@@ -85,6 +85,24 @@ depends on E4 landing first), 0017/0018 (curator-spec issues #54, #55).
 - Service: `STORY-260910-1py4f3` R2 memoization + cached health verdict,
   `STORY-260910-35tbgb` R3+P2 serve-time checkpoint gate
   (`TASK-260910-33j1hu` spec first).
+- `STORY-260916-1ll22r` absence-vs-read-failure collapse (environments §8.4):
+  inventory of every read site that maps an error to absence with a verdict
+  per site, one shared classification helper, a guard (analyzer, lint rule or
+  test) that fails the build when an `os.IsNotExist` branch swallows another
+  error class, vectors for unreadable-but-present markers, seeds, locks and
+  passthrough entries. Security-class correctness gap found at five sites over
+  three review cycles of the launcher/migration campaign.
+- `STORY-260916-8ql03k` profile install/reinstall defects
+  (`BUG-260916-3aco9f`, curator issue #73): `profile install` on an
+  already-recorded source drops `--use` and `--takeover`; every bug under the
+  story is fixed with a conformance vector and its issue closed with the
+  landed commit. Lives under `EPIC-260908-2wp8wn`.
+- `STORY-260916-12lbww` onboarding heuristic platform parity (environments
+  §9.5): one closed dotfile-manager table with macOS, Linux and Windows
+  locations per manager (chezmoi, home-manager, yadm, stow, dotbot at least),
+  each row verified or docs-confidence, declared in the spec first and read by
+  the implementation from the same table, vectors per platform. Lives under
+  `EPIC-260908-2wp8wn`.
 
 **Wave 4 — Low / Info:**
 - `STORY-260916-33vuzm` E7 launcher config ownership + symlink refusal.
