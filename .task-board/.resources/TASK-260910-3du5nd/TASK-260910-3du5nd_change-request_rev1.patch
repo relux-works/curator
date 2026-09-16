@@ -1,0 +1,1119 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index d15f7f1..6b9b724 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -14,6 +14,14 @@ Versioning for the complete specification set.
+   bounded operator-owned endpoint/authentication policy. Draft schemas and
+   conformance vectors are isolated from rc.9 release artifacts; no manager
+   implementation or release qualification is claimed.
++- Repository transport revision 2 (unreleased, opt-in): non-default endpoint
++  ports, operator-declared mirrors with exact-key `mirror_of` attestation and
++  operator-declared host aliases via source-policy schema 2, an additive
++  superset of unchanged schema 1. Canonical `host/path` stays the only portable
++  identity; new fail-closed classes `repository_mirror_undeclared` and
++  `repository_alias_unknown`; draft schemas and conformance vectors are
++  isolated from rc.9 release artifacts; no manager implementation or release
++  qualification is claimed.
+ 
+ ### Changed
+ 
+diff --git a/COMPATIBILITY.md b/COMPATIBILITY.md
+index ce53727..c25661a 100644
+--- a/COMPATIBILITY.md
++++ b/COMPATIBILITY.md
+@@ -236,5 +236,7 @@ and claims remain byte-frozen.
+ The separate [transport amendment](protocol/repository-transport.md) keeps
+ repository identity and pinned commit stable across authorized SSH/HTTPS
+ choices. Existing external build transport fields may still change receipt
+-identity; their security semantics are preserved. Advanced mappings remain
++identity; their security semantics are preserved. Revision 2 admits non-default
++ports, declared mirrors and operator host aliases as machine-policy endpoint
++properties; reusable alias registries and user-configuration import remain
+ unsupported. This draft is not a published protocol release.
+diff --git a/README.md b/README.md
+index 44c2ffc..56a50bd 100644
+--- a/README.md
++++ b/README.md
+@@ -62,7 +62,8 @@ an implementation is never the normative oracle.
+ [Skillfile sources revision 1](protocol/skillfile-sources.md) specifies local
+ and Git acquisition, individual/collection selection and frozen package identity.
+ The [transport amendment](protocol/repository-transport.md) separately defines
+-machine endpoint policy. See the [author/operator guide](docs/skillfile-sources.md),
++machine endpoint policy (revision 1 endpoints; revision 2 adds ports, declared
++mirrors and host aliases). See the [author/operator guide](docs/skillfile-sources.md),
+ [draft schemas](schemas/draft-sources-v1/README.md) and
+ [draft conformance checks](conformance/draft-sources-v1/README.md). These working
+ contracts do not change rc.9 release metadata or claim implementation support.
+diff --git a/UNRESOLVED_QUESTIONS.md b/UNRESOLVED_QUESTIONS.md
+index c3ce2d8..f17ab46 100644
+--- a/UNRESOLVED_QUESTIONS.md
++++ b/UNRESOLVED_QUESTIONS.md
+@@ -1,11 +1,21 @@
+ # Unresolved questions
+ 
+-## Advanced repository mappings (outside transport revision 1)
++## Advanced repository mappings decided by transport revision 2
+ 
+-Custom ports, mirrors, SSH host aliases, reusable logical alias registries and
+-safe translation of user `insteadOf`/SSH configuration require a separate
+-identity and authorization design. Revision 1 rejects these forms; matching
+-content alone does not authorize identity equivalence.
++Non-default endpoint ports, operator-declared mirrors and operator-declared
++host aliases are now decided normatively by [repository transport revision
++2](protocol/repository-transport.md) (source-policy schema 2, additive over
++schema 1). Ports are machine-policy endpoint properties stripped before
++canonicalization; mirrors require an exact-key `mirror_of` attestation;
++aliases resolve only from operator source-policy, never from user ssh/git
++configuration.
++
++## Still open: reusable alias registries and user-configuration import
++
++Reusable cross-machine logical alias registries and safe translation of user
++`insteadOf`/SSH configuration remain undecided and are rejected. Matching
++content alone does not authorize identity equivalence, and user configuration
++is usable only through explicit operator admission, unchanged from revision 1.
+ 
+ No source extension implementation or release qualification is claimed. A
+ future release must assign publication metadata and qualify implementations
+diff --git a/conformance/draft-sources-v1/README.md b/conformance/draft-sources-v1/README.md
+index 9c18e09..0d33cf7 100644
+--- a/conformance/draft-sources-v1/README.md
++++ b/conformance/draft-sources-v1/README.md
+@@ -6,7 +6,9 @@ and [transport amendment](../../protocol/repository-transport.md) define its
+ required outcomes. `index.json` lists structural positives and negatives;
+ `snapshot-cases.json` contains concrete byte inventories and expected hashes;
+ `semantic-cases.json` records required downstream resolver/filesystem/security
+-outcomes. These hand-authored draft files are not generator-owned rc.9 outputs.
++outcomes (`v2-*` cases cover transport revision 2: port, mirror and alias
++positives plus undeclared-mirror, unknown-alias and policy-misuse refusals).
++These hand-authored draft files are not generator-owned rc.9 outputs.
+ 
+ ## Specification checks
+ 
+diff --git a/conformance/draft-sources-v1/index.json b/conformance/draft-sources-v1/index.json
+index 4624af5..7c05418 100644
+--- a/conformance/draft-sources-v1/index.json
++++ b/conformance/draft-sources-v1/index.json
+@@ -508,5 +508,65 @@
+     "schema": "install-marker-v5.schema.json",
+     "instance": "schema-cases/install-marker-v5/valid-deprecated-network.json",
+     "valid": true
++  },
++  {
++    "schema": "source-policy-v2.schema.json",
++    "instance": "schema-cases/source-policy-v2/valid-port.json",
++    "valid": true
++  },
++  {
++    "schema": "source-policy-v2.schema.json",
++    "instance": "schema-cases/source-policy-v2/valid-mirror.json",
++    "valid": true
++  },
++  {
++    "schema": "source-policy-v2.schema.json",
++    "instance": "schema-cases/source-policy-v2/valid-alias.json",
++    "valid": true
++  },
++  {
++    "schema": "source-policy-v2.schema.json",
++    "instance": "schema-cases/source-policy-v2/valid-v1-shape.json",
++    "valid": true
++  },
++  {
++    "schema": "source-policy-v2.schema.json",
++    "instance": "schema-cases/source-policy-v2/invalid-unknown-top-level.json",
++    "valid": false
++  },
++  {
++    "schema": "source-policy-v2.schema.json",
++    "instance": "schema-cases/source-policy-v2/invalid-port-range.json",
++    "valid": false
++  },
++  {
++    "schema": "source-policy-v2.schema.json",
++    "instance": "schema-cases/source-policy-v2/invalid-port-leading-zero.json",
++    "valid": false
++  },
++  {
++    "schema": "source-policy-v2.schema.json",
++    "instance": "schema-cases/source-policy-v2/invalid-mirror-of-pattern.json",
++    "valid": false
++  },
++  {
++    "schema": "source-policy-v2.schema.json",
++    "instance": "schema-cases/source-policy-v2/invalid-alias-name.json",
++    "valid": false
++  },
++  {
++    "schema": "source-policy-v2.schema.json",
++    "instance": "schema-cases/source-policy-v2/invalid-alias-missing-auth.json",
++    "valid": false
++  },
++  {
++    "schema": "source-policy-v2.schema.json",
++    "instance": "schema-cases/source-policy-v2/invalid-alias-port-string.json",
++    "valid": false
++  },
++  {
++    "schema": "source-policy-v2.schema.json",
++    "instance": "schema-cases/source-policy-v2/invalid-endpoint-extra.json",
++    "valid": false
+   }
+ ]
+diff --git a/conformance/draft-sources-v1/schema-cases/source-policy-v2/invalid-alias-missing-auth.json b/conformance/draft-sources-v1/schema-cases/source-policy-v2/invalid-alias-missing-auth.json
+new file mode 100644
+index 0000000..23db996
+--- /dev/null
++++ b/conformance/draft-sources-v1/schema-cases/source-policy-v2/invalid-alias-missing-auth.json
+@@ -0,0 +1,20 @@
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "https://example.org/kit.git",
++          "authentication": "team-https",
++          "alias": "corp-mirror"
++        }
++      ],
++      "fallback": "none"
++    }
++  },
++  "aliases": {
++    "corp-mirror": {
++      "host": "mirror.corp.example"
++    }
++  }
++}
+diff --git a/conformance/draft-sources-v1/schema-cases/source-policy-v2/invalid-alias-name.json b/conformance/draft-sources-v1/schema-cases/source-policy-v2/invalid-alias-name.json
+new file mode 100644
+index 0000000..b8461b0
+--- /dev/null
++++ b/conformance/draft-sources-v1/schema-cases/source-policy-v2/invalid-alias-name.json
+@@ -0,0 +1,21 @@
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "https://example.org/kit.git",
++          "authentication": "team-https",
++          "alias": "corp-mirror"
++        }
++      ],
++      "fallback": "none"
++    }
++  },
++  "aliases": {
++    "Corp-Mirror": {
++      "host": "mirror.corp.example",
++      "authentication": "team-https"
++    }
++  }
++}
+diff --git a/conformance/draft-sources-v1/schema-cases/source-policy-v2/invalid-alias-port-string.json b/conformance/draft-sources-v1/schema-cases/source-policy-v2/invalid-alias-port-string.json
+new file mode 100644
+index 0000000..b848879
+--- /dev/null
++++ b/conformance/draft-sources-v1/schema-cases/source-policy-v2/invalid-alias-port-string.json
+@@ -0,0 +1,22 @@
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "https://example.org/kit.git",
++          "authentication": "team-https",
++          "alias": "corp-mirror"
++        }
++      ],
++      "fallback": "none"
++    }
++  },
++  "aliases": {
++    "corp-mirror": {
++      "host": "mirror.corp.example",
++      "port": "8443",
++      "authentication": "team-https"
++    }
++  }
++}
+diff --git a/conformance/draft-sources-v1/schema-cases/source-policy-v2/invalid-endpoint-extra.json b/conformance/draft-sources-v1/schema-cases/source-policy-v2/invalid-endpoint-extra.json
+new file mode 100644
+index 0000000..71d3a58
+--- /dev/null
++++ b/conformance/draft-sources-v1/schema-cases/source-policy-v2/invalid-endpoint-extra.json
+@@ -0,0 +1,15 @@
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "https://example.org/kit.git",
++          "authentication": "team-https",
++          "helper": "evil"
++        }
++      ],
++      "fallback": "none"
++    }
++  }
++}
+diff --git a/conformance/draft-sources-v1/schema-cases/source-policy-v2/invalid-mirror-of-pattern.json b/conformance/draft-sources-v1/schema-cases/source-policy-v2/invalid-mirror-of-pattern.json
+new file mode 100644
+index 0000000..63cea25
+--- /dev/null
++++ b/conformance/draft-sources-v1/schema-cases/source-policy-v2/invalid-mirror-of-pattern.json
+@@ -0,0 +1,15 @@
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "https://mirror.example.net/kit.git",
++          "authentication": "mirror-https",
++          "mirror_of": "Example.org/kit"
++        }
++      ],
++      "fallback": "none"
++    }
++  }
++}
+diff --git a/conformance/draft-sources-v1/schema-cases/source-policy-v2/invalid-port-leading-zero.json b/conformance/draft-sources-v1/schema-cases/source-policy-v2/invalid-port-leading-zero.json
+new file mode 100644
+index 0000000..dd3312e
+--- /dev/null
++++ b/conformance/draft-sources-v1/schema-cases/source-policy-v2/invalid-port-leading-zero.json
+@@ -0,0 +1,14 @@
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "ssh://git@example.org:0222/kit.git",
++          "authentication": "team-ssh"
++        }
++      ],
++      "fallback": "none"
++    }
++  }
++}
+diff --git a/conformance/draft-sources-v1/schema-cases/source-policy-v2/invalid-port-range.json b/conformance/draft-sources-v1/schema-cases/source-policy-v2/invalid-port-range.json
+new file mode 100644
+index 0000000..d86bc31
+--- /dev/null
++++ b/conformance/draft-sources-v1/schema-cases/source-policy-v2/invalid-port-range.json
+@@ -0,0 +1,14 @@
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "https://example.org:70000/kit.git",
++          "authentication": "team-https"
++        }
++      ],
++      "fallback": "none"
++    }
++  }
++}
+diff --git a/conformance/draft-sources-v1/schema-cases/source-policy-v2/invalid-unknown-top-level.json b/conformance/draft-sources-v1/schema-cases/source-policy-v2/invalid-unknown-top-level.json
+new file mode 100644
+index 0000000..0028355
+--- /dev/null
++++ b/conformance/draft-sources-v1/schema-cases/source-policy-v2/invalid-unknown-top-level.json
+@@ -0,0 +1,15 @@
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "ssh://git@example.org:2222/kit.git",
++          "authentication": "team-ssh"
++        }
++      ],
++      "fallback": "none"
++    }
++  },
++  "unexpected": true
++}
+diff --git a/conformance/draft-sources-v1/schema-cases/source-policy-v2/valid-alias.json b/conformance/draft-sources-v1/schema-cases/source-policy-v2/valid-alias.json
+new file mode 100644
+index 0000000..45654c4
+--- /dev/null
++++ b/conformance/draft-sources-v1/schema-cases/source-policy-v2/valid-alias.json
+@@ -0,0 +1,23 @@
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "https://example.org/kit.git",
++          "authentication": "team-https",
++          "alias": "corp-mirror",
++          "mirror_of": "example.org/kit"
++        }
++      ],
++      "fallback": "none"
++    }
++  },
++  "aliases": {
++    "corp-mirror": {
++      "host": "mirror.corp.example",
++      "port": 8443,
++      "authentication": "team-https"
++    }
++  }
++}
+diff --git a/conformance/draft-sources-v1/schema-cases/source-policy-v2/valid-mirror.json b/conformance/draft-sources-v1/schema-cases/source-policy-v2/valid-mirror.json
+new file mode 100644
+index 0000000..72d8f91
+--- /dev/null
++++ b/conformance/draft-sources-v1/schema-cases/source-policy-v2/valid-mirror.json
+@@ -0,0 +1,15 @@
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "https://mirror.example.net/kit.git",
++          "authentication": "mirror-https",
++          "mirror_of": "example.org/kit"
++        }
++      ],
++      "fallback": "none"
++    }
++  }
++}
+diff --git a/conformance/draft-sources-v1/schema-cases/source-policy-v2/valid-port.json b/conformance/draft-sources-v1/schema-cases/source-policy-v2/valid-port.json
+new file mode 100644
+index 0000000..2b5efc9
+--- /dev/null
++++ b/conformance/draft-sources-v1/schema-cases/source-policy-v2/valid-port.json
+@@ -0,0 +1,18 @@
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "ssh://git@example.org:2222/kit.git",
++          "authentication": "team-ssh"
++        },
++        {
++          "url": "https://example.org:8443/kit.git",
++          "authentication": "team-https"
++        }
++      ],
++      "fallback": "availability-auth"
++    }
++  }
++}
+diff --git a/conformance/draft-sources-v1/schema-cases/source-policy-v2/valid-v1-shape.json b/conformance/draft-sources-v1/schema-cases/source-policy-v2/valid-v1-shape.json
+new file mode 100644
+index 0000000..b2dc8f5
+--- /dev/null
++++ b/conformance/draft-sources-v1/schema-cases/source-policy-v2/valid-v1-shape.json
+@@ -0,0 +1,24 @@
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "git@example.org:kit.git",
++          "authentication": "team-ssh"
++        },
++        {
++          "url": "https://example.org/kit.git",
++          "authentication": "team-https"
++        }
++      ],
++      "fallback": "availability-auth"
++    }
++  },
++  "root_inputs": {
++    "local": [
++      "SKILL.md",
++      "scripts"
++    ]
++  }
++}
+diff --git a/conformance/draft-sources-v1/semantic-cases.json b/conformance/draft-sources-v1/semantic-cases.json
+index e0dc4ed..b0ca78e 100644
+--- a/conformance/draft-sources-v1/semantic-cases.json
++++ b/conformance/draft-sources-v1/semantic-cases.json
+@@ -812,5 +812,236 @@
+       "package": "local-snapshot"
+     },
+     "expected": "status-noncurrent-nonzero;repair-revalidate-exact-source-rebuild-not-adopt"
++  },
++  {
++    "id": "v2-port-endpoint",
++    "input": {
++      "transport_revision": 2,
++      "repository": "example.org/kit",
++      "endpoint": "https://example.org:8443/kit.git",
++      "lock_identity": "example.org/kit"
++    },
++    "expected": "attempt-listed-endpoint-once;port-stripped-for-identity;lock-records-canonical-identity-only"
++  },
++  {
++    "id": "v2-declared-mirror",
++    "input": {
++      "transport_revision": 2,
++      "repository": "example.org/kit",
++      "endpoint": "https://mirror.example.net/kit.git",
++      "mirror_of": "example.org/kit"
++    },
++    "expected": "attempt-listed-mirror-once;verify-locked-commit-tag-objects-identically-to-revision-1"
++  },
++  {
++    "id": "v2-mirror-first",
++    "input": {
++      "transport_revision": 2,
++      "repository": "example.org/kit",
++      "endpoints": [
++        "https://mirror.example.net/kit.git",
++        "https://example.org/kit.git"
++      ],
++      "mirror_of": "example.org/kit",
++      "fallback": "availability-auth",
++      "first_failure": "dns"
++    },
++    "expected": "mirror-first-allowed;ordinary-revision-1-fallback-applies;attempt-second"
++  },
++  {
++    "id": "v2-alias-resolution",
++    "input": {
++      "transport_revision": 2,
++      "repository": "example.org/kit",
++      "endpoint": "https://example.org/kit.git",
++      "alias": "corp-mirror",
++      "aliases": {
++        "corp-mirror": {
++          "host": "mirror.corp.example",
++          "port": 8443,
++          "authentication": "team-https"
++        }
++      },
++      "mirror_of": "example.org/kit"
++    },
++    "expected": "substitute-alias-once;connect-to-mirror.corp.example:8443;identity-stays-example.org/kit"
++  },
++  {
++    "id": "v2-reader-accepts-v1-policy",
++    "input": {
++      "transport_revision": 2,
++      "policy_schema_version": 1,
++      "policy": "valid-source-policy-v1-shape"
++    },
++    "expected": "accept-with-revision-1-semantics"
++  },
++  {
++    "id": "v2-undeclared-mirror",
++    "input": {
++      "transport_revision": 2,
++      "repository": "example.org/kit",
++      "endpoint": "https://evil.example.net/kit.git",
++      "mirror_of": null
++    },
++    "expected": "repository_mirror_undeclared;zero-attempts;no-fallback"
++  },
++  {
++    "id": "v2-pin-port-mismatch",
++    "input": {
++      "transport_revision": 2,
++      "repository": "example.org/kit",
++      "endpoints": [
++        "https://example.org/kit.git"
++      ],
++      "pin": "https://example.org:8443/kit.git"
++    },
++    "expected": "repository_policy_invalid;pin-must-equal-listed-url-exactly-including-port;zero-attempts"
++  },
++  {
++    "id": "v2-alias-unknown",
++    "input": {
++      "transport_revision": 2,
++      "repository": "example.org/kit",
++      "endpoint": "https://example.org/kit.git",
++      "alias": "absent-alias",
++      "aliases": {}
++    },
++    "expected": "repository_alias_unknown;zero-attempts;no-fallback"
++  },
++  {
++    "id": "v2-alias-mirror-undeclared",
++    "input": {
++      "transport_revision": 2,
++      "repository": "example.org/kit",
++      "endpoint": "https://example.org/kit.git",
++      "alias": "corp-mirror",
++      "aliases": {
++        "corp-mirror": {
++          "host": "mirror.corp.example",
++          "authentication": "team-https"
++        }
++      },
++      "mirror_of": null
++    },
++    "expected": "repository_mirror_undeclared;alias-target-host-differs-without-attestation;zero-attempts"
++  },
++  {
++    "id": "v2-user-ssh-alias-ignored",
++    "input": {
++      "transport_revision": 2,
++      "repository": "example.org/kit",
++      "declaration": "logical",
++      "policy_entry": null,
++      "user_ssh_config": "Host example.org; HostName real.example.net"
++    },
++    "expected": "user-config-never-consulted;repository_endpoint_unavailable"
++  },
++  {
++    "id": "v2-user-insteadof-ignored",
++    "input": {
++      "transport_revision": 2,
++      "declaration": "https://example.org/kit.git",
++      "policy_entry": null,
++      "user_git_config": "url.insteadOf rewrites example.org to evil.example.net"
++    },
++    "expected": "attempt-declared-url-once-literally;insteadOf-never-applied"
++  },
++  {
++    "id": "v2-embedded-alias-host",
++    "input": {
++      "transport_revision": 2,
++      "repository": "example.org/kit",
++      "endpoint": "ssh://git@corp-mirror/kit.git",
++      "aliases": {
++        "corp-mirror": {
++          "host": "mirror.corp.example",
++          "authentication": "team-ssh"
++        }
++      }
++    },
++    "expected": "repository_policy_invalid;alias-named-only-via-alias-field-never-as-url-host;zero-attempts"
++  },
++  {
++    "id": "v2-alias-auth-mismatch",
++    "input": {
++      "transport_revision": 2,
++      "repository": "example.org/kit",
++      "endpoint": "https://example.org/kit.git",
++      "endpoint_authentication": "team-https",
++      "alias": "corp-mirror",
++      "aliases": {
++        "corp-mirror": {
++          "host": "example.org",
++          "authentication": "other-provider"
++        }
++      }
++    },
++    "expected": "repository_policy_invalid;alias-authentication-must-equal-endpoint-authentication;zero-attempts"
++  },
++  {
++    "id": "v2-alias-chain",
++    "input": {
++      "transport_revision": 2,
++      "repository": "example.org/kit",
++      "endpoint": "https://example.org/kit.git",
++      "alias": "first",
++      "aliases": {
++        "first": {
++          "host": "second",
++          "authentication": "team-https"
++        },
++        "second": {
++          "host": "example.org",
++          "authentication": "team-https"
++        }
++      }
++    },
++    "expected": "repository_policy_invalid;alias-target-must-be-concrete-never-another-alias;zero-attempts"
++  },
++  {
++    "id": "v2-double-port",
++    "input": {
++      "transport_revision": 2,
++      "repository": "example.org/kit",
++      "endpoint": "https://example.org:8443/kit.git",
++      "alias": "corp-mirror",
++      "aliases": {
++        "corp-mirror": {
++          "host": "example.org",
++          "port": 9443,
++          "authentication": "team-https"
++        }
++      }
++    },
++    "expected": "repository_policy_invalid;url-port-and-alias-port-must-not-both-be-present;zero-attempts"
++  },
++  {
++    "id": "v2-spurious-mirror-of",
++    "input": {
++      "transport_revision": 2,
++      "repository": "example.org/kit",
++      "endpoint": "https://example.org/kit.git",
++      "mirror_of": "example.org/kit"
++    },
++    "expected": "repository_policy_invalid;mirror_of-forbidden-when-host-equals-key-host;zero-attempts"
++  },
++  {
++    "id": "v2-mirror-of-mismatch",
++    "input": {
++      "transport_revision": 2,
++      "repository": "example.org/kit",
++      "endpoint": "https://mirror.example.net/kit.git",
++      "mirror_of": "other.example/kit"
++    },
++    "expected": "repository_policy_invalid;mirror_of-must-equal-entry-key-exactly;zero-attempts"
++  },
++  {
++    "id": "v2-v1-reader-rejects-v2-policy",
++    "input": {
++      "transport_revision": 1,
++      "policy_schema_version": 2,
++      "policy": "valid-source-policy-v2-shape"
++    },
++    "expected": "repository_policy_invalid;no-silent-field-ignoring;zero-attempts"
+   }
+ ]
+diff --git a/docs/skillfile-sources.md b/docs/skillfile-sources.md
+index a3a7600..033b547 100644
+--- a/docs/skillfile-sources.md
++++ b/docs/skillfile-sources.md
+@@ -115,6 +115,37 @@ and locked commit stay identical. Configure the named authentication providers
+ through the manager's existing operator mechanism. Never put secrets in these
+ objects. TLS, host-key, integrity, ref and audit failures forbid fallback.
+ 
++Revision 2 (`schema_version: 2`, only on a manager that explicitly supports
++it) adds non-default ports, declared mirrors and host aliases as
++machine-policy endpoint properties. The canonical identity, declaration and
++lock stay identical:
++
++```json
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {"url": "ssh://git@example.org:2222/kit.git", "authentication": "team-ssh"},
++        {"url": "https://example.org/kit.git", "authentication": "team-https",
++         "alias": "corp-mirror", "mirror_of": "example.org/kit"}
++      ],
++      "fallback": "availability-auth"
++    }
++  },
++  "aliases": {
++    "corp-mirror": {"host": "mirror.corp.example", "port": 8443,
++                    "authentication": "team-https"}
++  }
++}
++```
++
++Ports are stripped before identity comparison. A mirror host needs
++`mirror_of` naming the entry key. An alias is named via the `alias` field
++(never embedded in the URL) and its authentication must equal the endpoint's.
++Package declarations never name aliases; user ssh/git configuration is never
++imported.
++
+ For a package at the project root, explicitly admit its disjoint inputs through
+ `root_inputs`, for example `{"project":["SKILL.md","agent-skill.json",
+ "references","scripts","build"]}` in source-policy.json. Listed files and
+diff --git a/protocol/repository-transport.md b/protocol/repository-transport.md
+index 441936d..ce97c1d 100644
+--- a/protocol/repository-transport.md
++++ b/protocol/repository-transport.md
+@@ -1,4 +1,4 @@
+-# Repository transport revision 1 (unreleased)
++# Repository transport revisions 1 and 2 (unreleased)
+ 
+ This normative opt-in `repository-transport-v1` amendment is separate from
+ [local source acquisition](skillfile-sources.md). It specifies machine endpoint
+@@ -7,6 +7,12 @@ when the manager explicitly supports this amendment. It does not change legacy
+ wire schemas or broaden a lane's admitted endpoint grammar. It is not a
+ published release or an implementation claim.
+ 
++Revision 1 is specified in sections 1–3 below and is unchanged by revision 2.
++Revision 2 (sections 4–7) is a separately scoped normative opt-in
++`repository-transport-v2` amendment deciding the advanced endpoint mappings
++that revision 1 left undecided. A reader MUST explicitly support each revision
++it accepts; revision 1 support alone MUST NOT accept revision 2 policy.
++
+ ## 1. Identity and declarations
+ 
+ Canonical repository identity remains core 6.1 `host/path`: lowercase host,
+@@ -103,5 +109,183 @@ substitutions keep their own rules and strict-audit rejection.
+ This revision adds no new fields to published skill build repositories or other
+ package manifests. Such lanes can use their existing URL declaration and an
+ admitted machine policy; the logical `repository` spelling is admitted only in
+-new Skillfile source objects. Advanced mappings remain explicitly undecided in
++new Skillfile source objects. The advanced endpoint mappings (non-default
++ports, mirrors, host aliases) are decided by revision 2 below; the remaining
++open items are tracked in
+ [UNRESOLVED_QUESTIONS.md](../UNRESOLVED_QUESTIONS.md).
++
++## 4. Revision 2 scope and schema versioning
++
++Revision 2 decides the advanced endpoint mappings that revision 1 left
++undecided: explicit non-default ports on listed endpoints, operator-declared
++mirrors, and operator-declared host aliases. It specifies machine endpoint
++properties only; like revision 1 it applies to new Skillfile sources and to
++existing Git acquisition lanes only when the manager explicitly supports this
++amendment. It is not a published release or an implementation claim.
++
++Source-policy schema 2 (`source-policy-v2.schema.json`,
++`schema_version: 2`) is a new file and an additive superset of schema 1: every
++schema-1 `repositories`/`root_inputs` shape is valid under schema 2 with
++`schema_version: 2`, extended with optional per-endpoint `mirror_of` and
++`alias` fields, an optional top-level `aliases` table, and an endpoint/`pin`
++URL grammar admitting explicit ports. A new `schema_version` value is used
++instead of optional fields under schema 1 because the version is a const
++discriminator: forking the shape under one value would split the meaning of
++"schema 1", while a revision 1 reader already fails a schema-2 document closed
++(`additionalProperties: false` and the const reject unknown members and the
++unknown version) instead of silently ignoring endpoint properties it cannot
++enforce. Schema 1 is byte-unchanged. A revision 2 reader MUST also accept
++schema-1 documents with revision 1 semantics; a revision 1 reader MUST reject
++a schema-2 document as `repository_policy_invalid` before any network I/O.
++
++No other schema changes: Skillfile schema 2, lock schema 1, marker schema 5,
++receipt schema 3, audit schema 1, every published manifest and every lane
++declaration grammar are unchanged. Core sections 6.1 and 6.3 are unchanged:
++ports, mirrors and aliases do not widen any acquisition lane's admitted
++declaration grammar. For a lane used under revision 2, the lane grammar still
++governs package declarations while the endpoint grammar of section 5 governs
++listed policy endpoints. A listed endpoint whose transport form or path
++characters fall outside the lane's grammar remains an error per revision 1,
++not a skipped candidate.
++
++## 5. Revision 2 identity, ports, mirrors and host aliases
++
++Canonical `host/path` (lowercase host, no port, no username, no terminal
++`.git`) remains the only portable repository identity. Ports, mirrors and
++aliases are machine-policy endpoint properties and MUST NOT enter package
++manifests, the portable Skillfile lock, receipts' portable identity, marker
++package identity, or allowlist matching; allowlists match canonical identity
++only. A port MUST NOT change receipt or cache identity beyond the existing
++declared/effective `https`/`ssh` transport enum: it is a connection property
++of the same endpoint transport, and the verified content (locked commit) is
++identical.
++
++An `endpoints[]` URL or `pin` MAY carry an explicit port only in URI form:
++`https://host[:port]/path` and `ssh://[user@]host[:port]/path`, where the port
++is decimal `1`–`65535` with no leading zeros. All other revision 1 URL rules
++are unchanged: no userinfo on HTTPS, optional ASCII SSH username, no dot
++components, no query/fragment/escapes. Scp-like `git@host:path` carries no
++port; the segment after `:` is always the path, so `git@host:2222/repo.git`
++names path `2222/repo.git`, never port 2222. Canonicalization strips an
++explicit port first and then applies the core 6.1 rules; the stripped endpoint
++still MUST satisfy the section 6 checks against the exact entry key. `pin`
++comparison is exact listed-URL string equality with the port included, so a
++pin that differs only by port fails before network I/O.
++
++An endpoint whose URL host (lowercased) differs from the entry-key host is a
++mirror. It is admitted only when the entry lists it explicitly under that
++exact canonical key with `mirror_of` equal to the key exactly. `mirror_of`
++MUST be present if and only if the URL host differs from the key host: a
++differing host without it fails `repository_mirror_undeclared`; a value not
++equal to the key, or a spurious attestation on a same-host endpoint, fails
++`repository_policy_invalid`. Mirrors are ordinary endpoints once declared: a
++mirror MAY be first in list order, and `pin`/`fallback` semantics are
++unchanged from revision 1. The manager MUST verify the locked commit and exact
++tag objects for a mirror identically to revision 1, and MUST NOT infer,
++generate, or discover mirrors: no generated URLs, no probing, no
++redirect-following to an unlisted host. A mirror attestation authorizes the
++listed host only.
++
++Host aliases are declared only in the operator-owned `aliases` table mapping
++an alias name to `{host, port?, authentication}`: a concrete target host, an
++optional port `1`–`65535`, and the authentication provider for connections via
++this alias. Alias names and target hosts MUST be lowercase
++`[a-z0-9][a-z0-9.-]*` and match case-sensitively and exactly. An endpoint
++names an alias only through its `alias` field; a URL host that equals an alias
++key fails `repository_policy_invalid` and is never substituted implicitly. At
++most one substitution applies: the connection goes to the alias host with the
++alias port when present, else the URL port when present, else the transport
++default. The alias target MUST be concrete: a target that is itself an alias
++key (chaining) fails `repository_policy_invalid`. A URL port and an alias
++port MUST NOT both be present. The alias `authentication` MUST equal the
++endpoint `authentication`: one provider per attempt, with no precedence rule
++to misimplement. An `alias` that names no table entry fails
++`repository_alias_unknown`. Repository identity always derives from the
++endpoint URL, never from the alias target; when the alias target host differs
++from the entry-key host, the endpoint additionally requires `mirror_of` equal
++to the key (alias routing to another host is a mirror declaration), else
++`repository_mirror_undeclared`. Package declarations stay canonical and
++logical: Skillfile `git`/`repository` fields and legacy lane declarations
++MUST NOT name aliases. User `~/.ssh/config` Host aliases, `insteadOf`,
++`ProxyCommand`, `core.sshCommand`, helpers, include files and environment
++overrides remain NOT imported.
++
++## 6. Revision 2 resolution, failure classes and attempt bounds
++
++Resolution for a schema-2 entry runs in this order, with every structural
++check failing before any network I/O for the entry: validate the policy
++document (invalid or unreadable fails `repository_policy_invalid`, never
++treated as absent); select the entry by exact canonical identity (absent
++entry keeps revision 1 behavior); per endpoint in list order, validate the
++section 5 URL grammar, reject an embedded alias host, resolve the `alias`
++field, canonicalize the URL with the port stripped, and apply the mirror and
++alias-target checks; then apply `pin` selection. `pin` selects exactly one
++listed endpoint by exact string equality and forbids fallback irrespective of
++the `fallback` value. A URL hint never reorders an explicit machine list.
++
++There is at most one attempt per listed endpoint (maximum two total), no
++implicit retry, and the existing lane's total deadline includes both attempts.
++The two-endpoint cap is unchanged from revision 1: ports, mirrors and aliases
++are properties of an endpoint, not new failure classes needing more attempts,
++so raising the cap would widen the network blast radius and invalidate
++revision 1 deadline accounting without authorizing any new identity. The
++revision 1 failure-classification table applies unchanged, extended only by
++these fail-closed rows (zero attempts, no fallback, no cache shortcut):
++
++| Failure | Result |
++|---|---|
++| Endpoint or alias-target host differs from the key host without `mirror_of` | `repository_mirror_undeclared`, forbidden |
++| `alias` names no entry in the policy alias table | `repository_alias_unknown`, forbidden |
++| `mirror_of` or alias misuse (`mirror_of` mismatch, spurious attestation, embedded alias host, chained alias, double port, authentication mismatch, pin mismatch) | `repository_policy_invalid`, forbidden |
++
++Mirror, port and alias properties add no fallback-allowed class: a declared
++mirror or aliased endpoint that fails with an availability/authentication
++error follows the ordinary revision 1 `availability-auth` rule, and every
++fail-closed class terminates acquisition without alternate network traffic.
++
++## 7. Revision 2 secrets, provenance, compatibility and external builds
++
++Secret handling is unchanged from revision 1: no passwords, tokens, or
++credential references in shared or policy objects; credentials stay in the
++existing trusted broker; nothing is exported or persisted in manifests,
++locks, receipts, logs, command arguments or worker environments; no fallback
++disables certificate or host-key validation.
++
++Sanitized endpoint provenance, including the listed URL with its port, the
++resolved connection host and port, the alias name when used and the
++`mirror_of` attestation when used, is recorded in machine-private operation
++diagnostics only, separately from portable identity. It MUST NOT enter the
++lock, receipts, markers, manifests or any portable artifact.
++
++Compatibility: revision 1 readers reject schema-2 documents closed; revision
++2 readers accept schema-1 documents with revision 1 semantics; schema 1,
++locks, manifests and receipts are unchanged, so portable artifacts stay
++identical across machines regardless of endpoint properties. No acquisition
++lane declaration grammar is widened.
++
++In external build receipt inputs the existing declared/effective transport
++fields keep recording the actual permitted endpoint transport (`https`/`ssh`)
++with no port field added. Manager section 11 remains stricter: the trusted
++Git distribution, clean configuration/environment, closed process graph, SSH
++wrapper, per-host broker, exact-ref fetch, raw-object parser and
++no-package-execution boundaries remain mandatory for every revision 2
++endpoint attempt. Auth-provider admission feeds that broker, not Git helper
++execution or compiler inheritance. Existing committed-HEAD development
++substitutions keep their own rules and strict-audit rejection.
++
++Conformance vectors live under
++[the draft source namespace](../conformance/draft-sources-v1/README.md):
++schema cases in `schema-cases/source-policy-v2/` (four positives: port,
++declared mirror, alias resolution, revision-1 shape under schema 2; eight
++negatives: unknown top-level member, out-of-range port, leading-zero port,
++malformed `mirror_of`, malformed alias name, alias missing authentication,
++string alias port, extra endpoint member) indexed in `index.json`, and
++`semantic-cases.json` cases `v2-port-endpoint`, `v2-declared-mirror`,
++`v2-mirror-first`, `v2-alias-resolution` and `v2-reader-accepts-v1-policy`
++(positive) and `v2-undeclared-mirror`, `v2-pin-port-mismatch`,
++`v2-alias-unknown`, `v2-alias-mirror-undeclared`,
++`v2-user-ssh-alias-ignored`, `v2-user-insteadof-ignored`,
++`v2-embedded-alias-host`, `v2-alias-auth-mismatch`, `v2-alias-chain`,
++`v2-double-port`, `v2-spurious-mirror-of`, `v2-mirror-of-mismatch` and
++`v2-v1-reader-rejects-v2-policy` (refusal). No manager implementation or
++release qualification is claimed.
+diff --git a/protocol/skillfile-sources.md b/protocol/skillfile-sources.md
+index 89d1a16..c01bde3 100644
+--- a/protocol/skillfile-sources.md
++++ b/protocol/skillfile-sources.md
+@@ -4,7 +4,7 @@ This is the normative, opt-in `skillfile-sources-v1` extension. It is an
+ unreleased working specification, not part of the rc.9 release or a claim that
+ any manager implements it. It extends core sections 3, 5–6 and 8–10 and manager sections
+ 2–3 and 7 only for Skillfile schema 2. The separately scoped transport amendment is
+-[repository transport revision 1](repository-transport.md).
++[repository transport revisions 1 and 2](repository-transport.md).
+ Schemas live in [the draft source namespace](../schemas/draft-sources-v1/README.md).
+ A reader MUST explicitly support the extension before accepting schema 2.
+ All other core, registry, audit, assurance and manager requirements remain in
+diff --git a/schemas/draft-sources-v1/README.md b/schemas/draft-sources-v1/README.md
+index 80e3fc5..6ca0d9d 100644
+--- a/schemas/draft-sources-v1/README.md
++++ b/schemas/draft-sources-v1/README.md
+@@ -1,7 +1,8 @@
+ # Unreleased source extension schemas
+ 
+ These Draft 2020-12 schemas belong to `skillfile-sources-v1` and the separately
+-scoped `repository-transport-v1` amendment. The directory is a draft namespace,
++scoped `repository-transport-v1` and `repository-transport-v2` amendments.
++The directory is a draft namespace,
+ not a new protocol release. It keeps the rc.9 schema corpus and generated
+ release identities byte-frozen. The `v1` in this directory versions the
+ extension namespace; each wire object's filename and `schema_version` identify
+@@ -14,6 +15,7 @@ its own revision. Existing core definitions are reused by relative references.
+ | `source-types-v1` | Shared selector and disjoint package identity definitions |
+ | `local-snapshot-v1` | Deterministic admitted-file inventory |
+ | `source-policy-v1` | Operator endpoint/auth policy and explicit root inputs |
++| `source-policy-v2` | Revision 2 policy: explicit ports, `mirror_of` mirrors, operator host aliases |
+ | `install-marker-v5` | Installed package/lock identity and runtime/build references |
+ | `build-receipt-v3` | Package-bound wrapper around existing closed build inputs |
+ | `source-audit-v1` | Machine audit report binding, not a registry attestation |
+diff --git a/schemas/draft-sources-v1/source-policy-v2.schema.json b/schemas/draft-sources-v1/source-policy-v2.schema.json
+new file mode 100644
+index 0000000..06096d7
+--- /dev/null
++++ b/schemas/draft-sources-v1/source-policy-v2.schema.json
+@@ -0,0 +1,137 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://relux-works.github.io/curator-spec/schemas/draft-sources-v1/source-policy-v2.schema.json",
++  "type": "object",
++  "$defs": {
++    "canonicalIdentity": {
++      "type": "string",
++      "maxLength": 4096,
++      "pattern": "^[a-z0-9][a-z0-9.-]*/(?!.*(?:^|/)\\.{1,2}(?:/|$))[^\\s\\\\:%?#/]+(?:/[^\\s\\\\:%?#/]+)*$"
++    },
++    "aliasName": {
++      "type": "string",
++      "minLength": 1,
++      "maxLength": 253,
++      "pattern": "^[a-z0-9][a-z0-9.-]*$"
++    },
++    "aliasHost": {
++      "type": "string",
++      "minLength": 1,
++      "maxLength": 253,
++      "pattern": "^[a-z0-9][a-z0-9.-]*$"
++    },
++    "port": {
++      "type": "integer",
++      "minimum": 1,
++      "maximum": 65535
++    },
++    "endpointUrlV2": {
++      "type": "string",
++      "minLength": 1,
++      "maxLength": 4096,
++      "pattern": "^(?:https://[A-Za-z0-9][A-Za-z0-9.-]*(?::(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?/(?!(?:\\.{1,2})(?:/|$))[^\\s%?#\\\\/:\\u0000-\\u001f\\u007f-\\u009f]+(?:/(?!(?:\\.{1,2})(?:/|$))[^\\s%?#\\\\/:\\u0000-\\u001f\\u007f-\\u009f]+)*|ssh://(?:[A-Za-z0-9][A-Za-z0-9._-]{0,63}@)?[A-Za-z0-9][A-Za-z0-9.-]*(?::(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?/(?!(?:\\.{1,2})(?:/|$))[A-Za-z0-9._-]+(?:/(?!(?:\\.{1,2})(?:/|$))[A-Za-z0-9._-]+)*|(?:[A-Za-z0-9][A-Za-z0-9._-]{0,63}@)?[A-Za-z0-9][A-Za-z0-9.-]*:(?!(?:\\.{1,2})(?:/|$))[A-Za-z0-9._-]+(?:/(?!(?:\\.{1,2})(?:/|$))[A-Za-z0-9._-]+)*)$"
++    }
++  },
++  "properties": {
++    "schema_version": {
++      "const": 2
++    },
++    "repositories": {
++      "type": "object",
++      "propertyNames": {
++        "$ref": "#/$defs/canonicalIdentity"
++      },
++      "additionalProperties": {
++        "type": "object",
++        "properties": {
++          "endpoints": {
++            "type": "array",
++            "items": {
++              "type": "object",
++              "properties": {
++                "url": {
++                  "$ref": "#/$defs/endpointUrlV2"
++                },
++                "authentication": {
++                  "$ref": "../v1/common.schema.json#/$defs/identifier"
++                },
++                "mirror_of": {
++                  "$ref": "#/$defs/canonicalIdentity"
++                },
++                "alias": {
++                  "$ref": "#/$defs/aliasName"
++                }
++              },
++              "required": [
++                "url",
++                "authentication"
++              ],
++              "additionalProperties": false
++            },
++            "minItems": 1,
++            "maxItems": 2,
++            "uniqueItems": true
++          },
++          "pin": {
++            "$ref": "#/$defs/endpointUrlV2"
++          },
++          "fallback": {
++            "enum": [
++              "none",
++              "availability-auth"
++            ]
++          }
++        },
++        "required": [
++          "endpoints",
++          "fallback"
++        ],
++        "additionalProperties": false
++      }
++    },
++    "aliases": {
++      "type": "object",
++      "propertyNames": {
++        "$ref": "#/$defs/aliasName"
++      },
++      "additionalProperties": {
++        "type": "object",
++        "properties": {
++          "host": {
++            "$ref": "#/$defs/aliasHost"
++          },
++          "port": {
++            "$ref": "#/$defs/port"
++          },
++          "authentication": {
++            "$ref": "../v1/common.schema.json#/$defs/identifier"
++          }
++        },
++        "required": [
++          "host",
++          "authentication"
++        ],
++        "additionalProperties": false
++      }
++    },
++    "root_inputs": {
++      "type": "object",
++      "propertyNames": {
++        "$ref": "../v1/common.schema.json#/$defs/identifier"
++      },
++      "additionalProperties": {
++        "type": "array",
++        "minItems": 1,
++        "uniqueItems": true,
++        "items": {
++          "$ref": "../v1/common.schema.json#/$defs/portablePath"
++        }
++      }
++    }
++  },
++  "required": [
++    "schema_version",
++    "repositories"
++  ],
++  "additionalProperties": false
++}
