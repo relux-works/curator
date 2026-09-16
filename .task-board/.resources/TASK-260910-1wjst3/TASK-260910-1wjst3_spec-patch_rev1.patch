@@ -1,0 +1,442 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 3f3411f..d5c7485 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -7,6 +7,28 @@ Versioning for the complete specification set.
+ 
+ ### Added
+ 
++- S6: shell-hook project env trust gate (manager profile section 8):
++  the cached hook sources only `.agents/env.sh` / `.agents/env.ps1`
++  bytes whose digest the manager recorded (`manager`) or the operator
++  approved once (`curator hook approve <path>`); an unknown file, or a
++  recorded file whose digest changed, warns once per shell session with
++  `shell_hook_env_unapproved` / `shell_hook_env_changed`, naming the path
++  and the approval command, and continues. Approval records
++  `{ path, sha256, approved_by: manager | operator, approved_at }` live
++  in manager-home shell-hook approval state below `<manager-home>`,
++  outside every profile/package/project surface and never read from
++  package, project, or profile data; `sha256` is lowercase hex SHA-256
++  over the exact bytes sourced; re-approval is required after a change.
++  `curator hook approvals` lists records read-only and
++  `curator hook revoke <path>` removes one; `curator status` and
++  `curator env status` report each known file as approved, unapproved, or
++  changed. Warn-first rollout in two labelled revisions: Revision A
++  (`A-warning`, warning release, old sourcing kept with the warning and a
++  migration hint naming the approval command, shipped first), then
++  Revision B (`B-enforcing`, flip release, unapproved/changed files are
++  not sourced). Vectors:
++  `conformance/v1/vectors/shell-hook-trust.json` (approved, unapproved,
++  and changed files under both rollout profiles for both env files).
+ - Opt-in Skillfile sources revision 1: backwards-compatible project schema 2,
+   local/Git acquisition, individual and collection selection, frozen package
+   identities, physical input/output guards and full runtime/build contracts.
+diff --git a/cli/curator.md b/cli/curator.md
+index f6b1770..8431cda 100644
+--- a/cli/curator.md
++++ b/cli/curator.md
+@@ -47,6 +47,9 @@ identifiers.
+ | `curator repair [target] [--all] [--audit [advisory\|strict]]` | rc.5 command contract: reacquire, audit, and restore non-current managed state |
+ | `curator gc` | Collect unreferenced machine state |
+ | `curator shell-init [auto\|zsh\|bash\|powershell] [--install] [--no-global]` | Print or cache optional shell integration |
++| `curator hook approve <path>` | Record approval for one project env file (`.agents/env.sh` or `.agents/env.ps1`): stores the absolute path with the digest of its current bytes as `approved_by: operator`; re-run after the file changes |
++| `curator hook approvals` | List every shell-hook approval record read-only (path, digest, approver, time) |
++| `curator hook revoke <path>` | Remove the shell-hook approval record for one absolute path |
+ 
+ Exit code 0 is success, including a syntax-only check that emitted only
+ warnings. Exit code 1 is an operation failure, security-policy block, partial
+@@ -94,6 +97,15 @@ The cached hook is sourced without starting Curator on each shell launch.
+ `CURATOR_AUTO_ENV=0` disables project-directory scanning while retaining
+ global activation. Curator never edits a shell profile automatically.
+ 
++The hook sources a project `.agents/env.sh` or `.agents/env.ps1` only
++when its bytes are trusted under manager-profile section 8 (a
++manager-recorded digest or an operator approval via
++`curator hook approve <path>`). An unknown file, or a recorded file
++whose digest changed, warns once per shell session with
++`shell_hook_env_unapproved` or `shell_hook_env_changed`, naming the path
++and the approval command; re-approval is required after a change. See
++`curator hook approvals` for the recorded set.
++
+ ## CI example
+ 
+ Pin a released Curator version using the platform package or verified release
+diff --git a/conformance/v1/manifest.json b/conformance/v1/manifest.json
+index 88cd89d..6637943 100644
+--- a/conformance/v1/manifest.json
++++ b/conformance/v1/manifest.json
+@@ -4176,6 +4176,10 @@
+       "path": "vectors/script-host-execution-policy.json",
+       "sha256": "sha256:35a58adc2df68bca8c89a042cbd617d76121a58601237de19013a62c5976617d"
+     },
++    {
++      "path": "vectors/shell-hook-trust.json",
++      "sha256": "sha256:26a0d1c74aab3ecebe2536d83708cbcde330491ccc6a63d8351e7474a50d7a20"
++    },
+     {
+       "path": "vectors/skill-manifest-resolution.json",
+       "sha256": "sha256:07c42987cdfcbdb0b78a0149373ad8b49ac2d1d70a5484b4e42a54e20586647c"
+diff --git a/conformance/v1/vectors/shell-hook-trust.json b/conformance/v1/vectors/shell-hook-trust.json
+new file mode 100644
+index 0000000..35586c3
+--- /dev/null
++++ b/conformance/v1/vectors/shell-hook-trust.json
+@@ -0,0 +1,209 @@
++{
++  "approval_record_shape": {
++    "approved_at": "RFC 3339 timestamp at which the digest was recorded",
++    "approved_by": [
++      "manager",
++      "operator"
++    ],
++    "members": [
++      "path",
++      "sha256",
++      "approved_by",
++      "approved_at"
++    ],
++    "path": "absolute project env file path the record authorizes",
++    "sha256": "lowercase hex SHA-256 over the exact bytes sourced, 64 characters, no prefix",
++    "storage": "manager-home shell-hook approval state below <manager-home>, outside every profile, package, and project surface; never read from package, project, or profile data"
++  },
++  "capability": "shell-hook-trust",
++  "commands": [
++    "curator hook approve <path>",
++    "curator hook approvals",
++    "curator hook revoke <path>"
++  ],
++  "diagnostics": [
++    "shell_hook_env_unapproved",
++    "shell_hook_env_changed"
++  ],
++  "example_record": {
++    "approved_at": "2026-09-16T00:00:00Z",
++    "approved_by": "manager",
++    "path": "/project/.agents/env.sh",
++    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
++  },
++  "files": [
++    ".agents/env.sh",
++    ".agents/env.ps1"
++  ],
++  "finding": "S6",
++  "protocol_version": "1.0.0-rc.9",
++  "rollout_profiles": [
++    {
++      "description": "Revision A warning release: sources unapproved and changed files but emits the diagnostic with a migration hint naming curator hook approve <path>; shipped first",
++      "name": "A-warning",
++      "sources_changed": true,
++      "sources_unapproved": true
++    },
++    {
++      "description": "Revision B flip release: does not source unapproved or changed files; warns once per shell session naming the path and curator hook approve <path>, then continues",
++      "name": "B-enforcing",
++      "sources_changed": false,
++      "sources_unapproved": false
++    }
++  ],
++  "cases": [
++    {
++      "approval": "present-match",
++      "approved_by": "manager",
++      "diagnostic": null,
++      "file": ".agents/env.sh",
++      "migration_hint_names_approval_command": false,
++      "name": "approved-env-sh-A-warning-sourced",
++      "observed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
++      "recorded_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
++      "rollout_profile": "A-warning",
++      "sourced": true,
++      "warns_once_per_shell_session": false
++    },
++    {
++      "approval": "present-match",
++      "approved_by": "manager",
++      "diagnostic": null,
++      "file": ".agents/env.sh",
++      "migration_hint_names_approval_command": false,
++      "name": "approved-env-sh-B-enforcing-sourced",
++      "observed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
++      "recorded_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
++      "rollout_profile": "B-enforcing",
++      "sourced": true,
++      "warns_once_per_shell_session": false
++    },
++    {
++      "approval": "absent",
++      "diagnostic": "shell_hook_env_unapproved",
++      "file": ".agents/env.sh",
++      "migration_hint_names_approval_command": true,
++      "name": "unapproved-env-sh-A-warning-sourced-with-warning",
++      "observed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
++      "recorded_sha256": null,
++      "rollout_profile": "A-warning",
++      "sourced": true,
++      "warns_once_per_shell_session": true
++    },
++    {
++      "approval": "absent",
++      "diagnostic": "shell_hook_env_unapproved",
++      "file": ".agents/env.sh",
++      "migration_hint_names_approval_command": true,
++      "name": "unapproved-env-sh-B-enforcing-not-sourced",
++      "observed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
++      "recorded_sha256": null,
++      "rollout_profile": "B-enforcing",
++      "sourced": false,
++      "warns_once_per_shell_session": true
++    },
++    {
++      "approval": "present-mismatch",
++      "approved_by": "operator",
++      "diagnostic": "shell_hook_env_changed",
++      "file": ".agents/env.sh",
++      "migration_hint_names_approval_command": true,
++      "name": "changed-env-sh-A-warning-sourced-with-warning",
++      "observed_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
++      "recorded_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
++      "rollout_profile": "A-warning",
++      "sourced": true,
++      "warns_once_per_shell_session": true
++    },
++    {
++      "approval": "present-mismatch",
++      "approved_by": "operator",
++      "diagnostic": "shell_hook_env_changed",
++      "file": ".agents/env.sh",
++      "migration_hint_names_approval_command": true,
++      "name": "changed-env-sh-B-enforcing-not-sourced",
++      "observed_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
++      "recorded_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
++      "rollout_profile": "B-enforcing",
++      "sourced": false,
++      "warns_once_per_shell_session": true
++    },
++    {
++      "approval": "present-match",
++      "approved_by": "operator",
++      "diagnostic": null,
++      "file": ".agents/env.ps1",
++      "migration_hint_names_approval_command": false,
++      "name": "approved-env-ps1-A-warning-sourced",
++      "observed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
++      "recorded_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
++      "rollout_profile": "A-warning",
++      "sourced": true,
++      "warns_once_per_shell_session": false
++    },
++    {
++      "approval": "present-match",
++      "approved_by": "operator",
++      "diagnostic": null,
++      "file": ".agents/env.ps1",
++      "migration_hint_names_approval_command": false,
++      "name": "approved-env-ps1-B-enforcing-sourced",
++      "observed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
++      "recorded_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
++      "rollout_profile": "B-enforcing",
++      "sourced": true,
++      "warns_once_per_shell_session": false
++    },
++    {
++      "approval": "absent",
++      "diagnostic": "shell_hook_env_unapproved",
++      "file": ".agents/env.ps1",
++      "migration_hint_names_approval_command": true,
++      "name": "unapproved-env-ps1-A-warning-sourced-with-warning",
++      "observed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
++      "recorded_sha256": null,
++      "rollout_profile": "A-warning",
++      "sourced": true,
++      "warns_once_per_shell_session": true
++    },
++    {
++      "approval": "absent",
++      "diagnostic": "shell_hook_env_unapproved",
++      "file": ".agents/env.ps1",
++      "migration_hint_names_approval_command": true,
++      "name": "unapproved-env-ps1-B-enforcing-not-sourced",
++      "observed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
++      "recorded_sha256": null,
++      "rollout_profile": "B-enforcing",
++      "sourced": false,
++      "warns_once_per_shell_session": true
++    },
++    {
++      "approval": "present-mismatch",
++      "approved_by": "manager",
++      "diagnostic": "shell_hook_env_changed",
++      "file": ".agents/env.ps1",
++      "migration_hint_names_approval_command": true,
++      "name": "changed-env-ps1-A-warning-sourced-with-warning",
++      "observed_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
++      "recorded_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
++      "rollout_profile": "A-warning",
++      "sourced": true,
++      "warns_once_per_shell_session": true
++    },
++    {
++      "approval": "present-mismatch",
++      "approved_by": "manager",
++      "diagnostic": "shell_hook_env_changed",
++      "file": ".agents/env.ps1",
++      "migration_hint_names_approval_command": true,
++      "name": "changed-env-ps1-B-enforcing-not-sourced",
++      "observed_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
++      "recorded_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
++      "rollout_profile": "B-enforcing",
++      "sourced": false,
++      "warns_once_per_shell_session": true
++    }
++  ],
++  "schema_version": 1
++}
+diff --git a/profiles/manager.md b/profiles/manager.md
+index 7c23f71..bda4f63 100644
+--- a/profiles/manager.md
++++ b/profiles/manager.md
+@@ -1086,6 +1086,122 @@ Global activation is OPTIONAL and enabled by default by conforming CLI
+ profiles. It is sourced once per global environment version and has lower PATH
+ precedence than a project environment.
+ 
++### 8.1 Project env file trust gate (S6)
++
++The project env files in scope are closed: exactly `.agents/env.sh`
++(POSIX hook) and `.agents/env.ps1` (PowerShell hook). No other project
++file is sourced by the hook. The same trust rule applies identically to
++both files.
++
++Under the enforcing rollout profile (Revision B, §8.5), a hook MUST
++source a candidate project env file ONLY when its exact bytes are
++trusted. Bytes are trusted ONLY when the manager's shell-hook approval
++state holds a record for that absolute file path whose recorded digest
++equals the digest of the bytes that would be sourced. Revision A (§8.5)
++is the labelled warning exception: it sources with the warning during
++the migration window. The two admitted trust sources are closed:
++
++- `manager` — the manager itself generated or installed the project env
++  file and recorded its digest at that time; or
++- `operator` — the operator approved the file once through the approval
++  command (`curator hook approve <path>`).
++
++An unknown file (no record for its absolute path), or a recorded file
++whose current digest differs from the recorded digest, MUST NOT be
++treated as trusted (under Revision A the hook still sources it but MUST
++warn; see §8.5). Re-approval is REQUIRED after the file changes: the
++operator MUST run `curator hook approve <path>` again to record the new
++digest; the old record MUST NOT authorize the changed bytes.
++
++When the hook selects an untrusted candidate it MUST warn once per shell
++session, naming the absolute file path and the approval command
++(`curator hook approve <path>`), and MUST continue without failing
++activation or the prompt. The warning MUST NOT be repeated for the same
++path within the same shell session.
++
++### 8.2 Approval record shape
++
++The shell-hook approval state is manager state below `<manager-home>`,
++in the sense of section 1 (caches, runtime store, audit state, and
++global/hybrid state below that home). It is kept outside every
++profile, package, and project surface. The manager MUST NOT read an
++approval record from package data, project data, or profile data, and
++package, project, or profile data MUST NOT influence the trust decision.
++
++The record set holds one record per absolute project env file path. Each
++record is a closed object with exactly these four members:
++
++- `path` — the absolute project env file path the record authorizes;
++- `sha256` — the lowercase hex SHA-256 digest (64 characters, no prefix)
++  computed over the exact bytes that would be sourced;
++- `approved_by` — exactly `manager` or `operator` (closed);
++- `approved_at` — the RFC 3339 timestamp at which the digest was recorded.
++
++No schema under `schemas/v1/` governs this manager-home state; the
++closed shape above is normative in text only. The `path` key is the
++absolute path; two spellings of the same file MUST resolve to one record
++before comparison. The digest is SHA-256 over the exact bytes sourced,
++hex-encoded lowercase.
++
++### 8.3 Approval commands
++
++The approval command surface is closed to exactly these three commands:
++
++- `curator hook approve <path>` — record (or re-record after a change)
++  the absolute path with the digest of its current bytes as
++  `approved_by: operator`;
++- `curator hook approvals` — list every approval record read-only;
++- `curator hook revoke <path>` — remove the record for the absolute path.
++
++`curator hook approve <path>` MUST fail without recording when the file
++is absent or unreadable, and MUST NOT trust a path with no readable
++bytes. `curator hook revoke <path>` on a path with no record MUST leave
++state unchanged and report that there was nothing to revoke. Listing
++MUST NOT mutate state.
++
++### 8.4 Diagnostics
++
++The shell-hook trust diagnostics are closed to exactly these two
++snake_case codes:
++
++| Condition | Diagnostic |
++|---|---|
++| candidate project env file has no approval record (warning) | `shell_hook_env_unapproved` |
++| candidate project env file digest differs from the recorded digest; re-approval required (warning) | `shell_hook_env_changed` |
++
++No other shell-hook diagnostic exists. Both codes are warnings: they
++never fail activation by themselves, and they use the identical spelling
++in text, tables, and conformance vectors.
++
++### 8.5 Warn-first rollout
++
++The trust gate ships in two explicitly labelled rollout profiles. The
++closed profile set is exactly `A-warning` and `B-enforcing`:
++
++- **Revision A (`A-warning`, warning release)** — the hook keeps the old
++  sourcing behavior (it sources unapproved and changed files) but MUST
++  emit the corresponding diagnostic (`shell_hook_env_unapproved` or
++  `shell_hook_env_changed`) with a migration hint naming
++  `curator hook approve <path>`. The manager ships this revision first.
++- **Revision B (`B-enforcing`, flip release)** — the hook MUST NOT source
++  an unapproved file or a changed file. It MUST emit the corresponding
++  diagnostic (`shell_hook_env_unapproved` or `shell_hook_env_changed`)
++  once per shell session, naming the path and
++  `curator hook approve <path>`, and continue.
++
++A release MUST NOT flip the default and add the refusal at once: the
++warning release (A) and the flip release (B) are separate revisions.
++
++### 8.6 Status posture
++
++Read-only status MUST report the shell-hook trust posture. `curator
++status` and, where the environments capability is implemented,
++`curator env status` list each known project env file with its trust
++state — approved, unapproved (`shell_hook_env_unapproved`), or changed
++(`shell_hook_env_changed`) — naming the absolute path and, for recorded
++files, the recorded `approved_by` value. `--check` treats a changed file
++as non-current; an unapproved file is reported as a warning row.
++
+ ## 9. Idempotent machine bootstrap
+ 
+ A manager SHOULD expose a non-interactive operation that creates its machine
+diff --git a/release/1.0.0-rc.9.json b/release/1.0.0-rc.9.json
+index 63c1f20..252ca53 100644
+--- a/release/1.0.0-rc.9.json
++++ b/release/1.0.0-rc.9.json
+@@ -12,7 +12,7 @@
+     "verified_provider_contract": "host-execution-provider-v1"
+   },
+   "candidate_protocol_pin": {
+-    "manifest_sha256": "sha256:0e195ecd26af2fcb5e5afb5c3fef0ebe60981888b057e8efc60c0b48cf584529",
++    "manifest_sha256": "sha256:7a8bab533b55919b7f269df3d0cd072161d09e7881a8593d2521766363c01f61",
+     "suite_root": "conformance/v1"
+   },
+   "claim_v5": {
+@@ -24,7 +24,7 @@
+   "downstream_consumption": {
+     "committed_release_pin_advanced": false,
+     "environment": "CURATOR_CONFORMANCE_ROOT",
+-    "required_manifest_sha256": "sha256:0e195ecd26af2fcb5e5afb5c3fef0ebe60981888b057e8efc60c0b48cf584529"
++    "required_manifest_sha256": "sha256:7a8bab533b55919b7f269df3d0cd072161d09e7881a8593d2521766363c01f61"
+   },
+   "historical_release": {
+     "immutable": true,
