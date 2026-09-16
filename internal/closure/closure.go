@@ -139,19 +139,22 @@ type Options struct {
 }
 
 type pending struct {
-	name   string
-	git    string
-	ref    manifest.Ref
-	source string
-	edge   Edge
-	chain  string
+	name     string
+	git      string
+	ref      manifest.Ref
+	source   string
+	edge     Edge
+	chain    string
+	selected *Node
 }
 
 // Build expands the manifest into an ordered closure.
 func Build(opts Options, projectManifest *manifest.Manifest, substitutions map[string]devsub.Substitution) ([]*Node, error) {
-	nodes := map[string]*Node{}
 	var queue []pending
 	for _, decl := range projectManifest.Skills {
+		if decl.Selector != nil {
+			return nil, fmt.Errorf("source_selection_invalid: draft selectors require expansion and frozen package acquisition before Git closure resolution")
+		}
 		queue = append(queue, pending{
 			name:   decl.Name,
 			git:    decl.Git,
@@ -162,14 +165,28 @@ func Build(opts Options, projectManifest *manifest.Manifest, substitutions map[s
 		})
 	}
 
+	return buildQueue(opts, queue, substitutions, false)
+}
+
+func buildQueue(opts Options, queue []pending, substitutions map[string]devsub.Substitution, draft bool) ([]*Node, error) {
+	nodes := map[string]*Node{}
 	for len(queue) > 0 {
 		item := queue[0]
 		queue = queue[1:]
 		node, exists := nodes[item.name]
 		if !exists {
-			resolved, err := resolveNode(opts, item, substitutions)
-			if err != nil {
-				return nil, err
+			resolved := item.selected
+			if resolved == nil {
+				var err error
+				resolved, err = resolveNode(opts, item, substitutions)
+				if err != nil {
+					return nil, err
+				}
+			}
+			for name := range nodes {
+				if draft && name != item.name && strings.EqualFold(name, item.name) {
+					return nil, fmt.Errorf("source_name_conflict: filesystem-equivalent skill names %s and %s", name, item.name)
+				}
 			}
 			nodes[item.name] = resolved
 			node = resolved
@@ -190,6 +207,9 @@ func Build(opts Options, projectManifest *manifest.Manifest, substitutions map[s
 				})
 			}
 		} else if err := unify(node, item); err != nil {
+			if draft {
+				return nil, fmt.Errorf("source_name_conflict: %w", err)
+			}
 			return nil, err
 		}
 		node.Edges = append(node.Edges, item.edge)
@@ -221,6 +241,9 @@ func DetectActiveCommandCollisions(nodes []*Node) error {
 // repository and the same commit (Spec §8.3). A substituted node skips
 // unification: the substitution replaces every requirement of that name.
 func unify(node *Node, item pending) error {
+	if node.Decl.Selector != nil && (node.Resolved.Commit == "" || node.Decl.Selector.Directory != ".") {
+		return fmt.Errorf("source_name_conflict: %s dependency cannot identify the selected local package or repository subdirectory", node.Name)
+	}
 	if node.Substituted != "" {
 		return nil
 	}

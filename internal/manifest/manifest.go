@@ -1,5 +1,5 @@
-// Package manifest parses the project manifest Skillfile.json, schema 1
-// (Spec §6.1), and edits skill declarations in place.
+// Package manifest parses the project manifest Skillfile.json, frozen schema 1
+// (Spec §6.1) and explicitly opted-in draft schema 2, and edits legacy declarations.
 package manifest
 
 import (
@@ -17,7 +17,7 @@ import (
 	"github.com/relux-works/curator/internal/verr"
 )
 
-// SchemaVersion is the only supported Skillfile schema.
+// SchemaVersion is the default, frozen Skillfile schema.
 const SchemaVersion = 1
 
 // Name is the manifest file name at the project root.
@@ -36,15 +36,20 @@ type Decl struct {
 	Source string // path under skills_root; defaults to Name
 	Ref    Ref
 	Git    string // optional clone URL
+	// Selector is non-nil only for an opt-in draft source selection. Legacy
+	// Source, Git and Ref remain empty for that arm.
+	Selector *Selector
 }
 
 // Manifest is the parsed project manifest.
 type Manifest struct {
-	Path         string
-	ProjectAlias string
-	Agents       []string
-	Locale       string
-	Skills       []Decl
+	Path          string
+	SchemaVersion int
+	Sources       map[string]Source
+	ProjectAlias  string
+	Agents        []string
+	Locale        string
+	Skills        []Decl
 }
 
 // PathIn returns the manifest path for a project root.
@@ -55,6 +60,11 @@ func PathIn(projectRoot string) string {
 // Load reads and parses the project manifest. A missing file returns
 // (nil, nil): the project is simply not initialized.
 func Load(projectRoot string) (*Manifest, error) {
+	return LoadWithOptions(projectRoot, ParseOptions{})
+}
+
+// LoadWithOptions reads a root project with explicitly admitted draft capabilities.
+func LoadWithOptions(projectRoot string, options ParseOptions) (*Manifest, error) {
 	filePath := PathIn(projectRoot)
 	payload, err := os.ReadFile(filePath) // #nosec G304 -- path is derived from the project root
 	if os.IsNotExist(err) {
@@ -63,7 +73,7 @@ func Load(projectRoot string) (*Manifest, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ParseBytes(payload, filePath)
+	return ParseBytesWithOptions(payload, filePath, options)
 }
 
 // ParseBytes parses one manifest payload that a caller already read. It is the
@@ -72,6 +82,11 @@ func Load(projectRoot string) (*Manifest, error) {
 // the file once and parse those bytes, instead of reading the path a second time
 // and parsing a possibly different generation.
 func ParseBytes(payload []byte, filePath string) (*Manifest, error) {
+	return ParseBytesWithOptions(payload, filePath, ParseOptions{})
+}
+
+// ParseBytesWithOptions validates the entire declaration without source I/O.
+func ParseBytesWithOptions(payload []byte, filePath string, options ParseOptions) (*Manifest, error) {
 	if err := protocoljson.Validate(payload); err != nil {
 		return nil, fmt.Errorf("malformed JSON in %s: %w", filePath, err)
 	}
@@ -83,14 +98,16 @@ func ParseBytes(payload []byte, filePath string) (*Manifest, error) {
 	if !ok {
 		return nil, fmt.Errorf("%s must contain a JSON object", filePath)
 	}
-	return Parse(obj, filePath)
+	return ParseWithOptions(obj, filePath, options)
 }
 
 // Parse validates a raw manifest object (Spec §6.1).
 func Parse(obj map[string]any, filePath string) (*Manifest, error) {
-	if unknown := unknownFields(obj, "schema_version", "project", "agents", "locale", "skills"); len(unknown) > 0 {
-		return nil, verr.New("Skillfile", "unsupported field(s): %s", strings.Join(unknown, ", "))
-	}
+	return ParseWithOptions(obj, filePath, ParseOptions{})
+}
+
+// ParseWithOptions admits schema 2 only for a reader supporting the draft.
+func ParseWithOptions(obj map[string]any, filePath string, options ParseOptions) (*Manifest, error) {
 	schema, present := obj["schema_version"]
 	if !present {
 		return nil, verr.New("schema_version", "missing required field")
@@ -99,8 +116,24 @@ func Parse(obj map[string]any, filePath string) (*Manifest, error) {
 	if !ok || number != float64(int(number)) {
 		return nil, verr.New("schema_version", "must be an integer, got %v", schema)
 	}
-	if int(number) != SchemaVersion {
+	if number != SchemaVersion && !(number == 2 && options.DraftSourcesV1) {
 		return nil, verr.New("schema_version", "unsupported Skillfile schema_version %d; this Skillfile requires a newer tool", int(number))
+	}
+
+	allowed := []string{"schema_version", "project", "agents", "locale", "skills"}
+	if number == 2 {
+		allowed = append(allowed, "sources")
+	}
+	if unknown := unknownFields(obj, allowed...); len(unknown) > 0 {
+		return nil, verr.New("Skillfile", "unsupported field(s): %s", strings.Join(unknown, ", "))
+	}
+	var sources map[string]Source
+	if number == 2 {
+		var err error
+		sources, err = parseSources(obj)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	alias, err := parseProjectAlias(obj)
@@ -140,6 +173,20 @@ func Parse(obj map[string]any, filePath string) (*Manifest, error) {
 		entry, ok := rawEntry.(map[string]any)
 		if !ok {
 			return nil, verr.New(label, "must be an object")
+		}
+		if _, selected := entry["from"]; selected && number == 2 {
+			decl, err := parseSelector(entry, sources, label)
+			if err != nil {
+				return nil, err
+			}
+			if decl.Name != "" {
+				if seen[decl.Name] {
+					return nil, verr.New(label, "source_name_conflict: duplicate skill name %s", decl.Name)
+				}
+				seen[decl.Name] = true
+			}
+			skills = append(skills, decl)
+			continue
 		}
 		if unknown := unknownFields(entry, "name", "source", "git", "tag", "branch", "revision"); len(unknown) > 0 {
 			return nil, verr.New(label, "unsupported field(s): %s", strings.Join(unknown, ", "))
@@ -192,7 +239,7 @@ func Parse(obj map[string]any, filePath string) (*Manifest, error) {
 		skills = append(skills, Decl{Name: name, Source: source, Ref: Ref{Kind: refKeys[0], Value: refValue}, Git: git})
 	}
 
-	return &Manifest{Path: filePath, ProjectAlias: alias, Agents: agents, Locale: locale, Skills: skills}, nil
+	return &Manifest{Path: filePath, SchemaVersion: int(number), Sources: sources, ProjectAlias: alias, Agents: agents, Locale: locale, Skills: skills}, nil
 }
 
 func parseProjectAlias(obj map[string]any) (string, error) {
