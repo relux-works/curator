@@ -1,10 +1,10 @@
 # TASK-260728-20ao7p: curator-rc5-e2e-docs-macos-windows
 
 ## Description
-Complete Curator rc.5 external-repository user/operator documentation and end-to-end qualification on local/SSH macOS and Windows hosts. Consume released shared vectors and exercise real project/global install, activation, lifecycle, offline, and rollback behavior.
+Re-scoped 2026-09-16 after closing draft PR #17 (superseded: the CI pieces landed on main in their own form, spec at v1.0.0-rc.11, SPEC_PIN promoted). The two pieces main still lacks from that branch: the native lifecycle blackbox test (cmd/curator/native_blackbox_test.go) and the external-build author guide (docs/external-build-repositories.md). Cut fresh from origin/main; do not revive the branch.
 
 ## Scope
-Curator docs and examples, shared-suite consumer, black-box and native tests using the available macOS host alias relux and Windows host alias win, release evidence, and exact curator-spec pin. Linux is explicitly excluded and remains a later story.
+cmd/curator native blackbox test; docs/external-build-repositories.md; the CI files are out of scope (already landed)
 
 ## Acceptance Criteria
-Docs explain repository declarations, descriptor targets, lock/tag policy, access failures, operator substitutions, audit behavior, cache/offline semantics, PATH activation, and signing boundary without exposing unsafe workarounds; shared rc.5 vectors and clean local tests pass; macOS and Windows native evidence covers network and protected-offline install, exact-tag moved/missing failures, project/global activation, cache corruption, repair, crash/rollback, and uninstall; schema-6 regression suites pass; outcome records exact OS/toolchain/spec revisions and does not claim Linux.
+Native lifecycle blackbox test runs on the hosted macOS and Windows lanes; the author guide is on main and linked from README; nothing else from PR #17 is carried over
