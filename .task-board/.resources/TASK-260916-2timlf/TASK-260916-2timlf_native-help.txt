@@ -1,0 +1,736 @@
+TASK-260916-2timlf native CLI evidence; 2026-09-16; zsh; help only.
+
+COMMAND: claude --help
+EXIT: 0
+0001: Usage: claude [options] [command] [prompt]
+0002: 
+0003: Claude Code - starts an interactive session by default, use -p/--print for
+0004: non-interactive output
+0005: 
+0006: Arguments:
+0007:   prompt                                Your prompt
+0008: 
+0009: Options:
+0010:   --add-dir <directories...>            Additional directories to allow tool
+0011:                                         access to
+0012:   --agent <agent>                       Agent for the current session. Overrides
+0013:                                         the 'agent' setting.
+0014:   --agents <json>                       JSON object defining custom agents (e.g.
+0015:                                         '{"reviewer": {"description": "Reviews
+0016:                                         code", "prompt": "You are a code
+0017:                                         reviewer"}}')
+0018:   --allow-dangerously-skip-permissions  Enable bypassing all permission checks
+0019:                                         as an option, without it being enabled
+0020:                                         by default. Recommended only for
+0021:                                         sandboxes with no internet access.
+0022:   --allowedTools, --allowed-tools <tools...>
+0023:       Comma or space-separated list of tool names to allow (e.g. "Bash(git *)
+0024:       Edit")
+0025:   --append-system-prompt <prompt>       Append a system prompt to the default
+0026:                                         system prompt
+0027:   --autocompact <auto|tokens>           Auto-compact window size (auto, or
+0028:                                         100k–1M tokens)
+0029:   --ax-screen-reader                    Render screen-reader friendly output
+0030:                                         (flat text, no decorative borders or
+0031:                                         animations).
+0032:   --bg, --background                    Start the session in the background and
+0033:                                         return immediately. Prints the id that
+0034:                                         `claude attach`, `logs`, `stop` and `rm`
+0035:                                         take; `claude agents` lists them. With
+0036:                                         --resume <session-id>, continues that
+0037:                                         session in the background under the same
+0038:                                         ID, or starts a copy and says so when
+0039:                                         the session is already running
+0040:   --bare                                Minimal mode: skip hooks, LSP, plugin
+0041:                                         sync, attribution, auto-memory,
+0042:                                         background prefetches, keychain reads,
+0043:                                         and CLAUDE.md auto-discovery. Sets
+0044:                                         CLAUDE_CODE_SIMPLE=1. Anthropic auth is
+0045:                                         strictly ANTHROPIC_API_KEY or
+0046:                                         apiKeyHelper via --settings (OAuth and
+0047:                                         keychain are never read). 3P providers
+0048:                                         (Bedrock/Vertex/Foundry) use their own
+0049:                                         credentials. Skills still resolve via
+0050:                                         /skill-name. Explicitly provide context
+0051:                                         via: --system-prompt[-file],
+0052:                                         --append-system-prompt[-file], --add-dir
+0053:                                         (CLAUDE.md dirs), --mcp-config,
+0054:                                         --settings, --agents, --plugin-dir.
+0055:   --betas <betas...>                    Beta headers to include in API requests
+0056:                                         (API key users only)
+0057:   --brief                               Enable SendUserMessage tool for
+0058:                                         agent-to-user communication
+0059:   --chrome                              Enable Claude in Chrome integration
+0060:   --cloud [description|session_id|url]  Create a cloud session with the given
+0061:                                         description, or attach to an existing
+0062:                                         one by session ID or claude.ai/code URL
+0063:   -c, --continue                        Continue the most recent conversation in
+0064:                                         the current directory
+0065:   --dangerously-skip-permissions        Bypass all permission checks.
+0066:                                         Recommended only for sandboxes with no
+0067:                                         internet access.
+0068:   -d, --debug [filter]                  Enable debug mode with optional category
+0069:                                         filtering (e.g., "api,hooks" or
+0070:                                         "!1p,!file")
+0071:   --debug-file <path>                   Write debug logs to a specific file path
+0072:                                         (implicitly enables debug mode)
+0073:   --disable-slash-commands              Disable all skills
+0074:   --disallowedTools, --disallowed-tools <tools...>
+0075:       Comma or space-separated list of tool names to deny (e.g. "Bash(git *)
+0076:       Edit")
+0077:   --effort <level>                      Effort level for the current session
+0078:                                         (low, medium, high, xhigh, max)
+0079:   --environment <environment_id>        Create a new cloud session that runs on
+0080:                                         the given self-hosted environment
+0081:                                         (ccpool_...).
+0082:   --exclude-dynamic-system-prompt-sections
+0083:       Move per-machine sections (cwd, env info, memory paths, git status) from
+0084:       the system prompt into the first user message. Improves cross-user
+0085:       prompt-cache reuse. Only applies with the default system prompt (ignored
+0086:       with --system-prompt). (default: false)
+0087:   --fallback-model <model>              Enable automatic fallback to specified
+0088:                                         model(s) when the default model is
+0089:                                         overloaded or not available. Accepts a
+0090:                                         comma-separated list to try each in
+0091:                                         order. Re-tries the primary at the start
+0092:                                         of each user turn.
+0093:   --file <specs...>                     File resources to download at startup.
+0094:                                         Format: file_id:relative_path (e.g.,
+0095:                                         --file file_abc:doc.txt
+0096:                                         file_def:img.png)
+0097:   --fork-session                        When resuming, create a new session ID
+0098:                                         instead of reusing the original (use
+0099:                                         with --resume or --continue)
+0100:   --forward-subagent-text               Forward subagent text and thinking
+0101:                                         blocks as assistant/user messages with
+0102:                                         parent_tool_use_id set (only works with
+0103:                                         --print and --output-format=stream-json)
+0104:   --from-pr [value]                     Resume a session linked to a PR by PR
+0105:                                         number/URL, or open interactive picker
+0106:                                         with optional search term
+0107:   -h, --help                            Display help for command
+0108:   --ide                                 Automatically connect to IDE on startup
+0109:                                         if exactly one valid IDE is available
+0110:   --include-hook-events                 Include all hook lifecycle events in the
+0111:                                         output stream (only works with
+0112:                                         --output-format=stream-json)
+0113:   --include-partial-messages            Include partial message chunks as they
+0114:                                         arrive (only works with --print and
+0115:                                         --output-format=stream-json)
+0116:   --input-format <format>               Input format (only works with --print):
+0117:                                         "text" (default), or "stream-json"
+0118:                                         (realtime streaming input) (choices:
+0119:                                         "text", "stream-json")
+0120:   --json-schema <schema>                JSON Schema for structured output
+0121:                                         validation. Example:
+0122:                                         {"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}
+0123:   --max-budget-usd <amount>             Maximum dollar amount to spend on API
+0124:                                         calls (only works with --print)
+0125:   --mcp-config <configs...>             Load MCP servers from JSON files or
+0126:                                         strings (space-separated)
+0127:   --model <model>                       Model for the current session. Provide
+0128:                                         an alias for the latest model (e.g.
+0129:                                         'fable', 'opus', or 'sonnet') or a
+0130:                                         model's full name (e.g.
+0131:                                         'claude-fable-5').
+0132:   -n, --name <name>                     Set a display name for this session
+0133:                                         (shown in the prompt box, /resume
+0134:                                         picker, and terminal title)
+0135:   --no-chrome                           Disable Claude in Chrome integration
+0136:   --no-session-persistence              Disable session persistence - sessions
+0137:                                         will not be saved to disk and cannot be
+0138:                                         resumed (only works with --print)
+0139:   --output-format <format>              Output format (only works with --print):
+0140:                                         "text" (default), "json" (single
+0141:                                         result), or "stream-json" (realtime
+0142:                                         streaming) (choices: "text", "json",
+0143:                                         "stream-json")
+0144:   --permission-mode <mode>              Permission mode to use for the session
+0145:                                         (choices: "acceptEdits", "auto",
+0146:                                         "bypassPermissions", "manual",
+0147:                                         "dontAsk", "plan")
+0148:   --permission-prompts <target>         Who answers permission prompts with
+0149:                                         --print: "host" (the SDK host or
+0150:                                         --permission-prompt-tool) or "none"
+0151:                                         (nobody: anything that would prompt is
+0152:                                         denied automatically; the permission
+0153:                                         mode still decides everything else)
+0154:                                         (choices: "host", "none", default:
+0155:                                         "host")
+0156:   --plugin-dir <path>                   Load a plugin from a directory or .zip
+0157:                                         for this session only; a folder of
+0158:                                         plugins loads each child (repeatable:
+0159:                                         --plugin-dir A --plugin-dir B.zip)
+0160:                                         (default: [])
+0161:   --plugin-url <url>                    Fetch a plugin .zip from a URL for this
+0162:                                         session only (repeatable: --plugin-url A
+0163:                                         --plugin-url B) (default: [])
+0164:   -p, --print                           Print response and exit (useful for
+0165:                                         pipes). Note: The workspace trust dialog
+0166:                                         is skipped when Claude is run in
+0167:                                         non-interactive mode (via -p, or when
+0168:                                         stdout is not a TTY, e.g. piped or
+0169:                                         redirected output). Only use this in
+0170:                                         directories you trust. Settings files
+0171:                                         that fail validation are silently
+0172:                                         ignored in this mode (no error dialog is
+0173:                                         shown).
+0174:   --prompt-suggestions [value]          Enable prompt suggestions. In print/SDK
+0175:                                         mode, emits a prompt_suggestion message
+0176:                                         after each turn with a predicted next
+0177:                                         user prompt (choices: "true", "false",
+0178:                                         "1", "0", "yes", "no", "on", "off",
+0179:                                         preset: "true")
+0180:   --remote-control [name]               Start an interactive session with Remote
+0181:                                         Control enabled (optionally named)
+0182:   --remote-control-session-name-prefix <prefix>
+0183:       Prefix for auto-generated Remote Control session names (default: hostname)
+0184:   --replay-user-messages                Re-emit user messages from stdin back on
+0185:                                         stdout for acknowledgment (only works
+0186:                                         with --input-format=stream-json and
+0187:                                         --output-format=stream-json)
+0188:   --restricted                          Restricted mode: removes the built-in
+0189:                                         tools that run commands or code (Bash,
+0190:                                         PowerShell, REPL and the other
+0191:                                         code-running tools) and WebFetch unless
+0192:                                         --tools names them, and ignores user,
+0193:                                         project and local settings files
+0194:                                         (managed settings and --settings still
+0195:                                         apply; add --strict-mcp-config to skip
+0196:                                         MCP servers too). Also confines the file
+0197:                                         tools to the working directories
+0198:                                         (--add-dir included), refuses
+0199:                                         bypassPermissions, and lets only a
+0200:                                         person or the configured permission
+0201:                                         handler approve writes to settings, git
+0202:                                         and tool-configuration files.
+0203:   -r, --resume [value]                  Resume a conversation by session ID, or
+0204:                                         open interactive picker with optional
+0205:                                         search term
+0206:   --safe-mode                           Start with all customizations
+0207:                                         (CLAUDE.md, skills, plugins, hooks, MCP
+0208:                                         servers, custom commands and agents,
+0209:                                         output styles, workflows, custom themes,
+0210:                                         keybindings, and more) disabled — useful
+0211:                                         for troubleshooting a broken
+0212:                                         configuration. Admin-managed (policy)
+0213:                                         settings still apply. Auth, model
+0214:                                         selection, built-in tools, and
+0215:                                         permissions work normally. Sets
+0216:                                         CLAUDE_CODE_SAFE_MODE=1.
+0217:   --session-id <uuid>                   Use a specific session ID for the
+0218:                                         conversation (must be a valid UUID)
+0219:   --setting-sources <sources>           Comma-separated list of setting sources
+0220:                                         to load (user, project, local).
+0221:   --settings <file-or-json>             Path to a settings JSON file or a JSON
+0222:                                         string to load additional settings from
+0223:   --strict-mcp-config                   Only use MCP servers from --mcp-config,
+0224:                                         ignoring all other MCP configurations
+0225:   --system-prompt <prompt>              System prompt to use for the session
+0226:   --system-prompt-snapshot <on|off>     Record the system prompt once per
+0227:                                         conversation and reuse it verbatim on
+0228:                                         every request and resume. on (the
+0229:                                         default): the prompt is rendered on the
+0230:                                         conversation's first request — a
+0231:                                         --system-prompt or
+0232:                                         --append-system-prompt included — sent,
+0233:                                         and recorded; every later request and
+0234:                                         resume sends the record as-is, even when
+0235:                                         a later launch passes different text,
+0236:                                         until the conversation is compacted.
+0237:                                         off: never record; the prompt is
+0238:                                         rendered fresh every request (for
+0239:                                         iterating on prompt text). No effect
+0240:                                         where system-prompt recording is not yet
+0241:                                         enabled. (choices: "on", "off")
+0242:   --teleport [session]                  Resume a teleport session, optionally
+0243:                                         specify session ID
+0244:   --tmux                                Create a tmux session for the worktree
+0245:                                         (requires --worktree). Uses iTerm2
+0246:                                         native panes when available; use
+0247:                                         --tmux=classic for traditional tmux.
+0248:   --tools <tools...>                    Specify the list of available tools from
+0249:                                         the built-in set. Use "" to disable all
+0250:                                         tools, "default" to use all tools, or
+0251:                                         specify tool names (e.g.
+0252:                                         "Bash,Edit,Read").
+0253:   --verbose                             Override verbose mode setting from
+0254:                                         config
+0255:   -v, --version                         Output the version number
+0256:   -w, --worktree [name]                 Create a new git worktree for this
+0257:                                         session (optionally specify a name)
+0258: 
+0259: Commands:
+0260:   agents [options]                      Manage background agents
+0261:   attach <id>                           Open a background session in this
+0262:                                         terminal. <id> is the short id that
+0263:                                         `claude --bg` prints and `claude agents`
+0264:                                         lists
+0265:   auth                                  Manage authentication
+0266:   auto-mode                             Inspect or reset auto mode classifier
+0267:                                         configuration
+0268:   doctor                                Check the health of your Claude Code
+0269:                                         installation. Reads settings files in
+0270:                                         the current directory without a trust
+0271:                                         prompt. For a full checkup that can also
+0272:                                         fix issues, run /doctor in a session.
+0273:   gateway [options]                     Run the enterprise auth/telemetry
+0274:                                         gateway
+0275:   import [options] [source]             Import config from another AI coding
+0276:                                         agent into Claude Code
+0277:   install [options] [target]            Install Claude Code native build. Use
+0278:                                         [target] to specify version (stable,
+0279:                                         latest, or specific version)
+0280:   logs <id>                             Print a background session's recent
+0281:                                         terminal output
+0282:   mcp                                   Configure and manage MCP servers
+0283:   plugin|plugins                        Manage Claude Code plugins
+0284:   project                               Manage Claude Code project state
+0285:   respawn [options] [id]                Restart a background session, or all of
+0286:                                         them with --all, so it runs the current
+0287:                                         Claude Code version
+0288:   rm <id>                               Delete a background session, and its
+0289:                                         worktree when that is safe. Works on
+0290:                                         sessions that have already exited
+0291:   setup-token                           Set up a long-lived authentication token
+0292:                                         (requires Claude subscription)
+0293:   stop|kill <id>                        Stop a background session. Its
+0294:                                         conversation is kept: `claude attach
+0295:                                         <id>` opens it again, `claude --resume`
+0296:                                         works once it is stopped
+0297:   ultrareview [options] [target]        Run a cloud-hosted multi-agent code
+0298:                                         review of the current branch (or a PR
+0299:                                         number / base branch) and print the
+0300:                                         findings
+0301:   update|upgrade                        Check for updates and install if
+0302:                                         available
+
+COMMAND: codex --help
+EXIT: 0
+0001: Codex CLI
+0002: 
+0003: If no subcommand is specified, options will be forwarded to the interactive CLI.
+0004: 
+0005: Usage: codex [OPTIONS] [PROMPT]
+0006:        codex [OPTIONS] <COMMAND> [ARGS]
+0007: 
+0008: Commands:
+0009:   agents            Browse all agent sessions on the shared local app-server daemon
+0010:   exec              Run Codex non-interactively [aliases: e]
+0011:   review            Run a code review non-interactively
+0012:   login             Manage login
+0013:   logout            Remove stored authentication credentials
+0014:   mcp               Manage external MCP servers for Codex
+0015:   plugin            Manage Codex plugins
+0016:   mcp-server        Start Codex as an MCP server (stdio)
+0017:   app-server        [experimental] Run the app server or related tooling
+0018:   remote-control    [experimental] Manage the app-server daemon with remote control enabled
+0019:   app               Launch the Desktop app (opens the app installer if missing)
+0020:   completion        Generate shell completion scripts
+0021:   update            Update Codex to the latest version
+0022:   doctor            Diagnose local Codex installation, config, auth, and runtime health
+0023:   sandbox           Run commands within a Codex-provided sandbox
+0024:   debug             Debugging tools
+0025:   apply             Apply the latest diff produced by Codex agent as a `git apply` to your local
+0026:                     working tree [aliases: a]
+0027:   resume            Resume a previous interactive session (picker by default; use --last to continue
+0028:                     the most recent)
+0029:   queue             Queue a message for an existing session
+0030:   archive           Archive a saved session by id or session name
+0031:   delete            Permanently delete a saved session by id or session name
+0032:   migrate-rollouts  Inspect or migrate legacy local sessions to paginated thread history
+0033:   unarchive         Unarchive a saved session by id or session name
+0034:   fork              Fork a previous interactive session (picker by default; use --last to fork the
+0035:                     most recent)
+0036:   cloud             [EXPERIMENTAL] Browse tasks from Codex Cloud and apply changes locally
+0037:   exec-server       [EXPERIMENTAL] Run the standalone exec-server service
+0038:   features          Inspect feature flags
+0039:   help              Print this message or the help of the given subcommand(s)
+0040: 
+0041: Arguments:
+0042:   [PROMPT]
+0043:           Optional user prompt to start the session
+0044: 
+0045: Options:
+0046:   -c, --config <key=value>
+0047:           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.
+0048:           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed
+0049:           as TOML. If it fails to parse as TOML, the raw string is used as a literal.
+0050:           
+0051:           Examples: - `-c model="o3"` - `-c 'sandbox_permissions=["disk-full-read-access"]'` - `-c
+0052:           shell_environment_policy.inherit=all`
+0053: 
+0054:       --enable <FEATURE>
+0055:           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`
+0056: 
+0057:       --disable <FEATURE>
+0058:           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`
+0059: 
+0060:       --remote <ADDR>
+0061:           Connect the TUI to a remote app server endpoint.
+0062:           
+0063:           Accepted forms: `ws://host:port`, `wss://host:port`, `unix://`, or `unix://PATH`.
+0064: 
+0065:       --remote-auth-token-env <ENV_VAR>
+0066:           Name of the environment variable containing the bearer token to send to a remote app
+0067:           server websocket
+0068: 
+0069:       --strict-config
+0070:           Error out when config.toml contains fields that are not recognized by this version of
+0071:           Codex
+0072: 
+0073:   -i, --image <FILE>...
+0074:           Optional image(s) to attach to the initial prompt
+0075: 
+0076:   -m, --model <MODEL>
+0077:           Model the agent should use
+0078: 
+0079:       --oss
+0080:           Use open-source provider
+0081: 
+0082:       --local-provider <OSS_PROVIDER>
+0083:           Specify which local provider to use (lmstudio or ollama). If not specified with --oss,
+0084:           will use config default or show selection
+0085: 
+0086:   -p, --profile <CONFIG_PROFILE_V2>
+0087:           Layer $CODEX_HOME/<name>.config.toml on top of the base user config
+0088: 
+0089:   -s, --sandbox <SANDBOX_MODE>
+0090:           Select the sandbox policy to use when executing model-generated shell commands
+0091:           
+0092:           [possible values: read-only, workspace-write, danger-full-access]
+0093: 
+0094:       --approve-for-me
+0095:           Route approval requests through automatic review using the workspace-write sandbox
+0096: 
+0097:       --dangerously-bypass-approvals-and-sandbox
+0098:           Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY
+0099:           DANGEROUS. Intended solely for running in environments that are externally sandboxed
+0100: 
+0101:       --dangerously-bypass-hook-trust
+0102:           Run enabled hooks without requiring persisted hook trust for this invocation. DANGEROUS.
+0103:           Intended only for automation that already vets hook sources
+0104: 
+0105:   -C, --cd <DIR>
+0106:           Tell the agent to use the specified directory as its working root
+0107: 
+0108:       --add-dir <DIR>
+0109:           Additional directories that should be writable alongside the primary workspace
+0110: 
+0111:   -a, --ask-for-approval <APPROVAL_POLICY>
+0112:           Configure when the model requires human approval before executing a command
+0113: 
+0114:           Possible values:
+0115:           - on-request: The model decides when to ask the user for approval
+0116:           - never:      Never ask for user approval Execution failures are immediately returned to
+0117:             the model
+0118: 
+0119:       --search
+0120:           Enable live web search. When enabled, the native Responses `web_search` tool is available
+0121:           to the model (no per‑call approval)
+0122: 
+0123:       --no-alt-screen
+0124:           Disable alternate screen mode
+0125:           
+0126:           Runs the TUI in inline mode, preserving terminal scrollback history.
+0127: 
+0128:   -h, --help
+0129:           Print help (see a summary with '-h')
+0130: 
+0131:   -V, --version
+0132:           Print version
+
+COMMAND: codex exec --help
+EXIT: 0
+0001: Run Codex non-interactively
+0002: 
+0003: Usage: codex exec [OPTIONS] [PROMPT]
+0004:        codex exec [OPTIONS] <COMMAND> [ARGS]
+0005: 
+0006: Commands:
+0007:   resume  Resume a previous session by id or pick the most recent with --last
+0008:   fork    Fork a previous session by id into a new session
+0009:   review  Run a code review against the current repository
+0010:   help    Print this message or the help of the given subcommand(s)
+0011: 
+0012: Arguments:
+0013:   [PROMPT]
+0014:           Initial instructions for the agent. If not provided as an argument (or if `-` is used),
+0015:           instructions are read from stdin. If stdin is piped and a prompt is also provided, stdin
+0016:           is appended as a `<stdin>` block
+0017: 
+0018: Options:
+0019:   -c, --config <key=value>
+0020:           Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.
+0021:           Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed
+0022:           as TOML. If it fails to parse as TOML, the raw string is used as a literal.
+0023:           
+0024:           Examples: - `-c model="o3"` - `-c 'sandbox_permissions=["disk-full-read-access"]'` - `-c
+0025:           shell_environment_policy.inherit=all`
+0026: 
+0027:       --enable <FEATURE>
+0028:           Enable a feature (repeatable). Equivalent to `-c features.<name>=true`
+0029: 
+0030:       --disable <FEATURE>
+0031:           Disable a feature (repeatable). Equivalent to `-c features.<name>=false`
+0032: 
+0033:       --strict-config
+0034:           Error out when config.toml contains fields that are not recognized by this version of
+0035:           Codex
+0036: 
+0037:   -i, --image <FILE>...
+0038:           Optional image(s) to attach to the initial prompt
+0039: 
+0040:   -m, --model <MODEL>
+0041:           Model the agent should use
+0042: 
+0043:       --oss
+0044:           Use open-source provider
+0045: 
+0046:       --local-provider <OSS_PROVIDER>
+0047:           Specify which local provider to use (lmstudio or ollama). If not specified with --oss,
+0048:           will use config default or show selection
+0049: 
+0050:   -p, --profile <CONFIG_PROFILE_V2>
+0051:           Layer $CODEX_HOME/<name>.config.toml on top of the base user config
+0052: 
+0053:   -s, --sandbox <SANDBOX_MODE>
+0054:           Select the sandbox policy to use when executing model-generated shell commands
+0055:           
+0056:           [possible values: read-only, workspace-write, danger-full-access]
+0057: 
+0058:       --approve-for-me
+0059:           Route approval requests through automatic review using the workspace-write sandbox
+0060: 
+0061:       --dangerously-bypass-approvals-and-sandbox
+0062:           Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY
+0063:           DANGEROUS. Intended solely for running in environments that are externally sandboxed
+0064: 
+0065:       --dangerously-bypass-hook-trust
+0066:           Run enabled hooks without requiring persisted hook trust for this invocation. DANGEROUS.
+0067:           Intended only for automation that already vets hook sources
+0068: 
+0069:   -C, --cd <DIR>
+0070:           Tell the agent to use the specified directory as its working root
+0071: 
+0072:       --add-dir <DIR>
+0073:           Additional directories that should be writable alongside the primary workspace
+0074: 
+0075:       --thread-source <SOURCE>
+0076:           Source classification for newly created or forked threads
+0077: 
+0078:       --skip-git-repo-check
+0079:           Allow running Codex outside a Git repository
+0080: 
+0081:       --ephemeral
+0082:           Run without persisting session files to disk
+0083: 
+0084:       --ignore-user-config
+0085:           Do not load `$CODEX_HOME/config.toml`; auth still uses `CODEX_HOME`
+0086: 
+0087:       --ignore-rules
+0088:           Do not load user or project execpolicy `.rules` files
+0089: 
+0090:       --output-schema <FILE>
+0091:           Path to a JSON Schema file describing the model's final response shape
+0092: 
+0093:       --color <COLOR>
+0094:           Specifies color settings for use in the output
+0095:           
+0096:           [default: auto]
+0097:           [possible values: always, never, auto]
+0098: 
+0099:       --json
+0100:           Print events to stdout as JSONL
+0101: 
+0102:   -o, --output-last-message <FILE>
+0103:           Specifies file where the last message from the agent should be written
+0104: 
+0105:   -h, --help
+0106:           Print help (see a summary with '-h')
+0107: 
+0108:   -V, --version
+0109:           Print version
+
+COMMAND: pi --help
+EXIT: 0
+0001: pi - AI coding assistant with read, bash, edit, write tools
+0002: 
+0003: Usage:
+0004:   pi [options] [@files...] [messages...]
+0005: 
+0006: Commands:
+0007:   pi install <source> [-l]     Install extension source and add to settings
+0008:   pi remove <source> [-l]      Remove extension source from settings
+0009:   pi uninstall <source> [-l]   Alias for remove
+0010:   pi update [source|self|pi]   Update pi, extensions, or model catalogs
+0011:   pi list                      List installed extensions from settings
+0012:   pi config [-l]               Open TUI to enable/disable package resources (Tab switches scope)
+0013:   pi auth <command>            Print credentials or check provider readiness
+0014:   pi <command> --help          Show help for install/remove/uninstall/update/list/config/auth
+0015: 
+0016: Options:
+0017:   --provider <name>              Provider name (default: google)
+0018:   --model <pattern>              Model pattern or ID (supports "provider/id" and optional ":<thinking>")
+0019:   --api-key <key>                API key (defaults to env vars)
+0020:   --system-prompt <text>         System prompt (default: coding assistant prompt)
+0021:   --append-system-prompt <text>  Append text or file contents to the system prompt (can be used multiple times)
+0022:   --mode <mode>                  Output mode: text (default), json, or rpc
+0023:   --print, -p                    Non-interactive mode: process prompt and exit
+0024:   --continue, -c                 Continue previous session
+0025:   --resume, -r                   Select a session to resume
+0026:   --session <path|id>            Use specific session file or partial UUID
+0027:   --session-id <id>              Use exact project session ID, creating it if missing
+0028:   --fork <path|id>               Fork specific session file or partial UUID into a new session
+0029:   --session-dir <dir>            Directory for session storage and lookup
+0030:   --no-session                   Don't save session (ephemeral)
+0031:   --name, -n <name>              Set session display name
+0032:   --models <patterns>            Comma-separated model patterns for Ctrl+P cycling
+0033:                                  Supports globs (anthropic/*, *sonnet*) and fuzzy matching
+0034:   --no-tools, -nt                Disable all tools by default (built-in and extension)
+0035:   --no-builtin-tools, -nbt       Disable built-in tools by default but keep extension/custom tools enabled
+0036:   --tools, -t <tools>            Comma-separated allowlist of tool names to enable
+0037:                                  Applies to built-in, extension, and custom tools
+0038:   --exclude-tools, -xt <tools>   Comma-separated denylist of tool names to disable
+0039:                                  Applies to built-in, extension, and custom tools
+0040:   --thinking <level>             Set thinking level: off, minimal, low, medium, high, xhigh, max
+0041:   --extension, -e <path>         Load an extension file (can be used multiple times)
+0042:   --no-extensions, -ne           Disable extension discovery (explicit -e paths still work)
+0043:   --skill <path>                 Load a skill file or directory (can be used multiple times)
+0044:   --no-skills, -ns               Disable skills discovery and loading
+0045:   --prompt-template <path>       Load a prompt template file or directory (can be used multiple times)
+0046:   --no-prompt-templates, -np     Disable prompt template discovery and loading
+0047:   --theme <path>                 Load a theme file or directory (can be used multiple times)
+0048:   --use-theme <name[/name]>      Set the initial interactive theme for this run
+0049:   --no-themes                    Disable theme discovery and loading
+0050:   --no-context-files, -nc        Disable AGENTS.md and CLAUDE.md discovery and loading
+0051:   --export <file>                Export session file to HTML and exit
+0052:   --list-models [search]         List available models (with optional fuzzy search)
+0053:   --verbose                      Force verbose startup (overrides quietStartup setting)
+0054:   --tui-mode <mode>              TUI mode: regular (default) or fullscreen
+0055:   --approve, -a                  Trust project-local files for this run
+0056:   --no-approve, -na              Ignore project-local files for this run
+0057:   --offline                      Disable startup network operations (same as PI_OFFLINE=1)
+0058:   --help, -h                     Show this help
+0059:   --version, -v                  Show version number
+0060: 
+0061: Extensions can register additional flags (e.g., --plan from plan-mode extension).
+0062: 
+0063: Examples:
+0064:   # Print a provider API key for an external client
+0065:   pi auth print-api-key --provider openai
+0066: 
+0067:   # Print an OAuth bearer token for an external client (refreshes if expired)
+0068:   pi auth print-bearer-token --provider openai-codex
+0069: 
+0070:   # Interactive mode
+0071:   pi
+0072: 
+0073:   # Interactive mode with initial prompt
+0074:   pi "List all .ts files in src/"
+0075: 
+0076:   # Include files in initial message
+0077:   pi @prompt.md @image.png "What color is the sky?"
+0078: 
+0079:   # Non-interactive mode (process and exit)
+0080:   pi -p "List all .ts files in src/"
+0081: 
+0082:   # Multiple messages (interactive)
+0083:   pi "Read package.json" "What dependencies do we have?"
+0084: 
+0085:   # Continue previous session
+0086:   pi --continue "What did we discuss?"
+0087: 
+0088:   # Start a named session
+0089:   pi --name "Refactor auth module"
+0090: 
+0091:   # Use different model
+0092:   pi --provider openai --model gpt-4o-mini "Help me refactor this code"
+0093: 
+0094:   # Use model with provider prefix (no --provider needed)
+0095:   pi --model openai/gpt-4o "Help me refactor this code"
+0096: 
+0097:   # Use model with thinking level shorthand
+0098:   pi --model sonnet:high "Solve this complex problem"
+0099: 
+0100:   # Limit model cycling to specific models
+0101:   pi --models claude-sonnet,claude-haiku,gpt-4o
+0102: 
+0103:   # Limit to a specific provider with glob pattern
+0104:   pi --models "github-copilot/*"
+0105: 
+0106:   # Cycle models with fixed thinking levels
+0107:   pi --models sonnet:high,haiku:low
+0108: 
+0109:   # Start with a specific thinking level
+0110:   pi --thinking high "Solve this complex problem"
+0111: 
+0112:   # Read-only mode (no file modifications possible)
+0113:   pi --tools read,grep,find,ls -p "Review the code in src/"
+0114: 
+0115:   # Disable one tool while keeping the rest available
+0116:   pi --exclude-tools ask_question
+0117: 
+0118:   # Export a session file to HTML
+0119:   pi --export ~/.pi/agent/sessions/--path--/session.jsonl
+0120:   pi --export session.jsonl output.html
+0121: 
+0122: Environment Variables:
+0123:   ANTHROPIC_AUTH_TOKEN             - Anthropic bearer auth token
+0124:   ANTHROPIC_API_KEY                - Anthropic Claude API key
+0125:   ANTHROPIC_OAUTH_TOKEN            - Anthropic OAuth token (alternative to API key)
+0126:   ANT_LING_API_KEY                 - Ant Ling API key
+0127:   OPENAI_API_KEY                   - OpenAI GPT API key
+0128:   AZURE_OPENAI_API_KEY             - Azure OpenAI API key
+0129:   AZURE_OPENAI_BASE_URL            - Azure OpenAI/Cognitive Services base URL (e.g. https://{resource}.openai.azure.com)
+0130:   AZURE_OPENAI_RESOURCE_NAME       - Azure OpenAI resource name (alternative to base URL)
+0131:   AZURE_OPENAI_API_VERSION         - Azure OpenAI API version (default: v1)
+0132:   AZURE_OPENAI_DEPLOYMENT_NAME_MAP - Azure OpenAI model=deployment map (comma-separated)
+0133:   DEEPSEEK_API_KEY                 - DeepSeek API key
+0134:   NVIDIA_API_KEY                   - NVIDIA NIM API key
+0135:   GEMINI_API_KEY                   - Google Gemini API key
+0136:   GROQ_API_KEY                     - Groq API key
+0137:   CEREBRAS_API_KEY                 - Cerebras API key
+0138:   XAI_API_KEY                      - xAI Grok API key
+0139:   FIREWORKS_API_KEY                - Fireworks API key
+0140:   TOGETHER_API_KEY                 - Together AI API key
+0141:   BASETEN_API_KEY                  - Baseten API key
+0142:   OPENROUTER_API_KEY               - OpenRouter API key
+0143:   AI_GATEWAY_API_KEY               - Vercel AI Gateway API key
+0144:   ZAI_API_KEY                      - ZAI Coding Plan API key (Global)
+0145:   ZAI_CODING_CN_API_KEY            - ZAI Coding Plan API key (China)
+0146:   MISTRAL_API_KEY                  - Mistral API key
+0147:   MINIMAX_API_KEY                  - MiniMax API key
+0148:   MOONSHOT_API_KEY                 - Moonshot AI API key
+0149:   OPENCODE_API_KEY                 - OpenCode Zen/OpenCode Go API key
+0150:   KIMI_API_KEY                     - Kimi For Coding API key
+0151:   CLOUDFLARE_API_KEY               - Cloudflare API token (Workers AI and AI Gateway)
+0152:   CLOUDFLARE_ACCOUNT_ID            - Cloudflare account id (required for both)
+0153:   CLOUDFLARE_GATEWAY_ID            - Cloudflare AI Gateway slug (required for AI Gateway)
+0154:   QWEN_TOKEN_PLAN_API_KEY          - Qwen Token Plan API key (international region)
+0155:   QWEN_TOKEN_PLAN_CN_API_KEY       - Qwen Token Plan API key (China region)
+0156:   XIAOMI_API_KEY                   - Xiaomi MiMo API key (api.xiaomimimo.com billing)
+0157:   XIAOMI_TOKEN_PLAN_CN_API_KEY     - Xiaomi MiMo Token Plan API key (China region)
+0158:   XIAOMI_TOKEN_PLAN_AMS_API_KEY    - Xiaomi MiMo Token Plan API key (Amsterdam region)
+0159:   XIAOMI_TOKEN_PLAN_SGP_API_KEY    - Xiaomi MiMo Token Plan API key (Singapore region)
+0160:   AWS_PROFILE                      - AWS profile for Amazon Bedrock
+0161:   AWS_ACCESS_KEY_ID                - AWS access key for Amazon Bedrock
+0162:   AWS_SECRET_ACCESS_KEY            - AWS secret key for Amazon Bedrock
+0163:   AWS_BEARER_TOKEN_BEDROCK         - Bedrock API key (bearer token)
+0164:   AWS_REGION                       - AWS region for Amazon Bedrock (e.g., us-east-1)
+0165:   PI_CODING_AGENT_DIR              - Config directory (default: ~/.pi/agent)
+0166:   PI_CODING_AGENT_SESSION_DIR      - Session storage directory (overridden by --session-dir)
+0167:   PI_PACKAGE_DIR                   - Override package directory (for Nix/Guix store paths)
+0168:   PI_OFFLINE                       - Disable startup network operations when set to 1/true/yes
+0169:   PI_TELEMETRY                     - Override install telemetry when set to 1/true/yes or 0/false/no
+0170:   PI_SHARE_VIEWER_URL              - Base URL for /share command (default: https://pi.dev/session/)
+0171: 
+0172: Built-in Tool Names:
+0173:   read   - Read file contents
+0174:   bash   - Execute bash commands
+0175:   edit   - Edit files with find/replace
+0176:   write  - Write files (creates/overwrites)
+0177:   grep   - Search file contents (read-only, off by default)
+0178:   find   - Find files by glob pattern (read-only, off by default)
+0179:   ls     - List directory contents (read-only, off by default)
+0180: 

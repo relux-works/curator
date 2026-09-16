@@ -1,0 +1,2 @@
+# Handoff note — TASK-260916-vht714 (2026-09-16)
+The blocker (TASK-260916-2timlf) is now done, so the handoff is admitted. The drafts you filed are still in the Story worktree (uncommitted). Do: `git status --porcelain` shows only decisions/0017-environment-credential-modes.md, decisions/0018-curator-run-permission-interface.md and UNRESOLVED_QUESTIONS.md (plus any index the convention requires); `PATH="$PWD/.temp/venv/bin:$PATH" make validate` exit 0 (quote it); then `task-board handoff TASK-260916-vht714 --role developer` in the foreground. No other changes.

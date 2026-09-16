@@ -1,0 +1,10 @@
+# TASK-260916-2timlf: astra-report-credential-and-permission-modes
+
+## Description
+Research report (no code): current behaviour and design options for (a) environment credential modes shared|isolated and (b) a curator run permission interface mapped to native flags. Inspect: curator internal/envregistry/envregistry.go (Passthrough per env and GOOS, seeds, CredentialScope), internal/envprofile/managed.go (seed/passthrough application, backups, takeover), curator-spec profiles/manager.md §7 (managed homes, passthrough), §12.1 knobs, environments spec sections on secrets (secret_material_waivers, passable_env_names); curator-agent-launcher internal/cli/cli.go (--ax-profile), README SPEC §4 (flags, defaults), agents-infra legacy `agents-infra claude|codex -d|--yolo` behaviour (skill-agents-management repo) for parity; Claude Code, Codex CLI and Pi documentation/`--help` for the exact native permission-bypass flags and for where each stores credentials on macOS (Claude: Keychain item Claude Code-credentials vs .credentials.json; Codex: auth.json; Pi: auth.json).
+
+## Scope
+(define task scope)
+
+## Acceptance Criteria
+Report TASK-<id>_report.md covers: (1) current state matrix per env x platform (credential store, passthrough strategy, observed behaviour on host e11-1 from TASK-260908-yl5x3k evidence); (2) option analysis for credential modes: knob shape (machine config, lockable, per env), strategies (file-link, keychain-shared, copy-at-provision with waiver, isolated), security implications, migration for existing managed homes; (3) option analysis for the permission interface: flag name/values, per-env native mapping table with exact flags verified from --help, refusal when a tool lacks an equivalent, interplay with --ax-profile and with defaults.json (never default to yolo), audit/provenance; (4) recommended design for both with spec touchpoints (which sections of which spec change) and implementation touchpoints (curator, launcher); (5) open questions. Facts cite file:line or command output.
