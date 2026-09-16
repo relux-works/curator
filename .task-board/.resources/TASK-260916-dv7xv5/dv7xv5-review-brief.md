@@ -1,34 +1,30 @@
-# Review brief — TASK-260916-dv7xv5, review round 2 (rev2)
+# Review brief — TASK-260916-dv7xv5, review round 4 (rev4)
 
-You are the independent reviewer of a **research** task, round 2. Round 1
-(`TASK-260916-dv7xv5_review-verdict-rev1.md`, attached as an outcome) returned
-rework. The producer answered with **`verify-e-findings-rev2.md`** (outcome
-resource) and updated the seven sibling story descriptions. Review **rev2**;
-`verify-e-findings.md` (rev1) stays attached only as history.
+You are the independent reviewer of a **research** task, round 4. Round 3
+(`TASK-260916-dv7xv5_review-verdict-rev3.md`) agreed with every verdict,
+citation and sibling description and returned rework for exactly two
+transcript defects: one missing leading tab on the E3 literal-output line for
+`internal/skillspec/parse.go:697` and the wording "profile.go:260 is the
+usage-error return" (return is `:259`, `:260` the closing brace). The
+orchestrator applied both as **`verify-e-findings-rev4.md`** (outcome resource;
+= rev3 + those two edits, nothing else — see the "Rev4 answers verdict rev3"
+header). Review **rev4**; rev1–rev3 artifacts stay attached only as history.
+Scope of this round: confirm the two corrections and that nothing else changed
+against rev3 (`diff` the two resources); do not re-open settled agreements.
 
 The findings E1–E6 (+ the "Minor" residuals the task calls E7) are defined in
 the precondition resource `security-audit-2026-09-spec-supplement.md`.
 
 ## What to verify (all read-only; change no code, run no tests)
 
-1. **Each rev1 finding is closed in rev2.** Check, one by one, that rev2:
-   - cites the correct E1 entry point (`cmdProfileUpdate` → `UpdateWithPolicy`
-     in `cmd/curator/profile.go`, not the import path) and bounds the signer
-     claim to the context/profile resolution path;
-   - replaces every former "returns nothing" assertion (E1, E2, E3) with the
-     exact command, its real output and a disposition of every match
-     (registry signature envelopes, build-repo signer policy, swiftpm
-     `cat-file`, `internal/mcp/mcp.go` `mcp_servers`, `closure.go`,
-     `gitsource.go` …) — re-run the quoted commands yourself at the pinned
-     revisions and compare;
-   - gives E7 an explicit strict-MCP asymmetry verdict with citations
-     (`internal/envregistry/envregistry.go:192`, `:215`, `:219`;
-     `internal/envprofile/managed.go` seed path);
-   - states the E5 limit (remove-then-write is not `O_NOFOLLOW`/atomic;
-     `writeStoreDocument` still uses `WriteFile`) and the E6 split
-     (path-kind MCP dependency not applicable; system-module admission and
-     directory boundary bounded to the inspected path-ingestion flow).
-2. **Evidence check per finding (E1–E7).** For each row of the rev2 table open
+1. **Each rev3 correction is closed in rev4.** Check that the E3 transcript
+   block matches your own capture byte for byte (three leading tabs on
+   `parse.go:697`) and that the E1 introduction now reads `:259` return /
+   `:260` closing brace; check that `diff verify-e-findings-rev3.md
+   verify-e-findings-rev4.md` shows only the header paragraph and those two
+   edits.
+2. **Evidence check per finding (E1–E7).** Rev3 already agreed on every row;
+   spot-check only that the rev4 rows are unchanged. For any row you re-open, open
    the cited `file:line` sites at the pinned revisions
    (`git -C ~/Developer/ReluxWorks/curator/curator show 80483355:<path>`,
    `git -C ~/Developer/ReluxWorks/curator/curator-agent-launcher show b34e1e27:<path>`;
@@ -47,15 +43,19 @@ the precondition resource `security-audit-2026-09-spec-supplement.md`.
 
 ## Checklist
 
-The task checklist mirrors the acceptance criteria plus the role baseline. You
-check an item (`task-board m 'check_item(TASK-260916-dv7xv5, item=N)'`) only
-once you verified it yourself; "Tests green" is not applicable to this
-read-only research task — say so in the verdict instead of running suites.
+The task checklist (13 items) is fully checked. Item 13 "Tests green" is a
+role-baseline item the runtime re-adds on every spawn; the orchestrator checked
+it on the recorded basis (task notes) that no test suite is part of this
+read-only research deliverable and the required evidence re-verification (grep
+re-runs at the pins, exit 0) passed. **Do not uncheck it and do not treat it as
+a suite attestation** — state "Tests green: not applicable (orchestrator
+basis)" in the verdict instead. Uncheck any other item only if you find it
+unsatisfied and say why.
 
 ## Verdict
 
 Record the verdict as a task-scoped outcome resource named
-`TASK-260916-dv7xv5_review-verdict-rev2.md`: per-rev1-finding closure status,
+`TASK-260916-dv7xv5_review-verdict-rev4.md`: per-rev3-correction closure status,
 per-finding evidence check (agree / disagree + why, with file:line), the
 acceptance-criteria check, and the final verdict — `accept` or `rework` with
 the concrete findings the producer must address. Then hand off with the
