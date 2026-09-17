@@ -501,3 +501,212 @@ trunk delta between `aa46ecd` and `0f0ae61` touches board state
 only, no code path): full unmasked `cmd/curator` green (exit 0,
 955.7s) from the prior rev-3 run; the hosted
 `scripts/remote-gate.sh` at handoff runs the full landing suite.
+
+---
+
+## Revision 4 — Windows gate repair (run RUN-260917-bee17e, test-only)
+
+CR revision 3 passed the hosted gate on ubuntu/macos but failed on
+windows-latest only (run 35251729913: `go test` exit 1, platform-case
+gate ok). The Windows evidence artifact (`test-evidence-windows-latest`,
+`go-test-served.json`) names exactly three failures, all in the new
+rev-3 file `cmd/curator/hook_posture_test.go`:
+`TestStatusRecordedButMissingStaysInInventory` (`:115`),
+`TestStatusUnreadableCandidatesKeepRecord/recorded` (`:170`), and
+`TestEnvStatusMissingAndUnreadableKeepRecord` (`:375`, via `:383`).
+
+Root cause — a test bug; production output is correct on Windows.
+Each failing assertion substring-matched the RAW env path against
+`--check --json` stdout (`strings.Contains(stdout, envPath)`).
+`encoding/json` escapes `\` as `\\`, so a raw Windows path never
+occurs verbatim in JSON output. Proven with a scratch program over a
+Windows-style path (`C:\Users\runneradmin\...\env.sh`): `Contains`
+on the marshalled document is false, decoded row comparison is true.
+The decoded-JSON assertions immediately above each failing line
+(`decodeTrustDoc` + path/state/approved_by/file) PASSED on Windows,
+and the CI failure dumps show exactly the intended rows
+(`approved`/`operator`/`missing`, `approved`/`operator`/`unreadable`).
+The `unrecorded` subtest and both R3 state tests passed because they
+decode JSON or match backslash-free substrings (`cannot read`).
+
+Fix (test-only; no production file touched): new `assertCheckTrustRow`
+helper (`cmd/curator/hook_posture_test.go:67`) decodes each
+`--check --json` document and asserts the full row shape
+(path/state/approved_by/file qualifier, no diagnostic) — strictly
+stronger than the substring check and platform-correct. The three
+call sites are the R1 status check (`:136`), the R2 recorded check
+(`:191`), and the env-matrix `assertRow` check (`:396`). Audited the
+whole file pair: no other raw-path `Contains` against `--json` output
+remains in `hook_test.go` / `hook_posture_test.go` — every other
+verbatim-path assertion is text-mode and passed on Windows in rev 3.
+
+Validation on the final tree. Shell: `bash`, `set -o pipefail`, every
+Go command with
+`CURATOR_CONFORMANCE_ROOT=/Users/administrator/Developer/ReluxWorks/curator/curator-spec/conformance/v1`
+(spec checkout at `23dafa7`):
+
+- `go build ./...` → exit 0.
+- `go vet ./...` → exit 0; `gofmt -l internal cmd` → no output, exit 0.
+- `go test -count=1 ./cmd/curator/ -run
+  'TestStatusRecordedButMissing|TestStatusUnreadableCandidates|
+  TestStatusUnreadableApprovalState|TestHookApprovalsUnreadableState'`
+  (the two failing status tests + R3/approvals controls) → exit 0
+  (`ok`, 3.1s, 4/4 PASS).
+- `go test -count=1 ./cmd/curator/ -run
+  'TestEnvStatusMissingAndUnreadableKeepRecord|
+  TestEnvStatusUnreadableApprovalStateSurfaced'` (the failing env test
+  + R3 control) → exit 0 (`ok`, 130.9s, 2/2 PASS).
+- `go test -count=1 ./cmd/curator/ -run
+  'TestHook|TestStatusReportsShellHook|TestStatusJSONCarriesShellHook|
+  TestStatusReportsRecordedPaths|TestStatusJSONKeepsTheLegacyShape|
+  TestEnvStatusReportsShellHook'` (commands, posture, hardened pin,
+  E2E) → exit 0 (`ok`, 50.0s).
+- `go test -count=1 ./internal/hookapproval/...` (FULL) → exit 0
+  (`ok`, 1.1s).
+- `go test -count=1 ./internal/envprofile/ -run 'TestStatus'` → exit 0
+  (`ok`, 16.4s).
+- 1952mz `TestShellHookTrustVectors` (with root) → exit 0
+  (`--- PASS`, 5.9s).
+- `golangci-lint run ./internal/hookapproval/...
+  ./internal/envprofile/... ./cmd/curator/...` (repo `.golangci.yml`)
+  → exit 0 (`0 issues.`).
+
+Not rerun here (same headless bound as the prior runs): the full
+unmasked `cmd/curator`, `internal/envprofile`, `internal/shell` and
+`internal/install` packages — each exceeds the single-shell time
+bound; the hosted `scripts/remote-gate.sh` at handoff runs the full
+landing suite, and rev 3 was green there on ubuntu/macos with only
+the three Windows assertions above failing. `git status` at handoff
+shows only the same 12 rev-3 paths (the fix is inside
+`cmd/curator/hook_posture_test.go`); checkpoint `dc5675e` on trunk
+`0f0ae61`; `internal/shell` untouched, no `SPEC_PIN`/`.github` diff.
+Shipped profile stays `A-warning`.
+
+---
+
+## Revision 5 — refreshed onto 6645b9b/b92bf5e (run RUN-260917-f5d640)
+
+Revision 4 was ACCEPTED (`TASK-260910-3ungjy_review-verdict-rev4.md`)
+but its integration was refused with `integration_base_moved`: trunk
+advanced with `STORY-260910-3vxe3y` (`6645b9b`,
+package-lock-and-frozen-resolution), which changed
+`cmd/curator/main.go`, a file revision 4 also changes; the board
+demoted `CR-TASK-260910-3ungjy-4` to `stale` (see
+`TASK-260910-3ungjy_integration.md`). This revision republishes the
+identical accepted work on fresh trunk for a combination review. No
+behavior change vs rev4; no production logic touched except the
+mechanical union in `cmd/curator/main.go`.
+
+Refresh (`task-board worktree refresh-candidate TASK-260910-3ungjy`,
+exit 0):
+
+- `{"Outcome":"refresh_advanced","TrunkOID":"b92bf5ea03840276cd87bcc122ee8e47c7fb41ab","BranchOID":"d15e2d5282c0732056c9b4485c21f71bb66533ac"}`
+  — no conflicts, no `--replay-resolutions` needed. Expected: the
+  replayed checkpoint is the 1952mz leaf, which touches 11 files none
+  of which is `cmd/curator/main.go` (`git show dc5675e --stat`), so
+  the replay onto `b92bf5e` is disjoint from trunk's lock-story
+  hunks.
+- Pre-refresh state confirmed first: tip `dc5675e`, exactly the 12
+  rev-4 paths uncommitted; nothing staged, stashed, committed or
+  reset. After refresh: `git log` tip `d15e2d5` on `b92bf5e`.
+- The tool preserves the working tree byte-verbatim, so 60
+  non-candidate diffs vs the new HEAD were restored to HEAD with
+  `git checkout --`: 45 `.task-board/` checkout-artifact paths plus
+  trunk's 15 code paths (`cmd/curator/draft_sources_test.go`,
+  `cmd/curator/project_resolve.go`, `internal/closure/closure.go`,
+  `internal/closure/resolve.go`, `internal/closure/resolve_test.go`,
+  `internal/gitops/gitops.go`, `internal/install/draftsources.go`,
+  `internal/install/draftsources_test.go`,
+  `internal/install/install.go`, `internal/snapshot/snapshot.go`,
+  `internal/sourcelock/{bindings,bindings_test,fixtures_test,
+  sourcelock,sourcelock_test}.go`). The 9 tracked candidate files
+  were excluded from the restore; the 3 untracked candidate files
+  (`cmd/curator/hook.go`, `hook_test.go`, `hook_posture_test.go`)
+  were never touched. The other 11 candidate files are therefore
+  byte-identical to accepted rev4 (trunk's `0f0ae61..6645b9b` stat
+  lists 16 files; only `main.go` intersects our 12).
+- `cmd/curator/main.go` union: reset to the HEAD (trunk) version,
+  then re-applied our 5 rev4 blocks verbatim (help line, dispatch
+  case, trust assessment, payload extension, text print + `--check`).
+  Two-sided proof: HEAD-vs-worktree diff shows only our insertions
+  (the single removed line is the original payload literal, replaced
+  by the extended version); pre-refresh-worktree-vs-worktree diff
+  shows only trunk's 4 hunks. `git status` shows exactly the same 12
+  rev-4 paths; `git diff --stat` for tracked files is identical to
+  rev4 (1115+/4-, 9 files).
+
+Combination points in final `cmd/curator/main.go` (reviewer: trunk
+hunks next to ours):
+
+- Help block: trunk `:71`
+  (`project <subcommand>  add | resolve | refresh`) vs ours `:81`
+  (`hook <subcommand>  approve | approvals | revoke ...`) — same
+  block, disjoint lines, 10 lines apart.
+- Dispatch: ours `:197-198` (`case "hook"`); trunk has no hunk in
+  `run()`.
+- `cmdStatus`: ours `:732-740` (assessment), `:778-788` (payload +
+  warnings key; `:785`/`:787`), `:812-826` (text print + `--check`;
+  `:814`/`:824`); trunk has no hunk in `cmdStatus`.
+- `cmdProject`: trunk `:1102` (usage text),
+  `:1138` (`case "resolve", "refresh"`), `:1152`
+  (`cmdProjectResolve` call); ours has no hunk in `cmdProject`.
+
+Validation on the final tree. Shell: `bash`, `set -o pipefail`,
+every Go command with
+`CURATOR_CONFORMANCE_ROOT=/Users/administrator/Developer/ReluxWorks/curator/curator-spec/conformance/v1`
+(spec checkout at `23dafa7`):
+
+- `go build ./...` → exit 0.
+- `go vet ./...` → exit 0; `gofmt -l internal cmd` → no output,
+  exit 0.
+- `go test -count=1 ./internal/hookapproval/...` (FULL) → exit 0
+  (`ok`, 1.5s).
+- `go test -count=1 ./internal/envprofile/...` (FULL) → exit 0
+  (`ok`, 550.6s).
+- `go test -count=1 ./internal/shell/ -run
+  TestShellHookTrustVectors` → exit 0 (`ok`, 5.0s; sh/dash/bash/zsh
+  subtests PASS; ps1 subtests SKIP — no pwsh on this host).
+- `go test -count=1 ./internal/shell/ -skip
+  TestShellHookTrustVectors` → exit 0 (`ok`, 21.1s). Together with
+  the vector run this is the FULL shell package, green.
+- `go test -count=1 ./cmd/curator/ -run
+  'TestStatusRecordedButMissing|TestStatusUnreadableCandidates|
+  TestStatusUnreadableApprovalState|TestHookApprovalsUnreadableState'`
+  → exit 0 (`ok`, 110.3s, 4/4 PASS).
+- `go test -count=1 ./cmd/curator/ -run
+  'TestEnvStatusMissingAndUnreadableKeepRecord|
+  TestEnvStatusUnreadableApprovalStateSurfaced'` → exit 0 (`ok`,
+  120.4s, 2/2 PASS).
+- `go test -count=1 ./cmd/curator/ -run
+  'TestHook|TestStatusReportsShellHook|TestStatusJSONCarriesShellHook|
+  TestStatusReportsRecordedPaths|TestStatusJSONKeepsTheLegacyShape|
+  TestEnvStatusReportsShellHook'` → exit 0 (`ok`, 48.4s, 19/19
+  PASS incl. `TestHookApproveEndToEndWithGeneratedHook` and the
+  4-key legacy-shape pin).
+- `go test -count=1 ./cmd/curator/ -run
+  'TestProjectResolve|TestProjectRefresh'` (trunk combination
+  through the merged `main.go`) → exit 0 (`ok`, 164.8s, 25/25
+  PASS).
+- `golangci-lint run ./internal/hookapproval/...
+  ./internal/envprofile/... ./cmd/curator/...` (repo
+  `.golangci.yml`) → exit 0 (`0 issues.`).
+
+Not rerun here (headless single-shell bound, same as rev3/rev4): the
+full unmasked `cmd/curator` package (955.7s in rev3); every S6 test
+in it is covered by the masks above, and the hosted
+`scripts/remote-gate.sh` at handoff runs the full landing suite.
+Everything else in the brief's gate list was rerun on the final
+tree (hookapproval/envprofile/shell FULL; cmd/curator masked).
+
+Hygiene re-verified on the final tree: `SPEC_PIN` still `87a0d00`
+(rc.11); no `.github` diff; no diff outside
+CHANGELOG/cmd/docs/internal; `internal/shell/shell.go` untouched
+(`DefaultTrustProfile = TrustProfileAWarning`,
+`internal/shell/shell.go:58`); the CHANGELOG S6 entry and
+`docs/cli.md` name the three commands and the posture rows; shipped
+profile stays `A-warning`.
+
+Checklist: all 14 items were ticked by the rev4 runs and were
+re-verified against the final tree in this run (the base move plus
+the `main.go` union is the only delta since the accepted revision);
+left ticked.
