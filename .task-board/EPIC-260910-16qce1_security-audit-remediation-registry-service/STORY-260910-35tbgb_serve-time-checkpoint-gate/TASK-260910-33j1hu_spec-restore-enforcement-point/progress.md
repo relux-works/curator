@@ -1,5 +1,5 @@
 ## Status
-to-review
+done
 
 ## Review
 required
@@ -55,12 +55,22 @@ spawn run started: [implementer] doc-writer (muse) (run=RUN-260917-eb9031)
 R3/P2 rev2 ready for review: F1 fixed — require_checkpoint_scenario pins all 7 checkpoint names to their mandatory input predicates on the production main() path; 8 new tests (4 required passing-replacements + 3 reverse-direction + 1 main-entry); reviewer probe re-run 4/4 rejected (exit 1). Other 7 files byte-identical to rev1 patch. validate.py exit 0, unittest 318 OK in bounded splits (78+54+85+101), go test exit 0 direct, regen identical over 1197 files. Rev2 patch + updated evidence attached.
 agent completed: [implementer] doc-writer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260917-eb9031, pid=70780, exit=0)
+spawn selection rationale tuple: {"role":"reviewer","pair":"gpt-6-astra/low","text":"Review of the R3+P2 curator-spec revision 2 (validator scenario pinning closure) with a replacement probe, make validate and the regeneration proof; gpt-6-astra:low is the admitted codex reviewer pair and the operator's review policy, independent of the muse producer"}
+spawn selection rationale for gpt-6-astra/low: Review of the R3+P2 curator-spec revision 2 (validator scenario pinning closure) with a replacement probe, make validate and the regeneration proof; gpt-6-astra:low is the admitted codex reviewer pair and the operator's review policy, independent of the muse producer
+spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn queued: [reviewer] reviewer (codex) (run=RUN-260917-d88a13, max_parallel=20)
+spawn run started: [reviewer] reviewer (codex) (run=RUN-260917-d88a13)
+agent completed: [reviewer] reviewer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260917-d88a13, pid=40029, exit=0)
+
+External integration evidence: curator-spec PR #66 landed by fast-forward push: main 47c3c8cbd5da5e3fd6d99b0327d382c6a36494fe (signed, Relux Bot) = accepted spec revision 2 candidate tree plus the E1 landing 684c9f1 (per-file identical hunks, additive CHANGELOG union, regenerated manifest/rc.9); all 9 check runs green; comment review posted
 
 ## Precondition Resources
 - [remediation-spec-producer-rules.md](file://TASK-260910-33j1hu/remediation-spec-producer-rules.md) — Campaign rules for curator-spec producers and reviewers
 - [TASK-260910-33j1hu_brief.md](file://TASK-260910-33j1hu/TASK-260910-33j1hu_brief.md) — Producer brief (R3/P2 restore-checkpoint enforcement point)
 - [TASK-260910-33j1hu_review-brief.md](file://TASK-260910-33j1hu/TASK-260910-33j1hu_review-brief.md) — Reviewer brief for spec revision 1 (R3+P2)
 - [TASK-260910-33j1hu_rework-rev2.md](file://TASK-260910-33j1hu/TASK-260910-33j1hu_rework-rev2.md) — Rework brief for revision 2 (F1: pin scenario predicates in the validator gate)
+- [TASK-260910-33j1hu_review-brief-rev2.md](file://TASK-260910-33j1hu/TASK-260910-33j1hu_review-brief-rev2.md) — Reviewer brief for spec revision 2 (R3+P2)
 
 ## Outcome Resources
 - [TASK-260910-33j1hu_spawn-log_-implementer--doc-writer--muse-_RUN-260917-29500f.log](file://TASK-260910-33j1hu/TASK-260910-33j1hu_spawn-log_-implementer--doc-writer--muse-_RUN-260917-29500f.log) — System spawn log captured by task-board
@@ -75,12 +85,20 @@ spawn run completed: muse (run=RUN-260917-eb9031, pid=70780, exit=0)
 - [TASK-260910-33j1hu_review-verdict-rev1.md](file://TASK-260910-33j1hu/TASK-260910-33j1hu_review-verdict-rev1.md) — Changes requested: mandatory checkpoint scenario coverage not pinned by validator
 - [TASK-260910-33j1hu_spawn-log_-implementer--doc-writer--muse-_RUN-260917-eb9031.log](file://TASK-260910-33j1hu/TASK-260910-33j1hu_spawn-log_-implementer--doc-writer--muse-_RUN-260917-eb9031.log) — System spawn log captured by task-board
 - [TASK-260910-33j1hu_spec-patch_rev2.patch](file://TASK-260910-33j1hu/TASK-260910-33j1hu_spec-patch_rev2.patch) — Rev2 spec patch: git diff HEAD of curator-spec story worktree (F1 scenario pin)
+- [TASK-260910-33j1hu_change-request_rev2.patch](file://TASK-260910-33j1hu/TASK-260910-33j1hu_change-request_rev2.patch) — Change Request CR-TASK-260910-33j1hu-2 revision 2 candidate patch (repository_delta=empty, 0 changed paths)
+- [TASK-260910-33j1hu_change-request_rev2-validation.log](file://TASK-260910-33j1hu/TASK-260910-33j1hu_change-request_rev2-validation.log) — Change Request CR-TASK-260910-33j1hu-2 revision 2 bounded validation log
+- [TASK-260910-33j1hu_spawn-log_-reviewer--reviewer--codex-_RUN-260917-d88a13.log](file://TASK-260910-33j1hu/TASK-260910-33j1hu_spawn-log_-reviewer--reviewer--codex-_RUN-260917-d88a13.log) — System spawn log captured by task-board
+- [TASK-260910-33j1hu_review-probe-rev2.py](file://TASK-260910-33j1hu/TASK-260910-33j1hu_review-probe-rev2.py) — Independent published-case replacement probe through validate.main
+- [TASK-260910-33j1hu_review-probe-rev2.log](file://TASK-260910-33j1hu/TASK-260910-33j1hu_review-probe-rev2.log) — F1 closure: 4/4 replacements rejected, unmodified control accepted
+- [TASK-260910-33j1hu_review-test-slices-rev2.py](file://TASK-260910-33j1hu/TASK-260910-33j1hu_review-test-slices-rev2.py) — Bounded discovery-suite continuation harness
+- [TASK-260910-33j1hu_review-validation-rev2.log](file://TASK-260910-33j1hu/TASK-260910-33j1hu_review-validation-rev2.log) — Independent validation: 318 tests covered, schema/vector and Go gates, explicit bounded interruption
+- [TASK-260910-33j1hu_review-verdict-rev2.md](file://TASK-260910-33j1hu/TASK-260910-33j1hu_review-verdict-rev2.md) — Accepted revision 2: F1 closed; exact patch, full split validation, regeneration, and scope evidence
 
 ## Created
 2026-09-10T14:46:44Z
 
 ## Last Update
-2026-09-17T17:04:36Z
+2026-09-17T18:22:40Z
 
 ## Assigned To
-[implementer] doc-writer (muse)
+[reviewer] reviewer (codex)
