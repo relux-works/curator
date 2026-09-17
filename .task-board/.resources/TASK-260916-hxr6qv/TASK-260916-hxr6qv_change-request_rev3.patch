@@ -1,0 +1,3649 @@
+diff --git a/cmd/curator/draft_transport_provenance_test.go b/cmd/curator/draft_transport_provenance_test.go
+new file mode 100644
+index 0000000..0979dba
+--- /dev/null
++++ b/cmd/curator/draft_transport_provenance_test.go
+@@ -0,0 +1,362 @@
++package main
++
++// Production provenance-sink wiring (rework P1): productionExternalDeps
++// must assign a live manager-home operation-diagnostics sink for the
++// sanitized resolved-lane records. A nil/removed assignment fails this
++// test by construction.
++
++import (
++	"encoding/json"
++	"fmt"
++	"os"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/buildrepo"
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/install"
++)
++
++func TestProductionExternalDepsAssignsTransportProvenanceSink(t *testing.T) {
++	t.Parallel()
++	home := t.TempDir()
++	cfg := &config.Config{Path: filepath.Join(home, "config.json")}
++	deps := productionExternalDeps(cfg, true)
++	if deps.DraftTransportTrace == nil {
++		t.Fatal("production DraftTransportTrace is nil: resolved-lane provenance dies with the call")
++	}
++	record := buildrepo.AttemptRecord{Index: 1, URL: "https://mirror.fixture.test/repository.git",
++		Transport: "https", Provider: "mirror-https",
++		Identity: "fixture.test/repository", ResolvedHost: "mirror.fixture.test",
++		MirrorOf: "fixture.test/repository", NetworkAttempted: true, Succeeded: true}
++	deps.DraftTransportTrace(record)
++	payload, err := os.ReadFile(install.DraftTransportProvenancePath(home))
++	if err != nil {
++		t.Fatalf("production sink wrote nothing to the manager home: %v", err)
++	}
++	lines := strings.Split(strings.TrimSuffix(string(payload), "\n"), "\n")
++	if len(lines) != 1 {
++		t.Fatalf("sink lines = %d, want 1", len(lines))
++	}
++	var line map[string]any
++	if err := json.Unmarshal([]byte(lines[0]), &line); err != nil {
++		t.Fatalf("sink line is not JSON: %v", err)
++	}
++	for key, want := range map[string]any{
++		"identity": "fixture.test/repository", "url": "https://mirror.fixture.test/repository.git",
++		"resolved_host": "mirror.fixture.test", "mirror_of": "fixture.test/repository",
++	} {
++		if line[key] != want {
++			t.Errorf("sink[%q] = %v, want %v", key, line[key], want)
++		}
++	}
++	// The sink serializes a fixed allowlisted shape: any future record
++	// field (and any secret) stays out unless explicitly named here.
++	allowed := map[string]bool{"index": true, "identity": true, "url": true, "transport": true,
++		"provider": true, "class": true, "network_attempted": true, "succeeded": true,
++		"resolved_host": true, "resolved_port": true, "alias": true, "mirror_of": true}
++	for key := range line {
++		if !allowed[key] {
++			t.Errorf("sink carries unallowlisted field %q", key)
++		}
++	}
++	// Machine-private, never portable: the sink resolves under the
++	// manager home that productionExternalDeps was constructed with.
++	if !strings.HasPrefix(install.DraftTransportProvenancePath(home), home+string(filepath.Separator)) {
++		t.Errorf("sink path escapes the manager home")
++	}
++}
++
++// TestProductionExternalDepsFalseDrivesMirrorFetchToSink is the rework-2
++// production-composition proof (repository-transport §§6-7): an ACTUAL
++// external operation through productionExternalDeps(cfg, false) — a real
++// `install app` (dryRun=false) over a temporary machine policy with a
++// listed mirror and a fake transport that fails the primary and succeeds
++// on the mirror — keeping the constructed sink.
++//
++// It asserts in the actual machine-private sink: the canonical identity
++// (never an alias/mirror host), the listed mirror URL with its resolved
++// mirror host and mirror_of attestation, and no broker secret. It asserts
++// the emitted portable artifacts (stdout/stderr, cache receipts, install
++// markers, project manifest — the lock/receipt/marker/manifest family)
++// carry no endpoint provenance and no secret.
++//
++// Both mutants must fail it: a removed sink (nil trace) leaves no sink
++// file, and a dry-run-only sink (assigned only when dryRun is true)
++// leaves no sink file for this dryRun=false run. Product code is
++// untouched; this test only drives the production CLI path.
++func TestProductionExternalDepsFalseDrivesMirrorFetchToSink(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("test transport wrapper is POSIX-only; production code is platform-neutral")
++	}
++	fixture := setupDraftCLI(t)
++	const secretMarker = "zz-secret-marker-260916-prod"
++	const mirrorHost = "mirror.fixture.test"
++	const mirrorURL = "https://mirror.fixture.test/https-tools.git"
++	const httpsIdentity = "fixture.test/https-tools"
++	const sshIdentity = "fixture.test/ssh-tools"
++
++	policy := `{"schema_version":2,"repositories":{` +
++		`"fixture.test/https-tools":{"endpoints":[` +
++		`{"url":"https://fixture.test/https-tools.git","authentication":"prov-a"},` +
++		`{"url":"https://mirror.fixture.test/https-tools.git","authentication":"prov-a","mirror_of":"fixture.test/https-tools"}` +
++		`],"fallback":"availability-auth"},` +
++		`"fixture.test/ssh-tools":{"endpoints":[` +
++		`{"url":"ssh://git@fixture.test/ssh-tools.git","authentication":"operator-acme"}` +
++		`],"fallback":"none"}}}`
++
++	providers := fmt.Sprintf(`{"schema_version":1,"providers":{`+
++		`"prov-a":{"https":{"username":"a"}},`+
++		`"operator-acme":{"https":{"anonymous":true},"ssh":{"identity":%q,"known_hosts":%q}}}}`,
++		fixture.identity, fixture.knownHosts)
++
++	fakeDir, logPath := fixture.installDraftFakeGit(t, map[string]draftCLIArm{
++		draftCLIHTTPS: {stderr: draftCLIDNSStderr},
++		mirrorURL:     {succeed: true, fileRepo: fixture.httpsBare},
++		draftCLISSH:   {succeed: true, fileRepo: fixture.sshBare},
++	}, map[string]string{"prov-a": secretMarker})
++
++	// Production composition uses process environment (PATH for git
++	// discovery, the draft switch) exactly like runDraftInstall, but this
++	// run is a REAL install (dryRun=false) so productionExternalDeps is
++	// constructed with false. Manual save/restore keeps the run bounded
++	// and isolated; this test never runs in parallel.
++	saved := map[string]*string{}
++	set := map[string]string{
++		"PATH":                              fakeDir + string(os.PathListSeparator) + fixture.origPath,
++		"GIT_SSH":                           fixture.staticSSH,
++		"CURATOR_BUILD_SSH_IDENTITY":        fixture.identity,
++		"CURATOR_BUILD_SSH_KNOWN_HOSTS":     fixture.knownHosts,
++		install.EnvDraftTransportResolution: "1",
++	}
++	unset := []string{"SSH_AUTH_SOCK", "CURATOR_BUILD_SSH_AGENT", "CURATOR_BUILD_HTTPS_TOKEN", "CURATOR_BUILD_HTTPS_HOST"}
++	for key := range set {
++		if value, ok := os.LookupEnv(key); ok {
++			held := value
++			saved[key] = &held
++		} else {
++			saved[key] = nil
++		}
++	}
++	for _, key := range unset {
++		if _, seen := saved[key]; seen {
++			continue
++		}
++		if value, ok := os.LookupEnv(key); ok {
++			held := value
++			saved[key] = &held
++		} else {
++			saved[key] = nil
++		}
++	}
++	defer func() {
++		for key, held := range saved {
++			if held == nil {
++				_ = os.Unsetenv(key)
++			} else {
++				_ = os.Setenv(key, *held)
++			}
++		}
++	}()
++	for key, value := range set {
++		if err := os.Setenv(key, value); err != nil {
++			t.Fatal(err)
++		}
++	}
++	for _, key := range unset {
++		if err := os.Unsetenv(key); err != nil {
++			t.Fatal(err)
++		}
++	}
++	if err := os.WriteFile(fixture.policyPath, []byte(policy), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(fixture.providersPath, []byte(providers), 0o644); err != nil {
++		t.Fatal(err)
++	}
++
++	home := filepath.Dir(fixture.configPath)
++	cfgCheck := &config.Config{Path: fixture.configPath}
++	depsCheck := productionExternalDeps(cfgCheck, false)
++	if depsCheck.DraftTransportTrace == nil {
++		t.Fatal("productionExternalDeps(cfg, false) left DraftTransportTrace nil: real-operation provenance dies with the call (removed-sink and dry-run-only mutants fail here)")
++	}
++	if !depsCheck.DraftTransportResolution {
++		t.Fatal("productionExternalDeps(cfg, false) did not honour the draft switch from the environment")
++	}
++	sinkPath := install.DraftTransportProvenancePath(home)
++	if _, err := os.Stat(sinkPath); !os.IsNotExist(err) {
++		t.Fatalf("sink %q exists before the real operation, want absent", sinkPath)
++	}
++
++	code, stdout, stderr := capture(t, fixture.configPath, "install", "app")
++	if code != exitOK {
++		t.Fatalf("real install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	// A real install fetches twice per repository: once for the
++	// read-only plan and once for staging. Both phases run the resolved
++	// lane with the production sink, so the primary/mirror/ssh pattern
++	// repeats exactly.
++	fetches := draftCLIFetchLines(t, logPath)
++	if len(fetches) != 6 {
++		t.Fatalf("%d fetches, want 6 (plan primary/mirror/ssh + stage primary/mirror/ssh):\n%s", len(fetches), strings.Join(fetches, "\n"))
++	}
++	for i, want := range []string{draftCLIHTTPS, mirrorURL, draftCLISSH, draftCLIHTTPS, mirrorURL, draftCLISSH} {
++		if !strings.Contains(fetches[i], "<"+want+">") {
++			t.Fatalf("fetch %d = %q, want %q\n%s", i, fetches[i], want, strings.Join(fetches, "\n"))
++		}
++	}
++
++	payload, err := os.ReadFile(sinkPath)
++	if err != nil {
++		t.Fatalf("real-operation sink missing at %q (nil/removed and dry-run-only mutants fail here): %v", sinkPath, err)
++	}
++	if strings.Contains(string(payload), secretMarker) {
++		t.Fatalf("machine-private sink leaks broker secret material")
++	}
++	lines := strings.Split(strings.TrimSuffix(string(payload), "\n"), "\n")
++	if len(lines) != 6 {
++		t.Fatalf("sink lines = %d, want 6 (plan primary/mirror/ssh + stage primary/mirror/ssh):\n%s", len(lines), string(payload))
++	}
++	var decoded []map[string]any
++	for _, raw := range lines {
++		var line map[string]any
++		if err := json.Unmarshal([]byte(raw), &line); err != nil {
++			t.Fatalf("sink line is not JSON: %q: %v", raw, err)
++		}
++		decoded = append(decoded, line)
++	}
++	// The mirror success records (one per phase) carry the canonical
++	// identity with the listed URL, the resolved mirror host, and the
++	// mirror_of attestation — never the mirror host as identity.
++	var mirrorLines []map[string]any
++	for _, line := range decoded {
++		if line["url"] == mirrorURL {
++			mirrorLines = append(mirrorLines, line)
++		}
++		identity, _ := line["identity"].(string)
++		if identity == mirrorHost || identity == mirrorURL {
++			t.Errorf("sink identity = %q, want the canonical key, never the mirror", identity)
++		}
++		if url, _ := line["url"].(string); strings.Contains(url, secretMarker) {
++			t.Errorf("sink url leaks secret: %q", url)
++		}
++	}
++	if len(mirrorLines) != 2 {
++		t.Fatalf("sink mirror records = %d, want 2 (plan + stage) for %q:\n%s", len(mirrorLines), mirrorURL, string(payload))
++	}
++	for _, mirrorLine := range mirrorLines {
++		for key, want := range map[string]any{
++			"identity": httpsIdentity, "url": mirrorURL,
++			"resolved_host": mirrorHost, "mirror_of": httpsIdentity,
++		} {
++			if mirrorLine[key] != want {
++				t.Errorf("mirror sink[%q] = %v, want %v (line %v)", key, mirrorLine[key], want, mirrorLine)
++			}
++		}
++		if mirrorLine["succeeded"] != true {
++			t.Errorf("mirror sink succeeded = %v, want true", mirrorLine["succeeded"])
++		}
++	}
++	allowed := map[string]bool{"index": true, "identity": true, "url": true, "transport": true,
++		"provider": true, "class": true, "network_attempted": true, "succeeded": true,
++		"resolved_host": true, "resolved_port": true, "alias": true, "mirror_of": true}
++	for _, line := range decoded {
++		for key := range line {
++			if !allowed[key] {
++				t.Errorf("sink carries unallowlisted field %q (line %v)", key, line)
++			}
++		}
++	}
++	// Every record names a canonical identity, never an alias/mirror.
++	for _, line := range decoded {
++		identity, _ := line["identity"].(string)
++		if identity != httpsIdentity && identity != sshIdentity {
++			t.Errorf("sink identity = %q, want %q or %q", identity, httpsIdentity, sshIdentity)
++		}
++	}
++
++	// Portable artifacts (lock/receipt/marker/manifest family) must carry
++	// no endpoint provenance and no secret. Stdout/stderr are the
++	// operator-visible portable surface; the cache and installed markers
++	// are the on-disk portable surfaces. The machine policy and the
++	// machine-private sink legitimately contain the mirror address and
++	// are excluded by construction (we never walk home root, only the
++	// portable cache and install outputs).
++	combined := stdout + stderr
++	if strings.Contains(combined, secretMarker) {
++		t.Errorf("portable CLI output leaks broker secret")
++	}
++	if strings.Contains(combined, mirrorHost) || strings.Contains(combined, mirrorURL) {
++		t.Errorf("portable CLI output carries endpoint provenance:\nstdout:\n%s\nstderr:\n%s", stdout, stderr)
++	}
++	assertPortableClean := func(path string, data []byte) {
++		t.Helper()
++		if strings.Contains(string(data), secretMarker) {
++			t.Errorf("portable artifact %q leaks broker secret", path)
++		}
++		if strings.Contains(string(data), mirrorHost) || strings.Contains(string(data), mirrorURL) {
++			t.Errorf("portable artifact %q carries endpoint provenance", path)
++		}
++	}
++	// Receipts: protected build-cache entries published by the real install.
++	for _, entry := range publishedCacheEntries(t, home) {
++		entries, err := os.ReadDir(entry)
++		if err != nil {
++			t.Fatal(err)
++		}
++		for _, child := range entries {
++			childPath := filepath.Join(entry, child.Name())
++			info, err := child.Info()
++			if err != nil {
++				t.Fatal(err)
++			}
++			if info.IsDir() {
++				continue
++			}
++			// Binaries are large; a bounded prefix still proves absence
++			// of the ASCII provenance markers without reading megabytes.
++			data, err := os.ReadFile(childPath)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if len(data) > 1<<20 {
++				data = data[:1<<20]
++			}
++			assertPortableClean(childPath, data)
++		}
++	}
++	// Markers: installed-skill markers under the project.
++	project := filepath.Join(fixture.root, "project")
++	_ = filepath.Walk(project, func(path string, info os.FileInfo, err error) error {
++		if err != nil {
++			return err
++		}
++		if info.IsDir() {
++			if info.Name() == ".git" {
++				return filepath.SkipDir
++			}
++			return nil
++		}
++		// The project input manifest is checked separately below; the
++		// walk covers emitted markers and installed outputs.
++		data, err := os.ReadFile(path)
++		if err != nil {
++			return err
++		}
++		if len(data) > 1<<20 {
++			data = data[:1<<20]
++		}
++		// Skip the sink-adjacent machine policy only if the walk ever
++		// reaches home (it does not: we walk the project only).
++		assertPortableClean(path, data)
++		return nil
++	})
++	// Manifest (portable project manifest) carries the declaration, never
++	// the connection address.
++	if manifestData, err := os.ReadFile(filepath.Join(project, "Skillfile.json")); err == nil {
++		assertPortableClean("Skillfile.json", manifestData)
++	}
++}
+diff --git a/cmd/curator/main.go b/cmd/curator/main.go
+index bdd22e4..0e871bd 100644
+--- a/cmd/curator/main.go
++++ b/cmd/curator/main.go
+@@ -1495,6 +1495,12 @@ func productionExternalDeps(cfg *config.Config, dryRun bool) install.ExternalDep
+ 	deps.DraftPolicyPath = filepath.Join(cfg.Home(), config.SourcePolicyFileName)
+ 	deps.DraftProvidersPath = filepath.Join(cfg.Home(), config.SourceProvidersFileName)
+ 	deps.DraftProviderReader = gitcred.Access{}
++	// Sanitized resolved-lane provenance reaches the manager-home
++	// operation-diagnostics log, never a portable artifact. The sink is
++	// always assigned so a real opted-in acquisition records its
++	// canonical identity with the listed and resolved mirror provenance;
++	// the legacy lane never invokes it.
++	deps.DraftTransportTrace = install.DraftTransportProvenanceTrace(cfg.Home())
+ 	deps.AuditWarnings = func(_ context.Context, subject buildrepo.AuditSubject) ([]string, error) {
+ 		candidate := audit.Subject{
+ 			Name: subject.Declared.Repository, Source: subject.Declared.Identity,
+diff --git a/docs/draft-source-policy.md b/docs/draft-source-policy.md
+index 88f24ad..fcd7984 100644
+--- a/docs/draft-source-policy.md
++++ b/docs/draft-source-policy.md
+@@ -1,26 +1,54 @@
+ # Draft repository endpoint policy boundary
+ 
+-This is an internal implementation of unreleased `repository-transport-v1`
+-revision 1 (machine policy loading and attempt planning), not an enabled
+-fetch path. Frozen v1 and release qualification are unchanged.
++This is an internal implementation of unreleased `repository-transport`
++revisions 1 and 2 (machine policy loading and attempt planning), not an
++enabled fetch path. Frozen v1 and release qualification are unchanged.
+ 
+ `config.LoadSourcePolicy` reads the operator-owned `source-policy.json`
+ beside the manager configuration; `config.ParseSourcePolicy` validates
+-one document. Entries are keyed by exact canonical identity
++one document. Schema 1 loads with revision-1 semantics byte-identically
++to the pre-revision-2 loader (ports, `mirror_of`, `alias`, and the
++`aliases` table are rejected there as unknown fields or lane-grammar
++violations). Schema 2 (`schema_version: 2`) loads as the additive
++superset of §4: port-bearing endpoint and pin URLs, per-endpoint
++`mirror_of` attestation, and the operator host-alias table.
++
++Entries are keyed by exact canonical identity
+ (`identity.DraftCanonicalKey`, no normalization); each lists one or two
+-distinct closed-grammar endpoints that canonicalize to the key, an opaque
+-operator provider reference per endpoint (`gitcred.ValidProvider`, never
+-a command or path), and a closed fallback mode. `pin` selects exactly one
+-listed URL by exact string equality and forces no fallback.
++distinct endpoints, an opaque operator provider reference per endpoint
++(`gitcred.ValidProvider`, never a command or path), and a closed
++fallback mode. `pin` selects exactly one listed URL by exact string
++equality — including any port — and forces no fallback.
++
++Canonical host/path is the only portable identity (§5). Ports, mirrors,
++and aliases are machine-policy endpoint properties carried per attempt
++(`config.Attempt`: `MirrorOf`, `Alias`, `ResolvedHost`,
++`ResolvedPort`, `HasExplicitPort`) and never enter identity, the lock,
++receipts, markers, or allowlist matching. A port never changes receipt
++or cache identity beyond the existing `https`/`ssh` transport enum.
++Endpoint URLs admit an explicit port only in URI form
++(`https://host[:port]/path`, `ssh://[user@]host[:port]/path`, decimal
++`1`–`65535`, no leading zeros); scp-like spellings carry no port. The
++port-stripped path of every endpoint must equal the key path; only the
++host may differ, and only with `mirror_of` equal to the key exactly. A
++differing resolved host without attestation fails
++`repository_mirror_undeclared`; an `alias` naming no table entry fails
++`repository_alias_unknown`; every other misuse (mismatch or spurious
++attestation, mirror URL combined with an alias, embedded alias host,
++chained alias, double port, authentication mismatch, pin mismatch, bad
++port or alias grammar) fails `repository_policy_invalid` — all before
++any network I/O, with zero attempts and no fallback.
+ 
+ `config.ResolveRepositoryEndpoints` plans attempts for one declaration
+ without network I/O: a URL without an entry attempts the declared URL
+ once with no policy provider; a logical identity without an entry fails
+ `repository_endpoint_unavailable`; an invalid or unreadable policy fails
+-`repository_policy_invalid` before any acquisition. A schema-2 document
+-is rejected closed: revision 2 ports, mirrors, and aliases need a
+-revision-2 reader and are a separate leaf.
++`repository_policy_invalid` before any acquisition. Package declarations
++stay canonical and logical and never name aliases.
+ 
+-This layer plans only. Failure classification, credential resolution,
+-and fetch attempts belong to transport application; root-input existence
+-is proven at acquisition time, not at load.
++This layer plans only. Attempt bounds over ports/mirrors/aliases, the
++§6 failure classification beyond the loader's fail-closed rows,
++provenance recording, and the strict external-build lane refusals (§7)
++are implemented by the sibling resolution leaf
++(`buildrepo.AcquireNetworkResolved` behind
++`install.acquireDraftNetwork`); see `docs/draft-transport-resolution.md`.
+diff --git a/docs/draft-transport-resolution.md b/docs/draft-transport-resolution.md
+index 0468d60..f07063c 100644
+--- a/docs/draft-transport-resolution.md
++++ b/docs/draft-transport-resolution.md
+@@ -71,10 +71,47 @@ creation (after plan validation, with no attempt recorded) rather than
+ run with an unbounded tree; the legacy lane keeps its WaitDelay-bound
+ behavior there unchanged.
+ 
+-Revision 2 ports, mirrors, and aliases need a revision-2 reader and are
+-a separate leaf. `buildsource` was inspected and needs no change:
+-locked-content verification for network acquisition is the lane's
+-raw-object proof, reused per attempt.
++Revision 2 ports, mirrors, and aliases (repository-transport §§5-7)
++resolve through the same executor. `config.ResolveRepositoryEndpoints`
++plans the §6 attempt order over the revision-2 reader's model
++(`mirror_of`, `alias`, resolved connection host and port per attempt);
++the executor revalidates the single resolved-host predicate over the
++carried values — `repository_mirror_undeclared` for a differing
++resolved host without attestation, `repository_policy_invalid` for
++every misuse — with zero attempts, no fallback, and no cache shortcut.
++The two-endpoint cap, one attempt per endpoint, no implicit retry, the
++shared total deadline, and the revision-1 fallback table are unchanged:
++ports, mirrors, and aliases are properties of an endpoint, not new
++attempts, so a declared mirror or aliased endpoint that fails with an
++availability/authentication error follows the ordinary
++`availability-auth` rule. `buildsource` was inspected and needs no
++change: locked-content verification for network acquisition is the
++lane's raw-object proof, reused per attempt, identically for mirrors.
++
++The strict external-build lane admits only the port-free, alias-free
++subset (§7): a selected endpoint with an explicit port (URL port or
++alias port) or an `alias` field fails
++`build_repository_identity_invalid` at plan validation, before any
++network I/O — the lane never strips a port or ignores an alias to
++force admission, and the SSH wrapper keeps its closed fixed argv. A
++mirror endpoint without ports or aliases is an ordinary lane URL and
++fetches with verification identical to revision 1, proving the same
++canonical identity and locked content.
++
++Sanitized endpoint provenance rides each machine-private attempt
++record: the canonical plan identity (never an alias or mirror host),
++the listed URL with its port, the resolved connection host and port,
++and the alias and `mirror_of` properties when used. Records never
++carry fetch output or secrets. Exhaustion still reports only the
++closed class vocabulary with the canonical identity; full URLs reach
++only the trace callback. Provenance never enters portable artifacts:
++no port field is added to receipt inputs (the existing
++declared/effective `https`/`ssh` transport enum is unchanged), and
++locks, markers, and manifests are untouched. User Git/SSH
++configuration (`~/.ssh/config` Host aliases, `insteadOf`,
++`ProxyCommand`, helpers, environment overrides) is never consulted:
++the lane pins its own configuration paths, broker, and wrapper, and
++fetches the declared URL literally when no policy entry applies.
+ 
+ ## Production caller (draft)
+ 
+@@ -88,16 +125,29 @@ no caller here mints it, so resolution always starts from the declared URL.
+ `install.acquireDraftNetwork` loads the machine policy beside the loaded
+ manager configuration, resolves the declared URL with
+ `config.ResolveRepositoryEndpoints`, converts the `config.Resolution` to a
+-`TransportPlan` field-for-field, and calls `AcquireNetworkResolved`. A
+-present policy selects the resolved lane; an absent policy file, or the
+-switch off, runs `AcquireNetwork` with the exact legacy request — the
+-switch-off path never opens the policy file. A present-but-invalid policy
+-fails `repository_policy_invalid` before any fetch. On Windows the executor
+-refuses with `transport_resolution_unsupported_platform` before any
+-process creation; the CLI pipeline reports every acquisition failure as
+-the lane diagnostic, so the typed code is visible only below the
+-pipeline. The trace callback is nil:
+-sanitized attempt records have no machine-private CLI sink yet.
++`TransportPlan` field-for-field — including the revision-2 `mirror_of`,
++`alias`, and resolved connection address — and calls
++`AcquireNetworkResolved`. A present policy selects the resolved lane; an
++absent policy file, or the switch off, runs `AcquireNetwork` with the
++exact legacy request — the switch-off path never opens the policy file.
++A present-but-invalid policy fails `repository_policy_invalid` before
++any fetch; an unattested mirror fails `repository_mirror_undeclared`
++and a dangling alias fails `repository_alias_unknown`, both with zero
++fetches. A selected port or alias endpoint fails
++`build_repository_identity_invalid` in this strict lane before any
++fetch. On Windows the executor refuses with
++`transport_resolution_unsupported_platform` before any process
++creation; the CLI pipeline reports every acquisition failure as the
++lane diagnostic, so the typed code is visible only below the pipeline.
++The trace callback is `ExternalDeps.DraftTransportTrace`, assigned by
++the production CLI to `install.DraftTransportProvenanceTrace(cfg.Home())`:
++sanitized attempt records append as one JSON line per endpoint to the
++manager-home operation diagnostics log
++`draft-transport-provenance.jsonl` (mode 0600, fixed allowlisted fields
++only: canonical identity, listed URL, resolved host and port, alias and
++`mirror_of` when used, lane transport, provider identifier, outcome) —
++never portable artifacts. The legacy lane never invokes it, so
++switch-off runs create no file.
+ 
+ Policy-named providers resolve only through the operator's provider table,
+ `source-providers.json` beside the manager configuration, read through
+diff --git a/internal/buildrepo/transport.go b/internal/buildrepo/transport.go
+index 3517894..975e4bd 100644
+--- a/internal/buildrepo/transport.go
++++ b/internal/buildrepo/transport.go
+@@ -376,9 +376,32 @@ func ClassifyAdmissionCode(code string) FailureClass {
+ // empty Authentication names no policy provider: the attempt uses the
+ // existing lane credentials from the base request, which is the only
+ // shape a URL declaration without a policy entry produces.
++//
++// Revision-2 endpoints (repository-transport §§5-7) carry machine-policy
++// endpoint properties beside the URL: MirrorOf attests a resolved
++// connection host that differs from the plan identity host, Alias names
++// the operator alias the connection substitutes, and ResolvedHost,
++// ResolvedPort and HasExplicitPort record the resulting connection
++// address (alias target when an alias is named, else the URL host and
++// URL port, else the transport default). The executor revalidates the
++// §6 predicate over these carried values before any network I/O; the
++// alias-table structural checks (chaining, authentication match,
++// embedded hosts) stay loader-enforced, since the plan carries no table.
+ type TransportAttempt struct {
+-	URL            string
+-	Authentication string
++	URL             string
++	Authentication  string
++	MirrorOf        string
++	Alias           string
++	ResolvedHost    string
++	ResolvedPort    int
++	HasExplicitPort bool
++}
++
++// carriesRevision2 reports whether the attempt carries any revision-2
++// endpoint property. A bare revision-1 attempt carries none: its
++// resolved address is the URL itself.
++func (a TransportAttempt) carriesRevision2() bool {
++	return a.MirrorOf != "" || a.Alias != "" || a.ResolvedHost != "" || a.ResolvedPort != 0 || a.HasExplicitPort
+ }
+ 
+ // TransportPlan is the ordered attempt plan for one declaration: one or
+@@ -403,13 +426,24 @@ func (p TransportPlan) isLegacyShape() bool {
+ // are never commands or paths. Violations fail repository_policy_invalid:
+ // a plan always derives from machine policy, so a malformed plan is a
+ // malformed policy.
++//
++// Revision-2 attempts additionally carry the §5 endpoint properties
++// (mirror_of, alias, resolved connection address), which are revalidated
++// against the §6 predicate here. An attempt with an explicit port or an
++// alias field then fails build_repository_identity_invalid: this
++// executor runs the strict external-build lane, whose URL grammar admits
++// neither, and the lane must never strip a port or ignore an alias to
++// force admission (§7). A declared mirror without ports or aliases is an
++// ordinary lane URL and remains admissible.
+ func ValidateTransportPlan(plan TransportPlan) error {
+ 	_, err := parseTransportPlan(plan)
+ 	return err
+ }
+ 
+ // parseTransportPlan validates the plan and returns the parsed lane
+-// sources in attempt order.
++// sources in attempt order. Revision-1 attempts take the original
++// checks byte-identically; revision-2 attempts additionally pass the §6
++// predicate and the §7 lane-grammar refusal.
+ func parseTransportPlan(plan TransportPlan) ([]Source, error) {
+ 	if len(plan.Attempts) < 1 || len(plan.Attempts) > 2 {
+ 		return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan requires one or two attempts")
+@@ -423,12 +457,30 @@ func parseTransportPlan(plan TransportPlan) ([]Source, error) {
+ 	sources := make([]Source, 0, len(plan.Attempts))
+ 	seen := map[string]bool{}
+ 	for index, attempt := range plan.Attempts {
+-		parsed, err := ParseSource(attempt.URL)
++		urlHost, urlPort, hasURLPort, strippedIdentity, err := parseTransportEndpointURL(attempt.URL)
+ 		if err != nil {
++			if attempt.carriesRevision2() {
++				return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d is outside the revision-2 endpoint grammar", index+1)
++			}
+ 			return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d is outside the closed repository grammar", index+1)
+ 		}
+-		if parsed.Identity != plan.Identity {
+-			return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d canonicalizes to %q, want %q", index+1, parsed.Identity, plan.Identity)
++		if !attempt.carriesRevision2() {
++			// A port-bearing URL without revision-2 provenance is a
++			// mistranslation, never a silently stripped endpoint.
++			if hasURLPort {
++				return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d carries an explicit port without revision-2 provenance", index+1)
++			}
++			if strippedIdentity != plan.Identity {
++				return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d canonicalizes to %q, want %q", index+1, strippedIdentity, plan.Identity)
++			}
++		} else if err := checkTransportRevision2(plan.Identity, index, attempt, urlHost, urlPort, hasURLPort, strippedIdentity); err != nil {
++			return nil, err
++		}
++		// The strict lane admits no explicit port and no alias
++		// rewriting: refuse before any network I/O rather than strip
++		// the port or fetch the unsubstituted URL (§7).
++		if attempt.HasExplicitPort || attempt.Alias != "" {
++			return nil, admissionError(CodeIdentityInvalid, "transport plan endpoint %d carries an explicit port or host alias outside the strict external-build lane grammar", index+1)
+ 		}
+ 		if seen[attempt.URL] {
+ 			return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoints must be distinct URLs")
+@@ -437,11 +489,170 @@ func parseTransportPlan(plan TransportPlan) ([]Source, error) {
+ 		if attempt.Authentication != "" && !gitcred.ValidProvider(attempt.Authentication) {
+ 			return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d authentication is not an opaque operator provider identifier", index+1)
+ 		}
++		// Port and alias attempts never reach here: they are refused
++		// above, so the listed URL always parses under the lane's
++		// closed grammar. A declared mirror is an ordinary lane URL.
++		parsed, err := ParseSource(attempt.URL)
++		if err != nil {
++			return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d is outside the closed repository grammar", index+1)
++		}
+ 		sources = append(sources, parsed)
+ 	}
+ 	return sources, nil
+ }
+ 
++// CodeRepositoryMirrorUndeclared names the published §6 class for a
++// resolved connection host that differs from the plan identity host
++// without a mirror_of attestation equal to the identity. Zero attempts,
++// no fallback.
++const CodeRepositoryMirrorUndeclared = "repository_mirror_undeclared"
++
++// checkTransportRevision2 revalidates one revision-2 attempt's §5
++// endpoint properties against the single §6 resolved-host predicate.
++// The alias-table structural checks (embedded alias hosts, chained
++// aliases, authentication match) stay loader-enforced: the plan carries
++// the resolved address, not the table, so this check enforces
++// consistency of the carried values with the URL and the identity.
++func checkTransportRevision2(planIdentity string, index int, attempt TransportAttempt, urlHost string, urlPort int, hasURLPort bool, strippedIdentity string) error {
++	endpoint := index + 1
++	keyHost, keyPath, _ := strings.Cut(planIdentity, "/")
++	_, epPath, _ := strings.Cut(strippedIdentity, "/")
++	// The port-stripped path must equal the identity path; only the
++	// host may differ, and only when attested.
++	if epPath != keyPath {
++		return admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d path %q is not the plan identity path %q; only the host may differ, and only when attested", endpoint, epPath, keyPath)
++	}
++	resolvedHost := attempt.ResolvedHost
++	if attempt.Alias == "" {
++		if resolvedHost == "" {
++			resolvedHost = urlHost
++		}
++		if resolvedHost != urlHost {
++			return admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d resolved host %q does not match the endpoint URL host %q", endpoint, resolvedHost, urlHost)
++		}
++		if attempt.HasExplicitPort != hasURLPort || attempt.ResolvedPort != urlPort {
++			return admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d resolved port does not match the endpoint URL port", endpoint)
++		}
++	} else {
++		// A mirror URL combined with an alias is refused: the URL
++		// host would be neither identity nor connection address.
++		if urlHost != keyHost {
++			return admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d combines a mirror URL with an alias", endpoint)
++		}
++		if resolvedHost == "" || !hostRE.MatchString(resolvedHost) {
++			return admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d names an alias without a resolved connection host", endpoint)
++		}
++		// A URL port and an alias port must not both be present: the
++		// resolved port differs from the URL port only through the
++		// alias port, so a carried port that equals neither reading
++		// (or the absence pattern it breaks) is a mistranslation.
++		if hasURLPort && attempt.HasExplicitPort && attempt.ResolvedPort != 0 && attempt.ResolvedPort != urlPort {
++			return admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d carries both a URL port and an alias port", endpoint)
++		}
++		if attempt.HasExplicitPort != (attempt.ResolvedPort != 0) || (hasURLPort && (!attempt.HasExplicitPort || attempt.ResolvedPort != urlPort)) {
++			return admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d resolved port does not match the endpoint URL port", endpoint)
++		}
++	}
++	if resolvedHost != keyHost {
++		if attempt.MirrorOf == "" {
++			return admissionError(CodeRepositoryMirrorUndeclared, "transport plan endpoint %d resolved host %q differs from the plan identity host %q without a mirror_of attestation", endpoint, resolvedHost, keyHost)
++		}
++		if attempt.MirrorOf != planIdentity {
++			return admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d mirror_of must equal the plan identity %q exactly", endpoint, planIdentity)
++		}
++	} else if attempt.MirrorOf != "" {
++		return admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d mirror_of is forbidden when the resolved host equals the plan identity host", endpoint)
++	}
++	return nil
++}
++
++// parseTransportEndpointURL validates a §5 endpoint URL: the lane's
++// closed grammar plus an optional explicit port on URI forms only
++// (https://host[:port]/path, ssh://[user@]host[:port]/path), decimal
++// 1-65535 with no leading zeros. Scp-like spellings carry no port: the
++// segment after ":" is always the path. It returns the lowercased URL
++// host, the explicit port (0 when absent), and the port-stripped lane
++// identity the key-path check applies to. Port-free URLs behave exactly
++// as ParseSource: stripped input equals raw input.
++func parseTransportEndpointURL(raw string) (urlHost string, urlPort int, hasPort bool, identity string, err error) {
++	stripped, port, hasExplicitPort, ok := splitTransportEndpointPort(raw)
++	if !ok {
++		return "", 0, false, "", fmt.Errorf("outside the revision-2 endpoint grammar")
++	}
++	parsed, parseErr := ParseSource(stripped)
++	if parseErr != nil {
++		return "", 0, false, "", parseErr
++	}
++	host, _, _ := strings.Cut(parsed.Identity, "/")
++	return host, port, hasExplicitPort, parsed.Identity, nil
++}
++
++// splitTransportEndpointPort separates an explicit URI-form port from
++// the endpoint URL. Every other spelling passes through unchanged.
++func splitTransportEndpointPort(raw string) (stripped string, port int, hasPort bool, ok bool) {
++	scheme := ""
++	rest := ""
++	if remainder, found := strings.CutPrefix(raw, "https://"); found {
++		scheme, rest = "https", remainder
++	} else if remainder, found := strings.CutPrefix(raw, "ssh://"); found {
++		scheme, rest = "ssh", remainder
++	} else {
++		return raw, 0, false, true
++	}
++	authority := rest
++	path := ""
++	if i := strings.Index(rest, "/"); i >= 0 {
++		authority, path = rest[:i], rest[i:]
++	}
++	hostport := authority
++	userinfo := ""
++	if i := strings.LastIndex(authority, "@"); i >= 0 {
++		userinfo, hostport = authority[:i], authority[i+1:]
++	}
++	if scheme == "https" && userinfo != "" {
++		return "", 0, false, false
++	}
++	host := hostport
++	if i := strings.LastIndex(hostport, ":"); i >= 0 {
++		value, valid := parseTransportPort(hostport[i+1:])
++		if !valid {
++			return "", 0, false, false
++		}
++		host, port, hasPort = hostport[:i], value, true
++	}
++	if host == "" {
++		return "", 0, false, false
++	}
++	rebuilt := scheme + "://"
++	if userinfo != "" {
++		rebuilt += userinfo + "@"
++	}
++	return rebuilt + host + path, port, hasPort, true
++}
++
++// parseTransportPort validates an explicit endpoint port: decimal
++// 1-65535 with no leading zeros.
++func parseTransportPort(value string) (int, bool) {
++	if value == "" || len(value) > 5 {
++		return 0, false
++	}
++	if len(value) > 1 && value[0] == '0' {
++		return 0, false
++	}
++	number := 0
++	for i := 0; i < len(value); i++ {
++		c := value[i]
++		if c < '0' || c > '9' {
++			return 0, false
++		}
++		number = number*10 + int(c-'0')
++	}
++	if number < 1 || number > 65535 {
++		return 0, false
++	}
++	return number, true
++}
++
+ // CodeRepositoryPolicyInvalid names the published malformed-policy class
+ // for plan-shape violations. It shares its spelling with the policy
+ // loader's diagnostic; both name the same §2 class.
+@@ -594,6 +805,14 @@ func (c CredentialProviders) ResolveSSH(provider string) (OperatorSSHCredentials
+ // endpoint: which URL was attempted with which provider, what class it
+ // failed with (empty on success), and whether any network traffic went
+ // out. Records never carry stderr or secrets.
++//
++// Revision-2 provenance (§7) rides the same record: the canonical plan
++// identity (never an alias or mirror host), the listed URL with its
++// port, the resolved connection host and port, and the alias and
++// mirror_of properties when used. The record stays machine-private:
++// identity, URLs, and hosts never enter portable artifacts (locks,
++// receipts, markers, manifests), and errors carry only the closed
++// class vocabulary.
+ type AttemptRecord struct {
+ 	Index int
+ 	URL   string
+@@ -608,6 +827,22 @@ type AttemptRecord struct {
+ 	// with no usable material records its auth failure with no traffic.
+ 	NetworkAttempted bool
+ 	Succeeded        bool
++	// Identity is the canonical repository identity the attempt proves,
++	// always the plan identity: ports, mirrors, and aliases never enter
++	// it.
++	Identity string
++	// ResolvedHost and ResolvedPort are the connection address the
++	// attempt dials: the alias target when an alias is named, else the
++	// endpoint URL host and port. ResolvedPort is 0 for the transport
++	// default.
++	ResolvedHost string
++	ResolvedPort int
++	// Alias names the operator alias substituted for this attempt, ""
++	// when the URL was dialed directly.
++	Alias string
++	// MirrorOf carries the mirror attestation when the resolved host
++	// differs from the identity host, "" otherwise.
++	MirrorOf string
+ }
+ 
+ // TransportTrace receives one AttemptRecord per planned endpoint, in
+@@ -679,7 +914,15 @@ func AcquireNetworkResolved(ctx context.Context, base NetworkRequest, plan Trans
+ 		return gateTransportAttempt(ctx, plan, records, record.Class, laneDiagnostic(err))
+ 	}
+ 	for index, attempt := range plan.Attempts {
+-		record := AttemptRecord{Index: index + 1, URL: attempt.URL, Transport: sources[index].Transport, Provider: attempt.Authentication}
++		// Provenance is bound before any traffic: the canonical plan
++		// identity with the attempt's own connection address (§7). A
++		// bare revision-1 attempt resolves to its URL host directly.
++		resolvedHost, resolvedPort := attempt.ResolvedHost, attempt.ResolvedPort
++		if resolvedHost == "" {
++			resolvedHost, _, _ = strings.Cut(sources[index].Identity, "/")
++		}
++		record := AttemptRecord{Index: index + 1, URL: attempt.URL, Transport: sources[index].Transport, Provider: attempt.Authentication,
++			Identity: plan.Identity, ResolvedHost: resolvedHost, ResolvedPort: resolvedPort, Alias: attempt.Alias, MirrorOf: attempt.MirrorOf}
+ 		request := base
+ 		request.Source = sources[index]
+ 		request.sshPolicy = nil
+diff --git a/internal/buildrepo/transport_v2_test.go b/internal/buildrepo/transport_v2_test.go
+new file mode 100644
+index 0000000..d2093b5
+--- /dev/null
++++ b/internal/buildrepo/transport_v2_test.go
+@@ -0,0 +1,290 @@
++package buildrepo
++
++import (
++	"strings"
++	"testing"
++)
++
++// Revision-2 plan validation (repository-transport §§6-7): the §6
++// resolved-host predicate over carried endpoint properties, the two new
++// failure classes, the attempt bound, and the strict-lane port/alias
++// refusal. No network I/O occurs here.
++
++// A declared mirror without ports or aliases is an ordinary lane URL:
++// validation succeeds and the lane source names the mirror endpoint.
++func TestValidateTransportPlanAdmitsDeclaredMirror(t *testing.T) {
++	t.Parallel()
++	plan := TransportPlan{
++		Identity: "example.org/kit",
++		Attempts: []TransportAttempt{{
++			URL: "https://mirror.example.net/kit.git", Authentication: "mirror-https",
++			MirrorOf: "example.org/kit", ResolvedHost: "mirror.example.net",
++		}},
++		Fallback: TransportFallbackNone,
++	}
++	sources, err := parseTransportPlan(plan)
++	if err != nil {
++		t.Fatalf("parseTransportPlan(mirror) = %v", err)
++	}
++	if len(sources) != 1 || sources[0].Git != "https://mirror.example.net/kit.git" || sources[0].Transport != "https" {
++		t.Fatalf("sources = %+v, want the listed mirror endpoint", sources)
++	}
++}
++
++// Every §6/§7 refusal row fails at plan validation with its published
++// class, before any network I/O.
++func TestValidateTransportPlanRevision2Refusals(t *testing.T) {
++	t.Parallel()
++	for _, testCase := range []struct {
++		name     string
++		attempts []TransportAttempt
++		fallback string
++		code     string
++	}{
++		{
++			"undeclared mirror",
++			[]TransportAttempt{{URL: "https://mirror.example.net/kit.git", Authentication: "mirror-https",
++				ResolvedHost: "mirror.example.net"}},
++			TransportFallbackNone, CodeRepositoryMirrorUndeclared,
++		},
++		{
++			// A mirror URL without any revision-2 provenance is not
++			// an attested mirror at all: it fails the revision-1
++			// identity check, still closed, still before any I/O.
++			"mirror URL without revision-2 provenance",
++			[]TransportAttempt{{URL: "https://mirror.example.net/kit.git", Authentication: "mirror-https"}},
++			TransportFallbackNone, CodeRepositoryPolicyInvalid,
++		},
++		{
++			"mirror_of mismatch",
++			[]TransportAttempt{{URL: "https://mirror.example.net/kit.git", Authentication: "mirror-https",
++				MirrorOf: "other.example/kit", ResolvedHost: "mirror.example.net"}},
++			TransportFallbackNone, CodeRepositoryPolicyInvalid,
++		},
++		{
++			"spurious mirror_of on same host",
++			[]TransportAttempt{{URL: "https://example.org/kit.git", Authentication: "team-https",
++				MirrorOf: "example.org/kit", ResolvedHost: "example.org"}},
++			TransportFallbackNone, CodeRepositoryPolicyInvalid,
++		},
++		{
++			"mirror path must equal the identity path",
++			[]TransportAttempt{{URL: "https://mirror.example.net/other.git", Authentication: "mirror-https",
++				MirrorOf: "example.org/kit", ResolvedHost: "mirror.example.net"}},
++			TransportFallbackNone, CodeRepositoryPolicyInvalid,
++		},
++		{
++			"https port refused in the strict lane",
++			[]TransportAttempt{{URL: "https://example.org:8443/kit.git", Authentication: "team-https",
++				ResolvedHost: "example.org", ResolvedPort: 8443, HasExplicitPort: true}},
++			TransportFallbackNone, CodeIdentityInvalid,
++		},
++		{
++			"ssh port refused in the strict lane",
++			[]TransportAttempt{{URL: "ssh://git@example.org:2222/kit.git", Authentication: "team-ssh",
++				ResolvedHost: "example.org", ResolvedPort: 2222, HasExplicitPort: true}},
++			TransportFallbackNone, CodeIdentityInvalid,
++		},
++		{
++			"alias refused in the strict lane even on the same host",
++			[]TransportAttempt{{URL: "https://example.org/kit.git", Authentication: "team-https",
++				Alias: "local-vip", ResolvedHost: "example.org"}},
++			TransportFallbackNone, CodeIdentityInvalid,
++		},
++		{
++			"alias refused in the strict lane on a mirror target",
++			[]TransportAttempt{{URL: "https://example.org/kit.git", Authentication: "team-https",
++				Alias: "corp-mirror", MirrorOf: "example.org/kit", ResolvedHost: "mirror.corp.example", ResolvedPort: 8443, HasExplicitPort: true}},
++			TransportFallbackNone, CodeIdentityInvalid,
++		},
++		{
++			"mirror URL combined with an alias",
++			[]TransportAttempt{{URL: "https://mirror.example.net/kit.git", Authentication: "mirror-https",
++				Alias: "corp-mirror", MirrorOf: "example.org/kit", ResolvedHost: "mirror.corp.example"}},
++			TransportFallbackNone, CodeRepositoryPolicyInvalid,
++		},
++		{
++			"alias without a resolved host",
++			[]TransportAttempt{{URL: "https://example.org/kit.git", Authentication: "team-https",
++				Alias: "corp-mirror"}},
++			TransportFallbackNone, CodeRepositoryPolicyInvalid,
++		},
++		{
++			"double port",
++			[]TransportAttempt{{URL: "https://example.org:8443/kit.git", Authentication: "team-https",
++				Alias: "corp-mirror", ResolvedHost: "example.org", ResolvedPort: 9443, HasExplicitPort: true}},
++			TransportFallbackNone, CodeRepositoryPolicyInvalid,
++		},
++		{
++			"resolved port mistranslation",
++			[]TransportAttempt{{URL: "https://example.org:8443/kit.git", Authentication: "team-https",
++				ResolvedHost: "example.org", ResolvedPort: 9443, HasExplicitPort: true}},
++			TransportFallbackNone, CodeRepositoryPolicyInvalid,
++		},
++		{
++			"port without revision-2 provenance is never stripped",
++			[]TransportAttempt{{URL: "https://example.org:8443/kit.git", Authentication: "team-https"}},
++			TransportFallbackNone, CodeRepositoryPolicyInvalid,
++		},
++		{
++			"three endpoints exceed the unchanged attempt bound",
++			[]TransportAttempt{
++				{URL: "https://example.org/kit.git"},
++				{URL: "https://example.org/kit"},
++				{URL: "ssh://git@example.org/kit.git"},
++			},
++			TransportFallbackAvailabilityAuth, CodeRepositoryPolicyInvalid,
++		},
++		{
++			"duplicate mirror endpoints",
++			[]TransportAttempt{
++				{URL: "https://mirror.example.net/kit.git", Authentication: "mirror-https",
++					MirrorOf: "example.org/kit", ResolvedHost: "mirror.example.net"},
++				{URL: "https://mirror.example.net/kit.git", Authentication: "mirror-https",
++					MirrorOf: "example.org/kit", ResolvedHost: "mirror.example.net"},
++			},
++			TransportFallbackAvailabilityAuth, CodeRepositoryPolicyInvalid,
++		},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			t.Parallel()
++			plan := TransportPlan{Identity: "example.org/kit", Attempts: testCase.attempts, Fallback: testCase.fallback}
++			err := ValidateTransportPlan(plan)
++			if err == nil {
++				t.Fatalf("ValidateTransportPlan(%+v) succeeded", plan)
++			}
++			if ErrorCode(err) != testCase.code {
++				t.Fatalf("err = %v, want code %s", err, testCase.code)
++			}
++		})
++	}
++}
++
++// A narrowing bound on the port/alias lane refusal: it fires only for
++// explicit ports and alias fields. Removing either property from an
++// otherwise identical plan must admit it (mirror) or move it to a
++// different class (undeclared mirror), never keep the lane refusal.
++func TestPortAliasRefusalNarrows(t *testing.T) {
++	t.Parallel()
++	port := TransportAttempt{URL: "https://example.org:8443/kit.git", Authentication: "team-https",
++		ResolvedHost: "example.org", ResolvedPort: 8443, HasExplicitPort: true}
++	plan := TransportPlan{Identity: "example.org/kit", Attempts: []TransportAttempt{port}, Fallback: TransportFallbackNone}
++	if err := ValidateTransportPlan(plan); ErrorCode(err) != CodeIdentityInvalid {
++		t.Fatalf("port plan err = %v, want %s", err, CodeIdentityInvalid)
++	}
++	// Dropping the port (URL and provenance together) admits the same
++	// endpoint: the refusal is the port, not the host or provider.
++	unported := port
++	unported.URL = "https://example.org/kit.git"
++	unported.ResolvedPort, unported.HasExplicitPort = 0, false
++	if err := ValidateTransportPlan(TransportPlan{Identity: "example.org/kit",
++		Attempts: []TransportAttempt{unported}, Fallback: TransportFallbackNone}); err != nil {
++		t.Fatalf("unported plan err = %v, want nil", err)
++	}
++	// Dropping only the carried provenance keeps a refusal, but as a
++	// mistranslation — never a silent strip.
++	stripped := port
++	stripped.ResolvedHost, stripped.ResolvedPort, stripped.HasExplicitPort = "", 0, false
++	if err := ValidateTransportPlan(TransportPlan{Identity: "example.org/kit",
++		Attempts: []TransportAttempt{stripped}, Fallback: TransportFallbackNone}); ErrorCode(err) != CodeRepositoryPolicyInvalid {
++		t.Fatalf("provenance-stripped port plan err = %v, want %s", err, CodeRepositoryPolicyInvalid)
++	}
++}
++
++// Revision-1 plans validate exactly as before: no provenance is
++// required, none is inferred, and the error vocabulary is unchanged.
++func TestValidateTransportPlanRevision1Unchanged(t *testing.T) {
++	t.Parallel()
++	legacy := TransportPlan{Identity: "example.org/kit",
++		Attempts: []TransportAttempt{{URL: "https://example.org/kit.git"}}, Fallback: TransportFallbackNone}
++	if err := ValidateTransportPlan(legacy); err != nil {
++		t.Fatalf("legacy plan err = %v, want nil", err)
++	}
++	mismatch := TransportPlan{Identity: "example.org/kit",
++		Attempts: []TransportAttempt{{URL: "https://other.example/kit.git"}}, Fallback: TransportFallbackNone}
++	err := ValidateTransportPlan(mismatch)
++	if err == nil || ErrorCode(err) != CodeRepositoryPolicyInvalid ||
++		!strings.Contains(err.Error(), `canonicalizes to "other.example/kit", want "example.org/kit"`) {
++		t.Fatalf("mismatch err = %v, want the byte-identical revision-1 diagnostic", err)
++	}
++}
++
++// The §5 endpoint URL grammar: explicit URI-form ports split off for
++// the identity check; every other spelling behaves as the lane grammar.
++func TestParseTransportEndpointURL(t *testing.T) {
++	t.Parallel()
++	for _, testCase := range []struct {
++		name         string
++		raw          string
++		wantHost     string
++		wantPort     int
++		wantHasPort  bool
++		wantIdentity string
++		wantOK       bool
++	}{
++		{"https port", "https://example.org:8443/kit.git", "example.org", 8443, true, "example.org/kit", true},
++		{"https default-shaped port one", "https://example.org:1/kit.git", "example.org", 1, true, "example.org/kit", true},
++		{"https upper bound", "https://example.org:65535/kit.git", "example.org", 65535, true, "example.org/kit", true},
++		{"ssh user and port", "ssh://git@example.org:2222/kit.git", "example.org", 2222, true, "example.org/kit", true},
++		{"port-free https", "https://example.org/kit.git", "example.org", 0, false, "example.org/kit", true},
++		{"port-free scp", "git@example.org:kit.git", "example.org", 0, false, "example.org/kit", true},
++		{"scp colon segment is a path, never a port", "git@example.org:2222/kit.git", "example.org", 0, false, "example.org/2222/kit", true},
++		{"port zero", "https://example.org:0/kit.git", "", 0, false, "", false},
++		{"port above range", "https://example.org:65536/kit.git", "", 0, false, "", false},
++		{"leading-zero port", "ssh://git@example.org:0222/kit.git", "", 0, false, "", false},
++		{"empty port", "https://example.org:/kit.git", "", 0, false, "", false},
++		{"non-numeric port", "https://example.org:https/kit.git", "", 0, false, "", false},
++		{"userinfo on https with port", "https://user@example.org:8443/kit.git", "", 0, false, "", false},
++		{"missing host", "https://:8443/kit.git", "", 0, false, "", false},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			t.Parallel()
++			host, port, hasPort, identity, err := parseTransportEndpointURL(testCase.raw)
++			if (err == nil) != testCase.wantOK {
++				t.Fatalf("parseTransportEndpointURL(%q) err = %v, want ok=%v", testCase.raw, err, testCase.wantOK)
++			}
++			if !testCase.wantOK {
++				return
++			}
++			if host != testCase.wantHost || port != testCase.wantPort || hasPort != testCase.wantHasPort || identity != testCase.wantIdentity {
++				t.Fatalf("parseTransportEndpointURL(%q) = %q, %d, %v, %q", testCase.raw, host, port, hasPort, identity)
++			}
++		})
++	}
++}
++
++// Exhaustion stays closed-vocabulary with revision-2 records: the
++// listed URL (with port), alias, and mirror host reach the
++// machine-private trace only, never the error.
++func TestExhaustionV2RecordsStayClosed(t *testing.T) {
++	t.Parallel()
++	plan := TransportPlan{
++		Identity: "example.org/kit",
++		Attempts: []TransportAttempt{
++			{URL: "https://example.org:8443/kit.git", Authentication: "prov-a",
++				ResolvedHost: "example.org", ResolvedPort: 8443, HasExplicitPort: true},
++			{URL: "https://mirror.example.net/kit.git", Authentication: "prov-b",
++				MirrorOf: "example.org/kit", ResolvedHost: "mirror.example.net"},
++		},
++		Fallback: TransportFallbackAvailabilityAuth,
++	}
++	records := []AttemptRecord{
++		{Index: 1, URL: plan.Attempts[0].URL, Transport: "https", Provider: "prov-a",
++			Class: FailureAvailability, NetworkAttempted: true, Identity: plan.Identity,
++			ResolvedHost: "example.org", ResolvedPort: 8443},
++		{Index: 2, URL: plan.Attempts[1].URL, Transport: "https", Provider: "prov-b",
++			Class: FailureAuth, NetworkAttempted: true, Identity: plan.Identity,
++			ResolvedHost: "mirror.example.net", MirrorOf: "example.org/kit"},
++	}
++	message := exhaustionError(plan, records, false).Error()
++	for _, want := range []string{CodeRepositoryEndpointUnavailable, "example.org/kit", "source-policy.json"} {
++		if !strings.Contains(message, want) {
++			t.Errorf("exhaustion %q lacks %q", message, want)
++		}
++	}
++	for _, forbidden := range []string{"https://", "mirror.example.net", "8443", "prov-a-secret", "\n"} {
++		if strings.Contains(message, forbidden) {
++			t.Errorf("exhaustion %q contains %q", message, forbidden)
++		}
++	}
++}
+diff --git a/internal/config/sourcepolicy.go b/internal/config/sourcepolicy.go
+index a76f898..01c5a88 100644
+--- a/internal/config/sourcepolicy.go
++++ b/internal/config/sourcepolicy.go
+@@ -1,7 +1,8 @@
+ package config
+ 
+-// Machine-owned repository endpoint policy (repository-transport-v1,
+-// revision 1): loading, validation, and declaration-to-attempt planning.
++// Machine-owned repository endpoint policy (repository-transport
++// revisions 1 and 2): loading, validation, and declaration-to-attempt
++// planning.
+ //
+ // source-policy.json lives beside the manager configuration, outside
+ // package-controlled trees. It is optional for URL declarations and
+@@ -9,14 +10,31 @@ package config
+ // no network I/O: every structural check fails before acquisition, and
+ // the sibling transport-application task consumes Resolution without
+ // re-deriving pin or fallback semantics.
++//
++// Revision 2 (source-policy-v2.schema.json, schema_version 2) is an
++// additive superset of schema 1: every schema-1 repositories/root_inputs
++// shape loads with revision-1 semantics, extended with optional
++// per-endpoint mirror_of and alias fields, an optional top-level aliases
++// table, and an endpoint/pin URL grammar admitting explicit ports
++// (repository-transport §§4-5). Canonical host/path stays the only
++// portable identity: aliases and mirrors are machine-policy endpoint
++// properties and never enter identity, the lock, receipts, markers, or
++// allowlist matching. Attempt bounds, failure classification beyond the
++// loader's fail-closed rows, and provenance recording (§§6-7) belong to
++// the sibling resolution leaf; the loaded model carries what that leaf
++// needs (mirror_of, alias, and the resolved connection address per
++// attempt).
+ 
+ import (
+ 	"encoding/json"
+ 	"fmt"
+ 	"os"
+ 	"path/filepath"
++	"regexp"
+ 	"sort"
+ 	"strings"
++	"unicode"
++	"unicode/utf8"
+ 
+ 	"github.com/relux-works/curator/internal/buildrepo"
+ 	"github.com/relux-works/curator/internal/gitcred"
+@@ -27,21 +45,29 @@ import (
+ )
+ 
+ // SourcePolicyFileName is the machine policy filename beside the manager
+-// configuration. SourcePolicySchemaVersion is the one schema this
+-// revision-1 reader accepts; a schema-2 document is rejected closed
+-// (repository-transport §4), never read with its revision-2 members
+-// ignored.
++// configuration. SourcePolicySchemaVersion is the schema 1 version;
++// SourcePolicySchemaVersionV2 is the additive revision-2 superset. This
++// revision-2 reader accepts both; schema 1 documents keep revision-1
++// semantics byte-identically (repository-transport §4).
+ const (
+-	SourcePolicyFileName      = "source-policy.json"
+-	SourcePolicySchemaVersion = 1
++	SourcePolicyFileName        = "source-policy.json"
++	SourcePolicySchemaVersion   = 1
++	SourcePolicySchemaVersionV2 = 2
+ )
+ 
+-// Stable transport diagnostics (repository-transport §2). Every error
++// Stable transport diagnostics (repository-transport §§2, 6). Every error
+ // produced here carries its class as a message prefix so callers match
+ // on prose exactly as the published failure classes spell it.
+ const (
+ 	CodeRepositoryPolicyInvalid       = "repository_policy_invalid"
+ 	CodeRepositoryEndpointUnavailable = "repository_endpoint_unavailable"
++	// CodeRepositoryMirrorUndeclared reports a resolved connection host
++	// that differs from the entry-key host without a mirror_of
++	// attestation equal to the key (§§5-6). Zero attempts, no fallback.
++	CodeRepositoryMirrorUndeclared = "repository_mirror_undeclared"
++	// CodeRepositoryAliasUnknown reports an alias field naming no entry
++	// in the policy alias table (§§5-6). Zero attempts, no fallback.
++	CodeRepositoryAliasUnknown = "repository_alias_unknown"
+ )
+ 
+ // Fallback modes (repository-transport §2). Pin forces FallbackNone
+@@ -53,11 +79,31 @@ const (
+ )
+ 
+ // Endpoint is one listed machine endpoint: a closed-grammar URL whose
+-// lane identity equals the entry key, plus an opaque operator-owned
+-// authentication provider reference.
++// port-stripped lane identity path equals the entry key path, plus an
++// opaque operator-owned authentication provider reference.
++//
++// Under schema 2 the URL may carry an explicit port (URI forms only),
++// MirrorOf attests a resolved connection host that differs from the
++// entry-key host (present if and only if it differs, always equal to the
++// key), and Alias names one entry of the operator alias table through
++// the alias field only. All three are machine-policy endpoint
++// properties, never portable identity (repository-transport §5).
+ type Endpoint struct {
+ 	URL            string
+ 	Authentication string
++	MirrorOf       string
++	Alias          string
++}
++
++// AliasEntry is one operator-owned host-alias table entry (§5): a
++// concrete lowercase target host, an optional port 1-65535, and the
++// authentication provider for connections via this alias, which must
++// equal the endpoint authentication.
++type AliasEntry struct {
++	Host           string
++	Port           int
++	HasPort        bool
++	Authentication string
+ }
+ 
+ // RepositoryPolicy is one validated `repositories` entry keyed by exact
+@@ -70,20 +116,37 @@ type RepositoryPolicy struct {
+ }
+ 
+ // SourcePolicy is a validated machine source-policy.json. Repositories
+-// maps exact canonical identity to its entry; RootInputs maps a
+-// case-sensitive source alias to its admitted source-relative inputs.
++// maps exact canonical identity to its entry; Aliases holds the
++// operator-owned host-alias table (nil when the document names none);
++// RootInputs maps a case-sensitive source alias to its admitted
++// source-relative inputs. SchemaVersion records the accepted document
++// version (1 or 2).
+ type SourcePolicy struct {
+-	Path         string
+-	Repositories map[string]RepositoryPolicy
+-	RootInputs   map[string][]string
++	Path          string
++	SchemaVersion int
++	Repositories  map[string]RepositoryPolicy
++	Aliases       map[string]AliasEntry
++	RootInputs    map[string][]string
+ }
+ 
+ // Attempt is one planned endpoint attempt. An empty Authentication names
+ // no policy provider: the caller falls back to the existing lane policy,
+ // which is the only case a URL declaration without an entry produces.
++//
++// MirrorOf, Alias, and the resolved connection address carry the §5
++// endpoint properties the sibling resolution leaf needs (§§6-7):
++// ResolvedHost is the alias target host when Alias is named, else the
++// endpoint URL host (both lowercased); ResolvedPort is the alias port
++// when present, else the URL port when present, else 0 for the transport
++// default; HasExplicitPort reports whether either port was present.
+ type Attempt struct {
+-	URL            string
+-	Authentication string
++	URL             string
++	Authentication  string
++	MirrorOf        string
++	Alias           string
++	ResolvedHost    string
++	ResolvedPort    int
++	HasExplicitPort bool
+ }
+ 
+ // Resolution is the ordered attempt plan for one declaration. Attempts
+@@ -122,8 +185,12 @@ func LoadSourcePolicy(path string) (*SourcePolicy, error) {
+ 	return ParseSourcePolicy(payload, path)
+ }
+ 
+-// ParseSourcePolicy validates one source-policy.json document (schema 1).
+-// path names the document in diagnostics only.
++// ParseSourcePolicy validates one source-policy.json document (schema 1
++// or schema 2). path names the document in diagnostics only. Schema 1
++// documents load with revision-1 semantics exactly as before; schema 2
++// documents load as the additive superset of §4 (ports, mirror_of, the
++// operator alias table). Unknown versions fail closed before any
++// network I/O.
+ func ParseSourcePolicy(payload []byte, path string) (*SourcePolicy, error) {
+ 	if err := protocoljson.Validate(payload); err != nil {
+ 		return nil, verr.New("", "%s: malformed JSON in %s: %v", CodeRepositoryPolicyInvalid, path, err)
+@@ -136,28 +203,32 @@ func ParseSourcePolicy(payload []byte, path string) (*SourcePolicy, error) {
+ 	if !ok {
+ 		return nil, verr.New("", "%s: %s must contain an object", CodeRepositoryPolicyInvalid, path)
+ 	}
+-	if err := rejectPolicyFields(obj, "", "schema_version", "repositories", "root_inputs"); err != nil {
+-		return nil, err
+-	}
+ 	schema, ok := integerValue(obj["schema_version"])
+ 	if !ok {
+-		return nil, verr.New("schema_version", "%s: must be integer %d", CodeRepositoryPolicyInvalid, SourcePolicySchemaVersion)
+-	}
+-	if schema == 2 {
+-		return nil, verr.New("schema_version", "%s: schema 2 is a revision-2 policy and requires a revision-2 reader", CodeRepositoryPolicyInvalid)
++		return nil, verr.New("schema_version", "%s: must be integer %d or %d", CodeRepositoryPolicyInvalid, SourcePolicySchemaVersion, SourcePolicySchemaVersionV2)
+ 	}
+-	if schema != SourcePolicySchemaVersion {
++	if schema != SourcePolicySchemaVersion && schema != SourcePolicySchemaVersionV2 {
+ 		return nil, verr.New("schema_version", "%s: unsupported source-policy schema_version %d", CodeRepositoryPolicyInvalid, schema)
+ 	}
+-	rawRepos, present := obj["repositories"]
+-	if !present || rawRepos == nil {
+-		return nil, verr.New("repositories", "%s: requires a repositories object", CodeRepositoryPolicyInvalid)
++	if schema == SourcePolicySchemaVersion {
++		return parseSourcePolicyV1(obj, path)
+ 	}
+-	repos, ok := rawRepos.(map[string]any)
+-	if !ok {
+-		return nil, verr.New("repositories", "%s: must be an object", CodeRepositoryPolicyInvalid)
++	return parseSourcePolicyV2(obj, path)
++}
++
++// parseSourcePolicyV1 validates a schema-1 document with revision-1
++// semantics. This path is byte-identical to the pre-revision-2 loader:
++// ports, mirror_of, alias members, and the aliases table are all
++// rejected here as unknown fields or lane-grammar violations.
++func parseSourcePolicyV1(obj map[string]any, path string) (*SourcePolicy, error) {
++	if err := rejectPolicyFields(obj, "", "schema_version", "repositories", "root_inputs"); err != nil {
++		return nil, err
+ 	}
+-	policy := &SourcePolicy{Path: path, Repositories: map[string]RepositoryPolicy{}}
++	repos, err := policyRepositoriesObject(obj)
++	if err != nil {
++		return nil, err
++	}
++	policy := &SourcePolicy{Path: path, SchemaVersion: SourcePolicySchemaVersion, Repositories: map[string]RepositoryPolicy{}}
+ 	for _, key := range sortedPolicyKeys(repos) {
+ 		entry, err := parseRepositoryEntry(key, repos[key])
+ 		if err != nil {
+@@ -175,6 +246,57 @@ func ParseSourcePolicy(payload []byte, path string) (*SourcePolicy, error) {
+ 	return policy, nil
+ }
+ 
++// parseSourcePolicyV2 validates a schema-2 document: the schema-1 shape
++// plus the optional aliases table and the per-endpoint mirror_of, alias,
++// and port extensions of §5.
++func parseSourcePolicyV2(obj map[string]any, path string) (*SourcePolicy, error) {
++	if err := rejectPolicyFields(obj, "", "schema_version", "repositories", "aliases", "root_inputs"); err != nil {
++		return nil, err
++	}
++	repos, err := policyRepositoriesObject(obj)
++	if err != nil {
++		return nil, err
++	}
++	policy := &SourcePolicy{Path: path, SchemaVersion: SourcePolicySchemaVersionV2, Repositories: map[string]RepositoryPolicy{}}
++	if rawAliases, present := obj["aliases"]; present {
++		aliases, err := parseAliasTable(rawAliases)
++		if err != nil {
++			return nil, err
++		}
++		policy.Aliases = aliases
++	}
++	if err := rejectChainedAliases(policy.Aliases); err != nil {
++		return nil, err
++	}
++	for _, key := range sortedPolicyKeys(repos) {
++		entry, err := parseRepositoryEntryV2(key, repos[key], policy.Aliases)
++		if err != nil {
++			return nil, err
++		}
++		policy.Repositories[key] = entry
++	}
++	if rawInputs, present := obj["root_inputs"]; present {
++		inputs, err := parseRootInputs(rawInputs)
++		if err != nil {
++			return nil, err
++		}
++		policy.RootInputs = inputs
++	}
++	return policy, nil
++}
++
++func policyRepositoriesObject(obj map[string]any) (map[string]any, error) {
++	rawRepos, present := obj["repositories"]
++	if !present || rawRepos == nil {
++		return nil, verr.New("repositories", "%s: requires a repositories object", CodeRepositoryPolicyInvalid)
++	}
++	repos, ok := rawRepos.(map[string]any)
++	if !ok {
++		return nil, verr.New("repositories", "%s: must be an object", CodeRepositoryPolicyInvalid)
++	}
++	return repos, nil
++}
++
+ // ResolveRepositoryEndpoints plans endpoint attempts for one source
+ // declaration: exactly one of gitURL (a declared URL) or repository (a
+ // logical canonical identity) must be set. policy may be nil for an
+@@ -206,24 +328,34 @@ func ResolveRepositoryEndpoints(policy *SourcePolicy, gitURL, repository string)
+ 	}
+ 	var entry RepositoryPolicy
+ 	found := false
++	var aliases map[string]AliasEntry
+ 	if policy != nil {
+ 		entry, found = policy.Repositories[canonical]
++		aliases = policy.Aliases
+ 	}
+ 	if !found {
+ 		if repository != "" {
+ 			return Resolution{}, fmt.Errorf("%s: no machine policy entry for %q", CodeRepositoryEndpointUnavailable, canonical)
+ 		}
+-		return Resolution{Identity: canonical, Attempts: []Attempt{{URL: gitURL}}, Fallback: FallbackNone}, nil
++		host, _, _ := strings.Cut(canonical, "/")
++		return Resolution{Identity: canonical, Attempts: []Attempt{{URL: gitURL, ResolvedHost: host}}, Fallback: FallbackNone}, nil
+ 	}
+ 	if len(entry.Endpoints) == 0 {
+ 		return Resolution{}, fmt.Errorf("%s: entry for %q lists no endpoints", CodeRepositoryPolicyInvalid, canonical)
+ 	}
++	// Identity is always the entry key: ports, mirrors, and aliases are
++	// machine-policy endpoint properties carried per attempt, never
++	// portable identity (§5).
+ 	if entry.Pin != "" {
+ 		for _, endpoint := range entry.Endpoints {
+ 			if endpoint.URL == entry.Pin {
++				attempt, err := planAttempt(canonical, endpoint, aliases)
++				if err != nil {
++					return Resolution{}, err
++				}
+ 				return Resolution{
+ 					Identity: canonical,
+-					Attempts: []Attempt{{URL: endpoint.URL, Authentication: endpoint.Authentication}},
++					Attempts: []Attempt{attempt},
+ 					Fallback: FallbackNone,
+ 				}, nil
+ 			}
+@@ -232,11 +364,41 @@ func ResolveRepositoryEndpoints(policy *SourcePolicy, gitURL, repository string)
+ 	}
+ 	attempts := make([]Attempt, 0, len(entry.Endpoints))
+ 	for _, endpoint := range entry.Endpoints {
+-		attempts = append(attempts, Attempt(endpoint))
++		attempt, err := planAttempt(canonical, endpoint, aliases)
++		if err != nil {
++			return Resolution{}, err
++		}
++		attempts = append(attempts, attempt)
+ 	}
+ 	return Resolution{Identity: canonical, Attempts: attempts, Fallback: entry.Fallback}, nil
+ }
+ 
++// planAttempt derives one attempt's §5 connection address from its
++// validated endpoint and the policy alias table. Parsed policies already
++// satisfy these checks; hand-built policies fail here with the same
++// fail-closed classes the loader reports.
++func planAttempt(key string, endpoint Endpoint, aliases map[string]AliasEntry) (Attempt, error) {
++	keyHost, keyPath, _ := strings.Cut(key, "/")
++	urlHost, urlPort, hasURLPort, epIdentity, err := parseRevision2EndpointURL(endpoint.URL)
++	if err != nil {
++		return Attempt{}, verr.New("", "%s: endpoint %q is outside the endpoint grammar", CodeRepositoryPolicyInvalid, endpoint.URL)
++	}
++	_, epPath, _ := strings.Cut(epIdentity, "/")
++	resolvedHost, resolvedPort, hasExplicitPort, err := checkEndpointSemantics("", key, keyHost, keyPath, urlHost, epPath, hasURLPort, urlPort, endpoint.MirrorOf, endpoint.Alias, endpoint.Authentication, aliases)
++	if err != nil {
++		return Attempt{}, err
++	}
++	return Attempt{
++		URL:             endpoint.URL,
++		Authentication:  endpoint.Authentication,
++		MirrorOf:        endpoint.MirrorOf,
++		Alias:           endpoint.Alias,
++		ResolvedHost:    resolvedHost,
++		ResolvedPort:    resolvedPort,
++		HasExplicitPort: hasExplicitPort,
++	}, nil
++}
++
+ func parseRepositoryEntry(key string, raw any) (RepositoryPolicy, error) {
+ 	label := "repositories." + key
+ 	if !identity.DraftCanonicalKey(key) {
+@@ -330,6 +492,366 @@ func parsePolicyEndpoint(label string, index int, key string, raw any) (Endpoint
+ 	return Endpoint{URL: urlValue, Authentication: provider}, nil
+ }
+ 
++// aliasNameRE is the §5 operator alias grammar: lowercase ASCII labels.
++// Alias names, alias target hosts, and the endpoint alias field all use
++// it, and every comparison is case-sensitive and exact.
++var aliasNameRE = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]*$`)
++
++// maxAliasNameBytes bounds alias names and target hosts (schema maxLength).
++const maxAliasNameBytes = 253
++
++func validAliasName(value string) bool {
++	return value != "" && len(value) <= maxAliasNameBytes && aliasNameRE.MatchString(value)
++}
++
++// parseRepositoryEntryV2 validates one schema-2 repositories entry: the
++// schema-1 shape plus per-endpoint mirror_of, alias, and port-bearing
++// URLs against the operator alias table.
++func parseRepositoryEntryV2(key string, raw any, aliases map[string]AliasEntry) (RepositoryPolicy, error) {
++	label := "repositories." + key
++	if !identity.DraftCanonicalKey(key) {
++		return RepositoryPolicy{}, verr.New(label, "%s: entry key must be exact canonical host/path", CodeRepositoryPolicyInvalid)
++	}
++	obj, ok := raw.(map[string]any)
++	if !ok {
++		return RepositoryPolicy{}, verr.New(label, "%s: must be an object", CodeRepositoryPolicyInvalid)
++	}
++	if err := rejectPolicyFields(obj, label, "endpoints", "pin", "fallback"); err != nil {
++		return RepositoryPolicy{}, err
++	}
++	rawEndpoints, present := obj["endpoints"]
++	if !present || rawEndpoints == nil {
++		return RepositoryPolicy{}, verr.New(label+".endpoints", "%s: requires one or two endpoints", CodeRepositoryPolicyInvalid)
++	}
++	list, ok := rawEndpoints.([]any)
++	if !ok || len(list) < 1 || len(list) > 2 {
++		return RepositoryPolicy{}, verr.New(label+".endpoints", "%s: requires one or two endpoints", CodeRepositoryPolicyInvalid)
++	}
++	entry := RepositoryPolicy{Identity: key}
++	seen := map[string]bool{}
++	for index, raw := range list {
++		endpoint, err := parsePolicyEndpointV2(label, index, key, raw, aliases)
++		if err != nil {
++			return RepositoryPolicy{}, err
++		}
++		if seen[endpoint.URL] {
++			return RepositoryPolicy{}, verr.New(label+".endpoints", "%s: endpoints must be distinct URLs", CodeRepositoryPolicyInvalid)
++		}
++		seen[endpoint.URL] = true
++		entry.Endpoints = append(entry.Endpoints, endpoint)
++	}
++	if rawPin, present := obj["pin"]; present {
++		pin, ok := rawPin.(string)
++		if !ok {
++			return RepositoryPolicy{}, verr.New(label+".pin", "%s: must be a listed endpoint URL", CodeRepositoryPolicyInvalid)
++		}
++		if _, _, _, _, err := parseRevision2EndpointURL(pin); err != nil {
++			return RepositoryPolicy{}, verr.New(label+".pin", "%s: pin is outside the revision-2 endpoint grammar", CodeRepositoryPolicyInvalid)
++		}
++		if !seen[pin] {
++			return RepositoryPolicy{}, verr.New(label+".pin", "%s: pin must equal a listed endpoint URL exactly, including any port", CodeRepositoryPolicyInvalid)
++		}
++		entry.Pin = pin
++	}
++	rawFallback, present := obj["fallback"]
++	if !present || rawFallback == nil {
++		return RepositoryPolicy{}, verr.New(label+".fallback", "%s: requires fallback %q or %q", CodeRepositoryPolicyInvalid, FallbackNone, FallbackAvailabilityAuth)
++	}
++	fallback, ok := rawFallback.(string)
++	if !ok || (fallback != FallbackNone && fallback != FallbackAvailabilityAuth) {
++		return RepositoryPolicy{}, verr.New(label+".fallback", "%s: requires fallback %q or %q", CodeRepositoryPolicyInvalid, FallbackNone, FallbackAvailabilityAuth)
++	}
++	entry.Fallback = fallback
++	return entry, nil
++}
++
++func parsePolicyEndpointV2(label string, index int, key string, raw any, aliases map[string]AliasEntry) (Endpoint, error) {
++	field := fmt.Sprintf("%s.endpoints[%d]", label, index)
++	obj, ok := raw.(map[string]any)
++	if !ok {
++		return Endpoint{}, verr.New(field, "%s: must be an object", CodeRepositoryPolicyInvalid)
++	}
++	if err := rejectPolicyFields(obj, field, "url", "authentication", "mirror_of", "alias"); err != nil {
++		return Endpoint{}, err
++	}
++	rawURL, present := obj["url"]
++	if !present || rawURL == nil {
++		return Endpoint{}, verr.New(field+".url", "%s: requires an endpoint URL", CodeRepositoryPolicyInvalid)
++	}
++	rawAuth, present := obj["authentication"]
++	if !present || rawAuth == nil {
++		return Endpoint{}, verr.New(field+".authentication", "%s: requires an authentication provider reference", CodeRepositoryPolicyInvalid)
++	}
++	urlValue, ok := rawURL.(string)
++	if !ok {
++		return Endpoint{}, verr.New(field+".url", "%s: must be a string", CodeRepositoryPolicyInvalid)
++	}
++	provider, ok := rawAuth.(string)
++	if !ok || !gitcred.ValidProvider(provider) {
++		return Endpoint{}, verr.New(field+".authentication", "%s: must be an opaque operator provider identifier", CodeRepositoryPolicyInvalid)
++	}
++	mirrorOf := ""
++	if rawMirror, present := obj["mirror_of"]; present {
++		value, ok := rawMirror.(string)
++		if !ok || !identity.DraftCanonicalKey(value) {
++			return Endpoint{}, verr.New(field+".mirror_of", "%s: mirror_of must be an exact canonical host/path", CodeRepositoryPolicyInvalid)
++		}
++		mirrorOf = value
++	}
++	aliasName := ""
++	if rawAlias, present := obj["alias"]; present {
++		value, ok := rawAlias.(string)
++		if !ok || !validAliasName(value) {
++			return Endpoint{}, verr.New(field+".alias", "%s: alias must be a lowercase operator alias name", CodeRepositoryPolicyInvalid)
++		}
++		aliasName = value
++	}
++	urlHost, urlPort, hasURLPort, epIdentity, err := parseRevision2EndpointURL(urlValue)
++	if err != nil {
++		return Endpoint{}, verr.New(field+".url", "%s: endpoint is outside the revision-2 endpoint grammar", CodeRepositoryPolicyInvalid)
++	}
++	keyHost, keyPath, _ := strings.Cut(key, "/")
++	_, epPath, _ := strings.Cut(epIdentity, "/")
++	if _, _, _, err := checkEndpointSemantics(field, key, keyHost, keyPath, urlHost, epPath, hasURLPort, urlPort, mirrorOf, aliasName, provider, aliases); err != nil {
++		return Endpoint{}, err
++	}
++	return Endpoint{URL: urlValue, Authentication: provider, MirrorOf: mirrorOf, Alias: aliasName}, nil
++}
++
++// checkEndpointSemantics enforces the §5 identity rules shared by the
++// loader and the attempt planner: the port-stripped path must equal the
++// key path; a URL host equal to an alias key is refused; an alias
++// reference must resolve to a concrete entry with matching
++// authentication and no double port; and the single resolved-host
++// predicate governs mirror_of. It returns the resolved connection host
++// (lowercased), the resolved port (0 for the transport default), and
++// whether an explicit port was present. field prefixes diagnostics and
++// is empty at the planning entry.
++func checkEndpointSemantics(field, key, keyHost, keyPath, urlHost, epPath string, hasURLPort bool, urlPort int, mirrorOf, aliasName, endpointAuth string, aliases map[string]AliasEntry) (string, int, bool, error) {
++	label := field
++	if label == "" {
++		label = "repositories." + key
++	}
++	if epPath != keyPath {
++		return "", 0, false, verr.New(label, "%s: endpoint path %q is not the entry-key path %q; only the host may differ, and only when attested", CodeRepositoryPolicyInvalid, epPath, keyPath)
++	}
++	// A URL host that equals an alias key is never substituted
++	// implicitly. The comparison uses the lowercased URL host because DNS
++	// is case-insensitive; an uppercase spelling of an alias key still
++	// addresses the alias.
++	if _, embedded := aliases[urlHost]; embedded {
++		return "", 0, false, verr.New(label, "%s: endpoint URL host %q names an operator alias; aliases apply only through the alias field", CodeRepositoryPolicyInvalid, urlHost)
++	}
++	resolvedHost := urlHost
++	resolvedPort := 0
++	hasExplicitPort := false
++	if aliasName != "" {
++		target, ok := aliases[aliasName]
++		if !ok {
++			return "", 0, false, verr.New(label, "%s: unknown operator alias %q", CodeRepositoryAliasUnknown, aliasName)
++		}
++		if urlHost != keyHost {
++			return "", 0, false, verr.New(label, "%s: a mirror URL must not be combined with an alias", CodeRepositoryPolicyInvalid)
++		}
++		if hasURLPort && target.HasPort {
++			return "", 0, false, verr.New(label, "%s: a URL port and an alias port must not both be present", CodeRepositoryPolicyInvalid)
++		}
++		if target.Authentication != endpointAuth {
++			return "", 0, false, verr.New(label, "%s: alias authentication must equal the endpoint authentication", CodeRepositoryPolicyInvalid)
++		}
++		resolvedHost = target.Host
++		if target.HasPort {
++			resolvedPort, hasExplicitPort = target.Port, true
++		} else if hasURLPort {
++			resolvedPort, hasExplicitPort = urlPort, true
++		}
++	} else if hasURLPort {
++		resolvedPort, hasExplicitPort = urlPort, true
++	}
++	if resolvedHost != keyHost {
++		if mirrorOf == "" {
++			return "", 0, false, verr.New(label, "%s: resolved host %q differs from the entry-key host %q without a mirror_of attestation", CodeRepositoryMirrorUndeclared, resolvedHost, keyHost)
++		}
++		if mirrorOf != key {
++			return "", 0, false, verr.New(label, "%s: mirror_of must equal the entry key %q exactly", CodeRepositoryPolicyInvalid, key)
++		}
++	} else if mirrorOf != "" {
++		return "", 0, false, verr.New(label, "%s: mirror_of is forbidden when the resolved host equals the entry-key host", CodeRepositoryPolicyInvalid)
++	}
++	return resolvedHost, resolvedPort, hasExplicitPort, nil
++}
++
++// parseRevision2EndpointURL validates a §5 endpoint or pin URL: the
++// revision-1 closed grammar plus an optional explicit port on URI forms
++// only (https://host[:port]/path, ssh://[user@]host[:port]/path). The
++// port is decimal 1-65535 with no leading zeros. Scp-like spellings
++// carry no port: the segment after ":" is always the path. It returns
++// the lowercased URL host, the explicit port, and the port-stripped lane
++// identity the key-path check applies to.
++func parseRevision2EndpointURL(raw string) (string, int, bool, string, error) {
++	if raw == "" || !utf8.ValidString(raw) || utf8.RuneCountInString(raw) > 4096 || strings.ContainsAny(raw, "%?#\\") || containsPolicyWhitespaceOrControl(raw) {
++		return "", 0, false, "", fmt.Errorf("outside the revision-2 endpoint grammar")
++	}
++	stripped := raw
++	port := 0
++	hasPort := false
++	if scheme, rest, ok := cutRevision2Scheme(raw); ok {
++		authority := rest
++		path := ""
++		if i := strings.Index(rest, "/"); i >= 0 {
++			authority, path = rest[:i], rest[i:]
++		}
++		hostport := authority
++		var userinfo string
++		hasUserinfo := false
++		if i := strings.LastIndex(authority, "@"); i >= 0 {
++			userinfo, hostport, hasUserinfo = authority[:i], authority[i+1:], true
++		}
++		if scheme == "https" && hasUserinfo {
++			return "", 0, false, "", fmt.Errorf("HTTPS carries no userinfo")
++		}
++		host := hostport
++		if i := strings.LastIndex(hostport, ":"); i >= 0 {
++			value, ok := parseRevision2Port(hostport[i+1:])
++			if !ok {
++				return "", 0, false, "", fmt.Errorf("invalid explicit port")
++			}
++			host, port, hasPort = hostport[:i], value, true
++		}
++		if host == "" {
++			return "", 0, false, "", fmt.Errorf("missing endpoint host")
++		}
++		rebuilt := scheme + "://"
++		if hasUserinfo {
++			rebuilt += userinfo + "@"
++		}
++		stripped = rebuilt + host + path
++	}
++	parsed, err := buildrepo.ParseSource(stripped)
++	if err != nil {
++		return "", 0, false, "", err
++	}
++	urlHost, _, _ := strings.Cut(parsed.Identity, "/")
++	return urlHost, port, hasPort, parsed.Identity, nil
++}
++
++// cutRevision2Scheme splits the two URI forms that may carry a port.
++// Every other spelling is scp-like and port-free.
++func cutRevision2Scheme(raw string) (string, string, bool) {
++	if rest, ok := strings.CutPrefix(raw, "https://"); ok {
++		return "https", rest, true
++	}
++	if rest, ok := strings.CutPrefix(raw, "ssh://"); ok {
++		return "ssh", rest, true
++	}
++	return "", "", false
++}
++
++// parseRevision2Port validates an explicit endpoint port: decimal
++// 1-65535 with no leading zeros.
++func parseRevision2Port(value string) (int, bool) {
++	if value == "" || len(value) > 5 {
++		return 0, false
++	}
++	if len(value) > 1 && value[0] == '0' {
++		return 0, false
++	}
++	number := 0
++	for i := 0; i < len(value); i++ {
++		c := value[i]
++		if c < '0' || c > '9' {
++			return 0, false
++		}
++		number = number*10 + int(c-'0')
++	}
++	if number < 1 || number > 65535 {
++		return 0, false
++	}
++	return number, true
++}
++
++func containsPolicyWhitespaceOrControl(value string) bool {
++	for _, r := range value {
++		if unicode.IsSpace(r) || unicode.IsControl(r) {
++			return true
++		}
++	}
++	return false
++}
++
++// parseAliasTable validates the operator-owned §5 aliases table: each
++// name maps to a concrete lowercase target host, an optional integer
++// port 1-65535, and an opaque authentication provider reference.
++func parseAliasTable(raw any) (map[string]AliasEntry, error) {
++	obj, ok := raw.(map[string]any)
++	if !ok {
++		return nil, verr.New("aliases", "%s: must be an object", CodeRepositoryPolicyInvalid)
++	}
++	aliases := make(map[string]AliasEntry, len(obj))
++	for _, name := range sortedPolicyKeys(obj) {
++		label := "aliases." + name
++		if !validAliasName(name) {
++			return nil, verr.New(label, "%s: alias name must be lowercase [a-z0-9][a-z0-9.-]*", CodeRepositoryPolicyInvalid)
++		}
++		entry, ok := obj[name].(map[string]any)
++		if !ok {
++			return nil, verr.New(label, "%s: must be an object", CodeRepositoryPolicyInvalid)
++		}
++		if err := rejectPolicyFields(entry, label, "host", "port", "authentication"); err != nil {
++			return nil, err
++		}
++		rawHost, present := entry["host"]
++		if !present || rawHost == nil {
++			return nil, verr.New(label+".host", "%s: requires a concrete target host", CodeRepositoryPolicyInvalid)
++		}
++		host, ok := rawHost.(string)
++		if !ok || !validAliasName(host) {
++			return nil, verr.New(label+".host", "%s: target host must be lowercase [a-z0-9][a-z0-9.-]*", CodeRepositoryPolicyInvalid)
++		}
++		rawAuth, present := entry["authentication"]
++		if !present || rawAuth == nil {
++			return nil, verr.New(label+".authentication", "%s: requires an authentication provider reference", CodeRepositoryPolicyInvalid)
++		}
++		provider, ok := rawAuth.(string)
++		if !ok || !gitcred.ValidProvider(provider) {
++			return nil, verr.New(label+".authentication", "%s: must be an opaque operator provider identifier", CodeRepositoryPolicyInvalid)
++		}
++		parsed := AliasEntry{Host: host, Authentication: provider}
++		if rawPort, present := entry["port"]; present {
++			if rawPort == nil {
++				return nil, verr.New(label+".port", "%s: port must be an integer 1-65535", CodeRepositoryPolicyInvalid)
++			}
++			value, ok := integerValue(rawPort)
++			if !ok || value < 1 || value > 65535 {
++				return nil, verr.New(label+".port", "%s: port must be an integer 1-65535", CodeRepositoryPolicyInvalid)
++			}
++			parsed.Port, parsed.HasPort = value, true
++		}
++		aliases[name] = parsed
++	}
++	return aliases, nil
++}
++
++// rejectChainedAliases enforces the single-substitution rule: an alias
++// target must be a concrete host, never another alias key.
++func rejectChainedAliases(aliases map[string]AliasEntry) error {
++	for _, name := range sortedAliasKeys(aliases) {
++		if _, chained := aliases[aliases[name].Host]; chained {
++			return verr.New("aliases."+name, "%s: alias target %q is itself an alias; alias targets must be concrete hosts", CodeRepositoryPolicyInvalid, aliases[name].Host)
++		}
++	}
++	return nil
++}
++
++func sortedAliasKeys(aliases map[string]AliasEntry) []string {
++	keys := make([]string, 0, len(aliases))
++	for key := range aliases {
++		keys = append(keys, key)
++	}
++	sort.Strings(keys)
++	return keys
++}
++
+ func parseRootInputs(raw any) (map[string][]string, error) {
+ 	obj, ok := raw.(map[string]any)
+ 	if !ok {
+diff --git a/internal/config/sourcepolicy_test.go b/internal/config/sourcepolicy_test.go
+index 568de77..a075dce 100644
+--- a/internal/config/sourcepolicy_test.go
++++ b/internal/config/sourcepolicy_test.go
+@@ -97,14 +97,23 @@ func TestParseSourcePolicyDocumentShape(t *testing.T) {
+ 	}
+ }
+ 
+-func TestParseSourcePolicyRejectsRevision2Closed(t *testing.T) {
+-	_, err := ParseSourcePolicy([]byte(`{"schema_version":2,"repositories":{"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https"}],"fallback":"none"}}}`), "source-policy.json")
+-	if err == nil || !strings.Contains(err.Error(), CodeRepositoryPolicyInvalid) || !strings.Contains(err.Error(), "revision-2") {
+-		t.Fatalf("v2 rejection %v does not name the revision boundary", err)
+-	}
++// The revision-2 reader accepts schema-2 documents while schema-1
++// documents keep rejecting revision-2 members as unknown fields: a
++// revision-1 shape never silently gains ports, mirrors, or aliases.
++func TestParseSourcePolicyRevision2Boundary(t *testing.T) {
++	v2shape := `{"schema_version":2,"repositories":{"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https"}],"fallback":"none"}}}`
++	policy := mustParsePolicy(t, v2shape)
++	if policy.SchemaVersion != SourcePolicySchemaVersionV2 {
++		t.Fatalf("SchemaVersion = %d", policy.SchemaVersion)
++	}
++	if len(policy.Repositories) != 1 || policy.Aliases != nil {
++		t.Fatalf("v2 v1-shape = %+v", policy)
++	}
++	// Schema 1 still rejects every revision-2 member closed.
+ 	mustRejectPolicy(t, `{"schema_version":1,"repositories":{},"aliases":{"corp-mirror":{"host":"mirror.example","authentication":"team-https"}}}`)
+ 	mustRejectPolicy(t, policyDoc(`"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https","alias":"corp-mirror"}],"fallback":"none"}`))
+ 	mustRejectPolicy(t, policyDoc(`"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https","mirror_of":"example.org/kit"}],"fallback":"none"}`))
++	mustRejectPolicy(t, policyDoc(`"example.org/kit":{"endpoints":[{"url":"https://example.org:8443/kit.git","authentication":"team-https"}],"fallback":"none"}`))
+ }
+ 
+ func TestParseSourcePolicyEntryKeysAreExactCanonical(t *testing.T) {
+diff --git a/internal/config/sourcepolicy_v2_test.go b/internal/config/sourcepolicy_v2_test.go
+new file mode 100644
+index 0000000..9e00b04
+--- /dev/null
++++ b/internal/config/sourcepolicy_v2_test.go
+@@ -0,0 +1,463 @@
++package config
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strconv"
++	"strings"
++	"testing"
++)
++
++// The revision-2 corpus mirrors the published schema cases
++// (source-policy-v2 under conformance/draft-sources-v1): every file
++// whose name starts with "valid" must load through the production
++// loader entry, and every other file must fail with the policy-invalid
++// class before any network I/O.
++func TestDraftPolicySchema2Corpus(t *testing.T) {
++	files, err := filepath.Glob("testdata/draft-sources-v1/source-policy-v2/*.json")
++	if err != nil || len(files) != 13 {
++		t.Fatalf("v2 corpus: %d files, %v", len(files), err)
++	}
++	for _, file := range files {
++		t.Run(filepath.Base(file), func(t *testing.T) {
++			payload, err := os.ReadFile(file)
++			if err != nil {
++				t.Fatal(err)
++			}
++			_, err = ParseSourcePolicy(payload, file)
++			want := strings.HasPrefix(filepath.Base(file), "valid")
++			if (err == nil) != want {
++				t.Fatalf("valid=%v: %v", want, err)
++			}
++			if err != nil && !strings.Contains(err.Error(), CodeRepositoryPolicyInvalid) {
++				t.Fatalf("error %q lacks class %q", err, CodeRepositoryPolicyInvalid)
++			}
++		})
++	}
++}
++
++// Schema 1 loads byte-identically under the revision-2 reader: same
++// version stamp, no alias table, empty revision-2 endpoint fields, and
++// the same effective entry bytes as before the superset.
++func TestSchema1GoldenUnchanged(t *testing.T) {
++	doc := `{"schema_version":1,"repositories":{"example.org/kit":{"endpoints":[` +
++		`{"url":"git@example.org:kit.git","authentication":"team-ssh"},` +
++		`{"url":"https://example.org/kit.git","authentication":"team-https"}],` +
++		`"fallback":"availability-auth"}},"root_inputs":{"local":["SKILL.md","scripts"]}}`
++	policy, err := ParseSourcePolicy([]byte(doc), "source-policy.json")
++	if err != nil {
++		t.Fatalf("ParseSourcePolicy: %v", err)
++	}
++	if policy.SchemaVersion != SourcePolicySchemaVersion {
++		t.Fatalf("SchemaVersion = %d", policy.SchemaVersion)
++	}
++	if policy.Aliases != nil {
++		t.Fatalf("Aliases = %+v", policy.Aliases)
++	}
++	entry, ok := policy.Repositories["example.org/kit"]
++	if !ok || len(entry.Endpoints) != 2 || entry.Fallback != FallbackAvailabilityAuth || entry.Pin != "" {
++		t.Fatalf("Repositories = %+v", policy.Repositories)
++	}
++	for _, endpoint := range entry.Endpoints {
++		if endpoint.MirrorOf != "" || endpoint.Alias != "" {
++			t.Fatalf("schema-1 endpoint carries revision-2 fields: %+v", endpoint)
++		}
++	}
++	type goldenEndpoint struct {
++		URL            string `json:"url"`
++		Authentication string `json:"authentication"`
++	}
++	type goldenEntry struct {
++		Endpoints []goldenEndpoint `json:"endpoints"`
++		Fallback  string           `json:"fallback"`
++	}
++	projected := goldenEntry{Fallback: entry.Fallback}
++	for _, endpoint := range entry.Endpoints {
++		projected.Endpoints = append(projected.Endpoints, goldenEndpoint{URL: endpoint.URL, Authentication: endpoint.Authentication})
++	}
++	encoded, err := json.Marshal(projected)
++	if err != nil {
++		t.Fatal(err)
++	}
++	const golden = `{"endpoints":[{"url":"git@example.org:kit.git","authentication":"team-ssh"},` +
++		`{"url":"https://example.org/kit.git","authentication":"team-https"}],"fallback":"availability-auth"}`
++	if string(encoded) != golden {
++		t.Fatalf("golden mismatch:\n got %s\nwant %s", encoded, golden)
++	}
++	if len(policy.RootInputs["local"]) != 2 {
++		t.Fatalf("RootInputs = %+v", policy.RootInputs)
++	}
++}
++
++func v2doc(entry, aliases string) string {
++	doc := `{"schema_version":2,"repositories":{"example.org/kit":` + entry + `}`
++	if aliases != "" {
++		doc += `,"aliases":` + aliases
++	}
++	return doc + `}`
++}
++
++func v2entry(endpoints, extra string) string {
++	entry := `"endpoints":[` + endpoints + `],"fallback":"none"`
++	if extra != "" {
++		entry += "," + extra
++	}
++	return `{` + entry + `}`
++}
++
++func v2endpoint(url, auth, extra string) string {
++	endpoint := `{"url":` + strconv.Quote(url) + `,"authentication":` + strconv.Quote(auth)
++	if extra != "" {
++		endpoint += "," + extra
++	}
++	return endpoint + `}`
++}
++
++func mustRejectWithClass(t *testing.T, doc, class string) {
++	t.Helper()
++	_, err := ParseSourcePolicy([]byte(doc), "source-policy.json")
++	if err == nil {
++		t.Fatalf("ParseSourcePolicy accepted %s", doc)
++	}
++	if !strings.Contains(err.Error(), class) {
++		t.Fatalf("error %q lacks class %q", err, class)
++	}
++}
++
++// The four published positives load as an additive superset: ports,
++// a declared mirror, alias resolution, and the bare revision-1 shape.
++func TestParseSourcePolicyV2Positives(t *testing.T) {
++	t.Run("port endpoints", func(t *testing.T) {
++		doc := v2doc(v2entry(
++			v2endpoint("ssh://git@example.org:2222/kit.git", "team-ssh", "")+","+
++				v2endpoint("https://example.org:8443/kit.git", "team-https", ""), ""), "")
++		policy := mustParsePolicy(t, doc)
++		if policy.SchemaVersion != SourcePolicySchemaVersionV2 {
++			t.Fatalf("SchemaVersion = %d", policy.SchemaVersion)
++		}
++		resolved, err := ResolveRepositoryEndpoints(policy, "", "example.org/kit")
++		if err != nil {
++			t.Fatal(err)
++		}
++		if resolved.Identity != "example.org/kit" {
++			t.Fatalf("Identity = %q", resolved.Identity)
++		}
++		if len(resolved.Attempts) != 2 {
++			t.Fatalf("Attempts = %+v", resolved.Attempts)
++		}
++		first, second := resolved.Attempts[0], resolved.Attempts[1]
++		if first.ResolvedHost != "example.org" || first.ResolvedPort != 2222 || !first.HasExplicitPort {
++			t.Fatalf("first = %+v", first)
++		}
++		if second.ResolvedHost != "example.org" || second.ResolvedPort != 8443 || !second.HasExplicitPort {
++			t.Fatalf("second = %+v", second)
++		}
++		if first.MirrorOf != "" || first.Alias != "" {
++			t.Fatalf("port endpoint carries mirror state: %+v", first)
++		}
++	})
++
++	t.Run("declared mirror", func(t *testing.T) {
++		doc := v2doc(v2entry(v2endpoint("https://mirror.example.net/kit.git", "mirror-https", `"mirror_of":"example.org/kit"`), ""), "")
++		policy := mustParsePolicy(t, doc)
++		if got := policy.Repositories["example.org/kit"].Endpoints[0].MirrorOf; got != "example.org/kit" {
++			t.Fatalf("MirrorOf = %q", got)
++		}
++		resolved, err := ResolveRepositoryEndpoints(policy, "", "example.org/kit")
++		if err != nil {
++			t.Fatal(err)
++		}
++		if resolved.Identity != "example.org/kit" {
++			t.Fatalf("Identity = %q, mirror host must never become identity", resolved.Identity)
++		}
++		attempt := resolved.Attempts[0]
++		if attempt.ResolvedHost != "mirror.example.net" || attempt.ResolvedPort != 0 || attempt.HasExplicitPort {
++			t.Fatalf("attempt = %+v", attempt)
++		}
++	})
++
++	t.Run("alias resolution", func(t *testing.T) {
++		doc := v2doc(v2entry(v2endpoint("https://example.org/kit.git", "team-https",
++			`"alias":"corp-mirror","mirror_of":"example.org/kit"`), ""),
++			`{"corp-mirror":{"host":"mirror.corp.example","port":8443,"authentication":"team-https"}}`)
++		policy := mustParsePolicy(t, doc)
++		stored := policy.Repositories["example.org/kit"].Endpoints[0]
++		if stored.Alias != "corp-mirror" || stored.MirrorOf != "example.org/kit" {
++			t.Fatalf("stored = %+v", stored)
++		}
++		if policy.Aliases["corp-mirror"].Host != "mirror.corp.example" || !policy.Aliases["corp-mirror"].HasPort {
++			t.Fatalf("Aliases = %+v", policy.Aliases)
++		}
++		resolved, err := ResolveRepositoryEndpoints(policy, "", "example.org/kit")
++		if err != nil {
++			t.Fatal(err)
++		}
++		if resolved.Identity != "example.org/kit" {
++			t.Fatalf("Identity = %q, alias target must never become identity", resolved.Identity)
++		}
++		attempt := resolved.Attempts[0]
++		if attempt.ResolvedHost != "mirror.corp.example" || attempt.ResolvedPort != 8443 || !attempt.HasExplicitPort {
++			t.Fatalf("attempt = %+v", attempt)
++		}
++	})
++
++	t.Run("same-host alias needs no attestation", func(t *testing.T) {
++		doc := v2doc(v2entry(v2endpoint("https://example.org/kit.git", "team-https", `"alias":"local-vip"`), ""),
++			`{"local-vip":{"host":"example.org","authentication":"team-https"}}`)
++		policy := mustParsePolicy(t, doc)
++		resolved, err := ResolveRepositoryEndpoints(policy, "", "example.org/kit")
++		if err != nil {
++			t.Fatal(err)
++		}
++		attempt := resolved.Attempts[0]
++		if resolved.Identity != "example.org/kit" || attempt.ResolvedHost != "example.org" || attempt.HasExplicitPort {
++			t.Fatalf("resolved = %+v", resolved)
++		}
++	})
++
++	t.Run("distinct port spellings are distinct endpoints", func(t *testing.T) {
++		doc := v2doc(v2entry(
++			v2endpoint("https://example.org/kit.git", "team-https", "")+","+
++				v2endpoint("https://example.org:8443/kit.git", "team-https", ""),
++			`"pin":"https://example.org:8443/kit.git"`), "")
++		policy := mustParsePolicy(t, doc)
++		resolved, err := ResolveRepositoryEndpoints(policy, "", "example.org/kit")
++		if err != nil {
++			t.Fatal(err)
++		}
++		if len(resolved.Attempts) != 1 || resolved.Attempts[0].URL != "https://example.org:8443/kit.git" || !resolved.Attempts[0].HasExplicitPort {
++			t.Fatalf("pinned = %+v", resolved)
++		}
++	})
++}
++
++// Every refusal row of §5 fails at the loader production entry with its
++// published class: mirror_undeclared for a differing resolved host
++// without attestation, alias_unknown for a dangling alias, and
++// policy_invalid for every misuse.
++func TestParseSourcePolicyV2Refusals(t *testing.T) {
++	mirrorAliases := `{"corp-mirror":{"host":"mirror.corp.example","authentication":"team-https"}}`
++	for _, tc := range []struct{ name, doc, class string }{
++		{
++			"undeclared mirror URL",
++			v2doc(v2entry(v2endpoint("https://mirror.example.net/kit.git", "mirror-https", ""), ""), ""),
++			CodeRepositoryMirrorUndeclared,
++		},
++		{
++			"alias to another host without mirror_of",
++			v2doc(v2entry(v2endpoint("https://example.org/kit.git", "team-https", `"alias":"corp-mirror"`), ""), mirrorAliases),
++			CodeRepositoryMirrorUndeclared,
++		},
++		{
++			"unknown alias with empty table",
++			v2doc(v2entry(v2endpoint("https://example.org/kit.git", "team-https", `"alias":"absent-alias"`), ""), `{}`),
++			CodeRepositoryAliasUnknown,
++		},
++		{
++			"unknown alias without table",
++			v2doc(v2entry(v2endpoint("https://example.org/kit.git", "team-https", `"alias":"absent-alias"`), ""), ""),
++			CodeRepositoryAliasUnknown,
++		},
++		{
++			"unknown alias beside a populated table",
++			v2doc(v2entry(v2endpoint("https://example.org/kit.git", "team-https", `"alias":"other-alias"`), ""), mirrorAliases),
++			CodeRepositoryAliasUnknown,
++		},
++		{
++			"mirror_of mismatch",
++			v2doc(v2entry(v2endpoint("https://mirror.example.net/kit.git", "mirror-https", `"mirror_of":"other.example/kit"`), ""), ""),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"spurious mirror_of on same host",
++			v2doc(v2entry(v2endpoint("https://example.org/kit.git", "team-https", `"mirror_of":"example.org/kit"`), ""), ""),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"spurious mirror_of on same-host alias",
++			v2doc(v2entry(v2endpoint("https://example.org/kit.git", "team-https", `"alias":"local-vip","mirror_of":"example.org/kit"`), ""),
++				`{"local-vip":{"host":"example.org","authentication":"team-https"}}`),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"mirror URL combined with alias",
++			v2doc(v2entry(v2endpoint("https://mirror.example.net/kit.git", "mirror-https", `"alias":"corp-mirror","mirror_of":"example.org/kit"`), ""),
++				`{"corp-mirror":{"host":"mirror.corp.example","authentication":"mirror-https"}}`),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"embedded alias host",
++			v2doc(v2entry(v2endpoint("ssh://git@corp-mirror/kit.git", "team-ssh", ""), ""),
++				`{"corp-mirror":{"host":"mirror.corp.example","authentication":"team-ssh"}}`),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"alias authentication mismatch",
++			v2doc(v2entry(v2endpoint("https://example.org/kit.git", "team-https", `"alias":"corp-mirror"`), ""),
++				`{"corp-mirror":{"host":"example.org","authentication":"other-provider"}}`),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"chained alias",
++			v2doc(v2entry(v2endpoint("https://example.org/kit.git", "team-https", `"alias":"first","mirror_of":"example.org/kit"`), ""),
++				`{"first":{"host":"second","authentication":"team-https"},"second":{"host":"example.org","authentication":"team-https"}}`),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"double port",
++			v2doc(v2entry(v2endpoint("https://example.org:8443/kit.git", "team-https", `"alias":"corp-mirror"`), ""),
++				`{"corp-mirror":{"host":"example.org","port":9443,"authentication":"team-https"}}`),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"pin differs only by port",
++			v2doc(v2entry(v2endpoint("https://example.org/kit.git", "team-https", ""), `"pin":"https://example.org:8443/kit.git"`), ""),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"port zero",
++			v2doc(v2entry(v2endpoint("https://example.org:0/kit.git", "team-https", ""), ""), ""),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"port above range",
++			v2doc(v2entry(v2endpoint("https://example.org:70000/kit.git", "team-https", ""), ""), ""),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"ssh port above range",
++			v2doc(v2entry(v2endpoint("ssh://git@example.org:65536/kit.git", "team-ssh", ""), ""), ""),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"leading-zero port",
++			v2doc(v2entry(v2endpoint("ssh://git@example.org:0222/kit.git", "team-ssh", ""), ""), ""),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"empty port",
++			v2doc(v2entry(v2endpoint("https://example.org:/kit.git", "team-https", ""), ""), ""),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"non-numeric port",
++			v2doc(v2entry(v2endpoint("https://example.org:https/kit.git", "team-https", ""), ""), ""),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"scp colon segment is a path, never a port",
++			v2doc(v2entry(v2endpoint("git@example.org:2222/kit.git", "team-ssh", ""), ""), ""),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"mirror path must equal the key path",
++			v2doc(v2entry(v2endpoint("https://mirror.example.net/other.git", "mirror-https", `"mirror_of":"example.org/kit"`), ""), ""),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"userinfo on https with port",
++			v2doc(v2entry(v2endpoint("https://user@example.org:8443/kit.git", "team-https", ""), ""), ""),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"uppercase alias name in table",
++			v2doc(v2entry(v2endpoint("https://example.org/kit.git", "team-https", `"alias":"Corp-Mirror"`), ""),
++				`{"Corp-Mirror":{"host":"mirror.corp.example","authentication":"team-https"}}`),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"uppercase alias target host",
++			v2doc(v2entry(v2endpoint("https://example.org/kit.git", "team-https", `"alias":"corp-mirror"`), ""),
++				`{"corp-mirror":{"host":"Mirror.Corp.Example","authentication":"team-https"}}`),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"uppercase endpoint alias field",
++			v2doc(v2entry(v2endpoint("https://example.org/kit.git", "team-https", `"alias":"Corp-Mirror"`), ""), mirrorAliases),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"string alias port",
++			v2doc(v2entry(v2endpoint("https://example.org/kit.git", "team-https", `"alias":"corp-mirror"`), ""),
++				`{"corp-mirror":{"host":"example.org","port":"8443","authentication":"team-https"}}`),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"zero alias port",
++			v2doc(v2entry(v2endpoint("https://example.org/kit.git", "team-https", `"alias":"corp-mirror"`), ""),
++				`{"corp-mirror":{"host":"example.org","port":0,"authentication":"team-https"}}`),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"alias missing authentication",
++			v2doc(v2entry(v2endpoint("https://example.org/kit.git", "team-https", `"alias":"corp-mirror"`), ""),
++				`{"corp-mirror":{"host":"example.org"}}`),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"alias missing host",
++			v2doc(v2entry(v2endpoint("https://example.org/kit.git", "team-https", `"alias":"corp-mirror"`), ""),
++				`{"corp-mirror":{"authentication":"team-https"}}`),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"null mirror_of",
++			v2doc(v2entry(`{"url":"https://example.org/kit.git","authentication":"team-https","mirror_of":null}`, ""), ""),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"non-canonical mirror_of",
++			v2doc(v2entry(v2endpoint("https://mirror.example.net/kit.git", "mirror-https", `"mirror_of":"Example.org/kit"`), ""), ""),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"null aliases table",
++			`{"schema_version":2,"repositories":{"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https"}],"fallback":"none"}},"aliases":null}`,
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"unknown top-level member",
++			`{"schema_version":2,"repositories":{"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https"}],"fallback":"none"}},"unexpected":true}`,
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"extra endpoint member",
++			v2doc(v2entry(`{"url":"https://example.org/kit.git","authentication":"team-https","helper":"evil"}`, ""), ""),
++			CodeRepositoryPolicyInvalid,
++		},
++		{
++			"duplicate port-bearing endpoints",
++			v2doc(v2entry(
++				v2endpoint("https://example.org:8443/kit.git", "team-https", "")+","+
++					v2endpoint("https://example.org:8443/kit.git", "team-https", ""), ""), ""),
++			CodeRepositoryPolicyInvalid,
++		},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			mustRejectWithClass(t, tc.doc, tc.class)
++		})
++	}
++}
++
++// The planning entry re-applies the fail-closed rows so hand-built
++// policies cannot smuggle an unattested mirror or a dangling alias past
++// the loader.
++func TestResolveV2HandBuiltViolations(t *testing.T) {
++	mirror := &SourcePolicy{Repositories: map[string]RepositoryPolicy{
++		"example.org/kit": {Identity: "example.org/kit",
++			Endpoints: []Endpoint{{URL: "https://mirror.example.net/kit.git", Authentication: "mirror-https"}},
++			Fallback:  FallbackNone},
++	}}
++	if _, err := ResolveRepositoryEndpoints(mirror, "", "example.org/kit"); err == nil || !strings.Contains(err.Error(), CodeRepositoryMirrorUndeclared) {
++		t.Fatalf("undeclared mirror err=%v", err)
++	}
++	dangling := &SourcePolicy{Repositories: map[string]RepositoryPolicy{
++		"example.org/kit": {Identity: "example.org/kit",
++			Endpoints: []Endpoint{{URL: "https://example.org/kit.git", Authentication: "team-https", Alias: "absent-alias"}},
++			Fallback:  FallbackNone},
++	}}
++	if _, err := ResolveRepositoryEndpoints(dangling, "", "example.org/kit"); err == nil || !strings.Contains(err.Error(), CodeRepositoryAliasUnknown) {
++		t.Fatalf("unknown alias err=%v", err)
++	}
++}
+diff --git a/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-alias-missing-auth.json b/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-alias-missing-auth.json
+new file mode 100644
+index 0000000..23db996
+--- /dev/null
++++ b/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-alias-missing-auth.json
+@@ -0,0 +1,20 @@
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "https://example.org/kit.git",
++          "authentication": "team-https",
++          "alias": "corp-mirror"
++        }
++      ],
++      "fallback": "none"
++    }
++  },
++  "aliases": {
++    "corp-mirror": {
++      "host": "mirror.corp.example"
++    }
++  }
++}
+diff --git a/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-alias-name.json b/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-alias-name.json
+new file mode 100644
+index 0000000..b8461b0
+--- /dev/null
++++ b/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-alias-name.json
+@@ -0,0 +1,21 @@
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "https://example.org/kit.git",
++          "authentication": "team-https",
++          "alias": "corp-mirror"
++        }
++      ],
++      "fallback": "none"
++    }
++  },
++  "aliases": {
++    "Corp-Mirror": {
++      "host": "mirror.corp.example",
++      "authentication": "team-https"
++    }
++  }
++}
+diff --git a/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-alias-port-string.json b/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-alias-port-string.json
+new file mode 100644
+index 0000000..b848879
+--- /dev/null
++++ b/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-alias-port-string.json
+@@ -0,0 +1,22 @@
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "https://example.org/kit.git",
++          "authentication": "team-https",
++          "alias": "corp-mirror"
++        }
++      ],
++      "fallback": "none"
++    }
++  },
++  "aliases": {
++    "corp-mirror": {
++      "host": "mirror.corp.example",
++      "port": "8443",
++      "authentication": "team-https"
++    }
++  }
++}
+diff --git a/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-endpoint-extra.json b/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-endpoint-extra.json
+new file mode 100644
+index 0000000..71d3a58
+--- /dev/null
++++ b/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-endpoint-extra.json
+@@ -0,0 +1,15 @@
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "https://example.org/kit.git",
++          "authentication": "team-https",
++          "helper": "evil"
++        }
++      ],
++      "fallback": "none"
++    }
++  }
++}
+diff --git a/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-mirror-of-pattern.json b/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-mirror-of-pattern.json
+new file mode 100644
+index 0000000..63cea25
+--- /dev/null
++++ b/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-mirror-of-pattern.json
+@@ -0,0 +1,15 @@
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "https://mirror.example.net/kit.git",
++          "authentication": "mirror-https",
++          "mirror_of": "Example.org/kit"
++        }
++      ],
++      "fallback": "none"
++    }
++  }
++}
+diff --git a/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-port-leading-zero.json b/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-port-leading-zero.json
+new file mode 100644
+index 0000000..dd3312e
+--- /dev/null
++++ b/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-port-leading-zero.json
+@@ -0,0 +1,14 @@
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "ssh://git@example.org:0222/kit.git",
++          "authentication": "team-ssh"
++        }
++      ],
++      "fallback": "none"
++    }
++  }
++}
+diff --git a/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-port-range-ssh.json b/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-port-range-ssh.json
+new file mode 100644
+index 0000000..a5222e9
+--- /dev/null
++++ b/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-port-range-ssh.json
+@@ -0,0 +1,18 @@
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "ssh://git@example.org:65536/kit.git",
++          "authentication": "team-ssh"
++        },
++        {
++          "url": "ssh://git@example.org:65539/kit.git",
++          "authentication": "team-ssh"
++        }
++      ],
++      "fallback": "none"
++    }
++  }
++}
+diff --git a/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-port-range.json b/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-port-range.json
+new file mode 100644
+index 0000000..d86bc31
+--- /dev/null
++++ b/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-port-range.json
+@@ -0,0 +1,14 @@
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "https://example.org:70000/kit.git",
++          "authentication": "team-https"
++        }
++      ],
++      "fallback": "none"
++    }
++  }
++}
+diff --git a/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-unknown-top-level.json b/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-unknown-top-level.json
+new file mode 100644
+index 0000000..0028355
+--- /dev/null
++++ b/internal/config/testdata/draft-sources-v1/source-policy-v2/invalid-unknown-top-level.json
+@@ -0,0 +1,15 @@
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "ssh://git@example.org:2222/kit.git",
++          "authentication": "team-ssh"
++        }
++      ],
++      "fallback": "none"
++    }
++  },
++  "unexpected": true
++}
+diff --git a/internal/config/testdata/draft-sources-v1/source-policy-v2/valid-alias.json b/internal/config/testdata/draft-sources-v1/source-policy-v2/valid-alias.json
+new file mode 100644
+index 0000000..45654c4
+--- /dev/null
++++ b/internal/config/testdata/draft-sources-v1/source-policy-v2/valid-alias.json
+@@ -0,0 +1,23 @@
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "https://example.org/kit.git",
++          "authentication": "team-https",
++          "alias": "corp-mirror",
++          "mirror_of": "example.org/kit"
++        }
++      ],
++      "fallback": "none"
++    }
++  },
++  "aliases": {
++    "corp-mirror": {
++      "host": "mirror.corp.example",
++      "port": 8443,
++      "authentication": "team-https"
++    }
++  }
++}
+diff --git a/internal/config/testdata/draft-sources-v1/source-policy-v2/valid-mirror.json b/internal/config/testdata/draft-sources-v1/source-policy-v2/valid-mirror.json
+new file mode 100644
+index 0000000..72d8f91
+--- /dev/null
++++ b/internal/config/testdata/draft-sources-v1/source-policy-v2/valid-mirror.json
+@@ -0,0 +1,15 @@
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "https://mirror.example.net/kit.git",
++          "authentication": "mirror-https",
++          "mirror_of": "example.org/kit"
++        }
++      ],
++      "fallback": "none"
++    }
++  }
++}
+diff --git a/internal/config/testdata/draft-sources-v1/source-policy-v2/valid-port.json b/internal/config/testdata/draft-sources-v1/source-policy-v2/valid-port.json
+new file mode 100644
+index 0000000..2b5efc9
+--- /dev/null
++++ b/internal/config/testdata/draft-sources-v1/source-policy-v2/valid-port.json
+@@ -0,0 +1,18 @@
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "ssh://git@example.org:2222/kit.git",
++          "authentication": "team-ssh"
++        },
++        {
++          "url": "https://example.org:8443/kit.git",
++          "authentication": "team-https"
++        }
++      ],
++      "fallback": "availability-auth"
++    }
++  }
++}
+diff --git a/internal/config/testdata/draft-sources-v1/source-policy-v2/valid-v1-shape.json b/internal/config/testdata/draft-sources-v1/source-policy-v2/valid-v1-shape.json
+new file mode 100644
+index 0000000..b2dc8f5
+--- /dev/null
++++ b/internal/config/testdata/draft-sources-v1/source-policy-v2/valid-v1-shape.json
+@@ -0,0 +1,24 @@
++{
++  "schema_version": 2,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "git@example.org:kit.git",
++          "authentication": "team-ssh"
++        },
++        {
++          "url": "https://example.org/kit.git",
++          "authentication": "team-https"
++        }
++      ],
++      "fallback": "availability-auth"
++    }
++  },
++  "root_inputs": {
++    "local": [
++      "SKILL.md",
++      "scripts"
++    ]
++  }
++}
+diff --git a/internal/install/drafttransport.go b/internal/install/drafttransport.go
+index e9c74b0..d1a9c0c 100644
+--- a/internal/install/drafttransport.go
++++ b/internal/install/drafttransport.go
+@@ -11,10 +11,12 @@ package install
+ 
+ import (
+ 	"context"
++	"encoding/json"
+ 	"fmt"
+ 	"os"
+ 	"os/exec"
+ 	"path/filepath"
++	"strings"
+ 
+ 	"github.com/relux-works/curator/internal/buildrepo"
+ 	"github.com/relux-works/curator/internal/config"
+@@ -36,6 +38,75 @@ func DraftTransportEnabled(getenv func(string) string) bool {
+ 	return getenv != nil && getenv(EnvDraftTransportResolution) == "1"
+ }
+ 
++// DraftTransportProvenanceFileName names the machine-private operation
++// diagnostics file holding sanitized resolved-lane endpoint provenance
++// (repository-transport §7). It lives directly under the manager home
++// beside the machine policy: the home directory already exists, so no
++// new directory is created, and portable artifacts (locks, receipts,
++// markers, manifests) never carry these properties.
++const DraftTransportProvenanceFileName = "draft-transport-provenance.jsonl"
++
++// DraftTransportProvenancePath resolves the operation-diagnostics sink
++// for one manager home.
++func DraftTransportProvenancePath(home string) string {
++	return filepath.Join(home, DraftTransportProvenanceFileName)
++}
++
++// DraftTransportProvenanceTrace returns the production TransportTrace
++// for one manager home: every sanitized attempt record is appended as
++// one JSON line carrying only the fixed allowlisted provenance fields
++// (canonical identity, listed URL, resolved host and port, alias and
++// mirror_of when used, lane transport, provider identifier, outcome).
++// The record type carries no secrets, and the allowlist keeps it that
++// way structurally: a future record field is never serialized unless
++// named here. Writes are best-effort and never fail an acquisition; an
++// empty home records nothing.
++func DraftTransportProvenanceTrace(home string) buildrepo.TransportTrace {
++	if home == "" {
++		return nil
++	}
++	return func(record buildrepo.AttemptRecord) {
++		appendTransportProvenance(DraftTransportProvenancePath(home), record)
++	}
++}
++
++// transportProvenanceLine is the exact serialized sink shape: fixed
++// sanitized fields only, never secrets, never fetch output.
++type transportProvenanceLine struct {
++	Index            int    `json:"index"`
++	Identity         string `json:"identity"`
++	URL              string `json:"url"`
++	Transport        string `json:"transport"`
++	Provider         string `json:"provider"`
++	Class            string `json:"class"`
++	NetworkAttempted bool   `json:"network_attempted"`
++	Succeeded        bool   `json:"succeeded"`
++	ResolvedHost     string `json:"resolved_host"`
++	ResolvedPort     int    `json:"resolved_port"`
++	Alias            string `json:"alias,omitempty"`
++	MirrorOf         string `json:"mirror_of,omitempty"`
++}
++
++func appendTransportProvenance(path string, record buildrepo.AttemptRecord) {
++	line, err := json.Marshal(transportProvenanceLine{
++		Index: record.Index, Identity: record.Identity, URL: record.URL,
++		Transport: record.Transport, Provider: record.Provider, Class: string(record.Class),
++		NetworkAttempted: record.NetworkAttempted, Succeeded: record.Succeeded,
++		ResolvedHost: record.ResolvedHost, ResolvedPort: record.ResolvedPort,
++		Alias: record.Alias, MirrorOf: record.MirrorOf,
++	})
++	if err != nil {
++		return
++	}
++	line = append(line, '\n')
++	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600) // #nosec G304 -- manager-home operation-diagnostics sink resolved above.
++	if err != nil {
++		return
++	}
++	_, _ = file.Write(line)
++	_ = file.Close()
++}
++
+ // acquireDraftNetwork routes one external-repository fetch behind the draft
+ // switch. git/transport/identity carry the effective fetch endpoint: the
+ // declared URL, or the network substitution's. The legacy call keeps the
+@@ -97,7 +168,7 @@ func (deps ExternalDeps) acquireDraftNetwork(ctx context.Context, tool buildrepo
+ 		}
+ 		base.Tool.SSHWrapper = manager
+ 	}
+-	return buildrepo.AcquireNetworkResolved(ctx, base, plan, providers, nil)
++	return buildrepo.AcquireNetworkResolved(ctx, base, plan, providers, deps.DraftTransportTrace)
+ }
+ 
+ // draftPlanNamesProvider reports whether any planned attempt names a policy
+@@ -114,8 +185,13 @@ func draftPlanNamesProvider(plan buildrepo.TransportPlan) bool {
+ }
+ 
+ // draftTransportPlan converts one machine-policy resolution to the executor's
+-// attempt plan field-for-field. The executor revalidates before any network
++// attempt plan field-for-field, including the revision-2 endpoint
++// properties (mirror_of, alias, resolved connection address) the §6
++// predicate revalidates. The executor revalidates before any network
+ // I/O; the validation here fails a mistranslation before SSH base discovery.
++// A selected port or alias endpoint is refused by the executor in this
++// strict external-build lane (§7); the conversion preserves it so the
++// refusal names the planned endpoint rather than a mistranslation.
+ func draftTransportPlan(resolution config.Resolution) (buildrepo.TransportPlan, error) {
+ 	var fallback string
+ 	switch resolution.Fallback {
+@@ -128,7 +204,9 @@ func draftTransportPlan(resolution config.Resolution) (buildrepo.TransportPlan,
+ 	}
+ 	attempts := make([]buildrepo.TransportAttempt, 0, len(resolution.Attempts))
+ 	for _, attempt := range resolution.Attempts {
+-		attempts = append(attempts, buildrepo.TransportAttempt{URL: attempt.URL, Authentication: attempt.Authentication})
++		attempts = append(attempts, buildrepo.TransportAttempt{URL: attempt.URL, Authentication: attempt.Authentication,
++			MirrorOf: attempt.MirrorOf, Alias: attempt.Alias, ResolvedHost: attempt.ResolvedHost,
++			ResolvedPort: attempt.ResolvedPort, HasExplicitPort: attempt.HasExplicitPort})
+ 	}
+ 	plan := buildrepo.TransportPlan{Identity: resolution.Identity, Attempts: attempts, Fallback: fallback}
+ 	if err := buildrepo.ValidateTransportPlan(plan); err != nil {
+@@ -138,10 +216,14 @@ func draftTransportPlan(resolution config.Resolution) (buildrepo.TransportPlan,
+ }
+ 
+ // draftPlanNeedsSSH reports whether any planned attempt fetches over SSH.
++// Port-bearing ssh:// URLs never parse under the lane's closed grammar,
++// so the scheme prefix is the fallback signal for revision-2 endpoints.
+ func draftPlanNeedsSSH(plan buildrepo.TransportPlan) bool {
+ 	for _, attempt := range plan.Attempts {
+ 		if parsed, err := buildrepo.ParseSource(attempt.URL); err == nil && parsed.Transport == "ssh" {
+ 			return true
++		} else if strings.HasPrefix(attempt.URL, "ssh://") {
++			return true
+ 		}
+ 	}
+ 	return false
+diff --git a/internal/install/drafttransport_provenance_test.go b/internal/install/drafttransport_provenance_test.go
+new file mode 100644
+index 0000000..ca3ac65
+--- /dev/null
++++ b/internal/install/drafttransport_provenance_test.go
+@@ -0,0 +1,186 @@
++package install
++
++import (
++	"context"
++	"encoding/json"
++	"fmt"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/buildrepo"
++	"github.com/relux-works/curator/internal/gitcred"
++)
++
++// Revision-2 provenance sink end to end (repository-transport §7):
++// the production sink construction (DraftTransportProvenanceTrace, the
++// same function productionExternalDeps assigns) carries a
++// declared-mirror acquisition's canonical identity with its listed and
++// resolved mirror provenance into the manager-home operation
++// diagnostics log, broker secrets never appear there, and portable
++// content carries none of those properties.
++func TestAcquireDraftNetworkRevision2ProvenanceSink(t *testing.T) {
++	readSinkLines := func(t *testing.T, home string) []map[string]any {
++		t.Helper()
++		payload, err := os.ReadFile(DraftTransportProvenancePath(home))
++		if err != nil {
++			t.Fatalf("read provenance sink: %v", err)
++		}
++		var lines []map[string]any
++		for _, raw := range strings.Split(strings.TrimSuffix(string(payload), "\n"), "\n") {
++			var line map[string]any
++			if err := json.Unmarshal([]byte(raw), &line); err != nil {
++				t.Fatalf("sink line is not JSON: %q: %v", raw, err)
++			}
++			lines = append(lines, line)
++		}
++		return lines
++	}
++	assertOnlySinkFile := func(t *testing.T, home string) {
++		t.Helper()
++		entries, err := os.ReadDir(home)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if len(entries) != 1 || entries[0].Name() != DraftTransportProvenanceFileName {
++			names := make([]string, 0, len(entries))
++			for _, entry := range entries {
++				names = append(names, entry.Name())
++			}
++			t.Fatalf("manager home holds %q, want only the operation-diagnostics sink", names)
++		}
++	}
++
++	t.Run("mirror provenance reaches the production sink", func(t *testing.T) {
++		bare, commit := draftBareFixture(t)
++		lock := buildrepo.LockedCommit{ObjectFormat: "sha1", Hex: commit}
++		home := t.TempDir()
++		tool, logPath := draftGitTool(t, map[string]draftGitArm{
++			draftMirrorHTTPS: {succeed: true, fileRepo: bare},
++		})
++		policy := draftPolicyFile(t, v2policy(v2entry(v2mirrorEndpoint(draftMirrorHTTPS, "mirror-https",
++			`"mirror_of":"fixture.test/repository"`), ""), ""))
++		providers := draftProvidersFile(t, v2anonymousProvidersDoc("mirror-https"))
++		deps := ExternalDeps{GitTool: tool, DraftTransportResolution: true, DraftPolicyPath: policy,
++			DraftProvidersPath:  providers,
++			DraftTransportTrace: DraftTransportProvenanceTrace(home),
++			Audit:               func(context.Context, buildrepo.AuditSubject) error { return nil }}
++		snapshot, err := v2acquire(t, deps, tool, lock)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if snapshot.Commit != commit {
++			t.Fatalf("commit = %s, want %s", snapshot.Commit, commit)
++		}
++		if fetches := draftFetchLines(t, logPath); len(fetches) != 1 {
++			t.Fatalf("%d fetches, want 1", len(fetches))
++		}
++		lines := readSinkLines(t, home)
++		if len(lines) != 1 {
++			t.Fatalf("sink lines = %v, want one provenance record", lines)
++		}
++		line := lines[0]
++		for key, want := range map[string]any{
++			"identity": "fixture.test/repository", "url": draftMirrorHTTPS,
++			"resolved_host": "mirror.fixture.test", "mirror_of": "fixture.test/repository",
++		} {
++			if line[key] != want {
++				t.Errorf("sink[%q] = %v, want %v (line %v)", key, line[key], want, line)
++			}
++		}
++		if line["alias"] != nil {
++			t.Errorf("sink carries alias = %v, want none", line["alias"])
++		}
++		// Portable content proves the locked commit, never the connection
++		// address: the snapshot carries no endpoint properties.
++		if dump := fmt.Sprintf("%+v", snapshot); strings.Contains(dump, "mirror.fixture.test") ||
++			strings.Contains(dump, "mirror_of") || strings.Contains(dump, draftMirrorHTTPS) {
++			t.Errorf("portable snapshot carries provenance: %+v", snapshot)
++		}
++		assertOnlySinkFile(t, home)
++	})
++
++	t.Run("secrets stay out of the sink while errors stay closed", func(t *testing.T) {
++		lock := buildrepo.LockedCommit{ObjectFormat: "sha1", Hex: strings.Repeat("1", 40)}
++		home := t.TempDir()
++		tool, _ := draftGitTool(t, map[string]draftGitArm{
++			draftMirrorHTTPS:  {stderr: draftMirrorDNSStderr},
++			draftHTTPSPrimary: {stderr: draftDNSStderr},
++		})
++		policy := draftPolicyFile(t, v2policy(`{"endpoints":[`+
++			v2mirrorEndpoint(draftMirrorHTTPS, "prov-a", `"mirror_of":"fixture.test/repository"`)+`,`+
++			v2mirrorEndpoint(draftHTTPSPrimary, "prov-b", "")+`],"fallback":"availability-auth"}`, ""))
++		providers := draftProvidersFile(t, `{"schema_version":1,"providers":{`+
++			`"prov-a":{"https":{"username":"a"}},"prov-b":{"https":{"username":"b"}}}}`)
++		const secretMarker = "zz-secret-marker-260916-sink"
++		reader := &draftProviderReader{secrets: map[string]gitcred.HostCredential{
++			"prov-a": {Username: "a", Secret: secretMarker + "-a"},
++			"prov-b": {Username: "b", Secret: secretMarker + "-b"},
++		}}
++		deps := ExternalDeps{GitTool: tool, DraftTransportResolution: true, DraftPolicyPath: policy,
++			DraftProvidersPath: providers, DraftProviderReader: reader,
++			DraftTransportTrace: DraftTransportProvenanceTrace(home),
++			Audit:               func(context.Context, buildrepo.AuditSubject) error { return nil }}
++		_, err := v2acquire(t, deps, tool, lock)
++		if buildrepo.ErrorCode(err) != buildrepo.CodeRepositoryEndpointUnavailable {
++			t.Fatalf("err = %v, want %s", err, buildrepo.CodeRepositoryEndpointUnavailable)
++		}
++		payload, readErr := os.ReadFile(DraftTransportProvenancePath(home))
++		if readErr != nil {
++			t.Fatal(readErr)
++		}
++		if lines := readSinkLines(t, home); len(lines) != 2 {
++			t.Fatalf("sink lines = %d, want two provenance records", len(lines))
++		}
++		if strings.Contains(string(payload), secretMarker) {
++			t.Errorf("provenance sink contains broker secret material")
++		}
++		if message := err.Error(); strings.Contains(message, secretMarker) ||
++			strings.Contains(message, "https://") || strings.Contains(message, "mirror.fixture.test") {
++			t.Errorf("exhaustion %q leaks endpoint or secret detail", message)
++		}
++		assertOnlySinkFile(t, home)
++	})
++
++	t.Run("nil trace records nothing and changes no verdict", func(t *testing.T) {
++		bare, commit := draftBareFixture(t)
++		lock := buildrepo.LockedCommit{ObjectFormat: "sha1", Hex: commit}
++		home := t.TempDir()
++		tool, _ := draftGitTool(t, map[string]draftGitArm{
++			draftMirrorHTTPS: {succeed: true, fileRepo: bare},
++		})
++		policy := draftPolicyFile(t, v2policy(v2entry(v2mirrorEndpoint(draftMirrorHTTPS, "mirror-https",
++			`"mirror_of":"fixture.test/repository"`), ""), ""))
++		providers := draftProvidersFile(t, v2anonymousProvidersDoc("mirror-https"))
++		deps := ExternalDeps{GitTool: tool, DraftTransportResolution: true, DraftPolicyPath: policy,
++			DraftProvidersPath: providers, DraftTransportTrace: nil,
++			Audit: func(context.Context, buildrepo.AuditSubject) error { return nil }}
++		snapshot, err := v2acquire(t, deps, tool, lock)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if snapshot.Commit != commit {
++			t.Fatalf("commit = %s, want %s", snapshot.Commit, commit)
++		}
++		// The positive subtests above fail without a wired sink: the
++		// sink file is their only provenance source.
++		if _, statErr := os.Stat(DraftTransportProvenancePath(home)); !os.IsNotExist(statErr) {
++			t.Fatalf("nil trace wrote %q", DraftTransportProvenancePath(home))
++		}
++	})
++
++	t.Run("empty home records nothing", func(t *testing.T) {
++		if trace := DraftTransportProvenanceTrace(""); trace != nil {
++			t.Fatal("empty-home trace is non-nil, want fail-closed nil")
++		}
++	})
++
++	t.Run("sink path stays under the manager home", func(t *testing.T) {
++		home := t.TempDir()
++		want := filepath.Join(home, DraftTransportProvenanceFileName)
++		if got := DraftTransportProvenancePath(home); got != want {
++			t.Fatalf("sink path = %q, want %q", got, want)
++		}
++	})
++}
+diff --git a/internal/install/drafttransport_v2_test.go b/internal/install/drafttransport_v2_test.go
+new file mode 100644
+index 0000000..3c0fa1e
+--- /dev/null
++++ b/internal/install/drafttransport_v2_test.go
+@@ -0,0 +1,570 @@
++package install
++
++import (
++	"context"
++	"fmt"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/buildrepo"
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/gitcred"
++)
++
++// Revision-2 bounded resolution and provenance through the production
++// entry point (repository-transport §§6-7): ExternalDeps.acquireDraftNetwork
++// with the draft/opt-in switch on.
++//
++// Every test below drives the production caller against the stand-in git
++// harness from drafttransport_test.go: the fake git fails a fetch with
++// fixture stderr or rewrites it to a fixture bare repository, and
++// everything else is the real lane. A refusal row is covered only when
++// the test asserts the published failure class with zero fetches and
++// zero trace records at this entry point.
++
++// --- revision-2 fixtures ---
++
++const (
++	draftMirrorHTTPS = "https://mirror.fixture.test/repository.git"
++	draftPortHTTPS   = "https://fixture.test:8443/repository.git"
++	draftPortSSH     = "ssh://git@fixture.test:2222/repository.git"
++)
++
++const draftMirrorDNSStderr = "fatal: unable to access 'https://mirror.fixture.test/repository.git': Could not resolve host: mirror.fixture.test"
++
++// v2deps routes one fetch through the production caller with the switch
++// on, capturing machine-private provenance records through the trace hook.
++func v2deps(tool buildrepo.GitTool, policy, providers string, reader buildrepo.ProviderSecretReader, records *[]buildrepo.AttemptRecord) ExternalDeps {
++	return ExternalDeps{GitTool: tool, DraftTransportResolution: true, DraftPolicyPath: policy,
++		DraftProvidersPath: providers, DraftProviderReader: reader,
++		DraftTransportTrace: func(record buildrepo.AttemptRecord) { *records = append(*records, record) },
++		Audit:               func(context.Context, buildrepo.AuditSubject) error { return nil }}
++}
++
++func v2acquire(t *testing.T, deps ExternalDeps, tool buildrepo.GitTool, lock buildrepo.LockedCommit) (*buildrepo.Snapshot, error) {
++	t.Helper()
++	return deps.acquireDraftNetwork(context.Background(), tool,
++		draftHTTPSPrimary, "https", "fixture.test/repository", lock, "", "", "")
++}
++
++func v2anonymousProvidersDoc(names ...string) string {
++	var providers []string
++	for _, name := range names {
++		providers = append(providers, fmt.Sprintf(`%q:{"https":{"anonymous":true}}`, name))
++	}
++	return `{"schema_version":1,"providers":{` + strings.Join(providers, ",") + `}}`
++}
++
++func v2mirrorEndpoint(url, auth, extra string) string {
++	endpoint := fmt.Sprintf(`{"url":%q,"authentication":%q`, url, auth)
++	if extra != "" {
++		endpoint += "," + extra
++	}
++	return endpoint + `}`
++}
++
++func v2policy(entry, aliases string) string {
++	doc := `{"schema_version":2,"repositories":{"fixture.test/repository":` + entry + `}`
++	if aliases != "" {
++		doc += `,"aliases":` + aliases
++	}
++	return doc + `}`
++}
++
++func v2entry(endpoints, extra string) string {
++	entry := `"endpoints":[` + endpoints + `],"fallback":"none"`
++	if extra != "" {
++		entry += "," + extra
++	}
++	return `{` + entry + `}`
++}
++
++// TestAcquireDraftNetworkRevision2Positives proves declared mirrors are
++// ordinary endpoints at the production entry: list order, pin, and the
++// revision-1 availability-auth fallback apply unchanged, provenance
++// names the canonical identity, and each endpoint is attempted at most
++// once.
++func TestAcquireDraftNetworkRevision2Positives(t *testing.T) {
++	bare, commit := draftBareFixture(t)
++	lock := buildrepo.LockedCommit{ObjectFormat: "sha1", Hex: commit}
++
++	t.Run("declared mirror admitted with canonical provenance", func(t *testing.T) {
++		tool, logPath := draftGitTool(t, map[string]draftGitArm{
++			draftMirrorHTTPS: {succeed: true, fileRepo: bare},
++		})
++		policy := draftPolicyFile(t, v2policy(v2entry(v2mirrorEndpoint(draftMirrorHTTPS, "mirror-https",
++			`"mirror_of":"fixture.test/repository"`), ""), ""))
++		providers := draftProvidersFile(t, v2anonymousProvidersDoc("mirror-https"))
++		var records []buildrepo.AttemptRecord
++		snapshot, err := v2acquire(t, v2deps(tool, policy, providers, nil, &records), tool, lock)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if snapshot.Commit != commit {
++			t.Fatalf("commit = %s, want %s", snapshot.Commit, commit)
++		}
++		if fetches := draftFetchLines(t, logPath); len(fetches) != 1 || !strings.Contains(fetches[0], "<"+draftMirrorHTTPS+">") {
++			t.Fatalf("fetches = %q, want exactly the listed mirror endpoint", fetches)
++		}
++		if len(records) != 1 {
++			t.Fatalf("records = %+v, want one provenance record", records)
++		}
++		record := records[0]
++		if record.Identity != "fixture.test/repository" {
++			t.Fatalf("record identity = %q, want the canonical key, never the mirror host", record.Identity)
++		}
++		if record.URL != draftMirrorHTTPS || record.ResolvedHost != "mirror.fixture.test" || record.ResolvedPort != 0 {
++			t.Fatalf("record = %+v, want the listed URL with the resolved mirror host", record)
++		}
++		if record.MirrorOf != "fixture.test/repository" || record.Alias != "" {
++			t.Fatalf("record = %+v, want the mirror attestation and no alias", record)
++		}
++		if !record.Succeeded || !record.NetworkAttempted || record.Class != "" || record.Transport != "https" {
++			t.Fatalf("record = %+v, want a successful https attempt", record)
++		}
++	})
++
++	t.Run("mirror first with availability fallback attempts second", func(t *testing.T) {
++		tool, logPath := draftGitTool(t, map[string]draftGitArm{
++			draftMirrorHTTPS:  {stderr: draftMirrorDNSStderr},
++			draftHTTPSPrimary: {succeed: true, fileRepo: bare},
++		})
++		policy := draftPolicyFile(t, v2policy(`{"endpoints":[`+
++			v2mirrorEndpoint(draftMirrorHTTPS, "mirror-https", `"mirror_of":"fixture.test/repository"`)+`,`+
++			v2mirrorEndpoint(draftHTTPSPrimary, "team-https", "")+`],"fallback":"availability-auth"}`, ""))
++		providers := draftProvidersFile(t, v2anonymousProvidersDoc("mirror-https", "team-https"))
++		var records []buildrepo.AttemptRecord
++		snapshot, err := v2acquire(t, v2deps(tool, policy, providers, nil, &records), tool, lock)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if snapshot.Commit != commit {
++			t.Fatalf("commit = %s, want %s", snapshot.Commit, commit)
++		}
++		if fetches := draftFetchLines(t, logPath); len(fetches) != 2 {
++			t.Fatalf("%d fetches, want 2:\n%s", len(fetches), strings.Join(fetches, "\n"))
++		}
++		if len(records) != 2 || records[0].Class != buildrepo.FailureAvailability || !records[1].Succeeded {
++			t.Fatalf("records = %+v, want availability then success", records)
++		}
++		for _, record := range records {
++			if record.Identity != "fixture.test/repository" {
++				t.Fatalf("record identity = %q, want the canonical key", record.Identity)
++			}
++		}
++	})
++
++	t.Run("pin selects the mirror and forbids fallback", func(t *testing.T) {
++		tool, logPath := draftGitTool(t, map[string]draftGitArm{
++			draftMirrorHTTPS:  {succeed: true, fileRepo: bare},
++			draftHTTPSPrimary: {stderr: draftDNSStderr},
++		})
++		policy := draftPolicyFile(t, v2policy(`{"endpoints":[`+
++			v2mirrorEndpoint(draftMirrorHTTPS, "mirror-https", `"mirror_of":"fixture.test/repository"`)+`,`+
++			v2mirrorEndpoint(draftHTTPSPrimary, "team-https", "")+`],"fallback":"availability-auth",`+
++			`"pin":`+fmt.Sprintf(`%q`, draftMirrorHTTPS)+`}`, ""))
++		providers := draftProvidersFile(t, v2anonymousProvidersDoc("mirror-https", "team-https"))
++		var records []buildrepo.AttemptRecord
++		snapshot, err := v2acquire(t, v2deps(tool, policy, providers, nil, &records), tool, lock)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if snapshot.Commit != commit {
++			t.Fatalf("commit = %s, want %s", snapshot.Commit, commit)
++		}
++		if fetches := draftFetchLines(t, logPath); len(fetches) != 1 || !strings.Contains(fetches[0], "<"+draftMirrorHTTPS+">") {
++			t.Fatalf("fetches = %q, want exactly the pinned mirror", fetches)
++		}
++		if len(records) != 1 || !records[0].Succeeded {
++			t.Fatalf("records = %+v, want one successful pinned attempt", records)
++		}
++	})
++
++	t.Run("fail-closed first failure stops before the mirror", func(t *testing.T) {
++		tool, logPath := draftGitTool(t, map[string]draftGitArm{
++			draftHTTPSPrimary: {stderr: draftTLSStderr},
++			draftMirrorHTTPS:  {succeed: true, fileRepo: bare},
++		})
++		policy := draftPolicyFile(t, v2policy(`{"endpoints":[`+
++			v2mirrorEndpoint(draftHTTPSPrimary, "team-https", "")+`,`+
++			v2mirrorEndpoint(draftMirrorHTTPS, "mirror-https", `"mirror_of":"fixture.test/repository"`)+`],"fallback":"availability-auth"}`, ""))
++		providers := draftProvidersFile(t, v2anonymousProvidersDoc("team-https", "mirror-https"))
++		var records []buildrepo.AttemptRecord
++		_, err := v2acquire(t, v2deps(tool, policy, providers, nil, &records), tool, lock)
++		if buildrepo.ErrorCode(err) != buildrepo.CodeSourceUnavailable {
++			t.Fatalf("err = %v, want the lane diagnostic unchanged", err)
++		}
++		if fetches := draftFetchLines(t, logPath); len(fetches) != 1 {
++			t.Fatalf("%d fetches, want 1:\n%s", len(fetches), strings.Join(fetches, "\n"))
++		}
++		if len(records) != 1 || records[0].Class != buildrepo.FailureTLS {
++			t.Fatalf("records = %+v, want one fail-closed tls record", records)
++		}
++	})
++
++	t.Run("fallback none stops after the first availability failure", func(t *testing.T) {
++		tool, logPath := draftGitTool(t, map[string]draftGitArm{
++			draftHTTPSPrimary: {stderr: draftDNSStderr},
++			draftMirrorHTTPS:  {succeed: true, fileRepo: bare},
++		})
++		policy := draftPolicyFile(t, v2policy(v2entry(
++			v2mirrorEndpoint(draftHTTPSPrimary, "team-https", "")+","+
++				v2mirrorEndpoint(draftMirrorHTTPS, "mirror-https", `"mirror_of":"fixture.test/repository"`), ""), ""))
++		providers := draftProvidersFile(t, v2anonymousProvidersDoc("team-https", "mirror-https"))
++		var records []buildrepo.AttemptRecord
++		_, err := v2acquire(t, v2deps(tool, policy, providers, nil, &records), tool, lock)
++		if buildrepo.ErrorCode(err) != buildrepo.CodeRepositoryEndpointUnavailable {
++			t.Fatalf("err = %v, want %s", err, buildrepo.CodeRepositoryEndpointUnavailable)
++		}
++		if fetches := draftFetchLines(t, logPath); len(fetches) != 1 {
++			t.Fatalf("%d fetches, want 1:\n%s", len(fetches), strings.Join(fetches, "\n"))
++		}
++		if len(records) != 1 {
++			t.Fatalf("records = %+v, want one attempt record", records)
++		}
++	})
++}
++
++// TestAcquireDraftNetworkRevision2ExhaustionSanitized proves §7 secret
++// handling at the production entry: exhaustion names the canonical
++// identity with closed-vocabulary classifications while broker secrets
++// and endpoint URLs stay out of the error.
++func TestAcquireDraftNetworkRevision2ExhaustionSanitized(t *testing.T) {
++	lock := buildrepo.LockedCommit{ObjectFormat: "sha1", Hex: strings.Repeat("1", 40)}
++	tool, logPath := draftGitTool(t, map[string]draftGitArm{
++		draftMirrorHTTPS:  {stderr: draftMirrorDNSStderr},
++		draftHTTPSPrimary: {stderr: draftDNSStderr},
++	})
++	policy := draftPolicyFile(t, v2policy(`{"endpoints":[`+
++		v2mirrorEndpoint(draftMirrorHTTPS, "prov-a", `"mirror_of":"fixture.test/repository"`)+`,`+
++		v2mirrorEndpoint(draftHTTPSPrimary, "prov-b", "")+`],"fallback":"availability-auth"}`, ""))
++	providers := draftProvidersFile(t, `{"schema_version":1,"providers":{`+
++		`"prov-a":{"https":{"username":"a"}},"prov-b":{"https":{"username":"b"}}}}`)
++	const secretMarker = "zz-secret-marker-260916"
++	reader := &draftProviderReader{secrets: map[string]gitcred.HostCredential{
++		"prov-a": {Username: "a", Secret: secretMarker + "-a"},
++		"prov-b": {Username: "b", Secret: secretMarker + "-b"},
++	}}
++	var records []buildrepo.AttemptRecord
++	_, err := v2acquire(t, v2deps(tool, policy, providers, reader, &records), tool, lock)
++	if buildrepo.ErrorCode(err) != buildrepo.CodeRepositoryEndpointUnavailable {
++		t.Fatalf("err = %v, want %s", err, buildrepo.CodeRepositoryEndpointUnavailable)
++	}
++	if fetches := draftFetchLines(t, logPath); len(fetches) != 2 {
++		t.Fatalf("%d fetches, want 2:\n%s", len(fetches), strings.Join(fetches, "\n"))
++	}
++	message := err.Error()
++	for _, want := range []string{buildrepo.CodeRepositoryEndpointUnavailable, "fixture.test/repository", "source-policy.json"} {
++		if !strings.Contains(message, want) {
++			t.Errorf("exhaustion %q lacks %q", message, want)
++		}
++	}
++	for _, forbidden := range []string{secretMarker, "https://", "mirror.fixture.test", "\n"} {
++		if strings.Contains(message, forbidden) {
++			t.Errorf("exhaustion %q contains %q", message, forbidden)
++		}
++	}
++	if len(records) != 2 {
++		t.Fatalf("records = %+v, want two provenance records", records)
++	}
++	dump := fmt.Sprintf("%+v", records)
++	for _, forbidden := range []string{secretMarker} {
++		if strings.Contains(dump, forbidden) {
++			t.Errorf("provenance records contain %q", forbidden)
++		}
++	}
++	if records[0].Identity != "fixture.test/repository" || records[1].Identity != "fixture.test/repository" {
++		t.Errorf("records = %+v, want the canonical identity on every record", records)
++	}
++	if records[0].ResolvedHost != "mirror.fixture.test" || records[0].MirrorOf != "fixture.test/repository" {
++		t.Errorf("records = %+v, want mirror provenance on the first record", records)
++	}
++	// Broker addressing follows the connection: the mirror attempt
++	// queries provider material for the mirror host, never the key host
++	// and never another attempt's provider.
++	wantQueries := []string{"prov-a@mirror.fixture.test", "prov-b@fixture.test"}
++	if fmt.Sprint(reader.queries) != fmt.Sprint(wantQueries) {
++		t.Errorf("broker queries = %q, want %q", reader.queries, wantQueries)
++	}
++}
++
++// TestAcquireDraftNetworkRevision2Refusals proves every §6/§7 refusal
++// row at the production entry: the published failure class with zero
++// fetches and zero provenance records. The providers file is broken on
++// purpose: a refusal that consulted it first would surface a different
++// class.
++func TestAcquireDraftNetworkRevision2Refusals(t *testing.T) {
++	_, commit := draftBareFixture(t)
++	lock := buildrepo.LockedCommit{ObjectFormat: "sha1", Hex: commit}
++	brokenProviders := draftProvidersFile(t, `not json`)
++	mirrorAliases := `{"corp-mirror":{"host":"mirror.corp.example","authentication":"team-https"}}`
++
++	for _, testCase := range []struct {
++		name       string
++		policy     string
++		wantSubstr string
++		wantCode   string
++	}{
++		{
++			"undeclared mirror",
++			v2policy(v2entry(v2mirrorEndpoint(draftMirrorHTTPS, "mirror-https", ""), ""), ""),
++			config.CodeRepositoryMirrorUndeclared, "",
++		},
++		{
++			"pin differs only by port",
++			v2policy(v2entry(v2mirrorEndpoint(draftHTTPSPrimary, "team-https", ""),
++				`"pin":"https://fixture.test:8443/repository.git"`), ""),
++			config.CodeRepositoryPolicyInvalid, "",
++		},
++		{
++			"unknown alias",
++			v2policy(v2entry(v2mirrorEndpoint(draftHTTPSPrimary, "team-https", `"alias":"absent-alias"`), ""), `{}`),
++			config.CodeRepositoryAliasUnknown, "",
++		},
++		{
++			"alias to another host without mirror_of",
++			v2policy(v2entry(v2mirrorEndpoint(draftHTTPSPrimary, "team-https", `"alias":"corp-mirror"`), ""), mirrorAliases),
++			config.CodeRepositoryMirrorUndeclared, "",
++		},
++		{
++			"embedded alias host",
++			v2policy(v2entry(v2mirrorEndpoint("ssh://git@corp-mirror/repository.git", "team-ssh", ""), ""),
++				`{"corp-mirror":{"host":"mirror.corp.example","authentication":"team-ssh"}}`),
++			config.CodeRepositoryPolicyInvalid, "",
++		},
++		{
++			"alias authentication mismatch",
++			v2policy(v2entry(v2mirrorEndpoint(draftHTTPSPrimary, "team-https", `"alias":"corp-mirror"`), ""),
++				`{"corp-mirror":{"host":"fixture.test","authentication":"other-provider"}}`),
++			config.CodeRepositoryPolicyInvalid, "",
++		},
++		{
++			"chained alias",
++			v2policy(v2entry(v2mirrorEndpoint(draftHTTPSPrimary, "team-https", `"alias":"first","mirror_of":"fixture.test/repository"`), ""),
++				`{"first":{"host":"second","authentication":"team-https"},"second":{"host":"fixture.test","authentication":"team-https"}}`),
++			config.CodeRepositoryPolicyInvalid, "",
++		},
++		{
++			"double port",
++			v2policy(v2entry(v2mirrorEndpoint(draftPortHTTPS, "team-https", `"alias":"corp-mirror"`), ""),
++				`{"corp-mirror":{"host":"fixture.test","port":9443,"authentication":"team-https"}}`),
++			config.CodeRepositoryPolicyInvalid, "",
++		},
++		{
++			"spurious mirror_of on same host",
++			v2policy(v2entry(v2mirrorEndpoint(draftHTTPSPrimary, "team-https", `"mirror_of":"fixture.test/repository"`), ""), ""),
++			config.CodeRepositoryPolicyInvalid, "",
++		},
++		{
++			"mirror_of mismatch",
++			v2policy(v2entry(v2mirrorEndpoint(draftMirrorHTTPS, "mirror-https", `"mirror_of":"other.test/repository"`), ""), ""),
++			config.CodeRepositoryPolicyInvalid, "",
++		},
++		{
++			"mirror URL combined with alias",
++			v2policy(v2entry(v2mirrorEndpoint(draftMirrorHTTPS, "mirror-https", `"alias":"corp-mirror","mirror_of":"fixture.test/repository"`), ""),
++				`{"corp-mirror":{"host":"mirror.corp.example","authentication":"mirror-https"}}`),
++			config.CodeRepositoryPolicyInvalid, "",
++		},
++		{
++			"explicit https port refused in the strict lane",
++			v2policy(v2entry(v2mirrorEndpoint(draftPortHTTPS, "team-https", ""), ""), ""),
++			"explicit port or host alias", buildrepo.CodeIdentityInvalid,
++		},
++		{
++			"explicit ssh port refused in the strict lane",
++			v2policy(v2entry(v2mirrorEndpoint(draftPortSSH, "team-ssh", ""), ""), ""),
++			"explicit port or host alias", buildrepo.CodeIdentityInvalid,
++		},
++		{
++			"same-host alias refused in the strict lane",
++			v2policy(v2entry(v2mirrorEndpoint(draftHTTPSPrimary, "team-https", `"alias":"local-vip"`), ""),
++				`{"local-vip":{"host":"fixture.test","authentication":"team-https"}}`),
++			"explicit port or host alias", buildrepo.CodeIdentityInvalid,
++		},
++		{
++			"mirror alias refused in the strict lane",
++			v2policy(v2entry(v2mirrorEndpoint(draftHTTPSPrimary, "team-https", `"alias":"corp-mirror","mirror_of":"fixture.test/repository"`), ""),
++				mirrorAliases),
++			"explicit port or host alias", buildrepo.CodeIdentityInvalid,
++		},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			tool, logPath := draftGitTool(t, map[string]draftGitArm{
++				draftHTTPSPrimary: {succeed: true, fileRepo: ""},
++				draftMirrorHTTPS:  {succeed: true, fileRepo: ""},
++				draftPortHTTPS:    {succeed: true, fileRepo: ""},
++				draftPortSSH:      {succeed: true, fileRepo: ""},
++			})
++			policy := draftPolicyFile(t, testCase.policy)
++			var records []buildrepo.AttemptRecord
++			_, err := v2acquire(t, v2deps(tool, policy, brokenProviders, nil, &records), tool, lock)
++			if err == nil {
++				t.Fatalf("acquireDraftNetwork succeeded, want a refusal")
++			}
++			if testCase.wantCode != "" {
++				if buildrepo.ErrorCode(err) != testCase.wantCode || !strings.Contains(err.Error(), testCase.wantSubstr) {
++					t.Fatalf("err = %v, want code %s containing %q", err, testCase.wantCode, testCase.wantSubstr)
++				}
++			} else if !strings.Contains(err.Error(), testCase.wantSubstr) {
++				t.Fatalf("err = %v, want class %s", err, testCase.wantSubstr)
++			}
++			if fetches := draftFetchLines(t, logPath); len(fetches) != 0 {
++				t.Fatalf("%d fetches, want 0:\n%s", len(fetches), strings.Join(fetches, "\n"))
++			}
++			if len(records) != 0 {
++				t.Fatalf("records = %+v, want zero attempts", records)
++			}
++		})
++	}
++}
++
++// TestRevision1ReaderRejectsV2Shapes proves §7 compatibility at the
++// loader the production caller uses: a revision-1 document carrying
++// revision-2 members fails closed instead of silently ignoring endpoint
++// properties it cannot enforce.
++func TestRevision1ReaderRejectsV2Shapes(t *testing.T) {
++	for _, doc := range []string{
++		`{"schema_version":1,"repositories":{"fixture.test/repository":{"endpoints":[{"url":"https://fixture.test/repository.git","authentication":"team-https"}],"fallback":"none"}},"aliases":{"a":{"host":"example.org","authentication":"team-https"}}}`,
++		`{"schema_version":1,"repositories":{"fixture.test/repository":{"endpoints":[{"url":"https://fixture.test/repository.git","authentication":"team-https","mirror_of":"fixture.test/repository"}],"fallback":"none"}}}`,
++		`{"schema_version":1,"repositories":{"fixture.test/repository":{"endpoints":[{"url":"https://fixture.test:8443/repository.git","authentication":"team-https"}],"fallback":"none"}}}`,
++		`{"schema_version":1,"repositories":{"fixture.test/repository":{"endpoints":[{"url":"https://fixture.test/repository.git","authentication":"team-https","alias":"a"}],"fallback":"none"}}}`,
++	} {
++		_, err := config.ParseSourcePolicy([]byte(doc), "source-policy.json")
++		if err == nil || !strings.Contains(err.Error(), config.CodeRepositoryPolicyInvalid) {
++			t.Fatalf("doc %s: err = %v, want %s", doc, err, config.CodeRepositoryPolicyInvalid)
++		}
++	}
++	// The revision-2 reader still accepts the bare revision-1 shape with
++	// revision-1 semantics: no alias table, no endpoint properties.
++	policy, err := config.ParseSourcePolicy([]byte(
++		`{"schema_version":1,"repositories":{"fixture.test/repository":{"endpoints":[{"url":"https://fixture.test/repository.git","authentication":"team-https"}],"fallback":"none"}}}`),
++		"source-policy.json")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if policy.SchemaVersion != config.SourcePolicySchemaVersion || policy.Aliases != nil {
++		t.Fatalf("policy = %+v, want a bare schema-1 load", policy)
++	}
++	resolved, err := config.ResolveRepositoryEndpoints(policy, draftHTTPSPrimary, "")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(resolved.Attempts) != 1 || resolved.Attempts[0].MirrorOf != "" || resolved.Attempts[0].Alias != "" || resolved.Attempts[0].HasExplicitPort {
++		t.Fatalf("resolved = %+v, want a bare revision-1 attempt", resolved)
++	}
++}
++
++// TestUserConfigIgnoredByResolvedLane proves §5 user-configuration
++// isolation at the production entry: hostile process-owned Git and SSH
++// configuration never redirects a fetch. The lane pins its own config
++// paths and wrapper, so planting insteadOf and GIT_SSH redirection in
++// the process environment must leave the declared-URL fetch literal.
++func TestUserConfigIgnoredByResolvedLane(t *testing.T) {
++	bare, commit := draftBareFixture(t)
++	lock := buildrepo.LockedCommit{ObjectFormat: "sha1", Hex: commit}
++
++	hostileGitConfig := draftPolicyFile(t, "[url \"https://evil.test/\"]\n\tinsteadOf = https://fixture.test/\n")
++	t.Setenv("GIT_CONFIG_GLOBAL", hostileGitConfig)
++	t.Setenv("GIT_CONFIG_SYSTEM", hostileGitConfig)
++	t.Setenv("GIT_CONFIG_NOSYSTEM", "0")
++	t.Setenv("GIT_SSH", "/nonexistent-evil-ssh")
++
++	t.Run("https insteadOf never applied without a policy", func(t *testing.T) {
++		tool, logPath := draftGitTool(t, map[string]draftGitArm{
++			draftHTTPSPrimary: {succeed: true, fileRepo: bare},
++		})
++		missing := draftPolicyFile(t, `{"schema_version":1,"repositories":{}}`)
++		// No entry for the declared identity: absent entry attempts the
++		// declared URL once with existing lane policy.
++		deps := ExternalDeps{GitTool: tool, DraftTransportResolution: true, DraftPolicyPath: missing,
++			Audit: func(context.Context, buildrepo.AuditSubject) error { return nil }}
++		snapshot, err := deps.acquireDraftNetwork(context.Background(), tool,
++			draftHTTPSPrimary, "https", "fixture.test/repository", lock, "", "", "")
++		if err != nil {
++			t.Fatal(err)
++		}
++		if snapshot.Commit != commit {
++			t.Fatalf("commit = %s, want %s", snapshot.Commit, commit)
++		}
++		if fetches := draftFetchLines(t, logPath); len(fetches) != 1 || !strings.Contains(fetches[0], "<"+draftHTTPSPrimary+">") ||
++			strings.Contains(fetches[0], "evil.test") {
++			t.Fatalf("fetches = %q, want exactly the declared URL, literally", fetches)
++		}
++	})
++
++	t.Run("ssh wrapper ignores hostile GIT_SSH without a policy", func(t *testing.T) {
++		tool, logPath := draftGitTool(t, map[string]draftGitArm{
++			draftSSHPrimary: {succeed: true, fileRepo: bare},
++		})
++		ssh := draftSSHCredentials(t)
++		tool.SSHCredentials = ssh
++		missing := draftPolicyFile(t, `{"schema_version":1,"repositories":{}}`)
++		deps := ExternalDeps{GitTool: tool, DraftTransportResolution: true, DraftPolicyPath: missing,
++			Audit: func(context.Context, buildrepo.AuditSubject) error { return nil }}
++		snapshot, err := deps.acquireDraftNetwork(context.Background(), tool,
++			draftSSHPrimary, "ssh", "fixture.test/repository", lock, "", "", "")
++		if err != nil {
++			t.Fatal(err)
++		}
++		if snapshot.Commit != commit {
++			t.Fatalf("commit = %s, want %s", snapshot.Commit, commit)
++		}
++		fetches := draftFetchLines(t, logPath)
++		if len(fetches) != 1 || !strings.Contains(fetches[0], "<"+draftSSHPrimary+">") {
++			t.Fatalf("fetches = %q, want exactly the declared URL, literally", fetches)
++		}
++		// The fetch keeps the tool's bound static wrapper: hostile
++		// process GIT_SSH never reaches the lane, whose environment
++		// carries only manager-owned values.
++		if !strings.Contains(fetches[0], tool.SSHWrapper) || strings.Contains(fetches[0], "evil-ssh") {
++			t.Fatalf("fetches = %q, want the bound static wrapper only", fetches)
++		}
++	})
++}
++
++// TestDraftTransportPlanV2Conversion proves the production caller maps
++// revision-2 resolutions field-for-field: the executor's revalidation
++// sees the loader's mirror_of, alias, and resolved address, never a
++// mistranslation.
++func TestDraftTransportPlanV2Conversion(t *testing.T) {
++	t.Parallel()
++	resolution := config.Resolution{Identity: "fixture.test/repository",
++		Attempts: []config.Attempt{
++			{URL: "https://mirror.fixture.test/repository.git", Authentication: "mirror-https",
++				MirrorOf: "fixture.test/repository", ResolvedHost: "mirror.fixture.test"},
++			{URL: "https://fixture.test/repository.git", Authentication: "team-https",
++				ResolvedHost: "fixture.test"},
++		}, Fallback: config.FallbackAvailabilityAuth}
++	plan, err := draftTransportPlan(resolution)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if plan.Identity != resolution.Identity || len(plan.Attempts) != 2 {
++		t.Fatalf("plan = %+v", plan)
++	}
++	if plan.Attempts[0].MirrorOf != "fixture.test/repository" || plan.Attempts[0].ResolvedHost != "mirror.fixture.test" {
++		t.Fatalf("plan attempts = %+v, want the carried mirror provenance", plan.Attempts)
++	}
++	if plan.Attempts[1].MirrorOf != "" || plan.Attempts[1].Alias != "" || plan.Attempts[1].HasExplicitPort {
++		t.Fatalf("plan attempts = %+v, want a bare second attempt", plan.Attempts)
++	}
++	if plan.Fallback != buildrepo.TransportFallbackAvailabilityAuth {
++		t.Fatalf("fallback = %q", plan.Fallback)
++	}
++}
++
++// TestDraftPlanNeedsSSHRevision2 keeps SSH base discovery port-aware:
++// a port-bearing ssh:// endpoint still needs the manager wrapper base
++// even though the strict lane later refuses the port.
++func TestDraftPlanNeedsSSHRevision2(t *testing.T) {
++	t.Parallel()
++	portSSH := buildrepo.TransportPlan{Attempts: []buildrepo.TransportAttempt{{URL: "ssh://git@fixture.test:2222/repository.git"}}}
++	if !draftPlanNeedsSSH(portSSH) {
++		t.Fatal("port-bearing ssh plan needs SSH")
++	}
++	portHTTPS := buildrepo.TransportPlan{Attempts: []buildrepo.TransportAttempt{{URL: "https://fixture.test:8443/repository.git"}}}
++	if draftPlanNeedsSSH(portHTTPS) {
++		t.Fatal("port-bearing https plan needs no SSH")
++	}
++}
+diff --git a/internal/install/external.go b/internal/install/external.go
+index 03159a0..7a6f67e 100644
+--- a/internal/install/external.go
++++ b/internal/install/external.go
+@@ -57,6 +57,13 @@ type ExternalDeps struct {
+ 	// operator's trusted broker. nil resolves no named HTTPS material:
+ 	// every non-anonymous named HTTPS provider is unavailable.
+ 	DraftProviderReader buildrepo.ProviderSecretReader
++	// DraftTransportTrace receives the resolved lane's sanitized
++	// per-endpoint provenance records (canonical identity, listed URL,
++	// resolved host and port, alias and mirror_of when used). It is
++	// machine-private: the caller stores records in operation
++	// diagnostics, separately from portable identity. nil records
++	// nothing.
++	DraftTransportTrace buildrepo.TransportTrace
+ }
+ 
+ // ExternalSource is the exact declared/effective source passed to an injected

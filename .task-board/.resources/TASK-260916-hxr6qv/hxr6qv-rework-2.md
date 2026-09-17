@@ -1,0 +1,5 @@
+# Rework 2 — TASK-260916-hxr6qv: one P2 (test-only) from verdict rev2 (TASK-260916-hxr6qv_review-verdict-rev2.md)
+
+The production sink is now assigned (main.go:1503) but the requested end-to-end proof is missing: cmd/curator/draft_transport_provenance_test.go fabricates an AttemptRecord and calls the callback directly; the install test constructs its own ExternalDeps. A dry-run-only-sink mutant survives both.
+
+Required: one bounded cmd/curator test that drives an ACTUAL external operation through productionExternalDeps(cfg, false) (temporary machine policy with a listed mirror, fake transport that fails the primary and succeeds on the mirror), keeping the constructed sink, and asserts in the actual machine-private sink: canonical identity, listed and resolved mirror provenance, no broker secret; and asserts the emitted portable artifacts (lock/receipt/marker/manifest) carry no endpoint provenance. Both mutants — removed sink and dry-run-only sink — must fail it (run them as overlays and record the exit codes). Product code unchanged. Narrow tests (-p 1, fast fixture), tool calls under 2 minutes, evidence, checklist, handoff rev3 (story_final).

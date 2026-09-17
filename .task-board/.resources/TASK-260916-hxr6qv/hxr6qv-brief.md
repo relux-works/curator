@@ -1,0 +1,7 @@
+# Brief — TASK-260916-hxr6qv (revision 2 bounded resolution and provenance), final leaf of STORY-260916-v58b5y
+
+Your Story worktree carries the checkpointed TASK-260916-27cv45 (schema 2 loader: ports, mirror_of, host-alias table; identity rules) — read its results.md and verdict. Base: the landed STORY-260910-1bhj0g executor (closed diagnostic grammar, admission, Windows refusal, CLI wiring).
+
+Scope: curator-spec main protocol/repository-transport.md §6 (revision 2 resolution: endpoint plan over ports/mirrors/aliases, attempt bounds, the two new failure classes) and §7 (secrets, provenance, compatibility, external builds) implemented in the executor and its caller behind the existing draft/opt-in switch, through the production entry point; revision 1 behaviour and the legacy lane stay byte-identical (goldens). Every refusal row of §6/§7 gets a negative test at the production entry; provenance output names the canonical identity, never an alias/mirror; secrets never appear in errors; mutants for the attempt bounds and the failure classes. Do not touch the closed grammar table except to add revision-2 shapes the spec names explicitly. No spec edits; frozen v1 untouched.
+
+Narrow tests only (-p 1, -run filters), tool calls under 2 minutes (background go test + tail), evidence with exit codes, checklist, handoff. Story final leaf (story_final): clean workspace; a base_authority_mismatch refusal at handoff is handled by the orchestrator — do not retry.
