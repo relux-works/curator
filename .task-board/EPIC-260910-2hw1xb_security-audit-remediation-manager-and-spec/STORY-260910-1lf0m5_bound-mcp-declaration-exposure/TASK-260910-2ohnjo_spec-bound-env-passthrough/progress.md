@@ -1,5 +1,5 @@
 ## Status
-integrating
+done
 
 ## Review
 required
@@ -87,6 +87,8 @@ spawn run started: [reviewer] reviewer (codex) (run=RUN-260917-427933)
 agent completed: [reviewer] reviewer (codex) (exit=0)
 spawn run completed: codex (run=RUN-260917-427933, pid=3851, exit=0)
 
+External integration evidence: curator-spec PR #63 merged: https://github.com/relux-works/curator-spec/pull/63, landed by fast-forward as commit 23dafa798fa80fc2591ddb287c1c6345e2715b3b on curator-spec main (signed, 8/8 checks green). Accepted CR-TASK-260910-2ohnjo-4 (review verdict rev3 by RUN-260917-427933) rebased by the orchestrator onto 0da4020 as the union of the landed S6/E2/E4 content and the accepted S4 delta; the exact landed tree was independently reviewed as TASK-260917-1sz0b4 (accept-landing: merge fidelity 11/11 files, regenerate-check 0, make validate 60 schemas / 1067 vectors / 288 tests, 4/4 mutants rejected). The manager task TASK-260910-gocke2 is now unblocked.
+
 ## Precondition Resources
 - [remediation-spec-producer-rules.md](file://TASK-260910-2ohnjo/remediation-spec-producer-rules.md) — Campaign rules for curator-spec producers/reviewers: worktree location, closed-set discipline, warn-first, validation and evidence, handoff (patch name fixed)
 - [TASK-260910-2ohnjo_brief.md](file://TASK-260910-2ohnjo/TASK-260910-2ohnjo_brief.md) — Spec task brief: finding, settled decisions, deliverable sections, vectors, rollout, out of scope, handoff
@@ -124,7 +126,7 @@ spawn run completed: codex (run=RUN-260917-427933, pid=3851, exit=0)
 2026-09-10T14:44:01Z
 
 ## Last Update
-2026-09-17T01:17:54Z
+2026-09-17T01:46:54Z
 
 ## Assigned To
 [reviewer] reviewer (codex)
