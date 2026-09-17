@@ -920,6 +920,212 @@ else
 fi
 
 echo ''
+echo '=== rust-pin-guard.sh: the committed toolchain file cannot drift ==='
+RPG="$HERE/rust-pin-guard.sh"
+assert 'the committed rust-toolchain.toml agrees with SupportedRustToolchainVersion' 0 bash "$RPG"
+printf '[toolchain]\nchannel = "1.92.0"\nprofile = "minimal"\n' >"$WORK/rust-bumped.toml"
+assert 'a bumped toolchain file is rejected' 1 env CI_RUST_TOOLCHAIN_FILE="$WORK/rust-bumped.toml" bash "$RPG"
+printf 'package rustsource\n\nconst SupportedRustToolchainVersion = "1.92.0"\n' >"$WORK/rust-const-bumped.go"
+assert 'a changed supported value is rejected' 1 env CI_RUST_GO_SOURCE="$WORK/rust-const-bumped.go" bash "$RPG"
+assert 'a missing toolchain file fails closed' 1 env CI_RUST_TOOLCHAIN_FILE="$WORK/absent.toml" bash "$RPG"
+printf '[toolchain]\nprofile = "minimal"\n' >"$WORK/rust-no-channel.toml"
+assert 'a toolchain file with no channel fails closed' 1 env CI_RUST_TOOLCHAIN_FILE="$WORK/rust-no-channel.toml" bash "$RPG"
+printf '[toolchain]\nchannel = "stable"\nprofile = "minimal"\n' >"$WORK/rust-stable.toml"
+assert 'a floating channel is rejected' 1 env CI_RUST_TOOLCHAIN_FILE="$WORK/rust-stable.toml" bash "$RPG"
+printf '[toolchain]\nchannel = "1.91.0"\nprofile = "default"\n' >"$WORK/rust-default-profile.toml"
+assert 'a non-minimal profile is rejected' 1 env CI_RUST_TOOLCHAIN_FILE="$WORK/rust-default-profile.toml" bash "$RPG"
+assert 'an unreadable Go source fails closed' 1 env CI_RUST_GO_SOURCE="$WORK/absent.go" bash "$RPG"
+printf 'package rustsource\n\nconst SomethingElse = "1.0.0"\n' >"$WORK/rust-no-const.go"
+assert 'a Go source with no declaration fails closed' 1 env CI_RUST_GO_SOURCE="$WORK/rust-no-const.go" bash "$RPG"
+
+echo ''
+echo '=== install-rust-toolchain.sh: rustup installs the filed channel, shims lead PATH ==='
+IRS="$HERE/install-rust-toolchain.sh"
+BASH_ABS="$(command -v bash)"
+
+# A fake rustup records its install invocation; fake shims satisfy the
+# post-install PATH check. Nothing here touches the network.
+FAKEBIN="$WORK/fake-rust-bin"
+mkdir -p "$FAKEBIN"
+cat >"$FAKEBIN/rustup" <<'EOF'
+#!/usr/bin/env bash
+echo "rustup $*" >>"$FAKE_RUSTUP_LOG"
+if [ "$1" = "show" ]; then
+	echo "1.92.0-test (overridden by fake rust-toolchain.toml)"
+fi
+EOF
+chmod +x "$FAKEBIN/rustup"
+printf '#!/usr/bin/env bash\necho "rustc fake"\n' >"$FAKEBIN/rustc"
+printf '#!/usr/bin/env bash\necho "cargo fake"\n' >"$FAKEBIN/cargo"
+chmod +x "$FAKEBIN/rustc" "$FAKEBIN/cargo"
+
+printf '[toolchain]\nchannel = "1.92.0"\nprofile = "minimal"\n' >"$WORK/rust-install-channel.toml"
+: >"$WORK/rustup-log.txt"; : >"$WORK/github-path.txt"
+assert 'the installer installs exactly the filed channel' 0 \
+	env PATH="$FAKEBIN:$PATH" FAKE_RUSTUP_LOG="$WORK/rustup-log.txt" GITHUB_PATH="$WORK/github-path.txt" \
+	    CARGO_HOME="$WORK/fake-cargo" CI_RUST_TOOLCHAIN_FILE="$WORK/rust-install-channel.toml" bash "$IRS"
+assert_contains 'the install invocation names the filed channel' 'toolchain install 1.92.0 --profile minimal' "$WORK/rustup-log.txt"
+assert_contains 'the shim directory is prepended for the rest of the lane' "$WORK/fake-cargo/bin" "$WORK/github-path.txt"
+
+# A PATH with no rustup anywhere on it: the hosted images ship rustup, so
+# the negative case must hide the real one rather than assume its absence.
+# Entries are filtered, never replaced wholesale: a bare single-directory
+# PATH breaks tool startup on Git Bash for Windows (awk died with exit 127
+# loading its DLLs), failing the row for the wrong reason. Every entry stays
+# except ones shipping a rustup executable, so the installer still parses
+# the channel file and then fails exactly on the missing rustup.
+NORUSTPATH=""
+OLDIFS="$IFS"; IFS=':'
+# shellcheck disable=SC2086
+for _entry in $PATH; do
+	[ -n "$_entry" ] || _entry='.'
+	if [ -x "$_entry/rustup" ] || [ -x "$_entry/rustup.exe" ]; then
+		continue
+	fi
+	if [ -z "$NORUSTPATH" ]; then
+		NORUSTPATH="$_entry"
+	else
+		NORUSTPATH="$NORUSTPATH:$_entry"
+	fi
+done
+IFS="$OLDIFS"
+assert 'a runner without rustup fails' 1 \
+	env PATH="$NORUSTPATH" GITHUB_PATH="$WORK/github-path.txt" \
+	    CI_RUST_TOOLCHAIN_FILE="$WORK/rust-install-channel.toml" "$BASH_ABS" "$IRS"
+assert_contains 'the failure names the runner-setup note' 'docs/self-hosted-runner-setup.md' "$WORK/out.txt"
+
+if grep -nE '[0-9]+\.[0-9]+\.[0-9]+' "$IRS" >"$WORK/out.txt"; then
+	bad 'the installer names no release; it reads the channel from the file' "$(tr '\n' ' ' <"$WORK/out.txt" | cut -c1-200)"
+else
+	ok 'the installer names no release; it reads the channel from the file'
+fi
+if grep -qF 'CI_RUST_TOOLCHAIN_FILE:-rust-toolchain.toml' "$IRS"; then
+	ok 'the installer reads its channel from rust-toolchain.toml'
+else
+	bad 'the installer reads its channel from rust-toolchain.toml' 'install-rust-toolchain.sh does not reference rust-toolchain.toml'
+fi
+
+echo ''
+echo '=== ci.yml: every suite lane verifies and installs the pinned Rust toolchain first ==='
+
+# A lane that runs test-gate.sh runs the rustsource production cases, so it
+# must verify the toolchain file against the Go constant, then install
+# exactly that channel with rustup and prepend the shims to PATH -- guard,
+# then install, in that order, before any test runs. A lane that drops the
+# guard can drift; a lane that drops the install fails the production cases
+# on rustc-not-found (rose-air run 35121791685). These cases read the wiring
+# back, so a refactor cannot drop a step without this self-test noticing.
+#
+# Emits one "<job> <guard?> <install?> <ordered?>" record per test-gate.sh
+# lane.
+rust_lane_records() {
+	awk '
+		/^  [a-z][a-z0-9-]*:[ \t\r]*$/ { job = $1; sub(/:[ \t\r]*$/, "", job); next }
+		/^[ \t]*run:.*test-gate\.sh/      { gate[job] = 1; gateline[job] = NR; next }
+		/^[ \t]*run:.*rust-pin-guard\.sh/ { guard[job] = 1; guardline[job] = NR; next }
+		/^[ \t]*run:.*install-rust-toolchain\.sh/ { install[job] = 1; installline[job] = NR; next }
+		END {
+			for (j in gate) {
+				ordered = (guard[j] && install[j] && \
+				           guardline[j] < installline[j] && installline[j] < gateline[j]) ? 1 : 0
+				printf "%s %d %d %d\n", j, (guard[j] ? 1 : 0), (install[j] ? 1 : 0), ordered
+			}
+		}
+	' "$WORKFLOW"
+}
+
+rust_records="$(rust_lane_records)"
+if [ -z "$rust_records" ]; then
+	bad 'the workflow still runs test-gate.sh' 'no test-gate.sh step found in .github/workflows/ci.yml'
+else
+	rust_unprovisioned=''
+	while read -r job has_guard has_install ordered; do
+		[ -n "$job" ] || continue
+		if [ "$has_guard" != '1' ] || [ "$has_install" != '1' ] || [ "$ordered" != '1' ]; then
+			rust_unprovisioned="$rust_unprovisioned $job(guard=$has_guard,install=$has_install,ordered=$ordered)"
+		fi
+	done <<-RECORDS
+	$rust_records
+	RECORDS
+	if [ -z "$rust_unprovisioned" ]; then
+		ok 'every test-gate.sh lane verifies the rust pin, then installs it via rustup before go test'
+	else
+		bad 'every test-gate.sh lane verifies the rust pin, then installs it via rustup before go test' \
+			"lanes missing the guard, the install, or the order:$rust_unprovisioned"
+	fi
+fi
+
+# The install lives in exactly one place. A lane that spells out its own
+# `rustup toolchain install` reinstalls the drift the guard exists to
+# prevent.
+if grep -nF 'rustup toolchain install' "$WORKFLOW" >"$WORK/out.txt"; then
+	bad 'no lane spells its own rustup install; every lane uses install-rust-toolchain.sh' "$(tr '\n' ' ' <"$WORK/out.txt" | cut -c1-200)"
+else
+	ok 'no lane spells its own rustup install; every lane uses install-rust-toolchain.sh'
+fi
+
+echo ''
+echo '=== platform-cases.tsv: the production rust cases run on darwin, tolerate host absence elsewhere ==='
+RUST_CASES='TestProductionManagerCapturesRegistryFromRawPaths TestProductionManagerCapturesGitWithoutCallerProjection'
+for rcase in $RUST_CASES; do
+	row="$(awk -F'\t' -v c="$rcase" '$1 == "internal/rustsource" && $2 == c { print }' "$SHIPPED")"
+	if [ -z "$row" ]; then
+		bad "$rcase has a ledger row" 'no internal/rustsource row names this case'
+		continue
+	fi
+	must="$(printf '%s' "$row" | awk -F'\t' '{print $3}')"
+	skip="$(printf '%s' "$row" | awk -F'\t' '{print $4}')"
+	cls="$(printf '%s' "$row" | awk -F'\t' '{print $5}')"
+	if [ "$must" = "darwin" ] && [ "$skip" = "linux,windows" ] && [ "$cls" = "host-capability" ]; then
+		ok "$rcase is required on darwin and tolerates host-capability absence on linux,windows"
+	else
+		bad "$rcase is required on darwin and tolerates host-capability absence on linux,windows" \
+			"must_run_on=$must skip_allowed_on=$skip class=$cls"
+	fi
+done
+
+if [ -f "$WORK/shipped-darwin.json" ] && [ -f "$WORK/shipped-linux.json" ]; then
+	# A skip on darwin is fatal even though the same reason is tolerated
+	# on linux: the lane installed the toolchain, so absence there means
+	# the install regressed, not a platform gap.
+	rust_dar_stream="$WORK/rust-darwin-skip.json"
+	cp "$WORK/shipped-darwin.json" "$rust_dar_stream"
+	for rcase in $RUST_CASES; do
+		evout internal/rustsource "$rcase" 'pinned Cargo toolchain root or executable unavailable for native target aarch64-apple-darwin' >>"$rust_dar_stream"
+		ev skip internal/rustsource "$rcase" >>"$rust_dar_stream"
+	done
+	assert 'a toolchain-absent skip of a production rust case fails on darwin' 1 \
+		env CI_GATE_GOOS=darwin CI_PLATFORM_CASES="$SHIPPED" CI_SKIP_CLASSES="$CLASSES" \
+		    CI_GATE_MODULE='github.com/relux-works/curator' bash "$GATE" "$rust_dar_stream" "$WORK/rust-ev-darwin"
+
+	rust_lin_stream="$WORK/rust-linux-skip.json"
+	cp "$WORK/shipped-linux.json" "$rust_lin_stream"
+	for rcase in $RUST_CASES; do
+		evout internal/rustsource "$rcase" 'no operator-approved Cargo descriptor for native target x86_64-unknown-linux-gnu' >>"$rust_lin_stream"
+		ev skip internal/rustsource "$rcase" >>"$rust_lin_stream"
+	done
+	assert 'the same absence skip of a production rust case passes on linux' 0 \
+		env CI_GATE_GOOS=linux CI_EXCLUDED_PKGS=internal/godriver \
+		    CI_PLATFORM_CASES="$SHIPPED" CI_SKIP_CLASSES="$CLASSES" \
+		    CI_GATE_MODULE='github.com/relux-works/curator' bash "$GATE" "$rust_lin_stream" "$WORK/rust-ev-linux"
+
+	# A different reason on linux is fatal too: the ledger pins the class,
+	# so an unrelated skip cannot masquerade as the toolchain absence.
+	rust_cls_stream="$WORK/rust-linux-wrongclass.json"
+	cp "$WORK/shipped-linux.json" "$rust_cls_stream"
+	for rcase in $RUST_CASES; do
+		evout internal/rustsource "$rcase" 'deferred on windows pending BUG-260916-2f3xbf' >>"$rust_cls_stream"
+		ev skip internal/rustsource "$rcase" >>"$rust_cls_stream"
+	done
+	assert 'a non-absence skip of a production rust case fails on linux' 1 \
+		env CI_GATE_GOOS=linux CI_EXCLUDED_PKGS=internal/godriver \
+		    CI_PLATFORM_CASES="$SHIPPED" CI_SKIP_CLASSES="$CLASSES" \
+		    CI_GATE_MODULE='github.com/relux-works/curator' bash "$GATE" "$rust_cls_stream" "$WORK/rust-ev-linux-cls"
+else
+	bad 'the rust behavioural cases have shipped streams to narrow' 'missing $WORK/shipped-darwin.json or $WORK/shipped-linux.json'
+fi
+
+echo ''
 printf 'gate-selftest: %d passed, %d failed' "$PASS" "$FAIL"
 [ "$SKIPPED" -gt 0 ] && printf ', %d skipped (reported above, not hidden)' "$SKIPPED"
 printf '\n'

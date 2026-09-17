@@ -16,7 +16,13 @@ import (
 	"strings"
 )
 
-const pinnedRustToolchainPrefix = "1.91.0-"
+// SupportedRustToolchainVersion is the exact Rust toolchain release admitted
+// by cargo-vendor-transform-v1. The pinned Cargo registry below, the
+// toolchain-root selector, and the repository's rust-toolchain.toml (kept in
+// agreement by .github/ci/rust-pin-guard.sh) all name this release.
+const SupportedRustToolchainVersion = "1.91.0"
+
+const pinnedRustToolchainPrefix = SupportedRustToolchainVersion + "-"
 
 type approvedCargoDescriptor struct {
 	Version, ImplementationCommit, ExecutableSHA256 string
@@ -28,7 +34,7 @@ type approvedCargoDescriptor struct {
 // independently reviewed identity before Cargo is registered at C0.
 var approvedCargoDescriptors = map[string]approvedCargoDescriptor{
 	"aarch64-apple-darwin": {
-		Version: "1.91.0", ImplementationCommit: "ea2d97820c16195b0ca3fadb4319fe512c199a43",
+		Version: SupportedRustToolchainVersion, ImplementationCommit: "ea2d97820c16195b0ca3fadb4319fe512c199a43",
 		ExecutableSHA256: "sha256:0da859e1130e00a81dac84fa1e86a3dbdd968ddfccef627a8d37255fcbb39e78",
 	},
 }
@@ -51,7 +57,7 @@ func NativeCargoUnavailableReason() string {
 	if err != nil || currentUser.HomeDir == "" {
 		return ""
 	}
-	root := filepath.Join(currentUser.HomeDir, ".rustup", "toolchains", "1.91.0-"+target)
+	root := filepath.Join(currentUser.HomeDir, ".rustup", "toolchains", SupportedRustToolchainVersion+"-"+target)
 	executable := filepath.Join(root, "bin", cargoExecutableName())
 	return cargoHostCapabilityReason(target, true, root, executable)
 }
@@ -97,7 +103,7 @@ func registerCargoAtC0(ctx context.Context) cargoRegistration {
 	if !ok {
 		return cargoRegistration{err: fmt.Errorf("no operator-approved Cargo descriptor for native target %s", target)}
 	}
-	root := filepath.Join(currentUser.HomeDir, ".rustup", "toolchains", "1.91.0-"+target)
+	root := filepath.Join(currentUser.HomeDir, ".rustup", "toolchains", SupportedRustToolchainVersion+"-"+target)
 	executable := filepath.Join(root, "bin", cargoExecutableName())
 	executable, err = filepath.EvalSymlinks(executable)
 	if err != nil {

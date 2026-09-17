@@ -7,6 +7,40 @@ import (
 	"testing"
 )
 
+func TestSupportedRustToolchainVersionIsTheRegistrySource(t *testing.T) {
+	if pinnedRustToolchainPrefix != SupportedRustToolchainVersion+"-" {
+		t.Fatalf("pinnedRustToolchainPrefix = %q, want %q", pinnedRustToolchainPrefix, SupportedRustToolchainVersion+"-")
+	}
+	if len(approvedCargoDescriptors) == 0 {
+		t.Fatal("approvedCargoDescriptors is empty")
+	}
+	for target, descriptor := range approvedCargoDescriptors {
+		if descriptor.Version != SupportedRustToolchainVersion {
+			t.Fatalf("approvedCargoDescriptors[%q].Version = %q, want %q", target, descriptor.Version, SupportedRustToolchainVersion)
+		}
+	}
+}
+
+func TestCargoToolchainValidateAdmitsOnlyTheSupportedVersion(t *testing.T) {
+	// The path must be absolute on every GOOS: a Unix-style "/pinned/..."
+	// literal is not absolute on Windows (no volume), and validate rightly
+	// rejects it there. Build it from t.TempDir like the sibling cases.
+	pinnedRoot := filepath.Join(t.TempDir(), "toolchains", SupportedRustToolchainVersion+"-test")
+	tool := cargoToolchain{
+		CargoPath: filepath.Join(pinnedRoot, "bin", "cargo"),
+		Version:   SupportedRustToolchainVersion, ImplementationCommit: "ea2d97820c16195b0ca3fadb4319fe512c199a43",
+		BinarySHA256: "sha256:" + strings.Repeat("a", 64),
+		Fingerprint:  "sha256:" + strings.Repeat("b", 64), C0CheckpointID: "sha256:" + strings.Repeat("c", 64),
+	}
+	if err := tool.validate(); err != nil {
+		t.Fatalf("supported toolchain rejected: %v", err)
+	}
+	tool.Version = "9.9.9-drift-probe"
+	if err := tool.validate(); err == nil {
+		t.Fatal("drifted toolchain version admitted")
+	}
+}
+
 func TestCargoHostCapabilityReasonClassifiesOnlyAbsence(t *testing.T) {
 	target := "aarch64-apple-darwin"
 	missingReason := "pinned Cargo toolchain root or executable unavailable for native target " + target

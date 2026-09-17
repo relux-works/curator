@@ -21,7 +21,7 @@ type cargoToolchain struct {
 }
 
 func (tool cargoToolchain) validate() error {
-	if !filepath.IsAbs(tool.CargoPath) || tool.Version != "1.91.0" || tool.ImplementationCommit != "ea2d97820c16195b0ca3fadb4319fe512c199a43" || !strings.HasPrefix(tool.BinarySHA256, "sha256:") || !strings.HasPrefix(tool.Fingerprint, "sha256:") || !strings.HasPrefix(tool.C0CheckpointID, "sha256:") {
+	if !filepath.IsAbs(tool.CargoPath) || tool.Version != SupportedRustToolchainVersion || tool.ImplementationCommit != "ea2d97820c16195b0ca3fadb4319fe512c199a43" || !strings.HasPrefix(tool.BinarySHA256, "sha256:") || !strings.HasPrefix(tool.Fingerprint, "sha256:") || !strings.HasPrefix(tool.C0CheckpointID, "sha256:") {
 		return fail(CodeVendorTransformUnsupported, "Cargo toolchain does not match the pinned transform", map[string]string{"version": tool.Version, "commit": tool.ImplementationCommit})
 	}
 	return nil

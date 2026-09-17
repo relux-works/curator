@@ -147,6 +147,22 @@ jobs:
           echo "$RUNNER_TEMP/pnpm-prefix/bin" >>"$GITHUB_PATH"
           echo "$RUNNER_TEMP/pnpm-prefix" >>"$GITHUB_PATH"
 
+      - name: Verify rust pin matches Go constant
+        shell: bash
+        run: bash .github/ci/rust-pin-guard.sh
+
+      # rustup is the installer on every runner: the hosted images ship it,
+      # and the self-hosted runner gets it once per
+      # docs/self-hosted-runner-setup.md. The install step reads the channel
+      # from rust-toolchain.toml (verified above against
+      # internal/rustsource.SupportedRustToolchainVersion), installs exactly
+      # that toolchain, and prepends the rustup shim directory to PATH, so
+      # `rustc -vV` in the rustsource production cases resolves the pinned
+      # release instead of failing the lane (rose-air run 35121791685).
+      - name: Install pinned Rust toolchain via rustup
+        shell: bash
+        run: bash .github/ci/install-rust-toolchain.sh
+
       - name: Verify Go toolchain identity
         shell: bash
         run: bash .github/ci/toolchain-identity.sh
@@ -274,6 +290,22 @@ jobs:
           echo "$RUNNER_TEMP/pnpm-prefix/bin" >>"$GITHUB_PATH"
           echo "$RUNNER_TEMP/pnpm-prefix" >>"$GITHUB_PATH"
 
+      - name: Verify rust pin matches Go constant
+        shell: bash
+        run: bash .github/ci/rust-pin-guard.sh
+
+      # rustup is the installer on every runner: the hosted images ship it,
+      # and the self-hosted runner gets it once per
+      # docs/self-hosted-runner-setup.md. The install step reads the channel
+      # from rust-toolchain.toml (verified above against
+      # internal/rustsource.SupportedRustToolchainVersion), installs exactly
+      # that toolchain, and prepends the rustup shim directory to PATH, so
+      # `rustc -vV` in the rustsource production cases resolves the pinned
+      # release instead of failing the lane (rose-air run 35121791685).
+      - name: Install pinned Rust toolchain via rustup
+        shell: bash
+        run: bash .github/ci/install-rust-toolchain.sh
+
       - name: Verify Go toolchain identity
         shell: bash
         run: bash .github/ci/toolchain-identity.sh
@@ -375,6 +407,22 @@ jobs:
           # shim (macbook-iv run 35072267145).
           echo "$RUNNER_TEMP/pnpm-prefix/bin" >>"$GITHUB_PATH"
           echo "$RUNNER_TEMP/pnpm-prefix" >>"$GITHUB_PATH"
+
+      - name: Verify rust pin matches Go constant
+        shell: bash
+        run: bash .github/ci/rust-pin-guard.sh
+
+      # rustup is the installer on every runner: the hosted images ship it,
+      # and the self-hosted runner gets it once per
+      # docs/self-hosted-runner-setup.md. The install step reads the channel
+      # from rust-toolchain.toml (verified above against
+      # internal/rustsource.SupportedRustToolchainVersion), installs exactly
+      # that toolchain, and prepends the rustup shim directory to PATH, so
+      # `rustc -vV` in the rustsource production cases resolves the pinned
+      # release instead of failing the lane (rose-air run 35121791685).
+      - name: Install pinned Rust toolchain via rustup
+        shell: bash
+        run: bash .github/ci/install-rust-toolchain.sh
 
       - name: Verify Go toolchain identity
         shell: bash
@@ -586,6 +634,22 @@ jobs:
           # shim (macbook-iv run 35072267145).
           echo "$RUNNER_TEMP/pnpm-prefix/bin" >>"$GITHUB_PATH"
           echo "$RUNNER_TEMP/pnpm-prefix" >>"$GITHUB_PATH"
+
+      - name: Verify rust pin matches Go constant
+        shell: bash
+        run: bash .github/ci/rust-pin-guard.sh
+
+      # rustup is the installer on every runner: the hosted images ship it,
+      # and the self-hosted runner gets it once per
+      # docs/self-hosted-runner-setup.md. The install step reads the channel
+      # from rust-toolchain.toml (verified above against
+      # internal/rustsource.SupportedRustToolchainVersion), installs exactly
+      # that toolchain, and prepends the rustup shim directory to PATH, so
+      # `rustc -vV` in the rustsource production cases resolves the pinned
+      # release instead of failing the lane (rose-air run 35121791685).
+      - name: Install pinned Rust toolchain via rustup
+        shell: bash
+        run: bash .github/ci/install-rust-toolchain.sh
 
       - name: Verify Go toolchain identity
         shell: bash

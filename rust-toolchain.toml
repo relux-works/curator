@@ -1,0 +1,13 @@
+# The one pinned Rust toolchain every CI lane installs before `go test`.
+#
+# This file is the single source of truth for the toolchain version: local
+# cargo/rustup reads it directly, and every suite lane installs exactly its
+# channel with `rustup toolchain install` (see
+# .github/ci/install-rust-toolchain.sh). The channel must name exactly
+# internal/rustsource.SupportedRustToolchainVersion -- `.github/ci/rust-pin-guard.sh`
+# fails any lane where the two disagree, instead of installing a toolchain
+# the closed Cargo registry would refuse downstream. No floating channel
+# ("stable") and no minimal-profile widening: both fail the guard.
+[toolchain]
+channel = "1.91.0"
+profile = "minimal"

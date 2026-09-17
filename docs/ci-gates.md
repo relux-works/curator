@@ -49,3 +49,8 @@ Publishing a family in a conformance root does not prove that a build reads it. 
 For schema 8, artifacts include `agent-skill-v8`, `csk-skill-v8`, `install-marker-v4`, `vectors/module-roots.json`, and `vectors/script-host-execution-policy.json`. These are consumed by `internal/skillspec`, `internal/marker`, `internal/moduleroots`, `internal/godriver`, and `internal/scriptpolicy`.
 
 The committed protocol-suite pin is declared as `SPEC_PIN` in the workflow `env:` block. Candidate suites enter via the `candidate-conformance` workflow on explicit `workflow_dispatch` calls supplying a full 40-character revision or materialized root. That job sets `CI_REQUIRE_FULL_ROOT=1` to enforce complete package coverage, and emitted artifacts are stamped as candidate-only evidence, proving neither a published release nor a conformance claim.
+
+## Self-hosted runner prerequisites
+
+The rose-air lane needs exactly one thing installed on the runner by hand:
+rustup. See [self-hosted-runner-setup.md](self-hosted-runner-setup.md).

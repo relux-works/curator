@@ -472,3 +472,21 @@ cmd/curator	TestEnvStatusReportsLockedRequire	linux,darwin,windows	-	-	env statu
 # ===========================================================================
 internal/pnpmsource	TestRealPinnedPNPMLockSupersetSnapshotDependencies	linux,darwin	windows	stage-deferred	pinned-pnpm lock-superset case executes on unix; deferred on windows pending BUG-260916-2f3xbf (undeclared writable-store member), asserted there once the bug lands
 internal/pnpmsource	TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization	linux,darwin	windows	stage-deferred	pinned-pnpm private-store and offline-materialization case executes on unix; deferred on windows pending BUG-260916-2f3xbf (undeclared writable-store member), asserted there once the bug lands
+
+# ===========================================================================
+# Pinned-Rust production cases (TASK-260916-vygif0)
+#
+# The rust pin (rust-toolchain.toml plus .github/ci/install-rust-toolchain.sh)
+# installs Rust 1.91.0 in every suite lane, so the two
+# TestProductionManager* cases execute instead of skipping for an absent
+# toolchain. They are required on darwin, where the closed Cargo registry
+# carries an operator-approved descriptor (aarch64-apple-darwin) and the
+# installed toolchain satisfies it. linux and windows runners have no
+# approved descriptor for their native target, so the host-capability
+# absence skip is tolerated there -- and only there, and only for that
+# class. A skip of either case on darwin, or for any other reason on any
+# runner, is fatal. If the registry ever approves a linux or windows
+# descriptor, widen must_run_on to cover it.
+# ===========================================================================
+internal/rustsource	TestProductionManagerCapturesRegistryFromRawPaths	darwin	linux,windows	host-capability	pinned-Rust registry capture executes on darwin; linux/windows have no operator-approved Cargo descriptor, so the host-capability absence skip is tolerated there
+internal/rustsource	TestProductionManagerCapturesGitWithoutCallerProjection	darwin	linux,windows	host-capability	pinned-Rust Git capture executes on darwin; linux/windows have no operator-approved Cargo descriptor, so the host-capability absence skip is tolerated there
