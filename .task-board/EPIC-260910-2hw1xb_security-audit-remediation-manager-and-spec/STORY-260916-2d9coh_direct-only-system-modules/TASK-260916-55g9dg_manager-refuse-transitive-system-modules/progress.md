@@ -41,12 +41,13 @@ spawn run started: [implementer] developer (muse) (run=RUN-260917-8f2998)
 
 ## Outcome Resources
 - [TASK-260916-55g9dg_spawn-log_-implementer--developer--muse-_RUN-260917-8f2998.log](file://TASK-260916-55g9dg/TASK-260916-55g9dg_spawn-log_-implementer--developer--muse-_RUN-260917-8f2998.log) — System spawn log captured by task-board
+- [TASK-260916-55g9dg_results.md](file://TASK-260916-55g9dg/TASK-260916-55g9dg_results.md) — E2 implementation results: per-file changes, AC mapping, validation transcripts, out-of-scope, spec gaps F1-F4
 
 ## Created
 2026-09-16T10:50:06Z
 
 ## Last Update
-2026-09-17T01:12:49Z
+2026-09-17T03:02:35Z
 
 ## Assigned To
 [implementer] developer (muse)
