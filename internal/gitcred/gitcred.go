@@ -39,7 +39,19 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/relux-works/curator/internal/identifiers"
 )
+
+// ValidProvider reports whether id is an admissible opaque authentication
+// provider reference for a repository-transport-v1 policy endpoint: a
+// closed portable identifier and nothing else. A provider ref is resolved
+// only through operator-owned configuration; it is never a command, an
+// executable path, a URL, or a package-supplied value, and nothing in this
+// package executes, opens, or otherwise interprets it. Anything outside
+// the identifier alphabet — slashes, drives, separators, whitespace —
+// fails here, before any credential machinery is addressed.
+func ValidProvider(id string) bool { return identifiers.Valid(id) }
 
 // NamespacePrefix opens the username of every manager-stored entry. A
 // distinct username is what keeps a manager entry separate from the
@@ -124,10 +136,11 @@ func (m HostMaterial) Empty() bool { return !m.HostCredential && len(m.Scopes) =
 
 // ReadHost reads the operator's own HTTPS credential for host.
 //
-// A manager-namespaced entry is never reported as the operator's own: a
-// helper asked for a host without a username answers with whatever record it
-// holds for that host, which can be a manager entry, and reporting that back
-// as the operator's own credential would make one record look like two.
+// A manager-namespaced or provider-namespaced entry is never reported as
+// the operator's own: a helper asked for a host without a username answers
+// with whatever record it holds for that host, which can be a manager
+// entry, and reporting that back as the operator's own credential would
+// make one record look like two.
 func (a Access) ReadHost(ctx context.Context, host string) (HostCredential, bool) {
 	if !portableValue(host) {
 		return HostCredential{}, false
@@ -137,7 +150,7 @@ func (a Access) ReadHost(ctx context.Context, host string) (HostCredential, bool
 		return HostCredential{}, false
 	}
 	username := answer["username"]
-	if strings.HasPrefix(username, NamespacePrefix) {
+	if strings.HasPrefix(username, NamespacePrefix) || providerNamespaceOwns(username) {
 		return HostCredential{}, false
 	}
 	if username == "" {

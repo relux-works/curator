@@ -37,12 +37,35 @@ type ExternalDeps struct {
 	BuildSSH BuildSSHSelection
 	// BuildHTTPS is the operator's captured HTTPS selection for this run.
 	BuildHTTPS BuildHTTPSSelection
+	// DraftTransportResolution opts this run's external-repository lane into
+	// bounded transport resolution (repository-transport-v1 §2): with a
+	// present machine policy, acquisition runs the resolved executor over the
+	// policy's endpoint plan. The zero value keeps the legacy lane for every
+	// fetch, without consulting any policy file.
+	DraftTransportResolution bool
+	// DraftPolicyPath names the machine source-policy.json consulted when
+	// DraftTransportResolution is set. "" resolves to the default path beside
+	// the manager configuration.
+	DraftPolicyPath string
+	// DraftProvidersPath names the machine source-providers.json consulted
+	// when DraftTransportResolution is set and a planned attempt names a
+	// policy provider. "" resolves to the default path beside the manager
+	// configuration. An absent file configures no providers; a
+	// present-but-invalid file fails the fetch before any traffic.
+	DraftProvidersPath string
+	// DraftProviderReader reads provider HTTPS secrets through the
+	// operator's trusted broker. nil resolves no named HTTPS material:
+	// every non-anonymous named HTTPS provider is unavailable.
+	DraftProviderReader buildrepo.ProviderSecretReader
 }
 
 // ExternalSource is the exact declared/effective source passed to an injected
 // acquisition boundary. It contains no credential or signing material.
+// GitURL is the declared fetchable repository URL; Declared.Repository is the
+// repository's configured name and never a fetch endpoint.
 type ExternalSource struct {
 	Skill, Repository string
+	GitURL            string
 	Declared          buildrepo.DeclaredState
 	Effective         buildrepo.EffectiveState
 	Substitution      *devsub.BuildRepositorySubstitution
@@ -153,7 +176,7 @@ func planExternalBuilds(ctx context.Context, scope, projectIdentity, home string
 		plan.messages = append(provenance, httpsProvenance...)
 	}
 	for index, row := range plan.rows {
-		source := ExternalSource{Skill: row.node.Name, Repository: row.repository.Name, Declared: row.declared, Effective: row.effective, Substitution: row.sub}
+		source := ExternalSource{Skill: row.node.Name, Repository: row.repository.Name, GitURL: row.repository.Git, Declared: row.declared, Effective: row.effective, Substitution: row.sub}
 		request, err := externalPipelineRequest(plan.deps, source, plan.credentialsFor(row), plan.httpsCredentialsFor(row), row.command, store, identityOnlyExternalGo{identity: plan.toolchain, target: plan.targetIdentity, toolchain: plan.toolchainInput}, buildrepo.OperationDryRun, plan.authority)
 		if err != nil {
 			return plan, err
@@ -206,7 +229,7 @@ func stageExternalBuilds(ctx context.Context, plan externalPlan, toolchain Toolc
 		}
 		// A verified final hit is copied into operation-private staging so the
 		// transaction and shim path are identical for hits and misses.
-		request, err := externalPipelineRequest(plan.deps, ExternalSource{Skill: row.node.Name, Repository: row.repository.Name, Declared: row.declared, Effective: row.effective, Substitution: row.sub}, plan.credentialsFor(row), plan.httpsCredentialsFor(row), row.command, store, adapter, buildrepo.OperationInstall, plan.authority)
+		request, err := externalPipelineRequest(plan.deps, ExternalSource{Skill: row.node.Name, Repository: row.repository.Name, GitURL: row.repository.Git, Declared: row.declared, Effective: row.effective, Substitution: row.sub}, plan.credentialsFor(row), plan.httpsCredentialsFor(row), row.command, store, adapter, buildrepo.OperationInstall, plan.authority)
 		if err != nil {
 			return stagedExternal{}, err
 		}
@@ -275,7 +298,7 @@ func externalPipelineRequest(deps ExternalDeps, source ExternalSource, credentia
 			if selected.Substitution != nil && selected.Substitution.Path != "" {
 				return buildrepo.AdmitLocal(ctx, buildrepo.LocalRequest{Path: selected.Substitution.Path, Tool: tool, Limits: deps.Limits})
 			}
-			git := selected.Declared.Repository
+			git := selected.GitURL
 			transport := selected.Declared.Transport
 			identity := selected.Declared.Identity
 			commit := selected.Declared.Commit
@@ -286,7 +309,7 @@ func externalPipelineRequest(deps ExternalDeps, source ExternalSource, credentia
 				commit, tag = selected.Effective.Commit, ""
 				refKind, refValue = selected.Substitution.RefKind, selected.Substitution.RefValue
 			}
-			return buildrepo.AcquireNetwork(ctx, buildrepo.NetworkRequest{Source: buildrepo.Source{Git: git, Transport: transport, Identity: identity}, Lock: buildrepo.LockedCommit{ObjectFormat: selected.Effective.ObjectFormat, Hex: commit}, Tag: tag, RefKind: refKind, RefValue: refValue, Tool: tool, Limits: deps.Limits})
+			return deps.acquireDraftNetwork(ctx, tool, git, transport, identity, buildrepo.LockedCommit{ObjectFormat: selected.Effective.ObjectFormat, Hex: commit}, tag, refKind, refValue)
 		}
 	}
 	if authority == nil {

@@ -103,6 +103,12 @@ type GitTool struct {
 	// so a closure that spans two hosts cannot offer either host the other's
 	// key (Spec §12.2).
 	SSHCredentials OperatorSSHCredentials
+	// SSHBase is the manager-owned base of per-attempt SSH wrapper
+	// policies. Bounded transport resolution completes it per SSH attempt
+	// with the endpoint source and the attempt's credential selection; a
+	// zero base binds no policy and every resolved SSH attempt refuses.
+	// Direct acquisition ignores it and keeps the static wrapper.
+	SSHBase SSHWrapperBase
 }
 
 // SSHPolicy contains the manager-owned inputs for the fixed SSH wrapper.
@@ -196,7 +202,7 @@ func ValidateGitTool(ctx context.Context, tool GitTool) error {
 			return admissionError(CodeIdentityInvalid, "%s is not an admitted absolute regular file", name)
 		}
 	}
-	cmd := exec.CommandContext(ctx, tool.Executable, "--version") // #nosec G204 -- operator-selected absolute executable.
+	cmd := newBoundedGitCommand(ctx, tool.Executable, "--version")
 	cmd.Env = cleanDiscoveryEnvironment()
 	out, err := cmd.Output()
 	if err != nil || len(out) > 256 {
@@ -223,6 +229,12 @@ type NetworkRequest struct {
 	RefValue string
 	Tool     GitTool
 	Limits   Limits
+	// sshPolicy is the bound per-attempt SSH wrapper policy. Only bounded
+	// transport resolution sets it: the fetch then runs behind a
+	// per-attempt wrapper pinned to this endpoint and its credentials
+	// instead of the tool's static wrapper. Direct acquisition leaves it
+	// nil and keeps the legacy static-wrapper behavior.
+	sshPolicy *SSHPolicy
 }
 
 // File is one normalized regular file in an admitted snapshot.
@@ -245,45 +257,87 @@ type Snapshot struct {
 // AcquireNetwork fetches exactly one locked object or exact tag into a fresh
 // private bare repository and proves the snapshot from raw objects.
 func AcquireNetwork(ctx context.Context, request NetworkRequest) (*Snapshot, error) {
-	if err := ValidateGitTool(ctx, request.Tool); err != nil {
+	if err := admitNetworkRequest(ctx, request); err != nil {
 		return nil, err
+	}
+	limits := normalizedLimits(request.Limits)
+	ctx, cancel := context.WithTimeout(ctx, limits.Timeout)
+	defer cancel()
+	snapshot, err := acquireNetworkFormat(ctx, request, limits)
+	if err != nil {
+		return nil, laneDiagnostic(err)
+	}
+	return snapshot, nil
+}
+
+// admitNetworkRequest runs the strict-lane admission checks shared by direct
+// acquisition and bounded transport resolution: trusted Git, canonical
+// source, broker/wrapper presence, SSH credential selection, and
+// locked-commit, tag, and substitution-ref validation. The bounded resolver
+// runs the same checks per attempt under its shared deadline, so a resolved
+// acquisition refuses exactly what the lane refuses.
+func admitNetworkRequest(ctx context.Context, request NetworkRequest) error {
+	if err := ValidateGitTool(ctx, request.Tool); err != nil {
+		return err
 	}
 	parsedSource, err := ParseSource(request.Source.Git)
 	if err != nil || parsedSource != request.Source {
-		return nil, admissionError(CodeIdentityInvalid, "network source is not canonical parsed input")
+		return admissionError(CodeIdentityInvalid, "network source is not canonical parsed input")
 	}
 	if request.Source.Transport != "https" && request.Source.Transport != "ssh" {
-		return nil, admissionError(CodeIdentityInvalid, "unsupported transport")
+		return admissionError(CodeIdentityInvalid, "unsupported transport")
 	}
 	if request.Source.Transport == "https" && request.Tool.AskPass == "" {
-		return nil, admissionError(CodeIdentityInvalid, "HTTPS requires a manager credential broker")
+		return admissionError(CodeIdentityInvalid, "HTTPS requires a manager credential broker")
 	}
 	if request.Source.Transport == "ssh" && request.Tool.SSHWrapper == "" {
-		return nil, admissionError(CodeIdentityInvalid, "SSH requires the exact manager wrapper")
+		return admissionError(CodeIdentityInvalid, "SSH requires the exact manager wrapper")
 	}
 	// The admission boundary refuses an unselected SSH repository even when a
 	// caller forgot to resolve credentials, so no fetch can quietly fall back
 	// to whatever the operator's ambient SSH state happens to offer.
 	if request.Source.Transport == "ssh" && !request.Tool.SSHCredentials.Selected() {
-		return nil, admissionError(CodeSSHCredentialMissing,
+		return admissionError(CodeSSHCredentialMissing,
 			"SSH build repositories require an operator identity or agent")
 	}
 	if _, err := ParseLockedCommit(map[string]any{"object_format": request.Lock.ObjectFormat, "hex": request.Lock.Hex}, "lock"); err != nil {
-		return nil, admissionError(CodeIdentityInvalid, "invalid immutable lock")
+		return admissionError(CodeIdentityInvalid, "invalid immutable lock")
 	}
 	if request.Tag != "" && !ValidRefName(request.Tag) {
-		return nil, admissionError(CodeIdentityInvalid, "invalid exact tag")
+		return admissionError(CodeIdentityInvalid, "invalid exact tag")
 	}
 	if request.RefKind != "" && request.RefKind != "revision" && request.RefKind != "branch" && request.RefKind != "tag" {
-		return nil, admissionError(CodeIdentityInvalid, "invalid substitution ref kind")
+		return admissionError(CodeIdentityInvalid, "invalid substitution ref kind")
 	}
 	if request.RefKind != "" && !ValidRefName(request.RefValue) {
-		return nil, admissionError(CodeIdentityInvalid, "invalid substitution ref")
+		return admissionError(CodeIdentityInvalid, "invalid substitution ref")
 	}
-	limits := normalizedLimits(request.Limits)
-	ctx, cancel := context.WithTimeout(ctx, limits.Timeout)
-	defer cancel()
-	return acquireNetworkFormat(ctx, request, limits)
+	return nil
+}
+
+// fetchError is a failed exact-ref fetch with its bounded stderr retained
+// for transport failure classification. The message never carries the
+// output: AcquireNetwork maps it to the legacy lane diagnostic, and the
+// bounded resolver classifies from the field without interpolating it.
+// truncated reports that stderr overflowed the bound, so the retained
+// prefix is incomplete and must never authorize a fallback.
+type fetchError struct {
+	stderr    string
+	truncated bool
+}
+
+func (e *fetchError) Error() string { return "exact source fetch failed" }
+
+// laneDiagnostic maps an internal acquisition failure to the lane's own
+// diagnostic: a fetch failure becomes the legacy CodeSourceUnavailable
+// error, which never carries fetch output. Every other error already is
+// a lane diagnostic and passes through unchanged.
+func laneDiagnostic(err error) error {
+	var fetch *fetchError
+	if errors.As(err, &fetch) {
+		return admissionError(CodeSourceUnavailable, "exact source fetch failed")
+	}
+	return err
 }
 
 func acquireNetworkFormat(ctx context.Context, request NetworkRequest, limits Limits) (*Snapshot, error) {
@@ -342,9 +396,17 @@ func acquireNetworkFormat(ctx context.Context, request NetworkRequest, limits Li
 			EnvHTTPSBrokerState+"="+state,
 			EnvHTTPSBrokerSecret+"="+request.Tool.HTTPSCredentials.secret)
 	}
+	if request.Source.Transport == "ssh" && request.sshPolicy != nil {
+		wrapper, state, err := materializeSSHWrapper(root, request.Tool.SSHWrapper, *request.sshPolicy)
+		if err != nil {
+			return nil, admissionError(CodeSourceUnavailable, "cannot materialize SSH wrapper")
+		}
+		fetchEnv = setEnvironmentValue(fetchEnv, "GIT_SSH", wrapper)
+		fetchEnv = append(fetchEnv, EnvSSHWrapperState+"="+state)
+	}
 	fetchArgs := strictFetchArgs(paths.repo, paths.hooks, askPass, request.Source.Transport, request.Source.Git, refspec)
-	if err := runGit(ctx, request.Tool.Executable, paths.work, fetchEnv, fetchArgs...); err != nil {
-		return nil, admissionError(CodeSourceUnavailable, "exact source fetch failed")
+	if stderr, truncated, err := runGitCapture(ctx, request.Tool.Executable, paths.work, fetchEnv, fetchArgs...); err != nil {
+		return nil, &fetchError{stderr: stderr, truncated: truncated}
 	}
 	if err := validatePrivateRepository(paths.repo, request.Lock.ObjectFormat); err != nil {
 		return nil, err
@@ -439,22 +501,56 @@ func cleanGitEnvironment(p privatePaths, tool GitTool, transport string) []strin
 }
 
 func runGit(ctx context.Context, executable, dir string, env []string, args ...string) error {
+	_, _, err := runGitCapture(ctx, executable, dir, env, args...)
+	return err
+}
+
+// gitPipeDrainBound caps how long a Git invocation may linger after its
+// context fires or its process exits while helpers still hold the stdio
+// pipes. Group cancellation normally ends the whole tree at once; the
+// bound covers a kill that cannot land and, on Windows, an orphaned
+// helper outside the killed process.
+const gitPipeDrainBound = 5 * time.Second
+
+// newBoundedGitCommand builds one lane Git invocation whose lifetime the
+// context bounds over the whole process graph: the child leads its own
+// group where the platform allows, cancellation kills the group, and pipe
+// draining past the deadline is bounded.
+func newBoundedGitCommand(ctx context.Context, executable string, args ...string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, executable, args...) // #nosec G204 -- absolute trusted executable; closed argument construction.
+	setChildProcessGroup(cmd)
+	cmd.Cancel = func() error { return killProcessTree(cmd.Process) }
+	cmd.WaitDelay = gitPipeDrainBound
+	return cmd
+}
+
+// runGitCapture runs one Git invocation and returns its bounded stderr
+// alongside the failure, plus whether stderr overflowed the bound. Success
+// returns no output: only a failed fetch needs classification, and only
+// the classifier reads the field.
+func runGitCapture(ctx context.Context, executable, dir string, env []string, args ...string) (string, bool, error) {
+	cmd := newBoundedGitCommand(ctx, executable, args...)
 	cmd.Dir, cmd.Env, cmd.Stdin = dir, env, bytes.NewReader(nil)
 	var stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = io.Discard, &boundedWriter{writer: &stderr, remaining: 64 << 10}
-	return cmd.Run()
+	capture := &boundedWriter{writer: &stderr, remaining: 64 << 10}
+	cmd.Stdout, cmd.Stderr = io.Discard, capture
+	if err := cmd.Run(); err != nil {
+		return stderr.String(), capture.truncated, err
+	}
+	return "", false, nil
 }
 
 type boundedWriter struct {
 	writer    io.Writer
 	remaining int
+	truncated bool
 }
 
 func (w *boundedWriter) Write(payload []byte) (int, error) {
 	original := len(payload)
 	if len(payload) > w.remaining {
 		payload = payload[:w.remaining]
+		w.truncated = true
 	}
 	if len(payload) > 0 {
 		if _, err := w.writer.Write(payload); err != nil {

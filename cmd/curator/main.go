@@ -93,6 +93,9 @@ func main() {
 	if buildrepo.IsHTTPSBrokerInvocation(os.Args[0]) {
 		os.Exit(buildrepo.RunHTTPSCredentialBroker(os.Args[1:], os.Getenv, os.Stdout))
 	}
+	if buildrepo.IsSSHWrapperInvocation(os.Args[0]) {
+		os.Exit(buildrepo.RunSSHWrapper(os.Args[1:], os.Getenv, os.Stdin, os.Stdout, os.Stderr))
+	}
 	// The fixed hidden go-v1 build worker is an implementation boundary, not a
 	// user-visible command surface. It is dispatched before any other parsing,
 	// requires exactly this one manager-owned argument, and is never reachable
@@ -1483,6 +1486,15 @@ func productionExternalDeps(cfg *config.Config, dryRun bool) install.ExternalDep
 	// that also parses --build-ssh-* flags overrides this with them.
 	deps.BuildSSH = install.CaptureBuildSSHSelection(cfg, install.BuildSSHFlags{}, os.Getenv)
 	deps.BuildHTTPS = install.CaptureBuildHTTPSSelection(cfg, os.Getenv)
+	// The draft transport switch is operator-owned process input, read once at
+	// the CLI boundary like every other ExternalDeps member. The machine policy
+	// and provider table live beside the manager configuration that was
+	// actually loaded; provider HTTPS secrets are read through the operator's
+	// own credential machinery.
+	deps.DraftTransportResolution = install.DraftTransportEnabled(os.Getenv)
+	deps.DraftPolicyPath = filepath.Join(cfg.Home(), config.SourcePolicyFileName)
+	deps.DraftProvidersPath = filepath.Join(cfg.Home(), config.SourceProvidersFileName)
+	deps.DraftProviderReader = gitcred.Access{}
 	deps.AuditWarnings = func(_ context.Context, subject buildrepo.AuditSubject) ([]string, error) {
 		candidate := audit.Subject{
 			Name: subject.Declared.Repository, Source: subject.Declared.Identity,

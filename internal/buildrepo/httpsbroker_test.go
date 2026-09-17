@@ -21,6 +21,12 @@ func TestMain(m *testing.M) {
 	if IsHTTPSBrokerInvocation(os.Args[0]) {
 		os.Exit(RunHTTPSCredentialBroker(os.Args[1:], os.Getenv, os.Stdout))
 	}
+	if IsSSHWrapperInvocation(os.Args[0]) {
+		os.Exit(RunSSHWrapper(os.Args[1:], os.Getenv, os.Stdin, os.Stdout, os.Stderr))
+	}
+	if isTestFakeSSH(os.Args[0]) {
+		os.Exit(testFakeSSHMain(os.Args))
+	}
 	os.Exit(m.Run())
 }
 
