@@ -1,0 +1,16 @@
+diff --git a/LOGBOOK.md b/LOGBOOK.md
+index 1d9f07f..cc18199 100644
+--- a/LOGBOOK.md
++++ b/LOGBOOK.md
+@@ -3,6 +3,11 @@
+ > Institutional memory. Concise, factual, high-signal.
+ > Newest entries first. One block per insight.
+ 
++## 2026-09-17 — E5 nofollow spec revision handed off to review (TASK-260916-1qfpu4)
++
++- DECISION: new environments §8.3.1 states the write discipline once — every materialization/takeover/repair/backup write replaces the directory entry (operation-private temp + rename) and MUST NOT follow a symlink at the target or below the managed root — with a closed target-link disposition (manager-owned → replace; §9.5 stop → §9.5; other unowned link → ledger rule). Exactly one new diagnostic, `environment_write_would_follow_link`, covering only the traversal case no existing stop names; the takeover flag covers entry replace, never traversal.
++- NOTE: implementer task TASK-260916-19shmj follows; conformance family `vectors/environments-write-nofollow.json` (10 cases, every foreign-link case asserting the former target byte-identical) with a semantic `tools/validate.py` gate. Spec patch `TASK-260916-1qfpu4_spec-patch_rev1.patch` + evidence `TASK-260916-1qfpu4_evidence.md` attached as task outcome resources; gates green (validate exit 0, 362 unittest OK, go test ok, regenerate exit 0, pre-existing vectors byte-identical).
++
+ ## 2026-09-06 — release channels lag completed main; rc.2/rc.3 never executed release automation (TASK-260906-1xitqi)
+ 
+ - FINDING: completed main `7320bc2` is 180 commits ahead of stable `v0.13.0` and 152 ahead of the only published `v0.14.0` prerelease, rc.1. Homebrew and Scoop point at rc.1; the installer follows GitHub latest and therefore installs v0.13.0. Rc.2 and rc.3 exist as tags but have neither a GitHub Release nor any Release workflow execution, so there is no failed GoReleaser job to rerun and those tags must not be moved or reused.

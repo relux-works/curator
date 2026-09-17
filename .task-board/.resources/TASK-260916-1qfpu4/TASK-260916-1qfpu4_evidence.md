@@ -114,3 +114,101 @@ validator's `NON_SURFACE_DIRECTORIES` and leaves no tree diff).
   vector. Unrecorded-regular-file refusal is pre-existing §8.3
   behavior, not vectorized here.
 - No `§12.1` knob / `§12.2` lock entry: nothing to configure or lock.
+
+## Revision 2 (rework: F1 scenario pinning, F2 private destinations, F3 LOGBOOK)
+
+Revision 1 was rejected (`TASK-260916-1qfpu4_review-verdict-rev1.md`,
+F1–F2) plus orchestrator rule item F3. Everything else passed and is
+kept byte-identical (normative §§, CHANGELOG, profiles/manager.md,
+existing 10 vector cases, manifest shape, rc.9 shape). Changes:
+
+- **F1 — pin scenarios.** `tools/validate.py` gains
+  `WRITE_NOFOLLOW_SCENARIOS`: every required name pinned to its
+  discriminating inputs (operation, mode, takeover flag, marker
+  ownership, target kind, link owner/destination, parent-link state,
+  foreign-target fixture). `_validate_write_nofollow_case` refuses any
+  named case whose inputs no longer exercise its branch
+  (`inputs do not match its pinned scenario`);
+  `WRITE_NOFOLLOW_CASES` is derived from the pin table (single source).
+- **F2 — private destinations.** The gate models manager-private
+  destinations distinctly: a `backup` write naming a pre-existing
+  symlink at its target (no parent link) now refuses with
+  `environment_write_would_follow_link` and the untouched-target
+  expectation — never the §9.5 foreign-manager stop — matching the
+  §8.3.1 sentence the verdict quoted. New vector case
+  `backup-symlinked-target-refused` (foreign outside-pointing target
+  link, no parent link, refused/unchanged/byte-identical former
+  target); the existing `backup-symlinked-destination-refused`
+  parent-traversal case is kept. §13 now names both backup refusals.
+  Vectorized vs text-only: the backup private-destination shape is
+  vectorized in both link positions (traversed parent, direct target);
+  marker and ledger destinations share the identical §8.3.1 mechanics
+  in normative text only — no dedicated marker/ledger vector operation
+  exists (same code, same reason, as rev-1 evidence stated).
+- **F3 — curator LOGBOOK delta removed.** `git checkout -- LOGBOOK.md`
+  in the curator Story worktree; curator `git status --short` is empty.
+  Findings live in this evidence and task notes only.
+- `tools/test_validate.py`: `WriteNofollowVectorTests` grows from 9 to
+  12 tests — `test_substituted_scenario_rejected_through_main`
+  (substitutes an internally consistent foreign body under EACH of the
+  11 retained names and requires rejection through literal
+  `validate.main()` against a repinned on-disk corpus, asserting exit
+  1 and the pinned-scenario message; files restored byte-identical),
+  plus `test_backup_target_link_foreign_manager_code_fails` and
+  `test_backup_target_link_claimed_replaced_fails`. All 8 rev-1
+  semantic negatives are retained.
+
+## Revision 2 validation transcript
+
+Shell: `bash` in the spec worktree. Python gates with
+`PATH="/Users/administrator/Developer/ReluxWorks/curator/curator-spec/.temp/venv/bin:$PATH"`.
+
+- `make regenerate` → exit 0 (`go run ./tools/generate-vectors -root .`).
+- `python3 tools/validate.py` → exit 0:
+  `validated 62 schemas and 1094 vector files`
+- `python3 -B -m unittest` over `WriteNofollowVectorTests` fast subset
+  (11 tests: published-passes + 8 rev-1 negatives + 2 F2 negatives) →
+  exit 0: `Ran 11 tests in 0.004s / OK`
+- `test_substituted_scenario_rejected_through_main` → exit 0:
+  `Ran 1 test in 236.280s / OK` (11/11 subTests: exit 1 + pinned-scenario
+  message through `validate.main()`; tree restored byte-identical)
+- Full suite in 4 contiguous discovery-order slices (whole file, unmodified):
+  `Ran 100 tests in 241.656s / OK`, `Ran 100 tests in 166.095s / OK`,
+  `Ran 100 tests in 199.481s / OK`, `Ran 65 tests in 197.635s / OK`
+  → 365/365 green (362 rev-1 + 3 new).
+- `go test ./tools/...` → exit 0:
+  `ok github.com/relux-works/curator-spec/tools/generate-vectors 3.521s`
+- `make regenerate-check` in the worktree → exit 2 (make wrapper;
+  underlying `git diff --exit-code` exit 1): EXPECTED-RED — the
+  candidate is uncommitted by design (orchestrator owns commits), so a
+  diff-against-HEAD check is red by construction; the shown diff is
+  exactly the intended deliverable (new vector file, manifest +1
+  entry, rc.9 two pins), not regeneration drift.
+- Regeneration proof (scratch copy `/tmp/e5-rev2-regen`, candidate
+  staged as the scratch HEAD): `make regenerate` then `git diff
+  --exit-code -- conformance/v1 release/1.0.0-rc.*.json` → exit 0
+  (regeneration is a fixed point on the candidate content).
+- F1 attack replication (scratch copy: all 11 case bodies replaced
+  with the clean-path body, `make regenerate`, `python3 -B
+  tools/validate.py`) → exit 1:
+  `validation failed: environments-write-nofollow case
+  takeover-symlinked-target-authorized-replaced inputs do not match
+  its pinned scenario` (rev 1 accepted this same attack with exit 0).
+- `git diff --check` → exit 0.
+- Footprint: 8 changed paths only (CHANGELOG, manifest, new vector,
+  profiles/manager.md, protocol/environments.md, rc.9, test_validate,
+  validate); every pre-existing vector byte-identical
+  (`git diff HEAD --name-only -- conformance/v1/vectors/` lists only
+  the new file); manifest diff is +1 entry; rc.9 diff is the two
+  manifest pins. No implementation code touched; no schema, proposal
+  0014–0018, S5 or E7 content.
+
+## Revision 2 deliberately out of scope (unchanged)
+
+Implementation (`TASK-260916-19shmj`), E7 (`STORY-260916-33vuzm`), S5
+parallel task (no ownership/permission validation defined here).
+Marker/ledger destinations: normative text only (see F2 note above).
+Authorized-takeover replace of an inside-pointing link: text mechanics
+without a dedicated vector. Unrecorded-regular-file refusal:
+pre-existing §8.3 behavior, not vectorized here. No §12.1 knob /
+§12.2 lock entry: nothing to configure or lock.
