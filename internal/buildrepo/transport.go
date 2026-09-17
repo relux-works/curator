@@ -376,9 +376,32 @@ func ClassifyAdmissionCode(code string) FailureClass {
 // empty Authentication names no policy provider: the attempt uses the
 // existing lane credentials from the base request, which is the only
 // shape a URL declaration without a policy entry produces.
+//
+// Revision-2 endpoints (repository-transport §§5-7) carry machine-policy
+// endpoint properties beside the URL: MirrorOf attests a resolved
+// connection host that differs from the plan identity host, Alias names
+// the operator alias the connection substitutes, and ResolvedHost,
+// ResolvedPort and HasExplicitPort record the resulting connection
+// address (alias target when an alias is named, else the URL host and
+// URL port, else the transport default). The executor revalidates the
+// §6 predicate over these carried values before any network I/O; the
+// alias-table structural checks (chaining, authentication match,
+// embedded hosts) stay loader-enforced, since the plan carries no table.
 type TransportAttempt struct {
-	URL            string
-	Authentication string
+	URL             string
+	Authentication  string
+	MirrorOf        string
+	Alias           string
+	ResolvedHost    string
+	ResolvedPort    int
+	HasExplicitPort bool
+}
+
+// carriesRevision2 reports whether the attempt carries any revision-2
+// endpoint property. A bare revision-1 attempt carries none: its
+// resolved address is the URL itself.
+func (a TransportAttempt) carriesRevision2() bool {
+	return a.MirrorOf != "" || a.Alias != "" || a.ResolvedHost != "" || a.ResolvedPort != 0 || a.HasExplicitPort
 }
 
 // TransportPlan is the ordered attempt plan for one declaration: one or
@@ -403,13 +426,24 @@ func (p TransportPlan) isLegacyShape() bool {
 // are never commands or paths. Violations fail repository_policy_invalid:
 // a plan always derives from machine policy, so a malformed plan is a
 // malformed policy.
+//
+// Revision-2 attempts additionally carry the §5 endpoint properties
+// (mirror_of, alias, resolved connection address), which are revalidated
+// against the §6 predicate here. An attempt with an explicit port or an
+// alias field then fails build_repository_identity_invalid: this
+// executor runs the strict external-build lane, whose URL grammar admits
+// neither, and the lane must never strip a port or ignore an alias to
+// force admission (§7). A declared mirror without ports or aliases is an
+// ordinary lane URL and remains admissible.
 func ValidateTransportPlan(plan TransportPlan) error {
 	_, err := parseTransportPlan(plan)
 	return err
 }
 
 // parseTransportPlan validates the plan and returns the parsed lane
-// sources in attempt order.
+// sources in attempt order. Revision-1 attempts take the original
+// checks byte-identically; revision-2 attempts additionally pass the §6
+// predicate and the §7 lane-grammar refusal.
 func parseTransportPlan(plan TransportPlan) ([]Source, error) {
 	if len(plan.Attempts) < 1 || len(plan.Attempts) > 2 {
 		return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan requires one or two attempts")
@@ -423,12 +457,30 @@ func parseTransportPlan(plan TransportPlan) ([]Source, error) {
 	sources := make([]Source, 0, len(plan.Attempts))
 	seen := map[string]bool{}
 	for index, attempt := range plan.Attempts {
-		parsed, err := ParseSource(attempt.URL)
+		urlHost, urlPort, hasURLPort, strippedIdentity, err := parseTransportEndpointURL(attempt.URL)
 		if err != nil {
+			if attempt.carriesRevision2() {
+				return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d is outside the revision-2 endpoint grammar", index+1)
+			}
 			return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d is outside the closed repository grammar", index+1)
 		}
-		if parsed.Identity != plan.Identity {
-			return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d canonicalizes to %q, want %q", index+1, parsed.Identity, plan.Identity)
+		if !attempt.carriesRevision2() {
+			// A port-bearing URL without revision-2 provenance is a
+			// mistranslation, never a silently stripped endpoint.
+			if hasURLPort {
+				return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d carries an explicit port without revision-2 provenance", index+1)
+			}
+			if strippedIdentity != plan.Identity {
+				return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d canonicalizes to %q, want %q", index+1, strippedIdentity, plan.Identity)
+			}
+		} else if err := checkTransportRevision2(plan.Identity, index, attempt, urlHost, urlPort, hasURLPort, strippedIdentity); err != nil {
+			return nil, err
+		}
+		// The strict lane admits no explicit port and no alias
+		// rewriting: refuse before any network I/O rather than strip
+		// the port or fetch the unsubstituted URL (§7).
+		if attempt.HasExplicitPort || attempt.Alias != "" {
+			return nil, admissionError(CodeIdentityInvalid, "transport plan endpoint %d carries an explicit port or host alias outside the strict external-build lane grammar", index+1)
 		}
 		if seen[attempt.URL] {
 			return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoints must be distinct URLs")
@@ -437,9 +489,168 @@ func parseTransportPlan(plan TransportPlan) ([]Source, error) {
 		if attempt.Authentication != "" && !gitcred.ValidProvider(attempt.Authentication) {
 			return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d authentication is not an opaque operator provider identifier", index+1)
 		}
+		// Port and alias attempts never reach here: they are refused
+		// above, so the listed URL always parses under the lane's
+		// closed grammar. A declared mirror is an ordinary lane URL.
+		parsed, err := ParseSource(attempt.URL)
+		if err != nil {
+			return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d is outside the closed repository grammar", index+1)
+		}
 		sources = append(sources, parsed)
 	}
 	return sources, nil
+}
+
+// CodeRepositoryMirrorUndeclared names the published §6 class for a
+// resolved connection host that differs from the plan identity host
+// without a mirror_of attestation equal to the identity. Zero attempts,
+// no fallback.
+const CodeRepositoryMirrorUndeclared = "repository_mirror_undeclared"
+
+// checkTransportRevision2 revalidates one revision-2 attempt's §5
+// endpoint properties against the single §6 resolved-host predicate.
+// The alias-table structural checks (embedded alias hosts, chained
+// aliases, authentication match) stay loader-enforced: the plan carries
+// the resolved address, not the table, so this check enforces
+// consistency of the carried values with the URL and the identity.
+func checkTransportRevision2(planIdentity string, index int, attempt TransportAttempt, urlHost string, urlPort int, hasURLPort bool, strippedIdentity string) error {
+	endpoint := index + 1
+	keyHost, keyPath, _ := strings.Cut(planIdentity, "/")
+	_, epPath, _ := strings.Cut(strippedIdentity, "/")
+	// The port-stripped path must equal the identity path; only the
+	// host may differ, and only when attested.
+	if epPath != keyPath {
+		return admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d path %q is not the plan identity path %q; only the host may differ, and only when attested", endpoint, epPath, keyPath)
+	}
+	resolvedHost := attempt.ResolvedHost
+	if attempt.Alias == "" {
+		if resolvedHost == "" {
+			resolvedHost = urlHost
+		}
+		if resolvedHost != urlHost {
+			return admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d resolved host %q does not match the endpoint URL host %q", endpoint, resolvedHost, urlHost)
+		}
+		if attempt.HasExplicitPort != hasURLPort || attempt.ResolvedPort != urlPort {
+			return admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d resolved port does not match the endpoint URL port", endpoint)
+		}
+	} else {
+		// A mirror URL combined with an alias is refused: the URL
+		// host would be neither identity nor connection address.
+		if urlHost != keyHost {
+			return admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d combines a mirror URL with an alias", endpoint)
+		}
+		if resolvedHost == "" || !hostRE.MatchString(resolvedHost) {
+			return admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d names an alias without a resolved connection host", endpoint)
+		}
+		// A URL port and an alias port must not both be present: the
+		// resolved port differs from the URL port only through the
+		// alias port, so a carried port that equals neither reading
+		// (or the absence pattern it breaks) is a mistranslation.
+		if hasURLPort && attempt.HasExplicitPort && attempt.ResolvedPort != 0 && attempt.ResolvedPort != urlPort {
+			return admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d carries both a URL port and an alias port", endpoint)
+		}
+		if attempt.HasExplicitPort != (attempt.ResolvedPort != 0) || (hasURLPort && (!attempt.HasExplicitPort || attempt.ResolvedPort != urlPort)) {
+			return admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d resolved port does not match the endpoint URL port", endpoint)
+		}
+	}
+	if resolvedHost != keyHost {
+		if attempt.MirrorOf == "" {
+			return admissionError(CodeRepositoryMirrorUndeclared, "transport plan endpoint %d resolved host %q differs from the plan identity host %q without a mirror_of attestation", endpoint, resolvedHost, keyHost)
+		}
+		if attempt.MirrorOf != planIdentity {
+			return admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d mirror_of must equal the plan identity %q exactly", endpoint, planIdentity)
+		}
+	} else if attempt.MirrorOf != "" {
+		return admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d mirror_of is forbidden when the resolved host equals the plan identity host", endpoint)
+	}
+	return nil
+}
+
+// parseTransportEndpointURL validates a §5 endpoint URL: the lane's
+// closed grammar plus an optional explicit port on URI forms only
+// (https://host[:port]/path, ssh://[user@]host[:port]/path), decimal
+// 1-65535 with no leading zeros. Scp-like spellings carry no port: the
+// segment after ":" is always the path. It returns the lowercased URL
+// host, the explicit port (0 when absent), and the port-stripped lane
+// identity the key-path check applies to. Port-free URLs behave exactly
+// as ParseSource: stripped input equals raw input.
+func parseTransportEndpointURL(raw string) (urlHost string, urlPort int, hasPort bool, identity string, err error) {
+	stripped, port, hasExplicitPort, ok := splitTransportEndpointPort(raw)
+	if !ok {
+		return "", 0, false, "", fmt.Errorf("outside the revision-2 endpoint grammar")
+	}
+	parsed, parseErr := ParseSource(stripped)
+	if parseErr != nil {
+		return "", 0, false, "", parseErr
+	}
+	host, _, _ := strings.Cut(parsed.Identity, "/")
+	return host, port, hasExplicitPort, parsed.Identity, nil
+}
+
+// splitTransportEndpointPort separates an explicit URI-form port from
+// the endpoint URL. Every other spelling passes through unchanged.
+func splitTransportEndpointPort(raw string) (stripped string, port int, hasPort bool, ok bool) {
+	scheme := ""
+	rest := ""
+	if remainder, found := strings.CutPrefix(raw, "https://"); found {
+		scheme, rest = "https", remainder
+	} else if remainder, found := strings.CutPrefix(raw, "ssh://"); found {
+		scheme, rest = "ssh", remainder
+	} else {
+		return raw, 0, false, true
+	}
+	authority := rest
+	path := ""
+	if i := strings.Index(rest, "/"); i >= 0 {
+		authority, path = rest[:i], rest[i:]
+	}
+	hostport := authority
+	userinfo := ""
+	if i := strings.LastIndex(authority, "@"); i >= 0 {
+		userinfo, hostport = authority[:i], authority[i+1:]
+	}
+	if scheme == "https" && userinfo != "" {
+		return "", 0, false, false
+	}
+	host := hostport
+	if i := strings.LastIndex(hostport, ":"); i >= 0 {
+		value, valid := parseTransportPort(hostport[i+1:])
+		if !valid {
+			return "", 0, false, false
+		}
+		host, port, hasPort = hostport[:i], value, true
+	}
+	if host == "" {
+		return "", 0, false, false
+	}
+	rebuilt := scheme + "://"
+	if userinfo != "" {
+		rebuilt += userinfo + "@"
+	}
+	return rebuilt + host + path, port, hasPort, true
+}
+
+// parseTransportPort validates an explicit endpoint port: decimal
+// 1-65535 with no leading zeros.
+func parseTransportPort(value string) (int, bool) {
+	if value == "" || len(value) > 5 {
+		return 0, false
+	}
+	if len(value) > 1 && value[0] == '0' {
+		return 0, false
+	}
+	number := 0
+	for i := 0; i < len(value); i++ {
+		c := value[i]
+		if c < '0' || c > '9' {
+			return 0, false
+		}
+		number = number*10 + int(c-'0')
+	}
+	if number < 1 || number > 65535 {
+		return 0, false
+	}
+	return number, true
 }
 
 // CodeRepositoryPolicyInvalid names the published malformed-policy class
@@ -594,6 +805,14 @@ func (c CredentialProviders) ResolveSSH(provider string) (OperatorSSHCredentials
 // endpoint: which URL was attempted with which provider, what class it
 // failed with (empty on success), and whether any network traffic went
 // out. Records never carry stderr or secrets.
+//
+// Revision-2 provenance (§7) rides the same record: the canonical plan
+// identity (never an alias or mirror host), the listed URL with its
+// port, the resolved connection host and port, and the alias and
+// mirror_of properties when used. The record stays machine-private:
+// identity, URLs, and hosts never enter portable artifacts (locks,
+// receipts, markers, manifests), and errors carry only the closed
+// class vocabulary.
 type AttemptRecord struct {
 	Index int
 	URL   string
@@ -608,6 +827,22 @@ type AttemptRecord struct {
 	// with no usable material records its auth failure with no traffic.
 	NetworkAttempted bool
 	Succeeded        bool
+	// Identity is the canonical repository identity the attempt proves,
+	// always the plan identity: ports, mirrors, and aliases never enter
+	// it.
+	Identity string
+	// ResolvedHost and ResolvedPort are the connection address the
+	// attempt dials: the alias target when an alias is named, else the
+	// endpoint URL host and port. ResolvedPort is 0 for the transport
+	// default.
+	ResolvedHost string
+	ResolvedPort int
+	// Alias names the operator alias substituted for this attempt, ""
+	// when the URL was dialed directly.
+	Alias string
+	// MirrorOf carries the mirror attestation when the resolved host
+	// differs from the identity host, "" otherwise.
+	MirrorOf string
 }
 
 // TransportTrace receives one AttemptRecord per planned endpoint, in
@@ -679,7 +914,15 @@ func AcquireNetworkResolved(ctx context.Context, base NetworkRequest, plan Trans
 		return gateTransportAttempt(ctx, plan, records, record.Class, laneDiagnostic(err))
 	}
 	for index, attempt := range plan.Attempts {
-		record := AttemptRecord{Index: index + 1, URL: attempt.URL, Transport: sources[index].Transport, Provider: attempt.Authentication}
+		// Provenance is bound before any traffic: the canonical plan
+		// identity with the attempt's own connection address (§7). A
+		// bare revision-1 attempt resolves to its URL host directly.
+		resolvedHost, resolvedPort := attempt.ResolvedHost, attempt.ResolvedPort
+		if resolvedHost == "" {
+			resolvedHost, _, _ = strings.Cut(sources[index].Identity, "/")
+		}
+		record := AttemptRecord{Index: index + 1, URL: attempt.URL, Transport: sources[index].Transport, Provider: attempt.Authentication,
+			Identity: plan.Identity, ResolvedHost: resolvedHost, ResolvedPort: resolvedPort, Alias: attempt.Alias, MirrorOf: attempt.MirrorOf}
 		request := base
 		request.Source = sources[index]
 		request.sshPolicy = nil

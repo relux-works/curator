@@ -97,14 +97,23 @@ func TestParseSourcePolicyDocumentShape(t *testing.T) {
 	}
 }
 
-func TestParseSourcePolicyRejectsRevision2Closed(t *testing.T) {
-	_, err := ParseSourcePolicy([]byte(`{"schema_version":2,"repositories":{"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https"}],"fallback":"none"}}}`), "source-policy.json")
-	if err == nil || !strings.Contains(err.Error(), CodeRepositoryPolicyInvalid) || !strings.Contains(err.Error(), "revision-2") {
-		t.Fatalf("v2 rejection %v does not name the revision boundary", err)
+// The revision-2 reader accepts schema-2 documents while schema-1
+// documents keep rejecting revision-2 members as unknown fields: a
+// revision-1 shape never silently gains ports, mirrors, or aliases.
+func TestParseSourcePolicyRevision2Boundary(t *testing.T) {
+	v2shape := `{"schema_version":2,"repositories":{"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https"}],"fallback":"none"}}}`
+	policy := mustParsePolicy(t, v2shape)
+	if policy.SchemaVersion != SourcePolicySchemaVersionV2 {
+		t.Fatalf("SchemaVersion = %d", policy.SchemaVersion)
 	}
+	if len(policy.Repositories) != 1 || policy.Aliases != nil {
+		t.Fatalf("v2 v1-shape = %+v", policy)
+	}
+	// Schema 1 still rejects every revision-2 member closed.
 	mustRejectPolicy(t, `{"schema_version":1,"repositories":{},"aliases":{"corp-mirror":{"host":"mirror.example","authentication":"team-https"}}}`)
 	mustRejectPolicy(t, policyDoc(`"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https","alias":"corp-mirror"}],"fallback":"none"}`))
 	mustRejectPolicy(t, policyDoc(`"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https","mirror_of":"example.org/kit"}],"fallback":"none"}`))
+	mustRejectPolicy(t, policyDoc(`"example.org/kit":{"endpoints":[{"url":"https://example.org:8443/kit.git","authentication":"team-https"}],"fallback":"none"}`))
 }
 
 func TestParseSourcePolicyEntryKeysAreExactCanonical(t *testing.T) {

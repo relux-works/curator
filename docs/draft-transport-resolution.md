@@ -71,10 +71,47 @@ creation (after plan validation, with no attempt recorded) rather than
 run with an unbounded tree; the legacy lane keeps its WaitDelay-bound
 behavior there unchanged.
 
-Revision 2 ports, mirrors, and aliases need a revision-2 reader and are
-a separate leaf. `buildsource` was inspected and needs no change:
-locked-content verification for network acquisition is the lane's
-raw-object proof, reused per attempt.
+Revision 2 ports, mirrors, and aliases (repository-transport §§5-7)
+resolve through the same executor. `config.ResolveRepositoryEndpoints`
+plans the §6 attempt order over the revision-2 reader's model
+(`mirror_of`, `alias`, resolved connection host and port per attempt);
+the executor revalidates the single resolved-host predicate over the
+carried values — `repository_mirror_undeclared` for a differing
+resolved host without attestation, `repository_policy_invalid` for
+every misuse — with zero attempts, no fallback, and no cache shortcut.
+The two-endpoint cap, one attempt per endpoint, no implicit retry, the
+shared total deadline, and the revision-1 fallback table are unchanged:
+ports, mirrors, and aliases are properties of an endpoint, not new
+attempts, so a declared mirror or aliased endpoint that fails with an
+availability/authentication error follows the ordinary
+`availability-auth` rule. `buildsource` was inspected and needs no
+change: locked-content verification for network acquisition is the
+lane's raw-object proof, reused per attempt, identically for mirrors.
+
+The strict external-build lane admits only the port-free, alias-free
+subset (§7): a selected endpoint with an explicit port (URL port or
+alias port) or an `alias` field fails
+`build_repository_identity_invalid` at plan validation, before any
+network I/O — the lane never strips a port or ignores an alias to
+force admission, and the SSH wrapper keeps its closed fixed argv. A
+mirror endpoint without ports or aliases is an ordinary lane URL and
+fetches with verification identical to revision 1, proving the same
+canonical identity and locked content.
+
+Sanitized endpoint provenance rides each machine-private attempt
+record: the canonical plan identity (never an alias or mirror host),
+the listed URL with its port, the resolved connection host and port,
+and the alias and `mirror_of` properties when used. Records never
+carry fetch output or secrets. Exhaustion still reports only the
+closed class vocabulary with the canonical identity; full URLs reach
+only the trace callback. Provenance never enters portable artifacts:
+no port field is added to receipt inputs (the existing
+declared/effective `https`/`ssh` transport enum is unchanged), and
+locks, markers, and manifests are untouched. User Git/SSH
+configuration (`~/.ssh/config` Host aliases, `insteadOf`,
+`ProxyCommand`, helpers, environment overrides) is never consulted:
+the lane pins its own configuration paths, broker, and wrapper, and
+fetches the declared URL literally when no policy entry applies.
 
 ## Production caller (draft)
 
@@ -88,16 +125,29 @@ no caller here mints it, so resolution always starts from the declared URL.
 `install.acquireDraftNetwork` loads the machine policy beside the loaded
 manager configuration, resolves the declared URL with
 `config.ResolveRepositoryEndpoints`, converts the `config.Resolution` to a
-`TransportPlan` field-for-field, and calls `AcquireNetworkResolved`. A
-present policy selects the resolved lane; an absent policy file, or the
-switch off, runs `AcquireNetwork` with the exact legacy request — the
-switch-off path never opens the policy file. A present-but-invalid policy
-fails `repository_policy_invalid` before any fetch. On Windows the executor
-refuses with `transport_resolution_unsupported_platform` before any
-process creation; the CLI pipeline reports every acquisition failure as
-the lane diagnostic, so the typed code is visible only below the
-pipeline. The trace callback is nil:
-sanitized attempt records have no machine-private CLI sink yet.
+`TransportPlan` field-for-field — including the revision-2 `mirror_of`,
+`alias`, and resolved connection address — and calls
+`AcquireNetworkResolved`. A present policy selects the resolved lane; an
+absent policy file, or the switch off, runs `AcquireNetwork` with the
+exact legacy request — the switch-off path never opens the policy file.
+A present-but-invalid policy fails `repository_policy_invalid` before
+any fetch; an unattested mirror fails `repository_mirror_undeclared`
+and a dangling alias fails `repository_alias_unknown`, both with zero
+fetches. A selected port or alias endpoint fails
+`build_repository_identity_invalid` in this strict lane before any
+fetch. On Windows the executor refuses with
+`transport_resolution_unsupported_platform` before any process
+creation; the CLI pipeline reports every acquisition failure as the
+lane diagnostic, so the typed code is visible only below the pipeline.
+The trace callback is `ExternalDeps.DraftTransportTrace`, assigned by
+the production CLI to `install.DraftTransportProvenanceTrace(cfg.Home())`:
+sanitized attempt records append as one JSON line per endpoint to the
+manager-home operation diagnostics log
+`draft-transport-provenance.jsonl` (mode 0600, fixed allowlisted fields
+only: canonical identity, listed URL, resolved host and port, alias and
+`mirror_of` when used, lane transport, provider identifier, outcome) —
+never portable artifacts. The legacy lane never invokes it, so
+switch-off runs create no file.
 
 Policy-named providers resolve only through the operator's provider table,
 `source-providers.json` beside the manager configuration, read through

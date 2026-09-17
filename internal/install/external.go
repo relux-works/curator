@@ -57,6 +57,13 @@ type ExternalDeps struct {
 	// operator's trusted broker. nil resolves no named HTTPS material:
 	// every non-anonymous named HTTPS provider is unavailable.
 	DraftProviderReader buildrepo.ProviderSecretReader
+	// DraftTransportTrace receives the resolved lane's sanitized
+	// per-endpoint provenance records (canonical identity, listed URL,
+	// resolved host and port, alias and mirror_of when used). It is
+	// machine-private: the caller stores records in operation
+	// diagnostics, separately from portable identity. nil records
+	// nothing.
+	DraftTransportTrace buildrepo.TransportTrace
 }
 
 // ExternalSource is the exact declared/effective source passed to an injected

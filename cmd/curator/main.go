@@ -1495,6 +1495,12 @@ func productionExternalDeps(cfg *config.Config, dryRun bool) install.ExternalDep
 	deps.DraftPolicyPath = filepath.Join(cfg.Home(), config.SourcePolicyFileName)
 	deps.DraftProvidersPath = filepath.Join(cfg.Home(), config.SourceProvidersFileName)
 	deps.DraftProviderReader = gitcred.Access{}
+	// Sanitized resolved-lane provenance reaches the manager-home
+	// operation-diagnostics log, never a portable artifact. The sink is
+	// always assigned so a real opted-in acquisition records its
+	// canonical identity with the listed and resolved mirror provenance;
+	// the legacy lane never invokes it.
+	deps.DraftTransportTrace = install.DraftTransportProvenanceTrace(cfg.Home())
 	deps.AuditWarnings = func(_ context.Context, subject buildrepo.AuditSubject) ([]string, error) {
 		candidate := audit.Subject{
 			Name: subject.Declared.Repository, Source: subject.Declared.Identity,

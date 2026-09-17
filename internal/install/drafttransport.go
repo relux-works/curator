@@ -11,10 +11,12 @@ package install
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/relux-works/curator/internal/buildrepo"
 	"github.com/relux-works/curator/internal/config"
@@ -34,6 +36,75 @@ const draftTransportSSHConnectTimeout = 15
 // DraftTransportEnabled reports whether the switch selects the resolved lane.
 func DraftTransportEnabled(getenv func(string) string) bool {
 	return getenv != nil && getenv(EnvDraftTransportResolution) == "1"
+}
+
+// DraftTransportProvenanceFileName names the machine-private operation
+// diagnostics file holding sanitized resolved-lane endpoint provenance
+// (repository-transport §7). It lives directly under the manager home
+// beside the machine policy: the home directory already exists, so no
+// new directory is created, and portable artifacts (locks, receipts,
+// markers, manifests) never carry these properties.
+const DraftTransportProvenanceFileName = "draft-transport-provenance.jsonl"
+
+// DraftTransportProvenancePath resolves the operation-diagnostics sink
+// for one manager home.
+func DraftTransportProvenancePath(home string) string {
+	return filepath.Join(home, DraftTransportProvenanceFileName)
+}
+
+// DraftTransportProvenanceTrace returns the production TransportTrace
+// for one manager home: every sanitized attempt record is appended as
+// one JSON line carrying only the fixed allowlisted provenance fields
+// (canonical identity, listed URL, resolved host and port, alias and
+// mirror_of when used, lane transport, provider identifier, outcome).
+// The record type carries no secrets, and the allowlist keeps it that
+// way structurally: a future record field is never serialized unless
+// named here. Writes are best-effort and never fail an acquisition; an
+// empty home records nothing.
+func DraftTransportProvenanceTrace(home string) buildrepo.TransportTrace {
+	if home == "" {
+		return nil
+	}
+	return func(record buildrepo.AttemptRecord) {
+		appendTransportProvenance(DraftTransportProvenancePath(home), record)
+	}
+}
+
+// transportProvenanceLine is the exact serialized sink shape: fixed
+// sanitized fields only, never secrets, never fetch output.
+type transportProvenanceLine struct {
+	Index            int    `json:"index"`
+	Identity         string `json:"identity"`
+	URL              string `json:"url"`
+	Transport        string `json:"transport"`
+	Provider         string `json:"provider"`
+	Class            string `json:"class"`
+	NetworkAttempted bool   `json:"network_attempted"`
+	Succeeded        bool   `json:"succeeded"`
+	ResolvedHost     string `json:"resolved_host"`
+	ResolvedPort     int    `json:"resolved_port"`
+	Alias            string `json:"alias,omitempty"`
+	MirrorOf         string `json:"mirror_of,omitempty"`
+}
+
+func appendTransportProvenance(path string, record buildrepo.AttemptRecord) {
+	line, err := json.Marshal(transportProvenanceLine{
+		Index: record.Index, Identity: record.Identity, URL: record.URL,
+		Transport: record.Transport, Provider: record.Provider, Class: string(record.Class),
+		NetworkAttempted: record.NetworkAttempted, Succeeded: record.Succeeded,
+		ResolvedHost: record.ResolvedHost, ResolvedPort: record.ResolvedPort,
+		Alias: record.Alias, MirrorOf: record.MirrorOf,
+	})
+	if err != nil {
+		return
+	}
+	line = append(line, '\n')
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600) // #nosec G304 -- manager-home operation-diagnostics sink resolved above.
+	if err != nil {
+		return
+	}
+	_, _ = file.Write(line)
+	_ = file.Close()
 }
 
 // acquireDraftNetwork routes one external-repository fetch behind the draft
@@ -97,7 +168,7 @@ func (deps ExternalDeps) acquireDraftNetwork(ctx context.Context, tool buildrepo
 		}
 		base.Tool.SSHWrapper = manager
 	}
-	return buildrepo.AcquireNetworkResolved(ctx, base, plan, providers, nil)
+	return buildrepo.AcquireNetworkResolved(ctx, base, plan, providers, deps.DraftTransportTrace)
 }
 
 // draftPlanNamesProvider reports whether any planned attempt names a policy
@@ -114,8 +185,13 @@ func draftPlanNamesProvider(plan buildrepo.TransportPlan) bool {
 }
 
 // draftTransportPlan converts one machine-policy resolution to the executor's
-// attempt plan field-for-field. The executor revalidates before any network
+// attempt plan field-for-field, including the revision-2 endpoint
+// properties (mirror_of, alias, resolved connection address) the §6
+// predicate revalidates. The executor revalidates before any network
 // I/O; the validation here fails a mistranslation before SSH base discovery.
+// A selected port or alias endpoint is refused by the executor in this
+// strict external-build lane (§7); the conversion preserves it so the
+// refusal names the planned endpoint rather than a mistranslation.
 func draftTransportPlan(resolution config.Resolution) (buildrepo.TransportPlan, error) {
 	var fallback string
 	switch resolution.Fallback {
@@ -128,7 +204,9 @@ func draftTransportPlan(resolution config.Resolution) (buildrepo.TransportPlan, 
 	}
 	attempts := make([]buildrepo.TransportAttempt, 0, len(resolution.Attempts))
 	for _, attempt := range resolution.Attempts {
-		attempts = append(attempts, buildrepo.TransportAttempt{URL: attempt.URL, Authentication: attempt.Authentication})
+		attempts = append(attempts, buildrepo.TransportAttempt{URL: attempt.URL, Authentication: attempt.Authentication,
+			MirrorOf: attempt.MirrorOf, Alias: attempt.Alias, ResolvedHost: attempt.ResolvedHost,
+			ResolvedPort: attempt.ResolvedPort, HasExplicitPort: attempt.HasExplicitPort})
 	}
 	plan := buildrepo.TransportPlan{Identity: resolution.Identity, Attempts: attempts, Fallback: fallback}
 	if err := buildrepo.ValidateTransportPlan(plan); err != nil {
@@ -138,9 +216,13 @@ func draftTransportPlan(resolution config.Resolution) (buildrepo.TransportPlan, 
 }
 
 // draftPlanNeedsSSH reports whether any planned attempt fetches over SSH.
+// Port-bearing ssh:// URLs never parse under the lane's closed grammar,
+// so the scheme prefix is the fallback signal for revision-2 endpoints.
 func draftPlanNeedsSSH(plan buildrepo.TransportPlan) bool {
 	for _, attempt := range plan.Attempts {
 		if parsed, err := buildrepo.ParseSource(attempt.URL); err == nil && parsed.Transport == "ssh" {
+			return true
+		} else if strings.HasPrefix(attempt.URL, "ssh://") {
 			return true
 		}
 	}
