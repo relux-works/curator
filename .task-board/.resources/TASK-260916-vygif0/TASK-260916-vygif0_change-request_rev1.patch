@@ -1,0 +1,599 @@
+diff --git a/.github/ci/gate-selftest.sh b/.github/ci/gate-selftest.sh
+index daaf2c1..1d3e250 100755
+--- a/.github/ci/gate-selftest.sh
++++ b/.github/ci/gate-selftest.sh
+@@ -919,6 +919,195 @@ else
+ 	bad 'the deferral behavioural cases have shipped streams to narrow' 'missing $WORK/shipped-windows.json or $WORK/shipped-linux.json'
+ fi
+ 
++echo ''
++echo '=== rust-pin-guard.sh: the committed toolchain file cannot drift ==='
++RPG="$HERE/rust-pin-guard.sh"
++assert 'the committed rust-toolchain.toml agrees with SupportedRustToolchainVersion' 0 bash "$RPG"
++printf '[toolchain]\nchannel = "1.92.0"\nprofile = "minimal"\n' >"$WORK/rust-bumped.toml"
++assert 'a bumped toolchain file is rejected' 1 env CI_RUST_TOOLCHAIN_FILE="$WORK/rust-bumped.toml" bash "$RPG"
++printf 'package rustsource\n\nconst SupportedRustToolchainVersion = "1.92.0"\n' >"$WORK/rust-const-bumped.go"
++assert 'a changed supported value is rejected' 1 env CI_RUST_GO_SOURCE="$WORK/rust-const-bumped.go" bash "$RPG"
++assert 'a missing toolchain file fails closed' 1 env CI_RUST_TOOLCHAIN_FILE="$WORK/absent.toml" bash "$RPG"
++printf '[toolchain]\nprofile = "minimal"\n' >"$WORK/rust-no-channel.toml"
++assert 'a toolchain file with no channel fails closed' 1 env CI_RUST_TOOLCHAIN_FILE="$WORK/rust-no-channel.toml" bash "$RPG"
++printf '[toolchain]\nchannel = "stable"\nprofile = "minimal"\n' >"$WORK/rust-stable.toml"
++assert 'a floating channel is rejected' 1 env CI_RUST_TOOLCHAIN_FILE="$WORK/rust-stable.toml" bash "$RPG"
++printf '[toolchain]\nchannel = "1.91.0"\nprofile = "default"\n' >"$WORK/rust-default-profile.toml"
++assert 'a non-minimal profile is rejected' 1 env CI_RUST_TOOLCHAIN_FILE="$WORK/rust-default-profile.toml" bash "$RPG"
++assert 'an unreadable Go source fails closed' 1 env CI_RUST_GO_SOURCE="$WORK/absent.go" bash "$RPG"
++printf 'package rustsource\n\nconst SomethingElse = "1.0.0"\n' >"$WORK/rust-no-const.go"
++assert 'a Go source with no declaration fails closed' 1 env CI_RUST_GO_SOURCE="$WORK/rust-no-const.go" bash "$RPG"
++
++echo ''
++echo '=== install-rust-toolchain.sh: rustup installs the filed channel, shims lead PATH ==='
++IRS="$HERE/install-rust-toolchain.sh"
++BASH_ABS="$(command -v bash)"
++
++# A fake rustup records its install invocation; fake shims satisfy the
++# post-install PATH check. Nothing here touches the network.
++FAKEBIN="$WORK/fake-rust-bin"
++mkdir -p "$FAKEBIN"
++cat >"$FAKEBIN/rustup" <<'EOF'
++#!/usr/bin/env bash
++echo "rustup $*" >>"$FAKE_RUSTUP_LOG"
++if [ "$1" = "show" ]; then
++	echo "1.92.0-test (overridden by fake rust-toolchain.toml)"
++fi
++EOF
++chmod +x "$FAKEBIN/rustup"
++printf '#!/usr/bin/env bash\necho "rustc fake"\n' >"$FAKEBIN/rustc"
++printf '#!/usr/bin/env bash\necho "cargo fake"\n' >"$FAKEBIN/cargo"
++chmod +x "$FAKEBIN/rustc" "$FAKEBIN/cargo"
++
++printf '[toolchain]\nchannel = "1.92.0"\nprofile = "minimal"\n' >"$WORK/rust-install-channel.toml"
++: >"$WORK/rustup-log.txt"; : >"$WORK/github-path.txt"
++assert 'the installer installs exactly the filed channel' 0 \
++	env PATH="$FAKEBIN:$PATH" FAKE_RUSTUP_LOG="$WORK/rustup-log.txt" GITHUB_PATH="$WORK/github-path.txt" \
++	    CARGO_HOME="$WORK/fake-cargo" CI_RUST_TOOLCHAIN_FILE="$WORK/rust-install-channel.toml" bash "$IRS"
++assert_contains 'the install invocation names the filed channel' 'toolchain install 1.92.0 --profile minimal' "$WORK/rustup-log.txt"
++assert_contains 'the shim directory is prepended for the rest of the lane' "$WORK/fake-cargo/bin" "$WORK/github-path.txt"
++
++# A PATH with no rustup anywhere on it: the hosted images ship rustup, so
++# the negative case must hide the real one rather than assume its absence.
++NORUSTBIN="$WORK/norust-bin"
++mkdir -p "$NORUSTBIN"
++ln -s "$(command -v awk)" "$NORUSTBIN/awk"
++assert 'a runner without rustup fails' 1 \
++	env PATH="$NORUSTBIN" GITHUB_PATH="$WORK/github-path.txt" \
++	    CI_RUST_TOOLCHAIN_FILE="$WORK/rust-install-channel.toml" "$BASH_ABS" "$IRS"
++assert_contains 'the failure names the runner-setup note' 'docs/self-hosted-runner-setup.md' "$WORK/out.txt"
++
++if grep -nE '[0-9]+\.[0-9]+\.[0-9]+' "$IRS" >"$WORK/out.txt"; then
++	bad 'the installer names no release; it reads the channel from the file' "$(tr '\n' ' ' <"$WORK/out.txt" | cut -c1-200)"
++else
++	ok 'the installer names no release; it reads the channel from the file'
++fi
++if grep -qF 'CI_RUST_TOOLCHAIN_FILE:-rust-toolchain.toml' "$IRS"; then
++	ok 'the installer reads its channel from rust-toolchain.toml'
++else
++	bad 'the installer reads its channel from rust-toolchain.toml' 'install-rust-toolchain.sh does not reference rust-toolchain.toml'
++fi
++
++echo ''
++echo '=== ci.yml: every suite lane verifies and installs the pinned Rust toolchain first ==='
++
++# A lane that runs test-gate.sh runs the rustsource production cases, so it
++# must verify the toolchain file against the Go constant, then install
++# exactly that channel with rustup and prepend the shims to PATH -- guard,
++# then install, in that order, before any test runs. A lane that drops the
++# guard can drift; a lane that drops the install fails the production cases
++# on rustc-not-found (rose-air run 35121791685). These cases read the wiring
++# back, so a refactor cannot drop a step without this self-test noticing.
++#
++# Emits one "<job> <guard?> <install?> <ordered?>" record per test-gate.sh
++# lane.
++rust_lane_records() {
++	awk '
++		/^  [a-z][a-z0-9-]*:[ \t\r]*$/ { job = $1; sub(/:[ \t\r]*$/, "", job); next }
++		/^[ \t]*run:.*test-gate\.sh/      { gate[job] = 1; gateline[job] = NR; next }
++		/^[ \t]*run:.*rust-pin-guard\.sh/ { guard[job] = 1; guardline[job] = NR; next }
++		/^[ \t]*run:.*install-rust-toolchain\.sh/ { install[job] = 1; installline[job] = NR; next }
++		END {
++			for (j in gate) {
++				ordered = (guard[j] && install[j] && \
++				           guardline[j] < installline[j] && installline[j] < gateline[j]) ? 1 : 0
++				printf "%s %d %d %d\n", j, (guard[j] ? 1 : 0), (install[j] ? 1 : 0), ordered
++			}
++		}
++	' "$WORKFLOW"
++}
++
++rust_records="$(rust_lane_records)"
++if [ -z "$rust_records" ]; then
++	bad 'the workflow still runs test-gate.sh' 'no test-gate.sh step found in .github/workflows/ci.yml'
++else
++	rust_unprovisioned=''
++	while read -r job has_guard has_install ordered; do
++		[ -n "$job" ] || continue
++		if [ "$has_guard" != '1' ] || [ "$has_install" != '1' ] || [ "$ordered" != '1' ]; then
++			rust_unprovisioned="$rust_unprovisioned $job(guard=$has_guard,install=$has_install,ordered=$ordered)"
++		fi
++	done <<-RECORDS
++	$rust_records
++	RECORDS
++	if [ -z "$rust_unprovisioned" ]; then
++		ok 'every test-gate.sh lane verifies the rust pin, then installs it via rustup before go test'
++	else
++		bad 'every test-gate.sh lane verifies the rust pin, then installs it via rustup before go test' \
++			"lanes missing the guard, the install, or the order:$rust_unprovisioned"
++	fi
++fi
++
++# The install lives in exactly one place. A lane that spells out its own
++# `rustup toolchain install` reinstalls the drift the guard exists to
++# prevent.
++if grep -nF 'rustup toolchain install' "$WORKFLOW" >"$WORK/out.txt"; then
++	bad 'no lane spells its own rustup install; every lane uses install-rust-toolchain.sh' "$(tr '\n' ' ' <"$WORK/out.txt" | cut -c1-200)"
++else
++	ok 'no lane spells its own rustup install; every lane uses install-rust-toolchain.sh'
++fi
++
++echo ''
++echo '=== platform-cases.tsv: the production rust cases run on darwin, tolerate host absence elsewhere ==='
++RUST_CASES='TestProductionManagerCapturesRegistryFromRawPaths TestProductionManagerCapturesGitWithoutCallerProjection'
++for rcase in $RUST_CASES; do
++	row="$(awk -F'\t' -v c="$rcase" '$1 == "internal/rustsource" && $2 == c { print }' "$SHIPPED")"
++	if [ -z "$row" ]; then
++		bad "$rcase has a ledger row" 'no internal/rustsource row names this case'
++		continue
++	fi
++	must="$(printf '%s' "$row" | awk -F'\t' '{print $3}')"
++	skip="$(printf '%s' "$row" | awk -F'\t' '{print $4}')"
++	cls="$(printf '%s' "$row" | awk -F'\t' '{print $5}')"
++	if [ "$must" = "darwin" ] && [ "$skip" = "linux,windows" ] && [ "$cls" = "host-capability" ]; then
++		ok "$rcase is required on darwin and tolerates host-capability absence on linux,windows"
++	else
++		bad "$rcase is required on darwin and tolerates host-capability absence on linux,windows" \
++			"must_run_on=$must skip_allowed_on=$skip class=$cls"
++	fi
++done
++
++if [ -f "$WORK/shipped-darwin.json" ] && [ -f "$WORK/shipped-linux.json" ]; then
++	# A skip on darwin is fatal even though the same reason is tolerated
++	# on linux: the lane installed the toolchain, so absence there means
++	# the install regressed, not a platform gap.
++	rust_dar_stream="$WORK/rust-darwin-skip.json"
++	cp "$WORK/shipped-darwin.json" "$rust_dar_stream"
++	for rcase in $RUST_CASES; do
++		evout internal/rustsource "$rcase" 'pinned Cargo toolchain root or executable unavailable for native target aarch64-apple-darwin' >>"$rust_dar_stream"
++		ev skip internal/rustsource "$rcase" >>"$rust_dar_stream"
++	done
++	assert 'a toolchain-absent skip of a production rust case fails on darwin' 1 \
++		env CI_GATE_GOOS=darwin CI_PLATFORM_CASES="$SHIPPED" CI_SKIP_CLASSES="$CLASSES" \
++		    CI_GATE_MODULE='github.com/relux-works/curator' bash "$GATE" "$rust_dar_stream" "$WORK/rust-ev-darwin"
++
++	rust_lin_stream="$WORK/rust-linux-skip.json"
++	cp "$WORK/shipped-linux.json" "$rust_lin_stream"
++	for rcase in $RUST_CASES; do
++		evout internal/rustsource "$rcase" 'no operator-approved Cargo descriptor for native target x86_64-unknown-linux-gnu' >>"$rust_lin_stream"
++		ev skip internal/rustsource "$rcase" >>"$rust_lin_stream"
++	done
++	assert 'the same absence skip of a production rust case passes on linux' 0 \
++		env CI_GATE_GOOS=linux CI_EXCLUDED_PKGS=internal/godriver \
++		    CI_PLATFORM_CASES="$SHIPPED" CI_SKIP_CLASSES="$CLASSES" \
++		    CI_GATE_MODULE='github.com/relux-works/curator' bash "$GATE" "$rust_lin_stream" "$WORK/rust-ev-linux"
++
++	# A different reason on linux is fatal too: the ledger pins the class,
++	# so an unrelated skip cannot masquerade as the toolchain absence.
++	rust_cls_stream="$WORK/rust-linux-wrongclass.json"
++	cp "$WORK/shipped-linux.json" "$rust_cls_stream"
++	for rcase in $RUST_CASES; do
++		evout internal/rustsource "$rcase" 'deferred on windows pending BUG-260916-2f3xbf' >>"$rust_cls_stream"
++		ev skip internal/rustsource "$rcase" >>"$rust_cls_stream"
++	done
++	assert 'a non-absence skip of a production rust case fails on linux' 1 \
++		env CI_GATE_GOOS=linux CI_EXCLUDED_PKGS=internal/godriver \
++		    CI_PLATFORM_CASES="$SHIPPED" CI_SKIP_CLASSES="$CLASSES" \
++		    CI_GATE_MODULE='github.com/relux-works/curator' bash "$GATE" "$rust_cls_stream" "$WORK/rust-ev-linux-cls"
++else
++	bad 'the rust behavioural cases have shipped streams to narrow' 'missing $WORK/shipped-darwin.json or $WORK/shipped-linux.json'
++fi
++
+ echo ''
+ printf 'gate-selftest: %d passed, %d failed' "$PASS" "$FAIL"
+ [ "$SKIPPED" -gt 0 ] && printf ', %d skipped (reported above, not hidden)' "$SKIPPED"
+diff --git a/.github/ci/install-rust-toolchain.sh b/.github/ci/install-rust-toolchain.sh
+new file mode 100755
+index 0000000..1060eaf
+--- /dev/null
++++ b/.github/ci/install-rust-toolchain.sh
+@@ -0,0 +1,47 @@
++#!/usr/bin/env bash
++# Install the pinned Rust toolchain for the CI lane.
++#
++# Reads the channel from rust-toolchain.toml -- the file rust-pin-guard.sh
++# verifies against internal/rustsource.SupportedRustToolchainVersion in the
++# preceding lane step -- installs exactly that toolchain with rustup, and
++# prepends the rustup shim directory to PATH for the rest of the lane, so
++# `rustc -vV` in the rustsource production cases resolves the pinned release
++# instead of whatever the runner happens to ship (rose-air run 35121791685:
++# no rustc on PATH failed the lane after the pnpm pin had gone green).
++#
++# rustup itself is a runner prerequisite, not something this script
++# bootstraps: the hosted images ship it, and the self-hosted runner gets it
++# once per docs/self-hosted-runner-setup.md. A runner without rustup fails
++# here with that note named, not with a generic rustc-not-found later.
++#
++# Usage (as a CI lane step; GITHUB_PATH must be set):
++#   bash .github/ci/install-rust-toolchain.sh
++#
++# Self-test overrides:
++#   CI_RUST_TOOLCHAIN_FILE toolchain file to read the channel from
++#                          (default: rust-toolchain.toml)
++
++set -euo pipefail
++
++fail() { echo "rust-pin: $*" >&2; exit 1; }
++
++file="${CI_RUST_TOOLCHAIN_FILE:-rust-toolchain.toml}"
++[ -r "$file" ] || fail "cannot read $file"
++
++channel="$(awk '/^[[:space:]]*\[toolchain[[:space:]]*\]/{in_toolchain=1; next} /^[[:space:]]*\[/{in_toolchain=0; next} in_toolchain && /^[[:space:]]*channel[[:space:]]*=[[:space:]]*"/{line=$0; sub(/^[^=]*=[[:space:]]*"/, "", line); sub(/".*$/, "", line); print line; exit}' "$file")"
++[ -n "$channel" ] || fail "no channel in the [toolchain] section of $file"
++
++command -v rustup >/dev/null 2>&1 || fail "rustup is not installed on this runner; install it once per docs/self-hosted-runner-setup.md, then re-run this lane"
++
++rustup toolchain install "$channel" --profile minimal
++
++cargo_home="${CARGO_HOME:-$HOME/.cargo}"
++[ -n "${GITHUB_PATH:-}" ] || fail "GITHUB_PATH is not set; run this script as a CI lane step"
++printf '%s\n' "$cargo_home/bin" >>"$GITHUB_PATH"
++export PATH="$cargo_home/bin:$PATH"
++
++command -v rustc >/dev/null 2>&1 || fail "rustc is not on PATH after installing Rust $channel"
++command -v cargo >/dev/null 2>&1 || fail "cargo is not on PATH after installing Rust $channel"
++rustc -vV
++cargo --version
++rustup show active-toolchain
+diff --git a/.github/ci/platform-cases.tsv b/.github/ci/platform-cases.tsv
+index 37e2f92..9aa1061 100644
+--- a/.github/ci/platform-cases.tsv
++++ b/.github/ci/platform-cases.tsv
+@@ -472,3 +472,21 @@ cmd/curator	TestEnvStatusReportsLockedRequire	linux,darwin,windows	-	-	env statu
+ # ===========================================================================
+ internal/pnpmsource	TestRealPinnedPNPMLockSupersetSnapshotDependencies	linux,darwin	windows	stage-deferred	pinned-pnpm lock-superset case executes on unix; deferred on windows pending BUG-260916-2f3xbf (undeclared writable-store member), asserted there once the bug lands
+ internal/pnpmsource	TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization	linux,darwin	windows	stage-deferred	pinned-pnpm private-store and offline-materialization case executes on unix; deferred on windows pending BUG-260916-2f3xbf (undeclared writable-store member), asserted there once the bug lands
++
++# ===========================================================================
++# Pinned-Rust production cases (TASK-260916-vygif0)
++#
++# The rust pin (rust-toolchain.toml plus .github/ci/install-rust-toolchain.sh)
++# installs Rust 1.91.0 in every suite lane, so the two
++# TestProductionManager* cases execute instead of skipping for an absent
++# toolchain. They are required on darwin, where the closed Cargo registry
++# carries an operator-approved descriptor (aarch64-apple-darwin) and the
++# installed toolchain satisfies it. linux and windows runners have no
++# approved descriptor for their native target, so the host-capability
++# absence skip is tolerated there -- and only there, and only for that
++# class. A skip of either case on darwin, or for any other reason on any
++# runner, is fatal. If the registry ever approves a linux or windows
++# descriptor, widen must_run_on to cover it.
++# ===========================================================================
++internal/rustsource	TestProductionManagerCapturesRegistryFromRawPaths	darwin	linux,windows	host-capability	pinned-Rust registry capture executes on darwin; linux/windows have no operator-approved Cargo descriptor, so the host-capability absence skip is tolerated there
++internal/rustsource	TestProductionManagerCapturesGitWithoutCallerProjection	darwin	linux,windows	host-capability	pinned-Rust Git capture executes on darwin; linux/windows have no operator-approved Cargo descriptor, so the host-capability absence skip is tolerated there
+diff --git a/.github/ci/rust-pin-guard.sh b/.github/ci/rust-pin-guard.sh
+new file mode 100755
+index 0000000..16b365f
+--- /dev/null
++++ b/.github/ci/rust-pin-guard.sh
+@@ -0,0 +1,52 @@
++#!/usr/bin/env bash
++# rust pin guard: rust-toolchain.toml must name exactly the release
++# internal/rustsource admits, or the lane stops before installing anything.
++#
++# The Go constant internal/rustsource.SupportedRustToolchainVersion is the
++# single source of truth; rust-toolchain.toml is the file the lanes install
++# from (and the file local cargo/rustup reads), kept as a committed file --
++# rather than extracted at install time -- so the installed toolchain is
++# visible in the repository and reproducible outside CI. This script is what
++# keeps the file honest: a Go-side bump that forgets the file fails the lane
++# here, instead of installing a toolchain the closed Cargo registry would
++# refuse downstream; a file bump without the Go constant fails the same way.
++#
++# A read failure is never a match: an unreadable file, a file with no
++# [toolchain] channel, a non-minimal profile, a floating channel, an
++# unreadable source file, or a source file with no declaration all fail
++# closed.
++#
++# Usage:
++#   bash .github/ci/rust-pin-guard.sh
++#
++# Self-test overrides:
++#   CI_RUST_GO_SOURCE      Go source to read the constant from
++#                          (default: internal/rustsource/toolchain_registry.go)
++#   CI_RUST_TOOLCHAIN_FILE toolchain file to read the channel from
++#                          (default: rust-toolchain.toml)
++
++set -u
++
++fail() { echo "rust-pin: $*" >&2; exit 1; }
++
++file="${CI_RUST_TOOLCHAIN_FILE:-rust-toolchain.toml}"
++[ -r "$file" ] || fail "cannot read $file"
++
++channel="$(awk '/^[[:space:]]*\[toolchain[[:space:]]*\]/{in_toolchain=1; next} /^[[:space:]]*\[/{in_toolchain=0; next} in_toolchain && /^[[:space:]]*channel[[:space:]]*=[[:space:]]*"/{line=$0; sub(/^[^=]*=[[:space:]]*"/, "", line); sub(/".*$/, "", line); print line; exit}' "$file")"
++[ -n "$channel" ] || fail "no channel in the [toolchain] section of $file"
++printf '%s' "$channel" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || fail "$file pins channel \"$channel\", which is not an exact x.y.z release"
++
++profile="$(awk '/^[[:space:]]*\[toolchain[[:space:]]*\]/{in_toolchain=1; next} /^[[:space:]]*\[/{in_toolchain=0; next} in_toolchain && /^[[:space:]]*profile[[:space:]]*=[[:space:]]*"/{line=$0; sub(/^[^=]*=[[:space:]]*"/, "", line); sub(/".*$/, "", line); print line; exit}' "$file")"
++[ "$profile" = "minimal" ] || fail "$file sets profile \"$profile\", want \"minimal\""
++
++src="${CI_RUST_GO_SOURCE:-internal/rustsource/toolchain_registry.go}"
++[ -r "$src" ] || fail "cannot read $src"
++
++line="$(grep -E 'SupportedRustToolchainVersion[[:space:]]*=[[:space:]]*"' "$src" | head -n 1)"
++[ -n "$line" ] || fail "no SupportedRustToolchainVersion declaration in $src"
++go_pin="$(printf '%s' "$line" | sed -n 's/.*SupportedRustToolchainVersion[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p')"
++[ -n "$go_pin" ] || fail "cannot parse SupportedRustToolchainVersion from $src"
++
++[ "$channel" = "$go_pin" ] || fail "rust-toolchain.toml channel=$channel disagrees with internal/rustsource SupportedRustToolchainVersion=$go_pin"
++
++printf 'rust-pin: toolchain file and Go agree on Rust %s\n' "$channel"
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index d0f212f..37ac76a 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -147,6 +147,22 @@ jobs:
+           echo "$RUNNER_TEMP/pnpm-prefix/bin" >>"$GITHUB_PATH"
+           echo "$RUNNER_TEMP/pnpm-prefix" >>"$GITHUB_PATH"
+ 
++      - name: Verify rust pin matches Go constant
++        shell: bash
++        run: bash .github/ci/rust-pin-guard.sh
++
++      # rustup is the installer on every runner: the hosted images ship it,
++      # and the self-hosted runner gets it once per
++      # docs/self-hosted-runner-setup.md. The install step reads the channel
++      # from rust-toolchain.toml (verified above against
++      # internal/rustsource.SupportedRustToolchainVersion), installs exactly
++      # that toolchain, and prepends the rustup shim directory to PATH, so
++      # `rustc -vV` in the rustsource production cases resolves the pinned
++      # release instead of failing the lane (rose-air run 35121791685).
++      - name: Install pinned Rust toolchain via rustup
++        shell: bash
++        run: bash .github/ci/install-rust-toolchain.sh
++
+       - name: Verify Go toolchain identity
+         shell: bash
+         run: bash .github/ci/toolchain-identity.sh
+@@ -274,6 +290,22 @@ jobs:
+           echo "$RUNNER_TEMP/pnpm-prefix/bin" >>"$GITHUB_PATH"
+           echo "$RUNNER_TEMP/pnpm-prefix" >>"$GITHUB_PATH"
+ 
++      - name: Verify rust pin matches Go constant
++        shell: bash
++        run: bash .github/ci/rust-pin-guard.sh
++
++      # rustup is the installer on every runner: the hosted images ship it,
++      # and the self-hosted runner gets it once per
++      # docs/self-hosted-runner-setup.md. The install step reads the channel
++      # from rust-toolchain.toml (verified above against
++      # internal/rustsource.SupportedRustToolchainVersion), installs exactly
++      # that toolchain, and prepends the rustup shim directory to PATH, so
++      # `rustc -vV` in the rustsource production cases resolves the pinned
++      # release instead of failing the lane (rose-air run 35121791685).
++      - name: Install pinned Rust toolchain via rustup
++        shell: bash
++        run: bash .github/ci/install-rust-toolchain.sh
++
+       - name: Verify Go toolchain identity
+         shell: bash
+         run: bash .github/ci/toolchain-identity.sh
+@@ -376,6 +408,22 @@ jobs:
+           echo "$RUNNER_TEMP/pnpm-prefix/bin" >>"$GITHUB_PATH"
+           echo "$RUNNER_TEMP/pnpm-prefix" >>"$GITHUB_PATH"
+ 
++      - name: Verify rust pin matches Go constant
++        shell: bash
++        run: bash .github/ci/rust-pin-guard.sh
++
++      # rustup is the installer on every runner: the hosted images ship it,
++      # and the self-hosted runner gets it once per
++      # docs/self-hosted-runner-setup.md. The install step reads the channel
++      # from rust-toolchain.toml (verified above against
++      # internal/rustsource.SupportedRustToolchainVersion), installs exactly
++      # that toolchain, and prepends the rustup shim directory to PATH, so
++      # `rustc -vV` in the rustsource production cases resolves the pinned
++      # release instead of failing the lane (rose-air run 35121791685).
++      - name: Install pinned Rust toolchain via rustup
++        shell: bash
++        run: bash .github/ci/install-rust-toolchain.sh
++
+       - name: Verify Go toolchain identity
+         shell: bash
+         run: bash .github/ci/toolchain-identity.sh
+@@ -587,6 +635,22 @@ jobs:
+           echo "$RUNNER_TEMP/pnpm-prefix/bin" >>"$GITHUB_PATH"
+           echo "$RUNNER_TEMP/pnpm-prefix" >>"$GITHUB_PATH"
+ 
++      - name: Verify rust pin matches Go constant
++        shell: bash
++        run: bash .github/ci/rust-pin-guard.sh
++
++      # rustup is the installer on every runner: the hosted images ship it,
++      # and the self-hosted runner gets it once per
++      # docs/self-hosted-runner-setup.md. The install step reads the channel
++      # from rust-toolchain.toml (verified above against
++      # internal/rustsource.SupportedRustToolchainVersion), installs exactly
++      # that toolchain, and prepends the rustup shim directory to PATH, so
++      # `rustc -vV` in the rustsource production cases resolves the pinned
++      # release instead of failing the lane (rose-air run 35121791685).
++      - name: Install pinned Rust toolchain via rustup
++        shell: bash
++        run: bash .github/ci/install-rust-toolchain.sh
++
+       - name: Verify Go toolchain identity
+         shell: bash
+         run: bash .github/ci/toolchain-identity.sh
+diff --git a/docs/ci-gates.md b/docs/ci-gates.md
+index 611815a..d4e59b7 100644
+--- a/docs/ci-gates.md
++++ b/docs/ci-gates.md
+@@ -49,3 +49,8 @@ Publishing a family in a conformance root does not prove that a build reads it.
+ For schema 8, artifacts include `agent-skill-v8`, `csk-skill-v8`, `install-marker-v4`, `vectors/module-roots.json`, and `vectors/script-host-execution-policy.json`. These are consumed by `internal/skillspec`, `internal/marker`, `internal/moduleroots`, `internal/godriver`, and `internal/scriptpolicy`.
+ 
+ The committed protocol-suite pin is declared as `SPEC_PIN` in the workflow `env:` block. Candidate suites enter via the `candidate-conformance` workflow on explicit `workflow_dispatch` calls supplying a full 40-character revision or materialized root. That job sets `CI_REQUIRE_FULL_ROOT=1` to enforce complete package coverage, and emitted artifacts are stamped as candidate-only evidence, proving neither a published release nor a conformance claim.
++
++## Self-hosted runner prerequisites
++
++The rose-air lane needs exactly one thing installed on the runner by hand:
++rustup. See [self-hosted-runner-setup.md](self-hosted-runner-setup.md).
+diff --git a/docs/self-hosted-runner-setup.md b/docs/self-hosted-runner-setup.md
+new file mode 100644
+index 0000000..5ec0bb2
+--- /dev/null
++++ b/docs/self-hosted-runner-setup.md
+@@ -0,0 +1,28 @@
++# Self-hosted runner setup (rose-air)
++
++The `test-self-hosted` lane (`Test (rose-air)` in
++[ci.yml](../.github/workflows/ci.yml)) runs the default gate on the
++organisation's self-hosted macOS ARM64 runner (labels `self-hosted, macOS,
++ARM64`). It runs on `main` pushes only, and only while the repository
++variable `ROSE_AIR_RUNNER` is `true`.
++
++## One-time prerequisites on the runner
++
++- **rustup.** Install once for the runner user (the installer at
++  https://rustup.rs), then verify `rustup --version` runs. The lane installs
++  the pinned toolchain itself from [rust-toolchain.toml](../rust-toolchain.toml)
++  on every run and never relies on a toolchain the runner happens to ship,
++  so no toolchain needs installing or pinning by hand. A lane on a runner
++  without rustup fails in the `Install pinned Rust toolchain via rustup`
++  step with this note named.
++
++Nothing else is installed by hand: Go and Node come from the
++`actions/setup-go` / `actions/setup-node` steps, pnpm is installed per lane
++into a lane-local prefix, and the Rust toolchain comes from rustup as above.
++
++## After setup
++
++No maintenance: toolchain versions are pinned in the repository
++(`rust-toolchain.toml`, `PNPM_PIN`) and each lane verifies its pin against
++the Go constant (`rust-pin-guard.sh`, `pnpm-pin-guard.sh`) before anything
++installs.
+diff --git a/internal/rustsource/pipeline.go b/internal/rustsource/pipeline.go
+index 61c851a..d06ff63 100644
+--- a/internal/rustsource/pipeline.go
++++ b/internal/rustsource/pipeline.go
+@@ -21,7 +21,7 @@ type cargoToolchain struct {
+ }
+ 
+ func (tool cargoToolchain) validate() error {
+-	if !filepath.IsAbs(tool.CargoPath) || tool.Version != "1.91.0" || tool.ImplementationCommit != "ea2d97820c16195b0ca3fadb4319fe512c199a43" || !strings.HasPrefix(tool.BinarySHA256, "sha256:") || !strings.HasPrefix(tool.Fingerprint, "sha256:") || !strings.HasPrefix(tool.C0CheckpointID, "sha256:") {
++	if !filepath.IsAbs(tool.CargoPath) || tool.Version != SupportedRustToolchainVersion || tool.ImplementationCommit != "ea2d97820c16195b0ca3fadb4319fe512c199a43" || !strings.HasPrefix(tool.BinarySHA256, "sha256:") || !strings.HasPrefix(tool.Fingerprint, "sha256:") || !strings.HasPrefix(tool.C0CheckpointID, "sha256:") {
+ 		return fail(CodeVendorTransformUnsupported, "Cargo toolchain does not match the pinned transform", map[string]string{"version": tool.Version, "commit": tool.ImplementationCommit})
+ 	}
+ 	return nil
+diff --git a/internal/rustsource/toolchain_registry.go b/internal/rustsource/toolchain_registry.go
+index 9c88bce..5753b1c 100644
+--- a/internal/rustsource/toolchain_registry.go
++++ b/internal/rustsource/toolchain_registry.go
+@@ -16,7 +16,13 @@ import (
+ 	"strings"
+ )
+ 
+-const pinnedRustToolchainPrefix = "1.91.0-"
++// SupportedRustToolchainVersion is the exact Rust toolchain release admitted
++// by cargo-vendor-transform-v1. The pinned Cargo registry below, the
++// toolchain-root selector, and the repository's rust-toolchain.toml (kept in
++// agreement by .github/ci/rust-pin-guard.sh) all name this release.
++const SupportedRustToolchainVersion = "1.91.0"
++
++const pinnedRustToolchainPrefix = SupportedRustToolchainVersion + "-"
+ 
+ type approvedCargoDescriptor struct {
+ 	Version, ImplementationCommit, ExecutableSHA256 string
+@@ -28,7 +34,7 @@ type approvedCargoDescriptor struct {
+ // independently reviewed identity before Cargo is registered at C0.
+ var approvedCargoDescriptors = map[string]approvedCargoDescriptor{
+ 	"aarch64-apple-darwin": {
+-		Version: "1.91.0", ImplementationCommit: "ea2d97820c16195b0ca3fadb4319fe512c199a43",
++		Version: SupportedRustToolchainVersion, ImplementationCommit: "ea2d97820c16195b0ca3fadb4319fe512c199a43",
+ 		ExecutableSHA256: "sha256:0da859e1130e00a81dac84fa1e86a3dbdd968ddfccef627a8d37255fcbb39e78",
+ 	},
+ }
+@@ -51,7 +57,7 @@ func NativeCargoUnavailableReason() string {
+ 	if err != nil || currentUser.HomeDir == "" {
+ 		return ""
+ 	}
+-	root := filepath.Join(currentUser.HomeDir, ".rustup", "toolchains", "1.91.0-"+target)
++	root := filepath.Join(currentUser.HomeDir, ".rustup", "toolchains", SupportedRustToolchainVersion+"-"+target)
+ 	executable := filepath.Join(root, "bin", cargoExecutableName())
+ 	return cargoHostCapabilityReason(target, true, root, executable)
+ }
+@@ -97,7 +103,7 @@ func registerCargoAtC0(ctx context.Context) cargoRegistration {
+ 	if !ok {
+ 		return cargoRegistration{err: fmt.Errorf("no operator-approved Cargo descriptor for native target %s", target)}
+ 	}
+-	root := filepath.Join(currentUser.HomeDir, ".rustup", "toolchains", "1.91.0-"+target)
++	root := filepath.Join(currentUser.HomeDir, ".rustup", "toolchains", SupportedRustToolchainVersion+"-"+target)
+ 	executable := filepath.Join(root, "bin", cargoExecutableName())
+ 	executable, err = filepath.EvalSymlinks(executable)
+ 	if err != nil {
+diff --git a/internal/rustsource/toolchain_registry_test.go b/internal/rustsource/toolchain_registry_test.go
+index db4ae73..a60f925 100644
+--- a/internal/rustsource/toolchain_registry_test.go
++++ b/internal/rustsource/toolchain_registry_test.go
+@@ -7,6 +7,36 @@ import (
+ 	"testing"
+ )
+ 
++func TestSupportedRustToolchainVersionIsTheRegistrySource(t *testing.T) {
++	if pinnedRustToolchainPrefix != SupportedRustToolchainVersion+"-" {
++		t.Fatalf("pinnedRustToolchainPrefix = %q, want %q", pinnedRustToolchainPrefix, SupportedRustToolchainVersion+"-")
++	}
++	if len(approvedCargoDescriptors) == 0 {
++		t.Fatal("approvedCargoDescriptors is empty")
++	}
++	for target, descriptor := range approvedCargoDescriptors {
++		if descriptor.Version != SupportedRustToolchainVersion {
++			t.Fatalf("approvedCargoDescriptors[%q].Version = %q, want %q", target, descriptor.Version, SupportedRustToolchainVersion)
++		}
++	}
++}
++
++func TestCargoToolchainValidateAdmitsOnlyTheSupportedVersion(t *testing.T) {
++	tool := cargoToolchain{
++		CargoPath: "/pinned/toolchains/" + SupportedRustToolchainVersion + "-test/bin/cargo",
++		Version:   SupportedRustToolchainVersion, ImplementationCommit: "ea2d97820c16195b0ca3fadb4319fe512c199a43",
++		BinarySHA256: "sha256:" + strings.Repeat("a", 64),
++		Fingerprint:  "sha256:" + strings.Repeat("b", 64), C0CheckpointID: "sha256:" + strings.Repeat("c", 64),
++	}
++	if err := tool.validate(); err != nil {
++		t.Fatalf("supported toolchain rejected: %v", err)
++	}
++	tool.Version = "9.9.9-drift-probe"
++	if err := tool.validate(); err == nil {
++		t.Fatal("drifted toolchain version admitted")
++	}
++}
++
+ func TestCargoHostCapabilityReasonClassifiesOnlyAbsence(t *testing.T) {
+ 	target := "aarch64-apple-darwin"
+ 	missingReason := "pinned Cargo toolchain root or executable unavailable for native target " + target
+diff --git a/rust-toolchain.toml b/rust-toolchain.toml
+new file mode 100644
+index 0000000..a0f14d9
+--- /dev/null
++++ b/rust-toolchain.toml
+@@ -0,0 +1,13 @@
++# The one pinned Rust toolchain every CI lane installs before `go test`.
++#
++# This file is the single source of truth for the toolchain version: local
++# cargo/rustup reads it directly, and every suite lane installs exactly its
++# channel with `rustup toolchain install` (see
++# .github/ci/install-rust-toolchain.sh). The channel must name exactly
++# internal/rustsource.SupportedRustToolchainVersion -- `.github/ci/rust-pin-guard.sh`
++# fails any lane where the two disagree, instead of installing a toolchain
++# the closed Cargo registry would refuse downstream. No floating channel
++# ("stable") and no minimal-profile widening: both fail the guard.
++[toolchain]
++channel = "1.91.0"
++profile = "minimal"

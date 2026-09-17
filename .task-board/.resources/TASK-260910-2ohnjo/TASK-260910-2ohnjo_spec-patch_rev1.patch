@@ -1,0 +1,888 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 3f3411f..771e5b4 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -96,6 +96,28 @@ Versioning for the complete specification set.
+   section 9.5 notice, section 8.3 backup, and refusal clauses) instead of
+   a standalone command. No diagnostic is added or renamed, and the
+   document stays revision 1.
++- S4 (MCP env passthrough and declaration surfacing): the environments
++  section 12.1 `passable_env_names` default is now empty (opt-in per name)
++  instead of `null` (unbounded); an explicit `null` keeps meaning unbounded
++  as a lockable-away operator choice (sections 2.2, 10.3; section 12.2
++  already lockable, unchanged). An empty `mcp_package_allowlist` still
++  permits every network identity but now warns
++  `mcp_package_allowlist_empty` at `profile install`, `profile update`,
++  and in `env status`, stating that every declaration package in the
++  closure is admitted. `profile install` and `profile update` print one
++  closed-column surfacing row per MCP declaration package (new section
++  2.3: `package`, `version`, `transport`, `command`, `args`, `env_names`),
++  repeated by `env status`. Warn-first rollout in two labelled steps
++  (impact row "S4 passthrough default"): profile `s4-warn` keeps the
++  unbounded default but warns `mcp_env_passthrough_unlisted` for every
++  passed operator variable outside the knob (naming the variables and the
++  knob, with a migration hint); profile `s4-enforce` makes the default
++  empty and drops unlisted names with `mcp_env_passthrough_dropped`. The
++  `manager-config-v2` schema default and its vectors follow the new empty
++  default, with new cases for absent/explicit-`null`/explicit-list, plus
++  `vectors/environments-env-passthrough.json` pinning both profiles, the
++  allowlist warning, and the surfacing bytes. The closed interpreter
++  contract for MCP launch stays a later revision.
+ 
+ ### Added
+ 
+diff --git a/conformance/v1/manifest.json b/conformance/v1/manifest.json
+index 88cd89d..2b4d6e0 100644
+--- a/conformance/v1/manifest.json
++++ b/conformance/v1/manifest.json
+@@ -4112,6 +4112,10 @@
+       "path": "vectors/context-versions.json",
+       "sha256": "sha256:4eac87963ac86c6e56d418a9e33cf0375cf7670619f560d97763e51fbb05c6b6"
+     },
++    {
++      "path": "vectors/environments-env-passthrough.json",
++      "sha256": "sha256:52101863e459d81b43733b1bff823df740d5b8a5d91a4e1b23c23d8da249cdcd"
++    },
+     {
+       "path": "vectors/environments.json",
+       "sha256": "sha256:1add03cafd6a4ec3b8bbb2a02e844e5f4edb0618eca15a41c52849c870eaaad9"
+@@ -4138,7 +4142,7 @@
+     },
+     {
+       "path": "vectors/manager-config-v2.json",
+-      "sha256": "sha256:c3eb7e6e685bcb37277c27f6a575e7c03ef4890af91a109f5cc4c98e66ea55f0"
++      "sha256": "sha256:26c9b85583de4c6d508808bbfbabe7a046d0b04691e647875a2d7aab5d5666e3"
+     },
+     {
+       "path": "vectors/manager-config.json",
+diff --git a/conformance/v1/vectors/environments-env-passthrough.json b/conformance/v1/vectors/environments-env-passthrough.json
+new file mode 100644
+index 0000000..9e2475a
+--- /dev/null
++++ b/conformance/v1/vectors/environments-env-passthrough.json
+@@ -0,0 +1,261 @@
++{
++  "allowlist_empty_cases": [
++    {
++      "admitted": "every declaration package in the closure",
++      "diagnostic": "mcp_package_allowlist_empty",
++      "fails_operation": false,
++      "mcp_package_allowlist": [],
++      "name": "empty-allowlist-install-warns",
++      "operation": "profile-install"
++    },
++    {
++      "admitted": "every declaration package in the closure",
++      "diagnostic": "mcp_package_allowlist_empty",
++      "fails_operation": false,
++      "mcp_package_allowlist": [],
++      "name": "empty-allowlist-update-warns",
++      "operation": "profile-update"
++    },
++    {
++      "admitted": "every declaration package in the closure",
++      "diagnostic": "mcp_package_allowlist_empty",
++      "mcp_package_allowlist": [],
++      "name": "empty-allowlist-status-posture",
++      "operation": "env-status",
++      "row_current": true
++    },
++    {
++      "conforming": false,
++      "diagnostic": null,
++      "mcp_package_allowlist": [
++        "https://github.com/example/figma-devmode-mcp"
++      ],
++      "name": "non-empty-allowlist-silent",
++      "operation": "profile-install",
++      "reason": "a manager that emits mcp_package_allowlist_empty for a non-empty allowlist is non-conforming"
++    },
++    {
++      "diagnostic": "mcp_package_not_allowed",
++      "fails_operation": true,
++      "mcp_package_allowlist": [
++        "https://github.com/example/figma-devmode-mcp"
++      ],
++      "name": "outside-non-empty-allowlist-refused",
++      "operation": "profile-install",
++      "package": "https://github.com/example/hostile-mcp"
++    }
++  ],
++  "capability": "agent-environments",
++  "capability_revision": 1,
++  "default_resolution_cases": [
++    {
++      "diagnostic": "mcp_env_passthrough_unlisted",
++      "dropped": [],
++      "effective": "unbounded",
++      "knob": "absent",
++      "migration_hint_names_knob": true,
++      "migration_hint_names_variables": true,
++      "name": "s4-warn-absent-warns-every-passed",
++      "passed": [
++        "FIGMA_API_KEY"
++      ],
++      "profile": "s4-warn",
++      "requested": [
++        "FIGMA_API_KEY"
++      ]
++    },
++    {
++      "diagnostic": "mcp_env_passthrough_dropped",
++      "dropped": [
++        "FIGMA_API_KEY"
++      ],
++      "effective": [],
++      "knob": "absent",
++      "name": "s4-enforce-absent-drops-all",
++      "passed": [],
++      "profile": "s4-enforce",
++      "requested": [
++        "FIGMA_API_KEY"
++      ]
++    },
++    {
++      "diagnostic": null,
++      "dropped": [],
++      "effective": "unbounded",
++      "knob": null,
++      "name": "explicit-null-unbounded",
++      "passed": [
++        "FIGMA_API_KEY",
++        "GITHUB_TOKEN"
++      ],
++      "profiles": [
++        "s4-enforce",
++        "s4-warn"
++      ],
++      "requested": [
++        "FIGMA_API_KEY",
++        "GITHUB_TOKEN"
++      ]
++    },
++    {
++      "diagnostic": null,
++      "dropped": [
++        "GITHUB_TOKEN"
++      ],
++      "effective": [
++        "FIGMA_API_KEY"
++      ],
++      "knob": [
++        "FIGMA_API_KEY"
++      ],
++      "name": "s4-warn-explicit-list-bounds-silently",
++      "passed": [
++        "FIGMA_API_KEY"
++      ],
++      "profile": "s4-warn",
++      "requested": [
++        "FIGMA_API_KEY",
++        "GITHUB_TOKEN"
++      ]
++    },
++    {
++      "diagnostic": "mcp_env_passthrough_dropped",
++      "dropped": [
++        "GITHUB_TOKEN"
++      ],
++      "effective": [
++        "FIGMA_API_KEY"
++      ],
++      "knob": [
++        "FIGMA_API_KEY"
++      ],
++      "name": "s4-enforce-explicit-list-drops-with-diagnostic",
++      "passed": [
++        "FIGMA_API_KEY"
++      ],
++      "profile": "s4-enforce",
++      "requested": [
++        "FIGMA_API_KEY",
++        "GITHUB_TOKEN"
++      ]
++    },
++    {
++      "conforming": false,
++      "name": "s4-enforce-absent-passes-unlisted",
++      "passed": [
++        "GITHUB_TOKEN"
++      ],
++      "profile": "s4-enforce",
++      "reason": "a manager that passes an unlisted operator value with an absent knob under s4-enforce is non-conforming",
++      "requested": [
++        "GITHUB_TOKEN"
++      ]
++    },
++    {
++      "conforming": false,
++      "knob": null,
++      "name": "explicit-null-treated-as-empty",
++      "profile": "s4-enforce",
++      "reason": "a manager that treats an explicit null as the empty list is non-conforming; null stays unbounded"
++    }
++  ],
++  "protocol_version": "1.0.0-rc.9",
++  "s4_profiles": [
++    "s4-enforce",
++    "s4-warn"
++  ],
++  "schema_cases": [
++    {
++      "effective": [],
++      "knob": "absent",
++      "name": "knob-absent-defaults-empty",
++      "valid": true
++    },
++    {
++      "effective": "unbounded",
++      "knob": null,
++      "name": "knob-explicit-null-unbounded",
++      "valid": true
++    },
++    {
++      "effective": [
++        "FIGMA_API_KEY"
++      ],
++      "knob": [
++        "FIGMA_API_KEY"
++      ],
++      "name": "knob-explicit-list",
++      "valid": true
++    },
++    {
++      "knob": [
++        "FIGMA API KEY"
++      ],
++      "name": "knob-invalid-name",
++      "valid": false
++    }
++  ],
++  "schema_version": 1,
++  "surfacing_cases": [
++    {
++      "declarations": [
++        {
++          "args": [
++            "-y",
++            "figma-developer-mcp",
++            "--stdio"
++          ],
++          "command": "npx",
++          "env_names": [
++            "FIGMA_API_KEY"
++          ],
++          "package": "figma-devmode",
++          "transport": "stdio",
++          "version": "1.2.0"
++        }
++      ],
++      "expected_byte_length": 126,
++      "expected_bytes": "mcp-declaration figma-devmode 1.2.0 stdio command=npx args=[\"-y\",\"figma-developer-mcp\",\"--stdio\"] env_names=[\"FIGMA_API_KEY\"]\n",
++      "expected_sha256": "sha256:fec4f12e1b86882f745362bd7ed51b1999b392ffaf8e29fce0560f67c43d0bb0",
++      "name": "single-stdio-declaration"
++    },
++    {
++      "declarations": [
++        {
++          "command": "-",
++          "env_names": [],
++          "package": "zeta-http",
++          "transport": "http",
++          "version": "2.0.0"
++        },
++        {
++          "args": [
++            "tool@1.0",
++            "serve"
++          ],
++          "command": "uvx",
++          "env_names": [],
++          "package": "alpha-stdio",
++          "transport": "stdio",
++          "version": "0.9.0"
++        }
++      ],
++      "expected_byte_length": 159,
++      "expected_bytes": "mcp-declaration alpha-stdio 0.9.0 stdio command=uvx args=[\"tool@1.0\",\"serve\"] env_names=[]\nmcp-declaration zeta-http 2.0.0 http command=- args=[] env_names=[]\n",
++      "expected_sha256": "sha256:21779bc294c12f777054976e9d5595eac1b2e676046963490574a2216fe491af",
++      "name": "stdio-and-http-ordering"
++    },
++    {
++      "conforming": false,
++      "name": "row-missing-env-names",
++      "reason": "a surfacing row without the closed env_names column is non-conforming",
++      "row": "mcp-declaration figma-devmode 1.2.0 stdio command=npx args=[\"-y\"]"
++    },
++    {
++      "conforming": false,
++      "name": "row-wrong-column-order",
++      "reason": "a surfacing row with reordered columns is non-conforming",
++      "row": "mcp-declaration figma-devmode 1.2.0 stdio env_names=[\"FIGMA_API_KEY\"] command=npx args=[\"-y\"]"
++    }
++  ]
++}
+diff --git a/conformance/v1/vectors/manager-config-v2.json b/conformance/v1/vectors/manager-config-v2.json
+index c6a35eb..dbd6a1b 100644
+--- a/conformance/v1/vectors/manager-config-v2.json
++++ b/conformance/v1/vectors/manager-config-v2.json
+@@ -15,7 +15,7 @@
+         "overlay_default_weight": 1000,
+         "overlays": {},
+         "overlays_allowed": true,
+-        "passable_env_names": null,
++        "passable_env_names": [],
+         "precedence": {
+           "placement": "winner-last",
+           "winner": "higher-weight"
+@@ -53,7 +53,7 @@
+         "overlay_default_weight": 1000,
+         "overlays": {},
+         "overlays_allowed": true,
+-        "passable_env_names": null,
++        "passable_env_names": [],
+         "precedence": {
+           "placement": "winner-last",
+           "winner": "higher-weight"
+@@ -94,7 +94,7 @@
+         "overlay_default_weight": 1000,
+         "overlays": {},
+         "overlays_allowed": true,
+-        "passable_env_names": null,
++        "passable_env_names": [],
+         "precedence": {
+           "placement": "winner-last",
+           "winner": "lower-weight"
+@@ -371,7 +371,7 @@
+           ]
+         },
+         "overlays_allowed": true,
+-        "passable_env_names": null,
++        "passable_env_names": [],
+         "precedence": {
+           "placement": "winner-last",
+           "winner": "higher-weight"
+@@ -443,7 +443,7 @@
+           ]
+         },
+         "overlays_allowed": true,
+-        "passable_env_names": null,
++        "passable_env_names": [],
+         "precedence": {
+           "placement": "winner-last",
+           "winner": "higher-weight"
+@@ -496,7 +496,7 @@
+           ]
+         },
+         "overlays_allowed": true,
+-        "passable_env_names": null,
++        "passable_env_names": [],
+         "precedence": {
+           "placement": "winner-last",
+           "winner": "higher-weight"
+@@ -549,7 +549,7 @@
+           ]
+         },
+         "overlays_allowed": true,
+-        "passable_env_names": null,
++        "passable_env_names": [],
+         "precedence": {
+           "placement": "winner-last",
+           "winner": "higher-weight"
+@@ -602,7 +602,7 @@
+           ]
+         },
+         "overlays_allowed": true,
+-        "passable_env_names": null,
++        "passable_env_names": [],
+         "precedence": {
+           "placement": "winner-last",
+           "winner": "higher-weight"
+@@ -655,7 +655,7 @@
+           ]
+         },
+         "overlays_allowed": true,
+-        "passable_env_names": null,
++        "passable_env_names": [],
+         "precedence": {
+           "placement": "winner-last",
+           "winner": "higher-weight"
+@@ -708,7 +708,7 @@
+           ]
+         },
+         "overlays_allowed": true,
+-        "passable_env_names": null,
++        "passable_env_names": [],
+         "precedence": {
+           "placement": "winner-last",
+           "winner": "higher-weight"
+@@ -762,7 +762,7 @@
+           ]
+         },
+         "overlays_allowed": true,
+-        "passable_env_names": null,
++        "passable_env_names": [],
+         "precedence": {
+           "placement": "winner-last",
+           "winner": "higher-weight"
+@@ -817,7 +817,7 @@
+           ]
+         },
+         "overlays_allowed": true,
+-        "passable_env_names": null,
++        "passable_env_names": [],
+         "precedence": {
+           "placement": "winner-last",
+           "winner": "higher-weight"
+@@ -872,7 +872,7 @@
+           ]
+         },
+         "overlays_allowed": true,
+-        "passable_env_names": null,
++        "passable_env_names": [],
+         "precedence": {
+           "placement": "winner-last",
+           "winner": "higher-weight"
+@@ -927,7 +927,7 @@
+           ]
+         },
+         "overlays_allowed": true,
+-        "passable_env_names": null,
++        "passable_env_names": [],
+         "precedence": {
+           "placement": "winner-last",
+           "winner": "higher-weight"
+@@ -982,7 +982,7 @@
+           ]
+         },
+         "overlays_allowed": true,
+-        "passable_env_names": null,
++        "passable_env_names": [],
+         "precedence": {
+           "placement": "winner-last",
+           "winner": "higher-weight"
+@@ -1037,7 +1037,7 @@
+           ]
+         },
+         "overlays_allowed": true,
+-        "passable_env_names": null,
++        "passable_env_names": [],
+         "precedence": {
+           "placement": "winner-last",
+           "winner": "higher-weight"
+@@ -1092,7 +1092,7 @@
+           ]
+         },
+         "overlays_allowed": true,
+-        "passable_env_names": null,
++        "passable_env_names": [],
+         "precedence": {
+           "placement": "winner-last",
+           "winner": "higher-weight"
+@@ -1485,5 +1485,140 @@
+     },
+     "name": "schema2-isolation-value-grammar",
+     "valid": false
++  },
++  {
++    "expected": {
++      "environments": {
++        "backup_retention": 5,
++        "current_profile": null,
++        "forms": {},
++        "in_place_mode": {},
++        "isolation": {},
++        "mcp_package_allowlist": [],
++        "overlay_default_weight": 1000,
++        "overlays": {},
++        "overlays_allowed": true,
++        "passable_env_names": [],
++        "precedence": {
++          "placement": "winner-last",
++          "winner": "higher-weight"
++        },
++        "require_current_profile": null,
++        "scoped_current": {},
++        "secret_material_waivers": [],
++        "shadow_acknowledged": [],
++        "system_prompt_files": {},
++        "targets": {},
++        "xdg_seed_allowlist": [
++          "git",
++          "gh",
++          "ssh"
++        ]
++      }
++    },
++    "input": {
++      "environments": {},
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-passable-env-absent-empty",
++    "valid": true
++  },
++  {
++    "expected": {
++      "environments": {
++        "backup_retention": 5,
++        "current_profile": null,
++        "forms": {},
++        "in_place_mode": {},
++        "isolation": {},
++        "mcp_package_allowlist": [],
++        "overlay_default_weight": 1000,
++        "overlays": {},
++        "overlays_allowed": true,
++        "passable_env_names": null,
++        "precedence": {
++          "placement": "winner-last",
++          "winner": "higher-weight"
++        },
++        "require_current_profile": null,
++        "scoped_current": {},
++        "secret_material_waivers": [],
++        "shadow_acknowledged": [],
++        "system_prompt_files": {},
++        "targets": {},
++        "xdg_seed_allowlist": [
++          "git",
++          "gh",
++          "ssh"
++        ]
++      }
++    },
++    "input": {
++      "environments": {
++        "passable_env_names": null
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-passable-env-explicit-null-unbounded",
++    "valid": true
++  },
++  {
++    "expected": {
++      "environments": {
++        "backup_retention": 5,
++        "current_profile": null,
++        "forms": {},
++        "in_place_mode": {},
++        "isolation": {},
++        "mcp_package_allowlist": [],
++        "overlay_default_weight": 1000,
++        "overlays": {},
++        "overlays_allowed": true,
++        "passable_env_names": [],
++        "precedence": {
++          "placement": "winner-last",
++          "winner": "higher-weight"
++        },
++        "require_current_profile": null,
++        "scoped_current": {},
++        "secret_material_waivers": [],
++        "shadow_acknowledged": [],
++        "system_prompt_files": {},
++        "targets": {},
++        "xdg_seed_allowlist": [
++          "git",
++          "gh",
++          "ssh"
++        ]
++      }
++    },
++    "input": {
++      "environments": {
++        "passable_env_names": []
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-passable-env-explicit-empty",
++    "valid": true
++  },
++  {
++    "input": {
++      "environments": {
++        "passable_env_names": [
++          "FIGMA API KEY"
++        ]
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-passable-env-invalid-name",
++    "valid": false
+   }
+ ]
+diff --git a/profiles/manager.md b/profiles/manager.md
+index 7c23f71..0061e7c 100644
+--- a/profiles/manager.md
++++ b/profiles/manager.md
+@@ -2200,7 +2200,8 @@ requirement they carry — audits every member under section 12.6, writes the
+ lock, and installs every member's store entry. Every closure member passes
+ the same gates: canonical source identity and the section 7 allowlist for
+ `git` sources, the `mcp_package_allowlist` knob for `mcp` members (an
+-empty list permits every network identity; a package outside a non-empty
++empty list permits every network identity with the
++`mcp_package_allowlist_empty` warning; a package outside a non-empty
+ list is `mcp_package_not_allowed`), snapshot validation, and the audit.
+ Activation follows operator intent without magic: install sets the machine
+ current profile only when the machine has none — reported, never silent —
+@@ -2425,7 +2426,7 @@ LF, so that the Decision 0013 Decision 6.4 `fragment-digest` extension key
+ is `sha256:` over exactly those bytes without the LF; `--format env` and
+ `--format shell` print the variables as environments §10.1 fixes, the
+ latter POSIX-only. Two knobs shape what a fragment can carry: the
+-`passable_env_names` knob (default `null`, unbounded) bounds, beside the
++`passable_env_names` knob (default empty — opt-in per name; explicit `null` stays unbounded; environments §2.2, §10.3) bounds, beside the
+ reserved-name exclusion of environments §2.2, which operator variable names
+ the fragment's `env_names` may name for the launcher's allowlist — values
+ never appear anywhere — and the `system_prompt_files.<profile>.pi` knob
+diff --git a/protocol/environments.md b/protocol/environments.md
+index e2973a6..4e95602 100644
+--- a/protocol/environments.md
++++ b/protocol/environments.md
+@@ -404,6 +404,9 @@ the addressed root is not a context package.
+ | `agent-context.json` absent at the addressed root, malformed, unknown field, wrong `schema_version`, invalid `name`, `version`, `weight`, `weights`, or `requires` entry; `context` present without `context/` | `context_manifest_invalid` |
+ | `agent-mcp.json` absent at the addressed root, malformed, unknown field, wrong `schema_version`, or a `server` rule of section 2.2 violated | `mcp_declaration_invalid` |
+ | an MCP declaration package's canonical source identity is outside the machine's MCP package allowlist | `mcp_package_not_allowed` |
++| the MCP package allowlist is empty at install, update, or status (warning: every declaration package in the closure is admitted) | `mcp_package_allowlist_empty` |
++| S4 profile `s4-warn`: a launch passes an operator variable not listed in an explicitly configured `passable_env_names`, or any passed operator variable when the knob is absent (warning, names the variables and the knob) | `mcp_env_passthrough_unlisted` |
++| S4 profile `s4-enforce`: a requested name outside the effective `passable_env_names` is dropped from the launch allowlist (warning, names the variables) | `mcp_env_passthrough_dropped` |
+ 
+ `profile_index_invalid`, `profile_root_invalid`, and
+ `profile_context_manifest_invalid` are withdrawn with the `Profilefile.json`
+@@ -443,8 +446,13 @@ server expects at run time; each MUST match the core §2 identifier grammar
+ and MUST NOT name a manager-reserved variable — the union of every manager
+ §3.1 reserved set across platforms and interpreter identifiers (`PATH`,
+ `HOME`, the `LD_`, `DYLD_`, `NODE_`, `NPM_CONFIG_`, and `PYTHON` families,
+-and the rest) — and machine configuration MAY bound the passable names
+-further by the lockable `passable_env_names` allowlist (section 12.1).
++and the rest) — and machine configuration bounds the passable names by the
++lockable `passable_env_names` allowlist (section 12.1): only a listed
++name's operator value may reach a launch. Under the revision-1 rule (S4
++profile `s4-enforce`, section 10.3) an absent knob is the empty list, so
++nothing passes unless the operator opts a name in; an explicit `null`
++keeps meaning unbounded — every requested name passes — as an explicit,
++lockable-away operator choice.
+ Values never appear in any package, lock, marker, fragment, or materialized
+ file; the operator's environment supplies them. `environments` is the
+ section 3 selector: the adapters whose materialized set includes this
+@@ -460,7 +468,42 @@ which declaration packages a profile may resolve; a package outside it is
+ `mcp_package_not_allowed` at resolution. The allowlist is over packages, not
+ launcher binaries, because a binary allowlist bounds nothing: `npx`, `uvx`,
+ `node`, or `sh` admit any program through `args`. An empty allowlist permits
+-every network identity, as core §6.1.
++every network identity, as core §6.1 — and that state always warns:
++`profile install`, `profile update`, and `env status` MUST emit
++`mcp_package_allowlist_empty`, stating that every declaration package in
++the closure is admitted.
++
++### 2.3 MCP declaration surfacing
++
++A `stdio` declaration names a program the agent tool executes at launch
++(section 10.3), so the operator sees every declaration before it can run.
++At `profile install` (section 9.1) and `profile update` (section 9.2) the
++manager MUST print, after the audit gate passes and before the lock is
++published or any surface is (re-)materialized, one surfacing row per MCP
++declaration package in the resolved closure, in ascending package-name
++byte order. `env status` (section 12) repeats the same rows for the
++current profile of each scope it reports. The row columns are closed, in
++this order:
++
++| Column | Content |
++|---|---|
++| `package` | the declaration package's name |
++| `version` | the declaration package's resolved version |
++| `transport` | exactly `stdio` or `http` |
++| `command` | the `stdio` `command`; exactly `-` when `transport` is `http` |
++| `args` | the `stdio` `args` as a JSON array with no spaces; `[]` when `transport` is `http` |
++| `env_names` | the declaration's requested `env_names` in declared order, as a JSON array with no spaces |
++
++Each row is one line of the form
++
++```text
++mcp-declaration <package> <version> <transport> command=<command> args=<args> env_names=<env_names>
++```
++
++terminated by exactly one LF. Strings inside `args` and `env_names` are
++JSON double-quoted strings. When the resolved MCP set is empty the manager
++prints no surfacing row. Surfacing is informative: it emits no diagnostic
++and never fails the operation.
+ 
+ ## 3. Context modules
+ 
+@@ -1603,6 +1646,11 @@ for a `path` source MUST carry the hint that a `core.autocrlf` or
+ `core.autocrlf=false`, or the `git` source kind, produces LF bytes. There is
+ no normalizing install flag: section 3 has no normalization path.
+ 
++After the audit gate passes and before the lock is published, `profile
++install` MUST print the section 2.3 surfacing rows for the resolved MCP
++set, and MUST emit `mcp_package_allowlist_empty` when the MCP package
++allowlist is empty; neither fails the install.
++
+ Activation on install follows operator intent without magic: `install` sets
+ the machine current profile only when the machine has none — first install,
+ and the activation is reported, never silent — or when the operator passes
+@@ -1663,6 +1711,11 @@ this order:
+    section 12; the old lock is retained beside the new one until the next
+    garbage collection so that a stale managed home can still be identified.
+ 
++After publishing the new lock and before any re-materialization, `profile
++update` MUST print the section 2.3 surfacing rows for the new lock's MCP
++set, and MUST emit `mcp_package_allowlist_empty` when the MCP package
++allowlist is empty; neither fails the update.
++
+ A root pinned by exact `tag` or `revision` is reported as pinned and does
+ not move; a moved tag is a warning, or an error under strict-tag policy. An
+ update that resolves to the identical lock changes nothing and says so. The
+@@ -1943,9 +1996,11 @@ section 9.5 takeover path with its notice and backup.
+ | lossy import proceeding under explicit consent (warning, loss list) | `environment_import_lossy` |
+ | imported skill declaration recovered from foreign records (warning) | `environment_import_skill_foreign` |
+ | chosen import profile name already installed | `profile_import_name_taken` |
++| MCP package allowlist empty at install or update (warning: every declaration package in the closure is admitted) | `mcp_package_allowlist_empty` |
+ 
+ `profile_index_ambiguous` is withdrawn with the multi-profile repository
+-shape; `--use` takes no name.
++shape; `--use` takes no name. Section 2.3 surfacing emits no diagnostic
++and never fails an operation.
+ 
+ ## 10. Resolution and the launch fragment
+ 
+@@ -2135,6 +2190,37 @@ also appears in the composed environment literals is dropped from the
+ allowlist by the launcher with a warning (Decision 0013 Decision 6.3), so
+ the composed document is disjoint by construction.
+ 
++**S4 rollout: warn-first passthrough profiles.** The `passable_env_names`
++default change is user-visible — the impact row is "S4 passthrough
++default" — so it ships in two explicitly labelled steps. The effective
++allowlist is the explicitly configured list when the knob carries one, and
++unbounded when the knob is explicitly `null`; when the knob is absent the
++profile decides:
++
++- Profile `s4-warn` (the warning release): an absent knob behaves as
++  unbounded — the pre-S4 behavior is kept — but every launch that passes
++  an operator variable warns `mcp_env_passthrough_unlisted`: when the knob
++  carries a list, for each passed variable outside it; when the knob is
++  absent, for each passed variable. The warning MUST name the variables
++  and the `passable_env_names` knob, and MUST carry the migration hint:
++  list the named variables to keep passing them after the flip. An
++  explicit `null` passes unbounded with no warning.
++- Profile `s4-enforce` (the flip release, the revision-1 rule): an absent
++  knob is the empty list. A requested name outside the effective list —
++  every requested name when the knob is absent — is dropped from the
++  launch allowlist with `mcp_env_passthrough_dropped`, naming the dropped
++  variables. An explicit `null` stays unbounded with no diagnostic, and a
++  system file MAY lock `passable_env_names` to a list so that `null` is
++  unavailable (section 12.2).
++
++A manager MUST ship `s4-warn` before `s4-enforce`: one release MUST NOT
++flip the default and start dropping in a single step. `env status` reports
++the active profile with the effective allowlist (section 12).
++
++The closed interpreter contract for MCP launch (audit item 4, analogous to
++`script-worker-v1`) is a later revision, not this one; it is noted here so
++that no reader mistakes the surfacing rows for an execution sandbox.
++
+ ### 10.4 Diagnostics
+ 
+ | Condition | Diagnostic |
+@@ -2144,6 +2230,8 @@ the composed document is disjoint by construction.
+ | managed home unprovisioned, stale, drifted, or passthrough detached; no fragment without `--repair` | `environment_home_stale` |
+ | repair could not acquire the mutation lock within the bounded wait | `environment_lock_unavailable` |
+ | managed home cannot be repaired from the store | `environment_repair_failed` |
++| S4 profile `s4-warn`: launch composition passes an operator variable outside the configured `passable_env_names` (warning, names the variables and the knob) | `mcp_env_passthrough_unlisted` |
++| S4 profile `s4-enforce`: launch composition drops a requested name outside the effective `passable_env_names` (warning, names the variables) | `mcp_env_passthrough_dropped` |
+ 
+ ## 11. Umbrella subcommand discovery
+ 
+@@ -2210,8 +2298,12 @@ with any `environment_seed_shadowed` entry, the standing `opencode`
+ split-brain note of section 7.1, the recorded and detected tool release per
+ adapter (section 7.9), both homes of the current profile per scope and
+ their provisioning state (section 8.1), backup generation counts and ages
+-per home (section 8.3), orphaned managed homes (section 9.2), and
+-`environment_context_size_exceeded` where it applies. Both commands follow
++per home (section 8.3), orphaned managed homes (section 9.2),
++`environment_context_size_exceeded` where it applies, the
++`mcp_package_allowlist_empty` warning row when the MCP package allowlist
++is empty, the active S4 profile (`s4-warn` or `s4-enforce`) with the
++effective `passable_env_names`, and the section 2.3 surfacing rows for the
++current profile of each scope reported. Both commands follow
+ the manager §10 discipline exactly: recompute and report, never mutate — no
+ fetch, no repair, no adoption, no channel application, no onboarding.
+ `--check` returns non-zero when any row is non-current.
+@@ -2224,7 +2316,9 @@ every recorded passthrough entry is live. A drifted, missing, shadow-inert
+ switched, stale, or unreadable state is non-current; unreadable evidence is
+ reported as unreadable, never as absence (section 8.4). Warnings —
+ `environment_context_size_exceeded`, `environment_tool_version_unverified`,
+-`environment_seed_shadowed`, `environment_foreign_manager_suspected`, an
++`environment_seed_shadowed`, `environment_foreign_manager_suspected`,
++`mcp_package_allowlist_empty`, `mcp_env_passthrough_unlisted`,
++`mcp_env_passthrough_dropped`, an
+ acknowledged shadowing path — never make a row non-current.
+ 
+ Garbage collection extends the manager §10 and core §9.4 rules: it runs
+@@ -2261,8 +2355,8 @@ knob is absent.
+ | `targets.<target-id>.consented` | boolean | `false` | 7.6 |
+ | `isolation.<profile>.<env-id>` | `shared`, `isolated` | `shared`; `isolated` for `claude_code` on macOS at the pinned release | 7.4 |
+ | `xdg_seed_allowlist` | list of XDG config entry names | `["git", "gh", "ssh"]` | 7.1 |
+-| `passable_env_names` | list of identifiers, or `null` for unbounded | `null` | 2.2, 10.3 |
+-| `mcp_package_allowlist` | list of canonical source identities | empty (permits all) | 2.2 |
++| `passable_env_names` | list of identifiers, or `null` for explicit unbounded | `[]` | 2.2, 10.3 |
++| `mcp_package_allowlist` | list of canonical source identities | empty (permits all, warned) | 2.2 |
+ | `shadow_acknowledged` | list of `{ env, path }` | empty | 7.5, 12 |
+ | `secret_material_waivers` | list of `{ pin, file, span: [start, end], reason }` | empty | 9.1 |
+ | `backup_retention` | non-negative integer, `0` = unlimited | `5` | 8.3 |
+@@ -2329,7 +2423,11 @@ referenced-form layout, and system-prompt output — under both `winner` and
+ both `placement` primitives; the section 5.6 hash binding; MCP
+ materialization bytes per adapter (section 5.8); the detector classes of
+ section 9.1 (`vectors/context-detectors.json`, positive and negative, the
+-waiver and unpinnable cases included); and the section 1.2 snapshot
++waiver and unpinnable cases included); the section 2.3 surfacing bytes,
++the section 10.3 S4 rollout profiles' default resolution, and the
++`mcp_package_allowlist_empty` warning
++(`vectors/environments-env-passthrough.json`); the `passable_env_names`
++schema default (`vectors/manager-config-v2.json`); and the section 1.2 snapshot
+ byte-exactness vector (`vectors/snapshot-acquisition.json`). The nine
+ retired `expected/environments/*` sets are regenerated under the v2 type
+ line. A manager claiming this capability MUST pass the complete vector set;
+diff --git a/release/1.0.0-rc.9.json b/release/1.0.0-rc.9.json
+index 63c1f20..e3bc995 100644
+--- a/release/1.0.0-rc.9.json
++++ b/release/1.0.0-rc.9.json
+@@ -12,7 +12,7 @@
+     "verified_provider_contract": "host-execution-provider-v1"
+   },
+   "candidate_protocol_pin": {
+-    "manifest_sha256": "sha256:0e195ecd26af2fcb5e5afb5c3fef0ebe60981888b057e8efc60c0b48cf584529",
++    "manifest_sha256": "sha256:7bd798e1e3d0b1fa98090f6c0fc6dcde28160c9810be767a001d41c501248466",
+     "suite_root": "conformance/v1"
+   },
+   "claim_v5": {
+@@ -24,7 +24,7 @@
+   "downstream_consumption": {
+     "committed_release_pin_advanced": false,
+     "environment": "CURATOR_CONFORMANCE_ROOT",
+-    "required_manifest_sha256": "sha256:0e195ecd26af2fcb5e5afb5c3fef0ebe60981888b057e8efc60c0b48cf584529"
++    "required_manifest_sha256": "sha256:7bd798e1e3d0b1fa98090f6c0fc6dcde28160c9810be767a001d41c501248466"
+   },
+   "historical_release": {
+     "immutable": true,
+diff --git a/schemas/v1/manager-config-v2.schema.json b/schemas/v1/manager-config-v2.schema.json
+index 569ca2c..118e6eb 100644
+--- a/schemas/v1/manager-config-v2.schema.json
++++ b/schemas/v1/manager-config-v2.schema.json
+@@ -451,7 +451,7 @@
+               "type": "null"
+             }
+           ],
+-          "default": null
++          "default": []
+         },
+         "mcp_package_allowlist": {
+           "type": "array",

@@ -1,0 +1,5 @@
+# Re-apply and hand off — TASK-260910-16k7xy revision 4 (final leaf of STORY-260910-24nyb1)
+
+The rev4 candidate (lint fix + declared Windows platform-control reason, results_rev4.md) was handed off but the Change Request construction refused `change_request_base_authority_mismatch` because trunk moved. The orchestrator captured the complete candidate as precondition resource TASK-260910-16k7xy_rev4-candidate.patch (git diff --binary HEAD; 6 paths: internal/envprofile/{boundaries_test.go,envprofile.go,draft_capture_test.go}, internal/snapshot/{boundaries.go,capture.go,capture_test.go}) and cleaned the workspace; this spawn replayed the story checkpoint onto the current trunk.
+
+Steps: `git apply --binary` the patch in the Story worktree; `git status --short` must show exactly those 6 paths; run `go vet ./internal/snapshot ./internal/envprofile` and `go test -p 1 ./internal/snapshot -run 'Capture|Vector' -count=1` (background + tail; tool calls under 2 minutes); then handoff. No other changes.

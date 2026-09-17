@@ -34,6 +34,7 @@ spawn run started: [reviewer] reviewer (claude) (run=RUN-260915-c9a7bf)
 Reviewer RUN-260915-c9a7bf verdict: CHANGES REQUESTED -> to-dev. Verified: both heads ACCEPT (rev2 verdict now attached), FF to main at 559447ef, hosted checks green (PR run 35012468253), preflight admits exactly gpt-6-astra:low and claude-fable-5-1:low, ROSE_AIR_RUNNER gate skips/admits correctly. Blocking: Test (rose-air) on main push run 35016800812 queued 17+ min with no runner assigned; lane has never executed, main run stuck queued. Need runner registered for curator repo (or var set false) and a green rose-air run attached. See TASK-260915-4f44cs_review-verdict.md
 agent completed: [reviewer] reviewer (claude) (exit=0)
 spawn run completed: claude (run=RUN-260915-c9a7bf, pid=713, exit=0)
+Rose-air after the pnpm pin (main 7c3ce2f, run 35121791685): all three real-pnpm cases green on macbook-iv; lane still red only on two internal/rustsource cases (rustc absent on the runner) → sibling task rose-air-lane-rust-toolchain. Evidence resource TASK-260915-4f44cs_rose-air-pnpm-evidence.md. Close with --landed-by-pr=70 once the lane is green.
 
 ## Precondition Resources
 (none)
@@ -44,12 +45,13 @@ spawn run completed: claude (run=RUN-260915-c9a7bf, pid=713, exit=0)
 - [TASK-260915-4f44cs_spawn-log_-reviewer--reviewer--claude-_RUN-260915-c9a7bf.log](file://TASK-260915-4f44cs/TASK-260915-4f44cs_spawn-log_-reviewer--reviewer--claude-_RUN-260915-c9a7bf.log) — System spawn log captured by task-board
 - [TASK-260915-4f44cs_review-verdict-pr70-rev2.md](file://TASK-260915-4f44cs/TASK-260915-4f44cs_review-verdict-pr70-rev2.md) — ACCEPT verdict for PR 70 rev2 head 559447ef (independent Claude Fable review, copied from PR comment 2026-09-15T19:58:37Z)
 - [TASK-260915-4f44cs_review-verdict.md](file://TASK-260915-4f44cs/TASK-260915-4f44cs_review-verdict.md) — Reviewer verdict RUN-260915-c9a7bf: CHANGES REQUESTED (rose-air lane never executed; everything else verified)
+- [TASK-260915-4f44cs_rose-air-pnpm-evidence.md](file://TASK-260915-4f44cs/TASK-260915-4f44cs_rose-air-pnpm-evidence.md)
 
 ## Created
 2026-09-15T16:30:49Z
 
 ## Last Update
-2026-09-15T20:17:20Z
+2026-09-16T17:12:46Z
 
 ## Assigned To
 [reviewer] reviewer (claude)

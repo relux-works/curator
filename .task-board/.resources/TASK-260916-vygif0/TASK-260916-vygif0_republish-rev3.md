@@ -1,0 +1,2 @@
+revision 3 = revision 2 unchanged; republished after the amended review
+Verified using a temporary Git index: read-tree HEAD, add -A, write-tree; exact candidate tree 0464af8889c9989fe5e18664f121af40f17a4dd6. Verification process exit 0. Repository files and real index unchanged. No tests/build rerun in this republish-only session; existing revision 2 producer and amended independent review evidence retained. Configured remote gate runs through handoff. Runner rustup setup remains an operator prerequisite per existing results.

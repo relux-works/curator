@@ -1,0 +1,702 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 5ce99f2..01dee93 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -3,7 +3,7 @@
+ ## 0.1.0 — unreleased
+ 
+ Release-readiness candidate; source builds report `0.1.0-dev`, against
+-SPEC `0.3.0-draft`. No tag or release is created by this work.
++SPEC `0.4.0-draft`. No tag or release is created by this work.
+ 
+ ### Added
+ 
+@@ -27,6 +27,11 @@ SPEC `0.3.0-draft`. No tag or release is created by this work.
+   composition and direct/tracked execution, with entry-point goldens (PR #15).
+ - Installation/configuration help and an opt-in `Test (rose-air)` ARM64 CI lane;
+   hosted build, formatting, vet, tests, race and goldens remain enabled.
++- E4: the §4.3 stderr line-group reports the resolved provider path
++  (`curator-run: provider: path=<absolute path>`, symlink-resolved own
++  executable, `path=unavailable` fallback that never fails the launch)
++  before the defaults line at every launch; path-only in this revision
++  (SPEC `0.4.0-draft`).
+ 
+ ### Corrected
+ 
+diff --git a/README.md b/README.md
+index 40b2ec4..e27a651 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ `curator-run` composes Curator's managed environment, agents-management's
+ admitted interactive plan, and optional ax tracking. The contract is
+-[SPEC 0.3.0-draft](SPEC.md).
++[SPEC 0.4.0-draft](SPEC.md).
+ 
+ ## Production pipeline
+ 
+@@ -92,7 +92,7 @@ sudo install -m 0755 curator-run /usr/local/bin/curator-run
+ curator-run --version
+ ```
+ 
+-This development build reports `0.1.0-dev` (specification `0.3.0-draft`).
++This development build reports `0.1.0-dev` (specification `0.4.0-draft`).
+ Ensure `/usr/local/bin` is on `PATH`, or install into a dedicated trusted
+ operator-owned directory on `PATH`. Do **not** install into Curator's user-bin
+ shim directory (`~/.local/bin`), a managed skill bin directory, or beneath the
+diff --git a/SPEC.md b/SPEC.md
+index 5ca1853..d65b889 100644
+--- a/SPEC.md
++++ b/SPEC.md
+@@ -1,6 +1,6 @@
+ # Curator Agent Launcher — Specification
+ 
+-**Specification version:** `0.3.0-draft`
++**Specification version:** `0.4.0-draft`
+ **Status:** in-repository draft (see [Versioning](#8-versioning))
+ 
+ The launcher is the **execution plane** of the four-plane composition fixed
+@@ -115,6 +115,24 @@ written against the executable's own argv. Curator carries no knowledge
+ of the launcher beyond the discovery rule, and nothing in profile,
+ marker, or fragment data influences dispatch.
+ 
++Under environments.md §11 with E4 trust roots (curator-spec `0da4020`,
++PR #62), the manager resolves `curator-<name>` providers from trust
++roots — its install directory, then the machine knob
++`provider_directories` — warns under revision A when the
++`PATH`-selected provider lies outside the roots, refuses under
++revision B, and reports the resolved absolute provider path in
++`env status`. The launcher is dispatched through that same
++trust-root resolution: whether invoked as `curator run …` (umbrella)
++or directly as `curator-run …`, the binary that runs is the
++resolved provider, and at every launch the launcher reports its own
++resolved executable path in the §4.3 line-group — absolute,
++symlinks resolved — so an operator sees which `curator-run` binary
++is about to run and where it lives. The umbrella passes no
++distinguishing argv or environment marker today: the two invocation
++shapes are indistinguishable to the launcher beyond the resolved
++path itself, so the §4.3 provider line carries the path only, with
++no origin suffix in this revision.
++
+ ## 3. CLI surface
+ 
+ ```text
+@@ -384,14 +402,41 @@ with no configured effort takes the lineup's effort for that model.
+    the frozen runtime whose vendor carries its exact id, independently of
+    this fallback preference.
+ 
+-The resolved pair and the level that produced each member are printed on
+-stderr at **every** launch, before the plan request, in one line-group —
+-so an operator always sees which model is about to run and why. A
+-refusal from the spawn plane for the resolved pair (`ErrEffortMissing`
+-when a required effort is still unset after all three levels) is
+-`plan_refused`, and the launcher completes the module's message — model,
+-vocabulary, recommendation — with its own flag spelling, `--effort`.
+-The launcher MUST NOT retry with a different pair.
++The §4.3 stderr line-group prints at **every** launch, before the plan
++request, in this order — so an operator always sees which binary is
++about to run, and which model, and why:
++
++1. `curator-run: provider: path=<absolute path>` — the launcher's own
++   executable path as the umbrella resolved it: `os.Executable`
++   resolved through symlinks (`filepath.EvalSymlinks`), absolute. On
++   any resolution failure (the executable lookup fails, symlink
++   evaluation fails, or the result is empty or not absolute) the line
++   carries the diagnostic-safe fallback `path=unavailable` instead,
++   and the launch proceeds: path resolution never fails a launch.
++   The line carries no origin suffix in this revision: the umbrella
++   passes no distinguishing argv or environment marker (§2), so
++   umbrella-dispatched and directly invoked launches are
++   indistinguishable beyond the resolved path itself. A future
++   revision MAY add a closed origin set (for example
++   `(umbrella|direct)`) once the umbrella passes a marker that
++   distinguishes them; until then the path-only form is the whole
++   contract.
++2. `curator-run: defaults: model=<model> (<level>) effort=<effort>
++   (<level>)` — the resolved pair and the level that produced each
++   member (`effort unset` when no level yielded one).
++
++Both values are folded with the existing framing rule (CR and CRLF
++fold to LF, every LF becomes LF plus two spaces), so a hostile path
++or model/effort word never splits the line-group into a second
++parseable line. Neither line is a §6 diagnostic line: `provider`
++and `defaults` are not diagnostic codes, and a folded continuation
++starts with whitespace, so `IsDiagnosticLine` never recognizes any
++line of the group. A refusal from the spawn plane for the resolved
++pair (`ErrEffortMissing` when a required effort is still unset after
++all three levels) is `plan_refused`, and the launcher completes the
++module's message — model, vocabulary, recommendation — with its own
++flag spelling, `--effort`. The launcher MUST NOT retry with a
++different pair.
+ 
+ ### 4.4 Obtain the launch plan (spawn plane)
+ 
+@@ -927,7 +972,7 @@ reordered.
+ ## 8. Versioning
+ 
+ - This specification is versioned semantically; the current version is
+-  **`0.3.0-draft`**. Draft versions may change incompatibly between
++  **`0.4.0-draft`**. Draft versions may change incompatibly between
+   commits; the `-draft` suffix is the signal that nothing downstream may
+   pin them.
+ - The `curator-run` binary reports both its build version and the
+@@ -944,6 +989,7 @@ reordered.
+ | Version | Change |
+ |---|---|
+ | `0.3.0-draft` | §4.2: correct the Pi system to `pi-native` using accepted A0 E1/E2 and landed native-Pi support (PR23, `a2a6e9f`). Other API/environment errata remain separately tracked. |
++| `0.4.0-draft` | E4 provider path (TASK-260916-16ys92). §2: the launcher is dispatched through the environments.md §11 trust-root resolution (curator-spec `0da4020`, PR #62) and reports its resolved executable path. §4.3: the stderr line-group grows to two lines — `curator-run: provider: path=<absolute path>` (own executable via `os.Executable` + `filepath.EvalSymlinks`, fallback `path=unavailable`, never fails the launch, folded with the existing framing rule) printed before the `defaults:` line at every launch; path-only in this revision because the umbrella passes no distinguishing marker, with the closed origin set deferred to a future revision. |
+ | `0.2.1-draft` | Follow-ups against environments.md 1.1 and the cycle-2 review. §4.1: the resolve invocation always passes `--repair`, with the read-only/fail-closed semantics of environments.md §10.1 stated, `resolve_repair_failed` kept, `resolve_lock_unavailable` added for `environment_lock_unavailable`, and `environment_home_stale` declared unreachable. §4.5: the codex layer file `<home>/curator-mcp.config.toml` MUST be stat-ed immediately before handoff or exec whenever the argv carries `-p curator-mcp` (a missing layer is silently ignored by codex, under `--strict-config` too), with `mcp_layer_missing` / `mcp_layer_unreadable`; `-p` takes exactly one value, so an operator `-p` after `--` fails the launch (Decision 0012 open question 3 closed). §4.6: `ax.json` `enabled: false` is not configured; the machine-over-operator precedence explained; the configuration read fires before a usage error. New §4.7 names the `defaults.json`/`ax.json` file family as launcher-owned knobs against the environments.md §12.1 manager knob table. §6: `defaults` row names §4.6/`ax.json`, `mcp` family added, invariant 1 extended. §9: docs-confidence item covers both files; codex `-p` item closed; residual-window item added. |
+ | `0.2.0-draft` | Decision 0013 D6 applied. §4 reordered fragment-first and grown to six steps: the managed home from the fragment is `LaunchRequest.Home` (D6.1, M7); the plan is requested as `LaunchModeInteractive` with an empty `Composition` and the launcher spells no provider flag (D5, M2); launcher-owned model/effort default precedence — flags, lockable `defaults.json` machine configuration, lineup fallback — with the resolved pair printed every launch (D6.2, M8); the composition rule with argv order as contract, the MCP channel applied by the launcher, the four-layer environment, and the literal-versus-lookup `env_names` collision rule (D6.3, F5); tracked mode specified as `ax start <name> --provider <id> --launch-plan - [--profile] --workspace <cwd>` with the request document, the four `works.relux.curator.*` extension keys, the `profile-pin` as the lock hash, session-name derivation, and Structured Error pass-through (D6.4). §3 gains `--name` and `--ax-profile`; §4.2 gains the `ax` provider-id column; §6 gains the `defaults` family; §7 requires the interactive-mode module release; §1 non-goals restated (D6.5). §5 unchanged apart from renumbered cross-references. |
+ | `0.1.2-draft` | §5.1 probe re-keyed from the fragment's descriptor list to the environment adapter's closed file-channel filename set, run on every launch into a managed home regardless of the fragment's `system_prompt` section; false stray-file drift-and-repair claim removed — a stray file at a registry filename is unmanaged, no automated contract removes it, and every launcher-mediated launch warns until the operator removes it; native/hand-launch and probe-to-exec race residuals recorded in §9. |
+@@ -1023,6 +1069,8 @@ reordered.
+ 
+ ## Specification changelog
+ 
++- 2026-09-17, 0.4.0-draft §2/§4.3 (E4, TASK-260916-16ys92): the launcher is dispatched through the environments.md §11 trust-root resolution and reports its own resolved executable path. §4.3 line-group grows to two lines: `curator-run: provider: path=<absolute path>` (os.Executable + filepath.EvalSymlinks; fallback `path=unavailable`, never fails the launch, folded with the existing framing rule) printed before the `defaults:` line at every launch. Path-only in this revision: the umbrella passes no distinguishing argv/env marker, so no closed origin set is defined yet.
++
+ - 2026-09-16, 0.3.0-draft §4.5 erratum: the owned environment literals are supplied by the admitted plan's snapshot (`BuildLaunchWithEnvironment`, agents-management v0.5.13). No second build or reconstruction of the effective request is required.
+ 
+ - 2026-09-15, 0.3.0-draft §4.3: record the orchestrator-authorized Pi
+diff --git a/cmd/curator-run/defaults_test.go b/cmd/curator-run/defaults_test.go
+index 4871001..a5b5247 100644
+--- a/cmd/curator-run/defaults_test.go
++++ b/cmd/curator-run/defaults_test.go
+@@ -49,7 +49,7 @@ func TestRunDefaultsPerMember(t *testing.T) {
+ 			}
+ 			var out, stderr strings.Builder
+ 			code := run(context.Background(), append([]string{tc.env}, tc.flags...), &out, &stderr, deps)
+-			if code != 1 || out.Len() != 0 || sr.calls != 1 || !strings.HasPrefix(stderr.String(), "curator-run: defaults: "+tc.want+"\ncurator-run: plan_refused: ") {
++			if code != 1 || out.Len() != 0 || sr.calls != 1 || !strings.HasPrefix(stderr.String(), "curator-run: provider: path="+testProviderPath+"\ncurator-run: defaults: "+tc.want+"\ncurator-run: plan_refused: ") {
+ 				t.Fatalf("exit=%d calls=%d stdout=%q stderr=%q", code, sr.calls, out.String(), stderr.String())
+ 			}
+ 		})
+@@ -136,10 +136,10 @@ func TestRunPiRuntimePreference(t *testing.T) {
+ 				if !strings.Contains(stderr.String(), `no preferred Pi runtime (pi-anthropic pi-openai pi-google) declares a driven model`) {
+ 					t.Fatal(stderr.String())
+ 				}
+-				if strings.Contains(stderr.String(), "plan_refused") || strings.Contains(stderr.String(), "curator-run: defaults:") {
++				if strings.Contains(stderr.String(), "plan_refused") || strings.Contains(stderr.String(), "curator-run: defaults:") || strings.Contains(stderr.String(), "curator-run: provider:") {
+ 					t.Fatal(stderr.String())
+ 				}
+-			} else if !strings.HasPrefix(stderr.String(), "curator-run: defaults: "+tc.want+"\ncurator-run: plan_refused:") {
++			} else if !strings.HasPrefix(stderr.String(), "curator-run: provider: path="+testProviderPath+"\ncurator-run: defaults: "+tc.want+"\ncurator-run: plan_refused:") {
+ 				t.Fatal(stderr.String())
+ 			}
+ 		})
+@@ -172,7 +172,7 @@ func TestRunDefaultsFailuresStopBeforeGroup(t *testing.T) {
+ 			}
+ 			var out, stderr strings.Builder
+ 			code := run(context.Background(), append([]string{"pi"}, tc.flags...), &out, &stderr, deps)
+-			if code != tc.code || sr.calls != 1 || out.Len() != 0 || !strings.Contains(stderr.String(), tc.detail) || strings.Contains(stderr.String(), "plan_refused") || strings.Contains(stderr.String(), "curator-run: defaults:") {
++			if code != tc.code || sr.calls != 1 || out.Len() != 0 || !strings.Contains(stderr.String(), tc.detail) || strings.Contains(stderr.String(), "plan_refused") || strings.Contains(stderr.String(), "curator-run: defaults:") || strings.Contains(stderr.String(), "curator-run: provider:") {
+ 				t.Fatalf("exit=%d stderr=%q", code, stderr.String())
+ 			}
+ 		})
+diff --git a/cmd/curator-run/main.go b/cmd/curator-run/main.go
+index 6bd58b2..ee2dad7 100644
+--- a/cmd/curator-run/main.go
++++ b/cmd/curator-run/main.go
+@@ -27,7 +27,7 @@ import (
+ 
+ const (
+ 	name        = cli.Name
+-	specVersion = "0.3.0-draft"
++	specVersion = "0.4.0-draft"
+ 	// buildVersion is the launcher's own version; the specification
+ 	// version is reported beside it (SPEC §8).
+ 	buildVersion = "0.1.0-dev"
+@@ -80,6 +80,10 @@ type launchDeps struct {
+ 	axBinary     string
+ 	stdin        io.Reader
+ 	now          func() time.Time
++	// providerPath supplies the §4.3 provider-line path. Production
++	// leaves it nil so EmitGroup resolves os.Executable; tests inject
++	// a deterministic path so goldens stay stable across machines.
++	providerPath func() string
+ 
+ 	configPaths func() (defaults.Paths, error)
+ 	resolver    fragmentResolver
+@@ -159,8 +163,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, deps laun
+ 	// SPEC §4.3: resolve model and effort defaults. A locked flag is a
+ 	// usage refusal, an unreadable file is defaults_config_invalid, and
+ 	// a system the lineup admits nothing for is defaults_unresolvable —
+-	// every one terminal with nothing launched. The resolved pair and
+-	// its per-member origins print on stderr before the plan request.
++	// every one terminal with nothing launched. The provider path and
++	// the resolved pair with its per-member origins print on stderr as
++	// one line-group before the plan request.
+ 	if deps.configPaths != nil {
+ 		paths, err := deps.configPaths()
+ 		if err != nil {
+@@ -181,7 +186,11 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, deps laun
+ 		var resolved defaults.Resolved
+ 		resolved, err = files.Complete(frag.Environment, flags, deps.registry)
+ 		if err == nil {
+-			_ = defaults.EmitGroup(stderr, resolved)
++			provider := defaults.ResolveProviderPath()
++			if deps.providerPath != nil {
++				provider = deps.providerPath()
++			}
++			_ = defaults.EmitGroupWithProvider(stderr, resolved, provider)
+ 			return launch(ctx, inv, frag, target, resolved, stdout, stderr, deps)
+ 		}
+ 	}
+diff --git a/cmd/curator-run/main_test.go b/cmd/curator-run/main_test.go
+index 018facb..aaed27b 100644
+--- a/cmd/curator-run/main_test.go
++++ b/cmd/curator-run/main_test.go
+@@ -127,6 +127,11 @@ func (f forbiddenRunner) Run(context.Context, string, []string, string, []string
+ 	return nil, 1, nil
+ }
+ 
++// testProviderPath is the deterministic §4.3 provider-line path for
++// entry-point tests: testDeps injects it so assertions never depend on
++// the test binary's own executable location.
++const testProviderPath = "/test/bin/curator-run"
++
+ // testDeps builds production-shaped dependencies with isolated
+ // configuration paths (absent files) and a registry from the real tagged
+ // module. No test reads ambient /etc or home configuration.
+@@ -138,10 +143,11 @@ func testDeps(t *testing.T, resolver fragmentResolver) launchDeps {
+ 	}
+ 	dir := t.TempDir()
+ 	return launchDeps{
+-		resolver: resolver,
+-		workdir:  func() (string, error) { return "", fmt.Errorf("early-stage fixture stops before plan admission") },
+-		defaults: defaults.Paths{Machine: filepath.Join(dir, "machine.json"), Operator: filepath.Join(dir, "operator.json")},
+-		registry: reg,
++		resolver:     resolver,
++		workdir:      func() (string, error) { return "", fmt.Errorf("early-stage fixture stops before plan admission") },
++		defaults:     defaults.Paths{Machine: filepath.Join(dir, "machine.json"), Operator: filepath.Join(dir, "operator.json")},
++		registry:     reg,
++		providerPath: func() string { return testProviderPath },
+ 	}
+ }
+ 
+@@ -200,7 +206,7 @@ func TestRunPiResolvesNativeLineup(t *testing.T) {
+ 		if got := run(context.Background(), args, &out, &errOut, testDeps(t, fragment.NewWithRunner("curator", sr))); got != 1 {
+ 			t.Errorf("run(%v) = %d, want 1 (stderr %q)", args, got, errOut.String())
+ 		}
+-		want := warn + name + ": defaults: model=claude-fable-5 (lineup) effort=high (lineup)\n" + name + ": plan_refused: "
++		want := warn + name + ": provider: path=" + testProviderPath + "\n" + name + ": defaults: model=claude-fable-5 (lineup) effort=high (lineup)\n" + name + ": plan_refused: "
+ 		if !strings.HasPrefix(errOut.String(), want) {
+ 			t.Errorf("run(%v) stderr %q: want forwarded warning, then the lineup group and plan_refused with digest", args, errOut.String())
+ 		}
+@@ -217,7 +223,7 @@ func TestRunPiResolvesNativeLineup(t *testing.T) {
+ 		if got := run(context.Background(), args, &out, &errOut, testDeps(t, fragment.NewWithRunner("curator", sr))); got != 1 {
+ 			t.Errorf("run(%v) = %d, want 1 (stderr %q)", args, got, errOut.String())
+ 		}
+-		want := warn + name + ": defaults: model=m (flag) effort=high (flag)\n" + name + ": plan_refused: "
++		want := warn + name + ": provider: path=" + testProviderPath + "\n" + name + ": defaults: model=m (flag) effort=high (flag)\n" + name + ": plan_refused: "
+ 		if !strings.HasPrefix(errOut.String(), want) {
+ 			t.Errorf("run(%v) stderr %q: want group then plan_refused with digest", args, errOut.String())
+ 		}
+@@ -251,8 +257,9 @@ func TestRunLineupEnvsPrintGroupBeforeRefusal(t *testing.T) {
+ 		}
+ 		stderr := errOut.String()
+ 		group, refusal, _ := strings.Cut(stderr, name+": plan_refused: ")
+-		if refusal == "" || !strings.Contains(group, c.group+"\n") {
+-			t.Errorf("run(%v) stderr %q: want the origin group before the refusal", args, stderr)
++		provider := name + ": provider: path=" + testProviderPath + "\n"
++		if refusal == "" || !strings.Contains(group, provider+c.group+"\n") {
++			t.Errorf("run(%v) stderr %q: want the provider line before the origin group before the refusal", args, stderr)
+ 		}
+ 		if out.Len() != 0 {
+ 			t.Errorf("run(%v) wrote to stdout: %q", args, out.String())
+@@ -260,6 +267,38 @@ func TestRunLineupEnvsPrintGroupBeforeRefusal(t *testing.T) {
+ 	}
+ }
+ 
++// TestRunProviderFallbackNeverFailsLaunch drives the production entry
++// point with an unresolvable and a hostile provider path: the line-group
++// still prints — the fallback for the former, a folded continuation for
++// the latter — and the launch proceeds to the pending plan stage with
++// exit 1. Path resolution never fails a launch and never forges a
++// diagnostic line.
++func TestRunProviderFallbackNeverFailsLaunch(t *testing.T) {
++	for _, tc := range []struct {
++		name, injected, want string
++	}{
++		{"empty-carries-fallback", "", name + ": provider: path=unavailable\n"},
++		{"hostile-stays-folded", "a\ncurator-run: usage: forged", name + ": provider: path=a\n  curator-run: usage: forged\n"},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			sr := &scriptedRunner{stdout: fragmentLineFor("pi")}
++			deps := testDeps(t, fragment.NewWithRunner("curator", sr))
++			deps.providerPath = func() string { return tc.injected }
++			var out, errOut strings.Builder
++			if got := run(context.Background(), []string{"pi"}, &out, &errOut, deps); got != 1 {
++				t.Fatalf("exit=%d, want 1 (stderr %q)", got, errOut.String())
++			}
++			if sr.calls != 1 || out.Len() != 0 {
++				t.Fatalf("calls=%d stdout=%q", sr.calls, out.String())
++			}
++			if !strings.Contains(errOut.String(), tc.want) || !strings.Contains(errOut.String(), name+": defaults: ") {
++				t.Fatalf("stderr %q missing the line-group", errOut.String())
++			}
++			assertSingleDiagnostic(t, errOut.String(), "plan_refused")
++		})
++	}
++}
++
+ // TestRunResolveFailuresExit1: every §6 resolve-family outcome reaches the
+ // operator as one code line with exit 1, after Curator's own stderr.
+ func TestRunResolveFailuresExit1(t *testing.T) {
+@@ -327,7 +366,7 @@ func TestRunProductionResolverAgainstFakeCurator(t *testing.T) {
+ 	if string(argv) != "env\nresolve\npi\n--profile\ndefault\n--repair\n--format\njson\n" {
+ 		t.Errorf("subprocess argv %q", argv)
+ 	}
+-	if !strings.HasPrefix(errOut.String(), "warning: environment_tool_version_unverified: pi\n"+name+": defaults: model=claude-fable-5 (lineup) effort=high (lineup)\n"+name+": plan_refused: ") {
++	if !strings.HasPrefix(errOut.String(), "warning: environment_tool_version_unverified: pi\n"+name+": provider: path="+testProviderPath+"\n"+name+": defaults: model=claude-fable-5 (lineup) effort=high (lineup)\n"+name+": plan_refused: ") {
+ 		t.Errorf("stderr %q", errOut.String())
+ 	}
+ 
+@@ -342,7 +381,7 @@ func TestRunProductionResolverAgainstFakeCurator(t *testing.T) {
+ // TestSpecVersionPinned fails when the reported specification version
+ // drifts from the version SPEC.md and README.md state; the three are one fact.
+ func TestSpecVersionPinned(t *testing.T) {
+-	const want = "0.3.0-draft"
++	const want = "0.4.0-draft"
+ 	if specVersion != want {
+ 		t.Fatalf("specVersion = %q, want %q", specVersion, want)
+ 	}
+@@ -438,10 +477,10 @@ func TestRunMapping(t *testing.T) {
+ 				t.Fatalf("native argv changed: %q", args)
+ 			}
+ 			if tc.system == "" {
+-				if !strings.HasPrefix(stderr.String(), name+": env_unsupported: ") || strings.Contains(stderr.String(), "plan_refused") || strings.Contains(stderr.String(), "defaults: ") {
++				if !strings.HasPrefix(stderr.String(), name+": env_unsupported: ") || strings.Contains(stderr.String(), "plan_refused") || strings.Contains(stderr.String(), "defaults: ") || strings.Contains(stderr.String(), "provider: path=") {
+ 					t.Fatalf("refusal: %q", stderr.String())
+ 				}
+-			} else if !strings.Contains(stderr.String(), name+": defaults: "+tc.group+"\n") || !strings.Contains(stderr.String(), name+": plan_refused: ") {
++			} else if !strings.Contains(stderr.String(), name+": provider: path="+testProviderPath+"\n"+name+": defaults: "+tc.group+"\n") || !strings.Contains(stderr.String(), name+": plan_refused: ") {
+ 				t.Fatalf("mapping: %q", stderr.String())
+ 			}
+ 		})
+@@ -671,8 +710,8 @@ func TestRunAliasesBehaveAsCanonical(t *testing.T) {
+ 			if aliasOut != canonOut || aliasErr != canonErr {
+ 				t.Fatalf("alias and canonical differ:\nalias out=%q err=%q\ncanon out=%q err=%q", aliasOut, aliasErr, canonOut, canonErr)
+ 			}
+-			if !strings.Contains(aliasErr, name+": defaults: ") || !strings.Contains(aliasErr, name+": plan_refused: ") {
+-				t.Fatalf("alias stderr missing origin group before refusal: %q", aliasErr)
++			if !strings.Contains(aliasErr, name+": provider: path="+testProviderPath+"\n") || !strings.Contains(aliasErr, name+": defaults: ") || !strings.Contains(aliasErr, name+": plan_refused: ") {
++				t.Fatalf("alias stderr missing line-group before refusal: %q", aliasErr)
+ 			}
+ 			// With flags and a native tail, the profile still forwards
+ 			// verbatim while the env operand stays canonical.
+diff --git a/cmd/curator-run/pipeline_test.go b/cmd/curator-run/pipeline_test.go
+index bf877b1..a51a64a 100644
+--- a/cmd/curator-run/pipeline_test.go
++++ b/cmd/curator-run/pipeline_test.go
+@@ -111,6 +111,10 @@ func entryFixture(t *testing.T, environment string, tracked bool) *pipelineFixtu
+ 	}
+ 	f.resolver = &scriptedRunner{stdout: string(raw) + "\n", stderr: "curator warning\n\x00\xff"}
+ 	f.deps = testDeps(t, fragment.NewWithRunner("curator", f.resolver))
++	// Deterministic §4.3 provider-line path under the fixture root, so
++	// the golden normalizes it to <ROOT> like every other host path.
++	provider := filepath.Join(f.dir, "curator-run")
++	f.deps.providerPath = func() string { return provider }
+ 	f.deps.defaults = defaults.Paths{Machine: filepath.Join(f.dir, "machine", "defaults.json"), Operator: filepath.Join(f.dir, "operator", "defaults.json")}
+ 	if err := os.Mkdir(filepath.Dir(f.deps.defaults.Operator), 0700); err != nil {
+ 		t.Fatal(err)
+diff --git a/cmd/curator-run/testdata/help.golden b/cmd/curator-run/testdata/help.golden
+index 1a900fd..253e318 100644
+--- a/cmd/curator-run/testdata/help.golden
++++ b/cmd/curator-run/testdata/help.golden
+@@ -1,4 +1,4 @@
+-curator-run 0.1.0-dev (specification 0.3.0-draft)
++curator-run 0.1.0-dev (specification 0.4.0-draft)
+ 
+ usage: curator-run <env-id> [--profile <name>] [--system-prompt <append|replace>]
+                    [--model <model>] [--effort <effort>]
+diff --git a/cmd/curator-run/testdata/pipeline-claude_code-false.golden b/cmd/curator-run/testdata/pipeline-claude_code-false.golden
+index 5955ec5..dc65cc6 100644
+--- a/cmd/curator-run/testdata/pipeline-claude_code-false.golden
++++ b/cmd/curator-run/testdata/pipeline-claude_code-false.golden
+@@ -25,5 +25,5 @@
+     "Stdin": "cGFyZW50IHN0ZGluCgD/",
+     "WorkDir": "<ROOT>"
+   },
+-  "Stderr": "curator warning\n\u0000\ufffdcurator-run: defaults: model=claude-opus-5 (flag) effort=medium (flag)\ncurator-run: warning: profile \"default\": applied flag/append system-prompt channel \"--append-system-prompt-file\". A custom system prefix can change request caching and billing: the default may use shared prompt caching; a custom prefix forms its own cache prefix.\nhelper stderr\n"
++  "Stderr": "curator warning\n\u0000\ufffdcurator-run: provider: path=<ROOT>/curator-run\ncurator-run: defaults: model=claude-opus-5 (flag) effort=medium (flag)\ncurator-run: warning: profile \"default\": applied flag/append system-prompt channel \"--append-system-prompt-file\". A custom system prefix can change request caching and billing: the default may use shared prompt caching; a custom prefix forms its own cache prefix.\nhelper stderr\n"
+ }
+diff --git a/cmd/curator-run/testdata/pipeline-claude_code-true.golden b/cmd/curator-run/testdata/pipeline-claude_code-true.golden
+index b0883a5..f74ee92 100644
+--- a/cmd/curator-run/testdata/pipeline-claude_code-true.golden
++++ b/cmd/curator-run/testdata/pipeline-claude_code-true.golden
+@@ -41,5 +41,5 @@
+     "schema_version": "1.0.0",
+     "stdin": null
+   },
+-  "Stderr": "curator warning\n\u0000\ufffdcurator-run: defaults: model=claude-opus-5 (flag) effort=medium (flag)\ncurator-run: warning: profile \"default\": applied flag/append system-prompt channel \"--append-system-prompt-file\". A custom system prefix can change request caching and billing: the default may use shared prompt caching; a custom prefix forms its own cache prefix.\nhelper stderr\n"
++  "Stderr": "curator warning\n\u0000\ufffdcurator-run: provider: path=<ROOT>/curator-run\ncurator-run: defaults: model=claude-opus-5 (flag) effort=medium (flag)\ncurator-run: warning: profile \"default\": applied flag/append system-prompt channel \"--append-system-prompt-file\". A custom system prefix can change request caching and billing: the default may use shared prompt caching; a custom prefix forms its own cache prefix.\nhelper stderr\n"
+ }
+diff --git a/cmd/curator-run/testdata/pipeline-codex_cli-false.golden b/cmd/curator-run/testdata/pipeline-codex_cli-false.golden
+index b5ce48c..6346b43 100644
+--- a/cmd/curator-run/testdata/pipeline-codex_cli-false.golden
++++ b/cmd/curator-run/testdata/pipeline-codex_cli-false.golden
+@@ -24,5 +24,5 @@
+     "Stdin": "cGFyZW50IHN0ZGluCgD/",
+     "WorkDir": "<ROOT>"
+   },
+-  "Stderr": "curator warning\n\u0000\ufffdcurator-run: defaults: model=gpt-6-astra (flag) effort=medium (flag)\ncurator-run: warning: profile \"default\": applied config-key/replace system-prompt channel. Replacement discards the tool's built-in system behavior entirely. A custom system prefix can change request caching and billing: the default may use shared prompt caching; a custom prefix forms its own cache prefix.\nhelper stderr\n"
++  "Stderr": "curator warning\n\u0000\ufffdcurator-run: provider: path=<ROOT>/curator-run\ncurator-run: defaults: model=gpt-6-astra (flag) effort=medium (flag)\ncurator-run: warning: profile \"default\": applied config-key/replace system-prompt channel. Replacement discards the tool's built-in system behavior entirely. A custom system prefix can change request caching and billing: the default may use shared prompt caching; a custom prefix forms its own cache prefix.\nhelper stderr\n"
+ }
+diff --git a/cmd/curator-run/testdata/pipeline-codex_cli-true.golden b/cmd/curator-run/testdata/pipeline-codex_cli-true.golden
+index e25a220..48ad3dc 100644
+--- a/cmd/curator-run/testdata/pipeline-codex_cli-true.golden
++++ b/cmd/curator-run/testdata/pipeline-codex_cli-true.golden
+@@ -40,5 +40,5 @@
+     "schema_version": "1.0.0",
+     "stdin": null
+   },
+-  "Stderr": "curator warning\n\u0000\ufffdcurator-run: defaults: model=gpt-6-astra (flag) effort=medium (flag)\ncurator-run: warning: profile \"default\": applied config-key/replace system-prompt channel. Replacement discards the tool's built-in system behavior entirely. A custom system prefix can change request caching and billing: the default may use shared prompt caching; a custom prefix forms its own cache prefix.\nhelper stderr\n"
++  "Stderr": "curator warning\n\u0000\ufffdcurator-run: provider: path=<ROOT>/curator-run\ncurator-run: defaults: model=gpt-6-astra (flag) effort=medium (flag)\ncurator-run: warning: profile \"default\": applied config-key/replace system-prompt channel. Replacement discards the tool's built-in system behavior entirely. A custom system prefix can change request caching and billing: the default may use shared prompt caching; a custom prefix forms its own cache prefix.\nhelper stderr\n"
+ }
+diff --git a/cmd/curator-run/testdata/pipeline-pi-false.golden b/cmd/curator-run/testdata/pipeline-pi-false.golden
+index bbbaa5d..a603491 100644
+--- a/cmd/curator-run/testdata/pipeline-pi-false.golden
++++ b/cmd/curator-run/testdata/pipeline-pi-false.golden
+@@ -23,5 +23,5 @@
+     "Stdin": "cGFyZW50IHN0ZGluCgD/",
+     "WorkDir": "<ROOT>"
+   },
+-  "Stderr": "curator warning\n\u0000\ufffdcurator-run: defaults: model=claude-opus-5 (flag) effort=high (flag)\ncurator-run: warning: profile \"default\": applied flag/append system-prompt channel \"--append-system-prompt\". A custom system prefix can change request caching and billing: the default may use shared prompt caching; a custom prefix forms its own cache prefix.\nhelper stderr\n"
++  "Stderr": "curator warning\n\u0000\ufffdcurator-run: provider: path=<ROOT>/curator-run\ncurator-run: defaults: model=claude-opus-5 (flag) effort=high (flag)\ncurator-run: warning: profile \"default\": applied flag/append system-prompt channel \"--append-system-prompt\". A custom system prefix can change request caching and billing: the default may use shared prompt caching; a custom prefix forms its own cache prefix.\nhelper stderr\n"
+ }
+diff --git a/cmd/curator-run/testdata/pipeline-pi-true.golden b/cmd/curator-run/testdata/pipeline-pi-true.golden
+index ed99b37..ee0aaa7 100644
+--- a/cmd/curator-run/testdata/pipeline-pi-true.golden
++++ b/cmd/curator-run/testdata/pipeline-pi-true.golden
+@@ -36,5 +36,5 @@
+     "schema_version": "1.0.0",
+     "stdin": null
+   },
+-  "Stderr": "curator warning\n\u0000\ufffdcurator-run: defaults: model=claude-opus-5 (flag) effort=high (flag)\ncurator-run: warning: profile \"default\": applied flag/append system-prompt channel \"--append-system-prompt\". A custom system prefix can change request caching and billing: the default may use shared prompt caching; a custom prefix forms its own cache prefix.\nhelper stderr\n"
++  "Stderr": "curator warning\n\u0000\ufffdcurator-run: provider: path=<ROOT>/curator-run\ncurator-run: defaults: model=claude-opus-5 (flag) effort=high (flag)\ncurator-run: warning: profile \"default\": applied flag/append system-prompt channel \"--append-system-prompt\". A custom system prefix can change request caching and billing: the default may use shared prompt caching; a custom prefix forms its own cache prefix.\nhelper stderr\n"
+ }
+diff --git a/internal/defaults/lineup.go b/internal/defaults/lineup.go
+index dc6ab39..cd6b09c 100644
+--- a/internal/defaults/lineup.go
++++ b/internal/defaults/lineup.go
+@@ -29,6 +29,8 @@ package defaults
+ import (
+ 	"fmt"
+ 	"io"
++	"os"
++	"path/filepath"
+ 	"strings"
+ 
+ 	"github.com/relux-works/skill-agents-management/pkg/agentic"
+@@ -276,16 +278,75 @@ func (r Resolved) Describe() string {
+ 	return "model=" + foldValue(r.Model.Value) + " (" + string(r.Model.Origin) + ") " + effort
+ }
+ 
+-// Line is the stderr origin line-group body: one line naming each
+-// resolved value and its origin.
++// Line is the stderr defaults line of the §4.3 line-group: one line
++// naming each resolved value and its origin.
+ func (r Resolved) Line() string {
+ 	return cli.Name + ": defaults: " + r.Describe()
+ }
+ 
+-// EmitGroup writes the origin line-group to stderr. It runs at every
+-// launch after resolution and before the plan request, so an operator
+-// always sees which model is about to run and why.
++// ProviderUnavailable is the SPEC §4.3 diagnostic-safe fallback carried
++// by the provider line when the executable path cannot be resolved. It
++// is a bare token, never a path, so it cannot be mistaken for a location
++// and never parses as a diagnostic line.
++const ProviderUnavailable = "unavailable"
++
++// ResolveProviderPath reports the launcher's own executable path as the
++// umbrella resolved it: os.Executable resolved through symlinks,
++// absolute. On any failure — the lookup fails, symlink evaluation
++// fails, or the result is empty or not absolute — it returns
++// ProviderUnavailable. Callers never fail the launch on this value.
++func ResolveProviderPath() string {
++	return ResolveProviderPathWith(os.Executable, filepath.EvalSymlinks)
++}
++
++// ResolveProviderPathWith is the injectable form of ResolveProviderPath:
++// executable supplies the own-binary path, evalSymlinks resolves it. It
++// exists so tests can drive every fallback without touching the process
++// binary. Production passes os.Executable and filepath.EvalSymlinks.
++func ResolveProviderPathWith(executable func() (string, error), evalSymlinks func(string) (string, error)) string {
++	if executable == nil || evalSymlinks == nil {
++		return ProviderUnavailable
++	}
++	exe, err := executable()
++	if err != nil || exe == "" {
++		return ProviderUnavailable
++	}
++	resolved, err := evalSymlinks(exe)
++	if err != nil || resolved == "" || !filepath.IsAbs(resolved) {
++		return ProviderUnavailable
++	}
++	return resolved
++}
++
++// ProviderLine renders the SPEC §4.3 provider line for one resolved
++// path. The value is folded with the same framing rule as the defaults
++// line, so a hostile path never splits the line-group into a second
++// parseable line. An empty path carries the fallback.
++func ProviderLine(path string) string {
++	if path == "" {
++		path = ProviderUnavailable
++	}
++	return cli.Name + ": provider: path=" + foldValue(path)
++}
++
++// EmitGroup writes the §4.3 line-group to stderr: the provider line
++// first, then the defaults line. It runs at every launch after
++// resolution and before the plan request, so an operator always sees
++// which binary is about to run, and which model, and why. Path
++// resolution never fails the launch: on failure the provider line
++// carries the fallback.
+ func EmitGroup(stderr io.Writer, r Resolved) error {
++	return EmitGroupWithProvider(stderr, r, ResolveProviderPath())
++}
++
++// EmitGroupWithProvider writes the §4.3 line-group with an explicit
++// provider path. Production resolves the path via ResolveProviderPath;
++// tests inject a deterministic path so goldens stay stable across
++// machines. An empty path carries the fallback.
++func EmitGroupWithProvider(stderr io.Writer, r Resolved, providerPath string) error {
++	if _, err := fmt.Fprintln(stderr, ProviderLine(providerPath)); err != nil {
++		return err
++	}
+ 	_, err := fmt.Fprintln(stderr, r.Line())
+ 	return err
+ }
+diff --git a/internal/defaults/lineup_test.go b/internal/defaults/lineup_test.go
+index c05f09d..6bba64b 100644
+--- a/internal/defaults/lineup_test.go
++++ b/internal/defaults/lineup_test.go
+@@ -29,6 +29,10 @@ func mustRegistry(t *testing.T) *vendorplugin.Registry {
+ 	return reg
+ }
+ 
++// errFallback is the injected resolution failure for the provider-path
++// fallback table: any error must yield the fallback, never propagate.
++var errFallback = errors.New("injected provider-path failure")
++
+ func lineupOrigin(t *testing.T, got defaults.ResolvedMember, value string) {
+ 	t.Helper()
+ 	if !got.Present || got.Value != value || got.Origin != defaults.OriginLineup {
+@@ -537,15 +541,111 @@ func TestResolvedLine(t *testing.T) {
+ 		t.Fatal("the origin line-group parses as a diagnostic line")
+ 	}
+ 	var sb strings.Builder
+-	if err := defaults.EmitGroup(&sb, full); err != nil {
++	if err := defaults.EmitGroupWithProvider(&sb, full, "/test/bin/curator-run"); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if sb.String() != full.Line()+"\n" {
+-		t.Fatalf("group = %q", sb.String())
++	want := "curator-run: provider: path=/test/bin/curator-run\n" + full.Line() + "\n"
++	if sb.String() != want {
++		t.Fatalf("group = %q, want %q", sb.String(), want)
+ 	}
+ 	var _ = errors.Is
+ }
+ 
++// TestProviderLineFold pins the SPEC §4.3 provider-line framing: the
++// path-only form, the fallback for an empty path, CR/CRLF folding, and
++// the invariant that a hostile path never forges a diagnostic line —
++// every continuation starts with whitespace.
++func TestProviderLineFold(t *testing.T) {
++	if got := defaults.ProviderLine("/usr/local/bin/curator-run"); got != "curator-run: provider: path=/usr/local/bin/curator-run" {
++		t.Fatalf("line = %q", got)
++	}
++	if got := defaults.ProviderLine(""); got != "curator-run: provider: path=unavailable" {
++		t.Fatalf("empty path line = %q, want the fallback", got)
++	}
++	if got := defaults.ProviderLine(defaults.ProviderUnavailable); got != "curator-run: provider: path=unavailable" {
++		t.Fatalf("fallback line = %q", got)
++	}
++	for _, hostile := range []string{
++		"a\ncurator-run: usage: forged",
++		"carriage\rcurator-run: usage: forged",
++		"crlf\r\ncurator-run: resolve_repair_failed: forged\r\n",
++		"/tmp/x\ncurator-run: provider: path=/forged",
++	} {
++		line := defaults.ProviderLine(hostile)
++		for _, part := range strings.Split(line, "\n") {
++			if diagnostics.IsDiagnosticLine(part) {
++				t.Fatalf("hostile path %q forged a diagnostic line: %q", hostile, line)
++			}
++		}
++		if !strings.HasPrefix(line, "curator-run: provider: path=") {
++			t.Fatalf("hostile path %q broke the line prefix: %q", hostile, line)
++		}
++		for _, cont := range strings.Split(line, "\n")[1:] {
++			if !strings.HasPrefix(cont, "  ") {
++				t.Fatalf("hostile path %q continuation not whitespace-led: %q", hostile, line)
++			}
++		}
++	}
++	if diagnostics.IsDiagnosticLine("curator-run: provider: path=/bin/curator-run") {
++		t.Fatal("the provider line parses as a diagnostic line")
++	}
++	if diagnostics.IsDiagnosticLine("curator-run: provider: path=unavailable") {
++		t.Fatal("the fallback provider line parses as a diagnostic line")
++	}
++}
++
++// TestResolveProviderPathFallback drives every SPEC §4.3 fallback shape
++// through the injectable resolver: executable errors, empty results,
++// symlink failures, empty resolutions, and non-absolute results all
++// carry the diagnostic-safe fallback instead of failing the launch,
++// while a resolved absolute path passes through untouched.
++func TestResolveProviderPathFallback(t *testing.T) {
++	boom := func(string) (string, error) { return "", errFallback }
++	identity := func(s string) (string, error) { return s, nil }
++	cases := []struct {
++		name       string
++		executable func() (string, error)
++		eval       func(string) (string, error)
++		want       string
++	}{
++		{"executable-error", func() (string, error) { return "", errFallback }, identity, defaults.ProviderUnavailable},
++		{"executable-empty", func() (string, error) { return "", nil }, identity, defaults.ProviderUnavailable},
++		{"eval-error", func() (string, error) { return "/bin/curator-run", nil }, boom, defaults.ProviderUnavailable},
++		{"eval-empty", func() (string, error) { return "/bin/curator-run", nil }, func(string) (string, error) { return "", nil }, defaults.ProviderUnavailable},
++		{"eval-relative", func() (string, error) { return "bin/curator-run", nil }, identity, defaults.ProviderUnavailable},
++		{"nil-executable", nil, identity, defaults.ProviderUnavailable},
++		{"nil-eval", func() (string, error) { return "/bin/curator-run", nil }, nil, defaults.ProviderUnavailable},
++		{"resolved-absolute", func() (string, error) { return "/tmp/link", nil }, func(string) (string, error) { return "/real/curator-run", nil }, "/real/curator-run"},
++	}
++	for _, c := range cases {
++		t.Run(c.name, func(t *testing.T) {
++			if got := defaults.ResolveProviderPathWith(c.executable, c.eval); got != c.want {
++				t.Fatalf("path = %q, want %q", got, c.want)
++			}
++		})
++	}
++}
++
++// TestResolveProviderPathProduction proves the production resolver never
++// returns an empty path: it is either an absolute path to this test
++// binary or the fallback, and the provider line renders either form.
++func TestResolveProviderPathProduction(t *testing.T) {
++	got := defaults.ResolveProviderPath()
++	if got == "" {
++		t.Fatal("production resolver returned an empty path")
++	}
++	if got != defaults.ProviderUnavailable && !filepath.IsAbs(got) {
++		t.Fatalf("production resolver returned a non-absolute path %q", got)
++	}
++	line := defaults.ProviderLine(got)
++	if !strings.HasPrefix(line, "curator-run: provider: path=") {
++		t.Fatalf("production line = %q", line)
++	}
++	if diagnostics.IsDiagnosticLine(strings.Split(line, "\n")[0]) {
++		t.Fatalf("production line parses as a diagnostic line: %q", line)
++	}
++}
++
+ // This API-level check proves the binding is admitted by the real module.
+ // It does not claim the launcher entry point calls BuildLaunch yet.
+ func TestCompletedPairsAdmitTaggedBuildLaunch(t *testing.T) {

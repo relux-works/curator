@@ -1,5 +1,5 @@
 ## Status
-development
+integrating
 
 ## Review
 required
@@ -117,6 +117,64 @@ spawn agent resolution: Agent selection: muse via explicit_override (preferred_a
 spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=muse; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
 spawn queued: [implementer] developer (muse) (run=RUN-260916-529683, max_parallel=20)
 spawn run started: [implementer] developer (muse) (run=RUN-260916-529683)
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260916-529683, pid=87075, exit=0)
+spawn selection rationale tuple: {"role":"reviewer","pair":"gpt-6-astra/low","text":"independent review rev7 (recovery guard persistence, unreadable-identity diagnostic); astra:low per worker policy"}
+Story STORY-260910-24nyb1 stayed on base 12f1287ee0fb538f9ca004dd53b870e824e5baf2: 1 published Change Request revision(s) are still measured from it — CR-TASK-260910-14hsti-7 revision 7 (ready, element TASK-260910-14hsti, base 12f1287ee0fb538f9ca004dd53b870e824e5baf2). Carry them forward and the next spawn converges. carry the listed revision(s) forward: review one still awaiting a verdict, or task-board worktree checkpoint <ELEMENT-ID> an accepted one; when trunk has already advanced on paths the revision also changes, task-board worktree converge STORY-260910-24nyb1 is the sanctioned convergence; inspect with task-board worktree status STORY-260910-24nyb1, or task-board worktree abort STORY-260910-24nyb1
+spawn selection rationale for gpt-6-astra/low: independent review rev7 (recovery guard persistence, unreadable-identity diagnostic); astra:low per worker policy
+spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [reviewer] reviewer (codex) (run=RUN-260916-1bbf4f, max_parallel=20)
+spawn run started: [reviewer] reviewer (codex) (run=RUN-260916-1bbf4f)
+Revision 7 CHANGES_REQUESTED. HIGH: Snapshot.Durable re-stats pathnames and records replacement identities instead of preserving Snapshot identities. Independent real Engine.Prepare/fresh Recover probe publishes across same-spelling replacement despite in-memory guard refusal, including a passing pre-journal control. Preserve original durable identity for admitted inputs and destination ancestors; add conversion/restart regressions. Verdict and probe archive attached; narrow tests/vet/format pass, 2/2 narrowing mutants killed. LOGBOOK untouched per campaign rule.
+agent completed: [reviewer] reviewer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260916-1bbf4f, pid=15360, exit=0)
+spawn selection rationale tuple: {"role":"developer","pair":"muse-spark-1.3-contributor/max","text":"rework rev8 (durable snapshot must carry planning identities); muse-spark:max, lite context"}
+Story STORY-260910-24nyb1 stayed on base 12f1287ee0fb538f9ca004dd53b870e824e5baf2: 1 published Change Request revision(s) are still measured from it — CR-TASK-260910-14hsti-7 revision 7 (changes_requested, element TASK-260910-14hsti, base 12f1287ee0fb538f9ca004dd53b870e824e5baf2). Carry them forward and the next spawn converges. carry the listed revision(s) forward: review one still awaiting a verdict, or task-board worktree checkpoint <ELEMENT-ID> an accepted one; when trunk has already advanced on paths the revision also changes, task-board worktree converge STORY-260910-24nyb1 is the sanctioned convergence; inspect with task-board worktree status STORY-260910-24nyb1, or task-board worktree abort STORY-260910-24nyb1
+spawn selection rationale for muse-spark-1.3-contributor/max: rework rev8 (durable snapshot must carry planning identities); muse-spark:max, lite context
+spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=muse; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
+spawn queued: [implementer] developer (muse) (run=RUN-260916-aa9d68, max_parallel=20)
+spawn run started: [implementer] developer (muse) (run=RUN-260916-aa9d68)
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260916-aa9d68, pid=18150, exit=0)
+spawn selection rationale tuple: {"role":"reviewer","pair":"gpt-6-astra/low","text":"independent review rev8 (durable snapshot carries planning identities); astra:low per worker policy"}
+Story STORY-260910-24nyb1 stayed on base 12f1287ee0fb538f9ca004dd53b870e824e5baf2: 1 published Change Request revision(s) are still measured from it — CR-TASK-260910-14hsti-8 revision 8 (ready, element TASK-260910-14hsti, base 12f1287ee0fb538f9ca004dd53b870e824e5baf2). Carry them forward and the next spawn converges. carry the listed revision(s) forward: review one still awaiting a verdict, or task-board worktree checkpoint <ELEMENT-ID> an accepted one; when trunk has already advanced on paths the revision also changes, task-board worktree converge STORY-260910-24nyb1 is the sanctioned convergence; inspect with task-board worktree status STORY-260910-24nyb1, or task-board worktree abort STORY-260910-24nyb1
+spawn selection rationale for gpt-6-astra/low: independent review rev8 (durable snapshot carries planning identities); astra:low per worker policy
+spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [reviewer] reviewer (codex) (run=RUN-260916-d93ed4, max_parallel=20)
+spawn run started: [reviewer] reviewer (codex) (run=RUN-260916-d93ed4)
+Review rev8 CHANGES_REQUESTED: Windows identityToken ignores the pinned FileInfo and reopens the path, allowing Info(A)/Token(B). Restore A before pre-journal check, then B before Recover bypasses identity continuity by code inspection. Native Windows capture-window reproduction unverified; emulated probe stalled before startup. Unix original regression passes; one independent narrowing killed; two additional attacks unknown due host startup stalls. Full evidence and runnable overlays attached as TASK-260910-14hsti_review-verdict-rev8.md and review-probes-rev8.tar.gz. No code changes.
+agent completed: [reviewer] reviewer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260916-d93ed4, pid=46661, exit=0)
+spawn selection rationale tuple: {"role":"developer","pair":"muse-spark-1.3-contributor/max","text":"rework rev9 (single-open Windows identity capture); muse-spark:max, lite context"}
+Story STORY-260910-24nyb1 stayed on base 12f1287ee0fb538f9ca004dd53b870e824e5baf2: 1 published Change Request revision(s) are still measured from it — CR-TASK-260910-14hsti-8 revision 8 (changes_requested, element TASK-260910-14hsti, base 12f1287ee0fb538f9ca004dd53b870e824e5baf2). Carry them forward and the next spawn converges. carry the listed revision(s) forward: review one still awaiting a verdict, or task-board worktree checkpoint <ELEMENT-ID> an accepted one; when trunk has already advanced on paths the revision also changes, task-board worktree converge STORY-260910-24nyb1 is the sanctioned convergence; inspect with task-board worktree status STORY-260910-24nyb1, or task-board worktree abort STORY-260910-24nyb1
+spawn selection rationale for muse-spark-1.3-contributor/max: rework rev9 (single-open Windows identity capture); muse-spark:max, lite context
+spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=muse; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
+spawn queued: [implementer] developer (muse) (run=RUN-260916-373e00, max_parallel=20)
+spawn run started: [implementer] developer (muse) (run=RUN-260916-373e00)
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260916-373e00, pid=52802, exit=0)
+spawn selection rationale tuple: {"role":"reviewer","pair":"gpt-6-astra/low","text":"independent review rev9 (single-open Windows identity capture); astra:low per worker policy"}
+Story STORY-260910-24nyb1 stayed on base 12f1287ee0fb538f9ca004dd53b870e824e5baf2: 1 published Change Request revision(s) are still measured from it — CR-TASK-260910-14hsti-9 revision 9 (ready, element TASK-260910-14hsti, base 12f1287ee0fb538f9ca004dd53b870e824e5baf2). Carry them forward and the next spawn converges. carry the listed revision(s) forward: review one still awaiting a verdict, or task-board worktree checkpoint <ELEMENT-ID> an accepted one; when trunk has already advanced on paths the revision also changes, task-board worktree converge STORY-260910-24nyb1 is the sanctioned convergence; inspect with task-board worktree status STORY-260910-24nyb1, or task-board worktree abort STORY-260910-24nyb1
+spawn selection rationale for gpt-6-astra/low: independent review rev9 (single-open Windows identity capture); astra:low per worker policy
+spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [reviewer] reviewer (codex) (run=RUN-260916-c89581, max_parallel=20)
+spawn run started: [reviewer] reviewer (codex) (run=RUN-260916-c89581)
+agent completed: [reviewer] reviewer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260916-c89581, pid=5951, exit=0)
+spawn selection rationale tuple: {"role":"developer","pair":"gpt-6-astra/low","text":"bound checkpoint run; astra:low"}
+Story STORY-260910-24nyb1 stayed on base 12f1287ee0fb538f9ca004dd53b870e824e5baf2: 1 published Change Request revision(s) are still measured from it — CR-TASK-260910-14hsti-9 revision 9 (accepted, element TASK-260910-14hsti, base 12f1287ee0fb538f9ca004dd53b870e824e5baf2). Carry them forward and the next spawn converges. carry the listed revision(s) forward: review one still awaiting a verdict, or task-board worktree checkpoint <ELEMENT-ID> an accepted one; when trunk has already advanced on paths the revision also changes, task-board worktree converge STORY-260910-24nyb1 is the sanctioned convergence; inspect with task-board worktree status STORY-260910-24nyb1, or task-board worktree abort STORY-260910-24nyb1
+spawn selection rationale for gpt-6-astra/low: bound checkpoint run; astra:low
+spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [implementer] developer (codex) (run=RUN-260916-ca79d1, max_parallel=20)
+spawn run started: [implementer] developer (codex) (run=RUN-260916-ca79d1)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260916-ca79d1, pid=11359, exit=0)
 
 ## Precondition Resources
 - [TASK-260910-14hsti_source-contract.md](file://TASK-260910-14hsti/TASK-260910-14hsti_source-contract.md) — Accepted specification, execution boundary and task-specific acceptance.
@@ -131,6 +189,9 @@ spawn run started: [implementer] developer (muse) (run=RUN-260916-529683)
 - [14hsti-rev5-windows-failure.md](file://TASK-260910-14hsti/14hsti-rev5-windows-failure.md)
 - [14hsti-review-rev6-note.md](file://TASK-260910-14hsti/14hsti-review-rev6-note.md)
 - [14hsti-rework-4.md](file://TASK-260910-14hsti/14hsti-rework-4.md)
+- [14hsti-rework-5.md](file://TASK-260910-14hsti/14hsti-rework-5.md)
+- [14hsti-rework-6.md](file://TASK-260910-14hsti/14hsti-rework-6.md)
+- [14hsti-checkpoint-instruction.md](file://TASK-260910-14hsti/14hsti-checkpoint-instruction.md)
 
 ## Outcome Resources
 - [TASK-260910-14hsti_spawn-log_-implementer--developer--muse-_RUN-260916-ef1f47.log](file://TASK-260910-14hsti/TASK-260910-14hsti_spawn-log_-implementer--developer--muse-_RUN-260916-ef1f47.log) — System spawn log captured by task-board
@@ -167,12 +228,34 @@ spawn run started: [implementer] developer (muse) (run=RUN-260916-529683)
 - [TASK-260910-14hsti_review-probes-rev6.tar.gz](file://TASK-260910-14hsti/TASK-260910-14hsti_review-probes-rev6.tar.gz) — Independent review overlays: two killed narrowing mutants and two failing boundary regression probes
 - [TASK-260910-14hsti_review-verdict-rev6.md](file://TASK-260910-14hsti/TASK-260910-14hsti_review-verdict-rev6.md) — CHANGES_REQUESTED: restart recovery bypasses physical boundary guard; inspection failures mislabeled as overlap. Exact-tree independent checks and 2/2 mutants killed.
 - [TASK-260910-14hsti_spawn-log_-implementer--developer--muse-_RUN-260916-529683.log](file://TASK-260910-14hsti/TASK-260910-14hsti_spawn-log_-implementer--developer--muse-_RUN-260916-529683.log) — System spawn log captured by task-board
+- [TASK-260910-14hsti_results_rev7.md](file://TASK-260910-14hsti/TASK-260910-14hsti_results_rev7.md) — rev7 rework-4 evidence: durable recovery proof + unreadable diagnostic, narrow gates, 2/2 mutants killed
+- [TASK-260910-14hsti_change-request_rev7.patch](file://TASK-260910-14hsti/TASK-260910-14hsti_change-request_rev7.patch) — Change Request CR-TASK-260910-14hsti-7 revision 7 candidate patch (repository_delta=present, 28 changed paths)
+- [TASK-260910-14hsti_change-request_rev7-validation.log](file://TASK-260910-14hsti/TASK-260910-14hsti_change-request_rev7-validation.log) — Change Request CR-TASK-260910-14hsti-7 revision 7 bounded validation log
+- [TASK-260910-14hsti_spawn-log_-reviewer--reviewer--codex-_RUN-260916-1bbf4f.log](file://TASK-260910-14hsti/TASK-260910-14hsti_spawn-log_-reviewer--reviewer--codex-_RUN-260916-1bbf4f.log) — System spawn log captured by task-board
+- [TASK-260910-14hsti_review-verdict-rev7.md](file://TASK-260910-14hsti/TASK-260910-14hsti_review-verdict-rev7.md)
+- [TASK-260910-14hsti_review-probes-rev7.tar.gz](file://TASK-260910-14hsti/TASK-260910-14hsti_review-probes-rev7.tar.gz) — Independent overlays: durable identity continuity failure, two killed narrowing mutants, candidate byte manifest
+- [TASK-260910-14hsti_spawn-log_-implementer--developer--muse-_RUN-260916-aa9d68.log](file://TASK-260910-14hsti/TASK-260910-14hsti_spawn-log_-implementer--developer--muse-_RUN-260916-aa9d68.log) — System spawn log captured by task-board
+- [TASK-260910-14hsti_results_rev8.md](file://TASK-260910-14hsti/TASK-260910-14hsti_results_rev8.md) — rev8 rework-5 evidence: serialize-only Durable, restart regression, 2/2 mutants killed
+- [TASK-260910-14hsti_change-request_rev8.patch](file://TASK-260910-14hsti/TASK-260910-14hsti_change-request_rev8.patch) — Change Request CR-TASK-260910-14hsti-8 revision 8 candidate patch (repository_delta=present, 28 changed paths)
+- [TASK-260910-14hsti_change-request_rev8-validation.log](file://TASK-260910-14hsti/TASK-260910-14hsti_change-request_rev8-validation.log) — Change Request CR-TASK-260910-14hsti-8 revision 8 bounded validation log
+- [TASK-260910-14hsti_spawn-log_-reviewer--reviewer--codex-_RUN-260916-d93ed4.log](file://TASK-260910-14hsti/TASK-260910-14hsti_spawn-log_-reviewer--reviewer--codex-_RUN-260916-d93ed4.log) — System spawn log captured by task-board
+- [TASK-260910-14hsti_review-probes-rev8.tar.gz](file://TASK-260910-14hsti/TASK-260910-14hsti_review-probes-rev8.tar.gz) — Independent rev8 overlay attacks, Windows capture probe and candidate hash manifest
+- [TASK-260910-14hsti_review-verdict-rev8.md](file://TASK-260910-14hsti/TASK-260910-14hsti_review-verdict-rev8.md) — CHANGES_REQUESTED: Windows capture coherence finding, test bounds, and persisted to-dev lifecycle
+- [TASK-260910-14hsti_spawn-log_-implementer--developer--muse-_RUN-260916-373e00.log](file://TASK-260910-14hsti/TASK-260910-14hsti_spawn-log_-implementer--developer--muse-_RUN-260916-373e00.log) — System spawn log captured by task-board
+- [TASK-260910-14hsti_results_rev9.md](file://TASK-260910-14hsti/TASK-260910-14hsti_results_rev9.md) — rev9 rework-6 evidence: single-inspection capture, seam, restart regressions, 1/1 mutant killed
+- [TASK-260910-14hsti_change-request_rev9.patch](file://TASK-260910-14hsti/TASK-260910-14hsti_change-request_rev9.patch) — Change Request CR-TASK-260910-14hsti-9 revision 9 candidate patch (repository_delta=present, 28 changed paths)
+- [TASK-260910-14hsti_change-request_rev9-validation.log](file://TASK-260910-14hsti/TASK-260910-14hsti_change-request_rev9-validation.log) — Change Request CR-TASK-260910-14hsti-9 revision 9 bounded validation log
+- [TASK-260910-14hsti_spawn-log_-reviewer--reviewer--codex-_RUN-260916-c89581.log](file://TASK-260910-14hsti/TASK-260910-14hsti_spawn-log_-reviewer--reviewer--codex-_RUN-260916-c89581.log) — System spawn log captured by task-board
+- [TASK-260910-14hsti_review-probes-rev9.tar.gz](file://TASK-260910-14hsti/TASK-260910-14hsti_review-probes-rev9.tar.gz) — Independent rev9 overlays: 2/2 narrowing mutants killed; exact candidate byte manifest
+- [TASK-260910-14hsti_review-verdict-rev9.md](file://TASK-260910-14hsti/TASK-260910-14hsti_review-verdict-rev9.md) — ACCEPTED: single-inspection identity capture; focused independent checks, 2/2 mutants killed, exact-tree hosted evidence
+- [TASK-260910-14hsti_spawn-log_-implementer--developer--codex-_RUN-260916-ca79d1.log](file://TASK-260910-14hsti/TASK-260910-14hsti_spawn-log_-implementer--developer--codex-_RUN-260916-ca79d1.log) — System spawn log captured by task-board
+- [TASK-260910-14hsti_checkpoint-results.md](file://TASK-260910-14hsti/TASK-260910-14hsti_checkpoint-results.md) — Revision 9 checkpoint output; checkpoint command exited 0 (zsh pipefail enabled).
 
 ## Created
 2026-09-10T13:56:03Z
 
 ## Last Update
-2026-09-16T15:36:08Z
+2026-09-16T19:48:16Z
 
 ## Assigned To
-[implementer] developer (muse)
+[implementer] developer (codex)

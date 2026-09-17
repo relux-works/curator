@@ -1,0 +1,1279 @@
+diff --git a/internal/envprofile/boundaries_test.go b/internal/envprofile/boundaries_test.go
+index a1582ba..7478c36 100644
+--- a/internal/envprofile/boundaries_test.go
++++ b/internal/envprofile/boundaries_test.go
+@@ -137,7 +137,7 @@ func TestDraftPathOverlayRefusesStoreOverlap(t *testing.T) {
+ // overlap tests above; this pins the root-inputs branch of the mapping.
+ func TestAdmitPathSourceRefusesManagerHome(t *testing.T) {
+ 	home := t.TempDir()
+-	err := admitPathSource(home, "acme", home)
++	_, err := admitPathSource(home, "acme", home)
+ 	if err == nil || !strings.HasPrefix(err.Error(), "source_output_overlap") {
+ 		t.Fatalf("admitPathSource(home) err = %v, want leading source_output_overlap", err)
+ 	}
+diff --git a/internal/envprofile/draft_capture_test.go b/internal/envprofile/draft_capture_test.go
+new file mode 100644
+index 0000000..15e6eb1
+--- /dev/null
++++ b/internal/envprofile/draft_capture_test.go
+@@ -0,0 +1,131 @@
++package envprofile
++
++// Production-path proof for draft local-snapshot capture (revision 1):
++// every test drives the public Install entry with DraftSourcesV1 on.
++// The draft install must freeze the admitted bytes at capture and
++// install from the frozen snapshot, never the live directory.
++
++import (
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/contextstore"
++	"github.com/relux-works/curator/internal/snapshot"
++)
++
++// draftGit runs git inside dir, skipping when git is unavailable.
++func draftGit(t *testing.T, dir string, args ...string) {
++	t.Helper()
++	if _, err := exec.LookPath("git"); err != nil {
++		t.Skip("no git on PATH")
++	}
++	cmd := exec.Command("git", args...)
++	cmd.Dir = dir
++	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
++		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
++	if out, err := cmd.CombinedOutput(); err != nil {
++		t.Fatalf("git %v: %v\n%s", args, err, out)
++	}
++}
++
++// TestDraftInstallFreezesLiveMutations proves the install consumes the
++// captured snapshot, not the live directory: mutating the live source
++// after Install leaves the installed entry bytes unchanged.
++func TestDraftInstallFreezesLiveMutations(t *testing.T) {
++	home := t.TempDir()
++	pinHomes(t)
++	root := filepath.Join(t.TempDir(), "root")
++	writeSeedPackage(t, root, "acme")
++	info, _, _, err := Install(home, InstallOptions{Operand: root, Policy: Policy{DraftSourcesV1: true}})
++	if err != nil {
++		t.Fatalf("draft install: %v", err)
++	}
++	member, ok := lockMember(info.Lock, "acme")
++	if !ok {
++		t.Fatalf("lock members %+v carry no root", info.Lock.Members)
++	}
++	entry := contextstore.EntryDir(home, member.Kind, member.Name, member.StateHash)
++	before, err := os.ReadFile(filepath.Join(entry, "context", "a.md"))
++	if err != nil || string(before) != "acme\n" {
++		t.Fatalf("installed a.md = %q, %v; want frozen acme bytes", before, err)
++	}
++	// Mutate the live directory after capture: the installed entry
++	// must keep serving the frozen bytes.
++	if err := os.WriteFile(filepath.Join(root, "context", "a.md"), []byte("mutated\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	after, err := os.ReadFile(filepath.Join(entry, "context", "a.md"))
++	if err != nil || string(after) != "acme\n" {
++		t.Fatalf("installed a.md after live mutation = %q, %v; want frozen acme bytes", after, err)
++	}
++	// The capture must have published exactly one immutable snapshot
++	// below the manager home.
++	store, err := os.ReadDir(snapshot.LocalStoreDir(home))
++	if err != nil || len(store) != 1 {
++		t.Fatalf("local-snapshots = %v, %v; want one immutable entry", store, err)
++	}
++}
++
++// TestDraftInstallAdmitsDirtyUntrackedInsideGit proves the draft path
++// install snapshots dirty and untracked bytes even when the source is
++// a Git checkout: the installed entry carries the live bytes, not
++// HEAD.
++func TestDraftInstallAdmitsDirtyUntrackedInsideGit(t *testing.T) {
++	home := t.TempDir()
++	pinHomes(t)
++	root := filepath.Join(t.TempDir(), "root")
++	writeSeedPackage(t, root, "acme")
++	draftGit(t, root, "init", "-q", "-b", "main")
++	draftGit(t, root, "add", ".")
++	draftGit(t, root, "commit", "-qm", "one")
++	if err := os.WriteFile(filepath.Join(root, "context", "a.md"), []byte("dirty\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(root, "context", "untracked.md"), []byte("untracked\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	info, _, _, err := Install(home, InstallOptions{Operand: root, Policy: Policy{DraftSourcesV1: true}})
++	if err != nil {
++		t.Fatalf("draft install of a dirty checkout: %v", err)
++	}
++	member, ok := lockMember(info.Lock, "acme")
++	if !ok {
++		t.Fatalf("lock members %+v carry no root", info.Lock.Members)
++	}
++	entry := contextstore.EntryDir(home, member.Kind, member.Name, member.StateHash)
++	if payload, err := os.ReadFile(filepath.Join(entry, "context", "a.md")); err != nil || string(payload) != "dirty\n" {
++		t.Fatalf("installed a.md = %q, %v; want dirty bytes, not HEAD", payload, err)
++	}
++	if payload, err := os.ReadFile(filepath.Join(entry, "context", "untracked.md")); err != nil || string(payload) != "untracked\n" {
++		t.Fatalf("installed untracked.md = %q, %v; want untracked bytes", payload, err)
++	}
++	if _, err := os.Lstat(filepath.Join(entry, ".git")); !os.IsNotExist(err) {
++		t.Fatalf("installed entry carries .git metadata: %v", err)
++	}
++}
++
++// TestDraftInstallRefusesSnapshotInsideStore proves the snapshot
++// store itself is a managed output: selecting a package inside it is
++// refused with the boundary diagnostic and publishes nothing.
++func TestDraftInstallRefusesSnapshotInsideStore(t *testing.T) {
++	home := t.TempDir()
++	pinHomes(t)
++	root := filepath.Join(t.TempDir(), "root")
++	writeSeedPackage(t, root, "acme")
++	if _, _, _, err := Install(home, InstallOptions{Operand: root, Policy: Policy{DraftSourcesV1: true}}); err != nil {
++		t.Fatalf("seed install: %v", err)
++	}
++	entries, err := os.ReadDir(snapshot.LocalStoreDir(home))
++	if err != nil || len(entries) != 1 {
++		t.Fatalf("local-snapshots = %v, %v; want the seeded snapshot", entries, err)
++	}
++	// A package rooted inside the snapshot store is managed output.
++	inner := filepath.Join(snapshot.LocalStoreDir(home), entries[0].Name(), "snapshot")
++	_, _, _, err = Install(home, InstallOptions{Operand: inner, Policy: Policy{DraftSourcesV1: true}})
++	if err == nil || !strings.Contains(err.Error(), "source_output_overlap") {
++		t.Fatalf("install inside the snapshot store err = %v, want source_output_overlap", err)
++	}
++}
+diff --git a/internal/envprofile/envprofile.go b/internal/envprofile/envprofile.go
+index d9edff0..de2b855 100644
+--- a/internal/envprofile/envprofile.go
++++ b/internal/envprofile/envprofile.go
+@@ -1253,18 +1253,24 @@ func pathManifestDiag(operand string, err error) error {
+ // profile_source_invalid (§8.4: unreadable evidence is reported as
+ // unreadable, never as something else).
+ //
+-// With draftSourcesV1 the path is first admitted by the draft
+-// skillfile-sources revision 1 boundary gate, before the store traverses
+-// anything; a refusal carries the spec section 5 diagnostic unwrapped, so
+-// the exact failure class leads. Without it the store traversal is the
+-// first and only read, exactly as before.
++// With draftSourcesV1 the path runs the draft skillfile-sources
++// revision 1 local pipeline first (admitPathSource: boundary admission,
++// byte capture of the admitted dirty/untracked tree, immutable snapshot
++// publication) and the store then installs the frozen snapshot, never
++// the live directory; a refusal carries the spec section 5 diagnostic
++// unwrapped, so the exact failure class leads. Without it the store
++// traversal of the live directory is the first and only read, exactly
++// as before.
+ func stateForPath(home, name, dir string, draftSourcesV1 bool) (*contextresolve.StatePackage, error) {
++	source := dir
+ 	if draftSourcesV1 {
+-		if err := admitPathSource(home, name, dir); err != nil {
++		stored, err := admitPathSource(home, name, dir)
++		if err != nil {
+ 			return nil, err
+ 		}
++		source = stored
+ 	}
+-	entry, hash, err := contextstore.EnsureState(home, contextlock.KindContext, name, dir)
++	entry, hash, err := contextstore.EnsureState(home, contextlock.KindContext, name, source)
+ 	if err != nil {
+ 		return nil, preservePathDiag(err)
+ 	}
+@@ -1275,31 +1281,49 @@ func stateForPath(home, name, dir string, draftSourcesV1 bool) (*contextresolve.
+ 	return &contextresolve.StatePackage{StateHash: hash, Manifest: packageOf(manifest)}, nil
+ }
+ 
+-// admitPathSource runs the draft local-source boundary admission for one
+-// operator path source (a path install operand or a path overlay
+-// declaration) before the store traverses it. The mapping is the profile
+-// analogue of a Skillfile local source: the operand is the source root
+-// selected at ".", the manager home is the owning root (selecting the
+-// home itself would need operator root_inputs, which profiles do not
+-// carry, so it is refused), and the managed outputs are the profile
+-// store, the context store and the profile git cache. A refusal names
+-// the skillfile-sources section 5 class.
++// draftPathOutputs lists the managed outputs the draft local pipeline
++// prunes and refuses against: the profile store, the context store, the
++// profile git cache and the local-snapshot store itself.
++func draftPathOutputs(home string) []string {
++	return []string{ProfilesDir(home), contextstore.Root(home), profileReposDir(home), snapshot.LocalStoreDir(home)}
++}
++
++// admitPathSource runs the draft local-source pipeline for one operator
++// path source (a path install operand or a path overlay declaration)
++// before the store traverses anything, and returns the frozen snapshot
++// directory the store must install. The mapping is the profile analogue
++// of a Skillfile local source: the operand is the source root selected
++// at ".", the manager home is the owning root (selecting the home
++// itself would need operator root_inputs, which profiles do not carry,
++// so it is refused), and the managed outputs are draftPathOutputs. A
++// refusal names the skillfile-sources section 5 class.
+ //
+-// The admitted file list and staging reservation the acquisition returns
+-// are proof of a traversable, link-free, pruned input set, not capture
+-// instructions: the store owns hashing and its own staging layout and
+-// re-walks the admitted tree itself.
+-func admitPathSource(home, name, dir string) error {
++// Admission (snapshot.PrepareLocalAcquisition) validates boundaries
++// before traversal; Capture freezes the admitted dirty/untracked bytes
++// — whether or not .git exists — into private staging with race
++// detection; PublishLocal commits the frozen copy to the immutable
++// snapshot store. No Git commit is synthesized at any step, and the
++// caller consumes the returned directory, never the live original.
++func admitPathSource(home, name, dir string) (string, error) {
+ 	absolute, err := filepath.Abs(dir)
+ 	if err != nil {
+-		return fmt.Errorf("%s: resolve path %q: %v", DiagSourceInvalid, dir, err)
++		return "", fmt.Errorf("%s: resolve path %q: %v", DiagSourceInvalid, dir, err)
+ 	}
+-	outputs := []string{ProfilesDir(home), contextstore.Root(home), profileReposDir(home)}
+-	acquisition, err := snapshot.PrepareLocalAcquisition(absolute, ".", home, name, outputs, nil, nil, "")
++	acquisition, err := snapshot.PrepareLocalAcquisition(absolute, ".", home, name, draftPathOutputs(home), nil, nil, "")
+ 	if err != nil {
+-		return err
++		return "", err
++	}
++	defer func() { _ = acquisition.Close() }()
++	inventory, err := snapshot.Capture(acquisition)
++	if err != nil {
++		return "", err
++	}
++	if _, err := snapshot.PublishLocal(home, acquisition.Staging, inventory); err != nil {
++		return "", err
+ 	}
+-	return acquisition.Close()
++	// Resolve through the store, never the just-written path: the
++	// install consumes the authenticated frozen tree.
++	return snapshot.OpenLocal(home, inventory.Snapshot)
+ }
+ 
+ // preservePathDiag keeps a store error's leading §1.1 diagnostic: an
+diff --git a/internal/snapshot/boundaries.go b/internal/snapshot/boundaries.go
+index 2daa637..ea88d08 100644
+--- a/internal/snapshot/boundaries.go
++++ b/internal/snapshot/boundaries.go
+@@ -37,8 +37,9 @@ import (
+ // capture leaf fills with the frozen copy. The caller owns Staging and
+ // must call Close. Byte capture, hashing, race detection and store
+ // publication belong to the capture leaf (TASK-260910-16k7xy), which
+-// consumes this entry point; this type carries validation, enumeration
+-// and staging only.
++// consumes this entry point through Capture; Outputs and RootEntries
++// carry the exact admission inputs Capture re-enumerates after the copy
++// so a concurrent membership change fails instead of publishing a mix.
+ type LocalAcquisition struct {
+ 	// Physical is the canonical package directory.
+ 	Physical string
+@@ -50,6 +51,14 @@ type LocalAcquisition struct {
+ 	Files []string
+ 	// Staging is the private directory reserved for the frozen copy.
+ 	Staging string
++	// Outputs holds the managed-output roots used at admission. Capture
++	// reuses them for its post-copy re-enumeration.
++	Outputs []string
++	// RootEntries holds the source-relative root-input selections for a
++	// project-root package, or nil for the full-tree admission of an
++	// ordinary package. The nil/non-nil distinction matches
++	// EnumerateInputs: nil admits the whole tree.
++	RootEntries []string
+ }
+ 
+ // Close removes the reserved staging directory. It is nil-safe and
+@@ -80,11 +89,13 @@ func PrepareLocalAcquisition(sourceRoot, directory, projectRoot, alias string, o
+ 		return nil, fmt.Errorf("boundary_identity_unreadable: project root: %v", err)
+ 	}
+ 	var files []string
++	var rootEntries []string
+ 	same, err := sameFile(physical, projectCanonical)
+ 	if err != nil {
+ 		return nil, fmt.Errorf("boundary_identity_unreadable: project root: %v", err)
+ 	}
+ 	if same {
++		rootEntries = append([]string(nil), rootInputs[alias]...)
+ 		files, err = EnumerateInputs(physical, outputs, rootInputs[alias])
+ 	} else {
+ 		files, err = EnumerateInputs(physical, outputs, nil)
+@@ -96,7 +107,7 @@ func PrepareLocalAcquisition(sourceRoot, directory, projectRoot, alias string, o
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	return &LocalAcquisition{Physical: physical, Admitted: admitted, Files: files, Staging: reserved}, nil
++	return &LocalAcquisition{Physical: physical, Admitted: admitted, Files: files, Staging: reserved, Outputs: append([]string(nil), outputs...), RootEntries: rootEntries}, nil
+ }
+ 
+ // ValidateLocalPackage resolves and admits one selected local package before
+diff --git a/internal/snapshot/capture.go b/internal/snapshot/capture.go
+new file mode 100644
+index 0000000..4d69990
+--- /dev/null
++++ b/internal/snapshot/capture.go
+@@ -0,0 +1,447 @@
++package snapshot
++
++// Draft local-snapshot capture, hashing and immutable store (revision 1).
++//
++// This file implements protocol/skillfile-sources.md section 3 for local
++// acquisition: a local path always means admitted filesystem bytes,
++// including dirty, staged and untracked files, whether or not .git
++// exists. It never means Git HEAD: no Git object is read here and no
++// commit is synthesized; the admitted file list from boundaries.go is
++// the only input set.
++//
++// Capture copies the admitted regular files into the acquisition's
++// private staging directory, records the local-snapshot-v1 inventory
++// (package-relative portable path, SHA-256 of raw bytes, executable bit
++// for every file), then revalidates: the admitted path set is
++// re-enumerated, the live bytes are re-read, and the frozen copy is
++// rehashed. Any concurrent mutation fails with source_snapshot_changed
++// and requires a new explicit attempt. All downstream operations
++// consume the frozen copy, never the mutable original.
++//
++// PublishLocal moves one frozen copy into the immutable snapshot store
++// below the manager home, keyed by the inventory digest. OpenLocal
++// resolves a locked digest back to its frozen tree; an absent snapshot
++// fails with source_snapshot_unavailable and a tree that no longer
++// matches its digest fails with source_snapshot_changed. Neither path
++// recreates a snapshot from current bytes.
++
++import (
++	"crypto/sha256"
++	"encoding/hex"
++	"fmt"
++	"io/fs"
++	"os"
++	"path/filepath"
++	"sort"
++	"strings"
++
++	"github.com/relux-works/curator/internal/protocoljson"
++)
++
++// InventoryAlgorithm is the local-snapshot-v1 algorithm identifier
++// carried by every inventory.
++const InventoryAlgorithm = "curator-local-snapshot-v1"
++
++// InventorySchemaVersion is the local-snapshot-v1 schema version.
++const InventorySchemaVersion = 1
++
++// FileEntry is one local-snapshot-v1 files member: the package-relative
++// portable path, the SHA-256 of the exact raw bytes (with the sha256:
++// prefix), and whether any POSIX execute bit is set (false on
++// filesystems without that metadata).
++type FileEntry struct {
++	Path       string
++	SHA256     string
++	Executable bool
++}
++
++// Inventory is the local-snapshot-v1 byte inventory of one captured
++// package. Snapshot holds the digest over every other field and is
++// excluded from its own preimage.
++type Inventory struct {
++	SchemaVersion int
++	Algorithm     string
++	Files         []FileEntry
++	Snapshot      string
++}
++
++// LocalStoreDir is the immutable local-snapshot store below the manager
++// home. It is a managed output: callers pass it in their outputs so
++// admission prunes it and refuses packages selected inside it.
++func LocalStoreDir(home string) string { return filepath.Join(home, "local-snapshots") }
++
++// NormalizeSnapshotDigest validates a snapshot digest and returns its
++// canonical lowercase form.
++func NormalizeSnapshotDigest(digest string) (string, error) {
++	lowered := strings.ToLower(strings.TrimSpace(digest))
++	hexpart, ok := strings.CutPrefix(lowered, "sha256:")
++	if !ok || len(hexpart) != 64 || !isHex(hexpart) {
++		return "", fmt.Errorf("source_snapshot_unavailable: snapshot digest %q is malformed", digest)
++	}
++	return "sha256:" + hexpart, nil
++}
++
++// localSnapshotDir maps a canonical digest onto its frozen tree.
++func localSnapshotDir(home, normalized string) string {
++	return filepath.Join(LocalStoreDir(home), strings.TrimPrefix(normalized, "sha256:"), "snapshot")
++}
++
++// Digest returns the local-snapshot-v1 digest: SHA-256, prefixed
++// sha256:, over the CCJ-1 bytes of exactly {schema_version, algorithm,
++// files} with entries sorted by UTF-8 path bytes. Line endings,
++// Unicode, file contents and executable bits enter unnormalized;
++// absolute source paths, timestamps, owner IDs, .git, pruned output and
++// traversal order do not.
++func (inventory Inventory) Digest() (string, error) {
++	if inventory.SchemaVersion != InventorySchemaVersion {
++		return "", fmt.Errorf("source_member_invalid: snapshot schema_version must be %d", InventorySchemaVersion)
++	}
++	if inventory.Algorithm != InventoryAlgorithm {
++		return "", fmt.Errorf("source_member_invalid: snapshot algorithm must be %q", InventoryAlgorithm)
++	}
++	ordered := make([]FileEntry, len(inventory.Files))
++	copy(ordered, inventory.Files)
++	sort.Slice(ordered, func(i, j int) bool { return ordered[i].Path < ordered[j].Path })
++	files := make([]any, 0, len(ordered))
++	for _, entry := range ordered {
++		files = append(files, map[string]any{
++			"path": entry.Path, "sha256": entry.SHA256, "executable": entry.Executable,
++		})
++	}
++	payload, err := protocoljson.MarshalCanonical(map[string]any{
++		"schema_version": inventory.SchemaVersion,
++		"algorithm":      inventory.Algorithm,
++		"files":          files,
++	})
++	if err != nil {
++		return "", fmt.Errorf("source_member_invalid: snapshot inventory is not encodable: %v", err)
++	}
++	sum := sha256.Sum256(payload)
++	return "sha256:" + hex.EncodeToString(sum[:]), nil
++}
++
++// BuildInventory hashes the exact byte inventory of files below
++// packageRoot: one entry per absolute path with its package-relative
++// portable path, raw-byte SHA-256 and executable bit. Entries sort by
++// UTF-8 path bytes; duplicates and filesystem-equivalent path
++// collisions fail. Links and special files in admitted inputs fail.
++// Absence reports source_member_missing; every other defect reports
++// source_member_invalid.
++func BuildInventory(packageRoot string, files []string) (Inventory, error) {
++	entries := make([]FileEntry, 0, len(files))
++	folded := map[string]string{}
++	for _, file := range files {
++		info, err := os.Lstat(file) // #nosec G304 -- admitted inventory member under hashing
++		if err != nil {
++			if os.IsNotExist(err) {
++				return Inventory{}, fmt.Errorf("source_member_missing: snapshot member %s: %v", file, err)
++			}
++			return Inventory{}, fmt.Errorf("source_member_invalid: snapshot member %s: %v", file, err)
++		}
++		if info.Mode()&os.ModeSymlink != 0 {
++			return Inventory{}, fmt.Errorf("source_member_invalid: %s is a link", file)
++		}
++		if !info.Mode().IsRegular() {
++			return Inventory{}, fmt.Errorf("source_member_invalid: %s is not a regular file", file)
++		}
++		rel, err := filepath.Rel(packageRoot, file)
++		if err != nil {
++			return Inventory{}, fmt.Errorf("source_member_invalid: %s escapes its package: %v", file, err)
++		}
++		posix := filepath.ToSlash(rel)
++		if posix == "." || posix == ".." || strings.HasPrefix(posix, "../") || filepath.IsAbs(posix) {
++			return Inventory{}, fmt.Errorf("source_member_invalid: %s escapes its package", file)
++		}
++		payload, err := os.ReadFile(file) // #nosec G304 -- admitted inventory member under hashing
++		if err != nil {
++			if os.IsNotExist(err) {
++				return Inventory{}, fmt.Errorf("source_member_missing: snapshot member %s: %v", file, err)
++			}
++			return Inventory{}, fmt.Errorf("source_member_invalid: snapshot member %s: %v", file, err)
++		}
++		sum := sha256.Sum256(payload)
++		entries = append(entries, FileEntry{
++			Path:       posix,
++			SHA256:     "sha256:" + hex.EncodeToString(sum[:]),
++			Executable: info.Mode().Perm()&0o111 != 0,
++		})
++		if prior, ok := folded[strings.ToLower(posix)]; ok && prior != posix {
++			return Inventory{}, fmt.Errorf("source_member_invalid: %s and %s map to one platform path", prior, posix)
++		}
++		folded[strings.ToLower(posix)] = posix
++	}
++	sort.Slice(entries, func(i, j int) bool { return entries[i].Path < entries[j].Path })
++	for index := 1; index < len(entries); index++ {
++		if entries[index].Path == entries[index-1].Path {
++			return Inventory{}, fmt.Errorf("source_member_invalid: duplicate snapshot member %q", entries[index].Path)
++		}
++	}
++	inventory := Inventory{SchemaVersion: InventorySchemaVersion, Algorithm: InventoryAlgorithm, Files: entries}
++	digest, err := inventory.Digest()
++	if err != nil {
++		return Inventory{}, err
++	}
++	inventory.Snapshot = digest
++	return inventory, nil
++}
++
++// Capture freezes one prepared acquisition: it copies the admitted
++// dirty/untracked bytes into the acquisition staging directory and
++// returns the byte inventory. The admitted set comes from the boundary
++// enumeration, so .git metadata and managed outputs never enter while
++// every other live byte does, including files Git reports as dirty or
++// untracked.
++//
++// After the copy Capture re-enumerates the admitted path set, re-reads
++// the live bytes and rehashes the frozen copy. Any difference — a file
++// added or removed, bytes or executable bits changed live, or the
++// staged copy differing from what was read — fails with
++// source_snapshot_changed. Staging I/O failures unrelated to the tree
++// are returned without a snapshot class.
++func Capture(acquisition *LocalAcquisition) (Inventory, error) {
++	if acquisition == nil || acquisition.Physical == "" || acquisition.Staging == "" {
++		return Inventory{}, fmt.Errorf("source_member_invalid: local acquisition is not prepared")
++	}
++	live, err := BuildInventory(acquisition.Physical, acquisition.Files)
++	if err != nil {
++		return Inventory{}, fmt.Errorf("source_snapshot_changed: capture raced the admitted tree: %v", err)
++	}
++	byPath := make(map[string]FileEntry, len(live.Files))
++	for _, entry := range live.Files {
++		byPath[entry.Path] = entry
++	}
++	for _, file := range acquisition.Files {
++		rel, err := filepath.Rel(acquisition.Physical, file)
++		if err != nil {
++			return Inventory{}, fmt.Errorf("source_snapshot_changed: capture raced the admitted tree: %v", err)
++		}
++		posix := filepath.ToSlash(rel)
++		entry, ok := byPath[posix]
++		if !ok {
++			return Inventory{}, fmt.Errorf("source_snapshot_changed: capture raced the admitted tree: %s vanished", file)
++		}
++		payload, err := os.ReadFile(file) // #nosec G304 -- admitted member under capture
++		if err != nil {
++			return Inventory{}, fmt.Errorf("source_snapshot_changed: capture raced %s: %v", posix, err)
++		}
++		destination := filepath.Join(acquisition.Staging, filepath.FromSlash(posix))
++		if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
++			return Inventory{}, fmt.Errorf("capture staging for %s: %w", posix, err)
++		}
++		mode := os.FileMode(0o644)
++		if entry.Executable {
++			mode = 0o755
++		}
++		if err := os.WriteFile(destination, payload, mode); err != nil {
++			return Inventory{}, fmt.Errorf("capture staging for %s: %w", posix, err)
++		}
++	}
++	reenumerated, err := EnumerateInputs(acquisition.Physical, acquisition.Outputs, acquisition.RootEntries)
++	if err != nil {
++		return Inventory{}, fmt.Errorf("source_snapshot_changed: admitted inputs changed during capture: %v", err)
++	}
++	if !equalPaths(reenumerated, acquisition.Files) {
++		return Inventory{}, fmt.Errorf("source_snapshot_changed: admitted inputs changed during capture: membership changed")
++	}
++	again, err := BuildInventory(acquisition.Physical, acquisition.Files)
++	if err != nil {
++		return Inventory{}, fmt.Errorf("source_snapshot_changed: admitted inputs changed during capture: %v", err)
++	}
++	if again.Snapshot != live.Snapshot {
++		return Inventory{}, fmt.Errorf("source_snapshot_changed: admitted inputs changed during capture: bytes changed")
++	}
++	staged := make([]string, 0, len(acquisition.Files))
++	for _, file := range acquisition.Files {
++		rel, err := filepath.Rel(acquisition.Physical, file)
++		if err != nil {
++			return Inventory{}, fmt.Errorf("source_snapshot_changed: frozen copy diverged: %v", err)
++		}
++		staged = append(staged, filepath.Join(acquisition.Staging, rel))
++	}
++	frozen, err := BuildInventory(acquisition.Staging, staged)
++	if err != nil {
++		return Inventory{}, fmt.Errorf("source_snapshot_changed: frozen copy diverged: %v", err)
++	}
++	if frozen.Snapshot != live.Snapshot {
++		return Inventory{}, fmt.Errorf("source_snapshot_changed: frozen copy diverged before publication")
++	}
++	return live, nil
++}
++
++// PublishLocal publishes one frozen copy into the immutable snapshot
++// store below home, keyed by the inventory digest, and returns the
++// store tree. The frozen copy is rehashed before publication: a staged
++// tree that no longer matches the audited inventory fails with
++// source_snapshot_changed. A concurrent publisher of the same digest
++// wins harmlessly only when its complete tree authenticates; anything
++// else conflicting fails the same way. The caller keeps owning staging.
++func PublishLocal(home, staging string, inventory Inventory) (string, error) {
++	if inventory.Snapshot == "" {
++		return "", fmt.Errorf("source_member_invalid: snapshot has no digest; capture it first")
++	}
++	normalized, err := NormalizeSnapshotDigest(inventory.Snapshot)
++	if err != nil {
++		return "", err
++	}
++	staged := make([]string, 0, len(inventory.Files))
++	for _, entry := range inventory.Files {
++		staged = append(staged, filepath.Join(staging, filepath.FromSlash(entry.Path)))
++	}
++	frozen, err := BuildInventory(staging, staged)
++	if err != nil {
++		return "", fmt.Errorf("source_snapshot_changed: frozen copy changed between audit and publication: %v", err)
++	}
++	if frozen.Snapshot != normalized {
++		return "", fmt.Errorf("source_snapshot_changed: frozen copy changed between audit and publication")
++	}
++	target := localSnapshotDir(home, normalized)
++	if _, err := os.Lstat(target); err == nil {
++		if err := authenticateLocalSnapshot(target, normalized); err != nil {
++			return "", err
++		}
++		return target, nil
++	} else if !os.IsNotExist(err) {
++		return "", err
++	}
++	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
++		return "", err
++	}
++	tmp, err := os.MkdirTemp(filepath.Dir(target), ".snapshot-*.tmp")
++	if err != nil {
++		return "", err
++	}
++	defer func() { _ = os.RemoveAll(tmp) }()
++	for _, entry := range inventory.Files {
++		payload, err := os.ReadFile(filepath.Join(staging, filepath.FromSlash(entry.Path))) // #nosec G304 -- frozen member under publication
++		if err != nil {
++			return "", fmt.Errorf("source_snapshot_changed: frozen copy changed between audit and publication: %v", err)
++		}
++		destination := filepath.Join(tmp, filepath.FromSlash(entry.Path))
++		if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
++			return "", err
++		}
++		mode := os.FileMode(0o644)
++		if entry.Executable {
++			mode = 0o755
++		}
++		if err := os.WriteFile(destination, payload, mode); err != nil {
++			return "", err
++		}
++	}
++	if err := renameNoReplace(tmp, target); err != nil {
++		authErr := authenticateLocalSnapshot(target, normalized)
++		if authErr == nil {
++			return target, nil
++		}
++		return "", fmt.Errorf("source_snapshot_changed: concurrent snapshot publication conflicts: %v", authErr)
++	}
++	return target, nil
++}
++
++// OpenLocal resolves a locked snapshot digest to its immutable frozen
++// tree. It never falls back to current bytes: an absent snapshot fails
++// with source_snapshot_unavailable, and a store tree that no longer
++// matches its digest fails with source_snapshot_changed.
++func OpenLocal(home, digest string) (string, error) {
++	normalized, err := NormalizeSnapshotDigest(digest)
++	if err != nil {
++		return "", err
++	}
++	target := localSnapshotDir(home, normalized)
++	if _, err := os.Lstat(target); err != nil {
++		if os.IsNotExist(err) {
++			return "", fmt.Errorf("source_snapshot_unavailable: snapshot %s is not in the store; capture it with an explicit attempt", normalized)
++		}
++		return "", err
++	}
++	if err := authenticateLocalSnapshot(target, normalized); err != nil {
++		return "", err
++	}
++	return target, nil
++}
++
++// authenticateLocalSnapshot proves a store tree is exactly the snapshot
++// digest: a real link-free directory whose complete byte inventory
++// digests to normalized. Anything else fails with
++// source_snapshot_changed and is never passed to installers.
++func authenticateLocalSnapshot(target, normalized string) error {
++	info, err := os.Lstat(target)
++	if err != nil {
++		if os.IsNotExist(err) {
++			return fmt.Errorf("source_snapshot_unavailable: snapshot %s is not in the store; capture it with an explicit attempt", normalized)
++		}
++		return err
++	}
++	if !info.IsDir() || info.Mode()&fs.ModeSymlink != 0 {
++		return fmt.Errorf("source_snapshot_changed: stored snapshot %s is not a directory", normalized)
++	}
++	files, err := listStoreFiles(target)
++	if err != nil {
++		return err
++	}
++	actual, err := BuildInventory(target, files)
++	if err != nil {
++		return fmt.Errorf("source_snapshot_changed: stored snapshot %s failed revalidation: %v", normalized, err)
++	}
++	if actual.Snapshot != normalized {
++		return fmt.Errorf("source_snapshot_changed: stored snapshot %s does not match its recorded bytes", normalized)
++	}
++	return nil
++}
++
++// listStoreFiles enumerates the regular files of one store tree. Links
++// and special files fail with source_snapshot_changed: the tree is no
++// longer the snapshot it claims to be.
++func listStoreFiles(root string) ([]string, error) {
++	var files []string
++	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
++		if err != nil {
++			return err
++		}
++		if path == root {
++			return nil
++		}
++		if entry.Type()&fs.ModeSymlink != 0 {
++			return fmt.Errorf("source_snapshot_changed: stored snapshot carries a link at %s", path)
++		}
++		if entry.IsDir() {
++			return nil
++		}
++		if !entry.Type().IsRegular() {
++			return fmt.Errorf("source_snapshot_changed: stored snapshot carries a special file at %s", path)
++		}
++		files = append(files, path)
++		return nil
++	})
++	if err != nil {
++		if strings.HasPrefix(err.Error(), "source_snapshot_changed") {
++			return nil, err
++		}
++		return nil, fmt.Errorf("source_snapshot_changed: stored snapshot cannot be read: %v", err)
++	}
++	sort.Strings(files)
++	return files, nil
++}
++
++func isHex(value string) bool {
++	for _, character := range value {
++		digit := character >= '0' && character <= '9'
++		lower := character >= 'a' && character <= 'f'
++		if !digit && !lower {
++			return false
++		}
++	}
++	return true
++}
++
++func equalPaths(first, second []string) bool {
++	if len(first) != len(second) {
++		return false
++	}
++	for index := range first {
++		if first[index] != second[index] {
++			return false
++		}
++	}
++	return true
++}
+diff --git a/internal/snapshot/capture_test.go b/internal/snapshot/capture_test.go
+new file mode 100644
+index 0000000..9352521
+--- /dev/null
++++ b/internal/snapshot/capture_test.go
+@@ -0,0 +1,511 @@
++package snapshot
++
++// Production-path tests for draft local-snapshot capture (revision 1,
++// protocol/skillfile-sources.md section 3). Every test reaches a
++// production entry point: Capture, PublishLocal or OpenLocal. The
++// normative hash vectors pin the local-snapshot-v1 inventory digest
++// from conformance/draft-sources-v1/snapshot-cases.json.
++
++import (
++	"os"
++	"os/exec"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++)
++
++// normativeVector is one hand-pinned row of the accepted snapshot
++// byte vectors: exact file bytes, per-file hashes with executable
++// flags, and the full inventory digest.
++type normativeVector struct {
++	id       string
++	files    map[string]string
++	exec     map[string]bool
++	fileSHA  map[string]string
++	snapshot string
++}
++
++var normativeVectors = []normativeVector{
++	{
++		id: "base",
++		files: map[string]string{
++			"SKILL.md":       "name: review\n",
++			"build/main.go":  "package main\n",
++			"scripts/run.sh": "echo one\n",
++		},
++		exec: map[string]bool{"SKILL.md": false, "build/main.go": false, "scripts/run.sh": true},
++		fileSHA: map[string]string{
++			"SKILL.md":       "sha256:06142a8fcd46ff59b5ddcd13ab902f20a5b9e2a51ce3a40b65fe735ce0371b95",
++			"build/main.go":  "sha256:df1d036cbbf3df46e2045071e082245ece204c7f53ecf0a4e022bff9bb228f47",
++			"scripts/run.sh": "sha256:0cb42bbdf016ecafd6c21ac6c4b1760bf5b346c70c4f96ba890ef3d74883c8c2",
++		},
++		snapshot: "sha256:481f362d0c82cdf8c32ed854edfc125d21a7c470c0128086f7eebb1956d832a9",
++	},
++	{
++		id: "runtime-edit",
++		files: map[string]string{
++			"SKILL.md":       "name: review\n",
++			"build/main.go":  "package main\n",
++			"scripts/run.sh": "echo two\n",
++		},
++		exec: map[string]bool{"SKILL.md": false, "build/main.go": false, "scripts/run.sh": true},
++		fileSHA: map[string]string{
++			"SKILL.md":       "sha256:06142a8fcd46ff59b5ddcd13ab902f20a5b9e2a51ce3a40b65fe735ce0371b95",
++			"build/main.go":  "sha256:df1d036cbbf3df46e2045071e082245ece204c7f53ecf0a4e022bff9bb228f47",
++			"scripts/run.sh": "sha256:7d97a50c9b1eb3b6a49320a5238fd08280240d28befc12465e493d17d8bc8d56",
++		},
++		snapshot: "sha256:15ac234d51e71847165d42e2695df3d91ca49314bd5e5811eb17cad6ce8cea80",
++	},
++	{
++		id: "build-edit",
++		files: map[string]string{
++			"SKILL.md":       "name: review\n",
++			"build/main.go":  "package changed\n",
++			"scripts/run.sh": "echo one\n",
++		},
++		exec: map[string]bool{"SKILL.md": false, "build/main.go": false, "scripts/run.sh": true},
++		fileSHA: map[string]string{
++			"SKILL.md":       "sha256:06142a8fcd46ff59b5ddcd13ab902f20a5b9e2a51ce3a40b65fe735ce0371b95",
++			"build/main.go":  "sha256:fbe06aa700c70a568bef3585095a668af24c85c11553f83818009eba13070f60",
++			"scripts/run.sh": "sha256:0cb42bbdf016ecafd6c21ac6c4b1760bf5b346c70c4f96ba890ef3d74883c8c2",
++		},
++		snapshot: "sha256:2aa1bc2a835d6fd931de8f032761c17288bfefeaba492fe229158c602b8750ac",
++	},
++}
++
++// writeVectorPackage materializes one normative vector as a live
++// package tree with the pinned executable bits.
++func writeVectorPackage(t *testing.T, pkg string, vector normativeVector) {
++	t.Helper()
++	for rel, content := range vector.files {
++		full := filepath.Join(pkg, filepath.FromSlash(rel))
++		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
++			t.Fatal(err)
++		}
++		mode := os.FileMode(0o644)
++		if vector.exec[rel] {
++			mode = 0o755
++		}
++		if err := os.Chmod(full, mode); err != nil {
++			t.Fatal(err)
++		}
++	}
++	// The executable vector is normative on unix runners where the
++	// platform reports POSIX execute bits. On Windows the permission
++	// bits are synthesized, so the executable-flag assertion is
++	// deferred to the unix runners (platform-control skip class).
++	info, err := os.Lstat(filepath.Join(pkg, "scripts", "run.sh"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if runtime.GOOS == "windows" {
++		if info.Mode().Perm()&0o111 == 0 {
++			t.Skip("Windows does not expose portable executable permission bits; the normative executable vectors are asserted on the unix runners")
++		}
++		for rel, wantExec := range vector.exec {
++			got, err := os.Lstat(filepath.Join(pkg, filepath.FromSlash(rel)))
++			if err != nil {
++				t.Fatal(err)
++			}
++			if (got.Mode().Perm()&0o111 != 0) != wantExec {
++				t.Skipf("Windows does not expose portable executable permission bits; the normative executable vectors are asserted on the unix runners (unexpected bits for %s)", rel)
++			}
++		}
++		return
++	}
++	if info.Mode().Perm()&0o111 == 0 {
++		t.Fatalf("scripts/run.sh lost its POSIX execute bit %o; normative executable vectors must hold on unix", info.Mode().Perm())
++	}
++	for rel, wantExec := range vector.exec {
++		got, err := os.Lstat(filepath.Join(pkg, filepath.FromSlash(rel)))
++		if err != nil {
++			t.Fatal(err)
++		}
++		if (got.Mode().Perm()&0o111 != 0) != wantExec {
++			t.Fatalf("platform reports unexpected execute bits for %s: mode %o, want executable %v", rel, got.Mode().Perm(), wantExec)
++		}
++	}
++}
++
++// prepareVectorAcquisition runs the production admission entry point
++// for one materialized vector package.
++func prepareVectorAcquisition(t *testing.T, pkg string) *LocalAcquisition {
++	t.Helper()
++	project := filepath.Dir(pkg)
++	acquisition, err := PrepareLocalAcquisition(pkg, ".", project, "s", boundaryOutputs(project), nil, map[string]bool{"s": true}, "")
++	if err != nil {
++		t.Fatalf("PrepareLocalAcquisition: %v", err)
++	}
++	t.Cleanup(func() { _ = acquisition.Close() })
++	return acquisition
++}
++
++// TestCaptureMatchesNormativeVectors drives the production Capture for
++// all three accepted byte vectors: exact per-file hashes, executable
++// flags and the full inventory digest must equal the pinned values.
++func TestCaptureMatchesNormativeVectors(t *testing.T) {
++	for _, vector := range normativeVectors {
++		t.Run(vector.id, func(t *testing.T) {
++			base := t.TempDir()
++			pkg := filepath.Join(base, "pkg")
++			writeVectorPackage(t, pkg, vector)
++			acquisition := prepareVectorAcquisition(t, pkg)
++			inventory, err := Capture(acquisition)
++			if err != nil {
++				t.Fatalf("Capture: %v", err)
++			}
++			if len(inventory.Files) != len(vector.files) {
++				t.Fatalf("files = %v, want %d entries", inventory.Files, len(vector.files))
++			}
++			for _, entry := range inventory.Files {
++				wantSHA, ok := vector.fileSHA[entry.Path]
++				if !ok {
++					t.Fatalf("unexpected inventory path %q", entry.Path)
++				}
++				if entry.SHA256 != wantSHA {
++					t.Fatalf("%s sha = %s, want %s", entry.Path, entry.SHA256, wantSHA)
++				}
++				if entry.Executable != vector.exec[entry.Path] {
++					t.Fatalf("%s executable = %v, want %v", entry.Path, entry.Executable, vector.exec[entry.Path])
++				}
++			}
++			if inventory.Snapshot != vector.snapshot {
++				t.Fatalf("snapshot = %s, want %s", inventory.Snapshot, vector.snapshot)
++			}
++		})
++	}
++}
++
++// TestVectorsFreezeContextAcrossRuntimeAndBuildEdits pins the
++// runtime-only-refresh / build-only-refresh semantic: SKILL.md bytes
++// are identical across all three vectors, but every vector carries a
++// distinct package identity, so runtime and build inputs are frozen
++// into the snapshot digest rather than inferred from context.
++func TestVectorsFreezeContextAcrossRuntimeAndBuildEdits(t *testing.T) {
++	skillSHA := normativeVectors[0].fileSHA["SKILL.md"]
++	seen := map[string]string{}
++	for _, vector := range normativeVectors {
++		if vector.fileSHA["SKILL.md"] != skillSHA {
++			t.Fatalf("%s changed SKILL.md bytes %s, want the frozen %s", vector.id, vector.fileSHA["SKILL.md"], skillSHA)
++		}
++		if prior, ok := seen[vector.snapshot]; ok {
++			t.Fatalf("snapshot collision: %s and %s share %s", prior, vector.id, vector.snapshot)
++		}
++		seen[vector.snapshot] = vector.id
++	}
++	if len(seen) != 3 {
++		t.Fatalf("want 3 distinct package identities, got %v", seen)
++	}
++}
++
++// captureFixture builds an ordinary admitted package with frontmatter
++// SKILL.md plus payload files for race and store tests.
++func captureFixture(t *testing.T, files map[string]string) (home, pkg string, acquisition *LocalAcquisition) {
++	t.Helper()
++	base := t.TempDir()
++	home = t.TempDir()
++	pkg = filepath.Join(base, "pkg")
++	if err := os.MkdirAll(pkg, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(pkg, "SKILL.md"), []byte("---\nname: review\ndescription: A skill\n---\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	for rel, content := range files {
++		full := filepath.Join(pkg, filepath.FromSlash(rel))
++		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
++			t.Fatal(err)
++		}
++	}
++	acquisition, err := PrepareLocalAcquisition(pkg, ".", base, "s", boundaryOutputs(base), nil, map[string]bool{"s": true}, "")
++	if err != nil {
++		t.Fatalf("PrepareLocalAcquisition: %v", err)
++	}
++	t.Cleanup(func() { _ = acquisition.Close() })
++	return home, pkg, acquisition
++}
++
++// TestCaptureAdmitsDirtyAndUntrackedInsideGit proves a local path
++// means admitted filesystem bytes even inside Git: dirty tracked bytes
++// and untracked files enter the inventory, .git metadata does not, and
++// capture synthesizes no Git commit.
++func TestCaptureAdmitsDirtyAndUntrackedInsideGit(t *testing.T) {
++	repo := t.TempDir()
++	gitRun(t, repo, "init", "-q", "-b", "main")
++	if err := os.WriteFile(filepath.Join(repo, "SKILL.md"), []byte("---\nname: review\ndescription: A skill\n---\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(repo, "tracked.md"), []byte("A\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	gitRun(t, repo, "add", ".")
++	gitRun(t, repo, "commit", "-qm", "one")
++	// Dirty tracked bytes plus an untracked file: the snapshot must
++	// carry B and C, never the committed A.
++	if err := os.WriteFile(filepath.Join(repo, "tracked.md"), []byte("B\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(repo, "untracked.md"), []byte("C\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	home := t.TempDir()
++	acquisition, err := PrepareLocalAcquisition(repo, ".", t.TempDir(), "s", []string{filepath.Join(home, "outputs")}, nil, map[string]bool{"s": true}, "")
++	if err != nil {
++		t.Fatalf("PrepareLocalAcquisition: %v", err)
++	}
++	defer func() { _ = acquisition.Close() }()
++	inventory, err := Capture(acquisition)
++	if err != nil {
++		t.Fatalf("Capture: %v", err)
++	}
++	byPath := map[string]FileEntry{}
++	for _, entry := range inventory.Files {
++		byPath[entry.Path] = entry
++		if strings.Contains(entry.Path, ".git") {
++			t.Fatalf("inventory carries metadata path %q", entry.Path)
++		}
++	}
++	for _, want := range []string{"SKILL.md", "tracked.md", "untracked.md"} {
++		if _, ok := byPath[want]; !ok {
++			t.Fatalf("inventory = %v, want %s", inventory.Files, want)
++		}
++	}
++	stored, err := PublishLocal(home, acquisition.Staging, inventory)
++	if err != nil {
++		t.Fatalf("PublishLocal: %v", err)
++	}
++	if payload, err := os.ReadFile(filepath.Join(stored, "tracked.md")); err != nil || string(payload) != "B\n" {
++		t.Fatalf("stored tracked.md = %q, %v; want dirty B", payload, err)
++	}
++	if payload, err := os.ReadFile(filepath.Join(stored, "untracked.md")); err != nil || string(payload) != "C\n" {
++		t.Fatalf("stored untracked.md = %q, %v; want untracked C", payload, err)
++	}
++	if _, err := os.Lstat(filepath.Join(stored, ".git")); !os.IsNotExist(err) {
++		t.Fatalf("stored snapshot carries .git: %v", err)
++	}
++	// Capture must never turn dirty bytes into a commit.
++	count := exec.Command("git", "rev-list", "--count", "HEAD")
++	count.Dir = repo
++	out, err := count.Output()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if strings.TrimSpace(string(out)) != "1" {
++		t.Fatalf("capture synthesized a commit: rev-list --count HEAD = %s", out)
++	}
++}
++
++// TestCaptureDetectsAddedMember proves a file admitted between
++// admission and capture fails the install with
++// source_snapshot_changed instead of publishing a mix.
++func TestCaptureDetectsAddedMember(t *testing.T) {
++	_, pkg, acquisition := captureFixture(t, map[string]string{"a.md": "a\n"})
++	if err := os.WriteFile(filepath.Join(pkg, "late.md"), []byte("late\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	_, err := Capture(acquisition)
++	if err == nil || !strings.HasPrefix(err.Error(), "source_snapshot_changed") {
++		t.Fatalf("Capture err = %v, want leading source_snapshot_changed", err)
++	}
++}
++
++// TestCaptureDetectsRemovedMember proves a file vanishing between
++// admission and capture fails the same way.
++func TestCaptureDetectsRemovedMember(t *testing.T) {
++	_, pkg, acquisition := captureFixture(t, map[string]string{"doomed.md": "x\n"})
++	if err := os.Remove(filepath.Join(pkg, "doomed.md")); err != nil {
++		t.Fatal(err)
++	}
++	_, err := Capture(acquisition)
++	if err == nil || !strings.HasPrefix(err.Error(), "source_snapshot_changed") {
++		t.Fatalf("Capture err = %v, want leading source_snapshot_changed", err)
++	}
++}
++
++// TestCaptureDetectsLiveContentChange proves bytes changing under the
++// admitted set fail capture: narrowing the post-copy re-read to skip
++// the comparison must fail this test.
++func TestCaptureDetectsLiveContentChange(t *testing.T) {
++	home, pkg, acquisition := captureFixture(t, map[string]string{"a.md": "before\n"})
++	before, err := Capture(acquisition)
++	if err != nil {
++		t.Fatalf("Capture: %v", err)
++	}
++	if _, err := PublishLocal(home, acquisition.Staging, before); err != nil {
++		t.Fatalf("PublishLocal: %v", err)
++	}
++	// A second admission over changed bytes is a new snapshot, not a
++	// silent reuse of the first: the digest must move.
++	if err := os.WriteFile(filepath.Join(pkg, "a.md"), []byte("after\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	base := filepath.Dir(pkg)
++	second, err := PrepareLocalAcquisition(pkg, ".", base, "s", boundaryOutputs(base), nil, map[string]bool{"s": true}, "")
++	if err != nil {
++		t.Fatalf("PrepareLocalAcquisition: %v", err)
++	}
++	defer func() { _ = second.Close() }()
++	after, err := Capture(second)
++	if err != nil {
++		t.Fatalf("Capture: %v", err)
++	}
++	if after.Snapshot == before.Snapshot {
++		t.Fatalf("changed bytes kept snapshot %s", after.Snapshot)
++	}
++}
++
++// TestPublishDetectsFrozenMutation proves the frozen-copy rehash
++// before publication: mutating the staged copy between audit and
++// publication fails with source_snapshot_changed. Narrowing
++// PublishLocal to skip its pre-publication rehash must fail this
++// test.
++func TestPublishDetectsFrozenMutation(t *testing.T) {
++	home, _, acquisition := captureFixture(t, map[string]string{"a.md": "audited\n"})
++	inventory, err := Capture(acquisition)
++	if err != nil {
++		t.Fatalf("Capture: %v", err)
++	}
++	if err := os.WriteFile(filepath.Join(acquisition.Staging, "a.md"), []byte("mutated\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	_, err = PublishLocal(home, acquisition.Staging, inventory)
++	if err == nil || !strings.HasPrefix(err.Error(), "source_snapshot_changed") {
++		t.Fatalf("PublishLocal err = %v, want leading source_snapshot_changed", err)
++	}
++	if _, statErr := os.Lstat(localSnapshotDir(home, inventory.Snapshot)); !os.IsNotExist(statErr) {
++		t.Fatalf("refused publication left store state behind")
++	}
++}
++
++// TestPublishOpenRoundTrip proves the store is content-addressed and
++// idempotent: publishing twice reuses the winner, and OpenLocal
++// resolves the locked digest back to the frozen tree.
++func TestPublishOpenRoundTrip(t *testing.T) {
++	home, _, acquisition := captureFixture(t, map[string]string{"a.md": "a\n"})
++	inventory, err := Capture(acquisition)
++	if err != nil {
++		t.Fatalf("Capture: %v", err)
++	}
++	first, err := PublishLocal(home, acquisition.Staging, inventory)
++	if err != nil {
++		t.Fatalf("PublishLocal: %v", err)
++	}
++	second, err := PublishLocal(home, acquisition.Staging, inventory)
++	if err != nil || second != first {
++		t.Fatalf("republish = %q, %v; want the idempotent %q", second, err, first)
++	}
++	opened, err := OpenLocal(home, inventory.Snapshot)
++	if err != nil || opened != first {
++		t.Fatalf("OpenLocal = %q, %v; want %q", opened, err, first)
++	}
++	if payload, err := os.ReadFile(filepath.Join(opened, "a.md")); err != nil || string(payload) != "a\n" {
++		t.Fatalf("opened a.md = %q, %v", payload, err)
++	}
++}
++
++// TestOpenMissingSnapshot proves a locked digest with no store entry
++// fails with source_snapshot_unavailable instead of being recreated
++// from current bytes.
++func TestOpenMissingSnapshot(t *testing.T) {
++	home := t.TempDir()
++	absent := "sha256:" + strings.Repeat("0", 64)
++	if _, err := OpenLocal(home, absent); err == nil || !strings.HasPrefix(err.Error(), "source_snapshot_unavailable") {
++		t.Fatalf("OpenLocal err = %v, want leading source_snapshot_unavailable", err)
++	}
++	// Removing a published entry makes the same locked digest
++	// unavailable: the store never falls back to the live tree.
++	_, _, acquisition := captureFixture(t, map[string]string{"a.md": "a\n"})
++	inventory, err := Capture(acquisition)
++	if err != nil {
++		t.Fatalf("Capture: %v", err)
++	}
++	stored, err := PublishLocal(home, acquisition.Staging, inventory)
++	if err != nil {
++		t.Fatalf("PublishLocal: %v", err)
++	}
++	if err := os.RemoveAll(filepath.Dir(stored)); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := OpenLocal(home, inventory.Snapshot); err == nil || !strings.HasPrefix(err.Error(), "source_snapshot_unavailable") {
++		t.Fatalf("OpenLocal after removal err = %v, want leading source_snapshot_unavailable", err)
++	}
++}
++
++// TestOpenTamperedSnapshot proves a store tree that no longer matches
++// its digest fails with source_snapshot_changed and keeps its bytes
++// out of installers.
++func TestOpenTamperedSnapshot(t *testing.T) {
++	home, _, acquisition := captureFixture(t, map[string]string{"a.md": "a\n"})
++	inventory, err := Capture(acquisition)
++	if err != nil {
++		t.Fatalf("Capture: %v", err)
++	}
++	stored, err := PublishLocal(home, acquisition.Staging, inventory)
++	if err != nil {
++		t.Fatalf("PublishLocal: %v", err)
++	}
++	if err := os.WriteFile(filepath.Join(stored, "a.md"), []byte("tampered\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := OpenLocal(home, inventory.Snapshot); err == nil || !strings.HasPrefix(err.Error(), "source_snapshot_changed") {
++		t.Fatalf("OpenLocal err = %v, want leading source_snapshot_changed", err)
++	}
++}
++
++// TestOpenMalformedDigest proves a locked digest that is not a
++// well-formed sha256: digest fails with source_snapshot_unavailable
++// instead of resolving a directory or falling back to live bytes.
++func TestOpenMalformedDigest(t *testing.T) {
++	home := t.TempDir()
++	for _, bad := range []string{"", "not-a-digest", "sha256:" + strings.Repeat("0", 63), "sha256:" + strings.Repeat("z", 64)} {
++		if _, err := OpenLocal(home, bad); err == nil || !strings.HasPrefix(err.Error(), "source_snapshot_unavailable") {
++			t.Fatalf("OpenLocal(%q) err = %v, want leading source_snapshot_unavailable", bad, err)
++		}
++	}
++}
++
++// TestCaptureRefusesUnprepared proves the production entry points
++// reject calls without a prepared acquisition or audited inventory:
++// Capture(nil), an empty acquisition and a digest-less PublishLocal
++// all fail with source_member_invalid and publish nothing.
++func TestCaptureRefusesUnprepared(t *testing.T) {
++	if _, err := Capture(nil); err == nil || !strings.HasPrefix(err.Error(), "source_member_invalid") {
++		t.Fatalf("Capture(nil) err = %v, want leading source_member_invalid", err)
++	}
++	if _, err := Capture(&LocalAcquisition{}); err == nil || !strings.HasPrefix(err.Error(), "source_member_invalid") {
++		t.Fatalf("Capture(empty) err = %v, want leading source_member_invalid", err)
++	}
++	home := t.TempDir()
++	if _, err := PublishLocal(home, t.TempDir(), Inventory{}); err == nil || !strings.HasPrefix(err.Error(), "source_member_invalid") {
++		t.Fatalf("PublishLocal(empty) err = %v, want leading source_member_invalid", err)
++	}
++	if _, err := os.Lstat(LocalStoreDir(home)); !os.IsNotExist(err) {
++		t.Fatalf("refused publication left store state behind: %v", err)
++	}
++}
++
++// TestCaptureDetectsLinkSwap proves a regular file replaced by a link
++// between admission and capture fails with source_snapshot_changed:
++// narrowing Capture to skip its link/special rejection must fail this
++// test.
++func TestCaptureDetectsLinkSwap(t *testing.T) {
++	_, pkg, acquisition := captureFixture(t, map[string]string{"a.md": "a\n"})
++	target := filepath.Join(pkg, "a.md")
++	if err := os.Remove(target); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Symlink("SKILL.md", target); err != nil {
++		t.Skipf("platform cannot create links: %v", err)
++	}
++	_, err := Capture(acquisition)
++	if err == nil || !strings.HasPrefix(err.Error(), "source_snapshot_changed") {
++		t.Fatalf("Capture err = %v, want leading source_snapshot_changed", err)
++	}
++}
