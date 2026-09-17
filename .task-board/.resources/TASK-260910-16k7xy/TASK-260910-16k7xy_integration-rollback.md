@@ -1,0 +1,4 @@
+integration_indeterminate: trunk is at 0737347812dca86d17abab099549267a41a8dfdf, which is neither the recorded expected trunk c64ceafc046828535e7acf94b2250ac49b984e03 nor the recorded candidate commit 3532b1bd895ef4036ae134738c65a0172e8ee17a; a foreign advance is never adopted, forced or guessed past
+  candidate_commit_oid: 3532b1bd895ef4036ae134738c65a0172e8ee17a
+  expected_trunk_oid: c64ceafc046828535e7acf94b2250ac49b984e03
+  observed_trunk: 0737347812dca86d17abab099549267a41a8dfdf

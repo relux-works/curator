@@ -1,5 +1,5 @@
 ## Status
-reviewing
+done
 
 ## Review
 required
@@ -127,6 +127,48 @@ spawn agent resolution: Agent selection: codex via explicit_override (preferred_
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [reviewer] reviewer (codex) (run=RUN-260917-459585, max_parallel=20)
 spawn run started: [reviewer] reviewer (codex) (run=RUN-260917-459585)
+agent completed: [reviewer] reviewer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260917-459585, pid=59815, exit=0)
+spawn selection rationale tuple: {"role":"developer","pair":"gpt-6-astra/low","text":"bound integration run (story_final STORY-24nyb1); astra:low"}
+spawn selection rationale for gpt-6-astra/low: bound integration run (story_final STORY-24nyb1); astra:low
+spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [implementer] developer (codex) (run=RUN-260917-05447b, max_parallel=20)
+spawn run started: [implementer] developer (codex) (run=RUN-260917-05447b)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260917-05447b, pid=72370, exit=0)
+spawn selection rationale tuple: {"role":"developer","pair":"gpt-6-astra/low","text":"bound integration run (story_final STORY-24nyb1, revision 6); astra:low"}
+spawn selection rationale for gpt-6-astra/low: bound integration run (story_final STORY-24nyb1, revision 6); astra:low
+spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [implementer] developer (codex) (run=RUN-260917-37e196, max_parallel=20)
+spawn run started: [implementer] developer (codex) (run=RUN-260917-37e196)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260917-37e196, pid=74560, exit=0)
+spawn selection rationale tuple: {"role":"developer","pair":"gpt-6-astra/low","text":"bound integration retry after the control-root main moved during the previous attempt; astra:low"}
+spawn selection rationale for gpt-6-astra/low: bound integration retry after the control-root main moved during the previous attempt; astra:low
+spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [implementer] developer (codex) (run=RUN-260917-c4a30e, max_parallel=20)
+spawn run started: [implementer] developer (codex) (run=RUN-260917-c4a30e)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260917-c4a30e, pid=20879, exit=0)
+spawn selection rationale tuple: {"role":"developer","pair":"gpt-6-astra/low","text":"bound rollback + fresh integration after a foreign trunk advance; astra:low"}
+spawn selection rationale for gpt-6-astra/low: bound rollback + fresh integration after a foreign trunk advance; astra:low
+spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [implementer] developer (codex) (run=RUN-260917-2fe443, max_parallel=20)
+spawn run started: [implementer] developer (codex) (run=RUN-260917-2fe443)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260917-2fe443, pid=23128, exit=0)
+spawn selection rationale tuple: {"role":"developer","pair":"gpt-6-astra/low","text":"bound integration resume after restoring the expected trunk ref; astra:low"}
+spawn selection rationale for gpt-6-astra/low: bound integration resume after restoring the expected trunk ref; astra:low
+spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [implementer] developer (codex) (run=RUN-260917-f7a599, max_parallel=20)
+spawn run started: [implementer] developer (codex) (run=RUN-260917-f7a599)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260917-f7a599, pid=33386, exit=0)
 
 ## Precondition Resources
 - [TASK-260910-16k7xy_source-contract.md](file://TASK-260910-16k7xy/TASK-260910-16k7xy_source-contract.md) — Accepted specification, execution boundary and task-specific acceptance.
@@ -143,6 +185,12 @@ spawn run started: [reviewer] reviewer (codex) (run=RUN-260917-459585)
 - [16k7xy-rework-2.md](file://TASK-260910-16k7xy/16k7xy-rework-2.md)
 - [TASK-260910-16k7xy_rev5-candidate.patch](file://TASK-260910-16k7xy/TASK-260910-16k7xy_rev5-candidate.patch)
 - [16k7xy-rework-3.md](file://TASK-260910-16k7xy/16k7xy-rework-3.md)
+- [16k7xy-integrate-instruction.md](file://TASK-260910-16k7xy/16k7xy-integrate-instruction.md)
+- [16k7xy-integrate-instruction-2.md](file://TASK-260910-16k7xy/16k7xy-integrate-instruction-2.md)
+- [16k7xy-integrate-instruction-3.md](file://TASK-260910-16k7xy/16k7xy-integrate-instruction-3.md)
+- [16k7xy-integrate-instruction-4.md](file://TASK-260910-16k7xy/16k7xy-integrate-instruction-4.md)
+- [16k7xy-integrate-instruction-5.md](file://TASK-260910-16k7xy/16k7xy-integrate-instruction-5.md)
+- [16k7xy-integrate-instruction-6.md](file://TASK-260910-16k7xy/16k7xy-integrate-instruction-6.md)
 
 ## Outcome Resources
 - [TASK-260910-16k7xy_spawn-log_-implementer--developer--muse-_RUN-260916-c043f0.log](file://TASK-260910-16k7xy/TASK-260910-16k7xy_spawn-log_-implementer--developer--muse-_RUN-260916-c043f0.log) — System spawn log captured by task-board
@@ -179,12 +227,20 @@ spawn run started: [reviewer] reviewer (codex) (run=RUN-260917-459585)
 - [TASK-260910-16k7xy_change-request_rev6.patch](file://TASK-260910-16k7xy/TASK-260910-16k7xy_change-request_rev6.patch) — Change Request CR-TASK-260910-16k7xy-6 revision 6 candidate patch (repository_delta=present, 33 changed paths)
 - [TASK-260910-16k7xy_change-request_rev6-validation.log](file://TASK-260910-16k7xy/TASK-260910-16k7xy_change-request_rev6-validation.log) — Change Request CR-TASK-260910-16k7xy-6 revision 6 bounded validation log
 - [TASK-260910-16k7xy_spawn-log_-reviewer--reviewer--codex-_RUN-260917-459585.log](file://TASK-260910-16k7xy/TASK-260910-16k7xy_spawn-log_-reviewer--reviewer--codex-_RUN-260917-459585.log) — System spawn log captured by task-board
+- [TASK-260910-16k7xy_review-verdict-rev6.md](file://TASK-260910-16k7xy/TASK-260910-16k7xy_review-verdict-rev6.md) — Independent rev6 acceptance: exact-tree CI, local regressions, four narrowing mutants
+- [TASK-260910-16k7xy_spawn-log_-implementer--developer--codex-_RUN-260917-05447b.log](file://TASK-260910-16k7xy/TASK-260910-16k7xy_spawn-log_-implementer--developer--codex-_RUN-260917-05447b.log) — System spawn log captured by task-board
+- [TASK-260910-16k7xy_integration-results.md](file://TASK-260910-16k7xy/TASK-260910-16k7xy_integration-results.md) — Revision 6 integration attempt 5: exit 1, board_delta_moved; exact refusal log.
+- [TASK-260910-16k7xy_spawn-log_-implementer--developer--codex-_RUN-260917-37e196.log](file://TASK-260910-16k7xy/TASK-260910-16k7xy_spawn-log_-implementer--developer--codex-_RUN-260917-37e196.log) — System spawn log captured by task-board
+- [TASK-260910-16k7xy_spawn-log_-implementer--developer--codex-_RUN-260917-c4a30e.log](file://TASK-260910-16k7xy/TASK-260910-16k7xy_spawn-log_-implementer--developer--codex-_RUN-260917-c4a30e.log) — System spawn log captured by task-board
+- [TASK-260910-16k7xy_spawn-log_-implementer--developer--codex-_RUN-260917-2fe443.log](file://TASK-260910-16k7xy/TASK-260910-16k7xy_spawn-log_-implementer--developer--codex-_RUN-260917-2fe443.log) — System spawn log captured by task-board
+- [TASK-260910-16k7xy_integration-rollback.md](file://TASK-260910-16k7xy/TASK-260910-16k7xy_integration-rollback.md) — Rollback refusal: exit 1 (zsh pipefail); integration_indeterminate, observed trunk 0737347812dca86d17abab099549267a41a8dfdf differs from recorded expected trunk and candidate. Step 2 not run; stopped as instructed.
+- [TASK-260910-16k7xy_spawn-log_-implementer--developer--codex-_RUN-260917-f7a599.log](file://TASK-260910-16k7xy/TASK-260910-16k7xy_spawn-log_-implementer--developer--codex-_RUN-260917-f7a599.log) — System spawn log captured by task-board
 
 ## Created
 2026-09-10T13:56:08Z
 
 ## Last Update
-2026-09-17T01:43:03Z
+2026-09-17T02:56:50Z
 
 ## Assigned To
-[reviewer] reviewer (codex)
+[implementer] developer (codex)

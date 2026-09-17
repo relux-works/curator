@@ -1,0 +1,5 @@
+# Review brief — TASK-260916-27cv45 (repository transport revision 2: schema 2 and endpoint identity)
+
+Spec: curator-spec main protocol/repository-transport.md §§4–5 (revision 2 scope, schema versioning, identity, ports, mirrors, host aliases). Scope of this leaf: the machine source-policy schema 2 as an additive superset of schema 1 loaded by the production policy loader (from the landed STORY-260910-1bhj0g): port-bearing endpoint and pin URLs, mirror_of attestation, operator host-alias table; canonical host/path stays the only portable identity. Resolution behaviour (§6) and provenance/secrets (§7) are the sibling leaf hxr6qv — out of scope here.
+
+Verify with evidence: schema 1 policies load byte-identically (golden); schema 2 fields parse with the exact §5 constraints (ports 1–65535, alias table shape, mirror_of pointing at a declared canonical, aliases/mirrors never becoming identity); every §5 refusal row has a negative test at the loader's production entry; unknown schema versions refuse; mutants for the identity rules; docs; hosted gate green; frozen v1 and the executor untouched. Verdict ACCEPT / CHANGES_REQUESTED with file:line; accept_cr on ACCEPT.
