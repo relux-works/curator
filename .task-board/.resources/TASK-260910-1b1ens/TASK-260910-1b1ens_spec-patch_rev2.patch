@@ -1,0 +1,1086 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 5588b0d..6d75ebf 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -88,6 +88,39 @@ Versioning for the complete specification set.
+   run <env-id>` follows the same rule under the launcher SPEC
+   (curator-agent-launcher README). No schema, vector, or wire change; frozen
+   v1 bytes untouched.
++- R1/P1: records and log pages carry their committed snapshot boundary
++  (registry protocol §5/§9 with new §9.3, registry-service profile
++  §2/§5/§10/§11): every `/v1/records` GET and `/v1/log` success page
++  carries a REQUIRED `boundary` member holding the complete signed
++  snapshot (`registry-snapshot-v1`, all fields including `sig`) at which
++  the page was evaluated, and all pages of one cursor chain carry a
++  byte-identical boundary. The wire moves to the new
++  `records-response-v2` and `log-response-v2` envelopes (v1 fields plus
++  `boundary`, `additionalProperties: false`); the v1 schemas stay
++  byte-frozen and a client validating v1 treats `boundary` as ignorable.
++  Before a page contributes records, a conforming client verifies the
++  boundary signature (§2), applies the §5 rollback rules to it —
++  below-high-water and equal-version-different-body rejected as
++  `registry_page_boundary_stale`, a higher version advancing the
++  high-water exactly like an accepted snapshot — and requires every page
++  of the chain to carry the first page's boundary
++  (`registry_page_boundary_mismatch`). A page without a valid boundary
++  is reported as `registry_page_boundary_missing`, naming the registry
++  URL, and the registry contributes no record for that operation.
++  Rollout is direct, not warn-first (impact row "R1"): no
++  legacy-accept mode, no knob. Service side (P1): a cursor is bound to
++  its first page's boundary; serving it at a differing boundary refuses
++  `404 invalid_cursor`, and the service never re-evaluates a cursor at a
++  newer boundary. The boundary is the stated page inclusion evidence;
++  log replay stays optional as the independent re-derivation of a
++  boundary's claims. Read-only status reports, per trusted registry,
++  the persisted high-water (`version`, `log_size`) and whether the last
++  page boundary was verified. Conformance: `page_boundary_cases` in
++  `vectors/registry-client.json` (fresh advance, equal accept/reject,
++  stale, mismatch, missing, bad signature) and boundary emission plus
++  cursor-boundary-disagreement cases in
++  `vectors/registry-service.json`, with v2 schema cases. Specified for
++  `STORY-260910-25yc0h` with `STORY-260910-3rvvxh`.
+ 
+ ### Changed
+ 
+diff --git a/conformance/v1/manifest.json b/conformance/v1/manifest.json
+index beaf91e..0dc1066 100644
+--- a/conformance/v1/manifest.json
++++ b/conformance/v1/manifest.json
+@@ -2954,7 +2954,7 @@
+     },
+     {
+       "path": "schema-cases/index.json",
+-      "sha256": "sha256:f724f40b2e159c93d7570d2fa11648c2cdfd54540e3e41f797e382582bd45200"
++      "sha256": "sha256:4bb75470ca071183aeb140f1ab3f4dc7e7432846edd08c4803389ac05b4ca053"
+     },
+     {
+       "path": "schema-cases/install-marker-v1/invalid.json",
+@@ -3492,6 +3492,14 @@
+       "path": "schema-cases/log-response-v1/valid.json",
+       "sha256": "sha256:52b0224bfd696c95d62932517a1004f332bed7e9fec6b12917b44d5a23134494"
+     },
++    {
++      "path": "schema-cases/log-response-v2/invalid.json",
++      "sha256": "sha256:52b0224bfd696c95d62932517a1004f332bed7e9fec6b12917b44d5a23134494"
++    },
++    {
++      "path": "schema-cases/log-response-v2/valid.json",
++      "sha256": "sha256:0df6780dfc5c7d6c6c89af8d5711bd3c3577b31d278286a15326813665c9d495"
++    },
+     {
+       "path": "schema-cases/manager-config-v1/invalid.json",
+       "sha256": "sha256:a4490b4aeefe0600f599d34b64ec6ed5b6824d7847482a8cae2001a7633a0363"
+@@ -3840,6 +3848,14 @@
+       "path": "schema-cases/records-response-v1/valid.json",
+       "sha256": "sha256:58787eeebe9b9381e220ab56bade8dfc6ef8d996c3edb79085dbe897b4385cb3"
+     },
++    {
++      "path": "schema-cases/records-response-v2/invalid.json",
++      "sha256": "sha256:58787eeebe9b9381e220ab56bade8dfc6ef8d996c3edb79085dbe897b4385cb3"
++    },
++    {
++      "path": "schema-cases/records-response-v2/valid.json",
++      "sha256": "sha256:e1b86a37ab960b8cf5a3d64d5fe3f4db48cc0b44c4727ad5c1db56a6bf7b1b43"
++    },
+     {
+       "path": "schema-cases/registry-bundle-v1/invalid.json",
+       "sha256": "sha256:35a2b49eb94b48d6c779d293cd7913630a21adcd9f315ec120453e0c77845f1b"
+@@ -4234,7 +4250,7 @@
+     },
+     {
+       "path": "vectors/registry-client.json",
+-      "sha256": "sha256:2e5cdce709f9f5178cef9d734b672b68a758118cbd7f45b36e8db5569dae2117"
++      "sha256": "sha256:bdfe024fb86718d86b1ef966dc0d8c68560c8c25238de11dae6ded7a41347150"
+     },
+     {
+       "path": "vectors/registry-resolution.json",
+@@ -4242,7 +4258,7 @@
+     },
+     {
+       "path": "vectors/registry-service.json",
+-      "sha256": "sha256:7e8cb23ccb18e786ea06c20e617553d17d4e6b0a1001142fcc89360fb69ca2f5"
++      "sha256": "sha256:1173e63ca73513ba8303834c51483c4fd634f619b0a42aa47f500807f848f0aa"
+     },
+     {
+       "path": "vectors/script-host-execution-policy.json",
+diff --git a/conformance/v1/schema-cases/index.json b/conformance/v1/schema-cases/index.json
+index 9285bc7..02eef51 100644
+--- a/conformance/v1/schema-cases/index.json
++++ b/conformance/v1/schema-cases/index.json
+@@ -3799,6 +3799,16 @@
+     "schema": "log-response-v1.schema.json",
+     "valid": false
+   },
++  {
++    "instance": "log-response-v2/valid.json",
++    "schema": "log-response-v2.schema.json",
++    "valid": true
++  },
++  {
++    "instance": "log-response-v2/invalid.json",
++    "schema": "log-response-v2.schema.json",
++    "valid": false
++  },
+   {
+     "instance": "manager-config-v1/valid.json",
+     "schema": "manager-config-v1.schema.json",
+@@ -4234,6 +4244,16 @@
+     "schema": "records-response-v1.schema.json",
+     "valid": false
+   },
++  {
++    "instance": "records-response-v2/valid.json",
++    "schema": "records-response-v2.schema.json",
++    "valid": true
++  },
++  {
++    "instance": "records-response-v2/invalid.json",
++    "schema": "records-response-v2.schema.json",
++    "valid": false
++  },
+   {
+     "instance": "registry-bundle-v1/valid.json",
+     "schema": "registry-bundle-v1.schema.json",
+diff --git a/conformance/v1/schema-cases/log-response-v2/invalid.json b/conformance/v1/schema-cases/log-response-v2/invalid.json
+new file mode 100644
+index 0000000..845406d
+--- /dev/null
++++ b/conformance/v1/schema-cases/log-response-v2/invalid.json
+@@ -0,0 +1,28 @@
++{
++  "entries": [
++    {
++      "entry_hash": "41f4782f79143df2d21d0776863852b736385543642549b38082c8c706f31b6a",
++      "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
++      "record": {
++        "audit": {
++          "auditor": "golden",
++          "note": "заметка",
++          "sequence": 1
++        },
++        "commit": "0123456789abcdef0123456789abcdef01234567",
++        "content_sha256": "sha256:f2c21f31f69bb5c9366028ac6e63a701c66803586c8ce12eac1186dcd350e5eb",
++        "name": "golden-skill",
++        "schema_version": 1,
++        "sig": {
++          "algorithm": "ed25519",
++          "key_id": "56475aa75463474c",
++          "signature": "wDdWjdUbQZhVoDIaGTxkZaeyM5AP5+k06Im2FJISLfsk91+cFyNAjdtCTgIrCaD9uJBrClP0xrUrr9HQG4kEAQ=="
++        },
++        "source_identity": "git.example.com/skills/golden-skill",
++        "status": "audited"
++      },
++      "seq": 1
++    }
++  ],
++  "next_cursor": null
++}
+diff --git a/conformance/v1/schema-cases/log-response-v2/valid.json b/conformance/v1/schema-cases/log-response-v2/valid.json
+new file mode 100644
+index 0000000..cb27737
+--- /dev/null
++++ b/conformance/v1/schema-cases/log-response-v2/valid.json
+@@ -0,0 +1,41 @@
++{
++  "boundary": {
++    "created_at": "2026-07-13T00:00:00Z",
++    "head": "98094f893ea294d02e994f7e5621b2b23b9ff416a7d3501cf28c674c85be7e75",
++    "log_size": 2,
++    "merkle_root": "f8750d79fbac61d4f8ff1accc5ead79cfa0167232f4f62908f3b51234eb68441",
++    "schema_version": 1,
++    "sig": {
++      "algorithm": "ed25519",
++      "key_id": "56475aa75463474c",
++      "signature": "CA/uK4YQsDe7IyZkPSqPuYJyUuR7mcQvb7jkFLOLUdzvc6A7iAmmKsUcbi4xrRBBIMya2tSqM53HbnDuG0L+Cg=="
++    },
++    "version": 2
++  },
++  "entries": [
++    {
++      "entry_hash": "41f4782f79143df2d21d0776863852b736385543642549b38082c8c706f31b6a",
++      "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
++      "record": {
++        "audit": {
++          "auditor": "golden",
++          "note": "заметка",
++          "sequence": 1
++        },
++        "commit": "0123456789abcdef0123456789abcdef01234567",
++        "content_sha256": "sha256:f2c21f31f69bb5c9366028ac6e63a701c66803586c8ce12eac1186dcd350e5eb",
++        "name": "golden-skill",
++        "schema_version": 1,
++        "sig": {
++          "algorithm": "ed25519",
++          "key_id": "56475aa75463474c",
++          "signature": "wDdWjdUbQZhVoDIaGTxkZaeyM5AP5+k06Im2FJISLfsk91+cFyNAjdtCTgIrCaD9uJBrClP0xrUrr9HQG4kEAQ=="
++        },
++        "source_identity": "git.example.com/skills/golden-skill",
++        "status": "audited"
++      },
++      "seq": 1
++    }
++  ],
++  "next_cursor": null
++}
+diff --git a/conformance/v1/schema-cases/records-response-v2/invalid.json b/conformance/v1/schema-cases/records-response-v2/invalid.json
+new file mode 100644
+index 0000000..87a1238
+--- /dev/null
++++ b/conformance/v1/schema-cases/records-response-v2/invalid.json
+@@ -0,0 +1,23 @@
++{
++  "next_cursor": null,
++  "records": [
++    {
++      "audit": {
++        "auditor": "golden",
++        "note": "заметка",
++        "sequence": 1
++      },
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "content_sha256": "sha256:f2c21f31f69bb5c9366028ac6e63a701c66803586c8ce12eac1186dcd350e5eb",
++      "name": "golden-skill",
++      "schema_version": 1,
++      "sig": {
++        "algorithm": "ed25519",
++        "key_id": "56475aa75463474c",
++        "signature": "wDdWjdUbQZhVoDIaGTxkZaeyM5AP5+k06Im2FJISLfsk91+cFyNAjdtCTgIrCaD9uJBrClP0xrUrr9HQG4kEAQ=="
++      },
++      "source_identity": "git.example.com/skills/golden-skill",
++      "status": "audited"
++    }
++  ]
++}
+diff --git a/conformance/v1/schema-cases/records-response-v2/valid.json b/conformance/v1/schema-cases/records-response-v2/valid.json
+new file mode 100644
+index 0000000..c92ecbb
+--- /dev/null
++++ b/conformance/v1/schema-cases/records-response-v2/valid.json
+@@ -0,0 +1,36 @@
++{
++  "boundary": {
++    "created_at": "2026-07-13T00:00:00Z",
++    "head": "98094f893ea294d02e994f7e5621b2b23b9ff416a7d3501cf28c674c85be7e75",
++    "log_size": 2,
++    "merkle_root": "f8750d79fbac61d4f8ff1accc5ead79cfa0167232f4f62908f3b51234eb68441",
++    "schema_version": 1,
++    "sig": {
++      "algorithm": "ed25519",
++      "key_id": "56475aa75463474c",
++      "signature": "CA/uK4YQsDe7IyZkPSqPuYJyUuR7mcQvb7jkFLOLUdzvc6A7iAmmKsUcbi4xrRBBIMya2tSqM53HbnDuG0L+Cg=="
++    },
++    "version": 2
++  },
++  "next_cursor": null,
++  "records": [
++    {
++      "audit": {
++        "auditor": "golden",
++        "note": "заметка",
++        "sequence": 1
++      },
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "content_sha256": "sha256:f2c21f31f69bb5c9366028ac6e63a701c66803586c8ce12eac1186dcd350e5eb",
++      "name": "golden-skill",
++      "schema_version": 1,
++      "sig": {
++        "algorithm": "ed25519",
++        "key_id": "56475aa75463474c",
++        "signature": "wDdWjdUbQZhVoDIaGTxkZaeyM5AP5+k06Im2FJISLfsk91+cFyNAjdtCTgIrCaD9uJBrClP0xrUrr9HQG4kEAQ=="
++      },
++      "source_identity": "git.example.com/skills/golden-skill",
++      "status": "audited"
++    }
++  ]
++}
+diff --git a/conformance/v1/vectors/registry-client.json b/conformance/v1/vectors/registry-client.json
+index b11367e..eed11cf 100644
+--- a/conformance/v1/vectors/registry-client.json
++++ b/conformance/v1/vectors/registry-client.json
+@@ -1,5 +1,124 @@
+ {
+   "key_rotation_resets_state": false,
++  "page_boundary_cases": [
++    {
++      "accepted": true,
++      "boundary_present": true,
++      "boundary_version": 8,
++      "chain_boundary_equal": true,
++      "diagnostic": null,
++      "high_water_advanced": true,
++      "name": "fresh-boundary-advances-high-water",
++      "registry_excluded": false,
++      "same_body": false,
++      "signature_valid": true,
++      "stored_version": 7
++    },
++    {
++      "accepted": true,
++      "boundary_present": true,
++      "boundary_version": 8,
++      "chain_boundary_equal": true,
++      "diagnostic": null,
++      "high_water_advanced": false,
++      "name": "equal-version-same-body-accepted",
++      "registry_excluded": false,
++      "same_body": true,
++      "signature_valid": true,
++      "stored_version": 8
++    },
++    {
++      "accepted": false,
++      "boundary_present": true,
++      "boundary_version": 8,
++      "chain_boundary_equal": true,
++      "diagnostic": "registry_page_boundary_stale",
++      "high_water_advanced": false,
++      "name": "equal-version-different-body-rejected",
++      "registry_excluded": true,
++      "same_body": false,
++      "signature_valid": true,
++      "stored_version": 8
++    },
++    {
++      "accepted": false,
++      "boundary_present": true,
++      "boundary_version": 7,
++      "chain_boundary_equal": true,
++      "diagnostic": "registry_page_boundary_stale",
++      "high_water_advanced": false,
++      "name": "below-high-water-rejected",
++      "registry_excluded": true,
++      "same_body": false,
++      "signature_valid": true,
++      "stored_version": 8
++    },
++    {
++      "accepted": false,
++      "boundary_present": true,
++      "boundary_version": 8,
++      "chain_boundary_equal": false,
++      "diagnostic": "registry_page_boundary_mismatch",
++      "high_water_advanced": false,
++      "name": "chain-boundary-mismatch-rejected",
++      "registry_excluded": true,
++      "same_body": false,
++      "signature_valid": true,
++      "stored_version": 7
++    },
++    {
++      "accepted": false,
++      "boundary_present": false,
++      "boundary_version": 0,
++      "chain_boundary_equal": false,
++      "diagnostic": "registry_page_boundary_missing",
++      "high_water_advanced": false,
++      "name": "missing-boundary-excluded",
++      "registry_excluded": true,
++      "same_body": false,
++      "signature_valid": false,
++      "stored_version": 7
++    },
++    {
++      "accepted": false,
++      "boundary_present": true,
++      "boundary_version": 8,
++      "chain_boundary_equal": true,
++      "diagnostic": "registry_page_boundary_missing",
++      "high_water_advanced": false,
++      "name": "bad-signature-rejected",
++      "registry_excluded": true,
++      "same_body": false,
++      "signature_valid": false,
++      "stored_version": 7
++    },
++    {
++      "accepted": false,
++      "boundary_present": true,
++      "boundary_version": 7,
++      "chain_boundary_equal": false,
++      "diagnostic": "registry_page_boundary_mismatch",
++      "high_water_advanced": false,
++      "name": "stale-and-mismatch-reports-mismatch",
++      "registry_excluded": true,
++      "same_body": false,
++      "signature_valid": true,
++      "stored_version": 8
++    },
++    {
++      "accepted": false,
++      "boundary_present": true,
++      "boundary_version": 9,
++      "chain_boundary_equal": false,
++      "diagnostic": "registry_page_boundary_mismatch",
++      "high_water_advanced": false,
++      "name": "higher-and-mismatch-never-advances",
++      "registry_excluded": true,
++      "same_body": false,
++      "signature_valid": true,
++      "stored_version": 7
++    }
++  ],
+   "pagination_rejections": [
+     {
+       "error": "pagination_cycle",
+diff --git a/conformance/v1/vectors/registry-service.json b/conformance/v1/vectors/registry-service.json
+index 62c1cde..8976acc 100644
+--- a/conformance/v1/vectors/registry-service.json
++++ b/conformance/v1/vectors/registry-service.json
+@@ -97,7 +97,17 @@
+         "status": "audited"
+       }
+     },
++    "boundary_emitted_on_every_page": true,
+     "boundary_log_size": 4,
++    "chain_boundary_byte_identical": true,
++    "cursor_boundary_cases": [
++      {
++        "error": "invalid_cursor",
++        "name": "cursor-boundary-disagreement",
++        "reevaluate_at_newer_boundary": false,
++        "status": 404
++      }
++    ],
+     "cursor_rejections": [
+       "changed_query",
+       "changed_limit",
+diff --git a/profiles/registry-service.md b/profiles/registry-service.md
+index f9674cd..b993276 100644
+--- a/profiles/registry-service.md
++++ b/profiles/registry-service.md
+@@ -38,6 +38,12 @@ snapshot boundary. That boundary is the exact tuple `version`, `log_size`,
+ `head`, `merkle_root`, and `created_at`. Every page reached from its cursor MUST
+ be evaluated against that same boundary even when later appends commit.
+ 
++Every page of either endpoint carries that boundary on the wire in the
++REQUIRED `boundary` member of the v2 response envelope: the complete signed
++snapshot object (`registry-snapshot-v1.schema.json`, all fields including
++`sig`) for the captured boundary. All pages of one cursor chain carry a
++byte-identical `boundary`.
++
+ For records, current-record selection ignores entries with `seq` greater than
+ the boundary `log_size`. For the log, entries satisfy `since < seq <= log_size`
+ and remain in ascending sequence order. An append after page one MUST NOT add,
+@@ -54,7 +60,11 @@ A cursor is opaque to clients and MUST be integrity protected. It is bound to:
+ 
+ Changing a filter, `since`, or `limit`; using a cursor on another endpoint;
+ presenting a malformed or expired cursor; or presenting a cursor whose snapshot
+-prefix is no longer available returns `404 invalid_cursor`. Cursor state MUST
++prefix is no longer available returns `404 invalid_cursor`. A cursor is bound
++to the boundary of its first page: presenting a cursor for a page that would
++be served at a boundary differing from the cursor's returns
++`404 invalid_cursor` (cursor-boundary disagreement), and the service MUST NOT
++re-evaluate a cursor at a newer boundary. Cursor state MUST
+ be bounded and MUST NOT contain credentials or unsigned client-controlled SQL,
+ paths, or object names. A cursor remains valid for at least the freshness
+ lifetime advertised on the first page and never longer than the service's
+@@ -115,7 +125,8 @@ A registry-service profile snapshot has `version == log_size`. The snapshot
+ body for a committed boundary is immutable: repeated reads of that boundary
+ retain its original `created_at`, head, size, and Merkle root. Key rotation MAY
+ replace only the outer signature. A newly generated timestamp MUST NOT make an
+-old boundary appear fresh.
++old boundary appear fresh. The `boundary` member emitted on records and log
++pages is the immutable snapshot body of the captured boundary.
+ 
+ Before acknowledging a write, the service MUST use storage durability settings
+ that survive the failure model documented by the operator. At minimum, process
+@@ -213,16 +224,20 @@ rollback state in protected durable storage outside response caches. A
+ registry signing key can authorize false records, and a
+ registry can refuse service. The protocol detects rollback and inconsistent
+ equal-version snapshots but does not create availability or consensus between
+-registries. Protocol 1.0 verifies transparency by replaying the append-only log
+-or an authenticated bundle; it does not define compact inclusion or consistency
+-proofs. Deployments that require public gossip or multi-party consensus add
+-those mechanisms without treating them as protocol 1.0 conformance evidence.
++registries. Protocol 1.0 states page inclusion evidence as the signed snapshot
++boundary carried on every records and log page; replaying the append-only log
++or an authenticated bundle stays optional and is how a client independently
++re-derives the head, size, and Merkle root a boundary claims. Protocol 1.0
++does not define compact inclusion or consistency proofs. Deployments that
++require public gossip or multi-party consensus add those mechanisms without
++treating them as protocol 1.0 conformance evidence.
+ 
+ ## 11. Conformance
+ 
+ A registry-service claim passes the shared schema and cryptographic vectors
+ plus executable cases for conjunctive lookup, artifact identity, snapshot-bound
+-pagination, scoped idempotency, concurrent append ordering, transaction
++pagination, page-boundary emission and cursor-boundary refusal, scoped
++idempotency, concurrent append ordering, transaction
+ rollback, crash recovery, immutable snapshots, bundle atomicity, backup restore
+ and rollback refusal, key rotation, and resource limits. Skipping a case is a
+ failure. Implementation-owned tests may add coverage but cannot replace the
+diff --git a/protocol/registry.md b/protocol/registry.md
+index 0b73fac..0da7f58 100644
+--- a/protocol/registry.md
++++ b/protocol/registry.md
+@@ -161,6 +161,18 @@ the client MUST NOT treat either condition as first use. Equal versions are
+ accepted only when `head`, `merkle_root`, and `log_size` equal the previously
+ accepted state.
+ 
++Page boundaries advance and check the same rollback state. The `boundary`
++carried by every records and log page (section 9.3) is a signed snapshot, and
++a conforming client applies this section's rules to the chain boundary — the
++first page's boundary — exactly as to a snapshot fetched from `/v1/snapshot`:
++a chain boundary below the persisted high-water, or equal to it with a
++different `head`, `merkle_root`, or `log_size`, is rejected, and a higher
++chain boundary advances the high-water with the same atomic persistence.
++Later pages are compared to the chain boundary before anything else and never
++advance or re-check the high-water on their own (section 9.3). A page MUST NOT
++contribute records or entries before its boundary is accepted under these
++rules.
++
+ Operators include rollback state in protected machine backup and restore it
+ without lowering a recorded version. When an operator knows established state
+ was lost and it cannot be recovered, trust in that registry remains disabled
+@@ -237,15 +249,16 @@ Production registries MUST use HTTPS. Plain HTTP is permitted only for an
+ explicitly configured loopback address. Requests use `Accept:
+ application/json`; JSON responses use `Content-Type: application/json` and
+ UTF-8. Unknown fields in response envelopes are ignored unless their schema
+-says otherwise.
++says otherwise. In particular, a client validating the frozen v1 records or
++log envelope treats the v2 `boundary` member as ignorable under this rule.
+ 
+ | Endpoint | Method | Success response |
+ |---|---|---|
+ | `/health` | GET | `health-response-v1.schema.json` |
+ | `/v1/meta` | GET | `registry-meta-response-v1.schema.json` |
+-| `/v1/records` | GET | `records-response-v1.schema.json` |
++| `/v1/records` | GET | `records-response-v2.schema.json` |
+ | `/v1/snapshot` | GET | registry snapshot schema |
+-| `/v1/log` | GET | `log-response-v1.schema.json` |
++| `/v1/log` | GET | `log-response-v2.schema.json` |
+ | `/v1/records` | POST | `submission-response-v1.schema.json` |
+ 
+ `/v1/records` GET accepts URL-encoded `source_identity`, `commit`, and
+@@ -264,9 +277,11 @@ federation, without discarding other records from the page.
+ `/v1/log` accepts non-negative `since`, the same `limit`, and cursor. Entries
+ are ascending by sequence. A cursor is bound to its original query and expires
+ no sooner than the advertised cache TTL. The first page of either endpoint
+-captures one signed snapshot boundary; all cursor pages are evaluated at that
+-same boundary according to the registry-service profile. Unknown, repeated,
+-unpaired, or present-but-empty query parameters return `400 invalid_query`.
++captures one committed signed snapshot boundary; all cursor pages are evaluated
++at that same boundary according to the registry-service profile, and every
++page carries that boundary on the wire as section 9.3 requires. Unknown,
++repeated, unpaired, or present-but-empty query parameters return
++`400 invalid_query`.
+ 
+ POST requires `Authorization: Bearer <token>`. Tokens carry at least 128 bits
+ of entropy; services store only SHA-256 digests and compare in constant time.
+@@ -331,6 +346,70 @@ valid and within the remaining deadline. Other 4xx responses are not retried.
+ All retry loops have a documented finite attempt bound and use backoff; they
+ MUST NOT retry indefinitely.
+ 
++### 9.3 Page boundary
++
++Every successful `/v1/records` GET and `/v1/log` response carries a REQUIRED
++`boundary` member whose value is the registry snapshot
++(`registry-snapshot-v1.schema.json`, all fields including `sig`) at which the
++page was evaluated. All pages of one cursor chain carry a byte-identical
++`boundary`: the service evaluates every cursor page at the captured boundary
++and never re-evaluates a cursor at a newer one (registry-service profile
++section 2).
++
++Before a page contributes records or entries, a conforming client processes
++its boundary in this order. The first page's boundary is the chain boundary;
++later pages carry no new information and are compared to it before anything
++else:
++
++1. presence and section 2 signature verification: a page carrying no
++   `boundary`, or whose boundary fails section 2 verification, is rejected
++   with `registry_page_boundary_missing` with no state change;
++2. for every page after the first: the boundary MUST be byte-identical to the
++   chain boundary, else the page is rejected with
++   `registry_page_boundary_mismatch` with no state change. A later page never
++   advances or re-checks the high-water on its own: equality with the chain
++   boundary already implies the section 5 check below;
++3. for the first page: the section 5 rollback rules against the persisted
++   high-water for that registry URL. A boundary whose `version` is below the
++   persisted high-water, or equal to it with a different `head`,
++   `merkle_root`, or `log_size`, is rejected with
++   `registry_page_boundary_stale` with no state change; an equal version with
++   the same body is accepted with nothing persisted; a higher version is
++   persisted atomically as the new high-water (section 5 discipline) BEFORE
++   the page contributes anything, then accepted.
++
++Only a first page that passes steps 1 and 3 changes rollback state; a page
++rejected at any step leaves it untouched. Diagnostic precedence for a later
++page is therefore `registry_page_boundary_missing` over
++`registry_page_boundary_mismatch`, and `registry_page_boundary_stale` is
++reported only for a first page.
++
++A rejected page contributes nothing: the registry is excluded from the
++resolution for that operation exactly like a reachable registry with an
++invalid snapshot (section 5), and the registry contributes no record for that
++operation under the section 4 wording. The client reports one of exactly
++these diagnostics, naming the registry URL:
++
++| Condition | Diagnostic |
++|---|---|
++| boundary `version` below the persisted high-water, or equal with different `head`, `merkle_root`, or `log_size` | `registry_page_boundary_stale` |
++| page boundary differs from the first page's boundary | `registry_page_boundary_mismatch` |
++| page carries no valid `boundary` (absent, or failing section 2 verification) | `registry_page_boundary_missing` |
++
++No other page-boundary diagnostic exists. There is no legacy-accept mode and
++no configuration knob: a missing boundary is reported, never silently
++accepted.
++
++The `boundary` is the stated inclusion evidence for the page: the items on
++the page were evaluated at the committed snapshot it carries. Replaying the
++append-only log stays optional, and now has a stated purpose: it is how a
++client independently re-derives the `head`, `log_size`, and `merkle_root` a
++boundary claims before trusting them (registry-service profile section 10).
++
++A conforming manager's read-only status reports, per trusted registry URL,
++the persisted high-water (`version`, `log_size`) and whether the last page
++boundary received from that registry was verified.
++
+ ## 10. Publication
+ 
+ An auditor signs a schema-valid record and submits it. Registry countersigning
+diff --git a/release/1.0.0-rc.9.json b/release/1.0.0-rc.9.json
+index 5b05c2c..5df186c 100644
+--- a/release/1.0.0-rc.9.json
++++ b/release/1.0.0-rc.9.json
+@@ -12,7 +12,7 @@
+     "verified_provider_contract": "host-execution-provider-v1"
+   },
+   "candidate_protocol_pin": {
+-    "manifest_sha256": "sha256:fcdc8ecac2348375b3bc5462d3f4bec5d56e75d7f8590c61b3f653f4c8a074b2",
++    "manifest_sha256": "sha256:ea9dd5a0030b889079cf5655517056e66a0f1d61812f8c2920b4beddc1fd24ed",
+     "suite_root": "conformance/v1"
+   },
+   "claim_v5": {
+@@ -24,7 +24,7 @@
+   "downstream_consumption": {
+     "committed_release_pin_advanced": false,
+     "environment": "CURATOR_CONFORMANCE_ROOT",
+-    "required_manifest_sha256": "sha256:fcdc8ecac2348375b3bc5462d3f4bec5d56e75d7f8590c61b3f653f4c8a074b2"
++    "required_manifest_sha256": "sha256:ea9dd5a0030b889079cf5655517056e66a0f1d61812f8c2920b4beddc1fd24ed"
+   },
+   "historical_release": {
+     "immutable": true,
+diff --git a/schemas/v1/README.md b/schemas/v1/README.md
+index 514b301..0761941 100644
+--- a/schemas/v1/README.md
++++ b/schemas/v1/README.md
+@@ -17,6 +17,14 @@ conformance claim v5. Rc.8 carries `assurance-policy-v1`,
+ conformance claim v4. These are new closed objects; no prior schema is widened
+ or reinterpreted.
+ 
++The R1/P1 page-boundary revision carries `records-response-v2` and
++`log-response-v2`: each v1 envelope plus one REQUIRED `boundary` member whose
++value is a `registry-snapshot-v1` object, `additionalProperties: false`
++unchanged. The v1 envelope schemas are byte-frozen and stay valid; a client
++validating the v1 envelope treats the added `boundary` as ignorable under the
++registry protocol section 9 unknown-fields rule. No other member is added,
++widened, or reinterpreted.
++
+ The agent-environments capability of `protocol/environments.md` (revision 1,
+ the Decision 0012 model) carries five closed objects: `agent-context-v1` for
+ the package manifest `agent-context.json` (section 2, with the section 1.4
+diff --git a/schemas/v1/log-response-v2.schema.json b/schemas/v1/log-response-v2.schema.json
+new file mode 100644
+index 0000000..65d5fea
+--- /dev/null
++++ b/schemas/v1/log-response-v2.schema.json
+@@ -0,0 +1,13 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://relux-works.github.io/curator-spec/schemas/v1/log-response-v2.schema.json",
++  "title": "Registry log response with page boundary",
++  "type": "object",
++  "required": ["entries", "next_cursor", "boundary"],
++  "properties": {
++    "entries": {"type": "array", "items": {"$ref": "registry-log-entry-v1.schema.json"}, "maxItems": 1000},
++    "next_cursor": {"type": ["string", "null"], "minLength": 1, "maxLength": 4096},
++    "boundary": {"$ref": "registry-snapshot-v1.schema.json"}
++  },
++  "additionalProperties": false
++}
+diff --git a/schemas/v1/records-response-v2.schema.json b/schemas/v1/records-response-v2.schema.json
+new file mode 100644
+index 0000000..310e35a
+--- /dev/null
++++ b/schemas/v1/records-response-v2.schema.json
+@@ -0,0 +1,13 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://relux-works.github.io/curator-spec/schemas/v1/records-response-v2.schema.json",
++  "title": "Registry records response with page boundary",
++  "type": "object",
++  "required": ["records", "next_cursor", "boundary"],
++  "properties": {
++    "records": {"type": "array", "items": {"type": "object"}, "maxItems": 1000},
++    "next_cursor": {"type": ["string", "null"], "minLength": 1, "maxLength": 4096},
++    "boundary": {"$ref": "registry-snapshot-v1.schema.json"}
++  },
++  "additionalProperties": false
++}
+diff --git a/tools/generate-vectors/main.go b/tools/generate-vectors/main.go
+index 3a6ce70..f7507fa 100644
+--- a/tools/generate-vectors/main.go
++++ b/tools/generate-vectors/main.go
+@@ -550,14 +550,19 @@ func writeRegistryServiceVectors(dir string) {
+ 			map[string]any{"name": "commit-without-source", "query": map[string]any{"commit": commitA}, "error": "invalid_query"},
+ 		},
+ 		"pagination": map[string]any{
+-			"query":                        map[string]any{"content_sha256": hashA, "limit": 1},
+-			"boundary_log_size":            4,
+-			"expected_pages":               []any{[]any{"alpha-revoked"}, []any{"beta-mirror"}},
+-			"append_after_first_page":      record("alpha-recovered", "alpha", sourceA, commitA, hashA, "audited"),
+-			"expected_original_cursor_ids": []any{"beta-mirror"},
+-			"expected_new_query_ids":       []any{"alpha-recovered", "beta-mirror"},
+-			"cursor_rejections":            []any{"changed_query", "changed_limit", "wrong_endpoint", "expired", "unavailable_snapshot"},
+-			"invalid_cursor_status":        404,
++			"query":                          map[string]any{"content_sha256": hashA, "limit": 1},
++			"boundary_log_size":              4,
++			"expected_pages":                 []any{[]any{"alpha-revoked"}, []any{"beta-mirror"}},
++			"append_after_first_page":        record("alpha-recovered", "alpha", sourceA, commitA, hashA, "audited"),
++			"expected_original_cursor_ids":   []any{"beta-mirror"},
++			"expected_new_query_ids":         []any{"alpha-recovered", "beta-mirror"},
++			"cursor_rejections":              []any{"changed_query", "changed_limit", "wrong_endpoint", "expired", "unavailable_snapshot"},
++			"invalid_cursor_status":          404,
++			"boundary_emitted_on_every_page": true,
++			"chain_boundary_byte_identical":  true,
++			"cursor_boundary_cases": []any{
++				map[string]any{"name": "cursor-boundary-disagreement", "status": 404, "error": "invalid_cursor", "reevaluate_at_newer_boundary": false},
++			},
+ 		},
+ 		"idempotency_cases": []any{
+ 			map[string]any{
+@@ -659,6 +664,24 @@ func writeRegistryClientVectors(dir string) {
+ 			map[string]any{"name": "corrupted-existing-state", "state": "malformed", "accepted": false},
+ 			map[string]any{"name": "unavailable-state-directory", "state": "unavailable", "accepted": false},
+ 		},
++		// page_boundary_cases follows registry protocol section 9.3. On a
++		// present, signature-valid boundary, chain_boundary_equal false only
++		// arises on a later page differing from the chain boundary (the first
++		// page's boundary); such a page reports mismatch with no high-water
++		// change even when its versions would otherwise be stale or higher.
++		// The missing-boundary case carries chain_boundary_equal false only
++		// as a placeholder because the missing check precedes the chain check.
++		"page_boundary_cases": []any{
++			map[string]any{"name": "fresh-boundary-advances-high-water", "stored_version": 7, "boundary_version": 8, "same_body": false, "signature_valid": true, "boundary_present": true, "chain_boundary_equal": true, "accepted": true, "diagnostic": nil, "high_water_advanced": true, "registry_excluded": false},
++			map[string]any{"name": "equal-version-same-body-accepted", "stored_version": 8, "boundary_version": 8, "same_body": true, "signature_valid": true, "boundary_present": true, "chain_boundary_equal": true, "accepted": true, "diagnostic": nil, "high_water_advanced": false, "registry_excluded": false},
++			map[string]any{"name": "equal-version-different-body-rejected", "stored_version": 8, "boundary_version": 8, "same_body": false, "signature_valid": true, "boundary_present": true, "chain_boundary_equal": true, "accepted": false, "diagnostic": "registry_page_boundary_stale", "high_water_advanced": false, "registry_excluded": true},
++			map[string]any{"name": "below-high-water-rejected", "stored_version": 8, "boundary_version": 7, "same_body": false, "signature_valid": true, "boundary_present": true, "chain_boundary_equal": true, "accepted": false, "diagnostic": "registry_page_boundary_stale", "high_water_advanced": false, "registry_excluded": true},
++			map[string]any{"name": "chain-boundary-mismatch-rejected", "stored_version": 7, "boundary_version": 8, "same_body": false, "signature_valid": true, "boundary_present": true, "chain_boundary_equal": false, "accepted": false, "diagnostic": "registry_page_boundary_mismatch", "high_water_advanced": false, "registry_excluded": true},
++			map[string]any{"name": "missing-boundary-excluded", "stored_version": 7, "boundary_version": 0, "same_body": false, "signature_valid": false, "boundary_present": false, "chain_boundary_equal": false, "accepted": false, "diagnostic": "registry_page_boundary_missing", "high_water_advanced": false, "registry_excluded": true},
++			map[string]any{"name": "bad-signature-rejected", "stored_version": 7, "boundary_version": 8, "same_body": false, "signature_valid": false, "boundary_present": true, "chain_boundary_equal": true, "accepted": false, "diagnostic": "registry_page_boundary_missing", "high_water_advanced": false, "registry_excluded": true},
++			map[string]any{"name": "stale-and-mismatch-reports-mismatch", "stored_version": 8, "boundary_version": 7, "same_body": false, "signature_valid": true, "boundary_present": true, "chain_boundary_equal": false, "accepted": false, "diagnostic": "registry_page_boundary_mismatch", "high_water_advanced": false, "registry_excluded": true},
++			map[string]any{"name": "higher-and-mismatch-never-advances", "stored_version": 7, "boundary_version": 9, "same_body": false, "signature_valid": true, "boundary_present": true, "chain_boundary_equal": false, "accepted": false, "diagnostic": "registry_page_boundary_mismatch", "high_water_advanced": false, "registry_excluded": true},
++		},
+ 	})
+ }
+ 
+@@ -2424,8 +2447,12 @@ func writeSchemaCases(suite string, marker, ledger, audited, snapshot, logEntry,
+ 		map[string]any{"name": "golden", "version": "1.0.0", "public_keys": []any{pinned}, "record_schema_versions": []any{1}, "policy": "test"},
+ 		map[string]any{"name": "golden"},
+ 	}
+-	cases["records-response-v1.schema.json"] = schemaCase{map[string]any{"records": []any{audited}, "next_cursor": nil}, map[string]any{"records": []any{}}}
+-	cases["log-response-v1.schema.json"] = schemaCase{map[string]any{"entries": []any{logEntry}, "next_cursor": nil}, map[string]any{"entries": []any{map[string]any{"seq": 0}}, "next_cursor": nil}}
++	recordsV1 := map[string]any{"records": []any{audited}, "next_cursor": nil}
++	cases["records-response-v1.schema.json"] = schemaCase{recordsV1, map[string]any{"records": []any{}}}
++	cases["records-response-v2.schema.json"] = schemaCase{map[string]any{"records": []any{audited}, "next_cursor": nil, "boundary": snapshot}, recordsV1}
++	logV1 := map[string]any{"entries": []any{logEntry}, "next_cursor": nil}
++	cases["log-response-v1.schema.json"] = schemaCase{logV1, map[string]any{"entries": []any{map[string]any{"seq": 0}}, "next_cursor": nil}}
++	cases["log-response-v2.schema.json"] = schemaCase{map[string]any{"entries": []any{logEntry}, "next_cursor": nil, "boundary": snapshot}, logV1}
+ 	cases["submission-response-v1.schema.json"] = schemaCase{map[string]any{"seq": 1, "entry_hash": logEntry["entry_hash"]}, map[string]any{"seq": 0, "entry_hash": "bad"}}
+ 	cases["error-response-v1.schema.json"] = schemaCase{map[string]any{"error": map[string]any{"code": "invalid_record", "message": "invalid record", "details": map[string]any{}}}, map[string]any{"detail": "invalid"}}
+ 	cases["conformance-claim-v1.schema.json"] = schemaCase{
+diff --git a/tools/test_validate.py b/tools/test_validate.py
+index 9982385..e8ad732 100644
+--- a/tools/test_validate.py
++++ b/tools/test_validate.py
+@@ -2939,5 +2939,131 @@ class SystemConfigV2SchemaTests(unittest.TestCase):
+             self.run_gate(text="### 12.2 Lockable knobs\n\nNothing is lockable.\n\n## 13\n")
+ 
+ 
++class RegistryPageBoundaryVectorTests(unittest.TestCase):
++    """The R1/P1 page-boundary gate must fail closed.
++
++    validate_registry_page_boundary_vectors is the production gate:
++    tools/validate.py main() runs it on every `make validate`,
++    recomputing each client case's accepted, diagnostic, high-water, and
++    exclusion values from its inputs. Each test narrows one rule and proves
++    the gate rejects what the rule must reject.
++    """
++
++    def setUp(self) -> None:
++        self.client = validate.load_json(
++            validate.SUITE / "vectors" / "registry-client.json"
++        )
++        self.service = validate.load_json(
++            validate.SUITE / "vectors" / "registry-service.json"
++        )
++
++    def case(self, name: str, vector: dict | None = None) -> dict:
++        source = self.client if vector is None else vector
++        return next(item for item in source["page_boundary_cases"] if item["name"] == name)
++
++    def run_gate(self, client=None, service=None) -> None:
++        validate.validate_registry_page_boundary_vectors(
++            client=self.client if client is None else client,
++            service=self.service if service is None else service,
++        )
++
++    def test_published_vectors_pass(self) -> None:
++        self.run_gate()
++
++    def test_stale_page_admitted_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.client)
++        case = self.case("below-high-water-rejected", changed)
++        case["accepted"] = True
++        case["diagnostic"] = None
++        case["registry_excluded"] = False
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(client=changed)
++
++    def test_equivocated_equal_version_admitted_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.client)
++        case = self.case("equal-version-different-body-rejected", changed)
++        case["accepted"] = True
++        case["diagnostic"] = None
++        case["registry_excluded"] = False
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(client=changed)
++
++    def test_chain_mismatch_admitted_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.client)
++        case = self.case("chain-boundary-mismatch-rejected", changed)
++        case["accepted"] = True
++        case["diagnostic"] = None
++        case["registry_excluded"] = False
++        case["high_water_advanced"] = True
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(client=changed)
++
++    def test_missing_boundary_admitted_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.client)
++        case = self.case("missing-boundary-excluded", changed)
++        case["accepted"] = True
++        case["diagnostic"] = None
++        case["registry_excluded"] = False
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(client=changed)
++
++    def test_bad_signature_accepted_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.client)
++        case = self.case("bad-signature-rejected", changed)
++        case["accepted"] = True
++        case["diagnostic"] = None
++        case["registry_excluded"] = False
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(client=changed)
++
++    def test_wrong_diagnostic_spelling_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.client)
++        self.case("below-high-water-rejected", changed)["diagnostic"] = "registry_page_stale"
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(client=changed)
++
++    def test_swapped_diagnostics_are_rejected(self) -> None:
++        changed = copy.deepcopy(self.client)
++        self.case("below-high-water-rejected", changed)["diagnostic"] = (
++            "registry_page_boundary_mismatch"
++        )
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(client=changed)
++
++    def test_missing_exclusion_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.client)
++        self.case("below-high-water-rejected", changed)["registry_excluded"] = False
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(client=changed)
++
++    def test_missing_high_water_advance_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.client)
++        self.case("fresh-boundary-advances-high-water", changed)["high_water_advanced"] = False
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(client=changed)
++
++    def test_dropped_case_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.client)
++        changed["page_boundary_cases"] = [
++            item
++            for item in changed["page_boundary_cases"]
++            if item["name"] != "missing-boundary-excluded"
++        ]
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(client=changed)
++
++    def test_dropped_emission_pin_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.service)
++        changed["pagination"]["boundary_emitted_on_every_page"] = False
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(service=changed)
++
++    def test_reevaluating_cursor_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.service)
++        changed["pagination"]["cursor_boundary_cases"][0]["reevaluate_at_newer_boundary"] = True
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(service=changed)
++
++
+ if __name__ == "__main__":
+     unittest.main()
+diff --git a/tools/validate.py b/tools/validate.py
+index e94190b..c6f0fe0 100644
+--- a/tools/validate.py
++++ b/tools/validate.py
+@@ -2383,6 +2383,145 @@ def validate_shared_fixture_markers(expected_root: Path | None = None) -> None:
+         )
+ 
+ 
++PAGE_BOUNDARY_DIAGNOSTICS = frozenset(
++    {
++        "registry_page_boundary_stale",
++        "registry_page_boundary_mismatch",
++        "registry_page_boundary_missing",
++    }
++)
++
++PAGE_BOUNDARY_CASES = frozenset(
++    {
++        "fresh-boundary-advances-high-water",
++        "equal-version-same-body-accepted",
++        "equal-version-different-body-rejected",
++        "below-high-water-rejected",
++        "chain-boundary-mismatch-rejected",
++        "missing-boundary-excluded",
++        "bad-signature-rejected",
++        "stale-and-mismatch-reports-mismatch",
++        "higher-and-mismatch-never-advances",
++    }
++)
++
++
++def expected_page_boundary_verdict(case: dict[str, Any]) -> tuple[bool, str | None, bool]:
++    """Recompute the R1 client verdict from the case inputs.
++
++    Returns (accepted, diagnostic, high_water_advanced) following registry
++    protocol section 9.3: presence and section 2 signature verification
++    first (absent or failing reports `registry_page_boundary_missing` with
++    no state change); then, for every page after the first, the chain
++    comparison against the chain boundary (the first page's boundary) — a
++    difference reports `registry_page_boundary_mismatch` with no state
++    change, and a later page never advances or re-checks the high-water on
++    its own; then, for the first page, the section 5 high-water comparison
++    (below, or equal with a different body, reports
++    `registry_page_boundary_stale` with no state change; equal with the
++    same body is accepted with nothing persisted; higher is accepted with
++    the high-water advanced). Only a first page that passes presence and
++    signature verification and the high-water check changes rollback state;
++    a rejected page leaves it untouched. Diagnostic precedence for a later
++    page is `missing` over `mismatch`, and `stale` is reported only for a
++    first page. In the vector shape, `chain_boundary_equal: false` on a
++    present, signature-valid boundary denotes a later page differing from
++    the chain boundary.
++    """
++    if not case.get("boundary_present") or not case.get("signature_valid"):
++        return False, "registry_page_boundary_missing", False
++    if not case.get("chain_boundary_equal"):
++        return False, "registry_page_boundary_mismatch", False
++    stored = case.get("stored_version")
++    boundary = case.get("boundary_version")
++    if (
++        not isinstance(stored, int)
++        or not isinstance(boundary, int)
++        or isinstance(stored, bool)
++        or isinstance(boundary, bool)
++        or stored < 0
++        or boundary < 0
++    ):
++        raise ValidationFailure(
++            f"registry-client page boundary case {case.get('name')!r} needs "
++            "non-negative integer stored and boundary versions"
++        )
++    if boundary < stored or (boundary == stored and not case.get("same_body")):
++        return False, "registry_page_boundary_stale", False
++    return True, None, boundary > stored
++
++
++def validate_registry_page_boundary_vectors(client: Any = None, service: Any = None) -> None:
++    """The R1/P1 records page-boundary vector gate.
++
++    Each client case's accepted, diagnostic, high-water, and exclusion values
++    are recomputed from its inputs, so a vector that admits a stale,
++    mismatched, or missing boundary fails. The service half pins the
++    boundary-on-every-page emission and the P1 cursor-boundary refusal.
++    """
++    if client is None:
++        client = load_json(SUITE / "vectors" / "registry-client.json")
++    if service is None:
++        service = load_json(SUITE / "vectors" / "registry-service.json")
++    require_named_cases(
++        client.get("page_boundary_cases"),
++        "registry-client page boundary",
++        set(PAGE_BOUNDARY_CASES),
++    )
++    for case in client["page_boundary_cases"]:
++        name = case.get("name")
++        accepted, diagnostic, advanced = expected_page_boundary_verdict(case)
++        if case.get("accepted") is not accepted:
++            raise ValidationFailure(
++                f"registry-client page boundary case {name!r} admits what "
++                "section 9.3 must reject" if accepted is False else
++                f"registry-client page boundary case {name!r} rejects what "
++                "section 9.3 must accept"
++            )
++        if case.get("diagnostic") is not None and case.get("diagnostic") not in PAGE_BOUNDARY_DIAGNOSTICS:
++            raise ValidationFailure(
++                f"registry-client page boundary case {name!r} uses "
++                f"non-closed diagnostic {case.get('diagnostic')!r}"
++            )
++        if case.get("diagnostic") != diagnostic:
++            raise ValidationFailure(
++                f"registry-client page boundary case {name!r} carries "
++                f"{case.get('diagnostic')!r}, expected {diagnostic!r}"
++            )
++        if case.get("high_water_advanced") is not advanced:
++            raise ValidationFailure(
++                f"registry-client page boundary case {name!r} has the wrong "
++                "high-water advance"
++            )
++        if case.get("registry_excluded") is not (not accepted):
++            raise ValidationFailure(
++                f"registry-client page boundary case {name!r} has the wrong "
++                "registry exclusion"
++            )
++    pagination = service.get("pagination")
++    if not isinstance(pagination, dict):
++        raise ValidationFailure("registry-service pagination boundary is incomplete")
++    if pagination.get("boundary_emitted_on_every_page") is not True:
++        raise ValidationFailure("registry-service must emit the boundary on every page")
++    if pagination.get("chain_boundary_byte_identical") is not True:
++        raise ValidationFailure("registry-service cursor-chain boundaries must be byte-identical")
++    require_named_cases(
++        pagination.get("cursor_boundary_cases"),
++        "registry-service cursor boundary",
++        {"cursor-boundary-disagreement"},
++    )
++    for case in pagination["cursor_boundary_cases"]:
++        if (
++            case.get("status") != 404
++            or case.get("error") != "invalid_cursor"
++            or case.get("reevaluate_at_newer_boundary") is not False
++        ):
++            raise ValidationFailure(
++                f"registry-service cursor boundary case {case.get('name')!r} must "
++                "refuse with 404 invalid_cursor without re-evaluating"
++            )
++
++
+ def validate_vector_semantics() -> None:
+     ledger = load_json(SUITE / "expected" / "adapter-ledger.json")
+     require_sorted_unique(ledger["entries"], "adapter ledger entries")
+@@ -5639,6 +5778,7 @@ def main() -> int:
+         validate_context_detector_vectors,
+         validate_snapshot_acquisition_vectors,
+         validate_shell_hook_trust_vectors,
++        validate_registry_page_boundary_vectors,
+         validate_manager_config_vectors,
+         validate_system_config_v2_schema,
+         validate_umbrella_provider_vectors,
