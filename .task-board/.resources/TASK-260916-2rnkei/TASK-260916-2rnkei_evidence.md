@@ -140,3 +140,127 @@ patch + evidence; docs consistent; no discrepancies; outcome resources
 attached). Item 8 (logbook) left unchecked: no board logbook facility
 exists and campaign rules forbid `LOGBOOK.md` edits, so decisions are
 recorded here and in task notes instead.
+
+---
+
+# Revision 2 (rework after `TASK-260916-2rnkei_review-verdict-rev1.md`, F1–F2)
+
+Everything from revision 1 that passed is kept; only the two verdict
+corrections change the tree. Scope note: F1 explicitly requires
+`tools/validate.py`, `tools/test_validate.py` and the Go generator edits,
+so revision 2 touches those files — the rev-1 "role boundary" reading of
+the doc-writer constraint is withdrawn for this rework, since the campaign
+rule 7 gate is a required conformance artifact, not manager
+implementation. No manager implementation code is touched.
+
+## R2.1. F2 — manager revision vs home revision
+
+- §7.4: the seed-rule paragraph now distinguishes the manager-shipped
+  revision from the home's recorded seed revision. An A-provisioned home
+  under a B manager keeps its bytes, lists its recorded names as
+  ungoverned, and reports `mcp_seed_unstripped` with the re-provision
+  hint; an empty recorded snapshot warns nothing (no inherited server to
+  re-provision away). A marker that predates the rule (absent record)
+  reports the same warning with the same hint.
+- §7.7: the `mcp_seed_unstripped` row covers both predicates (absent
+  record, or `A` record with non-empty snapshot under a B manager).
+- §7.8: the residual row now says a home *provisioned under revision B*
+  carries none in its base, with the A-home-under-B-manager residual
+  stated in parentheses.
+- §8.2: the recorded `revision` never changes after provisioning; an `A`
+  record under a B manager keeps ungoverned rows and adds
+  `mcp_seed_unstripped`.
+- §12: the posture enumeration and the codex-seed row paragraph state the
+  mismatch case (older recorded revision than shipped revision).
+- §13 and CHANGELOG name the new posture case and the gate.
+- Vector: new posture case `a-home-unstripped-under-b` (shipped B,
+  `codex_cli`, `A` record with `[figma, gh]` → row B, diagnostics
+  `[mcp_native_servers_ungoverned, mcp_seed_unstripped]`, listed
+  ungoverned, repair hint true, current).
+
+## R2.2. F1 — semantic validator gate and schema cases
+
+- `tools/validate.py`: new `validate_environments_codex_seed_vectors`,
+  registered in `main()`. Per provisioning case it parses the
+  `native_config_toml` fixture with `tomllib` and recomputes the seeded
+  members *and values* (new `seeded_members` expectation, see below),
+  snapshot names, diagnostic, hint, and the closed seed-record shape; per
+  posture case it recomputes the row from the shipped revision, the
+  adapter (closed set reused from `ENVIRONMENT_HOME_VARIABLES`), and the
+  recorded revision. Every named case is additionally pinned to its
+  branch: revision letters, servers present/absent/empty, the TOML form
+  (subtable / subtable-only / inline / absent / empty-table, read from
+  the raw fixture text because the parsed document cannot tell inline
+  from dotted form), the exact native top-level member set, and the
+  shipped/recorded/snapshot tuple — so an internally consistent
+  replacement under the same name fails.
+- `tools/test_validate.py`: new `CodexSeedVectorTests`, 32 tests: the
+  published vector passes; the reviewer's exact
+  `b-strips-servers-keeps-rest` ← `b-without-servers-no-warning`
+  replacement; the F2 `a-home-unstripped-under-b` ← `a-home-lists-ungoverned`
+  and ← `b-home-lists-not-inherited` replacements; narrowing tests per
+  refusal clause (revision flip, retained table/value/diagnostic/hint/
+  record/row mutations, invalid TOML, non-table `mcp_servers`, unknown
+  adapter, dropped cases, revision-string mutation); derivation corners
+  beyond the corpus (empty A snapshot under B warns nothing; a B record
+  never reports unstripped); and a `main()` registration guard.
+- `tools/generate-vectors/environments.go`: 7 new generated
+  `agent-environment-marker-v1` schema cases for the closed
+  `codex_seed_record` member — `valid-codex-seed-record`,
+  `valid-codex-seed-record-empty-snapshot`,
+  `invalid-codex-seed-record-unknown-field`,
+  `invalid-codex-seed-record-revision` (revision `C`),
+  `invalid-codex-seed-record-names-member` (empty-string member),
+  `invalid-codex-seed-record-names-not-array`,
+  `invalid-codex-seed-record-on-linked-home` — emitted by `make
+  regenerate` with index and manifest entries.
+- Vector shape addition: each provisioning `expected` gains
+  `seeded_members` (the retained parsed values), recomputed by the gate.
+  This is what pins "retained values": a fixture value edited without
+  its expectation fails; a consistent value edit still exercises the
+  branch and passes, which is correct — the gate refuses branch
+  collapse, not fixture bytes (bytes are pinned by git and the manifest
+  digest).
+
+## R2.3. Validation transcript (final tree)
+
+Shell `bash`, workdir = worktree. Python via
+`/Users/administrator/Developer/ReluxWorks/curator/curator-spec/.temp/venv/bin`
+(first on `PATH`). The `make validate` recipe was run as bounded
+sequential calls (the suite's ~13 min wall exceeds one headless call);
+every step below is the recipe's own command with its real exit code:
+
+- `python3 tools/validate.py` → `validated 62 schemas and 1101 vector
+  files`, exit 0 (16.7 s).
+- `python3 -B -m unittest` split by class/module, all OK, exit 0 each:
+  31 + 25 + 27 + 106 (incl. the 32 new `CodexSeedVectorTests`) + 55 +
+  63 + 78 = 385/385 (rev-1 353 + 32 new).
+- `go test ./tools/...` →
+  `ok github.com/relux-works/curator-spec/tools/generate-vectors`, exit 0
+  (2.8 s).
+- `make regenerate` → exit 0. Manifest diff: +7 schema-case entries,
+  index digest refresh, codex-seed digest refresh; rc.9: the 2 pin
+  lines; `conformance/v1/schema-cases/index.json`: +7 entries. All 31
+  HEAD-tracked vector files byte-identical (the changed vector file is
+  the new E3 family itself); all 974 non-index HEAD-tracked
+  schema-case files byte-identical.
+- Regeneration proof: candidate committed to a scratch baseline,
+  `go run ./tools/generate-vectors -root .` +
+  `git diff --exit-code -- conformance/v1 release/1.0.0-rc.*.json` →
+  exit 0 (generator idempotent). Note: `make regenerate-check` run
+  directly in the uncommitted worktree reports the worktree-vs-index
+  delta (exit 1) — that is the expected uncommitted-tree behavior, the
+  same reason the round-1 reviewer ran the check against a scratch
+  baseline.
+- Production-entry mutant probes (scratch copy, mutant applied to the
+  vector *file*, manifest refreshed with the repo generator, then the
+  real `python3 tools/validate.py`): F1 reviewer's replacement →
+  `validation failed: codex-seed case b-strips-servers-keeps-rest:
+  native top-level members are not the pinned set (...)`, exit 1; F2
+  replacement → `validation failed: codex-seed case
+  a-home-unstripped-under-b: revision_shipped does not match the pinned
+  one (B)`, exit 1. Replacement rejection at the production entry: 2/2.
+- `git diff --check` → exit 0. Closed spellings verified identical in
+  text, §7.7 table, schema, vectors, gate, and CHANGELOG; no
+  open-ended wording in added lines. Curator repository delta stays
+  EMPTY (all work is in the curator-spec story worktree).

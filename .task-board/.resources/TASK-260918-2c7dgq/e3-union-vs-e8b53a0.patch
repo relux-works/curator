@@ -1,0 +1,1970 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 8b4d848..314ac5b 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -88,6 +88,35 @@ Versioning for the complete specification set.
+   no-rebuild case, repair rebuild/entry-rebuild/enclosing-refusal/stale/
+   unprovisioned, the non-current posture rows, and negatives), checked
+   semantically by `tools/validate.py`.
++- E3: the `codex_cli` provisioning seed stops inheriting native
++  `mcp_servers` (environments §7.4/§7.7/§7.8/§8.2/§12/§13): a whole-copy
++  seed runs every native MCP server outside the profile lock and the
++  §2.2 allowlist while `claude_code` runs only the profile set, so the
++  seed rule ships in two labelled revisions — revision A (warning
++  release, ships first) still copies `config.toml` whole but provisioning
++  warns `mcp_native_servers_ungoverned` naming every inherited entry with
++  the migration hint (declare the server in the profile's MCP set, or
++  accept the loss), and revision B (flip release) copies every top-level
++  member except `mcp_servers` and reports the stripped names once with
++  `mcp_native_servers_not_inherited`. Both revisions write the marker
++  `codex_seed_record` (`revision` exactly `A` or `B`, `native_mcp_servers`
++  the provisioning-time name snapshot, names only); a managed `codex_cli`
++  home whose marker predates the rule — and a revision-A home now served
++  by a revision-B manager — reports `mcp_seed_unstripped` (warning) with
++  the re-provision hint, and existing homes keep their bytes. `env status`
++  reports the active codex-seed revision with its behaviour and, per
++  managed `codex_cli` home, the record with the native entries listed as
++  ungoverned (revision A, including an A-record home under a B manager)
++  or not inherited (revision B); all three rows are warnings and never
++  make a row non-current. §7.8 gains the closed per-adapter residual
++  table (what each channel does to the home's own MCP configuration).
++  Conformance vectors in `vectors/environments-codex-seed.json`
++  (provisioning under both revisions, the no-server and empty-table
++  negatives, the pre-rule-home and the A-home-under-B-manager
++  `mcp_seed_unstripped` postures, and the non-codex negative), pinned by
++  the `validate_environments_codex_seed_vectors` gate. Manager/README follow-up
++  (`TASK-260916-33abdk`): a managed codex home runs only the profile MCP
++  set; native `~/.codex/config.toml` servers are not inherited.
+ - E1: per-source signer allowlist and `profile update` delta confirmation
+   (Decision 0012 amendment 2026-09-17; environments
+   §1.1/§1.3/§1.4/§9.2/§9.7/§12/§12.1/§12.2/§13): the new closed machine knob
+diff --git a/conformance/v1/manifest.json b/conformance/v1/manifest.json
+index 22f027f..5e322c2 100644
+--- a/conformance/v1/manifest.json
++++ b/conformance/v1/manifest.json
+@@ -508,6 +508,26 @@
+       "path": "schema-cases/agent-context-v1/valid.json",
+       "sha256": "sha256:10d6e619e34cedea8b469d8d176a823805c76a0be0f3e33adf9cd379e7f54168"
+     },
++    {
++      "path": "schema-cases/agent-environment-marker-v1/invalid-codex-seed-record-names-member.json",
++      "sha256": "sha256:9e05ddbaf58b6c80d450bdb5acddafc1b080fdb03d1aafcc76a0ea3bae92cbaa"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v1/invalid-codex-seed-record-names-not-array.json",
++      "sha256": "sha256:e07cd97388d52b9c3e9b8b46b837af094f912178393466c6c5ae76f1ee289c3f"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v1/invalid-codex-seed-record-on-linked-home.json",
++      "sha256": "sha256:08851b781af73b73403dad99ff0706e30db6ee2791a12235dc9300200403b0a1"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v1/invalid-codex-seed-record-revision.json",
++      "sha256": "sha256:fb5402d8860a88a92fcd00b038f856f52670cd9e81ddc6bb133febb520393f8a"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v1/invalid-codex-seed-record-unknown-field.json",
++      "sha256": "sha256:b21511ff53554c4fb258397ed645457c860949fe86ac1d8bd42a784519a42674"
++    },
+     {
+       "path": "schema-cases/agent-environment-marker-v1/invalid-composition-without-precedence.json",
+       "sha256": "sha256:708fc93259a7ec50aafe833fb352c6ee068ec3cc559cbb5a9fa429630b519b37"
+@@ -720,6 +740,14 @@
+       "path": "schema-cases/agent-environment-marker-v1/invalid.json",
+       "sha256": "sha256:371bd441938244caf0c6616b240a2aa167536aacdc26086929e9ad75b47a8a75"
+     },
++    {
++      "path": "schema-cases/agent-environment-marker-v1/valid-codex-seed-record-empty-snapshot.json",
++      "sha256": "sha256:304cfa2dfbffc1be81dae07e3a6d7784f7eaa405796d9956ac1efa4396bd7770"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v1/valid-codex-seed-record.json",
++      "sha256": "sha256:33ebccc5ff3fbfcedeea9756aac370e3947d864c0904c3305a02d2e5a4f48da2"
++    },
+     {
+       "path": "schema-cases/agent-environment-marker-v1/valid-copied.json",
+       "sha256": "sha256:118f886fc122e59d73b4e59955d5d5401710f17e1940ccaaec13e72e8f0ab1e9"
+@@ -2954,7 +2982,7 @@
+     },
+     {
+       "path": "schema-cases/index.json",
+-      "sha256": "sha256:75c9fcc27dfd6fc1b47b8cc547c91f6a32ba375cfbe001efdcdd2226ac2f0b11"
++      "sha256": "sha256:abbf0662aa2d3ba8acff3fd838971a2666b590aee315b6719663790d2790b11a"
+     },
+     {
+       "path": "schema-cases/install-marker-v1/invalid.json",
+@@ -4280,6 +4308,10 @@
+       "path": "vectors/context-versions.json",
+       "sha256": "sha256:4eac87963ac86c6e56d418a9e33cf0375cf7670619f560d97763e51fbb05c6b6"
+     },
++    {
++      "path": "vectors/environments-codex-seed.json",
++      "sha256": "sha256:d7a6e24f783b72eecd5bed3e13db5ab7a0a286bca10289b8034a73d3f36b750f"
++    },
+     {
+       "path": "vectors/environments-env-passthrough.json",
+       "sha256": "sha256:1953748e548d4f335f9defa4baa1524998d29dab4bf36647fb8c8bcbdcabf6db"
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v1/invalid-codex-seed-record-names-member.json b/conformance/v1/schema-cases/agent-environment-marker-v1/invalid-codex-seed-record-names-member.json
+new file mode 100644
+index 0000000..4cfdc26
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v1/invalid-codex-seed-record-names-member.json
+@@ -0,0 +1,83 @@
++{
++  "codex_seed_record": {
++    "native_mcp_servers": [
++      "figma",
++      ""
++    ],
++    "revision": "B"
++  },
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 1
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v1/invalid-codex-seed-record-names-not-array.json b/conformance/v1/schema-cases/agent-environment-marker-v1/invalid-codex-seed-record-names-not-array.json
+new file mode 100644
+index 0000000..ef2b700
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v1/invalid-codex-seed-record-names-not-array.json
+@@ -0,0 +1,80 @@
++{
++  "codex_seed_record": {
++    "native_mcp_servers": "figma",
++    "revision": "B"
++  },
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 1
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v1/invalid-codex-seed-record-on-linked-home.json b/conformance/v1/schema-cases/agent-environment-marker-v1/invalid-codex-seed-record-on-linked-home.json
+new file mode 100644
+index 0000000..343adc7
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v1/invalid-codex-seed-record-on-linked-home.json
+@@ -0,0 +1,82 @@
++{
++  "codex_seed_record": {
++    "native_mcp_servers": [
++      "figma"
++    ],
++    "revision": "B"
++  },
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "linked",
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [
++        {
++          "path": "skills/pdf",
++          "reason": "symlink-fallback"
++        }
++      ],
++      "paths": [
++        "skills/pdf"
++      ]
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 1
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v1/invalid-codex-seed-record-revision.json b/conformance/v1/schema-cases/agent-environment-marker-v1/invalid-codex-seed-record-revision.json
+new file mode 100644
+index 0000000..cfd6ada
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v1/invalid-codex-seed-record-revision.json
+@@ -0,0 +1,82 @@
++{
++  "codex_seed_record": {
++    "native_mcp_servers": [
++      "figma"
++    ],
++    "revision": "C"
++  },
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 1
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v1/invalid-codex-seed-record-unknown-field.json b/conformance/v1/schema-cases/agent-environment-marker-v1/invalid-codex-seed-record-unknown-field.json
+new file mode 100644
+index 0000000..ea59e1e
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v1/invalid-codex-seed-record-unknown-field.json
+@@ -0,0 +1,85 @@
++{
++  "codex_seed_record": {
++    "commands": [
++      "npx"
++    ],
++    "native_mcp_servers": [
++      "figma"
++    ],
++    "revision": "B"
++  },
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 1
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v1/valid-codex-seed-record-empty-snapshot.json b/conformance/v1/schema-cases/agent-environment-marker-v1/valid-codex-seed-record-empty-snapshot.json
+new file mode 100644
+index 0000000..edacaba
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v1/valid-codex-seed-record-empty-snapshot.json
+@@ -0,0 +1,80 @@
++{
++  "codex_seed_record": {
++    "native_mcp_servers": [],
++    "revision": "A"
++  },
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 1
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v1/valid-codex-seed-record.json b/conformance/v1/schema-cases/agent-environment-marker-v1/valid-codex-seed-record.json
+new file mode 100644
+index 0000000..0ba7189
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v1/valid-codex-seed-record.json
+@@ -0,0 +1,83 @@
++{
++  "codex_seed_record": {
++    "native_mcp_servers": [
++      "figma",
++      "gh"
++    ],
++    "revision": "B"
++  },
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 1
++}
+diff --git a/conformance/v1/schema-cases/index.json b/conformance/v1/schema-cases/index.json
+index e54edea..16b4e78 100644
+--- a/conformance/v1/schema-cases/index.json
++++ b/conformance/v1/schema-cases/index.json
+@@ -254,6 +254,16 @@
+     "schema": "agent-environment-marker-v1.schema.json",
+     "valid": true
+   },
++  {
++    "instance": "agent-environment-marker-v1/valid-codex-seed-record.json",
++    "schema": "agent-environment-marker-v1.schema.json",
++    "valid": true
++  },
++  {
++    "instance": "agent-environment-marker-v1/valid-codex-seed-record-empty-snapshot.json",
++    "schema": "agent-environment-marker-v1.schema.json",
++    "valid": true
++  },
+   {
+     "instance": "agent-environment-marker-v1/invalid-version.json",
+     "schema": "agent-environment-marker-v1.schema.json",
+@@ -464,6 +474,31 @@
+     "schema": "agent-environment-marker-v1.schema.json",
+     "valid": false
+   },
++  {
++    "instance": "agent-environment-marker-v1/invalid-codex-seed-record-unknown-field.json",
++    "schema": "agent-environment-marker-v1.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "agent-environment-marker-v1/invalid-codex-seed-record-revision.json",
++    "schema": "agent-environment-marker-v1.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "agent-environment-marker-v1/invalid-codex-seed-record-names-member.json",
++    "schema": "agent-environment-marker-v1.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "agent-environment-marker-v1/invalid-codex-seed-record-names-not-array.json",
++    "schema": "agent-environment-marker-v1.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "agent-environment-marker-v1/invalid-codex-seed-record-on-linked-home.json",
++    "schema": "agent-environment-marker-v1.schema.json",
++    "valid": false
++  },
+   {
+     "instance": "agent-mcp-v1/valid.json",
+     "schema": "agent-mcp-v1.schema.json",
+diff --git a/conformance/v1/vectors/environments-codex-seed.json b/conformance/v1/vectors/environments-codex-seed.json
+new file mode 100644
+index 0000000..08ea594
+--- /dev/null
++++ b/conformance/v1/vectors/environments-codex-seed.json
+@@ -0,0 +1,246 @@
++{
++  "schema_version": 1,
++  "protocol_version": "1.0.0-rc.9",
++  "capability": "agent-environments",
++  "capability_revision": 1,
++  "rule": "codex provisioning seed mcp_servers handling (sections 7.4, 7.7, 7.8, 8.2, 12)",
++  "revision_a": "warning release: the codex_cli seed is still copied whole, but provisioning warns mcp_native_servers_ungoverned naming every inherited native mcp_servers entry with the migration hint",
++  "revision_b": "flip release: the codex_cli seed strips the mcp_servers table and every mcp_servers.* sub-table; provisioning reports the stripped names once with mcp_native_servers_not_inherited",
++  "provisioning_cases": [
++    {
++      "name": "a-copies-whole-with-servers",
++      "revision": "A",
++      "native_config_toml": "model = \"gpt-5-codex\"\n\n[projects.\"/Users/operator/work\"]\ntrust_level = \"trusted\"\n\n[tui]\ntheme = \"dark\"\n\n[mcp_servers.figma]\ncommand = \"npx\"\nargs = [\"-y\", \"figma-developer-mcp\", \"--stdio\"]\n\n[mcp_servers.gh]\ncommand = \"gh\"\nargs = [\"mcp\"]\n",
++      "expected": {
++        "seeded_has_mcp_servers": true,
++        "seeded_top_level_members": ["mcp_servers", "model", "projects", "tui"],
++        "seeded_members": {
++          "mcp_servers": {
++            "figma": {"command": "npx", "args": ["-y", "figma-developer-mcp", "--stdio"]},
++            "gh": {"command": "gh", "args": ["mcp"]}
++          },
++          "model": "gpt-5-codex",
++          "projects": {"/Users/operator/work": {"trust_level": "trusted"}},
++          "tui": {"theme": "dark"}
++        },
++        "names": ["figma", "gh"],
++        "diagnostic": "mcp_native_servers_ungoverned",
++        "migration_hint": true,
++        "codex_seed_record": {"revision": "A", "native_mcp_servers": ["figma", "gh"]}
++      }
++    },
++    {
++      "name": "b-strips-servers-keeps-rest",
++      "revision": "B",
++      "native_config_toml": "model = \"gpt-5-codex\"\n\n[projects.\"/Users/operator/work\"]\ntrust_level = \"trusted\"\n\n[tui]\ntheme = \"dark\"\n\n[mcp_servers.figma]\ncommand = \"npx\"\nargs = [\"-y\", \"figma-developer-mcp\", \"--stdio\"]\n\n[mcp_servers.gh]\ncommand = \"gh\"\nargs = [\"mcp\"]\n",
++      "expected": {
++        "seeded_has_mcp_servers": false,
++        "seeded_top_level_members": ["model", "projects", "tui"],
++        "seeded_members": {
++          "model": "gpt-5-codex",
++          "projects": {"/Users/operator/work": {"trust_level": "trusted"}},
++          "tui": {"theme": "dark"}
++        },
++        "names": ["figma", "gh"],
++        "diagnostic": "mcp_native_servers_not_inherited",
++        "migration_hint": false,
++        "codex_seed_record": {"revision": "B", "native_mcp_servers": ["figma", "gh"]}
++      }
++    },
++    {
++      "name": "a-without-servers-no-warning",
++      "revision": "A",
++      "native_config_toml": "model = \"gpt-5-codex\"\n\n[projects.\"/Users/operator/work\"]\ntrust_level = \"trusted\"\n\n[tui]\ntheme = \"dark\"\n",
++      "expected": {
++        "seeded_has_mcp_servers": false,
++        "seeded_top_level_members": ["model", "projects", "tui"],
++        "seeded_members": {
++          "model": "gpt-5-codex",
++          "projects": {"/Users/operator/work": {"trust_level": "trusted"}},
++          "tui": {"theme": "dark"}
++        },
++        "names": [],
++        "diagnostic": null,
++        "migration_hint": false,
++        "codex_seed_record": {"revision": "A", "native_mcp_servers": []}
++      }
++    },
++    {
++      "name": "b-without-servers-no-warning",
++      "revision": "B",
++      "native_config_toml": "model = \"gpt-5-codex\"\n\n[projects.\"/Users/operator/work\"]\ntrust_level = \"trusted\"\n\n[tui]\ntheme = \"dark\"\n",
++      "expected": {
++        "seeded_has_mcp_servers": false,
++        "seeded_top_level_members": ["model", "projects", "tui"],
++        "seeded_members": {
++          "model": "gpt-5-codex",
++          "projects": {"/Users/operator/work": {"trust_level": "trusted"}},
++          "tui": {"theme": "dark"}
++        },
++        "names": [],
++        "diagnostic": null,
++        "migration_hint": false,
++        "codex_seed_record": {"revision": "B", "native_mcp_servers": []}
++      }
++    },
++    {
++      "name": "b-subtable-only-form-stripped",
++      "revision": "B",
++      "native_config_toml": "model = \"gpt-5-codex\"\n\n[mcp_servers.\"quoted-name\"]\ncommand = \"server\"\nargs = []\n",
++      "expected": {
++        "seeded_has_mcp_servers": false,
++        "seeded_top_level_members": ["model"],
++        "seeded_members": {"model": "gpt-5-codex"},
++        "names": ["quoted-name"],
++        "diagnostic": "mcp_native_servers_not_inherited",
++        "migration_hint": false,
++        "codex_seed_record": {"revision": "B", "native_mcp_servers": ["quoted-name"]}
++      }
++    },
++    {
++      "name": "a-inline-table-form-inherited",
++      "revision": "A",
++      "native_config_toml": "model = \"gpt-5-codex\"\nmcp_servers = { local = { command = \"server\", args = [] } }\n",
++      "expected": {
++        "seeded_has_mcp_servers": true,
++        "seeded_top_level_members": ["mcp_servers", "model"],
++        "seeded_members": {
++          "mcp_servers": {"local": {"command": "server", "args": []}},
++          "model": "gpt-5-codex"
++        },
++        "names": ["local"],
++        "diagnostic": "mcp_native_servers_ungoverned",
++        "migration_hint": true,
++        "codex_seed_record": {"revision": "A", "native_mcp_servers": ["local"]}
++      }
++    },
++    {
++      "name": "b-empty-mcp-servers-table-no-warning",
++      "revision": "B",
++      "native_config_toml": "model = \"gpt-5-codex\"\n\n[mcp_servers]\n",
++      "expected": {
++        "seeded_has_mcp_servers": false,
++        "seeded_top_level_members": ["model"],
++        "seeded_members": {"model": "gpt-5-codex"},
++        "names": [],
++        "diagnostic": null,
++        "migration_hint": false,
++        "codex_seed_record": {"revision": "B", "native_mcp_servers": []}
++      }
++    }
++  ],
++  "posture_cases": [
++    {
++      "name": "a-home-lists-ungoverned",
++      "revision_shipped": "A",
++      "environment": "codex_cli",
++      "codex_seed_record": {"revision": "A", "native_mcp_servers": ["figma", "gh"]},
++      "expected": {
++        "codex_seed_row": "A",
++        "status_diagnostics": ["mcp_native_servers_ungoverned"],
++        "names_listed": ["figma", "gh"],
++        "listed_as": "ungoverned",
++        "repair_hint": false,
++        "row_current": true
++      }
++    },
++    {
++      "name": "a-home-unstripped-under-b",
++      "revision_shipped": "B",
++      "environment": "codex_cli",
++      "codex_seed_record": {"revision": "A", "native_mcp_servers": ["figma", "gh"]},
++      "expected": {
++        "codex_seed_row": "B",
++        "status_diagnostics": ["mcp_native_servers_ungoverned", "mcp_seed_unstripped"],
++        "names_listed": ["figma", "gh"],
++        "listed_as": "ungoverned",
++        "repair_hint": true,
++        "row_current": true
++      }
++    },
++    {
++      "name": "b-home-lists-not-inherited",
++      "revision_shipped": "B",
++      "environment": "codex_cli",
++      "codex_seed_record": {"revision": "B", "native_mcp_servers": ["figma"]},
++      "expected": {
++        "codex_seed_row": "B",
++        "status_diagnostics": ["mcp_native_servers_not_inherited"],
++        "names_listed": ["figma"],
++        "listed_as": "not-inherited",
++        "repair_hint": false,
++        "row_current": true
++      }
++    },
++    {
++      "name": "pre-rule-home-unstripped-under-b",
++      "revision_shipped": "B",
++      "environment": "codex_cli",
++      "codex_seed_record": null,
++      "expected": {
++        "codex_seed_row": "B",
++        "status_diagnostics": ["mcp_seed_unstripped"],
++        "names_listed": [],
++        "listed_as": "unknown",
++        "repair_hint": true,
++        "row_current": true
++      }
++    },
++    {
++      "name": "pre-rule-home-unstripped-under-a",
++      "revision_shipped": "A",
++      "environment": "codex_cli",
++      "codex_seed_record": null,
++      "expected": {
++        "codex_seed_row": "A",
++        "status_diagnostics": ["mcp_seed_unstripped"],
++        "names_listed": [],
++        "listed_as": "unknown",
++        "repair_hint": true,
++        "row_current": true
++      }
++    },
++    {
++      "name": "b-home-empty-snapshot-no-rows",
++      "revision_shipped": "B",
++      "environment": "codex_cli",
++      "codex_seed_record": {"revision": "B", "native_mcp_servers": []},
++      "expected": {
++        "codex_seed_row": "B",
++        "status_diagnostics": [],
++        "names_listed": [],
++        "listed_as": "none",
++        "repair_hint": false,
++        "row_current": true
++      }
++    },
++    {
++      "name": "a-home-empty-snapshot-no-rows",
++      "revision_shipped": "A",
++      "environment": "codex_cli",
++      "codex_seed_record": {"revision": "A", "native_mcp_servers": []},
++      "expected": {
++        "codex_seed_row": "A",
++        "status_diagnostics": [],
++        "names_listed": [],
++        "listed_as": "none",
++        "repair_hint": false,
++        "row_current": true
++      }
++    },
++    {
++      "name": "non-codex-home-without-record-no-rows",
++      "revision_shipped": "B",
++      "environment": "claude_code",
++      "codex_seed_record": null,
++      "expected": {
++        "codex_seed_row": "B",
++        "status_diagnostics": [],
++        "names_listed": [],
++        "listed_as": "none",
++        "repair_hint": false,
++        "row_current": true
++      }
++    }
++  ]
++}
+diff --git a/protocol/environments.md b/protocol/environments.md
+index 2594e10..b89ca48 100644
+--- a/protocol/environments.md
++++ b/protocol/environments.md
+@@ -1342,10 +1342,52 @@ and are excluded from every surface hash. The enumerated seeds:
+ | Environment | Provisioning seeds | Evidence |
+ |---|---|---|
+ | `claude_code` | `.claude.json` — **written**, not copied: exactly the object `{"hasCompletedOnboarding":true,"projects":{}}` at provisioning, to which repair adds one project entry per launch directory (below); `oauthAccount` is never seeded — login is per home (passthrough table); a `settings.json` seed is not declared in revision 1 | the minimal seed shape is **verified** on 2.1.261: a file holding only these members survives the first run, which merges its own first-run members around them; the fresh-home "Not logged in" behavior is **verified** |
+-| `codex_cli` | `config.toml` — copied whole (project trust, model, and MCP tables included; the launch channel of section 7.8 layers the profile's MCP set over it) | that the copied file is parsed in the fresh home is **verified** (0.153.2, its `mcp_servers` entries are listed); that a `projects.<path>.trust_level` entry does **not** lift the `exec` git wall is **verified** (section 7.9 `exec_flags`); the remaining member shapes are **docs-confidence** |
++| `codex_cli` | `config.toml` — copied under the seed rule below: revision A copies it whole (project trust, model, and MCP tables included); revision B copies every top-level member except `mcp_servers` (the `mcp_servers` table and every `mcp_servers.*` sub-table removed); the launch channel of section 7.8 layers the profile's MCP set over the seeded base in both revisions | that the copied file is parsed in the fresh home is **verified** (0.153.2); that a `projects.<path>.trust_level` entry does **not** lift the `exec` git wall is **verified** (section 7.9 `exec_flags`); that a whole-copy home lists the native `mcp_servers` entries is **verified** (0.153.2 — the revision-A and pre-rule behavior; revision B strips them); the remaining member shapes are **docs-confidence** |
+ | `opencode` | none — the XDG seeds of section 7.1 are the analogous class | — |
+ | `pi` | `settings.json`, `models.json` | that a fresh dir loses them and re-downloads its tool trees is **verified**; their shapes are docs-confidence |
+ 
++**Codex seed MCP rule.** A whole-copy `codex_cli` seed inherits every
++native `mcp_servers` entry into the managed home, outside the profile's
++lock and outside the section 2.2 allowlist, while the section 7.8 channel
++layers the profile's set over that base — the asymmetry the section 7.8
++residual table records. The seed rule therefore ships in two explicitly
++labelled revisions; a manager MUST ship revision A before revision B:
++
++- **Revision A (warning release).** The seed is still copied whole, but
++  provisioning MUST emit `mcp_native_servers_ungoverned` (warning) naming
++  every native `mcp_servers` entry the home inherited, stating that the
++  next revision stops inheriting them, and carrying the migration hint:
++  declare the server in the profile's MCP set, or accept the loss. `env
++  status` MUST list those entries per managed `codex_cli` home as
++  ungoverned — outside the lock and the section 2.2 allowlist.
++- **Revision B (flip release).** The seed copies `config.toml` with the
++  `mcp_servers` table and every `mcp_servers.*` sub-table removed — the
++  seeded file carries the trust, model, and TUI configuration, every
++  top-level member of the native file except `mcp_servers`, and MUST parse
++  as TOML — and provisioning MUST report the stripped names once with
++  `mcp_native_servers_not_inherited` (warning). A managed `codex_cli`
++  home provisioned under revision B runs only the profile's MCP set
++  through the section 7.8 channel. `env status` MUST list the stripped
++  entries per managed `codex_cli` home as not inherited.
++
++Both revisions write the `codex_seed_record` marker record of section 8.2
++at provisioning: the `revision` (`A` or `B`) and the snapshot of the
++native `mcp_servers` entry names taken from the native file at
++provisioning time — names only, never server commands or env values. The
++provisioning warning under either revision fires exactly when the snapshot
++is non-empty: a native file with no `mcp_servers` entries warns nothing,
++and the record is still written with an empty snapshot. The rule applies
++at provisioning only: seeds are thereafter owned by the tool, and an
++existing home keeps its bytes. The manager-shipped seed-rule revision and
++the home's recorded seed revision are distinct: a managed `codex_cli`
++home provisioned under revision A and now served by a revision-B manager
++keeps its inherited servers, `env status` MUST list their recorded names
++as ungoverned, and the home reports `mcp_seed_unstripped` (warning) with
++the repair hint (re-provision) — unless the recorded snapshot is empty,
++in which case there is no inherited server and the mismatch warns
++nothing. A managed `codex_cli` home whose marker predates the rule — the
++record is absent — reports the same warning with the same hint.
++
+ A seed is one-time by definition: a native-home change after provisioning
+ does not propagate, and the tool's later writes in the managed home are
+ its own state. The one per-launch-directory exception is the `claude_code`
+@@ -1471,6 +1513,9 @@ identifier not declared by the registry is `environment_target_unknown`.
+ | unrecorded entry in a managed `opencode` parent shadows an allowlisted operator entry (warning) | `environment_seed_shadowed` |
+ | first `auto` write into a secondary target's home without recorded consent | `environment_target_consent_required` |
+ | detected tool version differs from the adapter's recorded verified version (warning) | `environment_tool_version_unverified` |
++| native `mcp_servers` entries inherited into a managed `codex_cli` home under seed-rule revision A (warning; section 7.4) | `mcp_native_servers_ungoverned` |
++| native `mcp_servers` entries stripped from a managed `codex_cli` seed under seed-rule revision B (warning; section 7.4) | `mcp_native_servers_not_inherited` |
++| managed `codex_cli` home with an unstripped seed — marker lacks the seed record (pre-rule provisioning), or the recorded seed revision is `A` with a non-empty snapshot while the manager ships revision `B` (warning, re-provision hint; section 7.4) | `mcp_seed_unstripped` |
+ 
+ ### 7.8 MCP launch channels
+ 
+@@ -1488,6 +1533,19 @@ configuration.
+ | `opencode` | `variable` `OPENCODE_CONFIG` naming the section 5.8 file. opencode merges configuration in a documented order — remote, global, `OPENCODE_CONFIG`, project `opencode.json`, `.opencode/`, `OPENCODE_CONFIG_CONTENT`, managed — so a project-level entry with the same server name overrides the managed one; recorded, not prevented | merge order **docs-confidence** (opencode is not installed on the recording machine) |
+ | `pi` | none — pi 0.84.2 has no MCP channel; no file and no `mcp` section | **verified** absent from the 0.84.2 help |
+ 
++What each channel does to the home's own MCP configuration — the
++per-adapter residual — is closed in this table:
++
++| Environment | Home MCP configuration under the channel |
++|---|---|
++| `claude_code` | `--strict-mcp-config` disables every other MCP configuration, including servers recorded in the managed home's own `.claude.json`: the launch set is exactly the profile's |
++| `codex_cli` | `-p curator-mcp` layers the profile set over the seeded base: under seed-rule revision A the base still carries the native servers, reported as ungoverned (section 7.4); a home provisioned under revision B carries none in its base: the launch set is exactly the profile's (a revision-A home keeps its inherited base under a revision-B manager and reports `mcp_seed_unstripped`; section 7.4) |
++| `opencode` | the documented merge order applies — remote, global, `OPENCODE_CONFIG`, project `opencode.json`, `.opencode/`, `OPENCODE_CONFIG_CONTENT`, managed — so project-level servers remain and a same-named project entry overrides the managed one: recorded residual, not prevented |
++| `pi` | none: no channel, no MCP configuration in a managed launch |
++
++The launch set is what the tool offers the agent at launch under a managed
++launch through the channel above.
++
+ Whether a given tool passes its own environment through to a `stdio` server
+ is a per-adapter fact verified with the channel. Under Decision 0013 the
+ launcher adds the fragment's `env_names` to the launch plan's
+@@ -1645,6 +1703,18 @@ beside the managed surfaces. The marker records:
+   literal launch-directory paths whose project entry section 7.4 has
+   written into the managed `.claude.json`, so that resolve can tell a
+   missing entry from one the tool later rewrote;
++- for a managed `codex_cli` home provisioned under the section 7.4 seed
++  rule, `codex_seed_record`: the closed object `{ revision,
++  native_mcp_servers }` — `revision` exactly `A` (warning release: the
++  native servers were inherited) or `B` (flip release: the native servers
++  were stripped), `native_mcp_servers` the ascending-byte-order snapshot
++  of the native `mcp_servers` entry names taken at provisioning, names
++  only, empty when the native file carried none. The record is absent on
++  every other home; its absence on a managed `codex_cli` home means
++  pre-rule provisioning, reported as `mcp_seed_unstripped` (section 7.7).
++  The recorded `revision` never changes after provisioning: an `A` record
++  under a revision-B manager keeps reporting its inherited names as
++  ungoverned and adds `mcp_seed_unstripped` (section 12);
+ - for a managed `opencode` parent, the recorded XDG seed links of section
+   7.1;
+ - for a home whose backups directory is non-empty, nothing: backups are
+@@ -2797,11 +2867,18 @@ allowlist is present, naming the verified signer, `unconfigured` when none
+ is, `required-missing` when `require_source_signers` is true and none is —,
+ the active update-confirmation revision (`A-warning` or `B-flip`, section
+ 9.2) with its behaviour, the machine-level `require_source_signers`
+-value, and the store-trust row per installed profile — the section 4
++value, the store-trust row per installed profile — the section 4
+ boundary and pin-hash verdict for the profile's lock, marker, and
+ named store entries, naming the failing check and, for an enclosing
+ failure, the boundary (environments root or store root) when the profile
+-is `environment_store_untrusted`. Both commands follow
++is `environment_store_untrusted`, the active codex-seed revision (`A` or `B`, section 7.4) with its
++behaviour, and per managed `codex_cli` home the `codex_seed_record`
++revision with its native-server rows (`mcp_native_servers_ungoverned`
++for the native names an `A`-record home carries,
++`mcp_native_servers_not_inherited` for a `B`-record home's stripped
++names, `mcp_seed_unstripped` with the re-provision hint when the marker
++predates the rule or when an `A`-record home with a non-empty snapshot
++is served by a revision-`B` manager). Both commands follow
+ the manager §10 discipline exactly: recompute and report, never mutate — no
+ fetch, no repair, no adoption, no channel application, no onboarding.
+ `--check` returns non-zero when any row is non-current.
+@@ -2826,8 +2903,10 @@ Warnings —
+ `environment_context_size_exceeded`, `environment_tool_version_unverified`,
+ `environment_seed_shadowed`, `environment_foreign_manager_suspected`,
+ `context_system_module_dropped`, `mcp_package_allowlist_empty`,
+-`mcp_env_passthrough_unlisted`, `mcp_env_passthrough_dropped`, an
+-acknowledged shadowing path — never make a row non-current.
++`mcp_env_passthrough_unlisted`, `mcp_env_passthrough_dropped`,
++`mcp_native_servers_ungoverned`, `mcp_native_servers_not_inherited`,
++`mcp_seed_unstripped`, an acknowledged shadowing path — never make a row
++non-current.
+ 
+ The signer-verification rows re-verify the locked pins against the
+ effective allowlists from the manager's local source state, without
+@@ -2845,6 +2924,17 @@ revision B — a triggered delta refuses with
+ `--confirm-system-delta`. The row is informative and never makes a row
+ non-current; no configuration knob pre-confirms.
+ 
++The codex-seed row reports `A` when the manager ships revision A of
++section 7.4 — the `codex_cli` seed is copied whole and provisioning warns
++`mcp_native_servers_ungoverned` with the migration hint — and `B` when it
++ships revision B — the seed strips `mcp_servers` and provisioning reports
++`mcp_native_servers_not_inherited`. A home whose recorded seed revision
++is older than the shipped one — revision `A` under a revision-`B`
++manager — additionally reports `mcp_seed_unstripped` with the
++re-provision hint while its recorded names stay listed as ungoverned
++(section 7.4). The row is informative and never makes a row non-current;
++no configuration knob selects the revision.
++
+ Garbage collection extends the manager §10 and core §9.4 rules: it runs
+ under the manager-home mutation lock, and its live roots additionally
+ include every store entry named by any installed profile's lock — and by
+@@ -3045,8 +3135,8 @@ authorization states, the post-provisioning planted-link repair, the
+ manager-owned-link replace, the symlinked-backup-destination refusals (a traversed parent link and a directly symlinked target),
+ the inside-pointing-link ledger refusal, and the clean-path and
+ recorded-file positives — every foreign-link case asserting the link's
+-former target is byte-identical afterwards. ;
+-and the section 4
++former target is byte-identical afterwards;
++the section 4
+ protected-boundary cases
+ (`vectors/environments-store-boundary.json`) — the intact resolve that
+ emits a fragment; the swapped system-prompt bytes, swapped root-context
+@@ -3064,7 +3154,18 @@ entry-class case and the enclosing no-rebuild case; the repair rebuild,
+ entry-rebuild, enclosing-refusal, stale-repair, and unprovisioned cases;
+ the `env status` non-current posture rows naming the failing check and the
+ boundary; and the negative cases whose fragment-emitting,
+-current-reporting, or re-applying observation is non-conforming.  The nine
++current-reporting, or re-applying observation is non-conforming.;
++and the section 7.4 codex-seed
++cases (`vectors/environments-codex-seed.json`) — a native `config.toml`
++with `mcp_servers` tables under revision A (copied whole,
++`mcp_native_servers_ungoverned` names the entries, posture lists them
++ungoverned) and under revision B (the seeded file lacks them,
++`mcp_native_servers_not_inherited` names them), a native file without
++`mcp_servers` entries (no warning under either revision, the record still
++written), the pre-rule-home `mcp_seed_unstripped` posture, and the
++revision-A home under a revision-B manager (`mcp_seed_unstripped` with
++the re-provision hint, the recorded names still ungoverned) — with the
++`codex_seed_record` marker shape. The nine
+ retired `expected/environments/*` sets are regenerated under the v2 type
+ line. A manager claiming this capability MUST pass the complete vector set;
+ there is no partial claim. A manager conforms to revision A by warning
+@@ -3074,4 +3175,10 @@ revision B while still resolving on `PATH`. A manager conforms to the
+ update-delta revision A by warning with `profile_update_system_delta`
+ where the vectors warn, carrying the migration hint, and proceeding, and
+ to revision B by refusing with `profile_update_confirmation_required`
+-where the vectors refuse unless `--confirm-system-delta` is given.
++where the vectors refuse unless `--confirm-system-delta` is given. A
++manager conforms to the codex-seed revision A by copying the native
++`config.toml` whole, warning with `mcp_native_servers_ungoverned` where
++the vectors warn and carrying the migration hint, and to revision B by
++seeding without `mcp_servers` and reporting with
++`mcp_native_servers_not_inherited` where the vectors report; it MUST NOT
++claim revision B while still inheriting native servers.
+diff --git a/release/1.0.0-rc.9.json b/release/1.0.0-rc.9.json
+index 6d975f5..0ffb7cb 100644
+--- a/release/1.0.0-rc.9.json
++++ b/release/1.0.0-rc.9.json
+@@ -12,7 +12,7 @@
+     "verified_provider_contract": "host-execution-provider-v1"
+   },
+   "candidate_protocol_pin": {
+-    "manifest_sha256": "sha256:7342f14dc74ccb56c4f1fac6ffdaa10694d791bd39f6627786c603d304ba3ad5",
++    "manifest_sha256": "sha256:92d1e090065a4027f9aaa753b2826d4a1cdb46153e176501aca481620b0c18d1",
+     "suite_root": "conformance/v1"
+   },
+   "claim_v5": {
+@@ -24,7 +24,7 @@
+   "downstream_consumption": {
+     "committed_release_pin_advanced": false,
+     "environment": "CURATOR_CONFORMANCE_ROOT",
+-    "required_manifest_sha256": "sha256:7342f14dc74ccb56c4f1fac6ffdaa10694d791bd39f6627786c603d304ba3ad5"
++    "required_manifest_sha256": "sha256:92d1e090065a4027f9aaa753b2826d4a1cdb46153e176501aca481620b0c18d1"
+   },
+   "historical_release": {
+     "immutable": true,
+diff --git a/schemas/v1/agent-environment-marker-v1.schema.json b/schemas/v1/agent-environment-marker-v1.schema.json
+index 07bf07e..85ca580 100644
+--- a/schemas/v1/agent-environment-marker-v1.schema.json
++++ b/schemas/v1/agent-environment-marker-v1.schema.json
+@@ -83,7 +83,20 @@
+       "uniqueItems": true,
+       "items": {"$ref": "common.schema.json#/$defs/nonEmptyString"}
+     },
+-    "seed_links": {"$ref": "common.schema.json#/$defs/pathSet"}
++    "seed_links": {"$ref": "common.schema.json#/$defs/pathSet"},
++    "codex_seed_record": {
++      "type": "object",
++      "required": ["revision", "native_mcp_servers"],
++      "properties": {
++        "revision": {"enum": ["A", "B"]},
++        "native_mcp_servers": {
++          "type": "array",
++          "uniqueItems": true,
++          "items": {"$ref": "common.schema.json#/$defs/nonEmptyString"}
++        }
++      },
++      "additionalProperties": false
++    }
+   },
+   "allOf": [
+     {
+@@ -107,7 +120,8 @@
+           "passthrough": false,
+           "seeds": false,
+           "seeded_projects": false,
+-          "seed_links": false
++          "seed_links": false,
++          "codex_seed_record": false
+         }
+       }
+     }
+diff --git a/tools/generate-vectors/environments.go b/tools/generate-vectors/environments.go
+index f4a656e..0950cdf 100644
+--- a/tools/generate-vectors/environments.go
++++ b/tools/generate-vectors/environments.go
+@@ -1257,6 +1257,10 @@ func environmentMarkerSchemaExamples(valid map[string]any) []schemaExample {
+ 	passthroughLinked := cloneMap(valid)
+ 	passthroughLinked["passthrough"] = []any{map[string]any{"path": "auth.json", "strategy": "file-link"}}
+ 	delete(passthroughLinked, "seeded_projects")
++	codexSeed := cloneMap(valid)
++	codexSeed["codex_seed_record"] = map[string]any{"revision": "B", "native_mcp_servers": []any{"figma", "gh"}}
++	codexSeedEmpty := cloneMap(valid)
++	codexSeedEmpty["codex_seed_record"] = map[string]any{"revision": "A", "native_mcp_servers": []any{}}
+ 
+ 	return []schemaExample{
+ 		{name: "valid-local-profile", valid: true, instance: localProfile},
+@@ -1268,6 +1272,8 @@ func environmentMarkerSchemaExamples(valid map[string]any) []schemaExample {
+ 		{name: "valid-copied", valid: true, instance: copied},
+ 		{name: "valid-seeded-opencode-parent", valid: true, instance: seededParent},
+ 		{name: "valid-passthrough-file-link", valid: true, instance: passthroughLinked},
++		{name: "valid-codex-seed-record", valid: true, instance: codexSeed},
++		{name: "valid-codex-seed-record-empty-snapshot", valid: true, instance: codexSeedEmpty},
+ 		{name: "invalid-version", valid: false, instance: withField(valid, "version", 2)},
+ 		{name: "invalid-unknown-field", valid: false, instance: withField(valid, "environment", "claude_code")},
+ 		{name: "invalid-missing-precedence", valid: false, instance: without(valid, "precedence")},
+@@ -1310,6 +1316,11 @@ func environmentMarkerSchemaExamples(valid map[string]any) []schemaExample {
+ 		{name: "invalid-seed-links-on-linked-home", valid: false, instance: withField(linked, "seed_links", []any{"git"})},
+ 		{name: "invalid-seeded-projects-on-copied", valid: false, instance: withField(copied, "seeded_projects", []any{"/tmp"})},
+ 		{name: "invalid-seeded-projects-unsorted", valid: false, instance: withField(valid, "seeded_projects", []any{"/Users/operator/projects/b", "/Users/operator/projects/a"})},
++		{name: "invalid-codex-seed-record-unknown-field", valid: false, instance: withField(valid, "codex_seed_record", map[string]any{"revision": "B", "native_mcp_servers": []any{"figma"}, "commands": []any{"npx"}})},
++		{name: "invalid-codex-seed-record-revision", valid: false, instance: withField(valid, "codex_seed_record", map[string]any{"revision": "C", "native_mcp_servers": []any{"figma"}})},
++		{name: "invalid-codex-seed-record-names-member", valid: false, instance: withField(valid, "codex_seed_record", map[string]any{"revision": "B", "native_mcp_servers": []any{"figma", ""}})},
++		{name: "invalid-codex-seed-record-names-not-array", valid: false, instance: withField(valid, "codex_seed_record", map[string]any{"revision": "B", "native_mcp_servers": "figma"})},
++		{name: "invalid-codex-seed-record-on-linked-home", valid: false, instance: withField(linked, "codex_seed_record", map[string]any{"revision": "B", "native_mcp_servers": []any{"figma"}})},
+ 	}
+ }
+ 
+diff --git a/tools/test_validate.py b/tools/test_validate.py
+index 825e860..56e8285 100644
+--- a/tools/test_validate.py
++++ b/tools/test_validate.py
+@@ -2681,6 +2681,295 @@ class SourceSignersVectorTests(unittest.TestCase):
+         self.assertIn("section 9.2 delta rule", str(raised.exception))
+ 
+ 
++class CodexSeedVectorTests(unittest.TestCase):
++    """The E3 codex-seed provisioning/posture gate must fail closed.
++
++    validate_environments_codex_seed_vectors is the production gate:
++    tools/validate.py main() runs it on every `make validate`, recomputing
++    the section 7.4 provisioning outcome (seeded members and values,
++    snapshot names, diagnostic and hint, marker seed record) from the
++    parsed native config.toml and the seed rule revision, and the section
++    12 posture rows from the manager-shipped revision and the home's
++    recorded seed revision. Each test narrows one rule and proves the gate
++    rejects what the rule must reject, including the review round-1
++    branch-collapse replacements.
++    """
++
++    def setUp(self) -> None:
++        self.vector = validate.load_json(
++            validate.SUITE / "vectors" / "environments-codex-seed.json"
++        )
++
++    def case(self, family: str, name: str, vector: dict | None = None) -> dict:
++        source = self.vector if vector is None else vector
++        return next(item for item in source[family] if item["name"] == name)
++
++    def run_gate(self, vector=None) -> None:
++        validate.validate_environments_codex_seed_vectors(
++            vector=self.vector if vector is None else vector,
++        )
++
++    def replace_body(self, changed: dict, family: str, target: str, source: str) -> None:
++        donor = self.case(family, source, changed)
++        recipient = self.case(family, target, changed)
++        for key in list(recipient):
++            if key != "name":
++                del recipient[key]
++        for key, value in donor.items():
++            if key != "name":
++                recipient[key] = copy.deepcopy(value)
++
++    def test_published_vector_passes(self) -> None:
++        self.run_gate()
++
++    def test_review_mutant_strip_case_replaced_with_no_server_case_is_rejected(self) -> None:
++        # The review round-1 mutant: the B-strip case body replaced with
++        # the internally consistent no-server case under the same name.
++        changed = copy.deepcopy(self.vector)
++        self.replace_body(changed, "provisioning_cases", "b-strips-servers-keeps-rest", "b-without-servers-no-warning")
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_strip_case_replaced_with_subtable_only_case_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.replace_body(changed, "provisioning_cases", "b-strips-servers-keeps-rest", "b-subtable-only-form-stripped")
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_copy_case_replaced_with_inline_case_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.replace_body(changed, "provisioning_cases", "a-copies-whole-with-servers", "a-inline-table-form-inherited")
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_provisioning_revision_flip_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("provisioning_cases", "b-strips-servers-keeps-rest", changed)["revision"] = "A"
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_provisioning_retained_table_dropped_from_fixture_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = self.case("provisioning_cases", "b-strips-servers-keeps-rest", changed)
++        case["native_config_toml"] = case["native_config_toml"].replace("[tui]\ntheme = \"dark\"\n\n", "")
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_provisioning_retained_value_mutation_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = self.case("provisioning_cases", "b-strips-servers-keeps-rest", changed)
++        case["expected"]["seeded_members"]["model"] = "gpt-5-mini"
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_provisioning_diagnostic_silenced_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("provisioning_cases", "b-strips-servers-keeps-rest", changed)["expected"]["diagnostic"] = None
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_provisioning_warnings_not_interchangeable(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("provisioning_cases", "a-copies-whole-with-servers", changed)["expected"]["diagnostic"] = (
++            "mcp_native_servers_not_inherited"
++        )
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++        changed = copy.deepcopy(self.vector)
++        self.case("provisioning_cases", "b-strips-servers-keeps-rest", changed)["expected"]["diagnostic"] = (
++            "mcp_native_servers_ungoverned"
++        )
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_provisioning_hint_without_warning_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("provisioning_cases", "b-strips-servers-keeps-rest", changed)["expected"]["migration_hint"] = True
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++        changed = copy.deepcopy(self.vector)
++        self.case("provisioning_cases", "a-without-servers-no-warning", changed)["expected"]["migration_hint"] = True
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_provisioning_record_revision_mismatch_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = self.case("provisioning_cases", "b-strips-servers-keeps-rest", changed)
++        case["expected"]["codex_seed_record"]["revision"] = "A"
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++        changed = copy.deepcopy(self.vector)
++        case = self.case("provisioning_cases", "b-strips-servers-keeps-rest", changed)
++        case["expected"]["codex_seed_record"]["revision"] = "C"
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_provisioning_record_names_unsorted_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = self.case("provisioning_cases", "b-strips-servers-keeps-rest", changed)
++        case["expected"]["codex_seed_record"]["native_mcp_servers"] = ["gh", "figma"]
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_provisioning_record_extra_member_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = self.case("provisioning_cases", "b-strips-servers-keeps-rest", changed)
++        case["expected"]["codex_seed_record"]["commands"] = ["npx"]
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_provisioning_invalid_toml_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = self.case("provisioning_cases", "b-strips-servers-keeps-rest", changed)
++        case["native_config_toml"] += "\n[unclosed"
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_provisioning_seeded_flag_flip_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = self.case("provisioning_cases", "b-strips-servers-keeps-rest", changed)
++        case["expected"]["seeded_has_mcp_servers"] = True
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_provisioning_seeded_members_reorder_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = self.case("provisioning_cases", "b-strips-servers-keeps-rest", changed)
++        case["expected"]["seeded_top_level_members"] = ["tui", "projects", "model"]
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_provisioning_names_truncation_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = self.case("provisioning_cases", "b-strips-servers-keeps-rest", changed)
++        case["expected"]["names"] = ["figma"]
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_posture_unknown_adapter_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("posture_cases", "a-home-lists-ungoverned", changed)["environment"] = "cursor"
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_provisioning_extra_case_key_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("provisioning_cases", "b-strips-servers-keeps-rest", changed)["notes"] = "stale annotation"
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_provisioning_non_table_mcp_servers_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = self.case("provisioning_cases", "b-empty-mcp-servers-table-no-warning", changed)
++        case["native_config_toml"] = case["native_config_toml"].replace("[mcp_servers]\n", "mcp_servers = \"x\"\n")
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_posture_migration_case_replaced_with_same_revision_home_is_rejected(self) -> None:
++        # The F2 replacement: the B-manager/A-home case body replaced with
++        # the A/A case under the same name must fail on the shipped pin.
++        changed = copy.deepcopy(self.vector)
++        self.replace_body(changed, "posture_cases", "a-home-unstripped-under-b", "a-home-lists-ungoverned")
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_posture_migration_case_replaced_with_stripped_home_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.replace_body(changed, "posture_cases", "a-home-unstripped-under-b", "b-home-lists-not-inherited")
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_posture_unstripped_dropped_from_migration_case_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = self.case("posture_cases", "a-home-unstripped-under-b", changed)
++        case["expected"]["status_diagnostics"] = ["mcp_native_servers_ungoverned"]
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_posture_repair_hint_rides_only_unstripped(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("posture_cases", "pre-rule-home-unstripped-under-b", changed)["expected"]["repair_hint"] = False
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++        changed = copy.deepcopy(self.vector)
++        self.case("posture_cases", "b-home-lists-not-inherited", changed)["expected"]["repair_hint"] = True
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_posture_cross_adapter_record_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = self.case("posture_cases", "non-codex-home-without-record-no-rows", changed)
++        case["codex_seed_record"] = {"revision": "B", "native_mcp_servers": []}
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_posture_names_mismatch_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("posture_cases", "a-home-lists-ungoverned", changed)["expected"]["names_listed"] = []
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_posture_row_non_current_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("posture_cases", "a-home-unstripped-under-b", changed)["expected"]["row_current"] = False
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_dropped_provisioning_case_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        changed["provisioning_cases"] = [
++            item for item in changed["provisioning_cases"] if item["name"] != "b-empty-mcp-servers-table-no-warning"
++        ]
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_dropped_posture_case_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        changed["posture_cases"] = [
++            item for item in changed["posture_cases"] if item["name"] != "a-home-unstripped-under-b"
++        ]
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_revision_string_mutation_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        changed["revision_b"] = "flip release: the codex_cli seed strips everything"
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_derivation_corners_beyond_corpus(self) -> None:
++        # Totality of the posture derivation for input combinations the
++        # corpus does not carry: an empty A snapshot under a B manager
++        # warns nothing, and a stripped B record never reports unstripped.
++        self.assertEqual(
++            validate.e3_expected_posture("B", "codex_cli", "A", []),
++            {
++                "codex_seed_row": "B",
++                "status_diagnostics": [],
++                "names_listed": [],
++                "listed_as": "none",
++                "repair_hint": False,
++                "row_current": True,
++            },
++        )
++        self.assertEqual(
++            validate.e3_expected_posture("A", "codex_cli", "B", ["figma"]),
++            {
++                "codex_seed_row": "A",
++                "status_diagnostics": ["mcp_native_servers_not_inherited"],
++                "names_listed": ["figma"],
++                "listed_as": "not-inherited",
++                "repair_hint": False,
++                "row_current": True,
++            },
++        )
++
++    def test_gate_is_registered_in_main(self) -> None:
++        import inspect
++
++        self.assertIn("validate_environments_codex_seed_vectors", inspect.getsource(validate.main))
++
++
+ class ContextVersionVectorTests(unittest.TestCase):
+     """The environments.md section 1.3/1.4 gate must fail closed.
+ 
+diff --git a/tools/validate.py b/tools/validate.py
+index 72c2ebd..13a7c25 100644
+--- a/tools/validate.py
++++ b/tools/validate.py
+@@ -8,6 +8,7 @@ import hashlib
+ import json
+ import re
+ import sys
++import tomllib
+ import urllib.parse
+ from pathlib import Path
+ from typing import Any
+@@ -6424,6 +6425,325 @@ def validate_environments_store_boundary_vectors(vector: Any = None) -> None:
+                 raise ValidationFailure(f"store-boundary case {name}: a trusted row names no failing check")
+         elif case.get("names_failing_check") not in failing:
+             raise ValidationFailure(f"store-boundary case {name}: the status row names the failing check")
++# Sections 7.4, 7.7, 7.8, 8.2, 12: codex seed mcp_servers handling (E3)
++
++
++E3_DIAG_UNGOVERNED = "mcp_native_servers_ungoverned"
++E3_DIAG_NOT_INHERITED = "mcp_native_servers_not_inherited"
++E3_DIAG_UNSTRIPPED = "mcp_seed_unstripped"
++
++E3_REVISION_A = "warning release: the codex_cli seed is still copied whole, but provisioning warns mcp_native_servers_ungoverned naming every inherited native mcp_servers entry with the migration hint"
++E3_REVISION_B = "flip release: the codex_cli seed strips the mcp_servers table and every mcp_servers.* sub-table; provisioning reports the stripped names once with mcp_native_servers_not_inherited"
++
++# Each provisioning case is pinned to the branch it exercises: the seed
++# rule revision, the native mcp_servers state (present/absent/empty), the
++# TOML form that carries it, and the exact native top-level member set. A
++# named case whose body no longer matches its pin — e.g. the B-strip case
++# replaced by the no-server case — fails here even when the replacement is
++# internally consistent.
++E3_PROVISIONING_BRANCH = {
++    "a-copies-whole-with-servers": {
++        "revision": "A", "servers": "present", "form": "subtable",
++        "members": frozenset({"mcp_servers", "model", "projects", "tui"}),
++    },
++    "b-strips-servers-keeps-rest": {
++        "revision": "B", "servers": "present", "form": "subtable",
++        "members": frozenset({"mcp_servers", "model", "projects", "tui"}),
++    },
++    "a-without-servers-no-warning": {
++        "revision": "A", "servers": "absent", "form": "absent",
++        "members": frozenset({"model", "projects", "tui"}),
++    },
++    "b-without-servers-no-warning": {
++        "revision": "B", "servers": "absent", "form": "absent",
++        "members": frozenset({"model", "projects", "tui"}),
++    },
++    "b-subtable-only-form-stripped": {
++        "revision": "B", "servers": "present", "form": "subtable-only",
++        "members": frozenset({"mcp_servers", "model"}),
++    },
++    "a-inline-table-form-inherited": {
++        "revision": "A", "servers": "present", "form": "inline",
++        "members": frozenset({"mcp_servers", "model"}),
++    },
++    "b-empty-mcp-servers-table-no-warning": {
++        "revision": "B", "servers": "empty", "form": "empty-table",
++        "members": frozenset({"mcp_servers", "model"}),
++    },
++}
++
++# Each posture case is pinned to its inputs: the manager-shipped revision,
++# the adapter, the home's recorded seed revision (None means the record is
++# absent), and the snapshot state. The manager revision and the recorded
++# revision are distinct inputs: an A-record home under a B manager is its
++# own pinned case, not the A/A one.
++E3_POSTURE_BRANCH = {
++    "a-home-lists-ungoverned": {
++        "shipped": "A", "environment": "codex_cli", "record": "A", "snapshot": "non-empty",
++    },
++    "a-home-unstripped-under-b": {
++        "shipped": "B", "environment": "codex_cli", "record": "A", "snapshot": "non-empty",
++    },
++    "b-home-lists-not-inherited": {
++        "shipped": "B", "environment": "codex_cli", "record": "B", "snapshot": "non-empty",
++    },
++    "pre-rule-home-unstripped-under-b": {
++        "shipped": "B", "environment": "codex_cli", "record": None, "snapshot": "absent",
++    },
++    "pre-rule-home-unstripped-under-a": {
++        "shipped": "A", "environment": "codex_cli", "record": None, "snapshot": "absent",
++    },
++    "b-home-empty-snapshot-no-rows": {
++        "shipped": "B", "environment": "codex_cli", "record": "B", "snapshot": "empty",
++    },
++    "a-home-empty-snapshot-no-rows": {
++        "shipped": "A", "environment": "codex_cli", "record": "A", "snapshot": "empty",
++    },
++    "non-codex-home-without-record-no-rows": {
++        "shipped": "B", "environment": "claude_code", "record": None, "snapshot": "absent",
++    },
++}
++
++E3_PROVISIONING_CASE_KEYS = frozenset({"name", "revision", "native_config_toml", "expected"})
++E3_PROVISIONING_EXPECTED_KEYS = frozenset({
++    "seeded_has_mcp_servers", "seeded_top_level_members", "seeded_members",
++    "names", "diagnostic", "migration_hint", "codex_seed_record",
++})
++E3_POSTURE_CASE_KEYS = frozenset({"name", "revision_shipped", "environment", "codex_seed_record", "expected"})
++E3_POSTURE_EXPECTED_KEYS = frozenset({
++    "codex_seed_row", "status_diagnostics", "names_listed", "listed_as", "repair_hint", "row_current",
++})
++
++
++def e3_check_seed_record(value: Any, label: str) -> tuple[str, list[str]]:
++    """A section 8.2 seed record is the closed `{ revision,
++    native_mcp_servers }` object with an A/B revision and an
++    ascending-byte-order snapshot of non-empty names; return both."""
++    if not isinstance(value, dict) or set(value) != {"revision", "native_mcp_servers"}:
++        raise ValidationFailure(f"{label}: a codex seed record is exactly {{ revision, native_mcp_servers }}")
++    revision = value.get("revision")
++    if revision not in ("A", "B"):
++        raise ValidationFailure(f"{label}: a seed record revision must be A or B")
++    names = value.get("native_mcp_servers")
++    if not isinstance(names, list) or any(not isinstance(item, str) or not item for item in names):
++        raise ValidationFailure(f"{label}: native_mcp_servers must be an array of non-empty names")
++    if len(set(names)) != len(names):
++        raise ValidationFailure(f"{label}: native_mcp_servers names must be unique")
++    if names != sorted(names, key=lambda item: item.encode("utf-8")):
++        raise ValidationFailure(f"{label}: native_mcp_servers must be in ascending byte order")
++    return revision, names
++
++
++def e3_parse_native_config(text: Any, label: str) -> tuple[dict[str, Any], list[str]]:
++    """Parse a provisioning fixture: the native `config.toml` bytes and the
++    sorted native `mcp_servers` entry names. A fixture that is not TOML, or
++    whose `mcp_servers` member is not a table, asserts nothing and fails."""
++    if not isinstance(text, str):
++        raise ValidationFailure(f"{label}: native_config_toml must be text")
++    try:
++        doc = tomllib.loads(text)
++    except tomllib.TOMLDecodeError as exc:
++        raise ValidationFailure(f"{label}: native_config_toml is not valid TOML ({exc})") from exc
++    if "mcp_servers" not in doc:
++        return doc, []
++    servers = doc["mcp_servers"]
++    if not isinstance(servers, dict):
++        raise ValidationFailure(f"{label}: a native mcp_servers member is a table")
++    names = sorted(servers, key=lambda item: item.encode("utf-8"))
++    if any(not name for name in names):
++        raise ValidationFailure(f"{label}: a native mcp_servers entry name is empty")
++    return doc, names
++
++
++def e3_expected_provisioning(revision: str, doc: dict[str, Any], names: list[str]) -> dict[str, Any]:
++    """Recompute the section 7.4 provisioning outcome: revision A seeds the
++    native document whole, revision B seeds every top-level member except
++    `mcp_servers`, and the warning fires exactly when the snapshot is
++    non-empty, with the migration hint only on the revision-A warning."""
++    seeded = dict(doc) if revision == "A" else {key: value for key, value in doc.items() if key != "mcp_servers"}
++    diagnostic = (E3_DIAG_UNGOVERNED if revision == "A" else E3_DIAG_NOT_INHERITED) if names else None
++    return {
++        "seeded_has_mcp_servers": "mcp_servers" in seeded,
++        "seeded_top_level_members": sorted(seeded),
++        "seeded_members": seeded,
++        "names": names,
++        "diagnostic": diagnostic,
++        "migration_hint": diagnostic == E3_DIAG_UNGOVERNED,
++    }
++
++
++def e3_expected_posture(
++    shipped: str, environment: str, record_revision: str | None, record_names: list[str]
++) -> dict[str, Any]:
++    """Recompute the section 12 posture rows from the manager-shipped
++    revision and the home's recorded seed revision. An A-record home keeps
++    its inherited names listed as ungoverned under either manager and adds
++    `mcp_seed_unstripped` under a B manager when its snapshot is
++    non-empty; a B record lists stripped names as not inherited; an absent
++    record is pre-rule; any other adapter rows nothing. Every warning row
++    stays current."""
++    if environment != "codex_cli":
++        diagnostics, names, listed, repair = [], [], "none", False
++    elif record_revision is None:
++        diagnostics, names, listed, repair = [E3_DIAG_UNSTRIPPED], [], "unknown", True
++    elif record_revision == "A":
++        names = record_names
++        diagnostics = [E3_DIAG_UNGOVERNED] if record_names else []
++        if shipped == "B" and record_names:
++            diagnostics.append(E3_DIAG_UNSTRIPPED)
++        listed = "ungoverned" if record_names else "none"
++        repair = E3_DIAG_UNSTRIPPED in diagnostics
++    else:
++        names = record_names
++        diagnostics = [E3_DIAG_NOT_INHERITED] if record_names else []
++        listed = "not-inherited" if record_names else "none"
++        repair = False
++    return {
++        "codex_seed_row": shipped,
++        "status_diagnostics": diagnostics,
++        "names_listed": names,
++        "listed_as": listed,
++        "repair_hint": repair,
++        "row_current": True,
++    }
++
++
++def e3_check_native_form(raw: str, form: str, label: str) -> None:
++    """The TOML spelling the named case promises: dotted sub-tables, an
++    inline table, an empty table, or no `mcp_servers` mention at all. The
++    parsed document cannot tell an inline table from dotted sub-tables, so
++    the pin reads the raw fixture text."""
++    if form == "subtable" and "[mcp_servers." not in raw:
++        raise ValidationFailure(f"{label}: the pinned subtable form is gone")
++    elif form == "subtable-only" and ("[mcp_servers." not in raw or "mcp_servers =" in raw):
++        raise ValidationFailure(f"{label}: the pinned subtable-only form is gone")
++    elif form == "inline" and "mcp_servers = {" not in raw:
++        raise ValidationFailure(f"{label}: the pinned inline-table form is gone")
++    elif form == "absent" and "mcp_servers" in raw:
++        raise ValidationFailure(f"{label}: the pinned server-free form gained mcp_servers")
++    elif form == "empty-table" and ("[mcp_servers]" not in raw or "[mcp_servers." in raw):
++        raise ValidationFailure(f"{label}: the pinned empty-table form is gone")
++
++
++def validate_environments_codex_seed_vectors(
++    vector: Any = None, suite_root: Path | None = None
++) -> None:
++    """Recompute the E3 codex-seed provisioning and posture expectations.
++
++    Every provisioning case is derived from its declared inputs — the
++    parsed native `config.toml` members and values, the seed rule
++    revision, the snapshot names, the diagnostic and hint, and the marker
++    seed record — and every posture case from the manager-shipped
++    revision, the adapter, and the home's recorded seed revision. Every
++    named case is additionally pinned to the branch it exercises, so a
++    corpus where a named case no longer represents its branch — an
++    internally consistent replacement under the same name — fails here.
++    """
++    root = SUITE if suite_root is None else Path(suite_root)
++    if vector is None:
++        vector = load_json(root / "vectors" / "environments-codex-seed.json")
++    if (
++        vector.get("schema_version") != 1
++        or vector.get("protocol_version") != PROTOCOL_VERSION
++        or vector.get("capability") != "agent-environments"
++        or vector.get("capability_revision") != 1
++    ):
++        raise ValidationFailure("codex-seed vector has the wrong capability identity")
++    if vector.get("revision_a") != E3_REVISION_A or vector.get("revision_b") != E3_REVISION_B:
++        raise ValidationFailure("codex-seed revisions must pin exactly the warning and flip releases")
++
++    provisioning = named_cases(vector.get("provisioning_cases"), "codex-seed provisioning")
++    if set(provisioning) != set(E3_PROVISIONING_BRANCH):
++        raise ValidationFailure("codex-seed provisioning case inventory is not exact")
++    for name, case in provisioning.items():
++        label = f"codex-seed case {name}"
++        pin = E3_PROVISIONING_BRANCH[name]
++        if set(case) != E3_PROVISIONING_CASE_KEYS:
++            raise ValidationFailure(f"{label}: a provisioning case is exactly {{ name, revision, native_config_toml, expected }}")
++        revision = case.get("revision")
++        if revision not in ("A", "B"):
++            raise ValidationFailure(f"{label}: revision must be A or B")
++        if revision != pin["revision"]:
++            raise ValidationFailure(f"{label}: revision does not match the pinned one ({pin['revision']})")
++        raw = case.get("native_config_toml")
++        doc, names = e3_parse_native_config(raw, label)
++        if set(doc) != pin["members"]:
++            raise ValidationFailure(f"{label}: native top-level members are not the pinned set ({sorted(pin['members'])})")
++        servers_state = "absent" if "mcp_servers" not in doc else ("empty" if not names else "present")
++        if servers_state != pin["servers"]:
++            raise ValidationFailure(f"{label}: native mcp_servers are {servers_state}, the case pins {pin['servers']}")
++        e3_check_native_form(raw, pin["form"], label)
++        expected = case.get("expected")
++        if not isinstance(expected, dict) or set(expected) != E3_PROVISIONING_EXPECTED_KEYS:
++            raise ValidationFailure(f"{label}: expected is not the closed provisioning set")
++        want = e3_expected_provisioning(revision, doc, names)
++        if expected.get("seeded_has_mcp_servers") != want["seeded_has_mcp_servers"]:
++            raise ValidationFailure(f"{label}: seeded_has_mcp_servers is not the revision {revision} rule")
++        if expected.get("seeded_top_level_members") != want["seeded_top_level_members"]:
++            raise ValidationFailure(
++                f"{label}: seeded_top_level_members are not the revision {revision} rule ({want['seeded_top_level_members']})"
++            )
++        if expected.get("seeded_members") != want["seeded_members"]:
++            raise ValidationFailure(f"{label}: seeded_members are not the retained revision {revision} values")
++        if expected.get("names") != want["names"]:
++            raise ValidationFailure(f"{label}: names are not the native mcp_servers entries ({want['names']})")
++        if expected.get("diagnostic") != want["diagnostic"]:
++            raise ValidationFailure(f"{label}: diagnostic is not the revision {revision} rule ({want['diagnostic']!r})")
++        if expected.get("migration_hint") != want["migration_hint"]:
++            raise ValidationFailure(f"{label}: migration_hint rides only the revision-A warning")
++        record_revision, record_names = e3_check_seed_record(expected.get("codex_seed_record"), label)
++        if record_revision != revision or record_names != names:
++            raise ValidationFailure(f"{label}: codex_seed_record is not the revision {revision} record with the native names")
++
++    posture = named_cases(vector.get("posture_cases"), "codex-seed posture")
++    if set(posture) != set(E3_POSTURE_BRANCH):
++        raise ValidationFailure("codex-seed posture case inventory is not exact")
++    for name, case in posture.items():
++        label = f"codex-seed case {name}"
++        pin = E3_POSTURE_BRANCH[name]
++        if set(case) != E3_POSTURE_CASE_KEYS:
++            raise ValidationFailure(f"{label}: a posture case is exactly {{ name, revision_shipped, environment, codex_seed_record, expected }}")
++        shipped = case.get("revision_shipped")
++        if shipped not in ("A", "B"):
++            raise ValidationFailure(f"{label}: revision_shipped must be A or B")
++        if shipped != pin["shipped"]:
++            raise ValidationFailure(f"{label}: revision_shipped does not match the pinned one ({pin['shipped']})")
++        environment = case.get("environment")
++        if environment not in ENVIRONMENT_HOME_VARIABLES:
++            raise ValidationFailure(f"{label}: environment {environment!r} is outside the closed adapter set")
++        if environment != pin["environment"]:
++            raise ValidationFailure(f"{label}: environment does not match the pinned one ({pin['environment']})")
++        record = case.get("codex_seed_record")
++        if record is None:
++            if pin["record"] is not None or pin["snapshot"] != "absent":
++                raise ValidationFailure(f"{label}: the seed record is absent, the case pins a {pin['record']} record")
++            record_revision, record_names = None, []
++        else:
++            record_revision, record_names = e3_check_seed_record(record, label)
++            if record_revision != pin["record"]:
++                raise ValidationFailure(f"{label}: recorded revision does not match the pinned one ({pin['record']})")
++            snapshot = "empty" if not record_names else "non-empty"
++            if snapshot != pin["snapshot"]:
++                raise ValidationFailure(f"{label}: snapshot is {snapshot}, the case pins {pin['snapshot']}")
++        # The non-codex pin (record None) is what enforces the section 8.2
++        # absence rule: any other adapter carrying a seed record fails its
++        # recorded-revision pin above.
++        expected = case.get("expected")
++        if not isinstance(expected, dict) or set(expected) != E3_POSTURE_EXPECTED_KEYS:
++            raise ValidationFailure(f"{label}: expected is not the closed posture set")
++        want = e3_expected_posture(shipped, environment, record_revision, record_names)
++        if expected.get("codex_seed_row") != want["codex_seed_row"]:
++            raise ValidationFailure(f"{label}: codex_seed_row is not the shipped revision ({want['codex_seed_row']})")
++        if expected.get("status_diagnostics") != want["status_diagnostics"]:
++            raise ValidationFailure(f"{label}: status_diagnostics are not the posture rule ({want['status_diagnostics']})")
++        if expected.get("names_listed") != want["names_listed"]:
++            raise ValidationFailure(f"{label}: names_listed are not the recorded names ({want['names_listed']})")
++        if expected.get("listed_as") != want["listed_as"]:
++            raise ValidationFailure(f"{label}: listed_as is not the posture rule ({want['listed_as']!r})")
++        if expected.get("repair_hint") != want["repair_hint"]:
++            raise ValidationFailure(f"{label}: repair_hint rides only mcp_seed_unstripped")
++        if expected.get("row_current") != want["row_current"]:
++            raise ValidationFailure(f"{label}: a codex-seed warning row stays current")
+ 
+ 
+ # ---------------------------------------------------------------------------
+@@ -7483,6 +7803,7 @@ def main() -> int:
+         validate_environments_env_passthrough_vectors,
+         validate_environments_source_signers_vectors,
+         validate_environments_store_boundary_vectors,
++        validate_environments_codex_seed_vectors,
+         validate_context_version_vectors,
+         validate_context_detector_vectors,
+         validate_snapshot_acquisition_vectors,

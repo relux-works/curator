@@ -44,6 +44,14 @@ carries the product scope; this file carries where and how.
 6. Posture: every gate added gains its `env status` (or `curator doctor`-class)
    reporting row in the text.
 
+7. Validator gates for new vector families MUST pin each required scenario to
+   its discriminating inputs (a named case that no longer represents its
+   branch — e.g. a negative case rewritten as an internally consistent passing
+   case under the same name, or five failure classes collapsed to one — MUST
+   be refused by `tools/validate.py`), with negative tests in
+   `tools/test_validate.py` that perform exactly such replacements. Reviewers
+   probe this every round; two revisions were rejected for it.
+
 ## Validation and evidence
 - Run `make validate` from the worktree (the repository's Python venv; state
   the exact command, shell and exit code). Run any vector/schema checks the

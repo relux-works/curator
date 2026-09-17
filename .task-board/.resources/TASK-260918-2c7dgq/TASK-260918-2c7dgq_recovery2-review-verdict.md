@@ -1,0 +1,11 @@
+# Recovery 2 verdict and logbook
+
+Verdict: ACCEPTED for exact 4a2fa3ec428b5021e9e8a80f29fa7fc5a88e4990, preserving TASK-260918-2c7dgq_review-verdict.md.
+
+RUN-260917-8162f1 is not goal-bound. Initial required reviewing mutation refused: terminal_status, already done. All six checklist items are checked.
+
+Fresh checks in this run: delivery HEAD exact and git status clean; actual git diff e8b53a0 4a2fa3e SHA256 651809cf63fd94f11b6e41b97a3e8211703d64b33d47b87a0fc66d403372bcc8 equals attached union; accepted rev2 patch SHA256 dd6d113236ac0137285e050ee8bb8b51e786530e961e392530db20b18e433feb equals assignment. Read original per-hunk review and gate transcripts. Accept prior original-run evidence: regenerate-check exit 0; validate exit 0, 439 Python tests plus Go tests; three invalid vector substitutions rejected through main. These gates were NOT rerun in recovery 2. No new candidate changes justify repeating the long suite. Original nonblocking punctuation nit remains.
+
+Lifecycle diagnosis: board notes explicitly show two autonomous retries because reviewer completion cannot infer acceptance from done and expects accept_cr. task-board worktree status STORY-260916-1i1gfo --json establishes that the only CR is CR-TASK-260916-2rnkei-2, already accepted and owned by a different task/reviewer. There is NO CR for this landing-review task. Inventing a revision, accepting the other task, changing runner records, or supplying commit_ack would violate scope/ownership. The brief expressly instructed this review-only task to finish done; it already did.
+
+Recommendation to coordinator: preserve the accepted landing verdict and existing done task; reconcile the runner completion policy for review-only tasks without CRs, rather than scheduling the same reviewer again. Alternative if a CR is mandatory: arrange an explicitly tracked producer/reviewer lifecycle on an appropriate new element, at the cost of redundant workflow. No human product decision is needed, and this is not grounds to mark accepted code blocked or request code rework. No runtime code or board internals changed; no source edits, commits, long-running processes, or merges. Acceptance evidence is durable; runner completion remains a separate unresolved orchestration mismatch.
