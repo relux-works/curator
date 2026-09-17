@@ -1,0 +1,300 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 9bc34c4..247db27 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -27,7 +27,7 @@ jobs:
+         uses: actions/checkout@v4
+         with:
+           repository: relux-works/curator-spec
+-          ref: cbe912d064e06275b0a1aa6762b7c31f687051c5
++          ref: dced9b8317e0e8af79edf2d0539b32bd22b6c85b
+           path: protocol-spec
+       - uses: actions/setup-python@v5
+         with:
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index e98b9a1..067aaeb 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -33,6 +33,11 @@
+ 
+ ### Security
+ 
++- R1: `GET /v1/records` and `GET /v1/log` page envelopes now carry the
++  REQUIRED `boundary` member: the complete signed snapshot object
++  (`registry-snapshot-v1`, all fields including `sig`) at which the page was
++  evaluated, byte-identical across one cursor chain. Envelopes validate
++  against `records-response-v2` / `log-response-v2` (curator-spec `dced9b8`).
+ - `genkey --force` now refuses to replace the signer of a non-empty registry.
+ - Corrupt log, projection, snapshot, idempotency, or import-ledger state fails
+   readiness instead of truncating or repairing authoritative history.
+diff --git a/README.md b/README.md
+index 9e43cee..95f25d5 100644
+--- a/README.md
++++ b/README.md
+@@ -23,6 +23,8 @@ Ed25519 keys before trusting it.
+   must verify against that key.
+ - Signed pagination cursors bind the query to one immutable snapshot boundary;
+   concurrent appends cannot duplicate, omit, replace, or reorder later pages.
++  Every records and log page states that boundary in its signed `boundary`
++  member, byte-identical across one cursor chain.
+ - Log append, snapshot state, and auditor-scoped idempotency commit in one
+   serialized durable transaction. Startup fails closed on chain or ledger
+   corruption.
+@@ -55,9 +57,11 @@ docker compose exec registry curator-skill-registry --home /data genkey
+ - `GET /health`
+ - `GET /v1/meta` registry name, public keys, schema versions, policy
+ - `GET /v1/records?source_identity=&commit=` or `?content_sha256=` with
+-  `limit`, `cursor`, and `next_cursor`
++  `limit`, `cursor`, and `next_cursor`; every page carries the signed
++  `boundary` snapshot it was evaluated at
+ - `GET /v1/snapshot` signed Merkle root, size, version, timestamp
+-- `GET /v1/log?since=` paginated transparency log entries
++- `GET /v1/log?since=` paginated transparency log entries, each page carrying
++  its signed `boundary`
+ - `POST /v1/records` submit a signed record (auditor token required;
+   `Idempotency-Key` supported)
+ 
+diff --git a/src/csk_registry/app.py b/src/csk_registry/app.py
+index e08b5e8..fbaeb4a 100644
+--- a/src/csk_registry/app.py
++++ b/src/csk_registry/app.py
+@@ -257,7 +257,8 @@ def create_app(
+             else None
+         )
+         response.headers["Cache-Control"] = f"public, max-age={CURSOR_TTL_SECONDS}"
+-        return {"records": found, "next_cursor": next_cursor}
++        boundary_snapshot = build_snapshot(store, signing_key, boundary=boundary)
++        return {"records": found, "next_cursor": next_cursor, "boundary": boundary_snapshot}
+ 
+     @app.get("/v1/snapshot")
+     def snapshot(response: Response) -> dict[str, Any]:
+@@ -306,7 +307,8 @@ def create_app(
+             else None
+         )
+         response.headers["Cache-Control"] = f"public, max-age={CURSOR_TTL_SECONDS}"
+-        return {"entries": encoded, "next_cursor": next_cursor}
++        boundary_snapshot = build_snapshot(store, signing_key, boundary=boundary)
++        return {"entries": encoded, "next_cursor": next_cursor, "boundary": boundary_snapshot}
+ 
+     @app.post("/v1/records")
+     async def submit(
+diff --git a/tests/test_protocol_conformance.py b/tests/test_protocol_conformance.py
+index 8a3267d..b523bac 100644
+--- a/tests/test_protocol_conformance.py
++++ b/tests/test_protocol_conformance.py
+@@ -167,6 +167,135 @@ def test_shared_service_snapshot_bound_pagination_vector(tmp_path: Path) -> None
+     assert [record["audit"]["case"] for record in current] == case["expected_new_query_ids"]
+ 
+ 
++def _spec_schema(name: str) -> dict[str, Any]:
++    path = _root().parent.parent / "schemas" / "v1" / name
++    assert path.is_file(), f"spec schema not found: {path}"
++    schema = json.loads(path.read_text(encoding="utf-8"))
++    assert schema.get("additionalProperties") is False
++    return schema
++
++
++def _check_page_envelope(kind: str, envelope: Any, schema: dict[str, Any]) -> None:
++    """Mirror records/log-response-v2 against a served page envelope."""
++    items_key = "records" if kind == "records" else "entries"
++    assert isinstance(envelope, dict)
++    assert set(envelope) == set(schema["required"]) == {items_key, "next_cursor", "boundary"}
++    items = envelope[items_key]
++    assert isinstance(items, list) and len(items) <= 1000
++    if kind == "records":
++        assert all(isinstance(record, dict) for record in items)
++    else:
++        for entry in items:
++            assert isinstance(entry, dict)
++            assert set(entry) == {"seq", "entry_hash", "prev_hash", "record"}
++            assert isinstance(entry["seq"], int) and not isinstance(entry["seq"], bool)
++            assert isinstance(entry["record"], dict)
++    cursor = envelope["next_cursor"]
++    assert cursor is None or (isinstance(cursor, str) and 1 <= len(cursor) <= 4096)
++    validate_snapshot(envelope["boundary"])
++
++
++@pytest.mark.parametrize(
++    "schema_name,kind",
++    [
++        ("records-response-v2.schema.json", "records"),
++        ("log-response-v2.schema.json", "log"),
++    ],
++)
++def test_shared_service_page_envelope_schema_cases(schema_name: str, kind: str) -> None:
++    schema = _spec_schema(schema_name)
++    index = json.loads((_root() / "schema-cases" / "index.json").read_text(encoding="utf-8"))
++    cases = [entry for entry in index if entry["schema"] == schema_name]
++    assert cases, f"no schema-cases registered for {schema_name}"
++    for entry in cases:
++        instance = json.loads(
++            (_root() / "schema-cases" / entry["instance"]).read_text(encoding="utf-8")
++        )
++        if entry["valid"]:
++            _check_page_envelope(kind, instance, schema)
++        else:
++            with pytest.raises((AssertionError, ProtocolError)):
++                _check_page_envelope(kind, instance, schema)
++
++
++def test_shared_service_page_boundary_vectors(tmp_path: Path) -> None:
++    vectors = _json("vectors/registry-service.json")
++    pagination = vectors["pagination"]
++    assert pagination["boundary_emitted_on_every_page"] is True
++    assert pagination["chain_boundary_byte_identical"] is True
++    records_schema = _spec_schema("records-response-v2.schema.json")
++    log_schema = _spec_schema("log-response-v2.schema.json")
++
++    registry_key = signing.generate_key()
++    store = Store(tmp_path / "boundary-registry.db")
++    for item in vectors["records"]:
++        store.append(item["record"], created_at="2026-07-13T00:00:00Z")
++    client = TestClient(
++        create_app(store=store, signing_key=registry_key, tokens=AuditorTokens([]))
++    )
++
++    query = dict(pagination["query"])
++    first_response = client.get("/v1/records", params=query)
++    assert first_response.status_code == 200
++    first = first_response.json()
++    _check_page_envelope("records", first, records_schema)
++    assert [record["audit"]["case"] for record in first["records"]] == pagination[
++        "expected_pages"
++    ][0]
++    assert first["boundary"]["log_size"] == pagination["boundary_log_size"]
++    assert signing.verify_signed(registry_key.public_pinned, first["boundary"])
++    assert first["boundary"] == client.get("/v1/snapshot").json()
++    chain_boundary = signing.canonical_document_bytes(first["boundary"])
++
++    appended = pagination["append_after_first_page"]
++    store.append(appended["record"], created_at="2026-07-13T00:01:00Z")
++
++    assert isinstance(first["next_cursor"], str) and first["next_cursor"]
++    second_response = client.get(
++        "/v1/records", params={**query, "cursor": first["next_cursor"]}
++    )
++    assert second_response.status_code == 200
++    second = second_response.json()
++    _check_page_envelope("records", second, records_schema)
++    assert [record["audit"]["case"] for record in second["records"]] == pagination[
++        "expected_original_cursor_ids"
++    ]
++    assert second["next_cursor"] is None
++    assert signing.verify_signed(registry_key.public_pinned, second["boundary"])
++    assert signing.canonical_document_bytes(second["boundary"]) == chain_boundary
++
++    fresh = client.get(
++        "/v1/records",
++        params={"content_sha256": query["content_sha256"], "limit": 100},
++    ).json()
++    _check_page_envelope("records", fresh, records_schema)
++    assert [record["audit"]["case"] for record in fresh["records"]] == pagination[
++        "expected_new_query_ids"
++    ]
++    assert fresh["next_cursor"] is None
++    assert signing.verify_signed(registry_key.public_pinned, fresh["boundary"])
++    assert fresh["boundary"] == client.get("/v1/snapshot").json()
++    assert signing.canonical_document_bytes(fresh["boundary"]) != chain_boundary
++
++    log_first = client.get("/v1/log", params={"since": 0, "limit": 2}).json()
++    _check_page_envelope("log", log_first, log_schema)
++    assert signing.verify_signed(registry_key.public_pinned, log_first["boundary"])
++    assert log_first["boundary"] == client.get("/v1/snapshot").json()
++    log_chain = signing.canonical_document_bytes(log_first["boundary"])
++    entries = list(log_first["entries"])
++    body = log_first
++    while body["next_cursor"] is not None:
++        body = client.get(
++            "/v1/log",
++            params={"since": 0, "limit": 2, "cursor": body["next_cursor"]},
++        ).json()
++        _check_page_envelope("log", body, log_schema)
++        assert signing.verify_signed(registry_key.public_pinned, body["boundary"])
++        assert signing.canonical_document_bytes(body["boundary"]) == log_chain
++        entries.extend(body["entries"])
++    assert [entry["seq"] for entry in entries] == [1, 2, 3, 4, 5]
++
++
+ @pytest.mark.parametrize(
+     "case",
+     _json("vectors/registry-service.json")["idempotency_cases"] if ROOT_TEXT else [],
+diff --git a/tests/test_registry.py b/tests/test_registry.py
+index baee3db..dd430a8 100644
+--- a/tests/test_registry.py
++++ b/tests/test_registry.py
+@@ -777,3 +777,75 @@ def test_errors_use_stable_protocol_envelope(tmp_path: Path, method: str, path:
+     assert response.status_code == expected_status
+     error = response.json()["error"]
+     assert set(error) >= {"code", "message"}
++
++
++def test_records_pages_carry_byte_identical_boundary(tmp_path: Path):
++    client, registry_key, token = _client(tmp_path)
++    auditor_key = client.app.state.auditor_key  # type: ignore[attr-defined]
++    content_hash = "sha256:" + "1f" * 32
++    for index in range(3):
++        record = auditor_key.sign_record(_body(name=f"skill-{index}"))
++        assert client.post(
++            "/v1/records", json=record, headers={"Authorization": f"Bearer {token}"}
++        ).status_code == 201
++    snapshot = client.get("/v1/snapshot").json()
++    first = client.get(
++        "/v1/records", params={"content_sha256": content_hash, "limit": 1}
++    ).json()
++    assert set(first) == {"records", "next_cursor", "boundary"}
++    assert first["boundary"] == snapshot
++    assert signing.verify_signed(registry_key.public_pinned, first["boundary"])
++    # An append after the first page must not move the chain's boundary.
++    replacement = auditor_key.sign_record(_body("revoked", name="skill-0"))
++    assert client.post(
++        "/v1/records", json=replacement, headers={"Authorization": f"Bearer {token}"}
++    ).status_code == 201
++    chain = signing.canonical_document_bytes(first["boundary"])
++    body = first
++    names = [record["name"] for record in body["records"]]
++    while body["next_cursor"] is not None:
++        body = client.get(
++            "/v1/records",
++            params={"content_sha256": content_hash, "limit": 1, "cursor": body["next_cursor"]},
++        ).json()
++        assert set(body) == {"records", "next_cursor", "boundary"}
++        assert signing.verify_signed(registry_key.public_pinned, body["boundary"])
++        assert signing.canonical_document_bytes(body["boundary"]) == chain
++        names.extend(record["name"] for record in body["records"])
++    assert names == ["skill-0", "skill-1", "skill-2"]
++    assert body["boundary"]["created_at"] == snapshot["created_at"]
++    assert client.get("/v1/snapshot").json()["log_size"] == snapshot["log_size"] + 1
++
++
++def test_log_pages_carry_byte_identical_boundary(tmp_path: Path):
++    client, registry_key, token = _client(tmp_path)
++    auditor_key = client.app.state.auditor_key  # type: ignore[attr-defined]
++    for index in range(3):
++        record = auditor_key.sign_record(_body("audited", commit=f"{index:040d}"))
++        assert client.post(
++            "/v1/records", json=record, headers={"Authorization": f"Bearer {token}"}
++        ).status_code == 201
++    snapshot = client.get("/v1/snapshot").json()
++    first = client.get("/v1/log", params={"limit": 1}).json()
++    assert set(first) == {"entries", "next_cursor", "boundary"}
++    assert first["boundary"] == snapshot
++    assert signing.verify_signed(registry_key.public_pinned, first["boundary"])
++    late = auditor_key.sign_record(_body("audited", commit=f"{3:040d}"))
++    assert client.post(
++        "/v1/records", json=late, headers={"Authorization": f"Bearer {token}"}
++    ).status_code == 201
++    chain = signing.canonical_document_bytes(first["boundary"])
++    body = first
++    sequences = [entry["seq"] for entry in body["entries"]]
++    while body["next_cursor"] is not None:
++        body = client.get(
++            "/v1/log",
++            params={"limit": 1, "cursor": body["next_cursor"]},
++        ).json()
++        assert set(body) == {"entries", "next_cursor", "boundary"}
++        assert signing.verify_signed(registry_key.public_pinned, body["boundary"])
++        assert signing.canonical_document_bytes(body["boundary"]) == chain
++        sequences.extend(entry["seq"] for entry in body["entries"])
++    assert sequences == [1, 2, 3]
++    assert body["boundary"]["log_size"] == snapshot["log_size"]
++    assert client.get("/v1/snapshot").json()["log_size"] == snapshot["log_size"] + 1

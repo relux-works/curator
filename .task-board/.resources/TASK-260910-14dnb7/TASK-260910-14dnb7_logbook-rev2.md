@@ -1,0 +1,3 @@
+# TASK-260910-14dnb7 reviewer logbook — revision 2
+
+2026-09-17: Closed both rev1 findings on exact candidate 70e1b62c79d273f7fb7db4f0a6e188ca746164e1. Complete signed boundary survives staged rotation for both endpoints; overlap-issued cursor signed by new key still refuses its old-key boundary after retirement. Real Draft 2020-12 harness rejects malformed served log entry_hash. Independent pytest 126 passed, strict mypy clean, 4/4 narrowing mutants killed, cursor measurements 781 chars. Accepted for integration; not landed. Historical rotation-exception prose in producer results is superseded by Revision 2. Full evidence in TASK-260910-14dnb7_review-verdict-rev2.md and review-attacks-rev2 resources.
