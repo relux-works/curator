@@ -1,0 +1,22 @@
+# TASK-260916-2bwfli revision 3 \u2014 ACCEPTED
+
+Exact candidate: 8726af9de76a590b2932ae0160f16a28539717dc; base 37e38d95a3f5bf1849f0e3d08dc2bf40217437f7. Reviewer RUN-260917-18ee1f. All candidate blobs were independently hashed against filesystem bytes (including symlink contents): zero mismatches. Workspace has exactly the nine leaf files over replayed checkpoints 57b0c9e and af51e2e; no stray files. Executor and accepted policy loader unchanged. No repository code edits or commits.
+
+R1 resolved: internal/install/drafttransport.go:71-81 loads the operator table and constructs the accepted CredentialProviders contract; cmd/curator/main.go:1494-1497 binds the machine paths and gitcred.Access reader. Unknown provider names do not borrow repository selections or become anonymous. Missing material refuses the attempt; permitted authentication fallback remains executor-owned. Explicit anonymity requires operator configuration. The new closed provider document stays outside package data. Present invalid input fails rather than falling back as absent.
+
+Independent narrow commands, zsh, direct process exit codes:
+- go test -p 1 ./internal/config ./internal/install -run 'Test(ParseSourceProviders|LoadSourceProviders|Draft|AcquireDraftNetwork|DefaultAcquireFetches)' -count=1 -timeout=90s: exit 0; config 0.985s, install 19.590s.
+- go test -p 1 ./cmd/curator -run 'TestDraftTransportProviderAdmission' -count=1 -timeout=90s: exit 0, 39.197s. 4/4 CLI cases: unknown HTTPS, unknown SSH, separate configured provider lookup/missing material, explicit anonymous.
+- go test -p 1 ./cmd/curator -run 'TestDraftTransportLegacyGolden|TestDraftTransportResolvedMatrix|TestProductionBinaryDispatchesSSHWrapper' -count=1 -timeout=90s: exit 0, 51.599s. Golden covers switch off with policy, switch on without policy, switch off without policy; resolved matrix covers allowed availability fallback, TLS refusal, malformed policy before fetch. Production wrapper binary checks passthrough and rejected invocation/state cases.
+- git diff --check and gofmt -l on seven leaf Go files: exit 0, no output.
+
+Independent gate attacks used temporary Go overlays; candidate bytes never modified. 2/2 mutants killed by behavioral assertions, not timeouts or compiler errors:
+1. Narrow provider admission by explicitly adding only missing prov-unknown as anonymous at the production caller. CLI unknown_https test: exit 1, 13.197s; failed because unknown provider exited 0 (test body 8.72s).
+2. Always-resolved caller (switch branch condition false). LegacyGolden: exit 1, 7.325s; switch-off invocation wrongly exited 1 (test body 6.79s).
+This measures two selected wiring gates, not exhaustive mutation coverage. Provider tests assert namespace lookups and fetch counts; they do not capture live credential traffic. No live credentials or real remote fetches used.
+
+Hosted evidence reused, not replayed: TASK-260916-2bwfli_change-request_rev3-validation.log exit 0, run https://github.com/relux-works/curator/actions/runs/35165029469. Independently queried gh run view (exit 0): success at c3db511972e327fd74aaf11244807166b6e281bf; git rev-parse confirms its tree equals the reviewed candidate exactly. 11/11 executed jobs successful: Ubuntu/macOS/Windows tests, Ubuntu/macOS race, lint, naming, interop, three gate self-tests. Candidate suite and rose-air skipped: no ARM runtime verification claimed. Windows fixture skips match .github/ci/skip-classes.tsv:60 platform-control vocabulary. No full local suite run.
+
+Read sibling accepted verdicts/results, prior rev2 rejection, rev3 results, and local normative repository-transport sections 1-3. Review follows attached scope ruling: production external-repository URL acquisition via run -> externalPipelineRequest -> acquireDraftNetwork; logical Skillfile repository spelling remains parser-only. This does not claim a new Expand/BuildExpanded production caller. Golden pins the repaired declared-URL lane, as disclosed and reviewed previously, rather than broken pre-leaf name-as-URL behavior. Docs caller section describes switch, machine policy/providers, SSH dispatch, platform refusal and these bounds. Frozen schemas unchanged.
+
+No goal bound; goal queried before verdict, no directives. No LOGBOOK.md edit under campaign prohibition; this artifact and board notes persist review findings. Accept revision 3 through accept_cr, routing to integrating; producer owns integration and done.

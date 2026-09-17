@@ -1,5 +1,5 @@
 ## Status
-to-review
+done
 
 ## Review
 required
@@ -139,6 +139,66 @@ spawn queued: [implementer] developer (muse) (run=RUN-260916-96ca5d, max_paralle
 spawn run started: [implementer] developer (muse) (run=RUN-260916-96ca5d)
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260916-96ca5d, pid=77187, exit=0)
+spawn autonomous recovery: run RUN-260916-96ca5d queued successor RUN-260916-6e78b0 (attempt 1/3, model=muse-spark-1.3-contributor): Change Request construction for TASK-260910-5nrmtt failed: Change Request CR-TASK-260910-5nrmtt-3 revision 3 validation failed at command 1/1 (1-based) with exit code 1; log resource TASK-260910-5nrmtt_change-request_rev3-validation.log; retry: fix the failure and complete the producer again; the configured suite will rerun automatically
+spawn run started: [implementer] developer (muse) (run=RUN-260916-6e78b0)
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260916-6e78b0, pid=94401, exit=0)
+spawn selection rationale tuple: {"role":"reviewer","pair":"gpt-6-astra/low","text":"independent review rev4 (transport resolution: positive grammar, Windows refusal); astra:low per worker policy"}
+spawn selection rationale for gpt-6-astra/low: independent review rev4 (transport resolution: positive grammar, Windows refusal); astra:low per worker policy
+spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [reviewer] reviewer (codex) (run=RUN-260916-d5435f, max_parallel=20)
+spawn run started: [reviewer] reviewer (codex) (run=RUN-260916-d5435f)
+Rev4 CHANGES_REQUESTED: 3/3 independent AcquireNetworkResolved probes permit forbidden fallback (two fetches, nil error). Unknown facility audit: policy denied is ignored; HTTP 503 and SSH DNS shapes accept unknown tails. Verdict and regression patch attached. Package tests/vet/gofmt pass; 2/2 narrowing mutants killed. No code edits; ordinary implementation rework.
+agent completed: [reviewer] reviewer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260916-d5435f, pid=12731, exit=0)
+spawn selection rationale tuple: {"role":"developer","pair":"muse-spark-1.3-contributor/xhigh","text":"rework rev5 (closed diagnostic grammar); xhigh after max stream-idle deaths; lite context"}
+spawn selection rationale for muse-spark-1.3-contributor/xhigh: rework rev5 (closed diagnostic grammar); xhigh after max stream-idle deaths; lite context
+spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=muse; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
+spawn queued: [implementer] developer (muse) (run=RUN-260916-546e63, max_parallel=20)
+spawn run started: [implementer] developer (muse) (run=RUN-260916-546e63)
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260916-546e63, pid=16657, exit=0)
+spawn selection rationale tuple: {"role":"reviewer","pair":"gpt-6-astra/low","text":"independent review rev5 (closed diagnostic grammar); astra:low per worker policy"}
+spawn selection rationale for gpt-6-astra/low: independent review rev5 (closed diagnostic grammar); astra:low per worker policy
+spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [reviewer] reviewer (codex) (run=RUN-260916-3f93e5, max_parallel=20)
+spawn run started: [reviewer] reviewer (codex) (run=RUN-260916-3f93e5)
+Revision 5 CHANGES_REQUESTED: transport.go:311 framingGlue invents line boundaries and admits malformed 503fatal trailer output; production-entry probe makes two fetches and succeeds. Verdict and reproducer attached. Both required mutants killed; focused tests/vet pass. Remove repair and retain glued-line refusal test. Candidate untouched.
+agent completed: [reviewer] reviewer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260916-3f93e5, pid=37508, exit=0)
+spawn selection rationale tuple: {"role":"developer","pair":"muse-spark-1.3-contributor/xhigh","text":"rework rev6 (remove framing-glue preprocessing); xhigh, lite context"}
+spawn selection rationale for muse-spark-1.3-contributor/xhigh: rework rev6 (remove framing-glue preprocessing); xhigh, lite context
+spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=muse; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
+spawn queued: [implementer] developer (muse) (run=RUN-260916-cd8efa, max_parallel=20)
+spawn run started: [implementer] developer (muse) (run=RUN-260916-cd8efa)
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260916-cd8efa, pid=41285, exit=0)
+No Change Request revision was published for TASK-260910-5nrmtt (handoff_unsatisfied): the board is not at to-review
+spawn autonomous recovery: run RUN-260916-cd8efa queued successor RUN-260916-dc1bf9 (attempt 1/3, model=muse-spark-1.3-contributor): producer run RUN-260916-cd8efa remains unsatisfied: producer run RUN-260916-cd8efa published no Change Request and reached no handoff branch while TASK-260910-5nrmtt is development: the board is not at to-review
+spawn run started: [implementer] developer (muse) (run=RUN-260916-dc1bf9)
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260916-dc1bf9, pid=63225, exit=0)
+spawn selection rationale tuple: {"role":"reviewer","pair":"gpt-6-astra/low","text":"independent review rev6 (framing-glue removed); astra:low per worker policy"}
+spawn selection rationale for gpt-6-astra/low: independent review rev6 (framing-glue removed); astra:low per worker policy
+spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [reviewer] reviewer (codex) (run=RUN-260916-044c21, max_parallel=20)
+spawn run started: [reviewer] reviewer (codex) (run=RUN-260916-044c21)
+Revision 6 independently accepted: exact candidate verified; glue, unknown-line and free-tail mutants killed 3/3. Narrow suite had one timing-sensitive two-fetch assertion failure; isolated deadline test rerun passed, elapsed bound never failed. Details and platform bounds in TASK-260910-5nrmtt_review-verdict-rev6.md.
+agent completed: [reviewer] reviewer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260916-044c21, pid=9434, exit=0)
+spawn selection rationale tuple: {"role":"developer","pair":"gpt-6-astra/low","text":"bound checkpoint run; astra:low"}
+spawn selection rationale for gpt-6-astra/low: bound checkpoint run; astra:low
+spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [implementer] developer (codex) (run=RUN-260916-f3acf0, max_parallel=20)
+spawn run started: [implementer] developer (codex) (run=RUN-260916-f3acf0)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260916-f3acf0, pid=51179, exit=0)
 
 ## Precondition Resources
 - [TASK-260910-5nrmtt_source-contract.md](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_source-contract.md) — Accepted specification, execution boundary and task-specific acceptance.
@@ -152,6 +212,10 @@ spawn run completed: muse (run=RUN-260916-96ca5d, pid=77187, exit=0)
 - [5nrmtt-reapply.md](file://TASK-260910-5nrmtt/5nrmtt-reapply.md)
 - [5nrmtt-rework-2.md](file://TASK-260910-5nrmtt/5nrmtt-rework-2.md)
 - [5nrmtt-rework-2b.md](file://TASK-260910-5nrmtt/5nrmtt-rework-2b.md)
+- [5nrmtt-rework-3.md](file://TASK-260910-5nrmtt/5nrmtt-rework-3.md)
+- [5nrmtt-review-rev5-note.md](file://TASK-260910-5nrmtt/5nrmtt-review-rev5-note.md)
+- [5nrmtt-rework-4.md](file://TASK-260910-5nrmtt/5nrmtt-rework-4.md)
+- [5nrmtt-checkpoint-instruction.md](file://TASK-260910-5nrmtt/5nrmtt-checkpoint-instruction.md)
 
 ## Outcome Resources
 - [TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-96d008.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-96d008.log) — System spawn log captured by task-board
@@ -180,12 +244,37 @@ spawn run completed: muse (run=RUN-260916-96ca5d, pid=77187, exit=0)
 - [TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-db0f09.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-db0f09.log) — System spawn log captured by task-board
 - [TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-59c6b2.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-59c6b2.log) — System spawn log captured by task-board
 - [TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-96ca5d.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-96ca5d.log) — System spawn log captured by task-board
+- [TASK-260910-5nrmtt_change-request_rev3.patch](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_change-request_rev3.patch) — Change Request CR-TASK-260910-5nrmtt-3 revision 3 candidate patch (repository_delta=present, 12 changed paths)
+- [TASK-260910-5nrmtt_change-request_rev3-validation.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_change-request_rev3-validation.log) — Change Request CR-TASK-260910-5nrmtt-3 revision 3 bounded validation log
+- [TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-6e78b0.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-6e78b0.log) — System spawn log captured by task-board
+- [TASK-260910-5nrmtt_results-rev4.md](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_results-rev4.md) — Rev4 handoff evidence: rev3 gate skip-reason repair
+- [TASK-260910-5nrmtt_change-request_rev4.patch](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_change-request_rev4.patch) — Change Request CR-TASK-260910-5nrmtt-4 revision 4 candidate patch (repository_delta=present, 12 changed paths)
+- [TASK-260910-5nrmtt_change-request_rev4-validation.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_change-request_rev4-validation.log) — Change Request CR-TASK-260910-5nrmtt-4 revision 4 bounded validation log
+- [TASK-260910-5nrmtt_spawn-log_-reviewer--reviewer--codex-_RUN-260916-d5435f.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-reviewer--reviewer--codex-_RUN-260916-d5435f.log) — System spawn log captured by task-board
+- [TASK-260910-5nrmtt_review-reproducers-rev4.patch](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_review-reproducers-rev4.patch) — Three production-entry forbidden fallback regressions
+- [TASK-260910-5nrmtt_review-verdict-rev4.md](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_review-verdict-rev4.md) — CHANGES_REQUESTED: unknown facilities and unrestricted diagnostic tails permit fallback
+- [TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-546e63.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-546e63.log) — System spawn log captured by task-board
+- [TASK-260910-5nrmtt_results-rev5.md](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_results-rev5.md) — Rev5 handoff evidence: closed diagnostic grammar
+- [TASK-260910-5nrmtt_change-request_rev5.patch](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_change-request_rev5.patch) — Change Request CR-TASK-260910-5nrmtt-5 revision 5 candidate patch (repository_delta=present, 12 changed paths)
+- [TASK-260910-5nrmtt_change-request_rev5-validation.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_change-request_rev5-validation.log) — Change Request CR-TASK-260910-5nrmtt-5 revision 5 bounded validation log
+- [TASK-260910-5nrmtt_spawn-log_-reviewer--reviewer--codex-_RUN-260916-3f93e5.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-reviewer--reviewer--codex-_RUN-260916-3f93e5.log) — System spawn log captured by task-board
+- [TASK-260910-5nrmtt_review-reproducers-rev5.patch](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_review-reproducers-rev5.patch) — Production-entry malformed glued-line fallback reproducer
+- [TASK-260910-5nrmtt_review-verdict-rev5.md](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_review-verdict-rev5.md) — CHANGES_REQUESTED: framing repair bypasses whole-line closed grammar
+- [TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-cd8efa.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-cd8efa.log) — System spawn log captured by task-board
+- [TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-dc1bf9.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-dc1bf9.log) — System spawn log captured by task-board
+- [TASK-260910-5nrmtt_results-rev6.md](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_results-rev6.md) — Handoff evidence: rework 4 (rev6), glued-line fix
+- [TASK-260910-5nrmtt_change-request_rev6.patch](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_change-request_rev6.patch) — Change Request CR-TASK-260910-5nrmtt-6 revision 6 candidate patch (repository_delta=present, 13 changed paths)
+- [TASK-260910-5nrmtt_change-request_rev6-validation.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_change-request_rev6-validation.log) — Change Request CR-TASK-260910-5nrmtt-6 revision 6 bounded validation log
+- [TASK-260910-5nrmtt_spawn-log_-reviewer--reviewer--codex-_RUN-260916-044c21.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-reviewer--reviewer--codex-_RUN-260916-044c21.log) — System spawn log captured by task-board
+- [TASK-260910-5nrmtt_review-verdict-rev6.md](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_review-verdict-rev6.md) — ACCEPTED: glued-line repair removed; independent regressions and three killed mutants; timing rerun documented
+- [TASK-260910-5nrmtt_spawn-log_-implementer--developer--codex-_RUN-260916-f3acf0.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--codex-_RUN-260916-f3acf0.log) — System spawn log captured by task-board
+- [TASK-260910-5nrmtt_checkpoint-results.md](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_checkpoint-results.md) — Revision 6 checkpoint output; zsh with pipefail; checkpoint pipeline exit code 0; checkpoint ce24cee4bea21bc4e85ae1336e4adf6e82986cee; status integrating.
 
 ## Created
 2026-09-10T13:56:21Z
 
 ## Last Update
-2026-09-16T15:14:43Z
+2026-09-17T01:03:30Z
 
 ## Assigned To
-[implementer] developer (muse)
+[implementer] developer (codex)

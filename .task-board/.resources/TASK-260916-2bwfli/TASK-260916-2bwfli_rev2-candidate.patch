@@ -1,0 +1,1686 @@
+diff --git a/cmd/curator/draft_transport_test.go b/cmd/curator/draft_transport_test.go
+new file mode 100644
+index 0000000..77ff2af
+--- /dev/null
++++ b/cmd/curator/draft_transport_test.go
+@@ -0,0 +1,649 @@
++package main
++
++// Draft transport resolution at the CLI entry point.
++//
++// These tests drive `install --dry-run` through run() with a stand-in git on
++// PATH: a POSIX shell script that fails a fetch with fixture stderr or
++// rewrites it to a fixture bare repository. Everything else — manifest and
++// closure evaluation, credential selection, the strict lane, audit,
++// receipting — is the production path. None of these tests run in parallel:
++// they mutate process environment per run.
++
++import (
++	"encoding/json"
++	"fmt"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"regexp"
++	"runtime"
++	"sort"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/buildrepo"
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/install"
++	"github.com/relux-works/curator/internal/manifest"
++)
++
++const (
++	draftCLIHTTPS    = "https://fixture.test/https-tools.git"
++	draftCLIHTTPSAlt = "https://fixture.test/https-tools"
++	draftCLISSH      = "ssh://git@fixture.test/ssh-tools.git"
++	draftCLISSHAlt   = "ssh://git@fixture.test/ssh-tools"
++)
++
++const draftCLIDNSStderr = "fatal: unable to access 'https://fixture.test/https-tools.git': Could not resolve host: fixture.test"
++
++const draftCLITLSStderr = "fatal: unable to access 'https://fixture.test/https-tools.git': SSL certificate problem: self signed certificate"
++
++type draftCLIFixture struct {
++	t          *testing.T
++	root       string
++	configPath string
++	policyPath string
++	httpsBare  string
++	httpsLock  string
++	sshBare    string
++	sshLock    string
++	staticSSH  string
++	identity   string
++	knownHosts string
++	origPath   string
++}
++
++type draftCLIArm struct {
++	succeed  bool
++	fileRepo string
++	stderr   string
++}
++
++func setupDraftCLI(t *testing.T) *draftCLIFixture {
++	t.Helper()
++	if _, err := exec.LookPath("git"); err != nil {
++		t.Skip("git is not available")
++	}
++	fixture := &draftCLIFixture{t: t, root: t.TempDir(), origPath: os.Getenv("PATH")}
++	skillsRoot := filepath.Join(fixture.root, "skills")
++	project := filepath.Join(fixture.root, "project")
++	fixture.configPath = filepath.Join(fixture.root, "home", "config.json")
++	fixture.policyPath = filepath.Join(fixture.root, "home", "source-policy.json")
++	for _, dir := range []string{filepath.Join(skillsRoot, "skill-a"), project, filepath.Join(fixture.root, "home")} {
++		if err := os.MkdirAll(dir, 0o755); err != nil {
++			t.Fatal(err)
++		}
++	}
++	fixture.httpsBare, fixture.httpsLock = draftCLIExternalRepo(t, fixture.root, "https-remote")
++	fixture.sshBare, fixture.sshLock = draftCLIExternalRepo(t, fixture.root, "ssh-remote")
++	draftCLISkillRepo(t, skillsRoot, fixture.httpsLock, fixture.sshLock)
++	if err := os.WriteFile(filepath.Join(project, manifest.Name), []byte(
++		`{"schema_version":1,"agents":["codex_cli"],"skills":[{"name":"skill-a","tag":"v1"}]}`), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(project, ".gitignore"), []byte(".agents/\n.codex/skills/\nSkillfile.dev.json\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	draftCLIGit(t, "", "init", "--quiet", "-b", "main", project)
++	if err := config.Bootstrap(fixture.configPath, skillsRoot, "", []string{"codex_cli"}, false); err != nil {
++		t.Fatal(err)
++	}
++	if err := config.AddProject(fixture.configPath, "app", project, []string{"codex_cli"}); err != nil {
++		t.Fatal(err)
++	}
++	fixture.staticSSH = filepath.Join(fixture.root, "static-ssh-wrapper")
++	if err := os.WriteFile(fixture.staticSSH, []byte("#!/bin/sh\nexit 0\n"), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	fixture.identity = filepath.Join(fixture.root, "id_example")
++	if err := os.WriteFile(fixture.identity, []byte("key"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	fixture.knownHosts = filepath.Join(fixture.root, "known_hosts")
++	if err := os.WriteFile(fixture.knownHosts, []byte("hosts"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	return fixture
++}
++
++func draftCLIGit(t *testing.T, dir string, args ...string) string {
++	t.Helper()
++	command := exec.Command("git", args...)
++	command.Dir = dir
++	command.Env = append(os.Environ(),
++		"GIT_AUTHOR_NAME=Fixture", "GIT_AUTHOR_EMAIL=fixture@example.test",
++		"GIT_COMMITTER_NAME=Fixture", "GIT_COMMITTER_EMAIL=fixture@example.test",
++		"GIT_AUTHOR_DATE=2006-01-02T15:04:05Z", "GIT_COMMITTER_DATE=2006-01-02T15:04:05Z",
++		"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
++	)
++	output, err := command.CombinedOutput()
++	if err != nil {
++		t.Fatalf("git %v: %v\n%s", args, err, output)
++	}
++	return strings.TrimSpace(string(output))
++}
++
++// draftCLIExternalRepo builds a bare repository holding one external-build
++// descriptor commit. Fixed dates keep the lock stable across runs.
++func draftCLIExternalRepo(t *testing.T, root, name string) (bare, lock string) {
++	t.Helper()
++	work := filepath.Join(root, name+"-work")
++	bare = filepath.Join(root, name+".git")
++	draftCLIGit(t, "", "init", "--quiet", "-b", "main", "--object-format=sha1", work)
++	files := map[string]string{
++		"skill-build.json":       `{"schema_version":1,"targets":{"tool":{"driver":"go-repository-v1","build_root":"tools","source_dir":"tools/cmd/tool"}}}`,
++		"tools/go.mod":           "module example.test/tool\n",
++		"tools/cmd/tool/main.go": "package main\nfunc main() {}\n",
++	}
++	for name, content := range files {
++		path := filepath.Join(work, name)
++		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
++			t.Fatal(err)
++		}
++	}
++	draftCLIGit(t, work, "add", ".")
++	draftCLIGit(t, work, "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "external")
++	lock = draftCLIGit(t, work, "rev-parse", "HEAD")
++	draftCLIGit(t, "", "clone", "--quiet", "--bare", "--", work, bare)
++	return bare, lock
++}
++
++func draftCLISkillRepo(t *testing.T, skillsRoot, httpsLock, sshLock string) {
++	t.Helper()
++	repo := filepath.Join(skillsRoot, "skill-a")
++	skillManifest := map[string]any{
++		"schema_version": 7,
++		"capabilities":   map[string]any{},
++		"build_repositories": map[string]any{
++			"https-tools": map[string]any{"git": draftCLIHTTPS, "locked_commit": map[string]any{"object_format": "sha1", "hex": httpsLock}},
++			"ssh-tools":   map[string]any{"git": draftCLISSH, "locked_commit": map[string]any{"object_format": "sha1", "hex": sshLock}},
++		},
++		"commands": map[string]any{
++			"https-cmd": map[string]any{"type": "build", "driver": "go-repository-v1", "repository": "https-tools", "target": "tool"},
++			"ssh-cmd":   map[string]any{"type": "build", "driver": "go-repository-v1", "repository": "ssh-tools", "target": "tool"},
++		},
++	}
++	payload, err := json.Marshal(skillManifest)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(repo, "agent-skill.json"), payload, 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(repo, "SKILL.md"), []byte("---\nname: skill-a\n---\n# Skill\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	draftCLIGit(t, "", "init", "--quiet", "-b", "main", repo)
++	draftCLIGit(t, repo, "add", ".")
++	draftCLIGit(t, repo, "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "skill")
++	draftCLIGit(t, repo, "tag", "v1")
++}
++
++// installDraftFakeGit writes a stand-in git named `git` onto a fresh PATH
++// directory and returns its argv log path. Callers scope PATH per run.
++func (f *draftCLIFixture) installDraftFakeGit(t *testing.T, arms map[string]draftCLIArm) (fakeDir, logPath string) {
++	t.Helper()
++	if runtime.GOOS == "windows" {
++		t.Skip("test transport wrapper is POSIX-only; production code is platform-neutral")
++	}
++	realGit, err := exec.LookPath("git")
++	if err != nil {
++		t.Fatal(err)
++	}
++	fakeDir = t.TempDir()
++	wrapper := filepath.Join(fakeDir, "git")
++	logPath = filepath.Join(fakeDir, "argv.log")
++	urls := make([]string, 0, len(arms))
++	for url := range arms {
++		urls = append(urls, url)
++	}
++	sort.Strings(urls)
++	var script strings.Builder
++	script.WriteString("#!/bin/sh\n")
++	script.WriteString("{ printf 'argv:'; for arg in \"$@\"; do printf ' <%s>' \"$arg\"; done; printf ' | GIT_SSH=%s\\n' \"${GIT_SSH-}\"; } >> " + draftCLIShellQuote(logPath) + "\n")
++	script.WriteString("is_fetch=0; for arg in \"$@\"; do if [ \"$arg\" = \"fetch\" ]; then is_fetch=1; fi; done\n")
++	script.WriteString("if [ \"$is_fetch\" = 1 ]; then\n:\n")
++	for _, url := range urls {
++		if arms[url].succeed {
++			continue
++		}
++		script.WriteString("for arg in \"$@\"; do if [ \"$arg\" = " + draftCLIShellQuote(url) + " ]; then printf '%s' " + draftCLIShellQuote(arms[url].stderr) + " >&2; exit 128; fi; done\n")
++	}
++	script.WriteString("fi\nargs=\"\"; for arg in \"$@\"; do\n")
++	for _, url := range urls {
++		if !arms[url].succeed {
++			continue
++		}
++		script.WriteString("if [ \"$arg\" = " + draftCLIShellQuote(url) + " ]; then arg=" + draftCLIShellQuote("file://"+arms[url].fileRepo) + "; fi\n")
++	}
++	script.WriteString("case \"$arg\" in protocol.https.allow=always|protocol.ssh.allow=always) arg=protocol.file.allow=always ;; esac\n")
++	script.WriteString("args=\"$args\n$arg\"; done\noldifs=$IFS; IFS='\n'; set -- $args; IFS=$oldifs\n")
++	script.WriteString("exec " + draftCLIShellQuote(realGit) + " \"$@\"\n")
++	if err := os.WriteFile(wrapper, []byte(script.String()), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	return fakeDir, logPath
++}
++
++func draftCLIFetchLines(t *testing.T, logPath string) []string {
++	t.Helper()
++	payload, err := os.ReadFile(logPath)
++	if err != nil {
++		if os.IsNotExist(err) {
++			return nil
++		}
++		t.Fatalf("reading git log: %v", err)
++	}
++	var fetches []string
++	for _, line := range strings.Split(string(payload), "\n") {
++		if strings.Contains(line, "<fetch>") {
++			fetches = append(fetches, line)
++		}
++	}
++	return fetches
++}
++
++func draftCLIPolicy(entries map[string][]string, fallback string) string {
++	repositories := make([]string, 0, len(entries))
++	keys := make([]string, 0, len(entries))
++	for key := range entries {
++		keys = append(keys, key)
++	}
++	sort.Strings(keys)
++	for _, key := range keys {
++		var endpoints []string
++		for _, url := range entries[key] {
++			endpoints = append(endpoints, `{"url":"`+url+`","authentication":"operator-acme"}`)
++		}
++		repositories = append(repositories, `"`+key+`":{"endpoints":[`+strings.Join(endpoints, ",")+`],"fallback":"`+fallback+`"}`)
++	}
++	return `{"schema_version":1,"repositories":{` + strings.Join(repositories, ",") + `}}`
++}
++
++var (
++	draftCLIHexRE       = regexp.MustCompile(`\b[0-9a-f]{64}\b|\b[0-9a-f]{40}\b`)
++	draftCLIBuildRepoRE = regexp.MustCompile(`curator-buildrepo-[0-9]+`)
++	draftCLISSHDirRE    = regexp.MustCompile(`curator-draft-ssh-[0-9]+`)
++	draftCLIGoBuildRE   = regexp.MustCompile(`go-build[0-9]+`)
++	draftCLITagSHARE    = regexp.MustCompile(`tag v1 [0-9a-f]+`)
++)
++
++// normalizeDraftCLI replaces every host- and run-specific byte: temporary
++// paths (in resolved and unresolved spellings), per-run private-state
++// directory numbers, and full object IDs.
++func normalizeDraftCLI(t *testing.T, root, value string) string {
++	t.Helper()
++	prefixes := []string{root}
++	if resolved, err := filepath.EvalSymlinks(root); err == nil && resolved != root {
++		prefixes = append(prefixes, resolved)
++	}
++	tmp := os.TempDir()
++	prefixes = append(prefixes, tmp)
++	if resolved, err := filepath.EvalSymlinks(tmp); err == nil && resolved != tmp {
++		prefixes = append(prefixes, resolved)
++	}
++	sort.Slice(prefixes, func(i, j int) bool { return len(prefixes[i]) > len(prefixes[j]) })
++	for _, prefix := range prefixes {
++		prefix = strings.TrimRight(prefix, `/\`)
++		value = strings.ReplaceAll(value, prefix, "$T")
++	}
++	value = draftCLIBuildRepoRE.ReplaceAllString(value, `curator-buildrepo-$$N`)
++	value = draftCLISSHDirRE.ReplaceAllString(value, `curator-draft-ssh-$$N`)
++	value = draftCLIGoBuildRE.ReplaceAllString(value, `go-build$$N`)
++	value = draftCLITagSHARE.ReplaceAllString(value, `tag v1 $$S`)
++	value = draftCLIHexRE.ReplaceAllString(value, `$$H`)
++	return value
++}
++
++func draftCLIShellQuote(value string) string {
++	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
++}
++
++// runDraftInstall runs one CLI invocation with per-run process environment.
++// policy nil means no policy file; switchOn sets the draft switch to "1".
++func (f *draftCLIFixture) runDraftInstall(t *testing.T, fakeDir, logPath string, switchOn bool, policy *string) (int, string, string, []string) {
++	t.Helper()
++	saved := map[string]*string{}
++	set := map[string]string{
++		"PATH":                          fakeDir + string(os.PathListSeparator) + f.origPath,
++		"GIT_SSH":                       f.staticSSH,
++		"CURATOR_BUILD_SSH_IDENTITY":    f.identity,
++		"CURATOR_BUILD_SSH_KNOWN_HOSTS": f.knownHosts,
++	}
++	unset := []string{"SSH_AUTH_SOCK", "CURATOR_BUILD_SSH_AGENT", "CURATOR_BUILD_HTTPS_TOKEN", "CURATOR_BUILD_HTTPS_HOST", install.EnvDraftTransportResolution}
++	if switchOn {
++		set[install.EnvDraftTransportResolution] = "1"
++	}
++	for key := range set {
++		if value, ok := os.LookupEnv(key); ok {
++			held := value
++			saved[key] = &held
++		} else {
++			saved[key] = nil
++		}
++	}
++	for _, key := range unset {
++		if _, seen := saved[key]; seen {
++			continue
++		}
++		if value, ok := os.LookupEnv(key); ok {
++			held := value
++			saved[key] = &held
++		} else {
++			saved[key] = nil
++		}
++	}
++	defer func() {
++		for key, held := range saved {
++			if held == nil {
++				_ = os.Unsetenv(key)
++			} else {
++				_ = os.Setenv(key, *held)
++			}
++		}
++	}()
++	for key, value := range set {
++		if err := os.Setenv(key, value); err != nil {
++			t.Fatal(err)
++		}
++	}
++	for _, key := range unset {
++		if _, overridden := set[key]; overridden {
++			continue
++		}
++		if err := os.Unsetenv(key); err != nil {
++			t.Fatal(err)
++		}
++	}
++	if policy == nil {
++		if err := os.Remove(f.policyPath); err != nil && !os.IsNotExist(err) {
++			t.Fatal(err)
++		}
++	} else if err := os.WriteFile(f.policyPath, []byte(*policy), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	code, stdout, stderr := capture(t, f.configPath, "install", "app", "--dry-run")
++	return code, stdout, stderr, draftCLIFetchLines(t, logPath)
++}
++
++func draftCLISuccessArms(f *draftCLIFixture) map[string]draftCLIArm {
++	return map[string]draftCLIArm{
++		draftCLIHTTPS: {succeed: true, fileRepo: f.httpsBare},
++		draftCLISSH:   {succeed: true, fileRepo: f.sshBare},
++	}
++}
++
++// draftCLILegacyRun formats one legacy run for the golden: exit code,
++// normalized stdout, and normalized fetch lines.
++func draftCLILegacyRun(t *testing.T, root string, code int, stdout string, fetches []string) string {
++	t.Helper()
++	var out strings.Builder
++	_, _ = fmt.Fprintf(&out, "exit: %d\n", code)
++	out.WriteString("--- stdout ---\n")
++	out.WriteString(normalizeDraftCLI(t, root, stdout))
++	if !strings.HasSuffix(stdout, "\n") {
++		out.WriteString("\n")
++	}
++	out.WriteString("--- fetches ---\n")
++	out.WriteString(normalizeDraftCLI(t, root, strings.Join(fetches, "\n")))
++	out.WriteString("\n")
++	return out.String()
++}
++
++func TestDraftTransportLegacyGolden(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("test transport wrapper is POSIX-only; production code is platform-neutral")
++	}
++	fixture := setupDraftCLI(t)
++	policy := draftCLIPolicy(map[string][]string{
++		"fixture.test/https-tools": {draftCLIHTTPS},
++		"fixture.test/ssh-tools":   {draftCLISSH},
++	}, "none")
++
++	run := func(switchOn bool, policy *string) (int, string, string, []string) {
++		t.Helper()
++		fakeDir, logPath := fixture.installDraftFakeGit(t, draftCLISuccessArms(fixture))
++		return fixture.runDraftInstall(t, fakeDir, logPath, switchOn, policy)
++	}
++
++	code, stdout, stderr, fetches := run(false, &policy)
++	if code != exitOK {
++		t.Fatalf("switch off = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	if stderr != "" {
++		t.Fatalf("switch-off stderr:\n%s", stderr)
++	}
++	if len(fetches) != 2 {
++		t.Fatalf("%d fetches, want 2:\n%s", len(fetches), strings.Join(fetches, "\n"))
++	}
++	golden := draftCLILegacyRun(t, fixture.root, code, stdout, fetches)
++
++	want, err := os.ReadFile(filepath.Join("testdata", "draft-transport-legacy.golden"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if golden != string(want) {
++		t.Fatalf("legacy run differs from the committed golden:\n%s", golden)
++	}
++	for _, fetch := range fetches {
++		if strings.Contains(fetch, buildrepo.SSHWrapperName) {
++			t.Fatalf("legacy fetch used the manager wrapper:\n%s", fetch)
++		}
++	}
++
++	// Switch on without a policy, and switch off without one, must produce
++	// the same bytes on the same fixture.
++	code2, stdout2, stderr2, fetches2 := run(true, nil)
++	if code2 != exitOK || stderr2 != "" {
++		t.Fatalf("switch on without policy = %d\nstdout:\n%s\nstderr:\n%s", code2, stdout2, stderr2)
++	}
++	if other := draftCLILegacyRun(t, fixture.root, code2, stdout2, fetches2); other != golden {
++		t.Fatalf("switch on without policy differs from the legacy golden:\n%s", other)
++	}
++	code3, stdout3, stderr3, fetches3 := run(false, nil)
++	if code3 != exitOK || stderr3 != "" {
++		t.Fatalf("switch off without policy = %d\nstdout:\n%s\nstderr:\n%s", code3, stdout3, stderr3)
++	}
++	if other := draftCLILegacyRun(t, fixture.root, code3, stdout3, fetches3); other != golden {
++		t.Fatalf("switch off without policy differs from the legacy golden:\n%s", other)
++	}
++}
++
++func TestDraftTransportResolvedMatrix(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("test transport wrapper is POSIX-only; production code is platform-neutral")
++	}
++
++	t.Run("fallback on availability then success", func(t *testing.T) {
++		fixture := setupDraftCLI(t)
++		fakeDir, logPath := fixture.installDraftFakeGit(t, map[string]draftCLIArm{
++			draftCLIHTTPS:    {stderr: draftCLIDNSStderr},
++			draftCLIHTTPSAlt: {succeed: true, fileRepo: fixture.httpsBare},
++			draftCLISSH:      {succeed: true, fileRepo: fixture.sshBare},
++		})
++		policy := draftCLIPolicy(map[string][]string{
++			"fixture.test/https-tools": {draftCLIHTTPS, draftCLIHTTPSAlt},
++			"fixture.test/ssh-tools":   {draftCLISSH},
++		}, "availability-auth")
++		code, stdout, stderr, fetches := fixture.runDraftInstall(t, fakeDir, logPath, true, &policy)
++		if code != exitOK {
++			t.Fatalf("resolved = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++		}
++		if len(fetches) != 3 {
++			t.Fatalf("%d fetches, want 3:\n%s", len(fetches), strings.Join(fetches, "\n"))
++		}
++		if !strings.Contains(fetches[0], "<"+draftCLIHTTPS+">") || !strings.Contains(fetches[1], "<"+draftCLIHTTPSAlt+">") {
++			t.Fatalf("https attempts out of order:\n%s", strings.Join(fetches, "\n"))
++		}
++		if !strings.Contains(fetches[2], "<"+draftCLISSH+">") || !strings.Contains(fetches[2], buildrepo.SSHWrapperName) {
++			t.Fatalf("ssh attempt missed the manager wrapper:\n%s", strings.Join(fetches, "\n"))
++		}
++	})
++
++	t.Run("fail-closed class refuses with one fetch", func(t *testing.T) {
++		fixture := setupDraftCLI(t)
++		fakeDir, logPath := fixture.installDraftFakeGit(t, map[string]draftCLIArm{
++			draftCLIHTTPS:    {stderr: draftCLITLSStderr},
++			draftCLIHTTPSAlt: {succeed: true, fileRepo: fixture.httpsBare},
++			draftCLISSH:      {succeed: true, fileRepo: fixture.sshBare},
++		})
++		policy := draftCLIPolicy(map[string][]string{
++			"fixture.test/https-tools": {draftCLIHTTPS, draftCLIHTTPSAlt},
++			"fixture.test/ssh-tools":   {draftCLISSH},
++		}, "availability-auth")
++		code, stdout, stderr, fetches := fixture.runDraftInstall(t, fakeDir, logPath, true, &policy)
++		if code == exitOK {
++			t.Fatalf("refusal exited 0\nstdout:\n%s", stdout)
++		}
++		if combined := stdout + stderr; !strings.Contains(combined, buildrepo.CodeSourceUnavailable) {
++			t.Fatalf("refusal lacks the lane diagnostic:\nstdout:\n%s\nstderr:\n%s", stdout, stderr)
++		}
++		if len(fetches) != 1 || !strings.Contains(fetches[0], "<"+draftCLIHTTPS+">") {
++			t.Fatalf("fetches = %q, want exactly the refused first attempt", fetches)
++		}
++	})
++
++	t.Run("invalid policy fails before any fetch", func(t *testing.T) {
++		fixture := setupDraftCLI(t)
++		fakeDir, logPath := fixture.installDraftFakeGit(t, draftCLISuccessArms(fixture))
++		policy := `{"schema_version":1}`
++		code, stdout, stderr, fetches := fixture.runDraftInstall(t, fakeDir, logPath, true, &policy)
++		if code == exitOK {
++			t.Fatalf("invalid policy exited 0\nstdout:\n%s", stdout)
++		}
++		// The pipeline masks every acquisition failure as the lane
++		// diagnostic; the repository_policy_invalid class itself is pinned
++		// at install level. What matters here is the failure with no fetch.
++		if combined := stdout + stderr; !strings.Contains(combined, buildrepo.CodeSourceUnavailable) {
++			t.Fatalf("invalid policy lacks the lane diagnostic:\nstdout:\n%s\nstderr:\n%s", stdout, stderr)
++		}
++		if len(fetches) != 0 {
++			t.Fatalf("%d fetches, want 0:\n%s", len(fetches), strings.Join(fetches, "\n"))
++		}
++	})
++}
++
++func TestProductionBinaryDispatchesSSHWrapper(t *testing.T) {
++	binary := filepath.Join(t.TempDir(), "curator"+productionBinarySuffix())
++	build := exec.Command("go", "build", "-o", binary, ".")
++	if output, err := build.CombinedOutput(); err != nil {
++		t.Fatalf("build production curator: %v\n%s", err, output)
++	}
++	wrapperName := buildrepo.SSHWrapperName + productionBinarySuffix()
++	wrapper := filepath.Join(t.TempDir(), wrapperName)
++	payload, err := os.ReadFile(binary)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(wrapper, payload, 0o700); err != nil {
++		t.Fatal(err)
++	}
++
++	writeFile := func(name string, content []byte) string {
++		t.Helper()
++		path := filepath.Join(t.TempDir(), name)
++		if err := os.WriteFile(path, content, 0o600); err != nil {
++			t.Fatal(err)
++		}
++		return path
++	}
++	emptyConfig := writeFile("ssh.config", nil)
++	knownHosts := writeFile("known_hosts", []byte("hosts"))
++	emptyKnownHosts := writeFile("empty_known_hosts", nil)
++	identity := writeFile("id_example", []byte("key"))
++	sshLog := filepath.Join(t.TempDir(), "ssh-argv.log")
++
++	fakeSSH := ""
++	if runtime.GOOS != "windows" {
++		fakeSSH = filepath.Join(t.TempDir(), "ssh")
++		script := "#!/bin/sh\nfor arg in \"$@\"; do printf '<%s>' \"$arg\"; done >> " + draftCLIShellQuote(sshLog) + "\nprintf '\\n' >> " + draftCLIShellQuote(sshLog) + "\nexit 3\n"
++		if err := os.WriteFile(fakeSSH, []byte(script), 0o700); err != nil {
++			t.Fatal(err)
++		}
++	} else {
++		fakeSSH = filepath.Join(t.TempDir(), "ssh.exe")
++		if err := os.WriteFile(fakeSSH, []byte("MZ"), 0o700); err != nil {
++			t.Fatal(err)
++		}
++	}
++
++	policy := map[string]any{
++		"Wrapper": wrapper, "SSH": fakeSSH,
++		"ExpectedHost": "git@fixture.test", "RepositoryPath": "/repository.git",
++		"EmptyConfig": emptyConfig, "KnownHosts": knownHosts, "EmptyKnownHosts": emptyKnownHosts,
++		"Identity": identity, "ConnectTimeout": 15,
++	}
++	state, err := json.Marshal(policy)
++	if err != nil {
++		t.Fatal(err)
++	}
++	statePath := writeFile("ssh-wrapper-state.json", append(state, '\n'))
++
++	run := func(args []string, stateValue string) (int, string) {
++		t.Helper()
++		command := exec.Command(wrapper, args...)
++		command.Env = []string{"PATH=" + os.Getenv("PATH"), buildrepo.EnvSSHWrapperState + "=" + stateValue}
++		output, err := command.CombinedOutput()
++		if err == nil {
++			return 0, string(output)
++		}
++		if exit, ok := err.(*exec.ExitError); ok {
++			return exit.ExitCode(), string(output)
++		}
++		t.Fatalf("wrapper invocation failed: %v\n%s", err, output)
++		return -1, ""
++	}
++
++	if runtime.GOOS != "windows" {
++		t.Run("passthrough", func(t *testing.T) {
++			code, output := run([]string{"git@fixture.test", "git-upload-pack '/repository.git'"}, statePath)
++			if code != 3 {
++				t.Fatalf("wrapper exit = %d, want the ssh exit 3\n%s", code, output)
++			}
++			logged, err := os.ReadFile(sshLog)
++			if err != nil {
++				t.Fatal(err)
++			}
++			for _, want := range []string{"<-F>", "<" + emptyConfig + ">", "<BatchMode=yes>", "<git@fixture.test>", "<git-upload-pack '/repository.git'>"} {
++				if !strings.Contains(string(logged), want) {
++					t.Fatalf("ssh argv lacks %s:\n%s", want, logged)
++				}
++			}
++		})
++	}
++
++	for _, testCase := range []struct {
++		name string
++		args []string
++	}{
++		{"missing state refuses", []string{"git@fixture.test", "git-upload-pack '/repository.git'"}},
++		{"wrong tuple refuses", []string{"other@fixture.test", "git-upload-pack '/repository.git'"}},
++		{"single arg refuses before CLI parsing", []string{"--version"}},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			stateValue := ""
++			if testCase.name == "wrong tuple refuses" {
++				stateValue = statePath
++			}
++			if code, output := run(testCase.args, stateValue); code != 1 || output != "" {
++				t.Fatalf("refusal = (%d, %q), want silent exit 1", code, output)
++			}
++		})
++	}
++
++	t.Run("malformed state refuses", func(t *testing.T) {
++		bad := writeFile("bad-state.json", []byte("{broken"))
++		if code, output := run([]string{"git@fixture.test", "git-upload-pack '/repository.git'"}, bad); code != 1 || output != "" {
++			t.Fatalf("refusal = (%d, %q), want silent exit 1", code, output)
++		}
++	})
++}
++
++// Windows reaches the resolved lane through the same production caller, but
++// the CLI pipeline masks every acquisition failure as the lane diagnostic
++// (buildrepo.RunPipeline), so the lane's typed platform refusal is asserted
++// at install level by
++// TestAcquireDraftNetworkWindowsRefusesBeforeAnyProcess instead of here.
+diff --git a/cmd/curator/main.go b/cmd/curator/main.go
+index 3dd9ed2..a7927ca 100644
+--- a/cmd/curator/main.go
++++ b/cmd/curator/main.go
+@@ -93,6 +93,9 @@ func main() {
+ 	if buildrepo.IsHTTPSBrokerInvocation(os.Args[0]) {
+ 		os.Exit(buildrepo.RunHTTPSCredentialBroker(os.Args[1:], os.Getenv, os.Stdout))
+ 	}
++	if buildrepo.IsSSHWrapperInvocation(os.Args[0]) {
++		os.Exit(buildrepo.RunSSHWrapper(os.Args[1:], os.Getenv, os.Stdin, os.Stdout, os.Stderr))
++	}
+ 	// The fixed hidden go-v1 build worker is an implementation boundary, not a
+ 	// user-visible command surface. It is dispatched before any other parsing,
+ 	// requires exactly this one manager-owned argument, and is never reachable
+@@ -1483,6 +1486,11 @@ func productionExternalDeps(cfg *config.Config, dryRun bool) install.ExternalDep
+ 	// that also parses --build-ssh-* flags overrides this with them.
+ 	deps.BuildSSH = install.CaptureBuildSSHSelection(cfg, install.BuildSSHFlags{}, os.Getenv)
+ 	deps.BuildHTTPS = install.CaptureBuildHTTPSSelection(cfg, os.Getenv)
++	// The draft transport switch is operator-owned process input, read once at
++	// the CLI boundary like every other ExternalDeps member. The machine policy
++	// lives beside the manager configuration that was actually loaded.
++	deps.DraftTransportResolution = install.DraftTransportEnabled(os.Getenv)
++	deps.DraftPolicyPath = filepath.Join(cfg.Home(), config.SourcePolicyFileName)
+ 	deps.AuditWarnings = func(_ context.Context, subject buildrepo.AuditSubject) ([]string, error) {
+ 		candidate := audit.Subject{
+ 			Name: subject.Declared.Repository, Source: subject.Declared.Identity,
+diff --git a/cmd/curator/testdata/draft-transport-legacy.golden b/cmd/curator/testdata/draft-transport-legacy.golden
+new file mode 100644
+index 0000000..77421d3
+--- /dev/null
++++ b/cmd/curator/testdata/draft-transport-legacy.golden
+@@ -0,0 +1,12 @@
++exit: 0
++--- stdout ---
++app: skill-a: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (project .agents/bin lookup, manager global/bin fallback, validated POSIX and PowerShell bare-command fallbacks, Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional
++app: external build ssh: fixture.test/ssh-tools (command "ssh-cmd" of skill "skill-a") <- operator flags/env
++app: external build https: fixture.test/https-tools (command "https-cmd" of skill "skill-a") <- anonymous
++app: skill-a.https-cmd external build key=sha256:$H outcome=would-preflight-and-build
++app: skill-a.ssh-cmd external build key=sha256:$H outcome=would-preflight-and-build
++app: skill-a tag v1 $S context=yes commands=[https-cmd,ssh-cmd] via=<project> (planned)
++app: dry-run; no files modified
++--- fetches ---
++argv: <--git-dir=$T/curator-buildrepo-$N/repo.git> <--no-replace-objects> <--no-lazy-fetch> <--no-optional-locks> <-c> <protocol.allow=never> <-c> <protocol.https.allow=always> <-c> <protocol.version=0> <-c> <credential.helper=> <-c> <core.askPass=$T/go-build$N/b001/curator.test> <-c> <core.hooksPath=$T/curator-buildrepo-$N/empty-hooks> <-c> <core.fsmonitor=false> <-c> <core.untrackedCache=false> <-c> <submodule.recurse=false> <-c> <fetch.recurseSubmodules=false> <-c> <maintenance.auto=false> <-c> <fetch.writeCommitGraph=false> <-c> <fetch.fsckObjects=true> <-c> <transfer.fsckObjects=true> <-c> <http.followRedirects=false> <-c> <http.sslVerify=true> <-c> <http.proxy=> <-c> <https.proxy=> <fetch> <--quiet> <--atomic> <--no-tags> <--no-recurse-submodules> <--no-auto-maintenance> <--no-write-fetch-head> <--no-write-commit-graph> <--refmap=> <--jobs=1> <--upload-pack=git-upload-pack> <--> <https://fixture.test/https-tools.git> <$H:refs/curator/locked> | GIT_SSH=
++argv: <--git-dir=$T/curator-buildrepo-$N/repo.git> <--no-replace-objects> <--no-lazy-fetch> <--no-optional-locks> <-c> <protocol.allow=never> <-c> <protocol.ssh.allow=always> <-c> <protocol.version=0> <-c> <credential.helper=> <-c> <core.askPass=$T/go-build$N/b001/curator.test> <-c> <core.hooksPath=$T/curator-buildrepo-$N/empty-hooks> <-c> <core.fsmonitor=false> <-c> <core.untrackedCache=false> <-c> <submodule.recurse=false> <-c> <fetch.recurseSubmodules=false> <-c> <maintenance.auto=false> <-c> <fetch.writeCommitGraph=false> <-c> <fetch.fsckObjects=true> <-c> <transfer.fsckObjects=true> <-c> <http.followRedirects=false> <-c> <http.sslVerify=true> <-c> <http.proxy=> <-c> <https.proxy=> <fetch> <--quiet> <--atomic> <--no-tags> <--no-recurse-submodules> <--no-auto-maintenance> <--no-write-fetch-head> <--no-write-commit-graph> <--refmap=> <--jobs=1> <--upload-pack=git-upload-pack> <--> <ssh://git@fixture.test/ssh-tools.git> <$H:refs/curator/locked> | GIT_SSH=$T/static-ssh-wrapper
+diff --git a/docs/draft-transport-resolution.md b/docs/draft-transport-resolution.md
+index 86c201d..df1bb82 100644
+--- a/docs/draft-transport-resolution.md
++++ b/docs/draft-transport-resolution.md
+@@ -71,12 +71,55 @@ creation (after plan validation, with no attempt recorded) rather than
+ run with an unbounded tree; the legacy lane keeps its WaitDelay-bound
+ behavior there unchanged.
+ 
+-The wiring task converts `config.Resolution` to `TransportPlan`
+-field-for-field, populates the manager SSH wrapper base beside the
+-per-repository credential selection, adds the one-line SSH wrapper
+-dispatch to the manager binary, and routes policy plans here; no
+-acquisition caller is wired yet. Until then a resolved SSH attempt with
+-a zero manager base refuses. Revision 2 ports, mirrors, and aliases
+-need a revision-2 reader and are a separate leaf. `buildsource` was
+-inspected and needs no change: locked-content verification for network
+-acquisition is the lane's raw-object proof, reused per attempt.
++Revision 2 ports, mirrors, and aliases need a revision-2 reader and are
++a separate leaf. `buildsource` was inspected and needs no change:
++locked-content verification for network acquisition is the lane's
++raw-object proof, reused per attempt.
++
++## Production caller (draft)
++
++The external-repository lane (repository-transport §3: an existing lane
++using its URL declaration with an admitted machine policy) selects this
++executor behind the draft/opt-in switch
++`CURATOR_DRAFT_TRANSPORT_RESOLUTION=1`, read once at the CLI boundary into
++`install.ExternalDeps`. The logical `repository` spelling stays parser-only:
++no caller here mints it, so resolution always starts from the declared URL.
++
++`install.acquireDraftNetwork` loads the machine policy beside the loaded
++manager configuration, resolves the declared URL with
++`config.ResolveRepositoryEndpoints`, converts the `config.Resolution` to a
++`TransportPlan` field-for-field, and calls `AcquireNetworkResolved` with the
++repository's own operator-selected lane material. A present policy selects
++the resolved lane; an absent policy file, or the switch off, runs
++`AcquireNetwork` with the exact legacy request — the switch-off path never
++opens the policy file. A present-but-invalid policy fails
++`repository_policy_invalid` before any fetch. On Windows the executor
++refuses with `transport_resolution_unsupported_platform` before any
++process creation; the CLI pipeline reports every acquisition failure as
++the lane diagnostic, so the typed code is visible only below the
++pipeline. The trace callback is nil:
++sanitized attempt records have no machine-private CLI sink yet.
++
++Policy-named providers resolve to the one repository's own selections: the
++HTTPS selection authenticates HTTPS attempts (an unselected repository means
++explicitly anonymous, as in the legacy lane) and the SSH selection
++authenticates SSH attempts. Every named provider maps to the same
++repository selection; per-provider material distinction awaits an operator
++provider table and is out of scope. Selections never cross repositories.
++
++SSH attempts need two manager-owned inputs beside the per-repository
++credential selection, both populated per fetch: the wrapper base (the
++platform `ssh` executable plus fresh empty configuration files, removed
++after acquisition) and the manager binary itself as the per-attempt wrapper
++copy source. A missing SSH executable yields a zero base and the executor
++refuses each SSH attempt; an unadmittable manager binary refuses SSH
++resolution before any traffic rather than copying a file that would bypass
++the bound policy. The manager binary dispatches the wrapper basename before
++its public CLI, next to the HTTPS broker dispatch; the wrapper tuple, fixed
++argv, and state-file shape are unchanged.
++
++The wiring also repairs the declared-URL threading the lane needs to fetch
++at all: the default closure used to pass the repository's configured name
++where the lane requires the URL, so every unfetched acquisition refused in
++admission. `ExternalSource` now carries the declared URL and the legacy lane
++fetches it. The switch-off golden pins the repaired legacy bytes.
+diff --git a/internal/install/drafttransport.go b/internal/install/drafttransport.go
+new file mode 100644
+index 0000000..a5f5405
+--- /dev/null
++++ b/internal/install/drafttransport.go
+@@ -0,0 +1,218 @@
++package install
++
++// Draft bounded transport resolution wiring (repository-transport-v1 §2-3).
++//
++// The external-repository lane declares URLs only. Behind the draft/opt-in
++// switch, one fetch with a present machine policy runs the resolved executor
++// over the policy's endpoint plan; with the switch off, or with no policy
++// file, the legacy lane runs unchanged. The logical `repository` spelling is
++// admitted only in new Skillfile source objects (§3) and no caller here mints
++// it, so resolution always starts from the declared URL.
++
++import (
++	"context"
++	"fmt"
++	"os"
++	"os/exec"
++	"path/filepath"
++
++	"github.com/relux-works/curator/internal/buildrepo"
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/gitcred"
++)
++
++// EnvDraftTransportResolution names the draft/opt-in switch for bounded
++// transport resolution. Exactly "1" enables the resolved lane; every other
++// value, including unset and empty, keeps the legacy lane. The switch is
++// operator-owned: package data can neither set it nor observe it.
++const EnvDraftTransportResolution = "CURATOR_DRAFT_TRANSPORT_RESOLUTION"
++
++// draftTransportSSHConnectTimeout is the single connection timeout, in
++// seconds, pinned into every per-attempt SSH wrapper policy. The lane's
++// total deadline still bounds both attempts.
++const draftTransportSSHConnectTimeout = 15
++
++// DraftTransportEnabled reports whether the switch selects the resolved lane.
++func DraftTransportEnabled(getenv func(string) string) bool {
++	return getenv != nil && getenv(EnvDraftTransportResolution) == "1"
++}
++
++// acquireDraftNetwork routes one external-repository fetch behind the draft
++// switch. git/transport/identity carry the effective fetch endpoint: the
++// declared URL, or the network substitution's. The legacy call keeps the
++// exact legacy request shape; the resolved call passes the policy's endpoint
++// plan with this repository's own operator-selected lane material.
++func (deps ExternalDeps) acquireDraftNetwork(ctx context.Context, tool buildrepo.GitTool, ssh buildrepo.OperatorSSHCredentials, https BuildHTTPSCredentials, git, transport, identity string, lock buildrepo.LockedCommit, tag, refKind, refValue string) (*buildrepo.Snapshot, error) {
++	base := buildrepo.NetworkRequest{Source: buildrepo.Source{Git: git, Transport: transport, Identity: identity}, Lock: lock, Tag: tag, RefKind: refKind, RefValue: refValue, Tool: tool, Limits: deps.Limits}
++	if !deps.DraftTransportResolution {
++		return buildrepo.AcquireNetwork(ctx, base)
++	}
++	path := deps.DraftPolicyPath
++	if path == "" {
++		path = config.SourcePolicyPath()
++	}
++	policy, err := config.LoadSourcePolicy(path)
++	if err != nil {
++		return nil, err
++	}
++	if policy == nil {
++		return buildrepo.AcquireNetwork(ctx, base)
++	}
++	resolution, err := config.ResolveRepositoryEndpoints(policy, git, "")
++	if err != nil {
++		return nil, err
++	}
++	plan, err := draftTransportPlan(resolution)
++	if err != nil {
++		return nil, err
++	}
++	if draftPlanNeedsSSH(plan) {
++		var cleanup func()
++		base.Tool.SSHBase, cleanup, err = draftSSHWrapperBase()
++		if err != nil {
++			return nil, err
++		}
++		defer cleanup()
++		// The per-attempt wrapper copy must dispatch the manager binary: only
++		// it answers the wrapper tuple against the bound state file. An
++		// unadmittable manager refuses SSH resolution before any traffic
++		// rather than copying a file that would silently bypass the policy.
++		manager, err := draftManagerExecutable()
++		if err != nil {
++			return nil, err
++		}
++		base.Tool.SSHWrapper = manager
++	}
++	return buildrepo.AcquireNetworkResolved(ctx, base, plan, draftTransportAuth{https: https, ssh: ssh}, nil)
++}
++
++// draftTransportPlan converts one machine-policy resolution to the executor's
++// attempt plan field-for-field. The executor revalidates before any network
++// I/O; the validation here fails a mistranslation before SSH base discovery.
++func draftTransportPlan(resolution config.Resolution) (buildrepo.TransportPlan, error) {
++	var fallback string
++	switch resolution.Fallback {
++	case config.FallbackNone:
++		fallback = buildrepo.TransportFallbackNone
++	case config.FallbackAvailabilityAuth:
++		fallback = buildrepo.TransportFallbackAvailabilityAuth
++	default:
++		return buildrepo.TransportPlan{}, fmt.Errorf("%s: unknown effective fallback %q", config.CodeRepositoryPolicyInvalid, resolution.Fallback)
++	}
++	attempts := make([]buildrepo.TransportAttempt, 0, len(resolution.Attempts))
++	for _, attempt := range resolution.Attempts {
++		attempts = append(attempts, buildrepo.TransportAttempt{URL: attempt.URL, Authentication: attempt.Authentication})
++	}
++	plan := buildrepo.TransportPlan{Identity: resolution.Identity, Attempts: attempts, Fallback: fallback}
++	if err := buildrepo.ValidateTransportPlan(plan); err != nil {
++		return buildrepo.TransportPlan{}, err
++	}
++	return plan, nil
++}
++
++// draftPlanNeedsSSH reports whether any planned attempt fetches over SSH.
++func draftPlanNeedsSSH(plan buildrepo.TransportPlan) bool {
++	for _, attempt := range plan.Attempts {
++		if parsed, err := buildrepo.ParseSource(attempt.URL); err == nil && parsed.Transport == "ssh" {
++			return true
++		}
++	}
++	return false
++}
++
++// draftTransportAuth resolves policy-named providers to the one repository's
++// own operator-selected lane material: the HTTPS selection authenticates
++// HTTPS attempts (absence means explicitly anonymous, as in the legacy lane)
++// and the SSH selection authenticates SSH attempts. Every named provider maps
++// to this repository's selection; per-provider material distinction awaits an
++// operator provider table, which is out of scope for this wiring. Selections
++// never cross repositories: one repository's attempts cannot offer another
++// repository's key or secret.
++type draftTransportAuth struct {
++	https BuildHTTPSCredentials
++	ssh   buildrepo.OperatorSSHCredentials
++}
++
++// ResolveHTTPS implements buildrepo.AuthProvider.
++func (a draftTransportAuth) ResolveHTTPS(_ context.Context, provider, host string) (buildrepo.HTTPSCredentials, error) {
++	if !gitcred.ValidProvider(provider) {
++		return buildrepo.HTTPSCredentials{}, buildrepo.ErrProviderUnavailable
++	}
++	if !a.https.Selected() {
++		return buildrepo.HTTPSCredentials{}, buildrepo.ErrProviderAnonymous
++	}
++	credentials := buildrepo.NewHTTPSCredentials(host, a.https.Username, a.https.Secret())
++	if !credentials.Selected() {
++		return buildrepo.HTTPSCredentials{}, buildrepo.ErrProviderUnavailable
++	}
++	return credentials, nil
++}
++
++// ResolveSSH implements buildrepo.AuthProvider.
++func (a draftTransportAuth) ResolveSSH(provider string) (buildrepo.OperatorSSHCredentials, error) {
++	if !gitcred.ValidProvider(provider) {
++		return buildrepo.OperatorSSHCredentials{}, buildrepo.ErrProviderUnavailable
++	}
++	if !a.ssh.Selected() {
++		return buildrepo.OperatorSSHCredentials{}, buildrepo.ErrProviderUnavailable
++	}
++	admitted, err := buildrepo.ValidateOperatorSSHCredentials(a.ssh)
++	if err != nil || !admitted.Selected() {
++		return buildrepo.OperatorSSHCredentials{}, buildrepo.ErrProviderUnavailable
++	}
++	return admitted, nil
++}
++
++// draftSSHWrapperBase discovers the manager-owned base of per-attempt SSH
++// wrapper policies: the platform SSH executable and fresh empty configuration
++// files owned by this fetch. cleanup removes the empty files; the caller runs
++// it after acquisition returns. A missing or unadmitted SSH executable yields
++// a zero base with no error: the executor then refuses every SSH attempt
++// before any traffic. Only empty-file creation failures are errors.
++func draftSSHWrapperBase() (buildrepo.SSHWrapperBase, func(), error) {
++	none := func() {}
++	ssh, err := exec.LookPath("ssh")
++	if err != nil {
++		return buildrepo.SSHWrapperBase{}, none, nil
++	}
++	ssh, err = filepath.EvalSymlinks(ssh)
++	if err != nil {
++		return buildrepo.SSHWrapperBase{}, none, nil
++	}
++	if info, err := os.Lstat(ssh); err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
++		return buildrepo.SSHWrapperBase{}, none, nil
++	}
++	dir, err := os.MkdirTemp("", "curator-draft-ssh-")
++	if err != nil {
++		return buildrepo.SSHWrapperBase{}, none, err
++	}
++	cleanup := func() { _ = os.RemoveAll(dir) }
++	emptyConfig := filepath.Join(dir, "ssh_config")
++	if err := os.WriteFile(emptyConfig, nil, 0o600); err != nil {
++		cleanup()
++		return buildrepo.SSHWrapperBase{}, none, err
++	}
++	emptyKnownHosts := filepath.Join(dir, "known_hosts")
++	if err := os.WriteFile(emptyKnownHosts, nil, 0o600); err != nil {
++		cleanup()
++		return buildrepo.SSHWrapperBase{}, none, err
++	}
++	return buildrepo.SSHWrapperBase{SSH: ssh, EmptyConfig: emptyConfig, EmptyKnownHosts: emptyKnownHosts, ConnectTimeout: draftTransportSSHConnectTimeout}, cleanup, nil
++}
++
++// draftManagerExecutable admits the running manager binary as the SSH wrapper
++// copy source for resolved SSH attempts.
++func draftManagerExecutable() (string, error) {
++	executable, err := os.Executable()
++	if err != nil {
++		return "", fmt.Errorf("build_repository_identity_invalid: SSH transport resolution requires the manager executable: %v", err)
++	}
++	resolved, err := filepath.EvalSymlinks(executable)
++	if err != nil || !filepath.IsAbs(resolved) {
++		return "", fmt.Errorf("build_repository_identity_invalid: SSH transport resolution requires an absolute manager executable")
++	}
++	if info, err := os.Lstat(resolved); err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
++		return "", fmt.Errorf("build_repository_identity_invalid: SSH transport resolution requires an admitted manager executable")
++	}
++	return resolved, nil
++}
+diff --git a/internal/install/drafttransport_test.go b/internal/install/drafttransport_test.go
+new file mode 100644
+index 0000000..81d83e0
+--- /dev/null
++++ b/internal/install/drafttransport_test.go
+@@ -0,0 +1,622 @@
++package install
++
++import (
++	"context"
++	"errors"
++	"fmt"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/buildrepo"
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/skillspec"
++)
++
++func TestDraftTransportEnabled(t *testing.T) {
++	t.Parallel()
++	for _, testCase := range []struct {
++		name  string
++		value *string
++		want  bool
++	}{
++		{"one enables", strPtr("1"), true},
++		{"empty disables", strPtr(""), false},
++		{"zero disables", strPtr("0"), false},
++		{"true disables", strPtr("true"), false},
++		{"two disables", strPtr("2"), false},
++		{"unset disables", nil, false},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			t.Parallel()
++			getenv := func(string) string { return "" }
++			if testCase.value != nil {
++				getenv = func(string) string { return *testCase.value }
++			}
++			if got := DraftTransportEnabled(getenv); got != testCase.want {
++				t.Fatalf("DraftTransportEnabled = %v, want %v", got, testCase.want)
++			}
++		})
++	}
++	if DraftTransportEnabled(nil) {
++		t.Fatal("DraftTransportEnabled(nil) = true, want false")
++	}
++}
++
++func strPtr(value string) *string { return &value }
++
++func TestDraftTransportPlanConversion(t *testing.T) {
++	t.Parallel()
++	one := config.Resolution{Identity: "fixture.test/repository",
++		Attempts: []config.Attempt{{URL: "https://fixture.test/repository.git"}}, Fallback: config.FallbackNone}
++	plan, err := draftTransportPlan(one)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if plan.Identity != one.Identity || len(plan.Attempts) != 1 || plan.Attempts[0].URL != one.Attempts[0].URL ||
++		plan.Attempts[0].Authentication != "" || plan.Fallback != buildrepo.TransportFallbackNone {
++		t.Fatalf("legacy-shape plan = %+v", plan)
++	}
++	two := config.Resolution{Identity: "fixture.test/repository",
++		Attempts: []config.Attempt{
++			{URL: "https://fixture.test/repository.git", Authentication: "operator-acme"},
++			{URL: "https://fixture.test/repository", Authentication: "operator-acme"},
++		}, Fallback: config.FallbackAvailabilityAuth}
++	plan, err = draftTransportPlan(two)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(plan.Attempts) != 2 || plan.Attempts[0].Authentication != "operator-acme" ||
++		plan.Attempts[1].URL != "https://fixture.test/repository" || plan.Fallback != buildrepo.TransportFallbackAvailabilityAuth {
++		t.Fatalf("two-endpoint plan = %+v", plan)
++	}
++	bad := config.Resolution{Identity: "fixture.test/repository",
++		Attempts: []config.Attempt{{URL: "https://fixture.test/repository.git"}}, Fallback: "sometimes"}
++	if _, err := draftTransportPlan(bad); err == nil || !strings.Contains(err.Error(), config.CodeRepositoryPolicyInvalid) {
++		t.Fatalf("unknown fallback err = %v, want %s", err, config.CodeRepositoryPolicyInvalid)
++	}
++	mistranslated := config.Resolution{Identity: "fixture.test/repository",
++		Attempts: []config.Attempt{{URL: "not a url"}}, Fallback: config.FallbackNone}
++	if _, err := draftTransportPlan(mistranslated); err == nil {
++		t.Fatal("malformed endpoint converted without an error")
++	}
++}
++
++func TestDraftTransportAuth(t *testing.T) {
++	t.Parallel()
++	ctx := context.Background()
++	anonymous := draftTransportAuth{}
++	if _, err := anonymous.ResolveHTTPS(ctx, "operator-acme", "fixture.test"); !errors.Is(err, buildrepo.ErrProviderAnonymous) {
++		t.Fatalf("anonymous HTTPS err = %v, want ErrProviderAnonymous", err)
++	}
++	if _, err := anonymous.ResolveSSH("operator-acme"); !errors.Is(err, buildrepo.ErrProviderUnavailable) {
++		t.Fatalf("anonymous SSH err = %v, want ErrProviderUnavailable", err)
++	}
++	if _, err := anonymous.ResolveHTTPS(ctx, "not a provider!", "fixture.test"); !errors.Is(err, buildrepo.ErrProviderUnavailable) {
++		t.Fatalf("malformed provider HTTPS err = %v, want ErrProviderUnavailable", err)
++	}
++	if _, err := anonymous.ResolveSSH("not a provider!"); !errors.Is(err, buildrepo.ErrProviderUnavailable) {
++		t.Fatalf("malformed provider SSH err = %v, want ErrProviderUnavailable", err)
++	}
++	selected := draftTransportAuth{
++		https: NewBuildHTTPSCredentials("operator", "secret"),
++		ssh:   buildrepo.OperatorSSHCredentials{Identity: operatorPath(t, "id"), KnownHosts: operatorPath(t, "known_hosts")},
++	}
++	credentials, err := selected.ResolveHTTPS(ctx, "operator-acme", "fixture.test")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !credentials.Selected() || credentials.Host != "fixture.test" || credentials.Username != "operator" {
++		t.Fatalf("HTTPS credentials = %+v", credentials)
++	}
++	admitted, err := selected.ResolveSSH("operator-acme")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !admitted.Selected() || admitted.KnownHosts == "" {
++		t.Fatalf("SSH credentials = %+v", admitted)
++	}
++	broken := draftTransportAuth{ssh: buildrepo.OperatorSSHCredentials{Identity: filepath.Join(t.TempDir(), "missing")}}
++	if _, err := broken.ResolveSSH("operator-acme"); !errors.Is(err, buildrepo.ErrProviderUnavailable) {
++		t.Fatalf("missing identity err = %v, want ErrProviderUnavailable", err)
++	}
++}
++
++func operatorPath(t *testing.T, name string) string {
++	t.Helper()
++	path := filepath.Join(t.TempDir(), name)
++	if err := os.WriteFile(path, []byte("material"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	return path
++}
++
++func TestDraftPlanNeedsSSH(t *testing.T) {
++	t.Parallel()
++	https := buildrepo.TransportPlan{Attempts: []buildrepo.TransportAttempt{{URL: "https://fixture.test/repository.git"}}}
++	if draftPlanNeedsSSH(https) {
++		t.Fatal("https-only plan needs SSH")
++	}
++	mixed := buildrepo.TransportPlan{Attempts: []buildrepo.TransportAttempt{
++		{URL: "https://fixture.test/repository.git"},
++		{URL: "ssh://git@fixture.test/repository.git"},
++	}}
++	if !draftPlanNeedsSSH(mixed) {
++		t.Fatal("mixed plan needs no SSH")
++	}
++	malformed := buildrepo.TransportPlan{Attempts: []buildrepo.TransportAttempt{{URL: "not a url"}}}
++	if draftPlanNeedsSSH(malformed) {
++		t.Fatal("malformed plan needs SSH")
++	}
++}
++
++func TestDraftSSHWrapperBase(t *testing.T) {
++	base, cleanup, err := draftSSHWrapperBase()
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer cleanup()
++	if base.SSH == "" || base.EmptyConfig == "" || base.EmptyKnownHosts == "" || base.ConnectTimeout <= 0 {
++		t.Fatalf("SSH base = %+v", base)
++	}
++	for _, path := range []string{base.SSH, base.EmptyConfig, base.EmptyKnownHosts} {
++		info, err := os.Lstat(path)
++		if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
++			t.Fatalf("base path %s is not an admitted regular file: %v", path, err)
++		}
++	}
++	cleanup()
++	if _, err := os.Lstat(base.EmptyConfig); !os.IsNotExist(err) {
++		t.Fatalf("empty config survives cleanup: %v", err)
++	}
++
++	t.Run("missing ssh refuses later with a zero base", func(t *testing.T) {
++		t.Setenv("PATH", t.TempDir())
++		base, cleanup, err := draftSSHWrapperBase()
++		defer cleanup()
++		if err != nil {
++			t.Fatal(err)
++		}
++		if base != (buildrepo.SSHWrapperBase{}) {
++			t.Fatalf("base without ssh = %+v, want zero", base)
++		}
++	})
++}
++
++func TestDraftManagerExecutable(t *testing.T) {
++	t.Parallel()
++	executable, err := draftManagerExecutable()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !filepath.IsAbs(executable) {
++		t.Fatalf("manager executable %q is not absolute", executable)
++	}
++	info, err := os.Lstat(executable)
++	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
++		t.Fatalf("manager executable is not an admitted regular file: %v", err)
++	}
++}
++
++// --- selection tests ---
++//
++// The default acquisition closure is driven through acquireDraftNetwork
++// against a stand-in git: a POSIX shell wrapper around the real git that
++// fails a fetch with fixture stderr or rewrites it to a fixture bare
++// repository. Everything else is the real lane.
++
++const (
++	draftHTTPSPrimary   = "https://fixture.test/repository.git"
++	draftHTTPSAlternate = "https://fixture.test/repository"
++	draftSSHPrimary     = "ssh://git@fixture.test/repository.git"
++)
++
++const draftDNSStderr = "fatal: unable to access 'https://fixture.test/repository.git': Could not resolve host: fixture.test"
++
++const draftTLSStderr = "fatal: unable to access 'https://fixture.test/repository.git': SSL certificate problem: self signed certificate"
++
++type draftGitArm struct {
++	succeed  bool
++	fileRepo string
++	stderr   string
++}
++
++func draftGitTool(t *testing.T, arms map[string]draftGitArm) (buildrepo.GitTool, string) {
++	t.Helper()
++	if runtime.GOOS == "windows" {
++		t.Skip("test transport wrapper is POSIX-only; production code is platform-neutral")
++	}
++	git, err := exec.LookPath("git")
++	if err != nil {
++		t.Fatal(err)
++	}
++	git, err = filepath.EvalSymlinks(git)
++	if err != nil {
++		t.Fatal(err)
++	}
++	execPath, err := exec.Command(git, "--exec-path").Output()
++	if err != nil {
++		t.Fatal(err)
++	}
++	version, err := exec.Command(git, "--version").Output()
++	if err != nil {
++		t.Fatal(err)
++	}
++	root := t.TempDir()
++	wrapper := filepath.Join(root, "git-wrapper")
++	logPath := filepath.Join(root, "argv.log")
++	var script strings.Builder
++	script.WriteString("#!/bin/sh\n")
++	fmt.Fprintf(&script, "{ printf 'argv:'; for arg in \"$@\"; do printf ' <%%s>' \"$arg\"; done; printf ' | GIT_SSH=%%s\\n' \"${GIT_SSH-}\"; } >> %s\n", shellQuote(logPath))
++	script.WriteString("is_fetch=0; for arg in \"$@\"; do if [ \"$arg\" = \"fetch\" ]; then is_fetch=1; fi; done\n")
++	script.WriteString("if [ \"$is_fetch\" = 1 ]; then\n:\n")
++	for _, url := range sortedDraftURLs(arms) {
++		arm := arms[url]
++		if !arm.succeed {
++			fmt.Fprintf(&script, "for arg in \"$@\"; do if [ \"$arg\" = %s ]; then printf '%%s' %s >&2; exit 128; fi; done\n", shellQuote(url), shellQuote(arm.stderr))
++		}
++	}
++	script.WriteString("fi\nargs=\"\"; for arg in \"$@\"; do\n")
++	for _, url := range sortedDraftURLs(arms) {
++		if arms[url].succeed {
++			fmt.Fprintf(&script, "if [ \"$arg\" = %s ]; then arg=%s; fi\n", shellQuote(url), shellQuote("file://"+arms[url].fileRepo))
++		}
++	}
++	script.WriteString("case \"$arg\" in protocol.https.allow=always|protocol.ssh.allow=always) arg=protocol.file.allow=always ;; esac\n")
++	script.WriteString("args=\"$args\n$arg\"; done\noldifs=$IFS; IFS='\n'; set -- $args; IFS=$oldifs\n")
++	fmt.Fprintf(&script, "exec %s \"$@\"\n", shellQuote(git))
++	if err := os.WriteFile(wrapper, []byte(script.String()), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	askPass, err := os.Executable()
++	if err != nil {
++		t.Fatal(err)
++	}
++	return buildrepo.GitTool{Executable: wrapper, ExecPath: strings.TrimSpace(string(execPath)), AllowedVersions: []string{strings.TrimSpace(string(version))}, AskPass: askPass, SSHWrapper: askPass}, logPath
++}
++
++func sortedDraftURLs(arms map[string]draftGitArm) []string {
++	urls := make([]string, 0, len(arms))
++	for url := range arms {
++		urls = append(urls, url)
++	}
++	for i := 1; i < len(urls); i++ {
++		for j := i; j > 0 && urls[j] < urls[j-1]; j-- {
++			urls[j], urls[j-1] = urls[j-1], urls[j]
++		}
++	}
++	return urls
++}
++
++func shellQuote(value string) string {
++	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
++}
++
++func draftFetchLines(t *testing.T, logPath string) []string {
++	t.Helper()
++	payload, err := os.ReadFile(logPath)
++	if err != nil {
++		if os.IsNotExist(err) {
++			return nil
++		}
++		t.Fatalf("reading git log: %v", err)
++	}
++	var fetches []string
++	for _, line := range strings.Split(string(payload), "\n") {
++		if strings.Contains(line, "<fetch>") {
++			fetches = append(fetches, line)
++		}
++	}
++	return fetches
++}
++
++// draftBareFixture builds a bare repository holding one commit. Fixed dates
++// keep the lock stable across runs.
++func draftBareFixture(t *testing.T) (bare, commit string) {
++	t.Helper()
++	git, err := exec.LookPath("git")
++	if err != nil {
++		t.Fatal(err)
++	}
++	root := t.TempDir()
++	work := filepath.Join(root, "work")
++	bare = filepath.Join(root, "remote.git")
++	run := func(dir string, args ...string) string {
++		t.Helper()
++		command := exec.Command(git, args...)
++		command.Dir = dir
++		command.Env = append(os.Environ(),
++			"GIT_AUTHOR_NAME=Fixture", "GIT_AUTHOR_EMAIL=fixture@example.test",
++			"GIT_COMMITTER_NAME=Fixture", "GIT_COMMITTER_EMAIL=fixture@example.test",
++			"GIT_AUTHOR_DATE=2006-01-02T15:04:05Z", "GIT_COMMITTER_DATE=2006-01-02T15:04:05Z",
++			"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
++		)
++		output, err := command.CombinedOutput()
++		if err != nil {
++			t.Fatalf("git %v: %v\n%s", args, err, output)
++		}
++		return strings.TrimSpace(string(output))
++	}
++	run("", "init", "--quiet", "--object-format=sha1", work)
++	if err := os.WriteFile(filepath.Join(work, "hello.txt"), []byte("hello\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	run(work, "add", "--", "hello.txt")
++	run(work, "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "fixture")
++	commit = run(work, "rev-parse", "HEAD")
++	run("", "clone", "--quiet", "--bare", "--", work, bare)
++	return bare, commit
++}
++
++func draftPolicyFile(t *testing.T, payload string) string {
++	t.Helper()
++	path := filepath.Join(t.TempDir(), "source-policy.json")
++	if err := os.WriteFile(path, []byte(payload), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	return path
++}
++
++func draftPolicyEntry(urls ...string) string {
++	var endpoints []string
++	for _, url := range urls {
++		endpoints = append(endpoints, fmt.Sprintf(`{"url":%q,"authentication":"operator-acme"}`, url))
++	}
++	return fmt.Sprintf(`{"schema_version":1,"repositories":{"fixture.test/repository":{"endpoints":[%s],"fallback":"availability-auth"}}}`,
++		strings.Join(endpoints, ","))
++}
++
++func draftSSHCredentials(t *testing.T) buildrepo.OperatorSSHCredentials {
++	t.Helper()
++	return buildrepo.OperatorSSHCredentials{Identity: operatorPath(t, "id"), KnownHosts: operatorPath(t, "known_hosts")}
++}
++
++func TestAcquireDraftNetworkSelection(t *testing.T) {
++	bare, commit := draftBareFixture(t)
++	lock := buildrepo.LockedCommit{ObjectFormat: "sha1", Hex: commit}
++
++	newDeps := func(tool buildrepo.GitTool, enabled bool, policy string) ExternalDeps {
++		return ExternalDeps{GitTool: tool, DraftTransportResolution: enabled, DraftPolicyPath: policy,
++			Audit: func(context.Context, buildrepo.AuditSubject) error { return nil }}
++	}
++
++	t.Run("resolved falls back on availability then verifies", func(t *testing.T) {
++		tool, logPath := draftGitTool(t, map[string]draftGitArm{
++			draftHTTPSPrimary:   {stderr: draftDNSStderr},
++			draftHTTPSAlternate: {succeed: true, fileRepo: bare},
++		})
++		policy := draftPolicyFile(t, draftPolicyEntry(draftHTTPSPrimary, draftHTTPSAlternate))
++		snapshot, err := newDeps(tool, true, policy).acquireDraftNetwork(context.Background(), tool,
++			buildrepo.OperatorSSHCredentials{}, BuildHTTPSCredentials{}, draftHTTPSPrimary, "https", "fixture.test/repository", lock, "", "", "")
++		if err != nil {
++			t.Fatal(err)
++		}
++		if snapshot.Commit != commit {
++			t.Fatalf("commit = %s, want %s", snapshot.Commit, commit)
++		}
++		if fetches := draftFetchLines(t, logPath); len(fetches) != 2 {
++			t.Fatalf("%d fetches, want 2:\n%s", len(fetches), strings.Join(fetches, "\n"))
++		}
++	})
++
++	t.Run("resolved succeeds on the first endpoint with one fetch", func(t *testing.T) {
++		tool, logPath := draftGitTool(t, map[string]draftGitArm{
++			draftHTTPSPrimary: {succeed: true, fileRepo: bare},
++		})
++		policy := draftPolicyFile(t, draftPolicyEntry(draftHTTPSPrimary))
++		snapshot, err := newDeps(tool, true, policy).acquireDraftNetwork(context.Background(), tool,
++			buildrepo.OperatorSSHCredentials{}, BuildHTTPSCredentials{}, draftHTTPSPrimary, "https", "fixture.test/repository", lock, "", "", "")
++		if err != nil {
++			t.Fatal(err)
++		}
++		if snapshot.Commit != commit {
++			t.Fatalf("commit = %s, want %s", snapshot.Commit, commit)
++		}
++		if fetches := draftFetchLines(t, logPath); len(fetches) != 1 {
++			t.Fatalf("%d fetches, want 1:\n%s", len(fetches), strings.Join(fetches, "\n"))
++		}
++	})
++
++	t.Run("resolved refuses a fail-closed class with one fetch", func(t *testing.T) {
++		tool, logPath := draftGitTool(t, map[string]draftGitArm{
++			draftHTTPSPrimary:   {stderr: draftTLSStderr},
++			draftHTTPSAlternate: {succeed: true, fileRepo: bare},
++		})
++		policy := draftPolicyFile(t, draftPolicyEntry(draftHTTPSPrimary, draftHTTPSAlternate))
++		_, err := newDeps(tool, true, policy).acquireDraftNetwork(context.Background(), tool,
++			buildrepo.OperatorSSHCredentials{}, BuildHTTPSCredentials{}, draftHTTPSPrimary, "https", "fixture.test/repository", lock, "", "", "")
++		if buildrepo.ErrorCode(err) != buildrepo.CodeSourceUnavailable {
++			t.Fatalf("err = %v, want the legacy lane diagnostic", err)
++		}
++		if fetches := draftFetchLines(t, logPath); len(fetches) != 1 {
++			t.Fatalf("%d fetches, want 1:\n%s", len(fetches), strings.Join(fetches, "\n"))
++		}
++	})
++
++	t.Run("switch on without a policy runs the legacy lane", func(t *testing.T) {
++		tool, logPath := draftGitTool(t, map[string]draftGitArm{
++			draftHTTPSPrimary: {succeed: true, fileRepo: bare},
++		})
++		missing := filepath.Join(t.TempDir(), "absent-policy.json")
++		snapshot, err := newDeps(tool, true, missing).acquireDraftNetwork(context.Background(), tool,
++			buildrepo.OperatorSSHCredentials{}, BuildHTTPSCredentials{}, draftHTTPSPrimary, "https", "fixture.test/repository", lock, "", "", "")
++		if err != nil {
++			t.Fatal(err)
++		}
++		if snapshot.Commit != commit {
++			t.Fatalf("commit = %s, want %s", snapshot.Commit, commit)
++		}
++		if fetches := draftFetchLines(t, logPath); len(fetches) != 1 {
++			t.Fatalf("%d fetches, want 1:\n%s", len(fetches), strings.Join(fetches, "\n"))
++		}
++	})
++
++	t.Run("switch off ignores a present policy", func(t *testing.T) {
++		for _, payload := range []string{
++			draftPolicyEntry(draftHTTPSAlternate, draftHTTPSPrimary),
++			`not json`,
++		} {
++			tool, logPath := draftGitTool(t, map[string]draftGitArm{
++				draftHTTPSPrimary:   {succeed: true, fileRepo: bare},
++				draftHTTPSAlternate: {stderr: draftDNSStderr},
++			})
++			policy := draftPolicyFile(t, payload)
++			snapshot, err := newDeps(tool, false, policy).acquireDraftNetwork(context.Background(), tool,
++				buildrepo.OperatorSSHCredentials{}, BuildHTTPSCredentials{}, draftHTTPSPrimary, "https", "fixture.test/repository", lock, "", "", "")
++			if err != nil {
++				t.Fatalf("payload %q: %v", payload, err)
++			}
++			if snapshot.Commit != commit {
++				t.Fatalf("payload %q: commit = %s, want %s", payload, snapshot.Commit, commit)
++			}
++			fetches := draftFetchLines(t, logPath)
++			if len(fetches) != 1 || !strings.Contains(fetches[0], "<"+draftHTTPSPrimary+">") {
++				t.Fatalf("payload %q: fetches = %q, want exactly the declared URL", payload, fetches)
++			}
++		}
++	})
++
++	t.Run("invalid policy fails before any fetch", func(t *testing.T) {
++		tool, logPath := draftGitTool(t, map[string]draftGitArm{
++			draftHTTPSPrimary: {succeed: true, fileRepo: bare},
++		})
++		policy := draftPolicyFile(t, `{"schema_version":1}`)
++		_, err := newDeps(tool, true, policy).acquireDraftNetwork(context.Background(), tool,
++			buildrepo.OperatorSSHCredentials{}, BuildHTTPSCredentials{}, draftHTTPSPrimary, "https", "fixture.test/repository", lock, "", "", "")
++		if err == nil || !strings.Contains(err.Error(), config.CodeRepositoryPolicyInvalid) {
++			t.Fatalf("err = %v, want %s", err, config.CodeRepositoryPolicyInvalid)
++		}
++		if fetches := draftFetchLines(t, logPath); len(fetches) != 0 {
++			t.Fatalf("%d fetches, want 0:\n%s", len(fetches), strings.Join(fetches, "\n"))
++		}
++	})
++
++	t.Run("resolved ssh fetches behind the manager wrapper", func(t *testing.T) {
++		tool, logPath := draftGitTool(t, map[string]draftGitArm{
++			draftSSHPrimary: {succeed: true, fileRepo: bare},
++		})
++		policy := draftPolicyFile(t, draftPolicyEntry(draftSSHPrimary))
++		ssh := draftSSHCredentials(t)
++		tool.SSHCredentials = ssh
++		snapshot, err := newDeps(tool, true, policy).acquireDraftNetwork(context.Background(), tool,
++			ssh, BuildHTTPSCredentials{}, draftSSHPrimary, "ssh", "fixture.test/repository", lock, "", "", "")
++		if err != nil {
++			t.Fatal(err)
++		}
++		if snapshot.Commit != commit {
++			t.Fatalf("commit = %s, want %s", snapshot.Commit, commit)
++		}
++		fetches := draftFetchLines(t, logPath)
++		if len(fetches) != 1 {
++			t.Fatalf("%d fetches, want 1:\n%s", len(fetches), strings.Join(fetches, "\n"))
++		}
++		if !strings.Contains(fetches[0], buildrepo.SSHWrapperName) {
++			t.Fatalf("resolved ssh fetch kept the static wrapper:\n%s", fetches[0])
++		}
++	})
++
++	t.Run("legacy ssh keeps the static wrapper", func(t *testing.T) {
++		tool, logPath := draftGitTool(t, map[string]draftGitArm{
++			draftSSHPrimary: {succeed: true, fileRepo: bare},
++		})
++		policy := draftPolicyFile(t, draftPolicyEntry(draftSSHPrimary))
++		ssh := draftSSHCredentials(t)
++		// Production binds the repository selection into the tool before the
++		// closure runs; the legacy lane admits only a bound selection.
++		tool.SSHCredentials = ssh
++		snapshot, err := newDeps(tool, false, policy).acquireDraftNetwork(context.Background(), tool,
++			ssh, BuildHTTPSCredentials{}, draftSSHPrimary, "ssh", "fixture.test/repository", lock, "", "", "")
++		if err != nil {
++			t.Fatal(err)
++		}
++		if snapshot.Commit != commit {
++			t.Fatalf("commit = %s, want %s", snapshot.Commit, commit)
++		}
++		fetches := draftFetchLines(t, logPath)
++		if len(fetches) != 1 {
++			t.Fatalf("%d fetches, want 1:\n%s", len(fetches), strings.Join(fetches, "\n"))
++		}
++		if strings.Contains(fetches[0], buildrepo.SSHWrapperName) {
++			t.Fatalf("legacy ssh fetch used the manager wrapper:\n%s", fetches[0])
++		}
++		if !strings.Contains(fetches[0], tool.SSHWrapper) {
++			t.Fatalf("legacy ssh fetch lost the static wrapper:\n%s", fetches[0])
++		}
++	})
++
++	t.Run("resolved ssh without an ssh executable refuses without traffic", func(t *testing.T) {
++		tool, logPath := draftGitTool(t, map[string]draftGitArm{
++			draftSSHPrimary: {succeed: true, fileRepo: bare},
++		})
++		t.Setenv("PATH", t.TempDir())
++		policy := draftPolicyFile(t, draftPolicyEntry(draftSSHPrimary))
++		ssh := draftSSHCredentials(t)
++		_, err := newDeps(tool, true, policy).acquireDraftNetwork(context.Background(), tool,
++			ssh, BuildHTTPSCredentials{}, draftSSHPrimary, "ssh", "fixture.test/repository", lock, "", "", "")
++		if buildrepo.ErrorCode(err) != buildrepo.CodeIdentityInvalid || !strings.Contains(err.Error(), "SSH wrapper policy") {
++			t.Fatalf("err = %v, want the SSH base refusal", err)
++		}
++		if fetches := draftFetchLines(t, logPath); len(fetches) != 0 {
++			t.Fatalf("%d fetches, want 0:\n%s", len(fetches), strings.Join(fetches, "\n"))
++		}
++	})
++}
++
++// TestAcquireDraftNetworkWindowsRefusesBeforeAnyProcess runs on Windows
++// only and proves the production caller reaches the resolved executor
++// there: the switch is on and the policy is valid, yet acquisition refuses
++// with the lane's typed platform diagnostic. The tool cannot run, so a
++// refusal that came after any spawn would surface a different code. The
++// CLI pipeline masks every acquisition failure as the lane diagnostic, so
++// the typed code is asserted here, at the caller.
++func TestAcquireDraftNetworkWindowsRefusesBeforeAnyProcess(t *testing.T) {
++	if runtime.GOOS != "windows" {
++		t.Skip("windows refusal probe is exercised on Windows")
++	}
++	policy := draftPolicyFile(t, draftPolicyEntry(draftHTTPSPrimary))
++	// A tool that cannot run: any process spawn fails loudly, proving the
++	// refusal precedes every Git call.
++	tool := buildrepo.GitTool{Executable: filepath.Join(t.TempDir(), "no-such-git.exe")}
++	deps := ExternalDeps{DraftTransportResolution: true, DraftPolicyPath: policy}
++	_, err := deps.acquireDraftNetwork(context.Background(), tool,
++		buildrepo.OperatorSSHCredentials{}, BuildHTTPSCredentials{},
++		draftHTTPSPrimary, "https", "fixture.test/repository",
++		buildrepo.LockedCommit{ObjectFormat: "sha1", Hex: strings.Repeat("1", 40)}, "", "", "")
++	if buildrepo.ErrorCode(err) != buildrepo.CodeTransportResolutionUnsupportedPlatform {
++		t.Fatalf("err = %v, want %s", err, buildrepo.CodeTransportResolutionUnsupportedPlatform)
++	}
++}
++
++// TestDefaultAcquireFetchesTheDeclaredURL pins the repository URL threading:
++// the default closure fetches ExternalSource.GitURL, never the configured
++// repository name in Declared.Repository.
++func TestDefaultAcquireFetchesTheDeclaredURL(t *testing.T) {
++	bare, commit := draftBareFixture(t)
++	tool, logPath := draftGitTool(t, map[string]draftGitArm{
++		draftHTTPSPrimary: {succeed: true, fileRepo: bare},
++	})
++	deps := ExternalDeps{GitTool: tool,
++		Audit: func(context.Context, buildrepo.AuditSubject) error { return nil }}
++	source := ExternalSource{Skill: "skill-a", Repository: "tools", GitURL: draftHTTPSPrimary,
++		Declared:  buildrepo.DeclaredState{Repository: "tools", Identity: "fixture.test/repository", Transport: "https", ObjectFormat: "sha1", Commit: commit},
++		Effective: buildrepo.EffectiveState{IdentityKind: "network-git", Identity: "fixture.test/repository", Transport: "https", ObjectFormat: "sha1", Commit: commit}}
++	request, err := externalPipelineRequest(deps, source, buildrepo.OperatorSSHCredentials{}, BuildHTTPSCredentials{},
++		skillspec.Command{Name: "tool", Target: "tool"}, nil, nil, buildrepo.OperationDryRun, NewPortableBuildAuthority())
++	if err != nil {
++		t.Fatal(err)
++	}
++	snapshot, err := request.Acquire(context.Background())
++	if err != nil {
++		t.Fatal(err)
++	}
++	if snapshot.Commit != commit {
++		t.Fatalf("commit = %s, want %s", snapshot.Commit, commit)
++	}
++	fetches := draftFetchLines(t, logPath)
++	if len(fetches) != 1 || !strings.Contains(fetches[0], "<"+draftHTTPSPrimary+">") {
++		t.Fatalf("fetches = %q, want exactly the declared URL", fetches)
++	}
++}
+diff --git a/internal/install/external.go b/internal/install/external.go
+index d20bef2..f0052bb 100644
+--- a/internal/install/external.go
++++ b/internal/install/external.go
+@@ -37,12 +37,25 @@ type ExternalDeps struct {
+ 	BuildSSH BuildSSHSelection
+ 	// BuildHTTPS is the operator's captured HTTPS selection for this run.
+ 	BuildHTTPS BuildHTTPSSelection
++	// DraftTransportResolution opts this run's external-repository lane into
++	// bounded transport resolution (repository-transport-v1 §2): with a
++	// present machine policy, acquisition runs the resolved executor over the
++	// policy's endpoint plan. The zero value keeps the legacy lane for every
++	// fetch, without consulting any policy file.
++	DraftTransportResolution bool
++	// DraftPolicyPath names the machine source-policy.json consulted when
++	// DraftTransportResolution is set. "" resolves to the default path beside
++	// the manager configuration.
++	DraftPolicyPath string
+ }
+ 
+ // ExternalSource is the exact declared/effective source passed to an injected
+ // acquisition boundary. It contains no credential or signing material.
++// GitURL is the declared fetchable repository URL; Declared.Repository is the
++// repository's configured name and never a fetch endpoint.
+ type ExternalSource struct {
+ 	Skill, Repository string
++	GitURL            string
+ 	Declared          buildrepo.DeclaredState
+ 	Effective         buildrepo.EffectiveState
+ 	Substitution      *devsub.BuildRepositorySubstitution
+@@ -153,7 +166,7 @@ func planExternalBuilds(ctx context.Context, scope, projectIdentity, home string
+ 		plan.messages = append(provenance, httpsProvenance...)
+ 	}
+ 	for index, row := range plan.rows {
+-		source := ExternalSource{Skill: row.node.Name, Repository: row.repository.Name, Declared: row.declared, Effective: row.effective, Substitution: row.sub}
++		source := ExternalSource{Skill: row.node.Name, Repository: row.repository.Name, GitURL: row.repository.Git, Declared: row.declared, Effective: row.effective, Substitution: row.sub}
+ 		request, err := externalPipelineRequest(plan.deps, source, plan.credentialsFor(row), plan.httpsCredentialsFor(row), row.command, store, identityOnlyExternalGo{identity: plan.toolchain, target: plan.targetIdentity, toolchain: plan.toolchainInput}, buildrepo.OperationDryRun, plan.authority)
+ 		if err != nil {
+ 			return plan, err
+@@ -206,7 +219,7 @@ func stageExternalBuilds(ctx context.Context, plan externalPlan, toolchain Toolc
+ 		}
+ 		// A verified final hit is copied into operation-private staging so the
+ 		// transaction and shim path are identical for hits and misses.
+-		request, err := externalPipelineRequest(plan.deps, ExternalSource{Skill: row.node.Name, Repository: row.repository.Name, Declared: row.declared, Effective: row.effective, Substitution: row.sub}, plan.credentialsFor(row), plan.httpsCredentialsFor(row), row.command, store, adapter, buildrepo.OperationInstall, plan.authority)
++		request, err := externalPipelineRequest(plan.deps, ExternalSource{Skill: row.node.Name, Repository: row.repository.Name, GitURL: row.repository.Git, Declared: row.declared, Effective: row.effective, Substitution: row.sub}, plan.credentialsFor(row), plan.httpsCredentialsFor(row), row.command, store, adapter, buildrepo.OperationInstall, plan.authority)
+ 		if err != nil {
+ 			return stagedExternal{}, err
+ 		}
+@@ -275,7 +288,7 @@ func externalPipelineRequest(deps ExternalDeps, source ExternalSource, credentia
+ 			if selected.Substitution != nil && selected.Substitution.Path != "" {
+ 				return buildrepo.AdmitLocal(ctx, buildrepo.LocalRequest{Path: selected.Substitution.Path, Tool: tool, Limits: deps.Limits})
+ 			}
+-			git := selected.Declared.Repository
++			git := selected.GitURL
+ 			transport := selected.Declared.Transport
+ 			identity := selected.Declared.Identity
+ 			commit := selected.Declared.Commit
+@@ -286,7 +299,7 @@ func externalPipelineRequest(deps ExternalDeps, source ExternalSource, credentia
+ 				commit, tag = selected.Effective.Commit, ""
+ 				refKind, refValue = selected.Substitution.RefKind, selected.Substitution.RefValue
+ 			}
+-			return buildrepo.AcquireNetwork(ctx, buildrepo.NetworkRequest{Source: buildrepo.Source{Git: git, Transport: transport, Identity: identity}, Lock: buildrepo.LockedCommit{ObjectFormat: selected.Effective.ObjectFormat, Hex: commit}, Tag: tag, RefKind: refKind, RefValue: refValue, Tool: tool, Limits: deps.Limits})
++			return deps.acquireDraftNetwork(ctx, tool, credentials, httpsCredentials, git, transport, identity, buildrepo.LockedCommit{ObjectFormat: selected.Effective.ObjectFormat, Hex: commit}, tag, refKind, refValue)
+ 		}
+ 	}
+ 	if authority == nil {

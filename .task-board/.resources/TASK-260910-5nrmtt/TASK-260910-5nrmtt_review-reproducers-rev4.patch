@@ -1,0 +1,29 @@
+--- a/internal/buildrepo/transport_test.go
++++ b/internal/buildrepo/transport_test.go
+@@ -1899,3 +1899,26 @@
+ 		t.Fatalf("records = %+v, want no attempt recorded", records)
+ 	}
+ }
++
++func TestReviewRev4ClosedGrammar(t *testing.T) {
++	requirePOSIXTransport(t)
++	fixture := makeGitFixture(t, "sha1", false)
++	for _, msg := range []string{
++		"fatal: unable to access 'https://fixture.test/repository.git/': Could not resolve host: fixture.test\naudit: policy denied",
++		"fatal: unable to access 'https://fixture.test/repository.git/': The requested URL returned error: 503; object verification failed",
++		"ssh: Could not resolve hostname fixture.test: unexpected resolver protocol response",
++
++	} {
++		t.Run(msg, func(t *testing.T) {
++			tool, logPath := fakeTransportGitTool(t, map[string]transportBehavior{transportHTTPS: failTransport(msg), transportSSH: {succeed: true, fileRepo: fixture.bare}})
++			tool = transportSSHBaseTool(t, tool)
++			base := transportBase(t, tool, fixture)
++			plan := TransportPlan{Identity: base.Source.Identity, Attempts: []TransportAttempt{{URL: transportHTTPS}, {URL: transportSSH}}, Fallback: TransportFallbackAvailabilityAuth}
++			_, err := AcquireNetworkResolved(context.Background(), base, plan, nil, nil)
++			n := len(transportFetchLines(t, logPath))
++			if err == nil || n != 1 {
++				t.Fatalf("fail-closed diagnostic produced %d fetches, err=%v", n, err)
++			}
++		})
++	}
++}

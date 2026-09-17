@@ -1,0 +1,17 @@
+--- /dev/null
++++ b/internal/buildrepo/transport_review_test.go
+@@ -0,0 +1,14 @@
++package buildrepo
++import("context"; "testing")
++func TestReviewRev5GluedLineRefuses(t *testing.T) {
++ requirePOSIXTransport(t)
++ fixture := makeGitFixture(t,"sha1",false)
++ msg := "fatal: unable to access 'https://fixture.test/repository.git/': The requested URL returned error: 503fatal: the remote end hung up unexpectedly"
++ tool, logPath := fakeTransportGitTool(t,map[string]transportBehavior{transportHTTPS:failTransport(msg),transportSSH:{succeed:true,fileRepo:fixture.bare}})
++ tool=transportSSHBaseTool(t,tool)
++ base:=transportBase(t,tool,fixture)
++ plan:=TransportPlan{Identity:base.Source.Identity,Attempts:[]TransportAttempt{{URL:transportHTTPS},{URL:transportSSH}},Fallback:TransportFallbackAvailabilityAuth}
++ _,err:=AcquireNetworkResolved(context.Background(),base,plan,nil,nil)
++ n:=len(transportFetchLines(t,logPath))
++ if err==nil || n!=1 {t.Fatalf("malformed full line produced %d fetches, err=%v",n,err)}
++}
