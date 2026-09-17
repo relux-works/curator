@@ -23,6 +23,7 @@ import (
 	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/godriver"
+	"github.com/relux-works/curator/internal/hookapproval"
 	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
@@ -1737,8 +1738,41 @@ func TestStatusJSONKeepsTheLegacyShapeWithoutCompiledCommands(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &object); err != nil {
 		t.Fatalf("status --json is not one JSON object: %v\n%s", err, stdout)
 	}
-	if len(object) != 3 || object["alias"] == nil || object["path"] == nil || object["skills"] == nil {
+	// The §8.6 posture extends the historical document additively: the
+	// three legacy keys keep their shape, and the trust rows arrive under
+	// exactly one new key. A closure without compiled commands still
+	// carries no build key at all.
+	if len(object) != 4 || object["alias"] == nil || object["path"] == nil || object["skills"] == nil {
 		t.Fatalf("status --json changed the historical document shape:\n%s", stdout)
+	}
+	if object["builds"] != nil {
+		t.Fatalf("status --json without compiled commands carries a builds key:\n%s", stdout)
+	}
+	rows, ok := object["shell_hook_trust"].([]any)
+	if !ok || len(rows) != 2 {
+		t.Fatalf("shell_hook_trust = %v, want the two install-recorded files", object["shell_hook_trust"])
+	}
+	for _, entry := range rows {
+		row, ok := entry.(map[string]any)
+		if !ok {
+			t.Fatalf("shell_hook_trust row is not an object: %v", entry)
+		}
+		path, _ := row["path"].(string)
+		if path == "" || !filepath.IsAbs(path) {
+			t.Fatalf("trust row lacks an absolute path: %v", row)
+		}
+		if row["state"] != hookapproval.PostureApproved || row["approved_by"] != hookapproval.ApprovedByManager {
+			t.Fatalf("install-recorded trust row = %v, want approved/manager", row)
+		}
+		if _, present := row["diagnostic"]; present {
+			t.Fatalf("approved trust row carries a diagnostic: %v", row)
+		}
+		// Closed row shape: an approved file whose bytes compared
+		// carries exactly path, state and approved_by — no diagnostic,
+		// no file qualifier, and no other key.
+		if len(row) != 3 {
+			t.Fatalf("approved trust row carries %d keys, want exactly path/state/approved_by: %v", len(row), row)
+		}
 	}
 	skills, ok := object["skills"].(map[string]any)
 	if !ok || skills["skill-a"] != stateUpToDate {

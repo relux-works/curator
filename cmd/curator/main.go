@@ -78,6 +78,7 @@ Commands:
   audit [target] [flags]   run audit, pin trust, or publish a signed record
   gc                       remove unreferenced runtime entries
   shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
+  hook <subcommand>        approve | approvals | revoke (project env file trust)
   ui                       terminal view over installed state
   config <subcommand>      show | build-ssh | build-https (see config build-ssh -h, config build-https -h)
   --version                print the curator version
@@ -193,6 +194,8 @@ func (c cli) run(args []string) int {
 		return c.cmdGC()
 	case "shell-init":
 		return c.cmdShellInit(args[1:])
+	case "hook":
+		return c.cmdHook(args[1:])
 	case "ui":
 		return c.cmdUI()
 	case "config":
@@ -726,6 +729,16 @@ func (c cli) cmdStatus(args []string) int {
 		return exitCode
 	}
 
+	// Shell-hook trust posture (Manager profile §8.6): one invocation-global
+	// row set over every recorded path plus the env files of the targets of
+	// this invocation. It is assessed once, printed once for humans, and
+	// repeated per target in the machine-readable document.
+	targetRoots := make([]string, 0, len(targets))
+	for _, target := range targets {
+		targetRoots = append(targetRoots, target.Root)
+	}
+	trustRows, trustWarnings, trustStateUnreadable := hookTrustPosture(cfg.Home(), targetRoots)
+
 	exitCode := exitOK
 	jsonResults := make([]map[string]any, 0, len(targets))
 	for _, target := range targets {
@@ -762,7 +775,17 @@ func (c cli) cmdStatus(args []string) int {
 			continue
 		}
 		drift, builds := statusReport(cfg, scope, factsList(result.Builds), before)
-		payload := map[string]any{"alias": target.Alias, "path": target.Root, "skills": drift}
+		// The shell-hook trust posture (Manager profile §8.6) extends
+		// the document additively under its own key; an all-approved
+		// posture is still posture, so the key is always present. The
+		// warnings (malformed lines, or an unreadable approval state)
+		// travel under their own key, present only when non-empty, so a
+		// JSON consumer sees the same read failures the human output
+		// prints.
+		payload := map[string]any{"alias": target.Alias, "path": target.Root, "skills": drift, "shell_hook_trust": trustRows}
+		if len(trustWarnings) > 0 {
+			payload["shell_hook_trust_warnings"] = trustWarnings
+		}
 		// A closure without compiled commands keeps the historical object
 		// exactly: no build key appears at all.
 		if len(builds) > 0 {
@@ -785,6 +808,21 @@ func (c cli) cmdStatus(args []string) int {
 		if *check && checkFailed(drift, builds) {
 			exitCode = exitFail
 		}
+	}
+	if !*jsonOut {
+		for _, warning := range trustWarnings {
+			_, _ = fmt.Fprintln(c.stdout, "shell-hook-trust: warning: "+warning)
+		}
+		for _, row := range trustRows {
+			_, _ = fmt.Fprintln(c.stdout, formatTrustRow(row))
+		}
+	}
+	// A changed file, a recorded file whose bytes are missing or
+	// unreadable, or an unreadable approval state is non-current; an
+	// unapproved file whose bytes read stays a warning row and never fails
+	// the check (Spec §8.6).
+	if *check && hookTrustCheckFailed(trustRows, trustStateUnreadable) {
+		exitCode = exitFail
 	}
 	if *jsonOut {
 		var output any = jsonResults

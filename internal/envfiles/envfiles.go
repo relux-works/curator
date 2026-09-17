@@ -3,9 +3,13 @@
 package envfiles
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/relux-works/curator/internal/hookapproval"
 )
 
 // Names of the generated helper files inside a scope's env directory.
@@ -65,13 +69,15 @@ func ProjectDir(projectRoot string) string { return filepath.Join(projectRoot, "
 // GlobalDir is the directory that holds the global scope's helper files.
 func GlobalDir(home string) string { return filepath.Join(home, "global") }
 
-// WriteProject writes .agents/env.sh and .agents/env.ps1 into a project.
+// WriteProject writes .agents/env.sh and .agents/env.ps1 into a project and
+// records both digests as approved_by manager (Spec §8.1 manager trust
+// source), so the shell-hook trust gate sources them silently.
 //
 // It mutates live paths directly and therefore belongs only to callers outside
 // an install transaction, such as scaffolding a checkout. An installation
 // stages the same bytes through StageProject and lets the commit phase publish
-// them atomically.
-func WriteProject(projectRoot string) error {
+// them atomically; the commit phase records the digests after publication.
+func WriteProject(projectRoot, home string) error {
 	agentsDir := ProjectDir(projectRoot)
 	if err := os.MkdirAll(agentsDir, 0o755); err != nil {
 		return err
@@ -80,11 +86,17 @@ func WriteProject(projectRoot string) error {
 	if err := os.WriteFile(filepath.Join(agentsDir, ShellName), shell, 0o644); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(agentsDir, PowerShellName), powerShell, 0o644)
+	if err := os.WriteFile(filepath.Join(agentsDir, PowerShellName), powerShell, 0o644); err != nil {
+		return err
+	}
+	return recordLive(home, filepath.Join(agentsDir, ShellName), filepath.Join(agentsDir, PowerShellName))
 }
 
-// WriteGlobal writes the global env files exporting CSK_GLOBAL_ROOT. Like
-// WriteProject it is the direct-mutation form; StageGlobal is the install form.
+// WriteGlobal writes the global env files exporting CSK_GLOBAL_ROOT and
+// records both digests as approved_by manager. Like WriteProject it is the
+// direct-mutation form; StageGlobal is the install form. The trust gate of
+// Spec §8.1 covers project files only, so these records are inert for the
+// gate; they exist so every manager-written env file carries a digest.
 func WriteGlobal(home string) error {
 	globalDir := GlobalDir(home)
 	if err := os.MkdirAll(filepath.Join(globalDir, "bin"), 0o755); err != nil {
@@ -94,7 +106,21 @@ func WriteGlobal(home string) error {
 	if err := os.WriteFile(filepath.Join(globalDir, ShellName), shell, 0o644); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(globalDir, PowerShellName), powerShell, 0o644)
+	if err := os.WriteFile(filepath.Join(globalDir, PowerShellName), powerShell, 0o644); err != nil {
+		return err
+	}
+	return recordLive(home, filepath.Join(globalDir, ShellName), filepath.Join(globalDir, PowerShellName))
+}
+
+// recordLive hashes live env files and upserts manager records for them.
+func recordLive(home string, livePaths ...string) error {
+	now := time.Now().UTC()
+	for _, livePath := range livePaths {
+		if _, err := hookapproval.ApproveFile(home, livePath, hookapproval.ApprovedByManager, now); err != nil {
+			return fmt.Errorf("record shell-hook approval for %s: %w", livePath, err)
+		}
+	}
+	return nil
 }
 
 func psQuote(value string) string {

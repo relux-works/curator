@@ -10,9 +10,11 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/relux-works/curator/internal/buildcache"
 	"github.com/relux-works/curator/internal/buildmeta"
+	"github.com/relux-works/curator/internal/hookapproval"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/scopes"
 	"github.com/relux-works/curator/internal/staging"
@@ -686,8 +688,29 @@ func runCommit(ctx context.Context, request commitRequest) (outcome commitOutcom
 		return commitOutcome{}, fmt.Errorf("commit the install transaction: %w", err)
 	}
 	committed = true
+	outcome.warnings = append(outcome.warnings, recordPublishedEnvApprovals(request, targets)...)
 	outcome.warnings = append(outcome.warnings, collectAfterCommit(request, lock)...)
 	return outcome, nil
+}
+
+// recordPublishedEnvApprovals records approved_by manager digests for the env
+// files this commit just published (Spec §8.1 manager trust source). It runs
+// after the journal commit, still under the home lock, hashing the live bytes
+// the shell hook will read. A recording failure warns instead of failing the
+// committed install; the operator can re-record with curator hook approve.
+func recordPublishedEnvApprovals(request commitRequest, targets scopeTargets) []string {
+	var warnings []string
+	now := time.Now().UTC()
+	for _, target := range targets.plan.Targets {
+		if target.Class != staging.ClassEnvFile || target.Removal() {
+			continue
+		}
+		if _, err := hookapproval.ApproveFile(request.home, target.LivePath, hookapproval.ApprovedByManager, now); err != nil {
+			warnings = append(warnings, fmt.Sprintf("%s: warning: could not record shell-hook approval for %s: %v",
+				request.scope, target.LivePath, err))
+		}
+	}
+	return warnings
 }
 
 // collectAfterCommit runs the maintenance sweep while the home lock is still

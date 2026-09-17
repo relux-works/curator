@@ -147,6 +147,15 @@ internal/godriver	TestExecutableIdentityStillRejectsSubstitutionBehindAJunction	
 internal/runtimestore	TestUnixPostInstallShimPropagatesSignal	linux,darwin	-	-	the installed unix shim is executable and propagates signals
 internal/shell	TestPosixHookEntersNestedSwitchesAndLeavesProjects	linux,darwin	windows	platform-control	executes the POSIX shell hook end to end
 internal/shell	TestPowerShellHookRunsOnEveryPrompt	windows	linux,darwin	platform-control	executes the PowerShell prompt hook end to end
+# S6 shell-hook trust gate (TASK-260910-1952mz): the committed SPEC_PIN predates
+# vectors/shell-hook-trust.json, so the parent tolerates the root-content skip
+# exactly like TestCandidateGoV1SourceAwareContract. A subtest may skip only
+# where its interpreter is genuinely absent (no sh/dash/bash/zsh, or no pwsh);
+# on Windows Git Bash present means the POSIX subtests must run through it,
+# and only a genuinely absent Git Bash is a host-capability skip. The case
+# itself must still pass.
+internal/shell	TestShellHookTrustVectors	linux,darwin,windows	linux,darwin,windows	root-content	the emitted POSIX and PowerShell hooks satisfy every shell-hook-trust vector case's sourced, diagnostic, and once-per-session warning expectations
+internal/shell	TestShellHookTrustVectors/*	-	linux,darwin,windows	host-capability	a vector subtest may skip only where its interpreter is absent from the runner (on Windows, Git Bash absent); Git Bash present means the POSIX subtests must run; the case itself must still pass
 internal/envfiles	TestWriteProjectShapesAndSourcing	linux,darwin,windows	-	-	sources the generated env file through a real shell on unix; shape-only on Windows
 internal/install	TestEndToEndInstall	linux,darwin,windows	-	-	materialises the executable shim and env files of a full install
 internal/adapters	TestSymlinkModeStagesRelativeLinkTargets	linux,darwin,windows	-	-	creates a link (Windows: a reparse point) and asserts its target stays relative

@@ -5,11 +5,13 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/hookapproval"
 )
 
 // Production entry points under test: StatusOf, Remove (orphan retention),
@@ -408,5 +410,217 @@ func TestClaudeSeedMergePreservesToolState(t *testing.T) {
 	}
 	if !strings.Contains(string(merged), `"hasClaudeMdExternalIncludesApproved":true`) {
 		t.Fatalf("the launch entry lacks the includes key: %s", merged)
+	}
+}
+
+// TestStatusShellHookTrustFromLaunchProject proves the §8.6 posture rows
+// of StatusOf: the launch directory's project contributes its env files,
+// recorded paths are always known, and malformed state lines warn without
+// breaking the valid rows. The NonCurrent verdict over these rows (changed
+// fails, unapproved warns) runs through the same field the CLI --check
+// tests prove end to end; this level pins the rows, where the launch
+// directory is injectable.
+func TestStatusShellHookTrustFromLaunchProject(t *testing.T) {
+	home := t.TempDir()
+	project := filepath.Join(t.TempDir(), "project")
+	if err := os.MkdirAll(filepath.Join(project, ".agents"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(`{"schema_version":1,"skills":[]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	envPath := filepath.Join(project, ".agents", "env.sh")
+	if err := os.WriteFile(envPath, []byte("export CURATOR_PROJECT_ENV=1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := filepath.EvalSymlinks(envPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := StatusRequest{Home: home, Machine: envregistry.DefaultMachineConfig(), LaunchDir: project}
+
+	status, err := StatusOf(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(status.ShellHookTrust) != 1 {
+		t.Fatalf("trust rows = %+v, want the unapproved project file", status.ShellHookTrust)
+	}
+	row := status.ShellHookTrust[0]
+	if row.Path != resolved || row.State != hookapproval.PostureUnapproved || row.Diagnostic != hookapproval.DiagnosticEnvUnapproved {
+		t.Fatalf("trust row = %+v", row)
+	}
+
+	if _, err := hookapproval.ApproveFile(home, envPath, hookapproval.ApprovedByOperator, parseTrustStamp(t, "2026-09-17T00:00:00Z")); err != nil {
+		t.Fatal(err)
+	}
+	status, err = StatusOf(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(status.ShellHookTrust) != 1 {
+		t.Fatalf("trust rows = %+v", status.ShellHookTrust)
+	}
+	row = status.ShellHookTrust[0]
+	if row.Path != resolved || row.State != hookapproval.PostureApproved || row.ApprovedBy != hookapproval.ApprovedByOperator {
+		t.Fatalf("trust row = %+v", row)
+	}
+
+	if err := os.WriteFile(envPath, []byte("export CURATOR_PROJECT_ENV=2\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	status, err = StatusOf(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	row = status.ShellHookTrust[0]
+	if row.State != hookapproval.PostureChanged || row.Diagnostic != hookapproval.DiagnosticEnvChanged || row.ApprovedBy != hookapproval.ApprovedByOperator {
+		t.Fatalf("trust row = %+v", row)
+	}
+
+	// Outside any project the recorded path stays known.
+	status, err = StatusOf(StatusRequest{Home: home, Machine: envregistry.DefaultMachineConfig(), LaunchDir: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(status.ShellHookTrust) != 1 || status.ShellHookTrust[0].Path != resolved {
+		t.Fatalf("trust rows outside a project = %+v, want the recorded path", status.ShellHookTrust)
+	}
+
+	// A malformed line warns and is skipped; the valid row survives.
+	state, err := os.ReadFile(hookapproval.ApprovalsPath(home))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(hookapproval.ApprovalsPath(home), append(state, []byte("malformed-line\n")...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	status, err = StatusOf(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(status.ShellHookTrustWarnings) != 1 || !strings.Contains(status.ShellHookTrustWarnings[0], "line 2") {
+		t.Fatalf("trust warnings = %v, want the malformed line", status.ShellHookTrustWarnings)
+	}
+	if len(status.ShellHookTrust) != 1 || status.ShellHookTrust[0].State != hookapproval.PostureChanged {
+		t.Fatalf("trust rows = %+v, want the valid changed row", status.ShellHookTrust)
+	}
+}
+
+func parseTrustStamp(t *testing.T, value string) time.Time {
+	t.Helper()
+	stamp, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return stamp
+}
+
+// TestStatusShellHookTrustMissingUnreadableAndStateFailures proves the
+// R1–R3 rows of StatusOf with the launch directory outside any project: a
+// recorded file that disappears or becomes unreadable keeps its row and
+// record, an unreadable approval state warns, and a truly absent state
+// stays the quiet case. This level pins the rows and each row's own
+// NonCurrent verdict; the matrix-level NonCurrent flag over these rows
+// (and the CLI --check exits) runs through an otherwise-current matrix in
+// the cmd/curator tests, where the exit code is evidence of the trust
+// posture alone.
+func TestStatusShellHookTrustMissingUnreadableAndStateFailures(t *testing.T) {
+	home := t.TempDir()
+	envPath := filepath.Join(t.TempDir(), "project", ".agents", "env.sh")
+	if err := os.MkdirAll(filepath.Dir(envPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(envPath, []byte("export CURATOR_PROJECT_ENV=1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := filepath.EvalSymlinks(envPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := hookapproval.ApproveFile(home, envPath, hookapproval.ApprovedByOperator, parseTrustStamp(t, "2026-09-17T00:00:00Z")); err != nil {
+		t.Fatal(err)
+	}
+	outside := StatusRequest{Home: home, Machine: envregistry.DefaultMachineConfig(), LaunchDir: t.TempDir()}
+
+	status, err := StatusOf(outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(status.ShellHookTrust) != 1 || status.ShellHookTrust[0].State != hookapproval.PostureApproved {
+		t.Fatalf("trust rows = %+v, want the approved recorded path", status.ShellHookTrust)
+	}
+	if status.ShellHookTrust[0].NonCurrent() {
+		t.Fatal("an approved recorded path is current")
+	}
+
+	// R1: the approved file disappears; its row stays and is non-current.
+	if err := os.Remove(envPath); err != nil {
+		t.Fatal(err)
+	}
+	status, err = StatusOf(outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(status.ShellHookTrust) != 1 {
+		t.Fatalf("trust rows = %+v, want the missing recorded path", status.ShellHookTrust)
+	}
+	row := status.ShellHookTrust[0]
+	if row.Path != resolved || row.State != hookapproval.PostureApproved ||
+		row.ApprovedBy != hookapproval.ApprovedByOperator || row.File != hookapproval.PostureFileMissing {
+		t.Fatalf("trust row = %+v", row)
+	}
+	if !row.NonCurrent() {
+		t.Fatal("a recorded-but-missing file is non-current")
+	}
+
+	// R2: the approved file becomes unreadable-as-bytes; its record stays.
+	if err := os.Mkdir(envPath, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	status, err = StatusOf(outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(status.ShellHookTrust) != 1 {
+		t.Fatalf("trust rows = %+v, want the unreadable recorded path", status.ShellHookTrust)
+	}
+	row = status.ShellHookTrust[0]
+	if row.Path != resolved || row.ApprovedBy != hookapproval.ApprovedByOperator || row.File != hookapproval.PostureFileUnreadable {
+		t.Fatalf("trust row = %+v", row)
+	}
+	if !row.NonCurrent() {
+		t.Fatal("an unreadable recorded file is non-current")
+	}
+
+	// R3: the approval state itself becomes unreadable; the failure warns
+	// and is non-current, never an empty set.
+	if err := os.Remove(hookapproval.ApprovalsPath(home)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(hookapproval.ApprovalsPath(home), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	status, err = StatusOf(outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(status.ShellHookTrustWarnings) != 1 || !strings.Contains(status.ShellHookTrustWarnings[0], "cannot read") {
+		t.Fatalf("trust warnings = %v, want the state read failure", status.ShellHookTrustWarnings)
+	}
+	// The matrix-level NonCurrent flag for this failure is proven at the
+	// CLI level, where the matrix is otherwise current.
+
+	// Paired control: a truly absent state carries no rows and no
+	// warnings when no project candidate exists.
+	if err := os.Remove(hookapproval.ApprovalsPath(home)); err != nil {
+		t.Fatal(err)
+	}
+	status, err = StatusOf(outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(status.ShellHookTrust) != 0 || len(status.ShellHookTrustWarnings) != 0 {
+		t.Fatalf("trust rows = %+v warnings = %v, want none", status.ShellHookTrust, status.ShellHookTrustWarnings)
 	}
 }

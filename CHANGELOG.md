@@ -25,6 +25,33 @@ All notable implementation changes are recorded here.
   replace declared module directories elsewhere in the snapshot, and those
   directories join the directive, cgo, and assembly scan surface
   (Protocol Core §4.2.3).
+- S6: shell-hook trust gate — warning release (`A-warning`). The POSIX and
+  PowerShell hooks now verify a project `.agents/env.sh` / `.agents/env.ps1`
+  against the manager-home approval state before sourcing it, and warn once
+  per shell session with `shell_hook_env_unapproved` (no record) or
+  `shell_hook_env_changed` (bytes differ; re-approval required) naming the
+  absolute path and `curator hook approve <path>`. Files the manager itself
+  writes are recorded as `approved_by: manager` at write time and source
+  silently. This release only warns: unapproved and changed files are still
+  sourced. Migration: run `curator hook approve <path>` for each project env
+  file the warning names (a project-local approval record is ignored — only
+  the manager-home record counts). The operator approval surface is
+  `curator hook approve <path>` (records the current bytes as
+  `approved_by: operator`, fails without recording when the file is absent
+  or unreadable), `curator hook approvals` (read-only listing), and
+  `curator hook revoke <path>` (removes the record; revoking a missing
+  record leaves state unchanged and exits 0). `curator status` and
+  `curator env status` report the shell-hook trust posture per known env
+  file (`approved`, `shell_hook_env_unapproved`, `shell_hook_env_changed`);
+  a recorded file whose bytes are missing or unreadable keeps its row
+  with an explicit qualifier and is non-current under `--check`, as a
+  changed file is, while an unapproved file whose bytes read stays a
+  warning row. `status --json` gains `shell_hook_trust` (plus
+  `shell_hook_trust_warnings` when approval-state warnings exist, so an
+  unreadable approval state surfaces in JSON and fails `--check`). The
+  enforcing revision (`B-enforcing`,
+  refuse without sourcing) follows in a later release
+  (Manager profile §8).
 
 ### Changed
 

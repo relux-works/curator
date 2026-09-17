@@ -217,6 +217,23 @@ curator status --json
 
 The command prints status diagnostics for declared skills and compiled commands.
 
+`curator status` also reports the shell-hook trust posture (Manager profile
+§8.6): one `shell-hook-trust:` row per known project env file — every
+recorded path plus the `.agents/env.sh` / `.agents/env.ps1` of the reported
+projects — with its trust state (`approved`, `shell_hook_env_unapproved`, or
+`shell_hook_env_changed`), the absolute path, and, for recorded files, the
+recorded `approved_by` value. Untrusted rows name the `curator hook approve`
+command that records the current bytes. A recorded file whose bytes are
+missing or unreadable keeps its row with an explicit `file is missing` /
+`file is unreadable` qualifier (no digest comparison is claimed), and
+`--check` treats it as non-current, as it does a changed file; an
+unapproved file whose bytes read is a warning row and never fails the
+check. The `--json` document carries the same rows under `shell_hook_trust`
+(with the `file` qualifier where it applies) and any approval-state warnings
+(malformed lines, unreadable state) under `shell_hook_trust_warnings`.
+`curator env status` reports the same posture rows with the same `--check`
+semantics.
+
 ### curator list
 
 `curator list` lists configured projects and declared skills.
@@ -619,6 +636,52 @@ curator shell-init zsh --install
 ```
 
 The command outputs shell code for environment auto-switching.
+
+### curator hook approve
+
+`curator hook approve <path>` records the digest of a project env file's
+current bytes as `approved_by: operator` (the direnv-allow equivalent,
+Manager profile §8.3), so the shell hook sources it without warning.
+Re-run it after the file changes: the old record never authorizes the new
+bytes. The path resolves to the canonical absolute identity the hook uses.
+The command fails without recording when the file is absent or unreadable,
+with distinct exit text for the two.
+
+Synopsis:
+
+```bash
+curator hook approve <path>
+```
+
+Approve the env file a hook warning names:
+
+```bash
+curator hook approve ~/projects/app/.agents/env.sh
+```
+
+### curator hook approvals
+
+`curator hook approvals` lists every approval record read-only: one
+tab-separated path, sha256, approved_by, approved_at row per record, sorted
+by path. It never mutates state; a malformed record is reported and skipped.
+
+Synopsis:
+
+```bash
+curator hook approvals
+```
+
+### curator hook revoke
+
+`curator hook revoke <path>` removes the approval record for the path. On a
+path with no record it leaves state unchanged and reports that there was
+nothing to revoke (exit 0).
+
+Synopsis:
+
+```bash
+curator hook revoke <path>
+```
 
 ### curator ui
 

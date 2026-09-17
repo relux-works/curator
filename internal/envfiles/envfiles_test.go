@@ -7,13 +7,38 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/hookapproval"
 )
+
+// assertManagerRecorded proves a manager write left an approved_by manager
+// record whose digest equals the live bytes.
+func assertManagerRecorded(t *testing.T, home, livePath string) {
+	t.Helper()
+	payload, err := os.ReadFile(livePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, found, err := hookapproval.Lookup(home, livePath)
+	if err != nil || !found {
+		t.Fatalf("Lookup(%s) = %v, %v", livePath, found, err)
+	}
+	if record.SHA256 != hookapproval.Digest(payload) {
+		t.Fatalf("recorded digest %q does not match the live bytes of %s", record.SHA256, livePath)
+	}
+	if record.ApprovedBy != hookapproval.ApprovedByManager {
+		t.Fatalf("approved_by = %q, want manager", record.ApprovedBy)
+	}
+}
 
 func TestWriteProjectShapesAndSourcing(t *testing.T) {
 	project := t.TempDir()
-	if err := WriteProject(project); err != nil {
+	home := t.TempDir()
+	if err := WriteProject(project, home); err != nil {
 		t.Fatal(err)
 	}
+	assertManagerRecorded(t, home, filepath.Join(project, ".agents", "env.sh"))
+	assertManagerRecorded(t, home, filepath.Join(project, ".agents", "env.ps1"))
 	sh, err := os.ReadFile(filepath.Join(project, ".agents", "env.sh"))
 	if err != nil {
 		t.Fatal(err)
@@ -61,6 +86,8 @@ func TestWriteGlobal(t *testing.T) {
 	if err := WriteGlobal(home); err != nil {
 		t.Fatal(err)
 	}
+	assertManagerRecorded(t, home, filepath.Join(home, "global", "env.sh"))
+	assertManagerRecorded(t, home, filepath.Join(home, "global", "env.ps1"))
 	sh, err := os.ReadFile(filepath.Join(home, "global", "env.sh"))
 	if err != nil {
 		t.Fatal(err)

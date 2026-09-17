@@ -19,6 +19,12 @@ func printEnvStatus(stdout io.Writer, status *envprofile.Status) {
 		}
 		_, _ = fmt.Fprintf(stdout, "require_current_profile: %s (%s)\n", *status.RequireCurrentProfile, locked)
 	}
+	for _, warning := range status.ShellHookTrustWarnings {
+		_, _ = fmt.Fprintf(stdout, "shell-hook-trust: warning: %s\n", warning)
+	}
+	for _, row := range status.ShellHookTrust {
+		_, _ = fmt.Fprintln(stdout, formatTrustRow(row))
+	}
 	for _, home := range status.Homes {
 		state := "current"
 		if !home.Current {

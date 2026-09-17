@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/relux-works/curator/internal/envfiles"
+	"github.com/relux-works/curator/internal/hookapproval"
 )
 
 func TestDetectIsCrossPlatform(t *testing.T) {
@@ -47,6 +48,7 @@ func TestPosixHookEntersNestedSwitchesAndLeavesProjects(t *testing.T) {
 				t.Skip(shellName + " is unavailable")
 			}
 			root := t.TempDir()
+			home := t.TempDir()
 			first := filepath.Join(root, "first")
 			second := filepath.Join(root, "second")
 			outside := filepath.Join(root, "outside")
@@ -55,10 +57,10 @@ func TestPosixHookEntersNestedSwitchesAndLeavesProjects(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if err := envfiles.WriteProject(first); err != nil {
+			if err := envfiles.WriteProject(first, home); err != nil {
 				t.Fatal(err)
 			}
-			if err := envfiles.WriteProject(second); err != nil {
+			if err := envfiles.WriteProject(second, home); err != nil {
 				t.Fatal(err)
 			}
 			hookPath := writeHook(t, shellName, false)
@@ -76,11 +78,15 @@ printf 'left=%s:%s\n' "${CURATOR_ACTIVE_ENV-unset}" "$([ "$PATH" = "$original" ]
 `
 			output := runPosix(t, executable, script, map[string]string{
 				"HOOK_PATH": hookPath, "FIRST": first, "SECOND": second, "OUTSIDE": outside,
+				"CURATOR_CONFIG": filepath.Join(home, "config.json"),
 			})
 			for _, expected := range []string{"first=" + first, "second=" + second, "left=unset:restored"} {
 				if !strings.Contains(output, expected) {
 					t.Fatalf("hook output lacks %q:\n%s", expected, output)
 				}
+			}
+			if strings.Contains(output, "shell_hook_env_") {
+				t.Fatalf("manager-written env files warned:\n%s", output)
 			}
 		})
 	}
@@ -162,6 +168,22 @@ func TestBashHookPreservesPromptCommandArray(t *testing.T) {
 	}
 }
 
+func TestBashHookToleratesEmptyPromptCommandArrayUnderNounset(t *testing.T) {
+	executable, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("bash is unavailable")
+	}
+	hookPath := writeHook(t, "bash", false)
+	output := runPosix(t, executable,
+		`set -u; PROMPT_COMMAND=(); . "$HOOK_PATH"; printf '%s|%s|%s\n' "${#PROMPT_COMMAND[@]}" "${PROMPT_COMMAND[0]}" "$-"; set +u`,
+		map[string]string{"HOOK_PATH": hookPath},
+	)
+	fields := strings.Split(strings.TrimSuffix(output, "\n"), "|")
+	if len(fields) != 3 || fields[0] != "1" || fields[1] != "_curator_auto_env" || !strings.Contains(fields[2], "u") {
+		t.Fatalf("empty PROMPT_COMMAND array under nounset: %q", output)
+	}
+}
+
 func TestZshHookIsIdempotentAndDoesNotReenter(t *testing.T) {
 	executable, err := exec.LookPath("zsh")
 	if err != nil {
@@ -179,7 +201,12 @@ func TestZshHookIsIdempotentAndDoesNotReenter(t *testing.T) {
 	env := "CSK_SOURCE_COUNT=$(( ${CSK_SOURCE_COUNT:-0} + 1 ))\n" +
 		"_curator_auto_env\n" +
 		"export CSK_PROJECT_ROOT=" + shellQuote(project) + "\n"
-	if err := os.WriteFile(filepath.Join(agentsDir, "env.sh"), []byte(env), 0o600); err != nil {
+	envPath := filepath.Join(agentsDir, "env.sh")
+	if err := os.WriteFile(envPath, []byte(env), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	home := t.TempDir()
+	if _, err := hookapproval.ApproveFile(home, envPath, hookapproval.ApprovedByOperator, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
 	hookPath := writeHook(t, "zsh", false)
@@ -198,6 +225,7 @@ printf 'sources=%s chpwd=%s precmd=%s\n' "$CSK_SOURCE_COUNT" "$chpwd_count" "$pr
 `
 	output := runPosix(t, executable, script, map[string]string{
 		"HOOK_PATH": hookPath, "NESTED": nested,
+		"CURATOR_CONFIG": filepath.Join(home, "config.json"),
 	})
 	if output != "sources=1 chpwd=1 precmd=1\n" {
 		t.Fatalf("zsh hook is not reentrancy-safe and idempotent: %q", output)
@@ -337,6 +365,51 @@ func TestHookVariants(t *testing.T) {
 	}
 }
 
+func TestHookTrustGateShape(t *testing.T) {
+	if DefaultTrustProfile != TrustProfileAWarning {
+		t.Fatalf("DefaultTrustProfile = %q, want A-warning", DefaultTrustProfile)
+	}
+	if _, err := HookWithProfile("bash", false, "C-anything"); err == nil {
+		t.Fatal("HookWithProfile accepted an open profile")
+	}
+	if _, err := HookWithProfile("fish", false, TrustProfileAWarning); err == nil {
+		t.Fatal("HookWithProfile accepted an unknown shell")
+	}
+	for _, shellName := range []string{"zsh", "bash", "powershell"} {
+		for _, profile := range []TrustProfile{TrustProfileAWarning, TrustProfileBEnforcing} {
+			hook, err := HookWithProfile(shellName, true, profile)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, needle := range []string{
+				hookapproval.Filename,
+				DiagnosticEnvUnapproved,
+				DiagnosticEnvChanged,
+				"curator hook approve",
+				string(profile),
+			} {
+				if !strings.Contains(hook, needle) {
+					t.Fatalf("%s %s hook lacks %q", shellName, profile, needle)
+				}
+			}
+			other := TrustProfileAWarning
+			if profile == TrustProfileAWarning {
+				other = TrustProfileBEnforcing
+			}
+			if strings.Contains(hook, "'"+string(other)+"'") {
+				t.Fatalf("%s %s hook also bakes %q", shellName, profile, other)
+			}
+		}
+	}
+	def, err := Hook("bash", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(def, "'"+string(TrustProfileAWarning)+"'") {
+		t.Fatalf("default hook does not bake A-warning:\n%s", def)
+	}
+}
+
 func TestPowerShellHookRunsOnEveryPrompt(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Skip("PowerShell prompt integration is exercised on Windows")
@@ -357,7 +430,8 @@ func TestPowerShellHookRunsOnEveryPrompt(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := envfiles.WriteProject(project); err != nil {
+	home := t.TempDir()
+	if err := envfiles.WriteProject(project, home); err != nil {
 		t.Fatal(err)
 	}
 	hook, err := Hook("powershell", false)
@@ -390,7 +464,8 @@ Write-Output ("left={0}:{1}:{2}" -f $active, $restored, $secondPrompt)
 	// machine policy would otherwise refuse the harness script itself, which
 	// proves nothing about the hook under test.
 	command := exec.Command(powerShell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath)
-	command.Env = append(os.Environ(), "HOOK_PATH="+hookPath, "NESTED="+nested, "OUTSIDE="+outside)
+	command.Env = append(os.Environ(), "HOOK_PATH="+hookPath, "NESTED="+nested, "OUTSIDE="+outside,
+		"CURATOR_CONFIG="+filepath.Join(home, "config.json"))
 	output, err := command.CombinedOutput()
 	if err != nil {
 		t.Fatalf("hook execution: %v\n%s", err, output)

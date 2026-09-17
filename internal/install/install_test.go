@@ -12,6 +12,7 @@ import (
 	"github.com/relux-works/curator/internal/adapters"
 	"github.com/relux-works/curator/internal/closure"
 	"github.com/relux-works/curator/internal/config"
+	"github.com/relux-works/curator/internal/hookapproval"
 	manifestpkg "github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/runtimestore"
@@ -178,6 +179,50 @@ func TestEndToEndInstall(t *testing.T) {
 	// env files
 	if _, err := os.Stat(filepath.Join(e.project, ".agents", "env.sh")); err != nil {
 		t.Fatal("env.sh missing")
+	}
+}
+
+func TestProjectInstallRecordsShellHookApprovals(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	e.skill("skill-a")
+	e.declare("skill-a")
+
+	result := e.install(Options{})
+	if result.Status != "ok" {
+		t.Fatalf("install failed: %+v", result)
+	}
+	for _, name := range []string{"env.sh", "env.ps1"} {
+		live := filepath.Join(e.project, ".agents", name)
+		payload, err := os.ReadFile(live)
+		if err != nil {
+			t.Fatal(err)
+		}
+		record, found, err := hookapproval.Lookup(e.home, live)
+		if err != nil || !found {
+			t.Fatalf("Lookup(%s) = %v, %v", live, found, err)
+		}
+		if record.SHA256 != hookapproval.Digest(payload) {
+			t.Fatalf("recorded digest %q does not match the published %s", record.SHA256, name)
+		}
+		if record.ApprovedBy != hookapproval.ApprovedByManager {
+			t.Fatalf("approved_by = %q, want manager", record.ApprovedBy)
+		}
+	}
+}
+
+func TestProjectDryRunRecordsNoShellHookApprovals(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	e.skill("skill-a")
+	e.declare("skill-a")
+
+	result := e.install(Options{DryRun: true})
+	if result.Status != "ok" {
+		t.Fatalf("dry-run failed: %+v", result)
+	}
+	if _, err := os.Stat(hookapproval.ApprovalsPath(e.home)); !os.IsNotExist(err) {
+		t.Fatalf("dry-run wrote approval state: %v", err)
 	}
 }
 

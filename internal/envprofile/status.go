@@ -19,6 +19,8 @@ import (
 
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/hookapproval"
+	"github.com/relux-works/curator/internal/manifest"
 )
 
 // SurfaceState is one recorded surface row.
@@ -116,6 +118,18 @@ type Status struct {
 	Orphans                  []string       `json:"orphans"`
 	Notes                    []string       `json:"notes"`
 	NonCurrent               bool           `json:"non_current"`
+	// ShellHookTrust is the shell-hook trust posture (Manager profile
+	// §8.6): one row per known project env file. A changed file, or a
+	// recorded file whose bytes are missing or unreadable, makes the
+	// matrix non-current; an unapproved file whose bytes read is a
+	// warning row.
+	ShellHookTrust []hookapproval.Posture `json:"shell_hook_trust"`
+	// ShellHookTrustWarnings names malformed approval lines (skipped,
+	// never repaired) or an unreadable approval state. The key is
+	// present only when non-empty, so JSON consumers see the same read
+	// failures the human output prints; an unreadable approval state
+	// additionally makes the matrix non-current.
+	ShellHookTrustWarnings []string `json:"shell_hook_trust_warnings,omitempty"`
 	// RequireCurrentProfile reports the locked require_current_profile
 	// requirement (environments §12.2): when the system file locks the
 	// key to a profile name, env status reports it. Nil means no
@@ -192,6 +206,23 @@ func StatusOf(req StatusRequest) (*Status, error) {
 	if len(status.Orphans) > 0 {
 		status.NonCurrent = true
 	}
+	// Shell-hook trust posture (Manager profile §8.6): every recorded
+	// path, plus the env files of the project the launch directory is
+	// inside, if any. Read-only; a changed file, a recorded file whose
+	// bytes are missing or unreadable, or an unreadable approval state is
+	// non-current, while an unapproved file whose bytes read stays a
+	// warning row.
+	stateUnreadable := false
+	status.ShellHookTrust, status.ShellHookTrustWarnings, stateUnreadable = hookapproval.AssessFailClosedDetailed(req.Home, trustProjectCandidates(req.LaunchDir))
+	for _, row := range status.ShellHookTrust {
+		if row.NonCurrent() {
+			status.NonCurrent = true
+			break
+		}
+	}
+	if stateUnreadable {
+		status.NonCurrent = true
+	}
 	sort.Slice(status.Homes, func(i, j int) bool {
 		if status.Homes[i].Profile != status.Homes[j].Profile {
 			return status.Homes[i].Profile < status.Homes[j].Profile
@@ -200,6 +231,50 @@ func StatusOf(req StatusRequest) (*Status, error) {
 	})
 	sort.Strings(status.Orphans)
 	return status, nil
+}
+
+// trustProjectCandidates returns the two hook-sourced env files of the
+// project the launch directory is inside, or nothing when it is inside no
+// project. An empty launch directory means the process working directory,
+// matching the resolve verifier.
+func trustProjectCandidates(launchDir string) []string {
+	if launchDir == "" {
+		var err error
+		launchDir, err = os.Getwd()
+		if err != nil {
+			return nil
+		}
+	}
+	root, ok := trustProjectRoot(launchDir)
+	if !ok {
+		return nil
+	}
+	return []string{
+		filepath.Join(root, ".agents", "env.sh"),
+		filepath.Join(root, ".agents", "env.ps1"),
+	}
+}
+
+// trustProjectRoot searches upward from start for the nearest directory
+// carrying Skillfile.json.
+func trustProjectRoot(start string) (string, bool) {
+	dir, err := filepath.Abs(start)
+	if err != nil {
+		return "", false
+	}
+	if info, err := os.Stat(dir); err == nil && !info.IsDir() {
+		dir = filepath.Dir(dir)
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, manifest.Name)); err == nil {
+			return dir, true
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", false
+		}
+		dir = parent
+	}
 }
 
 // homeState verifies one profile × environment through the resolve
