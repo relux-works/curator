@@ -1,12 +1,2 @@
-integration_git_command_failed: git merge --ff-only 57925471983b30985dc2ccfb068fa3301d637896 failed in /Users/administrator/Developer/ReluxWorks/curator/curator
-  stderr: hint: Diverging branches can't be fast-forwarded, you need to either:
-hint:
-hint: 	git merge --no-ff
-hint:
-hint: or:
-hint:
-hint: 	git rebase
-hint:
-hint: Disable this message with "git config set advice.diverging false"
-fatal: Not possible to fast-forward, aborting.
-  cause: exit status 128
+integration_indeterminate: a completed lane path is absent from the committed manifest: .task-board/EPIC-260910-ohqchs_approved-skillfile-sources-implementation/STORY-260910-3vxe3y_package-lock-and-frozen-resolution/TASK-260910-1a75qd_implement-source-lock-model-and-validation/progress.md
+  txn_id: STORY-260910-3vxe3y/CR-TASK-260910-19w2aj-11/11

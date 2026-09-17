@@ -1,0 +1,1193 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index cbd6b7f..9aff71e 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -7,6 +7,43 @@ Versioning for the complete specification set.
+ 
+ ### Added
+ 
++- S5: protected-boundary contract for the environments root and profile
++  store (environments §4/§1.3/§8.2/§8.4/§8.5/§10.1/§10.4/§12/§13,
++  manager §12.2/§12.5/§12.7), mirroring core §9.3: the environments root
++  and every store entry are protected state — manager-created,
++  manager-protected, resolved independently of package input. On every
++  `env resolve`, and again under the manager-home mutation lock for every
++  mutating profile operation (install, update, use, sync, repair,
++  garbage collection), the manager MUST verify ownership, private
++  mutation permissions or DACL, containment, regular file types, and link
++  safety (`lstat`, no symlink at the root, the entry root, or any
++  component the manager did not create) for the environments root, the
++  profile store root, the lock and marker files, and every store entry
++  the lock names; link-target identity is necessary but no longer
++  sufficient currency at resolve. Surface hashes are verified, not
++  trusted: resolve recomputes the recorded section 5.6 system-prompt and
++  root-context surface hashes from the store entries the lock names and
++  compares them against the marker, at O(applied module bytes) — a
++  same-user byte swap of a system-prompt or root-context file is
++  detected, while a swap confined to the skills tree or the MCP file
++  stays a materialization/status-time detection as a stated bound. A
++  boundary that cannot be proven or a hash that does not match makes the
++  profile `environment_store_untrusted` (error): resolve emits no
++  fragment, status is non-current, `env status` reports the row naming
++  the failing check; a real operation rebuilds a `git` entry from the
++  revalidated snapshot into newly established protected state (a `path`
++  or `local` entry has no second copy, so repair fails with
++  `environment_repair_failed` and the operator reinstalls); dry-run
++  evaluation reports `would-rebuild-untrusted-store` and mutates
++  nothing. Repair re-applies only from entries that passed the contract,
++  so `env resolve --repair` is not persistence for a tampered store
++  (audit note E7). Rollout is direct, not warn-first (impact row "S5"):
++  no knob — the contract is not configurable. Conformance:
++  `vectors/environments-store-boundary.json` (intact resolve, swapped
++  bytes, symlinked root, ownership, permissions, containment,
++  non-regular, and hash-mismatch refusals, the dry-run outcome, repair
++  rebuild/refusal, the non-current posture row, and negatives), checked
++  semantically by `tools/validate.py`.
+ - E1: per-source signer allowlist and `profile update` delta confirmation
+   (Decision 0012 amendment 2026-09-17; environments
+   §1.1/§1.3/§1.4/§9.2/§9.7/§12/§12.1/§12.2/§13): the new closed machine knob
+diff --git a/conformance/v1/manifest.json b/conformance/v1/manifest.json
+index 29c0807..1ebbb1e 100644
+--- a/conformance/v1/manifest.json
++++ b/conformance/v1/manifest.json
+@@ -4288,6 +4288,10 @@
+       "path": "vectors/environments-source-signers.json",
+       "sha256": "sha256:fb59e44c33183fc5cf7c698c65038f49a8f1e2d2404137c80cb6d252d46f8d9c"
+     },
++    {
++      "path": "vectors/environments-store-boundary.json",
++      "sha256": "sha256:397c24293193e9585307190f080e87ef12eaa1ddba4f1f6720016200464003a4"
++    },
+     {
+       "path": "vectors/environments.json",
+       "sha256": "sha256:08b3ad8fcd89c35389328c142d8fb8329c86b2d0ef73d444ccf47d62736e2f51"
+diff --git a/conformance/v1/vectors/environments-store-boundary.json b/conformance/v1/vectors/environments-store-boundary.json
+new file mode 100644
+index 0000000..065cbaf
+--- /dev/null
++++ b/conformance/v1/vectors/environments-store-boundary.json
+@@ -0,0 +1,379 @@
++{
++  "capability": "agent-environments",
++  "capability_revision": 1,
++  "diagnostics": {
++    "store_untrusted": "environment_store_untrusted",
++    "dry_run_outcome": "would-rebuild-untrusted-store",
++    "repair_failed": "environment_repair_failed"
++  },
++  "resolve_cases": [
++    {
++      "containment": true,
++      "diagnostic": null,
++      "failing_check": null,
++      "fragment_emitted": true,
++      "home": "current",
++      "link_safety": true,
++      "name": "intact-resolve-emits-fragment",
++      "object": "store-entry",
++      "ownership": true,
++      "permissions": true,
++      "regular_types": true,
++      "row_current": true,
++      "surface": null,
++      "surface_hash_match": true
++    },
++    {
++      "containment": true,
++      "diagnostic": "environment_store_untrusted",
++      "failing_check": "surface_hash",
++      "fragment_emitted": false,
++      "home": "current",
++      "link_safety": true,
++      "name": "swapped-system-prompt-bytes-untrusted",
++      "object": "store-entry",
++      "ownership": true,
++      "permissions": true,
++      "regular_types": true,
++      "row_current": false,
++      "surface": "system-prompt",
++      "surface_hash_match": false
++    },
++    {
++      "containment": true,
++      "diagnostic": "environment_store_untrusted",
++      "failing_check": "surface_hash",
++      "fragment_emitted": false,
++      "home": "current",
++      "link_safety": true,
++      "name": "swapped-root-context-bytes-untrusted",
++      "object": "store-entry",
++      "ownership": true,
++      "permissions": true,
++      "regular_types": true,
++      "row_current": false,
++      "surface": "root-context",
++      "surface_hash_match": false
++    },
++    {
++      "containment": true,
++      "diagnostic": "environment_store_untrusted",
++      "failing_check": "link_safety",
++      "fragment_emitted": false,
++      "home": "current",
++      "link_safety": false,
++      "name": "symlinked-entry-root-untrusted",
++      "object": "store-entry",
++      "ownership": true,
++      "permissions": true,
++      "regular_types": true,
++      "row_current": false,
++      "surface": null,
++      "surface_hash_match": true
++    },
++    {
++      "containment": true,
++      "diagnostic": "environment_store_untrusted",
++      "failing_check": "ownership",
++      "fragment_emitted": false,
++      "home": "current",
++      "link_safety": true,
++      "name": "wrong-ownership-untrusted",
++      "object": "store-entry",
++      "ownership": false,
++      "permissions": true,
++      "regular_types": true,
++      "row_current": false,
++      "surface": null,
++      "surface_hash_match": true
++    },
++    {
++      "containment": true,
++      "diagnostic": "environment_store_untrusted",
++      "failing_check": "permissions",
++      "fragment_emitted": false,
++      "home": "current",
++      "link_safety": true,
++      "name": "wrong-permissions-untrusted",
++      "object": "store-entry",
++      "ownership": true,
++      "permissions": false,
++      "regular_types": true,
++      "row_current": false,
++      "surface": null,
++      "surface_hash_match": true
++    },
++    {
++      "containment": false,
++      "diagnostic": "environment_store_untrusted",
++      "failing_check": "containment",
++      "fragment_emitted": false,
++      "home": "current",
++      "link_safety": true,
++      "name": "containment-escape-untrusted",
++      "object": "store-entry",
++      "ownership": true,
++      "permissions": true,
++      "regular_types": true,
++      "row_current": false,
++      "surface": null,
++      "surface_hash_match": true
++    },
++    {
++      "containment": true,
++      "diagnostic": "environment_store_untrusted",
++      "failing_check": "regular_types",
++      "fragment_emitted": false,
++      "home": "current",
++      "link_safety": true,
++      "name": "non-regular-component-untrusted",
++      "object": "store-entry",
++      "ownership": true,
++      "permissions": true,
++      "regular_types": false,
++      "row_current": false,
++      "surface": null,
++      "surface_hash_match": true
++    },
++    {
++      "containment": true,
++      "diagnostic": "environment_store_untrusted",
++      "failing_check": "ownership",
++      "fragment_emitted": false,
++      "home": "current",
++      "link_safety": true,
++      "name": "lock-file-wrong-owner-untrusted",
++      "object": "lock-file",
++      "ownership": false,
++      "permissions": true,
++      "regular_types": true,
++      "row_current": false,
++      "surface": null,
++      "surface_hash_match": true
++    },
++    {
++      "containment": true,
++      "diagnostic": "environment_store_untrusted",
++      "failing_check": "link_safety",
++      "fragment_emitted": false,
++      "home": "current",
++      "link_safety": false,
++      "name": "marker-symlink-untrusted",
++      "object": "marker-file",
++      "ownership": true,
++      "permissions": true,
++      "regular_types": true,
++      "row_current": false,
++      "surface": null,
++      "surface_hash_match": true
++    },
++    {
++      "conforming": false,
++      "containment": true,
++      "diagnostic": "environment_store_untrusted",
++      "fragment_emitted": true,
++      "home": "current",
++      "link_safety": true,
++      "name": "swapped-bytes-emits-fragment",
++      "object": "store-entry",
++      "ownership": true,
++      "permissions": true,
++      "reason": "a manager that emits a fragment for a store entry whose surface hash does not match is non-conforming",
++      "regular_types": true,
++      "row_current": false,
++      "surface": "system-prompt",
++      "surface_hash_match": false
++    },
++    {
++      "conforming": false,
++      "containment": true,
++      "diagnostic": "environment_store_untrusted",
++      "fragment_emitted": false,
++      "home": "current",
++      "link_safety": true,
++      "name": "untrusted-reported-current",
++      "object": "store-entry",
++      "ownership": false,
++      "permissions": true,
++      "reason": "a manager that reports a current row for a profile whose store boundary cannot be proven is non-conforming",
++      "regular_types": true,
++      "row_current": true,
++      "surface": null,
++      "surface_hash_match": true
++    },
++    {
++      "conforming": false,
++      "containment": true,
++      "diagnostic": null,
++      "fragment_emitted": false,
++      "home": "current",
++      "link_safety": false,
++      "name": "untrusted-without-diagnostic",
++      "object": "store-entry",
++      "ownership": true,
++      "permissions": true,
++      "reason": "a manager that refuses the fragment without reporting environment_store_untrusted is non-conforming",
++      "regular_types": true,
++      "row_current": false,
++      "surface": null,
++      "surface_hash_match": true
++    }
++  ],
++  "dry_run_cases": [
++    {
++      "containment": true,
++      "link_safety": true,
++      "mutated": false,
++      "name": "dry-run-untrusted-reports-would-rebuild",
++      "object": "store-entry",
++      "outcome": "would-rebuild-untrusted-store",
++      "ownership": false,
++      "permissions": true,
++      "regular_types": true,
++      "surface": null,
++      "surface_hash_match": true
++    },
++    {
++      "containment": true,
++      "link_safety": true,
++      "mutated": false,
++      "name": "dry-run-intact-plans-nothing",
++      "object": "store-entry",
++      "outcome": null,
++      "ownership": true,
++      "permissions": true,
++      "regular_types": true,
++      "surface": null,
++      "surface_hash_match": true
++    },
++    {
++      "conforming": false,
++      "containment": true,
++      "link_safety": true,
++      "mutated": true,
++      "name": "dry-run-mutates",
++      "object": "store-entry",
++      "outcome": "would-rebuild-untrusted-store",
++      "ownership": false,
++      "permissions": true,
++      "reason": "a dry-run evaluation that mutates the store it reports on is non-conforming",
++      "regular_types": true,
++      "surface": null,
++      "surface_hash_match": true
++    }
++  ],
++  "repair_cases": [
++    {
++      "containment": true,
++      "diagnostic": null,
++      "entry_kind": "git",
++      "fragment_emitted": true,
++      "link_safety": true,
++      "name": "repair-rebuilds-git-entry-from-snapshot",
++      "object": "store-entry",
++      "ownership": true,
++      "permissions": true,
++      "reapplied_before_trust": false,
++      "rebuilt_from_snapshot": true,
++      "regular_types": true,
++      "surface": "system-prompt",
++      "surface_hash_match": false
++    },
++    {
++      "conforming": false,
++      "containment": true,
++      "diagnostic": "environment_repair_failed",
++      "entry_kind": "path",
++      "fragment_emitted": false,
++      "link_safety": true,
++      "name": "repair-reapplies-untrusted",
++      "object": "store-entry",
++      "ownership": false,
++      "permissions": true,
++      "reapplied_before_trust": true,
++      "reason": "a repair that re-applies a store entry before that entry passed the contract is non-conforming",
++      "rebuilt_from_snapshot": false,
++      "regular_types": true,
++      "surface": null,
++      "surface_hash_match": true
++    },
++    {
++      "containment": true,
++      "diagnostic": "environment_repair_failed",
++      "entry_kind": "local",
++      "fragment_emitted": false,
++      "link_safety": true,
++      "name": "repair-local-entry-cannot-rebuild",
++      "object": "store-entry",
++      "ownership": true,
++      "permissions": false,
++      "reapplied_before_trust": false,
++      "rebuilt_from_snapshot": false,
++      "regular_types": true,
++      "surface": null,
++      "surface_hash_match": true
++    },
++    {
++      "containment": true,
++      "diagnostic": "environment_repair_failed",
++      "entry_kind": "path",
++      "fragment_emitted": false,
++      "link_safety": true,
++      "name": "repair-path-entry-cannot-rebuild",
++      "object": "store-entry",
++      "ownership": false,
++      "permissions": true,
++      "reapplied_before_trust": false,
++      "rebuilt_from_snapshot": false,
++      "regular_types": true,
++      "surface": null,
++      "surface_hash_match": true
++    }
++  ],
++  "status_cases": [
++    {
++      "containment": true,
++      "diagnostic": null,
++      "link_safety": true,
++      "name": "status-intact-current",
++      "names_failing_check": null,
++      "object": "store-entry",
++      "ownership": true,
++      "permissions": true,
++      "regular_types": true,
++      "row_current": true,
++      "surface": null,
++      "surface_hash_match": true
++    },
++    {
++      "containment": true,
++      "diagnostic": "environment_store_untrusted",
++      "link_safety": true,
++      "name": "status-names-failing-check",
++      "names_failing_check": "ownership",
++      "object": "store-entry",
++      "ownership": false,
++      "permissions": true,
++      "regular_types": true,
++      "row_current": false,
++      "surface": null,
++      "surface_hash_match": true
++    },
++    {
++      "conforming": false,
++      "containment": true,
++      "diagnostic": "environment_store_untrusted",
++      "link_safety": true,
++      "name": "status-hides-failing-check",
++      "names_failing_check": null,
++      "object": "store-entry",
++      "ownership": false,
++      "permissions": true,
++      "reason": "an env status row that reports environment_store_untrusted without naming the failing check is non-conforming",
++      "regular_types": true,
++      "row_current": false,
++      "surface": null,
++      "surface_hash_match": true
++    }
++  ]
++}
+diff --git a/profiles/manager.md b/profiles/manager.md
+index d33921a..c164271 100644
+--- a/profiles/manager.md
++++ b/profiles/manager.md
+@@ -2327,7 +2327,9 @@ and newest backup.
+ Drift follows environments §8.4. A `linked` surface drifts when a link no
+ longer targets the expected store path or its target's bytes fail the
+ recorded hash; `copied` and `managed-home` surfaces drift when a recorded
+-content hash no longer matches. A drifted file is never silently
++content hash no longer matches. A store entry that fails the environments
++section 4 contract is not drift: the profile is
++`environment_store_untrusted` (environments §8.4, §10.1). A drifted file is never silently
+ overwritten outside repair, and an absent surface file and a failed read
+ are different facts: unreadable evidence is reported as unreadable with
+ currency unknown, never as absence.
+@@ -2335,6 +2337,7 @@ currency unknown, never as absence.
+ | Condition | Diagnostic (environments §5.7, §7.7, §8.5) |
+ |---|---|
+ | marker unreadable, malformed, or unsupported version | `environment_marker_invalid` |
++| store entry, lock, or marker file fails the environments §4 protected-boundary contract or its recorded surface hash | `environment_store_untrusted` |
+ | managed surface bytes or link differ from the record | `environment_surface_drift` |
+ | recorded surface file absent | `environment_surface_missing` |
+ | recorded surface file exists but cannot be read | `environment_surface_unreadable` |
+@@ -2562,8 +2565,13 @@ opt-in.
+ 
+ Resolution is read-only by default and lock-free: it reads the marker and
+ verifies exactly the surfaces the marker records, taking link-target
+-identity into the immutable store as sufficient currency for a linked
+-surface. A home that is unprovisioned, stale after `profile update`,
++identity into the immutable store as necessary but no longer sufficient
++currency for a linked surface — every resolve also verifies the
++environments section 4 protected-boundary contract and recomputes the
++recorded system-prompt and root-context surface hashes from the store
++entries the lock names, refusing with `environment_store_untrusted` and
++emitting no fragment when the boundary cannot be proven or a hash does not
++match. A home that is unprovisioned, stale after `profile update`,
+ drifted, or whose passthrough is detached — or, for a `claude_code` home in
+ the `referenced` form, that lacks the launch directory's project entry — is
+ stale: without `--repair` the manager reports `environment_home_stale` with
+@@ -2612,6 +2620,7 @@ in this profile launches.
+ | operand names an unregistered environment | `environment_unknown` |
+ | named or current profile not installed | `profile_unknown` |
+ | managed home unprovisioned, stale, drifted, or passthrough detached; no fragment without `--repair` | `environment_home_stale` |
++| store entry, lock, or marker file fails the environments §4 protected-boundary contract or its recorded surface hash at resolve (no fragment; non-current) | `environment_store_untrusted` |
+ | repair could not acquire the mutation lock within the bounded wait | `environment_lock_unavailable` |
+ | managed home cannot be repaired from the store | `environment_repair_failed` |
+ 
+@@ -2677,9 +2686,11 @@ parent, the standing `opencode` split-brain note, the recorded and detected
+ tool release per adapter, both homes of the current profile per scope with
+ their provisioning state, backup generation counts and ages per home,
+ orphaned managed homes, a locked `require_current_profile`,
+-`environment_context_size_exceeded` where it applies, and the effective
++`environment_context_size_exceeded` where it applies, the effective
+ `transitive_system_modules` value with every dropped system module by
+-package and path where the `drop` policy skipped any (environments §12).
++package and path where the `drop` policy skipped any, and the store-trust
++row per installed profile with the failing check named when the profile is
++`environment_store_untrusted` (environments §12).
+ `--check` returns
+ non-zero when any row is non-current.
+ 
+@@ -2687,7 +2698,8 @@ An installation row is current only when its marker is valid and
+ supported; profile identity, lock hash, member list, precedence, mode, and
+ form match the effective machine state; every recorded surface hash
+ verifies; and every recorded passthrough entry is live. A drifted, missing,
+-shadow-inert (unless acknowledged), detached, partially switched, stale, or
++shadow-inert (unless acknowledged), detached, partially switched, stale,
++store-untrusted (`environment_store_untrusted`), or
+ unreadable state is non-current, and unreadable evidence is reported as
+ unreadable, never as absence (environments §8.4). The warnings
+ `environment_context_size_exceeded`, `environment_tool_version_unverified`,
+@@ -2702,5 +2714,8 @@ until it is dropped — every managed home and in-place surface set
+ referenced by a valid environment marker, and every entry referenced by an
+ in-flight transaction journal. An unreadable marker or unprovable reference
+ fails safe: the uncertain entries are retained and the uncertainty reported.
++Garbage collection revalidates the environments section 4 boundary for
++every entry it considers: an entry that fails the contract is retained,
++never collected, and reported; collection never rebuilds an entry.
+ Environment-owned mutable state inside managed homes is never collected,
+ and backups are never collected by any revision-1 rule.
+diff --git a/protocol/environments.md b/protocol/environments.md
+index 9749d85..850d91b 100644
+--- a/protocol/environments.md
++++ b/protocol/environments.md
+@@ -198,6 +198,14 @@ a signer allowlist (section 12.1) the selected candidate's tag or commit
+ signature MUST verify before the candidate enters the lock. Verification
+ results are `env status` posture (section 12), not lock content.
+ 
++The lock file itself is verified under the section 4 protected-boundary
++contract: on every `env resolve`, and again under the manager-home
++mutation lock for every mutating profile operation, the manager MUST verify
++the lock file's ownership, private mutation permissions or DACL, regular
++file type, and link safety before trusting the lock it names. A lock file
++that fails the contract makes the profile `environment_store_untrusted`
++(section 10.1).
++
+ ### 1.4 Versions, ranges, and resolution
+ 
+ **Versions.** Version tags are strict Semantic Versioning 2.0 with a
+@@ -639,6 +647,46 @@ from the same lock's store entries, so the modes cannot diverge for one lock
+ hash. Physical store paths are implementation-specific (manager §1); the
+ store joins garbage collection under section 12.
+ 
++The environments root and every store entry are **protected state** in the
++core §9.3 sense: manager-created, manager-protected, and resolved
++independently of package input. Resolution and materialization MUST reuse a
++store entry only below that protected state. On every `env resolve`, and
++again under the manager-home mutation lock for every mutating profile
++operation — install, update, use, sync, repair, garbage collection — the
++manager MUST verify ownership, private mutation permissions or DACL,
++containment, regular file types, and link safety for the environments root,
++the profile store root, the profile lock file (section 1.3), the
++environment marker of every home the operation reads or writes (section
++8.2), and every store entry the lock names:
++
++- **ownership** — every verified path is owned by the operator;
++- **permissions** — private mutation permissions, or the platform DACL
++  equivalent: no identity other than the operator may mutate a verified
++  path;
++- **containment** — every store entry path resolves below the environments
++  root without leaving it; an entry path that escapes the root is
++  untrusted wherever it points;
++- **regular file types** — every store component is a directory or a
++  regular file; a special file below the store is untrusted;
++- **link safety** — verified by `lstat`, never by following links: no
++  symlink at the environments root, at a store entry root, or at any
++  component below the store root the manager did not create. The manager
++  creates no symlink below the store root — entries are immutable
++  regular-file trees — so any symlink there is untrusted.
++
++An implementation that cannot prove this boundary MUST fail closed: every
++`env resolve` reports `environment_store_untrusted` and emits no fragment,
++every mutating profile operation fails before its first write, and `env
++status` reports the row non-current (section 12). A real operation rebuilds
++an untrusted entry from the revalidated snapshot into newly established
++protected state; dry-run evaluation of such an entry reports
++`would-rebuild-untrusted-store` and mutates nothing; status is non-current.
++Self-consistent lock, marker, and hash bytes do not repair or authenticate
++an untrusted boundary.
++
++The contract is not configurable: no knob narrows, widens, or disables it.
++Rollout is direct (impact row "S5").
++
+ ## 5. Deterministic materialization
+ 
+ Materialized root context is a pure function of (lock, precedence policy,
+@@ -1584,6 +1632,15 @@ identifiers keep their exact spellings.
+ The marker is a record, not a signature: it MUST NOT be used as an
+ authorization token or provenance proof (core §10 discipline).
+ 
++The marker file itself is verified under the section 4
++protected-boundary contract alongside the home it records: ownership,
++private mutation permissions or DACL, regular file type, and link safety,
++verified on every `env resolve` and again under the manager-home mutation
++lock for every mutating profile operation. A marker file that fails the
++contract makes the profile `environment_store_untrusted` (section 10.1),
++distinct from `environment_marker_invalid`, which keeps meaning the marker
++cannot be read or parsed.
++
+ ### 8.3 Ledger discipline and backups
+ 
+ The marker is the ledger of record for environment surfaces, extending the
+@@ -1630,11 +1687,19 @@ surface file is `environment_surface_unreadable`, the row is non-current
+ with its currency reported as unknown, and no absence-shaped outcome —
+ `environment_surface_missing` included — may fire on either.
+ 
++Store failure is not drift: drift compares the home against the record,
++while `environment_store_untrusted` compares the store against the record
++and the section 4 boundary. A linked surface whose link targets the
++expected store path but whose store entry fails the contract is not
++`environment_surface_drift`; the profile is `environment_store_untrusted`
++(section 10.1) and no fragment is emitted.
++
+ ### 8.5 Diagnostics
+ 
+ | Condition | Diagnostic |
+ | --- | --- |
+ | marker unreadable, malformed, or unsupported version | `environment_marker_invalid` |
++| store entry, lock, or marker file fails the §4 protected-boundary contract or its recorded surface hash (non-current) | `environment_store_untrusted` |
+ | managed surface bytes or link differ from the record (non-current) | `environment_surface_drift` |
+ | recorded surface file absent (non-current) | `environment_surface_missing` |
+ | recorded surface file exists but cannot be read (non-current) | `environment_surface_unreadable` |
+@@ -2179,9 +2244,9 @@ channel.
+ home for the environment is materialized and current, and the verification
+ is **lock-free**: it reads the marker and covers exactly the surfaces the
+ marker records — no more — and for a symlinked surface whose link targets an
+-entry of the immutable profile store, link-target identity is sufficient
+-currency (the store entry's integrity is the store's own invariant, section
+-4), so a launch does not re-hash a large skills tree. A copied surface —
++entry of the immutable profile store, link-target identity is necessary but
++no longer sufficient currency: the store entry's integrity is verified, not
++assumed (section 4). A copied surface —
+ the `claude_code` root-context file in every mode, or a manager §5
+ fallback copy — has no link target and is verified by the content hash
+ the marker records for it (section 8.2), the same hash section 8.4 drift
+@@ -2205,10 +2270,53 @@ reconciling XDG seeds, adding the launch directory's project entry,
+ never touching environment-owned mutable state,
+ unmanaged files, seeds, or backups — and then emits the fragment. Repair
+ restores managed bytes from the store; it MUST NOT adopt candidate bytes
+-found in the home. Lock acquisition that times out is
++found in the home. A store entry is re-applied only after that entry passed
++the section 4 contract and its surface hashes: a non-trusted entry is never
++re-applied, so `env resolve --repair` is not persistence for a tampered
++store (audit note E7). A real operation rebuilds an untrusted entry from
++the revalidated snapshot into newly established protected state: for a
++`git` member the manager re-acquires the pinned commit's exact snapshot
++bytes (section 1.2) and republishes the entry with a fresh boundary; for a
++`path` or `local` member there is no second copy of the snapshot — the
++source directory is never read again (section 1) — so the entry cannot be
++rebuilt and repair fails with `environment_repair_failed` while the
++operator reinstalls. Dry-run evaluation of an entry that fails the
++contract reports `would-rebuild-untrusted-store` and mutates nothing.
++Lock acquisition that times out is
+ `environment_lock_unavailable`, distinct from `environment_repair_failed`,
+ which keeps meaning that the store cannot restore this home — an entry is
+-missing or fails validation. Neither emits a fragment.
++missing or fails validation, including the section 4 contract. Neither emits a fragment.
++
++**Store-trust verification.** On every resolve, as part of the lock-free
++verification, the manager MUST verify the section 4 protected-boundary
++contract for the environments root, the profile store root, the profile
++lock file, the home's marker file when the home has one, and every store
++entry the lock names. When the home carries a marker, the manager MUST
++additionally recompute the recorded section 5.6 surface hashes of the
++resolved environment's applied system-prompt and root-context modules from
++those store entries — the admitted applicable system modules (section 3)
++and the applicable root modules of every lock member, re-derived through
++the section 5 rules and hashed — and compare them against the marker's
++recorded hashes. A boundary that cannot be proven, or a hash that does not
++match, makes the profile `environment_store_untrusted`: resolve reports
++the diagnostic and emits **no fragment**, the profile is non-current, and
++`env status` reports the row (section 12). Surface hashes are verified, not
++trusted. An unprovisioned home has no marker to compare against: the
++boundary checks still run, and a boundary failure there is
++`environment_store_untrusted`; otherwise the home is
++`environment_home_stale` as above, and provisioning under `--repair`
++re-verifies the contract under the repair lock before writing. The
++recomputation costs O(applied system-prompt and root-context module bytes)
++for the resolved profile × environment: the skills tree, the MCP file,
++seeds, and backups are not re-hashed at resolve, so a launch still does not
++re-hash a large skills tree. A full-entry tree hash against the pin would
++detect more per resolve at the cost of hashing every entry on every launch;
++the per-surface rule detects the same-user byte swap of a system-prompt or
++root-context file at bounded cost, while the boundary checks and section
++8.4 drift carry the unhashed surfaces. A byte swap confined to the skills
++tree or the MCP file that preserves the boundary is therefore detected at
++materialization and status time, not at resolve — a stated bound, not a
++gap.
+ 
+ The two lock classes this document names are the **mutation lock** (manager
+ §2.5: every write below the manager home, `profile use`, `profile update`,
+@@ -2385,6 +2493,8 @@ that no reader mistakes the surfacing rows for an execution sandbox.
+ | operand names an unregistered environment | `environment_unknown` |
+ | named or current profile not installed | `profile_unknown` |
+ | managed home unprovisioned, stale, drifted, or passthrough detached; no fragment without `--repair` | `environment_home_stale` |
++| store entry, lock, or marker file fails the §4 protected-boundary contract or its recorded surface hash at resolve (no fragment; non-current) | `environment_store_untrusted` |
++| dry-run evaluation of an entry that fails the §4 contract (no mutation; a real operation would rebuild it) | `would-rebuild-untrusted-store` |
+ | repair could not acquire the mutation lock within the bounded wait | `environment_lock_unavailable` |
+ | managed home cannot be repaired from the store | `environment_repair_failed` |
+ | S4 profile `s4-warn`: launch composition passes an operator variable outside the configured `passable_env_names` (warning, names the variables and the knob) | `mcp_env_passthrough_unlisted` |
+@@ -2566,8 +2676,11 @@ signer-verification posture per lock member's source — `enforced` when an
+ allowlist is present, naming the verified signer, `unconfigured` when none
+ is, `required-missing` when `require_source_signers` is true and none is —,
+ the active update-confirmation revision (`A-warning` or `B-flip`, section
+-9.2) with its behaviour, and the machine-level `require_source_signers`
+-value. Both commands follow
++9.2) with its behaviour, the machine-level `require_source_signers`
++value, and the store-trust row per installed profile — the section 4
++boundary and surface-hash verdict for the profile's lock, marker, and
++named store entries, naming the failing check when the profile is
++`environment_store_untrusted`. Both commands follow
+ the manager §10 discipline exactly: recompute and report, never mutate — no
+ fetch, no repair, no adoption, no channel application, no onboarding.
+ `--check` returns non-zero when any row is non-current.
+@@ -2577,7 +2690,8 @@ profile identity, lock hash, member list, precedence, mode, and form match
+ the effective machine state; every recorded surface hash verifies; and
+ every recorded passthrough entry is live. A drifted, missing, shadow-inert
+ (unless acknowledged under `shadow_acknowledged`), detached, partially
+-switched, stale, refused-provider (section 11), or
++switched, stale, store-untrusted (`environment_store_untrusted`),
++refused-provider (section 11), or
+ unreadable state is non-current; unreadable evidence is
+ reported as unreadable, never as absence (section 8.4). A section 11
+ provider row is non-current when the active revision refuses or fails
+@@ -2617,7 +2731,11 @@ a retained previous lock until it is dropped (section 9.2) — every managed
+ home and in-place surface set referenced by a valid environment marker, and
+ every entry referenced by an in-flight transaction journal. An unreadable
+ marker or unprovable reference fails safe: the uncertain entries are
+-retained and the uncertainty reported. Environment-owned mutable state
++retained and the uncertainty reported. Garbage collection revalidates the
++section 4 boundary for every entry it considers: an entry that fails the
++contract is retained, never collected, and reported; collection never
++rebuilds an entry — rebuild is repair's work (section 10.1).
++Environment-owned mutable state
+ inside managed homes is never collected, and backups are never collected.
+ 
+ ### 12.1 Machine configuration knobs
+@@ -2792,7 +2910,17 @@ confirmation, a new system module, a changed MCP `args`, `url`, or
+ selector, and a reordered `env_names` warning under revision A and
+ refusing under revision B, `--confirm-system-delta` proceeding, a
+ reinstall refusing under revision B and proceeding with the flag, and
+-`--all` confirming every profile of the run. The nine
++`--all` confirming every profile of the run; and the section 4
++protected-boundary cases
++(`vectors/environments-store-boundary.json`) — the intact resolve that
++emits a fragment, the swapped system-prompt bytes, swapped root-context
++bytes, symlinked entry root, wrong ownership, wrong permissions,
++containment escape, non-regular component, and surface-hash mismatch cases
++that refuse with `environment_store_untrusted` and emit no fragment, the
++dry-run `would-rebuild-untrusted-store` case, the repair rebuild and
++refusal cases, the `env status` non-current posture row, and the negative
++cases whose fragment-emitting, current-reporting, or re-applying
++observation is non-conforming. The nine
+ retired `expected/environments/*` sets are regenerated under the v2 type
+ line. A manager claiming this capability MUST pass the complete vector set;
+ there is no partial claim. A manager conforms to revision A by warning
+diff --git a/release/1.0.0-rc.9.json b/release/1.0.0-rc.9.json
+index 7f4fe5a..f086fcc 100644
+--- a/release/1.0.0-rc.9.json
++++ b/release/1.0.0-rc.9.json
+@@ -12,7 +12,7 @@
+     "verified_provider_contract": "host-execution-provider-v1"
+   },
+   "candidate_protocol_pin": {
+-    "manifest_sha256": "sha256:dede0c16008150e4536fa463a3fef04a5ee0615227b852907cf2d460f34d5f59",
++    "manifest_sha256": "sha256:703b4de28dc124e6da33ddeb07ff7f7e383c27ce29060749e2426bb9fbde1512",
+     "suite_root": "conformance/v1"
+   },
+   "claim_v5": {
+@@ -24,7 +24,7 @@
+   "downstream_consumption": {
+     "committed_release_pin_advanced": false,
+     "environment": "CURATOR_CONFORMANCE_ROOT",
+-    "required_manifest_sha256": "sha256:dede0c16008150e4536fa463a3fef04a5ee0615227b852907cf2d460f34d5f59"
++    "required_manifest_sha256": "sha256:703b4de28dc124e6da33ddeb07ff7f7e383c27ce29060749e2426bb9fbde1512"
+   },
+   "historical_release": {
+     "immutable": true,
+diff --git a/tools/test_validate.py b/tools/test_validate.py
+index 7bb10d8..a099142 100644
+--- a/tools/test_validate.py
++++ b/tools/test_validate.py
+@@ -1998,6 +1998,147 @@ class EnvPassthroughVectorTests(unittest.TestCase):
+             self.run_gate(vector=changed)
+ 
+ 
++class StoreBoundaryVectorTests(unittest.TestCase):
++    """The S5 protected-boundary gate must fail closed.
++
++    validate_environments_store_boundary_vectors is the production gate:
++    tools/validate.py main() runs it on every `make validate`, recomputing
++    the §4 trust verdict from the five boundary checks plus the
++    surface-hash comparison, and from it the §10.1 diagnostic, the
++    fragment verdict, the §12 currency, the §4 dry-run outcome, and the
++    §10.1 repair outcomes. Each test narrows one rule and proves the gate
++    rejects what the rule must reject.
++    """
++
++    def setUp(self) -> None:
++        self.vector = validate.load_json(
++            validate.SUITE / "vectors" / "environments-store-boundary.json"
++        )
++
++    def case(self, family: str, name: str, vector: dict | None = None) -> dict:
++        source = self.vector if vector is None else vector
++        return next(item for item in source[family] if item["name"] == name)
++
++    def run_gate(self, vector=None) -> None:
++        validate.validate_environments_store_boundary_vectors(
++            vector=self.vector if vector is None else vector,
++        )
++
++    def test_published_vector_passes(self) -> None:
++        self.run_gate()
++
++    def test_fragment_emitted_for_swapped_bytes_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("resolve_cases", "swapped-system-prompt-bytes-untrusted", changed)["fragment_emitted"] = True
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_untrusted_silence_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("resolve_cases", "wrong-ownership-untrusted", changed)["diagnostic"] = None
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_untrusted_reported_current_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("resolve_cases", "symlinked-entry-root-untrusted", changed)["row_current"] = True
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_intact_refusal_is_rejected(self) -> None:
++        # The gate recomputes in both directions: an intact store that
++        # refuses the fragment is as wrong as an untrusted one emitting it.
++        changed = copy.deepcopy(self.vector)
++        case = self.case("resolve_cases", "intact-resolve-emits-fragment", changed)
++        case["fragment_emitted"] = False
++        case["diagnostic"] = "environment_store_untrusted"
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_multi_failure_case_is_rejected(self) -> None:
++        # A positive resolve case isolates exactly one failing check.
++        changed = copy.deepcopy(self.vector)
++        self.case("resolve_cases", "wrong-permissions-untrusted", changed)["ownership"] = False
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_swap_without_surface_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = self.case("resolve_cases", "swapped-root-context-bytes-untrusted", changed)
++        case["surface"] = None
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_surface_without_hash_break_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = self.case("resolve_cases", "swapped-root-context-bytes-untrusted", changed)
++        case["surface_hash_match"] = True
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_wrong_failing_check_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("resolve_cases", "containment-escape-untrusted", changed)["failing_check"] = "ownership"
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_healed_negative_is_rejected(self) -> None:
++        # A negative whose observation stops violating the rule must fail:
++        # the flipped fragment now matches the recomputed verdict.
++        changed = copy.deepcopy(self.vector)
++        self.case("resolve_cases", "swapped-bytes-emits-fragment", changed)["fragment_emitted"] = False
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_dry_run_wrong_outcome_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("dry_run_cases", "dry-run-untrusted-reports-would-rebuild", changed)["outcome"] = None
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_dry_run_mutation_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("dry_run_cases", "dry-run-untrusted-reports-would-rebuild", changed)["mutated"] = True
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_repair_reapply_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("repair_cases", "repair-rebuilds-git-entry-from-snapshot", changed)["reapplied_before_trust"] = True
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_path_rebuild_is_rejected(self) -> None:
++        # A path entry has no second copy: only a git entry rebuilds.
++        changed = copy.deepcopy(self.vector)
++        case = self.case("repair_cases", "repair-path-entry-cannot-rebuild", changed)
++        case["rebuilt_from_snapshot"] = True
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_status_missing_check_name_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("status_cases", "status-names-failing-check", changed)["names_failing_check"] = None
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_case_inventory_is_exact(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        changed["resolve_cases"] = [
++            item
++            for item in changed["resolve_cases"]
++            if item["name"] != "marker-symlink-untrusted"
++        ]
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_wrong_capability_identity_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        changed["capability"] = "agent-environments-v2"
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++
+ class SourceSignersVectorTests(unittest.TestCase):
+     """The E1 signer-verification/merge/posture/delta gate must fail closed.
+ 
+diff --git a/tools/validate.py b/tools/validate.py
+index 67dd216..1bad313 100644
+--- a/tools/validate.py
++++ b/tools/validate.py
+@@ -5799,6 +5799,242 @@ def validate_environments_source_signers_vectors(
+             raise ValidationFailure(f"{label}: expected is not the section 12 update-confirmation row")
+ 
+ 
++# ---------------------------------------------------------------------------
++# Sections 4, 8.4, 10.1, 10.4, 12: protected-boundary contract (S5)
++
++
++S5_DIAG_UNTRUSTED = "environment_store_untrusted"
++S5_OUTCOME_WOULD_REBUILD = "would-rebuild-untrusted-store"
++S5_DIAG_REPAIR_FAILED = "environment_repair_failed"
++
++S5_BOUNDARY_CHECKS = ("ownership", "permissions", "containment", "regular_types", "link_safety")
++S5_OBJECTS = ("environments-root", "store-root", "lock-file", "marker-file", "store-entry")
++S5_SURFACES = ("system-prompt", "root-context")
++S5_ENTRY_KINDS = ("git", "path", "local")
++
++S5_RESOLVE_CASES = {
++    "intact-resolve-emits-fragment",
++    "swapped-system-prompt-bytes-untrusted",
++    "swapped-root-context-bytes-untrusted",
++    "symlinked-entry-root-untrusted",
++    "wrong-ownership-untrusted",
++    "wrong-permissions-untrusted",
++    "containment-escape-untrusted",
++    "non-regular-component-untrusted",
++    "lock-file-wrong-owner-untrusted",
++    "marker-symlink-untrusted",
++    "swapped-bytes-emits-fragment",
++    "untrusted-reported-current",
++    "untrusted-without-diagnostic",
++}
++S5_RESOLVE_NEGATIVE_CASES = {
++    "swapped-bytes-emits-fragment",
++    "untrusted-reported-current",
++    "untrusted-without-diagnostic",
++}
++S5_DRY_RUN_CASES = {
++    "dry-run-untrusted-reports-would-rebuild",
++    "dry-run-intact-plans-nothing",
++    "dry-run-mutates",
++}
++S5_DRY_RUN_NEGATIVE_CASES = {"dry-run-mutates"}
++S5_REPAIR_CASES = {
++    "repair-rebuilds-git-entry-from-snapshot",
++    "repair-path-entry-cannot-rebuild",
++    "repair-local-entry-cannot-rebuild",
++    "repair-reapplies-untrusted",
++}
++S5_REPAIR_NEGATIVE_CASES = {"repair-reapplies-untrusted"}
++S5_STATUS_CASES = {
++    "status-intact-current",
++    "status-names-failing-check",
++    "status-hides-failing-check",
++}
++S5_STATUS_NEGATIVE_CASES = {"status-hides-failing-check"}
++
++
++def s5_check_inputs(case: dict[str, Any], name: str) -> dict[str, bool]:
++    """Read the six §4/§10.1 trust inputs of one store-boundary case.
++
++    The five boundary checks plus the surface-hash comparison; each is a
++    boolean, true when the check passes. Anything else is a malformed
++    vector, not a verdict.
++    """
++    inputs: dict[str, bool] = {}
++    for check in (*S5_BOUNDARY_CHECKS, "surface_hash_match"):
++        value = case.get(check)
++        if not isinstance(value, bool):
++            raise ValidationFailure(f"store-boundary case {name}: {check} must be a boolean")
++        inputs[check] = value
++    return inputs
++
++
++def s5_trusted(inputs: dict[str, bool]) -> tuple[bool, list[str]]:
++    """Recompute the §4 trust verdict: every check passes, else untrusted.
++
++    Returns the verdict with the failing checks in §4 order, the
++    surface-hash comparison last.
++    """
++    failing = [check for check in S5_BOUNDARY_CHECKS if not inputs[check]]
++    if not inputs["surface_hash_match"]:
++        failing.append("surface_hash")
++    return (not failing, failing)
++
++
++def s5_check_swap_shape(case: dict[str, Any], inputs: dict[str, bool], name: str) -> None:
++    """A modeled byte swap breaks the surface hash, and only a swap does.
++
++    `surface` names the applied surface the swap touched
++    (`system-prompt` or `root-context`, the §10.1 recomputation scope) or
++    is null when the case models no swap; a swap lives on a store entry.
++    """
++    surface = case.get("surface")
++    if surface is None:
++        if inputs["surface_hash_match"] is not True:
++            raise ValidationFailure(f"store-boundary case {name}: a hash mismatch without a swap needs its surface")
++    else:
++        if surface not in S5_SURFACES:
++            raise ValidationFailure(f"store-boundary case {name}: surface must be system-prompt, root-context, or null")
++        if inputs["surface_hash_match"] is not False:
++            raise ValidationFailure(f"store-boundary case {name}: a modeled swap breaks the surface hash")
++        if case.get("object") != "store-entry":
++            raise ValidationFailure(f"store-boundary case {name}: a modeled swap lives on a store entry")
++
++
++def validate_environments_store_boundary_vectors(vector: Any = None) -> None:
++    """Recompute every §4 protected-boundary verdict (§10.1, §10.4, §12).
++
++    Each positive resolve case isolates exactly one failing check of the
++    six — the five boundary checks plus the surface-hash comparison — and
++    the gate recomputes the diagnostic, the fragment verdict, and the
++    status currency from those inputs. Negatives carry a non-conforming
++    observation that must still violate the recomputed rule.
++    """
++    if vector is None:
++        vector = load_json(SUITE / "vectors" / "environments-store-boundary.json")
++    if vector.get("capability") != "agent-environments" or vector.get("capability_revision") != 1:
++        raise ValidationFailure("store-boundary vector has the wrong capability identity")
++    pinned = vector.get("diagnostics")
++    if not isinstance(pinned, dict) or pinned.get("store_untrusted") != S5_DIAG_UNTRUSTED or pinned.get("dry_run_outcome") != S5_OUTCOME_WOULD_REBUILD or pinned.get("repair_failed") != S5_DIAG_REPAIR_FAILED:
++        raise ValidationFailure("store-boundary diagnostics must pin environment_store_untrusted, would-rebuild-untrusted-store, and environment_repair_failed")
++
++    resolve = named_cases(vector.get("resolve_cases"), "store-boundary resolve")
++    if set(resolve) != S5_RESOLVE_CASES:
++        raise ValidationFailure("store-boundary resolve case inventory is not exact")
++    for name, case in resolve.items():
++        if case.get("home") != "current":
++            raise ValidationFailure(f"store-boundary case {name}: the modeled home is provisioned and otherwise current")
++        if case.get("object") not in S5_OBJECTS:
++            raise ValidationFailure(f"store-boundary case {name}: object must be one of {', '.join(S5_OBJECTS)}")
++        inputs = s5_check_inputs(case, name)
++        s5_check_swap_shape(case, inputs, name)
++        trusted, failing = s5_trusted(inputs)
++        expected_diag = None if trusted else S5_DIAG_UNTRUSTED
++        if name in S5_RESOLVE_NEGATIVE_CASES:
++            if case.get("conforming") is not False or not case.get("reason"):
++                raise ValidationFailure(f"store-boundary case {name}: a negative needs conforming=false and a reason")
++            if case.get("diagnostic") == expected_diag and case.get("fragment_emitted") is trusted and case.get("row_current") is trusted:
++                raise ValidationFailure(f"store-boundary case {name}: the observation no longer violates the §10.1 rule")
++            continue
++        if case.get("conforming") is False:
++            raise ValidationFailure(f"store-boundary case {name}: a positive case must not carry conforming=false")
++        if failing and len(failing) != 1:
++            raise ValidationFailure(f"store-boundary case {name}: a positive case isolates exactly one failing check")
++        if case.get("diagnostic") != expected_diag:
++            raise ValidationFailure(f"store-boundary case {name}: diagnostic is not the §10.1 rule ({expected_diag!r})")
++        if case.get("fragment_emitted") is not trusted:
++            raise ValidationFailure(f"store-boundary case {name}: an untrusted profile emits no fragment")
++        if case.get("row_current") is not trusted:
++            raise ValidationFailure(f"store-boundary case {name}: an untrusted profile is non-current")
++        if (case.get("failing_check") is None) != trusted:
++            raise ValidationFailure(f"store-boundary case {name}: failing_check names the check iff the profile is untrusted")
++        if not trusted and case.get("failing_check") not in failing:
++            raise ValidationFailure(f"store-boundary case {name}: failing_check names no failing check")
++
++    dry_run = named_cases(vector.get("dry_run_cases"), "store-boundary dry-run")
++    if set(dry_run) != S5_DRY_RUN_CASES:
++        raise ValidationFailure("store-boundary dry-run case inventory is not exact")
++    for name, case in dry_run.items():
++        if case.get("object") not in S5_OBJECTS:
++            raise ValidationFailure(f"store-boundary case {name}: object must be one of {', '.join(S5_OBJECTS)}")
++        inputs = s5_check_inputs(case, name)
++        s5_check_swap_shape(case, inputs, name)
++        trusted, _ = s5_trusted(inputs)
++        expected_outcome = None if trusted else S5_OUTCOME_WOULD_REBUILD
++        if name in S5_DRY_RUN_NEGATIVE_CASES:
++            if case.get("conforming") is not False or not case.get("reason"):
++                raise ValidationFailure(f"store-boundary case {name}: a negative needs conforming=false and a reason")
++            if case.get("mutated") is not True and case.get("outcome") == expected_outcome:
++                raise ValidationFailure(f"store-boundary case {name}: the observation no longer violates the dry-run rule")
++            continue
++        if case.get("conforming") is False:
++            raise ValidationFailure(f"store-boundary case {name}: a positive case must not carry conforming=false")
++        if case.get("outcome") != expected_outcome:
++            raise ValidationFailure(f"store-boundary case {name}: outcome is not the §4 dry-run rule ({expected_outcome!r})")
++        if case.get("mutated") is not False:
++            raise ValidationFailure(f"store-boundary case {name}: dry-run evaluation mutates nothing")
++
++    repair = named_cases(vector.get("repair_cases"), "store-boundary repair")
++    if set(repair) != S5_REPAIR_CASES:
++        raise ValidationFailure("store-boundary repair case inventory is not exact")
++    for name, case in repair.items():
++        kind = case.get("entry_kind")
++        if kind not in S5_ENTRY_KINDS:
++            raise ValidationFailure(f"store-boundary case {name}: entry_kind must be git, path, or local")
++        if case.get("object") not in S5_OBJECTS:
++            raise ValidationFailure(f"store-boundary case {name}: object must be one of {', '.join(S5_OBJECTS)}")
++        inputs = s5_check_inputs(case, name)
++        s5_check_swap_shape(case, inputs, name)
++        trusted, _ = s5_trusted(inputs)
++        if name in S5_REPAIR_NEGATIVE_CASES:
++            if case.get("conforming") is not False or not case.get("reason"):
++                raise ValidationFailure(f"store-boundary case {name}: a negative needs conforming=false and a reason")
++            if trusted or case.get("reapplied_before_trust") is not True:
++                raise ValidationFailure(f"store-boundary case {name}: the observation no longer violates the repair rule")
++            continue
++        if case.get("conforming") is False:
++            raise ValidationFailure(f"store-boundary case {name}: a positive case must not carry conforming=false")
++        if trusted:
++            raise ValidationFailure(f"store-boundary case {name}: a repair case starts from an untrusted entry")
++        if case.get("reapplied_before_trust") is not False:
++            raise ValidationFailure(f"store-boundary case {name}: a non-trusted entry is never re-applied")
++        if (case.get("rebuilt_from_snapshot") is True) != (kind == "git"):
++            raise ValidationFailure(f"store-boundary case {name}: only a git entry rebuilds from the revalidated snapshot")
++        if kind == "git":
++            if case.get("diagnostic") is not None or case.get("fragment_emitted") is not True:
++                raise ValidationFailure(f"store-boundary case {name}: a rebuilt git entry resolves")
++        elif case.get("diagnostic") != S5_DIAG_REPAIR_FAILED or case.get("fragment_emitted") is not False:
++            raise ValidationFailure(f"store-boundary case {name}: an unrebuildable entry fails repair without a fragment")
++
++    status = named_cases(vector.get("status_cases"), "store-boundary status")
++    if set(status) != S5_STATUS_CASES:
++        raise ValidationFailure("store-boundary status case inventory is not exact")
++    for name, case in status.items():
++        if case.get("object") not in S5_OBJECTS:
++            raise ValidationFailure(f"store-boundary case {name}: object must be one of {', '.join(S5_OBJECTS)}")
++        inputs = s5_check_inputs(case, name)
++        s5_check_swap_shape(case, inputs, name)
++        trusted, failing = s5_trusted(inputs)
++        expected_diag = None if trusted else S5_DIAG_UNTRUSTED
++        if name in S5_STATUS_NEGATIVE_CASES:
++            if case.get("conforming") is not False or not case.get("reason"):
++                raise ValidationFailure(f"store-boundary case {name}: a negative needs conforming=false and a reason")
++            if case.get("diagnostic") == expected_diag and case.get("row_current") is trusted and (case.get("names_failing_check") in failing or trusted):
++                raise ValidationFailure(f"store-boundary case {name}: the observation no longer violates the §12 rule")
++            continue
++        if case.get("conforming") is False:
++            raise ValidationFailure(f"store-boundary case {name}: a positive case must not carry conforming=false")
++        if case.get("diagnostic") != expected_diag:
++            raise ValidationFailure(f"store-boundary case {name}: diagnostic is not the §12 rule ({expected_diag!r})")
++        if case.get("row_current") is not trusted:
++            raise ValidationFailure(f"store-boundary case {name}: an untrusted profile is non-current")
++        if trusted:
++            if case.get("names_failing_check") is not None:
++                raise ValidationFailure(f"store-boundary case {name}: a trusted row names no failing check")
++        elif case.get("names_failing_check") not in failing:
++            raise ValidationFailure(f"store-boundary case {name}: the status row names the failing check")
++
++
+ # ---------------------------------------------------------------------------
+ # Section 9.1: detector classes
+ 
+@@ -6542,6 +6778,7 @@ def main() -> int:
+         validate_environment_vectors,
+         validate_environments_env_passthrough_vectors,
+         validate_environments_source_signers_vectors,
++        validate_environments_store_boundary_vectors,
+         validate_context_version_vectors,
+         validate_context_detector_vectors,
+         validate_snapshot_acquisition_vectors,

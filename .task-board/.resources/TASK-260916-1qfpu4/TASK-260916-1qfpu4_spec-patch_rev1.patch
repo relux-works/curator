@@ -1,0 +1,893 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index cbd6b7f..b52a81b 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -7,6 +7,35 @@ Versioning for the complete specification set.
+ 
+ ### Added
+ 
++- E5: nofollow write discipline for managed-surface writes (environments
++  §8.3.1, with pointers from §5/§5.8/§7.5/§8.1/§8.4/§9.5/§10.1/§12/§13
++  and the manager profile §12.2): every materialization, takeover,
++  repair, or backup write to a managed surface in any mode, a backup,
++  the marker, or the adapter ledger replaces the directory entry —
++  operation-private temp file plus rename — and MUST NOT follow a
++  symlink at the target path or at any path component below the managed
++  root that the manager did not create in this operation
++  (`O_NOFOLLOW`-class open, `lstat`-class inspection). A manager-owned
++  target link is replaced as an entry; the §9.5 foreign-manager stop
++  keeps its disposition, with an authorized takeover backing up the
++  link itself (same link text, never dereferenced) before replacing
++  the entry; any other unowned target link follows the ledger rule
++  (`environment_surface_unmanaged_conflict` unless a takeover
++  authorization covers the path). One new diagnostic,
++  `environment_write_would_follow_link`, refuses writes that would
++  traverse a non-manager link below the managed root, or open through
++  one at a backup, marker, or ledger destination — no takeover flag
++  authorizes traversal. `env status` reports link-blocked paths as
++  non-current rows naming the path. Direct rollout, under the hood: a
++  tampered or symlinked target now yields a refusal or an
++  entry-replacement, never a write through. Conformance vectors in
++  `vectors/environments-write-nofollow.json` (authorized-takeover
++  replace, unauthorized stop, symlinked-parent refusals under both
++  authorization states, planted-link and manager-owned-link repairs,
++  backup-destination refusal, inside-link ledger refusal, clean-path
++  and recorded-file positives — every foreign-link case asserting the
++  link's former target is byte-identical afterwards), checked
++  semantically by `tools/validate.py`.
+ - E1: per-source signer allowlist and `profile update` delta confirmation
+   (Decision 0012 amendment 2026-09-17; environments
+   §1.1/§1.3/§1.4/§9.2/§9.7/§12/§12.1/§12.2/§13): the new closed machine knob
+diff --git a/conformance/v1/manifest.json b/conformance/v1/manifest.json
+index 29c0807..82af993 100644
+--- a/conformance/v1/manifest.json
++++ b/conformance/v1/manifest.json
+@@ -4288,6 +4288,10 @@
+       "path": "vectors/environments-source-signers.json",
+       "sha256": "sha256:fb59e44c33183fc5cf7c698c65038f49a8f1e2d2404137c80cb6d252d46f8d9c"
+     },
++    {
++      "path": "vectors/environments-write-nofollow.json",
++      "sha256": "sha256:2d4c3d07ad9a5984895feda3b6ea59463aa0f7826d27b276ce47262a7e8818c0"
++    },
+     {
+       "path": "vectors/environments.json",
+       "sha256": "sha256:08b3ad8fcd89c35389328c142d8fb8329c86b2d0ef73d444ccf47d62736e2f51"
+diff --git a/conformance/v1/vectors/environments-write-nofollow.json b/conformance/v1/vectors/environments-write-nofollow.json
+new file mode 100644
+index 0000000..1b862b1
+--- /dev/null
++++ b/conformance/v1/vectors/environments-write-nofollow.json
+@@ -0,0 +1,283 @@
++{
++  "capability": "agent-environments",
++  "capability_revision": 1,
++  "cases": [
++    {
++      "expected": {
++        "backup_holds_link": true,
++        "diagnostic": null,
++        "entry_after": "managed-file",
++        "foreign_target_sha256_after": "4216d77d5df4a50bc737b315d9bbb070a042ee567b52213a35c255ad120d6120",
++        "outcome": "replaced"
++      },
++      "foreign_target_fixture": "foreign-notes",
++      "managed_fixture": "managed-root-context",
++      "marker_records_target": false,
++      "mode": "linked",
++      "name": "takeover-symlinked-target-authorized-replaced",
++      "operation": "takeover",
++      "parent_link": null,
++      "takeover_authorized": true,
++      "target": {
++        "kind": "symlink",
++        "link_owner": "foreign",
++        "link_points": "outside"
++      }
++    },
++    {
++      "expected": {
++        "backup_holds_link": false,
++        "diagnostic": "environment_foreign_manager_detected",
++        "entry_after": "unchanged",
++        "foreign_target_sha256_after": "4216d77d5df4a50bc737b315d9bbb070a042ee567b52213a35c255ad120d6120",
++        "outcome": "refused"
++      },
++      "foreign_target_fixture": "foreign-notes",
++      "managed_fixture": "managed-root-context",
++      "marker_records_target": false,
++      "mode": "linked",
++      "name": "takeover-symlinked-target-unauthorized-stopped",
++      "operation": "takeover",
++      "parent_link": null,
++      "takeover_authorized": false,
++      "target": {
++        "kind": "symlink",
++        "link_owner": "foreign",
++        "link_points": "outside"
++      }
++    },
++    {
++      "expected": {
++        "backup_holds_link": false,
++        "diagnostic": "environment_write_would_follow_link",
++        "entry_after": "unchanged",
++        "foreign_target_sha256_after": "4216d77d5df4a50bc737b315d9bbb070a042ee567b52213a35c255ad120d6120",
++        "outcome": "refused"
++      },
++      "foreign_target_fixture": "foreign-notes",
++      "managed_fixture": "managed-root-context",
++      "marker_records_target": false,
++      "mode": "managed-home",
++      "name": "materialize-symlinked-parent-refused",
++      "operation": "materialize",
++      "parent_link": {
++        "link_points": "outside"
++      },
++      "takeover_authorized": false,
++      "target": {
++        "kind": "absent",
++        "link_owner": null,
++        "link_points": null
++      }
++    },
++    {
++      "expected": {
++        "backup_holds_link": false,
++        "diagnostic": "environment_write_would_follow_link",
++        "entry_after": "unchanged",
++        "foreign_target_sha256_after": "4216d77d5df4a50bc737b315d9bbb070a042ee567b52213a35c255ad120d6120",
++        "outcome": "refused"
++      },
++      "foreign_target_fixture": "foreign-notes",
++      "managed_fixture": "managed-root-context",
++      "marker_records_target": false,
++      "mode": "linked",
++      "name": "takeover-symlinked-parent-authorized-still-refused",
++      "operation": "takeover",
++      "parent_link": {
++        "link_points": "outside"
++      },
++      "takeover_authorized": true,
++      "target": {
++        "kind": "symlink",
++        "link_owner": "foreign",
++        "link_points": "outside"
++      }
++    },
++    {
++      "expected": {
++        "backup_holds_link": false,
++        "diagnostic": null,
++        "entry_after": "managed-file",
++        "foreign_target_sha256_after": "4216d77d5df4a50bc737b315d9bbb070a042ee567b52213a35c255ad120d6120",
++        "outcome": "replaced"
++      },
++      "foreign_target_fixture": "foreign-notes",
++      "managed_fixture": "managed-root-context",
++      "marker_records_target": true,
++      "mode": "copied",
++      "name": "repair-planted-link-replaced",
++      "operation": "repair",
++      "parent_link": null,
++      "takeover_authorized": false,
++      "target": {
++        "kind": "symlink",
++        "link_owner": "foreign",
++        "link_points": "outside"
++      }
++    },
++    {
++      "expected": {
++        "backup_holds_link": false,
++        "diagnostic": null,
++        "entry_after": "managed-link",
++        "foreign_target_sha256_after": null,
++        "outcome": "replaced"
++      },
++      "foreign_target_fixture": null,
++      "managed_fixture": "managed-root-context",
++      "marker_records_target": true,
++      "mode": "linked",
++      "name": "repair-manager-owned-link-replaced",
++      "operation": "repair",
++      "parent_link": null,
++      "takeover_authorized": false,
++      "target": {
++        "kind": "symlink",
++        "link_owner": "manager",
++        "link_points": "store"
++      }
++    },
++    {
++      "expected": {
++        "backup_holds_link": false,
++        "diagnostic": "environment_write_would_follow_link",
++        "entry_after": "unchanged",
++        "foreign_target_sha256_after": "4216d77d5df4a50bc737b315d9bbb070a042ee567b52213a35c255ad120d6120",
++        "outcome": "refused"
++      },
++      "foreign_target_fixture": "foreign-notes",
++      "managed_fixture": "managed-root-context",
++      "marker_records_target": false,
++      "mode": "copied",
++      "name": "backup-symlinked-destination-refused",
++      "operation": "backup",
++      "parent_link": {
++        "link_points": "outside"
++      },
++      "takeover_authorized": false,
++      "target": {
++        "kind": "absent",
++        "link_owner": null,
++        "link_points": null
++      }
++    },
++    {
++      "expected": {
++        "backup_holds_link": false,
++        "diagnostic": null,
++        "entry_after": "managed-file",
++        "foreign_target_sha256_after": null,
++        "outcome": "written"
++      },
++      "foreign_target_fixture": null,
++      "managed_fixture": "managed-root-context",
++      "marker_records_target": false,
++      "mode": "managed-home",
++      "name": "materialize-clean-path-written",
++      "operation": "materialize",
++      "parent_link": null,
++      "takeover_authorized": false,
++      "target": {
++        "kind": "absent",
++        "link_owner": null,
++        "link_points": null
++      }
++    },
++    {
++      "expected": {
++        "backup_holds_link": false,
++        "diagnostic": "environment_surface_unmanaged_conflict",
++        "entry_after": "unchanged",
++        "foreign_target_sha256_after": "4216d77d5df4a50bc737b315d9bbb070a042ee567b52213a35c255ad120d6120",
++        "outcome": "refused"
++      },
++      "foreign_target_fixture": "foreign-notes",
++      "managed_fixture": "managed-root-context",
++      "marker_records_target": false,
++      "mode": "linked",
++      "name": "takeover-inside-link-unauthorized-unmanaged-conflict",
++      "operation": "takeover",
++      "parent_link": null,
++      "takeover_authorized": false,
++      "target": {
++        "kind": "symlink",
++        "link_owner": "foreign",
++        "link_points": "store"
++      }
++    },
++    {
++      "expected": {
++        "backup_holds_link": false,
++        "diagnostic": null,
++        "entry_after": "managed-file",
++        "foreign_target_sha256_after": null,
++        "outcome": "replaced"
++      },
++      "foreign_target_fixture": null,
++      "managed_fixture": "managed-root-context",
++      "marker_records_target": true,
++      "mode": "copied",
++      "name": "materialize-recorded-file-replaced",
++      "operation": "materialize",
++      "parent_link": null,
++      "takeover_authorized": false,
++      "target": {
++        "kind": "file",
++        "link_owner": null,
++        "link_points": null
++      }
++    }
++  ],
++  "diagnostics": [
++    "environment_write_would_follow_link",
++    "environment_foreign_manager_detected",
++    "environment_surface_unmanaged_conflict"
++  ],
++  "entry_states": [
++    "managed-file",
++    "managed-link",
++    "unchanged"
++  ],
++  "finding": "E5",
++  "fixtures": {
++    "foreign-notes": {
++      "bytes_base64": "IyBvcGVyYXRvciBub3RlcyAoZm9yZWlnbiBtYW5hZ2VyIHNvdXJjZSBvZiB0cnV0aCkKLSByb3RhdGUgdGhlIGRlcGxveSBrZXkK",
++      "description": "bytes living at the foreign link's former target; every foreign-link case asserts these bytes are untouched afterwards",
++      "sha256": "4216d77d5df4a50bc737b315d9bbb070a042ee567b52213a35c255ad120d6120"
++    },
++    "managed-root-context": {
++      "bytes_base64": "IyBnZW5lcmF0ZWQ6IEN1cmF0b3IgUHJvdG9jb2wgZW52aXJvbm1lbnRzIHJldmlzaW9uIDEKIyMgQ29udGV4dDogdW1icmVsbGEgMS4wLjAK",
++      "description": "bytes the manager writes on a successful replace",
++      "sha256": "13a7c5de6adb150db5f0a9f86da97f6753676b96d745ec57e3cd2330255f7fbe"
++    }
++  },
++  "link_points_values": [
++    "outside",
++    "store"
++  ],
++  "modes": [
++    "linked",
++    "copied",
++    "managed-home"
++  ],
++  "outcomes": [
++    "written",
++    "replaced",
++    "refused"
++  ],
++  "protocol_version": "1.0.0-rc.9",
++  "rule": "protocol/environments.md section 8.3.1: a materialization, takeover, repair, or backup write replaces the directory entry (operation-private temp file plus rename) and MUST NOT follow a symlink at the target path or at any path component below the managed root that the manager did not create in this operation. link_points 'outside' means outside the managed root (hence outside the profile store, the section 9.5 foreign-manager stop); link_points 'store' means into the profile store.",
++  "schema_version": 1,
++  "target_kinds": [
++    "absent",
++    "file",
++    "symlink"
++  ],
++  "write_classes": [
++    "materialize",
++    "takeover",
++    "repair",
++    "backup"
++  ]
++}
+diff --git a/profiles/manager.md b/profiles/manager.md
+index d33921a..90793af 100644
+--- a/profiles/manager.md
++++ b/profiles/manager.md
+@@ -2330,7 +2330,12 @@ recorded hash; `copied` and `managed-home` surfaces drift when a recorded
+ content hash no longer matches. A drifted file is never silently
+ overwritten outside repair, and an absent surface file and a failed read
+ are different facts: unreadable evidence is reported as unreadable with
+-currency unknown, never as absence.
++currency unknown, never as absence. Every materialization, takeover,
++repair, or backup write replaces the directory entry — operation-private
++temp file plus rename — and never follows a symlink at the target or
++below the managed root (environments §8.3.1); a write that would follow
++a link the manager does not own is refused with
++`environment_write_would_follow_link`.
+ 
+ | Condition | Diagnostic (environments §5.7, §7.7, §8.5) |
+ |---|---|
+@@ -2340,6 +2345,7 @@ currency unknown, never as absence.
+ | recorded surface file exists but cannot be read | `environment_surface_unreadable` |
+ | write would touch a file the marker does not record | `environment_surface_unmanaged_conflict` |
+ | next backup generation directory already exists | `environment_backup_exists` |
++| a write that would traverse a symlink below the managed root, or open through a symlink at a backup, marker, or ledger destination, that the manager did not create | `environment_write_would_follow_link` |
+ | two profile names map to one platform path below the environments root | `environment_path_collision` |
+ | provisioning seed exists in the native home but cannot be read | `environment_seed_unreadable` |
+ 
+diff --git a/protocol/environments.md b/protocol/environments.md
+index 9749d85..5919850 100644
+--- a/protocol/environments.md
++++ b/protocol/environments.md
+@@ -654,7 +654,9 @@ case-insensitive filesystem, managed homes for two such profile names
+ (section 8.1), backup paths (section 8.3) — MUST detect the collision and
+ fail with `environment_path_collision` before writing anything: the core §2
+ extraction rule, extended to every materialization and provisioning write
+-path.
++path. Every write below follows the section 8.3.1 write discipline: the
++manager replaces directory entries and never writes through a symbolic
++link.
+ 
+ **Parts and joining.** Output is assembled from ordered **parts**. Every
+ part is a byte string ending with exactly one LF. The document is the parts
+@@ -930,6 +932,7 @@ conformance-vector surface.
+ The resolved MCP set of a profile for an adapter — the lock's `mcp` members
+ whose `environments` selector applies to that adapter — materializes as one
+ inert, hashed, marker-recorded file per adapter, in a managed home only.
++Its write is a section 8.3.1 write.
+ It never materializes into a native in-place home, whose MCP configuration
+ lives in tool-owned mutable state, and never into a secondary fixed-home
+ target. The file location is below `<home>/.agent-context/mcp/` except
+@@ -1322,6 +1325,9 @@ revision-1 declarations are:
+ adapter ledger and environment marker protect only managed paths, so
+ materialization and `env status` MUST report `environment_shadowing_path_present`
+ when a declared shadowing path exists; the file itself is never touched.
++The existence check uses `lstat`-class semantics (section 8.3.1): a
++symlink at a declared shadowing path counts as present and is never
++dereferenced.
+ The surface is genuinely inert, so the row is **non-current** by default
+ (section 12). Machine configuration MAY record a per-path
+ `shadow_acknowledged` entry (section 12.1) — "this override is deliberate" —
+@@ -1508,7 +1514,8 @@ manager creates the home, materializes the managed surfaces, links the
+ section 7.4 passthrough entries, writes or copies the section 7.4
+ provisioning seeds, and — for `opencode` — seeds the section 7.1 XDG
+ links, in that order, as
+-one journaled transaction. The **first-resolve notice** accompanies that
++one journaled transaction. Every write in that transaction is a section
++8.3.1 write. The **first-resolve notice** accompanies that
+ provisioning and every first resolve of a home: the manager prints the
+ managed-home path, states that the tool will treat the home as its own
+ state root — sessions, trust records, and approvals accrue there and not in
+@@ -1614,6 +1621,54 @@ the number of backup generations and the age of the oldest and newest — a
+ backup of a hand-maintained context file may hold secrets, and the
+ operator is told it is there.
+ 
++### 8.3.1 Write discipline
++
++Every materialization, takeover, repair, or backup write this document
++directs at a managed surface in any mode (`copied`, `linked`,
++`managed-home`), a section 8.3 backup, the section 8.2 marker, or the
++adapter ledger — a closed list of write classes over a closed list of
++destinations — replaces the directory entry and never follows a symbolic
++link. The manager creates the new regular file or link under an
++operation-private name in the same directory, then renames over the
++target (atomic replace). The manager MUST NOT follow a symbolic link at
++the target path or at any path component below the managed root that the
++manager itself did not create in this operation: `O_NOFOLLOW`-class
++semantics on open, `lstat`-class semantics on inspection. Components at
++or above the managed root — the environments root for a managed home,
++the native home directory for in-place surfaces — resolve normally; only
++components strictly below the managed root are policed.
++
++A pre-existing symlink at a managed-surface target path is disposed by a
++closed rule:
++
++- a manager-owned link — a link the manager created in this operation,
++  or a marker-recorded surface entry — is replaced as an entry; drift
++  and repair semantics (sections 8.4, 10.1) apply unchanged;
++- the section 9.5 foreign-manager stop applies exactly as section 9.5
++  states: the operation stops, and an authorized takeover backs up the
++  link itself — the backup preserves the symlink with the same link
++  text, never dereferenced — then replaces the entry;
++- any other link the manager does not own follows the ledger rule: the
++  write fails with `environment_surface_unmanaged_conflict` unless a
++  takeover authorization covers that path, in which case the takeover
++  backs up the link itself, as above, and replaces the entry.
++
++A symlink at a path component below the managed root that the manager
++did not create in this operation refuses the write with
++`environment_write_would_follow_link`, naming the path, however the
++target itself is owned: no takeover flag authorizes traversal, because
++the flag covers replacing the target entry, never following a link. The
++same refusal fires when a backup, marker, or ledger destination path —
++manager-private paths with no ledger or takeover machinery of their own —
++traverses or names a link the manager did not create in this operation.
++Backup reads MUST NOT dereference a replaced link either. In no case is
++the target of a pre-existing link opened for writing.
++
++`env status` reports every managed-surface, backup, and marker path
++blocked by a link the manager does not own with
++`environment_write_would_follow_link`, naming the path; the row is
++non-current (section 12).
++
+ ### 8.4 Drift
+ 
+ For `linked` surfaces, drift is a link that no longer targets the expected
+@@ -1622,7 +1677,10 @@ store path or a target whose bytes fail the recorded hash. For `copied` and
+ matches. Drift detection MUST state both halves explicitly: the surface was
+ modified outside the manager, and the file was left untouched; the
+ installation is non-current, and `repair` restores the managed bytes. A
+-drifted file is never silently overwritten outside `repair`.
++drifted file is never silently overwritten outside `repair`. Drift
++inspection uses `lstat`-class semantics (section 8.3.1): a surface path
++that is a symlink is identified with `readlink`, never opened through
++the link.
+ 
+ An absent surface file and a failed read are different facts: a failed
+ marker read is `environment_marker_invalid`; a failed read of a recorded
+@@ -1640,6 +1698,7 @@ with its currency reported as unknown, and no absence-shaped outcome —
+ | recorded surface file exists but cannot be read (non-current) | `environment_surface_unreadable` |
+ | write would touch a file the marker does not record | `environment_surface_unmanaged_conflict` |
+ | next backup generation directory already exists | `environment_backup_exists` |
++| a write that would traverse a symlink below the managed root, or open through a symlink at a backup, marker, or ledger destination, that the manager did not create | `environment_write_would_follow_link` |
+ 
+ ## 9. Profile lifecycle
+ 
+@@ -2018,7 +2077,9 @@ such a trigger the manager:
+ 3. **Backs up, always**: every file the operation will replace is copied
+    into the next section 8.3 backup generation before the first write,
+    whether or not any import was requested, subject to
+-   `environment_backup_exists`.
++   `environment_backup_exists`. A symlink the operation will replace is
++   backed up as a symlink with the same link text, never dereferenced
++   (section 8.3.1).
+ 4. **Classifies and offers the import**: the detected state is classified
+    under section 9.6 and the classification is reported before any write;
+    the import itself runs only on the operator's request and under the
+@@ -2035,6 +2096,9 @@ operation. A carrying operation that meets unmanaged files outside
+ onboarding performs the same notice and backup as onboarding when the flag
+ is given; without the flag, section 8.3 applies and the operation fails
+ with `environment_surface_unmanaged_conflict` rather than overwrite.
++Every takeover write is a section 8.3.1 write: the operator's
++authorization covers replacing the directory entry after backup, never
++opening the link's target for writing.
+ Authentication is never part of onboarding, takeover, or import: credential
+ files stay where the section 7.4 passthrough expects them, untouched.
+ 
+@@ -2181,7 +2245,8 @@ is **lock-free**: it reads the marker and covers exactly the surfaces the
+ marker records — no more — and for a symlinked surface whose link targets an
+ entry of the immutable profile store, link-target identity is sufficient
+ currency (the store entry's integrity is the store's own invariant, section
+-4), so a launch does not re-hash a large skills tree. A copied surface —
++4; the link target is read with `lstat`-class semantics, section 8.3.1),
++so a launch does not re-hash a large skills tree. A copied surface —
+ the `claude_code` root-context file in every mode, or a manager §5
+ fallback copy — has no link target and is verified by the content hash
+ the marker records for it (section 8.2), the same hash section 8.4 drift
+@@ -2205,7 +2270,10 @@ reconciling XDG seeds, adding the launch directory's project entry,
+ never touching environment-owned mutable state,
+ unmanaged files, seeds, or backups — and then emits the fragment. Repair
+ restores managed bytes from the store; it MUST NOT adopt candidate bytes
+-found in the home. Lock acquisition that times out is
++found in the home. Repair writes are section 8.3.1 writes: repair
++replaces directory entries and refuses with
++`environment_write_would_follow_link` rather than writing through a link
++the manager does not own. Lock acquisition that times out is
+ `environment_lock_unavailable`, distinct from `environment_repair_failed`,
+ which keeps meaning that the store cannot restore this home — an entry is
+ missing or fails validation. Neither emits a fragment.
+@@ -2548,7 +2616,9 @@ with any `environment_seed_shadowed` entry, the standing `opencode`
+ split-brain note of section 7.1, the recorded and detected tool release per
+ adapter (section 7.9), both homes of the current profile per scope and
+ their provisioning state (section 8.1), backup generation counts and ages
+-per home (section 8.3), orphaned managed homes (section 9.2),
++per home (section 8.3), managed-surface, backup, and marker paths blocked
++by a link the manager does not own (section 8.3.1), orphaned managed
++homes (section 9.2),
+ `environment_context_size_exceeded` where it applies, the effective
+ `transitive_system_modules` value with every dropped system module by
+ package and path where the `drop` policy skipped any (section 3), the resolved
+@@ -2577,8 +2647,8 @@ profile identity, lock hash, member list, precedence, mode, and form match
+ the effective machine state; every recorded surface hash verifies; and
+ every recorded passthrough entry is live. A drifted, missing, shadow-inert
+ (unless acknowledged under `shadow_acknowledged`), detached, partially
+-switched, stale, refused-provider (section 11), or
+-unreadable state is non-current; unreadable evidence is
++switched, stale, refused-provider (section 11), link-blocked
++(section 8.3.1), or unreadable state is non-current; unreadable evidence is
+ reported as unreadable, never as absence (section 8.4). A section 11
+ provider row is non-current when the active revision refuses or fails
+ that provider — a manager-published or managed directory match under
+@@ -2792,7 +2862,17 @@ confirmation, a new system module, a changed MCP `args`, `url`, or
+ selector, and a reordered `env_names` warning under revision A and
+ refusing under revision B, `--confirm-system-delta` proceeding, a
+ reinstall refusing under revision B and proceeding with the flag, and
+-`--all` confirming every profile of the run. The nine
++`--all` confirming every profile of the run; and the section 8.3.1
++write-discipline vectors
++(`vectors/environments-write-nofollow.json`) — the symlinked-target
++takeover (replaced with backup under authorization, stopped with
++`environment_foreign_manager_detected` without), the symlinked-parent
++refusal with `environment_write_would_follow_link` under both
++authorization states, the post-provisioning planted-link repair, the
++manager-owned-link replace, the symlinked-backup-destination refusal,
++the inside-pointing-link ledger refusal, and the clean-path and
++recorded-file positives — every foreign-link case asserting the link's
++former target is byte-identical afterwards. The nine
+ retired `expected/environments/*` sets are regenerated under the v2 type
+ line. A manager claiming this capability MUST pass the complete vector set;
+ there is no partial claim. A manager conforms to revision A by warning
+diff --git a/release/1.0.0-rc.9.json b/release/1.0.0-rc.9.json
+index 7f4fe5a..1cb6920 100644
+--- a/release/1.0.0-rc.9.json
++++ b/release/1.0.0-rc.9.json
+@@ -12,7 +12,7 @@
+     "verified_provider_contract": "host-execution-provider-v1"
+   },
+   "candidate_protocol_pin": {
+-    "manifest_sha256": "sha256:dede0c16008150e4536fa463a3fef04a5ee0615227b852907cf2d460f34d5f59",
++    "manifest_sha256": "sha256:1e6e7303d23a25213854479a5015bb5aa1966e30a6b3a249f224120aec3cba65",
+     "suite_root": "conformance/v1"
+   },
+   "claim_v5": {
+@@ -24,7 +24,7 @@
+   "downstream_consumption": {
+     "committed_release_pin_advanced": false,
+     "environment": "CURATOR_CONFORMANCE_ROOT",
+-    "required_manifest_sha256": "sha256:dede0c16008150e4536fa463a3fef04a5ee0615227b852907cf2d460f34d5f59"
++    "required_manifest_sha256": "sha256:1e6e7303d23a25213854479a5015bb5aa1966e30a6b3a249f224120aec3cba65"
+   },
+   "historical_release": {
+     "immutable": true,
+diff --git a/tools/test_validate.py b/tools/test_validate.py
+index 7bb10d8..c212aee 100644
+--- a/tools/test_validate.py
++++ b/tools/test_validate.py
+@@ -2813,6 +2813,99 @@ class ShellHookTrustVectorTests(unittest.TestCase):
+         ]
+         with self.assertRaises(validate.ValidationFailure):
+             validate.validate_shell_hook_trust_vectors(changed)
++
++
++class WriteNofollowVectorTests(unittest.TestCase):
++    """The environments §8.3.1 nofollow write discipline must fail closed.
++
++    Each test narrows one rule of
++    validate_environments_write_nofollow_vectors: a write through a
++    symlinked parent, an unauthorized takeover claimed as replaced, a
++    touched foreign target, a backup that dereferences the replaced link,
++    or a dropped case must be rejected.
++    """
++
++    def setUp(self) -> None:
++        self.vector = validate.load_json(
++            validate.SUITE / "vectors" / "environments-write-nofollow.json"
++        )
++
++    def case(self, name: str, vector=None) -> dict:
++        for item in (vector or self.vector)["cases"]:
++            if item["name"] == name:
++                return item
++        raise AssertionError(f"environments-write-nofollow case {name} is missing")
++
++    def test_published_vector_passes(self) -> None:
++        validate.validate_environments_write_nofollow_vectors()
++
++    def test_parent_link_followed_fails(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        refused = self.case("materialize-symlinked-parent-refused", changed)
++        refused["expected"]["outcome"] = "written"
++        refused["expected"]["diagnostic"] = None
++        refused["expected"]["entry_after"] = "managed-file"
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_write_nofollow_vectors(changed)
++
++    def test_authorized_parent_traversal_fails(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        refused = self.case("takeover-symlinked-parent-authorized-still-refused", changed)
++        refused["expected"]["outcome"] = "replaced"
++        refused["expected"]["diagnostic"] = None
++        refused["expected"]["entry_after"] = "managed-file"
++        refused["expected"]["backup_holds_link"] = True
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_write_nofollow_vectors(changed)
++
++    def test_unauthorized_takeover_replaced_fails(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        stopped = self.case("takeover-symlinked-target-unauthorized-stopped", changed)
++        stopped["expected"]["outcome"] = "replaced"
++        stopped["expected"]["diagnostic"] = None
++        stopped["expected"]["entry_after"] = "managed-file"
++        stopped["expected"]["backup_holds_link"] = True
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_write_nofollow_vectors(changed)
++
++    def test_touched_foreign_target_fails(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        replaced = self.case("takeover-symlinked-target-authorized-replaced", changed)
++        replaced["expected"]["foreign_target_sha256_after"] = "0" * 64
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_write_nofollow_vectors(changed)
++
++    def test_stale_fixture_digest_fails(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        changed["fixtures"]["foreign-notes"]["sha256"] = "0" * 64
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_write_nofollow_vectors(changed)
++
++    def test_missing_link_backup_fails(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        replaced = self.case("takeover-symlinked-target-authorized-replaced", changed)
++        replaced["expected"]["backup_holds_link"] = False
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_write_nofollow_vectors(changed)
++
++    def test_wrong_refusal_code_fails(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        refused = self.case("takeover-inside-link-unauthorized-unmanaged-conflict", changed)
++        refused["expected"]["diagnostic"] = "environment_write_would_follow_link"
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_write_nofollow_vectors(changed)
++
++    def test_dropped_case_fails(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        changed["cases"] = [
++            item
++            for item in changed["cases"]
++            if item["name"] != "repair-planted-link-replaced"
++        ]
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_write_nofollow_vectors(changed)
++
++
+ class UmbrellaProviderVectorTests(unittest.TestCase):
+     """The environments §11 trust-root gate must fail closed.
+ 
+diff --git a/tools/validate.py b/tools/validate.py
+index 67dd216..0a77a65 100644
+--- a/tools/validate.py
++++ b/tools/validate.py
+@@ -6179,6 +6179,182 @@ def validate_shell_hook_trust_vectors(vector: Any = None) -> None:
+         for field, expected in warning_checks.items():
+             if case.get(field) is not expected:
+                 raise ValidationFailure(f"shell-hook-trust case {name} field {field} does not follow its trust state")
++
++
++WRITE_NOFOLLOW_WRITE_CLASSES = ("materialize", "takeover", "repair", "backup")
++WRITE_NOFOLLOW_MODES = ("linked", "copied", "managed-home")
++WRITE_NOFOLLOW_OUTCOMES = ("written", "replaced", "refused")
++WRITE_NOFOLLOW_DIAGNOSTICS = (
++    "environment_write_would_follow_link",
++    "environment_foreign_manager_detected",
++    "environment_surface_unmanaged_conflict",
++)
++WRITE_NOFOLLOW_TARGET_KINDS = ("absent", "file", "symlink")
++WRITE_NOFOLLOW_LINK_POINTS = ("outside", "store")
++WRITE_NOFOLLOW_ENTRY_STATES = ("managed-file", "managed-link", "unchanged")
++WRITE_NOFOLLOW_FIXTURES = ("foreign-notes", "managed-root-context")
++WRITE_NOFOLLOW_CASES = frozenset(
++    {
++        "takeover-symlinked-target-authorized-replaced",
++        "takeover-symlinked-target-unauthorized-stopped",
++        "materialize-symlinked-parent-refused",
++        "takeover-symlinked-parent-authorized-still-refused",
++        "repair-planted-link-replaced",
++        "repair-manager-owned-link-replaced",
++        "backup-symlinked-destination-refused",
++        "materialize-clean-path-written",
++        "takeover-inside-link-unauthorized-unmanaged-conflict",
++        "materialize-recorded-file-replaced",
++    }
++)
++
++
++def _validate_write_nofollow_case(name: str, case: dict[str, Any], fixtures: dict[str, Any]) -> None:
++    label = f"environments-write-nofollow case {name}"
++    operation = case.get("operation")
++    if operation not in WRITE_NOFOLLOW_WRITE_CLASSES:
++        raise ValidationFailure(f"{label} names an unknown write class")
++    if case.get("mode") not in WRITE_NOFOLLOW_MODES:
++        raise ValidationFailure(f"{label} names an unknown mode")
++    authorized = case.get("takeover_authorized")
++    recorded = case.get("marker_records_target")
++    if authorized not in (True, False) or recorded not in (True, False):
++        raise ValidationFailure(f"{label} authorization and marker flags must be booleans")
++    target = case.get("target", {})
++    if not isinstance(target, dict):
++        raise ValidationFailure(f"{label} target is not an object")
++    kind = target.get("kind")
++    if kind not in WRITE_NOFOLLOW_TARGET_KINDS:
++        raise ValidationFailure(f"{label} names an unknown target kind")
++    points = target.get("link_points")
++    owner = target.get("link_owner")
++    if kind == "symlink":
++        if points not in WRITE_NOFOLLOW_LINK_POINTS:
++            raise ValidationFailure(f"{label} symlink target must point outside or to the store")
++        if owner not in ("manager", "foreign"):
++            raise ValidationFailure(f"{label} symlink target must be manager- or foreign-owned")
++        if owner == "manager" and not recorded:
++            raise ValidationFailure(f"{label} manager-owned link must be a recorded entry")
++    elif points is not None or owner is not None:
++        raise ValidationFailure(f"{label} non-link target must not carry link fields")
++    parent = case.get("parent_link")
++    if parent is not None and (
++        not isinstance(parent, dict) or parent.get("link_points") not in WRITE_NOFOLLOW_LINK_POINTS
++    ):
++        raise ValidationFailure(f"{label} parent link must point outside or to the store")
++    if case.get("managed_fixture") != "managed-root-context":
++        raise ValidationFailure(f"{label} managed fixture is not managed-root-context")
++
++    # Derive the section 8.3.1 disposition: a non-manager parent link
++    # refuses first, then the target-link rule, then the clean path.
++    expected_diagnostic: Any = None
++    if parent is not None:
++        expected_outcome = "refused"
++        expected_diagnostic = "environment_write_would_follow_link"
++    elif kind == "symlink":
++        if recorded or owner == "manager":
++            expected_outcome = "replaced"
++        elif points == "outside":
++            if operation == "takeover" and authorized:
++                expected_outcome = "replaced"
++            else:
++                expected_outcome = "refused"
++                expected_diagnostic = "environment_foreign_manager_detected"
++        elif operation == "takeover" and authorized:
++            expected_outcome = "replaced"
++        else:
++            expected_outcome = "refused"
++            expected_diagnostic = "environment_surface_unmanaged_conflict"
++    elif kind == "absent":
++        expected_outcome = "written"
++    elif recorded:
++        expected_outcome = "replaced"
++    else:
++        raise ValidationFailure(f"{label} unrecorded regular file is outside this vector's scope")
++
++    expected = case.get("expected", {})
++    if expected.get("outcome") != expected_outcome:
++        raise ValidationFailure(f"{label} outcome does not follow the section 8.3.1 disposition")
++    if expected.get("diagnostic") != expected_diagnostic:
++        raise ValidationFailure(f"{label} diagnostic does not follow the section 8.3.1 disposition")
++
++    backup = kind == "symlink" and expected_outcome == "replaced" and not (recorded or owner == "manager")
++    if expected.get("backup_holds_link") is not backup:
++        raise ValidationFailure(f"{label} backup expectation does not follow its disposition")
++
++    if expected_outcome == "refused":
++        expected_entry = "unchanged"
++    elif kind == "symlink" and recorded and case.get("mode") == "linked":
++        expected_entry = "managed-link"
++    else:
++        expected_entry = "managed-file"
++    if expected.get("entry_after") != expected_entry:
++        raise ValidationFailure(f"{label} entry state does not follow its disposition")
++
++    foreign_id = case.get("foreign_target_fixture")
++    foreign_after = expected.get("foreign_target_sha256_after")
++    has_foreign_link = (kind == "symlink" and owner == "foreign") or parent is not None
++    if has_foreign_link:
++        if foreign_id not in fixtures:
++            raise ValidationFailure(f"{label} names an unknown foreign-target fixture")
++        if foreign_after != fixtures[foreign_id]["sha256"]:
++            raise ValidationFailure(f"{label} foreign target is not byte-identical afterwards")
++    elif foreign_id is not None or foreign_after is not None:
++        raise ValidationFailure(f"{label} carries a foreign target without a foreign link")
++
++
++def validate_environments_write_nofollow_vectors(vector: Any = None) -> None:
++    """The environments section 8.3.1 nofollow write-discipline vector.
++
++    Structural validation only: fixture digests are recomputed from the
++    fixture bytes, and each case's outcome, diagnostic, backup, entry, and
++    untouched-target values are derived from the section 8.3.1 disposition
++    model. This gate never touches the filesystem; behavioral conformance
++    is owned by the manager implementation task TASK-260916-19shmj.
++    """
++    if vector is None:
++        vector = load_json(SUITE / "vectors" / "environments-write-nofollow.json")
++    if (
++        vector.get("schema_version") != 1
++        or vector.get("protocol_version") != PROTOCOL_VERSION
++        or vector.get("capability") != "agent-environments"
++        or vector.get("capability_revision") != 1
++        or vector.get("finding") != "E5"
++    ):
++        raise ValidationFailure("environments-write-nofollow vector has the wrong capability identity")
++    if vector.get("write_classes") != list(WRITE_NOFOLLOW_WRITE_CLASSES):
++        raise ValidationFailure("environments-write-nofollow write classes are not the closed four-class set")
++    if vector.get("modes") != list(WRITE_NOFOLLOW_MODES):
++        raise ValidationFailure("environments-write-nofollow modes are not the closed three-mode set")
++    if vector.get("outcomes") != list(WRITE_NOFOLLOW_OUTCOMES):
++        raise ValidationFailure("environments-write-nofollow outcomes are not the closed three-outcome set")
++    if vector.get("diagnostics") != list(WRITE_NOFOLLOW_DIAGNOSTICS):
++        raise ValidationFailure("environments-write-nofollow diagnostics are not the closed three-code set")
++    if vector.get("target_kinds") != list(WRITE_NOFOLLOW_TARGET_KINDS):
++        raise ValidationFailure("environments-write-nofollow target kinds are not the closed three-kind set")
++    if vector.get("link_points_values") != list(WRITE_NOFOLLOW_LINK_POINTS):
++        raise ValidationFailure("environments-write-nofollow link-points values are not the closed two-value set")
++    if vector.get("entry_states") != list(WRITE_NOFOLLOW_ENTRY_STATES):
++        raise ValidationFailure("environments-write-nofollow entry states are not the closed three-state set")
++
++    fixtures = vector.get("fixtures", {})
++    if set(fixtures) != set(WRITE_NOFOLLOW_FIXTURES):
++        raise ValidationFailure("environments-write-nofollow fixture inventory is not exact")
++    for fixture_id, fixture in fixtures.items():
++        raw = decode_base64(
++            fixture.get("bytes_base64"),
++            f"environments-write-nofollow fixture {fixture_id} bytes",
++        )
++        if hashlib.sha256(raw).hexdigest() != fixture.get("sha256"):
++            raise ValidationFailure(f"environments-write-nofollow fixture {fixture_id} sha256 does not match its bytes")
++
++    cases = named_cases(vector.get("cases"), "environments write-nofollow")
++    if set(cases) != WRITE_NOFOLLOW_CASES:
++        raise ValidationFailure("environments-write-nofollow case inventory is not exact")
++    for name, case in cases.items():
++        _validate_write_nofollow_case(name, case, fixtures)
++
++
+ UMBRELLA_PROVIDER_DIAGNOSTICS = {
+     "subcommand_provider_missing",
+     "subcommand_provider_untrusted",
+@@ -6546,6 +6722,7 @@ def main() -> int:
+         validate_context_detector_vectors,
+         validate_snapshot_acquisition_vectors,
+         validate_shell_hook_trust_vectors,
++        validate_environments_write_nofollow_vectors,
+         validate_registry_page_boundary_vectors,
+         validate_manager_config_vectors,
+         validate_system_config_v2_schema,

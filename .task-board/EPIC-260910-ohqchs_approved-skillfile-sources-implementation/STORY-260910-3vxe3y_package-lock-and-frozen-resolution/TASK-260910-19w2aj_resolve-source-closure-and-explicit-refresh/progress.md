@@ -251,6 +251,8 @@ spawn agent resolution: Agent selection: codex via explicit_override (preferred_
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [implementer] developer (codex) (run=RUN-260917-ff21ef, max_parallel=20)
 spawn run started: [implementer] developer (codex) (run=RUN-260917-ff21ef)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260917-ff21ef, pid=60655, exit=0)
 
 ## Precondition Resources
 - [TASK-260910-19w2aj_source-contract.md](file://TASK-260910-19w2aj/TASK-260910-19w2aj_source-contract.md) — Accepted specification, execution boundary and task-specific acceptance.
@@ -368,7 +370,7 @@ spawn run started: [implementer] developer (codex) (run=RUN-260917-ff21ef)
 - [TASK-260910-19w2aj_spawn-log_-reviewer--reviewer--codex-_RUN-260917-e85220.log](file://TASK-260910-19w2aj/TASK-260910-19w2aj_spawn-log_-reviewer--reviewer--codex-_RUN-260917-e85220.log) — System spawn log captured by task-board
 - [TASK-260910-19w2aj_review-verdict-rev11.md](file://TASK-260910-19w2aj/TASK-260910-19w2aj_review-verdict-rev11.md) — Independent revision 11 acceptance evidence
 - [TASK-260910-19w2aj_spawn-log_-implementer--developer--codex-_RUN-260917-b938af.log](file://TASK-260910-19w2aj/TASK-260910-19w2aj_spawn-log_-implementer--developer--codex-_RUN-260917-b938af.log) — System spawn log captured by task-board
-- [TASK-260910-19w2aj_integration-results.md](file://TASK-260910-19w2aj/TASK-260910-19w2aj_integration-results.md) — Integration attempt 2: command exit 1; git fast-forward merge exit 128 due to diverging branches. GitHub gate 35244217437 passed.
+- [TASK-260910-19w2aj_integration-results.md](file://TASK-260910-19w2aj/TASK-260910-19w2aj_integration-results.md) — Revision 11 integration attempt 3: exit 1, integration_indeterminate; hosted gate 35248225440 passed; exact refusal log.
 - [TASK-260910-19w2aj_spawn-log_-implementer--developer--codex-_RUN-260917-b272f9.log](file://TASK-260910-19w2aj/TASK-260910-19w2aj_spawn-log_-implementer--developer--codex-_RUN-260917-b272f9.log) — System spawn log captured by task-board
 - [TASK-260910-19w2aj_spawn-log_-implementer--developer--codex-_RUN-260917-1920b5.log](file://TASK-260910-19w2aj/TASK-260910-19w2aj_spawn-log_-implementer--developer--codex-_RUN-260917-1920b5.log) — System spawn log captured by task-board
 - [TASK-260910-19w2aj_integration-rollback.md](file://TASK-260910-19w2aj/TASK-260910-19w2aj_integration-rollback.md) — Rollback exited 0; prepared transaction rolled back with trunk unmoved and nothing landed.
@@ -378,7 +380,7 @@ spawn run started: [implementer] developer (codex) (run=RUN-260917-ff21ef)
 2026-09-10T13:56:33Z
 
 ## Last Update
-2026-09-17T16:41:46Z
+2026-09-17T17:28:30Z
 
 ## Assigned To
 [implementer] developer (codex)

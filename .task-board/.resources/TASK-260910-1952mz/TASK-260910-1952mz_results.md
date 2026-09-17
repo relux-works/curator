@@ -661,3 +661,112 @@ Conformance root for test runs:
 - Windows behavior (Git Bash execution, cross-spelling, drive fold) is
   proven by the hosted gate at handoff, which runs the Windows lane with
   Git Bash and pwsh present.
+
+---
+
+## Revision 6 — CR rev5 hosted-gate repair (Windows cross-spelling marker)
+
+CR rev5 failed the hosted gate on exactly one lane (run 35201254365;
+`test-gate: go test exit=1, platform-case gate exit=0` on Test
+windows-latest; all other lanes green). The `test-evidence-windows-latest`
+artifact's `go-test-served.json` stream names exactly one failing test —
+the new Windows-only `TestShellHookTrustNativeRecordAuthorizesMSYSSpelling`
+(all 4 Git Bash subtests: `bash`, `sh`, `bash#01`, `sh#01`). Every other
+POSIX-under-Git-Bash suite the rev5 round enabled (hostile, malformed,
+symlink-alias) passed on Windows, as did `TestWindowsDriveIdentity`.
+
+Root cause (harness-only, no production change): the cross-spelling test's
+changed-bytes phase rewrites the fixture to
+`export CURATOR_PROJECT_ENV=2`, but `assertTrustOutcome` hardcoded the
+sourced marker to `"1"`. The hook behaved exactly right — the CI stderr
+shows `shell_hook_env_changed` with the native path plus one warning, and
+stdout shows `sourced1=2`/`sourced2=2` (A-warning sources the NEW bytes
+with a warning) — while the assertion demanded `sourced1=1`. Notably the
+two approved-phase activations (silent sourcing under A AND B through
+MSYS spelling against one native record) passed on Windows, i.e. the rev5
+identity repair itself is proven working; only this assertion was wrong.
+All vector fixtures export `=1` even in changed form (v2 adds a second
+variable), so no vector case could have caught the hardcoded marker.
+
+Fix (`internal/shell/shell_hook_trust_test.go` only — production bytes
+identical to rev5):
+
+- `hookTrustCase` gains harness-only `SourcedMarker string` (`json:"-"`,
+  `:50-56`): expected `${CURATOR_PROJECT_ENV}` value when `Sourced` is
+  true; empty means `"1"`, so every decoded vector case is unaffected.
+- `assertTrustOutcome` (`:197-205`) honors `SourcedMarker` when set.
+- The cross-spelling `expectA` (`:1131-1134`) sets `SourcedMarker = "2"`,
+  keeping the stronger proof (the NEW `=2` bytes are sourced under A,
+  not stale state) instead of weakening the fixture back to `=1`.
+- `gofmt -w` realignment of the struct block (comment splits the field
+  alignment); verified the rev6-vs-rev5 delta is exactly these hunks.
+
+Proof the fix targets the failure (throwaway in-package probe
+`zz_rev6_probe_test.go`, run once, archived as
+`TASK-260910-1952mz_rev6-probe_test.go`, then deleted from the tree):
+
+- Old expectation (no marker) against the byte-exact CI stdout/stderr
+  pair (CRLF kept): FAIL, exit 1, with the identical CI message
+  `stdout lacks "sourced1=1"` — the diagnosis reproduces.
+- New expectation (`SourcedMarker = "2"`) against the same pair: PASS,
+  exit 0 — the fix accepts exactly the CI-observed correct behavior.
+
+### Rev6 validation transcripts (exit codes real, `bash`, `set -o pipefail` where piped)
+
+Conformance root for test runs:
+`CURATOR_CONFORMANCE_ROOT=/Users/administrator/Developer/ReluxWorks/curator/curator-spec/conformance/v1`,
+`PATH=/tmp/pwsh/app:$PATH` (real pwsh 7.4.6, pre-existing tarball).
+
+- `go build ./...` → exit 0.
+- `go vet ./...` → exit 0.
+- `gofmt -l internal/ cmd/` → no output, exit 0 (after one `gofmt -w`
+  on the touched test file).
+- `GOOS=windows go build ./internal/shell/ ./internal/hookapproval/` →
+  exit 0; `GOOS=windows go vet` on the same → exit 0.
+- `go test -count=1 ./internal/hookapproval/... ./internal/envfiles/...`
+  → exit 0 (`ok` both; 161.8s/162.3s wall — see host note).
+- `./internal/shell/` via a pre-compiled warm binary (`go test -c -o
+  /tmp/shell-rev6.test`, exit 0) in bounded `-test.run` chunks, all
+  exit 0: shape/grammar/normalization/emission/parses/variants (7 PASS);
+  pre-existing behavior (10 PASS + `TestPowerShellHookRunsOnEveryPrompt`
+  SKIP, pre-existing Windows-only); `TestShellHookTrustVectors` 14/14
+  PASS with 0 SKIP (8 sh × sh/dash/bash/zsh + 6 ps1 under real pwsh);
+  `TestShellHookRejectsMalformedRecords` 99 subtests PASS;
+  `TestShellHookRefusesHostileCheckout` + `TestShellHookTrustResolvesSymlinkedProject`
+  posix+powershell PASS; `TestShellHookTrustNativeRecordAuthorizesMSYSSpelling`
+  SKIP on macOS (Windows-only, executes on the hosted lane).
+- Empty-root `TestShellHookTrustVectors` → SKIP (root-content), exit 0.
+- `go test -count=1 ./internal/install/ -run
+  'TestProjectInstallRecordsShellHookApprovals|TestProjectDryRunRecordsNoShellHookApprovals'`
+  → exit 0 (both PASS, 13.0s).
+- `go test -count=1 ./cmd/curator/ -run TestShellInit` → exit 0
+  (both PASS, 0.66s).
+- `golangci-lint run ./internal/shell/... ./internal/hookapproval/...
+  ./internal/envfiles/... ./internal/install/...` → `0 issues.`,
+  exit 0.
+- `bash .github/ci/ledger-consistency.sh /tmp/ledger-ev` →
+  `241 rows checked`, `ok`, exit 0 (no ledger change this round).
+- Not rerun in rev6: full `./internal/install/` and `./cmd/curator/`
+  suites (untouched by this round — one test-file-only change; rev4 ran
+  both green and the handoff remote-gate reruns the full suite
+  including the Windows lane that reproduces the original failure).
+
+### Rev6 scope notes
+
+- Files touched this round: `internal/shell/shell_hook_trust_test.go`
+  only. No production, ledger, SPEC_PIN, CHANGELOG, or sibling-surface
+  change (the Unreleased S6 warning-release entry already covers this
+  work). Shipped profile stays **`A-warning`**.
+- Host conditions during rev6 validation (shared Tier-3 macOS host):
+  a plain `go test ./internal/shell/...` wrapper run hit the 600s
+  package timeout mid-suite (zero assertion failures — the dump shows
+  the run parked in a shell activation), and the tiny hookapproval /
+  envfiles suites took ~162s each (rev5: ~2s). Both are the documented
+  first-exec/environmental stall, not a code slowdown: the change is
+  three string-comparison lines. Mitigation used, as in rev3: `go test
+  -c` once (0.8s), then the warm same-inode binary directly with
+  `-test.run` masks (`-test.list` 0.4s; every chunk green above).
+- Windows proof of the corrected assertion is the hosted gate at
+  handoff, which runs the cross-spelling test on the Windows lane with
+  Git Bash present; the local probe above proves the fixed assertion
+  accepts the exact bytes that lane produced.

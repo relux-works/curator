@@ -1,0 +1,487 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index cbd6b7f..79125aa 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -7,6 +7,32 @@ Versioning for the complete specification set.
+ 
+ ### Added
+ 
++- E3: the `codex_cli` provisioning seed stops inheriting native
++  `mcp_servers` (environments §7.4/§7.7/§7.8/§8.2/§12/§13): a whole-copy
++  seed runs every native MCP server outside the profile lock and the
++  §2.2 allowlist while `claude_code` runs only the profile set, so the
++  seed rule ships in two labelled revisions — revision A (warning
++  release, ships first) still copies `config.toml` whole but provisioning
++  warns `mcp_native_servers_ungoverned` naming every inherited entry with
++  the migration hint (declare the server in the profile's MCP set, or
++  accept the loss), and revision B (flip release) copies every top-level
++  member except `mcp_servers` and reports the stripped names once with
++  `mcp_native_servers_not_inherited`. Both revisions write the marker
++  `codex_seed_record` (`revision` exactly `A` or `B`, `native_mcp_servers`
++  the provisioning-time name snapshot, names only); a managed `codex_cli`
++  home whose marker predates the rule reports `mcp_seed_unstripped`
++  (warning) with the re-provision hint, and existing homes keep their
++  bytes. `env status` reports the active codex-seed revision with its
++  behaviour and, per managed `codex_cli` home, the record with the native
++  entries listed as ungoverned (revision A) or not inherited
++  (revision B); all three rows are warnings and never make a row
++  non-current. §7.8 gains the closed per-adapter residual table (what each
++  channel does to the home's own MCP configuration). Conformance vectors
++  in `vectors/environments-codex-seed.json` (provisioning under both
++  revisions, the no-server and empty-table negatives, the pre-rule-home
++  posture, and the non-codex negative). Manager/README follow-up
++  (`TASK-260916-33abdk`): a managed codex home runs only the profile MCP
++  set; native `~/.codex/config.toml` servers are not inherited.
+ - E1: per-source signer allowlist and `profile update` delta confirmation
+   (Decision 0012 amendment 2026-09-17; environments
+   §1.1/§1.3/§1.4/§9.2/§9.7/§12/§12.1/§12.2/§13): the new closed machine knob
+diff --git a/conformance/v1/manifest.json b/conformance/v1/manifest.json
+index 29c0807..2212156 100644
+--- a/conformance/v1/manifest.json
++++ b/conformance/v1/manifest.json
+@@ -4280,6 +4280,10 @@
+       "path": "vectors/context-versions.json",
+       "sha256": "sha256:4eac87963ac86c6e56d418a9e33cf0375cf7670619f560d97763e51fbb05c6b6"
+     },
++    {
++      "path": "vectors/environments-codex-seed.json",
++      "sha256": "sha256:3349fe85d42031fb2b748da7daad768edabc52847ab18f2450059e6d0dfedb7a"
++    },
+     {
+       "path": "vectors/environments-env-passthrough.json",
+       "sha256": "sha256:1953748e548d4f335f9defa4baa1524998d29dab4bf36647fb8c8bcbdcabf6db"
+diff --git a/conformance/v1/vectors/environments-codex-seed.json b/conformance/v1/vectors/environments-codex-seed.json
+new file mode 100644
+index 0000000..694ebb5
+--- /dev/null
++++ b/conformance/v1/vectors/environments-codex-seed.json
+@@ -0,0 +1,202 @@
++{
++  "schema_version": 1,
++  "protocol_version": "1.0.0-rc.9",
++  "capability": "agent-environments",
++  "capability_revision": 1,
++  "rule": "codex provisioning seed mcp_servers handling (sections 7.4, 7.7, 7.8, 8.2, 12)",
++  "revision_a": "warning release: the codex_cli seed is still copied whole, but provisioning warns mcp_native_servers_ungoverned naming every inherited native mcp_servers entry with the migration hint",
++  "revision_b": "flip release: the codex_cli seed strips the mcp_servers table and every mcp_servers.* sub-table; provisioning reports the stripped names once with mcp_native_servers_not_inherited",
++  "provisioning_cases": [
++    {
++      "name": "a-copies-whole-with-servers",
++      "revision": "A",
++      "native_config_toml": "model = \"gpt-5-codex\"\n\n[projects.\"/Users/operator/work\"]\ntrust_level = \"trusted\"\n\n[tui]\ntheme = \"dark\"\n\n[mcp_servers.figma]\ncommand = \"npx\"\nargs = [\"-y\", \"figma-developer-mcp\", \"--stdio\"]\n\n[mcp_servers.gh]\ncommand = \"gh\"\nargs = [\"mcp\"]\n",
++      "expected": {
++        "seeded_has_mcp_servers": true,
++        "seeded_top_level_members": ["mcp_servers", "model", "projects", "tui"],
++        "names": ["figma", "gh"],
++        "diagnostic": "mcp_native_servers_ungoverned",
++        "migration_hint": true,
++        "codex_seed_record": {"revision": "A", "native_mcp_servers": ["figma", "gh"]}
++      }
++    },
++    {
++      "name": "b-strips-servers-keeps-rest",
++      "revision": "B",
++      "native_config_toml": "model = \"gpt-5-codex\"\n\n[projects.\"/Users/operator/work\"]\ntrust_level = \"trusted\"\n\n[tui]\ntheme = \"dark\"\n\n[mcp_servers.figma]\ncommand = \"npx\"\nargs = [\"-y\", \"figma-developer-mcp\", \"--stdio\"]\n\n[mcp_servers.gh]\ncommand = \"gh\"\nargs = [\"mcp\"]\n",
++      "expected": {
++        "seeded_has_mcp_servers": false,
++        "seeded_top_level_members": ["model", "projects", "tui"],
++        "names": ["figma", "gh"],
++        "diagnostic": "mcp_native_servers_not_inherited",
++        "migration_hint": false,
++        "codex_seed_record": {"revision": "B", "native_mcp_servers": ["figma", "gh"]}
++      }
++    },
++    {
++      "name": "a-without-servers-no-warning",
++      "revision": "A",
++      "native_config_toml": "model = \"gpt-5-codex\"\n\n[projects.\"/Users/operator/work\"]\ntrust_level = \"trusted\"\n\n[tui]\ntheme = \"dark\"\n",
++      "expected": {
++        "seeded_has_mcp_servers": false,
++        "seeded_top_level_members": ["model", "projects", "tui"],
++        "names": [],
++        "diagnostic": null,
++        "migration_hint": false,
++        "codex_seed_record": {"revision": "A", "native_mcp_servers": []}
++      }
++    },
++    {
++      "name": "b-without-servers-no-warning",
++      "revision": "B",
++      "native_config_toml": "model = \"gpt-5-codex\"\n\n[projects.\"/Users/operator/work\"]\ntrust_level = \"trusted\"\n\n[tui]\ntheme = \"dark\"\n",
++      "expected": {
++        "seeded_has_mcp_servers": false,
++        "seeded_top_level_members": ["model", "projects", "tui"],
++        "names": [],
++        "diagnostic": null,
++        "migration_hint": false,
++        "codex_seed_record": {"revision": "B", "native_mcp_servers": []}
++      }
++    },
++    {
++      "name": "b-subtable-only-form-stripped",
++      "revision": "B",
++      "native_config_toml": "model = \"gpt-5-codex\"\n\n[mcp_servers.\"quoted-name\"]\ncommand = \"server\"\nargs = []\n",
++      "expected": {
++        "seeded_has_mcp_servers": false,
++        "seeded_top_level_members": ["model"],
++        "names": ["quoted-name"],
++        "diagnostic": "mcp_native_servers_not_inherited",
++        "migration_hint": false,
++        "codex_seed_record": {"revision": "B", "native_mcp_servers": ["quoted-name"]}
++      }
++    },
++    {
++      "name": "a-inline-table-form-inherited",
++      "revision": "A",
++      "native_config_toml": "model = \"gpt-5-codex\"\nmcp_servers = { local = { command = \"server\", args = [] } }\n",
++      "expected": {
++        "seeded_has_mcp_servers": true,
++        "seeded_top_level_members": ["mcp_servers", "model"],
++        "names": ["local"],
++        "diagnostic": "mcp_native_servers_ungoverned",
++        "migration_hint": true,
++        "codex_seed_record": {"revision": "A", "native_mcp_servers": ["local"]}
++      }
++    },
++    {
++      "name": "b-empty-mcp-servers-table-no-warning",
++      "revision": "B",
++      "native_config_toml": "model = \"gpt-5-codex\"\n\n[mcp_servers]\n",
++      "expected": {
++        "seeded_has_mcp_servers": false,
++        "seeded_top_level_members": ["model"],
++        "names": [],
++        "diagnostic": null,
++        "migration_hint": false,
++        "codex_seed_record": {"revision": "B", "native_mcp_servers": []}
++      }
++    }
++  ],
++  "posture_cases": [
++    {
++      "name": "a-home-lists-ungoverned",
++      "revision_shipped": "A",
++      "environment": "codex_cli",
++      "codex_seed_record": {"revision": "A", "native_mcp_servers": ["figma", "gh"]},
++      "expected": {
++        "codex_seed_row": "A",
++        "status_diagnostics": ["mcp_native_servers_ungoverned"],
++        "names_listed": ["figma", "gh"],
++        "listed_as": "ungoverned",
++        "repair_hint": false,
++        "row_current": true
++      }
++    },
++    {
++      "name": "b-home-lists-not-inherited",
++      "revision_shipped": "B",
++      "environment": "codex_cli",
++      "codex_seed_record": {"revision": "B", "native_mcp_servers": ["figma"]},
++      "expected": {
++        "codex_seed_row": "B",
++        "status_diagnostics": ["mcp_native_servers_not_inherited"],
++        "names_listed": ["figma"],
++        "listed_as": "not-inherited",
++        "repair_hint": false,
++        "row_current": true
++      }
++    },
++    {
++      "name": "pre-rule-home-unstripped-under-b",
++      "revision_shipped": "B",
++      "environment": "codex_cli",
++      "codex_seed_record": null,
++      "expected": {
++        "codex_seed_row": "B",
++        "status_diagnostics": ["mcp_seed_unstripped"],
++        "names_listed": [],
++        "listed_as": "unknown",
++        "repair_hint": true,
++        "row_current": true
++      }
++    },
++    {
++      "name": "pre-rule-home-unstripped-under-a",
++      "revision_shipped": "A",
++      "environment": "codex_cli",
++      "codex_seed_record": null,
++      "expected": {
++        "codex_seed_row": "A",
++        "status_diagnostics": ["mcp_seed_unstripped"],
++        "names_listed": [],
++        "listed_as": "unknown",
++        "repair_hint": true,
++        "row_current": true
++      }
++    },
++    {
++      "name": "b-home-empty-snapshot-no-rows",
++      "revision_shipped": "B",
++      "environment": "codex_cli",
++      "codex_seed_record": {"revision": "B", "native_mcp_servers": []},
++      "expected": {
++        "codex_seed_row": "B",
++        "status_diagnostics": [],
++        "names_listed": [],
++        "listed_as": "none",
++        "repair_hint": false,
++        "row_current": true
++      }
++    },
++    {
++      "name": "a-home-empty-snapshot-no-rows",
++      "revision_shipped": "A",
++      "environment": "codex_cli",
++      "codex_seed_record": {"revision": "A", "native_mcp_servers": []},
++      "expected": {
++        "codex_seed_row": "A",
++        "status_diagnostics": [],
++        "names_listed": [],
++        "listed_as": "none",
++        "repair_hint": false,
++        "row_current": true
++      }
++    },
++    {
++      "name": "non-codex-home-without-record-no-rows",
++      "revision_shipped": "B",
++      "environment": "claude_code",
++      "codex_seed_record": null,
++      "expected": {
++        "codex_seed_row": "B",
++        "status_diagnostics": [],
++        "names_listed": [],
++        "listed_as": "none",
++        "repair_hint": false,
++        "row_current": true
++      }
++    }
++  ]
++}
+diff --git a/protocol/environments.md b/protocol/environments.md
+index 9749d85..a918347 100644
+--- a/protocol/environments.md
++++ b/protocol/environments.md
+@@ -1270,10 +1270,46 @@ and are excluded from every surface hash. The enumerated seeds:
+ | Environment | Provisioning seeds | Evidence |
+ |---|---|---|
+ | `claude_code` | `.claude.json` — **written**, not copied: exactly the object `{"hasCompletedOnboarding":true,"projects":{}}` at provisioning, to which repair adds one project entry per launch directory (below); `oauthAccount` is never seeded — login is per home (passthrough table); a `settings.json` seed is not declared in revision 1 | the minimal seed shape is **verified** on 2.1.261: a file holding only these members survives the first run, which merges its own first-run members around them; the fresh-home "Not logged in" behavior is **verified** |
+-| `codex_cli` | `config.toml` — copied whole (project trust, model, and MCP tables included; the launch channel of section 7.8 layers the profile's MCP set over it) | that the copied file is parsed in the fresh home is **verified** (0.153.2, its `mcp_servers` entries are listed); that a `projects.<path>.trust_level` entry does **not** lift the `exec` git wall is **verified** (section 7.9 `exec_flags`); the remaining member shapes are **docs-confidence** |
++| `codex_cli` | `config.toml` — copied under the seed rule below: revision A copies it whole (project trust, model, and MCP tables included); revision B copies every top-level member except `mcp_servers` (the `mcp_servers` table and every `mcp_servers.*` sub-table removed); the launch channel of section 7.8 layers the profile's MCP set over the seeded base in both revisions | that the copied file is parsed in the fresh home is **verified** (0.153.2); that a `projects.<path>.trust_level` entry does **not** lift the `exec` git wall is **verified** (section 7.9 `exec_flags`); that a whole-copy home lists the native `mcp_servers` entries is **verified** (0.153.2 — the revision-A and pre-rule behavior; revision B strips them); the remaining member shapes are **docs-confidence** |
+ | `opencode` | none — the XDG seeds of section 7.1 are the analogous class | — |
+ | `pi` | `settings.json`, `models.json` | that a fresh dir loses them and re-downloads its tool trees is **verified**; their shapes are docs-confidence |
+ 
++**Codex seed MCP rule.** A whole-copy `codex_cli` seed inherits every
++native `mcp_servers` entry into the managed home, outside the profile's
++lock and outside the section 2.2 allowlist, while the section 7.8 channel
++layers the profile's set over that base — the asymmetry the section 7.8
++residual table records. The seed rule therefore ships in two explicitly
++labelled revisions; a manager MUST ship revision A before revision B:
++
++- **Revision A (warning release).** The seed is still copied whole, but
++  provisioning MUST emit `mcp_native_servers_ungoverned` (warning) naming
++  every native `mcp_servers` entry the home inherited, stating that the
++  next revision stops inheriting them, and carrying the migration hint:
++  declare the server in the profile's MCP set, or accept the loss. `env
++  status` MUST list those entries per managed `codex_cli` home as
++  ungoverned — outside the lock and the section 2.2 allowlist.
++- **Revision B (flip release).** The seed copies `config.toml` with the
++  `mcp_servers` table and every `mcp_servers.*` sub-table removed — the
++  seeded file carries the trust, model, and TUI configuration, every
++  top-level member of the native file except `mcp_servers`, and MUST parse
++  as TOML — and provisioning MUST report the stripped names once with
++  `mcp_native_servers_not_inherited` (warning). A managed `codex_cli`
++  home provisioned under revision B runs only the profile's MCP set
++  through the section 7.8 channel. `env status` MUST list the stripped
++  entries per managed `codex_cli` home as not inherited.
++
++Both revisions write the `codex_seed_record` marker record of section 8.2
++at provisioning: the `revision` (`A` or `B`) and the snapshot of the
++native `mcp_servers` entry names taken from the native file at
++provisioning time — names only, never server commands or env values. The
++provisioning warning under either revision fires exactly when the snapshot
++is non-empty: a native file with no `mcp_servers` entries warns nothing,
++and the record is still written with an empty snapshot. The rule applies
++at provisioning only: seeds are thereafter owned by the tool, an existing
++home keeps its bytes, and a managed `codex_cli` home whose marker predates
++the rule reports `mcp_seed_unstripped` (warning) with the repair hint
++(re-provision).
++
+ A seed is one-time by definition: a native-home change after provisioning
+ does not propagate, and the tool's later writes in the managed home are
+ its own state. The one per-launch-directory exception is the `claude_code`
+@@ -1396,6 +1432,9 @@ identifier not declared by the registry is `environment_target_unknown`.
+ | unrecorded entry in a managed `opencode` parent shadows an allowlisted operator entry (warning) | `environment_seed_shadowed` |
+ | first `auto` write into a secondary target's home without recorded consent | `environment_target_consent_required` |
+ | detected tool version differs from the adapter's recorded verified version (warning) | `environment_tool_version_unverified` |
++| native `mcp_servers` entries inherited into a managed `codex_cli` home under seed-rule revision A (warning; section 7.4) | `mcp_native_servers_ungoverned` |
++| native `mcp_servers` entries stripped from a managed `codex_cli` seed under seed-rule revision B (warning; section 7.4) | `mcp_native_servers_not_inherited` |
++| managed `codex_cli` home provisioned before the seed rule, marker lacks the seed record (warning, re-provision hint; section 7.4) | `mcp_seed_unstripped` |
+ 
+ ### 7.8 MCP launch channels
+ 
+@@ -1413,6 +1452,19 @@ configuration.
+ | `opencode` | `variable` `OPENCODE_CONFIG` naming the section 5.8 file. opencode merges configuration in a documented order — remote, global, `OPENCODE_CONFIG`, project `opencode.json`, `.opencode/`, `OPENCODE_CONFIG_CONTENT`, managed — so a project-level entry with the same server name overrides the managed one; recorded, not prevented | merge order **docs-confidence** (opencode is not installed on the recording machine) |
+ | `pi` | none — pi 0.84.2 has no MCP channel; no file and no `mcp` section | **verified** absent from the 0.84.2 help |
+ 
++What each channel does to the home's own MCP configuration — the
++per-adapter residual — is closed in this table:
++
++| Environment | Home MCP configuration under the channel |
++|---|---|
++| `claude_code` | `--strict-mcp-config` disables every other MCP configuration, including servers recorded in the managed home's own `.claude.json`: the launch set is exactly the profile's |
++| `codex_cli` | `-p curator-mcp` layers the profile set over the seeded base: under seed-rule revision A the base still carries the native servers, reported as ungoverned (section 7.4); under revision B the base carries none: the launch set is exactly the profile's |
++| `opencode` | the documented merge order applies — remote, global, `OPENCODE_CONFIG`, project `opencode.json`, `.opencode/`, `OPENCODE_CONFIG_CONTENT`, managed — so project-level servers remain and a same-named project entry overrides the managed one: recorded residual, not prevented |
++| `pi` | none: no channel, no MCP configuration in a managed launch |
++
++The launch set is what the tool offers the agent at launch under a managed
++launch through the channel above.
++
+ Whether a given tool passes its own environment through to a `stdio` server
+ is a per-adapter fact verified with the channel. Under Decision 0013 the
+ launcher adds the fragment's `env_names` to the launch plan's
+@@ -1569,6 +1621,15 @@ beside the managed surfaces. The marker records:
+   literal launch-directory paths whose project entry section 7.4 has
+   written into the managed `.claude.json`, so that resolve can tell a
+   missing entry from one the tool later rewrote;
++- for a managed `codex_cli` home provisioned under the section 7.4 seed
++  rule, `codex_seed_record`: the closed object `{ revision,
++  native_mcp_servers }` — `revision` exactly `A` (warning release: the
++  native servers were inherited) or `B` (flip release: the native servers
++  were stripped), `native_mcp_servers` the ascending-byte-order snapshot
++  of the native `mcp_servers` entry names taken at provisioning, names
++  only, empty when the native file carried none. The record is absent on
++  every other home; its absence on a managed `codex_cli` home means
++  pre-rule provisioning, reported as `mcp_seed_unstripped` (section 7.7);
+ - for a managed `opencode` parent, the recorded XDG seed links of section
+   7.1;
+ - for a home whose backups directory is non-empty, nothing: backups are
+@@ -2566,8 +2627,12 @@ signer-verification posture per lock member's source — `enforced` when an
+ allowlist is present, naming the verified signer, `unconfigured` when none
+ is, `required-missing` when `require_source_signers` is true and none is —,
+ the active update-confirmation revision (`A-warning` or `B-flip`, section
+-9.2) with its behaviour, and the machine-level `require_source_signers`
+-value. Both commands follow
++9.2) with its behaviour, the machine-level `require_source_signers`
++value, the active codex-seed revision (`A` or `B`, section 7.4) with its
++behaviour, and per managed `codex_cli` home the `codex_seed_record`
++revision with its native-server rows (`mcp_native_servers_ungoverned`
++under revision A, `mcp_native_servers_not_inherited` under revision B,
++`mcp_seed_unstripped` when the marker predates the rule). Both commands follow
+ the manager §10 discipline exactly: recompute and report, never mutate — no
+ fetch, no repair, no adoption, no channel application, no onboarding.
+ `--check` returns non-zero when any row is non-current.
+@@ -2591,8 +2656,10 @@ Warnings —
+ `environment_context_size_exceeded`, `environment_tool_version_unverified`,
+ `environment_seed_shadowed`, `environment_foreign_manager_suspected`,
+ `context_system_module_dropped`, `mcp_package_allowlist_empty`,
+-`mcp_env_passthrough_unlisted`, `mcp_env_passthrough_dropped`, an
+-acknowledged shadowing path — never make a row non-current.
++`mcp_env_passthrough_unlisted`, `mcp_env_passthrough_dropped`,
++`mcp_native_servers_ungoverned`, `mcp_native_servers_not_inherited`,
++`mcp_seed_unstripped`, an acknowledged shadowing path — never make a row
++non-current.
+ 
+ The signer-verification rows re-verify the locked pins against the
+ effective allowlists from the manager's local source state, without
+@@ -2610,6 +2677,13 @@ revision B — a triggered delta refuses with
+ `--confirm-system-delta`. The row is informative and never makes a row
+ non-current; no configuration knob pre-confirms.
+ 
++The codex-seed row reports `A` when the manager ships revision A of
++section 7.4 — the `codex_cli` seed is copied whole and provisioning warns
++`mcp_native_servers_ungoverned` with the migration hint — and `B` when it
++ships revision B — the seed strips `mcp_servers` and provisioning reports
++`mcp_native_servers_not_inherited`. The row is informative and never makes
++a row non-current; no configuration knob selects the revision.
++
+ Garbage collection extends the manager §10 and core §9.4 rules: it runs
+ under the manager-home mutation lock, and its live roots additionally
+ include every store entry named by any installed profile's lock — and by
+@@ -2792,7 +2866,15 @@ confirmation, a new system module, a changed MCP `args`, `url`, or
+ selector, and a reordered `env_names` warning under revision A and
+ refusing under revision B, `--confirm-system-delta` proceeding, a
+ reinstall refusing under revision B and proceeding with the flag, and
+-`--all` confirming every profile of the run. The nine
++`--all` confirming every profile of the run; the section 7.4 codex-seed
++cases (`vectors/environments-codex-seed.json`) — a native `config.toml`
++with `mcp_servers` tables under revision A (copied whole,
++`mcp_native_servers_ungoverned` names the entries, posture lists them
++ungoverned) and under revision B (the seeded file lacks them,
++`mcp_native_servers_not_inherited` names them), a native file without
++`mcp_servers` entries (no warning under either revision, the record still
++written), and the pre-rule-home `mcp_seed_unstripped` posture — with the
++`codex_seed_record` marker shape. The nine
+ retired `expected/environments/*` sets are regenerated under the v2 type
+ line. A manager claiming this capability MUST pass the complete vector set;
+ there is no partial claim. A manager conforms to revision A by warning
+@@ -2802,4 +2884,10 @@ revision B while still resolving on `PATH`. A manager conforms to the
+ update-delta revision A by warning with `profile_update_system_delta`
+ where the vectors warn, carrying the migration hint, and proceeding, and
+ to revision B by refusing with `profile_update_confirmation_required`
+-where the vectors refuse unless `--confirm-system-delta` is given.
++where the vectors refuse unless `--confirm-system-delta` is given. A
++manager conforms to the codex-seed revision A by copying the native
++`config.toml` whole, warning with `mcp_native_servers_ungoverned` where
++the vectors warn and carrying the migration hint, and to revision B by
++seeding without `mcp_servers` and reporting with
++`mcp_native_servers_not_inherited` where the vectors report; it MUST NOT
++claim revision B while still inheriting native servers.
+diff --git a/release/1.0.0-rc.9.json b/release/1.0.0-rc.9.json
+index 7f4fe5a..3085c04 100644
+--- a/release/1.0.0-rc.9.json
++++ b/release/1.0.0-rc.9.json
+@@ -12,7 +12,7 @@
+     "verified_provider_contract": "host-execution-provider-v1"
+   },
+   "candidate_protocol_pin": {
+-    "manifest_sha256": "sha256:dede0c16008150e4536fa463a3fef04a5ee0615227b852907cf2d460f34d5f59",
++    "manifest_sha256": "sha256:5618748dada0b9f7b392eedb62cdc24bb0440274a950cab7d84a46e86fee8ecf",
+     "suite_root": "conformance/v1"
+   },
+   "claim_v5": {
+@@ -24,7 +24,7 @@
+   "downstream_consumption": {
+     "committed_release_pin_advanced": false,
+     "environment": "CURATOR_CONFORMANCE_ROOT",
+-    "required_manifest_sha256": "sha256:dede0c16008150e4536fa463a3fef04a5ee0615227b852907cf2d460f34d5f59"
++    "required_manifest_sha256": "sha256:5618748dada0b9f7b392eedb62cdc24bb0440274a950cab7d84a46e86fee8ecf"
+   },
+   "historical_release": {
+     "immutable": true,
+diff --git a/schemas/v1/agent-environment-marker-v1.schema.json b/schemas/v1/agent-environment-marker-v1.schema.json
+index 07bf07e..85ca580 100644
+--- a/schemas/v1/agent-environment-marker-v1.schema.json
++++ b/schemas/v1/agent-environment-marker-v1.schema.json
+@@ -83,7 +83,20 @@
+       "uniqueItems": true,
+       "items": {"$ref": "common.schema.json#/$defs/nonEmptyString"}
+     },
+-    "seed_links": {"$ref": "common.schema.json#/$defs/pathSet"}
++    "seed_links": {"$ref": "common.schema.json#/$defs/pathSet"},
++    "codex_seed_record": {
++      "type": "object",
++      "required": ["revision", "native_mcp_servers"],
++      "properties": {
++        "revision": {"enum": ["A", "B"]},
++        "native_mcp_servers": {
++          "type": "array",
++          "uniqueItems": true,
++          "items": {"$ref": "common.schema.json#/$defs/nonEmptyString"}
++        }
++      },
++      "additionalProperties": false
++    }
+   },
+   "allOf": [
+     {
+@@ -107,7 +120,8 @@
+           "passthrough": false,
+           "seeds": false,
+           "seeded_projects": false,
+-          "seed_links": false
++          "seed_links": false,
++          "codex_seed_record": false
+         }
+       }
+     }

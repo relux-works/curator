@@ -1,0 +1,806 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 7642c98..a6b7158 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -33,6 +33,19 @@
+ 
+ ### Security
+ 
++- R2: snapshot-boundary lookups no longer rescan the log or rebuild the
++  Merkle tree per request. Each append now memoizes its boundary tuple
++  `(log_size, head, merkle_root, created_at)` in a durable `boundaries`
++  row in the same transaction (schema version 3, backfilled once at
++  startup), and `snapshot_boundary(max_seq)`, `boundary_available()`, and
++  the cursor carried-boundary check read one row (O(1)) with O(1)
++  structural anchors instead of recomputing. Appends maintain an
++  incremental Merkle frontier (O(log n) hashes, byte-identical roots).
++  The memoized rows are revalidated against the recomputed chain at every
++  startup, and a disagreement fails readiness like any other §5 mismatch;
++  the cache is never trusted over the log. This leaf covers the boundary
++  side only; the `/health` cached verdict follows separately
++  (curator-spec `dced9b8`).
+ - R1: `GET /v1/records` and `GET /v1/log` page envelopes now carry the
+   REQUIRED `boundary` member: the complete signed snapshot object
+   (`registry-snapshot-v1`, all fields including `sig`) at which the page was
+diff --git a/README.md b/README.md
+index 78fe170..fb94aa6 100644
+--- a/README.md
++++ b/README.md
+@@ -157,6 +157,18 @@ window. Startup refuses unexpired unscoped entries because assigning them to an
+ auditor would be ambiguous. Expired entries are discarded while the schema is
+ migrated; log history is unchanged.
+ 
++Schema version 3 adds two cache tables, `boundaries` (one memoized
++`(log_size, head, merkle_root, created_at)` row per committed prefix) and
++`merkle_frontier` (the O(log n) incremental-tree state for appends). The first
++startup on an older database creates both tables and backfills them from the
++log in one idempotent pass as part of startup verification; the memoized rows
++are revalidated against the recomputed chain on every startup, and any
++disagreement fails readiness. Reopening the database retries an interrupted
++migration without changing log history. Expect the first post-upgrade startup
++to take longer on large logs (one chain walk plus incremental Merkle work);
++steady-state startups revalidate without rewriting, and per-request reads are
++single-row lookups.
++
+ Private state is fail-closed. On POSIX, the data home is `0700` and private
+ files are `0600`. On Windows, the service replaces inherited permissions with
+ a protected DACL that grants full access only to the current service identity;
+diff --git a/src/csk_registry/store.py b/src/csk_registry/store.py
+index 9849ee9..1c8d63e 100644
+--- a/src/csk_registry/store.py
++++ b/src/csk_registry/store.py
+@@ -40,6 +40,17 @@ CREATE TABLE IF NOT EXISTS imported_records (
+     imported_at TEXT NOT NULL,
+     seq INTEGER REFERENCES log(seq) ON DELETE RESTRICT
+ );
++CREATE TABLE IF NOT EXISTS boundaries (
++    log_size INTEGER PRIMARY KEY,
++    head TEXT NOT NULL,
++    merkle_root TEXT NOT NULL,
++    created_at TEXT NOT NULL
++);
++CREATE TABLE IF NOT EXISTS merkle_frontier (
++    level INTEGER PRIMARY KEY,
++    len INTEGER NOT NULL,
++    tail TEXT NOT NULL
++);
+ """
+ 
+ _IDEMPOTENCY_SCHEMA = """
+@@ -56,7 +67,8 @@ CREATE INDEX idx_idempotency_expiry ON idempotency (expires_at);
+ """
+ 
+ _GENESIS = "0" * 64
+-_SCHEMA_VERSION = 2
++_SCHEMA_VERSION = 3
++_SCHEMA_VERSION_V2 = 2
+ _OPERATION_DEADLINE_SECONDS = 30.0
+ 
+ 
+@@ -166,12 +178,18 @@ class Store:
+                     self._mark_current_schema()
+                 elif user_version == _SCHEMA_VERSION:
+                     self._require_current_schema()
++                elif user_version == _SCHEMA_VERSION_V2:
++                    self._require_v2_schema()
++                    self._migrate_v2_to_v3()
++                    self._require_current_schema()
+                 else:
+                     raise StoreIntegrityError(
+                         f"unsupported database schema version {user_version}"
+                     )
+             _protect_sqlite_sidecars(path)
+             errors = self.integrity_errors()
++            if not errors:
++                self._ensure_boundaries()
+         except sqlite3.DatabaseError as exc:
+             self.close()
+             raise StoreIntegrityError(f"SQLite integrity verification failed: {exc}") from exc
+@@ -298,6 +316,8 @@ class Store:
+                 "seq",
+                 "expires_at",
+             },
++            "boundaries": {"log_size", "head", "merkle_root", "created_at"},
++            "merkle_frontier": {"level", "len", "tail"},
+         }
+         for table, expected_columns in required.items():
+             if self._table_columns(table) != expected_columns:
+@@ -307,6 +327,8 @@ class Store:
+             "metadata": ["key"],
+             "imported_records": ["fingerprint"],
+             "idempotency": ["auditor_id", "key"],
++            "boundaries": ["log_size"],
++            "merkle_frontier": ["level"],
+         }.items():
+             actual_primary_key = [
+                 str(row["name"])
+@@ -342,6 +364,57 @@ class Store:
+         if marker is None or marker["value"] != str(_SCHEMA_VERSION):
+             raise StoreIntegrityError("database schema version markers disagree")
+ 
++    def _require_v2_schema(self) -> None:
++        required = {
++            "log": {
++                "seq",
++                "entry_hash",
++                "prev_hash",
++                "name",
++                "source_identity",
++                "commit_hash",
++                "content_sha256",
++                "status",
++                "record_json",
++                "created_at",
++            },
++            "metadata": {"key", "value"},
++            "imported_records": {"fingerprint", "imported_at", "seq"},
++            "idempotency": {
++                "auditor_id",
++                "key",
++                "body_sha256",
++                "response_json",
++                "seq",
++                "expires_at",
++            },
++        }
++        for table, expected_columns in required.items():
++            if self._table_columns(table) != expected_columns:
++                raise StoreIntegrityError(f"database schema for {table} is unsupported")
++        marker = self._conn.execute(
++            "SELECT value FROM metadata WHERE key = 'schema_version'"
++        ).fetchone()
++        if marker is None or marker["value"] != str(_SCHEMA_VERSION_V2):
++            raise StoreIntegrityError("database schema version markers disagree")
++
++    def _migrate_v2_to_v3(self) -> None:
++        with self._write_transaction():
++            self._conn.execute(
++                "CREATE TABLE IF NOT EXISTS boundaries ("
++                "log_size INTEGER PRIMARY KEY, head TEXT NOT NULL, "
++                "merkle_root TEXT NOT NULL, created_at TEXT NOT NULL)"
++            )
++            self._conn.execute(
++                "CREATE TABLE IF NOT EXISTS merkle_frontier ("
++                "level INTEGER PRIMARY KEY, len INTEGER NOT NULL, tail TEXT NOT NULL)"
++            )
++            self._conn.execute(
++                "INSERT OR REPLACE INTO metadata (key, value) VALUES ('schema_version', ?)",
++                (str(_SCHEMA_VERSION),),
++            )
++            self._conn.execute(f"PRAGMA user_version={_SCHEMA_VERSION}")
++
+     def _table_columns(self, table: str) -> frozenset[str]:
+         return frozenset(
+             str(row["name"])
+@@ -507,8 +580,139 @@ class Store:
+         seq = int(cursor.lastrowid or 0)
+         if seq != previous_seq + 1:
+             raise StoreIntegrityError("log sequence is not contiguous")
++        frontier = self._load_frontier()
++        if (frontier[0].length if frontier else 0) != previous_seq:
++            raise StoreIntegrityError("merkle frontier does not match the log head")
++        new_root = _frontier_append(frontier, bytes.fromhex(entry_hash)).hex()
++        self._save_frontier(frontier)
++        try:
++            self._conn.execute(
++                "INSERT INTO boundaries (log_size, head, merkle_root, created_at) "
++                "VALUES (?, ?, ?, ?)",
++                (seq, entry_hash, new_root, created_at),
++            )
++        except sqlite3.IntegrityError as exc:
++            raise StoreIntegrityError("snapshot boundary cache is inconsistent") from exc
+         return LogEntry(seq=seq, entry_hash=entry_hash, prev_hash=prev_hash, record=record)
+ 
++    def _load_frontier(self) -> list[_FrontierLevel]:
++        rows = self._conn.execute(
++            "SELECT level, len, tail FROM merkle_frontier ORDER BY level"
++        ).fetchall()
++        frontier: list[_FrontierLevel] = []
++        for index, row in enumerate(rows):
++            if int(row["level"]) != index:
++                raise StoreIntegrityError("merkle frontier levels are not contiguous")
++            try:
++                tail_hex = json.loads(str(row["tail"]))
++            except json.JSONDecodeError as exc:
++                raise StoreIntegrityError("merkle frontier encoding is invalid") from exc
++            if (
++                not isinstance(tail_hex, list)
++                or not 1 <= len(tail_hex) <= 2
++                or any(not isinstance(item, str) or not _hex256(item) for item in tail_hex)
++            ):
++                raise StoreIntegrityError("merkle frontier encoding is invalid")
++            length = int(row["len"])
++            if length < 1 or len(tail_hex) > length:
++                raise StoreIntegrityError("merkle frontier length is invalid")
++            frontier.append(
++                _FrontierLevel(length=length, tail=[bytes.fromhex(item) for item in tail_hex])
++            )
++        return frontier
++
++    def _save_frontier(self, frontier: list[_FrontierLevel]) -> None:
++        self._conn.execute("DELETE FROM merkle_frontier")
++        for level, entry in enumerate(frontier):
++            self._conn.execute(
++                "INSERT INTO merkle_frontier (level, len, tail) VALUES (?, ?, ?)",
++                (
++                    level,
++                    entry.length,
++                    json.dumps([item.hex() for item in entry.tail], separators=(",", ":")),
++                ),
++            )
++
++    def _ensure_boundaries(self) -> None:
++        """Validate the memoized boundary cache against the log at startup.
++
++        Recomputes every prefix boundary incrementally from the log leaves
++        and compares it to the stored ``boundaries`` row: a missing row is
++        backfilled (first upgrade, or rows committed by a writer that did
++        not maintain the cache), but a stored row that disagrees with the
++        recomputed chain fails readiness like any other §5 mismatch — the
++        cache is never trusted over the log. The Merkle frontier is a pure
++        append accelerator, so a stale frontier is rebuilt without failing;
++        the length check in :meth:`_append_locked` keeps appends fail-closed
++        until the rebuild lands.
++        """
++        for _ in range(4):
++            leaves = self._conn.execute(
++                "SELECT seq, entry_hash, created_at FROM log ORDER BY seq"
++            ).fetchall()
++            size = len(leaves)
++            if any(int(row["seq"]) != index for index, row in enumerate(leaves, start=1)):
++                raise StoreIntegrityError("log sequence is not contiguous")
++            expected: list[tuple[str, str, str]] = []
++            frontier: list[_FrontierLevel] = []
++            for row in leaves:
++                root = _frontier_append(frontier, bytes.fromhex(str(row["entry_hash"]))).hex()
++                expected.append((str(row["entry_hash"]), root, str(row["created_at"])))
++            stored = {
++                int(row["log_size"]): (
++                    str(row["head"]),
++                    str(row["merkle_root"]),
++                    str(row["created_at"]),
++                )
++                for row in self._conn.execute(
++                    "SELECT log_size, head, merkle_root, created_at FROM boundaries"
++                ).fetchall()
++            }
++            if any(log_size < 1 or log_size > size for log_size in stored):
++                head_now = self._conn.execute(
++                    "SELECT seq FROM log ORDER BY seq DESC LIMIT 1"
++                ).fetchone()
++                if (int(head_now["seq"]) if head_now else 0) != size:
++                    continue
++                raise StoreIntegrityError("snapshot boundary cache is inconsistent")
++            for index, boundary in enumerate(expected, start=1):
++                cached = stored.get(index)
++                if cached is None:
++                    continue
++                if cached != boundary:
++                    raise StoreIntegrityError(
++                        "snapshot boundary cache disagrees with the committed log"
++                    )
++            missing = [index for index in range(1, size + 1) if index not in stored]
++            try:
++                stored_frontier = self._load_frontier()
++            except StoreIntegrityError:
++                stored_frontier = []
++                frontier_matches = False
++            else:
++                frontier_matches = len(stored_frontier) == len(frontier) and all(
++                    actual.length == want.length and actual.tail == want.tail
++                    for actual, want in zip(stored_frontier, frontier)
++                )
++            if not missing and frontier_matches:
++                return
++            with self._write_transaction():
++                head_now = self._conn.execute(
++                    "SELECT seq FROM log ORDER BY seq DESC LIMIT 1"
++                ).fetchone()
++                if (int(head_now["seq"]) if head_now else 0) != size:
++                    continue
++                for index in missing:
++                    head, root, created_at = expected[index - 1]
++                    self._conn.execute(
++                        "INSERT OR IGNORE INTO boundaries "
++                        "(log_size, head, merkle_root, created_at) VALUES (?, ?, ?, ?)",
++                        (index, head, root, created_at),
++                    )
++                self._save_frontier(frontier)
++            return
++        raise StoreIntegrityError("log changed during startup boundary verification")
++
+     def append_idempotent(
+         self,
+         record: dict[str, Any],
+@@ -706,6 +910,17 @@ class Store:
+         return actual
+ 
+     def _snapshot_boundary_locked(self, max_seq: int | None) -> SnapshotBoundary:
++        """Read one memoized boundary row (O(1), no Merkle recomputation).
++
++        The ``boundaries`` row for a committed size is written in the same
++        transaction as the log append that created it, so a single-row lookup
++        is the committed boundary. Two O(1) structural anchors keep live
++        reads fail-closed without rescanning: the log row at the boundary
++        must still carry the memoized head/timestamp, and the genesis row
++        must still exist (prefix pruning is refused instead of served from
++        the cache). The full hash-chain and Merkle proof runs once at
++        startup in :meth:`_ensure_boundaries`, never per request.
++        """
+         head_row = self._conn.execute(
+             "SELECT seq FROM log ORDER BY seq DESC LIMIT 1"
+         ).fetchone()
+@@ -713,32 +928,44 @@ class Store:
+         boundary = current if max_seq is None else max_seq
+         if boundary < 0 or boundary > current:
+             raise ValueError("snapshot boundary is unavailable")
+-        rows = self._conn.execute(
+-            "SELECT seq, entry_hash, created_at FROM log WHERE seq <= ? ORDER BY seq",
+-            (boundary,),
+-        ).fetchall()
+-        if len(rows) != boundary or any(
+-            int(row["seq"]) != index for index, row in enumerate(rows, start=1)
+-        ):
+-            raise StoreIntegrityError("log sequence is not contiguous")
+-        if rows:
+-            head = str(rows[-1]["entry_hash"])
+-            created_at = str(rows[-1]["created_at"])
+-        else:
+-            head = _GENESIS
++        if boundary == 0:
+             metadata = self._conn.execute(
+                 "SELECT value FROM metadata WHERE key = 'created_at'"
+             ).fetchone()
+             if metadata is None:
+                 raise StoreIntegrityError("service creation metadata is missing")
+-            created_at = str(metadata["value"])
+-        merkle_root = _merkle_root([str(row["entry_hash"]) for row in rows])
++            return SnapshotBoundary(
++                version=0,
++                log_size=0,
++                head=_GENESIS,
++                merkle_root=_GENESIS,
++                created_at=str(metadata["value"]),
++            )
++        cached = self._conn.execute(
++            "SELECT head, merkle_root, created_at FROM boundaries WHERE log_size = ?",
++            (boundary,),
++        ).fetchone()
++        if cached is None:
++            raise StoreIntegrityError("snapshot boundary cache is missing; restart to rebuild")
++        anchor = self._conn.execute(
++            "SELECT entry_hash, created_at FROM log WHERE seq = ?",
++            (boundary,),
++        ).fetchone()
++        if (
++            anchor is None
++            or str(anchor["entry_hash"]) != str(cached["head"])
++            or str(anchor["created_at"]) != str(cached["created_at"])
++        ):
++            raise StoreIntegrityError("log head does not match the snapshot boundary")
++        genesis = self._conn.execute("SELECT 1 FROM log WHERE seq = 1").fetchone()
++        if genesis is None:
++            raise StoreIntegrityError("log sequence is not contiguous")
+         return SnapshotBoundary(
+             version=boundary,
+             log_size=boundary,
+-            head=head,
+-            merkle_root=merkle_root,
+-            created_at=created_at,
++            head=str(cached["head"]),
++            merkle_root=str(cached["merkle_root"]),
++            created_at=str(cached["created_at"]),
+         )
+ 
+     def boundary_available(self, expected: SnapshotBoundary) -> bool:
+@@ -772,7 +999,7 @@ class Store:
+             schema_version = self._conn.execute(
+                 "SELECT value FROM metadata WHERE key = 'schema_version'"
+             ).fetchone()
+-            if schema_version is None or schema_version["value"] != "2":
++            if schema_version is None or schema_version["value"] != str(_SCHEMA_VERSION):
+                 errors.append("database schema metadata is missing or malformed")
+             previous = _GENESIS
+             expected_seq = 1
+@@ -916,6 +1143,17 @@ def _entry_from_row(row: sqlite3.Row) -> LogEntry:
+     )
+ 
+ 
++def _merkle_pair_hash(left: bytes, right: bytes) -> bytes:
++    """Hash one Merkle tree pair.
++
++    Every Merkle-tree hash in this module goes through this function so the
++    operation-count test can observe (via monkeypatch) exactly how many tree
++    hashes a read or an append performs. Entry-hash computation uses
++    ``hashlib.sha256`` directly and is never counted as Merkle work.
++    """
++    return hashlib.sha256(left + right).digest()
++
++
+ def _merkle_root(entry_hashes: list[str]) -> str:
+     if not entry_hashes:
+         return _GENESIS
+@@ -925,11 +1163,85 @@ def _merkle_root(entry_hashes: list[str]) -> str:
+         for index in range(0, len(level), 2):
+             left = level[index]
+             right = level[index + 1] if index + 1 < len(level) else left
+-            next_level.append(hashlib.sha256(left + right).digest())
++            next_level.append(_merkle_pair_hash(left, right))
+         level = next_level
+     return level[0].hex()
+ 
+ 
++@dataclass
++class _FrontierLevel:
++    length: int
++    tail: list[bytes]
++
++
++def _frontier_append(frontier: list[_FrontierLevel], leaf: bytes) -> bytes:
++    """Append one leaf to an incremental Merkle frontier.
++
++    The frontier holds, per tree level, the level length and its last two
++    node hashes. Updating it touches one node per level, so an append costs
++    O(log n) hashes and the returned root is byte-identical to
++    :func:`_merkle_root` over the full prefix.
++    """
++    if not frontier:
++        frontier.append(_FrontierLevel(length=1, tail=[leaf]))
++        return leaf
++    first = frontier[0]
++    if first.length == 1:
++        lower_new_tail = [first.tail[0], leaf]
++    else:
++        lower_new_tail = [first.tail[-1], leaf]
++    first.length += 1
++    first.tail = lower_new_tail
++    lower_new_length = first.length
++    level_index = 1
++    while True:
++        if lower_new_length <= 1:
++            del frontier[level_index:]
++            break
++        upper_new_length = (lower_new_length + 1) // 2
++        if lower_new_length % 2 == 1:
++            new_last = _merkle_pair_hash(lower_new_tail[-1], lower_new_tail[-1])
++        else:
++            new_last = _merkle_pair_hash(lower_new_tail[-2], lower_new_tail[-1])
++        if level_index >= len(frontier):
++            if upper_new_length != 1:
++                raise StoreIntegrityError("merkle frontier is inconsistent")
++            frontier.append(_FrontierLevel(length=1, tail=[new_last]))
++            break
++        upper_old = frontier[level_index]
++        if upper_old.length >= 2 and len(upper_old.tail) != 2:
++            raise StoreIntegrityError("merkle frontier tail is incomplete")
++        if upper_new_length == upper_old.length:
++            if upper_old.length == 1:
++                new_tail = [new_last]
++            else:
++                new_tail = [upper_old.tail[-2], new_last]
++        elif upper_new_length == upper_old.length + 1:
++            if upper_new_length == 1:
++                new_tail = [new_last]
++            else:
++                new_tail = [upper_old.tail[-1], new_last][-2:]
++        else:
++            raise StoreIntegrityError("merkle frontier is inconsistent")
++        upper_old.length = upper_new_length
++        upper_old.tail = new_tail
++        if upper_new_length == 1:
++            del frontier[level_index + 1 :]
++            break
++        lower_new_tail = new_tail
++        lower_new_length = upper_new_length
++        level_index += 1
++        if level_index > 64:
++            raise StoreIntegrityError("merkle frontier exceeds maximum depth")
++    return frontier[-1].tail[-1]
++
++
++def _frontier_root(frontier: list[_FrontierLevel]) -> bytes:
++    if not frontier:
++        return bytes.fromhex(_GENESIS)
++    return frontier[-1].tail[-1]
++
++
+ def _import_fingerprint(record: Any) -> str | None:
+     if not isinstance(record, dict):
+         return None
+diff --git a/tests/test_registry.py b/tests/test_registry.py
+index 013844b..63e9d02 100644
+--- a/tests/test_registry.py
++++ b/tests/test_registry.py
+@@ -1246,3 +1246,292 @@ def test_store_page_calls_verify_carried_boundary(tmp_path: Path):
+             max_seq=boundary.log_size,
+             boundary=boundary,
+         )
++
++
++def _counting_merkle_hasher(monkeypatch: pytest.MonkeyPatch) -> list[int]:
++    import csk_registry.store as store_module
++
++    calls: list[int] = [0]
++    real = store_module._merkle_pair_hash
++
++    def counting(left: bytes, right: bytes) -> bytes:
++        calls[0] += 1
++        return real(left, right)
++
++    monkeypatch.setattr(store_module, "_merkle_pair_hash", counting)
++    return calls
++
++
++def _seed_paginated_store(store: Store, key: signing.SigningKey, count: int) -> str:
++    content_hash = "sha256:" + "1f" * 32
++    for index in range(count):
++        store.append(
++            key.sign_record(_body(name=f"skill-{index:03d}")),
++            created_at=f"2026-07-13T00:{index // 60:02d}:{index % 60:02d}Z",
++        )
++    return content_hash
++
++
++def test_merkle_frontier_matches_naive_root() -> None:
++    import csk_registry.store as store_module
++
++    leaves = [hashlib.sha256(f"leaf-{index}".encode()).hexdigest() for index in range(100)]
++    frontier: list[store_module._FrontierLevel] = []
++    for index, leaf in enumerate(leaves):
++        root = store_module._frontier_append(frontier, bytes.fromhex(leaf)).hex()
++        assert root == store_module._merkle_root(leaves[: index + 1])
++
++
++def test_boundary_reads_perform_zero_merkle_hashes(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    import csk_registry.store as store_module
++
++    path = tmp_path / "memo.db"
++    store = Store(path)
++    registry_key = signing.generate_key()
++    content_hash = _seed_paginated_store(store, registry_key, 32)
++    # The one append after which every read must be hash-free.
++    store.append(
++        registry_key.sign_record(_body(name="skill-trigger")),
++        created_at="2026-07-13T01:00:00Z",
++    )
++    # Correctness oracle captured before the hasher is instrumented.
++    entry_hashes = [
++        str(row["entry_hash"])
++        for row in store._conn.execute(  # type: ignore[attr-defined]
++            "SELECT entry_hash FROM log ORDER BY seq"
++        )
++    ]
++    expected_roots = {
++        size: store_module._merkle_root(entry_hashes[:size]) for size in (1, 7, 33)
++    }
++    for size, root in expected_roots.items():
++        assert store.snapshot_boundary(size).merkle_root == root
++
++    client = TestClient(
++        create_app(store=store, signing_key=registry_key, tokens=AuditorTokens([]))
++    )
++    calls = _counting_merkle_hasher(monkeypatch)
++    boundary = store.snapshot_boundary()
++    assert store.boundary_available(boundary)
++
++    def _read_everything() -> None:
++        first_records = client.get(
++            "/v1/records", params={"content_sha256": content_hash, "limit": 1}
++        )
++        assert first_records.status_code == 200
++        records_cursor = first_records.json()["next_cursor"]
++        assert records_cursor
++        continued_records = client.get(
++            "/v1/records",
++            params={"content_sha256": content_hash, "limit": 1, "cursor": records_cursor},
++        )
++        assert continued_records.status_code == 200
++        first_log = client.get("/v1/log", params={"since": 0, "limit": 1})
++        assert first_log.status_code == 200
++        log_cursor = first_log.json()["next_cursor"]
++        assert log_cursor
++        continued_log = client.get(
++            "/v1/log", params={"since": 0, "limit": 1, "cursor": log_cursor}
++        )
++        assert continued_log.status_code == 200
++        assert client.get("/v1/snapshot").status_code == 200
++        assert store.snapshot_boundary().merkle_root == expected_roots[33]
++        assert store.snapshot_boundary(7).merkle_root == expected_roots[7]
++        assert store.boundary_available(boundary)
++        assert store.merkle_root() == expected_roots[33]
++        assert store.head()[0] == 33
++        assert store.checkpoint_matches(boundary)
++        found, _ = store.records_page(
++            content_sha256=content_hash, limit=5, offset=0, boundary=boundary
++        )
++        assert found
++        entries, _ = store.log_page(since=0, limit=5, offset=0, boundary=boundary)
++        assert entries
++
++    for _ in range(3):
++        _read_everything()
++    assert calls[0] == 0, f"reads recomputed the Merkle tree ({calls[0]} hashes)"
++
++    # Durability: the same zero-hash reads hold after a restart, which
++    # revalidates the cache against the log once before serving.
++    monkeypatch.undo()
++    store.close()
++    reopened = Store(path)
++    reopened_client = TestClient(
++        create_app(store=reopened, signing_key=registry_key, tokens=AuditorTokens([]))
++    )
++    calls_after_restart = _counting_merkle_hasher(monkeypatch)
++    for _ in range(2):
++        assert reopened_client.get("/v1/snapshot").status_code == 200
++        assert reopened.snapshot_boundary().merkle_root == expected_roots[33]
++        assert reopened.boundary_available(boundary)
++    assert calls_after_restart[0] == 0
++
++
++def test_boundary_append_cost_is_logarithmic(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    import csk_registry.store as store_module
++
++    store = Store(tmp_path / "append.db")
++    key = signing.generate_key()
++    _seed_paginated_store(store, key, 64)
++    calls = _counting_merkle_hasher(monkeypatch)
++    entry = store.append(
++        key.sign_record(_body(name="skill-065")),
++        created_at="2026-07-13T02:00:00Z",
++    )
++    assert entry.seq == 65
++    # One pair-hash per tree level: ~log2(n), far below the naive O(n).
++    assert 1 <= calls[0] <= 16, f"append used {calls[0]} Merkle hashes for 65 leaves"
++    monkeypatch.undo()
++    entry_hashes = [
++        str(row["entry_hash"])
++        for row in store._conn.execute(  # type: ignore[attr-defined]
++            "SELECT entry_hash FROM log ORDER BY seq"
++        )
++    ]
++    assert store.snapshot_boundary().merkle_root == store_module._merkle_root(entry_hashes)
++
++
++def test_boundary_cache_disagreement_fails_startup_but_missing_row_backfills(
++    tmp_path: Path,
++) -> None:
++    path = tmp_path / "cache.db"
++    store = Store(path)
++    key = signing.generate_key()
++    for index in range(3):
++        store.append(
++            key.sign_record(_body(name=f"skill-{index}")),
++            created_at=f"2026-07-13T00:00:0{index}Z",
++        )
++    genuine = store.snapshot_boundary()
++    store.close()
++
++    connection = sqlite3.connect(path)
++    try:
++        connection.execute(
++            "UPDATE boundaries SET merkle_root = ? WHERE log_size = 3", ("ff" * 32,)
++        )
++        connection.commit()
++    finally:
++        connection.close()
++    with pytest.raises(StoreIntegrityError, match="disagrees with the committed log"):
++        Store(path)
++
++    connection = sqlite3.connect(path)
++    try:
++        connection.execute(
++            "UPDATE boundaries SET merkle_root = ? WHERE log_size = 3",
++            (genuine.merkle_root,),
++        )
++        connection.execute("DELETE FROM boundaries WHERE log_size = 2")
++        connection.execute("DELETE FROM merkle_frontier")
++        connection.commit()
++    finally:
++        connection.close()
++    healed = Store(path)
++    try:
++        assert healed.snapshot_boundary() == genuine
++        assert healed.snapshot_boundary(2).head == store_module_head(healed, 2)
++    finally:
++        healed.close()
++
++
++def store_module_head(store: Store, seq: int) -> str:
++    row = store._conn.execute(  # type: ignore[attr-defined]
++        "SELECT entry_hash FROM log WHERE seq = ?", (seq,)
++    ).fetchone()
++    assert row is not None
++    return str(row["entry_hash"])
++
++
++def test_v2_database_migrates_and_backfills_boundaries(tmp_path: Path) -> None:
++    import csk_registry.store as store_module
++
++    path = tmp_path / "v2.db"
++    store = Store(path)
++    key = signing.generate_key()
++    for index in range(5):
++        store.append(
++            key.sign_record(_body(name=f"skill-{index}")),
++            created_at=f"2026-07-13T00:00:0{index}Z",
++        )
++    entry_hashes = [
++        str(row["entry_hash"])
++        for row in store._conn.execute(  # type: ignore[attr-defined]
++            "SELECT entry_hash FROM log ORDER BY seq"
++        )
++    ]
++    expected = [store_module._merkle_root(entry_hashes[: size]) for size in range(1, 6)]
++    store.close()
++
++    # Downgrade the file to the pre-R2 v2 shape: no cache tables, v2 markers.
++    connection = sqlite3.connect(path)
++    try:
++        connection.execute("DROP TABLE boundaries")
++        connection.execute("DROP TABLE merkle_frontier")
++        connection.execute("UPDATE metadata SET value = '2' WHERE key = 'schema_version'")
++        connection.execute("PRAGMA user_version=2")
++        connection.commit()
++    finally:
++        connection.close()
++
++    upgraded = Store(path)
++    try:
++        marker = upgraded._conn.execute(  # type: ignore[attr-defined]
++            "SELECT value FROM metadata WHERE key = 'schema_version'"
++        ).fetchone()
++        assert marker["value"] == "3"
++        version = upgraded._conn.execute("PRAGMA user_version").fetchone()[0]  # type: ignore[attr-defined]
++        assert int(version) == 3
++        for size, root in enumerate(expected, start=1):
++            assert upgraded.snapshot_boundary(size).merkle_root == root
++        upgraded.append(
++            key.sign_record(_body(name="skill-5")),
++            created_at="2026-07-13T00:00:05Z",
++        )
++        assert upgraded.head()[0] == 6
++    finally:
++        upgraded.close()
++
++
++def test_frontier_tampering_rebuilds_and_next_append_stays_correct(
++    tmp_path: Path,
++) -> None:
++    import csk_registry.store as store_module
++
++    path = tmp_path / "frontier.db"
++    store = Store(path)
++    key = signing.generate_key()
++    for index in range(4):
++        store.append(
++            key.sign_record(_body(name=f"skill-{index}")),
++            created_at=f"2026-07-13T00:00:0{index}Z",
++        )
++    store.close()
++    connection = sqlite3.connect(path)
++    try:
++        connection.execute("UPDATE merkle_frontier SET tail = ?", (json.dumps(["ff" * 32]),))
++        connection.commit()
++    finally:
++        connection.close()
++    reopened = Store(path)
++    try:
++        reopened.append(
++            key.sign_record(_body(name="skill-4")),
++            created_at="2026-07-13T00:00:04Z",
++        )
++        entry_hashes = [
++            str(row["entry_hash"])
++            for row in reopened._conn.execute(  # type: ignore[attr-defined]
++                "SELECT entry_hash FROM log ORDER BY seq"
++            )
++        ]
++        assert reopened.snapshot_boundary().merkle_root == store_module._merkle_root(
++            entry_hashes
++        )
++    finally:
++        reopened.close()

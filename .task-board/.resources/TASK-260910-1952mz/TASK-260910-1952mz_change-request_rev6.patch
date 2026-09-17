@@ -1,0 +1,3161 @@
+diff --git a/.github/ci/platform-cases.tsv b/.github/ci/platform-cases.tsv
+index 9aa1061..daed348 100644
+--- a/.github/ci/platform-cases.tsv
++++ b/.github/ci/platform-cases.tsv
+@@ -147,6 +147,15 @@ internal/godriver	TestExecutableIdentityStillRejectsSubstitutionBehindAJunction
+ internal/runtimestore	TestUnixPostInstallShimPropagatesSignal	linux,darwin	-	-	the installed unix shim is executable and propagates signals
+ internal/shell	TestPosixHookEntersNestedSwitchesAndLeavesProjects	linux,darwin	windows	platform-control	executes the POSIX shell hook end to end
+ internal/shell	TestPowerShellHookRunsOnEveryPrompt	windows	linux,darwin	platform-control	executes the PowerShell prompt hook end to end
++# S6 shell-hook trust gate (TASK-260910-1952mz): the committed SPEC_PIN predates
++# vectors/shell-hook-trust.json, so the parent tolerates the root-content skip
++# exactly like TestCandidateGoV1SourceAwareContract. A subtest may skip only
++# where its interpreter is genuinely absent (no sh/dash/bash/zsh, or no pwsh);
++# on Windows Git Bash present means the POSIX subtests must run through it,
++# and only a genuinely absent Git Bash is a host-capability skip. The case
++# itself must still pass.
++internal/shell	TestShellHookTrustVectors	linux,darwin,windows	linux,darwin,windows	root-content	the emitted POSIX and PowerShell hooks satisfy every shell-hook-trust vector case's sourced, diagnostic, and once-per-session warning expectations
++internal/shell	TestShellHookTrustVectors/*	-	linux,darwin,windows	host-capability	a vector subtest may skip only where its interpreter is absent from the runner (on Windows, Git Bash absent); Git Bash present means the POSIX subtests must run; the case itself must still pass
+ internal/envfiles	TestWriteProjectShapesAndSourcing	linux,darwin,windows	-	-	sources the generated env file through a real shell on unix; shape-only on Windows
+ internal/install	TestEndToEndInstall	linux,darwin,windows	-	-	materialises the executable shim and env files of a full install
+ internal/adapters	TestSymlinkModeStagesRelativeLinkTargets	linux,darwin,windows	-	-	creates a link (Windows: a reparse point) and asserts its target stays relative
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index d746c5d..1863272 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -25,6 +25,19 @@ All notable implementation changes are recorded here.
+   replace declared module directories elsewhere in the snapshot, and those
+   directories join the directive, cgo, and assembly scan surface
+   (Protocol Core §4.2.3).
++- S6: shell-hook trust gate — warning release (`A-warning`). The POSIX and
++  PowerShell hooks now verify a project `.agents/env.sh` / `.agents/env.ps1`
++  against the manager-home approval state before sourcing it, and warn once
++  per shell session with `shell_hook_env_unapproved` (no record) or
++  `shell_hook_env_changed` (bytes differ; re-approval required) naming the
++  absolute path and `curator hook approve <path>`. Files the manager itself
++  writes are recorded as `approved_by: manager` at write time and source
++  silently. This release only warns: unapproved and changed files are still
++  sourced. Migration: run `curator hook approve <path>` for each project env
++  file the warning names (a project-local approval record is ignored — only
++  the manager-home record counts). The enforcing revision (`B-enforcing`,
++  refuse without sourcing) follows in a later release
++  (Manager profile §8).
+ 
+ ### Changed
+ 
+diff --git a/internal/envfiles/envfiles.go b/internal/envfiles/envfiles.go
+index bd6a510..b2c85be 100644
+--- a/internal/envfiles/envfiles.go
++++ b/internal/envfiles/envfiles.go
+@@ -3,9 +3,13 @@
+ package envfiles
+ 
+ import (
++	"fmt"
+ 	"os"
+ 	"path/filepath"
+ 	"strings"
++	"time"
++
++	"github.com/relux-works/curator/internal/hookapproval"
+ )
+ 
+ // Names of the generated helper files inside a scope's env directory.
+@@ -65,13 +69,15 @@ func ProjectDir(projectRoot string) string { return filepath.Join(projectRoot, "
+ // GlobalDir is the directory that holds the global scope's helper files.
+ func GlobalDir(home string) string { return filepath.Join(home, "global") }
+ 
+-// WriteProject writes .agents/env.sh and .agents/env.ps1 into a project.
++// WriteProject writes .agents/env.sh and .agents/env.ps1 into a project and
++// records both digests as approved_by manager (Spec §8.1 manager trust
++// source), so the shell-hook trust gate sources them silently.
+ //
+ // It mutates live paths directly and therefore belongs only to callers outside
+ // an install transaction, such as scaffolding a checkout. An installation
+ // stages the same bytes through StageProject and lets the commit phase publish
+-// them atomically.
+-func WriteProject(projectRoot string) error {
++// them atomically; the commit phase records the digests after publication.
++func WriteProject(projectRoot, home string) error {
+ 	agentsDir := ProjectDir(projectRoot)
+ 	if err := os.MkdirAll(agentsDir, 0o755); err != nil {
+ 		return err
+@@ -80,11 +86,17 @@ func WriteProject(projectRoot string) error {
+ 	if err := os.WriteFile(filepath.Join(agentsDir, ShellName), shell, 0o644); err != nil {
+ 		return err
+ 	}
+-	return os.WriteFile(filepath.Join(agentsDir, PowerShellName), powerShell, 0o644)
++	if err := os.WriteFile(filepath.Join(agentsDir, PowerShellName), powerShell, 0o644); err != nil {
++		return err
++	}
++	return recordLive(home, filepath.Join(agentsDir, ShellName), filepath.Join(agentsDir, PowerShellName))
+ }
+ 
+-// WriteGlobal writes the global env files exporting CSK_GLOBAL_ROOT. Like
+-// WriteProject it is the direct-mutation form; StageGlobal is the install form.
++// WriteGlobal writes the global env files exporting CSK_GLOBAL_ROOT and
++// records both digests as approved_by manager. Like WriteProject it is the
++// direct-mutation form; StageGlobal is the install form. The trust gate of
++// Spec §8.1 covers project files only, so these records are inert for the
++// gate; they exist so every manager-written env file carries a digest.
+ func WriteGlobal(home string) error {
+ 	globalDir := GlobalDir(home)
+ 	if err := os.MkdirAll(filepath.Join(globalDir, "bin"), 0o755); err != nil {
+@@ -94,7 +106,21 @@ func WriteGlobal(home string) error {
+ 	if err := os.WriteFile(filepath.Join(globalDir, ShellName), shell, 0o644); err != nil {
+ 		return err
+ 	}
+-	return os.WriteFile(filepath.Join(globalDir, PowerShellName), powerShell, 0o644)
++	if err := os.WriteFile(filepath.Join(globalDir, PowerShellName), powerShell, 0o644); err != nil {
++		return err
++	}
++	return recordLive(home, filepath.Join(globalDir, ShellName), filepath.Join(globalDir, PowerShellName))
++}
++
++// recordLive hashes live env files and upserts manager records for them.
++func recordLive(home string, livePaths ...string) error {
++	now := time.Now().UTC()
++	for _, livePath := range livePaths {
++		if _, err := hookapproval.ApproveFile(home, livePath, hookapproval.ApprovedByManager, now); err != nil {
++			return fmt.Errorf("record shell-hook approval for %s: %w", livePath, err)
++		}
++	}
++	return nil
+ }
+ 
+ func psQuote(value string) string {
+diff --git a/internal/envfiles/envfiles_test.go b/internal/envfiles/envfiles_test.go
+index c4cb831..8281946 100644
+--- a/internal/envfiles/envfiles_test.go
++++ b/internal/envfiles/envfiles_test.go
+@@ -7,13 +7,38 @@ import (
+ 	"runtime"
+ 	"strings"
+ 	"testing"
++
++	"github.com/relux-works/curator/internal/hookapproval"
+ )
+ 
++// assertManagerRecorded proves a manager write left an approved_by manager
++// record whose digest equals the live bytes.
++func assertManagerRecorded(t *testing.T, home, livePath string) {
++	t.Helper()
++	payload, err := os.ReadFile(livePath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	record, found, err := hookapproval.Lookup(home, livePath)
++	if err != nil || !found {
++		t.Fatalf("Lookup(%s) = %v, %v", livePath, found, err)
++	}
++	if record.SHA256 != hookapproval.Digest(payload) {
++		t.Fatalf("recorded digest %q does not match the live bytes of %s", record.SHA256, livePath)
++	}
++	if record.ApprovedBy != hookapproval.ApprovedByManager {
++		t.Fatalf("approved_by = %q, want manager", record.ApprovedBy)
++	}
++}
++
+ func TestWriteProjectShapesAndSourcing(t *testing.T) {
+ 	project := t.TempDir()
+-	if err := WriteProject(project); err != nil {
++	home := t.TempDir()
++	if err := WriteProject(project, home); err != nil {
+ 		t.Fatal(err)
+ 	}
++	assertManagerRecorded(t, home, filepath.Join(project, ".agents", "env.sh"))
++	assertManagerRecorded(t, home, filepath.Join(project, ".agents", "env.ps1"))
+ 	sh, err := os.ReadFile(filepath.Join(project, ".agents", "env.sh"))
+ 	if err != nil {
+ 		t.Fatal(err)
+@@ -61,6 +86,8 @@ func TestWriteGlobal(t *testing.T) {
+ 	if err := WriteGlobal(home); err != nil {
+ 		t.Fatal(err)
+ 	}
++	assertManagerRecorded(t, home, filepath.Join(home, "global", "env.sh"))
++	assertManagerRecorded(t, home, filepath.Join(home, "global", "env.ps1"))
+ 	sh, err := os.ReadFile(filepath.Join(home, "global", "env.sh"))
+ 	if err != nil {
+ 		t.Fatal(err)
+diff --git a/internal/hookapproval/hookapproval.go b/internal/hookapproval/hookapproval.go
+new file mode 100644
+index 0000000..4591dec
+--- /dev/null
++++ b/internal/hookapproval/hookapproval.go
+@@ -0,0 +1,398 @@
++// Package hookapproval owns the manager-home shell-hook approval state of
++// Spec profiles/manager.md §8.2 (finding S6).
++//
++// The state lives below the manager home used by the rest of the manager
++// (Config.Home, the directory holding the config file), in the single file
++// <manager-home>/hook-approvals.tsv. It is outside every profile, package,
++// and project surface: this package never reads a record from package,
++// project, or profile data, and no such data influences a lookup.
++//
++// File format (read directly by the emitted POSIX and PowerShell hooks, so it
++// stays parseable without JSON tooling): one record per line, four TAB
++// separated fields, LF line endings, no header, sorted by path:
++//
++//		path \t sha256 \t approved_by \t approved_at \n
++//
++//	  - path: absolute, canonicalized env-file path (see Canonicalize;
++//	    on Windows the native spelling with an uppercase drive letter).
++//	  - sha256: lowercase hex SHA-256 over the exact bytes sourced (64 chars).
++//	  - approved_by: exactly "manager" or "operator".
++//	  - approved_at: RFC 3339 timestamp at which the digest was recorded.
++//
++// A path containing TAB, LF, or CR is refused at write time: it could never
++// round-trip through this format. Canonicalization resolves symlinks
++// (absolute + EvalSymlinks, see Canonicalize), so two spellings of one file
++// resolve to one record. Writes are atomic (same-directory temporary file
++// plus one rename onto the target) and never expose a partially written
++// record set; a failed publication leaves the prior record set untouched.
++package hookapproval
++
++import (
++	"crypto/sha256"
++	"encoding/hex"
++	"fmt"
++	"os"
++	"path/filepath"
++	"runtime"
++	"sort"
++	"strings"
++	"time"
++)
++
++// Closed trust sources of Spec §8.1.
++const (
++	ApprovedByManager  = "manager"
++	ApprovedByOperator = "operator"
++)
++
++// Closed record grammar of Spec §8.2, shared with the emitted hooks: the Go
++// reader below is the single source of truth, and the POSIX and PowerShell
++// hook templates are generated from these same constants, so the three
++// consumers cannot drift apart.
++const (
++	// RecordFieldCount is the exact TAB-separated field count of one state line.
++	RecordFieldCount = 4
++	// SHA256HexLength is the exact length of the lowercase hex digest field.
++	SHA256HexLength = 64
++	// TimestampShape is the RFC 3339 shape check (POSIX ERE, also valid RE2
++	// and .NET syntax) embedded in the emitted hooks. Consumers additionally
++	// range-check the captured date and time fields; the Go reader parses
++	// with time.Parse(time.RFC3339), which the shape mirrors.
++	TimestampShape = `^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9](\.[0-9][0-9]*)?(Z|[+-][0-9][0-9]:[0-9][0-9])$`
++)
++
++// Filename is the manager-home file holding the approval record set.
++const Filename = "hook-approvals.tsv"
++
++// Record is one closed approval record of Spec §8.2.
++type Record struct {
++	Path       string
++	SHA256     string
++	ApprovedBy string
++	ApprovedAt time.Time
++}
++
++// ApprovalsPath returns the state file below a manager home.
++func ApprovalsPath(home string) string { return filepath.Join(home, Filename) }
++
++// Canonicalize resolves a path to the single key its record is stored under:
++// absolute, symlink-resolved, and clean, so two spellings of the same file
++// (lexical detours, directory aliases, file symlinks) share one record. A
++// relative path resolves against the process working directory. A path with
++// missing trailing components resolves its longest existing ancestor and
++// reattaches the remainder lexically, so records can be written before every
++// component exists; a wholly unresolvable path falls back to its lexical
++// absolute spelling rather than failing.
++//
++// Windows identity rule (the single definition the emitted POSIX hook cites):
++// on Windows the canonical spelling is the native absolute path with
++// backslash separators and an uppercase drive letter (UNC paths keep their
++// leading double backslash), and record matching folds case, because the
++// Windows filesystem is case-insensitive while Git Bash observes the same
++// file through MSYS spelling (/c/...). The POSIX hook therefore maps its
++// resolved candidate through `cygpath -w`, uppercases the drive letter, and
++// compares case-insensitively in its record lookup; this package normalizes
++// the drive letter here and compares with pathsEqual. Both sides resolve
++// symlinks before this normalization, so native and MSYS spellings of one
++// file share one record. When `cygpath` is absent the hook cannot prove the
++// identity and warns plus refuses under both rollout profiles, never
++// sourcing silently.
++func Canonicalize(path string) (string, error) {
++	canonical, err := canonicalizeResolve(path)
++	if err != nil {
++		return "", err
++	}
++	return normalizeWindowsDrive(canonical), nil
++}
++
++func canonicalizeResolve(path string) (string, error) {
++	if path == "" {
++		return "", fmt.Errorf("hookapproval: path is empty")
++	}
++	if !filepath.IsAbs(path) {
++		absolute, err := filepath.Abs(path)
++		if err != nil {
++			return "", fmt.Errorf("hookapproval: resolve %q: %w", path, err)
++		}
++		path = absolute
++	}
++	path = filepath.Clean(path)
++	if resolved, err := filepath.EvalSymlinks(path); err == nil {
++		return filepath.Clean(resolved), nil
++	}
++	var rest []string
++	current := path
++	for {
++		parent := filepath.Dir(current)
++		if parent == current {
++			root, err := filepath.EvalSymlinks(current)
++			if err != nil {
++				return path, nil
++			}
++			return filepath.Clean(reattach(root, rest)), nil
++		}
++		rest = append(rest, filepath.Base(current))
++		if resolved, err := filepath.EvalSymlinks(parent); err == nil {
++			return filepath.Clean(reattach(resolved, rest)), nil
++		}
++		current = parent
++	}
++}
++
++// normalizeWindowsDrive uppercases the drive letter of a native Windows
++// absolute path (C:\... or C:/...); every other spelling passes through.
++// It runs after symlink resolution so both the stored record and the lookup
++// key carry the same drive form before the case-insensitive comparison.
++func normalizeWindowsDrive(path string) string {
++	if runtime.GOOS != "windows" {
++		return path
++	}
++	if len(path) >= 3 && path[1] == ':' && (path[2] == '\\' || path[2] == '/') {
++		if c := path[0]; c >= 'a' && c <= 'z' {
++			return string(c-'a'+'A') + path[1:]
++		}
++	}
++	return path
++}
++
++// pathsEqual reports whether two canonical paths name one record: exact on
++// Unix, ASCII/Unicode case-folded on Windows, mirroring the filesystem's
++// own identity. The emitted POSIX hook folds the same way under MSYS/Git
++// Bash/Cygwin (awk tolower on both sides of the lookup).
++func pathsEqual(a, b string) bool {
++	if runtime.GOOS == "windows" {
++		return strings.EqualFold(a, b)
++	}
++	return a == b
++}
++
++// reattach joins ancestor-resolved rest components (innermost last) below a
++// resolved directory.
++func reattach(resolved string, rest []string) string {
++	out := resolved
++	for i := len(rest) - 1; i >= 0; i-- {
++		out = filepath.Join(out, rest[i])
++	}
++	return out
++}
++
++// Digest returns the lowercase hex SHA-256 of data.
++func Digest(data []byte) string {
++	sum := sha256.Sum256(data)
++	return hex.EncodeToString(sum[:])
++}
++
++// Validate reports whether r is a well-formed closed record.
++func (r Record) Validate() error {
++	if r.Path == "" || !filepath.IsAbs(r.Path) || filepath.Clean(r.Path) != r.Path {
++		return fmt.Errorf("hookapproval: path %q is not an absolute canonical path", r.Path)
++	}
++	if strings.ContainsAny(r.Path, "\t\n\r") {
++		return fmt.Errorf("hookapproval: path %q carries a field separator", r.Path)
++	}
++	if len(r.SHA256) != SHA256HexLength {
++		return fmt.Errorf("hookapproval: sha256 %q is not %d hex characters", r.SHA256, SHA256HexLength)
++	}
++	for _, c := range r.SHA256 {
++		digit := c >= '0' && c <= '9'
++		lower := c >= 'a' && c <= 'f'
++		if !digit && !lower {
++			return fmt.Errorf("hookapproval: sha256 %q is not lowercase hex", r.SHA256)
++		}
++	}
++	if r.ApprovedBy != ApprovedByManager && r.ApprovedBy != ApprovedByOperator {
++		return fmt.Errorf("hookapproval: approved_by %q is not manager or operator", r.ApprovedBy)
++	}
++	if r.ApprovedAt.IsZero() {
++		return fmt.Errorf("hookapproval: approved_at is missing")
++	}
++	return nil
++}
++
++// List reads every approval record. An absent state file is an empty set; a
++// malformed line or an unreadable file is an error, never an empty set.
++func List(home string) ([]Record, error) {
++	payload, err := os.ReadFile(ApprovalsPath(home)) // #nosec G304 -- manager-home state path
++	if err != nil {
++		if os.IsNotExist(err) {
++			return nil, nil
++		}
++		return nil, fmt.Errorf("hookapproval: read state: %w", err)
++	}
++	if len(payload) == 0 {
++		return nil, nil
++	}
++	lines := strings.Split(string(payload), "\n")
++	records := make([]Record, 0, len(lines))
++	for i, line := range lines {
++		if i == len(lines)-1 && line == "" {
++			break // trailing newline
++		}
++		fields := strings.Split(line, "\t")
++		if len(fields) != RecordFieldCount || fields[0] == "" {
++			return nil, fmt.Errorf("hookapproval: line %d is malformed", i+1)
++		}
++		stamp, err := time.Parse(time.RFC3339, fields[3])
++		if err != nil {
++			return nil, fmt.Errorf("hookapproval: line %d carries a bad timestamp: %w", i+1, err)
++		}
++		record := Record{Path: fields[0], SHA256: fields[1], ApprovedBy: fields[2], ApprovedAt: stamp}
++		if err := record.Validate(); err != nil {
++			return nil, fmt.Errorf("hookapproval: line %d: %w", i+1, err)
++		}
++		records = append(records, record)
++	}
++	return records, nil
++}
++
++// Lookup returns the record authorizing path, canonicalizing two spellings of
++// one file to one record before comparison.
++func Lookup(home, path string) (Record, bool, error) {
++	canonical, err := Canonicalize(path)
++	if err != nil {
++		return Record{}, false, err
++	}
++	records, err := List(home)
++	if err != nil {
++		return Record{}, false, err
++	}
++	for _, record := range records {
++		if pathsEqual(record.Path, canonical) {
++			return record, true, nil
++		}
++	}
++	return Record{}, false, nil
++}
++
++// Upsert records (or re-records after a change) the digest for a path.
++func Upsert(home string, record Record) error {
++	canonical, err := Canonicalize(record.Path)
++	if err != nil {
++		return err
++	}
++	record.Path = canonical
++	if err := record.Validate(); err != nil {
++		return err
++	}
++	records, err := List(home)
++	if err != nil {
++		return err
++	}
++	replaced := false
++	for i, existing := range records {
++		if pathsEqual(existing.Path, canonical) {
++			records[i] = record
++			replaced = true
++			break
++		}
++	}
++	if !replaced {
++		records = append(records, record)
++	}
++	sort.Slice(records, func(i, j int) bool { return records[i].Path < records[j].Path })
++	return writeRecords(home, records)
++}
++
++// ApproveFile hashes the live bytes of path and records the digest. It fails
++// without recording when the file is absent or unreadable, and never trusts
++// a path with no readable bytes.
++func ApproveFile(home, path, approvedBy string, at time.Time) (Record, error) {
++	if approvedBy != ApprovedByManager && approvedBy != ApprovedByOperator {
++		return Record{}, fmt.Errorf("hookapproval: approved_by %q is not manager or operator", approvedBy)
++	}
++	canonical, err := Canonicalize(path)
++	if err != nil {
++		return Record{}, err
++	}
++	payload, err := os.ReadFile(canonical) // #nosec G304 -- caller-selected env file
++	if err != nil {
++		return Record{}, fmt.Errorf("hookapproval: read %s: %w", canonical, err)
++	}
++	record := Record{Path: canonical, SHA256: Digest(payload), ApprovedBy: approvedBy, ApprovedAt: at.UTC()}
++	if err := Upsert(home, record); err != nil {
++		return Record{}, err
++	}
++	return record, nil
++}
++
++// Revoke removes the record for path. A path with no record leaves state
++// unchanged and reports false.
++func Revoke(home, path string) (bool, error) {
++	canonical, err := Canonicalize(path)
++	if err != nil {
++		return false, err
++	}
++	records, err := List(home)
++	if err != nil {
++		return false, err
++	}
++	kept := records[:0]
++	removed := false
++	for _, record := range records {
++		if pathsEqual(record.Path, canonical) {
++			removed = true
++			continue
++		}
++		kept = append(kept, record)
++	}
++	if !removed {
++		return false, nil
++	}
++	// A failed publication leaves the record in place, so the removal did
++	// not happen: report it alongside the error.
++	if err := writeRecords(home, kept); err != nil {
++		return false, err
++	}
++	return true, nil
++}
++
++func writeRecords(home string, records []Record) error {
++	if err := os.MkdirAll(home, 0o755); err != nil {
++		return fmt.Errorf("hookapproval: create state dir: %w", err)
++	}
++	var body strings.Builder
++	for _, record := range records {
++		body.WriteString(record.Path)
++		body.WriteByte('\t')
++		body.WriteString(record.SHA256)
++		body.WriteByte('\t')
++		body.WriteString(record.ApprovedBy)
++		body.WriteByte('\t')
++		body.WriteString(record.ApprovedAt.UTC().Format(time.RFC3339))
++		body.WriteByte('\n')
++	}
++	temporary, err := os.CreateTemp(home, ".hook-approvals.*.tmp")
++	if err != nil {
++		return fmt.Errorf("hookapproval: stage state: %w", err)
++	}
++	temporaryPath := temporary.Name()
++	defer func() { _ = os.Remove(temporaryPath) }()
++	if _, err := temporary.WriteString(body.String()); err != nil {
++		_ = temporary.Close()
++		return fmt.Errorf("hookapproval: stage state: %w", err)
++	}
++	if err := temporary.Chmod(0o600); err != nil {
++		_ = temporary.Close()
++		return fmt.Errorf("hookapproval: stage state: %w", err)
++	}
++	if err := temporary.Sync(); err != nil {
++		_ = temporary.Close()
++		return fmt.Errorf("hookapproval: stage state: %w", err)
++	}
++	if err := temporary.Close(); err != nil {
++		return fmt.Errorf("hookapproval: stage state: %w", err)
++	}
++	target := ApprovalsPath(home)
++	// One atomic rename onto the target (POSIX rename; os.Rename on Windows
++	// replaces the destination). A failed publication reports the error and
++	// leaves the prior record set untouched: the target is never removed to
++	// make room, so readers keep observing the last valid state.
++	if err := renameFile(temporaryPath, target); err != nil {
++		return fmt.Errorf("hookapproval: publish state: %w", err)
++	}
++	return nil
++}
++
++// renameFile publishes staged state. It is a variable so the failure-path
++// test can prove a failed publication preserves the last valid state.
++var renameFile = os.Rename
+diff --git a/internal/hookapproval/hookapproval_test.go b/internal/hookapproval/hookapproval_test.go
+new file mode 100644
+index 0000000..b28d7fc
+--- /dev/null
++++ b/internal/hookapproval/hookapproval_test.go
+@@ -0,0 +1,401 @@
++package hookapproval
++
++import (
++	"errors"
++	"os"
++	"path/filepath"
++	"regexp"
++	"runtime"
++	"strings"
++	"testing"
++	"time"
++)
++
++var (
++	testDigest = Digest([]byte("manager env bytes"))
++	testStamp  = time.Date(2026, 9, 16, 0, 0, 0, 0, time.UTC)
++)
++
++func TestDigestMatchesKnownSHA256(t *testing.T) {
++	if got := Digest([]byte("abc")); got != "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" {
++		t.Fatalf("Digest(abc) = %q", got)
++	}
++}
++
++func TestLookupOnAbsentStateIsEmpty(t *testing.T) {
++	home := filepath.Join(t.TempDir(), "home")
++	if _, found, err := Lookup(home, filepath.Join(home, ".agents", "env.sh")); err != nil || found {
++		t.Fatalf("Lookup on absent state = %v, %v", found, err)
++	}
++	if records, err := List(home); err != nil || len(records) != 0 {
++		t.Fatalf("List on absent state = %v, %v", records, err)
++	}
++}
++
++func TestUpsertLookupListRoundTrip(t *testing.T) {
++	home := t.TempDir()
++	var err error
++	home, err = filepath.EvalSymlinks(home)
++	if err != nil {
++		t.Fatal(err)
++	}
++	first := filepath.Join(home, "project", ".agents", "env.sh")
++	second := filepath.Join(home, "project", ".agents", "env.ps1")
++	if err := Upsert(home, Record{Path: second, SHA256: testDigest, ApprovedBy: ApprovedByOperator, ApprovedAt: testStamp}); err != nil {
++		t.Fatal(err)
++	}
++	if err := Upsert(home, Record{Path: first, SHA256: testDigest, ApprovedBy: ApprovedByManager, ApprovedAt: testStamp}); err != nil {
++		t.Fatal(err)
++	}
++	records, err := List(home)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(records) != 2 || records[0].Path != second || records[1].Path != first {
++		t.Fatalf("List is not sorted by path: %+v", records)
++	}
++	if records[1].ApprovedBy != ApprovedByManager || !records[1].ApprovedAt.Equal(testStamp) {
++		t.Fatalf("record lost fields: %+v", records[1])
++	}
++	found, ok, err := Lookup(home, first)
++	if err != nil || !ok || found.SHA256 != testDigest {
++		t.Fatalf("Lookup = %+v, %v, %v", found, ok, err)
++	}
++	payload, err := os.ReadFile(ApprovalsPath(home))
++	if err != nil {
++		t.Fatal(err)
++	}
++	want := second + "\t" + testDigest + "\toperator\t2026-09-16T00:00:00Z\n" +
++		first + "\t" + testDigest + "\tmanager\t2026-09-16T00:00:00Z\n"
++	if string(payload) != want {
++		t.Fatalf("state file:\n%s\nwant:\n%s", payload, want)
++	}
++}
++
++func TestTwoSpellingsResolveToOneRecord(t *testing.T) {
++	home := t.TempDir()
++	resolvedHome, err := filepath.EvalSymlinks(home)
++	if err != nil {
++		t.Fatal(err)
++	}
++	canonical := filepath.Join(resolvedHome, "project", ".agents", "env.sh")
++	detour := home + "/project/nested/../.agents/env.sh"
++	if detour == canonical {
++		t.Fatal("fixture paths do not differ")
++	}
++	if err := Upsert(home, Record{Path: detour, SHA256: testDigest, ApprovedBy: ApprovedByManager, ApprovedAt: testStamp}); err != nil {
++		t.Fatal(err)
++	}
++	found, ok, err := Lookup(home, canonical)
++	if err != nil || !ok {
++		t.Fatalf("Lookup(canonical) = %v, %v", ok, err)
++	}
++	if found.Path != canonical {
++		t.Fatalf("stored path = %q, want %q", found.Path, canonical)
++	}
++	records, err := List(home)
++	if err != nil || len(records) != 1 {
++		t.Fatalf("List = %v, %v", records, err)
++	}
++	removed, err := Revoke(home, detour)
++	if err != nil || !removed {
++		t.Fatalf("Revoke(detour) = %v, %v", removed, err)
++	}
++	if _, ok, err := Lookup(home, canonical); err != nil || ok {
++		t.Fatalf("Lookup after revoke = %v, %v", ok, err)
++	}
++}
++
++func TestAliasAndRealPathShareOneRecord(t *testing.T) {
++	base := t.TempDir()
++	realDir := filepath.Join(base, "real-project", ".agents")
++	if err := os.MkdirAll(realDir, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	realPath := filepath.Join(realDir, "env.sh")
++	if err := os.WriteFile(realPath, []byte("env bytes"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	alias := filepath.Join(base, "alias-project")
++	if err := os.Symlink(filepath.Join(base, "real-project"), alias); err != nil {
++		t.Skipf("cannot stage a symlinked project directory: %v", err)
++	}
++	aliasPath := filepath.Join(alias, ".agents", "env.sh")
++	home := filepath.Join(base, "home")
++	// Record through the alias spelling; the real spelling must observe the
++	// same single record, and revoking through either spelling removes it.
++	record, err := ApproveFile(home, aliasPath, ApprovedByOperator, testStamp)
++	if err != nil {
++		t.Fatal(err)
++	}
++	resolvedReal, err := filepath.EvalSymlinks(realPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if record.Path != resolvedReal {
++		t.Fatalf("stored path = %q, want %q", record.Path, resolvedReal)
++	}
++	found, ok, err := Lookup(home, realPath)
++	if err != nil || !ok || found.SHA256 != record.SHA256 {
++		t.Fatalf("Lookup(real) = %+v, %v, %v", found, ok, err)
++	}
++	records, err := List(home)
++	if err != nil || len(records) != 1 {
++		t.Fatalf("List = %v, %v", records, err)
++	}
++	removed, err := Revoke(home, realPath)
++	if err != nil || !removed {
++		t.Fatalf("Revoke(real) = %v, %v", removed, err)
++	}
++	if _, ok, err := Lookup(home, aliasPath); err != nil || ok {
++		t.Fatalf("Lookup(alias) after revoke = %v, %v", ok, err)
++	}
++}
++
++func TestRevokeAbsentLeavesStateUnchanged(t *testing.T) {
++	home := t.TempDir()
++	if removed, err := Revoke(home, filepath.Join(home, "missing")); err != nil || removed {
++		t.Fatalf("Revoke on absent state = %v, %v", removed, err)
++	}
++	path := filepath.Join(home, "project", ".agents", "env.sh")
++	if err := Upsert(home, Record{Path: path, SHA256: testDigest, ApprovedBy: ApprovedByManager, ApprovedAt: testStamp}); err != nil {
++		t.Fatal(err)
++	}
++	before, err := os.ReadFile(ApprovalsPath(home))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if removed, err := Revoke(home, filepath.Join(home, "other")); err != nil || removed {
++		t.Fatalf("Revoke(other) = %v, %v", removed, err)
++	}
++	after, err := os.ReadFile(ApprovalsPath(home))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if string(before) != string(after) {
++		t.Fatalf("revoke of an absent path rewrote state:\n%s\n%s", before, after)
++	}
++}
++
++func TestApproveFileRefusesAbsentAndUnreadable(t *testing.T) {
++	home := t.TempDir()
++	missing := filepath.Join(home, "project", ".agents", "env.sh")
++	if _, err := ApproveFile(home, missing, ApprovedByOperator, testStamp); err == nil {
++		t.Fatal("ApproveFile of an absent file succeeded")
++	}
++	if _, ok, err := Lookup(home, missing); err != nil || ok {
++		t.Fatalf("absent file left a record: %v, %v", ok, err)
++	}
++	file := filepath.Join(home, "env.sh")
++	if err := os.WriteFile(file, []byte("bytes"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	record, err := ApproveFile(home, file, ApprovedByOperator, testStamp)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if record.SHA256 != Digest([]byte("bytes")) || record.ApprovedBy != ApprovedByOperator {
++		t.Fatalf("ApproveFile record = %+v", record)
++	}
++	if _, err := ApproveFile(home, file, "self", testStamp); err == nil {
++		t.Fatal("ApproveFile with a forged approved_by succeeded")
++	}
++}
++
++func TestUpsertRejectsOpenShapes(t *testing.T) {
++	home := t.TempDir()
++	base := Record{Path: filepath.Join(home, "env.sh"), SHA256: testDigest, ApprovedBy: ApprovedByManager, ApprovedAt: testStamp}
++	for _, mutate := range []struct {
++		name   string
++		change func(*Record)
++	}{
++		{"short digest", func(r *Record) { r.SHA256 = "abc" }},
++		{"uppercase digest", func(r *Record) { r.SHA256 = strings.ToUpper(testDigest) }},
++		{"non-hex digest", func(r *Record) { r.SHA256 = strings.Repeat("z", 64) }},
++		{"open approver", func(r *Record) { r.ApprovedBy = "self" }},
++		{"missing timestamp", func(r *Record) { r.ApprovedAt = time.Time{} }},
++		{"tab in path", func(r *Record) { r.Path = filepath.Join(home, "a\tb") }},
++		{"newline in path", func(r *Record) { r.Path = filepath.Join(home, "a\nb") }},
++	} {
++		t.Run(mutate.name, func(t *testing.T) {
++			record := base
++			mutate.change(&record)
++			if err := Upsert(home, record); err == nil {
++				t.Fatalf("Upsert(%+v) succeeded", record)
++			}
++		})
++	}
++	if records, err := List(home); err != nil || len(records) != 0 {
++		t.Fatalf("rejected upserts left state: %v, %v", records, err)
++	}
++}
++
++func TestFailedPublicationPreservesLastValidState(t *testing.T) {
++	home := t.TempDir()
++	first := filepath.Join(home, "project", ".agents", "env.sh")
++	second := filepath.Join(home, "project", ".agents", "env.ps1")
++	if err := Upsert(home, Record{Path: first, SHA256: testDigest, ApprovedBy: ApprovedByManager, ApprovedAt: testStamp}); err != nil {
++		t.Fatal(err)
++	}
++	if err := Upsert(home, Record{Path: second, SHA256: testDigest, ApprovedBy: ApprovedByOperator, ApprovedAt: testStamp}); err != nil {
++		t.Fatal(err)
++	}
++	before, err := os.ReadFile(ApprovalsPath(home))
++	if err != nil {
++		t.Fatal(err)
++	}
++	renameFile = func(_, _ string) error { return errors.New("injected publication failure") }
++	defer func() { renameFile = os.Rename }()
++	if err := Upsert(home, Record{Path: filepath.Join(home, "third"), SHA256: testDigest, ApprovedBy: ApprovedByManager, ApprovedAt: testStamp}); err == nil {
++		t.Fatal("Upsert over a failed publication succeeded")
++	}
++	if removed, err := Revoke(home, first); err == nil || removed {
++		t.Fatalf("Revoke over a failed publication = %v, %v", removed, err)
++	}
++	after, err := os.ReadFile(ApprovalsPath(home))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if string(after) != string(before) {
++		t.Fatalf("failed publication rewrote state:\n%s\nwas:\n%s", after, before)
++	}
++	records, err := List(home)
++	if err != nil || len(records) != 2 {
++		t.Fatalf("List after failed publication = %v, %v", records, err)
++	}
++	staged, err := filepath.Glob(filepath.Join(home, ".hook-approvals.*.tmp"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(staged) != 0 {
++		t.Fatalf("failed publication left staged files: %v", staged)
++	}
++}
++
++// TestTimestampShapeMirrorsRFC3339 ties the hook-embedded TimestampShape to
++// the Go reader's time.Parse(time.RFC3339): every timestamp Go accepts MUST
++// match the shape (a hook must never warn on a record Go wrote), and
++// structurally broken input MUST fail both. Well-formed but out-of-range
++// input (month 13, February 30, second 60) matches the shape by design; the
++// per-consumer range checks (awk, PowerShell TryParse) close that gap and are
++// covered end to end by the hook malformed-record tests.
++func TestTimestampShapeMirrorsRFC3339(t *testing.T) {
++	shape := regexp.MustCompile(TimestampShape)
++	goValid := []string{
++		"2026-09-16T00:00:00Z",
++		"2026-09-16T00:00:00.1Z",
++		"2026-09-16T00:00:00.123456789+02:00",
++		"2024-02-29T23:59:59-05:30",
++		"2026-09-16T00:00:00+00:00",
++	}
++	for _, stamp := range goValid {
++		if _, err := time.Parse(time.RFC3339, stamp); err != nil {
++			t.Fatalf("corpus input %q is not Go-valid: %v", stamp, err)
++		}
++		if !shape.MatchString(stamp) {
++			t.Fatalf("shape rejects Go-valid %q", stamp)
++		}
++	}
++	broken := []string{
++		"",
++		"not-a-time",
++		"2026-09-16 00:00:00",
++		"2026-09-16T00:00:00",
++		"2026-09-16T00:00:00+0000",
++		"2026-09-16t00:00:00z",
++		"2026-09-16T00:00:00.",
++		"2026-09-16T00:00:00Z ",
++	}
++	for _, stamp := range broken {
++		if _, err := time.Parse(time.RFC3339, stamp); err == nil {
++			t.Fatalf("corpus input %q is Go-valid", stamp)
++		}
++		if shape.MatchString(stamp) {
++			t.Fatalf("shape accepts broken %q", stamp)
++		}
++	}
++	// Well-formed but out of range: shape matches, Go rejects, hook
++	// range checks must reject (covered end to end by the hook tests).
++	rangeBroken := []string{
++		"2026-13-01T00:00:00Z",
++		"2026-02-30T00:00:00Z",
++		"2023-02-29T00:00:00Z",
++		"2026-09-16T24:00:00Z",
++		"2026-09-16T00:00:60Z",
++	}
++	for _, stamp := range rangeBroken {
++		if _, err := time.Parse(time.RFC3339, stamp); err == nil {
++			t.Fatalf("corpus input %q is Go-valid", stamp)
++		}
++		if !shape.MatchString(stamp) {
++			t.Fatalf("shape rejects well-formed %q", stamp)
++		}
++	}
++}
++
++// TestWindowsDriveIdentity proves the Windows half of the Canonicalize
++// identity rule: the stored spelling carries an uppercase drive letter and
++// a differently-cased spelling of the same file resolves to the one
++// record. It runs only on Windows; Unix filesystems keep exact identity.
++func TestWindowsDriveIdentity(t *testing.T) {
++	if runtime.GOOS != "windows" {
++		t.Skip("Windows drive identity is exercised on Windows")
++	}
++	home := t.TempDir()
++	// Mixed-case trailing components do not exist yet, so canonicalization
++	// keeps their case lexically: the stored and lookup spellings differ
++	// by case alone, and only the fold can match them.
++	mixed := filepath.Join(home, "Project", ".agents", "Env.sh")
++	lowerDrive := mixed
++	if c := lowerDrive[0]; c >= 'A' && c <= 'Z' {
++		lowerDrive = string(c-'A'+'a') + lowerDrive[1:]
++	}
++	canonical, err := Canonicalize(lowerDrive)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(canonical) < 3 || canonical[1] != ':' || canonical[0] < 'A' || canonical[0] > 'Z' {
++		t.Fatalf("canonical Windows path keeps a lowercase drive: %q", canonical)
++	}
++	if err := Upsert(home, Record{Path: lowerDrive, SHA256: testDigest, ApprovedBy: ApprovedByManager, ApprovedAt: testStamp}); err != nil {
++		t.Fatal(err)
++	}
++	folded := strings.ToLower(canonical)
++	if folded == canonical {
++		t.Fatal("fixture path has no uppercase letter to fold")
++	}
++	found, ok, err := Lookup(home, folded)
++	if err != nil || !ok || found.SHA256 != testDigest {
++		t.Fatalf("Lookup(folded) = %+v, %v, %v", found, ok, err)
++	}
++	records, err := List(home)
++	if err != nil || len(records) != 1 {
++		t.Fatalf("List = %v, %v", records, err)
++	}
++	if removed, err := Revoke(home, folded); err != nil || !removed {
++		t.Fatalf("Revoke(folded) = %v, %v", removed, err)
++	}
++}
++
++func TestMalformedStateFailsClosed(t *testing.T) {
++	home := t.TempDir()
++	path := filepath.Join(home, "env.sh")
++	good := path + "\t" + testDigest + "\tmanager\t2026-09-16T00:00:00Z\n"
++	for _, body := range []string{
++		"only-two-fields\t" + testDigest + "\n",
++		path + "\tshort\tmanager\t2026-09-16T00:00:00Z\n",
++		path + "\t" + testDigest + "\tself\t2026-09-16T00:00:00Z\n",
++		path + "\t" + testDigest + "\tmanager\tnot-a-time\n",
++		good + "trailing-garbage\n",
++	} {
++		if err := os.WriteFile(ApprovalsPath(home), []byte(body), 0o600); err != nil {
++			t.Fatal(err)
++		}
++		if _, err := List(home); err == nil {
++			t.Fatalf("List(%q) succeeded", body)
++		}
++		if _, _, err := Lookup(home, path); err == nil {
++			t.Fatalf("Lookup over %q succeeded", body)
++		}
++	}
++}
+diff --git a/internal/install/commit.go b/internal/install/commit.go
+index b9aa2c2..44a2adb 100644
+--- a/internal/install/commit.go
++++ b/internal/install/commit.go
+@@ -10,9 +10,11 @@ import (
+ 	"path/filepath"
+ 	"sort"
+ 	"strings"
++	"time"
+ 
+ 	"github.com/relux-works/curator/internal/buildcache"
+ 	"github.com/relux-works/curator/internal/buildmeta"
++	"github.com/relux-works/curator/internal/hookapproval"
+ 	"github.com/relux-works/curator/internal/managerlock"
+ 	"github.com/relux-works/curator/internal/scopes"
+ 	"github.com/relux-works/curator/internal/staging"
+@@ -665,10 +667,31 @@ func runCommit(ctx context.Context, request commitRequest) (outcome commitOutcom
+ 		return commitOutcome{}, fmt.Errorf("commit the install transaction: %w", err)
+ 	}
+ 	committed = true
++	outcome.warnings = append(outcome.warnings, recordPublishedEnvApprovals(request, targets)...)
+ 	outcome.warnings = append(outcome.warnings, collectAfterCommit(request, lock)...)
+ 	return outcome, nil
+ }
+ 
++// recordPublishedEnvApprovals records approved_by manager digests for the env
++// files this commit just published (Spec §8.1 manager trust source). It runs
++// after the journal commit, still under the home lock, hashing the live bytes
++// the shell hook will read. A recording failure warns instead of failing the
++// committed install; the operator can re-record with curator hook approve.
++func recordPublishedEnvApprovals(request commitRequest, targets scopeTargets) []string {
++	var warnings []string
++	now := time.Now().UTC()
++	for _, target := range targets.plan.Targets {
++		if target.Class != staging.ClassEnvFile || target.Removal() {
++			continue
++		}
++		if _, err := hookapproval.ApproveFile(request.home, target.LivePath, hookapproval.ApprovedByManager, now); err != nil {
++			warnings = append(warnings, fmt.Sprintf("%s: warning: could not record shell-hook approval for %s: %v",
++				request.scope, target.LivePath, err))
++		}
++	}
++	return warnings
++}
++
+ // collectAfterCommit runs the maintenance sweep while the home lock is still
+ // held, so consumer pruning, runtime collection, and the protected build-cache
+ // sweep serialize with every other manager-home mutation. A failure is reported
+diff --git a/internal/install/install_test.go b/internal/install/install_test.go
+index 0ea5dd2..e51e2f1 100644
+--- a/internal/install/install_test.go
++++ b/internal/install/install_test.go
+@@ -12,6 +12,7 @@ import (
+ 	"github.com/relux-works/curator/internal/adapters"
+ 	"github.com/relux-works/curator/internal/closure"
+ 	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/hookapproval"
+ 	manifestpkg "github.com/relux-works/curator/internal/manifest"
+ 	"github.com/relux-works/curator/internal/marker"
+ 	"github.com/relux-works/curator/internal/runtimestore"
+@@ -181,6 +182,50 @@ func TestEndToEndInstall(t *testing.T) {
+ 	}
+ }
+ 
++func TestProjectInstallRecordsShellHookApprovals(t *testing.T) {
++	t.Parallel()
++	e := newEnv(t)
++	e.skill("skill-a")
++	e.declare("skill-a")
++
++	result := e.install(Options{})
++	if result.Status != "ok" {
++		t.Fatalf("install failed: %+v", result)
++	}
++	for _, name := range []string{"env.sh", "env.ps1"} {
++		live := filepath.Join(e.project, ".agents", name)
++		payload, err := os.ReadFile(live)
++		if err != nil {
++			t.Fatal(err)
++		}
++		record, found, err := hookapproval.Lookup(e.home, live)
++		if err != nil || !found {
++			t.Fatalf("Lookup(%s) = %v, %v", live, found, err)
++		}
++		if record.SHA256 != hookapproval.Digest(payload) {
++			t.Fatalf("recorded digest %q does not match the published %s", record.SHA256, name)
++		}
++		if record.ApprovedBy != hookapproval.ApprovedByManager {
++			t.Fatalf("approved_by = %q, want manager", record.ApprovedBy)
++		}
++	}
++}
++
++func TestProjectDryRunRecordsNoShellHookApprovals(t *testing.T) {
++	t.Parallel()
++	e := newEnv(t)
++	e.skill("skill-a")
++	e.declare("skill-a")
++
++	result := e.install(Options{DryRun: true})
++	if result.Status != "ok" {
++		t.Fatalf("dry-run failed: %+v", result)
++	}
++	if _, err := os.Stat(hookapproval.ApprovalsPath(e.home)); !os.IsNotExist(err) {
++		t.Fatalf("dry-run wrote approval state: %v", err)
++	}
++}
++
+ func TestBuildRootExcludedBeforeLocaleRenderingWithoutCompilerExecution(t *testing.T) {
+ 	e := newEnv(t)
+ 	name := "build-skill"
+diff --git a/internal/shell/shell.go b/internal/shell/shell.go
+index 9dbbd1d..13dce55 100644
+--- a/internal/shell/shell.go
++++ b/internal/shell/shell.go
+@@ -8,6 +8,8 @@ import (
+ 	"path/filepath"
+ 	"runtime"
+ 	"strings"
++
++	"github.com/relux-works/curator/internal/hookapproval"
+ )
+ 
+ var hookFilenames = map[string]string{
+@@ -43,13 +45,43 @@ func Detect(environment map[string]string, goos string) string {
+ 	return "bash"
+ }
+ 
+-// Hook returns hook code for zsh, bash, or PowerShell.
++// TrustProfile selects the §8.5 rollout behavior baked into generated hook
++// code. The shipped default is the warning revision; the enforcing revision
++// is a later release, never this change.
++type TrustProfile string
++
++// Closed rollout profiles of Spec §8.5.
++const (
++	TrustProfileAWarning   TrustProfile = "A-warning"
++	TrustProfileBEnforcing TrustProfile = "B-enforcing"
++	// DefaultTrustProfile is the revision this release ships.
++	DefaultTrustProfile = TrustProfileAWarning
++)
++
++// Closed shell-hook trust diagnostics of Spec §8.4.
++const (
++	DiagnosticEnvUnapproved = "shell_hook_env_unapproved"
++	DiagnosticEnvChanged    = "shell_hook_env_changed"
++)
++
++// Hook returns hook code for zsh, bash, or PowerShell, generated for the
++// default (warning) trust profile.
+ func Hook(shellName string, includeGlobal bool) (string, error) {
++	return HookWithProfile(shellName, includeGlobal, DefaultTrustProfile)
++}
++
++// HookWithProfile returns hook code generated for one rollout profile.
++func HookWithProfile(shellName string, includeGlobal bool, profile TrustProfile) (string, error) {
++	switch profile {
++	case TrustProfileAWarning, TrustProfileBEnforcing:
++	default:
++		return "", fmt.Errorf("unsupported trust profile: %s", profile)
++	}
+ 	switch shellName {
+ 	case "zsh", "bash":
+-		return posixHook(shellName, includeGlobal), nil
++		return posixHook(shellName, includeGlobal, profile), nil
+ 	case "powershell":
+-		return powershellHook(includeGlobal), nil
++		return powershellHook(includeGlobal, profile), nil
+ 	default:
+ 		return "", fmt.Errorf("unsupported shell: %s", shellName)
+ 	}
+@@ -57,11 +89,16 @@ func Hook(shellName string, includeGlobal bool) (string, error) {
+ 
+ // InstallHook atomically caches one generated hook below the manager home.
+ func InstallHook(shellName, home string, includeGlobal bool) (string, error) {
++	return InstallHookWithProfile(shellName, home, includeGlobal, DefaultTrustProfile)
++}
++
++// InstallHookWithProfile caches one generated hook for one rollout profile.
++func InstallHookWithProfile(shellName, home string, includeGlobal bool, profile TrustProfile) (string, error) {
+ 	filename, known := hookFilenames[shellName]
+ 	if !known {
+ 		return "", fmt.Errorf("unsupported shell: %s", shellName)
+ 	}
+-	payload, err := Hook(shellName, includeGlobal)
++	payload, err := HookWithProfile(shellName, includeGlobal, profile)
+ 	if err != nil {
+ 		return "", err
+ 	}
+@@ -125,7 +162,7 @@ func posixReadableWindowsPath(path string) string {
+ 	return path
+ }
+ 
+-func posixHook(shellName string, includeGlobal bool) string {
++func posixHook(shellName string, includeGlobal bool, profile TrustProfile) string {
+ 	globalPart := ""
+ 	sourceGlobal := ""
+ 	if includeGlobal {
+@@ -134,7 +171,7 @@ _curator_global_env_file() {
+   local cfg="${CURATOR_CONFIG:-$HOME/.curator/config.json}"
+   local home_dir
+   case "$cfg" in
+-    [A-Za-z]:\\*|[A-Za-z]:/*|\\\\*) cfg="${cfg//\\//}" ;;
++    [A-Za-z]:\\*|[A-Za-z]:/*|\\\\*) cfg="$(printf '%s' "$cfg" | tr '\\' '/')" ;;
+   esac
+   home_dir="${cfg%/*}"
+   if [ "$home_dir" = "$cfg" ]; then
+@@ -160,28 +197,47 @@ _curator_source_global_env() {
+ 		sourceGlobal = "  _curator_source_global_env\n"
+ 	}
+ 
+-	integration := `case "$(declare -p PROMPT_COMMAND 2>/dev/null)" in
+-  declare\ -a*)
+-    _curator_prompt_present=0
+-    for _curator_prompt_entry in "${PROMPT_COMMAND[@]}"; do
+-      if [ "$_curator_prompt_entry" = "_curator_auto_env" ]; then
+-        _curator_prompt_present=1
+-        break
+-      fi
+-    done
+-    if [ "$_curator_prompt_present" = "0" ]; then
+-      PROMPT_COMMAND=("_curator_auto_env" "${PROMPT_COMMAND[@]}")
+-    fi
+-    unset _curator_prompt_present
+-    unset _curator_prompt_entry
+-    ;;
+-  *)
+-    case ";${PROMPT_COMMAND:-};" in
+-      *";_curator_auto_env;"*) ;;
+-      *) PROMPT_COMMAND="_curator_auto_env${PROMPT_COMMAND:+;$PROMPT_COMMAND}" ;;
++	// The bash prompt integration stays strictly POSIX-parseable (sh, dash,
++	// Git Bash): the array-aware branch runs only under bash, quoted inside
++	// eval so no other interpreter parses the array syntax. Other shells take
++	// the plain string branch, which is inert for them.
++	integration := `if [ -n "${BASH_VERSION:-}" ]; then
++  eval '
++    case "$(declare -p PROMPT_COMMAND 2>/dev/null)" in
++      declare\ -a*)
++        _curator_prompt_present=0
++        _curator_nounset=0
++        case "$-" in
++          *u*) _curator_nounset=1 ;;
++        esac
++        set +u
++        for _curator_prompt_entry in "${PROMPT_COMMAND[@]}"; do
++          if [ "$_curator_prompt_entry" = "_curator_auto_env" ]; then
++            _curator_prompt_present=1
++            break
++          fi
++        done
++        if [ "$_curator_prompt_present" = "0" ]; then
++          PROMPT_COMMAND=("_curator_auto_env" "${PROMPT_COMMAND[@]}")
++        fi
++        if [ "$_curator_nounset" = "1" ]; then
++          set -u
++        fi
++        ;;
++      *)
++        case ";${PROMPT_COMMAND:-};" in
++          *";_curator_auto_env;"*) ;;
++          *) PROMPT_COMMAND="_curator_auto_env${PROMPT_COMMAND:+;$PROMPT_COMMAND}" ;;
++        esac
++        ;;
+     esac
+-    ;;
+-esac
++    unset _curator_prompt_present _curator_prompt_entry _curator_nounset'
++else
++  case ";${PROMPT_COMMAND:-};" in
++    *";_curator_auto_env;"*) ;;
++    *) PROMPT_COMMAND="_curator_auto_env${PROMPT_COMMAND:+;$PROMPT_COMMAND}" ;;
++  esac
++fi
+ `
+ 	if shellName == "zsh" {
+ 		integration = `autoload -Uz add-zsh-hook 2>/dev/null || true
+@@ -192,8 +248,267 @@ add-zsh-hook chpwd _curator_auto_env 2>/dev/null || true
+ `
+ 	}
+ 
+-	return `# Curator shell hook
+-` + globalPart + `
++	trustPart := `
++_curator_hook_approvals_file() {
++  local cfg="${CURATOR_CONFIG:-$HOME/.curator/config.json}"
++  local home_dir
++  case "$cfg" in
++    [A-Za-z]:\\*|[A-Za-z]:/*|\\\\*) cfg="$(printf '%s' "$cfg" | tr '\\' '/')" ;;
++  esac
++  home_dir="${cfg%/*}"
++  if [ "$home_dir" = "$cfg" ]; then
++    home_dir="."
++  elif [ -z "$home_dir" ]; then
++    home_dir="/"
++  fi
++  printf '%s/hook-approvals.tsv\n' "$home_dir"
++}
++
++_curator_trust_canonical() {
++  local _curator_tc_path _curator_tc_dir _curator_tc_base _curator_tc_phys _curator_tc_link _curator_tc_n
++  _curator_tc_path="$1"
++  case "$_curator_tc_path" in
++    /*) ;;
++    *) _curator_tc_path="${PWD:-/}/$_curator_tc_path" ;;
++  esac
++  _curator_tc_dir="${_curator_tc_path%/*}"
++  _curator_tc_base="${_curator_tc_path##*/}"
++  if [ -z "$_curator_tc_dir" ]; then
++    _curator_tc_dir="/"
++  fi
++  if _curator_tc_phys="$(cd -P "$_curator_tc_dir" 2>/dev/null && pwd -P)"; then
++    if [ "$_curator_tc_phys" = "/" ]; then
++      _curator_tc_path="/$_curator_tc_base"
++    else
++      _curator_tc_path="$_curator_tc_phys/$_curator_tc_base"
++    fi
++  fi
++  if command -v readlink >/dev/null 2>&1; then
++    _curator_tc_n=0
++    while [ "$_curator_tc_n" -lt 32 ] && [ -L "$_curator_tc_path" ]; do
++      _curator_tc_link="$(readlink "$_curator_tc_path" 2>/dev/null)" || break
++      case "$_curator_tc_link" in
++        /*) _curator_tc_path="$_curator_tc_link" ;;
++        *) _curator_tc_path="${_curator_tc_path%/*}/$_curator_tc_link" ;;
++      esac
++      _curator_tc_dir="${_curator_tc_path%/*}"
++      _curator_tc_base="${_curator_tc_path##*/}"
++      if [ -z "$_curator_tc_dir" ]; then
++        _curator_tc_dir="/"
++      fi
++      if _curator_tc_phys="$(cd -P "$_curator_tc_dir" 2>/dev/null && pwd -P)"; then
++        if [ "$_curator_tc_phys" = "/" ]; then
++          _curator_tc_path="/$_curator_tc_base"
++        else
++          _curator_tc_path="$_curator_tc_phys/$_curator_tc_base"
++        fi
++      fi
++      _curator_tc_n=$((_curator_tc_n + 1))
++    done
++  fi
++  printf '%s\n' "$_curator_tc_path"
++}
++
++_curator_trust_is_windows_shell() {
++  case "$(uname -s 2>/dev/null)" in
++    MINGW*|MSYS*|CYGWIN*) return 0 ;;
++    *) return 1 ;;
++  esac
++}
++
++# Single comparison identity of hookapproval.Canonicalize: under MSYS/Git
++# Bash/Cygwin the resolved MSYS spelling is mapped to the native Windows
++# spelling (C:\..., uppercase drive) via cygpath -w; elsewhere the resolved
++# spelling is the identity. Prints the identity; fails when cygpath is
++# absent, in which case the caller warns and refuses under both profiles,
++# never sourcing silently.
++_curator_trust_identity() {
++  local _curator_ti_native _curator_ti_drive _curator_ti_rest
++  if _curator_trust_is_windows_shell; then
++    if ! command -v cygpath >/dev/null 2>&1; then
++      return 1
++    fi
++    _curator_ti_native="$(cygpath -w "$1" 2>/dev/null | tr -d '\r')" || return 1
++    if [ -z "$_curator_ti_native" ]; then
++      return 1
++    fi
++    case "$_curator_ti_native" in
++      [a-z]:*)
++        _curator_ti_drive="$(printf '%s' "$_curator_ti_native" | cut -c1 | tr 'a-z' 'A-Z')"
++        _curator_ti_rest="$(printf '%s' "$_curator_ti_native" | cut -c2-)"
++        _curator_ti_native="$_curator_ti_drive$_curator_ti_rest"
++        ;;
++    esac
++    printf '%s\n' "$_curator_ti_native"
++  else
++    printf '%s\n' "$1"
++  fi
++}
++
++_curator_trust_digest() {
++  local out digest tool
++  for tool in shasum sha256sum openssl; do
++    if command -v "$tool" >/dev/null 2>&1; then
++      case "$tool" in
++        shasum) out="$(shasum -a 256 "$1" 2>/dev/null)" || continue ;;
++        sha256sum) out="$(sha256sum "$1" 2>/dev/null)" || continue ;;
++        openssl) out="$(openssl dgst -sha256 "$1" 2>/dev/null)" || continue ;;
++      esac
++      case "$tool" in
++        openssl) digest="${out##* }" ;;
++        *) digest="${out%% *}" ;;
++      esac
++      case "$digest" in
++        *[!0-9a-f]*|"") continue ;;
++      esac
++      if [ "${#digest}" -eq __CURATOR_DIGEST_LEN__ ]; then
++        printf '%s\n' "$digest"
++        return 0
++      fi
++    fi
++  done
++  return 1
++}
++
++_curator_trust_recorded() {
++  local _curator_trust_fold
++  if [ ! -e "$2" ]; then
++    return 1
++  fi
++  if [ ! -f "$2" ] || [ ! -r "$2" ] || ! command -v awk >/dev/null 2>&1; then
++    return 2
++  fi
++  _curator_trust_fold=0
++  case "$(uname -s 2>/dev/null)" in
++    MINGW*|MSYS*|CYGWIN*) _curator_trust_fold=1 ;;
++  esac
++  awk -F'\t' -v fold="$_curator_trust_fold" 'BEGIN { want = ARGV[1]; ARGV[1] = "" }
++function _curator_valid_digest(d) {
++  if (length(d) != __CURATOR_DIGEST_LEN__) { return 0 }
++  return (d !~ /[^0-9a-f]/)
++}
++function _curator_valid_ts(ts,  rest, y, mo, d, h, mi, s, oh, om, n, dim) {
++  if (ts !~ /__CURATOR_TIMESTAMP_SHAPE__/) { return 0 }
++  y = substr(ts, 1, 4) + 0
++  mo = substr(ts, 6, 2) + 0
++  d = substr(ts, 9, 2) + 0
++  h = substr(ts, 12, 2) + 0
++  mi = substr(ts, 15, 2) + 0
++  s = substr(ts, 18, 2) + 0
++  if (mo < 1 || mo > 12 || h > 23 || mi > 59 || s > 59) { return 0 }
++  dim = 31
++  if (mo == 4 || mo == 6 || mo == 9 || mo == 11) { dim = 30 } else if (mo == 2) {
++    dim = 28
++    if ((y % 4 == 0 && y % 100 != 0) || y % 400 == 0) { dim = 29 }
++  }
++  if (d < 1 || d > dim) { return 0 }
++  rest = substr(ts, 20)
++  if (substr(rest, 1, 1) == ".") {
++    rest = substr(rest, 2)
++    n = 0
++    while (substr(rest, n + 1, 1) ~ /[0-9]/) { n++ }
++    rest = substr(rest, n + 1)
++  }
++  if (rest == "Z") { return 1 }
++  if (rest ~ /^[+-][0-9][0-9]:[0-9][0-9]$/) {
++    oh = substr(rest, 2, 2) + 0
++    om = substr(rest, 5, 2) + 0
++    if (oh > 23 || om > 59) { return 0 }
++    return 1
++  }
++  return 0
++}
++{
++  _curator_path_match = ($1 == want)
++  if (fold == 1) { _curator_path_match = (tolower($1) == tolower(want)) }
++  if (!_curator_path_match) { next }
++  if (NF != __CURATOR_RECORD_FIELDS__) { next }
++  if (!_curator_valid_digest($2)) { next }
++  if ($3 != "__CURATOR_APPROVED_BY_MANAGER__" && $3 != "__CURATOR_APPROVED_BY_OPERATOR__") { next }
++  if (!_curator_valid_ts($4)) { next }
++  print $2
++  found = 1
++  exit
++}
++END { exit !found }' "$1" "$2" 2>/dev/null
++}
++
++_curator_trust_warned() {
++  case "
++${_CURATOR_HOOK_TRUST_WARNED:-}" in
++    *"
++$1
++"*) return 0 ;;
++    *) return 1 ;;
++  esac
++}
++
++_curator_trust_note_warned() {
++  _CURATOR_HOOK_TRUST_WARNED="${_CURATOR_HOOK_TRUST_WARNED:-}$1
++"
++  export _CURATOR_HOOK_TRUST_WARNED
++}
++
++_curator_trust_warn() {
++  if _curator_trust_warned "$1"; then
++    return 0
++  fi
++  _curator_trust_note_warned "$1"
++  if [ "$2" = "shell_hook_env_changed" ]; then
++    printf 'curator: %s: %s changed since approval; run curator hook approve %s to approve the new bytes\n' "$2" "$1" "$1" >&2
++  else
++    printf 'curator: %s: %s is not approved; run curator hook approve %s to approve it\n' "$2" "$1" "$1" >&2
++  fi
++}
++
++_curator_trust_allow() {
++  local approvals digest recorded rc candidate identity
++  candidate="$(_curator_trust_canonical "$1")"
++  if identity="$(_curator_trust_identity "$candidate" 2>/dev/null)"; then
++    candidate="$identity"
++  else
++    _curator_trust_warn "$candidate" "shell_hook_env_unapproved"
++    return 1
++  fi
++  approvals="$(_curator_hook_approvals_file)"
++  if digest="$(_curator_trust_digest "$1" 2>/dev/null)"; then
++    :
++  else
++    digest=""
++  fi
++  if [ -z "$digest" ]; then
++    _curator_trust_warn "$candidate" "shell_hook_env_unapproved"
++    return 1
++  fi
++  if recorded="$(_curator_trust_recorded "$candidate" "$approvals" 2>/dev/null)"; then
++    rc=0
++  else
++    rc=$?
++  fi
++  if [ "$rc" -eq 2 ]; then
++    _curator_trust_warn "$candidate" "shell_hook_env_unapproved"
++    return 1
++  fi
++  if [ -z "$recorded" ]; then
++    _curator_trust_warn "$candidate" "shell_hook_env_unapproved"
++    if [ "${_CURATOR_TRUST_PROFILE:-__CURATOR_BAKED_PROFILE__}" = "B-enforcing" ]; then
++      return 1
++    fi
++    return 0
++  fi
++  if [ "$recorded" = "$digest" ]; then
++    return 0
++  fi
++  _curator_trust_warn "$candidate" "shell_hook_env_changed"
++  if [ "${_CURATOR_TRUST_PROFILE:-__CURATOR_BAKED_PROFILE__}" = "B-enforcing" ]; then
++    return 1
++  fi
++  return 0
++}
++`
++	return expandTrustTokens(`# Curator shell hook
++_CURATOR_TRUST_PROFILE='`+string(profile)+`'
++`+globalPart+trustPart+`
+ _curator_find_env() {
+   local dir="${PWD:-}"
+   case "$dir" in
+@@ -218,7 +533,7 @@ _curator_find_env() {
+ 
+ _curator_auto_env() {
+   local env_file
+-` + sourceGlobal + `  if [ "${CURATOR_AUTO_ENV:-1}" = "0" ]; then
++`+sourceGlobal+`  if [ "${CURATOR_AUTO_ENV:-1}" = "0" ]; then
+     if [ -n "${CURATOR_ACTIVE_ENV:-}" ]; then
+       PATH="${CURATOR_OLD_PATH:-$PATH}"
+       export PATH
+@@ -241,15 +556,36 @@ _curator_auto_env() {
+     # used by env.sh while it resolves the project root.
+     CURATOR_ACTIVE_ENV="$env_file"
+     export CURATOR_ACTIVE_ENV
+-    . "$env_file"
++    if _curator_trust_allow "$env_file"; then
++      . "$env_file"
++    else
++      unset CURATOR_ACTIVE_ENV
++      unset CURATOR_OLD_PATH
++    fi
+   fi
+ }
+ 
+-` + integration + `_curator_auto_env
+-`
++`+integration+`_curator_auto_env
++`, profile)
++}
++
++// expandTrustTokens renders the trust-gate placeholders of a generated hook
++// from the profile and the hookapproval record grammar, so the emitted POSIX
++// and PowerShell consumers validate the same closed record the Go reader
++// enforces.
++func expandTrustTokens(hook string, profile TrustProfile) string {
++	replacer := strings.NewReplacer(
++		"__CURATOR_BAKED_PROFILE__", string(profile),
++		"__CURATOR_RECORD_FIELDS__", fmt.Sprintf("%d", hookapproval.RecordFieldCount),
++		"__CURATOR_DIGEST_LEN__", fmt.Sprintf("%d", hookapproval.SHA256HexLength),
++		"__CURATOR_APPROVED_BY_MANAGER__", hookapproval.ApprovedByManager,
++		"__CURATOR_APPROVED_BY_OPERATOR__", hookapproval.ApprovedByOperator,
++		"__CURATOR_TIMESTAMP_SHAPE__", hookapproval.TimestampShape,
++	)
++	return replacer.Replace(hook)
+ }
+ 
+-func powershellHook(includeGlobal bool) string {
++func powershellHook(includeGlobal bool, profile TrustProfile) string {
+ 	globalPart := ""
+ 	sourceGlobal := ""
+ 	if includeGlobal {
+@@ -272,10 +608,173 @@ function Invoke-CuratorGlobalEnv {
+ `
+ 		sourceGlobal = "  Invoke-CuratorGlobalEnv\n"
+ 	}
+-	return `# Curator shell hook
+-` + globalPart + `
++	trustPart := `
++function Get-CuratorHookApprovalsFile {
++  $cfg = if ($env:CURATOR_CONFIG) { $env:CURATOR_CONFIG } else { Join-Path $HOME ".curator/config.json" }
++  $homeDir = Split-Path -Parent $cfg
++  return (Join-Path $homeDir "hook-approvals.tsv")
++}
++
++function Get-CuratorTrustDigest {
++  param([string]$Path)
++  try {
++    $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Path -ErrorAction Stop).Hash
++    if ($hash -and $hash.Length -eq 64) { return $hash.ToLowerInvariant() }
++    return $null
++  } catch {
++    return $null
++  }
++}
++
++function Get-CuratorTrustCanonical {
++  param([string]$Path)
++  try {
++    $full = [System.IO.Path]::GetFullPath($Path)
++  } catch {
++    return $Path
++  }
++  try {
++    # Resolve links component by component (EvalSymlinks semantics): a link
++    # may sit at any ancestor (an aliased project directory), not only at
++    # the final path, and Get-Item on the file alone never exposes those.
++    # Each resolution restarts the scan over the expanded absolute path so
++    # links inside the target spell out too; the hop bound keeps a link
++    # cycle from hanging activation. Unlistable components are kept
++    # lexically, matching the Go ancestor fallback.
++    $hops = 0
++    $changed = $true
++    while ($changed -and $hops -lt 32) {
++      $changed = $false
++      $root = [System.IO.Path]::GetPathRoot($full)
++      $parts = @($full.Substring($root.Length) -split '[\\/]+')
++      $acc = $root
++      for ($i = 0; $i -lt $parts.Count; $i++) {
++        $part = $parts[$i]
++        if ($part -eq '' -or $part -eq '.') { continue }
++        # Track the parent directly: Split-Path -Parent returns an empty
++        # string for single-component rooted paths (observed: '/tmp' -> ''),
++        # which would make the Join-Path below throw a binding error.
++        $parent = $acc
++        $acc = Join-Path $acc $part
++        # Prefer the .NET link probe: the filesystem provider cannot list
++        # some root-level links (observed: Get-Item -LiteralPath /tmp fails
++        # on macOS while LinkTarget reports private/tmp). Get-Item stays as
++        # the fallback for runtimes without LinkTarget (Windows PowerShell).
++        $target = $null
++        try { $target = ([System.IO.DirectoryInfo]$acc).LinkTarget } catch { $target = $null }
++        if (-not $target) {
++          try { $target = ([System.IO.FileInfo]$acc).LinkTarget } catch { $target = $null }
++        }
++        if (-not $target) {
++          try {
++            $entry = Get-Item -LiteralPath $acc -ErrorAction Stop
++            $target = $entry.Target
++            if ($target -is [System.Array]) {
++              if ($target.Count -eq 0) { $target = $null } else { $target = $target[0] }
++            }
++          } catch {
++            $target = $null
++          }
++        }
++        if (-not $target) { continue }
++        if ($target -is [System.Array]) {
++          if ($target.Count -eq 0) { continue }
++          $target = $target[0]
++        }
++        $target = [string]$target
++        if ($target -eq '') { continue }
++        if (-not [System.IO.Path]::IsPathRooted($target)) {
++          $target = Join-Path $parent $target
++        }
++        if ($i + 1 -lt $parts.Count) {
++          $tail = ($parts[($i + 1)..($parts.Count - 1)] -join [string][System.IO.Path]::DirectorySeparatorChar)
++          if ($tail -ne '') { $target = Join-Path $target $tail }
++        }
++        $full = [System.IO.Path]::GetFullPath($target)
++        $changed = $true
++        $hops++
++        break
++      }
++    }
++    return $full
++  } catch {
++    return $full
++  }
++}
++
++function Get-CuratorTrustRecorded {
++  param([string]$Candidate, [string]$ApprovalsFile)
++  if (-not (Test-Path -LiteralPath $ApprovalsFile)) { return @{ State = "absent" } }
++  try {
++    $lines = Get-Content -LiteralPath $ApprovalsFile -ErrorAction Stop
++  } catch {
++    return @{ State = "unreadable" }
++  }
++  foreach ($line in $lines) {
++    $fields = $line.Split([char]9)
++    if ($fields.Count -ne __CURATOR_RECORD_FIELDS__) { continue }
++    if ($fields[0] -cne $Candidate) { continue }
++    if ($fields[1] -cnotmatch '^[0-9a-f]{__CURATOR_DIGEST_LEN__}$') { continue }
++    if ($fields[2] -cne '__CURATOR_APPROVED_BY_MANAGER__' -and $fields[2] -cne '__CURATOR_APPROVED_BY_OPERATOR__') { continue }
++    if ($fields[3] -cnotmatch '__CURATOR_TIMESTAMP_SHAPE__') { continue }
++    $parsed = [DateTimeOffset]::MinValue
++    if (-not [DateTimeOffset]::TryParse($fields[3], [ref]$parsed)) { continue }
++    return @{ State = "found"; SHA256 = $fields[1] }
++  }
++  return @{ State = "absent" }
++}
++
++function Test-CuratorTrustWarned {
++  param([string]$Candidate)
++  $nl = [string][char]10
++  $framed = $nl + $global:CuratorTrustWarned
++  return $framed.Contains($nl + $Candidate + $nl)
++}
++
++function Write-CuratorTrustWarning {
++  param([string]$Candidate, [string]$Diagnostic)
++  if (Test-CuratorTrustWarned $Candidate) { return }
++  $nl = [string][char]10
++  $global:CuratorTrustWarned = $global:CuratorTrustWarned + $Candidate + $nl
++  if ($Diagnostic -ceq "shell_hook_env_changed") {
++    $message = "curator: ${Diagnostic}: $Candidate changed since approval; run curator hook approve $Candidate to approve the new bytes"
++  } else {
++    $message = "curator: ${Diagnostic}: $Candidate is not approved; run curator hook approve $Candidate to approve it"
++  }
++  [Console]::Error.WriteLine($message)
++}
++
++function Test-CuratorTrustAllow {
++  param([string]$Candidate)
++  $Candidate = Get-CuratorTrustCanonical $Candidate
++  $approvalsFile = Get-CuratorHookApprovalsFile
++  $effectiveProfile = if ($CuratorTrustProfile) { $CuratorTrustProfile } else { '__CURATOR_BAKED_PROFILE__' }
++  $digest = Get-CuratorTrustDigest $Candidate
++  if (-not $digest) {
++    Write-CuratorTrustWarning $Candidate "shell_hook_env_unapproved"
++    return $false
++  }
++  $recorded = Get-CuratorTrustRecorded $Candidate $approvalsFile
++  if ($recorded.State -ceq "unreadable") {
++    Write-CuratorTrustWarning $Candidate "shell_hook_env_unapproved"
++    return $false
++  }
++  if ($recorded.State -ceq "absent" -or -not $recorded.SHA256) {
++    Write-CuratorTrustWarning $Candidate "shell_hook_env_unapproved"
++    return ($effectiveProfile -cne "B-enforcing")
++  }
++  if ($recorded.SHA256 -ceq $digest) {
++    return $true
++  }
++  Write-CuratorTrustWarning $Candidate "shell_hook_env_changed"
++  return ($effectiveProfile -cne "B-enforcing")
++}
++`
++	return expandTrustTokens(`# Curator shell hook
++$CuratorTrustProfile = '`+string(profile)+`'
++`+globalPart+trustPart+`
+ function Invoke-CuratorAutoEnv {
+-` + sourceGlobal + `  if ($env:CURATOR_AUTO_ENV -eq "0") {
++`+sourceGlobal+`  if ($env:CURATOR_AUTO_ENV -eq "0") {
+     if ($env:CURATOR_ACTIVE_ENV) {
+       $env:PATH = $env:CURATOR_OLD_PATH
+       Remove-Item Env:\CURATOR_ACTIVE_ENV -ErrorAction SilentlyContinue
+@@ -300,7 +799,12 @@ function Invoke-CuratorAutoEnv {
+   if ($envFile -and $env:CURATOR_ACTIVE_ENV -ne $envFile) {
+     $env:CURATOR_OLD_PATH = $env:PATH
+     $env:CURATOR_ACTIVE_ENV = $envFile
+-    . $envFile
++    if (Test-CuratorTrustAllow $envFile) {
++      . $envFile
++    } else {
++      Remove-Item Env:\CURATOR_ACTIVE_ENV -ErrorAction SilentlyContinue
++      Remove-Item Env:\CURATOR_OLD_PATH -ErrorAction SilentlyContinue
++    }
+   }
+ }
+ if (-not $global:CuratorPromptWrapped) {
+@@ -315,5 +819,5 @@ if (-not $global:CuratorPromptWrapped) {
+   $global:CuratorPromptWrapped = $true
+ }
+ Invoke-CuratorAutoEnv
+-`
++`, profile)
+ }
+diff --git a/internal/shell/shell_hook_trust_test.go b/internal/shell/shell_hook_trust_test.go
+new file mode 100644
+index 0000000..94caffb
+--- /dev/null
++++ b/internal/shell/shell_hook_trust_test.go
+@@ -0,0 +1,1205 @@
++package shell
++
++import (
++	"context"
++	"encoding/base64"
++	"encoding/json"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"runtime"
++	"strconv"
++	"strings"
++	"testing"
++	"time"
++
++	"github.com/relux-works/curator/internal/hookapproval"
++)
++
++// hookTrustVector is the subset of conformance/v1/vectors/shell-hook-trust.json
++// this execution consumes.
++type hookTrustVector struct {
++	Fixtures map[string]hookTrustFixture `json:"fixtures"`
++	Cases    []hookTrustCase             `json:"cases"`
++}
++
++type hookTrustFixture struct {
++	File        string `json:"file"`
++	BytesBase64 string `json:"bytes_base64"`
++	SHA256      string `json:"sha256"`
++}
++
++type hookTrustRecord struct {
++	Path       string `json:"path"`
++	SHA256     string `json:"sha256"`
++	ApprovedBy string `json:"approved_by"`
++	ApprovedAt string `json:"approved_at"`
++}
++
++type hookTrustCase struct {
++	Name                  string           `json:"name"`
++	File                  string           `json:"file"`
++	CandidateFixture      string           `json:"candidate_fixture"`
++	RolloutProfile        string           `json:"rollout_profile"`
++	ManagerRecord         *hookTrustRecord `json:"manager_approval_record"`
++	ProjectSuppliedRecord *struct {
++		Source string          `json:"source"`
++		Record hookTrustRecord `json:"record"`
++	} `json:"project_supplied_record"`
++	ObservedSHA256 string  `json:"observed_sha256"`
++	Diagnostic     *string `json:"diagnostic"`
++	Sourced        bool    `json:"sourced"`
++	// SourcedMarker is the harness-only expected ${CURATOR_PROJECT_ENV}
++	// value when Sourced is true; empty means "1". Every vector fixture
++	// exports 1 (even the changed-bytes fixtures, which add a second
++	// variable), so decoded cases keep the zero value; hand-built cases
++	// whose bytes export another value set it explicitly.
++	SourcedMarker               string `json:"-"`
++	WarningFirst                bool   `json:"warning_first_activation"`
++	WarningSecond               bool   `json:"warning_second_activation_same_session"`
++	WarningsTotal               int    `json:"warnings_total_across_two_activations"`
++	WarningNamesPath            bool   `json:"warning_names_path"`
++	WarningNamesApprovalCommand bool   `json:"warning_names_approval_command"`
++}
++
++// TestShellHookTrustVectors executes every shell-hook-trust conformance case
++// against the emitted hook, following the §8.7 recipe: materialize the
++// fixture bytes, seed exactly the case's manager-home record, place a forged
++// record only in project data, generate the hook for the case's profile, run
++// activation twice in one shell session, and compare sourced, diagnostic, and
++// warning count with the case's expectations.
++//
++// The vector's absolute candidate paths (/project/...) cannot be materialized
++// on a test host, so the harness remaps them below a resolved temporary
++// directory: the record path and the materialized path move together, and the
++// hook observes the remapped absolute path.
++func TestShellHookTrustVectors(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	payload, err := os.ReadFile(filepath.Join(root, "vectors", "shell-hook-trust.json")) // #nosec G304 -- explicit conformance input
++	if os.IsNotExist(err) {
++		t.Skipf("%s publishes no shell-hook-trust vector", root)
++	}
++	if err != nil {
++		t.Fatal(err)
++	}
++	var vectors hookTrustVector
++	if err := json.Unmarshal(payload, &vectors); err != nil {
++		t.Fatal(err)
++	}
++	if len(vectors.Cases) == 0 {
++		t.Fatal("shell-hook-trust vector publishes no cases")
++	}
++	for _, c := range vectors.Cases {
++		t.Run(c.Name, func(t *testing.T) {
++			runHookTrustCase(t, c, vectors.Fixtures)
++		})
++	}
++}
++
++func runHookTrustCase(t *testing.T, c hookTrustCase, fixtures map[string]hookTrustFixture) {
++	t.Helper()
++	fixture, known := fixtures[c.CandidateFixture]
++	if !known {
++		t.Fatalf("case names unknown fixture %q", c.CandidateFixture)
++	}
++	if fixture.File != c.File {
++		t.Fatalf("fixture %q is for %q, case wants %q", c.CandidateFixture, fixture.File, c.File)
++	}
++	content, err := base64.StdEncoding.DecodeString(fixture.BytesBase64)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if hookapproval.Digest(content) != fixture.SHA256 || fixture.SHA256 != c.ObservedSHA256 {
++		t.Fatal("fixture bytes do not match the vector digests")
++	}
++	base, err := filepath.EvalSymlinks(t.TempDir())
++	if err != nil {
++		t.Fatal(err)
++	}
++	project := filepath.Join(base, "project")
++	agentsDir := filepath.Join(project, ".agents")
++	if err := os.MkdirAll(agentsDir, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	candidate := filepath.Join(agentsDir, filepath.Base(c.File))
++	if err := os.WriteFile(candidate, content, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	home := filepath.Join(base, "home")
++	if err := os.MkdirAll(home, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if c.ManagerRecord != nil {
++		stamp, err := time.Parse(time.RFC3339, c.ManagerRecord.ApprovedAt)
++		if err != nil {
++			t.Fatal(err)
++		}
++		record := hookapproval.Record{
++			Path:       candidate,
++			SHA256:     c.ManagerRecord.SHA256,
++			ApprovedBy: c.ManagerRecord.ApprovedBy,
++			ApprovedAt: stamp,
++		}
++		if err := hookapproval.Upsert(home, record); err != nil {
++			t.Fatal(err)
++		}
++	}
++	if c.ProjectSuppliedRecord != nil {
++		forged, err := json.Marshal(c.ProjectSuppliedRecord.Record)
++		if err != nil {
++			t.Fatal(err)
++		}
++		// The forged record lives only in project data; the hook must ignore it.
++		if err := os.WriteFile(filepath.Join(agentsDir, "hook-approvals.json"), forged, 0o600); err != nil {
++			t.Fatal(err)
++		}
++	}
++	var profile TrustProfile
++	switch c.RolloutProfile {
++	case string(TrustProfileAWarning):
++		profile = TrustProfileAWarning
++	case string(TrustProfileBEnforcing):
++		profile = TrustProfileBEnforcing
++	default:
++		t.Fatalf("case names unknown rollout profile %q", c.RolloutProfile)
++	}
++	switch c.File {
++	case ".agents/env.sh":
++		// The emitted POSIX hook must run under every POSIX interpreter,
++		// not only bash/zsh: sh and dash (when present) execute the same
++		// activation through the bash hook flavor.
++		for _, shell := range posixTrustShells(t) {
++			t.Run(shell.name, func(t *testing.T) {
++				stdout, stderr := runPosixTrustActivation(t, shell, project, home, profile)
++				assertTrustOutcome(t, c, candidate, stdout, stderr)
++			})
++		}
++	case ".agents/env.ps1":
++		stdout, stderr := runPowerShellTrustActivation(t, project, home, profile)
++		assertTrustOutcome(t, c, candidate, stdout, stderr)
++	default:
++		t.Fatalf("case names unknown file %q", c.File)
++	}
++}
++
++// assertTrustOutcome compares one two-activation observation with the case's
++// expectations: sourced markers on stdout, diagnostics and warning counts on
++// stderr, first/second split at the PROBE-1 marker.
++func assertTrustOutcome(t *testing.T, c hookTrustCase, candidate, stdout, stderr string) {
++	t.Helper()
++	// PowerShell on Windows frames stderr lines with CRLF; normalize so the
++	// diagnostic counts and the activation-probe split hold on every runner.
++	stdout = strings.ReplaceAll(stdout, "\r\n", "\n")
++	stderr = strings.ReplaceAll(stderr, "\r\n", "\n")
++	wantSourced := "no"
++	if c.Sourced {
++		wantSourced = "1"
++		if c.SourcedMarker != "" {
++			wantSourced = c.SourcedMarker
++		}
++	}
++	for _, marker := range []string{"sourced1=" + wantSourced, "sourced2=" + wantSourced} {
++		if !strings.Contains(stdout, marker) {
++			t.Fatalf("stdout lacks %q:\nstdout:\n%s\nstderr:\n%s", marker, stdout, stderr)
++		}
++	}
++	if c.Diagnostic == nil {
++		if strings.Contains(stderr, "shell_hook_env_") {
++			t.Fatalf("trusted candidate warned:\n%s", stderr)
++		}
++	} else {
++		if *c.Diagnostic != DiagnosticEnvUnapproved && *c.Diagnostic != DiagnosticEnvChanged {
++			t.Fatalf("case expects unknown diagnostic %q", *c.Diagnostic)
++		}
++		if !strings.Contains(stderr, *c.Diagnostic) {
++			t.Fatalf("stderr lacks diagnostic %q:\n%s", *c.Diagnostic, stderr)
++		}
++	}
++	parts := strings.SplitN(stderr, "PROBE-1\n", 2)
++	if len(parts) != 2 {
++		t.Fatalf("stderr lacks the activation probe:\n%s", stderr)
++	}
++	if runtime.GOOS == "windows" {
++		assertTrustWarningWindows(t, c, candidate, stderr, parts)
++		return
++	}
++	approvalCommand := "curator hook approve " + candidate
++	if got := strings.Count(stderr, approvalCommand); got != c.WarningsTotal {
++		t.Fatalf("warning count = %d, want %d:\n%s", got, c.WarningsTotal, stderr)
++	}
++	if c.WarningNamesPath && !strings.Contains(stderr, candidate) {
++		t.Fatalf("warning does not name %q:\n%s", candidate, stderr)
++	}
++	if c.WarningNamesApprovalCommand && !strings.Contains(stderr, approvalCommand) {
++		t.Fatalf("warning does not name the approval command:\n%s", stderr)
++	}
++	for i, want := range []bool{c.WarningFirst, c.WarningSecond} {
++		got := strings.Contains(parts[i], approvalCommand)
++		if got != want {
++			t.Fatalf("activation %d warned = %v, want %v:\n%s", i+1, got, want, stderr)
++		}
++	}
++}
++
++// assertTrustWarningWindows checks the warning half of a vector case by the
++// spelling the hook itself prints on Windows: the sourced/diagnostic/warning
++// outcomes stay exact, while the warned path is compared modulo the native
++// vs MSYS spelling, separator, and case differences the filesystem treats
++// as one file (hookapproval.Canonicalize identity rule). The count is taken
++// on the approval-command prefix and every warned path token must normalize
++// to the expected candidate, so a warning for the wrong path still fails.
++func assertTrustWarningWindows(t *testing.T, c hookTrustCase, candidate, stderr string, parts []string) {
++	t.Helper()
++	const prefix = "curator hook approve "
++	if got := strings.Count(stderr, prefix); got != c.WarningsTotal {
++		t.Fatalf("warning count = %d, want %d:\n%s", got, c.WarningsTotal, stderr)
++	}
++	nativeNorm, msysNorm := windowsWarningSpellings(candidate)
++	flat := strings.ToLower(strings.ReplaceAll(stderr, "\\", "/"))
++	if c.WarningsTotal > 0 || c.WarningNamesPath || c.WarningNamesApprovalCommand {
++		if c.WarningNamesPath || c.WarningsTotal > 0 {
++			if !strings.Contains(flat, nativeNorm) && (msysNorm == "" || !strings.Contains(flat, msysNorm)) {
++				t.Fatalf("warning does not name %q:\n%s", candidate, stderr)
++			}
++		}
++	}
++	for _, warned := range warnedApprovalPaths(stderr) {
++		if normalizeWindowsPathToken(warned) != nativeNorm {
++			t.Fatalf("warning names %q, want %q:\n%s", warned, candidate, stderr)
++		}
++	}
++	for i, want := range []bool{c.WarningFirst, c.WarningSecond} {
++		got := strings.Contains(parts[i], prefix)
++		if got != want {
++			t.Fatalf("activation %d warned = %v, want %v:\n%s", i+1, got, want, stderr)
++		}
++	}
++}
++
++// windowsWarningSpellings returns the normalized native spelling of a Go
++// candidate path plus its MSYS equivalent (/c/...), both lowercased with
++// forward slashes, for warning comparison on Windows.
++func windowsWarningSpellings(candidate string) (nativeNorm, msysNorm string) {
++	nativeNorm = strings.ToLower(strings.ReplaceAll(candidate, "\\", "/"))
++	if len(nativeNorm) >= 3 && isWindowsDriveLetter(nativeNorm[0]) && nativeNorm[1] == ':' && nativeNorm[2] == '/' {
++		msysNorm = "/" + string(nativeNorm[0]) + "/" + nativeNorm[3:]
++	}
++	return nativeNorm, msysNorm
++}
++
++// normalizeWindowsPathToken folds one warned path token to the native
++// normalized form: separators unified, a leading MSYS /c/... or
++// /cygdrive/c/... spelling converted to drive form, then lowercased.
++func normalizeWindowsPathToken(p string) string {
++	p = strings.ReplaceAll(p, "\\", "/")
++	if len(p) >= 3 && p[0] == '/' && isWindowsDriveLetter(p[1]) && p[2] == '/' {
++		p = string(p[1]) + ":/" + p[3:]
++	}
++	if strings.HasPrefix(p, "/cygdrive/") && len(p) >= 12 && isWindowsDriveLetter(p[10]) && p[11] == '/' {
++		p = string(p[10]) + ":/" + p[12:]
++	}
++	return strings.ToLower(p)
++}
++
++func isWindowsDriveLetter(c byte) bool {
++	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
++}
++
++// warnedApprovalPaths extracts the path token following every
++// "curator hook approve " prefix in stderr.
++func warnedApprovalPaths(stderr string) []string {
++	const prefix = "curator hook approve "
++	var out []string
++	for {
++		i := strings.Index(stderr, prefix)
++		if i < 0 {
++			return out
++		}
++		rest := stderr[i+len(prefix):]
++		end := len(rest)
++		if j := strings.Index(rest, " to approve"); j >= 0 && j < end {
++			end = j
++		}
++		if j := strings.Index(rest, "\n"); j >= 0 && j < end {
++			end = j
++		}
++		out = append(out, strings.TrimSpace(rest[:end]))
++		stderr = rest[end:]
++	}
++}
++
++func runPosixTrustActivation(t *testing.T, shell trustShell, project, home string, profile TrustProfile) (stdout, stderr string) {
++	t.Helper()
++	hook, err := HookWithProfile(shell.flavor, false, profile)
++	if err != nil {
++		t.Fatal(err)
++	}
++	hookPath := filepath.Join(t.TempDir(), "hook")
++	if err := os.WriteFile(hookPath, []byte(hook), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	script := `cd "$PROJ"
++. "$HOOK"
++printf 'sourced1=%s\n' "${CURATOR_PROJECT_ENV:-no}"
++printf 'PROBE-1\n' >&2
++_curator_auto_env
++printf 'sourced2=%s\n' "${CURATOR_PROJECT_ENV:-no}"
++`
++	return runTrustShell(t, shell.executable, script, map[string]string{
++		"PROJ": project, "HOOK": hookPath,
++		"CURATOR_CONFIG": filepath.Join(home, "config.json"),
++	})
++}
++
++func runPowerShellTrustActivation(t *testing.T, project, home string, profile TrustProfile) (stdout, stderr string) {
++	t.Helper()
++	powerShell, err := exec.LookPath("pwsh")
++	if err != nil {
++		t.Skip("PowerShell is unavailable (no pwsh on this runner)")
++	}
++	hook, err := HookWithProfile("powershell", false, profile)
++	if err != nil {
++		t.Fatal(err)
++	}
++	dir := t.TempDir()
++	hookPath := filepath.Join(dir, "hook.ps1")
++	if err := os.WriteFile(hookPath, []byte(hook), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	script := "Set-Location $env:PROJ\n" +
++		". $env:HOOK\n" +
++		"if ($env:CURATOR_PROJECT_ENV) { Write-Output (\"sourced1=\" + $env:CURATOR_PROJECT_ENV) } else { Write-Output \"sourced1=no\" }\n" +
++		"[Console]::Error.WriteLine(\"PROBE-1\")\n" +
++		"Invoke-CuratorAutoEnv\n" +
++		"if ($env:CURATOR_PROJECT_ENV) { Write-Output (\"sourced2=\" + $env:CURATOR_PROJECT_ENV) } else { Write-Output \"sourced2=no\" }\n"
++	scriptPath := filepath.Join(dir, "activate.ps1")
++	if err := os.WriteFile(scriptPath, []byte(script), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
++	defer cancel()
++	command := exec.CommandContext(ctx, powerShell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath)
++	command.Env = append(os.Environ(),
++		"PROJ="+project, "HOOK="+hookPath,
++		"CURATOR_CONFIG="+filepath.Join(home, "config.json"))
++	var out, errOut strings.Builder
++	command.Stdout = &out
++	command.Stderr = &errOut
++	if err := command.Run(); err != nil {
++		t.Fatalf("powershell activation: %v\nstdout:\n%s\nstderr:\n%s", err, out.String(), errOut.String())
++	}
++	return out.String(), errOut.String()
++}
++
++// trustShell is one POSIX interpreter the trust tests execute the emitted
++// hook under, with the hook flavor it runs.
++type trustShell struct {
++	name       string
++	executable string
++	flavor     string
++}
++
++// posixTrustShells resolves every POSIX interpreter on this runner. Plain sh
++// and dash (when present) run the bash hook flavor: the emitted hook is
++// strictly POSIX-parseable, so the activation path must work there, not only
++// under bash/zsh. On Windows the same probe finds Git Bash (bash.exe, sh.exe
++// on PATH); when PATH lacks it the well-known Git for Windows install roots
++// are checked, so the vector, hostile, malformed, and alias cases run
++// wherever Git Bash is actually present. Interpreters resolving to the same
++// binary run once. The skip names the absent interpreter (host-capability),
++// never the GOOS alone.
++func posixTrustShells(t *testing.T) []trustShell {
++	t.Helper()
++	var shells []trustShell
++	seen := map[string]bool{}
++	names := []string{"sh", "dash", "bash", "zsh"}
++	if runtime.GOOS == "windows" {
++		names = []string{"bash", "sh", "bash.exe", "sh.exe"}
++	}
++	for _, name := range names {
++		executable, err := exec.LookPath(name)
++		if err != nil {
++			continue
++		}
++		identity := executable
++		if resolved, err := filepath.EvalSymlinks(executable); err == nil {
++			identity = resolved
++		}
++		if seen[identity] {
++			continue
++		}
++		seen[identity] = true
++		flavor := "bash"
++		if strings.TrimSuffix(strings.ToLower(name), ".exe") == "zsh" {
++			flavor = "zsh"
++		}
++		shells = append(shells, trustShell{name: strings.TrimSuffix(strings.ToLower(name), ".exe"), executable: executable, flavor: flavor})
++	}
++	if runtime.GOOS == "windows" {
++		for _, candidate := range []string{
++			`C:\Program Files\Git\bin\bash.exe`,
++			`C:\Program Files\Git\usr\bin\bash.exe`,
++			`C:\Program Files\Git\bin\sh.exe`,
++			`C:\Program Files\Git\usr\bin\sh.exe`,
++		} {
++			if _, err := os.Stat(candidate); err != nil {
++				continue
++			}
++			identity := candidate
++			if resolved, err := filepath.EvalSymlinks(candidate); err == nil {
++				identity = resolved
++			}
++			if seen[identity] {
++				continue
++			}
++			seen[identity] = true
++			name := "bash"
++			if strings.HasPrefix(strings.ToLower(filepath.Base(candidate)), "sh.") {
++				name = "sh"
++			}
++			shells = append(shells, trustShell{name: name, executable: candidate, flavor: "bash"})
++		}
++	}
++	if len(shells) == 0 {
++		if runtime.GOOS == "windows" {
++			t.Skip("bash is unavailable (Git Bash absent on this runner)")
++		}
++		t.Skip("bash is unavailable (no POSIX shell on this runner)")
++	}
++	return shells
++}
++
++func runTrustShell(t *testing.T, executable, script string, environment map[string]string) (stdout, stderr string) {
++	t.Helper()
++	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
++	defer cancel()
++	// Git Bash reports bash.exe/sh.exe; fold the suffix so the Windows
++	// interpreters take the same argument shapes as their Unix names.
++	base := strings.TrimSuffix(strings.ToLower(filepath.Base(executable)), ".exe")
++	args := []string{"--noprofile", "--norc", "-c", script}
++	switch base {
++	case "zsh":
++		args = []string{"-dfc", script}
++	case "sh", "dash":
++		// dash accepts no profile-suppression flags; bash-as-sh reads no
++		// profile for -c either, but honors $ENV, which is cleared below.
++		args = []string{"-c", script}
++	}
++	command := exec.CommandContext(ctx, executable, args...)
++	command.Env = append([]string{}, os.Environ()...)
++	command.Env = append(command.Env, "SHELL="+executable)
++	for name, value := range environment {
++		command.Env = append(command.Env, name+"="+value)
++	}
++	if base == "sh" {
++		filtered := command.Env[:0]
++		for _, entry := range command.Env {
++			if entry == "ENV" || strings.HasPrefix(entry, "ENV=") {
++				continue
++			}
++			filtered = append(filtered, entry)
++		}
++		command.Env = filtered
++	}
++	var out, errOut strings.Builder
++	command.Stdout = &out
++	command.Stderr = &errOut
++	if err := command.Run(); err != nil {
++		t.Fatalf("%s activation: %v\nstdout:\n%s\nstderr:\n%s",
++			filepath.Base(executable), err, out.String(), errOut.String())
++	}
++	return out.String(), errOut.String()
++}
++
++// TestShellHookRefusesHostileCheckout simulates a hostile project checkout:
++// foreign env-file bytes with no approval record. Under B-enforcing the
++// payload must never execute; under A-warning it executes but warns once with
++// the migration hint. Both profiles keep activation itself green.
++func TestShellHookRefusesHostileCheckout(t *testing.T) {
++	t.Run("posix", func(t *testing.T) {
++		// Runs through Git Bash on Windows; posixTrustShells skips only
++		// when no POSIX interpreter is present (host-capability).
++		base, err := filepath.EvalSymlinks(t.TempDir())
++		if err != nil {
++			t.Fatal(err)
++		}
++		project := filepath.Join(base, "hostile")
++		agentsDir := filepath.Join(project, ".agents")
++		if err := os.MkdirAll(agentsDir, 0o755); err != nil {
++			t.Fatal(err)
++		}
++		candidate := filepath.Join(agentsDir, "env.sh")
++		payload := "printf 'pwned' > \"$HOSTILE_CANARY\"\n" + "export HOSTILE_MARKER=pwned\n"
++		if err := os.WriteFile(candidate, []byte(payload), 0o600); err != nil {
++			t.Fatal(err)
++		}
++		home := filepath.Join(base, "home")
++		if err := os.MkdirAll(home, 0o755); err != nil {
++			t.Fatal(err)
++		}
++		script := `cd "$PROJ"
++. "$HOOK"
++printf 'marker1=%s\n' "${HOSTILE_MARKER:-no}"
++printf 'PROBE-1\n' >&2
++_curator_auto_env
++printf 'marker2=%s\n' "${HOSTILE_MARKER:-no}"
++`
++		for _, shell := range posixTrustShells(t) {
++			t.Run(shell.name, func(t *testing.T) {
++				canary := filepath.Join(t.TempDir(), "canary")
++				run := func(t *testing.T, profile TrustProfile) (stdout, stderr string) {
++					t.Helper()
++					_ = os.Remove(canary)
++					hook, err := HookWithProfile(shell.flavor, false, profile)
++					if err != nil {
++						t.Fatal(err)
++					}
++					hookPath := filepath.Join(t.TempDir(), "hook")
++					if err := os.WriteFile(hookPath, []byte(hook), 0o600); err != nil {
++						t.Fatal(err)
++					}
++					return runTrustShell(t, shell.executable, script, map[string]string{
++						"PROJ": project, "HOOK": hookPath, "HOSTILE_CANARY": canary,
++						"CURATOR_CONFIG": filepath.Join(home, "config.json"),
++					})
++				}
++
++				stdout, stderr := run(t, TrustProfileBEnforcing)
++				if strings.Contains(stdout, "marker1=pwned") || strings.Contains(stdout, "marker2=pwned") {
++					t.Fatalf("B-enforcing sourced the hostile payload:\n%s\n%s", stdout, stderr)
++				}
++				if _, err := os.Stat(canary); !os.IsNotExist(err) {
++					t.Fatalf("B-enforcing executed the hostile payload (canary: %v)", err)
++				}
++				assertHostileWarning(t, candidate, stderr)
++
++				stdout, stderr = run(t, TrustProfileAWarning)
++				if !strings.Contains(stdout, "marker1=pwned") {
++					t.Fatalf("A-warning did not source with a warning:\n%s\n%s", stdout, stderr)
++				}
++				if _, err := os.Stat(canary); err != nil {
++					t.Fatalf("A-warning did not execute the payload it sources: %v", err)
++				}
++				assertHostileWarning(t, candidate, stderr)
++			})
++		}
++	})
++
++	t.Run("powershell", func(t *testing.T) {
++		powerShell, err := exec.LookPath("pwsh")
++		if err != nil {
++			t.Skip("PowerShell is unavailable (no pwsh on this runner)")
++		}
++		base, err := filepath.EvalSymlinks(t.TempDir())
++		if err != nil {
++			t.Fatal(err)
++		}
++		project := filepath.Join(base, "hostile")
++		agentsDir := filepath.Join(project, ".agents")
++		if err := os.MkdirAll(agentsDir, 0o755); err != nil {
++			t.Fatal(err)
++		}
++		candidate := filepath.Join(agentsDir, "env.ps1")
++		canary := filepath.Join(base, "canary")
++		payload := "Set-Content -LiteralPath $env:HOSTILE_CANARY -Value \"pwned\"\n" +
++			"$env:HOSTILE_MARKER = \"pwned\"\n"
++		if err := os.WriteFile(candidate, []byte(payload), 0o600); err != nil {
++			t.Fatal(err)
++		}
++		home := filepath.Join(base, "home")
++		if err := os.MkdirAll(home, 0o755); err != nil {
++			t.Fatal(err)
++		}
++		run := func(t *testing.T, profile TrustProfile) (stdout, stderr string) {
++			t.Helper()
++			_ = os.Remove(canary)
++			hook, err := HookWithProfile("powershell", false, profile)
++			if err != nil {
++				t.Fatal(err)
++			}
++			dir := t.TempDir()
++			hookPath := filepath.Join(dir, "hook.ps1")
++			if err := os.WriteFile(hookPath, []byte(hook), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			script := "Set-Location $env:PROJ\n" +
++				". $env:HOOK\n" +
++				"if ($env:HOSTILE_MARKER) { Write-Output (\"marker1=\" + $env:HOSTILE_MARKER) } else { Write-Output \"marker1=no\" }\n" +
++				"[Console]::Error.WriteLine(\"PROBE-1\")\n" +
++				"Invoke-CuratorAutoEnv\n" +
++				"if ($env:HOSTILE_MARKER) { Write-Output (\"marker2=\" + $env:HOSTILE_MARKER) } else { Write-Output \"marker2=no\" }\n"
++			scriptPath := filepath.Join(dir, "activate.ps1")
++			if err := os.WriteFile(scriptPath, []byte(script), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
++			defer cancel()
++			command := exec.CommandContext(ctx, powerShell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath)
++			command.Env = append(os.Environ(),
++				"PROJ="+project, "HOOK="+hookPath, "HOSTILE_CANARY="+canary,
++				"CURATOR_CONFIG="+filepath.Join(home, "config.json"))
++			var out, errOut strings.Builder
++			command.Stdout = &out
++			command.Stderr = &errOut
++			if err := command.Run(); err != nil {
++				t.Fatalf("powershell activation: %v\nstdout:\n%s\nstderr:\n%s", err, out.String(), errOut.String())
++			}
++			return out.String(), errOut.String()
++		}
++
++		stdout, stderr := run(t, TrustProfileBEnforcing)
++		if strings.Contains(stdout, "marker1=pwned") || strings.Contains(stdout, "marker2=pwned") {
++			t.Fatalf("B-enforcing sourced the hostile payload:\n%s\n%s", stdout, stderr)
++		}
++		if _, err := os.Stat(canary); !os.IsNotExist(err) {
++			t.Fatalf("B-enforcing executed the hostile payload (canary: %v)", err)
++		}
++		assertHostileWarning(t, candidate, stderr)
++
++		stdout, stderr = run(t, TrustProfileAWarning)
++		if !strings.Contains(stdout, "marker1=pwned") {
++			t.Fatalf("A-warning did not source with a warning:\n%s\n%s", stdout, stderr)
++		}
++		if _, err := os.Stat(canary); err != nil {
++			t.Fatalf("A-warning did not execute the payload it sources: %v", err)
++		}
++		assertHostileWarning(t, candidate, stderr)
++	})
++}
++
++// assertHostileWarning proves the hostile payload raised exactly one
++// unapproved warning naming the path and the approval command: on the first
++// activation, never on the second.
++func assertHostileWarning(t *testing.T, candidate, stderr string) {
++	t.Helper()
++	// PowerShell on Windows frames stderr lines with CRLF; normalize so the
++	// warning count and the activation-probe split hold on every runner.
++	stderr = strings.ReplaceAll(stderr, "\r\n", "\n")
++	if !strings.Contains(stderr, DiagnosticEnvUnapproved) {
++		t.Fatalf("stderr lacks %q:\n%s", DiagnosticEnvUnapproved, stderr)
++	}
++	if strings.Contains(stderr, DiagnosticEnvChanged) {
++		t.Fatalf("unapproved payload raised the changed diagnostic:\n%s", stderr)
++	}
++	parts := strings.SplitN(stderr, "PROBE-1\n", 2)
++	if len(parts) != 2 {
++		t.Fatalf("stderr lacks the activation probe:\n%s", stderr)
++	}
++	if runtime.GOOS == "windows" {
++		const prefix = "curator hook approve "
++		if got := strings.Count(stderr, prefix); got != 1 {
++			t.Fatalf("warning count = %d, want 1:\n%s", got, stderr)
++		}
++		nativeNorm, msysNorm := windowsWarningSpellings(candidate)
++		flat := strings.ToLower(strings.ReplaceAll(stderr, "\\", "/"))
++		if !strings.Contains(flat, nativeNorm) && (msysNorm == "" || !strings.Contains(flat, msysNorm)) {
++			t.Fatalf("warning does not name %q:\n%s", candidate, stderr)
++		}
++		for _, warned := range warnedApprovalPaths(stderr) {
++			if normalizeWindowsPathToken(warned) != nativeNorm {
++				t.Fatalf("warning names %q, want %q:\n%s", warned, candidate, stderr)
++			}
++		}
++		if !strings.Contains(parts[0], prefix) || strings.Contains(parts[1], prefix) {
++			t.Fatalf("warning is not first-activation-only:\n%s", stderr)
++		}
++		return
++	}
++	approvalCommand := "curator hook approve " + candidate
++	if got := strings.Count(stderr, approvalCommand); got != 1 {
++		t.Fatalf("warning count = %d, want 1:\n%s", got, stderr)
++	}
++	if !strings.Contains(parts[0], approvalCommand) || strings.Contains(parts[1], approvalCommand) {
++		t.Fatalf("warning is not first-activation-only:\n%s", stderr)
++	}
++}
++
++// TestGeneratedHookParsesUnderPOSIXShells syntax-checks every generated POSIX
++// hook (both flavors, both profiles, with and without the global section)
++// under each interpreter on the runner. It names the interpreters explicitly
++// instead of depending on the host shell, and skips only the interpreters
++// the runner lacks.
++func TestGeneratedHookParsesUnderPOSIXShells(t *testing.T) {
++	type checker struct {
++		name       string
++		executable string
++	}
++	var checkers []checker
++	for _, name := range []string{"sh", "dash", "bash", "zsh"} {
++		executable, err := exec.LookPath(name)
++		if err != nil {
++			t.Logf("%s is unavailable, skipping its syntax check", name)
++			continue
++		}
++		checkers = append(checkers, checker{name: name, executable: executable})
++	}
++	if len(checkers) == 0 {
++		t.Skip("no POSIX shell on this runner")
++	}
++	for _, flavor := range []string{"bash", "zsh"} {
++		for _, profile := range []TrustProfile{TrustProfileAWarning, TrustProfileBEnforcing} {
++			for _, includeGlobal := range []bool{false, true} {
++				hook, err := HookWithProfile(flavor, includeGlobal, profile)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if hook == "" {
++					t.Fatalf("HookWithProfile(%s, %v, %s) is empty", flavor, includeGlobal, profile)
++				}
++				hookPath := filepath.Join(t.TempDir(), "hook")
++				if err := os.WriteFile(hookPath, []byte(hook), 0o600); err != nil {
++					t.Fatal(err)
++				}
++				for _, checker := range checkers {
++					t.Run(flavor+"/"+string(profile)+"/global-"+boolName(includeGlobal)+"/"+checker.name, func(t *testing.T) {
++						ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
++						defer cancel()
++						output, err := exec.CommandContext(ctx, checker.executable, "-n", hookPath).CombinedOutput()
++						if err != nil {
++							t.Fatalf("%s -n %s %s (global=%v): %v\n%s",
++								checker.name, flavor, profile, includeGlobal, err, output)
++						}
++					})
++				}
++			}
++		}
++	}
++}
++
++func boolName(value bool) string {
++	if value {
++		return "yes"
++	}
++	return "no"
++}
++
++// TestHookEmbedsClosedRecordGrammar proves the emitted hooks validate the
++// same closed record the Go reader enforces: the generated text carries the
++// hookapproval grammar constants verbatim, and no unexpanded placeholder
++// survives generation.
++func TestHookEmbedsClosedRecordGrammar(t *testing.T) {
++	fieldCount := strconv.Itoa(hookapproval.RecordFieldCount)
++	digestLength := strconv.Itoa(hookapproval.SHA256HexLength)
++	for _, flavor := range []string{"bash", "zsh", "powershell"} {
++		for _, profile := range []TrustProfile{TrustProfileAWarning, TrustProfileBEnforcing} {
++			hook, err := HookWithProfile(flavor, false, profile)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if strings.Contains(hook, "__CURATOR_") {
++				t.Fatalf("%s %s hook carries an unexpanded placeholder", flavor, profile)
++			}
++			needles := []string{hookapproval.TimestampShape, fieldCount, digestLength}
++			if flavor == "powershell" {
++				needles = append(needles,
++					"'"+hookapproval.ApprovedByManager+"'",
++					"'"+hookapproval.ApprovedByOperator+"'")
++			} else {
++				needles = append(needles,
++					`"`+hookapproval.ApprovedByManager+`"`,
++					`"`+hookapproval.ApprovedByOperator+`"`)
++			}
++			for _, needle := range needles {
++				if !strings.Contains(hook, needle) {
++					t.Fatalf("%s %s hook lacks grammar %q", flavor, profile, needle)
++				}
++			}
++		}
++	}
++}
++
++// TestShellHookRejectsMalformedRecords seeds manager-home state lines that
++// carry the candidate path with the matching digest but a malformed record
++// (open shape, forged approver, bad timestamp), and proves the emitted hooks
++// treat the candidate as unapproved under both rollout profiles: refused
++// under B-enforcing, sourced with exactly one first-activation warning under
++// A-warning. The Go reader must reject every seeded line, proving the test
++// premise and the reader/hook agreement.
++func TestShellHookRejectsMalformedRecords(t *testing.T) {
++	unapproved := DiagnosticEnvUnapproved
++	cases := []struct {
++		name  string
++		state func(candidate, digest string) string
++	}{
++		{"two-fields", func(candidate, digest string) string {
++			return candidate + "\t" + digest + "\n"
++		}},
++		{"five-fields", func(candidate, digest string) string {
++			return candidate + "\t" + digest + "\tmanager\t2026-09-16T00:00:00Z\textra\n"
++		}},
++		{"forged-approver", func(candidate, digest string) string {
++			return candidate + "\t" + digest + "\tproject\t2026-09-16T00:00:00Z\n"
++		}},
++		{"empty-approver", func(candidate, digest string) string {
++			return candidate + "\t" + digest + "\t\t2026-09-16T00:00:00Z\n"
++		}},
++		{"uppercase-approver", func(candidate, digest string) string {
++			return candidate + "\t" + digest + "\tManager\t2026-09-16T00:00:00Z\n"
++		}},
++		{"uppercase-digest", func(candidate, digest string) string {
++			return candidate + "\t" + strings.ToUpper(digest) + "\tmanager\t2026-09-16T00:00:00Z\n"
++		}},
++		{"short-digest", func(candidate, _ string) string {
++			return candidate + "\tshort\tmanager\t2026-09-16T00:00:00Z\n"
++		}},
++		{"nonhex-digest", func(candidate, _ string) string {
++			return candidate + "\t" + strings.Repeat("z", 64) + "\tmanager\t2026-09-16T00:00:00Z\n"
++		}},
++		{"bad-timestamp", func(candidate, digest string) string {
++			return candidate + "\t" + digest + "\tmanager\tnot-a-time\n"
++		}},
++		{"empty-timestamp", func(candidate, digest string) string {
++			return candidate + "\t" + digest + "\tmanager\t\n"
++		}},
++		{"month-13", func(candidate, digest string) string {
++			return candidate + "\t" + digest + "\tmanager\t2026-13-01T00:00:00Z\n"
++		}},
++		{"february-30", func(candidate, digest string) string {
++			return candidate + "\t" + digest + "\tmanager\t2026-02-30T00:00:00Z\n"
++		}},
++		{"second-60", func(candidate, digest string) string {
++			return candidate + "\t" + digest + "\tmanager\t2026-09-16T00:00:60Z\n"
++		}},
++		{"lowercase-timestamp", func(candidate, digest string) string {
++			return candidate + "\t" + digest + "\tmanager\t2026-09-16t00:00:00z\n"
++		}},
++	}
++	for _, malformed := range cases {
++		t.Run(malformed.name, func(t *testing.T) {
++			t.Run("posix", func(t *testing.T) {
++				// Runs through Git Bash on Windows; posixTrustShells
++				// skips only when no POSIX interpreter is present.
++				for _, shell := range posixTrustShells(t) {
++					t.Run(shell.name, func(t *testing.T) {
++						base, err := filepath.EvalSymlinks(t.TempDir())
++						if err != nil {
++							t.Fatal(err)
++						}
++						project := filepath.Join(base, "project")
++						agentsDir := filepath.Join(project, ".agents")
++						if err := os.MkdirAll(agentsDir, 0o755); err != nil {
++							t.Fatal(err)
++						}
++						content := []byte("export CURATOR_PROJECT_ENV=1\n")
++						candidate := filepath.Join(agentsDir, "env.sh")
++						if err := os.WriteFile(candidate, content, 0o600); err != nil {
++							t.Fatal(err)
++						}
++						home := filepath.Join(base, "home")
++						if err := os.MkdirAll(home, 0o755); err != nil {
++							t.Fatal(err)
++						}
++						digest := hookapproval.Digest(content)
++						if err := os.WriteFile(hookapproval.ApprovalsPath(home),
++							[]byte(malformed.state(candidate, digest)), 0o600); err != nil {
++							t.Fatal(err)
++						}
++						if _, err := hookapproval.List(home); err == nil {
++							t.Fatalf("Go reader accepted the %s state line", malformed.name)
++						}
++						for _, profile := range []TrustProfile{TrustProfileBEnforcing, TrustProfileAWarning} {
++							sourced := profile == TrustProfileAWarning
++							expect := hookTrustCase{
++								Name:                        malformed.name + "/" + string(profile),
++								Diagnostic:                  &unapproved,
++								Sourced:                     sourced,
++								WarningFirst:                true,
++								WarningSecond:               false,
++								WarningsTotal:               1,
++								WarningNamesPath:            true,
++								WarningNamesApprovalCommand: true,
++							}
++							stdout, stderr := runPosixTrustActivation(t, shell, project, home, profile)
++							assertTrustOutcome(t, expect, candidate, stdout, stderr)
++						}
++					})
++				}
++			})
++			t.Run("powershell", func(t *testing.T) {
++				if _, err := exec.LookPath("pwsh"); err != nil {
++					t.Skip("PowerShell is unavailable (no pwsh on this runner)")
++				}
++				base, err := filepath.EvalSymlinks(t.TempDir())
++				if err != nil {
++					t.Fatal(err)
++				}
++				project := filepath.Join(base, "project")
++				agentsDir := filepath.Join(project, ".agents")
++				if err := os.MkdirAll(agentsDir, 0o755); err != nil {
++					t.Fatal(err)
++				}
++				content := []byte("$env:CURATOR_PROJECT_ENV = \"1\"\n")
++				candidate := filepath.Join(agentsDir, "env.ps1")
++				if err := os.WriteFile(candidate, content, 0o600); err != nil {
++					t.Fatal(err)
++				}
++				home := filepath.Join(base, "home")
++				if err := os.MkdirAll(home, 0o755); err != nil {
++					t.Fatal(err)
++				}
++				digest := hookapproval.Digest(content)
++				if err := os.WriteFile(hookapproval.ApprovalsPath(home),
++					[]byte(malformed.state(candidate, digest)), 0o600); err != nil {
++					t.Fatal(err)
++				}
++				if _, err := hookapproval.List(home); err == nil {
++					t.Fatalf("Go reader accepted the %s state line", malformed.name)
++				}
++				for _, profile := range []TrustProfile{TrustProfileBEnforcing, TrustProfileAWarning} {
++					sourced := profile == TrustProfileAWarning
++					expect := hookTrustCase{
++						Name:                        malformed.name + "/" + string(profile),
++						Diagnostic:                  &unapproved,
++						Sourced:                     sourced,
++						WarningFirst:                true,
++						WarningSecond:               false,
++						WarningsTotal:               1,
++						WarningNamesPath:            true,
++						WarningNamesApprovalCommand: true,
++					}
++					stdout, stderr := runPowerShellTrustActivation(t, project, home, profile)
++					assertTrustOutcome(t, expect, candidate, stdout, stderr)
++				}
++			})
++		})
++	}
++}
++
++// TestShellHookTrustResolvesSymlinkedProject opens a manager-approved project
++// through a directory alias and proves the emitted hooks source it silently
++// under both rollout profiles: two spellings of one file resolve to the one
++// record, with no warning on either activation.
++func TestShellHookTrustResolvesSymlinkedProject(t *testing.T) {
++	t.Run("posix", func(t *testing.T) {
++		// Runs through Git Bash on Windows; posixTrustShells skips only
++		// when no POSIX interpreter is present (host-capability).
++		for _, shell := range posixTrustShells(t) {
++			t.Run(shell.name, func(t *testing.T) {
++				base, err := filepath.EvalSymlinks(t.TempDir())
++				if err != nil {
++					t.Fatal(err)
++				}
++				realProject := filepath.Join(base, "real-project")
++				agentsDir := filepath.Join(realProject, ".agents")
++				if err := os.MkdirAll(agentsDir, 0o755); err != nil {
++					t.Fatal(err)
++				}
++				content := []byte("export CURATOR_PROJECT_ENV=1\n")
++				candidate := filepath.Join(agentsDir, "env.sh")
++				if err := os.WriteFile(candidate, content, 0o600); err != nil {
++					t.Fatal(err)
++				}
++				alias := filepath.Join(base, "alias-project")
++				if err := os.Symlink(realProject, alias); err != nil {
++					t.Skipf("cannot stage a symlinked project directory: %v", err)
++				}
++				home := filepath.Join(base, "home")
++				if err := os.MkdirAll(home, 0o755); err != nil {
++					t.Fatal(err)
++				}
++				if _, err := hookapproval.ApproveFile(home, candidate, hookapproval.ApprovedByManager, time.Now().UTC()); err != nil {
++					t.Fatal(err)
++				}
++				for _, profile := range []TrustProfile{TrustProfileBEnforcing, TrustProfileAWarning} {
++					expect := hookTrustCase{
++						Name:         "symlinked-project/" + string(profile),
++						Sourced:      true,
++						WarningFirst: false, WarningSecond: false,
++					}
++					stdout, stderr := runPosixTrustActivation(t, shell, alias, home, profile)
++					assertTrustOutcome(t, expect, candidate, stdout, stderr)
++				}
++			})
++		}
++	})
++	t.Run("powershell", func(t *testing.T) {
++		if _, err := exec.LookPath("pwsh"); err != nil {
++			t.Skip("PowerShell is unavailable (no pwsh on this runner)")
++		}
++		base, err := filepath.EvalSymlinks(t.TempDir())
++		if err != nil {
++			t.Fatal(err)
++		}
++		realProject := filepath.Join(base, "real-project")
++		agentsDir := filepath.Join(realProject, ".agents")
++		if err := os.MkdirAll(agentsDir, 0o755); err != nil {
++			t.Fatal(err)
++		}
++		content := []byte("$env:CURATOR_PROJECT_ENV = \"1\"\n")
++		candidate := filepath.Join(agentsDir, "env.ps1")
++		if err := os.WriteFile(candidate, content, 0o600); err != nil {
++			t.Fatal(err)
++		}
++		alias := filepath.Join(base, "alias-project")
++		if err := os.Symlink(realProject, alias); err != nil {
++			t.Skipf("cannot stage a symlinked project directory: %v", err)
++		}
++		home := filepath.Join(base, "home")
++		if err := os.MkdirAll(home, 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if _, err := hookapproval.ApproveFile(home, candidate, hookapproval.ApprovedByManager, time.Now().UTC()); err != nil {
++			t.Fatal(err)
++		}
++		for _, profile := range []TrustProfile{TrustProfileBEnforcing, TrustProfileAWarning} {
++			expect := hookTrustCase{
++				Name:         "symlinked-project/" + string(profile),
++				Sourced:      true,
++				WarningFirst: false, WarningSecond: false,
++			}
++			stdout, stderr := runPowerShellTrustActivation(t, alias, home, profile)
++			assertTrustOutcome(t, expect, candidate, stdout, stderr)
++		}
++	})
++}
++
++// TestShellHookTrustNativeRecordAuthorizesMSYSSpelling proves the Windows
++// identity rule end to end: one native manager record authorizes the same
++// file reached through MSYS spelling under Git Bash. The shell is shown to
++// observe MSYS spelling (its PWD starts with "/"), the approved bytes
++// source silently under both rollout profiles, and changed bytes are
++// refused under B-enforcing (sourced with a changed warning under
++// A-warning). It runs only on Windows; the interpreter probe inside
++// posixTrustShells skips with a host-capability reason when Git Bash is
++// genuinely absent.
++func TestShellHookTrustNativeRecordAuthorizesMSYSSpelling(t *testing.T) {
++	if runtime.GOOS != "windows" {
++		t.Skip("native/MSYS spelling identity is exercised on Windows")
++	}
++	for _, shell := range posixTrustShells(t) {
++		t.Run(shell.name, func(t *testing.T) {
++			base, err := filepath.EvalSymlinks(t.TempDir())
++			if err != nil {
++				t.Fatal(err)
++			}
++			project := filepath.Join(base, "project")
++			agentsDir := filepath.Join(project, ".agents")
++			if err := os.MkdirAll(agentsDir, 0o755); err != nil {
++				t.Fatal(err)
++			}
++			content := []byte("export CURATOR_PROJECT_ENV=1\n")
++			candidate := filepath.Join(agentsDir, "env.sh")
++			if err := os.WriteFile(candidate, content, 0o600); err != nil {
++				t.Fatal(err)
++			}
++			home := filepath.Join(base, "home")
++			if err := os.MkdirAll(home, 0o755); err != nil {
++				t.Fatal(err)
++			}
++			// The record is stored under the native spelling the Go
++			// writer canonicalizes; the hook below reaches the same
++			// file through MSYS spelling.
++			if _, err := hookapproval.ApproveFile(home, candidate, hookapproval.ApprovedByManager, time.Now().UTC()); err != nil {
++				t.Fatal(err)
++			}
++			pwdOut, _ := runTrustShell(t, shell.executable, `cd "$PROJ" && pwd`, map[string]string{"PROJ": project})
++			pwdOut = strings.ReplaceAll(strings.TrimSpace(pwdOut), "\r\n", "\n")
++			if !strings.HasPrefix(pwdOut, "/") {
++				t.Fatalf("Git Bash does not observe MSYS spelling, PWD = %q", pwdOut)
++			}
++			for _, profile := range []TrustProfile{TrustProfileAWarning, TrustProfileBEnforcing} {
++				expect := hookTrustCase{
++					Name:         "native-record-msys-lookup/" + string(profile),
++					Sourced:      true,
++					WarningFirst: false, WarningSecond: false,
++				}
++				stdout, stderr := runPosixTrustActivation(t, shell, project, home, profile)
++				assertTrustOutcome(t, expect, candidate, stdout, stderr)
++			}
++			changed := DiagnosticEnvChanged
++			if err := os.WriteFile(candidate, []byte("export CURATOR_PROJECT_ENV=2\n"), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			expectB := hookTrustCase{
++				Name:                        "native-record-msys-lookup/changed/B-enforcing",
++				Diagnostic:                  &changed,
++				Sourced:                     false,
++				WarningFirst:                true,
++				WarningSecond:               false,
++				WarningsTotal:               1,
++				WarningNamesPath:            true,
++				WarningNamesApprovalCommand: true,
++			}
++			stdout, stderr := runPosixTrustActivation(t, shell, project, home, TrustProfileBEnforcing)
++			assertTrustOutcome(t, expectB, candidate, stdout, stderr)
++			expectA := expectB
++			expectA.Name = "native-record-msys-lookup/changed/A-warning"
++			expectA.Sourced = true
++			// The rotated bytes export 2, so a sourced activation prints
++			// sourced1=2/sourced2=2: the marker proves the NEW bytes were
++			// sourced under A-warning, not stale state.
++			expectA.SourcedMarker = "2"
++			stdout, stderr = runPosixTrustActivation(t, shell, project, home, TrustProfileAWarning)
++			assertTrustOutcome(t, expectA, candidate, stdout, stderr)
++		})
++	}
++}
++
++// TestWindowsWarningNormalization proves the Windows warning comparison
++// folds the spellings the hook may print: native backslashes, forward
++// slashes, MSYS /c/... and /cygdrive/c/... forms, and letter case all
++// name one file. It runs on every platform because it exercises the
++// comparison helpers directly, not the Windows-only activation path.
++func TestWindowsWarningNormalization(t *testing.T) {
++	candidate := `C:\Users\me\proj\.agents\env.sh`
++	nativeNorm, msysNorm := windowsWarningSpellings(candidate)
++	if nativeNorm != "c:/users/me/proj/.agents/env.sh" {
++		t.Fatalf("native spelling = %q", nativeNorm)
++	}
++	if msysNorm != "/c/users/me/proj/.agents/env.sh" {
++		t.Fatalf("msys spelling = %q", msysNorm)
++	}
++	for _, spelling := range []string{
++		`C:\Users\me\proj\.agents\env.sh`,
++		`c:\users\me\proj\.agents\env.sh`,
++		`C:/Users/me/proj/.agents/env.sh`,
++		`/c/Users/me/proj/.agents/env.sh`,
++		`/C/Users/me/proj/.agents/env.sh`,
++		`/cygdrive/c/Users/me/proj/.agents/env.sh`,
++	} {
++		if got := normalizeWindowsPathToken(spelling); got != nativeNorm {
++			t.Fatalf("normalize(%q) = %q, want %q", spelling, got, nativeNorm)
++		}
++	}
++	if got := normalizeWindowsPathToken(`D:\unrelated\env.sh`); got == nativeNorm {
++		t.Fatalf("a different drive folded to the candidate: %q", got)
++	}
++	stderr := "curator: shell_hook_env_unapproved: /c/Users/me/proj/.agents/env.sh is not approved; " +
++		"run curator hook approve /c/Users/me/proj/.agents/env.sh to approve it\n"
++	paths := warnedApprovalPaths(stderr)
++	if len(paths) != 1 || paths[0] != "/c/Users/me/proj/.agents/env.sh" {
++		t.Fatalf("warned paths = %q", paths)
++	}
++	if normalizeWindowsPathToken(paths[0]) != nativeNorm {
++		t.Fatalf("warned MSYS path does not name the native candidate")
++	}
++}
++
++// TestPosixHookEmitsWindowsIdentity proves the generated POSIX hook carries
++// the single-identity translation: MSYS detection, cygpath -w mapping with
++// a documented refusal when cygpath is absent, drive-letter normalization,
++// and the case-folded record lookup. Functional proof runs on Windows CI
++// through Git Bash; this shape test pins the emission on every platform.
++func TestPosixHookEmitsWindowsIdentity(t *testing.T) {
++	for _, profile := range []TrustProfile{TrustProfileAWarning, TrustProfileBEnforcing} {
++		hook, err := HookWithProfile("bash", false, profile)
++		if err != nil {
++			t.Fatal(err)
++		}
++		for _, needle := range []string{
++			"_curator_trust_identity",
++			"_curator_trust_is_windows_shell",
++			"MINGW*|MSYS*|CYGWIN*",
++			"cygpath -w",
++			"tolower($1) == tolower(want)",
++			"hookapproval.Canonicalize",
++		} {
++			if !strings.Contains(hook, needle) {
++				t.Fatalf("%s POSIX hook lacks the Windows identity %q", profile, needle)
++			}
++		}
++	}
++}
+diff --git a/internal/shell/shell_test.go b/internal/shell/shell_test.go
+index 6349a00..aff4e4f 100644
+--- a/internal/shell/shell_test.go
++++ b/internal/shell/shell_test.go
+@@ -11,6 +11,7 @@ import (
+ 	"time"
+ 
+ 	"github.com/relux-works/curator/internal/envfiles"
++	"github.com/relux-works/curator/internal/hookapproval"
+ )
+ 
+ func TestDetectIsCrossPlatform(t *testing.T) {
+@@ -47,6 +48,7 @@ func TestPosixHookEntersNestedSwitchesAndLeavesProjects(t *testing.T) {
+ 				t.Skip(shellName + " is unavailable")
+ 			}
+ 			root := t.TempDir()
++			home := t.TempDir()
+ 			first := filepath.Join(root, "first")
+ 			second := filepath.Join(root, "second")
+ 			outside := filepath.Join(root, "outside")
+@@ -55,10 +57,10 @@ func TestPosixHookEntersNestedSwitchesAndLeavesProjects(t *testing.T) {
+ 					t.Fatal(err)
+ 				}
+ 			}
+-			if err := envfiles.WriteProject(first); err != nil {
++			if err := envfiles.WriteProject(first, home); err != nil {
+ 				t.Fatal(err)
+ 			}
+-			if err := envfiles.WriteProject(second); err != nil {
++			if err := envfiles.WriteProject(second, home); err != nil {
+ 				t.Fatal(err)
+ 			}
+ 			hookPath := writeHook(t, shellName, false)
+@@ -76,12 +78,16 @@ printf 'left=%s:%s\n' "${CURATOR_ACTIVE_ENV-unset}" "$([ "$PATH" = "$original" ]
+ `
+ 			output := runPosix(t, executable, script, map[string]string{
+ 				"HOOK_PATH": hookPath, "FIRST": first, "SECOND": second, "OUTSIDE": outside,
++				"CURATOR_CONFIG": filepath.Join(home, "config.json"),
+ 			})
+ 			for _, expected := range []string{"first=" + first, "second=" + second, "left=unset:restored"} {
+ 				if !strings.Contains(output, expected) {
+ 					t.Fatalf("hook output lacks %q:\n%s", expected, output)
+ 				}
+ 			}
++			if strings.Contains(output, "shell_hook_env_") {
++				t.Fatalf("manager-written env files warned:\n%s", output)
++			}
+ 		})
+ 	}
+ }
+@@ -162,6 +168,22 @@ func TestBashHookPreservesPromptCommandArray(t *testing.T) {
+ 	}
+ }
+ 
++func TestBashHookToleratesEmptyPromptCommandArrayUnderNounset(t *testing.T) {
++	executable, err := exec.LookPath("bash")
++	if err != nil {
++		t.Skip("bash is unavailable")
++	}
++	hookPath := writeHook(t, "bash", false)
++	output := runPosix(t, executable,
++		`set -u; PROMPT_COMMAND=(); . "$HOOK_PATH"; printf '%s|%s|%s\n' "${#PROMPT_COMMAND[@]}" "${PROMPT_COMMAND[0]}" "$-"; set +u`,
++		map[string]string{"HOOK_PATH": hookPath},
++	)
++	fields := strings.Split(strings.TrimSuffix(output, "\n"), "|")
++	if len(fields) != 3 || fields[0] != "1" || fields[1] != "_curator_auto_env" || !strings.Contains(fields[2], "u") {
++		t.Fatalf("empty PROMPT_COMMAND array under nounset: %q", output)
++	}
++}
++
+ func TestZshHookIsIdempotentAndDoesNotReenter(t *testing.T) {
+ 	executable, err := exec.LookPath("zsh")
+ 	if err != nil {
+@@ -179,7 +201,12 @@ func TestZshHookIsIdempotentAndDoesNotReenter(t *testing.T) {
+ 	env := "CSK_SOURCE_COUNT=$(( ${CSK_SOURCE_COUNT:-0} + 1 ))\n" +
+ 		"_curator_auto_env\n" +
+ 		"export CSK_PROJECT_ROOT=" + shellQuote(project) + "\n"
+-	if err := os.WriteFile(filepath.Join(agentsDir, "env.sh"), []byte(env), 0o600); err != nil {
++	envPath := filepath.Join(agentsDir, "env.sh")
++	if err := os.WriteFile(envPath, []byte(env), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	home := t.TempDir()
++	if _, err := hookapproval.ApproveFile(home, envPath, hookapproval.ApprovedByOperator, time.Now().UTC()); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	hookPath := writeHook(t, "zsh", false)
+@@ -198,6 +225,7 @@ printf 'sources=%s chpwd=%s precmd=%s\n' "$CSK_SOURCE_COUNT" "$chpwd_count" "$pr
+ `
+ 	output := runPosix(t, executable, script, map[string]string{
+ 		"HOOK_PATH": hookPath, "NESTED": nested,
++		"CURATOR_CONFIG": filepath.Join(home, "config.json"),
+ 	})
+ 	if output != "sources=1 chpwd=1 precmd=1\n" {
+ 		t.Fatalf("zsh hook is not reentrancy-safe and idempotent: %q", output)
+@@ -337,6 +365,51 @@ func TestHookVariants(t *testing.T) {
+ 	}
+ }
+ 
++func TestHookTrustGateShape(t *testing.T) {
++	if DefaultTrustProfile != TrustProfileAWarning {
++		t.Fatalf("DefaultTrustProfile = %q, want A-warning", DefaultTrustProfile)
++	}
++	if _, err := HookWithProfile("bash", false, "C-anything"); err == nil {
++		t.Fatal("HookWithProfile accepted an open profile")
++	}
++	if _, err := HookWithProfile("fish", false, TrustProfileAWarning); err == nil {
++		t.Fatal("HookWithProfile accepted an unknown shell")
++	}
++	for _, shellName := range []string{"zsh", "bash", "powershell"} {
++		for _, profile := range []TrustProfile{TrustProfileAWarning, TrustProfileBEnforcing} {
++			hook, err := HookWithProfile(shellName, true, profile)
++			if err != nil {
++				t.Fatal(err)
++			}
++			for _, needle := range []string{
++				hookapproval.Filename,
++				DiagnosticEnvUnapproved,
++				DiagnosticEnvChanged,
++				"curator hook approve",
++				string(profile),
++			} {
++				if !strings.Contains(hook, needle) {
++					t.Fatalf("%s %s hook lacks %q", shellName, profile, needle)
++				}
++			}
++			other := TrustProfileAWarning
++			if profile == TrustProfileAWarning {
++				other = TrustProfileBEnforcing
++			}
++			if strings.Contains(hook, "'"+string(other)+"'") {
++				t.Fatalf("%s %s hook also bakes %q", shellName, profile, other)
++			}
++		}
++	}
++	def, err := Hook("bash", false)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !strings.Contains(def, "'"+string(TrustProfileAWarning)+"'") {
++		t.Fatalf("default hook does not bake A-warning:\n%s", def)
++	}
++}
++
+ func TestPowerShellHookRunsOnEveryPrompt(t *testing.T) {
+ 	if runtime.GOOS != "windows" {
+ 		t.Skip("PowerShell prompt integration is exercised on Windows")
+@@ -357,7 +430,8 @@ func TestPowerShellHookRunsOnEveryPrompt(t *testing.T) {
+ 			t.Fatal(err)
+ 		}
+ 	}
+-	if err := envfiles.WriteProject(project); err != nil {
++	home := t.TempDir()
++	if err := envfiles.WriteProject(project, home); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	hook, err := Hook("powershell", false)
+@@ -390,7 +464,8 @@ Write-Output ("left={0}:{1}:{2}" -f $active, $restored, $secondPrompt)
+ 	// machine policy would otherwise refuse the harness script itself, which
+ 	// proves nothing about the hook under test.
+ 	command := exec.Command(powerShell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath)
+-	command.Env = append(os.Environ(), "HOOK_PATH="+hookPath, "NESTED="+nested, "OUTSIDE="+outside)
++	command.Env = append(os.Environ(), "HOOK_PATH="+hookPath, "NESTED="+nested, "OUTSIDE="+outside,
++		"CURATOR_CONFIG="+filepath.Join(home, "config.json"))
+ 	output, err := command.CombinedOutput()
+ 	if err != nil {
+ 		t.Fatalf("hook execution: %v\n%s", err, output)

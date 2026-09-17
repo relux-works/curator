@@ -1,5 +1,5 @@
 ## Status
-development
+integrating
 
 ## Review
 required
@@ -90,6 +90,31 @@ agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260917-376318, pid=56031, exit=0)
 spawn autonomous recovery: run RUN-260917-376318 queued successor RUN-260917-7c7307 (attempt 1/3, model=muse-spark-1.3-contributor): Change Request construction for TASK-260910-1952mz failed: Change Request CR-TASK-260910-1952mz-5 revision 5 validation failed at command 1/1 (1-based) with exit code 1; log resource TASK-260910-1952mz_change-request_rev5-validation.log; retry: fix the failure and complete the producer again; the configured suite will rerun automatically
 spawn run started: [implementer] developer (muse) (run=RUN-260917-7c7307)
+Orchestrator: rev5 hosted gate (run 35201254365) failed only on windows-latest in TestShellHookTrustNativeRecordAuthorizesMSYSSpelling, subcase changed/A-warning: the hook sourced the changed bytes (sourced1=2) and warned once, which is the section 8 profile-A behaviour; the harness compared against the default marker 1. Fix = expectA.SourcedMarker = "2"; no hook/identity change needed. Analysis attached: TASK-260910-1952mz_gate-failure-rev5.md
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260917-7c7307, pid=13307, exit=0)
+spawn selection rationale tuple: {"role":"reviewer","pair":"gpt-6-astra/low","text":"Review of S6 manager CR revision 6 (rev-5 Windows identity work plus the harness marker repair) with independent build/test, interdiff and mutants; gpt-6-astra:low is the admitted codex reviewer pair and the operator's review policy, independent of the muse producer"}
+spawn selection rationale for gpt-6-astra/low: Review of S6 manager CR revision 6 (rev-5 Windows identity work plus the harness marker repair) with independent build/test, interdiff and mutants; gpt-6-astra:low is the admitted codex reviewer pair and the operator's review policy, independent of the muse producer
+spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn queued: [reviewer] reviewer (codex) (run=RUN-260917-c2f450, max_parallel=20)
+spawn run started: [reviewer] reviewer (codex) (run=RUN-260917-c2f450)
+agent completed: [reviewer] reviewer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260917-c2f450, pid=99162, exit=0)
+spawn selection rationale tuple: {"role":"developer","pair":"muse-spark-1.3-contributor/max","text":"Checkpoint run bound to the accepted revision 6 producer role/archetype (worktree checkpoint of a non-final leaf); muse-spark-1.3-contributor:max is the operator's producer pair for this campaign"}
+spawn selection rationale for muse-spark-1.3-contributor/max: Checkpoint run bound to the accepted revision 6 producer role/archetype (worktree checkpoint of a non-final leaf); muse-spark-1.3-contributor:max is the operator's producer pair for this campaign
+spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn queued: [implementer] developer (muse) (run=RUN-260917-e67105, max_parallel=20)
+spawn run started: [implementer] developer (muse) (run=RUN-260917-e67105)
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260917-e67105, pid=15918, exit=0)
+Orchestrator: checkpoint run RUN-260917-e67105 was refused with change_request_candidate_drift because the rev-6 reviewer left its disposable copy under .review/rev6/ (107 MB, untracked) inside the Story worktree. Verified git diff (with add -N) patch-id 1d0ce398 equals the published rev6 patch, removed .review/rev6/ only, and re-routed a bound checkpoint run.
+spawn selection rationale tuple: {"role":"developer","pair":"muse-spark-1.3-contributor/max","text":"Second checkpoint run bound to the accepted revision 6 after the reviewer's untracked .review/rev6 leftovers (the drift cause) were removed; muse-spark-1.3-contributor:max is the operator's producer pair for this campaign"}
+spawn selection rationale for muse-spark-1.3-contributor/max: Second checkpoint run bound to the accepted revision 6 after the reviewer's untracked .review/rev6 leftovers (the drift cause) were removed; muse-spark-1.3-contributor:max is the operator's producer pair for this campaign
+spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn queued: [implementer] developer (muse) (run=RUN-260917-0e8d7e, max_parallel=20)
+spawn run started: [implementer] developer (muse) (run=RUN-260917-0e8d7e)
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260917-0e8d7e, pid=27942, exit=0)
 
 ## Precondition Resources
 - [remediation-manager-producer-rules.md](file://TASK-260910-1952mz/remediation-manager-producer-rules.md) — Campaign rules for curator manager producers/reviewers: worktree, spec source at curator-spec 0da4020, conformance root and root-content skips, warn-first, posture, validation, handoff
@@ -99,10 +124,13 @@ spawn run started: [implementer] developer (muse) (run=RUN-260917-7c7307)
 - [TASK-260910-1952mz_rework-rev3.md](file://TASK-260910-1952mz/TASK-260910-1952mz_rework-rev3.md) — Rework brief rev3: real POSIX/dash hook repair (no weakened gate), closed-record validation in the hooks, realpath identity on both sides, atomic state replacement with failure-path test
 - [TASK-260910-1952mz_gate-failure-rev3.md](file://TASK-260910-1952mz/TASK-260910-1952mz_gate-failure-rev3.md) — Hosted gate failure of CR rev3 (run 35189457421): only TestShellHookTrustResolvesSymlinkedProject/powershell — the PowerShell hook does not resolve the symlinked candidate path before the record lookup
 - [TASK-260910-1952mz_rework-rev5.md](file://TASK-260910-1952mz/TASK-260910-1952mz_rework-rev5.md) — Rework brief rev5: one native/MSYS identity for the POSIX hook under Git Bash (cygpath), run Windows POSIX coverage instead of GOOS skips, prove the cross-spelling case
+- [TASK-260910-1952mz_gate-failure-rev5.md](file://TASK-260910-1952mz/TASK-260910-1952mz_gate-failure-rev5.md) — Orchestrator analysis of the rev5 hosted gate failure (windows-latest, harness SourcedMarker bug)
+- [TASK-260910-1952mz_review-brief-rev6.md](file://TASK-260910-1952mz/TASK-260910-1952mz_review-brief-rev6.md) — Reviewer brief for Change Request revision 6
+- [TASK-260910-1952mz_checkpoint-rev6.md_brief.md](file://TASK-260910-1952mz/TASK-260910-1952mz_checkpoint-rev6.md_brief.md) — Checkpoint-run instruction for accepted revision 6
 
 ## Outcome Resources
 - [TASK-260910-1952mz_spawn-log_-implementer--developer--muse-_RUN-260917-063e54.log](file://TASK-260910-1952mz/TASK-260910-1952mz_spawn-log_-implementer--developer--muse-_RUN-260917-063e54.log) — System spawn log captured by task-board
-- [TASK-260910-1952mz_results.md](file://TASK-260910-1952mz/TASK-260910-1952mz_results.md) — Producer results incl. rev5 Git Bash identity appendix
+- [TASK-260910-1952mz_results.md](file://TASK-260910-1952mz/TASK-260910-1952mz_results.md) — Producer results incl. rev6 Windows gate repair
 - [TASK-260910-1952mz_change-request_rev1.patch](file://TASK-260910-1952mz/TASK-260910-1952mz_change-request_rev1.patch) — Change Request CR-TASK-260910-1952mz-1 revision 1 candidate patch (repository_delta=present, 11 changed paths)
 - [TASK-260910-1952mz_change-request_rev1-validation.log](file://TASK-260910-1952mz/TASK-260910-1952mz_change-request_rev1-validation.log) — Change Request CR-TASK-260910-1952mz-1 revision 1 bounded validation log
 - [TASK-260910-1952mz_spawn-log_-implementer--developer--muse-_RUN-260917-abbfd5.log](file://TASK-260910-1952mz/TASK-260910-1952mz_spawn-log_-implementer--developer--muse-_RUN-260917-abbfd5.log) — System spawn log captured by task-board
@@ -131,12 +159,23 @@ spawn run started: [implementer] developer (muse) (run=RUN-260917-7c7307)
 - [TASK-260910-1952mz_change-request_rev5.patch](file://TASK-260910-1952mz/TASK-260910-1952mz_change-request_rev5.patch) — Change Request CR-TASK-260910-1952mz-5 revision 5 candidate patch (repository_delta=present, 11 changed paths)
 - [TASK-260910-1952mz_change-request_rev5-validation.log](file://TASK-260910-1952mz/TASK-260910-1952mz_change-request_rev5-validation.log) — Change Request CR-TASK-260910-1952mz-5 revision 5 bounded validation log
 - [TASK-260910-1952mz_spawn-log_-implementer--developer--muse-_RUN-260917-7c7307.log](file://TASK-260910-1952mz/TASK-260910-1952mz_spawn-log_-implementer--developer--muse-_RUN-260917-7c7307.log) — System spawn log captured by task-board
+- [TASK-260910-1952mz_rev6-probe_test.go](file://TASK-260910-1952mz/TASK-260910-1952mz_rev6-probe_test.go) — Rev6 throwaway probe: CI byte-replay through assertTrustOutcome
+- [TASK-260910-1952mz_logbook-rev6.md](file://TASK-260910-1952mz/TASK-260910-1952mz_logbook-rev6.md) — Producer logbook rev6: gate repair notes
+- [TASK-260910-1952mz_change-request_rev6.patch](file://TASK-260910-1952mz/TASK-260910-1952mz_change-request_rev6.patch) — Change Request CR-TASK-260910-1952mz-6 revision 6 candidate patch (repository_delta=present, 11 changed paths)
+- [TASK-260910-1952mz_change-request_rev6-validation.log](file://TASK-260910-1952mz/TASK-260910-1952mz_change-request_rev6-validation.log) — Change Request CR-TASK-260910-1952mz-6 revision 6 bounded validation log
+- [TASK-260910-1952mz_spawn-log_-reviewer--reviewer--codex-_RUN-260917-c2f450.log](file://TASK-260910-1952mz/TASK-260910-1952mz_spawn-log_-reviewer--reviewer--codex-_RUN-260917-c2f450.log) — System spawn log captured by task-board
+- [TASK-260910-1952mz_review-verdict-rev6.md](file://TASK-260910-1952mz/TASK-260910-1952mz_review-verdict-rev6.md) — Accepted revision 6: independent conformance, integration tests, 14 vectors and two killed narrowing mutants
+- [TASK-260910-1952mz_review-evidence-rev6.tar.gz](file://TASK-260910-1952mz/TASK-260910-1952mz_review-evidence-rev6.tar.gz) — Raw independent validation, mutation failures, same-file probe and exact-candidate hosted log
+- [TASK-260910-1952mz_review-logbook-rev6.md](file://TASK-260910-1952mz/TASK-260910-1952mz_review-logbook-rev6.md) — Review observations and operational anomalies; candidate unchanged
+- [TASK-260910-1952mz_spawn-log_-implementer--developer--muse-_RUN-260917-e67105.log](file://TASK-260910-1952mz/TASK-260910-1952mz_spawn-log_-implementer--developer--muse-_RUN-260917-e67105.log) — System spawn log captured by task-board
+- [TASK-260910-1952mz_checkpoint-rev6.md](file://TASK-260910-1952mz/TASK-260910-1952mz_checkpoint-rev6.md) — Checkpoint record for accepted CR revision 6 (commit d489ae0, leaf stays integrating)
+- [TASK-260910-1952mz_spawn-log_-implementer--developer--muse-_RUN-260917-0e8d7e.log](file://TASK-260910-1952mz/TASK-260910-1952mz_spawn-log_-implementer--developer--muse-_RUN-260917-0e8d7e.log) — System spawn log captured by task-board
 
 ## Created
 2026-09-10T14:43:12Z
 
 ## Last Update
-2026-09-17T09:30:30Z
+2026-09-17T11:23:06Z
 
 ## Assigned To
 [implementer] developer (muse)
