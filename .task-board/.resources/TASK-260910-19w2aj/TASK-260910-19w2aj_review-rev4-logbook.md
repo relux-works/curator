@@ -1,0 +1,3 @@
+# TASK-260910-19w2aj review logbook — 2026-09-17
+
+Revision 4 review reproduced two production gaps despite green focused tests and hosted gate: CLI resolve omits SkillsRoot (dependency lookup falls into CWD), and frozen ref recovery collapses source aliases by repository identity (selected v2 becomes marker v1). See TASK-260910-19w2aj_review-verdict-rev4.md and its two attached CLI fixture/log pairs. Request implementation rework; preserve rev4 authentication fixes. No external blocker. Stored as a task-scoped logbook outcome because campaign instructions forbid LOGBOOK.md edits and no logbook executable is available.

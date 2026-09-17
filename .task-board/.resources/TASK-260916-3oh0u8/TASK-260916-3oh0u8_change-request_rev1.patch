@@ -1,0 +1,2395 @@
+diff --git a/.github/ci/platform-cases.tsv b/.github/ci/platform-cases.tsv
+index 9aa1061..7559802 100644
+--- a/.github/ci/platform-cases.tsv
++++ b/.github/ci/platform-cases.tsv
+@@ -352,6 +352,7 @@ cmd/curator	TestEnvStatusMatrix	linux,darwin,windows	-	-	env status reports the
+ cmd/curator	TestUmbrellaMissingProvider	linux,darwin,windows	-	-	an unknown subcommand with no provider names the executable and the installation guidance
+ cmd/curator	TestUmbrellaDispatchesToProvider	linux,darwin	windows	host-capability	the provider receives the remaining arguments verbatim over a POSIX launcher fixture
+ cmd/curator	TestUmbrellaPropagatesExitCode	linux,darwin	windows	host-capability	the provider exit code is the command exit code over a POSIX launcher fixture
++cmd/curator	TestUmbrellaProviderResolutionVectors	linux,darwin,windows	linux,darwin,windows	root-content	each umbrella-provider-resolution vector case resolves through the production lookup under both rollout revisions
+ 
+ # Opt-in developer probe -- never required, always tolerated.
+ # ===========================================================================
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index d746c5d..6bc7f7d 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -6,6 +6,26 @@ All notable implementation changes are recorded here.
+ 
+ ### Added
+ 
++- E4: umbrella provider lookup from trust roots (warning release,
++  revision A). Unknown subcommands still resolve `curator-<name>` on the
++  ambient `PATH`, but the manager now computes the trust verdict against
++  the trust roots — the manager install directory, then the new
++  machine-configuration `provider_directories` list (environments
++  §11/§12.1, lockable under §12.2) — and warns
++  `subcommand_provider_outside_trust_roots` with the resolved path, the
++  roots consulted, and the migration hint when the selection lies
++  outside them. Providers inside manager-published or managed
++  directories stay refused (`subcommand_provider_untrusted`), an
++  unreadable trust root fails (`subcommand_provider_root_unreadable`,
++  never absence), and `env status` reports the resolved provider path
++  with its trust verdict per discovered provider — always `curator-run`
++  and `curator-session` — with refused, missing, and unreadable rows
++  non-current for `--check`. Revision B (trust roots only, `PATH`
++  never selects) follows in a later release; this story blocks proposal
++  0016 / `path_prepend`.
++
++### Added
++
+ - Scoped HTTPS credentials for external build repositories. A `build_https`
+   configuration section maps a source scope to a token source — the operator's
+   own Git credential for the host, a manager-namespaced keyring entry, or a
+diff --git a/TASK-260916-3oh0u8_results.md b/TASK-260916-3oh0u8_results.md
+new file mode 100644
+index 0000000..dc9c36d
+--- /dev/null
++++ b/TASK-260916-3oh0u8_results.md
+@@ -0,0 +1,193 @@
++# TASK-260916-3oh0u8 results — provider lookup from trust roots (E4, manager)
++
++Story STORY-260916-2otjbn, wave 1. Spec: curator-spec `0da4020`
++(`protocol/environments.md` §11/§11.1/§12/§12.1/§12.2,
++`profiles/manager.md` §1, `cli/curator.md`), vectors
++`conformance/v1/vectors/umbrella-provider-resolution.json`.
++Shipped profile: **revision A (warning release)**; revision B is
++implemented behind the same switch and covered by vectors, but not
++shipped. The flip is a later release.
++
++## Per-file changes
++
++- `internal/config/environments.go` — new `Environments.ProviderDirectories`
++  knob: closed list of absolute paths (POSIX-absolute or Windows
++  drive-absolute with either separator, 1–4096 chars, unique),
++  default `[]`, rendered as `[]` (never null); added to
++  `EnvKnobNames` (so `env config show/set/unset` and `SplitEnvKnob`
++  accept it), `LockableEnvKeys`, and `EnvLockKey`.
++- `internal/config/config.go` — `environments.provider_directories`
++  added to the manager §1 `LockableKeys` set (system-file carry +
++  lock allowed; locked-but-unset fails closed via the existing gate).
++- `cmd/curator/umbrella.go` — trust-root resolution. One rollout
++  constant (`activeProviderRevision = providerRevisionA`); both
++  revisions implemented in `resolveProvider`:
++  - trust roots = install dir (running executable resolved through
++    symlinks) then `provider_directories` in order; first executable
++    regular file directly inside a root wins, non-executables
++    skipped, never descending; Windows searches `name+PATHEXT` in
++    order (bare name never matches, as the platform lookup does).
++  - revision A: PATH selects (own ordered search matching LookPath
++    semantics incl. empty-entry and PATHEXT handling); unreadable
++    root fails first (`subcommand_provider_root_unreadable`, first
++    root in order, never absence/fallback); managed/published
++    candidate refused (`subcommand_provider_untrusted`, path +
++    roots); inside-roots resolves silently; outside resolves with
++    `subcommand_provider_outside_trust_roots` (path, roots, hint);
++    no PATH match is `subcommand_provider_missing` (roots named)
++    even when a root holds it.
++  - revision B: roots scanned in order (unreadable fails at
++    encounter, earlier match wins); managed/published match
++    refused; diagnostic-only PATH probe refused; else missing.
++    Five outcomes disjoint.
++  - refused set = user-bin shim dir (directly inside), managed
++    skill bin dirs (global `bin` + every configured project's
++    `.agents/bin`, directly inside), environments root (at or
++    below); symlink-aware on both sides.
++  - discovery (`discoverProviderNames`) + posture rows
++    (`providerPosture`) for §12.
++- `cmd/curator/main.go` — umbrella branch threads the loaded config
++  (nil when unloadable → install dir alone) into `cmdUmbrella`.
++- `cmd/curator/env.go` — `env status` attaches provider posture after
++  `StatusOf`.
++- `cmd/curator/envstatus.go` — `provider <name>:` rows (path +
++  verdict + current/non-current) and `attachProviderPosture`
++  (refused/missing/unreadable rows set `NonCurrent`, so `--check`
++  fails; the warning row stays current).
++- `internal/envprofile/status.go` — data-only `ProviderState` +
++  verdict constants and `Status.Providers` (`providers` in JSON);
++  no §11 logic there (resolution stays in `cmd/curator` per scope).
++- `cmd/curator/umbrella_conformance_test.go` (new) — executes every
++  vector case for both revisions through `resolveProvider`.
++- `cmd/curator/umbrella_test.go` (new) — hostile plant (warned
++  end-to-end under A, refused under B), selection matrix, refused
++  dirs incl. symlink, unreadable-never-absence, missing/warning
++  text, posture rows, name/candidate parsing, shipped-revision pin.
++- `cmd/curator/envconfig_test.go`, `cmd/curator/env_test.go` —
++  knob CLI round-trip + lock tests; status matrix plants stub
++  providers (warned-current under A) and asserts the new rows and
++  the `providers` JSON member (see contract note below).
++- `internal/config/environments_test.go` — knob grammar/default/
++  render/lock/write tests; §12.2 transcription extended to seven
++  keys per the landed spec.
++- `.github/ci/platform-cases.tsv` — ledger row for
++  `TestUmbrellaProviderResolutionVectors` (all platforms,
++  `root-content`, mirroring the godriver row).
++- `CHANGELOG.md` — Unreleased E4 warning-release entry (revision B
++  later, 0016 dependency).
++
++## How each AC line is met (file:line)
++
++- "Conformance subset green" — `TestUmbrellaProviderResolutionVectors`
++  (`cmd/curator/umbrella_conformance_test.go:58`): all 14 cases ×
++  both revisions pass against `0da4020` (exit 0). Provider schema
++  cases: all four `invalid-provider-directories-*` schema cases
++  (manager + system families) pass through `Load`, and the minimal
++  invalid vector `schema2-provider-directories-relative` passes
++  through `Parse`; the full-file *valid* provider cases reject
++  only for the sibling story's `transitive_system_modules` /
++  `system_module_waivers` knobs (verified: zero failures mention
++  `provider_directories`).
++- "a curator-run planted through a PATH entry outside the trust
++  roots is refused" — refused under B:
++  `TestUmbrellaHostilePathPlantRefusedUnderB`
++  (`cmd/curator/umbrella_test.go`), plus the vector case
++  `s6-planted-path-provider-warns-then-refuses` (B expects
++  `subcommand_provider_untrusted`, null resolved); warned under
++  the shipped A: `TestUmbrellaHostilePathPlantWarnsUnderAEndToEnd`
++  (end-to-end through `run()`: dispatches + warns).
++
++## Validation transcripts (real exit codes, `sh`, unpiped gates)
++
++Conformance root exported unless noted:
++`CURATOR_CONFORMANCE_ROOT=…/curator-spec/conformance/v1` (`0da4020`).
++
++- `go build ./...` → exit 0.
++- `go vet ./...` → exit 0.
++- `gofmt -l .` → clean (no output).
++- `golangci-lint run ./cmd/curator/... ./internal/config/...
++  ./internal/envprofile/...` → exit 0, 0 issues (one
++  `ineffassign` in a new test found and fixed first).
++- `go test ./cmd/curator/ -run '<22-test mask: all umbrella,
++  vector, env-status, envconfig-knob, TestRunUnknownCommand>'`
++  → exit 0, 22/22 PASS, 14/14 vector subtests PASS.
++- `go test ./cmd/curator/ -run 'TestEnv|TestUmbrella|TestRun|
++  TestConfig|TestGlobal|TestProfile'` → exit 0, `ok` (454 s;
++  96 tests matched, zero FAIL/panic lines in the log).
++- `go test ./internal/config/ -run '<knob mask>'` → exit 0.
++- `go test ./internal/config/` (full) → exit 1: 44 subtests fail,
++  ALL solely for out-of-scope knobs (`transitive_system_modules`,
++  `system_module_waivers`, and the S4 `passable_env_names`
++  default change). Proven same-root causes, none mine:
++  `unsupported field` counts are 11× system_module_waivers, 8×
++  transitive_system_modules, 1× lock refusal for transitive; and
++  `schema2-passable-env-absent-empty` fails identically on the
++  pristine baseline (verified via stash + rerun + pop, exit 1
++  both ways). On the CI pin (`87a0d00`) these cases do not exist
++  and the package is green.
++- `go test ./internal/envprofile/ -run 'TestStatus|TestProvider|
++  StatusOf'` → exit 0. Full package: NOT green in this session —
++  `TestSCPOverlayResolvesAsGit` (git-subprocess overlay test in
++  an untouched file) hung past the 10 m `go test` timeout under
++  concurrent-agent load on this host; unrelated to this change
++  (my envprofile diff adds only a struct field/type/constants).
++- Skip paths: unset root → exit 0, `SKIP
++  (CURATOR_CONFORMANCE_ROOT is not set)`; root without the vector
++  → exit 0, `SKIP (… publishes no umbrella-provider-resolution
++  vector)` — the `publishes no ` root-content pattern.
++- Narrowing mutants (each reverted after; revert verified by
++  grep): B-probe-refusal→missing → exit 1 (4 vector subtests +
++  hostile test fail; trust-root refusal still passes, proving
++  narrowness); A-warn→silent → exit 1 (4 vector subtests + 3
++  warn tests fail); grammar accepts relative → exit 1
++  (`schema2-provider-directories-relative` vector + 3 unit
++  subtests fail).
++- Full `go test ./cmd/curator/` (incl. compiled-build lanes) was
++  NOT run here: the package TestMain serializes on the host
++  GOROOT lock, which concurrent agents on this host hold for
++  minutes at a time (one attempt failed to acquire it within
++  TestMain's 5 min budget without running a single test). The
++  runtime's `scripts/remote-gate.sh` runs the full suite at
++  handoff. Relevant-blast-radius subsets above are green.
++
++## Profile shipped
++
++Revision A (warning release): `activeProviderRevision =
++providerRevisionA` (`cmd/curator/umbrella.go`), pinned by
++`TestActiveRevisionIsWarningRelease`. PATH still selects; the
++trust verdict warns. Revision B ships in a later release.
++
++## Deliberately out of scope
++
++- Launcher side (`TASK-260916-16ys92`), proposal 0016 itself,
++  SPEC_PIN, spec edits.
++- Sibling knobs in the same root families
++  (`transitive_system_modules`, `system_module_waivers`, S4
++  `passable_env_names` default): not implemented; their red
++  cases are reported, not patched around.
++- `curator status` (project-skills surface) carries no provider
++  rows: the spec defines provider posture under `env status`
++  (§12) only, and the brief names `envstatus.go`. Adding rows to
++  `curator status` would invent spec surface.
++
++## Spec gaps / decisions (reported, not patched)
++
++- §11 does not order the revision-A unreadable check against the
++  managed-dir refusal. Implemented: readability first (the
++  general "MUST NOT fall through … to PATH" bullet forbids
++  consulting PATH selection while a root is unreadable).
++- §11 does not say whether a revision-B earlier match outranks a
++  later unreadable root. Implemented encounter order (earlier
++  match wins; "no LATER root … fires"), with a committed test.
++- "Ownership/writability check" (task description): no MUST-level
++  writability enforcement exists in §11 (operator-administered
++  roots are SHOULD-level and unvectorized); implemented as the
++  manager-owned-directory refusal, extended to skill bin dirs.
++- The root's invalid `provider-directories` schema cases are
++  full every-knob files: they reject for the sibling knobs first
++  and cannot isolate this grammar until that story lands. The
++  minimal invalid vector + unit tests isolate it (proven by M3).
++- Existing `TestEnvStatusMatrix` asserted post-repair `--check`
++  exit 0 under the pre-E4 contract; the landed spec makes
++  missing provider rows non-current, so the test now plants stub
++  providers (warned-current under A) with that standing noted.
+diff --git a/cmd/curator/env.go b/cmd/curator/env.go
+index 96a10b6..1c2d74b 100644
+--- a/cmd/curator/env.go
++++ b/cmd/curator/env.go
+@@ -102,6 +102,7 @@ func (c cli) cmdEnvStatus(cfg *config.Config, args []string) int {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitFail
+ 	}
++	attachProviderPosture(cfg, status)
+ 	if *asJSON {
+ 		payload, err := json.MarshalIndent(status, "", "  ")
+ 		if err != nil {
+diff --git a/cmd/curator/env_test.go b/cmd/curator/env_test.go
+index 61eb006..a551f92 100644
+--- a/cmd/curator/env_test.go
++++ b/cmd/curator/env_test.go
+@@ -95,6 +95,21 @@ func TestEnvResolveUnknowns(t *testing.T) {
+ // --check and --json.
+ func TestEnvStatusMatrix(t *testing.T) {
+ 	source, _ := profileHome(t)
++	// The §12 provider rows join the matrix: run and session are always
++	// reported, and a missing row is non-current — so the post-repair
++	// --check plants stub providers, which warn outside the trust
++	// roots under revision A but stay current.
++	bin := t.TempDir()
++	for _, name := range []string{"curator-run", "curator-session"} {
++		full := filepath.Join(bin, name)
++		if runtime.GOOS == "windows" {
++			full += ".exe"
++		}
++		if err := os.WriteFile(full, []byte(""), 0o755); err != nil {
++			t.Fatal(err)
++		}
++	}
++	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+ 	pkg := t.TempDir()
+ 	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
+ 	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
+@@ -129,6 +144,11 @@ func TestEnvStatusMatrix(t *testing.T) {
+ 			t.Fatalf("status rows miss %q:\n%s", want, stdout)
+ 		}
+ 	}
++	for _, want := range []string{"provider run:", "provider session:", "subcommand_provider_outside_trust_roots"} {
++		if !strings.Contains(stdout, want) {
++			t.Fatalf("status rows miss %q:\n%s", want, stdout)
++		}
++	}
+ 	code, jsonOut, _ := runProfile(t, source, "env", "status", "--json")
+ 	if code != exitOK {
+ 		t.Fatalf("status --json = %d", code)
+@@ -137,7 +157,7 @@ func TestEnvStatusMatrix(t *testing.T) {
+ 	if err := json.Unmarshal([]byte(jsonOut), &decoded); err != nil {
+ 		t.Fatalf("status --json is not JSON: %v", err)
+ 	}
+-	for _, key := range []string{"homes", "scopes", "adapters", "targets", "profiles", "unregistered_environments", "orphans", "notes", "non_current"} {
++	for _, key := range []string{"homes", "scopes", "adapters", "targets", "profiles", "providers", "unregistered_environments", "orphans", "notes", "non_current"} {
+ 		if _, ok := decoded[key]; !ok {
+ 			t.Fatalf("status --json misses snake_case member %q: %v", key, decoded)
+ 		}
+@@ -145,6 +165,24 @@ func TestEnvStatusMatrix(t *testing.T) {
+ 	if _, ok := decoded["Homes"]; ok {
+ 		t.Fatalf("status --json publishes Go field names: %v", decoded)
+ 	}
++	providers, _ := decoded["providers"].([]any)
++	names := map[string]bool{}
++	for _, entry := range providers {
++		row, _ := entry.(map[string]any)
++		if row == nil {
++			t.Fatalf("provider row is not an object: %v", entry)
++		}
++		for _, key := range []string{"name", "executable", "resolved", "verdict", "current", "trust_roots_consulted"} {
++			if _, ok := row[key]; !ok {
++				t.Fatalf("provider row misses snake_case member %q: %v", key, row)
++			}
++		}
++		name, _ := row["name"].(string)
++		names[name] = true
++	}
++	if !names["run"] || !names["session"] {
++		t.Fatalf("providers miss the always-reported rows: %v", names)
++	}
+ }
+ 
+ // TestUmbrellaMissingProvider narrows the discovery gate: an unknown
+@@ -183,6 +221,11 @@ func TestUmbrellaDispatchesToProvider(t *testing.T) {
+ 	if !strings.Contains(stdout, "provider got: alpha --beta") {
+ 		t.Fatalf("provider did not receive argv verbatim:\n%s", stdout)
+ 	}
++	// The temp bin is outside the trust roots, so revision A dispatches
++	// with the migration warning.
++	if !strings.Contains(stderr, "subcommand_provider_outside_trust_roots") {
++		t.Fatalf("stderr carries no outside-roots warning:\n%s", stderr)
++	}
+ }
+ 
+ // TestUmbrellaPropagatesExitCode proves the provider's exit code is the
+diff --git a/cmd/curator/envconfig_test.go b/cmd/curator/envconfig_test.go
+index 1367fed..b74e359 100644
+--- a/cmd/curator/envconfig_test.go
++++ b/cmd/curator/envconfig_test.go
+@@ -116,6 +116,79 @@ func TestEnvConfigRefusals(t *testing.T) {
+ 	}
+ }
+ 
++// TestEnvConfigProviderDirectoriesRoundTrip proves the §11/§12.1 knob
++// travels the env config read-modify-write path: show reads the []
++// default, set stores the list, show reads it back, an invalid
++// spelling is refused without writing, and unset restores the default.
++func TestEnvConfigProviderDirectoriesRoundTrip(t *testing.T) {
++	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
++	code, stdout, _ := runProfile(t, source, "env", "config", "show", "provider_directories")
++	if code != exitOK || strings.TrimSpace(stdout) != "[]" {
++		t.Fatalf("show default = %d %q, want []", code, stdout)
++	}
++	code, stdout, stderr := runProfile(t, source, "env", "config", "set", "provider_directories", `["/opt/a", "/opt/b"]`)
++	if code != exitOK {
++		t.Fatalf("set = %d\nstderr:\n%s", code, stderr)
++	}
++	if !strings.Contains(stdout, "/opt/a") || !strings.Contains(stdout, "/opt/b") {
++		t.Fatalf("set printed %q, want the stored list", stdout)
++	}
++	source = reloadSource(t, source)
++	code, stdout, _ = runProfile(t, source, "env", "config", "show", "provider_directories")
++	if code != exitOK || !strings.Contains(stdout, "/opt/a") || !strings.Contains(stdout, "/opt/b") {
++		t.Fatalf("show after set = %d %q", code, stdout)
++	}
++	code, _, stderr = runProfile(t, source, "env", "config", "set", "provider_directories", `["rel/providers"]`)
++	if code != exitFail || !strings.Contains(stderr, "provider_directories") {
++		t.Fatalf("set of a relative entry = %d, want the grammar refusal\nstderr:\n%s", code, stderr)
++	}
++	source = reloadSource(t, source)
++	if len(source.cfg.Env.ProviderDirectories) != 2 {
++		t.Fatalf("a refused set wrote the machine file: %v", source.cfg.Env.ProviderDirectories)
++	}
++	code, _, stderr = runProfile(t, source, "env", "config", "unset", "provider_directories")
++	if code != exitOK {
++		t.Fatalf("unset = %d\nstderr:\n%s", code, stderr)
++	}
++	source = reloadSource(t, source)
++	code, stdout, _ = runProfile(t, source, "env", "config", "show", "provider_directories")
++	if code != exitOK || strings.TrimSpace(stdout) != "[]" {
++		t.Fatalf("show after unset = %d %q, want []", code, stdout)
++	}
++}
++
++// TestEnvConfigProviderDirectoriesLockedRefuses drives the §12.2 fleet
++// policy through run(): a system file locks the list, a set refuses
++// with the system-file warning, and show reads the locked value.
++func TestEnvConfigProviderDirectoriesLockedRefuses(t *testing.T) {
++	source, _ := profileHome(t)
++	home := t.TempDir()
++	userPath := filepath.Join(home, "config.json")
++	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	systemPath := filepath.Join(home, "system.json")
++	if err := os.WriteFile(systemPath, []byte(`{"schema_version": 2, "locked": ["environments.provider_directories"],
++		"environments": {"provider_directories": ["/opt/fleet"]}}`), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
++	cfg, err := config.Load(userPath, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	source.path = userPath
++	source.cfg = cfg
++	code, _, stderr := runProfile(t, source, "env", "config", "set", "provider_directories", `["/opt/user"]`)
++	if code != exitFail || !strings.Contains(stderr, systemPath) {
++		t.Fatalf("set on the locked knob = %d, want the system-file refusal\nstderr:\n%s", code, stderr)
++	}
++	code, stdout, _ := runProfile(t, source, "env", "config", "show", "provider_directories")
++	if code != exitOK || !strings.Contains(stdout, "/opt/fleet") {
++		t.Fatalf("show of the locked knob = %d %q", code, stdout)
++	}
++}
++
+ // TestEnvConfigLockedKnobRefuses drives the manager §1 locked-key refusal
+ // through run(): a locked knob refuses with the system-file warning and the
+ // file is unchanged.
+diff --git a/cmd/curator/envstatus.go b/cmd/curator/envstatus.go
+index bf64bd2..15a109b 100644
+--- a/cmd/curator/envstatus.go
++++ b/cmd/curator/envstatus.go
+@@ -3,7 +3,10 @@ package main
+ import (
+ 	"fmt"
+ 	"io"
++	"path/filepath"
++	"sort"
+ 
++	"github.com/relux-works/curator/internal/config"
+ 	"github.com/relux-works/curator/internal/envprofile"
+ )
+ 
+@@ -65,6 +68,9 @@ func printEnvStatus(stdout io.Writer, status *envprofile.Status) {
+ 	for _, adapter := range status.Adapters {
+ 		_, _ = fmt.Fprintf(stdout, "tool %s: recorded %s detected %s\n", adapter.ID, adapter.Recorded, adapter.Detected)
+ 	}
++	for _, provider := range status.Providers {
++		_, _ = fmt.Fprintf(stdout, "provider %s: %s\n", provider.Name, describeProvider(provider))
++	}
+ 	for _, target := range status.Targets {
+ 		_, _ = fmt.Fprintf(stdout, "target %s (%s): participating=%v (%s); %s\n", target.ID, target.Adapter, target.Participating, target.Detail, target.Ungoverned)
+ 	}
+@@ -86,6 +92,55 @@ func printEnvStatus(stdout io.Writer, status *envprofile.Status) {
+ 	}
+ }
+ 
++// describeProvider renders one §12 umbrella provider row: the resolved
++// absolute provider path with its trust verdict. A refused or failed
++// provider row is non-current; the revision-A outside-roots warning row
++// stays current.
++func describeProvider(provider envprofile.ProviderState) string {
++	state := "current"
++	if !provider.Current {
++		state = "non-current"
++	}
++	switch provider.Verdict {
++	case envprofile.ProviderTrusted:
++		return fmt.Sprintf("%s (trusted, %s)", derefProvider(provider.Resolved), state)
++	case envprofile.ProviderOutsideTrustRoots:
++		return fmt.Sprintf("%s (%s, %s)", derefProvider(provider.Resolved), derefProvider(provider.Diagnostic), state)
++	case envprofile.ProviderRefused:
++		return fmt.Sprintf("%s (%s, %s)", derefProvider(provider.RefusedPath), derefProvider(provider.Diagnostic), state)
++	case envprofile.ProviderUnreadable:
++		return fmt.Sprintf("unreadable trust root %s (%s, %s)", derefProvider(provider.UnreadableDirectory), derefProvider(provider.Diagnostic), state)
++	default:
++		return fmt.Sprintf("missing (%s, %s)", derefProvider(provider.Diagnostic), state)
++	}
++}
++
++// derefProvider renders an optional provider field, never empty.
++func derefProvider(value *string) string {
++	if value == nil || *value == "" {
++		return "-"
++	}
++	return *value
++}
++
++// attachProviderPosture resolves the §12 umbrella provider rows for the
++// loaded machine configuration and folds their currency into the
++// matrix: a refused, missing, or unreadable provider row is
++// non-current, so env status --check fails while one stands.
++func attachProviderPosture(cfg *config.Config, status *envprofile.Status) {
++	var projectBins []string
++	for _, project := range cfg.Projects {
++		projectBins = append(projectBins, filepath.Join(project.Path, ".agents", "bin"))
++	}
++	sort.Strings(projectBins)
++	status.Providers = providerPosture(cfg.Home(), cfg.Env.ProviderDirectories, projectBins)
++	for _, provider := range status.Providers {
++		if !provider.Current {
++			status.NonCurrent = true
++		}
++	}
++}
++
+ func shortHash(hash string) string {
+ 	if len(hash) > 19 {
+ 		return hash[:19] + "…"
+diff --git a/cmd/curator/main.go b/cmd/curator/main.go
+index 3dd9ed2..6b83b95 100644
+--- a/cmd/curator/main.go
++++ b/cmd/curator/main.go
+@@ -206,10 +206,12 @@ func (c cli) run(args []string) int {
+ 	// is the root a future config there would own.
+ 	if identifiers.Valid(args[0]) {
+ 		home := filepath.Dir(c.config.Path())
+-		if cfg, code := c.loadConfig(); code == exitOK {
++		var cfg *config.Config
++		if loaded, code := c.loadConfig(); code == exitOK {
++			cfg = loaded
+ 			home = cfg.Home()
+ 		}
+-		return c.cmdUmbrella(home, args)
++		return c.cmdUmbrella(cfg, home, args)
+ 	}
+ 	_, _ = fmt.Fprintf(c.stderr, "curator: unknown command %q\n\n%s", args[0], usage)
+ 	return exitUsage
+diff --git a/cmd/curator/umbrella.go b/cmd/curator/umbrella.go
+index 84d4c11..2d487a0 100644
+--- a/cmd/curator/umbrella.go
++++ b/cmd/curator/umbrella.go
+@@ -6,63 +6,430 @@ import (
+ 	"os/exec"
+ 	"path/filepath"
+ 	"runtime"
++	"sort"
+ 	"strings"
+ 
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/envprofile"
+ 	"github.com/relux-works/curator/internal/envregistry"
+ 	"github.com/relux-works/curator/internal/globalbins"
++	"github.com/relux-works/curator/internal/identifiers"
++	"github.com/relux-works/curator/internal/install"
+ )
+ 
+ // Umbrella subcommand discovery (environments §11): a CLI subcommand the
+ // manager does not implement resolves to an executable named curator-<name>
+-// on PATH and is executed with the remaining arguments verbatim — the git,
+-// kubectl, and docker external-subcommand convention — except that the run
+-// row rewrites a leading claude/codex alias to its canonical environment
+-// id first (manager profile §12.1). The manager carries no knowledge of
+-// any provider: no provider registry, no provider-specific flags, no
+-// version coupling. The first providers are curator-run (the launcher,
+-// its own specification) and curator-session (a shim to the agent
+-// session manager); neither ships here.
+-
+-// findProvider resolves curator-<name> on PATH. Profile, marker, and
+-// fragment data never influence the dispatched name, the resolved path,
+-// or the argument vector: dispatch input is operator argv and PATH alone.
+-// A provider inside a manager-published or managed directory — the
+-// user-bin shim directory, or any directory below the environments root —
+-// is refused with subcommand_provider_untrusted, so profile-materialized
+-// files cannot poison the PATH the dispatch trusts.
+-func findProvider(home, name string) (string, error) {
+-	path, err := exec.LookPath("curator-" + name)
+-	if err != nil {
+-		return "", fmt.Errorf("subcommand_provider_missing: no curator-%s on PATH: install the %s provider; nothing is downloaded or installed implicitly", name, name)
++// and is executed with the remaining arguments verbatim — the git,
++// kubectl, and docker external-subcommand convention, closed to the search
++// each rollout revision names — except that the run row rewrites a leading
++// claude/codex alias to its canonical environment id first (manager
++// profile §12.1). The manager carries no knowledge of any provider: no
++// provider registry, no provider-specific flags, no version coupling. The
++// first providers are curator-run (the launcher, its own specification)
++// and curator-session (a shim to the agent session manager); neither
++// ships here.
++//
++// The provider trust roots, in search order, are the install directory —
++// the directory holding the running manager executable, resolved after
++// symlinks — then the machine-configuration provider_directories list.
++
++// Closed §11.1 diagnostics for umbrella provider lookup.
++const (
++	providerDiagnosticMissing        = "subcommand_provider_missing"
++	providerDiagnosticUntrusted      = "subcommand_provider_untrusted"
++	providerDiagnosticOutsideRoots   = "subcommand_provider_outside_trust_roots"
++	providerDiagnosticRootUnreadable = "subcommand_provider_root_unreadable"
++)
++
++// providerRevision selects the §11 rollout profile.
++type providerRevision int
++
++const (
++	// providerRevisionA is the warning release: the ambient PATH still
++	// selects, and a selection outside the trust roots warns.
++	providerRevisionA providerRevision = iota + 1
++	// providerRevisionB is the flip release: the trust roots select, the
++	// ambient PATH never does, and a PATH-only match is refused.
++	providerRevisionB
++)
++
++// activeProviderRevision is the ONE rollout switch: the revision this
++// release ships. Both revisions are implemented so the conformance
++// vectors for both run; the flip to B is a later release, never this
++// change.
++const activeProviderRevision = providerRevisionA
++
++// defaultWindowsPathExt is the PATHEXT fallback Go's own lookup uses
++// when the variable is empty.
++var defaultWindowsPathExt = []string{".com", ".exe", ".bat", ".cmd"}
++
++// labeledDir is a refused directory with the human label the
++// subcommand_provider_untrusted refusal names.
++type labeledDir struct {
++	path  string
++	label string
++}
++
++// providerInputs drives resolveProvider: the trust roots, the refused
++// directories, and the ambient search domain. Production builds it from
++// the host; the conformance vectors build it from the case.
++type providerInputs struct {
++	installDir    string
++	providerDirs  []string
++	publishedDirs []labeledDir
++	managedRoots  []labeledDir
++	pathEntries   []string
++	platform      string
++	pathExt       []string
++	revision      providerRevision
++}
++
++// providerOutcome is one §11 lookup. Resolved names the absolute
++// provider path when the revision selects it — silently, or with the
++// revision-A warning when warned is set. Otherwise diagnostic names the
++// closed failure and resolved is empty; the five outcomes are disjoint.
++type providerOutcome struct {
++	resolved      string
++	warned        bool
++	diagnostic    string
++	roots         []string
++	revision      providerRevision
++	untrustedPath string
++	refusedLabel  string
++	unreadableDir string
++	unreadableErr error
++	hintDir       string
++}
++
++// trustRootsOf returns the §11 search order: the install directory,
++// then provider_directories in listed order.
++func trustRootsOf(installDir string, providerDirs []string) []string {
++	roots := make([]string, 0, len(providerDirs)+1)
++	roots = append(roots, installDir)
++	roots = append(roots, providerDirs...)
++	return roots
++}
++
++// resolveProvider runs one §11 lookup for curator-<name>. Profile,
++// marker, and fragment data never influence the dispatched name, the
++// resolved path, or the argument vector: dispatch input is operator argv,
++// the trust roots, and machine configuration alone.
++func resolveProvider(name string, in providerInputs) providerOutcome {
++	exe := "curator-" + name
++	roots := trustRootsOf(in.installDir, in.providerDirs)
++	if in.revision == providerRevisionB {
++		return resolveRevisionB(exe, in, roots)
++	}
++	return resolveRevisionA(exe, in, roots)
++}
++
++// resolveRevisionA is exactly the pre-change behavior with the trust
++// verdict: the ambient PATH selects, a PATH match inside a
++// manager-published or managed directory is refused, an unreadable trust
++// root fails instead of resolving, a PATH match inside a trust root
++// resolves silently, a PATH match outside the trust roots resolves with
++// the migration warning, and no PATH match is missing — even when a
++// trust root holds the provider, which revision A never consults for
++// selection.
++func resolveRevisionA(exe string, in providerInputs, roots []string) providerOutcome {
++	if dir, err := firstUnreadableRoot(roots); err != nil {
++		return providerOutcome{diagnostic: providerDiagnosticRootUnreadable, roots: roots, revision: providerRevisionA, unreadableDir: dir, unreadableErr: err}
+ 	}
+-	if untrusted, dir := providerUntrustedDir(home, path); untrusted {
+-		return "", fmt.Errorf("subcommand_provider_untrusted: curator-%s resolved inside %s (%s)", name, dir, path)
++	match, found := searchOrderedDirs(exe, in.pathEntries, in)
++	if !found {
++		return providerOutcome{diagnostic: providerDiagnosticMissing, roots: roots, revision: providerRevisionA}
+ 	}
+-	return path, nil
++	absolute := mustAbsolute(match)
++	canonical := canonicalPath(absolute)
++	if refused, label := refuseDir(canonical, in.publishedDirs, in.managedRoots); refused {
++		return providerOutcome{diagnostic: providerDiagnosticUntrusted, roots: roots, revision: providerRevisionA, untrustedPath: absolute, refusedLabel: label}
++	}
++	if insideTrustRoots(canonical, roots) {
++		return providerOutcome{resolved: absolute, roots: roots, revision: providerRevisionA}
++	}
++	return providerOutcome{resolved: absolute, warned: true, diagnostic: providerDiagnosticOutsideRoots, roots: roots, revision: providerRevisionA, hintDir: filepath.Dir(absolute)}
+ }
+ 
+-// providerUntrustedDir reports whether the resolved provider lives in a
+-// directory the manager itself publishes onto PATH.
+-func providerUntrustedDir(home, path string) (bool, string) {
+-	absolute, err := filepath.Abs(path)
+-	if err != nil {
+-		return false, ""
++// resolveRevisionB searches the trust roots in order for the first
++// executable regular file directly inside a root, then performs the
++// diagnostic-only PATH probe. The five outcomes are mutually exclusive:
++// a trusted match resolves silently; a match inside a
++// manager-published or managed directory is refused; a probe match is
++// refused; neither holding the provider is missing; and an unreadable
++// trust root fails with no later root, probe, or absence outcome firing.
++func resolveRevisionB(exe string, in providerInputs, roots []string) providerOutcome {
++	for _, root := range roots {
++		if err := checkRootReadable(root); err != nil {
++			return providerOutcome{diagnostic: providerDiagnosticRootUnreadable, roots: roots, revision: providerRevisionB, unreadableDir: root, unreadableErr: err}
++		}
++		match, found := searchOneDir(exe, root, in)
++		if !found {
++			continue
++		}
++		absolute := mustAbsolute(match)
++		canonical := canonicalPath(absolute)
++		if refused, label := refuseDir(canonical, in.publishedDirs, in.managedRoots); refused {
++			return providerOutcome{diagnostic: providerDiagnosticUntrusted, roots: roots, revision: providerRevisionB, untrustedPath: absolute, refusedLabel: label}
++		}
++		return providerOutcome{resolved: absolute, roots: roots, revision: providerRevisionB}
++	}
++	if match, found := searchOrderedDirs(exe, in.pathEntries, in); found {
++		absolute := mustAbsolute(match)
++		canonical := canonicalPath(absolute)
++		_, label := refuseDir(canonical, in.publishedDirs, in.managedRoots)
++		return providerOutcome{diagnostic: providerDiagnosticUntrusted, roots: roots, revision: providerRevisionB, untrustedPath: absolute, refusedLabel: label}
++	}
++	return providerOutcome{diagnostic: providerDiagnosticMissing, roots: roots, revision: providerRevisionB}
++}
++
++// searchOrderedDirs searches directories in order for the first
++// executable regular file named exe directly inside one, skipping
++// non-executables and never descending. An empty entry means the
++// working directory on unix (shell semantics) and is skipped on
++// Windows, matching the platform lookup.
++func searchOrderedDirs(exe string, dirs []string, in providerInputs) (string, bool) {
++	for _, dir := range dirs {
++		if dir == "" {
++			if in.platform == "windows" {
++				continue
++			}
++			dir = "."
++		}
++		if match, found := searchOneDir(exe, dir, in); found {
++			return match, true
++		}
++	}
++	return "", false
++}
++
++// searchOneDir names the executable directly inside dir: the bare name
++// on unix, the PATHEXT candidates in order on Windows.
++func searchOneDir(exe, dir string, in providerInputs) (string, bool) {
++	for _, candidate := range executableCandidates(exe, in) {
++		full := filepath.Join(dir, candidate)
++		if isExecutableFile(full, in.platform) {
++			return full, true
++		}
++	}
++	return "", false
++}
++
++// executableCandidates lists the filenames a provider may carry: the
++// bare executable name on unix, the name plus each PATHEXT extension in
++// order on Windows — where an extensionless file is not executable and
++// never matches, exactly as the platform lookup behaves.
++func executableCandidates(exe string, in providerInputs) []string {
++	if in.platform != "windows" {
++		return []string{exe}
++	}
++	exts := in.pathExt
++	if len(exts) == 0 {
++		exts = defaultWindowsPathExt
++	}
++	out := make([]string, 0, len(exts))
++	for _, ext := range exts {
++		out = append(out, exe+ext)
++	}
++	return out
++}
++
++// isExecutableFile reports whether path is an executable regular file:
++// a regular file with an execute bit on unix, a regular file with an
++// executable extension on Windows (the caller supplies the extension,
++// so existence as a regular file decides).
++func isExecutableFile(path, platform string) bool {
++	info, err := os.Stat(path)
++	if err != nil || !info.Mode().IsRegular() {
++		return false
++	}
++	if platform == "windows" {
++		return true
++	}
++	return info.Mode().Perm()&0o111 != 0
++}
++
++// firstUnreadableRoot names the first trust root in search order the
++// manager cannot read. Any read failure — including a root that does
++// not exist — is unreadable, never absence (§8.4): the caller fails
++// instead of falling through to a later root, to PATH, or to missing.
++func firstUnreadableRoot(roots []string) (string, error) {
++	for _, root := range roots {
++		if err := checkRootReadable(root); err != nil {
++			return root, err
++		}
++	}
++	return "", nil
++}
++
++func checkRootReadable(root string) error {
++	_, err := os.ReadDir(root)
++	return err
++}
++
++// refuseDir reports whether the canonical candidate path lives in a
++// directory the manager itself publishes onto PATH — directly inside
++// the user-bin shim directory or a managed skill bin directory — or at
++// or below a manager-owned root, so profile-materialized files cannot
++// poison the dispatch the manager trusts. Both sides resolve through
++// symlinks: a provider reached via a shim symlink into a refused
++// directory is still refused.
++func refuseDir(canonical string, published []labeledDir, managed []labeledDir) (bool, string) {
++	dir := filepath.Dir(canonical)
++	for _, entry := range published {
++		if entry.path == "" {
++			continue
++		}
++		if sameDir(dir, canonicalPath(entry.path)) {
++			return true, entry.label
++		}
++	}
++	for _, entry := range managed {
++		if entry.path == "" {
++			continue
++		}
++		if underDir(canonical, canonicalPath(entry.path)) {
++			return true, entry.label
++		}
++	}
++	return false, ""
++}
++
++// insideTrustRoots reports whether the canonical candidate path lies
++// directly inside one of the trust roots.
++func insideTrustRoots(canonical string, roots []string) bool {
++	dir := filepath.Dir(canonical)
++	for _, root := range roots {
++		if sameDir(dir, canonicalPath(root)) {
++			return true
++		}
+ 	}
+-	// Resolve through the link: a provider reached via a shim symlink
+-	// into a managed directory is still a managed directory.
++	return false
++}
++
++// canonicalPath resolves path for directory comparison: absolute,
++// through symlinks when they resolve, cleaned otherwise.
++func canonicalPath(path string) string {
++	absolute := mustAbsolute(path)
+ 	if resolved, err := filepath.EvalSymlinks(absolute); err == nil {
+-		absolute = resolved
++		return resolved
++	}
++	return filepath.Clean(absolute)
++}
++
++func mustAbsolute(path string) string {
++	if absolute, err := filepath.Abs(path); err == nil {
++		return absolute
++	}
++	return path
++}
++
++// rootsConsulted renders the trust roots the outcome names.
++func (o providerOutcome) rootsConsulted() string {
++	return strings.Join(o.roots, ", ")
++}
++
++// failure renders the closed refusal for a lookup that selected
++// nothing: missing, untrusted, or root-unreadable.
++func (o providerOutcome) failure(name string) string {
++	switch o.diagnostic {
++	case providerDiagnosticUntrusted:
++		if o.refusedLabel != "" {
++			return fmt.Sprintf("%s: curator-%s at %s resolved inside %s (trust roots consulted: %s)",
++				o.diagnostic, name, o.untrustedPath, o.refusedLabel, o.rootsConsulted())
++		}
++		return fmt.Sprintf("%s: curator-%s at %s is outside the trust roots consulted (%s)",
++			o.diagnostic, name, o.untrustedPath, o.rootsConsulted())
++	case providerDiagnosticRootUnreadable:
++		return fmt.Sprintf("%s: trust root %s cannot be read: %v",
++			o.diagnostic, o.unreadableDir, o.unreadableErr)
++	default:
++		domain := "on PATH"
++		if o.revision == providerRevisionB {
++			domain = "in the trust roots or the PATH probe"
++		}
++		return fmt.Sprintf("%s: no curator-%s %s (trust roots consulted: %s): install the %s provider; nothing is downloaded or installed implicitly",
++			providerDiagnosticMissing, name, domain, o.rootsConsulted(), name)
++	}
++}
++
++// warningText renders the revision-A outside-trust-roots warning: the
++// resolved path, the roots consulted, and the provider_directories
++// migration hint.
++func (o providerOutcome) warningText(name string) string {
++	return fmt.Sprintf("%s: curator-%s resolved to %s outside the trust roots consulted (%s); list %s in provider_directories to trust it",
++		providerDiagnosticOutsideRoots, name, o.resolved, o.rootsConsulted(), o.hintDir)
++}
++
++// findProvider resolves curator-<name> under the §11 trust-root rule.
++// It returns the absolute provider path, the revision-A warning when
++// the selection lies outside the trust roots, or the closed refusal.
++func findProvider(name string, in providerInputs) (path, warning string, err error) {
++	outcome := resolveProvider(name, in)
++	if outcome.resolved == "" {
++		return "", "", fmt.Errorf("%s", outcome.failure(name))
++	}
++	if outcome.warned {
++		return outcome.resolved, outcome.warningText(name), nil
++	}
++	return outcome.resolved, "", nil
++}
++
++// providerInputsForHost builds the lookup inputs from the running
++// host: the install directory of this executable resolved through
++// symlinks, the machine provider_directories, the refused directories
++// (the user-bin shim directory, the managed skill bin directories, and
++// the environments root), and the ambient PATH.
++func providerInputsForHost(home string, providerDirs, projectBinDirs []string, revision providerRevision) (providerInputs, error) {
++	executable, err := os.Executable()
++	if err != nil {
++		return providerInputs{}, fmt.Errorf("cannot determine the manager install directory: %v", err)
++	}
++	if resolved, err := filepath.EvalSymlinks(executable); err == nil {
++		executable = resolved
+ 	}
+-	dir := filepath.Dir(absolute)
++	published := []labeledDir{}
+ 	userHome, _ := os.UserHomeDir()
+ 	selection := globalbins.Select(home, runtime.GOOS, pathEnvironment(), userHome)
+-	if selection.Path != "" && sameDir(dir, selection.Path) {
+-		return true, "the user-bin shim directory"
++	if selection.Path != "" {
++		published = append(published, labeledDir{path: selection.Path, label: "the user-bin shim directory"})
+ 	}
+-	if underDir(absolute, filepath.Join(home, "environments")) {
+-		return true, "the environments root"
++	published = append(published, labeledDir{path: filepath.Join(install.GlobalRoot(home), "bin"), label: "a managed skill bin directory"})
++	for _, dir := range projectBinDirs {
++		published = append(published, labeledDir{path: dir, label: "a managed skill bin directory"})
+ 	}
+-	return false, ""
++	return providerInputs{
++		installDir:    filepath.Dir(executable),
++		providerDirs:  providerDirs,
++		publishedDirs: published,
++		managedRoots:  []labeledDir{{path: filepath.Join(home, "environments"), label: "the environments root"}},
++		pathEntries:   filepath.SplitList(os.Getenv("PATH")),
++		platform:      runtime.GOOS,
++		pathExt:       windowsPathExt(),
++		revision:      revision,
++	}, nil
++}
++
++// windowsPathExt reads the executable extensions in PATHEXT order,
++// lowercased and dot-prefixed as the platform lookup does.
++func windowsPathExt() []string {
++	raw := os.Getenv("PATHEXT")
++	if raw == "" {
++		return append([]string{}, defaultWindowsPathExt...)
++	}
++	var exts []string
++	for _, entry := range strings.Split(strings.ToLower(raw), ";") {
++		if entry == "" {
++			continue
++		}
++		if !strings.HasPrefix(entry, ".") {
++			entry = "." + entry
++		}
++		exts = append(exts, entry)
++	}
++	if len(exts) == 0 {
++		return append([]string{}, defaultWindowsPathExt...)
++	}
++	return exts
+ }
+ 
+ // pathEnvironment carries the process PATH to the selector.
+@@ -79,6 +446,136 @@ func underDir(path, root string) bool {
+ 	return path == clean || strings.HasPrefix(path, clean+string(filepath.Separator))
+ }
+ 
++// providerSubcommand extracts the subcommand name from a directory
++// entry: curator-<name>, with a Windows executable extension stripped.
++// Anything else — including a name outside the identifier grammar — is
++// not a provider.
++func providerSubcommand(entry string, in providerInputs) (string, bool) {
++	rest, found := strings.CutPrefix(entry, "curator-")
++	if !found || rest == "" {
++		return "", false
++	}
++	if in.platform == "windows" {
++		// An extensionless file is not executable on Windows and the
++		// search never discovers it, so discovery skips it too.
++		lowered := strings.ToLower(rest)
++		stripped := false
++		for _, ext := range executableCandidates("", in) {
++			if strings.HasSuffix(lowered, ext) {
++				rest = rest[:len(rest)-len(ext)]
++				stripped = true
++				break
++			}
++		}
++		if !stripped || rest == "" {
++			return "", false
++		}
++	}
++	if !identifiers.Valid(rest) {
++		return "", false
++	}
++	return rest, true
++}
++
++// discoverProviderNames lists the subcommand names with a curator-<name>
++// executable in the active revision's search domain — the PATH entries
++// under revision A, the trust roots plus the diagnostic-only PATH probe
++// domain under revision B — always including run and session, which §12
++// reports even when absent. An unreadable directory during discovery is
++// skipped here; unreadable trust roots are reported per provider by the
++// lookup itself.
++func discoverProviderNames(in providerInputs) []string {
++	seen := map[string]bool{"run": true, "session": true}
++	var dirs []string
++	if in.revision == providerRevisionB {
++		dirs = append(dirs, trustRootsOf(in.installDir, in.providerDirs)...)
++	}
++	dirs = append(dirs, in.pathEntries...)
++	for _, dir := range dirs {
++		if dir == "" {
++			if in.platform == "windows" {
++				continue
++			}
++			dir = "."
++		}
++		entries, err := os.ReadDir(dir)
++		if err != nil {
++			continue
++		}
++		for _, entry := range entries {
++			if name, ok := providerSubcommand(entry.Name(), in); ok {
++				seen[name] = true
++			}
++		}
++	}
++	names := make([]string, 0, len(seen))
++	for name := range seen {
++		names = append(names, name)
++	}
++	sort.Strings(names)
++	return names
++}
++
++// providerPosture resolves every discovered provider under the active
++// revision and reports the resolved absolute path with its trust
++// verdict (§12): trusted, the revision-A outside-roots warning, a
++// refusal, missing, or an unreadable trust root. A refused or failed
++// provider row is non-current; the warning row stays current.
++func providerPosture(home string, providerDirs, projectBinDirs []string) []envprofile.ProviderState {
++	in, err := providerInputsForHost(home, providerDirs, projectBinDirs, activeProviderRevision)
++	if err != nil {
++		return nil
++	}
++	return providerPostureFor(in)
++}
++
++// providerPostureFor is the test seam behind providerPosture.
++func providerPostureFor(in providerInputs) []envprofile.ProviderState {
++	var rows []envprofile.ProviderState
++	for _, name := range discoverProviderNames(in) {
++		outcome := resolveProvider(name, in)
++		row := envprofile.ProviderState{
++			Name:       name,
++			Executable: "curator-" + name,
++			Verdict:    envprofile.ProviderTrusted,
++			Current:    true,
++			TrustRoots: append([]string{}, outcome.roots...),
++		}
++		switch {
++		case outcome.resolved != "" && !outcome.warned:
++			resolved := outcome.resolved
++			row.Resolved = &resolved
++		case outcome.warned:
++			resolved := outcome.resolved
++			diagnostic := providerDiagnosticOutsideRoots
++			row.Resolved = &resolved
++			row.Verdict = envprofile.ProviderOutsideTrustRoots
++			row.Diagnostic = &diagnostic
++		case outcome.diagnostic == providerDiagnosticRootUnreadable:
++			diagnostic := outcome.diagnostic
++			unreadable := outcome.unreadableDir
++			row.Verdict = envprofile.ProviderUnreadable
++			row.Diagnostic = &diagnostic
++			row.UnreadableDirectory = &unreadable
++			row.Current = false
++		case outcome.diagnostic == providerDiagnosticUntrusted:
++			diagnostic := outcome.diagnostic
++			refused := outcome.untrustedPath
++			row.RefusedPath = &refused
++			row.Verdict = envprofile.ProviderRefused
++			row.Diagnostic = &diagnostic
++			row.Current = false
++		default:
++			diagnostic := providerDiagnosticMissing
++			row.Verdict = envprofile.ProviderMissing
++			row.Diagnostic = &diagnostic
++			row.Current = false
++		}
++		rows = append(rows, row)
++	}
++	return rows
++}
++
+ // normalizeRunEnvOperand rewrites the launcher environment operand of
+ // `curator run <env-id> ...` from an alias to its canonical id. Only the
+ // first token after run is an operand position the manager may read: the
+@@ -103,15 +600,34 @@ func normalizeRunEnvOperand(args []string) []string {
+ }
+ 
+ // cmdUmbrella executes the resolved provider with the remaining arguments
+-// verbatim and propagates its exit code.
+-func (c cli) cmdUmbrella(home string, args []string) int {
++// verbatim and propagates its exit code. cfg is nil when the machine
++// configuration did not load, in which case the lookup trusts the
++// install directory alone.
++func (c cli) cmdUmbrella(cfg *config.Config, home string, args []string) int {
+ 	args = normalizeRunEnvOperand(args)
+-	path, err := findProvider(home, args[0])
++	var providerDirs []string
++	var projectBins []string
++	if cfg != nil {
++		providerDirs = cfg.Env.ProviderDirectories
++		for _, project := range cfg.Projects {
++			projectBins = append(projectBins, filepath.Join(project.Path, ".agents", "bin"))
++		}
++		sort.Strings(projectBins)
++	}
++	in, err := providerInputsForHost(home, providerDirs, projectBins, activeProviderRevision)
+ 	if err != nil {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitFail
+ 	}
+-	command := exec.Command(path, args[1:]...) // #nosec G204,G702 -- §11 dispatches the LookPath-resolved provider with operator argv verbatim
++	path, warning, err := findProvider(args[0], in)
++	if err != nil {
++		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
++		return exitFail
++	}
++	if warning != "" {
++		_, _ = fmt.Fprintln(c.stderr, "warning:", warning)
++	}
++	command := exec.Command(path, args[1:]...) // #nosec G204,G702 -- §11 dispatches the trust-root-resolved provider with operator argv verbatim
+ 	command.Stdin = os.Stdin
+ 	command.Stdout = c.stdout
+ 	command.Stderr = c.stderr
+diff --git a/cmd/curator/umbrella_conformance_test.go b/cmd/curator/umbrella_conformance_test.go
+new file mode 100644
+index 0000000..8cff223
+--- /dev/null
++++ b/cmd/curator/umbrella_conformance_test.go
+@@ -0,0 +1,300 @@
++package main
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++)
++
++// Umbrella provider trust-root vectors (environments §11, §13). Every
++// case of vectors/umbrella-provider-resolution.json runs through the
++// production resolveProvider entry point — the function backing both
++// dispatch and the env status posture rows — for BOTH rollout
++// revisions: the case's directories and executables are materialized in
++// a temp tree, the case's PATH is searched, and the resolved path, the
++// closed diagnostic, and the named roots are compared. A coverage row
++// is driven only by this production entry point, never by a helper.
++
++// umbrellaVectorCase is one umbrella-provider-resolution.json case.
++type umbrellaVectorCase struct {
++	Name                string   `json:"name"`
++	Subcommand          string   `json:"subcommand"`
++	ExecutableName      string   `json:"executable_name"`
++	InstallDir          string   `json:"install_dir"`
++	ProviderDirectories []string `json:"provider_directories"`
++	PathEntries         []string `json:"path_entries"`
++	PublishedDirs       []string `json:"published_dirs"`
++	ManagedDirs         []string `json:"managed_dirs"`
++	UnreadableDirs      []string `json:"unreadable_dirs"`
++	Present             []struct {
++		Path       string `json:"path"`
++		Executable bool   `json:"executable"`
++	} `json:"present"`
++	RevisionA umbrellaVectorExpect `json:"revision_a"`
++	RevisionB umbrellaVectorExpect `json:"revision_b"`
++}
++
++// umbrellaVectorExpect is one revision's expected outcome. Pointers
++// distinguish an expected null from an absent member: silent successes
++// carry no trust_roots_consulted member at all.
++type umbrellaVectorExpect struct {
++	Resolved               *string  `json:"resolved"`
++	Diagnostic             *string  `json:"diagnostic"`
++	TrustRootsConsulted    []string `json:"trust_roots_consulted"`
++	TrustRootsPresent      bool
++	UntrustedPath          *string `json:"untrusted_path"`
++	MigrationHintDirectory *string `json:"migration_hint_directory"`
++	UnreadableDirectory    *string `json:"unreadable_directory"`
++}
++
++// TestUmbrellaProviderResolutionVectors executes the §11 vector family
++// for both revisions. The committed CI pin predates the family, so a
++// root that publishes no such vector takes the established root-content
++// path (registered in .github/ci/platform-cases.tsv); a root that
++// publishes it with no cases fails instead of passing empty.
++func TestUmbrellaProviderResolutionVectors(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	path := filepath.Join(root, "vectors", "umbrella-provider-resolution.json")
++	payload, err := os.ReadFile(path) // #nosec G304 -- explicit conformance input
++	if os.IsNotExist(err) {
++		t.Skipf("%s publishes no umbrella-provider-resolution vector", root)
++	}
++	if err != nil {
++		t.Fatal(err)
++	}
++	var family struct {
++		Cases []umbrellaVectorCase `json:"cases"`
++	}
++	raw := map[string]any{}
++	if err := json.Unmarshal(payload, &raw); err != nil {
++		t.Fatal(err)
++	}
++	if err := json.Unmarshal(payload, &family); err != nil {
++		t.Fatal(err)
++	}
++	if len(family.Cases) == 0 {
++		t.Fatalf("vectors/umbrella-provider-resolution.json publishes no cases")
++	}
++	markPresentRoots(t, raw, family.Cases)
++	for _, tc := range family.Cases {
++		tc := tc
++		t.Run(tc.Name, func(t *testing.T) {
++			sandbox := materializeUmbrellaCase(t, tc)
++			checkUmbrellaRevision(t, sandbox, tc, providerRevisionA, tc.RevisionA)
++			checkUmbrellaRevision(t, sandbox, tc, providerRevisionB, tc.RevisionB)
++		})
++	}
++}
++
++// markPresentRoots records which expectations carry an explicit
++// trust_roots_consulted member, since its absence on silent successes
++// is significant: the member is compared only when present.
++func markPresentRoots(t *testing.T, raw map[string]any, cases []umbrellaVectorCase) {
++	t.Helper()
++	rawCases, _ := raw["cases"].([]any)
++	if len(rawCases) != len(cases) {
++		t.Fatalf("vector case count %d does not match decoded %d", len(rawCases), len(cases))
++	}
++	for i, entry := range rawCases {
++		obj, _ := entry.(map[string]any)
++		if obj == nil {
++			t.Fatalf("case %d is not an object", i)
++		}
++		for _, key := range []string{"revision_a", "revision_b"} {
++			rev, _ := obj[key].(map[string]any)
++			if rev == nil {
++				t.Fatalf("case %q carries no %s", cases[i].Name, key)
++			}
++			_, present := rev["trust_roots_consulted"]
++			if key == "revision_a" {
++				cases[i].RevisionA.TrustRootsPresent = present
++			} else {
++				cases[i].RevisionB.TrustRootsPresent = present
++			}
++		}
++	}
++}
++
++// umbrellaSandbox is one materialized vector case: the remapped trust
++// roots, search domain, and refused directories.
++type umbrellaSandbox struct {
++	inputs providerInputs
++	remap  func(string) string
++}
++
++// materializeUmbrellaCase builds the case's filesystem in a temp tree.
++// Every absolute vector path is remapped below the sandbox root, so the
++// lookup runs against real directories the test owns. Unreadable roots
++// are left uncreated: a trust root that does not exist is still a read
++// failure, never absence (§8.4). On Windows an executable file carries
++// the .exe suffix the platform lookup requires, and a non-executable
++// file keeps its bare name; the expected paths are translated the same
++// way.
++func materializeUmbrellaCase(t *testing.T, tc umbrellaVectorCase) umbrellaSandbox {
++	t.Helper()
++	tmp, err := filepath.EvalSymlinks(t.TempDir())
++	if err != nil {
++		t.Fatal(err)
++	}
++	sandbox := filepath.Join(tmp, "root")
++	remap := func(vectorPath string) string {
++		rel := strings.TrimPrefix(filepath.Clean(vectorPath), "/")
++		return filepath.Join(sandbox, filepath.FromSlash(rel))
++	}
++	unreadable := map[string]bool{}
++	for _, dir := range tc.UnreadableDirs {
++		unreadable[remap(dir)] = true
++	}
++	mkdirs := func(dirs ...string) {
++		for _, dir := range dirs {
++			if unreadable[dir] {
++				continue
++			}
++			if err := os.MkdirAll(dir, 0o755); err != nil {
++				t.Fatal(err)
++			}
++		}
++	}
++	installDir := remap(tc.InstallDir)
++	var providerDirs []string
++	for _, dir := range tc.ProviderDirectories {
++		providerDirs = append(providerDirs, remap(dir))
++	}
++	var pathEntries []string
++	for _, entry := range tc.PathEntries {
++		pathEntries = append(pathEntries, remap(entry))
++	}
++	var published []labeledDir
++	for _, dir := range tc.PublishedDirs {
++		published = append(published, labeledDir{path: remap(dir), label: "a manager-published directory"})
++	}
++	var managed []labeledDir
++	for _, dir := range tc.ManagedDirs {
++		managed = append(managed, labeledDir{path: remap(dir), label: "a managed directory"})
++	}
++	mkdirs(installDir)
++	mkdirs(providerDirs...)
++	mkdirs(pathEntries...)
++	for _, entry := range published {
++		mkdirs(entry.path)
++	}
++	for _, entry := range managed {
++		mkdirs(entry.path)
++	}
++	for _, file := range tc.Present {
++		full := remap(file.Path)
++		mkdirs(filepath.Dir(full))
++		name := full
++		if runtime.GOOS == "windows" && file.Executable {
++			name += ".exe"
++		}
++		mode := os.FileMode(0o644)
++		if file.Executable {
++			mode = 0o755
++		}
++		if err := os.WriteFile(name, []byte("#!/bin/sh\nexit 0\n"), mode); err != nil {
++			t.Fatal(err)
++		}
++	}
++	return umbrellaSandbox{
++		inputs: providerInputs{
++			installDir:    installDir,
++			providerDirs:  providerDirs,
++			publishedDirs: published,
++			managedRoots:  managed,
++			pathEntries:   pathEntries,
++			platform:      runtime.GOOS,
++			pathExt:       append([]string{}, defaultWindowsPathExt...),
++		},
++		remap: func(vectorPath string) string {
++			out := remap(vectorPath)
++			if runtime.GOOS == "windows" && isVectorExecutableFile(tc, vectorPath) {
++				out += ".exe"
++			}
++			return out
++		},
++	}
++}
++
++// isVectorExecutableFile reports whether the vector's present list
++// carries path as an executable file, for the Windows .exe translation
++// of expected file paths. Directories never translate.
++func isVectorExecutableFile(tc umbrellaVectorCase, vectorPath string) bool {
++	for _, file := range tc.Present {
++		if file.Path == vectorPath {
++			return file.Executable
++		}
++	}
++	return false
++}
++
++// checkUmbrellaRevision runs one revision of one case through the
++// production entry point and compares the resolved path, the closed
++// diagnostic, and every named root and path.
++func checkUmbrellaRevision(t *testing.T, sandbox umbrellaSandbox, tc umbrellaVectorCase, revision providerRevision, want umbrellaVectorExpect) {
++	t.Helper()
++	in := sandbox.inputs
++	in.revision = revision
++	label := "revision A"
++	if revision == providerRevisionB {
++		label = "revision B"
++	}
++	outcome := resolveProvider(tc.Subcommand, in)
++	if tc.ExecutableName != "curator-"+tc.Subcommand {
++		t.Fatalf("%s: executable_name %q does not name the subcommand", label, tc.ExecutableName)
++	}
++	// The outcomes are disjoint: a lookup either selects (silently or
++	// with the revision-A warning) or fails with exactly one diagnostic.
++	selected := outcome.resolved != ""
++	failed := outcome.diagnostic != "" && !outcome.warned
++	if selected == failed {
++		t.Fatalf("%s: resolved=%q warned=%v diagnostic=%q is not disjoint", label, outcome.resolved, outcome.warned, outcome.diagnostic)
++	}
++	if want.Resolved == nil {
++		if selected {
++			t.Fatalf("%s: resolved %q, want no selection", label, outcome.resolved)
++		}
++	} else {
++		if sandbox.remap(*want.Resolved) != outcome.resolved {
++			t.Fatalf("%s: resolved %q, want %q", label, outcome.resolved, sandbox.remap(*want.Resolved))
++		}
++	}
++	if want.Diagnostic == nil {
++		if outcome.warned || outcome.diagnostic != "" {
++			t.Fatalf("%s: diagnostic=%q warned=%v, want a silent success", label, outcome.diagnostic, outcome.warned)
++		}
++	} else if *want.Diagnostic != outcome.diagnostic {
++		t.Fatalf("%s: diagnostic %q, want %q", label, outcome.diagnostic, *want.Diagnostic)
++	}
++	if want.TrustRootsPresent {
++		var wantRoots []string
++		for _, root := range want.TrustRootsConsulted {
++			wantRoots = append(wantRoots, sandbox.remap(root))
++		}
++		if strings.Join(wantRoots, "\x00") != strings.Join(outcome.roots, "\x00") {
++			t.Fatalf("%s: roots consulted %q, want %q", label, outcome.roots, wantRoots)
++		}
++	}
++	if want.UntrustedPath != nil && sandbox.remap(*want.UntrustedPath) != outcome.untrustedPath {
++		t.Fatalf("%s: untrusted path %q, want %q", label, outcome.untrustedPath, sandbox.remap(*want.UntrustedPath))
++	}
++	if want.MigrationHintDirectory != nil && sandbox.remap(*want.MigrationHintDirectory) != outcome.hintDir {
++		t.Fatalf("%s: migration hint %q, want %q", label, outcome.hintDir, sandbox.remap(*want.MigrationHintDirectory))
++	}
++	if want.UnreadableDirectory != nil && sandbox.remap(*want.UnreadableDirectory) != outcome.unreadableDir {
++		t.Fatalf("%s: unreadable directory %q, want %q", label, outcome.unreadableDir, sandbox.remap(*want.UnreadableDirectory))
++	}
++	// A warning selects under revision A only; revision B never warns.
++	if outcome.warned && revision != providerRevisionA {
++		t.Fatalf("%s: a warning fired outside revision A", label)
++	}
++	if revision == providerRevisionA && outcome.diagnostic == providerDiagnosticOutsideRoots && !outcome.warned {
++		t.Fatalf("revision A: the outside-roots diagnostic fired without a selection")
++	}
++}
+diff --git a/cmd/curator/umbrella_test.go b/cmd/curator/umbrella_test.go
+new file mode 100644
+index 0000000..b4d7ed3
+--- /dev/null
++++ b/cmd/curator/umbrella_test.go
+@@ -0,0 +1,495 @@
++package main
++
++import (
++	"os"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/envprofile"
++)
++
++// These tests drive the production §11 lookup: resolveProvider directly
++// for the verdict matrix, and run() end to end for the shipped
++// revision-A dispatch behavior.
++
++// TestActiveRevisionIsWarningRelease pins the rollout switch: this
++// release ships the warning revision. The flip to B is a later release
++// whose diff must touch this line deliberately.
++func TestActiveRevisionIsWarningRelease(t *testing.T) {
++	t.Parallel()
++	if activeProviderRevision != providerRevisionA {
++		t.Fatalf("activeProviderRevision = %d, want the warning revision A", activeProviderRevision)
++	}
++}
++
++// writeProviderFile materializes one curator-<name> candidate: an
++// executable regular file, or a present-but-skipped non-executable.
++// On Windows an executable carries the .exe suffix the platform
++// lookup requires and a non-executable keeps its bare name.
++func writeProviderFile(t *testing.T, dir, name string, executable bool) string {
++	t.Helper()
++	if err := os.MkdirAll(dir, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	full := filepath.Join(dir, name)
++	if runtime.GOOS == "windows" && executable {
++		full += ".exe"
++	}
++	mode := os.FileMode(0o644)
++	if executable {
++		mode = 0o755
++	}
++	if err := os.WriteFile(full, []byte("#!/bin/sh\nexit 0\n"), mode); err != nil {
++		t.Fatal(err)
++	}
++	return full
++}
++
++// umbrellaInputs builds lookup inputs over temp dirs with the host
++// platform and the default executable extensions.
++func umbrellaInputs(installDir string, providerDirs, pathEntries []string, revision providerRevision) providerInputs {
++	return providerInputs{
++		installDir:    installDir,
++		providerDirs:  providerDirs,
++		publishedDirs: []labeledDir{{path: filepath.Join(installDir, "..", "published"), label: "a manager-published directory"}},
++		managedRoots:  []labeledDir{{path: filepath.Join(installDir, "..", "managed"), label: "a managed directory"}},
++		pathEntries:   pathEntries,
++		platform:      runtime.GOOS,
++		pathExt:       append([]string{}, defaultWindowsPathExt...),
++		revision:      revision,
++	}
++}
++
++// TestUmbrellaHostilePathPlantWarnsUnderAEndToEnd is the AC's hostile
++// case through the shipped dispatch: a curator-run planted through a
++// PATH entry outside the trust roots still runs under revision A, but
++// warns with the resolved path, the roots consulted, and the
++// provider_directories migration hint.
++func TestUmbrellaHostilePathPlantWarnsUnderAEndToEnd(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("no bash on this platform")
++	}
++	source, _ := profileHome(t)
++	plant := t.TempDir()
++	if err := os.WriteFile(filepath.Join(plant, "curator-run"), []byte("#!/bin/sh\necho planted\n"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	t.Setenv("PATH", plant)
++	code, stdout, stderr := runProfile(t, source, "run", "alpha")
++	if code != exitOK {
++		t.Fatalf("run = %d, want dispatch under revision A\nstderr:\n%s", code, stderr)
++	}
++	if !strings.Contains(stdout, "planted") {
++		t.Fatalf("the planted provider did not run:\n%s", stdout)
++	}
++	for _, want := range []string{
++		"subcommand_provider_outside_trust_roots",
++		filepath.Join(plant, "curator-run"),
++		"trust roots consulted",
++		"provider_directories",
++		plant,
++	} {
++		if !strings.Contains(stderr, want) {
++			t.Fatalf("stderr misses %q:\n%s", want, stderr)
++		}
++	}
++}
++
++// TestUmbrellaHostilePathPlantRefusedUnderB is the same plant under
++// the enforcing revision: the PATH-only provider is refused with its
++// path and the roots consulted, and nothing resolves — even when a
++// trusted provider exists, the PATH selection never leaks through.
++func TestUmbrellaHostilePathPlantRefusedUnderB(t *testing.T) {
++	tmp := t.TempDir()
++	install := filepath.Join(tmp, "install")
++	plant := filepath.Join(tmp, "plant")
++	planted := writeProviderFile(t, plant, "curator-run", true)
++	in := umbrellaInputs(install, nil, []string{plant}, providerRevisionB)
++	if err := os.MkdirAll(install, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	outcome := resolveProvider("run", in)
++	if outcome.resolved != "" || outcome.diagnostic != providerDiagnosticUntrusted {
++		t.Fatalf("outcome = %+v, want an untrusted refusal with no selection", outcome)
++	}
++	if outcome.untrustedPath != planted {
++		t.Fatalf("untrusted path = %q, want %q", outcome.untrustedPath, planted)
++	}
++	if len(outcome.roots) != 1 || outcome.roots[0] != install {
++		t.Fatalf("roots consulted = %q, want [%q]", outcome.roots, install)
++	}
++	// A trusted provider alongside the plant resolves; the plant is
++	// never selected and never named.
++	trusted := writeProviderFile(t, install, "curator-run", true)
++	outcome = resolveProvider("run", in)
++	if outcome.resolved != trusted || outcome.diagnostic != "" {
++		t.Fatalf("outcome = %+v, want the silent trusted selection", outcome)
++	}
++}
++
++// TestUmbrellaTrustRootSelectionBothRevisions pins the selection
++// matrix: install dir first, listed order, non-executables skipped,
++// never descending, and the revision-A PATH-only semantics.
++func TestUmbrellaTrustRootSelectionBothRevisions(t *testing.T) {
++	tmp := t.TempDir()
++	install := filepath.Join(tmp, "install")
++	first := filepath.Join(tmp, "first")
++	second := filepath.Join(tmp, "second")
++	pathDir := filepath.Join(tmp, "path")
++	for _, dir := range []string{install, first, second, pathDir} {
++		if err := os.MkdirAll(dir, 0o755); err != nil {
++			t.Fatal(err)
++		}
++	}
++	for _, revision := range []providerRevision{providerRevisionA, providerRevisionB} {
++		in := umbrellaInputs(install, []string{first, second}, []string{pathDir}, revision)
++		// Listed order, first match wins; install dir beats the list.
++		wantSecond := writeProviderFile(t, second, "curator-run", true)
++		if outcome := resolveProvider("run", in); revision == providerRevisionB && outcome.resolved != wantSecond {
++			t.Fatalf("B: resolved %q, want %q", outcome.resolved, wantSecond)
++		}
++		wantInstall := writeProviderFile(t, install, "curator-run", true)
++		if outcome := resolveProvider("run", in); revision == providerRevisionB && outcome.resolved != wantInstall {
++			t.Fatalf("B: resolved %q, want the install-dir match %q", outcome.resolved, wantInstall)
++		}
++		// A non-executable file of the same name is skipped.
++		writeProviderFile(t, first, "curator-run", false)
++		if outcome := resolveProvider("run", in); revision == providerRevisionB && outcome.resolved != wantInstall {
++			t.Fatalf("B: a non-executable shadowed the match: %+v", outcome)
++		}
++		// Search never descends into subdirectories.
++		nested := filepath.Join(first, "nested")
++		writeProviderFile(t, nested, "curator-deep", true)
++		if outcome := resolveProvider("deep", in); outcome.diagnostic != providerDiagnosticMissing {
++			t.Fatalf("resolved a nested provider: %+v", outcome)
++		}
++		if err := os.Remove(wantInstall); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Remove(wantSecond); err != nil {
++			t.Fatal(err)
++		}
++	}
++	// Revision A never consults the trust roots for selection: a
++	// trust-root-only provider is missing even though the root holds it.
++	in := umbrellaInputs(install, []string{first}, []string{pathDir}, providerRevisionA)
++	writeProviderFile(t, first, "curator-run", true)
++	if outcome := resolveProvider("run", in); outcome.diagnostic != providerDiagnosticMissing || outcome.resolved != "" {
++		t.Fatalf("A: trust-root-only provider outcome = %+v, want missing", outcome)
++	}
++	// A PATH selection directly inside a trust root resolves silently.
++	in = umbrellaInputs(install, []string{pathDir}, []string{pathDir}, providerRevisionA)
++	silent := writeProviderFile(t, pathDir, "curator-run", true)
++	if outcome := resolveProvider("run", in); outcome.resolved != silent || outcome.warned || outcome.diagnostic != "" {
++		t.Fatalf("A: trusted PATH selection outcome = %+v, want silent", outcome)
++	}
++}
++
++// TestUmbrellaRefusedDirectoriesBothRevisions pins the
++// ownership/writability gate: a provider inside a manager-published or
++// managed directory is refused under both revisions, wherever else the
++// path was found — including through a symlink, and including a trust
++// root that lists a refused directory.
++func TestUmbrellaRefusedDirectoriesBothRevisions(t *testing.T) {
++	tmp := t.TempDir()
++	install := filepath.Join(tmp, "install")
++	published := filepath.Join(tmp, "published")
++	managed := filepath.Join(tmp, "managed")
++	nested := filepath.Join(managed, "nested")
++	plain := filepath.Join(tmp, "plain")
++	for _, dir := range []string{install, published, managed, nested, plain} {
++		if err := os.MkdirAll(dir, 0o755); err != nil {
++			t.Fatal(err)
++		}
++	}
++	refusedPublished := writeProviderFile(t, published, "curator-run", true)
++	refusedNested := writeProviderFile(t, nested, "curator-run", true)
++	for _, revision := range []providerRevision{providerRevisionA, providerRevisionB} {
++		newInputs := func(dirs, path []string) providerInputs {
++			return providerInputs{
++				installDir:    install,
++				providerDirs:  dirs,
++				publishedDirs: []labeledDir{{path: published, label: "a manager-published directory"}},
++				managedRoots:  []labeledDir{{path: managed, label: "a managed directory"}},
++				pathEntries:   path,
++				platform:      runtime.GOOS,
++				pathExt:       append([]string{}, defaultWindowsPathExt...),
++				revision:      revision,
++			}
++		}
++		// A PATH match inside a published directory is refused.
++		if outcome := resolveProvider("run", newInputs(nil, []string{published})); outcome.diagnostic != providerDiagnosticUntrusted || outcome.untrustedPath != refusedPublished {
++			t.Fatalf("revision %d: published PATH match outcome = %+v", revision, outcome)
++		}
++		// Below a managed root counts too.
++		if outcome := resolveProvider("run", newInputs(nil, []string{nested})); outcome.diagnostic != providerDiagnosticUntrusted || outcome.untrustedPath != refusedNested {
++			t.Fatalf("revision %d: managed PATH match outcome = %+v", revision, outcome)
++		}
++		// A trust root that lists a refused directory still refuses.
++		if outcome := resolveProvider("run", newInputs([]string{published, plain}, []string{plain})); revision == providerRevisionB &&
++			(outcome.diagnostic != providerDiagnosticUntrusted || outcome.untrustedPath != refusedPublished) {
++			t.Fatalf("B: listed-but-published outcome = %+v", outcome)
++		}
++	}
++}
++
++// TestUmbrellaSymlinkIntoManagedRefused proves the refusal resolves
++// through the link: a provider reached via a shim symlink into a
++// managed directory is still a managed directory.
++func TestUmbrellaSymlinkIntoManagedRefused(t *testing.T) {
++	tmp := t.TempDir()
++	install := filepath.Join(tmp, "install")
++	managed := filepath.Join(tmp, "managed")
++	linkDir := filepath.Join(tmp, "links")
++	for _, dir := range []string{install, managed, linkDir} {
++		if err := os.MkdirAll(dir, 0o755); err != nil {
++			t.Fatal(err)
++		}
++	}
++	target := writeProviderFile(t, managed, "curator-run", true)
++	link := filepath.Join(linkDir, "curator-run")
++	if runtime.GOOS == "windows" {
++		link += ".exe"
++	}
++	if err := os.Symlink(target, link); err != nil {
++		t.Skip("creating Windows symlink requires host support")
++	}
++	for _, revision := range []providerRevision{providerRevisionA, providerRevisionB} {
++		in := providerInputs{
++			installDir:    install,
++			publishedDirs: nil,
++			managedRoots:  []labeledDir{{path: managed, label: "a managed directory"}},
++			pathEntries:   []string{linkDir},
++			platform:      runtime.GOOS,
++			pathExt:       append([]string{}, defaultWindowsPathExt...),
++			revision:      revision,
++		}
++		if outcome := resolveProvider("run", in); outcome.diagnostic != providerDiagnosticUntrusted || outcome.resolved != "" {
++			t.Fatalf("revision %d: symlinked provider outcome = %+v, want a refusal", revision, outcome)
++		}
++	}
++}
++
++// TestUmbrellaUnreadableRootNeverAbsence pins §8.4 at the lookup: a
++// trust root the manager cannot read — including one that does not
++// exist — fails with the first unreadable root named, never falls
++// through to a later root, to PATH, or to missing, and never resolves.
++func TestUmbrellaUnreadableRootNeverAbsence(t *testing.T) {
++	tmp := t.TempDir()
++	install := filepath.Join(tmp, "install")
++	gone := filepath.Join(tmp, "gone")
++	pathDir := filepath.Join(tmp, "path")
++	for _, dir := range []string{install, pathDir} {
++		if err := os.MkdirAll(dir, 0o755); err != nil {
++			t.Fatal(err)
++		}
++	}
++	// A PATH provider that revision A would warn on still fails: the
++	// unreadable root outranks selection, warning, and absence alike.
++	writeProviderFile(t, pathDir, "curator-run", true)
++	for _, revision := range []providerRevision{providerRevisionA, providerRevisionB} {
++		in := umbrellaInputs(install, []string{gone}, []string{pathDir}, revision)
++		outcome := resolveProvider("run", in)
++		if outcome.diagnostic != providerDiagnosticRootUnreadable || outcome.resolved != "" {
++			t.Fatalf("revision %d: outcome = %+v, want root-unreadable", revision, outcome)
++		}
++		if outcome.unreadableDir != gone {
++			t.Fatalf("revision %d: unreadable dir = %q, want %q", revision, outcome.unreadableDir, gone)
++		}
++		// An unreadable install directory fails the same way.
++		in.installDir = filepath.Join(tmp, "no-install-dir")
++		outcome = resolveProvider("run", in)
++		if outcome.diagnostic != providerDiagnosticRootUnreadable || outcome.unreadableDir != in.installDir {
++			t.Fatalf("revision %d: install outcome = %+v", revision, outcome)
++		}
++	}
++	// Under revision B an earlier trusted match wins before the scan
++	// reaches a later unreadable root; nothing after the match fires.
++	in := umbrellaInputs(install, []string{gone}, []string{pathDir}, providerRevisionB)
++	trusted := writeProviderFile(t, install, "curator-run", true)
++	if outcome := resolveProvider("run", in); outcome.resolved != trusted || outcome.diagnostic != "" {
++		t.Fatalf("B: early match outcome = %+v, want the silent selection", outcome)
++	}
++}
++
++// TestUmbrellaMissingNamesRoots pins the missing refusal: the exact
++// executable name, the installation guidance with no implicit
++// install, and the trust roots consulted.
++func TestUmbrellaMissingNamesRoots(t *testing.T) {
++	tmp := t.TempDir()
++	install := filepath.Join(tmp, "install")
++	listed := filepath.Join(tmp, "listed")
++	empty := filepath.Join(tmp, "empty")
++	for _, dir := range []string{install, listed, empty} {
++		if err := os.MkdirAll(dir, 0o755); err != nil {
++			t.Fatal(err)
++		}
++	}
++	for _, revision := range []providerRevision{providerRevisionA, providerRevisionB} {
++		in := umbrellaInputs(install, []string{listed}, []string{empty}, revision)
++		outcome := resolveProvider("frobnicate", in)
++		if outcome.diagnostic != providerDiagnosticMissing || outcome.resolved != "" {
++			t.Fatalf("revision %d: outcome = %+v, want missing", revision, outcome)
++		}
++		_, _, err := findProvider("frobnicate", in)
++		if err == nil {
++			t.Fatalf("revision %d: missing provider returned no error", revision)
++		}
++		for _, want := range []string{"subcommand_provider_missing", "curator-frobnicate", install, listed, "nothing is downloaded or installed implicitly"} {
++			if !strings.Contains(err.Error(), want) {
++				t.Fatalf("revision %d: error misses %q: %v", revision, want, err)
++			}
++		}
++	}
++}
++
++// TestUmbrellaWarningText pins the revision-A warning contents: the
++// resolved path, the roots consulted, and the migration hint naming
++// the provider's directory.
++func TestUmbrellaWarningText(t *testing.T) {
++	tmp := t.TempDir()
++	install := filepath.Join(tmp, "install")
++	outside := filepath.Join(tmp, "outside")
++	for _, dir := range []string{install, outside} {
++		if err := os.MkdirAll(dir, 0o755); err != nil {
++			t.Fatal(err)
++		}
++	}
++	selected := writeProviderFile(t, outside, "curator-run", true)
++	in := umbrellaInputs(install, nil, []string{outside}, providerRevisionA)
++	path, warning, err := findProvider("run", in)
++	if err != nil || path != selected {
++		t.Fatalf("path = %q err = %v, want the selection", path, err)
++	}
++	for _, want := range []string{"subcommand_provider_outside_trust_roots", selected, install, "provider_directories", outside} {
++		if !strings.Contains(warning, want) {
++			t.Fatalf("warning misses %q: %q", want, warning)
++		}
++	}
++}
++
++// TestProviderPostureRows pins the §12 rows: every discovered provider
++// plus always run and session, with the resolved path, the verdict,
++// and the currency the spec assigns — warned rows stay current,
++// refused, missing, and unreadable rows are non-current.
++func TestProviderPostureRows(t *testing.T) {
++	tmp, err := filepath.EvalSymlinks(t.TempDir())
++	if err != nil {
++		t.Fatal(err)
++	}
++	install := filepath.Join(tmp, "install")
++	pathDir := filepath.Join(tmp, "path")
++	for _, dir := range []string{install, pathDir} {
++		if err := os.MkdirAll(dir, 0o755); err != nil {
++			t.Fatal(err)
++		}
++	}
++	selected := writeProviderFile(t, pathDir, "curator-run", true)
++	// A name outside the identifier grammar is not a provider.
++	if err := os.WriteFile(filepath.Join(pathDir, "curator-!bad"), []byte("x"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	in := providerInputs{
++		installDir:    install,
++		providerDirs:  nil,
++		publishedDirs: nil,
++		managedRoots:  nil,
++		pathEntries:   []string{pathDir},
++		platform:      runtime.GOOS,
++		pathExt:       append([]string{}, defaultWindowsPathExt...),
++		revision:      providerRevisionA,
++	}
++	rows := providerPostureFor(in)
++	byName := map[string]envprofile.ProviderState{}
++	for _, row := range rows {
++		byName[row.Name] = row
++	}
++	if _, ok := byName["!bad"]; ok {
++		t.Fatalf("a non-identifier name was discovered: %+v", rows)
++	}
++	run, ok := byName["run"]
++	if !ok {
++		t.Fatalf("no run row: %+v", rows)
++	}
++	if run.Verdict != envprofile.ProviderOutsideTrustRoots || !run.Current {
++		t.Fatalf("run row = %+v, want a current warning", run)
++	}
++	if run.Resolved == nil || *run.Resolved != selected {
++		t.Fatalf("run resolved = %+v, want %q", run.Resolved, selected)
++	}
++	session, ok := byName["session"]
++	if !ok {
++		t.Fatalf("session is always reported: %+v", rows)
++	}
++	if session.Verdict != envprofile.ProviderMissing || session.Current {
++		t.Fatalf("session row = %+v, want a non-current missing row", session)
++	}
++	if session.Diagnostic == nil || *session.Diagnostic != providerDiagnosticMissing {
++		t.Fatalf("session diagnostic = %+v", session.Diagnostic)
++	}
++	// An unreadable trust root fails every row with the directory.
++	in.providerDirs = []string{filepath.Join(tmp, "gone")}
++	rows = providerPostureFor(in)
++	if len(rows) == 0 {
++		t.Fatal("no rows under an unreadable root")
++	}
++	for _, row := range rows {
++		if row.Verdict != envprofile.ProviderUnreadable || row.Current {
++			t.Fatalf("row = %+v, want a non-current unreadable row", row)
++		}
++		if row.UnreadableDirectory == nil || *row.UnreadableDirectory != filepath.Join(tmp, "gone") {
++			t.Fatalf("row unreadable dir = %+v", row.UnreadableDirectory)
++		}
++	}
++}
++
++// TestProviderSubcommandParsing pins provider discovery names: the
++// curator- prefix with an identifier spelling, and the Windows
++// executable extension stripped before validation.
++func TestProviderSubcommandParsing(t *testing.T) {
++	unix := providerInputs{platform: "linux", pathExt: append([]string{}, defaultWindowsPathExt...)}
++	windows := providerInputs{platform: "windows", pathExt: append([]string{}, defaultWindowsPathExt...)}
++	cases := []struct {
++		entry string
++		in    providerInputs
++		name  string
++		ok    bool
++	}{
++		{"curator-run", unix, "run", true},
++		{"curator-session", unix, "session", true},
++		{"curator-run.exe", windows, "run", true},
++		{"curator-run.EXE", windows, "run", true},
++		{"curator-run.bat", windows, "run", true},
++		{"curator-", unix, "", false},
++		{"curator-!bad", unix, "", false},
++		{"curator-run", windows, "", false},
++		{"run", unix, "", false},
++		{"notcurator-run", unix, "", false},
++	}
++	for _, tc := range cases {
++		if name, ok := providerSubcommand(tc.entry, tc.in); ok != tc.ok || name != tc.name {
++			t.Errorf("providerSubcommand(%q, %s) = (%q, %v), want (%q, %v)",
++				tc.entry, tc.in.platform, name, ok, tc.name, tc.ok)
++		}
++	}
++}
++
++// TestExecutableCandidates pins the Windows search order: the bare
++// name never matches there, and the PATHEXT extensions apply in
++// order. Unix searches the bare name alone.
++func TestExecutableCandidates(t *testing.T) {
++	unix := providerInputs{platform: "linux"}
++	if got := executableCandidates("curator-run", unix); len(got) != 1 || got[0] != "curator-run" {
++		t.Fatalf("unix candidates = %q", got)
++	}
++	windows := providerInputs{platform: "windows", pathExt: []string{".exe", ".bat"}}
++	if got := executableCandidates("curator-run", windows); len(got) != 2 || got[0] != "curator-run.exe" || got[1] != "curator-run.bat" {
++		t.Fatalf("windows candidates = %q", got)
++	}
++	empty := providerInputs{platform: "windows"}
++	if got := executableCandidates("curator-run", empty); len(got) != len(defaultWindowsPathExt) {
++		t.Fatalf("empty PATHEXT candidates = %q, want the platform default", got)
++	}
++}
+diff --git a/internal/config/config.go b/internal/config/config.go
+index 15db809..a8b09f6 100644
+--- a/internal/config/config.go
++++ b/internal/config/config.go
+@@ -62,6 +62,7 @@ var LockableKeys = map[string]bool{
+ 	"environments.passable_env_names":      true,
+ 	"environments.require_current_profile": true,
+ 	"environments.isolation":               true,
++	"environments.provider_directories":    true,
+ }
+ 
+ var (
+diff --git a/internal/config/environments.go b/internal/config/environments.go
+index fa68b5e..08762a0 100644
+--- a/internal/config/environments.go
++++ b/internal/config/environments.go
+@@ -32,6 +32,9 @@ type Environments struct {
+ 	// slice — possibly empty — is the bounded allowlist.
+ 	PassableEnvNames    []string
+ 	MCPPackageAllowlist []string
++	// ProviderDirectories is the §11 trust-root list after the install
++	// directory, in listed order; the §12.1 default is the empty list.
++	ProviderDirectories []string
+ 	ShadowAcknowledged  []ShadowAcknowledgement
+ 	SecretWaivers       []SecretMaterialWaiver
+ 	BackupRetention     int
+@@ -102,6 +105,7 @@ var LockableEnvKeys = map[string]bool{
+ 	"environments.passable_env_names":      true,
+ 	"environments.require_current_profile": true,
+ 	"environments.isolation":               true,
++	"environments.provider_directories":    true,
+ }
+ 
+ // systemEnvKnobs are the environments keys a system file may carry at all:
+@@ -115,8 +119,10 @@ func systemEnvKnobs() map[string]bool {
+ }
+ 
+ var (
+-	envRangeRE  = regexp.MustCompile(`^[0-9A-Za-z.*<>=^~| \-]+$`)
+-	envCommitRE = regexp.MustCompile(`^[0-9a-f]{40}(?:[0-9a-f]{24})?$`)
++	envRangeRE      = regexp.MustCompile(`^[0-9A-Za-z.*<>=^~| \-]+$`)
++	envCommitRE     = regexp.MustCompile(`^[0-9a-f]{40}(?:[0-9a-f]{24})?$`)
++	providerDriveRE = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
++	maxProviderDir  = 4096
+ )
+ 
+ // defaultEnvironments returns the §12.1 defaults.
+@@ -133,6 +139,7 @@ func defaultEnvironments() Environments {
+ 		Isolation:            map[string]map[string]string{},
+ 		XDGSeedAllowlist:     []string{"git", "gh", "ssh"},
+ 		MCPPackageAllowlist:  []string{},
++		ProviderDirectories:  []string{},
+ 		ShadowAcknowledged:   []ShadowAcknowledgement{},
+ 		SecretWaivers:        []SecretMaterialWaiver{},
+ 		BackupRetention:      DefaultBackupRetention,
+@@ -266,6 +273,13 @@ func parseEnvironments(raw any) (Environments, error) {
+ 	if err := parseEnumMap(obj, "in_place_mode", map[string]bool{"linked": true, "copied": true}, env.InPlaceMode); err != nil {
+ 		return Environments{}, err
+ 	}
++	if rawPD, present := obj["provider_directories"]; present && rawPD != nil {
++		dirs, err := parseProviderDirectories(rawPD)
++		if err != nil {
++			return Environments{}, err
++		}
++		env.ProviderDirectories = dirs
++	}
+ 	return env, nil
+ }
+ 
+@@ -279,6 +293,7 @@ var EnvKnobNames = []string{
+ 	"targets", "isolation", "xdg_seed_allowlist", "passable_env_names",
+ 	"mcp_package_allowlist", "shadow_acknowledged", "secret_material_waivers",
+ 	"backup_retention", "require_current_profile", "in_place_mode",
++	"provider_directories",
+ }
+ 
+ // envKnob reports whether key is a §12.1 knob name.
+@@ -653,6 +668,39 @@ func nonEmptyString(value string) bool {
+ 	return length >= 1 && length <= 8192
+ }
+ 
++// parseProviderDirectories validates the §11/§12.1 provider_directories
++// knob with the manager-config-v2 grammar: a list of unique absolute
++// paths, each POSIX-absolute or Windows drive-absolute and 1-4096
++// characters long — the two spellings the schema admits.
++func parseProviderDirectories(raw any) ([]string, error) {
++	const field = "environments.provider_directories"
++	dirs, err := stringList(raw, field)
++	if err != nil {
++		return nil, err
++	}
++	seen := map[string]bool{}
++	out := []string{}
++	for _, dir := range dirs {
++		if !validProviderDir(dir) || seen[dir] {
++			return nil, verr.New(field, "must contain unique absolute paths: POSIX-absolute or Windows drive-absolute, 1-4096 characters")
++		}
++		seen[dir] = true
++		out = append(out, dir)
++	}
++	return out, nil
++}
++
++func validProviderDir(dir string) bool {
++	length := utf8.RuneCountInString(dir)
++	if length < 1 || length > maxProviderDir {
++		return false
++	}
++	if strings.HasPrefix(dir, "/") {
++		return true
++	}
++	return providerDriveRE.MatchString(dir)
++}
++
+ func parseShadowAcknowledged(raw any) ([]ShadowAcknowledgement, error) {
+ 	list, ok := raw.([]any)
+ 	if !ok {
+@@ -913,6 +961,10 @@ func (e Environments) render() map[string]any {
+ 	for _, name := range e.MCPPackageAllowlist {
+ 		mcp = append(mcp, name)
+ 	}
++	providerDirs := []any{}
++	for _, dir := range e.ProviderDirectories {
++		providerDirs = append(providerDirs, dir)
++	}
+ 	var passable any
+ 	if e.PassableEnvNames != nil {
+ 		list := []any{}
+@@ -938,6 +990,7 @@ func (e Environments) render() map[string]any {
+ 		"mcp_package_allowlist": mcp, "shadow_acknowledged": shadow,
+ 		"secret_material_waivers": waivers, "backup_retention": e.BackupRetention,
+ 		"require_current_profile": require, "in_place_mode": inPlace,
++		"provider_directories": providerDirs,
+ 	}
+ }
+ 
+@@ -955,7 +1008,7 @@ func EnvLockKey(knob string) string {
+ 		return "environments.precedence"
+ 	case "isolation":
+ 		return "environments.isolation"
+-	case "overlays_allowed", "mcp_package_allowlist", "passable_env_names", "require_current_profile":
++	case "overlays_allowed", "mcp_package_allowlist", "passable_env_names", "require_current_profile", "provider_directories":
+ 		return "environments." + head
+ 	}
+ 	return ""
+diff --git a/internal/config/environments_test.go b/internal/config/environments_test.go
+index 2d08c24..527a0e1 100644
+--- a/internal/config/environments_test.go
++++ b/internal/config/environments_test.go
+@@ -67,6 +67,7 @@ func TestSchema2Defaults(t *testing.T) {
+ 		"targets": len(env.Targets), "isolation": len(env.Isolation),
+ 		"mcp": len(env.MCPPackageAllowlist), "shadow": len(env.ShadowAcknowledged),
+ 		"waivers": len(env.SecretWaivers), "inplace": len(env.InPlaceMode),
++		"providerdirs": len(env.ProviderDirectories),
+ 	} {
+ 		if value != 0 {
+ 			t.Fatalf("%s default must be empty, got %d", name, value)
+@@ -158,6 +159,13 @@ func TestSchema2KnobRejections(t *testing.T) {
+ 		{"waiver unknown", `{"secret_material_waivers": [{"pin": "` + strings.Repeat("a", 40) + `", "file": "f", "span": [1, 2], "reason": "r", "extra": 1}]}`, "unsupported"},
+ 		{"backup negative", `{"backup_retention": -1}`, "backup_retention"},
+ 		{"require grammar", `{"require_current_profile": "-bad"}`, "require_current_profile"},
++		{"provider relative", `{"provider_directories": ["rel/providers"]}`, "provider_directories"},
++		{"provider empty entry", `{"provider_directories": [""]}`, "provider_directories"},
++		{"provider duplicate", `{"provider_directories": ["/opt/a", "/opt/a"]}`, "provider_directories"},
++		{"provider bare drive", `{"provider_directories": ["C:"]}`, "provider_directories"},
++		{"provider not list", `{"provider_directories": "/opt/a"}`, "provider_directories"},
++		{"provider non-string", `{"provider_directories": [42]}`, "provider_directories"},
++		{"provider overlong", `{"provider_directories": ["/` + strings.Repeat("a", 4096) + `"]}`, "provider_directories"},
+ 	}
+ 	for _, tc := range cases {
+ 		t.Run(tc.name, func(t *testing.T) {
+@@ -181,7 +189,8 @@ func TestSchema2EveryKnobParses(t *testing.T) {
+ 		"shadow_acknowledged": [{"env": "pi", "path": "AGENTS.override.md"}],
+ 		"secret_material_waivers": [{"pin": "`+strings.Repeat("c", 40)+`", "file": "context/r.md", "span": [1, 2], "reason": "r"}],
+ 		"backup_retention": 0, "require_current_profile": "companyA",
+-		"in_place_mode": {"pi": "copied"}}}`)
++		"in_place_mode": {"pi": "copied"},
++		"provider_directories": ["/opt/curator/providers", "C:\\Program Files\\curator\\providers"]}}`)
+ 	env := cfg.Env
+ 	if env.CurrentProfile == nil || *env.CurrentProfile != "companyA" {
+ 		t.Fatalf("current_profile: %+v", env.CurrentProfile)
+@@ -211,6 +220,10 @@ func TestSchema2EveryKnobParses(t *testing.T) {
+ 	if env.InPlaceMode["pi"] != "copied" || len(env.SecretWaivers) != 1 || len(env.ShadowAcknowledged) != 1 {
+ 		t.Fatalf("tail: %+v", env)
+ 	}
++	if len(env.ProviderDirectories) != 2 || env.ProviderDirectories[0] != "/opt/curator/providers" ||
++		env.ProviderDirectories[1] != `C:\Program Files\curator\providers` {
++		t.Fatalf("provider_directories: %+v", env.ProviderDirectories)
++	}
+ 	// overlays_allowed false empties every overlay list (§12.2).
+ 	if got := env.EffectiveOverlays("companyA"); len(got) != 0 {
+ 		t.Fatalf("EffectiveOverlays with overlays_allowed=false = %v, want empty", got)
+@@ -462,16 +475,19 @@ func TestSystemV2LockableSubsetIsClassWide(t *testing.T) {
+ 		"backup_retention":        `{"backup_retention": 1}`,
+ 		"require_current_profile": `{"require_current_profile": "acme"}`,
+ 		"in_place_mode":           `{"in_place_mode": {"codex_cli": "linked"}}`,
++		"provider_directories":    `{"provider_directories": ["/opt/curator/providers"]}`,
+ 	}
+ 	if len(payloads) != len(EnvKnobNames) {
+ 		t.Fatalf("payloads cover %d knobs, EnvKnobNames carries %d: keep the two in step", len(payloads), len(EnvKnobNames))
+ 	}
+-	// The §12.2 transcription: exactly the six keys the specification
++	// The §12.2 transcription: exactly the seven keys the specification
+ 	// states ("overlays_allowed, precedence, mcp_package_allowlist,
+-	// passable_env_names, require_current_profile, and isolation"). This
+-	// literal is the spec sentence; LockableEnvKeys is the implementation.
+-	// Either drifting — a widening that would reach §9.1 secret material,
+-	// or a narrowing that would drop a fleet-policy knob — fails below.
++	// passable_env_names, require_current_profile, isolation, and
++	// provider_directories" — the last carried by the §11 trust-root
++	// rule). This literal is the spec sentence; LockableEnvKeys is the
++	// implementation. Either drifting — a widening that would reach §9.1
++	// secret material, or a narrowing that would drop a fleet-policy
++	// knob — fails below.
+ 	transcribed := map[string]bool{
+ 		"environments.overlays_allowed":        true,
+ 		"environments.precedence":              true,
+@@ -479,6 +495,7 @@ func TestSystemV2LockableSubsetIsClassWide(t *testing.T) {
+ 		"environments.passable_env_names":      true,
+ 		"environments.require_current_profile": true,
+ 		"environments.isolation":               true,
++		"environments.provider_directories":    true,
+ 	}
+ 	if len(LockableEnvKeys) != len(transcribed) {
+ 		t.Fatalf("LockableEnvKeys carries %d keys, §12.2 transcribes %d: a widening or narrowing without spec standing fails here", len(LockableEnvKeys), len(transcribed))
+@@ -535,7 +552,7 @@ func TestEffectiveJSONShape(t *testing.T) {
+ 		"system_prompt_files", "targets", "isolation", "xdg_seed_allowlist",
+ 		"passable_env_names", "mcp_package_allowlist", "shadow_acknowledged",
+ 		"secret_material_waivers", "backup_retention", "require_current_profile",
+-		"in_place_mode"} {
++		"in_place_mode", "provider_directories"} {
+ 		if _, present := env[knob]; !present {
+ 			t.Fatalf("rendered environments lack %q", knob)
+ 		}
+@@ -544,3 +561,115 @@ func TestEffectiveJSONShape(t *testing.T) {
+ 		t.Fatalf("scalar defaults: %v %v", env["overlay_default_weight"], env["overlays_allowed"])
+ 	}
+ }
++
++// TestProviderDirectoriesDefaultRendersEmptyList pins the §12.1 default:
++// an absent knob parses to the empty list and renders as [] (never null),
++// which the manager-config-v2 vectors require.
++func TestProviderDirectoriesDefaultRendersEmptyList(t *testing.T) {
++	cfg := loadText(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
++	if len(cfg.Env.ProviderDirectories) != 0 {
++		t.Fatalf("default = %v, want empty", cfg.Env.ProviderDirectories)
++	}
++	rendered := cfg.Env.render()["provider_directories"]
++	list, ok := rendered.([]any)
++	if !ok || len(list) != 0 {
++		t.Fatalf("rendered default = %#v, want []", rendered)
++	}
++	payload, err := json.Marshal(cfg.EffectiveJSON())
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !strings.Contains(string(payload), `"provider_directories":[]`) {
++		t.Fatalf("effective JSON renders no [] default: %s", payload)
++	}
++}
++
++// TestProviderDirectoriesDriveSpellings pins the two absolute spellings
++// the schema admits: POSIX-absolute and Windows drive-absolute with
++// either separator. A bare drive letter carries no root and is refused.
++func TestProviderDirectoriesDriveSpellings(t *testing.T) {
++	cfg := loadText(t, `{"schema_version": 2, "skills_root": "x", "projects": {}, "environments": {
++		"provider_directories": ["/opt/a", "C:\\Program Files\\p", "D:/teams/p"]}}`)
++	want := []string{"/opt/a", `C:\Program Files\p`, "D:/teams/p"}
++	if len(cfg.Env.ProviderDirectories) != len(want) {
++		t.Fatalf("dirs = %v, want %v", cfg.Env.ProviderDirectories, want)
++	}
++	for i, dir := range want {
++		if cfg.Env.ProviderDirectories[i] != dir {
++			t.Fatalf("dirs = %v, want %v", cfg.Env.ProviderDirectories, want)
++		}
++	}
++	loadFails(t, `{"schema_version": 2, "skills_root": "x", "projects": {},
++		"environments": {"provider_directories": ["C:"]}}`, "provider_directories")
++}
++
++// TestProviderDirectoriesLockedWins proves the §12.2 fleet policy: a
++// system file locks the list, the system value replaces the machine knob
++// whole with a warning naming the system file, and a locked-but-unset
++// key is a configuration error.
++func TestProviderDirectoriesLockedWins(t *testing.T) {
++	user := `{"schema_version": 2, "skills_root": "x", "projects": {},
++		"environments": {"provider_directories": ["/opt/user"]}}`
++	system := `{"schema_version": 2, "locked": ["environments.provider_directories"],
++		"environments": {"provider_directories": ["/opt/fleet"]}}`
++	cfg, warnings, err := loadWithSystem(t, user, system)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(cfg.Env.ProviderDirectories) != 1 || cfg.Env.ProviderDirectories[0] != "/opt/fleet" {
++		t.Fatalf("locked dirs = %v, want the system list", cfg.Env.ProviderDirectories)
++	}
++	if !cfg.LockedBySystem("environments.provider_directories") {
++		t.Fatalf("the lock bit is not recorded: %v", cfg.Locked)
++	}
++	joined := strings.Join(warnings, "\n")
++	if !strings.Contains(joined, "environments.provider_directories") || !strings.Contains(joined, "system.json") {
++		t.Fatalf("warnings miss the locked knob or the system file: %v", warnings)
++	}
++	if key := EnvLockKey("provider_directories"); key != "environments.provider_directories" {
++		t.Fatalf("EnvLockKey = %q", key)
++	}
++	// An unlocked system list is only a default: the machine knob wins.
++	cfg, _, err = loadWithSystem(t, user, `{"schema_version": 2, "locked": [],
++		"environments": {"provider_directories": ["/opt/fleet"]}}`)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(cfg.Env.ProviderDirectories) != 1 || cfg.Env.ProviderDirectories[0] != "/opt/user" {
++		t.Fatalf("unlocked default overrode the machine knob: %v", cfg.Env.ProviderDirectories)
++	}
++	// A locked-but-unset key fails closed.
++	_, _, err = loadWithSystem(t, user, `{"schema_version": 2,
++		"locked": ["environments.provider_directories"], "environments": {}}`)
++	if err == nil || !strings.Contains(err.Error(), "locks") {
++		t.Fatalf("err = %v, want the locked-but-unset refusal", err)
++	}
++}
++
++// TestProviderDirectoriesWriteRoundTrip proves the read-modify-write path
++// `env config set` uses carries the knob: WriteRaw validates and stores
++// it, and the stored file loads back with the same list.
++func TestProviderDirectoriesWriteRoundTrip(t *testing.T) {
++	path := writeConfig(t, t.TempDir(), "config.json",
++		`{"schema_version": 2, "skills_root": "x", "projects": {}}`)
++	object, err := ReadRaw(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	env, _ := object["environments"].(map[string]any)
++	if env == nil {
++		env = map[string]any{}
++		object["environments"] = env
++	}
++	env["provider_directories"] = []any{"/opt/a", "/opt/b"}
++	if _, err := WriteRaw(path, object); err != nil {
++		t.Fatal(err)
++	}
++	cfg, err := Load(path, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(cfg.Env.ProviderDirectories) != 2 || cfg.Env.ProviderDirectories[1] != "/opt/b" {
++		t.Fatalf("round trip = %v", cfg.Env.ProviderDirectories)
++	}
++}
+diff --git a/internal/envprofile/status.go b/internal/envprofile/status.go
+index 592738a..b2b0fc4 100644
+--- a/internal/envprofile/status.go
++++ b/internal/envprofile/status.go
+@@ -105,17 +105,53 @@ type ProfileState struct {
+ 	Precedence PrecedenceState `json:"precedence"`
+ }
+ 
++// Provider verdicts for the §11/§12 umbrella provider posture rows: the
++// trust verdict of one curator-<name> executable under the active
++// revision.
++const (
++	// ProviderTrusted resolves inside the trust roots with no warning.
++	ProviderTrusted = "trusted"
++	// ProviderOutsideTrustRoots resolves outside the trust roots with
++	// the revision-A warning and stays current.
++	ProviderOutsideTrustRoots = "outside_trust_roots"
++	// ProviderRefused is refused with subcommand_provider_untrusted.
++	ProviderRefused = "refused"
++	// ProviderMissing is absent with subcommand_provider_missing.
++	ProviderMissing = "missing"
++	// ProviderUnreadable failed with
++	// subcommand_provider_root_unreadable.
++	ProviderUnreadable = "unreadable"
++)
++
++// ProviderState is one §12 umbrella provider row: the resolved
++// absolute provider path with its trust verdict. Resolved is set when
++// the revision selected the provider; RefusedPath names the refused
++// path on a refusal; Diagnostic names the closed §11.1 outcome when
++// the row is not a silent success.
++type ProviderState struct {
++	Name                string   `json:"name"`
++	Executable          string   `json:"executable"`
++	Resolved            *string  `json:"resolved"`
++	RefusedPath         *string  `json:"refused_path,omitempty"`
++	Verdict             string   `json:"verdict"`
++	Diagnostic          *string  `json:"diagnostic,omitempty"`
++	Current             bool     `json:"current"`
++	TrustRoots          []string `json:"trust_roots_consulted"`
++	UnreadableDirectory *string  `json:"unreadable_directory,omitempty"`
++}
++
+ // Status is the whole matrix.
+ type Status struct {
+-	Homes                    []HomeState    `json:"homes"`
+-	Scopes                   []ScopeHome    `json:"scopes"`
+-	Adapters                 []AdapterState `json:"adapters"`
+-	Targets                  []TargetState  `json:"targets"`
+-	Profiles                 []ProfileState `json:"profiles"`
+-	UnregisteredEnvironments []string       `json:"unregistered_environments"`
+-	Orphans                  []string       `json:"orphans"`
+-	Notes                    []string       `json:"notes"`
+-	NonCurrent               bool           `json:"non_current"`
++	Homes                    []HomeState     `json:"homes"`
++	Scopes                   []ScopeHome     `json:"scopes"`
++	Adapters                 []AdapterState  `json:"adapters"`
++	Targets                  []TargetState   `json:"targets"`
++	Profiles                 []ProfileState  `json:"profiles"`
++	Providers                []ProviderState `json:"providers"`
++	UnregisteredEnvironments []string        `json:"unregistered_environments"`
++	Orphans                  []string        `json:"orphans"`
++	Notes                    []string        `json:"notes"`
++	NonCurrent               bool            `json:"non_current"`
+ 	// RequireCurrentProfile reports the locked require_current_profile
+ 	// requirement (environments §12.2): when the system file locks the
+ 	// key to a profile name, env status reports it. Nil means no

@@ -1,0 +1,579 @@
+=== build-vet-fmt.log ===
+.task-board/.resources/TASK-260908-1bpra2/TASK-260908-1bpra2_oracle.go
+.task-board/.resources/TASK-260908-1c0fwn/TASK-260908-1c0fwn_env_probe_test.go
+.task-board/.resources/TASK-260908-1c0fwn/TASK-260908-1c0fwn_review_probe_test.go
+.task-board/.resources/TASK-260908-3jux68/TASK-260908-3jux68_oracle-rev2.go
+.task-board/.resources/TASK-260916-bn5kvb/TASK-260916-bn5kvb_oracle.go
+.temp/review-1952mz/copy/.task-board/.resources/TASK-260908-1bpra2/TASK-260908-1bpra2_oracle.go
+.temp/review-1952mz/copy/.task-board/.resources/TASK-260908-1c0fwn/TASK-260908-1c0fwn_env_probe_test.go
+.temp/review-1952mz/copy/.task-board/.resources/TASK-260908-1c0fwn/TASK-260908-1c0fwn_review_probe_test.go
+.temp/review-1952mz/copy/.task-board/.resources/TASK-260908-3jux68/TASK-260908-3jux68_oracle-rev2.go
+.temp/review-1952mz/copy/.task-board/.resources/TASK-260916-bn5kvb/TASK-260916-bn5kvb_oracle.go
+.temp/review-1952mz/copy/internal/shell/review_probe_test.go
+
+
+=== tests.log ===
+=== RUN   TestShellHookTrustVectors
+=== RUN   TestShellHookTrustVectors/approved-env-sh-A-warning-sourced
+=== RUN   TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced
+=== RUN   TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning
+=== RUN   TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced
+=== RUN   TestShellHookTrustVectors/approved-env-ps1-A-warning-sourced
+    shell_hook_trust_test.go:90: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/approved-env-ps1-B-enforcing-sourced
+    shell_hook_trust_test.go:90: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/unapproved-env-ps1-A-warning-sourced-with-warning
+    shell_hook_trust_test.go:90: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/unapproved-env-ps1-B-enforcing-not-sourced
+    shell_hook_trust_test.go:90: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/changed-env-ps1-A-warning-sourced-with-warning
+    shell_hook_trust_test.go:90: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/changed-env-ps1-B-enforcing-not-sourced
+    shell_hook_trust_test.go:90: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced
+--- PASS: TestShellHookTrustVectors (1.28s)
+    --- PASS: TestShellHookTrustVectors/approved-env-sh-A-warning-sourced (0.19s)
+    --- PASS: TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced (0.32s)
+    --- PASS: TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning (0.17s)
+    --- PASS: TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced (0.13s)
+    --- PASS: TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning (0.08s)
+    --- PASS: TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced (0.12s)
+    --- SKIP: TestShellHookTrustVectors/approved-env-ps1-A-warning-sourced (0.02s)
+    --- SKIP: TestShellHookTrustVectors/approved-env-ps1-B-enforcing-sourced (0.02s)
+    --- SKIP: TestShellHookTrustVectors/unapproved-env-ps1-A-warning-sourced-with-warning (0.00s)
+    --- SKIP: TestShellHookTrustVectors/unapproved-env-ps1-B-enforcing-not-sourced (0.00s)
+    --- SKIP: TestShellHookTrustVectors/changed-env-ps1-A-warning-sourced-with-warning (0.02s)
+    --- SKIP: TestShellHookTrustVectors/changed-env-ps1-B-enforcing-not-sourced (0.02s)
+    --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning (0.08s)
+    --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced (0.10s)
+=== RUN   TestShellHookRefusesHostileCheckout
+=== RUN   TestShellHookRefusesHostileCheckout/posix
+=== RUN   TestShellHookRefusesHostileCheckout/powershell
+    shell_hook_trust_test.go:416: PowerShell is unavailable (no pwsh on this runner)
+--- PASS: TestShellHookRefusesHostileCheckout (0.13s)
+    --- PASS: TestShellHookRefusesHostileCheckout/posix (0.13s)
+    --- SKIP: TestShellHookRefusesHostileCheckout/powershell (0.00s)
+=== RUN   TestDetectIsCrossPlatform
+=== RUN   TestDetectIsCrossPlatform/zsh
+=== RUN   TestDetectIsCrossPlatform/bash
+=== RUN   TestDetectIsCrossPlatform/git_bash
+=== RUN   TestDetectIsCrossPlatform/windows
+=== RUN   TestDetectIsCrossPlatform/PowerShell_environment
+=== RUN   TestDetectIsCrossPlatform/portable_fallback
+--- PASS: TestDetectIsCrossPlatform (0.00s)
+    --- PASS: TestDetectIsCrossPlatform/zsh (0.00s)
+    --- PASS: TestDetectIsCrossPlatform/bash (0.00s)
+    --- PASS: TestDetectIsCrossPlatform/git_bash (0.00s)
+    --- PASS: TestDetectIsCrossPlatform/windows (0.00s)
+    --- PASS: TestDetectIsCrossPlatform/PowerShell_environment (0.00s)
+    --- PASS: TestDetectIsCrossPlatform/portable_fallback (0.00s)
+=== RUN   TestPosixHookEntersNestedSwitchesAndLeavesProjects
+=== RUN   TestPosixHookEntersNestedSwitchesAndLeavesProjects/bash
+=== RUN   TestPosixHookEntersNestedSwitchesAndLeavesProjects/zsh
+--- PASS: TestPosixHookEntersNestedSwitchesAndLeavesProjects (0.46s)
+    --- PASS: TestPosixHookEntersNestedSwitchesAndLeavesProjects/bash (0.20s)
+    --- PASS: TestPosixHookEntersNestedSwitchesAndLeavesProjects/zsh (0.27s)
+=== RUN   TestPosixHookRejectsNonAbsolutePWDWithoutHanging
+=== RUN   TestPosixHookRejectsNonAbsolutePWDWithoutHanging/bash
+=== RUN   TestPosixHookRejectsNonAbsolutePWDWithoutHanging/bash/#00
+=== RUN   TestPosixHookRejectsNonAbsolutePWDWithoutHanging/bash/.
+=== RUN   TestPosixHookRejectsNonAbsolutePWDWithoutHanging/bash/relative-path
+=== RUN   TestPosixHookRejectsNonAbsolutePWDWithoutHanging/zsh
+=== RUN   TestPosixHookRejectsNonAbsolutePWDWithoutHanging/zsh/#00
+=== RUN   TestPosixHookRejectsNonAbsolutePWDWithoutHanging/zsh/.
+=== RUN   TestPosixHookRejectsNonAbsolutePWDWithoutHanging/zsh/relative-path
+--- PASS: TestPosixHookRejectsNonAbsolutePWDWithoutHanging (0.06s)
+    --- PASS: TestPosixHookRejectsNonAbsolutePWDWithoutHanging/bash (0.03s)
+        --- PASS: TestPosixHookRejectsNonAbsolutePWDWithoutHanging/bash/#00 (0.01s)
+        --- PASS: TestPosixHookRejectsNonAbsolutePWDWithoutHanging/bash/. (0.01s)
+        --- PASS: TestPosixHookRejectsNonAbsolutePWDWithoutHanging/bash/relative-path (0.01s)
+    --- PASS: TestPosixHookRejectsNonAbsolutePWDWithoutHanging/zsh (0.03s)
+        --- PASS: TestPosixHookRejectsNonAbsolutePWDWithoutHanging/zsh/#00 (0.01s)
+        --- PASS: TestPosixHookRejectsNonAbsolutePWDWithoutHanging/zsh/. (0.01s)
+        --- PASS: TestPosixHookRejectsNonAbsolutePWDWithoutHanging/zsh/relative-path (0.01s)
+=== RUN   TestPosixHookSupportsNounsetProfiles
+=== RUN   TestPosixHookSupportsNounsetProfiles/bash
+=== RUN   TestPosixHookSupportsNounsetProfiles/zsh
+--- PASS: TestPosixHookSupportsNounsetProfiles (0.04s)
+    --- PASS: TestPosixHookSupportsNounsetProfiles/bash (0.02s)
+    --- PASS: TestPosixHookSupportsNounsetProfiles/zsh (0.02s)
+=== RUN   TestBashHookDoesNotDuplicatePromptCommand
+--- PASS: TestBashHookDoesNotDuplicatePromptCommand (0.01s)
+=== RUN   TestBashHookPreservesPromptCommandArray
+--- PASS: TestBashHookPreservesPromptCommandArray (0.01s)
+=== RUN   TestZshHookIsIdempotentAndDoesNotReenter
+--- PASS: TestZshHookIsIdempotentAndDoesNotReenter (0.08s)
+=== RUN   TestPosixHookDoesNotReenterWhileSourcingGlobalEnv
+=== RUN   TestPosixHookDoesNotReenterWhileSourcingGlobalEnv/bash
+=== RUN   TestPosixHookDoesNotReenterWhileSourcingGlobalEnv/zsh
+--- PASS: TestPosixHookDoesNotReenterWhileSourcingGlobalEnv (0.06s)
+    --- PASS: TestPosixHookDoesNotReenterWhileSourcingGlobalEnv/bash (0.03s)
+    --- PASS: TestPosixHookDoesNotReenterWhileSourcingGlobalEnv/zsh (0.03s)
+=== RUN   TestPosixHookNormalizesGitBashConfigAndAvoidsDirname
+--- PASS: TestPosixHookNormalizesGitBashConfigAndAvoidsDirname (0.03s)
+=== RUN   TestInstallHookAndSourceCommand
+--- PASS: TestInstallHookAndSourceCommand (0.13s)
+=== RUN   TestHookVariants
+--- PASS: TestHookVariants (0.00s)
+=== RUN   TestHookTrustGateShape
+--- PASS: TestHookTrustGateShape (0.00s)
+=== RUN   TestPowerShellHookRunsOnEveryPrompt
+    shell_test.go:399: PowerShell prompt integration is exercised on Windows
+--- SKIP: TestPowerShellHookRunsOnEveryPrompt (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/shell	3.670s
+=== RUN   TestDigestMatchesKnownSHA256
+--- PASS: TestDigestMatchesKnownSHA256 (0.00s)
+=== RUN   TestLookupOnAbsentStateIsEmpty
+--- PASS: TestLookupOnAbsentStateIsEmpty (0.00s)
+=== RUN   TestUpsertLookupListRoundTrip
+--- PASS: TestUpsertLookupListRoundTrip (0.05s)
+=== RUN   TestTwoSpellingsResolveToOneRecord
+--- PASS: TestTwoSpellingsResolveToOneRecord (0.09s)
+=== RUN   TestRevokeAbsentLeavesStateUnchanged
+--- PASS: TestRevokeAbsentLeavesStateUnchanged (0.04s)
+=== RUN   TestApproveFileRefusesAbsentAndUnreadable
+--- PASS: TestApproveFileRefusesAbsentAndUnreadable (0.12s)
+=== RUN   TestUpsertRejectsOpenShapes
+=== RUN   TestUpsertRejectsOpenShapes/short_digest
+=== RUN   TestUpsertRejectsOpenShapes/uppercase_digest
+=== RUN   TestUpsertRejectsOpenShapes/non-hex_digest
+=== RUN   TestUpsertRejectsOpenShapes/open_approver
+=== RUN   TestUpsertRejectsOpenShapes/missing_timestamp
+=== RUN   TestUpsertRejectsOpenShapes/tab_in_path
+=== RUN   TestUpsertRejectsOpenShapes/newline_in_path
+--- PASS: TestUpsertRejectsOpenShapes (0.00s)
+    --- PASS: TestUpsertRejectsOpenShapes/short_digest (0.00s)
+    --- PASS: TestUpsertRejectsOpenShapes/uppercase_digest (0.00s)
+    --- PASS: TestUpsertRejectsOpenShapes/non-hex_digest (0.00s)
+    --- PASS: TestUpsertRejectsOpenShapes/open_approver (0.00s)
+    --- PASS: TestUpsertRejectsOpenShapes/missing_timestamp (0.00s)
+    --- PASS: TestUpsertRejectsOpenShapes/tab_in_path (0.00s)
+    --- PASS: TestUpsertRejectsOpenShapes/newline_in_path (0.00s)
+=== RUN   TestMalformedStateFailsClosed
+--- PASS: TestMalformedStateFailsClosed (0.08s)
+PASS
+ok  	github.com/relux-works/curator/internal/hookapproval	1.232s
+=== RUN   TestWriteProjectShapesAndSourcing
+--- PASS: TestWriteProjectShapesAndSourcing (0.06s)
+=== RUN   TestWriteGlobal
+--- PASS: TestWriteGlobal (0.09s)
+PASS
+ok  	github.com/relux-works/curator/internal/envfiles	0.573s
+
+
+=== extra.log ===
+ok  	github.com/relux-works/curator/internal/install	8.848s
+ok  	github.com/relux-works/curator/cmd/curator	0.657s
+0 issues.
+
+
+=== adversarial.log ===
+=== RUN   TestReviewerMalformedApproval
+=== RUN   TestReviewerMalformedApproval/two-fields
+    reviewer_adversarial_test.go:12: INVALID RECORD SOURCED under B: sourced1=1
+        sourced2=1
+         stderr="PROBE-1\n"
+=== RUN   TestReviewerMalformedApproval/bad-approver
+    reviewer_adversarial_test.go:12: INVALID RECORD SOURCED under B: sourced1=1
+        sourced2=1
+         stderr="PROBE-1\n"
+=== RUN   TestReviewerMalformedApproval/bad-timestamp
+    reviewer_adversarial_test.go:12: INVALID RECORD SOURCED under B: sourced1=1
+        sourced2=1
+         stderr="PROBE-1\n"
+--- FAIL: TestReviewerMalformedApproval (0.19s)
+    --- FAIL: TestReviewerMalformedApproval/two-fields (0.07s)
+    --- FAIL: TestReviewerMalformedApproval/bad-approver (0.06s)
+    --- FAIL: TestReviewerMalformedApproval/bad-timestamp (0.06s)
+=== RUN   TestReviewerAlias
+    reviewer_adversarial_test.go:20: alias lookup: found=false err=<nil>
+    reviewer_adversarial_test.go:22: APPROVED ALIAS REFUSED: sourced1=no
+        sourced2=no
+         stderr="curator: shell_hook_env_unapproved: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestReviewerAlias1233428890/001/alias/.agents/env.sh is not approved; run curator hook approve /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestReviewerAlias1233428890/001/alias/.agents/env.sh to approve it\nPROBE-1\n"
+--- FAIL: TestReviewerAlias (0.13s)
+=== RUN   TestReviewerPOSIX
+=== RUN   TestReviewerPOSIX/sh
+=== RUN   TestReviewerPOSIX/dash
+    reviewer_adversarial_test.go:24: /bin/dash: exit status 2 /var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestReviewerPOSIXdash3891115899/001/hook: 183: Syntax error: "(" unexpected (expecting "fi")
+--- FAIL: TestReviewerPOSIX (0.11s)
+    --- PASS: TestReviewerPOSIX/sh (0.03s)
+    --- FAIL: TestReviewerPOSIX/dash (0.08s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/shell	0.946s
+FAIL
+
+
+=== M1_only_unapproved_refused.log ===
+=== RUN   TestShellHookTrustVectors
+=== RUN   TestShellHookTrustVectors/approved-env-sh-A-warning-sourced
+=== RUN   TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced
+=== RUN   TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning
+=== RUN   TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced
+    shell_hook_trust_test.go:90: stdout lacks "sourced1=no":
+        stdout:
+        sourced1=1
+        sourced2=1
+        
+        stderr:
+        curator: shell_hook_env_changed: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorschanged-env-sh-B-enforcing-not-sourced2929762709/001/project/.agents/env.sh changed since approval; run curator hook approve /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorschanged-env-sh-B-enforcing-not-sourced2929762709/001/project/.agents/env.sh to approve the new bytes
+        PROBE-1
+=== RUN   TestShellHookTrustVectors/approved-env-ps1-A-warning-sourced
+    shell_hook_trust_test.go:90: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/approved-env-ps1-B-enforcing-sourced
+    shell_hook_trust_test.go:90: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/unapproved-env-ps1-A-warning-sourced-with-warning
+    shell_hook_trust_test.go:90: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/unapproved-env-ps1-B-enforcing-not-sourced
+    shell_hook_trust_test.go:90: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/changed-env-ps1-A-warning-sourced-with-warning
+    shell_hook_trust_test.go:90: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/changed-env-ps1-B-enforcing-not-sourced
+    shell_hook_trust_test.go:90: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced
+--- FAIL: TestShellHookTrustVectors (0.76s)
+    --- PASS: TestShellHookTrustVectors/approved-env-sh-A-warning-sourced (0.13s)
+    --- PASS: TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced (0.09s)
+    --- PASS: TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning (0.05s)
+    --- PASS: TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced (0.09s)
+    --- PASS: TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning (0.08s)
+    --- FAIL: TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced (0.08s)
+    --- SKIP: TestShellHookTrustVectors/approved-env-ps1-A-warning-sourced (0.02s)
+    --- SKIP: TestShellHookTrustVectors/approved-env-ps1-B-enforcing-sourced (0.02s)
+    --- SKIP: TestShellHookTrustVectors/unapproved-env-ps1-A-warning-sourced-with-warning (0.00s)
+    --- SKIP: TestShellHookTrustVectors/unapproved-env-ps1-B-enforcing-not-sourced (0.00s)
+    --- SKIP: TestShellHookTrustVectors/changed-env-ps1-A-warning-sourced-with-warning (0.02s)
+    --- SKIP: TestShellHookTrustVectors/changed-env-ps1-B-enforcing-not-sourced (0.02s)
+    --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning (0.05s)
+    --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced (0.09s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/shell	1.226s
+FAIL
+
+exit=1
+
+
+=== M2_only_changed_refused.log ===
+=== RUN   TestShellHookTrustVectors
+=== RUN   TestShellHookTrustVectors/approved-env-sh-A-warning-sourced
+=== RUN   TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced
+    shell_hook_trust_test.go:90: stdout lacks "sourced1=no":
+        stdout:
+        sourced1=1
+        sourced2=1
+        
+        stderr:
+        curator: shell_hook_env_unapproved: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorsunapproved-env-sh-B-enforcing-not-sour1750098831/001/project/.agents/env.sh is not approved; run curator hook approve /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorsunapproved-env-sh-B-enforcing-not-sour1750098831/001/project/.agents/env.sh to approve it
+        PROBE-1
+=== RUN   TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning
+=== RUN   TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced
+=== RUN   TestShellHookTrustVectors/approved-env-ps1-A-warning-sourced
+    shell_hook_trust_test.go:90: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/approved-env-ps1-B-enforcing-sourced
+    shell_hook_trust_test.go:90: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/unapproved-env-ps1-A-warning-sourced-with-warning
+    shell_hook_trust_test.go:90: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/unapproved-env-ps1-B-enforcing-not-sourced
+    shell_hook_trust_test.go:90: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/changed-env-ps1-A-warning-sourced-with-warning
+    shell_hook_trust_test.go:90: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/changed-env-ps1-B-enforcing-not-sourced
+    shell_hook_trust_test.go:90: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced
+    shell_hook_trust_test.go:90: stdout lacks "sourced1=no":
+        stdout:
+        sourced1=1
+        sourced2=1
+        
+        stderr:
+        curator: shell_hook_env_unapproved: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorsforged-project-record-env-sh-B-enforci1031595534/001/project/.agents/env.sh is not approved; run curator hook approve /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorsforged-project-record-env-sh-B-enforci1031595534/001/project/.agents/env.sh to approve it
+        PROBE-1
+--- FAIL: TestShellHookTrustVectors (1.03s)
+    --- PASS: TestShellHookTrustVectors/approved-env-sh-A-warning-sourced (0.08s)
+    --- PASS: TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced (0.08s)
+    --- PASS: TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning (0.06s)
+    --- FAIL: TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced (0.05s)
+    --- PASS: TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning (0.08s)
+    --- PASS: TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced (0.12s)
+    --- SKIP: TestShellHookTrustVectors/approved-env-ps1-A-warning-sourced (0.03s)
+    --- SKIP: TestShellHookTrustVectors/approved-env-ps1-B-enforcing-sourced (0.02s)
+    --- SKIP: TestShellHookTrustVectors/unapproved-env-ps1-A-warning-sourced-with-warning (0.00s)
+    --- SKIP: TestShellHookTrustVectors/unapproved-env-ps1-B-enforcing-not-sourced (0.00s)
+    --- SKIP: TestShellHookTrustVectors/changed-env-ps1-A-warning-sourced-with-warning (0.02s)
+    --- SKIP: TestShellHookTrustVectors/changed-env-ps1-B-enforcing-not-sourced (0.03s)
+    --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning (0.13s)
+    --- FAIL: TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced (0.33s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/shell	1.379s
+FAIL
+
+exit=1
+
+
+=== ledger.log ===
+ok    internal/buildcache :: TestWindowsProtectedStateMatrix [must=windows skip=-]
+ok    internal/buildcache :: TestWindowsProtectedStateMatrix/* [must=- skip=windows]
+ok    internal/buildcache :: TestValidateWindowsSecurityPolicy [must=windows skip=-]
+ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedEntry [must=windows skip=windows]
+ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedCacheRoot [must=windows skip=windows]
+ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedWindowsScopes [must=windows skip=windows]
+ok    internal/runtimestore :: TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode [must=windows skip=-]
+ok    internal/runtimestore :: TestInstallSingleCommandAndShims [must=linux,darwin,windows skip=-]
+ok    internal/runtimestore :: TestRuntimeCommandPath [must=linux,darwin,windows skip=-]
+ok    internal/runtimestore :: TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly [must=linux,darwin skip=windows]
+ok    internal/buildcache :: TestUnixProtectedStateMatrix [must=linux,darwin skip=-]
+ok    internal/buildcache :: TestUnixProtectionHelperFailuresFailClosed [must=linux,darwin skip=-]
+ok    internal/config :: TestBootstrapAndAddProject [must=linux,darwin,windows skip=-]
+ok    internal/buildcache :: TestSweepDoesNotFollowSymlinkedEntries [must=linux,darwin skip=-]
+ok    internal/buildcache :: TestSweepDoesNotFollowASymlinkedCacheRoot [must=linux,darwin skip=-]
+ok    internal/buildcache :: TestRetireEntryRemovesLinksWithoutFollowingThem [must=linux,darwin skip=-]
+ok    internal/buildcache :: TestUnixRejectsEntrySymlinkAndUnprotectedCacheRoot [must=linux,darwin skip=-]
+ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedUnixScopes [must=linux,darwin skip=-]
+ok    internal/buildsource :: TestRejectsSpecialFile [must=linux,darwin skip=-]
+ok    internal/gitops :: TestArchiveRejectsLinks [must=linux,darwin,windows skip=-]
+ok    internal/gitops :: TestExtractReproducesByteExactVector [must=linux,darwin,windows skip=-]
+ok    internal/gitops :: TestExtractIgnoresWorkingTreeConversion [must=linux,darwin,windows skip=-]
+ok    internal/gitops :: TestExtractRefusesSubmodules [must=linux,darwin,windows skip=-]
+ok    internal/gitops :: TestExtractPreservesExecutableBit [must=linux,darwin skip=windows]
+ok    internal/gitops :: TestExtractRefusesOversizeBlobWithoutStreaming [must=linux,darwin,windows skip=-]
+ok    internal/gitops :: TestExtractRefusesDuplicatePlatformPathBeforeLargeBlob [must=darwin,windows skip=linux]
+ok    internal/gitops :: TestPlanWritesRefusesCaseCollisionBeforeStreaming [must=darwin,windows skip=linux]
+ok    internal/gitops :: TestExtractRefusesEscapeBeforeLargeBlob [must=linux,darwin,windows skip=-]
+ok    internal/gitops :: TestExtractRefusesMissingObjectsFromListing [must=linux,darwin,windows skip=-]
+ok    internal/gitops :: TestExtractTerminatesCatFileOnMidStreamFramingError [must=linux,darwin skip=windows]
+ok    internal/gitops :: TestExtractTerminatesCatFileOnWriteFailure [must=linux,darwin skip=windows]
+ok    internal/gitops :: TestExtractRemovesWrittenFilesOnMidStreamError [must=linux,darwin,windows skip=-]
+ok    internal/gitops :: TestExtractRefusesDotGitComponents [must=linux,darwin,windows skip=-]
+ok    internal/gitops :: TestExtractPreservesNestedExecutableBit [must=linux,darwin skip=windows]
+ok    internal/buildsource :: TestFrozenTokenRejectsMutation [must=linux,darwin,windows skip=-]
+ok    internal/buildsource :: TestFrozenTokenRejectsMutation/* [must=- skip=linux,darwin,windows]
+ok    internal/buildsource :: TestFrozenTokenRejectsRootReplacement [must=linux,darwin,windows skip=-]
+ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation [must=linux,darwin,windows skip=-]
+ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation/* [must=- skip=linux,darwin,windows]
+ok    internal/install :: TestDryRunTouchesNothing [must=linux,darwin,windows skip=-]
+ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext [must=linux,darwin,windows skip=-]
+excl  internal/godriver :: TestResourceLimitsStayInsideManagerBounds (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestResourceLimitsStayInsideManagerBounds [must=darwin,windows skip=-]
+excl  internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly [must=darwin,windows skip=-]
+excl  internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes [must=darwin,windows skip=-]
+excl  internal/godriver :: TestPerFileSizeLimitIsReallyApplied (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestPerFileSizeLimitIsReallyApplied [must=darwin skip=windows]
+excl  internal/godriver :: TestBuildFailsClosedWhenTheGoChildCannotStart (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestBuildFailsClosedWhenTheGoChildCannotStart [must=windows skip=darwin]
+excl  internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation [must=darwin,windows skip=-]
+excl  internal/godriver :: TestExecutableIdentityResolvesALauncherLink (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestExecutableIdentityResolvesALauncherLink [must=darwin,windows skip=windows]
+ok    internal/godriver :: TestExecutableIdentityResolvesALauncherLink/* [must=- skip=windows]
+excl  internal/godriver :: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink [must=darwin,windows skip=windows]
+ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/* [must=- skip=windows]
+excl  internal/godriver :: TestExecutableIdentityResolvesARealSymlinkedProcessLaunch (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestExecutableIdentityResolvesARealSymlinkedProcessLaunch [must=darwin,windows skip=windows]
+excl  internal/godriver :: TestBuildAcceptsAManagerStartedThroughALauncherLink (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestBuildAcceptsAManagerStartedThroughALauncherLink [must=darwin,windows skip=windows]
+excl  internal/godriver :: TestWorkerProvesTheInstalledIdentityWhenLaunchedThroughALink (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestWorkerProvesTheInstalledIdentityWhenLaunchedThroughALink [must=darwin,windows skip=windows]
+ok    internal/godriver :: TestExecutableIdentityResolvesALauncherReachedThroughADirectoryJunction [must=windows skip=windows]
+ok    internal/godriver :: TestExecutableIdentityStillRejectsSubstitutionBehindAJunction [must=windows skip=windows]
+ok    internal/runtimestore :: TestUnixPostInstallShimPropagatesSignal [must=linux,darwin skip=-]
+ok    internal/shell :: TestPosixHookEntersNestedSwitchesAndLeavesProjects [must=linux,darwin skip=windows]
+ok    internal/shell :: TestPowerShellHookRunsOnEveryPrompt [must=windows skip=linux,darwin]
+ok    internal/shell :: TestShellHookTrustVectors [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/shell :: TestShellHookTrustVectors/* [must=- skip=linux,darwin,windows]
+ok    internal/envfiles :: TestWriteProjectShapesAndSourcing [must=linux,darwin,windows skip=-]
+ok    internal/install :: TestEndToEndInstall [must=linux,darwin,windows skip=-]
+ok    internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets [must=linux,darwin,windows skip=-]
+ok    internal/install :: TestRegistrySnapshotSurvivesASecondBoundaryDuringFetch [must=linux,darwin,windows skip=-]
+ok    internal/install :: TestRegistryFutureSnapshotDeniesInstallThroughResolveRegistries [must=linux,darwin,windows skip=-]
+ok    internal/registry :: TestSnapshotFutureBoundIsExactAtEveryConfiguredSkew [must=linux,darwin,windows skip=-]
+ok    internal/registry :: TestSnapshotZeroClockSkewIsLiteral [must=linux,darwin,windows skip=-]
+ok    internal/transaction :: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/transaction :: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/transaction :: TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/install/atomicity :: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder [must=linux,darwin,windows skip=-]
+ok    internal/install/atomicity :: TestStaleAdapterRemovalRollsBackToTheExactPriorEntry [must=linux,darwin,windows skip=-]
+ok    internal/install/atomicity :: TestAdapterMirrorLinksAreJournaledAndRestoredExactly [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/transaction :: TestCommitAndRollbackRestoreALinkExactly [must=linux,darwin,windows skip=-]
+ok    internal/transaction :: TestRecoveryFinishesAPreparedLinkTransaction [must=linux,darwin,windows skip=-]
+ok    internal/transaction :: TestEntryRemovalRestoresTheExactLink [must=linux,darwin,windows skip=-]
+ok    internal/transaction :: TestEntryTargetsDoNotAliasTheirDestination [must=linux,darwin,windows skip=-]
+ok    internal/transaction :: TestNamespaceIdentityIsReadOnceWithinOneValidationPass [must=linux,darwin,windows skip=-]
+ok    internal/transaction :: TestWindowsNamespaceIdentityIsCompletedWhenItIsTaken [must=windows skip=-]
+ok    internal/interop :: TestGoldenContextCopy [must=linux,darwin,windows skip=-]
+ok    internal/interop/environments :: TestConformanceSnapshotAcquisition [must=linux,darwin,windows skip=-]
+ok    internal/interop/environments :: TestConformanceContextVersions [must=linux,darwin,windows skip=-]
+ok    internal/interop/environments :: TestConformanceContextResolution [must=linux,darwin,windows skip=-]
+ok    internal/interop/environments :: TestConformanceEnvironmentsHeader [must=linux,darwin,windows skip=-]
+ok    internal/interop/environments :: TestConformanceEnvironmentsMonolithic [must=linux,darwin,windows skip=-]
+ok    internal/interop/environments :: TestConformanceContextDetectors [must=linux,darwin,windows skip=-]
+ok    internal/interop/environments :: TestEveryFamilyThisPackageReadsIsDeclaredInRootArtefacts [must=linux,darwin,windows skip=-]
+ok    internal/interop/environments :: TestNoCaseHereSkipsForAnythingButTheDeferredRoot [must=linux,darwin,windows skip=-]
+ok    internal/interop/environments :: TestNoLedgerRowForThisPackageToleratesASkip [must=linux,darwin,windows skip=-]
+ok    internal/interop/environments :: TestNoRootReadHereEscapesTheDeclaredArtefactGuard [must=linux,darwin,windows skip=-]
+ok    internal/interop/environments :: TestTheRootIsAlwaysBoundToThatOneName [must=linux,darwin,windows skip=-]
+ok    internal/interop/environments :: TestConformanceEveryPathTheVectorsNameIsDeclared [must=linux,darwin,windows skip=-]
+excl  internal/godriver :: TestCandidateGoV1SourceAwareContract (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestCandidateGoV1SourceAwareContract [must=darwin,windows skip=darwin,windows]
+excl  internal/godriver :: TestFingerprintReportsUnreadableDirectoryIdentically (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestFingerprintReportsUnreadableDirectoryIdentically [must=darwin,windows skip=-]
+ok    cmd/curator :: TestCompiledInstallFollowsTheNativeControlInventoryExactly [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestCompiledProjectStatusAndUntrustedRecovery [must=darwin,windows skip=linux]
+ok    cmd/curator :: TestCompiledProjectRepairsCorruptCompiledState [must=darwin,windows skip=linux]
+ok    cmd/curator :: TestCompiledProjectRestoresCacheWhenCommitFails [must=darwin,windows skip=linux]
+ok    cmd/curator :: TestStatusReportsATransitivelyResolvedCompiledCommand [must=darwin,windows skip=linux]
+ok    cmd/curator :: TestStatusReportsAnUnusableToolchainPerCompiledCommand [must=darwin,windows skip=linux]
+ok    cmd/curator :: TestGCRetainsAndReportsReferencedCompiledState [must=darwin,windows skip=linux]
+ok    cmd/curator :: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck [must=darwin,windows skip=linux]
+ok    cmd/curator :: TestGlobalStatusReportsATransitivelyResolvedCompiledCommand [must=darwin,windows skip=linux]
+ok    internal/godriver :: TestProbeRejectsAnUncoveredPlatformBeforeTheWorker [must=linux,darwin,windows skip=-]
+ok    internal/skillspec :: TestReleasedSchemaCases [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/marker :: TestReadAuthoritativeMarkerV4SchemaCases [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/moduleroots :: TestModuleRootVectors [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/godriver :: TestModuleRootVectorsDriveTheWholeBuild [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/scriptpolicy :: TestScriptHostExecutionPolicySectionsAreAllClassified [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/scriptpolicy :: TestScriptExecutionPolicyIdentityMatchesTheSuite [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/scriptpolicy :: TestScriptExecutionOptInCases [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/scriptpolicy :: TestARefusalPrecedesEveryWorkerSurface [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/config :: TestManagerConfigV2SchemaCases [must=linux,darwin,windows skip=-]
+ok    internal/config :: TestSystemConfigV2SchemaCases [must=linux,darwin,windows skip=-]
+ok    internal/config :: TestManagerConfigV2Vectors [must=linux,darwin,windows skip=-]
+ok    internal/config :: TestSystemV2LockableSubsetIsClassWide [must=linux,darwin,windows skip=-]
+ok    internal/contextmaterialize :: TestReferencedRejectsCodex [must=linux,darwin,windows skip=-]
+ok    internal/contextmaterialize :: TestCodexTOMLExactness [must=linux,darwin,windows skip=-]
+ok    internal/contextmaterialize :: TestMCPEnvNamesUnion [must=linux,darwin,windows skip=-]
+ok    internal/envregistry :: TestIsolationMatrix [must=linux,darwin,windows skip=-]
+ok    internal/envregistry :: TestFormUnsupported [must=linux,darwin,windows skip=-]
+ok    internal/envfragment :: TestFragmentJSONCanonical [must=linux,darwin,windows skip=-]
+ok    internal/envfragment :: TestCheckBoundary [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestResolveProvisionRepair [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestResolveStaleUnprovisioned [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestResolveDriftRepair [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestResolvePassthroughLiveness [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestResolveClaudeProjectEntry [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestResolveLockContention [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestStatusOrphanRetention [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestOpencodeXDGSeeds [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestSeedUnreadableStopsBeforeFirstWrite [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestClaudeRootAlwaysCopied [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestCodexUnreadableConfigFails [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestStatusProfileMembersAndUnregistered [must=linux,darwin,windows skip=-]
+ok    internal/envregistry :: TestSecondaryTargetsBoundToAdapters [must=linux,darwin,windows skip=-]
+ok    internal/envfragment :: TestFragmentEnvCarriesOnlyEnvObject [must=linux,darwin,windows skip=-]
+ok    internal/envmarker :: TestParseAuthoritativeEnvMarkerSchemaCases [must=linux,darwin,windows skip=-]
+ok    internal/envfragment :: TestFragmentAuthoritativeSchemaCases [must=linux,darwin,windows skip=-]
+ok    internal/envfragment :: TestFragmentEmissionMatchesReference [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestEnvResolveRepairEmitsFragment [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestEnvStatusMatrix [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestUmbrellaMissingProvider [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestUmbrellaDispatchesToProvider [must=linux,darwin skip=windows]
+ok    cmd/curator :: TestUmbrellaPropagatesExitCode [must=linux,darwin skip=windows]
+ok    internal/hashing :: TestCrossCheckTree [must=- skip=linux,darwin,windows]
+ok    internal/config :: TestPathOverlayDeclarationParses [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestPathOverlayJoinsClosure [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestPathOverlayFormIsSourceInvalid [must=linux,darwin,windows skip=-]
+ok    internal/config :: TestGitOverlayDeclarationParses [must=linux,darwin,windows skip=-]
+ok    internal/identity :: TestClassifySourceMatrix [must=linux,darwin,windows skip=-]
+ok    internal/identity :: TestClassifySourceNeverProbesTheFilesystem [must=linux,darwin,windows skip=-]
+ok    internal/identity :: TestClassifySourceEcmaWhitespace [must=linux,darwin,windows skip=-]
+ok    internal/identity :: TestParseOneCharacterHostIsANetworkIdentity [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestInstallOperandKindIsSyntactic [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestInstallNeverDemotesANetworkIdentityToAPath [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestInstallRefusesANonSourceOperand [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestOverlayInvalidSourceKindIsSourceInvalid [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestSCPOverlayResolvesAsGit [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestOverlayExplicitWeightOverridesDefault [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestGitOverlayJoinsClosure [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestOverlayRepeatedNameIsCompositionInvalid [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestOverlayDuplicateNameIsCompositionInvalid [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestForbiddenOverlaysResolveAlone [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestRemoveRefusesOverlayOfAnotherProfile [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestWeightRulesApplyInOrder [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestWeightDuplicateRefused [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestWeightUnknownRefused [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestNonRootWeightsMapRefused [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestWeightConflictErrorAndWarning [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestWeightRulesAllFourDisagree [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestPrecedencePrimitivesDriveEmission [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestPrecedenceTieKeepsTopologicalOrder [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestMissingPathOperandIsPathMissing [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestMissingOverlayPathIsPathMissing [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestNonDirectoryPathIsSourceInvalid [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestNestedGitIsSourceInvalid [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestSymlinkInPathIsSourceInvalid [must=linux,darwin skip=windows]
+ok    internal/envprofile :: TestFoldedPathsAreSourceInvalid [must=linux skip=darwin,windows]
+ok    internal/envprofile :: TestRootGitExcluded [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestUnreadablePathIsUnreadable [must=linux,darwin skip=windows]
+ok    internal/envprofile :: TestUnreadablePathRootLeadsUnreadable [must=linux,darwin skip=windows]
+ok    internal/envprofile :: TestPathSnapshotImmutableAcrossUpdateSyncUse [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestUpdatePathWithoutStatePinIsSourceInvalid [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestUpdatePathMissingSnapshotIsSourceInvalid [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestUpdatePathSnapshotNameMismatchIsSourceInvalid [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestPathReinstallBareAndNonCurrentMovesPin [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestUpdateBlocksSecretOverlayMember [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestReinstallBlocksSecretOverlayMember [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestUpdateBlocksRevokedOverlayMember [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestReinstallBlocksRevokedOverlayMember [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestPathUpdateAllSucceedsWithImportedProfile [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestUseWithoutTakeoverRefusesUnmanaged [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestUseTakeoverBacksUpAndNotifies [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestForeignSymlinkStopsSwitch [must=linux,darwin skip=windows]
+ok    internal/envprofile :: TestTakeoverWarnsDotfileHeuristic [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestMachineClearReachesSeamGate [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestReadOnlyCommandsNeverOnboard [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestRepairTakeoverProvisionsManagedHome [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportLosslessInstallsThroughPathPipeline [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportNormalizesOrdersAndPins [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestNormalizeImportText [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportLossyStopsWithoutConsent [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportLossyProceedsWithConsent [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportUnreadableRootIsLoss [must=linux,darwin skip=windows]
+ok    internal/envprofile :: TestImportInvalidUTF8IsLoss [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportPartialActivationKeepsLock [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportNameTakenBeforeAnyWrite [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportSkillForeignPinnedByRevision [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportSkillMarkerRecovery [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportRecordsImportedFromNative [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportSkipsManagedRootContext [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportDivergentSkillsAreLoss [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportLedgerFailureIsLoss [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportAbsentMarkerDetectsNative [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportCorruptMarkerIsLoss [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportUnreadableMarkerIsLoss [must=linux,darwin skip=windows]
+ok    cmd/curator :: TestProfileImportRow [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileImportLossyRow [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileImportNameTakenRow [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileComposeAddPathRow [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileComposeAddRefusesAFormOnAPathSource [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestPathOverlayFromMachineConfigJoinsTheClosure [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestOverlayFromMachineConfigIsRefusedByKind [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileUseTakeoverRow [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileInstallReinstallHonoursUseAndTakeover [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestResolveTakeoverRequiresRepair [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestSyncTakeoverFlagParses [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileInstallUseLockedRequireRefuses [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileInstallFirstActivationLockedRequireRefuses [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileUseClearOperandIsUsage [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileScopedUseUnaffectedByLockedRequire [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileImportUseLockedRequireRefuses [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileUpdateResyncPassesLockedRequire [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileComposeAddWarnsWhenOverlaysForbidden [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestEnvStatusReportsLockedRequire [must=linux,darwin,windows skip=-]
+ok    internal/pnpmsource :: TestRealPinnedPNPMLockSupersetSnapshotDependencies [must=linux,darwin skip=windows]
+ok    internal/pnpmsource :: TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization [must=linux,darwin skip=windows]
+ok    internal/rustsource :: TestProductionManagerCapturesRegistryFromRawPaths [must=darwin skip=linux,windows]
+ok    internal/rustsource :: TestProductionManagerCapturesGitWithoutCallerProjection [must=darwin skip=linux,windows]
+
+ledger-consistency: 241 rows checked across linux darwin windows
+ledger-consistency: ok

@@ -1,0 +1,1482 @@
+
+===== checks.log =====
+BUILD_EXIT=0
+VET_EXIT=0
+.task-board/.resources/TASK-260908-1bpra2/TASK-260908-1bpra2_oracle.go
+.task-board/.resources/TASK-260908-1c0fwn/TASK-260908-1c0fwn_env_probe_test.go
+.task-board/.resources/TASK-260908-1c0fwn/TASK-260908-1c0fwn_review_probe_test.go
+.task-board/.resources/TASK-260908-3jux68/TASK-260908-3jux68_oracle-rev2.go
+.task-board/.resources/TASK-260916-bn5kvb/TASK-260916-bn5kvb_oracle.go
+.temp/review-1952mz/copy/.task-board/.resources/TASK-260908-1bpra2/TASK-260908-1bpra2_oracle.go
+.temp/review-1952mz/copy/.task-board/.resources/TASK-260908-1c0fwn/TASK-260908-1c0fwn_env_probe_test.go
+.temp/review-1952mz/copy/.task-board/.resources/TASK-260908-1c0fwn/TASK-260908-1c0fwn_review_probe_test.go
+.temp/review-1952mz/copy/.task-board/.resources/TASK-260908-3jux68/TASK-260908-3jux68_oracle-rev2.go
+.temp/review-1952mz/copy/.task-board/.resources/TASK-260916-bn5kvb/TASK-260916-bn5kvb_oracle.go
+.temp/review-1952mz/copy/internal/shell/review_probe_test.go
+.temp/review-1952mz/independent-copy/.task-board/.resources/TASK-260908-1bpra2/TASK-260908-1bpra2_oracle.go
+.temp/review-1952mz/independent-copy/.task-board/.resources/TASK-260908-1c0fwn/TASK-260908-1c0fwn_env_probe_test.go
+.temp/review-1952mz/independent-copy/.task-board/.resources/TASK-260908-1c0fwn/TASK-260908-1c0fwn_review_probe_test.go
+.temp/review-1952mz/independent-copy/.task-board/.resources/TASK-260908-3jux68/TASK-260908-3jux68_oracle-rev2.go
+.temp/review-1952mz/independent-copy/.task-board/.resources/TASK-260916-bn5kvb/TASK-260916-bn5kvb_oracle.go
+.temp/review-1952mz/independent-copy/internal/shell/reviewer_adversarial_test.go
+GOFMT_EXIT=0
+=== RUN   TestShellHookTrustVectors
+=== RUN   TestShellHookTrustVectors/approved-env-sh-A-warning-sourced
+=== RUN   TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/sh
+=== RUN   TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/dash
+=== RUN   TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/bash
+=== RUN   TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/zsh
+=== RUN   TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced
+=== RUN   TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/sh
+=== RUN   TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/dash
+=== RUN   TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/bash
+=== RUN   TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/zsh
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/sh
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/dash
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/bash
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/zsh
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/sh
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/dash
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/bash
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/zsh
+=== RUN   TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning
+=== RUN   TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/sh
+=== RUN   TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/dash
+=== RUN   TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/bash
+=== RUN   TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/zsh
+=== RUN   TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced
+=== RUN   TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/sh
+=== RUN   TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/dash
+=== RUN   TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/bash
+=== RUN   TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/zsh
+=== RUN   TestShellHookTrustVectors/approved-env-ps1-A-warning-sourced
+    shell_hook_trust_test.go:91: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/approved-env-ps1-B-enforcing-sourced
+    shell_hook_trust_test.go:91: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/unapproved-env-ps1-A-warning-sourced-with-warning
+    shell_hook_trust_test.go:91: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/unapproved-env-ps1-B-enforcing-not-sourced
+    shell_hook_trust_test.go:91: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/changed-env-ps1-A-warning-sourced-with-warning
+    shell_hook_trust_test.go:91: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/changed-env-ps1-B-enforcing-not-sourced
+    shell_hook_trust_test.go:91: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/sh
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/dash
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/bash
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/zsh
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/sh
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/dash
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/bash
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/zsh
+--- PASS: TestShellHookTrustVectors (2.97s)
+    --- PASS: TestShellHookTrustVectors/approved-env-sh-A-warning-sourced (0.28s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/sh (0.07s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/dash (0.06s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/bash (0.06s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/zsh (0.06s)
+    --- PASS: TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced (0.41s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/sh (0.06s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/dash (0.07s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/bash (0.12s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/zsh (0.08s)
+    --- PASS: TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning (0.44s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/sh (0.09s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/dash (0.13s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/bash (0.08s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/zsh (0.06s)
+    --- PASS: TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced (0.36s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/sh (0.10s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/dash (0.09s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/bash (0.08s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/zsh (0.09s)
+    --- PASS: TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning (0.29s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/sh (0.09s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/dash (0.05s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/bash (0.08s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/zsh (0.05s)
+    --- PASS: TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced (0.47s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/sh (0.11s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/dash (0.09s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/bash (0.15s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/zsh (0.10s)
+    --- SKIP: TestShellHookTrustVectors/approved-env-ps1-A-warning-sourced (0.03s)
+    --- SKIP: TestShellHookTrustVectors/approved-env-ps1-B-enforcing-sourced (0.02s)
+    --- SKIP: TestShellHookTrustVectors/unapproved-env-ps1-A-warning-sourced-with-warning (0.00s)
+    --- SKIP: TestShellHookTrustVectors/unapproved-env-ps1-B-enforcing-not-sourced (0.00s)
+    --- SKIP: TestShellHookTrustVectors/changed-env-ps1-A-warning-sourced-with-warning (0.02s)
+    --- SKIP: TestShellHookTrustVectors/changed-env-ps1-B-enforcing-not-sourced (0.02s)
+    --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning (0.22s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/sh (0.06s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/dash (0.06s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/bash (0.05s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/zsh (0.05s)
+    --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced (0.39s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/sh (0.10s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/dash (0.08s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/bash (0.10s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/zsh (0.10s)
+=== RUN   TestShellHookRefusesHostileCheckout
+=== RUN   TestShellHookRefusesHostileCheckout/posix
+=== RUN   TestShellHookRefusesHostileCheckout/posix/sh
+=== RUN   TestShellHookRefusesHostileCheckout/posix/dash
+=== RUN   TestShellHookRefusesHostileCheckout/posix/bash
+=== RUN   TestShellHookRefusesHostileCheckout/posix/zsh
+=== RUN   TestShellHookRefusesHostileCheckout/powershell
+    shell_hook_trust_test.go:458: PowerShell is unavailable (no pwsh on this runner)
+--- PASS: TestShellHookRefusesHostileCheckout (0.59s)
+    --- PASS: TestShellHookRefusesHostileCheckout/posix (0.59s)
+        --- PASS: TestShellHookRefusesHostileCheckout/posix/sh (0.16s)
+        --- PASS: TestShellHookRefusesHostileCheckout/posix/dash (0.12s)
+        --- PASS: TestShellHookRefusesHostileCheckout/posix/bash (0.15s)
+        --- PASS: TestShellHookRefusesHostileCheckout/posix/zsh (0.16s)
+    --- SKIP: TestShellHookRefusesHostileCheckout/powershell (0.00s)
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/bash/A-warning/global-no/sh
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/bash/A-warning/global-no/dash
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/bash/A-warning/global-no/bash
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/bash/A-warning/global-no/zsh
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/bash/A-warning/global-yes/sh
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/bash/A-warning/global-yes/dash
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/bash/A-warning/global-yes/bash
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/bash/A-warning/global-yes/zsh
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/bash/B-enforcing/global-no/sh
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/bash/B-enforcing/global-no/dash
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/bash/B-enforcing/global-no/bash
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/bash/B-enforcing/global-no/zsh
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/bash/B-enforcing/global-yes/sh
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/bash/B-enforcing/global-yes/dash
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/bash/B-enforcing/global-yes/bash
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/bash/B-enforcing/global-yes/zsh
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/zsh/A-warning/global-no/sh
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/zsh/A-warning/global-no/dash
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/zsh/A-warning/global-no/bash
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/zsh/A-warning/global-no/zsh
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/zsh/A-warning/global-yes/sh
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/zsh/A-warning/global-yes/dash
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/zsh/A-warning/global-yes/bash
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/zsh/A-warning/global-yes/zsh
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/zsh/B-enforcing/global-no/sh
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/zsh/B-enforcing/global-no/dash
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/zsh/B-enforcing/global-no/bash
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/zsh/B-enforcing/global-no/zsh
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/zsh/B-enforcing/global-yes/sh
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/zsh/B-enforcing/global-yes/dash
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/zsh/B-enforcing/global-yes/bash
+=== RUN   TestGeneratedHookParsesUnderPOSIXShells/zsh/B-enforcing/global-yes/zsh
+--- PASS: TestGeneratedHookParsesUnderPOSIXShells (0.32s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/bash/A-warning/global-no/sh (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/bash/A-warning/global-no/dash (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/bash/A-warning/global-no/bash (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/bash/A-warning/global-no/zsh (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/bash/A-warning/global-yes/sh (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/bash/A-warning/global-yes/dash (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/bash/A-warning/global-yes/bash (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/bash/A-warning/global-yes/zsh (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/bash/B-enforcing/global-no/sh (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/bash/B-enforcing/global-no/dash (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/bash/B-enforcing/global-no/bash (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/bash/B-enforcing/global-no/zsh (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/bash/B-enforcing/global-yes/sh (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/bash/B-enforcing/global-yes/dash (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/bash/B-enforcing/global-yes/bash (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/bash/B-enforcing/global-yes/zsh (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/zsh/A-warning/global-no/sh (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/zsh/A-warning/global-no/dash (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/zsh/A-warning/global-no/bash (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/zsh/A-warning/global-no/zsh (0.02s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/zsh/A-warning/global-yes/sh (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/zsh/A-warning/global-yes/dash (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/zsh/A-warning/global-yes/bash (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/zsh/A-warning/global-yes/zsh (0.02s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/zsh/B-enforcing/global-no/sh (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/zsh/B-enforcing/global-no/dash (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/zsh/B-enforcing/global-no/bash (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/zsh/B-enforcing/global-no/zsh (0.02s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/zsh/B-enforcing/global-yes/sh (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/zsh/B-enforcing/global-yes/dash (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/zsh/B-enforcing/global-yes/bash (0.01s)
+    --- PASS: TestGeneratedHookParsesUnderPOSIXShells/zsh/B-enforcing/global-yes/zsh (0.02s)
+=== RUN   TestHookEmbedsClosedRecordGrammar
+--- PASS: TestHookEmbedsClosedRecordGrammar (0.00s)
+=== RUN   TestShellHookRejectsMalformedRecords
+=== RUN   TestShellHookRejectsMalformedRecords/two-fields
+=== RUN   TestShellHookRejectsMalformedRecords/two-fields/posix
+=== RUN   TestShellHookRejectsMalformedRecords/two-fields/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/two-fields/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/two-fields/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/two-fields/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/two-fields/powershell
+    shell_hook_trust_test.go:768: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookRejectsMalformedRecords/five-fields
+=== RUN   TestShellHookRejectsMalformedRecords/five-fields/posix
+=== RUN   TestShellHookRejectsMalformedRecords/five-fields/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/five-fields/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/five-fields/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/five-fields/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/five-fields/powershell
+    shell_hook_trust_test.go:768: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookRejectsMalformedRecords/forged-approver
+=== RUN   TestShellHookRejectsMalformedRecords/forged-approver/posix
+=== RUN   TestShellHookRejectsMalformedRecords/forged-approver/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/forged-approver/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/forged-approver/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/forged-approver/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/forged-approver/powershell
+    shell_hook_trust_test.go:768: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookRejectsMalformedRecords/empty-approver
+=== RUN   TestShellHookRejectsMalformedRecords/empty-approver/posix
+=== RUN   TestShellHookRejectsMalformedRecords/empty-approver/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/empty-approver/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/empty-approver/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/empty-approver/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/empty-approver/powershell
+    shell_hook_trust_test.go:768: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-approver
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-approver/posix
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-approver/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-approver/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-approver/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-approver/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-approver/powershell
+    shell_hook_trust_test.go:768: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-digest
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-digest/posix
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-digest/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-digest/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-digest/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-digest/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-digest/powershell
+    shell_hook_trust_test.go:768: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookRejectsMalformedRecords/short-digest
+=== RUN   TestShellHookRejectsMalformedRecords/short-digest/posix
+=== RUN   TestShellHookRejectsMalformedRecords/short-digest/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/short-digest/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/short-digest/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/short-digest/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/short-digest/powershell
+    shell_hook_trust_test.go:768: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookRejectsMalformedRecords/nonhex-digest
+=== RUN   TestShellHookRejectsMalformedRecords/nonhex-digest/posix
+=== RUN   TestShellHookRejectsMalformedRecords/nonhex-digest/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/nonhex-digest/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/nonhex-digest/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/nonhex-digest/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/nonhex-digest/powershell
+    shell_hook_trust_test.go:768: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookRejectsMalformedRecords/bad-timestamp
+=== RUN   TestShellHookRejectsMalformedRecords/bad-timestamp/posix
+=== RUN   TestShellHookRejectsMalformedRecords/bad-timestamp/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/bad-timestamp/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/bad-timestamp/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/bad-timestamp/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/bad-timestamp/powershell
+    shell_hook_trust_test.go:768: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookRejectsMalformedRecords/empty-timestamp
+=== RUN   TestShellHookRejectsMalformedRecords/empty-timestamp/posix
+=== RUN   TestShellHookRejectsMalformedRecords/empty-timestamp/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/empty-timestamp/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/empty-timestamp/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/empty-timestamp/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/empty-timestamp/powershell
+    shell_hook_trust_test.go:768: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookRejectsMalformedRecords/month-13
+=== RUN   TestShellHookRejectsMalformedRecords/month-13/posix
+=== RUN   TestShellHookRejectsMalformedRecords/month-13/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/month-13/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/month-13/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/month-13/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/month-13/powershell
+    shell_hook_trust_test.go:768: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookRejectsMalformedRecords/february-30
+=== RUN   TestShellHookRejectsMalformedRecords/february-30/posix
+=== RUN   TestShellHookRejectsMalformedRecords/february-30/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/february-30/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/february-30/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/february-30/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/february-30/powershell
+    shell_hook_trust_test.go:768: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookRejectsMalformedRecords/second-60
+=== RUN   TestShellHookRejectsMalformedRecords/second-60/posix
+=== RUN   TestShellHookRejectsMalformedRecords/second-60/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/second-60/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/second-60/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/second-60/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/second-60/powershell
+    shell_hook_trust_test.go:768: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookRejectsMalformedRecords/lowercase-timestamp
+=== RUN   TestShellHookRejectsMalformedRecords/lowercase-timestamp/posix
+=== RUN   TestShellHookRejectsMalformedRecords/lowercase-timestamp/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/lowercase-timestamp/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/lowercase-timestamp/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/lowercase-timestamp/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/lowercase-timestamp/powershell
+    shell_hook_trust_test.go:768: PowerShell is unavailable (no pwsh on this runner)
+--- PASS: TestShellHookRejectsMalformedRecords (9.90s)
+    --- PASS: TestShellHookRejectsMalformedRecords/two-fields (0.64s)
+        --- PASS: TestShellHookRejectsMalformedRecords/two-fields/posix (0.64s)
+            --- PASS: TestShellHookRejectsMalformedRecords/two-fields/posix/sh (0.16s)
+            --- PASS: TestShellHookRejectsMalformedRecords/two-fields/posix/dash (0.15s)
+            --- PASS: TestShellHookRejectsMalformedRecords/two-fields/posix/bash (0.17s)
+            --- PASS: TestShellHookRejectsMalformedRecords/two-fields/posix/zsh (0.16s)
+        --- SKIP: TestShellHookRejectsMalformedRecords/two-fields/powershell (0.00s)
+    --- PASS: TestShellHookRejectsMalformedRecords/five-fields (0.65s)
+        --- PASS: TestShellHookRejectsMalformedRecords/five-fields/posix (0.65s)
+            --- PASS: TestShellHookRejectsMalformedRecords/five-fields/posix/sh (0.16s)
+            --- PASS: TestShellHookRejectsMalformedRecords/five-fields/posix/dash (0.14s)
+            --- PASS: TestShellHookRejectsMalformedRecords/five-fields/posix/bash (0.19s)
+            --- PASS: TestShellHookRejectsMalformedRecords/five-fields/posix/zsh (0.16s)
+        --- SKIP: TestShellHookRejectsMalformedRecords/five-fields/powershell (0.00s)
+    --- PASS: TestShellHookRejectsMalformedRecords/forged-approver (0.68s)
+        --- PASS: TestShellHookRejectsMalformedRecords/forged-approver/posix (0.68s)
+            --- PASS: TestShellHookRejectsMalformedRecords/forged-approver/posix/sh (0.18s)
+            --- PASS: TestShellHookRejectsMalformedRecords/forged-approver/posix/dash (0.20s)
+            --- PASS: TestShellHookRejectsMalformedRecords/forged-approver/posix/bash (0.14s)
+            --- PASS: TestShellHookRejectsMalformedRecords/forged-approver/posix/zsh (0.16s)
+        --- SKIP: TestShellHookRejectsMalformedRecords/forged-approver/powershell (0.00s)
+    --- PASS: TestShellHookRejectsMalformedRecords/empty-approver (0.70s)
+        --- PASS: TestShellHookRejectsMalformedRecords/empty-approver/posix (0.70s)
+            --- PASS: TestShellHookRejectsMalformedRecords/empty-approver/posix/sh (0.19s)
+            --- PASS: TestShellHookRejectsMalformedRecords/empty-approver/posix/dash (0.17s)
+            --- PASS: TestShellHookRejectsMalformedRecords/empty-approver/posix/bash (0.18s)
+            --- PASS: TestShellHookRejectsMalformedRecords/empty-approver/posix/zsh (0.17s)
+        --- SKIP: TestShellHookRejectsMalformedRecords/empty-approver/powershell (0.00s)
+    --- PASS: TestShellHookRejectsMalformedRecords/uppercase-approver (0.70s)
+        --- PASS: TestShellHookRejectsMalformedRecords/uppercase-approver/posix (0.70s)
+            --- PASS: TestShellHookRejectsMalformedRecords/uppercase-approver/posix/sh (0.18s)
+            --- PASS: TestShellHookRejectsMalformedRecords/uppercase-approver/posix/dash (0.15s)
+            --- PASS: TestShellHookRejectsMalformedRecords/uppercase-approver/posix/bash (0.17s)
+            --- PASS: TestShellHookRejectsMalformedRecords/uppercase-approver/posix/zsh (0.20s)
+        --- SKIP: TestShellHookRejectsMalformedRecords/uppercase-approver/powershell (0.00s)
+    --- PASS: TestShellHookRejectsMalformedRecords/uppercase-digest (0.65s)
+        --- PASS: TestShellHookRejectsMalformedRecords/uppercase-digest/posix (0.65s)
+            --- PASS: TestShellHookRejectsMalformedRecords/uppercase-digest/posix/sh (0.19s)
+            --- PASS: TestShellHookRejectsMalformedRecords/uppercase-digest/posix/dash (0.15s)
+            --- PASS: TestShellHookRejectsMalformedRecords/uppercase-digest/posix/bash (0.15s)
+            --- PASS: TestShellHookRejectsMalformedRecords/uppercase-digest/posix/zsh (0.16s)
+        --- SKIP: TestShellHookRejectsMalformedRecords/uppercase-digest/powershell (0.00s)
+    --- PASS: TestShellHookRejectsMalformedRecords/short-digest (0.78s)
+        --- PASS: TestShellHookRejectsMalformedRecords/short-digest/posix (0.78s)
+            --- PASS: TestShellHookRejectsMalformedRecords/short-digest/posix/sh (0.21s)
+            --- PASS: TestShellHookRejectsMalformedRecords/short-digest/posix/dash (0.17s)
+            --- PASS: TestShellHookRejectsMalformedRecords/short-digest/posix/bash (0.15s)
+            --- PASS: TestShellHookRejectsMalformedRecords/short-digest/posix/zsh (0.24s)
+        --- SKIP: TestShellHookRejectsMalformedRecords/short-digest/powershell (0.00s)
+    --- PASS: TestShellHookRejectsMalformedRecords/nonhex-digest (0.72s)
+        --- PASS: TestShellHookRejectsMalformedRecords/nonhex-digest/posix (0.72s)
+            --- PASS: TestShellHookRejectsMalformedRecords/nonhex-digest/posix/sh (0.19s)
+            --- PASS: TestShellHookRejectsMalformedRecords/nonhex-digest/posix/dash (0.16s)
+            --- PASS: TestShellHookRejectsMalformedRecords/nonhex-digest/posix/bash (0.17s)
+            --- PASS: TestShellHookRejectsMalformedRecords/nonhex-digest/posix/zsh (0.20s)
+        --- SKIP: TestShellHookRejectsMalformedRecords/nonhex-digest/powershell (0.00s)
+    --- PASS: TestShellHookRejectsMalformedRecords/bad-timestamp (0.71s)
+        --- PASS: TestShellHookRejectsMalformedRecords/bad-timestamp/posix (0.71s)
+            --- PASS: TestShellHookRejectsMalformedRecords/bad-timestamp/posix/sh (0.19s)
+            --- PASS: TestShellHookRejectsMalformedRecords/bad-timestamp/posix/dash (0.16s)
+            --- PASS: TestShellHookRejectsMalformedRecords/bad-timestamp/posix/bash (0.18s)
+            --- PASS: TestShellHookRejectsMalformedRecords/bad-timestamp/posix/zsh (0.18s)
+        --- SKIP: TestShellHookRejectsMalformedRecords/bad-timestamp/powershell (0.00s)
+    --- PASS: TestShellHookRejectsMalformedRecords/empty-timestamp (0.74s)
+        --- PASS: TestShellHookRejectsMalformedRecords/empty-timestamp/posix (0.74s)
+            --- PASS: TestShellHookRejectsMalformedRecords/empty-timestamp/posix/sh (0.19s)
+            --- PASS: TestShellHookRejectsMalformedRecords/empty-timestamp/posix/dash (0.15s)
+            --- PASS: TestShellHookRejectsMalformedRecords/empty-timestamp/posix/bash (0.22s)
+            --- PASS: TestShellHookRejectsMalformedRecords/empty-timestamp/posix/zsh (0.18s)
+        --- SKIP: TestShellHookRejectsMalformedRecords/empty-timestamp/powershell (0.00s)
+    --- PASS: TestShellHookRejectsMalformedRecords/month-13 (0.71s)
+        --- PASS: TestShellHookRejectsMalformedRecords/month-13/posix (0.71s)
+            --- PASS: TestShellHookRejectsMalformedRecords/month-13/posix/sh (0.19s)
+            --- PASS: TestShellHookRejectsMalformedRecords/month-13/posix/dash (0.15s)
+            --- PASS: TestShellHookRejectsMalformedRecords/month-13/posix/bash (0.18s)
+            --- PASS: TestShellHookRejectsMalformedRecords/month-13/posix/zsh (0.18s)
+        --- SKIP: TestShellHookRejectsMalformedRecords/month-13/powershell (0.00s)
+    --- PASS: TestShellHookRejectsMalformedRecords/february-30 (0.71s)
+        --- PASS: TestShellHookRejectsMalformedRecords/february-30/posix (0.71s)
+            --- PASS: TestShellHookRejectsMalformedRecords/february-30/posix/sh (0.19s)
+            --- PASS: TestShellHookRejectsMalformedRecords/february-30/posix/dash (0.16s)
+            --- PASS: TestShellHookRejectsMalformedRecords/february-30/posix/bash (0.18s)
+            --- PASS: TestShellHookRejectsMalformedRecords/february-30/posix/zsh (0.18s)
+        --- SKIP: TestShellHookRejectsMalformedRecords/february-30/powershell (0.00s)
+    --- PASS: TestShellHookRejectsMalformedRecords/second-60 (0.78s)
+        --- PASS: TestShellHookRejectsMalformedRecords/second-60/posix (0.78s)
+            --- PASS: TestShellHookRejectsMalformedRecords/second-60/posix/sh (0.19s)
+            --- PASS: TestShellHookRejectsMalformedRecords/second-60/posix/dash (0.21s)
+            --- PASS: TestShellHookRejectsMalformedRecords/second-60/posix/bash (0.18s)
+            --- PASS: TestShellHookRejectsMalformedRecords/second-60/posix/zsh (0.20s)
+        --- SKIP: TestShellHookRejectsMalformedRecords/second-60/powershell (0.00s)
+    --- PASS: TestShellHookRejectsMalformedRecords/lowercase-timestamp (0.71s)
+        --- PASS: TestShellHookRejectsMalformedRecords/lowercase-timestamp/posix (0.71s)
+            --- PASS: TestShellHookRejectsMalformedRecords/lowercase-timestamp/posix/sh (0.19s)
+            --- PASS: TestShellHookRejectsMalformedRecords/lowercase-timestamp/posix/dash (0.16s)
+            --- PASS: TestShellHookRejectsMalformedRecords/lowercase-timestamp/posix/bash (0.18s)
+            --- PASS: TestShellHookRejectsMalformedRecords/lowercase-timestamp/posix/zsh (0.18s)
+        --- SKIP: TestShellHookRejectsMalformedRecords/lowercase-timestamp/powershell (0.00s)
+=== RUN   TestShellHookTrustResolvesSymlinkedProject
+=== RUN   TestShellHookTrustResolvesSymlinkedProject/posix
+=== RUN   TestShellHookTrustResolvesSymlinkedProject/posix/sh
+=== RUN   TestShellHookTrustResolvesSymlinkedProject/posix/dash
+=== RUN   TestShellHookTrustResolvesSymlinkedProject/posix/bash
+=== RUN   TestShellHookTrustResolvesSymlinkedProject/posix/zsh
+=== RUN   TestShellHookTrustResolvesSymlinkedProject/powershell
+    shell_hook_trust_test.go:866: PowerShell is unavailable (no pwsh on this runner)
+--- PASS: TestShellHookTrustResolvesSymlinkedProject (0.70s)
+    --- PASS: TestShellHookTrustResolvesSymlinkedProject/posix (0.70s)
+        --- PASS: TestShellHookTrustResolvesSymlinkedProject/posix/sh (0.15s)
+        --- PASS: TestShellHookTrustResolvesSymlinkedProject/posix/dash (0.14s)
+        --- PASS: TestShellHookTrustResolvesSymlinkedProject/posix/bash (0.16s)
+        --- PASS: TestShellHookTrustResolvesSymlinkedProject/posix/zsh (0.26s)
+    --- SKIP: TestShellHookTrustResolvesSymlinkedProject/powershell (0.00s)
+=== RUN   TestDetectIsCrossPlatform
+=== RUN   TestDetectIsCrossPlatform/zsh
+=== RUN   TestDetectIsCrossPlatform/bash
+=== RUN   TestDetectIsCrossPlatform/git_bash
+=== RUN   TestDetectIsCrossPlatform/windows
+=== RUN   TestDetectIsCrossPlatform/PowerShell_environment
+=== RUN   TestDetectIsCrossPlatform/portable_fallback
+--- PASS: TestDetectIsCrossPlatform (0.00s)
+    --- PASS: TestDetectIsCrossPlatform/zsh (0.00s)
+    --- PASS: TestDetectIsCrossPlatform/bash (0.00s)
+    --- PASS: TestDetectIsCrossPlatform/git_bash (0.00s)
+    --- PASS: TestDetectIsCrossPlatform/windows (0.00s)
+    --- PASS: TestDetectIsCrossPlatform/PowerShell_environment (0.00s)
+    --- PASS: TestDetectIsCrossPlatform/portable_fallback (0.00s)
+=== RUN   TestPosixHookEntersNestedSwitchesAndLeavesProjects
+=== RUN   TestPosixHookEntersNestedSwitchesAndLeavesProjects/bash
+=== RUN   TestPosixHookEntersNestedSwitchesAndLeavesProjects/zsh
+--- PASS: TestPosixHookEntersNestedSwitchesAndLeavesProjects (0.61s)
+    --- PASS: TestPosixHookEntersNestedSwitchesAndLeavesProjects/bash (0.24s)
+    --- PASS: TestPosixHookEntersNestedSwitchesAndLeavesProjects/zsh (0.37s)
+=== RUN   TestPosixHookRejectsNonAbsolutePWDWithoutHanging
+=== RUN   TestPosixHookRejectsNonAbsolutePWDWithoutHanging/bash
+=== RUN   TestPosixHookRejectsNonAbsolutePWDWithoutHanging/bash/#00
+=== RUN   TestPosixHookRejectsNonAbsolutePWDWithoutHanging/bash/.
+=== RUN   TestPosixHookRejectsNonAbsolutePWDWithoutHanging/bash/relative-path
+=== RUN   TestPosixHookRejectsNonAbsolutePWDWithoutHanging/zsh
+=== RUN   TestPosixHookRejectsNonAbsolutePWDWithoutHanging/zsh/#00
+=== RUN   TestPosixHookRejectsNonAbsolutePWDWithoutHanging/zsh/.
+=== RUN   TestPosixHookRejectsNonAbsolutePWDWithoutHanging/zsh/relative-path
+--- PASS: TestPosixHookRejectsNonAbsolutePWDWithoutHanging (0.08s)
+    --- PASS: TestPosixHookRejectsNonAbsolutePWDWithoutHanging/bash (0.04s)
+        --- PASS: TestPosixHookRejectsNonAbsolutePWDWithoutHanging/bash/#00 (0.01s)
+        --- PASS: TestPosixHookRejectsNonAbsolutePWDWithoutHanging/bash/. (0.01s)
+        --- PASS: TestPosixHookRejectsNonAbsolutePWDWithoutHanging/bash/relative-path (0.01s)
+    --- PASS: TestPosixHookRejectsNonAbsolutePWDWithoutHanging/zsh (0.04s)
+        --- PASS: TestPosixHookRejectsNonAbsolutePWDWithoutHanging/zsh/#00 (0.01s)
+        --- PASS: TestPosixHookRejectsNonAbsolutePWDWithoutHanging/zsh/. (0.01s)
+        --- PASS: TestPosixHookRejectsNonAbsolutePWDWithoutHanging/zsh/relative-path (0.01s)
+=== RUN   TestPosixHookSupportsNounsetProfiles
+=== RUN   TestPosixHookSupportsNounsetProfiles/bash
+=== RUN   TestPosixHookSupportsNounsetProfiles/zsh
+--- PASS: TestPosixHookSupportsNounsetProfiles (0.06s)
+    --- PASS: TestPosixHookSupportsNounsetProfiles/bash (0.03s)
+    --- PASS: TestPosixHookSupportsNounsetProfiles/zsh (0.03s)
+=== RUN   TestBashHookDoesNotDuplicatePromptCommand
+--- PASS: TestBashHookDoesNotDuplicatePromptCommand (0.02s)
+=== RUN   TestBashHookPreservesPromptCommandArray
+--- PASS: TestBashHookPreservesPromptCommandArray (0.02s)
+=== RUN   TestBashHookToleratesEmptyPromptCommandArrayUnderNounset
+--- PASS: TestBashHookToleratesEmptyPromptCommandArrayUnderNounset (0.01s)
+=== RUN   TestZshHookIsIdempotentAndDoesNotReenter
+--- PASS: TestZshHookIsIdempotentAndDoesNotReenter (0.13s)
+=== RUN   TestPosixHookDoesNotReenterWhileSourcingGlobalEnv
+=== RUN   TestPosixHookDoesNotReenterWhileSourcingGlobalEnv/bash
+=== RUN   TestPosixHookDoesNotReenterWhileSourcingGlobalEnv/zsh
+--- PASS: TestPosixHookDoesNotReenterWhileSourcingGlobalEnv (0.04s)
+    --- PASS: TestPosixHookDoesNotReenterWhileSourcingGlobalEnv/bash (0.02s)
+    --- PASS: TestPosixHookDoesNotReenterWhileSourcingGlobalEnv/zsh (0.02s)
+=== RUN   TestPosixHookNormalizesGitBashConfigAndAvoidsDirname
+--- PASS: TestPosixHookNormalizesGitBashConfigAndAvoidsDirname (0.03s)
+=== RUN   TestInstallHookAndSourceCommand
+--- PASS: TestInstallHookAndSourceCommand (0.05s)
+=== RUN   TestHookVariants
+--- PASS: TestHookVariants (0.00s)
+=== RUN   TestHookTrustGateShape
+--- PASS: TestHookTrustGateShape (0.00s)
+=== RUN   TestPowerShellHookRunsOnEveryPrompt
+    shell_test.go:415: PowerShell prompt integration is exercised on Windows
+--- SKIP: TestPowerShellHookRunsOnEveryPrompt (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/shell	15.889s
+=== RUN   TestDigestMatchesKnownSHA256
+--- PASS: TestDigestMatchesKnownSHA256 (0.00s)
+=== RUN   TestLookupOnAbsentStateIsEmpty
+--- PASS: TestLookupOnAbsentStateIsEmpty (0.00s)
+=== RUN   TestUpsertLookupListRoundTrip
+--- PASS: TestUpsertLookupListRoundTrip (0.05s)
+=== RUN   TestTwoSpellingsResolveToOneRecord
+--- PASS: TestTwoSpellingsResolveToOneRecord (0.05s)
+=== RUN   TestAliasAndRealPathShareOneRecord
+--- PASS: TestAliasAndRealPathShareOneRecord (0.05s)
+=== RUN   TestRevokeAbsentLeavesStateUnchanged
+--- PASS: TestRevokeAbsentLeavesStateUnchanged (0.02s)
+=== RUN   TestApproveFileRefusesAbsentAndUnreadable
+--- PASS: TestApproveFileRefusesAbsentAndUnreadable (0.02s)
+=== RUN   TestUpsertRejectsOpenShapes
+=== RUN   TestUpsertRejectsOpenShapes/short_digest
+=== RUN   TestUpsertRejectsOpenShapes/uppercase_digest
+=== RUN   TestUpsertRejectsOpenShapes/non-hex_digest
+=== RUN   TestUpsertRejectsOpenShapes/open_approver
+=== RUN   TestUpsertRejectsOpenShapes/missing_timestamp
+=== RUN   TestUpsertRejectsOpenShapes/tab_in_path
+=== RUN   TestUpsertRejectsOpenShapes/newline_in_path
+--- PASS: TestUpsertRejectsOpenShapes (0.00s)
+    --- PASS: TestUpsertRejectsOpenShapes/short_digest (0.00s)
+    --- PASS: TestUpsertRejectsOpenShapes/uppercase_digest (0.00s)
+    --- PASS: TestUpsertRejectsOpenShapes/non-hex_digest (0.00s)
+    --- PASS: TestUpsertRejectsOpenShapes/open_approver (0.00s)
+    --- PASS: TestUpsertRejectsOpenShapes/missing_timestamp (0.00s)
+    --- PASS: TestUpsertRejectsOpenShapes/tab_in_path (0.00s)
+    --- PASS: TestUpsertRejectsOpenShapes/newline_in_path (0.00s)
+=== RUN   TestFailedPublicationPreservesLastValidState
+--- PASS: TestFailedPublicationPreservesLastValidState (0.19s)
+=== RUN   TestTimestampShapeMirrorsRFC3339
+--- PASS: TestTimestampShapeMirrorsRFC3339 (0.00s)
+=== RUN   TestMalformedStateFailsClosed
+--- PASS: TestMalformedStateFailsClosed (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/hookapproval	1.176s
+=== RUN   TestWriteProjectShapesAndSourcing
+--- PASS: TestWriteProjectShapesAndSourcing (0.09s)
+=== RUN   TestWriteGlobal
+--- PASS: TestWriteGlobal (0.12s)
+PASS
+ok  	github.com/relux-works/curator/internal/envfiles	1.417s
+TEST_EXIT=0
+
+===== pwsh.log =====
+=== RUN   TestShellHookTrustVectors
+=== RUN   TestShellHookTrustVectors/approved-env-sh-A-warning-sourced
+=== RUN   TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/sh
+=== RUN   TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/dash
+=== RUN   TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/bash
+=== RUN   TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/zsh
+=== RUN   TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced
+=== RUN   TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/sh
+=== RUN   TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/dash
+=== RUN   TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/bash
+=== RUN   TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/zsh
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/sh
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/dash
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/bash
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/zsh
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/sh
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/dash
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/bash
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/zsh
+=== RUN   TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning
+=== RUN   TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/sh
+=== RUN   TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/dash
+=== RUN   TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/bash
+=== RUN   TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/zsh
+=== RUN   TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced
+=== RUN   TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/sh
+=== RUN   TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/dash
+=== RUN   TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/bash
+=== RUN   TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/zsh
+=== RUN   TestShellHookTrustVectors/approved-env-ps1-A-warning-sourced
+=== RUN   TestShellHookTrustVectors/approved-env-ps1-B-enforcing-sourced
+=== RUN   TestShellHookTrustVectors/unapproved-env-ps1-A-warning-sourced-with-warning
+=== RUN   TestShellHookTrustVectors/unapproved-env-ps1-B-enforcing-not-sourced
+=== RUN   TestShellHookTrustVectors/changed-env-ps1-A-warning-sourced-with-warning
+=== RUN   TestShellHookTrustVectors/changed-env-ps1-B-enforcing-not-sourced
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/sh
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/dash
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/bash
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/zsh
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/sh
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/dash
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/bash
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/zsh
+--- PASS: TestShellHookTrustVectors (12.57s)
+    --- PASS: TestShellHookTrustVectors/approved-env-sh-A-warning-sourced (0.25s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/sh (0.07s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/dash (0.05s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/bash (0.05s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/zsh (0.05s)
+    --- PASS: TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced (0.22s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/sh (0.05s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/dash (0.05s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/bash (0.05s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/zsh (0.05s)
+    --- PASS: TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning (0.24s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/sh (0.05s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/dash (0.06s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/bash (0.06s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/zsh (0.07s)
+    --- PASS: TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced (0.43s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/sh (0.11s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/dash (0.09s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/bash (0.11s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/zsh (0.12s)
+    --- PASS: TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning (0.34s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/sh (0.07s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/dash (0.06s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/bash (0.07s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/zsh (0.07s)
+    --- PASS: TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced (0.53s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/sh (0.12s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/dash (0.11s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/bash (0.12s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/zsh (0.14s)
+    --- PASS: TestShellHookTrustVectors/approved-env-ps1-A-warning-sourced (2.13s)
+    --- PASS: TestShellHookTrustVectors/approved-env-ps1-B-enforcing-sourced (1.35s)
+    --- PASS: TestShellHookTrustVectors/unapproved-env-ps1-A-warning-sourced-with-warning (1.58s)
+    --- PASS: TestShellHookTrustVectors/unapproved-env-ps1-B-enforcing-not-sourced (2.02s)
+    --- PASS: TestShellHookTrustVectors/changed-env-ps1-A-warning-sourced-with-warning (1.21s)
+    --- PASS: TestShellHookTrustVectors/changed-env-ps1-B-enforcing-not-sourced (1.61s)
+    --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning (0.27s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/sh (0.10s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/dash (0.05s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/bash (0.06s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/zsh (0.06s)
+    --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced (0.38s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/sh (0.10s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/dash (0.08s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/bash (0.09s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/zsh (0.10s)
+=== RUN   TestShellHookRefusesHostileCheckout
+=== RUN   TestShellHookRefusesHostileCheckout/posix
+=== RUN   TestShellHookRefusesHostileCheckout/posix/sh
+=== RUN   TestShellHookRefusesHostileCheckout/posix/dash
+=== RUN   TestShellHookRefusesHostileCheckout/posix/bash
+=== RUN   TestShellHookRefusesHostileCheckout/posix/zsh
+=== RUN   TestShellHookRefusesHostileCheckout/powershell
+--- PASS: TestShellHookRefusesHostileCheckout (3.38s)
+    --- PASS: TestShellHookRefusesHostileCheckout/posix (0.62s)
+        --- PASS: TestShellHookRefusesHostileCheckout/posix/sh (0.16s)
+        --- PASS: TestShellHookRefusesHostileCheckout/posix/dash (0.14s)
+        --- PASS: TestShellHookRefusesHostileCheckout/posix/bash (0.16s)
+        --- PASS: TestShellHookRefusesHostileCheckout/posix/zsh (0.16s)
+    --- PASS: TestShellHookRefusesHostileCheckout/powershell (2.76s)
+=== RUN   TestShellHookRejectsMalformedRecords
+=== RUN   TestShellHookRejectsMalformedRecords/two-fields
+=== RUN   TestShellHookRejectsMalformedRecords/two-fields/posix
+=== RUN   TestShellHookRejectsMalformedRecords/two-fields/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/two-fields/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/two-fields/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/two-fields/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/two-fields/powershell
+=== RUN   TestShellHookRejectsMalformedRecords/five-fields
+=== RUN   TestShellHookRejectsMalformedRecords/five-fields/posix
+=== RUN   TestShellHookRejectsMalformedRecords/five-fields/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/five-fields/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/five-fields/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/five-fields/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/five-fields/powershell
+=== RUN   TestShellHookRejectsMalformedRecords/forged-approver
+=== RUN   TestShellHookRejectsMalformedRecords/forged-approver/posix
+=== RUN   TestShellHookRejectsMalformedRecords/forged-approver/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/forged-approver/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/forged-approver/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/forged-approver/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/forged-approver/powershell
+=== RUN   TestShellHookRejectsMalformedRecords/empty-approver
+=== RUN   TestShellHookRejectsMalformedRecords/empty-approver/posix
+=== RUN   TestShellHookRejectsMalformedRecords/empty-approver/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/empty-approver/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/empty-approver/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/empty-approver/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/empty-approver/powershell
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-approver
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-approver/posix
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-approver/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-approver/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-approver/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-approver/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-approver/powershell
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-digest
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-digest/posix
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-digest/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-digest/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-digest/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-digest/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/uppercase-digest/powershell
+=== RUN   TestShellHookRejectsMalformedRecords/short-digest
+=== RUN   TestShellHookRejectsMalformedRecords/short-digest/posix
+=== RUN   TestShellHookRejectsMalformedRecords/short-digest/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/short-digest/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/short-digest/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/short-digest/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/short-digest/powershell
+=== RUN   TestShellHookRejectsMalformedRecords/nonhex-digest
+=== RUN   TestShellHookRejectsMalformedRecords/nonhex-digest/posix
+=== RUN   TestShellHookRejectsMalformedRecords/nonhex-digest/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/nonhex-digest/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/nonhex-digest/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/nonhex-digest/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/nonhex-digest/powershell
+=== RUN   TestShellHookRejectsMalformedRecords/bad-timestamp
+=== RUN   TestShellHookRejectsMalformedRecords/bad-timestamp/posix
+=== RUN   TestShellHookRejectsMalformedRecords/bad-timestamp/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/bad-timestamp/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/bad-timestamp/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/bad-timestamp/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/bad-timestamp/powershell
+=== RUN   TestShellHookRejectsMalformedRecords/empty-timestamp
+=== RUN   TestShellHookRejectsMalformedRecords/empty-timestamp/posix
+=== RUN   TestShellHookRejectsMalformedRecords/empty-timestamp/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/empty-timestamp/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/empty-timestamp/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/empty-timestamp/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/empty-timestamp/powershell
+=== RUN   TestShellHookRejectsMalformedRecords/month-13
+=== RUN   TestShellHookRejectsMalformedRecords/month-13/posix
+=== RUN   TestShellHookRejectsMalformedRecords/month-13/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/month-13/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/month-13/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/month-13/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/month-13/powershell
+=== RUN   TestShellHookRejectsMalformedRecords/february-30
+=== RUN   TestShellHookRejectsMalformedRecords/february-30/posix
+=== RUN   TestShellHookRejectsMalformedRecords/february-30/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/february-30/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/february-30/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/february-30/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/february-30/powershell
+=== RUN   TestShellHookRejectsMalformedRecords/second-60
+=== RUN   TestShellHookRejectsMalformedRecords/second-60/posix
+=== RUN   TestShellHookRejectsMalformedRecords/second-60/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/second-60/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/second-60/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/second-60/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/second-60/powershell
+=== RUN   TestShellHookRejectsMalformedRecords/lowercase-timestamp
+=== RUN   TestShellHookRejectsMalformedRecords/lowercase-timestamp/posix
+=== RUN   TestShellHookRejectsMalformedRecords/lowercase-timestamp/posix/sh
+=== RUN   TestShellHookRejectsMalformedRecords/lowercase-timestamp/posix/dash
+=== RUN   TestShellHookRejectsMalformedRecords/lowercase-timestamp/posix/bash
+=== RUN   TestShellHookRejectsMalformedRecords/lowercase-timestamp/posix/zsh
+=== RUN   TestShellHookRejectsMalformedRecords/lowercase-timestamp/powershell
+--- PASS: TestShellHookRejectsMalformedRecords (50.80s)
+    --- PASS: TestShellHookRejectsMalformedRecords/two-fields (3.88s)
+        --- PASS: TestShellHookRejectsMalformedRecords/two-fields/posix (0.65s)
+            --- PASS: TestShellHookRejectsMalformedRecords/two-fields/posix/sh (0.18s)
+            --- PASS: TestShellHookRejectsMalformedRecords/two-fields/posix/dash (0.15s)
+            --- PASS: TestShellHookRejectsMalformedRecords/two-fields/posix/bash (0.16s)
+            --- PASS: TestShellHookRejectsMalformedRecords/two-fields/posix/zsh (0.16s)
+        --- PASS: TestShellHookRejectsMalformedRecords/two-fields/powershell (3.22s)
+    --- PASS: TestShellHookRejectsMalformedRecords/five-fields (4.16s)
+        --- PASS: TestShellHookRejectsMalformedRecords/five-fields/posix (0.67s)
+            --- PASS: TestShellHookRejectsMalformedRecords/five-fields/posix/sh (0.18s)
+            --- PASS: TestShellHookRejectsMalformedRecords/five-fields/posix/dash (0.16s)
+            --- PASS: TestShellHookRejectsMalformedRecords/five-fields/posix/bash (0.18s)
+            --- PASS: TestShellHookRejectsMalformedRecords/five-fields/posix/zsh (0.15s)
+        --- PASS: TestShellHookRejectsMalformedRecords/five-fields/powershell (3.49s)
+    --- PASS: TestShellHookRejectsMalformedRecords/forged-approver (3.52s)
+        --- PASS: TestShellHookRejectsMalformedRecords/forged-approver/posix (0.64s)
+            --- PASS: TestShellHookRejectsMalformedRecords/forged-approver/posix/sh (0.19s)
+            --- PASS: TestShellHookRejectsMalformedRecords/forged-approver/posix/dash (0.14s)
+            --- PASS: TestShellHookRejectsMalformedRecords/forged-approver/posix/bash (0.15s)
+            --- PASS: TestShellHookRejectsMalformedRecords/forged-approver/posix/zsh (0.16s)
+        --- PASS: TestShellHookRejectsMalformedRecords/forged-approver/powershell (2.88s)
+    --- PASS: TestShellHookRejectsMalformedRecords/empty-approver (3.54s)
+        --- PASS: TestShellHookRejectsMalformedRecords/empty-approver/posix (0.71s)
+            --- PASS: TestShellHookRejectsMalformedRecords/empty-approver/posix/sh (0.16s)
+            --- PASS: TestShellHookRejectsMalformedRecords/empty-approver/posix/dash (0.21s)
+            --- PASS: TestShellHookRejectsMalformedRecords/empty-approver/posix/bash (0.17s)
+            --- PASS: TestShellHookRejectsMalformedRecords/empty-approver/posix/zsh (0.17s)
+        --- PASS: TestShellHookRejectsMalformedRecords/empty-approver/powershell (2.83s)
+    --- PASS: TestShellHookRejectsMalformedRecords/uppercase-approver (5.89s)
+        --- PASS: TestShellHookRejectsMalformedRecords/uppercase-approver/posix (0.66s)
+            --- PASS: TestShellHookRejectsMalformedRecords/uppercase-approver/posix/sh (0.15s)
+            --- PASS: TestShellHookRejectsMalformedRecords/uppercase-approver/posix/dash (0.13s)
+            --- PASS: TestShellHookRejectsMalformedRecords/uppercase-approver/posix/bash (0.15s)
+            --- PASS: TestShellHookRejectsMalformedRecords/uppercase-approver/posix/zsh (0.22s)
+        --- PASS: TestShellHookRejectsMalformedRecords/uppercase-approver/powershell (5.23s)
+    --- PASS: TestShellHookRejectsMalformedRecords/uppercase-digest (3.48s)
+        --- PASS: TestShellHookRejectsMalformedRecords/uppercase-digest/posix (0.80s)
+            --- PASS: TestShellHookRejectsMalformedRecords/uppercase-digest/posix/sh (0.15s)
+            --- PASS: TestShellHookRejectsMalformedRecords/uppercase-digest/posix/dash (0.21s)
+            --- PASS: TestShellHookRejectsMalformedRecords/uppercase-digest/posix/bash (0.21s)
+            --- PASS: TestShellHookRejectsMalformedRecords/uppercase-digest/posix/zsh (0.24s)
+        --- PASS: TestShellHookRejectsMalformedRecords/uppercase-digest/powershell (2.67s)
+    --- PASS: TestShellHookRejectsMalformedRecords/short-digest (3.11s)
+        --- PASS: TestShellHookRejectsMalformedRecords/short-digest/posix (0.61s)
+            --- PASS: TestShellHookRejectsMalformedRecords/short-digest/posix/sh (0.14s)
+            --- PASS: TestShellHookRejectsMalformedRecords/short-digest/posix/dash (0.17s)
+            --- PASS: TestShellHookRejectsMalformedRecords/short-digest/posix/bash (0.13s)
+            --- PASS: TestShellHookRejectsMalformedRecords/short-digest/posix/zsh (0.16s)
+        --- PASS: TestShellHookRejectsMalformedRecords/short-digest/powershell (2.50s)
+    --- PASS: TestShellHookRejectsMalformedRecords/nonhex-digest (3.16s)
+        --- PASS: TestShellHookRejectsMalformedRecords/nonhex-digest/posix (0.59s)
+            --- PASS: TestShellHookRejectsMalformedRecords/nonhex-digest/posix/sh (0.15s)
+            --- PASS: TestShellHookRejectsMalformedRecords/nonhex-digest/posix/dash (0.14s)
+            --- PASS: TestShellHookRejectsMalformedRecords/nonhex-digest/posix/bash (0.15s)
+            --- PASS: TestShellHookRejectsMalformedRecords/nonhex-digest/posix/zsh (0.15s)
+        --- PASS: TestShellHookRejectsMalformedRecords/nonhex-digest/powershell (2.57s)
+    --- PASS: TestShellHookRejectsMalformedRecords/bad-timestamp (3.73s)
+        --- PASS: TestShellHookRejectsMalformedRecords/bad-timestamp/posix (0.58s)
+            --- PASS: TestShellHookRejectsMalformedRecords/bad-timestamp/posix/sh (0.15s)
+            --- PASS: TestShellHookRejectsMalformedRecords/bad-timestamp/posix/dash (0.16s)
+            --- PASS: TestShellHookRejectsMalformedRecords/bad-timestamp/posix/bash (0.14s)
+            --- PASS: TestShellHookRejectsMalformedRecords/bad-timestamp/posix/zsh (0.14s)
+        --- PASS: TestShellHookRejectsMalformedRecords/bad-timestamp/powershell (3.15s)
+    --- PASS: TestShellHookRejectsMalformedRecords/empty-timestamp (3.68s)
+        --- PASS: TestShellHookRejectsMalformedRecords/empty-timestamp/posix (0.78s)
+            --- PASS: TestShellHookRejectsMalformedRecords/empty-timestamp/posix/sh (0.15s)
+            --- PASS: TestShellHookRejectsMalformedRecords/empty-timestamp/posix/dash (0.13s)
+            --- PASS: TestShellHookRejectsMalformedRecords/empty-timestamp/posix/bash (0.25s)
+            --- PASS: TestShellHookRejectsMalformedRecords/empty-timestamp/posix/zsh (0.25s)
+        --- PASS: TestShellHookRejectsMalformedRecords/empty-timestamp/powershell (2.90s)
+    --- PASS: TestShellHookRejectsMalformedRecords/month-13 (3.04s)
+        --- PASS: TestShellHookRejectsMalformedRecords/month-13/posix (0.58s)
+            --- PASS: TestShellHookRejectsMalformedRecords/month-13/posix/sh (0.14s)
+            --- PASS: TestShellHookRejectsMalformedRecords/month-13/posix/dash (0.14s)
+            --- PASS: TestShellHookRejectsMalformedRecords/month-13/posix/bash (0.13s)
+            --- PASS: TestShellHookRejectsMalformedRecords/month-13/posix/zsh (0.17s)
+        --- PASS: TestShellHookRejectsMalformedRecords/month-13/powershell (2.45s)
+    --- PASS: TestShellHookRejectsMalformedRecords/february-30 (3.30s)
+        --- PASS: TestShellHookRejectsMalformedRecords/february-30/posix (0.66s)
+            --- PASS: TestShellHookRejectsMalformedRecords/february-30/posix/sh (0.17s)
+            --- PASS: TestShellHookRejectsMalformedRecords/february-30/posix/dash (0.14s)
+            --- PASS: TestShellHookRejectsMalformedRecords/february-30/posix/bash (0.17s)
+            --- PASS: TestShellHookRejectsMalformedRecords/february-30/posix/zsh (0.18s)
+        --- PASS: TestShellHookRejectsMalformedRecords/february-30/powershell (2.64s)
+    --- PASS: TestShellHookRejectsMalformedRecords/second-60 (3.08s)
+        --- PASS: TestShellHookRejectsMalformedRecords/second-60/posix (0.54s)
+            --- PASS: TestShellHookRejectsMalformedRecords/second-60/posix/sh (0.14s)
+            --- PASS: TestShellHookRejectsMalformedRecords/second-60/posix/dash (0.12s)
+            --- PASS: TestShellHookRejectsMalformedRecords/second-60/posix/bash (0.13s)
+            --- PASS: TestShellHookRejectsMalformedRecords/second-60/posix/zsh (0.15s)
+        --- PASS: TestShellHookRejectsMalformedRecords/second-60/powershell (2.54s)
+    --- PASS: TestShellHookRejectsMalformedRecords/lowercase-timestamp (3.24s)
+        --- PASS: TestShellHookRejectsMalformedRecords/lowercase-timestamp/posix (0.56s)
+            --- PASS: TestShellHookRejectsMalformedRecords/lowercase-timestamp/posix/sh (0.14s)
+            --- PASS: TestShellHookRejectsMalformedRecords/lowercase-timestamp/posix/dash (0.13s)
+            --- PASS: TestShellHookRejectsMalformedRecords/lowercase-timestamp/posix/bash (0.13s)
+            --- PASS: TestShellHookRejectsMalformedRecords/lowercase-timestamp/posix/zsh (0.15s)
+        --- PASS: TestShellHookRejectsMalformedRecords/lowercase-timestamp/powershell (2.68s)
+=== RUN   TestShellHookTrustResolvesSymlinkedProject
+=== RUN   TestShellHookTrustResolvesSymlinkedProject/posix
+=== RUN   TestShellHookTrustResolvesSymlinkedProject/posix/sh
+=== RUN   TestShellHookTrustResolvesSymlinkedProject/posix/dash
+=== RUN   TestShellHookTrustResolvesSymlinkedProject/posix/bash
+=== RUN   TestShellHookTrustResolvesSymlinkedProject/posix/zsh
+=== RUN   TestShellHookTrustResolvesSymlinkedProject/powershell
+--- PASS: TestShellHookTrustResolvesSymlinkedProject (3.10s)
+    --- PASS: TestShellHookTrustResolvesSymlinkedProject/posix (0.66s)
+        --- PASS: TestShellHookTrustResolvesSymlinkedProject/posix/sh (0.15s)
+        --- PASS: TestShellHookTrustResolvesSymlinkedProject/posix/dash (0.17s)
+        --- PASS: TestShellHookTrustResolvesSymlinkedProject/posix/bash (0.12s)
+        --- PASS: TestShellHookTrustResolvesSymlinkedProject/posix/zsh (0.22s)
+    --- PASS: TestShellHookTrustResolvesSymlinkedProject/powershell (2.44s)
+PASS
+ok  	github.com/relux-works/curator/internal/shell	70.192s
+TEST_EXIT=0
+
+===== entrypoints.log =====
+ok  	github.com/relux-works/curator/internal/install	5.754s
+INSTALL_EXIT=0
+ok  	github.com/relux-works/curator/cmd/curator	0.494s
+CLI_EXIT=0
+0 issues.
+LINT_EXIT=0
+
+===== ledger.log =====
+SOURCE_GOFMT_EXIT=0
+ok    internal/buildcache :: TestWindowsProtectedStateMatrix [must=windows skip=-]
+ok    internal/buildcache :: TestWindowsProtectedStateMatrix/* [must=- skip=windows]
+ok    internal/buildcache :: TestValidateWindowsSecurityPolicy [must=windows skip=-]
+ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedEntry [must=windows skip=windows]
+ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedCacheRoot [must=windows skip=windows]
+ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedWindowsScopes [must=windows skip=windows]
+ok    internal/runtimestore :: TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode [must=windows skip=-]
+ok    internal/runtimestore :: TestInstallSingleCommandAndShims [must=linux,darwin,windows skip=-]
+ok    internal/runtimestore :: TestRuntimeCommandPath [must=linux,darwin,windows skip=-]
+ok    internal/runtimestore :: TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly [must=linux,darwin skip=windows]
+ok    internal/buildcache :: TestUnixProtectedStateMatrix [must=linux,darwin skip=-]
+ok    internal/buildcache :: TestUnixProtectionHelperFailuresFailClosed [must=linux,darwin skip=-]
+ok    internal/config :: TestBootstrapAndAddProject [must=linux,darwin,windows skip=-]
+ok    internal/buildcache :: TestSweepDoesNotFollowSymlinkedEntries [must=linux,darwin skip=-]
+ok    internal/buildcache :: TestSweepDoesNotFollowASymlinkedCacheRoot [must=linux,darwin skip=-]
+ok    internal/buildcache :: TestRetireEntryRemovesLinksWithoutFollowingThem [must=linux,darwin skip=-]
+ok    internal/buildcache :: TestUnixRejectsEntrySymlinkAndUnprotectedCacheRoot [must=linux,darwin skip=-]
+ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedUnixScopes [must=linux,darwin skip=-]
+ok    internal/buildsource :: TestRejectsSpecialFile [must=linux,darwin skip=-]
+ok    internal/gitops :: TestArchiveRejectsLinks [must=linux,darwin,windows skip=-]
+ok    internal/gitops :: TestExtractReproducesByteExactVector [must=linux,darwin,windows skip=-]
+ok    internal/gitops :: TestExtractIgnoresWorkingTreeConversion [must=linux,darwin,windows skip=-]
+ok    internal/gitops :: TestExtractRefusesSubmodules [must=linux,darwin,windows skip=-]
+ok    internal/gitops :: TestExtractPreservesExecutableBit [must=linux,darwin skip=windows]
+ok    internal/gitops :: TestExtractRefusesOversizeBlobWithoutStreaming [must=linux,darwin,windows skip=-]
+ok    internal/gitops :: TestExtractRefusesDuplicatePlatformPathBeforeLargeBlob [must=darwin,windows skip=linux]
+ok    internal/gitops :: TestPlanWritesRefusesCaseCollisionBeforeStreaming [must=darwin,windows skip=linux]
+ok    internal/gitops :: TestExtractRefusesEscapeBeforeLargeBlob [must=linux,darwin,windows skip=-]
+ok    internal/gitops :: TestExtractRefusesMissingObjectsFromListing [must=linux,darwin,windows skip=-]
+ok    internal/gitops :: TestExtractTerminatesCatFileOnMidStreamFramingError [must=linux,darwin skip=windows]
+ok    internal/gitops :: TestExtractTerminatesCatFileOnWriteFailure [must=linux,darwin skip=windows]
+ok    internal/gitops :: TestExtractRemovesWrittenFilesOnMidStreamError [must=linux,darwin,windows skip=-]
+ok    internal/gitops :: TestExtractRefusesDotGitComponents [must=linux,darwin,windows skip=-]
+ok    internal/gitops :: TestExtractPreservesNestedExecutableBit [must=linux,darwin skip=windows]
+ok    internal/buildsource :: TestFrozenTokenRejectsMutation [must=linux,darwin,windows skip=-]
+ok    internal/buildsource :: TestFrozenTokenRejectsMutation/* [must=- skip=linux,darwin,windows]
+ok    internal/buildsource :: TestFrozenTokenRejectsRootReplacement [must=linux,darwin,windows skip=-]
+ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation [must=linux,darwin,windows skip=-]
+ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation/* [must=- skip=linux,darwin,windows]
+ok    internal/install :: TestDryRunTouchesNothing [must=linux,darwin,windows skip=-]
+ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext [must=linux,darwin,windows skip=-]
+excl  internal/godriver :: TestResourceLimitsStayInsideManagerBounds (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestResourceLimitsStayInsideManagerBounds [must=darwin,windows skip=-]
+excl  internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly [must=darwin,windows skip=-]
+excl  internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes [must=darwin,windows skip=-]
+excl  internal/godriver :: TestPerFileSizeLimitIsReallyApplied (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestPerFileSizeLimitIsReallyApplied [must=darwin skip=windows]
+excl  internal/godriver :: TestBuildFailsClosedWhenTheGoChildCannotStart (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestBuildFailsClosedWhenTheGoChildCannotStart [must=windows skip=darwin]
+excl  internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation [must=darwin,windows skip=-]
+excl  internal/godriver :: TestExecutableIdentityResolvesALauncherLink (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestExecutableIdentityResolvesALauncherLink [must=darwin,windows skip=windows]
+ok    internal/godriver :: TestExecutableIdentityResolvesALauncherLink/* [must=- skip=windows]
+excl  internal/godriver :: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink [must=darwin,windows skip=windows]
+ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/* [must=- skip=windows]
+excl  internal/godriver :: TestExecutableIdentityResolvesARealSymlinkedProcessLaunch (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestExecutableIdentityResolvesARealSymlinkedProcessLaunch [must=darwin,windows skip=windows]
+excl  internal/godriver :: TestBuildAcceptsAManagerStartedThroughALauncherLink (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestBuildAcceptsAManagerStartedThroughALauncherLink [must=darwin,windows skip=windows]
+excl  internal/godriver :: TestWorkerProvesTheInstalledIdentityWhenLaunchedThroughALink (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestWorkerProvesTheInstalledIdentityWhenLaunchedThroughALink [must=darwin,windows skip=windows]
+ok    internal/godriver :: TestExecutableIdentityResolvesALauncherReachedThroughADirectoryJunction [must=windows skip=windows]
+ok    internal/godriver :: TestExecutableIdentityStillRejectsSubstitutionBehindAJunction [must=windows skip=windows]
+ok    internal/runtimestore :: TestUnixPostInstallShimPropagatesSignal [must=linux,darwin skip=-]
+ok    internal/shell :: TestPosixHookEntersNestedSwitchesAndLeavesProjects [must=linux,darwin skip=windows]
+ok    internal/shell :: TestPowerShellHookRunsOnEveryPrompt [must=windows skip=linux,darwin]
+ok    internal/shell :: TestShellHookTrustVectors [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/shell :: TestShellHookTrustVectors/* [must=- skip=linux,darwin,windows]
+ok    internal/envfiles :: TestWriteProjectShapesAndSourcing [must=linux,darwin,windows skip=-]
+ok    internal/install :: TestEndToEndInstall [must=linux,darwin,windows skip=-]
+ok    internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets [must=linux,darwin,windows skip=-]
+ok    internal/install :: TestRegistrySnapshotSurvivesASecondBoundaryDuringFetch [must=linux,darwin,windows skip=-]
+ok    internal/install :: TestRegistryFutureSnapshotDeniesInstallThroughResolveRegistries [must=linux,darwin,windows skip=-]
+ok    internal/registry :: TestSnapshotFutureBoundIsExactAtEveryConfiguredSkew [must=linux,darwin,windows skip=-]
+ok    internal/registry :: TestSnapshotZeroClockSkewIsLiteral [must=linux,darwin,windows skip=-]
+ok    internal/transaction :: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/transaction :: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/transaction :: TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/install/atomicity :: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder [must=linux,darwin,windows skip=-]
+ok    internal/install/atomicity :: TestStaleAdapterRemovalRollsBackToTheExactPriorEntry [must=linux,darwin,windows skip=-]
+ok    internal/install/atomicity :: TestAdapterMirrorLinksAreJournaledAndRestoredExactly [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/transaction :: TestCommitAndRollbackRestoreALinkExactly [must=linux,darwin,windows skip=-]
+ok    internal/transaction :: TestRecoveryFinishesAPreparedLinkTransaction [must=linux,darwin,windows skip=-]
+ok    internal/transaction :: TestEntryRemovalRestoresTheExactLink [must=linux,darwin,windows skip=-]
+ok    internal/transaction :: TestEntryTargetsDoNotAliasTheirDestination [must=linux,darwin,windows skip=-]
+ok    internal/transaction :: TestNamespaceIdentityIsReadOnceWithinOneValidationPass [must=linux,darwin,windows skip=-]
+ok    internal/transaction :: TestWindowsNamespaceIdentityIsCompletedWhenItIsTaken [must=windows skip=-]
+ok    internal/interop :: TestGoldenContextCopy [must=linux,darwin,windows skip=-]
+ok    internal/interop/environments :: TestConformanceSnapshotAcquisition [must=linux,darwin,windows skip=-]
+ok    internal/interop/environments :: TestConformanceContextVersions [must=linux,darwin,windows skip=-]
+ok    internal/interop/environments :: TestConformanceContextResolution [must=linux,darwin,windows skip=-]
+ok    internal/interop/environments :: TestConformanceEnvironmentsHeader [must=linux,darwin,windows skip=-]
+ok    internal/interop/environments :: TestConformanceEnvironmentsMonolithic [must=linux,darwin,windows skip=-]
+ok    internal/interop/environments :: TestConformanceContextDetectors [must=linux,darwin,windows skip=-]
+ok    internal/interop/environments :: TestEveryFamilyThisPackageReadsIsDeclaredInRootArtefacts [must=linux,darwin,windows skip=-]
+ok    internal/interop/environments :: TestNoCaseHereSkipsForAnythingButTheDeferredRoot [must=linux,darwin,windows skip=-]
+ok    internal/interop/environments :: TestNoLedgerRowForThisPackageToleratesASkip [must=linux,darwin,windows skip=-]
+ok    internal/interop/environments :: TestNoRootReadHereEscapesTheDeclaredArtefactGuard [must=linux,darwin,windows skip=-]
+ok    internal/interop/environments :: TestTheRootIsAlwaysBoundToThatOneName [must=linux,darwin,windows skip=-]
+ok    internal/interop/environments :: TestConformanceEveryPathTheVectorsNameIsDeclared [must=linux,darwin,windows skip=-]
+excl  internal/godriver :: TestCandidateGoV1SourceAwareContract (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestCandidateGoV1SourceAwareContract [must=darwin,windows skip=darwin,windows]
+excl  internal/godriver :: TestFingerprintReportsUnreadableDirectoryIdentically (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestFingerprintReportsUnreadableDirectoryIdentically [must=darwin,windows skip=-]
+ok    cmd/curator :: TestCompiledInstallFollowsTheNativeControlInventoryExactly [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestCompiledProjectStatusAndUntrustedRecovery [must=darwin,windows skip=linux]
+ok    cmd/curator :: TestCompiledProjectRepairsCorruptCompiledState [must=darwin,windows skip=linux]
+ok    cmd/curator :: TestCompiledProjectRestoresCacheWhenCommitFails [must=darwin,windows skip=linux]
+ok    cmd/curator :: TestStatusReportsATransitivelyResolvedCompiledCommand [must=darwin,windows skip=linux]
+ok    cmd/curator :: TestStatusReportsAnUnusableToolchainPerCompiledCommand [must=darwin,windows skip=linux]
+ok    cmd/curator :: TestGCRetainsAndReportsReferencedCompiledState [must=darwin,windows skip=linux]
+ok    cmd/curator :: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck [must=darwin,windows skip=linux]
+ok    cmd/curator :: TestGlobalStatusReportsATransitivelyResolvedCompiledCommand [must=darwin,windows skip=linux]
+ok    internal/godriver :: TestProbeRejectsAnUncoveredPlatformBeforeTheWorker [must=linux,darwin,windows skip=-]
+ok    internal/skillspec :: TestReleasedSchemaCases [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/marker :: TestReadAuthoritativeMarkerV4SchemaCases [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/moduleroots :: TestModuleRootVectors [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/godriver :: TestModuleRootVectorsDriveTheWholeBuild [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/scriptpolicy :: TestScriptHostExecutionPolicySectionsAreAllClassified [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/scriptpolicy :: TestScriptExecutionPolicyIdentityMatchesTheSuite [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/scriptpolicy :: TestScriptExecutionOptInCases [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/scriptpolicy :: TestARefusalPrecedesEveryWorkerSurface [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/config :: TestManagerConfigV2SchemaCases [must=linux,darwin,windows skip=-]
+ok    internal/config :: TestSystemConfigV2SchemaCases [must=linux,darwin,windows skip=-]
+ok    internal/config :: TestManagerConfigV2Vectors [must=linux,darwin,windows skip=-]
+ok    internal/config :: TestSystemV2LockableSubsetIsClassWide [must=linux,darwin,windows skip=-]
+ok    internal/contextmaterialize :: TestReferencedRejectsCodex [must=linux,darwin,windows skip=-]
+ok    internal/contextmaterialize :: TestCodexTOMLExactness [must=linux,darwin,windows skip=-]
+ok    internal/contextmaterialize :: TestMCPEnvNamesUnion [must=linux,darwin,windows skip=-]
+ok    internal/envregistry :: TestIsolationMatrix [must=linux,darwin,windows skip=-]
+ok    internal/envregistry :: TestFormUnsupported [must=linux,darwin,windows skip=-]
+ok    internal/envfragment :: TestFragmentJSONCanonical [must=linux,darwin,windows skip=-]
+ok    internal/envfragment :: TestCheckBoundary [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestResolveProvisionRepair [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestResolveStaleUnprovisioned [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestResolveDriftRepair [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestResolvePassthroughLiveness [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestResolveClaudeProjectEntry [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestResolveLockContention [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestStatusOrphanRetention [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestOpencodeXDGSeeds [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestSeedUnreadableStopsBeforeFirstWrite [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestClaudeRootAlwaysCopied [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestCodexUnreadableConfigFails [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestStatusProfileMembersAndUnregistered [must=linux,darwin,windows skip=-]
+ok    internal/envregistry :: TestSecondaryTargetsBoundToAdapters [must=linux,darwin,windows skip=-]
+ok    internal/envfragment :: TestFragmentEnvCarriesOnlyEnvObject [must=linux,darwin,windows skip=-]
+ok    internal/envmarker :: TestParseAuthoritativeEnvMarkerSchemaCases [must=linux,darwin,windows skip=-]
+ok    internal/envfragment :: TestFragmentAuthoritativeSchemaCases [must=linux,darwin,windows skip=-]
+ok    internal/envfragment :: TestFragmentEmissionMatchesReference [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestEnvResolveRepairEmitsFragment [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestEnvStatusMatrix [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestUmbrellaMissingProvider [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestUmbrellaDispatchesToProvider [must=linux,darwin skip=windows]
+ok    cmd/curator :: TestUmbrellaPropagatesExitCode [must=linux,darwin skip=windows]
+ok    internal/hashing :: TestCrossCheckTree [must=- skip=linux,darwin,windows]
+ok    internal/config :: TestPathOverlayDeclarationParses [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestPathOverlayJoinsClosure [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestPathOverlayFormIsSourceInvalid [must=linux,darwin,windows skip=-]
+ok    internal/config :: TestGitOverlayDeclarationParses [must=linux,darwin,windows skip=-]
+ok    internal/identity :: TestClassifySourceMatrix [must=linux,darwin,windows skip=-]
+ok    internal/identity :: TestClassifySourceNeverProbesTheFilesystem [must=linux,darwin,windows skip=-]
+ok    internal/identity :: TestClassifySourceEcmaWhitespace [must=linux,darwin,windows skip=-]
+ok    internal/identity :: TestParseOneCharacterHostIsANetworkIdentity [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestInstallOperandKindIsSyntactic [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestInstallNeverDemotesANetworkIdentityToAPath [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestInstallRefusesANonSourceOperand [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestOverlayInvalidSourceKindIsSourceInvalid [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestSCPOverlayResolvesAsGit [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestOverlayExplicitWeightOverridesDefault [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestGitOverlayJoinsClosure [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestOverlayRepeatedNameIsCompositionInvalid [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestOverlayDuplicateNameIsCompositionInvalid [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestForbiddenOverlaysResolveAlone [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestRemoveRefusesOverlayOfAnotherProfile [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestWeightRulesApplyInOrder [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestWeightDuplicateRefused [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestWeightUnknownRefused [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestNonRootWeightsMapRefused [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestWeightConflictErrorAndWarning [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestWeightRulesAllFourDisagree [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestPrecedencePrimitivesDriveEmission [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestPrecedenceTieKeepsTopologicalOrder [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestMissingPathOperandIsPathMissing [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestMissingOverlayPathIsPathMissing [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestNonDirectoryPathIsSourceInvalid [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestNestedGitIsSourceInvalid [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestSymlinkInPathIsSourceInvalid [must=linux,darwin skip=windows]
+ok    internal/envprofile :: TestFoldedPathsAreSourceInvalid [must=linux skip=darwin,windows]
+ok    internal/envprofile :: TestRootGitExcluded [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestUnreadablePathIsUnreadable [must=linux,darwin skip=windows]
+ok    internal/envprofile :: TestUnreadablePathRootLeadsUnreadable [must=linux,darwin skip=windows]
+ok    internal/envprofile :: TestPathSnapshotImmutableAcrossUpdateSyncUse [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestUpdatePathWithoutStatePinIsSourceInvalid [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestUpdatePathMissingSnapshotIsSourceInvalid [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestUpdatePathSnapshotNameMismatchIsSourceInvalid [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestPathReinstallBareAndNonCurrentMovesPin [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestUpdateBlocksSecretOverlayMember [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestReinstallBlocksSecretOverlayMember [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestUpdateBlocksRevokedOverlayMember [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestReinstallBlocksRevokedOverlayMember [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestPathUpdateAllSucceedsWithImportedProfile [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestUseWithoutTakeoverRefusesUnmanaged [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestUseTakeoverBacksUpAndNotifies [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestForeignSymlinkStopsSwitch [must=linux,darwin skip=windows]
+ok    internal/envprofile :: TestTakeoverWarnsDotfileHeuristic [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestMachineClearReachesSeamGate [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestReadOnlyCommandsNeverOnboard [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestRepairTakeoverProvisionsManagedHome [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportLosslessInstallsThroughPathPipeline [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportNormalizesOrdersAndPins [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestNormalizeImportText [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportLossyStopsWithoutConsent [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportLossyProceedsWithConsent [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportUnreadableRootIsLoss [must=linux,darwin skip=windows]
+ok    internal/envprofile :: TestImportInvalidUTF8IsLoss [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportPartialActivationKeepsLock [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportNameTakenBeforeAnyWrite [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportSkillForeignPinnedByRevision [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportSkillMarkerRecovery [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportRecordsImportedFromNative [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportSkipsManagedRootContext [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportDivergentSkillsAreLoss [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportLedgerFailureIsLoss [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportAbsentMarkerDetectsNative [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportCorruptMarkerIsLoss [must=linux,darwin,windows skip=-]
+ok    internal/envprofile :: TestImportUnreadableMarkerIsLoss [must=linux,darwin skip=windows]
+ok    cmd/curator :: TestProfileImportRow [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileImportLossyRow [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileImportNameTakenRow [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileComposeAddPathRow [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileComposeAddRefusesAFormOnAPathSource [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestPathOverlayFromMachineConfigJoinsTheClosure [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestOverlayFromMachineConfigIsRefusedByKind [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileUseTakeoverRow [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileInstallReinstallHonoursUseAndTakeover [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestResolveTakeoverRequiresRepair [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestSyncTakeoverFlagParses [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileInstallUseLockedRequireRefuses [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileInstallFirstActivationLockedRequireRefuses [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileUseClearOperandIsUsage [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileScopedUseUnaffectedByLockedRequire [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileImportUseLockedRequireRefuses [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileUpdateResyncPassesLockedRequire [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestProfileComposeAddWarnsWhenOverlaysForbidden [must=linux,darwin,windows skip=-]
+ok    cmd/curator :: TestEnvStatusReportsLockedRequire [must=linux,darwin,windows skip=-]
+ok    internal/pnpmsource :: TestRealPinnedPNPMLockSupersetSnapshotDependencies [must=linux,darwin skip=windows]
+ok    internal/pnpmsource :: TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization [must=linux,darwin skip=windows]
+ok    internal/rustsource :: TestProductionManagerCapturesRegistryFromRawPaths [must=darwin skip=linux,windows]
+ok    internal/rustsource :: TestProductionManagerCapturesGitWithoutCallerProjection [must=darwin skip=linux,windows]
+
+ledger-consistency: 241 rows checked across linux darwin windows
+ledger-consistency: ok
+LEDGER_EXIT=0
+
+===== root-skip.log =====
+=== RUN   TestShellHookTrustVectors
+    shell_hook_trust_test.go:77: /Users/administrator/Developer/ReluxWorks/curator/curator/.temp/STORY-260910-2awkzu/worktree/.temp/review-1952mz/empty-root publishes no shell-hook-trust vector
+--- SKIP: TestShellHookTrustVectors (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/shell	0.369s
+
+===== mutant1.log =====
+=== RUN   TestShellHookTrustVectors
+=== RUN   TestShellHookTrustVectors/approved-env-sh-A-warning-sourced
+=== RUN   TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/sh
+=== RUN   TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/dash
+=== RUN   TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/bash
+=== RUN   TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/zsh
+=== RUN   TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced
+=== RUN   TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/sh
+=== RUN   TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/dash
+=== RUN   TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/bash
+=== RUN   TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/zsh
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/sh
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/dash
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/bash
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/zsh
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/sh
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/dash
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/bash
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/zsh
+=== RUN   TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning
+=== RUN   TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/sh
+=== RUN   TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/dash
+=== RUN   TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/bash
+=== RUN   TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/zsh
+=== RUN   TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced
+=== RUN   TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/sh
+    shell_hook_trust_test.go:171: stdout lacks "sourced1=no":
+        stdout:
+        sourced1=1
+        sourced2=1
+        
+        stderr:
+        curator: shell_hook_env_changed: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorschanged-env-sh-B-enforcing-not-sourced1411646778/001/project/.agents/env.sh changed since approval; run curator hook approve /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorschanged-env-sh-B-enforcing-not-sourced1411646778/001/project/.agents/env.sh to approve the new bytes
+        PROBE-1
+=== RUN   TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/dash
+    shell_hook_trust_test.go:171: stdout lacks "sourced1=no":
+        stdout:
+        sourced1=1
+        sourced2=1
+        
+        stderr:
+        curator: shell_hook_env_changed: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorschanged-env-sh-B-enforcing-not-sourced1411646778/001/project/.agents/env.sh changed since approval; run curator hook approve /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorschanged-env-sh-B-enforcing-not-sourced1411646778/001/project/.agents/env.sh to approve the new bytes
+        PROBE-1
+=== RUN   TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/bash
+    shell_hook_trust_test.go:171: stdout lacks "sourced1=no":
+        stdout:
+        sourced1=1
+        sourced2=1
+        
+        stderr:
+        curator: shell_hook_env_changed: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorschanged-env-sh-B-enforcing-not-sourced1411646778/001/project/.agents/env.sh changed since approval; run curator hook approve /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorschanged-env-sh-B-enforcing-not-sourced1411646778/001/project/.agents/env.sh to approve the new bytes
+        PROBE-1
+=== RUN   TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/zsh
+    shell_hook_trust_test.go:171: stdout lacks "sourced1=no":
+        stdout:
+        sourced1=1
+        sourced2=1
+        
+        stderr:
+        curator: shell_hook_env_changed: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorschanged-env-sh-B-enforcing-not-sourced1411646778/001/project/.agents/env.sh changed since approval; run curator hook approve /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorschanged-env-sh-B-enforcing-not-sourced1411646778/001/project/.agents/env.sh to approve the new bytes
+        PROBE-1
+=== RUN   TestShellHookTrustVectors/approved-env-ps1-A-warning-sourced
+    shell_hook_trust_test.go:91: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/approved-env-ps1-B-enforcing-sourced
+    shell_hook_trust_test.go:91: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/unapproved-env-ps1-A-warning-sourced-with-warning
+    shell_hook_trust_test.go:91: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/unapproved-env-ps1-B-enforcing-not-sourced
+    shell_hook_trust_test.go:91: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/changed-env-ps1-A-warning-sourced-with-warning
+    shell_hook_trust_test.go:91: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/changed-env-ps1-B-enforcing-not-sourced
+    shell_hook_trust_test.go:91: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/sh
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/dash
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/bash
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/zsh
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/sh
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/dash
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/bash
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/zsh
+--- FAIL: TestShellHookTrustVectors (2.47s)
+    --- PASS: TestShellHookTrustVectors/approved-env-sh-A-warning-sourced (0.30s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/sh (0.09s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/dash (0.06s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/bash (0.06s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/zsh (0.06s)
+    --- PASS: TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced (0.24s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/sh (0.07s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/dash (0.05s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/bash (0.05s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/zsh (0.05s)
+    --- PASS: TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning (0.24s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/sh (0.07s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/dash (0.05s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/bash (0.06s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/zsh (0.06s)
+    --- PASS: TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced (0.38s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/sh (0.11s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/dash (0.09s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/bash (0.09s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/zsh (0.09s)
+    --- PASS: TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning (0.31s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/sh (0.10s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/dash (0.05s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/bash (0.06s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/zsh (0.08s)
+    --- FAIL: TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced (0.29s)
+        --- FAIL: TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/sh (0.06s)
+        --- FAIL: TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/dash (0.05s)
+        --- FAIL: TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/bash (0.08s)
+        --- FAIL: TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/zsh (0.08s)
+    --- SKIP: TestShellHookTrustVectors/approved-env-ps1-A-warning-sourced (0.02s)
+    --- SKIP: TestShellHookTrustVectors/approved-env-ps1-B-enforcing-sourced (0.02s)
+    --- SKIP: TestShellHookTrustVectors/unapproved-env-ps1-A-warning-sourced-with-warning (0.00s)
+    --- SKIP: TestShellHookTrustVectors/unapproved-env-ps1-B-enforcing-not-sourced (0.00s)
+    --- SKIP: TestShellHookTrustVectors/changed-env-ps1-A-warning-sourced-with-warning (0.02s)
+    --- SKIP: TestShellHookTrustVectors/changed-env-ps1-B-enforcing-not-sourced (0.02s)
+    --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning (0.21s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/sh (0.06s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/dash (0.04s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/bash (0.05s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/zsh (0.05s)
+    --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced (0.39s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/sh (0.12s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/dash (0.08s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/bash (0.09s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/zsh (0.10s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/shell	3.169s
+FAIL
+MUTANT_EXIT=1
+
+===== mutant2.log =====
+=== RUN   TestShellHookTrustVectors
+=== RUN   TestShellHookTrustVectors/approved-env-sh-A-warning-sourced
+=== RUN   TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/sh
+=== RUN   TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/dash
+=== RUN   TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/bash
+=== RUN   TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/zsh
+=== RUN   TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced
+=== RUN   TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/sh
+=== RUN   TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/dash
+=== RUN   TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/bash
+=== RUN   TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/zsh
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/sh
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/dash
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/bash
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/zsh
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/sh
+    shell_hook_trust_test.go:171: stdout lacks "sourced1=no":
+        stdout:
+        sourced1=1
+        sourced2=1
+        
+        stderr:
+        curator: shell_hook_env_unapproved: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorsunapproved-env-sh-B-enforcing-not-sour3339807532/001/project/.agents/env.sh is not approved; run curator hook approve /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorsunapproved-env-sh-B-enforcing-not-sour3339807532/001/project/.agents/env.sh to approve it
+        PROBE-1
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/dash
+    shell_hook_trust_test.go:171: stdout lacks "sourced1=no":
+        stdout:
+        sourced1=1
+        sourced2=1
+        
+        stderr:
+        curator: shell_hook_env_unapproved: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorsunapproved-env-sh-B-enforcing-not-sour3339807532/001/project/.agents/env.sh is not approved; run curator hook approve /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorsunapproved-env-sh-B-enforcing-not-sour3339807532/001/project/.agents/env.sh to approve it
+        PROBE-1
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/bash
+    shell_hook_trust_test.go:171: stdout lacks "sourced1=no":
+        stdout:
+        sourced1=1
+        sourced2=1
+        
+        stderr:
+        curator: shell_hook_env_unapproved: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorsunapproved-env-sh-B-enforcing-not-sour3339807532/001/project/.agents/env.sh is not approved; run curator hook approve /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorsunapproved-env-sh-B-enforcing-not-sour3339807532/001/project/.agents/env.sh to approve it
+        PROBE-1
+=== RUN   TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/zsh
+    shell_hook_trust_test.go:171: stdout lacks "sourced1=no":
+        stdout:
+        sourced1=1
+        sourced2=1
+        
+        stderr:
+        curator: shell_hook_env_unapproved: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorsunapproved-env-sh-B-enforcing-not-sour3339807532/001/project/.agents/env.sh is not approved; run curator hook approve /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorsunapproved-env-sh-B-enforcing-not-sour3339807532/001/project/.agents/env.sh to approve it
+        PROBE-1
+=== RUN   TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning
+=== RUN   TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/sh
+=== RUN   TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/dash
+=== RUN   TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/bash
+=== RUN   TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/zsh
+=== RUN   TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced
+=== RUN   TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/sh
+=== RUN   TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/dash
+=== RUN   TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/bash
+=== RUN   TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/zsh
+=== RUN   TestShellHookTrustVectors/approved-env-ps1-A-warning-sourced
+    shell_hook_trust_test.go:91: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/approved-env-ps1-B-enforcing-sourced
+    shell_hook_trust_test.go:91: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/unapproved-env-ps1-A-warning-sourced-with-warning
+    shell_hook_trust_test.go:91: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/unapproved-env-ps1-B-enforcing-not-sourced
+    shell_hook_trust_test.go:91: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/changed-env-ps1-A-warning-sourced-with-warning
+    shell_hook_trust_test.go:91: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/changed-env-ps1-B-enforcing-not-sourced
+    shell_hook_trust_test.go:91: PowerShell is unavailable (no pwsh on this runner)
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/sh
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/dash
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/bash
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/zsh
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/sh
+    shell_hook_trust_test.go:171: stdout lacks "sourced1=no":
+        stdout:
+        sourced1=1
+        sourced2=1
+        
+        stderr:
+        curator: shell_hook_env_unapproved: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorsforged-project-record-env-sh-B-enforci2365446187/001/project/.agents/env.sh is not approved; run curator hook approve /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorsforged-project-record-env-sh-B-enforci2365446187/001/project/.agents/env.sh to approve it
+        PROBE-1
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/dash
+    shell_hook_trust_test.go:171: stdout lacks "sourced1=no":
+        stdout:
+        sourced1=1
+        sourced2=1
+        
+        stderr:
+        curator: shell_hook_env_unapproved: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorsforged-project-record-env-sh-B-enforci2365446187/001/project/.agents/env.sh is not approved; run curator hook approve /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorsforged-project-record-env-sh-B-enforci2365446187/001/project/.agents/env.sh to approve it
+        PROBE-1
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/bash
+    shell_hook_trust_test.go:171: stdout lacks "sourced1=no":
+        stdout:
+        sourced1=1
+        sourced2=1
+        
+        stderr:
+        curator: shell_hook_env_unapproved: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorsforged-project-record-env-sh-B-enforci2365446187/001/project/.agents/env.sh is not approved; run curator hook approve /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorsforged-project-record-env-sh-B-enforci2365446187/001/project/.agents/env.sh to approve it
+        PROBE-1
+=== RUN   TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/zsh
+    shell_hook_trust_test.go:171: stdout lacks "sourced1=no":
+        stdout:
+        sourced1=1
+        sourced2=1
+        
+        stderr:
+        curator: shell_hook_env_unapproved: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorsforged-project-record-env-sh-B-enforci2365446187/001/project/.agents/env.sh is not approved; run curator hook approve /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestShellHookTrustVectorsforged-project-record-env-sh-B-enforci2365446187/001/project/.agents/env.sh to approve it
+        PROBE-1
+--- FAIL: TestShellHookTrustVectors (3.13s)
+    --- PASS: TestShellHookTrustVectors/approved-env-sh-A-warning-sourced (0.34s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/sh (0.07s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/dash (0.06s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/bash (0.07s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-A-warning-sourced/zsh (0.07s)
+    --- PASS: TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced (0.29s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/sh (0.07s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/dash (0.06s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/bash (0.07s)
+        --- PASS: TestShellHookTrustVectors/approved-env-sh-B-enforcing-sourced/zsh (0.06s)
+    --- PASS: TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning (0.27s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/sh (0.06s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/dash (0.05s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/bash (0.06s)
+        --- PASS: TestShellHookTrustVectors/unapproved-env-sh-A-warning-sourced-with-warning/zsh (0.07s)
+    --- FAIL: TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced (0.23s)
+        --- FAIL: TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/sh (0.06s)
+        --- FAIL: TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/dash (0.04s)
+        --- FAIL: TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/bash (0.06s)
+        --- FAIL: TestShellHookTrustVectors/unapproved-env-sh-B-enforcing-not-sourced/zsh (0.06s)
+    --- PASS: TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning (0.33s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/sh (0.07s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/dash (0.06s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/bash (0.08s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-A-warning-sourced-with-warning/zsh (0.09s)
+    --- PASS: TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced (0.48s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/sh (0.12s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/dash (0.10s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/bash (0.12s)
+        --- PASS: TestShellHookTrustVectors/changed-env-sh-B-enforcing-not-sourced/zsh (0.12s)
+    --- SKIP: TestShellHookTrustVectors/approved-env-ps1-A-warning-sourced (0.03s)
+    --- SKIP: TestShellHookTrustVectors/approved-env-ps1-B-enforcing-sourced (0.04s)
+    --- SKIP: TestShellHookTrustVectors/unapproved-env-ps1-A-warning-sourced-with-warning (0.00s)
+    --- SKIP: TestShellHookTrustVectors/unapproved-env-ps1-B-enforcing-not-sourced (0.02s)
+    --- SKIP: TestShellHookTrustVectors/changed-env-ps1-A-warning-sourced-with-warning (0.14s)
+    --- SKIP: TestShellHookTrustVectors/changed-env-ps1-B-enforcing-not-sourced (0.07s)
+    --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning (0.49s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/sh (0.10s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/dash (0.07s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/bash (0.11s)
+        --- PASS: TestShellHookTrustVectors/forged-project-record-env-sh-A-warning-sourced-with-warning/zsh (0.07s)
+    --- FAIL: TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced (0.40s)
+        --- FAIL: TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/sh (0.06s)
+        --- FAIL: TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/dash (0.07s)
+        --- FAIL: TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/bash (0.15s)
+        --- FAIL: TestShellHookTrustVectors/forged-project-record-env-sh-B-enforcing-not-sourced/zsh (0.11s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/shell	3.715s
+FAIL
+MUTANT_EXIT=1
+
+===== hosted.log =====
+$ sh scripts/remote-gate.sh
+remote gate: attempt 1/3: pushing 97299d4502ee7a49453c3f5afb29bcb313670706 as gate/STORY-260910-2awkzu/260917-072854-11961-1
+remote: 
+remote: Create a pull request for 'gate/STORY-260910-2awkzu/260917-072854-11961-1' on GitHub by visiting:        
+remote:      https://github.com/relux-works/curator/pull/new/gate/STORY-260910-2awkzu/260917-072854-11961-1        
+remote: 
+remote gate: run 35194739427 (https://github.com/relux-works/curator/actions/runs/35194739427)
+remote gate: run 35194739427 finished: success
+  Interop conformance gate: success  
+  Race (macos-latest): success  
+  Naming gate: success  
+  Test (ubuntu-latest): success  
+  Test (windows-latest): success  
+  Race (ubuntu-latest): success  
+  Test (macos-latest): success  
+  Lint: success  
+  Gate self-test (ubuntu-latest): success  
+  Gate self-test (windows-latest): success  
+  Gate self-test (macos-latest): success  
+  Candidate suite (${{ matrix.os }}): skipped  
+  Test (rose-air): skipped  
+[exit 0]
+coverage_unit=exact_command_shard required=1 green=1 failed=0 missing=0 test_case_coverage=unknown

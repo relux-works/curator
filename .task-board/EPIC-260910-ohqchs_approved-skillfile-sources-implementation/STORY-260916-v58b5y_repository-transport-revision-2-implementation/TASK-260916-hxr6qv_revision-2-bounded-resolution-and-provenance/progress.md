@@ -107,6 +107,8 @@ spawn agent resolution: Agent selection: codex via explicit_override (preferred_
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [implementer] developer (codex) (run=RUN-260917-5912d8, max_parallel=20)
 spawn run started: [implementer] developer (codex) (run=RUN-260917-5912d8)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260917-5912d8, pid=11148, exit=0)
 
 ## Precondition Resources
 - [hxr6qv-brief.md](file://TASK-260916-hxr6qv/hxr6qv-brief.md)
@@ -143,12 +145,13 @@ spawn run started: [implementer] developer (codex) (run=RUN-260917-5912d8)
 - [TASK-260916-hxr6qv_spawn-log_-reviewer--reviewer--codex-_RUN-260917-b53b5d.log](file://TASK-260916-hxr6qv/TASK-260916-hxr6qv_spawn-log_-reviewer--reviewer--codex-_RUN-260917-b53b5d.log) — System spawn log captured by task-board
 - [TASK-260916-hxr6qv_review-verdict-rev4.md](file://TASK-260916-hxr6qv/TASK-260916-hxr6qv_review-verdict-rev4.md) — Revision 4 independent review: acceptance, exact-tree hosted proof and host-stall verification bounds
 - [TASK-260916-hxr6qv_spawn-log_-implementer--developer--codex-_RUN-260917-5912d8.log](file://TASK-260916-hxr6qv/TASK-260916-hxr6qv_spawn-log_-implementer--developer--codex-_RUN-260917-5912d8.log) — System spawn log captured by task-board
+- [TASK-260916-hxr6qv_integration-results.md](file://TASK-260916-hxr6qv/TASK-260916-hxr6qv_integration-results.md) — Integration revision 4 refusal log; zsh with pipefail; integration exit code 1: integration_indeterminate, completed lane progress.md absent from committed manifest.
 
 ## Created
 2026-09-16T11:47:00Z
 
 ## Last Update
-2026-09-17T09:29:28Z
+2026-09-17T09:30:33Z
 
 ## Assigned To
 [implementer] developer (codex)

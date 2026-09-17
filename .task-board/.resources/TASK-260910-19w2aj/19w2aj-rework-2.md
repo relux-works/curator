@@ -1,0 +1,3 @@
+# Rework 2 — TASK-260910-19w2aj: one gate failure (run 35183472040, Windows platform-case gate)
+
+cmd/curator TestProjectResolveGitSelectionThroughCLI skips on Windows with the undeclared reason "fake git wrapper is POSIX-only; production code is platform-neutral". The repository's declared platform-control reason for exactly this fixture is "test transport wrapper is POSIX-only" (.github/ci/skip-classes.tsv:60) — use that sentence verbatim as the skip reason (gated on GOOS == windows), or build the fake git as a Go test binary so the case runs on Windows (preferred if cheap). Do not add a skip class. Nothing else changes (rev2 fixed the four review findings; keep them). Run the linter and the narrow tests, then hand off rev3 (story_final). Tool calls under 2 minutes.

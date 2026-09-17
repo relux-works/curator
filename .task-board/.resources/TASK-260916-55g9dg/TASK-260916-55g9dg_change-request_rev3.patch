@@ -1,0 +1,2416 @@
+diff --git a/.github/ci/platform-cases.tsv b/.github/ci/platform-cases.tsv
+index 9aa1061..5ead678 100644
+--- a/.github/ci/platform-cases.tsv
++++ b/.github/ci/platform-cases.tsv
+@@ -318,6 +318,7 @@ internal/config	TestManagerConfigV2SchemaCases	linux,darwin,windows	-	-	the publ
+ internal/config	TestSystemConfigV2SchemaCases	linux,darwin,windows	-	-	the published system-config-v2 family merges or fails through the config loader
+ internal/config	TestManagerConfigV2Vectors	linux,darwin,windows	-	-	the published manager-config-v2 vectors render the expected effective configuration
+ internal/config	TestSystemV2LockableSubsetIsClassWide	linux,darwin,windows	-	-	the system file carries exactly the transcribed section 12.2 set class-wide: every lockable key is carriable and every non-lockable key is refused
++internal/config	TestSystemModuleSchemaSubset	linux,darwin,windows	linux,darwin,windows	root-content	the seven E2 system-module schema cases run through Load with the E2 rejection reason, or the root-content skip records a root publishing none
+ 
+ # ===========================================================================
+ # Stage (b): managed homes, fragment, and umbrella rows.
+@@ -326,6 +327,7 @@ internal/config	TestSystemV2LockableSubsetIsClassWide	linux,darwin,windows	-	-	t
+ internal/contextmaterialize	TestReferencedRejectsCodex	linux,darwin,windows	-	-	the referenced form for an adapter without it fails with environment_form_unsupported, never a silent fallback
+ internal/contextmaterialize	TestCodexTOMLExactness	linux,darwin,windows	-	-	the codex MCP layer renders the fixed TOML bytes with sorted tables and the reserved layer name
+ internal/contextmaterialize	TestMCPEnvNamesUnion	linux,darwin,windows	-	-	the fragment env_names union is sorted over every member server
++internal/contextmaterialize	TestSystemModuleAdmissionVectors	linux,darwin,windows	linux,darwin,windows	root-content	the five system-module admission cases of vectors/environments.json run byte-exact through SystemPrompt, or the root-content skip records a root publishing none
+ internal/envregistry	TestIsolationMatrix	linux,darwin,windows	-	-	the credential isolation matrix refuses isolated for opencode and shared for claude_code on macOS at the pin
+ internal/envregistry	TestFormUnsupported	linux,darwin,windows	-	-	a configured form the adapter does not support fails, never falls back
+ internal/envfragment	TestFragmentJSONCanonical	linux,darwin,windows	-	-	the launch fragment renders byte-exact CCJ-1 plus one LF
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index d746c5d..d44d98e 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -25,6 +25,19 @@ All notable implementation changes are recorded here.
+   replace declared module directories elsewhere in the snapshot, and those
+   directories join the directive, cgo, and assembly scan surface
+   (Protocol Core §4.2.3).
++- E2: direct-only `class: system` modules. Only the system modules of direct
++  packages — the root, the active overlays, and the packages their
++  `requires.contexts` name — plus packages admitted by a
++  `system_module_waivers` entry reach the system-prompt output and the
++  launch fragment; transitive system modules are refused. The machine knob
++  `transitive_system_modules` selects `drop` (default, non-breaking: the
++  module is skipped at materialization with the
++  `context_system_module_dropped` warning naming package and module) or
++  `error` (opt-in strictness: resolution fails with
++  `context_system_module_transitive` and the lock is left unchanged). The
++  knob locks to `error` only; waivers are not lockable. `curator env
++  status` reports the effective policy value with every dropped module by
++  package and path (Protocol environments §3, §5.5, §12).
+ 
+ ### Changed
+ 
+diff --git a/cmd/curator/envstatus.go b/cmd/curator/envstatus.go
+index bf64bd2..d255ccf 100644
+--- a/cmd/curator/envstatus.go
++++ b/cmd/curator/envstatus.go
+@@ -69,11 +69,14 @@ func printEnvStatus(stdout io.Writer, status *envprofile.Status) {
+ 		_, _ = fmt.Fprintf(stdout, "target %s (%s): participating=%v (%s); %s\n", target.ID, target.Adapter, target.Participating, target.Detail, target.Ungoverned)
+ 	}
+ 	for _, profile := range status.Profiles {
+-		_, _ = fmt.Fprintf(stdout, "profile %s: lock %s, precedence winner=%s placement=%s\n",
+-			profile.Profile, shortHash(profile.LockHash), profile.Precedence.Winner, profile.Precedence.Placement)
++		_, _ = fmt.Fprintf(stdout, "profile %s: lock %s, precedence winner=%s placement=%s, transitive_system_modules=%s\n",
++			profile.Profile, shortHash(profile.LockHash), profile.Precedence.Winner, profile.Precedence.Placement, profile.TransitiveSystemModules)
+ 		for _, member := range profile.Members {
+ 			_, _ = fmt.Fprintf(stdout, "  member %s %s weight %d\n", member.Kind, member.Name, member.Weight)
+ 		}
++		for _, dropped := range profile.DroppedSystemModules {
++			_, _ = fmt.Fprintf(stdout, "  dropped system module %s %s\n", dropped.Package, dropped.Path)
++		}
+ 	}
+ 	for _, id := range status.UnregisteredEnvironments {
+ 		_, _ = fmt.Fprintf(stdout, "unregistered environment in machine configuration: %s\n", id)
+diff --git a/internal/config/config.go b/internal/config/config.go
+index 15db809..37bca92 100644
+--- a/internal/config/config.go
++++ b/internal/config/config.go
+@@ -52,16 +52,17 @@ var DefaultAgents = []string{"codex_cli"}
+ // among them — are deliberately absent and never lockable: credential
+ // material is operator-owned (ratified with the spec owner 2026-08-23).
+ var LockableKeys = map[string]bool{
+-	"audit_registries":                     true,
+-	"disable_builtin_registries":           true,
+-	"allowed_sources":                      true,
+-	"audit":                                true,
+-	"environments.overlays_allowed":        true,
+-	"environments.precedence":              true,
+-	"environments.mcp_package_allowlist":   true,
+-	"environments.passable_env_names":      true,
+-	"environments.require_current_profile": true,
+-	"environments.isolation":               true,
++	"audit_registries":                       true,
++	"disable_builtin_registries":             true,
++	"allowed_sources":                        true,
++	"audit":                                  true,
++	"environments.overlays_allowed":          true,
++	"environments.precedence":                true,
++	"environments.mcp_package_allowlist":     true,
++	"environments.passable_env_names":        true,
++	"environments.require_current_profile":   true,
++	"environments.isolation":                 true,
++	"environments.transitive_system_modules": true,
+ }
+ 
+ var (
+diff --git a/internal/config/environments.go b/internal/config/environments.go
+index fa68b5e..dc82629 100644
+--- a/internal/config/environments.go
++++ b/internal/config/environments.go
+@@ -34,6 +34,13 @@ type Environments struct {
+ 	MCPPackageAllowlist []string
+ 	ShadowAcknowledged  []ShadowAcknowledgement
+ 	SecretWaivers       []SecretMaterialWaiver
++	// TransitiveSystemModules is the §3/§5.5 admission policy: drop
++	// (default) skips transitive system modules at materialization with a
++	// warning, error refuses them at resolution.
++	TransitiveSystemModules string
++	// SystemModuleWaivers admits transitive packages' system modules by
++	// name; an entry naming no lock member has no effect.
++	SystemModuleWaivers []SystemModuleWaiver
+ 	BackupRetention     int
+ 	RequireCurrent      *string
+ 	InPlaceMode         map[string]string
+@@ -86,6 +93,14 @@ type SecretMaterialWaiver struct {
+ 	Reason string
+ }
+ 
++// SystemModuleWaiver is one system_module_waivers entry (environments
++// §12.1): the admitted context member's package name and the free-text
++// reason recording why the operator admits its system modules.
++type SystemModuleWaiver struct {
++	Package string
++	Reason  string
++}
++
+ // Defaults from the environments §12.1 table.
+ const (
+ 	DefaultOverlayWeight   = 1000
+@@ -96,12 +111,13 @@ const (
+ // LockableEnvKeys are the environments §12.2 keys a system file may lock,
+ // named as the manager §1 locked set names them.
+ var LockableEnvKeys = map[string]bool{
+-	"environments.overlays_allowed":        true,
+-	"environments.precedence":              true,
+-	"environments.mcp_package_allowlist":   true,
+-	"environments.passable_env_names":      true,
+-	"environments.require_current_profile": true,
+-	"environments.isolation":               true,
++	"environments.overlays_allowed":          true,
++	"environments.precedence":                true,
++	"environments.mcp_package_allowlist":     true,
++	"environments.passable_env_names":        true,
++	"environments.require_current_profile":   true,
++	"environments.isolation":                 true,
++	"environments.transitive_system_modules": true,
+ }
+ 
+ // systemEnvKnobs are the environments keys a system file may carry at all:
+@@ -122,21 +138,23 @@ var (
+ // defaultEnvironments returns the §12.1 defaults.
+ func defaultEnvironments() Environments {
+ 	return Environments{
+-		ScopedCurrent:        map[string]string{},
+-		Overlays:             map[string][]OverlayDeclaration{},
+-		OverlayDefaultWeight: DefaultOverlayWeight,
+-		OverlaysAllowed:      true,
+-		Precedence:           Precedence{Winner: "higher-weight", Placement: "winner-last"},
+-		Forms:                map[string]string{},
+-		SystemPromptFiles:    map[string]SystemPromptFiles{},
+-		Targets:              map[string]TargetConfig{},
+-		Isolation:            map[string]map[string]string{},
+-		XDGSeedAllowlist:     []string{"git", "gh", "ssh"},
+-		MCPPackageAllowlist:  []string{},
+-		ShadowAcknowledged:   []ShadowAcknowledgement{},
+-		SecretWaivers:        []SecretMaterialWaiver{},
+-		BackupRetention:      DefaultBackupRetention,
+-		InPlaceMode:          map[string]string{},
++		ScopedCurrent:           map[string]string{},
++		Overlays:                map[string][]OverlayDeclaration{},
++		OverlayDefaultWeight:    DefaultOverlayWeight,
++		OverlaysAllowed:         true,
++		Precedence:              Precedence{Winner: "higher-weight", Placement: "winner-last"},
++		Forms:                   map[string]string{},
++		SystemPromptFiles:       map[string]SystemPromptFiles{},
++		Targets:                 map[string]TargetConfig{},
++		Isolation:               map[string]map[string]string{},
++		XDGSeedAllowlist:        []string{"git", "gh", "ssh"},
++		MCPPackageAllowlist:     []string{},
++		ShadowAcknowledged:      []ShadowAcknowledgement{},
++		SecretWaivers:           []SecretMaterialWaiver{},
++		TransitiveSystemModules: "drop",
++		SystemModuleWaivers:     []SystemModuleWaiver{},
++		BackupRetention:         DefaultBackupRetention,
++		InPlaceMode:             map[string]string{},
+ 	}
+ }
+ 
+@@ -253,6 +271,23 @@ func parseEnvironments(raw any) (Environments, error) {
+ 		}
+ 		env.SecretWaivers = waivers
+ 	}
++	if rawTransitive, present := obj["transitive_system_modules"]; present {
++		transitive, ok := rawTransitive.(string)
++		if !ok || (transitive != "drop" && transitive != "error") {
++			return Environments{}, verr.New("environments.transitive_system_modules", "must be drop or error")
++		}
++		env.TransitiveSystemModules = transitive
++	}
++	// An explicit null is rejected like any other mistyped list: the
++	// schema type is array (§12.1), so null is malformed, never the
++	// empty default. Only absence takes the default.
++	if rawWaivers, present := obj["system_module_waivers"]; present {
++		waivers, err := parseSystemModuleWaivers(rawWaivers)
++		if err != nil {
++			return Environments{}, err
++		}
++		env.SystemModuleWaivers = waivers
++	}
+ 	if rawRetention, present := obj["backup_retention"]; present {
+ 		retention, err := boundedInteger(rawRetention, 0, maxSafeInteger)
+ 		if err != nil {
+@@ -278,6 +313,7 @@ var EnvKnobNames = []string{
+ 	"overlays_allowed", "precedence", "forms", "system_prompt_files",
+ 	"targets", "isolation", "xdg_seed_allowlist", "passable_env_names",
+ 	"mcp_package_allowlist", "shadow_acknowledged", "secret_material_waivers",
++	"transitive_system_modules", "system_module_waivers",
+ 	"backup_retention", "require_current_profile", "in_place_mode",
+ }
+ 
+@@ -733,6 +769,36 @@ func parseSecretWaivers(raw any) ([]SecretMaterialWaiver, error) {
+ 	return waivers, nil
+ }
+ 
++func parseSystemModuleWaivers(raw any) ([]SystemModuleWaiver, error) {
++	list, ok := raw.([]any)
++	if !ok {
++		return nil, verr.New("environments.system_module_waivers", "must be a list")
++	}
++	waivers := []SystemModuleWaiver{}
++	for index, item := range list {
++		label := fmt.Sprintf("environments.system_module_waivers[%d]", index)
++		entry, ok := item.(map[string]any)
++		if !ok {
++			return nil, verr.New(label, "must be an object")
++		}
++		for key := range entry {
++			if key != "package" && key != "reason" {
++				return nil, verr.New(label, "has unsupported field %q", key)
++			}
++		}
++		pkg, _ := entry["package"].(string)
++		if !identifiers.Valid(pkg) {
++			return nil, verr.New(label+".package", "%s", identifiers.Rule)
++		}
++		reason, _ := entry["reason"].(string)
++		if !nonEmptyString(reason) {
++			return nil, verr.New(label+".reason", "requires a non-empty string")
++		}
++		waivers = append(waivers, SystemModuleWaiver{Package: pkg, Reason: reason})
++	}
++	return waivers, nil
++}
++
+ // validRange is the closed range-grammar character check of
+ // manager-config-v2 (length 1-1024 over [0-9A-Za-z.*<>=^~| -]). Full range
+ // semantics belong to the resolver (pkgversion); the config layer pins the
+@@ -814,6 +880,14 @@ func parseSystemEnvironments(raw any) (map[string]any, error) {
+ 			return nil, err
+ 		}
+ 	}
++	// Environments §12.2 locks transitive_system_modules only toward
++	// error: a system file MUST NOT admit a transitive package's system
++	// modules by locking (or defaulting) the knob to drop.
++	if rawTransitive, present := obj["transitive_system_modules"]; present && rawTransitive != nil {
++		if transitive, _ := rawTransitive.(string); transitive == "drop" {
++			return nil, verr.New("environments.transitive_system_modules", "a system file locks transitive_system_modules only toward error")
++		}
++	}
+ 	return obj, nil
+ }
+ 
+@@ -905,6 +979,12 @@ func (e Environments) render() map[string]any {
+ 			"span": []any{waiver.Span[0], waiver.Span[1]}, "reason": waiver.Reason,
+ 		})
+ 	}
++	systemWaivers := []any{}
++	for _, waiver := range e.SystemModuleWaivers {
++		systemWaivers = append(systemWaivers, map[string]any{
++			"package": waiver.Package, "reason": waiver.Reason,
++		})
++	}
+ 	xdg := []any{}
+ 	for _, name := range e.XDGSeedAllowlist {
+ 		xdg = append(xdg, name)
+@@ -936,7 +1016,9 @@ func (e Environments) render() map[string]any {
+ 		"forms":      forms, "system_prompt_files": spf, "targets": targets,
+ 		"isolation": isolation, "xdg_seed_allowlist": xdg, "passable_env_names": passable,
+ 		"mcp_package_allowlist": mcp, "shadow_acknowledged": shadow,
+-		"secret_material_waivers": waivers, "backup_retention": e.BackupRetention,
++		"secret_material_waivers":   waivers,
++		"transitive_system_modules": e.TransitiveSystemModules, "system_module_waivers": systemWaivers,
++		"backup_retention":        e.BackupRetention,
+ 		"require_current_profile": require, "in_place_mode": inPlace,
+ 	}
+ }
+@@ -955,7 +1037,7 @@ func EnvLockKey(knob string) string {
+ 		return "environments.precedence"
+ 	case "isolation":
+ 		return "environments.isolation"
+-	case "overlays_allowed", "mcp_package_allowlist", "passable_env_names", "require_current_profile":
++	case "overlays_allowed", "mcp_package_allowlist", "passable_env_names", "require_current_profile", "transitive_system_modules":
+ 		return "environments." + head
+ 	}
+ 	return ""
+diff --git a/internal/config/environments_conformance_test.go b/internal/config/environments_conformance_test.go
+index e313587..91990e8 100644
+--- a/internal/config/environments_conformance_test.go
++++ b/internal/config/environments_conformance_test.go
+@@ -185,9 +185,10 @@ func TestManagerConfigV2Vectors(t *testing.T) {
+ 				t.Fatal(err)
+ 			}
+ 			for key, want := range tc.Expected {
+-				if !reflect.DeepEqual(got[key], want) {
++				gotValue := got[key]
++				if !reflect.DeepEqual(gotValue, want) {
+ 					wantJSON, _ := json.Marshal(want)
+-					gotJSON, _ := json.Marshal(got[key])
++					gotJSON, _ := json.Marshal(gotValue)
+ 					t.Fatalf("member %q:\n got %s\nwant %s", key, gotJSON, wantJSON)
+ 				}
+ 			}
+diff --git a/internal/config/environments_test.go b/internal/config/environments_test.go
+index 2d08c24..c558435 100644
+--- a/internal/config/environments_test.go
++++ b/internal/config/environments_test.go
+@@ -432,53 +432,58 @@ func TestRequireCurrentProfileUnlockedCarriesNoRefusal(t *testing.T) {
+ // gate is class-wide, not per-knob-name. The knob list is EnvKnobNames (the
+ // §12.1 table the reader enforces) with a grammatically valid system-file
+ // payload per knob, so a knob added to the reader without a payload fails
+-// here. The admitted set is transcribed from environments §12.2 — the six
+-// keys the specification states, written out independently — and asserted
++// here. The admitted set is transcribed from environments §12.2 — the keys
++// the specification states, written out independently — and asserted
+ // set-equal with LockableEnvKeys (the map parseSystemEnvironments enforces
+ // via systemEnvKnobs), so a knob added to or removed from that map without
+ // §12.2 standing fails here instead of widening or narrowing the system
+ // file's reach silently. A narrowing mutant that admits exactly one
+ // non-lockable knob (for example secret_material_waivers,
+-// xdg_seed_allowlist or in_place_mode) must fail this test, and so must a
+-// widening mutant that adds one member to LockableEnvKeys.
++// system_module_waivers, xdg_seed_allowlist or in_place_mode) must fail
++// this test, and so must a widening mutant that adds one member to
++// LockableEnvKeys.
+ func TestSystemV2LockableSubsetIsClassWide(t *testing.T) {
+ 	user := `{"schema_version": 2, "skills_root": "x", "projects": {}}`
+ 	payloads := map[string]string{
+-		"current_profile":         `{"current_profile": "a"}`,
+-		"scoped_current":          `{"scoped_current": {"codex_cli": "a"}}`,
+-		"overlays":                `{"overlays": {}}`,
+-		"overlay_default_weight":  `{"overlay_default_weight": 5}`,
+-		"overlays_allowed":        `{"overlays_allowed": false}`,
+-		"precedence":              `{"precedence": {"winner": "lower-weight"}}`,
+-		"forms":                   `{"forms": {"claude_code": "monolithic"}}`,
+-		"system_prompt_files":     `{"system_prompt_files": {"a": {"pi": "append"}}}`,
+-		"targets":                 `{"targets": {"codex_cli": {"participation": "off"}}}`,
+-		"isolation":               `{"isolation": {"a": {"pi": "shared"}}}`,
+-		"xdg_seed_allowlist":      `{"xdg_seed_allowlist": ["git"]}`,
+-		"passable_env_names":      `{"passable_env_names": []}`,
+-		"mcp_package_allowlist":   `{"mcp_package_allowlist": []}`,
+-		"shadow_acknowledged":     `{"shadow_acknowledged": [{"env": "codex_cli", "path": "some/path"}]}`,
+-		"secret_material_waivers": `{"secret_material_waivers": [{"pin": "0123456789abcdef0123456789abcdef01234567", "file": "context/a.md", "span": [1, 2], "reason": "org policy"}]}`,
+-		"backup_retention":        `{"backup_retention": 1}`,
+-		"require_current_profile": `{"require_current_profile": "acme"}`,
+-		"in_place_mode":           `{"in_place_mode": {"codex_cli": "linked"}}`,
++		"current_profile":           `{"current_profile": "a"}`,
++		"scoped_current":            `{"scoped_current": {"codex_cli": "a"}}`,
++		"overlays":                  `{"overlays": {}}`,
++		"overlay_default_weight":    `{"overlay_default_weight": 5}`,
++		"overlays_allowed":          `{"overlays_allowed": false}`,
++		"precedence":                `{"precedence": {"winner": "lower-weight"}}`,
++		"forms":                     `{"forms": {"claude_code": "monolithic"}}`,
++		"system_prompt_files":       `{"system_prompt_files": {"a": {"pi": "append"}}}`,
++		"targets":                   `{"targets": {"codex_cli": {"participation": "off"}}}`,
++		"isolation":                 `{"isolation": {"a": {"pi": "shared"}}}`,
++		"xdg_seed_allowlist":        `{"xdg_seed_allowlist": ["git"]}`,
++		"passable_env_names":        `{"passable_env_names": []}`,
++		"mcp_package_allowlist":     `{"mcp_package_allowlist": []}`,
++		"shadow_acknowledged":       `{"shadow_acknowledged": [{"env": "codex_cli", "path": "some/path"}]}`,
++		"secret_material_waivers":   `{"secret_material_waivers": [{"pin": "0123456789abcdef0123456789abcdef01234567", "file": "context/a.md", "span": [1, 2], "reason": "org policy"}]}`,
++		"transitive_system_modules": `{"transitive_system_modules": "error"}`,
++		"system_module_waivers":     `{"system_module_waivers": [{"package": "sysleaf", "reason": "reviewed"}]}`,
++		"backup_retention":          `{"backup_retention": 1}`,
++		"require_current_profile":   `{"require_current_profile": "acme"}`,
++		"in_place_mode":             `{"in_place_mode": {"codex_cli": "linked"}}`,
+ 	}
+ 	if len(payloads) != len(EnvKnobNames) {
+ 		t.Fatalf("payloads cover %d knobs, EnvKnobNames carries %d: keep the two in step", len(payloads), len(EnvKnobNames))
+ 	}
+-	// The §12.2 transcription: exactly the six keys the specification
+-	// states ("overlays_allowed, precedence, mcp_package_allowlist,
+-	// passable_env_names, require_current_profile, and isolation"). This
+-	// literal is the spec sentence; LockableEnvKeys is the implementation.
+-	// Either drifting — a widening that would reach §9.1 secret material,
+-	// or a narrowing that would drop a fleet-policy knob — fails below.
++	// The §12.2 transcription: exactly the keys the specification states
++	// ("overlays_allowed, precedence, mcp_package_allowlist,
++	// passable_env_names, require_current_profile, isolation, and
++	// transitive_system_modules"). This literal is the spec sentence;
++	// LockableEnvKeys is the implementation. Either drifting — a widening
++	// that would reach §9.1 secret material or §12.1 waivers, or a
++	// narrowing that would drop a fleet-policy knob — fails below.
+ 	transcribed := map[string]bool{
+-		"environments.overlays_allowed":        true,
+-		"environments.precedence":              true,
+-		"environments.mcp_package_allowlist":   true,
+-		"environments.passable_env_names":      true,
+-		"environments.require_current_profile": true,
+-		"environments.isolation":               true,
++		"environments.overlays_allowed":          true,
++		"environments.precedence":                true,
++		"environments.mcp_package_allowlist":     true,
++		"environments.passable_env_names":        true,
++		"environments.require_current_profile":   true,
++		"environments.isolation":                 true,
++		"environments.transitive_system_modules": true,
+ 	}
+ 	if len(LockableEnvKeys) != len(transcribed) {
+ 		t.Fatalf("LockableEnvKeys carries %d keys, §12.2 transcribes %d: a widening or narrowing without spec standing fails here", len(LockableEnvKeys), len(transcribed))
+@@ -534,7 +539,8 @@ func TestEffectiveJSONShape(t *testing.T) {
+ 		"overlay_default_weight", "overlays_allowed", "precedence", "forms",
+ 		"system_prompt_files", "targets", "isolation", "xdg_seed_allowlist",
+ 		"passable_env_names", "mcp_package_allowlist", "shadow_acknowledged",
+-		"secret_material_waivers", "backup_retention", "require_current_profile",
++		"secret_material_waivers", "transitive_system_modules",
++		"system_module_waivers", "backup_retention", "require_current_profile",
+ 		"in_place_mode"} {
+ 		if _, present := env[knob]; !present {
+ 			t.Fatalf("rendered environments lack %q", knob)
+@@ -544,3 +550,122 @@ func TestEffectiveJSONShape(t *testing.T) {
+ 		t.Fatalf("scalar defaults: %v %v", env["overlay_default_weight"], env["overlays_allowed"])
+ 	}
+ }
++
++// TestTransitiveSystemModulesDefaults proves the §12.1 defaults: drop for
++// the policy, empty for the waiver list.
++func TestTransitiveSystemModulesDefaults(t *testing.T) {
++	cfg := loadText(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
++	if cfg.Env.TransitiveSystemModules != "drop" {
++		t.Fatalf("transitive_system_modules = %q, want drop", cfg.Env.TransitiveSystemModules)
++	}
++	if len(cfg.Env.SystemModuleWaivers) != 0 {
++		t.Fatalf("system_module_waivers = %+v, want empty", cfg.Env.SystemModuleWaivers)
++	}
++}
++
++// TestTransitiveSystemModulesValues drives the closed enum and the waiver
++// object grammar through the production reader: error and a valid waiver
++// parse, and every malformed shape is refused.
++func TestTransitiveSystemModulesValues(t *testing.T) {
++	cfg := loadText(t, `{"schema_version": 2, "skills_root": "x", "projects": {},`+
++		`"environments": {"transitive_system_modules": "error",`+
++		`"system_module_waivers": [{"package": "sysleaf", "reason": "reviewed leaf"}]}}`)
++	if cfg.Env.TransitiveSystemModules != "error" {
++		t.Fatalf("transitive_system_modules = %q, want error", cfg.Env.TransitiveSystemModules)
++	}
++	if len(cfg.Env.SystemModuleWaivers) != 1 || cfg.Env.SystemModuleWaivers[0].Package != "sysleaf" {
++		t.Fatalf("system_module_waivers = %+v", cfg.Env.SystemModuleWaivers)
++	}
++	cases := map[string]string{
++		"enum value":   `{"transitive_system_modules": "quarantine"}`,
++		"enum type":    `{"transitive_system_modules": true}`,
++		"missing":      `{"system_module_waivers": [{"package": "sysleaf"}]}`,
++		"package":      `{"system_module_waivers": [{"package": "Bad Name", "reason": "x"}]}`,
++		"empty reason": `{"system_module_waivers": [{"package": "sysleaf", "reason": ""}]}`,
++		"unknown":      `{"system_module_waivers": [{"package": "sysleaf", "reason": "x", "expires": "never"}]}`,
++		"not a list":   `{"system_module_waivers": {}}`,
++		"not objects":  `{"system_module_waivers": ["sysleaf"]}`,
++	}
++	for name, body := range cases {
++		text := `{"schema_version": 2, "skills_root": "x", "projects": {}, "environments": ` + body + `}`
++		path := writeConfig(t, t.TempDir(), "config.json", text)
++		if _, err := Load(path, nil); err == nil {
++			t.Fatalf("%s: invalid knob accepted", name)
++		}
++	}
++}
++
++// TestSystemModuleWaiversNullRejected proves an explicit null waiver list
++// is a mistyped knob, not the empty default: the schema type is array
++// (§12.1), so Load refuses it with the closed grammar's wrong-type error.
++// Absence and the empty list still load with no waivers.
++func TestSystemModuleWaiversNullRejected(t *testing.T) {
++	loadFails(t, `{"schema_version": 2, "skills_root": "x", "projects": {},`+
++		`"environments": {"system_module_waivers": null}}`,
++		"environments.system_module_waivers")
++	for name, body := range map[string]string{
++		"absent": `{"schema_version": 2, "skills_root": "x", "projects": {}}`,
++		"empty": `{"schema_version": 2, "skills_root": "x", "projects": {},` +
++			`"environments": {"system_module_waivers": []}}`,
++	} {
++		cfg := loadText(t, body)
++		if len(cfg.Env.SystemModuleWaivers) != 0 {
++			t.Fatalf("%s: system_module_waivers = %+v, want empty", name, cfg.Env.SystemModuleWaivers)
++		}
++	}
++}
++
++// TestSystemTransitiveDirection proves the §12.2 lock direction: a system
++// file locks transitive_system_modules only to error, and waivers are not
++// lockable at all.
++func TestSystemTransitiveDirection(t *testing.T) {
++	user := `{"schema_version": 2, "skills_root": "x", "projects": {}}`
++	t.Run("error locks", func(t *testing.T) {
++		system := `{"schema_version": 2, "locked": ["environments.transitive_system_modules"],` +
++			`"environments": {"transitive_system_modules": "error"}}`
++		cfg, _, err := loadWithSystem(t, user, system)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if cfg.Env.TransitiveSystemModules != "error" || !cfg.Locked["environments.transitive_system_modules"] {
++			t.Fatalf("locked error not effective: %+v %+v", cfg.Env.TransitiveSystemModules, cfg.Locked)
++		}
++	})
++	t.Run("error overrides the machine knob", func(t *testing.T) {
++		machine := `{"schema_version": 2, "skills_root": "x", "projects": {},` +
++			`"environments": {"transitive_system_modules": "drop"}}`
++		system := `{"schema_version": 2, "locked": ["environments.transitive_system_modules"],` +
++			`"environments": {"transitive_system_modules": "error"}}`
++		cfg, _, err := loadWithSystem(t, machine, system)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if cfg.Env.TransitiveSystemModules != "error" {
++			t.Fatalf("locked error lost to the machine knob: %q", cfg.Env.TransitiveSystemModules)
++		}
++	})
++	refused := map[string]string{
++		"drop direction": `{"schema_version": 2, "locked": ["environments.transitive_system_modules"],` +
++			`"environments": {"transitive_system_modules": "drop"}}`,
++		"drop default": `{"schema_version": 2, "locked": [],` +
++			`"environments": {"transitive_system_modules": "drop"}}`,
++		"bad value": `{"schema_version": 2, "locked": ["environments.transitive_system_modules"],` +
++			`"environments": {"transitive_system_modules": "quarantine"}}`,
++		"waivers carried": `{"schema_version": 2, "locked": [],` +
++			`"environments": {"system_module_waivers": [{"package": "sysleaf", "reason": "x"}]}}`,
++	}
++	for name, system := range refused {
++		if _, _, err := loadWithSystem(t, user, system); err == nil {
++			t.Fatalf("%s: system file accepted", name)
++		}
++	}
++	if LockableKeys["environments.system_module_waivers"] || LockableEnvKeys["environments.system_module_waivers"] {
++		t.Fatalf("system_module_waivers is lockable: a lock must not admit a transitive package's system modules")
++	}
++	if lock := EnvLockKey("transitive_system_modules"); lock != "environments.transitive_system_modules" {
++		t.Fatalf("EnvLockKey(transitive_system_modules) = %q", lock)
++	}
++	if lock := EnvLockKey("system_module_waivers"); lock != "" {
++		t.Fatalf("EnvLockKey(system_module_waivers) = %q, want no lock", lock)
++	}
++}
+diff --git a/internal/config/system_module_schema_test.go b/internal/config/system_module_schema_test.go
+new file mode 100644
+index 0000000..674aa2b
+--- /dev/null
++++ b/internal/config/system_module_schema_test.go
+@@ -0,0 +1,119 @@
++// E2 system-module schema cases (environments §12.1, §12.2): the seven
++// schema cases the finding publishes — five manager-config-v2 and two
++// system-config-v2 — run here, selected by name, with exact published bytes
++// through the production Load entry point.
++//
++// The general consumers (TestManagerConfigV2SchemaCases,
++// TestSystemConfigV2SchemaCases) iterate whatever the root's index lists,
++// so a root predating the E2 cases runs them green with no E2 case at
++// all. This driver is the explicit subset accounting: it runs every E2
++// case when the root publishes them, fails loud on a partial
++// publication, and otherwise takes the root-content skip the campaign
++// rules require for a new vector family, with the matching
++// .github/ci/platform-cases.tsv row (class root-content) beside the
++// internal/godriver precedent.
++//
++// An invalid E2 case must be rejected for its E2 reason, not merely
++// rejected: a sibling knob the published bytes also carry (E4's
++// provider_directories at the current root) must not turn the case into
++// a false green. The rejection has to name the E2 knob.
++package config
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++// systemModuleSchemaCases names the E2 schema cases by family and file,
++// with the knob substring an invalid case's rejection must name. The
++// index — not this table — decides each case's validity.
++var systemModuleSchemaCases = []struct {
++	family string
++	file   string
++	knob   string
++}{
++	{"manager-config-v2", "valid-system-module-waiver.json", ""},
++	{"manager-config-v2", "invalid-transitive-system-modules-value.json", "transitive_system_modules"},
++	{"manager-config-v2", "invalid-system-module-waiver-missing-reason.json", "system_module_waivers"},
++	{"manager-config-v2", "invalid-system-module-waiver-package-grammar.json", "system_module_waivers"},
++	{"manager-config-v2", "invalid-system-module-waiver-unknown-field.json", "system_module_waivers"},
++	{"system-config-v2", "invalid-transitive-system-modules-drop-direction.json", "transitive_system_modules"},
++	{"system-config-v2", "invalid-transitive-system-modules-value.json", "transitive_system_modules"},
++}
++
++// TestSystemModuleSchemaSubset drives the seven E2 schema cases through
++// Load with exact published bytes.
++func TestSystemModuleSchemaSubset(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	indexPath := filepath.Join(root, "schema-cases", "index.json")
++	payload, err := os.ReadFile(indexPath) // #nosec G304 -- explicit conformance input
++	if os.IsNotExist(err) {
++		t.Skipf("%s publishes no schema cases", root)
++	}
++	if err != nil {
++		t.Fatal(err)
++	}
++	var entries []schemaIndexEntry
++	if err := json.Unmarshal(payload, &entries); err != nil {
++		t.Fatal(err)
++	}
++	validity := map[string]bool{}
++	for _, entry := range entries {
++		validity[entry.Instance] = entry.Valid
++	}
++	var missing []string
++	present := 0
++	for _, tc := range systemModuleSchemaCases {
++		if _, ok := validity[tc.family+"/"+tc.file]; ok {
++			present++
++		} else {
++			missing = append(missing, tc.family+"/"+tc.file)
++		}
++	}
++	if present == 0 {
++		t.Skipf("%s publishes no system-module schema cases", root)
++	}
++	if len(missing) != 0 {
++		t.Fatalf("conformance root %s publishes only %d of %d system-module schema cases, missing %s",
++			root, present, len(systemModuleSchemaCases), strings.Join(missing, ", "))
++	}
++	for _, tc := range systemModuleSchemaCases {
++		t.Run(tc.family+"/"+tc.file, func(t *testing.T) {
++			casePayload, err := os.ReadFile(filepath.Join(root, "schema-cases", tc.family, tc.file)) // #nosec G304 -- explicit conformance input
++			if err != nil {
++				t.Fatal(err)
++			}
++			var errLoad error
++			if tc.family == "system-config-v2" {
++				const user = `{"schema_version": 2, "skills_root": "/tmp/skills", "projects": {}}`
++				dir := t.TempDir()
++				userPath := writeConfig(t, dir, "config.json", user)
++				systemPath := writeConfig(t, dir, "system.json", string(casePayload))
++				t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
++				_, errLoad = Load(userPath, nil)
++			} else {
++				path := writeConfig(t, t.TempDir(), "config.json", string(casePayload))
++				_, errLoad = Load(path, nil)
++			}
++			wantValid := validity[tc.family+"/"+tc.file]
++			if wantValid && errLoad != nil {
++				t.Fatalf("valid case rejected: %v", errLoad)
++			}
++			if !wantValid {
++				if errLoad == nil {
++					t.Fatalf("invalid case accepted")
++				}
++				if !strings.Contains(errLoad.Error(), tc.knob) {
++					t.Fatalf("rejected for %q, naming no %q: the E2 defect is not what refused this case",
++						errLoad, tc.knob)
++				}
++			}
++		})
++	}
++}
+diff --git a/internal/contextmaterialize/admission.go b/internal/contextmaterialize/admission.go
+new file mode 100644
+index 0000000..ca4c02a
+--- /dev/null
++++ b/internal/contextmaterialize/admission.go
+@@ -0,0 +1,199 @@
++// Package contextmaterialize system-module admission (environments §3,
++// §5.5, §12.1): a package is direct when it is the root itself, an active
++// overlay, or named by the root's or an active overlay's requires.contexts
++// entry; every other context member is transitive. Only the system modules
++// of direct packages, and of transitive packages admitted by a
++// system_module_waivers entry, are admitted: the system-prompt output and
++// the launch fragment carry only admitted modules. Under the drop policy
++// (default) a non-admitted applicable system module is skipped at
++// materialization with the context_system_module_dropped warning; under
++// error, resolution of the same module fails with
++// context_system_module_transitive.
++package contextmaterialize
++
++import (
++	"fmt"
++
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/contextpkg"
++)
++
++// Admission diagnostics (environments §3.1, §5.7).
++const (
++	// DiagSystemModuleDropped warns that a transitive system module was
++	// skipped at materialization under the drop policy, naming the
++	// package and the module path.
++	DiagSystemModuleDropped = "context_system_module_dropped"
++	// DiagSystemModuleTransitive refuses a transitive system module under
++	// the error policy, naming the package and the module path.
++	DiagSystemModuleTransitive = "context_system_module_transitive"
++)
++
++// Transitive system-module policies (environments §12.1).
++const (
++	TransitiveDrop  = "drop"
++	TransitiveError = "error"
++)
++
++// Admission is the effective §12.1 system-module admission policy:
++// the transitive_system_modules value with the waived package names.
++type Admission struct {
++	// Transitive is drop or error; "" selects the drop default.
++	Transitive string
++	// Waivers admits transitive packages by name.
++	Waivers map[string]bool
++}
++
++// Policy resolves the effective policy value, refusing anything outside
++// the closed enum. Machine configuration validates the spelling at the
++// reader; this guards programmatic callers.
++func (a Admission) Policy() (string, error) {
++	switch a.Transitive {
++	case "", TransitiveDrop:
++		return TransitiveDrop, nil
++	case TransitiveError:
++		return TransitiveError, nil
++	default:
++		return "", fmt.Errorf("transitive_system_modules %q is not drop or error", a.Transitive)
++	}
++}
++
++// Waived reports whether a waiver admits the package's system modules.
++func (a Admission) Waived(pkg string) bool {
++	return a.Waivers[pkg]
++}
++
++// DirectSet computes the direct package set from the lock (environments
++// §3): the root, every active overlay, and every package named by the
++// root's or an active overlay's requires.contexts entry. The lock's
++// required_by lists carry exactly those edges — one name, one kind, so an
++// edge into a context member is a contexts edge — and the overlay flags
++// mark the active overlays, so no manifest read is needed.
++func DirectSet(lock *contextlock.Lock) map[string]bool {
++	direct := map[string]bool{}
++	if lock == nil {
++		return direct
++	}
++	overlays := map[string]bool{}
++	for _, member := range lock.Members {
++		if member.Kind != contextlock.KindContext {
++			continue
++		}
++		if member.Overlay {
++			overlays[member.Name] = true
++		}
++	}
++	direct[lock.Root] = true
++	for name := range overlays {
++		direct[name] = true
++	}
++	for _, member := range lock.Members {
++		if member.Kind != contextlock.KindContext || direct[member.Name] {
++			continue
++		}
++		for _, requirer := range member.RequiredBy {
++			if requirer == lock.Root || overlays[requirer] {
++				direct[member.Name] = true
++				break
++			}
++		}
++	}
++	return direct
++}
++
++// DroppedModule names one non-admitted system module by package and
++// manifest path.
++type DroppedModule struct {
++	Package string
++	Path    string
++}
++
++// ClassifiedModule is one admitted system module with its bytes.
++type ClassifiedModule struct {
++	Package string
++	Module  Module
++}
++
++// TransitiveSystemModuleError is the §3 error-policy refusal, naming the
++// package and the module path.
++type TransitiveSystemModuleError struct {
++	Package string
++	Module  string
++}
++
++func (e *TransitiveSystemModuleError) Error() string {
++	return fmt.Sprintf("%s: package %q system module %q is transitive and the transitive_system_modules policy is error",
++		DiagSystemModuleTransitive, e.Package, e.Module)
++}
++
++// ClassifySystemModules splits every applicable system module of the
++// emitted order into admitted and dropped (environments §3): a module is
++// admitted when its package is direct or waived. Both lists follow emitted
++// order with manifest order within a package, so dropped[0] is the module
++// the error policy names. Members without package content contribute
++// nothing; callers that need the content error check presence themselves.
++func ClassifySystemModules(lock *contextlock.Lock, order []contextlock.Member, packages map[string]Package, environment string, admission Admission) (admitted []ClassifiedModule, dropped []DroppedModule) {
++	direct := DirectSet(lock)
++	for _, member := range order {
++		pkg, ok := packages[member.Name]
++		if !ok {
++			continue
++		}
++		for _, module := range Applicable(pkg, "system", environment) {
++			if direct[member.Name] || admission.Waived(member.Name) {
++				admitted = append(admitted, ClassifiedModule{Package: member.Name, Module: module})
++			} else {
++				dropped = append(dropped, DroppedModule{Package: member.Name, Path: module.Path})
++			}
++		}
++	}
++	return admitted, dropped
++}
++
++// FirstTransitiveSystemModule reports the first non-admitted system module
++// in emitted order (manifest order within a package) that applies to at
++// least one of envIDs, or nil when the closure carries none. Under the
++// drop policy it always reports nil: drop never fails resolution,
++// installation, or update for admission. A module whose selector names no
++// registered environment selects nothing (§3) and can never reach a
++// system-prompt surface, so it never refuses resolution.
++func FirstTransitiveSystemModule(lock *contextlock.Lock, precedence Precedence, modules map[string][]contextpkg.Module, admission Admission, envIDs []string) (*DroppedModule, error) {
++	policy, err := admission.Policy()
++	if err != nil {
++		return nil, err
++	}
++	if policy != TransitiveError {
++		return nil, nil
++	}
++	order, err := EmittedOrder(lock, precedence)
++	if err != nil {
++		return nil, err
++	}
++	direct := DirectSet(lock)
++	for _, member := range order {
++		if direct[member.Name] || admission.Waived(member.Name) {
++			continue
++		}
++		for _, module := range modules[member.Name] {
++			class := module.Class
++			if class == "" {
++				class = "root"
++			}
++			if class != "system" {
++				continue
++			}
++			applies := false
++			for _, env := range envIDs {
++				if module.Applies(env) {
++					applies = true
++					break
++				}
++			}
++			if !applies {
++				continue
++			}
++			return &DroppedModule{Package: member.Name, Path: module.Path}, nil
++		}
++	}
++	return nil, nil
++}
+diff --git a/internal/contextmaterialize/admission_test.go b/internal/contextmaterialize/admission_test.go
+new file mode 100644
+index 0000000..747540e
+--- /dev/null
++++ b/internal/contextmaterialize/admission_test.go
+@@ -0,0 +1,285 @@
++package contextmaterialize
++
++import (
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/contextpkg"
++)
++
++// admissionLock builds root -> mid -> leaf with an unrelated overlay, so
++// leaf is transitive, mid is direct through the root, and the overlay is
++// direct by flag.
++func admissionLock() *contextlock.Lock {
++	return &contextlock.Lock{
++		Root: "sysroot",
++		Members: []contextlock.Member{
++			{Kind: contextlock.KindContext, Name: "sysleaf", Version: "1.0.0", Commit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Source: "github.com/example/sysleaf", RequiredBy: []string{"sysmid"}},
++			{Kind: contextlock.KindContext, Name: "sysmid", Version: "1.0.0", Commit: "9999999999999999999999999999999999999999", Source: "github.com/example/sysmid", RequiredBy: []string{"sysroot"}},
++			{Kind: contextlock.KindContext, Name: "sysovl", Version: "1.0.0", Commit: "7777777777777777777777777777777777777777", Source: "github.com/example/sysovl", RequiredBy: []string{}, Overlay: true},
++			{Kind: contextlock.KindContext, Name: "sysroot", Version: "1.0.0", Commit: "8888888888888888888888888888888888888888", Source: "github.com/example/sysroot", RequiredBy: []string{}},
++		},
++	}
++}
++
++func admissionPackages() map[string]Package {
++	system := func(text string) Module {
++		return Module{Module: contextpkg.Module{Path: "90-system.md", Class: "system"}, Bytes: []byte(text)}
++	}
++	return map[string]Package{
++		"sysroot": {HasContext: true, Modules: []Module{system("Root system prompt.\n")}},
++		"sysmid":  {HasContext: true, Modules: []Module{system("Mid system prompt.\n")}},
++		"sysleaf": {HasContext: true, Modules: []Module{system("Leaf system prompt.\n")}},
++		"sysovl":  {HasContext: true},
++	}
++}
++
++// TestDirectSet proves the §3 partition: the root, every overlay, and
++// every package the root or an overlay requires are direct; the rest is
++// transitive. A package required by both the root and a transitive
++// member stays direct, and a package an overlay requires is direct even
++// when a transitive member requires it too.
++func TestDirectSet(t *testing.T) {
++	direct := DirectSet(admissionLock())
++	for _, name := range []string{"sysroot", "sysmid", "sysovl"} {
++		if !direct[name] {
++			t.Fatalf("%s is not direct", name)
++		}
++	}
++	if direct["sysleaf"] {
++		t.Fatalf("sysleaf is direct")
++	}
++	overlay := &contextlock.Lock{
++		Root: "sysroot",
++		Members: []contextlock.Member{
++			{Kind: contextlock.KindContext, Name: "sysleaf", RequiredBy: []string{"sysmid", "sysovl"}},
++			{Kind: contextlock.KindContext, Name: "sysmid", RequiredBy: []string{"sysroot"}},
++			{Kind: contextlock.KindContext, Name: "sysovl", RequiredBy: []string{}, Overlay: true},
++			{Kind: contextlock.KindContext, Name: "sysroot", RequiredBy: []string{}},
++		},
++	}
++	if !DirectSet(overlay)["sysleaf"] {
++		t.Fatalf("a package named by an active overlay's requires is not direct")
++	}
++	shared := &contextlock.Lock{
++		Root: "sysroot",
++		Members: []contextlock.Member{
++			{Kind: contextlock.KindContext, Name: "shared", RequiredBy: []string{"sysmid", "sysroot"}},
++			{Kind: contextlock.KindContext, Name: "sysmid", RequiredBy: []string{"sysroot"}},
++			{Kind: contextlock.KindContext, Name: "sysroot", RequiredBy: []string{}},
++		},
++	}
++	if !DirectSet(shared)["shared"] {
++		t.Fatalf("a package named by the root's requires is not direct")
++	}
++	if got := DirectSet(nil); len(got) != 0 {
++		t.Fatalf("nil lock direct set %+v", got)
++	}
++}
++
++// TestSystemPromptDropSkipsTransitive proves the drop default: the
++// document holds exactly the admitted modules' bytes and dropped names
++// the skipped package and module.
++func TestSystemPromptDropSkipsTransitive(t *testing.T) {
++	lock := admissionLock()
++	document, written, dropped, err := SystemPrompt(lock, DefaultPrecedence, "claude_code", admissionPackages(), Admission{})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !written {
++		t.Fatalf("written is false")
++	}
++	if want := "Leaf system prompt.\n"; strings.Contains(string(document), want) {
++		t.Fatalf("document carries the transitive module:\n%s", document)
++	}
++	if want := "Mid system prompt.\n\nRoot system prompt.\n"; string(document) != want {
++		t.Fatalf("document %q, want %q", document, want)
++	}
++	if len(dropped) != 1 || dropped[0] != (DroppedModule{Package: "sysleaf", Path: "90-system.md"}) {
++		t.Fatalf("dropped %+v", dropped)
++	}
++}
++
++// TestSystemPromptDropWarnsPerModule proves every dropped module is
++// reported in emitted order: two transitive packages yield two dropped
++// entries, dependencies first.
++func TestSystemPromptDropWarnsPerModule(t *testing.T) {
++	lock := admissionLock()
++	packages := admissionPackages()
++	packages["sysovl"] = Package{HasContext: true, Modules: []Module{
++		{Module: contextpkg.Module{Path: "90-system.md", Class: "system"}, Bytes: []byte("Overlay system prompt.\n")},
++	}}
++	// sysovl is direct by flag, so only sysleaf drops.
++	_, _, dropped, err := SystemPrompt(lock, DefaultPrecedence, "claude_code", packages, Admission{Transitive: TransitiveDrop})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(dropped) != 1 || dropped[0].Package != "sysleaf" {
++		t.Fatalf("dropped %+v, want only the transitive package", dropped)
++	}
++}
++
++// TestSystemPromptErrorRefusesFirst proves the error refusal names the
++// first non-admitted module in emitted order and returns no document.
++func TestSystemPromptErrorRefusesFirst(t *testing.T) {
++	lock := admissionLock()
++	document, written, dropped, err := SystemPrompt(lock, DefaultPrecedence, "claude_code", admissionPackages(), Admission{Transitive: TransitiveError})
++	if err == nil {
++		t.Fatalf("error policy admitted a transitive system module")
++	}
++	transitive, ok := err.(*TransitiveSystemModuleError)
++	if !ok {
++		t.Fatalf("error %T (%v) is not the refusal", err, err)
++	}
++	if transitive.Package != "sysleaf" || transitive.Module != "90-system.md" {
++		t.Fatalf("refusal %+v names neither the package nor the module", transitive)
++	}
++	if !strings.Contains(err.Error(), DiagSystemModuleTransitive) {
++		t.Fatalf("error %q carries no %s", err, DiagSystemModuleTransitive)
++	}
++	if document != nil || written {
++		t.Fatalf("refusal returned a document")
++	}
++	if len(dropped) != 1 || dropped[0].Package != "sysleaf" {
++		t.Fatalf("dropped %+v", dropped)
++	}
++}
++
++// TestSystemPromptWaiverAdmits proves a waiver admits the transitive
++// package's system modules under both policies, while an entry naming no
++// member changes nothing.
++func TestSystemPromptWaiverAdmits(t *testing.T) {
++	lock := admissionLock()
++	packages := admissionPackages()
++	for _, policy := range []string{TransitiveDrop, TransitiveError} {
++		document, written, dropped, err := SystemPrompt(lock, DefaultPrecedence, "claude_code", packages,
++			Admission{Transitive: policy, Waivers: map[string]bool{"sysleaf": true}})
++		if err != nil {
++			t.Fatal(err)
++		}
++		if !written || len(dropped) != 0 {
++			t.Fatalf("policy %s: written=%v dropped=%+v", policy, written, dropped)
++		}
++		if want := "Leaf system prompt.\n\nMid system prompt.\n\nRoot system prompt.\n"; string(document) != want {
++			t.Fatalf("policy %s: document %q, want %q", policy, document, want)
++		}
++	}
++	_, _, dropped, err := SystemPrompt(lock, DefaultPrecedence, "claude_code", packages,
++		Admission{Waivers: map[string]bool{"absent": true}})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(dropped) != 1 {
++		t.Fatalf("a waiver naming no member admitted a module: %+v", dropped)
++	}
++}
++
++// TestSystemPromptSelectorExcludes proves a system module whose selector
++// excludes the environment is not applicable: it is neither admitted nor
++// dropped, and it never refuses under error.
++func TestSystemPromptSelectorExcludes(t *testing.T) {
++	lock := admissionLock()
++	packages := admissionPackages()
++	packages["sysleaf"] = Package{HasContext: true, Modules: []Module{
++		{Module: contextpkg.Module{Path: "90-system.md", Class: "system", Environments: []string{"pi"}}, Bytes: []byte("Leaf system prompt.\n")},
++	}}
++	document, written, dropped, err := SystemPrompt(lock, DefaultPrecedence, "claude_code", packages, Admission{Transitive: TransitiveError})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !written || len(dropped) != 0 {
++		t.Fatalf("written=%v dropped=%+v", written, dropped)
++	}
++	if strings.Contains(string(document), "Leaf") {
++		t.Fatalf("document carries a module inapplicable to claude_code:\n%s", document)
++	}
++}
++
++// TestSystemPromptAllDroppedUnwritten proves a system-prompt output with
++// no admitted module is absent: written is false and the caller writes no
++// file and emits no fragment section.
++func TestSystemPromptAllDroppedUnwritten(t *testing.T) {
++	lock := &contextlock.Lock{
++		Root: "sysroot",
++		Members: []contextlock.Member{
++			{Kind: contextlock.KindContext, Name: "sysleaf", RequiredBy: []string{"sysmid"}},
++			{Kind: contextlock.KindContext, Name: "sysmid", RequiredBy: []string{"sysroot"}},
++			{Kind: contextlock.KindContext, Name: "sysroot", RequiredBy: []string{}},
++		},
++	}
++	packages := map[string]Package{
++		"sysroot": {HasContext: true},
++		"sysmid":  {HasContext: true},
++		"sysleaf": {HasContext: true, Modules: []Module{
++			{Module: contextpkg.Module{Path: "90-system.md", Class: "system"}, Bytes: []byte("Leaf system prompt.\n")},
++		}},
++	}
++	document, written, dropped, err := SystemPrompt(lock, DefaultPrecedence, "claude_code", packages, Admission{})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if document != nil || written {
++		t.Fatalf("all-dropped output is written")
++	}
++	if len(dropped) != 1 {
++		t.Fatalf("dropped %+v", dropped)
++	}
++}
++
++// TestSystemPromptRejectsPolicy proves a policy outside the closed enum
++// fails closed instead of silently selecting a behavior.
++func TestSystemPromptRejectsPolicy(t *testing.T) {
++	_, _, _, err := SystemPrompt(admissionLock(), DefaultPrecedence, "claude_code", admissionPackages(), Admission{Transitive: "quarantine"})
++	if err == nil || !strings.Contains(err.Error(), "quarantine") {
++		t.Fatalf("err = %v, want the policy refusal", err)
++	}
++}
++
++// TestFirstTransitiveSystemModuleOrder proves the resolution refusal
++// scans emitted order with manifest order within a package, and only
++// modules that apply to a registered environment.
++func TestFirstTransitiveSystemModuleOrder(t *testing.T) {
++	lock := admissionLock()
++	modules := map[string][]contextpkg.Module{
++		"sysroot": {{Path: "00-root.md"}, {Path: "90-system.md", Class: "system"}},
++		"sysmid":  {{Path: "90-system.md", Class: "system"}},
++		"sysleaf": {
++			{Path: "00-leaf.md"},
++			{Path: "80-other.md", Class: "system", Environments: []string{"unknown_env"}},
++			{Path: "90-system.md", Class: "system"},
++			{Path: "91-second.md", Class: "system"},
++		},
++	}
++	first, err := FirstTransitiveSystemModule(lock, DefaultPrecedence, modules,
++		Admission{Transitive: TransitiveError}, []string{"claude_code", "codex_cli", "opencode", "pi"})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if first == nil || *first != (DroppedModule{Package: "sysleaf", Path: "90-system.md"}) {
++		t.Fatalf("first %+v, want sysleaf/90-system.md in manifest order past the root modules and the unregistered selector", first)
++	}
++	// A module selecting only an unregistered environment never refuses.
++	onlyUnknown := map[string][]contextpkg.Module{
++		"sysleaf": {{Path: "90-system.md", Class: "system", Environments: []string{"unknown_env"}}},
++	}
++	first, err = FirstTransitiveSystemModule(lock, DefaultPrecedence, onlyUnknown,
++		Admission{Transitive: TransitiveError}, []string{"claude_code", "codex_cli", "opencode", "pi"})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if first != nil {
++		t.Fatalf("first %+v, want nil for a module that selects nothing", first)
++	}
++	// Drop never refuses.
++	first, err = FirstTransitiveSystemModule(lock, DefaultPrecedence, modules, Admission{}, []string{"claude_code"})
++	if err != nil || first != nil {
++		t.Fatalf("drop refused: %+v %v", first, err)
++	}
++	// A waiver admits.
++	first, err = FirstTransitiveSystemModule(lock, DefaultPrecedence, modules,
++		Admission{Transitive: TransitiveError, Waivers: map[string]bool{"sysleaf": true}}, []string{"claude_code"})
++	if err != nil || first != nil {
++		t.Fatalf("waived refusal: %+v %v", first, err)
++	}
++}
+diff --git a/internal/contextmaterialize/contextmaterialize.go b/internal/contextmaterialize/contextmaterialize.go
+index 2e9e0a6..f5a7dc2 100644
+--- a/internal/contextmaterialize/contextmaterialize.go
++++ b/internal/contextmaterialize/contextmaterialize.go
+@@ -2,7 +2,8 @@
+ // environments §5: the curator-root-context-v2 generation header (§5.1), the
+ // emitted order under both precedence primitives (§5, §6), chapter parts, the
+ // monolithic form (§5.2), the zero-module case (§5.4), the system-prompt
+-// output (§5.5), and the content-hash binding of a surface (§5.6).
++// output (§5.5) with the §3 system-module admission, and the content-hash
++// binding of a surface (§5.6).
+ //
+ // Materialized root context is a pure function of (lock, precedence policy,
+ // environment identifier, form); nothing here reads a clock, a path, or an
+@@ -243,30 +244,46 @@ func Monolithic(lock *contextlock.Lock, lockHash string, precedence Precedence,
+ }
+ 
+ // SystemPrompt assembles the system-prompt output (environments §5.5): the
+-// applicable system modules of every member in emitted order, joined with no
+-// header and no chapter parts. written is false when no module applies.
+-func SystemPrompt(lock *contextlock.Lock, precedence Precedence, environment string, packages map[string]Package) (document []byte, written bool, err error) {
++// admitted applicable system modules of every member in emitted order,
++// joined with no header and no chapter parts. written is false when no
++// admitted module applies. dropped names every non-admitted applicable
++// module in the same order, so the caller warns
++// context_system_module_dropped per module under drop. Under error the
++// first dropped module refuses the materialization with
++// context_system_module_transitive and no document is returned. Only
++// admitted modules are byte-validated and joined: a skipped module
++// contributes no bytes, and its validity was settled at snapshot
++// validation.
++func SystemPrompt(lock *contextlock.Lock, precedence Precedence, environment string, packages map[string]Package, admission Admission) (document []byte, written bool, dropped []DroppedModule, err error) {
++	policy, err := admission.Policy()
++	if err != nil {
++		return nil, false, nil, err
++	}
+ 	order, err := EmittedOrder(lock, precedence)
+ 	if err != nil {
+-		return nil, false, err
++		return nil, false, nil, err
+ 	}
+-	var parts [][]byte
+ 	for _, member := range order {
+-		pkg, ok := packages[member.Name]
+-		if !ok {
+-			return nil, false, fmt.Errorf("no package content for member %s", member.Name)
+-		}
+-		for _, module := range Applicable(pkg, "system", environment) {
+-			if err := contextpkg.ValidateModuleBytes(module.Bytes); err != nil {
+-				return nil, false, fmt.Errorf("module %s of %s: %v", module.Path, member.Name, err)
+-			}
+-			parts = append(parts, module.Bytes)
++		if _, ok := packages[member.Name]; !ok {
++			return nil, false, nil, fmt.Errorf("no package content for member %s", member.Name)
+ 		}
+ 	}
+-	if len(parts) == 0 {
+-		return nil, false, nil
++	admitted, dropped := ClassifySystemModules(lock, order, packages, environment, admission)
++	if policy == TransitiveError && len(dropped) > 0 {
++		first := dropped[0]
++		return nil, false, dropped, &TransitiveSystemModuleError{Package: first.Package, Module: first.Path}
+ 	}
+-	return Join(parts), true, nil
++	if len(admitted) == 0 {
++		return nil, false, dropped, nil
++	}
++	parts := make([][]byte, 0, len(admitted))
++	for _, module := range admitted {
++		if err := contextpkg.ValidateModuleBytes(module.Module.Bytes); err != nil {
++			return nil, false, dropped, fmt.Errorf("module %s of %s: %v", module.Module.Path, module.Package, err)
++		}
++		parts = append(parts, module.Module.Bytes)
++	}
++	return Join(parts), true, dropped, nil
+ }
+ 
+ // SurfaceHash is the core §8 content hash over a materialized file set keyed
+diff --git a/internal/contextmaterialize/system_module_admission_test.go b/internal/contextmaterialize/system_module_admission_test.go
+new file mode 100644
+index 0000000..01be51b
+--- /dev/null
++++ b/internal/contextmaterialize/system_module_admission_test.go
+@@ -0,0 +1,298 @@
++// System-module admission vectors (environments §3, §5.5, §5.7): the five
++// system-module-* materialization cases of vectors/environments.json run
++// here, selected by name, byte for byte through the production SystemPrompt
++// assembler and the ClassifySystemModules split.
++//
++// The general consumer in internal/interop/environments iterates whatever
++// cases the root publishes, so a root predating the admission family runs
++// it green with no admission case at all. This driver is the explicit
++// subset accounting: it runs all five when the root publishes them, fails
++// loud on a partial publication, and otherwise takes the root-content skip
++// the campaign rules require for a new vector family, with the matching
++// .github/ci/platform-cases.tsv row (class root-content) beside the
++// internal/godriver precedent. It lives in the production package rather
++// than internal/interop/environments because that package's committed
++// contract forbids any skip but the deferred root
++// (TestNoCaseHereSkipsForAnythingButTheDeferredRoot,
++// TestNoLedgerRowForThisPackageToleratesASkip): a root-content driver there
++// would weaken the gate it exists to enforce.
++package contextmaterialize
++
++import (
++	"bytes"
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"reflect"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/contextpkg"
++)
++
++// systemModuleAdmissionCases are the five §3 admission cases by name:
++// direct, transitive-drop (byte-identical output), transitive-error,
++// waived, and overlay-direct.
++var systemModuleAdmissionCases = []string{
++	"system-module-direct",
++	"system-module-transitive-drop",
++	"system-module-transitive-error",
++	"system-module-transitive-waived",
++	"system-module-overlay-direct",
++}
++
++// admissionVectorCase is one materialization case of
++// vectors/environments.json as this driver consumes it.
++type admissionVectorCase struct {
++	Name        string          `json:"name"`
++	Surface     string          `json:"surface"`
++	Environment string          `json:"environment"`
++	Lock        json.RawMessage `json:"lock"`
++	LockSHA256  string          `json:"lock_sha256"`
++	Precedence  struct {
++		Winner    string `json:"winner"`
++		Placement string `json:"placement"`
++	} `json:"precedence"`
++	Packages map[string]struct {
++		HasContext bool `json:"has_context"`
++		Modules    []struct {
++			Path         string   `json:"path"`
++			Class        string   `json:"class"`
++			Environments []string `json:"environments"`
++			Content      string   `json:"content"`
++		} `json:"modules"`
++	} `json:"packages"`
++	EmittedOrder []string `json:"emitted_order"`
++	FileWritten  bool     `json:"file_written"`
++	Files        []struct {
++		Path     string `json:"path"`
++		Bytes    int    `json:"bytes"`
++		Expected string `json:"expected"`
++		SHA256   string `json:"sha256"`
++	} `json:"files"`
++	SurfaceSHA256 string `json:"surface_sha256"`
++	MachinePolicy *struct {
++		TransitiveSystemModules string `json:"transitive_system_modules"`
++		SystemModuleWaivers     []struct {
++			Package string `json:"package"`
++			Reason  string `json:"reason"`
++		} `json:"system_module_waivers"`
++	} `json:"machine_policy"`
++	Admitted []struct {
++		Package string `json:"package"`
++		Path    string `json:"path"`
++	} `json:"admitted"`
++	Dropped []struct {
++		Package string `json:"package"`
++		Path    string `json:"path"`
++	} `json:"dropped"`
++	Warnings []struct {
++		Diagnostic string `json:"diagnostic"`
++		Package    string `json:"package"`
++		Path       string `json:"path"`
++	} `json:"warnings"`
++	Error        string `json:"error"`
++	ErrorPackage string `json:"error_package"`
++	ErrorModule  string `json:"error_module"`
++}
++
++// TestSystemModuleAdmissionVectors drives the production system-prompt
++// assembler against the five admission cases, byte for byte.
++func TestSystemModuleAdmissionVectors(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	payload, err := os.ReadFile(filepath.Join(root, "vectors", "environments.json")) // #nosec G304 -- explicit conformance input
++	if os.IsNotExist(err) {
++		t.Skipf("%s publishes no environments vector", root)
++	}
++	if err != nil {
++		t.Fatal(err)
++	}
++	var vector struct {
++		MaterializationCases []admissionVectorCase `json:"materialization_cases"`
++	}
++	if err := json.Unmarshal(payload, &vector); err != nil {
++		t.Fatal(err)
++	}
++	byName := map[string]admissionVectorCase{}
++	for _, tc := range vector.MaterializationCases {
++		byName[tc.Name] = tc
++	}
++	var missing []string
++	for _, name := range systemModuleAdmissionCases {
++		if _, ok := byName[name]; !ok {
++			missing = append(missing, name)
++		}
++	}
++	if len(missing) == len(systemModuleAdmissionCases) {
++		t.Skipf("%s publishes no system-module admission cases", root)
++	}
++	if len(missing) != 0 {
++		t.Fatalf("conformance root %s publishes only %d of %d system-module admission cases, missing %s",
++			root, len(systemModuleAdmissionCases)-len(missing), len(systemModuleAdmissionCases), strings.Join(missing, ", "))
++	}
++	for _, name := range systemModuleAdmissionCases {
++		t.Run(name, func(t *testing.T) {
++			runAdmissionVectorCase(t, root, byName[name])
++		})
++	}
++}
++
++// runAdmissionVectorCase executes one admission case through SystemPrompt
++// and ClassifySystemModules: lock hash, emitted order, the admitted and
++// dropped sets, the drop warnings (or the error-policy refusal naming
++// package and module), and the expected file bytes and surface hash.
++func runAdmissionVectorCase(t *testing.T, root string, tc admissionVectorCase) {
++	t.Helper()
++	if tc.Surface != "system-prompt" {
++		t.Fatalf("admission case %q has surface %q, want system-prompt", tc.Name, tc.Surface)
++	}
++	if tc.MachinePolicy == nil {
++		t.Fatalf("admission case %q carries no machine_policy", tc.Name)
++	}
++	lock, err := contextlock.Parse(tc.Lock)
++	if err != nil {
++		t.Fatalf("vector lock does not parse: %v", err)
++	}
++	hash, err := lock.Hash()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if hash != tc.LockSHA256 {
++		t.Fatalf("lock hash %s, want %s", hash, tc.LockSHA256)
++	}
++	precedence := Precedence{Winner: tc.Precedence.Winner, Placement: tc.Precedence.Placement}
++	packages := map[string]Package{}
++	for name, pkg := range tc.Packages {
++		content := Package{HasContext: pkg.HasContext}
++		for _, module := range pkg.Modules {
++			content.Modules = append(content.Modules, Module{
++				Module: contextpkg.Module{Path: module.Path, Class: module.Class, Environments: module.Environments},
++				Bytes:  []byte(module.Content),
++			})
++		}
++		packages[name] = content
++	}
++	order, err := EmittedOrder(lock, precedence)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var names []string
++	for _, member := range order {
++		names = append(names, member.Name)
++	}
++	if !reflect.DeepEqual(names, tc.EmittedOrder) {
++		t.Fatalf("emitted order %v, want %v", names, tc.EmittedOrder)
++	}
++	admission := Admission{Transitive: tc.MachinePolicy.TransitiveSystemModules}
++	for _, waiver := range tc.MachinePolicy.SystemModuleWaivers {
++		if admission.Waivers == nil {
++			admission.Waivers = map[string]bool{}
++		}
++		admission.Waivers[waiver.Package] = true
++	}
++	document, written, dropped, err := SystemPrompt(lock, precedence, tc.Environment, packages, admission)
++	if tc.Error != "" {
++		if err == nil {
++			t.Fatalf("expected %s, got no error", tc.Error)
++		}
++		if !strings.Contains(err.Error(), tc.Error) ||
++			!strings.Contains(err.Error(), tc.ErrorPackage) ||
++			!strings.Contains(err.Error(), tc.ErrorModule) {
++			t.Fatalf("error %q names neither %s nor %s/%s", err, tc.Error, tc.ErrorPackage, tc.ErrorModule)
++		}
++		assertAdmissionDropped(t, dropped, tc)
++		return
++	}
++	if err != nil {
++		t.Fatal(err)
++	}
++	if written != tc.FileWritten {
++		t.Fatalf("file_written %v, want %v", written, tc.FileWritten)
++	}
++	admitted, classified := ClassifySystemModules(lock, order, packages, tc.Environment, admission)
++	var gotAdmitted [][2]string
++	for _, module := range admitted {
++		gotAdmitted = append(gotAdmitted, [2]string{module.Package, module.Module.Path})
++	}
++	var wantAdmitted [][2]string
++	for _, module := range tc.Admitted {
++		wantAdmitted = append(wantAdmitted, [2]string{module.Package, module.Path})
++	}
++	if len(gotAdmitted) == 0 {
++		gotAdmitted = [][2]string{}
++	}
++	if len(wantAdmitted) == 0 {
++		wantAdmitted = [][2]string{}
++	}
++	if !reflect.DeepEqual(gotAdmitted, wantAdmitted) {
++		t.Fatalf("admitted %v, want %v", gotAdmitted, wantAdmitted)
++	}
++	assertAdmissionDropped(t, classified, tc)
++	assertAdmissionDropped(t, dropped, tc)
++	var gotWarnings [][3]string
++	for _, module := range dropped {
++		gotWarnings = append(gotWarnings, [3]string{DiagSystemModuleDropped, module.Package, module.Path})
++	}
++	var wantWarnings [][3]string
++	for _, warning := range tc.Warnings {
++		wantWarnings = append(wantWarnings, [3]string{warning.Diagnostic, warning.Package, warning.Path})
++	}
++	if len(gotWarnings) == 0 {
++		gotWarnings = [][3]string{}
++	}
++	if len(wantWarnings) == 0 {
++		wantWarnings = [][3]string{}
++	}
++	if !reflect.DeepEqual(gotWarnings, wantWarnings) {
++		t.Fatalf("warnings %v, want %v", gotWarnings, wantWarnings)
++	}
++	if !written {
++		if len(tc.Files) != 0 {
++			t.Fatalf("the vector lists files for an unwritten surface")
++		}
++		return
++	}
++	if len(tc.Files) != 1 {
++		t.Fatalf("expected exactly one file for a system-prompt surface, vector lists %d", len(tc.Files))
++	}
++	want, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(tc.Files[0].Expected))) // #nosec G304 -- explicit conformance input
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !bytes.Equal(document, want) {
++		t.Fatalf("%s bytes differ from %s:\n got %q\nwant %q", tc.Files[0].Path, tc.Files[0].Expected, document, want)
++	}
++	if len(document) != tc.Files[0].Bytes || FileHash(document) != tc.Files[0].SHA256 {
++		t.Fatalf("%s: %d bytes %s, want %d bytes %s",
++			tc.Files[0].Path, len(document), FileHash(document), tc.Files[0].Bytes, tc.Files[0].SHA256)
++	}
++	if got := SurfaceHash(map[string][]byte{tc.Files[0].Path: document}); got != tc.SurfaceSHA256 {
++		t.Fatalf("surface hash %s, want %s", got, tc.SurfaceSHA256)
++	}
++}
++
++// assertAdmissionDropped pins the dropped set in emitted order.
++func assertAdmissionDropped(t *testing.T, dropped []DroppedModule, tc admissionVectorCase) {
++	t.Helper()
++	var got [][2]string
++	for _, module := range dropped {
++		got = append(got, [2]string{module.Package, module.Path})
++	}
++	var want [][2]string
++	for _, module := range tc.Dropped {
++		want = append(want, [2]string{module.Package, module.Path})
++	}
++	if len(got) == 0 {
++		got = [][2]string{}
++	}
++	if len(want) == 0 {
++		want = [][2]string{}
++	}
++	if !reflect.DeepEqual(got, want) {
++		t.Fatalf("%s: dropped %v, want %v", tc.Name, got, want)
++	}
++}
+diff --git a/internal/envprofile/admission_test.go b/internal/envprofile/admission_test.go
+new file mode 100644
+index 0000000..b4ec807
+--- /dev/null
++++ b/internal/envprofile/admission_test.go
+@@ -0,0 +1,389 @@
++package envprofile
++
++import (
++	"encoding/json"
++	"errors"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/contextmaterialize"
++	"github.com/relux-works/curator/internal/envregistry"
++)
++
++// Production entry points under test: Install, UpdateWithPolicy, Resolve,
++// StatusOf. Every fixture builds a root -> mid -> leaf git closure where
++// the leaf carries a class: system module, so the leaf is transitive and
++// its system module is admitted only by waiver.
++
++// admissionRepos serves a sysroot -> sysmid -> sysleaf closure. The leaf
++// always carries a system module; rootSystem and midSystem select whether
++// the root and mid carry one too.
++func admissionRepos(t *testing.T, ids *gitIdentities, rootSystem, midSystem bool) string {
++	t.Helper()
++	leaf := gitRepo(t, map[string]string{
++		"agent-context.json": `{"schema_version": 1, "name": "sysleaf", "version": "1.0.0",` +
++			`"context": {"modules": [{"path": "90-system.md", "class": "system"}]}}` + "\n",
++		"context/90-system.md": "Leaf system prompt.\n",
++	}, "v1.0.0")
++	leafURL := ids.serve(leaf, "https://example.com/sysleaf")
++	midModules := `[{"path": "00-mid.md"}]`
++	midFiles := map[string]string{
++		"context/00-mid.md": "# Mid\n\nMid context.\n",
++	}
++	if midSystem {
++		midModules = `[{"path": "00-mid.md"}, {"path": "90-system.md", "class": "system"}]`
++		midFiles["context/90-system.md"] = "Mid system prompt.\n"
++	}
++	midFiles["agent-context.json"] = `{"schema_version": 1, "name": "sysmid", "version": "1.0.0",` +
++		`"context": {"modules": ` + midModules + `},` +
++		`"requires": {"contexts": {"sysleaf": {"git": "` + leafURL + `", "range": "*"}}}}` + "\n"
++	mid := gitRepo(t, midFiles, "v1.0.0")
++	midURL := ids.serve(mid, "https://example.com/sysmid")
++	rootModules := `[{"path": "00-root.md"}]`
++	rootFiles := map[string]string{
++		"context/00-root.md": "# Sysroot\n\nRoot context.\n",
++	}
++	if rootSystem {
++		rootModules = `[{"path": "00-root.md"}, {"path": "90-system.md", "class": "system"}]`
++		rootFiles["context/90-system.md"] = "Root system prompt.\n"
++	}
++	rootFiles["agent-context.json"] = `{"schema_version": 1, "name": "sysroot", "version": "1.0.0",` +
++		`"context": {"modules": ` + rootModules + `},` +
++		`"requires": {"contexts": {"sysmid": {"git": "` + midURL + `", "range": "*"}}}}` + "\n"
++	root := gitRepo(t, rootFiles, "v1.0.0")
++	return ids.serve(root, "https://example.com/sysroot")
++}
++
++func admissionPolicy() Policy {
++	return Policy{TransitiveSystemModules: contextmaterialize.TransitiveDrop}
++}
++
++// TestInstallErrorRefusesTransitiveSystemModule drives the production
++// Install under the error policy: resolution fails with
++// context_system_module_transitive naming the transitive package and
++// module, and no lock is written.
++func TestInstallErrorRefusesTransitiveSystemModule(t *testing.T) {
++	home := t.TempDir()
++	pinHomes(t)
++	ids := newGitIdentities(t)
++	operand := admissionRepos(t, ids, true, true)
++	policy := admissionPolicy()
++	policy.TransitiveSystemModules = contextmaterialize.TransitiveError
++	_, _, _, err := Install(home, InstallOptions{Operand: operand, Policy: policy})
++	if err == nil {
++		t.Fatalf("error policy installed a transitive system module")
++	}
++	var refusal *contextmaterialize.TransitiveSystemModuleError
++	if !errors.As(err, &refusal) {
++		t.Fatalf("err %v is not the %s refusal", err, contextmaterialize.DiagSystemModuleTransitive)
++	}
++	if refusal.Package != "sysleaf" || refusal.Module != "90-system.md" {
++		t.Fatalf("refusal %+v names neither the package nor the module", refusal)
++	}
++	if _, statErr := os.Stat(lockPath(home, "sysroot")); !os.IsNotExist(statErr) {
++		t.Fatalf("refused install wrote a lock: %v", statErr)
++	}
++}
++
++// TestInstallErrorWaiverAdmits drives the production Install under the
++// error policy with a waiver for the transitive package: the waiver
++// admits the module and the install succeeds.
++func TestInstallErrorWaiverAdmits(t *testing.T) {
++	home := t.TempDir()
++	pinHomes(t)
++	ids := newGitIdentities(t)
++	operand := admissionRepos(t, ids, true, true)
++	policy := admissionPolicy()
++	policy.TransitiveSystemModules = contextmaterialize.TransitiveError
++	policy.SystemModuleWaivers = []SystemModuleWaiver{{Package: "sysleaf", Reason: "reviewed"}}
++	info, _, _, err := Install(home, InstallOptions{Operand: operand, Policy: policy})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(info.Lock.Members) != 3 {
++		t.Fatalf("lock members %+v", info.Lock.Members)
++	}
++}
++
++// TestUpdateErrorLeavesLockUnchanged installs under drop, then updates
++// under error: the update fails with the refusal and the old lock bytes
++// are untouched.
++func TestUpdateErrorLeavesLockUnchanged(t *testing.T) {
++	home := t.TempDir()
++	pinHomes(t)
++	ids := newGitIdentities(t)
++	operand := admissionRepos(t, ids, true, true)
++	if _, _, _, err := Install(home, InstallOptions{Operand: operand, Policy: admissionPolicy()}); err != nil {
++		t.Fatal(err)
++	}
++	before, err := os.ReadFile(lockPath(home, "sysroot"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	policy := admissionPolicy()
++	policy.TransitiveSystemModules = contextmaterialize.TransitiveError
++	_, _, err = UpdateWithPolicy(home, "sysroot", policy)
++	if err == nil {
++		t.Fatalf("error policy updated past a transitive system module")
++	}
++	if !strings.Contains(err.Error(), contextmaterialize.DiagSystemModuleTransitive) ||
++		!strings.Contains(err.Error(), "sysleaf") || !strings.Contains(err.Error(), "90-system.md") {
++		t.Fatalf("err %v names neither the diagnostic, the package, nor the module", err)
++	}
++	after, err := os.ReadFile(lockPath(home, "sysroot"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if string(after) != string(before) {
++		t.Fatalf("refused update changed the lock:\n%s\n%s", before, after)
++	}
++}
++
++// admissionNative makes the one native-home base shared by repair and
++// status. The passthrough liveness row compares the recorded link target
++// against the effective one, so a split base reports every file-link
++// entry detached — visible on Linux, where claude_code carries the
++// .credentials.json entry (darwin and windows link nothing).
++func admissionNative(t *testing.T) func(string) (string, error) {
++	t.Helper()
++	native := t.TempDir()
++	return func(id string) (string, error) {
++		dir := filepath.Join(native, id)
++		_ = os.MkdirAll(dir, 0o755)
++		return dir, nil
++	}
++}
++
++// admissionResolve provisions the managed home for envID and returns the
++// resolve result: the production Resolve with repair under policy. The
++// caller supplies the native-home base so status can re-verify against
++// the same one.
++func admissionResolve(t *testing.T, home, profile, envID string, policy Policy, nativeHomeOf func(string) (string, error)) *ResolveResult {
++	t.Helper()
++	result, err := Resolve(ResolveRequest{
++		Home:         home,
++		Profile:      profile,
++		EnvID:        envID,
++		LaunchDir:    t.TempDir(),
++		Machine:      envregistry.DefaultMachineConfig(),
++		Repair:       true,
++		Format:       "json",
++		Policy:       policy,
++		Detect:       func(envregistry.Adapter) string { return "unknown" },
++		NativeHomeOf: nativeHomeOf,
++		OperatorXDG:  t.TempDir(),
++	})
++	if err != nil {
++		t.Fatalf("resolve --repair: %v", err)
++	}
++	return result
++}
++
++// TestDropRepairWarnsAndFragmentFollowsAdmitted installs under drop and
++// repairs the managed home: the repair warns
++// context_system_module_dropped naming package and module, the inert
++// system-prompt file holds exactly the admitted modules' bytes, and the
++// fragment carries the system_prompt section for the admitted set.
++func TestDropRepairWarnsAndFragmentFollowsAdmitted(t *testing.T) {
++	home := t.TempDir()
++	pinHomes(t)
++	ids := newGitIdentities(t)
++	operand := admissionRepos(t, ids, true, true)
++	info, _, _, err := Install(home, InstallOptions{Operand: operand, Policy: admissionPolicy()})
++	if err != nil {
++		t.Fatal(err)
++	}
++	found := false
++	for _, warning := range info.Warnings {
++		if strings.Contains(warning, "context-system-module-present") && strings.Contains(warning, "sysleaf") {
++			found = true
++		}
++	}
++	if !found {
++		t.Fatalf("install warnings %+v lack the always-warn finding for the transitive member", info.Warnings)
++	}
++	result := admissionResolve(t, home, "sysroot", "claude_code", admissionPolicy(), admissionNative(t))
++	warned := false
++	for _, warning := range result.Warnings {
++		if strings.Contains(warning, contextmaterialize.DiagSystemModuleDropped) &&
++			strings.Contains(warning, "sysleaf") && strings.Contains(warning, "90-system.md") {
++			warned = true
++		}
++	}
++	if !warned {
++		t.Fatalf("resolve warnings %+v lack the drop warning naming package and module", result.Warnings)
++	}
++	payload, err := os.ReadFile(filepath.Join(ManagedHomeDir(home, "sysroot", "claude_code"), ".agent-context", "system-prompt.md"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if want := "Mid system prompt.\n\nRoot system prompt.\n"; string(payload) != want {
++		t.Fatalf("system-prompt.md %q, want exactly the admitted modules' bytes %q", payload, want)
++	}
++	var fragment struct {
++		SystemPrompt *struct {
++			Path string `json:"path"`
++		} `json:"system_prompt"`
++	}
++	if err := json.Unmarshal(result.Document, &fragment); err != nil {
++		t.Fatal(err)
++	}
++	if fragment.SystemPrompt == nil || fragment.SystemPrompt.Path == "" {
++		t.Fatalf("fragment lacks system_prompt for a non-empty admitted set: %s", result.Document)
++	}
++}
++
++// TestDropAllDroppedOmitsFragmentSection repairs a profile whose only
++// system module is transitive: nothing is written and the fragment
++// carries no system_prompt section.
++func TestDropAllDroppedOmitsFragmentSection(t *testing.T) {
++	home := t.TempDir()
++	pinHomes(t)
++	ids := newGitIdentities(t)
++	operand := admissionRepos(t, ids, false, false)
++	if _, _, _, err := Install(home, InstallOptions{Operand: operand, Policy: admissionPolicy()}); err != nil {
++		t.Fatal(err)
++	}
++	result := admissionResolve(t, home, "sysroot", "claude_code", admissionPolicy(), admissionNative(t))
++	if _, err := os.Stat(filepath.Join(ManagedHomeDir(home, "sysroot", "claude_code"), ".agent-context", "system-prompt.md")); !os.IsNotExist(err) {
++		t.Fatalf("all-dropped materialization wrote a system-prompt file: %v", err)
++	}
++	var fragment struct {
++		SystemPrompt *struct{} `json:"system_prompt"`
++	}
++	if err := json.Unmarshal(result.Document, &fragment); err != nil {
++		t.Fatal(err)
++	}
++	if fragment.SystemPrompt != nil {
++		t.Fatalf("fragment carries system_prompt with an empty admitted set: %s", result.Document)
++	}
++}
++
++// TestStatusReportsPolicyAndDropped proves the §12 posture: the profile
++// row reports the effective policy value with every dropped module by
++// package and path, and the drop warning never makes a home row
++// non-current.
++func TestStatusReportsPolicyAndDropped(t *testing.T) {
++	home := t.TempDir()
++	pinHomes(t)
++	ids := newGitIdentities(t)
++	operand := admissionRepos(t, ids, true, true)
++	if _, _, _, err := Install(home, InstallOptions{Operand: operand, Policy: admissionPolicy()}); err != nil {
++		t.Fatal(err)
++	}
++	nativeHomeOf := admissionNative(t)
++	admissionResolve(t, home, "sysroot", "claude_code", admissionPolicy(), nativeHomeOf)
++	status, err := StatusOf(StatusRequest{
++		Home:         home,
++		Machine:      envregistry.DefaultMachineConfig(),
++		Detect:       func(envregistry.Adapter) string { return "unknown" },
++		NativeHomeOf: nativeHomeOf,
++		OperatorXDG:  t.TempDir(),
++		LaunchDir:    t.TempDir(),
++		Policy:       admissionPolicy(),
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	var profile *ProfileState
++	for i := range status.Profiles {
++		if status.Profiles[i].Profile == "sysroot" {
++			profile = &status.Profiles[i]
++		}
++	}
++	if profile == nil {
++		t.Fatalf("no profile row for sysroot")
++	}
++	if profile.TransitiveSystemModules != contextmaterialize.TransitiveDrop {
++		t.Fatalf("policy row %q, want drop", profile.TransitiveSystemModules)
++	}
++	if len(profile.DroppedSystemModules) != 1 ||
++		profile.DroppedSystemModules[0] != (DroppedSystemModule{Package: "sysleaf", Path: "90-system.md"}) {
++		t.Fatalf("dropped %+v, want the transitive module by package and path", profile.DroppedSystemModules)
++	}
++	for _, state := range status.Homes {
++		if state.Profile != "sysroot" || state.Environment != "claude_code" {
++			continue
++		}
++		if !state.Current {
++			t.Fatalf("drop warnings made the row non-current: %+v", state.Findings)
++		}
++		warned := false
++		for _, warning := range state.Warnings {
++			if strings.Contains(warning, contextmaterialize.DiagSystemModuleDropped) {
++				warned = true
++			}
++		}
++		if !warned {
++			t.Fatalf("home warnings %+v lack the drop warning", state.Warnings)
++		}
++	}
++}
++
++// TestStatusErrorReportsPolicyWithoutDropped proves the error posture: the
++// profile row reports error with an empty dropped list, since nothing is
++// skipped under error.
++func TestStatusErrorReportsPolicyWithoutDropped(t *testing.T) {
++	home := t.TempDir()
++	pinHomes(t)
++	ids := newGitIdentities(t)
++	operand := admissionRepos(t, ids, true, true)
++	if _, _, _, err := Install(home, InstallOptions{Operand: operand, Policy: admissionPolicy()}); err != nil {
++		t.Fatal(err)
++	}
++	policy := admissionPolicy()
++	policy.TransitiveSystemModules = contextmaterialize.TransitiveError
++	native := t.TempDir()
++	status, err := StatusOf(StatusRequest{
++		Home:         home,
++		Machine:      envregistry.DefaultMachineConfig(),
++		Detect:       func(envregistry.Adapter) string { return "unknown" },
++		NativeHomeOf: func(id string) (string, error) { return filepath.Join(native, id), nil },
++		OperatorXDG:  t.TempDir(),
++		LaunchDir:    t.TempDir(),
++		Policy:       policy,
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, profile := range status.Profiles {
++		if profile.Profile != "sysroot" {
++			continue
++		}
++		if profile.TransitiveSystemModules != contextmaterialize.TransitiveError {
++			t.Fatalf("policy row %q, want error", profile.TransitiveSystemModules)
++		}
++		if len(profile.DroppedSystemModules) != 0 {
++			t.Fatalf("dropped %+v under error, want empty", profile.DroppedSystemModules)
++		}
++	}
++}
++
++// TestPolicyFromConfigCarriesAdmission proves the machine knobs reach the
++// profile policy: the error value and the waiver list.
++func TestPolicyFromConfigCarriesAdmission(t *testing.T) {
++	cfg := &config.Config{Env: config.Environments{
++		TransitiveSystemModules: contextmaterialize.TransitiveError,
++		SystemModuleWaivers:     []config.SystemModuleWaiver{{Package: "sysleaf", Reason: "reviewed"}},
++	}}
++	policy := PolicyFromConfig(cfg)
++	if policy.TransitiveSystemModules != contextmaterialize.TransitiveError {
++		t.Fatalf("policy %q", policy.TransitiveSystemModules)
++	}
++	if len(policy.SystemModuleWaivers) != 1 || policy.SystemModuleWaivers[0].Package != "sysleaf" {
++		t.Fatalf("waivers %+v", policy.SystemModuleWaivers)
++	}
++	admission := policy.Admission()
++	if effective, err := admission.Policy(); err != nil || effective != contextmaterialize.TransitiveError {
++		t.Fatalf("admission %q %v", effective, err)
++	}
++	if !admission.Waived("sysleaf") || admission.Waived("sysmid") {
++		t.Fatalf("waived set %+v", admission.Waivers)
++	}
++	if effective, err := (Policy{}).Admission().Policy(); err != nil || effective != contextmaterialize.TransitiveDrop {
++		t.Fatalf("zero policy admission %q %v", effective, err)
++	}
++}
+diff --git a/internal/envprofile/envprofile.go b/internal/envprofile/envprofile.go
+index 4959ba2..2843f52 100644
+--- a/internal/envprofile/envprofile.go
++++ b/internal/envprofile/envprofile.go
+@@ -42,6 +42,7 @@ import (
+ 	"github.com/relux-works/curator/internal/contextpkg"
+ 	"github.com/relux-works/curator/internal/contextresolve"
+ 	"github.com/relux-works/curator/internal/contextstore"
++	"github.com/relux-works/curator/internal/envregistry"
+ 	"github.com/relux-works/curator/internal/gitops"
+ 	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/identifiers"
+@@ -414,6 +415,13 @@ type Policy struct {
+ 	// refuses a machine-scope switch (environments §12.2).
+ 	RequireCurrent       *string
+ 	RequireCurrentLocked bool
++	// TransitiveSystemModules is the effective §12.1 admission policy:
++	// drop (default) or error. "" selects the drop default, so the zero
++	// Policy resolves exactly like an unconfigured machine.
++	TransitiveSystemModules string
++	// SystemModuleWaivers admits transitive packages' system modules by
++	// name (environments §3, §12.1).
++	SystemModuleWaivers []SystemModuleWaiver
+ 	// Takeover is the explicit section 9.5 takeover flag carried by a
+ 	// mutating operation (profile install, use, update, sync, env resolve
+ 	// --repair): with it the operation backs up and takes over the
+@@ -436,6 +444,14 @@ type OverlaySpec struct {
+ 	Weight    *int64
+ }
+ 
++// SystemModuleWaiver is one effective system_module_waivers entry
++// (environments §12.1): the admitted package name with the operator's
++// reason.
++type SystemModuleWaiver struct {
++	Package string
++	Reason  string
++}
++
+ // ForbidsOverlays reports whether the composition policy empties every
+ // overlay list (environments §12.2).
+ func (p Policy) ForbidsOverlays() bool { return !p.OverlaysAllowed }
+@@ -463,6 +479,19 @@ func (p Policy) Precedence() contextmaterialize.Precedence {
+ 	return precedence
+ }
+ 
++// Admission returns the effective §3 system-module admission policy: the
++// transitive_system_modules value with the waived package names.
++func (p Policy) Admission() contextmaterialize.Admission {
++	admission := contextmaterialize.Admission{Transitive: p.TransitiveSystemModules}
++	if len(p.SystemModuleWaivers) > 0 {
++		admission.Waivers = map[string]bool{}
++		for _, waiver := range p.SystemModuleWaivers {
++			admission.Waivers[waiver.Package] = true
++		}
++	}
++	return admission
++}
++
+ // CheckMachineUse enforces a locked require_current_profile at the §9.2
+ // machine-scope switch itself (environments §12.2, manager §1): with the
+ // key locked to a profile name, a machine-scope switch to any other
+@@ -495,15 +524,20 @@ func PolicyFromConfig(cfg *config.Config) Policy {
+ 		return Policy{OverlaysAllowed: true, OverlayDefaultWeight: config.DefaultOverlayWeight}
+ 	}
+ 	policy := Policy{
+-		AllowedSources:       cfg.AllowedSources,
+-		MCPAllowlist:         cfg.Env.MCPPackageAllowlist,
+-		Revocations:          cfg.Audit.Revocations,
+-		OverlaysAllowed:      cfg.Env.OverlaysAllowed,
+-		OverlayDefaultWeight: int64(cfg.Env.OverlayDefaultWeight),
+-		PrecedenceWinner:     cfg.Env.Precedence.Winner,
+-		PrecedencePlacement:  cfg.Env.Precedence.Placement,
+-		RequireCurrent:       cfg.Env.RequireCurrent,
+-		RequireCurrentLocked: cfg.Locked["environments.require_current_profile"],
++		AllowedSources:          cfg.AllowedSources,
++		MCPAllowlist:            cfg.Env.MCPPackageAllowlist,
++		Revocations:             cfg.Audit.Revocations,
++		OverlaysAllowed:         cfg.Env.OverlaysAllowed,
++		OverlayDefaultWeight:    int64(cfg.Env.OverlayDefaultWeight),
++		PrecedenceWinner:        cfg.Env.Precedence.Winner,
++		PrecedencePlacement:     cfg.Env.Precedence.Placement,
++		RequireCurrent:          cfg.Env.RequireCurrent,
++		RequireCurrentLocked:    cfg.Locked["environments.require_current_profile"],
++		TransitiveSystemModules: cfg.Env.TransitiveSystemModules,
++	}
++	for _, waiver := range cfg.Env.SystemModuleWaivers {
++		policy.SystemModuleWaivers = append(policy.SystemModuleWaivers,
++			SystemModuleWaiver{Package: waiver.Package, Reason: waiver.Reason})
+ 	}
+ 	if len(cfg.Env.Overlays) > 0 {
+ 		policy.Overlays = map[string][]OverlaySpec{}
+@@ -681,6 +715,9 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
+ 		return Info{}, false, false, err
+ 	}
+ 	warnings = append(warnings, auditWarnings...)
++	if err := checkAdmissionPrePublish(home, manager, result, options.Policy); err != nil {
++		return Info{}, false, false, err
++	}
+ 	sourcePayload, err := marshalSource(source)
+ 	if err != nil {
+ 		return Info{}, false, false, err
+@@ -776,6 +813,9 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input
+ 			return Info{}, false, false, fmt.Errorf("%s: new member %s %v; the old lock stands", DiagUpdateBlocked, key, err)
+ 		}
+ 	}
++	if err := checkAdmissionPrePublish(home, manager, result, policy); err != nil {
++		return Info{}, false, false, err
++	}
+ 	if result.LockHash == oldHash {
+ 		// The snapshot is unchanged, so there is no lock to publish — but
+ 		// the install row's activation still runs. The §9.5 stop-and-retry
+@@ -988,6 +1028,9 @@ func updateLocked(op *operation, home, name string, policy Policy) (Info, bool,
+ 			return Info{}, false, fmt.Errorf("%s: new member %s %v; the old lock stands", DiagUpdateBlocked, key, err)
+ 		}
+ 	}
++	if err := checkAdmissionPrePublish(home, manager, result, policy); err != nil {
++		return Info{}, false, err
++	}
+ 	if result.LockHash == oldHash {
+ 		machine, _ := Current(home)
+ 		return Info{Name: name, Source: source, Lock: result.Lock, LockHash: oldHash, Current: machine == name}, false, nil
+@@ -1149,6 +1192,60 @@ func auditAndStore(home string, manager *gitManager, result *contextresolve.Resu
+ 	return warnings, nil
+ }
+ 
++// checkAdmissionPrePublish enforces the §3 error policy before a lock is
++// published: the first non-admitted system module in emitted order fails
++// the operation with context_system_module_transitive, so a refused
++// install writes no lock and a refused update leaves the old lock in
++// place. Under drop it admits everything: drop skips at materialization
++// and never fails resolution, installation, or update. Every lock publish
++// site — install, reinstall, update — calls this before publishing or
++// before the identical-lock fast path, which must not bypass the refusal:
++// a lock that violates the current error policy fails the update even
++// when nothing moved. An unreadable manifest is never absence (§8.4):
++// admission cannot be decided for a member whose modules are unknown, so
++// resolution fails closed instead of admitting blind. The always-warn
++// context-system-module-present surfacing is unaffected and reports every
++// member's system modules whatever the policy.
++func checkAdmissionPrePublish(home string, manager *gitManager, result *contextresolve.Result, policy Policy) error {
++	admission := policy.Admission()
++	if effective, err := admission.Policy(); err != nil || effective != contextmaterialize.TransitiveError {
++		return err
++	}
++	modules := map[string][]contextpkg.Module{}
++	for key, resolved := range result.Members {
++		if resolved.Kind != contextlock.KindContext {
++			continue
++		}
++		entry, err := manager.ensureEntry(home, resolved)
++		if err != nil {
++			return err
++		}
++		manifest, err := contextpkg.LoadManifest(packageRoot(entry, resolved.Directory))
++		if err != nil {
++			return fmt.Errorf("%s: member %s manifest cannot be read; system-module admission cannot be decided: %v", DiagSourceInvalid, key, err)
++		}
++		modules[resolved.Name] = manifest.Modules
++	}
++	first, err := contextmaterialize.FirstTransitiveSystemModule(result.Lock, policy.Precedence(), modules, admission, registryEnvIDs())
++	if err != nil {
++		return err
++	}
++	if first == nil {
++		return nil
++	}
++	return &contextmaterialize.TransitiveSystemModuleError{Package: first.Package, Module: first.Path}
++}
++
++// registryEnvIDs lists the closed revision-1 adapter environments a system
++// module selector is evaluated against at resolution.
++func registryEnvIDs() []string {
++	ids := make([]string, 0, len(envregistry.Registry))
++	for _, adapter := range envregistry.Registry {
++		ids = append(ids, adapter.ID)
++	}
++	return ids
++}
++
+ // pinOf renders the member pin as the audit spells it.
+ func pinOf(resolved contextresolve.Resolved) string {
+ 	if resolved.Commit != "" {
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index 9ee5e34..76d95c1 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -1780,12 +1780,19 @@ func copyTree(source, destination string) error {
+ // (§5.5): the inert .agent-context/system-prompt.md, linked from the
+ // store, plus the pi live channels machine configuration explicitly
+ // materializes (off by default, so a plain launch carries no active
+-// system prompt).
++// system prompt). The surface carries only admitted system modules (§3):
++// under drop every skipped module warns context_system_module_dropped
++// naming package and path, and under error the first skipped module
++// refuses the assembly with context_system_module_transitive.
+ func (p *homePlan) systemPrompt(req *ResolveRequest, lock *contextlock.Lock, precedence contextmaterialize.Precedence, packages map[string]contextmaterialize.Package, surfaces map[string]envmarker.Surface) error {
+-	document, written, err := contextmaterialize.SystemPrompt(lock, precedence, p.adapter.ID, packages)
++	document, written, dropped, err := contextmaterialize.SystemPrompt(lock, precedence, p.adapter.ID, packages, req.Policy.Admission())
+ 	if err != nil {
+ 		return err
+ 	}
++	for _, module := range dropped {
++		p.warnings = append(p.warnings, fmt.Sprintf("%s: package %s system module %s is transitive; skipped under the drop policy",
++			contextmaterialize.DiagSystemModuleDropped, module.Package, module.Path))
++	}
+ 	if !written {
+ 		return nil
+ 	}
+diff --git a/internal/envprofile/status.go b/internal/envprofile/status.go
+index 592738a..fccd37a 100644
+--- a/internal/envprofile/status.go
++++ b/internal/envprofile/status.go
+@@ -17,6 +17,9 @@ import (
+ 	"strings"
+ 	"time"
+ 
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/contextmaterialize"
++	"github.com/relux-works/curator/internal/contextpkg"
+ 	"github.com/relux-works/curator/internal/envmarker"
+ 	"github.com/relux-works/curator/internal/envregistry"
+ )
+@@ -103,6 +106,19 @@ type ProfileState struct {
+ 	LockHash   string          `json:"lock_hash"`
+ 	Members    []MemberState   `json:"members"`
+ 	Precedence PrecedenceState `json:"precedence"`
++	// TransitiveSystemModules is the effective §12.1 admission policy.
++	TransitiveSystemModules string `json:"transitive_system_modules"`
++	// DroppedSystemModules names every system module the drop policy
++	// skips for the profile, in emitted order (§3, §12). It is empty
++	// under the error policy, where nothing is skipped.
++	DroppedSystemModules []DroppedSystemModule `json:"dropped_system_modules"`
++}
++
++// DroppedSystemModule names one system module the drop policy skips, by
++// package and manifest path.
++type DroppedSystemModule struct {
++	Package string `json:"package"`
++	Path    string `json:"path"`
+ }
+ 
+ // Status is the whole matrix.
+@@ -360,12 +376,76 @@ func profileStates(req StatusRequest, infos []Info) []ProfileState {
+ 				Winner:    precedence.Winner,
+ 				Placement: precedence.Placement,
+ 			},
++			TransitiveSystemModules: effectiveTransitivePolicy(req.Policy),
++			DroppedSystemModules:    droppedSystemModulesOf(req.Home, lock, req.Policy),
+ 		})
+ 	}
+ 	sort.Slice(out, func(i, j int) bool { return out[i].Profile < out[j].Profile })
+ 	return out
+ }
+ 
++// effectiveTransitivePolicy reports the policy value status prints: the
++// configured knob, defaulting to drop exactly as resolution and
++// materialization do.
++func effectiveTransitivePolicy(policy Policy) string {
++	if effective, err := policy.Admission().Policy(); err == nil {
++		return effective
++	}
++	return contextmaterialize.TransitiveDrop
++}
++
++// droppedSystemModulesOf recomputes, read-only, the system modules the
++// drop policy skips for the profile: every non-admitted system module in
++// emitted order that applies to at least one registered adapter. Under
++// the error policy nothing is skipped and the list is empty. A member
++// whose manifest cannot be read contributes nothing here; the profile's
++// home rows already report that same failure as non-current through the
++// resolve verifier, so the gap is never silent.
++func droppedSystemModulesOf(home string, lock *contextlock.Lock, policy Policy) []DroppedSystemModule {
++	dropped := []DroppedSystemModule{}
++	admission := policy.Admission()
++	if effective, err := admission.Policy(); err != nil || effective != contextmaterialize.TransitiveDrop {
++		return dropped
++	}
++	order, err := contextmaterialize.EmittedOrder(lock, policy.Precedence())
++	if err != nil {
++		return dropped
++	}
++	direct := contextmaterialize.DirectSet(lock)
++	envIDs := registryEnvIDs()
++	manager := newGitManager(home)
++	for _, member := range order {
++		if direct[member.Name] || admission.Waived(member.Name) {
++			continue
++		}
++		manifest, err := contextpkg.LoadManifest(packageRoot(manager.entryPath(home, resolvedOf(member)), member.Directory))
++		if err != nil {
++			continue
++		}
++		for _, module := range manifest.Modules {
++			class := module.Class
++			if class == "" {
++				class = "root"
++			}
++			if class != "system" {
++				continue
++			}
++			applies := false
++			for _, env := range envIDs {
++				if module.Applies(env) {
++					applies = true
++					break
++				}
++			}
++			if !applies {
++				continue
++			}
++			dropped = append(dropped, DroppedSystemModule{Package: member.Name, Path: module.Path})
++		}
++	}
++	return dropped
++}
++
+ // unregisteredEnvironments reports env-ids named in machine configuration
+ // that the closed registry does not declare (§12).
+ func unregisteredEnvironments(machine envregistry.MachineConfig) []string {
+diff --git a/internal/interop/environments/context_materialization_test.go b/internal/interop/environments/context_materialization_test.go
+index 86b53b6..f781af4 100644
+--- a/internal/interop/environments/context_materialization_test.go
++++ b/internal/interop/environments/context_materialization_test.go
+@@ -61,9 +61,36 @@ type environmentsVector struct {
+ 			Expected string `json:"expected"`
+ 			SHA256   string `json:"sha256"`
+ 		} `json:"files"`
++		MachinePolicy *struct {
++			TransitiveSystemModules string `json:"transitive_system_modules"`
++			SystemModuleWaivers     []struct {
++				Package string `json:"package"`
++				Reason  string `json:"reason"`
++			} `json:"system_module_waivers"`
++		} `json:"machine_policy"`
++		Admitted     []vectorModuleRef `json:"admitted"`
++		Dropped      []vectorModuleRef `json:"dropped"`
++		Warnings     []vectorWarning   `json:"warnings"`
++		Error        string            `json:"error"`
++		ErrorPackage string            `json:"error_package"`
++		ErrorModule  string            `json:"error_module"`
+ 	} `json:"materialization_cases"`
+ }
+ 
++// vectorModuleRef is one admitted or dropped system module of a
++// materialization case, by package and manifest path.
++type vectorModuleRef struct {
++	Package string `json:"package"`
++	Path    string `json:"path"`
++}
++
++// vectorWarning is one expected drop warning of a materialization case.
++type vectorWarning struct {
++	Diagnostic string `json:"diagnostic"`
++	Package    string `json:"package"`
++	Path       string `json:"path"`
++}
++
+ func loadEnvironmentsVector(t *testing.T) (string, environmentsVector) {
+ 	t.Helper()
+ 	root := suiteRoot(t)
+@@ -195,13 +222,46 @@ func TestConformanceEnvironmentsMonolithic(t *testing.T) {
+ 				}
+ 			case "system-prompt":
+ 				var document []byte
+-				document, written, err = contextmaterialize.SystemPrompt(lock, precedence, tc.Environment, packages)
++				admission := contextmaterialize.Admission{}
++				if tc.MachinePolicy != nil {
++					admission.Transitive = tc.MachinePolicy.TransitiveSystemModules
++					for _, waiver := range tc.MachinePolicy.SystemModuleWaivers {
++						if admission.Waivers == nil {
++							admission.Waivers = map[string]bool{}
++						}
++						admission.Waivers[waiver.Package] = true
++					}
++				}
++				var dropped []contextmaterialize.DroppedModule
++				document, written, dropped, err = contextmaterialize.SystemPrompt(lock, precedence, tc.Environment, packages, admission)
++				if tc.Error != "" {
++					if err == nil {
++						t.Fatalf("expected %s, got no error", tc.Error)
++					}
++					if !strings.Contains(err.Error(), tc.Error) ||
++						!strings.Contains(err.Error(), tc.ErrorPackage) ||
++						!strings.Contains(err.Error(), tc.ErrorModule) {
++						t.Fatalf("error %q names neither %s nor %s/%s", err, tc.Error, tc.ErrorPackage, tc.ErrorModule)
++					}
++					assertDroppedModules(t, dropped, tc.Dropped)
++					err = nil
++					break
++				}
+ 				if err == nil && written {
+ 					if len(tc.Files) != 1 {
+ 						t.Fatalf("expected exactly one file for a system-prompt surface, vector lists %d", len(tc.Files))
+ 					}
+ 					files[tc.Files[0].Path] = document
+ 				}
++				if tc.MachinePolicy != nil {
++					admitted, classified := contextmaterialize.ClassifySystemModules(lock, order, packages, tc.Environment, admission)
++					assertAdmittedModules(t, admitted, tc.Admitted)
++					assertDroppedModules(t, classified, tc.Dropped)
++					assertDroppedModules(t, dropped, tc.Dropped)
++					assertDropWarnings(t, dropped, tc.Warnings)
++				} else if len(dropped) != 0 {
++					t.Fatalf("a case without machine_policy dropped %+v", dropped)
++				}
+ 			case "mcp":
+ 				var servers []contextmaterialize.MCPServer
+ 				for name, server := range tc.MCPServers {
+@@ -290,3 +350,56 @@ func TestConformanceEnvironmentsMonolithic(t *testing.T) {
+ 		})
+ 	}
+ }
++
++// assertAdmittedModules pins the admitted set: the production
++// classification must name exactly the vector's admitted modules in
++// emitted order.
++func assertAdmittedModules(t *testing.T, admitted []contextmaterialize.ClassifiedModule, want []vectorModuleRef) {
++	t.Helper()
++	got := make([]vectorModuleRef, 0, len(admitted))
++	for _, module := range admitted {
++		got = append(got, vectorModuleRef{Package: module.Package, Path: module.Module.Path})
++	}
++	if want == nil {
++		want = []vectorModuleRef{}
++	}
++	if !reflect.DeepEqual(got, want) {
++		t.Fatalf("admitted %+v, want %+v", got, want)
++	}
++}
++
++// assertDroppedModules pins the dropped set in emitted order.
++func assertDroppedModules(t *testing.T, dropped []contextmaterialize.DroppedModule, want []vectorModuleRef) {
++	t.Helper()
++	got := make([]vectorModuleRef, 0, len(dropped))
++	for _, module := range dropped {
++		got = append(got, vectorModuleRef{Package: module.Package, Path: module.Path})
++	}
++	if want == nil {
++		want = []vectorModuleRef{}
++	}
++	if !reflect.DeepEqual(got, want) {
++		t.Fatalf("dropped %+v, want %+v", got, want)
++	}
++}
++
++// assertDropWarnings pins the drop warnings: one
++// context_system_module_dropped per dropped module, in order, naming
++// package and path.
++func assertDropWarnings(t *testing.T, dropped []contextmaterialize.DroppedModule, want []vectorWarning) {
++	t.Helper()
++	got := make([]vectorWarning, 0, len(dropped))
++	for _, module := range dropped {
++		got = append(got, vectorWarning{
++			Diagnostic: contextmaterialize.DiagSystemModuleDropped,
++			Package:    module.Package,
++			Path:       module.Path,
++		})
++	}
++	if want == nil {
++		want = []vectorWarning{}
++	}
++	if !reflect.DeepEqual(got, want) {
++		t.Fatalf("warnings %+v, want %+v", got, want)
++	}
++}
