@@ -1,0 +1,3 @@
+Revision 6 review: production resolve expands Git selectors against the working checkout before resolving the declared ref. Independent CLI fixtures prove (a) a valid v1 package is refused when HEAD removes its metadata, and (b) v1 collection membership silently drops beta because HEAD contains only alpha (1/2 members). Changes requested, ordinary producer rework. Exact candidate and complete commands are in review-verdict-rev6.md and attached repro logs.
+
+Separately reproduced local real-install marker failure after successful resolve/dry-run. Marker migration/atomic source publication has sibling owners TASK-260910-1xs0pj and TASK-260910-3eu4cy; retain as integration limitation, not proof of working local installation. No code or LOGBOOK.md edits.

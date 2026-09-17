@@ -1,0 +1,7 @@
+# Rework 8 — TASK-260910-19w2aj: one P1 from verdict rev8 (TASK-260910-19w2aj_review-verdict-rev8.md; repro attached)
+
+P1 — explicit refresh never fetches legacy Git roots or transitive repositories: DraftResolveConfig (project_resolve.go:123-129) omits Fetch, closure.Options FetchExisting is false, so ensureRepo (closure.go:364) never fetches; `project refresh` exits 0 with the SAME stale lock while the upstream branch advanced (reproduced for configured-git `{name,branch}` and network-git `{name,branch,git}`). Alias acquisition fetches separately.
+
+Required: make the explicit resolve/refresh operation refresh the applicable legacy and transitive repositories through the admitted acquisition path (deduplicated, policy-gated, failure semantics preserved — a failed fetch leaves lock/bindings/install unchanged); never fetch origin-less configured repositories; never double-fetch aliases; frozen install/launch stays offline. CLI regressions with temp config: remote branch advance while the checkout stays stale → refresh publishes the new commit and complete runtime bytes; newly required transitive refs fetched; pinned consumption before refresh unchanged; acquisition failure leaves prior state intact; a narrowing mutant that fetches aliases only must fail.
+
+Preserve all accepted fixes (rev2–rev8, incl. the allowlist propagation just accepted). Narrow tests (fast Git fixtures), tool calls under 2 minutes, evidence, checklist, handoff rev9 (story_final).
