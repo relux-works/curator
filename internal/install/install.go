@@ -72,6 +72,10 @@ type Options struct {
 	VerifyMcp     func(nodes []*closure.Node) (map[string]map[string][]string, []string, error)
 	AuditGate     func(nodes []*closure.Node) (warnings []string, errs []string)
 	ResolveAttest func(nodes []*closure.Node) (map[string]*marker.Attestation, []string, error)
+	// DraftSourcesV1 opts the frozen Skillfile schema 2 lane into
+	// draft source closure. False preserves the frozen v1 behavior
+	// byte-identically; schema-2 manifests then fail at parse time.
+	DraftSourcesV1 bool
 }
 
 func (o Options) context() context.Context {
@@ -220,7 +224,7 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 	// the locked checkout: `curator add` and `curator remove` rewrite it while
 	// holding no operation lock, so it can gain, lose, or retarget a
 	// declaration at any point during this run.
-	projectManifest, projectManifestGeneration, err := readManifestDocument(projectRoot)
+	projectManifest, projectManifestGeneration, projectManifestPayload, err := readManifestDocumentDraft(projectRoot, draftSourcesEnabled(opts))
 	if err != nil {
 		result.failf("%v", err)
 		return result, nil
@@ -365,20 +369,43 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 		opts.FetchedRepos = map[string]bool{}
 	}
 	fetchedBefore := copySet(opts.FetchedRepos)
-	nodes, err := closure.Build(closure.Options{
-		SkillsRoot:     cfg.SkillsRoot,
-		Home:           cfg.Home(),
-		AllowedSources: cfg.AllowedSources,
-		FetchExisting:  opts.Fetch && !opts.DryRun,
-		FetchedRepos:   opts.FetchedRepos,
-		ScratchRoot:    scratchRoot,
-	}, effectiveManifest, substitutions)
-	if err != nil {
-		result.failf("%v", err)
-		return result, nil
-	}
-	for _, repo := range newSetEntries(fetchedBefore, opts.FetchedRepos) {
-		result.Messages = append(result.Messages, fmt.Sprintf("%s: fetched %s", alias, filepath.Base(repo)))
+	var nodes []*closure.Node
+	if effectiveManifest.SchemaVersion == 2 {
+		if !draftSourcesEnabled(opts) {
+			result.failf("source_selection_invalid: Skillfile schema 2 requires the draft lane; unset %s keeps frozen v1", EnvDraftSourcesV1)
+			return result, nil
+		}
+		if len(hybridDirect) > 0 {
+			result.failf("source_selection_invalid: hybrid activation is not admitted with a draft lock; resolve it explicitly")
+			return result, nil
+		}
+		if len(substitutions) > 0 {
+			result.failf("source_selection_invalid: development substitutions are not admitted with draft selectors")
+			return result, nil
+		}
+		frozenNodes, _, _, err := draftFrozenNodes(cfg.Home(), projectRoot, cfg.SkillsRoot, projectManifestPayload)
+		if err != nil {
+			result.failf("%v", err)
+			return result, nil
+		}
+		nodes = frozenNodes
+	} else {
+		built, err := closure.Build(closure.Options{
+			SkillsRoot:     cfg.SkillsRoot,
+			Home:           cfg.Home(),
+			AllowedSources: cfg.AllowedSources,
+			FetchExisting:  opts.Fetch && !opts.DryRun,
+			FetchedRepos:   opts.FetchedRepos,
+			ScratchRoot:    scratchRoot,
+		}, effectiveManifest, substitutions)
+		if err != nil {
+			result.failf("%v", err)
+			return result, nil
+		}
+		nodes = built
+		for _, repo := range newSetEntries(fetchedBefore, opts.FetchedRepos) {
+			result.Messages = append(result.Messages, fmt.Sprintf("%s: fetched %s", alias, filepath.Base(repo)))
+		}
 	}
 
 	// 8. Validate every node with the same rules as `skill check`. Manifest

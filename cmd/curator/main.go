@@ -68,7 +68,7 @@ Commands:
   upgrade [path]           fetch the selected dependency closure, then install
   status [path] [flags]    manifest, installed, and compiled state (--check, --json, --attest)
   list                     configured projects and declared skills
-  project <subcommand>     add | resolve
+  project <subcommand>     add | resolve | refresh
   skill check <dir>        validate one skill package (--locale, --json)
   global <subcommand>      init | add | remove | list | status (--check, --json) | install | update | upgrade
   profile <subcommand>     install | list | use | update | remove | sync | compose (see profile install -h)
@@ -1061,7 +1061,7 @@ func (c cli) cmdList() int {
 
 func (c cli) cmdProject(args []string) int {
 	if len(args) == 0 {
-		_, _ = fmt.Fprintln(c.stderr, "curator: project requires a subcommand: add, resolve")
+		_, _ = fmt.Fprintln(c.stderr, "curator: project requires a subcommand: add, resolve, refresh")
 		return exitUsage
 	}
 	switch args[0] {
@@ -1097,7 +1097,7 @@ func (c cli) cmdProject(args []string) int {
 		}
 		_, _ = fmt.Fprintf(c.stdout, "added project %s: %s\n", positional[0], root)
 		return exitOK
-	case "resolve":
+	case "resolve", "refresh":
 		cfg, code := c.loadConfig()
 		if code != exitOK {
 			return code
@@ -1111,14 +1111,7 @@ func (c cli) cmdProject(args []string) int {
 			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 			return exitUsage
 		}
-		target := targets[0]
-		if _, err := os.Stat(filepath.Join(target.Root, manifest.Name)); err != nil {
-			_, _ = fmt.Fprintln(c.stderr, "curator: Skillfile.json not found at or above", target.Root)
-			return exitFail
-		}
-		_, _ = fmt.Fprintf(c.stdout, "alias: %s\npath: %s\nskillfile: %s\n", target.Alias, target.Root, filepath.Join(target.Root, manifest.Name))
-		_, _ = fmt.Fprintf(c.stdout, "skills: %s\nbin: %s\n", filepath.Join(target.Root, ".agents", "skills"), filepath.Join(target.Root, ".agents", "bin"))
-		return exitOK
+		return c.cmdProjectResolve(cfg, targets[0], args[0])
 	default:
 		_, _ = fmt.Fprintf(c.stderr, "curator: unknown project subcommand %q\n", args[0])
 		return exitUsage

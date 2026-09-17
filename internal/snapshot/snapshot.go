@@ -22,6 +22,63 @@ func Dir(home, source, commit string) string {
 	return filepath.Join(home, "cache", filepath.FromSlash(source), commit, "snapshot")
 }
 
+// AuthenticateGit proves the cached snapshot for source at commit is exactly
+// the tree of commit in repo and returns its directory. It is the read-only
+// frozen-consumption counterpart of Get: a missing cache entry fails with
+// source_snapshot_unavailable and never triggers extraction-into-place, while
+// a cache tree whose complete byte inventory (every regular file including
+// runtime and build roots, plus permission bits) differs from the locked
+// commit fails with source_snapshot_changed. Only local repository reads back
+// the pinned commit; no fetch, no ref resolution, and no live-source adoption
+// occurs. Callers authenticate the shared commit tree once, then serve locked
+// member subtrees from it.
+func AuthenticateGit(home, source, repo, commit string) (string, error) {
+	target := Dir(home, source, commit)
+	info, err := os.Lstat(target)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return "", fmt.Errorf("source_snapshot_unavailable: snapshot for %s at %s is not in the store; capture it with an explicit attempt", source, commit)
+		}
+		return "", err
+	}
+	if !info.IsDir() || info.Mode()&fs.ModeSymlink != 0 {
+		return "", fmt.Errorf("source_snapshot_changed: stored snapshot for %s at %s is not a directory", source, commit)
+	}
+	if err := gitops.EnsureRepo(repo); err != nil {
+		return "", fmt.Errorf("source_snapshot_unavailable: cannot authenticate snapshot for %s at %s without its locked repository; capture it with an explicit attempt", source, commit)
+	}
+	parent := filepath.Dir(target)
+	if err := os.MkdirAll(parent, 0o755); err != nil {
+		return "", err
+	}
+	tmp, err := os.MkdirTemp(parent, ".snapshot-auth-*.tmp")
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = os.RemoveAll(tmp) }()
+	// MkdirTemp deliberately creates a private directory. Restore the cache
+	// root mode before comparing, exactly as publication does, so the root
+	// mode itself never reports a false mismatch.
+	if err := os.Chmod(tmp, 0o755); err != nil { // #nosec G302 -- authentication compares against published immutable snapshots that preserve the historical world-readable cache-root mode.
+		return "", err
+	}
+	if err := gitops.Extract(repo, commit, tmp); err != nil {
+		return "", fmt.Errorf("source_snapshot_unavailable: cannot authenticate snapshot for %s at %s without its locked commit; capture it with an explicit attempt", source, commit)
+	}
+	expectedDigest, err := transaction.DigestPath(tmp)
+	if err != nil {
+		return "", fmt.Errorf("source_snapshot_changed: stored snapshot for %s at %s failed authentication: %v", source, commit, err)
+	}
+	actualDigest, err := transaction.DigestPath(target)
+	if err != nil {
+		return "", fmt.Errorf("source_snapshot_changed: stored snapshot for %s at %s failed authentication: %v", source, commit, err)
+	}
+	if actualDigest != expectedDigest {
+		return "", fmt.Errorf("source_snapshot_changed: stored snapshot for %s at %s does not match its locked commit", source, commit)
+	}
+	return target, nil
+}
+
 // Get returns the snapshot directory, producing it from the repository on a
 // cache miss. Staging is atomic: a concurrent producer of the same snapshot
 // wins harmlessly.

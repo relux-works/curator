@@ -454,6 +454,16 @@ func snapshotFor(opts Options, source, repo, commit string) (string, error) {
 	return target, nil
 }
 
+// MarkRepoFetched records repo as already refreshed in m using the same
+// key ensureRepo consults, so an explicit operation that refreshed a tree
+// through another lane (for example a Git alias acquisition) never
+// fetches it twice. A nil map accepts the mark by doing nothing.
+func MarkRepoFetched(m map[string]bool, repo string) {
+	if m != nil {
+		m[repoKey(repo)] = true
+	}
+}
+
 func alreadyFetched(opts Options, repo string) bool {
 	if opts.FetchedRepos == nil {
 		return false

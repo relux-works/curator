@@ -120,12 +120,36 @@ func revParse(repo, spec string) (string, error) {
 	return out, nil
 }
 
-// Fetch updates a repository: all remotes, tags, prune.
+// HasRemote reports whether repo declares at least one remote. Absence
+// and failure are distinct: a successful empty enumeration reports
+// (false, nil) and Fetch treats it as a no-op, while a failed enumeration
+// reports (false, err) and Fetch propagates the error instead of
+// succeeding with a stale tree.
+func HasRemote(repo string) (bool, error) {
+	out, err := run(repo, "remote")
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(out) != "", nil
+}
+
+// Fetch updates a repository: all remotes, tags, prune. A repository
+// with no remotes (for example an origin-less configured checkout) is a
+// successful no-op: there is nothing to refresh and no network to touch.
+// The origin-less skip happens only after a successful empty remote
+// enumeration; a failed enumeration fails the fetch.
 func Fetch(repo string) error {
 	if err := EnsureRepo(repo); err != nil {
 		return err
 	}
-	_, err := run(repo, "fetch", "--all", "--tags", "--prune")
+	has, err := HasRemote(repo)
+	if err != nil {
+		return err
+	}
+	if !has {
+		return nil
+	}
+	_, err = run(repo, "fetch", "--all", "--tags", "--prune")
 	return err
 }
 
