@@ -1,5 +1,5 @@
 ## Status
-reviewing
+done
 
 ## Review
 required
@@ -80,6 +80,13 @@ spawn selection rationale for gpt-6-astra/low: Review of the R2 cached /health r
 spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
 spawn queued: [reviewer] reviewer (codex) (run=RUN-260917-533635, max_parallel=8)
 spawn run started: [reviewer] reviewer (codex) (run=RUN-260917-533635)
+agent completed: [reviewer] reviewer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260917-533635, pid=8220, exit=0)
+spawn selection rationale tuple: {"role":"developer","pair":"muse-spark-1.3-contributor/max","text":"Completion run bound to the accepted final-leaf revision 2 producer role/archetype (worktree complete of STORY-260910-1py4f3 after PR #8 landed 131952d); muse-spark-1.3-contributor:max is the operator's producer pair for this campaign"}
+spawn selection rationale for muse-spark-1.3-contributor/max: Completion run bound to the accepted final-leaf revision 2 producer role/archetype (worktree complete of STORY-260910-1py4f3 after PR #8 landed 131952d); muse-spark-1.3-contributor:max is the operator's producer pair for this campaign
+spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn queued: [implementer] developer (muse) (run=RUN-260917-99ac72, max_parallel=8)
+spawn run started: [implementer] developer (muse) (run=RUN-260917-99ac72)
 
 ## Precondition Resources
 - [remediation-registry-producer-rules.md](file://TASK-260910-3p2rbh/remediation-registry-producer-rules.md) — Campaign rules for curator-skill-registry producers and reviewers
@@ -87,6 +94,7 @@ spawn run started: [reviewer] reviewer (codex) (run=RUN-260917-533635)
 - [TASK-260910-3p2rbh_review-brief.md](file://TASK-260910-3p2rbh/TASK-260910-3p2rbh_review-brief.md) — Reviewer brief for Change Request revision 1
 - [TASK-260910-3p2rbh_rework-rev2.md](file://TASK-260910-3p2rbh/TASK-260910-3p2rbh_rework-rev2.md) — Rework brief for revision 2 (snapshot consistency, frontier anchors, post-commit publication, transient staleness re-decision)
 - [TASK-260910-3p2rbh_review-brief-rev2.md](file://TASK-260910-3p2rbh/TASK-260910-3p2rbh_review-brief-rev2.md) — Reviewer brief for Change Request revision 2
+- [TASK-260910-3p2rbh_completion_brief.md](file://TASK-260910-3p2rbh/TASK-260910-3p2rbh_completion_brief.md) — Completion-run instruction (worktree complete after PR #8 landed)
 
 ## Outcome Resources
 - [TASK-260910-3p2rbh_spawn-log_-implementer--developer--muse-_RUN-260917-651bbc.log](file://TASK-260910-3p2rbh/TASK-260910-3p2rbh_spawn-log_-implementer--developer--muse-_RUN-260917-651bbc.log) — System spawn log captured by task-board
@@ -106,12 +114,17 @@ spawn run started: [reviewer] reviewer (codex) (run=RUN-260917-533635)
 - [TASK-260910-3p2rbh_change-request_rev2.patch](file://TASK-260910-3p2rbh/TASK-260910-3p2rbh_change-request_rev2.patch) — Change Request CR-TASK-260910-3p2rbh-2 revision 2 candidate patch (repository_delta=present, 9 changed paths)
 - [TASK-260910-3p2rbh_change-request_rev2-validation.log](file://TASK-260910-3p2rbh/TASK-260910-3p2rbh_change-request_rev2-validation.log) — Change Request CR-TASK-260910-3p2rbh-2 revision 2 bounded validation log
 - [TASK-260910-3p2rbh_spawn-log_-reviewer--reviewer--codex-_RUN-260917-533635.log](file://TASK-260910-3p2rbh/TASK-260910-3p2rbh_spawn-log_-reviewer--reviewer--codex-_RUN-260917-533635.log) — System spawn log captured by task-board
+- [TASK-260910-3p2rbh_review-transcripts-rev2.log](file://TASK-260910-3p2rbh/TASK-260910-3p2rbh_review-transcripts-rev2.log) — Independent pytest, mypy, original reproductions, additional attacks and narrowing mutants
+- [TASK-260910-3p2rbh_review-attacks-rev2.py](file://TASK-260910-3p2rbh/TASK-260910-3p2rbh_review-attacks-rev2.py) — Actual stalled verifier, canonical-byte corruption and idempotent replay review probes
+- [TASK-260910-3p2rbh_review-logbook-rev2.md](file://TASK-260910-3p2rbh/TASK-260910-3p2rbh_review-logbook-rev2.md) — Review closure and mutation findings logbook
+- [TASK-260910-3p2rbh_review-verdict-rev2.md](file://TASK-260910-3p2rbh/TASK-260910-3p2rbh_review-verdict-rev2.md) — Accepted revision 2 with independent validation and negative evidence
+- [TASK-260910-3p2rbh_spawn-log_-implementer--developer--muse-_RUN-260917-99ac72.log](file://TASK-260910-3p2rbh/TASK-260910-3p2rbh_spawn-log_-implementer--developer--muse-_RUN-260917-99ac72.log) — System spawn log captured by task-board
 
 ## Created
 2026-09-10T14:46:43Z
 
 ## Last Update
-2026-09-17T17:26:16Z
+2026-09-17T17:48:28Z
 
 ## Assigned To
-[reviewer] reviewer (codex)
+[implementer] developer (muse)
