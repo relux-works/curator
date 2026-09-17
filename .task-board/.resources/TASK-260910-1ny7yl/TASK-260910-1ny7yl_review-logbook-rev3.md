@@ -1,0 +1,3 @@
+# Review logbook — TASK-260910-1ny7yl revision 3
+
+All three prior rework requests independently verified closed: production console events 2/2; root-only mismatch rejected and root-drop mutant killed; actual CLI restored-backup test passes. Candidate matches published tree 28/28 files. Independent suite 166 passed, strict mypy clean. Three narrowing mutants killed; head-only above-prefix mutant requires comparator test (startup vectors diverge both head/root), an explicit test coverage bound. Acceptance evidence attached; reviewer routes to integrating without performing integration. No candidate changes.

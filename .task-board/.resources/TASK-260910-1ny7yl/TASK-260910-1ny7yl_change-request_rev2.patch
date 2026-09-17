@@ -1,0 +1,1223 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 247db27..00f498d 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -27,7 +27,7 @@ jobs:
+         uses: actions/checkout@v4
+         with:
+           repository: relux-works/curator-spec
+-          ref: dced9b8317e0e8af79edf2d0539b32bd22b6c85b
++          ref: 47c3c8cbd5da5e3fd6d99b0327d382c6a36494fe
+           path: protocol-spec
+       - uses: actions/setup-python@v5
+         with:
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 18ea164..a0ed589 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -33,6 +33,25 @@
+ 
+ ### Security
+ 
++- R3/P2: `serve --checkpoint <signed snapshot>`
++  (`CURATOR_SKILL_REGISTRY_CHECKPOINT`) compares the live boundary against
++  the operator checkpoint at startup, after the §5 integrity verification
++  and before the listener binds or `/health` can report ready. The
++  checkpoint signature is verified first against the accepted
++  (staged-rotation) keys; a live version below the checkpoint refuses with
++  `restore_below_checkpoint`, an equal version with a different `head`,
++  `merkle_root`, or `log_size` — or a live state above the checkpoint whose
++  log does not reproduce the checkpoint boundary at its `log_size` — refuses
++  with `restore_inconsistent_with_checkpoint`, and a bad signature refuses
++  with `checkpoint_signature_invalid`. A refusal stays up non-ready
++  (`/health` 503 carrying the diagnostic code, writes 503) without
++  truncating or repairing history; without a checkpoint the
++  `startup_checkpoint` audit event records `checkpoint_not_configured`,
++  otherwise the compared checkpoint/live boundaries (`version`, `log_size`,
++  `head`) and the outcome. `verify-backup` stays as the offline vetting
++  procedure; the startup comparison is the normative readiness gate. The
++  `health-response-v1` success envelope is unchanged (curator-spec
++  `47c3c8c`).
+ - R2: snapshot-boundary lookups no longer rescan the log or rebuild the
+   Merkle tree per request. Each append now memoizes its boundary tuple
+   `(log_size, head, merkle_root, created_at)` in a durable `boundaries`
+diff --git a/README.md b/README.md
+index a2ef3cc..7ef43e3 100644
+--- a/README.md
++++ b/README.md
+@@ -97,6 +97,41 @@ older or equivocal database is refused. Stop all writers before replacing the
+ live database. Signing keys and `auditors.json` are backed up separately using
+ encrypted, access-controlled secret storage.
+ 
++### Startup checkpoint gate
++
++`verify-backup` is the offline procedure for vetting a backup before a
++restore. The normative enforcement of "before the service becomes ready" is
++the startup checkpoint comparison: pass the operator checkpoint to `serve`
++and the service compares live state against it after integrity verification
++and before the listener binds or `/health` can report ready.
++
++```bash
++curator-skill-registry --home ./data serve --checkpoint /secure-high-water/registry-snapshot.json
++# or: CURATOR_SKILL_REGISTRY_CHECKPOINT=/secure-high-water/registry-snapshot.json
++```
++
++The file is a signed `registry-snapshot-v1` object, verified against the
++accepted signing keys (the staged-rotation set). Produce it with
++`backup --checkpoint-out` alongside a consistent database backup, or with
++`export-snapshot` for the live boundary; keep it outside the primary store,
++encrypted and access controlled. To rotate it, write the new checkpoint and
++restart `serve` against it — the comparison runs once at startup. Re-issue
++the checkpoint (re-export the live boundary) before retiring an old signing
++key, otherwise a checkpoint signed by the retired key refuses with
++`checkpoint_signature_invalid`.
++
++A live version below the checkpoint refuses with
++`restore_below_checkpoint`; an equal version with a different `head`,
++`merkle_root`, or `log_size`, or a live state above the checkpoint whose log
++does not reproduce the checkpoint boundary at its `log_size`, refuses with
++`restore_inconsistent_with_checkpoint`. A refusal stays up non-ready:
++`/health` reports `503` with the diagnostic code, writes report `503`, and
++history is never truncated or repaired — recover the missing verified suffix
++or remain unavailable. Without `--checkpoint` the service starts as before
++and records `checkpoint_not_configured` in the `startup_checkpoint` audit
++event; with one, that event carries the compared checkpoint/live boundaries
++(`version`, `log_size`, `head`) and the outcome.
++
+ ### Signing-key rotation
+ 
+ Rotation is staged so clients never see an unannounced signer and live cursors
+@@ -211,8 +246,9 @@ mypy
+ 
+ CI checks out the authoritative specification suite and verifies CCJ-1 bytes,
+ signed objects, stable pagination, concurrent append, scoped idempotency,
+-recovery, restore checkpoints, key rotation, resource controls, chain/Merkle
+-commitments, and authenticated bundle imports on Linux, macOS, and Windows.
++recovery, restore checkpoints, the startup checkpoint comparison, key
++rotation, resource controls, chain/Merkle commitments, and authenticated
++bundle imports on Linux, macOS, and Windows.
+ 
+ See [SECURITY.md](SECURITY.md) for private reporting and incident boundaries,
+ and [CHANGELOG.md](CHANGELOG.md) for behavior and compatibility changes.
+diff --git a/SECURITY.md b/SECURITY.md
+index 17ecf6e..e24b091 100644
+--- a/SECURITY.md
++++ b/SECURITY.md
+@@ -20,14 +20,20 @@ publish corrective records through an unaffected auditor. History is not
+ rewritten. An auditor compromise disables that auditor credential and uses a
+ different authorized auditor for corrective records.
+ 
+-Restore is fail-closed: `verify-backup` validates the full store and requires a
+-signed external high-water checkpoint before the database can serve the same
+-canonical URL. Keep checkpoints and secret backups outside the primary store,
+-encrypted and access controlled. Cursor and response data never bootstrap
+-trust; clients pin registry keys out of band. Pagination is fail-closed too: a
+-cursor page is served only at the cursor's carried boundary, and a carried
+-boundary that disagrees with the committed log or is no longer available is
+-refused with `404 invalid_cursor` rather than re-evaluated at a newer boundary.
++Restore is fail-closed: `serve --checkpoint` (or
++`CURATOR_SKILL_REGISTRY_CHECKPOINT`) compares live state against the signed
++external high-water checkpoint after integrity verification and before the
++service becomes ready, and a live state below or inconsistent with it stays
++up non-ready with writes disabled instead of serving stale state. This
++startup comparison is the normative "before the service becomes ready" gate;
++`verify-backup` stays as the offline operator procedure for vetting a
++candidate backup before a restore. Keep checkpoints and secret backups
++outside the primary store, encrypted and access controlled. Cursor and
++response data never bootstrap trust; clients pin registry keys out of band.
++Pagination is fail-closed too: a cursor page is served only at the cursor's
++carried boundary, and a carried boundary that disagrees with the committed
++log or is no longer available is refused with `404 invalid_cursor` rather
++than re-evaluated at a newer boundary.
+ 
+ Health is fail-closed too: `GET /health` serves a cached integrity verdict
+ that a background full verifier refreshes on a bounded interval, and any
+diff --git a/compose.yaml b/compose.yaml
+index f77ac6b..d6d3927 100644
+--- a/compose.yaml
++++ b/compose.yaml
+@@ -7,8 +7,16 @@ services:
+       - "127.0.0.1:18082:8082"
+     volumes:
+       - registry-data:/data
++      # Startup checkpoint gate (profile §6): mount the operator's signed
++      # checkpoint (a registry-snapshot-v1 file kept outside the primary
++      # store) read-only and point the service at it. Without it the service
++      # records checkpoint_not_configured; with it, a live state below or
++      # inconsistent with the checkpoint stays up non-ready (/health 503)
++      # with writes disabled instead of serving stale state.
++      # - /secure-high-water/registry-snapshot.json:/checkpoint/registry-snapshot.json:ro
+     environment:
+       CURATOR_SKILL_REGISTRY_HOME: /data
++      # CURATOR_SKILL_REGISTRY_CHECKPOINT: /checkpoint/registry-snapshot.json
+     # The 30 s probe is a cheap cached-verdict read (no chain walk); the
+     # server-side full re-verification interval is configured with
+     # --health-verify-interval (default 300 s).
+diff --git a/src/csk_registry/__init__.py b/src/csk_registry/__init__.py
+index 70c2fa3..9e4f55f 100644
+--- a/src/csk_registry/__init__.py
++++ b/src/csk_registry/__init__.py
+@@ -8,6 +8,7 @@ __version__ = "0.1.0"
+ COMMAND_NAME = "curator-skill-registry"
+ HOME_ENV = "CURATOR_SKILL_REGISTRY_HOME"
+ HEALTH_VERIFY_INTERVAL_ENV = "CURATOR_SKILL_REGISTRY_HEALTH_VERIFY_INTERVAL"
++CHECKPOINT_ENV = "CURATOR_SKILL_REGISTRY_CHECKPOINT"
+ LEGACY_COMMAND_NAME = "csk-registry"
+ LEGACY_HOME_ENV = "CSK_REGISTRY_HOME"
+ 
+diff --git a/src/csk_registry/app.py b/src/csk_registry/app.py
+index f99175a..d17a9c5 100644
+--- a/src/csk_registry/app.py
++++ b/src/csk_registry/app.py
+@@ -20,8 +20,13 @@ from fastapi.exceptions import RequestValidationError
+ from fastapi.responses import JSONResponse
+ from starlette.exceptions import HTTPException as StarletteHTTPException
+ 
+-from . import COMMAND_NAME, HEALTH_VERIFY_INTERVAL_ENV, __version__, home_from_env
++from . import CHECKPOINT_ENV, COMMAND_NAME, HEALTH_VERIFY_INTERVAL_ENV, __version__, home_from_env
+ from .auth import AuditorTokens
++from .checkpoint import (
++    CHECKPOINT_NOT_CONFIGURED,
++    CHECKPOINT_SIGNATURE_INVALID,
++    CheckpointView,
++)
+ from .clock import utc_now
+ from .keys import load_active_key, public_keys
+ from .limits import FixedWindowLimiter
+@@ -201,9 +206,19 @@ def create_app(
+     def health() -> dict[str, str]:
+         # Cached verdict: no chain walk, no hashing, no I/O per probe. The
+         # background verifier refreshes it; a failed or stale verdict is
+-        # non-ready, exactly like a startup §5 mismatch.
+-        if not store.health_verdict().ready:
+-            raise APIError(503, "not_ready", "registry durable state failed integrity verification")
++        # non-ready, exactly like a startup §5 mismatch. A §6 startup
++        # checkpoint refusal reports its diagnostic as the error code.
++        verdict = store.health_verdict()
++        if not verdict.ready:
++            if verdict.code == "not_ready":
++                raise APIError(
++                    503, "not_ready", "registry durable state failed integrity verification"
++                )
++            raise APIError(
++                503,
++                verdict.code,
++                f"registry startup checkpoint comparison refused: {verdict.code}",
++            )
+         return {"status": "ok"}
+ 
+     @app.get("/v1/meta")
+@@ -635,6 +650,81 @@ def _success_response(payload: dict[str, Any], *, status_code: int) -> JSONRespo
+     )
+ 
+ 
++def _enforce_startup_checkpoint(store: Store, accepted_keys: tuple[str, ...]) -> None:
++    """Run the §6 startup checkpoint comparison (or record its absence).
++
++    Called after the §5 store verification and before the app is returned,
++    hence before the listener binds or ``/health`` can report ready. A
++    missing or empty ``CURATOR_SKILL_REGISTRY_CHECKPOINT`` starts the
++    service unchanged and records the ``checkpoint_not_configured``
++    posture. An unreadable or malformed checkpoint file is an operator
++    configuration error and fails startup. A well-formed checkpoint is
++    signature-checked first against the accepted (staged-rotation) keys,
++    then compared; either refusal latches non-ready plus writes-disabled
++    through the common integrity path while the process stays up.
++    """
++    configured = os.environ.get(CHECKPOINT_ENV)
++    if not configured:
++        _log_startup_checkpoint(
++            {"configured": False, "posture": CHECKPOINT_NOT_CONFIGURED}, refused=False
++        )
++        return
++    path = Path(configured).expanduser()
++    try:
++        raw = path.read_bytes()
++    except OSError as exc:
++        raise RuntimeError(f"startup checkpoint is unreadable: {exc}") from exc
++    try:
++        snapshot = validate_snapshot(load_json(raw))
++        checkpoint = CheckpointView.from_snapshot(snapshot)
++    except ProtocolError as exc:
++        raise RuntimeError(
++            f"startup checkpoint is not a signed registry-snapshot-v1 object: {exc}"
++        ) from exc
++    live = store.snapshot_boundary()
++    compared: dict[str, Any] = {
++        "checkpoint": {
++            "version": checkpoint.version,
++            "log_size": checkpoint.log_size,
++            "head": checkpoint.head,
++        },
++        "live": {
++            "version": live.version,
++            "log_size": live.log_size,
++            "head": live.head,
++        },
++    }
++    if not any(verify_signed(key, snapshot) for key in accepted_keys):
++        diagnostic = CHECKPOINT_SIGNATURE_INVALID
++        store.refuse_startup_checkpoint(
++            diagnostic, f"startup checkpoint comparison refused: {diagnostic}"
++        )
++        _log_startup_checkpoint(
++            {"configured": True, "result": "refused", "diagnostic": diagnostic, **compared},
++            refused=True,
++        )
++        return
++    refused = store.apply_startup_checkpoint(checkpoint)
++    if refused is None:
++        _log_startup_checkpoint(
++            {"configured": True, "result": "ok", **compared}, refused=False
++        )
++    else:
++        _log_startup_checkpoint(
++            {"configured": True, "result": "refused", "diagnostic": refused, **compared},
++            refused=True,
++        )
++
++
++def _log_startup_checkpoint(fields: dict[str, Any], *, refused: bool) -> None:
++    event = {"event": "startup_checkpoint", **fields}
++    message = json.dumps(event, sort_keys=True, separators=(",", ":"))
++    if refused:
++        _AUDIT_LOG.warning("%s", message)
++    else:
++        _AUDIT_LOG.info("%s", message)
++
++
+ def app_from_env() -> FastAPI:
+     home = Path(home_from_env()).expanduser()
+     home.mkdir(parents=True, exist_ok=True)
+@@ -650,11 +740,13 @@ def app_from_env() -> FastAPI:
+         ),
+     )
+     tokens = AuditorTokens.from_file(home / "auditors.json")
++    verification_keys = public_keys(home, signing_key)
++    _enforce_startup_checkpoint(store, verification_keys)
+     return create_app(
+         store=store,
+         signing_key=signing_key,
+         tokens=tokens,
+-        verification_keys=public_keys(home, signing_key),
++        verification_keys=verification_keys,
+         max_concurrent_requests=_positive_env(
+             "CURATOR_SKILL_REGISTRY_MAX_CONCURRENT_REQUESTS",
+             DEFAULT_MAX_CONCURRENT_REQUESTS,
+diff --git a/src/csk_registry/checkpoint.py b/src/csk_registry/checkpoint.py
+new file mode 100644
+index 0000000..5149eab
+--- /dev/null
++++ b/src/csk_registry/checkpoint.py
+@@ -0,0 +1,103 @@
++"""Startup checkpoint comparison (registry-service profile §6)."""
++from __future__ import annotations
++
++from dataclasses import dataclass
++from typing import TYPE_CHECKING, Any
++
++from .protocol import ProtocolError
++
++if TYPE_CHECKING:
++    from .store import SnapshotBoundary
++
++
++RESTORE_BELOW_CHECKPOINT = "restore_below_checkpoint"
++RESTORE_INCONSISTENT_WITH_CHECKPOINT = "restore_inconsistent_with_checkpoint"
++CHECKPOINT_SIGNATURE_INVALID = "checkpoint_signature_invalid"
++CHECKPOINT_NOT_CONFIGURED = "checkpoint_not_configured"
++
++#: The closed refusal set of profile §6 ("No other restore-checkpoint
++#: diagnostic exists"). ``checkpoint_not_configured`` is posture, recorded
++#: when no checkpoint is configured, never a refusal.
++REFUSAL_DIAGNOSTICS = frozenset(
++    {
++        RESTORE_BELOW_CHECKPOINT,
++        RESTORE_INCONSISTENT_WITH_CHECKPOINT,
++        CHECKPOINT_SIGNATURE_INVALID,
++    }
++)
++
++
++@dataclass(frozen=True)
++class CheckpointView:
++    """Checkpoint boundary fields used by the §6 startup comparison.
++
++    Unlike :class:`SnapshotBoundary`, ``version`` and ``log_size`` are not
++    forced equal: ``registry-snapshot-v1`` permits ``log_size <= version``,
++    and the equal-version rule compares ``log_size`` explicitly.
++    """
++
++    version: int
++    log_size: int
++    head: str
++    merkle_root: str
++    created_at: str
++
++    @classmethod
++    def from_snapshot(cls, snapshot: dict[str, Any]) -> CheckpointView:
++        version = snapshot.get("version")
++        log_size = snapshot.get("log_size")
++        head = snapshot.get("head")
++        merkle_root = snapshot.get("merkle_root")
++        created_at = snapshot.get("created_at")
++        if (
++            not isinstance(version, int)
++            or isinstance(version, bool)
++            or not isinstance(log_size, int)
++            or isinstance(log_size, bool)
++            or not isinstance(head, str)
++            or not isinstance(merkle_root, str)
++            or not isinstance(created_at, str)
++        ):
++            raise ProtocolError("snapshot checkpoint boundary is malformed")
++        return cls(
++            version=version,
++            log_size=log_size,
++            head=head,
++            merkle_root=merkle_root,
++            created_at=created_at,
++        )
++
++
++def compare_checkpoint(
++    live: SnapshotBoundary,
++    checkpoint: CheckpointView,
++    prefix: SnapshotBoundary | None,
++) -> str | None:
++    """Compare the verified live boundary against a verified §6 checkpoint.
++
++    ``prefix`` is the live boundary at ``checkpoint.log_size`` (the R2
++    ``boundaries`` row), or ``None`` when that prefix is unavailable.
++    Returns ``None`` when the live state may serve, otherwise the refusal
++    diagnostic: live below the checkpoint is
++    ``restore_below_checkpoint``; an equal version with a different
++    ``head``, ``merkle_root`` or ``log_size``, or a live state above the
++    checkpoint whose log does not reproduce the checkpoint head and Merkle
++    root at its ``log_size``, is ``restore_inconsistent_with_checkpoint``.
++    """
++    if live.version < checkpoint.version or live.log_size < checkpoint.log_size:
++        return RESTORE_BELOW_CHECKPOINT
++    if live.version == checkpoint.version:
++        if (
++            live.head == checkpoint.head
++            and live.merkle_root == checkpoint.merkle_root
++            and live.log_size == checkpoint.log_size
++        ):
++            return None
++        return RESTORE_INCONSISTENT_WITH_CHECKPOINT
++    if (
++        prefix is not None
++        and prefix.head == checkpoint.head
++        and prefix.merkle_root == checkpoint.merkle_root
++    ):
++        return None
++    return RESTORE_INCONSISTENT_WITH_CHECKPOINT
+diff --git a/src/csk_registry/cli.py b/src/csk_registry/cli.py
+index 579e8ef..fce5e0a 100644
+--- a/src/csk_registry/cli.py
++++ b/src/csk_registry/cli.py
+@@ -10,7 +10,7 @@ import secrets
+ import sys
+ from pathlib import Path
+ 
+-from . import COMMAND_NAME, HEALTH_VERIFY_INTERVAL_ENV, HOME_ENV, home_from_env
++from . import CHECKPOINT_ENV, COMMAND_NAME, HEALTH_VERIFY_INTERVAL_ENV, HOME_ENV, home_from_env
+ from .auth import Auditor, AuditorTokens
+ from .bundle import export_bundle, import_bundle
+ from .clock import utc_now
+@@ -349,6 +349,8 @@ def _cmd_serve(args: argparse.Namespace) -> int:
+     os.environ[HOME_ENV] = args.home
+     if args.health_verify_interval is not None:
+         os.environ[HEALTH_VERIFY_INTERVAL_ENV] = str(args.health_verify_interval)
++    if args.checkpoint is not None:
++        os.environ[CHECKPOINT_ENV] = args.checkpoint
+     uvicorn.run(
+         app_from_env(),
+         host=args.host,
+@@ -477,6 +479,19 @@ def build_parser() -> argparse.ArgumentParser:
+             f"{HEALTH_VERIFY_INTERVAL_ENV} when the flag is absent)"
+         ),
+     )
++    serve.add_argument(
++        "--checkpoint",
++        default=None,
++        metavar="PATH",
++        help=(
++            "signed registry-snapshot-v1 checkpoint compared against live "
++            "state at startup, after integrity verification and before the "
++            "listener binds or /health reports ready; a live state below or "
++            "inconsistent with it stays up non-ready with writes disabled "
++            f"({CHECKPOINT_ENV} when the flag is absent; without a checkpoint "
++            "the service records checkpoint_not_configured)"
++        ),
++    )
+     serve.set_defaults(func=_cmd_serve)
+ 
+     return parser
+diff --git a/src/csk_registry/store.py b/src/csk_registry/store.py
+index de0093a..efa3890 100644
+--- a/src/csk_registry/store.py
++++ b/src/csk_registry/store.py
+@@ -14,6 +14,7 @@ from datetime import UTC, datetime
+ from pathlib import Path
+ from typing import Any, Iterator, NoReturn
+ 
++from .checkpoint import REFUSAL_DIAGNOSTICS, CheckpointView, compare_checkpoint
+ from .permissions import protect_private_file
+ from .signing import canonical_bytes
+ 
+@@ -152,6 +153,9 @@ class HealthVerdict:
+     the background full verifier, and advanced incrementally by appends. It
+     performs no hashing or I/O to read: ``ready`` is a pure function of the
+     stored fields plus the staleness bound evaluated at read time.
++    ``code`` is the ``503`` error code served while non-ready: ``not_ready``
++    for integrity failures, or the §6 refusal diagnostic when a startup
++    checkpoint comparison refused.
+     """
+ 
+     ready: bool
+@@ -159,6 +163,7 @@ class HealthVerdict:
+     verified_log_size: int
+     verified_at: str
+     error: str | None
++    code: str = "not_ready"
+ 
+ 
+ @dataclass(frozen=True)
+@@ -199,6 +204,7 @@ class Store:
+         self._health_verified_log_size = 0
+         self._health_verified_at = ""
+         self._health_error: str | None = "startup verification has not completed"
++        self._health_code = "not_ready"
+         self._health_last_refresh_monotonic = time.monotonic()
+         self._integrity_failed = False
+         self._verifier_lock = threading.Lock()
+@@ -1364,6 +1370,7 @@ class Store:
+                     verified_log_size=self._health_verified_log_size,
+                     verified_at=self._health_verified_at,
+                     error=self._health_error,
++                    code=self._health_code,
+                 )
+             if self._health_stale_locked(now):
+                 return HealthVerdict(
+@@ -1471,6 +1478,7 @@ class Store:
+                     verified_log_size=self._health_verified_log_size,
+                     verified_at=self._health_verified_at,
+                     error=self._health_error,
++                    code=self._health_code,
+                 )
+                 self._log_health_refresh(
+                     result="integrity_failed_latched",
+@@ -1514,6 +1522,7 @@ class Store:
+                     verified_log_size=self._health_verified_log_size,
+                     verified_at=self._health_verified_at,
+                     error=self._health_error,
++                    code=self._health_code,
+                 )
+             boundary: SnapshotBoundary | None = None
+             if not errors:
+@@ -1544,6 +1553,7 @@ class Store:
+                     verified_log_size=self._health_verified_log_size,
+                     verified_at=self._health_verified_at,
+                     error=self._health_error,
++                    code=self._health_code,
+                 )
+             # The walked prefix is verified and every newer append passed its
+             # incremental check, so the live head is verified transitively.
+@@ -1660,6 +1670,50 @@ class Store:
+             return False
+         return prefix == checkpoint
+ 
++    def refuse_startup_checkpoint(self, diagnostic: str, detail: str) -> None:
++        """Latch a §6 startup-checkpoint refusal without comparison.
++
++        Used when the checkpoint itself is unusable (its signature fails
++        against the accepted keys): the service stays up non-ready with
++        writes disabled through the common integrity-failure path, exactly
++        like a failed comparison. Only the closed §6 refusal diagnostics
++        are accepted; only a restart clears the latch. History is untouched.
++        """
++        if diagnostic not in REFUSAL_DIAGNOSTICS:
++            raise ValueError(f"unknown startup-checkpoint diagnostic: {diagnostic}")
++        with self._lock:
++            if not self._integrity_failed:
++                self._health_code = diagnostic
++            self._latch_integrity_failure_locked(detail)
++
++    def apply_startup_checkpoint(self, checkpoint: CheckpointView) -> str | None:
++        """Compare the verified live boundary against a §6 startup checkpoint.
++
++        Runs once at startup, after the §5 verification and before the
++        service reports ready. Returns ``None`` when the comparison passes.
++        On refusal, latches non-ready plus writes-disabled through the
++        common integrity-failure path (``/health`` 503 with the refusal
++        diagnostic, writes 503) and returns that diagnostic. Only a restart
++        clears it; history is never truncated or repaired.
++        """
++        with self._lock, self._operation_deadline():
++            live = self._snapshot_boundary_locked(None)
++            prefix: SnapshotBoundary | None = None
++            if live.version > checkpoint.version:
++                try:
++                    prefix = self._snapshot_boundary_locked(checkpoint.log_size)
++                except (ValueError, StoreIntegrityError):
++                    prefix = None
++            diagnostic = compare_checkpoint(live, checkpoint, prefix)
++            if diagnostic is None:
++                return None
++            self.refuse_startup_checkpoint(
++                diagnostic,
++                f"startup checkpoint comparison refused: {diagnostic} "
++                f"(live version {live.version}, checkpoint version {checkpoint.version})",
++            )
++            return diagnostic
++
+     def backup_to(self, destination: Path) -> SnapshotBoundary:
+         destination.parent.mkdir(parents=True, exist_ok=True)
+         if destination.exists():
+diff --git a/tests/test_protocol_conformance.py b/tests/test_protocol_conformance.py
+index 56a7d1b..5a93b5c 100644
+--- a/tests/test_protocol_conformance.py
++++ b/tests/test_protocol_conformance.py
+@@ -3,6 +3,7 @@ from __future__ import annotations
+ import base64
+ import hashlib
+ import json
++import logging
+ import os
+ import sqlite3
+ from concurrent.futures import ThreadPoolExecutor
+@@ -15,10 +16,11 @@ from jsonschema import Draft202012Validator, ValidationError
+ from referencing import Registry
+ from referencing.jsonschema import DRAFT202012
+ 
+-from csk_registry import signing
+-from csk_registry.app import _encode_cursor, create_app
++from csk_registry import CHECKPOINT_ENV, HOME_ENV, signing
++from csk_registry.app import _encode_cursor, app_from_env, create_app
+ from csk_registry.auth import Auditor, AuditorTokens
+ from csk_registry.bundle import import_bundle
++from csk_registry.keys import initialize_key, write_private_json
+ from csk_registry.protocol import (
+     ProtocolError,
+     load_json,
+@@ -743,6 +745,226 @@ def test_shared_service_snapshot_and_restore_vectors(tmp_path: Path) -> None:
+         assert candidate_store.checkpoint_matches(checkpoint) is case["ready"]
+ 
+ 
++def _checkpoint_record(key: signing.SigningKey, lineage: str, index: int) -> dict[str, Any]:
++    return key.sign_record(
++        {
++            "schema_version": 1,
++            "name": f"skill-{lineage}-{index}",
++            "source_identity": "git.example.com/skills/checkpoint",
++            "commit": f"{index:040d}",
++            "content_sha256": "sha256:" + f"{index:064x}",
++            "status": "audited",
++            "audit": {"lineage": lineage},
++        }
++    )
++
++
++def _append_checkpoint_record(store: Store, key: signing.SigningKey, lineage: str, index: int) -> None:
++    store.append(
++        _checkpoint_record(key, lineage, index),
++        created_at=f"2026-07-13T00:00:{index:02d}Z",
++    )
++
++
++def _run_startup_checkpoint_case(
++    workdir: Path,
++    case: dict[str, Any],
++    monkeypatch: pytest.MonkeyPatch,
++    caplog: pytest.LogCaptureFixture,
++) -> None:
++    """Drive one ``checkpoint_cases`` vector through the real startup path."""
++    name = case["name"]
++    live_version = case["live_version"]
++    checkpoint_version = case["checkpoint_version"]
++    home = workdir / "home"
++    home.mkdir(parents=True, exist_ok=True)
++    registry_key = initialize_key(home)
++    auditor_key = signing.generate_key()
++    token = "startup-checkpoint-conformance-token"
++    write_private_json(
++        home / "auditors.json",
++        {
++            "auditors": [
++                {
++                    "auditor_id": "checkpoint-auditor",
++                    "org": "Conformance",
++                    "public_key": auditor_key.public_pinned,
++                    "token_sha256": hashlib.sha256(token.encode()).hexdigest(),
++                }
++            ]
++        },
++    )
++    live = Store(home / "registry.db")
++    scratch = Store(workdir / "scratch.db")
++    checkpoint_snapshot: dict[str, Any] | None = None
++    if name == "checkpoint-below-live-consistent":
++        for index in range(checkpoint_version):
++            _append_checkpoint_record(live, registry_key, "A", index)
++        checkpoint_snapshot = build_snapshot(live, registry_key)
++        for index in range(checkpoint_version, live_version):
++            _append_checkpoint_record(live, registry_key, "A", index)
++    elif name == "checkpoint-equal-consistent":
++        for index in range(live_version):
++            _append_checkpoint_record(live, registry_key, "A", index)
++        checkpoint_snapshot = build_snapshot(live, registry_key)
++    elif name == "checkpoint-equal-inconsistent":
++        for index in range(live_version):
++            _append_checkpoint_record(live, registry_key, "A", index)
++        for index in range(checkpoint_version):
++            _append_checkpoint_record(scratch, registry_key, "B", index)
++        checkpoint_snapshot = build_snapshot(scratch, registry_key)
++    elif name == "live-below-checkpoint":
++        for index in range(checkpoint_version):
++            _append_checkpoint_record(scratch, registry_key, "A", index)
++        checkpoint_snapshot = build_snapshot(scratch, registry_key)
++        for index in range(live_version):
++            _append_checkpoint_record(live, registry_key, "A", index)
++    elif name == "live-above-prefix-mismatch":
++        for index in range(checkpoint_version):
++            _append_checkpoint_record(scratch, registry_key, "B", index)
++        checkpoint_snapshot = build_snapshot(scratch, registry_key)
++        for index in range(live_version):
++            _append_checkpoint_record(live, registry_key, "A", index)
++    elif name == "checkpoint-signature-invalid":
++        for index in range(live_version):
++            _append_checkpoint_record(live, registry_key, "A", index)
++        checkpoint_snapshot = build_snapshot(live, signing.generate_key())
++    elif name == "checkpoint-not-configured":
++        for index in range(live_version):
++            _append_checkpoint_record(live, registry_key, "A", index)
++    else:
++        raise AssertionError(f"unknown checkpoint case {name!r}")
++
++    # The constructed inputs reproduce the vector's discriminating predicates.
++    assert live.head()[0] == live_version
++    live_boundary = live.snapshot_boundary()
++    if checkpoint_snapshot is not None:
++        assert checkpoint_snapshot["version"] == checkpoint_version
++        assert checkpoint_snapshot["log_size"] == checkpoint_version
++        assert (
++            signing.verify_signed(registry_key.public_pinned, checkpoint_snapshot)
++            is case["signature_valid"]
++        )
++        if live_version == checkpoint_version:
++            same_body = (
++                live_boundary.head == checkpoint_snapshot["head"]
++                and live_boundary.merkle_root == checkpoint_snapshot["merkle_root"]
++                and live_boundary.log_size == checkpoint_snapshot["log_size"]
++            )
++            assert same_body is case["same_boundary_body"]
++        if live_version > checkpoint_version:
++            prefix = live.snapshot_boundary(checkpoint_version)
++            reproduced = (
++                prefix.head == checkpoint_snapshot["head"]
++                and prefix.merkle_root == checkpoint_snapshot["merkle_root"]
++            )
++            assert reproduced is case["prefix_reproduced"]
++
++    checkpoint_path = workdir / "checkpoint.json"
++    if case["checkpoint_configured"]:
++        assert checkpoint_snapshot is not None
++        checkpoint_path.write_text(json.dumps(checkpoint_snapshot), encoding="utf-8")
++    live.close()
++    scratch.close()
++
++    monkeypatch.setenv(HOME_ENV, str(home))
++    if case["checkpoint_configured"]:
++        monkeypatch.setenv(CHECKPOINT_ENV, str(checkpoint_path))
++    else:
++        monkeypatch.delenv(CHECKPOINT_ENV, raising=False)
++    caplog.clear()
++    with caplog.at_level(logging.INFO, logger="csk_registry.audit"):
++        app = app_from_env()
++    client = TestClient(app)
++
++    health = client.get("/health")
++    if case["ready"]:
++        assert health.status_code == 200
++        assert health.json() == {"status": "ok"}
++    else:
++        assert health.status_code == 503
++        assert health.json()["error"]["code"] == case["diagnostic"]
++
++    # Writes follow readiness through the common integrity path.
++    submission = auditor_key.sign_record(
++        {
++            "schema_version": 1,
++            "name": "skill-submit-0",
++            "source_identity": "git.example.com/skills/checkpoint",
++            "commit": f"{99:040d}",
++            "content_sha256": "sha256:" + f"{99:064x}",
++            "status": "audited",
++            "audit": {},
++        }
++    )
++    posted = client.post(
++        "/v1/records", json=submission, headers={"Authorization": f"Bearer {token}"}
++    )
++    if case["ready"]:
++        assert posted.status_code == 201
++    else:
++        assert posted.status_code == 503
++        assert posted.json()["error"]["code"] == "storage_unavailable"
++
++    startup_events = []
++    for record in caplog.records:
++        try:
++            payload = json.loads(record.getMessage())
++        except (TypeError, ValueError):
++            continue
++        if isinstance(payload, dict) and payload.get("event") == "startup_checkpoint":
++            startup_events.append(payload)
++    assert len(startup_events) == 1
++    event = startup_events[0]
++    if not case["checkpoint_configured"]:
++        assert event["configured"] is False
++        assert event["posture"] == case["posture"] == "checkpoint_not_configured"
++    else:
++        assert checkpoint_snapshot is not None
++        assert event["configured"] is True
++        assert event["checkpoint"]["version"] == checkpoint_version
++        assert event["checkpoint"]["log_size"] == checkpoint_version
++        assert event["checkpoint"]["head"] == checkpoint_snapshot["head"]
++        assert event["live"]["version"] == live_version
++        assert event["live"]["log_size"] == live_version
++        assert event["live"]["head"] == live_boundary.head
++        if case["ready"]:
++            assert event["result"] == "ok"
++            assert "diagnostic" not in event
++        else:
++            assert event["result"] == "refused"
++            assert event["diagnostic"] == case["diagnostic"]
++
++    if not case["ready"]:
++        # A refusal never truncates or repairs history: the store alone
++        # still verifies and reports ready without the checkpoint.
++        reopened = Store(home / "registry.db")
++        try:
++            assert reopened.head()[0] == live_version
++            assert reopened.health_verdict().ready
++        finally:
++            reopened.close()
++
++
++def test_shared_service_startup_checkpoint_cases(
++    tmp_path: Path,
++    monkeypatch: pytest.MonkeyPatch,
++    caplog: pytest.LogCaptureFixture,
++) -> None:
++    cases = _json("vectors/registry-service.json")["checkpoint_cases"]
++    assert {case["name"] for case in cases} == {
++        "checkpoint-below-live-consistent",
++        "checkpoint-equal-consistent",
++        "checkpoint-equal-inconsistent",
++        "live-below-checkpoint",
++        "live-above-prefix-mismatch",
++        "checkpoint-signature-invalid",
++        "checkpoint-not-configured",
++    }
++    for case in cases:
++        _run_startup_checkpoint_case(tmp_path / case["name"], case, monkeypatch, caplog)
++
++
+ def _service_http_client(
+     tmp_path: Path,
+     *,
+diff --git a/tests/test_registry.py b/tests/test_registry.py
+index a2e2561..dc5db98 100644
+--- a/tests/test_registry.py
++++ b/tests/test_registry.py
+@@ -16,6 +16,7 @@ import pytest
+ from fastapi.testclient import TestClient
+ 
+ from csk_registry import (
++    CHECKPOINT_ENV,
+     COMMAND_NAME,
+     HOME_ENV,
+     LEGACY_COMMAND_NAME,
+@@ -23,10 +24,11 @@ from csk_registry import (
+     home_from_env,
+     signing,
+ )
+-from csk_registry.app import _encode_cursor, create_app
++from csk_registry.app import _encode_cursor, app_from_env, create_app
+ from csk_registry.auth import Auditor, AuditorTokens
++from csk_registry.checkpoint import CheckpointView, compare_checkpoint
+ from csk_registry.cli import build_parser, main
+-from csk_registry.keys import load_active_key, public_keys
++from csk_registry.keys import initialize_key, load_active_key, public_keys, write_private_json
+ from csk_registry.permissions import (
+     private_directory_permissions_enforced,
+     private_file_permissions_enforced,
+@@ -666,6 +668,306 @@ def test_backup_cli_emits_and_verifies_signed_checkpoint(tmp_path: Path):
+     ) == 2
+ 
+ 
++def _startup_home(home: Path, *, records: int) -> tuple[signing.SigningKey, str]:
++    """Create a serve-ready home with a key, one auditor, and a live log."""
++    home.mkdir(parents=True, exist_ok=True)
++    key = initialize_key(home)
++    auditor_key = signing.generate_key()
++    token = "startup-checkpoint-unit-test-token"
++    write_private_json(
++        home / "auditors.json",
++        {
++            "auditors": [
++                {
++                    "auditor_id": "a1",
++                    "org": "Example",
++                    "public_key": auditor_key.public_pinned,
++                    "token_sha256": hashlib.sha256(token.encode()).hexdigest(),
++                }
++            ]
++        },
++    )
++    store = Store(home / "registry.db")
++    for index in range(records):
++        store.append(
++            key.sign_record(
++                _body(
++                    "audited",
++                    name=f"skill-checkpoint-{index}",
++                    commit=f"{index:040d}",
++                    content_sha256="sha256:" + f"{index:064x}",
++                )
++            ),
++            created_at=f"2026-07-13T00:00:{index:02d}Z",
++        )
++    store.close()
++    return auditor_key, token
++
++
++def test_serve_checkpoint_flag_sets_env_and_defers_to_env(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++):
++    assert build_parser().parse_args(["serve"]).checkpoint is None
++    assert (
++        build_parser()
++        .parse_args(["serve", "--checkpoint", "/secure/checkpoint.json"])
++        .checkpoint
++        == "/secure/checkpoint.json"
++    )
++
++    seen: dict[str, object] = {}
++
++    def fake_run(app: object, **kwargs: object) -> None:
++        seen["app"] = app
++        seen["kwargs"] = kwargs
++
++    monkeypatch.setattr("uvicorn.run", fake_run)
++    monkeypatch.setattr("csk_registry.app.app_from_env", lambda: "app-sentinel")
++    home = tmp_path / "home"
++    old_home = os.environ.get(HOME_ENV)
++    old_checkpoint = os.environ.get(CHECKPOINT_ENV)
++    try:
++        # The flag wins over the environment.
++        monkeypatch.setenv(CHECKPOINT_ENV, "/from/env.json")
++        assert (
++            main(["--home", str(home), "serve", "--checkpoint", "/from/flag.json"]) == 0
++        )
++        assert os.environ[HOME_ENV] == str(home)
++        assert os.environ[CHECKPOINT_ENV] == "/from/flag.json"
++        assert seen["app"] == "app-sentinel"
++        # Without the flag the environment value passes through untouched.
++        monkeypatch.setenv(CHECKPOINT_ENV, "/from/env.json")
++        assert main(["--home", str(home), "serve"]) == 0
++        assert os.environ[CHECKPOINT_ENV] == "/from/env.json"
++    finally:
++        if old_home is None:
++            os.environ.pop(HOME_ENV, None)
++        else:
++            os.environ[HOME_ENV] = old_home
++        if old_checkpoint is None:
++            os.environ.pop(CHECKPOINT_ENV, None)
++        else:
++            os.environ[CHECKPOINT_ENV] = old_checkpoint
++
++
++def test_serve_refuses_restored_older_database(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
++):
++    home = tmp_path / "home"
++    auditor_key, token = _startup_home(home, records=7)
++    key = load_active_key(home)
++    store = Store(home / "registry.db")
++    older_backup = tmp_path / "older.db"
++    store.backup_to(older_backup)
++    for index in range(7, 10):
++        store.append(
++            key.sign_record(
++                _body(
++                    "audited",
++                    name=f"skill-checkpoint-{index}",
++                    commit=f"{index:040d}",
++                    content_sha256="sha256:" + f"{index:064x}",
++                )
++            ),
++            created_at=f"2026-07-13T00:00:{index:02d}Z",
++        )
++    checkpoint_path = tmp_path / "checkpoint.json"
++    checkpoint_snapshot = build_snapshot(store, key)
++    checkpoint_path.write_text(json.dumps(checkpoint_snapshot), encoding="utf-8")
++    store.close()
++    probe = Store(older_backup)
++    older_boundary = probe.snapshot_boundary()
++    probe.close()
++    # Silently restore the older database over the live one.
++    (home / "registry.db").write_bytes(older_backup.read_bytes())
++    for sidecar in ("-wal", "-shm"):
++        (home / f"registry.db{sidecar}").unlink(missing_ok=True)
++
++    monkeypatch.setenv(HOME_ENV, str(home))
++    monkeypatch.setenv(CHECKPOINT_ENV, str(checkpoint_path))
++    caplog.clear()
++    with caplog.at_level(logging.INFO, logger="csk_registry.audit"):
++        client = TestClient(app_from_env())
++
++    refused = client.get("/health")
++    assert refused.status_code == 503
++    assert refused.json()["error"]["code"] == "restore_below_checkpoint"
++    write = client.post(
++        "/v1/records",
++        json=auditor_key.sign_record(_body("audited", name="skill-late-write")),
++        headers={"Authorization": f"Bearer {token}"},
++    )
++    assert write.status_code == 503
++    assert write.json()["error"]["code"] == "storage_unavailable"
++    # Reads still serve, exactly like a §5 latch: only readiness and writes refuse.
++    assert client.get("/v1/snapshot").status_code == 200
++
++    events = []
++    for record in caplog.records:
++        try:
++            payload = json.loads(record.getMessage())
++        except (TypeError, ValueError):
++            continue
++        if isinstance(payload, dict) and payload.get("event") == "startup_checkpoint":
++            events.append(payload)
++    assert len(events) == 1
++    assert events[0]["result"] == "refused"
++    assert events[0]["diagnostic"] == "restore_below_checkpoint"
++    assert events[0]["checkpoint"] == {
++        "version": 10,
++        "log_size": 10,
++        "head": checkpoint_snapshot["head"],
++    }
++    assert events[0]["live"] == {
++        "version": 7,
++        "log_size": 7,
++        "head": older_boundary.head,
++    }
++
++    # The refusal repaired nothing: the restored database is byte-identical.
++    assert (home / "registry.db").read_bytes() == older_backup.read_bytes()
++    reopened = Store(home / "registry.db")
++    try:
++        assert reopened.head()[0] == 7
++        assert reopened.health_verdict().ready
++    finally:
++        reopened.close()
++
++
++def test_startup_checkpoint_unreadable_or_malformed_fails_startup(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++):
++    home = tmp_path / "home"
++    _startup_home(home, records=1)
++    monkeypatch.setenv(HOME_ENV, str(home))
++    monkeypatch.setenv(CHECKPOINT_ENV, str(home / "missing.json"))
++    with pytest.raises(RuntimeError, match="startup checkpoint is unreadable"):
++        app_from_env()
++    (home / "bad.json").write_text("not json{", encoding="utf-8")
++    monkeypatch.setenv(CHECKPOINT_ENV, str(home / "bad.json"))
++    with pytest.raises(RuntimeError, match="not a signed registry-snapshot-v1 object"):
++        app_from_env()
++    (home / "shape.json").write_text(json.dumps({"schema_version": 1}), encoding="utf-8")
++    monkeypatch.setenv(CHECKPOINT_ENV, str(home / "shape.json"))
++    with pytest.raises(RuntimeError, match="not a signed registry-snapshot-v1 object"):
++        app_from_env()
++
++
++def test_compare_checkpoint_closed_diagnostics() -> None:
++    live = SnapshotBoundary(
++        version=8,
++        log_size=8,
++        head="a" * 64,
++        merkle_root="b" * 64,
++        created_at="2026-07-13T00:00:07Z",
++    )
++    same = CheckpointView(
++        version=8,
++        log_size=8,
++        head="a" * 64,
++        merkle_root="b" * 64,
++        created_at="2026-07-13T00:00:07Z",
++    )
++    assert compare_checkpoint(live, same, live) is None
++    above = SnapshotBoundary(
++        version=10,
++        log_size=10,
++        head="c" * 64,
++        merkle_root="d" * 64,
++        created_at="2026-07-13T00:00:09Z",
++    )
++    assert compare_checkpoint(above, same, live) is None
++    assert (
++        compare_checkpoint(
++            live,
++            CheckpointView(
++                version=9,
++                log_size=9,
++                head="f" * 64,
++                merkle_root="f" * 64,
++                created_at="2026-07-13T00:00:08Z",
++            ),
++            None,
++        )
++        == "restore_below_checkpoint"
++    )
++    for field, value in (
++        ("head", "0" * 64),
++        ("merkle_root", "0" * 64),
++        ("log_size", 7),
++    ):
++        mutated = CheckpointView(
++            version=same.version,
++            log_size=same.log_size if field != "log_size" else int(value),
++            head=same.head if field != "head" else str(value),
++            merkle_root=same.merkle_root if field != "merkle_root" else str(value),
++            created_at=same.created_at,
++        )
++        assert (
++            compare_checkpoint(live, mutated, live)
++            == "restore_inconsistent_with_checkpoint"
++        )
++    assert (
++        compare_checkpoint(above, same, None) == "restore_inconsistent_with_checkpoint"
++    )
++    diverged = SnapshotBoundary(
++        version=8,
++        log_size=8,
++        head="e" * 64,
++        merkle_root="b" * 64,
++        created_at="2026-07-13T00:00:07Z",
++    )
++    assert (
++        compare_checkpoint(above, same, diverged)
++        == "restore_inconsistent_with_checkpoint"
++    )
++
++
++def test_checkpoint_refusal_latches_and_survives_verifier(tmp_path: Path) -> None:
++    home = tmp_path / "home"
++    _startup_home(home, records=2)
++    store = Store(home / "registry.db")
++    ahead = CheckpointView(
++        version=5,
++        log_size=5,
++        head="f" * 64,
++        merkle_root="f" * 64,
++        created_at="2026-07-13T00:00:04Z",
++    )
++    assert store.apply_startup_checkpoint(ahead) == "restore_below_checkpoint"
++    verdict = store.health_verdict()
++    assert not verdict.ready
++    assert verdict.code == "restore_below_checkpoint"
++    with pytest.raises(StoreIntegrityError):
++        store.append(
++            load_active_key(home).sign_record(_body()),
++            created_at="2026-07-13T00:00:02Z",
++        )
++    refreshed = store.refresh_health_verdict()
++    assert not refreshed.ready
++    assert refreshed.code == "restore_below_checkpoint"
++    store.close()
++
++    passing = Store(tmp_path / "passing.db")
++    boundary = passing.snapshot_boundary()
++    assert (
++        passing.apply_startup_checkpoint(
++            CheckpointView(
++                version=boundary.version,
++                log_size=boundary.log_size,
++                head=boundary.head,
++                merkle_root=boundary.merkle_root,
++                created_at=boundary.created_at,
++            )
++        )
++        is None
++    )
++    assert passing.health_verdict().ready
++    with pytest.raises(ValueError, match="unknown startup-checkpoint diagnostic"):
++        passing.refuse_startup_checkpoint("bogus_code", "detail")
++    passing.close()
++
++
+ def test_staged_key_rotation_preserves_snapshot_body_and_live_cursors(tmp_path: Path):
+     home = tmp_path / "home"
+     assert main(["--home", str(home), "genkey"]) == 0
+@@ -1689,6 +1991,18 @@ def test_health_corruption_detected_at_next_refresh_disables_writes(
+     assert refresh_events[0]["error"]
+ 
+ 
++#: Fixed manual-clock epoch for the exact-boundary staleness test. Anchoring
++#: the manual clock to the raw ``time.monotonic()`` value is host-dependent:
++#: when ``base + 20.0`` crosses a binary binade boundary (host uptime within
++#: 20 s below a power of two) the sum can round up by ~1 ulp, so the
++#: exact-bound step reads stale and the test flakes lane-dependently. Both
++#: exact-bound additions from this epoch (``+ 20.0`` twice, 40 s apart) stay
++#: inside the ``[8192, 16384)`` binade, where a sum of exactly representable
++#: addends is exact and the age subtraction is exact by Sterbenz — the
++#: boundary reads exactly ``20.0`` on every host.
++_MANUAL_CLOCK_EPOCH = 10000.0
++
++
+ class _ManualStoreClock:
+     """Injectable ``time`` replacement for deterministic staleness tests."""
+ 
+@@ -1699,6 +2013,17 @@ class _ManualStoreClock:
+         return self.now
+ 
+ 
++def test_manual_clock_epoch_keeps_exact_bound_additions_exact() -> None:
++    # Premise lock for _MANUAL_CLOCK_EPOCH: both exact-bound additions in
++    # test_health_stale_verifier_fails_closed_and_refresh_recovers must read
++    # exactly 20.0, else the boundary is off by ~1 ulp on every host.
++    first = _MANUAL_CLOCK_EPOCH + 20.0
++    assert first - _MANUAL_CLOCK_EPOCH == 20.0
++    renewed = _MANUAL_CLOCK_EPOCH + 20.001
++    second = renewed + 20.0
++    assert second - renewed == 20.0
++
++
+ def test_health_stale_verifier_fails_closed_and_refresh_recovers(
+     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+ ) -> None:
+@@ -1715,9 +2040,19 @@ def test_health_stale_verifier_fails_closed_and_refresh_recovers(
+     assert client.get("/health").status_code == 200
+ 
+     # Deterministic clock: the stale bound is 2 × 10 = 20 s. No sleeps.
+-    base = store._health_last_refresh_monotonic
+-    clock = _ManualStoreClock(base)
++    # Only the explicit refresh_health_verdict() calls below may advance the
++    # verdict under the manual clock: the verifier only runs under the serving
++    # lifespan (this bare TestClient never starts it — locked by the assert),
++    # and the stop is the ordered guard before the clock install.
++    assert not store.health_verifier_running()
++    store.stop_health_verifier()
++    clock = _ManualStoreClock(_MANUAL_CLOCK_EPOCH)
+     monkeypatch.setattr(store_module, "time", clock)
++    # Re-anchor last_refresh to the fixed epoch through the production refresh
++    # entry point, then read the base AFTER the pause/clock install.
++    assert store.refresh_health_verdict().ready
++    base = store._health_last_refresh_monotonic
++    assert base == _MANUAL_CLOCK_EPOCH
+ 
+     # (a) Exact boundary: age == bound is still fresh; age > bound is stale.
+     clock.now = base + 20.0

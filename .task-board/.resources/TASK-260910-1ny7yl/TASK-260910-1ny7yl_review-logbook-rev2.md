@@ -1,0 +1,2 @@
+
+2026-09-17 review rev2: discovered production startup INFO suppression masked by caplog; demonstrated an above-prefix Merkle-root-only narrowing mutant survives all 162 tests; identified missing CLI restore integration coverage. Ordinary implementation/test rework required. Preserve correct comparison/latch code, repair observability and add discriminating entry-point tests, then republish for another reviewer cycle. No standalone logbook tool is installed/exposed in this session; this durable task-scoped logbook entry is also attached separately on the board.

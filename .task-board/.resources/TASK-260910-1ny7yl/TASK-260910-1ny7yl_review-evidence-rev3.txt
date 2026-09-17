@@ -1,0 +1,406 @@
+/tmp/1ny7yl-pytest.log
+........................................................................ [ 43%]
+........................................................................ [ 86%]
+......................                                                   [100%]
+=============================== warnings summary ===============================
+../../../tmp/1ny7yl-review3-venv/lib/python3.14/site-packages/fastapi/testclient.py:1
+  /tmp/1ny7yl-review3-venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+../../../tmp/1ny7yl-review3-venv/lib/python3.14/site-packages/starlette/testclient.py:53
+  /tmp/1ny7yl-review3-venv/lib/python3.14/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+166 passed, 2 warnings in 31.39s
+
+
+/tmp/1ny7yl-mypy.log
+Success: no issues found in 14 source files
+
+
+/tmp/1ny7yl-console-probe.py
+import runpy,tempfile,pathlib,os,json
+ns=runpy.run_path('/tmp/1ny7yl-review3/tests/test_registry.py')
+root=pathlib.Path(tempfile.mkdtemp(prefix='1ny7yl-console-'));home=root/'home'
+ns['_startup_home'](home,records=3)
+store=ns['Store'](home/'registry.db');snap=ns['build_snapshot'](store,ns['load_active_key'](home));store.close()
+checkpoint=root/'checkpoint.json';checkpoint.write_text(json.dumps(snap))
+env=dict(os.environ);env.pop(ns['CHECKPOINT_ENV'],None)
+for name,args in [('absent',[]),('valid',['--checkpoint',str(checkpoint)])]:
+ output=ns['_run_serve_until_terminated'](home,args,env)
+ print(name,output,sep='\n');events=ns['_startup_checkpoint_events'](output)
+ assert len(events)==1 and 'Application startup complete.' in output
+ assert events[0].get('posture')=='checkpoint_not_configured' if name=='absent' else events[0].get('result')=='ok'
+print('console startup events: 2/2')
+
+
+/tmp/1ny7yl-console.log
+/tmp/1ny7yl-review3-venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+  from starlette.testclient import TestClient as TestClient  # noqa
+absent
+{"configured":false,"event":"startup_checkpoint","posture":"checkpoint_not_configured"}
+INFO:     Started server process [74682]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:60805 (Press CTRL+C to quit)
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [74682]
+
+valid
+{"checkpoint":{"head":"f398d7a031255c349758daa9333fe3661125295b8ac26c2b09991d2dcb56c374","log_size":3,"version":3},"configured":true,"event":"startup_checkpoint","live":{"head":"f398d7a031255c349758daa9333fe3661125295b8ac26c2b09991d2dcb56c374","log_size":3,"version":3},"result":"ok"}
+INFO:     Started server process [74792]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:60811 (Press CTRL+C to quit)
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [74792]
+
+console startup events: 2/2
+
+
+/tmp/1ny7yl-mutant-root.log
+.F.                                                                      [100%]
+=================================== FAILURES ===================================
+________ test_startup_checkpoint_above_with_root_only_mismatch_refuses _________
+
+tmp_path = PosixPath('/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/pytest-of-administrator/pytest-100/test_startup_checkpoint_above_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1136a2fd0>
+
+    def test_startup_checkpoint_above_with_root_only_mismatch_refuses(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        home = tmp_path / "home"
+        auditor_key, token = _startup_home(home, records=10)
+        key = load_active_key(home)
+        store = Store(home / "registry.db")
+        prefix = store.snapshot_boundary(8)
+        tampered_root = "0" * 64 if prefix.merkle_root != "0" * 64 else "f" * 64
+        checkpoint_snapshot = key.sign_record(
+            {
+                "schema_version": 1,
+                "version": 8,
+                "log_size": 8,
+                "head": prefix.head,
+                "merkle_root": tampered_root,
+                "created_at": prefix.created_at,
+            }
+        )
+        assert signing.verify_signed(key.public_pinned, checkpoint_snapshot)
+        checkpoint_path = tmp_path / "checkpoint.json"
+        checkpoint_path.write_text(json.dumps(checkpoint_snapshot), encoding="utf-8")
+        store.close()
+        monkeypatch.setenv(HOME_ENV, str(home))
+        monkeypatch.setenv(CHECKPOINT_ENV, str(checkpoint_path))
+        client = TestClient(app_from_env())
+        refused = client.get("/health")
+>       assert refused.status_code == 503
+E       assert 200 == 503
+E        +  where 200 = <Response [200 OK]>.status_code
+
+tests/test_registry.py:1163: AssertionError
+=============================== warnings summary ===============================
+../../../tmp/1ny7yl-review3-venv/lib/python3.14/site-packages/fastapi/testclient.py:1
+  /tmp/1ny7yl-review3-venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+../../../tmp/1ny7yl-review3-venv/lib/python3.14/site-packages/starlette/testclient.py:53
+  /tmp/1ny7yl-review3-venv/lib/python3.14/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_registry.py::test_startup_checkpoint_above_with_root_only_mismatch_refuses
+1 failed, 2 passed, 163 deselected, 2 warnings in 6.34s
+
+
+/tmp/1ny7yl-mutant-signature.log
+..F                                                                      [100%]
+=================================== FAILURES ===================================
+_________________ test_shared_service_startup_checkpoint_cases _________________
+
+tmp_path = PosixPath('/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/pytest-of-administrator/pytest-101/test_shared_service_startup_ch0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x113796330>
+caplog = <_pytest.logging.LogCaptureFixture object at 0x1138786e0>
+
+    def test_shared_service_startup_checkpoint_cases(
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        cases = _json("vectors/registry-service.json")["checkpoint_cases"]
+        assert {case["name"] for case in cases} == {
+            "checkpoint-below-live-consistent",
+            "checkpoint-equal-consistent",
+            "checkpoint-equal-inconsistent",
+            "live-below-checkpoint",
+            "live-above-prefix-mismatch",
+            "checkpoint-signature-invalid",
+            "checkpoint-not-configured",
+        }
+        for case in cases:
+>           _run_startup_checkpoint_case(tmp_path / case["name"], case, monkeypatch, caplog)
+
+tests/test_protocol_conformance.py:965: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+workdir = PosixPath('/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/pytest-of-administrator/pytest-101/test_shared_service_startup_ch0/checkpoint-signature-invalid')
+case = {'checkpoint_configured': True, 'checkpoint_version': 8, 'diagnostic': 'checkpoint_signature_invalid', 'live_version': 8, ...}
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x113796330>
+caplog = <_pytest.logging.LogCaptureFixture object at 0x1138786e0>
+
+    def _run_startup_checkpoint_case(
+        workdir: Path,
+        case: dict[str, Any],
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Drive one ``checkpoint_cases`` vector through the real startup path."""
+        name = case["name"]
+        live_version = case["live_version"]
+        checkpoint_version = case["checkpoint_version"]
+        home = workdir / "home"
+        home.mkdir(parents=True, exist_ok=True)
+        registry_key = initialize_key(home)
+        auditor_key = signing.generate_key()
+        token = "startup-checkpoint-conformance-token"
+        write_private_json(
+            home / "auditors.json",
+            {
+                "auditors": [
+                    {
+                        "auditor_id": "checkpoint-auditor",
+                        "org": "Conformance",
+                        "public_key": auditor_key.public_pinned,
+                        "token_sha256": hashlib.sha256(token.encode()).hexdigest(),
+                    }
+                ]
+            },
+        )
+        live = Store(home / "registry.db")
+        scratch = Store(workdir / "scratch.db")
+        checkpoint_snapshot: dict[str, Any] | None = None
+        if name == "checkpoint-below-live-consistent":
+            for index in range(checkpoint_version):
+                _append_checkpoint_record(live, registry_key, "A", index)
+            checkpoint_snapshot = build_snapshot(live, registry_key)
+            for index in range(checkpoint_version, live_version):
+                _append_checkpoint_record(live, registry_key, "A", index)
+        elif name == "checkpoint-equal-consistent":
+            for index in range(live_version):
+                _append_checkpoint_record(live, registry_key, "A", index)
+            checkpoint_snapshot = build_snapshot(live, registry_key)
+        elif name == "checkpoint-equal-inconsistent":
+            for index in range(live_version):
+                _append_checkpoint_record(live, registry_key, "A", index)
+            for index in range(checkpoint_version):
+                _append_checkpoint_record(scratch, registry_key, "B", index)
+            checkpoint_snapshot = build_snapshot(scratch, registry_key)
+        elif name == "live-below-checkpoint":
+            for index in range(checkpoint_version):
+                _append_checkpoint_record(scratch, registry_key, "A", index)
+            checkpoint_snapshot = build_snapshot(scratch, registry_key)
+            for index in range(live_version):
+                _append_checkpoint_record(live, registry_key, "A", index)
+        elif name == "live-above-prefix-mismatch":
+            for index in range(checkpoint_version):
+                _append_checkpoint_record(scratch, registry_key, "B", index)
+            checkpoint_snapshot = build_snapshot(scratch, registry_key)
+            for index in range(live_version):
+                _append_checkpoint_record(live, registry_key, "A", index)
+        elif name == "checkpoint-signature-invalid":
+            for index in range(live_version):
+                _append_checkpoint_record(live, registry_key, "A", index)
+            checkpoint_snapshot = build_snapshot(live, signing.generate_key())
+        elif name == "checkpoint-not-configured":
+            for index in range(live_version):
+                _append_checkpoint_record(live, registry_key, "A", index)
+        else:
+            raise AssertionError(f"unknown checkpoint case {name!r}")
+    
+        # The constructed inputs reproduce the vector's discriminating predicates.
+        assert live.head()[0] == live_version
+        live_boundary = live.snapshot_boundary()
+        if checkpoint_snapshot is not None:
+            assert checkpoint_snapshot["version"] == checkpoint_version
+            assert checkpoint_snapshot["log_size"] == checkpoint_version
+            assert (
+                signing.verify_signed(registry_key.public_pinned, checkpoint_snapshot)
+                is case["signature_valid"]
+            )
+            if live_version == checkpoint_version:
+                same_body = (
+                    live_boundary.head == checkpoint_snapshot["head"]
+                    and live_boundary.merkle_root == checkpoint_snapshot["merkle_root"]
+                    and live_boundary.log_size == checkpoint_snapshot["log_size"]
+                )
+                assert same_body is case["same_boundary_body"]
+            if live_version > checkpoint_version:
+                prefix = live.snapshot_boundary(checkpoint_version)
+                reproduced = (
+                    prefix.head == checkpoint_snapshot["head"]
+                    and prefix.merkle_root == checkpoint_snapshot["merkle_root"]
+                )
+                assert reproduced is case["prefix_reproduced"]
+    
+        checkpoint_path = workdir / "checkpoint.json"
+        if case["checkpoint_configured"]:
+            assert checkpoint_snapshot is not None
+            checkpoint_path.write_text(json.dumps(checkpoint_snapshot), encoding="utf-8")
+        live.close()
+        scratch.close()
+    
+        monkeypatch.setenv(HOME_ENV, str(home))
+        if case["checkpoint_configured"]:
+            monkeypatch.setenv(CHECKPOINT_ENV, str(checkpoint_path))
+        else:
+            monkeypatch.delenv(CHECKPOINT_ENV, raising=False)
+        caplog.clear()
+        with caplog.at_level(logging.INFO, logger="csk_registry.audit"):
+            app = app_from_env()
+        client = TestClient(app)
+    
+        health = client.get("/health")
+        if case["ready"]:
+            assert health.status_code == 200
+            assert health.json() == {"status": "ok"}
+        else:
+>           assert health.status_code == 503
+E           assert 200 == 503
+E            +  where 200 = <Response [200 OK]>.status_code
+
+tests/test_protocol_conformance.py:885: AssertionError
+------------------------------ Captured log call -------------------------------
+INFO     csk_registry.audit:app.py:744 {"checkpoint":{"head":"245cc996ba5dd6a8cd3d1ea5313ac2f9c3b5eb16a3a4cc680c7c115fd1c35fd2","log_size":8,"version":8},"configured":true,"event":"startup_checkpoint","live":{"head":"48b7c6bed9cdc8c62b5a0f2acb57b85d1e8ffc3a547c53b08cb76ee03c66940b","log_size":10,"version":10},"result":"ok"}
+INFO     csk_registry.audit:app.py:744 {"checkpoint":{"head":"245cc996ba5dd6a8cd3d1ea5313ac2f9c3b5eb16a3a4cc680c7c115fd1c35fd2","log_size":8,"version":8},"configured":true,"event":"startup_checkpoint","live":{"head":"245cc996ba5dd6a8cd3d1ea5313ac2f9c3b5eb16a3a4cc680c7c115fd1c35fd2","log_size":8,"version":8},"result":"ok"}
+INFO     csk_registry.audit:store.py:1597 {"duration_ms":0.0,"error":"startup checkpoint comparison refused: restore_inconsistent_with_checkpoint (live version 8, checkpoint version 8)","error_count":1,"event":"health_refresh","log_size":8,"result":"integrity_failed"}
+WARNING  csk_registry.audit:app.py:742 {"checkpoint":{"head":"2e6b8606c9c70a0d457bfd3c15bf99eb32e49395ff207775bc227d13d52d28fa","log_size":8,"version":8},"configured":true,"diagnostic":"restore_inconsistent_with_checkpoint","event":"startup_checkpoint","live":{"head":"245cc996ba5dd6a8cd3d1ea5313ac2f9c3b5eb16a3a4cc680c7c115fd1c35fd2","log_size":8,"version":8},"result":"refused"}
+INFO     csk_registry.audit:store.py:1597 {"duration_ms":0.0,"error":"startup checkpoint comparison refused: restore_below_checkpoint (live version 7, checkpoint version 8)","error_count":1,"event":"health_refresh","log_size":7,"result":"integrity_failed"}
+WARNING  csk_registry.audit:app.py:742 {"checkpoint":{"head":"245cc996ba5dd6a8cd3d1ea5313ac2f9c3b5eb16a3a4cc680c7c115fd1c35fd2","log_size":8,"version":8},"configured":true,"diagnostic":"restore_below_checkpoint","event":"startup_checkpoint","live":{"head":"b06f6086937dd066d8d0db3eba42ddcc6973f89ff2336e9a9ca596d591fa276c","log_size":7,"version":7},"result":"refused"}
+INFO     csk_registry.audit:store.py:1597 {"duration_ms":0.0,"error":"startup checkpoint comparison refused: restore_inconsistent_with_checkpoint (live version 10, checkpoint version 8)","error_count":1,"event":"health_refresh","log_size":10,"result":"integrity_failed"}
+WARNING  csk_registry.audit:app.py:742 {"checkpoint":{"head":"2e6b8606c9c70a0d457bfd3c15bf99eb32e49395ff207775bc227d13d52d28fa","log_size":8,"version":8},"configured":true,"diagnostic":"restore_inconsistent_with_checkpoint","event":"startup_checkpoint","live":{"head":"48b7c6bed9cdc8c62b5a0f2acb57b85d1e8ffc3a547c53b08cb76ee03c66940b","log_size":10,"version":10},"result":"refused"}
+INFO     csk_registry.audit:app.py:744 {"checkpoint":{"head":"245cc996ba5dd6a8cd3d1ea5313ac2f9c3b5eb16a3a4cc680c7c115fd1c35fd2","log_size":8,"version":8},"configured":true,"event":"startup_checkpoint","live":{"head":"245cc996ba5dd6a8cd3d1ea5313ac2f9c3b5eb16a3a4cc680c7c115fd1c35fd2","log_size":8,"version":8},"result":"ok"}
+=============================== warnings summary ===============================
+../../../tmp/1ny7yl-review3-venv/lib/python3.14/site-packages/fastapi/testclient.py:1
+  /tmp/1ny7yl-review3-venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+../../../tmp/1ny7yl-review3-venv/lib/python3.14/site-packages/starlette/testclient.py:53
+  /tmp/1ny7yl-review3-venv/lib/python3.14/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_protocol_conformance.py::test_shared_service_startup_checkpoint_cases
+1 failed, 2 passed, 163 deselected, 2 warnings in 6.40s
+
+
+/tmp/1ny7yl-mutant-head.log
+...                                                                      [100%]
+=============================== warnings summary ===============================
+../../../tmp/1ny7yl-review3-venv/lib/python3.14/site-packages/fastapi/testclient.py:1
+  /tmp/1ny7yl-review3-venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+../../../tmp/1ny7yl-review3-venv/lib/python3.14/site-packages/starlette/testclient.py:53
+  /tmp/1ny7yl-review3-venv/lib/python3.14/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+3 passed, 163 deselected, 2 warnings in 6.31s
+
+
+/tmp/1ny7yl-mutant-head-broad.log
+.....F...                                                                [100%]
+=================================== FAILURES ===================================
+__________________ test_compare_checkpoint_closed_diagnostics __________________
+
+    def test_compare_checkpoint_closed_diagnostics() -> None:
+        live = SnapshotBoundary(
+            version=8,
+            log_size=8,
+            head="a" * 64,
+            merkle_root="b" * 64,
+            created_at="2026-07-13T00:00:07Z",
+        )
+        same = CheckpointView(
+            version=8,
+            log_size=8,
+            head="a" * 64,
+            merkle_root="b" * 64,
+            created_at="2026-07-13T00:00:07Z",
+        )
+        assert compare_checkpoint(live, same, live) is None
+        above = SnapshotBoundary(
+            version=10,
+            log_size=10,
+            head="c" * 64,
+            merkle_root="d" * 64,
+            created_at="2026-07-13T00:00:09Z",
+        )
+        assert compare_checkpoint(above, same, live) is None
+        assert (
+            compare_checkpoint(
+                live,
+                CheckpointView(
+                    version=9,
+                    log_size=9,
+                    head="f" * 64,
+                    merkle_root="f" * 64,
+                    created_at="2026-07-13T00:00:08Z",
+                ),
+                None,
+            )
+            == "restore_below_checkpoint"
+        )
+        for field, value in (
+            ("head", "0" * 64),
+            ("merkle_root", "0" * 64),
+            ("log_size", 7),
+        ):
+            mutated = CheckpointView(
+                version=same.version,
+                log_size=same.log_size if field != "log_size" else int(value),
+                head=same.head if field != "head" else str(value),
+                merkle_root=same.merkle_root if field != "merkle_root" else str(value),
+                created_at=same.created_at,
+            )
+            assert (
+                compare_checkpoint(live, mutated, live)
+                == "restore_inconsistent_with_checkpoint"
+            )
+        assert (
+            compare_checkpoint(above, same, None) == "restore_inconsistent_with_checkpoint"
+        )
+        diverged = SnapshotBoundary(
+            version=8,
+            log_size=8,
+            head="e" * 64,
+            merkle_root="b" * 64,
+            created_at="2026-07-13T00:00:07Z",
+        )
+>       assert (
+            compare_checkpoint(above, same, diverged)
+            == "restore_inconsistent_with_checkpoint"
+        )
+E       AssertionError: assert None == 'restore_inconsistent_with_checkpoint'
+E        +  where None = compare_checkpoint(SnapshotBoundary(version=10, log_size=10, head='cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc', merkle_root='dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd', created_at='2026-07-13T00:00:09Z'), CheckpointView(version=8, log_size=8, head='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', merkle_root='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', created_at='2026-07-13T00:00:07Z'), SnapshotBoundary(version=8, log_size=8, head='eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee', merkle_root='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', created_at='2026-07-13T00:00:07Z'))
+
+tests/test_registry.py:1119: AssertionError
+=============================== warnings summary ===============================
+../../../tmp/1ny7yl-review3-venv/lib/python3.14/site-packages/fastapi/testclient.py:1
+  /tmp/1ny7yl-review3-venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+../../../tmp/1ny7yl-review3-venv/lib/python3.14/site-packages/starlette/testclient.py:53
+  /tmp/1ny7yl-review3-venv/lib/python3.14/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_registry.py::test_compare_checkpoint_closed_diagnostics - A...
+1 failed, 8 passed, 157 deselected, 2 warnings in 13.71s
