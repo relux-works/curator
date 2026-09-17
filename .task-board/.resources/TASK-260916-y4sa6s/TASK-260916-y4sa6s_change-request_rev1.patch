@@ -1,0 +1,18 @@
+diff --git a/LOGBOOK.md b/LOGBOOK.md
+index 1d9f07f..d63d306 100644
+--- a/LOGBOOK.md
++++ b/LOGBOOK.md
+@@ -3,6 +3,13 @@
+ > Institutional memory. Concise, factual, high-signal.
+ > Newest entries first. One block per insight.
+ 
++## 2026-09-17 — E1 spec revision: signer allowlist + update confirmation shipped to review (TASK-260916-y4sa6s)
++
++- DECISION: curator-spec revision for finding E1 (per-source `source_signers` allowlist with tag-OR-commit verification before lock entry, `require_source_signers` direction, `profile update` delta + warn-first confirmation revisions A/B under `--confirm-system-delta`, `latest`-stays-`*` residual) is ready for review: 138 files, `make validate` exit 0 (60 schemas, 1087 vector files; 325 Python tests; Go suite green; regenerate idempotent). Patch + evidence attached as task outcome resources; no implementation code touched.
++- FINDING: the settled MCP trigger is exactly `command`/`args`/`env_names`, so an `http` declaration's `url` change and an MCP `environments` selector change never trigger confirmation. Recorded in the evidence as a board follow-up candidate; no vector pins the silent behavior.
++- FINDING: `env status` names the verified signer only when local source state reproduces the verification (`unknown` otherwise, staying current). If the manager retains no tag/commit objects, every `enforced` row reports `unknown` — a retention rule for local source state would strengthen this.
++- NOTE: reinstall-as-update runs the confirmation gate but `profile install` takes no `--confirm-system-delta`, so a triggered reinstall under revision B refuses and completes via `profile update --confirm-system-delta` — the fail-closed reading, flagged for the manager task (`TASK-260916-1zgucp`) to confirm.
++
+ ## 2026-09-06 — release channels lag completed main; rc.2/rc.3 never executed release automation (TASK-260906-1xitqi)
+ 
+ - FINDING: completed main `7320bc2` is 180 commits ahead of stable `v0.13.0` and 152 ahead of the only published `v0.14.0` prerelease, rc.1. Homebrew and Scoop point at rc.1; the installer follows GitHub latest and therefore installs v0.13.0. Rc.2 and rc.3 exist as tags but have neither a GitHub Release nor any Release workflow execution, so there is no failed GoReleaser job to rerun and those tags must not be moved or reused.
