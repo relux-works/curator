@@ -344,6 +344,48 @@ func validateJournal(journal *Journal) error {
 	if err := validateIndependentTargetNamespaces(journal.Targets); err != nil {
 		return journalf("target namespaces are not independent: %v", err)
 	}
+	if err := validateBoundaryProof(journal); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateBoundaryProof(journal *Journal) error {
+	proof := journal.BoundaryProof
+	if proof == nil {
+		return nil
+	}
+	for canonical, token := range proof.Admitted {
+		if !validText(canonical) || !filepath.IsAbs(canonical) || filepath.Clean(canonical) != canonical {
+			return journalf("boundary admitted path is invalid")
+		}
+		if token == "" || !validText(token) {
+			return journalf("boundary admitted identity is invalid")
+		}
+	}
+	livePaths := make(map[string]struct{}, len(journal.Targets))
+	for _, target := range journal.Targets {
+		livePaths[target.LivePath] = struct{}{}
+	}
+	for live, record := range proof.Targets {
+		if !validText(live) || !filepath.IsAbs(live) || filepath.Clean(live) != live {
+			return journalf("boundary target path is invalid")
+		}
+		if _, known := livePaths[live]; !known {
+			return journalf("boundary proof names an unknown live path")
+		}
+		if !validText(record.Canonical) || !filepath.IsAbs(record.Canonical) || filepath.Clean(record.Canonical) != record.Canonical {
+			return journalf("boundary target canonical path is invalid")
+		}
+		for ancestor, token := range record.Ancestors {
+			if !validText(ancestor) || !filepath.IsAbs(ancestor) || filepath.Clean(ancestor) != ancestor {
+				return journalf("boundary ancestor path is invalid")
+			}
+			if token == "" || !validText(token) {
+				return journalf("boundary ancestor identity is invalid")
+			}
+		}
+	}
 	return nil
 }
 
@@ -870,6 +912,12 @@ func journalDigest(journal *Journal) (string, error) {
 }
 
 func (engine *Engine) removeJournalDurably(journal *Journal) error {
+	// Every terminal journal removal funnels through here (committed
+	// cleanup and completed rollback), so the retained per-write
+	// boundary check is released with it. A failed removal leaves the
+	// journal for recovery, which resumes rollback or cleanup — neither
+	// commits new targets, so the gate is no longer needed either way.
+	delete(engine.guards, journal.TransactionID)
 	digest, err := journalDigest(journal)
 	if err != nil {
 		return err

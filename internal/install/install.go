@@ -676,6 +676,15 @@ func stageProjectTargets(request projectTargetRequest) (scopeTargets, error) {
 	var targets scopeTargets
 	stageRoot := request.scoped.stageRoot
 
+	// The node snapshots are the admitted inputs of this scope: no
+	// adapter destination may overwrite them, and the publication
+	// guard pins their identity for the per-write recheck. A node
+	// without one cannot stage and fails before anything is derived.
+	admitted, err := nodeSnapshots(request.nodes)
+	if err != nil {
+		return scopeTargets{}, err
+	}
+
 	// Runtime trees and canonical launchers come first: an install marker
 	// records the published build identity of every compiled command, so the
 	// protected cache entry must already be resolved when the marker is built.
@@ -751,14 +760,16 @@ func stageProjectTargets(request projectTargetRequest) (scopeTargets, error) {
 	sort.Strings(hybridContextNames)
 	mirror, err := adapters.StageProject(stageRoot, request.projectRoot, request.agents, []adapters.Group{
 		{
-			Root:    request.skillsDir,
-			Skills:  contextNames,
-			Sources: contextSources(targets.plan, request.skillsDir, contextNames),
+			Root:     request.skillsDir,
+			Skills:   contextNames,
+			Sources:  contextSources(targets.plan, request.skillsDir, contextNames),
+			Admitted: admitted,
 		},
 		{
-			Root:    request.hybridStore,
-			Skills:  hybridContextNames,
-			Sources: contextSources(targets.plan, request.hybridStore, hybridContextNames),
+			Root:     request.hybridStore,
+			Skills:   hybridContextNames,
+			Sources:  contextSources(targets.plan, request.hybridStore, hybridContextNames),
+			Admitted: admitted,
 		},
 	}, request.cfg.AdapterMode)
 	if err != nil {
@@ -767,6 +778,9 @@ func stageProjectTargets(request projectTargetRequest) (scopeTargets, error) {
 	targets.plan.Merge(mirror.Plan())
 	for _, message := range mirror.Messages {
 		targets.messages = append(targets.messages, request.alias+": "+message)
+	}
+	if err := targets.attachBoundaries(admitted); err != nil {
+		return scopeTargets{}, err
 	}
 
 	if len(runtime.commands) > 0 && !directoryOnPath(request.binDir, os.Getenv("PATH"), request.platform) {

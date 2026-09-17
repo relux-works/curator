@@ -51,8 +51,11 @@ func (m *gitManager) withPolicy(policy Policy) *gitManager {
 	return m
 }
 
+// profileReposDir holds one clone per canonical git identity.
+func profileReposDir(home string) string { return filepath.Join(home, "profile-repos") }
+
 // reposDir holds one clone per canonical git identity.
-func (m *gitManager) reposDir() string { return filepath.Join(m.home, "profile-repos") }
+func (m *gitManager) reposDir() string { return profileReposDir(m.home) }
 
 // repoDir maps a canonical identity onto its clone path.
 func (m *gitManager) repoDir(identity string) string {

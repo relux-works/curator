@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+
+	"github.com/relux-works/curator/internal/staging"
 )
 
 const (
@@ -113,20 +115,36 @@ type Plan struct {
 	ProjectIdentity     string
 	Targets             []Target
 	ReferencedBuildKeys []string
+	// BoundaryCheck, when non-nil, re-validates destination separation
+	// and physical identity immediately before each publication write
+	// (see BoundaryCheck). It is in-memory only: Prepare retains it for
+	// Commit in the same process. Nil skips the in-memory gate; the
+	// durable proof below still guards restart recovery.
+	BoundaryCheck BoundaryCheck
+	// BoundaryProof, when non-nil, is the durable boundary record
+	// persisted in the journal: the same canonical spellings and
+	// filesystem identities the in-memory check pins, in journal-stable
+	// form. A nil proof is a legacy unguarded journal; a non-nil proof
+	// is protected and is re-verified before each remaining write after
+	// a restart, or the commit fails closed. A plan with a check but no
+	// proof (test scaffolding) journals an empty protected marker that
+	// fails closed on recovery, never legacy.
+	BoundaryProof *staging.DurableSnapshot
 }
 
 // Journal is the canonical durable recovery record. Paths are absolute so
 // home-only restart recovery never depends on the invoking project.
 type Journal struct {
-	Schema              string         `json:"schema"`
-	TransactionID       string         `json:"transaction_id"`
-	ProjectIdentity     string         `json:"project_identity"`
-	Phase               Phase          `json:"phase"`
-	RemovalPath         string         `json:"removal_path,omitempty"`
-	RemovalDigest       string         `json:"removal_digest,omitempty"`
-	RemovalEntries      []RemovalEntry `json:"removal_entries,omitempty"`
-	ReferencedBuildKeys []string       `json:"referenced_build_keys"`
-	Targets             []TargetRecord `json:"targets"`
+	Schema              string                   `json:"schema"`
+	TransactionID       string                   `json:"transaction_id"`
+	ProjectIdentity     string                   `json:"project_identity"`
+	Phase               Phase                    `json:"phase"`
+	RemovalPath         string                   `json:"removal_path,omitempty"`
+	RemovalDigest       string                   `json:"removal_digest,omitempty"`
+	RemovalEntries      []RemovalEntry           `json:"removal_entries,omitempty"`
+	ReferencedBuildKeys []string                 `json:"referenced_build_keys"`
+	Targets             []TargetRecord           `json:"targets"`
+	BoundaryProof       *staging.DurableSnapshot `json:"boundary_proof,omitempty"`
 }
 
 // RemovalEntry records one file, directory, or link that the transaction owns

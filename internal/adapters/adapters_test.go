@@ -318,7 +318,7 @@ func TestStageGlobalCoversTheNativeDiscoveryMirrorOnce(t *testing.T) {
 	makeSkill(t, canonical, "skill-g")
 
 	mirror, err := StageGlobal(stageRoot, home, userHome,
-		[]string{"claude_code", "opencode", "windsurf"}, []string{"skill-g"}, "copy", nil)
+		[]string{"claude_code", "opencode", "windsurf"}, []string{"skill-g"}, "copy", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/relux-works/curator/internal/staging"
 )
 
 // Engine owns journals beneath one manager home. It does not acquire locks;
@@ -19,6 +21,12 @@ type Engine struct {
 	journalRoot      string
 	hooks            Hooks
 	syncStagedParent func(string) error
+	// guards retains the in-memory per-write boundary check of every
+	// prepared transaction, keyed by transaction id. A transaction
+	// prepared without a check has no entry; a journal resumed after a
+	// restart re-verifies its durable proof instead, and only a legacy
+	// journal (nil proof) skips the gate.
+	guards map[string]BoundaryCheck
 }
 
 // New constructs an engine without creating manager-home state.
@@ -33,6 +41,7 @@ func New(home string, options ...Option) (*Engine, error) {
 	engine := &Engine{
 		journalRoot:      filepath.Join(filepath.Clean(absolute), "state", "transactions", "v1"),
 		syncStagedParent: syncDirectory,
+		guards:           map[string]BoundaryCheck{},
 	}
 	for _, option := range options {
 		if option != nil {
@@ -109,6 +118,9 @@ func (engine *Engine) Prepare(lock HomeLock, plan Plan) (*Journal, error) {
 		return nil, engine.abortPreparation(journal, err)
 	}
 	prepared = true
+	if plan.BoundaryCheck != nil {
+		engine.guards[journal.TransactionID] = plan.BoundaryCheck
+	}
 	return cloneJournal(journal), nil
 }
 
@@ -141,6 +153,10 @@ func (engine *Engine) buildJournal(plan Plan) (*Journal, []string, error) {
 		Phase:               PhasePreparing,
 		ReferencedBuildKeys: keys,
 		Targets:             make([]TargetRecord, len(targets)),
+		BoundaryProof:       cloneDurableProof(plan.BoundaryProof),
+	}
+	if journal.BoundaryProof == nil && plan.BoundaryCheck != nil {
+		journal.BoundaryProof = &staging.DurableSnapshot{}
 	}
 	sources := make([]string, len(targets))
 	livePaths := make(map[string]struct{}, len(targets))
@@ -375,6 +391,9 @@ func (engine *Engine) commitTarget(journal *Journal, index int) error {
 				return corruptionf("target %s/%s changed before backup", target.Class, target.Identifier)
 			}
 			if digest != DigestAbsent {
+				if err := engine.checkBoundary(journal, index); err != nil {
+					return err
+				}
 				if err := durableRenameNoReplace(target.LivePath, target.BackupPath); err != nil {
 					return err
 				}
@@ -429,6 +448,9 @@ func (engine *Engine) commitTarget(journal *Journal, index int) error {
 				}
 				return err
 			}
+			if err := engine.checkBoundary(journal, index); err != nil {
+				return err
+			}
 			if err := durableRenameNoReplace(target.StagedPath, target.LivePath); err != nil {
 				return err
 			}
@@ -456,6 +478,38 @@ func (engine *Engine) commitTarget(journal *Journal, index int) error {
 	default:
 		return journalf("target %s/%s has state %q during commit", target.Class, target.Identifier, target.State)
 	}
+}
+
+// checkBoundary runs the transaction's per-write boundary recheck for one
+// target. The caller holds the engine mutex and calls this immediately
+// before a live mutation, after all verification of the bytes involved. A
+// retained in-memory check covers the same-process commit; a journal
+// resumed after a restart re-verifies its durable proof instead, and only
+// a legacy journal (nil proof) skips the gate. A protected journal whose
+// proof cannot be restored fails closed. Rollback never calls this: a
+// refusal must restore published state, not refuse the restoration.
+func (engine *Engine) checkBoundary(journal *Journal, index int) error {
+	if guard := engine.guards[journal.TransactionID]; guard != nil {
+		return guard(index, journal.Targets[index].LivePath)
+	}
+	proof := journal.BoundaryProof
+	if proof == nil {
+		return nil
+	}
+	if len(proof.Targets) == 0 {
+		return fmt.Errorf("boundary_identity_unreadable: boundary proof has no recorded targets")
+	}
+	target := journal.Targets[index]
+	var stagingKind string
+	switch target.Kind {
+	case KindBytes:
+		stagingKind = staging.KindBytes
+	case KindEntry:
+		stagingKind = staging.KindEntry
+	default:
+		return fmt.Errorf("boundary_identity_unreadable: unknown target kind %q", target.Kind)
+	}
+	return staging.RecheckDurableOne(staging.Target{LivePath: target.LivePath, Kind: stagingKind}, *proof)
 }
 
 func (engine *Engine) recoverPendingBackup(target *TargetRecord) error {
@@ -892,5 +946,27 @@ func cloneJournal(journal *Journal) *Journal {
 	for index := range clone.Targets {
 		clone.Targets[index].StagingEntries = append([]RemovalEntry(nil), journal.Targets[index].StagingEntries...)
 	}
+	clone.BoundaryProof = cloneDurableProof(journal.BoundaryProof)
 	return &clone
+}
+
+func cloneDurableProof(proof *staging.DurableSnapshot) *staging.DurableSnapshot {
+	if proof == nil {
+		return nil
+	}
+	clone := &staging.DurableSnapshot{
+		Targets:  make(map[string]staging.DurableTarget, len(proof.Targets)),
+		Admitted: make(map[string]string, len(proof.Admitted)),
+	}
+	for canonical, token := range proof.Admitted {
+		clone.Admitted[canonical] = token
+	}
+	for live, record := range proof.Targets {
+		ancestors := make(map[string]string, len(record.Ancestors))
+		for ancestor, token := range record.Ancestors {
+			ancestors[ancestor] = token
+		}
+		clone.Targets[live] = staging.DurableTarget{Canonical: record.Canonical, Ancestors: ancestors}
+	}
+	return clone
 }

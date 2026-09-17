@@ -382,6 +382,15 @@ func stageGlobalTargets(request globalTargetRequest) (scopeTargets, error) {
 	var targets scopeTargets
 	stageRoot := request.scoped.stageRoot
 
+	// The node snapshots are the admitted inputs of this scope: no
+	// adapter destination may overwrite them, and the publication
+	// guard pins their identity for the per-write recheck. A node
+	// without one cannot stage and fails before anything is derived.
+	admitted, err := nodeSnapshots(request.nodes)
+	if err != nil {
+		return scopeTargets{}, err
+	}
+
 	runtime, err := stageRuntimeAndShims(
 		stageRoot, request.home, request.binDir, request.nodes,
 		runtimestore.GlobalCanonicalShim, request.platform, request.scoped, request.plan.plannedInputs(), request.external.entries, request.externalStoreRoot,
@@ -437,13 +446,16 @@ func stageGlobalTargets(request globalTargetRequest) (scopeTargets, error) {
 	sort.Strings(contextNames)
 	mirror, err := adapters.StageGlobal(
 		stageRoot, request.home, request.userHome, request.agents, contextNames, request.cfg.AdapterMode,
-		contextSources(targets.plan, request.skillsDir, contextNames))
+		contextSources(targets.plan, request.skillsDir, contextNames), admitted)
 	if err != nil {
 		return scopeTargets{}, err
 	}
 	targets.plan.Merge(mirror.Plan())
 	for _, message := range mirror.Messages {
 		targets.messages = append(targets.messages, "global: "+message)
+	}
+	if err := targets.attachBoundaries(admitted); err != nil {
+		return scopeTargets{}, err
 	}
 	return targets, nil
 }

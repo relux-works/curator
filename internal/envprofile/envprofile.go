@@ -48,6 +48,7 @@ import (
 	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/protocoljson"
+	"github.com/relux-works/curator/internal/snapshot"
 )
 
 // Diagnostics (environments §1.1, §2.1, §9.7, manager profile §12.3).
@@ -421,6 +422,17 @@ type Policy struct {
 	// the operation fails rather than overwrite. It is operation-scoped
 	// and never set from machine configuration.
 	Takeover bool
+	// DraftSourcesV1 opts path-source capture into the draft
+	// skillfile-sources revision 1 boundary admission: with it, every
+	// path install and path overlay is validated by
+	// snapshot.PrepareLocalAcquisition before the store traverses it,
+	// and overlap with managed outputs is refused with the spec
+	// section 5 diagnostic. Without it (the default, and the only
+	// behavior with a machine configuration today) path capture keeps
+	// its legacy semantics byte-identically. The schema-2 install
+	// integration leaf owns threading a user-facing switch through;
+	// until then only explicit Policy construction enables it.
+	DraftSourcesV1 bool
 }
 
 // OverlaySpec is one machine overlay declaration for a profile
@@ -602,7 +614,7 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 		if name == "" {
 			name = manifest.Name
 		}
-		state, err := stateForPath(home, manifest.Name, options.Operand)
+		state, err := stateForPath(home, manifest.Name, options.Operand, options.Policy.DraftSourcesV1)
 		if err != nil {
 			return Info{}, false, false, err
 		}
@@ -1240,8 +1252,25 @@ func pathManifestDiag(operand string, err error) error {
 // its leading diagnostic and is never wrapped in a second
 // profile_source_invalid (§8.4: unreadable evidence is reported as
 // unreadable, never as something else).
-func stateForPath(home, name, dir string) (*contextresolve.StatePackage, error) {
-	entry, hash, err := contextstore.EnsureState(home, contextlock.KindContext, name, dir)
+//
+// With draftSourcesV1 the path runs the draft skillfile-sources
+// revision 1 local pipeline first (admitPathSource: boundary admission,
+// byte capture of the admitted dirty/untracked tree, immutable snapshot
+// publication) and the store then installs the frozen snapshot, never
+// the live directory; a refusal carries the spec section 5 diagnostic
+// unwrapped, so the exact failure class leads. Without it the store
+// traversal of the live directory is the first and only read, exactly
+// as before.
+func stateForPath(home, name, dir string, draftSourcesV1 bool) (*contextresolve.StatePackage, error) {
+	source := dir
+	if draftSourcesV1 {
+		stored, err := admitPathSource(home, name, dir)
+		if err != nil {
+			return nil, err
+		}
+		source = stored
+	}
+	entry, hash, err := contextstore.EnsureState(home, contextlock.KindContext, name, source)
 	if err != nil {
 		return nil, preservePathDiag(err)
 	}
@@ -1250,6 +1279,65 @@ func stateForPath(home, name, dir string) (*contextresolve.StatePackage, error) 
 		return nil, fmt.Errorf("%s: %v", DiagSourceInvalid, err)
 	}
 	return &contextresolve.StatePackage{StateHash: hash, Manifest: packageOf(manifest)}, nil
+}
+
+// draftPathOutputs lists the managed outputs the draft local pipeline
+// prunes and refuses against: the profile store, the context store, the
+// profile git cache and the local-snapshot store itself.
+func draftPathOutputs(home string) []string {
+	return []string{ProfilesDir(home), contextstore.Root(home), profileReposDir(home), snapshot.LocalStoreDir(home)}
+}
+
+// admitPathSource runs the draft local-source pipeline for one operator
+// path source (a path install operand or a path overlay declaration)
+// before the store traverses anything, and returns the frozen snapshot
+// directory the store must install. The mapping is the profile analogue
+// of a Skillfile local source: the operand is the source root selected
+// at ".", the manager home is the owning root (selecting the home
+// itself would need operator root_inputs, which profiles do not carry,
+// so it is refused), and the managed outputs are draftPathOutputs. A
+// refusal names the skillfile-sources section 5 class.
+//
+// admitPathSourceAfterFreezeHook is a test-only deterministic scheduling
+// seam: when non-nil it runs after the snapshot freezes (capture and
+// publication) but before the caller consumes it, so a test can mutate
+// the live directory inside one Install and prove the install serves the
+// frozen bytes. Production code leaves it nil.
+var admitPathSourceAfterFreezeHook func()
+
+// Admission (snapshot.PrepareLocalAcquisition) validates boundaries
+// before traversal; Capture freezes the admitted dirty/untracked bytes
+// — whether or not .git exists — into private staging with race
+// detection; PublishLocal commits the frozen copy to the immutable
+// snapshot store. No Git commit is synthesized at any step, and the
+// caller consumes the returned directory, never the live original.
+func admitPathSource(home, name, dir string) (string, error) {
+	absolute, err := filepath.Abs(dir)
+	if err != nil {
+		return "", fmt.Errorf("%s: resolve path %q: %v", DiagSourceInvalid, dir, err)
+	}
+	acquisition, err := snapshot.PrepareLocalAcquisition(absolute, ".", home, name, draftPathOutputs(home), nil, nil, "")
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = acquisition.Close() }()
+	inventory, err := snapshot.Capture(acquisition)
+	if err != nil {
+		return "", err
+	}
+	if _, err := snapshot.PublishLocal(home, acquisition.Staging, inventory); err != nil {
+		return "", err
+	}
+	// Resolve through the store, never the just-written path: the
+	// install consumes the authenticated frozen tree.
+	stored, err := snapshot.OpenLocal(home, inventory.Snapshot)
+	if err != nil {
+		return "", err
+	}
+	if admitPathSourceAfterFreezeHook != nil {
+		admitPathSourceAfterFreezeHook()
+	}
+	return stored, nil
 }
 
 // preservePathDiag keeps a store error's leading §1.1 diagnostic: an

@@ -90,6 +90,26 @@ func stageNode(stageRoot string, install nodeInstall, clock Clock) (staging.Plan
 	return plan, "installed", nil
 }
 
+// nodeSnapshots returns the resolved content snapshots of every closure
+// node: the admitted inputs the publication boundary guard must protect.
+// Staging already reads these directories (context projection and runtime
+// trees consume snapshot bytes), so a node without one cannot stage and
+// fails here with the member diagnostic instead of staging blind.
+func nodeSnapshots(nodes []*closure.Node) ([]string, error) {
+	admitted := make([]string, 0, len(nodes))
+	for _, node := range nodes {
+		if node == nil || node.Snapshot == "" {
+			name := "<nil>"
+			if node != nil {
+				name = node.Name
+			}
+			return nil, fmt.Errorf("source_member_missing: node %s has no content snapshot", name)
+		}
+		admitted = append(admitted, node.Snapshot)
+	}
+	return admitted, nil
+}
+
 // contextSources maps each installed skill name to the directory its content
 // currently lives in, so an adapter mirror can be staged from the replacement
 // this run is about to commit rather than from a canonical path that does not

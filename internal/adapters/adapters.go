@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/protocoljson"
@@ -88,10 +89,17 @@ func UnknownAgents(agents []string) []string {
 // not exist at the canonical root yet, so it maps each name to the staged
 // directory instead. A skill that is already current is left out and read from
 // the canonical root.
+//
+// Admitted lists the local-source inputs this plan must not overwrite:
+// canonical or absolute admitted paths. Production planning sets it to
+// the closure node snapshots and the planner refuses a mirror that
+// would overwrite any entry, in either direction, including through
+// links, casing aliases or a changed parent. Empty disables the check.
 type Group struct {
-	Root    string
-	Skills  []string
-	Sources map[string]string
+	Root     string
+	Skills   []string
+	Sources  map[string]string
+	Admitted []string
 }
 
 // source resolves where the content of one skill is read from.
@@ -104,13 +112,19 @@ func (group Group) source(name string) string {
 
 // unmanagedConflict reports whether target exists but is neither in the
 // ledger nor recognizably ours (a symlink to the source, or an install
-// marker inside a copied directory).
+// marker inside a copied directory). A casing alias of the requested name
+// that the ledger does not own is unmanaged even when the requested
+// spelling is listed: the ledger covers exact names, not filesystem
+// case-equivalents. Inspection failures fail closed, never as absence.
 func unmanagedConflict(target string, inLedger bool, source string) (bool, error) {
 	info, err := os.Lstat(target)
 	if err != nil {
-		return false, nil
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
 	}
-	if inLedger {
+	if inLedger && !casingAliasUnmanaged(target) {
 		return false, nil
 	}
 	if info.Mode()&os.ModeSymlink != 0 {
@@ -128,6 +142,26 @@ func unmanagedConflict(target string, inLedger bool, source string) (bool, error
 		return false, nil
 	}
 	return true, nil
+}
+
+// casingAliasUnmanaged reports whether the live entry's on-disk spelling
+// differs by case from the requested target base. A ledger hit for the
+// requested spelling does not cover such an alias: the caller falls through
+// to symlink/marker proof instead of adopting blindly. Read failures fail
+// closed by forcing the proof path.
+func casingAliasUnmanaged(target string) bool {
+	base := filepath.Base(target)
+	entries, err := os.ReadDir(filepath.Dir(target)) // #nosec G304 -- adapter parent under validation
+	if err != nil {
+		return true
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if name != base && strings.EqualFold(name, base) {
+			return true
+		}
+	}
+	return false
 }
 
 func readLedger(adapterRoot string) map[string]bool {

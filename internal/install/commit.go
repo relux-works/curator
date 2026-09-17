@@ -506,6 +506,16 @@ type scopeTargets struct {
 	// referencedKeys are the build keys the committed markers depend on, so GC
 	// retains them while this transaction is in flight.
 	referencedKeys []string
+	// boundaries carries the local-source boundary record of the scope:
+	// the planning-time snapshot plus the admitted inputs it pins (the
+	// closure node snapshots) and the journal-stable copy for restart
+	// recovery. Both production stagers (project and global) populate it
+	// via attachBoundaries. runCommit rechecks it immediately before
+	// journaling, and journalPlan carries it into the transaction as the
+	// per-write BoundaryCheck plus the durable BoundaryProof, all under
+	// the serialized transaction. A nil record (only test scaffolding
+	// stages without one) skips every gate with byte-identical behavior.
+	boundaries *staging.Boundaries
 }
 
 // commitOutcome reports what the serialized phase changed.
@@ -637,6 +647,17 @@ func runCommit(ctx context.Context, request commitRequest) (outcome commitOutcom
 	if targets.plan.Empty() {
 		outcome.warnings = append(outcome.warnings, collectAfterCommit(request, lock)...)
 		return outcome, nil
+	}
+	// Draft local-source boundary recheck (skillfile-sources revision 1
+	// section 2): immediately before the first publication write, and
+	// under the serialized transaction, re-verify destination separation
+	// and physical identity against the planning-time snapshot. A changed
+	// boundary fails here — before journaling, so there is nothing to
+	// roll back — with the spec section 5 diagnostic class.
+	if targets.boundaries != nil {
+		if err := targets.plan.Recheck(targets.boundaries.Snapshot, targets.boundaries.Admitted); err != nil {
+			return commitOutcome{}, err
+		}
 	}
 
 	// A target below a directory that does not exist yet needs that directory
@@ -857,12 +878,20 @@ func journalPlan(request commitRequest, targets scopeTargets) (transaction.Plan,
 	if identity == "" {
 		identity = "global:" + request.home
 	}
+	sorted := targets.Sorted()
 	plan := transaction.Plan{
 		TransactionID:       id,
 		ProjectIdentity:     identity,
 		ReferencedBuildKeys: uniqueSorted(targets.referencedKeys),
+		// The per-write guard rechecks physical identity and
+		// destination separation immediately before each publication
+		// write (skillfile-sources revision 1 section 2), in memory
+		// for this process and durably after a restart. A nil record
+		// leaves the engine with its legacy behavior.
+		BoundaryCheck: boundaryCheckFor(sorted, targets.boundaries),
+		BoundaryProof: boundaryProofFor(targets.boundaries),
 	}
-	for _, target := range targets.Sorted() {
+	for _, target := range sorted {
 		kind, err := journalKind(target.Kind)
 		if err != nil {
 			return transaction.Plan{}, created, fmt.Errorf("stage %s/%s: %w", target.Class, target.Identifier, err)
@@ -941,6 +970,66 @@ func removeCreatedDirectories(created []string) {
 
 // Sorted exposes the staged targets in commit order for the journal.
 func (targets scopeTargets) Sorted() []staging.Target { return targets.plan.Sorted() }
+
+// attachBoundaries pins the planning-time physical record of the staged
+// plan: every destination's resolved spelling and ancestor identity plus
+// the identity of every admitted input, in memory and in journal-stable
+// form. Both production stagers call it once their plan is complete; the
+// journal and the per-write guard recheck against this record. An
+// unrecordable plan fails here, before anything is journaled.
+func (targets *scopeTargets) attachBoundaries(admitted []string) error {
+	snapshot, err := targets.plan.Snapshot(admitted)
+	if err != nil {
+		return err
+	}
+	durable, err := snapshot.Durable()
+	if err != nil {
+		return err
+	}
+	targets.boundaries = &staging.Boundaries{Snapshot: snapshot, Admitted: admitted, Durable: durable}
+	return nil
+}
+
+// boundaryProofFor carries a staged boundary record into the transaction
+// as the durable proof restart recovery re-verifies. A nil record leaves
+// the journal legacy.
+func boundaryProofFor(boundaries *staging.Boundaries) *staging.DurableSnapshot {
+	if boundaries == nil {
+		return nil
+	}
+	durable := boundaries.Durable
+	return &durable
+}
+
+// boundaryCheckFor adapts a staged plan and its boundary record to the
+// transaction engine's per-write guard. sorted must be the same commit
+// order journalPlan journals, so journal target indexes name staging
+// targets; the live-path comparison fails closed on any drift rather
+// than rechecking the wrong target.
+func boundaryCheckFor(sorted []staging.Target, boundaries *staging.Boundaries) transaction.BoundaryCheck {
+	if boundaries == nil {
+		return nil
+	}
+	snapshot := boundaries.Snapshot
+	admitted := boundaries.Admitted
+	return func(index int, livePath string) error {
+		if index < 0 || index >= len(sorted) {
+			return fmt.Errorf("source_output_overlap: boundary check for unknown target %d", index)
+		}
+		expected, err := filepath.Abs(sorted[index].LivePath)
+		if err != nil {
+			return fmt.Errorf("source_output_overlap: boundary check for %s: %v", sorted[index].LivePath, err)
+		}
+		actual, err := filepath.Abs(livePath)
+		if err != nil {
+			return fmt.Errorf("source_output_overlap: boundary check for %s: %v", livePath, err)
+		}
+		if filepath.Clean(expected) != filepath.Clean(actual) {
+			return fmt.Errorf("source_output_overlap: boundary check target drift: journal %s is not staged %s", livePath, sorted[index].LivePath)
+		}
+		return staging.RecheckOne(sorted[index], snapshot, admitted)
+	}
+}
 
 func uniqueSorted(values []string) []string {
 	seen := map[string]bool{}

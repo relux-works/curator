@@ -45,13 +45,15 @@ func StageProject(stageRoot, projectRoot string, agents []string, groups []Group
 }
 
 // StageGlobal stages the home-level adapter mirrors, including the
-// native-discovery mirror.
+// native-discovery mirror. admitted lists the inputs the planned mirrors
+// must not overwrite; empty disables that check.
 func StageGlobal(
 	stageRoot, home, userHome string,
 	agents []string,
 	skills []string,
 	mode string,
 	sources map[string]string,
+	admitted []string,
 ) (Mirror, error) {
 	canonical := filepath.Join(home, "global", "skills")
 	roots := map[string]string{}
@@ -63,7 +65,7 @@ func StageGlobal(
 			roots[agent] = filepath.Join(userHome, filepath.FromSlash(NativeDiscoveryHomePath))
 		}
 	}
-	return stage(stageRoot, roots, []Group{{Root: canonical, Skills: skills, Sources: sources}}, mode)
+	return stage(stageRoot, roots, []Group{{Root: canonical, Skills: skills, Sources: sources, Admitted: admitted}}, mode)
 }
 
 func stage(stageRoot string, adapterRoots map[string]string, groups []Group, mode string) (Mirror, error) {
@@ -89,6 +91,18 @@ func stage(stageRoot string, adapterRoots map[string]string, groups []Group, mod
 		}
 		staged[adapterRoot] = true
 		if err := mirror.stageRoot(stageRoot, adapterRoot, groups, expected, mode); err != nil {
+			return Mirror{}, err
+		}
+	}
+	// Production planning pins its admitted inputs on the groups; the
+	// planned mirrors must not overwrite them. Empty Admitted skips the
+	// gate.
+	var admitted []string
+	for _, group := range groups {
+		admitted = append(admitted, group.Admitted...)
+	}
+	if len(admitted) > 0 {
+		if err := ValidateDestinations(mirror.plan, admitted); err != nil {
 			return Mirror{}, err
 		}
 	}

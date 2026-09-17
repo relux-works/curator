@@ -34,7 +34,7 @@ func resolveOverlays(home string, manager *gitManager, profile string, policy Po
 	}
 	overlays := make([]contextresolve.Overlay, 0, len(decls))
 	for index, decl := range decls {
-		overlay, err := resolveOverlay(home, manager, decl)
+		overlay, err := resolveOverlay(home, manager, decl, policy.DraftSourcesV1)
 		if err != nil {
 			return nil, fmt.Errorf("overlay %d of profile %q: %v", index, profile, err)
 		}
@@ -48,7 +48,7 @@ func resolveOverlays(home string, manager *gitManager, profile string, policy Po
 // same one the config reader and `profile compose add` use — so a
 // declaration classified `path` at the reader can never resolve as `git`
 // here, and no filesystem probe can move it between the two.
-func resolveOverlay(home string, manager *gitManager, decl OverlaySpec) (contextresolve.Overlay, error) {
+func resolveOverlay(home string, manager *gitManager, decl OverlaySpec, draftSourcesV1 bool) (contextresolve.Overlay, error) {
 	weight := decl.Weight
 	kind := identity.ClassifySource(decl.Source)
 	if kind == identity.SourceInvalid {
@@ -62,7 +62,7 @@ func resolveOverlay(home string, manager *gitManager, decl OverlaySpec) (context
 		if err != nil {
 			return contextresolve.Overlay{}, pathManifestDiag(decl.Source, err)
 		}
-		state, err := stateForPath(home, manifest.Name, decl.Source)
+		state, err := stateForPath(home, manifest.Name, decl.Source, draftSourcesV1)
 		if err != nil {
 			return contextresolve.Overlay{}, err
 		}
