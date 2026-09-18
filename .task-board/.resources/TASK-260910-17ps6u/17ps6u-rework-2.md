@@ -1,0 +1,12 @@
+# Rework 2 — TASK-260910-17ps6u (revision 2 → 3): Windows-only gate failure
+
+Revision 2 fixed the marker-band test: ubuntu/macos lanes are green (gate run 35309565085). Only Test (windows-latest) fails, in the two new tests:
+- internal/install TestDraftLocalRuntimeMaterializesFromFrozenSnapshot — draftruntime_test.go:137: install Status:failed, Errors:[consumer: script command "ctool" path is not portable]
+- internal/install TestDraftLocalRefreshReplacesFrozenRuntime — draftruntime_test.go:255: Errors:[provider: script command "ptool" path is not portable]
+Cause: internal/runtimestore/runtimestore.go commandRel(command, platform) returns command.WinPath on windows; writeDraftScriptSkill (draftruntime_test.go) declares only "unix_path": "scripts/<cmd>.sh", so on Windows the command path is empty and validateScriptSpec refuses it. Existing install tests declare both (install_test.go:86 and :868 use "unix_path" + "win_path").
+
+Do exactly:
+1. In writeDraftScriptSkill declare both paths for every fixture command: "unix_path": "scripts/<cmd>.sh" and "win_path": "scripts/<cmd>.sh" (same file is fine for materialization; if the Windows arm needs a .cmd file to satisfy portable-path/extension rules, write "scripts/<cmd>.cmd" with an `@echo <name>-ok` body too). Materialization, runtime-store keys, marker v5 binding, refresh replacement and the no-links-in-protected-tree assertions must RUN on Windows — do not skip the whole test.
+2. Keep Windows skips only for the parts that execute the POSIX scripts (shim execution), using the existing declared reason verbatim: `executes POSIX skill commands` (see install_test.go:281). Do not add a skip class.
+3. Check every other new test in this leaf (draftruntime_test.go, gc_draft_test.go, marker_v5_test.go, sourcev1_test.go) for the same unix_path-only pattern or POSIX-only assumptions (exec bits: use the declared reason `Windows does not expose portable executable permission bits` where an executable-bit assertion is unavoidable on Windows).
+4. Narrow evidence with real exit codes (macOS): `go test -p 1 ./internal/install -run 'TestDraftLocal(RuntimeMaterializesFromFrozenSnapshot|RefreshReplacesFrozenRuntime)' -count=1 -timeout=180s` (background + tail), `go vet ./internal/install`, gofmt; state that Windows is verified only by the hosted gate. Append "Revision 3" to results.md, then `task-board handoff TASK-260910-17ps6u --role developer`. Every tool call under 2 minutes; no other changes.

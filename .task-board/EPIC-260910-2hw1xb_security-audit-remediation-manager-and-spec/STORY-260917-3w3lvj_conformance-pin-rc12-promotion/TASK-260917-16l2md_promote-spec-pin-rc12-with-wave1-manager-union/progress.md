@@ -130,7 +130,7 @@ spawn run completed: muse (run=RUN-260918-2b033a, pid=48242, exit=0)
 - [TASK-260917-16l2md_review-evidence-rev3.zip](file://TASK-260917-16l2md/TASK-260917-16l2md_review-evidence-rev3.zip) — Independent review transcripts, production-entry failing probes, and three killed narrowing mutants
 - [TASK-260917-16l2md_review-verdict-rev3.md](file://TASK-260917-16l2md/TASK-260917-16l2md_review-verdict-rev3.md) — Changes requested: S4 emission order, E4 null grammar, and missing operator docs
 - [TASK-260917-16l2md_spawn-log_-implementer--developer--muse-_RUN-260918-a066ea.log](file://TASK-260917-16l2md/TASK-260917-16l2md_spawn-log_-implementer--developer--muse-_RUN-260918-a066ea.log) — System spawn log captured by task-board
-- [TASK-260917-16l2md_change-request_rev4.patch](file://TASK-260917-16l2md/TASK-260917-16l2md_change-request_rev4.patch) — Change Request CR-TASK-260917-16l2md-4 revision 4 candidate patch (repository_delta=present, 41 changed paths)
+- [TASK-260917-16l2md_change-request_rev4.patch](file://TASK-260917-16l2md/TASK-260917-16l2md_change-request_rev4.patch) — Change Request revision 4 candidate patch; the stray compiled curator binary hunk (13.9 MB) was removed on 2026-09-18 because its base85 encoding tripped the repository naming gate on main (operator-authorized fix on top)
 - [TASK-260917-16l2md_change-request_rev4-validation.log](file://TASK-260917-16l2md/TASK-260917-16l2md_change-request_rev4-validation.log) — Change Request CR-TASK-260917-16l2md-4 revision 4 bounded validation log
 - [TASK-260917-16l2md_spawn-log_-reviewer--reviewer--codex-_RUN-260918-245ab4.log](file://TASK-260917-16l2md/TASK-260917-16l2md_spawn-log_-reviewer--reviewer--codex-_RUN-260918-245ab4.log) — System spawn log captured by task-board
 - [TASK-260917-16l2md_review-evidence-rev4.zip](file://TASK-260917-16l2md/TASK-260917-16l2md_review-evidence-rev4.zip) — Independent revision-4 checks, passing prior probes, three killed narrowing mutants, and binary cleanup evidence
@@ -148,7 +148,7 @@ spawn run completed: muse (run=RUN-260918-2b033a, pid=48242, exit=0)
 2026-09-17T17:45:35Z
 
 ## Last Update
-2026-09-18T03:13:29Z
+2026-09-18T11:12:04Z
 
 ## Assigned To
 [implementer] developer (muse)

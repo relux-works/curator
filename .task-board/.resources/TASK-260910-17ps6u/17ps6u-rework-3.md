@@ -1,0 +1,12 @@
+# Rework 3 — TASK-260910-17ps6u (revision 3 → 4)
+
+Revision 3 was CHANGES_REQUESTED by the independent reviewer with ONE finding (read TASK-260910-17ps6u_review-verdict-rev3.md; its overlay probe TestReviewV5ForeignNullFields is described there — reuse its scenarios as regression rows). Everything else was confirmed: keep the materialization, runtime-store keys, refresh, GC and the marker-band test as they are.
+
+## F1 — P2: malformed v5 package union accepted as current
+internal/marker/marker.go:428-438 validates DECODED values instead of raw package field presence. The shared Package struct knows the fields of every union arm, so DisallowUnknownFields cannot enforce a single arm, and JSON null collapses to ""/nil. A local-snapshot package carrying source:null, repository:null, directory:null or commit:null is accepted by marker.Read and marker.Current returns true (4/4 malformed packages accepted in the reviewer's probe).
+
+Required correction (exactly):
+1. Validate the RAW package object against the closed shape of the applicable arm BEFORE lossy decoding: for each arm an explicit allowed-field set, required fields present and non-null with the right JSON type, foreign-arm fields forbidden even when null/empty, nested commit object closed the same way. Use the repository's existing raw-JSON validator (protocoljson.Validate — the same one the accepted sibling hwxr26 uses for source-audit documents; it also rejects duplicate keys and trailing data) rather than hand-rolled map checks where it fits; do not solve by silently dropping foreign fields.
+2. Reader and currentness regression tests across both arms: forbidden fields with null and with empty values → Read refuses (typed invalid-marker) and Current is never true; keep the valid controls per arm; add a duplicate-key row if the validator handles it.
+3. Narrowing mutant: restore decoded-value validation only (drop the raw closed-shape check) and show the new rows kill it; record command + exit code.
+4. Narrow evidence with real exit codes: `go test -p 1 ./internal/marker -count=1 -timeout=120s`, `go test -p 1 ./internal/install -run 'TestDraftLocal|TestLegacyInstallUntouchedWhenDraftOff' -count=1 -timeout=240s` (background + tail), `go vet ./internal/marker ./internal/install`, gofmt. Append "Revision 4" to results.md, checklist, `task-board handoff TASK-260910-17ps6u --role developer`. Every tool call under 2 minutes; no other scope changes.

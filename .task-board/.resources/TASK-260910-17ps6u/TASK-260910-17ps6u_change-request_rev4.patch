@@ -1,0 +1,1948 @@
+diff --git a/cmd/curator/builds_test.go b/cmd/curator/builds_test.go
+index d376df0..89dc062 100644
+--- a/cmd/curator/builds_test.go
++++ b/cmd/curator/builds_test.go
+@@ -504,20 +504,24 @@ func TestMarkerRefusalSeparatesUnsupportedFromInvalid(t *testing.T) {
+ 			payload: `{"name":"build-skill"}`, want: stateInvalidMarker,
+ 		},
+ 		"schema from a newer manager": {
+-			payload: `{"schema_version":5,"name":"build-skill"}`, want: stateUnsupportedMarker,
++			payload: fmt.Sprintf(`{"schema_version":%d,"name":"build-skill"}`, marker.NewestSchemaVersion+1),
++			want:    stateUnsupportedMarker,
+ 		},
+ 		"schema below the oldest readable": {
+ 			payload: `{"schema_version":0,"name":"build-skill"}`, want: stateUnsupportedMarker,
+ 		},
+-		// Schemas 3 and 4 are readable. Calling their documents unreadable told
+-		// an operator to expect a manager upgrade that does not exist, when the
+-		// document itself was simply not a valid marker.
++		// Schemas 3, 4 and 5 are readable. Calling their documents unreadable
++		// told an operator to expect a manager upgrade that does not exist, when
++		// the document itself was simply not a valid marker.
+ 		"readable external schema that is still not a valid marker": {
+ 			payload: `{"schema_version":3,"name":"build-skill"}`, want: stateInvalidMarker,
+ 		},
+ 		"readable policy schema that is still not a valid marker": {
+ 			payload: `{"schema_version":4,"name":"build-skill"}`, want: stateInvalidMarker,
+ 		},
++		"readable draft schema 5 that is still not a valid marker": {
++			payload: `{"schema_version":5,"name":"build-skill"}`, want: stateInvalidMarker,
++		},
+ 		"build driver outside the closed set": {
+ 			payload: `{"schema_version":2,"name":"build-skill",` +
+ 				`"builds":{"build-tool":{"driver":"go-v2"}}}`,
+diff --git a/internal/install/draftruntime.go b/internal/install/draftruntime.go
+new file mode 100644
+index 0000000..d0d2016
+--- /dev/null
++++ b/internal/install/draftruntime.go
+@@ -0,0 +1,145 @@
++package install
++
++import (
++	"sort"
++
++	"github.com/relux-works/curator/internal/buildsource"
++	"github.com/relux-works/curator/internal/closure"
++	"github.com/relux-works/curator/internal/marker"
++	"github.com/relux-works/curator/internal/runtimestore"
++	"github.com/relux-works/curator/internal/sourcelock"
++)
++
++// draftRuntimeKeys derives the protected runtime-store leaf of every locked
++// local-snapshot draft member from its frozen package identity
++// (skillfile-sources §4). The key is SHA-256 over the CCJ-1 bytes of the
++// locked package in the distinct source-v1 namespace — never the bare
++// snapshot digest and never a Git commit substituted into the other arm.
++// A runtime-only refresh changes the package, so it changes the key and
++// requires new runtime publication instead of reusing the previous tree.
++//
++// Git draft members keep their accepted commit-keyed leaves: their marker
++// and runtime key migrate to the namespaced identity together in the
++// integration leaf, never one without the other.
++func draftRuntimeKeys(lock *sourcelock.Lock) (map[string]string, error) {
++	keys := make(map[string]string, len(lock.Members))
++	for _, member := range lock.Members {
++		if member.Package.Kind != sourcelock.KindLocalSnapshot {
++			continue
++		}
++		digest, err := member.Package.Digest()
++		if err != nil {
++			return nil, err
++		}
++		key, err := runtimestore.SourceV1Key(digest)
++		if err != nil {
++			return nil, err
++		}
++		keys[member.Name] = key
++	}
++	return keys, nil
++}
++
++// draftRuntimeKey selects the runtime-store leaf of one node: the frozen
++// source-v1 key on the draft lane, the resolved commit on the frozen v1
++// lane. An empty key map keeps the legacy behavior byte-identically.
++func draftRuntimeKey(node *closure.Node, runtimeKeys map[string]string) string {
++	if key, ok := runtimeKeys[node.Name]; ok && key != "" {
++		return key
++	}
++	return node.Resolved.Commit
++}
++
++// draftMarkerPackage translates a locked package identity into the draft
++// marker-v5 arm. The translation is exact: the local arm carries no commit,
++// so a snapshot digest can never enter the Git arm, and a commit can never
++// enter the snapshot arm.
++func draftMarkerPackage(pkg sourcelock.Package) *marker.Package {
++	translated := &marker.Package{
++		Kind:       pkg.Kind,
++		Snapshot:   pkg.Snapshot,
++		Repository: pkg.Repository,
++		Source:     pkg.Source,
++		Directory:  pkg.Directory,
++	}
++	if pkg.IsGit() {
++		translated.Commit = &marker.Commit{ObjectFormat: pkg.Commit.ObjectFormat, Hex: pkg.Commit.Hex}
++	}
++	return translated
++}
++
++// buildDraftMarker stages the install marker of one local-snapshot draft
++// member: marker schema 5 with the frozen package and the binding lock,
++// every retained field carried exactly like the legacy marker. Git draft
++// members keep their accepted legacy shape; only local snapshots — which
++// have no legacy identity at all — reach this builder.
++func buildDraftMarker(
++	node *closure.Node,
++	member sourcelock.Member,
++	lockSHA256 string,
++	effectiveLocale string,
++	agents []string,
++	activeCommands []string,
++	mcp map[string][]string,
++	builds map[string]marker.Build,
++	source *buildsource.Identity,
++) *marker.Marker {
++	var commands []string
++	for name, command := range node.Spec.Commands {
++		if command.Type == "script" || command.Type == "build" {
++			commands = append(commands, name)
++		}
++	}
++	var dependencies []string
++	for name := range node.Spec.Dependencies {
++		dependencies = append(dependencies, name)
++	}
++	var requirements []string
++	for name := range node.Spec.Requirements {
++		requirements = append(requirements, name)
++	}
++	if builds == nil {
++		builds = map[string]marker.Build{}
++	}
++	// Build state is all-or-nothing, exactly like the legacy marker: a
++	// node with no published build carries no build source at all.
++	if node.Spec.SchemaVersion >= 7 {
++		upgraded := make(map[string]marker.Build, len(builds))
++		for command, build := range builds {
++			if build.Driver == "go-v1" {
++				build.ReceiptSchemaVersion = 1
++				build.ExecutionPolicy = "manager-worker-v1"
++			}
++			upgraded[command] = build
++		}
++		builds = upgraded
++	}
++	if len(builds) == 0 {
++		source = nil
++	}
++	buildRoots := append([]string(nil), node.Spec.BuildRoots...)
++	sort.Strings(buildRoots)
++	expected := &marker.Marker{
++		Name:               node.Name,
++		Package:            draftMarkerPackage(member.Package),
++		LockSHA256:         lockSHA256,
++		Locale:             effectiveLocale,
++		Agents:             agents,
++		Commands:           commands,
++		Dependencies:       dependencies,
++		SkillSchemaVersion: node.Spec.SchemaVersion,
++		RuntimeRoots:       node.Spec.RuntimeRoots,
++		BuildRoots:         buildRoots,
++		BuildSource:        source,
++		Builds:             builds,
++		Requirements:       requirements,
++		McpServers:         mcp,
++		Activation:         &marker.Activation{Context: node.ContextActive(), Commands: activeCommands},
++		Requirers:          node.Consumers(),
++	}
++	if !node.ContextActive() {
++		expected.Locale = ""
++		expected.Agents = []string{}
++	}
++	return expected
++}
+diff --git a/internal/install/draftruntime_test.go b/internal/install/draftruntime_test.go
+new file mode 100644
+index 0000000..28c2c96
+--- /dev/null
++++ b/internal/install/draftruntime_test.go
+@@ -0,0 +1,545 @@
++package install
++
++import (
++	"encoding/json"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/closure"
++	"github.com/relux-works/curator/internal/manifest"
++	"github.com/relux-works/curator/internal/marker"
++	"github.com/relux-works/curator/internal/runtimestore"
++	"github.com/relux-works/curator/internal/sourcelock"
++)
++
++// This suite exercises the draft local runtime lane at the production
++// entry (install.Project): scripts and dependency runtimes materialize
++// from immutable local snapshots under source-v1 keys with the existing
++// command, capability, protected-store and shim semantics, and refresh
++// replaces from a new frozen snapshot instead of adopting live bytes.
++
++const draftLocalCollectionPayload = `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["*"]}]}`
++
++// writeDraftScriptSkill writes one local draft package with a runnable
++// script command under a declared runtime root. mutateSpec adjusts the
++// agent-skill.json object (extra dependencies, policies) per case.
++func writeDraftScriptSkill(t *testing.T, dir, name, command, scriptBody string, mutateSpec func(map[string]any)) {
++	t.Helper()
++	if err := os.MkdirAll(filepath.Join(dir, "scripts"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.MkdirAll(filepath.Join(dir, "references"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	skillMD := "---\nname: " + name + "\ndescription: Test\n---\n# " + name + "\n" +
++		"Resolve commands via project .agents/bin lookup, then manager global/bin fallback, " +
++		"then a validated bare command: command -v on POSIX and Get-Command on PowerShell.\n"
++	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(skillMD), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	spec := map[string]any{
++		"schema_version": 4,
++		"capabilities":   map[string]any{},
++		"commands": map[string]any{
++			command: map[string]any{"type": "script", "unix_path": "scripts/" + command + ".sh", "win_path": "scripts/" + command + ".sh"},
++		},
++		"dependencies":  map[string]any{"skills": map[string]any{}},
++		"runtime_roots": []string{"scripts"},
++	}
++	if mutateSpec != nil {
++		mutateSpec(spec)
++	}
++	raw, err := json.Marshal(spec)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(dir, "agent-skill.json"), raw, 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(dir, "scripts", command+".sh"), []byte(scriptBody), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(dir, "references", "info.md"), []byte("context"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++}
++
++func draftLocalInstall(t *testing.T, cfgHome, project string, dryRun bool) Result {
++	t.Helper()
++	cfg := draftTestConfig(cfgHome, t.TempDir())
++	return Project(cfg, project, "test", Options{DryRun: dryRun, DraftSourcesV1: true, Platform: installPlatform()})
++}
++
++func draftLockedRuntimeKey(t *testing.T, project, name string) (lock *sourcelock.Lock, key string) {
++	t.Helper()
++	var err error
++	lock, err = sourcelock.Read(sourcelock.PathIn(project))
++	if err != nil {
++		t.Fatal(err)
++	}
++	member, ok := lock.Find(name)
++	if !ok {
++		t.Fatalf("lock misses %s", name)
++	}
++	digest, err := member.Package.Digest()
++	if err != nil {
++		t.Fatal(err)
++	}
++	key, err = runtimestore.SourceV1Key(digest)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return lock, key
++}
++
++func assertNoLiveLinks(t *testing.T, root string) {
++	t.Helper()
++	if err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
++		if err != nil {
++			return err
++		}
++		if info.Mode()&os.ModeSymlink != 0 {
++			t.Fatalf("protected runtime tree holds a link (must be frozen bytes, never live links): %s", path)
++		}
++		if !info.IsDir() && !info.Mode().IsRegular() {
++			t.Fatalf("protected runtime tree holds a special file: %s", path)
++		}
++		return nil
++	}); err != nil {
++		t.Fatal(err)
++	}
++}
++
++// TestDraftLocalRuntimeMaterializesFromFrozenSnapshot is the acceptance
++// core: a provider skill with a runnable script and a consumer skill with
++// a runnable script plus a skill dependency install for real from one
++// immutable local snapshot, and every published artifact is verified.
++func TestDraftLocalRuntimeMaterializesFromFrozenSnapshot(t *testing.T) {
++	project, home, _ := draftProject(t, draftLocalCollectionPayload, nil)
++	writeDraftScriptSkill(t, filepath.Join(project, "skills", "provider"), "provider", "ptool", "#!/bin/sh\necho provider-ok\n", nil)
++	writeDraftScriptSkill(t, filepath.Join(project, "skills", "consumer"), "consumer", "ctool", "#!/bin/sh\necho consumer-ok\n",
++		func(spec map[string]any) {
++			spec["dependencies"] = map[string]any{
++				"commands": map[string]any{
++					"dep": map[string]any{"type": "skill", "skill": "provider", "command": "ptool"},
++				},
++				"skills": map[string]any{},
++			}
++		})
++	resolveDraftForInstall(t, project, home, draftLocalCollectionPayload)
++
++	result := draftLocalInstall(t, home, project, false)
++	if result.Status != "ok" {
++		t.Fatalf("install = %+v", result)
++	}
++
++	lock, err := sourcelock.Read(sourcelock.PathIn(project))
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, name := range []string{"provider", "consumer"} {
++		member, ok := lock.Find(name)
++		if !ok {
++			t.Fatalf("lock misses %s", name)
++		}
++		_, key := draftLockedRuntimeKey(t, project, name)
++
++		// The declared runtime root materialized under the frozen
++		// package key with the exact snapshot bytes.
++		var script string
++		if name == "provider" {
++			script = "ptool.sh"
++		} else {
++			script = "ctool.sh"
++		}
++		runtimeScript := filepath.Join(home, "runtime", name, key, "scripts", script)
++		payload, err := os.ReadFile(runtimeScript)
++		if err != nil {
++			t.Fatalf("runtime script missing: %v", err)
++		}
++		if !strings.Contains(string(payload), "-ok") {
++			t.Fatalf("runtime script has unexpected bytes: %q", payload)
++		}
++
++		// The protected tree is copied bytes, never live links.
++		assertNoLiveLinks(t, filepath.Join(home, "runtime", name, key))
++
++		// Context installed without the runtime root; the marker binds
++		// the frozen package and lock generation.
++		installed := filepath.Join(project, ".agents", "skills", name)
++		if _, err := os.Stat(filepath.Join(installed, "SKILL.md")); err != nil {
++			t.Fatalf("context missing for %s: %v", name, err)
++		}
++		if _, err := os.Lstat(filepath.Join(installed, "scripts")); !os.IsNotExist(err) {
++			t.Fatalf("runtime root leaked into installed context for %s", name)
++		}
++		recorded := marker.Read(installed)
++		if recorded == nil || recorded.SchemaVersion != marker.SchemaV5 {
++			t.Fatalf("marker for %s is not schema 5: %+v", name, recorded)
++		}
++		if recorded.Package == nil || recorded.Package.Snapshot != member.Package.Snapshot ||
++			recorded.LockSHA256 != lock.LockSHA256 {
++			t.Fatalf("marker for %s does not bind the frozen package: %+v", name, recorded)
++		}
++
++		// The adapter mirror serves the installed context, not the live source.
++		mirrorSkill := filepath.Join(project, ".claude", "skills", name, "SKILL.md")
++		mirrorPayload, err := os.ReadFile(mirrorSkill)
++		if err != nil {
++			t.Fatalf("adapter mirror missing for %s: %v", name, err)
++		}
++		installedPayload, err := os.ReadFile(filepath.Join(installed, "SKILL.md"))
++		if err != nil {
++			t.Fatal(err)
++		}
++		if string(mirrorPayload) != string(installedPayload) {
++			t.Fatalf("adapter mirror for %s does not serve the installed context", name)
++		}
++
++		// The canonical shim reaches the frozen runtime, never the live tree.
++		var shim string
++		if name == "provider" {
++			shim = filepath.Join(project, ".agents", "bin", shimName("ptool"))
++		} else {
++			shim = filepath.Join(project, ".agents", "bin", shimName("ctool"))
++		}
++		shimPayload, err := os.ReadFile(shim)
++		if err != nil {
++			t.Fatalf("shim missing for %s: %v", name, err)
++		}
++		if !strings.Contains(string(shimPayload), filepath.Join("runtime", name)) {
++			t.Fatalf("shim for %s does not reach the protected runtime store:\n%s", name, shimPayload)
++		}
++		if strings.Contains(string(shimPayload), filepath.Join("skills", name)) {
++			t.Fatalf("shim for %s points at the live source tree:\n%s", name, shimPayload)
++		}
++	}
++
++	if runtime.GOOS == "windows" {
++		t.Skip("executes POSIX skill commands")
++	}
++	for command, want := range map[string]string{"ptool": "provider-ok\n", "ctool": "consumer-ok\n"} {
++		out, err := exec.Command(filepath.Join(project, ".agents", "bin", command)).Output()
++		if err != nil {
++			t.Fatalf("shim %s did not run: %v", command, err)
++		}
++		if string(out) != want {
++			t.Fatalf("shim %s output = %q, want %q", command, out, want)
++		}
++	}
++
++	// A second install without changes is current through the v5 marker.
++	again := draftLocalInstall(t, home, project, false)
++	if again.Status != "ok" {
++		t.Fatalf("reinstall = %+v", again)
++	}
++	if !strings.Contains(strings.Join(again.Messages, "\n"), "up-to-date") {
++		t.Fatalf("reinstall did not report up-to-date installations: %q", again.Messages)
++	}
++}
++
++// TestDraftLocalRefreshReplacesFrozenRuntime proves refresh semantics:
++// live edits stay pinned until an explicit refresh reselects, and the
++// refresh publishes a new frozen tree under a new package key instead of
++// adopting live bytes or linking them.
++func TestDraftLocalRefreshReplacesFrozenRuntime(t *testing.T) {
++	project, home, _ := draftProject(t, draftLocalCollectionPayload, nil)
++	script := filepath.Join(project, "skills", "provider", "scripts", "ptool.sh")
++	writeDraftScriptSkill(t, filepath.Join(project, "skills", "provider"), "provider", "ptool", "#!/bin/sh\necho v1\n", nil)
++	resolveDraftForInstall(t, project, home, draftLocalCollectionPayload)
++	if result := draftLocalInstall(t, home, project, false); result.Status != "ok" {
++		t.Fatalf("install v1 = %+v", result)
++	}
++	_, key1 := draftLockedRuntimeKey(t, project, "provider")
++	runtimeScript1 := filepath.Join(home, "runtime", "provider", key1, "scripts", "ptool.sh")
++	if payload, err := os.ReadFile(runtimeScript1); err != nil || !strings.Contains(string(payload), "echo v1") {
++		t.Fatalf("runtime v1 = %q, %v", payload, err)
++	}
++
++	// A live edit without refresh stays pinned: the frozen install keeps
++	// serving the locked bytes and the package key does not move.
++	if err := os.WriteFile(script, []byte("#!/bin/sh\necho v2-live\n"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if result := draftLocalInstall(t, home, project, false); result.Status != "ok" {
++		t.Fatalf("pinned reinstall = %+v", result)
++	}
++	if payload, err := os.ReadFile(runtimeScript1); err != nil || !strings.Contains(string(payload), "echo v1") {
++		t.Fatalf("pinned reinstall adopted live bytes: %q, %v", payload, err)
++	}
++	if _, key := draftLockedRuntimeKey(t, project, "provider"); key != key1 {
++		t.Fatalf("pinned reinstall moved the package key %s -> %s", key1, key)
++	}
++
++	// Explicit refresh reselects: the lock generation moves and the next
++	// install publishes the new frozen tree under a new key.
++	resolveDraftForInstall(t, project, home, draftLocalCollectionPayload)
++	lock, key2 := draftLockedRuntimeKey(t, project, "provider")
++	_ = lock
++	if key2 == key1 {
++		t.Fatalf("refresh left the package key unchanged after a runtime-only edit")
++	}
++	if result := draftLocalInstall(t, home, project, false); result.Status != "ok" {
++		t.Fatalf("install v2 = %+v", result)
++	}
++	runtimeScript2 := filepath.Join(home, "runtime", "provider", key2, "scripts", "ptool.sh")
++	payload, err := os.ReadFile(runtimeScript2)
++	if err != nil || !strings.Contains(string(payload), "echo v2-live") {
++		t.Fatalf("refreshed runtime = %q, %v, want the reselected frozen bytes", payload, err)
++	}
++	assertNoLiveLinks(t, filepath.Join(home, "runtime", "provider", key2))
++	// The refreshed install rebound the marker: it names the new frozen
++	// package and lock generation, so status observes the runtime-only
++	// change even though the projected context stayed identical.
++	recorded := marker.Read(filepath.Join(project, ".agents", "skills", "provider"))
++	if recorded == nil || recorded.SchemaVersion != marker.SchemaV5 {
++		t.Fatalf("refreshed marker is not schema 5: %+v", recorded)
++	}
++	if recorded.LockSHA256 != lock.LockSHA256 {
++		t.Fatalf("refreshed marker binds lock %s, want %s", recorded.LockSHA256, lock.LockSHA256)
++	}
++	member, ok := lock.Find("provider")
++	if !ok {
++		t.Fatalf("refreshed lock misses provider")
++	}
++	if recorded.Package == nil || recorded.Package.Snapshot != member.Package.Snapshot {
++		t.Fatalf("refreshed marker does not bind the reselected package: %+v", recorded.Package)
++	}
++}
++
++// TestDraftLocalTamperedFrozenRuntimeRefuses proves full-inventory
++// authentication covers runtime roots on the mutating path: a tampered
++// script fails source_snapshot_changed before any publication, even though
++// the projected context hash excludes runtime bytes.
++func TestDraftLocalTamperedFrozenRuntimeRefuses(t *testing.T) {
++	project, home, _ := draftProject(t, draftLocalCollectionPayload, nil)
++	writeDraftScriptSkill(t, filepath.Join(project, "skills", "provider"), "provider", "ptool", "#!/bin/sh\necho v1\n", nil)
++	plan := resolveDraftForInstall(t, project, home, draftLocalCollectionPayload)
++	if err := os.WriteFile(filepath.Join(plan.Frozen["provider"], "scripts", "ptool.sh"), []byte("#!/bin/sh\necho TAMPERED\n"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	result := draftLocalInstall(t, home, project, false)
++	if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "source_snapshot_changed") {
++		t.Fatalf("result = %+v, want source_snapshot_changed", result)
++	}
++	assertNoInstallSideEffects(t, project, home)
++}
++
++// TestDraftLocalMissingSnapshotRefuses proves a missing locked snapshot
++// fails unavailable on the mutating path without publishing partial state.
++func TestDraftLocalMissingSnapshotRefuses(t *testing.T) {
++	project, home, _ := draftProject(t, draftLocalCollectionPayload, nil)
++	writeDraftScriptSkill(t, filepath.Join(project, "skills", "provider"), "provider", "ptool", "#!/bin/sh\necho v1\n", nil)
++	plan := resolveDraftForInstall(t, project, home, draftLocalCollectionPayload)
++	for _, tree := range plan.Frozen {
++		if err := os.RemoveAll(filepath.Dir(filepath.Dir(tree))); err != nil {
++			t.Fatal(err)
++		}
++	}
++	result := draftLocalInstall(t, home, project, false)
++	if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "source_snapshot_unavailable") {
++		t.Fatalf("result = %+v, want source_snapshot_unavailable", result)
++	}
++	assertNoInstallSideEffects(t, project, home)
++}
++
++func assertNoInstallSideEffects(t *testing.T, project, home string) {
++	t.Helper()
++	if _, err := os.Lstat(filepath.Join(project, ".agents")); !os.IsNotExist(err) {
++		t.Fatalf("refused install published project state under .agents")
++	}
++	if _, err := os.Lstat(filepath.Join(home, "runtime")); !os.IsNotExist(err) {
++		t.Fatalf("refused install published protected runtime state")
++	}
++}
++
++// TestDraftLocalEnforcedCommandRefused proves script-worker enforcement
++// stays mandatory for draft locals: an enforced command fails on the
++// mutating path before any publication.
++func TestDraftLocalEnforcedCommandRefused(t *testing.T) {
++	payload := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["review"]}]}`
++	project, home, _ := draftProject(t, payload, map[string]string{"skills/review": "review"})
++	dir := filepath.Join(project, "skills", "review")
++	if err := os.MkdirAll(filepath.Join(dir, "scripts"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(dir, "scripts", "tool"), []byte("#!/bin/sh\necho tool\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	spec := map[string]any{
++		"schema_version": 8,
++		"capabilities":   map[string]any{},
++		"runtime_roots":  []string{"scripts"},
++		"commands": map[string]any{
++			"tool": map[string]any{
++				"type": "script", "unix_path": "scripts/tool", "win_path": "scripts/tool",
++				"execution_policy": "script-worker-v1", "interpreter": "python3-v1",
++			},
++		},
++	}
++	raw, _ := json.Marshal(spec)
++	if err := os.WriteFile(filepath.Join(dir, "agent-skill.json"), raw, 0o644); err != nil {
++		t.Fatal(err)
++	}
++	resolveDraftForInstall(t, project, home, payload)
++	result := draftLocalInstall(t, home, project, false)
++	if result.Status != "failed" ||
++		!strings.Contains(strings.Join(result.Errors, ";"), "script_execution_policy_unsupported") {
++		t.Fatalf("result = %+v, want scriptpolicy refusal", result)
++	}
++	assertNoInstallSideEffects(t, project, home)
++}
++
++// TestDraftLocalMissingSystemCommandRefused proves system-command
++// readiness stays mandatory for draft locals.
++func TestDraftLocalMissingSystemCommandRefused(t *testing.T) {
++	project, home, _ := draftProject(t, draftLocalCollectionPayload, nil)
++	writeDraftScriptSkill(t, filepath.Join(project, "skills", "provider"), "provider", "ptool", "#!/bin/sh\necho v1\n", nil)
++	writeDraftScriptSkill(t, filepath.Join(project, "skills", "consumer"), "consumer", "ctool", "#!/bin/sh\necho v1\n",
++		func(spec map[string]any) {
++			spec["dependencies"] = map[string]any{
++				"commands": map[string]any{
++					"sys": map[string]any{"type": "system", "command": "definitely-not-a-real-binary-xyz"},
++				},
++				"skills": map[string]any{},
++			}
++		})
++	resolveDraftForInstall(t, project, home, draftLocalCollectionPayload)
++	result := draftLocalInstall(t, home, project, false)
++	if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "missing system command") {
++		t.Fatalf("result = %+v, want missing system command refusal", result)
++	}
++	assertNoInstallSideEffects(t, project, home)
++}
++
++// TestDraftLocalSkillDependencyRefused proves skill dependency closure
++// stays mandatory for draft locals: an absent provider and a provider
++// without the required script command both fail before publication.
++func TestDraftLocalSkillDependencyRefused(t *testing.T) {
++	skillDepOn := func(skill, command string) func(map[string]any) {
++		return func(spec map[string]any) {
++			spec["dependencies"] = map[string]any{
++				"commands": map[string]any{
++					"dep": map[string]any{"type": "skill", "skill": skill, "command": command},
++				},
++				"skills": map[string]any{},
++			}
++		}
++	}
++	t.Run("absent-provider", func(t *testing.T) {
++		project, home, _ := draftProject(t, draftLocalCollectionPayload, nil)
++		writeDraftScriptSkill(t, filepath.Join(project, "skills", "consumer"), "consumer", "ctool", "#!/bin/sh\necho v1\n",
++			skillDepOn("absent", "ptool"))
++		resolveDraftForInstall(t, project, home, draftLocalCollectionPayload)
++		result := draftLocalInstall(t, home, project, false)
++		if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "missing skill dependency") {
++			t.Fatalf("result = %+v, want missing skill dependency refusal", result)
++		}
++		assertNoInstallSideEffects(t, project, home)
++	})
++	t.Run("provider-without-script-command", func(t *testing.T) {
++		project, home, _ := draftProject(t, draftLocalCollectionPayload, nil)
++		writeDraftPackage(t, filepath.Join(project, "skills", "provider"), "provider")
++		writeDraftScriptSkill(t, filepath.Join(project, "skills", "consumer"), "consumer", "ctool", "#!/bin/sh\necho v1\n",
++			skillDepOn("provider", "ptool"))
++		resolveDraftForInstall(t, project, home, draftLocalCollectionPayload)
++		result := draftLocalInstall(t, home, project, false)
++		if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "does not export a script command") {
++			t.Fatalf("result = %+v, want script-command refusal", result)
++		}
++		assertNoInstallSideEffects(t, project, home)
++	})
++}
++
++// TestDraftLocalInvalidCapabilitiesRefuseAtResolve proves capability
++// declarations stay validated for draft locals: an unknown capability
++// field fails the explicit resolve with source_member_invalid.
++func TestDraftLocalInvalidCapabilitiesRefuseAtResolve(t *testing.T) {
++	payload := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["review"]}]}`
++	project, home, raw := draftProject(t, payload, map[string]string{"skills/review": "review"})
++	spec := map[string]any{
++		"schema_version": 4,
++		"capabilities":   map[string]any{"bogus": true},
++		"commands":       map[string]any{},
++		"dependencies":   map[string]any{"skills": map[string]any{}},
++	}
++	encoded, _ := json.Marshal(spec)
++	if err := os.WriteFile(filepath.Join(project, "skills", "review", "agent-skill.json"), encoded, 0o644); err != nil {
++		t.Fatal(err)
++	}
++	m, err := manifest.ParseBytesWithOptions(raw, filepath.Join(project, "Skillfile.json"), manifest.ParseOptions{DraftSourcesV1: true})
++	if err != nil {
++		t.Fatal(err)
++	}
++	_, err = closure.ResolveDraft(closure.DraftResolveConfig{ProjectRoot: project, Home: home, Manifest: m, ManifestPayload: raw})
++	if err == nil || !strings.Contains(err.Error(), "source_member_invalid") {
++		t.Fatalf("resolve err = %v, want source_member_invalid", err)
++	}
++}
++
++// TestDraftMarkerPackageDigestMatchesLockDigest pins the two package
++// preimage implementations together: the marker v5 package and the lock
++// member hash identically, so runtime store, status, repair, rollback and
++// GC follow one key.
++func TestDraftMarkerPackageDigestMatchesLockDigest(t *testing.T) {
++	project, home, _ := draftProject(t, draftLocalCollectionPayload, nil)
++	writeDraftScriptSkill(t, filepath.Join(project, "skills", "provider"), "provider", "ptool", "#!/bin/sh\necho v1\n", nil)
++	resolveDraftForInstall(t, project, home, draftLocalCollectionPayload)
++	lock, err := sourcelock.Read(sourcelock.PathIn(project))
++	if err != nil {
++		t.Fatal(err)
++	}
++	member, ok := lock.Find("provider")
++	if !ok {
++		t.Fatalf("lock misses provider")
++	}
++	lockDigest, err := member.Package.Digest()
++	if err != nil {
++		t.Fatal(err)
++	}
++	markerDigest, err := draftMarkerPackage(member.Package).Digest()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if lockDigest != markerDigest {
++		t.Fatalf("marker digest %s != lock digest %s", markerDigest, lockDigest)
++	}
++	if key, err := runtimestore.SourceV1Key(lockDigest); err != nil {
++		t.Fatalf("lock digest does not name a runtime key: %v", err)
++	} else if keys, err := draftRuntimeKeys(lock); err != nil || keys["provider"] != key {
++		t.Fatalf("runtime keys = %v, %v, want provider=%s", keys, err, key)
++	}
++}
++
++// TestDraftRuntimeKeysSkipGitMembers proves the interim boundary: only
++// local snapshots take source-v1 keys, while Git draft members keep their
++// accepted commit-keyed leaves until marker and key migrate together.
++func TestDraftRuntimeKeysSkipGitMembers(t *testing.T) {
++	localPkg, err := sourcelock.LocalPackage("sha256:" + strings.Repeat("ab", 32))
++	if err != nil {
++		t.Fatal(err)
++	}
++	gitPkg, err := sourcelock.NetworkGitPackage("example.org/kit",
++		sourcelock.Commit{ObjectFormat: "sha1", Hex: strings.Repeat("cd", 20)}, "skills/review")
++	if err != nil {
++		t.Fatal(err)
++	}
++	lock := &sourcelock.Lock{Members: []sourcelock.Member{
++		{Name: "local", Package: localPkg},
++		{Name: "review", Package: gitPkg},
++	}}
++	keys, err := draftRuntimeKeys(lock)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if _, ok := keys["local"]; !ok {
++		t.Fatalf("keys = %v, want a source-v1 key for the local member", keys)
++	}
++	if _, ok := keys["review"]; ok {
++		t.Fatalf("keys = %v, the Git member must keep its commit-keyed leaf", keys)
++	}
++}
+diff --git a/internal/install/global.go b/internal/install/global.go
+index 1d86375..51e9d16 100644
+--- a/internal/install/global.go
++++ b/internal/install/global.go
+@@ -391,9 +391,12 @@ func stageGlobalTargets(request globalTargetRequest) (scopeTargets, error) {
+ 		return scopeTargets{}, err
+ 	}
+ 
++	// The global scope has no draft lane: a nil key map keeps the
++	// resolved-commit runtime behavior byte-identically.
+ 	runtime, err := stageRuntimeAndShims(
+ 		stageRoot, request.home, request.binDir, request.nodes,
+ 		runtimestore.GlobalCanonicalShim, request.platform, request.scoped, request.plan.plannedInputs(), request.external.entries, request.externalStoreRoot,
++		nil,
+ 	)
+ 	if err != nil {
+ 		return scopeTargets{}, err
+diff --git a/internal/install/install.go b/internal/install/install.go
+index 29818ca..07987d7 100644
+--- a/internal/install/install.go
++++ b/internal/install/install.go
+@@ -546,6 +546,21 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
+ 	binDir := filepath.Join(projectRoot, ".agents", "bin")
+ 	hybridStore := scopes.HybridSkillsRoot(cfg.Home())
+ 	hybridNames := hybridStoreNames(nodes, projectDeclared)
++	if draftLock != nil {
++		// Collection selectors carry no manifest declaration name, so
++		// the manifest-seeded walk above strands every collection root
++		// in the machine hybrid store. The lock names the exact root
++		// set instead: members carrying a selection index are direct
++		// project selections (skillfile-sources §3), transitives stay
++		// reachable through their requirers like on the legacy lane.
++		declared := make(map[string]bool, len(draftLock.Members))
++		for _, member := range draftLock.Members {
++			if member.Selection != nil {
++				declared[member.Name] = true
++			}
++		}
++		hybridNames = hybridStoreNames(nodes, declared)
++	}
+ 
+ 	// 16. Moved tags. This gate reads installed generations, so every marker it
+ 	// consults joins the same optimistic observation set the declaration inputs
+@@ -638,6 +653,18 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
+ 	// 20. Serialized publication and commit. Everything below the private build
+ 	// staging is derived and published under one manager-home mutation lock, in
+ 	// deterministic classes, with the machine-wide consumer ledger last.
++	// The draft lane publishes script runtimes under the frozen source-v1
++	// keys derived here, before any staging runs: a member whose package
++	// identity cannot be hashed fails before the first live mutation.
++	var runtimeKeys map[string]string
++	if draftLock != nil {
++		keys, err := draftRuntimeKeys(draftLock)
++		if err != nil {
++			result.failf("%v", err)
++			return result, nil
++		}
++		runtimeKeys = keys
++	}
+ 	outcome, commitErr := runCommit(opts.context(), commitRequest{
+ 		scope:       alias,
+ 		home:        cfg.Home(),
+@@ -655,6 +682,7 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
+ 				skillsDir: skillsDir, binDir: binDir, hybridStore: hybridStore,
+ 				plan: plan, deps: deps, scoped: scoped, verbose: opts.Verbose,
+ 				external: externalStaged, externalStoreRoot: externalPlan.deps.StoreRoot,
++				draftLock: draftLock, runtimeKeys: runtimeKeys,
+ 			})
+ 		},
+ 	})
+@@ -713,6 +741,11 @@ type projectTargetRequest struct {
+ 	verbose           bool
+ 	external          stagedExternal
+ 	externalStoreRoot string
++	// draftLock is the consumed frozen lock on the draft lane and nil on
++	// the frozen v1 lane. runtimeKeys overrides the commit-keyed runtime
++	// leaf per node with the frozen source-v1 key.
++	draftLock   *sourcelock.Lock
++	runtimeKeys map[string]string
+ }
+ 
+ // stageProjectTargets derives the complete desired state of one project under
+@@ -737,6 +770,7 @@ func stageProjectTargets(request projectTargetRequest) (scopeTargets, error) {
+ 	runtime, err := stageRuntimeAndShims(
+ 		stageRoot, request.cfg.Home(), request.binDir, request.nodes,
+ 		runtimestore.ProjectShim, request.platform, request.scoped, request.plan.plannedInputs(), request.external.entries, request.externalStoreRoot,
++		request.runtimeKeys,
+ 	)
+ 	if err != nil {
+ 		return scopeTargets{}, err
+@@ -761,9 +795,11 @@ func stageProjectTargets(request projectTargetRequest) (scopeTargets, error) {
+ 		} else {
+ 			expectedSkills[node.Name] = true
+ 		}
+-		expected := buildMarker(node, nodeLocale, nodeAgents, node.ActiveCommandNames(),
+-			request.mcpFound[node.Name], request.attestations[node.Name],
+-			runtime.builds[node.Name], request.plan.sourceIdentity(node.Name))
++		expected, err := request.buildNodeMarker(node, nodeLocale, nodeAgents,
++			runtime.builds[node.Name])
++		if err != nil {
++			return scopeTargets{}, err
++		}
+ 		nodePlan, status, err := stageNode(stageRoot, nodeInstall{
+ 			node: node, store: store, kind: kind, locale: nodeLocale, agents: nodeAgents, expected: expected,
+ 		}, request.deps.Clock)
+@@ -988,6 +1024,35 @@ func validateNodes(nodes []*closure.Node, localeValue, alias string, result *Res
+ 	return valid
+ }
+ 
++// buildNodeMarker stages the install marker of one project node. On the
++// draft lane a local-snapshot member carries no legacy source identity, so
++// it records marker schema 5 with its frozen package and binding lock;
++// every other member — frozen v1 nodes and Git draft members with their
++// accepted legacy shape — records the legacy marker byte-identically.
++func (request projectTargetRequest) buildNodeMarker(
++	node *closure.Node,
++	nodeLocale string,
++	nodeAgents []string,
++	builds map[string]marker.Build,
++) (*marker.Marker, error) {
++	active := node.ActiveCommandNames()
++	source := request.plan.sourceIdentity(node.Name)
++	if request.draftLock != nil {
++		member, ok := request.draftLock.Find(node.Name)
++		if !ok {
++			return nil, fmt.Errorf("source_member_missing: %s is not a locked member", node.Name)
++		}
++		if member.Package.Kind == sourcelock.KindLocalSnapshot {
++			return buildDraftMarker(node, member, request.draftLock.LockSHA256,
++				nodeLocale, nodeAgents, active,
++				request.mcpFound[node.Name], builds, source), nil
++		}
++	}
++	return buildMarker(node, nodeLocale, nodeAgents, active,
++		request.mcpFound[node.Name], request.attestations[node.Name],
++		builds, source), nil
++}
++
+ func buildMarker(
+ 	node *closure.Node,
+ 	effectiveLocale string,
+diff --git a/internal/install/targets.go b/internal/install/targets.go
+index 402c383..5f8f046 100644
+--- a/internal/install/targets.go
++++ b/internal/install/targets.go
+@@ -146,6 +146,11 @@ type runtimeStaging struct {
+ // stageRuntimeAndShims derives every runtime tree, canonical launcher, and
+ // stale launcher removal of one scope without touching a live path.
+ //
++// runtimeKeys optionally overrides the commit-keyed runtime leaf per node:
++// the draft lane passes frozen source-v1 keys for its local-snapshot
++// members (which carry no commit) so they materialize under their package
++// identity. A nil map keeps the resolved-commit behavior byte-identically.
++//
+ // A compiled command resolves through the protected cache entry that the
+ // commit phase already published or verified, so a launcher can only ever point
+ // at an immutable protected artifact — never at a snapshot or private path.
+@@ -158,6 +163,7 @@ func stageRuntimeAndShims(
+ 	plannedInputs map[string]map[string]plannedBuildInput,
+ 	external map[string]map[string]externalEntry,
+ 	externalRoot string,
++	runtimeKeys map[string]string,
+ ) (runtimeStaging, error) {
+ 	result := runtimeStaging{commands: map[string]bool{}, builds: map[string]map[string]marker.Build{}}
+ 	var specs []runtimestore.ShimSpec
+@@ -176,8 +182,9 @@ func stageRuntimeAndShims(
+ 		}
+ 		targets := map[string]runtimestore.RuntimeTarget{}
+ 		if len(scriptCommands) > 0 {
++			runtimeKey := draftRuntimeKey(node, runtimeKeys)
+ 			runtimePlan, err := runtimestore.PrepareScriptRuntime(stageRoot, runtimestore.ScriptRuntimeSpec{
+-				Home: home, SkillName: node.Name, Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
++				Home: home, SkillName: node.Name, Commit: runtimeKey, Snapshot: node.Snapshot,
+ 				RuntimeRoots: node.Spec.RuntimeRoots, Commands: scriptCommands, Platform: platform,
+ 			})
+ 			if err != nil {
+@@ -185,7 +192,7 @@ func stageRuntimeAndShims(
+ 			}
+ 			if runtimePlan.Desired != nil {
+ 				result.plan.Replace(staging.ClassRuntime,
+-					node.Name+"/"+node.Resolved.Commit,
++					node.Name+"/"+runtimeKey,
+ 					runtimePlan.Desired.LivePath, runtimePlan.Desired.StagedPath)
+ 			}
+ 			for name, target := range runtimePlan.Commands {
+diff --git a/internal/marker/marker.go b/internal/marker/marker.go
+index 870bc9c..0392861 100644
+--- a/internal/marker/marker.go
++++ b/internal/marker/marker.go
+@@ -4,6 +4,8 @@ package marker
+ 
+ import (
+ 	"bytes"
++	"crypto/sha256"
++	"encoding/hex"
+ 	"encoding/json"
+ 	"errors"
+ 	"fmt"
+@@ -12,6 +14,7 @@ import (
+ 	"reflect"
+ 	"regexp"
+ 	"sort"
++	"strings"
+ 	"time"
+ 	"unicode/utf8"
+ 
+@@ -40,16 +43,26 @@ const (
+ 	// 8 and no other difference, so every marker-v3 build-record rule applies
+ 	// to it unchanged.
+ 	PolicySchemaVersion = 4
++	// SchemaV5 is written only for skillfile-sources draft installations
++	// (Skillfile schema 2). Its package replaces the legacy
++	// source/git/ref_kind/ref/commit fields and its lock_sha256 binds the
++	// installed selection through the validated lock. Legacy lanes never
++	// write it; Git draft members keep their accepted legacy shape until
++	// the integration leaf migrates them, so only local-snapshot packages
++	// reach it today.
++	SchemaV5 = 5
+ 	// NewestSchemaVersion is the highest marker schema this release reads. It
+ 	// is what an operator is told when a document from a newer manager is
+ 	// refused, so it must advance with every new readable schema.
+-	NewestSchemaVersion = PolicySchemaVersion
++	NewestSchemaVersion = SchemaV5
+ )
+ 
+ var (
+-	markerCommitRE = regexp.MustCompile(`^[0-9a-f]{40}(?:[0-9a-f]{24})?$`)
+-	markerSHA256RE = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+-	markerKeyIDRE  = regexp.MustCompile(`^[0-9a-f]{16}$`)
++	markerCommitRE    = regexp.MustCompile(`^[0-9a-f]{40}(?:[0-9a-f]{24})?$`)
++	markerSHA256RE    = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
++	markerSHA1RE      = regexp.MustCompile(`^[0-9a-f]{40}$`)
++	markerSHA256HexRE = regexp.MustCompile(`^[0-9a-f]{64}$`)
++	markerKeyIDRE     = regexp.MustCompile(`^[0-9a-f]{16}$`)
+ )
+ 
+ // Activation records how the node was activated.
+@@ -148,14 +161,36 @@ type RepositorySubstitute struct {
+ 	Ref  *RepositoryRef `json:"ref,omitempty"`
+ }
+ 
++// Package is the draft marker-v5 frozen package identity. It mirrors
++// the disjoint source-types arms: a local snapshot never carries Git
++// fields and a Git package never carries a snapshot digest. The digest
++// forms are never substituted across arms.
++type Package struct {
++	Kind       string  `json:"kind"`
++	Snapshot   string  `json:"snapshot,omitempty"`
++	Repository string  `json:"repository,omitempty"`
++	Source     string  `json:"source,omitempty"`
++	Commit     *Commit `json:"commit,omitempty"`
++	Directory  string  `json:"directory,omitempty"`
++}
++
++// Commit is a locked Git object: format-bound lowercase hex, never a
++// snapshot digest and never prefixed.
++type Commit struct {
++	ObjectFormat string `json:"object_format"`
++	Hex          string `json:"hex"`
++}
++
+ // Marker is the install marker payload (Spec §8.5).
+ type Marker struct {
+ 	SchemaVersion      int                   `json:"schema_version"`
+ 	Name               string                `json:"name"`
+-	Source             string                `json:"source"`
+-	RefKind            string                `json:"ref_kind"`
+-	Ref                string                `json:"ref"`
+-	Commit             string                `json:"commit"`
++	Source             string                `json:"source,omitempty"`
++	RefKind            string                `json:"ref_kind,omitempty"`
++	Ref                string                `json:"ref,omitempty"`
++	Commit             string                `json:"commit,omitempty"`
++	Package            *Package              `json:"package,omitempty"`
++	LockSHA256         string                `json:"lock_sha256,omitempty"`
+ 	ContentSHA256      string                `json:"content_sha256"`
+ 	Locale             string                `json:"locale,omitempty"`
+ 	Agents             []string              `json:"agents"`
+@@ -218,6 +253,10 @@ func (m Marker) MarshalJSON() ([]byte, error) {
+ 		delete(object, "build_source")
+ 		delete(object, "builds")
+ 	}
++	// A draft v5 marker carries no legacy source identity: the replaced
++	// fields stay empty and omitempty keeps them absent, so no reader can
++	// mistake one for an unattributed legacy marker. A builder that sets
++	// them fails v5 validation below instead of being silently masked.
+ 	return json.Marshal(object)
+ }
+ 
+@@ -262,6 +301,17 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
+ 	case ExternalSchemaVersion, PolicySchemaVersion:
+ 		required = append(required, "build_roots", "builds")
+ 		allowed = append(allowed, "build_roots", "build_source", "builds")
++	case SchemaV5:
++		// The frozen package replaces every legacy source field, so v5
++		// carries its own required set without them.
++		required = []string{
++			"schema_version", "name", "package", "lock_sha256", "content_sha256", "locale",
++			"agents", "commands", "dependencies", "skill_schema_version", "runtime_roots",
++			"build_roots", "builds", "installed_at", "files",
++		}
++		allowed = append(append([]string(nil), required...),
++			"requirements", "mcp_servers", "attestation", "activation", "requirers", "substituted",
++			"build_source")
+ 	default:
+ 		return false
+ 	}
+@@ -270,18 +320,28 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
+ 			return false
+ 		}
+ 	}
+-	if !onlyFields(raw, allowed) || !identifiers.Valid(m.Name) || !identifiers.PortablePath(m.Source) ||
++	if !onlyFields(raw, allowed) || !identifiers.Valid(m.Name) {
++		return false
++	}
++	if m.SchemaVersion == SchemaV5 {
++		if !validV5Identity(m, raw) {
++			return false
++		}
++	} else if !identifiers.PortablePath(m.Source) ||
+ 		(m.RefKind != "tag" && m.RefKind != "branch" && m.RefKind != "revision") ||
+-		m.Ref == "" || utf8.RuneCountInString(m.Ref) > 8192 || !markerCommitRE.MatchString(m.Commit) ||
+-		!markerSHA256RE.MatchString(m.ContentSHA256) || m.SkillSchemaVersion < 0 ||
++		m.Ref == "" || utf8.RuneCountInString(m.Ref) > 8192 || !markerCommitRE.MatchString(m.Commit) {
++		return false
++	}
++	if !markerSHA256RE.MatchString(m.ContentSHA256) || m.SkillSchemaVersion < 0 ||
+ 		(m.SchemaVersion == LegacySchemaVersion && m.SkillSchemaVersion > 5) ||
+ 		(m.SchemaVersion == SchemaVersion && m.SkillSchemaVersion > 6) ||
+ 		(m.SchemaVersion == ExternalSchemaVersion && m.SkillSchemaVersion != 7) ||
+-		(m.SchemaVersion == PolicySchemaVersion && m.SkillSchemaVersion != 8) {
++		(m.SchemaVersion == PolicySchemaVersion && m.SkillSchemaVersion != 8) ||
++		(m.SchemaVersion == SchemaV5 && (m.SkillSchemaVersion < 1 || m.SkillSchemaVersion > 8)) {
+ 		return false
+ 	}
+ 	setsSorted := m.SchemaVersion == SchemaVersion || m.SchemaVersion == ExternalSchemaVersion ||
+-		m.SchemaVersion == PolicySchemaVersion
++		m.SchemaVersion == PolicySchemaVersion || m.SchemaVersion == SchemaV5
+ 	if !validNullableLocale(raw["locale"], m.Locale) || !validTimestamp(m.InstalledAt) ||
+ 		!validIdentifierSet(m.Agents, setsSorted) || !validIdentifierSet(m.Commands, setsSorted) ||
+ 		!validIdentifierSet(m.Dependencies, setsSorted) || !validPathSet(m.RuntimeRoots, setsSorted) ||
+@@ -329,12 +389,227 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
+ 		}
+ 	}
+ 	if (m.SchemaVersion == SchemaVersion || m.SchemaVersion == ExternalSchemaVersion ||
+-		m.SchemaVersion == PolicySchemaVersion) && !validBuildState(m, raw) {
++		m.SchemaVersion == PolicySchemaVersion || m.SchemaVersion == SchemaV5) && !validBuildState(m, raw) {
++		return false
++	}
++	return true
++}
++
++// validV5Identity enforces the draft marker-v5 identity: the frozen package
++// replaces every legacy source field, the lock binds the installed selection
++// through the validated lock, and a local snapshot admits neither a network
++// attestation nor a development substitution.
++func validV5Identity(m *Marker, raw map[string]json.RawMessage) bool {
++	for _, field := range []string{"source", "git", "ref_kind", "ref", "commit"} {
++		if _, present := raw[field]; present {
++			return false
++		}
++	}
++	if !validV5PackageShape(raw["package"]) || !validV5Package(m.Package) {
++		return false
++	}
++	if !markerSHA256RE.MatchString(m.LockSHA256) {
++		return false
++	}
++	if m.Package.Kind == "local-snapshot" {
++		if _, present := raw["attestation"]; present {
++			return false
++		}
++		if _, present := raw["substituted"]; present {
++			return false
++		}
++	}
++	return true
++}
++
++// v5PackageArms is the closed raw shape of every source-types package arm:
++// the exact member set the schema admits, each bound to its JSON type. The
++// shared Package struct knows the fields of every arm, so a decoded value
++// cannot tell a foreign field carrying null or "" from an absent one; the
++// raw object can, and must be checked before the lossy decode.
++var v5PackageArms = map[string]map[string]string{
++	"local-snapshot": {"kind": "string", "snapshot": "string"},
++	"network-git":    {"kind": "string", "repository": "string", "commit": "object", "directory": "string"},
++	"configured-git": {"kind": "string", "source": "string", "commit": "object", "directory": "string"},
++}
++
++// v5CommitShape is the closed lockedCommit object: both members required,
++// both strings.
++var v5CommitShape = map[string]string{"object_format": "string", "hex": "string"}
++
++// validV5PackageShape validates the raw package object against the closed
++// shape of its arm: every arm member present with the right JSON type,
++// nothing else present even as null or empty, and the nested commit object
++// closed the same way. Duplicate keys and trailing data were already
++// refused by protocoljson.Validate over the whole document.
++func validV5PackageShape(raw json.RawMessage) bool {
++	object, ok := rawObject(raw)
++	if !ok {
++		return false
++	}
++	var kind string
++	if kindRaw, present := object["kind"]; !present || json.Unmarshal(kindRaw, &kind) != nil {
++		return false
++	}
++	arm, known := v5PackageArms[kind]
++	if !known || !closedRawShape(object, arm) {
++		return false
++	}
++	if commitRaw, present := object["commit"]; present {
++		commit, ok := rawObject(commitRaw)
++		if !ok || !closedRawShape(commit, v5CommitShape) {
++			return false
++		}
++	}
++	return true
++}
++
++// closedRawShape reports whether object carries exactly the members of
++// shape, each with the declared JSON type. A null member is neither absent
++// nor of its type, so it is refused either way.
++func closedRawShape(object map[string]json.RawMessage, shape map[string]string) bool {
++	if len(object) != len(shape) {
++		return false
++	}
++	for member, kind := range shape {
++		value, present := object[member]
++		if !present || rawJSONType(value) != kind {
++			return false
++		}
++	}
++	return true
++}
++
++// rawJSONType names the JSON type of a raw value: string, object, or
++// "" for anything else (null, numbers, booleans, arrays, malformed).
++func rawJSONType(raw json.RawMessage) string {
++	trimmed := bytes.TrimSpace(raw)
++	switch {
++	case len(trimmed) == 0:
++		return ""
++	case trimmed[0] == '"':
++		var s string
++		if json.Unmarshal(trimmed, &s) != nil {
++			return ""
++		}
++		return "string"
++	case trimmed[0] == '{':
++		if _, ok := rawObject(trimmed); !ok {
++			return ""
++		}
++		return "object"
++	default:
++		return ""
++	}
++}
++
++// validV5Package mirrors the disjoint source-types arms: a local snapshot
++// never carries Git fields and a Git package never carries a snapshot
++// digest. Digest forms are never substituted across arms.
++func validV5Package(p *Package) bool {
++	if p == nil {
++		return false
++	}
++	switch p.Kind {
++	case "local-snapshot":
++		if !markerSHA256RE.MatchString(p.Snapshot) {
++			return false
++		}
++		if p.Repository != "" || p.Source != "" || p.Commit != nil || p.Directory != "" {
++			return false
++		}
++	case "network-git":
++		if p.Snapshot != "" || p.Source != "" {
++			return false
++		}
++		if p.Repository == "" || strings.HasSuffix(p.Repository, ".git") {
++			return false
++		}
++		if !validV5Commit(p.Commit) {
++			return false
++		}
++		if p.Directory != "." && (!identifiers.PortablePath(p.Directory) || strings.ContainsAny(p.Directory, "*?[]")) {
++			return false
++		}
++	case "configured-git":
++		if p.Snapshot != "" || p.Repository != "" {
++			return false
++		}
++		if !identifiers.PortablePath(p.Source) {
++			return false
++		}
++		if !validV5Commit(p.Commit) {
++			return false
++		}
++		if p.Directory != "." {
++			return false
++		}
++	default:
+ 		return false
+ 	}
+ 	return true
+ }
+ 
++// validV5Commit enforces the lockedCommit shape: sha1 binds 40 hex, sha256
++// binds 64. A snapshot digest never satisfies it: it carries a prefix the
++// bare hex grammar rejects.
++func validV5Commit(c *Commit) bool {
++	if c == nil {
++		return false
++	}
++	switch c.ObjectFormat {
++	case "sha1":
++		return markerSHA1RE.MatchString(c.Hex)
++	case "sha256":
++		return markerSHA256HexRE.MatchString(c.Hex)
++	default:
++		return false
++	}
++}
++
++// object renders the canonical package preimage: exactly the disjoint
++// source-types arms the lock validation hashes, so a marker package and
++// its lock member digest identically.
++func (p *Package) object() map[string]any {
++	if p == nil {
++		return nil
++	}
++	switch p.Kind {
++	case "network-git":
++		return map[string]any{
++			"kind":       p.Kind,
++			"repository": p.Repository,
++			"commit":     map[string]any{"object_format": p.Commit.ObjectFormat, "hex": p.Commit.Hex},
++			"directory":  p.Directory,
++		}
++	case "configured-git":
++		return map[string]any{
++			"kind":      p.Kind,
++			"source":    p.Source,
++			"commit":    map[string]any{"object_format": p.Commit.ObjectFormat, "hex": p.Commit.Hex},
++			"directory": p.Directory,
++		}
++	default:
++		return map[string]any{"kind": p.Kind, "snapshot": p.Snapshot}
++	}
++}
++
++// Digest returns the sha256:<hex> content identity of the package over its
++// CCJ-1 bytes. It must agree with the lock package digest for the same
++// identity: the runtime store, status, repair, rollback and GC all follow
++// this key, and a mismatch would strand or sweep live trees.
++func (p *Package) Digest() (string, error) {
++	if !validV5Package(p) {
++		return "", fmt.Errorf("draft marker package is invalid")
++	}
++	canonical, err := protocoljson.MarshalCanonical(p.object())
++	if err != nil {
++		return "", err
++	}
++	sum := sha256.Sum256(canonical)
++	return "sha256:" + hex.EncodeToString(sum[:]), nil
++}
++
+ func onlyFields(raw map[string]json.RawMessage, allowed []string) bool {
+ 	fields := make(map[string]bool, len(allowed))
+ 	for _, field := range allowed {
+@@ -380,7 +655,11 @@ func validBuildState(m *Marker, raw map[string]json.RawMessage) bool {
+ 		if unixErr != nil || windowsErr != nil || (build.ArtifactPath != unixPath && build.ArtifactPath != windowsPath) {
+ 			return false
+ 		}
+-		if m.SchemaVersion == SchemaVersion {
++		// A draft v5 marker carries its build entries through with the arm
++		// the legacy lane would have selected for the same skill schema,
++		// so the source-aware receipt upgrade (sibling scope) can narrow
++		// this mapping without touching the identity plumbing.
++		if m.SchemaVersion == SchemaVersion || (m.SchemaVersion == SchemaV5 && m.SkillSchemaVersion < 7) {
+ 			if build.Driver != buildmeta.DriverGoV1 || build.ReceiptSchemaVersion != 0 || build.ExecutionPolicy != "" || hasRepositoryState(build) {
+ 				return false
+ 			}
+@@ -531,7 +810,7 @@ func rawObject(raw json.RawMessage) (map[string]json.RawMessage, bool) {
+ // silently reports a perfectly current installation as needing reinstallation
+ // the moment the written schema advances.
+ func BuildBearingSchema(version int) bool {
+-	return version == SchemaVersion || externalCapableSchema(version)
++	return version == SchemaVersion || version == SchemaV5 || externalCapableSchema(version)
+ }
+ 
+ // externalCapableSchema reports whether a marker of this schema can record
+@@ -546,15 +825,22 @@ func externalCapableSchema(version int) bool {
+ // only the written version advances with the manifest band.
+ func SupportedSchema(version int) bool {
+ 	return version == LegacySchemaVersion || version == SchemaVersion ||
+-		version == ExternalSchemaVersion || version == PolicySchemaVersion
++		version == ExternalSchemaVersion || version == PolicySchemaVersion ||
++		version == SchemaV5
+ }
+ 
+ // Write stores the marker inside dir with sorted keys and a trailing newline.
++//
++// A marker carrying a frozen draft package is always schema 5, regardless
++// of skill manifest version; every other marker keeps the legacy
++// skill-schema band byte-identically.
+ func Write(dir string, m *Marker) error {
+ 	if m == nil {
+ 		return errors.New("install marker is nil")
+ 	}
+ 	switch {
++	case m.Package != nil:
++		m.SchemaVersion = SchemaV5
+ 	case m.SkillSchemaVersion >= 8:
+ 		m.SchemaVersion = PolicySchemaVersion
+ 	case m.SkillSchemaVersion == 7:
+@@ -639,6 +925,22 @@ func Current(installedDir string, expected *Marker, buildState ...BuildCurrentne
+ 	if recorded.RefKind != expected.RefKind || recorded.Ref != expected.Ref || recorded.Commit != expected.Commit {
+ 		return false, nil
+ 	}
++	// A draft marker is current only for the exact frozen package and lock
++	// generation it was installed from: a runtime-only refresh changes the
++	// package identity while the projected context stays identical, so the
++	// lock comparison below is what observes it. The expectation is staged
++	// fresh on every run, so its schema version is unset until Write; the
++	// frozen package it carries is what selects the v5 comparison. A v5
++	// marker never matches a legacy one; changed registry, substitution,
++	// declared ref, package or lock makes the installation non-current.
++	if recorded.SchemaVersion == SchemaV5 || expected.Package != nil {
++		if recorded.SchemaVersion != SchemaV5 || expected.Package == nil {
++			return false, nil
++		}
++		if !reflect.DeepEqual(recorded.Package, expected.Package) || recorded.LockSHA256 != expected.LockSHA256 {
++			return false, nil
++		}
++	}
+ 	if recorded.Locale != expected.Locale {
+ 		return false, nil
+ 	}
+diff --git a/internal/marker/marker_v5_test.go b/internal/marker/marker_v5_test.go
+new file mode 100644
+index 0000000..d65fae7
+--- /dev/null
++++ b/internal/marker/marker_v5_test.go
+@@ -0,0 +1,310 @@
++package marker
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/hashing"
++)
++
++// v5LocalMarker returns a minimal valid local-snapshot draft marker. The
++// caller stamps content fields (content hash, files, installed_at) through
++// Write like production staging does.
++func v5LocalMarker() *Marker {
++	return &Marker{
++		Name:               "review",
++		Package:            &Package{Kind: "local-snapshot", Snapshot: "sha256:" + strings.Repeat("ab", 32)},
++		LockSHA256:         "sha256:" + strings.Repeat("cd", 32),
++		ContentSHA256:      "sha256:" + strings.Repeat("ef", 32),
++		Locale:             "en",
++		Agents:             []string{"claude_code"},
++		Commands:           []string{"tool"},
++		Dependencies:       []string{},
++		SkillSchemaVersion: 4,
++		RuntimeRoots:       []string{"scripts"},
++		BuildRoots:         []string{},
++		InstalledAt:        "2026-09-18T00:00:00Z",
++		Files:              []string{"SKILL.md"},
++		Builds:             map[string]Build{},
++		Activation:         &Activation{Context: true, Commands: []string{"tool"}},
++		Requirers:          []string{"<project>"},
++	}
++}
++
++func writeV5(t *testing.T, m *Marker) (string, *Marker) {
++	t.Helper()
++	dir := t.TempDir()
++	if err := os.MkdirAll(filepath.Join(dir, "references"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("content"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(dir, "references", "info.md"), []byte("context"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	hash, err := hashing.ContentSHA256(dir, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	m.ContentSHA256 = hash
++	m.Files = []string{"SKILL.md", "references/info.md"}
++	if err := Write(dir, m); err != nil {
++		t.Fatalf("Write = %v", err)
++	}
++	recorded := Read(dir)
++	if recorded == nil {
++		t.Fatalf("Read returned nil for a freshly written v5 marker")
++	}
++	return dir, recorded
++}
++
++func TestMarkerV5LocalRoundTrip(t *testing.T) {
++	dir, recorded := writeV5(t, v5LocalMarker())
++	_ = dir
++	if recorded.SchemaVersion != SchemaV5 {
++		t.Fatalf("schema = %d, want %d", recorded.SchemaVersion, SchemaV5)
++	}
++	if recorded.Package == nil || recorded.Package.Kind != "local-snapshot" ||
++		recorded.Package.Snapshot != "sha256:"+strings.Repeat("ab", 32) {
++		t.Fatalf("package = %+v", recorded.Package)
++	}
++	if recorded.LockSHA256 != "sha256:"+strings.Repeat("cd", 32) {
++		t.Fatalf("lock = %q", recorded.LockSHA256)
++	}
++	// The replaced legacy identity is absent, never empty.
++	payload, err := os.ReadFile(filepath.Join(dir, Name))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var raw map[string]json.RawMessage
++	if err := json.Unmarshal(payload, &raw); err != nil {
++		t.Fatal(err)
++	}
++	for _, field := range []string{"source", "git", "ref_kind", "ref", "commit", "substituted", "attestation"} {
++		if _, present := raw[field]; present {
++			t.Fatalf("v5 marker carries replaced/forbidden field %q", field)
++		}
++	}
++}
++
++func TestMarkerV5Currentness(t *testing.T) {
++	m := v5LocalMarker()
++	dir, recorded := writeV5(t, m)
++	// An identical restaging is current.
++	fresh := v5LocalMarker()
++	fresh.ContentSHA256 = recorded.ContentSHA256
++	fresh.Files = append([]string(nil), recorded.Files...)
++	current, err := Current(dir, fresh)
++	if err != nil || !current {
++		t.Fatalf("Current = %v, %v, want true", current, err)
++	}
++	changedLock := v5LocalMarker()
++	changedLock.LockSHA256 = "sha256:" + strings.Repeat("00", 32)
++	if current, _ := Current(dir, changedLock); current {
++		t.Fatalf("Current stayed true across a lock generation change")
++	}
++	changedPackage := v5LocalMarker()
++	changedPackage.Package = &Package{Kind: "local-snapshot", Snapshot: "sha256:" + strings.Repeat("11", 32)}
++	if current, _ := Current(dir, changedPackage); current {
++		t.Fatalf("Current stayed true across a package identity change")
++	}
++	legacy := v5LocalMarker()
++	legacy.Package = nil
++	legacy.LockSHA256 = ""
++	legacy.Source = "review"
++	legacy.RefKind = "tag"
++	legacy.Ref = "v1"
++	legacy.Commit = strings.Repeat("22", 20)
++	if current, _ := Current(dir, legacy); current {
++		t.Fatalf("Current matched a v5 marker against a legacy expectation")
++	}
++}
++
++func TestMarkerV5RefusesMalformedIdentity(t *testing.T) {
++	cases := map[string]func(*Marker){
++		"missing-package": func(m *Marker) { m.Package = nil },
++		"missing-lock":    func(m *Marker) { m.LockSHA256 = "" },
++		"malformed-lock":  func(m *Marker) { m.LockSHA256 = "sha256:xyz" },
++		"legacy-source":   func(m *Marker) { m.Source = "review" },
++		"legacy-ref":      func(m *Marker) { m.RefKind = "tag"; m.Ref = "v1"; m.Commit = strings.Repeat("22", 20) },
++		"attestation": func(m *Marker) {
++			m.Attestation = &Attestation{Registry: "example.org/kit", Status: "audited"}
++		},
++		"substituted":      func(m *Marker) { m.Substituted = "dev:review" },
++		"bad-snapshot":     func(m *Marker) { m.Package.Snapshot = "bad" },
++		"snapshot-and-git": func(m *Marker) { m.Package.Commit = &Commit{ObjectFormat: "sha1", Hex: strings.Repeat("33", 20)} },
++		"unknown-kind":     func(m *Marker) { m.Package.Kind = "bad-kind" },
++		"skill-schema-0":   func(m *Marker) { m.SkillSchemaVersion = 0 },
++		"skill-schema-9":   func(m *Marker) { m.SkillSchemaVersion = 9 },
++	}
++	for name, mutate := range cases {
++		t.Run(name, func(t *testing.T) {
++			m := v5LocalMarker()
++			mutate(m)
++			if err := Write(t.TempDir(), m); err == nil {
++				t.Fatalf("Write admitted a v5 marker with %s", name)
++			}
++		})
++	}
++}
++
++func TestMarkerV5GitArmShape(t *testing.T) {
++	m := v5LocalMarker()
++	m.Package = &Package{
++		Kind:       "network-git",
++		Repository: "example.org/kit",
++		Commit:     &Commit{ObjectFormat: "sha1", Hex: strings.Repeat("44", 20)},
++		Directory:  "skills/review",
++	}
++	if err := Write(t.TempDir(), m); err != nil {
++		t.Fatalf("Write refused a structural network-git v5 package: %v", err)
++	}
++	// A snapshot digest never satisfies the commit arm: the bare hex
++	// grammar rejects the prefixed form, so the arms cannot be confused.
++	m.Package.Commit = &Commit{ObjectFormat: "sha1", Hex: "sha256:" + strings.Repeat("44", 20)}
++	if err := Write(t.TempDir(), m); err == nil {
++		t.Fatalf("Write admitted a snapshot digest in the commit arm")
++	}
++}
++
++// v5GitMarker returns a minimal valid network-git draft marker.
++func v5GitMarker() *Marker {
++	m := v5LocalMarker()
++	m.Package = &Package{
++		Kind:       "network-git",
++		Repository: "example.org/kit",
++		Commit:     &Commit{ObjectFormat: "sha1", Hex: strings.Repeat("44", 20)},
++		Directory:  "skills/review",
++	}
++	return m
++}
++
++// rewriteV5Package writes a recorded v5 marker back with its raw package
++// object replaced by the given JSON text, bypassing Write so the document
++// carries exactly the bytes a foreign or hostile writer could produce.
++func rewriteV5Package(t *testing.T, dir string, packageJSON string) {
++	t.Helper()
++	payload, err := os.ReadFile(filepath.Join(dir, Name))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var raw map[string]json.RawMessage
++	if err := json.Unmarshal(payload, &raw); err != nil {
++		t.Fatal(err)
++	}
++	raw["package"] = json.RawMessage(packageJSON)
++	rewritten, err := json.Marshal(raw)
++	if err != nil {
++		t.Fatal(err)
++	}
++	// json.Marshal re-encodes RawMessage members verbatim only when they
++	// are valid JSON; a duplicate-key row is valid JSON to the encoder and
++	// survives as written.
++	if err := os.WriteFile(filepath.Join(dir, Name), rewritten, 0o644); err != nil {
++		t.Fatal(err)
++	}
++}
++
++// TestMarkerV5PackageClosedShape is the reader/currentness regression for
++// review finding F1 (revision 3): a package object must match the closed
++// raw shape of its arm before decoding. Foreign-arm members are refused
++// whether they carry null or an empty value, because the decoded Package
++// value collapses both to "absent".
++func TestMarkerV5PackageClosedShape(t *testing.T) {
++	const (
++		snapshot = "sha256:abababababababababababababababababababababababababababababababab"
++		hex40    = "4444444444444444444444444444444444444444"
++	)
++	localValid := `{"kind":"local-snapshot","snapshot":"` + snapshot + `"}`
++	gitValid := `{"kind":"network-git","repository":"example.org/kit","commit":{"object_format":"sha1","hex":"` + hex40 + `"},"directory":"skills/review"}`
++	configuredValid := `{"kind":"configured-git","source":"vendor/kit","commit":{"object_format":"sha1","hex":"` + hex40 + `"},"directory":"."}`
++
++	type row struct {
++		arm     string // "local" or "git": which recorded marker to start from
++		pkg     string
++		current bool // whether Current against the original expectation must stay true
++		readOK  bool
++	}
++	rows := map[string]row{
++		// Valid controls per arm: the closed-shape check admits exactly the
++		// arm's members and Current stays true.
++		"local-control":               {"local", localValid, true, true},
++		"git-control":                 {"git", gitValid, true, true},
++		"configured-control-readable": {"git", configuredValid, false, true},
++
++		// local-snapshot: every foreign-arm member with null and with an
++		// empty value is refused.
++		"local-source-null":      {"local", `{"kind":"local-snapshot","snapshot":"` + snapshot + `","source":null}`, false, false},
++		"local-source-empty":     {"local", `{"kind":"local-snapshot","snapshot":"` + snapshot + `","source":""}`, false, false},
++		"local-repository-null":  {"local", `{"kind":"local-snapshot","snapshot":"` + snapshot + `","repository":null}`, false, false},
++		"local-repository-empty": {"local", `{"kind":"local-snapshot","snapshot":"` + snapshot + `","repository":""}`, false, false},
++		"local-directory-null":   {"local", `{"kind":"local-snapshot","snapshot":"` + snapshot + `","directory":null}`, false, false},
++		"local-directory-empty":  {"local", `{"kind":"local-snapshot","snapshot":"` + snapshot + `","directory":""}`, false, false},
++		"local-commit-null":      {"local", `{"kind":"local-snapshot","snapshot":"` + snapshot + `","commit":null}`, false, false},
++		"local-commit-empty":     {"local", `{"kind":"local-snapshot","snapshot":"` + snapshot + `","commit":{}}`, false, false},
++		"local-snapshot-null":    {"local", `{"kind":"local-snapshot","snapshot":null}`, false, false},
++		"local-snapshot-missing": {"local", `{"kind":"local-snapshot"}`, false, false},
++		"local-unknown-member":   {"local", `{"kind":"local-snapshot","snapshot":"` + snapshot + `","extra":1}`, false, false},
++		"local-duplicate-key":    {"local", `{"kind":"local-snapshot","snapshot":"` + snapshot + `","snapshot":"` + snapshot + `"}`, false, false},
++		"local-kind-null":        {"local", `{"kind":null,"snapshot":"` + snapshot + `"}`, false, false},
++		"local-kind-number":      {"local", `{"kind":5,"snapshot":"` + snapshot + `"}`, false, false},
++		"local-package-null":     {"local", `null`, false, false},
++		"local-package-array":    {"local", `[]`, false, false},
++
++		// network-git: snapshot/source foreign members, nulls in required
++		// members, and an open commit object are refused.
++		"git-snapshot-null":         {"git", `{"kind":"network-git","repository":"example.org/kit","commit":{"object_format":"sha1","hex":"` + hex40 + `"},"directory":"skills/review","snapshot":null}`, false, false},
++		"git-snapshot-empty":        {"git", `{"kind":"network-git","repository":"example.org/kit","commit":{"object_format":"sha1","hex":"` + hex40 + `"},"directory":"skills/review","snapshot":""}`, false, false},
++		"git-source-null":           {"git", `{"kind":"network-git","repository":"example.org/kit","commit":{"object_format":"sha1","hex":"` + hex40 + `"},"directory":"skills/review","source":null}`, false, false},
++		"git-source-empty":          {"git", `{"kind":"network-git","repository":"example.org/kit","commit":{"object_format":"sha1","hex":"` + hex40 + `"},"directory":"skills/review","source":""}`, false, false},
++		"git-directory-null":        {"git", `{"kind":"network-git","repository":"example.org/kit","commit":{"object_format":"sha1","hex":"` + hex40 + `"},"directory":null}`, false, false},
++		"git-directory-missing":     {"git", `{"kind":"network-git","repository":"example.org/kit","commit":{"object_format":"sha1","hex":"` + hex40 + `"}}`, false, false},
++		"git-commit-null":           {"git", `{"kind":"network-git","repository":"example.org/kit","commit":null,"directory":"skills/review"}`, false, false},
++		"git-commit-string":         {"git", `{"kind":"network-git","repository":"example.org/kit","commit":"` + hex40 + `","directory":"skills/review"}`, false, false},
++		"git-commit-hex-null":       {"git", `{"kind":"network-git","repository":"example.org/kit","commit":{"object_format":"sha1","hex":null},"directory":"skills/review"}`, false, false},
++		"git-commit-extra-member":   {"git", `{"kind":"network-git","repository":"example.org/kit","commit":{"object_format":"sha1","hex":"` + hex40 + `","ref":"main"},"directory":"skills/review"}`, false, false},
++		"git-commit-missing-format": {"git", `{"kind":"network-git","repository":"example.org/kit","commit":{"hex":"` + hex40 + `"},"directory":"skills/review"}`, false, false},
++		"git-commit-duplicate-key":  {"git", `{"kind":"network-git","repository":"example.org/kit","commit":{"object_format":"sha1","object_format":"sha1","hex":"` + hex40 + `"},"directory":"skills/review"}`, false, false},
++
++		// configured-git: repository/snapshot foreign members refused.
++		"configured-repository-null":  {"git", `{"kind":"configured-git","source":"vendor/kit","commit":{"object_format":"sha1","hex":"` + hex40 + `"},"directory":".","repository":null}`, false, false},
++		"configured-repository-empty": {"git", `{"kind":"configured-git","source":"vendor/kit","commit":{"object_format":"sha1","hex":"` + hex40 + `"},"directory":".","repository":""}`, false, false},
++		"configured-snapshot-null":    {"git", `{"kind":"configured-git","source":"vendor/kit","commit":{"object_format":"sha1","hex":"` + hex40 + `"},"directory":".","snapshot":null}`, false, false},
++	}
++	for name, r := range rows {
++		t.Run(name, func(t *testing.T) {
++			var m *Marker
++			if r.arm == "local" {
++				m = v5LocalMarker()
++			} else {
++				m = v5GitMarker()
++			}
++			dir, recorded := writeV5(t, m)
++			rewriteV5Package(t, dir, r.pkg)
++			got := Read(dir)
++			if (got != nil) != r.readOK {
++				t.Fatalf("Read = %v, want readable=%v for package %s", got, r.readOK, r.pkg)
++			}
++			expected := *recorded
++			current, _ := Current(dir, &expected)
++			if current != r.current {
++				t.Fatalf("Current = %v, want %v for package %s", current, r.current, r.pkg)
++			}
++			if got == nil {
++				// A refused document must never satisfy currentness for
++				// any expectation, including one that mirrors its own
++				// malformed value.
++				var malformed Package
++				_ = json.Unmarshal([]byte(r.pkg), &malformed)
++				expected.Package = &malformed
++				if current, _ := Current(dir, &expected); current {
++					t.Fatalf("Current = true for a refused package %s", r.pkg)
++				}
++			}
++		})
++	}
++}
+diff --git a/internal/marker/schema_band_test.go b/internal/marker/schema_band_test.go
+index 4c2f686..43ac99a 100644
+--- a/internal/marker/schema_band_test.go
++++ b/internal/marker/schema_band_test.go
+@@ -17,6 +17,7 @@ func TestSupportedSchemaBandIsExactAndNewestIsItsMaximum(t *testing.T) {
+ 		SchemaVersion:         true,
+ 		ExternalSchemaVersion: true,
+ 		PolicySchemaVersion:   true,
++		SchemaV5:              true,
+ 	}
+ 	for version := -1; version <= NewestSchemaVersion+3; version++ {
+ 		if got := SupportedSchema(version); got != supported[version] {
+@@ -48,6 +49,7 @@ func TestBuildBearingSchemaCoversEverySchemaThatCanRecordABuild(t *testing.T) {
+ 		SchemaVersion:         true,
+ 		ExternalSchemaVersion: true,
+ 		PolicySchemaVersion:   true,
++		SchemaV5:              true,
+ 	}
+ 	for version := -1; version <= NewestSchemaVersion+3; version++ {
+ 		if got := BuildBearingSchema(version); got != bearing[version] {
+diff --git a/internal/runtimestore/sourcev1.go b/internal/runtimestore/sourcev1.go
+new file mode 100644
+index 0000000..712f6f4
+--- /dev/null
++++ b/internal/runtimestore/sourcev1.go
+@@ -0,0 +1,50 @@
++package runtimestore
++
++import (
++	"fmt"
++	"path/filepath"
++	"regexp"
++
++	"github.com/relux-works/curator/internal/identifiers"
++)
++
++// SourceV1Namespace names the distinct runtime-store namespace for
++// skillfile-sources draft installations (skillfile-sources §4). Draft
++// runtime trees never share a leaf with a legacy commit-keyed entry:
++// legacy leaves are bare 40/64-hex commits while draft leaves always
++// carry this prefix, so neither lane can adopt the other's bytes.
++const SourceV1Namespace = "source-v1"
++
++var sourceV1DigestRE = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
++
++// SourceV1Key derives the portable runtime-store leaf for one frozen draft
++// package digest. The digest is SHA-256 over the CCJ-1 bytes of the locked
++// package identity — never the bare snapshot digest and never a Git commit
++// substituted into the other arm. A runtime edit followed by refresh
++// changes the locked package, so it changes this key and requires new
++// runtime publication instead of reusing the previous tree.
++func SourceV1Key(packageDigest string) (string, error) {
++	if !sourceV1DigestRE.MatchString(packageDigest) {
++		return "", fmt.Errorf("draft package digest must be sha256:<64 lowercase hex>")
++	}
++	key := SourceV1Namespace + "-" + packageDigest[len("sha256:"):]
++	if !identifiers.Valid(key) {
++		return "", fmt.Errorf("draft runtime key is not a portable identifier")
++	}
++	return key, nil
++}
++
++// SourceV1Dir returns the runtime store location for a draft skill package:
++// home/runtime/<skill>/<source-v1 key>. It keeps the existing per-skill
++// layout so protected-store sweeping keeps working; only the leaf carries
++// the namespace.
++func SourceV1Dir(home, skillName, packageDigest string) (string, error) {
++	if !identifiers.Valid(skillName) {
++		return "", fmt.Errorf("draft runtime skill must be a portable identifier")
++	}
++	key, err := SourceV1Key(packageDigest)
++	if err != nil {
++		return "", err
++	}
++	return filepath.Join(home, "runtime", skillName, key), nil
++}
+diff --git a/internal/runtimestore/sourcev1_test.go b/internal/runtimestore/sourcev1_test.go
+new file mode 100644
+index 0000000..cbee289
+--- /dev/null
++++ b/internal/runtimestore/sourcev1_test.go
+@@ -0,0 +1,56 @@
++package runtimestore
++
++import (
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++func TestSourceV1KeyShape(t *testing.T) {
++	digest := "sha256:" + strings.Repeat("ab", 32)
++	key, err := SourceV1Key(digest)
++	if err != nil {
++		t.Fatalf("SourceV1Key = %v", err)
++	}
++	if key != "source-v1-"+strings.Repeat("ab", 32) {
++		t.Fatalf("key = %q", key)
++	}
++	// The namespace prefix keeps draft leaves disjoint from bare-commit
++	// legacy leaves: no 40/64-hex commit equals a namespaced key.
++	if key == strings.Repeat("ab", 32) {
++		t.Fatalf("namespaced key collides with a bare commit leaf")
++	}
++}
++
++func TestSourceV1KeyRefusesMalformedDigests(t *testing.T) {
++	for _, digest := range []string{
++		"",
++		"sha256:xyz",
++		strings.Repeat("ab", 32),
++		"SHA256:" + strings.Repeat("ab", 32),
++		"sha256:" + strings.Repeat("AB", 32),
++		"sha256:" + strings.Repeat("ab", 20),
++	} {
++		if _, err := SourceV1Key(digest); err == nil {
++			t.Fatalf("SourceV1Key(%q) admitted a malformed digest", digest)
++		}
++	}
++}
++
++func TestSourceV1DirLayout(t *testing.T) {
++	digest := "sha256:" + strings.Repeat("cd", 32)
++	dir, err := SourceV1Dir(filepath.Join(string(filepath.Separator), "home"), "review", digest)
++	if err != nil {
++		t.Fatalf("SourceV1Dir = %v", err)
++	}
++	want := filepath.Join(string(filepath.Separator), "home", "runtime", "review", "source-v1-"+strings.Repeat("cd", 32))
++	if dir != want {
++		t.Fatalf("dir = %q, want %q", dir, want)
++	}
++	if _, err := SourceV1Dir(filepath.Join(string(filepath.Separator), "home"), "", digest); err == nil {
++		t.Fatalf("SourceV1Dir admitted an empty skill name")
++	}
++	if _, err := SourceV1Dir(filepath.Join(string(filepath.Separator), "home"), "review", "bad"); err == nil {
++		t.Fatalf("SourceV1Dir admitted a malformed digest")
++	}
++}
+diff --git a/internal/scopes/gc.go b/internal/scopes/gc.go
+index 26e9346..711d7e2 100644
+--- a/internal/scopes/gc.go
++++ b/internal/scopes/gc.go
+@@ -10,6 +10,7 @@ import (
+ 	"github.com/relux-works/curator/internal/buildcache"
+ 	"github.com/relux-works/curator/internal/buildrepo"
+ 	"github.com/relux-works/curator/internal/marker"
++	"github.com/relux-works/curator/internal/runtimestore"
+ )
+ 
+ // CollectRuntime removes runtime store entries referenced by no marker of
+@@ -209,7 +210,24 @@ func markScopes(home string) marks {
+ 
+ func (marked *marks) absorb(scope scopeMarks) {
+ 	for _, installed := range scope.markers {
+-		marked.runtime[installed.Name+"/"+installed.Commit] = true
++		if installed.Package != nil {
++			// A draft marker keys its runtime tree by the frozen package
++			// identity in the source-v1 namespace, never by a commit: mark
++			// that leaf so the sweep keeps the live tree. An unhashable
++			// package cannot name its tree, so it is reported instead of
++			// silently unmarked.
++			digest, digestErr := installed.Package.Digest()
++			key, keyErr := runtimestore.SourceV1Key(digest)
++			if digestErr != nil || keyErr != nil {
++				marked.uncertain = append(marked.uncertain, fmt.Sprintf(
++					"installed skill %s names a draft package with no derivable runtime key; its runtime tree was left alone",
++					installed.Name))
++				continue
++			}
++			marked.runtime[installed.Name+"/"+key] = true
++		} else {
++			marked.runtime[installed.Name+"/"+installed.Commit] = true
++		}
+ 		// Every build-bearing schema contributes its live cache keys. A schema
+ 		// missing from this band is not "no builds": its recorded keys would go
+ 		// unmarked and the collector would delete artifacts an installation is
+diff --git a/internal/scopes/gc_draft_test.go b/internal/scopes/gc_draft_test.go
+new file mode 100644
+index 0000000..9f3d8f1
+--- /dev/null
++++ b/internal/scopes/gc_draft_test.go
+@@ -0,0 +1,76 @@
++package scopes
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/hashing"
++	"github.com/relux-works/curator/internal/marker"
++	"github.com/relux-works/curator/internal/runtimestore"
++)
++
++// TestCollectRetainsDraftSourceV1Runtime proves the mark phase follows the
++// draft runtime key: a local-snapshot marker keeps its source-v1 package
++// tree while an unreferenced leaf is still swept. Without the v5 branch
++// the sweep would mark a bare-commit leaf that does not exist and delete
++// the live draft tree.
++func TestCollectRetainsDraftSourceV1Runtime(t *testing.T) {
++	home := t.TempDir()
++	project := t.TempDir()
++	skillsDir := filepath.Join(project, ".agents", "skills", "draft-skill")
++	if err := os.MkdirAll(skillsDir, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	snapshot := "sha256:" + strings.Repeat("ab", 32)
++	pkg := &marker.Package{Kind: "local-snapshot", Snapshot: snapshot}
++	digest, err := pkg.Digest()
++	if err != nil {
++		t.Fatal(err)
++	}
++	key, err := runtimestore.SourceV1Key(digest)
++	if err != nil {
++		t.Fatal(err)
++	}
++	hash, err := hashing.ContentSHA256(skillsDir, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := marker.Write(skillsDir, &marker.Marker{
++		Name: "draft-skill", Package: pkg,
++		LockSHA256:    "sha256:" + strings.Repeat("cd", 32),
++		ContentSHA256: hash,
++		Agents:        []string{}, Commands: []string{}, Dependencies: []string{},
++		SkillSchemaVersion: 4,
++		InstalledAt:        "2026-09-18T00:00:00Z",
++		Activation:         &marker.Activation{Context: true, Commands: []string{}},
++	}); err != nil {
++		t.Fatal(err)
++	}
++	if err := RecordConsumer(home, project); err != nil {
++		t.Fatal(err)
++	}
++	live := filepath.Join(home, "runtime", "draft-skill", key)
++	stale := filepath.Join(home, "runtime", "draft-skill", strings.Repeat("f", 40))
++	for _, dir := range []string{live, stale} {
++		if err := os.MkdirAll(dir, 0o755); err != nil {
++			t.Fatal(err)
++		}
++	}
++
++	cache := &recordingCache{}
++	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: cache})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if _, err := os.Stat(live); err != nil {
++		t.Fatalf("a live draft runtime tree was swept: %v", err)
++	}
++	if len(result.RemovedRuntime) != 1 || result.RemovedRuntime[0] != "draft-skill/"+strings.Repeat("f", 40) {
++		t.Fatalf("removed runtime = %v, want only the unreferenced leaf", result.RemovedRuntime)
++	}
++	if len(result.Warnings) != 0 {
++		t.Fatalf("a clean pass warned: %v", result.Warnings)
++	}
++}
