@@ -1,0 +1,103 @@
+diff --git a/.github/ci/gate-selftest.sh b/.github/ci/gate-selftest.sh
+index a1c19d4..5f9d600 100755
+--- a/.github/ci/gate-selftest.sh
++++ b/.github/ci/gate-selftest.sh
+@@ -989,8 +989,28 @@ for _entry in $PATH; do
+ 	fi
+ done
+ IFS="$OLDIFS"
++
++# rustup present ONLY under CARGO_HOME/bin: the self-hosted runner service
++# starts from launchd with a minimal PATH and the lane shell reads no
++# profiles, so a per-user rustup (~/.cargo/bin, --no-modify-path) is
++# invisible until the installer prepends it. RUSTUP_HOME points elsewhere
++# on purpose: resolution must not depend on it.
++CARGOBIN="$WORK/fake-cargo-only/bin"
++mkdir -p "$CARGOBIN" "$WORK/empty-rustup-home"
++cp "$FAKEBIN/rustup" "$FAKEBIN/rustc" "$FAKEBIN/cargo" "$CARGOBIN/"
++: >"$WORK/rustup-log-cargo.txt"; : >"$WORK/github-path-cargo.txt"
++assert 'the installer finds rustup under CARGO_HOME/bin without PATH help' 0 \
++	env PATH="$NORUSTPATH" FAKE_RUSTUP_LOG="$WORK/rustup-log-cargo.txt" GITHUB_PATH="$WORK/github-path-cargo.txt" \
++	    CARGO_HOME="$WORK/fake-cargo-only" RUSTUP_HOME="$WORK/empty-rustup-home" \
++	    CI_RUST_TOOLCHAIN_FILE="$WORK/rust-install-channel.toml" "$BASH_ABS" "$IRS"
++assert_contains 'the CARGO_HOME-only install names the filed channel' 'toolchain install 1.92.0 --profile minimal' "$WORK/rustup-log-cargo.txt"
++assert_contains 'the CARGO_HOME bin dir is recorded for the rest of the lane' "$WORK/fake-cargo-only/bin" "$WORK/github-path-cargo.txt"
++
++# Absent from both PATH and CARGO_HOME/bin: CARGO_HOME points at an empty
++# prefix so a real ~/.cargo/bin on this host cannot leak into the row.
++mkdir -p "$WORK/empty-cargo/bin"
+ assert 'a runner without rustup fails' 1 \
+-	env PATH="$NORUSTPATH" GITHUB_PATH="$WORK/github-path.txt" \
++	env PATH="$NORUSTPATH" GITHUB_PATH="$WORK/github-path.txt" CARGO_HOME="$WORK/empty-cargo" \
+ 	    CI_RUST_TOOLCHAIN_FILE="$WORK/rust-install-channel.toml" "$BASH_ABS" "$IRS"
+ assert_contains 'the failure names the runner-setup note' 'docs/self-hosted-runner-setup.md' "$WORK/out.txt"
+ 
+diff --git a/.github/ci/install-rust-toolchain.sh b/.github/ci/install-rust-toolchain.sh
+index 1060eaf..533941f 100755
+--- a/.github/ci/install-rust-toolchain.sh
++++ b/.github/ci/install-rust-toolchain.sh
+@@ -10,9 +10,13 @@
+ # no rustc on PATH failed the lane after the pnpm pin had gone green).
+ #
+ # rustup itself is a runner prerequisite, not something this script
+-# bootstraps: the hosted images ship it, and the self-hosted runner gets it
+-# once per docs/self-hosted-runner-setup.md. A runner without rustup fails
+-# here with that note named, not with a generic rustc-not-found later.
++# bootstraps: the hosted images ship it on PATH, and the self-hosted runner
++# gets it once per docs/self-hosted-runner-setup.md under ~/.cargo/bin (or
++# $CARGO_HOME/bin), which this script prepends to PATH itself -- the runner
++# service starts from launchd with a minimal PATH and the lane shell reads
++# no profiles. Resolution uses PATH and $CARGO_HOME/bin only, never
++# RUSTUP_HOME. A runner without rustup in either place fails here with that
++# note named, not with a generic rustc-not-found later.
+ #
+ # Usage (as a CI lane step; GITHUB_PATH must be set):
+ #   bash .github/ci/install-rust-toolchain.sh
+@@ -31,15 +35,15 @@ file="${CI_RUST_TOOLCHAIN_FILE:-rust-toolchain.toml}"
+ channel="$(awk '/^[[:space:]]*\[toolchain[[:space:]]*\]/{in_toolchain=1; next} /^[[:space:]]*\[/{in_toolchain=0; next} in_toolchain && /^[[:space:]]*channel[[:space:]]*=[[:space:]]*"/{line=$0; sub(/^[^=]*=[[:space:]]*"/, "", line); sub(/".*$/, "", line); print line; exit}' "$file")"
+ [ -n "$channel" ] || fail "no channel in the [toolchain] section of $file"
+ 
+-command -v rustup >/dev/null 2>&1 || fail "rustup is not installed on this runner; install it once per docs/self-hosted-runner-setup.md, then re-run this lane"
+-
+-rustup toolchain install "$channel" --profile minimal
+-
+ cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+ [ -n "${GITHUB_PATH:-}" ] || fail "GITHUB_PATH is not set; run this script as a CI lane step"
+ printf '%s\n' "$cargo_home/bin" >>"$GITHUB_PATH"
+ export PATH="$cargo_home/bin:$PATH"
+ 
++command -v rustup >/dev/null 2>&1 || fail "rustup is not installed on this runner; install it once per docs/self-hosted-runner-setup.md, then re-run this lane"
++
++rustup toolchain install "$channel" --profile minimal
++
+ command -v rustc >/dev/null 2>&1 || fail "rustc is not on PATH after installing Rust $channel"
+ command -v cargo >/dev/null 2>&1 || fail "cargo is not on PATH after installing Rust $channel"
+ rustc -vV
+diff --git a/docs/self-hosted-runner-setup.md b/docs/self-hosted-runner-setup.md
+index 5ec0bb2..e0f1237 100644
+--- a/docs/self-hosted-runner-setup.md
++++ b/docs/self-hosted-runner-setup.md
+@@ -8,14 +8,21 @@ variable `ROSE_AIR_RUNNER` is `true`.
+ 
+ ## One-time prerequisites on the runner
+ 
+-- **rustup.** Install once for the runner user (the installer at
+-  https://rustup.rs), then verify `rustup --version` runs. The lane installs
++- **rustup.** Install once for the runner user with the installer at
++  https://rustup.rs using its `--no-modify-path` form, then verify
++  `~/.cargo/bin/rustup --version` runs. The lane installs
+   the pinned toolchain itself from [rust-toolchain.toml](../rust-toolchain.toml)
+   on every run and never relies on a toolchain the runner happens to ship,
+   so no toolchain needs installing or pinning by hand. A lane on a runner
+   without rustup fails in the `Install pinned Rust toolchain via rustup`
+   step with this note named.
+ 
++The runner service starts from launchd with a minimal PATH and reads no
++shell profiles, so `rustup` is not expected on the service PATH. Keep it at
++the default `~/.cargo/bin` of the runner user (or `$CARGO_HOME/bin`): the
++lane locates `rustup` there itself and prepends that directory to `PATH`
++before any `rustup` call. Do not edit the service PATH to compensate.
++
+ Nothing else is installed by hand: Go and Node come from the
+ `actions/setup-go` / `actions/setup-node` steps, pnpm is installed per lane
+ into a lane-local prefix, and the Rust toolchain comes from rustup as above.

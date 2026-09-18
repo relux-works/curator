@@ -1,0 +1,3 @@
+revision 9 = revision 8 unchanged; gate rerun after a Windows runner flake
+
+Verified git status --short --untracked-files=all against revision 8 patch: exactly 14 paths, no extras or missing paths; comparison exit 0. No repository files changed. Prior narrow tests and validation are recorded in TASK-260910-hwxr26_results-rev8.md; not rerun in this republish-only run. Hosted gate is invoked once by handoff. Revision 8 hosted failure: run 35293912060, Windows TestStatusReportsATransitivelyResolvedCompiledCommand, worker job limit flags 0x0 versus 0x2308 (operator-classified runner flake).

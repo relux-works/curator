@@ -1,5 +1,5 @@
 ## Status
-to-dev
+done
 
 ## Review
 required
@@ -41,7 +41,7 @@ Rose-air after the pnpm pin (main 7c3ce2f, run 35121791685): all three real-pnpm
 
 ## Outcome Resources
 - [TASK-260915-4f44cs_review-verdict-pr70.md](file://TASK-260915-4f44cs/TASK-260915-4f44cs_review-verdict-pr70.md) — Independent Claude Fable review of curator PR 70 at 4d240bac: ACCEPT
-- [TASK-260915-4f44cs_landing-evidence.md](file://TASK-260915-4f44cs/TASK-260915-4f44cs_landing-evidence.md) — PR 70 landing evidence: reviewed heads, checks, fast-forward, post-landing preflight
+- [TASK-260915-4f44cs_landing-evidence.md](file://TASK-260915-4f44cs/TASK-260915-4f44cs_landing-evidence.md) — PR 70 landed; rose-air lane green on main run 35302875022 after the Rust toolchain resolution (updated 2026-09-18)
 - [TASK-260915-4f44cs_spawn-log_-reviewer--reviewer--claude-_RUN-260915-c9a7bf.log](file://TASK-260915-4f44cs/TASK-260915-4f44cs_spawn-log_-reviewer--reviewer--claude-_RUN-260915-c9a7bf.log) — System spawn log captured by task-board
 - [TASK-260915-4f44cs_review-verdict-pr70-rev2.md](file://TASK-260915-4f44cs/TASK-260915-4f44cs_review-verdict-pr70-rev2.md) — ACCEPT verdict for PR 70 rev2 head 559447ef (independent Claude Fable review, copied from PR comment 2026-09-15T19:58:37Z)
 - [TASK-260915-4f44cs_review-verdict.md](file://TASK-260915-4f44cs/TASK-260915-4f44cs_review-verdict.md) — Reviewer verdict RUN-260915-c9a7bf: CHANGES REQUESTED (rose-air lane never executed; everything else verified)
@@ -51,7 +51,7 @@ Rose-air after the pnpm pin (main 7c3ce2f, run 35121791685): all three real-pnpm
 2026-09-15T16:30:49Z
 
 ## Last Update
-2026-09-16T17:12:46Z
+2026-09-18T04:27:27Z
 
 ## Assigned To
 [reviewer] reviewer (claude)

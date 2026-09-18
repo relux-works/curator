@@ -123,6 +123,8 @@ spawn selection rationale for muse-spark-1.3-contributor/max: Integration run bo
 spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
 spawn queued: [implementer] developer (muse) (run=RUN-260917-8391cd, max_parallel=20)
 spawn run started: [implementer] developer (muse) (run=RUN-260917-8391cd)
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260917-8391cd, pid=74092, exit=0)
 
 ## Precondition Resources
 - [remediation-manager-producer-rules.md](file://TASK-260910-3ungjy/remediation-manager-producer-rules.md) — Campaign rules for curator manager producers and reviewers
@@ -177,12 +179,13 @@ spawn run started: [implementer] developer (muse) (run=RUN-260917-8391cd)
 - [TASK-260910-3ungjy_review-logbook-rev5.md](file://TASK-260910-3ungjy/TASK-260910-3ungjy_review-logbook-rev5.md) — Reviewer logbook: combination identity and validation setup anomaly
 - [TASK-260910-3ungjy_review-verdict-rev5.md](file://TASK-260910-3ungjy/TASK-260910-3ungjy_review-verdict-rev5.md) — Independent reviewer acceptance of revision 5 with per-requirement evidence
 - [TASK-260910-3ungjy_spawn-log_-implementer--developer--muse-_RUN-260917-8391cd.log](file://TASK-260910-3ungjy/TASK-260910-3ungjy_spawn-log_-implementer--developer--muse-_RUN-260917-8391cd.log) — System spawn log captured by task-board
+- [TASK-260910-3ungjy_integration-rev5.md](file://TASK-260910-3ungjy/TASK-260910-3ungjy_integration-rev5.md) — Integration run for accepted revision 5: integrate refused with integration_indeterminate but squash 64cacfc + board b9a1545 landed signed, story done, gate green
 
 ## Created
 2026-09-10T14:43:13Z
 
 ## Last Update
-2026-09-17T22:05:17Z
+2026-09-17T22:49:29Z
 
 ## Assigned To
 [implementer] developer (muse)

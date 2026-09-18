@@ -87,6 +87,8 @@ spawn selection rationale for muse-spark-1.3-contributor/max: Completion run bou
 spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
 spawn queued: [implementer] developer (muse) (run=RUN-260917-99ac72, max_parallel=8)
 spawn run started: [implementer] developer (muse) (run=RUN-260917-99ac72)
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260917-99ac72, pid=44406, exit=0)
 
 ## Precondition Resources
 - [remediation-registry-producer-rules.md](file://TASK-260910-3p2rbh/remediation-registry-producer-rules.md) — Campaign rules for curator-skill-registry producers and reviewers
@@ -119,12 +121,13 @@ spawn run started: [implementer] developer (muse) (run=RUN-260917-99ac72)
 - [TASK-260910-3p2rbh_review-logbook-rev2.md](file://TASK-260910-3p2rbh/TASK-260910-3p2rbh_review-logbook-rev2.md) — Review closure and mutation findings logbook
 - [TASK-260910-3p2rbh_review-verdict-rev2.md](file://TASK-260910-3p2rbh/TASK-260910-3p2rbh_review-verdict-rev2.md) — Accepted revision 2 with independent validation and negative evidence
 - [TASK-260910-3p2rbh_spawn-log_-implementer--developer--muse-_RUN-260917-99ac72.log](file://TASK-260910-3p2rbh/TASK-260910-3p2rbh_spawn-log_-implementer--developer--muse-_RUN-260917-99ac72.log) — System spawn log captured by task-board
+- [TASK-260910-3p2rbh_completion.md](file://TASK-260910-3p2rbh/TASK-260910-3p2rbh_completion.md) — Completion transcripts: worktree complete + board commit for STORY-260910-1py4f3
 
 ## Created
 2026-09-10T14:46:43Z
 
 ## Last Update
-2026-09-17T17:48:28Z
+2026-09-17T17:50:42Z
 
 ## Assigned To
 [implementer] developer (muse)

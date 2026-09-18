@@ -1,0 +1,15 @@
+# Rework 8 — TASK-260910-hwxr26 (revision 9 → 10)
+
+Revision 9 (= rev8) was CHANGES_REQUESTED by the independent reviewer with ONE finding (read TASK-260910-hwxr26_review-verdict-rev9.md and the attached TASK-260910-hwxr26_review-probe-rev9.go — reuse its scenarios as regression rows). Everything else from rev1–rev8 was confirmed effective: do not restructure it.
+
+## F1 — P2: unreadable existing binding is treated as first issuance
+internal/audit/sourceaudit.go:888–894 and :1068–1071 (write effects :958–961). `sourceAuditObjectExists` collapses every os.Stat error to false; Stat follows symlinks, so a dangling binding link or a symlink loop looks ABSENT. LoadSourceAudit classifies both missing and unreadable bindings as source_audit_unavailable and CheckSourceAudit then calls establishSourceAudit on this false absence — bypassing validation of the existing report and overwriting it (reviewer reproduced at install.Project: dangling symlink → mutating Project passes the gate and creates the link target; self-referencing symlink + `{}` report → the malformed report is overwritten with new evidence, then the object write fails with ELOOP).
+
+Required correction (exactly, no wider change):
+1. Replace the boolean existence probe with a typed tri-state from loading/probing: absent / present / read-failure (unreadable, dangling link, loop, permission, not-a-regular-file, any non-ENOENT error). Use non-following inspection (os.Lstat) for the entry itself; propagate every non-absence error.
+2. Establish (first issuance) ONLY after positively proving that no binding entry exists (Lstat → ENOENT for the entry, and the report likewise absent). Any unreadable or existing-but-broken entry REFUSES before either record (report or object) is written — same fail-closed class as the accepted §4 report refusal and rework-1's first-issuance-vs-broken-record distinction; use the existing typed refusal outcome for broken records (no new grammar).
+3. Production regression rows at install.Project (both dry-run and mutating): dangling binding symlink; self-referencing symlink loop; symlink loop + `{}` report; assert refusal AND that the report bytes, the object path and the link target are unchanged (no target created). Keep the genuine first-issuance positive control (nothing exists → establish succeeds) and the ordinary present/valid control.
+4. Narrowing mutant: restore the error-to-absence collapse (any stat error → absent) and show the new rows kill it; record the command and exit code in results.md.
+5. Windows: if a symlink fixture cannot be created there, skip with the declared platform-control reason from .github/ci/skip-classes.tsv verbatim; never add a skip class. The loop/dangling rows must still run on ubuntu/macos.
+
+Rules unchanged: narrow tests only (-p 1, -run filters), every tool call under 2 minutes (background go test + tail), evidence with exit codes, update results.md (rev10), checklist, then `task-board handoff TASK-260910-hwxr26 --role developer`. Do not touch LOGBOOK.md, specs or anything outside internal/audit + its tests (+ the install-level regression test file already used by this leaf).

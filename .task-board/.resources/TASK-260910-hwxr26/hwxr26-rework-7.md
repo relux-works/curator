@@ -1,0 +1,5 @@
+# Rework 7 — TASK-260910-hwxr26: one P2 from verdict rev7 (TASK-260910-hwxr26_review-verdict-rev7.md; probe TestReviewDuplicateAuditJSON attached)
+
+Duplicate JSON keys bypass the closed raw shapes: sourceaudit.go:282-285 and :444-447 decode into maps (Go keeps the last duplicate), :463-466 second typed decode likewise — a document with a duplicated `package`/`schema_version`/`revoked` member is admitted. Core §1 requires duplicate-key rejection and the repository already has the shared validator for exactly this: call `protocoljson.Validate` on the ORIGINAL object bytes and the ORIGINAL report bytes before any lossy map/struct decoding (top level and nested), keep source_audit_* diagnostics, do not write another decoder. Production regressions: duplicate keys at top level and in nested package/commit/report members for both object and report → refuse, records unchanged; intact-record controls; a narrowing mutant that validates objects but not reports (or nested members) must fail.
+
+Everything else in rev7 stays (vendored schemas, closed shapes, typed renewal). Narrow tests, tool calls under 2 minutes, evidence, checklist, handoff rev8 (non-final leaf).
