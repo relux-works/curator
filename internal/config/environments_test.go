@@ -67,6 +67,7 @@ func TestSchema2Defaults(t *testing.T) {
 		"targets": len(env.Targets), "isolation": len(env.Isolation),
 		"mcp": len(env.MCPPackageAllowlist), "shadow": len(env.ShadowAcknowledged),
 		"waivers": len(env.SecretWaivers), "inplace": len(env.InPlaceMode),
+		"providerdirs": len(env.ProviderDirectories),
 	} {
 		if value != 0 {
 			t.Fatalf("%s default must be empty, got %d", name, value)
@@ -158,6 +159,13 @@ func TestSchema2KnobRejections(t *testing.T) {
 		{"waiver unknown", `{"secret_material_waivers": [{"pin": "` + strings.Repeat("a", 40) + `", "file": "f", "span": [1, 2], "reason": "r", "extra": 1}]}`, "unsupported"},
 		{"backup negative", `{"backup_retention": -1}`, "backup_retention"},
 		{"require grammar", `{"require_current_profile": "-bad"}`, "require_current_profile"},
+		{"provider relative", `{"provider_directories": ["rel/providers"]}`, "provider_directories"},
+		{"provider empty entry", `{"provider_directories": [""]}`, "provider_directories"},
+		{"provider duplicate", `{"provider_directories": ["/opt/a", "/opt/a"]}`, "provider_directories"},
+		{"provider bare drive", `{"provider_directories": ["C:"]}`, "provider_directories"},
+		{"provider not list", `{"provider_directories": "/opt/a"}`, "provider_directories"},
+		{"provider non-string", `{"provider_directories": [42]}`, "provider_directories"},
+		{"provider overlong", `{"provider_directories": ["/` + strings.Repeat("a", 4096) + `"]}`, "provider_directories"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -181,7 +189,8 @@ func TestSchema2EveryKnobParses(t *testing.T) {
 		"shadow_acknowledged": [{"env": "pi", "path": "AGENTS.override.md"}],
 		"secret_material_waivers": [{"pin": "`+strings.Repeat("c", 40)+`", "file": "context/r.md", "span": [1, 2], "reason": "r"}],
 		"backup_retention": 0, "require_current_profile": "companyA",
-		"in_place_mode": {"pi": "copied"}}}`)
+		"in_place_mode": {"pi": "copied"},
+		"provider_directories": ["/opt/curator/providers", "C:\\Program Files\\curator\\providers"]}}`)
 	env := cfg.Env
 	if env.CurrentProfile == nil || *env.CurrentProfile != "companyA" {
 		t.Fatalf("current_profile: %+v", env.CurrentProfile)
@@ -210,6 +219,10 @@ func TestSchema2EveryKnobParses(t *testing.T) {
 	}
 	if env.InPlaceMode["pi"] != "copied" || len(env.SecretWaivers) != 1 || len(env.ShadowAcknowledged) != 1 {
 		t.Fatalf("tail: %+v", env)
+	}
+	if len(env.ProviderDirectories) != 2 || env.ProviderDirectories[0] != "/opt/curator/providers" ||
+		env.ProviderDirectories[1] != `C:\Program Files\curator\providers` {
+		t.Fatalf("provider_directories: %+v", env.ProviderDirectories)
 	}
 	// overlays_allowed false empties every overlay list (§12.2).
 	if got := env.EffectiveOverlays("companyA"); len(got) != 0 {
@@ -432,53 +445,61 @@ func TestRequireCurrentProfileUnlockedCarriesNoRefusal(t *testing.T) {
 // gate is class-wide, not per-knob-name. The knob list is EnvKnobNames (the
 // §12.1 table the reader enforces) with a grammatically valid system-file
 // payload per knob, so a knob added to the reader without a payload fails
-// here. The admitted set is transcribed from environments §12.2 — the six
-// keys the specification states, written out independently — and asserted
+// here. The admitted set is transcribed from environments §12.2 — the keys
+// the specification states, written out independently — and asserted
 // set-equal with LockableEnvKeys (the map parseSystemEnvironments enforces
 // via systemEnvKnobs), so a knob added to or removed from that map without
 // §12.2 standing fails here instead of widening or narrowing the system
 // file's reach silently. A narrowing mutant that admits exactly one
 // non-lockable knob (for example secret_material_waivers,
-// xdg_seed_allowlist or in_place_mode) must fail this test, and so must a
-// widening mutant that adds one member to LockableEnvKeys.
+// system_module_waivers, xdg_seed_allowlist or in_place_mode) must fail
+// this test, and so must a widening mutant that adds one member to
+// LockableEnvKeys.
 func TestSystemV2LockableSubsetIsClassWide(t *testing.T) {
 	user := `{"schema_version": 2, "skills_root": "x", "projects": {}}`
 	payloads := map[string]string{
-		"current_profile":         `{"current_profile": "a"}`,
-		"scoped_current":          `{"scoped_current": {"codex_cli": "a"}}`,
-		"overlays":                `{"overlays": {}}`,
-		"overlay_default_weight":  `{"overlay_default_weight": 5}`,
-		"overlays_allowed":        `{"overlays_allowed": false}`,
-		"precedence":              `{"precedence": {"winner": "lower-weight"}}`,
-		"forms":                   `{"forms": {"claude_code": "monolithic"}}`,
-		"system_prompt_files":     `{"system_prompt_files": {"a": {"pi": "append"}}}`,
-		"targets":                 `{"targets": {"codex_cli": {"participation": "off"}}}`,
-		"isolation":               `{"isolation": {"a": {"pi": "shared"}}}`,
-		"xdg_seed_allowlist":      `{"xdg_seed_allowlist": ["git"]}`,
-		"passable_env_names":      `{"passable_env_names": []}`,
-		"mcp_package_allowlist":   `{"mcp_package_allowlist": []}`,
-		"shadow_acknowledged":     `{"shadow_acknowledged": [{"env": "codex_cli", "path": "some/path"}]}`,
-		"secret_material_waivers": `{"secret_material_waivers": [{"pin": "0123456789abcdef0123456789abcdef01234567", "file": "context/a.md", "span": [1, 2], "reason": "org policy"}]}`,
-		"backup_retention":        `{"backup_retention": 1}`,
-		"require_current_profile": `{"require_current_profile": "acme"}`,
-		"in_place_mode":           `{"in_place_mode": {"codex_cli": "linked"}}`,
+		"current_profile":           `{"current_profile": "a"}`,
+		"scoped_current":            `{"scoped_current": {"codex_cli": "a"}}`,
+		"overlays":                  `{"overlays": {}}`,
+		"overlay_default_weight":    `{"overlay_default_weight": 5}`,
+		"overlays_allowed":          `{"overlays_allowed": false}`,
+		"precedence":                `{"precedence": {"winner": "lower-weight"}}`,
+		"forms":                     `{"forms": {"claude_code": "monolithic"}}`,
+		"system_prompt_files":       `{"system_prompt_files": {"a": {"pi": "append"}}}`,
+		"targets":                   `{"targets": {"codex_cli": {"participation": "off"}}}`,
+		"isolation":                 `{"isolation": {"a": {"pi": "shared"}}}`,
+		"xdg_seed_allowlist":        `{"xdg_seed_allowlist": ["git"]}`,
+		"passable_env_names":        `{"passable_env_names": []}`,
+		"mcp_package_allowlist":     `{"mcp_package_allowlist": []}`,
+		"shadow_acknowledged":       `{"shadow_acknowledged": [{"env": "codex_cli", "path": "some/path"}]}`,
+		"secret_material_waivers":   `{"secret_material_waivers": [{"pin": "0123456789abcdef0123456789abcdef01234567", "file": "context/a.md", "span": [1, 2], "reason": "org policy"}]}`,
+		"transitive_system_modules": `{"transitive_system_modules": "error"}`,
+		"system_module_waivers":     `{"system_module_waivers": [{"package": "sysleaf", "reason": "reviewed"}]}`,
+		"backup_retention":          `{"backup_retention": 1}`,
+		"require_current_profile":   `{"require_current_profile": "acme"}`,
+		"in_place_mode":             `{"in_place_mode": {"codex_cli": "linked"}}`,
+		"provider_directories":      `{"provider_directories": ["/opt/curator/providers"]}`,
 	}
 	if len(payloads) != len(EnvKnobNames) {
 		t.Fatalf("payloads cover %d knobs, EnvKnobNames carries %d: keep the two in step", len(payloads), len(EnvKnobNames))
 	}
-	// The §12.2 transcription: exactly the six keys the specification
+	// The §12.2 transcription: exactly the eight keys the specification
 	// states ("overlays_allowed, precedence, mcp_package_allowlist,
-	// passable_env_names, require_current_profile, and isolation"). This
-	// literal is the spec sentence; LockableEnvKeys is the implementation.
-	// Either drifting — a widening that would reach §9.1 secret material,
-	// or a narrowing that would drop a fleet-policy knob — fails below.
+	// passable_env_names, require_current_profile, transitive_system_modules,
+	// isolation, and provider_directories" — the last carried by the §11
+	// trust-root rule). This literal is the spec sentence; LockableEnvKeys
+	// is the implementation. Either drifting — a widening that would reach
+	// §9.1 secret material or §12.1 waivers, or a narrowing that would drop
+	// a fleet-policy knob — fails below.
 	transcribed := map[string]bool{
-		"environments.overlays_allowed":        true,
-		"environments.precedence":              true,
-		"environments.mcp_package_allowlist":   true,
-		"environments.passable_env_names":      true,
-		"environments.require_current_profile": true,
-		"environments.isolation":               true,
+		"environments.overlays_allowed":          true,
+		"environments.precedence":                true,
+		"environments.mcp_package_allowlist":     true,
+		"environments.passable_env_names":        true,
+		"environments.require_current_profile":   true,
+		"environments.transitive_system_modules": true,
+		"environments.isolation":                 true,
+		"environments.provider_directories":      true,
 	}
 	if len(LockableEnvKeys) != len(transcribed) {
 		t.Fatalf("LockableEnvKeys carries %d keys, §12.2 transcribes %d: a widening or narrowing without spec standing fails here", len(LockableEnvKeys), len(transcribed))
@@ -534,8 +555,9 @@ func TestEffectiveJSONShape(t *testing.T) {
 		"overlay_default_weight", "overlays_allowed", "precedence", "forms",
 		"system_prompt_files", "targets", "isolation", "xdg_seed_allowlist",
 		"passable_env_names", "mcp_package_allowlist", "shadow_acknowledged",
-		"secret_material_waivers", "backup_retention", "require_current_profile",
-		"in_place_mode"} {
+		"secret_material_waivers", "transitive_system_modules",
+		"system_module_waivers", "backup_retention", "require_current_profile",
+		"in_place_mode", "provider_directories"} {
 		if _, present := env[knob]; !present {
 			t.Fatalf("rendered environments lack %q", knob)
 		}
@@ -543,4 +565,317 @@ func TestEffectiveJSONShape(t *testing.T) {
 	if env["overlay_default_weight"] != float64(1000) || env["overlays_allowed"] != true {
 		t.Fatalf("scalar defaults: %v %v", env["overlay_default_weight"], env["overlays_allowed"])
 	}
+}
+
+// TestTransitiveSystemModulesDefaults proves the §12.1 defaults: drop for
+// the policy, empty for the waiver list.
+func TestTransitiveSystemModulesDefaults(t *testing.T) {
+	cfg := loadText(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
+	if cfg.Env.TransitiveSystemModules != "drop" {
+		t.Fatalf("transitive_system_modules = %q, want drop", cfg.Env.TransitiveSystemModules)
+	}
+	if len(cfg.Env.SystemModuleWaivers) != 0 {
+		t.Fatalf("system_module_waivers = %+v, want empty", cfg.Env.SystemModuleWaivers)
+	}
+}
+
+// TestTransitiveSystemModulesValues drives the closed enum and the waiver
+// object grammar through the production reader: error and a valid waiver
+// parse, and every malformed shape is refused.
+func TestTransitiveSystemModulesValues(t *testing.T) {
+	cfg := loadText(t, `{"schema_version": 2, "skills_root": "x", "projects": {},`+
+		`"environments": {"transitive_system_modules": "error",`+
+		`"system_module_waivers": [{"package": "sysleaf", "reason": "reviewed leaf"}]}}`)
+	if cfg.Env.TransitiveSystemModules != "error" {
+		t.Fatalf("transitive_system_modules = %q, want error", cfg.Env.TransitiveSystemModules)
+	}
+	if len(cfg.Env.SystemModuleWaivers) != 1 || cfg.Env.SystemModuleWaivers[0].Package != "sysleaf" {
+		t.Fatalf("system_module_waivers = %+v", cfg.Env.SystemModuleWaivers)
+	}
+	cases := map[string]string{
+		"enum value":   `{"transitive_system_modules": "quarantine"}`,
+		"enum type":    `{"transitive_system_modules": true}`,
+		"missing":      `{"system_module_waivers": [{"package": "sysleaf"}]}`,
+		"package":      `{"system_module_waivers": [{"package": "Bad Name", "reason": "x"}]}`,
+		"empty reason": `{"system_module_waivers": [{"package": "sysleaf", "reason": ""}]}`,
+		"unknown":      `{"system_module_waivers": [{"package": "sysleaf", "reason": "x", "expires": "never"}]}`,
+		"not a list":   `{"system_module_waivers": {}}`,
+		"not objects":  `{"system_module_waivers": ["sysleaf"]}`,
+	}
+	for name, body := range cases {
+		text := `{"schema_version": 2, "skills_root": "x", "projects": {}, "environments": ` + body + `}`
+		path := writeConfig(t, t.TempDir(), "config.json", text)
+		if _, err := Load(path, nil); err == nil {
+			t.Fatalf("%s: invalid knob accepted", name)
+		}
+	}
+}
+
+// TestSystemModuleWaiversNullRejected proves an explicit null waiver list
+// is a mistyped knob, not the empty default: the schema type is array
+// (§12.1), so Load refuses it with the closed grammar's wrong-type error.
+// Absence and the empty list still load with no waivers.
+func TestSystemModuleWaiversNullRejected(t *testing.T) {
+	loadFails(t, `{"schema_version": 2, "skills_root": "x", "projects": {},`+
+		`"environments": {"system_module_waivers": null}}`,
+		"environments.system_module_waivers")
+	for name, body := range map[string]string{
+		"absent": `{"schema_version": 2, "skills_root": "x", "projects": {}}`,
+		"empty": `{"schema_version": 2, "skills_root": "x", "projects": {},` +
+			`"environments": {"system_module_waivers": []}}`,
+	} {
+		cfg := loadText(t, body)
+		if len(cfg.Env.SystemModuleWaivers) != 0 {
+			t.Fatalf("%s: system_module_waivers = %+v, want empty", name, cfg.Env.SystemModuleWaivers)
+		}
+	}
+}
+
+// TestSystemTransitiveDirection proves the §12.2 lock direction: a system
+// file locks transitive_system_modules only to error, and waivers are not
+// lockable at all.
+func TestSystemTransitiveDirection(t *testing.T) {
+	user := `{"schema_version": 2, "skills_root": "x", "projects": {}}`
+	t.Run("error locks", func(t *testing.T) {
+		system := `{"schema_version": 2, "locked": ["environments.transitive_system_modules"],` +
+			`"environments": {"transitive_system_modules": "error"}}`
+		cfg, _, err := loadWithSystem(t, user, system)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.Env.TransitiveSystemModules != "error" || !cfg.Locked["environments.transitive_system_modules"] {
+			t.Fatalf("locked error not effective: %+v %+v", cfg.Env.TransitiveSystemModules, cfg.Locked)
+		}
+	})
+	t.Run("error overrides the machine knob", func(t *testing.T) {
+		machine := `{"schema_version": 2, "skills_root": "x", "projects": {},` +
+			`"environments": {"transitive_system_modules": "drop"}}`
+		system := `{"schema_version": 2, "locked": ["environments.transitive_system_modules"],` +
+			`"environments": {"transitive_system_modules": "error"}}`
+		cfg, _, err := loadWithSystem(t, machine, system)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.Env.TransitiveSystemModules != "error" {
+			t.Fatalf("locked error lost to the machine knob: %q", cfg.Env.TransitiveSystemModules)
+		}
+	})
+	refused := map[string]string{
+		"drop direction": `{"schema_version": 2, "locked": ["environments.transitive_system_modules"],` +
+			`"environments": {"transitive_system_modules": "drop"}}`,
+		"drop default": `{"schema_version": 2, "locked": [],` +
+			`"environments": {"transitive_system_modules": "drop"}}`,
+		"bad value": `{"schema_version": 2, "locked": ["environments.transitive_system_modules"],` +
+			`"environments": {"transitive_system_modules": "quarantine"}}`,
+		"waivers carried": `{"schema_version": 2, "locked": [],` +
+			`"environments": {"system_module_waivers": [{"package": "sysleaf", "reason": "x"}]}}`,
+	}
+	for name, system := range refused {
+		if _, _, err := loadWithSystem(t, user, system); err == nil {
+			t.Fatalf("%s: system file accepted", name)
+		}
+	}
+	if LockableKeys["environments.system_module_waivers"] || LockableEnvKeys["environments.system_module_waivers"] {
+		t.Fatalf("system_module_waivers is lockable: a lock must not admit a transitive package's system modules")
+	}
+	if lock := EnvLockKey("transitive_system_modules"); lock != "environments.transitive_system_modules" {
+		t.Fatalf("EnvLockKey(transitive_system_modules) = %q", lock)
+	}
+	if lock := EnvLockKey("system_module_waivers"); lock != "" {
+		t.Fatalf("EnvLockKey(system_module_waivers) = %q, want no lock", lock)
+	}
+}
+
+// TestProviderDirectoriesDefaultRendersEmptyList pins the §12.1 default:
+// an absent knob parses to the empty list and renders as [] (never null),
+// which the manager-config-v2 vectors require.
+func TestProviderDirectoriesDefaultRendersEmptyList(t *testing.T) {
+	cfg := loadText(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
+	if len(cfg.Env.ProviderDirectories) != 0 {
+		t.Fatalf("default = %v, want empty", cfg.Env.ProviderDirectories)
+	}
+	rendered := cfg.Env.render()["provider_directories"]
+	list, ok := rendered.([]any)
+	if !ok || len(list) != 0 {
+		t.Fatalf("rendered default = %#v, want []", rendered)
+	}
+	payload, err := json.Marshal(cfg.EffectiveJSON())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(payload), `"provider_directories":[]`) {
+		t.Fatalf("effective JSON renders no [] default: %s", payload)
+	}
+}
+
+// TestProviderDirectoriesDriveSpellings pins the two absolute spellings
+// the schema admits: POSIX-absolute and Windows drive-absolute with
+// either separator. A bare drive letter carries no root and is refused.
+func TestProviderDirectoriesDriveSpellings(t *testing.T) {
+	cfg := loadText(t, `{"schema_version": 2, "skills_root": "x", "projects": {}, "environments": {
+		"provider_directories": ["/opt/a", "C:\\Program Files\\p", "D:/teams/p"]}}`)
+	want := []string{"/opt/a", `C:\Program Files\p`, "D:/teams/p"}
+	if len(cfg.Env.ProviderDirectories) != len(want) {
+		t.Fatalf("dirs = %v, want %v", cfg.Env.ProviderDirectories, want)
+	}
+	for i, dir := range want {
+		if cfg.Env.ProviderDirectories[i] != dir {
+			t.Fatalf("dirs = %v, want %v", cfg.Env.ProviderDirectories, want)
+		}
+	}
+	loadFails(t, `{"schema_version": 2, "skills_root": "x", "projects": {},
+		"environments": {"provider_directories": ["C:"]}}`, "provider_directories")
+}
+
+// TestProviderDirectoriesLockedWins proves the §12.2 fleet policy: a
+// system file locks the list, the system value replaces the machine knob
+// whole with a warning naming the system file, and a locked-but-unset
+// key is a configuration error.
+func TestProviderDirectoriesLockedWins(t *testing.T) {
+	user := `{"schema_version": 2, "skills_root": "x", "projects": {},
+		"environments": {"provider_directories": ["/opt/user"]}}`
+	system := `{"schema_version": 2, "locked": ["environments.provider_directories"],
+		"environments": {"provider_directories": ["/opt/fleet"]}}`
+	cfg, warnings, err := loadWithSystem(t, user, system)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Env.ProviderDirectories) != 1 || cfg.Env.ProviderDirectories[0] != "/opt/fleet" {
+		t.Fatalf("locked dirs = %v, want the system list", cfg.Env.ProviderDirectories)
+	}
+	if !cfg.LockedBySystem("environments.provider_directories") {
+		t.Fatalf("the lock bit is not recorded: %v", cfg.Locked)
+	}
+	joined := strings.Join(warnings, "\n")
+	if !strings.Contains(joined, "environments.provider_directories") || !strings.Contains(joined, "system.json") {
+		t.Fatalf("warnings miss the locked knob or the system file: %v", warnings)
+	}
+	if key := EnvLockKey("provider_directories"); key != "environments.provider_directories" {
+		t.Fatalf("EnvLockKey = %q", key)
+	}
+	// An unlocked system list is only a default: the machine knob wins.
+	cfg, _, err = loadWithSystem(t, user, `{"schema_version": 2, "locked": [],
+		"environments": {"provider_directories": ["/opt/fleet"]}}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Env.ProviderDirectories) != 1 || cfg.Env.ProviderDirectories[0] != "/opt/user" {
+		t.Fatalf("unlocked default overrode the machine knob: %v", cfg.Env.ProviderDirectories)
+	}
+	// A locked-but-unset key fails closed.
+	_, _, err = loadWithSystem(t, user, `{"schema_version": 2,
+		"locked": ["environments.provider_directories"], "environments": {}}`)
+	if err == nil || !strings.Contains(err.Error(), "locks") {
+		t.Fatalf("err = %v, want the locked-but-unset refusal", err)
+	}
+}
+
+// TestProviderDirectoriesNullRejected proves an explicit null trust-root
+// list is a mistyped knob, not the empty default: the schema type is
+// array (§12.1) with no null meaning, so Load refuses it with the
+// wrong-type error naming the knob. Absence and the empty list still
+// load with no trust roots. The system file takes the same path: a null
+// there is refused too.
+func TestProviderDirectoriesNullRejected(t *testing.T) {
+	loadFails(t, `{"schema_version": 2, "skills_root": "x", "projects": {},`+
+		`"environments": {"provider_directories": null}}`,
+		"environments.provider_directories")
+	for name, body := range map[string]string{
+		"absent": `{"schema_version": 2, "skills_root": "x", "projects": {}}`,
+		"empty": `{"schema_version": 2, "skills_root": "x", "projects": {},` +
+			`"environments": {"provider_directories": []}}`,
+	} {
+		cfg := loadText(t, body)
+		if len(cfg.Env.ProviderDirectories) != 0 {
+			t.Fatalf("%s: provider_directories = %+v, want empty", name, cfg.Env.ProviderDirectories)
+		}
+	}
+	user := `{"schema_version": 2, "skills_root": "x", "projects": {}}`
+	_, _, err := loadWithSystem(t, user, `{"schema_version": 2, "locked": [],`+
+		`"environments": {"provider_directories": null}}`)
+	if err == nil || !strings.Contains(err.Error(), "environments.provider_directories") {
+		t.Fatalf("system null err = %v, want mention of %q", err, "environments.provider_directories")
+	}
+}
+
+// TestProviderDirectoriesWriteRoundTrip proves the read-modify-write path
+// `env config set` uses carries the knob: WriteRaw validates and stores
+// it, and the stored file loads back with the same list.
+func TestProviderDirectoriesWriteRoundTrip(t *testing.T) {
+	path := writeConfig(t, t.TempDir(), "config.json",
+		`{"schema_version": 2, "skills_root": "x", "projects": {}}`)
+	object, err := ReadRaw(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	env, _ := object["environments"].(map[string]any)
+	if env == nil {
+		env = map[string]any{}
+		object["environments"] = env
+	}
+	env["provider_directories"] = []any{"/opt/a", "/opt/b"}
+	if _, err := WriteRaw(path, object); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Env.ProviderDirectories) != 2 || cfg.Env.ProviderDirectories[1] != "/opt/b" {
+		t.Fatalf("round trip = %v", cfg.Env.ProviderDirectories)
+	}
+}
+
+// TestPassableEnvNamesPresence pins the S4 knob presence behind the §12.1
+// schema default: absent renders [] and leaves the presence bit clear,
+// explicit null renders null (unbounded) with the bit set, and a list
+// renders itself.
+func TestPassableEnvNamesPresence(t *testing.T) {
+	render := func(t *testing.T, cfg *Config) any {
+		t.Helper()
+		payload, err := json.Marshal(cfg.EffectiveJSON())
+		if err != nil {
+			t.Fatal(err)
+		}
+		var rendered map[string]any
+		if err := json.Unmarshal(payload, &rendered); err != nil {
+			t.Fatal(err)
+		}
+		return rendered["environments"].(map[string]any)["passable_env_names"]
+	}
+	absent := loadText(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
+	if absent.Env.PassableEnvNamesSet || absent.Env.PassableEnvNames != nil {
+		t.Fatalf("absent knob: set=%v names=%v", absent.Env.PassableEnvNamesSet, absent.Env.PassableEnvNames)
+	}
+	if got := render(t, absent); got == nil {
+		t.Fatal("absent knob renders null, want the [] schema default")
+	} else if list, ok := got.([]any); !ok || len(list) != 0 {
+		t.Fatalf("absent knob renders %v, want []", got)
+	}
+	explicitNull := loadText(t, `{"schema_version": 2, "skills_root": "x", "projects": {}, "environments": {"passable_env_names": null}}`)
+	if !explicitNull.Env.PassableEnvNamesSet || explicitNull.Env.PassableEnvNames != nil {
+		t.Fatalf("null knob: set=%v names=%v", explicitNull.Env.PassableEnvNamesSet, explicitNull.Env.PassableEnvNames)
+	}
+	if got := render(t, explicitNull); got != nil {
+		t.Fatalf("null knob renders %v, want null", got)
+	}
+	listed := loadText(t, `{"schema_version": 2, "skills_root": "x", "projects": {}, "environments": {"passable_env_names": ["A_B"]}}`)
+	if !listed.Env.PassableEnvNamesSet || len(listed.Env.PassableEnvNames) != 1 {
+		t.Fatalf("list knob: set=%v names=%v", listed.Env.PassableEnvNamesSet, listed.Env.PassableEnvNames)
+	}
+	gotListed := render(t, listed)
+	listedNames, ok := gotListed.([]any)
+	if !ok || len(listedNames) != 1 || listedNames[0] != "A_B" {
+		t.Fatalf("list knob renders %v, want [A_B]", gotListed)
+	}
+	empty := loadText(t, `{"schema_version": 2, "skills_root": "x", "projects": {}, "environments": {"passable_env_names": []}}`)
+	if !empty.Env.PassableEnvNamesSet {
+		t.Fatal("explicit [] leaves the presence bit clear")
+	}
+	gotEmpty := render(t, empty)
+	emptyNames, ok := gotEmpty.([]any)
+	if !ok || len(emptyNames) != 0 {
+		t.Fatalf("explicit [] renders %v, want []", gotEmpty)
+	}
+	loadFails(t, `{"schema_version": 2, "skills_root": "x", "projects": {}, "environments": {"passable_env_names": ["FIGMA API KEY"]}}`, "passable_env_names")
 }

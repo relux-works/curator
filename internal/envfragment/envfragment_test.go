@@ -193,3 +193,117 @@ func TestBoundEnvNames(t *testing.T) {
 		t.Fatalf("an empty passable list bounds everything out: %v", got)
 	}
 }
+
+// TestResolvePassthroughProfiles drives the §10.3 S4 matrix: s4-warn
+// keeps unbounded behaviour for an absent knob with the unlisted warning,
+// s4-enforce drops unlisted names with the dropped warning, an explicit
+// null stays unbounded and silent under both, and reserved names stay
+// excluded everywhere.
+func TestResolvePassthroughProfiles(t *testing.T) {
+	cases := []struct {
+		name       string
+		requested  []string
+		passable   []string
+		knobSet    bool
+		profile    S4Profile
+		passed     []string
+		dropped    []string
+		diagnostic string
+	}{
+		{"warn-absent-passes-with-warning",
+			[]string{"FIGMA_API_KEY"}, nil, false, S4Warn,
+			[]string{"FIGMA_API_KEY"}, []string{}, DiagPassthroughUnlisted},
+		{"enforce-absent-drops-all",
+			[]string{"FIGMA_API_KEY"}, nil, false, S4Enforce,
+			[]string{}, []string{"FIGMA_API_KEY"}, DiagPassthroughDropped},
+		{"warn-null-unbounded-silent",
+			[]string{"FIGMA_API_KEY", "GITHUB_TOKEN"}, nil, true, S4Warn,
+			[]string{"FIGMA_API_KEY", "GITHUB_TOKEN"}, []string{}, ""},
+		{"enforce-null-unbounded-silent",
+			[]string{"FIGMA_API_KEY", "GITHUB_TOKEN"}, nil, true, S4Enforce,
+			[]string{"FIGMA_API_KEY", "GITHUB_TOKEN"}, []string{}, ""},
+		{"warn-list-bounds-silently",
+			[]string{"FIGMA_API_KEY", "GITHUB_TOKEN"}, []string{"FIGMA_API_KEY"}, true, S4Warn,
+			[]string{"FIGMA_API_KEY"}, []string{"GITHUB_TOKEN"}, ""},
+		{"enforce-list-drops-with-diagnostic",
+			[]string{"FIGMA_API_KEY", "GITHUB_TOKEN"}, []string{"FIGMA_API_KEY"}, true, S4Enforce,
+			[]string{"FIGMA_API_KEY"}, []string{"GITHUB_TOKEN"}, DiagPassthroughDropped},
+		{"enforce-empty-list-drops-all",
+			[]string{"FIGMA_API_KEY"}, []string{}, true, S4Enforce,
+			[]string{}, []string{"FIGMA_API_KEY"}, DiagPassthroughDropped},
+		{"warn-absent-nothing-passed-silent",
+			nil, nil, false, S4Warn, []string{}, []string{}, ""},
+		{"warn-absent-reserved-excluded",
+			[]string{"FIGMA_API_KEY", "PATH", "LD_PRELOAD"}, nil, false, S4Warn,
+			[]string{"FIGMA_API_KEY"}, []string{}, DiagPassthroughUnlisted},
+		{"enforce-list-reserved-excluded-silently",
+			[]string{"FIGMA_API_KEY", "PATH"}, []string{}, true, S4Enforce,
+			[]string{}, []string{"FIGMA_API_KEY"}, DiagPassthroughDropped},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			verdict := ResolvePassthrough(tc.requested, tc.passable, tc.knobSet, tc.profile)
+			if strings.Join(verdict.Passed, ",") != strings.Join(tc.passed, ",") {
+				t.Fatalf("passed = %v, want %v", verdict.Passed, tc.passed)
+			}
+			if strings.Join(verdict.Dropped, ",") != strings.Join(tc.dropped, ",") {
+				t.Fatalf("dropped = %v, want %v", verdict.Dropped, tc.dropped)
+			}
+			if tc.diagnostic == "" {
+				if verdict.Warning != "" {
+					t.Fatalf("warning = %q, want silent", verdict.Warning)
+				}
+				return
+			}
+			if !strings.HasPrefix(verdict.Warning, tc.diagnostic+":") {
+				t.Fatalf("warning = %q, want the %s diagnostic", verdict.Warning, tc.diagnostic)
+			}
+			named := tc.dropped
+			if tc.diagnostic == DiagPassthroughUnlisted {
+				named = tc.passed
+			}
+			for _, name := range named {
+				if !strings.Contains(verdict.Warning, name) {
+					t.Fatalf("warning %q names no %q", verdict.Warning, name)
+				}
+			}
+			if tc.diagnostic == DiagPassthroughUnlisted {
+				if !strings.Contains(verdict.Warning, "passable_env_names") {
+					t.Fatalf("warning %q names no knob", verdict.Warning)
+				}
+				if !strings.Contains(verdict.Warning, MigrationHint) {
+					t.Fatalf("warning %q carries no migration hint", verdict.Warning)
+				}
+			}
+		})
+	}
+}
+
+// TestEffectivePassable pins the profile default behind the knob
+// presence bit: absent is unbounded under s4-warn and empty under
+// s4-enforce, explicit null is unbounded under both.
+func TestEffectivePassable(t *testing.T) {
+	if got := EffectivePassable(nil, false, S4Warn); got != nil {
+		t.Fatalf("s4-warn absent = %v, want unbounded", got)
+	}
+	if got := EffectivePassable(nil, false, S4Enforce); got == nil || len(got) != 0 {
+		t.Fatalf("s4-enforce absent = %v, want empty", got)
+	}
+	if got := EffectivePassable(nil, true, S4Warn); got != nil {
+		t.Fatalf("s4-warn null = %v, want unbounded", got)
+	}
+	if got := EffectivePassable(nil, true, S4Enforce); got != nil {
+		t.Fatalf("s4-enforce null = %v, want unbounded", got)
+	}
+	if got := EffectivePassable([]string{"A_B"}, true, S4Warn); len(got) != 1 || got[0] != "A_B" {
+		t.Fatalf("s4-warn list = %v", got)
+	}
+}
+
+// TestActiveProfileIsWarn pins the shipped default: the warning release
+// goes out first, and the flip is a later release.
+func TestActiveProfileIsWarn(t *testing.T) {
+	if ActiveS4Profile != S4Warn {
+		t.Fatalf("ActiveS4Profile = %q, want s4-warn first", ActiveS4Profile)
+	}
+}

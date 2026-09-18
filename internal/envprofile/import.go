@@ -7,6 +7,7 @@ package envprofile
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -49,6 +50,12 @@ type ImportOptions struct {
 	// Use activates the installed profile under the section 9.1 rules.
 	Use    bool
 	Policy Policy
+	// SurfacingSink receives the §2.3 declaration rows at the required
+	// emission point of the underlying install: after the audit gate
+	// passes and before the lock is published or any surface is
+	// (re-)materialized. A set sink prints the rows during the
+	// operation and Info.Surfacing stays empty.
+	SurfacingSink io.Writer
 	// NativeHomeOf resolves native homes; nil means the process homes. A
 	// test seam: production never sets it.
 	NativeHomeOf func(id string) (string, error)
@@ -156,6 +163,7 @@ func importLocked(op *operation, home string, options ImportOptions) (Info, bool
 	installOptions := InstallOptions{
 		Operand: stage, As: name, Use: options.Use,
 		Policy: options.Policy, Imported: true,
+		SurfacingSink: options.SurfacingSink,
 	}
 	info, activated, updated, err := installLocked(op, home, installOptions)
 	if err != nil {

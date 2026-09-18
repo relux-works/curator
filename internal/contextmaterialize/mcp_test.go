@@ -199,3 +199,30 @@ func TestOpenCodeMCPJSONShape(t *testing.T) {
 		t.Fatalf("the codex-only server must not enter the opencode set: %q", text)
 	}
 }
+
+// TestFormatDeclarationRows pins the §2.3 surfacing bytes: closed columns
+// in order, ascending package-name byte order, compact JSON arrays, -/[]
+// for http, one LF per row, and no rows for an empty set.
+func TestFormatDeclarationRows(t *testing.T) {
+	got := FormatDeclarationRows([]MCPDeclaration{
+		{Package: "zeta-http", Version: "2.0.0", Transport: MCPTransportHTTP, EnvNames: []string{}},
+		{Package: "figma-devmode", Version: "1.2.0", Transport: MCPTransportStdio, Command: "npx",
+			Args: []string{"-y", "hello world", `say "hi"`}, EnvNames: []string{"FIGMA_API_KEY"}},
+	})
+	want := "mcp-declaration figma-devmode 1.2.0 stdio command=npx " +
+		`args=["-y","hello world","say \"hi\""] env_names=["FIGMA_API_KEY"]` + "\n" +
+		"mcp-declaration zeta-http 2.0.0 http command=- args=[] env_names=[]\n"
+	if got != want {
+		t.Fatalf("rows:\n got %q\nwant %q", got, want)
+	}
+	if got := FormatDeclarationRows(nil); got != "" {
+		t.Fatalf("empty set renders %q, want no rows", got)
+	}
+	// Nil slices render as empty arrays, never null.
+	got = FormatDeclarationRows([]MCPDeclaration{
+		{Package: "bare", Version: "0.1.0", Transport: MCPTransportStdio, Command: "tool"},
+	})
+	if want := "mcp-declaration bare 0.1.0 stdio command=tool args=[] env_names=[]\n"; got != want {
+		t.Fatalf("rows:\n got %q\nwant %q", got, want)
+	}
+}

@@ -67,8 +67,12 @@ func (c cli) cmdProfileImport(cfg *config.Config, args []string) int {
 		return exitUsage
 	}
 	policy := envprofile.PolicyFromConfig(cfg)
+	// The §2.3 surfacing rows print to stdout during the operation —
+	// after the audit gate passes, before the lock is published — so
+	// Info.Surfacing stays empty and nothing prints twice.
 	info, activated, updated, err := envprofile.Import(cfg.Home(), envprofile.ImportOptions{
 		As: *as, AllowLossy: *allowLossy, Use: *use, Policy: policy,
+		SurfacingSink: c.stdout,
 	})
 	for _, warning := range info.Warnings {
 		_, _ = fmt.Fprintln(c.stderr, "warning:", warning)
@@ -111,10 +115,14 @@ func (c cli) cmdProfileInstall(cfg *config.Config, args []string) int {
 	}
 	policy := envprofile.PolicyFromConfig(cfg)
 	policy.Takeover = *takeover
+	// The §2.3 surfacing rows print to stdout during the operation —
+	// after the audit gate passes, before the lock is published or any
+	// surface is (re-)materialized — so Info.Surfacing stays empty and
+	// nothing prints twice.
 	info, activated, updated, err := envprofile.Install(cfg.Home(), envprofile.InstallOptions{
 		Operand: positional[0], Directory: *directory,
 		Range: *rng, Tag: *tag, Revision: *revision, As: *as, Use: *use,
-		Policy: policy,
+		Policy: policy, SurfacingSink: c.stdout,
 	})
 	for _, warning := range info.Warnings {
 		_, _ = fmt.Fprintln(c.stderr, "warning:", warning)
@@ -297,7 +305,14 @@ func (c cli) cmdProfileUpdate(cfg *config.Config, args []string) int {
 	}
 	failed := false
 	for _, name := range names {
-		info, moved, err := envprofile.UpdateWithPolicy(cfg.Home(), name, policy)
+		// The §2.3 surfacing rows print to stdout during the operation —
+		// after the audit gate passes, before the lock is published or
+		// any scope is resynced — so Info.Surfacing stays empty and
+		// nothing prints twice. The closed columns carry no per-profile
+		// prefix.
+		info, moved, err := envprofile.UpdateWithOptions(cfg.Home(), name, envprofile.UpdateOptions{
+			Policy: policy, SurfacingSink: c.stdout,
+		})
 		if err != nil {
 			_, _ = fmt.Fprintf(c.stderr, "%s: %v\n", name, err)
 			failed = true

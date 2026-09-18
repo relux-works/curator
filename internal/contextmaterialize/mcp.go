@@ -8,6 +8,8 @@
 package contextmaterialize
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -123,6 +125,73 @@ func MCPSet(servers []MCPServer, environment string) ([]MCPServer, error) {
 	}
 	sort.Slice(set, func(i, j int) bool { return set[i].Name < set[j].Name })
 	return set, nil
+}
+
+// MCPDeclaration is one resolved MCP declaration package as the §2.3
+// surfacing rows show it: package name, resolved version, transport, and
+// — for stdio — the command, args, and requested env_names in declared
+// order. URL-carrying http servers surface no command or args.
+type MCPDeclaration struct {
+	Package   string
+	Version   string
+	Transport string
+	Command   string
+	Args      []string
+	EnvNames  []string
+}
+
+// FormatDeclarationRows renders one §2.3 surfacing row per MCP declaration
+// package, in ascending package-name byte order:
+//
+//	mcp-declaration <package> <version> <transport> command=<command> args=<args> env_names=<env_names>
+//
+// args and env_names are JSON arrays with no spaces; an http server
+// renders command=- and args=[]. Each row carries exactly one LF; an
+// empty set renders no rows. Surfacing is informative: the columns are
+// closed and fixed-order, and rendering never fails.
+func FormatDeclarationRows(declarations []MCPDeclaration) string {
+	ordered := append([]MCPDeclaration(nil), declarations...)
+	sort.Slice(ordered, func(i, j int) bool { return ordered[i].Package < ordered[j].Package })
+	var out strings.Builder
+	for _, declaration := range ordered {
+		command := declaration.Command
+		args := declaration.Args
+		if declaration.Transport == MCPTransportHTTP {
+			command = "-"
+			args = nil
+		}
+		out.WriteString("mcp-declaration ")
+		out.WriteString(declaration.Package)
+		out.WriteByte(' ')
+		out.WriteString(declaration.Version)
+		out.WriteByte(' ')
+		out.WriteString(declaration.Transport)
+		out.WriteString(" command=")
+		out.WriteString(command)
+		out.WriteString(" args=")
+		out.WriteString(compactJSONArray(args))
+		out.WriteString(" env_names=")
+		out.WriteString(compactJSONArray(declaration.EnvNames))
+		out.WriteByte('\n')
+	}
+	return out.String()
+}
+
+// compactJSONArray renders a JSON array with no spaces: JSON
+// double-quoted strings, [] for a nil or empty slice. HTML escaping is
+// off so an argument renders exactly the bytes the declaration carries;
+// quotes, backslashes, and control characters keep their JSON escapes.
+func compactJSONArray(values []string) string {
+	var out bytes.Buffer
+	encoder := json.NewEncoder(&out)
+	encoder.SetEscapeHTML(false)
+	if values == nil {
+		values = []string{}
+	}
+	if err := encoder.Encode(values); err != nil {
+		return "[]"
+	}
+	return strings.TrimSuffix(out.String(), "\n")
 }
 
 // MCPEnvNames returns the sorted union of the env_names of the servers in

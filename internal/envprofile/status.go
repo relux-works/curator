@@ -17,6 +17,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/relux-works/curator/internal/contextlock"
+	"github.com/relux-works/curator/internal/contextmaterialize"
+	"github.com/relux-works/curator/internal/contextpkg"
+	"github.com/relux-works/curator/internal/envfragment"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/hookapproval"
@@ -105,19 +109,76 @@ type ProfileState struct {
 	LockHash   string          `json:"lock_hash"`
 	Members    []MemberState   `json:"members"`
 	Precedence PrecedenceState `json:"precedence"`
+	// TransitiveSystemModules is the effective §12.1 admission policy.
+	TransitiveSystemModules string `json:"transitive_system_modules"`
+	// DroppedSystemModules names every system module the drop policy
+	// skips for the profile, in emitted order (§3, §12). It is empty
+	// under the error policy, where nothing is skipped.
+	DroppedSystemModules []DroppedSystemModule `json:"dropped_system_modules"`
+}
+
+// DroppedSystemModule names one system module the drop policy skips, by
+// package and manifest path.
+type DroppedSystemModule struct {
+	Package string `json:"package"`
+	Path    string `json:"path"`
+}
+
+// Provider verdicts for the §11/§12 umbrella provider posture rows: the
+// trust verdict of one curator-<name> executable under the active
+// revision.
+const (
+	// ProviderTrusted resolves inside the trust roots with no warning.
+	ProviderTrusted = "trusted"
+	// ProviderOutsideTrustRoots resolves outside the trust roots with
+	// the revision-A warning and stays current.
+	ProviderOutsideTrustRoots = "outside_trust_roots"
+	// ProviderRefused is refused with subcommand_provider_untrusted.
+	ProviderRefused = "refused"
+	// ProviderMissing is absent with subcommand_provider_missing.
+	ProviderMissing = "missing"
+	// ProviderUnreadable failed with
+	// subcommand_provider_root_unreadable.
+	ProviderUnreadable = "unreadable"
+)
+
+// ProviderState is one §12 umbrella provider row: the resolved
+// absolute provider path with its trust verdict. Resolved is set when
+// the revision selected the provider; RefusedPath names the refused
+// path on a refusal; Diagnostic names the closed §11.1 outcome when
+// the row is not a silent success.
+type ProviderState struct {
+	Name                string   `json:"name"`
+	Executable          string   `json:"executable"`
+	Resolved            *string  `json:"resolved"`
+	RefusedPath         *string  `json:"refused_path,omitempty"`
+	Verdict             string   `json:"verdict"`
+	Diagnostic          *string  `json:"diagnostic,omitempty"`
+	Current             bool     `json:"current"`
+	TrustRoots          []string `json:"trust_roots_consulted"`
+	UnreadableDirectory *string  `json:"unreadable_directory,omitempty"`
+}
+
+// DeclarationScope repeats the §2.3 surfacing rows for the current
+// profile of one reported scope, in row order without the LF.
+type DeclarationScope struct {
+	Scope   string   `json:"scope"`
+	Profile string   `json:"profile"`
+	Rows    []string `json:"rows"`
 }
 
 // Status is the whole matrix.
 type Status struct {
-	Homes                    []HomeState    `json:"homes"`
-	Scopes                   []ScopeHome    `json:"scopes"`
-	Adapters                 []AdapterState `json:"adapters"`
-	Targets                  []TargetState  `json:"targets"`
-	Profiles                 []ProfileState `json:"profiles"`
-	UnregisteredEnvironments []string       `json:"unregistered_environments"`
-	Orphans                  []string       `json:"orphans"`
-	Notes                    []string       `json:"notes"`
-	NonCurrent               bool           `json:"non_current"`
+	Homes                    []HomeState     `json:"homes"`
+	Scopes                   []ScopeHome     `json:"scopes"`
+	Adapters                 []AdapterState  `json:"adapters"`
+	Targets                  []TargetState   `json:"targets"`
+	Profiles                 []ProfileState  `json:"profiles"`
+	Providers                []ProviderState `json:"providers"`
+	UnregisteredEnvironments []string        `json:"unregistered_environments"`
+	Orphans                  []string        `json:"orphans"`
+	Notes                    []string        `json:"notes"`
+	NonCurrent               bool            `json:"non_current"`
 	// ShellHookTrust is the shell-hook trust posture (Manager profile
 	// §8.6): one row per known project env file. A changed file, or a
 	// recorded file whose bytes are missing or unreadable, makes the
@@ -130,6 +191,19 @@ type Status struct {
 	// failures the human output prints; an unreadable approval state
 	// additionally makes the matrix non-current.
 	ShellHookTrustWarnings []string `json:"shell_hook_trust_warnings,omitempty"`
+	// S4Profile is the active §10.3 passthrough profile, and
+	// PassableEnvNames the effective allowlist under it: nil renders
+	// null and means unbounded (environments §12).
+	S4Profile        string   `json:"s4_profile"`
+	PassableEnvNames []string `json:"passable_env_names"`
+	// Warnings carries machine-level warnings: the
+	// mcp_package_allowlist_empty row when the MCP package allowlist is
+	// empty, and unreadable-declaration notices. Warnings never make a
+	// row non-current (§12).
+	Warnings []string `json:"warnings"`
+	// MCPDeclarations repeats the §2.3 surfacing rows for the current
+	// profile of each scope reported.
+	MCPDeclarations []DeclarationScope `json:"mcp_declarations"`
 	// RequireCurrentProfile reports the locked require_current_profile
 	// requirement (environments §12.2): when the system file locks the
 	// key to a profile name, env status reports it. Nil means no
@@ -203,6 +277,20 @@ func StatusOf(req StatusRequest) (*Status, error) {
 	status.Profiles = profileStates(req, infos)
 	status.UnregisteredEnvironments = unregisteredEnvironments(req.Machine)
 	status.Orphans = orphanHomes(req.Home, installed)
+	// §12 posture: the active S4 profile with the effective
+	// passable_env_names, the allowlist-empty warning row, and the
+	// §2.3 surfacing rows for the current profile of each reported
+	// scope. None of them affects currency.
+	status.S4Profile = string(envfragment.ActiveS4Profile)
+	status.PassableEnvNames = envfragment.EffectivePassable(
+		req.Machine.PassableEnvNames, req.Machine.PassableEnvNamesSet,
+		envfragment.ActiveS4Profile)
+	if warning := AllowlistEmptyWarning(req.Policy.MCPAllowlist); warning != "" {
+		status.Warnings = append(status.Warnings, warning)
+	}
+	declarations, declarationWarnings := declarationScopes(req, installed)
+	status.MCPDeclarations = declarations
+	status.Warnings = append(status.Warnings, declarationWarnings...)
 	if len(status.Orphans) > 0 {
 		status.NonCurrent = true
 	}
@@ -435,10 +523,74 @@ func profileStates(req StatusRequest, infos []Info) []ProfileState {
 				Winner:    precedence.Winner,
 				Placement: precedence.Placement,
 			},
+			TransitiveSystemModules: effectiveTransitivePolicy(req.Policy),
+			DroppedSystemModules:    droppedSystemModulesOf(req.Home, lock, req.Policy),
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Profile < out[j].Profile })
 	return out
+}
+
+// effectiveTransitivePolicy reports the policy value status prints: the
+// configured knob, defaulting to drop exactly as resolution and
+// materialization do.
+func effectiveTransitivePolicy(policy Policy) string {
+	if effective, err := policy.Admission().Policy(); err == nil {
+		return effective
+	}
+	return contextmaterialize.TransitiveDrop
+}
+
+// droppedSystemModulesOf recomputes, read-only, the system modules the
+// drop policy skips for the profile: every non-admitted system module in
+// emitted order that applies to at least one registered adapter. Under
+// the error policy nothing is skipped and the list is empty. A member
+// whose manifest cannot be read contributes nothing here; the profile's
+// home rows already report that same failure as non-current through the
+// resolve verifier, so the gap is never silent.
+func droppedSystemModulesOf(home string, lock *contextlock.Lock, policy Policy) []DroppedSystemModule {
+	dropped := []DroppedSystemModule{}
+	admission := policy.Admission()
+	if effective, err := admission.Policy(); err != nil || effective != contextmaterialize.TransitiveDrop {
+		return dropped
+	}
+	order, err := contextmaterialize.EmittedOrder(lock, policy.Precedence())
+	if err != nil {
+		return dropped
+	}
+	direct := contextmaterialize.DirectSet(lock)
+	envIDs := registryEnvIDs()
+	manager := newGitManager(home)
+	for _, member := range order {
+		if direct[member.Name] || admission.Waived(member.Name) {
+			continue
+		}
+		manifest, err := contextpkg.LoadManifest(packageRoot(manager.entryPath(home, resolvedOf(member)), member.Directory))
+		if err != nil {
+			continue
+		}
+		for _, module := range manifest.Modules {
+			class := module.Class
+			if class == "" {
+				class = "root"
+			}
+			if class != "system" {
+				continue
+			}
+			applies := false
+			for _, env := range envIDs {
+				if module.Applies(env) {
+					applies = true
+					break
+				}
+			}
+			if !applies {
+				continue
+			}
+			dropped = append(dropped, DroppedSystemModule{Package: member.Name, Path: module.Path})
+		}
+	}
+	return dropped
 }
 
 // unregisteredEnvironments reports env-ids named in machine configuration
@@ -521,6 +673,58 @@ func scopeHomes(req StatusRequest, installed map[string]bool) []ScopeHome {
 		return out[i].Environment < out[j].Environment
 	})
 	return out
+}
+
+// declarationScopes repeats the §2.3 surfacing rows for the current
+// profile of each scope reported (environments §12): the machine scope
+// first, then every scoped current in key order. A scope whose profile
+// is not installed reports nothing; a scope with an empty MCP set
+// reports no rows; an installed profile whose lock or declaration
+// cannot be read is reported as unreadable, never as an empty set
+// (§8.4).
+func declarationScopes(req StatusRequest, installed map[string]bool) ([]DeclarationScope, []string) {
+	machine, _ := Current(req.Home)
+	scoped, _ := ScopedCurrents(req.Home)
+	type scope struct{ name, profile string }
+	scopes := []scope{{"machine", machine}}
+	keys := make([]string, 0, len(scoped))
+	for key := range scoped {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		scopes = append(scopes, scope{key, scoped[key]})
+	}
+	manager := newGitManager(req.Home)
+	var out []DeclarationScope
+	var warnings []string
+	for _, item := range scopes {
+		if item.profile == "" || !installed[item.profile] {
+			continue
+		}
+		lock, _, err := readLock(req.Home, item.profile)
+		if err != nil || lock == nil {
+			warnings = append(warnings, "profile "+item.profile+" lock cannot be read: "+readLockError(err))
+			continue
+		}
+		rows, unreadable := surfacingRows(req.Home, manager, lock)
+		for _, warning := range unreadable {
+			warnings = append(warnings, item.profile+": "+warning)
+		}
+		if len(rows) == 0 {
+			continue
+		}
+		out = append(out, DeclarationScope{Scope: item.name, Profile: item.profile, Rows: rows})
+	}
+	return out, warnings
+}
+
+// readLockError renders a lock-read failure without dereferencing nil.
+func readLockError(err error) string {
+	if err == nil {
+		return "no lock"
+	}
+	return err.Error()
 }
 
 // adapterStates reports the recorded and detected tool release per

@@ -6,6 +6,23 @@ All notable implementation changes are recorded here.
 
 ### Added
 
+- E4: umbrella provider lookup from trust roots (warning release,
+  revision A). Unknown subcommands still resolve `curator-<name>` on the
+  ambient `PATH`, but the manager now computes the trust verdict against
+  the trust roots — the manager install directory, then the new
+  machine-configuration `provider_directories` list (environments
+  §11/§12.1, lockable under §12.2) — and warns
+  `subcommand_provider_outside_trust_roots` with the resolved path, the
+  roots consulted, and the migration hint when the selection lies
+  outside them. Providers inside manager-published or managed
+  directories stay refused (`subcommand_provider_untrusted`), an
+  unreadable trust root fails (`subcommand_provider_root_unreadable`,
+  never absence), and `env status` reports the resolved provider path
+  with its trust verdict per discovered provider — always `curator-run`
+  and `curator-session` — with refused, missing, and unreadable rows
+  non-current for `--check`. Revision B (trust roots only, `PATH`
+  never selects) follows in a later release; this story blocks proposal
+  0016 / `path_prepend`.
 - Scoped HTTPS credentials for external build repositories. A `build_https`
   configuration section maps a source scope to a token source — the operator's
   own Git credential for the host, a manager-namespaced keyring entry, or a
@@ -52,6 +69,44 @@ All notable implementation changes are recorded here.
   enforcing revision (`B-enforcing`,
   refuse without sourcing) follows in a later release
   (Manager profile §8).
+- E2: direct-only `class: system` modules. Only the system modules of direct
+  packages — the root, the active overlays, and the packages their
+  `requires.contexts` name — plus packages admitted by a
+  `system_module_waivers` entry reach the system-prompt output and the
+  launch fragment; transitive system modules are refused. The machine knob
+  `transitive_system_modules` selects `drop` (default, non-breaking: the
+  module is skipped at materialization with the
+  `context_system_module_dropped` warning naming package and module) or
+  `error` (opt-in strictness: resolution fails with
+  `context_system_module_transitive` and the lock is left unchanged). The
+  knob locks to `error` only; waivers are not lockable. `curator env
+  status` reports the effective policy value with every dropped module by
+  package and path (Protocol environments §3, §5.5, §12).
+- S4 warning release (`s4-warn`, audit finding S4): `profile install`,
+  `profile update`, and `env status` now surface every resolved MCP
+  declaration package — package, version, transport, stdio command, args,
+  and requested `env_names` — as one `mcp-declaration` row printed after
+  the audit gate passes and before the lock is published; an empty MCP
+  package allowlist warns `mcp_package_allowlist_empty`; and a resolution
+  that passes an operator variable outside the configured
+  `passable_env_names` list — or any passed variable when the knob is
+  absent — warns `mcp_env_passthrough_unlisted` naming the variables and
+  the knob with the migration hint ("list the named variables to keep
+  passing them after the flip"). `env status` postures the active S4
+  profile with the effective `passable_env_names`. An explicit
+  `passable_env_names: null` stays unbounded with no warning. The
+  enforcing profile (`s4-enforce`: absent knob is empty, unlisted names
+  dropped with `mcp_env_passthrough_dropped`) is implemented behind the
+  same option and follows in a later release; this release keeps the
+  pre-S4 unbounded behaviour and only warns
+  (Spec environments §2.2, §2.3, §10.3, §12).
+- Conformance pin → v1.0.0-rc.12 (`dced9b8`): the hosted gate now runs
+  the manager-config-v2, environments (with the E2 system-module
+  admission cases), umbrella-provider-resolution, and
+  environments-env-passthrough vectors at the rc.12 root, and the four
+  `root-content` skip paths the E2/E4/S4 candidates carried for those
+  families are removed — an absent family now fails instead of
+  skipping.
 
 ### Changed
 
@@ -66,6 +121,18 @@ All notable implementation changes are recorded here.
 
 ### Fixed
 
+- E4: the user-bin shim directory counts as manager-published — and
+  refuses providers under revision A — only once the manager has
+  actually published shims there (the ownership ledger exists) or the
+  operator declared it via `CURATOR_GLOBAL_USER_BIN` (now honored by
+  the lookup; previously ignored). A merely selected PATH entry holds
+  no manager-written content, so providers there warn
+  `subcommand_provider_outside_trust_roots` and stay current instead
+  of refusing; on Windows, where temp trees sit below the user
+  profile, the selector otherwise claimed ordinary PATH directories.
+  Trust-root and refused-directory comparisons now also match by
+  filesystem identity, so an 8.3 short spelling and a case variant
+  name the same directory (environments §11).
 - Git snapshots are extracted from the object database (`git ls-tree -r -z`
   plus `git cat-file --batch`) instead of `git archive`, so every regular file
   carries exactly its committed blob bytes. `git archive` applied
