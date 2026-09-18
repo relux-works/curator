@@ -189,6 +189,8 @@ spawn agent resolution: Agent selection: codex via explicit_override (preferred_
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [implementer] developer (codex) (run=RUN-260918-f664ec, max_parallel=20)
 spawn run started: [implementer] developer (codex) (run=RUN-260918-f664ec)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260918-f664ec, pid=86390, exit=0)
 
 ## Precondition Resources
 - [TASK-260910-dufdai_source-contract.md](file://TASK-260910-dufdai/TASK-260910-dufdai_source-contract.md) — Accepted specification, execution boundary and task-specific acceptance.
@@ -252,14 +254,14 @@ spawn run started: [implementer] developer (codex) (run=RUN-260918-f664ec)
 - [TASK-260910-dufdai_review-verdict-rev6.md](file://TASK-260910-dufdai/TASK-260910-dufdai_review-verdict-rev6.md) — Independent review verdict for revision 6 (RUN-260918-0d00db): ACCEPT; F1 resolved on both arms, hosted gate 35352816423 resolves to candidate tree 08b96ccc, 3 reviewer probes, 3 mutants killed, bounds B1-B3
 - [TASK-260910-dufdai_review-evidence-rev6.tar.gz](file://TASK-260910-dufdai/TASK-260910-dufdai_review-evidence-rev6.tar.gz) — Review evidence archive for revision 6: local test logs with exit codes, overlaid reviewer probes and mutants, Windows hosted job log and go-test.json extract
 - [TASK-260910-dufdai_spawn-log_-implementer--developer--codex-_RUN-260918-aaf49d.log](file://TASK-260910-dufdai/TASK-260910-dufdai_spawn-log_-implementer--developer--codex-_RUN-260918-aaf49d.log) — System spawn log captured by task-board
-- [TASK-260910-dufdai_integration-results.md](file://TASK-260910-dufdai/TASK-260910-dufdai_integration-results.md) — Revision 6 integration refusal; command exit code 1: integration_base_moved. Exact integration output.
+- [TASK-260910-dufdai_integration-results.md](file://TASK-260910-dufdai/TASK-260910-dufdai_integration-results.md) — Revision 6 integration exited 1: integration_indeterminate; completed lane progress.md absent from committed manifest. Hosted gate 35362417337 passed. No retry.
 - [TASK-260910-dufdai_spawn-log_-implementer--developer--codex-_RUN-260918-f664ec.log](file://TASK-260910-dufdai/TASK-260910-dufdai_spawn-log_-implementer--developer--codex-_RUN-260918-f664ec.log) — System spawn log captured by task-board
 
 ## Created
 2026-09-10T13:56:51Z
 
 ## Last Update
-2026-09-18T15:25:27Z
+2026-09-18T16:23:49Z
 
 ## Assigned To
 [implementer] developer (codex)

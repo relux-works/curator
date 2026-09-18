@@ -1,0 +1,1115 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index ee5d4ee..98b855a 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -33,6 +33,19 @@
+ 
+ ### Security
+ 
++- R4: documented the reverse-proxy deployment the rate-limit and body bounds
++  assume (docs only, no wire-schema change, curator-spec `47c3c8c`).
++  `README.md` § Production transport and limits now states the rate-limit
++  model (network limiter on client host, 600/minute; concurrency semaphore,
++  128 slots with 0.1 s acquire; auditor limiter on auditor id,
++  120/minute), that a proxy without trusted forwarded headers collapses all
++  clients into one shared network bucket, and the recommended configuration
++  (`serve --behind-https-proxy --trusted-proxy <proxy IPs>`, forwarded
++  headers from other sources ignored) with a worked nginx snippet. The same
++  section states the body-before-auth squatting bounds (16 MiB, 15 s
++  deadline, `503 overloaded` semantics), the proxy-side mitigations (body,
++  connection, and timeout caps), and an operator checklist. `SECURITY.md`
++  points at that section from the threat model.
+ - P4: `import-bundle` now persists a per-upstream high-water (`version`,
+   `log_size`, `head`, `merkle_root` per upstream `key_id`) in a new
+   `upstream_high_water` table (schema version 4, migrated once at startup)
+@@ -62,6 +75,32 @@
+   default, `default_key_provider()` factory), documented in `SECURITY.md` as
+   the KMS hook point; no external provider is implemented. No protocol,
+   envelope, or key-material change (curator-spec `dced9b8`).
++- R7: `verify-backup` without `--public-key` now warns prominently instead of
++  silently trusting the live home's keyring: it prints `WARNING: keys
++  resolved from the live home <path>; supply --public-key from an out-of-band
++  copy for an independent check` on stderr and records the same text in the
++  `warning` member of the JSON result on both the `backup_valid: true` and
++  `backup_valid: false` envelopes. The verdict and exit codes are unchanged
++  (still `0`/`2`), and the `--public-key` path emits no warning and keeps its
++  exact previous envelopes. Operators should pass the registry's pinned
++  public key from an out-of-band copy kept with the checkpoint outside the
++  primary store. No wire-schema change (curator-spec `47c3c8c`).
++- R8: idempotency retention raised from 24 h to 26 h
++  (`IDEMPOTENCY_TTL_SECONDS`): the registry-service profile §4 minimum is
++  "at least 24 hours from the first successful commit", and the two extra
++  hours of slack keep a client retry at the 24 h contract boundary, plus
++  network delay, deduplicated instead of double-appending. The store still
++  refuses any retention below the 24 h profile minimum, and the success,
++  replay (`200`), and conflict (`409`) envelopes are unchanged (curator-spec
++  `dced9b8`).
++- R5: JSON nested deeper than 100 levels is rejected with `400 invalid_json`
++  instead of `500 internal_error`. `protocol.load_json` enforces the bound
++  with an iterative pre-parse scan and maps `RecursionError` to the new
++  `JSONDepthError` (`ProtocolError`); the CCJ canonicalization entry points
++  enforce the same bound and map `RecursionError` to `CanonicalDepthError`.
++  `POST /v1/records` reports depth violations as `invalid_json` while other
++  record errors keep `invalid_record`, and over-deep cursors keep
++  `404 invalid_cursor`. No wire-schema change (curator-spec `47c3c8c`).
+ - R3/P2: `serve --checkpoint <signed snapshot>`
+   (`CURATOR_SKILL_REGISTRY_CHECKPOINT`) compares the live boundary against
+   the operator checkpoint at startup, after the §5 integrity verification
+diff --git a/README.md b/README.md
+index d892bb9..66c1cca 100644
+--- a/README.md
++++ b/README.md
+@@ -91,7 +91,8 @@ curator-skill-registry --home ./data verify-chain      # verify the log hash cha
+ curator-skill-registry --home ./data backup \
+   --out /backups/registry.db --checkpoint-out /backups/registry-snapshot.json
+ curator-skill-registry --home ./data verify-backup /backups/registry.db \
+-  --checkpoint /secure-high-water/registry-snapshot.json
++  --checkpoint /secure-high-water/registry-snapshot.json \
++  --public-key ed25519:<pinned-registry-public-key>
+ ```
+ 
+ `backup` uses SQLite's consistent backup API and emits a signed snapshot
+@@ -101,6 +102,18 @@ older or equivocal database is refused. Stop all writers before replacing the
+ live database. Signing keys and `auditors.json` are backed up separately using
+ encrypted, access-controlled secret storage.
+ 
++`verify-backup` expects `--public-key` from an out-of-band copy of the
++registry's pinned signing key, so the check is independent of the home under
++test: take the key from the `genkey` (or `prepare-key-rotation` /
++`activate-key-rotation`) output or from `GET /v1/meta` `public_keys` while the
++deployment is known good, and store that copy with the checkpoint outside the
++primary store, encrypted and access controlled. Refresh the copy at every
++rotation before retiring the old key. Omitting `--public-key` still works for
++existing scripts but verifies against the live home's own keyring — which a
++compromised home defeats — and warns prominently on stderr and in the JSON
++result's `warning` member. Never copy the verification key from the live home
++under test.
++
+ ### Upstream import high-water
+ 
+ `import-bundle` persists, per upstream public key (`key_id` of
+@@ -248,7 +261,9 @@ reverse proxy requires `--behind-https-proxy --trusted-proxy <ip-list>`;
+ forwarded headers from other sources are ignored.
+ 
+ The process caps concurrent work, network-source request rate, auditor
+-submission rate, page size, cursor size, and request bodies. `429` and overload
++submission rate, page size, cursor size, and request bodies. JSON text nested
++deeper than 100 levels of objects/arrays is rejected with `400 invalid_json`
++(over-deep pagination cursors stay `404 invalid_cursor`). `429` and overload
+ `503` responses include `Retry-After`. The following settings accept positive
+ integers:
+ 
+@@ -258,6 +273,140 @@ CURATOR_SKILL_REGISTRY_NETWORK_REQUESTS_PER_MINUTE
+ CURATOR_SKILL_REGISTRY_AUDITOR_SUBMISSIONS_PER_MINUTE
+ ```
+ 
++#### Rate-limit model and reverse-proxy bucketing
++
++Three independent controls bound load, checked in this order per request:
++
++| Control | Keys on | Default bound | Refusal |
++|---|---|---|---|
++| Network limiter | client host (`network:<host>`) | 600 requests/minute, 60 s fixed window | `429 rate_limited` + `Retry-After` |
++| Concurrency semaphore | global slots | 128 slots, 0.1 s acquire wait | `503 overloaded` + `Retry-After: 1` |
++| Auditor limiter | auditor id (`auditor:<id>`), after token verification | 120 submissions/minute, 60 s fixed window | `429 rate_limited` + `Retry-After` |
++
++The network limiter keys on `request.client.host`. With forwarded headers
++disabled (the default), that is the TCP peer — so a reverse proxy without
++trusted forwarded headers collapses every client behind it into one shared
++`network:<proxy-ip>` bucket, and one noisy client throttles everyone.
++
++Recommended configuration: terminate TLS at the proxy, bind the service to
++loopback, and enable forwarded-header trust ONLY for the proxy's own
++addresses:
++
++```bash
++curator-skill-registry --home /data serve --host 127.0.0.1 --port 8082 \
++  --behind-https-proxy --trusted-proxy 127.0.0.1
++```
++
++The exact settings are the `serve` flags `--behind-https-proxy` (default:
++off — forwarded headers are ignored entirely) and `--trusted-proxy
++<comma-separated proxy IPs>` (default: unset; required together with
++`--behind-https-proxy`); there is no environment-variable equivalent. They
++map directly to Uvicorn `proxy_headers` / `forwarded_allow_ips`, and
++forwarded headers from other sources are ignored. List only the proxy
++addresses you operate — every listed address may set the client identity
++used for rate limiting and audit.
++
++Worked nginx example for the recommended setup (TLS at the proxy, service
++on loopback, proxy at `127.0.0.1` matching `--trusted-proxy` above):
++
++```nginx
++limit_conn_zone $binary_remote_addr zone=registry_conn:10m;
++
++upstream registry {
++    server 127.0.0.1:8082;
++}
++
++server {
++    listen 443 ssl;
++    server_name registry.example.com;
++
++    ssl_certificate     /etc/nginx/tls/registry.crt;
++    ssl_certificate_key /etc/nginx/tls/registry.key;
++
++    client_max_body_size 16m;  # reject oversized bodies at the edge
++    client_body_timeout 15s;   # idle gap allowed between successive body reads
++    limit_conn registry_conn 32;  # per-client connection cap
++
++    location / {
++        proxy_pass http://registry;
++        proxy_set_header Host              $host;
++        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
++        proxy_set_header X-Forwarded-Proto $scheme;
++        proxy_read_timeout 30s;  # upstream response reads, not the client body
++    }
++}
++```
++
++#### Body-before-auth bounds and proxy mitigations
++
++`POST /v1/records` reads the request body before verifying the auditor
++token: the body read accepts at most 16 MiB within a 15-second read
++deadline, and only then is the bearer token verified and the auditor
++limiter checked. A declared `Content-Length` over 16 MiB is refused with
++`413 request_too_large` before streaming starts; a stream is refused the
++same way once a received chunk pushes the buffered total past 16 MiB, so
++the bound covers the accepted/buffered body rather than raw inbound
++bandwidth. A body not fully received within the 15 s read deadline is
++refused with `503 request_timeout`. The 15 s bound scopes only the body
++read: a slot is acquired before routing and released after the route
++finishes, so a request holds one of the 128 concurrency slots while
++streaming; a request that cannot acquire a slot within 0.1 s is refused
++with `503 overloaded` and `Retry-After: 1`.
++
++What an unauthenticated attacker can and cannot do with these bounds:
++
++- Can: occupy concurrency slots with slow streams (each body read bounded
++  by the 15 s deadline), causing `503 overloaded` for other requests while
++  all 128 slots are held, and force the service to buffer up to 16 MiB per
++  stream.
++- Cannot, without a valid token: reach the auditor limiter or append a
++  record — token verification runs after the body read and rejects unknown
++  tokens before the auditor limiter is consulted. A request with a valid
++  token reaches the auditor limiter before its signature is validated, but
++  a record append additionally requires a valid schema and a signature that
++  verifies for the auditor. No refusal persists anything (no registry
++  append or persistent registry mutation, though network-limiter accounting
++  and an audit event still happen on refused requests), and there is no
++  amplification — one stream holds exactly one slot.
++
++`503 overloaded` is transient and retryable: it means "no slot within
++0.1 s", carries `Retry-After: 1`, causes no registry append or persistent
++registry mutation, and is audited like any other request. Treat sustained `overloaded` as a saturation signal (slow
++clients or an attack filling the slots), not a storage failure — storage
++failures report `503 storage_unavailable` / `503 not_ready` instead.
++
++Proxy-side mitigations (in front of the finite application limits):
++
++- Cap request bodies at the proxy (`client_max_body_size 16m` above) so
++  oversized streams are rejected before reaching the service.
++- Cap connections per client (`limit_conn` above) so one source cannot hold
++  many of the 128 slots at once.
++- Bound stalled uploads at the edge with `client_body_timeout`, which
++  limits the idle gap between successive body reads — not the total upload
++  duration, so a trickling client can still take longer than 15 s overall.
++  `proxy_read_timeout` covers a different scope (reads of the upstream
++  response) and does not bound the incoming body.
++
++Nginx buffers proxied request bodies by default (`proxy_request_buffering`
++is on): the complete body is received at the edge before forwarding, so in
++this setup slow-client occupancy sits primarily at the proxy rather than in
++the service's 128 slots.
++
++#### Operator checklist (proxy and load bounds)
++
++- [ ] TLS terminates at the proxy (or direct `--ssl-certfile` /
++  `--ssl-keyfile`); the service binds loopback or a private address only.
++- [ ] `serve` passes `--behind-https-proxy --trusted-proxy <proxy IPs>` —
++  proxy addresses only, never client ranges or `0.0.0.0/0`.
++- [ ] The proxy sets `X-Forwarded-For` / `X-Forwarded-Proto` (Uvicorn trusts
++  only these two headers, only from `--trusted-proxy`).
++- [ ] The proxy caps bodies at 16 MiB, connections per client, and request
++  timeouts (see the snippet above).
++- [ ] The three limiter env settings keep their defaults (600 / 120 / 128)
++  unless load testing says otherwise; `429`/`503` rates and `Retry-After`
++  compliance are monitored, and the `csk_registry.audit` event stream is
++  retained access-controlled.
++
+ Run one writable service process per database on local durable storage. SQLite
+ uses WAL, `synchronous=FULL`, a five-second lock deadline, serialized append
+ transactions, a 30-second operation deadline, and startup integrity
+@@ -277,7 +426,7 @@ migration, the former `csk-registry` command and `CSK_REGISTRY_HOME` variable
+ remain supported as compatibility aliases; the new names take precedence.
+ 
+ Before upgrading a database created by a release that stored idempotency keys
+-without auditor identity, stop submissions for the prior 24-hour retention
++without auditor identity, stop submissions for the prior 26-hour retention
+ window. Startup refuses unexpired unscoped entries because assigning them to an
+ auditor would be ambiguous. Expired entries are discarded while the schema is
+ migrated; log history is unchanged.
+diff --git a/SECURITY.md b/SECURITY.md
+index 0812269..e21cc74 100644
+--- a/SECURITY.md
++++ b/SECURITY.md
+@@ -47,9 +47,15 @@ service becomes ready, and a live state below or inconsistent with it stays
+ up non-ready with writes disabled instead of serving stale state. This
+ startup comparison is the normative "before the service becomes ready" gate;
+ `verify-backup` stays as the offline operator procedure for vetting a
+-candidate backup before a restore. Keep checkpoints and secret backups
+-outside the primary store, encrypted and access controlled. Cursor and
+-response data never bootstrap trust; clients pin registry keys out of band.
++candidate backup before a restore. Give `verify-backup` its `--public-key`
++from an out-of-band copy of the registry's pinned signing key, recorded at
++`genkey`/rotation time and kept with the checkpoint outside the primary
++store; omitting the flag verifies against the live home's own keyring, which
++a compromised home defeats, so the command warns prominently on stderr and
++in its JSON `warning` member in that case. Keep checkpoints, pinned-key
++copies, and secret backups outside the primary store, encrypted and access
++controlled. Cursor and response data never bootstrap trust; clients pin
++registry keys out of band.
+ Pagination is fail-closed too: a cursor page is served only at the cursor's
+ carried boundary, and a carried boundary that disagrees with the committed
+ log or is no longer available is refused with `404 invalid_cursor` rather
+@@ -76,5 +82,17 @@ non-ready state that is transient instead of latched: the next successful
+ pass restores readiness automatically, while a failed pass still latches
+ until restart.
+ 
++Rate limiting is proxy-aware by deployment, not by default: the network
++limiter keys on the observed client host, so a reverse proxy without
++trusted forwarded headers collapses all clients into one shared bucket,
++and `POST /v1/records` streams up to 16 MiB (15 s deadline) holding one of
++the 128 concurrency slots before the auditor token is verified — bounded,
++but saturable into transient `503 overloaded` by unauthenticated slow
++streams. The threat model therefore requires the proxy deployment in
++[README § Production transport and limits](README.md#production-transport-and-limits):
++TLS at the proxy, forwarded-header trust only for the proxy's own addresses
++(`serve --behind-https-proxy --trusted-proxy`), and proxy-side body,
++connection, and timeout caps.
++
+ The complete normative threat model and deployment requirements are in the
+ [Curator registry-service profile](https://github.com/relux-works/curator-spec/blob/main/profiles/registry-service.md).
+diff --git a/src/csk_registry/app.py b/src/csk_registry/app.py
+index af1ad00..ab55947 100644
+--- a/src/csk_registry/app.py
++++ b/src/csk_registry/app.py
+@@ -32,6 +32,7 @@ from .keys import load_active_key, public_keys
+ from .limits import FixedWindowLimiter
+ from .permissions import protect_private_directory
+ from .protocol import (
++    JSONDepthError,
+     ProtocolError,
+     load_json,
+     validate_record,
+@@ -39,7 +40,9 @@ from .protocol import (
+     validate_source_identity,
+ )
+ from .signing import (
++    MAX_JSON_DEPTH,
+     SigningKey,
++    CanonicalDepthError,
+     canonical_bytes,
+     canonical_document_bytes,
+     verify,
+@@ -59,7 +62,12 @@ from .store import (
+ MAX_PAGE_SIZE = 1000
+ MAX_BODY_BYTES = 16 * 1024 * 1024
+ CURSOR_TTL_SECONDS = 3600
+-IDEMPOTENCY_TTL_SECONDS = 24 * 3600
++# Registry-service profile §4 (curator-spec dced9b8): "Retention is at least
++# 24 hours from the first successful commit and is not shortened by restart,
++# cleanup, or credential rotation." The two extra hours are slack so a client
++# retry at the 24 h contract boundary, plus network delay, is still
++# deduplicated instead of double-appending (R8).
++IDEMPOTENCY_TTL_SECONDS = 26 * 3600
+ DEFAULT_MAX_CONCURRENT_REQUESTS = 128
+ DEFAULT_NETWORK_REQUESTS_PER_MINUTE = 600
+ DEFAULT_AUDITOR_SUBMISSIONS_PER_MINUTE = 120
+@@ -410,8 +418,20 @@ def create_app(
+             )
+         try:
+             record = validate_record(load_json(body))
++        except JSONDepthError as exc:
++            raise APIError(400, "invalid_json", str(exc)) from exc
++        except CanonicalDepthError as exc:
++            raise APIError(400, "invalid_json", str(exc)) from exc
+         except ProtocolError as exc:
+             raise APIError(400, "invalid_record", str(exc)) from exc
++        except RecursionError as exc:
++            # Unreachable: load_json and canonicalization already map
++            # over-deep input, but a pathological body must never be a 500.
++            raise APIError(
++                400,
++                "invalid_json",
++                f"JSON nesting exceeds maximum depth of {MAX_JSON_DEPTH}",
++            ) from exc
+         if not verify_signed(auditor.public_pinned, record):
+             raise APIError(400, "invalid_signature", "record signature does not verify for this auditor")
+         countersigned = _countersign(record, signing_key, endorser=auditor.auditor_id)
+@@ -420,7 +440,16 @@ def create_app(
+                 not 0x21 <= ord(character) <= 0x7E for character in idempotency_key
+             ):
+                 raise APIError(400, "invalid_idempotency_key", "Idempotency-Key is malformed")
+-            body_sha256 = hashlib.sha256(canonical_bytes(record)).hexdigest()
++            try:
++                body_sha256 = hashlib.sha256(canonical_bytes(record)).hexdigest()
++            except (CanonicalDepthError, RecursionError) as exc:
++                # Unreachable: the record already passed validation, but a
++                # pathological body must never be a 500.
++                raise APIError(
++                    400,
++                    "invalid_json",
++                    f"JSON nesting exceeds maximum depth of {MAX_JSON_DEPTH}",
++                ) from exc
+             try:
+                 response, replayed = store.append_idempotent(
+                     countersigned,
+@@ -552,7 +581,7 @@ def _cursor_state(
+         ):
+             raise ValueError("value")
+         return offset, boundary, snapshot
+-    except (ValueError, ProtocolError) as exc:
++    except (ValueError, ProtocolError, RecursionError) as exc:
+         raise APIError(404, "invalid_cursor", "pagination cursor is invalid or expired") from exc
+ 
+ 
+diff --git a/src/csk_registry/cli.py b/src/csk_registry/cli.py
+index 26fabc9..fe2c89b 100644
+--- a/src/csk_registry/cli.py
++++ b/src/csk_registry/cli.py
+@@ -322,8 +322,18 @@ def _cmd_backup(args: argparse.Namespace) -> int:
+     return 0
+ 
+ 
++def _implicit_key_warning(home: Path) -> str:
++    return (
++        f"keys resolved from the live home {home}; supply --public-key "
++        "from an out-of-band copy for an independent check"
++    )
++
++
+ def _cmd_verify_backup(args: argparse.Namespace) -> int:
+     home = _home(args)
++    warning = None if args.public_key else _implicit_key_warning(home)
++    if warning is not None:
++        print(f"WARNING: {warning}", file=sys.stderr)
+     try:
+         store = Store(Path(args.database).expanduser())
+         checkpoint_value = load_json(Path(args.checkpoint).expanduser().read_bytes())
+@@ -341,18 +351,19 @@ def _cmd_verify_backup(args: argparse.Namespace) -> int:
+         if not store.checkpoint_matches(boundary):
+             raise ValueError("backup is below or inconsistent with the checkpoint")
+     except (OSError, ValueError, StoreIntegrityError) as exc:
+-        print(json.dumps({"backup_valid": False, "error": str(exc)}, indent=2))
++        payload: dict[str, object] = {"backup_valid": False, "error": str(exc)}
++        if warning is not None:
++            payload["warning"] = warning
++        print(json.dumps(payload, indent=2))
+         return 2
+-    print(
+-        json.dumps(
+-            {
+-                "backup_valid": True,
+-                "log_size": boundary.log_size,
+-                "head": boundary.head,
+-            },
+-            indent=2,
+-        )
+-    )
++    success: dict[str, object] = {
++        "backup_valid": True,
++        "log_size": boundary.log_size,
++        "head": boundary.head,
++    }
++    if warning is not None:
++        success["warning"] = warning
++    print(json.dumps(success, indent=2))
+     return 0
+ 
+ 
+@@ -493,7 +504,10 @@ def build_parser() -> argparse.ArgumentParser:
+     verify_backup.add_argument("--checkpoint", required=True, help="signed checkpoint JSON")
+     verify_backup.add_argument(
+         "--public-key",
+-        help="checkpoint signing key (default: registry key under --home)",
++        help=(
++            "checkpoint signing key from an out-of-band copy "
++            "(default: registry keys under --home, with a warning)"
++        ),
+     )
+     verify_backup.set_defaults(func=_cmd_verify_backup)
+ 
+diff --git a/src/csk_registry/errors.py b/src/csk_registry/errors.py
+new file mode 100644
+index 0000000..e910da6
+--- /dev/null
++++ b/src/csk_registry/errors.py
+@@ -0,0 +1,13 @@
++"""Shared error bases for the registry service.
++
++Kept free of package imports: both the signing layer (``signing.py``) and
++the protocol layer (``protocol.py``) derive errors from
++:class:`ProtocolError`, so the base lives here to avoid a
++protocol↔signing import cycle.
++"""
++
++from __future__ import annotations
++
++
++class ProtocolError(ValueError):
++    """A client-supplied protocol object is malformed."""
+diff --git a/src/csk_registry/protocol.py b/src/csk_registry/protocol.py
+index b73737a..0f6cc4a 100644
+--- a/src/csk_registry/protocol.py
++++ b/src/csk_registry/protocol.py
+@@ -7,7 +7,13 @@ import re
+ import unicodedata
+ from typing import Any
+ 
+-from .signing import MAX_SAFE_INTEGER, canonical_document_bytes
++from .errors import ProtocolError as ProtocolError
++from .signing import (
++    MAX_JSON_DEPTH,
++    MAX_SAFE_INTEGER,
++    CanonicalDepthError,
++    canonical_document_bytes,
++)
+ 
+ 
+ STATUSES = {"audited", "revoked", "deprecated", "pending"}
+@@ -23,11 +29,74 @@ _WINDOWS_RESERVED = {"con", "prn", "aux", "nul"} | {
+ }
+ 
+ 
+-class ProtocolError(ValueError):
++class JSONDepthError(ProtocolError):
++    """Protocol JSON nested deeper than ``MAX_JSON_DEPTH``."""
++
+     pass
+ 
+ 
++def _check_json_depth(raw: bytes | str) -> None:
++    """Reject JSON text nested deeper than ``MAX_JSON_DEPTH`` without parsing.
++
++    An iterative bracket scan outside strings, so pathological depth fails
++    before ``json.loads`` can recurse into the interpreter limit. Malformed
++    text is left for the parser to reject; only the depth bound is enforced.
++    """
++    depth = 0
++    in_string = False
++    escaped = False
++
++    def bump(opening: bool) -> None:
++        nonlocal depth
++        if opening:
++            depth += 1
++            if depth > MAX_JSON_DEPTH:
++                raise JSONDepthError(
++                    f"JSON nesting exceeds maximum depth of {MAX_JSON_DEPTH}"
++                )
++        else:
++            depth = max(0, depth - 1)
++
++    if isinstance(raw, bytes):
++        for byte in raw:
++            if in_string:
++                if escaped:
++                    escaped = False
++                elif byte == 0x5C:  # backslash
++                    escaped = True
++                elif byte == 0x22:  # quote
++                    in_string = False
++            elif byte == 0x22:
++                in_string = True
++            elif byte == 0x7B or byte == 0x5B:  # { [
++                bump(True)
++            elif byte == 0x7D or byte == 0x5D:  # } ]
++                bump(False)
++    else:
++        for character in raw:
++            if in_string:
++                if escaped:
++                    escaped = False
++                elif character == "\\":
++                    escaped = True
++                elif character == '"':
++                    in_string = False
++            elif character == '"':
++                in_string = True
++            elif character == "{" or character == "[":
++                bump(True)
++            elif character == "}" or character == "]":
++                bump(False)
++
++
+ def load_json(raw: bytes | str) -> Any:
++    """Parse protocol JSON, rejecting over-deep documents.
++
++    Documents nested deeper than ``MAX_JSON_DEPTH`` (100 levels of
++    objects/arrays) raise :class:`JSONDepthError`, a ``ProtocolError``;
++    ``RecursionError`` from the parser or canonicalization is mapped to
++    the same error so callers only handle ``ProtocolError``.
++    """
+     if (isinstance(raw, bytes) and raw.startswith(b"\xef\xbb\xbf")) or (
+         isinstance(raw, str) and raw.startswith("\ufeff")
+     ):
+@@ -51,6 +120,7 @@ def load_json(raw: bytes | str) -> Any:
+         raise ProtocolError(f"registry JSON does not allow non-integer number {text!r}")
+ 
+     try:
++        _check_json_depth(raw)
+         value = json.loads(
+             raw,
+             object_pairs_hook=object_pairs,
+@@ -60,12 +130,36 @@ def load_json(raw: bytes | str) -> Any:
+         )
+         canonical_document_bytes(value)
+         return value
++    except JSONDepthError:
++        raise
++    except CanonicalDepthError as exc:
++        raise JSONDepthError(str(exc)) from exc
+     except ProtocolError:
+         raise
++    except RecursionError as exc:
++        raise JSONDepthError(
++            f"JSON nesting exceeds maximum depth of {MAX_JSON_DEPTH}"
++        ) from exc
+     except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+         raise ProtocolError(f"invalid protocol JSON: {exc}") from exc
+ 
+ 
++def _canonicalize_validated(value: Any) -> None:
++    """Canonicalize a validated object, mapping depth failures to ``ProtocolError``.
++
++    Only depth violations are converted; other CCJ errors keep their
++    existing ``CanonicalError`` behaviour.
++    """
++    try:
++        canonical_document_bytes(value)
++    except CanonicalDepthError as exc:
++        raise JSONDepthError(str(exc)) from exc
++    except RecursionError as exc:
++        raise JSONDepthError(
++            f"JSON nesting exceeds maximum depth of {MAX_JSON_DEPTH}"
++        ) from exc
++
++
+ def validate_record(record: Any) -> dict[str, Any]:
+     if not isinstance(record, dict):
+         raise ProtocolError("audit record must be an object")
+@@ -114,7 +208,7 @@ def validate_record(record: Any) -> dict[str, Any]:
+         ):
+             raise ProtocolError("audit record endorsement requires an endorser")
+         validate_signature(endorsement.get("sig"))
+-    canonical_document_bytes(record)
++    _canonicalize_validated(record)
+     return record
+ 
+ 
+@@ -162,7 +256,7 @@ def validate_snapshot(snapshot: Any) -> dict[str, Any]:
+     if not isinstance(created_at, str) or _TIMESTAMP.fullmatch(created_at) is None:
+         raise ProtocolError("snapshot timestamp is malformed")
+     validate_signature(snapshot.get("sig"))
+-    canonical_document_bytes(snapshot)
++    _canonicalize_validated(snapshot)
+     return snapshot
+ 
+ 
+diff --git a/src/csk_registry/signing.py b/src/csk_registry/signing.py
+index a86b403..97be55e 100644
+--- a/src/csk_registry/signing.py
++++ b/src/csk_registry/signing.py
+@@ -11,31 +11,65 @@ from cryptography.exceptions import InvalidSignature
+ from cryptography.hazmat.primitives import serialization
+ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
+ 
++from .errors import ProtocolError
++
+ 
+ MAX_SAFE_INTEGER = 9_007_199_254_740_991
+ 
++MAX_JSON_DEPTH = 100
++"""Maximum accepted JSON nesting depth (nested objects/arrays).
++
++Inputs nested deeper than this are rejected before they can recurse into
++the interpreter limit, so pathological documents fail closed as client
++errors instead of raising ``RecursionError``.
++"""
++
+ 
+ class CanonicalError(ValueError):
+     pass
+ 
+ 
++class CanonicalDepthError(CanonicalError, ProtocolError):
++    """CCJ-1 input nested deeper than ``MAX_JSON_DEPTH``.
++
++    A ``ProtocolError`` so request-layer callers catch depth failures with
++    the protocol contract, while remaining ``CanonicalError`` /
++    ``ValueError`` compatible for existing handlers.
++    """
++
++
+ def canonical_bytes(record: dict[str, Any]) -> bytes:
+-    """Return Curator Canonical JSON 1 bytes for a signed object."""
++    """Return Curator Canonical JSON 1 bytes for a signed object.
++
++    Inputs nested deeper than ``MAX_JSON_DEPTH`` raise
++    :class:`CanonicalDepthError` (catchable as ``ProtocolError``).
++    """
+     body = {key: value for key, value in record.items() if key != "sig"}
+     return _canonical_document(body)
+ 
+ 
+ def canonical_document_bytes(value: Any) -> bytes:
+-    """Canonicalize a complete JSON value without stripping a signature."""
++    """Canonicalize a complete JSON value without stripping a signature.
++
++    Inputs nested deeper than ``MAX_JSON_DEPTH`` raise
++    :class:`CanonicalDepthError` (catchable as ``ProtocolError``).
++    """
+     return _canonical_document(value)
+ 
+ 
+ def _canonical_document(value: Any) -> bytes:
+-    _validate_ccj(value)
+-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
++    try:
++        _validate_ccj(value)
++        return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
++    except CanonicalDepthError:
++        raise
++    except RecursionError as exc:
++        raise CanonicalDepthError(
++            f"JSON nesting exceeds maximum depth of {MAX_JSON_DEPTH}"
++        ) from exc
+ 
+ 
+-def _validate_ccj(value: Any) -> None:
++def _validate_ccj(value: Any, depth: int = 0) -> None:
+     if value is None or isinstance(value, bool):
+         return
+     if isinstance(value, int):
+@@ -49,15 +83,23 @@ def _validate_ccj(value: Any) -> None:
+             raise CanonicalError("CCJ-1 strings must not contain lone surrogates")
+         return
+     if isinstance(value, list):
++        if depth + 1 > MAX_JSON_DEPTH:
++            raise CanonicalDepthError(
++                f"JSON nesting exceeds maximum depth of {MAX_JSON_DEPTH}"
++            )
+         for item in value:
+-            _validate_ccj(item)
++            _validate_ccj(item, depth + 1)
+         return
+     if isinstance(value, dict):
++        if depth + 1 > MAX_JSON_DEPTH:
++            raise CanonicalDepthError(
++                f"JSON nesting exceeds maximum depth of {MAX_JSON_DEPTH}"
++            )
+         for key, item in value.items():
+             if not isinstance(key, str):
+                 raise CanonicalError("CCJ-1 object keys must be strings")
+-            _validate_ccj(key)
+-            _validate_ccj(item)
++            _validate_ccj(key, depth + 1)
++            _validate_ccj(item, depth + 1)
+         return
+     raise CanonicalError(f"CCJ-1 does not support {type(value).__name__}")
+ 
+@@ -161,7 +203,7 @@ def verify_signed(public_pinned: str, obj: dict[str, Any]) -> bool:
+     try:
+         public = parse_public_key(public_pinned)
+         canonical = canonical_bytes(obj)
+-    except (ValueError, CanonicalError):
++    except (ValueError, RecursionError):
+         return False
+     if sig.get("algorithm") != "ed25519":
+         return False
+diff --git a/tests/test_registry.py b/tests/test_registry.py
+index 81c8c3e..b09f743 100644
+--- a/tests/test_registry.py
++++ b/tests/test_registry.py
+@@ -14,6 +14,7 @@ import tomllib
+ from collections.abc import Callable
+ from concurrent.futures import ThreadPoolExecutor
+ from pathlib import Path
++from typing import Any
+ 
+ import pytest
+ from fastapi import FastAPI
+@@ -28,7 +29,7 @@ from csk_registry import (
+     home_from_env,
+     signing,
+ )
+-from csk_registry.app import _encode_cursor, app_from_env, create_app
++from csk_registry.app import _encode_cursor, _url64, app_from_env, create_app
+ from csk_registry.auth import Auditor, AuditorTokens
+ from csk_registry.checkpoint import CheckpointView, compare_checkpoint
+ from csk_registry.cli import build_parser, main
+@@ -39,7 +40,14 @@ from csk_registry.permissions import (
+     protect_private_directory,
+     protect_private_file,
+ )
+-from csk_registry.protocol import ProtocolError, portable_path, validate_record, validate_source_identity
++from csk_registry.protocol import (
++    JSONDepthError,
++    ProtocolError,
++    load_json,
++    portable_path,
++    validate_record,
++    validate_source_identity,
++)
+ from csk_registry.snapshot import build_snapshot
+ from csk_registry.store import (
+     CursorBoundaryMismatch,
+@@ -283,6 +291,123 @@ def test_submit_rejects_wrong_signature(tmp_path: Path):
+     assert resp.status_code == 400
+ 
+ 
++def _nested_list(depth: int) -> list[Any]:
++    value: list[Any] = []
++    for _ in range(depth - 1):
++        value = [value]
++    return value
++
++
++def test_load_json_rejects_over_deep_nesting():
++    bound = signing.MAX_JSON_DEPTH
++    assert isinstance(load_json("[" * bound + "]" * bound), list)
++    assert isinstance(load_json('{"a":' * bound + "1" + "}" * bound), dict)
++    for raw in (
++        "[" * (bound + 1) + "]" * (bound + 1),
++        ('{"a":' * (bound + 1) + "1" + "}" * (bound + 1)).encode("utf-8"),
++        "[" * 5000 + "]" * 5000,
++    ):
++        with pytest.raises(JSONDepthError) as excinfo:
++            load_json(raw)
++        assert str(bound) in str(excinfo.value)
++        with pytest.raises(ProtocolError):
++            load_json(raw)
++    # Brackets inside strings do not count toward the bound.
++    load_json('{"k": "' + "[" * (bound + 10) + '"}')
++    load_json(b'{"k": "' + b"[" * (bound + 10) + b'"}')
++
++
++def test_load_json_maps_recursion_error_to_depth_error(monkeypatch: pytest.MonkeyPatch):
++    def boom(value: object) -> bytes:
++        raise RecursionError("boom")
++
++    monkeypatch.setattr("csk_registry.protocol.canonical_document_bytes", boom)
++    with pytest.raises(JSONDepthError, match="maximum depth"):
++        load_json('{"a": 1}')
++
++
++def test_canonicalization_rejects_over_deep_nesting():
++    bound = signing.MAX_JSON_DEPTH
++    signing.canonical_document_bytes(_nested_list(bound))
++    with pytest.raises(signing.CanonicalDepthError) as excinfo:
++        signing.canonical_document_bytes(_nested_list(bound + 1))
++    assert str(bound) in str(excinfo.value)
++    with pytest.raises(signing.CanonicalDepthError, match="maximum depth"):
++        signing.canonical_bytes({"k": _nested_list(bound + 1)})
++    assert signing.verify_signed("ed25519:" + "A" * 43 + "=", {"k": _nested_list(bound + 1)}) is False
++    # Depth failures honor the protocol contract while keeping
++    # CanonicalError/ValueError compatibility for existing handlers.
++    assert issubclass(signing.CanonicalDepthError, ProtocolError)
++    assert issubclass(signing.CanonicalDepthError, signing.CanonicalError)
++    with pytest.raises(ProtocolError, match="maximum depth"):
++        signing.canonical_document_bytes(_nested_list(bound + 1))
++    with pytest.raises(ProtocolError, match="maximum depth"):
++        signing.canonical_bytes({"k": _nested_list(bound + 1)})
++
++
++@pytest.mark.parametrize("entry_point", ["canonical_bytes", "canonical_document_bytes"])
++@pytest.mark.parametrize("fault", ["validate_ccj", "json_dumps"])
++def test_canonicalization_maps_recursion_error_to_protocol_error(
++    monkeypatch: pytest.MonkeyPatch, entry_point: str, fault: str
++):
++    if fault == "validate_ccj":
++        # RecursionError raised from the CCJ validation path.
++        def boom_validate(value: object, depth: int = 0) -> None:
++            raise RecursionError("boom")
++
++        monkeypatch.setattr("csk_registry.signing._validate_ccj", boom_validate)
++    else:
++        # RecursionError raised from JSON serialization.
++        def boom_dumps(*args: Any, **kwargs: Any) -> str:
++            raise RecursionError("boom")
++
++        monkeypatch.setattr("csk_registry.signing.json.dumps", boom_dumps)
++    call = getattr(signing, entry_point)
++    with pytest.raises(signing.CanonicalDepthError, match="maximum depth"):
++        call({"a": 1})
++    with pytest.raises(ProtocolError, match="maximum depth"):
++        call({"a": 1})
++
++
++def test_submit_rejects_deeply_nested_json_with_invalid_json(tmp_path: Path):
++    client, _, token = _client(tmp_path)
++    bound = signing.MAX_JSON_DEPTH
++    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
++    # Just over the explicit bound (far below the interpreter limit).
++    over = "[" * (bound + 1) + "]" * (bound + 1)
++    resp = client.post("/v1/records", content=over, headers=headers)
++    assert resp.status_code == 400
++    assert resp.json()["error"]["code"] == "invalid_json"
++    # Pathological depth that previously raised RecursionError -> 500.
++    pathological = "[" * 5000 + "]" * 5000
++    resp = client.post("/v1/records", content=pathological, headers=headers)
++    assert resp.status_code == 400
++    assert resp.json()["error"]["code"] == "invalid_json"
++    # Same verdict on the idempotent-submit path.
++    resp = client.post(
++        "/v1/records",
++        content=pathological,
++        headers={**headers, "Idempotency-Key": "deep-key"},
++    )
++    assert resp.status_code == 400
++    assert resp.json()["error"]["code"] == "invalid_json"
++    # Non-depth errors keep their existing mapping.
++    resp = client.post("/v1/records", content="{bad json", headers=headers)
++    assert resp.status_code == 400
++    assert resp.json()["error"]["code"] == "invalid_record"
++
++
++def test_deeply_nested_cursor_is_invalid_cursor_not_500(tmp_path: Path):
++    client, key, _ = _client(tmp_path)
++    payload = ("[" * 1200 + "]" * 1200).encode("utf-8")
++    signature = base64.b64decode(key.sign(payload))
++    cursor = f"{_url64(payload)}.{_url64(signature)}"
++    assert len(cursor) <= 4096
++    resp = client.get("/v1/log", params={"since": 0, "limit": 1, "cursor": cursor})
++    assert resp.status_code == 404
++    assert resp.json()["error"]["code"] == "invalid_cursor"
++
++
+ def test_submission_audit_log_is_structured_and_omits_bearer_token(
+     tmp_path: Path,
+     caplog: pytest.LogCaptureFixture,
+@@ -672,6 +797,159 @@ def test_backup_cli_emits_and_verifies_signed_checkpoint(tmp_path: Path):
+     ) == 2
+ 
+ 
++def test_verify_backup_without_public_key_warns_on_stderr_and_in_output(
++    tmp_path: Path, capsys: pytest.CaptureFixture[str]
++) -> None:
++    home = tmp_path / "home"
++    home.mkdir()
++    protect_private_directory(home)
++    key = signing.generate_key()
++    key_path = home / "signing-key.pem"
++    key_path.write_bytes(signing.export_key_pem(key))
++    protect_private_file(key_path)
++    store = Store(home / "registry.db")
++    store.append(key.sign_record(_body()), created_at="2026-07-07T00:00:00Z")
++    store.close()
++
++    backup = tmp_path / "backup.db"
++    checkpoint = tmp_path / "checkpoint.json"
++    assert main(
++        [
++            "--home",
++            str(home),
++            "backup",
++            "--out",
++            str(backup),
++            "--checkpoint-out",
++            str(checkpoint),
++        ]
++    ) == 0
++    capsys.readouterr()
++
++    assert main(
++        [
++            "--home",
++            str(home),
++            "verify-backup",
++            str(backup),
++            "--checkpoint",
++            str(checkpoint),
++        ]
++    ) == 0
++    captured = capsys.readouterr()
++    payload = json.loads(captured.out)
++    assert payload["backup_valid"] is True
++    assert str(home) in payload["warning"]
++    assert "--public-key" in payload["warning"]
++    assert "out-of-band" in payload["warning"]
++    assert "WARNING" in captured.err
++    assert str(home) in captured.err
++    assert "--public-key" in captured.err
++
++    live = Store(home / "registry.db")
++    live.append(key.sign_record(_body("revoked")), created_at="2026-07-07T01:00:00Z")
++    newer_checkpoint = tmp_path / "newer-checkpoint.json"
++    newer_checkpoint.write_text(
++        json.dumps(build_snapshot(live, key)),
++        encoding="utf-8",
++    )
++    live.close()
++    assert main(
++        [
++            "--home",
++            str(home),
++            "verify-backup",
++            str(backup),
++            "--checkpoint",
++            str(newer_checkpoint),
++        ]
++    ) == 2
++    captured = capsys.readouterr()
++    payload = json.loads(captured.out)
++    assert payload["backup_valid"] is False
++    assert "error" in payload
++    assert str(home) in payload["warning"]
++    assert "--public-key" in payload["warning"]
++    assert "WARNING" in captured.err
++    assert str(home) in captured.err
++
++
++def test_verify_backup_with_explicit_public_key_is_quiet(
++    tmp_path: Path, capsys: pytest.CaptureFixture[str]
++) -> None:
++    home = tmp_path / "home"
++    home.mkdir()
++    protect_private_directory(home)
++    key = signing.generate_key()
++    key_path = home / "signing-key.pem"
++    key_path.write_bytes(signing.export_key_pem(key))
++    protect_private_file(key_path)
++    store = Store(home / "registry.db")
++    store.append(key.sign_record(_body()), created_at="2026-07-07T00:00:00Z")
++    store.close()
++
++    backup = tmp_path / "backup.db"
++    checkpoint = tmp_path / "checkpoint.json"
++    assert main(
++        [
++            "--home",
++            str(home),
++            "backup",
++            "--out",
++            str(backup),
++            "--checkpoint-out",
++            str(checkpoint),
++        ]
++    ) == 0
++    capsys.readouterr()
++
++    assert main(
++        [
++            "--home",
++            str(home),
++            "verify-backup",
++            str(backup),
++            "--checkpoint",
++            str(checkpoint),
++            "--public-key",
++            key.public_pinned,
++        ]
++    ) == 0
++    captured = capsys.readouterr()
++    payload = json.loads(captured.out)
++    assert set(payload) == {"backup_valid", "log_size", "head"}
++    assert payload["backup_valid"] is True
++    assert "live home" not in captured.err
++    assert "out-of-band" not in captured.err
++
++    live = Store(home / "registry.db")
++    live.append(key.sign_record(_body("revoked")), created_at="2026-07-07T01:00:00Z")
++    newer_checkpoint = tmp_path / "newer-checkpoint.json"
++    newer_checkpoint.write_text(
++        json.dumps(build_snapshot(live, key)),
++        encoding="utf-8",
++    )
++    live.close()
++    assert main(
++        [
++            "--home",
++            str(home),
++            "verify-backup",
++            str(backup),
++            "--checkpoint",
++            str(newer_checkpoint),
++            "--public-key",
++            key.public_pinned,
++        ]
++    ) == 2
++    captured = capsys.readouterr()
++    payload = json.loads(captured.out)
++    assert set(payload) == {"backup_valid", "error"}
++    assert payload["backup_valid"] is False
++    assert "live home" not in captured.err
++    assert "out-of-band" not in captured.err
++
++
+ def _startup_home(home: Path, *, records: int) -> tuple[signing.SigningKey, str]:
+     """Create a serve-ready home with a key, one auditor, and a live log."""
+     home.mkdir(parents=True, exist_ok=True)
+@@ -1433,6 +1711,63 @@ def test_submission_idempotency_replays_and_conflicts(tmp_path: Path):
+     assert len(client.get("/v1/log").json()["entries"]) == 1
+ 
+ 
++class _ManualAppClock:
++    """Injectable ``time`` replacement for deterministic idempotency TTL tests."""
++
++    def __init__(self, now: float) -> None:
++        self.now = now
++
++    def time(self) -> float:
++        return self.now
++
++    def monotonic(self) -> float:
++        return self.now
++
++
++def test_idempotency_retry_within_slack_window_is_deduplicated(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    import csk_registry.app as app_module
++
++    assert app_module.IDEMPOTENCY_TTL_SECONDS == 26 * 3600
++    client, _, token = _client(tmp_path)
++    auditor_key = client.app.state.auditor_key  # type: ignore[attr-defined]
++    clock = _ManualAppClock(1_800_000_000.0)
++    monkeypatch.setattr(app_module, "time", clock)
++    headers = {"Authorization": f"Bearer {token}", "Idempotency-Key": "slack-key"}
++    record = auditor_key.sign_record(_body("audited"))
++    first = client.post("/v1/records", json=record, headers=headers)
++    assert first.status_code == 201
++    # A retry at 25 h — past the 24 h contract minimum but inside the 26 h
++    # retention — replays the original response without a second append.
++    clock.now += 25 * 3600
++    replay = client.post("/v1/records", json=record, headers=headers)
++    assert replay.status_code == 200
++    assert replay.json() == first.json()
++    assert len(client.get("/v1/log").json()["entries"]) == 1
++
++
++def test_idempotency_retry_past_retention_expires(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    import csk_registry.app as app_module
++
++    client, _, token = _client(tmp_path)
++    auditor_key = client.app.state.auditor_key  # type: ignore[attr-defined]
++    clock = _ManualAppClock(1_800_000_000.0)
++    monkeypatch.setattr(app_module, "time", clock)
++    headers = {"Authorization": f"Bearer {token}", "Idempotency-Key": "expiry-key"}
++    record = auditor_key.sign_record(_body("audited"))
++    first = client.post("/v1/records", json=record, headers=headers)
++    assert first.status_code == 201
++    # A retry past the 26 h retention is a new submission, not a replay.
++    clock.now += 26 * 3600 + 1
++    second = client.post("/v1/records", json=record, headers=headers)
++    assert second.status_code == 201
++    assert second.json()["seq"] == first.json()["seq"] + 1
++    assert len(client.get("/v1/log").json()["entries"]) == 2
++
++
+ @pytest.mark.parametrize(
+     ("method", "path", "expected_status"),
+     [("get", "/v1/records", 400), ("get", "/missing", 404), ("post", "/v1/records", 401)],

@@ -70,8 +70,7 @@ brief carries the product scope; this file carries where and how.
   `done`.
 
 ## Models and review
-- Producers: Muse `muse-spark-1.3-contributor` at `max`; reviewers: Codex
-  `gpt-6-astra` at `low`. Reviewers verify the exact candidate tree, re-run
+- Producers: Muse `muse-spark-1.3-contributor` at `max`; reviewers: Claude `claude-opus-5` at `max` (from 2026-09-18; codex `gpt-6-astra:low` before). Reviewers verify the exact candidate tree, re-run
   narrow tests independently, attack the gate with narrowing mutants, and
   record exactly one verdict through `accept_cr(<ID>, revision=<N>,
   evidence=<their own verdict resource>)` or a changes-requested verdict

@@ -1,0 +1,307 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index f8b1f41..73c534c 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -33,6 +33,16 @@
+ 
+ ### Security
+ 
++- R7: `verify-backup` without `--public-key` now warns prominently instead of
++  silently trusting the live home's keyring: it prints `WARNING: keys
++  resolved from the live home <path>; supply --public-key from an out-of-band
++  copy for an independent check` on stderr and records the same text in the
++  `warning` member of the JSON result on both the `backup_valid: true` and
++  `backup_valid: false` envelopes. The verdict and exit codes are unchanged
++  (still `0`/`2`), and the `--public-key` path emits no warning and keeps its
++  exact previous envelopes. Operators should pass the registry's pinned
++  public key from an out-of-band copy kept with the checkpoint outside the
++  primary store. No wire-schema change (curator-spec `47c3c8c`).
+ - R8: idempotency retention raised from 24 h to 26 h
+   (`IDEMPOTENCY_TTL_SECONDS`): the registry-service profile §4 minimum is
+   "at least 24 hours from the first successful commit", and the two extra
+diff --git a/README.md b/README.md
+index d114e7f..878eff3 100644
+--- a/README.md
++++ b/README.md
+@@ -87,7 +87,8 @@ curator-skill-registry --home ./data verify-chain      # verify the log hash cha
+ curator-skill-registry --home ./data backup \
+   --out /backups/registry.db --checkpoint-out /backups/registry-snapshot.json
+ curator-skill-registry --home ./data verify-backup /backups/registry.db \
+-  --checkpoint /secure-high-water/registry-snapshot.json
++  --checkpoint /secure-high-water/registry-snapshot.json \
++  --public-key ed25519:<pinned-registry-public-key>
+ ```
+ 
+ `backup` uses SQLite's consistent backup API and emits a signed snapshot
+@@ -97,6 +98,18 @@ older or equivocal database is refused. Stop all writers before replacing the
+ live database. Signing keys and `auditors.json` are backed up separately using
+ encrypted, access-controlled secret storage.
+ 
++`verify-backup` expects `--public-key` from an out-of-band copy of the
++registry's pinned signing key, so the check is independent of the home under
++test: take the key from the `genkey` (or `prepare-key-rotation` /
++`activate-key-rotation`) output or from `GET /v1/meta` `public_keys` while the
++deployment is known good, and store that copy with the checkpoint outside the
++primary store, encrypted and access controlled. Refresh the copy at every
++rotation before retiring the old key. Omitting `--public-key` still works for
++existing scripts but verifies against the live home's own keyring — which a
++compromised home defeats — and warns prominently on stderr and in the JSON
++result's `warning` member. Never copy the verification key from the live home
++under test.
++
+ ### Startup checkpoint gate
+ 
+ `verify-backup` is the offline procedure for vetting a backup before a
+diff --git a/SECURITY.md b/SECURITY.md
+index e24b091..437d8c4 100644
+--- a/SECURITY.md
++++ b/SECURITY.md
+@@ -27,9 +27,15 @@ service becomes ready, and a live state below or inconsistent with it stays
+ up non-ready with writes disabled instead of serving stale state. This
+ startup comparison is the normative "before the service becomes ready" gate;
+ `verify-backup` stays as the offline operator procedure for vetting a
+-candidate backup before a restore. Keep checkpoints and secret backups
+-outside the primary store, encrypted and access controlled. Cursor and
+-response data never bootstrap trust; clients pin registry keys out of band.
++candidate backup before a restore. Give `verify-backup` its `--public-key`
++from an out-of-band copy of the registry's pinned signing key, recorded at
++`genkey`/rotation time and kept with the checkpoint outside the primary
++store; omitting the flag verifies against the live home's own keyring, which
++a compromised home defeats, so the command warns prominently on stderr and
++in its JSON `warning` member in that case. Keep checkpoints, pinned-key
++copies, and secret backups outside the primary store, encrypted and access
++controlled. Cursor and response data never bootstrap trust; clients pin
++registry keys out of band.
+ Pagination is fail-closed too: a cursor page is served only at the cursor's
+ carried boundary, and a carried boundary that disagrees with the committed
+ log or is no longer available is refused with `404 invalid_cursor` rather
+diff --git a/src/csk_registry/cli.py b/src/csk_registry/cli.py
+index 4b664e8..5577ccf 100644
+--- a/src/csk_registry/cli.py
++++ b/src/csk_registry/cli.py
+@@ -290,8 +290,18 @@ def _cmd_backup(args: argparse.Namespace) -> int:
+     return 0
+ 
+ 
++def _implicit_key_warning(home: Path) -> str:
++    return (
++        f"keys resolved from the live home {home}; supply --public-key "
++        "from an out-of-band copy for an independent check"
++    )
++
++
+ def _cmd_verify_backup(args: argparse.Namespace) -> int:
+     home = _home(args)
++    warning = None if args.public_key else _implicit_key_warning(home)
++    if warning is not None:
++        print(f"WARNING: {warning}", file=sys.stderr)
+     try:
+         store = Store(Path(args.database).expanduser())
+         checkpoint_value = load_json(Path(args.checkpoint).expanduser().read_bytes())
+@@ -309,18 +319,19 @@ def _cmd_verify_backup(args: argparse.Namespace) -> int:
+         if not store.checkpoint_matches(boundary):
+             raise ValueError("backup is below or inconsistent with the checkpoint")
+     except (OSError, ValueError, StoreIntegrityError) as exc:
+-        print(json.dumps({"backup_valid": False, "error": str(exc)}, indent=2))
++        payload: dict[str, object] = {"backup_valid": False, "error": str(exc)}
++        if warning is not None:
++            payload["warning"] = warning
++        print(json.dumps(payload, indent=2))
+         return 2
+-    print(
+-        json.dumps(
+-            {
+-                "backup_valid": True,
+-                "log_size": boundary.log_size,
+-                "head": boundary.head,
+-            },
+-            indent=2,
+-        )
+-    )
++    success: dict[str, object] = {
++        "backup_valid": True,
++        "log_size": boundary.log_size,
++        "head": boundary.head,
++    }
++    if warning is not None:
++        success["warning"] = warning
++    print(json.dumps(success, indent=2))
+     return 0
+ 
+ 
+@@ -453,7 +464,10 @@ def build_parser() -> argparse.ArgumentParser:
+     verify_backup.add_argument("--checkpoint", required=True, help="signed checkpoint JSON")
+     verify_backup.add_argument(
+         "--public-key",
+-        help="checkpoint signing key (default: registry key under --home)",
++        help=(
++            "checkpoint signing key from an out-of-band copy "
++            "(default: registry keys under --home, with a warning)"
++        ),
+     )
+     verify_backup.set_defaults(func=_cmd_verify_backup)
+ 
+diff --git a/tests/test_registry.py b/tests/test_registry.py
+index 8a6a3d7..a94a91f 100644
+--- a/tests/test_registry.py
++++ b/tests/test_registry.py
+@@ -796,6 +796,159 @@ def test_backup_cli_emits_and_verifies_signed_checkpoint(tmp_path: Path):
+     ) == 2
+ 
+ 
++def test_verify_backup_without_public_key_warns_on_stderr_and_in_output(
++    tmp_path: Path, capsys: pytest.CaptureFixture[str]
++) -> None:
++    home = tmp_path / "home"
++    home.mkdir()
++    protect_private_directory(home)
++    key = signing.generate_key()
++    key_path = home / "signing-key.pem"
++    key_path.write_bytes(signing.export_key_pem(key))
++    protect_private_file(key_path)
++    store = Store(home / "registry.db")
++    store.append(key.sign_record(_body()), created_at="2026-07-07T00:00:00Z")
++    store.close()
++
++    backup = tmp_path / "backup.db"
++    checkpoint = tmp_path / "checkpoint.json"
++    assert main(
++        [
++            "--home",
++            str(home),
++            "backup",
++            "--out",
++            str(backup),
++            "--checkpoint-out",
++            str(checkpoint),
++        ]
++    ) == 0
++    capsys.readouterr()
++
++    assert main(
++        [
++            "--home",
++            str(home),
++            "verify-backup",
++            str(backup),
++            "--checkpoint",
++            str(checkpoint),
++        ]
++    ) == 0
++    captured = capsys.readouterr()
++    payload = json.loads(captured.out)
++    assert payload["backup_valid"] is True
++    assert str(home) in payload["warning"]
++    assert "--public-key" in payload["warning"]
++    assert "out-of-band" in payload["warning"]
++    assert "WARNING" in captured.err
++    assert str(home) in captured.err
++    assert "--public-key" in captured.err
++
++    live = Store(home / "registry.db")
++    live.append(key.sign_record(_body("revoked")), created_at="2026-07-07T01:00:00Z")
++    newer_checkpoint = tmp_path / "newer-checkpoint.json"
++    newer_checkpoint.write_text(
++        json.dumps(build_snapshot(live, key)),
++        encoding="utf-8",
++    )
++    live.close()
++    assert main(
++        [
++            "--home",
++            str(home),
++            "verify-backup",
++            str(backup),
++            "--checkpoint",
++            str(newer_checkpoint),
++        ]
++    ) == 2
++    captured = capsys.readouterr()
++    payload = json.loads(captured.out)
++    assert payload["backup_valid"] is False
++    assert "error" in payload
++    assert str(home) in payload["warning"]
++    assert "--public-key" in payload["warning"]
++    assert "WARNING" in captured.err
++    assert str(home) in captured.err
++
++
++def test_verify_backup_with_explicit_public_key_is_quiet(
++    tmp_path: Path, capsys: pytest.CaptureFixture[str]
++) -> None:
++    home = tmp_path / "home"
++    home.mkdir()
++    protect_private_directory(home)
++    key = signing.generate_key()
++    key_path = home / "signing-key.pem"
++    key_path.write_bytes(signing.export_key_pem(key))
++    protect_private_file(key_path)
++    store = Store(home / "registry.db")
++    store.append(key.sign_record(_body()), created_at="2026-07-07T00:00:00Z")
++    store.close()
++
++    backup = tmp_path / "backup.db"
++    checkpoint = tmp_path / "checkpoint.json"
++    assert main(
++        [
++            "--home",
++            str(home),
++            "backup",
++            "--out",
++            str(backup),
++            "--checkpoint-out",
++            str(checkpoint),
++        ]
++    ) == 0
++    capsys.readouterr()
++
++    assert main(
++        [
++            "--home",
++            str(home),
++            "verify-backup",
++            str(backup),
++            "--checkpoint",
++            str(checkpoint),
++            "--public-key",
++            key.public_pinned,
++        ]
++    ) == 0
++    captured = capsys.readouterr()
++    payload = json.loads(captured.out)
++    assert set(payload) == {"backup_valid", "log_size", "head"}
++    assert payload["backup_valid"] is True
++    assert "live home" not in captured.err
++    assert "out-of-band" not in captured.err
++
++    live = Store(home / "registry.db")
++    live.append(key.sign_record(_body("revoked")), created_at="2026-07-07T01:00:00Z")
++    newer_checkpoint = tmp_path / "newer-checkpoint.json"
++    newer_checkpoint.write_text(
++        json.dumps(build_snapshot(live, key)),
++        encoding="utf-8",
++    )
++    live.close()
++    assert main(
++        [
++            "--home",
++            str(home),
++            "verify-backup",
++            str(backup),
++            "--checkpoint",
++            str(newer_checkpoint),
++            "--public-key",
++            key.public_pinned,
++        ]
++    ) == 2
++    captured = capsys.readouterr()
++    payload = json.loads(captured.out)
++    assert set(payload) == {"backup_valid", "error"}
++    assert payload["backup_valid"] is False
++    assert "live home" not in captured.err
++    assert "out-of-band" not in captured.err
++
++
+ def _startup_home(home: Path, *, records: int) -> tuple[signing.SigningKey, str]:
+     """Create a serve-ready home with a key, one auditor, and a live log."""
+     home.mkdir(parents=True, exist_ok=True)

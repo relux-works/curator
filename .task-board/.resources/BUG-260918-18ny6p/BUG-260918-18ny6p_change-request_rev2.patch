@@ -1,0 +1,159 @@
+diff --git a/.github/ci/gate-selftest.sh b/.github/ci/gate-selftest.sh
+index 5f9d600..292f8c4 100755
+--- a/.github/ci/gate-selftest.sh
++++ b/.github/ci/gate-selftest.sh
+@@ -1006,13 +1006,41 @@ assert 'the installer finds rustup under CARGO_HOME/bin without PATH help' 0 \
+ assert_contains 'the CARGO_HOME-only install names the filed channel' 'toolchain install 1.92.0 --profile minimal' "$WORK/rustup-log-cargo.txt"
+ assert_contains 'the CARGO_HOME bin dir is recorded for the rest of the lane' "$WORK/fake-cargo-only/bin" "$WORK/github-path-cargo.txt"
+ 
+-# Absent from both PATH and CARGO_HOME/bin: CARGO_HOME points at an empty
+-# prefix so a real ~/.cargo/bin on this host cannot leak into the row.
+-mkdir -p "$WORK/empty-cargo/bin"
+-assert 'a runner without rustup fails' 1 \
+-	env PATH="$NORUSTPATH" GITHUB_PATH="$WORK/github-path.txt" CARGO_HOME="$WORK/empty-cargo" \
++# rustup present ONLY under a Homebrew prefix: the Homebrew formula keeps
++# the rustup binary at $HOMEBREW_PREFIX/bin and puts only the toolchain
++# proxies under ~/.cargo/bin, so a launchd-started runner (PATH without
++# /opt/homebrew/bin) sees no rustup on PATH or in CARGO_HOME/bin (rose-air
++# run 35306933411). HOMEBREW_PREFIX points at a fake prefix so the row
++# drives the probe without depending on a real /opt/homebrew on this host.
++BREWBIN="$WORK/fake-brew/bin"
++BREWCARGO="$WORK/fake-cargo-brew/bin"
++mkdir -p "$BREWBIN" "$BREWCARGO"
++cp "$FAKEBIN/rustup" "$BREWBIN/"
++cp "$FAKEBIN/rustc" "$FAKEBIN/cargo" "$BREWCARGO/"
++: >"$WORK/rustup-log-brew.txt"; : >"$WORK/github-path-brew.txt"
++assert 'the installer finds rustup under the Homebrew prefix without PATH help' 0 \
++	env PATH="$NORUSTPATH" FAKE_RUSTUP_LOG="$WORK/rustup-log-brew.txt" GITHUB_PATH="$WORK/github-path-brew.txt" \
++	    CARGO_HOME="$WORK/fake-cargo-brew" HOMEBREW_PREFIX="$WORK/fake-brew" RUSTUP_HOME="$WORK/empty-rustup-home" \
+ 	    CI_RUST_TOOLCHAIN_FILE="$WORK/rust-install-channel.toml" "$BASH_ABS" "$IRS"
+-assert_contains 'the failure names the runner-setup note' 'docs/self-hosted-runner-setup.md' "$WORK/out.txt"
++assert_contains 'the Homebrew-prefix install names the filed channel' 'toolchain install 1.92.0 --profile minimal' "$WORK/rustup-log-brew.txt"
++assert_contains 'the Homebrew bin dir is recorded for the rest of the lane' "$WORK/fake-brew/bin" "$WORK/github-path-brew.txt"
++assert_contains 'the CARGO_HOME bin dir (proxies) is still recorded alongside it' "$WORK/fake-cargo-brew/bin" "$WORK/github-path-brew.txt"
++
++# Absent from PATH, CARGO_HOME/bin and the Homebrew prefix: CARGO_HOME and
++# HOMEBREW_PREFIX point at empty prefixes so neither a real ~/.cargo/bin nor
++# a real Homebrew rustup on this host can leak into the row. The fixed
++# /opt/homebrew/bin and /usr/local/bin probes are hidden the same way as
++# PATH entries: the row is skipped (named) on a host that ships rustup
++# there, since the script cannot be told to ignore them.
++mkdir -p "$WORK/empty-cargo/bin" "$WORK/empty-brew/bin"
++if [ -x /opt/homebrew/bin/rustup ] || [ -x /usr/local/bin/rustup ]; then
++	skip 'a runner without rustup fails' 'this host ships rustup under /opt/homebrew/bin or /usr/local/bin, which the script probes unconditionally; the row runs on the hosted lanes'
++else
++	assert 'a runner without rustup fails' 1 \
++		env PATH="$NORUSTPATH" GITHUB_PATH="$WORK/github-path.txt" CARGO_HOME="$WORK/empty-cargo" HOMEBREW_PREFIX="$WORK/empty-brew" \
++		    CI_RUST_TOOLCHAIN_FILE="$WORK/rust-install-channel.toml" "$BASH_ABS" "$IRS"
++	assert_contains 'the failure names the runner-setup note' 'docs/self-hosted-runner-setup.md' "$WORK/out.txt"
++fi
+ 
+ if grep -nE '[0-9]+\.[0-9]+\.[0-9]+' "$IRS" >"$WORK/out.txt"; then
+ 	bad 'the installer names no release; it reads the channel from the file' "$(tr '\n' ' ' <"$WORK/out.txt" | cut -c1-200)"
+diff --git a/.github/ci/install-rust-toolchain.sh b/.github/ci/install-rust-toolchain.sh
+index 533941f..f45e012 100755
+--- a/.github/ci/install-rust-toolchain.sh
++++ b/.github/ci/install-rust-toolchain.sh
+@@ -11,12 +11,19 @@
+ #
+ # rustup itself is a runner prerequisite, not something this script
+ # bootstraps: the hosted images ship it on PATH, and the self-hosted runner
+-# gets it once per docs/self-hosted-runner-setup.md under ~/.cargo/bin (or
+-# $CARGO_HOME/bin), which this script prepends to PATH itself -- the runner
+-# service starts from launchd with a minimal PATH and the lane shell reads
+-# no profiles. Resolution uses PATH and $CARGO_HOME/bin only, never
+-# RUSTUP_HOME. A runner without rustup in either place fails here with that
+-# note named, not with a generic rustc-not-found later.
++# gets it once per docs/self-hosted-runner-setup.md -- either under
++# ~/.cargo/bin (or $CARGO_HOME/bin) via rustup.rs, or as the Homebrew
++# formula, which keeps the rustup binary under the Homebrew prefix
++# (/opt/homebrew/bin on Apple silicon) and only the toolchain proxies under
++# ~/.cargo/bin. The runner service starts from launchd with a minimal PATH
++# (no /opt/homebrew/bin) and the lane shell reads no profiles, so this
++# script resolves rustup itself, in order: PATH, $CARGO_HOME/bin,
++# $HOMEBREW_PREFIX/bin (if set), /opt/homebrew/bin, /usr/local/bin. The
++# directory that holds rustup is prepended to PATH and GITHUB_PATH before
++# any rustup call; $CARGO_HOME/bin stays on both too because the proxies
++# live there. Resolution never uses RUSTUP_HOME. A runner without rustup in
++# any of those places fails here with that note named (rose-air run
++# 35306933411), not with a generic rustc-not-found later.
+ #
+ # Usage (as a CI lane step; GITHUB_PATH must be set):
+ #   bash .github/ci/install-rust-toolchain.sh
+@@ -40,7 +47,32 @@ cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+ printf '%s\n' "$cargo_home/bin" >>"$GITHUB_PATH"
+ export PATH="$cargo_home/bin:$PATH"
+ 
+-command -v rustup >/dev/null 2>&1 || fail "rustup is not installed on this runner; install it once per docs/self-hosted-runner-setup.md, then re-run this lane"
++# Resolve rustup: PATH (now led by $cargo_home/bin), then the Homebrew
++# prefixes. The first executable wins and its directory is prepended so the
++# rustup call below and every later step in the lane resolve the same binary.
++rustup_bin=""
++if command -v rustup >/dev/null 2>&1; then
++	rustup_bin="$(command -v rustup)"
++else
++	for candidate in \
++		"$cargo_home/bin/rustup" \
++		${HOMEBREW_PREFIX:+"$HOMEBREW_PREFIX/bin/rustup"} \
++		/opt/homebrew/bin/rustup \
++		/usr/local/bin/rustup; do
++		if [ -x "$candidate" ]; then
++			rustup_bin="$candidate"
++			break
++		fi
++	done
++fi
++[ -n "$rustup_bin" ] || fail "rustup is not installed on this runner; install it once per docs/self-hosted-runner-setup.md, then re-run this lane"
++
++rustup_dir="$(dirname "$rustup_bin")"
++if [ "$rustup_dir" != "$cargo_home/bin" ]; then
++	printf '%s\n' "$rustup_dir" >>"$GITHUB_PATH"
++	export PATH="$rustup_dir:$PATH"
++fi
++echo "rust-pin: using rustup at $rustup_bin"
+ 
+ rustup toolchain install "$channel" --profile minimal
+ 
+diff --git a/docs/self-hosted-runner-setup.md b/docs/self-hosted-runner-setup.md
+index e0f1237..5b97209 100644
+--- a/docs/self-hosted-runner-setup.md
++++ b/docs/self-hosted-runner-setup.md
+@@ -8,20 +8,30 @@ variable `ROSE_AIR_RUNNER` is `true`.
+ 
+ ## One-time prerequisites on the runner
+ 
+-- **rustup.** Install once for the runner user with the installer at
+-  https://rustup.rs using its `--no-modify-path` form, then verify
+-  `~/.cargo/bin/rustup --version` runs. The lane installs
++- **rustup.** Install once for the runner user, either with the installer at
++  https://rustup.rs using its `--no-modify-path` form (verify
++  `~/.cargo/bin/rustup --version` runs) or as the Homebrew formula
++  (`brew install rustup`; verify `/opt/homebrew/bin/rustup --version`
++  runs). An existing install of either kind is fine as is. The lane installs
+   the pinned toolchain itself from [rust-toolchain.toml](../rust-toolchain.toml)
+   on every run and never relies on a toolchain the runner happens to ship,
+   so no toolchain needs installing or pinning by hand. A lane on a runner
+   without rustup fails in the `Install pinned Rust toolchain via rustup`
+   step with this note named.
+ 
+-The runner service starts from launchd with a minimal PATH and reads no
+-shell profiles, so `rustup` is not expected on the service PATH. Keep it at
+-the default `~/.cargo/bin` of the runner user (or `$CARGO_HOME/bin`): the
+-lane locates `rustup` there itself and prepends that directory to `PATH`
+-before any `rustup` call. Do not edit the service PATH to compensate.
++The runner service starts from launchd with a minimal PATH
++(`/usr/bin:/bin:/usr/sbin:/sbin`, no `/opt/homebrew/bin`) and reads no
++shell profiles, so `rustup` is not expected on the service PATH. The lane
++locates it itself: it probes `PATH`, then `~/.cargo/bin` of the runner user
++(or `$CARGO_HOME/bin`), then the Homebrew prefixes (`$HOMEBREW_PREFIX/bin`,
++`/opt/homebrew/bin`, `/usr/local/bin`), and prepends the directory that
++holds `rustup` (plus `~/.cargo/bin` for the toolchain proxies) to `PATH`
++before any `rustup` call. A Homebrew `rustup` keeps its binary under
++`/opt/homebrew/bin` and only the proxies under `~/.cargo/bin`, which is why
++the Homebrew prefixes are probed. Nothing on the runner needs changing for
++this; as an alternative, the runner's `.path` file (in the runner
++directory, read by the service at start) may carry `/opt/homebrew/bin`,
++but the lane does not depend on it.
+ 
+ Nothing else is installed by hand: Go and Node come from the
+ `actions/setup-go` / `actions/setup-node` steps, pnpm is installed per lane

@@ -1,0 +1,2284 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 72e4af0..4c44d02 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -7,6 +7,31 @@ Versioning for the complete specification set.
+ 
+ ### Added
+ 
++- STORY-260916-1ll22r: absence-versus-read-failure discipline stated once
++  (environments §1.1/§1.3/§4/§7.1/§7.3/§7.4/§7.5/§7.6/§7.7/§8.2/§8.3/§8.4/
++  §9.4/§9.5/§9.6/§10.1/§10.4/§11/§12/§13, manager §12.2/§12.5/§12.7): new
++  §8.4.1 states the general rule once — a failed read, stat, or parse of
++  any state or surface file is never reported as absence and never triggers
++  an absence-shaped action — with a closed table of the unreadable outcome
++  per file class (marker, lock, ledger, backup record, provisioning seed,
++  passthrough entry, recorded surface, inventory candidate); every read-site
++  section references the rule instead of restating it. New diagnostic
++  `environment_passthrough_unreadable` for a recorded passthrough entry
++  whose link state cannot be established (status and resolve report it
++  non-current with currency unknown; `--repair` leaves the entry untouched);
++  lock read/parse failures are entry-class `environment_store_untrusted`,
++  never `profile_unknown`, and are never rebuilt from — no mutating
++  operation rebuilds, re-materializes, or replaces anything from an
++  unreadable lock (recovery is an explicit operator action). New diagnostic
++  `environment_backup_record_unreadable` for a backup inventory that cannot
++  be listed or read (status reports it non-current with currency unknown;
++  restore, scrub, and retention pruning stop before mutating). Conformance
++  vectors in `vectors/environments-read-failure.json` (unreadable-but-present
++  markers, locks, seeds, passthrough entries, and backup records across the
++  applicable failure classes, repair/update no-rebuild cases, absence-side
++  positives, and absence-shaped negatives), checked by
++  `validate_environments_read_failure_vectors`. Rollout is direct
++  (correctness of an existing MUST).
+ - S1/S3: hardened-defaults profile and the named advisory revocation
+   residual (manager §1/§7.1/§10/§12.7, registry §4/§8, SECURITY.md,
+   environments §2.1/§2.2/§9.7/§10.3/§10.4/§12/§12.1/§13): one closed
+diff --git a/conformance/v1/manifest.json b/conformance/v1/manifest.json
+index a347f22..7e04259 100644
+--- a/conformance/v1/manifest.json
++++ b/conformance/v1/manifest.json
+@@ -4368,6 +4368,10 @@
+       "path": "vectors/environments-path-kind-admission.json",
+       "sha256": "sha256:708476ab6d581d71baea986b1bf6cb581b38ea6f530fe8a721c4a2cbbdf6f110"
+     },
++    {
++      "path": "vectors/environments-read-failure.json",
++      "sha256": "sha256:b3efcf7d3f2b1521fc4c889f4c2280367079a25a36d98661b0121eb78bc81977"
++    },
+     {
+       "path": "vectors/environments-source-signers.json",
+       "sha256": "sha256:fb59e44c33183fc5cf7c698c65038f49a8f1e2d2404137c80cb6d252d46f8d9c"
+diff --git a/conformance/v1/vectors/environments-read-failure.json b/conformance/v1/vectors/environments-read-failure.json
+new file mode 100644
+index 0000000..81da988
+--- /dev/null
++++ b/conformance/v1/vectors/environments-read-failure.json
+@@ -0,0 +1,608 @@
++{
++  "capability": "agent-environments",
++  "capability_revision": 1,
++  "cases": [
++    {
++      "entry_kind": "file",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_marker_unreadable",
++        "fragment_emitted": false,
++        "row_current": false
++      },
++      "failure_class": "permission-denied",
++      "file_class": "marker",
++      "name": "marker-open-permission-denied-unreadable",
++      "operation": "env-resolve",
++      "presence": "present"
++    },
++    {
++      "entry_kind": "file",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_marker_unreadable",
++        "fragment_emitted": false,
++        "row_current": false
++      },
++      "failure_class": "io-error",
++      "file_class": "marker",
++      "name": "marker-read-io-error-unreadable",
++      "operation": "env-resolve",
++      "presence": "present"
++    },
++    {
++      "entry_kind": "file",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_marker_unreadable",
++        "fragment_emitted": false,
++        "row_current": false
++      },
++      "failure_class": "unparseable-content",
++      "file_class": "marker",
++      "name": "marker-unparseable-content-unreadable",
++      "operation": "env-resolve",
++      "presence": "present"
++    },
++    {
++      "entry_kind": "file",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_marker_unreadable",
++        "fragment_emitted": false,
++        "row_current": false
++      },
++      "failure_class": "schema-invalid-content",
++      "file_class": "marker",
++      "name": "marker-schema-invalid-content-unreadable",
++      "operation": "env-resolve",
++      "presence": "present"
++    },
++    {
++      "entry_kind": "missing",
++      "expected": {
++        "currency": "known",
++        "diagnostic": "environment_home_stale",
++        "fragment_emitted": false,
++        "row_current": false
++      },
++      "failure_class": null,
++      "file_class": "marker",
++      "name": "marker-absent-unprovisioned-stale",
++      "operation": "env-resolve",
++      "presence": "absent"
++    },
++    {
++      "conforming": false,
++      "entry_kind": "file",
++      "expected": {
++        "currency": "known",
++        "diagnostic": "environment_home_stale",
++        "fragment_emitted": false,
++        "row_current": false
++      },
++      "failure_class": "permission-denied",
++      "file_class": "marker",
++      "name": "marker-unreadable-reported-stale",
++      "operation": "env-resolve",
++      "presence": "present",
++      "reason": "reporting an unreadable marker as unprovisioned (environment_home_stale) is non-conforming: a failed marker read is environment_marker_unreadable with currency unknown, never absence"
++    },
++    {
++      "entry_kind": "file",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_store_untrusted",
++        "fragment_emitted": false,
++        "row_current": false
++      },
++      "failure_class": "permission-denied",
++      "file_class": "lock",
++      "name": "lock-open-permission-denied-untrusted",
++      "operation": "env-resolve",
++      "presence": "present"
++    },
++    {
++      "entry_kind": "file",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_store_untrusted",
++        "fragment_emitted": false,
++        "row_current": false
++      },
++      "failure_class": "io-error",
++      "file_class": "lock",
++      "name": "lock-read-io-error-untrusted",
++      "operation": "env-resolve",
++      "presence": "present"
++    },
++    {
++      "entry_kind": "file",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_store_untrusted",
++        "fragment_emitted": false,
++        "row_current": false
++      },
++      "failure_class": "unparseable-content",
++      "file_class": "lock",
++      "name": "lock-unparseable-content-untrusted",
++      "operation": "env-resolve",
++      "presence": "present"
++    },
++    {
++      "entry_kind": "file",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_store_untrusted",
++        "fragment_emitted": false,
++        "row_current": false
++      },
++      "failure_class": "schema-invalid-content",
++      "file_class": "lock",
++      "name": "lock-schema-invalid-content-untrusted",
++      "operation": "env-resolve",
++      "presence": "present"
++    },
++    {
++      "entry_kind": "symlink",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_store_untrusted",
++        "fragment_emitted": false,
++        "row_current": false
++      },
++      "failure_class": "symlink-where-regular-required",
++      "file_class": "lock",
++      "name": "lock-symlink-where-regular-required-untrusted",
++      "operation": "env-resolve",
++      "presence": "present"
++    },
++    {
++      "entry_kind": "directory",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_store_untrusted",
++        "fragment_emitted": false,
++        "row_current": false
++      },
++      "failure_class": "directory-where-file-expected",
++      "file_class": "lock",
++      "name": "lock-directory-where-file-expected-untrusted",
++      "operation": "env-resolve",
++      "presence": "present"
++    },
++    {
++      "entry_kind": "file",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_store_untrusted",
++        "fragment_emitted": false,
++        "row_current": false
++      },
++      "failure_class": "parent-not-directory",
++      "file_class": "lock",
++      "name": "lock-parent-not-directory-untrusted",
++      "operation": "env-resolve",
++      "presence": "present"
++    },
++    {
++      "entry_kind": "missing",
++      "expected": {
++        "currency": "known",
++        "diagnostic": "profile_unknown",
++        "fragment_emitted": false,
++        "row_current": false
++      },
++      "failure_class": null,
++      "file_class": "lock",
++      "name": "lock-absent-profile-unknown",
++      "operation": "env-resolve",
++      "presence": "absent"
++    },
++    {
++      "conforming": false,
++      "entry_kind": "file",
++      "expected": {
++        "currency": "known",
++        "diagnostic": "profile_unknown",
++        "fragment_emitted": false,
++        "row_current": false
++      },
++      "failure_class": "permission-denied",
++      "file_class": "lock",
++      "name": "lock-unreadable-reported-unknown",
++      "operation": "env-resolve",
++      "presence": "present",
++      "reason": "reporting an unreadable lock as not-installed (profile_unknown) is non-conforming: a failed lock read is entry-class environment_store_untrusted, never absence"
++    },
++    {
++      "entry_kind": "file",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_store_untrusted",
++        "fragment_emitted": false,
++        "rebuilt": false,
++        "row_current": false,
++        "written": false
++      },
++      "failure_class": "permission-denied",
++      "file_class": "lock",
++      "name": "lock-unreadable-repair-refused-no-rebuild",
++      "operation": "repair",
++      "presence": "present"
++    },
++    {
++      "entry_kind": "file",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_store_untrusted",
++        "rebuilt": false,
++        "row_current": false,
++        "written": false
++      },
++      "failure_class": "unparseable-content",
++      "file_class": "lock",
++      "name": "lock-unreadable-update-refused-no-rebuild",
++      "operation": "update",
++      "presence": "present"
++    },
++    {
++      "conforming": false,
++      "entry_kind": "file",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_store_untrusted",
++        "fragment_emitted": false,
++        "rebuilt": true,
++        "row_current": false,
++        "written": true
++      },
++      "failure_class": "permission-denied",
++      "file_class": "lock",
++      "name": "lock-unreadable-repair-rebuilt",
++      "operation": "repair",
++      "presence": "present",
++      "reason": "rebuilding or writing from an unreadable lock is non-conforming: a mutating operation against an unreadable lock refuses with environment_store_untrusted and rebuilds nothing and writes nothing — recovery is an explicit operator action"
++    },
++    {
++      "entry_kind": "file",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_seed_unreadable",
++        "provisioning_continues": false
++      },
++      "failure_class": "permission-denied",
++      "file_class": "seed",
++      "name": "seed-open-permission-denied-unreadable",
++      "operation": "provision",
++      "presence": "present"
++    },
++    {
++      "entry_kind": "file",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_seed_unreadable",
++        "provisioning_continues": false
++      },
++      "failure_class": "io-error",
++      "file_class": "seed",
++      "name": "seed-read-io-error-unreadable",
++      "operation": "provision",
++      "presence": "present"
++    },
++    {
++      "entry_kind": "file",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_seed_unreadable",
++        "provisioning_continues": false
++      },
++      "failure_class": "unparseable-content",
++      "file_class": "seed",
++      "name": "seed-unparseable-content-unreadable",
++      "operation": "provision",
++      "presence": "present"
++    },
++    {
++      "entry_kind": "symlink",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_seed_unreadable",
++        "provisioning_continues": false
++      },
++      "failure_class": "symlink-where-regular-required",
++      "file_class": "seed",
++      "name": "seed-symlink-where-regular-required-unreadable",
++      "operation": "provision",
++      "presence": "present"
++    },
++    {
++      "entry_kind": "directory",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_seed_unreadable",
++        "provisioning_continues": false
++      },
++      "failure_class": "directory-where-file-expected",
++      "file_class": "seed",
++      "name": "seed-directory-where-file-expected-unreadable",
++      "operation": "provision",
++      "presence": "present"
++    },
++    {
++      "entry_kind": "file",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_seed_unreadable",
++        "provisioning_continues": false
++      },
++      "failure_class": "parent-not-directory",
++      "file_class": "seed",
++      "name": "seed-parent-not-directory-unreadable",
++      "operation": "provision",
++      "presence": "present"
++    },
++    {
++      "entry_kind": "missing",
++      "expected": {
++        "currency": "known",
++        "diagnostic": null,
++        "provisioning_continues": true
++      },
++      "failure_class": null,
++      "file_class": "seed",
++      "name": "seed-absent-not-seeded-provisioned",
++      "operation": "provision",
++      "presence": "absent"
++    },
++    {
++      "conforming": false,
++      "entry_kind": "file",
++      "expected": {
++        "currency": "known",
++        "diagnostic": null,
++        "provisioning_continues": true
++      },
++      "failure_class": "permission-denied",
++      "file_class": "seed",
++      "name": "seed-unreadable-skipped-as-absent",
++      "operation": "provision",
++      "presence": "present",
++      "reason": "skipping an unreadable seed as absent and provisioning through is non-conforming: a failed seed read is environment_seed_unreadable and provisioning stops before the first write"
++    },
++    {
++      "entry_kind": "symlink",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_passthrough_unreadable",
++        "repair_relinks": false,
++        "row_current": false
++      },
++      "failure_class": "permission-denied",
++      "file_class": "passthrough",
++      "name": "passthrough-lstat-permission-denied-unreadable",
++      "operation": "env-status",
++      "presence": "present"
++    },
++    {
++      "entry_kind": "symlink",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_passthrough_unreadable",
++        "repair_relinks": false,
++        "row_current": false
++      },
++      "failure_class": "io-error",
++      "file_class": "passthrough",
++      "name": "passthrough-readlink-io-error-unreadable",
++      "operation": "env-status",
++      "presence": "present"
++    },
++    {
++      "entry_kind": "symlink",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_passthrough_unreadable",
++        "repair_relinks": false,
++        "row_current": false
++      },
++      "failure_class": "parent-not-directory",
++      "file_class": "passthrough",
++      "name": "passthrough-parent-not-directory-unreadable",
++      "operation": "env-status",
++      "presence": "present"
++    },
++    {
++      "entry_kind": "symlink",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_passthrough_unreadable",
++        "fragment_emitted": false,
++        "row_current": false
++      },
++      "failure_class": "permission-denied",
++      "file_class": "passthrough",
++      "name": "passthrough-unreadable-resolve-no-fragment",
++      "operation": "env-resolve",
++      "presence": "present"
++    },
++    {
++      "entry_kind": "missing",
++      "expected": {
++        "currency": "known",
++        "diagnostic": "environment_passthrough_detached",
++        "repair_relinks": true,
++        "row_current": false
++      },
++      "failure_class": null,
++      "file_class": "passthrough",
++      "name": "passthrough-link-missing-detached",
++      "operation": "env-status",
++      "presence": "absent"
++    },
++    {
++      "entry_kind": "directory",
++      "expected": {
++        "currency": "known",
++        "diagnostic": "environment_passthrough_detached",
++        "repair_relinks": true,
++        "row_current": false
++      },
++      "failure_class": null,
++      "file_class": "passthrough",
++      "name": "passthrough-directory-at-entry-detached",
++      "operation": "env-status",
++      "presence": "present"
++    },
++    {
++      "entry_kind": "missing",
++      "expected": {
++        "currency": "known",
++        "diagnostic": "environment_home_stale",
++        "fragment_emitted": false,
++        "row_current": false
++      },
++      "failure_class": null,
++      "file_class": "passthrough",
++      "name": "passthrough-detached-resolve-stale",
++      "operation": "env-resolve",
++      "presence": "absent"
++    },
++    {
++      "conforming": false,
++      "entry_kind": "symlink",
++      "expected": {
++        "currency": "known",
++        "diagnostic": "environment_passthrough_detached",
++        "repair_relinks": true,
++        "row_current": false
++      },
++      "failure_class": "permission-denied",
++      "file_class": "passthrough",
++      "name": "passthrough-unreadable-reported-detached",
++      "operation": "env-status",
++      "presence": "present",
++      "reason": "reporting an unreadable passthrough entry as detached (environment_passthrough_detached) is non-conforming: a failed entry read is environment_passthrough_unreadable with currency unknown, and repair must not re-link the entry"
++    },
++    {
++      "entry_kind": "directory",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_backup_record_unreadable",
++        "row_current": false
++      },
++      "failure_class": "permission-denied",
++      "file_class": "backup-record",
++      "name": "backup-record-unreadable-status-unknown",
++      "operation": "env-status",
++      "presence": "present"
++    },
++    {
++      "entry_kind": "directory",
++      "expected": {
++        "currency": "unknown",
++        "diagnostic": "environment_backup_record_unreadable",
++        "written": false
++      },
++      "failure_class": "io-error",
++      "file_class": "backup-record",
++      "name": "backup-record-unreadable-restore-stops",
++      "operation": "restore",
++      "presence": "present"
++    },
++    {
++      "entry_kind": "missing",
++      "expected": {
++        "currency": "known",
++        "diagnostic": null,
++        "row_current": true
++      },
++      "failure_class": null,
++      "file_class": "backup-record",
++      "name": "backup-record-absent-status-zero",
++      "operation": "env-status",
++      "presence": "absent"
++    },
++    {
++      "entry_kind": "missing",
++      "expected": {
++        "currency": "known",
++        "diagnostic": null,
++        "written": false
++      },
++      "failure_class": null,
++      "file_class": "backup-record",
++      "name": "backup-record-absent-restore-nothing",
++      "operation": "restore",
++      "presence": "absent"
++    },
++    {
++      "conforming": false,
++      "entry_kind": "directory",
++      "expected": {
++        "currency": "known",
++        "diagnostic": null,
++        "row_current": true
++      },
++      "failure_class": "permission-denied",
++      "file_class": "backup-record",
++      "name": "backup-record-unreadable-reported-empty",
++      "operation": "env-status",
++      "presence": "present",
++      "reason": "reporting an unreadable backup inventory as empty (zero generations, current) is non-conforming: a failed backup-inventory read is environment_backup_record_unreadable with currency unknown, never absence"
++    }
++  ],
++  "currencies": [
++    "known",
++    "unknown"
++  ],
++  "diagnostics": [
++    "environment_backup_record_unreadable",
++    "environment_home_stale",
++    "environment_marker_unreadable",
++    "environment_passthrough_detached",
++    "environment_passthrough_unreadable",
++    "environment_seed_unreadable",
++    "environment_store_untrusted",
++    "profile_unknown"
++  ],
++  "entry_kinds": [
++    "directory",
++    "file",
++    "missing",
++    "symlink"
++  ],
++  "failure_classes": [
++    "directory-where-file-expected",
++    "io-error",
++    "parent-not-directory",
++    "permission-denied",
++    "schema-invalid-content",
++    "symlink-where-regular-required",
++    "unparseable-content"
++  ],
++  "file_classes": [
++    "backup-record",
++    "lock",
++    "marker",
++    "passthrough",
++    "seed"
++  ],
++  "operations": [
++    "env-resolve",
++    "env-status",
++    "provision",
++    "repair",
++    "restore",
++    "update"
++  ],
++  "presence_values": [
++    "absent",
++    "present"
++  ],
++  "protocol_version": "1.0.0-rc.9",
++  "rule": "protocol/environments.md section 8.4.1: a failed read, stat, or parse of any state or surface file is never reported as absence. Each case pins one file class (marker, lock, provisioning seed, credential passthrough entry, backup-record inventory) to its typed, present-or-absent discriminating inputs and the expected diagnostic. Failure classes: permission-denied (EACCES-class), io-error (EIO-class), unparseable-content (bytes fail decoding or parsing), schema-invalid-content (parsed content fails schema validation for a reason other than version), symlink-where-regular-required, directory-where-file-expected, parent-not-directory (ENOTDIR-class: the entry exists but a path component above it is not a directory, so the open fails). presence/entry_kind are ground truth: permission-denied and io-error strike at the open/read stage after lstat. Boundary verification precedes readability classification (sections 1.3, 4, 8.2, 10.1): a marker failure that violates the section 4 contract, or that prevents proving the boundary (symlink, directory, or unstatable marker path), is environment_store_untrusted and is outside this family; the marker cases therefore cover the open/read/parse stages only. Seed unparseable-content applies where the seed path parses (the codex_cli revision-B mcp_servers strip, which MUST parse as TOML); elsewhere seeds are unparsed byte copies. Passthrough entries carry no content and require a link, so unparseable-content, schema-invalid-content, and symlink-where-regular-required do not apply to them; a directory at the entry path is 'no longer a symlink' and stays detached-side. currency 'unknown' pins the section 8.4.1 rule that an unreadable file makes the affected row non-current with currency unknown; absence-side outcomes carry currency 'known'. repair_relinks pins that --repair re-links a detached entry and leaves an unreadable entry untouched. repair is env resolve --repair and update is profile update (sections 10.1, 9.2): against an unreadable lock both refuse with environment_store_untrusted and rebuild nothing (rebuilt) and write nothing (written), repair emitting no fragment; restore restores the newest backup generation (env unmanage --restore-backups, section 9.2) and stops before mutating (written) when the generations inventory cannot be established. The backup-record class covers the generations inventory: an unreadable inventory is environment_backup_record_unreadable with currency unknown, while a known-empty inventory is current with currency known.",
++  "schema_version": 1,
++  "story": "STORY-260916-1ll22r"
++}
+diff --git a/profiles/manager.md b/profiles/manager.md
+index 408be01..c566d40 100644
+--- a/profiles/manager.md
++++ b/profiles/manager.md
+@@ -2481,7 +2481,8 @@ environment surfaces, extending the Protocol Core section 11 rule
+ unchanged: the manager MUST remove or replace only files the preceding
+ marker records and MUST fail rather than overwrite an unmanaged file. Skill
+ entries keep the core adapter ledger; the two records never merge. An
+-unreadable or invalid marker fails closed: the home's surfaces are treated
++unreadable or invalid marker fails closed under the environments §8.4.1
++absence-versus-read-failure rule: the home's surfaces are treated
+ as unmanaged and nothing is removed or replaced. The marker is a record,
+ not a signature, and MUST NOT be used as an authorization token or
+ provenance proof.
+@@ -2495,7 +2496,7 @@ the XDG links. Two profile names that map to one platform path below the
+ environments root fail with `environment_path_collision` before writing. A
+ provisioning seed that is absent in the native home is not seeded; one that
+ exists but cannot be read is `environment_seed_unreadable` and provisioning
+-stops before the first write. The manager prints the first-resolve notice
++stops before the first write (environments §8.4.1, seed row). The manager prints the first-resolve notice
+ with that provisioning and on every first resolve of a home — the
+ managed-home path, the statement that the tool treats the home as its own
+ state root, and any first-run step the seeds do not cover — and never
+@@ -2512,7 +2513,11 @@ it removes the oldest generations beyond the count, and `0` keeps every
+ generation. `env backups scrub [--older-than <days>]` removes generations
+ on the operator's explicit request and nothing else removes one. `env
+ status` reports, per home, the generation count and the age of the oldest
+-and newest backup.
++and newest backup. A backup inventory that cannot be established is
++unknown, never empty (environments §8.4.1, backup-record row): status
++reports `environment_backup_record_unreadable` with the row non-current
++and currency unknown, and restore, scrub, and retention pruning stop
++before mutating.
+ 
+ Drift follows environments §8.4. A `linked` surface drifts when a link no
+ longer targets the expected store path or its target's bytes fail the
+@@ -2521,8 +2526,9 @@ content hash no longer matches. A store entry that fails the environments
+ section 4 contract is not drift: the profile is
+ `environment_store_untrusted` (environments §8.4, §10.1). A drifted file is never silently
+ overwritten outside repair, and an absent surface file and a failed read
+-are different facts: unreadable evidence is reported as unreadable with
+-currency unknown, never as absence. Every materialization, takeover,
++are different facts (environments §8.4.1): unreadable evidence is reported
++as unreadable with currency unknown, never as absence. Every
++materialization, takeover,
+ repair, or backup write replaces the directory entry — operation-private
+ temp file plus rename — and never follows a symlink at the target or
+ below the managed root (environments §8.3.1); a write that would follow
+@@ -2539,9 +2545,11 @@ a link the manager does not own is refused with
+ | recorded surface file exists but cannot be read | `environment_surface_unreadable` |
+ | write would touch a file the marker does not record | `environment_surface_unmanaged_conflict` |
+ | next backup generation directory already exists | `environment_backup_exists` |
++| backup inventory (generations directory or a needed generation) cannot be listed or read (non-current, currency unknown) | `environment_backup_record_unreadable` |
+ | a write that would traverse a symlink below the managed root, or open through a symlink at a backup, marker, or ledger destination, that the manager did not create | `environment_write_would_follow_link` |
+ | two profile names map to one platform path below the environments root | `environment_path_collision` |
+ | provisioning seed exists in the native home but cannot be read | `environment_seed_unreadable` |
++| recorded passthrough entry whose link state cannot be established (non-current, currency unknown; never "detached") | `environment_passthrough_unreadable` |
+ 
+ ### 12.3 Profile lifecycle
+ 
+@@ -2769,14 +2777,21 @@ named store entry's pin hash from its bytes, refusing with
+ `environment_store_untrusted` and emitting no fragment when the boundary
+ cannot be proven or a pin hash does not match, with an enclosing-boundary
+ failure refusing with no rebuild and an entry-class failure rebuilding
+-from the revalidated snapshot (environments §4, §10.1). Home currency is
++from the revalidated snapshot (environments §4, §10.1), except an
++unreadable or malformed lock, which no mutating operation rebuilds,
++re-materializes, or replaces anything from (environments §8.4.1, lock
++row). Home currency is
+ separate: a marker that belongs to another lock is
+ `environment_home_stale`, never `environment_store_untrusted`. A home
+ that is unprovisioned, stale after `profile update`,
+ drifted, or whose passthrough is detached — or, for a `claude_code` home in
+ the `referenced` form, that lacks the launch directory's project entry — is
+ stale: without `--repair` the manager reports `environment_home_stale` with
+-the reasons and emits no fragment. Under `--repair` the same verification
++the reasons and emits no fragment. An unreadable marker, surface, lock, or
++passthrough entry is never stale (environments §8.4.1): resolve reports the
++unreadable diagnostic and emits no fragment, and `--repair` neither
++re-materializes an unreadable surface nor re-links an unreadable entry.
++Under `--repair` the same verification
+ runs first and a current home emits its fragment without any lock; only a
+ stale home takes the section 2.5 mutation lock with a bounded wait of at
+ least one and at most sixty seconds, documented by the manager, and
+@@ -2822,6 +2837,9 @@ in this profile launches.
+ | named or current profile not installed | `profile_unknown` |
+ | managed home unprovisioned, stale, drifted, or passthrough detached; no fragment without `--repair` | `environment_home_stale` |
+ | marker unreadable or malformed at resolve (no fragment; non-current, currency unknown) | `environment_marker_unreadable` |
++| recorded surface file unreadable at resolve (no fragment; non-current, currency unknown) | `environment_surface_unreadable` |
++| lock file unreadable or malformed at resolve (no fragment; non-current, currency unknown; never rebuilt from) | `environment_store_untrusted` |
++| recorded passthrough entry unreadable at resolve (no fragment; non-current, currency unknown) | `environment_passthrough_unreadable` |
+ | store entry, lock, or marker file fails the environments §4 protected-boundary contract or its pin hash at resolve (no fragment; non-current) | `environment_store_untrusted` |
+ | enclosing boundary cannot be proven at resolve (no fragment; non-current; nothing rebuilt) | `environment_store_untrusted` |
+ | repair could not acquire the mutation lock within the bounded wait | `environment_lock_unavailable` |
+@@ -2876,7 +2894,9 @@ declared requirement (`range`, `tag`, or `revision` as written), root
+ version, lock hash, and current markers — the machine default and every
+ scope that differs; a `local` profile reports `local`, `-`, `0.0.0`, and
+ its lock hash, and a `path` root reports `path`, its recorded source path,
+-`-`, and whether it is imported-from-native. `env status` reports the
++`-`, and whether it is imported-from-native. A profile whose lock cannot
++be read is listed with `environment_store_untrusted`, never omitted as not
++installed (environments §8.4.1, lock row). `env status` reports the
+ profile × environment × surface matrix of environments §12: mode, form,
+ materialized lock hash, content-hash currency, drift, missing surfaces,
+ marker validity, unregistered adapters found in the `environments` object,
+@@ -2887,8 +2907,9 @@ ungoverned-surfaces statement, the passthrough liveness row and the
+ recorded seeds per managed home, the XDG seed state per managed `opencode`
+ parent, the standing `opencode` split-brain note, the recorded and detected
+ tool release per adapter, both homes of the current profile per scope with
+-their provisioning state, backup generation counts and ages per home,
+-orphaned managed homes, a locked `require_current_profile`,
++their provisioning state, backup generation counts and ages per home (or
++`environment_backup_record_unreadable` when the inventory cannot be
++established), orphaned managed homes, a locked `require_current_profile`,
+ `environment_context_size_exceeded` where it applies, the effective
+ `transitive_system_modules` value with every dropped system module by
+ package and path where the `drop` policy skipped any, and the store-trust
+@@ -2912,7 +2933,7 @@ shadow-inert (unless acknowledged), detached, partially switched, stale,
+ store-untrusted (`environment_store_untrusted`), hardened-contradicting
+ (section 10), or
+ unreadable state is non-current, and unreadable evidence is reported as
+-unreadable, never as absence (environments §8.4). The warnings
++unreadable, never as absence (environments §8.4.1). The warnings
+ `environment_context_size_exceeded`, `environment_tool_version_unverified`,
+ `environment_seed_shadowed`, `environment_foreign_manager_suspected`,
+ `context_system_module_dropped`, and
+@@ -2924,8 +2945,10 @@ named by any installed profile's lock — and by a retained previous lock
+ until it is dropped — every managed home and in-place surface set
+ referenced by a valid environment marker, and every entry referenced by an
+ in-flight transaction journal. An unreadable marker
+-(`environment_marker_unreadable`) or unprovable reference
+-fails safe: the uncertain entries are retained and the uncertainty reported.
++(`environment_marker_unreadable`, environments §8.4.1), an unreadable lock
++(entry-class `environment_store_untrusted`, environments §8.4.1), or another
++unprovable reference fails safe: the uncertain entries are retained and the
++uncertainty reported.
+ An enclosing boundary that cannot be proven refuses collection before its
+ first write with nothing rebuilt. Garbage collection revalidates the
+ environments section 4 boundary for
+diff --git a/protocol/environments.md b/protocol/environments.md
+index 0c0c2e6..c91219c 100644
+--- a/protocol/environments.md
++++ b/protocol/environments.md
+@@ -107,6 +107,7 @@ machine configuration.
+ | `path` operand names a directory that cannot be read | `profile_source_path_unreadable` |
+ | profile name violates the core §2 grammar | `profile_name_invalid` |
+ | operation names a profile that is not installed | `profile_unknown` |
++| installed profile's lock file is present but cannot be read or parsed | `environment_store_untrusted` (entry-class; never `profile_unknown`) |
+ | no candidate satisfies a name's effective constraint, or a final constraint is unsatisfied (names every requirer, its range or exact form, and the candidates considered) | `context_range_conflict` |
+ | `git` source with a signer allowlist whose selected candidate carries neither a tag signature nor a commit signature (names the source and the tag or commit) | `context_source_unsigned` |
+ | `git` source with a signer allowlist whose candidate signature verifies against no allowed signer, or fails verification (names the source, the tag or commit, and the signer seen) | `context_source_signer_rejected` |
+@@ -116,7 +117,7 @@ machine configuration.
+ | root `weights` map names a package outside the closure | `context_weight_unknown` |
+ 
+ A missing `path` operand and an unreadable one are different facts (the
+-section 8.4 discipline): `profile_source_path_missing` never fires on a
++section 8.4.1 discipline): `profile_source_path_missing` never fires on a
+ failed read, and `profile_source_path_unreadable` never fires on absence.
+ 
+ ### 1.2 Snapshot bytes
+@@ -206,7 +207,13 @@ mutation lock for every mutating profile operation, the manager MUST verify
+ the lock file's ownership, private mutation permissions or DACL, regular
+ file type, and link safety before trusting the lock it names. A lock file
+ that fails the contract makes the profile `environment_store_untrusted`
+-(section 10.1).
++(section 10.1). Lock reads follow the section 8.4.1
++absence-versus-read-failure rule (lock row): an absent lock file is the
++not-installed condition (`profile_unknown`), while a lock file that is
++present but cannot be read or parsed — permission, I/O, or path errors,
++undecodable bytes, content that fails parsing or schema validation — is
++entry-class `environment_store_untrusted` (section 4), never
++`profile_unknown`, and is never rebuilt from (section 8.4.1, lock row).
+ 
+ ### 1.4 Versions, ranges, and resolution
+ 
+@@ -732,13 +739,21 @@ every resolve (no fragment); nothing is rebuilt, because there is no
+ protected place to rebuild into; `env status` reports the row non-current
+ naming the boundary (section 12); the operator repairs the boundary out of
+ band. (b) An individual entry — a store entry, the lock file, or a marker
+-file — that fails its own boundary checks or its pin hash inside a proven
+-enclosing boundary is `environment_store_untrusted`; a real operation
++file — that fails its own boundary checks or its pin hash — or, for the
++lock file, cannot be read or parsed (section 8.4.1, lock row) — inside a
++proven enclosing boundary is `environment_store_untrusted`; a real operation
+ rebuilds it from the revalidated snapshot into newly established protected
+ state (operation-private staging, atomic publication under the mutation
+-lock), dry-run evaluation reports `would-rebuild-untrusted-store` and
+-mutates nothing, resolve fails closed (no fragment, non-current) until
+-rebuilt. Verification order is enclosing boundary → entries → pin hashes →
++lock), except a lock file that cannot be read or parsed, which is never
++rebuilt from (section 8.4.1, lock row): no mutating operation rebuilds,
++re-materializes, or replaces anything from the unreadable evidence.
++Dry-run evaluation of a boundary-or-hash entry-class failure reports
++`would-rebuild-untrusted-store` and mutates nothing; dry-run evaluation
++of an unreadable or malformed lock reports `environment_store_untrusted`
++with no rebuild planned and mutates nothing. Resolve fails closed (no
++fragment, non-current) until rebuilt — or, for the unreadable lock, until
++the operator recovers out of band. Verification order is enclosing
++boundary → entries → pin hashes →
+ home currency (section 10.1). An implementation that cannot prove the
+ enclosing boundary MUST fail closed as in (a); an implementation that
+ cannot prove an entry boundary or pin hash MUST fail closed as in (b).
+@@ -783,8 +798,8 @@ failure is not in the entry-rebuild branch of (b) above: dry-run
+ evaluation of a `path` source directory failure reports
+ `environment_store_untrusted` with no rebuild planned and mutates
+ nothing — never `would-rebuild-untrusted-store`, which names only a
+-store entry, lock, or marker file failure that a real operation would
+-rebuild (section 10.1).
++store entry or marker file failure, or a lock boundary-check failure,
++that a real operation would rebuild (section 10.1).
+ 
+ The contract is not configurable: no knob narrows, widens, or disables it.
+ Rollout is direct (impact row "S5"). Rollout of the `path`-directory
+@@ -1258,6 +1273,12 @@ recorded; a recorded seed whose target no longer exists is removed; an
+ entry in the managed parent that the marker does not record is never
+ touched — where such an entry shadows an allowlisted operator entry, the
+ condition is reported as `environment_seed_shadowed` and left as it is.
++Reconciliation presence checks follow the section 8.4.1
++absence-versus-read-failure rule (seed row): an allowlisted entry whose
++state cannot be established is never treated as absent — a recorded seed
++whose target cannot be statted for any reason other than absence is kept,
++nothing is seeded from an entry that cannot be read, and the operation
++reports `environment_seed_unreadable`.
+ `XDG_DATA_HOME` and `XDG_STATE_HOME` are **ambient**: the manager never
+ sets, seeds, or manages them, so opencode's authentication state and every
+ XDG data or state file stay the operator's own on every launch. A dedicated
+@@ -1320,7 +1341,7 @@ resolve is sent as literal prompt text. The descriptor therefore records
+ `argument: path` with the polymorphism, and the launcher MUST verify that
+ the path is a readable regular file immediately before exec and fail rather
+ than let the tool interpret a dead path as prompt text — the read-failure-
+-as-absence class section 8.4 bans, applied at launch. The `codex_cli`
++as-absence class section 8.4.1 bans, applied at launch. The `codex_cli`
+ config key is **verified** present in the codex configuration surface
+ (0.153.2); that a per-invocation `-c model_instructions_file=<path>`
+ override applies it is docs-confidence.
+@@ -1378,7 +1399,15 @@ file-shaped strategy is watched by the **liveness row** —
+ `env status` MUST report `environment_passthrough_detached` (non-current)
+ when a recorded passthrough entry is no longer a symlink or no longer
+ targets the native entry, and `env resolve --repair` MUST re-link it,
+-leaving both files' bytes untouched. Where the pinned release's write
++leaving both files' bytes untouched. A recorded entry whose link state
++cannot be established — `lstat` or `readlink` fails with permission, I/O,
++or path errors — is not detached (section 8.4.1, passthrough row): `env
++status` MUST report `environment_passthrough_unreadable` (non-current,
++currency unknown), `env resolve` MUST report it the same way and emit no
++fragment, and `--repair` MUST NOT re-link the entry: repair leaves it
++untouched for the operator to make readable. A directory at the entry path
++is "no longer a symlink" and stays detached-side: it is
++`environment_passthrough_detached`, re-linked by `--repair`. Where the pinned release's write
+ behavior is verified in-place, a manager MAY record the entry as
+ `in-place` and skip nothing: the liveness row runs regardless. An
+ in-place rewrite has its own hazard, recorded here although nothing in this
+@@ -1499,7 +1528,13 @@ repository for `exec`, and no configuration seed lifts it), and `pi` has
+ no trust wall. A seed that is absent in the native home is simply not
+ seeded; a seed that exists but cannot be read is
+ `environment_seed_unreadable` and provisioning stops before the first
+-write (section 8.4 discipline).
++write (section 8.4.1, seed row). A seed path that is not a regular file —
++a symlink, directory, or special file — is unreadable-side: provisioning
++stops with `environment_seed_unreadable`, never by copying through the
++link nor by skipping the seed as absent. Under revision B, native
++`config.toml` bytes that do not parse as TOML are likewise
++`environment_seed_unreadable`: the strip cannot be computed, so
++provisioning stops rather than seeding whole or skipping.
+ 
+ **Isolation matrix.** What a managed home isolates per adapter, in revision
+ 1, normatively:
+@@ -1527,7 +1562,10 @@ materialization and `env status` MUST report `environment_shadowing_path_present
+ when a declared shadowing path exists; the file itself is never touched.
+ The existence check uses `lstat`-class semantics (section 8.3.1): a
+ symlink at a declared shadowing path counts as present and is never
+-dereferenced.
++dereferenced. An `lstat` that fails for any reason other than ENOENT-class
++absence is not absence (section 8.4.1): the path is reported as
++`environment_shadowing_path_present` naming the path as unverifiable,
++never as absent.
+ The surface is genuinely inert, so the row is **non-current** by default
+ (section 12). Machine configuration MAY record a per-path
+ `shadow_acknowledged` entry (section 12.1) — "this override is deliberate" —
+@@ -1574,7 +1612,11 @@ Target participation is machine configuration, never profile data: `auto`
+ (default), `off`, or an explicit per-target enable. Under `auto` the target
+ participates exactly when its probe path exists: a machine without the probe
+ path materializes nothing there and reports nothing missing; a machine with
+-it re-materializes the target on every install, `use`, and `sync`. The
++it re-materializes the target on every install, `use`, and `sync`. A probe
++path that cannot be statted for any reason other than ENOENT-class absence
++counts as present — the target participates and the first-write consent
++gate below applies unchanged — and `env status` reports the probe as
++unverifiable, never as absent (section 8.4.1). The
+ **first write** into a target's home under `auto` is a write into another
+ application's directory and requires one-time consent: the manager stops
+ with `environment_target_consent_required`, naming the target and the home,
+@@ -1598,7 +1640,8 @@ identifier not declared by the registry is `environment_target_unknown`.
+ | `isolated` configured for `opencode`, or for `claude_code` on macOS below the pinned release | `environment_isolated_unsupported` |
+ | `shared` configured for `claude_code` on macOS at or above the pinned release | `environment_shared_unsupported` |
+ | recorded passthrough entry is no longer a symlink to the native entry (non-current) | `environment_passthrough_detached` |
+-| provisioning seed exists in the native home but cannot be read | `environment_seed_unreadable` |
++| recorded passthrough entry whose link state cannot be established — `lstat` or `readlink` fails with permission, I/O, or path errors (non-current, currency unknown; never "detached") | `environment_passthrough_unreadable` |
++| provisioning seed exists but cannot be read — a native-home file or a named XDG entry | `environment_seed_unreadable` |
+ | unrecorded entry in a managed `opencode` parent shadows an allowlisted operator entry (warning) | `environment_seed_shadowed` |
+ | first `auto` write into a secondary target's home without recorded consent | `environment_target_consent_required` |
+ | detected tool version differs from the adapter's recorded verified version (warning) | `environment_tool_version_unverified` |
+@@ -1811,11 +1854,11 @@ beside the managed surfaces. The marker records:
+ 
+ Readers MUST reject an unsupported marker version with
+ `environment_marker_invalid` and MUST NOT infer newer semantics from
+-unknown fields. An absent marker and an unreadable or malformed marker are
+-distinct facts (section 8.4): an absent marker is the unprovisioned-home
+-condition (`environment_home_stale`, section 10.1), while an unreadable or
+-malformed marker fails closed with `environment_marker_unreadable` — the
+-marker-unreadable class, non-current with currency unknown, never
++unknown fields. Marker reads follow the section 8.4.1
++absence-versus-read-failure rule (marker row): an absent marker is the
++unprovisioned-home condition (`environment_home_stale`, section 10.1),
++while an unreadable or malformed marker fails closed with
++`environment_marker_unreadable` — non-current with currency unknown, never
+ "absent" — the home's surfaces are treated as unmanaged, nothing is
+ removed or replaced. The marker joins
+ the `agent-*` identifier family deliberately; the frozen core §1.1
+@@ -1864,6 +1907,19 @@ the number of backup generations and the age of the oldest and newest — a
+ backup of a hand-maintained context file may hold secrets, and the
+ operator is told it is there.
+ 
++Ledger and backup reads follow the section 8.4.1 absence-versus-read-failure
++rule (ledger and backup-record rows). The ledger of record unreadable is
++`environment_marker_unreadable`: nothing is recorded, so nothing is removed
++or replaced, and any attempted write meets
++`environment_surface_unmanaged_conflict`. A backup inventory that cannot be
++established — the generations directory or a generation needed by restore,
++scrub, retention, or status cannot be listed or read — is unknown, never
++empty, and reports `environment_backup_record_unreadable`: `env status`
++reports the backup row non-current with currency unknown; restore, scrub,
++and retention pruning stop before mutating with the same diagnostic; and
++the next-generation existence check never proceeds as if the generation
++were absent.
++
+ ### 8.3.1 Write discipline
+ 
+ Every materialization, takeover, repair, or backup write this document
+@@ -1925,16 +1981,12 @@ inspection uses `lstat`-class semantics (section 8.3.1): a surface path
+ that is a symlink is identified with `readlink`, never opened through
+ the link.
+ 
+-An absent surface file and a failed read are different facts: a failed
+-marker read is `environment_marker_unreadable`; a failed read of a recorded
+-surface file is `environment_surface_unreadable`, the row is non-current
+-with its currency reported as unknown, and no absence-shaped outcome —
+-`environment_surface_missing` included — may fire on either. An absent
+-marker and an unreadable or malformed marker are likewise distinct: the
+-absent marker is the unprovisioned-home condition
+-(`environment_home_stale`, section 10.1), while the unreadable or
+-malformed marker is `environment_marker_unreadable` (non-current, currency
+-unknown), never "absent".
++Absence and read failure are distinct facts for every state and surface
++file (section 8.4.1): drift compares the home against the record, so a
++surface that cannot be read is not drifted — it is
++`environment_surface_unreadable` (non-current, currency unknown), and no
++absence-shaped outcome — `environment_surface_missing` included — may fire
++on it.
+ 
+ Store failure is not drift: drift compares the home against the record,
+ while `environment_store_untrusted` compares the store against its pin
+@@ -1945,6 +1997,47 @@ expected store path but whose store entry fails the contract is not
+ check (section 10.1): a marker that belongs to another lock is
+ `environment_home_stale`, never `environment_store_untrusted`.
+ 
++### 8.4.1 Absence versus read failure
++
++For every file the manager reads as state or surface — marker, lock,
++ledger, backup record, provisioning seed, passthrough entry, recorded
++surface, inventory candidate, a closed list — the outcomes "absent" and
++"present but unreadable or malformed" are distinct facts. "Absent" means
++ENOENT-class on `lstat` or `open` of the exact path: no entry exists there.
++"Present but unreadable or malformed" means the path resolves to an entry
++the manager cannot use: permission or I/O errors on stat, open, or read; a
++path component that is not a directory; a symlink where a regular file is
++required, or a directory where a file is expected; undecodable bytes; or
++content that fails parsing or schema validation. A failed read, stat, or
++parse of any such file MUST NOT be reported, persisted, or acted upon as
++absence, and MUST NOT trigger any absence-shaped action — provisioning,
++re-seeding, takeover, re-materialization, or an "unprovisioned" verdict. An
++unreadable file makes the affected row non-current with currency unknown
++(section 12), and the operation that needs the file fails closed.
++
++The unreadable outcome per file class is closed in this table; every
++section that reads one of these files references this rule and names its
++row's diagnostic, never a local restatement:
++
++| File class | Absence legitimately means | Present but unreadable or malformed means | Owning section |
++| --- | --- | --- | --- |
++| marker | no marker file: the home is unprovisioned (`environment_home_stale` at resolve) | `environment_marker_unreadable` — non-current, currency unknown; surfaces treated as unmanaged, nothing removed or replaced | 8.2 |
++| lock | no lock file: the profile is not installed (`profile_unknown`) | `environment_store_untrusted` (entry-class) — never `profile_unknown`; resolve emits no fragment, status is non-current with currency unknown, and no mutating operation (install, update, use, sync, repair, garbage collection) rebuilds, re-materializes, or replaces anything from the unreadable evidence — recovery is an explicit operator action (reinstall from the profile source, or the section 9.2 retained previous lock) that never reads the unreadable file as input | 1.3 |
++| ledger | the ledger is absent with its home (unprovisioned) | the marker as ledger of record unreadable is `environment_marker_unreadable`; no remove or replace (attempted writes meet `environment_surface_unmanaged_conflict`) | 8.3 |
++| backup record | no generations: nothing to restore; the next generation proceeds; status reports zero | `environment_backup_record_unreadable` — the backup inventory is unknown: status reports the backup row non-current with currency unknown; restore, scrub, and retention pruning stop before mutating; the next-generation check never proceeds as if the generation were absent | 8.3 |
++| provisioning seed | the seed is not seeded | `environment_seed_unreadable` — provisioning stops before the first write | 7.4 |
++| passthrough entry | the recorded link is missing, replaced, or retargeted: `environment_passthrough_detached`, re-linked by `--repair` | `environment_passthrough_unreadable` — non-current, currency unknown, never "detached"; repair leaves the entry untouched | 7.4 |
++| recorded surface | `environment_surface_missing` | `environment_surface_unreadable` — non-current, currency unknown | 8.4 |
++| inventory candidate | not detected — never in the loss list | a loss with reason; a lossy import stops with `environment_import_lossy` unless consented; onboarding stops before its first write while the inventory is incomplete | 9.5, 9.6 |
++
++Boundary verification precedes readability classification: on the section
++10.1 verification order (enclosing boundary, then entries, then pin hashes,
++then home currency), a failure that violates the section 4 contract — a
++symlink at the marker or lock path, a non-regular entry component — or that
++prevents proving the boundary at all is `environment_store_untrusted` for a
++lock, marker, or store file, never an unreadable code (sections 1.3, 4,
++8.2).
++
+ ### 8.5 Diagnostics
+ 
+ | Condition | Diagnostic |
+@@ -1957,6 +2050,7 @@ check (section 10.1): a marker that belongs to another lock is
+ | recorded surface file exists but cannot be read (non-current) | `environment_surface_unreadable` |
+ | write would touch a file the marker does not record | `environment_surface_unmanaged_conflict` |
+ | next backup generation directory already exists | `environment_backup_exists` |
++| backup inventory (generations directory or a needed generation) cannot be listed or read (non-current, currency unknown; restore, scrub, and retention pruning stop before mutating) | `environment_backup_record_unreadable` |
+ | a write that would traverse a symlink below the managed root, or open through a symlink at a backup, marker, or ledger destination, that the manager did not create | `environment_write_would_follow_link` |
+ 
+ ## 9. Profile lifecycle
+@@ -2260,7 +2354,9 @@ discipline. Global skill operations act on the current profile and accept
+ `--profile <name>` and `--all-profiles`. `profile sync` re-materializes
+ every installed profile across every registered adapter and participating
+ target from the locks it finds; it is the actualization path when a new
+-adapter or target is registered on the machine.
++adapter or target is registered on the machine. A lock it cannot read is
++not "not found" (section 8.4.1, lock row): the profile is reported as
++`environment_store_untrusted` and left unmaterialized.
+ 
+ **Commands.** Skill commands reach a shell through the manager's forwarding
+ shims in one user-bin directory (manager §12.1; core §12.1). That directory
+@@ -2300,7 +2396,14 @@ root-context surface (section 2), so no root-context file is written for
+ `env status` treat a `local` profile exactly like an installed one. A
+ machine that never installs another profile observes no behavior change:
+ `default` simply is the current profile and existing global installations
+-keep their behavior byte-for-byte.
++keep their behavior byte-for-byte. Migration reads each global skill's
++install record to synthesize the lock; a record it cannot read is a loss
++with reason under the section 8.4.1 inventory-candidate row — never "not
++installed" — and migration stops before any write with
++`environment_import_lossy` naming the skill. Unlike import, the migration
++path admits no consent flag: the operator makes the record readable — or
++removes the skill through the normal global-remove path — and retries;
++the skill is never dropped silently.
+ 
+ ### 9.5 Onboarding
+ 
+@@ -2330,6 +2433,15 @@ such a trigger the manager:
+    unmanaged files to `environment_foreign_manager_suspected` (warning): a
+    dotfile manager appears to manage this machine and will overwrite
+    managed surfaces on its next apply. The heuristic never blocks.
++   Inventory reads follow the section 8.4.1 absence-versus-read-failure
++   rule (inventory-candidate row): a candidate that cannot be read is never
++   treated as absent — a detected-surface candidate that cannot be read
++   joins the section 9.6 loss list with its reason, and a symlink at a
++   managed-surface path whose target cannot be read stops the operation
++   with `environment_foreign_manager_detected`, naming the path as
++   unverifiable, with the same explicit choice. The dotfile-manager
++   heuristic stays best-effort and warning-only: a probe it cannot
++   complete yields no signal and never gates.
+ 2. **Notifies**: before any write, the operator is told that native global
+    context files are being replaced by managed ones and where the backup
+    lands.
+@@ -2384,7 +2496,10 @@ For each registered adapter, over its native default home:
+ - each **skills entry** of the adapter's manager §5 global skills surface
+   that the manager's adapter ledger does not record. A ledgered entry
+   belongs to the machine-global scope and reaches managed state through
+-  the section 9.4 migration, never through import.
++  the section 9.4 migration, never through import. An entry whose ledger
++  membership cannot be established — the ledger cannot be read — is not
++  "not recorded" (section 8.4.1, inventory-candidate row): it is a loss
++  with reason below.
+ 
+ A surface that is absent is simply not detected. A participating
+ secondary fixed-home target (section 7.6) joins the section 9.5 inventory
+@@ -2411,8 +2526,9 @@ root-context file that is not valid UTF-8, a skills entry with no
+ recoverable exact declaration, or a divergent secondary-target
+ root-context file. The **loss list** names each loss — adapter, platform
+ path, and reason — and an absence and a failed read stay different facts
+-(section 8.4): an absent surface never appears in the loss list, and a
+-failed read is always a loss, never treated as absence.
++(section 8.4.1, inventory-candidate row): an absent surface never appears
++in the loss list, and a failed read is always a loss, never treated as
++absence.
+ 
+ **Consent gate.** A lossless import proceeds without stopping. A lossy
+ import stops with `environment_import_lossy` and the loss list; it
+@@ -2481,6 +2597,8 @@ declaration (section 2.2) — reassembly emits no `requires.mcp` entry.
+ | chosen import profile name already installed | `profile_import_name_taken` |
+ | MCP package allowlist empty at install or update under the `permissive` posture (warning: every declaration package in the closure is admitted) | `mcp_package_allowlist_empty` |
+ | MCP package allowlist empty at install or update under the `hardened` posture while the resolved closure carries an MCP declaration package (resolution error; old lock stands) | `mcp_package_allowlist_empty` |
++| recorded passthrough entry whose link state cannot be established (non-current, currency unknown; never "detached"; policy owned by §7.7) | `environment_passthrough_unreadable` |
++| backup inventory (generations directory or a needed generation) that cannot be listed or read (non-current, currency unknown; restore, scrub, and retention pruning stop before mutating; policy owned by §8.5) | `environment_backup_record_unreadable` |
+ 
+ `profile_index_ambiguous` is withdrawn with the multi-profile repository
+ shape; `--use` takes no name. Section 2.3 surfacing emits no diagnostic
+@@ -2547,18 +2665,24 @@ rebuild into, and the operator repairs the boundary out of band; an
+ individual entry (store entry, lock file, marker file) that fails inside a
+ proven enclosing boundary is rebuilt by a real operation from the
+ revalidated snapshot into newly established protected state
+-(operation-private staging, atomic publication under the mutation lock):
+-for a `git` member the manager re-acquires the pinned commit's exact
+-snapshot bytes (section 1.2) and republishes the entry with a fresh
+-boundary; for a `path` or `local` member there is no second copy of the
+-snapshot — bytes are never adopted from the source directory again
+-(section 1) — so the entry cannot be rebuilt and repair fails with
+-`environment_repair_failed` while the operator reinstalls. Dry-run
+-evaluation of an entry-class failure of a store entry, the lock file, or
+-a marker file reports `would-rebuild-untrusted-store` and mutates
+-nothing; dry-run evaluation of an enclosing-boundary failure, or of a
+-`path` source directory failure, reports `environment_store_untrusted`
+-with no rebuild planned and mutates nothing (section 4).
++(operation-private staging, atomic publication under the mutation lock);
++an unreadable or malformed lock file is never rebuilt from (section
++8.4.1, lock row) — install, update, use, sync, repair, and garbage
++collection refuse with `environment_store_untrusted` without rebuilding,
++re-materializing, or replacing anything, and recovery is the lock row's
++explicit operator action. For a `git` member the manager re-acquires the
++pinned commit's exact snapshot bytes (section 1.2) and republishes the
++entry with a fresh boundary; for a `path` or `local` member there is no
++second copy of the snapshot — bytes are never adopted from the source
++directory again (section 1) — so the entry cannot be rebuilt and repair
++fails with `environment_repair_failed` while the operator reinstalls.
++Dry-run evaluation of an entry-class failure of a store entry or a marker
++file, or of a lock file that fails its boundary checks, reports
++`would-rebuild-untrusted-store` and mutates nothing; dry-run evaluation
++of an enclosing-boundary failure, of a `path` source directory failure,
++or of an unreadable or malformed lock file reports
++`environment_store_untrusted` with no rebuild planned and mutates nothing
++(section 4).
+ Lock acquisition that times out is
+ `environment_lock_unavailable`, distinct from `environment_repair_failed`,
+ which keeps meaning that the store cannot restore this home — an entry is
+@@ -2588,9 +2712,21 @@ hashes are compared with the surfaces the CURRENT lock would generate
+ condition (`environment_home_stale`) repaired from the verified store,
+ never `environment_store_untrusted`. An intact updated store with an old
+ marker is stale and repair succeeds; a swapped updated store with an old
+-marker is untrusted and its bytes are never adopted. An absent marker is
+-unprovisioned (`environment_home_stale`); an unreadable or malformed
+-marker is `environment_marker_unreadable` (section 8.4), never "absent".
++marker is untrusted and its bytes are never adopted. Resolve's reads follow
++the section 8.4.1 absence-versus-read-failure rule: an absent marker is
++unprovisioned (`environment_home_stale`); an unreadable or malformed marker
++is `environment_marker_unreadable` (marker row), never "absent"; an
++unreadable recorded surface is `environment_surface_unreadable` (surface
++row), never "missing" and never a stale-home reason; an unreadable lock is
++entry-class `environment_store_untrusted` (lock row), never
++`profile_unknown` and never rebuilt from; and an unreadable passthrough
++entry is `environment_passthrough_unreadable` (passthrough row), never
++"detached" and never a stale-home reason — while a detached entry stays
++a stale-home reason repaired by `--repair`. `--repair` neither
++re-materializes an unreadable surface nor re-links an unreadable entry:
++it reports the unreadable diagnostic and emits no fragment.
++Provisioning-time seed reads fail with `environment_seed_unreadable`
++(seed row) and stop provisioning before the first write.
+ The pin recomputation costs O(store entry bytes named by the lock) per
+ resolve: every named entry is re-hashed, so a same-user byte swap of a
+ system-prompt or root-context file — or any file in the entry — is
+@@ -2786,10 +2922,13 @@ that no reader mistakes the surfacing rows for an execution sandbox.
+ | named or current profile not installed | `profile_unknown` |
+ | managed home unprovisioned, stale, drifted, or passthrough detached; no fragment without `--repair` | `environment_home_stale` |
+ | marker unreadable or malformed at resolve (no fragment; non-current, currency unknown; never "absent") | `environment_marker_unreadable` |
++| recorded surface file unreadable at resolve (no fragment; non-current, currency unknown; never "missing", never a stale-home reason; `--repair` does not re-materialize it) | `environment_surface_unreadable` |
++| lock file unreadable or malformed at resolve (no fragment; non-current, currency unknown; never `profile_unknown`; never rebuilt from — section 8.4.1, lock row) | `environment_store_untrusted` |
++| recorded passthrough entry unreadable at resolve (no fragment; non-current, currency unknown; never "detached", never a stale-home reason; `--repair` does not re-link it) | `environment_passthrough_unreadable` |
+ | store entry, lock, or marker file fails the §4 protected-boundary contract or its pin hash, or a `path` source directory fails its §4 boundary checks, at resolve (no fragment; non-current) | `environment_store_untrusted` |
+ | enclosing boundary (environments root or store root) cannot be proven at resolve (no fragment; non-current; nothing rebuilt) | `environment_store_untrusted` |
+-| dry-run evaluation of an entry-class failure of a store entry, the lock file, or a marker file (no mutation; a real operation would rebuild it) | `would-rebuild-untrusted-store` |
+-| dry-run evaluation of an enclosing-boundary failure, or of a `path` source directory failure (no mutation; no rebuild planned) | `environment_store_untrusted` |
++| dry-run evaluation of an entry-class failure of a store entry or a marker file, or of a lock file that fails its boundary checks (no mutation; a real operation would rebuild it) | `would-rebuild-untrusted-store` |
++| dry-run evaluation of an enclosing-boundary failure, of a `path` source directory failure, or of an unreadable or malformed lock file (no mutation; no rebuild planned) | `environment_store_untrusted` |
+ | repair could not acquire the mutation lock within the bounded wait | `environment_lock_unavailable` |
+ | managed home cannot be repaired from the store | `environment_repair_failed` |
+ | S4 profile `s4-warn`: launch composition passes an operator variable outside the configured `passable_env_names` (warning, names the variables and the knob) | `mcp_env_passthrough_unlisted` |
+@@ -2832,7 +2971,7 @@ each profile names. The rules are closed:
+   MUST fail with `subcommand_provider_root_unreadable`, naming the first
+   unreadable root in search order, and MUST NOT fall through to a later
+   root, to `PATH`, or to `subcommand_provider_missing`. An unreadable root
+-  is reported as unreadable, never as absence (section 8.4).
++  is reported as unreadable, never as absence (section 8.4.1).
+ - The ambient `PATH` is not a trust root. Under revision A the ambient
+   `PATH` still selects the provider (the pre-change behavior) and a
+   selection outside the trust roots warns; under revision B the ambient
+@@ -2937,7 +3076,9 @@ default and every section 9.3 scope that differs. A `local` profile
+ reports `local` as its source, `-` for requirement, `0.0.0` as version, and
+ its lock hash. A `path` root reports `path` as its source, its recorded
+ source path as the identity, `-` for requirement, and whether it is
+-imported-from-native.
++imported-from-native. A profile whose lock cannot be read is listed with
++`environment_store_untrusted`, never omitted as not installed (section
++8.4.1, lock row).
+ 
+ `env status [--check] [--json]` reports the
+ profile × environment × surface matrix: mode, form, materialized lock hash,
+@@ -2954,7 +3095,9 @@ with any `environment_seed_shadowed` entry, the standing `opencode`
+ split-brain note of section 7.1, the recorded and detected tool release per
+ adapter (section 7.9), both homes of the current profile per scope and
+ their provisioning state (section 8.1), backup generation counts and ages
+-per home (section 8.3), managed-surface, backup, and marker paths blocked
++per home (section 8.3; `environment_backup_record_unreadable`,
++non-current with currency unknown, when the inventory cannot be
++established), managed-surface, backup, and marker paths blocked
+ by a link the manager does not own (section 8.3.1), orphaned managed
+ homes (section 9.2),
+ `environment_context_size_exceeded` where it applies, the effective
+@@ -3017,7 +3160,7 @@ every recorded passthrough entry is live. A drifted, missing, shadow-inert
+ switched, stale, store-untrusted (`environment_store_untrusted`),
+ refused-provider (section 11), link-blocked (section 8.3.1), or
+ unreadable state is non-current; unreadable evidence is
+-reported as unreadable, never as absence (section 8.4). A section 11
++reported as unreadable, never as absence (section 8.4.1). A section 11
+ provider row is non-current when the active revision refuses or fails
+ that provider — a manager-published or managed directory match under
+ either revision, an outside-trust-roots `PATH` match refused under
+@@ -3073,8 +3216,10 @@ include every store entry named by any installed profile's lock — and by
+ a retained previous lock until it is dropped (section 9.2) — every managed
+ home and in-place surface set referenced by a valid environment marker, and
+ every entry referenced by an in-flight transaction journal. An unreadable
+-marker (`environment_marker_unreadable`) or unprovable reference fails
+-safe: the uncertain entries are retained and the uncertainty reported. An
++marker (`environment_marker_unreadable`, section 8.4.1), an unreadable lock
++(entry-class `environment_store_untrusted`, section 8.4.1), or another
++unprovable reference fails safe: the uncertain entries are retained and the
++uncertainty reported. An
+ enclosing boundary that cannot be proven refuses collection before its
+ first write — nothing is collected and nothing is rebuilt, and the
+ uncertainty is reported; the operator repairs the boundary out of band.
+@@ -3349,3 +3494,36 @@ the vectors warn and carrying the migration hint, and to revision B by
+ seeding without `mcp_servers` and reporting with
+ `mcp_native_servers_not_inherited` where the vectors report; it MUST NOT
+ claim revision B while still inheriting native servers.
++
++The section 8.4.1 absence-versus-read-failure cases
++(`vectors/environments-read-failure.json`) pin unreadable-but-present to its
++typed discriminating inputs for five file classes: markers at the
++open/read/parse stages (permission-denied, I/O, unparseable, and
++schema-invalid cases report `environment_marker_unreadable`, never
++`environment_home_stale`; a marker failure that violates the section 4
++contract, or that prevents proving the boundary, stays
++`environment_store_untrusted` under the section 8.4.1 precedence rule);
++locks (all seven failure classes — permission-denied, I/O, unparseable,
++schema-invalid, symlink-where-regular-required,
++directory-where-file-expected, parent-not-directory — report entry-class
++`environment_store_untrusted`, never `profile_unknown`; repair and update
++against an unreadable lock refuse with nothing rebuilt and nothing
++written); provisioning seeds (the six applicable classes report
++`environment_seed_unreadable` and provisioning stops, including a
++non-regular seed path and unparseable revision-B `config.toml` bytes);
++passthrough entries (lstat/readlink permission-denied, I/O, and
++parent-not-directory report `environment_passthrough_unreadable` at status
++and at resolve with no fragment, and `--repair` leaves the entry
++untouched; a directory at the entry path stays detached-side); and backup
++records (an unreadable generations inventory reports
++`environment_backup_record_unreadable` at status with currency unknown
++and stops restore before mutating). Each class carries absence-side
++positives pinning the contrast — an absent marker is
++`environment_home_stale`, an absent lock is `profile_unknown`, an absent
++seed provisions through, a missing link is
++`environment_passthrough_detached` (a stale-home reason at resolve), an
++absent backup inventory reports zero at status and nothing to restore —
++and negatives whose absence-shaped observation (stale, unknown,
++provisioned-through, detached, reported-empty) — or, for the lock,
++rebuild-shaped observation — is non-conforming, checked by
++`validate_environments_read_failure_vectors`.
+diff --git a/release/1.0.0-rc.9.json b/release/1.0.0-rc.9.json
+index f51bc43..6d4f3a6 100644
+--- a/release/1.0.0-rc.9.json
++++ b/release/1.0.0-rc.9.json
+@@ -12,7 +12,7 @@
+     "verified_provider_contract": "host-execution-provider-v1"
+   },
+   "candidate_protocol_pin": {
+-    "manifest_sha256": "sha256:061bc0976504213ca5e9319d2c016c9c8a3339117de245c6793ba54d37740a39",
++    "manifest_sha256": "sha256:03b9c0f90183fa2b5fbc9de59b650d3263c93e363b25c27ccc07668914f9b08e",
+     "suite_root": "conformance/v1"
+   },
+   "claim_v5": {
+@@ -24,7 +24,7 @@
+   "downstream_consumption": {
+     "committed_release_pin_advanced": false,
+     "environment": "CURATOR_CONFORMANCE_ROOT",
+-    "required_manifest_sha256": "sha256:061bc0976504213ca5e9319d2c016c9c8a3339117de245c6793ba54d37740a39"
++    "required_manifest_sha256": "sha256:03b9c0f90183fa2b5fbc9de59b650d3263c93e363b25c27ccc07668914f9b08e"
+   },
+   "historical_release": {
+     "immutable": true,
+diff --git a/tools/test_validate.py b/tools/test_validate.py
+index 8182662..2acf383 100644
+--- a/tools/test_validate.py
++++ b/tools/test_validate.py
+@@ -4210,6 +4210,277 @@ class WriteNofollowVectorTests(unittest.TestCase):
+             validate.validate_environments_write_nofollow_vectors(changed)
+ 
+ 
++class ReadFailureVectorTests(unittest.TestCase):
++    """The environments §8.4.1 absence-versus-read-failure gate must fail closed.
++
++    Each test narrows one rule of
++    validate_environments_read_failure_vectors: an unreadable marker, lock,
++    seed, passthrough entry, or backup-record inventory answered with its
++    absence-shaped outcome, a lock repair or update that rebuilds or writes,
++    a failure class collapsed onto another, a currency or repair disposition
++    relaxed, a scenario substitution under a retained name, a negative
++    rewritten as a passing case or as a different violation, or a dropped
++    case must be rejected.
++    """
++
++    def setUp(self) -> None:
++        self.vector = validate.load_json(
++            validate.SUITE / "vectors" / "environments-read-failure.json"
++        )
++
++    def case(self, name: str, vector=None) -> dict:
++        for item in (vector or self.vector)["cases"]:
++            if item["name"] == name:
++                return item
++        raise AssertionError(f"environments-read-failure case {name} is missing")
++
++    def run_main_with_vector(self, vector: dict) -> tuple[int, str]:
++        """Run the real validate.main() against a substituted on-disk corpus.
++
++        The mutated vector is written to the worktree with the manifest and
++        rc.9 pins recomputed around it, so the only failing check can be the
++        read-failure gate itself; all three files are restored byte-identical
++        afterwards.
++        """
++        vector_path = validate.SUITE / "vectors" / "environments-read-failure.json"
++        manifest_path = validate.SUITE / "manifest.json"
++        rc9_path = validate.ROOT / "release" / "1.0.0-rc.9.json"
++        originals = {path: path.read_bytes() for path in (vector_path, manifest_path, rc9_path)}
++        try:
++            vector_bytes = (json.dumps(vector, indent=2, sort_keys=True) + "\n").encode("utf-8")
++            vector_path.write_bytes(vector_bytes)
++            manifest = json.loads(originals[manifest_path].decode("utf-8"))
++            for entry in manifest["files"]:
++                if entry["path"] == "vectors/environments-read-failure.json":
++                    entry["sha256"] = "sha256:" + hashlib.sha256(vector_bytes).hexdigest()
++            manifest_bytes = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode("utf-8")
++            manifest_path.write_bytes(manifest_bytes)
++            release = json.loads(originals[rc9_path].decode("utf-8"))
++            manifest_digest = "sha256:" + hashlib.sha256(manifest_bytes).hexdigest()
++            release["candidate_protocol_pin"]["manifest_sha256"] = manifest_digest
++            release["downstream_consumption"]["required_manifest_sha256"] = manifest_digest
++            rc9_path.write_bytes((json.dumps(release, indent=2, sort_keys=True) + "\n").encode("utf-8"))
++            stdout, stderr = io.StringIO(), io.StringIO()
++            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
++                status = validate.main()
++            return status, stderr.getvalue()
++        finally:
++            for path, payload in originals.items():
++                path.write_bytes(payload)
++            for path, payload in originals.items():
++                if path.read_bytes() != payload:
++                    raise AssertionError(f"{path} was not restored byte-identical")
++
++    def test_published_vector_passes(self) -> None:
++        validate.validate_environments_read_failure_vectors()
++
++    def test_substituted_scenario_rejected_through_main(self) -> None:
++        """Every retained name refuses an internally consistent foreign body.
++
++        Producer rule 7: substituting another branch's passing case under a
++        retained name must be rejected by the validator entry point, not
++        merely inventoried. Each substitution runs through validate.main()
++        against a repinned on-disk corpus.
++        """
++        for name in sorted(validate.READ_FAILURE_CASES):
++            with self.subTest(case=name):
++                donor_name = (
++                    "marker-absent-unprovisioned-stale"
++                    if self.case(name)["file_class"] != "marker"
++                    else "seed-absent-not-seeded-provisioned"
++                )
++                donor = copy.deepcopy(self.case(donor_name))
++                changed = copy.deepcopy(self.vector)
++                for index, item in enumerate(changed["cases"]):
++                    if item["name"] == name:
++                        changed["cases"][index] = dict(donor, name=name)
++                status, stderr = self.run_main_with_vector(changed)
++                self.assertEqual(status, 1)
++                self.assertIn("pinned scenario", stderr)
++
++    def test_unreadable_marker_reported_stale_fails(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        unreadable = self.case("marker-open-permission-denied-unreadable", changed)
++        unreadable["expected"] = dict(validate.READ_FAILURE_NEGATIVES["marker-unreadable-reported-stale"])
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_read_failure_vectors(changed)
++
++    def test_unreadable_lock_reported_unknown_fails(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        unreadable = self.case("lock-read-io-error-untrusted", changed)
++        unreadable["expected"] = dict(validate.READ_FAILURE_NEGATIVES["lock-unreadable-reported-unknown"])
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_read_failure_vectors(changed)
++
++    def test_unreadable_seed_provisioned_through_fails(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        unreadable = self.case("seed-open-permission-denied-unreadable", changed)
++        unreadable["expected"] = dict(validate.READ_FAILURE_NEGATIVES["seed-unreadable-skipped-as-absent"])
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_read_failure_vectors(changed)
++
++    def test_unreadable_passthrough_reported_detached_fails(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        unreadable = self.case("passthrough-lstat-permission-denied-unreadable", changed)
++        unreadable["expected"] = dict(
++            validate.READ_FAILURE_NEGATIVES["passthrough-unreadable-reported-detached"]
++        )
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_read_failure_vectors(changed)
++
++    def test_lock_repair_rebuild_or_write_fails(self) -> None:
++        """A repair against an unreadable lock rebuilds nothing and writes nothing."""
++        for field in ("rebuilt", "written"):
++            with self.subTest(field=field):
++                changed = copy.deepcopy(self.vector)
++                refused = self.case("lock-unreadable-repair-refused-no-rebuild", changed)
++                refused["expected"][field] = True
++                with self.assertRaises(validate.ValidationFailure):
++                    validate.validate_environments_read_failure_vectors(changed)
++
++    def test_lock_update_unknown_or_rebuild_fails(self) -> None:
++        """An update against an unreadable lock refuses as untrusted, never unknown."""
++        changed = copy.deepcopy(self.vector)
++        refused = self.case("lock-unreadable-update-refused-no-rebuild", changed)
++        refused["expected"]["diagnostic"] = "profile_unknown"
++        refused["expected"]["currency"] = "known"
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_read_failure_vectors(changed)
++        changed = copy.deepcopy(self.vector)
++        refused = self.case("lock-unreadable-update-refused-no-rebuild", changed)
++        refused["expected"]["rebuilt"] = True
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_read_failure_vectors(changed)
++
++    def test_backup_unreadable_reported_empty_fails(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        unreadable = self.case("backup-record-unreadable-status-unknown", changed)
++        unreadable["expected"] = dict(
++            validate.READ_FAILURE_NEGATIVES["backup-record-unreadable-reported-empty"]
++        )
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_read_failure_vectors(changed)
++
++    def test_backup_restore_write_or_silence_fails(self) -> None:
++        """A restore against an unreadable inventory stops with its diagnostic."""
++        changed = copy.deepcopy(self.vector)
++        stopped = self.case("backup-record-unreadable-restore-stops", changed)
++        stopped["expected"]["written"] = True
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_read_failure_vectors(changed)
++        changed = copy.deepcopy(self.vector)
++        stopped = self.case("backup-record-unreadable-restore-stops", changed)
++        stopped["expected"]["diagnostic"] = None
++        stopped["expected"]["currency"] = "known"
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_read_failure_vectors(changed)
++
++    def test_failure_class_collapse_refused(self) -> None:
++        """Collapsing every failure class onto one is refused per scenario.
++
++        Producer rule 7: the mutant keeps each case internally consistent —
++        only the pinned failure class (and the entry shape it implies)
++        changes — so only scenario pinning can catch it.
++        """
++        for name in sorted(validate.READ_FAILURE_CASES):
++            pinned = validate.READ_FAILURE_SCENARIOS[name]
++            if pinned["failure_class"] is None or pinned["failure_class"] == "permission-denied":
++                continue
++            with self.subTest(case=name):
++                changed = copy.deepcopy(self.vector)
++                collapsed = self.case(name, changed)
++                collapsed["failure_class"] = "permission-denied"
++                collapsed["entry_kind"] = (
++                    "symlink" if pinned["file_class"] == "passthrough" else "file"
++                )
++                with self.assertRaises(validate.ValidationFailure):
++                    validate.validate_environments_read_failure_vectors(changed)
++
++    def test_relaxed_currency_fails(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        unreadable = self.case("lock-parent-not-directory-untrusted", changed)
++        unreadable["expected"]["currency"] = "known"
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_read_failure_vectors(changed)
++
++    def test_repair_relinks_relaxed_fails(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        unreadable = self.case("passthrough-readlink-io-error-unreadable", changed)
++        unreadable["expected"]["repair_relinks"] = True
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_read_failure_vectors(changed)
++
++    def test_absent_rewritten_as_unreadable_fails(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        absent = self.case("marker-absent-unprovisioned-stale", changed)
++        absent["presence"] = "present"
++        absent["entry_kind"] = "file"
++        absent["failure_class"] = "permission-denied"
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_read_failure_vectors(changed)
++
++    def test_negative_rewritten_as_passing_fails(self) -> None:
++        """A negative rewritten as an internally consistent passing case fails.
++
++        Producer rule 7: for every negative, the absence-shaped observation
++        is replaced by the derived correct verdict and the negative verdict
++        is removed; the pinned refusal must still catch the retained name.
++        """
++        for name, inputs in validate.READ_FAILURE_SCENARIOS.items():
++            if name not in validate.READ_FAILURE_NEGATIVES:
++                continue
++            with self.subTest(case=name):
++                changed = copy.deepcopy(self.vector)
++                rewritten = self.case(name, changed)
++                rewritten["expected"] = validate._read_failure_expected(
++                    inputs["file_class"],
++                    inputs["operation"],
++                    inputs["presence"],
++                    inputs["entry_kind"],
++                    inputs["failure_class"],
++                )
++                del rewritten["conforming"]
++                del rewritten["reason"]
++                with self.assertRaises(validate.ValidationFailure):
++                    validate.validate_environments_read_failure_vectors(changed)
++
++    def test_negative_rewritten_as_other_violation_fails(self) -> None:
++        """A negative rewritten as a different violation still fails.
++
++        The negative pins the exact absence-shaped observation it refuses,
++        not merely 'some violation': a stall reported as a fragment-emitting
++        success under the retained negative name must be refused.
++        """
++        changed = copy.deepcopy(self.vector)
++        rewritten = self.case("marker-unreadable-reported-stale", changed)
++        rewritten["expected"] = {
++            "diagnostic": None,
++            "fragment_emitted": True,
++            "row_current": True,
++            "currency": "known",
++        }
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_read_failure_vectors(changed)
++
++    def test_dropped_case_fails(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        changed["cases"] = [
++            item
++            for item in changed["cases"]
++            if item["name"] != "passthrough-unreadable-resolve-no-fragment"
++        ]
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_read_failure_vectors(changed)
++
++    def test_relaxed_closed_set_fails(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        changed["diagnostics"] = [
++            code for code in changed["diagnostics"] if code != "profile_unknown"
++        ]
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_read_failure_vectors(changed)
++
++
+ class UmbrellaProviderVectorTests(unittest.TestCase):
+     """The environments §11 trust-root gate must fail closed.
+ 
+diff --git a/tools/validate.py b/tools/validate.py
+index 46ef536..9d0a1b7 100644
+--- a/tools/validate.py
++++ b/tools/validate.py
+@@ -8271,6 +8271,640 @@ def validate_environments_write_nofollow_vectors(vector: Any = None) -> None:
+         _validate_write_nofollow_case(name, case, fixtures)
+ 
+ 
++READ_FAILURE_DIAGNOSTICS = (
++    "environment_backup_record_unreadable",
++    "environment_home_stale",
++    "environment_marker_unreadable",
++    "environment_passthrough_detached",
++    "environment_passthrough_unreadable",
++    "environment_seed_unreadable",
++    "environment_store_untrusted",
++    "profile_unknown",
++)
++READ_FAILURE_FILE_CLASSES = ("backup-record", "lock", "marker", "passthrough", "seed")
++READ_FAILURE_OPERATIONS = ("env-resolve", "env-status", "provision", "repair", "restore", "update")
++READ_FAILURE_PRESENCE_VALUES = ("absent", "present")
++READ_FAILURE_ENTRY_KINDS = ("directory", "file", "missing", "symlink")
++READ_FAILURE_FAILURE_CLASSES = (
++    "directory-where-file-expected",
++    "io-error",
++    "parent-not-directory",
++    "permission-denied",
++    "schema-invalid-content",
++    "symlink-where-regular-required",
++    "unparseable-content",
++)
++READ_FAILURE_CURRENCIES = ("known", "unknown")
++# Failure classes applicable per file class (section 8.4.1): a marker failure
++# that violates the section 4 contract, or that prevents proving the boundary,
++# is environment_store_untrusted and is outside this family, so markers cover
++# the open/read/parse stages only; seeds are unparsed byte copies except the
++# codex_cli revision-B strip, so schema-invalid-content does not apply to them;
++# passthrough entries carry no content and require a link, so only the
++# lstat/readlink failure classes apply to them; backup-record inventories are
++# listed, never parsed, and their inventory root is a directory, so only the
++# list/stat failure classes apply to them.
++READ_FAILURE_APPLICABLE = {
++    "backup-record": frozenset(
++        {"permission-denied", "io-error", "parent-not-directory"}
++    ),
++    "marker": frozenset(
++        {
++            "permission-denied",
++            "io-error",
++            "unparseable-content",
++            "schema-invalid-content",
++        }
++    ),
++    "lock": frozenset(READ_FAILURE_FAILURE_CLASSES),
++    "seed": frozenset(
++        {
++            "permission-denied",
++            "io-error",
++            "unparseable-content",
++            "symlink-where-regular-required",
++            "directory-where-file-expected",
++            "parent-not-directory",
++        }
++    ),
++    "passthrough": frozenset(
++        {"permission-denied", "io-error", "parent-not-directory"}
++    ),
++}
++# Each required scenario pinned to its typed discriminating inputs (producer
++# rule 7): a named case rewritten as another branch's passing case under the
++# same name — or with its failure class collapsed to another — must be
++# refused, not merely inventoried.
++READ_FAILURE_SCENARIOS = {
++    "marker-open-permission-denied-unreadable": {
++        "file_class": "marker",
++        "operation": "env-resolve",
++        "presence": "present",
++        "entry_kind": "file",
++        "failure_class": "permission-denied",
++    },
++    "marker-read-io-error-unreadable": {
++        "file_class": "marker",
++        "operation": "env-resolve",
++        "presence": "present",
++        "entry_kind": "file",
++        "failure_class": "io-error",
++    },
++    "marker-unparseable-content-unreadable": {
++        "file_class": "marker",
++        "operation": "env-resolve",
++        "presence": "present",
++        "entry_kind": "file",
++        "failure_class": "unparseable-content",
++    },
++    "marker-schema-invalid-content-unreadable": {
++        "file_class": "marker",
++        "operation": "env-resolve",
++        "presence": "present",
++        "entry_kind": "file",
++        "failure_class": "schema-invalid-content",
++    },
++    "marker-absent-unprovisioned-stale": {
++        "file_class": "marker",
++        "operation": "env-resolve",
++        "presence": "absent",
++        "entry_kind": "missing",
++        "failure_class": None,
++    },
++    "marker-unreadable-reported-stale": {
++        "file_class": "marker",
++        "operation": "env-resolve",
++        "presence": "present",
++        "entry_kind": "file",
++        "failure_class": "permission-denied",
++    },
++    "lock-open-permission-denied-untrusted": {
++        "file_class": "lock",
++        "operation": "env-resolve",
++        "presence": "present",
++        "entry_kind": "file",
++        "failure_class": "permission-denied",
++    },
++    "lock-read-io-error-untrusted": {
++        "file_class": "lock",
++        "operation": "env-resolve",
++        "presence": "present",
++        "entry_kind": "file",
++        "failure_class": "io-error",
++    },
++    "lock-unparseable-content-untrusted": {
++        "file_class": "lock",
++        "operation": "env-resolve",
++        "presence": "present",
++        "entry_kind": "file",
++        "failure_class": "unparseable-content",
++    },
++    "lock-schema-invalid-content-untrusted": {
++        "file_class": "lock",
++        "operation": "env-resolve",
++        "presence": "present",
++        "entry_kind": "file",
++        "failure_class": "schema-invalid-content",
++    },
++    "lock-symlink-where-regular-required-untrusted": {
++        "file_class": "lock",
++        "operation": "env-resolve",
++        "presence": "present",
++        "entry_kind": "symlink",
++        "failure_class": "symlink-where-regular-required",
++    },
++    "lock-directory-where-file-expected-untrusted": {
++        "file_class": "lock",
++        "operation": "env-resolve",
++        "presence": "present",
++        "entry_kind": "directory",
++        "failure_class": "directory-where-file-expected",
++    },
++    "lock-parent-not-directory-untrusted": {
++        "file_class": "lock",
++        "operation": "env-resolve",
++        "presence": "present",
++        "entry_kind": "file",
++        "failure_class": "parent-not-directory",
++    },
++    "lock-absent-profile-unknown": {
++        "file_class": "lock",
++        "operation": "env-resolve",
++        "presence": "absent",
++        "entry_kind": "missing",
++        "failure_class": None,
++    },
++    "lock-unreadable-reported-unknown": {
++        "file_class": "lock",
++        "operation": "env-resolve",
++        "presence": "present",
++        "entry_kind": "file",
++        "failure_class": "permission-denied",
++    },
++    "lock-unreadable-repair-refused-no-rebuild": {
++        "file_class": "lock",
++        "operation": "repair",
++        "presence": "present",
++        "entry_kind": "file",
++        "failure_class": "permission-denied",
++    },
++    "lock-unreadable-update-refused-no-rebuild": {
++        "file_class": "lock",
++        "operation": "update",
++        "presence": "present",
++        "entry_kind": "file",
++        "failure_class": "unparseable-content",
++    },
++    "lock-unreadable-repair-rebuilt": {
++        "file_class": "lock",
++        "operation": "repair",
++        "presence": "present",
++        "entry_kind": "file",
++        "failure_class": "permission-denied",
++    },
++    "seed-open-permission-denied-unreadable": {
++        "file_class": "seed",
++        "operation": "provision",
++        "presence": "present",
++        "entry_kind": "file",
++        "failure_class": "permission-denied",
++    },
++    "seed-read-io-error-unreadable": {
++        "file_class": "seed",
++        "operation": "provision",
++        "presence": "present",
++        "entry_kind": "file",
++        "failure_class": "io-error",
++    },
++    "seed-unparseable-content-unreadable": {
++        "file_class": "seed",
++        "operation": "provision",
++        "presence": "present",
++        "entry_kind": "file",
++        "failure_class": "unparseable-content",
++    },
++    "seed-symlink-where-regular-required-unreadable": {
++        "file_class": "seed",
++        "operation": "provision",
++        "presence": "present",
++        "entry_kind": "symlink",
++        "failure_class": "symlink-where-regular-required",
++    },
++    "seed-directory-where-file-expected-unreadable": {
++        "file_class": "seed",
++        "operation": "provision",
++        "presence": "present",
++        "entry_kind": "directory",
++        "failure_class": "directory-where-file-expected",
++    },
++    "seed-parent-not-directory-unreadable": {
++        "file_class": "seed",
++        "operation": "provision",
++        "presence": "present",
++        "entry_kind": "file",
++        "failure_class": "parent-not-directory",
++    },
++    "seed-absent-not-seeded-provisioned": {
++        "file_class": "seed",
++        "operation": "provision",
++        "presence": "absent",
++        "entry_kind": "missing",
++        "failure_class": None,
++    },
++    "seed-unreadable-skipped-as-absent": {
++        "file_class": "seed",
++        "operation": "provision",
++        "presence": "present",
++        "entry_kind": "file",
++        "failure_class": "permission-denied",
++    },
++    "passthrough-lstat-permission-denied-unreadable": {
++        "file_class": "passthrough",
++        "operation": "env-status",
++        "presence": "present",
++        "entry_kind": "symlink",
++        "failure_class": "permission-denied",
++    },
++    "passthrough-readlink-io-error-unreadable": {
++        "file_class": "passthrough",
++        "operation": "env-status",
++        "presence": "present",
++        "entry_kind": "symlink",
++        "failure_class": "io-error",
++    },
++    "passthrough-parent-not-directory-unreadable": {
++        "file_class": "passthrough",
++        "operation": "env-status",
++        "presence": "present",
++        "entry_kind": "symlink",
++        "failure_class": "parent-not-directory",
++    },
++    "passthrough-unreadable-resolve-no-fragment": {
++        "file_class": "passthrough",
++        "operation": "env-resolve",
++        "presence": "present",
++        "entry_kind": "symlink",
++        "failure_class": "permission-denied",
++    },
++    "passthrough-link-missing-detached": {
++        "file_class": "passthrough",
++        "operation": "env-status",
++        "presence": "absent",
++        "entry_kind": "missing",
++        "failure_class": None,
++    },
++    "passthrough-directory-at-entry-detached": {
++        "file_class": "passthrough",
++        "operation": "env-status",
++        "presence": "present",
++        "entry_kind": "directory",
++        "failure_class": None,
++    },
++    "passthrough-detached-resolve-stale": {
++        "file_class": "passthrough",
++        "operation": "env-resolve",
++        "presence": "absent",
++        "entry_kind": "missing",
++        "failure_class": None,
++    },
++    "passthrough-unreadable-reported-detached": {
++        "file_class": "passthrough",
++        "operation": "env-status",
++        "presence": "present",
++        "entry_kind": "symlink",
++        "failure_class": "permission-denied",
++    },
++    "backup-record-unreadable-status-unknown": {
++        "file_class": "backup-record",
++        "operation": "env-status",
++        "presence": "present",
++        "entry_kind": "directory",
++        "failure_class": "permission-denied",
++    },
++    "backup-record-unreadable-restore-stops": {
++        "file_class": "backup-record",
++        "operation": "restore",
++        "presence": "present",
++        "entry_kind": "directory",
++        "failure_class": "io-error",
++    },
++    "backup-record-absent-status-zero": {
++        "file_class": "backup-record",
++        "operation": "env-status",
++        "presence": "absent",
++        "entry_kind": "missing",
++        "failure_class": None,
++    },
++    "backup-record-absent-restore-nothing": {
++        "file_class": "backup-record",
++        "operation": "restore",
++        "presence": "absent",
++        "entry_kind": "missing",
++        "failure_class": None,
++    },
++    "backup-record-unreadable-reported-empty": {
++        "file_class": "backup-record",
++        "operation": "env-status",
++        "presence": "present",
++        "entry_kind": "directory",
++        "failure_class": "permission-denied",
++    },
++}
++READ_FAILURE_CASES = frozenset(READ_FAILURE_SCENARIOS)
++# Each negative pinned to the exact non-conforming observation it refuses —
++# absence-shaped for the per-class negatives, rebuild-shaped for the lock
++# no-rebuild negative: a negative rewritten as an internally consistent
++# passing case — or as a different violation — under the same name must be
++# refused.
++READ_FAILURE_NEGATIVES = {
++    "marker-unreadable-reported-stale": {
++        "diagnostic": "environment_home_stale",
++        "fragment_emitted": False,
++        "row_current": False,
++        "currency": "known",
++    },
++    "lock-unreadable-reported-unknown": {
++        "diagnostic": "profile_unknown",
++        "fragment_emitted": False,
++        "row_current": False,
++        "currency": "known",
++    },
++    "seed-unreadable-skipped-as-absent": {
++        "diagnostic": None,
++        "provisioning_continues": True,
++        "currency": "known",
++    },
++    "passthrough-unreadable-reported-detached": {
++        "diagnostic": "environment_passthrough_detached",
++        "row_current": False,
++        "currency": "known",
++        "repair_relinks": True,
++    },
++    "lock-unreadable-repair-rebuilt": {
++        "diagnostic": "environment_store_untrusted",
++        "fragment_emitted": False,
++        "row_current": False,
++        "currency": "unknown",
++        "rebuilt": True,
++        "written": True,
++    },
++    "backup-record-unreadable-reported-empty": {
++        "diagnostic": None,
++        "row_current": True,
++        "currency": "known",
++    },
++}
++
++
++def _read_failure_expected(
++    file_class: str, operation: str, presence: str, entry_kind: str, failure_class: Any
++) -> dict[str, Any]:
++    """Derive the section 8.4.1 disposition for one scenario's inputs."""
++    if failure_class is None:
++        if file_class == "marker":
++            return {
++                "diagnostic": "environment_home_stale",
++                "fragment_emitted": False,
++                "row_current": False,
++                "currency": "known",
++            }
++        if file_class == "lock":
++            return {
++                "diagnostic": "profile_unknown",
++                "fragment_emitted": False,
++                "row_current": False,
++                "currency": "known",
++            }
++        if file_class == "seed":
++            return {
++                "diagnostic": None,
++                "provisioning_continues": True,
++                "currency": "known",
++            }
++        if file_class == "backup-record":
++            if operation == "restore":
++                return {
++                    "diagnostic": None,
++                    "currency": "known",
++                    "written": False,
++                }
++            return {
++                "diagnostic": None,
++                "row_current": True,
++                "currency": "known",
++            }
++        if operation == "env-resolve":
++            return {
++                "diagnostic": "environment_home_stale",
++                "fragment_emitted": False,
++                "row_current": False,
++                "currency": "known",
++            }
++        return {
++            "diagnostic": "environment_passthrough_detached",
++            "row_current": False,
++            "currency": "known",
++            "repair_relinks": True,
++        }
++    if file_class == "marker":
++        return {
++            "diagnostic": "environment_marker_unreadable",
++            "fragment_emitted": False,
++            "row_current": False,
++            "currency": "unknown",
++        }
++    if file_class == "lock":
++        if operation == "repair":
++            return {
++                "diagnostic": "environment_store_untrusted",
++                "fragment_emitted": False,
++                "row_current": False,
++                "currency": "unknown",
++                "rebuilt": False,
++                "written": False,
++            }
++        if operation == "update":
++            return {
++                "diagnostic": "environment_store_untrusted",
++                "row_current": False,
++                "currency": "unknown",
++                "rebuilt": False,
++                "written": False,
++            }
++        return {
++            "diagnostic": "environment_store_untrusted",
++            "fragment_emitted": False,
++            "row_current": False,
++            "currency": "unknown",
++        }
++    if file_class == "seed":
++        return {
++            "diagnostic": "environment_seed_unreadable",
++            "provisioning_continues": False,
++            "currency": "unknown",
++        }
++    if file_class == "backup-record":
++        if operation == "restore":
++            return {
++                "diagnostic": "environment_backup_record_unreadable",
++                "currency": "unknown",
++                "written": False,
++            }
++        return {
++            "diagnostic": "environment_backup_record_unreadable",
++            "row_current": False,
++            "currency": "unknown",
++        }
++    if operation == "env-resolve":
++        return {
++            "diagnostic": "environment_passthrough_unreadable",
++            "fragment_emitted": False,
++            "row_current": False,
++            "currency": "unknown",
++        }
++    return {
++        "diagnostic": "environment_passthrough_unreadable",
++        "row_current": False,
++        "currency": "unknown",
++        "repair_relinks": False,
++    }
++
++
++def _validate_read_failure_case(name: str, case: dict[str, Any]) -> None:
++    label = f"environments-read-failure case {name}"
++    file_class = case.get("file_class")
++    if file_class not in READ_FAILURE_FILE_CLASSES:
++        raise ValidationFailure(f"{label} names an unknown file class")
++    operation = case.get("operation")
++    if operation not in READ_FAILURE_OPERATIONS:
++        raise ValidationFailure(f"{label} names an unknown operation")
++    if file_class == "marker" and operation != "env-resolve":
++        raise ValidationFailure(f"{label} marker scenarios resolve")
++    if file_class == "lock" and operation not in ("env-resolve", "repair", "update"):
++        raise ValidationFailure(f"{label} lock scenarios resolve, repair, or update")
++    if file_class == "seed" and operation != "provision":
++        raise ValidationFailure(f"{label} seed scenarios provision")
++    if file_class == "passthrough" and operation not in ("env-resolve", "env-status"):
++        raise ValidationFailure(f"{label} passthrough scenarios resolve or report status")
++    if file_class == "backup-record" and operation not in ("env-status", "restore"):
++        raise ValidationFailure(f"{label} backup-record scenarios report status or restore")
++    presence = case.get("presence")
++    if presence not in READ_FAILURE_PRESENCE_VALUES:
++        raise ValidationFailure(f"{label} presence is not absent or present")
++    entry_kind = case.get("entry_kind")
++    if entry_kind not in READ_FAILURE_ENTRY_KINDS:
++        raise ValidationFailure(f"{label} names an unknown entry kind")
++    failure_class = case.get("failure_class")
++    if failure_class is not None and failure_class not in READ_FAILURE_FAILURE_CLASSES:
++        raise ValidationFailure(f"{label} names an unknown failure class")
++    if presence == "absent":
++        if entry_kind != "missing" or failure_class is not None:
++            raise ValidationFailure(f"{label} an absent entry carries no kind or failure")
++    elif failure_class is None:
++        # The one present-but-absence-side scenario: a directory at a
++        # passthrough entry path is "no longer a symlink" (section 7.4).
++        if not (
++            file_class == "passthrough"
++            and entry_kind == "directory"
++            and operation == "env-status"
++        ):
++            raise ValidationFailure(f"{label} a present entry with no failure is outside this family")
++    else:
++        if failure_class not in READ_FAILURE_APPLICABLE[file_class]:
++            raise ValidationFailure(f"{label} failure class does not apply to its file class")
++        if failure_class == "symlink-where-regular-required" and entry_kind != "symlink":
++            raise ValidationFailure(f"{label} symlink failure needs a symlink entry")
++        elif failure_class == "directory-where-file-expected" and entry_kind != "directory":
++            raise ValidationFailure(f"{label} directory failure needs a directory entry")
++        elif failure_class == "parent-not-directory" and entry_kind not in ("file", "symlink"):
++            raise ValidationFailure(f"{label} parent failure needs an entry beyond the bad component")
++        elif (
++            failure_class
++            in (
++                "permission-denied",
++                "io-error",
++                "unparseable-content",
++                "schema-invalid-content",
++            )
++            and entry_kind
++            != {"passthrough": "symlink", "backup-record": "directory"}.get(
++                file_class, "file"
++            )
++        ):
++            raise ValidationFailure(f"{label} content failure needs its file-class entry shape")
++
++    pinned = READ_FAILURE_SCENARIOS.get(name)
++    actual = {
++        "file_class": file_class,
++        "operation": operation,
++        "presence": presence,
++        "entry_kind": entry_kind,
++        "failure_class": failure_class,
++    }
++    if pinned is None or actual != pinned:
++        raise ValidationFailure(f"{label} inputs do not match its pinned scenario")
++
++    expected = case.get("expected")
++    if not isinstance(expected, dict):
++        raise ValidationFailure(f"{label} expected is not an object")
++    if name in READ_FAILURE_NEGATIVES:
++        if case.get("conforming") is not False or not case.get("reason"):
++            raise ValidationFailure(f"{label} a negative needs conforming=false and a reason")
++        refused = READ_FAILURE_NEGATIVES[name]
++        if expected != refused:
++            raise ValidationFailure(f"{label} observation is not its pinned absence-shaped refusal")
++        return
++    if case.get("conforming") is False or "reason" in case:
++        raise ValidationFailure(f"{label} a positive case must not carry a negative verdict")
++    derived = _read_failure_expected(file_class, operation, presence, entry_kind, failure_class)
++    if expected != derived:
++        raise ValidationFailure(f"{label} observation does not follow the section 8.4.1 disposition")
++
++
++def validate_environments_read_failure_vectors(vector: Any = None) -> None:
++    """The environments section 8.4.1 absence-versus-read-failure vectors.
++
++    Structural validation only: closed sets are exact, each named case is
++    pinned to its typed discriminating inputs, each positive observation is
++    derived from the section 8.4.1 disposition, and each negative pins the
++    exact absence-shaped observation it refuses. This gate never touches the
++    filesystem; behavioral conformance is owned by the manager
++    implementation task created after this spec lands.
++    """
++    if vector is None:
++        vector = load_json(SUITE / "vectors" / "environments-read-failure.json")
++    if (
++        vector.get("schema_version") != 1
++        or vector.get("protocol_version") != PROTOCOL_VERSION
++        or vector.get("capability") != "agent-environments"
++        or vector.get("capability_revision") != 1
++        or vector.get("story") != "STORY-260916-1ll22r"
++    ):
++        raise ValidationFailure("environments-read-failure vector has the wrong capability identity")
++    if vector.get("file_classes") != list(READ_FAILURE_FILE_CLASSES):
++        raise ValidationFailure("environments-read-failure file classes are not the closed five-class set")
++    if vector.get("operations") != list(READ_FAILURE_OPERATIONS):
++        raise ValidationFailure("environments-read-failure operations are not the closed six-operation set")
++    if vector.get("presence_values") != list(READ_FAILURE_PRESENCE_VALUES):
++        raise ValidationFailure("environments-read-failure presence values are not the closed two-value set")
++    if vector.get("entry_kinds") != list(READ_FAILURE_ENTRY_KINDS):
++        raise ValidationFailure("environments-read-failure entry kinds are not the closed four-kind set")
++    if vector.get("failure_classes") != list(READ_FAILURE_FAILURE_CLASSES):
++        raise ValidationFailure("environments-read-failure failure classes are not the closed seven-class set")
++    if vector.get("diagnostics") != list(READ_FAILURE_DIAGNOSTICS):
++        raise ValidationFailure("environments-read-failure diagnostics are not the closed eight-code set")
++    if vector.get("currencies") != list(READ_FAILURE_CURRENCIES):
++        raise ValidationFailure("environments-read-failure currencies are not the closed two-value set")
++    if not isinstance(vector.get("rule"), str) or not vector.get("rule"):
++        raise ValidationFailure("environments-read-failure rule text is missing")
++
++    cases = named_cases(vector.get("cases"), "environments read-failure")
++    if set(cases) != READ_FAILURE_CASES:
++        raise ValidationFailure("environments-read-failure case inventory is not exact")
++    for name, case in cases.items():
++        _validate_read_failure_case(name, case)
++
++
+ UMBRELLA_PROVIDER_DIAGNOSTICS = {
+     "subcommand_provider_missing",
+     "subcommand_provider_untrusted",
+@@ -9555,6 +10189,7 @@ def main() -> int:
+         validate_snapshot_acquisition_vectors,
+         validate_shell_hook_trust_vectors,
+         validate_environments_write_nofollow_vectors,
++        validate_environments_read_failure_vectors,
+         validate_registry_page_boundary_vectors,
+         validate_registry_checkpoint_vectors,
+         validate_registry_bootstrap_vectors,

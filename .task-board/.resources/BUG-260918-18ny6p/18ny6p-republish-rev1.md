@@ -1,0 +1,3 @@
+# Republish unchanged — BUG-260918-18ny6p revision 1 → 2 (bound developer run)
+
+The rev1 hosted gate (run 35314782711) failed ONLY on "Naming gate" because of an unrelated board resource on main (fixed on main by 6401d3c); the Story has been converged onto that trunk with your 3 candidate paths carried. Do NOT change any file. Verify `git status --short` in the Story worktree lists exactly the three rev1 paths (.github/ci/install-rust-toolchain.sh, .github/ci/gate-selftest.sh, docs/self-hosted-runner-setup.md), append one line to BUG-260918-18ny6p_results.md ("revision 2 = revision 1 unchanged; gate rerun after the naming-gate resource fix on main"), then `task-board handoff BUG-260918-18ny6p --role developer`. If the rerun fails again, attach the failure and stop.

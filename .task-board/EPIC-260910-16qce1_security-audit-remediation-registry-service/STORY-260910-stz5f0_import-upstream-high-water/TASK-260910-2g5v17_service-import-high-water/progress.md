@@ -111,6 +111,8 @@ spawn selection rationale for muse-spark-1.3-contributor/max: Bound producer-rol
 spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
 spawn queued: [implementer] developer (muse) (run=RUN-260918-ac7956, max_parallel=8)
 spawn run started: [implementer] developer (muse) (run=RUN-260918-ac7956)
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260918-ac7956, pid=81877, exit=0)
 
 ## Precondition Resources
 - [TASK-260910-2g5v17_brief.md](file://TASK-260910-2g5v17/TASK-260910-2g5v17_brief.md) — Producer brief
@@ -152,12 +154,13 @@ spawn run started: [implementer] developer (muse) (run=RUN-260918-ac7956)
 - [TASK-260910-2g5v17_review-logbook-rev3.md](file://TASK-260910-2g5v17/TASK-260910-2g5v17_review-logbook-rev3.md)
 - [TASK-260910-2g5v17_review-verdict-rev3.md](file://TASK-260910-2g5v17/TASK-260910-2g5v17_review-verdict-rev3.md) — Accepted exact landed tree: three-way accounting, independent pytest/mypy, narrowing mutants and timing failure disclosure
 - [TASK-260910-2g5v17_spawn-log_-implementer--developer--muse-_RUN-260918-ac7956.log](file://TASK-260910-2g5v17/TASK-260910-2g5v17_spawn-log_-implementer--developer--muse-_RUN-260918-ac7956.log) — System spawn log captured by task-board
+- [TASK-260910-2g5v17_completion.md](file://TASK-260910-2g5v17/TASK-260910-2g5v17_completion.md) — Integration completion record: worktree complete transcripts and board commit d69863d for landed revision 3 (RUN-260918-ac7956)
 
 ## Created
 2026-09-10T14:47:04Z
 
 ## Last Update
-2026-09-18T13:12:13Z
+2026-09-18T13:14:37Z
 
 ## Assigned To
 [implementer] developer (muse)

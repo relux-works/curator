@@ -1,5 +1,5 @@
 ## Status
-to-dev
+done
 
 ## Review
 required
@@ -27,6 +27,10 @@ estimated(fibonacci(2))
 - [x] Relevant build/validation commands run after changes and build not broken
 - [x] New outcome artifact attached on the board with a task-scoped name when the work produces notes, logs, screenshots, or other deliverables
 - [x] Important findings, decisions, anomalies, or regressions recorded in logbook when relevant
+- [x] Implementation matches AC
+- [x] Solution fits project architecture
+- [x] Tests green
+- [x] If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches
 
 ## Notes
 spawn selection rationale tuple: {"role":"developer","pair":"claude-fable-5-1/low","text":"muse unavailable (billing 402); claude-fable-5-1:low admitted fallback; small CI-script fix"}
@@ -44,11 +48,29 @@ spawn run started: [implementer] developer (claude) (run=RUN-260918-ddc428)
 agent completed: [implementer] developer (claude) (exit=143)
 spawn run RUN-260918-ddc428 cancelled by operator; operator action required; reason: no operator reason supplied
 spawn run completed: claude (run=RUN-260918-ddc428, pid=67248, exit=143)
+spawn selection rationale tuple: {"role":"developer","pair":"muse-spark-1.3-contributor/xhigh","text":"coding producer policy: muse-spark-1.3-contributor (billing restored per operator); trivial republish after a naming-gate-only failure"}
+spawn selection rationale for muse-spark-1.3-contributor/xhigh: coding producer policy: muse-spark-1.3-contributor (billing restored per operator); trivial republish after a naming-gate-only failure
+spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=muse; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
+spawn queued: [implementer] developer (muse) (run=RUN-260918-2b67ba, max_parallel=20)
+spawn run started: [implementer] developer (muse) (run=RUN-260918-2b67ba)
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260918-2b67ba, pid=67472, exit=0)
+spawn selection rationale tuple: {"role":"reviewer","pair":"gpt-6-astra/low","text":"reviewer policy: gpt-6-astra low; independent exact-head review of revision 2 after a green gate and a terminal producer run"}
+spawn selection rationale for gpt-6-astra/low: reviewer policy: gpt-6-astra low; independent exact-head review of revision 2 after a green gate and a terminal producer run
+spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [reviewer] reviewer (codex) (run=RUN-260918-294030, max_parallel=20)
+spawn run started: [reviewer] reviewer (codex) (run=RUN-260918-294030)
+agent completed: [reviewer] reviewer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260918-294030, pid=11632, exit=0)
 
 ## Precondition Resources
 - [rustup-homebrew-brief.md](file://BUG-260918-18ny6p/rustup-homebrew-brief.md)
 - [campaign-producer-rules.md](file://BUG-260918-18ny6p/campaign-producer-rules.md)
 - [rustup-homebrew-review-brief.md](file://BUG-260918-18ny6p/rustup-homebrew-review-brief.md)
+- [18ny6p-republish-rev1.md](file://BUG-260918-18ny6p/18ny6p-republish-rev1.md)
+- [rustup-homebrew-review-2.md](file://BUG-260918-18ny6p/rustup-homebrew-review-2.md)
 
 ## Outcome Resources
 - [BUG-260918-18ny6p_spawn-log_-implementer--developer--claude-_RUN-260918-cc3314.log](file://BUG-260918-18ny6p/BUG-260918-18ny6p_spawn-log_-implementer--developer--claude-_RUN-260918-cc3314.log) — System spawn log captured by task-board
@@ -56,12 +78,17 @@ spawn run completed: claude (run=RUN-260918-ddc428, pid=67248, exit=143)
 - [BUG-260918-18ny6p_change-request_rev1.patch](file://BUG-260918-18ny6p/BUG-260918-18ny6p_change-request_rev1.patch) — Change Request CR-BUG-260918-18ny6p-1 revision 1 candidate patch (repository_delta=present, 3 changed paths)
 - [BUG-260918-18ny6p_change-request_rev1-validation.log](file://BUG-260918-18ny6p/BUG-260918-18ny6p_change-request_rev1-validation.log) — Change Request CR-BUG-260918-18ny6p-1 revision 1 bounded validation log
 - [BUG-260918-18ny6p_spawn-log_-implementer--developer--claude-_RUN-260918-ddc428.log](file://BUG-260918-18ny6p/BUG-260918-18ny6p_spawn-log_-implementer--developer--claude-_RUN-260918-ddc428.log) — System spawn log captured by task-board
+- [BUG-260918-18ny6p_spawn-log_-implementer--developer--muse-_RUN-260918-2b67ba.log](file://BUG-260918-18ny6p/BUG-260918-18ny6p_spawn-log_-implementer--developer--muse-_RUN-260918-2b67ba.log) — System spawn log captured by task-board
+- [BUG-260918-18ny6p_change-request_rev2.patch](file://BUG-260918-18ny6p/BUG-260918-18ny6p_change-request_rev2.patch) — Change Request CR-BUG-260918-18ny6p-2 revision 2 candidate patch (repository_delta=present, 3 changed paths)
+- [BUG-260918-18ny6p_change-request_rev2-validation.log](file://BUG-260918-18ny6p/BUG-260918-18ny6p_change-request_rev2-validation.log) — Change Request CR-BUG-260918-18ny6p-2 revision 2 bounded validation log
+- [BUG-260918-18ny6p_spawn-log_-reviewer--reviewer--codex-_RUN-260918-294030.log](file://BUG-260918-18ny6p/BUG-260918-18ny6p_spawn-log_-reviewer--reviewer--codex-_RUN-260918-294030.log) — System spawn log captured by task-board
+- [BUG-260918-18ny6p_review-verdict-rev2.md](file://BUG-260918-18ny6p/BUG-260918-18ny6p_review-verdict-rev2.md) — Independent revision 2 acceptance evidence, exact tree verification and narrowing mutant
 
 ## Created
 2026-09-18T06:15:03Z
 
 ## Last Update
-2026-09-18T06:56:16Z
+2026-09-18T13:32:18Z
 
 ## Assigned To
-[implementer] developer (claude)
+[reviewer] reviewer (codex)

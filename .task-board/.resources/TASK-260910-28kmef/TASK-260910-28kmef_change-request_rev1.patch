@@ -1,0 +1,501 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 0cb6f68..9de92a7 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -33,6 +33,14 @@
+ 
+ ### Security
+ 
++- R5: JSON nested deeper than 100 levels is rejected with `400 invalid_json`
++  instead of `500 internal_error`. `protocol.load_json` enforces the bound
++  with an iterative pre-parse scan and maps `RecursionError` to the new
++  `JSONDepthError` (`ProtocolError`); the CCJ canonicalization entry points
++  enforce the same bound and map `RecursionError` to `CanonicalDepthError`.
++  `POST /v1/records` reports depth violations as `invalid_json` while other
++  record errors keep `invalid_record`, and over-deep cursors keep
++  `404 invalid_cursor`. No wire-schema change (curator-spec `dced9b8`).
+ - R3/P2: `serve --checkpoint <signed snapshot>`
+   (`CURATOR_SKILL_REGISTRY_CHECKPOINT`) compares the live boundary against
+   the operator checkpoint at startup, after the §5 integrity verification
+diff --git a/README.md b/README.md
+index 862726d..8a53a1f 100644
+--- a/README.md
++++ b/README.md
+@@ -160,7 +160,9 @@ reverse proxy requires `--behind-https-proxy --trusted-proxy <ip-list>`;
+ forwarded headers from other sources are ignored.
+ 
+ The process caps concurrent work, network-source request rate, auditor
+-submission rate, page size, cursor size, and request bodies. `429` and overload
++submission rate, page size, cursor size, and request bodies. JSON text nested
++deeper than 100 levels of objects/arrays is rejected with `400 invalid_json`
++(over-deep pagination cursors stay `404 invalid_cursor`). `429` and overload
+ `503` responses include `Retry-After`. The following settings accept positive
+ integers:
+ 
+diff --git a/src/csk_registry/app.py b/src/csk_registry/app.py
+index af1ad00..8358373 100644
+--- a/src/csk_registry/app.py
++++ b/src/csk_registry/app.py
+@@ -32,6 +32,7 @@ from .keys import load_active_key, public_keys
+ from .limits import FixedWindowLimiter
+ from .permissions import protect_private_directory
+ from .protocol import (
++    JSONDepthError,
+     ProtocolError,
+     load_json,
+     validate_record,
+@@ -39,7 +40,9 @@ from .protocol import (
+     validate_source_identity,
+ )
+ from .signing import (
++    MAX_JSON_DEPTH,
+     SigningKey,
++    CanonicalDepthError,
+     canonical_bytes,
+     canonical_document_bytes,
+     verify,
+@@ -410,8 +413,20 @@ def create_app(
+             )
+         try:
+             record = validate_record(load_json(body))
++        except JSONDepthError as exc:
++            raise APIError(400, "invalid_json", str(exc)) from exc
++        except CanonicalDepthError as exc:
++            raise APIError(400, "invalid_json", str(exc)) from exc
+         except ProtocolError as exc:
+             raise APIError(400, "invalid_record", str(exc)) from exc
++        except RecursionError as exc:
++            # Unreachable: load_json and canonicalization already map
++            # over-deep input, but a pathological body must never be a 500.
++            raise APIError(
++                400,
++                "invalid_json",
++                f"JSON nesting exceeds maximum depth of {MAX_JSON_DEPTH}",
++            ) from exc
+         if not verify_signed(auditor.public_pinned, record):
+             raise APIError(400, "invalid_signature", "record signature does not verify for this auditor")
+         countersigned = _countersign(record, signing_key, endorser=auditor.auditor_id)
+@@ -420,7 +435,16 @@ def create_app(
+                 not 0x21 <= ord(character) <= 0x7E for character in idempotency_key
+             ):
+                 raise APIError(400, "invalid_idempotency_key", "Idempotency-Key is malformed")
+-            body_sha256 = hashlib.sha256(canonical_bytes(record)).hexdigest()
++            try:
++                body_sha256 = hashlib.sha256(canonical_bytes(record)).hexdigest()
++            except (CanonicalDepthError, RecursionError) as exc:
++                # Unreachable: the record already passed validation, but a
++                # pathological body must never be a 500.
++                raise APIError(
++                    400,
++                    "invalid_json",
++                    f"JSON nesting exceeds maximum depth of {MAX_JSON_DEPTH}",
++                ) from exc
+             try:
+                 response, replayed = store.append_idempotent(
+                     countersigned,
+@@ -552,7 +576,7 @@ def _cursor_state(
+         ):
+             raise ValueError("value")
+         return offset, boundary, snapshot
+-    except (ValueError, ProtocolError) as exc:
++    except (ValueError, ProtocolError, RecursionError) as exc:
+         raise APIError(404, "invalid_cursor", "pagination cursor is invalid or expired") from exc
+ 
+ 
+diff --git a/src/csk_registry/protocol.py b/src/csk_registry/protocol.py
+index b73737a..53038c5 100644
+--- a/src/csk_registry/protocol.py
++++ b/src/csk_registry/protocol.py
+@@ -7,7 +7,12 @@ import re
+ import unicodedata
+ from typing import Any
+ 
+-from .signing import MAX_SAFE_INTEGER, canonical_document_bytes
++from .signing import (
++    MAX_JSON_DEPTH,
++    MAX_SAFE_INTEGER,
++    CanonicalDepthError,
++    canonical_document_bytes,
++)
+ 
+ 
+ STATUSES = {"audited", "revoked", "deprecated", "pending"}
+@@ -27,7 +32,74 @@ class ProtocolError(ValueError):
+     pass
+ 
+ 
++class JSONDepthError(ProtocolError):
++    """Protocol JSON nested deeper than ``MAX_JSON_DEPTH``."""
++
++    pass
++
++
++def _check_json_depth(raw: bytes | str) -> None:
++    """Reject JSON text nested deeper than ``MAX_JSON_DEPTH`` without parsing.
++
++    An iterative bracket scan outside strings, so pathological depth fails
++    before ``json.loads`` can recurse into the interpreter limit. Malformed
++    text is left for the parser to reject; only the depth bound is enforced.
++    """
++    depth = 0
++    in_string = False
++    escaped = False
++
++    def bump(opening: bool) -> None:
++        nonlocal depth
++        if opening:
++            depth += 1
++            if depth > MAX_JSON_DEPTH:
++                raise JSONDepthError(
++                    f"JSON nesting exceeds maximum depth of {MAX_JSON_DEPTH}"
++                )
++        else:
++            depth = max(0, depth - 1)
++
++    if isinstance(raw, bytes):
++        for byte in raw:
++            if in_string:
++                if escaped:
++                    escaped = False
++                elif byte == 0x5C:  # backslash
++                    escaped = True
++                elif byte == 0x22:  # quote
++                    in_string = False
++            elif byte == 0x22:
++                in_string = True
++            elif byte == 0x7B or byte == 0x5B:  # { [
++                bump(True)
++            elif byte == 0x7D or byte == 0x5D:  # } ]
++                bump(False)
++    else:
++        for character in raw:
++            if in_string:
++                if escaped:
++                    escaped = False
++                elif character == "\\":
++                    escaped = True
++                elif character == '"':
++                    in_string = False
++            elif character == '"':
++                in_string = True
++            elif character == "{" or character == "[":
++                bump(True)
++            elif character == "}" or character == "]":
++                bump(False)
++
++
+ def load_json(raw: bytes | str) -> Any:
++    """Parse protocol JSON, rejecting over-deep documents.
++
++    Documents nested deeper than ``MAX_JSON_DEPTH`` (100 levels of
++    objects/arrays) raise :class:`JSONDepthError`, a ``ProtocolError``;
++    ``RecursionError`` from the parser or canonicalization is mapped to
++    the same error so callers only handle ``ProtocolError``.
++    """
+     if (isinstance(raw, bytes) and raw.startswith(b"\xef\xbb\xbf")) or (
+         isinstance(raw, str) and raw.startswith("\ufeff")
+     ):
+@@ -51,6 +123,7 @@ def load_json(raw: bytes | str) -> Any:
+         raise ProtocolError(f"registry JSON does not allow non-integer number {text!r}")
+ 
+     try:
++        _check_json_depth(raw)
+         value = json.loads(
+             raw,
+             object_pairs_hook=object_pairs,
+@@ -60,12 +133,36 @@ def load_json(raw: bytes | str) -> Any:
+         )
+         canonical_document_bytes(value)
+         return value
++    except JSONDepthError:
++        raise
++    except CanonicalDepthError as exc:
++        raise JSONDepthError(str(exc)) from exc
+     except ProtocolError:
+         raise
++    except RecursionError as exc:
++        raise JSONDepthError(
++            f"JSON nesting exceeds maximum depth of {MAX_JSON_DEPTH}"
++        ) from exc
+     except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+         raise ProtocolError(f"invalid protocol JSON: {exc}") from exc
+ 
+ 
++def _canonicalize_validated(value: Any) -> None:
++    """Canonicalize a validated object, mapping depth failures to ``ProtocolError``.
++
++    Only depth violations are converted; other CCJ errors keep their
++    existing ``CanonicalError`` behaviour.
++    """
++    try:
++        canonical_document_bytes(value)
++    except CanonicalDepthError as exc:
++        raise JSONDepthError(str(exc)) from exc
++    except RecursionError as exc:
++        raise JSONDepthError(
++            f"JSON nesting exceeds maximum depth of {MAX_JSON_DEPTH}"
++        ) from exc
++
++
+ def validate_record(record: Any) -> dict[str, Any]:
+     if not isinstance(record, dict):
+         raise ProtocolError("audit record must be an object")
+@@ -114,7 +211,7 @@ def validate_record(record: Any) -> dict[str, Any]:
+         ):
+             raise ProtocolError("audit record endorsement requires an endorser")
+         validate_signature(endorsement.get("sig"))
+-    canonical_document_bytes(record)
++    _canonicalize_validated(record)
+     return record
+ 
+ 
+@@ -162,7 +259,7 @@ def validate_snapshot(snapshot: Any) -> dict[str, Any]:
+     if not isinstance(created_at, str) or _TIMESTAMP.fullmatch(created_at) is None:
+         raise ProtocolError("snapshot timestamp is malformed")
+     validate_signature(snapshot.get("sig"))
+-    canonical_document_bytes(snapshot)
++    _canonicalize_validated(snapshot)
+     return snapshot
+ 
+ 
+diff --git a/src/csk_registry/signing.py b/src/csk_registry/signing.py
+index 1067ed1..a797e41 100644
+--- a/src/csk_registry/signing.py
++++ b/src/csk_registry/signing.py
+@@ -14,28 +14,57 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey,
+ 
+ MAX_SAFE_INTEGER = 9_007_199_254_740_991
+ 
++MAX_JSON_DEPTH = 100
++"""Maximum accepted JSON nesting depth (nested objects/arrays).
++
++Inputs nested deeper than this are rejected before they can recurse into
++the interpreter limit, so pathological documents fail closed as client
++errors instead of raising ``RecursionError``.
++"""
++
+ 
+ class CanonicalError(ValueError):
+     pass
+ 
+ 
++class CanonicalDepthError(CanonicalError):
++    """CCJ-1 input nested deeper than ``MAX_JSON_DEPTH``."""
++
++    pass
++
++
+ def canonical_bytes(record: dict[str, Any]) -> bytes:
+-    """Return Curator Canonical JSON 1 bytes for a signed object."""
++    """Return Curator Canonical JSON 1 bytes for a signed object.
++
++    Inputs nested deeper than ``MAX_JSON_DEPTH`` raise
++    :class:`CanonicalDepthError`.
++    """
+     body = {key: value for key, value in record.items() if key != "sig"}
+     return _canonical_document(body)
+ 
+ 
+ def canonical_document_bytes(value: Any) -> bytes:
+-    """Canonicalize a complete JSON value without stripping a signature."""
++    """Canonicalize a complete JSON value without stripping a signature.
++
++    Inputs nested deeper than ``MAX_JSON_DEPTH`` raise
++    :class:`CanonicalDepthError`.
++    """
+     return _canonical_document(value)
+ 
+ 
+ def _canonical_document(value: Any) -> bytes:
+-    _validate_ccj(value)
+-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
++    try:
++        _validate_ccj(value)
++        return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
++    except CanonicalDepthError:
++        raise
++    except RecursionError as exc:
++        raise CanonicalDepthError(
++            f"JSON nesting exceeds maximum depth of {MAX_JSON_DEPTH}"
++        ) from exc
+ 
+ 
+-def _validate_ccj(value: Any) -> None:
++def _validate_ccj(value: Any, depth: int = 0) -> None:
+     if value is None or isinstance(value, bool):
+         return
+     if isinstance(value, int):
+@@ -49,15 +78,23 @@ def _validate_ccj(value: Any) -> None:
+             raise CanonicalError("CCJ-1 strings must not contain lone surrogates")
+         return
+     if isinstance(value, list):
++        if depth + 1 > MAX_JSON_DEPTH:
++            raise CanonicalDepthError(
++                f"JSON nesting exceeds maximum depth of {MAX_JSON_DEPTH}"
++            )
+         for item in value:
+-            _validate_ccj(item)
++            _validate_ccj(item, depth + 1)
+         return
+     if isinstance(value, dict):
++        if depth + 1 > MAX_JSON_DEPTH:
++            raise CanonicalDepthError(
++                f"JSON nesting exceeds maximum depth of {MAX_JSON_DEPTH}"
++            )
+         for key, item in value.items():
+             if not isinstance(key, str):
+                 raise CanonicalError("CCJ-1 object keys must be strings")
+-            _validate_ccj(key)
+-            _validate_ccj(item)
++            _validate_ccj(key, depth + 1)
++            _validate_ccj(item, depth + 1)
+         return
+     raise CanonicalError(f"CCJ-1 does not support {type(value).__name__}")
+ 
+@@ -142,7 +179,7 @@ def verify_signed(public_pinned: str, obj: dict[str, Any]) -> bool:
+     try:
+         public = parse_public_key(public_pinned)
+         canonical = canonical_bytes(obj)
+-    except (ValueError, CanonicalError):
++    except (ValueError, RecursionError):
+         return False
+     if sig.get("algorithm") != "ed25519":
+         return False
+diff --git a/tests/test_registry.py b/tests/test_registry.py
+index c1ab14b..b3622d3 100644
+--- a/tests/test_registry.py
++++ b/tests/test_registry.py
+@@ -13,6 +13,7 @@ import time
+ import tomllib
+ from concurrent.futures import ThreadPoolExecutor
+ from pathlib import Path
++from typing import Any
+ 
+ import pytest
+ from fastapi import FastAPI
+@@ -27,7 +28,7 @@ from csk_registry import (
+     home_from_env,
+     signing,
+ )
+-from csk_registry.app import _encode_cursor, app_from_env, create_app
++from csk_registry.app import _encode_cursor, _url64, app_from_env, create_app
+ from csk_registry.auth import Auditor, AuditorTokens
+ from csk_registry.checkpoint import CheckpointView, compare_checkpoint
+ from csk_registry.cli import build_parser, main
+@@ -38,7 +39,14 @@ from csk_registry.permissions import (
+     protect_private_directory,
+     protect_private_file,
+ )
+-from csk_registry.protocol import ProtocolError, portable_path, validate_record, validate_source_identity
++from csk_registry.protocol import (
++    JSONDepthError,
++    ProtocolError,
++    load_json,
++    portable_path,
++    validate_record,
++    validate_source_identity,
++)
+ from csk_registry.snapshot import build_snapshot
+ from csk_registry.store import (
+     CursorBoundaryMismatch,
+@@ -282,6 +290,100 @@ def test_submit_rejects_wrong_signature(tmp_path: Path):
+     assert resp.status_code == 400
+ 
+ 
++def _nested_list(depth: int) -> list[Any]:
++    value: list[Any] = []
++    for _ in range(depth - 1):
++        value = [value]
++    return value
++
++
++def test_load_json_rejects_over_deep_nesting():
++    bound = signing.MAX_JSON_DEPTH
++    assert isinstance(load_json("[" * bound + "]" * bound), list)
++    assert isinstance(load_json('{"a":' * bound + "1" + "}" * bound), dict)
++    for raw in (
++        "[" * (bound + 1) + "]" * (bound + 1),
++        ('{"a":' * (bound + 1) + "1" + "}" * (bound + 1)).encode("utf-8"),
++        "[" * 5000 + "]" * 5000,
++    ):
++        with pytest.raises(JSONDepthError) as excinfo:
++            load_json(raw)
++        assert str(bound) in str(excinfo.value)
++        with pytest.raises(ProtocolError):
++            load_json(raw)
++    # Brackets inside strings do not count toward the bound.
++    load_json('{"k": "' + "[" * (bound + 10) + '"}')
++    load_json(b'{"k": "' + b"[" * (bound + 10) + b'"}')
++
++
++def test_load_json_maps_recursion_error_to_depth_error(monkeypatch: pytest.MonkeyPatch):
++    def boom(value: object) -> bytes:
++        raise RecursionError("boom")
++
++    monkeypatch.setattr("csk_registry.protocol.canonical_document_bytes", boom)
++    with pytest.raises(JSONDepthError, match="maximum depth"):
++        load_json('{"a": 1}')
++
++
++def test_canonicalization_rejects_over_deep_nesting():
++    bound = signing.MAX_JSON_DEPTH
++    signing.canonical_document_bytes(_nested_list(bound))
++    with pytest.raises(signing.CanonicalDepthError) as excinfo:
++        signing.canonical_document_bytes(_nested_list(bound + 1))
++    assert str(bound) in str(excinfo.value)
++    with pytest.raises(signing.CanonicalDepthError, match="maximum depth"):
++        signing.canonical_bytes({"k": _nested_list(bound + 1)})
++    assert signing.verify_signed("ed25519:" + "A" * 43 + "=", {"k": _nested_list(bound + 1)}) is False
++
++
++def test_canonicalization_maps_recursion_error_to_depth_error(monkeypatch: pytest.MonkeyPatch):
++    def boom(value: object, depth: int = 0) -> None:
++        raise RecursionError("boom")
++
++    monkeypatch.setattr("csk_registry.signing._validate_ccj", boom)
++    with pytest.raises(signing.CanonicalDepthError, match="maximum depth"):
++        signing.canonical_document_bytes({"a": 1})
++
++
++def test_submit_rejects_deeply_nested_json_with_invalid_json(tmp_path: Path):
++    client, _, token = _client(tmp_path)
++    bound = signing.MAX_JSON_DEPTH
++    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
++    # Just over the explicit bound (far below the interpreter limit).
++    over = "[" * (bound + 1) + "]" * (bound + 1)
++    resp = client.post("/v1/records", content=over, headers=headers)
++    assert resp.status_code == 400
++    assert resp.json()["error"]["code"] == "invalid_json"
++    # Pathological depth that previously raised RecursionError -> 500.
++    pathological = "[" * 5000 + "]" * 5000
++    resp = client.post("/v1/records", content=pathological, headers=headers)
++    assert resp.status_code == 400
++    assert resp.json()["error"]["code"] == "invalid_json"
++    # Same verdict on the idempotent-submit path.
++    resp = client.post(
++        "/v1/records",
++        content=pathological,
++        headers={**headers, "Idempotency-Key": "deep-key"},
++    )
++    assert resp.status_code == 400
++    assert resp.json()["error"]["code"] == "invalid_json"
++    # Non-depth errors keep their existing mapping.
++    resp = client.post("/v1/records", content="{bad json", headers=headers)
++    assert resp.status_code == 400
++    assert resp.json()["error"]["code"] == "invalid_record"
++
++
++def test_deeply_nested_cursor_is_invalid_cursor_not_500(tmp_path: Path):
++    client, key, _ = _client(tmp_path)
++    payload = ("[" * 1200 + "]" * 1200).encode("utf-8")
++    signature = base64.b64decode(key.sign(payload))
++    cursor = f"{_url64(payload)}.{_url64(signature)}"
++    assert len(cursor) <= 4096
++    resp = client.get("/v1/log", params={"since": 0, "limit": 1, "cursor": cursor})
++    assert resp.status_code == 404
++    assert resp.json()["error"]["code"] == "invalid_cursor"
++
++
+ def test_submission_audit_log_is_structured_and_omits_bearer_token(
+     tmp_path: Path,
+     caplog: pytest.LogCaptureFixture,

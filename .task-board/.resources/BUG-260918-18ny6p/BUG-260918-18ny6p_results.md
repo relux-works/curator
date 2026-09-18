@@ -31,3 +31,9 @@ First full self-test run (log /tmp/gate-selftest-18ny6p.log) exited 1: the new "
 - No workflow topology change; rust-toolchain.toml, rust-pin-guard.sh, ci.yml, internal/rustsource untouched.
 
 | golangci-lint run (repo lint; no Go files changed) — 0 issues | 0 |
+
+## Revision 2 (republish, 2026-09-18)
+
+revision 2 = revision 1 unchanged; gate rerun after the naming-gate resource fix on main
+
+Rev2 verification (developer rerun, worktree converged onto main 6401d3c; `git status --short` lists exactly the three rev1 paths, `git diff --stat` 3 files, 91 insertions, 21 deletions; no file changed for rev2): bash -n on both scripts exit 0; full `bash .github/ci/gate-selftest.sh` exit 0 — 187 passed, 0 failed, including "the installer finds rustup under the Homebrew prefix without PATH help" (pass), "the installer finds rustup under CARGO_HOME/bin without PATH help" (pass), and "a runner without rustup fails" (named failure, exit 1 expected).

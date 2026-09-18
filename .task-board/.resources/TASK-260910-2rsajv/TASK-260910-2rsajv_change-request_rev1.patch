@@ -1,0 +1,118 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 0b72e06..f8b1f41 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -33,6 +33,14 @@
+ 
+ ### Security
+ 
++- R8: idempotency retention raised from 24 h to 26 h
++  (`IDEMPOTENCY_TTL_SECONDS`): the registry-service profile §4 minimum is
++  "at least 24 hours from the first successful commit", and the two extra
++  hours of slack keep a client retry at the 24 h contract boundary, plus
++  network delay, deduplicated instead of double-appending. The store still
++  refuses any retention below the 24 h profile minimum, and the success,
++  replay (`200`), and conflict (`409`) envelopes are unchanged (curator-spec
++  `dced9b8`).
+ - R5: JSON nested deeper than 100 levels is rejected with `400 invalid_json`
+   instead of `500 internal_error`. `protocol.load_json` enforces the bound
+   with an iterative pre-parse scan and maps `RecursionError` to the new
+diff --git a/README.md b/README.md
+index 8a53a1f..d114e7f 100644
+--- a/README.md
++++ b/README.md
+@@ -191,7 +191,7 @@ migration, the former `csk-registry` command and `CSK_REGISTRY_HOME` variable
+ remain supported as compatibility aliases; the new names take precedence.
+ 
+ Before upgrading a database created by a release that stored idempotency keys
+-without auditor identity, stop submissions for the prior 24-hour retention
++without auditor identity, stop submissions for the prior 26-hour retention
+ window. Startup refuses unexpired unscoped entries because assigning them to an
+ auditor would be ambiguous. Expired entries are discarded while the schema is
+ migrated; log history is unchanged.
+diff --git a/src/csk_registry/app.py b/src/csk_registry/app.py
+index 8358373..ab55947 100644
+--- a/src/csk_registry/app.py
++++ b/src/csk_registry/app.py
+@@ -62,7 +62,12 @@ from .store import (
+ MAX_PAGE_SIZE = 1000
+ MAX_BODY_BYTES = 16 * 1024 * 1024
+ CURSOR_TTL_SECONDS = 3600
+-IDEMPOTENCY_TTL_SECONDS = 24 * 3600
++# Registry-service profile §4 (curator-spec dced9b8): "Retention is at least
++# 24 hours from the first successful commit and is not shortened by restart,
++# cleanup, or credential rotation." The two extra hours are slack so a client
++# retry at the 24 h contract boundary, plus network delay, is still
++# deduplicated instead of double-appending (R8).
++IDEMPOTENCY_TTL_SECONDS = 26 * 3600
+ DEFAULT_MAX_CONCURRENT_REQUESTS = 128
+ DEFAULT_NETWORK_REQUESTS_PER_MINUTE = 600
+ DEFAULT_AUDITOR_SUBMISSIONS_PER_MINUTE = 120
+diff --git a/tests/test_registry.py b/tests/test_registry.py
+index dc19133..8a6a3d7 100644
+--- a/tests/test_registry.py
++++ b/tests/test_registry.py
+@@ -1557,6 +1557,63 @@ def test_submission_idempotency_replays_and_conflicts(tmp_path: Path):
+     assert len(client.get("/v1/log").json()["entries"]) == 1
+ 
+ 
++class _ManualAppClock:
++    """Injectable ``time`` replacement for deterministic idempotency TTL tests."""
++
++    def __init__(self, now: float) -> None:
++        self.now = now
++
++    def time(self) -> float:
++        return self.now
++
++    def monotonic(self) -> float:
++        return self.now
++
++
++def test_idempotency_retry_within_slack_window_is_deduplicated(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    import csk_registry.app as app_module
++
++    assert app_module.IDEMPOTENCY_TTL_SECONDS == 26 * 3600
++    client, _, token = _client(tmp_path)
++    auditor_key = client.app.state.auditor_key  # type: ignore[attr-defined]
++    clock = _ManualAppClock(1_800_000_000.0)
++    monkeypatch.setattr(app_module, "time", clock)
++    headers = {"Authorization": f"Bearer {token}", "Idempotency-Key": "slack-key"}
++    record = auditor_key.sign_record(_body("audited"))
++    first = client.post("/v1/records", json=record, headers=headers)
++    assert first.status_code == 201
++    # A retry at 25 h — past the 24 h contract minimum but inside the 26 h
++    # retention — replays the original response without a second append.
++    clock.now += 25 * 3600
++    replay = client.post("/v1/records", json=record, headers=headers)
++    assert replay.status_code == 200
++    assert replay.json() == first.json()
++    assert len(client.get("/v1/log").json()["entries"]) == 1
++
++
++def test_idempotency_retry_past_retention_expires(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    import csk_registry.app as app_module
++
++    client, _, token = _client(tmp_path)
++    auditor_key = client.app.state.auditor_key  # type: ignore[attr-defined]
++    clock = _ManualAppClock(1_800_000_000.0)
++    monkeypatch.setattr(app_module, "time", clock)
++    headers = {"Authorization": f"Bearer {token}", "Idempotency-Key": "expiry-key"}
++    record = auditor_key.sign_record(_body("audited"))
++    first = client.post("/v1/records", json=record, headers=headers)
++    assert first.status_code == 201
++    # A retry past the 26 h retention is a new submission, not a replay.
++    clock.now += 26 * 3600 + 1
++    second = client.post("/v1/records", json=record, headers=headers)
++    assert second.status_code == 201
++    assert second.json()["seq"] == first.json()["seq"] + 1
++    assert len(client.get("/v1/log").json()["entries"]) == 2
++
++
+ @pytest.mark.parametrize(
+     ("method", "path", "expected_status"),
+     [("get", "/v1/records", 400), ("get", "/missing", 404), ("post", "/v1/records", 401)],

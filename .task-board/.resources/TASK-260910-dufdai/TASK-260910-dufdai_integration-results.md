@@ -1,4 +1,2 @@
-integration_base_moved: unpublished Story prefix is not proven: a same-Story predecessor and acceptance against the current protected base are required
-  head: 90c4ae5551faaece9750bb855383a7d2a9471dba
-  protected_oid: 1c464c56d5ba05b759b8dd879a7a5b816bfb8551
-  remedy: if the local commits were already landed under rewritten identities, run task-board worktree reconcile-trunk; unique local commits must be published through a pull request
+integration_indeterminate: a completed lane path is absent from the committed manifest: .task-board/EPIC-260910-ohqchs_approved-skillfile-sources-implementation/STORY-260910-20sx61_source-audit-runtime-and-build-integration/TASK-260910-17ps6u_materialize-local-runtime-and-command-dependencies/progress.md
+  txn_id: STORY-260910-20sx61/CR-TASK-260910-dufdai-6/6
