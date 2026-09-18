@@ -1,5 +1,5 @@
 ## Status
-integrating
+done
 
 ## Review
 required
@@ -81,6 +81,8 @@ spawn run started: [reviewer] reviewer (codex) (run=RUN-260918-406fd5)
 agent completed: [reviewer] reviewer (codex) (exit=0)
 spawn run completed: codex (run=RUN-260918-406fd5, pid=26232, exit=0)
 
+External integration evidence: curator-spec PR #72 landed on main as 5146c7b9ed4b0c07b840ab58f9908f197d667478 (ff push after independent acceptance: TASK-260910-2qtiho revision 3 on e8b53a0, TASK-260918-2mglq0 revision 1 on 1e73c03 whose exact worktree tree is the landed tree, patch-id f1b62139; regenerate-check and validate exit 0; 9/9 checks green). Curator delta empty by design (spec-only tasks).
+
 ## Precondition Resources
 - [remediation-spec-producer-rules.md](file://TASK-260910-2qtiho/remediation-spec-producer-rules.md) — Campaign rules for curator-spec producers and reviewers
 - [TASK-260910-2qtiho_brief.md](file://TASK-260910-2qtiho/TASK-260910-2qtiho_brief.md) — Producer brief (S1+S3 hardened-defaults profile)
@@ -122,7 +124,7 @@ spawn run completed: codex (run=RUN-260918-406fd5, pid=26232, exit=0)
 2026-09-10T14:44:32Z
 
 ## Last Update
-2026-09-18T03:00:13Z
+2026-09-18T04:41:22Z
 
 ## Assigned To
 [reviewer] reviewer (codex)

@@ -1,5 +1,5 @@
 ## Status
-reviewing
+done
 
 ## Review
 required
@@ -29,10 +29,10 @@ estimated(fibonacci(5))
 - [x] No discrepancies between code and description
 - [x] Result linked as a new task-scoped outcome resource
 - [x] Important findings, decisions, anomalies, or regressions recorded in logbook when relevant
-- [ ] Implementation matches AC
-- [ ] Solution fits project architecture
-- [ ] Tests green
-- [ ] If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches
+- [x] Implementation matches AC
+- [x] Solution fits project architecture
+- [x] Tests green
+- [x] If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches
 
 ## Notes
 spawn selection rationale tuple: {"role":"doc-writer","pair":"muse-spark-1.3-contributor/max","text":"Normative spec revision (rebase of an accepted S1+S3 spec onto the moved curator-spec main plus absorbing the landed E3 gate into the closed posture inventory, vectors and validator); muse-spark-1.3-contributor:max is the operator's producer pair for this campaign; reviewer stays codex gpt-6-astra:low"}
@@ -47,6 +47,10 @@ spawn selection rationale for gpt-6-astra/low: Round-1 review of the S1+S3 revis
 spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
 spawn queued: [reviewer] reviewer (codex) (run=RUN-260918-bf34fe, max_parallel=20)
 spawn run started: [reviewer] reviewer (codex) (run=RUN-260918-bf34fe)
+agent completed: [reviewer] reviewer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260918-bf34fe, pid=44531, exit=0)
+
+External integration evidence: curator-spec PR #72 landed on main as 5146c7b9ed4b0c07b840ab58f9908f197d667478 (ff push after independent acceptance: TASK-260910-2qtiho revision 3 on e8b53a0, TASK-260918-2mglq0 revision 1 on 1e73c03 whose exact worktree tree is the landed tree, patch-id f1b62139; regenerate-check and validate exit 0; 9/9 checks green). Curator delta empty by design (spec-only tasks).
 
 ## Precondition Resources
 - [remediation-spec-producer-rules.md](file://TASK-260918-2mglq0/remediation-spec-producer-rules.md) — Spec producer rules (rule 7 pinning; patch = git diff HEAD)
@@ -64,12 +68,14 @@ spawn run started: [reviewer] reviewer (codex) (run=RUN-260918-bf34fe)
 - [TASK-260918-2mglq0_spawn-log_-reviewer--reviewer--codex-_RUN-260918-bf34fe.log](file://TASK-260918-2mglq0/TASK-260918-2mglq0_spawn-log_-reviewer--reviewer--codex-_RUN-260918-bf34fe.log) — System spawn log captured by task-board
 - [TASK-260918-2mglq0_review-probe-rev1.py](file://TASK-260918-2mglq0/TASK-260918-2mglq0_review-probe-rev1.py) — Independent five-shape validate.main semantic rejection probe
 - [TASK-260918-2mglq0_review-shards-rev1.py](file://TASK-260918-2mglq0/TASK-260918-2mglq0_review-shards-rev1.py) — Complete discovery partition into bounded sequential test shards
+- [TASK-260918-2mglq0_review-evidence-rev1.tar.gz](file://TASK-260918-2mglq0/TASK-260918-2mglq0_review-evidence-rev1.tar.gz) — Independent identity comparisons, bounded validation transcripts and negative probes
+- [TASK-260918-2mglq0_review-verdict-rev1.md](file://TASK-260918-2mglq0/TASK-260918-2mglq0_review-verdict-rev1.md) — Accepted: exact two-layer patch review, 538 tests and 5 main-entry negative probes
 
 ## Created
 2026-09-18T03:00:53Z
 
 ## Last Update
-2026-09-18T04:26:28Z
+2026-09-18T04:41:20Z
 
 ## Assigned To
 [reviewer] reviewer (codex)
