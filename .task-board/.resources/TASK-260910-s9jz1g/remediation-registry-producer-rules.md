@@ -16,20 +16,26 @@ carries the product scope; this file carries where and how.
   `~/.claude`, `~/.codex`, `~/.curator`. Do not commit on the Story branch, do
   not push, no branches/PRs/tags/releases: the runtime publishes your Change
   Request at handoff and the orchestrator owns the signed landing.
-- Specification: curator-spec `main` (`1e73c03` at the time of writing; the registry contract you implement is the pinned `dced9b8` revision) is checked out read-only at
+- Specification: curator-spec `main` (`5146c7b` at the time of writing; the registry contract you implement is the revision the CI pin names — `47c3c8c`, R3/P2 — read it from a detached worktree at that commit, not from `main`) is checked out read-only at
   `/Users/administrator/Developer/ReluxWorks/curator/curator-spec`
   (`protocol/registry.md` §5/§9/§9.3, `profiles/registry-service.md` §2/§5/§11,
   `schemas/v1/records-response-v2.schema.json`, `log-response-v2.schema.json`,
   `conformance/v1/vectors/registry-service.json`, `registry-client.json`,
   `schema-cases/{records,log}-response-v2/`). The text is the contract, never a
   brief paraphrase.
-- Conformance root for local runs and for CI:
-  `export CURATOR_CONFORMANCE_ROOT=/Users/administrator/Developer/ReluxWorks/curator/curator-spec/conformance/v1`.
-  The workflow `.github/workflows/ci.yml` checks out the protocol suite at a
-  pinned commit (`ref:` under "Checkout authoritative protocol suite"); a task
-  that consumes new vectors or schemas MUST move that pin to `dced9b8` in the
-  same change (settled by the orchestrator for this campaign) and keep every
-  pre-existing conformance test green at the new pin.
+- Conformance root for local runs = the commit the workflow pins:
+  `.github/workflows/ci.yml` checks out the protocol suite at a pinned commit
+  (`ref:` under "Checkout authoritative protocol suite"), currently
+  `47c3c8cbd5da5e3fd6d99b0327d382c6a36494fe` (R3/P2; the suite's
+  `checkpoint_cases` test needs it — an older root fails that test, the
+  `main` tip carries families the service does not implement). Create a
+  detached worktree and export it:
+  `git -C /Users/administrator/Developer/ReluxWorks/curator/curator-spec worktree add /tmp/spec-47c3c8c 47c3c8cbd5da5e3fd6d99b0327d382c6a36494fe`
+  (skip if present) and
+  `export CURATOR_CONFORMANCE_ROOT=/tmp/spec-47c3c8c/conformance/v1`.
+  A task that consumes newer vectors or schemas moves the pin forward in the
+  same change (never backward) and keeps every pre-existing conformance test
+  green at the new pin.
 - Python: create a venv OUTSIDE the tree (e.g. `/tmp/csk-venv`:
   `python3 -m venv /tmp/csk-venv && /tmp/csk-venv/bin/pip install -e '.[dev]'`
   from the worktree), never `.venv` inside the worktree. State the interpreter
@@ -47,7 +53,7 @@ carries the product scope; this file carries where and how.
 3. Posture/observability where the brief names it; `README.md`/`SECURITY.md`
    updated when operator-visible behaviour changes.
 4. Release note: `CHANGELOG.md` Unreleased entry naming the finding id, the
-   envelope/field/error changes and the spec revision (`curator-spec dced9b8`).
+   envelope/field/error changes and the spec revision it implements (the pinned curator-spec commit).
 
 ## Validation and evidence
 - `python -m pytest -q` with `CURATOR_CONFORMANCE_ROOT` set (state the exact

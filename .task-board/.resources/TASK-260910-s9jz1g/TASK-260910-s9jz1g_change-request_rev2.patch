@@ -1,0 +1,922 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 0cb6f68..c562b1d 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -33,6 +33,19 @@
+ 
+ ### Security
+ 
++- R6: optional passphrase-protected signing key via `CSK_REGISTRY_KEY_PASSPHRASE`
++  (environment only, never a CLI flag). When set, `genkey`, rotation
++  staging, and rotation activation write encrypted PKCS8 PEM
++  (`BestAvailableEncryption`) and every key load decrypts with it; when
++  unset, behaviour is unchanged. An encrypted key with the variable missing
++  or wrong fails closed with a single diagnostic naming the variable (no
++  traceback, no partial start); a plain key with the variable set loads
++  with an unencrypted-key warning; a present-but-empty variable is rejected
++  with a single diagnostic before any key write or load. Key loading and storing
++  funnel through the `csk_registry.keys.KeyProvider` seam (`FileKeyProvider`
++  default, `default_key_provider()` factory), documented in `SECURITY.md` as
++  the KMS hook point; no external provider is implemented. No protocol,
++  envelope, or key-material change (curator-spec `dced9b8`).
+ - R3/P2: `serve --checkpoint <signed snapshot>`
+   (`CURATOR_SKILL_REGISTRY_CHECKPOINT`) compares the live boundary against
+   the operator checkpoint at startup, after the §5 integrity verification
+diff --git a/README.md b/README.md
+index 862726d..47c36e1 100644
+--- a/README.md
++++ b/README.md
+@@ -152,6 +152,70 @@ survive the change:
+ `cancel-key-rotation --confirm` discards a staged key before activation.
+ `genkey --force` refuses to replace the signer of a non-empty registry.
+ 
++### Passphrase-protected signing key
++
++The signing key can be stored as passphrase-encrypted PKCS8 instead of plain
++PEM. Set the passphrase before generating the key:
++
++```bash
++export CSK_REGISTRY_KEY_PASSPHRASE='<secret>'
++curator-skill-registry --home ./data genkey
++```
++
++When the variable is set, `genkey`, rotation staging, and rotation
++activation write encrypted PEM (`BestAvailableEncryption`), and every command
++plus `serve` decrypts with it. There is deliberately no `--passphrase` flag:
++process arguments are world-readable on most systems.
++
++- Encrypted key with the variable missing or wrong: the command (or `serve`
++  startup) fails closed with a single diagnostic naming the variable;
++  nothing starts.
++- Plain key with the variable set: still loads, so an existing deployment
++  keeps working while it migrates, but logs a warning that the key is
++  unencrypted.
++- Variable set but empty: rejected with a single diagnostic naming the
++  variable before any key is written or loaded; unset it for plain PEM or
++  set a non-empty value.
++- Variable unset: behaviour is exactly as before (plain PEM written and read).
++
++Encrypt an existing plain key in place (same key material; the file keeps its
++`0600` mode):
++
++```bash
++export CSK_REGISTRY_KEY_PASSPHRASE='<secret>'
++python - <<'EOF'
++import os
++from pathlib import Path
++from csk_registry import signing
++path = Path("./data/signing-key.pem")
++key = signing.load_key(path.read_bytes())
++path.write_bytes(signing.export_key_pem(key, os.environ["CSK_REGISTRY_KEY_PASSPHRASE"].encode()))
++print("encrypted:", key.key_id)
++EOF
++```
++
++Rotate the passphrase by re-encrypting with the new value (same key material,
++new secret):
++
++```bash
++export OLD_PASSPHRASE='<old secret>' CSK_REGISTRY_KEY_PASSPHRASE='<new secret>'
++python - <<'EOF'
++import os
++from pathlib import Path
++from csk_registry import signing
++path = Path("./data/signing-key.pem")
++key = signing.load_key(path.read_bytes(), passphrase=os.environ["OLD_PASSPHRASE"].encode())
++path.write_bytes(signing.export_key_pem(key, os.environ["CSK_REGISTRY_KEY_PASSPHRASE"].encode()))
++print("re-encrypted:", key.key_id)
++EOF
++```
++
++After either operation, re-run any key command (for example
++`export-snapshot`) to confirm the new secret decrypts, and if a rotation is
++staged, re-encrypt `next-signing-key.pem` the same way. See `compose.yaml`
++for wiring the secret without baking it into the image, and [SECURITY.md](SECURITY.md)
++for what the passphrase does and does not protect.
++
+ ### Production transport and limits
+ 
+ Plain HTTP is accepted only on a loopback bind. For direct TLS, pass
+diff --git a/SECURITY.md b/SECURITY.md
+index e24b091..ea57863 100644
+--- a/SECURITY.md
++++ b/SECURITY.md
+@@ -20,6 +20,26 @@ publish corrective records through an unaffected auditor. History is not
+ rewritten. An auditor compromise disables that auditor credential and uses a
+ different authorized auditor for corrective records.
+ 
++The signing key can additionally be stored as passphrase-encrypted PKCS8
++(`CSK_REGISTRY_KEY_PASSPHRASE`, see README). The passphrase protects the key
++at rest against an offline copy of the volume or key file made without the
++secret — a disk image, a backup, or the PEM file sitting beside
++`registry.db`: without the passphrase the PEM does not decrypt, so a bare
++volume leak no longer yields key and history together. It does not protect
++against a live process compromise (the running service necessarily holds both
++the key and the secret), nor against a deployment environment that leaks the
++variable itself, and it is no substitute for the owner-only file permissions
++above. The passphrase travels exclusively through the environment, never
++through argv. A present-but-empty value is rejected; only true absence
++selects plain PEM.
++
++All key loads and stores funnel through the `KeyProvider` seam in
++`src/csk_registry/keys.py`: the `KeyProvider` Protocol, the `FileKeyProvider`
++default, and the `default_key_provider()` factory that reads the variable.
++That seam is the hook point for an external key provider (KMS/HSM, profile
++§7): such a provider implements the Protocol and is passed to the key
++functions without touching call sites. No external provider is implemented.
++
+ Restore is fail-closed: `serve --checkpoint` (or
+ `CURATOR_SKILL_REGISTRY_CHECKPOINT`) compares live state against the signed
+ external high-water checkpoint after integrity verification and before the
+diff --git a/compose.yaml b/compose.yaml
+index d6d3927..320af58 100644
+--- a/compose.yaml
++++ b/compose.yaml
+@@ -17,6 +17,12 @@ services:
+     environment:
+       CURATOR_SKILL_REGISTRY_HOME: /data
+       # CURATOR_SKILL_REGISTRY_CHECKPOINT: /checkpoint/registry-snapshot.json
++      # R6: passphrase for the encrypted signing key (see README). Never bake
++      # it into the image: inject it at deploy time from the host environment
++      # or an env file kept outside version control, for example:
++      # CSK_REGISTRY_KEY_PASSPHRASE: ${CSK_REGISTRY_KEY_PASSPHRASE:?Set CSK_REGISTRY_KEY_PASSPHRASE in the host environment}
++    # env_file:
++    #   - /run/secrets/curator-skill-registry.env  # holds CSK_REGISTRY_KEY_PASSPHRASE=...
+     # The 30 s probe is a cheap cached-verdict read (no chain walk); the
+     # server-side full re-verification interval is configured with
+     # --health-verify-interval (default 300 s).
+diff --git a/src/csk_registry/__init__.py b/src/csk_registry/__init__.py
+index 9e4f55f..efa22b8 100644
+--- a/src/csk_registry/__init__.py
++++ b/src/csk_registry/__init__.py
+@@ -9,6 +9,7 @@ COMMAND_NAME = "curator-skill-registry"
+ HOME_ENV = "CURATOR_SKILL_REGISTRY_HOME"
+ HEALTH_VERIFY_INTERVAL_ENV = "CURATOR_SKILL_REGISTRY_HEALTH_VERIFY_INTERVAL"
+ CHECKPOINT_ENV = "CURATOR_SKILL_REGISTRY_CHECKPOINT"
++KEY_PASSPHRASE_ENV = "CSK_REGISTRY_KEY_PASSPHRASE"
+ LEGACY_COMMAND_NAME = "csk-registry"
+ LEGACY_HOME_ENV = "CSK_REGISTRY_HOME"
+ 
+diff --git a/src/csk_registry/cli.py b/src/csk_registry/cli.py
+index 4b664e8..71b62d1 100644
+--- a/src/csk_registry/cli.py
++++ b/src/csk_registry/cli.py
+@@ -15,6 +15,7 @@ from .auth import Auditor, AuditorTokens
+ from .bundle import export_bundle, import_bundle
+ from .clock import utc_now
+ from .keys import (
++    KeyPassphraseError,
+     active_key_path,
+     activate_rotation,
+     cancel_rotation,
+@@ -505,7 +506,14 @@ def main(argv: list[str] | None = None) -> int:
+     parser = build_parser()
+     args = parser.parse_args(argv)
+     func = args.func
+-    result = func(args)
++    try:
++        result = func(args)
++    except KeyPassphraseError as exc:
++        # Encrypted-key commands fail closed at startup with one diagnostic
++        # naming the variable: no traceback, and for `serve` no listener
++        # (app_from_env raises before uvicorn.run is reached).
++        print(str(exc), file=sys.stderr)
++        return 1
+     return int(result)
+ 
+ 
+diff --git a/src/csk_registry/keys.py b/src/csk_registry/keys.py
+index b3f3017..a5aad74 100644
+--- a/src/csk_registry/keys.py
++++ b/src/csk_registry/keys.py
+@@ -2,10 +2,14 @@ from __future__ import annotations
+ 
+ import hashlib
+ import json
++import logging
+ import os
+ import tempfile
++from dataclasses import dataclass
+ from pathlib import Path
++from typing import Protocol
+ 
++from . import KEY_PASSPHRASE_ENV
+ from .permissions import (
+     protect_private_directory,
+     protect_private_file,
+@@ -24,6 +28,104 @@ ACTIVE_KEY_NAME = "signing-key.pem"
+ NEXT_KEY_NAME = "next-signing-key.pem"
+ KEYRING_NAME = "signing-keyring.json"
+ 
++_LOG = logging.getLogger(__name__)
++
++_EMPTY_PASSPHRASE_MESSAGE = (
++    f"{KEY_PASSPHRASE_ENV} is set but empty; "
++    "unset it for a plain key or set a non-empty passphrase"
++)
++
++
++class KeyPassphraseError(ValueError):
++    """An encrypted signing key cannot be decrypted with the configured secret.
++
++    Subclasses ``ValueError`` so every existing command handler reports the
++    single diagnostic naming ``KEY_PASSPHRASE_ENV`` without a traceback.
++    """
++
++
++class KeyProvider(Protocol):
++    """Seam for signing-key storage; the KMS hook point (see SECURITY.md).
++
++    Every key load and store in this module funnels through a provider. The
++    default is :class:`FileKeyProvider` (PEM files under the data home with
++    an optional passphrase). An external KMS/HSM integration implements this
++    Protocol and passes it to the functions below; call sites stay unchanged.
++    """
++
++    @property
++    def passphrase(self) -> bytes | None:
++        """Passphrase for encrypted PEM, or None for plain PEM."""
++        ...
++
++    def load(self, path: Path) -> SigningKey:
++        """Load and decrypt the private key stored at ``path``."""
++        ...
++
++    def store(self, path: Path, key: SigningKey) -> None:
++        """Atomically store ``key`` at ``path``, encrypted when set."""
++        ...
++
++
++@dataclass(frozen=True)
++class FileKeyProvider:
++    """File-backed PEM provider with an optional passphrase."""
++
++    passphrase: bytes | None = None
++
++    def load(self, path: Path) -> SigningKey:
++        if self.passphrase == b"":
++            raise KeyPassphraseError(_EMPTY_PASSPHRASE_MESSAGE)
++        pem = _read_private_key(path)
++        if b"ENCRYPTED PRIVATE KEY" in pem:
++            if self.passphrase is None:
++                raise KeyPassphraseError(
++                    f"signing key {path} is encrypted but {KEY_PASSPHRASE_ENV} is not set"
++                )
++            try:
++                return load_key(pem, passphrase=self.passphrase)
++            except (TypeError, ValueError) as exc:
++                raise KeyPassphraseError(
++                    f"could not decrypt signing key {path} with {KEY_PASSPHRASE_ENV}"
++                    " (wrong passphrase?)"
++                ) from exc
++        if self.passphrase is not None:
++            _LOG.warning(
++                "signing key %s is not encrypted although %s is set; "
++                "encrypt it at rest (see README) or unset the variable",
++                path,
++                KEY_PASSPHRASE_ENV,
++            )
++        return load_key(pem)
++
++    def store(self, path: Path, key: SigningKey) -> None:
++        if self.passphrase == b"":
++            raise KeyPassphraseError(_EMPTY_PASSPHRASE_MESSAGE)
++        _atomic_write(path, export_key_pem(key, passphrase=self.passphrase), 0o600)
++
++
++def key_passphrase_from_env() -> bytes | None:
++    """Return the key passphrase from the environment, or None when unset.
++
++    Set means encrypted and unset means plain; a present-but-empty value is
++    rejected because PKCS8 encryption requires a non-empty password.
++    """
++    if KEY_PASSPHRASE_ENV not in os.environ:
++        return None
++    raw = os.environ[KEY_PASSPHRASE_ENV]
++    if raw == "":
++        raise KeyPassphraseError(_EMPTY_PASSPHRASE_MESSAGE)
++    return raw.encode("utf-8")
++
++
++def default_key_provider() -> FileKeyProvider:
++    """Return the default file-backed provider honouring the environment."""
++    return FileKeyProvider(passphrase=key_passphrase_from_env())
++
++
++def _resolve_provider(provider: KeyProvider | None) -> KeyProvider:
++    return provider if provider is not None else default_key_provider()
++
+ 
+ def active_key_path(home: Path) -> Path:
+     return home / ACTIVE_KEY_NAME
+@@ -33,24 +135,29 @@ def next_key_path(home: Path) -> Path:
+     return home / NEXT_KEY_NAME
+ 
+ 
+-def load_active_key(home: Path) -> SigningKey:
+-    return load_key(_read_private_key(active_key_path(home)))
++def load_active_key(home: Path, *, provider: KeyProvider | None = None) -> SigningKey:
++    return _resolve_provider(provider).load(active_key_path(home))
+ 
+ 
+-def initialize_key(home: Path, *, replace: bool = False) -> SigningKey:
++def initialize_key(
++    home: Path, *, replace: bool = False, provider: KeyProvider | None = None
++) -> SigningKey:
+     path = active_key_path(home)
+     if path.exists() and not replace:
+         raise ValueError(f"signing key already exists at {path}")
+     if next_key_path(home).exists():
+         raise ValueError("a signing-key rotation is already staged")
+     key = generate_key()
+-    _atomic_write(path, export_key_pem(key), 0o600)
++    _resolve_provider(provider).store(path, key)
+     _write_public_keys(home, (key.public_pinned,))
+     return key
+ 
+ 
+-def public_keys(home: Path, active: SigningKey | None = None) -> tuple[str, ...]:
+-    current = active or load_active_key(home)
++def public_keys(
++    home: Path, active: SigningKey | None = None, *, provider: KeyProvider | None = None
++) -> tuple[str, ...]:
++    resolved = _resolve_provider(provider)
++    current = active or resolved.load(active_key_path(home))
+     values: list[str] = [current.public_pinned]
+     path = home / KEYRING_NAME
+     if path.is_file():
+@@ -76,48 +183,58 @@ def public_keys(home: Path, active: SigningKey | None = None) -> tuple[str, ...]
+             raise ValueError(f"signing keyring is malformed: {exc}") from exc
+     staged = next_key_path(home)
+     if staged.is_file():
+-        staged_public = load_key(_read_private_key(staged)).public_pinned
++        staged_public = resolved.load(staged).public_pinned
+         if staged_public not in values:
+             values.append(staged_public)
+     return tuple(values)
+ 
+ 
+-def prepare_rotation(home: Path) -> tuple[SigningKey, SigningKey]:
+-    active = load_active_key(home)
++def prepare_rotation(
++    home: Path, *, provider: KeyProvider | None = None
++) -> tuple[SigningKey, SigningKey]:
++    resolved = _resolve_provider(provider)
++    active = resolved.load(active_key_path(home))
+     staged_path = next_key_path(home)
+     if staged_path.exists():
+         raise ValueError("a signing-key rotation is already staged")
+     staged = generate_key()
+-    _atomic_write(staged_path, export_key_pem(staged), 0o600)
++    resolved.store(staged_path, staged)
+     try:
+-        _write_public_keys(home, (*public_keys(home, active), staged.public_pinned))
++        _write_public_keys(home, (*public_keys(home, active, provider=resolved), staged.public_pinned))
+     except (OSError, ValueError):
+         staged_path.unlink(missing_ok=True)
+         raise
+     return active, staged
+ 
+ 
+-def activate_rotation(home: Path) -> tuple[SigningKey, SigningKey]:
+-    active = load_active_key(home)
++def activate_rotation(
++    home: Path, *, provider: KeyProvider | None = None
++) -> tuple[SigningKey, SigningKey]:
++    resolved = _resolve_provider(provider)
++    active = resolved.load(active_key_path(home))
+     staged_path = next_key_path(home)
+     if not staged_path.is_file():
+         raise ValueError("no signing-key rotation is staged")
+-    staged = load_key(_read_private_key(staged_path))
+-    _write_public_keys(home, (*public_keys(home, active), staged.public_pinned))
+-    os.replace(staged_path, active_key_path(home))
+-    protect_private_file(active_key_path(home))
++    staged = resolved.load(staged_path)
++    _write_public_keys(home, (*public_keys(home, active, provider=resolved), staged.public_pinned))
++    # Re-export through the provider so the configured encryption applies to
++    # the activated key (a plain staged key becomes encrypted when the
++    # variable is set); the staged key material and public pins are unchanged.
++    resolved.store(active_key_path(home), staged)
++    staged_path.unlink()
+     _sync_directory(home)
+     return active, staged
+ 
+ 
+-def cancel_rotation(home: Path) -> SigningKey:
+-    active = load_active_key(home)
++def cancel_rotation(home: Path, *, provider: KeyProvider | None = None) -> SigningKey:
++    resolved = _resolve_provider(provider)
++    active = resolved.load(active_key_path(home))
+     staged_path = next_key_path(home)
+     if not staged_path.is_file():
+         raise ValueError("no signing-key rotation is staged")
+-    staged = load_key(_read_private_key(staged_path))
++    staged = resolved.load(staged_path)
+     retained = tuple(
+-        value for value in public_keys(home, active) if value != staged.public_pinned
++        value for value in public_keys(home, active, provider=resolved) if value != staged.public_pinned
+     )
+     _write_public_keys(home, retained)
+     staged_path.unlink()
+@@ -125,13 +242,14 @@ def cancel_rotation(home: Path) -> SigningKey:
+     return staged
+ 
+ 
+-def retire_public_key(home: Path, key_id: str) -> str:
+-    active = load_active_key(home)
++def retire_public_key(home: Path, key_id: str, *, provider: KeyProvider | None = None) -> str:
++    resolved = _resolve_provider(provider)
++    active = resolved.load(active_key_path(home))
+     staged_path = next_key_path(home)
+-    staged = load_key(_read_private_key(staged_path)) if staged_path.is_file() else None
++    staged = resolved.load(staged_path) if staged_path.is_file() else None
+     if key_id == active.key_id or (staged is not None and key_id == staged.key_id):
+         raise ValueError("the active or staged signing key cannot be retired")
+-    values = list(public_keys(home, active))
++    values = list(public_keys(home, active, provider=resolved))
+     matches = [value for value in values if _key_id(value) == key_id]
+     if len(matches) != 1:
+         raise ValueError(f"retained signing key {key_id!r} was not found")
+diff --git a/src/csk_registry/signing.py b/src/csk_registry/signing.py
+index 1067ed1..a86b403 100644
+--- a/src/csk_registry/signing.py
++++ b/src/csk_registry/signing.py
+@@ -97,18 +97,37 @@ def generate_key() -> SigningKey:
+     return SigningKey(Ed25519PrivateKey.generate())
+ 
+ 
+-def load_key(pem: bytes) -> SigningKey:
+-    key = serialization.load_pem_private_key(pem, password=None)
++def load_key(pem: bytes, passphrase: bytes | None = None) -> SigningKey:
++    """Load an Ed25519 private key from PKCS8 PEM.
++
++    Pass ``passphrase`` only for encrypted PEM: the backend raises
++    ``TypeError`` when the password/encryption combination mismatches, so
++    callers that accept both shapes (see ``keys.FileKeyProvider``) detect
++    the ``ENCRYPTED PRIVATE KEY`` marker before deciding.
++    """
++    key = serialization.load_pem_private_key(pem, password=passphrase)
+     if not isinstance(key, Ed25519PrivateKey):
+         raise ValueError("private key is not an Ed25519 key")
+     return SigningKey(key)
+ 
+ 
+-def export_key_pem(key: SigningKey) -> bytes:
++def export_key_pem(key: SigningKey, passphrase: bytes | None = None) -> bytes:
++    """Export ``key`` as PKCS8 PEM, encrypted when ``passphrase`` is given.
++
++    A ``None`` passphrase writes plain PEM, exactly as before. A non-empty
++    passphrase selects ``BestAvailableEncryption``; an empty one is rejected
++    by the backend.
++    """
++    if passphrase is None:
++        return key.private.private_bytes(
++            serialization.Encoding.PEM,
++            serialization.PrivateFormat.PKCS8,
++            serialization.NoEncryption(),
++        )
+     return key.private.private_bytes(
+         serialization.Encoding.PEM,
+         serialization.PrivateFormat.PKCS8,
+-        serialization.NoEncryption(),
++        serialization.BestAvailableEncryption(passphrase),
+     )
+ 
+ 
+diff --git a/tests/test_key_passphrase.py b/tests/test_key_passphrase.py
+new file mode 100644
+index 0000000..de24399
+--- /dev/null
++++ b/tests/test_key_passphrase.py
+@@ -0,0 +1,430 @@
++from __future__ import annotations
++
++import hashlib
++import json
++import logging
++from pathlib import Path
++
++import pytest
++from fastapi.testclient import TestClient
++
++from csk_registry import CHECKPOINT_ENV, HOME_ENV, KEY_PASSPHRASE_ENV, signing
++from csk_registry.app import app_from_env
++from csk_registry.cli import main
++from csk_registry.keys import (
++    FileKeyProvider,
++    KeyPassphraseError,
++    default_key_provider,
++    initialize_key,
++    key_passphrase_from_env,
++    load_active_key,
++    public_keys,
++    write_private_json,
++)
++from csk_registry.store import Store
++
++ENCRYPTED_HEADER = b"-----BEGIN ENCRYPTED PRIVATE KEY-----"
++PLAIN_HEADER = b"-----BEGIN PRIVATE KEY-----"
++
++
++def test_encrypted_pem_round_trip_preserves_public_key() -> None:
++    key = signing.generate_key()
++    pem = signing.export_key_pem(key, passphrase=b"s3cret")
++    assert pem.startswith(ENCRYPTED_HEADER)
++    loaded = signing.load_key(pem, passphrase=b"s3cret")
++    assert loaded.public_pinned == key.public_pinned
++    assert loaded.key_id == key.key_id
++
++
++def test_export_without_passphrase_stays_plain() -> None:
++    key = signing.generate_key()
++    pem = signing.export_key_pem(key)
++    assert pem.startswith(PLAIN_HEADER)
++    assert b"ENCRYPTED" not in pem
++    assert signing.load_key(pem).public_pinned == key.public_pinned
++
++
++def test_passphrase_from_env_shapes(monkeypatch: pytest.MonkeyPatch) -> None:
++    monkeypatch.delenv(KEY_PASSPHRASE_ENV, raising=False)
++    assert key_passphrase_from_env() is None
++    assert default_key_provider().passphrase is None
++    monkeypatch.setenv(KEY_PASSPHRASE_ENV, "s3cret")
++    assert key_passphrase_from_env() == b"s3cret"
++    assert default_key_provider().passphrase == b"s3cret"
++
++
++def test_empty_passphrase_rejected_before_any_write(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
++) -> None:
++    monkeypatch.setenv(KEY_PASSPHRASE_ENV, "")
++    with pytest.raises(KeyPassphraseError, match="CSK_REGISTRY_KEY_PASSPHRASE"):
++        key_passphrase_from_env()
++    with pytest.raises(KeyPassphraseError, match="empty"):
++        default_key_provider()
++    home = tmp_path / "home"
++    with pytest.raises(KeyPassphraseError, match="CSK_REGISTRY_KEY_PASSPHRASE"):
++        initialize_key(home)
++    assert not (home / "signing-key.pem").exists()
++    capsys.readouterr()
++    assert main(["--home", str(home), "genkey"]) == 1
++    err = capsys.readouterr().err
++    assert err.count(KEY_PASSPHRASE_ENV) == 1
++    assert "empty" in err
++    assert "Traceback" not in err
++    assert not (home / "signing-key.pem").exists()
++
++
++def test_empty_passphrase_at_load_time_fails_closed(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    monkeypatch.delenv(KEY_PASSPHRASE_ENV, raising=False)
++    home = tmp_path / "home"
++    key = initialize_key(home)
++    assert load_active_key(home).public_pinned == key.public_pinned
++    monkeypatch.setenv(KEY_PASSPHRASE_ENV, "")
++    with pytest.raises(KeyPassphraseError, match="CSK_REGISTRY_KEY_PASSPHRASE"):
++        load_active_key(home)
++    with pytest.raises(KeyPassphraseError, match="empty"):
++        load_active_key(home, provider=FileKeyProvider(passphrase=b""))
++
++
++def test_missing_passphrase_fails_closed_naming_variable(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    monkeypatch.setenv(KEY_PASSPHRASE_ENV, "correct-horse")
++    home = tmp_path / "home"
++    initialize_key(home)
++    assert (home / "signing-key.pem").read_bytes().startswith(ENCRYPTED_HEADER)
++    monkeypatch.delenv(KEY_PASSPHRASE_ENV)
++    with pytest.raises(KeyPassphraseError, match="CSK_REGISTRY_KEY_PASSPHRASE"):
++        load_active_key(home)
++    with pytest.raises(KeyPassphraseError, match="not set"):
++        load_active_key(home, provider=FileKeyProvider(passphrase=None))
++
++
++def test_wrong_passphrase_fails_closed_naming_variable(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    monkeypatch.setenv(KEY_PASSPHRASE_ENV, "right")
++    home = tmp_path / "home"
++    initialize_key(home)
++    monkeypatch.setenv(KEY_PASSPHRASE_ENV, "wrong")
++    with pytest.raises(KeyPassphraseError, match="CSK_REGISTRY_KEY_PASSPHRASE"):
++        load_active_key(home)
++    with pytest.raises(KeyPassphraseError, match="wrong passphrase"):
++        load_active_key(home, provider=FileKeyProvider(passphrase=b"wrong"))
++
++
++def test_plain_pem_loads_with_warning_while_variable_set(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
++) -> None:
++    monkeypatch.delenv(KEY_PASSPHRASE_ENV, raising=False)
++    home = tmp_path / "home"
++    key = initialize_key(home)
++    with caplog.at_level(logging.WARNING, logger="csk_registry.keys"):
++        caplog.clear()
++        assert load_active_key(home).public_pinned == key.public_pinned
++    assert "not encrypted" not in caplog.text
++    monkeypatch.setenv(KEY_PASSPHRASE_ENV, "new-secret")
++    with caplog.at_level(logging.WARNING, logger="csk_registry.keys"):
++        caplog.clear()
++        assert load_active_key(home).public_pinned == key.public_pinned
++    assert "CSK_REGISTRY_KEY_PASSPHRASE" in caplog.text
++    assert "not encrypted" in caplog.text
++
++
++def test_genkey_honours_variable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
++    home = tmp_path / "home"
++    monkeypatch.delenv(KEY_PASSPHRASE_ENV, raising=False)
++    assert main(["--home", str(home), "genkey"]) == 0
++    assert b"ENCRYPTED" not in (home / "signing-key.pem").read_bytes()
++    monkeypatch.setenv(KEY_PASSPHRASE_ENV, "s3cret")
++    assert main(["--home", str(home), "genkey", "--force"]) == 0
++    assert (home / "signing-key.pem").read_bytes().startswith(ENCRYPTED_HEADER)
++    assert public_keys(home) == (load_active_key(home).public_pinned,)
++
++
++def test_rotation_with_encrypted_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
++    monkeypatch.setenv(KEY_PASSPHRASE_ENV, "rotation-secret")
++    home = tmp_path / "home"
++    assert main(["--home", str(home), "genkey"]) == 0
++    old = load_active_key(home)
++    assert main(["--home", str(home), "prepare-key-rotation"]) == 0
++    assert (home / "next-signing-key.pem").read_bytes().startswith(ENCRYPTED_HEADER)
++    assert len(public_keys(home)) == 2
++    assert (
++        main(["--home", str(home), "activate-key-rotation", "--confirm-pins-deployed"])
++        == 0
++    )
++    assert not (home / "next-signing-key.pem").exists()
++    new = load_active_key(home)
++    assert new.key_id != old.key_id
++    assert (home / "signing-key.pem").read_bytes().startswith(ENCRYPTED_HEADER)
++    assert set(public_keys(home)) == {old.public_pinned, new.public_pinned}
++
++
++def test_rotation_migrates_plain_key_to_encrypted(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    monkeypatch.delenv(KEY_PASSPHRASE_ENV, raising=False)
++    home = tmp_path / "home"
++    assert main(["--home", str(home), "genkey"]) == 0
++    old_public = load_active_key(home).public_pinned
++    monkeypatch.setenv(KEY_PASSPHRASE_ENV, "adopted")
++    assert main(["--home", str(home), "prepare-key-rotation"]) == 0
++    assert b"ENCRYPTED" not in (home / "signing-key.pem").read_bytes()
++    assert (home / "next-signing-key.pem").read_bytes().startswith(ENCRYPTED_HEADER)
++    assert (
++        main(["--home", str(home), "activate-key-rotation", "--confirm-pins-deployed"])
++        == 0
++    )
++    assert (home / "signing-key.pem").read_bytes().startswith(ENCRYPTED_HEADER)
++    assert set(public_keys(home)) == {old_public, load_active_key(home).public_pinned}
++
++
++def test_activation_encrypts_plain_staged_key(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    """Staged while unset, activated while set: the active key is encrypted."""
++    monkeypatch.delenv(KEY_PASSPHRASE_ENV, raising=False)
++    home = tmp_path / "home"
++    assert main(["--home", str(home), "genkey"]) == 0
++    old = load_active_key(home)
++    assert main(["--home", str(home), "prepare-key-rotation"]) == 0
++    assert b"ENCRYPTED" not in (home / "next-signing-key.pem").read_bytes()
++    staged_public = public_keys(home)[1]
++    monkeypatch.setenv(KEY_PASSPHRASE_ENV, "late-secret")
++    assert (
++        main(["--home", str(home), "activate-key-rotation", "--confirm-pins-deployed"])
++        == 0
++    )
++    assert not (home / "next-signing-key.pem").exists()
++    assert (home / "signing-key.pem").read_bytes().startswith(ENCRYPTED_HEADER)
++    new = load_active_key(home)
++    assert new.key_id != old.key_id
++    assert new.public_pinned == staged_public
++    assert set(public_keys(home)) == {old.public_pinned, new.public_pinned}
++
++
++def test_activation_keeps_encrypted_staged_key_loadable(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    """Encrypted staged key activated under the same passphrase stays loadable."""
++    monkeypatch.setenv(KEY_PASSPHRASE_ENV, "same-secret")
++    home = tmp_path / "home"
++    assert main(["--home", str(home), "genkey"]) == 0
++    assert main(["--home", str(home), "prepare-key-rotation"]) == 0
++    staged_pem = (home / "next-signing-key.pem").read_bytes()
++    assert staged_pem.startswith(ENCRYPTED_HEADER)
++    assert (
++        main(["--home", str(home), "activate-key-rotation", "--confirm-pins-deployed"])
++        == 0
++    )
++    active_pem = (home / "signing-key.pem").read_bytes()
++    assert active_pem.startswith(ENCRYPTED_HEADER)
++    assert load_active_key(home).public_pinned in set(public_keys(home))
++
++
++@pytest.mark.parametrize("command", [["prepare-key-rotation"], ["sign-record"]])
++def test_commands_fail_closed_with_single_diagnostic(
++    tmp_path: Path,
++    monkeypatch: pytest.MonkeyPatch,
++    capsys: pytest.CaptureFixture[str],
++    command: list[str],
++) -> None:
++    monkeypatch.setenv(KEY_PASSPHRASE_ENV, "sealed")
++    home = tmp_path / "home"
++    assert main(["--home", str(home), "genkey"]) == 0
++    monkeypatch.delenv(KEY_PASSPHRASE_ENV)
++    argv = ["--home", str(home), *command]
++    if command == ["sign-record"]:
++        record = tmp_path / "record.json"
++        record.write_text(json.dumps({"schema_version": 1}), encoding="utf-8")
++        argv += ["--record", str(record)]
++    capsys.readouterr()
++    assert main(argv) == 1
++    captured = capsys.readouterr()
++    assert captured.err.count(KEY_PASSPHRASE_ENV) == 1
++    assert "Traceback" not in captured.err
++    assert "Traceback" not in captured.out
++
++
++def test_command_with_wrong_passphrase_names_variable(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
++) -> None:
++    monkeypatch.setenv(KEY_PASSPHRASE_ENV, "right")
++    home = tmp_path / "home"
++    assert main(["--home", str(home), "genkey"]) == 0
++    monkeypatch.setenv(KEY_PASSPHRASE_ENV, "wrong")
++    capsys.readouterr()
++    assert main(["--home", str(home), "prepare-key-rotation"]) == 1
++    err = capsys.readouterr().err
++    assert err.count(KEY_PASSPHRASE_ENV) == 1
++    assert "wrong passphrase" in err
++    assert "Traceback" not in err
++
++
++def test_explicit_provider_overrides_environment(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    monkeypatch.delenv(KEY_PASSPHRASE_ENV, raising=False)
++    home = tmp_path / "home"
++    provider = FileKeyProvider(passphrase=b"explicit-secret")
++    key = initialize_key(home, provider=provider)
++    assert (home / "signing-key.pem").read_bytes().startswith(ENCRYPTED_HEADER)
++    assert load_active_key(home, provider=provider).public_pinned == key.public_pinned
++    with pytest.raises(KeyPassphraseError, match="CSK_REGISTRY_KEY_PASSPHRASE"):
++        load_active_key(home)
++
++
++def test_key_operations_funnel_through_provider(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    """A custom KeyProvider sees every load/store (the KMS hook shape)."""
++
++    monkeypatch.delenv(KEY_PASSPHRASE_ENV, raising=False)
++    home = tmp_path / "home"
++    inner = FileKeyProvider()
++    calls: list[tuple[str, str]] = []
++
++    class RecordingProvider:
++        @property
++        def passphrase(self) -> bytes | None:
++            return inner.passphrase
++
++        def load(self, path: Path) -> signing.SigningKey:
++            calls.append(("load", path.name))
++            return inner.load(path)
++
++        def store(self, path: Path, key: signing.SigningKey) -> None:
++            calls.append(("store", path.name))
++            inner.store(path, key)
++
++    provider = RecordingProvider()
++    initialize_key(home, provider=provider)  # type: ignore[arg-type]
++    load_active_key(home, provider=provider)  # type: ignore[arg-type]
++    assert ("store", "signing-key.pem") in calls
++    assert ("load", "signing-key.pem") in calls
++
++
++def _serve_ready_encrypted_home(home: Path, *, records: int) -> signing.SigningKey:
++    """Create a serve-ready home; the caller must preset the passphrase env."""
++    home.mkdir(parents=True, exist_ok=True)
++    key = initialize_key(home)
++    token = "passphrase-startup-unit-test-token"
++    write_private_json(
++        home / "auditors.json",
++        {
++            "auditors": [
++                {
++                    "auditor_id": "a1",
++                    "org": "Example",
++                    "public_key": signing.generate_key().public_pinned,
++                    "token_sha256": hashlib.sha256(token.encode()).hexdigest(),
++                }
++            ]
++        },
++    )
++    store = Store(home / "registry.db")
++    for index in range(records):
++        store.append(
++            key.sign_record(
++                {
++                    "schema_version": 1,
++                    "name": f"skill-passphrase-{index}",
++                    "source_identity": "gitlab.example.com/skills/skill-passphrase",
++                    "commit": f"{index:040d}",
++                    "content_sha256": "sha256:" + f"{index:064x}",
++                    "status": "audited",
++                    "audit": {"ruleset_version": "csk-audit/1"},
++                }
++            ),
++            created_at=f"2026-07-13T00:00:{index:02d}Z",
++        )
++    store.close()
++    return key
++
++
++def test_serve_startup_with_encrypted_key(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    monkeypatch.setenv(KEY_PASSPHRASE_ENV, "serve-secret")
++    home = tmp_path / "home"
++    key = _serve_ready_encrypted_home(home, records=2)
++    assert (home / "signing-key.pem").read_bytes().startswith(ENCRYPTED_HEADER)
++    monkeypatch.setenv(HOME_ENV, str(home))
++    monkeypatch.delenv(CHECKPOINT_ENV, raising=False)
++    client = TestClient(app_from_env())
++    assert client.get("/health").status_code == 200
++    snapshot = client.get("/v1/snapshot").json()
++    assert signing.verify_signed(key.public_pinned, snapshot)
++
++
++def test_serve_startup_without_passphrase_fails_closed(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    monkeypatch.setenv(KEY_PASSPHRASE_ENV, "serve-secret")
++    home = tmp_path / "home"
++    _serve_ready_encrypted_home(home, records=1)
++    monkeypatch.setenv(HOME_ENV, str(home))
++    monkeypatch.delenv(CHECKPOINT_ENV, raising=False)
++    monkeypatch.delenv(KEY_PASSPHRASE_ENV)
++    with pytest.raises(KeyPassphraseError, match="CSK_REGISTRY_KEY_PASSPHRASE"):
++        app_from_env()
++
++
++def test_serve_command_with_encrypted_key(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    monkeypatch.setenv(KEY_PASSPHRASE_ENV, "serve-secret")
++    home = tmp_path / "home"
++    _serve_ready_encrypted_home(home, records=1)
++    monkeypatch.setenv(HOME_ENV, str(home))
++    monkeypatch.delenv(CHECKPOINT_ENV, raising=False)
++    calls: list[object] = []
++    monkeypatch.setattr("uvicorn.run", lambda app, **kwargs: calls.append(app))
++    assert main(["--home", str(home), "serve"]) == 0
++    assert len(calls) == 1
++
++
++def test_serve_command_without_passphrase_has_no_partial_start(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
++) -> None:
++    monkeypatch.setenv(KEY_PASSPHRASE_ENV, "serve-secret")
++    home = tmp_path / "home"
++    _serve_ready_encrypted_home(home, records=1)
++    monkeypatch.setenv(HOME_ENV, str(home))
++    monkeypatch.delenv(CHECKPOINT_ENV, raising=False)
++    monkeypatch.delenv(KEY_PASSPHRASE_ENV)
++
++    def _must_not_run(app: object, **kwargs: object) -> None:
++        raise AssertionError("uvicorn.run must not run without the passphrase")
++
++    monkeypatch.setattr("uvicorn.run", _must_not_run)
++    capsys.readouterr()
++    assert main(["--home", str(home), "serve"]) == 1
++    captured = capsys.readouterr()
++    assert captured.err.count(KEY_PASSPHRASE_ENV) == 1
++    assert "Traceback" not in captured.err
++
++
++def test_serve_command_with_empty_passphrase_has_no_partial_start(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
++) -> None:
++    monkeypatch.delenv(KEY_PASSPHRASE_ENV, raising=False)
++    home = tmp_path / "home"
++    _serve_ready_encrypted_home(home, records=1)
++    monkeypatch.setenv(HOME_ENV, str(home))
++    monkeypatch.delenv(CHECKPOINT_ENV, raising=False)
++    monkeypatch.setenv(KEY_PASSPHRASE_ENV, "")
++
++    def _must_not_run(app: object, **kwargs: object) -> None:
++        raise AssertionError("uvicorn.run must not run with an empty passphrase")
++
++    monkeypatch.setattr("uvicorn.run", _must_not_run)
++    capsys.readouterr()
++    assert main(["--home", str(home), "serve"]) == 1
++    captured = capsys.readouterr()
++    assert captured.err.count(KEY_PASSPHRASE_ENV) == 1
++    assert "empty" in captured.err
++    assert "Traceback" not in captured.err
