@@ -2,7 +2,8 @@
 // environments §5: the curator-root-context-v2 generation header (§5.1), the
 // emitted order under both precedence primitives (§5, §6), chapter parts, the
 // monolithic form (§5.2), the zero-module case (§5.4), the system-prompt
-// output (§5.5), and the content-hash binding of a surface (§5.6).
+// output (§5.5) with the §3 system-module admission, and the content-hash
+// binding of a surface (§5.6).
 //
 // Materialized root context is a pure function of (lock, precedence policy,
 // environment identifier, form); nothing here reads a clock, a path, or an
@@ -243,30 +244,46 @@ func Monolithic(lock *contextlock.Lock, lockHash string, precedence Precedence, 
 }
 
 // SystemPrompt assembles the system-prompt output (environments §5.5): the
-// applicable system modules of every member in emitted order, joined with no
-// header and no chapter parts. written is false when no module applies.
-func SystemPrompt(lock *contextlock.Lock, precedence Precedence, environment string, packages map[string]Package) (document []byte, written bool, err error) {
+// admitted applicable system modules of every member in emitted order,
+// joined with no header and no chapter parts. written is false when no
+// admitted module applies. dropped names every non-admitted applicable
+// module in the same order, so the caller warns
+// context_system_module_dropped per module under drop. Under error the
+// first dropped module refuses the materialization with
+// context_system_module_transitive and no document is returned. Only
+// admitted modules are byte-validated and joined: a skipped module
+// contributes no bytes, and its validity was settled at snapshot
+// validation.
+func SystemPrompt(lock *contextlock.Lock, precedence Precedence, environment string, packages map[string]Package, admission Admission) (document []byte, written bool, dropped []DroppedModule, err error) {
+	policy, err := admission.Policy()
+	if err != nil {
+		return nil, false, nil, err
+	}
 	order, err := EmittedOrder(lock, precedence)
 	if err != nil {
-		return nil, false, err
+		return nil, false, nil, err
 	}
-	var parts [][]byte
 	for _, member := range order {
-		pkg, ok := packages[member.Name]
-		if !ok {
-			return nil, false, fmt.Errorf("no package content for member %s", member.Name)
-		}
-		for _, module := range Applicable(pkg, "system", environment) {
-			if err := contextpkg.ValidateModuleBytes(module.Bytes); err != nil {
-				return nil, false, fmt.Errorf("module %s of %s: %v", module.Path, member.Name, err)
-			}
-			parts = append(parts, module.Bytes)
+		if _, ok := packages[member.Name]; !ok {
+			return nil, false, nil, fmt.Errorf("no package content for member %s", member.Name)
 		}
 	}
-	if len(parts) == 0 {
-		return nil, false, nil
+	admitted, dropped := ClassifySystemModules(lock, order, packages, environment, admission)
+	if policy == TransitiveError && len(dropped) > 0 {
+		first := dropped[0]
+		return nil, false, dropped, &TransitiveSystemModuleError{Package: first.Package, Module: first.Path}
 	}
-	return Join(parts), true, nil
+	if len(admitted) == 0 {
+		return nil, false, dropped, nil
+	}
+	parts := make([][]byte, 0, len(admitted))
+	for _, module := range admitted {
+		if err := contextpkg.ValidateModuleBytes(module.Module.Bytes); err != nil {
+			return nil, false, dropped, fmt.Errorf("module %s of %s: %v", module.Module.Path, module.Package, err)
+		}
+		parts = append(parts, module.Module.Bytes)
+	}
+	return Join(parts), true, dropped, nil
 }
 
 // SurfaceHash is the core §8 content hash over a materialized file set keyed

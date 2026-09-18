@@ -28,12 +28,25 @@ type Environments struct {
 	Targets              map[string]TargetConfig
 	Isolation            map[string]map[string]string
 	XDGSeedAllowlist     []string
-	// PassableEnvNames is nil for the null (unbounded) default; a non-nil
-	// slice — possibly empty — is the bounded allowlist.
+	// PassableEnvNames is the passable_env_names knob (§12.1, default
+	// []): nil with PassableEnvNamesSet false means the knob is absent;
+	// nil with PassableEnvNamesSet true is the explicit null (unbounded);
+	// a non-nil slice — possibly empty — is the bounded allowlist.
 	PassableEnvNames    []string
+	PassableEnvNamesSet bool
 	MCPPackageAllowlist []string
+	// ProviderDirectories is the §11 trust-root list after the install
+	// directory, in listed order; the §12.1 default is the empty list.
+	ProviderDirectories []string
 	ShadowAcknowledged  []ShadowAcknowledgement
 	SecretWaivers       []SecretMaterialWaiver
+	// TransitiveSystemModules is the §3/§5.5 admission policy: drop
+	// (default) skips transitive system modules at materialization with a
+	// warning, error refuses them at resolution.
+	TransitiveSystemModules string
+	// SystemModuleWaivers admits transitive packages' system modules by
+	// name; an entry naming no lock member has no effect.
+	SystemModuleWaivers []SystemModuleWaiver
 	BackupRetention     int
 	RequireCurrent      *string
 	InPlaceMode         map[string]string
@@ -86,6 +99,14 @@ type SecretMaterialWaiver struct {
 	Reason string
 }
 
+// SystemModuleWaiver is one system_module_waivers entry (environments
+// §12.1): the admitted context member's package name and the free-text
+// reason recording why the operator admits its system modules.
+type SystemModuleWaiver struct {
+	Package string
+	Reason  string
+}
+
 // Defaults from the environments §12.1 table.
 const (
 	DefaultOverlayWeight   = 1000
@@ -96,12 +117,14 @@ const (
 // LockableEnvKeys are the environments §12.2 keys a system file may lock,
 // named as the manager §1 locked set names them.
 var LockableEnvKeys = map[string]bool{
-	"environments.overlays_allowed":        true,
-	"environments.precedence":              true,
-	"environments.mcp_package_allowlist":   true,
-	"environments.passable_env_names":      true,
-	"environments.require_current_profile": true,
-	"environments.isolation":               true,
+	"environments.overlays_allowed":          true,
+	"environments.precedence":                true,
+	"environments.mcp_package_allowlist":     true,
+	"environments.passable_env_names":        true,
+	"environments.require_current_profile":   true,
+	"environments.isolation":                 true,
+	"environments.transitive_system_modules": true,
+	"environments.provider_directories":      true,
 }
 
 // systemEnvKnobs are the environments keys a system file may carry at all:
@@ -115,28 +138,33 @@ func systemEnvKnobs() map[string]bool {
 }
 
 var (
-	envRangeRE  = regexp.MustCompile(`^[0-9A-Za-z.*<>=^~| \-]+$`)
-	envCommitRE = regexp.MustCompile(`^[0-9a-f]{40}(?:[0-9a-f]{24})?$`)
+	envRangeRE      = regexp.MustCompile(`^[0-9A-Za-z.*<>=^~| \-]+$`)
+	envCommitRE     = regexp.MustCompile(`^[0-9a-f]{40}(?:[0-9a-f]{24})?$`)
+	providerDriveRE = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
+	maxProviderDir  = 4096
 )
 
 // defaultEnvironments returns the §12.1 defaults.
 func defaultEnvironments() Environments {
 	return Environments{
-		ScopedCurrent:        map[string]string{},
-		Overlays:             map[string][]OverlayDeclaration{},
-		OverlayDefaultWeight: DefaultOverlayWeight,
-		OverlaysAllowed:      true,
-		Precedence:           Precedence{Winner: "higher-weight", Placement: "winner-last"},
-		Forms:                map[string]string{},
-		SystemPromptFiles:    map[string]SystemPromptFiles{},
-		Targets:              map[string]TargetConfig{},
-		Isolation:            map[string]map[string]string{},
-		XDGSeedAllowlist:     []string{"git", "gh", "ssh"},
-		MCPPackageAllowlist:  []string{},
-		ShadowAcknowledged:   []ShadowAcknowledgement{},
-		SecretWaivers:        []SecretMaterialWaiver{},
-		BackupRetention:      DefaultBackupRetention,
-		InPlaceMode:          map[string]string{},
+		ScopedCurrent:           map[string]string{},
+		Overlays:                map[string][]OverlayDeclaration{},
+		OverlayDefaultWeight:    DefaultOverlayWeight,
+		OverlaysAllowed:         true,
+		Precedence:              Precedence{Winner: "higher-weight", Placement: "winner-last"},
+		Forms:                   map[string]string{},
+		SystemPromptFiles:       map[string]SystemPromptFiles{},
+		Targets:                 map[string]TargetConfig{},
+		Isolation:               map[string]map[string]string{},
+		XDGSeedAllowlist:        []string{"git", "gh", "ssh"},
+		MCPPackageAllowlist:     []string{},
+		ProviderDirectories:     []string{},
+		ShadowAcknowledged:      []ShadowAcknowledgement{},
+		SecretWaivers:           []SecretMaterialWaiver{},
+		TransitiveSystemModules: "drop",
+		SystemModuleWaivers:     []SystemModuleWaiver{},
+		BackupRetention:         DefaultBackupRetention,
+		InPlaceMode:             map[string]string{},
 	}
 }
 
@@ -222,6 +250,7 @@ func parseEnvironments(raw any) (Environments, error) {
 		env.XDGSeedAllowlist = allowlist
 	}
 	if rawPassable, present := obj["passable_env_names"]; present {
+		env.PassableEnvNamesSet = true
 		if rawPassable == nil {
 			env.PassableEnvNames = nil
 		} else {
@@ -253,6 +282,23 @@ func parseEnvironments(raw any) (Environments, error) {
 		}
 		env.SecretWaivers = waivers
 	}
+	if rawTransitive, present := obj["transitive_system_modules"]; present {
+		transitive, ok := rawTransitive.(string)
+		if !ok || (transitive != "drop" && transitive != "error") {
+			return Environments{}, verr.New("environments.transitive_system_modules", "must be drop or error")
+		}
+		env.TransitiveSystemModules = transitive
+	}
+	// An explicit null is rejected like any other mistyped list: the
+	// schema type is array (§12.1), so null is malformed, never the
+	// empty default. Only absence takes the default.
+	if rawWaivers, present := obj["system_module_waivers"]; present {
+		waivers, err := parseSystemModuleWaivers(rawWaivers)
+		if err != nil {
+			return Environments{}, err
+		}
+		env.SystemModuleWaivers = waivers
+	}
 	if rawRetention, present := obj["backup_retention"]; present {
 		retention, err := boundedInteger(rawRetention, 0, maxSafeInteger)
 		if err != nil {
@@ -266,6 +312,17 @@ func parseEnvironments(raw any) (Environments, error) {
 	if err := parseEnumMap(obj, "in_place_mode", map[string]bool{"linked": true, "copied": true}, env.InPlaceMode); err != nil {
 		return Environments{}, err
 	}
+	// An explicit null is rejected like any other mistyped list: the
+	// schema type is array (§12.1), so null is malformed, never the
+	// empty default. Only absence takes the default. Unlike
+	// passable_env_names, this knob has no null meaning.
+	if rawPD, present := obj["provider_directories"]; present {
+		dirs, err := parseProviderDirectories(rawPD)
+		if err != nil {
+			return Environments{}, err
+		}
+		env.ProviderDirectories = dirs
+	}
 	return env, nil
 }
 
@@ -278,7 +335,9 @@ var EnvKnobNames = []string{
 	"overlays_allowed", "precedence", "forms", "system_prompt_files",
 	"targets", "isolation", "xdg_seed_allowlist", "passable_env_names",
 	"mcp_package_allowlist", "shadow_acknowledged", "secret_material_waivers",
+	"transitive_system_modules", "system_module_waivers",
 	"backup_retention", "require_current_profile", "in_place_mode",
+	"provider_directories",
 }
 
 // envKnob reports whether key is a §12.1 knob name.
@@ -653,6 +712,39 @@ func nonEmptyString(value string) bool {
 	return length >= 1 && length <= 8192
 }
 
+// parseProviderDirectories validates the §11/§12.1 provider_directories
+// knob with the manager-config-v2 grammar: a list of unique absolute
+// paths, each POSIX-absolute or Windows drive-absolute and 1-4096
+// characters long — the two spellings the schema admits.
+func parseProviderDirectories(raw any) ([]string, error) {
+	const field = "environments.provider_directories"
+	dirs, err := stringList(raw, field)
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	out := []string{}
+	for _, dir := range dirs {
+		if !validProviderDir(dir) || seen[dir] {
+			return nil, verr.New(field, "must contain unique absolute paths: POSIX-absolute or Windows drive-absolute, 1-4096 characters")
+		}
+		seen[dir] = true
+		out = append(out, dir)
+	}
+	return out, nil
+}
+
+func validProviderDir(dir string) bool {
+	length := utf8.RuneCountInString(dir)
+	if length < 1 || length > maxProviderDir {
+		return false
+	}
+	if strings.HasPrefix(dir, "/") {
+		return true
+	}
+	return providerDriveRE.MatchString(dir)
+}
+
 func parseShadowAcknowledged(raw any) ([]ShadowAcknowledgement, error) {
 	list, ok := raw.([]any)
 	if !ok {
@@ -729,6 +821,36 @@ func parseSecretWaivers(raw any) ([]SecretMaterialWaiver, error) {
 			return nil, verr.New(label+".reason", "requires a non-empty string")
 		}
 		waivers = append(waivers, SecretMaterialWaiver{Pin: pin, File: file, Span: bounds, Reason: reason})
+	}
+	return waivers, nil
+}
+
+func parseSystemModuleWaivers(raw any) ([]SystemModuleWaiver, error) {
+	list, ok := raw.([]any)
+	if !ok {
+		return nil, verr.New("environments.system_module_waivers", "must be a list")
+	}
+	waivers := []SystemModuleWaiver{}
+	for index, item := range list {
+		label := fmt.Sprintf("environments.system_module_waivers[%d]", index)
+		entry, ok := item.(map[string]any)
+		if !ok {
+			return nil, verr.New(label, "must be an object")
+		}
+		for key := range entry {
+			if key != "package" && key != "reason" {
+				return nil, verr.New(label, "has unsupported field %q", key)
+			}
+		}
+		pkg, _ := entry["package"].(string)
+		if !identifiers.Valid(pkg) {
+			return nil, verr.New(label+".package", "%s", identifiers.Rule)
+		}
+		reason, _ := entry["reason"].(string)
+		if !nonEmptyString(reason) {
+			return nil, verr.New(label+".reason", "requires a non-empty string")
+		}
+		waivers = append(waivers, SystemModuleWaiver{Package: pkg, Reason: reason})
 	}
 	return waivers, nil
 }
@@ -812,6 +934,14 @@ func parseSystemEnvironments(raw any) (map[string]any, error) {
 	if rawIsolation, present := obj["isolation"]; present && rawIsolation != nil {
 		if _, err := parseIsolation(rawIsolation, true); err != nil {
 			return nil, err
+		}
+	}
+	// Environments §12.2 locks transitive_system_modules only toward
+	// error: a system file MUST NOT admit a transitive package's system
+	// modules by locking (or defaulting) the knob to drop.
+	if rawTransitive, present := obj["transitive_system_modules"]; present && rawTransitive != nil {
+		if transitive, _ := rawTransitive.(string); transitive == "drop" {
+			return nil, verr.New("environments.transitive_system_modules", "a system file locks transitive_system_modules only toward error")
 		}
 	}
 	return obj, nil
@@ -905,6 +1035,12 @@ func (e Environments) render() map[string]any {
 			"span": []any{waiver.Span[0], waiver.Span[1]}, "reason": waiver.Reason,
 		})
 	}
+	systemWaivers := []any{}
+	for _, waiver := range e.SystemModuleWaivers {
+		systemWaivers = append(systemWaivers, map[string]any{
+			"package": waiver.Package, "reason": waiver.Reason,
+		})
+	}
 	xdg := []any{}
 	for _, name := range e.XDGSeedAllowlist {
 		xdg = append(xdg, name)
@@ -913,13 +1049,26 @@ func (e Environments) render() map[string]any {
 	for _, name := range e.MCPPackageAllowlist {
 		mcp = append(mcp, name)
 	}
-	var passable any
-	if e.PassableEnvNames != nil {
-		list := []any{}
-		for _, name := range e.PassableEnvNames {
-			list = append(list, name)
+	providerDirs := []any{}
+	for _, dir := range e.ProviderDirectories {
+		providerDirs = append(providerDirs, dir)
+	}
+	// The §12.1 schema default is []: an absent knob renders the empty
+	// list, an explicit null renders null (unbounded), a configured
+	// list renders itself. The S4 runtime default for an absent knob —
+	// unbounded with a warning under s4-warn — lives in the resolver,
+	// not in this rendering.
+	var passable any = []any{}
+	if e.PassableEnvNamesSet {
+		if e.PassableEnvNames != nil {
+			list := []any{}
+			for _, name := range e.PassableEnvNames {
+				list = append(list, name)
+			}
+			passable = list
+		} else {
+			passable = nil
 		}
-		passable = list
 	}
 	var current any
 	if e.CurrentProfile != nil {
@@ -936,8 +1085,11 @@ func (e Environments) render() map[string]any {
 		"forms":      forms, "system_prompt_files": spf, "targets": targets,
 		"isolation": isolation, "xdg_seed_allowlist": xdg, "passable_env_names": passable,
 		"mcp_package_allowlist": mcp, "shadow_acknowledged": shadow,
-		"secret_material_waivers": waivers, "backup_retention": e.BackupRetention,
+		"secret_material_waivers":   waivers,
+		"transitive_system_modules": e.TransitiveSystemModules, "system_module_waivers": systemWaivers,
+		"backup_retention":        e.BackupRetention,
 		"require_current_profile": require, "in_place_mode": inPlace,
+		"provider_directories": providerDirs,
 	}
 }
 
@@ -955,7 +1107,7 @@ func EnvLockKey(knob string) string {
 		return "environments.precedence"
 	case "isolation":
 		return "environments.isolation"
-	case "overlays_allowed", "mcp_package_allowlist", "passable_env_names", "require_current_profile":
+	case "overlays_allowed", "mcp_package_allowlist", "passable_env_names", "require_current_profile", "transitive_system_modules", "provider_directories":
 		return "environments." + head
 	}
 	return ""

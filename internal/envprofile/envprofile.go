@@ -27,6 +27,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -42,6 +43,7 @@ import (
 	"github.com/relux-works/curator/internal/contextpkg"
 	"github.com/relux-works/curator/internal/contextresolve"
 	"github.com/relux-works/curator/internal/contextstore"
+	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/gitops"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
@@ -65,6 +67,10 @@ const (
 	// DiagLockUnavailable reports that the manager-home mutation lock
 	// could not be acquired within the bounded wait (manager §2.5).
 	DiagLockUnavailable = "environment_lock_unavailable"
+	// DiagAllowlistEmpty warns that the MCP package allowlist is empty,
+	// so every declaration package in the closure is admitted
+	// (environments §2.1, §2.2). It never fails the operation.
+	DiagAllowlistEmpty = "mcp_package_allowlist_empty"
 )
 
 // Source kinds (environments §1).
@@ -152,9 +158,14 @@ func prevLockPath(home, name string) string {
 
 // Info is one installed or listed profile. Warnings carries the
 // non-blocking audit findings of the install or update that produced it:
-// context-system-module-present, mcp_command_unresolved, and unmatched
-// waivers. Activation carries the per-adapter results of the §9.2 switch
-// an install activation performed, if any.
+// context-system-module-present, mcp_command_unresolved, unmatched
+// waivers, and mcp_package_allowlist_empty. Surfacing carries the §2.3
+// declaration rows for the resolved MCP set, one row per line without
+// the LF, computed after the audit gate passed — unless the caller
+// passed a surfacing sink, in which case the rows were already printed
+// at the §2.3 emission point and Surfacing is empty. Activation carries
+// the per-adapter results of the §9.2 switch an install activation
+// performed, if any.
 type Info struct {
 	Name       string
 	Source     Source
@@ -163,6 +174,7 @@ type Info struct {
 	Current    bool
 	ScopedFor  []string
 	Warnings   []string
+	Surfacing  []string
 	Activation []EntryResult
 }
 
@@ -415,6 +427,13 @@ type Policy struct {
 	// refuses a machine-scope switch (environments §12.2).
 	RequireCurrent       *string
 	RequireCurrentLocked bool
+	// TransitiveSystemModules is the effective §12.1 admission policy:
+	// drop (default) or error. "" selects the drop default, so the zero
+	// Policy resolves exactly like an unconfigured machine.
+	TransitiveSystemModules string
+	// SystemModuleWaivers admits transitive packages' system modules by
+	// name (environments §3, §12.1).
+	SystemModuleWaivers []SystemModuleWaiver
 	// Takeover is the explicit section 9.5 takeover flag carried by a
 	// mutating operation (profile install, use, update, sync, env resolve
 	// --repair): with it the operation backs up and takes over the
@@ -448,6 +467,14 @@ type OverlaySpec struct {
 	Weight    *int64
 }
 
+// SystemModuleWaiver is one effective system_module_waivers entry
+// (environments §12.1): the admitted package name with the operator's
+// reason.
+type SystemModuleWaiver struct {
+	Package string
+	Reason  string
+}
+
 // ForbidsOverlays reports whether the composition policy empties every
 // overlay list (environments §12.2).
 func (p Policy) ForbidsOverlays() bool { return !p.OverlaysAllowed }
@@ -473,6 +500,19 @@ func (p Policy) Precedence() contextmaterialize.Precedence {
 		precedence.Placement = p.PrecedencePlacement
 	}
 	return precedence
+}
+
+// Admission returns the effective §3 system-module admission policy: the
+// transitive_system_modules value with the waived package names.
+func (p Policy) Admission() contextmaterialize.Admission {
+	admission := contextmaterialize.Admission{Transitive: p.TransitiveSystemModules}
+	if len(p.SystemModuleWaivers) > 0 {
+		admission.Waivers = map[string]bool{}
+		for _, waiver := range p.SystemModuleWaivers {
+			admission.Waivers[waiver.Package] = true
+		}
+	}
+	return admission
 }
 
 // CheckMachineUse enforces a locked require_current_profile at the §9.2
@@ -507,15 +547,20 @@ func PolicyFromConfig(cfg *config.Config) Policy {
 		return Policy{OverlaysAllowed: true, OverlayDefaultWeight: config.DefaultOverlayWeight}
 	}
 	policy := Policy{
-		AllowedSources:       cfg.AllowedSources,
-		MCPAllowlist:         cfg.Env.MCPPackageAllowlist,
-		Revocations:          cfg.Audit.Revocations,
-		OverlaysAllowed:      cfg.Env.OverlaysAllowed,
-		OverlayDefaultWeight: int64(cfg.Env.OverlayDefaultWeight),
-		PrecedenceWinner:     cfg.Env.Precedence.Winner,
-		PrecedencePlacement:  cfg.Env.Precedence.Placement,
-		RequireCurrent:       cfg.Env.RequireCurrent,
-		RequireCurrentLocked: cfg.Locked["environments.require_current_profile"],
+		AllowedSources:          cfg.AllowedSources,
+		MCPAllowlist:            cfg.Env.MCPPackageAllowlist,
+		Revocations:             cfg.Audit.Revocations,
+		OverlaysAllowed:         cfg.Env.OverlaysAllowed,
+		OverlayDefaultWeight:    int64(cfg.Env.OverlayDefaultWeight),
+		PrecedenceWinner:        cfg.Env.Precedence.Winner,
+		PrecedencePlacement:     cfg.Env.Precedence.Placement,
+		RequireCurrent:          cfg.Env.RequireCurrent,
+		RequireCurrentLocked:    cfg.Locked["environments.require_current_profile"],
+		TransitiveSystemModules: cfg.Env.TransitiveSystemModules,
+	}
+	for _, waiver := range cfg.Env.SystemModuleWaivers {
+		policy.SystemModuleWaivers = append(policy.SystemModuleWaivers,
+			SystemModuleWaiver{Package: waiver.Package, Reason: waiver.Reason})
 	}
 	if len(cfg.Env.Overlays) > 0 {
 		policy.Overlays = map[string][]OverlaySpec{}
@@ -552,6 +597,13 @@ type InstallOptions struct {
 	// onboarding import: the install record and the environment markers
 	// carry imported_from_native. Only the import sets it.
 	Imported bool
+	// SurfacingSink receives the §2.3 declaration rows at the required
+	// emission point: after the audit gate passes and before the lock
+	// is published or any surface is (re-)materialized. A nil sink
+	// keeps the rows in Info.Surfacing; a set sink prints them during
+	// the operation and Info.Surfacing stays empty, so the rows print
+	// exactly once. Emission never fails the operation.
+	SurfacingSink io.Writer
 }
 
 // Install installs one root context package as a profile: it resolves the
@@ -661,7 +713,7 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 			if isPath {
 				return reinstallPathLocked(op, home, name, source, input, options)
 			}
-			info, moved, err := updateLocked(op, home, name, options.Policy)
+			info, moved, err := updateLocked(op, home, name, options.Policy, options.SurfacingSink)
 			if err != nil {
 				return Info{}, false, false, err
 			}
@@ -693,6 +745,21 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 		return Info{}, false, false, err
 	}
 	warnings = append(warnings, auditWarnings...)
+	if err := checkAdmissionPrePublish(home, manager, result, options.Policy); err != nil {
+		return Info{}, false, false, err
+	}
+	// Environments §9.1: after the audit gate passes and before the lock
+	// is published, surface the resolved MCP set (§2.3) and warn when
+	// the MCP package allowlist is empty. Neither fails the install.
+	surfacing, unreadable := surfacingRows(home, manager, result.Lock)
+	warnings = append(warnings, unreadable...)
+	if warning := AllowlistEmptyWarning(options.Policy.MCPAllowlist); warning != "" {
+		warnings = append(warnings, warning)
+	}
+	// The §2.3 emission point: the rows print before the lock is
+	// published or any surface is (re-)materialized below — even when
+	// publication or activation later fails.
+	surfacing = carrySurfacing(options.SurfacingSink, surfacing)
 	sourcePayload, err := marshalSource(source)
 	if err != nil {
 		return Info{}, false, false, err
@@ -711,7 +778,7 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 		return Info{}, false, false, err
 	}
 	if machine != "" && !options.Use {
-		info := Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: machine == name, Warnings: warnings}
+		info := Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: machine == name, Warnings: warnings, Surfacing: surfacing}
 		return info, false, false, nil
 	}
 	// Activation performs the §9.2 switch under the same held operation:
@@ -721,7 +788,7 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 	// leaves it unchanged with profile_use_partial on failure.
 	results, switchErr := useLocked(op, home, name, "", "", false, options.Policy)
 	machine, _ = Current(home)
-	info := Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: machine == name, Warnings: warnings, Activation: results}
+	info := Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: machine == name, Warnings: warnings, Surfacing: surfacing, Activation: results}
 	if switchErr != nil {
 		return info, false, false, switchErr
 	}
@@ -788,19 +855,32 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input 
 			return Info{}, false, false, fmt.Errorf("%s: new member %s %v; the old lock stands", DiagUpdateBlocked, key, err)
 		}
 	}
+	if err := checkAdmissionPrePublish(home, manager, result, policy); err != nil {
+		return Info{}, false, false, err
+	}
 	if result.LockHash == oldHash {
 		// The snapshot is unchanged, so there is no lock to publish — but
 		// the install row's activation still runs. The §9.5 stop-and-retry
 		// lands here: the stopped attempt already published the lock, so
 		// the retry resolves identically and must still take over the
 		// unmanaged files and switch, never report success for no work.
+		// The resolved set is still surfaced: the audit gate passed and
+		// the candidate is what the machine runs.
+		surfacing, unreadable := surfacingRows(home, manager, result.Lock)
+		warnings := append([]string{}, unreadable...)
+		if warning := AllowlistEmptyWarning(policy.MCPAllowlist); warning != "" {
+			warnings = append(warnings, warning)
+		}
+		// The §2.3 emission point: the rows print before the
+		// activation below (re-)materializes any surface.
+		surfacing = carrySurfacing(options.SurfacingSink, surfacing)
 		if activate, err := reinstallActivation(home, name, options.Use); err != nil {
 			return Info{}, false, false, err
 		} else if activate {
-			return activateReinstall(op, home, name, source, result.Lock, oldHash, nil, policy)
+			return activateReinstall(op, home, name, source, result.Lock, oldHash, warnings, surfacing, policy)
 		}
 		machine, _ := Current(home)
-		info := Info{Name: name, Source: source, Lock: result.Lock, LockHash: oldHash, Current: machine == name}
+		info := Info{Name: name, Source: source, Lock: result.Lock, LockHash: oldHash, Current: machine == name, Warnings: warnings, Surfacing: surfacing}
 		return info, false, true, nil
 	}
 	warnings := resolutionWarnings(result)
@@ -809,6 +889,17 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input 
 		return Info{}, false, false, err
 	}
 	warnings = append(warnings, auditWarnings...)
+	// Environments §9.1: after the audit gate passes and before the lock
+	// is published, surface the resolved MCP set (§2.3) and warn when
+	// the MCP package allowlist is empty. Neither fails the install.
+	surfacing, unreadable := surfacingRows(home, manager, result.Lock)
+	warnings = append(warnings, unreadable...)
+	if warning := AllowlistEmptyWarning(policy.MCPAllowlist); warning != "" {
+		warnings = append(warnings, warning)
+	}
+	// The §2.3 emission point: the rows print before the lock is
+	// published or any scope is resynced below.
+	surfacing = carrySurfacing(options.SurfacingSink, surfacing)
 	canonical, err := result.Lock.Canonical()
 	if err != nil {
 		return Info{}, false, false, err
@@ -824,13 +915,13 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input 
 	if activate, err := reinstallActivation(home, name, options.Use); err != nil {
 		return Info{}, false, false, err
 	} else if activate {
-		return activateReinstall(op, home, name, source, result.Lock, hash, warnings, policy)
+		return activateReinstall(op, home, name, source, result.Lock, hash, warnings, surfacing, policy)
 	}
 	if err := resyncCurrentScopes(op, home, name, policy); err != nil {
 		return Info{}, false, false, err
 	}
 	machine, _ := Current(home)
-	return Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: machine == name, Warnings: warnings}, false, true, nil
+	return Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: machine == name, Warnings: warnings, Surfacing: surfacing}, false, true, nil
 }
 
 // reinstallActivation reports whether a same-source path reinstall must run
@@ -858,10 +949,10 @@ func reinstallActivation(home, name string, use bool) (bool, error) {
 // switch leaves the recorded current unchanged and returns the switch
 // error, exactly as a fresh install does; the lock work (published above
 // when the pin moved) still stands.
-func activateReinstall(op *operation, home, name string, source Source, lock *contextlock.Lock, hash string, warnings []string, policy Policy) (Info, bool, bool, error) {
+func activateReinstall(op *operation, home, name string, source Source, lock *contextlock.Lock, hash string, warnings, surfacing []string, policy Policy) (Info, bool, bool, error) {
 	results, switchErr := useLocked(op, home, name, "", "", false, policy)
 	machine, _ := Current(home)
-	info := Info{Name: name, Source: source, Lock: lock, LockHash: hash, Current: machine == name, Warnings: warnings, Activation: results}
+	info := Info{Name: name, Source: source, Lock: lock, LockHash: hash, Current: machine == name, Warnings: warnings, Surfacing: surfacing, Activation: results}
 	if switchErr != nil {
 		return info, false, true, switchErr
 	}
@@ -892,21 +983,40 @@ func Update(home, name string) (Info, bool, error) {
 	return UpdateWithPolicy(home, name, policy)
 }
 
+// UpdateOptions selects one profile update.
+type UpdateOptions struct {
+	// Policy carries the machine gates (§9.1).
+	Policy Policy
+	// SurfacingSink receives the §2.3 declaration rows at the required
+	// emission point: after the audit gate passes and before the lock
+	// is published or any surface is re-materialized. A nil sink keeps
+	// the rows in Info.Surfacing; a set sink prints them during the
+	// operation and Info.Surfacing stays empty, so the rows print
+	// exactly once. Emission never fails the operation.
+	SurfacingSink io.Writer
+}
+
 // UpdateWithPolicy re-resolves under the machine gates of policy
 // (environments §9.1): the source allowlist, the MCP package allowlist, and
 // the always-strict audit with revocation and the canary. The CLI passes the
 // machine configuration; tests inject narrowing policies directly.
 func UpdateWithPolicy(home, name string, policy Policy) (Info, bool, error) {
+	return UpdateWithOptions(home, name, UpdateOptions{Policy: policy})
+}
+
+// UpdateWithOptions re-resolves like UpdateWithPolicy and prints the §2.3
+// declaration rows to the options' sink at the required emission point.
+func UpdateWithOptions(home, name string, options UpdateOptions) (Info, bool, error) {
 	op, err := beginOperation(home)
 	if err != nil {
 		return Info{}, false, err
 	}
 	defer func() { _ = op.close() }()
-	return updateLocked(op, home, name, policy)
+	return updateLocked(op, home, name, options.Policy, options.SurfacingSink)
 }
 
 // updateLocked re-resolves under the held operation lock.
-func updateLocked(op *operation, home, name string, policy Policy) (Info, bool, error) {
+func updateLocked(op *operation, home, name string, policy Policy, sink io.Writer) (Info, bool, error) {
 	if err := ensureDefault(op, home, policy); err != nil {
 		return Info{}, false, err
 	}
@@ -1000,9 +1110,23 @@ func updateLocked(op *operation, home, name string, policy Policy) (Info, bool, 
 			return Info{}, false, fmt.Errorf("%s: new member %s %v; the old lock stands", DiagUpdateBlocked, key, err)
 		}
 	}
+	if err := checkAdmissionPrePublish(home, manager, result, policy); err != nil {
+		return Info{}, false, err
+	}
 	if result.LockHash == oldHash {
+		// The lock is unchanged and nothing is published, but the
+		// candidate set is still surfaced: the audit gate passed and
+		// the candidate is what the machine runs.
 		machine, _ := Current(home)
-		return Info{Name: name, Source: source, Lock: result.Lock, LockHash: oldHash, Current: machine == name}, false, nil
+		surfacing, unreadable := surfacingRows(home, manager, result.Lock)
+		warnings := append([]string{}, unreadable...)
+		if warning := AllowlistEmptyWarning(policy.MCPAllowlist); warning != "" {
+			warnings = append(warnings, warning)
+		}
+		// The §2.3 emission point: nothing is published on this path,
+		// but the rows still print exactly once.
+		surfacing = carrySurfacing(sink, surfacing)
+		return Info{Name: name, Source: source, Lock: result.Lock, LockHash: oldHash, Current: machine == name, Warnings: warnings, Surfacing: surfacing}, false, nil
 	}
 	warnings := resolutionWarnings(result)
 	auditWarnings, err := auditAndStore(home, manager, result, policy)
@@ -1010,6 +1134,19 @@ func updateLocked(op *operation, home, name string, policy Policy) (Info, bool, 
 		return Info{}, false, err
 	}
 	warnings = append(warnings, auditWarnings...)
+	// Environments §9.2: after the audit gate passes and before the lock
+	// is published or any surface is re-materialized, surface the
+	// candidate lock's MCP set (§2.3) and warn when the MCP package
+	// allowlist is empty. Neither fails the update.
+	surfacing, unreadable := surfacingRows(home, manager, result.Lock)
+	warnings = append(warnings, unreadable...)
+	if warning := AllowlistEmptyWarning(policy.MCPAllowlist); warning != "" {
+		warnings = append(warnings, warning)
+	}
+	// The §2.3 emission point: the rows print before the lock is
+	// published or any scope is resynced below — even when publication
+	// or the resync later fails.
+	surfacing = carrySurfacing(sink, surfacing)
 	canonical, err := result.Lock.Canonical()
 	if err != nil {
 		return Info{}, false, err
@@ -1029,7 +1166,7 @@ func updateLocked(op *operation, home, name string, policy Policy) (Info, bool, 
 		return Info{}, false, err
 	}
 	machine, _ := Current(home)
-	return Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: machine == name, Warnings: warnings}, true, nil
+	return Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: machine == name, Warnings: warnings, Surfacing: surfacing}, true, nil
 }
 
 // Remove deletes a profile that is current in no scope and an overlay of
@@ -1159,6 +1296,60 @@ func auditAndStore(home string, manager *gitManager, result *contextresolve.Resu
 		}
 	}
 	return warnings, nil
+}
+
+// checkAdmissionPrePublish enforces the §3 error policy before a lock is
+// published: the first non-admitted system module in emitted order fails
+// the operation with context_system_module_transitive, so a refused
+// install writes no lock and a refused update leaves the old lock in
+// place. Under drop it admits everything: drop skips at materialization
+// and never fails resolution, installation, or update. Every lock publish
+// site — install, reinstall, update — calls this before publishing or
+// before the identical-lock fast path, which must not bypass the refusal:
+// a lock that violates the current error policy fails the update even
+// when nothing moved. An unreadable manifest is never absence (§8.4):
+// admission cannot be decided for a member whose modules are unknown, so
+// resolution fails closed instead of admitting blind. The always-warn
+// context-system-module-present surfacing is unaffected and reports every
+// member's system modules whatever the policy.
+func checkAdmissionPrePublish(home string, manager *gitManager, result *contextresolve.Result, policy Policy) error {
+	admission := policy.Admission()
+	if effective, err := admission.Policy(); err != nil || effective != contextmaterialize.TransitiveError {
+		return err
+	}
+	modules := map[string][]contextpkg.Module{}
+	for key, resolved := range result.Members {
+		if resolved.Kind != contextlock.KindContext {
+			continue
+		}
+		entry, err := manager.ensureEntry(home, resolved)
+		if err != nil {
+			return err
+		}
+		manifest, err := contextpkg.LoadManifest(packageRoot(entry, resolved.Directory))
+		if err != nil {
+			return fmt.Errorf("%s: member %s manifest cannot be read; system-module admission cannot be decided: %v", DiagSourceInvalid, key, err)
+		}
+		modules[resolved.Name] = manifest.Modules
+	}
+	first, err := contextmaterialize.FirstTransitiveSystemModule(result.Lock, policy.Precedence(), modules, admission, registryEnvIDs())
+	if err != nil {
+		return err
+	}
+	if first == nil {
+		return nil
+	}
+	return &contextmaterialize.TransitiveSystemModuleError{Package: first.Package, Module: first.Path}
+}
+
+// registryEnvIDs lists the closed revision-1 adapter environments a system
+// module selector is evaluated against at resolution.
+func registryEnvIDs() []string {
+	ids := make([]string, 0, len(envregistry.Registry))
+	for _, adapter := range envregistry.Registry {
+		ids = append(ids, adapter.ID)
+	}
+	return ids
 }
 
 // pinOf renders the member pin as the audit spells it.

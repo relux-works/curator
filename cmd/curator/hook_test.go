@@ -623,6 +623,22 @@ func TestStatusReportsRecordedPathsBeyondTheCurrentProject(t *testing.T) {
 func TestEnvStatusReportsShellHookTrustPosture(t *testing.T) {
 	// No t.Parallel: profileHome sets process environment, exactly like
 	// the other env matrix tests.
+	// The §12 provider rows join the matrix: run and session are
+	// always reported, and a missing row is non-current — so plant
+	// stub providers, which warn outside the trust roots under
+	// revision A but stay current, keeping the --check exit code
+	// evidence of the trust posture alone.
+	bin := t.TempDir()
+	for _, name := range []string{"curator-run", "curator-session"} {
+		full := filepath.Join(bin, name)
+		if runtime.GOOS == "windows" {
+			full += ".exe"
+		}
+		if err := os.WriteFile(full, []byte(""), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	source, _ := profileHome(t)
 	pkg := t.TempDir()
 	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")

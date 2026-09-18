@@ -52,16 +52,18 @@ var DefaultAgents = []string{"codex_cli"}
 // among them — are deliberately absent and never lockable: credential
 // material is operator-owned (ratified with the spec owner 2026-08-23).
 var LockableKeys = map[string]bool{
-	"audit_registries":                     true,
-	"disable_builtin_registries":           true,
-	"allowed_sources":                      true,
-	"audit":                                true,
-	"environments.overlays_allowed":        true,
-	"environments.precedence":              true,
-	"environments.mcp_package_allowlist":   true,
-	"environments.passable_env_names":      true,
-	"environments.require_current_profile": true,
-	"environments.isolation":               true,
+	"audit_registries":                       true,
+	"disable_builtin_registries":             true,
+	"allowed_sources":                        true,
+	"audit":                                  true,
+	"environments.overlays_allowed":          true,
+	"environments.precedence":                true,
+	"environments.mcp_package_allowlist":     true,
+	"environments.passable_env_names":        true,
+	"environments.require_current_profile":   true,
+	"environments.isolation":                 true,
+	"environments.transitive_system_modules": true,
+	"environments.provider_directories":      true,
 }
 
 var (

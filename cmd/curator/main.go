@@ -212,10 +212,12 @@ func (c cli) run(args []string) int {
 	// is the root a future config there would own.
 	if identifiers.Valid(args[0]) {
 		home := filepath.Dir(c.config.Path())
-		if cfg, code := c.loadConfig(); code == exitOK {
+		var cfg *config.Config
+		if loaded, code := c.loadConfig(); code == exitOK {
+			cfg = loaded
 			home = cfg.Home()
 		}
-		return c.cmdUmbrella(home, args)
+		return c.cmdUmbrella(cfg, home, args)
 	}
 	_, _ = fmt.Fprintf(c.stderr, "curator: unknown command %q\n\n%s", args[0], usage)
 	return exitUsage
