@@ -1,0 +1,3 @@
+# Review logbook — TASK-260910-2g5v17 revision 2
+
+F1 resolved: authoritative serialized comparison now carries diagnostic, override, boundary before-image and audit outcome. Independent full pytest 183 passed, strict mypy passed; 4/4 race schedules (5 cases), 2/2 narrowing mutants caught and late-failure atomic rollback passed. Producer startup concurrency flake did not reproduce in the full run; frequency remains unknown. Actual CI pin 47c3c8c used; rev1 docs preserved per rework scope. Candidate untouched. Detailed evidence: TASK-260910-2g5v17_review-verdict-rev2.md. Accept revision 2 into integrating; producer integration remains outstanding.
