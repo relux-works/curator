@@ -4,6 +4,8 @@ package marker
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +14,7 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -40,16 +43,26 @@ const (
 	// 8 and no other difference, so every marker-v3 build-record rule applies
 	// to it unchanged.
 	PolicySchemaVersion = 4
+	// SchemaV5 is written only for skillfile-sources draft installations
+	// (Skillfile schema 2). Its package replaces the legacy
+	// source/git/ref_kind/ref/commit fields and its lock_sha256 binds the
+	// installed selection through the validated lock. Legacy lanes never
+	// write it; Git draft members keep their accepted legacy shape until
+	// the integration leaf migrates them, so only local-snapshot packages
+	// reach it today.
+	SchemaV5 = 5
 	// NewestSchemaVersion is the highest marker schema this release reads. It
 	// is what an operator is told when a document from a newer manager is
 	// refused, so it must advance with every new readable schema.
-	NewestSchemaVersion = PolicySchemaVersion
+	NewestSchemaVersion = SchemaV5
 )
 
 var (
-	markerCommitRE = regexp.MustCompile(`^[0-9a-f]{40}(?:[0-9a-f]{24})?$`)
-	markerSHA256RE = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
-	markerKeyIDRE  = regexp.MustCompile(`^[0-9a-f]{16}$`)
+	markerCommitRE    = regexp.MustCompile(`^[0-9a-f]{40}(?:[0-9a-f]{24})?$`)
+	markerSHA256RE    = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+	markerSHA1RE      = regexp.MustCompile(`^[0-9a-f]{40}$`)
+	markerSHA256HexRE = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	markerKeyIDRE     = regexp.MustCompile(`^[0-9a-f]{16}$`)
 )
 
 // Activation records how the node was activated.
@@ -148,14 +161,36 @@ type RepositorySubstitute struct {
 	Ref  *RepositoryRef `json:"ref,omitempty"`
 }
 
+// Package is the draft marker-v5 frozen package identity. It mirrors
+// the disjoint source-types arms: a local snapshot never carries Git
+// fields and a Git package never carries a snapshot digest. The digest
+// forms are never substituted across arms.
+type Package struct {
+	Kind       string  `json:"kind"`
+	Snapshot   string  `json:"snapshot,omitempty"`
+	Repository string  `json:"repository,omitempty"`
+	Source     string  `json:"source,omitempty"`
+	Commit     *Commit `json:"commit,omitempty"`
+	Directory  string  `json:"directory,omitempty"`
+}
+
+// Commit is a locked Git object: format-bound lowercase hex, never a
+// snapshot digest and never prefixed.
+type Commit struct {
+	ObjectFormat string `json:"object_format"`
+	Hex          string `json:"hex"`
+}
+
 // Marker is the install marker payload (Spec §8.5).
 type Marker struct {
 	SchemaVersion      int                   `json:"schema_version"`
 	Name               string                `json:"name"`
-	Source             string                `json:"source"`
-	RefKind            string                `json:"ref_kind"`
-	Ref                string                `json:"ref"`
-	Commit             string                `json:"commit"`
+	Source             string                `json:"source,omitempty"`
+	RefKind            string                `json:"ref_kind,omitempty"`
+	Ref                string                `json:"ref,omitempty"`
+	Commit             string                `json:"commit,omitempty"`
+	Package            *Package              `json:"package,omitempty"`
+	LockSHA256         string                `json:"lock_sha256,omitempty"`
 	ContentSHA256      string                `json:"content_sha256"`
 	Locale             string                `json:"locale,omitempty"`
 	Agents             []string              `json:"agents"`
@@ -218,6 +253,10 @@ func (m Marker) MarshalJSON() ([]byte, error) {
 		delete(object, "build_source")
 		delete(object, "builds")
 	}
+	// A draft v5 marker carries no legacy source identity: the replaced
+	// fields stay empty and omitempty keeps them absent, so no reader can
+	// mistake one for an unattributed legacy marker. A builder that sets
+	// them fails v5 validation below instead of being silently masked.
 	return json.Marshal(object)
 }
 
@@ -262,6 +301,17 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
 	case ExternalSchemaVersion, PolicySchemaVersion:
 		required = append(required, "build_roots", "builds")
 		allowed = append(allowed, "build_roots", "build_source", "builds")
+	case SchemaV5:
+		// The frozen package replaces every legacy source field, so v5
+		// carries its own required set without them.
+		required = []string{
+			"schema_version", "name", "package", "lock_sha256", "content_sha256", "locale",
+			"agents", "commands", "dependencies", "skill_schema_version", "runtime_roots",
+			"build_roots", "builds", "installed_at", "files",
+		}
+		allowed = append(append([]string(nil), required...),
+			"requirements", "mcp_servers", "attestation", "activation", "requirers", "substituted",
+			"build_source")
 	default:
 		return false
 	}
@@ -270,18 +320,28 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
 			return false
 		}
 	}
-	if !onlyFields(raw, allowed) || !identifiers.Valid(m.Name) || !identifiers.PortablePath(m.Source) ||
+	if !onlyFields(raw, allowed) || !identifiers.Valid(m.Name) {
+		return false
+	}
+	if m.SchemaVersion == SchemaV5 {
+		if !validV5Identity(m, raw) {
+			return false
+		}
+	} else if !identifiers.PortablePath(m.Source) ||
 		(m.RefKind != "tag" && m.RefKind != "branch" && m.RefKind != "revision") ||
-		m.Ref == "" || utf8.RuneCountInString(m.Ref) > 8192 || !markerCommitRE.MatchString(m.Commit) ||
-		!markerSHA256RE.MatchString(m.ContentSHA256) || m.SkillSchemaVersion < 0 ||
+		m.Ref == "" || utf8.RuneCountInString(m.Ref) > 8192 || !markerCommitRE.MatchString(m.Commit) {
+		return false
+	}
+	if !markerSHA256RE.MatchString(m.ContentSHA256) || m.SkillSchemaVersion < 0 ||
 		(m.SchemaVersion == LegacySchemaVersion && m.SkillSchemaVersion > 5) ||
 		(m.SchemaVersion == SchemaVersion && m.SkillSchemaVersion > 6) ||
 		(m.SchemaVersion == ExternalSchemaVersion && m.SkillSchemaVersion != 7) ||
-		(m.SchemaVersion == PolicySchemaVersion && m.SkillSchemaVersion != 8) {
+		(m.SchemaVersion == PolicySchemaVersion && m.SkillSchemaVersion != 8) ||
+		(m.SchemaVersion == SchemaV5 && (m.SkillSchemaVersion < 1 || m.SkillSchemaVersion > 8)) {
 		return false
 	}
 	setsSorted := m.SchemaVersion == SchemaVersion || m.SchemaVersion == ExternalSchemaVersion ||
-		m.SchemaVersion == PolicySchemaVersion
+		m.SchemaVersion == PolicySchemaVersion || m.SchemaVersion == SchemaV5
 	if !validNullableLocale(raw["locale"], m.Locale) || !validTimestamp(m.InstalledAt) ||
 		!validIdentifierSet(m.Agents, setsSorted) || !validIdentifierSet(m.Commands, setsSorted) ||
 		!validIdentifierSet(m.Dependencies, setsSorted) || !validPathSet(m.RuntimeRoots, setsSorted) ||
@@ -329,10 +389,225 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
 		}
 	}
 	if (m.SchemaVersion == SchemaVersion || m.SchemaVersion == ExternalSchemaVersion ||
-		m.SchemaVersion == PolicySchemaVersion) && !validBuildState(m, raw) {
+		m.SchemaVersion == PolicySchemaVersion || m.SchemaVersion == SchemaV5) && !validBuildState(m, raw) {
 		return false
 	}
 	return true
+}
+
+// validV5Identity enforces the draft marker-v5 identity: the frozen package
+// replaces every legacy source field, the lock binds the installed selection
+// through the validated lock, and a local snapshot admits neither a network
+// attestation nor a development substitution.
+func validV5Identity(m *Marker, raw map[string]json.RawMessage) bool {
+	for _, field := range []string{"source", "git", "ref_kind", "ref", "commit"} {
+		if _, present := raw[field]; present {
+			return false
+		}
+	}
+	if !validV5PackageShape(raw["package"]) || !validV5Package(m.Package) {
+		return false
+	}
+	if !markerSHA256RE.MatchString(m.LockSHA256) {
+		return false
+	}
+	if m.Package.Kind == "local-snapshot" {
+		if _, present := raw["attestation"]; present {
+			return false
+		}
+		if _, present := raw["substituted"]; present {
+			return false
+		}
+	}
+	return true
+}
+
+// v5PackageArms is the closed raw shape of every source-types package arm:
+// the exact member set the schema admits, each bound to its JSON type. The
+// shared Package struct knows the fields of every arm, so a decoded value
+// cannot tell a foreign field carrying null or "" from an absent one; the
+// raw object can, and must be checked before the lossy decode.
+var v5PackageArms = map[string]map[string]string{
+	"local-snapshot": {"kind": "string", "snapshot": "string"},
+	"network-git":    {"kind": "string", "repository": "string", "commit": "object", "directory": "string"},
+	"configured-git": {"kind": "string", "source": "string", "commit": "object", "directory": "string"},
+}
+
+// v5CommitShape is the closed lockedCommit object: both members required,
+// both strings.
+var v5CommitShape = map[string]string{"object_format": "string", "hex": "string"}
+
+// validV5PackageShape validates the raw package object against the closed
+// shape of its arm: every arm member present with the right JSON type,
+// nothing else present even as null or empty, and the nested commit object
+// closed the same way. Duplicate keys and trailing data were already
+// refused by protocoljson.Validate over the whole document.
+func validV5PackageShape(raw json.RawMessage) bool {
+	object, ok := rawObject(raw)
+	if !ok {
+		return false
+	}
+	var kind string
+	if kindRaw, present := object["kind"]; !present || json.Unmarshal(kindRaw, &kind) != nil {
+		return false
+	}
+	arm, known := v5PackageArms[kind]
+	if !known || !closedRawShape(object, arm) {
+		return false
+	}
+	if commitRaw, present := object["commit"]; present {
+		commit, ok := rawObject(commitRaw)
+		if !ok || !closedRawShape(commit, v5CommitShape) {
+			return false
+		}
+	}
+	return true
+}
+
+// closedRawShape reports whether object carries exactly the members of
+// shape, each with the declared JSON type. A null member is neither absent
+// nor of its type, so it is refused either way.
+func closedRawShape(object map[string]json.RawMessage, shape map[string]string) bool {
+	if len(object) != len(shape) {
+		return false
+	}
+	for member, kind := range shape {
+		value, present := object[member]
+		if !present || rawJSONType(value) != kind {
+			return false
+		}
+	}
+	return true
+}
+
+// rawJSONType names the JSON type of a raw value: string, object, or
+// "" for anything else (null, numbers, booleans, arrays, malformed).
+func rawJSONType(raw json.RawMessage) string {
+	trimmed := bytes.TrimSpace(raw)
+	switch {
+	case len(trimmed) == 0:
+		return ""
+	case trimmed[0] == '"':
+		var s string
+		if json.Unmarshal(trimmed, &s) != nil {
+			return ""
+		}
+		return "string"
+	case trimmed[0] == '{':
+		if _, ok := rawObject(trimmed); !ok {
+			return ""
+		}
+		return "object"
+	default:
+		return ""
+	}
+}
+
+// validV5Package mirrors the disjoint source-types arms: a local snapshot
+// never carries Git fields and a Git package never carries a snapshot
+// digest. Digest forms are never substituted across arms.
+func validV5Package(p *Package) bool {
+	if p == nil {
+		return false
+	}
+	switch p.Kind {
+	case "local-snapshot":
+		if !markerSHA256RE.MatchString(p.Snapshot) {
+			return false
+		}
+		if p.Repository != "" || p.Source != "" || p.Commit != nil || p.Directory != "" {
+			return false
+		}
+	case "network-git":
+		if p.Snapshot != "" || p.Source != "" {
+			return false
+		}
+		if p.Repository == "" || strings.HasSuffix(p.Repository, ".git") {
+			return false
+		}
+		if !validV5Commit(p.Commit) {
+			return false
+		}
+		if p.Directory != "." && (!identifiers.PortablePath(p.Directory) || strings.ContainsAny(p.Directory, "*?[]")) {
+			return false
+		}
+	case "configured-git":
+		if p.Snapshot != "" || p.Repository != "" {
+			return false
+		}
+		if !identifiers.PortablePath(p.Source) {
+			return false
+		}
+		if !validV5Commit(p.Commit) {
+			return false
+		}
+		if p.Directory != "." {
+			return false
+		}
+	default:
+		return false
+	}
+	return true
+}
+
+// validV5Commit enforces the lockedCommit shape: sha1 binds 40 hex, sha256
+// binds 64. A snapshot digest never satisfies it: it carries a prefix the
+// bare hex grammar rejects.
+func validV5Commit(c *Commit) bool {
+	if c == nil {
+		return false
+	}
+	switch c.ObjectFormat {
+	case "sha1":
+		return markerSHA1RE.MatchString(c.Hex)
+	case "sha256":
+		return markerSHA256HexRE.MatchString(c.Hex)
+	default:
+		return false
+	}
+}
+
+// object renders the canonical package preimage: exactly the disjoint
+// source-types arms the lock validation hashes, so a marker package and
+// its lock member digest identically.
+func (p *Package) object() map[string]any {
+	if p == nil {
+		return nil
+	}
+	switch p.Kind {
+	case "network-git":
+		return map[string]any{
+			"kind":       p.Kind,
+			"repository": p.Repository,
+			"commit":     map[string]any{"object_format": p.Commit.ObjectFormat, "hex": p.Commit.Hex},
+			"directory":  p.Directory,
+		}
+	case "configured-git":
+		return map[string]any{
+			"kind":      p.Kind,
+			"source":    p.Source,
+			"commit":    map[string]any{"object_format": p.Commit.ObjectFormat, "hex": p.Commit.Hex},
+			"directory": p.Directory,
+		}
+	default:
+		return map[string]any{"kind": p.Kind, "snapshot": p.Snapshot}
+	}
+}
+
+// Digest returns the sha256:<hex> content identity of the package over its
+// CCJ-1 bytes. It must agree with the lock package digest for the same
+// identity: the runtime store, status, repair, rollback and GC all follow
+// this key, and a mismatch would strand or sweep live trees.
+func (p *Package) Digest() (string, error) {
+	if !validV5Package(p) {
+		return "", fmt.Errorf("draft marker package is invalid")
+	}
+	canonical, err := protocoljson.MarshalCanonical(p.object())
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(canonical)
+	return "sha256:" + hex.EncodeToString(sum[:]), nil
 }
 
 func onlyFields(raw map[string]json.RawMessage, allowed []string) bool {
@@ -380,6 +655,15 @@ func validBuildState(m *Marker, raw map[string]json.RawMessage) bool {
 		if unixErr != nil || windowsErr != nil || (build.ArtifactPath != unixPath && build.ArtifactPath != windowsPath) {
 			return false
 		}
+		// A draft v5 marker binds receipt version 3 on every build entry,
+		// whatever the skill schema: its cache entries are receipt-3 package
+		// wrappers, so a legacy record shape can never describe them.
+		if m.SchemaVersion == SchemaV5 {
+			if !validV5Build(build) {
+				return false
+			}
+			continue
+		}
 		if m.SchemaVersion == SchemaVersion {
 			if build.Driver != buildmeta.DriverGoV1 || build.ReceiptSchemaVersion != 0 || build.ExecutionPolicy != "" || hasRepositoryState(build) {
 				return false
@@ -401,13 +685,23 @@ func hasRepositoryState(build Build) bool {
 }
 
 func validV3Build(build Build) bool {
+	return validDriverBuild(build, 1, 2)
+}
+
+// validV5Build is the marker-5 record: every retained driver field of the
+// v3/v4 record with receipt_schema_version 3 on both arms.
+func validV5Build(build Build) bool {
+	return validDriverBuild(build, buildmeta.SourceAwareSchemaVersion, buildmeta.SourceAwareSchemaVersion)
+}
+
+func validDriverBuild(build Build, localReceipt, externalReceipt int) bool {
 	if build.ExecutionPolicy != buildmeta.ExecutionPolicy {
 		return false
 	}
 	if build.Driver == buildmeta.DriverGoV1 {
-		return build.ReceiptSchemaVersion == 1 && !hasRepositoryState(build)
+		return build.ReceiptSchemaVersion == localReceipt && !hasRepositoryState(build)
 	}
-	if build.Driver != "go-repository-v1" || build.ReceiptSchemaVersion != 2 ||
+	if build.Driver != "go-repository-v1" || build.ReceiptSchemaVersion != externalReceipt ||
 		!identifiers.Valid(build.Repository) || !identifiers.Valid(build.DescriptorTarget) ||
 		build.DeclaredIdentity == nil || build.DeclaredIdentity.Kind != "network-git" || build.DeclaredIdentity.Value == "" ||
 		build.DeclaredLockedCommit == nil || build.DeclaredLockedCommit.ObjectFormat != build.ObjectFormat ||
@@ -531,7 +825,7 @@ func rawObject(raw json.RawMessage) (map[string]json.RawMessage, bool) {
 // silently reports a perfectly current installation as needing reinstallation
 // the moment the written schema advances.
 func BuildBearingSchema(version int) bool {
-	return version == SchemaVersion || externalCapableSchema(version)
+	return version == SchemaVersion || version == SchemaV5 || externalCapableSchema(version)
 }
 
 // externalCapableSchema reports whether a marker of this schema can record
@@ -546,15 +840,22 @@ func externalCapableSchema(version int) bool {
 // only the written version advances with the manifest band.
 func SupportedSchema(version int) bool {
 	return version == LegacySchemaVersion || version == SchemaVersion ||
-		version == ExternalSchemaVersion || version == PolicySchemaVersion
+		version == ExternalSchemaVersion || version == PolicySchemaVersion ||
+		version == SchemaV5
 }
 
 // Write stores the marker inside dir with sorted keys and a trailing newline.
+//
+// A marker carrying a frozen draft package is always schema 5, regardless
+// of skill manifest version; every other marker keeps the legacy
+// skill-schema band byte-identically.
 func Write(dir string, m *Marker) error {
 	if m == nil {
 		return errors.New("install marker is nil")
 	}
 	switch {
+	case m.Package != nil:
+		m.SchemaVersion = SchemaV5
 	case m.SkillSchemaVersion >= 8:
 		m.SchemaVersion = PolicySchemaVersion
 	case m.SkillSchemaVersion == 7:
@@ -638,6 +939,22 @@ func Current(installedDir string, expected *Marker, buildState ...BuildCurrentne
 	}
 	if recorded.RefKind != expected.RefKind || recorded.Ref != expected.Ref || recorded.Commit != expected.Commit {
 		return false, nil
+	}
+	// A draft marker is current only for the exact frozen package and lock
+	// generation it was installed from: a runtime-only refresh changes the
+	// package identity while the projected context stays identical, so the
+	// lock comparison below is what observes it. The expectation is staged
+	// fresh on every run, so its schema version is unset until Write; the
+	// frozen package it carries is what selects the v5 comparison. A v5
+	// marker never matches a legacy one; changed registry, substitution,
+	// declared ref, package or lock makes the installation non-current.
+	if recorded.SchemaVersion == SchemaV5 || expected.Package != nil {
+		if recorded.SchemaVersion != SchemaV5 || expected.Package == nil {
+			return false, nil
+		}
+		if !reflect.DeepEqual(recorded.Package, expected.Package) || recorded.LockSHA256 != expected.LockSHA256 {
+			return false, nil
+		}
 	}
 	if recorded.Locale != expected.Locale {
 		return false, nil

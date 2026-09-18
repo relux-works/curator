@@ -504,19 +504,23 @@ func TestMarkerRefusalSeparatesUnsupportedFromInvalid(t *testing.T) {
 			payload: `{"name":"build-skill"}`, want: stateInvalidMarker,
 		},
 		"schema from a newer manager": {
-			payload: `{"schema_version":5,"name":"build-skill"}`, want: stateUnsupportedMarker,
+			payload: fmt.Sprintf(`{"schema_version":%d,"name":"build-skill"}`, marker.NewestSchemaVersion+1),
+			want:    stateUnsupportedMarker,
 		},
 		"schema below the oldest readable": {
 			payload: `{"schema_version":0,"name":"build-skill"}`, want: stateUnsupportedMarker,
 		},
-		// Schemas 3 and 4 are readable. Calling their documents unreadable told
-		// an operator to expect a manager upgrade that does not exist, when the
-		// document itself was simply not a valid marker.
+		// Schemas 3, 4 and 5 are readable. Calling their documents unreadable
+		// told an operator to expect a manager upgrade that does not exist, when
+		// the document itself was simply not a valid marker.
 		"readable external schema that is still not a valid marker": {
 			payload: `{"schema_version":3,"name":"build-skill"}`, want: stateInvalidMarker,
 		},
 		"readable policy schema that is still not a valid marker": {
 			payload: `{"schema_version":4,"name":"build-skill"}`, want: stateInvalidMarker,
+		},
+		"readable draft schema 5 that is still not a valid marker": {
+			payload: `{"schema_version":5,"name":"build-skill"}`, want: stateInvalidMarker,
 		},
 		"build driver outside the closed set": {
 			payload: `{"schema_version":2,"name":"build-skill",` +

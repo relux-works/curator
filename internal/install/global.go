@@ -282,7 +282,7 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 		result.failBuild(planErr)
 		return result, nil
 	}
-	externalPlan, externalPlanErr := planExternalBuilds(opts.context(), "global", "global", home, nodes, nil, deps.Toolchain, opts.External, deps.Assurance, opts.DryRun)
+	externalPlan, externalPlanErr := planExternalBuilds(opts.context(), "global", "global", home, nodes, nil, nil, deps.Toolchain, opts.External, deps.Assurance, opts.DryRun)
 	if externalPlanErr != nil {
 		result.failBuild(externalPlanErr)
 		return result, nil
@@ -391,15 +391,19 @@ func stageGlobalTargets(request globalTargetRequest) (scopeTargets, error) {
 		return scopeTargets{}, err
 	}
 
+	// The global scope has no draft lane: a nil key map keeps the
+	// resolved-commit runtime behavior byte-identically.
 	runtime, err := stageRuntimeAndShims(
 		stageRoot, request.home, request.binDir, request.nodes,
 		runtimestore.GlobalCanonicalShim, request.platform, request.scoped, request.plan.plannedInputs(), request.external.entries, request.externalStoreRoot,
+		nil,
 	)
 	if err != nil {
 		return scopeTargets{}, err
 	}
 	targets.plan.Merge(runtime.plan)
 	targets.plan.Merge(request.external.transactionPlan(request.externalStoreRoot))
+	targets.adoptions = request.external.adoptions(request.externalStoreRoot)
 	targets.referencedKeys = runtime.referencedKeys()
 
 	expectedSkills := map[string]bool{}

@@ -107,18 +107,35 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
 		referenced[name] = true
 	}
 
-	base := filepath.Join(store.home, "cache", "build", buildmeta.DriverGoV1)
-	if !pathWithin(store.home, base) {
-		return result, fmt.Errorf("cache path crosses the manager-home boundary")
+	// Both namespaces are swept with one referenced-key set: a key is the
+	// digest of its own logical input, so a receipt-3 key can never name a
+	// legacy entry and vice versa. An absent namespace root is simply empty.
+	for _, sourceAware := range []bool{false, true} {
+		base, err := store.namespaceBase(sourceAware)
+		if err != nil {
+			return result, err
+		}
+		if !store.sweepNamespace(base, referenced, now, grace, &result) {
+			// The boundary below the manager home could not be proven; the
+			// same refusal applies to every namespace, so it is reported once.
+			return result, nil
+		}
 	}
+	return result, nil
+}
+
+// sweepNamespace sweeps one protected cache root. It reports false only when
+// the root's boundary was refused (an absent root is simply empty); every
+// refusal is recorded as a warning on the result.
+func (store *Store) sweepNamespace(base string, referenced map[string]bool, now time.Time, grace time.Duration, result *SweepResult) bool {
 	root, err := openSweepRoot(store.home, base)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return result, nil
+			return true
 		}
 		result.Warnings = append(result.Warnings, fmt.Sprintf(
 			"build cache sweep skipped: %v; no entry was traversed or removed", err))
-		return result, nil
+		return false
 	}
 	// The proven root stays open, and every mutation below goes through the
 	// handle-relative mutator bound to it, so no removal can follow a pathname
@@ -129,7 +146,7 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
 	if err != nil {
 		result.Warnings = append(result.Warnings, fmt.Sprintf(
 			"build cache sweep skipped: list protected cache root: %v", err))
-		return result, nil
+		return false
 	}
 	for _, name := range names {
 		switch {
@@ -137,7 +154,7 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
 			if referenced[name] {
 				continue
 			}
-			store.sweepUnreferenced(root, name, now, grace, &result)
+			store.sweepUnreferenced(root, name, now, grace, result)
 		case strings.HasPrefix(name, sweepPrefix):
 			// Manager-private wreckage of an interrupted removal: the entry is
 			// already unreachable by key, so finishing the deletion is safe.
@@ -150,7 +167,7 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
 				"build cache sweep: retained unrecognized cache root member %q; inspect it and remove it manually", name))
 		}
 	}
-	return result, nil
+	return true
 }
 
 // sweepUnreferenced classifies one unreferenced candidate and removes it only

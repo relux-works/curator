@@ -15,8 +15,14 @@ import (
 
 // Closed go-v1 metadata identifiers.
 const (
-	// SchemaVersion is the only build input and receipt schema version.
+	// SchemaVersion is the closed driver-input schema version and the legacy
+	// receipt schema version. It never changes inside the source-aware wrapper.
 	SchemaVersion = 1
+	// SourceAwareSchemaVersion is the draft-sources-v1 receipt schema: the
+	// closed driver input wrapped as input:{schema_version:3,package,build}
+	// (skillfile-sources §4 "Build receipt schema 3"). It is selected only by
+	// an Input that carries a frozen package identity.
+	SourceAwareSchemaVersion = 3
 	// DriverGoV1 is the closed local compiled-build driver identifier.
 	DriverGoV1 = "go-v1"
 
@@ -87,14 +93,20 @@ type Policy struct {
 // identities and paths only; absolute paths and timestamps are not represented.
 type Input struct {
 	SchemaVersion int
-	Driver        string
-	BuildSource   buildsource.Identity
-	BuildRoot     string
-	Command       string
-	SourceDir     string
-	Target        Target
-	Toolchain     Toolchain
-	Policy        Policy
+	// Package is the frozen source-types-v1 package identity of the skill the
+	// command belongs to. nil keeps the legacy schema-1 receipt and cache key
+	// byte-identical; a present package selects the receipt-3 wrapper, whose
+	// cache key is SHA-256 over the CCJ-1 bytes of the whole wrapped input, so
+	// no legacy entry can ever answer for it.
+	Package     *Package
+	Driver      string
+	BuildSource buildsource.Identity
+	BuildRoot   string
+	Command     string
+	SourceDir   string
+	Target      Target
+	Toolchain   Toolchain
+	Policy      Policy
 }
 
 // Artifact is the single manager-derived executable described by a receipt.
@@ -188,8 +200,26 @@ func (input Input) Validate() error {
 	if input.Policy != FixedPolicy() {
 		return fmt.Errorf("policy is not the fixed go-v1 policy")
 	}
+	if input.Package != nil {
+		if err := input.Package.Validate(); err != nil {
+			return fmt.Errorf("receipt package identity: %w", err)
+		}
+	}
 	return nil
 }
+
+// ReceiptSchemaVersion is the receipt schema this input selects: the legacy
+// schema 1 without a package identity, schema 3 with one.
+func (input Input) ReceiptSchemaVersion() int {
+	if input.Package != nil {
+		return SourceAwareSchemaVersion
+	}
+	return SchemaVersion
+}
+
+// SourceAware reports whether this input selects the receipt-3 wrapper and
+// its distinct cache namespace.
+func (input Input) SourceAware() bool { return input.Package != nil }
 
 func (target Target) validate() error {
 	if !identifiers.Valid(target.GOOS) || !identifiers.Valid(target.GOARCH) {
@@ -310,13 +340,34 @@ func inputValue(input Input) map[string]any {
 	}
 }
 
-func receiptValue(receipt Receipt) map[string]any {
+// logicalValue is the exact value the cache key hashes: the closed driver
+// input alone for the legacy schema, or the receipt-3 wrapper around it.
+func logicalValue(input Input) (map[string]any, error) {
+	build := inputValue(input)
+	if input.Package == nil {
+		return build, nil
+	}
+	if err := input.Package.Validate(); err != nil {
+		return nil, fmt.Errorf("receipt package identity: %w", err)
+	}
+	return map[string]any{
+		"schema_version": SourceAwareSchemaVersion,
+		"package":        input.Package.object(),
+		"build":          build,
+	}, nil
+}
+
+func receiptValue(receipt Receipt) (map[string]any, error) {
+	input, err := logicalValue(receipt.Input)
+	if err != nil {
+		return nil, err
+	}
 	return map[string]any{
 		"schema_version": receipt.SchemaVersion,
 		"cache_key":      string(receipt.CacheKey),
-		"input":          inputValue(receipt.Input),
+		"input":          input,
 		"artifact": map[string]any{
 			"path": receipt.Artifact.Path, "sha256": receipt.Artifact.SHA256, "size": receipt.Artifact.Size,
 		},
-	}
+	}, nil
 }

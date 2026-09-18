@@ -303,7 +303,16 @@ func Matches(record Record, sourceIdentity, commit, contentSHA256 string) bool {
 
 // Resolve combines verified records from every trusted registry under
 // deny-wins (Spec §13.3).
+//
+// A query with no network identity and no commit is unknown by
+// construction: local content has no audit-record-v1 identity, so no
+// content-hash-only coincidence may resolve it into an attestation.
+// Callers skip such packages before resolving; the guard keeps that
+// invariant inside the trust boundary too.
 func Resolve(registries []Registry, sourceIdentity, commit, contentSHA256 string, fetch FetchFn) Resolution {
+	if sourceIdentity == "" && commit == "" {
+		return Resolution{Result: ResultUnknown}
+	}
 	var warnings []string
 	var audited, deprecated *Attestation
 	for _, reg := range registries {

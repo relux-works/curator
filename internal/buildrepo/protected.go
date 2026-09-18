@@ -38,6 +38,30 @@ func (s *DiskProtectedStore) prepare() error {
 	return s.protectedDir(s.Root, true)
 }
 
+// PrepareNamespaces creates the store root and the snapshot and artifact
+// namespaces of the given receipt schema versions through the store's own
+// private directory creation, so a transaction that later renames entries
+// below them never has to invent a parent. A parent the store did not create
+// privately — an inheritable DACL on Windows, group- or world-writable or
+// foreign-owned on unix — is refused, never repaired.
+func (s *DiskProtectedStore) PrepareNamespaces(receiptSchemaVersions ...int) error {
+	if err := s.prepare(); err != nil {
+		return err
+	}
+	if err := s.protectedDir(filepath.Join(s.Root, "snapshots"), true); err != nil {
+		return err
+	}
+	for _, version := range receiptSchemaVersions {
+		if version != LegacyReceiptSchemaVersion && version != SourceAwareReceiptSchemaVersion {
+			return fmt.Errorf("unknown receipt schema version %d", version)
+		}
+		if err := s.protectedDir(filepath.Join(s.Root, ArtifactsDir(version)), true); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func cacheName(key string) (string, error) {
 	value := strings.TrimPrefix(key, "sha256:")
 	if len(value) != 64 {
@@ -189,8 +213,10 @@ func (s *DiskProtectedStore) LookupArtifact(key string, input map[string]any, mu
 	if err != nil {
 		return nil, err
 	}
-	entry := filepath.Join(s.Root, "artifacts", name)
-	if err := s.protectedDir(filepath.Join(s.Root, "artifacts"), false); err != nil {
+	version := ReceiptSchemaVersionOf(input)
+	parent := filepath.Join(s.Root, ArtifactsDir(version))
+	entry := filepath.Join(parent, name)
+	if err := s.protectedDir(parent, false); err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
@@ -202,7 +228,7 @@ func (s *DiskProtectedStore) LookupArtifact(key string, input map[string]any, mu
 		}
 		return nil, err
 	}
-	guard, err := s.protectedDirGuard(s.Root, filepath.Join(s.Root, "artifacts"), entry)
+	guard, err := s.protectedDirGuard(s.Root, parent, entry)
 	if err != nil {
 		return nil, s.corrupt(entry, CodeArtifactInvalid, mutate, err)
 	}
@@ -239,7 +265,7 @@ func (s *DiskProtectedStore) LookupArtifact(key string, input map[string]any, mu
 	if obj["cache_key"] != key || !bytes.Equal(wantInput, gotInputBytes) {
 		return nil, s.corrupt(entry, CodeReceiptInvalid, mutate, fmt.Errorf("receipt input mismatch"))
 	}
-	if len(obj) != 4 || !numberEquals(obj["schema_version"], 2) {
+	if len(obj) != 4 || !numberEquals(obj["schema_version"], version) {
 		return nil, s.corrupt(entry, CodeReceiptInvalid, mutate, fmt.Errorf("receipt closed shape mismatch"))
 	}
 	artifact, err := s.readProtectedFile(filepath.Join(entry, "artifact"), 1<<30)
@@ -281,7 +307,8 @@ func (s *DiskProtectedStore) StoreArtifact(key string, input map[string]any, _ s
 	if err != nil {
 		return nil, err
 	}
-	parent := filepath.Join(s.Root, "artifacts")
+	version := ReceiptSchemaVersionOf(input)
+	parent := filepath.Join(s.Root, ArtifactsDir(version))
 	if err = s.protectedDir(parent, true); err != nil {
 		return nil, err
 	}
@@ -308,7 +335,7 @@ func (s *DiskProtectedStore) StoreArtifact(key string, input map[string]any, _ s
 	if !ok {
 		return nil, fmt.Errorf("receipt input does not identify a portable artifact path")
 	}
-	record := map[string]any{"schema_version": 2, "cache_key": key, "input": input, "artifact": map[string]any{"path": artifactPath, "sha256": "sha256:" + hex.EncodeToString(sum[:]), "size": len(artifact)}}
+	record := map[string]any{"schema_version": version, "cache_key": key, "input": input, "artifact": map[string]any{"path": artifactPath, "sha256": "sha256:" + hex.EncodeToString(sum[:]), "size": len(artifact)}}
 	receipt, err := registry.CanonicalBytesChecked(record)
 	if err != nil {
 		return nil, err
@@ -326,6 +353,116 @@ func (s *DiskProtectedStore) StoreArtifact(key string, input map[string]any, _ s
 		return nil, err
 	}
 	return receipt, nil
+}
+
+// AdoptArtifact re-secures and proves an artifact entry that the install
+// transaction has just materialized below a prepared namespace of this store.
+//
+// The transaction publishes a staged entry by recreating every directory and
+// file as a fresh object (a mode-only copy, then a rename into the live path).
+// On unix the copied modes are the proof, so the entry is already a hit; on
+// Windows a freshly created object inherits its parent's DACL, which the
+// store's lookup refuses ("protected object DACL is inheritable"). Adoption
+// therefore applies the store's own securing routine to the entry tree and
+// then runs the ordinary exact lookup: the entry is trusted only when that
+// lookup — receipt shape, key, artifact digest, execution receipt, directory
+// and file proofs — succeeds. Nothing is created: an absent entry, an
+// unprepared namespace, a key that is not the SHA-256 of the receipt input, or
+// a receipt of another schema version is an error, and a failing entry is left
+// in place unquarantined so the evidence survives for the next lookup.
+func (s *DiskProtectedStore) AdoptArtifact(receiptSchemaVersion int, key string) error {
+	if receiptSchemaVersion != LegacyReceiptSchemaVersion && receiptSchemaVersion != SourceAwareReceiptSchemaVersion {
+		return fmt.Errorf("unknown receipt schema version %d", receiptSchemaVersion)
+	}
+	name, err := cacheName(key)
+	if err != nil {
+		return err
+	}
+	entry, err := s.adoptionEntry(filepath.Join(s.Root, ArtifactsDir(receiptSchemaVersion)), name)
+	if err != nil {
+		return err
+	}
+	receipt, err := s.readProtectedFile(filepath.Join(entry, "receipt.json"), 4<<20)
+	if err != nil {
+		return fmt.Errorf("adopt protected artifact %s: receipt: %w", name, err)
+	}
+	if err = protocoljson.Validate(receipt); err != nil {
+		return fmt.Errorf("adopt protected artifact %s: receipt: %w", name, err)
+	}
+	var obj map[string]any
+	decoder := json.NewDecoder(bytes.NewReader(receipt))
+	decoder.UseNumber()
+	if decoder.Decode(&obj) != nil {
+		return fmt.Errorf("adopt protected artifact %s: receipt JSON invalid", name)
+	}
+	input, ok := obj["input"].(map[string]any)
+	if !ok {
+		return fmt.Errorf("adopt protected artifact %s: receipt input absent", name)
+	}
+	derived, err := cacheKey(input)
+	if err != nil || derived != key || ReceiptSchemaVersionOf(input) != receiptSchemaVersion {
+		return fmt.Errorf("adopt protected artifact %s: receipt input does not derive the entry key in receipt schema %d", name, receiptSchemaVersion)
+	}
+	hit, err := s.LookupArtifact(key, input, false)
+	if err != nil {
+		return fmt.Errorf("adopt protected artifact %s: %w", name, err)
+	}
+	if hit == nil {
+		return fmt.Errorf("adopt protected artifact %s: entry is not an exact hit after adoption", name)
+	}
+	return nil
+}
+
+// AdoptSnapshot is AdoptArtifact for a protected snapshot entry the install
+// transaction materialized below the prepared snapshot namespace.
+func (s *DiskProtectedStore) AdoptSnapshot(key string) error {
+	name, err := cacheName(key)
+	if err != nil {
+		return err
+	}
+	if _, err = s.adoptionEntry(filepath.Join(s.Root, "snapshots"), name); err != nil {
+		return err
+	}
+	if _, err = s.LoadSnapshot(key, false); err != nil {
+		return fmt.Errorf("adopt protected snapshot %s: %w", name, err)
+	}
+	return nil
+}
+
+// adoptionEntry proves the store root and the namespace parent (never
+// creating either), requires the entry to be an existing real directory, and
+// re-secures the entry tree with the store's securing routine (a reparse point
+// or symbolic link inside it is refused).
+func (s *DiskProtectedStore) adoptionEntry(parent, name string) (string, error) {
+	if err := s.protectedDir(s.Root, false); err != nil {
+		return "", fmt.Errorf("adopt protected entry %s: store root: %w", name, err)
+	}
+	if err := s.protectedDir(parent, false); err != nil {
+		return "", fmt.Errorf("adopt protected entry %s: namespace %s: %w", name, filepath.Base(parent), err)
+	}
+	entry := filepath.Join(parent, name)
+	info, err := os.Lstat(entry)
+	if err != nil {
+		return "", fmt.Errorf("adopt protected entry %s: %w", name, err)
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return "", fmt.Errorf("adopt protected entry %s: not a directory", name)
+	}
+	if err := filepath.WalkDir(entry, func(_ string, item os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if item.Type()&os.ModeSymlink != 0 || (!item.IsDir() && !item.Type().IsRegular()) {
+			return fmt.Errorf("non-regular entry")
+		}
+		return nil
+	}); err != nil {
+		return "", fmt.Errorf("adopt protected entry %s: %w", name, err)
+	}
+	if err := secureProtectedTree(entry); err != nil {
+		return "", fmt.Errorf("adopt protected entry %s: secure: %w", name, err)
+	}
+	return entry, nil
 }
 
 func (s *DiskProtectedStore) readProtectedFile(name string, maxBytes int64) ([]byte, error) {
@@ -418,6 +555,7 @@ func numberEquals(value any, want int) bool {
 }
 
 func artifactPathFromInput(input map[string]any) (string, bool) {
+	input = driverInputOf(input)
 	command, ok := input["command"].(string)
 	if !ok || command == "" || strings.ContainsAny(command, "/\\") {
 		return "", false

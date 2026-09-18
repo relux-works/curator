@@ -124,7 +124,7 @@ func (store *Store) Inspect(expect Expectation) Result {
 		return Result{Status: Corrupt, Reason: "invalid assurance cache input: " + err.Error()}
 	}
 	key := buildmeta.CacheKey(assuredID)
-	entryPath, _, err := store.paths(key)
+	entryPath, _, err := store.pathsIn(key, expect.Input.SourceAware())
 	if err != nil {
 		return Result{Status: Corrupt, Reason: err.Error()}
 	}
@@ -250,7 +250,38 @@ func classifyEntry(opened *openedEntry, artifactRel, entryPath string, expect Ex
 	}
 }
 
+// Cache namespaces below <home>/cache/build. Legacy schema-1 receipts and
+// draft receipt-3 entries never share a root: a source-aware lookup can only
+// be answered by an entry published under the receipt-3 namespace, so no
+// legacy hit can satisfy it (skillfile-sources §4).
+const (
+	// Namespace is the legacy go-v1 cache root name.
+	Namespace = buildmeta.DriverGoV1
+	// SourceAwareNamespace is the distinct receipt-3 cache root name.
+	SourceAwareNamespace = buildmeta.DriverGoV1 + "-receipt-3"
+)
+
+func namespaceName(sourceAware bool) string {
+	if sourceAware {
+		return SourceAwareNamespace
+	}
+	return Namespace
+}
+
+func (store *Store) namespaceBase(sourceAware bool) (string, error) {
+	base := filepath.Join(store.home, "cache", "build", namespaceName(sourceAware))
+	if !pathWithin(store.home, base) {
+		return "", fmt.Errorf("cache path crosses the manager-home boundary")
+	}
+	return base, nil
+}
+
+// paths resolves a legacy-namespace entry; pathsIn selects the namespace.
 func (store *Store) paths(key buildmeta.CacheKey) (entry, base string, err error) {
+	return store.pathsIn(key, false)
+}
+
+func (store *Store) pathsIn(key buildmeta.CacheKey, sourceAware bool) (entry, base string, err error) {
 	keyText := string(key)
 	if !strings.HasPrefix(keyText, "sha256:") || len(keyText) != len("sha256:")+64 {
 		return "", "", fmt.Errorf("cache key is malformed")
@@ -259,9 +290,12 @@ func (store *Store) paths(key buildmeta.CacheKey) (entry, base string, err error
 	if _, err := hex.DecodeString(hexKey); err != nil || strings.ToLower(hexKey) != hexKey {
 		return "", "", fmt.Errorf("cache key is malformed")
 	}
-	base = filepath.Join(store.home, "cache", "build", buildmeta.DriverGoV1)
+	base, err = store.namespaceBase(sourceAware)
+	if err != nil {
+		return "", "", err
+	}
 	entry = filepath.Join(base, hexKey)
-	if !pathWithin(store.home, base) || !pathWithin(base, entry) {
+	if !pathWithin(base, entry) {
 		return "", "", fmt.Errorf("cache path crosses the manager-home boundary")
 	}
 	return entry, base, nil

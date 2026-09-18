@@ -125,6 +125,33 @@ func (receipt BuildSessionReceipt) ValidateFor(binding AssuranceBinding, input b
 	return nil
 }
 
+// ValidateForDigest proves this receipt belongs to the exact assurance
+// authority, an explicit build-input digest, toolchain, and artifact. The
+// digest is the SHA-256 of the canonical receipt-3 wrapper
+// (sha256(CCJ-1(receipt.input))) for the external source-aware arm, which no
+// go-v1 logical input hashes to. Every provider, nonce, toolchain, artifact,
+// and checkpoint check of ValidateFor is preserved; only the input identity
+// is supplied as a precomputed digest instead of a go-v1 logical input.
+func (receipt BuildSessionReceipt) ValidateForDigest(binding AssuranceBinding, expectedBuildInputSHA256 closuregraph.ID, toolchain buildmeta.Toolchain, artifact buildmeta.Artifact) error {
+	if err := receipt.Validate(); err != nil {
+		return err
+	}
+	if !reflect.DeepEqual(receipt.Binding, binding) {
+		return failure("assurance_evidence_mismatch", "build-session receipt assurance differs from the operation")
+	}
+	if !expectedBuildInputSHA256.Valid() {
+		return failure("verified_execution_receipt_invalid", "expected build input digest is malformed")
+	}
+	toolchainID, err := toolchainIdentity(toolchain)
+	if err != nil {
+		return err
+	}
+	if receipt.BuildInputSHA256 != expectedBuildInputSHA256 || receipt.ToolchainSHA256 != toolchainID || receipt.ArtifactSHA256 != closuregraph.ID(artifact.SHA256) {
+		return failure("verified_execution_receipt_invalid", "build-session receipt input, toolchain, or artifact differs")
+	}
+	return nil
+}
+
 // ID returns the typed receipt digest used by protected cache publication.
 func (receipt BuildSessionReceipt) ID() (closuregraph.ID, error) {
 	if err := receipt.Validate(); err != nil {
@@ -219,4 +246,44 @@ func NewVerifiedBuildSessionReceipt(binding AssuranceBinding, input buildmeta.In
 		ArtifactSHA256: closuregraph.ID(artifact.SHA256), ProviderExecutionReceipt: &providerExecutionReceipt,
 	}
 	return receipt, receipt.ValidateFor(binding, input, artifact)
+}
+
+// NewPortableBuildSessionReceiptForDigest constructs portable evidence bound
+// to an explicit build-input digest (the external receipt-3 wrapper digest)
+// instead of a go-v1 logical input. Toolchain, artifact, and controls are
+// proved exactly as in NewPortableBuildSessionReceipt.
+func NewPortableBuildSessionReceiptForDigest(expectedBuildInputSHA256 closuregraph.ID, toolchain buildmeta.Toolchain, artifact buildmeta.Artifact, controls []RuntimeControlEvidence) (BuildSessionReceipt, error) {
+	if !expectedBuildInputSHA256.Valid() {
+		return BuildSessionReceipt{}, failure("verified_execution_receipt_invalid", "expected build input digest is malformed")
+	}
+	toolchainID, err := toolchainIdentity(toolchain)
+	if err != nil {
+		return BuildSessionReceipt{}, err
+	}
+	receipt := BuildSessionReceipt{
+		ReceiptType: PortableBuildSessionReceipt, Binding: PortableAssuranceBinding(),
+		BuildInputSHA256: expectedBuildInputSHA256, ToolchainSHA256: toolchainID,
+		ArtifactSHA256: closuregraph.ID(artifact.SHA256), RuntimeControls: append([]RuntimeControlEvidence(nil), controls...),
+	}
+	return receipt, receipt.ValidateForDigest(receipt.Binding, expectedBuildInputSHA256, toolchain, artifact)
+}
+
+// NewVerifiedBuildSessionReceiptForDigest constructs the verified envelope
+// around a provider execution receipt bound to an explicit build-input digest
+// (the external receipt-3 wrapper digest). Provider linkage and all other
+// checks match NewVerifiedBuildSessionReceipt.
+func NewVerifiedBuildSessionReceiptForDigest(binding AssuranceBinding, expectedBuildInputSHA256 closuregraph.ID, toolchain buildmeta.Toolchain, artifact buildmeta.Artifact, providerExecutionReceipt closuregraph.ID) (BuildSessionReceipt, error) {
+	if !expectedBuildInputSHA256.Valid() {
+		return BuildSessionReceipt{}, failure("verified_execution_receipt_invalid", "expected build input digest is malformed")
+	}
+	toolchainID, err := toolchainIdentity(toolchain)
+	if err != nil {
+		return BuildSessionReceipt{}, err
+	}
+	receipt := BuildSessionReceipt{
+		ReceiptType: VerifiedBuildSessionReceipt, Binding: binding,
+		BuildInputSHA256: expectedBuildInputSHA256, ToolchainSHA256: toolchainID,
+		ArtifactSHA256: closuregraph.ID(artifact.SHA256), ProviderExecutionReceipt: &providerExecutionReceipt,
+	}
+	return receipt, receipt.ValidateForDigest(binding, expectedBuildInputSHA256, toolchain, artifact)
 }

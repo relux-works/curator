@@ -787,7 +787,7 @@ func TestDefaultAcquireFetchesTheDeclaredURL(t *testing.T) {
 		Declared:  buildrepo.DeclaredState{Repository: "tools", Identity: "fixture.test/repository", Transport: "https", ObjectFormat: "sha1", Commit: commit},
 		Effective: buildrepo.EffectiveState{IdentityKind: "network-git", Identity: "fixture.test/repository", Transport: "https", ObjectFormat: "sha1", Commit: commit}}
 	request, err := externalPipelineRequest(deps, source, buildrepo.OperatorSSHCredentials{}, BuildHTTPSCredentials{},
-		skillspec.Command{Name: "tool", Target: "tool"}, nil, nil, buildrepo.OperationDryRun, NewPortableBuildAuthority())
+		skillspec.Command{Name: "tool", Target: "tool"}, nil, nil, nil, buildrepo.OperationDryRun, NewPortableBuildAuthority())
 	if err != nil {
 		t.Fatal(err)
 	}

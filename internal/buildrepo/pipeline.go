@@ -14,6 +14,7 @@ import (
 
 	"github.com/relux-works/curator/internal/buildmeta"
 	"github.com/relux-works/curator/internal/closureexec"
+	"github.com/relux-works/curator/internal/closuregraph"
 	"github.com/relux-works/curator/internal/registry"
 )
 
@@ -97,6 +98,17 @@ type GoSession interface {
 // CompileRequest is the restricted target view passed to the compiler session.
 type CompileRequest struct {
 	Root, SourceDir, Command string
+	// Package is the frozen package identity of the skill whose command is
+	// compiled, or nil on the legacy lane. The compiler session binds it into
+	// the execution receipt's build_input_sha256 so that digest is the exact
+	// receipt-3 build input, never a context-only hash.
+	Package *buildmeta.Package
+	// ExpectedDigest is the exact receipt-3 wrapper digest
+	// (sha256(CCJ-1(receipt.input)) == receipt.cache_key) the execution
+	// receipt must bind on the source-aware arm, or "" on the legacy lane.
+	// A session that binds only the compiler go-v1 view digest instead is
+	// refused, even when its package matches.
+	ExpectedDigest string
 }
 
 // CompileResult carries the artifact together with the exact session receipt
@@ -148,16 +160,26 @@ type PipelineRequest struct {
 	// AssuranceCheck revalidates the same operation authority immediately at
 	// cache lookup/adoption, dispatch, and publication boundaries.
 	AssuranceCheck func(context.Context) error
+	// Package is the frozen source-types-v1 identity of the skill declaring
+	// this external command. nil keeps the legacy receipt-2 record and cache
+	// namespace byte-identical; a present package selects the receipt-3
+	// wrapper input:{schema_version:3,package,build} and its distinct
+	// artifact namespace (skillfile-sources §4).
+	Package *buildmeta.Package
 }
 
 // PipelineResult is the audited receipt-v2 result ready for transaction staging.
 type PipelineResult struct {
 	State, Code, SnapshotKey, CacheKey string
-	BuildSource                        string
-	Artifact, Receipt                  []byte
-	ExecutionReceipt                   closureexec.BuildSessionReceipt
-	Subject                            AuditSubject
-	Warnings                           []string
+	// ReceiptSchemaVersion is the receipt schema the cache key and receipt
+	// were derived under: LegacyReceiptSchemaVersion or
+	// SourceAwareReceiptSchemaVersion. It selects the artifact namespace.
+	ReceiptSchemaVersion int
+	BuildSource          string
+	Artifact, Receipt    []byte
+	ExecutionReceipt     closureexec.BuildSessionReceipt
+	Subject              AuditSubject
+	Warnings             []string
 }
 
 func (r PipelineRequest) trace(phase string) {
@@ -279,7 +301,11 @@ func RunPipeline(ctx context.Context, request PipelineRequest) (PipelineResult, 
 			return result, err
 		}
 	}
-	input := receiptInput(request, target, snapshot.Digest, request.Go.Identity())
+	input, err := receiptInput(request, target, snapshot.Digest, request.Go.Identity())
+	if err != nil {
+		return result, err
+	}
+	result.ReceiptSchemaVersion = ReceiptSchemaVersionOf(input)
 	result.CacheKey, err = cacheKey(input)
 	if err != nil {
 		return result, err
@@ -289,10 +315,27 @@ func RunPipeline(ctx context.Context, request PipelineRequest) (PipelineResult, 
 		return result, err
 	}
 	defer removeCompilerRoot()
-	compileRequest := CompileRequest{Root: compilerRoot, SourceDir: sourceDir, Command: request.Command}
+	// The source-aware arm binds the exact receipt-3 wrapper digest in the
+	// execution receipt (skillfile-sources §4, lines 289-295): the wrapper
+	// is the complete {schema_version:3,package,build} value whose SHA-256
+	// is the cache key. The compiler go-v1 view digest (build root "build"
+	// wrapped with the package) is a different value and must never satisfy
+	// this arm, even when its package matches.
+	compileRequest := CompileRequest{Root: compilerRoot, SourceDir: sourceDir, Command: request.Command, Package: request.Package}
+	if request.Package != nil {
+		compileRequest.ExpectedDigest = result.CacheKey
+	}
 	buildInput, err := request.Go.BuildInput(compileRequest)
 	if err != nil {
 		return result, fmt.Errorf("derive assured compiler input: %w", err)
+	}
+	// The session must bind exactly the package identity this build was
+	// keyed under: an execution receipt over a context-only (legacy) digest
+	// can never attest a receipt-3 entry, and a package the request never
+	// selected can never enter one. A session unable to bind it is refused
+	// before any cache adoption or dispatch instead of downgraded.
+	if !reflect.DeepEqual(buildInput.Package, request.Package) {
+		return result, admissionError(CodeReceiptInvalid, "compiler session did not bind the receipt package identity of this build")
 	}
 	request.trace("artifact-cache-lookup")
 	if err := request.AssuranceCheck(ctx); err != nil {
@@ -305,7 +348,11 @@ func RunPipeline(ctx context.Context, request PipelineRequest) (PipelineResult, 
 	if cacheErr == nil && hit != nil {
 		execution, receiptErr := closureexec.DecodeBuildSessionReceipt(hit.ExecutionReceipt)
 		if receiptErr == nil {
-			receiptErr = execution.ValidateFor(request.Assurance, buildInput, artifactMetadata(input, hit.Bytes))
+			if compileRequest.ExpectedDigest != "" {
+				receiptErr = execution.ValidateForDigest(request.Assurance, closuregraph.ID(compileRequest.ExpectedDigest), buildInput.Toolchain, artifactMetadata(input, hit.Bytes))
+			} else {
+				receiptErr = execution.ValidateFor(request.Assurance, buildInput, artifactMetadata(input, hit.Bytes))
+			}
 		}
 		if receiptErr == nil {
 			if err := validateMaterialized(root, snapshot); err != nil {
@@ -336,7 +383,11 @@ func RunPipeline(ctx context.Context, request PipelineRequest) (PipelineResult, 
 	if len(artifact) == 0 {
 		return result, admissionError(CodeArtifactInvalid, "compiler returned an empty artifact")
 	}
-	if err := compiled.ExecutionReceipt.ValidateFor(request.Assurance, buildInput, artifactMetadata(input, artifact)); err != nil {
+	if compileRequest.ExpectedDigest != "" {
+		if err := compiled.ExecutionReceipt.ValidateForDigest(request.Assurance, closuregraph.ID(compileRequest.ExpectedDigest), buildInput.Toolchain, artifactMetadata(input, artifact)); err != nil {
+			return result, admissionError(CodeReceiptInvalid, "compiler execution receipt mismatch: %v", err)
+		}
+	} else if err := compiled.ExecutionReceipt.ValidateFor(request.Assurance, buildInput, artifactMetadata(input, artifact)); err != nil {
 		return result, admissionError(CodeReceiptInvalid, "compiler execution receipt mismatch: %v", err)
 	}
 	executionBytes, err := compiled.ExecutionReceipt.CanonicalBytes()
@@ -544,7 +595,69 @@ func artifactMetadata(input map[string]any, artifact []byte) buildmeta.Artifact 
 	return buildmeta.Artifact{Path: path, SHA256: "sha256:" + hex.EncodeToString(sum[:]), Size: int64(len(artifact))}
 }
 
-func receiptInput(r PipelineRequest, target Target, digest string, tool ToolchainIdentity) map[string]any {
+// External receipt schema versions and their artifact namespaces below the
+// external build cache root. A receipt-3 lookup is answered only from the
+// receipt-3 namespace; no legacy receipt-2 hit can satisfy it.
+const (
+	// LegacyReceiptSchemaVersion is the frozen receipt-2 external record.
+	LegacyReceiptSchemaVersion = 2
+	// SourceAwareReceiptSchemaVersion is the draft receipt-3 package wrapper.
+	SourceAwareReceiptSchemaVersion = 3
+
+	legacyArtifactsDir      = "artifacts"
+	sourceAwareArtifactsDir = "artifacts-receipt-3"
+)
+
+// ArtifactsDir names the artifact namespace of one receipt schema version
+// below the external build cache root. Unknown versions map to the legacy
+// namespace name only for path rendering; lookup and publication derive the
+// version from the input shape and never from this default.
+func ArtifactsDir(receiptSchemaVersion int) string {
+	if receiptSchemaVersion == SourceAwareReceiptSchemaVersion {
+		return sourceAwareArtifactsDir
+	}
+	return legacyArtifactsDir
+}
+
+// ReceiptSchemaVersionOf reports the receipt schema a logical input selects:
+// the receipt-3 wrapper carries a package and a nested build object, the
+// legacy receipt-2 input is the closed driver input itself.
+func ReceiptSchemaVersionOf(input map[string]any) int {
+	if numberEquals(input["schema_version"], SourceAwareReceiptSchemaVersion) {
+		if _, ok := input["package"]; ok {
+			if _, ok := input["build"].(map[string]any); ok {
+				return SourceAwareReceiptSchemaVersion
+			}
+		}
+	}
+	return LegacyReceiptSchemaVersion
+}
+
+// driverInputOf returns the closed driver input: the input itself for the
+// legacy shape, the nested build object for the receipt-3 wrapper.
+func driverInputOf(input map[string]any) map[string]any {
+	if ReceiptSchemaVersionOf(input) == SourceAwareReceiptSchemaVersion {
+		return input["build"].(map[string]any)
+	}
+	return input
+}
+
+func receiptInput(r PipelineRequest, target Target, digest string, tool ToolchainIdentity) (map[string]any, error) {
+	build := legacyReceiptInput(r, target, digest, tool)
+	if r.Package == nil {
+		return build, nil
+	}
+	if err := r.Package.Validate(); err != nil {
+		return nil, fmt.Errorf("receipt package identity: %w", err)
+	}
+	return map[string]any{"schema_version": SourceAwareReceiptSchemaVersion, "package": r.Package.Object(), "build": build}, nil
+}
+
+// legacyReceiptInput is the unchanged receipt-2 driver input; inside the
+// receipt-3 wrapper it keeps every declared/effective identity, locked
+// commit, transport, substitution, target, toolchain, policy and assurance
+// field exactly as before.
+func legacyReceiptInput(r PipelineRequest, target Target, digest string, tool ToolchainIdentity) map[string]any {
 	declared := map[string]any{"identity": map[string]any{"kind": "network-git", "value": r.Declared.Identity}, "transport": r.Declared.Transport, "locked_commit": map[string]any{"object_format": r.Declared.ObjectFormat, "hex": r.Declared.Commit}}
 	if r.Declared.Tag != "" {
 		declared["tag"] = r.Declared.Tag

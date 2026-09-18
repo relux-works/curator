@@ -11,9 +11,12 @@ import (
 	"github.com/relux-works/curator/internal/buildmeta"
 	"github.com/relux-works/curator/internal/buildsource"
 	"github.com/relux-works/curator/internal/closureexec"
+	"github.com/relux-works/curator/internal/closuregraph"
 	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/marker"
 )
+
+func closuregraphID(value string) closuregraph.ID { return closuregraph.ID(value) }
 
 // BuildSession is the trusted, operation-private Go session that one staging
 // pass runs under. Only the frozen identities that enter a cache key are
@@ -65,6 +68,17 @@ type StageRequest struct {
 	Modules      []string
 	BuildRoots   []string
 	RuntimeRoots []string
+	// Package is the frozen package identity the planned receipt-3 input
+	// carries, or nil on the legacy lane. The execution receipt binds the
+	// digest of exactly that logical input in build_input_sha256; a session
+	// that cannot bind it is refused rather than downgraded.
+	Package *buildmeta.Package
+	// ExpectedBuildInputSHA256 is the exact receipt-3 wrapper digest
+	// (sha256(CCJ-1(receipt.input))) the execution receipt must bind on the
+	// external source-aware arm, or "" on the local/legacy lanes. A builder
+	// that binds only the compiler go-v1 view digest instead is refused,
+	// even when its package matches.
+	ExpectedBuildInputSHA256 string
 }
 
 // StagedArtifact is one verified operation-private output. The path is
@@ -238,8 +252,17 @@ func (goBuilder) Stage(ctx context.Context, request StageRequest) (StagedArtifac
 	for index, control := range result.Evidence.Controls {
 		controls[index] = closureexec.RuntimeControlEvidence{Name: control.Name, Availability: control.Availability, Status: control.Status}
 	}
+	// The external source-aware arm binds the exact receipt-3 wrapper digest,
+	// never the compiler go-v1 view digest.
+	if request.ExpectedBuildInputSHA256 != "" {
+		receipt, err := closureexec.NewPortableBuildSessionReceiptForDigest(closuregraphID(request.ExpectedBuildInputSHA256), session.Toolchain(), result.Artifact.Metadata, controls)
+		if err != nil {
+			return StagedArtifact{}, err
+		}
+		return StagedArtifact{Path: result.Artifact.StagedPath, Metadata: result.Artifact.Metadata, ExecutionReceipt: receipt}, nil
+	}
 	input := buildmeta.Input{
-		SchemaVersion: buildmeta.SchemaVersion, Driver: buildmeta.DriverGoV1,
+		SchemaVersion: buildmeta.SchemaVersion, Package: request.Package, Driver: buildmeta.DriverGoV1,
 		BuildSource: request.Source.Identity(), BuildRoot: request.BuildRoot,
 		Command: request.Command, SourceDir: request.SourceDir,
 		Target: session.Target(), Toolchain: session.Toolchain(), Policy: buildmeta.FixedPolicy(),

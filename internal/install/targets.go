@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/relux-works/curator/internal/buildmeta"
+	"github.com/relux-works/curator/internal/buildrepo"
 	"github.com/relux-works/curator/internal/closure"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/locale"
@@ -146,6 +147,11 @@ type runtimeStaging struct {
 // stageRuntimeAndShims derives every runtime tree, canonical launcher, and
 // stale launcher removal of one scope without touching a live path.
 //
+// runtimeKeys optionally overrides the commit-keyed runtime leaf per node:
+// the draft lane passes frozen source-v1 keys for its local-snapshot
+// members (which carry no commit) so they materialize under their package
+// identity. A nil map keeps the resolved-commit behavior byte-identically.
+//
 // A compiled command resolves through the protected cache entry that the
 // commit phase already published or verified, so a launcher can only ever point
 // at an immutable protected artifact — never at a snapshot or private path.
@@ -158,6 +164,7 @@ func stageRuntimeAndShims(
 	plannedInputs map[string]map[string]plannedBuildInput,
 	external map[string]map[string]externalEntry,
 	externalRoot string,
+	runtimeKeys map[string]string,
 ) (runtimeStaging, error) {
 	result := runtimeStaging{commands: map[string]bool{}, builds: map[string]map[string]marker.Build{}}
 	var specs []runtimestore.ShimSpec
@@ -176,8 +183,9 @@ func stageRuntimeAndShims(
 		}
 		targets := map[string]runtimestore.RuntimeTarget{}
 		if len(scriptCommands) > 0 {
+			runtimeKey := draftRuntimeKey(node, runtimeKeys)
 			runtimePlan, err := runtimestore.PrepareScriptRuntime(stageRoot, runtimestore.ScriptRuntimeSpec{
-				Home: home, SkillName: node.Name, Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
+				Home: home, SkillName: node.Name, Commit: runtimeKey, Snapshot: node.Snapshot,
 				RuntimeRoots: node.Spec.RuntimeRoots, Commands: scriptCommands, Platform: platform,
 			})
 			if err != nil {
@@ -185,7 +193,7 @@ func stageRuntimeAndShims(
 			}
 			if runtimePlan.Desired != nil {
 				result.plan.Replace(staging.ClassRuntime,
-					node.Name+"/"+node.Resolved.Commit,
+					node.Name+"/"+runtimeKey,
 					runtimePlan.Desired.LivePath, runtimePlan.Desired.StagedPath)
 			}
 			for name, target := range runtimePlan.Commands {
@@ -203,7 +211,7 @@ func stageRuntimeAndShims(
 					return runtimeStaging{}, fmt.Errorf("%s.%s: the external build was not staged", node.Name, name)
 				}
 				keyName := strings.TrimPrefix(entry.result.CacheKey, "sha256:")
-				finalArtifact := filepath.Join(externalRoot, "artifacts", keyName, "artifact")
+				finalArtifact := filepath.Join(externalRoot, buildrepo.ArtifactsDir(entry.result.ReceiptSchemaVersion), keyName, "artifact")
 				compiled, err := runtimestore.ExternalCompiledTarget(entry.artifactPath, finalArtifact,
 					entry.record.CacheKey, entry.record.ReceiptSHA256, entry.record.ArtifactSHA256, platform)
 				if err != nil {

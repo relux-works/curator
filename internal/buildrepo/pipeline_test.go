@@ -38,7 +38,7 @@ func (g recordingGo) BuildInput(request CompileRequest) (buildmeta.Input, error)
 	defer func() { _ = token.Close() }()
 	identity := g.Identity()
 	input := buildmeta.Input{
-		SchemaVersion: buildmeta.SchemaVersion, Driver: buildmeta.DriverGoV1,
+		SchemaVersion: buildmeta.SchemaVersion, Package: request.Package, Driver: buildmeta.DriverGoV1,
 		BuildSource: token.Identity(), BuildRoot: "build", Command: request.Command, SourceDir: request.SourceDir,
 		Target:    buildmeta.Target{GOOS: identity.GOOS, GOARCH: identity.GOARCH, Tuning: identity.Tuning},
 		Toolchain: buildmeta.Toolchain{Algorithm: buildmeta.ToolchainAlgorithm, ContentSHA256: identity.ContentSHA256, GoVersion: identity.GoVersion, GoRelpath: identity.GoRelpath},
@@ -62,6 +62,18 @@ func (g recordingGo) Compile(_ context.Context, request CompileRequest) (Compile
 	binding := g.assurance
 	if binding.AssuranceMode == "" {
 		binding = closureexec.PortableAssuranceBinding()
+	}
+	// The source-aware arm mints the execution receipt against the exact
+	// receipt-3 wrapper digest, never the compiler go-v1 view digest.
+	if request.ExpectedDigest != "" {
+		provider := closuregraph.ID("sha256:" + strings.Repeat("e", 64))
+		var receipt closureexec.BuildSessionReceipt
+		if binding.AssuranceMode == closureexec.AssuranceVerified {
+			receipt, err = closureexec.NewVerifiedBuildSessionReceiptForDigest(binding, closuregraph.ID(request.ExpectedDigest), input.Toolchain, metadata, provider)
+		} else {
+			receipt, err = closureexec.NewPortableBuildSessionReceiptForDigest(closuregraph.ID(request.ExpectedDigest), input.Toolchain, metadata, nil)
+		}
+		return CompileResult{Artifact: artifact, ExecutionReceipt: receipt}, err
 	}
 	var receipt closureexec.BuildSessionReceipt
 	if binding.AssuranceMode == closureexec.AssuranceVerified {
@@ -315,7 +327,7 @@ func TestExternalProtectedCacheDoesNotAdoptLegacyAssuranceBlindEntry(t *testing.
 		Audit:   func(context.Context, AuditSubject) error { return nil },
 	}
 	target := Target{BuildRoot: "tools", SourceDir: "tools/cmd/tool"}
-	legacyInput := receiptInput(request, target, snapshot.Digest, goSession.Identity())
+	legacyInput := legacyReceiptInput(request, target, snapshot.Digest, goSession.Identity())
 	delete(legacyInput, "assurance")
 	legacyKey, err := cacheKey(legacyInput)
 	if err != nil {
@@ -528,7 +540,7 @@ func TestExternalReceiptV2CacheKeyVector(t *testing.T) {
 	request := PipelineRequest{Assurance: closureexec.PortableAssuranceBinding(), Command: "golden-tool", Target: "golden-tool", Declared: DeclaredState{Repository: "golden-tools", Identity: "github.com/example/golden-tools", Transport: "https", ObjectFormat: "sha1", Commit: "0123456789abcdef0123456789abcdef01234567", Tag: "v1.4.0"}, Effective: EffectiveState{IdentityKind: "network-git", Identity: "github.com/example/golden-tools", Transport: "https", ObjectFormat: "sha1", Commit: "0123456789abcdef0123456789abcdef01234567"}}
 	target := Target{BuildRoot: ".", SourceDir: "cmd/golden-tool"}
 	tool := ToolchainIdentity{ContentSHA256: "sha256:" + strings.Repeat("c", 64), GoVersion: "go version go1.26.1 darwin/arm64", GoRelpath: "bin/go", GOOS: "darwin", GOARCH: "arm64", Tuning: map[string]string{"GOARM64": "v8.0"}}
-	key, err := cacheKey(receiptInput(request, target, "sha256:"+strings.Repeat("b", 64), tool))
+	key, err := cacheKey(legacyReceiptInput(request, target, "sha256:"+strings.Repeat("b", 64), tool))
 	if err != nil {
 		t.Fatal(err)
 	}

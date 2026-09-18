@@ -361,6 +361,11 @@ type buildPlanRequest struct {
 	nodes  []*closure.Node
 	deps   BuildDeps
 	dryRun bool
+	// packages carries the frozen source-types-v1 identity of every draft
+	// member whose builds are recorded under the receipt-3 wrapper, keyed by
+	// skill name. nil (the frozen v1 lane and every legacy member) keeps the
+	// schema-1 receipts, keys and namespace byte-identical.
+	packages map[string]*buildmeta.Package
 }
 
 // planBuilds derives the immutable build plan after every manifest, closure,
@@ -408,7 +413,7 @@ func planBuilds(ctx context.Context, request buildPlanRequest) (BuildPlan, error
 
 	var blocked []string
 	for _, item := range planned {
-		build, err := planOne(item, plan.sources[item.node.Name], target, toolchain, request.deps.Cache, request.deps.Assurance)
+		build, err := planOne(item, plan.sources[item.node.Name], request.packages[item.node.Name], target, toolchain, request.deps.Cache, request.deps.Assurance)
 		if err != nil {
 			return plan, err
 		}
@@ -483,6 +488,7 @@ func toolchainInventory(
 func planOne(
 	item plannedCommand,
 	source *buildsource.Token,
+	pkg *buildmeta.Package,
 	target buildmeta.Target,
 	toolchain buildmeta.Toolchain,
 	cache CacheInspector,
@@ -497,6 +503,7 @@ func planOne(
 	}
 	input := buildmeta.Input{
 		SchemaVersion: buildmeta.SchemaVersion,
+		Package:       pkg,
 		Driver:        buildmeta.DriverGoV1,
 		BuildSource:   source.Identity(),
 		BuildRoot:     buildRoot,

@@ -85,7 +85,10 @@ type plannedExternal struct {
 	declared   buildrepo.DeclaredState
 	effective  buildrepo.EffectiveState
 	sub        *devsub.BuildRepositorySubstitution
-	result     buildrepo.PipelineResult
+	// pkg is the frozen package identity of the declaring draft member, or
+	// nil on the legacy lane; it selects the receipt-3 wrapper and namespace.
+	pkg    *buildmeta.Package
+	result buildrepo.PipelineResult
 }
 
 type externalPlan struct {
@@ -140,7 +143,7 @@ func (deps ExternalDeps) resolved(home string) ExternalDeps {
 	return deps
 }
 
-func planExternalBuilds(ctx context.Context, scope, projectIdentity, home string, nodes []*closure.Node, substitutions map[string]map[string]devsub.BuildRepositorySubstitution, toolchain Toolchain, deps ExternalDeps, authority *BuildAuthority, dryRun bool) (externalPlan, error) {
+func planExternalBuilds(ctx context.Context, scope, projectIdentity, home string, nodes []*closure.Node, substitutions map[string]map[string]devsub.BuildRepositorySubstitution, packages map[string]*buildmeta.Package, toolchain Toolchain, deps ExternalDeps, authority *BuildAuthority, dryRun bool) (externalPlan, error) {
 	if authority == nil {
 		return externalPlan{}, fmt.Errorf("build assurance authority is absent")
 	}
@@ -164,7 +167,7 @@ func planExternalBuilds(ctx context.Context, scope, projectIdentity, home string
 		if err != nil {
 			return plan, fmt.Errorf("%s.%s: %w", item.node.Name, item.command.Name, err)
 		}
-		plan.rows = append(plan.rows, plannedExternal{node: item.node, command: item.command, repository: repository, declared: declared, effective: effective, sub: sub})
+		plan.rows = append(plan.rows, plannedExternal{node: item.node, command: item.command, repository: repository, declared: declared, effective: effective, sub: sub, pkg: packages[item.node.Name]})
 	}
 	// Credentials are selected for the whole run before the first repository is
 	// reached, so a closure holding one unselected private repository fails
@@ -184,7 +187,7 @@ func planExternalBuilds(ctx context.Context, scope, projectIdentity, home string
 	}
 	for index, row := range plan.rows {
 		source := ExternalSource{Skill: row.node.Name, Repository: row.repository.Name, GitURL: row.repository.Git, Declared: row.declared, Effective: row.effective, Substitution: row.sub}
-		request, err := externalPipelineRequest(plan.deps, source, plan.credentialsFor(row), plan.httpsCredentialsFor(row), row.command, store, identityOnlyExternalGo{identity: plan.toolchain, target: plan.targetIdentity, toolchain: plan.toolchainInput}, buildrepo.OperationDryRun, plan.authority)
+		request, err := externalPipelineRequest(plan.deps, source, plan.credentialsFor(row), plan.httpsCredentialsFor(row), row.command, row.pkg, store, identityOnlyExternalGo{identity: plan.toolchain, target: plan.targetIdentity, toolchain: plan.toolchainInput}, buildrepo.OperationDryRun, plan.authority)
 		if err != nil {
 			return plan, err
 		}
@@ -202,10 +205,15 @@ func stageExternalBuilds(ctx context.Context, plan externalPlan, toolchain Toolc
 	if len(plan.rows) == 0 {
 		return staged, nil
 	}
-	root, err := private.dir("external-cache-")
+	privateDir, err := private.dir("external-cache-")
 	if err != nil {
 		return staged, err
 	}
+	// The staging store root is created by the protected store itself, not by
+	// the temporary-directory helper: only the store's private creation yields
+	// a directory the store later proves as its own (a non-inheritable,
+	// owner-private DACL on Windows; 0700 on unix).
+	root := filepath.Join(privateDir, "store")
 	staged.root = root
 	session, err := toolchain.Establish(ctx)
 	if err != nil {
@@ -214,12 +222,15 @@ func stageExternalBuilds(ctx context.Context, plan externalPlan, toolchain Toolc
 	defer func() { _ = session.Release() }()
 	adapter := externalGoAdapter{session: session, builder: builder}
 	store := &buildrepo.DiskProtectedStore{Root: root}
+	if err := store.PrepareNamespaces(); err != nil {
+		return stagedExternal{}, err
+	}
 	for _, row := range plan.rows {
 		if row.result.State == "cache-hit" {
 			if err := plan.authority.revalidate(ctx); err != nil {
 				return stagedExternal{}, err
 			}
-			entryRoot := filepath.Join(plan.deps.StoreRoot, "artifacts", strings.TrimPrefix(row.result.CacheKey, "sha256:"))
+			entryRoot := filepath.Join(plan.deps.StoreRoot, buildrepo.ArtifactsDir(row.result.ReceiptSchemaVersion), strings.TrimPrefix(row.result.CacheKey, "sha256:"))
 			artifactPath := filepath.Join(entryRoot, "artifact")
 			artifact, readErr := os.ReadFile(artifactPath) // #nosec G304 -- manager-derived protected cache path from a validated cache key.
 			if readErr != nil {
@@ -236,7 +247,7 @@ func stageExternalBuilds(ctx context.Context, plan externalPlan, toolchain Toolc
 		}
 		// A verified final hit is copied into operation-private staging so the
 		// transaction and shim path are identical for hits and misses.
-		request, err := externalPipelineRequest(plan.deps, ExternalSource{Skill: row.node.Name, Repository: row.repository.Name, GitURL: row.repository.Git, Declared: row.declared, Effective: row.effective, Substitution: row.sub}, plan.credentialsFor(row), plan.httpsCredentialsFor(row), row.command, store, adapter, buildrepo.OperationInstall, plan.authority)
+		request, err := externalPipelineRequest(plan.deps, ExternalSource{Skill: row.node.Name, Repository: row.repository.Name, GitURL: row.repository.Git, Declared: row.declared, Effective: row.effective, Substitution: row.sub}, plan.credentialsFor(row), plan.httpsCredentialsFor(row), row.command, row.pkg, store, adapter, buildrepo.OperationInstall, plan.authority)
 		if err != nil {
 			return stagedExternal{}, err
 		}
@@ -244,7 +255,7 @@ func stageExternalBuilds(ctx context.Context, plan externalPlan, toolchain Toolc
 		if err != nil {
 			return stagedExternal{}, fmt.Errorf("%s.%s: %w", row.node.Name, row.command.Name, err)
 		}
-		entryRoot := filepath.Join(root, "artifacts", strings.TrimPrefix(result.CacheKey, "sha256:"))
+		entryRoot := filepath.Join(root, buildrepo.ArtifactsDir(result.ReceiptSchemaVersion), strings.TrimPrefix(result.CacheKey, "sha256:"))
 		artifactPath := filepath.Join(entryRoot, "artifact")
 		receiptPath := filepath.Join(entryRoot, "receipt.json")
 		artifact, err := os.ReadFile(artifactPath) // #nosec G304 -- pipeline result supplies the manager-staged artifact path.
@@ -266,7 +277,84 @@ func stageExternalBuilds(ctx context.Context, plan externalPlan, toolchain Toolc
 	if err := session.VerifyToolchain(ctx); err != nil {
 		return stagedExternal{}, err
 	}
+	if err := staged.prepareFinalNamespaces(plan.deps.StoreRoot); err != nil {
+		return stagedExternal{}, err
+	}
 	return staged, nil
+}
+
+// prepareFinalNamespaces creates, through the protected store's private
+// creation, every final-root parent the transaction will rename staged
+// entries into: the root, the snapshot namespace and the artifact namespace of
+// each receipt schema version being published. The commit's generic directory
+// scaffolding must never create a protected parent, because a parent it
+// creates is not provably private and every later lookup refuses it. Nothing
+// is prepared when no entry is published.
+func (staged stagedExternal) prepareFinalNamespaces(finalRoot string) error {
+	versions := map[int]bool{}
+	for _, commands := range staged.entries {
+		for _, entry := range commands {
+			if !entry.existing {
+				versions[entry.result.ReceiptSchemaVersion] = true
+			}
+		}
+	}
+	if len(versions) == 0 {
+		return nil
+	}
+	list := make([]int, 0, len(versions))
+	for version := range versions {
+		list = append(list, version)
+	}
+	sort.Ints(list)
+	return (&buildrepo.DiskProtectedStore{Root: finalRoot}).PrepareNamespaces(list...)
+}
+
+// externalAdoption is one protected entry the transaction publishes into the
+// final store and the commit must adopt through the store before any lookup.
+type externalAdoption struct {
+	root                 string
+	receiptSchemaVersion int
+	key                  string
+	snapshot             bool
+}
+
+func (adoption externalAdoption) adopt() error {
+	store := &buildrepo.DiskProtectedStore{Root: adoption.root}
+	if adoption.snapshot {
+		return store.AdoptSnapshot(adoption.key)
+	}
+	return store.AdoptArtifact(adoption.receiptSchemaVersion, adoption.key)
+}
+
+// adoptions lists, in commit order, every entry transactionPlan publishes into
+// the final root: the artifact entry of each newly built command and each
+// snapshot published with it. The transaction recreates these objects as fresh
+// files (a mode-only copy, then a rename), which keeps the unix proof but not
+// the Windows one; runCommit adopts each entry through the protected store
+// immediately after the journal commit so both arms are exact hits afterwards.
+func (staged stagedExternal) adoptions(finalRoot string) []externalAdoption {
+	var list []externalAdoption
+	snapshots := map[string]bool{}
+	for _, commands := range staged.entries {
+		for _, entry := range commands {
+			if entry.existing {
+				continue
+			}
+			list = append(list, externalAdoption{root: finalRoot, receiptSchemaVersion: entry.result.ReceiptSchemaVersion, key: entry.result.CacheKey})
+			if entry.result.SnapshotKey != "" && !snapshots[entry.result.SnapshotKey] {
+				snapshots[entry.result.SnapshotKey] = true
+				list = append(list, externalAdoption{root: finalRoot, key: entry.result.SnapshotKey, snapshot: true})
+			}
+		}
+	}
+	sort.Slice(list, func(i, j int) bool {
+		if list[i].snapshot != list[j].snapshot {
+			return !list[i].snapshot
+		}
+		return list[i].key < list[j].key
+	})
+	return list
 }
 
 func (staged stagedExternal) transactionPlan(finalRoot string) staging.Plan {
@@ -278,7 +366,7 @@ func (staged stagedExternal) transactionPlan(finalRoot string) staging.Plan {
 				continue
 			}
 			key := strings.TrimPrefix(entry.result.CacheKey, "sha256:")
-			plan.Replace("05-external-cache", skill+"/"+command, filepath.Join(finalRoot, "artifacts", key), filepath.Dir(entry.artifactPath))
+			plan.Replace("05-external-cache", skill+"/"+command, filepath.Join(finalRoot, buildrepo.ArtifactsDir(entry.result.ReceiptSchemaVersion), key), filepath.Dir(entry.artifactPath))
 			if entry.result.SnapshotKey != "" {
 				snapshotKey := strings.TrimPrefix(entry.result.SnapshotKey, "sha256:")
 				if !snapshots[snapshotKey] {
@@ -291,7 +379,7 @@ func (staged stagedExternal) transactionPlan(finalRoot string) staging.Plan {
 	return plan
 }
 
-func externalPipelineRequest(deps ExternalDeps, source ExternalSource, credentials buildrepo.OperatorSSHCredentials, httpsCredentials BuildHTTPSCredentials, command skillspec.Command, store buildrepo.ProtectedStore, goSession buildrepo.GoSession, operation buildrepo.Operation, authority *BuildAuthority) (buildrepo.PipelineRequest, error) {
+func externalPipelineRequest(deps ExternalDeps, source ExternalSource, credentials buildrepo.OperatorSSHCredentials, httpsCredentials BuildHTTPSCredentials, command skillspec.Command, pkg *buildmeta.Package, store buildrepo.ProtectedStore, goSession buildrepo.GoSession, operation buildrepo.Operation, authority *BuildAuthority) (buildrepo.PipelineRequest, error) {
 	if deps.Audit == nil && deps.AuditWarnings == nil {
 		return buildrepo.PipelineRequest{}, fmt.Errorf("build_repository_audit_blocked: independent external repository audit is not configured")
 	}
@@ -322,7 +410,7 @@ func externalPipelineRequest(deps ExternalDeps, source ExternalSource, credentia
 	if authority == nil {
 		return buildrepo.PipelineRequest{}, fmt.Errorf("build assurance authority is absent")
 	}
-	return buildrepo.PipelineRequest{Operation: operation, Command: command.Name, Target: command.Target, Declared: source.Declared, Effective: source.Effective, Acquire: func(ctx context.Context) (*buildrepo.Snapshot, error) { return acquire(ctx, source) }, Audit: deps.Audit, AuditWarnings: deps.AuditWarnings, Store: store, Go: goSession, SigningPolicy: deps.SigningPolicy, Assurance: authority.Binding(), AssuranceCheck: authority.revalidate}, nil
+	return buildrepo.PipelineRequest{Operation: operation, Command: command.Name, Target: command.Target, Declared: source.Declared, Effective: source.Effective, Acquire: func(ctx context.Context) (*buildrepo.Snapshot, error) { return acquire(ctx, source) }, Audit: deps.Audit, AuditWarnings: deps.AuditWarnings, Store: store, Go: goSession, SigningPolicy: deps.SigningPolicy, Assurance: authority.Binding(), AssuranceCheck: authority.revalidate, Package: pkg}, nil
 }
 
 func externalGitTool(tool buildrepo.GitTool, source ExternalSource, sshCredentials buildrepo.OperatorSSHCredentials, httpsCredentials BuildHTTPSCredentials) buildrepo.GitTool {
@@ -365,7 +453,9 @@ func (g externalGoAdapter) Compile(ctx context.Context, request buildrepo.Compil
 		return buildrepo.CompileResult{}, err
 	}
 	defer func() { _ = token.Close() }()
-	result, err := g.builder.Stage(ctx, StageRequest{Session: g.session, Source: token, CommandObject: map[string]any{"type": "build", "driver": "go-v1", "source_dir": request.SourceDir}, BuildRoot: "build", SourceDir: request.SourceDir, Command: request.Command})
+	// Thread the exact receipt-3 wrapper digest so the staged execution
+	// receipt binds sha256(CCJ-1(receipt.input)), never the compiler view.
+	result, err := g.builder.Stage(ctx, StageRequest{Session: g.session, Source: token, CommandObject: map[string]any{"type": "build", "driver": "go-v1", "source_dir": request.SourceDir}, BuildRoot: "build", SourceDir: request.SourceDir, Command: request.Command, Package: request.Package, ExpectedBuildInputSHA256: request.ExpectedDigest})
 	if err != nil {
 		return buildrepo.CompileResult{}, err
 	}
@@ -383,7 +473,7 @@ func externalBuildInput(request buildrepo.CompileRequest, target buildmeta.Targe
 	}
 	defer func() { _ = token.Close() }()
 	input := buildmeta.Input{
-		SchemaVersion: buildmeta.SchemaVersion, Driver: buildmeta.DriverGoV1,
+		SchemaVersion: buildmeta.SchemaVersion, Package: request.Package, Driver: buildmeta.DriverGoV1,
 		BuildSource: token.Identity(), BuildRoot: "build", Command: request.Command, SourceDir: request.SourceDir,
 		Target: target, Toolchain: toolchain, Policy: buildmeta.FixedPolicy(),
 	}
@@ -426,7 +516,7 @@ func effectiveRepository(projectIdentity string, repository skillspec.BuildRepos
 
 func externalMarkerBuild(row plannedExternal, result buildrepo.PipelineResult, goos, receiptHash, artifactHash string) marker.Build {
 	effective := result.Subject.Effective
-	record := marker.Build{Driver: "go-repository-v1", ReceiptSchemaVersion: 2, ExecutionPolicy: buildmeta.ExecutionPolicy, Repository: row.repository.Name, DeclaredIdentity: &marker.RepositoryIdentity{Kind: "network-git", Value: row.declared.Identity}, DeclaredLockedCommit: &marker.RepositoryCommit{ObjectFormat: row.declared.ObjectFormat, Hex: row.declared.Commit}, DeclaredTag: row.declared.Tag, EffectiveIdentity: &marker.RepositoryIdentity{Kind: row.effective.IdentityKind, Value: row.effective.Identity}, ObjectFormat: row.effective.ObjectFormat, Commit: row.effective.Commit, Substituted: row.effective.Substituted, BuildSource: &buildsource.Identity{Algorithm: buildsource.Algorithm, ContentSHA256: result.BuildSource}, DescriptorTarget: row.command.Target, CacheKey: buildmeta.CacheKey(result.CacheKey), ReceiptSHA256: buildmeta.ReceiptHash(receiptHash), ArtifactSHA256: artifactHash}
+	record := marker.Build{Driver: "go-repository-v1", ReceiptSchemaVersion: result.ReceiptSchemaVersion, ExecutionPolicy: buildmeta.ExecutionPolicy, Repository: row.repository.Name, DeclaredIdentity: &marker.RepositoryIdentity{Kind: "network-git", Value: row.declared.Identity}, DeclaredLockedCommit: &marker.RepositoryCommit{ObjectFormat: row.declared.ObjectFormat, Hex: row.declared.Commit}, DeclaredTag: row.declared.Tag, EffectiveIdentity: &marker.RepositoryIdentity{Kind: row.effective.IdentityKind, Value: row.effective.Identity}, ObjectFormat: row.effective.ObjectFormat, Commit: row.effective.Commit, Substituted: row.effective.Substituted, BuildSource: &buildsource.Identity{Algorithm: buildsource.Algorithm, ContentSHA256: result.BuildSource}, DescriptorTarget: row.command.Target, CacheKey: buildmeta.CacheKey(result.CacheKey), ReceiptSHA256: buildmeta.ReceiptHash(receiptHash), ArtifactSHA256: artifactHash}
 	record.EffectiveIdentity = &marker.RepositoryIdentity{Kind: effective.IdentityKind, Value: effective.Identity}
 	record.ObjectFormat, record.Commit, record.Substituted = effective.ObjectFormat, effective.Commit, effective.Substituted
 	record.ArtifactPath, _ = buildmeta.ArtifactPath(row.command.Name, goos)

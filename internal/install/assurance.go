@@ -8,6 +8,7 @@ import (
 	"github.com/relux-works/curator/internal/buildcache"
 	"github.com/relux-works/curator/internal/buildmeta"
 	"github.com/relux-works/curator/internal/closureexec"
+	"github.com/relux-works/curator/internal/closuregraph"
 )
 
 const buildSessionProviderCapability = "curator-build-session-provider-v1"
@@ -165,8 +166,16 @@ func (builder *assuredBuilder) Stage(ctx context.Context, request StageRequest) 
 	if err != nil {
 		return StagedArtifact{}, err
 	}
+	// The external source-aware arm validates against the exact receipt-3
+	// wrapper digest, never the compiler go-v1 view digest.
+	if request.ExpectedBuildInputSHA256 != "" {
+		if err := artifact.ExecutionReceipt.ValidateForDigest(builder.authority.binding, closuregraph.ID(request.ExpectedBuildInputSHA256), session.Toolchain(), artifact.Metadata); err != nil {
+			return StagedArtifact{}, err
+		}
+		return artifact, nil
+	}
 	input := buildmeta.Input{
-		SchemaVersion: buildmeta.SchemaVersion, Driver: buildmeta.DriverGoV1,
+		SchemaVersion: buildmeta.SchemaVersion, Package: request.Package, Driver: buildmeta.DriverGoV1,
 		BuildSource: request.Source.Identity(), BuildRoot: request.BuildRoot,
 		Command: request.Command, SourceDir: request.SourceDir,
 		Target: session.Target(), Toolchain: session.Toolchain(), Policy: buildmeta.FixedPolicy(),

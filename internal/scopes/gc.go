@@ -10,6 +10,7 @@ import (
 	"github.com/relux-works/curator/internal/buildcache"
 	"github.com/relux-works/curator/internal/buildrepo"
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/runtimestore"
 )
 
 // CollectRuntime removes runtime store entries referenced by no marker of
@@ -209,7 +210,24 @@ func markScopes(home string) marks {
 
 func (marked *marks) absorb(scope scopeMarks) {
 	for _, installed := range scope.markers {
-		marked.runtime[installed.Name+"/"+installed.Commit] = true
+		if installed.Package != nil {
+			// A draft marker keys its runtime tree by the frozen package
+			// identity in the source-v1 namespace, never by a commit: mark
+			// that leaf so the sweep keeps the live tree. An unhashable
+			// package cannot name its tree, so it is reported instead of
+			// silently unmarked.
+			digest, digestErr := installed.Package.Digest()
+			key, keyErr := runtimestore.SourceV1Key(digest)
+			if digestErr != nil || keyErr != nil {
+				marked.uncertain = append(marked.uncertain, fmt.Sprintf(
+					"installed skill %s names a draft package with no derivable runtime key; its runtime tree was left alone",
+					installed.Name))
+				continue
+			}
+			marked.runtime[installed.Name+"/"+key] = true
+		} else {
+			marked.runtime[installed.Name+"/"+installed.Commit] = true
+		}
 		// Every build-bearing schema contributes its live cache keys. A schema
 		// missing from this band is not "no builds": its recorded keys would go
 		// unmarked and the collector would delete artifacts an installation is

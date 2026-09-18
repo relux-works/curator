@@ -35,6 +35,7 @@ import (
 	"github.com/relux-works/curator/internal/scopes"
 	"github.com/relux-works/curator/internal/skillcheck"
 	"github.com/relux-works/curator/internal/skillspec"
+	"github.com/relux-works/curator/internal/sourcelock"
 )
 
 // Options control one installation run.
@@ -370,6 +371,7 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 	}
 	fetchedBefore := copySet(opts.FetchedRepos)
 	var nodes []*closure.Node
+	var draftLock *sourcelock.Lock
 	if effectiveManifest.SchemaVersion == 2 {
 		if !draftSourcesEnabled(opts) {
 			result.failf("source_selection_invalid: Skillfile schema 2 requires the draft lane; unset %s keeps frozen v1", EnvDraftSourcesV1)
@@ -383,12 +385,13 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 			result.failf("source_selection_invalid: development substitutions are not admitted with draft selectors")
 			return result, nil
 		}
-		frozenNodes, _, _, err := draftFrozenNodes(cfg.Home(), projectRoot, cfg.SkillsRoot, projectManifestPayload)
+		frozenNodes, _, lock, err := draftFrozenNodes(cfg.Home(), projectRoot, cfg.SkillsRoot, projectManifestPayload)
 		if err != nil {
 			result.failf("%v", err)
 			return result, nil
 		}
 		nodes = frozenNodes
+		draftLock = lock
 	} else {
 		built, err := closure.Build(closure.Options{
 			SkillsRoot:     cfg.SkillsRoot,
@@ -456,6 +459,22 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 					alias, node.Name))
 				break
 			}
+		}
+	}
+
+	// 12b. Draft source-audit binding (skillfile-sources §4). Draft members
+	// carry frozen package identities the shared gates below never see, so
+	// the local-attestation refusal and the source-audit-v1 validation run
+	// here, still before registry resolution and any cache or compiler
+	// work. The frozen v1 lane never sets draftLock and skips this gate.
+	if draftLock != nil {
+		sourceWarnings, err := checkDraftSourceAudit(cfg, nodes, draftLock, opts.DryRun, time.Now())
+		for _, warning := range sourceWarnings {
+			result.Messages = append(result.Messages, alias+": "+warning)
+		}
+		if err != nil {
+			result.failf("%s", err)
+			return result, nil
 		}
 	}
 
@@ -527,6 +546,21 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 	binDir := filepath.Join(projectRoot, ".agents", "bin")
 	hybridStore := scopes.HybridSkillsRoot(cfg.Home())
 	hybridNames := hybridStoreNames(nodes, projectDeclared)
+	if draftLock != nil {
+		// Collection selectors carry no manifest declaration name, so
+		// the manifest-seeded walk above strands every collection root
+		// in the machine hybrid store. The lock names the exact root
+		// set instead: members carrying a selection index are direct
+		// project selections (skillfile-sources §3), transitives stay
+		// reachable through their requirers like on the legacy lane.
+		declared := make(map[string]bool, len(draftLock.Members))
+		for _, member := range draftLock.Members {
+			if member.Selection != nil {
+				declared[member.Name] = true
+			}
+		}
+		hybridNames = hybridStoreNames(nodes, declared)
+	}
 
 	// 16. Moved tags. This gate reads installed generations, so every marker it
 	// consults joins the same optimistic observation set the declaration inputs
@@ -553,8 +587,12 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 	// 17. Build planning. This is the last read-only phase: it resolves the
 	// trusted toolchain identity and inspects protected cache state, but runs
 	// no go list or go build and writes no persistent state.
+	// Draft members installed under marker schema 5 record their builds
+	// under the receipt-3 package wrapper on both arms; every other member
+	// keeps the legacy receipts, keys and namespaces byte-identical.
+	buildPackages := draftBuildPackages(draftLock)
 	plan, planErr := planBuilds(opts.context(), buildPlanRequest{
-		scope: alias, nodes: nodes, deps: deps, dryRun: opts.DryRun,
+		scope: alias, nodes: nodes, deps: deps, dryRun: opts.DryRun, packages: buildPackages,
 	})
 	defer func() { releasePlan(&result, plan) }()
 	result.Messages = append(result.Messages, plan.Lines()...)
@@ -566,7 +604,7 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 		return result, nil
 	}
 	externalPlan, externalPlanErr := planExternalBuilds(opts.context(), alias, alias, cfg.Home(), nodes,
-		buildRepositorySubstitutions, deps.Toolchain, opts.External, deps.Assurance, opts.DryRun)
+		buildRepositorySubstitutions, buildPackages, deps.Toolchain, opts.External, deps.Assurance, opts.DryRun)
 	if externalPlanErr != nil {
 		result.failBuild(externalPlanErr)
 		return result, nil
@@ -619,6 +657,18 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 	// 20. Serialized publication and commit. Everything below the private build
 	// staging is derived and published under one manager-home mutation lock, in
 	// deterministic classes, with the machine-wide consumer ledger last.
+	// The draft lane publishes script runtimes under the frozen source-v1
+	// keys derived here, before any staging runs: a member whose package
+	// identity cannot be hashed fails before the first live mutation.
+	var runtimeKeys map[string]string
+	if draftLock != nil {
+		keys, err := draftRuntimeKeys(draftLock)
+		if err != nil {
+			result.failf("%v", err)
+			return result, nil
+		}
+		runtimeKeys = keys
+	}
 	outcome, commitErr := runCommit(opts.context(), commitRequest{
 		scope:       alias,
 		home:        cfg.Home(),
@@ -636,6 +686,7 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 				skillsDir: skillsDir, binDir: binDir, hybridStore: hybridStore,
 				plan: plan, deps: deps, scoped: scoped, verbose: opts.Verbose,
 				external: externalStaged, externalStoreRoot: externalPlan.deps.StoreRoot,
+				draftLock: draftLock, runtimeKeys: runtimeKeys,
 			})
 		},
 	})
@@ -694,6 +745,11 @@ type projectTargetRequest struct {
 	verbose           bool
 	external          stagedExternal
 	externalStoreRoot string
+	// draftLock is the consumed frozen lock on the draft lane and nil on
+	// the frozen v1 lane. runtimeKeys overrides the commit-keyed runtime
+	// leaf per node with the frozen source-v1 key.
+	draftLock   *sourcelock.Lock
+	runtimeKeys map[string]string
 }
 
 // stageProjectTargets derives the complete desired state of one project under
@@ -718,12 +774,14 @@ func stageProjectTargets(request projectTargetRequest) (scopeTargets, error) {
 	runtime, err := stageRuntimeAndShims(
 		stageRoot, request.cfg.Home(), request.binDir, request.nodes,
 		runtimestore.ProjectShim, request.platform, request.scoped, request.plan.plannedInputs(), request.external.entries, request.externalStoreRoot,
+		request.runtimeKeys,
 	)
 	if err != nil {
 		return scopeTargets{}, err
 	}
 	targets.plan.Merge(runtime.plan)
 	targets.plan.Merge(request.external.transactionPlan(request.externalStoreRoot))
+	targets.adoptions = request.external.adoptions(request.externalStoreRoot)
 	targets.referencedKeys = runtime.referencedKeys()
 
 	expectedSkills := map[string]bool{}
@@ -742,9 +800,11 @@ func stageProjectTargets(request projectTargetRequest) (scopeTargets, error) {
 		} else {
 			expectedSkills[node.Name] = true
 		}
-		expected := buildMarker(node, nodeLocale, nodeAgents, node.ActiveCommandNames(),
-			request.mcpFound[node.Name], request.attestations[node.Name],
-			runtime.builds[node.Name], request.plan.sourceIdentity(node.Name))
+		expected, err := request.buildNodeMarker(node, nodeLocale, nodeAgents,
+			runtime.builds[node.Name])
+		if err != nil {
+			return scopeTargets{}, err
+		}
 		nodePlan, status, err := stageNode(stageRoot, nodeInstall{
 			node: node, store: store, kind: kind, locale: nodeLocale, agents: nodeAgents, expected: expected,
 		}, request.deps.Clock)
@@ -967,6 +1027,35 @@ func validateNodes(nodes []*closure.Node, localeValue, alias string, result *Res
 		}
 	}
 	return valid
+}
+
+// buildNodeMarker stages the install marker of one project node. On the
+// draft lane a local-snapshot member carries no legacy source identity, so
+// it records marker schema 5 with its frozen package and binding lock;
+// every other member — frozen v1 nodes and Git draft members with their
+// accepted legacy shape — records the legacy marker byte-identically.
+func (request projectTargetRequest) buildNodeMarker(
+	node *closure.Node,
+	nodeLocale string,
+	nodeAgents []string,
+	builds map[string]marker.Build,
+) (*marker.Marker, error) {
+	active := node.ActiveCommandNames()
+	source := request.plan.sourceIdentity(node.Name)
+	if request.draftLock != nil {
+		member, ok := request.draftLock.Find(node.Name)
+		if !ok {
+			return nil, fmt.Errorf("source_member_missing: %s is not a locked member", node.Name)
+		}
+		if member.Package.Kind == sourcelock.KindLocalSnapshot {
+			return buildDraftMarker(node, member, request.draftLock.LockSHA256,
+				nodeLocale, nodeAgents, active,
+				request.mcpFound[node.Name], builds, source), nil
+		}
+	}
+	return buildMarker(node, nodeLocale, nodeAgents, active,
+		request.mcpFound[node.Name], request.attestations[node.Name],
+		builds, source), nil
 }
 
 func buildMarker(

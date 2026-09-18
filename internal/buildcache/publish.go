@@ -47,6 +47,10 @@ type PublicationResult struct {
 	ArtifactPath string
 	ReceiptHash  buildmeta.ReceiptHash
 	CacheKey     buildmeta.CacheKey
+	// SourceAware records the namespace the winner lives in: the receipt-3
+	// root when the published input carried a package identity. Revert needs
+	// it to find the same slot again.
+	SourceAware bool
 	// Quarantined is where an unusable predecessor was moved aside, and is
 	// empty when this publication displaced nothing. It is the other half of
 	// Revert: a caller that has to undo a publication it made cannot restore
@@ -232,7 +236,7 @@ func (store *Store) Publish(publication Publication, lock HomeLock) (result Publ
 		return PublicationResult{}, fmt.Errorf("rewind publication artifact: %w", err)
 	}
 
-	entryPath, base, err := store.paths(key)
+	entryPath, base, err := store.pathsIn(key, publication.Input.SourceAware())
 	if err != nil {
 		return PublicationResult{}, err
 	}
@@ -315,6 +319,7 @@ func (store *Store) Publish(publication Publication, lock HomeLock) (result Publ
 				return PublicationResult{
 					Status: ReusedWinner, ArtifactPath: winner.ArtifactPath,
 					ReceiptHash: winner.ReceiptHash, CacheKey: key, Quarantined: displaced,
+					SourceAware: publication.Input.SourceAware(),
 				}, nil
 			}
 			return PublicationResult{}, &ConflictError{Key: key}
@@ -362,6 +367,7 @@ func (store *Store) Publish(publication Publication, lock HomeLock) (result Publ
 			return PublicationResult{
 				Status: Published, ArtifactPath: winner.ArtifactPath,
 				ReceiptHash: winner.ReceiptHash, CacheKey: key, Quarantined: displaced,
+				SourceAware: publication.Input.SourceAware(),
 			}, nil
 		}
 		// A racing publisher may have selected a winner. Loop to validate it;
@@ -392,7 +398,7 @@ func (store *Store) Publish(publication Publication, lock HomeLock) (result Publ
 // the run found. The caller has one correct response to either, which is to
 // stop claiming the live cache is unchanged.
 func (store *Store) Revert(key buildmeta.CacheKey, published PublicationResult, lock HomeLock) error {
-	if _, _, err := store.paths(key); err != nil {
+	if _, _, err := store.pathsIn(key, published.SourceAware); err != nil {
 		return &StateChangedError{Key: key, Err: err}
 	}
 	if published.CacheKey != "" {
@@ -407,7 +413,7 @@ func (store *Store) Revert(key buildmeta.CacheKey, published PublicationResult, 
 	if published.Status != Published {
 		return nil
 	}
-	entryPath, base, err := store.paths(key)
+	entryPath, base, err := store.pathsIn(key, published.SourceAware)
 	if err != nil {
 		return &StateChangedError{Key: key, Err: err}
 	}

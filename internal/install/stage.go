@@ -117,6 +117,7 @@ func stageBuilds(ctx context.Context, plan BuildPlan, deps BuildDeps) (Staged, e
 			Modules:       build.modules,
 			BuildRoots:    build.buildRoots,
 			RuntimeRoots:  build.runtimeRoots,
+			Package:       build.input.Package,
 		})
 		if err != nil {
 			return Staged{}, fmt.Errorf("%s.%s: %w", build.skill, build.command, err)

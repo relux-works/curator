@@ -306,6 +306,15 @@ type fakeBuilder struct {
 	staged  []string
 	failOn  map[string]error
 	observe func(StageRequest)
+	// dropPackage makes the fake session bind the legacy context-only
+	// input digest instead of the receipt-3 package wrapper it was asked
+	// for: the negative row for "unable to bind that input MUST reject".
+	dropPackage bool
+	// bindCompilerView keeps the requested package but binds only the
+	// compiler go-v1 view digest instead of the exact receipt-3 wrapper
+	// digest: the negative row for "must not claim compatibility based on
+	// a context-only hash" when the package matches.
+	bindCompilerView bool
 }
 
 func (builder *fakeBuilder) Stage(_ context.Context, request StageRequest) (StagedArtifact, error) {
@@ -338,11 +347,26 @@ func (builder *fakeBuilder) Stage(_ context.Context, request StageRequest) (Stag
 	metadata := buildmeta.Artifact{
 		Path: relative, SHA256: "sha256:" + hex.EncodeToString(digest[:]), Size: int64(len(payload)),
 	}
+	// The external source-aware arm binds the exact receipt-3 wrapper
+	// digest; bindCompilerView simulates a session that binds only the
+	// compiler view even though its package matches.
+	if request.ExpectedBuildInputSHA256 != "" && !builder.dropPackage && !builder.bindCompilerView {
+		executionReceipt, err := closureexec.NewPortableBuildSessionReceiptForDigest(closuregraphID(request.ExpectedBuildInputSHA256), session.toolchain, metadata, nil)
+		if err != nil {
+			return StagedArtifact{}, err
+		}
+		return StagedArtifact{
+			Path: path, Metadata: metadata, ExecutionReceipt: executionReceipt,
+		}, nil
+	}
 	input := buildmeta.Input{
-		SchemaVersion: buildmeta.SchemaVersion, Driver: buildmeta.DriverGoV1,
+		SchemaVersion: buildmeta.SchemaVersion, Package: request.Package, Driver: buildmeta.DriverGoV1,
 		BuildSource: request.Source.Identity(), BuildRoot: request.BuildRoot,
 		Command: request.Command, SourceDir: request.SourceDir,
 		Target: session.target, Toolchain: session.toolchain, Policy: buildmeta.FixedPolicy(),
+	}
+	if builder.dropPackage {
+		input.Package = nil
 	}
 	executionReceipt, err := closureexec.NewPortableBuildSessionReceipt(input, metadata, nil)
 	if err != nil {

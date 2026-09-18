@@ -517,6 +517,10 @@ type scopeTargets struct {
 	// per-write BoundaryCheck plus the durable BoundaryProof, all under
 	// the serialized transaction. A nil record (only test scaffolding
 	// stages without one) skips every gate with byte-identical behavior.
+	// adoptions are the protected external build-cache entries this commit
+	// publishes; runCommit adopts each through the store right after the
+	// journal commit, before the maintenance sweep reads them.
+	adoptions  []externalAdoption
 	boundaries *staging.Boundaries
 }
 
@@ -689,6 +693,7 @@ func runCommit(ctx context.Context, request commitRequest) (outcome commitOutcom
 	}
 	committed = true
 	outcome.warnings = append(outcome.warnings, recordPublishedEnvApprovals(request, targets)...)
+	outcome.warnings = append(outcome.warnings, adoptExternalPublications(request, targets)...)
 	outcome.warnings = append(outcome.warnings, collectAfterCommit(request, lock)...)
 	return outcome, nil
 }
@@ -708,6 +713,28 @@ func recordPublishedEnvApprovals(request commitRequest, targets scopeTargets) []
 		if _, err := hookapproval.ApproveFile(request.home, target.LivePath, hookapproval.ApprovedByManager, now); err != nil {
 			warnings = append(warnings, fmt.Sprintf("%s: warning: could not record shell-hook approval for %s: %v",
 				request.scope, target.LivePath, err))
+		}
+	}
+	return warnings
+}
+
+// adoptExternalPublications re-secures and proves, through the protected
+// store, every external build-cache entry the journal commit just published
+// (see stagedExternal.adoptions). It runs still under the home lock and before
+// the maintenance sweep, which refuses an unprovable retained receipt. The
+// journal commit is durable at this point, so a failure is reported as a
+// warning naming the entry; the entry stays in place and the next lookup
+// classifies it exactly as the store proves it.
+func adoptExternalPublications(request commitRequest, targets scopeTargets) []string {
+	var warnings []string
+	for _, adoption := range targets.adoptions {
+		if err := adoption.adopt(); err != nil {
+			kind := "artifact"
+			if adoption.snapshot {
+				kind = "snapshot"
+			}
+			warnings = append(warnings, fmt.Sprintf("%s: warning: external build cache %s %s was published but could not be adopted: %v",
+				request.scope, kind, adoption.key, err))
 		}
 	}
 	return warnings

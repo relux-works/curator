@@ -29,10 +29,35 @@ func Collect(root string, referenced []string, now time.Time, grace time.Duratio
 		keep[strings.TrimPrefix(key, "sha256:")] = true
 	}
 	reachableSnapshots := map[string]bool{}
-	artifactsRoot := filepath.Join(root, "artifacts")
+	for _, version := range []int{LegacyReceiptSchemaVersion, SourceAwareReceiptSchemaVersion} {
+		removed, err = collectArtifacts(store, filepath.Join(root, ArtifactsDir(version)), keep, reachableSnapshots, now, grace, removed)
+		if err != nil {
+			return removed, err
+		}
+	}
+	snapshotsRoot := filepath.Join(root, "snapshots")
+	snapshots, readErr := os.ReadDir(snapshotsRoot)
+	if readErr != nil && !os.IsNotExist(readErr) {
+		return removed, readErr
+	}
+	for _, entry := range snapshots {
+		if entry.IsDir() && !reachableSnapshots[entry.Name()] {
+			if err := os.RemoveAll(filepath.Join(snapshotsRoot, entry.Name())); err != nil {
+				return removed, err
+			}
+			removed = append(removed, "external-snapshot:sha256:"+entry.Name())
+		}
+	}
+	sort.Strings(removed)
+	return removed, nil
+}
+
+// collectArtifacts sweeps one artifact namespace and records the snapshot
+// roots its retained receipts still reach.
+func collectArtifacts(store *DiskProtectedStore, artifactsRoot string, keep, reachableSnapshots map[string]bool, now time.Time, grace time.Duration, removed []string) ([]string, error) {
 	entries, readErr := os.ReadDir(artifactsRoot)
 	if readErr != nil && !os.IsNotExist(readErr) {
-		return nil, readErr
+		return removed, readErr
 	}
 	for _, entry := range entries {
 		if !entry.IsDir() {
@@ -64,20 +89,6 @@ func Collect(root string, referenced []string, now time.Time, grace time.Duratio
 			reachableSnapshots[strings.TrimPrefix(key, "sha256:")] = true
 		}
 	}
-	snapshotsRoot := filepath.Join(root, "snapshots")
-	snapshots, readErr := os.ReadDir(snapshotsRoot)
-	if readErr != nil && !os.IsNotExist(readErr) {
-		return removed, readErr
-	}
-	for _, entry := range snapshots {
-		if entry.IsDir() && !reachableSnapshots[entry.Name()] {
-			if err := os.RemoveAll(filepath.Join(snapshotsRoot, entry.Name())); err != nil {
-				return removed, err
-			}
-			removed = append(removed, "external-snapshot:sha256:"+entry.Name())
-		}
-	}
-	sort.Strings(removed)
 	return removed, nil
 }
 
@@ -86,7 +97,8 @@ func snapshotKeyFromReceipt(receipt map[string]any) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	source, ok := input["source"].(map[string]any)
+	// A receipt-3 wrapper keeps the effective source inside its build object.
+	source, ok := driverInputOf(input)["source"].(map[string]any)
 	if !ok {
 		return "", false
 	}

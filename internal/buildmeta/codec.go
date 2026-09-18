@@ -19,7 +19,11 @@ func (input Input) CanonicalBytes() ([]byte, error) {
 	if err := input.Validate(); err != nil {
 		return nil, err
 	}
-	return protocoljson.MarshalCanonical(inputValue(input))
+	value, err := logicalValue(input)
+	if err != nil {
+		return nil, err
+	}
+	return protocoljson.MarshalCanonical(value)
 }
 
 // CacheKey returns SHA-256 of the exact canonical logical input bytes.
@@ -38,7 +42,7 @@ func DecodeInput(payload []byte) (Input, error) {
 	if err := protocoljson.UnmarshalCanonical(payload, &raw); err != nil {
 		return Input{}, fmt.Errorf("decode build input: %w", err)
 	}
-	input, err := parseInput(raw)
+	input, err := parseLogicalInput(raw)
 	if err != nil {
 		return Input{}, err
 	}
@@ -61,17 +65,17 @@ func NewReceipt(input Input, artifact Artifact) (Receipt, error) {
 	if err != nil {
 		return Receipt{}, err
 	}
-	return Receipt{SchemaVersion: SchemaVersion, CacheKey: key, Input: input, Artifact: artifact}, nil
+	return Receipt{SchemaVersion: input.ReceiptSchemaVersion(), CacheKey: key, Input: input, Artifact: artifact}, nil
 }
 
 // Validate checks the receipt schema, its complete logical input, derived key,
 // and platform-derived artifact metadata.
 func (receipt Receipt) Validate() error {
-	if receipt.SchemaVersion != SchemaVersion {
-		return fmt.Errorf("build receipt schema_version must be %d", SchemaVersion)
-	}
 	if err := receipt.Input.Validate(); err != nil {
 		return err
+	}
+	if receipt.SchemaVersion != receipt.Input.ReceiptSchemaVersion() {
+		return fmt.Errorf("build receipt schema_version must be %d for this input", receipt.Input.ReceiptSchemaVersion())
 	}
 	wantKey, err := receipt.Input.CacheKey()
 	if err != nil {
@@ -89,7 +93,11 @@ func (receipt Receipt) CanonicalBytes() ([]byte, error) {
 	if err := receipt.Validate(); err != nil {
 		return nil, err
 	}
-	return protocoljson.MarshalCanonical(receiptValue(receipt))
+	value, err := receiptValue(receipt)
+	if err != nil {
+		return nil, err
+	}
+	return protocoljson.MarshalCanonical(value)
 }
 
 // DecodeReceipt reads an exact canonical schema-1 receipt and validates all of
@@ -114,7 +122,19 @@ func DecodeReceipt(payload []byte) (Receipt, error) {
 	if err != nil {
 		return Receipt{}, err
 	}
-	input, err := parseInput(inputObject)
+	// The receipt schema selects the input shape before any lossy decoding:
+	// a schema-1 receipt admits only the closed driver input, a schema-3
+	// receipt only the package wrapper. Neither shape is accepted under the
+	// other version, so a legacy entry can never be re-labelled source-aware.
+	var input Input
+	switch version {
+	case SchemaVersion:
+		input, err = parseInput(inputObject)
+	case SourceAwareSchemaVersion:
+		input, err = parseSourceAwareInput(inputObject)
+	default:
+		return Receipt{}, fmt.Errorf("build receipt schema_version %d is unsupported", version)
+	}
 	if err != nil {
 		return Receipt{}, err
 	}
@@ -178,6 +198,58 @@ func CheckReceiptHash(payload []byte, expected ReceiptHash) error {
 func hashBytes(payload []byte) string {
 	digest := sha256.Sum256(payload)
 	return "sha256:" + hex.EncodeToString(digest[:])
+}
+
+// parseLogicalInput decodes either logical input shape by its own
+// schema_version: 1 is the closed driver input, 3 the package wrapper.
+func parseLogicalInput(raw map[string]any) (Input, error) {
+	version, err := integerField(raw, "schema_version", "build input")
+	if err != nil {
+		return Input{}, err
+	}
+	switch version {
+	case SchemaVersion:
+		return parseInput(raw)
+	case SourceAwareSchemaVersion:
+		return parseSourceAwareInput(raw)
+	default:
+		return Input{}, fmt.Errorf("build input schema_version %d is unsupported", version)
+	}
+}
+
+// parseSourceAwareInput decodes the closed receipt-3 wrapper
+// {schema_version:3,package,build}. The package is decoded with the closed
+// source-types-v1 parser and the build with the unchanged driver-input parser,
+// so neither side admits foreign, null or duplicate fields.
+func parseSourceAwareInput(raw map[string]any) (Input, error) {
+	if err := exactFields(raw, "source-aware build input", "schema_version", "package", "build"); err != nil {
+		return Input{}, err
+	}
+	version, err := integerField(raw, "schema_version", "source-aware build input")
+	if err != nil {
+		return Input{}, err
+	}
+	if version != SourceAwareSchemaVersion {
+		return Input{}, fmt.Errorf("source-aware build input schema_version must be %d", SourceAwareSchemaVersion)
+	}
+	packageObject, err := objectField(raw, "package", "source-aware build input")
+	if err != nil {
+		return Input{}, err
+	}
+	pkg, err := parsePackage(packageObject)
+	if err != nil {
+		return Input{}, fmt.Errorf("receipt package identity: %w", err)
+	}
+	buildObject, err := objectField(raw, "build", "source-aware build input")
+	if err != nil {
+		return Input{}, err
+	}
+	input, err := parseInput(buildObject)
+	if err != nil {
+		return Input{}, err
+	}
+	input.Package = &pkg
+	return input, nil
 }
 
 func parseInput(raw map[string]any) (Input, error) {
