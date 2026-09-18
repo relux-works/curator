@@ -989,8 +989,28 @@ for _entry in $PATH; do
 	fi
 done
 IFS="$OLDIFS"
+
+# rustup present ONLY under CARGO_HOME/bin: the self-hosted runner service
+# starts from launchd with a minimal PATH and the lane shell reads no
+# profiles, so a per-user rustup (~/.cargo/bin, --no-modify-path) is
+# invisible until the installer prepends it. RUSTUP_HOME points elsewhere
+# on purpose: resolution must not depend on it.
+CARGOBIN="$WORK/fake-cargo-only/bin"
+mkdir -p "$CARGOBIN" "$WORK/empty-rustup-home"
+cp "$FAKEBIN/rustup" "$FAKEBIN/rustc" "$FAKEBIN/cargo" "$CARGOBIN/"
+: >"$WORK/rustup-log-cargo.txt"; : >"$WORK/github-path-cargo.txt"
+assert 'the installer finds rustup under CARGO_HOME/bin without PATH help' 0 \
+	env PATH="$NORUSTPATH" FAKE_RUSTUP_LOG="$WORK/rustup-log-cargo.txt" GITHUB_PATH="$WORK/github-path-cargo.txt" \
+	    CARGO_HOME="$WORK/fake-cargo-only" RUSTUP_HOME="$WORK/empty-rustup-home" \
+	    CI_RUST_TOOLCHAIN_FILE="$WORK/rust-install-channel.toml" "$BASH_ABS" "$IRS"
+assert_contains 'the CARGO_HOME-only install names the filed channel' 'toolchain install 1.92.0 --profile minimal' "$WORK/rustup-log-cargo.txt"
+assert_contains 'the CARGO_HOME bin dir is recorded for the rest of the lane' "$WORK/fake-cargo-only/bin" "$WORK/github-path-cargo.txt"
+
+# Absent from both PATH and CARGO_HOME/bin: CARGO_HOME points at an empty
+# prefix so a real ~/.cargo/bin on this host cannot leak into the row.
+mkdir -p "$WORK/empty-cargo/bin"
 assert 'a runner without rustup fails' 1 \
-	env PATH="$NORUSTPATH" GITHUB_PATH="$WORK/github-path.txt" \
+	env PATH="$NORUSTPATH" GITHUB_PATH="$WORK/github-path.txt" CARGO_HOME="$WORK/empty-cargo" \
 	    CI_RUST_TOOLCHAIN_FILE="$WORK/rust-install-channel.toml" "$BASH_ABS" "$IRS"
 assert_contains 'the failure names the runner-setup note' 'docs/self-hosted-runner-setup.md' "$WORK/out.txt"
 
