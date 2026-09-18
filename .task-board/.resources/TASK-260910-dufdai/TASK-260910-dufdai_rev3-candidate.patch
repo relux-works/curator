@@ -1,0 +1,3946 @@
+diff --git a/internal/buildcache/cache.go b/internal/buildcache/cache.go
+index 2ac5fff..c98d1c1 100644
+--- a/internal/buildcache/cache.go
++++ b/internal/buildcache/cache.go
+@@ -124,7 +124,7 @@ func (store *Store) Inspect(expect Expectation) Result {
+ 		return Result{Status: Corrupt, Reason: "invalid assurance cache input: " + err.Error()}
+ 	}
+ 	key := buildmeta.CacheKey(assuredID)
+-	entryPath, _, err := store.paths(key)
++	entryPath, _, err := store.pathsIn(key, expect.Input.SourceAware())
+ 	if err != nil {
+ 		return Result{Status: Corrupt, Reason: err.Error()}
+ 	}
+@@ -250,7 +250,38 @@ func classifyEntry(opened *openedEntry, artifactRel, entryPath string, expect Ex
+ 	}
+ }
+ 
++// Cache namespaces below <home>/cache/build. Legacy schema-1 receipts and
++// draft receipt-3 entries never share a root: a source-aware lookup can only
++// be answered by an entry published under the receipt-3 namespace, so no
++// legacy hit can satisfy it (skillfile-sources §4).
++const (
++	// Namespace is the legacy go-v1 cache root name.
++	Namespace = buildmeta.DriverGoV1
++	// SourceAwareNamespace is the distinct receipt-3 cache root name.
++	SourceAwareNamespace = buildmeta.DriverGoV1 + "-receipt-3"
++)
++
++func namespaceName(sourceAware bool) string {
++	if sourceAware {
++		return SourceAwareNamespace
++	}
++	return Namespace
++}
++
++func (store *Store) namespaceBase(sourceAware bool) (string, error) {
++	base := filepath.Join(store.home, "cache", "build", namespaceName(sourceAware))
++	if !pathWithin(store.home, base) {
++		return "", fmt.Errorf("cache path crosses the manager-home boundary")
++	}
++	return base, nil
++}
++
++// paths resolves a legacy-namespace entry; pathsIn selects the namespace.
+ func (store *Store) paths(key buildmeta.CacheKey) (entry, base string, err error) {
++	return store.pathsIn(key, false)
++}
++
++func (store *Store) pathsIn(key buildmeta.CacheKey, sourceAware bool) (entry, base string, err error) {
+ 	keyText := string(key)
+ 	if !strings.HasPrefix(keyText, "sha256:") || len(keyText) != len("sha256:")+64 {
+ 		return "", "", fmt.Errorf("cache key is malformed")
+@@ -259,9 +290,12 @@ func (store *Store) paths(key buildmeta.CacheKey) (entry, base string, err error
+ 	if _, err := hex.DecodeString(hexKey); err != nil || strings.ToLower(hexKey) != hexKey {
+ 		return "", "", fmt.Errorf("cache key is malformed")
+ 	}
+-	base = filepath.Join(store.home, "cache", "build", buildmeta.DriverGoV1)
++	base, err = store.namespaceBase(sourceAware)
++	if err != nil {
++		return "", "", err
++	}
+ 	entry = filepath.Join(base, hexKey)
+-	if !pathWithin(store.home, base) || !pathWithin(base, entry) {
++	if !pathWithin(base, entry) {
+ 		return "", "", fmt.Errorf("cache path crosses the manager-home boundary")
+ 	}
+ 	return entry, base, nil
+diff --git a/internal/buildcache/collect.go b/internal/buildcache/collect.go
+index a4f44c0..092273f 100644
+--- a/internal/buildcache/collect.go
++++ b/internal/buildcache/collect.go
+@@ -107,18 +107,35 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
+ 		referenced[name] = true
+ 	}
+ 
+-	base := filepath.Join(store.home, "cache", "build", buildmeta.DriverGoV1)
+-	if !pathWithin(store.home, base) {
+-		return result, fmt.Errorf("cache path crosses the manager-home boundary")
++	// Both namespaces are swept with one referenced-key set: a key is the
++	// digest of its own logical input, so a receipt-3 key can never name a
++	// legacy entry and vice versa. An absent namespace root is simply empty.
++	for _, sourceAware := range []bool{false, true} {
++		base, err := store.namespaceBase(sourceAware)
++		if err != nil {
++			return result, err
++		}
++		if !store.sweepNamespace(base, referenced, now, grace, &result) {
++			// The boundary below the manager home could not be proven; the
++			// same refusal applies to every namespace, so it is reported once.
++			return result, nil
++		}
+ 	}
++	return result, nil
++}
++
++// sweepNamespace sweeps one protected cache root. It reports false only when
++// the root's boundary was refused (an absent root is simply empty); every
++// refusal is recorded as a warning on the result.
++func (store *Store) sweepNamespace(base string, referenced map[string]bool, now time.Time, grace time.Duration, result *SweepResult) bool {
+ 	root, err := openSweepRoot(store.home, base)
+ 	if err != nil {
+ 		if errors.Is(err, os.ErrNotExist) {
+-			return result, nil
++			return true
+ 		}
+ 		result.Warnings = append(result.Warnings, fmt.Sprintf(
+ 			"build cache sweep skipped: %v; no entry was traversed or removed", err))
+-		return result, nil
++		return false
+ 	}
+ 	// The proven root stays open, and every mutation below goes through the
+ 	// handle-relative mutator bound to it, so no removal can follow a pathname
+@@ -129,7 +146,7 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
+ 	if err != nil {
+ 		result.Warnings = append(result.Warnings, fmt.Sprintf(
+ 			"build cache sweep skipped: list protected cache root: %v", err))
+-		return result, nil
++		return false
+ 	}
+ 	for _, name := range names {
+ 		switch {
+@@ -137,7 +154,7 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
+ 			if referenced[name] {
+ 				continue
+ 			}
+-			store.sweepUnreferenced(root, name, now, grace, &result)
++			store.sweepUnreferenced(root, name, now, grace, result)
+ 		case strings.HasPrefix(name, sweepPrefix):
+ 			// Manager-private wreckage of an interrupted removal: the entry is
+ 			// already unreachable by key, so finishing the deletion is safe.
+@@ -150,7 +167,7 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
+ 				"build cache sweep: retained unrecognized cache root member %q; inspect it and remove it manually", name))
+ 		}
+ 	}
+-	return result, nil
++	return true
+ }
+ 
+ // sweepUnreferenced classifies one unreferenced candidate and removes it only
+diff --git a/internal/buildcache/publish.go b/internal/buildcache/publish.go
+index d9d7339..dc352ba 100644
+--- a/internal/buildcache/publish.go
++++ b/internal/buildcache/publish.go
+@@ -47,6 +47,10 @@ type PublicationResult struct {
+ 	ArtifactPath string
+ 	ReceiptHash  buildmeta.ReceiptHash
+ 	CacheKey     buildmeta.CacheKey
++	// SourceAware records the namespace the winner lives in: the receipt-3
++	// root when the published input carried a package identity. Revert needs
++	// it to find the same slot again.
++	SourceAware bool
+ 	// Quarantined is where an unusable predecessor was moved aside, and is
+ 	// empty when this publication displaced nothing. It is the other half of
+ 	// Revert: a caller that has to undo a publication it made cannot restore
+@@ -232,7 +236,7 @@ func (store *Store) Publish(publication Publication, lock HomeLock) (result Publ
+ 		return PublicationResult{}, fmt.Errorf("rewind publication artifact: %w", err)
+ 	}
+ 
+-	entryPath, base, err := store.paths(key)
++	entryPath, base, err := store.pathsIn(key, publication.Input.SourceAware())
+ 	if err != nil {
+ 		return PublicationResult{}, err
+ 	}
+@@ -315,6 +319,7 @@ func (store *Store) Publish(publication Publication, lock HomeLock) (result Publ
+ 				return PublicationResult{
+ 					Status: ReusedWinner, ArtifactPath: winner.ArtifactPath,
+ 					ReceiptHash: winner.ReceiptHash, CacheKey: key, Quarantined: displaced,
++					SourceAware: publication.Input.SourceAware(),
+ 				}, nil
+ 			}
+ 			return PublicationResult{}, &ConflictError{Key: key}
+@@ -362,6 +367,7 @@ func (store *Store) Publish(publication Publication, lock HomeLock) (result Publ
+ 			return PublicationResult{
+ 				Status: Published, ArtifactPath: winner.ArtifactPath,
+ 				ReceiptHash: winner.ReceiptHash, CacheKey: key, Quarantined: displaced,
++				SourceAware: publication.Input.SourceAware(),
+ 			}, nil
+ 		}
+ 		// A racing publisher may have selected a winner. Loop to validate it;
+@@ -392,7 +398,7 @@ func (store *Store) Publish(publication Publication, lock HomeLock) (result Publ
+ // the run found. The caller has one correct response to either, which is to
+ // stop claiming the live cache is unchanged.
+ func (store *Store) Revert(key buildmeta.CacheKey, published PublicationResult, lock HomeLock) error {
+-	if _, _, err := store.paths(key); err != nil {
++	if _, _, err := store.pathsIn(key, published.SourceAware); err != nil {
+ 		return &StateChangedError{Key: key, Err: err}
+ 	}
+ 	if published.CacheKey != "" {
+@@ -407,7 +413,7 @@ func (store *Store) Revert(key buildmeta.CacheKey, published PublicationResult,
+ 	if published.Status != Published {
+ 		return nil
+ 	}
+-	entryPath, base, err := store.paths(key)
++	entryPath, base, err := store.pathsIn(key, published.SourceAware)
+ 	if err != nil {
+ 		return &StateChangedError{Key: key, Err: err}
+ 	}
+diff --git a/internal/buildcache/sourceaware_test.go b/internal/buildcache/sourceaware_test.go
+new file mode 100644
+index 0000000..502cb2e
+--- /dev/null
++++ b/internal/buildcache/sourceaware_test.go
+@@ -0,0 +1,220 @@
++package buildcache
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++	"time"
++
++	"github.com/relux-works/curator/internal/buildmeta"
++	"github.com/relux-works/curator/internal/closureexec"
++)
++
++func sourceAwareTestInput(command string) buildmeta.Input {
++	input := testInput(command)
++	input.Package = &buildmeta.Package{Kind: buildmeta.PackageKindLocalSnapshot, Snapshot: "sha256:" + strings.Repeat("ab", 32)}
++	return input
++}
++
++func entryDirs(t *testing.T, home string) (legacy, sourceAware []string) {
++	t.Helper()
++	list := func(name string) []string {
++		entries, err := os.ReadDir(filepath.Join(home, "cache", "build", name))
++		if err != nil {
++			if os.IsNotExist(err) {
++				return nil
++			}
++			t.Fatal(err)
++		}
++		var names []string
++		for _, entry := range entries {
++			names = append(names, entry.Name())
++		}
++		return names
++	}
++	return list(Namespace), list(SourceAwareNamespace)
++}
++
++// TestSourceAwarePublicationUsesTheReceipt3Namespace is the positive row:
++// a package-bearing input publishes under cache/build/go-v1-receipt-3 with a
++// schema-3 receipt, is found again by the same expectation, and leaves the
++// legacy namespace untouched.
++func TestSourceAwarePublicationUsesTheReceipt3Namespace(t *testing.T) {
++	store := newTestStore(t)
++	input := sourceAwareTestInput("tool")
++	publication, receiptHash := testPublication(t, store.Home(), input, []byte("source-aware executable"))
++	result, err := store.Publish(publication, testHomeLock{})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if result.Status != Published || !result.SourceAware || result.ReceiptHash != receiptHash {
++		t.Fatalf("publication = %+v", result)
++	}
++	legacy, sourceAware := entryDirs(t, store.Home())
++	if len(legacy) != 0 || len(sourceAware) != 1 || "sha256:"+sourceAware[0] != string(result.CacheKey) {
++		t.Fatalf("namespaces: legacy=%v receipt-3=%v key=%s", legacy, sourceAware, result.CacheKey)
++	}
++	hit := store.Inspect(Expectation{Input: input, ReceiptHash: receiptHash, Assurance: publication.Assurance})
++	if hit.Status != Hit || hit.Receipt.SchemaVersion != buildmeta.SourceAwareSchemaVersion || hit.Receipt.Input.Package == nil {
++		t.Fatalf("inspection = %+v", hit)
++	}
++	if !strings.Contains(hit.ArtifactPath, string(filepath.Separator)+SourceAwareNamespace+string(filepath.Separator)) {
++		t.Fatalf("artifact path outside the receipt-3 namespace: %s", hit.ArtifactPath)
++	}
++	again, err := store.Publish(publication, testHomeLock{})
++	if err != nil || again.Status != ReusedWinner || !again.SourceAware {
++		t.Fatalf("identical publication = %+v, %v", again, err)
++	}
++	// Revert finds the same slot through the recorded namespace.
++	if err := store.Revert(result.CacheKey, result, testHomeLock{}); err != nil {
++		t.Fatal(err)
++	}
++	if after := store.Inspect(Expectation{Input: input, Assurance: publication.Assurance}); after.Status == Hit {
++		t.Fatalf("reverted receipt-3 publication still live: %+v", after)
++	}
++}
++
++// TestNoLegacyHitSatisfiesASourceAwareLookup is the namespace negative row:
++// the same driver input published without a package is a miss for the
++// package-bearing expectation, and vice versa; an entry copied across the
++// namespace boundary is refused rather than adopted.
++func TestNoLegacyHitSatisfiesASourceAwareLookup(t *testing.T) {
++	store := newTestStore(t)
++	legacyInput := testInput("tool")
++	legacyPublication, _ := testPublication(t, store.Home(), legacyInput, []byte("legacy executable"))
++	if _, err := store.Publish(legacyPublication, testHomeLock{}); err != nil {
++		t.Fatal(err)
++	}
++	sourceAwareInput := sourceAwareTestInput("tool")
++	if miss := store.Inspect(Expectation{Input: sourceAwareInput, Assurance: legacyPublication.Assurance}); miss.Status != Miss {
++		t.Fatalf("legacy entry answered a source-aware lookup: %+v", miss)
++	}
++	publication, _ := testPublication(t, store.Home(), sourceAwareInput, []byte("source-aware executable"))
++	published, err := store.Publish(publication, testHomeLock{})
++	if err != nil {
++		t.Fatal(err)
++	}
++	other := sourceAwareTestInput("tool")
++	other.Package = &buildmeta.Package{Kind: buildmeta.PackageKindLocalSnapshot, Snapshot: "sha256:" + strings.Repeat("cd", 32)}
++	if miss := store.Inspect(Expectation{Input: other, Assurance: publication.Assurance}); miss.Status != Miss {
++		t.Fatalf("a different package identity reused the entry: %+v", miss)
++	}
++	if hit := store.Inspect(Expectation{Input: legacyInput, Assurance: legacyPublication.Assurance}); hit.Status != Hit || hit.Receipt.SchemaVersion != buildmeta.SchemaVersion {
++		t.Fatalf("legacy lookup no longer exact: %+v", hit)
++	}
++
++	// Plant the receipt-3 winner under the legacy namespace at the legacy
++	// key: the legacy expectation must not adopt a wrapper receipt.
++	legacyKey, err := testAssuredCacheKey(legacyInput, legacyPublication.Assurance)
++	if err != nil {
++		t.Fatal(err)
++	}
++	sourceAwareEntry, _, err := store.pathsIn(published.CacheKey, true)
++	if err != nil {
++		t.Fatal(err)
++	}
++	plantedEntry, _, err := store.paths(legacyKey)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.RemoveAll(plantedEntry); err != nil {
++		t.Fatal(err)
++	}
++	if err := copyTree(sourceAwareEntry, plantedEntry); err != nil {
++		t.Fatal(err)
++	}
++	planted := store.Inspect(Expectation{Input: legacyInput, Assurance: legacyPublication.Assurance})
++	if planted.Status == Hit {
++		t.Fatalf("legacy lookup adopted a planted receipt-3 entry: %+v", planted)
++	}
++	// And the legacy winner planted under the receipt-3 namespace at the
++	// source-aware key is refused for the source-aware expectation.
++	legacyEntry, _, err := store.paths(legacyKey)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.RemoveAll(legacyEntry); err != nil {
++		t.Fatal(err)
++	}
++	if err := copyTree(sourceAwareEntry, legacyEntry); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.RemoveAll(sourceAwareEntry); err != nil {
++		t.Fatal(err)
++	}
++	legacyWinner, _ := testPublication(t, store.Home(), legacyInput, []byte("legacy executable"))
++	if _, err := store.Publish(legacyWinner, testHomeLock{}); err != nil {
++		t.Fatal(err)
++	}
++	legacyEntry, _, err = store.paths(legacyKey)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := copyTree(legacyEntry, sourceAwareEntry); err != nil {
++		t.Fatal(err)
++	}
++	if planted := store.Inspect(Expectation{Input: sourceAwareInput, Assurance: publication.Assurance}); planted.Status == Hit {
++		t.Fatalf("source-aware lookup adopted a planted legacy entry: %+v", planted)
++	}
++}
++
++func copyTree(source, destination string) error {
++	return filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
++		if err != nil {
++			return err
++		}
++		rel, err := filepath.Rel(source, path)
++		if err != nil {
++			return err
++		}
++		target := filepath.Join(destination, rel)
++		if info.IsDir() {
++			return os.MkdirAll(target, info.Mode().Perm())
++		}
++		payload, err := os.ReadFile(path) // #nosec G304 -- test fixture copy
++		if err != nil {
++			return err
++		}
++		return os.WriteFile(target, payload, info.Mode().Perm())
++	})
++}
++
++// TestSweepCollectsTheReceipt3Namespace: unreferenced receipt-3 entries are
++// removed after grace and referenced ones retained, with the same key set
++// that governs the legacy namespace.
++func TestSweepCollectsTheReceipt3Namespace(t *testing.T) {
++	store := newTestStore(t)
++	binding := closureexec.PortableAssuranceBinding()
++	keep, _ := testPublication(t, store.Home(), sourceAwareTestInput("keep"), []byte("kept"))
++	kept, err := store.Publish(keep, testHomeLock{})
++	if err != nil {
++		t.Fatal(err)
++	}
++	drop, _ := testPublication(t, store.Home(), sourceAwareTestInput("drop"), []byte("dropped"))
++	dropped, err := store.Publish(drop, testHomeLock{})
++	if err != nil {
++		t.Fatal(err)
++	}
++	legacy, _ := testPublication(t, store.Home(), testInput("legacy"), []byte("legacy"))
++	legacyPublished, err := store.Publish(legacy, testHomeLock{})
++	if err != nil {
++		t.Fatal(err)
++	}
++	result, err := store.Sweep(SweepRequest{Referenced: []string{string(kept.CacheKey)}, Now: time.Now().Add(48 * time.Hour), Grace: time.Hour}, testHomeLock{})
++	if err != nil {
++		t.Fatal(err)
++	}
++	removed := strings.Join(result.Removed, "\n")
++	if !strings.Contains(removed, strings.TrimPrefix(string(dropped.CacheKey), "sha256:")) ||
++		!strings.Contains(removed, strings.TrimPrefix(string(legacyPublished.CacheKey), "sha256:")) ||
++		strings.Contains(removed, strings.TrimPrefix(string(kept.CacheKey), "sha256:")) {
++		t.Fatalf("sweep removed %v, warnings %v", result.Removed, result.Warnings)
++	}
++	if hit := store.Inspect(Expectation{Input: keep.Input, Assurance: binding}); hit.Status != Hit {
++		t.Fatalf("referenced receipt-3 entry swept: %+v", hit)
++	}
++	if miss := store.Inspect(Expectation{Input: drop.Input, Assurance: binding}); miss.Status != Miss {
++		t.Fatalf("unreferenced receipt-3 entry retained: %+v", miss)
++	}
++}
+diff --git a/internal/buildmeta/codec.go b/internal/buildmeta/codec.go
+index 6cb3c46..ecb285f 100644
+--- a/internal/buildmeta/codec.go
++++ b/internal/buildmeta/codec.go
+@@ -19,7 +19,11 @@ func (input Input) CanonicalBytes() ([]byte, error) {
+ 	if err := input.Validate(); err != nil {
+ 		return nil, err
+ 	}
+-	return protocoljson.MarshalCanonical(inputValue(input))
++	value, err := logicalValue(input)
++	if err != nil {
++		return nil, err
++	}
++	return protocoljson.MarshalCanonical(value)
+ }
+ 
+ // CacheKey returns SHA-256 of the exact canonical logical input bytes.
+@@ -38,7 +42,7 @@ func DecodeInput(payload []byte) (Input, error) {
+ 	if err := protocoljson.UnmarshalCanonical(payload, &raw); err != nil {
+ 		return Input{}, fmt.Errorf("decode build input: %w", err)
+ 	}
+-	input, err := parseInput(raw)
++	input, err := parseLogicalInput(raw)
+ 	if err != nil {
+ 		return Input{}, err
+ 	}
+@@ -61,18 +65,18 @@ func NewReceipt(input Input, artifact Artifact) (Receipt, error) {
+ 	if err != nil {
+ 		return Receipt{}, err
+ 	}
+-	return Receipt{SchemaVersion: SchemaVersion, CacheKey: key, Input: input, Artifact: artifact}, nil
++	return Receipt{SchemaVersion: input.ReceiptSchemaVersion(), CacheKey: key, Input: input, Artifact: artifact}, nil
+ }
+ 
+ // Validate checks the receipt schema, its complete logical input, derived key,
+ // and platform-derived artifact metadata.
+ func (receipt Receipt) Validate() error {
+-	if receipt.SchemaVersion != SchemaVersion {
+-		return fmt.Errorf("build receipt schema_version must be %d", SchemaVersion)
+-	}
+ 	if err := receipt.Input.Validate(); err != nil {
+ 		return err
+ 	}
++	if receipt.SchemaVersion != receipt.Input.ReceiptSchemaVersion() {
++		return fmt.Errorf("build receipt schema_version must be %d for this input", receipt.Input.ReceiptSchemaVersion())
++	}
+ 	wantKey, err := receipt.Input.CacheKey()
+ 	if err != nil {
+ 		return err
+@@ -89,7 +93,11 @@ func (receipt Receipt) CanonicalBytes() ([]byte, error) {
+ 	if err := receipt.Validate(); err != nil {
+ 		return nil, err
+ 	}
+-	return protocoljson.MarshalCanonical(receiptValue(receipt))
++	value, err := receiptValue(receipt)
++	if err != nil {
++		return nil, err
++	}
++	return protocoljson.MarshalCanonical(value)
+ }
+ 
+ // DecodeReceipt reads an exact canonical schema-1 receipt and validates all of
+@@ -114,7 +122,19 @@ func DecodeReceipt(payload []byte) (Receipt, error) {
+ 	if err != nil {
+ 		return Receipt{}, err
+ 	}
+-	input, err := parseInput(inputObject)
++	// The receipt schema selects the input shape before any lossy decoding:
++	// a schema-1 receipt admits only the closed driver input, a schema-3
++	// receipt only the package wrapper. Neither shape is accepted under the
++	// other version, so a legacy entry can never be re-labelled source-aware.
++	var input Input
++	switch version {
++	case SchemaVersion:
++		input, err = parseInput(inputObject)
++	case SourceAwareSchemaVersion:
++		input, err = parseSourceAwareInput(inputObject)
++	default:
++		return Receipt{}, fmt.Errorf("build receipt schema_version %d is unsupported", version)
++	}
+ 	if err != nil {
+ 		return Receipt{}, err
+ 	}
+@@ -180,6 +200,58 @@ func hashBytes(payload []byte) string {
+ 	return "sha256:" + hex.EncodeToString(digest[:])
+ }
+ 
++// parseLogicalInput decodes either logical input shape by its own
++// schema_version: 1 is the closed driver input, 3 the package wrapper.
++func parseLogicalInput(raw map[string]any) (Input, error) {
++	version, err := integerField(raw, "schema_version", "build input")
++	if err != nil {
++		return Input{}, err
++	}
++	switch version {
++	case SchemaVersion:
++		return parseInput(raw)
++	case SourceAwareSchemaVersion:
++		return parseSourceAwareInput(raw)
++	default:
++		return Input{}, fmt.Errorf("build input schema_version %d is unsupported", version)
++	}
++}
++
++// parseSourceAwareInput decodes the closed receipt-3 wrapper
++// {schema_version:3,package,build}. The package is decoded with the closed
++// source-types-v1 parser and the build with the unchanged driver-input parser,
++// so neither side admits foreign, null or duplicate fields.
++func parseSourceAwareInput(raw map[string]any) (Input, error) {
++	if err := exactFields(raw, "source-aware build input", "schema_version", "package", "build"); err != nil {
++		return Input{}, err
++	}
++	version, err := integerField(raw, "schema_version", "source-aware build input")
++	if err != nil {
++		return Input{}, err
++	}
++	if version != SourceAwareSchemaVersion {
++		return Input{}, fmt.Errorf("source-aware build input schema_version must be %d", SourceAwareSchemaVersion)
++	}
++	packageObject, err := objectField(raw, "package", "source-aware build input")
++	if err != nil {
++		return Input{}, err
++	}
++	pkg, err := parsePackage(packageObject)
++	if err != nil {
++		return Input{}, fmt.Errorf("receipt package identity: %w", err)
++	}
++	buildObject, err := objectField(raw, "build", "source-aware build input")
++	if err != nil {
++		return Input{}, err
++	}
++	input, err := parseInput(buildObject)
++	if err != nil {
++		return Input{}, err
++	}
++	input.Package = &pkg
++	return input, nil
++}
++
+ func parseInput(raw map[string]any) (Input, error) {
+ 	if err := exactFields(raw, "build input", "schema_version", "driver", "build_source", "build_root", "command", "source_dir", "target", "toolchain", "policy"); err != nil {
+ 		return Input{}, err
+diff --git a/internal/buildmeta/models.go b/internal/buildmeta/models.go
+index 0bff7df..32df72f 100644
+--- a/internal/buildmeta/models.go
++++ b/internal/buildmeta/models.go
+@@ -15,8 +15,14 @@ import (
+ 
+ // Closed go-v1 metadata identifiers.
+ const (
+-	// SchemaVersion is the only build input and receipt schema version.
++	// SchemaVersion is the closed driver-input schema version and the legacy
++	// receipt schema version. It never changes inside the source-aware wrapper.
+ 	SchemaVersion = 1
++	// SourceAwareSchemaVersion is the draft-sources-v1 receipt schema: the
++	// closed driver input wrapped as input:{schema_version:3,package,build}
++	// (skillfile-sources §4 "Build receipt schema 3"). It is selected only by
++	// an Input that carries a frozen package identity.
++	SourceAwareSchemaVersion = 3
+ 	// DriverGoV1 is the closed local compiled-build driver identifier.
+ 	DriverGoV1 = "go-v1"
+ 
+@@ -87,14 +93,20 @@ type Policy struct {
+ // identities and paths only; absolute paths and timestamps are not represented.
+ type Input struct {
+ 	SchemaVersion int
+-	Driver        string
+-	BuildSource   buildsource.Identity
+-	BuildRoot     string
+-	Command       string
+-	SourceDir     string
+-	Target        Target
+-	Toolchain     Toolchain
+-	Policy        Policy
++	// Package is the frozen source-types-v1 package identity of the skill the
++	// command belongs to. nil keeps the legacy schema-1 receipt and cache key
++	// byte-identical; a present package selects the receipt-3 wrapper, whose
++	// cache key is SHA-256 over the CCJ-1 bytes of the whole wrapped input, so
++	// no legacy entry can ever answer for it.
++	Package     *Package
++	Driver      string
++	BuildSource buildsource.Identity
++	BuildRoot   string
++	Command     string
++	SourceDir   string
++	Target      Target
++	Toolchain   Toolchain
++	Policy      Policy
+ }
+ 
+ // Artifact is the single manager-derived executable described by a receipt.
+@@ -188,9 +200,27 @@ func (input Input) Validate() error {
+ 	if input.Policy != FixedPolicy() {
+ 		return fmt.Errorf("policy is not the fixed go-v1 policy")
+ 	}
++	if input.Package != nil {
++		if err := input.Package.Validate(); err != nil {
++			return fmt.Errorf("receipt package identity: %w", err)
++		}
++	}
+ 	return nil
+ }
+ 
++// ReceiptSchemaVersion is the receipt schema this input selects: the legacy
++// schema 1 without a package identity, schema 3 with one.
++func (input Input) ReceiptSchemaVersion() int {
++	if input.Package != nil {
++		return SourceAwareSchemaVersion
++	}
++	return SchemaVersion
++}
++
++// SourceAware reports whether this input selects the receipt-3 wrapper and
++// its distinct cache namespace.
++func (input Input) SourceAware() bool { return input.Package != nil }
++
+ func (target Target) validate() error {
+ 	if !identifiers.Valid(target.GOOS) || !identifiers.Valid(target.GOARCH) {
+ 		return fmt.Errorf("target GOOS and GOARCH must be portable identifiers")
+@@ -310,13 +340,34 @@ func inputValue(input Input) map[string]any {
+ 	}
+ }
+ 
+-func receiptValue(receipt Receipt) map[string]any {
++// logicalValue is the exact value the cache key hashes: the closed driver
++// input alone for the legacy schema, or the receipt-3 wrapper around it.
++func logicalValue(input Input) (map[string]any, error) {
++	build := inputValue(input)
++	if input.Package == nil {
++		return build, nil
++	}
++	if err := input.Package.Validate(); err != nil {
++		return nil, fmt.Errorf("receipt package identity: %w", err)
++	}
++	return map[string]any{
++		"schema_version": SourceAwareSchemaVersion,
++		"package":        input.Package.object(),
++		"build":          build,
++	}, nil
++}
++
++func receiptValue(receipt Receipt) (map[string]any, error) {
++	input, err := logicalValue(receipt.Input)
++	if err != nil {
++		return nil, err
++	}
+ 	return map[string]any{
+ 		"schema_version": receipt.SchemaVersion,
+ 		"cache_key":      string(receipt.CacheKey),
+-		"input":          inputValue(receipt.Input),
++		"input":          input,
+ 		"artifact": map[string]any{
+ 			"path": receipt.Artifact.Path, "sha256": receipt.Artifact.SHA256, "size": receipt.Artifact.Size,
+ 		},
+-	}
++	}, nil
+ }
+diff --git a/internal/buildmeta/package.go b/internal/buildmeta/package.go
+new file mode 100644
+index 0000000..c66dbc8
+--- /dev/null
++++ b/internal/buildmeta/package.go
+@@ -0,0 +1,210 @@
++package buildmeta
++
++import (
++	"fmt"
++	"regexp"
++	"sort"
++	"strings"
++	"unicode/utf8"
++
++	"github.com/relux-works/curator/internal/identifiers"
++	"github.com/relux-works/curator/internal/identity"
++)
++
++// Frozen source-types-v1 package arms (skillfile-sources §4). The shapes are
++// disjoint: a local snapshot never carries Git fields and a Git package never
++// carries a snapshot digest. The values mirror sourcelock's package identity
++// byte for byte so a receipt-3 `input.package` compares exactly with the lock
++// member and the marker-5 `package` it was installed from; buildmeta keeps its
++// own copy because the receipt model must stay a leaf below the build drivers.
++const (
++	PackageKindLocalSnapshot = "local-snapshot"
++	PackageKindNetworkGit    = "network-git"
++	PackageKindConfiguredGit = "configured-git"
++)
++
++var (
++	packageDigestRE    = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
++	packageSHA1RE      = regexp.MustCompile(`^[0-9a-f]{40}$`)
++	packageSHA256HexRE = regexp.MustCompile(`^[0-9a-f]{64}$`)
++)
++
++// PackageCommit is a locked Git object: format-bound lowercase hex, never a
++// snapshot digest and never prefixed.
++type PackageCommit struct {
++	ObjectFormat string
++	Hex          string
++}
++
++// Package is the frozen package identity a receipt-3 build input binds.
++// Exactly one arm is populated; Validate refuses every cross-arm field.
++type Package struct {
++	Kind       string
++	Snapshot   string         // local-snapshot only: sha256:<hex> inventory digest
++	Repository string         // network-git only: canonical host/path
++	Source     string         // configured-git only: legacy configured-root path
++	Commit     *PackageCommit // Git arms only
++	Directory  string         // Git arms only: effective per-member directory
++}
++
++// Validate enforces the disjoint arm shapes of source-types schema 1.
++func (p Package) Validate() error {
++	switch p.Kind {
++	case PackageKindLocalSnapshot:
++		if !packageDigestRE.MatchString(p.Snapshot) {
++			return fmt.Errorf("package snapshot must be sha256:<64 lowercase hex>")
++		}
++		if p.Repository != "" || p.Source != "" || p.Commit != nil || p.Directory != "" {
++			return fmt.Errorf("local-snapshot package must not carry Git identity")
++		}
++	case PackageKindNetworkGit:
++		if p.Snapshot != "" || p.Source != "" {
++			return fmt.Errorf("network-git package must not carry snapshot or configured source")
++		}
++		if !validPackageRepository(p.Repository) {
++			return fmt.Errorf("package repository must be canonical host/path")
++		}
++		if err := p.Commit.validate(); err != nil {
++			return err
++		}
++		if p.Directory != "." && (!identifiers.PortablePath(p.Directory) || strings.ContainsAny(p.Directory, "*?[]")) {
++			return fmt.Errorf("package directory must be '.' or a portable contained path")
++		}
++	case PackageKindConfiguredGit:
++		if p.Snapshot != "" || p.Repository != "" {
++			return fmt.Errorf("configured-git package must not carry snapshot or network repository")
++		}
++		if !identifiers.PortablePath(p.Source) {
++			return fmt.Errorf("package source must be a portable configured-root path")
++		}
++		if err := p.Commit.validate(); err != nil {
++			return err
++		}
++		if p.Directory != "." {
++			return fmt.Errorf("configured-git package directory must be '.'")
++		}
++	default:
++		return fmt.Errorf("unknown package kind %q", p.Kind)
++	}
++	return nil
++}
++
++func (c *PackageCommit) validate() error {
++	if c == nil {
++		return fmt.Errorf("package commit is required")
++	}
++	switch c.ObjectFormat {
++	case "sha1":
++		if !packageSHA1RE.MatchString(c.Hex) {
++			return fmt.Errorf("sha1 package commit must be 40 lowercase hex")
++		}
++	case "sha256":
++		if !packageSHA256HexRE.MatchString(c.Hex) {
++			return fmt.Errorf("sha256 package commit must be 64 lowercase hex")
++		}
++	default:
++		return fmt.Errorf("package commit object_format must be sha1 or sha256")
++	}
++	return nil
++}
++
++func validPackageRepository(value string) bool {
++	if value == "" || utf8.RuneCountInString(value) > 4096 || strings.HasSuffix(value, ".git") {
++		return false
++	}
++	return identity.ValidCanonical(value)
++}
++
++// Object returns the closed source-types-v1 value: exactly the fields of
++// one arm. Callers validate first; an invalid package renders an object no
++// receipt decoder accepts.
++func (p Package) Object() map[string]any { return p.object() }
++
++// object is the closed source-types-v1 value: exactly the fields of one arm.
++func (p Package) object() map[string]any {
++	switch p.Kind {
++	case PackageKindNetworkGit:
++		return map[string]any{
++			"kind":       p.Kind,
++			"repository": p.Repository,
++			"commit":     map[string]any{"object_format": p.Commit.ObjectFormat, "hex": p.Commit.Hex},
++			"directory":  p.Directory,
++		}
++	case PackageKindConfiguredGit:
++		return map[string]any{
++			"kind":      p.Kind,
++			"source":    p.Source,
++			"commit":    map[string]any{"object_format": p.Commit.ObjectFormat, "hex": p.Commit.Hex},
++			"directory": p.Directory,
++		}
++	default:
++		return map[string]any{"kind": p.Kind, "snapshot": p.Snapshot}
++	}
++}
++
++// parsePackage decodes the closed package object: the exact field set of the
++// declared arm, string-typed members, then the same validation as Validate.
++// Null, foreign-arm and unknown fields are refused before any value is used.
++func parsePackage(raw map[string]any) (Package, error) {
++	kind, err := stringField(raw, "kind", "package")
++	if err != nil {
++		return Package{}, err
++	}
++	var allowed []string
++	switch kind {
++	case PackageKindLocalSnapshot:
++		allowed = []string{"kind", "snapshot"}
++	case PackageKindNetworkGit:
++		allowed = []string{"kind", "repository", "commit", "directory"}
++	case PackageKindConfiguredGit:
++		allowed = []string{"kind", "source", "commit", "directory"}
++	default:
++		return Package{}, fmt.Errorf("unknown package kind %q", kind)
++	}
++	sort.Strings(allowed)
++	if err := exactFields(raw, "package", allowed...); err != nil {
++		return Package{}, err
++	}
++	parsed := Package{Kind: kind}
++	for _, field := range allowed {
++		switch field {
++		case "kind":
++		case "commit":
++			commitObject, err := objectField(raw, "commit", "package")
++			if err != nil {
++				return Package{}, err
++			}
++			if err := exactFields(commitObject, "package commit", "hex", "object_format"); err != nil {
++				return Package{}, err
++			}
++			format, err := stringField(commitObject, "object_format", "package commit")
++			if err != nil {
++				return Package{}, err
++			}
++			hexValue, err := stringField(commitObject, "hex", "package commit")
++			if err != nil {
++				return Package{}, err
++			}
++			parsed.Commit = &PackageCommit{ObjectFormat: format, Hex: hexValue}
++		default:
++			value, err := stringField(raw, field, "package")
++			if err != nil {
++				return Package{}, err
++			}
++			switch field {
++			case "snapshot":
++				parsed.Snapshot = value
++			case "repository":
++				parsed.Repository = value
++			case "source":
++				parsed.Source = value
++			case "directory":
++				parsed.Directory = value
++			}
++		}
++	}
++	if err := parsed.Validate(); err != nil {
++		return Package{}, err
++	}
++	return parsed, nil
++}
+diff --git a/internal/buildmeta/receipt_v3_test.go b/internal/buildmeta/receipt_v3_test.go
+new file mode 100644
+index 0000000..24afae9
+--- /dev/null
++++ b/internal/buildmeta/receipt_v3_test.go
+@@ -0,0 +1,355 @@
++package buildmeta
++
++import (
++	"bytes"
++	"crypto/sha256"
++	"encoding/hex"
++	"encoding/json"
++	"reflect"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/protocoljson"
++	"github.com/relux-works/curator/internal/sourcelock"
++)
++
++func localPackage() *Package {
++	return &Package{Kind: PackageKindLocalSnapshot, Snapshot: "sha256:" + strings.Repeat("ab", 32)}
++}
++
++func networkPackage() *Package {
++	return &Package{Kind: PackageKindNetworkGit, Repository: "git.example.com/skills/tools",
++		Commit: &PackageCommit{ObjectFormat: "sha1", Hex: strings.Repeat("1", 40)}, Directory: "skills/tool"}
++}
++
++func configuredPackage() *Package {
++	return &Package{Kind: PackageKindConfiguredGit, Source: "vendor/tools",
++		Commit: &PackageCommit{ObjectFormat: "sha256", Hex: strings.Repeat("2", 64)}, Directory: "."}
++}
++
++func sourceAwareInput(pkg *Package) Input {
++	input := goldenInput()
++	input.Package = pkg
++	return input
++}
++
++func sha256Text(payload []byte) string {
++	sum := sha256.Sum256(payload)
++	return "sha256:" + hex.EncodeToString(sum[:])
++}
++
++// TestSourceAwareReceiptWrapsTheClosedDriverInput is the positive row of
++// skillfile-sources §4 "Build receipt schema 3": the receipt is
++// {schema_version:3, cache_key, input:{schema_version:3,package,build}, artifact},
++// the build is the unchanged schema-1 driver input, and the cache key is the
++// SHA-256 of the CCJ-1 bytes of the whole wrapped input.
++func TestSourceAwareReceiptWrapsTheClosedDriverInput(t *testing.T) {
++	for name, pkg := range map[string]*Package{"local-snapshot": localPackage(), "network-git": networkPackage(), "configured-git": configuredPackage()} {
++		t.Run(name, func(t *testing.T) {
++			input := sourceAwareInput(pkg)
++			if input.ReceiptSchemaVersion() != SourceAwareSchemaVersion || !input.SourceAware() {
++				t.Fatalf("input did not select receipt schema 3")
++			}
++			logical, err := input.CanonicalBytes()
++			if err != nil {
++				t.Fatal(err)
++			}
++			var wrapper map[string]json.RawMessage
++			if err := json.Unmarshal(logical, &wrapper); err != nil {
++				t.Fatal(err)
++			}
++			if len(wrapper) != 3 || string(wrapper["schema_version"]) != "3" {
++				t.Fatalf("wrapper shape = %s", logical)
++			}
++			legacy, err := goldenInput().CanonicalBytes()
++			if err != nil {
++				t.Fatal(err)
++			}
++			if !bytes.Equal(wrapper["build"], legacy) {
++				t.Fatalf("wrapped build is not the unchanged schema-1 driver input:\n%s\n%s", wrapper["build"], legacy)
++			}
++			lockPackage := sourcelock.Package{Kind: pkg.Kind, Snapshot: pkg.Snapshot, Repository: pkg.Repository, Source: pkg.Source, Directory: pkg.Directory}
++			if pkg.Commit != nil {
++				lockPackage.Commit = sourcelock.Commit{ObjectFormat: pkg.Commit.ObjectFormat, Hex: pkg.Commit.Hex}
++			}
++			lockBytes, err := lockPackage.Canonical()
++			if err != nil {
++				t.Fatal(err)
++			}
++			if !bytes.Equal(wrapper["package"], lockBytes) {
++				t.Fatalf("receipt package differs from the lock member identity:\n%s\n%s", wrapper["package"], lockBytes)
++			}
++			key, err := input.CacheKey()
++			if err != nil {
++				t.Fatal(err)
++			}
++			if string(key) != sha256Text(logical) {
++				t.Fatalf("cache key %s is not SHA-256 of the wrapped input", key)
++			}
++			if legacyKey, _ := goldenInput().CacheKey(); legacyKey == key {
++				t.Fatal("source-aware key aliases the legacy key")
++			}
++			receipt, err := NewReceipt(input, goldenArtifact())
++			if err != nil {
++				t.Fatal(err)
++			}
++			if receipt.SchemaVersion != SourceAwareSchemaVersion || receipt.CacheKey != key {
++				t.Fatalf("receipt = %+v", receipt)
++			}
++			payload, err := receipt.CanonicalBytes()
++			if err != nil {
++				t.Fatal(err)
++			}
++			if err := protocoljson.Validate(payload); err != nil {
++				t.Fatal(err)
++			}
++			decoded, err := DecodeReceipt(payload)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if !reflect.DeepEqual(decoded, receipt) {
++				t.Fatalf("round trip = %+v, want %+v", decoded, receipt)
++			}
++			if _, err := DecodeExpectedReceipt(payload, input); err != nil {
++				t.Fatal(err)
++			}
++			if _, err := DecodeExpectedReceipt(payload, goldenInput()); err == nil {
++				t.Fatal("a legacy expectation accepted the source-aware receipt")
++			}
++		})
++	}
++}
++
++// TestLegacyReceiptBytesAreUnchangedWithoutAPackage pins the switch-off
++// path: an input without a package still produces the schema-1 golden key,
++// receipt and hash byte for byte.
++func TestLegacyReceiptBytesAreUnchangedWithoutAPackage(t *testing.T) {
++	input := goldenInput()
++	if input.SourceAware() || input.ReceiptSchemaVersion() != SchemaVersion {
++		t.Fatal("legacy input selected the source-aware receipt")
++	}
++	key, err := input.CacheKey()
++	if err != nil || string(key) != wantCacheKey {
++		t.Fatalf("legacy key = %s, %v; want %s", key, err, wantCacheKey)
++	}
++	receipt, err := NewReceipt(input, goldenArtifact())
++	if err != nil {
++		t.Fatal(err)
++	}
++	payload, err := receipt.CanonicalBytes()
++	if err != nil {
++		t.Fatal(err)
++	}
++	rawInput := decodeRaw(t, payload)["input"].(map[string]any)
++	if _, wrapped := rawInput["package"]; wrapped || rawInput["build"] != nil || len(rawInput) != 9 || receipt.SchemaVersion != SchemaVersion {
++		t.Fatalf("legacy receipt gained wrapper fields: %s", payload)
++	}
++	hash, err := HashReceiptBytes(payload)
++	if err != nil || string(hash) != wantReceiptHash {
++		t.Fatalf("legacy receipt hash = %s, %v; want %s", hash, err, wantReceiptHash)
++	}
++}
++
++// TestSourceAwareKeyFollowsEveryInputMutation: a change to the package
++// identity or to any build input field changes the key, so the required
++// cache, marker and assurance state is invalidated rather than reused.
++func TestSourceAwareKeyFollowsEveryInputMutation(t *testing.T) {
++	base := sourceAwareInput(localPackage())
++	baseKey, err := base.CacheKey()
++	if err != nil {
++		t.Fatal(err)
++	}
++	mutants := map[string]func(*Input){
++		"package snapshot": func(i *Input) {
++			i.Package = &Package{Kind: PackageKindLocalSnapshot, Snapshot: "sha256:" + strings.Repeat("cd", 32)}
++		},
++		"package arm":     func(i *Input) { i.Package = networkPackage() },
++		"build source":    func(i *Input) { i.BuildSource.ContentSHA256 = "sha256:" + strings.Repeat("e", 64) },
++		"toolchain":       func(i *Input) { i.Toolchain.ContentSHA256 = "sha256:" + strings.Repeat("f", 64) },
++		"target":          func(i *Input) { i.Target.GOARCH = "amd64"; i.Target.Tuning = map[string]string{"GOAMD64": "v1"} },
++		"command":         func(i *Input) { i.Command = "other-tool"; i.SourceDir = "build/cmd/other-tool" },
++		"package removed": func(i *Input) { i.Package = nil },
++		"network-git commit": func(i *Input) {
++			p := *networkPackage()
++			p.Commit = &PackageCommit{ObjectFormat: "sha1", Hex: strings.Repeat("3", 40)}
++			i.Package = &p
++		},
++		"network-git dir":       func(i *Input) { p := *networkPackage(); p.Directory = "skills/other"; i.Package = &p },
++		"configured-git source": func(i *Input) { p := *configuredPackage(); p.Source = "vendor/other"; i.Package = &p },
++	}
++	seen := map[CacheKey]string{"": "base"}
++	seen[baseKey] = "base"
++	for name, mutate := range mutants {
++		mutant := sourceAwareInput(localPackage())
++		mutate(&mutant)
++		key, err := mutant.CacheKey()
++		if err != nil {
++			t.Fatalf("%s: %v", name, err)
++		}
++		if previous, dup := seen[key]; dup {
++			t.Fatalf("%s: key collides with %s", name, previous)
++		}
++		seen[key] = name
++	}
++}
++
++func decodeRaw(t *testing.T, payload []byte) map[string]any {
++	t.Helper()
++	var raw map[string]any
++	decoder := json.NewDecoder(bytes.NewReader(payload))
++	decoder.UseNumber()
++	if err := decoder.Decode(&raw); err != nil {
++		t.Fatal(err)
++	}
++	return raw
++}
++
++func encodeRaw(t *testing.T, raw map[string]any) []byte {
++	t.Helper()
++	payload, err := protocoljson.MarshalCanonical(raw)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return payload
++}
++
++// TestSourceAwareReceiptReaderRefusesEveryShapeConfusion drives the closed
++// decoder with every way a receipt-3 document can be confused with a legacy
++// one or carry a malformed package: each row must be refused, and the cache
++// key of the accepted control must not be derivable from any of them.
++func TestSourceAwareReceiptReaderRefusesEveryShapeConfusion(t *testing.T) {
++	input := sourceAwareInput(networkPackage())
++	receipt, err := NewReceipt(input, goldenArtifact())
++	if err != nil {
++		t.Fatal(err)
++	}
++	control, err := receipt.CanonicalBytes()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if _, err := DecodeReceipt(control); err != nil {
++		t.Fatalf("control refused: %v", err)
++	}
++	legacyReceipt, err := NewReceipt(goldenInput(), goldenArtifact())
++	if err != nil {
++		t.Fatal(err)
++	}
++	legacyBytes, err := legacyReceipt.CanonicalBytes()
++	if err != nil {
++		t.Fatal(err)
++	}
++	rows := map[string]func(raw map[string]any){
++		"receipt schema 1 over wrapper input":    func(raw map[string]any) { raw["schema_version"] = json.Number("1") },
++		"receipt schema 2 is not a local schema": func(raw map[string]any) { raw["schema_version"] = json.Number("2") },
++		"wrapper schema 1":                       func(raw map[string]any) { raw["input"].(map[string]any)["schema_version"] = json.Number("1") },
++		"wrapper unknown field":                  func(raw map[string]any) { raw["input"].(map[string]any)["extra"] = "x" },
++		"wrapper missing package":                func(raw map[string]any) { delete(raw["input"].(map[string]any), "package") },
++		"wrapper missing build":                  func(raw map[string]any) { delete(raw["input"].(map[string]any), "build") },
++		"package null":                           func(raw map[string]any) { raw["input"].(map[string]any)["package"] = nil },
++		"package empty":                          func(raw map[string]any) { raw["input"].(map[string]any)["package"] = map[string]any{} },
++		"package unknown kind": func(raw map[string]any) {
++			raw["input"].(map[string]any)["package"].(map[string]any)["kind"] = "tarball"
++		},
++		"package foreign arm field": func(raw map[string]any) {
++			raw["input"].(map[string]any)["package"].(map[string]any)["snapshot"] = "sha256:" + strings.Repeat("a", 64)
++		},
++		"package extra field": func(raw map[string]any) { raw["input"].(map[string]any)["package"].(map[string]any)["ref"] = "v1" },
++		"package commit null": func(raw map[string]any) { raw["input"].(map[string]any)["package"].(map[string]any)["commit"] = nil },
++		"package commit extra field": func(raw map[string]any) {
++			raw["input"].(map[string]any)["package"].(map[string]any)["commit"].(map[string]any)["tag"] = "v1"
++		},
++		"package commit uppercase hex": func(raw map[string]any) {
++			raw["input"].(map[string]any)["package"].(map[string]any)["commit"].(map[string]any)["hex"] = strings.Repeat("A", 40)
++		},
++		"package commit wrong length": func(raw map[string]any) {
++			raw["input"].(map[string]any)["package"].(map[string]any)["commit"].(map[string]any)["hex"] = strings.Repeat("1", 64)
++		},
++		"package commit format": func(raw map[string]any) {
++			raw["input"].(map[string]any)["package"].(map[string]any)["commit"].(map[string]any)["object_format"] = "md5"
++		},
++		"package repository with .git": func(raw map[string]any) {
++			raw["input"].(map[string]any)["package"].(map[string]any)["repository"] = "git.example.com/skills/tools.git"
++		},
++		"package repository uppercase host": func(raw map[string]any) {
++			raw["input"].(map[string]any)["package"].(map[string]any)["repository"] = "GIT.example.com/skills/tools"
++		},
++		"package directory escapes": func(raw map[string]any) {
++			raw["input"].(map[string]any)["package"].(map[string]any)["directory"] = "../tool"
++		},
++		"package directory glob": func(raw map[string]any) {
++			raw["input"].(map[string]any)["package"].(map[string]any)["directory"] = "skills/*"
++		},
++		"package snapshot into git arm": func(raw map[string]any) {
++			raw["input"].(map[string]any)["package"] = map[string]any{"kind": "local-snapshot", "snapshot": strings.Repeat("1", 40)}
++		},
++		"package non-string field": func(raw map[string]any) {
++			raw["input"].(map[string]any)["package"].(map[string]any)["repository"] = json.Number("1")
++		},
++		"build schema 3": func(raw map[string]any) {
++			raw["input"].(map[string]any)["build"].(map[string]any)["schema_version"] = json.Number("3")
++		},
++		"build carries package": func(raw map[string]any) {
++			raw["input"].(map[string]any)["build"].(map[string]any)["package"] = raw["input"].(map[string]any)["package"]
++		},
++		"cache key of inner build":    func(raw map[string]any) { raw["cache_key"] = wantCacheKey },
++		"cache key of legacy receipt": func(raw map[string]any) { raw["cache_key"] = string(legacyReceipt.CacheKey) },
++	}
++	for name, mutate := range rows {
++		raw := decodeRaw(t, control)
++		mutate(raw)
++		payload := encodeRaw(t, raw)
++		if _, err := DecodeReceipt(payload); err == nil {
++			t.Fatalf("%s: accepted", name)
++		}
++		if _, err := DecodeExpectedReceipt(payload, input); err == nil {
++			t.Fatalf("%s: accepted as the expected input", name)
++		}
++	}
++	// A legacy receipt re-labelled as schema 3 is refused: the wrapper shape
++	// is mandatory under version 3, the driver-input shape under version 1.
++	raw := decodeRaw(t, legacyBytes)
++	raw["schema_version"] = json.Number("3")
++	if _, err := DecodeReceipt(encodeRaw(t, raw)); err == nil {
++		t.Fatal("legacy driver input accepted under receipt schema 3")
++	}
++	raw = decodeRaw(t, legacyBytes)
++	raw["input"].(map[string]any)["package"] = map[string]any{"kind": "local-snapshot", "snapshot": "sha256:" + strings.Repeat("ab", 32)}
++	if _, err := DecodeReceipt(encodeRaw(t, raw)); err == nil {
++		t.Fatal("legacy receipt with a smuggled package accepted")
++	}
++	// Duplicate keys in the wrapper are refused before any lossy decoding.
++	duplicated := bytes.Replace(control, []byte(`"input":{`), []byte(`"input":{"build":null,`), 1)
++	if _, err := DecodeReceipt(duplicated); err == nil {
++		t.Fatal("duplicate wrapper key accepted")
++	}
++	if _, err := DecodeInput(bytes.Replace(control, []byte(`"schema_version":3}`), []byte(`"schema_version":3}}`), 1)); err == nil {
++		t.Fatal("non-canonical input accepted")
++	}
++}
++
++// TestSourceAwareInputValidationRefusesInvalidPackages: a present package is
++// validated by every key derivation, so no receipt can be minted over an
++// identity the lock would refuse.
++func TestSourceAwareInputValidationRefusesInvalidPackages(t *testing.T) {
++	rows := map[string]*Package{
++		"empty":                      {},
++		"snapshot with git fields":   {Kind: PackageKindLocalSnapshot, Snapshot: "sha256:" + strings.Repeat("ab", 32), Directory: "."},
++		"snapshot malformed digest":  {Kind: PackageKindLocalSnapshot, Snapshot: strings.Repeat("ab", 32)},
++		"network without commit":     {Kind: PackageKindNetworkGit, Repository: "git.example.com/a/b", Directory: "."},
++		"network with snapshot":      {Kind: PackageKindNetworkGit, Repository: "git.example.com/a/b", Commit: &PackageCommit{ObjectFormat: "sha1", Hex: strings.Repeat("1", 40)}, Directory: ".", Snapshot: "sha256:" + strings.Repeat("ab", 32)},
++		"configured directory":       {Kind: PackageKindConfiguredGit, Source: "vendor/x", Commit: &PackageCommit{ObjectFormat: "sha1", Hex: strings.Repeat("1", 40)}, Directory: "sub"},
++		"configured absolute source": {Kind: PackageKindConfiguredGit, Source: "/vendor/x", Commit: &PackageCommit{ObjectFormat: "sha1", Hex: strings.Repeat("1", 40)}, Directory: "."},
++	}
++	for name, pkg := range rows {
++		input := sourceAwareInput(pkg)
++		if err := input.Validate(); err == nil {
++			t.Fatalf("%s: validated", name)
++		}
++		if _, err := input.CacheKey(); err == nil {
++			t.Fatalf("%s: derived a cache key", name)
++		}
++		if _, err := NewReceipt(input, goldenArtifact()); err == nil {
++			t.Fatalf("%s: minted a receipt", name)
++		}
++	}
++}
+diff --git a/internal/buildrepo/adopt_test.go b/internal/buildrepo/adopt_test.go
+new file mode 100644
+index 0000000..ffe239b
+--- /dev/null
++++ b/internal/buildrepo/adopt_test.go
+@@ -0,0 +1,329 @@
++package buildrepo
++
++import (
++	"io"
++	"os"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++)
++
++// transactionCopy recreates a staged entry the way the install transaction
++// publishes it (internal/transaction/staging.go createStagingEntry +
++// copyStagingFile): every directory and file is a fresh object created with
++// mode 0 and chmod-ed to the source mode, then the bytes are appended. This is
++// exactly the object shape a protected lookup meets after the commit — modes
++// preserved on unix, DACL inherited from the parent on Windows.
++func transactionCopy(t *testing.T, source, destination string) {
++	t.Helper()
++	err := filepath.WalkDir(source, func(path string, entry os.DirEntry, walkErr error) error {
++		if walkErr != nil {
++			return walkErr
++		}
++		rel, err := filepath.Rel(source, path)
++		if err != nil {
++			return err
++		}
++		target := filepath.Join(destination, rel)
++		info, err := os.Lstat(path)
++		if err != nil {
++			return err
++		}
++		if entry.IsDir() {
++			if err := os.Mkdir(target, 0); err != nil {
++				return err
++			}
++			return os.Chmod(target, info.Mode().Perm())
++		}
++		file, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0)
++		if err != nil {
++			return err
++		}
++		if err := file.Chmod(info.Mode().Perm()); err != nil {
++			_ = file.Close()
++			return err
++		}
++		in, err := os.Open(path)
++		if err != nil {
++			_ = file.Close()
++			return err
++		}
++		_, copyErr := io.Copy(file, in)
++		_ = in.Close()
++		if closeErr := file.Close(); copyErr == nil {
++			copyErr = closeErr
++		}
++		return copyErr
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++}
++
++func adoptionArtifactInput(version int) map[string]any {
++	build := map[string]any{"command": "tool", "target": map[string]any{"goos": runtime.GOOS}}
++	if version == LegacyReceiptSchemaVersion {
++		return build
++	}
++	return map[string]any{"schema_version": SourceAwareReceiptSchemaVersion, "package": testPackage().Object(), "build": build}
++}
++
++// stagedArtifactEntry publishes one artifact into an operation-private staging
++// store and returns the store, the derived key, the input and the entry path.
++func stagedArtifactEntry(t *testing.T, version int) (*DiskProtectedStore, string, map[string]any, string) {
++	t.Helper()
++	input := adoptionArtifactInput(version)
++	key, err := cacheKey(input)
++	if err != nil {
++		t.Fatal(err)
++	}
++	staging := &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "staging")}
++	if err := staging.PrepareNamespaces(version); err != nil {
++		t.Fatal(err)
++	}
++	artifact := []byte("adopted artifact " + ArtifactsDir(version))
++	if _, err := staging.StoreArtifact(key, input, "tool", artifact, testExecutionReceiptBytes(t, driverInputOf(input), artifact)); err != nil {
++		t.Fatal(err)
++	}
++	return staging, key, input, filepath.Join(staging.Root, ArtifactsDir(version), strings.TrimPrefix(key, "sha256:"))
++}
++
++// TestAdoptArtifactMakesATransactionCopyACleanHit: an artifact entry that the
++// transaction recreated below a prepared final namespace is a clean exact hit
++// after AdoptArtifact, in both receipt namespaces. On Windows the copy is
++// refused BEFORE adoption (inherited DACL), which is the failure the hosted
++// gate reported; on unix the mode-only copy already proves and adoption is
++// the walk-only mode. Either way the post-adoption lookup is the proof.
++func TestAdoptArtifactMakesATransactionCopyACleanHit(t *testing.T) {
++	for _, version := range []int{LegacyReceiptSchemaVersion, SourceAwareReceiptSchemaVersion} {
++		t.Run(ArtifactsDir(version), func(t *testing.T) {
++			_, key, input, stagedEntry := stagedArtifactEntry(t, version)
++			final := &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "final")}
++			if err := final.PrepareNamespaces(version); err != nil {
++				t.Fatal(err)
++			}
++			finalEntry := filepath.Join(final.Root, ArtifactsDir(version), strings.TrimPrefix(key, "sha256:"))
++			transactionCopy(t, stagedEntry, finalEntry)
++
++			before, err := final.LookupArtifact(key, input, false)
++			if runtime.GOOS == "windows" {
++				if err == nil || !strings.Contains(err.Error(), "DACL") {
++					t.Fatalf("Windows lookup of the unadopted transaction copy = %v, %v; want the inherited-DACL refusal", before, err)
++				}
++			} else if err != nil || before == nil {
++				t.Fatalf("unix lookup of the transaction copy = %v, %v; want a hit from the preserved modes", before, err)
++			}
++			if err := final.AdoptArtifact(version, key); err != nil {
++				t.Fatalf("adoption: %v", err)
++			}
++			hit, err := final.LookupArtifact(key, input, false)
++			if err != nil || hit == nil || string(hit.Bytes) != "adopted artifact "+ArtifactsDir(version) {
++				t.Fatalf("lookup after adoption = %v, %v", hit, err)
++			}
++			if err := final.AdoptArtifact(version, key); err != nil {
++				t.Fatalf("second adoption is not idempotent: %v", err)
++			}
++			// The entry was adopted in place: no quarantine, no extra objects.
++			if _, err := os.Lstat(filepath.Join(final.Root, "quarantine")); !os.IsNotExist(err) {
++				t.Fatalf("adoption quarantined or created objects: %v", err)
++			}
++		})
++	}
++}
++
++// TestAdoptArtifactRefusesWhatItCannotProve: every refusal of adoption is an
++// error and never a write — no entry, namespace or parent is created and the
++// evidence stays in place.
++func TestAdoptArtifactRefusesWhatItCannotProve(t *testing.T) {
++	version := SourceAwareReceiptSchemaVersion
++	_, key, _, stagedEntry := stagedArtifactEntry(t, version)
++	name := strings.TrimPrefix(key, "sha256:")
++	newFinal := func(t *testing.T, prepare bool) *DiskProtectedStore {
++		t.Helper()
++		final := &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "final")}
++		if prepare {
++			if err := final.PrepareNamespaces(version); err != nil {
++				t.Fatal(err)
++			}
++		}
++		return final
++	}
++	rows := []struct {
++		name    string
++		arrange func(t *testing.T) (*DiskProtectedStore, int, string)
++		want    string
++	}{
++		{"unknown schema version", func(t *testing.T) (*DiskProtectedStore, int, string) {
++			return newFinal(t, true), 4, key
++		}, "unknown receipt schema version"},
++		{"malformed key", func(t *testing.T) (*DiskProtectedStore, int, string) {
++			return newFinal(t, true), version, "sha256:zz"
++		}, "invalid protected key"},
++		{"absent store root", func(t *testing.T) (*DiskProtectedStore, int, string) {
++			return newFinal(t, false), version, key
++		}, "store root"},
++		{"unprepared namespace", func(t *testing.T) (*DiskProtectedStore, int, string) {
++			final := newFinal(t, false)
++			if err := final.PrepareNamespaces(LegacyReceiptSchemaVersion); err != nil {
++				t.Fatal(err)
++			}
++			return final, version, key
++		}, "namespace " + ArtifactsDir(version)},
++		{"absent entry", func(t *testing.T) (*DiskProtectedStore, int, string) {
++			return newFinal(t, true), version, key
++		}, name},
++		{"entry is a file", func(t *testing.T) (*DiskProtectedStore, int, string) {
++			final := newFinal(t, true)
++			if err := os.WriteFile(filepath.Join(final.Root, ArtifactsDir(version), name), []byte("x"), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			return final, version, key
++		}, "not a directory"},
++		{"entry copied under another key", func(t *testing.T) (*DiskProtectedStore, int, string) {
++			final := newFinal(t, true)
++			other := "sha256:" + strings.Repeat("0", 64)
++			transactionCopy(t, stagedEntry, filepath.Join(final.Root, ArtifactsDir(version), strings.TrimPrefix(other, "sha256:")))
++			return final, version, other
++		}, "does not derive the entry key"},
++		{"entry copied into the other namespace", func(t *testing.T) (*DiskProtectedStore, int, string) {
++			final := newFinal(t, true)
++			if err := final.PrepareNamespaces(LegacyReceiptSchemaVersion); err != nil {
++				t.Fatal(err)
++			}
++			transactionCopy(t, stagedEntry, filepath.Join(final.Root, ArtifactsDir(LegacyReceiptSchemaVersion), name))
++			return final, LegacyReceiptSchemaVersion, key
++		}, "does not derive the entry key"},
++		{"tampered artifact bytes", func(t *testing.T) (*DiskProtectedStore, int, string) {
++			final := newFinal(t, true)
++			entry := filepath.Join(final.Root, ArtifactsDir(version), name)
++			transactionCopy(t, stagedEntry, entry)
++			if err := os.WriteFile(filepath.Join(entry, "artifact"), []byte("forged"), 0o700); err != nil {
++				t.Fatal(err)
++			}
++			return final, version, key
++		}, CodeArtifactInvalid},
++		{"tampered receipt", func(t *testing.T) (*DiskProtectedStore, int, string) {
++			final := newFinal(t, true)
++			entry := filepath.Join(final.Root, ArtifactsDir(version), name)
++			transactionCopy(t, stagedEntry, entry)
++			if err := os.WriteFile(filepath.Join(entry, "receipt.json"), []byte(`{"input":{}}`), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			return final, version, key
++		}, "does not derive the entry key"},
++		{"missing execution receipt", func(t *testing.T) (*DiskProtectedStore, int, string) {
++			final := newFinal(t, true)
++			entry := filepath.Join(final.Root, ArtifactsDir(version), name)
++			transactionCopy(t, stagedEntry, entry)
++			if err := os.Remove(filepath.Join(entry, "execution-receipt.ccj.json")); err != nil {
++				t.Fatal(err)
++			}
++			return final, version, key
++		}, CodeReceiptInvalid},
++	}
++	if runtime.GOOS != "windows" {
++		rows = append(rows, struct {
++			name    string
++			arrange func(t *testing.T) (*DiskProtectedStore, int, string)
++			want    string
++		}{"symbolic link inside the entry", func(t *testing.T) (*DiskProtectedStore, int, string) {
++			final := newFinal(t, true)
++			entry := filepath.Join(final.Root, ArtifactsDir(version), name)
++			transactionCopy(t, stagedEntry, entry)
++			if err := os.Symlink(filepath.Join(entry, "artifact"), filepath.Join(entry, "alias")); err != nil {
++				t.Fatal(err)
++			}
++			return final, version, key
++		}, "non-regular entry"})
++	}
++	for _, row := range rows {
++		t.Run(row.name, func(t *testing.T) {
++			final, adoptVersion, adoptKey := row.arrange(t)
++			err := final.AdoptArtifact(adoptVersion, adoptKey)
++			if err == nil || !strings.Contains(err.Error(), row.want) {
++				t.Fatalf("adoption = %v, want an error containing %q", err, row.want)
++			}
++			if _, statErr := os.Lstat(filepath.Join(final.Root, "quarantine")); !os.IsNotExist(statErr) {
++				t.Fatalf("a refused adoption quarantined the evidence: %v", statErr)
++			}
++		})
++	}
++	// A refusal creates nothing: the absent-store row leaves no root behind.
++	final := newFinal(t, false)
++	if err := final.AdoptArtifact(version, key); err == nil {
++		t.Fatal("adoption into an absent store succeeded")
++	}
++	if _, err := os.Lstat(final.Root); !os.IsNotExist(err) {
++		t.Fatalf("a refused adoption created the store root: %v", err)
++	}
++}
++
++// TestAdoptSnapshotMakesATransactionCopyACleanHit is the snapshot arm of the
++// same property, plus its refusals: absent entry and tampered file bytes.
++func TestAdoptSnapshotMakesATransactionCopyACleanHit(t *testing.T) {
++	snapshot, _, effective := pipelineFixture(t)
++	key, err := SnapshotKey(effective, snapshot.Digest)
++	if err != nil {
++		t.Fatal(err)
++	}
++	name := strings.TrimPrefix(key, "sha256:")
++	staging := &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "staging")}
++	if err := staging.PrepareNamespaces(); err != nil {
++		t.Fatal(err)
++	}
++	if err := staging.StoreSnapshot(key, snapshot); err != nil {
++		t.Fatal(err)
++	}
++	final := &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "final")}
++	if err := final.AdoptSnapshot(key); err == nil {
++		t.Fatal("adoption into an absent store succeeded")
++	}
++	if _, err := os.Lstat(final.Root); !os.IsNotExist(err) {
++		t.Fatalf("a refused adoption created the store root: %v", err)
++	}
++	if err := final.PrepareNamespaces(); err != nil {
++		t.Fatal(err)
++	}
++	if err := final.AdoptSnapshot(key); err == nil || !strings.Contains(err.Error(), name) {
++		t.Fatalf("absent snapshot adopted: %v", err)
++	}
++	transactionCopy(t, filepath.Join(staging.Root, "snapshots", name), filepath.Join(final.Root, "snapshots", name))
++	before, err := final.LoadSnapshot(key, false)
++	if runtime.GOOS == "windows" {
++		if err == nil || !strings.Contains(err.Error(), "DACL") {
++			t.Fatalf("Windows load of the unadopted transaction copy = %v, %v; want the inherited-DACL refusal", before, err)
++		}
++	} else if err != nil || before == nil {
++		t.Fatalf("unix load of the transaction copy = %v, %v", before, err)
++	}
++	if err := final.AdoptSnapshot(key); err != nil {
++		t.Fatalf("adoption: %v", err)
++	}
++	loaded, err := final.LoadSnapshot(key, false)
++	if err != nil || loaded == nil || loaded.Digest != snapshot.Digest || loaded.Commit != snapshot.Commit {
++		t.Fatalf("load after adoption = %+v, %v", loaded, err)
++	}
++	// Tampered bytes are refused by the proof, and adoption never repairs or
++	// quarantines them.
++	files := filepath.Join(final.Root, "snapshots", name, "files")
++	var first string
++	_ = filepath.WalkDir(files, func(path string, entry os.DirEntry, _ error) error {
++		if first == "" && !entry.IsDir() {
++			first = path
++		}
++		return nil
++	})
++	if first == "" {
++		t.Fatal("snapshot has no files")
++	}
++	if err := os.WriteFile(first, []byte("forged"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if err := final.AdoptSnapshot(key); err == nil || !strings.Contains(err.Error(), CodeObjectSemanticsInvalid) {
++		t.Fatalf("tampered snapshot adopted: %v", err)
++	}
++	if _, err := os.Lstat(filepath.Join(final.Root, "quarantine")); !os.IsNotExist(err) {
++		t.Fatalf("a refused adoption quarantined the evidence: %v", err)
++	}
++}
+diff --git a/internal/buildrepo/gc.go b/internal/buildrepo/gc.go
+index 9c1d609..afc6b73 100644
+--- a/internal/buildrepo/gc.go
++++ b/internal/buildrepo/gc.go
+@@ -29,10 +29,35 @@ func Collect(root string, referenced []string, now time.Time, grace time.Duratio
+ 		keep[strings.TrimPrefix(key, "sha256:")] = true
+ 	}
+ 	reachableSnapshots := map[string]bool{}
+-	artifactsRoot := filepath.Join(root, "artifacts")
++	for _, version := range []int{LegacyReceiptSchemaVersion, SourceAwareReceiptSchemaVersion} {
++		removed, err = collectArtifacts(store, filepath.Join(root, ArtifactsDir(version)), keep, reachableSnapshots, now, grace, removed)
++		if err != nil {
++			return removed, err
++		}
++	}
++	snapshotsRoot := filepath.Join(root, "snapshots")
++	snapshots, readErr := os.ReadDir(snapshotsRoot)
++	if readErr != nil && !os.IsNotExist(readErr) {
++		return removed, readErr
++	}
++	for _, entry := range snapshots {
++		if entry.IsDir() && !reachableSnapshots[entry.Name()] {
++			if err := os.RemoveAll(filepath.Join(snapshotsRoot, entry.Name())); err != nil {
++				return removed, err
++			}
++			removed = append(removed, "external-snapshot:sha256:"+entry.Name())
++		}
++	}
++	sort.Strings(removed)
++	return removed, nil
++}
++
++// collectArtifacts sweeps one artifact namespace and records the snapshot
++// roots its retained receipts still reach.
++func collectArtifacts(store *DiskProtectedStore, artifactsRoot string, keep, reachableSnapshots map[string]bool, now time.Time, grace time.Duration, removed []string) ([]string, error) {
+ 	entries, readErr := os.ReadDir(artifactsRoot)
+ 	if readErr != nil && !os.IsNotExist(readErr) {
+-		return nil, readErr
++		return removed, readErr
+ 	}
+ 	for _, entry := range entries {
+ 		if !entry.IsDir() {
+@@ -64,20 +89,6 @@ func Collect(root string, referenced []string, now time.Time, grace time.Duratio
+ 			reachableSnapshots[strings.TrimPrefix(key, "sha256:")] = true
+ 		}
+ 	}
+-	snapshotsRoot := filepath.Join(root, "snapshots")
+-	snapshots, readErr := os.ReadDir(snapshotsRoot)
+-	if readErr != nil && !os.IsNotExist(readErr) {
+-		return removed, readErr
+-	}
+-	for _, entry := range snapshots {
+-		if entry.IsDir() && !reachableSnapshots[entry.Name()] {
+-			if err := os.RemoveAll(filepath.Join(snapshotsRoot, entry.Name())); err != nil {
+-				return removed, err
+-			}
+-			removed = append(removed, "external-snapshot:sha256:"+entry.Name())
+-		}
+-	}
+-	sort.Strings(removed)
+ 	return removed, nil
+ }
+ 
+@@ -86,7 +97,8 @@ func snapshotKeyFromReceipt(receipt map[string]any) (string, bool) {
+ 	if !ok {
+ 		return "", false
+ 	}
+-	source, ok := input["source"].(map[string]any)
++	// A receipt-3 wrapper keeps the effective source inside its build object.
++	source, ok := driverInputOf(input)["source"].(map[string]any)
+ 	if !ok {
+ 		return "", false
+ 	}
+diff --git a/internal/buildrepo/pipeline.go b/internal/buildrepo/pipeline.go
+index 3ce7e09..f220f6f 100644
+--- a/internal/buildrepo/pipeline.go
++++ b/internal/buildrepo/pipeline.go
+@@ -97,6 +97,11 @@ type GoSession interface {
+ // CompileRequest is the restricted target view passed to the compiler session.
+ type CompileRequest struct {
+ 	Root, SourceDir, Command string
++	// Package is the frozen package identity of the skill whose command is
++	// compiled, or nil on the legacy lane. The compiler session binds it into
++	// the execution receipt's build_input_sha256 so that digest is the exact
++	// receipt-3 build input, never a context-only hash.
++	Package *buildmeta.Package
+ }
+ 
+ // CompileResult carries the artifact together with the exact session receipt
+@@ -148,16 +153,26 @@ type PipelineRequest struct {
+ 	// AssuranceCheck revalidates the same operation authority immediately at
+ 	// cache lookup/adoption, dispatch, and publication boundaries.
+ 	AssuranceCheck func(context.Context) error
++	// Package is the frozen source-types-v1 identity of the skill declaring
++	// this external command. nil keeps the legacy receipt-2 record and cache
++	// namespace byte-identical; a present package selects the receipt-3
++	// wrapper input:{schema_version:3,package,build} and its distinct
++	// artifact namespace (skillfile-sources §4).
++	Package *buildmeta.Package
+ }
+ 
+ // PipelineResult is the audited receipt-v2 result ready for transaction staging.
+ type PipelineResult struct {
+ 	State, Code, SnapshotKey, CacheKey string
+-	BuildSource                        string
+-	Artifact, Receipt                  []byte
+-	ExecutionReceipt                   closureexec.BuildSessionReceipt
+-	Subject                            AuditSubject
+-	Warnings                           []string
++	// ReceiptSchemaVersion is the receipt schema the cache key and receipt
++	// were derived under: LegacyReceiptSchemaVersion or
++	// SourceAwareReceiptSchemaVersion. It selects the artifact namespace.
++	ReceiptSchemaVersion int
++	BuildSource          string
++	Artifact, Receipt    []byte
++	ExecutionReceipt     closureexec.BuildSessionReceipt
++	Subject              AuditSubject
++	Warnings             []string
+ }
+ 
+ func (r PipelineRequest) trace(phase string) {
+@@ -279,7 +294,11 @@ func RunPipeline(ctx context.Context, request PipelineRequest) (PipelineResult,
+ 			return result, err
+ 		}
+ 	}
+-	input := receiptInput(request, target, snapshot.Digest, request.Go.Identity())
++	input, err := receiptInput(request, target, snapshot.Digest, request.Go.Identity())
++	if err != nil {
++		return result, err
++	}
++	result.ReceiptSchemaVersion = ReceiptSchemaVersionOf(input)
+ 	result.CacheKey, err = cacheKey(input)
+ 	if err != nil {
+ 		return result, err
+@@ -289,11 +308,19 @@ func RunPipeline(ctx context.Context, request PipelineRequest) (PipelineResult,
+ 		return result, err
+ 	}
+ 	defer removeCompilerRoot()
+-	compileRequest := CompileRequest{Root: compilerRoot, SourceDir: sourceDir, Command: request.Command}
++	compileRequest := CompileRequest{Root: compilerRoot, SourceDir: sourceDir, Command: request.Command, Package: request.Package}
+ 	buildInput, err := request.Go.BuildInput(compileRequest)
+ 	if err != nil {
+ 		return result, fmt.Errorf("derive assured compiler input: %w", err)
+ 	}
++	// The session must bind exactly the package identity this build was
++	// keyed under: an execution receipt over a context-only (legacy) digest
++	// can never attest a receipt-3 entry, and a package the request never
++	// selected can never enter one. A session unable to bind it is refused
++	// before any cache adoption or dispatch instead of downgraded.
++	if !reflect.DeepEqual(buildInput.Package, request.Package) {
++		return result, admissionError(CodeReceiptInvalid, "compiler session did not bind the receipt package identity of this build")
++	}
+ 	request.trace("artifact-cache-lookup")
+ 	if err := request.AssuranceCheck(ctx); err != nil {
+ 		return result, err
+@@ -544,7 +571,69 @@ func artifactMetadata(input map[string]any, artifact []byte) buildmeta.Artifact
+ 	return buildmeta.Artifact{Path: path, SHA256: "sha256:" + hex.EncodeToString(sum[:]), Size: int64(len(artifact))}
+ }
+ 
+-func receiptInput(r PipelineRequest, target Target, digest string, tool ToolchainIdentity) map[string]any {
++// External receipt schema versions and their artifact namespaces below the
++// external build cache root. A receipt-3 lookup is answered only from the
++// receipt-3 namespace; no legacy receipt-2 hit can satisfy it.
++const (
++	// LegacyReceiptSchemaVersion is the frozen receipt-2 external record.
++	LegacyReceiptSchemaVersion = 2
++	// SourceAwareReceiptSchemaVersion is the draft receipt-3 package wrapper.
++	SourceAwareReceiptSchemaVersion = 3
++
++	legacyArtifactsDir      = "artifacts"
++	sourceAwareArtifactsDir = "artifacts-receipt-3"
++)
++
++// ArtifactsDir names the artifact namespace of one receipt schema version
++// below the external build cache root. Unknown versions map to the legacy
++// namespace name only for path rendering; lookup and publication derive the
++// version from the input shape and never from this default.
++func ArtifactsDir(receiptSchemaVersion int) string {
++	if receiptSchemaVersion == SourceAwareReceiptSchemaVersion {
++		return sourceAwareArtifactsDir
++	}
++	return legacyArtifactsDir
++}
++
++// ReceiptSchemaVersionOf reports the receipt schema a logical input selects:
++// the receipt-3 wrapper carries a package and a nested build object, the
++// legacy receipt-2 input is the closed driver input itself.
++func ReceiptSchemaVersionOf(input map[string]any) int {
++	if numberEquals(input["schema_version"], SourceAwareReceiptSchemaVersion) {
++		if _, ok := input["package"]; ok {
++			if _, ok := input["build"].(map[string]any); ok {
++				return SourceAwareReceiptSchemaVersion
++			}
++		}
++	}
++	return LegacyReceiptSchemaVersion
++}
++
++// driverInputOf returns the closed driver input: the input itself for the
++// legacy shape, the nested build object for the receipt-3 wrapper.
++func driverInputOf(input map[string]any) map[string]any {
++	if ReceiptSchemaVersionOf(input) == SourceAwareReceiptSchemaVersion {
++		return input["build"].(map[string]any)
++	}
++	return input
++}
++
++func receiptInput(r PipelineRequest, target Target, digest string, tool ToolchainIdentity) (map[string]any, error) {
++	build := legacyReceiptInput(r, target, digest, tool)
++	if r.Package == nil {
++		return build, nil
++	}
++	if err := r.Package.Validate(); err != nil {
++		return nil, fmt.Errorf("receipt package identity: %w", err)
++	}
++	return map[string]any{"schema_version": SourceAwareReceiptSchemaVersion, "package": r.Package.Object(), "build": build}, nil
++}
++
++// legacyReceiptInput is the unchanged receipt-2 driver input; inside the
++// receipt-3 wrapper it keeps every declared/effective identity, locked
++// commit, transport, substitution, target, toolchain, policy and assurance
++// field exactly as before.
++func legacyReceiptInput(r PipelineRequest, target Target, digest string, tool ToolchainIdentity) map[string]any {
+ 	declared := map[string]any{"identity": map[string]any{"kind": "network-git", "value": r.Declared.Identity}, "transport": r.Declared.Transport, "locked_commit": map[string]any{"object_format": r.Declared.ObjectFormat, "hex": r.Declared.Commit}}
+ 	if r.Declared.Tag != "" {
+ 		declared["tag"] = r.Declared.Tag
+diff --git a/internal/buildrepo/pipeline_test.go b/internal/buildrepo/pipeline_test.go
+index c9e964c..85ab75f 100644
+--- a/internal/buildrepo/pipeline_test.go
++++ b/internal/buildrepo/pipeline_test.go
+@@ -38,7 +38,7 @@ func (g recordingGo) BuildInput(request CompileRequest) (buildmeta.Input, error)
+ 	defer func() { _ = token.Close() }()
+ 	identity := g.Identity()
+ 	input := buildmeta.Input{
+-		SchemaVersion: buildmeta.SchemaVersion, Driver: buildmeta.DriverGoV1,
++		SchemaVersion: buildmeta.SchemaVersion, Package: request.Package, Driver: buildmeta.DriverGoV1,
+ 		BuildSource: token.Identity(), BuildRoot: "build", Command: request.Command, SourceDir: request.SourceDir,
+ 		Target:    buildmeta.Target{GOOS: identity.GOOS, GOARCH: identity.GOARCH, Tuning: identity.Tuning},
+ 		Toolchain: buildmeta.Toolchain{Algorithm: buildmeta.ToolchainAlgorithm, ContentSHA256: identity.ContentSHA256, GoVersion: identity.GoVersion, GoRelpath: identity.GoRelpath},
+@@ -315,7 +315,7 @@ func TestExternalProtectedCacheDoesNotAdoptLegacyAssuranceBlindEntry(t *testing.
+ 		Audit:   func(context.Context, AuditSubject) error { return nil },
+ 	}
+ 	target := Target{BuildRoot: "tools", SourceDir: "tools/cmd/tool"}
+-	legacyInput := receiptInput(request, target, snapshot.Digest, goSession.Identity())
++	legacyInput := legacyReceiptInput(request, target, snapshot.Digest, goSession.Identity())
+ 	delete(legacyInput, "assurance")
+ 	legacyKey, err := cacheKey(legacyInput)
+ 	if err != nil {
+@@ -528,7 +528,7 @@ func TestExternalReceiptV2CacheKeyVector(t *testing.T) {
+ 	request := PipelineRequest{Assurance: closureexec.PortableAssuranceBinding(), Command: "golden-tool", Target: "golden-tool", Declared: DeclaredState{Repository: "golden-tools", Identity: "github.com/example/golden-tools", Transport: "https", ObjectFormat: "sha1", Commit: "0123456789abcdef0123456789abcdef01234567", Tag: "v1.4.0"}, Effective: EffectiveState{IdentityKind: "network-git", Identity: "github.com/example/golden-tools", Transport: "https", ObjectFormat: "sha1", Commit: "0123456789abcdef0123456789abcdef01234567"}}
+ 	target := Target{BuildRoot: ".", SourceDir: "cmd/golden-tool"}
+ 	tool := ToolchainIdentity{ContentSHA256: "sha256:" + strings.Repeat("c", 64), GoVersion: "go version go1.26.1 darwin/arm64", GoRelpath: "bin/go", GOOS: "darwin", GOARCH: "arm64", Tuning: map[string]string{"GOARM64": "v8.0"}}
+-	key, err := cacheKey(receiptInput(request, target, "sha256:"+strings.Repeat("b", 64), tool))
++	key, err := cacheKey(legacyReceiptInput(request, target, "sha256:"+strings.Repeat("b", 64), tool))
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+diff --git a/internal/buildrepo/protected.go b/internal/buildrepo/protected.go
+index 237dd21..210649a 100644
+--- a/internal/buildrepo/protected.go
++++ b/internal/buildrepo/protected.go
+@@ -38,6 +38,30 @@ func (s *DiskProtectedStore) prepare() error {
+ 	return s.protectedDir(s.Root, true)
+ }
+ 
++// PrepareNamespaces creates the store root and the snapshot and artifact
++// namespaces of the given receipt schema versions through the store's own
++// private directory creation, so a transaction that later renames entries
++// below them never has to invent a parent. A parent the store did not create
++// privately — an inheritable DACL on Windows, group- or world-writable or
++// foreign-owned on unix — is refused, never repaired.
++func (s *DiskProtectedStore) PrepareNamespaces(receiptSchemaVersions ...int) error {
++	if err := s.prepare(); err != nil {
++		return err
++	}
++	if err := s.protectedDir(filepath.Join(s.Root, "snapshots"), true); err != nil {
++		return err
++	}
++	for _, version := range receiptSchemaVersions {
++		if version != LegacyReceiptSchemaVersion && version != SourceAwareReceiptSchemaVersion {
++			return fmt.Errorf("unknown receipt schema version %d", version)
++		}
++		if err := s.protectedDir(filepath.Join(s.Root, ArtifactsDir(version)), true); err != nil {
++			return err
++		}
++	}
++	return nil
++}
++
+ func cacheName(key string) (string, error) {
+ 	value := strings.TrimPrefix(key, "sha256:")
+ 	if len(value) != 64 {
+@@ -189,8 +213,10 @@ func (s *DiskProtectedStore) LookupArtifact(key string, input map[string]any, mu
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	entry := filepath.Join(s.Root, "artifacts", name)
+-	if err := s.protectedDir(filepath.Join(s.Root, "artifacts"), false); err != nil {
++	version := ReceiptSchemaVersionOf(input)
++	parent := filepath.Join(s.Root, ArtifactsDir(version))
++	entry := filepath.Join(parent, name)
++	if err := s.protectedDir(parent, false); err != nil {
+ 		if os.IsNotExist(err) {
+ 			return nil, nil
+ 		}
+@@ -202,7 +228,7 @@ func (s *DiskProtectedStore) LookupArtifact(key string, input map[string]any, mu
+ 		}
+ 		return nil, err
+ 	}
+-	guard, err := s.protectedDirGuard(s.Root, filepath.Join(s.Root, "artifacts"), entry)
++	guard, err := s.protectedDirGuard(s.Root, parent, entry)
+ 	if err != nil {
+ 		return nil, s.corrupt(entry, CodeArtifactInvalid, mutate, err)
+ 	}
+@@ -239,7 +265,7 @@ func (s *DiskProtectedStore) LookupArtifact(key string, input map[string]any, mu
+ 	if obj["cache_key"] != key || !bytes.Equal(wantInput, gotInputBytes) {
+ 		return nil, s.corrupt(entry, CodeReceiptInvalid, mutate, fmt.Errorf("receipt input mismatch"))
+ 	}
+-	if len(obj) != 4 || !numberEquals(obj["schema_version"], 2) {
++	if len(obj) != 4 || !numberEquals(obj["schema_version"], version) {
+ 		return nil, s.corrupt(entry, CodeReceiptInvalid, mutate, fmt.Errorf("receipt closed shape mismatch"))
+ 	}
+ 	artifact, err := s.readProtectedFile(filepath.Join(entry, "artifact"), 1<<30)
+@@ -281,7 +307,8 @@ func (s *DiskProtectedStore) StoreArtifact(key string, input map[string]any, _ s
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	parent := filepath.Join(s.Root, "artifacts")
++	version := ReceiptSchemaVersionOf(input)
++	parent := filepath.Join(s.Root, ArtifactsDir(version))
+ 	if err = s.protectedDir(parent, true); err != nil {
+ 		return nil, err
+ 	}
+@@ -308,7 +335,7 @@ func (s *DiskProtectedStore) StoreArtifact(key string, input map[string]any, _ s
+ 	if !ok {
+ 		return nil, fmt.Errorf("receipt input does not identify a portable artifact path")
+ 	}
+-	record := map[string]any{"schema_version": 2, "cache_key": key, "input": input, "artifact": map[string]any{"path": artifactPath, "sha256": "sha256:" + hex.EncodeToString(sum[:]), "size": len(artifact)}}
++	record := map[string]any{"schema_version": version, "cache_key": key, "input": input, "artifact": map[string]any{"path": artifactPath, "sha256": "sha256:" + hex.EncodeToString(sum[:]), "size": len(artifact)}}
+ 	receipt, err := registry.CanonicalBytesChecked(record)
+ 	if err != nil {
+ 		return nil, err
+@@ -328,6 +355,116 @@ func (s *DiskProtectedStore) StoreArtifact(key string, input map[string]any, _ s
+ 	return receipt, nil
+ }
+ 
++// AdoptArtifact re-secures and proves an artifact entry that the install
++// transaction has just materialized below a prepared namespace of this store.
++//
++// The transaction publishes a staged entry by recreating every directory and
++// file as a fresh object (a mode-only copy, then a rename into the live path).
++// On unix the copied modes are the proof, so the entry is already a hit; on
++// Windows a freshly created object inherits its parent's DACL, which the
++// store's lookup refuses ("protected object DACL is inheritable"). Adoption
++// therefore applies the store's own securing routine to the entry tree and
++// then runs the ordinary exact lookup: the entry is trusted only when that
++// lookup — receipt shape, key, artifact digest, execution receipt, directory
++// and file proofs — succeeds. Nothing is created: an absent entry, an
++// unprepared namespace, a key that is not the SHA-256 of the receipt input, or
++// a receipt of another schema version is an error, and a failing entry is left
++// in place unquarantined so the evidence survives for the next lookup.
++func (s *DiskProtectedStore) AdoptArtifact(receiptSchemaVersion int, key string) error {
++	if receiptSchemaVersion != LegacyReceiptSchemaVersion && receiptSchemaVersion != SourceAwareReceiptSchemaVersion {
++		return fmt.Errorf("unknown receipt schema version %d", receiptSchemaVersion)
++	}
++	name, err := cacheName(key)
++	if err != nil {
++		return err
++	}
++	entry, err := s.adoptionEntry(filepath.Join(s.Root, ArtifactsDir(receiptSchemaVersion)), name)
++	if err != nil {
++		return err
++	}
++	receipt, err := s.readProtectedFile(filepath.Join(entry, "receipt.json"), 4<<20)
++	if err != nil {
++		return fmt.Errorf("adopt protected artifact %s: receipt: %w", name, err)
++	}
++	if err = protocoljson.Validate(receipt); err != nil {
++		return fmt.Errorf("adopt protected artifact %s: receipt: %w", name, err)
++	}
++	var obj map[string]any
++	decoder := json.NewDecoder(bytes.NewReader(receipt))
++	decoder.UseNumber()
++	if decoder.Decode(&obj) != nil {
++		return fmt.Errorf("adopt protected artifact %s: receipt JSON invalid", name)
++	}
++	input, ok := obj["input"].(map[string]any)
++	if !ok {
++		return fmt.Errorf("adopt protected artifact %s: receipt input absent", name)
++	}
++	derived, err := cacheKey(input)
++	if err != nil || derived != key || ReceiptSchemaVersionOf(input) != receiptSchemaVersion {
++		return fmt.Errorf("adopt protected artifact %s: receipt input does not derive the entry key in receipt schema %d", name, receiptSchemaVersion)
++	}
++	hit, err := s.LookupArtifact(key, input, false)
++	if err != nil {
++		return fmt.Errorf("adopt protected artifact %s: %w", name, err)
++	}
++	if hit == nil {
++		return fmt.Errorf("adopt protected artifact %s: entry is not an exact hit after adoption", name)
++	}
++	return nil
++}
++
++// AdoptSnapshot is AdoptArtifact for a protected snapshot entry the install
++// transaction materialized below the prepared snapshot namespace.
++func (s *DiskProtectedStore) AdoptSnapshot(key string) error {
++	name, err := cacheName(key)
++	if err != nil {
++		return err
++	}
++	if _, err = s.adoptionEntry(filepath.Join(s.Root, "snapshots"), name); err != nil {
++		return err
++	}
++	if _, err = s.LoadSnapshot(key, false); err != nil {
++		return fmt.Errorf("adopt protected snapshot %s: %w", name, err)
++	}
++	return nil
++}
++
++// adoptionEntry proves the store root and the namespace parent (never
++// creating either), requires the entry to be an existing real directory, and
++// re-secures the entry tree with the store's securing routine (a reparse point
++// or symbolic link inside it is refused).
++func (s *DiskProtectedStore) adoptionEntry(parent, name string) (string, error) {
++	if err := s.protectedDir(s.Root, false); err != nil {
++		return "", fmt.Errorf("adopt protected entry %s: store root: %w", name, err)
++	}
++	if err := s.protectedDir(parent, false); err != nil {
++		return "", fmt.Errorf("adopt protected entry %s: namespace %s: %w", name, filepath.Base(parent), err)
++	}
++	entry := filepath.Join(parent, name)
++	info, err := os.Lstat(entry)
++	if err != nil {
++		return "", fmt.Errorf("adopt protected entry %s: %w", name, err)
++	}
++	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
++		return "", fmt.Errorf("adopt protected entry %s: not a directory", name)
++	}
++	if err := filepath.WalkDir(entry, func(_ string, item os.DirEntry, walkErr error) error {
++		if walkErr != nil {
++			return walkErr
++		}
++		if item.Type()&os.ModeSymlink != 0 || (!item.IsDir() && !item.Type().IsRegular()) {
++			return fmt.Errorf("non-regular entry")
++		}
++		return nil
++	}); err != nil {
++		return "", fmt.Errorf("adopt protected entry %s: %w", name, err)
++	}
++	if err := secureProtectedTree(entry); err != nil {
++		return "", fmt.Errorf("adopt protected entry %s: secure: %w", name, err)
++	}
++	return entry, nil
++}
++
+ func (s *DiskProtectedStore) readProtectedFile(name string, maxBytes int64) ([]byte, error) {
+ 	if s.identityProof == nil {
+ 		return readNativeProtectedFile(name, maxBytes, s.proofHook)
+@@ -418,6 +555,7 @@ func numberEquals(value any, want int) bool {
+ }
+ 
+ func artifactPathFromInput(input map[string]any) (string, bool) {
++	input = driverInputOf(input)
+ 	command, ok := input["command"].(string)
+ 	if !ok || command == "" || strings.ContainsAny(command, "/\\") {
+ 		return "", false
+diff --git a/internal/buildrepo/receipt_v3_test.go b/internal/buildrepo/receipt_v3_test.go
+new file mode 100644
+index 0000000..f9ef165
+--- /dev/null
++++ b/internal/buildrepo/receipt_v3_test.go
+@@ -0,0 +1,478 @@
++package buildrepo
++
++import (
++	"bytes"
++	"context"
++	"crypto/sha256"
++	"encoding/hex"
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++	"time"
++
++	"github.com/relux-works/curator/internal/buildmeta"
++	"github.com/relux-works/curator/internal/closureexec"
++	"github.com/relux-works/curator/internal/protocoljson"
++	"github.com/relux-works/curator/internal/registry"
++)
++
++func testPackage() *buildmeta.Package {
++	return &buildmeta.Package{Kind: buildmeta.PackageKindLocalSnapshot, Snapshot: "sha256:" + strings.Repeat("ab", 32)}
++}
++
++// packageBlindGo is a compiler session that binds the legacy context-only
++// build input digest into the execution receipt even when asked for the
++// receipt-3 wrapper: the negative row for "an implementation unable to bind
++// that input MUST reject execution".
++type packageBlindGo struct{ recordingGo }
++
++func (g packageBlindGo) BuildInput(request CompileRequest) (buildmeta.Input, error) {
++	request.Package = nil
++	return g.recordingGo.BuildInput(request)
++}
++
++func (g packageBlindGo) Compile(ctx context.Context, request CompileRequest) (CompileResult, error) {
++	request.Package = nil
++	return g.recordingGo.Compile(ctx, request)
++}
++
++func sourceAwareRequest(t *testing.T, root string, events *[]string, goSession GoSession) (PipelineRequest, *Snapshot) {
++	t.Helper()
++	snapshot, declared, effective := pipelineFixture(t)
++	if goSession == nil {
++		goSession = recordingGo{events: events}
++	}
++	return PipelineRequest{Operation: OperationInstall, Assurance: closureexec.PortableAssuranceBinding(), AssuranceCheck: allowTestAssurance,
++		Command: "tool", Target: "tool", Declared: declared, Effective: effective, Store: &DiskProtectedStore{Root: root}, Go: goSession,
++		Acquire: func(context.Context) (*Snapshot, error) { return cloneSnapshot(snapshot), nil },
++		Audit:   func(context.Context, AuditSubject) error { return nil }, Package: testPackage()}, snapshot
++}
++
++func decodeReceiptObject(t *testing.T, payload []byte) map[string]any {
++	t.Helper()
++	if err := protocoljson.Validate(payload); err != nil {
++		t.Fatal(err)
++	}
++	var object map[string]any
++	decoder := json.NewDecoder(bytes.NewReader(payload))
++	decoder.UseNumber()
++	if err := decoder.Decode(&object); err != nil {
++		t.Fatal(err)
++	}
++	return object
++}
++
++// TestExternalReceipt3WrapsTheReceipt2InputOnTheExternalArm is the positive
++// row of the external arm: the pipeline publishes under artifacts-receipt-3
++// with input:{schema_version:3,package,build}, the build is the byte-identical
++// receipt-2 driver input, the cache key is SHA-256 over the CCJ-1 wrapper, and
++// the same request is a cache hit while a package-less request is not.
++func TestExternalReceipt3WrapsTheReceipt2InputOnTheExternalArm(t *testing.T) {
++	root := filepath.Join(t.TempDir(), "cache")
++	events := []string{}
++	request, snapshot := sourceAwareRequest(t, root, &events, nil)
++	result, err := RunPipeline(context.Background(), request)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if result.State != "would-preflight-and-build" || result.ReceiptSchemaVersion != SourceAwareReceiptSchemaVersion {
++		t.Fatalf("result = %+v", result)
++	}
++	entry := filepath.Join(root, ArtifactsDir(SourceAwareReceiptSchemaVersion), strings.TrimPrefix(result.CacheKey, "sha256:"))
++	receipt, err := os.ReadFile(filepath.Join(entry, "receipt.json"))
++	if err != nil {
++		t.Fatalf("receipt-3 entry missing: %v", err)
++	}
++	if _, err := os.Stat(filepath.Join(root, ArtifactsDir(LegacyReceiptSchemaVersion))); !os.IsNotExist(err) {
++		t.Fatalf("legacy artifacts namespace was created: %v", err)
++	}
++	if !bytes.Equal(receipt, result.Receipt) {
++		t.Fatal("result receipt differs from the protected receipt")
++	}
++	object := decodeReceiptObject(t, receipt)
++	if len(object) != 4 || object["schema_version"] != json.Number("3") || object["cache_key"] != result.CacheKey {
++		t.Fatalf("receipt shape = %v", object)
++	}
++	input := object["input"].(map[string]any)
++	if len(input) != 3 || input["schema_version"] != json.Number("3") {
++		t.Fatalf("wrapper shape = %v", input)
++	}
++	wantPackage, _ := registry.CanonicalBytesChecked(testPackage().Object())
++	gotPackage, _ := registry.CanonicalBytesChecked(input["package"].(map[string]any))
++	if !bytes.Equal(wantPackage, gotPackage) {
++		t.Fatalf("package = %s, want %s", gotPackage, wantPackage)
++	}
++	legacyInput := legacyReceiptInput(request, Target{BuildRoot: "tools", SourceDir: "tools/cmd/tool"}, snapshot.Digest, request.Go.Identity())
++	wantBuild, _ := registry.CanonicalBytesChecked(legacyInput)
++	gotBuild, _ := registry.CanonicalBytesChecked(input["build"].(map[string]any))
++	if !bytes.Equal(wantBuild, gotBuild) {
++		t.Fatalf("wrapped build is not the unchanged receipt-2 input:\n%s\n%s", gotBuild, wantBuild)
++	}
++	wrapper, _ := registry.CanonicalBytesChecked(input)
++	sum := sha256.Sum256(wrapper)
++	if result.CacheKey != "sha256:"+hex.EncodeToString(sum[:]) {
++		t.Fatalf("cache key %s is not SHA-256 of the wrapped input", result.CacheKey)
++	}
++	legacyKey, _ := cacheKey(legacyInput)
++	if legacyKey == result.CacheKey {
++		t.Fatal("receipt-3 key aliases the receipt-2 key")
++	}
++	if !bytes.Contains(receipt, []byte(`"transport":"https"`)) || !bytes.Contains(receipt, []byte(`"locked_commit"`)) || !bytes.Contains(receipt, []byte(`"assurance"`)) {
++		t.Fatalf("receipt lost declared/effective fields: %s", receipt)
++	}
++
++	events = events[:0]
++	again, err := RunPipeline(context.Background(), request)
++	if err != nil || again.State != "cache-hit" || again.CacheKey != result.CacheKey || again.ReceiptSchemaVersion != SourceAwareReceiptSchemaVersion {
++		t.Fatalf("second run = %+v, %v", again, err)
++	}
++	if strings.Contains(strings.Join(events, ","), "compiler-call") {
++		t.Fatalf("cache hit compiled again: %v", events)
++	}
++
++	legacyRequest := request
++	legacyRequest.Package = nil
++	legacy, err := RunPipeline(context.Background(), legacyRequest)
++	if err != nil || legacy.State != "would-preflight-and-build" || legacy.ReceiptSchemaVersion != LegacyReceiptSchemaVersion || legacy.CacheKey != legacyKey {
++		t.Fatalf("legacy request = %+v, %v (no receipt-3 hit may satisfy it)", legacy, err)
++	}
++	if _, err := os.Stat(filepath.Join(root, ArtifactsDir(LegacyReceiptSchemaVersion), strings.TrimPrefix(legacyKey, "sha256:"), "receipt.json")); err != nil {
++		t.Fatalf("legacy entry not published under the legacy namespace: %v", err)
++	}
++	otherPackage := request
++	otherPackage.Package = &buildmeta.Package{Kind: buildmeta.PackageKindLocalSnapshot, Snapshot: "sha256:" + strings.Repeat("cd", 32)}
++	other, err := RunPipeline(context.Background(), otherPackage)
++	if err != nil || other.State != "would-preflight-and-build" || other.CacheKey == result.CacheKey {
++		t.Fatalf("package mutation reused the entry: %+v, %v", other, err)
++	}
++}
++
++// TestExternalReceipt3RefusesEveryEvidenceFieldMismatch mutates every
++// external-evidence field of a protected receipt-3 entry on disk — package,
++// declared identity and locked commit, effective identity/commit/transport,
++// substitution, build source, descriptor target, target, toolchain, policy,
++// assurance, both schema versions and the cache key — and requires the next
++// lookup to refuse the entry and rebuild instead of adopting it.
++func TestExternalReceipt3RefusesEveryEvidenceFieldMismatch(t *testing.T) {
++	rows := map[string]func(input map[string]any){
++		"package snapshot": func(i map[string]any) {
++			i["package"].(map[string]any)["snapshot"] = "sha256:" + strings.Repeat("cd", 32)
++		},
++		"package kind": func(i map[string]any) {
++			i["package"] = map[string]any{"kind": "network-git", "repository": "git.example.com/a/b", "commit": map[string]any{"object_format": "sha1", "hex": strings.Repeat("1", 40)}, "directory": "."}
++		},
++		"package extra field": func(i map[string]any) { i["package"].(map[string]any)["ref"] = "v1" },
++		"package removed":     func(i map[string]any) { delete(i, "package") },
++		"wrapper schema 2":    func(i map[string]any) { i["schema_version"] = json.Number("2") },
++		"build schema 3":      func(i map[string]any) { build(i)["schema_version"] = json.Number("3") },
++		"declared identity": func(i map[string]any) {
++			source(i)["declared"].(map[string]any)["identity"].(map[string]any)["value"] = "example.test/other"
++		},
++		"declared identity kind": func(i map[string]any) {
++			source(i)["declared"].(map[string]any)["identity"].(map[string]any)["kind"] = "operator-local-git"
++		},
++		"declared transport": func(i map[string]any) { source(i)["declared"].(map[string]any)["transport"] = "ssh" },
++		"declared locked commit hex": func(i map[string]any) {
++			source(i)["declared"].(map[string]any)["locked_commit"].(map[string]any)["hex"] = strings.Repeat("2", 40)
++		},
++		"declared locked commit format": func(i map[string]any) {
++			source(i)["declared"].(map[string]any)["locked_commit"].(map[string]any)["object_format"] = "sha256"
++		},
++		"declared tag added": func(i map[string]any) { source(i)["declared"].(map[string]any)["tag"] = "v1" },
++		"effective identity": func(i map[string]any) {
++			source(i)["effective"].(map[string]any)["identity"].(map[string]any)["value"] = "example.test/other"
++		},
++		"effective identity kind": func(i map[string]any) {
++			source(i)["effective"].(map[string]any)["identity"].(map[string]any)["kind"] = "operator-local-git"
++		},
++		"effective commit":        func(i map[string]any) { source(i)["effective"].(map[string]any)["commit"] = strings.Repeat("2", 40) },
++		"effective object format": func(i map[string]any) { source(i)["effective"].(map[string]any)["object_format"] = "sha256" },
++		"effective transport":     func(i map[string]any) { source(i)["effective"].(map[string]any)["transport"] = "ssh" },
++		"effective substituted":   func(i map[string]any) { source(i)["effective"].(map[string]any)["substituted"] = true },
++		"effective substitution added": func(i map[string]any) {
++			source(i)["effective"].(map[string]any)["substitution"] = map[string]any{"type": "local-path"}
++		},
++		"effective build source digest": func(i map[string]any) {
++			source(i)["effective"].(map[string]any)["build_source"].(map[string]any)["content_sha256"] = "sha256:" + strings.Repeat("9", 64)
++		},
++		"effective build source algorithm": func(i map[string]any) {
++			source(i)["effective"].(map[string]any)["build_source"].(map[string]any)["algorithm"] = "other"
++		},
++		"repository":        func(i map[string]any) { source(i)["repository"] = "other" },
++		"descriptor target": func(i map[string]any) { source(i)["descriptor"].(map[string]any)["target"] = "other" },
++		"descriptor path":   func(i map[string]any) { source(i)["descriptor"].(map[string]any)["path"] = "other.json" },
++		"command":           func(i map[string]any) { build(i)["command"] = "other" },
++		"build root":        func(i map[string]any) { build(i)["build_root"] = "other" },
++		"source dir":        func(i map[string]any) { build(i)["source_dir"] = "tools/cmd/other" },
++		"driver":            func(i map[string]any) { build(i)["driver"] = "go-v1" },
++		"target goarch":     func(i map[string]any) { build(i)["target"].(map[string]any)["goarch"] = "other" },
++		"target tuning": func(i map[string]any) {
++			build(i)["target"].(map[string]any)["tuning"] = map[string]any{"GOAMD64": "v4"}
++		},
++		"toolchain digest": func(i map[string]any) {
++			build(i)["toolchain"].(map[string]any)["content_sha256"] = "sha256:" + strings.Repeat("9", 64)
++		},
++		"toolchain version":  func(i map[string]any) { build(i)["toolchain"].(map[string]any)["go_version"] = "other" },
++		"policy execution":   func(i map[string]any) { build(i)["policy"].(map[string]any)["execution_policy"] = "hardened-worker-v1" },
++		"policy source kind": func(i map[string]any) { build(i)["policy"].(map[string]any)["source_kind"] = "other" },
++		"policy network":     func(i map[string]any) { build(i)["policy"].(map[string]any)["network"] = "full" },
++		"assurance mode":     func(i map[string]any) { build(i)["assurance"].(map[string]any)["assurance_mode"] = "verified" },
++		"assurance removed":  func(i map[string]any) { delete(build(i), "assurance") },
++	}
++	for name, mutate := range rows {
++		t.Run(name, func(t *testing.T) {
++			root := filepath.Join(t.TempDir(), "cache")
++			events := []string{}
++			compiles := 0
++			request, _ := sourceAwareRequest(t, root, &events, recordingGo{events: &events, compile: func(CompileRequest) error { compiles++; return nil }})
++			first, err := RunPipeline(context.Background(), request)
++			if err != nil {
++				t.Fatal(err)
++			}
++			entry := filepath.Join(root, ArtifactsDir(SourceAwareReceiptSchemaVersion), strings.TrimPrefix(first.CacheKey, "sha256:"))
++			receiptPath := filepath.Join(entry, "receipt.json")
++			object := decodeReceiptObject(t, first.Receipt)
++			mutate(object["input"].(map[string]any))
++			forged, err := registry.CanonicalBytesChecked(object)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if bytes.Equal(forged, first.Receipt) {
++				t.Fatal("mutation did not change the receipt")
++			}
++			if err := os.WriteFile(receiptPath, forged, 0o600); err != nil {
++				t.Fatal(err)
++			}
++			hit, lookupErr := request.Store.LookupArtifact(first.CacheKey, mustSourceAwareInput(t, request, first), false)
++			if hit != nil || lookupErr == nil || ErrorCode(lookupErr) != CodeReceiptInvalid {
++				t.Fatalf("forged receipt adopted: hit=%v err=%v", hit != nil, lookupErr)
++			}
++			second, err := RunPipeline(context.Background(), request)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if second.State != "would-rebuild-untrusted-cache" || compiles != 2 || !bytes.Equal(second.Receipt, first.Receipt) {
++				t.Fatalf("state=%s compiles=%d", second.State, compiles)
++			}
++		})
++	}
++	t.Run("receipt schema version", func(t *testing.T) {
++		// Only receipt_schema_version changes to 3: a record that keeps the
++		// exact wrapper input and key but claims schema 2 is refused as a
++		// closed-shape mismatch, never adopted as either version.
++		root := filepath.Join(t.TempDir(), "cache")
++		events := []string{}
++		request, _ := sourceAwareRequest(t, root, &events, nil)
++		first, err := RunPipeline(context.Background(), request)
++		if err != nil {
++			t.Fatal(err)
++		}
++		object := decodeReceiptObject(t, first.Receipt)
++		object["schema_version"] = json.Number("2")
++		forged, _ := registry.CanonicalBytesChecked(object)
++		entry := filepath.Join(root, ArtifactsDir(SourceAwareReceiptSchemaVersion), strings.TrimPrefix(first.CacheKey, "sha256:"))
++		if err := os.WriteFile(filepath.Join(entry, "receipt.json"), forged, 0o600); err != nil {
++			t.Fatal(err)
++		}
++		if hit, err := request.Store.LookupArtifact(first.CacheKey, mustSourceAwareInput(t, request, first), false); hit != nil || err == nil || ErrorCode(err) != CodeReceiptInvalid {
++			t.Fatalf("re-labelled receipt adopted: hit=%v err=%v", hit != nil, err)
++		}
++	})
++	t.Run("cache key", func(t *testing.T) {
++		root := filepath.Join(t.TempDir(), "cache")
++		events := []string{}
++		request, _ := sourceAwareRequest(t, root, &events, nil)
++		first, err := RunPipeline(context.Background(), request)
++		if err != nil {
++			t.Fatal(err)
++		}
++		object := decodeReceiptObject(t, first.Receipt)
++		object["cache_key"] = "sha256:" + strings.Repeat("0", 64)
++		forged, _ := registry.CanonicalBytesChecked(object)
++		entry := filepath.Join(root, ArtifactsDir(SourceAwareReceiptSchemaVersion), strings.TrimPrefix(first.CacheKey, "sha256:"))
++		if err := os.WriteFile(filepath.Join(entry, "receipt.json"), forged, 0o600); err != nil {
++			t.Fatal(err)
++		}
++		if hit, err := request.Store.LookupArtifact(first.CacheKey, mustSourceAwareInput(t, request, first), false); hit != nil || err == nil {
++			t.Fatalf("forged cache key adopted: %v", err)
++		}
++	})
++}
++
++func build(input map[string]any) map[string]any  { return input["build"].(map[string]any) }
++func source(input map[string]any) map[string]any { return build(input)["source"].(map[string]any) }
++
++func mustSourceAwareInput(t *testing.T, request PipelineRequest, result PipelineResult) map[string]any {
++	t.Helper()
++	object := decodeReceiptObject(t, result.Receipt)
++	input := object["input"].(map[string]any)
++	if ReceiptSchemaVersionOf(input) != SourceAwareReceiptSchemaVersion {
++		t.Fatalf("published input is not receipt-3: %v", input)
++	}
++	_ = request
++	return input
++}
++
++// TestExternalReceipt3EntriesNeverCrossNamespaces: a receipt-2 record planted
++// at the receipt-3 key inside the receipt-3 namespace, and a receipt-3 record
++// planted in the legacy namespace, are both refused; no legacy cache hit
++// satisfies a source-aware lookup.
++func TestExternalReceipt3EntriesNeverCrossNamespaces(t *testing.T) {
++	root := filepath.Join(t.TempDir(), "cache")
++	events := []string{}
++	request, _ := sourceAwareRequest(t, root, &events, nil)
++	sourceAware, err := RunPipeline(context.Background(), request)
++	if err != nil {
++		t.Fatal(err)
++	}
++	legacyRequest := request
++	legacyRequest.Package = nil
++	legacy, err := RunPipeline(context.Background(), legacyRequest)
++	if err != nil {
++		t.Fatal(err)
++	}
++	sourceAwareEntry := filepath.Join(root, ArtifactsDir(SourceAwareReceiptSchemaVersion), strings.TrimPrefix(sourceAware.CacheKey, "sha256:"))
++	legacyEntry := filepath.Join(root, ArtifactsDir(LegacyReceiptSchemaVersion), strings.TrimPrefix(legacy.CacheKey, "sha256:"))
++	// Legacy receipt under the receipt-3 key: closed-shape refusal.
++	if err := os.WriteFile(filepath.Join(sourceAwareEntry, "receipt.json"), legacy.Receipt, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if hit, err := request.Store.LookupArtifact(sourceAware.CacheKey, mustSourceAwareInput(t, request, sourceAware), false); hit != nil || err == nil {
++		t.Fatalf("legacy receipt adopted at the receipt-3 key: %v", err)
++	}
++	// Receipt-3 record under the legacy key: refused for the legacy input.
++	if err := os.WriteFile(filepath.Join(legacyEntry, "receipt.json"), sourceAware.Receipt, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	legacyObject := decodeReceiptObject(t, legacy.Receipt)
++	if hit, err := request.Store.LookupArtifact(legacy.CacheKey, legacyObject["input"].(map[string]any), false); hit != nil || err == nil {
++		t.Fatalf("receipt-3 record adopted at the legacy key: %v", err)
++	}
++}
++
++// TestExternalReceipt3RequiresTheSessionToBindTheWrappedInput: a compiler
++// session whose execution receipt binds the context-only legacy digest is
++// refused at compile and never published; a protected entry whose execution
++// receipt binds the legacy digest is refused at lookup.
++func TestExternalReceipt3RequiresTheSessionToBindTheWrappedInput(t *testing.T) {
++	root := filepath.Join(t.TempDir(), "cache")
++	events := []string{}
++	request, _ := sourceAwareRequest(t, root, &events, packageBlindGo{recordingGo{events: &events}})
++	_, err := RunPipeline(context.Background(), request)
++	if err == nil || ErrorCode(err) != CodeReceiptInvalid {
++		t.Fatalf("package-blind session accepted: %v", err)
++	}
++	if entries, _ := os.ReadDir(filepath.Join(root, ArtifactsDir(SourceAwareReceiptSchemaVersion))); len(entries) != 0 {
++		t.Fatalf("refused compilation published %d entries", len(entries))
++	}
++	bound, _ := sourceAwareRequest(t, root, &events, nil)
++	first, err := RunPipeline(context.Background(), bound)
++	if err != nil {
++		t.Fatal(err)
++	}
++	entry := filepath.Join(root, ArtifactsDir(SourceAwareReceiptSchemaVersion), strings.TrimPrefix(first.CacheKey, "sha256:"))
++	object := decodeReceiptObject(t, first.Receipt)
++	legacyExecution := testExecutionReceiptBytes(t, driverInputOf(object["input"].(map[string]any)), first.Artifact)
++	if err := os.WriteFile(filepath.Join(entry, "execution-receipt.ccj.json"), legacyExecution, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	compiles := 0
++	bound.Go = recordingGo{events: &events, compile: func(CompileRequest) error { compiles++; return nil }}
++	second, err := RunPipeline(context.Background(), bound)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if second.State != "would-rebuild-untrusted-cache" || second.Code != CodeReceiptInvalid || compiles != 1 {
++		t.Fatalf("legacy-bound execution receipt adopted: state=%s code=%s compiles=%d", second.State, second.Code, compiles)
++	}
++}
++
++// TestCollectSweepsTheReceipt3Namespace: unreferenced receipt-3 artifacts are
++// removed after grace, referenced ones keep their snapshot reachable.
++func TestCollectSweepsTheReceipt3Namespace(t *testing.T) {
++	root := filepath.Join(t.TempDir(), "cache")
++	events := []string{}
++	keep, _ := sourceAwareRequest(t, root, &events, nil)
++	kept, err := RunPipeline(context.Background(), keep)
++	if err != nil {
++		t.Fatal(err)
++	}
++	drop := keep
++	drop.Package = &buildmeta.Package{Kind: buildmeta.PackageKindLocalSnapshot, Snapshot: "sha256:" + strings.Repeat("cd", 32)}
++	dropped, err := RunPipeline(context.Background(), drop)
++	if err != nil {
++		t.Fatal(err)
++	}
++	removed, err := Collect(root, []string{kept.CacheKey}, time.Now().Add(48*time.Hour), time.Hour)
++	if err != nil {
++		t.Fatal(err)
++	}
++	joined := strings.Join(removed, "\n")
++	if !strings.Contains(joined, strings.TrimPrefix(dropped.CacheKey, "sha256:")) || strings.Contains(joined, strings.TrimPrefix(kept.CacheKey, "sha256:")) || strings.Contains(joined, "external-snapshot") {
++		t.Fatalf("removed = %v", removed)
++	}
++	if _, err := os.Stat(filepath.Join(root, ArtifactsDir(SourceAwareReceiptSchemaVersion), strings.TrimPrefix(kept.CacheKey, "sha256:"), "artifact")); err != nil {
++		t.Fatalf("referenced receipt-3 entry swept: %v", err)
++	}
++}
++
++// TestPrepareNamespacesCreatesEveryProtectedParentPrivately: the store creates
++// its root, the snapshot namespace and one artifact namespace per requested
++// receipt schema version through its own private creation, idempotently, so a
++// transaction renaming entries into the final root never invents a parent.
++func TestPrepareNamespacesCreatesEveryProtectedParentPrivately(t *testing.T) {
++	store := &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "cache")}
++	if err := store.PrepareNamespaces(LegacyReceiptSchemaVersion, SourceAwareReceiptSchemaVersion); err != nil {
++		t.Fatal(err)
++	}
++	for _, name := range []string{"", "snapshots", ArtifactsDir(LegacyReceiptSchemaVersion), ArtifactsDir(SourceAwareReceiptSchemaVersion)} {
++		path := filepath.Join(store.Root, name)
++		info, err := os.Lstat(path)
++		if err != nil || !info.IsDir() {
++			t.Fatalf("%s: %v", path, err)
++		}
++		if runtime.GOOS != "windows" && info.Mode().Perm() != 0o700 {
++			t.Fatalf("%s mode = %o, want 0700", path, info.Mode().Perm())
++		}
++		// The prepared parent is what the store itself proves private.
++		if err := store.protectedDir(path, false); err != nil {
++			t.Fatalf("%s is not proved private after preparation: %v", path, err)
++		}
++	}
++	if err := store.PrepareNamespaces(SourceAwareReceiptSchemaVersion); err != nil {
++		t.Fatalf("second preparation is not idempotent: %v", err)
++	}
++	if err := store.PrepareNamespaces(4); err == nil {
++		t.Fatal("an unknown receipt schema version prepared a namespace")
++	}
++	if entries, _ := os.ReadDir(store.Root); len(entries) != 3 {
++		t.Fatalf("root entries = %d, want snapshots and two artifact namespaces", len(entries))
++	}
++}
++
++// TestPrepareNamespacesRefusesAForeignParent: a namespace parent that the
++// store did not create privately (here group/world-writable) is refused with
++// the protected-boundary code and never repaired.
++func TestPrepareNamespacesRefusesAForeignParent(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("mode-bit foreign-parent fixture is exercised on the unix runners; the Windows DACL refusal is asserted by TestWindowsProtectedSecurityDescriptorRejectsWrongOwnerAndDACL")
++	}
++	store := &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "cache")}
++	foreign := filepath.Join(store.Root, ArtifactsDir(SourceAwareReceiptSchemaVersion))
++	if err := os.MkdirAll(foreign, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Chmod(foreign, 0o777); err != nil {
++		t.Fatal(err)
++	}
++	err := store.PrepareNamespaces(SourceAwareReceiptSchemaVersion)
++	if err == nil || !strings.Contains(err.Error(), CodeProtectedBoundaryUntrusted) {
++		t.Fatalf("foreign parent accepted: %v", err)
++	}
++	if info, statErr := os.Lstat(foreign); statErr != nil || info.Mode().Perm() != 0o777 {
++		t.Fatalf("refusal repaired the foreign parent: %v %v", info, statErr)
++	}
++}
+diff --git a/internal/install/assurance.go b/internal/install/assurance.go
+index e21d297..5c99d90 100644
+--- a/internal/install/assurance.go
++++ b/internal/install/assurance.go
+@@ -166,7 +166,7 @@ func (builder *assuredBuilder) Stage(ctx context.Context, request StageRequest)
+ 		return StagedArtifact{}, err
+ 	}
+ 	input := buildmeta.Input{
+-		SchemaVersion: buildmeta.SchemaVersion, Driver: buildmeta.DriverGoV1,
++		SchemaVersion: buildmeta.SchemaVersion, Package: request.Package, Driver: buildmeta.DriverGoV1,
+ 		BuildSource: request.Source.Identity(), BuildRoot: request.BuildRoot,
+ 		Command: request.Command, SourceDir: request.SourceDir,
+ 		Target: session.Target(), Toolchain: session.Toolchain(), Policy: buildmeta.FixedPolicy(),
+diff --git a/internal/install/builddeps.go b/internal/install/builddeps.go
+index 1acc5ef..4d14f0d 100644
+--- a/internal/install/builddeps.go
++++ b/internal/install/builddeps.go
+@@ -65,6 +65,11 @@ type StageRequest struct {
+ 	Modules      []string
+ 	BuildRoots   []string
+ 	RuntimeRoots []string
++	// Package is the frozen package identity the planned receipt-3 input
++	// carries, or nil on the legacy lane. The execution receipt binds the
++	// digest of exactly that logical input in build_input_sha256; a session
++	// that cannot bind it is refused rather than downgraded.
++	Package *buildmeta.Package
+ }
+ 
+ // StagedArtifact is one verified operation-private output. The path is
+@@ -239,7 +244,7 @@ func (goBuilder) Stage(ctx context.Context, request StageRequest) (StagedArtifac
+ 		controls[index] = closureexec.RuntimeControlEvidence{Name: control.Name, Availability: control.Availability, Status: control.Status}
+ 	}
+ 	input := buildmeta.Input{
+-		SchemaVersion: buildmeta.SchemaVersion, Driver: buildmeta.DriverGoV1,
++		SchemaVersion: buildmeta.SchemaVersion, Package: request.Package, Driver: buildmeta.DriverGoV1,
+ 		BuildSource: request.Source.Identity(), BuildRoot: request.BuildRoot,
+ 		Command: request.Command, SourceDir: request.SourceDir,
+ 		Target: session.Target(), Toolchain: session.Toolchain(), Policy: buildmeta.FixedPolicy(),
+diff --git a/internal/install/buildhttps_test.go b/internal/install/buildhttps_test.go
+index 06c3d98..61a6a8e 100644
+--- a/internal/install/buildhttps_test.go
++++ b/internal/install/buildhttps_test.go
+@@ -316,7 +316,7 @@ func TestBuildHTTPSResolutionIsCarriedByTheExternalInstallPlan(t *testing.T) {
+ 		},
+ 	}
+ 	plan, err := planExternalBuilds(context.Background(), "project", "project/id", t.TempDir(),
+-		[]*closure.Node{node}, nil, probeOnlyToolchain{}, deps, NewPortableBuildAuthority(), true)
++		[]*closure.Node{node}, nil, nil, probeOnlyToolchain{}, deps, NewPortableBuildAuthority(), true)
+ 	if err == nil || !strings.Contains(err.Error(), buildrepo.CodeSourceUnavailable) {
+ 		t.Fatalf("plan error = %v, want the post-resolution acquisition stop", err)
+ 	}
+@@ -363,7 +363,7 @@ func TestPromptedBuildHTTPSAbortStopsTheProductionPlanBeforeAnyFetch(t *testing.
+ 		},
+ 	}
+ 	_, err := planExternalBuilds(context.Background(), "project", "project/id", t.TempDir(),
+-		[]*closure.Node{node}, nil, probeOnlyToolchain{}, deps, NewPortableBuildAuthority(), false)
++		[]*closure.Node{node}, nil, nil, probeOnlyToolchain{}, deps, NewPortableBuildAuthority(), false)
+ 	if !errors.Is(err, ErrBuildHTTPSAborted) {
+ 		t.Fatalf("plan error = %v, want prompt abort", err)
+ 	}
+diff --git a/internal/install/buildsshprecheck_test.go b/internal/install/buildsshprecheck_test.go
+index 89b2912..1395554 100644
+--- a/internal/install/buildsshprecheck_test.go
++++ b/internal/install/buildsshprecheck_test.go
+@@ -278,7 +278,7 @@ func TestTheCredentialPrecheckRunsBeforeAnyFetch(t *testing.T) {
+ 		sshBuildNode("infra", "build-kit", "other.example.test/tools/kit"),
+ 	}
+ 	_, err := planExternalBuilds(context.Background(), "project", "project/id", t.TempDir(),
+-		nodes, nil, probeOnlyToolchain{}, deps, NewPortableBuildAuthority(), true)
++		nodes, nil, nil, probeOnlyToolchain{}, deps, NewPortableBuildAuthority(), true)
+ 	if err == nil {
+ 		t.Fatal("a plan with no selected credentials succeeded")
+ 	}
+@@ -318,7 +318,7 @@ func TestADryRunReportsThePerRepositoryCredentialSource(t *testing.T) {
+ 	nodes := []*closure.Node{sshBuildNode("portals", "build-tool", "git.example.test/portals/app")}
+ 
+ 	plan, err := planExternalBuilds(context.Background(), "project", "project/id", t.TempDir(),
+-		nodes, nil, probeOnlyToolchain{}, deps, NewPortableBuildAuthority(), true)
++		nodes, nil, nil, probeOnlyToolchain{}, deps, NewPortableBuildAuthority(), true)
+ 	if err == nil {
+ 		t.Fatal("the stubbed fetch was expected to fail the plan")
+ 	}
+@@ -330,7 +330,7 @@ func TestADryRunReportsThePerRepositoryCredentialSource(t *testing.T) {
+ 	// An install reports through its own build rows instead; the credential
+ 	// report belongs to the mode whose whole output is the report.
+ 	installPlan, err := planExternalBuilds(context.Background(), "project", "project/id", t.TempDir(),
+-		nodes, nil, probeOnlyToolchain{}, deps, NewPortableBuildAuthority(), false)
++		nodes, nil, nil, probeOnlyToolchain{}, deps, NewPortableBuildAuthority(), false)
+ 	if err == nil {
+ 		t.Fatal("the stubbed fetch was expected to fail the plan")
+ 	}
+diff --git a/internal/install/commit.go b/internal/install/commit.go
+index 41a118b..9b75ed3 100644
+--- a/internal/install/commit.go
++++ b/internal/install/commit.go
+@@ -517,6 +517,10 @@ type scopeTargets struct {
+ 	// per-write BoundaryCheck plus the durable BoundaryProof, all under
+ 	// the serialized transaction. A nil record (only test scaffolding
+ 	// stages without one) skips every gate with byte-identical behavior.
++	// adoptions are the protected external build-cache entries this commit
++	// publishes; runCommit adopts each through the store right after the
++	// journal commit, before the maintenance sweep reads them.
++	adoptions  []externalAdoption
+ 	boundaries *staging.Boundaries
+ }
+ 
+@@ -689,6 +693,7 @@ func runCommit(ctx context.Context, request commitRequest) (outcome commitOutcom
+ 	}
+ 	committed = true
+ 	outcome.warnings = append(outcome.warnings, recordPublishedEnvApprovals(request, targets)...)
++	outcome.warnings = append(outcome.warnings, adoptExternalPublications(request, targets)...)
+ 	outcome.warnings = append(outcome.warnings, collectAfterCommit(request, lock)...)
+ 	return outcome, nil
+ }
+@@ -713,6 +718,28 @@ func recordPublishedEnvApprovals(request commitRequest, targets scopeTargets) []
+ 	return warnings
+ }
+ 
++// adoptExternalPublications re-secures and proves, through the protected
++// store, every external build-cache entry the journal commit just published
++// (see stagedExternal.adoptions). It runs still under the home lock and before
++// the maintenance sweep, which refuses an unprovable retained receipt. The
++// journal commit is durable at this point, so a failure is reported as a
++// warning naming the entry; the entry stays in place and the next lookup
++// classifies it exactly as the store proves it.
++func adoptExternalPublications(request commitRequest, targets scopeTargets) []string {
++	var warnings []string
++	for _, adoption := range targets.adoptions {
++		if err := adoption.adopt(); err != nil {
++			kind := "artifact"
++			if adoption.snapshot {
++				kind = "snapshot"
++			}
++			warnings = append(warnings, fmt.Sprintf("%s: warning: external build cache %s %s was published but could not be adopted: %v",
++				request.scope, kind, adoption.key, err))
++		}
++	}
++	return warnings
++}
++
+ // collectAfterCommit runs the maintenance sweep while the home lock is still
+ // held, so consumer pruning, runtime collection, and the protected build-cache
+ // sweep serialize with every other manager-home mutation. A failure is reported
+diff --git a/internal/install/draftbuild_adopt_test.go b/internal/install/draftbuild_adopt_test.go
+new file mode 100644
+index 0000000..e566f4d
+--- /dev/null
++++ b/internal/install/draftbuild_adopt_test.go
+@@ -0,0 +1,75 @@
++package install
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/buildrepo"
++)
++
++// TestExternalAdoptionsListEveryPublishedEntryOnce: the commit adopts exactly
++// the entries transactionPlan publishes — one artifact per newly built command
++// in its receipt namespace, each snapshot once, nothing for a final-root hit —
++// artifacts before snapshots, in key order.
++func TestExternalAdoptionsListEveryPublishedEntryOnce(t *testing.T) {
++	keyA := "sha256:" + strings.Repeat("a", 64)
++	keyB := "sha256:" + strings.Repeat("b", 64)
++	keyC := "sha256:" + strings.Repeat("c", 64)
++	snapshot := "sha256:" + strings.Repeat("d", 64)
++	staged := stagedExternal{root: "/staged", entries: map[string]map[string]externalEntry{
++		"tooling": {
++			"etool": {result: buildrepo.PipelineResult{CacheKey: keyB, ReceiptSchemaVersion: buildrepo.SourceAwareReceiptSchemaVersion, SnapshotKey: snapshot}, artifactPath: "/staged/x/artifact"},
++			"ltool": {result: buildrepo.PipelineResult{CacheKey: keyA, ReceiptSchemaVersion: buildrepo.LegacyReceiptSchemaVersion, SnapshotKey: snapshot}, artifactPath: "/staged/y/artifact"},
++			"hit":   {result: buildrepo.PipelineResult{CacheKey: keyC, ReceiptSchemaVersion: buildrepo.SourceAwareReceiptSchemaVersion, SnapshotKey: snapshot}, existing: true},
++		},
++	}}
++	got := staged.adoptions("/final")
++	want := []externalAdoption{
++		{root: "/final", receiptSchemaVersion: buildrepo.LegacyReceiptSchemaVersion, key: keyA},
++		{root: "/final", receiptSchemaVersion: buildrepo.SourceAwareReceiptSchemaVersion, key: keyB},
++		{root: "/final", key: snapshot, snapshot: true},
++	}
++	if len(got) != len(want) {
++		t.Fatalf("adoptions = %+v, want %+v", got, want)
++	}
++	for i := range want {
++		if got[i] != want[i] {
++			t.Fatalf("adoption %d = %+v, want %+v", i, got[i], want[i])
++		}
++	}
++	if list := (stagedExternal{}).adoptions("/final"); len(list) != 0 {
++		t.Fatalf("an empty staged set adopts %+v", list)
++	}
++	// The adoption set is exactly the live paths the transaction publishes.
++	plan := staged.transactionPlan("/final")
++	if len(plan.Targets) != len(got) {
++		t.Fatalf("transaction publishes %d targets but %d entries are adopted", len(plan.Targets), len(got))
++	}
++}
++
++// TestAdoptExternalPublicationsWarnsWithoutCreatingAnything: a publication the
++// store cannot prove is reported as a warning naming the kind and key; the
++// committed install is not reverted and the store root is not invented.
++func TestAdoptExternalPublicationsWarnsWithoutCreatingAnything(t *testing.T) {
++	root := filepath.Join(t.TempDir(), "absent-external-build-cache")
++	key := "sha256:" + strings.Repeat("e", 64)
++	snapshot := "sha256:" + strings.Repeat("f", 64)
++	targets := scopeTargets{adoptions: []externalAdoption{
++		{root: root, receiptSchemaVersion: buildrepo.SourceAwareReceiptSchemaVersion, key: key},
++		{root: root, key: snapshot, snapshot: true},
++	}}
++	warnings := adoptExternalPublications(commitRequest{scope: "project"}, targets)
++	if len(warnings) != 2 ||
++		!strings.Contains(warnings[0], "project: warning: external build cache artifact "+key+" was published but could not be adopted") ||
++		!strings.Contains(warnings[1], "project: warning: external build cache snapshot "+snapshot+" was published but could not be adopted") {
++		t.Fatalf("warnings = %q", warnings)
++	}
++	if _, err := os.Lstat(root); !os.IsNotExist(err) {
++		t.Fatalf("a failed adoption created the store root: %v", err)
++	}
++	if warnings := adoptExternalPublications(commitRequest{scope: "project"}, scopeTargets{}); len(warnings) != 0 {
++		t.Fatalf("no publications warned: %q", warnings)
++	}
++}
+diff --git a/internal/install/draftbuild_test.go b/internal/install/draftbuild_test.go
+new file mode 100644
+index 0000000..664758a
+--- /dev/null
++++ b/internal/install/draftbuild_test.go
+@@ -0,0 +1,509 @@
++package install
++
++import (
++	"bytes"
++	"context"
++	"crypto/sha256"
++	"encoding/binary"
++	"encoding/hex"
++	"encoding/json"
++	"errors"
++	"os"
++	"path/filepath"
++	"reflect"
++	"runtime"
++	"sort"
++	"strings"
++	"testing"
++	"time"
++
++	"github.com/relux-works/curator/internal/buildcache"
++	"github.com/relux-works/curator/internal/buildmeta"
++	"github.com/relux-works/curator/internal/buildrepo"
++	"github.com/relux-works/curator/internal/marker"
++	"github.com/relux-works/curator/internal/protocoljson"
++	"github.com/relux-works/curator/internal/sourcelock"
++)
++
++const draftBuildPayload = `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["*"]}]}`
++
++const externalLockedCommit = "0123456789abcdef0123456789abcdef01234567"
++
++// writeDraftBuildSkill writes one local draft package declaring a local
++// go-v1 build command ("ltool") and, for schema 7, an external
++// go-repository-v1 command ("etool") over a declared build repository: both
++// build arms of one marker-5 member.
++func writeDraftBuildSkill(t *testing.T, dir, name string, external bool) {
++	t.Helper()
++	for _, rel := range []string{"src/cmd/ltool", "references"} {
++		if err := os.MkdirAll(filepath.Join(dir, filepath.FromSlash(rel)), 0o755); err != nil {
++			t.Fatal(err)
++		}
++	}
++	files := map[string]string{
++		"SKILL.md":              "---\nname: " + name + "\ndescription: Test\n---\n# " + name + "\n",
++		"src/go.mod":            "module example.com/" + name + "\n",
++		"src/cmd/ltool/main.go": "package main\n\nfunc main() {}\n",
++		"references/info.md":    "context",
++	}
++	for rel, content := range files {
++		if err := os.WriteFile(filepath.Join(dir, filepath.FromSlash(rel)), []byte(content), 0o644); err != nil {
++			t.Fatal(err)
++		}
++	}
++	commands := map[string]any{"ltool": map[string]any{"type": "build", "driver": "go-v1", "source_dir": "src/cmd/ltool"}}
++	spec := map[string]any{"schema_version": 6, "build_roots": []string{"src"}, "capabilities": map[string]any{}, "commands": commands}
++	if external {
++		spec["schema_version"] = 7
++		spec["build_repositories"] = map[string]any{"tools": map[string]any{
++			"git":           "https://git.example.com/skills/tools.git",
++			"locked_commit": map[string]any{"object_format": "sha1", "hex": externalLockedCommit},
++		}}
++		commands["etool"] = map[string]any{"type": "build", "driver": "go-repository-v1", "repository": "tools", "target": "tool"}
++	}
++	payload, err := json.Marshal(spec)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(dir, "agent-skill.json"), payload, 0o644); err != nil {
++		t.Fatal(err)
++	}
++}
++
++// externalTestSnapshot frames one proved external repository snapshot the way
++// the raw-object admission does (curator-build-source-v1 framing), so the
++// fake acquisition hands the pipeline bytes it can materialize and revalidate.
++func externalTestSnapshot() *buildrepo.Snapshot {
++	files := []buildrepo.File{
++		{Path: "skill-build.json", Content: []byte(`{"schema_version":1,"targets":{"tool":{"driver":"go-repository-v1","build_root":"tools","source_dir":"tools/cmd/tool"}}}`)},
++		{Path: "tools/cmd/tool/main.go", Content: []byte("package main\n\nfunc main() {}\n")},
++		{Path: "tools/go.mod", Content: []byte("module example.test/tool\n")},
++	}
++	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
++	canonical := []byte("curator-build-source-v1\x00")
++	for _, file := range files {
++		canonical = append(canonical, 'F')
++		canonical = binary.BigEndian.AppendUint64(canonical, uint64(len(file.Path)))
++		canonical = append(canonical, file.Path...)
++		canonical = binary.BigEndian.AppendUint64(canonical, uint64(len(file.Content)))
++		canonical = append(canonical, file.Content...)
++	}
++	sum := sha256.Sum256(canonical)
++	return &buildrepo.Snapshot{ObjectFormat: "sha1", Commit: externalLockedCommit, Files: files, CanonicalBytes: canonical, Digest: "sha256:" + hex.EncodeToString(sum[:])}
++}
++
++func draftBuildDeps(t *testing.T) (BuildDeps, *fakeToolchain, *fakeBuilder) {
++	t.Helper()
++	toolchain := &fakeToolchain{t: t, target: testTarget(), toolchain: testToolchain()}
++	builder := &fakeBuilder{t: t, failOn: map[string]error{}}
++	// Cache is left nil so the real protected build cache under the manager
++	// home is exercised: the receipt-3 namespace is a property of that store.
++	deps := BuildDeps{Toolchain: toolchain, Builder: builder, Clock: fixedClock{at: time.Unix(1_700_000_000, 0).UTC()}, Generation: &countingGeneration{}}
++	return deps, toolchain, builder
++}
++
++func draftExternalDeps(t *testing.T) ExternalDeps {
++	t.Helper()
++	return ExternalDeps{
++		Acquire: func(_ context.Context, _ ExternalSource) (*buildrepo.Snapshot, error) {
++			return externalTestSnapshot(), nil
++		},
++		Audit: func(context.Context, buildrepo.AuditSubject) error { return nil },
++	}
++}
++
++func draftBuildInstall(t *testing.T, home, project string, deps BuildDeps, external ExternalDeps) Result {
++	t.Helper()
++	cfg := draftTestConfig(home, t.TempDir())
++	return Project(cfg, project, "test", Options{DraftSourcesV1: true, Platform: installPlatform(), Build: deps, External: external})
++}
++
++func readReceiptObject(t *testing.T, path string) map[string]any {
++	t.Helper()
++	payload, err := os.ReadFile(path) // #nosec G304 -- test reads a manager-home receipt
++	if err != nil {
++		t.Fatalf("receipt missing: %v", err)
++	}
++	if err := protocoljson.Validate(payload); err != nil {
++		t.Fatalf("receipt is not canonical: %v", err)
++	}
++	var object map[string]any
++	decoder := json.NewDecoder(bytes.NewReader(payload))
++	decoder.UseNumber()
++	if err := decoder.Decode(&object); err != nil {
++		t.Fatal(err)
++	}
++	return object
++}
++
++func canonicalOf(t *testing.T, value any) []byte {
++	t.Helper()
++	payload, err := protocoljson.MarshalCanonical(value)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return payload
++}
++
++func dirNames(t *testing.T, dir string) []string {
++	t.Helper()
++	entries, err := os.ReadDir(dir)
++	if err != nil {
++		if os.IsNotExist(err) {
++			return nil
++		}
++		t.Fatal(err)
++	}
++	var names []string
++	for _, entry := range entries {
++		names = append(names, entry.Name())
++	}
++	return names
++}
++
++// TestDraftBuildsPublishReceipt3OnBothArms is the acceptance core at
++// install.Project: a marker-5 member with a local go-v1 command and an
++// external go-repository-v1 command publishes both under the distinct
++// receipt-3 namespaces with receipts whose input.package equals the marker
++// package, whose build keeps every legacy field, and whose marker records
++// bind receipt version 3 on both arms; a reinstall is current.
++func TestDraftBuildsPublishReceipt3OnBothArms(t *testing.T) {
++	project, home, _ := draftProject(t, draftBuildPayload, nil)
++	writeDraftBuildSkill(t, filepath.Join(project, "skills", "tooling"), "tooling", true)
++	resolveDraftForInstall(t, project, home, draftBuildPayload)
++	deps, _, builder := draftBuildDeps(t)
++
++	result := draftBuildInstall(t, home, project, deps, draftExternalDeps(t))
++	if result.Status != "ok" {
++		t.Fatalf("install = %+v", result)
++	}
++	lock, err := sourcelock.Read(sourcelock.PathIn(project))
++	if err != nil {
++		t.Fatal(err)
++	}
++	member, ok := lock.Find("tooling")
++	if !ok {
++		t.Fatal("lock misses tooling")
++	}
++	wantPackage, err := member.Package.Canonical()
++	if err != nil {
++		t.Fatal(err)
++	}
++	recorded := marker.Read(filepath.Join(project, ".agents", "skills", "tooling"))
++	if recorded == nil || recorded.SchemaVersion != marker.SchemaV5 || recorded.Package == nil {
++		t.Fatalf("marker = %+v", recorded)
++	}
++	if len(recorded.Builds) != 2 {
++		t.Fatalf("marker builds = %+v", recorded.Builds)
++	}
++	local, external := recorded.Builds["ltool"], recorded.Builds["etool"]
++	if local.Driver != buildmeta.DriverGoV1 || local.ReceiptSchemaVersion != 3 || local.ExecutionPolicy != buildmeta.ExecutionPolicy {
++		t.Fatalf("local marker record = %+v", local)
++	}
++	if external.Driver != "go-repository-v1" || external.ReceiptSchemaVersion != 3 || external.Repository != "tools" ||
++		external.DeclaredLockedCommit == nil || external.DeclaredLockedCommit.Hex != externalLockedCommit || external.DeclaredIdentity == nil ||
++		external.EffectiveIdentity == nil || external.Commit != externalLockedCommit || external.BuildSource == nil || external.DescriptorTarget != "tool" || external.Substituted {
++		t.Fatalf("external marker record lost retained fields: %+v", external)
++	}
++
++	// Local arm: the entry lives in the receipt-3 namespace only.
++	legacyLocal := dirNames(t, filepath.Join(home, "cache", "build", buildcache.Namespace))
++	sourceAwareLocal := dirNames(t, filepath.Join(home, "cache", "build", buildcache.SourceAwareNamespace))
++	if len(legacyLocal) != 0 || len(sourceAwareLocal) != 1 || "sha256:"+sourceAwareLocal[0] != string(local.CacheKey) {
++		t.Fatalf("local namespaces: legacy=%v receipt-3=%v key=%s", legacyLocal, sourceAwareLocal, local.CacheKey)
++	}
++	localReceipt := readReceiptObject(t, filepath.Join(home, "cache", "build", buildcache.SourceAwareNamespace, sourceAwareLocal[0], buildcache.ReceiptFilename))
++	localInput := localReceipt["input"].(map[string]any)
++	if localReceipt["schema_version"] != json.Number("3") || localInput["schema_version"] != json.Number("3") || len(localInput) != 3 {
++		t.Fatalf("local receipt shape = %v", localReceipt)
++	}
++	if !bytes.Equal(canonicalOf(t, localInput["package"]), wantPackage) {
++		t.Fatalf("local receipt package %s != lock package %s", canonicalOf(t, localInput["package"]), wantPackage)
++	}
++	if build := localInput["build"].(map[string]any); build["schema_version"] != json.Number("1") || build["driver"] != "go-v1" || build["command"] != "ltool" || build["build_root"] != "src" {
++		t.Fatalf("local wrapped build = %v", build)
++	}
++	if decoded, err := buildmeta.DecodeReceipt(canonicalOf(t, localReceipt)); err != nil || decoded.CacheKey == "" {
++		t.Fatalf("local receipt does not decode as receipt-3: %v", err)
++	}
++
++	// External arm: artifacts-receipt-3 only, receipt-3 wrapper around the
++	// unchanged receipt-2 input with every declared/effective field.
++	externalRoot := filepath.Join(home, "external-build-cache")
++	legacyExternal := dirNames(t, filepath.Join(externalRoot, buildrepo.ArtifactsDir(buildrepo.LegacyReceiptSchemaVersion)))
++	sourceAwareExternal := dirNames(t, filepath.Join(externalRoot, buildrepo.ArtifactsDir(buildrepo.SourceAwareReceiptSchemaVersion)))
++	if len(legacyExternal) != 0 || len(sourceAwareExternal) != 1 || "sha256:"+sourceAwareExternal[0] != string(external.CacheKey) {
++		t.Fatalf("external namespaces: legacy=%v receipt-3=%v key=%s", legacyExternal, sourceAwareExternal, external.CacheKey)
++	}
++	externalReceipt := readReceiptObject(t, filepath.Join(externalRoot, buildrepo.ArtifactsDir(buildrepo.SourceAwareReceiptSchemaVersion), sourceAwareExternal[0], "receipt.json"))
++	externalInput := externalReceipt["input"].(map[string]any)
++	if externalReceipt["schema_version"] != json.Number("3") || externalInput["schema_version"] != json.Number("3") || len(externalInput) != 3 {
++		t.Fatalf("external receipt shape = %v", externalReceipt)
++	}
++	if !bytes.Equal(canonicalOf(t, externalInput["package"]), wantPackage) {
++		t.Fatalf("external receipt package %s != lock package %s", canonicalOf(t, externalInput["package"]), wantPackage)
++	}
++	externalBuild := externalInput["build"].(map[string]any)
++	externalSource := externalBuild["source"].(map[string]any)
++	declared := externalSource["declared"].(map[string]any)
++	effective := externalSource["effective"].(map[string]any)
++	if externalBuild["schema_version"] != json.Number("2") || externalBuild["driver"] != "go-repository-v1" || externalSource["repository"] != "tools" ||
++		declared["transport"] != "https" || declared["locked_commit"].(map[string]any)["hex"] != externalLockedCommit ||
++		effective["commit"] != externalLockedCommit || effective["substituted"] != false || externalBuild["assurance"] == nil {
++		t.Fatalf("external wrapped build lost fields: %v", externalBuild)
++	}
++	sum := sha256.Sum256(canonicalOf(t, externalInput))
++	if string(external.CacheKey) != "sha256:"+hex.EncodeToString(sum[:]) {
++		t.Fatalf("external key %s is not SHA-256 of the wrapped input", external.CacheKey)
++	}
++	receiptPayload, _ := os.ReadFile(filepath.Join(externalRoot, buildrepo.ArtifactsDir(buildrepo.SourceAwareReceiptSchemaVersion), sourceAwareExternal[0], "receipt.json"))
++	receiptSum := sha256.Sum256(receiptPayload)
++	if string(external.ReceiptSHA256) != "sha256:"+hex.EncodeToString(receiptSum[:]) {
++		t.Fatalf("external marker receipt hash does not bind the protected receipt")
++	}
++	if strings.Join(builder.calls, ",") != "ltool,etool" && strings.Join(builder.calls, ",") != "etool,ltool" {
++		t.Fatalf("builder calls = %v", builder.calls)
++	}
++
++	// A reinstall reuses both receipt-3 entries: the plan takes exact cache
++	// hits for both arms and nothing is compiled again (build-bearing nodes
++	// are re-staged from the cache on every lane, so the context line still
++	// reads "installed").
++	again := draftBuildInstall(t, home, project, deps, draftExternalDeps(t))
++	if again.Status != "ok" {
++		t.Fatalf("reinstall = %+v", again)
++	}
++	messages := strings.Join(again.Messages, "\n")
++	if !strings.Contains(messages, "tooling.ltool build source=") || !strings.Contains(messages, "key="+string(local.CacheKey)+" outcome=cache-hit") ||
++		!strings.Contains(messages, "tooling.etool external build key="+string(external.CacheKey)+" outcome=cache-hit") {
++		t.Fatalf("reinstall did not take exact receipt-3 cache hits: %q", again.Messages)
++	}
++	if len(builder.calls) != 2 {
++		t.Fatalf("reinstall rebuilt: %v", builder.calls)
++	}
++	if reread := marker.Read(filepath.Join(project, ".agents", "skills", "tooling")); reread == nil || !reflect.DeepEqual(reread.Builds, recorded.Builds) {
++		t.Fatalf("reinstall changed the marker build records: %+v", reread)
++	}
++}
++
++// TestDraftBuildKeyFollowsThePackageIdentity: a runtime-only edit followed by
++// an explicit refresh changes the frozen package, so both arms are keyed
++// anew — the previous entries can never answer for the new identity — and
++// the marker rebinds to the new receipts.
++func TestDraftBuildKeyFollowsThePackageIdentity(t *testing.T) {
++	project, home, _ := draftProject(t, draftBuildPayload, nil)
++	writeDraftBuildSkill(t, filepath.Join(project, "skills", "tooling"), "tooling", true)
++	resolveDraftForInstall(t, project, home, draftBuildPayload)
++	deps, _, builder := draftBuildDeps(t)
++	first := draftBuildInstall(t, home, project, deps, draftExternalDeps(t))
++	if first.Status != "ok" {
++		t.Fatalf("install = %+v", first)
++	}
++	before := marker.Read(filepath.Join(project, ".agents", "skills", "tooling"))
++
++	// A context-only edit: the build roots are untouched, so the build source
++	// identity is unchanged and only the package identity moves.
++	if err := os.WriteFile(filepath.Join(project, "skills", "tooling", "references", "info.md"), []byte("context v2"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	pinned := draftBuildInstall(t, home, project, deps, draftExternalDeps(t))
++	if pinned.Status != "ok" || len(builder.calls) != 2 {
++		t.Fatalf("pinned reinstall rebuilt or failed: %+v calls=%v", pinned, builder.calls)
++	}
++	resolveDraftForInstall(t, project, home, draftBuildPayload)
++	refreshed := draftBuildInstall(t, home, project, deps, draftExternalDeps(t))
++	if refreshed.Status != "ok" {
++		t.Fatalf("refreshed install = %+v", refreshed)
++	}
++	after := marker.Read(filepath.Join(project, ".agents", "skills", "tooling"))
++	if after == nil || before == nil || after.Package.Snapshot == before.Package.Snapshot {
++		t.Fatalf("package identity did not move: before=%+v after=%+v", before, after)
++	}
++	for _, command := range []string{"ltool", "etool"} {
++		if after.Builds[command].CacheKey == before.Builds[command].CacheKey || after.Builds[command].ReceiptSHA256 == before.Builds[command].ReceiptSHA256 {
++			t.Fatalf("%s kept its key across a package change: %+v", command, after.Builds[command])
++		}
++		if after.Builds[command].ReceiptSchemaVersion != 3 {
++			t.Fatalf("%s lost receipt version 3: %+v", command, after.Builds[command])
++		}
++	}
++	if len(builder.calls) != 4 {
++		t.Fatalf("refresh did not rebuild both arms: %v", builder.calls)
++	}
++	if entries := dirNames(t, filepath.Join(home, "cache", "build", buildcache.SourceAwareNamespace)); len(entries) != 2 {
++		t.Fatalf("local receipt-3 namespace = %v", entries)
++	}
++	// The external cache is collected immediately after commit for keys no
++	// marker references (existing external GC behavior), so exactly the new
++	// key survives there.
++	if entries := dirNames(t, filepath.Join(home, "external-build-cache", buildrepo.ArtifactsDir(buildrepo.SourceAwareReceiptSchemaVersion))); len(entries) != 1 || "sha256:"+entries[0] != string(after.Builds["etool"].CacheKey) {
++		t.Fatalf("external receipt-3 namespace = %v, want only %s", entries, after.Builds["etool"].CacheKey)
++	}
++}
++
++// TestDraftBuildRefusesASessionThatBindsTheLegacyDigest: an execution receipt
++// over the context-only digest cannot attest a receipt-3 entry. The install
++// fails closed on both arms before any cache publication or marker write.
++func TestDraftBuildRefusesASessionThatBindsTheLegacyDigest(t *testing.T) {
++	for _, external := range []bool{false, true} {
++		name := "local"
++		if external {
++			name = "external"
++		}
++		t.Run(name, func(t *testing.T) {
++			project, home, _ := draftProject(t, draftBuildPayload, nil)
++			writeDraftBuildSkill(t, filepath.Join(project, "skills", "tooling"), "tooling", external)
++			resolveDraftForInstall(t, project, home, draftBuildPayload)
++			deps, _, builder := draftBuildDeps(t)
++			builder.dropPackage = true
++			result := draftBuildInstall(t, home, project, deps, draftExternalDeps(t))
++			if result.Status == "ok" {
++				t.Fatalf("legacy-bound execution receipt accepted: %+v", result)
++			}
++			joined := strings.Join(append(result.Errors, result.Messages...), "\n")
++			if !strings.Contains(joined, "receipt") {
++				t.Fatalf("refusal does not name the receipt binding: %s", joined)
++			}
++			for _, dir := range []string{
++				filepath.Join(home, "cache", "build", buildcache.Namespace),
++				filepath.Join(home, "cache", "build", buildcache.SourceAwareNamespace),
++				filepath.Join(home, "external-build-cache", buildrepo.ArtifactsDir(buildrepo.LegacyReceiptSchemaVersion)),
++				filepath.Join(home, "external-build-cache", buildrepo.ArtifactsDir(buildrepo.SourceAwareReceiptSchemaVersion)),
++			} {
++				if entries := dirNames(t, dir); len(entries) != 0 {
++					t.Fatalf("refused install published %v under %s", entries, dir)
++				}
++			}
++			if marker.Read(filepath.Join(project, ".agents", "skills", "tooling")) != nil {
++				t.Fatal("refused install wrote a marker")
++			}
++		})
++	}
++}
++
++// TestDraftBuildToolchainFailureBehaviorIsPreserved: the trusted toolchain
++// boundary fails exactly as on the legacy lane — before any cache lookup,
++// compilation or persistent state — and the package wrapper adds no path
++// around it.
++func TestDraftBuildToolchainFailureBehaviorIsPreserved(t *testing.T) {
++	project, home, _ := draftProject(t, draftBuildPayload, nil)
++	writeDraftBuildSkill(t, filepath.Join(project, "skills", "tooling"), "tooling", false)
++	resolveDraftForInstall(t, project, home, draftBuildPayload)
++	deps, toolchain, builder := draftBuildDeps(t)
++	toolchain.establishErr = errors.New("trusted toolchain unavailable")
++	result := draftBuildInstall(t, home, project, deps, draftExternalDeps(t))
++	if result.Status != "failed" || len(builder.calls) != 0 {
++		t.Fatalf("result = %+v calls=%v", result, builder.calls)
++	}
++	if _, err := os.Lstat(filepath.Join(home, "cache")); !os.IsNotExist(err) {
++		t.Fatalf("toolchain failure left cache state: %v", err)
++	}
++	if marker.Read(filepath.Join(project, ".agents", "skills", "tooling")) != nil {
++		t.Fatal("toolchain failure wrote a marker")
++	}
++	// The row is reported with the identities it already had, like on v1.
++	if len(result.Builds) != 1 || result.Builds[0].Driver() != buildmeta.DriverGoV1 || result.Builds[0].CacheKey() != "" {
++		t.Fatalf("builds inventory = %+v", result.Builds)
++	}
++}
++
++// TestLegacyBuildsKeepReceipt1WithTheSwitchOff pins the frozen v1 lane: a
++// Git skill installed without the draft switch publishes a schema-1 receipt
++// under the legacy namespace and no receipt-3 namespace exists.
++func TestLegacyBuildsKeepReceipt1WithTheSwitchOff(t *testing.T) {
++	e := newEnv(t)
++	e.buildSkill("build-skill", "alpha")
++	e.declare("build-skill")
++	deps, _, builder := draftBuildDeps(t)
++	result := e.install(Options{Build: deps})
++	if result.Status != "ok" || len(builder.calls) != 1 {
++		t.Fatalf("legacy install = %+v calls=%v", result, builder.calls)
++	}
++	legacy := dirNames(t, filepath.Join(e.home, "cache", "build", buildcache.Namespace))
++	if len(legacy) != 1 {
++		t.Fatalf("legacy namespace = %v", legacy)
++	}
++	if _, err := os.Lstat(filepath.Join(e.home, "cache", "build", buildcache.SourceAwareNamespace)); !os.IsNotExist(err) {
++		t.Fatalf("legacy install created the receipt-3 namespace: %v", err)
++	}
++	receipt := readReceiptObject(t, filepath.Join(e.home, "cache", "build", buildcache.Namespace, legacy[0], buildcache.ReceiptFilename))
++	input := receipt["input"].(map[string]any)
++	if receipt["schema_version"] != json.Number("1") || input["schema_version"] != json.Number("1") || input["package"] != nil || len(input) != 9 {
++		t.Fatalf("legacy receipt shape = %v", receipt)
++	}
++	recorded := marker.Read(filepath.Join(e.project, ".agents", "skills", "build-skill"))
++	if recorded == nil || recorded.SchemaVersion == marker.SchemaV5 || recorded.Builds["alpha"].ReceiptSchemaVersion == 3 {
++		t.Fatalf("legacy marker = %+v", recorded)
++	}
++}
++
++// TestDraftBuildFinalRootParentsAreStoreCreated: the external arm publishes
++// into final-root namespaces the protected store created privately before the
++// transaction, so a lookup on the next install proves every parent (root,
++// snapshots, receipt-3 artifacts) as its own instead of a parent the commit's
++// generic scaffolding invented; on unix each parent is 0700. The negative row
++// pre-creates a foreign world-writable artifact namespace: the install refuses
++// with the protected-boundary code before publishing or writing a marker.
++func TestDraftBuildFinalRootParentsAreStoreCreated(t *testing.T) {
++	project, home, _ := draftProject(t, draftBuildPayload, nil)
++	writeDraftBuildSkill(t, filepath.Join(project, "skills", "tooling"), "tooling", true)
++	resolveDraftForInstall(t, project, home, draftBuildPayload)
++	deps, _, builder := draftBuildDeps(t)
++	if result := draftBuildInstall(t, home, project, deps, draftExternalDeps(t)); result.Status != "ok" {
++		t.Fatalf("install = %+v", result)
++	}
++	finalRoot := filepath.Join(home, "external-build-cache")
++	store := &buildrepo.DiskProtectedStore{Root: finalRoot}
++	for _, name := range []string{"", "snapshots", buildrepo.ArtifactsDir(buildrepo.SourceAwareReceiptSchemaVersion)} {
++		path := filepath.Join(finalRoot, name)
++		info, err := os.Lstat(path)
++		if err != nil || !info.IsDir() {
++			t.Fatalf("%s: %v", path, err)
++		}
++		if runtime.GOOS != "windows" && info.Mode().Perm() != 0o700 {
++			t.Fatalf("%s mode = %o, want 0700", path, info.Mode().Perm())
++		}
++	}
++	if _, err := os.Lstat(filepath.Join(finalRoot, buildrepo.ArtifactsDir(buildrepo.LegacyReceiptSchemaVersion))); !os.IsNotExist(err) {
++		t.Fatalf("a receipt-3 publication prepared the legacy namespace: %v", err)
++	}
++	recorded := marker.Read(filepath.Join(project, ".agents", "skills", "tooling"))
++	if recorded == nil || recorded.Builds["etool"].CacheKey == "" {
++		t.Fatalf("marker = %+v", recorded)
++	}
++	// The store proves the published entry through the prepared parents.
++	if err := store.PrepareNamespaces(buildrepo.SourceAwareReceiptSchemaVersion); err != nil {
++		t.Fatalf("prepared parents are not proved private: %v", err)
++	}
++	if again := draftBuildInstall(t, home, project, deps, draftExternalDeps(t)); again.Status != "ok" || len(builder.calls) != 2 {
++		t.Fatalf("reinstall over the prepared parents = %+v calls=%v", again, builder.calls)
++	}
++
++	t.Run("foreign parent refused", func(t *testing.T) {
++		if runtime.GOOS == "windows" {
++			t.Skip("mode-bit foreign-parent fixture is exercised on the unix runners; the Windows DACL refusal is asserted by TestWindowsProtectedSecurityDescriptorRejectsWrongOwnerAndDACL")
++		}
++		project, home, _ := draftProject(t, draftBuildPayload, nil)
++		writeDraftBuildSkill(t, filepath.Join(project, "skills", "tooling"), "tooling", true)
++		resolveDraftForInstall(t, project, home, draftBuildPayload)
++		deps, _, builder := draftBuildDeps(t)
++		foreign := filepath.Join(home, "external-build-cache", buildrepo.ArtifactsDir(buildrepo.SourceAwareReceiptSchemaVersion))
++		if err := os.MkdirAll(foreign, 0o700); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Chmod(foreign, 0o777); err != nil {
++			t.Fatal(err)
++		}
++		result := draftBuildInstall(t, home, project, deps, draftExternalDeps(t))
++		if result.Status == "ok" || !strings.Contains(strings.Join(append(result.Errors, result.Messages...), "\n"), buildrepo.CodeProtectedBoundaryUntrusted) {
++			t.Fatalf("foreign parent accepted: %+v", result)
++		}
++		if entries := dirNames(t, foreign); len(entries) != 0 {
++			t.Fatalf("refused install published %v under the foreign parent", entries)
++		}
++		if marker.Read(filepath.Join(project, ".agents", "skills", "tooling")) != nil {
++			t.Fatal("refused install wrote a marker")
++		}
++		_ = builder
++	})
++}
+diff --git a/internal/install/draftruntime.go b/internal/install/draftruntime.go
+index d0d2016..2eaa6b9 100644
+--- a/internal/install/draftruntime.go
++++ b/internal/install/draftruntime.go
+@@ -3,6 +3,7 @@ package install
+ import (
+ 	"sort"
+ 
++	"github.com/relux-works/curator/internal/buildmeta"
+ 	"github.com/relux-works/curator/internal/buildsource"
+ 	"github.com/relux-works/curator/internal/closure"
+ 	"github.com/relux-works/curator/internal/marker"
+@@ -40,6 +41,45 @@ func draftRuntimeKeys(lock *sourcelock.Lock) (map[string]string, error) {
+ 	return keys, nil
+ }
+ 
++// draftBuildPackages selects the frozen package identity of every draft
++// member whose installation is recorded under marker schema 5 — today the
++// local-snapshot arm, exactly the members buildDraftMarker stages. Their
++// compiled commands are keyed and receipted under the receipt-3 wrapper on
++// both the local go-v1 and the external go-repository-v1 arm; Git draft
++// members keep their accepted legacy receipts until their marker migrates
++// with them, never one without the other. nil on the frozen v1 lane.
++func draftBuildPackages(lock *sourcelock.Lock) map[string]*buildmeta.Package {
++	if lock == nil {
++		return nil
++	}
++	packages := make(map[string]*buildmeta.Package, len(lock.Members))
++	for _, member := range lock.Members {
++		if member.Package.Kind != sourcelock.KindLocalSnapshot {
++			continue
++		}
++		packages[member.Name] = receiptPackage(member.Package)
++	}
++	return packages
++}
++
++// receiptPackage translates a locked package identity into the receipt
++// model arm for arm. The translation is exact and lossless: the local arm
++// carries no commit, so a snapshot digest can never enter the Git arm, and
++// a commit can never enter the snapshot arm.
++func receiptPackage(pkg sourcelock.Package) *buildmeta.Package {
++	translated := &buildmeta.Package{
++		Kind:       pkg.Kind,
++		Snapshot:   pkg.Snapshot,
++		Repository: pkg.Repository,
++		Source:     pkg.Source,
++		Directory:  pkg.Directory,
++	}
++	if pkg.IsGit() {
++		translated.Commit = &buildmeta.PackageCommit{ObjectFormat: pkg.Commit.ObjectFormat, Hex: pkg.Commit.Hex}
++	}
++	return translated
++}
++
+ // draftRuntimeKey selects the runtime-store leaf of one node: the frozen
+ // source-v1 key on the draft lane, the resolved commit on the frozen v1
+ // lane. An empty key map keeps the legacy behavior byte-identically.
+@@ -103,17 +143,17 @@ func buildDraftMarker(
+ 	}
+ 	// Build state is all-or-nothing, exactly like the legacy marker: a
+ 	// node with no published build carries no build source at all.
+-	if node.Spec.SchemaVersion >= 7 {
+-		upgraded := make(map[string]marker.Build, len(builds))
+-		for command, build := range builds {
+-			if build.Driver == "go-v1" {
+-				build.ReceiptSchemaVersion = 1
+-				build.ExecutionPolicy = "manager-worker-v1"
+-			}
+-			upgraded[command] = build
+-		}
+-		builds = upgraded
++	// Marker-5 build entries bind receipt version 3 and the execution policy
++	// for every driver, whatever the skill schema: the receipt the cache
++	// holds for this member is the package wrapper, so no legacy record
++	// shape can describe it (skillfile-sources §4).
++	upgraded := make(map[string]marker.Build, len(builds))
++	for command, build := range builds {
++		build.ReceiptSchemaVersion = buildmeta.SourceAwareSchemaVersion
++		build.ExecutionPolicy = buildmeta.ExecutionPolicy
++		upgraded[command] = build
+ 	}
++	builds = upgraded
+ 	if len(builds) == 0 {
+ 		source = nil
+ 	}
+diff --git a/internal/install/drafttransport_test.go b/internal/install/drafttransport_test.go
+index 6a88651..e8ad6dd 100644
+--- a/internal/install/drafttransport_test.go
++++ b/internal/install/drafttransport_test.go
+@@ -787,7 +787,7 @@ func TestDefaultAcquireFetchesTheDeclaredURL(t *testing.T) {
+ 		Declared:  buildrepo.DeclaredState{Repository: "tools", Identity: "fixture.test/repository", Transport: "https", ObjectFormat: "sha1", Commit: commit},
+ 		Effective: buildrepo.EffectiveState{IdentityKind: "network-git", Identity: "fixture.test/repository", Transport: "https", ObjectFormat: "sha1", Commit: commit}}
+ 	request, err := externalPipelineRequest(deps, source, buildrepo.OperatorSSHCredentials{}, BuildHTTPSCredentials{},
+-		skillspec.Command{Name: "tool", Target: "tool"}, nil, nil, buildrepo.OperationDryRun, NewPortableBuildAuthority())
++		skillspec.Command{Name: "tool", Target: "tool"}, nil, nil, nil, buildrepo.OperationDryRun, NewPortableBuildAuthority())
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+diff --git a/internal/install/external.go b/internal/install/external.go
+index 7a6f67e..ab9ed01 100644
+--- a/internal/install/external.go
++++ b/internal/install/external.go
+@@ -85,7 +85,10 @@ type plannedExternal struct {
+ 	declared   buildrepo.DeclaredState
+ 	effective  buildrepo.EffectiveState
+ 	sub        *devsub.BuildRepositorySubstitution
+-	result     buildrepo.PipelineResult
++	// pkg is the frozen package identity of the declaring draft member, or
++	// nil on the legacy lane; it selects the receipt-3 wrapper and namespace.
++	pkg    *buildmeta.Package
++	result buildrepo.PipelineResult
+ }
+ 
+ type externalPlan struct {
+@@ -140,7 +143,7 @@ func (deps ExternalDeps) resolved(home string) ExternalDeps {
+ 	return deps
+ }
+ 
+-func planExternalBuilds(ctx context.Context, scope, projectIdentity, home string, nodes []*closure.Node, substitutions map[string]map[string]devsub.BuildRepositorySubstitution, toolchain Toolchain, deps ExternalDeps, authority *BuildAuthority, dryRun bool) (externalPlan, error) {
++func planExternalBuilds(ctx context.Context, scope, projectIdentity, home string, nodes []*closure.Node, substitutions map[string]map[string]devsub.BuildRepositorySubstitution, packages map[string]*buildmeta.Package, toolchain Toolchain, deps ExternalDeps, authority *BuildAuthority, dryRun bool) (externalPlan, error) {
+ 	if authority == nil {
+ 		return externalPlan{}, fmt.Errorf("build assurance authority is absent")
+ 	}
+@@ -164,7 +167,7 @@ func planExternalBuilds(ctx context.Context, scope, projectIdentity, home string
+ 		if err != nil {
+ 			return plan, fmt.Errorf("%s.%s: %w", item.node.Name, item.command.Name, err)
+ 		}
+-		plan.rows = append(plan.rows, plannedExternal{node: item.node, command: item.command, repository: repository, declared: declared, effective: effective, sub: sub})
++		plan.rows = append(plan.rows, plannedExternal{node: item.node, command: item.command, repository: repository, declared: declared, effective: effective, sub: sub, pkg: packages[item.node.Name]})
+ 	}
+ 	// Credentials are selected for the whole run before the first repository is
+ 	// reached, so a closure holding one unselected private repository fails
+@@ -184,7 +187,7 @@ func planExternalBuilds(ctx context.Context, scope, projectIdentity, home string
+ 	}
+ 	for index, row := range plan.rows {
+ 		source := ExternalSource{Skill: row.node.Name, Repository: row.repository.Name, GitURL: row.repository.Git, Declared: row.declared, Effective: row.effective, Substitution: row.sub}
+-		request, err := externalPipelineRequest(plan.deps, source, plan.credentialsFor(row), plan.httpsCredentialsFor(row), row.command, store, identityOnlyExternalGo{identity: plan.toolchain, target: plan.targetIdentity, toolchain: plan.toolchainInput}, buildrepo.OperationDryRun, plan.authority)
++		request, err := externalPipelineRequest(plan.deps, source, plan.credentialsFor(row), plan.httpsCredentialsFor(row), row.command, row.pkg, store, identityOnlyExternalGo{identity: plan.toolchain, target: plan.targetIdentity, toolchain: plan.toolchainInput}, buildrepo.OperationDryRun, plan.authority)
+ 		if err != nil {
+ 			return plan, err
+ 		}
+@@ -202,10 +205,15 @@ func stageExternalBuilds(ctx context.Context, plan externalPlan, toolchain Toolc
+ 	if len(plan.rows) == 0 {
+ 		return staged, nil
+ 	}
+-	root, err := private.dir("external-cache-")
++	privateDir, err := private.dir("external-cache-")
+ 	if err != nil {
+ 		return staged, err
+ 	}
++	// The staging store root is created by the protected store itself, not by
++	// the temporary-directory helper: only the store's private creation yields
++	// a directory the store later proves as its own (a non-inheritable,
++	// owner-private DACL on Windows; 0700 on unix).
++	root := filepath.Join(privateDir, "store")
+ 	staged.root = root
+ 	session, err := toolchain.Establish(ctx)
+ 	if err != nil {
+@@ -214,12 +222,15 @@ func stageExternalBuilds(ctx context.Context, plan externalPlan, toolchain Toolc
+ 	defer func() { _ = session.Release() }()
+ 	adapter := externalGoAdapter{session: session, builder: builder}
+ 	store := &buildrepo.DiskProtectedStore{Root: root}
++	if err := store.PrepareNamespaces(); err != nil {
++		return stagedExternal{}, err
++	}
+ 	for _, row := range plan.rows {
+ 		if row.result.State == "cache-hit" {
+ 			if err := plan.authority.revalidate(ctx); err != nil {
+ 				return stagedExternal{}, err
+ 			}
+-			entryRoot := filepath.Join(plan.deps.StoreRoot, "artifacts", strings.TrimPrefix(row.result.CacheKey, "sha256:"))
++			entryRoot := filepath.Join(plan.deps.StoreRoot, buildrepo.ArtifactsDir(row.result.ReceiptSchemaVersion), strings.TrimPrefix(row.result.CacheKey, "sha256:"))
+ 			artifactPath := filepath.Join(entryRoot, "artifact")
+ 			artifact, readErr := os.ReadFile(artifactPath) // #nosec G304 -- manager-derived protected cache path from a validated cache key.
+ 			if readErr != nil {
+@@ -236,7 +247,7 @@ func stageExternalBuilds(ctx context.Context, plan externalPlan, toolchain Toolc
+ 		}
+ 		// A verified final hit is copied into operation-private staging so the
+ 		// transaction and shim path are identical for hits and misses.
+-		request, err := externalPipelineRequest(plan.deps, ExternalSource{Skill: row.node.Name, Repository: row.repository.Name, GitURL: row.repository.Git, Declared: row.declared, Effective: row.effective, Substitution: row.sub}, plan.credentialsFor(row), plan.httpsCredentialsFor(row), row.command, store, adapter, buildrepo.OperationInstall, plan.authority)
++		request, err := externalPipelineRequest(plan.deps, ExternalSource{Skill: row.node.Name, Repository: row.repository.Name, GitURL: row.repository.Git, Declared: row.declared, Effective: row.effective, Substitution: row.sub}, plan.credentialsFor(row), plan.httpsCredentialsFor(row), row.command, row.pkg, store, adapter, buildrepo.OperationInstall, plan.authority)
+ 		if err != nil {
+ 			return stagedExternal{}, err
+ 		}
+@@ -244,7 +255,7 @@ func stageExternalBuilds(ctx context.Context, plan externalPlan, toolchain Toolc
+ 		if err != nil {
+ 			return stagedExternal{}, fmt.Errorf("%s.%s: %w", row.node.Name, row.command.Name, err)
+ 		}
+-		entryRoot := filepath.Join(root, "artifacts", strings.TrimPrefix(result.CacheKey, "sha256:"))
++		entryRoot := filepath.Join(root, buildrepo.ArtifactsDir(result.ReceiptSchemaVersion), strings.TrimPrefix(result.CacheKey, "sha256:"))
+ 		artifactPath := filepath.Join(entryRoot, "artifact")
+ 		receiptPath := filepath.Join(entryRoot, "receipt.json")
+ 		artifact, err := os.ReadFile(artifactPath) // #nosec G304 -- pipeline result supplies the manager-staged artifact path.
+@@ -266,9 +277,86 @@ func stageExternalBuilds(ctx context.Context, plan externalPlan, toolchain Toolc
+ 	if err := session.VerifyToolchain(ctx); err != nil {
+ 		return stagedExternal{}, err
+ 	}
++	if err := staged.prepareFinalNamespaces(plan.deps.StoreRoot); err != nil {
++		return stagedExternal{}, err
++	}
+ 	return staged, nil
+ }
+ 
++// prepareFinalNamespaces creates, through the protected store's private
++// creation, every final-root parent the transaction will rename staged
++// entries into: the root, the snapshot namespace and the artifact namespace of
++// each receipt schema version being published. The commit's generic directory
++// scaffolding must never create a protected parent, because a parent it
++// creates is not provably private and every later lookup refuses it. Nothing
++// is prepared when no entry is published.
++func (staged stagedExternal) prepareFinalNamespaces(finalRoot string) error {
++	versions := map[int]bool{}
++	for _, commands := range staged.entries {
++		for _, entry := range commands {
++			if !entry.existing {
++				versions[entry.result.ReceiptSchemaVersion] = true
++			}
++		}
++	}
++	if len(versions) == 0 {
++		return nil
++	}
++	list := make([]int, 0, len(versions))
++	for version := range versions {
++		list = append(list, version)
++	}
++	sort.Ints(list)
++	return (&buildrepo.DiskProtectedStore{Root: finalRoot}).PrepareNamespaces(list...)
++}
++
++// externalAdoption is one protected entry the transaction publishes into the
++// final store and the commit must adopt through the store before any lookup.
++type externalAdoption struct {
++	root                 string
++	receiptSchemaVersion int
++	key                  string
++	snapshot             bool
++}
++
++func (adoption externalAdoption) adopt() error {
++	store := &buildrepo.DiskProtectedStore{Root: adoption.root}
++	if adoption.snapshot {
++		return store.AdoptSnapshot(adoption.key)
++	}
++	return store.AdoptArtifact(adoption.receiptSchemaVersion, adoption.key)
++}
++
++// adoptions lists, in commit order, every entry transactionPlan publishes into
++// the final root: the artifact entry of each newly built command and each
++// snapshot published with it. The transaction recreates these objects as fresh
++// files (a mode-only copy, then a rename), which keeps the unix proof but not
++// the Windows one; runCommit adopts each entry through the protected store
++// immediately after the journal commit so both arms are exact hits afterwards.
++func (staged stagedExternal) adoptions(finalRoot string) []externalAdoption {
++	var list []externalAdoption
++	snapshots := map[string]bool{}
++	for _, commands := range staged.entries {
++		for _, entry := range commands {
++			if entry.existing {
++				continue
++			}
++			list = append(list, externalAdoption{root: finalRoot, receiptSchemaVersion: entry.result.ReceiptSchemaVersion, key: entry.result.CacheKey})
++			if entry.result.SnapshotKey != "" && !snapshots[entry.result.SnapshotKey] {
++				snapshots[entry.result.SnapshotKey] = true
++				list = append(list, externalAdoption{root: finalRoot, key: entry.result.SnapshotKey, snapshot: true})
++			}
++		}
++	}
++	sort.Slice(list, func(i, j int) bool {
++		if list[i].snapshot != list[j].snapshot {
++			return !list[i].snapshot
++		}
++		return list[i].key < list[j].key
++	})
++	return list
++}
++
+ func (staged stagedExternal) transactionPlan(finalRoot string) staging.Plan {
+ 	var plan staging.Plan
+ 	snapshots := map[string]bool{}
+@@ -278,7 +366,7 @@ func (staged stagedExternal) transactionPlan(finalRoot string) staging.Plan {
+ 				continue
+ 			}
+ 			key := strings.TrimPrefix(entry.result.CacheKey, "sha256:")
+-			plan.Replace("05-external-cache", skill+"/"+command, filepath.Join(finalRoot, "artifacts", key), filepath.Dir(entry.artifactPath))
++			plan.Replace("05-external-cache", skill+"/"+command, filepath.Join(finalRoot, buildrepo.ArtifactsDir(entry.result.ReceiptSchemaVersion), key), filepath.Dir(entry.artifactPath))
+ 			if entry.result.SnapshotKey != "" {
+ 				snapshotKey := strings.TrimPrefix(entry.result.SnapshotKey, "sha256:")
+ 				if !snapshots[snapshotKey] {
+@@ -291,7 +379,7 @@ func (staged stagedExternal) transactionPlan(finalRoot string) staging.Plan {
+ 	return plan
+ }
+ 
+-func externalPipelineRequest(deps ExternalDeps, source ExternalSource, credentials buildrepo.OperatorSSHCredentials, httpsCredentials BuildHTTPSCredentials, command skillspec.Command, store buildrepo.ProtectedStore, goSession buildrepo.GoSession, operation buildrepo.Operation, authority *BuildAuthority) (buildrepo.PipelineRequest, error) {
++func externalPipelineRequest(deps ExternalDeps, source ExternalSource, credentials buildrepo.OperatorSSHCredentials, httpsCredentials BuildHTTPSCredentials, command skillspec.Command, pkg *buildmeta.Package, store buildrepo.ProtectedStore, goSession buildrepo.GoSession, operation buildrepo.Operation, authority *BuildAuthority) (buildrepo.PipelineRequest, error) {
+ 	if deps.Audit == nil && deps.AuditWarnings == nil {
+ 		return buildrepo.PipelineRequest{}, fmt.Errorf("build_repository_audit_blocked: independent external repository audit is not configured")
+ 	}
+@@ -322,7 +410,7 @@ func externalPipelineRequest(deps ExternalDeps, source ExternalSource, credentia
+ 	if authority == nil {
+ 		return buildrepo.PipelineRequest{}, fmt.Errorf("build assurance authority is absent")
+ 	}
+-	return buildrepo.PipelineRequest{Operation: operation, Command: command.Name, Target: command.Target, Declared: source.Declared, Effective: source.Effective, Acquire: func(ctx context.Context) (*buildrepo.Snapshot, error) { return acquire(ctx, source) }, Audit: deps.Audit, AuditWarnings: deps.AuditWarnings, Store: store, Go: goSession, SigningPolicy: deps.SigningPolicy, Assurance: authority.Binding(), AssuranceCheck: authority.revalidate}, nil
++	return buildrepo.PipelineRequest{Operation: operation, Command: command.Name, Target: command.Target, Declared: source.Declared, Effective: source.Effective, Acquire: func(ctx context.Context) (*buildrepo.Snapshot, error) { return acquire(ctx, source) }, Audit: deps.Audit, AuditWarnings: deps.AuditWarnings, Store: store, Go: goSession, SigningPolicy: deps.SigningPolicy, Assurance: authority.Binding(), AssuranceCheck: authority.revalidate, Package: pkg}, nil
+ }
+ 
+ func externalGitTool(tool buildrepo.GitTool, source ExternalSource, sshCredentials buildrepo.OperatorSSHCredentials, httpsCredentials BuildHTTPSCredentials) buildrepo.GitTool {
+@@ -365,7 +453,7 @@ func (g externalGoAdapter) Compile(ctx context.Context, request buildrepo.Compil
+ 		return buildrepo.CompileResult{}, err
+ 	}
+ 	defer func() { _ = token.Close() }()
+-	result, err := g.builder.Stage(ctx, StageRequest{Session: g.session, Source: token, CommandObject: map[string]any{"type": "build", "driver": "go-v1", "source_dir": request.SourceDir}, BuildRoot: "build", SourceDir: request.SourceDir, Command: request.Command})
++	result, err := g.builder.Stage(ctx, StageRequest{Session: g.session, Source: token, CommandObject: map[string]any{"type": "build", "driver": "go-v1", "source_dir": request.SourceDir}, BuildRoot: "build", SourceDir: request.SourceDir, Command: request.Command, Package: request.Package})
+ 	if err != nil {
+ 		return buildrepo.CompileResult{}, err
+ 	}
+@@ -383,7 +471,7 @@ func externalBuildInput(request buildrepo.CompileRequest, target buildmeta.Targe
+ 	}
+ 	defer func() { _ = token.Close() }()
+ 	input := buildmeta.Input{
+-		SchemaVersion: buildmeta.SchemaVersion, Driver: buildmeta.DriverGoV1,
++		SchemaVersion: buildmeta.SchemaVersion, Package: request.Package, Driver: buildmeta.DriverGoV1,
+ 		BuildSource: token.Identity(), BuildRoot: "build", Command: request.Command, SourceDir: request.SourceDir,
+ 		Target: target, Toolchain: toolchain, Policy: buildmeta.FixedPolicy(),
+ 	}
+@@ -426,7 +514,7 @@ func effectiveRepository(projectIdentity string, repository skillspec.BuildRepos
+ 
+ func externalMarkerBuild(row plannedExternal, result buildrepo.PipelineResult, goos, receiptHash, artifactHash string) marker.Build {
+ 	effective := result.Subject.Effective
+-	record := marker.Build{Driver: "go-repository-v1", ReceiptSchemaVersion: 2, ExecutionPolicy: buildmeta.ExecutionPolicy, Repository: row.repository.Name, DeclaredIdentity: &marker.RepositoryIdentity{Kind: "network-git", Value: row.declared.Identity}, DeclaredLockedCommit: &marker.RepositoryCommit{ObjectFormat: row.declared.ObjectFormat, Hex: row.declared.Commit}, DeclaredTag: row.declared.Tag, EffectiveIdentity: &marker.RepositoryIdentity{Kind: row.effective.IdentityKind, Value: row.effective.Identity}, ObjectFormat: row.effective.ObjectFormat, Commit: row.effective.Commit, Substituted: row.effective.Substituted, BuildSource: &buildsource.Identity{Algorithm: buildsource.Algorithm, ContentSHA256: result.BuildSource}, DescriptorTarget: row.command.Target, CacheKey: buildmeta.CacheKey(result.CacheKey), ReceiptSHA256: buildmeta.ReceiptHash(receiptHash), ArtifactSHA256: artifactHash}
++	record := marker.Build{Driver: "go-repository-v1", ReceiptSchemaVersion: result.ReceiptSchemaVersion, ExecutionPolicy: buildmeta.ExecutionPolicy, Repository: row.repository.Name, DeclaredIdentity: &marker.RepositoryIdentity{Kind: "network-git", Value: row.declared.Identity}, DeclaredLockedCommit: &marker.RepositoryCommit{ObjectFormat: row.declared.ObjectFormat, Hex: row.declared.Commit}, DeclaredTag: row.declared.Tag, EffectiveIdentity: &marker.RepositoryIdentity{Kind: row.effective.IdentityKind, Value: row.effective.Identity}, ObjectFormat: row.effective.ObjectFormat, Commit: row.effective.Commit, Substituted: row.effective.Substituted, BuildSource: &buildsource.Identity{Algorithm: buildsource.Algorithm, ContentSHA256: result.BuildSource}, DescriptorTarget: row.command.Target, CacheKey: buildmeta.CacheKey(result.CacheKey), ReceiptSHA256: buildmeta.ReceiptHash(receiptHash), ArtifactSHA256: artifactHash}
+ 	record.EffectiveIdentity = &marker.RepositoryIdentity{Kind: effective.IdentityKind, Value: effective.Identity}
+ 	record.ObjectFormat, record.Commit, record.Substituted = effective.ObjectFormat, effective.Commit, effective.Substituted
+ 	record.ArtifactPath, _ = buildmeta.ArtifactPath(row.command.Name, goos)
+diff --git a/internal/install/global.go b/internal/install/global.go
+index 51e9d16..b557aba 100644
+--- a/internal/install/global.go
++++ b/internal/install/global.go
+@@ -282,7 +282,7 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
+ 		result.failBuild(planErr)
+ 		return result, nil
+ 	}
+-	externalPlan, externalPlanErr := planExternalBuilds(opts.context(), "global", "global", home, nodes, nil, deps.Toolchain, opts.External, deps.Assurance, opts.DryRun)
++	externalPlan, externalPlanErr := planExternalBuilds(opts.context(), "global", "global", home, nodes, nil, nil, deps.Toolchain, opts.External, deps.Assurance, opts.DryRun)
+ 	if externalPlanErr != nil {
+ 		result.failBuild(externalPlanErr)
+ 		return result, nil
+@@ -403,6 +403,7 @@ func stageGlobalTargets(request globalTargetRequest) (scopeTargets, error) {
+ 	}
+ 	targets.plan.Merge(runtime.plan)
+ 	targets.plan.Merge(request.external.transactionPlan(request.externalStoreRoot))
++	targets.adoptions = request.external.adoptions(request.externalStoreRoot)
+ 	targets.referencedKeys = runtime.referencedKeys()
+ 
+ 	expectedSkills := map[string]bool{}
+diff --git a/internal/install/install.go b/internal/install/install.go
+index 07987d7..fd8f110 100644
+--- a/internal/install/install.go
++++ b/internal/install/install.go
+@@ -587,8 +587,12 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
+ 	// 17. Build planning. This is the last read-only phase: it resolves the
+ 	// trusted toolchain identity and inspects protected cache state, but runs
+ 	// no go list or go build and writes no persistent state.
++	// Draft members installed under marker schema 5 record their builds
++	// under the receipt-3 package wrapper on both arms; every other member
++	// keeps the legacy receipts, keys and namespaces byte-identical.
++	buildPackages := draftBuildPackages(draftLock)
+ 	plan, planErr := planBuilds(opts.context(), buildPlanRequest{
+-		scope: alias, nodes: nodes, deps: deps, dryRun: opts.DryRun,
++		scope: alias, nodes: nodes, deps: deps, dryRun: opts.DryRun, packages: buildPackages,
+ 	})
+ 	defer func() { releasePlan(&result, plan) }()
+ 	result.Messages = append(result.Messages, plan.Lines()...)
+@@ -600,7 +604,7 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
+ 		return result, nil
+ 	}
+ 	externalPlan, externalPlanErr := planExternalBuilds(opts.context(), alias, alias, cfg.Home(), nodes,
+-		buildRepositorySubstitutions, deps.Toolchain, opts.External, deps.Assurance, opts.DryRun)
++		buildRepositorySubstitutions, buildPackages, deps.Toolchain, opts.External, deps.Assurance, opts.DryRun)
+ 	if externalPlanErr != nil {
+ 		result.failBuild(externalPlanErr)
+ 		return result, nil
+@@ -777,6 +781,7 @@ func stageProjectTargets(request projectTargetRequest) (scopeTargets, error) {
+ 	}
+ 	targets.plan.Merge(runtime.plan)
+ 	targets.plan.Merge(request.external.transactionPlan(request.externalStoreRoot))
++	targets.adoptions = request.external.adoptions(request.externalStoreRoot)
+ 	targets.referencedKeys = runtime.referencedKeys()
+ 
+ 	expectedSkills := map[string]bool{}
+diff --git a/internal/install/plan.go b/internal/install/plan.go
+index b2a0238..95fcda2 100644
+--- a/internal/install/plan.go
++++ b/internal/install/plan.go
+@@ -361,6 +361,11 @@ type buildPlanRequest struct {
+ 	nodes  []*closure.Node
+ 	deps   BuildDeps
+ 	dryRun bool
++	// packages carries the frozen source-types-v1 identity of every draft
++	// member whose builds are recorded under the receipt-3 wrapper, keyed by
++	// skill name. nil (the frozen v1 lane and every legacy member) keeps the
++	// schema-1 receipts, keys and namespace byte-identical.
++	packages map[string]*buildmeta.Package
+ }
+ 
+ // planBuilds derives the immutable build plan after every manifest, closure,
+@@ -408,7 +413,7 @@ func planBuilds(ctx context.Context, request buildPlanRequest) (BuildPlan, error
+ 
+ 	var blocked []string
+ 	for _, item := range planned {
+-		build, err := planOne(item, plan.sources[item.node.Name], target, toolchain, request.deps.Cache, request.deps.Assurance)
++		build, err := planOne(item, plan.sources[item.node.Name], request.packages[item.node.Name], target, toolchain, request.deps.Cache, request.deps.Assurance)
+ 		if err != nil {
+ 			return plan, err
+ 		}
+@@ -483,6 +488,7 @@ func toolchainInventory(
+ func planOne(
+ 	item plannedCommand,
+ 	source *buildsource.Token,
++	pkg *buildmeta.Package,
+ 	target buildmeta.Target,
+ 	toolchain buildmeta.Toolchain,
+ 	cache CacheInspector,
+@@ -497,6 +503,7 @@ func planOne(
+ 	}
+ 	input := buildmeta.Input{
+ 		SchemaVersion: buildmeta.SchemaVersion,
++		Package:       pkg,
+ 		Driver:        buildmeta.DriverGoV1,
+ 		BuildSource:   source.Identity(),
+ 		BuildRoot:     buildRoot,
+diff --git a/internal/install/stage.go b/internal/install/stage.go
+index 8a91d26..7ef7cf3 100644
+--- a/internal/install/stage.go
++++ b/internal/install/stage.go
+@@ -117,6 +117,7 @@ func stageBuilds(ctx context.Context, plan BuildPlan, deps BuildDeps) (Staged, e
+ 			Modules:       build.modules,
+ 			BuildRoots:    build.buildRoots,
+ 			RuntimeRoots:  build.runtimeRoots,
++			Package:       build.input.Package,
+ 		})
+ 		if err != nil {
+ 			return Staged{}, fmt.Errorf("%s.%s: %w", build.skill, build.command, err)
+diff --git a/internal/install/stage_test.go b/internal/install/stage_test.go
+index b777f9c..4eeb41a 100644
+--- a/internal/install/stage_test.go
++++ b/internal/install/stage_test.go
+@@ -306,6 +306,10 @@ type fakeBuilder struct {
+ 	staged  []string
+ 	failOn  map[string]error
+ 	observe func(StageRequest)
++	// dropPackage makes the fake session bind the legacy context-only
++	// input digest instead of the receipt-3 package wrapper it was asked
++	// for: the negative row for "unable to bind that input MUST reject".
++	dropPackage bool
+ }
+ 
+ func (builder *fakeBuilder) Stage(_ context.Context, request StageRequest) (StagedArtifact, error) {
+@@ -339,11 +343,14 @@ func (builder *fakeBuilder) Stage(_ context.Context, request StageRequest) (Stag
+ 		Path: relative, SHA256: "sha256:" + hex.EncodeToString(digest[:]), Size: int64(len(payload)),
+ 	}
+ 	input := buildmeta.Input{
+-		SchemaVersion: buildmeta.SchemaVersion, Driver: buildmeta.DriverGoV1,
++		SchemaVersion: buildmeta.SchemaVersion, Package: request.Package, Driver: buildmeta.DriverGoV1,
+ 		BuildSource: request.Source.Identity(), BuildRoot: request.BuildRoot,
+ 		Command: request.Command, SourceDir: request.SourceDir,
+ 		Target: session.target, Toolchain: session.toolchain, Policy: buildmeta.FixedPolicy(),
+ 	}
++	if builder.dropPackage {
++		input.Package = nil
++	}
+ 	executionReceipt, err := closureexec.NewPortableBuildSessionReceipt(input, metadata, nil)
+ 	if err != nil {
+ 		return StagedArtifact{}, err
+diff --git a/internal/install/targets.go b/internal/install/targets.go
+index 5f8f046..c585c33 100644
+--- a/internal/install/targets.go
++++ b/internal/install/targets.go
+@@ -8,6 +8,7 @@ import (
+ 	"strings"
+ 
+ 	"github.com/relux-works/curator/internal/buildmeta"
++	"github.com/relux-works/curator/internal/buildrepo"
+ 	"github.com/relux-works/curator/internal/closure"
+ 	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/locale"
+@@ -210,7 +211,7 @@ func stageRuntimeAndShims(
+ 					return runtimeStaging{}, fmt.Errorf("%s.%s: the external build was not staged", node.Name, name)
+ 				}
+ 				keyName := strings.TrimPrefix(entry.result.CacheKey, "sha256:")
+-				finalArtifact := filepath.Join(externalRoot, "artifacts", keyName, "artifact")
++				finalArtifact := filepath.Join(externalRoot, buildrepo.ArtifactsDir(entry.result.ReceiptSchemaVersion), keyName, "artifact")
+ 				compiled, err := runtimestore.ExternalCompiledTarget(entry.artifactPath, finalArtifact,
+ 					entry.record.CacheKey, entry.record.ReceiptSHA256, entry.record.ArtifactSHA256, platform)
+ 				if err != nil {
+diff --git a/internal/marker/marker.go b/internal/marker/marker.go
+index 0392861..3d7f9c5 100644
+--- a/internal/marker/marker.go
++++ b/internal/marker/marker.go
+@@ -655,11 +655,16 @@ func validBuildState(m *Marker, raw map[string]json.RawMessage) bool {
+ 		if unixErr != nil || windowsErr != nil || (build.ArtifactPath != unixPath && build.ArtifactPath != windowsPath) {
+ 			return false
+ 		}
+-		// A draft v5 marker carries its build entries through with the arm
+-		// the legacy lane would have selected for the same skill schema,
+-		// so the source-aware receipt upgrade (sibling scope) can narrow
+-		// this mapping without touching the identity plumbing.
+-		if m.SchemaVersion == SchemaVersion || (m.SchemaVersion == SchemaV5 && m.SkillSchemaVersion < 7) {
++		// A draft v5 marker binds receipt version 3 on every build entry,
++		// whatever the skill schema: its cache entries are receipt-3 package
++		// wrappers, so a legacy record shape can never describe them.
++		if m.SchemaVersion == SchemaV5 {
++			if !validV5Build(build) {
++				return false
++			}
++			continue
++		}
++		if m.SchemaVersion == SchemaVersion {
+ 			if build.Driver != buildmeta.DriverGoV1 || build.ReceiptSchemaVersion != 0 || build.ExecutionPolicy != "" || hasRepositoryState(build) {
+ 				return false
+ 			}
+@@ -680,13 +685,23 @@ func hasRepositoryState(build Build) bool {
+ }
+ 
+ func validV3Build(build Build) bool {
++	return validDriverBuild(build, 1, 2)
++}
++
++// validV5Build is the marker-5 record: every retained driver field of the
++// v3/v4 record with receipt_schema_version 3 on both arms.
++func validV5Build(build Build) bool {
++	return validDriverBuild(build, buildmeta.SourceAwareSchemaVersion, buildmeta.SourceAwareSchemaVersion)
++}
++
++func validDriverBuild(build Build, localReceipt, externalReceipt int) bool {
+ 	if build.ExecutionPolicy != buildmeta.ExecutionPolicy {
+ 		return false
+ 	}
+ 	if build.Driver == buildmeta.DriverGoV1 {
+-		return build.ReceiptSchemaVersion == 1 && !hasRepositoryState(build)
++		return build.ReceiptSchemaVersion == localReceipt && !hasRepositoryState(build)
+ 	}
+-	if build.Driver != "go-repository-v1" || build.ReceiptSchemaVersion != 2 ||
++	if build.Driver != "go-repository-v1" || build.ReceiptSchemaVersion != externalReceipt ||
+ 		!identifiers.Valid(build.Repository) || !identifiers.Valid(build.DescriptorTarget) ||
+ 		build.DeclaredIdentity == nil || build.DeclaredIdentity.Kind != "network-git" || build.DeclaredIdentity.Value == "" ||
+ 		build.DeclaredLockedCommit == nil || build.DeclaredLockedCommit.ObjectFormat != build.ObjectFormat ||
+diff --git a/internal/marker/marker_v5_builds_test.go b/internal/marker/marker_v5_builds_test.go
+new file mode 100644
+index 0000000..3eefbe9
+--- /dev/null
++++ b/internal/marker/marker_v5_builds_test.go
+@@ -0,0 +1,110 @@
++package marker
++
++import (
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/buildmeta"
++	"github.com/relux-works/curator/internal/buildsource"
++)
++
++func v5LocalBuild() Build {
++	return Build{Driver: buildmeta.DriverGoV1, ReceiptSchemaVersion: 3, ExecutionPolicy: buildmeta.ExecutionPolicy,
++		CacheKey: buildmeta.CacheKey("sha256:" + strings.Repeat("1", 64)), ReceiptSHA256: buildmeta.ReceiptHash("sha256:" + strings.Repeat("2", 64)),
++		ArtifactSHA256: "sha256:" + strings.Repeat("3", 64), ArtifactPath: "bin/tool"}
++}
++
++func v5ExternalBuild() Build {
++	return Build{Driver: "go-repository-v1", ReceiptSchemaVersion: 3, ExecutionPolicy: buildmeta.ExecutionPolicy,
++		Repository: "tools", DeclaredIdentity: &RepositoryIdentity{Kind: "network-git", Value: "git.example.com/skills/tools"},
++		DeclaredLockedCommit: &RepositoryCommit{ObjectFormat: "sha1", Hex: strings.Repeat("a", 40)},
++		EffectiveIdentity:    &RepositoryIdentity{Kind: "network-git", Value: "git.example.com/skills/tools"},
++		ObjectFormat:         "sha1", Commit: strings.Repeat("a", 40),
++		BuildSource:      &buildsource.Identity{Algorithm: buildsource.Algorithm, ContentSHA256: "sha256:" + strings.Repeat("4", 64)},
++		DescriptorTarget: "tool",
++		CacheKey:         buildmeta.CacheKey("sha256:" + strings.Repeat("5", 64)), ReceiptSHA256: buildmeta.ReceiptHash("sha256:" + strings.Repeat("6", 64)),
++		ArtifactSHA256: "sha256:" + strings.Repeat("7", 64), ArtifactPath: "bin/ext"}
++}
++
++func v5BuildMarker(local, external bool) *Marker {
++	m := v5LocalMarker()
++	m.SkillSchemaVersion = 7
++	m.Commands = []string{"tool", "ext"}
++	m.Activation = &Activation{Context: true, Commands: []string{"tool", "ext"}}
++	m.Builds = map[string]Build{}
++	if local {
++		m.BuildRoots = []string{"build"}
++		m.BuildSource = &buildsource.Identity{Algorithm: buildsource.Algorithm, ContentSHA256: "sha256:" + strings.Repeat("8", 64)}
++		m.Builds["tool"] = v5LocalBuild()
++	}
++	if external {
++		m.Builds["ext"] = v5ExternalBuild()
++	}
++	return m
++}
++
++// TestMarkerV5BuildsBindReceiptVersion3OnBothArms: a schema-5 marker records
++// every retained driver field with receipt_schema_version 3 for local go-v1
++// and external go-repository-v1 builds, and refuses every other version.
++func TestMarkerV5BuildsBindReceiptVersion3OnBothArms(t *testing.T) {
++	for name, m := range map[string]*Marker{"local": v5BuildMarker(true, false), "external": v5BuildMarker(false, true), "both": v5BuildMarker(true, true)} {
++		t.Run(name, func(t *testing.T) {
++			_, recorded := writeV5(t, m)
++			if recorded.SchemaVersion != SchemaV5 || len(recorded.Builds) != len(m.Builds) {
++				t.Fatalf("recorded = %+v", recorded)
++			}
++			for command, build := range recorded.Builds {
++				if build.ReceiptSchemaVersion != 3 || build.ExecutionPolicy != buildmeta.ExecutionPolicy {
++					t.Fatalf("%s: build = %+v", command, build)
++				}
++			}
++			if ext, ok := recorded.Builds["ext"]; ok && (ext.DeclaredLockedCommit == nil || ext.EffectiveIdentity == nil || ext.BuildSource == nil || ext.DescriptorTarget != "tool" || ext.Repository != "tools") {
++				t.Fatalf("external record lost retained fields: %+v", ext)
++			}
++		})
++	}
++	refusals := map[string]func(*Marker){
++		"local receipt 1": func(m *Marker) { b := m.Builds["tool"]; b.ReceiptSchemaVersion = 1; m.Builds["tool"] = b },
++		"local receipt absent": func(m *Marker) {
++			b := m.Builds["tool"]
++			b.ReceiptSchemaVersion = 0
++			b.ExecutionPolicy = ""
++			m.Builds["tool"] = b
++		},
++		"local receipt 2":            func(m *Marker) { b := m.Builds["tool"]; b.ReceiptSchemaVersion = 2; m.Builds["tool"] = b },
++		"local policy absent":        func(m *Marker) { b := m.Builds["tool"]; b.ExecutionPolicy = ""; m.Builds["tool"] = b },
++		"local with repository":      func(m *Marker) { b := m.Builds["tool"]; b.Repository = "tools"; m.Builds["tool"] = b },
++		"external receipt 2":         func(m *Marker) { b := m.Builds["ext"]; b.ReceiptSchemaVersion = 2; m.Builds["ext"] = b },
++		"external receipt 1":         func(m *Marker) { b := m.Builds["ext"]; b.ReceiptSchemaVersion = 1; m.Builds["ext"] = b },
++		"external hash-only record":  func(m *Marker) { b := m.Builds["ext"]; b.DeclaredLockedCommit = nil; m.Builds["ext"] = b },
++		"external missing source":    func(m *Marker) { b := m.Builds["ext"]; b.BuildSource = nil; m.Builds["ext"] = b },
++		"external missing effective": func(m *Marker) { b := m.Builds["ext"]; b.EffectiveIdentity = nil; m.Builds["ext"] = b },
++		"external commit length":     func(m *Marker) { b := m.Builds["ext"]; b.Commit = strings.Repeat("a", 39); m.Builds["ext"] = b },
++		"external substitution bool": func(m *Marker) { b := m.Builds["ext"]; b.Substituted = true; m.Builds["ext"] = b },
++	}
++	for name, mutate := range refusals {
++		m := v5BuildMarker(true, true)
++		mutate(m)
++		dir := t.TempDir()
++		if err := Write(dir, m); err != nil {
++			continue // refused at write: also a refusal
++		}
++		if Read(dir) != nil {
++			t.Fatalf("%s: v5 marker read back as valid", name)
++		}
++	}
++	// Legacy schema-4 markers keep their receipt versions: 3 is refused there.
++	legacy := v5BuildMarker(true, true)
++	legacy.SchemaVersion = PolicySchemaVersion
++	legacy.Package, legacy.LockSHA256 = nil, ""
++	legacy.SkillSchemaVersion = 8
++	legacy.Source, legacy.RefKind, legacy.Ref, legacy.Commit = "review", "tag", "v1", strings.Repeat("9", 40)
++	rawLegacy := *legacy
++	dir := t.TempDir()
++	if err := Write(dir, &rawLegacy); err == nil && Read(dir) != nil {
++		recorded := Read(dir)
++		if recorded.SchemaVersion == PolicySchemaVersion {
++			t.Fatal("legacy marker accepted receipt version 3")
++		}
++	}
++}

@@ -206,3 +206,168 @@ The legacy receipt-2 external arm shares this path exactly (same `transactionPla
 - `internal/transaction` was not changed (out of scope); the engine's fresh-object copy remains the publication mechanism for every other class.
 
 Ready for review (revision 3, developer role).
+
+---
+
+## Revision 4 = revision 3 re-applied on the refreshed base (naming-gate fix on trunk)
+
+Revision 3 (gate run 35335555197) passed every test/race/lint lane INCLUDING Windows; it failed ONLY on "Naming gate" because the Story base (ee3a564) carried an operator resource with a stray binary hunk. Trunk fixed that in 6401d3c and the Story branch was refreshed onto it before this run (sibling checkpoints replayed: fc817d1 hwxr26, 351dfa6 17ps6u).
+
+This run did exactly per dufdai-reapply-rev3.md, changing nothing else:
+1. Confirmed `git log --oneline -3` = 351dfa6 / fc817d1 / 6401d3c and `git status --short` empty before applying.
+2. `git apply --binary --index <control-root>/.task-board/.resources/TASK-260910-dufdai/TASK-260910-dufdai_rev3-candidate.patch` (sha256 ffa84e3b…), then `git reset -q` to leave unstaged working-tree changes.
+3. Verified `git status --short | wc -l` = 32; file set identical to the rev3 candidate (24 modified + 8 new):
+   - modified: internal/buildcache/cache.go, collect.go, publish.go; internal/buildmeta/codec.go, models.go; internal/buildrepo/gc.go, pipeline.go, pipeline_test.go, protected.go; internal/install/assurance.go, builddeps.go, buildhttps_test.go, buildsshprecheck_test.go, commit.go, draftruntime.go, drafttransport_test.go, external.go, global.go, install.go, plan.go, stage.go, stage_test.go, targets.go; internal/marker/marker.go
+   - new: internal/buildcache/sourceaware_test.go; internal/buildmeta/package.go, receipt_v3_test.go; internal/buildrepo/adopt_test.go, receipt_v3_test.go; internal/install/draftbuild_adopt_test.go, draftbuild_test.go; internal/marker/marker_v5_builds_test.go
+
+## Commands and exit codes (this session, re-applied tree)
+| command | exit |
+|---|---|
+| `git apply --binary --index <rev3-candidate.patch>` | 0 |
+| `go build ./...` | 0 |
+| `go vet ./internal/buildrepo ./internal/install` | 0 |
+| `go test -p 1 ./internal/buildrepo -run 'Receipt\|Protected\|Prepare' -count=1 -timeout=110s` | 0 (4.2s) |
+| `gofmt -l internal/buildcache internal/buildmeta internal/buildrepo internal/install internal/marker` | 0, no output |
+| `git diff --check` | 0 |
+
+Windows is verified by the hosted gate only (rev3 already proved all lanes green there); no code changed since, so no new Windows risk. The "Naming gate" failure mode from rev3 is addressed by the trunk fix (6401d3c) this base now includes.
+
+Checklist: scope/acceptance unchanged from rev3 (receipt v3 wrapper/cache key both arms; identities, commits, targets, substitutions, assurance preserved; toolchain behaviour preserved; no prebuilt download/bootstrap); narrow tests green with real exit codes; gofmt/diff-check clean; work left UNCOMMITTED (32 unstaged paths).
+
+Ready for review (revision 4, developer role).
+
+revision 5 = revision 4 unchanged; gate rerun after a macOS runner flake.
+
+---
+
+## Revision 5 = the revision-4 candidate re-applied on the refreshed base (trunk moved by a board-only commit)
+
+Revision 4 (gate run 35340496757) was green everywhere except a macOS runner flake (`internal/install TestDryRunEffectBindingsSeeWhatARealOperationWrites`: `fork/exec /opt/homebrew/bin/git: permission denied`); its republish handoff was refused with `change_request_base_authority_mismatch` because trunk moved by board-only commit b56089e while the revision was outstanding. The Story branch was refreshed onto b56089e before this run (sibling checkpoints replayed: 395f9d7 hwxr26, bfc0b33 17ps6u). The one-line "revision 5 = revision 4 unchanged" note above is the refused republish attempt; this section is the re-apply actually handed off.
+
+This run did exactly per dufdai-reapply-rev5.md, changing nothing else:
+1. Confirmed `git log --oneline -3` = bfc0b33 / 395f9d7 / b56089e and `git status --short` empty before applying (the refresh landed mid-session; status re-checked at 0 after the replay).
+2. `git apply --binary --index <control-root>/.task-board/.resources/TASK-260910-dufdai/TASK-260910-dufdai_rev3-candidate.patch` (sha256 ffa84e3bc3b0c182a4f3a587b6f2d1f06d5ebc6700a42e4704061eff34a0b07d, verified before applying), then `git reset -q` to leave unstaged working-tree changes.
+3. Verified `git status --short | wc -l` = 32; file set identical to the rev3 candidate (24 modified + 8 new):
+   - modified: internal/buildcache/cache.go, collect.go, publish.go; internal/buildmeta/codec.go, models.go; internal/buildrepo/gc.go, pipeline.go, pipeline_test.go, protected.go; internal/install/assurance.go, builddeps.go, buildhttps_test.go, buildsshprecheck_test.go, commit.go, draftruntime.go, drafttransport_test.go, external.go, global.go, install.go, plan.go, stage.go, stage_test.go, targets.go; internal/marker/marker.go
+   - new: internal/buildcache/sourceaware_test.go; internal/buildmeta/package.go, receipt_v3_test.go; internal/buildrepo/adopt_test.go, receipt_v3_test.go; internal/install/draftbuild_adopt_test.go, draftbuild_test.go; internal/marker/marker_v5_builds_test.go
+   - `git diff --binary HEAD | shasum -a 256` = ca2ac3ea927e2895d3172e4b8df02ec396fd170b7947131df262f86142e64cbe (differs from the patch-file sha only by header ordering on the new base; file set identical).
+
+## Commands and exit codes (this session, re-applied tree)
+| command | exit |
+|---|---|
+| `git apply --binary --index <rev3-candidate.patch>` | 0 |
+| `git reset -q` | 0 |
+| `go build ./...` | 0 |
+| `go vet ./internal/buildrepo ./internal/install` | 0 |
+| `go test -p 1 ./internal/buildrepo -run 'Receipt\|Protected\|Prepare' -count=1 -timeout=110s` | 0 (5.4s) |
+| `gofmt -l internal/buildcache internal/buildmeta internal/buildrepo internal/install internal/marker` | 0, no output |
+| `git diff --check` | 0 |
+
+Windows is verified by the hosted gate only (rev3 already proved all lanes green there); no code changed since, so no new Windows risk.
+
+Checklist: scope/acceptance unchanged from rev3 (receipt v3 wrapper/cache key both arms; identities, commits, targets, substitutions, assurance preserved; toolchain behaviour preserved; no prebuilt download/bootstrap); narrow tests green with real exit codes; gofmt/diff-check clean; work left UNCOMMITTED (32 unstaged paths).
+
+Ready for review (revision 5, developer role).
+
+---
+
+# Revision 6 — external execution binds the exact receipt-3 input (rework 3, F1)
+
+Base: bfc0b33 / 395f9d7 / b56089e (Story branch, siblings checkpointed). Work left UNCOMMITTED: `git status --short | wc -l` = 33 (25 modified + 8 new; rev5 had 32 — the extra modified file is `internal/closureexec/build_session.go`, new shared additive helper required by this fix).
+
+## Root cause (reviewer F1, confirmed)
+
+`internal/buildrepo/pipeline.go` derived the external wrapper `input:{schema_version:3,package,build}` (with the unchanged receipt-2 driver input inside `build`) and its `cache_key = sha256(CCJ-1(wrapper))`, but derived a separate compiler `buildInput` through `Go.BuildInput` (`internal/install/external.go:externalBuildInput`: go-v1 schema-1 view, build root "build", wrapped with the package). The package-equality guard (`reflect.DeepEqual`) passed for a compiler-view receipt, and both cache-hit and fresh-compile `ValidateFor` validated the execution receipt against that compiler-view input. The compiler-view wrapper digest (e.g. reviewer got `1c2be023…`) never equals the exact external wrapper digest (`1d8047f4…`), so `build_input_sha256` bound the wrong input while the install succeeded. Spec skillfile-sources §4 lines 289-295 requires permits, execution receipts, and checkpoints to bind the exact receipt-3 input digest and to refuse when unable.
+
+## Change (exactly rework-3, no other scope)
+
+- `internal/closureexec/build_session.go` (shared, additive): new `ValidateForDigest(binding, expectedBuildInputSHA256, toolchain, artifact)` preserving every provider/nonce/toolchain/artifact/checkpoint check of `ValidateFor`; new `NewPortableBuildSessionReceiptForDigest` / `NewVerifiedBuildSessionReceiptForDigest` minting the same shapes bound to an explicit digest. Existing `ValidateFor`/`New*` untouched (legacy/local byte-identical).
+- `internal/buildrepo/pipeline.go`: `CompileRequest.ExpectedDigest` (exact wrapper digest == `result.CacheKey` on the source-aware arm, `""` on legacy). `RunPipeline` sets it when `request.Package != nil`, keeps the package guard, validates cache-hit and fresh-compile executions via `ValidateForDigest(assurance, ExpectedDigest, buildInput.Toolchain, artifactMetadata(wrapper))` on that arm and via `ValidateFor` on legacy. A compiler-view-only session is refused with `build_repository_receipt_invalid` before publication.
+- `internal/buildrepo/pipeline_test.go`: `recordingGo.Compile` mints via `ForDigest` when `ExpectedDigest != ""` (verified + portable); legacy path unchanged.
+- `internal/buildrepo/receipt_v3_test.go`: `packageBlindGo` clears `ExpectedDigest`; new `compilerViewGo` keeps the package but drops `ExpectedDigest` (simulates the rev5 bug with matching package).
+- `internal/install/builddeps.go`: `StageRequest.ExpectedBuildInputSHA256`; `goBuilder.Stage` mints via `ForDigest` with the session toolchain when set.
+- `internal/install/assurance.go`: `assuredBuilder.Stage` validates via `ValidateForDigest(binding, ExpectedDigest, session.Toolchain(), artifact)` when set.
+- `internal/install/external.go`: `externalGoAdapter.Compile` threads `request.ExpectedDigest` into `StageRequest`.
+- `internal/install/stage_test.go`: `fakeBuilder.bindCompilerView` (package matches, compiler-view digest); `Stage` mints via `ForDigest` unless `dropPackage` or `bindCompilerView`.
+- Tests (production entry): `internal/buildrepo/receipt_v3_test.go:TestExternalReceipt3ExecutionBindsExactWrapperDigest` (fresh publication binds `sha256(CCJ-1(receipt.input)) == cache_key` in `build_input_sha256`, reuse is an exact hit, fresh compiler-view session refused); `internal/install/draftbuild_test.go:TestReviewExternalExecutionBindsExactReceipt3Input` (reviewer probe reused verbatim as regression: fresh + reuse bind the same digest); `TestDraftBuildRefusesCompilerViewDigest` (package matches but compiler-view digest refused before any publication/marker).
+
+Legacy schema-2 external lane (`ExpectedDigest == ""`) uses the unchanged `ValidateFor`/minting path; frozen v1 goldens untouched.
+
+## Shared edits (outside the literal scope line, minimal and additive)
+
+`internal/closureexec/build_session.go` (digest-explicit validation/minting helpers only); `internal/install/{builddeps,assurance,external,stage_test}.go` (digest threading + validation, same pattern as the accepted rev1-3 plumbing); no 17ps6u/hwxr26 files touched; `internal/transaction` untouched.
+
+## Changed paths (rev6)
+
+```
+ M internal/buildcache/cache.go            M internal/install/draftruntime.go
+ M internal/buildcache/collect.go          M internal/install/external.go
+ M internal/buildcache/publish.go          M internal/install/global.go
+ M internal/buildmeta/codec.go             M internal/install/install.go
+ M internal/buildmeta/models.go            M internal/install/plan.go
+ M internal/buildrepo/gc.go                M internal/install/stage.go
+ M internal/buildrepo/pipeline.go          M internal/install/stage_test.go
+ M internal/buildrepo/pipeline_test.go     M internal/install/targets.go
+ M internal/buildrepo/protected.go         M internal/closureexec/build_session.go
+ M internal/install/assurance.go           M internal/marker/marker.go
+ M internal/install/builddeps.go           ?? internal/buildcache/sourceaware_test.go
+ M internal/install/buildhttps_test.go     ?? internal/buildmeta/package.go
+ M internal/install/buildsshprecheck_test.go ?? internal/buildmeta/receipt_v3_test.go
+ M internal/install/commit.go              ?? internal/buildrepo/adopt_test.go
+ M internal/install/drafttransport_test.go ?? internal/buildrepo/receipt_v3_test.go
+                                           ?? internal/install/draftbuild_adopt_test.go
+                                           ?? internal/install/draftbuild_test.go
+                                           ?? internal/marker/marker_v5_builds_test.go
+```
+
+## Commands and exit codes (zsh, `set -o pipefail`, standalone processes, this session, final tree unless noted)
+
+| command | exit |
+|---|---|
+| `go build ./...` | 0 |
+| `go vet ./internal/buildrepo ./internal/install ./internal/closureexec` | 0 |
+| `gofmt -l internal/buildrepo internal/install internal/closureexec internal/buildmeta internal/buildcache internal/marker` | 0, no output |
+| `git diff --check` | 0 |
+| `go test -p 1 ./internal/buildrepo -run 'TestExternalReceipt3ExecutionBindsExactWrapperDigest' -count=1 -timeout=120s` | 0 (1.5s) |
+| `go test -p 1 ./internal/buildrepo -run 'TestExternalReceipt3RequiresTheSessionToBindTheWrappedInput' -count=1 -timeout=120s` | 0 (1.7s) |
+| `go test -p 1 ./internal/buildrepo -run 'Receipt\|Pipeline\|Assurance' -count=1 -timeout=170s` | 0 (9.0s) |
+| `go test -p 1 ./internal/closureexec -run 'TestBuildSession\|TestAssured\|TestDerivation' -count=1 -timeout=90s` | 0 (1.4s) |
+| `go test -p 1 ./internal/buildmeta ./internal/buildcache -count=1 -timeout=90s` | 0 (2.4s / 32.4s) |
+| `go test -p 1 ./internal/install -run 'TestReviewExternalExecutionBindsExactReceipt3Input' -count=1 -timeout=170s` | 0 (23.6s) |
+| `go test -p 1 ./internal/install -run 'TestDraftBuildRefusesCompilerViewDigest' -count=1 -timeout=170s` | 0 (1.2s, binary cached) |
+| `go test -p 1 ./internal/install -run 'TestLegacyBuildsKeepReceipt1' -count=1 -timeout=120s` | 0 (17.4s) |
+| `go test -p 1 ./internal/install -run 'TestDraftBuild' -count=1 -timeout=300s` | 0 (149.8s) |
+| `go test -p 1 ./internal/buildrepo -run 'TestResolvedTransportTotalDeadlineBoundsSlowFetch' -count=1 -timeout=90s` (isolated rerun) | 0 (9.1s) |
+
+Not green as a whole-package run in this session: `go test -p 1 ./internal/buildrepo -count=1 -timeout=170s` under parallel load (install suite running concurrently) failed `TestResolvedTransportTotalDeadlineBoundsSlowFetch` (`fetch count = 1, want 2`) then timed out in `TestReviewResolvedMustRetainAdmission` (2m50s). Both are transport timing tests untouched by this leaf (`pipeline.go`/`build_session.go`/`install` only); the isolated rerun above is green (exit 0). Treated as a host-load flake, not a leaf regression; the configured landing suite at handoff is the authority for the full package.
+
+## Narrowing mutants (applied, tested, restored from byte copies; `go build ./...` green after restore, `cmp` clean)
+
+| mutant | test | exit |
+|---|---|---|
+| M-compiler-view: `pipeline.go` never sets `compileRequest.ExpectedDigest` (restores the rev5 bug: session binds compiler-view digest, validation uses compiler view) | `go test -p 1 ./internal/buildrepo -run 'TestExternalReceipt3ExecutionBindsExactWrapperDigest' -count=1` | 1 (killed: `execution binds sha256:13ba… , want exact wrapper digest sha256:bbf0…`) |
+| same mutant | `go test -p 1 ./internal/install -run 'TestReviewExternalExecutionBindsExactReceipt3Input' -count=1` | 1 (killed: `successful install accepted wrong execution binding: got <compiler-view> ; exact receipt-3 input digest <wrapper>`) |
+
+Restore verified: `cp /tmp/pipeline.go.bak internal/buildrepo/pipeline.go`, `go build ./...` 0, `cmp` clean, `go test -p 1 ./internal/buildrepo -run 'TestExternalReceipt3ExecutionBindsExactWrapperDigest|TestExternalReceipt3RequiresTheSessionToBindTheWrappedInput'` 0.
+
+## Bounds / findings
+
+- Windows verified by the hosted gate only (no Windows host here); no new skips — the new tests use fake builder/toolchain and canonical bytes only.
+- Full `internal/buildrepo` package green only as the narrow `Receipt|Pipeline|Assurance` subset plus the isolated transport rerun above; the one whole-package attempt flaked on transport timing under parallel load (see table).
+- No prebuilt download, compiler bootstrap, spec edits, Git aliases/mirrors/ports, or registry changes. No live credential export or runtime-home modification.
+- No `logbook` edits (campaign rule); findings recorded here.
+
+Checklist: scope/acceptance per rework-3 (exact wrapper digest bound in execution on fresh + reuse, compiler-view-with-matching-package refused, legacy unchanged, both arms at install.Project); narrow tests green with real exit codes; mutants killed at both levels; gofmt/diff-check clean; work left UNCOMMITTED (33 paths).
+
+Ready for review (revision 6, developer role, final leaf).
+
+Revision 6 = the rework-3 candidate re-applied on the refreshed base (trunk moved by board-only commits during the rework).
+
+## Re-apply sanity (RUN current, Story worktree on 0113311/ad3999f over trunk 1c464c5, 33 paths, status empty before apply)
+
+| command | exit |
+|---|---|
+| `go build ./...` | 0 |
+| `go vet ./internal/buildrepo ./internal/install` | 0 |
+| `go test -p 1 ./internal/buildrepo -run 'Receipt\|Pipeline\|Assurance\|Protected' -count=1 -timeout=180s` | 0 (10.7s) |
+| `git status --short \| wc -l` after apply+reset | 33 |
