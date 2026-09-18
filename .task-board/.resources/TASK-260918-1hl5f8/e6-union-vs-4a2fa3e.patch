@@ -1,0 +1,1757 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 314ac5b..747cbd0 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -7,6 +7,40 @@ Versioning for the complete specification set.
+ 
+ ### Added
+ 
++- E6: `path`-kind admission rule and the store-boundary extension to
++  `path` source directories (Decision 0012 amendment 2026-09-18;
++  environments §1/§2.1/§2.2/§3/§4/§6/§8.5/§9.6/§10.1/§10.4/§12/§13): MCP
++  declaration packages MUST resolve from `git` sources — a declaration
++  carried by a `path`-kind root, overlay, or onboarding import is refused
++  at resolution with the new error
++  `mcp_declaration_path_source_refused` naming the package and the
++  declaration, never admitted and never warned-through — because a `path`
++  source has no canonical identity for the MCP package allowlist and is
++  never verified (E1), which makes the allowlist total over canonical
++  identities. A `path` source may carry `class: system` modules only when
++  directly named (a root or overlay, the E2 direct-naming rule applying as
++  is) AND only after its directory passes the §4 protected-boundary
++  contract — ownership, private permissions or DACL, containment below the
++  declared directory, regular file types, link safety — at every resolve
++  and before any materialization, exactly like a store entry; a `path`
++  source that fails it is entry-class `environment_store_untrusted` (no
++  fragment, non-current, posture row naming the path and the failing
++  check) with no rebuild — the source is the operator's directory, the
++  operator fixes it — while its `state_sha256` pin remains the integrity
++  baseline for its store entry and no pin is recomputed against the live
++  directory. `path` overlays and onboarding imports without system modules
++  are admitted as today but pass the same contract: the check is on the
++  directory, not on the content class. Rollout is direct, not warn-first
++  (impact row "E6": under the hood): no knob. Conformance:
++  `vectors/environments-path-kind-admission.json` (the `git` MCP
++  positive, the `path` root/overlay/import MCP refusals, the admitted
++  `path` overlay with a system module, the admitted `path` root,
++  overlay, and import without system modules, the boundary-check
++  refusals with their posture rows — one per check plus no-system
++  overlay and import refusals — the transitive `path` module refused by
++  E2's rule, the dry-run cases reporting `environment_store_untrusted`
++  with no rebuild planned for a `path` directory failure, and
++  negatives), checked semantically by `tools/validate.py`.
+ - E5: nofollow write discipline for managed-surface writes (environments
+   §8.3.1, with pointers from §5/§5.8/§7.5/§8.1/§8.4/§9.5/§10.1/§12/§13
+   and the manager profile §12.2): every materialization, takeover,
+diff --git a/conformance/v1/manifest.json b/conformance/v1/manifest.json
+index 5e322c2..050b087 100644
+--- a/conformance/v1/manifest.json
++++ b/conformance/v1/manifest.json
+@@ -4316,6 +4316,10 @@
+       "path": "vectors/environments-env-passthrough.json",
+       "sha256": "sha256:1953748e548d4f335f9defa4baa1524998d29dab4bf36647fb8c8bcbdcabf6db"
+     },
++    {
++      "path": "vectors/environments-path-kind-admission.json",
++      "sha256": "sha256:708476ab6d581d71baea986b1bf6cb581b38ea6f530fe8a721c4a2cbbdf6f110"
++    },
+     {
+       "path": "vectors/environments-source-signers.json",
+       "sha256": "sha256:fb59e44c33183fc5cf7c698c65038f49a8f1e2d2404137c80cb6d252d46f8d9c"
+diff --git a/conformance/v1/vectors/environments-path-kind-admission.json b/conformance/v1/vectors/environments-path-kind-admission.json
+new file mode 100644
+index 0000000..b93b352
+--- /dev/null
++++ b/conformance/v1/vectors/environments-path-kind-admission.json
+@@ -0,0 +1,541 @@
++{
++  "capability": "agent-environments",
++  "capability_revision": 1,
++  "diagnostics": {
++    "mcp_path_source_refused": "mcp_declaration_path_source_refused",
++    "store_untrusted": "environment_store_untrusted",
++    "system_module_transitive": "context_system_module_transitive"
++  },
++  "dry_run_cases": [
++    {
++      "carries_system_modules": true,
++      "containment": true,
++      "diagnostic": "environment_store_untrusted",
++      "direct": true,
++      "failing_check": "permissions",
++      "link_safety": true,
++      "machine_policy": {
++        "transitive_system_modules": "drop"
++      },
++      "module": "90-system.md",
++      "mutated": false,
++      "name": "path-overlay-dry-run-untrusted-no-rebuild",
++      "names_check": "permissions",
++      "names_path": "/Users/operator/personal",
++      "origin": "operator",
++      "outcome": null,
++      "ownership": true,
++      "package": "personal",
++      "path": "/Users/operator/personal",
++      "permissions": false,
++      "rebuild_planned": false,
++      "regular_types": true,
++      "role": "overlay"
++    },
++    {
++      "carries_system_modules": true,
++      "containment": true,
++      "diagnostic": null,
++      "direct": true,
++      "failing_check": null,
++      "link_safety": true,
++      "machine_policy": {
++        "transitive_system_modules": "drop"
++      },
++      "module": "90-system.md",
++      "mutated": false,
++      "name": "path-overlay-dry-run-intact-plans-nothing",
++      "names_check": null,
++      "names_path": null,
++      "origin": "operator",
++      "outcome": null,
++      "ownership": true,
++      "package": "personal",
++      "path": "/Users/operator/personal",
++      "permissions": true,
++      "rebuild_planned": false,
++      "regular_types": true,
++      "role": "overlay"
++    },
++    {
++      "carries_system_modules": true,
++      "conforming": false,
++      "containment": true,
++      "diagnostic": "environment_store_untrusted",
++      "direct": true,
++      "failing_check": "permissions",
++      "link_safety": true,
++      "machine_policy": {
++        "transitive_system_modules": "drop"
++      },
++      "module": "90-system.md",
++      "mutated": false,
++      "name": "path-overlay-dry-run-reports-would-rebuild",
++      "names_check": "permissions",
++      "names_path": "/Users/operator/personal",
++      "origin": "operator",
++      "outcome": "would-rebuild-untrusted-store",
++      "ownership": true,
++      "package": "personal",
++      "path": "/Users/operator/personal",
++      "permissions": false,
++      "reason": "a dry-run evaluation of a path source directory failure that reports would-rebuild-untrusted-store is non-conforming: the operator's directory is never rebuilt",
++      "rebuild_planned": false,
++      "regular_types": true,
++      "role": "overlay"
++    }
++  ],
++  "mcp_kind_cases": [
++    {
++      "admitted": true,
++      "declaration": "figma-devmode",
++      "diagnostic": null,
++      "name": "git-mcp-declaration-admitted",
++      "names_declaration": null,
++      "names_package": null,
++      "origin": "requires-edge",
++      "package": "figma-devmode",
++      "pin_kind": "commit",
++      "source": "github.com/companyA/mcp-figma-devmode",
++      "source_kind": "git"
++    },
++    {
++      "admitted": false,
++      "declaration": "figma-devmode",
++      "diagnostic": "mcp_declaration_path_source_refused",
++      "name": "path-overlay-mcp-declaration-refused",
++      "names_declaration": "figma-devmode",
++      "names_package": "figma-devmode",
++      "origin": "overlay",
++      "package": "figma-devmode",
++      "pin_kind": "state_sha256",
++      "source": null,
++      "source_kind": "path"
++    },
++    {
++      "admitted": false,
++      "declaration": "figma-devmode",
++      "diagnostic": "mcp_declaration_path_source_refused",
++      "name": "path-root-mcp-declaration-refused",
++      "names_declaration": "figma-devmode",
++      "names_package": "figma-devmode",
++      "origin": "root",
++      "package": "figma-devmode",
++      "pin_kind": "state_sha256",
++      "source": null,
++      "source_kind": "path"
++    },
++    {
++      "admitted": false,
++      "declaration": "figma-devmode",
++      "diagnostic": "mcp_declaration_path_source_refused",
++      "name": "path-import-mcp-declaration-refused",
++      "names_declaration": "figma-devmode",
++      "names_package": "figma-devmode",
++      "origin": "onboarding-import",
++      "package": "figma-devmode",
++      "pin_kind": "state_sha256",
++      "source": null,
++      "source_kind": "path"
++    },
++    {
++      "admitted": true,
++      "conforming": false,
++      "declaration": "figma-devmode",
++      "diagnostic": null,
++      "name": "path-mcp-declaration-admitted",
++      "names_declaration": null,
++      "names_package": null,
++      "origin": "overlay",
++      "package": "figma-devmode",
++      "pin_kind": "state_sha256",
++      "reason": "a declaration carried by a path overlay that reports admitted is non-conforming",
++      "source": null,
++      "source_kind": "path"
++    }
++  ],
++  "path_boundary_cases": [
++    {
++      "carries_system_modules": true,
++      "containment": true,
++      "diagnostic": null,
++      "direct": true,
++      "failing_check": null,
++      "fragment_emitted": true,
++      "link_safety": true,
++      "machine_policy": {
++        "transitive_system_modules": "drop"
++      },
++      "module": "90-system.md",
++      "name": "path-overlay-system-module-admitted",
++      "names_check": null,
++      "names_module": null,
++      "names_package": null,
++      "names_path": null,
++      "origin": "operator",
++      "ownership": true,
++      "package": "personal",
++      "path": "/Users/operator/personal",
++      "permissions": true,
++      "rebuild_planned": false,
++      "regular_types": true,
++      "role": "overlay",
++      "row_current": true
++    },
++    {
++      "carries_system_modules": false,
++      "containment": true,
++      "diagnostic": null,
++      "direct": true,
++      "failing_check": null,
++      "fragment_emitted": true,
++      "link_safety": true,
++      "machine_policy": {
++        "transitive_system_modules": "drop"
++      },
++      "module": null,
++      "name": "path-root-no-system-modules-admitted",
++      "names_check": null,
++      "names_module": null,
++      "names_package": null,
++      "names_path": null,
++      "origin": "operator",
++      "ownership": true,
++      "package": "team-context",
++      "path": "/Users/operator/team-context",
++      "permissions": true,
++      "rebuild_planned": false,
++      "regular_types": true,
++      "role": "root",
++      "row_current": true
++    },
++    {
++      "carries_system_modules": false,
++      "containment": true,
++      "diagnostic": null,
++      "direct": true,
++      "failing_check": null,
++      "fragment_emitted": true,
++      "link_safety": true,
++      "machine_policy": {
++        "transitive_system_modules": "drop"
++      },
++      "module": null,
++      "name": "path-import-no-system-modules-admitted",
++      "names_check": null,
++      "names_module": null,
++      "names_package": null,
++      "names_path": null,
++      "origin": "onboarding-import",
++      "ownership": true,
++      "package": "imported",
++      "path": "/Users/operator/.curator/imports/imported",
++      "permissions": true,
++      "rebuild_planned": false,
++      "regular_types": true,
++      "role": "root",
++      "row_current": true
++    },
++    {
++      "carries_system_modules": false,
++      "containment": true,
++      "diagnostic": null,
++      "direct": true,
++      "failing_check": null,
++      "fragment_emitted": true,
++      "link_safety": true,
++      "machine_policy": {
++        "transitive_system_modules": "drop"
++      },
++      "module": null,
++      "name": "path-overlay-no-system-modules-admitted",
++      "names_check": null,
++      "names_module": null,
++      "names_package": null,
++      "names_path": null,
++      "origin": "operator",
++      "ownership": true,
++      "package": "personal",
++      "path": "/Users/operator/personal",
++      "permissions": true,
++      "rebuild_planned": false,
++      "regular_types": true,
++      "role": "overlay",
++      "row_current": true
++    },
++    {
++      "carries_system_modules": true,
++      "containment": true,
++      "diagnostic": "environment_store_untrusted",
++      "direct": true,
++      "failing_check": "permissions",
++      "fragment_emitted": false,
++      "link_safety": true,
++      "machine_policy": {
++        "transitive_system_modules": "drop"
++      },
++      "module": "90-system.md",
++      "name": "path-overlay-world-writable-untrusted",
++      "names_check": "permissions",
++      "names_module": null,
++      "names_package": null,
++      "names_path": "/Users/operator/personal",
++      "origin": "operator",
++      "ownership": true,
++      "package": "personal",
++      "path": "/Users/operator/personal",
++      "permissions": false,
++      "rebuild_planned": false,
++      "regular_types": true,
++      "role": "overlay",
++      "row_current": false
++    },
++    {
++      "carries_system_modules": true,
++      "containment": true,
++      "diagnostic": "environment_store_untrusted",
++      "direct": true,
++      "failing_check": "link_safety",
++      "fragment_emitted": false,
++      "link_safety": false,
++      "machine_policy": {
++        "transitive_system_modules": "drop"
++      },
++      "module": "90-system.md",
++      "name": "path-overlay-symlinked-component-untrusted",
++      "names_check": "link_safety",
++      "names_module": null,
++      "names_package": null,
++      "names_path": "/Users/operator/personal",
++      "origin": "operator",
++      "ownership": true,
++      "package": "personal",
++      "path": "/Users/operator/personal",
++      "permissions": true,
++      "rebuild_planned": false,
++      "regular_types": true,
++      "role": "overlay",
++      "row_current": false
++    },
++    {
++      "carries_system_modules": true,
++      "containment": true,
++      "diagnostic": "environment_store_untrusted",
++      "direct": true,
++      "failing_check": "ownership",
++      "fragment_emitted": false,
++      "link_safety": true,
++      "machine_policy": {
++        "transitive_system_modules": "drop"
++      },
++      "module": "90-system.md",
++      "name": "path-overlay-wrong-ownership-untrusted",
++      "names_check": "ownership",
++      "names_module": null,
++      "names_package": null,
++      "names_path": "/Users/operator/personal",
++      "origin": "operator",
++      "ownership": false,
++      "package": "personal",
++      "path": "/Users/operator/personal",
++      "permissions": true,
++      "rebuild_planned": false,
++      "regular_types": true,
++      "role": "overlay",
++      "row_current": false
++    },
++    {
++      "carries_system_modules": true,
++      "containment": false,
++      "diagnostic": "environment_store_untrusted",
++      "direct": true,
++      "failing_check": "containment",
++      "fragment_emitted": false,
++      "link_safety": true,
++      "machine_policy": {
++        "transitive_system_modules": "drop"
++      },
++      "module": "90-system.md",
++      "name": "path-overlay-containment-escape-untrusted",
++      "names_check": "containment",
++      "names_module": null,
++      "names_package": null,
++      "names_path": "/Users/operator/personal",
++      "origin": "operator",
++      "ownership": true,
++      "package": "personal",
++      "path": "/Users/operator/personal",
++      "permissions": true,
++      "rebuild_planned": false,
++      "regular_types": true,
++      "role": "overlay",
++      "row_current": false
++    },
++    {
++      "carries_system_modules": true,
++      "containment": true,
++      "diagnostic": "environment_store_untrusted",
++      "direct": true,
++      "failing_check": "regular_types",
++      "fragment_emitted": false,
++      "link_safety": true,
++      "machine_policy": {
++        "transitive_system_modules": "drop"
++      },
++      "module": "90-system.md",
++      "name": "path-overlay-non-regular-component-untrusted",
++      "names_check": "regular_types",
++      "names_module": null,
++      "names_package": null,
++      "names_path": "/Users/operator/personal",
++      "origin": "operator",
++      "ownership": true,
++      "package": "personal",
++      "path": "/Users/operator/personal",
++      "permissions": true,
++      "rebuild_planned": false,
++      "regular_types": false,
++      "role": "overlay",
++      "row_current": false
++    },
++    {
++      "carries_system_modules": false,
++      "containment": true,
++      "diagnostic": "environment_store_untrusted",
++      "direct": true,
++      "failing_check": "permissions",
++      "fragment_emitted": false,
++      "link_safety": true,
++      "machine_policy": {
++        "transitive_system_modules": "drop"
++      },
++      "module": null,
++      "name": "path-overlay-no-system-world-writable-untrusted",
++      "names_check": "permissions",
++      "names_module": null,
++      "names_package": null,
++      "names_path": "/Users/operator/personal",
++      "origin": "operator",
++      "ownership": true,
++      "package": "personal",
++      "path": "/Users/operator/personal",
++      "permissions": false,
++      "rebuild_planned": false,
++      "regular_types": true,
++      "role": "overlay",
++      "row_current": false
++    },
++    {
++      "carries_system_modules": false,
++      "containment": true,
++      "diagnostic": "environment_store_untrusted",
++      "direct": true,
++      "failing_check": "ownership",
++      "fragment_emitted": false,
++      "link_safety": true,
++      "machine_policy": {
++        "transitive_system_modules": "drop"
++      },
++      "module": null,
++      "name": "path-import-no-system-wrong-ownership-untrusted",
++      "names_check": "ownership",
++      "names_module": null,
++      "names_package": null,
++      "names_path": "/Users/operator/.curator/imports/imported",
++      "origin": "onboarding-import",
++      "ownership": false,
++      "package": "imported",
++      "path": "/Users/operator/.curator/imports/imported",
++      "permissions": true,
++      "rebuild_planned": false,
++      "regular_types": true,
++      "role": "root",
++      "row_current": false
++    },
++    {
++      "carries_system_modules": true,
++      "containment": true,
++      "diagnostic": "context_system_module_transitive",
++      "direct": false,
++      "failing_check": null,
++      "fragment_emitted": false,
++      "link_safety": true,
++      "machine_policy": {
++        "transitive_system_modules": "error"
++      },
++      "module": "90-system.md",
++      "name": "path-transitive-system-module-refused",
++      "names_check": null,
++      "names_module": "90-system.md",
++      "names_package": "leaf",
++      "names_path": null,
++      "origin": "operator",
++      "ownership": true,
++      "package": "leaf",
++      "path": "/Users/operator/leaf",
++      "permissions": true,
++      "rebuild_planned": false,
++      "regular_types": true,
++      "role": "member",
++      "row_current": false
++    },
++    {
++      "carries_system_modules": true,
++      "conforming": false,
++      "containment": true,
++      "diagnostic": null,
++      "direct": true,
++      "failing_check": null,
++      "fragment_emitted": true,
++      "link_safety": true,
++      "machine_policy": {
++        "transitive_system_modules": "drop"
++      },
++      "module": "90-system.md",
++      "name": "path-overlay-untrusted-reported-current",
++      "names_check": null,
++      "names_module": null,
++      "names_package": null,
++      "names_path": null,
++      "origin": "operator",
++      "ownership": true,
++      "package": "personal",
++      "path": "/Users/operator/personal",
++      "permissions": false,
++      "reason": "a world-writable path directory that reports current and emits a fragment is non-conforming",
++      "rebuild_planned": false,
++      "regular_types": true,
++      "role": "overlay",
++      "row_current": true
++    },
++    {
++      "carries_system_modules": true,
++      "conforming": false,
++      "containment": true,
++      "diagnostic": "environment_store_untrusted",
++      "direct": true,
++      "failing_check": "ownership",
++      "fragment_emitted": false,
++      "link_safety": true,
++      "machine_policy": {
++        "transitive_system_modules": "drop"
++      },
++      "module": "90-system.md",
++      "name": "path-overlay-untrusted-rebuilds",
++      "names_check": "ownership",
++      "names_module": null,
++      "names_package": null,
++      "names_path": "/Users/operator/personal",
++      "origin": "operator",
++      "ownership": false,
++      "package": "personal",
++      "path": "/Users/operator/personal",
++      "permissions": true,
++      "reason": "a path source has no second copy, so a rebuild planned for one is non-conforming",
++      "rebuild_planned": true,
++      "regular_types": true,
++      "role": "overlay",
++      "row_current": false
++    }
++  ]
++}
+diff --git a/decisions/0012-context-packages-and-semver-locks.md b/decisions/0012-context-packages-and-semver-locks.md
+index 613f5fc..e79a070 100644
+--- a/decisions/0012-context-packages-and-semver-locks.md
++++ b/decisions/0012-context-packages-and-semver-locks.md
+@@ -124,6 +124,76 @@ this document was changed by the amendment.
+    policy of Decision 8 covers a *moved* tag, not a *new* one. Normative
+    home: environments §1.4.
+ 
++## Amendment (2026-09-18, E6)
++
++Recorded for security-audit finding E6 (2026-09): `path`-kind sources sit
++outside the source-identity allowlists and the store boundary
++(`docs/security-audit-2026-09.md` E6, verified against the shipped manager
++in Appendix B: dependencies are git-only, so a `path`-kind MCP package
++cannot enter a closure through `requires`, while a `path`-kind root or
++overlay still carries `class: system` modules with no directory boundary).
++Each item quotes the original passage verbatim, states why it is
++incomplete, cites the evidence, and gives the added rule with its
++normative home in `protocol/environments.md`. The original passages remain
++in the body, each marked `[Amendment 2026-09-18, item N]`; nothing else in
++this document was changed by the amendment.
++
++1. **MCP declarations: `git` sources only.** Original (Decision 6,
++   "Policy"): "Policy is the manager §1 system configuration: an allowlist
++   of MCP package canonical source identities (§6.1 matching), lockable,
++   bounding which declaration packages a profile may resolve —
++   `mcp_package_not_allowed` otherwise." Why incomplete: the allowlist is
++   over canonical source identities, which a `path` source does not have
++   (Decision 5; environments §1), and a `path` source is never verified
++   (Amendment 2026-09-17, item 1) — yet the text never states whether a
++   `path`-kind MCP declaration package is admissible, leaving the
++   allowlist's totality open. Evidence: finding E6 ("if a `path`-kind MCP
++   declaration package is admissible, the allowlist cannot name it and it
++   is unbounded by construction; if it is not, the text should say so").
++   Added rule: an MCP declaration package MUST resolve from a `git`
++   source; a declaration carried by a `path`-kind package — a root, an
++   overlay, or an onboarding import — is refused at resolution with
++   `mcp_declaration_path_source_refused` (error) naming the package and
++   the declaration — never admitted, never warned-through. The
++   environments §2.2 allowlist is total over canonical identities.
++   Normative home: environments §2.2, §2.1.
++2. **`class: system` modules from a `path` source: direct naming plus the
++   boundary contract.** Original (Decision 5): "An overlay is an ordinary
++   context package named by a `git` source with a range or exact form, or
++   by a `path` source (an operator-local directory under the environments
++   §1 `path` rules) — a personal repository or a local directory on the
++   machine." Why incomplete: the sentence admits `path` overlays into the
++   closure with no directory boundary, while a `path` source has no
++   canonical identity for the E1 signer allowlist and is never verified.
++   Evidence: finding E6 and Appendix B (a `path`-kind root or overlay
++   still carries `class: system` modules with no directory boundary).
++   Added rule: a `path` source may carry `class: system` modules only when
++   it is directly named — a `path` root or overlay, with the environments
++   §3 direct-naming rule applying as is — AND only after its directory
++   passes the environments §4 protected-boundary contract (ownership,
++   private permissions or DACL, containment below the declared directory,
++   regular file types, link safety) at every resolve and before any
++   materialization, exactly like a store entry; a `path` source that fails
++   it is `environment_store_untrusted` for that profile — no fragment,
++   non-current, posture row naming the path and the failing check — with
++   no rebuild (the source is the operator's directory; the operator fixes
++   it). Its `state_sha256` pin remains the integrity baseline as §4
++   defines. Normative home: environments §3, §4, §6.
++3. **The boundary contract covers every `path` source directory.**
++   Original (Compatibility impact, §9.6 row): "reassembly emits
++   `agent-context.json` (version `1.0.0`, one module per adapter as before)
++   with `requires.skills` pinned by `revision`; detection,
++   classification, consent, and normalization stand". Why incomplete: the
++   row reassembles the import into the `path` pipeline with no directory
++   boundary, and Decision 5 states the contract for no `path` overlay
++   either — yet the check is on the directory, not on the content class.
++   Evidence: finding E6 ("for `path` overlays, require the directory to
++   pass the ownership/permission/containment validation S5 proposes for
++   the store"). Added rule: `path` overlays and onboarding imports without
++   system modules are admitted as today but pass the same §4 boundary
++   contract at every resolve and before any materialization.
++   Normative home: environments §4, §6, §9.6.
++
+ ## Context
+ 
+ Decision 0010 shaped a profile as a directory inside one repository: an
+@@ -464,7 +534,7 @@ Machine configuration MAY declare, per installed profile, an ordered list
+ of overlays. An overlay is an ordinary context package named by a `git`
+ source with a range or exact form, or by a `path` source (an operator-local
+ directory under the environments §1 `path` rules) — a personal repository
+-or a local directory on the machine. Each overlay declaration carries a
++or a local directory on the machine [Amendment 2026-09-18, item 2]. Each overlay declaration carries a
+ machine-assigned weight (default: the configurable machine default,
+ initially above the weights roots use in practice — Open question 1
+ recommends `1000` — so that personal refinements prevail under the default
+@@ -566,7 +636,7 @@ This is deliberately not a plugin runtime: MCP is the plugin standard, and
+ the missing pieces were declaration, materialization, and policy. Policy is
+ the manager §1 system configuration: an allowlist of MCP package canonical
+ source identities (§6.1 matching), lockable, bounding which declaration
+-packages a profile may resolve — `mcp_package_not_allowed` otherwise. The
++packages a profile may resolve — `mcp_package_not_allowed` otherwise [Amendment 2026-09-18, item 1]. The
+ allowlist is over packages, not launcher binaries, because a binary
+ allowlist bounds nothing: `npx`, `uvx`, `node`, or `sh` admit any program
+ through `args`. An organization allowlists the declaration packages it has
+@@ -826,7 +896,7 @@ change, *unchanged* means not a byte:
+ | §9.3 | unchanged | — |
+ | §9.4 skills and migration | rewritten | the profile skill set is the lock's skills; direct machine declarations write into the lock; `default` keeps its `local` kind with a lock of migrated skills |
+ | §9.5 onboarding | unchanged | — |
+-| §9.6 import | rewritten | reassembly emits `agent-context.json` (version `1.0.0`, one module per adapter as before) with `requires.skills` pinned by `revision`; detection, classification, consent, and normalization stand |
++| §9.6 import | rewritten | reassembly emits `agent-context.json` (version `1.0.0`, one module per adapter as before) with `requires.skills` pinned by `revision`; detection, classification, consent, and normalization stand [Amendment 2026-09-18, item 3] |
+ | §9.7 | bytes change | `profile_index_ambiguous` withdrawn; the ref-flag row reworded |
+ | §10.1 `env resolve` | bytes change | the pure-function tuple follows §5; repair semantics unchanged here (review M10 is separate) |
+ | §10.2 fragment | rewritten | `profile` carries `lock_sha256`; `composition` withdrawn; `precedence` becomes an object; the `mcp` section; the identifier `launch-env-fragment-v1` is kept, its schema rewritten in place |
+diff --git a/protocol/environments.md b/protocol/environments.md
+index b89ca48..fdf10da 100644
+--- a/protocol/environments.md
++++ b/protocol/environments.md
+@@ -73,10 +73,12 @@ The closed set of revision-1 source kinds is:
+   project. The operand names a directory whose root contains
+   `agent-context.json`; the section 2 and section 3 shapes apply unchanged.
+   Installation copies the directory's tree into the profile store as an
+-  immutable snapshot and never reads the source directory again: later
+-  edits to the source directory change nothing until the operator
+-  reinstalls, and nothing about a `path` source is ever fetched from a
+-  network. The snapshot contains only directories and regular files under
++  immutable snapshot and never adopts bytes from the source directory
++  again: later edits to the source directory change nothing until the
++  operator reinstalls, and nothing about a `path` source is ever fetched
++  from a network. The section 4 boundary verification re-inspects the
++  directory (`lstat`-class, metadata only) at every resolve but adopts no
++  bytes. The snapshot contains only directories and regular files under
+   the core §6.2 archive discipline — a symbolic link, hard link, special
+   file, or platform path collision in the tree is `profile_source_invalid`.
+   A root-level `.git` entry is excluded from the snapshot; a `.git` entry
+@@ -451,6 +453,7 @@ the addressed root is not a context package.
+ | `agent-context.json` absent at the addressed root, malformed, unknown field, wrong `schema_version`, invalid `name`, `version`, `weight`, `weights`, or `requires` entry; `context` present without `context/` | `context_manifest_invalid` |
+ | `agent-mcp.json` absent at the addressed root, malformed, unknown field, wrong `schema_version`, or a `server` rule of section 2.2 violated | `mcp_declaration_invalid` |
+ | an MCP declaration package's canonical source identity is outside the machine's MCP package allowlist | `mcp_package_not_allowed` |
++| MCP declaration carried by a `path`-kind package — a root, an overlay, or an onboarding import — at resolution (names the package and the declaration) | `mcp_declaration_path_source_refused` |
+ | the MCP package allowlist is empty at install, update, or status (warning: every declaration package in the closure is admitted) | `mcp_package_allowlist_empty` |
+ | S4 profile `s4-warn`: a launch passes an operator variable not listed in an explicitly configured `passable_env_names`, or any passed operator variable when the knob is absent (warning, names the variables and the knob) | `mcp_env_passthrough_unlisted` |
+ | S4 profile `s4-enforce`: a requested name outside the effective `passable_env_names` is dropped from the launch allowlist (warning, names the variables) | `mcp_env_passthrough_dropped` |
+@@ -520,6 +523,17 @@ every network identity, as core §6.1 — and that state always warns:
+ `mcp_package_allowlist_empty`, stating that every declaration package in
+ the closure is admitted.
+ 
++**Source kind: `git` only.** An MCP declaration package MUST resolve from
++a `git` source. A `path`-kind package — a root, an overlay, or an
++onboarding import (sections 6, 9.1, 9.6) — MUST NOT carry an MCP
++declaration: resolution MUST refuse a closure whose `mcp` member carries
++no canonical source (a `state_sha256` pin) with
++`mcp_declaration_path_source_refused` (error), naming the package and the
++declaration — never admitted, never warned-through. A `path` source has
++no canonical identity for the allowlist above and is never verified
++(section 1.4), which is why it may not carry declarations; the allowlist
++is total over canonical identities.
++
+ ### 2.3 MCP declaration surfacing
+ 
+ A `stdio` declaration names a program the agent tool executes at launch
+@@ -619,6 +633,22 @@ only admitted system modules. The machine policy `transitive_system_modules`
+   package — and the manager MUST NOT write or change the lock: `profile
+   install` MUST fail, and `profile update` MUST leave the old lock in place.
+ 
++**`path` sources.** The direct-naming rule above applies as is to `path`
++members: a `path` root or overlay is direct, and a `path` package reached
++only through another package's `requires` is transitive — a lock
++resolution cannot produce, because `requires` entries are `git`-only
++(section 2) — with its system modules non-admitted exactly like any
++transitive package's. A `path` source is never verified (section 1.4),
++which is why
++its system modules are admitted only under this rule AND only after its
++directory passes the section 4 protected-boundary contract at every
++resolve and before any materialization, exactly like a store entry: a
++`path` source that fails it is `environment_store_untrusted` (section 4),
++not an admission verdict — no fragment, non-current, posture row naming
++the path and the failing check — with no rebuild. The boundary check is
++on the directory, not on the content class: a `path` source without
++system modules passes the same contract (sections 6, 9.6).
++
+ The `context-system-module-present` finding class (section 9.1) is
+ unaffected by admission: it MUST report every `class: system` module of every
+ member at install and update, admitted or not, so system-prompt provenance
+@@ -705,8 +735,50 @@ cannot prove an entry boundary or pin hash MUST fail closed as in (b).
+ Self-consistent lock, marker, and hash bytes do not repair or authenticate
+ an untrusted boundary.
+ 
++**`path` source directories.** The contract extends to the declared
++directory of every `path` source the lock names — a root, an overlay, or
++an onboarding import (sections 6, 9.1, 9.6). On every `env resolve`, and
++again under the manager-home mutation lock for every mutating profile
++operation — install, update, use, sync, repair, garbage collection — the
++manager MUST verify the five boundary checks for the directory, with the
++declared directory as the root the checks are relative to:
++
++- **ownership** — the directory and every component below it are owned by
++  the operator;
++- **permissions** — private mutation permissions, or the platform DACL
++  equivalent: no identity other than the operator may mutate the
++  directory or any component below it;
++- **containment** — every component resolves below the declared directory
++  without leaving it; a component that escapes it is untrusted wherever
++  it points;
++- **regular file types** — every component below the declared directory
++  is a directory or a regular file; a special file is untrusted;
++- **link safety** — verified by `lstat`, never by following links: no
++  symlink at the declared directory or at any component below it. The
++  manager creates no symlink below the declared directory, so any symlink
++  there is untrusted.
++
++The verification inspects the directory but adopts no bytes from it:
++later edits to the source directory change nothing until the operator
++reinstalls (section 1), and no pin is recomputed against the live
++directory — the member's `state_sha256` pin remains the integrity
++baseline for its store entry as above. A `path` source that fails the
++contract is entry-class `environment_store_untrusted` for that profile:
++resolve emits no fragment, status is non-current, and `env status`
++reports the row naming the path and the failing check (section 12).
++There is no rebuild: the source is the operator's directory, and the
++operator fixes it out of band; a real operation MUST NOT re-copy the
++directory into the store to clear the verdict. For dry-run purposes the
++failure is not in the entry-rebuild branch of (b) above: dry-run
++evaluation of a `path` source directory failure reports
++`environment_store_untrusted` with no rebuild planned and mutates
++nothing — never `would-rebuild-untrusted-store`, which names only a
++store entry, lock, or marker file failure that a real operation would
++rebuild (section 10.1).
++
+ The contract is not configurable: no knob narrows, widens, or disables it.
+-Rollout is direct (impact row "S5").
++Rollout is direct (impact row "S5"). Rollout of the `path`-directory
++extension is direct (impact row "E6": under the hood).
+ 
+ ## 5. Deterministic materialization
+ 
+@@ -1051,6 +1123,13 @@ an uninstallable or unreadable source fails resolution with the section 1.1
+ diagnostic of that source; a declaration that repeats a name already in the
+ closure by another declaration is `environment_composition_invalid`.
+ 
++A `path` overlay passes the section 4 protected-boundary contract at
++every resolve and before any materialization, exactly like a store
++entry — the check is on the directory, not on the content class — and a
++`path` overlay that fails it is `environment_store_untrusted` with no
++rebuild (section 4). A `path` overlay MUST NOT carry an MCP declaration
++(section 2.2).
++
+ **Effective weight.** Every closure member has one effective weight,
+ computed by exactly these rules in order, each overriding the previous:
+ 
+@@ -1862,7 +1941,7 @@ check (section 10.1): a marker that belongs to another lock is
+ | --- | --- |
+ | marker unreadable or malformed (non-current, currency unknown; never "absent") | `environment_marker_unreadable` |
+ | marker unsupported version | `environment_marker_invalid` |
+-| store entry, lock, or marker file fails the §4 protected-boundary contract or its pin hash (non-current) | `environment_store_untrusted` |
++| store entry, lock, or marker file fails the §4 protected-boundary contract or its pin hash, or a `path` source directory fails its §4 boundary checks (non-current) | `environment_store_untrusted` |
+ | managed surface bytes or link differ from the record (non-current) | `environment_surface_drift` |
+ | recorded surface file absent (non-current) | `environment_surface_missing` |
+ | recorded surface file exists but cannot be read (non-current) | `environment_surface_unreadable` |
+@@ -2364,7 +2443,10 @@ resolution of the pinned skills, always-strict audit; a blocking finding,
+ `context-secret-material` included, fails the import like any install.
+ Activation follows the section 9.1 rules without magic. The import writes
+ nothing into any native home by itself: replacing native files remains the
+-section 9.5 takeover path with its notice and backup.
++section 9.5 takeover path with its notice and backup. The import is a
++`path` root for the section 4 boundary contract: its directory passes the
++same verification at every resolve, and an import MUST NOT carry an MCP
++declaration (section 2.2) — reassembly emits no `requires.mcp` entry.
+ 
+ ### 9.7 Diagnostics
+ 
+@@ -2458,13 +2540,14 @@ revalidated snapshot into newly established protected state
+ for a `git` member the manager re-acquires the pinned commit's exact
+ snapshot bytes (section 1.2) and republishes the entry with a fresh
+ boundary; for a `path` or `local` member there is no second copy of the
+-snapshot — the source directory is never read again (section 1) — so the
+-entry cannot be rebuilt and repair fails with
++snapshot — bytes are never adopted from the source directory again
++(section 1) — so the entry cannot be rebuilt and repair fails with
+ `environment_repair_failed` while the operator reinstalls. Dry-run
+-evaluation of an entry-class failure reports
+-`would-rebuild-untrusted-store` and mutates nothing; dry-run evaluation of
+-an enclosing-boundary failure reports `environment_store_untrusted` with
+-no rebuild planned and mutates nothing.
++evaluation of an entry-class failure of a store entry, the lock file, or
++a marker file reports `would-rebuild-untrusted-store` and mutates
++nothing; dry-run evaluation of an enclosing-boundary failure, or of a
++`path` source directory failure, reports `environment_store_untrusted`
++with no rebuild planned and mutates nothing (section 4).
+ Lock acquisition that times out is
+ `environment_lock_unavailable`, distinct from `environment_repair_failed`,
+ which keeps meaning that the store cannot restore this home — an entry is
+@@ -2475,7 +2558,8 @@ verification, the manager MUST verify in order: enclosing boundary →
+ entries → pin hashes → home currency (section 4). It verifies the section
+ 4 protected-boundary contract for the environments root, the profile store
+ root, the profile lock file, the home's marker file when the home has one,
+-and every store entry the lock names; then it recomputes every named store
++every store entry the lock names, and — for a `path` root or overlay —
++the source directory (section 4); then it recomputes every named store
+ entry's tree hash from its bytes and requires equality with the pin
+ (section 4) — for a `git` member the tree object identity of the pinned
+ commit, for a `path` or `local` member the `state_sha256` — with no home
+@@ -2679,10 +2763,10 @@ that no reader mistakes the surfacing rows for an execution sandbox.
+ | named or current profile not installed | `profile_unknown` |
+ | managed home unprovisioned, stale, drifted, or passthrough detached; no fragment without `--repair` | `environment_home_stale` |
+ | marker unreadable or malformed at resolve (no fragment; non-current, currency unknown; never "absent") | `environment_marker_unreadable` |
+-| store entry, lock, or marker file fails the §4 protected-boundary contract or its pin hash at resolve (no fragment; non-current) | `environment_store_untrusted` |
++| store entry, lock, or marker file fails the §4 protected-boundary contract or its pin hash, or a `path` source directory fails its §4 boundary checks, at resolve (no fragment; non-current) | `environment_store_untrusted` |
+ | enclosing boundary (environments root or store root) cannot be proven at resolve (no fragment; non-current; nothing rebuilt) | `environment_store_untrusted` |
+-| dry-run evaluation of an entry-class failure (no mutation; a real operation would rebuild it) | `would-rebuild-untrusted-store` |
+-| dry-run evaluation of an enclosing-boundary failure (no mutation; no rebuild planned) | `environment_store_untrusted` |
++| dry-run evaluation of an entry-class failure of a store entry, the lock file, or a marker file (no mutation; a real operation would rebuild it) | `would-rebuild-untrusted-store` |
++| dry-run evaluation of an enclosing-boundary failure, or of a `path` source directory failure (no mutation; no rebuild planned) | `environment_store_untrusted` |
+ | repair could not acquire the mutation lock within the bounded wait | `environment_lock_unavailable` |
+ | managed home cannot be repaired from the store | `environment_repair_failed` |
+ | S4 profile `s4-warn`: launch composition passes an operator variable outside the configured `passable_env_names` (warning, names the variables and the knob) | `mcp_env_passthrough_unlisted` |
+@@ -2868,10 +2952,11 @@ is, `required-missing` when `require_source_signers` is true and none is —,
+ the active update-confirmation revision (`A-warning` or `B-flip`, section
+ 9.2) with its behaviour, the machine-level `require_source_signers`
+ value, the store-trust row per installed profile — the section 4
+-boundary and pin-hash verdict for the profile's lock, marker, and
+-named store entries, naming the failing check and, for an enclosing
+-failure, the boundary (environments root or store root) when the profile
+-is `environment_store_untrusted`, the active codex-seed revision (`A` or `B`, section 7.4) with its
++boundary and pin-hash verdict for the profile's lock, marker, named store
++entries, and — for a `path` root or overlay — the source directory,
++naming the failing check and the path or, for an enclosing failure, the
++boundary (environments root or store root) when the profile is
++`environment_store_untrusted`, the active codex-seed revision (`A` or `B`, section 7.4) with its
+ behaviour, and per managed `codex_cli` home the `codex_seed_record`
+ revision with its native-server rows (`mcp_native_servers_ungoverned`
+ for the native names an `A`-record home carries,
+@@ -3154,8 +3239,8 @@ entry-class case and the enclosing no-rebuild case; the repair rebuild,
+ entry-rebuild, enclosing-refusal, stale-repair, and unprovisioned cases;
+ the `env status` non-current posture rows naming the failing check and the
+ boundary; and the negative cases whose fragment-emitting,
+-current-reporting, or re-applying observation is non-conforming.;
+-and the section 7.4 codex-seed
++current-reporting, or re-applying observation is non-conforming;
++the section 7.4 codex-seed
+ cases (`vectors/environments-codex-seed.json`) — a native `config.toml`
+ with `mcp_servers` tables under revision A (copied whole,
+ `mcp_native_servers_ungoverned` names the entries, posture lists them
+@@ -3165,7 +3250,25 @@ ungoverned) and under revision B (the seeded file lacks them,
+ written), the pre-rule-home `mcp_seed_unstripped` posture, and the
+ revision-A home under a revision-B manager (`mcp_seed_unstripped` with
+ the re-provision hint, the recorded names still ungoverned) — with the
+-`codex_seed_record` marker shape. The nine
++`codex_seed_record` marker shape;
++and the section 2.2 and section 4 path-kind admission cases
++(`vectors/environments-path-kind-admission.json`) — the `git` MCP
++declaration admitted, the `path` root, overlay, and onboarding-import MCP
++declarations refused with `mcp_declaration_path_source_refused` naming the
++package and the declaration, the directly named `path` overlay with a
++system module admitted when its directory passes the contract, the `path`
++root, the `path` overlay, and the onboarding import without system
++modules admitted, the world-writable, symlinked-component,
++wrong-ownership, containment-escape, and non-regular-component
++directories refused with `environment_store_untrusted`, no fragment, and
++a posture row naming the path and the failing check, the world-writable
++no-system overlay and the untrusted no-system onboarding import refused
++the same way regardless of content class, the transitive `path` system
++module refused with `context_system_module_transitive`, the dry-run
++evaluation of a `path` directory failure reporting
++`environment_store_untrusted` with no rebuild planned and mutating
++nothing, and the negatives whose admitted, current-reporting,
++rebuilding, or would-rebuild-reporting observation is non-conforming. The nine
+ retired `expected/environments/*` sets are regenerated under the v2 type
+ line. A manager claiming this capability MUST pass the complete vector set;
+ there is no partial claim. A manager conforms to revision A by warning
+diff --git a/release/1.0.0-rc.9.json b/release/1.0.0-rc.9.json
+index 0ffb7cb..a0804e9 100644
+--- a/release/1.0.0-rc.9.json
++++ b/release/1.0.0-rc.9.json
+@@ -12,7 +12,7 @@
+     "verified_provider_contract": "host-execution-provider-v1"
+   },
+   "candidate_protocol_pin": {
+-    "manifest_sha256": "sha256:92d1e090065a4027f9aaa753b2826d4a1cdb46153e176501aca481620b0c18d1",
++    "manifest_sha256": "sha256:5ff658fa2889d4bb3d9e3173dfe6a7e6a47e929f29e2cd8f7def9d5c2b06cbdd",
+     "suite_root": "conformance/v1"
+   },
+   "claim_v5": {
+@@ -24,7 +24,7 @@
+   "downstream_consumption": {
+     "committed_release_pin_advanced": false,
+     "environment": "CURATOR_CONFORMANCE_ROOT",
+-    "required_manifest_sha256": "sha256:92d1e090065a4027f9aaa753b2826d4a1cdb46153e176501aca481620b0c18d1"
++    "required_manifest_sha256": "sha256:5ff658fa2889d4bb3d9e3173dfe6a7e6a47e929f29e2cd8f7def9d5c2b06cbdd"
+   },
+   "historical_release": {
+     "immutable": true,
+diff --git a/tools/test_validate.py b/tools/test_validate.py
+index 56e8285..9b44c02 100644
+--- a/tools/test_validate.py
++++ b/tools/test_validate.py
+@@ -2229,6 +2229,391 @@ class StoreBoundaryVectorTests(unittest.TestCase):
+             self.run_gate(vector=changed)
+ 
+ 
++class PathKindAdmissionVectorTests(unittest.TestCase):
++    """The E6 path-kind admission gate must fail closed.
++
++    validate_environments_path_kind_admission_vectors is the production
++    gate: tools/validate.py main() runs it on every `make validate`,
++    recomputing the §2.2 MCP source-kind verdict (git only; a path
++    declaration is refused naming package and declaration), the §4
++    directory-boundary verdict from the five boundary checks (no pin is
++    recomputed against the live directory), the §3 direct-naming verdict
++    for a trusted directory, and from them the fragment verdict, the §12
++    currency, and the posture naming, plus the §10.1 dry-run verdict (a
++    `path` directory failure reports `environment_store_untrusted` with
++    no rebuild planned, never `would-rebuild-untrusted-store`). Each
++    named case is pinned to its discriminating inputs (source kind, pin
++    kind, origin; failing check, directness, content, policy, role,
++    origin). Each test narrows one rule and proves the gate rejects what
++    the rule must reject.
++    """
++
++    def setUp(self) -> None:
++        self.vector = validate.load_json(
++            validate.SUITE / "vectors" / "environments-path-kind-admission.json"
++        )
++
++    def case(self, family: str, name: str, vector: dict | None = None) -> dict:
++        source = self.vector if vector is None else vector
++        return next(item for item in source[family] if item["name"] == name)
++
++    def run_gate(self, vector=None) -> None:
++        validate.validate_environments_path_kind_admission_vectors(
++            vector=self.vector if vector is None else vector,
++        )
++
++    def test_published_vector_passes(self) -> None:
++        self.run_gate()
++
++    def test_path_mcp_admitted_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = self.case("mcp_kind_cases", "path-overlay-mcp-declaration-refused", changed)
++        case["admitted"] = True
++        case["diagnostic"] = None
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_git_mcp_refused_is_rejected(self) -> None:
++        # The gate recomputes in both directions: a git declaration that
++        # refuses is as wrong as a path declaration that admits.
++        changed = copy.deepcopy(self.vector)
++        case = self.case("mcp_kind_cases", "git-mcp-declaration-admitted", changed)
++        case["admitted"] = False
++        case["diagnostic"] = "mcp_declaration_path_source_refused"
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_refusal_missing_declaration_name_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("mcp_kind_cases", "path-root-mcp-declaration-refused", changed)["names_declaration"] = None
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_refusal_wrong_diagnostic_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("mcp_kind_cases", "path-import-mcp-declaration-refused", changed)["diagnostic"] = "mcp_package_not_allowed"
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_path_rewritten_as_git_is_rejected(self) -> None:
++        # A named path branch rewritten as a git admission under the same
++        # name — with the pin inputs updated to match — is refused.
++        changed = copy.deepcopy(self.vector)
++        case = self.case("mcp_kind_cases", "path-overlay-mcp-declaration-refused", changed)
++        case["source_kind"] = "git"
++        case["pin_kind"] = "commit"
++        case["source"] = "github.com/companyA/mcp-figma-devmode"
++        case["admitted"] = True
++        case["diagnostic"] = None
++        case["names_package"] = None
++        case["names_declaration"] = None
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_healed_mcp_negative_is_rejected(self) -> None:
++        # A negative whose observation stops violating the rule must fail:
++        # the admitted observation now claims the recomputed refusal.
++        changed = copy.deepcopy(self.vector)
++        case = self.case("mcp_kind_cases", "path-mcp-declaration-admitted", changed)
++        case["admitted"] = False
++        case["diagnostic"] = "mcp_declaration_path_source_refused"
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_world_writable_emits_fragment_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = self.case("path_boundary_cases", "path-overlay-world-writable-untrusted", changed)
++        case["fragment_emitted"] = True
++        case["row_current"] = True
++        case["diagnostic"] = None
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_untrusted_silence_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("path_boundary_cases", "path-overlay-symlinked-component-untrusted", changed)["diagnostic"] = None
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_posture_missing_path_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("path_boundary_cases", "path-overlay-wrong-ownership-untrusted", changed)["names_path"] = None
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_wrong_failing_check_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = self.case("path_boundary_cases", "path-overlay-containment-escape-untrusted", changed)
++        case["failing_check"] = "ownership"
++        case["names_check"] = "ownership"
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_rebuild_planned_is_rejected(self) -> None:
++        # A path source has no second copy: no rebuild is ever planned.
++        changed = copy.deepcopy(self.vector)
++        self.case("path_boundary_cases", "path-overlay-non-regular-component-untrusted", changed)["rebuild_planned"] = True
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_healed_current_negative_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = self.case("path_boundary_cases", "path-overlay-untrusted-reported-current", changed)
++        case["diagnostic"] = "environment_store_untrusted"
++        case["fragment_emitted"] = False
++        case["row_current"] = False
++        case["failing_check"] = "permissions"
++        case["names_path"] = "/Users/operator/personal"
++        case["names_check"] = "permissions"
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_healed_rebuild_negative_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("path_boundary_cases", "path-overlay-untrusted-rebuilds", changed)["rebuild_planned"] = False
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_five_to_one_narrowing_is_rejected(self) -> None:
++        # The reviewer's narrowing: five named boundary branches collapsed
++        # to ownership-only, with failing_check updated to match. Without
++        # scenario pinning the gate accepts (5/5 coverage falls to 1/5
++        # with exit 0); the pinned gate must refuse.
++        changed = copy.deepcopy(self.vector)
++        narrow = {
++            "path-overlay-world-writable-untrusted": "permissions",
++            "path-overlay-symlinked-component-untrusted": "link_safety",
++            "path-overlay-containment-escape-untrusted": "containment",
++            "path-overlay-non-regular-component-untrusted": "regular_types",
++        }
++        for name, check in narrow.items():
++            case = self.case("path_boundary_cases", name, changed)
++            case[check] = True
++            case["ownership"] = False
++            case["failing_check"] = "ownership"
++            case["names_check"] = "ownership"
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_transitive_misdiagnosed_as_untrusted_is_rejected(self) -> None:
++        # A trusted directory with a transitive system module is E2's
++        # refusal, never environment_store_untrusted.
++        changed = copy.deepcopy(self.vector)
++        case = self.case("path_boundary_cases", "path-transitive-system-module-refused", changed)
++        case["diagnostic"] = "environment_store_untrusted"
++        case["failing_check"] = "ownership"
++        case["names_path"] = "/Users/operator/leaf"
++        case["names_check"] = "ownership"
++        case["names_package"] = None
++        case["names_module"] = None
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_transitive_rewritten_as_direct_is_rejected(self) -> None:
++        # A named transitive branch rewritten as a direct admission under
++        # the same name is refused.
++        changed = copy.deepcopy(self.vector)
++        case = self.case("path_boundary_cases", "path-transitive-system-module-refused", changed)
++        case["direct"] = True
++        case["role"] = "overlay"
++        case["diagnostic"] = None
++        case["fragment_emitted"] = True
++        case["row_current"] = True
++        case["names_package"] = None
++        case["names_module"] = None
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_pin_hash_comparison_is_rejected(self) -> None:
++        # No pin is recomputed against the live directory (§4): a case
++        # carrying a pin-hash comparison models the wrong rule.
++        changed = copy.deepcopy(self.vector)
++        self.case("path_boundary_cases", "path-overlay-system-module-admitted", changed)["pin_hash_match"] = True
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_multi_failure_case_is_rejected(self) -> None:
++        # A positive boundary case isolates exactly one failing check.
++        changed = copy.deepcopy(self.vector)
++        self.case("path_boundary_cases", "path-overlay-world-writable-untrusted", changed)["ownership"] = False
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_case_inventory_is_exact(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        changed["path_boundary_cases"] = [
++            item
++            for item in changed["path_boundary_cases"]
++            if item["name"] != "path-transitive-system-module-refused"
++        ]
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_no_system_overlay_refusal_healed_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = self.case("path_boundary_cases", "path-overlay-no-system-world-writable-untrusted", changed)
++        case["permissions"] = True
++        case["fragment_emitted"] = True
++        case["row_current"] = True
++        case["diagnostic"] = None
++        case["failing_check"] = None
++        case["names_path"] = None
++        case["names_check"] = None
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_no_system_overlay_rewritten_as_system_is_rejected(self) -> None:
++        # A named no-system branch rewritten as a system-module case
++        # under the same name is refused: the check is on the directory,
++        # not on the content class.
++        changed = copy.deepcopy(self.vector)
++        case = self.case("path_boundary_cases", "path-overlay-no-system-world-writable-untrusted", changed)
++        case["carries_system_modules"] = True
++        case["module"] = "90-system.md"
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_no_system_import_refusal_healed_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = self.case("path_boundary_cases", "path-import-no-system-wrong-ownership-untrusted", changed)
++        case["ownership"] = True
++        case["fragment_emitted"] = True
++        case["row_current"] = True
++        case["diagnostic"] = None
++        case["failing_check"] = None
++        case["names_path"] = None
++        case["names_check"] = None
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_no_system_import_rewritten_as_system_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = self.case("path_boundary_cases", "path-import-no-system-wrong-ownership-untrusted", changed)
++        case["carries_system_modules"] = True
++        case["module"] = "90-system.md"
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_no_system_overlay_control_rewritten_as_system_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = self.case("path_boundary_cases", "path-overlay-no-system-modules-admitted", changed)
++        case["carries_system_modules"] = True
++        case["module"] = "90-system.md"
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_no_system_narrowing_disagrees_with_corpus(self) -> None:
++        # The reviewer's narrowing as verdicts: a manager that skips the
++        # directory check for sources without system modules reports
++        # trusted for them. The pinned corpus must contradict it on both
++        # no-system entry classes (overlay and onboarding import).
++        mismatches = []
++        for case in self.vector["path_boundary_cases"]:
++            if case.get("conforming") is False:
++                continue
++            inputs = {check: case[check] for check in validate.E6_BOUNDARY_CHECKS}
++            trusted, _ = validate.e6_boundary_trusted(inputs)
++            narrowed = trusted if case["carries_system_modules"] else True
++            if not narrowed:
++                narrowed_diag = validate.E6_DIAG_UNTRUSTED
++            elif (
++                case["carries_system_modules"]
++                and not case["direct"]
++                and case["machine_policy"]["transitive_system_modules"] == "error"
++            ):
++                narrowed_diag = validate.E6_DIAG_TRANSITIVE
++            else:
++                narrowed_diag = None
++            if narrowed_diag != case["diagnostic"]:
++                mismatches.append(case["name"])
++        self.assertIn("path-overlay-no-system-world-writable-untrusted", mismatches)
++        self.assertIn("path-import-no-system-wrong-ownership-untrusted", mismatches)
++
++    def test_dry_run_would_rebuild_report_is_rejected(self) -> None:
++        # A dry-run evaluation of a `path` directory failure that reports
++        # would-rebuild-untrusted-store is refused: that outcome names
++        # only a store entry, lock, or marker file failure (§4, §10.1).
++        changed = copy.deepcopy(self.vector)
++        self.case("dry_run_cases", "path-overlay-dry-run-untrusted-no-rebuild", changed)["outcome"] = (
++            validate.S5_OUTCOME_WOULD_REBUILD
++        )
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_dry_run_untrusted_silence_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("dry_run_cases", "path-overlay-dry-run-untrusted-no-rebuild", changed)["diagnostic"] = None
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_dry_run_intact_reports_untrusted_is_rejected(self) -> None:
++        # The gate recomputes in both directions: an intact directory
++        # that reports untrusted is as wrong as a failure that is silent.
++        changed = copy.deepcopy(self.vector)
++        case = self.case("dry_run_cases", "path-overlay-dry-run-intact-plans-nothing", changed)
++        case["diagnostic"] = "environment_store_untrusted"
++        case["failing_check"] = "permissions"
++        case["names_path"] = "/Users/operator/personal"
++        case["names_check"] = "permissions"
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_dry_run_mutates_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("dry_run_cases", "path-overlay-dry-run-untrusted-no-rebuild", changed)["mutated"] = True
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_dry_run_rebuild_planned_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("dry_run_cases", "path-overlay-dry-run-untrusted-no-rebuild", changed)["rebuild_planned"] = True
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_dry_run_untrusted_healed_is_rejected(self) -> None:
++        # A named dry-run failure branch rewritten as a passing case
++        # under the same name is refused.
++        changed = copy.deepcopy(self.vector)
++        case = self.case("dry_run_cases", "path-overlay-dry-run-untrusted-no-rebuild", changed)
++        case["permissions"] = True
++        case["diagnostic"] = None
++        case["failing_check"] = None
++        case["names_path"] = None
++        case["names_check"] = None
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_healed_dry_run_negative_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        self.case("dry_run_cases", "path-overlay-dry-run-reports-would-rebuild", changed)["outcome"] = None
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_dry_run_negative_wrong_violation_is_rejected(self) -> None:
++        # The negative isolates exactly the R1 violation: healing the
++        # outcome while violating elsewhere is still refused.
++        changed = copy.deepcopy(self.vector)
++        case = self.case("dry_run_cases", "path-overlay-dry-run-reports-would-rebuild", changed)
++        case["outcome"] = None
++        case["mutated"] = True
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_dry_run_inventory_is_exact(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        changed["dry_run_cases"] = [
++            item for item in changed["dry_run_cases"] if item["name"] != "path-overlay-dry-run-intact-plans-nothing"
++        ]
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++    def test_wrong_capability_identity_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        changed["capability"] = "agent-environments-v2"
++        with self.assertRaises(validate.ValidationFailure):
++            self.run_gate(vector=changed)
++
++
+ class SourceSignersVectorTests(unittest.TestCase):
+     """The E1 signer-verification/merge/posture/delta gate must fail closed.
+ 
+diff --git a/tools/validate.py b/tools/validate.py
+index 13a7c25..bbb7895 100644
+--- a/tools/validate.py
++++ b/tools/validate.py
+@@ -6746,6 +6746,355 @@ def validate_environments_codex_seed_vectors(
+             raise ValidationFailure(f"{label}: a codex-seed warning row stays current")
+ 
+ 
++# ---------------------------------------------------------------------------
++# E6: path-kind admission and the store-boundary extension to path source
++# directories (sections 1, 2.1, 2.2, 3, 4, 6, 8.5, 9.6, 10.1, 10.4, 12, 13)
++
++
++E6_DIAG_MCP_REFUSED = "mcp_declaration_path_source_refused"
++E6_DIAG_UNTRUSTED = "environment_store_untrusted"
++E6_DIAG_TRANSITIVE = "context_system_module_transitive"
++
++E6_BOUNDARY_CHECKS = ("ownership", "permissions", "containment", "regular_types", "link_safety")
++E6_SOURCE_KINDS = ("git", "path")
++E6_PIN_KINDS = ("commit", "state_sha256")
++E6_MCP_ORIGINS = ("requires-edge", "root", "overlay", "onboarding-import")
++E6_ROLES = ("root", "overlay", "member")
++E6_ORIGINS = ("operator", "onboarding-import")
++E6_POLICIES = ("drop", "error")
++
++E6_MCP_CASES = {
++    "git-mcp-declaration-admitted",
++    "path-overlay-mcp-declaration-refused",
++    "path-root-mcp-declaration-refused",
++    "path-import-mcp-declaration-refused",
++    "path-mcp-declaration-admitted",
++}
++E6_MCP_NEGATIVE_CASES = {"path-mcp-declaration-admitted"}
++E6_BOUNDARY_CASES = {
++    "path-overlay-system-module-admitted",
++    "path-root-no-system-modules-admitted",
++    "path-import-no-system-modules-admitted",
++    "path-overlay-no-system-modules-admitted",
++    "path-overlay-world-writable-untrusted",
++    "path-overlay-symlinked-component-untrusted",
++    "path-overlay-wrong-ownership-untrusted",
++    "path-overlay-containment-escape-untrusted",
++    "path-overlay-non-regular-component-untrusted",
++    "path-overlay-no-system-world-writable-untrusted",
++    "path-import-no-system-wrong-ownership-untrusted",
++    "path-transitive-system-module-refused",
++    "path-overlay-untrusted-reported-current",
++    "path-overlay-untrusted-rebuilds",
++}
++E6_BOUNDARY_NEGATIVE_CASES = {
++    "path-overlay-untrusted-reported-current",
++    "path-overlay-untrusted-rebuilds",
++}
++E6_DRY_RUN_CASES = {
++    "path-overlay-dry-run-untrusted-no-rebuild",
++    "path-overlay-dry-run-intact-plans-nothing",
++    "path-overlay-dry-run-reports-would-rebuild",
++}
++E6_DRY_RUN_NEGATIVE_CASES = {"path-overlay-dry-run-reports-would-rebuild"}
++
++# Each named case is pinned to its discriminating inputs: an MCP case to
++# the declaration's source kind, pin kind, and origin; a boundary or
++# dry-run case to its failing check (or none), directness, system-module
++# content, machine policy, role, and origin. A corpus where a named branch
++# no longer exercises its inputs (for example a path refusal rewritten as
++# a git admission under the same name, the five boundary branches
++# collapsed to ownership-only, or a no-system refusal rewritten as a
++# system-module case) is refused.
++E6_MCP_PIN: dict[str, dict[str, Any]] = {
++    "git-mcp-declaration-admitted": {"source_kind": "git", "pin_kind": "commit", "origin": "requires-edge"},
++    "path-overlay-mcp-declaration-refused": {"source_kind": "path", "pin_kind": "state_sha256", "origin": "overlay"},
++    "path-root-mcp-declaration-refused": {"source_kind": "path", "pin_kind": "state_sha256", "origin": "root"},
++    "path-import-mcp-declaration-refused": {"source_kind": "path", "pin_kind": "state_sha256", "origin": "onboarding-import"},
++    "path-mcp-declaration-admitted": {"source_kind": "path", "pin_kind": "state_sha256", "origin": "overlay"},
++}
++E6_BOUNDARY_PIN: dict[str, dict[str, Any]] = {
++    "path-overlay-system-module-admitted": {"check": None, "direct": True, "carries": True, "policy": "drop", "role": "overlay", "origin": "operator"},
++    "path-root-no-system-modules-admitted": {"check": None, "direct": True, "carries": False, "policy": "drop", "role": "root", "origin": "operator"},
++    "path-import-no-system-modules-admitted": {"check": None, "direct": True, "carries": False, "policy": "drop", "role": "root", "origin": "onboarding-import"},
++    "path-overlay-no-system-modules-admitted": {"check": None, "direct": True, "carries": False, "policy": "drop", "role": "overlay", "origin": "operator"},
++    "path-overlay-world-writable-untrusted": {"check": "permissions", "direct": True, "carries": True, "policy": "drop", "role": "overlay", "origin": "operator"},
++    "path-overlay-symlinked-component-untrusted": {"check": "link_safety", "direct": True, "carries": True, "policy": "drop", "role": "overlay", "origin": "operator"},
++    "path-overlay-wrong-ownership-untrusted": {"check": "ownership", "direct": True, "carries": True, "policy": "drop", "role": "overlay", "origin": "operator"},
++    "path-overlay-containment-escape-untrusted": {"check": "containment", "direct": True, "carries": True, "policy": "drop", "role": "overlay", "origin": "operator"},
++    "path-overlay-non-regular-component-untrusted": {"check": "regular_types", "direct": True, "carries": True, "policy": "drop", "role": "overlay", "origin": "operator"},
++    "path-overlay-no-system-world-writable-untrusted": {"check": "permissions", "direct": True, "carries": False, "policy": "drop", "role": "overlay", "origin": "operator"},
++    "path-import-no-system-wrong-ownership-untrusted": {"check": "ownership", "direct": True, "carries": False, "policy": "drop", "role": "root", "origin": "onboarding-import"},
++    "path-transitive-system-module-refused": {"check": None, "direct": False, "carries": True, "policy": "error", "role": "member", "origin": "operator"},
++    "path-overlay-untrusted-reported-current": {"check": "permissions", "direct": True, "carries": True, "policy": "drop", "role": "overlay", "origin": "operator"},
++    "path-overlay-untrusted-rebuilds": {"check": "ownership", "direct": True, "carries": True, "policy": "drop", "role": "overlay", "origin": "operator"},
++}
++E6_DRY_RUN_PIN: dict[str, dict[str, Any]] = {
++    "path-overlay-dry-run-untrusted-no-rebuild": {"check": "permissions", "direct": True, "carries": True, "policy": "drop", "role": "overlay", "origin": "operator"},
++    "path-overlay-dry-run-intact-plans-nothing": {"check": None, "direct": True, "carries": True, "policy": "drop", "role": "overlay", "origin": "operator"},
++    "path-overlay-dry-run-reports-would-rebuild": {"check": "permissions", "direct": True, "carries": True, "policy": "drop", "role": "overlay", "origin": "operator"},
++}
++
++
++def e6_check_boundary_inputs(case: dict[str, Any], name: str) -> dict[str, bool]:
++    """Read the five §4 boundary inputs of one path-directory case.
++
++    No pin is recomputed against the live directory (§4): a case carrying
++    a pin-hash comparison models the wrong rule.
++    """
++    if "pin_hash_match" in case:
++        raise ValidationFailure(f"path-kind case {name}: no pin is recomputed against the live directory")
++    inputs: dict[str, bool] = {}
++    for check in E6_BOUNDARY_CHECKS:
++        value = case.get(check)
++        if not isinstance(value, bool):
++            raise ValidationFailure(f"path-kind case {name}: {check} must be a boolean")
++        inputs[check] = value
++    return inputs
++
++
++def e6_boundary_trusted(inputs: dict[str, bool]) -> tuple[bool, list[str]]:
++    """Recompute the §4 directory verdict: every boundary check passes, else untrusted."""
++    failing = [check for check in E6_BOUNDARY_CHECKS if not inputs[check]]
++    return (not failing, failing)
++
++
++def e6_check_mcp_pin(pin: dict[str, Any], case: dict[str, Any], name: str) -> None:
++    """Bind a named MCP case to its source kind, pin kind, and origin."""
++    for field in ("source_kind", "pin_kind", "origin"):
++        if case.get(field) != pin[field]:
++            raise ValidationFailure(f"path-kind case {name}: {field} must be {pin[field]} for this branch")
++
++
++def e6_check_boundary_pin(pin: dict[str, Any], case: dict[str, Any], failing: list[str], name: str) -> None:
++    """Bind a named boundary case to its failing check, directness, content, policy, role, and origin."""
++    if case.get("direct") is not pin["direct"]:
++        raise ValidationFailure(f"path-kind case {name}: direct must be {pin['direct']} for this branch")
++    if case.get("carries_system_modules") is not pin["carries"]:
++        raise ValidationFailure(f"path-kind case {name}: carries_system_modules must be {pin['carries']} for this branch")
++    if case.get("machine_policy", {}).get("transitive_system_modules") != pin["policy"]:
++        raise ValidationFailure(f"path-kind case {name}: policy must be {pin['policy']} for this branch")
++    if case.get("role") != pin["role"]:
++        raise ValidationFailure(f"path-kind case {name}: role must be {pin['role']} for this branch")
++    if case.get("origin") != pin["origin"]:
++        raise ValidationFailure(f"path-kind case {name}: origin must be {pin['origin']} for this branch")
++    expected = pin["check"]
++    if expected is None:
++        if failing:
++            raise ValidationFailure(f"path-kind case {name}: this branch models no failing boundary check")
++    elif expected not in failing:
++        raise ValidationFailure(f"path-kind case {name}: this branch must fail {expected}")
++    elif len(failing) != 1:
++        raise ValidationFailure(f"path-kind case {name}: this branch isolates exactly its failing check")
++
++
++def e6_expected_names(case: dict[str, Any], expected_diag: str | None, failing: list[str]) -> dict[str, Any]:
++    """Recompute the §2.1/§3.1/§12 naming rule for one boundary observation."""
++    if expected_diag == E6_DIAG_UNTRUSTED:
++        return {"names_path": case.get("path"), "names_check": failing[0], "names_package": None, "names_module": None}
++    if expected_diag == E6_DIAG_TRANSITIVE:
++        return {"names_path": None, "names_check": None, "names_package": case.get("package"), "names_module": case.get("module")}
++    return {"names_path": None, "names_check": None, "names_package": None, "names_module": None}
++
++
++def validate_environments_path_kind_admission_vectors(vector: Any = None) -> None:
++    """Recompute every E6 path-kind admission verdict (§1, §2.1, §2.2, §3, §4, §10.1, §10.4, §12).
++
++    An MCP declaration resolves only from a `git` source: a declaration
++    carried by a `path` root, overlay, or onboarding import is refused
++    with `mcp_declaration_path_source_refused` naming the package and the
++    declaration. A `path` source directory passes the five §4 boundary
++    checks at every resolve; a failure is entry-class
++    `environment_store_untrusted` — no fragment, non-current, posture row
++    naming the path and the failing check — with no rebuild, while a
++    directory that passes admits system modules only under the §3
++    direct-naming rule. Dry-run evaluation of a `path` directory failure
++    reports `environment_store_untrusted` with no rebuild planned and
++    mutates nothing — never `would-rebuild-untrusted-store`, which names
++    only a store entry, lock, or marker file failure. Each named case is
++    pinned to its discriminating inputs, so a corpus where a named branch
++    no longer exercises its branch is refused. Negatives carry a
++    non-conforming observation that must still violate the recomputed rule.
++    """
++    if vector is None:
++        vector = load_json(SUITE / "vectors" / "environments-path-kind-admission.json")
++    if vector.get("capability") != "agent-environments" or vector.get("capability_revision") != 1:
++        raise ValidationFailure("path-kind vector has the wrong capability identity")
++    pinned = vector.get("diagnostics")
++    if (
++        not isinstance(pinned, dict)
++        or pinned.get("mcp_path_source_refused") != E6_DIAG_MCP_REFUSED
++        or pinned.get("store_untrusted") != E6_DIAG_UNTRUSTED
++        or pinned.get("system_module_transitive") != E6_DIAG_TRANSITIVE
++    ):
++        raise ValidationFailure(
++            "path-kind diagnostics must pin mcp_declaration_path_source_refused, "
++            "environment_store_untrusted, and context_system_module_transitive"
++        )
++
++    mcp = named_cases(vector.get("mcp_kind_cases"), "path-kind mcp")
++    if set(mcp) != E6_MCP_CASES:
++        raise ValidationFailure("path-kind mcp case inventory is not exact")
++    for name, case in mcp.items():
++        if case.get("source_kind") not in E6_SOURCE_KINDS:
++            raise ValidationFailure(f"path-kind case {name}: source_kind must be git or path")
++        if case.get("pin_kind") not in E6_PIN_KINDS:
++            raise ValidationFailure(f"path-kind case {name}: pin_kind must be commit or state_sha256")
++        if case.get("origin") not in E6_MCP_ORIGINS:
++            raise ValidationFailure(f"path-kind case {name}: origin must be one of {', '.join(E6_MCP_ORIGINS)}")
++        if not case.get("package") or not case.get("declaration"):
++            raise ValidationFailure(f"path-kind case {name}: package and declaration must be named")
++        if case["source_kind"] == "git":
++            if not case.get("source") or case.get("pin_kind") != "commit":
++                raise ValidationFailure(f"path-kind case {name}: a git declaration carries a canonical source and a commit pin")
++        else:
++            if case.get("source") is not None or case.get("pin_kind") != "state_sha256":
++                raise ValidationFailure(f"path-kind case {name}: a path declaration carries no source and a state pin")
++        e6_check_mcp_pin(E6_MCP_PIN[name], case, name)
++        expected_admitted = case["source_kind"] == "git"
++        expected_diag = None if expected_admitted else E6_DIAG_MCP_REFUSED
++        if name in E6_MCP_NEGATIVE_CASES:
++            if case.get("conforming") is not False or not case.get("reason"):
++                raise ValidationFailure(f"path-kind case {name}: a negative needs conforming=false and a reason")
++            if case.get("admitted") is expected_admitted and case.get("diagnostic") == expected_diag:
++                raise ValidationFailure(f"path-kind case {name}: the observation no longer violates the §2.2 rule")
++            continue
++        if case.get("conforming") is False:
++            raise ValidationFailure(f"path-kind case {name}: a positive case must not carry conforming=false")
++        if case.get("admitted") is not expected_admitted:
++            raise ValidationFailure(f"path-kind case {name}: admission is not the §2.2 rule")
++        if case.get("diagnostic") != expected_diag:
++            raise ValidationFailure(f"path-kind case {name}: diagnostic is not the §2.1 rule ({expected_diag!r})")
++        if expected_admitted:
++            if case.get("names_package") is not None or case.get("names_declaration") is not None:
++                raise ValidationFailure(f"path-kind case {name}: an admitted declaration names nothing")
++        elif case.get("names_package") != case.get("package") or case.get("names_declaration") != case.get("declaration"):
++            raise ValidationFailure(f"path-kind case {name}: the refusal names the package and the declaration")
++
++    boundary = named_cases(vector.get("path_boundary_cases"), "path-kind boundary")
++    if set(boundary) != E6_BOUNDARY_CASES:
++        raise ValidationFailure("path-kind boundary case inventory is not exact")
++    for name, case in boundary.items():
++        if case.get("role") not in E6_ROLES:
++            raise ValidationFailure(f"path-kind case {name}: role must be one of {', '.join(E6_ROLES)}")
++        if case.get("origin") not in E6_ORIGINS:
++            raise ValidationFailure(f"path-kind case {name}: origin must be operator or onboarding-import")
++        if not isinstance(case.get("direct"), bool) or not isinstance(case.get("carries_system_modules"), bool):
++            raise ValidationFailure(f"path-kind case {name}: direct and carries_system_modules must be booleans")
++        policy = case.get("machine_policy", {}).get("transitive_system_modules")
++        if policy not in E6_POLICIES:
++            raise ValidationFailure(f"path-kind case {name}: policy must be drop or error")
++        path = case.get("path")
++        if not isinstance(path, str) or not path.startswith("/"):
++            raise ValidationFailure(f"path-kind case {name}: path must be an absolute directory")
++        if not case.get("package"):
++            raise ValidationFailure(f"path-kind case {name}: package must be named")
++        if case["carries_system_modules"]:
++            if not case.get("module"):
++                raise ValidationFailure(f"path-kind case {name}: a system-module carrier names its module")
++        elif case.get("module") is not None:
++            raise ValidationFailure(f"path-kind case {name}: no module without system modules")
++        inputs = e6_check_boundary_inputs(case, name)
++        trusted, failing = e6_boundary_trusted(inputs)
++        e6_check_boundary_pin(E6_BOUNDARY_PIN[name], case, failing, name)
++        if not trusted:
++            expected_diag = E6_DIAG_UNTRUSTED
++        elif case["carries_system_modules"] and not case["direct"] and policy == "error":
++            expected_diag = E6_DIAG_TRANSITIVE
++        else:
++            expected_diag = None
++        expected_fragment = expected_diag is None
++        expected_current = expected_diag is None
++        expected_names = e6_expected_names(case, expected_diag, failing)
++        if name in E6_BOUNDARY_NEGATIVE_CASES:
++            if case.get("conforming") is not False or not case.get("reason"):
++                raise ValidationFailure(f"path-kind case {name}: a negative needs conforming=false and a reason")
++            if (
++                case.get("diagnostic") == expected_diag
++                and case.get("fragment_emitted") is expected_fragment
++                and case.get("row_current") is expected_current
++                and case.get("rebuild_planned") is False
++                and all(case.get(field) == value for field, value in expected_names.items())
++            ):
++                raise ValidationFailure(f"path-kind case {name}: the observation no longer violates the §4 rule")
++            continue
++        if case.get("conforming") is False:
++            raise ValidationFailure(f"path-kind case {name}: a positive case must not carry conforming=false")
++        if case.get("diagnostic") != expected_diag:
++            raise ValidationFailure(f"path-kind case {name}: diagnostic is not the §4/§3 rule ({expected_diag!r})")
++        if case.get("fragment_emitted") is not expected_fragment:
++            raise ValidationFailure(f"path-kind case {name}: fragment verdict is not the §4 rule")
++        if case.get("row_current") is not expected_current:
++            raise ValidationFailure(f"path-kind case {name}: currency is not the §12 rule")
++        if case.get("rebuild_planned") is not False:
++            raise ValidationFailure(f"path-kind case {name}: a path source is never rebuilt")
++        expected_check: str | None = failing[0] if failing else None
++        if case.get("failing_check") != expected_check:
++            raise ValidationFailure(f"path-kind case {name}: failing_check is not the §4 rule ({expected_check!r})")
++        for field, value in expected_names.items():
++            if case.get(field) != value:
++                raise ValidationFailure(f"path-kind case {name}: {field} is not the §12 rule ({value!r})")
++
++    dry_run = named_cases(vector.get("dry_run_cases"), "path-kind dry-run")
++    if set(dry_run) != E6_DRY_RUN_CASES:
++        raise ValidationFailure("path-kind dry-run case inventory is not exact")
++    for name, case in dry_run.items():
++        if case.get("role") not in E6_ROLES:
++            raise ValidationFailure(f"path-kind case {name}: role must be one of {', '.join(E6_ROLES)}")
++        if case.get("origin") not in E6_ORIGINS:
++            raise ValidationFailure(f"path-kind case {name}: origin must be operator or onboarding-import")
++        if not isinstance(case.get("direct"), bool) or not isinstance(case.get("carries_system_modules"), bool):
++            raise ValidationFailure(f"path-kind case {name}: direct and carries_system_modules must be booleans")
++        policy = case.get("machine_policy", {}).get("transitive_system_modules")
++        if policy not in E6_POLICIES:
++            raise ValidationFailure(f"path-kind case {name}: policy must be drop or error")
++        path = case.get("path")
++        if not isinstance(path, str) or not path.startswith("/"):
++            raise ValidationFailure(f"path-kind case {name}: path must be an absolute directory")
++        if not case.get("package"):
++            raise ValidationFailure(f"path-kind case {name}: package must be named")
++        if case["carries_system_modules"]:
++            if not case.get("module"):
++                raise ValidationFailure(f"path-kind case {name}: a system-module carrier names its module")
++        elif case.get("module") is not None:
++            raise ValidationFailure(f"path-kind case {name}: no module without system modules")
++        inputs = e6_check_boundary_inputs(case, name)
++        trusted, failing = e6_boundary_trusted(inputs)
++        e6_check_boundary_pin(E6_DRY_RUN_PIN[name], case, failing, name)
++        expected_diag = E6_DIAG_UNTRUSTED if not trusted else None
++        expected_check: str | None = failing[0] if failing else None
++        expected_names_path = path if not trusted else None
++        if name in E6_DRY_RUN_NEGATIVE_CASES:
++            if case.get("conforming") is not False or not case.get("reason"):
++                raise ValidationFailure(f"path-kind case {name}: a negative needs conforming=false and a reason")
++            if case.get("outcome") != S5_OUTCOME_WOULD_REBUILD:
++                raise ValidationFailure(f"path-kind case {name}: this branch must report would-rebuild-untrusted-store")
++            if (
++                case.get("diagnostic") != expected_diag
++                or case.get("mutated") is not False
++                or case.get("rebuild_planned") is not False
++                or case.get("failing_check") != expected_check
++                or case.get("names_path") != expected_names_path
++                or case.get("names_check") != expected_check
++            ):
++                raise ValidationFailure(f"path-kind case {name}: only the reported outcome violates the §10.1 rule")
++            continue
++        if case.get("conforming") is False:
++            raise ValidationFailure(f"path-kind case {name}: a positive case must not carry conforming=false")
++        if case.get("diagnostic") != expected_diag:
++            raise ValidationFailure(f"path-kind case {name}: diagnostic is not the §10.4 rule ({expected_diag!r})")
++        if case.get("outcome") is not None:
++            raise ValidationFailure(f"path-kind case {name}: a path directory dry-run never plans a rebuild")
++        if case.get("mutated") is not False:
++            raise ValidationFailure(f"path-kind case {name}: dry-run evaluation mutates nothing")
++        if case.get("rebuild_planned") is not False:
++            raise ValidationFailure(f"path-kind case {name}: a path source is never rebuilt")
++        if case.get("failing_check") != expected_check:
++            raise ValidationFailure(f"path-kind case {name}: failing_check is not the §4 rule ({expected_check!r})")
++        if case.get("names_path") != expected_names_path or case.get("names_check") != expected_check:
++            raise ValidationFailure(f"path-kind case {name}: posture naming is not the §12 rule")
++
++
+ # ---------------------------------------------------------------------------
+ # Section 9.1: detector classes
+ 
+@@ -7804,6 +8153,7 @@ def main() -> int:
+         validate_environments_source_signers_vectors,
+         validate_environments_store_boundary_vectors,
+         validate_environments_codex_seed_vectors,
++        validate_environments_path_kind_admission_vectors,
+         validate_context_version_vectors,
+         validate_context_detector_vectors,
+         validate_snapshot_acquisition_vectors,
