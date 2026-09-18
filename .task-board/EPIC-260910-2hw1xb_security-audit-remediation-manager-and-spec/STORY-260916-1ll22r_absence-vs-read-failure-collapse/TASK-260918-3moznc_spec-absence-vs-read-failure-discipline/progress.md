@@ -1,5 +1,5 @@
 ## Status
-integrating
+done
 
 ## Review
 required
@@ -65,6 +65,10 @@ spawn agent resolution: Agent selection: claude via explicit_override (preferred
 spawn queued: [reviewer] reviewer (claude) (run=RUN-260918-41c0f7, max_parallel=20)
 spawn run started: [reviewer] reviewer (claude) (run=RUN-260918-41c0f7)
 Review rev2 (RUN-260918-41c0f7, claude-opus-5): ACCEPTED via accept_cr revision=2 -> integrating. F1 (unreadable lock never rebuilt from; precedence in §8.4.1 lock row, referenced from §1.3/§4/§10.1/§10.4 + manager §12.5; repair/update no-rebuild vectors + rebuild-shaped negative), F2 (§9.7 passthrough row), F3 (environment_backup_record_unreadable, error-class, spelled identically in §8.3/§8.4.1/§8.5/§9.7/§12/§13 + manager §12.2/§12.7, 5 vectors) and the §9.4 migration note verified; rev1->rev2 interdiff traces only to F1-F3/§9.4. Patch == git diff HEAD (sha 7fff0900, base 5146c7b); 36/36 pre-existing vectors byte-identical; EMPTY curator delta is correct (spec lives in curator-spec). Independent gates on disposable clones: validate.py exit 0 (62 schemas/1118 vectors), go test exit 0, unittest 556 OK exit 0 (992 s), make regenerate-check exit 0 + double-regenerate fixpoint. Rule-7 replays: 135/135 in-memory and 31/31 through the real validate.py entry point refused. No worktree files touched. Evidence: TASK-260918-3moznc_review-verdict-rev2.md + _review-validation-rev2.log. Next: integration run bound to producer role doc-writer / archetype implementer.
+agent completed: [reviewer] reviewer (claude) (exit=0)
+spawn run completed: claude (run=RUN-260918-41c0f7, pid=84945, exit=0)
+
+External integration evidence: curator-spec PR #73 landed on main as 23be89e94237d921d14ae325c6bc41ccfbe17103 (ff push after independent acceptance at revision 2 by claude-opus-5:max, TASK-260918-3moznc_review-verdict-rev2.md; clean apply of the accepted patch 16755b45 on its base 5146c7b; regenerate-check and validate exit 0; 9/9 checks green). Curator delta empty by design (spec-only task).
 
 ## Precondition Resources
 - [TASK-260918-3moznc_brief.md](file://TASK-260918-3moznc/TASK-260918-3moznc_brief.md) — Producer brief
@@ -94,7 +98,7 @@ Review rev2 (RUN-260918-41c0f7, claude-opus-5): ACCEPTED via accept_cr revision=
 2026-09-18T04:44:45Z
 
 ## Last Update
-2026-09-18T16:25:07Z
+2026-09-18T17:25:37Z
 
 ## Assigned To
 [reviewer] reviewer (claude)
