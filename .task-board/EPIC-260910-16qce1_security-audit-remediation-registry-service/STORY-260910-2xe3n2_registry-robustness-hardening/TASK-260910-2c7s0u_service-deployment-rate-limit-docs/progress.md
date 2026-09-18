@@ -1,5 +1,5 @@
 ## Status
-integrating
+done
 
 ## Review
 required
@@ -72,6 +72,11 @@ spawn queued: [reviewer] reviewer (codex) (run=RUN-260918-c84a03, max_parallel=8
 spawn run started: [reviewer] reviewer (codex) (run=RUN-260918-c84a03)
 agent completed: [reviewer] reviewer (codex) (exit=0)
 spawn run completed: codex (run=RUN-260918-c84a03, pid=79789, exit=0)
+spawn selection rationale tuple: {"role":"doc-writer","pair":"muse-spark-1.3-contributor/max","text":"Bound producer-role run for task-board worktree complete after the story landing (proves the landed tree, publishes the story board state, transitions the Story to done); muse-spark-1.3-contributor:max is the operator's producer pair"}
+spawn selection rationale for muse-spark-1.3-contributor/max: Bound producer-role run for task-board worktree complete after the story landing (proves the landed tree, publishes the story board state, transitions the Story to done); muse-spark-1.3-contributor:max is the operator's producer pair
+spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn queued: [implementer] doc-writer (muse) (run=RUN-260918-29b2b3, max_parallel=8)
+spawn run started: [implementer] doc-writer (muse) (run=RUN-260918-29b2b3)
 
 ## Precondition Resources
 - [TASK-260910-2c7s0u_brief.md](file://TASK-260910-2c7s0u/TASK-260910-2c7s0u_brief.md) — Producer brief
@@ -80,6 +85,7 @@ spawn run completed: codex (run=RUN-260918-c84a03, pid=79789, exit=0)
 - [TASK-260910-2c7s0u_review-brief.md](file://TASK-260910-2c7s0u/TASK-260910-2c7s0u_review-brief.md) — Reviewer brief, round 1 (docs vs code; replay fidelity; story-final tree)
 - [TASK-260910-2c7s0u_rework-rev2.md](file://TASK-260910-2c7s0u/TASK-260910-2c7s0u_rework-rev2.md) — Rework brief rev2: F1 stage-specific guarantees, F2 nginx timeout scopes, F3 placeholder
 - [TASK-260910-2c7s0u_review-brief-rev2.md](file://TASK-260910-2c7s0u/TASK-260910-2c7s0u_review-brief-rev2.md) — Reviewer brief, round 2 (F1-F3 documentation corrections)
+- [TASK-260910-2c7s0u_completion-run.md](file://TASK-260910-2c7s0u/TASK-260910-2c7s0u_completion-run.md) — Completion run instruction: worktree complete after PR #12 landed as db32e7fd2f8446ba0d186e356290699c4a7d8cdd
 
 ## Outcome Resources
 - [TASK-260910-2c7s0u_spawn-log_-implementer--doc-writer--muse-_RUN-260918-b6238d.log](file://TASK-260910-2c7s0u/TASK-260910-2c7s0u_spawn-log_-implementer--doc-writer--muse-_RUN-260918-b6238d.log) — System spawn log captured by task-board
@@ -97,12 +103,13 @@ spawn run completed: codex (run=RUN-260918-c84a03, pid=79789, exit=0)
 - [TASK-260910-2c7s0u_spawn-log_-reviewer--reviewer--codex-_RUN-260918-c84a03.log](file://TASK-260910-2c7s0u/TASK-260910-2c7s0u_spawn-log_-reviewer--reviewer--codex-_RUN-260918-c84a03.log) — System spawn log captured by task-board
 - [TASK-260910-2c7s0u_logbook-review-rev2.md](file://TASK-260910-2c7s0u/TASK-260910-2c7s0u_logbook-review-rev2.md) — F1-F3 resolved and replay-context anomaly reconfirmed
 - [TASK-260910-2c7s0u_review-verdict-rev2.md](file://TASK-260910-2c7s0u/TASK-260910-2c7s0u_review-verdict-rev2.md) — Accepted revision 2: independent tests, mypy, two narrowing mutants, scope and replay evidence
+- [TASK-260910-2c7s0u_spawn-log_-implementer--doc-writer--muse-_RUN-260918-29b2b3.log](file://TASK-260910-2c7s0u/TASK-260910-2c7s0u_spawn-log_-implementer--doc-writer--muse-_RUN-260918-29b2b3.log) — System spawn log captured by task-board
 
 ## Created
 2026-09-10T14:47:02Z
 
 ## Last Update
-2026-09-18T14:25:09Z
+2026-09-18T17:56:08Z
 
 ## Assigned To
-[reviewer] reviewer (codex)
+[implementer] doc-writer (muse)
