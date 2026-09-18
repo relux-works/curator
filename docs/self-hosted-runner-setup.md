@@ -8,20 +8,30 @@ variable `ROSE_AIR_RUNNER` is `true`.
 
 ## One-time prerequisites on the runner
 
-- **rustup.** Install once for the runner user with the installer at
-  https://rustup.rs using its `--no-modify-path` form, then verify
-  `~/.cargo/bin/rustup --version` runs. The lane installs
+- **rustup.** Install once for the runner user, either with the installer at
+  https://rustup.rs using its `--no-modify-path` form (verify
+  `~/.cargo/bin/rustup --version` runs) or as the Homebrew formula
+  (`brew install rustup`; verify `/opt/homebrew/bin/rustup --version`
+  runs). An existing install of either kind is fine as is. The lane installs
   the pinned toolchain itself from [rust-toolchain.toml](../rust-toolchain.toml)
   on every run and never relies on a toolchain the runner happens to ship,
   so no toolchain needs installing or pinning by hand. A lane on a runner
   without rustup fails in the `Install pinned Rust toolchain via rustup`
   step with this note named.
 
-The runner service starts from launchd with a minimal PATH and reads no
-shell profiles, so `rustup` is not expected on the service PATH. Keep it at
-the default `~/.cargo/bin` of the runner user (or `$CARGO_HOME/bin`): the
-lane locates `rustup` there itself and prepends that directory to `PATH`
-before any `rustup` call. Do not edit the service PATH to compensate.
+The runner service starts from launchd with a minimal PATH
+(`/usr/bin:/bin:/usr/sbin:/sbin`, no `/opt/homebrew/bin`) and reads no
+shell profiles, so `rustup` is not expected on the service PATH. The lane
+locates it itself: it probes `PATH`, then `~/.cargo/bin` of the runner user
+(or `$CARGO_HOME/bin`), then the Homebrew prefixes (`$HOMEBREW_PREFIX/bin`,
+`/opt/homebrew/bin`, `/usr/local/bin`), and prepends the directory that
+holds `rustup` (plus `~/.cargo/bin` for the toolchain proxies) to `PATH`
+before any `rustup` call. A Homebrew `rustup` keeps its binary under
+`/opt/homebrew/bin` and only the proxies under `~/.cargo/bin`, which is why
+the Homebrew prefixes are probed. Nothing on the runner needs changing for
+this; as an alternative, the runner's `.path` file (in the runner
+directory, read by the service at start) may carry `/opt/homebrew/bin`,
+but the lane does not depend on it.
 
 Nothing else is installed by hand: Go and Node come from the
 `actions/setup-go` / `actions/setup-node` steps, pnpm is installed per lane

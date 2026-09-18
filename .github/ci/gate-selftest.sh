@@ -1006,13 +1006,41 @@ assert 'the installer finds rustup under CARGO_HOME/bin without PATH help' 0 \
 assert_contains 'the CARGO_HOME-only install names the filed channel' 'toolchain install 1.92.0 --profile minimal' "$WORK/rustup-log-cargo.txt"
 assert_contains 'the CARGO_HOME bin dir is recorded for the rest of the lane' "$WORK/fake-cargo-only/bin" "$WORK/github-path-cargo.txt"
 
-# Absent from both PATH and CARGO_HOME/bin: CARGO_HOME points at an empty
-# prefix so a real ~/.cargo/bin on this host cannot leak into the row.
-mkdir -p "$WORK/empty-cargo/bin"
-assert 'a runner without rustup fails' 1 \
-	env PATH="$NORUSTPATH" GITHUB_PATH="$WORK/github-path.txt" CARGO_HOME="$WORK/empty-cargo" \
+# rustup present ONLY under a Homebrew prefix: the Homebrew formula keeps
+# the rustup binary at $HOMEBREW_PREFIX/bin and puts only the toolchain
+# proxies under ~/.cargo/bin, so a launchd-started runner (PATH without
+# /opt/homebrew/bin) sees no rustup on PATH or in CARGO_HOME/bin (rose-air
+# run 35306933411). HOMEBREW_PREFIX points at a fake prefix so the row
+# drives the probe without depending on a real /opt/homebrew on this host.
+BREWBIN="$WORK/fake-brew/bin"
+BREWCARGO="$WORK/fake-cargo-brew/bin"
+mkdir -p "$BREWBIN" "$BREWCARGO"
+cp "$FAKEBIN/rustup" "$BREWBIN/"
+cp "$FAKEBIN/rustc" "$FAKEBIN/cargo" "$BREWCARGO/"
+: >"$WORK/rustup-log-brew.txt"; : >"$WORK/github-path-brew.txt"
+assert 'the installer finds rustup under the Homebrew prefix without PATH help' 0 \
+	env PATH="$NORUSTPATH" FAKE_RUSTUP_LOG="$WORK/rustup-log-brew.txt" GITHUB_PATH="$WORK/github-path-brew.txt" \
+	    CARGO_HOME="$WORK/fake-cargo-brew" HOMEBREW_PREFIX="$WORK/fake-brew" RUSTUP_HOME="$WORK/empty-rustup-home" \
 	    CI_RUST_TOOLCHAIN_FILE="$WORK/rust-install-channel.toml" "$BASH_ABS" "$IRS"
-assert_contains 'the failure names the runner-setup note' 'docs/self-hosted-runner-setup.md' "$WORK/out.txt"
+assert_contains 'the Homebrew-prefix install names the filed channel' 'toolchain install 1.92.0 --profile minimal' "$WORK/rustup-log-brew.txt"
+assert_contains 'the Homebrew bin dir is recorded for the rest of the lane' "$WORK/fake-brew/bin" "$WORK/github-path-brew.txt"
+assert_contains 'the CARGO_HOME bin dir (proxies) is still recorded alongside it' "$WORK/fake-cargo-brew/bin" "$WORK/github-path-brew.txt"
+
+# Absent from PATH, CARGO_HOME/bin and the Homebrew prefix: CARGO_HOME and
+# HOMEBREW_PREFIX point at empty prefixes so neither a real ~/.cargo/bin nor
+# a real Homebrew rustup on this host can leak into the row. The fixed
+# /opt/homebrew/bin and /usr/local/bin probes are hidden the same way as
+# PATH entries: the row is skipped (named) on a host that ships rustup
+# there, since the script cannot be told to ignore them.
+mkdir -p "$WORK/empty-cargo/bin" "$WORK/empty-brew/bin"
+if [ -x /opt/homebrew/bin/rustup ] || [ -x /usr/local/bin/rustup ]; then
+	skip 'a runner without rustup fails' 'this host ships rustup under /opt/homebrew/bin or /usr/local/bin, which the script probes unconditionally; the row runs on the hosted lanes'
+else
+	assert 'a runner without rustup fails' 1 \
+		env PATH="$NORUSTPATH" GITHUB_PATH="$WORK/github-path.txt" CARGO_HOME="$WORK/empty-cargo" HOMEBREW_PREFIX="$WORK/empty-brew" \
+		    CI_RUST_TOOLCHAIN_FILE="$WORK/rust-install-channel.toml" "$BASH_ABS" "$IRS"
+	assert_contains 'the failure names the runner-setup note' 'docs/self-hosted-runner-setup.md' "$WORK/out.txt"
+fi
 
 if grep -nE '[0-9]+\.[0-9]+\.[0-9]+' "$IRS" >"$WORK/out.txt"; then
 	bad 'the installer names no release; it reads the channel from the file' "$(tr '\n' ' ' <"$WORK/out.txt" | cut -c1-200)"
