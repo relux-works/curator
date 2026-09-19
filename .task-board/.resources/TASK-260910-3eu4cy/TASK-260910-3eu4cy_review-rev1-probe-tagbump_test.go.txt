@@ -1,0 +1,94 @@
+package install
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/relux-works/curator/internal/gitops"
+	"github.com/relux-works/curator/internal/marker"
+)
+
+// Review probe A: a DECLARED tag bump (v1 -> v2, v1 never moves) under a
+// schema-5 marker. Legacy semantics (flag help: "fail if an installed tag
+// moved to another commit"): no moved-tag warning, StrictTags install ok.
+func TestReviewDraftDeclaredTagBumpIsNotAMovedTag(t *testing.T) {
+	project, home, repo, _ := setupGitInstall(t)
+	if result := draftRealInstall(t, project, home, Options{}); result.Status != "ok" {
+		t.Fatalf("install = %+v", result)
+	}
+	first, err := gitops.Resolve(repo, "tag", "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	skillMD := filepath.Join(repo, "skills", "review", "SKILL.md")
+	skillPayload, err := os.ReadFile(skillMD)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(skillMD, append(skillPayload, []byte("\n<!-- v2 -->\n")...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	testGit(t, repo, "add", ".")
+	testGit(t, repo, "commit", "-qm", "second")
+	testGit(t, repo, "tag", "v2") // new tag; v1 stays where it was
+	still, err := gitops.Resolve(repo, "tag", "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if still.Commit != first.Commit {
+		t.Fatalf("v1 moved: %s -> %s", first.Commit, still.Commit)
+	}
+	second, err := gitops.Resolve(repo, "tag", "v2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := `{"schema_version":2,"sources":{"s":{"git":"https://example.org/kit.git","tag":"v2"}},"skills":[{"name":"review","from":"s","directory":"skills/review"}]}`
+	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	refreshDraftLocked(t, project, home, payload, map[string]string{"s": repo})
+
+	strict := draftRealInstall(t, project, home, Options{StrictTags: true})
+	t.Logf("strict install status=%s errors=%v messages=%v", strict.Status, strict.Errors, strict.Messages)
+	if strict.Status != "ok" {
+		t.Fatalf("declared tag bump v1->v2 refused under StrictTags: %+v (v1 still %s, v2 %s)", strict.Errors, first.Commit, second.Commit)
+	}
+	if joined := strings.Join(strict.Messages, "\n"); strings.Contains(joined, "moved tag") {
+		t.Fatalf("declared tag bump reported as a moved tag: %s", joined)
+	}
+	recorded := marker.Read(filepath.Join(project, ".agents", "skills", "review"))
+	if recorded == nil || recorded.Package == nil || recorded.Package.Commit == nil || recorded.Package.Commit.Hex != second.Commit {
+		t.Fatalf("marker binds %+v, want %s", recorded, second.Commit)
+	}
+}
+
+// Legacy control: the same declared bump on the frozen v1 lane passes StrictTags.
+func TestReviewLegacyDeclaredTagBumpIsNotAMovedTag(t *testing.T) {
+	e := newEnv(t)
+	e.skill("skill-a")
+	e.declare("skill-a")
+	if result := e.install(Options{}); result.Status != "ok" {
+		t.Fatalf("first: %+v", result)
+	}
+	dir := filepath.Join(e.skillsRoot, "skill-a")
+	e.write(dir, "SKILL.md", "---\nname: skill-a\ndescription: d2\n---\n# v2\n")
+	e.git(dir, "commit", "-qam", "two")
+	e.git(dir, "tag", "v2")
+	payload, _ := json.MarshalIndent(map[string]any{
+		"schema_version": 1,
+		"agents":         []string{"claude_code"},
+		"skills":         []map[string]any{{"name": "skill-a", "tag": "v2"}},
+	}, "", "  ")
+	e.write(e.project, "Skillfile.json", string(payload))
+	strict := e.install(Options{StrictTags: true})
+	t.Logf("legacy strict install status=%s errors=%v messages=%v", strict.Status, strict.Errors, strict.Messages)
+	if strict.Status != "ok" {
+		t.Fatalf("legacy declared bump refused under StrictTags: %+v", strict)
+	}
+	if strings.Contains(strings.Join(strict.Messages, "\n"), "moved tag") {
+		t.Fatalf("legacy declared bump reported as moved: %v", strict.Messages)
+	}
+}

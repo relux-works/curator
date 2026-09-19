@@ -1,0 +1,918 @@
+diff --git a/internal/install/draftmarker_git_test.go b/internal/install/draftmarker_git_test.go
+new file mode 100644
+index 0000000..b8dff42
+--- /dev/null
++++ b/internal/install/draftmarker_git_test.go
+@@ -0,0 +1,505 @@
++package install
++
++import (
++	"encoding/json"
++	"errors"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/buildcache"
++	"github.com/relux-works/curator/internal/buildmeta"
++	"github.com/relux-works/curator/internal/buildrepo"
++	"github.com/relux-works/curator/internal/closure"
++	"github.com/relux-works/curator/internal/devsub"
++	"github.com/relux-works/curator/internal/manifest"
++	"github.com/relux-works/curator/internal/marker"
++	"github.com/relux-works/curator/internal/skillspec"
++	"github.com/relux-works/curator/internal/sourcelock"
++)
++
++// This suite proves the install-marker migration at the production entry
++// (install.Project): every schema-2 installation records marker schema 5
++// with its frozen package and binding lock, Git members keep the
++// attestation and substitution semantics the migration table preserves,
++// local snapshots admit neither, and the currentness readers compare the
++// full identity against the effective plan without ever authorizing from
++// a recorded summary.
++
++// setupGitScriptInstall resolves one Git-selected script package with a
++// declared runtime root through the production closure and writes its
++// lock plus machine bindings, returning the project, home and repository.
++func setupGitScriptInstall(t *testing.T) (project, home, repo string) {
++	t.Helper()
++	payload := `{"schema_version":2,"sources":{"s":{"git":"https://example.org/kit.git","tag":"v1"}},"skills":[{"name":"review","from":"s","directory":"skills/review"}]}`
++	project, home, _ = draftProject(t, payload, nil)
++	repo = t.TempDir()
++	writeDraftScriptSkill(t, filepath.Join(repo, "skills", "review"), "review", "rtool", "#!/bin/sh\necho review-ok\n", nil)
++	testGit(t, repo, "init", "-q", "-b", "main")
++	testGit(t, repo, "add", ".")
++	testGit(t, repo, "commit", "-qm", "fixture")
++	testGit(t, repo, "tag", "v1")
++	m, err := manifest.ParseBytesWithOptions([]byte(payload), filepath.Join(project, "Skillfile.json"), manifest.ParseOptions{DraftSourcesV1: true})
++	if err != nil {
++		t.Fatal(err)
++	}
++	plan, err := closure.ResolveDraft(closure.DraftResolveConfig{
++		ProjectRoot: project, Home: home, Manifest: m, ManifestPayload: []byte(payload),
++		Expansion: manifest.ExpansionOptions{GitRoots: map[string]string{"s": repo}},
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := sourcelock.Write(sourcelock.PathIn(project), plan.Lock); err != nil {
++		t.Fatal(err)
++	}
++	bindings, err := sourcelock.NewBindings(plan.Lock.LockSHA256, map[string]sourcelock.SourceBinding{"s": {Location: repo}})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := sourcelock.WriteBindings(DraftBindingsPath(home, project), bindings); err != nil {
++		t.Fatal(err)
++	}
++	return project, home, repo
++}
++
++// setupGitBuildInstall resolves one Git-selected build package declaring
++// a local go-v1 command and an external go-repository-v1 command.
++func setupGitBuildInstall(t *testing.T) (project, home string) {
++	t.Helper()
++	payload := `{"schema_version":2,"sources":{"s":{"git":"https://example.org/kit.git","tag":"v1"}},"skills":[{"name":"tooling","from":"s","directory":"skills/tooling"}]}`
++	project, home, _ = draftProject(t, payload, nil)
++	repo := t.TempDir()
++	writeDraftBuildSkill(t, filepath.Join(repo, "skills", "tooling"), "tooling", true)
++	testGit(t, repo, "init", "-q", "-b", "main")
++	testGit(t, repo, "add", ".")
++	testGit(t, repo, "commit", "-qm", "fixture")
++	testGit(t, repo, "tag", "v1")
++	m, err := manifest.ParseBytesWithOptions([]byte(payload), filepath.Join(project, "Skillfile.json"), manifest.ParseOptions{DraftSourcesV1: true})
++	if err != nil {
++		t.Fatal(err)
++	}
++	plan, err := closure.ResolveDraft(closure.DraftResolveConfig{
++		ProjectRoot: project, Home: home, Manifest: m, ManifestPayload: []byte(payload),
++		Expansion: manifest.ExpansionOptions{GitRoots: map[string]string{"s": repo}},
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := sourcelock.Write(sourcelock.PathIn(project), plan.Lock); err != nil {
++		t.Fatal(err)
++	}
++	bindings, err := sourcelock.NewBindings(plan.Lock.LockSHA256, map[string]sourcelock.SourceBinding{"s": {Location: repo}})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := sourcelock.WriteBindings(DraftBindingsPath(home, project), bindings); err != nil {
++		t.Fatal(err)
++	}
++	return project, home
++}
++
++func draftRealInstall(t *testing.T, project, home string, opts Options) Result {
++	t.Helper()
++	cfg := draftTestConfig(home, t.TempDir())
++	opts.DraftSourcesV1 = true
++	opts.Platform = installPlatform()
++	return Project(cfg, project, "test", opts)
++}
++
++// TestDraftGitInstallWritesMarkerV5 is the migration core: a network-git
++// draft member installs for real under marker schema 5 with the exact
++// frozen package and binding lock, no legacy source field survives in the
++// recorded bytes, and a reinstall is current through that marker.
++func TestDraftGitInstallWritesMarkerV5(t *testing.T) {
++	project, home, _, _ := setupGitInstall(t)
++	result := draftRealInstall(t, project, home, Options{})
++	if result.Status != "ok" {
++		t.Fatalf("install = %+v", result)
++	}
++	lock, err := sourcelock.Read(sourcelock.PathIn(project))
++	if err != nil {
++		t.Fatal(err)
++	}
++	member, ok := lock.Find("review")
++	if !ok {
++		t.Fatal("lock misses review")
++	}
++	installed := filepath.Join(project, ".agents", "skills", "review")
++	recorded := marker.Read(installed)
++	if recorded == nil || recorded.SchemaVersion != marker.SchemaV5 || recorded.Package == nil {
++		t.Fatalf("marker = %+v, want schema 5 with a package", recorded)
++	}
++	if recorded.Package.Kind != sourcelock.KindNetworkGit ||
++		recorded.Package.Repository != member.Package.Repository ||
++		recorded.Package.Commit == nil ||
++		recorded.Package.Commit.ObjectFormat != member.Package.Commit.ObjectFormat ||
++		recorded.Package.Commit.Hex != member.Package.Commit.Hex ||
++		recorded.Package.Directory != member.Package.Directory ||
++		recorded.LockSHA256 != lock.LockSHA256 {
++		t.Fatalf("marker package %+v lock %s does not bind locked %+v %s",
++			recorded.Package, recorded.LockSHA256, member.Package, lock.LockSHA256)
++	}
++	payload, err := os.ReadFile(filepath.Join(installed, marker.Name))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var raw map[string]json.RawMessage
++	if err := json.Unmarshal(payload, &raw); err != nil {
++		t.Fatal(err)
++	}
++	for _, field := range []string{"source", "git", "ref_kind", "ref", "commit"} {
++		if _, present := raw[field]; present {
++			t.Fatalf("v5 Git marker carries replaced field %q", field)
++		}
++	}
++	again := draftRealInstall(t, project, home, Options{})
++	if again.Status != "ok" {
++		t.Fatalf("reinstall = %+v", again)
++	}
++	if !strings.Contains(strings.Join(again.Messages, "\n"), "up-to-date") {
++		t.Fatalf("reinstall did not report up-to-date installations: %q", again.Messages)
++	}
++}
++
++// TestDraftGitRuntimeMaterializesUnderSourceV1Key proves the migrated
++// runtime boundary for Git: the declared runtime root materializes from
++// the frozen commit tree under the namespaced package key — the same key
++// GC derives from the recorded v5 marker — as copied bytes, never links.
++func TestDraftGitRuntimeMaterializesUnderSourceV1Key(t *testing.T) {
++	project, home, _ := setupGitScriptInstall(t)
++	result := draftRealInstall(t, project, home, Options{})
++	if result.Status != "ok" {
++		t.Fatalf("install = %+v", result)
++	}
++	_, key := draftLockedRuntimeKey(t, project, "review")
++	runtimeScript := filepath.Join(home, "runtime", "review", key, "scripts", "rtool.sh")
++	scriptPayload, err := os.ReadFile(runtimeScript)
++	if err != nil {
++		t.Fatalf("runtime script missing under source-v1 key %s: %v", key, err)
++	}
++	if !strings.Contains(string(scriptPayload), "review-ok") {
++		t.Fatalf("runtime script has unexpected bytes: %q", scriptPayload)
++	}
++	assertNoLiveLinks(t, filepath.Join(home, "runtime", "review", key))
++	installed := filepath.Join(project, ".agents", "skills", "review")
++	if _, err := os.Lstat(filepath.Join(installed, "scripts")); !os.IsNotExist(err) {
++		t.Fatalf("runtime root leaked into installed Git context")
++	}
++	recorded := marker.Read(installed)
++	if recorded == nil || recorded.SchemaVersion != marker.SchemaV5 || recorded.Package == nil ||
++		recorded.Package.Kind != sourcelock.KindNetworkGit {
++		t.Fatalf("marker = %+v, want schema 5 network-git", recorded)
++	}
++	shimPayload, err := os.ReadFile(filepath.Join(project, ".agents", "bin", shimName("rtool")))
++	if err != nil {
++		t.Fatalf("shim missing: %v", err)
++	}
++	if !strings.Contains(string(shimPayload), filepath.Join("runtime", "review")) {
++		t.Fatalf("shim does not reach the protected runtime store:\n%s", shimPayload)
++	}
++	again := draftRealInstall(t, project, home, Options{})
++	if again.Status != "ok" {
++		t.Fatalf("reinstall = %+v", again)
++	}
++	if !strings.Contains(strings.Join(again.Messages, "\n"), "up-to-date") {
++		t.Fatalf("reinstall did not report up-to-date installations: %q", again.Messages)
++	}
++}
++
++// TestDraftGitInstallCarriesRegistryAttestation proves the recorded
++// attestation equals exactly the registry evidence the effective plan
++// selected — registry, status and key presence — and that changed
++// evidence makes the installation non-current so the reinstall records
++// the new summary instead of trusting the old one.
++func TestDraftGitInstallCarriesRegistryAttestation(t *testing.T) {
++	project, home, _, _ := setupGitInstall(t)
++	attested := &marker.Attestation{Registry: "example.org/kit", Status: "audited", KeyID: "0123456789abcdef"}
++	attest := func(attestation *marker.Attestation) func([]*closure.Node) (map[string]*marker.Attestation, []string, error) {
++		return func([]*closure.Node) (map[string]*marker.Attestation, []string, error) {
++			return map[string]*marker.Attestation{"review": attestation}, nil, nil
++		}
++	}
++	installed := filepath.Join(project, ".agents", "skills", "review")
++	if result := draftRealInstall(t, project, home, Options{ResolveAttest: attest(attested)}); result.Status != "ok" {
++		t.Fatalf("install = %+v", result)
++	}
++	recorded := marker.Read(installed)
++	if recorded == nil || recorded.SchemaVersion != marker.SchemaV5 {
++		t.Fatalf("marker = %+v, want schema 5", recorded)
++	}
++	if recorded.Attestation == nil || *recorded.Attestation != *attested {
++		t.Fatalf("attestation = %+v, want exactly %+v", recorded.Attestation, attested)
++	}
++	// Key absence is significant: evidence without a key records no key.
++	unkeyed := &marker.Attestation{Registry: "example.org/kit", Status: "deprecated"}
++	if result := draftRealInstall(t, project, home, Options{ResolveAttest: attest(unkeyed)}); result.Status != "ok" {
++		t.Fatalf("reinstall = %+v", result)
++	}
++	reread := marker.Read(installed)
++	if reread == nil || reread.Attestation == nil || *reread.Attestation != *unkeyed {
++		t.Fatalf("attestation after evidence change = %+v, want exactly %+v", reread.Attestation, unkeyed)
++	}
++	payload, err := os.ReadFile(filepath.Join(installed, marker.Name))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var raw map[string]json.RawMessage
++	if err := json.Unmarshal(payload, &raw); err != nil {
++		t.Fatal(err)
++	}
++	var attestationRaw map[string]json.RawMessage
++	if err := json.Unmarshal(raw["attestation"], &attestationRaw); err != nil {
++		t.Fatal(err)
++	}
++	if _, present := attestationRaw["key_id"]; present {
++		t.Fatalf("marker records a key the evidence does not carry: %s", raw["attestation"])
++	}
++}
++
++// TestDraftInstallRevokedEvidenceRefusesDespiteAttestedMarker proves a
++// recorded attestation never authorizes: when the registry evidence is
++// revoked the reinstall is refused and the prior marker is preserved
++// byte-identically instead of becoming an unattested success.
++func TestDraftInstallRevokedEvidenceRefusesDespiteAttestedMarker(t *testing.T) {
++	project, home, _, _ := setupGitInstall(t)
++	attested := &marker.Attestation{Registry: "example.org/kit", Status: "audited"}
++	installed := filepath.Join(project, ".agents", "skills", "review")
++	first := draftRealInstall(t, project, home, Options{ResolveAttest: func([]*closure.Node) (map[string]*marker.Attestation, []string, error) {
++		return map[string]*marker.Attestation{"review": attested}, nil, nil
++	}})
++	if first.Status != "ok" {
++		t.Fatalf("install = %+v", first)
++	}
++	before, err := os.ReadFile(filepath.Join(installed, marker.Name))
++	if err != nil {
++		t.Fatal(err)
++	}
++	revoked := errors.New("review is revoked by example.org/kit")
++	again := draftRealInstall(t, project, home, Options{ResolveAttest: func([]*closure.Node) (map[string]*marker.Attestation, []string, error) {
++		return nil, nil, revoked
++	}})
++	if again.Status != "failed" || !strings.Contains(strings.Join(again.Errors, ";"), "revoked") {
++		t.Fatalf("reinstall = %+v, want the revocation refusal", again)
++	}
++	after, err := os.ReadFile(filepath.Join(installed, marker.Name))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if string(after) != string(before) {
++		t.Fatalf("refused reinstall rewrote the attested marker")
++	}
++}
++
++// TestDraftLocalRejectsConfusedAttestation proves the install lane fails
++// closed when the registry backend selects evidence for a local snapshot:
++// local content has no network attestation identity, so the run is
++// refused with the arm diagnostic and stages nothing live.
++func TestDraftLocalRejectsConfusedAttestation(t *testing.T) {
++	project, home, _ := draftProject(t, draftLocalCollectionPayload, nil)
++	writeDraftPackage(t, filepath.Join(project, "skills", "review"), "review")
++	resolveDraftForInstall(t, project, home, draftLocalCollectionPayload)
++	result := draftRealInstall(t, project, home, Options{ResolveAttest: func([]*closure.Node) (map[string]*marker.Attestation, []string, error) {
++		return map[string]*marker.Attestation{"review": {Registry: "example.org/kit", Status: "audited"}}, nil, nil
++	}})
++	if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "source_member_invalid") {
++		t.Fatalf("install = %+v, want the source_member_invalid refusal", result)
++	}
++	if !strings.Contains(strings.Join(result.Errors, ";"), "cannot carry a registry attestation") {
++		t.Fatalf("install errors = %q, want the arm diagnostic", result.Errors)
++	}
++	if _, err := os.Lstat(filepath.Join(project, ".agents", "skills", "review")); !os.IsNotExist(err) {
++		t.Fatalf("refused install staged a live installation")
++	}
++}
++
++// TestDraftMarkerArmGuards proves buildDraftMarker carries the preserved
++// Git evidence summaries and rejects both for the local arm. The local
++// rows are unreachable through install.Project — the closure and install
++// gates refuse substitutions first and local nodes resolve no registry
++// identity — so the builder is the narrowest honest seam.
++func TestDraftMarkerArmGuards(t *testing.T) {
++	node := func(substituted string) *closure.Node {
++		return &closure.Node{
++			Name:        "review",
++			Spec:        &skillspec.Spec{SchemaVersion: 4, Commands: map[string]skillspec.Command{}, Dependencies: map[string]skillspec.CommandDependency{}, Requirements: map[string]skillspec.Requirement{}},
++			Edges:       []closure.Edge{{Consumer: closure.ProjectEdge, Mode: "full"}},
++			Substituted: substituted,
++		}
++	}
++	gitMember := func() sourcelock.Member {
++		pkg, err := sourcelock.NetworkGitPackage("example.org/kit",
++			sourcelock.Commit{ObjectFormat: "sha1", Hex: strings.Repeat("cd", 20)}, "skills/review")
++		if err != nil {
++			t.Fatal(err)
++		}
++		return sourcelock.Member{Name: "review", Package: pkg}
++	}
++	localMember := func() sourcelock.Member {
++		pkg, err := sourcelock.LocalPackage("sha256:" + strings.Repeat("ab", 32))
++		if err != nil {
++			t.Fatal(err)
++		}
++		return sourcelock.Member{Name: "review", Package: pkg}
++	}
++	attestation := &marker.Attestation{Registry: "example.org/kit", Status: "audited"}
++	lockSHA := "sha256:" + strings.Repeat("ef", 32)
++
++	carried, err := buildDraftMarker(node(""), gitMember(), lockSHA, "en", []string{"claude_code"}, nil, nil, attestation, nil, nil)
++	if err != nil {
++		t.Fatalf("Git marker with attestation = %v", err)
++	}
++	if carried.Attestation == nil || *carried.Attestation != *attestation {
++		t.Fatalf("Git attestation = %+v, want %+v", carried.Attestation, attestation)
++	}
++	substituted, err := buildDraftMarker(node("dev:review"), gitMember(), lockSHA, "en", []string{"claude_code"}, nil, nil, nil, nil, nil)
++	if err != nil {
++		t.Fatalf("Git marker with substitution = %v", err)
++	}
++	if substituted.Substituted != "dev:review" {
++		t.Fatalf("Git substituted = %q, want the operator identifier", substituted.Substituted)
++	}
++	if _, err := buildDraftMarker(node(""), localMember(), lockSHA, "en", []string{"claude_code"}, nil, nil, attestation, nil, nil); err == nil {
++		t.Fatalf("local marker admitted a registry attestation")
++	} else if !strings.Contains(err.Error(), "source_member_invalid") {
++		t.Fatalf("local attestation error = %v, want source_member_invalid", err)
++	}
++	if _, err := buildDraftMarker(node("dev:review"), localMember(), lockSHA, "en", []string{"claude_code"}, nil, nil, nil, nil, nil); err == nil {
++		t.Fatalf("local marker admitted a development substitution")
++	} else if !strings.Contains(err.Error(), "source_member_invalid") {
++		t.Fatalf("local substitution error = %v, want source_member_invalid", err)
++	}
++}
++
++// TestDraftSelectorSubstitutionForbidden proves a new from selector can
++// never enable a legacy development substitution: an operator
++// substitution manifest alongside a schema-2 project refuses the install
++// with nothing published, and strict audit refuses even earlier.
++func TestDraftSelectorSubstitutionForbidden(t *testing.T) {
++	writeSubstitutions := func(t *testing.T, project string) {
++		t.Helper()
++		content := `{"substitutions": {"review": {"path": ` + quoteJSONPath(t.TempDir()) + "}}}\n"
++		if err := os.WriteFile(devsub.PathIn(project), []byte(content), 0o644); err != nil {
++			t.Fatal(err)
++		}
++		// The install gitignore gate runs before substitution planning:
++		// the operator file must be ignored like any generated path.
++		ignore, err := os.ReadFile(filepath.Join(project, ".gitignore"))
++		if err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(filepath.Join(project, ".gitignore"), append(ignore, []byte(devsub.Name+"\n")...), 0o644); err != nil {
++			t.Fatal(err)
++		}
++	}
++	t.Run("draft-selectors-refuse", func(t *testing.T) {
++		project, home, _ := draftProject(t, draftLocalCollectionPayload, nil)
++		writeDraftPackage(t, filepath.Join(project, "skills", "review"), "review")
++		resolveDraftForInstall(t, project, home, draftLocalCollectionPayload)
++		writeSubstitutions(t, project)
++		result := draftRealInstall(t, project, home, Options{})
++		if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "development substitutions are not admitted with draft selectors") {
++			t.Fatalf("install = %+v, want the draft substitution refusal", result)
++		}
++		if _, err := os.Lstat(filepath.Join(project, ".agents", "skills")); !os.IsNotExist(err) {
++			t.Fatalf("refused install published skills state")
++		}
++	})
++	t.Run("strict-refuses-first", func(t *testing.T) {
++		project, home, _ := draftProject(t, draftLocalCollectionPayload, nil)
++		writeDraftPackage(t, filepath.Join(project, "skills", "review"), "review")
++		resolveDraftForInstall(t, project, home, draftLocalCollectionPayload)
++		writeSubstitutions(t, project)
++		cfg := draftTestConfig(home, t.TempDir())
++		cfg.Audit.Enabled = true
++		cfg.Audit.Mode = "strict"
++		result := Project(cfg, project, "test", Options{DraftSourcesV1: true, Platform: installPlatform()})
++		if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "strict audit refuses substituted installs") {
++			t.Fatalf("install = %+v, want the strict refusal", result)
++		}
++		if _, err := os.Lstat(filepath.Join(project, ".agents", "skills")); !os.IsNotExist(err) {
++			t.Fatalf("refused install published skills state")
++		}
++	})
++}
++
++// TestDraftGitBuildsPublishReceipt3 proves the receipt binding migrated
++// with the Git marker: a network-git member with a local go-v1 command
++// and an external go-repository-v1 command publishes both under the
++// distinct receipt-3 namespaces, the marker records bind receipt version
++// 3 with every retained field, and a reinstall takes exact cache hits
++// without compiling again.
++func TestDraftGitBuildsPublishReceipt3(t *testing.T) {
++	project, home := setupGitBuildInstall(t)
++	deps, _, builder := draftBuildDeps(t)
++	result := draftBuildInstall(t, home, project, deps, draftExternalDeps(t))
++	if result.Status != "ok" {
++		t.Fatalf("install = %+v", result)
++	}
++	lock, err := sourcelock.Read(sourcelock.PathIn(project))
++	if err != nil {
++		t.Fatal(err)
++	}
++	member, ok := lock.Find("tooling")
++	if !ok {
++		t.Fatal("lock misses tooling")
++	}
++	wantPackage, err := member.Package.Canonical()
++	if err != nil {
++		t.Fatal(err)
++	}
++	recorded := marker.Read(filepath.Join(project, ".agents", "skills", "tooling"))
++	if recorded == nil || recorded.SchemaVersion != marker.SchemaV5 || recorded.Package == nil ||
++		recorded.Package.Kind != sourcelock.KindNetworkGit {
++		t.Fatalf("marker = %+v, want schema 5 network-git", recorded)
++	}
++	if len(recorded.Builds) != 2 {
++		t.Fatalf("marker builds = %+v, want both arms", recorded.Builds)
++	}
++	local, external := recorded.Builds["ltool"], recorded.Builds["etool"]
++	if local.Driver != buildmeta.DriverGoV1 || local.ReceiptSchemaVersion != 3 || local.ExecutionPolicy != buildmeta.ExecutionPolicy {
++		t.Fatalf("local marker record = %+v", local)
++	}
++	if external.Driver != "go-repository-v1" || external.ReceiptSchemaVersion != 3 || external.Repository != "tools" ||
++		external.DeclaredLockedCommit == nil || external.DeclaredLockedCommit.Hex != externalLockedCommit || external.Substituted {
++		t.Fatalf("external marker record lost retained fields: %+v", external)
++	}
++	if len(dirNames(t, filepath.Join(home, "cache", "build", buildcache.Namespace))) != 0 {
++		t.Fatalf("Git local build published outside the receipt-3 namespace")
++	}
++	sourceAwareLocal := dirNames(t, filepath.Join(home, "cache", "build", buildcache.SourceAwareNamespace))
++	if len(sourceAwareLocal) != 1 || "sha256:"+sourceAwareLocal[0] != string(local.CacheKey) {
++		t.Fatalf("local receipt-3 entries = %v, want the marker key %s", sourceAwareLocal, local.CacheKey)
++	}
++	localReceipt := readReceiptObject(t, filepath.Join(home, "cache", "build", buildcache.SourceAwareNamespace, sourceAwareLocal[0], buildcache.ReceiptFilename))
++	localInput := localReceipt["input"].(map[string]any)
++	if !jsonEqualCanonical(t, localInput["package"], wantPackage) {
++		t.Fatalf("local receipt package does not equal the Git lock package")
++	}
++	externalRoot := filepath.Join(home, "external-build-cache")
++	if len(dirNames(t, filepath.Join(externalRoot, buildrepo.ArtifactsDir(buildrepo.LegacyReceiptSchemaVersion)))) != 0 {
++		t.Fatalf("Git external build published outside the receipt-3 namespace")
++	}
++	sourceAwareExternal := dirNames(t, filepath.Join(externalRoot, buildrepo.ArtifactsDir(buildrepo.SourceAwareReceiptSchemaVersion)))
++	if len(sourceAwareExternal) != 1 || "sha256:"+sourceAwareExternal[0] != string(external.CacheKey) {
++		t.Fatalf("external receipt-3 entries = %v, want the marker key %s", sourceAwareExternal, external.CacheKey)
++	}
++	if strings.Join(builder.calls, ",") != "ltool,etool" && strings.Join(builder.calls, ",") != "etool,ltool" {
++		t.Fatalf("builder calls = %v", builder.calls)
++	}
++	again := draftBuildInstall(t, home, project, deps, draftExternalDeps(t))
++	if again.Status != "ok" {
++		t.Fatalf("reinstall = %+v", again)
++	}
++	messages := strings.Join(again.Messages, "\n")
++	if !strings.Contains(messages, "tooling.ltool build source=") || !strings.Contains(messages, "key="+string(local.CacheKey)+" outcome=cache-hit") ||
++		!strings.Contains(messages, "tooling.etool external build key="+string(external.CacheKey)+" outcome=cache-hit") {
++		t.Fatalf("reinstall did not take exact receipt-3 cache hits: %q", again.Messages)
++	}
++}
++
++func jsonEqualCanonical(t *testing.T, value any, want []byte) bool {
++	t.Helper()
++	return string(canonicalOf(t, value)) == string(want)
++}
+diff --git a/internal/install/draftruntime.go b/internal/install/draftruntime.go
+index 2eaa6b9..4409fe9 100644
+--- a/internal/install/draftruntime.go
++++ b/internal/install/draftruntime.go
+@@ -1,6 +1,7 @@
+ package install
+ 
+ import (
++	"fmt"
+ 	"sort"
+ 
+ 	"github.com/relux-works/curator/internal/buildmeta"
+@@ -12,22 +13,18 @@ import (
+ )
+ 
+ // draftRuntimeKeys derives the protected runtime-store leaf of every locked
+-// local-snapshot draft member from its frozen package identity
+-// (skillfile-sources §4). The key is SHA-256 over the CCJ-1 bytes of the
+-// locked package in the distinct source-v1 namespace — never the bare
+-// snapshot digest and never a Git commit substituted into the other arm.
+-// A runtime-only refresh changes the package, so it changes the key and
+-// requires new runtime publication instead of reusing the previous tree.
+-//
+-// Git draft members keep their accepted commit-keyed leaves: their marker
+-// and runtime key migrate to the namespaced identity together in the
+-// integration leaf, never one without the other.
++// draft member from its frozen package identity (skillfile-sources §4).
++// The key is SHA-256 over the CCJ-1 bytes of the locked package in the
++// distinct source-v1 namespace — never the bare snapshot digest and never
++// a Git commit substituted into the other arm. A runtime-only refresh
++// changes the package, so it changes the key and requires new runtime
++// publication instead of reusing the previous tree. The marker and the
++// runtime key migrated together: every draft member records marker schema
++// 5, so every draft runtime leaf is namespaced and GC marks them from the
++// recorded package.
+ func draftRuntimeKeys(lock *sourcelock.Lock) (map[string]string, error) {
+ 	keys := make(map[string]string, len(lock.Members))
+ 	for _, member := range lock.Members {
+-		if member.Package.Kind != sourcelock.KindLocalSnapshot {
+-			continue
+-		}
+ 		digest, err := member.Package.Digest()
+ 		if err != nil {
+ 			return nil, err
+@@ -42,21 +39,18 @@ func draftRuntimeKeys(lock *sourcelock.Lock) (map[string]string, error) {
+ }
+ 
+ // draftBuildPackages selects the frozen package identity of every draft
+-// member whose installation is recorded under marker schema 5 — today the
+-// local-snapshot arm, exactly the members buildDraftMarker stages. Their
+-// compiled commands are keyed and receipted under the receipt-3 wrapper on
+-// both the local go-v1 and the external go-repository-v1 arm; Git draft
+-// members keep their accepted legacy receipts until their marker migrates
+-// with them, never one without the other. nil on the frozen v1 lane.
++// member: every draft installation is recorded under marker schema 5,
++// exactly the members buildDraftMarker stages. Their compiled commands
++// are keyed and receipted under the receipt-3 wrapper on both the local
++// go-v1 and the external go-repository-v1 arm; the marker and the receipt
++// binding migrated together, never one without the other. nil on the
++// frozen v1 lane.
+ func draftBuildPackages(lock *sourcelock.Lock) map[string]*buildmeta.Package {
+ 	if lock == nil {
+ 		return nil
+ 	}
+ 	packages := make(map[string]*buildmeta.Package, len(lock.Members))
+ 	for _, member := range lock.Members {
+-		if member.Package.Kind != sourcelock.KindLocalSnapshot {
+-			continue
+-		}
+ 		packages[member.Name] = receiptPackage(member.Package)
+ 	}
+ 	return packages
+@@ -108,11 +102,16 @@ func draftMarkerPackage(pkg sourcelock.Package) *marker.Package {
+ 	return translated
+ }
+ 
+-// buildDraftMarker stages the install marker of one local-snapshot draft
+-// member: marker schema 5 with the frozen package and the binding lock,
+-// every retained field carried exactly like the legacy marker. Git draft
+-// members keep their accepted legacy shape; only local snapshots — which
+-// have no legacy identity at all — reach this builder.
++// buildDraftMarker stages the install marker of one draft member: marker
++// schema 5 with the frozen package and the binding lock, every retained
++// field carried exactly like the legacy marker (skillfile-sources §4
++// migration table). A Git member keeps the registry attestation the
++// effective plan selected and the legacy development-substitution
++// identifier it carries; a local snapshot admits neither — local content
++// has no network attestation identity and no selector to substitute —
++// so staging either for one fails closed instead of writing a marker the
++// reader must refuse. The attestation recorded here is a summary, never
++// authorization: every gate re-resolves its own evidence.
+ func buildDraftMarker(
+ 	node *closure.Node,
+ 	member sourcelock.Member,
+@@ -121,9 +120,18 @@ func buildDraftMarker(
+ 	agents []string,
+ 	activeCommands []string,
+ 	mcp map[string][]string,
++	attestation *marker.Attestation,
+ 	builds map[string]marker.Build,
+ 	source *buildsource.Identity,
+-) *marker.Marker {
++) (*marker.Marker, error) {
++	if member.Package.Kind == sourcelock.KindLocalSnapshot {
++		if attestation != nil {
++			return nil, fmt.Errorf("source_member_invalid: local-snapshot member %s cannot carry a registry attestation", node.Name)
++		}
++		if node.Substituted != "" {
++			return nil, fmt.Errorf("source_member_invalid: local-snapshot member %s cannot carry a development substitution", node.Name)
++		}
++	}
+ 	var commands []string
+ 	for name, command := range node.Spec.Commands {
+ 		if command.Type == "script" || command.Type == "build" {
+@@ -174,12 +182,14 @@ func buildDraftMarker(
+ 		Builds:             builds,
+ 		Requirements:       requirements,
+ 		McpServers:         mcp,
++		Attestation:        attestation,
+ 		Activation:         &marker.Activation{Context: node.ContextActive(), Commands: activeCommands},
+ 		Requirers:          node.Consumers(),
++		Substituted:        node.Substituted,
+ 	}
+ 	if !node.ContextActive() {
+ 		expected.Locale = ""
+ 		expected.Agents = []string{}
+ 	}
+-	return expected
++	return expected, nil
+ }
+diff --git a/internal/install/draftruntime_test.go b/internal/install/draftruntime_test.go
+index 28c2c96..dfed597 100644
+--- a/internal/install/draftruntime_test.go
++++ b/internal/install/draftruntime_test.go
+@@ -515,10 +515,12 @@ func TestDraftMarkerPackageDigestMatchesLockDigest(t *testing.T) {
+ 	}
+ }
+ 
+-// TestDraftRuntimeKeysSkipGitMembers proves the interim boundary: only
+-// local snapshots take source-v1 keys, while Git draft members keep their
+-// accepted commit-keyed leaves until marker and key migrate together.
+-func TestDraftRuntimeKeysSkipGitMembers(t *testing.T) {
++// TestDraftRuntimeKeysCoverAllArms proves the migrated boundary: every
++// locked draft member takes a source-v1 key derived from its frozen
++// package digest, never a commit-keyed leaf. The marker and the runtime
++// key migrated together (marker schema 5 for every draft installation),
++// so GC marks every draft runtime leaf from the recorded package.
++func TestDraftRuntimeKeysCoverAllArms(t *testing.T) {
+ 	localPkg, err := sourcelock.LocalPackage("sha256:" + strings.Repeat("ab", 32))
+ 	if err != nil {
+ 		t.Fatal(err)
+@@ -528,18 +530,31 @@ func TestDraftRuntimeKeysSkipGitMembers(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
++	configuredPkg, err := sourcelock.ConfiguredGitPackage("vendor/kit",
++		sourcelock.Commit{ObjectFormat: "sha1", Hex: strings.Repeat("ef", 20)})
++	if err != nil {
++		t.Fatal(err)
++	}
+ 	lock := &sourcelock.Lock{Members: []sourcelock.Member{
+ 		{Name: "local", Package: localPkg},
+ 		{Name: "review", Package: gitPkg},
++		{Name: "vendored", Package: configuredPkg},
+ 	}}
+ 	keys, err := draftRuntimeKeys(lock)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if _, ok := keys["local"]; !ok {
+-		t.Fatalf("keys = %v, want a source-v1 key for the local member", keys)
+-	}
+-	if _, ok := keys["review"]; ok {
+-		t.Fatalf("keys = %v, the Git member must keep its commit-keyed leaf", keys)
++	for _, member := range lock.Members {
++		digest, err := member.Package.Digest()
++		if err != nil {
++			t.Fatal(err)
++		}
++		want, err := runtimestore.SourceV1Key(digest)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if keys[member.Name] != want {
++			t.Fatalf("keys[%s] = %q, want source-v1 key %q", member.Name, keys[member.Name], want)
++		}
+ 	}
+ }
+diff --git a/internal/install/install.go b/internal/install/install.go
+index fd8f110..1284125 100644
+--- a/internal/install/install.go
++++ b/internal/install/install.go
+@@ -1030,10 +1030,11 @@ func validateNodes(nodes []*closure.Node, localeValue, alias string, result *Res
+ }
+ 
+ // buildNodeMarker stages the install marker of one project node. On the
+-// draft lane a local-snapshot member carries no legacy source identity, so
+-// it records marker schema 5 with its frozen package and binding lock;
+-// every other member — frozen v1 nodes and Git draft members with their
+-// accepted legacy shape — records the legacy marker byte-identically.
++// draft lane every locked member records marker schema 5 with its frozen
++// package and binding lock (skillfile-sources §4 migration table): Git
++// members keep the registry attestation the effective plan selected and
++// the substitution identifier they carry, while a local snapshot admits
++// neither. Frozen v1 nodes record the legacy marker byte-identically.
+ func (request projectTargetRequest) buildNodeMarker(
+ 	node *closure.Node,
+ 	nodeLocale string,
+@@ -1047,11 +1048,10 @@ func (request projectTargetRequest) buildNodeMarker(
+ 		if !ok {
+ 			return nil, fmt.Errorf("source_member_missing: %s is not a locked member", node.Name)
+ 		}
+-		if member.Package.Kind == sourcelock.KindLocalSnapshot {
+-			return buildDraftMarker(node, member, request.draftLock.LockSHA256,
+-				nodeLocale, nodeAgents, active,
+-				request.mcpFound[node.Name], builds, source), nil
+-		}
++		return buildDraftMarker(node, member, request.draftLock.LockSHA256,
++			nodeLocale, nodeAgents, active,
++			request.mcpFound[node.Name], request.attestations[node.Name],
++			builds, source)
+ 	}
+ 	return buildMarker(node, nodeLocale, nodeAgents, active,
+ 		request.mcpFound[node.Name], request.attestations[node.Name],
+diff --git a/internal/marker/marker_v5_git_test.go b/internal/marker/marker_v5_git_test.go
+new file mode 100644
+index 0000000..9f3d5d8
+--- /dev/null
++++ b/internal/marker/marker_v5_git_test.go
+@@ -0,0 +1,177 @@
++package marker
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++// v5GitAttestedMarker returns a network-git draft marker carrying every
++// retained migration-table field: the registry attestation the effective
++// plan selected and a legacy development-substitution identifier.
++func v5GitAttestedMarker() *Marker {
++	m := v5GitMarker()
++	m.Attestation = &Attestation{Registry: "example.org/kit", Status: "audited", KeyID: "0123456789abcdef"}
++	m.Substituted = "dev:review"
++	m.Requirements = []string{"dep"}
++	m.McpServers = map[string][]string{"srv": {"tool"}}
++	return m
++}
++
++// TestMarkerV5GitRoundTrip pins the 25-field v4 migration for the Git arms:
++// the frozen package replaces every legacy source field, the lock binds
++// the installed selection, and every retained field keeps its meaning,
++// including attestation and substituted for eligible Git packages.
++func TestMarkerV5GitRoundTrip(t *testing.T) {
++	for _, pkg := range []*Package{
++		{Kind: "network-git", Repository: "example.org/kit", Commit: &Commit{ObjectFormat: "sha1", Hex: strings.Repeat("44", 20)}, Directory: "skills/review"},
++		{Kind: "configured-git", Source: "vendor/kit", Commit: &Commit{ObjectFormat: "sha1", Hex: strings.Repeat("55", 20)}, Directory: "."},
++	} {
++		t.Run(pkg.Kind, func(t *testing.T) {
++			m := v5GitAttestedMarker()
++			m.Package = pkg
++			dir, recorded := writeV5(t, m)
++			if recorded.SchemaVersion != SchemaV5 {
++				t.Fatalf("schema = %d, want %d", recorded.SchemaVersion, SchemaV5)
++			}
++			if recorded.Attestation == nil || *recorded.Attestation != *m.Attestation {
++				t.Fatalf("attestation = %+v, want %+v", recorded.Attestation, m.Attestation)
++			}
++			if recorded.Substituted != m.Substituted {
++				t.Fatalf("substituted = %q, want %q", recorded.Substituted, m.Substituted)
++			}
++			payload, err := os.ReadFile(filepath.Join(dir, Name))
++			if err != nil {
++				t.Fatal(err)
++			}
++			var raw map[string]json.RawMessage
++			if err := json.Unmarshal(payload, &raw); err != nil {
++				t.Fatal(err)
++			}
++			// The replaced legacy identity is absent, never empty.
++			for _, field := range []string{"source", "git", "ref_kind", "ref", "commit"} {
++				if _, present := raw[field]; present {
++					t.Fatalf("v5 Git marker carries replaced field %q", field)
++				}
++			}
++			// Every retained migration-table field is present.
++			for _, field := range []string{
++				"schema_version", "name", "package", "lock_sha256", "content_sha256", "locale",
++				"agents", "commands", "dependencies", "skill_schema_version", "runtime_roots",
++				"build_roots", "builds", "installed_at", "files",
++				"requirements", "mcp_servers", "attestation", "activation", "requirers", "substituted",
++			} {
++				if _, present := raw[field]; !present {
++					t.Fatalf("v5 Git marker misses retained field %q", field)
++				}
++			}
++			// An identical restaging is current: the attested Git package
++			// with a matching summary satisfies currentness when every
++			// other comparison passes (attested-network-current).
++			fresh := v5GitAttestedMarker()
++			fresh.Package = pkg
++			fresh.ContentSHA256 = recorded.ContentSHA256
++			fresh.Files = append([]string(nil), recorded.Files...)
++			if current, err := Current(dir, fresh); err != nil || !current {
++				t.Fatalf("Current = %v, %v, want true", current, err)
++			}
++		})
++	}
++}
++
++// TestMarkerV5PlanMismatch proves every marker-plan mismatch case is
++// non-current: changed registry, status, key, substitution identifier,
++// package or lock against the effective plan refuses currency.
++func TestMarkerV5PlanMismatch(t *testing.T) {
++	base := v5GitAttestedMarker()
++	dir, _ := writeV5(t, base)
++	control := v5GitAttestedMarker()
++	control.ContentSHA256 = base.ContentSHA256
++	control.Files = append([]string(nil), base.Files...)
++	if current, err := Current(dir, control); err != nil || !current {
++		t.Fatalf("control Current = %v, %v, want true", current, err)
++	}
++	cases := map[string]func(*Marker){
++		"registry": func(m *Marker) { m.Attestation.Registry = "example.org/other" },
++		"status":   func(m *Marker) { m.Attestation.Status = "deprecated" },
++		"key_id":   func(m *Marker) { m.Attestation.KeyID = "fedcba9876543210" },
++		"attestation-absent": func(m *Marker) {
++			m.Attestation = nil
++		},
++		"substituted": func(m *Marker) { m.Substituted = "dev:other" },
++		"substituted-absent": func(m *Marker) {
++			m.Substituted = ""
++		},
++		"package": func(m *Marker) {
++			m.Package = &Package{Kind: "network-git", Repository: "example.org/kit",
++				Commit: &Commit{ObjectFormat: "sha1", Hex: strings.Repeat("66", 20)}, Directory: "skills/review"}
++		},
++		"lock_sha256": func(m *Marker) { m.LockSHA256 = "sha256:" + strings.Repeat("00", 32) },
++	}
++	for name, mutate := range cases {
++		t.Run(name, func(t *testing.T) {
++			fresh := v5GitAttestedMarker()
++			fresh.ContentSHA256 = base.ContentSHA256
++			fresh.Files = append([]string(nil), base.Files...)
++			attestation := *fresh.Attestation
++			fresh.Attestation = &attestation
++			mutate(fresh)
++			if current, err := Current(dir, fresh); err != nil || current {
++				t.Fatalf("Current = %v, %v across %s mismatch, want false", current, err, name)
++			}
++		})
++	}
++}
++
++// TestMarkerV5LocalRejectsEvidenceSummaryBytes proves the reader refuses a
++// local-snapshot marker carrying registry or substitution summaries even
++// when the bytes come from a foreign writer that bypassed Write.
++func TestMarkerV5LocalRejectsEvidenceSummaryBytes(t *testing.T) {
++	for name, member := range map[string]string{
++		"attestation": `"attestation":{"registry":"example.org/kit","status":"audited"}`,
++		"substituted": `"substituted":"dev:review"`,
++	} {
++		t.Run(name, func(t *testing.T) {
++			dir, recorded := writeV5(t, v5LocalMarker())
++			payload, err := os.ReadFile(filepath.Join(dir, Name))
++			if err != nil {
++				t.Fatal(err)
++			}
++			trimmed := strings.TrimSuffix(string(payload), "\n")
++			rewritten := strings.TrimSuffix(trimmed, "}") + "," + member + "}"
++			if err := os.WriteFile(filepath.Join(dir, Name), []byte(rewritten), 0o644); err != nil {
++				t.Fatal(err)
++			}
++			if got := Read(dir); got != nil {
++				t.Fatalf("Read admitted a local marker with %s: %+v", name, got)
++			}
++			expected := *recorded
++			if current, _ := Current(dir, &expected); current {
++				t.Fatalf("Current stayed true for a local marker with %s", name)
++			}
++		})
++	}
++}
++
++// TestMarkerV5LegacyInterchange proves old markers never attest schema-2
++// currency and schema-5 markers never attest legacy currency: either
++// direction is non-current, so migration and rollback both reinstall.
++func TestMarkerV5LegacyInterchange(t *testing.T) {
++	legacyDir, _ := install(t)
++	// A legacy installation is not current for a schema-2 expectation.
++	v5 := v5GitAttestedMarker()
++	if current, err := Current(legacyDir, v5); err != nil || current {
++		t.Fatalf("legacy-recorded Current = %v, %v, want false", current, err)
++	}
++	// A schema-5 installation is not current for a legacy expectation.
++	v5Dir, _ := writeV5(t, v5GitAttestedMarker())
++	legacyExpectation := &Marker{
++		Name: "review", Source: "review", RefKind: "tag", Ref: "v1",
++		Commit: strings.Repeat("44", 20),
++	}
++	if current, err := Current(v5Dir, legacyExpectation); err != nil || current {
++		t.Fatalf("v5-recorded Current = %v, %v, want false", current, err)
++	}
++}
