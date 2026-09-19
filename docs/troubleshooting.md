@@ -352,3 +352,169 @@ curator install --verbose
 ```
 
 The command prints detailed execution diagnostic messages.
+
+## Draft source and transport diagnostics
+
+These stable classes appear only on the draft Skillfile lane
+(`CURATOR_DRAFT_SOURCES_V1=1`). Each names the selector or member and
+the reason without secrets, and the CLI appends a sanitized
+remediation. Fetch failures report one closed-vocabulary clause per
+attempted endpoint (`availability`, `auth`, `tls`, `host-key`,
+`ref-moved`, `identity`, `integrity`, `audit`, `http-404`,
+`policy-unreadable`, `unknown`); raw tool output and full URLs never
+appear in user-facing text.
+
+### source_alias_unknown
+
+Symptom: `source_alias_unknown: <alias>`.
+
+Cause: a `from` selector names an alias with no `sources` entry.
+
+Remedy: declare the alias under `sources` in Skillfile.json, or fix
+the `from` spelling, then run `curator project resolve`.
+
+### source_selection_invalid
+
+Symptom: `source_selection_invalid` with the offending selector.
+
+Cause: the selector breaks a structural rule: unknown fields, a mixed
+form, a non-contained directory, a bad collection (`**`, partial
+globs, files as members), a missing or doubled ref, or a transitive
+branch.
+
+Remedy: fix the named selector (directory, include/exclude, and ref
+rules in docs/cli.md), then retry the explicit attempt.
+
+### source_member_missing
+
+Symptom: `source_member_missing` with the member name.
+
+Cause: an explicit `include` literal has no such directory, or a
+requirement names a skill outside the lock.
+
+Remedy: add the named member directory with valid SKILL.md, or drop it
+from `include`, then run `curator project resolve`.
+
+### source_member_invalid
+
+Symptom: `source_member_invalid` with the member name.
+
+Cause: the package fails validation: SKILL.md frontmatter without the
+required name or description, a manifest identity mismatch, a
+non-directory member, or an identity the lane cannot prove.
+
+Remedy: fix the named package (valid SKILL.md frontmatter and manifest
+identity), then run `curator project resolve`.
+
+### source_name_conflict
+
+Symptom: `source_name_conflict` with the colliding names.
+
+Cause: two selections install one skill name, or two destination
+names are filesystem-equivalent.
+
+Remedy: give each installed skill exactly one selection (rename or
+drop a duplicate), then run `curator project resolve`.
+
+### source_output_overlap
+
+Symptom: `source_output_overlap` with the overlapping path.
+
+Cause: a selected package sits inside managed output (`.agents`,
+adapter directories, the manager home, caches, staging, or the
+snapshot store), or a root package lacks `root_inputs` admission.
+
+Remedy: move the authored package out of managed output, or admit a
+root package via `root_inputs` in machine source-policy.json, then
+run `curator project resolve`.
+
+### source_snapshot_changed
+
+Symptom: `source_snapshot_changed` with the member name.
+
+Cause: admitted inputs changed during capture — a concurrent edit, a
+membership change mid-collection, or a store tree that no longer
+matches its locked content.
+
+Remedy: retry the explicit attempt without editing mid-run.
+
+### source_snapshot_unavailable
+
+Symptom: `source_snapshot_unavailable` with the member name.
+
+Cause: install or status found no lock, no machine bindings, or no
+frozen snapshot for the member.
+
+Remedy: run the explicit attempt first: `curator project resolve`.
+
+### source_lock_stale
+
+Symptom: `source_lock_stale`.
+
+Cause: the Skillfile changed since the lock was published, or the
+machine bindings no longer belong to the lock generation.
+
+Remedy: run `curator project refresh`, then `curator install` to
+materialize the refreshed lock.
+
+### repository_endpoint_unavailable
+
+Symptom: `repository_endpoint_unavailable` with the canonical identity
+and one clause per attempted endpoint.
+
+Cause: every planned endpoint failed with an availability or
+authentication error, or a logical `repository` declaration has no
+machine policy entry.
+
+Remedy: verify the network path and operator authentication for the
+listed endpoints, then retry with machine source-policy.json.
+
+### repository_policy_invalid
+
+Symptom: `repository_policy_invalid` with the offending field.
+
+Cause: machine source-policy.json is missing a required shape, names
+an unknown member or version, lists a bad endpoint, or cannot be read.
+
+Remedy: fix machine source-policy.json beside the manager
+configuration; an invalid policy is never treated as absent.
+
+### repository_mirror_undeclared
+
+Symptom: `repository_mirror_undeclared`.
+
+Cause: the resolved connection host differs from the entry-key host
+without a `mirror_of` attestation equal to the key.
+
+Remedy: attest the mirror with `mirror_of` equal to the entry key in
+machine source-policy.json.
+
+### repository_alias_unknown
+
+Symptom: `repository_alias_unknown` with the alias name.
+
+Cause: an endpoint `alias` field names no entry of the policy
+`aliases` table.
+
+Remedy: declare the alias in the `aliases` table. The table lives in
+machine source-policy.json.
+
+### source_audit_rejected
+
+Symptom: `source_audit_rejected` with the member name.
+
+Cause: the machine binding for the locked package is malformed or no
+longer matches the locked package, context, policy, or evidence.
+
+Remedy: re-resolve under trusted machine policy; the persisted audit
+report must match the locked package.
+
+### source_audit_unavailable
+
+Symptom: `source_audit_unavailable` with the member name.
+
+Cause: no machine binding or audit report exists for the locked
+package yet — planning must not invent trust.
+
+Remedy: run the explicit attempt under trusted machine policy so the
+audit report is persisted.

@@ -551,6 +551,7 @@ func (c cli) cmdRemove(args []string) int {
 
 func (c cli) installFlags(args []string) (install.Options, []string, bool, string, error) {
 	flags := c.newFlagSet("install")
+	appendDraftUsage(flags, c.stderr, "install")
 	all := flags.Bool("all", false, "operate on all configured projects")
 	dryRun := flags.Bool("dry-run", false, "plan work without modifying files")
 	fixGitignore := flags.Bool("fix-gitignore", false, "append missing managed gitignore entries")
@@ -656,7 +657,7 @@ func (c cli) printStatusRefusal(result install.Result) {
 
 func (c cli) printFailures(result install.Result, prefix string) {
 	for _, message := range result.Errors {
-		_, _ = fmt.Fprintln(c.stderr, prefix, message)
+		_, _ = fmt.Fprintln(c.stderr, prefix, withDraftRemediation(message))
 	}
 	if guidance := goToolchainGuidance(result.BuildDiagnostic); guidance != "" {
 		_, _ = fmt.Fprintln(c.stderr, prefix, guidance)
@@ -697,6 +698,7 @@ func (c cli) cmdUpdate() int {
 
 func (c cli) cmdStatus(args []string) int {
 	flags := c.newFlagSet("status")
+	appendDraftUsage(flags, c.stderr, "status")
 	all := flags.Bool("all", false, "operate on all configured projects")
 	check := flags.Bool("check", false, "exit non-zero unless every skill is up to date")
 	jsonOut := flags.Bool("json", false, "machine-readable output")
@@ -784,7 +786,7 @@ func (c cli) cmdStatus(args []string) int {
 			var driftErr error
 			drift, driftErr = draftStatusDrift(target.Root, scope.skillsDir, result.Attestations)
 			if driftErr != nil {
-				_, _ = fmt.Fprintln(c.stderr, "curator:", driftErr)
+				_, _ = fmt.Fprintln(c.stderr, "curator:", withDraftRemediation(driftErr.Error()))
 				exitCode = exitFail
 				continue
 			}
@@ -1169,6 +1171,15 @@ func (c cli) cmdProject(args []string) int {
 		_, _ = fmt.Fprintf(c.stdout, "added project %s: %s\n", positional[0], root)
 		return exitOK
 	case "resolve", "refresh":
+		// The explicit -h surface exists only on the opt-in lane, the
+		// same rule as appendDraftUsage: with the switch off the flag
+		// spellings fall through to the frozen v1 path untouched. The
+		// bare word "help" is never intercepted, so it keeps resolving
+		// as a project alias or path.
+		if install.DraftSourcesEnabled(os.Getenv) && len(args) > 1 && (args[1] == "-h" || args[1] == "--help") {
+			_, _ = fmt.Fprint(c.stdout, projectResolveUsage)
+			return exitOK
+		}
 		cfg, code := c.loadConfig()
 		if code != exitOK {
 			return code

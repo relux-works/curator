@@ -80,6 +80,13 @@ const (
 	FailurePolicy       FailureClass = "policy-unreadable"
 )
 
+// Reason is the closed per-class reason used in exhaustion diagnostics.
+// Raw fetch output is never interpolated: the class alone determines the
+// text, so a hostile or confused remote cannot inject secrets or
+// misleading detail into errors. The CLI draft fetch path renders the
+// same vocabulary; the strict lane keeps calling failureReason.
+func (c FailureClass) Reason() string { return c.failureReason() }
+
 // failureReason is the closed per-class reason used in exhaustion
 // diagnostics. Raw fetch output is never interpolated: the class alone
 // determines the text, so a hostile or confused remote cannot inject

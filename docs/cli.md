@@ -144,6 +144,12 @@ curator install --dry-run
 
 The command prints planned installation steps without modifying disk files.
 
+For schema-2 projects with the draft opt-in switch set, `install`
+materializes the locked snapshot and repairs drifted bytes from the
+lock without touching the lock itself; see [Draft Skillfile
+sources](#draft-skillfile-sources-opt-in-unreleased). Run `install -h`
+with the switch set for the workflow summary.
+
 ### curator update
 
 `curator update` fetches all source repositories under `skills_root`.
@@ -216,6 +222,12 @@ curator status --json
 ```
 
 The command prints status diagnostics for declared skills and compiled commands.
+
+For schema-2 projects with the draft opt-in switch set, `status`
+compares installed state against the frozen lock only — it never
+rescans collections, advances branches, or replaces a local snapshot;
+see [Draft Skillfile sources](#draft-skillfile-sources-opt-in-unreleased).
+Run `status -h` with the switch set for the workflow summary.
 
 `curator status` also reports the shell-hook trust posture (Manager profile
 §8.6): one `shell-hook-trust:` row per known project env file — every
@@ -293,6 +305,213 @@ curator project resolve .
 ```
 
 The command updates `Skillfile.lock` with resolved dependency commits and content hashes.
+
+For frozen v1 projects the command prints the alias, project path,
+Skillfile path, and managed skill and bin directories without modifying
+disk state. For schema-2 projects with the draft opt-in switch set (see
+[Draft Skillfile sources](#draft-skillfile-sources-opt-in-unreleased)),
+it runs the explicit attempt: it acquires every Git source alias,
+freezes local bytes and Git commits into a locked plan, and publishes
+`Skillfile.lock.json` plus the machine bindings transactionally after
+every gate succeeds. With `CURATOR_DRAFT_SOURCES_V1=1`, `curator project
+resolve -h` prints the draft workflow; with the switch off the `-h` and
+`--help` spellings keep the frozen v1 behavior (they resolve the current
+project exactly as before). The bare word `help` is never a help flag:
+it resolves as a project alias or path.
+
+### curator project refresh
+
+`curator project refresh` re-runs the explicit attempt for a project
+closure: refs are resolved anew, local bytes and collection membership
+are re-frozen, and the lock plus machine bindings are replaced
+atomically only after every gate succeeds. Failure preserves prior
+state. For frozen v1 projects it behaves exactly like `project
+resolve`.
+
+Synopsis:
+
+```bash
+curator project refresh [path]
+```
+
+Refresh a draft lock after editing sources or after upstream refs moved:
+
+```bash
+curator project refresh .
+curator install .
+```
+
+Refresh alone changes nothing live: run `curator install` afterwards to
+materialize the refreshed lock. Launch and status never refresh on
+their own. Run `curator project refresh -h` for the workflow (draft
+switch on; with the switch off the flag spellings keep the frozen v1
+behavior, as for `resolve`).
+
+## Draft Skillfile sources (opt-in, unreleased)
+
+Skillfile schema 2 with local and Git sources is draft functionality
+behind the operator-owned opt-in switch. It is not part of the released
+v1 behavior: package data can neither set nor observe the switch, and
+with the switch off schema 2 fails closed while frozen v1 behaves
+byte-identically.
+
+```bash
+export CURATOR_DRAFT_SOURCES_V1=1
+```
+
+### Workflow
+
+Five existing verbs move a schema-2 project; no new command is added:
+
+```bash
+curator project resolve .   # freeze declared sources into Skillfile.lock.json
+curator install .           # materialize the locked snapshot (repairs drift)
+curator status .            # compare installed state against the lock (--check, --json)
+curator project refresh .   # re-resolve refs, bytes, and membership explicitly
+curator install .           # install the refreshed lock (refresh alone changes nothing live)
+```
+
+Launch and status never rescan collections, advance branches, or
+replace a local snapshot: installed shims execute the frozen runtime
+until an explicit refresh plus install republishes it. A Skillfile
+edited after resolve fails `source_lock_stale` until refresh; running
+install again after refresh repairs drifted bytes from the lock while
+the lock bytes stay identical. Every stable `source_*` and
+`repository_*` failure prints a sanitized remediation naming the fix;
+see [Draft source and transport
+diagnostics](troubleshooting.md#draft-source-and-transport-diagnostics).
+
+### Local sources
+
+A `path` source freezes admitted filesystem bytes, including dirty,
+staged, and untracked files; it never means Git HEAD. Relative paths
+resolve against the declaring Skillfile's directory:
+
+```json
+{
+  "schema_version": 2,
+  "sources": {
+    "local": {"path": "./pkgs"}
+  },
+  "skills": [
+    {"name": "review", "from": "local", "directory": "review"}
+  ]
+}
+```
+
+An absolute path names shared machine content instead:
+
+```json
+{"path": "/work/shared-agents"}
+```
+
+Shared manifests with absolute paths stay intentionally
+machine-specific, but the lock never copies those paths into identity
+fields. Keep authored packages out of managed output (`.agents`,
+adapter directories, the manager home): selecting a package inside
+managed output fails `source_output_overlap`. Selecting the project
+root as the package requires explicit `root_inputs` for that alias in
+machine `source-policy.json` (see below).
+
+### Git sources
+
+A Git source pins exactly one of `tag`, `branch`, or `revision`
+(branch only in the root project). Every member from one alias uses
+the same resolved commit:
+
+```json
+{"git": "https://example.org/kit.git", "tag": "v1.2.0"}
+```
+
+```json
+{
+  "schema_version": 2,
+  "sources": {
+    "team": {"git": "https://example.org/kit.git", "tag": "v1.2.0"}
+  },
+  "skills": [
+    {"name": "review", "from": "team", "directory": "skills/review"}
+  ]
+}
+```
+
+The logical spelling names the canonical identity and resolves
+endpoints through machine policy:
+
+```json
+{"repository": "example.org/kit", "branch": "main"}
+```
+
+Without a policy entry for that identity, a logical declaration fails
+`repository_endpoint_unavailable`; a URL declaration without an entry
+attempts the declared URL once with no fallback.
+
+### Collections
+
+A collection selects immediate child directories of one source
+directory. `include` names literal folders or `"*"`; `exclude` removes
+literals afterwards. Every remaining directory must carry valid
+SKILL.md frontmatter or the whole operation fails:
+
+```json
+{"from": "team", "directory": "skills", "include": ["review", "docs"]}
+```
+
+```json
+{"from": "team", "directory": "skills", "include": ["*"]}
+```
+
+```json
+{"from": "team", "directory": "skills", "include": ["*"], "exclude": ["release"]}
+```
+
+Overlapping installed names fail `source_name_conflict`.
+
+### Machine policy setup
+
+`source-policy.json` is operator-owned and lives beside the manager
+configuration (next to `config.json`, outside package-controlled
+trees). It maps canonical `host/path` entries to one or two endpoints
+plus fallback, and admits root packages via `root_inputs`:
+
+```json
+{
+  "schema_version": 1,
+  "repositories": {
+    "example.org/kit": {
+      "endpoints": [
+        {"url": "git@example.org:kit.git", "authentication": "team-ssh"},
+        {"url": "https://example.org/kit.git", "authentication": "team-https"}
+      ],
+      "fallback": "availability-auth"
+    }
+  },
+  "root_inputs": {
+    "project": ["SKILL.md", "agent-skill.json", "references", "scripts", "build"]
+  }
+}
+```
+
+Without `pin`, endpoints are attempted in list order; `pin` selects
+exactly one listed URL and forbids fallback. `fallback:
+"availability-auth"` permits the next endpoint only after a positively
+classified availability or authentication failure — TLS, host-key,
+identity, ref, audit, and unclassified failures never fall back.
+Named authentication providers (`source-providers.json` beside the
+same configuration) apply to the external build lane under
+`CURATOR_DRAFT_TRANSPORT_RESOLUTION`, not to Skillfile sources:
+`project resolve` and `project refresh` clone and fetch with the
+operator's ambient Git credentials, and the `authentication`
+identifier on a Skillfile endpoint is validated but unused on this
+lane. Never put secrets in these objects. An invalid or
+unreadable policy fails `repository_policy_invalid` and is never
+treated as absent.
+
+For a package at the project root, each `root_inputs` entry is a
+source-relative, portable, link-free path disjoint from outputs; every
+listed path must exist and cover SKILL.md, the manifest, and every
+required context, runtime, and build input. Changing `root_inputs`
+requires explicit refresh. Normal nested packages need no list.
 
 ## Skill package validation
 
