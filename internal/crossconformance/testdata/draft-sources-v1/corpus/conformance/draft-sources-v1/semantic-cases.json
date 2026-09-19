@@ -1,0 +1,1086 @@
+[
+  {
+    "id": "broad-root",
+    "input": {
+      "path": ".",
+      "directory": "agents/skills/review",
+      "physical": "project/agents/skills/review",
+      "outputs": [
+        "project/.agents"
+      ]
+    },
+    "expected": "allow"
+  },
+  {
+    "id": "managed-source",
+    "input": {
+      "path": ".",
+      "directory": ".agents/skills/review",
+      "physical": "project/.agents/skills/review",
+      "outputs": [
+        "project/.agents"
+      ]
+    },
+    "expected": "source_output_overlap"
+  },
+  {
+    "id": "symlink-managed",
+    "input": {
+      "directory": "authored/review",
+      "physical": "project/.agents/skills/review",
+      "outputs": [
+        "project/.agents"
+      ]
+    },
+    "expected": "source_output_overlap"
+  },
+  {
+    "id": "case-alias",
+    "input": {
+      "filesystem": "case-insensitive",
+      "physical": "project/.AGENTS/skills/review",
+      "outputs": [
+        "project/.agents"
+      ]
+    },
+    "expected": "source_output_overlap"
+  },
+  {
+    "id": "write-boundary-retarget",
+    "input": {
+      "planned_output": "project/.agents",
+      "publication_output": "project/agents/skills/review"
+    },
+    "expected": "source_output_overlap"
+  },
+  {
+    "id": "root-no-inputs",
+    "input": {
+      "path": ".",
+      "directory": ".",
+      "root_inputs": null
+    },
+    "expected": "source_output_overlap"
+  },
+  {
+    "id": "selector-escape",
+    "input": {
+      "directory": "skills/review",
+      "physical": "outside/review"
+    },
+    "expected": "source_selection_invalid"
+  },
+  {
+    "id": "unknown-alias",
+    "input": {
+      "from": "absent",
+      "sources": {}
+    },
+    "expected": "source_alias_unknown"
+  },
+  {
+    "id": "missing-excluded-literal",
+    "input": {
+      "include": [
+        "missing"
+      ],
+      "exclude": [
+        "missing"
+      ],
+      "children": []
+    },
+    "expected": "source_member_missing"
+  },
+  {
+    "id": "bad-wildcard-member",
+    "input": {
+      "include": [
+        "*"
+      ],
+      "children": {
+        "review": "valid",
+        "docs": "missing-SKILL.md"
+      }
+    },
+    "expected": "source_member_invalid"
+  },
+  {
+    "id": "duplicate-name",
+    "input": {
+      "members": [
+        {
+          "folder": "a",
+          "name": "review"
+        },
+        {
+          "folder": "b",
+          "name": "review"
+        }
+      ]
+    },
+    "expected": "source_name_conflict"
+  },
+  {
+    "id": "frozen-membership",
+    "input": {
+      "locked": [
+        "review"
+      ],
+      "live": [
+        "review",
+        "docs"
+      ],
+      "operation": "launch"
+    },
+    "expected": "use-locked-review-only"
+  },
+  {
+    "id": "capture-mutation",
+    "input": {
+      "captured": "A",
+      "after-capture": "B"
+    },
+    "expected": "source_snapshot_changed"
+  },
+  {
+    "id": "frozen-copy-mutation",
+    "input": {
+      "audited": "A",
+      "before-publication": "B"
+    },
+    "expected": "source_snapshot_changed"
+  },
+  {
+    "id": "local-git-dirty",
+    "input": {
+      "head": "A",
+      "filesystem": "B",
+      "untracked": "C"
+    },
+    "expected": "snapshot-B-and-C"
+  },
+  {
+    "id": "missing-audit-report",
+    "input": {
+      "decision": "allow",
+      "report": "unreadable"
+    },
+    "expected": "reject"
+  },
+  {
+    "id": "strict-network-attestation-local",
+    "input": {
+      "kind": "local-snapshot",
+      "policy": "require-network-attestation"
+    },
+    "expected": "reject"
+  },
+  {
+    "id": "missing-snapshot",
+    "input": {
+      "locked": "A",
+      "snapshot_store": "absent",
+      "live": "B"
+    },
+    "expected": "source_snapshot_unavailable"
+  },
+  {
+    "id": "runtime-only-refresh",
+    "input": {
+      "context_before": "A",
+      "context_after": "A",
+      "script_before": "B",
+      "script_after": "C"
+    },
+    "expected": "new-package-runtime-and-cache-identity"
+  },
+  {
+    "id": "build-only-refresh",
+    "input": {
+      "context_before": "A",
+      "context_after": "A",
+      "build_before": "B",
+      "build_after": "C"
+    },
+    "expected": "new-package-and-cache-identity"
+  },
+  {
+    "id": "fallback-dns",
+    "input": {
+      "fallback": "availability-auth",
+      "pin": null,
+      "first_failure": "dns",
+      "endpoints": 2
+    },
+    "expected": "attempt-second"
+  },
+  {
+    "id": "fallback-auth-rejected",
+    "input": {
+      "fallback": "availability-auth",
+      "pin": null,
+      "first_failure": "auth-rejected",
+      "endpoints": 2
+    },
+    "expected": "attempt-second"
+  },
+  {
+    "id": "fallback-tls",
+    "input": {
+      "fallback": "availability-auth",
+      "pin": null,
+      "first_failure": "tls",
+      "endpoints": 2
+    },
+    "expected": "stop-no-second-attempt"
+  },
+  {
+    "id": "fallback-host-key",
+    "input": {
+      "fallback": "availability-auth",
+      "pin": null,
+      "first_failure": "host-key",
+      "endpoints": 2
+    },
+    "expected": "stop-no-second-attempt"
+  },
+  {
+    "id": "fallback-integrity",
+    "input": {
+      "fallback": "availability-auth",
+      "pin": null,
+      "first_failure": "integrity",
+      "endpoints": 2
+    },
+    "expected": "stop-no-second-attempt"
+  },
+  {
+    "id": "fallback-identity",
+    "input": {
+      "fallback": "availability-auth",
+      "pin": null,
+      "first_failure": "identity",
+      "endpoints": 2
+    },
+    "expected": "stop-no-second-attempt"
+  },
+  {
+    "id": "fallback-ref-moved",
+    "input": {
+      "fallback": "availability-auth",
+      "pin": null,
+      "first_failure": "ref-moved",
+      "endpoints": 2
+    },
+    "expected": "stop-no-second-attempt"
+  },
+  {
+    "id": "fallback-audit",
+    "input": {
+      "fallback": "availability-auth",
+      "pin": null,
+      "first_failure": "audit",
+      "endpoints": 2
+    },
+    "expected": "stop-no-second-attempt"
+  },
+  {
+    "id": "fallback-unknown",
+    "input": {
+      "fallback": "availability-auth",
+      "pin": null,
+      "first_failure": "unknown",
+      "endpoints": 2
+    },
+    "expected": "stop-no-second-attempt"
+  },
+  {
+    "id": "fallback-policy-unreadable",
+    "input": {
+      "fallback": "availability-auth",
+      "pin": null,
+      "first_failure": "policy-unreadable",
+      "endpoints": 2
+    },
+    "expected": "stop-no-second-attempt"
+  },
+  {
+    "id": "fallback-http-404",
+    "input": {
+      "fallback": "availability-auth",
+      "pin": null,
+      "first_failure": "http-404",
+      "endpoints": 2
+    },
+    "expected": "stop-no-second-attempt"
+  },
+  {
+    "id": "pinned-auth",
+    "input": {
+      "fallback": "availability-auth",
+      "pin": "first",
+      "first_failure": "auth-rejected",
+      "endpoints": 2
+    },
+    "expected": "stop-no-second-attempt"
+  },
+  {
+    "id": "endpoint-identity-mismatch",
+    "input": {
+      "repository": "example.org/kit",
+      "endpoint": "https://evil.org/kit"
+    },
+    "expected": "repository_policy_invalid"
+  },
+  {
+    "id": "attested-network-current",
+    "input": {
+      "package": "network-git",
+      "signed_record": "valid-fresh-exact-name-repository-commit-context",
+      "marker_attestation": "matches-registry-status-key",
+      "operation": "status"
+    },
+    "expected": "current-if-all-other-gates-pass"
+  },
+  {
+    "id": "legacy-substitution-current",
+    "input": {
+      "selector": "legacy",
+      "strict_audit": false,
+      "effective_committed_package": "matches-lock",
+      "marker_substituted": "matches-operator-identifier"
+    },
+    "expected": "current-if-all-other-gates-pass"
+  },
+  {
+    "id": "legacy-substitution-strict",
+    "input": {
+      "selector": "legacy",
+      "strict_audit": true,
+      "marker_substituted": "absent",
+      "operator_substitution": "present"
+    },
+    "expected": "reject-before-cache-compiler-publication"
+  },
+  {
+    "id": "selector-substitution-forbidden",
+    "input": {
+      "selector": "from",
+      "operator_substitution": "present"
+    },
+    "expected": "reject-no-publication"
+  },
+  {
+    "id": "local-required-registry",
+    "input": {
+      "package": "local-snapshot",
+      "policy": "requires-network-attestation"
+    },
+    "expected": "reject-no-publication"
+  },
+  {
+    "id": "external-substitution-strict",
+    "input": {
+      "package": "local-snapshot",
+      "external_substituted": true,
+      "strict_audit": true
+    },
+    "expected": "reject-before-cache-compiler-publication"
+  },
+  {
+    "id": "external-only-current",
+    "input": {
+      "package": "local-snapshot",
+      "top_level_build_source": "absent",
+      "external_record": "complete-matches-receipt3-input.build",
+      "receipt_package": "matches-marker",
+      "protected_artifact": "verified"
+    },
+    "expected": "current-if-all-other-gates-pass"
+  },
+  {
+    "id": "attestation-evidence-absent",
+    "input": {
+      "required_registry_evidence": "absent",
+      "marker_summary": "apparently-valid",
+      "operations": [
+        "install",
+        "status",
+        "repair",
+        "refresh"
+      ]
+    },
+    "expected": "install-repair-refresh-refuse-preserve-prior-state;status-noncurrent-or-unknown-nonzero-no-mutation"
+  },
+  {
+    "id": "attestation-evidence-unreadable",
+    "input": {
+      "required_registry_evidence": "unreadable",
+      "marker_summary": "apparently-valid",
+      "operations": [
+        "install",
+        "status",
+        "repair",
+        "refresh"
+      ]
+    },
+    "expected": "install-repair-refresh-refuse-preserve-prior-state;status-noncurrent-or-unknown-nonzero-no-mutation"
+  },
+  {
+    "id": "attestation-evidence-malformed",
+    "input": {
+      "required_registry_evidence": "malformed",
+      "marker_summary": "apparently-valid",
+      "operations": [
+        "install",
+        "status",
+        "repair",
+        "refresh"
+      ]
+    },
+    "expected": "install-repair-refresh-refuse-preserve-prior-state;status-noncurrent-or-unknown-nonzero-no-mutation"
+  },
+  {
+    "id": "attestation-evidence-stale",
+    "input": {
+      "required_registry_evidence": "stale",
+      "marker_summary": "apparently-valid",
+      "operations": [
+        "install",
+        "status",
+        "repair",
+        "refresh"
+      ]
+    },
+    "expected": "install-repair-refresh-refuse-preserve-prior-state;status-noncurrent-or-unknown-nonzero-no-mutation"
+  },
+  {
+    "id": "attestation-evidence-revoked",
+    "input": {
+      "required_registry_evidence": "revoked",
+      "marker_summary": "apparently-valid",
+      "operations": [
+        "install",
+        "status",
+        "repair",
+        "refresh"
+      ]
+    },
+    "expected": "install-repair-refresh-refuse-preserve-prior-state;status-noncurrent-or-unknown-nonzero-no-mutation"
+  },
+  {
+    "id": "attestation-evidence-wrong-name",
+    "input": {
+      "required_registry_evidence": "wrong-name",
+      "marker_summary": "apparently-valid",
+      "operations": [
+        "install",
+        "status",
+        "repair",
+        "refresh"
+      ]
+    },
+    "expected": "install-repair-refresh-refuse-preserve-prior-state;status-noncurrent-or-unknown-nonzero-no-mutation"
+  },
+  {
+    "id": "attestation-evidence-wrong-repository",
+    "input": {
+      "required_registry_evidence": "wrong-repository",
+      "marker_summary": "apparently-valid",
+      "operations": [
+        "install",
+        "status",
+        "repair",
+        "refresh"
+      ]
+    },
+    "expected": "install-repair-refresh-refuse-preserve-prior-state;status-noncurrent-or-unknown-nonzero-no-mutation"
+  },
+  {
+    "id": "attestation-evidence-wrong-commit",
+    "input": {
+      "required_registry_evidence": "wrong-commit",
+      "marker_summary": "apparently-valid",
+      "operations": [
+        "install",
+        "status",
+        "repair",
+        "refresh"
+      ]
+    },
+    "expected": "install-repair-refresh-refuse-preserve-prior-state;status-noncurrent-or-unknown-nonzero-no-mutation"
+  },
+  {
+    "id": "attestation-evidence-wrong-context",
+    "input": {
+      "required_registry_evidence": "wrong-context",
+      "marker_summary": "apparently-valid",
+      "operations": [
+        "install",
+        "status",
+        "repair",
+        "refresh"
+      ]
+    },
+    "expected": "install-repair-refresh-refuse-preserve-prior-state;status-noncurrent-or-unknown-nonzero-no-mutation"
+  },
+  {
+    "id": "attestation-evidence-wrong-key",
+    "input": {
+      "required_registry_evidence": "wrong-key",
+      "marker_summary": "apparently-valid",
+      "operations": [
+        "install",
+        "status",
+        "repair",
+        "refresh"
+      ]
+    },
+    "expected": "install-repair-refresh-refuse-preserve-prior-state;status-noncurrent-or-unknown-nonzero-no-mutation"
+  },
+  {
+    "id": "marker-plan-mismatch-registry",
+    "input": {
+      "marker_field": "registry",
+      "effective_plan": "different",
+      "operation": "status"
+    },
+    "expected": "noncurrent-nonzero-no-mutation"
+  },
+  {
+    "id": "marker-plan-mismatch-status",
+    "input": {
+      "marker_field": "status",
+      "effective_plan": "different",
+      "operation": "status"
+    },
+    "expected": "noncurrent-nonzero-no-mutation"
+  },
+  {
+    "id": "marker-plan-mismatch-key_id",
+    "input": {
+      "marker_field": "key_id",
+      "effective_plan": "different",
+      "operation": "status"
+    },
+    "expected": "noncurrent-nonzero-no-mutation"
+  },
+  {
+    "id": "marker-plan-mismatch-substituted",
+    "input": {
+      "marker_field": "substituted",
+      "effective_plan": "different",
+      "operation": "status"
+    },
+    "expected": "noncurrent-nonzero-no-mutation"
+  },
+  {
+    "id": "marker-plan-mismatch-package",
+    "input": {
+      "marker_field": "package",
+      "effective_plan": "different",
+      "operation": "status"
+    },
+    "expected": "noncurrent-nonzero-no-mutation"
+  },
+  {
+    "id": "marker-plan-mismatch-lock_sha256",
+    "input": {
+      "marker_field": "lock_sha256",
+      "effective_plan": "different",
+      "operation": "status"
+    },
+    "expected": "noncurrent-nonzero-no-mutation"
+  },
+  {
+    "id": "external-evidence-mismatch-repository",
+    "input": {
+      "marker_receipt_or_plan_field": "repository",
+      "comparison": "mismatch",
+      "operations": [
+        "status",
+        "repair"
+      ],
+      "package": "local-snapshot"
+    },
+    "expected": "status-noncurrent-nonzero;repair-revalidate-exact-source-rebuild-not-adopt"
+  },
+  {
+    "id": "external-evidence-mismatch-declared_identity",
+    "input": {
+      "marker_receipt_or_plan_field": "declared_identity",
+      "comparison": "mismatch",
+      "operations": [
+        "status",
+        "repair"
+      ],
+      "package": "local-snapshot"
+    },
+    "expected": "status-noncurrent-nonzero;repair-revalidate-exact-source-rebuild-not-adopt"
+  },
+  {
+    "id": "external-evidence-mismatch-declared_locked_commit",
+    "input": {
+      "marker_receipt_or_plan_field": "declared_locked_commit",
+      "comparison": "mismatch",
+      "operations": [
+        "status",
+        "repair"
+      ],
+      "package": "local-snapshot"
+    },
+    "expected": "status-noncurrent-nonzero;repair-revalidate-exact-source-rebuild-not-adopt"
+  },
+  {
+    "id": "external-evidence-mismatch-declared_tag",
+    "input": {
+      "marker_receipt_or_plan_field": "declared_tag",
+      "comparison": "mismatch",
+      "operations": [
+        "status",
+        "repair"
+      ],
+      "package": "local-snapshot"
+    },
+    "expected": "status-noncurrent-nonzero;repair-revalidate-exact-source-rebuild-not-adopt"
+  },
+  {
+    "id": "external-evidence-mismatch-effective_identity",
+    "input": {
+      "marker_receipt_or_plan_field": "effective_identity",
+      "comparison": "mismatch",
+      "operations": [
+        "status",
+        "repair"
+      ],
+      "package": "local-snapshot"
+    },
+    "expected": "status-noncurrent-nonzero;repair-revalidate-exact-source-rebuild-not-adopt"
+  },
+  {
+    "id": "external-evidence-mismatch-object_format",
+    "input": {
+      "marker_receipt_or_plan_field": "object_format",
+      "comparison": "mismatch",
+      "operations": [
+        "status",
+        "repair"
+      ],
+      "package": "local-snapshot"
+    },
+    "expected": "status-noncurrent-nonzero;repair-revalidate-exact-source-rebuild-not-adopt"
+  },
+  {
+    "id": "external-evidence-mismatch-commit",
+    "input": {
+      "marker_receipt_or_plan_field": "commit",
+      "comparison": "mismatch",
+      "operations": [
+        "status",
+        "repair"
+      ],
+      "package": "local-snapshot"
+    },
+    "expected": "status-noncurrent-nonzero;repair-revalidate-exact-source-rebuild-not-adopt"
+  },
+  {
+    "id": "external-evidence-mismatch-substituted",
+    "input": {
+      "marker_receipt_or_plan_field": "substituted",
+      "comparison": "mismatch",
+      "operations": [
+        "status",
+        "repair"
+      ],
+      "package": "local-snapshot"
+    },
+    "expected": "status-noncurrent-nonzero;repair-revalidate-exact-source-rebuild-not-adopt"
+  },
+  {
+    "id": "external-evidence-mismatch-substitution",
+    "input": {
+      "marker_receipt_or_plan_field": "substitution",
+      "comparison": "mismatch",
+      "operations": [
+        "status",
+        "repair"
+      ],
+      "package": "local-snapshot"
+    },
+    "expected": "status-noncurrent-nonzero;repair-revalidate-exact-source-rebuild-not-adopt"
+  },
+  {
+    "id": "external-evidence-mismatch-build_source",
+    "input": {
+      "marker_receipt_or_plan_field": "build_source",
+      "comparison": "mismatch",
+      "operations": [
+        "status",
+        "repair"
+      ],
+      "package": "local-snapshot"
+    },
+    "expected": "status-noncurrent-nonzero;repair-revalidate-exact-source-rebuild-not-adopt"
+  },
+  {
+    "id": "external-evidence-mismatch-descriptor_target",
+    "input": {
+      "marker_receipt_or_plan_field": "descriptor_target",
+      "comparison": "mismatch",
+      "operations": [
+        "status",
+        "repair"
+      ],
+      "package": "local-snapshot"
+    },
+    "expected": "status-noncurrent-nonzero;repair-revalidate-exact-source-rebuild-not-adopt"
+  },
+  {
+    "id": "external-evidence-mismatch-execution_policy",
+    "input": {
+      "marker_receipt_or_plan_field": "execution_policy",
+      "comparison": "mismatch",
+      "operations": [
+        "status",
+        "repair"
+      ],
+      "package": "local-snapshot"
+    },
+    "expected": "status-noncurrent-nonzero;repair-revalidate-exact-source-rebuild-not-adopt"
+  },
+  {
+    "id": "external-evidence-mismatch-cache_key",
+    "input": {
+      "marker_receipt_or_plan_field": "cache_key",
+      "comparison": "mismatch",
+      "operations": [
+        "status",
+        "repair"
+      ],
+      "package": "local-snapshot"
+    },
+    "expected": "status-noncurrent-nonzero;repair-revalidate-exact-source-rebuild-not-adopt"
+  },
+  {
+    "id": "external-evidence-mismatch-receipt_sha256",
+    "input": {
+      "marker_receipt_or_plan_field": "receipt_sha256",
+      "comparison": "mismatch",
+      "operations": [
+        "status",
+        "repair"
+      ],
+      "package": "local-snapshot"
+    },
+    "expected": "status-noncurrent-nonzero;repair-revalidate-exact-source-rebuild-not-adopt"
+  },
+  {
+    "id": "external-evidence-mismatch-artifact_sha256",
+    "input": {
+      "marker_receipt_or_plan_field": "artifact_sha256",
+      "comparison": "mismatch",
+      "operations": [
+        "status",
+        "repair"
+      ],
+      "package": "local-snapshot"
+    },
+    "expected": "status-noncurrent-nonzero;repair-revalidate-exact-source-rebuild-not-adopt"
+  },
+  {
+    "id": "external-evidence-mismatch-artifact_path",
+    "input": {
+      "marker_receipt_or_plan_field": "artifact_path",
+      "comparison": "mismatch",
+      "operations": [
+        "status",
+        "repair"
+      ],
+      "package": "local-snapshot"
+    },
+    "expected": "status-noncurrent-nonzero;repair-revalidate-exact-source-rebuild-not-adopt"
+  },
+  {
+    "id": "external-evidence-mismatch-input.package",
+    "input": {
+      "marker_receipt_or_plan_field": "input.package",
+      "comparison": "mismatch",
+      "operations": [
+        "status",
+        "repair"
+      ],
+      "package": "local-snapshot"
+    },
+    "expected": "status-noncurrent-nonzero;repair-revalidate-exact-source-rebuild-not-adopt"
+  },
+  {
+    "id": "v2-port-endpoint",
+    "input": {
+      "transport_revision": 2,
+      "repository": "example.org/kit",
+      "endpoint": "https://example.org:8443/kit.git",
+      "lock_identity": "example.org/kit"
+    },
+    "expected": "attempt-listed-endpoint-once;port-stripped-for-identity;lock-records-canonical-identity-only"
+  },
+  {
+    "id": "v2-declared-mirror",
+    "input": {
+      "transport_revision": 2,
+      "repository": "example.org/kit",
+      "endpoint": "https://mirror.example.net/kit.git",
+      "mirror_of": "example.org/kit"
+    },
+    "expected": "attempt-listed-mirror-once;verify-locked-commit-tag-objects-identically-to-revision-1"
+  },
+  {
+    "id": "v2-mirror-first",
+    "input": {
+      "transport_revision": 2,
+      "repository": "example.org/kit",
+      "endpoints": [
+        "https://mirror.example.net/kit.git",
+        "https://example.org/kit.git"
+      ],
+      "mirror_of": "example.org/kit",
+      "fallback": "availability-auth",
+      "first_failure": "dns"
+    },
+    "expected": "mirror-first-allowed;ordinary-revision-1-fallback-applies;attempt-second"
+  },
+  {
+    "id": "v2-alias-resolution",
+    "input": {
+      "transport_revision": 2,
+      "repository": "example.org/kit",
+      "endpoint": "https://example.org/kit.git",
+      "alias": "corp-mirror",
+      "aliases": {
+        "corp-mirror": {
+          "host": "mirror.corp.example",
+          "port": 8443,
+          "authentication": "team-https"
+        }
+      },
+      "mirror_of": "example.org/kit"
+    },
+    "expected": "substitute-alias-once;connect-to-mirror.corp.example:8443;identity-stays-example.org/kit"
+  },
+  {
+    "id": "v2-reader-accepts-v1-policy",
+    "input": {
+      "transport_revision": 2,
+      "policy_schema_version": 1,
+      "policy": "valid-source-policy-v1-shape"
+    },
+    "expected": "accept-with-revision-1-semantics"
+  },
+  {
+    "id": "v2-undeclared-mirror",
+    "input": {
+      "transport_revision": 2,
+      "repository": "example.org/kit",
+      "endpoint": "https://evil.example.net/kit.git",
+      "mirror_of": null
+    },
+    "expected": "repository_mirror_undeclared;zero-attempts;no-fallback"
+  },
+  {
+    "id": "v2-pin-port-mismatch",
+    "input": {
+      "transport_revision": 2,
+      "repository": "example.org/kit",
+      "endpoints": [
+        "https://example.org/kit.git"
+      ],
+      "pin": "https://example.org:8443/kit.git"
+    },
+    "expected": "repository_policy_invalid;pin-must-equal-listed-url-exactly-including-port;zero-attempts"
+  },
+  {
+    "id": "v2-alias-unknown",
+    "input": {
+      "transport_revision": 2,
+      "repository": "example.org/kit",
+      "endpoint": "https://example.org/kit.git",
+      "alias": "absent-alias",
+      "aliases": {}
+    },
+    "expected": "repository_alias_unknown;zero-attempts;no-fallback"
+  },
+  {
+    "id": "v2-alias-mirror-undeclared",
+    "input": {
+      "transport_revision": 2,
+      "repository": "example.org/kit",
+      "endpoint": "https://example.org/kit.git",
+      "alias": "corp-mirror",
+      "aliases": {
+        "corp-mirror": {
+          "host": "mirror.corp.example",
+          "authentication": "team-https"
+        }
+      },
+      "mirror_of": null
+    },
+    "expected": "repository_mirror_undeclared;alias-target-host-differs-without-attestation;zero-attempts"
+  },
+  {
+    "id": "v2-user-ssh-alias-ignored",
+    "input": {
+      "transport_revision": 2,
+      "repository": "example.org/kit",
+      "declaration": "logical",
+      "policy_entry": null,
+      "user_ssh_config": "Host example.org; HostName real.example.net"
+    },
+    "expected": "user-config-never-consulted;repository_endpoint_unavailable"
+  },
+  {
+    "id": "v2-user-insteadof-ignored",
+    "input": {
+      "transport_revision": 2,
+      "declaration": "https://example.org/kit.git",
+      "policy_entry": null,
+      "user_git_config": "url.insteadOf rewrites example.org to evil.example.net"
+    },
+    "expected": "attempt-declared-url-once-literally;insteadOf-never-applied"
+  },
+  {
+    "id": "v2-embedded-alias-host",
+    "input": {
+      "transport_revision": 2,
+      "repository": "example.org/kit",
+      "endpoint": "ssh://git@corp-mirror/kit.git",
+      "aliases": {
+        "corp-mirror": {
+          "host": "mirror.corp.example",
+          "authentication": "team-ssh"
+        }
+      }
+    },
+    "expected": "repository_policy_invalid;alias-named-only-via-alias-field-never-as-url-host;zero-attempts"
+  },
+  {
+    "id": "v2-alias-auth-mismatch",
+    "input": {
+      "transport_revision": 2,
+      "repository": "example.org/kit",
+      "endpoint": "https://example.org/kit.git",
+      "endpoint_authentication": "team-https",
+      "alias": "corp-mirror",
+      "aliases": {
+        "corp-mirror": {
+          "host": "example.org",
+          "authentication": "other-provider"
+        }
+      }
+    },
+    "expected": "repository_policy_invalid;alias-authentication-must-equal-endpoint-authentication;zero-attempts"
+  },
+  {
+    "id": "v2-alias-chain",
+    "input": {
+      "transport_revision": 2,
+      "repository": "example.org/kit",
+      "endpoint": "https://example.org/kit.git",
+      "alias": "first",
+      "aliases": {
+        "first": {
+          "host": "second",
+          "authentication": "team-https"
+        },
+        "second": {
+          "host": "example.org",
+          "authentication": "team-https"
+        }
+      }
+    },
+    "expected": "repository_policy_invalid;alias-target-must-be-concrete-never-another-alias;zero-attempts"
+  },
+  {
+    "id": "v2-double-port",
+    "input": {
+      "transport_revision": 2,
+      "repository": "example.org/kit",
+      "endpoint": "https://example.org:8443/kit.git",
+      "alias": "corp-mirror",
+      "aliases": {
+        "corp-mirror": {
+          "host": "example.org",
+          "port": 9443,
+          "authentication": "team-https"
+        }
+      }
+    },
+    "expected": "repository_policy_invalid;url-port-and-alias-port-must-not-both-be-present;zero-attempts"
+  },
+  {
+    "id": "v2-spurious-mirror-of",
+    "input": {
+      "transport_revision": 2,
+      "repository": "example.org/kit",
+      "endpoint": "https://example.org/kit.git",
+      "mirror_of": "example.org/kit"
+    },
+    "expected": "repository_policy_invalid;mirror_of-forbidden-when-host-equals-key-host;zero-attempts"
+  },
+  {
+    "id": "v2-mirror-of-mismatch",
+    "input": {
+      "transport_revision": 2,
+      "repository": "example.org/kit",
+      "endpoint": "https://mirror.example.net/kit.git",
+      "mirror_of": "other.example/kit"
+    },
+    "expected": "repository_policy_invalid;mirror_of-must-equal-entry-key-exactly;zero-attempts"
+  },
+  {
+    "id": "v2-v1-reader-rejects-v2-policy",
+    "input": {
+      "transport_revision": 1,
+      "policy_schema_version": 2,
+      "policy": "valid-source-policy-v2-shape"
+    },
+    "expected": "repository_policy_invalid;no-silent-field-ignoring;zero-attempts"
+  },
+  {
+    "id": "v2-external-build-mirror-admitted",
+    "input": {
+      "transport_revision": 2,
+      "lane": "external-build (manager section 11)",
+      "repository": "example.org/kit",
+      "endpoint": "https://mirror.example.net/kit.git",
+      "mirror_of": "example.org/kit"
+    },
+    "expected": "attempt-listed-mirror-once;section-11.2-url-grammar-satisfied;verify-locked-commit-tag-objects-identically-to-revision-1"
+  },
+  {
+    "id": "v2-external-build-port-refused",
+    "input": {
+      "transport_revision": 2,
+      "lane": "external-build (manager section 11)",
+      "repository": "example.org/kit",
+      "endpoint": "ssh://git@example.org:2222/kit.git"
+    },
+    "expected": "build_repository_identity_invalid;explicit-port-outside-section-11.2-grammar;zero-attempts;no-port-stripping-to-force-admission"
+  },
+  {
+    "id": "v2-external-build-alias-refused",
+    "input": {
+      "transport_revision": 2,
+      "lane": "external-build (manager section 11)",
+      "repository": "example.org/kit",
+      "endpoint": "https://example.org/kit.git",
+      "alias": "corp-mirror",
+      "aliases": {
+        "corp-mirror": {
+          "host": "mirror.corp.example",
+          "authentication": "team-https"
+        }
+      },
+      "mirror_of": "example.org/kit"
+    },
+    "expected": "build_repository_identity_invalid;alias-rewriting-has-no-resolved-host-input-in-strict-lane;zero-attempts"
+  }
+]
