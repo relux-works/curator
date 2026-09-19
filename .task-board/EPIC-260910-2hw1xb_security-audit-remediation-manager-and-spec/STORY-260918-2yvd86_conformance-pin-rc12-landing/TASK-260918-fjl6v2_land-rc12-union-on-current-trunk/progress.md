@@ -1,5 +1,5 @@
 ## Status
-to-review
+integrating
 
 ## Review
 required
@@ -28,6 +28,10 @@ estimated(fibonacci(8))
 - [x] Relevant build/validation commands run after changes and build not broken
 - [x] New outcome artifact attached on the board with a task-scoped name when the work produces notes, logs, screenshots, or other deliverables
 - [x] Important findings, decisions, anomalies, or regressions recorded in logbook when relevant
+- [x] Implementation matches AC
+- [x] Solution fits project architecture
+- [x] Tests green
+- [x] If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches
 
 ## Notes
 spawn selection rationale tuple: {"role":"developer","pair":"muse-spark-1.3-contributor/max","text":"Story-final landing of the accepted rc.12 union on a fresh trunk fork using the prepared resolutions and fix-up (the old story's replay is blocked by a tool error); muse-spark-1.3-contributor:max is the operator's producer pair; reviewer stays codex gpt-6-astra:low"}
@@ -38,6 +42,27 @@ spawn run started: [implementer] developer (muse) (run=RUN-260918-ee603f)
 Candidate landed on trunk 1c464c5: union 40 files (3 byte-verified resolutions, main.go auto-merge proven both ways) + fixup +33. Full 75-pkg suite green locally (all go test chunks exit 0). Ledger exit 1 on 4 pre-existing host-capability skips (pnpm/cargo) in untouched packages, reproduced on bare trunk; hosted gate at handoff is arbiter. Board CLI note: PATH shim wedged pre-exec mid-run; writes done via task-board-main-6cb09a23-curatorlike.
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260918-ee603f, pid=85657, exit=0)
+spawn selection rationale tuple: {"role":"reviewer","pair":"claude-opus-5/max","text":"Identity and combination review of the accepted rc.12 union re-applied on the current trunk (story-final landing); claude-opus-5:max is the operator's reviewer pair from 2026-09-18"}
+spawn selection rationale for claude-opus-5/max: Identity and combination review of the accepted rc.12 union re-applied on the current trunk (story-final landing); claude-opus-5:max is the operator's reviewer pair from 2026-09-18
+spawn agent resolution: Agent selection: claude via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn queued: [reviewer] reviewer (claude) (run=RUN-260918-a93e60, max_parallel=20)
+spawn run started: [reviewer] reviewer (claude) (run=RUN-260918-a93e60)
+agent completed: [reviewer] reviewer (claude) (exit=0)
+spawn run completed: claude (run=RUN-260918-a93e60, pid=43310, exit=0)
+spawn selection rationale tuple: {"role":"developer","pair":"muse-spark-1.3-contributor/max","text":"Bound producer-role integration run (task-board worktree integrate lands the accepted rc.12 union as the signed story squash on the local trunk); muse-spark-1.3-contributor:max is the operator's producer pair"}
+spawn selection rationale for muse-spark-1.3-contributor/max: Bound producer-role integration run (task-board worktree integrate lands the accepted rc.12 union as the signed story squash on the local trunk); muse-spark-1.3-contributor:max is the operator's producer pair
+spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn queued: [implementer] developer (muse) (run=RUN-260918-df2574, max_parallel=20)
+spawn run started: [implementer] developer (muse) (run=RUN-260918-df2574)
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260918-df2574, pid=16337, exit=0)
+spawn selection rationale tuple: {"role":"developer","pair":"muse-spark-1.3-contributor/max","text":"Bound producer-role integration run, attempt 2 with the gate poll detached from the managed shell (attempt 1 lost its sleep children to SIGKILL while the GitHub gate was green); muse-spark-1.3-contributor:max is the operator's producer pair"}
+spawn selection rationale for muse-spark-1.3-contributor/max: Bound producer-role integration run, attempt 2 with the gate poll detached from the managed shell (attempt 1 lost its sleep children to SIGKILL while the GitHub gate was green); muse-spark-1.3-contributor:max is the operator's producer pair
+spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn queued: [implementer] developer (muse) (run=RUN-260918-cd849a, max_parallel=20)
+spawn run started: [implementer] developer (muse) (run=RUN-260918-cd849a)
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260918-cd849a, pid=57971, exit=0)
 
 ## Precondition Resources
 - [TASK-260918-fjl6v2_brief.md](file://TASK-260918-fjl6v2/TASK-260918-fjl6v2_brief.md) — Producer brief: apply the accepted rc.12 union + prepared resolutions + fix-up onto the fresh trunk fork, story-final handoff
@@ -48,16 +73,27 @@ spawn run completed: muse (run=RUN-260918-ee603f, pid=85657, exit=0)
 - [TASK-260918-11f9l1_resolved-status.go](file://TASK-260918-fjl6v2/TASK-260918-11f9l1_resolved-status.go) — Prepared by TASK-260918-11f9l1 (combination worked out and validated in a scratch tree)
 - [TASK-260918-11f9l1_fixup.patch](file://TASK-260918-fjl6v2/TASK-260918-11f9l1_fixup.patch) — Prepared by TASK-260918-11f9l1 (combination worked out and validated in a scratch tree)
 - [TASK-260918-11f9l1_results.md](file://TASK-260918-fjl6v2/TASK-260918-11f9l1_results.md) — Prepared by TASK-260918-11f9l1 (combination worked out and validated in a scratch tree)
+- [TASK-260918-fjl6v2_review-brief.md](file://TASK-260918-fjl6v2/TASK-260918-fjl6v2_review-brief.md) — Reviewer brief, round 1 (identity vs the accepted union, combination correctness, gates)
+- [TASK-260918-fjl6v2_integration-run.md](file://TASK-260918-fjl6v2/TASK-260918-fjl6v2_integration-run.md) — Integration run instruction: worktree integrate of the story-final union (board-owner path)
+- [TASK-260918-fjl6v2_integration-run-attempt2.md](file://TASK-260918-fjl6v2/TASK-260918-fjl6v2_integration-run-attempt2.md) — Integration run attempt 2: worktree integrate detached via os.setsid so the remote-gate poll loop cannot be SIGKILLed by the managed shell; short polling
 
 ## Outcome Resources
 - [TASK-260918-fjl6v2_spawn-log_-implementer--developer--muse-_RUN-260918-ee603f.log](file://TASK-260918-fjl6v2/TASK-260918-fjl6v2_spawn-log_-implementer--developer--muse-_RUN-260918-ee603f.log) — System spawn log captured by task-board
 - [TASK-260918-fjl6v2_results.md](file://TASK-260918-fjl6v2/TASK-260918-fjl6v2_results.md)
+- [TASK-260918-fjl6v2_change-request_rev1.patch](file://TASK-260918-fjl6v2/TASK-260918-fjl6v2_change-request_rev1.patch) — Change Request CR-TASK-260918-fjl6v2-1 revision 1 candidate patch (repository_delta=present, 42 changed paths)
+- [TASK-260918-fjl6v2_change-request_rev1-validation.log](file://TASK-260918-fjl6v2/TASK-260918-fjl6v2_change-request_rev1-validation.log) — Change Request CR-TASK-260918-fjl6v2-1 revision 1 bounded validation log
+- [TASK-260918-fjl6v2_spawn-log_-reviewer--reviewer--claude-_RUN-260918-a93e60.log](file://TASK-260918-fjl6v2/TASK-260918-fjl6v2_spawn-log_-reviewer--reviewer--claude-_RUN-260918-a93e60.log) — System spawn log captured by task-board
+- [TASK-260918-fjl6v2_review-verdict-rev1.md](file://TASK-260918-fjl6v2/TASK-260918-fjl6v2_review-verdict-rev1.md) — Reviewer verdict rev 1 (accepted): per-file identity table, three-way union evidence, fix-up probe, local+hosted gate transcripts, narrowing mutants
+- [TASK-260918-fjl6v2_spawn-log_-implementer--developer--muse-_RUN-260918-df2574.log](file://TASK-260918-fjl6v2/TASK-260918-fjl6v2_spawn-log_-implementer--developer--muse-_RUN-260918-df2574.log) — System spawn log captured by task-board
+- [TASK-260918-fjl6v2_integration.md](file://TASK-260918-fjl6v2/TASK-260918-fjl6v2_integration.md) — Integration run transcript: integrate refused twice (local gate-poller SIGKILLed, exit 137); trunk unmoved, tree gate-green on run 35390532501
+- [TASK-260918-fjl6v2_spawn-log_-implementer--developer--muse-_RUN-260918-cd849a.log](file://TASK-260918-fjl6v2/TASK-260918-fjl6v2_spawn-log_-implementer--developer--muse-_RUN-260918-cd849a.log) — System spawn log captured by task-board
+- [TASK-260918-fjl6v2_integration-attempt2.md](file://TASK-260918-fjl6v2/TASK-260918-fjl6v2_integration-attempt2.md) — Integration attempt 2 (detached): revalidation_unavailable refusal, trunk unmoved, transcripts + default-binary hang finding
 
 ## Created
 2026-09-18T14:22:40Z
 
 ## Last Update
-2026-09-18T16:23:10Z
+2026-09-18T21:48:09Z
 
 ## Assigned To
 [implementer] developer (muse)

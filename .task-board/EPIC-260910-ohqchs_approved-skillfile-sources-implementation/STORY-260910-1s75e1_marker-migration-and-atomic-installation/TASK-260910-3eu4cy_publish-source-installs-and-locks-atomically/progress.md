@@ -110,6 +110,8 @@ spawn agent resolution: Agent selection: codex via explicit_override (preferred_
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [implementer] developer (codex) (run=RUN-260919-9708a4, max_parallel=20)
 spawn run started: [implementer] developer (codex) (run=RUN-260919-9708a4)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260919-9708a4, pid=10304, exit=0)
 
 ## Precondition Resources
 - [TASK-260910-3eu4cy_source-contract.md](file://TASK-260910-3eu4cy/TASK-260910-3eu4cy_source-contract.md) — Accepted specification, execution boundary and task-specific acceptance.
@@ -151,12 +153,13 @@ spawn run started: [implementer] developer (codex) (run=RUN-260919-9708a4)
 - [TASK-260910-3eu4cy_review-verdict-rev3.md](file://TASK-260910-3eu4cy/TASK-260910-3eu4cy_review-verdict-rev3.md) — Reviewer verdict rev3 (RUN-260919-759f8f): ACCEPT - F1-F4 closed per rulings, rev1 probes pass, MR1/MR7/MR8/M-v5/M-div killed, rev2->rev3 has no production change (Windows rev2 failure = budget, not a hang); F-W1 landing-time finding: Windows internal/install lane at 3516/3600 s, orchestrator decision on the CI budget needed before the landing PR
 - [TASK-260910-3eu4cy_review-rev3-evidence.tar.gz](file://TASK-260910-3eu4cy/TASK-260910-3eu4cy_review-rev3-evidence.tar.gz) — Reviewer rev3 evidence bundle: re-armed rev1 probes (zz_review_status_test.go with the recovery row, zz_review_tagbump_test.go), raw -v outputs of every rerun and mutant, driver logs with exit codes, mutant edit scripts, Windows gate timing analysis (cmp.py/timeline.py + outputs for the baseline/rev1/rev2/rev3 evidence streams, gate run JSON)
 - [TASK-260910-3eu4cy_spawn-log_-implementer--developer--codex-_RUN-260919-9708a4.log](file://TASK-260910-3eu4cy/TASK-260910-3eu4cy_spawn-log_-implementer--developer--codex-_RUN-260919-9708a4.log) — System spawn log captured by task-board
+- [TASK-260910-3eu4cy_integration-results.md](file://TASK-260910-3eu4cy/TASK-260910-3eu4cy_integration-results.md) — Revision 3 bound integration results; zsh pipefail enabled; integration pipeline exit code 0. Reparented and revalidated exact landed tree; cleanup_pending; hosted delivery steps remain as recorded in log.
 
 ## Created
 2026-09-10T13:57:03Z
 
 ## Last Update
-2026-09-19T09:29:53Z
+2026-09-19T10:15:34Z
 
 ## Assigned To
 [implementer] developer (codex)

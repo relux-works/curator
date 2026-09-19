@@ -77,6 +77,8 @@ spawn selection rationale for muse-spark-1.3-contributor/max: Bound producer-rol
 spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
 spawn queued: [implementer] doc-writer (muse) (run=RUN-260918-29b2b3, max_parallel=8)
 spawn run started: [implementer] doc-writer (muse) (run=RUN-260918-29b2b3)
+agent completed: [implementer] doc-writer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260918-29b2b3, pid=82352, exit=0)
 
 ## Precondition Resources
 - [TASK-260910-2c7s0u_brief.md](file://TASK-260910-2c7s0u/TASK-260910-2c7s0u_brief.md) — Producer brief
@@ -104,12 +106,13 @@ spawn run started: [implementer] doc-writer (muse) (run=RUN-260918-29b2b3)
 - [TASK-260910-2c7s0u_logbook-review-rev2.md](file://TASK-260910-2c7s0u/TASK-260910-2c7s0u_logbook-review-rev2.md) — F1-F3 resolved and replay-context anomaly reconfirmed
 - [TASK-260910-2c7s0u_review-verdict-rev2.md](file://TASK-260910-2c7s0u/TASK-260910-2c7s0u_review-verdict-rev2.md) — Accepted revision 2: independent tests, mypy, two narrowing mutants, scope and replay evidence
 - [TASK-260910-2c7s0u_spawn-log_-implementer--doc-writer--muse-_RUN-260918-29b2b3.log](file://TASK-260910-2c7s0u/TASK-260910-2c7s0u_spawn-log_-implementer--doc-writer--muse-_RUN-260918-29b2b3.log) — System spawn log captured by task-board
+- [TASK-260910-2c7s0u_completion.md](file://TASK-260910-2c7s0u/TASK-260910-2c7s0u_completion.md) — Completion run: worktree complete transcripts, landed commit db32e7f and board commit d91b11a
 
 ## Created
 2026-09-10T14:47:02Z
 
 ## Last Update
-2026-09-18T17:56:08Z
+2026-09-18T18:00:03Z
 
 ## Assigned To
 [implementer] doc-writer (muse)

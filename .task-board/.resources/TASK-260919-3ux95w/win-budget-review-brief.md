@@ -1,0 +1,2 @@
+# Review brief — TASK-260919-3ux95w
+Verify the exact candidate tree: only ci.yml (two GO_TEST_TIMEOUT expressions → Windows 120m, others 30m) and the budget comment (and a gate-selftest row if one pinned the expression) changed; nothing else. Confirm the hosted gate ran on the exact candidate tree and the Windows Test job used the 120m budget (job log shows GO_TEST_TIMEOUT: 120m). Verdict ACCEPT (accept_cr with your own evidence resource) or CHANGES_REQUESTED. Bounded local commands.

@@ -25,10 +25,10 @@ notEstimated
 (none)
 
 ## Outcome Resources
-- [BUG-260918-1jxmol_decision-packet.md](file://BUG-260918-1jxmol/BUG-260918-1jxmol_decision-packet.md) — Decision packet: full Xcode developer registry required by the closed rust target registry on the self-hosted darwin runner
+- [BUG-260918-1jxmol_decision-packet.md](file://BUG-260918-1jxmol/BUG-260918-1jxmol_decision-packet.md) — Decision packet (updated 16:40Z): Xcode installed; runner re-registered under ~/Library/GitHubActions with a different environment — rustup not visible again; runner-side fix needed before the Xcode layer can be observed
 
 ## Created
 2026-09-18T13:48:08Z
 
 ## Last Update
-2026-09-18T13:48:16Z
+2026-09-18T16:34:56Z

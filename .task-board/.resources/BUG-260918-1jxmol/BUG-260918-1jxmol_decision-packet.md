@@ -22,3 +22,8 @@ Alternative 1 (install Xcode on macbook-iv, one-time, documented), because the r
 
 ## Decision needed from the operator
 Which alternative; if 1, the operator installs Xcode + xcode-select on macbook-iv (and tells the orchestrator), after which the next main push proves the lane and this bug closes with that run as evidence; if 2 or 3, the orchestrator files the corresponding code task.
+
+## Update 2026-09-18 16:40Z — runner re-registered, rustup not visible again
+- Operator installed Xcode on macbook-iv (~16:00Z). The next main run (35368429341, commit e857e50, 16:31Z) fails EARLIER again: `rust-pin: rustup is not installed on this runner`.
+- Evidence of a new runner installation: work dir moved from `/Users/iv/actions-runner-relux-works-rose-air/_work` (run 35350749331, 13:41Z, rustup found at `/Users/iv/.cargo/bin/rustup`) to `/Users/iv/Library/GitHubActions/macbook-iv/_work`; the checkout step now logs `Can't unlink already-existing object: Permission denied` for files under `~/go/pkg/mod` → the new runner service runs under a different user/environment than the one that installed rustup and the Go module cache.
+- Needed on the runner (operator): run the new runner as user `iv` with `HOME=/Users/iv` (as before), or give the new runner `.path` (`/Users/iv/.cargo/bin:/opt/homebrew/bin` first) + `.env` (`CARGO_HOME=/Users/iv/.cargo`) and access to `/Users/iv/.cargo` and `~/go/pkg/mod`. The Xcode layer (this bug's original question) can only be observed after rustup resolves again.
