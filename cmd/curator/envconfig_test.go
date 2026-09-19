@@ -116,6 +116,79 @@ func TestEnvConfigRefusals(t *testing.T) {
 	}
 }
 
+// TestEnvConfigProviderDirectoriesRoundTrip proves the §11/§12.1 knob
+// travels the env config read-modify-write path: show reads the []
+// default, set stores the list, show reads it back, an invalid
+// spelling is refused without writing, and unset restores the default.
+func TestEnvConfigProviderDirectoriesRoundTrip(t *testing.T) {
+	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
+	code, stdout, _ := runProfile(t, source, "env", "config", "show", "provider_directories")
+	if code != exitOK || strings.TrimSpace(stdout) != "[]" {
+		t.Fatalf("show default = %d %q, want []", code, stdout)
+	}
+	code, stdout, stderr := runProfile(t, source, "env", "config", "set", "provider_directories", `["/opt/a", "/opt/b"]`)
+	if code != exitOK {
+		t.Fatalf("set = %d\nstderr:\n%s", code, stderr)
+	}
+	if !strings.Contains(stdout, "/opt/a") || !strings.Contains(stdout, "/opt/b") {
+		t.Fatalf("set printed %q, want the stored list", stdout)
+	}
+	source = reloadSource(t, source)
+	code, stdout, _ = runProfile(t, source, "env", "config", "show", "provider_directories")
+	if code != exitOK || !strings.Contains(stdout, "/opt/a") || !strings.Contains(stdout, "/opt/b") {
+		t.Fatalf("show after set = %d %q", code, stdout)
+	}
+	code, _, stderr = runProfile(t, source, "env", "config", "set", "provider_directories", `["rel/providers"]`)
+	if code != exitFail || !strings.Contains(stderr, "provider_directories") {
+		t.Fatalf("set of a relative entry = %d, want the grammar refusal\nstderr:\n%s", code, stderr)
+	}
+	source = reloadSource(t, source)
+	if len(source.cfg.Env.ProviderDirectories) != 2 {
+		t.Fatalf("a refused set wrote the machine file: %v", source.cfg.Env.ProviderDirectories)
+	}
+	code, _, stderr = runProfile(t, source, "env", "config", "unset", "provider_directories")
+	if code != exitOK {
+		t.Fatalf("unset = %d\nstderr:\n%s", code, stderr)
+	}
+	source = reloadSource(t, source)
+	code, stdout, _ = runProfile(t, source, "env", "config", "show", "provider_directories")
+	if code != exitOK || strings.TrimSpace(stdout) != "[]" {
+		t.Fatalf("show after unset = %d %q, want []", code, stdout)
+	}
+}
+
+// TestEnvConfigProviderDirectoriesLockedRefuses drives the §12.2 fleet
+// policy through run(): a system file locks the list, a set refuses
+// with the system-file warning, and show reads the locked value.
+func TestEnvConfigProviderDirectoriesLockedRefuses(t *testing.T) {
+	source, _ := profileHome(t)
+	home := t.TempDir()
+	userPath := filepath.Join(home, "config.json")
+	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	systemPath := filepath.Join(home, "system.json")
+	if err := os.WriteFile(systemPath, []byte(`{"schema_version": 2, "locked": ["environments.provider_directories"],
+		"environments": {"provider_directories": ["/opt/fleet"]}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
+	cfg, err := config.Load(userPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source.path = userPath
+	source.cfg = cfg
+	code, _, stderr := runProfile(t, source, "env", "config", "set", "provider_directories", `["/opt/user"]`)
+	if code != exitFail || !strings.Contains(stderr, systemPath) {
+		t.Fatalf("set on the locked knob = %d, want the system-file refusal\nstderr:\n%s", code, stderr)
+	}
+	code, stdout, _ := runProfile(t, source, "env", "config", "show", "provider_directories")
+	if code != exitOK || !strings.Contains(stdout, "/opt/fleet") {
+		t.Fatalf("show of the locked knob = %d %q", code, stdout)
+	}
+}
+
 // TestEnvConfigLockedKnobRefuses drives the manager §1 locked-key refusal
 // through run(): a locked knob refuses with the system-file warning and the
 // file is unchanged.

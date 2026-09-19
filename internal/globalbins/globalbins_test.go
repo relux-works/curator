@@ -271,3 +271,63 @@ func containsMessage(messages []string, fragment string) bool {
 	}
 	return false
 }
+
+// TestPublishedShimsTracksTheLedger pins the umbrella lookup's seam: a
+// directory the manager never published into reports unpublished, and
+// any ledger the manager wrote — including an emptied one — marks the
+// directory as a publication target. Presence counts, not content.
+func TestPublishedShimsTracksTheLedger(t *testing.T) {
+	root := t.TempDir()
+	fresh := filepath.Join(root, "fresh")
+	if err := os.MkdirAll(fresh, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if PublishedShims(fresh) {
+		t.Fatal("a directory with no ledger reports published")
+	}
+	if PublishedShims(filepath.Join(root, "missing")) {
+		t.Fatal("a missing directory reports published")
+	}
+	published := filepath.Join(root, "published")
+	if err := os.MkdirAll(published, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeLedger(published, map[string]bool{"tool": true}); err != nil {
+		t.Fatal(err)
+	}
+	if !PublishedShims(published) {
+		t.Fatal("a directory carrying the ownership ledger reports unpublished")
+	}
+	if err := writeLedger(published, map[string]bool{}); err != nil {
+		t.Fatal(err)
+	}
+	if !PublishedShims(published) {
+		t.Fatal("an emptied ledger stops marking its directory as published")
+	}
+}
+
+// TestSelectReportsExplicit pins which selections carry the
+// operator-declared publishing location: an explicitly configured bin
+// reports Explicit, a scanned PATH entry does not.
+func TestSelectReportsExplicit(t *testing.T) {
+	root := t.TempDir()
+	userHome := filepath.Join(root, "user")
+	managerHome := filepath.Join(root, "manager")
+	userBin := filepath.Join(userHome, ".local", "bin")
+	if err := os.MkdirAll(userBin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	explicit := Select(managerHome, "unix", map[string]string{
+		"PATH":     userBin,
+		UserBinEnv: userBin,
+	}, userHome)
+	if explicit.Path != userBin || !explicit.Explicit {
+		t.Fatalf("explicit selection = %+v, want the declared bin marked explicit", explicit)
+	}
+	scanned := Select(managerHome, "unix", map[string]string{
+		"PATH": userBin,
+	}, userHome)
+	if scanned.Path != userBin || scanned.Explicit {
+		t.Fatalf("scanned selection = %+v, want the PATH entry without the explicit mark", scanned)
+	}
+}

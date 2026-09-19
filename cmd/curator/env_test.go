@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/config"
 )
 
 // These tests drive the production run() entry point for the env rows and
@@ -95,6 +97,21 @@ func TestEnvResolveUnknowns(t *testing.T) {
 // --check and --json.
 func TestEnvStatusMatrix(t *testing.T) {
 	source, _ := profileHome(t)
+	// The §12 provider rows join the matrix: run and session are always
+	// reported, and a missing row is non-current — so the post-repair
+	// --check plants stub providers, which warn outside the trust
+	// roots under revision A but stay current.
+	bin := t.TempDir()
+	for _, name := range []string{"curator-run", "curator-session"} {
+		full := filepath.Join(bin, name)
+		if runtime.GOOS == "windows" {
+			full += ".exe"
+		}
+		if err := os.WriteFile(full, []byte(""), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	pkg := t.TempDir()
 	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
 	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
@@ -129,6 +146,11 @@ func TestEnvStatusMatrix(t *testing.T) {
 			t.Fatalf("status rows miss %q:\n%s", want, stdout)
 		}
 	}
+	for _, want := range []string{"provider run:", "provider session:", "subcommand_provider_outside_trust_roots"} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("status rows miss %q:\n%s", want, stdout)
+		}
+	}
 	code, jsonOut, _ := runProfile(t, source, "env", "status", "--json")
 	if code != exitOK {
 		t.Fatalf("status --json = %d", code)
@@ -137,13 +159,31 @@ func TestEnvStatusMatrix(t *testing.T) {
 	if err := json.Unmarshal([]byte(jsonOut), &decoded); err != nil {
 		t.Fatalf("status --json is not JSON: %v", err)
 	}
-	for _, key := range []string{"homes", "scopes", "adapters", "targets", "profiles", "unregistered_environments", "orphans", "notes", "non_current"} {
+	for _, key := range []string{"homes", "scopes", "adapters", "targets", "profiles", "providers", "unregistered_environments", "orphans", "notes", "non_current"} {
 		if _, ok := decoded[key]; !ok {
 			t.Fatalf("status --json misses snake_case member %q: %v", key, decoded)
 		}
 	}
 	if _, ok := decoded["Homes"]; ok {
 		t.Fatalf("status --json publishes Go field names: %v", decoded)
+	}
+	providers, _ := decoded["providers"].([]any)
+	names := map[string]bool{}
+	for _, entry := range providers {
+		row, _ := entry.(map[string]any)
+		if row == nil {
+			t.Fatalf("provider row is not an object: %v", entry)
+		}
+		for _, key := range []string{"name", "executable", "resolved", "verdict", "current", "trust_roots_consulted"} {
+			if _, ok := row[key]; !ok {
+				t.Fatalf("provider row misses snake_case member %q: %v", key, row)
+			}
+		}
+		name, _ := row["name"].(string)
+		names[name] = true
+	}
+	if !names["run"] || !names["session"] {
+		t.Fatalf("providers miss the always-reported rows: %v", names)
 	}
 }
 
@@ -182,6 +222,11 @@ func TestUmbrellaDispatchesToProvider(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "provider got: alpha --beta") {
 		t.Fatalf("provider did not receive argv verbatim:\n%s", stdout)
+	}
+	// The temp bin is outside the trust roots, so revision A dispatches
+	// with the migration warning.
+	if !strings.Contains(stderr, "subcommand_provider_outside_trust_roots") {
+		t.Fatalf("stderr carries no outside-roots warning:\n%s", stderr)
 	}
 }
 
@@ -227,5 +272,82 @@ func TestImplementedCommandWinsOverProvider(t *testing.T) {
 	code, stdout, _ := runProfile(t, source, "profile")
 	if code == exitOK || strings.Contains(stdout, "shadowed") {
 		t.Fatalf("the implemented subcommand must win: %d %q", code, stdout)
+	}
+}
+
+// TestEnvStatusS4Posture drives the §12 posture through run(): with an
+// absent knob the text names s4-warn with an unbounded effective list,
+// warns the empty allowlist, and prints no rows for the empty MCP set;
+// the JSON carries the same posture members.
+func TestEnvStatusS4Posture(t *testing.T) {
+	source, _ := profileHome(t)
+	pkg := t.TempDir()
+	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
+	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
+		t.Fatalf("install stderr:\n%s", stderr)
+	}
+	code, stdout, _ := runProfile(t, source, "env", "status")
+	if code != exitOK {
+		t.Fatalf("status = %d\n%s", code, stdout)
+	}
+	if !strings.Contains(stdout, "s4_profile: s4-warn, passable_env_names: unbounded") {
+		t.Fatalf("status postures no S4 profile:\n%s", stdout)
+	}
+	if !strings.Contains(stdout, "warning: mcp_package_allowlist_empty") {
+		t.Fatalf("status warns no empty allowlist:\n%s", stdout)
+	}
+	if strings.Contains(stdout, "mcp-declaration") {
+		t.Fatalf("an empty MCP set must print no rows:\n%s", stdout)
+	}
+	code, jsonOut, _ := runProfile(t, source, "env", "status", "--json")
+	if code != exitOK {
+		t.Fatalf("status --json = %d", code)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal([]byte(jsonOut), &decoded); err != nil {
+		t.Fatalf("status --json is not JSON: %v", err)
+	}
+	if decoded["s4_profile"] != "s4-warn" {
+		t.Fatalf("s4_profile = %v", decoded["s4_profile"])
+	}
+	if decoded["passable_env_names"] != nil {
+		t.Fatalf("passable_env_names = %v, want null for unbounded", decoded["passable_env_names"])
+	}
+	warnings, _ := decoded["warnings"].([]any)
+	found := false
+	for _, raw := range warnings {
+		found = found || strings.HasPrefix(raw.(string), "mcp_package_allowlist_empty:")
+	}
+	if !found {
+		t.Fatalf("warnings = %v, want the allowlist-empty row", warnings)
+	}
+}
+
+// TestEnvStatusEffectivePassableList drives the posture with a
+// configured knob: the text renders the effective list.
+func TestEnvStatusEffectivePassableList(t *testing.T) {
+	source, home := profileHome(t)
+	userPath := filepath.Join(home, "machine.json")
+	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {},`+
+		`"environments": {"passable_env_names": ["A_B"]}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(userPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source.path = userPath
+	source.cfg = cfg
+	pkg := t.TempDir()
+	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
+	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
+		t.Fatalf("install stderr:\n%s", stderr)
+	}
+	code, stdout, _ := runProfile(t, source, "env", "status")
+	if code != exitOK {
+		t.Fatalf("status = %d\n%s", code, stdout)
+	}
+	if !strings.Contains(stdout, `s4_profile: s4-warn, passable_env_names: ["A_B"]`) {
+		t.Fatalf("status postures no effective list:\n%s", stdout)
 	}
 }

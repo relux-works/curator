@@ -191,31 +191,128 @@ func (f *Fragment) ShellFormat(adapter envregistry.Adapter) []byte {
 	return []byte(out.String())
 }
 
-// BoundEnvNames applies the two bounds of §10.3 before the composer sees a
-// name: the §2.2 reserved-name exclusion, then the lockable
-// passable_env_names allowlist (nil means unbounded). The input must
-// already be sorted; the output keeps the order.
-func BoundEnvNames(names []string, passable []string) []string {
-	out := []string{}
-	for _, name := range names {
+// S4 passthrough diagnostics (environments §2.1, §10.4).
+const (
+	// DiagPassthroughUnlisted warns, under s4-warn, for each passed
+	// operator variable outside an explicitly configured
+	// passable_env_names list, or for each passed variable when the knob
+	// is absent. It names the variables and the knob and carries the
+	// migration hint.
+	DiagPassthroughUnlisted = "mcp_env_passthrough_unlisted" // #nosec G101 -- diagnostic code, not a credential
+	// DiagPassthroughDropped warns, under s4-enforce, for each requested
+	// name dropped from the launch allowlist. It names the variables.
+	DiagPassthroughDropped = "mcp_env_passthrough_dropped" // #nosec G101 -- diagnostic code, not a credential
+)
+
+// S4Profile is one §10.3 warn-first passthrough profile: the warning
+// release keeps the pre-S4 unbounded default with a warning, the flip
+// release bounds an absent knob to the empty list.
+type S4Profile string
+
+const (
+	// S4Warn is the warning release: an absent passable_env_names knob
+	// behaves as unbounded, but every resolution that passes an
+	// operator variable warns mcp_env_passthrough_unlisted.
+	S4Warn S4Profile = "s4-warn"
+	// S4Enforce is the flip release, the revision-1 rule: an absent
+	// knob is the empty list, and unlisted requested names are dropped
+	// with mcp_env_passthrough_dropped.
+	S4Enforce S4Profile = "s4-enforce"
+)
+
+// ActiveS4Profile is the shipped profile: s4-warn first. A manager MUST
+// ship s4-warn before s4-enforce — one release MUST NOT flip the default
+// and start dropping in a single step — so the flip is a later release
+// that moves this one constant.
+const ActiveS4Profile = S4Warn
+
+// MigrationHint is the §10.3 migration hint the unlisted warning carries.
+const MigrationHint = "list the named variables to keep passing them after the flip"
+
+// PassthroughVerdict is one S4 resolution: the names that reach the launch
+// allowlist, the requested names outside the effective list, and the
+// profile warning, if any. Reserved names are excluded before the bound
+// and appear in neither list: the §2.2 exclusion is silent.
+type PassthroughVerdict struct {
+	Passed  []string
+	Dropped []string
+	Warning string
+}
+
+// EffectivePassable returns the effective passable_env_names allowlist for
+// the profile: the explicitly configured list when the knob carries one,
+// unbounded (nil) when the knob is explicitly null, and — when the knob
+// is absent — unbounded under s4-warn, the empty list under s4-enforce.
+// Nil always means unbounded, matching BoundEnvNames.
+func EffectivePassable(passable []string, knobSet bool, profile S4Profile) []string {
+	if knobSet {
+		return passable
+	}
+	if profile == S4Enforce {
+		return []string{}
+	}
+	return nil
+}
+
+// ResolvePassthrough applies the S4 profile's §10.3 bound to the
+// requested names: the §2.2 reserved-name exclusion first, then the
+// effective passable_env_names allowlist. knobSet distinguishes an absent
+// knob (the profile default applies) from an explicit null (unbounded,
+// silent under both profiles). The input must already be sorted; Passed
+// and Dropped keep the requested order. Warning is "" when the profile
+// is silent and otherwise starts with the diagnostic code.
+func ResolvePassthrough(requested []string, passable []string, knobSet bool, profile S4Profile) PassthroughVerdict {
+	effective := EffectivePassable(passable, knobSet, profile)
+	verdict := PassthroughVerdict{Passed: []string{}, Dropped: []string{}}
+	for _, name := range requested {
 		if contextpkg.ReservedEnvName(name) {
 			continue
 		}
-		if passable != nil {
-			allowed := false
-			for _, candidate := range passable {
-				if candidate == name {
-					allowed = true
-					break
-				}
-			}
-			if !allowed {
-				continue
+		if effective == nil {
+			verdict.Passed = append(verdict.Passed, name)
+			continue
+		}
+		allowed := false
+		for _, candidate := range effective {
+			if candidate == name {
+				allowed = true
+				break
 			}
 		}
-		out = append(out, name)
+		if allowed {
+			verdict.Passed = append(verdict.Passed, name)
+		} else {
+			verdict.Dropped = append(verdict.Dropped, name)
+		}
 	}
-	return out
+	switch profile {
+	case S4Enforce:
+		if len(verdict.Dropped) > 0 {
+			verdict.Warning = DiagPassthroughDropped + ": dropping " +
+				strings.Join(verdict.Dropped, ", ") + " outside passable_env_names"
+		}
+	default:
+		// Under s4-warn an explicitly configured list bounds silently
+		// (unlisted requested names never reach Passed, so there is
+		// nothing to warn about); an absent knob passes unbounded and
+		// warns for each passed variable.
+		if !knobSet && len(verdict.Passed) > 0 {
+			verdict.Warning = DiagPassthroughUnlisted + ": passing " +
+				strings.Join(verdict.Passed, ", ") +
+				" with passable_env_names absent; " + MigrationHint
+		}
+	}
+	return verdict
+}
+
+// BoundEnvNames applies the two bounds of §10.3 before the composer sees a
+// name: the §2.2 reserved-name exclusion, then the lockable
+// passable_env_names allowlist under the active S4 profile. A nil passable
+// is read as an ABSENT knob — unbounded under s4-warn, empty under
+// s4-enforce — so explicit-null callers must use ResolvePassthrough with
+// knobSet. The input must already be sorted; the output keeps the order.
+func BoundEnvNames(names []string, passable []string) []string {
+	return ResolvePassthrough(names, passable, passable != nil, ActiveS4Profile).Passed
 }
 
 // CheckBoundary enforces the §10.3 profile-influence boundary on an
