@@ -759,7 +759,10 @@ func (c cli) cmdStatus(args []string) int {
 			// Everything else keeps the historical behaviour exactly: a failure
 			// that describes no compiled command, or describes only some of them,
 			// reports the error and exits non-zero rather than publishing a
-			// silently partial report.
+			// silently partial report. A stale draft lock takes this path too:
+			// the row set cannot be derived from the new manifest without a
+			// collection rescan, which status must not do, so a stale lock is
+			// not a per-member verdict at all.
 			if !result.BuildsComplete {
 				c.printResult(result)
 				exitCode = exitFail
@@ -774,7 +777,23 @@ func (c cli) cmdStatus(args []string) int {
 			}
 			continue
 		}
-		drift, builds := statusReport(cfg, scope, factsList(result.Builds), before)
+		facts := factsList(result.Builds)
+		var drift map[string]string
+		var builds []buildReport
+		if draftStatusApplies(target.Root) {
+			var driftErr error
+			drift, driftErr = draftStatusDrift(target.Root, scope.skillsDir, result.Attestations)
+			if driftErr != nil {
+				_, _ = fmt.Fprintln(c.stderr, "curator:", driftErr)
+				exitCode = exitFail
+				continue
+			}
+			if len(facts) > 0 {
+				builds = classifyScopeBuilds(cfg, scope, facts, before, drift)
+			}
+		} else {
+			drift, builds = statusReport(cfg, scope, facts, before)
+		}
 		// The shell-hook trust posture (Manager profile §8.6) extends
 		// the document additively under its own key; an all-approved
 		// posture is still posture, so the key is always present. The
@@ -900,7 +919,21 @@ func statusReport(
 	if len(builds) == 0 {
 		return drift, nil
 	}
+	return drift, classifyScopeBuilds(cfg, scope, builds, before, drift)
+}
 
+// classifyScopeBuilds is the compiled half of a status verdict, shared by
+// the legacy and draft skill surfaces: it classifies every planned build
+// against installed markers and the protected cache, closes the
+// classification race window with a second look, and demotes drifted
+// skills. drift is updated in place.
+func classifyScopeBuilds(
+	cfg *config.Config,
+	scope statusScope,
+	builds []buildFacts,
+	before map[string]string,
+	drift map[string]string,
+) []buildReport {
 	bySkill := map[string][]buildFacts{}
 	var skills []string
 	for _, facts := range builds {
@@ -950,7 +983,7 @@ func statusReport(
 		reports = append(reports, item.rows...)
 		demoteSkill(drift, item.skill, item.state)
 	}
-	return drift, reports
+	return reports
 }
 
 // changedDuringCheck reports why one skill's compiled verdict is not

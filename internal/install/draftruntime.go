@@ -1,6 +1,7 @@
 package install
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/relux-works/curator/internal/buildmeta"
@@ -12,22 +13,18 @@ import (
 )
 
 // draftRuntimeKeys derives the protected runtime-store leaf of every locked
-// local-snapshot draft member from its frozen package identity
-// (skillfile-sources §4). The key is SHA-256 over the CCJ-1 bytes of the
-// locked package in the distinct source-v1 namespace — never the bare
-// snapshot digest and never a Git commit substituted into the other arm.
-// A runtime-only refresh changes the package, so it changes the key and
-// requires new runtime publication instead of reusing the previous tree.
-//
-// Git draft members keep their accepted commit-keyed leaves: their marker
-// and runtime key migrate to the namespaced identity together in the
-// integration leaf, never one without the other.
+// draft member from its frozen package identity (skillfile-sources §4).
+// The key is SHA-256 over the CCJ-1 bytes of the locked package in the
+// distinct source-v1 namespace — never the bare snapshot digest and never
+// a Git commit substituted into the other arm. A runtime-only refresh
+// changes the package, so it changes the key and requires new runtime
+// publication instead of reusing the previous tree. The marker and the
+// runtime key migrated together: every draft member records marker schema
+// 5, so every draft runtime leaf is namespaced and GC marks them from the
+// recorded package.
 func draftRuntimeKeys(lock *sourcelock.Lock) (map[string]string, error) {
 	keys := make(map[string]string, len(lock.Members))
 	for _, member := range lock.Members {
-		if member.Package.Kind != sourcelock.KindLocalSnapshot {
-			continue
-		}
 		digest, err := member.Package.Digest()
 		if err != nil {
 			return nil, err
@@ -42,21 +39,18 @@ func draftRuntimeKeys(lock *sourcelock.Lock) (map[string]string, error) {
 }
 
 // draftBuildPackages selects the frozen package identity of every draft
-// member whose installation is recorded under marker schema 5 — today the
-// local-snapshot arm, exactly the members buildDraftMarker stages. Their
-// compiled commands are keyed and receipted under the receipt-3 wrapper on
-// both the local go-v1 and the external go-repository-v1 arm; Git draft
-// members keep their accepted legacy receipts until their marker migrates
-// with them, never one without the other. nil on the frozen v1 lane.
+// member: every draft installation is recorded under marker schema 5,
+// exactly the members buildDraftMarker stages. Their compiled commands
+// are keyed and receipted under the receipt-3 wrapper on both the local
+// go-v1 and the external go-repository-v1 arm; the marker and the receipt
+// binding migrated together, never one without the other. nil on the
+// frozen v1 lane.
 func draftBuildPackages(lock *sourcelock.Lock) map[string]*buildmeta.Package {
 	if lock == nil {
 		return nil
 	}
 	packages := make(map[string]*buildmeta.Package, len(lock.Members))
 	for _, member := range lock.Members {
-		if member.Package.Kind != sourcelock.KindLocalSnapshot {
-			continue
-		}
 		packages[member.Name] = receiptPackage(member.Package)
 	}
 	return packages
@@ -108,11 +102,19 @@ func draftMarkerPackage(pkg sourcelock.Package) *marker.Package {
 	return translated
 }
 
-// buildDraftMarker stages the install marker of one local-snapshot draft
-// member: marker schema 5 with the frozen package and the binding lock,
-// every retained field carried exactly like the legacy marker. Git draft
-// members keep their accepted legacy shape; only local snapshots — which
-// have no legacy identity at all — reach this builder.
+// buildDraftMarker stages the install marker of one draft member: marker
+// schema 5 with the frozen package and the binding lock, every retained
+// field carried exactly like the legacy marker (skillfile-sources §4
+// migration table). The package replaces the legacy source identity on
+// every arm; the declared ref selection lives in the manifest and bound
+// lock, never in the marker. A Git member carries the registry
+// attestation the effective plan selected and the legacy
+// development-substitution identifier the node carries. A local snapshot
+// admits neither — local content has no network identity and no selector
+// to substitute — so staging an attestation or substitution for one
+// fails closed instead of writing a marker the reader must refuse. The
+// summaries recorded here never authorize: every gate re-resolves its
+// own evidence.
 func buildDraftMarker(
 	node *closure.Node,
 	member sourcelock.Member,
@@ -121,9 +123,18 @@ func buildDraftMarker(
 	agents []string,
 	activeCommands []string,
 	mcp map[string][]string,
+	attestation *marker.Attestation,
 	builds map[string]marker.Build,
 	source *buildsource.Identity,
-) *marker.Marker {
+) (*marker.Marker, error) {
+	if member.Package.Kind == sourcelock.KindLocalSnapshot {
+		if attestation != nil {
+			return nil, fmt.Errorf("source_member_invalid: local-snapshot member %s cannot carry a registry attestation", node.Name)
+		}
+		if node.Substituted != "" {
+			return nil, fmt.Errorf("source_member_invalid: local-snapshot member %s cannot carry a development substitution", node.Name)
+		}
+	}
 	var commands []string
 	for name, command := range node.Spec.Commands {
 		if command.Type == "script" || command.Type == "build" {
@@ -174,12 +185,14 @@ func buildDraftMarker(
 		Builds:             builds,
 		Requirements:       requirements,
 		McpServers:         mcp,
+		Attestation:        attestation,
 		Activation:         &marker.Activation{Context: node.ContextActive(), Commands: activeCommands},
 		Requirers:          node.Consumers(),
+		Substituted:        node.Substituted,
 	}
 	if !node.ContextActive() {
 		expected.Locale = ""
 		expected.Agents = []string{}
 	}
-	return expected
+	return expected, nil
 }

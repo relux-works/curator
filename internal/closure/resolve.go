@@ -247,9 +247,15 @@ func stagePriorFile(path string) (prior []byte, existed bool, err error) {
 }
 
 // restorePriorFile returns the file at path to its staged prior bytes:
-// rewrite them when the file existed, remove the new file when it did
-// not. Publication writes are atomic renames, so a failed second write
-// leaves the first write fully in place to roll back.
+// rewrite them atomically when the file existed, remove the new file when
+// it did not. Publication writes are atomic renames, so a failed second
+// write leaves the first write fully in place to roll back, and the
+// restore itself is an atomic rename too, so a crash during rollback
+// leaves either the prior or the published bytes behind, never a torn
+// file. A crash between the two publication renames instead leaves the
+// new lock beside the old bindings; that generation mismatch fails closed
+// (source_lock_stale via Bindings.CheckFresh) and the next explicit
+// attempt re-publishes both files.
 func restorePriorFile(path string, prior []byte, existed bool) error {
 	if !existed {
 		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
@@ -257,7 +263,7 @@ func restorePriorFile(path string, prior []byte, existed bool) error {
 		}
 		return nil
 	}
-	return os.WriteFile(path, prior, 0o644)
+	return sourcelock.Restore(path, prior)
 }
 
 // FrozenOptions carries the member-scoped inputs of frozen consumption.

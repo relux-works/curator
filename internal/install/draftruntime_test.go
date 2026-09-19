@@ -515,10 +515,12 @@ func TestDraftMarkerPackageDigestMatchesLockDigest(t *testing.T) {
 	}
 }
 
-// TestDraftRuntimeKeysSkipGitMembers proves the interim boundary: only
-// local snapshots take source-v1 keys, while Git draft members keep their
-// accepted commit-keyed leaves until marker and key migrate together.
-func TestDraftRuntimeKeysSkipGitMembers(t *testing.T) {
+// TestDraftRuntimeKeysCoverAllArms proves the migrated boundary: every
+// locked draft member takes a source-v1 key derived from its frozen
+// package digest, never a commit-keyed leaf. The marker and the runtime
+// key migrated together (marker schema 5 for every draft installation),
+// so GC marks every draft runtime leaf from the recorded package.
+func TestDraftRuntimeKeysCoverAllArms(t *testing.T) {
 	localPkg, err := sourcelock.LocalPackage("sha256:" + strings.Repeat("ab", 32))
 	if err != nil {
 		t.Fatal(err)
@@ -528,18 +530,31 @@ func TestDraftRuntimeKeysSkipGitMembers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	configuredPkg, err := sourcelock.ConfiguredGitPackage("vendor/kit",
+		sourcelock.Commit{ObjectFormat: "sha1", Hex: strings.Repeat("ef", 20)})
+	if err != nil {
+		t.Fatal(err)
+	}
 	lock := &sourcelock.Lock{Members: []sourcelock.Member{
 		{Name: "local", Package: localPkg},
 		{Name: "review", Package: gitPkg},
+		{Name: "vendored", Package: configuredPkg},
 	}}
 	keys, err := draftRuntimeKeys(lock)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := keys["local"]; !ok {
-		t.Fatalf("keys = %v, want a source-v1 key for the local member", keys)
-	}
-	if _, ok := keys["review"]; ok {
-		t.Fatalf("keys = %v, the Git member must keep its commit-keyed leaf", keys)
+	for _, member := range lock.Members {
+		digest, err := member.Package.Digest()
+		if err != nil {
+			t.Fatal(err)
+		}
+		want, err := runtimestore.SourceV1Key(digest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if keys[member.Name] != want {
+			t.Fatalf("keys[%s] = %q, want source-v1 key %q", member.Name, keys[member.Name], want)
+		}
 	}
 }

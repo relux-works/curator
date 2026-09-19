@@ -46,10 +46,9 @@ const (
 	// SchemaV5 is written only for skillfile-sources draft installations
 	// (Skillfile schema 2). Its package replaces the legacy
 	// source/git/ref_kind/ref/commit fields and its lock_sha256 binds the
-	// installed selection through the validated lock. Legacy lanes never
-	// write it; Git draft members keep their accepted legacy shape until
-	// the integration leaf migrates them, so only local-snapshot packages
-	// reach it today.
+	// installed selection and declared ref through the validated lock and
+	// matching manifest. Every locked draft member records it, whatever
+	// the skill manifest version; legacy lanes never write it.
 	SchemaV5 = 5
 	// NewestSchemaVersion is the highest marker schema this release reads. It
 	// is what an operator is told when a document from a newer manager is
@@ -327,9 +326,7 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
 		if !validV5Identity(m, raw) {
 			return false
 		}
-	} else if !identifiers.PortablePath(m.Source) ||
-		(m.RefKind != "tag" && m.RefKind != "branch" && m.RefKind != "revision") ||
-		m.Ref == "" || utf8.RuneCountInString(m.Ref) > 8192 || !markerCommitRE.MatchString(m.Commit) {
+	} else if !identifiers.PortablePath(m.Source) || !validLegacyTriple(m) {
 		return false
 	}
 	if !markerSHA256RE.MatchString(m.ContentSHA256) || m.SkillSchemaVersion < 0 ||
@@ -420,6 +417,14 @@ func validV5Identity(m *Marker, raw map[string]json.RawMessage) bool {
 		}
 	}
 	return true
+}
+
+// validLegacyTriple reports whether the declared ref identity uses the
+// legacy grammar: a known ref kind, a non-empty bounded ref and a hex
+// commit. Legacy markers require it.
+func validLegacyTriple(m *Marker) bool {
+	return (m.RefKind == "tag" || m.RefKind == "branch" || m.RefKind == "revision") &&
+		m.Ref != "" && utf8.RuneCountInString(m.Ref) <= 8192 && markerCommitRE.MatchString(m.Commit)
 }
 
 // v5PackageArms is the closed raw shape of every source-types package arm:

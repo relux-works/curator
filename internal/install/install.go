@@ -120,6 +120,12 @@ type Result struct {
 	// instead of claiming the live cache is always unchanged after a failure.
 	// The warnings of the run say which case it was.
 	BuildCacheRetained bool
+	// Attestations is the registry evidence the effective plan selected,
+	// by skill name. A read-only caller compares it against the recorded
+	// marker summaries (skillfile-sources §4: changed registry, status,
+	// or key is non-current); it never authorizes. Nil when resolution
+	// never ran or failed.
+	Attestations map[string]*marker.Attestation
 }
 
 func (r *Result) failf(format string, args ...any) {
@@ -523,6 +529,7 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 		result.failf("%v", regErr)
 		return result, nil
 	}
+	result.Attestations = attestations
 
 	// 15. Narrow boundaries for the remaining read-only gates. Operation-private
 	// toolchain state must never land in the checkout, the runtime store, or a
@@ -573,6 +580,9 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 		}
 		observed.observe("marker/"+kind+"/"+node.Name, filepath.Join(store, node.Name, marker.Name))
 	}
+	// On the draft lane install never re-resolves refs, so a tag move is
+	// observable only at explicit refresh; schema-5 markers never match
+	// the gate below (see detectMovedTagsIn).
 	movedTags := detectMovedTags(projectRoot, nodes, deps.Generation)
 	if len(movedTags) > 0 {
 		if opts.StrictTags {
@@ -1030,10 +1040,12 @@ func validateNodes(nodes []*closure.Node, localeValue, alias string, result *Res
 }
 
 // buildNodeMarker stages the install marker of one project node. On the
-// draft lane a local-snapshot member carries no legacy source identity, so
-// it records marker schema 5 with its frozen package and binding lock;
-// every other member — frozen v1 nodes and Git draft members with their
-// accepted legacy shape — records the legacy marker byte-identically.
+// draft lane every locked member records marker schema 5 with its frozen
+// package and binding lock (skillfile-sources §4 migration table): the
+// package replaces the legacy source identity on every arm, Git members
+// carry the registry attestation the effective plan selected and the
+// substitution identifier they carry, and a local snapshot admits
+// neither. Frozen v1 nodes record the legacy marker byte-identically.
 func (request projectTargetRequest) buildNodeMarker(
 	node *closure.Node,
 	nodeLocale string,
@@ -1047,11 +1059,10 @@ func (request projectTargetRequest) buildNodeMarker(
 		if !ok {
 			return nil, fmt.Errorf("source_member_missing: %s is not a locked member", node.Name)
 		}
-		if member.Package.Kind == sourcelock.KindLocalSnapshot {
-			return buildDraftMarker(node, member, request.draftLock.LockSHA256,
-				nodeLocale, nodeAgents, active,
-				request.mcpFound[node.Name], builds, source), nil
-		}
+		return buildDraftMarker(node, member, request.draftLock.LockSHA256,
+			nodeLocale, nodeAgents, active,
+			request.mcpFound[node.Name], request.attestations[node.Name],
+			builds, source)
 	}
 	return buildMarker(node, nodeLocale, nodeAgents, active,
 		request.mcpFound[node.Name], request.attestations[node.Name],
@@ -1214,6 +1225,13 @@ func detectMovedTags(projectRoot string, nodes []*closure.Node, generation Gener
 
 // detectMovedTagsIn is a read-only gate: it only reads the recorded
 // installation generation of each node through the injected reader.
+//
+// A draft schema-5 marker never matches this gate: the closed shape
+// carries no ref, so a commit difference between the marker and the
+// frozen node cannot distinguish "the same tag moved" from "the operator
+// declared a different tag". On the draft lane install never re-resolves
+// refs — the frozen lock binds the declared ref — so a tag move is
+// observable only at explicit refresh, never here.
 func detectMovedTagsIn(skillsDir string, nodes []*closure.Node, generation GenerationReader) []string {
 	var warnings []string
 	for _, node := range nodes {
@@ -1222,6 +1240,9 @@ func detectMovedTagsIn(skillsDir string, nodes []*closure.Node, generation Gener
 		}
 		recorded := generation.InstalledMarker(filepath.Join(skillsDir, node.Name))
 		if recorded == nil {
+			continue
+		}
+		if recorded.Package != nil {
 			continue
 		}
 		if recorded.RefKind == "tag" && recorded.Ref == node.Resolved.Ref && recorded.Commit != node.Resolved.Commit {

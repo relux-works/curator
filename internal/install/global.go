@@ -222,6 +222,7 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 		result.failf("%v", regErr)
 		return result, nil
 	}
+	result.Attestations = attestations
 
 	// Narrow boundaries for the remaining read-only gates. Operation-private
 	// toolchain state must never land in the global scope, the runtime store,

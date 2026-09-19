@@ -730,6 +730,17 @@ func Read(path string) (*Lock, error) {
 	return lock, nil
 }
 
+// Restore atomically returns the file at path to staged prior bytes. It is
+// the rollback half of a two-file publication (see closure.RefreshDraft):
+// the bytes are the exact ones staged before the first publication write,
+// so they are stored verbatim — never re-encoded — through the same
+// temp-file, sync, and rename sequence as Write. A crash during the
+// restore leaves either the prior or the published bytes behind, never a
+// torn file.
+func Restore(path string, prior []byte) error {
+	return writeFileAtomic(path, prior, 0o644, 0o755)
+}
+
 // Write validates the lock and stores its canonical bytes at path
 // atomically. The lock must already carry its lock_sha256; New computes it.
 func Write(path string, lock *Lock) error {

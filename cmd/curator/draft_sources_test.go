@@ -483,11 +483,73 @@ func TestProjectResolveTransitiveProviderIgnoresProcessCWDThroughCLI(t *testing.
 	}
 }
 
+// assertV5GitMarker binds an installed v5 Git marker to its lock
+// generation at the CLI production entry: schema 5, the locked package
+// kind and commit, and the binding lock. The replaced legacy identity
+// is absent from the decoded marker and the raw bytes alike; the
+// declared ref (tag vN) is asserted from the manifest the lock binds,
+// which is the v5 shape of the "tag vN at the locked commit" identity.
+func assertV5GitMarker(t *testing.T, project, skill string, lock *sourcelock.Lock, wantKind, wantTag string) *marker.Marker {
+	t.Helper()
+	member, ok := lock.Find(skill)
+	if !ok {
+		t.Fatalf("lock misses %s", skill)
+	}
+	installed := filepath.Join(project, ".agents", "skills", skill)
+	recorded := marker.Read(installed)
+	if recorded == nil {
+		t.Fatalf("installed marker unreadable in %s", installed)
+	}
+	if recorded.SchemaVersion != marker.SchemaV5 {
+		t.Fatalf("schema = %d, want %d", recorded.SchemaVersion, marker.SchemaV5)
+	}
+	if recorded.Package == nil || recorded.Package.Kind != wantKind ||
+		recorded.Package.Repository != member.Package.Repository ||
+		recorded.Package.Source != member.Package.Source ||
+		recorded.Package.Directory != member.Package.Directory ||
+		recorded.Package.Commit == nil ||
+		recorded.Package.Commit.ObjectFormat != member.Package.Commit.ObjectFormat ||
+		recorded.Package.Commit.Hex != member.Package.Commit.Hex ||
+		recorded.LockSHA256 != lock.LockSHA256 {
+		t.Fatalf("marker binds %+v %s, want the locked %s %+v %s",
+			recorded.Package, recorded.LockSHA256, wantKind, member.Package, lock.LockSHA256)
+	}
+	if recorded.Source != "" || recorded.Git != "" ||
+		recorded.RefKind != "" || recorded.Ref != "" || recorded.Commit != "" {
+		t.Fatalf("marker identity = %q %q %s %s %s, want empty",
+			recorded.Source, recorded.Git, recorded.RefKind, recorded.Ref, recorded.Commit)
+	}
+	payload, err := os.ReadFile(filepath.Join(installed, marker.Name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &raw); err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{"source", "git", "ref_kind", "ref", "commit"} {
+		if _, present := raw[field]; present {
+			t.Fatalf("v5 Git marker carries replaced field %q", field)
+		}
+	}
+	manifestPayload, err := os.ReadFile(filepath.Join(project, "Skillfile.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(manifestPayload), `"tag":"`+wantTag+`"`) {
+		t.Fatalf("manifest does not declare tag %s:\n%s", wantTag, manifestPayload)
+	}
+	if err := lock.CheckStale(manifestPayload); err != nil {
+		t.Fatalf("lock does not bind the declaring manifest: %v", err)
+	}
+	return recorded
+}
+
 // TestProjectResolveGitAliasSelectionThroughCLI proves frozen consumption
 // recovers the declaring alias from the lock member's selection index when
 // two aliases share one canonical repository: aliases a (tag v1) and s
 // (tag v2) point at the same commit, the selection declares `from: s`,
-// so the dry-run report and the installed marker must name v2, never the
+// so the dry-run report and the bound lock must name v2, never the
 // first alias.
 func TestProjectResolveGitAliasSelectionThroughCLI(t *testing.T) {
 	if runtime.GOOS == "windows" {
@@ -558,12 +620,9 @@ func TestProjectResolveGitAliasSelectionThroughCLI(t *testing.T) {
 	if code, _, stderr := capture(t, configPath, "install", "app"); code != exitOK {
 		t.Fatalf("real install = %d\nstderr:\n%s", code, stderr)
 	}
-	recorded := marker.Read(filepath.Join(project, ".agents", "skills", "review"))
-	if recorded == nil {
-		t.Fatalf("installed marker unreadable")
-	}
-	if recorded.RefKind != "tag" || recorded.Ref != "v2" || recorded.Commit != commit {
-		t.Fatalf("marker identity = %s %s %s, want tag v2 %s", recorded.RefKind, recorded.Ref, recorded.Commit, commit)
+	assertV5GitMarker(t, project, "review", lock, "network-git", "v2")
+	if member.Package.Commit.Hex != commit {
+		t.Fatalf("locked commit = %s, want the tagged %s", member.Package.Commit.Hex, commit)
 	}
 }
 
@@ -592,7 +651,8 @@ func initCLILegacyRepo(t *testing.T, dir, name string) {
 // resolve and install through the production CLI: resolve → dry-run → real
 // install → pinned reinstall. It covers the default source location, a
 // custom source location, and the declared ref recovery (dry-run names tag
-// v1, the marker carries kind/ref/commit/source).
+// v1, the marker binds the locked package and lock while the manifest
+// declares the ref).
 func TestProjectResolveLegacyConfiguredGitThroughCLI(t *testing.T) {
 	for _, mode := range []string{"default", "custom-source"} {
 		t.Run(mode, func(t *testing.T) {
@@ -641,19 +701,12 @@ func TestProjectResolveLegacyConfiguredGitThroughCLI(t *testing.T) {
 			if code, _, stderr := capture(t, configPath, "install", "app"); code != exitOK {
 				t.Fatalf("real install = %d\nstderr:\n%s", code, stderr)
 			}
-			installed := filepath.Join(project, ".agents", "skills", "review")
-			recorded := marker.Read(installed)
-			if recorded == nil {
-				t.Fatalf("installed marker unreadable in %s", installed)
+			recorded := assertV5GitMarker(t, project, "review", lock, "configured-git", "v1")
+			if recorded.Package.Source != source {
+				t.Fatalf("marker package source = %q, want %q", recorded.Package.Source, source)
 			}
-			if recorded.RefKind != "tag" || recorded.Ref != "v1" || recorded.Commit != commit {
-				t.Fatalf("marker identity = %s %s %s, want tag v1 %s", recorded.RefKind, recorded.Ref, recorded.Commit, commit)
-			}
-			if recorded.Source != source {
-				t.Fatalf("marker source = %q, want %q", recorded.Source, source)
-			}
-			if recorded.Git != "" {
-				t.Fatalf("marker git = %q, want empty for configured-git", recorded.Git)
+			if member.Package.Commit.Hex != commit {
+				t.Fatalf("locked commit = %s, want the tagged %s", member.Package.Commit.Hex, commit)
 			}
 			if code, _, stderr := capture(t, configPath, "install", "app"); code != exitOK {
 				t.Fatalf("pinned reinstall = %d\nstderr:\n%s", code, stderr)
@@ -723,19 +776,9 @@ func TestProjectResolveLegacyNetworkGitThroughCLI(t *testing.T) {
 			if code, _, stderr := capture(t, configPath, "install", "app"); code != exitOK {
 				t.Fatalf("real install = %d\nstderr:\n%s", code, stderr)
 			}
-			installed := filepath.Join(project, ".agents", "skills", "review")
-			recorded := marker.Read(installed)
-			if recorded == nil {
-				t.Fatalf("installed marker unreadable in %s", installed)
-			}
-			if recorded.RefKind != "tag" || recorded.Ref != "v1" || recorded.Commit != commit {
-				t.Fatalf("marker identity = %s %s %s, want tag v1 %s", recorded.RefKind, recorded.Ref, recorded.Commit, commit)
-			}
-			if recorded.Source != source {
-				t.Fatalf("marker source = %q, want %q", recorded.Source, source)
-			}
-			if recorded.Git != declaredURL {
-				t.Fatalf("marker git = %q, want %q", recorded.Git, declaredURL)
+			assertV5GitMarker(t, project, "review", lock, "network-git", "v1")
+			if member.Package.Commit.Hex != commit {
+				t.Fatalf("locked commit = %s, want the tagged %s", member.Package.Commit.Hex, commit)
 			}
 			if code, _, stderr := capture(t, configPath, "install", "app"); code != exitOK {
 				t.Fatalf("pinned reinstall = %d\nstderr:\n%s", code, stderr)
@@ -896,13 +939,7 @@ func TestProjectResolveGitTagDiffersFromHEADThroughCLI(t *testing.T) {
 	if code, _, stderr := capture(t, configPath, "install", "app"); code != exitOK {
 		t.Fatalf("real install = %d\nstderr:\n%s", code, stderr)
 	}
-	recorded := marker.Read(filepath.Join(project, ".agents", "skills", "review"))
-	if recorded == nil {
-		t.Fatalf("installed marker unreadable")
-	}
-	if recorded.RefKind != "tag" || recorded.Ref != "v1" || recorded.Commit != commit {
-		t.Fatalf("marker identity = %s %s %s, want tag v1 %s", recorded.RefKind, recorded.Ref, recorded.Commit, commit)
-	}
+	assertV5GitMarker(t, project, "review", lock, "network-git", "v1")
 	if code, _, stderr := capture(t, configPath, "install", "app"); code != exitOK {
 		t.Fatalf("pinned reinstall = %d\nstderr:\n%s", code, stderr)
 	}
@@ -1277,9 +1314,10 @@ func TestProjectResolveDraftAllowlistTransitiveThroughCLI(t *testing.T) {
 }
 
 // TestProjectResolveGitRealInstallThroughCLI proves a successfully resolved
-// Git selection installs for real through the CLI with the accepted source
-// identity in its marker, and that a second install consumes the pin
-// without the network: deleting the bare repository must not fail it.
+// Git selection installs for real through the CLI with the accepted v5
+// package and lock binding in its marker, and that a second install
+// consumes the pin without the network: deleting the bare repository
+// must not fail it.
 func TestProjectResolveGitRealInstallThroughCLI(t *testing.T) {
 	configPath, project, commit, _, bare := setupScriptGitCLI(t)
 	if code, _, stderr := capture(t, configPath, "install", "app"); code != exitOK {
@@ -1289,15 +1327,13 @@ func TestProjectResolveGitRealInstallThroughCLI(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(installed, "SKILL.md")); err != nil {
 		t.Fatalf("installed skill missing: %v", err)
 	}
-	recorded := marker.Read(installed)
-	if recorded == nil {
-		t.Fatalf("installed marker unreadable in %s", installed)
+	lock, err := sourcelock.Read(filepath.Join(project, "Skillfile.lock.json"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if recorded.RefKind != "tag" || recorded.Ref != "v1" || recorded.Commit != commit {
-		t.Fatalf("marker identity = %s %s %s, want tag v1 %s", recorded.RefKind, recorded.Ref, recorded.Commit, commit)
-	}
-	if recorded.Source != "review" {
-		t.Fatalf("marker source = %q, want the installed name", recorded.Source)
+	recorded := assertV5GitMarker(t, project, "review", lock, "network-git", "v1")
+	if recorded.Package.Commit.Hex != commit {
+		t.Fatalf("marker commit = %s, want the tagged %s", recorded.Package.Commit.Hex, commit)
 	}
 	if err := os.RemoveAll(bare); err != nil {
 		t.Fatal(err)
