@@ -45,15 +45,10 @@ func (e *env) git(dir string, args ...string) {
 	// from making the suite non-interactive, this keeps developer credentials
 	// outside every fixture that later becomes a build/package input.
 	gitArgs := append([]string{"-c", "commit.gpgsign=false", "-c", "tag.gpgSign=false"}, args...)
-	cmd := exec.Command("git", gitArgs...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(),
+	gitFixture(e.t, dir, args, gitArgs, []string{
 		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
 		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",
-	)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		e.t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
+	})
 }
 
 func (e *env) write(root, rel, content string) {

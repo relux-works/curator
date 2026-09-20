@@ -3,7 +3,6 @@ package install
 import (
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -18,15 +17,10 @@ import (
 func testGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	gitArgs := append([]string{"-c", "commit.gpgsign=false", "-c", "tag.gpgSign=false"}, args...)
-	cmd := exec.Command("git", gitArgs...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(),
+	gitFixture(t, dir, args, gitArgs, []string{
 		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
 		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",
-	)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
+	})
 	return dir
 }
 

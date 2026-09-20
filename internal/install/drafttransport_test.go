@@ -477,18 +477,12 @@ func draftBareFixture(t *testing.T) (bare, commit string) {
 	bare = filepath.Join(root, "remote.git")
 	run := func(dir string, args ...string) string {
 		t.Helper()
-		command := exec.Command(git, args...)
-		command.Dir = dir
-		command.Env = append(os.Environ(),
+		output := gitFixtureWithBinary(t, git, dir, args, args, []string{
 			"GIT_AUTHOR_NAME=Fixture", "GIT_AUTHOR_EMAIL=fixture@example.test",
 			"GIT_COMMITTER_NAME=Fixture", "GIT_COMMITTER_EMAIL=fixture@example.test",
 			"GIT_AUTHOR_DATE=2006-01-02T15:04:05Z", "GIT_COMMITTER_DATE=2006-01-02T15:04:05Z",
 			"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
-		)
-		output, err := command.CombinedOutput()
-		if err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, output)
-		}
+		})
 		return strings.TrimSpace(string(output))
 	}
 	run("", "init", "--quiet", "--object-format=sha1", work)
