@@ -1,0 +1,1920 @@
+diff --git a/README.md b/README.md
+index 5ba663e..c5586dc 100644
+--- a/README.md
++++ b/README.md
+@@ -227,6 +227,47 @@ curator config build-https  # configure HTTPS credentials for external build rep
+ 
+ </details>
+ 
++## Draft Skillfile sources (opt-in, unreleased)
++
++Skillfile schema 2 with local and Git sources is draft functionality
++behind the operator-owned switch `CURATOR_DRAFT_SOURCES_V1=1`. It is
++not part of the released v1 behavior: with the switch off, schema 2
++fails closed and frozen v1 behaves byte-identically.
++
++```bash
++export CURATOR_DRAFT_SOURCES_V1=1
++curator project resolve .   # freeze sources into Skillfile.lock.json
++curator install .           # materialize the locked snapshot (repairs drift)
++curator status .            # compare installed state against the lock
++curator project refresh .   # re-resolve explicitly, then install again
++```
++
++```json
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {"path": "./pkgs"},
++    "team": {"git": "https://example.org/kit.git", "tag": "v1.2.0"}
++  },
++  "skills": [
++    {"name": "review", "from": "local", "directory": "review"},
++    {"from": "team", "directory": "skills", "include": ["docs", "release"]}
++  ]
++}
++```
++
++Local paths freeze working-tree bytes (never Git HEAD); Git aliases
++pin exactly one tag, branch, or revision; collections select immediate
++child directories. Installed shims execute the frozen runtime — launch
++and status never rescan live inputs. Git endpoint selection and root
++admission come from operator-owned `source-policy.json` beside the
++manager configuration. See [Draft Skillfile
++sources](docs/cli.md#draft-skillfile-sources-opt-in-unreleased) for
++local, absolute, Git, and collection examples with machine policy
++setup, and [Draft source and transport
++diagnostics](docs/troubleshooting.md#draft-source-and-transport-diagnostics)
++for the stable error classes.
++
+ ## An open protocol
+ 
+ Curator conforms to an open specification. Independent implementations include [cocoaskills](https://github.com/ivanopcode/cocoaskills). The registry protocol is implemented by [Curator Skill Registry](https://github.com/relux-works/curator-skill-registry).
+diff --git a/cmd/curator/draft_diagnostics.go b/cmd/curator/draft_diagnostics.go
+new file mode 100644
+index 0000000..010249d
+--- /dev/null
++++ b/cmd/curator/draft_diagnostics.go
+@@ -0,0 +1,159 @@
++package main
++
++// Draft source diagnostics (skillfile-sources §5, repository-transport §§2,
++// 6): sanitized remediation for the stable source/transport error classes at
++// the existing CLI entry points.
++//
++// This is a presentation layer over the landed lanes. The underlying error
++// strings are the sibling lanes' contract and stay byte-identical;
++// remediation is appended at print time, so output without a stable class —
++// every frozen v1 message — is unchanged. Remediation text carries no
++// secrets and no endpoint provenance: only the closed class vocabulary,
++// the portable identity or selector the error already named, and the
++// operator-owned files and commands that fix it. The per-attempt fetch
++// rendering mirrors the accepted revision-2 exhaustion shape
++// (buildrepo.AcquireNetworkResolved): endpoint order, transport, opaque
++// provider identifier, closed class and reason — never raw tool output or
++// full URLs.
++
++import (
++	"strconv"
++	"strings"
++
++	"github.com/relux-works/curator/internal/buildrepo"
++	"github.com/relux-works/curator/internal/config"
++)
++
++// draftRemediation maps one stable error class to its sanitized operator
++// remediation. already names guidance the underlying message may already
++// carry; when present the entry is left alone instead of repeated.
++type draftRemediation struct {
++	remediation string
++	already     []string
++}
++
++// draftEndpointRemediation is the shared operator remediation for an
++// exhausted endpoint plan, worded identically to the strict-lane
++// exhaustion diagnostic so both lanes guide the operator the same way.
++const draftEndpointRemediation = `verify the network path and operator authentication for the listed endpoints, then retry with machine source-policy.json`
++
++// draftRemediations covers the nine skillfile-sources §5 classes, the four
++// repository-transport §§2/6 classes, and the two source-audit-v1 outcome
++// classes. Every value is static prose: nothing from the failing input is
++// interpolated.
++var draftRemediations = []struct {
++	class string
++	entry draftRemediation
++}{
++	{"source_alias_unknown", draftRemediation{
++		remediation: `declare the alias under "sources" in Skillfile.json, or fix the "from" spelling, then run: curator project resolve`,
++	}},
++	{"source_selection_invalid", draftRemediation{
++		remediation: `fix the named selector (directory, include/exclude, and ref rules in docs/cli.md), then retry the explicit attempt`,
++		already:     []string{"requires the draft lane"},
++	}},
++	{"source_member_missing", draftRemediation{
++		remediation: `add the named member directory with valid SKILL.md, or drop it from "include", then run: curator project resolve`,
++	}},
++	{"source_member_invalid", draftRemediation{
++		remediation: `fix the named package (valid SKILL.md frontmatter and manifest identity), then run: curator project resolve`,
++	}},
++	{"source_name_conflict", draftRemediation{
++		remediation: `give each installed skill exactly one selection (rename or drop a duplicate), then run: curator project resolve`,
++	}},
++	{"source_output_overlap", draftRemediation{
++		remediation: `move the authored package out of managed output, or admit a root package via "root_inputs" in machine source-policy.json, then run: curator project resolve`,
++	}},
++	{"source_snapshot_changed", draftRemediation{
++		remediation: `inputs changed during capture; retry the explicit attempt without editing mid-run`,
++		already:     []string{"retry the explicit attempt"},
++	}},
++	{"source_snapshot_unavailable", draftRemediation{
++		remediation: `run the explicit attempt first: curator project resolve`,
++		already:     []string{"run explicit resolve first", "explicit attempt"},
++	}},
++	{"source_lock_stale", draftRemediation{
++		remediation: `the Skillfile changed since the lock; run: curator project refresh`,
++		already:     []string{"explicit refresh required", "explicit refresh"},
++	}},
++	{"repository_endpoint_unavailable", draftRemediation{
++		remediation: draftEndpointRemediation,
++		already:     []string{"verify the network path"},
++	}},
++	{"repository_policy_invalid", draftRemediation{
++		remediation: `fix machine source-policy.json beside the manager configuration; an invalid policy is never treated as absent`,
++	}},
++	{"repository_mirror_undeclared", draftRemediation{
++		remediation: `attest the mirror with "mirror_of" equal to the entry key in machine source-policy.json`,
++	}},
++	{"repository_alias_unknown", draftRemediation{
++		remediation: `declare the alias in the "aliases" table of machine source-policy.json`,
++	}},
++	{"source_audit_rejected", draftRemediation{
++		remediation: `re-resolve under trusted machine policy; the persisted audit report must match the locked package`,
++	}},
++	{"source_audit_unavailable", draftRemediation{
++		remediation: `run the explicit attempt under trusted machine policy so the audit report is persisted`,
++	}},
++}
++
++// withDraftRemediation appends the sanitized remediation of the first stable
++// class named in message. Messages without a stable class, and messages
++// that already carry their guidance, return unchanged.
++func withDraftRemediation(message string) string {
++	for _, row := range draftRemediations {
++		if !strings.Contains(message, row.class) {
++			continue
++		}
++		for _, marker := range row.entry.already {
++			if strings.Contains(message, marker) {
++				return message
++			}
++		}
++		if strings.Contains(message, row.entry.remediation) {
++			return message
++		}
++		return message + "; " + row.entry.remediation
++	}
++	return message
++}
++
++// draftAttemptTransport names the display transport of one planned endpoint
++// URL for sanitized diagnostics. Only the scheme shape is reported; the
++// URL itself is never printed.
++func draftAttemptTransport(rawURL string) string {
++	trimmed := strings.TrimSpace(rawURL)
++	switch {
++	case strings.HasPrefix(trimmed, "https://"):
++		return "https"
++	case strings.HasPrefix(trimmed, "http://"):
++		return "http"
++	case strings.HasPrefix(trimmed, "ssh://"):
++		return "ssh"
++	case strings.HasPrefix(trimmed, "file://"):
++		return "file"
++	case strings.HasPrefix(trimmed, "git://"):
++		return "git"
++	}
++	// An scp-like spelling (user@host:path) carries no scheme; anything
++	// else is outside the endpoint grammar and reported as unknown.
++	if at := strings.Index(trimmed, "@"); at > 0 {
++		if colon := strings.Index(trimmed[at:], ":"); colon > 0 && !strings.Contains(trimmed, "://") {
++			return "ssh"
++		}
++	}
++	return "unknown"
++}
++
++// draftAttemptClause renders one sanitized per-attempt clause in the
++// revision-2 exhaustion shape: endpoint order, transport, opaque provider
++// identifier, closed class and reason. The URL and raw tool output never
++// appear.
++func draftAttemptClause(index int, attempt config.Attempt, class buildrepo.FailureClass) string {
++	clause := "endpoint " + strconv.Itoa(index) + " (" + draftAttemptTransport(attempt.URL)
++	if attempt.Authentication != "" {
++		clause += `, provider "` + attempt.Authentication + `"`
++	}
++	clause += "): " + string(class) + ": " + class.Reason()
++	return clause
++}
+diff --git a/cmd/curator/draft_diagnostics_test.go b/cmd/curator/draft_diagnostics_test.go
+new file mode 100644
+index 0000000..2d44234
+--- /dev/null
++++ b/cmd/curator/draft_diagnostics_test.go
+@@ -0,0 +1,1019 @@
++package main
++
++// Draft source workflow diagnostics at the CLI production entry.
++//
++// These tests drive the documented local/absolute/Git/collection
++// examples, the machine policy setup, and every stable source/transport
++// remediation through run(), never through the helpers under test. None
++// of these tests run in parallel: they mutate process environment per
++// run. Documented payloads below are quoted verbatim from docs/cli.md
++// (placeholders substituted); TestDraftDocsPinExamples fails if the
++// docs drift from the exercised shapes.
++
++import (
++	"os"
++	"os/exec"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/buildrepo"
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/install"
++	"github.com/relux-works/curator/internal/sourcelock"
++)
++
++// Documented acquisition shapes (docs/cli.md, README.md). Absolute and
++// Git placeholders are substituted with fixture values before the run.
++const (
++	docLocalRelativePayload = `{"schema_version":2,"sources":{"local":{"path":"./pkgs"}},"skills":[{"name":"review","from":"local","directory":"review"}]}`
++	docAbsolutePathShape    = `{"path": "/work/shared-agents"}`
++	docGitTagShape          = `{"git": "https://example.org/kit.git", "tag": "v1.2.0"}`
++	docLogicalBranchShape   = `{"repository": "example.org/kit", "branch": "main"}`
++	docCollectionListShape  = `{"from": "team", "directory": "skills", "include": ["review", "docs"]}`
++	docCollectionStarShape  = `{"from": "team", "directory": "skills", "include": ["*"]}`
++	docCollectionExclude    = `{"from": "team", "directory": "skills", "include": ["*"], "exclude": ["release"]}`
++)
++
++func TestWithDraftRemediationTable(t *testing.T) {
++	rows := []struct {
++		name    string
++		message string
++		want    string
++	}{
++		{"alias", "source_alias_unknown: ghost", "declare the alias"},
++		{"selection", "sources.s: source_selection_invalid: bad directory", "fix the named selector"},
++		{"missing", "source_member_missing: ghost has no frozen tree", "add the named member directory"},
++		{"invalid", "source_member_invalid: review: bad frontmatter", "fix the named package"},
++		{"conflict", "source_name_conflict: review twice", "exactly one selection"},
++		{"overlap", "source_output_overlap: .agents/skills", "move the authored package out of managed output"},
++		{"changed", "source_snapshot_changed: stored snapshot diverged", "retry the explicit attempt without editing mid-run"},
++		{"unavailable", "source_snapshot_unavailable: no lock", "run the explicit attempt first: curator project resolve"},
++		{"stale", "source_lock_stale: manifest differs", "run: curator project refresh"},
++		{"endpoint", "repository_endpoint_unavailable: identity x: down", "verify the network path and operator authentication"},
++		{"policy", "repository_policy_invalid: bad schema", "fix machine source-policy.json"},
++		{"mirror", "repository_mirror_undeclared: host differs", `"mirror_of" equal to the entry key`},
++		{"alias", "repository_alias_unknown: ghost", `"aliases" table of machine source-policy.json`},
++		{"auditRejected", "review: source_audit_rejected: evidence mismatch", "re-resolve under trusted machine policy"},
++		{"auditUnavailable", "review: source_audit_unavailable: no binding", "run the explicit attempt under trusted machine policy"},
++	}
++	for _, row := range rows {
++		got := withDraftRemediation(row.message)
++		if !strings.Contains(got, row.want) {
++			t.Errorf("%s: withDraftRemediation(%q) = %q, want %q", row.name, row.message, got, row.want)
++		}
++		if !strings.HasPrefix(got, row.message) {
++			t.Errorf("%s: remediation is not appended: %q", row.name, got)
++		}
++		// Idempotent: a second pass appends nothing.
++		if again := withDraftRemediation(got); again != got {
++			t.Errorf("%s: second pass changed %q to %q", row.name, got, again)
++		}
++	}
++	already := []string{
++		"source_snapshot_unavailable: no Skillfile lock; run explicit resolve first",
++		"source_lock_stale: Skillfile changed since lock; explicit refresh required",
++		"source_snapshot_changed: admitted membership changed during capture; retry the explicit attempt",
++		"repository_endpoint_unavailable: identity x: down; verify the network path and operator authentication for the listed endpoints, then retry with machine source-policy.json",
++		"source_selection_invalid: Skillfile schema 2 requires the draft lane; unset CURATOR_DRAFT_SOURCES_V1 keeps frozen v1",
++	}
++	for _, message := range already {
++		if got := withDraftRemediation(message); got != message {
++			t.Errorf("already-guided message changed:\n got %q\nwant %q", got, message)
++		}
++	}
++	legacy := []string{
++		"Skillfile.json not found",
++		"up-to-date",
++		"build_repository_identity_invalid: wrong identity",
++		"source is not a portable identifier",
++	}
++	for _, message := range legacy {
++		if got := withDraftRemediation(message); got != message {
++			t.Errorf("legacy message changed:\n got %q\nwant %q", got, message)
++		}
++	}
++}
++
++func TestDraftAttemptTransportTable(t *testing.T) {
++	rows := []struct {
++		url  string
++		want string
++	}{
++		{"https://example.org/kit.git", "https"},
++		{"https://example.org:8443/kit.git", "https"},
++		{"http://example.org/kit.git", "http"},
++		{"ssh://git@example.org/kit.git", "ssh"},
++		{"ssh://git@example.org:2222/kit.git", "ssh"},
++		{"git@example.org:kit.git", "ssh"},
++		{"file:///tmp/kit.git", "file"},
++		{"git://example.org/kit.git", "git"},
++		{"example.org/kit", "unknown"},
++		{"", "unknown"},
++	}
++	for _, row := range rows {
++		if got := draftAttemptTransport(row.url); got != row.want {
++			t.Errorf("draftAttemptTransport(%q) = %q, want %q", row.url, got, row.want)
++		}
++	}
++}
++
++func TestDraftAttemptClauseShape(t *testing.T) {
++	clause := draftAttemptClause(1,
++		config.Attempt{URL: "https://example.org/kit.git", Authentication: "team-https"},
++		buildrepo.FailureTLS)
++	if !strings.Contains(clause, `endpoint 1 (https, provider "team-https"): tls: TLS certificate validation failed`) {
++		t.Fatalf("clause = %q", clause)
++	}
++	if strings.Contains(clause, "example.org") {
++		t.Fatalf("clause leaks the endpoint URL: %q", clause)
++	}
++	bare := draftAttemptClause(2, config.Attempt{URL: "git@example.org:kit.git"}, buildrepo.FailureAuth)
++	if !strings.Contains(bare, "endpoint 2 (ssh): auth: endpoint authentication unavailable or rejected") {
++		t.Fatalf("bare clause = %q", bare)
++	}
++	if strings.Contains(bare, "example.org") || strings.Contains(bare, "provider") {
++		t.Fatalf("bare clause leaks endpoint detail: %q", bare)
++	}
++}
++
++func TestEndpointExhaustionCarriesRemediation(t *testing.T) {
++	resolution := config.Resolution{
++		Identity: "fixture.test/kit",
++		Attempts: []config.Attempt{
++			{URL: "https://fixture.test/kit.git", Authentication: "team-https"},
++			{URL: "ssh://git@fixture.test/kit.git"},
++		},
++		Fallback: config.FallbackAvailabilityAuth,
++	}
++	exhausted := endpointExhaustion(resolution, []buildrepo.FailureClass{buildrepo.FailureAuth})
++	for _, want := range []string{
++		"identity fixture.test/kit",
++		`endpoint 1 (https, provider "team-https"): auth: endpoint authentication unavailable or rejected`,
++		"endpoint 2: not attempted",
++		draftEndpointRemediation,
++	} {
++		if !strings.Contains(exhausted, want) {
++			t.Errorf("endpointExhaustion misses %q:\n%s", want, exhausted)
++		}
++	}
++	if strings.Contains(exhausted, "fixture.test/kit.git") {
++		t.Errorf("endpointExhaustion leaks the endpoint URL:\n%s", exhausted)
++	}
++	fetched := fetchExhaustion(resolution, buildrepo.FailureAvailability)
++	for _, want := range []string{
++		"identity fixture.test/kit",
++		"fetch of the existing checkout failed (availability: endpoint unavailable (DNS, connection, or HTTP 502/503/504 failure))",
++		draftEndpointRemediation,
++	} {
++		if !strings.Contains(fetched, want) {
++			t.Errorf("fetchExhaustion misses %q:\n%s", want, fetched)
++		}
++	}
++}
++
++func TestDraftProjectResolveHelp(t *testing.T) {
++	for _, verb := range []string{"resolve", "refresh"} {
++		for _, flag := range []string{"-h", "--help", "help"} {
++			code, stdout, stderr := capture(t, filepath.Join(t.TempDir(), "config.json"), "project", verb, flag)
++			if code != exitOK || stdout != projectResolveUsage || stderr != "" {
++				t.Fatalf("project %s %s = code %d, stdout %d bytes, stderr %q; want the help golden on stdout",
++					verb, flag, code, len(stdout), stderr)
++			}
++		}
++	}
++	// The golden names the opt-in switch, the five verbs, every
++	// documented shape, and the frozen-launch rule, all labelled draft.
++	for _, marker := range []string{
++		"CURATOR_DRAFT_SOURCES_V1=1",
++		"project resolve", "project refresh", "curator install", "curator status",
++		`{"path": "./agents"}`, `{"path": "/work/shared-agents"}`,
++		`{"git": "https://example.org/kit.git", "tag": "v1.2.0"}`,
++		`{"repository": "example.org/kit", "branch": "main"}`,
++		`{"from": "team", "directory": "skills", "include": ["*"]}`,
++		"source-policy.json", `"root_inputs"`,
++		"never rescan", "unreleased",
++	} {
++		if !strings.Contains(projectResolveUsage, marker) {
++			t.Errorf("help golden misses %q", marker)
++		}
++	}
++}
++
++func TestDraftInstallStatusHelpGated(t *testing.T) {
++	configPath := filepath.Join(t.TempDir(), "config.json")
++	for _, command := range []string{"install", "status"} {
++		// Switch off: exactly the flag defaults, no draft marker.
++		code, _, stderr := capture(t, configPath, command, "-h")
++		if code != exitUsage {
++			t.Fatalf("%s -h (switch off) = %d, want %d", command, exitUsage, exitUsage)
++		}
++		for _, marker := range []string{"CURATOR_DRAFT_SOURCES_V1", "Draft Skillfile", "source-policy"} {
++			if strings.Contains(stderr, marker) {
++				t.Fatalf("%s -h (switch off) leaks draft text %q:\n%s", command, marker, stderr)
++			}
++		}
++		if !strings.Contains(stderr, "Usage of "+command+":") {
++			t.Fatalf("%s -h (switch off) lost the flag defaults:\n%s", command, stderr)
++		}
++	}
++	t.Setenv(install.EnvDraftSourcesV1, "1")
++	for _, command := range []string{"install", "status"} {
++		code, _, stderr := capture(t, configPath, command, "-h")
++		if code != exitUsage {
++			t.Fatalf("%s -h (switch on) = %d, want %d", command, exitUsage, exitUsage)
++		}
++		if !strings.Contains(stderr, "Usage of "+command+":") {
++			t.Fatalf("%s -h (switch on) lost the flag defaults:\n%s", command, stderr)
++		}
++		if !strings.Contains(stderr, draftWorkflowSection) {
++			t.Fatalf("%s -h (switch on) misses the draft workflow section:\n%s", command, stderr)
++		}
++	}
++}
++
++// writeDocPkgs lays out the documented local fixture: pkgs/review for
++// the individual rows and pkgs/skills/{review,docs,release} for the
++// collection rows (the exclude row drops release).
++func writeDocPkgs(t *testing.T, pkgs string) {
++	t.Helper()
++	writeCLISkill(t, filepath.Join(pkgs, "review"), "review")
++	writeCLISkill(t, filepath.Join(pkgs, "skills", "review"), "review")
++	writeCLISkill(t, filepath.Join(pkgs, "skills", "docs"), "docs")
++	writeCLISkill(t, filepath.Join(pkgs, "skills", "release"), "release")
++}
++
++// TestDraftDocumentedLocalShapesThroughCLI runs every documented local
++// acquisition shape through the real verbs: resolve, install --dry-run,
++// install, and status. The relative row is docs/cli.md verbatim.
++func TestDraftDocumentedLocalShapesThroughCLI(t *testing.T) {
++	withDraftSourcesSwitch(t)
++	rows := []struct {
++		name    string
++		payload func(project, pkgs string) string
++		members []string
++	}{
++		{
++			name:    "relative-individual",
++			payload: func(string, string) string { return docLocalRelativePayload },
++			members: []string{"review"},
++		},
++		{
++			name: "absolute-individual",
++			payload: func(_, pkgs string) string {
++				return `{"schema_version":2,"sources":{"shared":{"path":` + quotePath(pkgs) + `}},"skills":[{"name":"review","from":"shared","directory":"review"}]}`
++			},
++			members: []string{"review"},
++		},
++		{
++			name: "collection-list",
++			payload: func(string, string) string {
++				return `{"schema_version":2,"sources":{"team":{"path":"./pkgs"}},"skills":[` + docCollectionListShape + `]}`
++			},
++			members: []string{"docs", "review"},
++		},
++		{
++			name: "collection-star",
++			payload: func(string, string) string {
++				return `{"schema_version":2,"sources":{"team":{"path":"./pkgs"}},"skills":[` + docCollectionStarShape + `]}`
++			},
++			members: []string{"docs", "release", "review"},
++		},
++		{
++			name: "collection-exclude",
++			payload: func(string, string) string {
++				return `{"schema_version":2,"sources":{"team":{"path":"./pkgs"}},"skills":[` + docCollectionExclude + `]}`
++			},
++			members: []string{"docs", "review"},
++		},
++	}
++	for _, row := range rows {
++		t.Run(row.name, func(t *testing.T) {
++			root := t.TempDir()
++			configPath, project := setupCLIProject(t, root)
++			t.Setenv("CURATOR_CONFIG", configPath)
++			pkgs := filepath.Join(project, "pkgs")
++			writeDocPkgs(t, pkgs)
++			payload := row.payload(project, pkgs)
++			if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
++				t.Fatal(err)
++			}
++			if code, _, stderr := capture(t, configPath, "project", "resolve", "app"); code != exitOK {
++				t.Fatalf("project resolve = %d\nstderr:\n%s", code, stderr)
++			}
++			lock, err := sourcelock.Read(filepath.Join(project, "Skillfile.lock.json"))
++			if err != nil {
++				t.Fatal(err)
++			}
++			if len(lock.Members) != len(row.members) {
++				t.Fatalf("lock members = %d, want %d (%v)", len(lock.Members), len(row.members), row.members)
++			}
++			for _, want := range row.members {
++				if _, ok := lock.Find(want); !ok {
++					t.Fatalf("lock misses %s: %+v", want, lock.Members)
++				}
++			}
++			if code, _, stderr := capture(t, configPath, "install", "app", "--dry-run"); code != exitOK {
++				t.Fatalf("install --dry-run = %d\nstderr:\n%s", code, stderr)
++			}
++			if code, _, stderr := capture(t, configPath, "install", "app"); code != exitOK {
++				t.Fatalf("install = %d\nstderr:\n%s", code, stderr)
++			}
++			code, stdout, stderr := capture(t, configPath, "status", "app")
++			if code != exitOK {
++				t.Fatalf("status = %d\nstderr:\n%s", code, stderr)
++			}
++			for _, want := range row.members {
++				if !strings.Contains(stdout, "app: "+want+" up-to-date") {
++					t.Fatalf("status misses up-to-date %s:\n%s", want, stdout)
++				}
++			}
++		})
++	}
++}
++
++// quotePath renders one native path as a JSON string value.
++func quotePath(path string) string {
++	escaped := strings.ReplaceAll(path, `\`, `\\`)
++	escaped = strings.ReplaceAll(escaped, `"`, `\"`)
++	return `"` + escaped + `"`
++}
++
++// setupRemediationProject bootstraps one draft project with pkgs/review
++// present and returns its config path, project root, and home. It pins
++// CURATOR_CONFIG at the test config so the explicit attempt loads
++// machine source-policy.json from the test home, never the operator's.
++func setupRemediationProject(t *testing.T) (configPath, project, home string) {
++	t.Helper()
++	withDraftSourcesSwitch(t)
++	root := t.TempDir()
++	configPath, project = setupCLIProject(t, root)
++	t.Setenv("CURATOR_CONFIG", configPath)
++	writeCLISkill(t, filepath.Join(project, "pkgs", "review"), "review")
++	return configPath, project, filepath.Dir(configPath)
++}
++
++func writeRemediationManifest(t *testing.T, project, payload string) {
++	t.Helper()
++	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
++		t.Fatal(err)
++	}
++}
++
++// TestDraftRemediationThroughCLI fails one CLI verb per stable source or
++// transport class and requires the class plus its sanitized remediation
++// on stderr. Classes whose underlying message already guides the
++// operator assert the single guidance instead of a duplicate.
++func TestDraftRemediationThroughCLI(t *testing.T) {
++	rows := []struct {
++		name    string
++		payload string
++		verb    []string
++		class   string
++		remedy  string
++		absent  string
++		setup   func(t *testing.T, configPath, project, home string)
++	}{
++		{
++			name:    "alias-unknown",
++			payload: `{"schema_version":2,"sources":{"s":{"path":"./pkgs"}},"skills":[{"name":"review","from":"ghost","directory":"review"}]}`,
++			verb:    []string{"project", "resolve", "app"},
++			class:   "source_alias_unknown",
++			remedy:  `declare the alias under "sources"`,
++		},
++		{
++			name:    "selection-invalid",
++			payload: `{"schema_version":2,"sources":{"s":{"path":"./pkgs"}},"skills":[{"name":"review","from":"s","directory":"/absolute"}]}`,
++			verb:    []string{"project", "resolve", "app"},
++			class:   "source_selection_invalid",
++			remedy:  "fix the named selector",
++		},
++		{
++			name:    "member-missing",
++			payload: `{"schema_version":2,"sources":{"s":{"path":"./pkgs"}},"skills":[{"from":"s","directory":".","include":["ghost"]}]}`,
++			verb:    []string{"project", "resolve", "app"},
++			class:   "source_member_missing",
++			remedy:  "add the named member directory",
++		},
++		{
++			name:    "member-invalid",
++			payload: `{"schema_version":2,"sources":{"s":{"path":"./pkgs"}},"skills":[{"from":"s","directory":".","include":["broken"]}]}`,
++			verb:    []string{"project", "resolve", "app"},
++			class:   "source_member_invalid",
++			remedy:  "fix the named package",
++			setup: func(t *testing.T, _, project, _ string) {
++				broken := filepath.Join(project, "pkgs", "broken")
++				if err := os.MkdirAll(broken, 0o755); err != nil {
++					t.Fatal(err)
++				}
++				if err := os.WriteFile(filepath.Join(broken, "SKILL.md"), []byte("# no frontmatter\n"), 0o644); err != nil {
++					t.Fatal(err)
++				}
++			},
++		},
++		{
++			name:    "name-conflict",
++			payload: `{"schema_version":2,"sources":{"s":{"path":"./pkgs"}},"skills":[{"name":"review","from":"s","directory":"review"},{"name":"review","from":"s","directory":"review"}]}`,
++			verb:    []string{"project", "resolve", "app"},
++			class:   "source_name_conflict",
++			remedy:  "exactly one selection",
++		},
++		{
++			name:    "output-overlap",
++			payload: `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"name":"managed","from":"s","directory":".agents/skills"}]}`,
++			verb:    []string{"project", "resolve", "app"},
++			class:   "source_output_overlap",
++			remedy:  "move the authored package out of managed output",
++			setup: func(t *testing.T, _, project, _ string) {
++				if err := os.MkdirAll(filepath.Join(project, ".agents", "skills"), 0o755); err != nil {
++					t.Fatal(err)
++				}
++			},
++		},
++		{
++			name:    "snapshot-changed",
++			payload: `{"schema_version":2,"sources":{"s":{"path":"./pkgs"}},"skills":[{"name":"review","from":"s","directory":"review"}]}`,
++			verb:    []string{"install", "app", "--dry-run"},
++			class:   "source_snapshot_changed",
++			remedy:  "retry the explicit attempt without editing mid-run",
++			setup: func(t *testing.T, configPath, project, home string) {
++				if code, _, stderr := capture(t, configPath, "project", "resolve", "app"); code != exitOK {
++					t.Fatalf("project resolve = %d\nstderr:\n%s", code, stderr)
++				}
++				lock, err := sourcelock.Read(filepath.Join(project, "Skillfile.lock.json"))
++				if err != nil {
++					t.Fatal(err)
++				}
++				member, ok := lock.Find("review")
++				if !ok {
++					t.Fatalf("lock misses review: %+v", lock.Members)
++				}
++				digest := strings.TrimPrefix(member.Package.Snapshot, "sha256:")
++				store := filepath.Join(home, "local-snapshots", digest, "snapshot", "references", "info.md")
++				if err := os.WriteFile(store, []byte("tampered"), 0o644); err != nil {
++					t.Fatal(err)
++				}
++			},
++		},
++		{
++			name:    "snapshot-unavailable",
++			payload: `{"schema_version":2,"sources":{"s":{"path":"./pkgs"}},"skills":[{"name":"review","from":"s","directory":"review"}]}`,
++			verb:    []string{"install", "app", "--dry-run"},
++			class:   "source_snapshot_unavailable",
++			remedy:  "run explicit resolve first",
++			absent:  "run the explicit attempt first",
++		},
++		{
++			name:    "lock-stale",
++			payload: `{"schema_version":2,"sources":{"s":{"path":"./pkgs"}},"skills":[{"name":"review","from":"s","directory":"review"}]}`,
++			verb:    []string{"install", "app", "--dry-run"},
++			class:   "source_lock_stale",
++			remedy:  "explicit refresh required",
++			absent:  "changed since the lock; run",
++			setup: func(t *testing.T, configPath, project, _ string) {
++				if code, _, stderr := capture(t, configPath, "project", "resolve", "app"); code != exitOK {
++					t.Fatalf("project resolve = %d\nstderr:\n%s", code, stderr)
++				}
++				stale := `{"schema_version":2,"sources":{"s":{"path":"./pkgs"}},"skills":[{"name":"review","from":"s","directory":"review"},{"name":"docs","from":"s","directory":"review"}]}`
++				writeRemediationManifest(t, project, stale)
++			},
++		},
++		{
++			name:    "endpoint-unavailable",
++			payload: `{"schema_version":2,"sources":{"kit":{"repository":"fixture.test/kit","tag":"v1"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`,
++			verb:    []string{"project", "resolve", "app"},
++			class:   "repository_endpoint_unavailable",
++			remedy:  "retry with machine source-policy.json",
++		},
++		{
++			name:    "policy-invalid",
++			payload: `{"schema_version":2,"sources":{"kit":{"git":"https://fixture.test/kit.git","tag":"v1"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`,
++			verb:    []string{"project", "resolve", "app"},
++			class:   "repository_policy_invalid",
++			remedy:  "fix machine source-policy.json",
++			setup: func(t *testing.T, _, _, home string) {
++				if err := os.WriteFile(filepath.Join(home, "source-policy.json"), []byte(`{"schema_version":1`), 0o644); err != nil {
++					t.Fatal(err)
++				}
++			},
++		},
++		{
++			name:    "mirror-undeclared",
++			payload: `{"schema_version":2,"sources":{"kit":{"git":"https://fixture.test/kit.git","tag":"v1"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`,
++			verb:    []string{"project", "resolve", "app"},
++			class:   "repository_mirror_undeclared",
++			remedy:  `"mirror_of" equal to the entry key`,
++			setup: func(t *testing.T, _, _, home string) {
++				policy := `{"schema_version":2,"repositories":{"fixture.test/kit":{"endpoints":[{"url":"https://mirror.test/kit.git","authentication":"team-https"}],"fallback":"none"}}}`
++				if err := os.WriteFile(filepath.Join(home, "source-policy.json"), []byte(policy), 0o644); err != nil {
++					t.Fatal(err)
++				}
++			},
++		},
++		{
++			name:    "alias-unknown",
++			payload: `{"schema_version":2,"sources":{"kit":{"git":"https://fixture.test/kit.git","tag":"v1"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`,
++			verb:    []string{"project", "resolve", "app"},
++			class:   "repository_alias_unknown",
++			remedy:  `"aliases" table of machine source-policy.json`,
++			setup: func(t *testing.T, _, _, home string) {
++				policy := `{"schema_version":2,"repositories":{"fixture.test/kit":{"endpoints":[{"url":"https://fixture.test/kit.git","authentication":"team-https","alias":"ghost"}],"fallback":"none"}}}`
++				if err := os.WriteFile(filepath.Join(home, "source-policy.json"), []byte(policy), 0o644); err != nil {
++					t.Fatal(err)
++				}
++			},
++		},
++		{
++			name:    "audit-unavailable",
++			payload: `{"schema_version":2,"sources":{"s":{"path":"./pkgs"}},"skills":[{"name":"review","from":"s","directory":"review"}]}`,
++			verb:    []string{"install", "app", "--dry-run", "--audit", "advisory"},
++			class:   "source_audit_unavailable",
++			remedy:  "run the explicit attempt under trusted machine policy",
++			setup: func(t *testing.T, configPath, _, _ string) {
++				if code, _, stderr := capture(t, configPath, "project", "resolve", "app"); code != exitOK {
++					t.Fatalf("project resolve = %d\nstderr:\n%s", code, stderr)
++				}
++			},
++		},
++		{
++			name:    "audit-rejected",
++			payload: `{"schema_version":2,"sources":{"s":{"path":"./pkgs"}},"skills":[{"name":"review","from":"s","directory":"review"}]}`,
++			verb:    []string{"install", "app", "--dry-run", "--audit", "advisory"},
++			class:   "source_audit_rejected",
++			remedy:  "re-resolve under trusted machine policy",
++			setup: func(t *testing.T, configPath, _, home string) {
++				if code, _, stderr := capture(t, configPath, "project", "resolve", "app"); code != exitOK {
++					t.Fatalf("project resolve = %d\nstderr:\n%s", code, stderr)
++				}
++				if code, _, stderr := capture(t, configPath, "install", "app", "--audit", "advisory"); code != exitOK {
++					t.Fatalf("install --audit advisory = %d\nstderr:\n%s", code, stderr)
++				}
++				reports, err := filepath.Glob(filepath.Join(home, "source-audit", "*.report.json"))
++				if err != nil || len(reports) != 1 {
++					t.Fatalf("audit reports = %v, %v", reports, err)
++				}
++				if err := os.WriteFile(reports[0], []byte(`{"tampered":true}`), 0o644); err != nil {
++					t.Fatal(err)
++				}
++			},
++		},
++	}
++	for _, row := range rows {
++		t.Run(row.name, func(t *testing.T) {
++			configPath, project, home := setupRemediationProject(t)
++			writeRemediationManifest(t, project, row.payload)
++			if row.setup != nil {
++				row.setup(t, configPath, project, home)
++			}
++			code, _, stderr := capture(t, configPath, row.verb...)
++			if code != exitFail {
++				t.Fatalf("%v = %d, want %d\nstderr:\n%s", row.verb, code, exitFail, stderr)
++			}
++			if !strings.Contains(stderr, row.class) {
++				t.Fatalf("stderr misses class %q:\n%s", row.class, stderr)
++			}
++			if !strings.Contains(stderr, row.remedy) {
++				t.Fatalf("stderr misses remediation %q:\n%s", row.remedy, stderr)
++			}
++			if row.absent != "" && strings.Contains(stderr, row.absent) {
++				t.Fatalf("stderr repeats guidance %q:\n%s", row.absent, stderr)
++			}
++		})
++	}
++}
++
++// setupKitBare builds the documented Git fixture: a bare repository with
++// one package under skills/review at tag v1 on branch main. It returns
++// the bare path and the tag commit.
++func setupKitBare(t *testing.T, root string) (bare, commit string) {
++	t.Helper()
++	work := filepath.Join(root, "kit-work")
++	bare = filepath.Join(root, "kit.git")
++	if err := os.MkdirAll(work, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	writeCLISkill(t, filepath.Join(work, "skills", "review"), "review")
++	runGit(t, work, "init", "-q", "-b", "main")
++	runGit(t, work, "add", ".")
++	runGit(t, work, "commit", "-qm", "fixture")
++	runGit(t, work, "tag", "v1")
++	runGit(t, "", "clone", "--quiet", "--bare", "--", work, bare)
++	out, err := exec.Command("git", "--git-dir", bare, "rev-parse", "v1^{commit}").Output()
++	if err != nil {
++		t.Fatalf("rev-parse: %v", err)
++	}
++	return bare, strings.TrimSpace(string(out))
++}
++
++// withRewrittenGitURL puts a stand-in git on PATH that rewrites one
++// declared fixture URL to a local bare repository.
++func withRewrittenGitURL(t *testing.T, declaredURL, bare string) {
++	t.Helper()
++	if runtime.GOOS == "windows" {
++		t.Skip("test transport wrapper is POSIX-only")
++	}
++	realGit, err := exec.LookPath("git")
++	if err != nil {
++		t.Skip("git is not available")
++	}
++	fakeDir := installFakeGitForDraftCLI(t, declaredURL, bare, realGit)
++	savedPath, hadPath := os.LookupEnv("PATH")
++	t.Cleanup(func() {
++		if hadPath {
++			_ = os.Setenv("PATH", savedPath)
++		} else {
++			_ = os.Unsetenv("PATH")
++		}
++	})
++	if err := os.Setenv("PATH", fakeDir+string(os.PathListSeparator)+os.Getenv("PATH")); err != nil {
++		t.Fatal(err)
++	}
++}
++
++// TestDraftMachinePolicySetupThroughCLI proves the documented machine
++// policy setup end to end: a logical repository declaration resolves
++// through source-policy.json beside the manager configuration, and the
++// installed marker binds the policy-selected commit. A malformed pin in
++// the same file fails closed with remediation and publishes nothing.
++func TestDraftMachinePolicySetupThroughCLI(t *testing.T) {
++	withDraftSourcesSwitch(t)
++	root := t.TempDir()
++	bare, commit := setupKitBare(t, root)
++	const declaredURL = "https://fixture.test/kit.git"
++	withRewrittenGitURL(t, declaredURL, bare)
++
++	configPath, project := setupCLIProject(t, root)
++	t.Setenv("CURATOR_CONFIG", configPath)
++	home := filepath.Dir(configPath)
++	policy := `{"schema_version":1,"repositories":{"fixture.test/kit":{"endpoints":[{"url":"` + declaredURL + `","authentication":"team-https"}],"fallback":"none"}}}`
++	if err := os.WriteFile(filepath.Join(home, "source-policy.json"), []byte(policy), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	payload := `{"schema_version":2,"sources":{"kit":{"repository":"fixture.test/kit","tag":"v1"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
++	writeRemediationManifest(t, project, payload)
++	if code, stdout, stderr := capture(t, configPath, "project", "resolve", "app"); code != exitOK {
++		t.Fatalf("project resolve = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	lock, err := sourcelock.Read(filepath.Join(project, "Skillfile.lock.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	member, ok := lock.Find("review")
++	if !ok || member.Package.Commit.Hex != commit {
++		t.Fatalf("lock binds %+v, want commit %s", member.Package, commit)
++	}
++	if member.Package.Repository != "fixture.test/kit" {
++		t.Fatalf("lock identity = %q, want the canonical key", member.Package.Repository)
++	}
++	if code, _, stderr := capture(t, configPath, "install", "app"); code != exitOK {
++		t.Fatalf("install = %d\nstderr:\n%s", code, stderr)
++	}
++	code, stdout, stderr := capture(t, configPath, "status", "app")
++	if code != exitOK || !strings.Contains(stdout, "app: review up-to-date") {
++		t.Fatalf("status = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++
++	// A pin that names no listed endpoint fails closed before any
++	// network I/O, with remediation, and the prior lock is untouched.
++	lockBefore, err := os.ReadFile(filepath.Join(project, "Skillfile.lock.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	badPin := `{"schema_version":1,"repositories":{"fixture.test/kit":{"endpoints":[{"url":"` + declaredURL + `","authentication":"team-https"}],"pin":"https://fixture.test/other.git","fallback":"none"}}}`
++	if err := os.WriteFile(filepath.Join(home, "source-policy.json"), []byte(badPin), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	code, _, stderr = capture(t, configPath, "project", "refresh", "app")
++	if code != exitFail || !strings.Contains(stderr, "repository_policy_invalid") || !strings.Contains(stderr, "fix machine source-policy.json") {
++		t.Fatalf("bad-pin refresh = %d, stderr %q, want repository_policy_invalid with remediation", code, stderr)
++	}
++	lockAfter, err := os.ReadFile(filepath.Join(project, "Skillfile.lock.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if string(lockAfter) != string(lockBefore) {
++		t.Fatalf("failed refresh rewrote the lock")
++	}
++}
++
++// TestDraftDocumentedGitRevisionThroughCLI runs the documented revision
++// pin through the real verbs: resolve, install, and status.
++func TestDraftDocumentedGitRevisionThroughCLI(t *testing.T) {
++	withDraftSourcesSwitch(t)
++	root := t.TempDir()
++	bare, commit := setupKitBare(t, root)
++	const declaredURL = "https://fixture.test/kit.git"
++	withRewrittenGitURL(t, declaredURL, bare)
++
++	configPath, project := setupCLIProject(t, root)
++	t.Setenv("CURATOR_CONFIG", configPath)
++	payload := `{"schema_version":2,"sources":{"kit":{"git":"` + declaredURL + `","revision":"` + commit + `"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
++	writeRemediationManifest(t, project, payload)
++	if code, _, stderr := capture(t, configPath, "project", "resolve", "app"); code != exitOK {
++		t.Fatalf("project resolve = %d\nstderr:\n%s", code, stderr)
++	}
++	if code, _, stderr := capture(t, configPath, "install", "app"); code != exitOK {
++		t.Fatalf("install = %d\nstderr:\n%s", code, stderr)
++	}
++	code, stdout, stderr := capture(t, configPath, "status", "app")
++	if code != exitOK || !strings.Contains(stdout, "app: review up-to-date") {
++		t.Fatalf("status = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++}
++
++// TestDraftFetchFailureSanitizedThroughCLI fails a Git acquisition
++// against a missing local path and requires the closed-vocabulary
++// diagnostic: the class, one per-attempt clause, and remediation —
++// never the URL, the raw tool output, or a secret.
++func TestDraftFetchFailureSanitizedThroughCLI(t *testing.T) {
++	if _, err := exec.LookPath("git"); err != nil {
++		t.Skip("git is not available")
++	}
++	configPath, project, _ := setupRemediationProject(t)
++	// The host is unroutable, so the clone fails without network; the
++	// prompt guard keeps the failure closed with no terminal in tests.
++	t.Setenv("GIT_TERMINAL_PROMPT", "0")
++	const declared = "https://invalid.invalid/no-such-repo.git"
++	payload := `{"schema_version":2,"sources":{"kit":{"git":"` + declared + `","tag":"v1"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
++	writeRemediationManifest(t, project, payload)
++	code, _, stderr := capture(t, configPath, "project", "resolve", "app")
++	if code != exitFail {
++		t.Fatalf("project resolve = %d, want %d\nstderr:\n%s", code, exitFail, stderr)
++	}
++	for _, want := range []string{
++		"repository_endpoint_unavailable",
++		"identity invalid.invalid/no-such-repo",
++		"endpoint 1 (https)",
++		"verify the network path and operator authentication",
++	} {
++		if !strings.Contains(stderr, want) {
++			t.Fatalf("stderr misses %q:\n%s", want, stderr)
++		}
++	}
++	// The portable identity is expected above; the endpoint URL, the
++	// scheme, and raw tool output must never appear.
++	for _, leak := range []string{declared, "https://", "no-such-repo.git", "git clone failed", "failed: "} {
++		if strings.Contains(stderr, leak) {
++			t.Fatalf("stderr leaks endpoint detail %q:\n%s", leak, stderr)
++		}
++	}
++	if _, err := os.Stat(filepath.Join(project, "Skillfile.lock.json")); !os.IsNotExist(err) {
++		t.Fatalf("failed resolve published a lock: %v", err)
++	}
++}
++
++// runDocShim executes one installed project shim and returns its output.
++func runDocShim(t *testing.T, project, command string) string {
++	t.Helper()
++	out, err := exec.Command(filepath.Join(project, ".agents", "bin", command)).Output() // #nosec G204 -- the installed shim under test
++	if err != nil {
++		t.Fatalf("shim %s did not run: %v", command, err)
++	}
++	return string(out)
++}
++
++// TestDraftLaunchConsumesFrozenRuntimeThroughCLI proves launch never
++// rescans live inputs at the CLI entry: the installed shim executes
++// the frozen runtime before and after a live mutation, status stays
++// current, a reinstall without refresh keeps the frozen bytes, and only
++// an explicit refresh plus install publishes the new bytes.
++func TestDraftLaunchConsumesFrozenRuntimeThroughCLI(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("executes POSIX skill commands")
++	}
++	withDraftSourcesSwitch(t)
++	root := t.TempDir()
++	configPath, project := setupCLIProject(t, root)
++	t.Setenv("CURATOR_CONFIG", configPath)
++	scriptDir := filepath.Join(project, "pkgs", "review")
++	writeCLIScriptSkill(t, scriptDir, "review")
++	payload := `{"schema_version":2,"sources":{"s":{"path":"./pkgs"}},"skills":[{"name":"review","from":"s","directory":"review"}]}`
++	writeRemediationManifest(t, project, payload)
++	if code, _, stderr := capture(t, configPath, "project", "resolve", "app"); code != exitOK {
++		t.Fatalf("project resolve = %d\nstderr:\n%s", code, stderr)
++	}
++	if code, _, stderr := capture(t, configPath, "install", "app"); code != exitOK {
++		t.Fatalf("install = %d\nstderr:\n%s", code, stderr)
++	}
++	if got := runDocShim(t, project, "tool"); got != "original\n" {
++		t.Fatalf("shim output = %q, want %q", got, "original\n")
++	}
++	// A live mutation changes neither the launched bytes, the status
++	// verdict, nor a reinstall without refresh.
++	script := filepath.Join(scriptDir, "scripts", "tool.sh")
++	if err := os.WriteFile(script, []byte("#!/bin/sh\necho mutated\n"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if got := runDocShim(t, project, "tool"); got != "original\n" {
++		t.Fatalf("shim after live mutation = %q, want frozen %q", got, "original\n")
++	}
++	code, stdout, stderr := capture(t, configPath, "status", "app")
++	if code != exitOK || !strings.Contains(stdout, "app: review up-to-date") {
++		t.Fatalf("status after live mutation = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	if code, _, stderr := capture(t, configPath, "install", "app"); code != exitOK {
++		t.Fatalf("reinstall without refresh = %d\nstderr:\n%s", code, stderr)
++	}
++	if got := runDocShim(t, project, "tool"); got != "original\n" {
++		t.Fatalf("shim after reinstall without refresh = %q, want frozen %q", got, "original\n")
++	}
++	// The frozen runtime is verified on every consumption: a tampered
++	// store fails instead of launching unverified bytes.
++	lock, err := sourcelock.Read(filepath.Join(project, "Skillfile.lock.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	member, ok := lock.Find("review")
++	if !ok {
++		t.Fatalf("lock misses review: %+v", lock.Members)
++	}
++	digest := strings.TrimPrefix(member.Package.Snapshot, "sha256:")
++	home := filepath.Dir(configPath)
++	stored := filepath.Join(home, "local-snapshots", digest, "snapshot", "scripts", "tool.sh")
++	storedBytes, err := os.ReadFile(stored)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(stored, []byte("#!/bin/sh\necho tampered\n"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if code, _, stderr := capture(t, configPath, "install", "app", "--dry-run"); code != exitFail || !strings.Contains(stderr, "source_snapshot_changed") {
++		t.Fatalf("tampered-store install = %d, stderr %q, want source_snapshot_changed", code, stderr)
++	}
++	if err := os.WriteFile(stored, storedBytes, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	// Only an explicit refresh plus install publishes the new bytes.
++	if code, _, stderr := capture(t, configPath, "project", "refresh", "app"); code != exitOK {
++		t.Fatalf("project refresh = %d\nstderr:\n%s", code, stderr)
++	}
++	if code, _, stderr := capture(t, configPath, "install", "app"); code != exitOK {
++		t.Fatalf("install after refresh = %d\nstderr:\n%s", code, stderr)
++	}
++	if got := runDocShim(t, project, "tool"); got != "mutated\n" {
++		t.Fatalf("shim after refresh plus install = %q, want %q", got, "mutated\n")
++	}
++}
++
++// TestDraftRepairRestoresDriftedContentThroughCLI proves install repairs
++// drifted installed bytes from the frozen lock at the CLI entry while
++// the lock bytes stay identical.
++func TestDraftRepairRestoresDriftedContentThroughCLI(t *testing.T) {
++	configPath, project, _ := setupRemediationProject(t)
++	payload := `{"schema_version":2,"sources":{"s":{"path":"./pkgs"}},"skills":[{"name":"review","from":"s","directory":"review"}]}`
++	writeRemediationManifest(t, project, payload)
++	if code, _, stderr := capture(t, configPath, "project", "resolve", "app"); code != exitOK {
++		t.Fatalf("project resolve = %d\nstderr:\n%s", code, stderr)
++	}
++	if code, _, stderr := capture(t, configPath, "install", "app"); code != exitOK {
++		t.Fatalf("install = %d\nstderr:\n%s", code, stderr)
++	}
++	lockPath := filepath.Join(project, "Skillfile.lock.json")
++	lockBefore, err := os.ReadFile(lockPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	installed := filepath.Join(project, ".agents", "skills", "review", "SKILL.md")
++	staged, err := os.ReadFile(installed)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(installed, append(staged, []byte("drift")...), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	code, stdout, stderr := capture(t, configPath, "status", "app")
++	if code != exitOK || !strings.Contains(stdout, "app: review content-drift") {
++		t.Fatalf("status after drift = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	if code, _, stderr := capture(t, configPath, "install", "app"); code != exitOK {
++		t.Fatalf("repair install = %d\nstderr:\n%s", code, stderr)
++	}
++	restored, err := os.ReadFile(installed)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if string(restored) != string(staged) {
++		t.Fatalf("repair left drifted bytes behind")
++	}
++	lockAfter, err := os.ReadFile(lockPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if string(lockAfter) != string(lockBefore) {
++		t.Fatalf("repair rewrote the lock")
++	}
++	code, stdout, stderr = capture(t, configPath, "status", "app")
++	if code != exitOK || !strings.Contains(stdout, "app: review up-to-date") {
++		t.Fatalf("status after repair = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++}
++
++// TestDraftDocsPinExamples pins the documented contract in the
++// repository docs: every exercised acquisition shape, the opt-in
++// label, the machine policy setup, and every stable class remedy.
++func TestDraftDocsPinExamples(t *testing.T) {
++	cli := readRepoDoc(t, "docs", "cli.md")
++	readme := readRepoDoc(t, "README.md")
++	trouble := readRepoDoc(t, "docs", "troubleshooting.md")
++	compact := compactJSON(cli)
++	for _, shape := range []string{
++		docLocalRelativePayload,
++		docAbsolutePathShape,
++		docGitTagShape,
++		docLogicalBranchShape,
++		docCollectionListShape,
++		docCollectionStarShape,
++		docCollectionExclude,
++	} {
++		if !strings.Contains(compact, compactJSON(shape)) {
++			t.Errorf("docs/cli.md misses the exercised shape %s", shape)
++		}
++	}
++	for _, marker := range []string{
++		"CURATOR_DRAFT_SOURCES_V1=1",
++		"opt-in, unreleased",
++		"source-policy.json",
++		`"root_inputs"`,
++		`"availability-auth"`,
++		"curator project refresh",
++		"never rescan",
++	} {
++		if !strings.Contains(cli, marker) {
++			t.Errorf("docs/cli.md misses %q", marker)
++		}
++	}
++	for _, marker := range []string{
++		"CURATOR_DRAFT_SOURCES_V1=1",
++		"Draft Skillfile sources",
++		"unreleased",
++		`"path": "./pkgs"`,
++		"source-policy.json",
++		"never rescan live inputs",
++	} {
++		if !strings.Contains(readme, marker) {
++			t.Errorf("README.md misses %q", marker)
++		}
++	}
++	for _, class := range []string{
++		"source_alias_unknown", "source_selection_invalid",
++		"source_member_missing", "source_member_invalid",
++		"source_name_conflict", "source_output_overlap",
++		"source_snapshot_changed", "source_snapshot_unavailable",
++		"source_lock_stale", "repository_endpoint_unavailable",
++		"repository_policy_invalid", "repository_mirror_undeclared",
++		"repository_alias_unknown", "source_audit_rejected",
++		"source_audit_unavailable",
++	} {
++		if !strings.Contains(trouble, "### "+class) {
++			t.Errorf("docs/troubleshooting.md misses section %s", class)
++		}
++	}
++	// Each remedy keyword below is asserted verbatim against the CLI
++	// remediation output by TestWithDraftRemediationTable and
++	// TestDraftRemediationThroughCLI; the docs must carry the same words.
++	for class, keyword := range map[string]string{
++		"source_alias_unknown":            "declare the alias",
++		"source_selection_invalid":        "fix the named selector",
++		"source_member_missing":           "add the named member directory",
++		"source_member_invalid":           "fix the named package",
++		"source_name_conflict":            "exactly one selection",
++		"source_output_overlap":           "move the authored package out of managed output",
++		"source_snapshot_changed":         "without editing mid-run",
++		"source_snapshot_unavailable":     "run the explicit attempt first",
++		"source_lock_stale":               "curator project refresh",
++		"repository_endpoint_unavailable": "verify the network path",
++		"repository_policy_invalid":       "fix machine source-policy.json",
++		"repository_mirror_undeclared":    "equal to the entry key",
++		"repository_alias_unknown":        "declare the alias in the",
++		"source_audit_rejected":           "re-resolve under trusted machine policy",
++		"source_audit_unavailable":        "run the explicit attempt under trusted machine policy",
++	} {
++		if !strings.Contains(trouble, keyword) {
++			t.Errorf("docs/troubleshooting.md misses the %s remedy keyword %q", class, keyword)
++		}
++	}
++}
++
++// readRepoDoc reads one repository doc relative to the package directory.
++func readRepoDoc(t *testing.T, elements ...string) string {
++	t.Helper()
++	parts := append([]string{"..", ".."}, elements...)
++	payload, err := os.ReadFile(filepath.Join(parts...))
++	if err != nil {
++		t.Fatal(err)
++	}
++	return string(payload)
++}
++
++// compactJSON strips JSON-insignificant whitespace so the docs pin
++// tolerates pretty-printed manifests.
++func compactJSON(text string) string {
++	return strings.Map(func(r rune) rune {
++		switch r {
++		case ' ', '\t', '\n', '\r':
++			return -1
++		}
++		return r
++	}, text)
++}
+diff --git a/cmd/curator/draft_help.go b/cmd/curator/draft_help.go
+new file mode 100644
+index 0000000..a85f699
+--- /dev/null
++++ b/cmd/curator/draft_help.go
+@@ -0,0 +1,91 @@
++package main
++
++// Draft source workflow help (skillfile-sources revision 1, unreleased):
++// the existing-command UX for the opt-in lane.
++//
++// Nothing here adds a command or flag. `project resolve` and `project
++// refresh` gain an explicit `-h` surface, and `install`/`status` usage
++// appends the workflow section only while the draft switch is set, so
++// frozen v1 help bytes are unchanged with the switch off. Every example
++// below is exercised through run() by draft_diagnostics_test.go; the full
++// reference with machine policy setup lives in docs/cli.md.
++
++import (
++	"flag"
++	"fmt"
++	"io"
++	"os"
++
++	"github.com/relux-works/curator/internal/install"
++)
++
++// draftWorkflowSection is the shared opt-in workflow summary appended to
++// per-command help. It names the switch, the five existing verbs that
++// move a schema-2 project, and the frozen-launch rule.
++const draftWorkflowSection = `Draft Skillfile sources (opt-in, unreleased):
++  Skillfile schema 2 resolves only with CURATOR_DRAFT_SOURCES_V1=1. The
++  switch is operator-owned: package data can neither set nor observe it.
++  Without it, schema 2 fails closed and frozen v1 behaves byte-identically.
++
++  curator project resolve [path]   freeze declared sources into Skillfile.lock.json
++  curator install [path]           materialize the locked snapshot (repairs drift)
++  curator status [path]            compare installed state against the lock (--check, --json)
++  curator project refresh [path]   re-resolve refs, bytes, and membership explicitly
++  curator install [path]           install the refreshed lock (refresh alone changes nothing live)
++
++  Launch and status never rescan collections, advance branches, or
++  replace a local snapshot: installed shims execute the frozen runtime
++  until an explicit refresh plus install republishes it. A Skillfile
++  edited after resolve fails source_lock_stale until refresh; run
++  install again after refresh to repair drifted bytes from the lock.
++`
++
++// draftExamplesSection shows one acquisition shape per line. Each shape
++// is a value of one "sources" alias or one "skills" selector; docs/cli.md
++// carries the same shapes as complete manifests.
++const draftExamplesSection = `Draft source examples (one alias or selector value per line):
++  {"path": "./agents"}              local directory, relative to Skillfile.json
++  {"path": "/work/shared-agents"}   local directory, absolute
++  {"git": "https://example.org/kit.git", "tag": "v1.2.0"}   Git source at a tag
++  {"repository": "example.org/kit", "branch": "main"}       logical Git source (needs machine policy)
++  {"name": "review", "from": "team", "directory": "skills/review"}   one skill
++  {"from": "team", "directory": "skills", "include": ["review", "docs"]}   collection
++  {"from": "team", "directory": "skills", "include": ["*"]}   whole directory
++  {"from": "team", "directory": "skills", "include": ["*"], "exclude": ["release"]}   minus one
++
++  Machine policy (operator-owned, beside the manager configuration):
++  source-policy.json maps canonical host/path entries to one or two
++  endpoints plus fallback, and admits root packages via "root_inputs".
++  See "Draft Skillfile sources" in docs/cli.md.
++`
++
++// projectResolveUsage is the explicit help for the two existing verbs
++// that run the explicit draft attempt. It describes the frozen v1
++// behavior first, then the opt-in lane.
++const projectResolveUsage = `curator project resolve: resolve transitive dependencies for a project closure
++
++Usage:
++  curator project resolve [path]
++  curator project refresh [path]
++
++Frozen v1: prints the alias, project path, Skillfile path, and managed
++skill and bin directories without modifying disk state.
++
++` + draftWorkflowSection + `
++` + draftExamplesSection
++
++// appendDraftUsage wraps the flag defaults of one existing command with
++// the draft workflow section while the opt-in switch is set. With the
++// switch off the output is exactly the flag defaults.
++func appendDraftUsage(flags *flag.FlagSet, out io.Writer, name string) {
++	defaults := func() {
++		_, _ = fmt.Fprintf(out, "Usage of %s:\n", name)
++		flags.PrintDefaults()
++	}
++	flags.Usage = func() {
++		defaults()
++		if install.DraftSourcesEnabled(os.Getenv) {
++			_, _ = fmt.Fprint(out, "\n"+draftWorkflowSection)
++		}
++	}
++}
+diff --git a/cmd/curator/main.go b/cmd/curator/main.go
+index 1ef687c..bf73936 100644
+--- a/cmd/curator/main.go
++++ b/cmd/curator/main.go
+@@ -551,6 +551,7 @@ func (c cli) cmdRemove(args []string) int {
+ 
+ func (c cli) installFlags(args []string) (install.Options, []string, bool, string, error) {
+ 	flags := c.newFlagSet("install")
++	appendDraftUsage(flags, c.stderr, "install")
+ 	all := flags.Bool("all", false, "operate on all configured projects")
+ 	dryRun := flags.Bool("dry-run", false, "plan work without modifying files")
+ 	fixGitignore := flags.Bool("fix-gitignore", false, "append missing managed gitignore entries")
+@@ -656,7 +657,7 @@ func (c cli) printStatusRefusal(result install.Result) {
+ 
+ func (c cli) printFailures(result install.Result, prefix string) {
+ 	for _, message := range result.Errors {
+-		_, _ = fmt.Fprintln(c.stderr, prefix, message)
++		_, _ = fmt.Fprintln(c.stderr, prefix, withDraftRemediation(message))
+ 	}
+ 	if guidance := goToolchainGuidance(result.BuildDiagnostic); guidance != "" {
+ 		_, _ = fmt.Fprintln(c.stderr, prefix, guidance)
+@@ -697,6 +698,7 @@ func (c cli) cmdUpdate() int {
+ 
+ func (c cli) cmdStatus(args []string) int {
+ 	flags := c.newFlagSet("status")
++	appendDraftUsage(flags, c.stderr, "status")
+ 	all := flags.Bool("all", false, "operate on all configured projects")
+ 	check := flags.Bool("check", false, "exit non-zero unless every skill is up to date")
+ 	jsonOut := flags.Bool("json", false, "machine-readable output")
+@@ -784,7 +786,7 @@ func (c cli) cmdStatus(args []string) int {
+ 			var driftErr error
+ 			drift, driftErr = draftStatusDrift(target.Root, scope.skillsDir, result.Attestations)
+ 			if driftErr != nil {
+-				_, _ = fmt.Fprintln(c.stderr, "curator:", driftErr)
++				_, _ = fmt.Fprintln(c.stderr, "curator:", withDraftRemediation(driftErr.Error()))
+ 				exitCode = exitFail
+ 				continue
+ 			}
+@@ -1169,6 +1171,10 @@ func (c cli) cmdProject(args []string) int {
+ 		_, _ = fmt.Fprintf(c.stdout, "added project %s: %s\n", positional[0], root)
+ 		return exitOK
+ 	case "resolve", "refresh":
++		if len(args) > 1 && (args[1] == "-h" || args[1] == "--help" || args[1] == "help") {
++			_, _ = fmt.Fprint(c.stdout, projectResolveUsage)
++			return exitOK
++		}
+ 		cfg, code := c.loadConfig()
+ 		if code != exitOK {
+ 			return code
+diff --git a/cmd/curator/project_resolve.go b/cmd/curator/project_resolve.go
+index bd72985..da8f803 100644
+--- a/cmd/curator/project_resolve.go
++++ b/cmd/curator/project_resolve.go
+@@ -22,6 +22,7 @@ import (
+ 	"os"
+ 	"path/filepath"
+ 	"sort"
++	"strconv"
+ 	"strings"
+ 
+ 	"github.com/relux-works/curator/internal/buildrepo"
+@@ -70,7 +71,7 @@ func (c cli) cmdProjectResolve(cfg *config.Config, target projectTarget, verb st
+ 		projectManifest, err = manifest.ParseBytes(payload, manifest.PathIn(target.Root))
+ 	}
+ 	if err != nil {
+-		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
++		_, _ = fmt.Fprintln(c.stderr, "curator:", withDraftRemediation(err.Error()))
+ 		return exitFail
+ 	}
+ 	if projectManifest.SchemaVersion != 2 {
+@@ -85,7 +86,7 @@ func (c cli) cmdProjectResolve(cfg *config.Config, target projectTarget, verb st
+ 	}
+ 	plan, lockPath, bindingsPath, err := c.resolveDraftPlan(cfg, target, projectManifest, payload)
+ 	if err != nil {
+-		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
++		_, _ = fmt.Fprintln(c.stderr, "curator:", withDraftRemediation(err.Error()))
+ 		return exitFail
+ 	}
+ 	_, _ = fmt.Fprintf(c.stdout, "%s %s: %d skills\nlock: %s\nbindings: %s\nlock_sha256: %s\n",
+@@ -188,18 +189,20 @@ func acquireDraftGitRoots(home, projectRoot string, projectManifest *manifest.Ma
+ // failure advances to the next listed endpoint only under the
+ // availability-auth fallback; every other failure — and exhaustion —
+ // fails closed as repository_endpoint_unavailable with the sanitized
+-// per-attempt classes. The raw tool output is reported to the operator
+-// on stderr but never enters portable state.
++// per-attempt classes and operator remediation. Raw tool output feeds
++// classification only: warnings and errors carry the closed class
++// vocabulary, never URLs, stderr, or secrets, and nothing here enters
++// portable state.
+ func fetchDraftRepoAllowingFallback(repoDir string, resolution config.Resolution, alias string, stderr io.Writer) error {
+ 	if _, err := os.Stat(filepath.Join(repoDir, ".git")); err == nil {
+ 		if err := gitops.Fetch(repoDir); err != nil {
+ 			class := buildrepo.ClassifyFetchOutput(gitFailureDetail(err))
+ 			if buildrepo.AllowSecondAttempt(resolution.Fallback, class) && len(resolution.Attempts) > 1 {
+-				_, _ = fmt.Fprintf(stderr, "warning: %s: fetch failed (%s); recloning from the alternate endpoint\n", alias, class)
++				_, _ = fmt.Fprintf(stderr, "warning: %s: fetch failed (%s: %s); recloning from the alternate endpoint\n", alias, class, class.Reason())
+ 				_ = os.RemoveAll(repoDir)
+ 			} else {
+-				_, _ = fmt.Fprintf(stderr, "warning: %s: %v\n", alias, err)
+-				return fmt.Errorf("%s: %s: %s", config.CodeRepositoryEndpointUnavailable, alias, endpointExhaustion(resolution, []buildrepo.FailureClass{class}))
++				_, _ = fmt.Fprintf(stderr, "warning: %s: fetch of the existing checkout failed (%s: %s)\n", alias, class, class.Reason())
++				return fmt.Errorf("%s: %s: %s", config.CodeRepositoryEndpointUnavailable, alias, fetchExhaustion(resolution, class))
+ 			}
+ 		} else {
+ 			return nil
+@@ -214,7 +217,7 @@ func fetchDraftRepoAllowingFallback(repoDir string, resolution config.Resolution
+ 		}
+ 		class := buildrepo.ClassifyFetchOutput(gitFailureDetail(cloneErr))
+ 		classes = append(classes, class)
+-		_, _ = fmt.Fprintf(stderr, "warning: %s: %v\n", alias, cloneErr)
++		_, _ = fmt.Fprintf(stderr, "warning: %s: %s\n", alias, draftAttemptClause(index+1, attempt, class))
+ 		if index+1 < len(attempts) && !buildrepo.AllowSecondAttempt(resolution.Fallback, class) {
+ 			break
+ 		}
+@@ -236,15 +239,32 @@ func gitFailureDetail(err error) string {
+ 	return message
+ }
+ 
+-// endpointExhaustion renders the sanitized per-attempt failure summary:
+-// one closed class reason per attempt, never raw remote output.
++// endpointExhaustion renders the sanitized clone-attempt failure summary
++// in the revision-2 exhaustion shape: the portable identity, one closed
++// clause per planned endpoint, and operator remediation. classes[i]
++// describes attempts[i]; endpoints the fallback gate never reached are
++// reported as not attempted. URLs and raw remote output never appear.
+ func endpointExhaustion(resolution config.Resolution, classes []buildrepo.FailureClass) string {
+-	reasons := make([]string, 0, len(classes))
+-	for _, class := range classes {
+-		reasons = append(reasons, string(class))
++	attempts := resolution.Attempts
++	clauses := make([]string, 0, len(attempts))
++	for index, attempt := range attempts {
++		if index < len(classes) {
++			clauses = append(clauses, draftAttemptClause(index+1, attempt, classes[index]))
++			continue
++		}
++		clauses = append(clauses, "endpoint "+strconv.Itoa(index+1)+": not attempted")
+ 	}
+-	if len(reasons) == 0 {
+-		reasons = append(reasons, string(buildrepo.FailureUnknown))
++	if len(clauses) == 0 {
++		clauses = append(clauses, "endpoint 1 ("+string(buildrepo.FailureUnknown)+"): "+buildrepo.FailureUnknown.Reason())
+ 	}
+-	return fmt.Sprintf("identity %s: %s", resolution.Identity, strings.Join(reasons, ", "))
++	return fmt.Sprintf("identity %s: %s; %s", resolution.Identity, strings.Join(clauses, "; "), draftEndpointRemediation)
++}
++
++// fetchExhaustion renders the sanitized failure of a fetch against the
++// existing checkout: the portable identity, the closed class of the
++// fetch, and operator remediation. The checkout's origin is not one of
++// the planned attempts, so it is never attributed to an endpoint number.
++func fetchExhaustion(resolution config.Resolution, class buildrepo.FailureClass) string {
++	return fmt.Sprintf("identity %s: fetch of the existing checkout failed (%s: %s); %s",
++		resolution.Identity, class, class.Reason(), draftEndpointRemediation)
+ }
+diff --git a/docs/cli.md b/docs/cli.md
+index e4215b3..06d6e1c 100644
+--- a/docs/cli.md
++++ b/docs/cli.md
+@@ -144,6 +144,12 @@ curator install --dry-run
+ 
+ The command prints planned installation steps without modifying disk files.
+ 
++For schema-2 projects with the draft opt-in switch set, `install`
++materializes the locked snapshot and repairs drifted bytes from the
++lock without touching the lock itself; see [Draft Skillfile
++sources](#draft-skillfile-sources-opt-in-unreleased). Run `install -h`
++with the switch set for the workflow summary.
++
+ ### curator update
+ 
+ `curator update` fetches all source repositories under `skills_root`.
+@@ -217,6 +223,12 @@ curator status --json
+ 
+ The command prints status diagnostics for declared skills and compiled commands.
+ 
++For schema-2 projects with the draft opt-in switch set, `status`
++compares installed state against the frozen lock only — it never
++rescans collections, advances branches, or replaces a local snapshot;
++see [Draft Skillfile sources](#draft-skillfile-sources-opt-in-unreleased).
++Run `status -h` with the switch set for the workflow summary.
++
+ `curator status` also reports the shell-hook trust posture (Manager profile
+ §8.6): one `shell-hook-trust:` row per known project env file — every
+ recorded path plus the `.agents/env.sh` / `.agents/env.ps1` of the reported
+@@ -294,6 +306,203 @@ curator project resolve .
+ 
+ The command updates `Skillfile.lock` with resolved dependency commits and content hashes.
+ 
++For frozen v1 projects the command prints the alias, project path,
++Skillfile path, and managed skill and bin directories without modifying
++disk state. For schema-2 projects with the draft opt-in switch set (see
++[Draft Skillfile sources](#draft-skillfile-sources-opt-in-unreleased)),
++it runs the explicit attempt: it acquires every Git source alias,
++freezes local bytes and Git commits into a locked plan, and publishes
++`Skillfile.lock.json` plus the machine bindings transactionally after
++every gate succeeds. Run `curator project resolve -h` for the workflow.
++
++### curator project refresh
++
++`curator project refresh` re-runs the explicit attempt for a project
++closure: refs are resolved anew, local bytes and collection membership
++are re-frozen, and the lock plus machine bindings are replaced
++atomically only after every gate succeeds. Failure preserves prior
++state. For frozen v1 projects it behaves exactly like `project
++resolve`.
++
++Synopsis:
++
++```bash
++curator project refresh [path]
++```
++
++Refresh a draft lock after editing sources or after upstream refs moved:
++
++```bash
++curator project refresh .
++curator install .
++```
++
++Refresh alone changes nothing live: run `curator install` afterwards to
++materialize the refreshed lock. Launch and status never refresh on
++their own. Run `curator project refresh -h` for the workflow.
++
++## Draft Skillfile sources (opt-in, unreleased)
++
++Skillfile schema 2 with local and Git sources is draft functionality
++behind the operator-owned opt-in switch. It is not part of the released
++v1 behavior: package data can neither set nor observe the switch, and
++with the switch off schema 2 fails closed while frozen v1 behaves
++byte-identically.
++
++```bash
++export CURATOR_DRAFT_SOURCES_V1=1
++```
++
++### Workflow
++
++Five existing verbs move a schema-2 project; no new command is added:
++
++```bash
++curator project resolve .   # freeze declared sources into Skillfile.lock.json
++curator install .           # materialize the locked snapshot (repairs drift)
++curator status .            # compare installed state against the lock (--check, --json)
++curator project refresh .   # re-resolve refs, bytes, and membership explicitly
++curator install .           # install the refreshed lock (refresh alone changes nothing live)
++```
++
++Launch and status never rescan collections, advance branches, or
++replace a local snapshot: installed shims execute the frozen runtime
++until an explicit refresh plus install republishes it. A Skillfile
++edited after resolve fails `source_lock_stale` until refresh; running
++install again after refresh repairs drifted bytes from the lock while
++the lock bytes stay identical. Every stable `source_*` and
++`repository_*` failure prints a sanitized remediation naming the fix;
++see [Draft source and transport
++diagnostics](troubleshooting.md#draft-source-and-transport-diagnostics).
++
++### Local sources
++
++A `path` source freezes admitted filesystem bytes, including dirty,
++staged, and untracked files; it never means Git HEAD. Relative paths
++resolve against the declaring Skillfile's directory:
++
++```json
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {"path": "./pkgs"}
++  },
++  "skills": [
++    {"name": "review", "from": "local", "directory": "review"}
++  ]
++}
++```
++
++An absolute path names shared machine content instead:
++
++```json
++{"path": "/work/shared-agents"}
++```
++
++Shared manifests with absolute paths stay intentionally
++machine-specific, but the lock never copies those paths into identity
++fields. Keep authored packages out of managed output (`.agents`,
++adapter directories, the manager home): selecting a package inside
++managed output fails `source_output_overlap`. Selecting the project
++root as the package requires explicit `root_inputs` for that alias in
++machine `source-policy.json` (see below).
++
++### Git sources
++
++A Git source pins exactly one of `tag`, `branch`, or `revision`
++(branch only in the root project). Every member from one alias uses
++the same resolved commit:
++
++```json
++{"git": "https://example.org/kit.git", "tag": "v1.2.0"}
++```
++
++```json
++{
++  "schema_version": 2,
++  "sources": {
++    "team": {"git": "https://example.org/kit.git", "tag": "v1.2.0"}
++  },
++  "skills": [
++    {"name": "review", "from": "team", "directory": "skills/review"}
++  ]
++}
++```
++
++The logical spelling names the canonical identity and resolves
++endpoints through machine policy:
++
++```json
++{"repository": "example.org/kit", "branch": "main"}
++```
++
++Without a policy entry for that identity, a logical declaration fails
++`repository_endpoint_unavailable`; a URL declaration without an entry
++attempts the declared URL once with no fallback.
++
++### Collections
++
++A collection selects immediate child directories of one source
++directory. `include` names literal folders or `"*"`; `exclude` removes
++literals afterwards. Every remaining directory must carry valid
++SKILL.md frontmatter or the whole operation fails:
++
++```json
++{"from": "team", "directory": "skills", "include": ["review", "docs"]}
++```
++
++```json
++{"from": "team", "directory": "skills", "include": ["*"]}
++```
++
++```json
++{"from": "team", "directory": "skills", "include": ["*"], "exclude": ["release"]}
++```
++
++Overlapping installed names fail `source_name_conflict`.
++
++### Machine policy setup
++
++`source-policy.json` is operator-owned and lives beside the manager
++configuration (next to `config.json`, outside package-controlled
++trees). It maps canonical `host/path` entries to one or two endpoints
++plus fallback, and admits root packages via `root_inputs`:
++
++```json
++{
++  "schema_version": 1,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {"url": "git@example.org:kit.git", "authentication": "team-ssh"},
++        {"url": "https://example.org/kit.git", "authentication": "team-https"}
++      ],
++      "fallback": "availability-auth"
++    }
++  },
++  "root_inputs": {
++    "project": ["SKILL.md", "agent-skill.json", "references", "scripts", "build"]
++  }
++}
++```
++
++Without `pin`, endpoints are attempted in list order; `pin` selects
++exactly one listed URL and forbids fallback. `fallback:
++"availability-auth"` permits the next endpoint only after a positively
++classified availability or authentication failure — TLS, host-key,
++identity, ref, audit, and unclassified failures never fall back.
++Configure the named authentication providers through the manager's
++existing operator mechanism (`source-providers.json` beside the same
++configuration). Never put secrets in these objects. An invalid or
++unreadable policy fails `repository_policy_invalid` and is never
++treated as absent.
++
++For a package at the project root, each `root_inputs` entry is a
++source-relative, portable, link-free path disjoint from outputs; every
++listed path must exist and cover SKILL.md, the manifest, and every
++required context, runtime, and build input. Changing `root_inputs`
++requires explicit refresh. Normal nested packages need no list.
++
+ ## Skill package validation
+ 
+ ### curator skill check
+diff --git a/docs/troubleshooting.md b/docs/troubleshooting.md
+index 3bce45f..69be11d 100644
+--- a/docs/troubleshooting.md
++++ b/docs/troubleshooting.md
+@@ -352,3 +352,169 @@ curator install --verbose
+ ```
+ 
+ The command prints detailed execution diagnostic messages.
++
++## Draft source and transport diagnostics
++
++These stable classes appear only on the draft Skillfile lane
++(`CURATOR_DRAFT_SOURCES_V1=1`). Each names the selector or member and
++the reason without secrets, and the CLI appends a sanitized
++remediation. Fetch failures report one closed-vocabulary clause per
++attempted endpoint (`availability`, `auth`, `tls`, `host-key`,
++`ref-moved`, `identity`, `integrity`, `audit`, `http-404`,
++`policy-unreadable`, `unknown`); raw tool output and full URLs never
++appear in user-facing text.
++
++### source_alias_unknown
++
++Symptom: `source_alias_unknown: <alias>`.
++
++Cause: a `from` selector names an alias with no `sources` entry.
++
++Remedy: declare the alias under `sources` in Skillfile.json, or fix
++the `from` spelling, then run `curator project resolve`.
++
++### source_selection_invalid
++
++Symptom: `source_selection_invalid` with the offending selector.
++
++Cause: the selector breaks a structural rule: unknown fields, a mixed
++form, a non-contained directory, a bad collection (`**`, partial
++globs, files as members), a missing or doubled ref, or a transitive
++branch.
++
++Remedy: fix the named selector (directory, include/exclude, and ref
++rules in docs/cli.md), then retry the explicit attempt.
++
++### source_member_missing
++
++Symptom: `source_member_missing` with the member name.
++
++Cause: an explicit `include` literal has no such directory, or a
++requirement names a skill outside the lock.
++
++Remedy: add the named member directory with valid SKILL.md, or drop it
++from `include`, then run `curator project resolve`.
++
++### source_member_invalid
++
++Symptom: `source_member_invalid` with the member name.
++
++Cause: the package fails validation: SKILL.md frontmatter without the
++required name or description, a manifest identity mismatch, a
++non-directory member, or an identity the lane cannot prove.
++
++Remedy: fix the named package (valid SKILL.md frontmatter and manifest
++identity), then run `curator project resolve`.
++
++### source_name_conflict
++
++Symptom: `source_name_conflict` with the colliding names.
++
++Cause: two selections install one skill name, or two destination
++names are filesystem-equivalent.
++
++Remedy: give each installed skill exactly one selection (rename or
++drop a duplicate), then run `curator project resolve`.
++
++### source_output_overlap
++
++Symptom: `source_output_overlap` with the overlapping path.
++
++Cause: a selected package sits inside managed output (`.agents`,
++adapter directories, the manager home, caches, staging, or the
++snapshot store), or a root package lacks `root_inputs` admission.
++
++Remedy: move the authored package out of managed output, or admit a
++root package via `root_inputs` in machine source-policy.json, then
++run `curator project resolve`.
++
++### source_snapshot_changed
++
++Symptom: `source_snapshot_changed` with the member name.
++
++Cause: admitted inputs changed during capture — a concurrent edit, a
++membership change mid-collection, or a store tree that no longer
++matches its locked content.
++
++Remedy: retry the explicit attempt without editing mid-run.
++
++### source_snapshot_unavailable
++
++Symptom: `source_snapshot_unavailable` with the member name.
++
++Cause: install or status found no lock, no machine bindings, or no
++frozen snapshot for the member.
++
++Remedy: run the explicit attempt first: `curator project resolve`.
++
++### source_lock_stale
++
++Symptom: `source_lock_stale`.
++
++Cause: the Skillfile changed since the lock was published, or the
++machine bindings no longer belong to the lock generation.
++
++Remedy: run `curator project refresh`, then `curator install` to
++materialize the refreshed lock.
++
++### repository_endpoint_unavailable
++
++Symptom: `repository_endpoint_unavailable` with the canonical identity
++and one clause per attempted endpoint.
++
++Cause: every planned endpoint failed with an availability or
++authentication error, or a logical `repository` declaration has no
++machine policy entry.
++
++Remedy: verify the network path and operator authentication for the
++listed endpoints, then retry with machine source-policy.json.
++
++### repository_policy_invalid
++
++Symptom: `repository_policy_invalid` with the offending field.
++
++Cause: machine source-policy.json is missing a required shape, names
++an unknown member or version, lists a bad endpoint, or cannot be read.
++
++Remedy: fix machine source-policy.json beside the manager
++configuration; an invalid policy is never treated as absent.
++
++### repository_mirror_undeclared
++
++Symptom: `repository_mirror_undeclared`.
++
++Cause: the resolved connection host differs from the entry-key host
++without a `mirror_of` attestation equal to the key.
++
++Remedy: attest the mirror with `mirror_of` equal to the entry key in
++machine source-policy.json.
++
++### repository_alias_unknown
++
++Symptom: `repository_alias_unknown` with the alias name.
++
++Cause: an endpoint `alias` field names no entry of the policy
++`aliases` table.
++
++Remedy: declare the alias in the `aliases` table. The table lives in
++machine source-policy.json.
++
++### source_audit_rejected
++
++Symptom: `source_audit_rejected` with the member name.
++
++Cause: the machine binding for the locked package is malformed or no
++longer matches the locked package, context, policy, or evidence.
++
++Remedy: re-resolve under trusted machine policy; the persisted audit
++report must match the locked package.
++
++### source_audit_unavailable
++
++Symptom: `source_audit_unavailable` with the member name.
++
++Cause: no machine binding or audit report exists for the locked
++package yet — planning must not invent trust.
++
++Remedy: run the explicit attempt under trusted machine policy so the
++audit report is persisted.
+diff --git a/internal/buildrepo/transport.go b/internal/buildrepo/transport.go
+index 975e4bd..7210490 100644
+--- a/internal/buildrepo/transport.go
++++ b/internal/buildrepo/transport.go
+@@ -80,6 +80,13 @@ const (
+ 	FailurePolicy       FailureClass = "policy-unreadable"
+ )
+ 
++// Reason is the closed per-class reason used in exhaustion diagnostics.
++// Raw fetch output is never interpolated: the class alone determines the
++// text, so a hostile or confused remote cannot inject secrets or
++// misleading detail into errors. The CLI draft fetch path renders the
++// same vocabulary; the strict lane keeps calling failureReason.
++func (c FailureClass) Reason() string { return c.failureReason() }
++
+ // failureReason is the closed per-class reason used in exhaustion
+ // diagnostics. Raw fetch output is never interpolated: the class alone
+ // determines the text, so a hostile or confused remote cannot inject
