@@ -21,7 +21,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/relux-works/curator/internal/buildrepo"
@@ -70,7 +72,7 @@ func (c cli) cmdProjectResolve(cfg *config.Config, target projectTarget, verb st
 		projectManifest, err = manifest.ParseBytes(payload, manifest.PathIn(target.Root))
 	}
 	if err != nil {
-		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", withDraftRemediation(err.Error()))
 		return exitFail
 	}
 	if projectManifest.SchemaVersion != 2 {
@@ -85,7 +87,7 @@ func (c cli) cmdProjectResolve(cfg *config.Config, target projectTarget, verb st
 	}
 	plan, lockPath, bindingsPath, err := c.resolveDraftPlan(cfg, target, projectManifest, payload)
 	if err != nil {
-		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", withDraftRemediation(err.Error()))
 		return exitFail
 	}
 	_, _ = fmt.Fprintf(c.stdout, "%s %s: %d skills\nlock: %s\nbindings: %s\nlock_sha256: %s\n",
@@ -188,18 +190,20 @@ func acquireDraftGitRoots(home, projectRoot string, projectManifest *manifest.Ma
 // failure advances to the next listed endpoint only under the
 // availability-auth fallback; every other failure — and exhaustion —
 // fails closed as repository_endpoint_unavailable with the sanitized
-// per-attempt classes. The raw tool output is reported to the operator
-// on stderr but never enters portable state.
+// per-attempt classes and operator remediation. Raw tool output feeds
+// classification only: warnings and errors carry the closed class
+// vocabulary, never URLs, stderr, or secrets, and nothing here enters
+// portable state.
 func fetchDraftRepoAllowingFallback(repoDir string, resolution config.Resolution, alias string, stderr io.Writer) error {
 	if _, err := os.Stat(filepath.Join(repoDir, ".git")); err == nil {
 		if err := gitops.Fetch(repoDir); err != nil {
 			class := buildrepo.ClassifyFetchOutput(gitFailureDetail(err))
 			if buildrepo.AllowSecondAttempt(resolution.Fallback, class) && len(resolution.Attempts) > 1 {
-				_, _ = fmt.Fprintf(stderr, "warning: %s: fetch failed (%s); recloning from the alternate endpoint\n", alias, class)
+				_, _ = fmt.Fprintf(stderr, "warning: %s: fetch failed (%s: %s); recloning from the alternate endpoint\n", alias, class, class.Reason())
 				_ = os.RemoveAll(repoDir)
 			} else {
-				_, _ = fmt.Fprintf(stderr, "warning: %s: %v\n", alias, err)
-				return fmt.Errorf("%s: %s: %s", config.CodeRepositoryEndpointUnavailable, alias, endpointExhaustion(resolution, []buildrepo.FailureClass{class}))
+				_, _ = fmt.Fprintf(stderr, "warning: %s: fetch of the existing checkout failed (%s: %s)\n", alias, class, class.Reason())
+				return fmt.Errorf("%s: %s: %s", config.CodeRepositoryEndpointUnavailable, alias, fetchExhaustion(resolution, class))
 			}
 		} else {
 			return nil
@@ -212,14 +216,38 @@ func fetchDraftRepoAllowingFallback(repoDir string, resolution config.Resolution
 		if cloneErr == nil {
 			return nil
 		}
-		class := buildrepo.ClassifyFetchOutput(gitFailureDetail(cloneErr))
+		class := buildrepo.ClassifyFetchOutput(stripCloneFraming(gitFailureDetail(cloneErr)))
 		classes = append(classes, class)
-		_, _ = fmt.Fprintf(stderr, "warning: %s: %v\n", alias, cloneErr)
+		_, _ = fmt.Fprintf(stderr, "warning: %s: %s\n", alias, draftAttemptClause(index+1, attempt, class))
 		if index+1 < len(attempts) && !buildrepo.AllowSecondAttempt(resolution.Fallback, class) {
 			break
 		}
 	}
 	return fmt.Errorf("%s: %s: %s", config.CodeRepositoryEndpointUnavailable, alias, endpointExhaustion(resolution, classes))
+}
+
+// cloneFramingPattern matches git's fixed clone progress line. git prints
+// it to stderr even when stderr is not a terminal; it names the local
+// destination directory only and carries no failure evidence.
+var cloneFramingPattern = regexp.MustCompile(`^Cloning into '[^']+'\.\.\.$`)
+
+// stripCloneFraming drops git's fixed clone progress line from clone
+// stderr before classification. Without this every clone failure
+// classifies unknown (the closed table matches no progress line) and
+// the availability-auth fallback never advances past a DNS or
+// authentication failure on a fresh clone. Only exact matches are
+// dropped; every other line — including a near-match — is kept, so
+// classification stays fail-closed.
+func stripCloneFraming(detail string) string {
+	lines := strings.Split(detail, "\n")
+	kept := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if cloneFramingPattern.MatchString(strings.TrimSpace(line)) {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	return strings.Join(kept, "\n")
 }
 
 // gitFailureDetail extracts the inner git tool stderr from a gitops error
@@ -236,15 +264,32 @@ func gitFailureDetail(err error) string {
 	return message
 }
 
-// endpointExhaustion renders the sanitized per-attempt failure summary:
-// one closed class reason per attempt, never raw remote output.
+// endpointExhaustion renders the sanitized clone-attempt failure summary
+// in the revision-2 exhaustion shape: the portable identity, one closed
+// clause per planned endpoint, and operator remediation. classes[i]
+// describes attempts[i]; endpoints the fallback gate never reached are
+// reported as not attempted. URLs and raw remote output never appear.
 func endpointExhaustion(resolution config.Resolution, classes []buildrepo.FailureClass) string {
-	reasons := make([]string, 0, len(classes))
-	for _, class := range classes {
-		reasons = append(reasons, string(class))
+	attempts := resolution.Attempts
+	clauses := make([]string, 0, len(attempts))
+	for index, attempt := range attempts {
+		if index < len(classes) {
+			clauses = append(clauses, draftAttemptClause(index+1, attempt, classes[index]))
+			continue
+		}
+		clauses = append(clauses, "endpoint "+strconv.Itoa(index+1)+": not attempted")
 	}
-	if len(reasons) == 0 {
-		reasons = append(reasons, string(buildrepo.FailureUnknown))
+	if len(clauses) == 0 {
+		clauses = append(clauses, "endpoint 1 ("+string(buildrepo.FailureUnknown)+"): "+buildrepo.FailureUnknown.Reason())
 	}
-	return fmt.Sprintf("identity %s: %s", resolution.Identity, strings.Join(reasons, ", "))
+	return fmt.Sprintf("identity %s: %s; %s", resolution.Identity, strings.Join(clauses, "; "), draftEndpointRemediation)
+}
+
+// fetchExhaustion renders the sanitized failure of a fetch against the
+// existing checkout: the portable identity, the closed class of the
+// fetch, and operator remediation. The checkout's origin is not one of
+// the planned attempts, so it is never attributed to an endpoint number.
+func fetchExhaustion(resolution config.Resolution, class buildrepo.FailureClass) string {
+	return fmt.Sprintf("identity %s: fetch of the existing checkout failed (%s: %s); %s",
+		resolution.Identity, class, class.Reason(), draftEndpointRemediation)
 }

@@ -227,6 +227,47 @@ curator config build-https  # configure HTTPS credentials for external build rep
 
 </details>
 
+## Draft Skillfile sources (opt-in, unreleased)
+
+Skillfile schema 2 with local and Git sources is draft functionality
+behind the operator-owned switch `CURATOR_DRAFT_SOURCES_V1=1`. It is
+not part of the released v1 behavior: with the switch off, schema 2
+fails closed and frozen v1 behaves byte-identically.
+
+```bash
+export CURATOR_DRAFT_SOURCES_V1=1
+curator project resolve .   # freeze sources into Skillfile.lock.json
+curator install .           # materialize the locked snapshot (repairs drift)
+curator status .            # compare installed state against the lock
+curator project refresh .   # re-resolve explicitly, then install again
+```
+
+```json
+{
+  "schema_version": 2,
+  "sources": {
+    "local": {"path": "./pkgs"},
+    "team": {"git": "https://example.org/kit.git", "tag": "v1.2.0"}
+  },
+  "skills": [
+    {"name": "review", "from": "local", "directory": "review"},
+    {"from": "team", "directory": "skills", "include": ["docs", "release"]}
+  ]
+}
+```
+
+Local paths freeze working-tree bytes (never Git HEAD); Git aliases
+pin exactly one tag, branch, or revision; collections select immediate
+child directories. Installed shims execute the frozen runtime — launch
+and status never rescan live inputs. Git endpoint selection and root
+admission come from operator-owned `source-policy.json` beside the
+manager configuration. See [Draft Skillfile
+sources](docs/cli.md#draft-skillfile-sources-opt-in-unreleased) for
+local, absolute, Git, and collection examples with machine policy
+setup, and [Draft source and transport
+diagnostics](docs/troubleshooting.md#draft-source-and-transport-diagnostics)
+for the stable error classes.
+
 ## An open protocol
 
 Curator conforms to an open specification. Independent implementations include [cocoaskills](https://github.com/ivanopcode/cocoaskills). The registry protocol is implemented by [Curator Skill Registry](https://github.com/relux-works/curator-skill-registry).
