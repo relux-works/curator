@@ -819,104 +819,75 @@ else
 fi
 
 echo ''
-echo '=== platform-cases.tsv: the Windows-deferred pnpm cases are narrow and classified ==='
+echo '=== platform-cases.tsv: the real-pnpm cases are required on windows with no deferral ==='
 #
-# BUG-260916-2f3xbf defers exactly two real-pnpm cases on Windows (rev2 gate
-# run 35098955988: the writable store registry does not declare a member pnpm
-# writes there). The deferral is three coordinated parts -- the Go skip, the
-# class-table row admitting its reason, and the ledger rows requiring the
-# cases on unix while tolerating that class on windows only -- and these cases
-# read all three back from the shipped files, so a reworded reason, a widened
-# column, or a third deferral fails here instead of silently changing what
-# windows-latest proves. The reason is extracted from the Go source, never
-# restated, so the behavioural cases drive the gate with the exact text the
-# tests print.
-DEFER_GO='internal/pnpmsource/conformance_test.go'
-DEFER_CASES='TestRealPinnedPNPMLockSupersetSnapshotDependencies TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization'
+# BUG-260916-2f3xbf declared pnpm's Windows junction spelling of the
+# writable-store registry and the materialized links, so the two install cases
+# that gate run 35098955988 deferred are required on windows-latest exactly as
+# on unix. These cases read the shipped files back, so a resurrected skip, a
+# narrowed column, or a reworded row fails here instead of silently changing
+# what windows-latest proves.
+PNPM_GO='internal/pnpmsource/conformance_test.go'
+PNPM_CASES='TestRealPinnedPNPMLockSupersetSnapshotDependencies TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization'
 
-defer_reason="$(sed -n 's/.*t\.Skip("\(.*BUG-260916-2f3xbf.*\)").*/\1/p' "$DEFER_GO" | head -n 1)"
-if [ -z "$defer_reason" ]; then
-	bad 'the Go suite prints a bug-naming deferral reason' "no t.Skip naming BUG-260916-2f3xbf in $DEFER_GO"
-	defer_reason='BUG-260916-2f3xbf reason unextractable; the behavioural cases below fail'
+if grep -q 'BUG-260916-2f3xbf\|skipOnWindowsForStoreRegistryGap' "$PNPM_GO"; then
+	bad 'the Go suite carries no Windows pnpm deferral' "deferral text survives in $PNPM_GO"
 else
-	ok 'the Go suite prints a bug-naming deferral reason'
+	ok 'the Go suite carries no Windows pnpm deferral'
 fi
 
-# The deferral call sites, by enclosing Test: exactly the two failing cases.
-# (The awk tracks `func Test*` headers; the helper's own definition is not a
-# Test and its body never self-calls, so only real call sites are listed.)
-defer_callers="$(awk '/^func Test[A-Za-z0-9_]*\(/{fn=$2; sub(/\(.*/, "", fn)} /skipOnWindowsForStoreRegistryGap\(t\)/{print fn}' "$DEFER_GO" | LC_ALL=C sort | tr '\n' ' ')"
-if [ "$defer_callers" = 'TestRealPinnedPNPMLockSupersetSnapshotDependencies TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization ' ]; then
-	ok 'the Go suite defers exactly the two failing cases, nowhere else'
+if grep -v '^[ \t]*#' "$CLASSES" | grep -q 'BUG-260916-2f3xbf'; then
+	bad 'the class table carries no bug-naming deferral row' "deferral row survives in $CLASSES"
 else
-	bad 'the Go suite defers exactly the two failing cases, nowhere else' "callers: ${defer_callers:-<none>}"
+	ok 'the class table carries no bug-naming deferral row'
 fi
 
-# First-match-wins, exactly as platform-case-gate.sh classifies: no earlier
-# row may shadow the deferral reason into another class.
-defer_class="$(awk -F'\t' -v reason="$defer_reason" '/^[ \t]*#/ || /^[ \t]*$/ {next} reason ~ $2 {print $1; exit}' "$CLASSES")"
-if [ "$defer_class" = 'stage-deferred' ]; then
-	ok 'the class table admits the printed reason as stage-deferred'
-else
-	bad 'the class table admits the printed reason as stage-deferred' "first match: ${defer_class:-<none>}"
-fi
-
-for dcase in $DEFER_CASES; do
-	row="$(awk -F'\t' -v c="$dcase" '$1 == "internal/pnpmsource" && $2 == c {print $3"|"$4"|"$5}' "$SHIPPED")"
-	if [ "$row" = 'linux,darwin|windows|stage-deferred' ]; then
-		ok "the ledger requires $dcase on unix and tolerates stage-deferred on windows only"
+for pcase in $PNPM_CASES; do
+	row="$(awk -F'\t' -v c="$pcase" '$1 == "internal/pnpmsource" && $2 == c {print $3"|"$4"|"$5}' "$SHIPPED")"
+	if [ "$row" = 'linux,darwin,windows|-|-' ]; then
+		ok "the ledger requires $pcase on every runner and tolerates no skip"
 	else
-		bad "the ledger requires $dcase on unix and tolerates stage-deferred on windows only" "row: ${row:-<missing>}"
+		bad "the ledger requires $pcase on every runner and tolerates no skip" "row: ${row:-<missing>}"
 	fi
 done
 
 # Behavioural: the shipped streams the satisfiability loop above built are the
-# otherwise-passing runs; narrow exactly the two deferred cases inside them.
+# otherwise-passing runs; narrow exactly the two install cases inside them.
+# The gate counts a pass as satisfied, so the pass events are removed first
+# and the verdicts below rest on the skip alone.
 if [ -f "$WORK/shipped-windows.json" ] && [ -f "$WORK/shipped-linux.json" ]; then
-	win_stream="$WORK/defer-windows.json"
-	cp "$WORK/shipped-windows.json" "$win_stream"
-	for dcase in $DEFER_CASES; do
-		evout internal/pnpmsource "$dcase" "$defer_reason" >>"$win_stream"
-		ev skip internal/pnpmsource "$dcase" >>"$win_stream"
+	win_stream="$WORK/pnpm-windows-skip.json"
+	grep -v -e TestRealPinnedPNPMLockSupersetSnapshotDependencies -e TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization \
+		"$WORK/shipped-windows.json" >"$win_stream"
+	for pcase in $PNPM_CASES; do
+		evout internal/pnpmsource "$pcase" 'pinned pnpm executable unavailable' >>"$win_stream"
+		ev skip internal/pnpmsource "$pcase" >>"$win_stream"
 	done
-	assert 'the two bug-naming skips are tolerated on windows' 0 \
+	assert 'a pnpm-absent skip of an install case fails on windows' 1 \
 		env CI_GATE_GOOS=windows CI_PLATFORM_CASES="$SHIPPED" CI_SKIP_CLASSES="$CLASSES" \
-		    CI_GATE_MODULE='github.com/relux-works/curator' bash "$GATE" "$win_stream" "$WORK/defer-ev-win"
-	if [ -f "$WORK/defer-ev-win/skips-observed.tsv" ]; then
-		for dcase in $DEFER_CASES; do
-			assert_contains "windows records $dcase as ledger-tolerated stage-deferred" \
-				"$(printf '%s\tstage-deferred\ttolerated-by-ledger' "$dcase")" "$WORK/defer-ev-win/skips-observed.tsv"
+		    CI_GATE_MODULE='github.com/relux-works/curator' bash "$GATE" "$win_stream" "$WORK/pnpm-ev-win"
+	if [ -f "$WORK/pnpm-ev-win/skips-observed.tsv" ]; then
+		for pcase in $PNPM_CASES; do
+			assert_contains "windows records $pcase as ledger-refused, not tolerated" \
+				"$(printf '%s\thost-capability\tFATAL-not-tolerated' "$pcase")" "$WORK/pnpm-ev-win/skips-observed.tsv"
 		done
 	else
-		bad 'the windows run recorded its skip verdicts' 'missing $WORK/defer-ev-win/skips-observed.tsv'
+		bad 'the windows run recorded its skip verdicts' 'missing $WORK/pnpm-ev-win/skips-observed.tsv'
 	fi
 
-	# The same skip on linux is fatal: the deferral is windows-only.
-	lin_stream="$WORK/defer-linux.json"
+	lin_stream="$WORK/pnpm-linux-skip.json"
 	grep -v -e TestRealPinnedPNPMLockSupersetSnapshotDependencies -e TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization \
 		"$WORK/shipped-linux.json" >"$lin_stream"
-	for dcase in $DEFER_CASES; do
-		evout internal/pnpmsource "$dcase" "$defer_reason" >>"$lin_stream"
-		ev skip internal/pnpmsource "$dcase" >>"$lin_stream"
+	for pcase in $PNPM_CASES; do
+		evout internal/pnpmsource "$pcase" 'pinned pnpm executable unavailable' >>"$lin_stream"
+		ev skip internal/pnpmsource "$pcase" >>"$lin_stream"
 	done
-	assert 'the same skip on linux fails the gate' 1 \
+	assert 'the same skip fails on linux too' 1 \
 		env CI_GATE_GOOS=linux CI_EXCLUDED_PKGS=internal/godriver \
 		    CI_PLATFORM_CASES="$SHIPPED" CI_SKIP_CLASSES="$CLASSES" \
-		    CI_GATE_MODULE='github.com/relux-works/curator' bash "$GATE" "$lin_stream" "$WORK/defer-ev-lin"
-
-	# A different reason on windows is fatal too: the ledger pins the class,
-	# so a pnpm-absent skip cannot masquerade as the bug deferral.
-	cls_stream="$WORK/defer-windows-wrongclass.json"
-	cp "$WORK/shipped-windows.json" "$cls_stream"
-	for dcase in $DEFER_CASES; do
-		evout internal/pnpmsource "$dcase" 'pinned pnpm executable unavailable' >>"$cls_stream"
-		ev skip internal/pnpmsource "$dcase" >>"$cls_stream"
-	done
-	assert 'a non-deferral skip of a deferred case fails on windows' 1 \
-		env CI_GATE_GOOS=windows CI_PLATFORM_CASES="$SHIPPED" CI_SKIP_CLASSES="$CLASSES" \
-		    CI_GATE_MODULE='github.com/relux-works/curator' bash "$GATE" "$cls_stream" "$WORK/defer-ev-cls"
+		    CI_GATE_MODULE='github.com/relux-works/curator' bash "$GATE" "$lin_stream" "$WORK/pnpm-ev-lin"
 else
-	bad 'the deferral behavioural cases have shipped streams to narrow' 'missing $WORK/shipped-windows.json or $WORK/shipped-linux.json'
+	bad 'the pnpm behavioural cases have shipped streams to narrow' 'missing $WORK/shipped-windows.json or $WORK/shipped-linux.json'
 fi
 
 echo ''
@@ -1162,7 +1133,7 @@ if [ -f "$WORK/shipped-darwin.json" ] && [ -f "$WORK/shipped-linux.json" ]; then
 	rust_cls_stream="$WORK/rust-linux-wrongclass.json"
 	cp "$WORK/shipped-linux.json" "$rust_cls_stream"
 	for rcase in $RUST_CASES; do
-		evout internal/rustsource "$rcase" 'deferred on windows pending BUG-260916-2f3xbf' >>"$rust_cls_stream"
+		evout internal/rustsource "$rcase" 'CURATOR_CONFORMANCE_ROOT is not set' >>"$rust_cls_stream"
 		ev skip internal/rustsource "$rcase" >>"$rust_cls_stream"
 	done
 	assert 'a non-absence skip of a production rust case fails on linux' 1 \

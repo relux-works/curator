@@ -103,7 +103,9 @@ opt-in	cross-check env not set	allow	enabled by an explicit developer environmen
 opt-in	hashes the whole host GOROOT	allow	a whole-GOROOT probe, not part of the gate
 
 # --- deferred delivery stages -------------------------------------------------
-stage-deferred	deferred on windows pending BUG-260916-2f3xbf	allow	the Windows pnpm writable-store member BUG-260916-2f3xbf owns; asserted on windows-latest once the bug lands, never as a pass here
+# No stage is currently deferred. BUG-260916-2f3xbf's Windows pnpm deferral was
+# the only row here; it was removed when the bug landed and the two real-pnpm
+# cases became required on windows-latest.
 
 # --- go test plumbing -------------------------------------------------------
 helper-process	helper process	allow	the go test helper-process re-exec pattern

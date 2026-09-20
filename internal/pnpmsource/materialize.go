@@ -438,10 +438,14 @@ func reconcileWritableStoreOverlay(storeRoot, projectRoot string, expected []Sto
 	for _, entry := range entries {
 		link := filepath.Join(registry, entry.Name())
 		info, statErr := os.Lstat(link)
-		if statErr != nil || info.Mode()&fs.ModeSymlink == 0 {
+		if statErr != nil || !admittedLink(info, link) {
 			return fail(CodeInputUndeclared, "pnpm writable store registry contains an undeclared member", map[string]string{"entry": entry.Name()})
 		}
-		target, evalErr := filepath.EvalSymlinks(link)
+		resolved, resolveErr := normalizeTreeLink(link, info)
+		if resolveErr != nil {
+			return fail(CodeInputUndeclared, "pnpm writable store registry link cannot be resolved", map[string]string{"entry": entry.Name()})
+		}
+		target, evalErr := filepath.EvalSymlinks(resolved)
 		if evalErr != nil {
 			return fail(CodeInputUndeclared, "pnpm writable store registry link cannot be resolved", map[string]string{"entry": entry.Name()})
 		}
@@ -795,10 +799,14 @@ func validateDirectNodeModules(nodeModules string, root bool, expected map[strin
 			return fmt.Errorf("direct dependency link %q is missing", name)
 		}
 		info, statErr := os.Lstat(link)
-		if statErr != nil || info.Mode()&fs.ModeSymlink == 0 {
+		if statErr != nil || !admittedLink(info, link) {
 			return fmt.Errorf("direct dependency member %q is not a link", name)
 		}
-		actual, evalErr := filepath.EvalSymlinks(link)
+		resolved, resolveErr := normalizeTreeLink(link, info)
+		if resolveErr != nil {
+			return fmt.Errorf("direct dependency link %q cannot be resolved", name)
+		}
+		actual, evalErr := filepath.EvalSymlinks(resolved)
 		if evalErr != nil {
 			return fmt.Errorf("direct dependency link %q cannot be resolved", name)
 		}
@@ -855,10 +863,14 @@ func validateSnapshotInstance(ctx context.Context, projectRoot, virtual string, 
 			return fail(CodeGraphIncomplete, "pnpm snapshot dependency link is missing", map[string]string{"snapshot": snapshot.Key, "dependency": name})
 		}
 		linkInfo, err := os.Lstat(link)
-		if err != nil || linkInfo.Mode()&fs.ModeSymlink == 0 {
+		if err != nil || !admittedLink(linkInfo, link) {
 			return fail(CodeGraphIncomplete, "pnpm snapshot dependency member is not an exact link", map[string]string{"snapshot": snapshot.Key, "dependency": name})
 		}
-		actualTarget, err := filepath.EvalSymlinks(link)
+		resolved, resolveErr := normalizeTreeLink(link, linkInfo)
+		if resolveErr != nil {
+			return fail(CodeGraphIncomplete, "pnpm snapshot dependency link cannot be resolved", map[string]string{"snapshot": snapshot.Key, "dependency": name})
+		}
+		actualTarget, err := filepath.EvalSymlinks(resolved)
 		if err != nil {
 			return fail(CodeGraphIncomplete, "pnpm snapshot dependency link cannot be resolved", map[string]string{"snapshot": snapshot.Key, "dependency": name})
 		}
@@ -1070,7 +1082,20 @@ func copyContainedNode(realRoot, source, destination string, active map[string]b
 		return err
 	}
 	for _, entry := range entries {
-		if err = copyContainedNode(realRoot, filepath.Join(realSource, entry.Name()), filepath.Join(destination, entry.Name()), active); err != nil {
+		// Resolve the admitted link spelling before the recursive copy, the
+		// way the npm sibling does: filepath.EvalSymlinks does not evaluate
+		// Windows junctions, so a junction left in the descent path makes
+		// every deeper EvalSymlinks fail. On Unix this is the identity and
+		// the copy is unchanged.
+		info, infoErr := entry.Info()
+		if infoErr != nil {
+			return infoErr
+		}
+		childSource, linkErr := normalizeTreeLink(filepath.Join(realSource, entry.Name()), info)
+		if linkErr != nil {
+			return linkErr
+		}
+		if err = copyContainedNode(realRoot, childSource, filepath.Join(destination, entry.Name()), active); err != nil {
 			return err
 		}
 	}

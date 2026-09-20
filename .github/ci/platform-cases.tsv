@@ -461,26 +461,20 @@ cmd/curator	TestProfileComposeAddWarnsWhenOverlaysForbidden	linux,darwin,windows
 cmd/curator	TestEnvStatusReportsLockedRequire	linux,darwin,windows	-	-	env status reports the locked require_current_profile in JSON and text
 
 # ===========================================================================
-# Real-pnpm integration -- Windows store-registry gap (BUG-260916-2f3xbf)
+# Real-pnpm integration (BUG-260916-2f3xbf landed)
 #
 # The pnpm pin (TASK-260916-5aqozl) installs pnpm 10.33.0 in every suite lane
-# so the three TestRealPinnedPNPM* cases execute instead of skipping. On
-# windows-latest two of them fail with `closure_input_undeclared: pnpm
-# writable store registry contains an undeclared member` (gate run 35098955988):
-# pnpm writes a store member on Windows that the closure registry does not
-# declare. That is a product gap, not a CI gap, filed as BUG-260916-2f3xbf.
-#
-# Until the bug lands, exactly these two cases are Windows-deferred: required
-# on linux,darwin, where they pass against the pinned pnpm, and tolerating the
-# bug-naming stage-deferred skip on windows only. A skip of either case on a
-# unix runner, or for any other reason on Windows, is fatal. The third case
+# so the three TestRealPinnedPNPM* cases execute instead of skipping. pnpm
+# links directories through symlink-dir, which creates junctions on Windows;
+# BUG-260916-2f3xbf declared that spelling in the writable-store registry and
+# the materialized-link validators (internal/pnpmsource linkentry_*.go), so
+# both install cases below are required on windows-latest exactly as on unix.
+# Any skip of either case, on any runner, is fatal. The third case
 # (TestRealPinnedPNPMTargetPrunedUnreachableRejectsBeforeInstall) passes on all
-# three runners and carries no row. Removal: BUG-260916-2f3xbf's AC is green on
-# windows-latest with no ledger deferral -- widen must_run_on to windows and
-# delete the Go skip with it.
+# three runners and carries no row.
 # ===========================================================================
-internal/pnpmsource	TestRealPinnedPNPMLockSupersetSnapshotDependencies	linux,darwin	windows	stage-deferred	pinned-pnpm lock-superset case executes on unix; deferred on windows pending BUG-260916-2f3xbf (undeclared writable-store member), asserted there once the bug lands
-internal/pnpmsource	TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization	linux,darwin	windows	stage-deferred	pinned-pnpm private-store and offline-materialization case executes on unix; deferred on windows pending BUG-260916-2f3xbf (undeclared writable-store member), asserted there once the bug lands
+internal/pnpmsource	TestRealPinnedPNPMLockSupersetSnapshotDependencies	linux,darwin,windows	-	-	pinned-pnpm lock-superset case executes against the pinned pnpm on every runner, including the Windows junction spelling of the store registry
+internal/pnpmsource	TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization	linux,darwin,windows	-	-	pinned-pnpm private-store and offline-materialization case executes against the pinned pnpm on every runner, including the Windows junction spelling of the store registry
 
 # ===========================================================================
 # Pinned-Rust production cases (TASK-260916-vygif0)

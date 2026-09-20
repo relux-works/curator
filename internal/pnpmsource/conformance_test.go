@@ -870,7 +870,6 @@ func TestRealPinnedPNPMLockSupersetSnapshotDependencies(t *testing.T) {
 	fixture := newTargetPrunedSnapshotDependencyFixture(t)
 	capture := captureFixture(t, fixture)
 	runner := newConcretePNPMRunner(t)
-	skipOnWindowsForStoreRegistryGap(t)
 	runner.context = makeExecutionContext(t, capture, runner)
 	storeRoot := filepath.Join(t.TempDir(), "store")
 	store, err := DerivePrivateStore(t.Context(), capture, storeRoot, runner.context)
@@ -1106,7 +1105,15 @@ func TestWritableStoreOverlayAllowsOnlyExactProjectRegistration(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(registry, "rogue"), []byte("x"), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		assertCode(t, reconcileWritableStoreOverlay(store, project, expected), CodeInputUndeclared)
+		assertUndeclaredMemberRefusal(t, reconcileWritableStoreOverlay(store, project, expected))
+	})
+	t.Run("plain directory member refused", func(t *testing.T) {
+		store, project, expected := makeFixture(t)
+		registry := filepath.Join(store, "v10", "projects")
+		if err := os.Mkdir(filepath.Join(registry, "c8805e97311ac3a64fd7c507d26b47dc"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		assertUndeclaredMemberRefusal(t, reconcileWritableStoreOverlay(store, project, expected))
 	})
 	t.Run("frozen content drift", func(t *testing.T) {
 		store, project, expected := makeFixture(t)
@@ -1124,7 +1131,6 @@ func TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization(t *testing.T) {
 	fixture := newHostPNPMFixture(t)
 	capture := captureFixture(t, fixture)
 	runner := newConcretePNPMRunner(t)
-	skipOnWindowsForStoreRegistryGap(t)
 	runner.context = makeExecutionContext(t, capture, runner)
 	storeRoot := filepath.Join(t.TempDir(), "store")
 	store, err := DerivePrivateStore(t.Context(), capture, storeRoot, runner.context)
@@ -1284,31 +1290,6 @@ func TestResolveWindowsPNPMEntrypoint(t *testing.T) {
 			}
 		}
 	})
-}
-
-// skipOnWindowsForStoreRegistryGap defers the real-pnpm cases whose Windows
-// store writes the closure registry does not yet declare.
-//
-// Gate run 35098955988 (rev2 of the pnpm pin): with real pnpm 10.33.0
-// available on windows-latest for the first time, two of the three
-// TestRealPinnedPNPM* cases fail in DerivePrivateStore/Materialize with
-// `closure_input_undeclared: pnpm writable store registry contains an
-// undeclared member` -- pnpm writes a store member on Windows that the
-// registry does not declare. That is a product gap, filed as
-// BUG-260916-2f3xbf and out of scope for the pin task, so the orchestrator
-// defers exactly those two cases on Windows until the bug lands: the
-// platform-case ledger requires them on linux,darwin and tolerates this skip
-// on windows under class stage-deferred, and the skip reason names the bug so
-// the deferral is visible in skips-observed.tsv. The call sits after
-// newConcretePNPMRunner so a missing or unpinned pnpm still skips with the
-// existing host-capability reason; it fires only when pnpm is present on
-// Windows. Removal: delete the calls and this helper when BUG-260916-2f3xbf
-// lands -- the bug's AC is green on windows-latest with no ledger deferral.
-func skipOnWindowsForStoreRegistryGap(t *testing.T) {
-	t.Helper()
-	if runtime.GOOS == "windows" {
-		t.Skip("deferred on windows pending BUG-260916-2f3xbf: pnpm writable store registry contains an undeclared member")
-	}
 }
 
 func newConcretePNPMRunner(t *testing.T) *concretePNPMRunner {
@@ -1827,6 +1808,20 @@ func assertCode(t *testing.T, err error, want string) {
 		t.Fatalf("code=%q want=%q err=%v", ErrorCode(err), want, err)
 	}
 }
+
+// assertUndeclaredMemberRefusal pins the kind gate, not just the code: a
+// non-link registry member must be refused as an undeclared member. The
+// narrowing mutant that admits every member still fails closed at the target
+// check, but with the wrong diagnostic, so it fails this assertion.
+func assertUndeclaredMemberRefusal(t *testing.T, err error) {
+	t.Helper()
+	assertCode(t, err, CodeInputUndeclared)
+	diagnostic, ok := err.(*Error)
+	if !ok || !strings.Contains(diagnostic.Detail, "contains an undeclared member") {
+		t.Fatalf("rogue registry member refused by the wrong gate: %v", err)
+	}
+}
+
 func cloneBytesMap(values map[string][]byte) map[string][]byte {
 	result := map[string][]byte{}
 	for key, value := range values {
