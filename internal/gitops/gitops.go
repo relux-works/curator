@@ -399,7 +399,7 @@ func writeBlobs(repo string, entries []treeEntry) error {
 		return err
 	}
 	if err := cmd.Start(); err != nil {
-		return err
+		return fmt.Errorf("git cat-file --batch failed in %s: %w", repo, err)
 	}
 	go func() {
 		defer func() { _ = stdin.Close() }()

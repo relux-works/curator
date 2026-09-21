@@ -99,6 +99,11 @@ All notable implementation changes are recorded here.
   reported as an invalid document rather than as one from a newer manager.
   Schemas 3 and 4 are read by this release, so `upgrade the manager` was never
   the remedy for them.
+- A snapshot-extraction spawn failure of `git cat-file --batch` is now
+  reported with its operation context (`git cat-file --batch failed in ...`)
+  like every other product git spawn, instead of surfacing the bare fork/exec
+  text. The underlying cause is preserved in the message and the error chain;
+  success-path behaviour is unchanged.
 
 ## 0.12.5 - 2026-07-14
 
