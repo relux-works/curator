@@ -500,12 +500,38 @@ identity, ref, audit, and unclassified failures never fall back.
 Named authentication providers (`source-providers.json` beside the
 same configuration) apply to the external build lane under
 `CURATOR_DRAFT_TRANSPORT_RESOLUTION`, not to Skillfile sources:
-`project resolve` and `project refresh` clone and fetch with the
-operator's ambient Git credentials, and the `authentication`
-identifier on a Skillfile endpoint is validated but unused on this
-lane. Never put secrets in these objects. An invalid or
-unreadable policy fails `repository_policy_invalid` and is never
-treated as absent.
+`project resolve` and `project refresh` clone and fetch with
+credentials from the invoking environment only (SSH agent via
+`SSH_AUTH_SOCK`, `GIT_ASKPASS` — the only HTTPS credential channel on
+this lane: it answers git's username and password prompts (or embed the
+username in the endpoint URL), it supplies credentials, it cannot
+redirect the endpoint); user and system Git configuration — credential
+helpers, `insteadOf`/`pushInsteadOf`, URL rewriting and includes,
+`core.sshCommand` — is never consulted, and no interactive prompt
+occurs. Git's environment on this lane is built from an explicit
+allow-list (`PATH`; `HOME`/`USERPROFILE` only so OpenSSH finds its
+default `known_hosts` and default identity files; `TMPDIR`/`TMP`/`TEMP`;
+`TZ`; Windows process essentials; `SSH_AUTH_SOCK`; `GIT_ASKPASS`):
+every other ambient name — `GIT_SSH`/`GIT_SSH_COMMAND`,
+`GIT_PROXY_COMMAND`, `GIT_EXEC_PATH`, every other `GIT_*` override, and
+the proxy environment — is dropped by construction and cannot redirect
+or hijack the clone, so the draft lane does not honour proxy
+environment. SSH runs a curator-owned command with an empty ssh config
+(`-F` an empty file, `BatchMode`, `StrictHostKeyChecking=yes`,
+`ProxyCommand=none`, `ProxyJump=none`, forwarding disabled, host-key
+validation never disabled): host aliases, `ProxyCommand`, `IdentityFile`
+and every other `~/.ssh/config` entry are not read — use an agent (or a
+default-named key) and the literal host name; unknown hosts fail closed
+(seed `known_hosts` with `ssh-keyscan` or a first manual `ssh`). The
+`ssh` binary itself resolves through the honoured `PATH` (the lane's
+tooling bound). The `authentication` identifier on a Skillfile endpoint is
+validated but unused on this lane. Never put secrets in these
+objects. An invalid or unreadable policy fails
+`repository_policy_invalid` and is never treated as absent. On
+Windows the isolation also drops Git for Windows' own system
+configuration (`http.sslBackend`, `http.sslCAInfo`); whether HTTPS
+verification still works there depends on the build's compiled
+defaults and is unverified.
 
 For a package at the project root, each `root_inputs` entry is a
 source-relative, portable, link-free path disjoint from outputs; every

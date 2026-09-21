@@ -88,16 +88,6 @@ func semanticBound(t *testing.T, c draftSemanticCase, reason string) {
 	t.Logf("BOUND %s: expected %q: %s", c.ID, c.Expected, reason)
 }
 
-// semanticKnownGap records a driven row whose production behavior fails
-// the draft expectation: a known product conformance gap, not a bound.
-// The row locks the gap signature and fails when the gap is fixed; it
-// is counted as known-gap, never as passing.
-func semanticKnownGap(t *testing.T, c draftSemanticCase, reason string) {
-	t.Helper()
-	recordSemanticOutcome(c.ID, semanticOutcomeKnownGap)
-	t.Logf("KNOWN-GAP %s: expected %q: %s", c.ID, c.Expected, reason)
-}
-
 // Semantic outcome classes, one recorded per executed case id.
 const (
 	semanticOutcomeDriven   = "driven"

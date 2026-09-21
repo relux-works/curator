@@ -129,7 +129,8 @@ func installDraftTransportShim(t *testing.T, failURL, failStderr, rewriteURL, ba
 		script.WriteString("if [ \"$arg\" = '" + rewriteURL + "' ]; then rewrite=1; url=\"$arg\"; fi\n")
 	}
 	script.WriteString("done\n")
-	script.WriteString("if [ \"$1\" = \"clone\" ]; then printf '%s\\n' \"$url\" >>\"$log\"\n")
+	script.WriteString("is_clone=0; for arg in \"$@\"; do if [ \"$arg\" = \"clone\" ]; then is_clone=1; fi; done\n")
+	script.WriteString("if [ \"$is_clone\" = \"1\" ]; then printf '%s\\n' \"$url\" >>\"$log\"\n")
 	script.WriteString("dest=''; for arg in \"$@\"; do dest=\"$arg\"; done\n")
 	script.WriteString("if [ \"$fail\" = \"1\" ]; then printf \"Cloning into '%s'...\\n\" \"$dest\" >&2\n")
 	script.WriteString("printf '%s\\n' \"" + failStderr + "\" >&2\n")

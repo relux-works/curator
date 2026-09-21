@@ -461,3 +461,157 @@ func TestResolveV2HandBuiltViolations(t *testing.T) {
 		t.Fatalf("unknown alias err=%v", err)
 	}
 }
+
+// ConnectionURL applies the §5 alias substitution to the listed URL:
+// the resolved host with the resolved port, keeping scheme, userinfo,
+// and path. Attempts without an alias connect to the listed URL
+// verbatim, so legacy, port, and declared-mirror behavior is unchanged.
+func TestAttemptConnectionURL(t *testing.T) {
+	cases := []struct {
+		name    string
+		attempt Attempt
+		want    string
+	}{
+		{
+			name:    "legacy https passes through",
+			attempt: Attempt{URL: "https://example.org/kit.git"},
+			want:    "https://example.org/kit.git",
+		},
+		{
+			name:    "legacy scp passes through",
+			attempt: Attempt{URL: "git@example.org:kit.git"},
+			want:    "git@example.org:kit.git",
+		},
+		{
+			name:    "port endpoint passes through",
+			attempt: Attempt{URL: "https://example.org:8443/kit.git", ResolvedHost: "example.org", ResolvedPort: 8443, HasExplicitPort: true},
+			want:    "https://example.org:8443/kit.git",
+		},
+		{
+			name:    "declared mirror passes through",
+			attempt: Attempt{URL: "https://mirror.example.net/kit.git", MirrorOf: "example.org/kit", ResolvedHost: "mirror.example.net"},
+			want:    "https://mirror.example.net/kit.git",
+		},
+		{
+			name:    "https alias with port",
+			attempt: Attempt{URL: "https://example.org/kit.git", Alias: "corp-mirror", ResolvedHost: "mirror.corp.example", ResolvedPort: 8443, HasExplicitPort: true},
+			want:    "https://mirror.corp.example:8443/kit.git",
+		},
+		{
+			name:    "https alias without port",
+			attempt: Attempt{URL: "https://example.org/kit.git", Alias: "corp-mirror", ResolvedHost: "mirror.corp.example"},
+			want:    "https://mirror.corp.example/kit.git",
+		},
+		{
+			name:    "https URL port survives an unported alias",
+			attempt: Attempt{URL: "https://example.org:8443/kit.git", Alias: "corp-mirror", ResolvedHost: "mirror.corp.example", ResolvedPort: 8443, HasExplicitPort: true},
+			want:    "https://mirror.corp.example:8443/kit.git",
+		},
+		{
+			name:    "same-host alias applies the alias port",
+			attempt: Attempt{URL: "https://example.org/kit.git", Alias: "local-port", ResolvedHost: "example.org", ResolvedPort: 8443, HasExplicitPort: true},
+			want:    "https://example.org:8443/kit.git",
+		},
+		{
+			name:    "ssh URI alias keeps userinfo",
+			attempt: Attempt{URL: "ssh://git@example.org/kit.git", Alias: "corp-mirror", ResolvedHost: "mirror.corp.example", ResolvedPort: 2222, HasExplicitPort: true},
+			want:    "ssh://git@mirror.corp.example:2222/kit.git",
+		},
+		{
+			name:    "ssh URI alias without port or user",
+			attempt: Attempt{URL: "ssh://example.org/kit.git", Alias: "corp-mirror", ResolvedHost: "mirror.corp.example"},
+			want:    "ssh://mirror.corp.example/kit.git",
+		},
+		{
+			name:    "scp alias without port keeps the spelling",
+			attempt: Attempt{URL: "git@example.org:kit.git", Alias: "corp-mirror", ResolvedHost: "mirror.corp.example"},
+			want:    "git@mirror.corp.example:kit.git",
+		},
+		{
+			name:    "scp alias with port renders ssh with a home-relative path",
+			attempt: Attempt{URL: "git@example.org:teams/kit.git", Alias: "corp-mirror", ResolvedHost: "mirror.corp.example", ResolvedPort: 2222, HasExplicitPort: true},
+			want:    "ssh://git@mirror.corp.example:2222/~/teams/kit.git",
+		},
+		{
+			name:    "nested https path survives substitution",
+			attempt: Attempt{URL: "https://example.org/teams/kit.git", Alias: "corp-mirror", ResolvedHost: "mirror.corp.example", ResolvedPort: 8443, HasExplicitPort: true},
+			want:    "https://mirror.corp.example:8443/teams/kit.git",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			target, ok := c.attempt.ConnectionURL()
+			if !ok {
+				t.Fatalf("ConnectionURL(%+v) refused a well-formed attempt", c.attempt)
+			}
+			if target != c.want {
+				t.Fatalf("ConnectionURL(%+v) = %q, want %q", c.attempt, target, c.want)
+			}
+		})
+	}
+}
+
+// ConnectionURL fails closed when a named alias cannot form a
+// connection target; the caller refuses before any network I/O rather
+// than connecting to the unsubstituted URL or a half-substituted one.
+func TestAttemptConnectionURLRefusesMistranslations(t *testing.T) {
+	valid := Attempt{URL: "https://example.org/kit.git", Alias: "corp-mirror", ResolvedHost: "mirror.corp.example", ResolvedPort: 8443, HasExplicitPort: true}
+	cases := []struct {
+		name    string
+		attempt Attempt
+	}{
+		{"empty resolved host", Attempt{URL: valid.URL, Alias: valid.Alias, ResolvedPort: valid.ResolvedPort, HasExplicitPort: true}},
+		{"uppercase resolved host", Attempt{URL: valid.URL, Alias: valid.Alias, ResolvedHost: "Mirror.Corp.Example", ResolvedPort: valid.ResolvedPort, HasExplicitPort: true}},
+		{"resolved host with port separator", Attempt{URL: valid.URL, Alias: valid.Alias, ResolvedHost: "mirror.corp.example:22", ResolvedPort: valid.ResolvedPort, HasExplicitPort: true}},
+		{"port flag without port value", Attempt{URL: valid.URL, Alias: valid.Alias, ResolvedHost: valid.ResolvedHost, HasExplicitPort: true}},
+		{"port value without port flag", Attempt{URL: valid.URL, Alias: valid.Alias, ResolvedHost: valid.ResolvedHost, ResolvedPort: 8443}},
+		{"zero port", Attempt{URL: valid.URL, Alias: valid.Alias, ResolvedHost: valid.ResolvedHost, ResolvedPort: 0, HasExplicitPort: true}},
+		{"out-of-range port", Attempt{URL: valid.URL, Alias: valid.Alias, ResolvedHost: valid.ResolvedHost, ResolvedPort: 65536, HasExplicitPort: true}},
+		{"empty URL", Attempt{URL: "", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost, ResolvedPort: valid.ResolvedPort, HasExplicitPort: true}},
+		{"non-URL", Attempt{URL: "not-a-url", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost, ResolvedPort: valid.ResolvedPort, HasExplicitPort: true}},
+		{"https without host", Attempt{URL: "https:///kit.git", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost, ResolvedPort: valid.ResolvedPort, HasExplicitPort: true}},
+		{"https without path", Attempt{URL: "https://example.org", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost, ResolvedPort: valid.ResolvedPort, HasExplicitPort: true}},
+		{"https with userinfo", Attempt{URL: "https://git@example.org/kit.git", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost, ResolvedPort: valid.ResolvedPort, HasExplicitPort: true}},
+		{"https with garbage port", Attempt{URL: "https://example.org:abc/kit.git", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost, ResolvedPort: valid.ResolvedPort, HasExplicitPort: true}},
+		{"https with query", Attempt{URL: "https://example.org/kit.git?x=1", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost}},
+		{"ssh URI with empty user", Attempt{URL: "ssh://@example.org/kit.git", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost}},
+		{"scp without path", Attempt{URL: "git@example.org:", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost}},
+		{"scp with absolute path", Attempt{URL: "git@example.org:/kit.git", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost}},
+		{"scp with second colon", Attempt{URL: "git@example.org:kit:evil.git", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if target, ok := c.attempt.ConnectionURL(); ok {
+				t.Fatalf("ConnectionURL(%+v) = %q, want refusal", c.attempt, target)
+			}
+		})
+	}
+}
+
+// Every loader-planned alias attempt forms the §5 connection target:
+// the alias host with the alias port when present, else the URL port
+// when present, else the transport default.
+func TestAttemptConnectionURLFollowsLoaderPlans(t *testing.T) {
+	docs := map[string]string{
+		"https://mirror.corp.example:8443/kit.git":     `{"schema_version":2,"repositories":{"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https","alias":"m","mirror_of":"example.org/kit"}],"fallback":"none"}},"aliases":{"m":{"host":"mirror.corp.example","port":8443,"authentication":"team-https"}}}`,
+		"git@mirror.corp.example:kit.git":              `{"schema_version":2,"repositories":{"example.org/kit":{"endpoints":[{"url":"git@example.org:kit.git","authentication":"team-ssh","alias":"m","mirror_of":"example.org/kit"}],"fallback":"none"}},"aliases":{"m":{"host":"mirror.corp.example","authentication":"team-ssh"}}}`,
+		"ssh://git@mirror.corp.example:2222/~/kit.git": `{"schema_version":2,"repositories":{"example.org/kit":{"endpoints":[{"url":"git@example.org:kit.git","authentication":"team-ssh","alias":"m","mirror_of":"example.org/kit"}],"fallback":"none"}},"aliases":{"m":{"host":"mirror.corp.example","port":2222,"authentication":"team-ssh"}}}`,
+	}
+	for want, doc := range docs {
+		policy, err := ParseSourcePolicy([]byte(doc), "source-policy.json")
+		if err != nil {
+			t.Fatalf("ParseSourcePolicy: %v", err)
+		}
+		resolved, err := ResolveRepositoryEndpoints(policy, "", "example.org/kit")
+		if err != nil {
+			t.Fatalf("ResolveRepositoryEndpoints: %v", err)
+		}
+		target, ok := resolved.Attempts[0].ConnectionURL()
+		if !ok {
+			t.Fatalf("ConnectionURL(%+v) refused a loader-planned attempt", resolved.Attempts[0])
+		}
+		if target != want {
+			t.Fatalf("ConnectionURL(%+v) = %q, want %q", resolved.Attempts[0], target, want)
+		}
+	}
+}

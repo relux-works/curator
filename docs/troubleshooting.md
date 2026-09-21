@@ -468,6 +468,23 @@ machine policy entry.
 
 Remedy: verify the network path and operator authentication for the
 listed endpoints, then retry with machine source-policy.json.
+A `credential.helper` from user or system Git configuration is
+never consulted on this lane and no prompt occurs, so a private
+HTTPS Skillfile source that relied on a helper fails here with an
+authentication clause: provide the credential through the invoking
+environment instead — a non-interactive `GIT_ASKPASS` program that
+answers git's username and password prompts (or embed the username in
+the endpoint URL), or an SSH endpoint with an agent via
+`SSH_AUTH_SOCK` — then retry the explicit attempt.
+SSH on this lane runs a curator-owned command with an empty ssh
+config: host aliases, `ProxyCommand`, `IdentityFile` and every other
+`~/.ssh/config` entry are not read, so an SSH source that relied on an
+alias or a `ProxyCommand` fails here — use an agent (or a
+default-named key) and the literal host name instead. Unknown hosts
+fail closed with a host-key clause: seed `known_hosts` with
+`ssh-keyscan` or a first manual `ssh`, then retry. The proxy
+environment is not honoured on this lane either: a source reachable
+only through a proxy fails here with an availability clause.
 
 ### repository_policy_invalid
 
@@ -518,3 +535,19 @@ package yet — planning must not invent trust.
 
 Remedy: run the explicit attempt under trusted machine policy so the
 audit report is persisted.
+
+### build_repository_identity_invalid
+
+Symptom: `build_repository_identity_invalid: transport plan endpoint
+N carries an explicit port or host alias outside the strict
+external-build lane grammar`, on the resolved lane only
+(`CURATOR_DRAFT_TRANSPORT_RESOLUTION=1` with a machine policy).
+
+Cause: the planned endpoint entry carries an explicit port or a host
+alias, which the strict external-build lane refuses deterministically
+(§7) before any fetch. Other `build_repository_identity_invalid`
+diagnostics keep their lane behavior and carry no appended guidance.
+
+Remedy: fix the endpoint entry in machine source-policy.json: the
+strict external-build lane admits no explicit port and no host alias,
+then retry the explicit attempt.

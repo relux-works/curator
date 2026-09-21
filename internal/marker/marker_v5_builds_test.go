@@ -1,6 +1,9 @@
 package marker
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -106,5 +109,238 @@ func TestMarkerV5BuildsBindReceiptVersion3OnBothArms(t *testing.T) {
 		if recorded.SchemaVersion == PolicySchemaVersion {
 			t.Fatal("legacy marker accepted receipt version 3")
 		}
+	}
+}
+
+// rewriteV5Build writes a recorded v5 marker back with one builds entry
+// replaced by the given JSON text, bypassing Write so the document carries
+// exactly the bytes a foreign writer could produce.
+func rewriteV5Build(t *testing.T, dir, command, buildJSON string) {
+	t.Helper()
+	payload, err := os.ReadFile(filepath.Join(dir, Name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &raw); err != nil {
+		t.Fatal(err)
+	}
+	var builds map[string]json.RawMessage
+	if err := json.Unmarshal(raw["builds"], &builds); err != nil {
+		t.Fatal(err)
+	}
+	builds[command] = json.RawMessage(buildJSON)
+	rewrittenBuilds, err := json.Marshal(builds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw["builds"] = rewrittenBuilds
+	rewritten, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, Name), rewritten, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func mustExtJSON(t *testing.T, build Build) string {
+	t.Helper()
+	payload, err := json.Marshal(build)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(payload)
+}
+
+func mutateExtJSON(t *testing.T, base Build, mutate func(map[string]json.RawMessage)) string {
+	t.Helper()
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(mustExtJSON(t, base)), &object); err != nil {
+		t.Fatal(err)
+	}
+	mutate(object)
+	payload, err := json.Marshal(object)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(payload)
+}
+
+func mutateNestedJSON(t *testing.T, outer map[string]json.RawMessage, field string, mutate func(map[string]json.RawMessage)) {
+	t.Helper()
+	var nested map[string]json.RawMessage
+	if err := json.Unmarshal(outer[field], &nested); err != nil {
+		t.Fatal(err)
+	}
+	mutate(nested)
+	payload, err := json.Marshal(nested)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outer[field] = payload
+}
+
+// TestMarkerV5ExternalBuildClosedShape is the reader regression for
+// BUG-260920-2eg8nv: an external go-repository-v1 record must match the
+// closed raw shape of its arm. An absent `substituted` decodes to the same
+// false as an explicit one, and a null member decodes to the same zero
+// value as an absent one, so the raw object is checked before the lossy
+// decode. Every row drives marker.Read, the production entry.
+func TestMarkerV5ExternalBuildClosedShape(t *testing.T) {
+	substitutedLocal := v5ExternalBuild()
+	substitutedLocal.Substituted = true
+	substitutedLocal.Substitution = &RepositorySubstitute{Type: "local-path"}
+	substitutedNetwork := v5ExternalBuild()
+	substitutedNetwork.Substituted = true
+	substitutedNetwork.Substitution = &RepositorySubstitute{
+		Type: "network-git",
+		Ref:  &RepositoryRef{Kind: "tag", Value: "v1.4.0"},
+	}
+	withTag := v5ExternalBuild()
+	withTag.DeclaredTag = "v1.4.0"
+
+	type row struct {
+		build  func(t *testing.T) string
+		readOK bool
+	}
+	rows := map[string]row{
+		"control-unsubstituted":       {func(t *testing.T) string { return mustExtJSON(t, v5ExternalBuild()) }, true},
+		"control-substituted-local":   {func(t *testing.T) string { return mustExtJSON(t, substitutedLocal) }, true},
+		"control-substituted-network": {func(t *testing.T) string { return mustExtJSON(t, substitutedNetwork) }, true},
+		"control-declared-tag":        {func(t *testing.T) string { return mustExtJSON(t, withTag) }, true},
+
+		"missing-substituted": {func(t *testing.T) string {
+			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { delete(o, "substituted") })
+		}, false},
+		"substituted-null": {func(t *testing.T) string {
+			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { o["substituted"] = json.RawMessage(`null`) })
+		}, false},
+		"substituted-string": {func(t *testing.T) string {
+			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { o["substituted"] = json.RawMessage(`"false"`) })
+		}, false},
+		"substituted-number": {func(t *testing.T) string {
+			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { o["substituted"] = json.RawMessage(`0`) })
+		}, false},
+		"substitution-null": {func(t *testing.T) string {
+			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { o["substitution"] = json.RawMessage(`null`) })
+		}, false},
+		"substituted-true-missing-substitution": {func(t *testing.T) string {
+			missing := v5ExternalBuild()
+			missing.Substituted = true
+			return mustExtJSON(t, missing)
+		}, false},
+		"substituted-false-with-substitution": {func(t *testing.T) string {
+			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) {
+				o["substitution"] = json.RawMessage(`{"type":"local-path"}`)
+			})
+		}, false},
+		"foreign-field": {func(t *testing.T) string {
+			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { o["extra"] = json.RawMessage(`1`) })
+		}, false},
+		"foreign-field-null": {func(t *testing.T) string {
+			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { o["extra"] = json.RawMessage(`null`) })
+		}, false},
+		"declared-tag-null": {func(t *testing.T) string {
+			return mutateExtJSON(t, withTag, func(o map[string]json.RawMessage) { o["declared_tag"] = json.RawMessage(`null`) })
+		}, false},
+		"declared-tag-number": {func(t *testing.T) string {
+			return mutateExtJSON(t, withTag, func(o map[string]json.RawMessage) { o["declared_tag"] = json.RawMessage(`123`) })
+		}, false},
+		"commit-null": {func(t *testing.T) string {
+			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { o["commit"] = json.RawMessage(`null`) })
+		}, false},
+		"repository-null": {func(t *testing.T) string {
+			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { o["repository"] = json.RawMessage(`null`) })
+		}, false},
+		"receipt-version-null": {func(t *testing.T) string {
+			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { o["receipt_schema_version"] = json.RawMessage(`null`) })
+		}, false},
+		"receipt-version-string": {func(t *testing.T) string {
+			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { o["receipt_schema_version"] = json.RawMessage(`"3"`) })
+		}, false},
+		"missing-repository": {func(t *testing.T) string {
+			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { delete(o, "repository") })
+		}, false},
+		"missing-commit": {func(t *testing.T) string {
+			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { delete(o, "commit") })
+		}, false},
+		"missing-build-source": {func(t *testing.T) string {
+			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { delete(o, "build_source") })
+		}, false},
+		"declared-identity-null": {func(t *testing.T) string {
+			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { o["declared_identity"] = json.RawMessage(`null`) })
+		}, false},
+		"declared-identity-extra": {func(t *testing.T) string {
+			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) {
+				mutateNestedJSON(t, o, "declared_identity", func(n map[string]json.RawMessage) { n["extra"] = json.RawMessage(`1`) })
+			})
+		}, false},
+		"declared-identity-kind-null": {func(t *testing.T) string {
+			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) {
+				mutateNestedJSON(t, o, "declared_identity", func(n map[string]json.RawMessage) { n["kind"] = json.RawMessage(`null`) })
+			})
+		}, false},
+		"locked-commit-extra": {func(t *testing.T) string {
+			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) {
+				mutateNestedJSON(t, o, "declared_locked_commit", func(n map[string]json.RawMessage) { n["ref"] = json.RawMessage(`"main"`) })
+			})
+		}, false},
+		"locked-commit-hex-null": {func(t *testing.T) string {
+			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) {
+				mutateNestedJSON(t, o, "declared_locked_commit", func(n map[string]json.RawMessage) { n["hex"] = json.RawMessage(`null`) })
+			})
+		}, false},
+		"effective-identity-extra": {func(t *testing.T) string {
+			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) {
+				mutateNestedJSON(t, o, "effective_identity", func(n map[string]json.RawMessage) { n["extra"] = json.RawMessage(`1`) })
+			})
+		}, false},
+		"build-source-extra": {func(t *testing.T) string {
+			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) {
+				mutateNestedJSON(t, o, "build_source", func(n map[string]json.RawMessage) { n["extra"] = json.RawMessage(`1`) })
+			})
+		}, false},
+		"local-path-with-ref": {func(t *testing.T) string {
+			return mutateExtJSON(t, substitutedLocal, func(o map[string]json.RawMessage) {
+				mutateNestedJSON(t, o, "substitution", func(n map[string]json.RawMessage) {
+					n["ref"] = json.RawMessage(`{"kind":"tag","value":"v1.4.0"}`)
+				})
+			})
+		}, false},
+		"network-git-missing-ref": {func(t *testing.T) string {
+			return mutateExtJSON(t, substitutedNetwork, func(o map[string]json.RawMessage) {
+				mutateNestedJSON(t, o, "substitution", func(n map[string]json.RawMessage) { delete(n, "ref") })
+			})
+		}, false},
+		"network-git-ref-null": {func(t *testing.T) string {
+			return mutateExtJSON(t, substitutedNetwork, func(o map[string]json.RawMessage) {
+				mutateNestedJSON(t, o, "substitution", func(n map[string]json.RawMessage) { n["ref"] = json.RawMessage(`null`) })
+			})
+		}, false},
+		"substitution-unknown-type": {func(t *testing.T) string {
+			return mutateExtJSON(t, substitutedLocal, func(o map[string]json.RawMessage) {
+				mutateNestedJSON(t, o, "substitution", func(n map[string]json.RawMessage) { n["type"] = json.RawMessage(`"bad"`) })
+			})
+		}, false},
+		"substitution-missing-type": {func(t *testing.T) string {
+			return mutateExtJSON(t, substitutedLocal, func(o map[string]json.RawMessage) { o["substitution"] = json.RawMessage(`{}`) })
+		}, false},
+	}
+	for name, r := range rows {
+		t.Run(name, func(t *testing.T) {
+			dir, _ := writeV5(t, v5BuildMarker(true, true))
+			rewriteV5Build(t, dir, "ext", r.build(t))
+			got := Read(dir)
+			if (got != nil) != r.readOK {
+				t.Fatalf("Read = %v, want readable=%v", got, r.readOK)
+			}
+			if got == nil {
+				return
+			}
+			if got.Builds["ext"].Driver != "go-repository-v1" {
+				t.Fatalf("recorded ext driver = %q", got.Builds["ext"].Driver)
+			}
+		})
 	}
 }

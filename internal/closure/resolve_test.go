@@ -720,6 +720,172 @@ func TestResolveDraftResolvesEachGitAliasOnce(t *testing.T) {
 	}
 }
 
+// TestResolveDraftAliasFetchFallbackIgnoresUserConfig proves the
+// pinGitAliases fallback fetch (FetchRepo nil) is the isolated
+// variant: with a hostile user git configuration redirecting the
+// alias remote to another repository, the fallback refresh must still
+// bind the declared tag, never evil's (BUG-260920-3ukdk4 N1).
+// Reverting the fallback to the ambient fetch must fail this test.
+func TestResolveDraftAliasFetchFallbackIgnoresUserConfig(t *testing.T) {
+	home := t.TempDir()
+	scratch := t.TempDir()
+	declared := draftGitRepo(t, map[string]string{"skills/review": "review"}, "v1")
+	declaredV1, err := gitops.Resolve(declared, "tag", "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	declaredBare := filepath.Join(scratch, "declared.git")
+	gitCloneBare(t, declared, declaredBare)
+	declaredURL := "file://" + filepath.ToSlash(mustAbs(t, declaredBare))
+	evil := draftGitRepo(t, map[string]string{"skills/review": "review"}, "v1")
+	if err := os.WriteFile(filepath.Join(evil, "skills", "review", "references", "info.md"), []byte("evil"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitAt(t, evil, "add", ".")
+	gitAt(t, evil, "commit", "-qm", "evil")
+	gitAt(t, evil, "tag", "-f", "v1")
+	evilV1, err := gitops.Resolve(evil, "tag", "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if evilV1.Commit == declaredV1.Commit {
+		t.Fatal("declared and evil tags collide")
+	}
+	evilBare := filepath.Join(scratch, "evil.git")
+	gitCloneBare(t, evil, evilBare)
+	evilURL := "file://" + filepath.ToSlash(mustAbs(t, evilBare))
+	// The alias tree carries a file:// origin so the insteadOf rule
+	// matches exactly the URL git fetches.
+	aliasRepo := filepath.Join(scratch, "alias")
+	gitCloneURL(t, declaredURL, aliasRepo)
+	hostile := filepath.Join(scratch, "hostile.gitconfig")
+	hostileBody := "[url \"" + evilURL + "\"]\n" +
+		"\tinsteadOf = " + declaredURL + "\n" +
+		"\tpushInsteadOf = " + declaredURL + "\n"
+	if err := os.WriteFile(hostile, []byte(hostileBody), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Positive control: a raw fetch of a clone of the declared tree
+	// under the hostile selectors binds evil's tag, proving the payload
+	// redirects fetches when it is consulted.
+	control := filepath.Join(scratch, "control")
+	gitCloneURL(t, declaredURL, control)
+	gitAt(t, control, "tag", "-d", "v1")
+	hostileEnv := gitEnvWithoutConfig(t,
+		"GIT_CONFIG_GLOBAL="+hostile,
+		"GIT_CONFIG_SYSTEM="+hostile,
+		"GIT_CONFIG_NOSYSTEM=0",
+		"HOME="+t.TempDir(),
+		"XDG_CONFIG_HOME="+t.TempDir(),
+	)
+	gitFetchEnv(t, control, hostileEnv)
+	controlV1, err := gitops.Resolve(control, "tag", "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if controlV1.Commit != evilV1.Commit {
+		t.Fatalf("control tag v1 = %s, want evil %s (payload not live)", controlV1.Commit, evilV1.Commit)
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", hostile)
+	t.Setenv("GIT_CONFIG_SYSTEM", hostile)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "0")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	payload := `{"schema_version":2,"sources":{"s":{"git":"https://example.org/kit.git","tag":"v1"}},"skills":[{"name":"review","from":"s","directory":"skills/review"}]}`
+	project := t.TempDir()
+	m, raw := parseDraftManifest(t, project, payload)
+	plan, err := ResolveDraft(DraftResolveConfig{
+		ProjectRoot:     project,
+		Home:            home,
+		Manifest:        m,
+		ManifestPayload: raw,
+		Expansion:       manifest.ExpansionOptions{GitRoots: map[string]string{"s": aliasRepo}},
+		Fetch:           true,
+		FetchRepo:       nil, // exercise the production fallback
+	})
+	if err != nil {
+		t.Fatalf("ResolveDraft with hostile user config = %v, want the declared bind", err)
+	}
+	member, ok := plan.Lock.Find("review")
+	if !ok {
+		t.Fatal("lock misses review")
+	}
+	if member.Package.Commit.Hex == evilV1.Commit {
+		t.Fatalf("lock binds the evil tag %s: the alias fallback fetch consulted user configuration", evilV1.Commit)
+	}
+	if member.Package.Commit.Hex != declaredV1.Commit {
+		t.Fatalf("lock binds %s, want the declared tag %s", member.Package.Commit.Hex, declaredV1.Commit)
+	}
+}
+
+// mustAbs returns the absolute path of p.
+func mustAbs(t *testing.T, p string) string {
+	t.Helper()
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return abs
+}
+
+// gitCloneBare clones src to dest as a bare repository.
+func gitCloneBare(t *testing.T, src, dest string) {
+	t.Helper()
+	cmd := exec.Command("git", "clone", "--quiet", "--bare", "--", src, dest)
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
+		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git clone --bare: %v\n%s", err, out)
+	}
+}
+
+// gitCloneURL clones srcURL to dest, preserving srcURL verbatim as the
+// origin URL.
+func gitCloneURL(t *testing.T, srcURL, dest string) {
+	t.Helper()
+	cmd := exec.Command("git", "clone", "--quiet", "--", srcURL, dest)
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
+		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git clone: %v\n%s", err, out)
+	}
+}
+
+// gitEnvWithoutConfig returns the process environment with every
+// persistent-config selector removed and extra appended, so the caller
+// controls exactly which configuration git consults.
+func gitEnvWithoutConfig(t *testing.T, extra ...string) []string {
+	t.Helper()
+	var env []string
+	for _, entry := range os.Environ() {
+		name := entry
+		if index := strings.IndexByte(entry, '='); index >= 0 {
+			name = entry[:index]
+		}
+		switch name {
+		case "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_NOSYSTEM",
+			"GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS":
+			continue
+		}
+		env = append(env, entry)
+	}
+	return append(env, extra...)
+}
+
+// gitFetchEnv runs git fetch --all --tags in dir under env.
+func gitFetchEnv(t *testing.T, dir string, env []string) {
+	t.Helper()
+	cmd := exec.Command("git", "fetch", "--quiet", "--all", "--tags")
+	cmd.Dir = dir
+	cmd.Env = env
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git fetch: %v\n%s", err, out)
+	}
+}
+
 func TestOpenDraftFrozenGitTamperRefused(t *testing.T) {
 	setup := func(t *testing.T) (string, *sourcelock.Lock, string, FrozenOptions) {
 		t.Helper()

@@ -520,7 +520,7 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 	resolveAttest := opts.ResolveAttest
 	if resolveAttest == nil {
 		resolveAttest = func(nodes []*closure.Node) (map[string]*marker.Attestation, []string, error) {
-			return resolveRegistries(cfg, nodes, alias, !opts.DryRun)
+			return resolveRegistries(cfg, nodes, alias, !opts.DryRun, draftLock != nil)
 		}
 	}
 	attestations, regWarnings, regErr := resolveAttest(nodes)
@@ -1311,8 +1311,12 @@ func mcpVerifier(env mcp.Env, agents []string, scope string) func([]*closure.Nod
 // resolveRegistries applies the audit registry gate (Spec §13.3, §13.4):
 // snapshot verification excludes tampered registries (all tampered fails),
 // a verified revocation denies, strict policy fails unknown artifacts, and
-// the authorizing attestation lands in the marker.
-func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string, persist bool) (map[string]*marker.Attestation, []string, error) {
+// the authorizing attestation lands in the marker. On the draft lane
+// (draft true) network members resolve through the exact draft §4 entry:
+// a record authorizes only on exact name, canonical repository, commit,
+// and context hash matching. The frozen v1 lane keeps §13.3 OR-matching
+// byte-identically.
+func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string, persist bool, draft bool) (map[string]*marker.Attestation, []string, error) {
 	trusted := cfg.TrustedRegistries()
 	if len(trusted) == 0 {
 		return map[string]*marker.Attestation{}, nil, nil
@@ -1390,7 +1394,12 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string, 
 		if err != nil {
 			return nil, warnings, err
 		}
-		resolution := registry.Resolve(usable, node.Identity, node.Resolved.Commit, contentHash, fetch)
+		var resolution registry.Resolution
+		if draft {
+			resolution = registry.ResolveExact(usable, node.Name, node.Identity, node.Resolved.Commit, contentHash, fetch)
+		} else {
+			resolution = registry.Resolve(usable, node.Identity, node.Resolved.Commit, contentHash, fetch)
+		}
 		for _, warning := range resolution.Warnings {
 			warnings = append(warnings, alias+": registry: "+warning)
 		}

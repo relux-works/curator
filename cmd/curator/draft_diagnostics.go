@@ -38,9 +38,12 @@ type draftRemediation struct {
 const draftEndpointRemediation = `verify the network path and operator authentication for the listed endpoints, then retry with machine source-policy.json`
 
 // draftRemediations covers the nine skillfile-sources §5 classes, the four
-// repository-transport §§2/6 classes, and the two source-audit-v1 outcome
-// classes. Every value is static prose: nothing from the failing input is
-// interpolated.
+// repository-transport §§2/6 classes, the two source-audit-v1 outcome
+// classes, and the strict-lane §7 transport-plan refusal surfaced through
+// install external planning. Every value is static prose: nothing from the
+// failing input is interpolated. Rows match by substring; the §7 row keys
+// on the refusal's own static diagnostic (not the bare identity class) so
+// every other build_repository_identity_invalid message stays unguided.
 var draftRemediations = []struct {
 	class string
 	entry draftRemediation
@@ -94,6 +97,9 @@ var draftRemediations = []struct {
 	}},
 	{"source_audit_unavailable", draftRemediation{
 		remediation: `run the explicit attempt under trusted machine policy so the audit report is persisted`,
+	}},
+	{buildrepo.TransportPlanRefusalPrefix, draftRemediation{
+		remediation: `fix the endpoint entry in machine source-policy.json: the strict external-build lane admits no explicit port and no host alias, then retry the explicit attempt`,
 	}},
 }
 

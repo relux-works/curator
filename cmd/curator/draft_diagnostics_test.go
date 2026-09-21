@@ -57,6 +57,7 @@ func TestWithDraftRemediationTable(t *testing.T) {
 		{"alias", "repository_alias_unknown: ghost", `"aliases" table of machine source-policy.json`},
 		{"auditRejected", "review: source_audit_rejected: evidence mismatch", "re-resolve under trusted machine policy"},
 		{"auditUnavailable", "review: source_audit_unavailable: no binding", "run the explicit attempt under trusted machine policy"},
+		{"identityInvalid", "review.etool: build_repository_identity_invalid: transport plan endpoint 1 carries an explicit port or host alias outside the strict external-build lane grammar", "fix the endpoint entry in machine source-policy.json"},
 	}
 	for _, row := range rows {
 		got := withDraftRemediation(row.message)
@@ -86,8 +87,13 @@ func TestWithDraftRemediationTable(t *testing.T) {
 	legacy := []string{
 		"Skillfile.json not found",
 		"up-to-date",
-		"build_repository_identity_invalid: wrong identity",
+		"build_repository_source_unavailable: exact external source is unavailable",
 		"source is not a portable identifier",
+		// stbg4d pin: frozen v1 messages are byte-identical — the §7
+		// remediation row must not fire on any other identity
+		// diagnostic, synthetic or lane-produced.
+		"build_repository_identity_invalid: wrong identity",
+		"skill-a.ssh-cmd: build_repository_identity_invalid: SSH requires the exact manager wrapper",
 	}
 	for _, message := range legacy {
 		if got := withDraftRemediation(message); got != message {
@@ -1138,8 +1144,15 @@ func TestDraftDocsPinExamples(t *testing.T) {
 		`"availability-auth"`,
 		"curator project refresh",
 		"never rescan",
-		"ambient Git credentials",
+		"credentials from the invoking environment",
+		"is never consulted",
 		"CURATOR_DRAFT_TRANSPORT_RESOLUTION",
+		"allow-list",
+		"does not honour proxy",
+		"GIT_SSH_COMMAND",
+		"ProxyCommand=none",
+		"ssh-keyscan",
+		"answers git's username and password prompts",
 	} {
 		if !strings.Contains(cli, marker) {
 			t.Errorf("docs/cli.md misses %q", marker)
@@ -1165,7 +1178,7 @@ func TestDraftDocsPinExamples(t *testing.T) {
 		"source_lock_stale", "repository_endpoint_unavailable",
 		"repository_policy_invalid", "repository_mirror_undeclared",
 		"repository_alias_unknown", "source_audit_rejected",
-		"source_audit_unavailable",
+		"source_audit_unavailable", "build_repository_identity_invalid",
 	} {
 		if !strings.Contains(trouble, "### "+class) {
 			t.Errorf("docs/troubleshooting.md misses section %s", class)
@@ -1175,24 +1188,38 @@ func TestDraftDocsPinExamples(t *testing.T) {
 	// remediation output by TestWithDraftRemediationTable and
 	// TestDraftRemediationThroughCLI; the docs must carry the same words.
 	for class, keyword := range map[string]string{
-		"source_alias_unknown":            "declare the alias",
-		"source_selection_invalid":        "fix the named selector",
-		"source_member_missing":           "add the named member directory",
-		"source_member_invalid":           "fix the named package",
-		"source_name_conflict":            "exactly one selection",
-		"source_output_overlap":           "move the authored package out of managed output",
-		"source_snapshot_changed":         "without editing mid-run",
-		"source_snapshot_unavailable":     "run the explicit attempt first",
-		"source_lock_stale":               "curator project refresh",
-		"repository_endpoint_unavailable": "verify the network path",
-		"repository_policy_invalid":       "fix machine source-policy.json",
-		"repository_mirror_undeclared":    "equal to the entry key",
-		"repository_alias_unknown":        "declare the alias in the",
-		"source_audit_rejected":           "re-resolve under trusted machine policy",
-		"source_audit_unavailable":        "run the explicit attempt under trusted machine policy",
+		"source_alias_unknown":              "declare the alias",
+		"source_selection_invalid":          "fix the named selector",
+		"source_member_missing":             "add the named member directory",
+		"source_member_invalid":             "fix the named package",
+		"source_name_conflict":              "exactly one selection",
+		"source_output_overlap":             "move the authored package out of managed output",
+		"source_snapshot_changed":           "without editing mid-run",
+		"source_snapshot_unavailable":       "run the explicit attempt first",
+		"source_lock_stale":                 "curator project refresh",
+		"repository_endpoint_unavailable":   "verify the network path",
+		"repository_policy_invalid":         "fix machine source-policy.json",
+		"repository_mirror_undeclared":      "equal to the entry key",
+		"repository_alias_unknown":          "declare the alias in the",
+		"source_audit_rejected":             "re-resolve under trusted machine policy",
+		"source_audit_unavailable":          "run the explicit attempt under trusted machine policy",
+		"build_repository_identity_invalid": "fix the endpoint entry",
 	} {
 		if !strings.Contains(trouble, keyword) {
 			t.Errorf("docs/troubleshooting.md misses the %s remedy keyword %q", class, keyword)
+		}
+	}
+	// Isolation wording (TASK-260920-3ccq6b): the askpass fix and the ssh
+	// and proxy operator consequences pinned in the endpoint remedy.
+	for _, marker := range []string{
+		"answers git's username and password prompts",
+		"embed the username in",
+		"are not read",
+		"ssh-keyscan",
+		"is not honoured on this lane",
+	} {
+		if !strings.Contains(trouble, marker) {
+			t.Errorf("docs/troubleshooting.md misses %q", marker)
 		}
 	}
 }

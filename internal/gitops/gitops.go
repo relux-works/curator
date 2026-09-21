@@ -35,11 +35,199 @@ type ResolvedRef struct {
 }
 
 func run(dir string, args ...string) (string, error) {
+	return runWithEnv(dir, append(os.Environ(), "GIT_ALLOW_PROTOCOL="+AllowedProtocols), args...)
+}
+
+// draftAllowedEnv is the explicit allow-list of ambient names honoured on
+// the draft literal-URL lane (repository-transport §5: environment
+// overrides remain NOT imported). Every other ambient name is dropped by
+// construction, so no GIT_* override (GIT_SSH*, GIT_PROXY_COMMAND,
+// GIT_EXEC_PATH, GIT_DIR, GIT_SSL_*, GIT_CURL_*, GIT_TRACE*, GIT_HTTP_*,
+// GIT_CONFIG*, GIT_TEMPLATE_DIR, GIT_NAMESPACE,
+// GIT_ALTERNATE_OBJECT_DIRECTORIES, …) and no proxy name (http_proxy,
+// https_proxy, all_proxy, no_proxy in any case) can reach git. Matching is
+// case-insensitive so a differently-cased spelling cannot survive on
+// Windows, where process environment names are case-insensitive.
+//
+// Honoured, and why: PATH (tooling; the ssh binary below resolves through
+// it — the draft lane's tooling bound, unlike the resolved lane's pinned
+// tooling); HOME/USERPROFILE (only so OpenSSH finds its compiled-in
+// default known_hosts and default identity files); TMPDIR/TMP/TEMP (temp
+// files); TZ (dates); SYSTEMROOT/WINDIR/COMSPEC/PATHEXT/SYSTEMDRIVE
+// (Windows process essentials); SSH_AUTH_SOCK (agent credentials);
+// GIT_ASKPASS (the only HTTPS credential channel on this lane: it supplies
+// credentials, it cannot redirect the endpoint). LOCALAPPDATA/APPDATA are
+// deliberately absent: git-for-windows needs them only for credential
+// helpers and caches, which this lane disables, so no entry requires them.
+// SSH_ASKPASS is absent: BatchMode below disables every prompt, so it is
+// inert. XDG_CONFIG_HOME is absent: the pinned GIT_CONFIG_GLOBAL below
+// already overrides it. Locale is pinned, not honoured (see below).
+var draftAllowedEnv = []string{
+	"PATH",
+	"HOME",
+	"USERPROFILE",
+	"TMPDIR",
+	"TMP",
+	"TEMP",
+	"TZ",
+	"SYSTEMROOT",
+	"WINDIR",
+	"COMSPEC",
+	"PATHEXT",
+	"SYSTEMDRIVE",
+	"SSH_AUTH_SOCK",
+	"GIT_ASKPASS",
+}
+
+// isDraftAllowedEnv reports whether an ambient name is honoured on the
+// draft lane. Case-insensitive for the Windows spelling.
+func isDraftAllowedEnv(name string) bool {
+	for _, allowed := range draftAllowedEnv {
+		if strings.EqualFold(name, allowed) {
+			return true
+		}
+	}
+	return false
+}
+
+// draftSSHOptions is the curator-owned ssh hardening for the draft lane,
+// mirroring the resolved lane's ExactSSHCommand core where it applies
+// without pinned paths: no user or system ssh configuration is read
+// (-F empty below), no proxy or forwarding, no prompts, host-key
+// validation never disabled. Identities and known_hosts are deliberately
+// NOT pinned: the compiled-in defaults (~/.ssh/known_hosts, default
+// identity files) plus the agent stay in force.
+var draftSSHOptions = []string{
+	"BatchMode=yes",
+	"StrictHostKeyChecking=yes",
+	"ProxyCommand=none",
+	"ProxyJump=none",
+	"PermitLocalCommand=no",
+	"ForwardAgent=no",
+	"ClearAllForwardings=yes",
+	"RequestTTY=no",
+	"CanonicalizeHostname=no",
+	"UpdateHostKeys=no",
+	"ConnectionAttempts=1",
+}
+
+// draftSSHCommand renders the curator-owned ssh command for GIT_SSH_COMMAND
+// with the empty ssh config path shell-quoted. GIT_SSH_COMMAND (not a
+// GIT_SSH wrapper file) is used so no extra executable is materialized and
+// git-for-windows' bundled sh/ssh resolve through the honoured PATH; the
+// single-quoted POSIX form is honoured by that sh on every platform.
+func draftSSHCommand(emptyConfig string) string {
+	var out strings.Builder
+	out.WriteString("ssh -F ")
+	out.WriteString(shellQuote(emptyConfig))
+	for _, option := range draftSSHOptions {
+		out.WriteString(" -o ")
+		out.WriteString(option)
+	}
+	return out.String()
+}
+
+// shellQuote quotes one word for POSIX sh (and git-for-windows' bundled
+// sh): single quotes with embedded quotes escaped. Fixed option words need
+// no quoting; only the temp path is quoted.
+func shellQuote(word string) string {
+	return "'" + strings.ReplaceAll(word, "'", "'\\''") + "'"
+}
+
+// isolatedGitConfigArgs pins transport security per git invocation, before
+// the subcommand (git -c key=value clone/fetch/remote …). credential.helper
+// is already implied empty by the pinned empty user/system configuration
+// for a fresh clone, and http.sslVerify already defaults true, but the -c
+// pins also hold against a repo-local .git/config on the fetch path, which
+// the empty user/system pins do not cover. http.followRedirects is pinned
+// false so a redirect to an unlisted host never leaves the lane. Proxy
+// configuration is deliberately NOT pinned here: proxies are refused by the
+// allow-list (environment) plus the empty user/system configuration, and
+// the lane documents that it does not honour proxy environment; a repo-local
+// http.proxy in a curator-owned checkout is outside the user-configuration
+// threat model.
+var isolatedGitConfigArgs = []string{
+	"-c", "http.sslVerify=true",
+	"-c", "http.followRedirects=false",
+	"-c", "credential.helper=",
+}
+
+// withIsolatedConfigArgs prepends the transport pins before one git
+// subcommand's arguments.
+func withIsolatedConfigArgs(args []string) []string {
+	out := make([]string, 0, len(args)+len(isolatedGitConfigArgs))
+	out = append(out, isolatedGitConfigArgs...)
+	out = append(out, args...)
+	return out
+}
+
+// isolatedGitEnv builds the environment for the draft literal-URL lane
+// from the explicit allow-list plus pinned isolation. User and system git
+// configuration files are pointed at a fresh empty file (created per call
+// so no path is shared or reused), config selection from the environment is
+// absent by construction, interactive prompts stay disabled, the protocol
+// comes from the lane (GIT_PROTOCOL_FROM_USER=0), and ssh runs the
+// curator-owned command with a fresh empty ssh config (host aliases,
+// ProxyCommand, IdentityFile and every other ~/.ssh/config entry are not
+// read). The caller must run exactly the returned cleanup.
+func isolatedGitEnv() (env []string, cleanup func(), err error) {
+	emptyGit, err := os.CreateTemp("", "curator-gitconfig-*")
+	if err != nil {
+		return nil, nil, fmt.Errorf("isolating git configuration: %w", err)
+	}
+	emptyGitName := emptyGit.Name()
+	if err := emptyGit.Close(); err != nil {
+		_ = os.Remove(emptyGitName)
+		return nil, nil, fmt.Errorf("isolating git configuration: %w", err)
+	}
+	emptySSH, err := os.CreateTemp("", "curator-sshconfig-*")
+	if err != nil {
+		_ = os.Remove(emptyGitName)
+		return nil, nil, fmt.Errorf("isolating ssh configuration: %w", err)
+	}
+	emptySSHName := emptySSH.Name()
+	if err := emptySSH.Close(); err != nil {
+		_ = os.Remove(emptyGitName)
+		_ = os.Remove(emptySSHName)
+		return nil, nil, fmt.Errorf("isolating ssh configuration: %w", err)
+	}
+	cleanup = func() {
+		_ = os.Remove(emptyGitName)
+		_ = os.Remove(emptySSHName)
+	}
+	ambient := os.Environ()
+	env = make([]string, 0, len(ambient)+16)
+	for _, entry := range ambient {
+		name := entry
+		if index := strings.IndexByte(entry, '='); index >= 0 {
+			name = entry[:index]
+		}
+		if !isDraftAllowedEnv(name) {
+			continue
+		}
+		env = append(env, entry)
+	}
+	env = append(env,
+		"LANG=C",
+		"LC_ALL=C",
+		"GIT_CONFIG_GLOBAL="+emptyGitName,
+		"GIT_CONFIG_SYSTEM="+emptyGitName,
+		"GIT_CONFIG_NOSYSTEM=1",
+		"GIT_ALLOW_PROTOCOL="+AllowedProtocols,
+		"GIT_TERMINAL_PROMPT=0",
+		"GIT_PROTOCOL_FROM_USER=0",
+		"GIT_SSH_COMMAND="+draftSSHCommand(emptySSHName),
+	)
+	return env, cleanup, nil
+}
+
+// runWithEnv runs one git invocation with an explicit environment.
+func runWithEnv(dir string, env []string, args ...string) (string, error) {
 	cmd := exec.Command("git", args...) // #nosec G204 -- fixed binary, arguments are built by this package
 	if dir != "" {
 		cmd.Dir = dir
 	}
-	cmd.Env = append(os.Environ(), "GIT_ALLOW_PROTOCOL="+AllowedProtocols)
+	cmd.Env = env
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -56,6 +244,28 @@ func run(dir string, args ...string) (string, error) {
 // Clone clones a remote URL into destination. It refuses suspicious URLs
 // (empty or dash-prefixed) and passes the URL positionally after "--".
 func Clone(remoteURL, destination string) error {
+	return cloneWith(remoteURL, destination, run)
+}
+
+// CloneIsolated is the draft literal-URL lane's clone: identical to Clone
+// except the invocation runs on the allow-list environment with pinned
+// transport (no user or system git configuration — no
+// insteadOf/pushInsteadOf, url rewriting, helpers, includes, or
+// core.sshCommand from configuration files — no ambient GIT_* override,
+// no proxy environment, and the curator-owned ssh command with an empty ssh
+// config), independent of HOME.
+func CloneIsolated(remoteURL, destination string) error {
+	env, cleanup, err := isolatedGitEnv()
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+	return cloneWith(remoteURL, destination, func(dir string, args ...string) (string, error) {
+		return runWithEnv(dir, env, withIsolatedConfigArgs(args)...)
+	})
+}
+
+func cloneWith(remoteURL, destination string, runFn func(dir string, args ...string) (string, error)) error {
 	trimmed := strings.TrimSpace(remoteURL)
 	if trimmed == "" || strings.HasPrefix(trimmed, "-") {
 		return fmt.Errorf("refusing to clone suspicious git URL: %q", remoteURL)
@@ -66,7 +276,7 @@ func Clone(remoteURL, destination string) error {
 	if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
 		return err
 	}
-	if _, err := run("", "clone", "--", trimmed, destination); err != nil {
+	if _, err := runFn("", "clone", "--", trimmed, destination); err != nil {
 		_ = os.RemoveAll(destination)
 		return fmt.Errorf("git clone failed for %s -> %s: %w", remoteURL, destination, err)
 	}
@@ -126,7 +336,11 @@ func revParse(repo, spec string) (string, error) {
 // reports (false, err) and Fetch propagates the error instead of
 // succeeding with a stale tree.
 func HasRemote(repo string) (bool, error) {
-	out, err := run(repo, "remote")
+	return hasRemoteWith(repo, run)
+}
+
+func hasRemoteWith(repo string, runFn func(dir string, args ...string) (string, error)) (bool, error) {
+	out, err := runFn(repo, "remote")
 	if err != nil {
 		return false, err
 	}
@@ -139,17 +353,35 @@ func HasRemote(repo string) (bool, error) {
 // The origin-less skip happens only after a successful empty remote
 // enumeration; a failed enumeration fails the fetch.
 func Fetch(repo string) error {
+	return fetchWith(repo, run)
+}
+
+// FetchIsolated is the draft literal-URL lane's fetch: identical to Fetch
+// except the invocation runs on the allow-list environment with pinned
+// transport, like CloneIsolated, independent of HOME.
+func FetchIsolated(repo string) error {
+	env, cleanup, err := isolatedGitEnv()
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+	return fetchWith(repo, func(dir string, args ...string) (string, error) {
+		return runWithEnv(dir, env, withIsolatedConfigArgs(args)...)
+	})
+}
+
+func fetchWith(repo string, runFn func(dir string, args ...string) (string, error)) error {
 	if err := EnsureRepo(repo); err != nil {
 		return err
 	}
-	has, err := HasRemote(repo)
+	has, err := hasRemoteWith(repo, runFn)
 	if err != nil {
 		return err
 	}
 	if !has {
 		return nil
 	}
-	_, err = run(repo, "fetch", "--all", "--tags", "--prune")
+	_, err = runFn(repo, "fetch", "--all", "--tags", "--prune")
 	return err
 }
 

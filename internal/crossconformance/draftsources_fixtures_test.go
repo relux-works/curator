@@ -124,6 +124,12 @@ func refreshDraftLockedWithRoots(t *testing.T, project, home, payload string, gi
 	return plan
 }
 
+// draftInstallConfig is deliberately a bare Go-API literal: zero clock skew
+// (a literal zero, not the 300 s loader default) with the attest stub
+// minting created_at at serve time is the strict case that exposed
+// BUG-260920-2d9gfv — a refusal class must not depend on the fetch's own
+// duration. Keep it strict: do not paper over a future-timestamp flake with
+// a larger skew or a fixed created_at in the stub.
 func draftInstallConfig(home string) *config.Config {
 	return &config.Config{Path: filepath.Join(home, "config.json"), SkillsRoot: filepath.Join(home, "skills-root"), DefaultAgents: []string{"claude_code"}, AdapterMode: "auto"}
 }

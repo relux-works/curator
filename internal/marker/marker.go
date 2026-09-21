@@ -442,6 +442,56 @@ var v5PackageArms = map[string]map[string]string{
 // both strings.
 var v5CommitShape = map[string]string{"object_format": "string", "hex": "string"}
 
+// v5ExternalBuildTypes is the closed member-to-JSON-type map of the v5
+// external go-repository-v1 build record arm (install-marker-v5.schema.json
+// external oneOf branch, receipt_schema_version 3). The decoded Build value
+// cannot tell an absent `substituted` from an explicit false, nor a null
+// member from an absent one; the raw object can, and must be checked before
+// the lossy decode, the same discipline as the package arms above.
+var v5ExternalBuildTypes = map[string]string{
+	"driver":                 "string",
+	"receipt_schema_version": "number",
+	"execution_policy":       "string",
+	"repository":             "string",
+	"declared_identity":      "object",
+	"declared_locked_commit": "object",
+	"effective_identity":     "object",
+	"object_format":          "string",
+	"commit":                 "string",
+	"substituted":            "boolean",
+	"build_source":           "object",
+	"descriptor_target":      "string",
+	"cache_key":              "string",
+	"receipt_sha256":         "string",
+	"artifact_sha256":        "string",
+	"artifact_path":          "string",
+	"declared_tag":           "string",
+	"substitution":           "object",
+}
+
+// v5ExternalBuildRequired is the required member set of the external arm:
+// every type member above except the optional declared_tag and the
+// substituted-conditional substitution.
+var v5ExternalBuildRequired = []string{
+	"driver", "receipt_schema_version", "execution_policy", "repository",
+	"declared_identity", "declared_locked_commit", "effective_identity",
+	"object_format", "commit", "substituted", "build_source",
+	"descriptor_target", "cache_key", "receipt_sha256", "artifact_sha256",
+	"artifact_path",
+}
+
+// Closed nested shapes of the external arm. Declared and effective
+// identities share the same member names (kind/value) across their
+// network/local variants; the const values stay the job of the decoded
+// validation. The locked commit reuses v5CommitShape.
+var (
+	v5IdentityShape            = map[string]string{"kind": "string", "value": "string"}
+	v5BuildSourceShape         = map[string]string{"algorithm": "string", "content_sha256": "string"}
+	v5SubstitutionLocalShape   = map[string]string{"type": "string"}
+	v5SubstitutionNetworkShape = map[string]string{"type": "string", "ref": "object"}
+	v5SubstitutionRefShape     = map[string]string{"kind": "string", "value": "string"}
+)
+
 // validV5PackageShape validates the raw package object against the closed
 // shape of its arm: every arm member present with the right JSON type,
 // nothing else present even as null or empty, and the nested commit object
@@ -485,8 +535,8 @@ func closedRawShape(object map[string]json.RawMessage, shape map[string]string) 
 	return true
 }
 
-// rawJSONType names the JSON type of a raw value: string, object, or
-// "" for anything else (null, numbers, booleans, arrays, malformed).
+// rawJSONType names the JSON type of a raw value: string, object,
+// boolean, number, or "" for anything else (null, arrays, malformed).
 func rawJSONType(raw json.RawMessage) string {
 	trimmed := bytes.TrimSpace(raw)
 	switch {
@@ -503,9 +553,98 @@ func rawJSONType(raw json.RawMessage) string {
 			return ""
 		}
 		return "object"
+	case trimmed[0] == 't' || trimmed[0] == 'f':
+		if bytes.Equal(trimmed, []byte("true")) || bytes.Equal(trimmed, []byte("false")) {
+			return "boolean"
+		}
+		return ""
+	case trimmed[0] == '-' || (trimmed[0] >= '0' && trimmed[0] <= '9'):
+		var n json.Number
+		if json.Unmarshal(trimmed, &n) != nil {
+			return ""
+		}
+		return "number"
 	default:
 		return ""
 	}
+}
+
+// validV5ExternalBuildShape validates the raw external build record against
+// the closed shape of its arm: every required member present with the right
+// JSON type, nothing else present even as null, the substituted/substitution
+// conditional, and the nested identity, commit, build-source and substitution
+// objects closed the same way. Value grammars behind the member types stay
+// the job of the decoded validation; this check pins the closed shape, the
+// class that admitted an absent substituted as an explicit false.
+func validV5ExternalBuildShape(raw json.RawMessage) bool {
+	object, ok := rawObject(raw)
+	if !ok {
+		return false
+	}
+	for _, field := range v5ExternalBuildRequired {
+		if _, present := object[field]; !present {
+			return false
+		}
+	}
+	for member, value := range object {
+		want, allowed := v5ExternalBuildTypes[member]
+		if !allowed || rawJSONType(value) != want {
+			return false
+		}
+	}
+	// Presence of substituted was enforced by the required loop above,
+	// which is the single refusal point for an absent member: the decode
+	// below tolerates absence so a mutant dropping the requirement admits
+	// the record instead of surviving behind a redundant refusal.
+	var substituted bool
+	if subRaw, present := object["substituted"]; present {
+		if json.Unmarshal(subRaw, &substituted) != nil {
+			return false
+		}
+	}
+	_, hasSubstitution := object["substitution"]
+	if substituted != hasSubstitution {
+		return false
+	}
+	for _, field := range []string{"declared_identity", "effective_identity"} {
+		nested, ok := rawObject(object[field])
+		if !ok || !closedRawShape(nested, v5IdentityShape) {
+			return false
+		}
+	}
+	if nested, ok := rawObject(object["declared_locked_commit"]); !ok || !closedRawShape(nested, v5CommitShape) {
+		return false
+	}
+	if nested, ok := rawObject(object["build_source"]); !ok || !closedRawShape(nested, v5BuildSourceShape) {
+		return false
+	}
+	if subRaw, present := object["substitution"]; present {
+		sub, ok := rawObject(subRaw)
+		if !ok {
+			return false
+		}
+		var subType string
+		if typeRaw, present := sub["type"]; !present || json.Unmarshal(typeRaw, &subType) != nil {
+			return false
+		}
+		switch subType {
+		case "local-path":
+			if !closedRawShape(sub, v5SubstitutionLocalShape) {
+				return false
+			}
+		case "network-git":
+			if !closedRawShape(sub, v5SubstitutionNetworkShape) {
+				return false
+			}
+			ref, ok := rawObject(sub["ref"])
+			if !ok || !closedRawShape(ref, v5SubstitutionRefShape) {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // validV5Package mirrors the disjoint source-types arms: a local snapshot
@@ -648,6 +787,12 @@ func validBuildState(m *Marker, raw map[string]json.RawMessage) bool {
 	} else if sourcePresent || m.BuildSource != nil {
 		return false
 	}
+	var buildsRaw map[string]json.RawMessage
+	if m.SchemaVersion == SchemaV5 {
+		if err := json.Unmarshal(raw["builds"], &buildsRaw); err != nil || buildsRaw == nil {
+			return false
+		}
+	}
 	for command, build := range m.Builds {
 		if !identifiers.Valid(command) || !containsString(m.Commands, command) ||
 			!markerSHA256RE.MatchString(string(build.CacheKey)) ||
@@ -664,6 +809,12 @@ func validBuildState(m *Marker, raw map[string]json.RawMessage) bool {
 		// whatever the skill schema: its cache entries are receipt-3 package
 		// wrappers, so a legacy record shape can never describe them.
 		if m.SchemaVersion == SchemaV5 {
+			if build.Driver == "go-repository-v1" {
+				rawBuild, present := buildsRaw[command]
+				if !present || !validV5ExternalBuildShape(rawBuild) {
+					return false
+				}
+			}
 			if !validV5Build(build) {
 				return false
 			}

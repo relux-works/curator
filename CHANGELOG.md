@@ -55,6 +55,13 @@ All notable implementation changes are recorded here.
 
 ### Changed
 
+- The install transaction engine now caches canonical namespace resolutions
+  per transaction across journal saves in one per-write recheck epoch
+  (invalidated by `checkBoundary` before every publication write; legacy
+  journals without a recheck keep walking every save). Behaviour-preserving
+  performance fix: the draft failure-at-every-target-class sweep and late
+  rollbacks spend far less time in `filepath.EvalSymlinks` on Windows, with
+  every rollback and boundary proof unchanged.
 - A `go-v1` build root whose `vendor/modules.txt` carries a directory
   replacement the command does not declare is now refused with
   `build_module_root_directive_undeclared`. §4.2.3 requires a command with an
@@ -104,6 +111,56 @@ All notable implementation changes are recorded here.
   like every other product git spawn, instead of surfacing the bare fork/exec
   text. The underlying cause is preserved in the message and the error chain;
   success-path behaviour is unchanged.
+- Draft Skillfile acquisition no longer consults user or system Git
+  configuration when cloning or fetching a literal `git:` source
+  (`project resolve`/`project refresh`). A hostile
+  `url.<evil>.insteadOf` (or `pushInsteadOf`, URL rewriting,
+  includes, credential helper, `core.sshCommand`) in the operator's
+  git configuration previously redirected the clone and the lock
+  bound the attacker's commit; the lane now runs every clone and
+  fetch with user and system configuration isolated, independent of
+  `HOME`, with no interactive prompt. Credentials come from the
+  invoking environment only (SSH agent via `SSH_AUTH_SOCK`,
+  `GIT_ASKPASS`, `GIT_SSH`/`GIT_SSH_COMMAND`): a private HTTPS
+  source that authenticated through a configured credential helper
+  now fails `repository_endpoint_unavailable` instead of prompting —
+  provide a non-interactive `GIT_ASKPASS` program or an SSH endpoint
+  with an agent (docs/cli.md, docs/troubleshooting.md).
+- Draft literal-URL acquisition now builds git's environment from an
+  explicit allow-list and runs SSH under a curator-owned command
+  (`project resolve`/`project refresh`). Per-invocation ambient
+  overrides (`GIT_SSH_COMMAND`, `GIT_SSH`, `GIT_PROXY_COMMAND`,
+  `GIT_EXEC_PATH`, every other `GIT_*` override) and the proxy
+  environment previously reached git, and the real ssh read the
+  user's `~/.ssh/config` (Host aliases, `ProxyCommand`); only the
+  contract-listed environment now reaches git (`PATH`,
+  `HOME`/`USERPROFILE` for default `known_hosts`/identities, temp
+  dirs, `TZ`, Windows process essentials, `SSH_AUTH_SOCK`,
+  `GIT_ASKPASS`), transport pins (`http.sslVerify`,
+  `http.followRedirects=false`, empty `credential.helper`,
+  `GIT_PROTOCOL_FROM_USER=0`) hold per invocation, and ssh runs with
+  an empty config (`-F`, `BatchMode`, `StrictHostKeyChecking=yes`,
+  `ProxyCommand=none`, `ProxyJump=none`, forwarding disabled;
+  host-key validation never disabled). Operator consequences: SSH
+  host aliases, `ProxyCommand`, and `IdentityFile` entries are not
+  read — use an agent (or a default-named key) and the literal host
+  name; unknown hosts fail closed (seed `known_hosts` with
+  `ssh-keyscan` or a first manual `ssh`); proxy environment is not
+  honoured. `GIT_ASKPASS` stays the only HTTPS credential channel
+  (docs/cli.md, docs/troubleshooting.md).
+- Audit-registry snapshot verification no longer mistakes a snapshot
+  published while a fetch is in flight for a future-dated
+  snapshot. The future-timestamp bound was evaluated against a clock
+  reading taken before the snapshot fetch, so under a literal zero
+  clock skew any whole-second boundary crossed during the fetch
+  excluded every trusted registry with `every trusted audit registry
+  served a tampered snapshot` instead of the evidence verdict the
+  fetch actually returned. The bound now tolerates the checker's own
+  latency since it sampled its clock, measured monotonically; a timestamp
+  genuinely ahead of the post-fetch clock plus skew is still refused
+  with the same class and text, and the stale check is unchanged. This
+  removes the nondeterministic refusal-class flip on both the draft
+  and legacy lanes (BUG-260920-2d9gfv).
 
 ## 0.12.5 - 2026-07-14
 

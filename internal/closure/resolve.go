@@ -647,7 +647,11 @@ func pinGitAliases(cfg DraftResolveConfig, gitResolve func(string, string, strin
 		if cfg.Fetch {
 			fetch := cfg.FetchRepo
 			if fetch == nil {
-				fetch = gitops.Fetch
+				// Alias trees are draft-lane acquisitions: the
+				// fallback fetch is user-configuration-isolated
+				// like the production alias acquisition, never
+				// the ambient variant (BUG-260920-3ukdk4).
+				fetch = gitops.FetchIsolated
 			}
 			// The dedup key is the shared closure repository key, so a
 			// tree the caller already refreshed (for example through the

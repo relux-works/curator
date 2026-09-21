@@ -2,9 +2,10 @@ package main
 
 // Draft transport resolution at the CLI entry point.
 //
-// These tests drive `install --dry-run` through run() with a stand-in git on
-// PATH: a POSIX shell script that fails a fetch with fixture stderr or
-// rewrites it to a fixture bare repository. Everything else — manifest and
+// These tests drive `install --dry-run` (and, where pinned, `status`)
+// through run() with a stand-in git on PATH: a POSIX shell script that
+// fails a fetch with fixture stderr or rewrites it to a fixture bare
+// repository. Everything else — manifest and
 // closure evaluation, credential selection, the strict lane, audit,
 // receipting — is the production path. None of these tests run in parallel:
 // they mutate process environment per run.
@@ -370,10 +371,18 @@ func draftCLIShellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
 }
 
-// runDraftInstall runs one CLI invocation with per-run process environment.
+// runDraftInstall runs install --dry-run with per-run process environment.
 // policy nil means no policy file; providers nil means no providers file;
 // switchOn sets the draft switch to "1".
 func (f *draftCLIFixture) runDraftInstall(t *testing.T, fakeDir, logPath string, switchOn bool, policy, providers *string) (int, string, string, []string) {
+	t.Helper()
+	return f.runDraftCLI(t, fakeDir, logPath, switchOn, policy, providers, "install", "app", "--dry-run")
+}
+
+// runDraftCLI runs one CLI invocation with the same per-run process
+// environment as runDraftInstall: PATH with the stand-in git, the bound
+// lane credentials, the draft switch, and the policy/providers files.
+func (f *draftCLIFixture) runDraftCLI(t *testing.T, fakeDir, logPath string, switchOn bool, policy, providers *string, args ...string) (int, string, string, []string) {
 	t.Helper()
 	saved := map[string]*string{}
 	set := map[string]string{
@@ -441,7 +450,7 @@ func (f *draftCLIFixture) runDraftInstall(t *testing.T, fakeDir, logPath string,
 	} else if err := os.WriteFile(f.providersPath, []byte(*providers), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	code, stdout, stderr := capture(t, f.configPath, "install", "app", "--dry-run")
+	code, stdout, stderr := capture(t, f.configPath, args...)
 	return code, stdout, stderr, draftCLIFetchLines(t, logPath)
 }
 
@@ -722,6 +731,95 @@ func TestDraftTransportProviderAdmission(t *testing.T) {
 			t.Fatalf("broker fills = %q, want none", fills)
 		}
 	})
+}
+
+// TestDraftTransportIdentityInvalidSurfacesThroughCLI proves the strict-lane
+// §7 refusal reaches the CLI unchanged: a port-planned endpoint fails
+// install and status with build_repository_identity_invalid (never the
+// masked build_repository_source_unavailable) plus the sanitized
+// remediation, with zero fetch attempts.
+func TestDraftTransportIdentityInvalidSurfacesThroughCLI(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test transport wrapper is POSIX-only; production code is platform-neutral")
+	}
+	fixture := setupDraftCLI(t)
+	fakeDir, logPath := fixture.installDraftFakeGit(t, draftCLISuccessArms(fixture), nil)
+	policy := `{"schema_version":2,"repositories":{` +
+		`"fixture.test/https-tools":{"endpoints":[{"url":"https://fixture.test:8443/https-tools.git","authentication":"operator-acme"}],"fallback":"none"},` +
+		`"fixture.test/ssh-tools":{"endpoints":[{"url":"ssh://git@fixture.test:2222/ssh-tools.git","authentication":"operator-acme"}],"fallback":"none"}}}`
+	operator := draftCLIOperatorProviders(fixture)
+	code, stdout, stderr, fetches := fixture.runDraftInstall(t, fakeDir, logPath, true, &policy, &operator)
+	if code == exitOK {
+		t.Fatalf("port-planned install exited 0\nstdout:\n%s", stdout)
+	}
+	combined := stdout + stderr
+	if !strings.Contains(combined, buildrepo.CodeIdentityInvalid) {
+		t.Fatalf("CLI misses the true class %s:\nstdout:\n%s\nstderr:\n%s", buildrepo.CodeIdentityInvalid, stdout, stderr)
+	}
+	if strings.Contains(combined, buildrepo.CodeSourceUnavailable) {
+		t.Fatalf("CLI masks the class as %s:\nstdout:\n%s\nstderr:\n%s", buildrepo.CodeSourceUnavailable, stdout, stderr)
+	}
+	if !strings.Contains(combined, "fix the endpoint entry in machine source-policy.json") {
+		t.Fatalf("CLI misses the sanitized remediation:\nstdout:\n%s\nstderr:\n%s", stdout, stderr)
+	}
+	if len(fetches) != 0 {
+		t.Fatalf("%d fetches, want 0:\n%s", len(fetches), strings.Join(fetches, "\n"))
+	}
+	// status shares the install.Project dry-run plan plus printFailures
+	// path, so the same port-planned policy must print the same exact
+	// class line — pinned here, not assumed.
+	code, stdout, stderr, fetches = fixture.runDraftCLI(t, fakeDir, logPath, true, &policy, &operator, "status", "app")
+	if code == exitOK {
+		t.Fatalf("port-planned status exited 0\nstdout:\n%s", stdout)
+	}
+	const want = "error: skill-a.https-cmd: build_repository_identity_invalid: transport plan endpoint 1 carries an explicit port or host alias outside the strict external-build lane grammar"
+	if !strings.Contains(stderr, want) {
+		t.Fatalf("status misses the exact class line %q:\nstdout:\n%s\nstderr:\n%s", want, stdout, stderr)
+	}
+	if strings.Contains(stderr, buildrepo.CodeSourceUnavailable) {
+		t.Fatalf("status masks the class as %s:\nstdout:\n%s\nstderr:\n%s", buildrepo.CodeSourceUnavailable, stdout, stderr)
+	}
+	if !strings.Contains(stderr, "fix the endpoint entry in machine source-policy.json") {
+		t.Fatalf("status misses the sanitized remediation:\nstdout:\n%s\nstderr:\n%s", stdout, stderr)
+	}
+	if len(fetches) != 0 {
+		t.Fatalf("status ran %d fetches, want 0:\n%s", len(fetches), strings.Join(fetches, "\n"))
+	}
+}
+
+// TestReviewProbeLegacyLaneIdentityInvalid pins the frozen lane
+// byte-identical: with the draft switch off, no machine policy, and no
+// GIT_SSH wrapper, the SSH lane's own identity refusal still collapses
+// to source-unavailable at install level (the §7 preservation is scoped
+// to the transport-plan refusal) and carries no appended guidance.
+func TestReviewProbeLegacyLaneIdentityInvalid(t *testing.T) {
+	fixture := setupDraftCLI(t)
+	fakeDir, _ := fixture.installDraftFakeGit(t, draftCLISuccessArms(fixture), nil)
+	t.Setenv("PATH", fakeDir+string(os.PathListSeparator)+fixture.origPath)
+	t.Setenv("CURATOR_BUILD_SSH_IDENTITY", fixture.identity)
+	t.Setenv("CURATOR_BUILD_SSH_KNOWN_HOSTS", fixture.knownHosts)
+	for _, key := range []string{"GIT_SSH", "SSH_AUTH_SOCK", "CURATOR_BUILD_SSH_AGENT", "CURATOR_BUILD_HTTPS_TOKEN", "CURATOR_BUILD_HTTPS_HOST", install.EnvDraftTransportResolution} {
+		t.Setenv(key, "")
+		_ = os.Unsetenv(key)
+	}
+	_ = os.Remove(fixture.policyPath)
+	_ = os.Remove(fixture.providersPath)
+	for _, args := range [][]string{{"install", "app", "--dry-run"}, {"status", "app"}} {
+		code, stdout, stderr := capture(t, fixture.configPath, args...)
+		if code != exitFail {
+			t.Fatalf("%v: exit = %d, want %d\nstdout:\n%s\nstderr:\n%s", args, code, exitFail, stdout, stderr)
+		}
+		const want = "error: skill-a.ssh-cmd: build_repository_source_unavailable: exact external source is unavailable"
+		if !strings.Contains(stderr, want) {
+			t.Fatalf("%v: stderr misses the frozen diagnostic %q:\n%s", args, want, stderr)
+		}
+		if strings.Contains(stderr, buildrepo.CodeIdentityInvalid) {
+			t.Fatalf("%v: frozen lane leaks %s:\n%s", args, buildrepo.CodeIdentityInvalid, stderr)
+		}
+		if strings.Contains(stderr, "fix the endpoint entry in machine source-policy.json") {
+			t.Fatalf("%v: frozen lane carries port/alias guidance:\n%s", args, stderr)
+		}
+	}
 }
 
 func TestProductionBinaryDispatchesSSHWrapper(t *testing.T) {

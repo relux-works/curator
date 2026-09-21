@@ -639,6 +639,58 @@ func TestPipelineFailuresStopBeforeCacheAndCompiler(t *testing.T) {
 	}
 }
 
+func TestPipelinePreservesIdentityInvalidFromAcquisition(t *testing.T) {
+	_, declared, effective := pipelineFixture(t)
+	events := []string{}
+	planErr := admissionError(CodeIdentityInvalid, "transport plan endpoint 1 carries an explicit port or host alias outside the strict external-build lane grammar")
+	request := PipelineRequest{Operation: OperationInstall, Assurance: closureexec.PortableAssuranceBinding(), AssuranceCheck: allowTestAssurance, Command: "tool", Target: "tool", Declared: declared, Effective: effective,
+		OfflineSnapshotKey: "sha256:" + strings.Repeat("0", 64),
+		Store:              recordingStore{inner: &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "cache")}, events: &events},
+		Go:                 recordingGo{events: &events},
+		Acquire:            func(context.Context) (*Snapshot, error) { return nil, planErr },
+		Audit:              func(context.Context, AuditSubject) error { events = append(events, "audit-call"); return nil }}
+	_, err := RunPipeline(context.Background(), request)
+	if ErrorCode(err) != CodeIdentityInvalid {
+		t.Fatalf("error = %v, want the preserved class %s", err, CodeIdentityInvalid)
+	}
+	if err.Error() != planErr.Error() {
+		t.Fatalf("error = %q, want the lane diagnostic unchanged %q", err.Error(), planErr.Error())
+	}
+	// A deterministic refusal is not an availability failure: no offline
+	// snapshot may substitute for it and no audit may run past it.
+	for _, forbidden := range []string{"snapshot-load", "audit-call", "cache-call", "compiler-call", "artifact-store"} {
+		if contains(events, forbidden) {
+			t.Fatalf("events = %v, want no %s past a deterministic refusal", events, forbidden)
+		}
+	}
+}
+
+// TestPipelineCollapsesNonTransportPlanIdentityInvalid pins the scope of
+// the §7 preservation: any other identity refusal (here the frozen
+// lane's SSH wrapper diagnostic) keeps the legacy collapse to
+// source-unavailable, through the legacy offline-snapshot branch.
+func TestPipelineCollapsesNonTransportPlanIdentityInvalid(t *testing.T) {
+	_, declared, effective := pipelineFixture(t)
+	events := []string{}
+	laneErr := admissionError(CodeIdentityInvalid, "SSH requires the exact manager wrapper")
+	request := PipelineRequest{Operation: OperationInstall, Assurance: closureexec.PortableAssuranceBinding(), AssuranceCheck: allowTestAssurance, Command: "tool", Target: "tool", Declared: declared, Effective: effective,
+		OfflineSnapshotKey: "sha256:" + strings.Repeat("0", 64),
+		Store:              recordingStore{inner: &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "cache")}, events: &events},
+		Go:                 recordingGo{events: &events},
+		Acquire:            func(context.Context) (*Snapshot, error) { return nil, laneErr },
+		Audit:              func(context.Context, AuditSubject) error { events = append(events, "audit-call"); return nil }}
+	_, err := RunPipeline(context.Background(), request)
+	if ErrorCode(err) != CodeSourceUnavailable {
+		t.Fatalf("error = %v, want the legacy collapse to %s", err, CodeSourceUnavailable)
+	}
+	if err.Error() != CodeSourceUnavailable+": exact external source is unavailable" {
+		t.Fatalf("error = %q, want the byte-identical legacy diagnostic", err.Error())
+	}
+	if !contains(events, "snapshot-load") {
+		t.Fatalf("events = %v, want the legacy offline-snapshot branch past a non-§7 refusal", events)
+	}
+}
+
 func TestSigningPoliciesFailClosedBeforeSourceAndPackageInputs(t *testing.T) {
 	for _, testCase := range []struct {
 		name string

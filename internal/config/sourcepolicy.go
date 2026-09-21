@@ -32,6 +32,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -147,6 +148,143 @@ type Attempt struct {
 	ResolvedHost    string
 	ResolvedPort    int
 	HasExplicitPort bool
+}
+
+// ConnectionURL returns the git connection target for one planned
+// attempt: the listed URL with the §5 alias substitution applied. An
+// attempt without an alias connects to its listed URL verbatim —
+// explicit ports and declared mirrors already address the connection
+// there. An attempt naming an alias connects to the resolved address:
+// the alias host with the alias port when present, else the URL port
+// when present, else the transport default. The listed URL keeps its
+// scheme, userinfo, and path; only the host (and port) change, except
+// an scp-like URL combined with an explicit port, which has no
+// port-bearing spelling and is rendered as the equivalent ssh:// URL
+// with a home-relative path.
+//
+// ok is false when no connection target can be formed from the carried
+// values; the caller fails the acquisition closed before any network
+// I/O. Loader-planned attempts always form a target: ok is false only
+// for a hand-built or mistranslated attempt.
+func (a Attempt) ConnectionURL() (target string, ok bool) {
+	if a.Alias == "" {
+		return a.URL, true
+	}
+	// A named alias always resolves through the operator table, so the
+	// connection host is always an alias-table host; anything else is a
+	// mistranslation. The port flag and value must agree, as in the
+	// sibling executor's §6 predicate.
+	if !validAliasName(a.ResolvedHost) {
+		return "", false
+	}
+	if a.HasExplicitPort != (a.ResolvedPort != 0) {
+		return "", false
+	}
+	port := ""
+	if a.HasExplicitPort {
+		if a.ResolvedPort < 1 || a.ResolvedPort > 65535 {
+			return "", false
+		}
+		port = ":" + strconv.Itoa(a.ResolvedPort)
+	}
+	if rest, found := strings.CutPrefix(a.URL, "https://"); found {
+		_, path, valid := splitConnectionAuthority(rest, false)
+		if !valid {
+			return "", false
+		}
+		return "https://" + a.ResolvedHost + port + path, true
+	}
+	if rest, found := strings.CutPrefix(a.URL, "ssh://"); found {
+		userinfo, path, valid := splitConnectionAuthority(rest, true)
+		if !valid {
+			return "", false
+		}
+		return "ssh://" + userinfo + a.ResolvedHost + port + path, true
+	}
+	return scpConnectionURL(a.URL, a.ResolvedHost, port)
+}
+
+// splitConnectionAuthority splits the post-scheme remainder of a
+// URI-form endpoint URL into its userinfo prefix ("" or ending in "@")
+// and its path (starting in "/"). A listed URL port is dropped: the
+// caller applies the resolved port. ok is false when the remainder is
+// outside the endpoint grammar.
+func splitConnectionAuthority(rest string, userinfoAllowed bool) (userinfo, path string, ok bool) {
+	authority, path := rest, ""
+	if i := strings.Index(rest, "/"); i >= 0 {
+		authority, path = rest[:i], rest[i:]
+	}
+	if authority == "" || path == "" || strings.ContainsAny(path, "%?#\\") || containsPolicyWhitespaceOrControl(path) {
+		return "", "", false
+	}
+	if i := strings.LastIndex(authority, "@"); i >= 0 {
+		if !userinfoAllowed {
+			return "", "", false
+		}
+		userinfo, authority = authority[:i+1], authority[i+1:]
+		if !validConnectionUserinfo(userinfo[:len(userinfo)-1]) || authority == "" {
+			return "", "", false
+		}
+	}
+	// The lane host grammar carries no colon, so any port suffix starts
+	// at the first colon; a second colon, or a non-port suffix, is
+	// outside the grammar rather than a silently dropped port.
+	host, suffix, hasPort := strings.Cut(authority, ":")
+	if host == "" {
+		return "", "", false
+	}
+	if hasPort {
+		if _, valid := parseRevision2Port(suffix); !valid {
+			return "", "", false
+		}
+	}
+	return userinfo, path, true
+}
+
+// scpConnectionURL substitutes the resolved host (and port) into an
+// scp-like [user@]host:path endpoint URL. Without an explicit port the
+// spelling is kept; with one the URL is rendered as the equivalent
+// ssh:// URL, since the scp-like spelling cannot carry a port. Admitted
+// scp-like paths are home-relative, so the ~/ prefix preserves the
+// remote path.
+func scpConnectionURL(raw, resolvedHost, port string) (string, bool) {
+	left, path, hasColon := strings.Cut(raw, ":")
+	if !hasColon || strings.Contains(raw, "://") || left == "" || path == "" ||
+		strings.HasPrefix(path, "/") || strings.ContainsAny(path, "%?#\\:") || containsPolicyWhitespaceOrControl(path) {
+		return "", false
+	}
+	userinfo := ""
+	host := left
+	if i := strings.LastIndex(left, "@"); i >= 0 {
+		userinfo, host = left[:i+1], left[i+1:]
+		if !validConnectionUserinfo(userinfo[:len(userinfo)-1]) {
+			return "", false
+		}
+	}
+	if host == "" {
+		return "", false
+	}
+	if port == "" {
+		return userinfo + resolvedHost + ":" + path, true
+	}
+	return "ssh://" + userinfo + resolvedHost + port + "/~/" + path, true
+}
+
+// validConnectionUserinfo reports whether value can pass through into a
+// substituted connection URL without changing the URL structure: no
+// separator, whitespace, or control bytes. The loader already enforces
+// the lane username grammar; this is the fail-closed floor for
+// hand-built attempts.
+func validConnectionUserinfo(value string) bool {
+	if value == "" || len(value) > 64 {
+		return false
+	}
+	for _, r := range value {
+		if r > unicode.MaxASCII || unicode.IsSpace(r) || unicode.IsControl(r) || strings.ContainsRune("@/:", r) {
+			return false
+		}
+	}
+	return true
 }
 
 // Resolution is the ordered attempt plan for one declaration. Attempts

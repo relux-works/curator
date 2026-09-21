@@ -227,6 +227,16 @@ func ensureJSONEOF(decoder *json.Decoder) error {
 }
 
 func validateJournal(journal *Journal) error {
+	return validateJournalWithResolver(journal, canonicalNamespaceTargetPath, canonicalNamespacePath)
+}
+
+func validateJournalWithResolver(journal *Journal, resolveTarget func(string, bool) (string, error), resolve func(string) (string, error)) error {
+	if resolveTarget == nil {
+		resolveTarget = canonicalNamespaceTargetPath
+	}
+	if resolve == nil {
+		resolve = canonicalNamespacePath
+	}
 	if journal == nil || journal.Schema != journalSchema || !transactionIDPattern.MatchString(journal.TransactionID) {
 		return journalf("schema or transaction id is invalid")
 	}
@@ -341,7 +351,7 @@ func validateJournal(journal *Journal) error {
 			return journalf("target %d state %q is invalid", index, target.State)
 		}
 	}
-	if err := validateIndependentTargetNamespaces(journal.Targets); err != nil {
+	if err := validateIndependentTargetNamespacesWithResolver(journal.Targets, resolveTarget, resolve); err != nil {
 		return journalf("target namespaces are not independent: %v", err)
 	}
 	if err := validateBoundaryProof(journal); err != nil {
@@ -390,10 +400,32 @@ func validateBoundaryProof(journal *Journal) error {
 }
 
 func (engine *Engine) validateJournal(journal *Journal) error {
-	if err := validateJournal(journal); err != nil {
+	// Guarded transactions share canonical resolutions across saves in one
+	// recheck epoch; legacy journals without a recheck walk every save so
+	// the independence proof never relies on a stale resolution.
+	transactionID := ""
+	useCache := false
+	if journal != nil {
+		transactionID = journal.TransactionID
+		useCache = engine.namespaceRecheckPresent(journal)
+	}
+	var resolveTarget func(string, bool) (string, error)
+	var resolve func(string) (string, error)
+	if useCache {
+		resolveTarget = func(path string, entry bool) (string, error) {
+			return engine.cachedCanonicalTargetPath(transactionID, path, entry)
+		}
+		resolve = func(path string) (string, error) {
+			return engine.cachedCanonicalPath(transactionID, path)
+		}
+	} else {
+		resolveTarget = engine.resolveTargetPath
+		resolve = engine.resolveCanonical
+	}
+	if err := validateJournalWithResolver(journal, resolveTarget, resolve); err != nil {
 		return err
 	}
-	if err := validateIndependentTargetNamespaces(journal.Targets, targetNamespacePath{
+	if err := validateIndependentTargetNamespacesWithResolver(journal.Targets, resolveTarget, resolve, targetNamespacePath{
 		owner: "engine",
 		kind:  "journal namespace",
 		path:  engine.journalRoot,
@@ -918,6 +950,7 @@ func (engine *Engine) removeJournalDurably(journal *Journal) error {
 	// journal for recovery, which resumes rollback or cleanup — neither
 	// commits new targets, so the gate is no longer needed either way.
 	delete(engine.guards, journal.TransactionID)
+	delete(engine.nsCache, journal.TransactionID)
 	digest, err := journalDigest(journal)
 	if err != nil {
 		return err

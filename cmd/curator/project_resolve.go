@@ -186,7 +186,9 @@ func acquireDraftGitRoots(home, projectRoot string, projectManifest *manifest.Ma
 
 // fetchDraftRepoAllowingFallback brings repoDir onto the resolved
 // endpoints: a fresh clone when no tree exists, otherwise a fetch of the
-// existing tree. A positively classified availability/authentication
+// existing tree. Clone and fetch run user-configuration-isolated
+// (repository-transport: user configuration never consulted).
+// A positively classified availability/authentication
 // failure advances to the next listed endpoint only under the
 // availability-auth fallback; every other failure — and exhaustion —
 // fails closed as repository_endpoint_unavailable with the sanitized
@@ -196,7 +198,7 @@ func acquireDraftGitRoots(home, projectRoot string, projectManifest *manifest.Ma
 // portable state.
 func fetchDraftRepoAllowingFallback(repoDir string, resolution config.Resolution, alias string, stderr io.Writer) error {
 	if _, err := os.Stat(filepath.Join(repoDir, ".git")); err == nil {
-		if err := gitops.Fetch(repoDir); err != nil {
+		if err := gitops.FetchIsolated(repoDir); err != nil {
 			class := buildrepo.ClassifyFetchOutput(gitFailureDetail(err))
 			if buildrepo.AllowSecondAttempt(resolution.Fallback, class) && len(resolution.Attempts) > 1 {
 				_, _ = fmt.Fprintf(stderr, "warning: %s: fetch failed (%s: %s); recloning from the alternate endpoint\n", alias, class, class.Reason())
@@ -210,9 +212,21 @@ func fetchDraftRepoAllowingFallback(repoDir string, resolution config.Resolution
 		}
 	}
 	attempts := resolution.Attempts
+	// Alias-substituted endpoints connect to the resolved host:port,
+	// not the listed URL (repository-transport §5). Every connection
+	// target is derived before any clone runs: a mistranslated attempt
+	// fails closed with no network traffic.
+	targets := make([]string, len(attempts))
+	for index, attempt := range attempts {
+		target, ok := attempt.ConnectionURL()
+		if !ok {
+			return fmt.Errorf("%s: %s: endpoint %d connection target is malformed", config.CodeRepositoryPolicyInvalid, alias, index+1)
+		}
+		targets[index] = target
+	}
 	classes := make([]buildrepo.FailureClass, 0, len(attempts))
 	for index, attempt := range attempts {
-		cloneErr := gitops.Clone(attempt.URL, repoDir)
+		cloneErr := gitops.CloneIsolated(targets[index], repoDir)
 		if cloneErr == nil {
 			return nil
 		}

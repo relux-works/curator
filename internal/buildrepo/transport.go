@@ -427,6 +427,15 @@ func (p TransportPlan) isLegacyShape() bool {
 	return len(p.Attempts) == 1 && p.Attempts[0].Authentication == "" && p.Fallback == TransportFallbackNone
 }
 
+// TransportPlanRefusalPrefix is the static class-and-diagnostic prefix of
+// the strict-lane §7 transport-plan refusal below: the only
+// build_repository_identity_invalid diagnostic that names a transport
+// plan endpoint. The install acquisition layer preserves this refusal
+// through its collapse, and the CLI keys its remediation row on this
+// same prefix, so both stay scoped to the refusal they describe and
+// every other identity diagnostic keeps the legacy behavior.
+const TransportPlanRefusalPrefix = CodeIdentityInvalid + ": transport plan endpoint"
+
 // ValidateTransportPlan checks plan shape before any network I/O: one or
 // two attempts, distinct closed-grammar URLs that canonicalize to one
 // identity, a closed fallback mode, and opaque provider references that

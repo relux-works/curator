@@ -61,7 +61,13 @@ func CheckSnapshots(registries []Registry, cacheDir string, fetch SnapshotFetchF
 
 // CheckSnapshotsWithPolicy applies explicit manager-config age and clock-skew
 // bounds. A zero clock skew is literal; a zero max age retains the historical
-// default for callers of CheckSnapshots.
+// default for callers of CheckSnapshots. The future-timestamp bound additionally
+// tolerates the checker's own latency since it sampled its clock, measured
+// monotonically from function entry: a registry that publishes while a fetch
+// is in flight must not read as tampered. `now` stays the check's reference
+// time, so for the production callers (which pass `time.Now()`) the bound is
+// the post-fetch wall clock plus the configured skew, while callers that
+// inject a fixed `now` with an instant fetch observe a ~zero tolerance.
 func CheckSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch SnapshotFetchFn, now time.Time, maxAge, clockSkew time.Duration) (map[string]bool, []string) {
 	return checkSnapshotsWithPolicy(registries, cacheDir, fetch, now, maxAge, clockSkew, true)
 }
@@ -73,6 +79,14 @@ func CheckSnapshotsWithPolicyReadOnly(registries []Registry, stateDir string, fe
 }
 
 func checkSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch SnapshotFetchFn, now time.Time, maxAge, clockSkew time.Duration, persist bool) (map[string]bool, []string) {
+	// The future-timestamp bound below tolerates the checker's own latency
+	// since it sampled its clock. The start is taken once at function entry
+	// — not per registry — so the bound is the post-fetch wall clock plus
+	// the configured skew for the production callers, and a sibling's slow
+	// fetch cannot flip another registry's refusal class. `now` stays the
+	// reference time, so injected-`now` callers with instant fetches still
+	// observe a ~zero tolerance.
+	start := time.Now()
 	if maxAge == 0 {
 		maxAge = DefaultSnapshotMaxAge
 	}
@@ -155,7 +169,13 @@ func checkSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch Snap
 			tampered[reg.URL] = true
 			continue
 		}
-		if parsed.CreatedAt.After(now.Add(clockSkew)) {
+		// The bound is the reference time plus the configured skew plus the
+		// checker's own latency since it sampled its clock: only a timestamp
+		// ahead of the post-fetch clock plus skew is genuinely future and
+		// still refused. (The stale check above needs no such term: a
+		// pre-fetch reference can only make a snapshot look less stale,
+		// never falsely stale.)
+		if parsed.CreatedAt.After(now.Add(clockSkew).Add(time.Since(start))) {
 			warnings = append(warnings, fmt.Sprintf("registry %s snapshot timestamp is too far in the future", reg.Name))
 			tampered[reg.URL] = true
 			continue

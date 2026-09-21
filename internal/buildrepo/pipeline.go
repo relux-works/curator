@@ -208,6 +208,17 @@ func RunPipeline(ctx context.Context, request PipelineRequest) (PipelineResult, 
 		if request.Operation == OperationSyntax {
 			return PipelineResult{State: "unverified-offline", Code: CodeUnverifiedOffline}, nil
 		}
+		// A deterministic §7 transport-plan refusal is not an
+		// availability failure: the planned endpoint is outside the
+		// strict-lane grammar, so no offline snapshot can substitute
+		// for it. Return the lane's own diagnostic unchanged instead
+		// of masking it as source-unavailable. Scoped to the §7
+		// refusal's own static diagnostic (resolved lane only); every
+		// other identity refusal keeps the legacy collapse below, so
+		// the frozen lane is byte-identical.
+		if ErrorCode(acquireErr) == CodeIdentityInvalid && strings.Contains(acquireErr.Error(), TransportPlanRefusalPrefix) {
+			return result, acquireErr
+		}
 		// An untagged exact protected snapshot may support offline reinstall,
 		// but a declared tag requires a same-operation exact-tag assertion.
 		if request.Declared.Tag == "" && request.OfflineSnapshotKey != "" && request.Store != nil {

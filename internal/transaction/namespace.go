@@ -85,6 +85,20 @@ func (resolved *resolvedNamespacePath) identity() (os.FileInfo, error) {
 }
 
 func validateIndependentTargetNamespaces(targets []TargetRecord, reserved ...targetNamespacePath) error {
+	return validateIndependentTargetNamespacesWithResolver(targets, canonicalNamespaceTargetPath, canonicalNamespacePath, reserved...)
+}
+
+// validateIndependentTargetNamespacesWithResolver is the resolver-injected
+// form of the independence sweep. The engine passes its per-transaction
+// cached resolvers so saves within one recheck epoch share resolutions;
+// the free wrapper above passes the direct walks.
+func validateIndependentTargetNamespacesWithResolver(targets []TargetRecord, resolveTarget func(string, bool) (string, error), resolve func(string) (string, error), reserved ...targetNamespacePath) error {
+	if resolveTarget == nil {
+		resolveTarget = canonicalNamespaceTargetPath
+	}
+	if resolve == nil {
+		resolve = canonicalNamespacePath
+	}
 	paths := make([]resolvedNamespacePath, 0, len(targets)*7+len(reserved))
 	for index := range targets {
 		target := &targets[index]
@@ -101,7 +115,7 @@ func validateIndependentTargetNamespaces(targets []TargetRecord, reserved ...tar
 			if candidate.path == "" {
 				continue
 			}
-			key, err := canonicalNamespaceTargetPath(candidate.path, entry)
+			key, err := resolveTarget(candidate.path, entry)
 			if err != nil {
 				return fmt.Errorf("target %d %s path: %w", index, candidate.kind, err)
 			}
@@ -124,7 +138,7 @@ func validateIndependentTargetNamespaces(targets []TargetRecord, reserved ...tar
 			}))
 			if candidate.kind != "live" {
 				tombPath := candidate.path + ".delete"
-				tombKey, err := canonicalNamespaceTargetPath(tombPath, entry)
+				tombKey, err := resolveTarget(tombPath, entry)
 				if err != nil {
 					return fmt.Errorf("target %d %s tomb path: %w", index, candidate.kind, err)
 				}
@@ -141,7 +155,7 @@ func validateIndependentTargetNamespaces(targets []TargetRecord, reserved ...tar
 		}
 	}
 	for _, candidate := range reserved {
-		key, err := canonicalNamespacePath(candidate.path)
+		key, err := resolve(candidate.path)
 		if err != nil {
 			return fmt.Errorf("%s %s path: %w", candidate.owner, candidate.kind, err)
 		}

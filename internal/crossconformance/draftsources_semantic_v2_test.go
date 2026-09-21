@@ -22,9 +22,9 @@ import (
 // the fetch behavior through the compiled CLI on unix (POSIX-only
 // wrapper; the declared platform-control reason on Windows). Refusals
 // carry zero clone attempts; positives bind the canonical lock
-// identity. The two user-configuration rows are explicit bounds: the
-// resolved lane isolates user git/ssh configuration (proven in-package),
-// but CLI resolve inherits it (see results: CLI user-config gap).
+// identity. Both user-configuration rows are driven: the resolved lane
+// isolates user git/ssh configuration (proven in-package), and CLI
+// resolve isolates user git configuration on the literal-URL lane.
 
 const (
 	v2Identity      = "fixture.test/kit"
@@ -79,7 +79,7 @@ func init() {
 	registerDraftSemantic("v2-mirror-of-mismatch", driveV2MirrorOfMismatch)
 	registerDraftSemantic("v2-v1-reader-rejects-v2-policy", driveV2V1ReaderRejectsV2)
 	registerDraftSemantic("v2-user-ssh-alias-ignored", driveV2UserSSHAlias)
-	registerDraftSemantic("v2-user-insteadof-ignored", driveV2UserInsteadOfGap)
+	registerDraftSemantic("v2-user-insteadof-ignored", driveV2UserInsteadOf)
 	registerDraftSemantic("v2-external-build-mirror-admitted", driveV2ExternalMirrorAdmitted)
 	registerDraftSemantic("v2-external-build-port-refused", driveV2ExternalPortRefused)
 	registerDraftSemantic("v2-external-build-alias-refused", driveV2ExternalAliasRefused)
@@ -219,13 +219,11 @@ func driveV2MirrorFirst(t *testing.T, _ draftSemanticCase) {
 	v2LockIdentity(t, parts[1], parts[0])
 }
 
-// driveV2AliasResolution is a known product gap: the loader resolves the
-// alias (alias + resolved host/port carried, identity canonical), but
-// CLI resolve clones the listed URL literally and never connects to
-// the substituted address, and no fetch-entry proof of substitution
-// exists (in-package positives cover mirrors only). The row locks the
-// gap signature; convert it to a drive when a fetch lane substitutes.
-func driveV2AliasResolution(t *testing.T, c draftSemanticCase) {
+// driveV2AliasResolution drives the §5 substitution end to end: the
+// loader resolves the alias, CLI resolve connects to the substituted
+// address exactly once, the lock keeps the canonical identity, and the
+// substituted address never appears in user-facing diagnostics.
+func driveV2AliasResolution(t *testing.T, _ draftSemanticCase) {
 	aliases := `{"corp-mirror":{"host":"` + v2AliasHost + `","port":8443,"authentication":"team-https"}}`
 	doc := v2PolicyDoc(v2Entry(v2Endpoint(v2AliasEndpoint, "team-https", `"alias":"corp-mirror","mirror_of":"`+v2Identity+`"`), "none", ""), aliases)
 	resolved := v2Resolve(t, v2Parse(t, doc))
@@ -239,16 +237,21 @@ func driveV2AliasResolution(t *testing.T, c draftSemanticCase) {
 	if resolved.Identity != v2Identity {
 		t.Fatalf("identity = %q, want the canonical key", resolved.Identity)
 	}
-	code, stderr, clones, rest := v2CLIResolve(t, doc, "https://never.invalid/x.git", "fatal: unexpected", attempt.URL)
+	if target, ok := attempt.ConnectionURL(); !ok || target != v2AliasURL {
+		t.Fatalf("ConnectionURL = %q, %v, want %q", target, ok, v2AliasURL)
+	}
+	code, stderr, clones, rest := v2CLIResolve(t, doc, "https://never.invalid/x.git", "fatal: unexpected", v2AliasURL)
 	parts := strings.SplitN(rest, "|", 2)
 	if code != 0 {
-		t.Fatalf("resolve = %d:\n%s", code, stderr)
+		t.Fatalf("resolve = %d, want success:\n%s", code, stderr)
 	}
-	if len(clones) != 1 || clones[0] != v2AliasEndpoint {
-		t.Fatalf("clones = %v, want the gap signature (listed URL once); convert the known gap to a drive", clones)
+	if len(clones) != 1 || clones[0] != v2AliasURL {
+		t.Fatalf("clones = %v, want the substituted address once", clones)
+	}
+	if strings.Contains(stderr, v2AliasHost) || strings.Contains(stderr, "corp-mirror") {
+		t.Fatalf("stderr leaks endpoint provenance:\n%s", stderr)
 	}
 	v2LockIdentity(t, parts[1], parts[0])
-	semanticKnownGap(t, c, "CLI resolve clones the listed URL and ignores alias substitution (resolved mirror.corp.example:8443 never connected); no fetch entry proves the substituted connection (see results: alias-substitution gap)")
 }
 
 func driveV2ReaderAcceptsV1(t *testing.T, _ draftSemanticCase) {
@@ -349,16 +352,20 @@ func driveV2V1ReaderRejectsV2(t *testing.T, _ draftSemanticCase) {
 	driveV2Refusal(t, `{"schema_version":1,"repositories":{"`+v2Identity+`":{"endpoints":[`+v2Endpoint(v2Primary, "team-https", `"mirror_of":"`+v2Identity+`"`)+`],"fallback":"none"}}}`, config.CodeRepositoryPolicyInvalid)
 }
 
-// driveV2UserInsteadOfGap is a known product gap: the resolved lane
-// pins its git configuration (proven in-package by
-// TestUserConfigIgnoredByResolvedLane), but CLI resolve inherits user
-// configuration through gitops.Clone, so a hostile insteadOf redirects
-// the fetch. The row reproduces the hostile flow and locks the gap
-// signature (the lock binds the substituted commit); convert it to a
-// drive when the CLI lane isolates user config.
-func driveV2UserInsteadOfGap(t *testing.T, c draftSemanticCase) {
+// driveV2UserInsteadOf drives the spec case exactly: a literal URL
+// declaration with no machine policy entry and a hostile user git
+// configuration must attempt the declared URL once, literally, with the
+// insteadOf never applied. The transport shim stands in for the network
+// (the declared URL is served from the local bare fixture); the hostile
+// insteadOf targets the URL real git receives, so any consultation
+// redirects the clone to the evil fixture and the lock binds the evil
+// commit instead of the declared one. Hostile configuration is planted
+// through the GIT_CONFIG selectors and the child HOME file together, so
+// the row also proves the isolation is HOME-independent.
+func driveV2UserInsteadOf(t *testing.T, _ draftSemanticCase) {
 	realGit := requireGit(t)
 	root := t.TempDir()
+	bare, commit := draftCLIKitBare(t, root)
 	evilWork := filepath.Join(root, "evil-work")
 	evilBare := filepath.Join(root, "evil.git")
 	if err := os.MkdirAll(evilWork, 0o755); err != nil {
@@ -371,35 +378,162 @@ func driveV2UserInsteadOfGap(t *testing.T, c draftSemanticCase) {
 	runDraftGit(t, evilWork, "tag", "v1")
 	runDraftGit(t, "", "clone", "--quiet", "--bare", "--", evilWork, evilBare)
 	evilCommit := draftGitOutput(t, "", "--git-dir", evilBare, "rev-parse", "v1^{commit}")
-	fakeDir := t.TempDir()
-	script := "#!/bin/sh\nexec '" + realGit + "' \"$@\"\n"
-	if err := os.WriteFile(filepath.Join(fakeDir, "git"), []byte(script), 0o700); err != nil {
-		t.Fatal(err)
+	if evilCommit == commit {
+		t.Fatal("declared and evil fixtures collide")
 	}
-	hostile := filepath.Join(root, "hostile.gitconfig")
-	if err := os.WriteFile(hostile, []byte("[url \"file://"+evilBare+"\"]\n\tinsteadOf = "+v2Primary+"\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	fakeDir, logPath := installDraftTransportShim(t, "https://never.invalid/x.git", "fatal: unexpected", v2Primary, bare, realGit)
 	pathEnv := draftTransportPATH(t, fakeDir)
+	hostileBody := "[url \"file://" + evilBare + "\"]\n" +
+		"\tinsteadOf = file://" + bare + "\n" +
+		"\tpushInsteadOf = file://" + bare + "\n" +
+		"[core]\n\tsshCommand = /nonexistent-evil-ssh\n"
+	hostile := filepath.Join(root, "hostile.gitconfig")
+	if err := os.WriteFile(hostile, []byte(hostileBody), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	env := append(pathEnv, "GIT_CONFIG_GLOBAL="+hostile, "GIT_CONFIG_SYSTEM="+hostile, "GIT_CONFIG_NOSYSTEM=0")
 	configPath, project, home := setupCLIProject(t, root)
+	if err := os.WriteFile(filepath.Join(home, ".gitconfig"), []byte(hostileBody), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	payload := `{"schema_version":2,"sources":{"kit":{"git":"` + v2Primary + `","tag":"v1"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	code, stdout, stderr := runCurator(t, home, configPath, env, "project", "resolve", "app")
 	if code != 0 {
-		t.Fatalf("resolve = %d, want the gap signature (success via substitution):\n%s\n%s", code, stdout, stderr)
+		t.Fatalf("resolve = %d, want success:\n%s\n%s", code, stdout, stderr)
+	}
+	if clones := draftCloneLog(t, logPath); len(clones) != 1 || clones[0] != v2Primary {
+		t.Fatalf("clones = %v, want the declared URL once, literally", clones)
 	}
 	lock, err := sourcelock.Read(filepath.Join(project, "Skillfile.lock.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	member, ok := lock.Find("review")
-	if !ok || member.Package.Commit.Hex != evilCommit {
-		t.Fatalf("lock binds %+v, want the substituted evil commit %s; convert the known gap to a drive", member.Package, evilCommit)
+	if !ok {
+		t.Fatal("lock misses review")
 	}
-	semanticKnownGap(t, c, "CLI resolve honors user insteadOf (lock binds the substituted commit); resolved-lane isolation is proven in-package only (see results: CLI user-config gap)")
+	if member.Package.Commit.Hex == evilCommit {
+		t.Fatalf("lock binds the evil commit %s: user insteadOf was applied", evilCommit)
+	}
+	if member.Package.Commit.Hex != commit {
+		t.Fatalf("lock binds %s, want the declared commit %s", member.Package.Commit.Hex, commit)
+	}
+	if member.Package.Repository != v2Identity {
+		t.Fatalf("lock identity = %q, want the canonical key", member.Package.Repository)
+	}
+}
+
+// TestDraftLiteralRefreshIgnoresUserConfig pins the fetch half of the
+// draft literal-URL isolation (BUG-260920-3ukdk4) at the production
+// entry: after a clean resolve, a hostile user git configuration must
+// not redirect the refresh fetch to another repository. It is
+// intentionally NOT a corpus row (no registerDraftSemantic call): the
+// semantic ratio stays 94 and TestDraftSourcesSemanticCoverage is
+// unaffected.
+func TestDraftLiteralRefreshIgnoresUserConfig(t *testing.T) {
+	realGit := requireGit(t)
+	root := t.TempDir()
+	bare, commit := draftCLIKitBare(t, root)
+	work := filepath.Join(root, "kit-work")
+	evilWork := filepath.Join(root, "evil-work")
+	evilBare := filepath.Join(root, "evil.git")
+	if err := os.MkdirAll(evilWork, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeDraftSkill(t, filepath.Join(evilWork, "skills", "review"), "review")
+	runDraftGit(t, evilWork, "init", "-q", "-b", "main")
+	runDraftGit(t, evilWork, "add", ".")
+	runDraftGit(t, evilWork, "commit", "-qm", "evil")
+	runDraftGit(t, evilWork, "tag", "v1")
+	runDraftGit(t, "", "clone", "--quiet", "--bare", "--", evilWork, evilBare)
+	evilMain := draftGitOutput(t, "", "--git-dir", evilBare, "rev-parse", "main^{commit}")
+	if evilMain == commit {
+		t.Fatal("declared and evil fixtures collide")
+	}
+	fakeDir, logPath := installDraftTransportShim(t, "https://never.invalid/x.git", "fatal: unexpected", v2Primary, bare, realGit)
+	pathEnv := draftTransportPATH(t, fakeDir)
+	configPath, project, home := setupCLIProject(t, root)
+	payload := `{"schema_version":2,"sources":{"kit":{"git":"` + v2Primary + `","branch":"main"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
+	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code, stdout, stderr := runCurator(t, home, configPath, pathEnv, "project", "resolve", "app"); code != 0 {
+		t.Fatalf("initial resolve = %d:\n%s\n%s", code, stdout, stderr)
+	}
+	lock, err := sourcelock.Read(filepath.Join(project, "Skillfile.lock.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	member, ok := lock.Find("review")
+	if !ok {
+		t.Fatal("lock misses review")
+	}
+	if member.Package.Commit.Hex != commit {
+		t.Fatalf("initial lock = %s, want %s", member.Package.Commit.Hex, commit)
+	}
+	// Advance the declared repository's main past the resolved commit.
+	if err := os.WriteFile(filepath.Join(work, "skills", "review", "references", "info.md"), []byte("advanced"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runDraftGit(t, work, "add", ".")
+	runDraftGit(t, work, "commit", "-qm", "advance")
+	runDraftGit(t, work, "push", "-q", "--", bare, "main:main")
+	advanced := draftGitOutput(t, "", "--git-dir", bare, "rev-parse", "main^{commit}")
+	if advanced == commit || advanced == evilMain {
+		t.Fatal("fixture advance collided")
+	}
+	hostileBody := "[url \"file://" + evilBare + "\"]\n" +
+		"\tinsteadOf = file://" + bare + "\n" +
+		"\tpushInsteadOf = file://" + bare + "\n"
+	hostile := filepath.Join(root, "hostile.gitconfig")
+	if err := os.WriteFile(hostile, []byte(hostileBody), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".gitconfig"), []byte(hostileBody), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	hostileEnv := []string{"GIT_CONFIG_GLOBAL=" + hostile, "GIT_CONFIG_SYSTEM=" + hostile, "GIT_CONFIG_NOSYSTEM=0"}
+	// Positive control: a raw fetch of a clone of the declared tree
+	// under the hostile selectors lands on evil's main, proving the
+	// payload redirects fetches when it is consulted.
+	control := filepath.Join(t.TempDir(), "control")
+	if code, _, stderr := testcli.Run(t, "", nil, "", realGit, "clone", "--quiet", "--", "file://"+bare, control); code != 0 {
+		t.Fatalf("control clone: %s", stderr)
+	}
+	if code, _, stderr := testcli.Run(t, control, hostileEnv, "", realGit, "fetch", "--quiet", "--all"); code != 0 {
+		t.Fatalf("control fetch: %s", stderr)
+	}
+	if got := draftGitOutput(t, control, "rev-parse", "origin/main"); got != evilMain {
+		t.Fatalf("control origin/main = %s, want evil %s (payload not live)", got, evilMain)
+	}
+	env := append(pathEnv, hostileEnv...)
+	code, stdout, stderr := runCurator(t, home, configPath, env, "project", "refresh", "app")
+	if code != 0 {
+		t.Fatalf("refresh = %d:\n%s\n%s", code, stdout, stderr)
+	}
+	if clones := draftCloneLog(t, logPath); len(clones) != 1 {
+		t.Fatalf("clones = %v, want exactly the initial clone (refresh must fetch, not reclone)", clones)
+	}
+	lock, err = sourcelock.Read(filepath.Join(project, "Skillfile.lock.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	member, ok = lock.Find("review")
+	if !ok {
+		t.Fatal("lock misses review")
+	}
+	if member.Package.Commit.Hex == evilMain {
+		t.Fatalf("refresh lock binds evil main %s: user configuration was applied on the fetch path", evilMain)
+	}
+	if member.Package.Commit.Hex != advanced {
+		t.Fatalf("refresh lock = %s, want advanced declared %s", member.Package.Commit.Hex, advanced)
+	}
+	if member.Package.Repository != v2Identity {
+		t.Fatalf("lock identity = %q, want the canonical key", member.Package.Repository)
+	}
 }
 
 // driveV2UserSSHAlias drives the spec case exactly: a logical
@@ -674,10 +808,8 @@ func driveV2ExternalMirrorAdmitted(t *testing.T, _ draftSemanticCase) {
 // assumed), and the executor gate refuses the converted plan with
 // build_repository_identity_invalid before any network I/O. Layer 2 runs
 // on unix through install.Project: the run refuses with zero fetch
-// attempts and preserves all state. The install-level diagnostic is
-// logged, not asserted: the pipeline reports every acquire error as
-// build_repository_source_unavailable (see results), so the true class
-// is pinned at the executor gate, where it is observable.
+// attempts, preserves all state, and reports the true class end to end
+// instead of masking it as build_repository_source_unavailable.
 func driveV2ExternalRefused(t *testing.T, skillGit, policyDoc, providersDoc string) {
 	policy := v2Parse(t, policyDoc)
 	resolved, err := config.ResolveRepositoryEndpoints(policy, skillGit, "")
@@ -731,7 +863,13 @@ func driveV2ExternalRefused(t *testing.T, skillGit, policyDoc, providersDoc stri
 	if result.Status != "failed" {
 		t.Fatalf("install = %+v, want refusal", result)
 	}
-	t.Logf("install-level diagnostic (masked class, true class pinned above): %s", strings.Join(result.Errors, ";"))
+	combined := strings.Join(result.Errors, ";")
+	if !strings.Contains(combined, buildrepo.CodeIdentityInvalid) {
+		t.Fatalf("install diagnostic = %q, want the true class %s", combined, buildrepo.CodeIdentityInvalid)
+	}
+	if strings.Contains(combined, buildrepo.CodeSourceUnavailable) {
+		t.Fatalf("install diagnostic masks the class as %s: %q", buildrepo.CodeSourceUnavailable, combined)
+	}
 	if fetches := v2FetchURLs(t, logPath); len(fetches) != 0 {
 		t.Fatalf("fetches = %q, want zero attempts", fetches)
 	}

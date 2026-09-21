@@ -38,11 +38,11 @@ import (
 //     refresh cannot launder revoked evidence.
 //  3. Compiled-CLI status (unix): status is nonzero and read-only.
 //
-// wrong-name and wrong-context are explicit bounds: frozen §13.3
-// OR-matching (content, or identity+commit; name uncompared) accepts
-// them as audited, while draft §4 demands exact name, repository,
-// commit, and context matching. The bound rows lock the accepted
-// behavior at the Resolve entry so the gap cannot widen silently.
+// wrong-name and wrong-context are driven through the exact draft §4
+// entry: frozen §13.3 OR-matching (content, or identity+commit; name
+// uncompared) still accepts them as audited behind registry.Resolve,
+// which the legacy lane keeps byte-identically, while the draft lane
+// resolves through registry.ResolveExact and refuses both shapes.
 
 type attestCondition int
 
@@ -56,6 +56,8 @@ const (
 	attestWrongRepository
 	attestWrongCommit
 	attestWrongKey
+	attestWrongName
+	attestWrongContext
 )
 
 type stubSigner struct {
@@ -186,6 +188,12 @@ func (s *attestStub) serveRecords(w http.ResponseWriter, r *http.Request) {
 		}, s.good)
 	case attestWrongKey:
 		mint(nil, s.rogue)
+	case attestWrongName:
+		mint(func(body map[string]any) { body["name"] = "other" }, s.good)
+	case attestWrongContext:
+		mint(func(body map[string]any) {
+			body["content_sha256"] = "sha256:" + strings.Repeat("e", 64)
+		}, s.good)
 	default:
 		mint(nil, s.good)
 	}
@@ -262,6 +270,8 @@ var draftEvidenceConditions = map[string]attestCondition{
 	"attestation-evidence-wrong-repository": attestWrongRepository,
 	"attestation-evidence-wrong-commit":     attestWrongCommit,
 	"attestation-evidence-wrong-key":        attestWrongKey,
+	"attestation-evidence-wrong-name":       attestWrongName,
+	"attestation-evidence-wrong-context":    attestWrongContext,
 }
 
 func init() {
@@ -269,8 +279,6 @@ func init() {
 		id, condition := id, condition
 		registerDraftSemantic(id, func(t *testing.T, c draftSemanticCase) { driveAttestationEvidence(t, c, condition) })
 	}
-	registerDraftSemantic("attestation-evidence-wrong-name", driveAttestationWrongNameGap)
-	registerDraftSemantic("attestation-evidence-wrong-context", driveAttestationWrongContextGap)
 }
 
 func driveAttestationEvidence(t *testing.T, c draftSemanticCase, condition attestCondition) {
@@ -324,6 +332,20 @@ func driveAttestationEvidence(t *testing.T, c draftSemanticCase, condition attes
 		}, stub.good)}, nil))
 	case attestWrongKey:
 		resolution = registry.Resolve(regs, identity, commit, content, static([]map[string]any{mintStatic(nil, stub.rogue)}, nil))
+	case attestWrongName:
+		payloads := []map[string]any{mintStatic(func(body map[string]any) { body["name"] = "other" }, stub.good)}
+		if legacy := registry.Resolve(regs, identity, commit, content, static(payloads, nil)); legacy.Result != registry.ResultAudited {
+			t.Fatalf("legacy Resolve(wrong-name) = %s, want the frozen audited outcome", legacy.Result)
+		}
+		resolution = registry.ResolveExact(regs, "review", identity, commit, content, static(payloads, nil))
+	case attestWrongContext:
+		payloads := []map[string]any{mintStatic(func(body map[string]any) {
+			body["content_sha256"] = "sha256:" + strings.Repeat("e", 64)
+		}, stub.good)}
+		if legacy := registry.Resolve(regs, identity, commit, content, static(payloads, nil)); legacy.Result != registry.ResultAudited {
+			t.Fatalf("legacy Resolve(wrong-context) = %s, want the frozen audited outcome", legacy.Result)
+		}
+		resolution = registry.ResolveExact(regs, "review", identity, commit, content, static(payloads, nil))
 	}
 	wantResult := registry.ResultUnknown
 	if condition == attestRevoked {
@@ -473,35 +495,4 @@ func mergeRegistryConfig(t *testing.T, configPath string, stub *attestStub) {
 	if err := os.WriteFile(configPath, merged, 0o644); err != nil {
 		t.Fatal(err)
 	}
-}
-
-func driveAttestationWrongNameGap(t *testing.T, c draftSemanticCase) {
-	stub := newAttestStub(t)
-	identity, commit, content := "example.org/kit", strings.Repeat("a", 40), "sha256:"+strings.Repeat("d", 64)
-	body := map[string]any{"name": "other", "source_identity": identity, "commit": commit, "content_sha256": content,
-		"status": registry.StatusAudited, "audit": map[string]any{"auditor": "team"}}
-	resolution := registry.Resolve(stub.registries(), identity, commit, content,
-		func(_, _, _, _ string) ([]map[string]any, error) {
-			return []map[string]any{stub.good.sign(body)}, nil
-		})
-	if resolution.Result != registry.ResultAudited {
-		t.Fatalf("wrong-name Resolve = %s, want the locked audited outcome; convert the known gap to a drive", resolution.Result)
-	}
-	semanticKnownGap(t, c, "frozen §13.3 matching never compares record name, so a wrong-name record resolves audited; draft §4 exact-name matching is not implemented (see results: draft exact-match gap)")
-}
-
-func driveAttestationWrongContextGap(t *testing.T, c draftSemanticCase) {
-	stub := newAttestStub(t)
-	identity, commit, content := "example.org/kit", strings.Repeat("a", 40), "sha256:"+strings.Repeat("d", 64)
-	body := map[string]any{"name": "review", "source_identity": identity, "commit": commit,
-		"content_sha256": "sha256:" + strings.Repeat("e", 64),
-		"status":         registry.StatusAudited, "audit": map[string]any{"auditor": "team"}}
-	resolution := registry.Resolve(stub.registries(), identity, commit, content,
-		func(_, _, _, _ string) ([]map[string]any, error) {
-			return []map[string]any{stub.good.sign(body)}, nil
-		})
-	if resolution.Result != registry.ResultAudited {
-		t.Fatalf("wrong-context Resolve = %s, want the locked audited outcome; convert the known gap to a drive", resolution.Result)
-	}
-	semanticKnownGap(t, c, "frozen §13.3 OR-matching accepts identity+commit with a wrong context hash; draft §4 exact-context matching is not implemented (see results: draft exact-match gap)")
 }

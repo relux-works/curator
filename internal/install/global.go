@@ -213,7 +213,7 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 	resolveAttest := opts.ResolveAttest
 	if resolveAttest == nil {
 		resolveAttest = func(nodes []*closure.Node) (map[string]*marker.Attestation, []string, error) {
-			return resolveRegistries(cfg, nodes, "global", !opts.DryRun)
+			return resolveRegistries(cfg, nodes, "global", !opts.DryRun, false)
 		}
 	}
 	attestations, regWarnings, regErr := resolveAttest(nodes)

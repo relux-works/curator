@@ -162,6 +162,111 @@ func TestMatches(t *testing.T) {
 	}
 }
 
+// TestMatchesExact locks draft §4 admission: name, canonical repository,
+// commit, and context hash must ALL match. Each single-field mismatch
+// refuses, including the two shapes frozen §13.3 OR-matching admits (a
+// wrong name with identity+commit+content matching, and a wrong context
+// hash with name+identity+commit matching).
+func TestMatchesExact(t *testing.T) {
+	s := newSigner(t)
+	parsed, _ := ParseRecord(s.sign(record(StatusAudited)))
+	const name, repository = "skill-a", "git.example.com/skills/skill-a"
+	if !MatchesExact(parsed, name, repository, testCommit, testContentSHA256) {
+		t.Fatal("exact record must match")
+	}
+	for field, mutated := range map[string]struct {
+		name, repository, commit, content string
+	}{
+		"wrong name":       {name: "other", repository: repository, commit: testCommit, content: testContentSHA256},
+		"wrong repository": {name: name, repository: "other.test/kit", commit: testCommit, content: testContentSHA256},
+		"wrong commit":     {name: name, repository: repository, commit: strings.Repeat("b", 40), content: testContentSHA256},
+		"wrong context":    {name: name, repository: repository, commit: testCommit, content: "sha256:" + strings.Repeat("e", 64)},
+	} {
+		t.Run(field, func(t *testing.T) {
+			if MatchesExact(parsed, mutated.name, mutated.repository, mutated.commit, mutated.content) {
+				t.Fatalf("MatchesExact admitted a %s record", field)
+			}
+		})
+	}
+}
+
+// TestResolveExact drives the draft-lane resolution entry: an exact
+// record resolves audited, every single-field mismatch resolves unknown,
+// and an exact revocation still denies. It also locks the frozen legacy
+// entry: Resolve keeps admitting the wrong-name and wrong-context shapes
+// as audited, so the v1 lane is byte-identically unchanged.
+func TestResolveExact(t *testing.T) {
+	s := newSigner(t)
+	registries := []Registry{{Name: "one", URL: "https://one", PublicKeys: []string{s.pinned}}}
+	const name, repository = "skill-a", "git.example.com/skills/skill-a"
+	resolve := func(body map[string]any) (exact, legacy Resolution) {
+		fetch := staticFetch(map[string][]map[string]any{"https://one": {s.sign(body)}}, nil)
+		return ResolveExact(registries, name, repository, testCommit, testContentSHA256, fetch),
+			Resolve(registries, repository, testCommit, testContentSHA256, fetch)
+	}
+	mint := func(mut func(map[string]any)) map[string]any {
+		body := record(StatusAudited)
+		if mut != nil {
+			mut(body)
+		}
+		return body
+	}
+	exact, _ := resolve(mint(nil))
+	if exact.Result != ResultAudited || exact.Attestation == nil || exact.Attestation.Registry != "one" {
+		t.Fatalf("exact resolution: %+v", exact)
+	}
+	for field, mut := range map[string]func(map[string]any){
+		"wrong-name": func(body map[string]any) {
+			body["name"] = "other"
+		},
+		"wrong-repository": func(body map[string]any) {
+			body["source_identity"] = "other.test/kit"
+			body["commit"] = strings.Repeat("b", 40)
+			body["content_sha256"] = "sha256:" + strings.Repeat("e", 64)
+		},
+		"wrong-commit": func(body map[string]any) {
+			body["commit"] = strings.Repeat("b", 40)
+			body["content_sha256"] = "sha256:" + strings.Repeat("e", 64)
+		},
+		"wrong-context": func(body map[string]any) {
+			body["content_sha256"] = "sha256:" + strings.Repeat("e", 64)
+		},
+	} {
+		t.Run(field, func(t *testing.T) {
+			exact, _ := resolve(mint(mut))
+			if exact.Result != ResultUnknown {
+				t.Fatalf("ResolveExact(%s) = %s, want unknown", field, exact.Result)
+			}
+			if exact.Attestation != nil {
+				t.Fatalf("ResolveExact(%s) carried an attestation: %+v", field, exact.Attestation)
+			}
+		})
+	}
+	revoked, _ := resolve(mint(func(body map[string]any) { body["status"] = StatusRevoked }))
+	if revoked.Result != ResultRevoked {
+		t.Fatalf("exact revocation must deny: %+v", revoked)
+	}
+	// Frozen legacy entry: wrong-name and wrong-context still resolve
+	// audited under §13.3 OR-matching.
+	if legacy := func() Resolution {
+		_, legacy := resolve(mint(func(body map[string]any) { body["name"] = "other" }))
+		return legacy
+	}(); legacy.Result != ResultAudited {
+		t.Fatalf("legacy Resolve(wrong-name) = %s, want the frozen audited outcome", legacy.Result)
+	}
+	if legacy := func() Resolution {
+		_, legacy := resolve(mint(func(body map[string]any) {
+			body["content_sha256"] = "sha256:" + strings.Repeat("e", 64)
+		}))
+		return legacy
+	}(); legacy.Result != ResultAudited {
+		t.Fatalf("legacy Resolve(wrong-context) = %s, want the frozen audited outcome", legacy.Result)
+	}
+	if empty := ResolveExact(registries, name, "", "", testContentSHA256, staticFetch(nil, nil)); empty.Result != ResultUnknown {
+		t.Fatalf("identity-less query must stay unknown: %+v", empty)
+	}
+}
+
 func staticFetch(payloads map[string][]map[string]any, errs map[string]error) FetchFn {
 	return func(url, _, _, _ string) ([]map[string]any, error) {
 		if err := errs[url]; err != nil {
@@ -642,11 +747,12 @@ func TestSnapshotFutureBoundIsExactAtEveryConfiguredSkew(t *testing.T) {
 }
 
 // TestSnapshotZeroClockSkewIsLiteral pins the documented reading of a zero
-// clock skew: zero means zero, not "fall back to the default". A manager that
-// configures no tolerance gets none, and a sub-second future timestamp is
-// already out of bounds. The install fixtures depend on this: they stamp their
-// snapshot before the run rather than during the fetch, because under this
-// policy any drift forward is tampering (BUG-260906-1bdotx).
+// clock skew: zero means zero configured tolerance, not "fall back to the
+// default". With an instant fetch a sub-second future timestamp is already out
+// of bounds. The product additionally tolerates its own latency since it
+// sampled its clock (BUG-260920-2d9gfv), so a serve-time mint that lands
+// within that latency is legitimate even here; the install fixtures that stamp
+// before the run are unaffected (BUG-260906-1bdotx).
 func TestSnapshotZeroClockSkewIsLiteral(t *testing.T) {
 	s := newSigner(t)
 	now := time.Now().UTC().Truncate(time.Second).Add(500 * time.Millisecond)
@@ -664,4 +770,98 @@ func TestSnapshotZeroClockSkewIsLiteral(t *testing.T) {
 	if tampered[reg.URL] || len(warnings) != 0 {
 		t.Fatalf("the shipped default must absorb sub-second drift: %v %v", tampered, warnings)
 	}
+}
+
+// TestSnapshotFutureBoundToleratesCheckerLatency pins the elapsed-time term
+// of the future-timestamp bound (BUG-260920-2d9gfv) with an injected `now`:
+// a snapshot minted while its own fetch is in flight is legitimate even
+// under a literal zero skew; a slow sibling's latency is inside the bound
+// (the wall clock simply advanced), so an instant registry behind the
+// post-fetch clock is accepted while one ahead of it still refuses; and a
+// timestamp genuinely ahead of the post-fetch clock (now + skew + 2s) still
+// refuses. Dropping the elapsed term fails the accept rows; scoping the
+// start per registry (the rev1 shape) fails the sibling accept; dropping
+// the future check entirely fails the refuse rows.
+func TestSnapshotFutureBoundToleratesCheckerLatency(t *testing.T) {
+	// created_at round-trips as whole seconds, so each row anchors its
+	// injected `now` on a whole second just before the check: every future
+	// offset below is an exact whole number of seconds, and the 500 ms
+	// margins against the 1.5 s sleeps hold on any scheduler the suite
+	// runs on.
+	t.Run("mint during a slow fetch is accepted under zero skew", func(t *testing.T) {
+		now := time.Now().UTC().Truncate(time.Second)
+		s := newSigner(t)
+		fetch := func(string) (map[string]any, error) {
+			time.Sleep(1500 * time.Millisecond)
+			return s.sign(snapshotBody(5, now.Add(time.Second))), nil
+		}
+		reg := Registry{Name: "one", URL: "https://one", PublicKeys: []string{s.pinned}}
+		tampered, warnings := CheckSnapshotsWithPolicy([]Registry{reg}, t.TempDir(), fetch, now, 0, 0)
+		if tampered[reg.URL] || len(warnings) != 0 {
+			t.Fatalf("a snapshot minted during its own fetch must be accepted: %v %v", tampered, warnings)
+		}
+	})
+	t.Run("a slow sibling's latency is inside the bound", func(t *testing.T) {
+		now := time.Now().UTC().Truncate(time.Second)
+		// After a 1.5 s sibling, an instant registry with created_at one
+		// second past the injected `now` is already behind the wall clock
+		// when checked and must be accepted.
+		t.Run("behind the post-fetch clock is accepted", func(t *testing.T) {
+			slow, fast := newSigner(t), newSigner(t)
+			slowReg := Registry{Name: "slow", URL: "https://slow", PublicKeys: []string{slow.pinned}}
+			fastReg := Registry{Name: "fast", URL: "https://fast", PublicKeys: []string{fast.pinned}}
+			fetch := func(url string) (map[string]any, error) {
+				if url == slowReg.URL {
+					time.Sleep(1500 * time.Millisecond)
+					return slow.sign(snapshotBody(5, now.Add(time.Second))), nil
+				}
+				return fast.sign(snapshotBody(5, now.Add(time.Second))), nil
+			}
+			tampered, warnings := CheckSnapshotsWithPolicy(
+				[]Registry{slowReg, fastReg}, t.TempDir(), fetch, now, 0, 0)
+			if tampered[slowReg.URL] {
+				t.Fatalf("the slow registry's own mint must be accepted: %v", warnings)
+			}
+			if tampered[fastReg.URL] || len(warnings) != 0 {
+				t.Fatalf("a timestamp behind the post-fetch clock must be accepted: %v %v", tampered, warnings)
+			}
+		})
+		// The same shape with created_at ahead of the post-fetch clock
+		// (now + skew + 3 s, i.e. ~1.5 s past the checker's clock after the
+		// sibling's fetch) is genuinely future and must still refuse.
+		for _, skew := range []time.Duration{0, 30 * time.Second} {
+			slow, fast := newSigner(t), newSigner(t)
+			slowReg := Registry{Name: "slow", URL: "https://slow", PublicKeys: []string{slow.pinned}}
+			fastReg := Registry{Name: "fast", URL: "https://fast", PublicKeys: []string{fast.pinned}}
+			fetch := func(url string) (map[string]any, error) {
+				if url == slowReg.URL {
+					time.Sleep(1500 * time.Millisecond)
+					return slow.sign(snapshotBody(5, now.Add(time.Second))), nil
+				}
+				return fast.sign(snapshotBody(5, now.Add(skew).Add(3*time.Second))), nil
+			}
+			tampered, warnings := CheckSnapshotsWithPolicy(
+				[]Registry{slowReg, fastReg}, t.TempDir(), fetch, now, 0, skew)
+			if tampered[slowReg.URL] {
+				t.Fatalf("skew %v: the slow registry's own mint must be accepted: %v", skew, warnings)
+			}
+			if !tampered[fastReg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "fast snapshot timestamp is too far in the future") {
+				t.Fatalf("skew %v: a timestamp ahead of the post-fetch clock must refuse: %v %v", skew, tampered, warnings)
+			}
+		}
+	})
+	t.Run("now plus skew plus two seconds still refuses", func(t *testing.T) {
+		now := time.Now().UTC().Truncate(time.Second)
+		for _, skew := range []time.Duration{0, 30 * time.Second} {
+			s := newSigner(t)
+			fetch := func(string) (map[string]any, error) {
+				return s.sign(snapshotBody(5, now.Add(skew).Add(2*time.Second))), nil
+			}
+			reg := Registry{Name: "one", URL: "https://one", PublicKeys: []string{s.pinned}}
+			tampered, warnings := CheckSnapshotsWithPolicy([]Registry{reg}, t.TempDir(), fetch, now, 0, skew)
+			if !tampered[reg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "too far in the future") {
+				t.Fatalf("skew %v: now+skew+2s must refuse: %v %v", skew, tampered, warnings)
+			}
+		}
+	})
 }

@@ -27,6 +27,26 @@ type Engine struct {
 	// restart re-verifies its durable proof instead, and only a legacy
 	// journal (nil proof) skips the gate.
 	guards map[string]BoundaryCheck
+	// nsCache retains canonical namespace resolutions per transaction,
+	// keyed by transaction id then the exact input path. Each entry holds
+	// the resolved path or the resolution error from the first walk in the
+	// current recheck epoch. checkBoundary invalidates the transaction's
+	// entry on every per-write recheck, so the next save re-walks the
+	// filesystem; legacy journals without a recheck bypass the cache and
+	// walk every save. The cache never crosses transactions or engines.
+	// All callers hold mu.
+	nsCache map[string]map[string]canonicalCacheEntry
+	// canonicalResolver resolves one absolute path for namespace
+	// validation. Nil means canonicalNamespacePath. Tests inject a
+	// counting wrapper to prove hit/miss behavior.
+	canonicalResolver func(string) (string, error)
+}
+
+// canonicalCacheEntry is one cached canonicalization: the resolved path on
+// success, or the resolution error the walk returned.
+type canonicalCacheEntry struct {
+	resolved string
+	err      error
 }
 
 // New constructs an engine without creating manager-home state.
@@ -42,6 +62,7 @@ func New(home string, options ...Option) (*Engine, error) {
 		journalRoot:      filepath.Join(filepath.Clean(absolute), "state", "transactions", "v1"),
 		syncStagedParent: syncDirectory,
 		guards:           map[string]BoundaryCheck{},
+		nsCache:          map[string]map[string]canonicalCacheEntry{},
 	}
 	for _, option := range options {
 		if option != nil {
@@ -488,7 +509,15 @@ func (engine *Engine) commitTarget(journal *Journal, index int) error {
 // a legacy journal (nil proof) skips the gate. A protected journal whose
 // proof cannot be restored fails closed. Rollback never calls this: a
 // refusal must restore published state, not refuse the restoration.
+//
+// This is also the per-write invalidation seam for the canonical namespace
+// cache: the entry is dropped before the recheck runs, so the recheck
+// itself always re-walks the live filesystem and the next journal save
+// after it re-resolves every path. A symlink swapped between two saves in
+// one epoch is therefore still caught here, and the transaction refuses as
+// before.
 func (engine *Engine) checkBoundary(journal *Journal, index int) error {
+	delete(engine.nsCache, journal.TransactionID)
 	if guard := engine.guards[journal.TransactionID]; guard != nil {
 		return guard(index, journal.Targets[index].LivePath)
 	}
@@ -510,6 +539,88 @@ func (engine *Engine) checkBoundary(journal *Journal, index int) error {
 		return fmt.Errorf("boundary_identity_unreadable: unknown target kind %q", target.Kind)
 	}
 	return staging.RecheckDurableOne(staging.Target{LivePath: target.LivePath, Kind: stagingKind}, *proof)
+}
+
+// namespaceRecheckPresent reports whether the transaction carries a
+// per-write recheck: an in-memory guard, a durable proof, or both. Only
+// then is the canonical cache allowed; legacy journals walk every save.
+func (engine *Engine) namespaceRecheckPresent(journal *Journal) bool {
+	if engine.guards[journal.TransactionID] != nil {
+		return true
+	}
+	return journal.BoundaryProof != nil
+}
+
+// resolveCanonical walks one path without caching, through the test seam
+// when one is installed.
+func (engine *Engine) resolveCanonical(path string) (string, error) {
+	if engine.canonicalResolver != nil {
+		return engine.canonicalResolver(path)
+	}
+	return canonicalNamespacePath(path)
+}
+
+// resolveTargetPath canonicalizes one target path without caching. It
+// mirrors canonicalNamespaceTargetPath exactly; the parent walk goes
+// through the same test seam as resolveCanonical.
+func (engine *Engine) resolveTargetPath(path string, entry bool) (string, error) {
+	if !entry {
+		return engine.resolveCanonical(path)
+	}
+	if path == "" || !validText(path) || !filepath.IsAbs(path) {
+		return "", fmt.Errorf("path is not valid absolute filesystem text")
+	}
+	absolute := filepath.Clean(path)
+	parent := filepath.Dir(absolute)
+	if parent == absolute {
+		return absolute, nil
+	}
+	resolvedParent, err := engine.resolveCanonical(parent)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(resolvedParent, filepath.Base(absolute)), nil
+}
+
+// cachedCanonicalPath returns the cached resolution for the exact input
+// path, walking and storing it on the first use in the epoch.
+func (engine *Engine) cachedCanonicalPath(transactionID, path string) (string, error) {
+	if engine.nsCache == nil {
+		engine.nsCache = map[string]map[string]canonicalCacheEntry{}
+	}
+	cache := engine.nsCache[transactionID]
+	if cache == nil {
+		cache = map[string]canonicalCacheEntry{}
+		engine.nsCache[transactionID] = cache
+	}
+	if entry, ok := cache[path]; ok {
+		return entry.resolved, entry.err
+	}
+	resolved, err := engine.resolveCanonical(path)
+	cache[path] = canonicalCacheEntry{resolved: resolved, err: err}
+	return resolved, err
+}
+
+// cachedCanonicalTargetPath canonicalizes one target path with the parent
+// walk served from the transaction's cache. It mirrors
+// canonicalNamespaceTargetPath exactly.
+func (engine *Engine) cachedCanonicalTargetPath(transactionID, path string, entry bool) (string, error) {
+	if !entry {
+		return engine.cachedCanonicalPath(transactionID, path)
+	}
+	if path == "" || !validText(path) || !filepath.IsAbs(path) {
+		return "", fmt.Errorf("path is not valid absolute filesystem text")
+	}
+	absolute := filepath.Clean(path)
+	parent := filepath.Dir(absolute)
+	if parent == absolute {
+		return absolute, nil
+	}
+	resolvedParent, err := engine.cachedCanonicalPath(transactionID, parent)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(resolvedParent, filepath.Base(absolute)), nil
 }
 
 func (engine *Engine) recoverPendingBackup(target *TargetRecord) error {

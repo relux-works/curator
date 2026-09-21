@@ -49,15 +49,11 @@ var draftSchemaBounds = map[string]string{
 	// Schema-valid but normatively inconsistent: builds:{} with a
 	// top-level build_source violates "build_source required exactly
 	// for active local go-v1 commands and absent otherwise"
-	// (protocol/skillfile-sources.md), which marker.Read enforces in
-	// validBuildState. The reader is right; the fixture cannot pass.
+	// (protocol/skillfile-sources.md §marker, which marker.Read enforces
+	// in validBuildState). The reader is right; the fixture cannot pass.
+	// Reported upstream to curator-spec (see BUG-260920-2eg8nv discrepancy
+	// text); the row stays a bound until the corpus is fixed.
 	"schema-cases/install-marker-v5/valid.json": "normatively inconsistent fixture (empty builds with build_source); reader refusal is correct",
-	// The external go-repository-v1 arm admits absent `substituted`
-	// (validDriverBuild enforces substituted==present(substitution)
-	// consistency, not presence), while the schema requires the
-	// Boolean. Reader-vs-contract gap; see the task finding. The row
-	// locks the admitted behavior so the gap cannot widen silently.
-	"schema-cases/install-marker-v5/invalid-external-missing-substituted.json": "reader admits absent substituted on the external arm; schema requires it",
 }
 
 // TestDraftSourcesSchemaCases drives all 115 pinned schema cases.
@@ -189,11 +185,6 @@ func driveInstallMarkerV5Case(t *testing.T, dir string, entry draftSchemaEntry) 
 		// Bound: normatively inconsistent fixture, see draftSchemaBounds.
 		if got != nil {
 			t.Fatalf("bound fixture valid.json now accepted; convert the row to a drive")
-		}
-	case "schema-cases/install-marker-v5/invalid-external-missing-substituted.json":
-		// Bound: reader admits, schema refuses, see draftSchemaBounds.
-		if got == nil {
-			t.Fatalf("bound fixture invalid-external-missing-substituted.json now refused; convert the row to a drive")
 		}
 	default:
 		if (got != nil) != entry.Valid {

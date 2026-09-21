@@ -301,6 +301,18 @@ func Matches(record Record, sourceIdentity, commit, contentSHA256 string) bool {
 	return record.SourceIdentity == sourceIdentity && record.Commit == commit
 }
 
+// MatchesExact reports whether a record is the exact evidence for one
+// draft-lane network artifact: name, canonical source identity, commit,
+// and context hash must ALL match (skillfile-sources draft §4). Unlike
+// Matches, neither a content-only coincidence nor an identity+commit
+// coincidence admits the record, and the record name is always compared.
+func MatchesExact(record Record, name, sourceIdentity, commit, contentSHA256 string) bool {
+	return record.Name == name &&
+		record.SourceIdentity == sourceIdentity &&
+		record.Commit == commit &&
+		record.ContentSHA256 == contentSHA256
+}
+
 // Resolve combines verified records from every trusted registry under
 // deny-wins (Spec §13.3).
 //
@@ -313,6 +325,28 @@ func Resolve(registries []Registry, sourceIdentity, commit, contentSHA256 string
 	if sourceIdentity == "" && commit == "" {
 		return Resolution{Result: ResultUnknown}
 	}
+	return resolveMatched(registries, sourceIdentity, commit, contentSHA256, fetch, func(record Record) bool {
+		return Matches(record, sourceIdentity, commit, contentSHA256)
+	})
+}
+
+// ResolveExact combines verified records exactly like Resolve, but a
+// record authorizes only on an exact draft §4 match of name, canonical
+// repository, commit, and context hash. The draft install lane resolves
+// network members through this entry; the frozen v1 lane keeps Resolve
+// byte-identically.
+func ResolveExact(registries []Registry, name, sourceIdentity, commit, contentSHA256 string, fetch FetchFn) Resolution {
+	if sourceIdentity == "" && commit == "" {
+		return Resolution{Result: ResultUnknown}
+	}
+	return resolveMatched(registries, sourceIdentity, commit, contentSHA256, fetch, func(record Record) bool {
+		return MatchesExact(record, name, sourceIdentity, commit, contentSHA256)
+	})
+}
+
+// resolveMatched is the shared deny-wins combination behind Resolve and
+// ResolveExact: only the record-admission predicate differs.
+func resolveMatched(registries []Registry, sourceIdentity, commit, contentSHA256 string, fetch FetchFn, match func(Record) bool) Resolution {
 	var warnings []string
 	var audited, deprecated *Attestation
 	for _, reg := range registries {
@@ -331,7 +365,7 @@ func Resolve(registries []Registry, sourceIdentity, commit, contentSHA256 string
 				warnings = append(warnings, fmt.Sprintf("registry %s returned a malformed record: %v", reg.Name, err))
 				continue
 			}
-			if !Matches(record, sourceIdentity, commit, contentSHA256) {
+			if !match(record) {
 				continue
 			}
 			if !VerifySigned(payload, reg.PublicKeys) {
