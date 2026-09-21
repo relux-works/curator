@@ -1,0 +1,89 @@
+diff --git a/conformance/draft-sources-v1/index.json b/conformance/draft-sources-v1/index.json
+index 3c124c2..effd940 100644
+--- a/conformance/draft-sources-v1/index.json
++++ b/conformance/draft-sources-v1/index.json
+@@ -257,7 +257,14 @@
+   {
+     "schema": "install-marker-v5.schema.json",
+     "instance": "schema-cases/install-marker-v5/valid.json",
+-    "valid": true
++    "valid": true,
++    "comment": "Present branch of protocol/skillfile-sources.md:268 (top-level build_source required exactly for active local go-v1 commands): local-helper go-v1 build entry; BUG-260921-3cgij4 fixed empty-builds+build_source here"
++  },
++  {
++    "schema": "install-marker-v5.schema.json",
++    "instance": "schema-cases/install-marker-v5/valid-no-builds.json",
++    "valid": true,
++    "comment": "Absent branch of protocol/skillfile-sources.md:268 (build_source absent otherwise): empty builds and no top-level build_source; sibling of valid.json per BUG-260921-3cgij4"
+   },
+   {
+     "schema": "install-marker-v5.schema.json",
+diff --git a/conformance/draft-sources-v1/schema-cases/install-marker-v5/valid-no-builds.json b/conformance/draft-sources-v1/schema-cases/install-marker-v5/valid-no-builds.json
+new file mode 100644
+index 0000000..47e0c4c
+--- /dev/null
++++ b/conformance/draft-sources-v1/schema-cases/install-marker-v5/valid-no-builds.json
+@@ -0,0 +1,40 @@
++{
++  "activation": {
++    "commands": [
++      "golden-tool"
++    ],
++    "context": true
++  },
++  "agents": [
++    "codex_cli"
++  ],
++  "build_roots": [
++    "build"
++  ],
++  "builds": {},
++  "commands": [
++    "golden-tool",
++    "local-helper"
++  ],
++  "content_sha256": "sha256:e2bd2941476b164099dc773d7448c638ff99849f8dce76e7b105f215fcdf31be",
++  "dependencies": [],
++  "files": [
++    ".skill_triggers/en.md",
++    "SKILL.md",
++    "references/notes.md"
++  ],
++  "installed_at": "2000-01-01T00:00:00Z",
++  "locale": null,
++  "name": "golden-skill",
++  "requirers": [
++    "<project>"
++  ],
++  "runtime_roots": [],
++  "schema_version": 5,
++  "skill_schema_version": 8,
++  "package": {
++    "kind": "local-snapshot",
++    "snapshot": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
++  },
++  "lock_sha256": "sha256:04c57a18c2e1ccae26695420aa586ded8d15d7aace16d198bc5fbe4fbb060d81"
++}
+diff --git a/conformance/draft-sources-v1/schema-cases/install-marker-v5/valid.json b/conformance/draft-sources-v1/schema-cases/install-marker-v5/valid.json
+index f3d6a29..cda43b9 100644
+--- a/conformance/draft-sources-v1/schema-cases/install-marker-v5/valid.json
++++ b/conformance/draft-sources-v1/schema-cases/install-marker-v5/valid.json
+@@ -15,7 +15,17 @@
+     "algorithm": "curator-build-source-v1",
+     "content_sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+   },
+-  "builds": {},
++  "builds": {
++    "local-helper": {
++      "artifact_path": "bin/local-helper",
++      "artifact_sha256": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
++      "cache_key": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "driver": "go-v1",
++      "execution_policy": "manager-worker-v1",
++      "receipt_schema_version": 3,
++      "receipt_sha256": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
++    }
++  },
+   "commands": [
+     "golden-tool",
+     "local-helper"

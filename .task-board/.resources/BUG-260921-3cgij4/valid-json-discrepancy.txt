@@ -1,0 +1,15 @@
+## valid.json quirk — exact reason
+
+Fixture `schema-cases/install-marker-v5/valid.json` (index `valid:true`) has
+`"builds": {}` plus a top-level `build_source`. `validBuildState`
+(`internal/marker/marker.go`) returns `!sourcePresent && m.BuildSource == nil`
+for empty builds, so the document is refused. This matches the normative rule
+in `protocol/skillfile-sources.md`: "Top-level `build_source` remains required
+exactly for active local `go-v1` commands and absent otherwise". With zero
+builds there are no active local commands, so `build_source` must be absent;
+the fixture violates its own contract. JSON Schema cannot express the
+cross-field rule, hence schema-valid but normatively inconsistent. The reader
+is right; no workaround was added. Probe evidence below; discrepancy text
+attached separately for the orchestrator to raise on curator-spec.
+
+## Evidence (narrow, real exit codes)
