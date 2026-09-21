@@ -1,0 +1,102 @@
+##### gitops.log
+ok  	github.com/relux-works/curator/internal/gitops	12.051s
+EXIT=0 elapsed=13s
+
+##### xc-build.log
+EXIT=0 elapsed=3s
+
+##### xc-r1.log
+=== RUN   TestDraftSourcesSemanticCoverage
+--- PASS: TestDraftSourcesSemanticCoverage (0.00s)
+=== RUN   TestDraftLiteralRefreshIgnoresUserConfig
+--- PASS: TestDraftLiteralRefreshIgnoresUserConfig (3.99s)
+PASS
+EXIT=0 elapsed=5s
+
+##### xc-corpus.log
+=== RUN   TestDraftSourcesSemanticCases
+=== RUN   TestDraftSourcesSemanticCases/v2-user-ssh-alias-ignored
+=== RUN   TestDraftSourcesSemanticCases/v2-user-insteadof-ignored
+=== NAME  TestDraftSourcesSemanticCases
+    draftsources_semantic_test.go:54: semantic cases: 2 driven, 0 known-gap, 0 bound, 0 skipped, 94 total
+    draftsources_semantic_test.go:57: executed(2) != total(94, want 94); run the full matrix without -run subtest filters
+--- FAIL: TestDraftSourcesSemanticCases (2.97s)
+    --- PASS: TestDraftSourcesSemanticCases/v2-user-ssh-alias-ignored (1.81s)
+    --- PASS: TestDraftSourcesSemanticCases/v2-user-insteadof-ignored (1.15s)
+FAIL
+EXIT=1 elapsed=3s
+
+##### closure-cmd.log
+ok  	github.com/relux-works/curator/internal/closure	22.326s
+EXIT=0 elapsed=23s
+--- PASS: TestWithDraftRemediationTable (0.00s)
+--- PASS: TestDraftRemediationThroughCLI (4.09s)
+--- PASS: TestDraftDocsPinExamples (0.00s)
+--- PASS: TestProjectResolveLegacyUntouched (0.04s)
+--- PASS: TestProjectResolveDraftOffRefuses (0.05s)
+--- PASS: TestDraftTransportLegacyGolden (19.94s)
+PASS
+ok  	github.com/relux-works/curator/cmd/curator	24.692s
+EXIT2=0 elapsed=29s
+
+##### probes.log
+=== RUN   TestReviewProbeIncludeFileRewrite
+--- PASS: TestReviewProbeIncludeFileRewrite (4.84s)
+=== RUN   TestReviewProbeHooksPathExecution
+--- PASS: TestReviewProbeHooksPathExecution (1.82s)
+=== RUN   TestReviewProbeXDGChannel
+--- PASS: TestReviewProbeXDGChannel (1.42s)
+=== RUN   TestReviewProbeSystemOnly
+--- PASS: TestReviewProbeSystemOnly (1.52s)
+=== RUN   TestReviewProbeCoreSSHCommand
+--- PASS: TestReviewProbeCoreSSHCommand (1.14s)
+=== RUN   TestReviewProbeRefreshFetchIsolated
+--- PASS: TestReviewProbeRefreshFetchIsolated (2.26s)
+=== RUN   TestReviewProbeEnvInjectedConfig
+--- PASS: TestReviewProbeEnvInjectedConfig (1.46s)
+=== RUN   TestReviewProbeUserSSHConfigConsulted
+    zz_review_probe_test.go:344: resolve exit=1
+    zz_review_probe_test.go:351: child ~/.ssh/config was not consulted (open /var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestReviewProbeUserSSHConfigConsulted2578849821/001/sshconfig-consulted.marker: no such file or directory)
+--- PASS: TestReviewProbeUserSSHConfigConsulted (0.65s)
+PASS
+ok  	github.com/relux-works/curator/internal/crossconformance	15.629s
+EXIT=0 elapsed=20s
+
+##### m7.log
+=== RUN   TestDraftLiteralRefreshIgnoresUserConfig
+    draftsources_semantic_v2_test.go:512: refresh = 1:
+        
+        warning: kit: fetch of the existing checkout failed (unknown: unclassified failure)
+        curator: repository_endpoint_unavailable: kit: identity fixture.test/kit: fetch of the existing checkout failed (unknown: unclassified failure); verify the network path and operator authentication for the listed endpoints, then retry with machine source-policy.json
+--- FAIL: TestDraftLiteralRefreshIgnoresUserConfig (5.42s)
+FAIL
+EXIT=1 elapsed=16s
+
+##### m7b.log
+=== RUN   TestDraftLiteralRefreshIgnoresUserConfig
+    draftsources_semantic_v2_test.go:512: refresh = 1:
+        
+        warning: kit: endpoint 1 (https): unknown: unclassified failure
+        curator: repository_endpoint_unavailable: kit: identity fixture.test/kit: endpoint 1 (https): unknown: unclassified failure; verify the network path and operator authentication for the listed endpoints, then retry with machine source-policy.json
+--- FAIL: TestDraftLiteralRefreshIgnoresUserConfig (4.28s)
+FAIL
+EXIT=1 elapsed=8s
+
+##### noop.log
+=== RUN   TestDraftLiteralRefreshIgnoresUserConfig
+    draftsources_semantic_v2_test.go:529: refresh lock = c7af56b4496be7ffcdb31dec13533fb933f4eee1, want advanced declared 04e508cf95c8d40a10b80692979f8f008d00a924
+--- FAIL: TestDraftLiteralRefreshIgnoresUserConfig (6.04s)
+FAIL
+EXIT=1 elapsed=13s
+
+##### n1.log
+=== RUN   TestResolveDraftAliasFetchFallbackIgnoresUserConfig
+    resolve_test.go:806: ResolveDraft with hostile user config = git fetch --all --tags --prune failed: From file:///var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestResolveDraftAliasFetchFallbackIgnoresUserConfig2051357376/002/evil
+           7f8688c..a1455a0  main       -> origin/main
+         ! [rejected]        v1         -> v1  (would clobber existing tag), want the declared bind
+--- FAIL: TestResolveDraftAliasFetchFallbackIgnoresUserConfig (1.19s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/closure	1.577s
+FAIL
+EXIT=1 elapsed=4s
+

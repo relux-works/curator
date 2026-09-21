@@ -1,0 +1,283 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 34ef7c5a..a86d252f 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -136,6 +136,19 @@ All notable implementation changes are recorded here.
+   `ssh-keyscan` or a first manual `ssh`); proxy environment is not
+   honoured. `GIT_ASKPASS` stays the only HTTPS credential channel
+   (docs/cli.md, docs/troubleshooting.md).
++- Audit-registry snapshot verification no longer mistakes a snapshot
++  published while its own fetch is in flight for a future-dated
++  snapshot. The future-timestamp bound was evaluated against a clock
++  reading taken before the snapshot fetch, so under a literal zero
++  clock skew any whole-second boundary crossed during the fetch
++  excluded every trusted registry with `every trusted audit registry
++  served a tampered snapshot` instead of the evidence verdict the
++  fetch actually returned. The bound now tolerates the checker's own
++  per-registry latency, measured monotonically; a timestamp genuinely
++  ahead of the post-fetch clock is still refused with the same class
++  and text, and the stale check is unchanged. This removes the
++  nondeterministic refusal-class flip on both the draft and legacy
++  lanes (BUG-260920-2d9gfv).
+ 
+ ## 0.12.5 - 2026-07-14
+ 
+diff --git a/internal/crossconformance/draftsources_fixtures_test.go b/internal/crossconformance/draftsources_fixtures_test.go
+index 5ddc7f58..a7f2002e 100644
+--- a/internal/crossconformance/draftsources_fixtures_test.go
++++ b/internal/crossconformance/draftsources_fixtures_test.go
+@@ -124,6 +124,12 @@ func refreshDraftLockedWithRoots(t *testing.T, project, home, payload string, gi
+ 	return plan
+ }
+ 
++// draftInstallConfig is deliberately a bare Go-API literal: zero clock skew
++// (a literal zero, not the 300 s loader default) with the attest stub
++// minting created_at at serve time is the strict case that exposed
++// BUG-260920-2d9gfv — a refusal class must not depend on the fetch's own
++// duration. Keep it strict: do not paper over a future-timestamp flake with
++// a larger skew or a fixed created_at in the stub.
+ func draftInstallConfig(home string) *config.Config {
+ 	return &config.Config{Path: filepath.Join(home, "config.json"), SkillsRoot: filepath.Join(home, "skills-root"), DefaultAgents: []string{"claude_code"}, AdapterMode: "auto"}
+ }
+diff --git a/internal/install/registry_e2e_test.go b/internal/install/registry_e2e_test.go
+index 362bc1e7..ab20ee34 100644
+--- a/internal/install/registry_e2e_test.go
++++ b/internal/install/registry_e2e_test.go
+@@ -26,6 +26,8 @@ import (
+ type registryFixture struct {
+ 	createdAt      time.Time
+ 	beforeSnapshot func()
++	serveTimeMint  bool
++	futureOffset   time.Duration
+ }
+ 
+ type registryOption func(*registryFixture)
+@@ -40,14 +42,34 @@ func beforeSnapshotResponse(hook func()) registryOption {
+ 	return func(f *registryFixture) { f.beforeSnapshot = hook }
+ }
+ 
+-// crossSecondBoundary blocks until just past the next whole second, so the
++// snapshotMintedAtServeTime stamps created_at when the handler runs rather
++// than when the fixture is built. A real registry may publish between our
++// clock read and our fetch completing; that publication is legitimate and
++// must not read as tampering (BUG-260920-2d9gfv).
++func snapshotMintedAtServeTime() registryOption {
++	return func(f *registryFixture) { f.serveTimeMint = true }
++}
++
++// snapshotFutureBy stamps created_at the given offset ahead of the serve
++// clock (truncated to whole seconds). Unlike snapshotCreatedAt, which is
++// anchored at fixture-build time and can slide into the past while test
++// setup runs, a serve-relative stamp stays genuinely ahead of the
++// post-fetch clock no matter how slow setup was.
++func snapshotFutureBy(offset time.Duration) registryOption {
++	return func(f *registryFixture) { f.serveTimeMint = true; f.futureOffset = offset }
++}
++
++// crossSecondBoundary blocks until 50 ms past the next whole second, so the
+ // snapshot response is written in a later wall-clock second than the one in
+ // which the checker sampled its `now`. RFC3339 truncates created_at down to
+ // that later second, which is how a per-request timestamp lands ahead of a
+-// `now` that was sampled before the fetch (BUG-260906-1bdotx).
++// `now` that was sampled before the fetch (BUG-260906-1bdotx). The 50 ms
++// (not 2 ms) keeps the serve-time mint comfortably ahead of the checker's
++// pre-fetch work even on a loaded -race runner, so the acceptance margin
++// does not depend on scheduler luck (BUG-260920-2d9gfv).
+ func crossSecondBoundary() {
+ 	now := time.Now()
+-	time.Sleep(now.Truncate(time.Second).Add(time.Second + 2*time.Millisecond).Sub(now))
++	time.Sleep(now.Truncate(time.Second).Add(time.Second + 50*time.Millisecond).Sub(now))
+ }
+ 
+ // fakeRegistry serves signed snapshot and records for one artifact status.
+@@ -81,9 +103,13 @@ func fakeRegistry(t *testing.T, status, sourceIdentity, commit, contentHash stri
+ 			if fixture.beforeSnapshot != nil {
+ 				fixture.beforeSnapshot()
+ 			}
++			stamped := createdAt
++			if fixture.serveTimeMint {
++				stamped = time.Now().UTC().Add(fixture.futureOffset).Truncate(time.Second).Format(time.RFC3339)
++			}
+ 			_ = json.NewEncoder(w).Encode(sign(map[string]any{
+ 				"schema_version": 1, "merkle_root": strings.Repeat("a", 64), "log_size": 1, "head": strings.Repeat("b", 64),
+-				"version": 1, "created_at": createdAt,
++				"version": 1, "created_at": stamped,
+ 			}))
+ 		case strings.HasSuffix(r.URL.Path, "/v1/records"):
+ 			record := sign(map[string]any{
+@@ -196,6 +222,58 @@ func TestRegistrySnapshotSurvivesASecondBoundaryDuringFetch(t *testing.T) {
+ 	}
+ }
+ 
++// TestRegistrySnapshotMintedDuringFetchIsNotFuture is the deterministic
++// production-entry reproduction for BUG-260920-2d9gfv. resolveRegistries
++// samples `now` before it fetches; a registry that publishes while the fetch
++// is in flight serves a created_at in a later whole second than that `now`,
++// and under a literal zero clock skew any positive difference read as
++// tampering. The hook makes that crossing certain instead of leaving it to
++// the runner's speed: the stub signs strictly after the next second
++// boundary, so created_at is always ahead of the pre-fetch `now` while
++// remaining behind the post-fetch clock. It runs through the frozen v1 lane
++// (schema-1 Skillfile, install.Project -> resolveRegistries ->
++// registry.CheckSnapshotsWithPolicy) with the same zero-skew Go-API config
++// shape the crossconformance harness uses, so it is also the legacy-lane
++// proof that the fix only removes the false "future" refusal.
++func TestRegistrySnapshotMintedDuringFetchIsNotFuture(t *testing.T) {
++	t.Parallel()
++	e, server := registryEnv(t, "audited", snapshotMintedAtServeTime(), beforeSnapshotResponse(crossSecondBoundary))
++	defer server.Close()
++	e.cfg.Audit.SnapshotClockSkewSeconds = 0
++	result := e.install(Options{})
++	if result.Status != "ok" {
++		t.Fatalf("a snapshot minted while we were fetching must install: %+v", result)
++	}
++	if joined := strings.Join(result.Messages, "\n"); strings.Contains(joined, "too far in the future") {
++		t.Fatalf("mint-during-fetch was read as a future timestamp: %s", joined)
++	}
++}
++
++// TestRegistrySnapshotTwoSecondsPastSkewStillRefuses is the negative half of
++// the same bound at the production entry: a snapshot genuinely ahead of the
++// client's clock after the fetch (serve clock + 2s truncated, i.e. at least
++// a second past now + skew with the zero skew used here) must still be
++// refused with the tampered-snapshot class, through the same v1 lane as the
++// row above. The stamp is serve-relative so slow test setup cannot slide it
++// into the past before `now` is sampled. Dropping the future check entirely
++// admits this row.
++func TestRegistrySnapshotTwoSecondsPastSkewStillRefuses(t *testing.T) {
++	t.Parallel()
++	e, server := registryEnv(t, "audited", snapshotFutureBy(2*time.Second))
++	defer server.Close()
++	e.cfg.Audit.SnapshotClockSkewSeconds = 0
++	result := e.install(Options{})
++	if result.Status != "failed" {
++		t.Fatalf("a snapshot 2s past a zero skew must deny the install: %+v", result)
++	}
++	if !strings.Contains(strings.Join(result.Errors, "\n"), "every trusted audit registry served a tampered snapshot") {
++		t.Fatalf("a genuinely future snapshot must exclude the registry: %+v", result.Errors)
++	}
++	if !strings.Contains(strings.Join(result.Messages, "\n"), "registry test-reg snapshot timestamp is too far in the future") {
++		t.Fatalf("the refusal must name the future timestamp: %+v", result.Messages)
++	}
++}
++
+ // TestRegistryFutureSnapshotDeniesInstallThroughResolveRegistries drives the
+ // production install path with a genuinely future-dated snapshot. A future
+ // snapshot is what a rollback or equivocation attempt looks like, so this must
+diff --git a/internal/registry/registry_test.go b/internal/registry/registry_test.go
+index fc9e1b2b..56f3fec2 100644
+--- a/internal/registry/registry_test.go
++++ b/internal/registry/registry_test.go
+@@ -770,3 +770,67 @@ func TestSnapshotZeroClockSkewIsLiteral(t *testing.T) {
+ 		t.Fatalf("the shipped default must absorb sub-second drift: %v %v", tampered, warnings)
+ 	}
+ }
++
++// TestSnapshotFutureBoundToleratesOnlyItsOwnFetchLatency pins the
++// elapsed-time term of the future-timestamp bound (BUG-260920-2d9gfv) with an
++// injected `now`: a snapshot minted while its own fetch is in flight is
++// legitimate even under a literal zero skew; a slow sibling registry does
++// not widen another registry's bound; and a timestamp genuinely ahead of the
++// post-fetch clock (now + skew + 2s) still refuses. Dropping the elapsed term
++// fails the first two rows; dropping the future check entirely fails the
++// third.
++func TestSnapshotFutureBoundToleratesOnlyItsOwnFetchLatency(t *testing.T) {
++	// created_at round-trips as whole seconds, so each row anchors its
++	// injected `now` on a whole second just before the check: every future
++	// offset below is an exact whole number of seconds, and the 500 ms
++	// margins against the 1.5 s sleeps hold on any scheduler the suite
++	// runs on.
++	t.Run("mint during a slow fetch is accepted under zero skew", func(t *testing.T) {
++		now := time.Now().UTC().Truncate(time.Second)
++		s := newSigner(t)
++		fetch := func(string) (map[string]any, error) {
++			time.Sleep(1500 * time.Millisecond)
++			return s.sign(snapshotBody(5, now.Add(time.Second))), nil
++		}
++		reg := Registry{Name: "one", URL: "https://one", PublicKeys: []string{s.pinned}}
++		tampered, warnings := CheckSnapshotsWithPolicy([]Registry{reg}, t.TempDir(), fetch, now, 0, 0)
++		if tampered[reg.URL] || len(warnings) != 0 {
++			t.Fatalf("a snapshot minted during its own fetch must be accepted: %v %v", tampered, warnings)
++		}
++	})
++	t.Run("a slow sibling does not widen another registry's bound", func(t *testing.T) {
++		now := time.Now().UTC().Truncate(time.Second)
++		slow, fast := newSigner(t), newSigner(t)
++		slowReg := Registry{Name: "slow", URL: "https://slow", PublicKeys: []string{slow.pinned}}
++		fastReg := Registry{Name: "fast", URL: "https://fast", PublicKeys: []string{fast.pinned}}
++		fetch := func(url string) (map[string]any, error) {
++			if url == slowReg.URL {
++				time.Sleep(1500 * time.Millisecond)
++				return slow.sign(snapshotBody(5, now.Add(time.Second))), nil
++			}
++			return fast.sign(snapshotBody(5, now.Add(time.Second))), nil
++		}
++		tampered, warnings := CheckSnapshotsWithPolicy(
++			[]Registry{slowReg, fastReg}, t.TempDir(), fetch, now, 0, 0)
++		if tampered[slowReg.URL] {
++			t.Fatalf("the slow registry's own mint must be accepted: %v", warnings)
++		}
++		if !tampered[fastReg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "fast snapshot timestamp is too far in the future") {
++			t.Fatalf("the instant sibling must still refuse its future timestamp: %v %v", tampered, warnings)
++		}
++	})
++	t.Run("now plus skew plus two seconds still refuses", func(t *testing.T) {
++		now := time.Now().UTC().Truncate(time.Second)
++		for _, skew := range []time.Duration{0, 30 * time.Second} {
++			s := newSigner(t)
++			fetch := func(string) (map[string]any, error) {
++				return s.sign(snapshotBody(5, now.Add(skew).Add(2*time.Second))), nil
++			}
++			reg := Registry{Name: "one", URL: "https://one", PublicKeys: []string{s.pinned}}
++			tampered, warnings := CheckSnapshotsWithPolicy([]Registry{reg}, t.TempDir(), fetch, now, 0, skew)
++			if !tampered[reg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "too far in the future") {
++				t.Fatalf("skew %v: now+skew+2s must refuse: %v %v", skew, tampered, warnings)
++			}
++		}
++	})
++}
+diff --git a/internal/registry/snapshot.go b/internal/registry/snapshot.go
+index 5c4eae18..32e3dce0 100644
+--- a/internal/registry/snapshot.go
++++ b/internal/registry/snapshot.go
+@@ -61,7 +61,12 @@ func CheckSnapshots(registries []Registry, cacheDir string, fetch SnapshotFetchF
+ 
+ // CheckSnapshotsWithPolicy applies explicit manager-config age and clock-skew
+ // bounds. A zero clock skew is literal; a zero max age retains the historical
+-// default for callers of CheckSnapshots.
++// default for callers of CheckSnapshots. The future-timestamp bound additionally
++// tolerates the checker's own per-registry latency (state read, fetch, parse,
++// verify), measured monotonically from just before that registry is checked:
++// a registry that publishes while its fetch is in flight must not read as
++// tampered. `now` stays the check's reference time, so callers that inject a
++// fixed `now` with an instant fetch observe a ~zero tolerance.
+ func CheckSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch SnapshotFetchFn, now time.Time, maxAge, clockSkew time.Duration) (map[string]bool, []string) {
+ 	return checkSnapshotsWithPolicy(registries, cacheDir, fetch, now, maxAge, clockSkew, true)
+ }
+@@ -110,6 +115,12 @@ func checkSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch Snap
+ 		if len(reg.PublicKeys) == 0 {
+ 			continue
+ 		}
++		// The future-timestamp bound below tolerates only this registry's
++		// own check latency. A function-entry clock would let one slow
++		// registry widen the bound for every registry checked after it;
++		// scoping the start per registry keeps a genuinely future snapshot
++		// refused no matter how slow its siblings were.
++		checkStart := time.Now()
+ 		stateName := "snapshot-" + urlDigest(reg.URL) + ".json"
+ 		stateFile := filepath.Join(cacheDir, stateName)
+ 		state, stateExists, err := readSnapshotState(stateFile)
+@@ -155,7 +166,12 @@ func checkSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch Snap
+ 			tampered[reg.URL] = true
+ 			continue
+ 		}
+-		if parsed.CreatedAt.After(now.Add(clockSkew)) {
++		// The bound is the reference time plus the configured skew plus the
++		// checker's own latency for this registry: only a timestamp ahead of
++		// the post-fetch clock is genuinely future. (The stale check above
++		// needs no such term: a pre-fetch reference can only make a snapshot
++		// look less stale, never falsely stale.)
++		if parsed.CreatedAt.After(now.Add(clockSkew).Add(time.Since(checkStart))) {
+ 			warnings = append(warnings, fmt.Sprintf("registry %s snapshot timestamp is too far in the future", reg.Name))
+ 			tampered[reg.URL] = true
+ 			continue

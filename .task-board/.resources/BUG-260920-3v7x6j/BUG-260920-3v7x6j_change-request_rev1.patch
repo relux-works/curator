@@ -1,0 +1,416 @@
+diff --git a/cmd/curator/project_resolve.go b/cmd/curator/project_resolve.go
+index b13fa67a..99713355 100644
+--- a/cmd/curator/project_resolve.go
++++ b/cmd/curator/project_resolve.go
+@@ -212,9 +212,21 @@ func fetchDraftRepoAllowingFallback(repoDir string, resolution config.Resolution
+ 		}
+ 	}
+ 	attempts := resolution.Attempts
++	// Alias-substituted endpoints connect to the resolved host:port,
++	// not the listed URL (repository-transport §5). Every connection
++	// target is derived before any clone runs: a mistranslated attempt
++	// fails closed with no network traffic.
++	targets := make([]string, len(attempts))
++	for index, attempt := range attempts {
++		target, ok := attempt.ConnectionURL()
++		if !ok {
++			return fmt.Errorf("%s: %s: endpoint %d connection target is malformed", config.CodeRepositoryPolicyInvalid, alias, index+1)
++		}
++		targets[index] = target
++	}
+ 	classes := make([]buildrepo.FailureClass, 0, len(attempts))
+ 	for index, attempt := range attempts {
+-		cloneErr := gitops.CloneIsolated(attempt.URL, repoDir)
++		cloneErr := gitops.CloneIsolated(targets[index], repoDir)
+ 		if cloneErr == nil {
+ 			return nil
+ 		}
+diff --git a/internal/config/sourcepolicy.go b/internal/config/sourcepolicy.go
+index 01c5a887..bc1c3940 100644
+--- a/internal/config/sourcepolicy.go
++++ b/internal/config/sourcepolicy.go
+@@ -32,6 +32,7 @@ import (
+ 	"path/filepath"
+ 	"regexp"
+ 	"sort"
++	"strconv"
+ 	"strings"
+ 	"unicode"
+ 	"unicode/utf8"
+@@ -149,6 +150,143 @@ type Attempt struct {
+ 	HasExplicitPort bool
+ }
+ 
++// ConnectionURL returns the git connection target for one planned
++// attempt: the listed URL with the §5 alias substitution applied. An
++// attempt without an alias connects to its listed URL verbatim —
++// explicit ports and declared mirrors already address the connection
++// there. An attempt naming an alias connects to the resolved address:
++// the alias host with the alias port when present, else the URL port
++// when present, else the transport default. The listed URL keeps its
++// scheme, userinfo, and path; only the host (and port) change, except
++// an scp-like URL combined with an explicit port, which has no
++// port-bearing spelling and is rendered as the equivalent ssh:// URL
++// with a home-relative path.
++//
++// ok is false when no connection target can be formed from the carried
++// values; the caller fails the acquisition closed before any network
++// I/O. Loader-planned attempts always form a target: ok is false only
++// for a hand-built or mistranslated attempt.
++func (a Attempt) ConnectionURL() (target string, ok bool) {
++	if a.Alias == "" {
++		return a.URL, true
++	}
++	// A named alias always resolves through the operator table, so the
++	// connection host is always an alias-table host; anything else is a
++	// mistranslation. The port flag and value must agree, as in the
++	// sibling executor's §6 predicate.
++	if !validAliasName(a.ResolvedHost) {
++		return "", false
++	}
++	if a.HasExplicitPort != (a.ResolvedPort != 0) {
++		return "", false
++	}
++	port := ""
++	if a.HasExplicitPort {
++		if a.ResolvedPort < 1 || a.ResolvedPort > 65535 {
++			return "", false
++		}
++		port = ":" + strconv.Itoa(a.ResolvedPort)
++	}
++	if rest, found := strings.CutPrefix(a.URL, "https://"); found {
++		_, path, valid := splitConnectionAuthority(rest, false)
++		if !valid {
++			return "", false
++		}
++		return "https://" + a.ResolvedHost + port + path, true
++	}
++	if rest, found := strings.CutPrefix(a.URL, "ssh://"); found {
++		userinfo, path, valid := splitConnectionAuthority(rest, true)
++		if !valid {
++			return "", false
++		}
++		return "ssh://" + userinfo + a.ResolvedHost + port + path, true
++	}
++	return scpConnectionURL(a.URL, a.ResolvedHost, port)
++}
++
++// splitConnectionAuthority splits the post-scheme remainder of a
++// URI-form endpoint URL into its userinfo prefix ("" or ending in "@")
++// and its path (starting in "/"). A listed URL port is dropped: the
++// caller applies the resolved port. ok is false when the remainder is
++// outside the endpoint grammar.
++func splitConnectionAuthority(rest string, userinfoAllowed bool) (userinfo, path string, ok bool) {
++	authority, path := rest, ""
++	if i := strings.Index(rest, "/"); i >= 0 {
++		authority, path = rest[:i], rest[i:]
++	}
++	if authority == "" || path == "" || strings.ContainsAny(path, "%?#\\") || containsPolicyWhitespaceOrControl(path) {
++		return "", "", false
++	}
++	if i := strings.LastIndex(authority, "@"); i >= 0 {
++		if !userinfoAllowed {
++			return "", "", false
++		}
++		userinfo, authority = authority[:i+1], authority[i+1:]
++		if !validConnectionUserinfo(userinfo[:len(userinfo)-1]) || authority == "" {
++			return "", "", false
++		}
++	}
++	// The lane host grammar carries no colon, so any port suffix starts
++	// at the first colon; a second colon, or a non-port suffix, is
++	// outside the grammar rather than a silently dropped port.
++	host, suffix, hasPort := strings.Cut(authority, ":")
++	if host == "" {
++		return "", "", false
++	}
++	if hasPort {
++		if _, valid := parseRevision2Port(suffix); !valid {
++			return "", "", false
++		}
++	}
++	return userinfo, path, true
++}
++
++// scpConnectionURL substitutes the resolved host (and port) into an
++// scp-like [user@]host:path endpoint URL. Without an explicit port the
++// spelling is kept; with one the URL is rendered as the equivalent
++// ssh:// URL, since the scp-like spelling cannot carry a port. Admitted
++// scp-like paths are home-relative, so the ~/ prefix preserves the
++// remote path.
++func scpConnectionURL(raw, resolvedHost, port string) (string, bool) {
++	left, path, hasColon := strings.Cut(raw, ":")
++	if !hasColon || strings.Contains(raw, "://") || left == "" || path == "" ||
++		strings.HasPrefix(path, "/") || strings.ContainsAny(path, "%?#\\:") || containsPolicyWhitespaceOrControl(path) {
++		return "", false
++	}
++	userinfo := ""
++	host := left
++	if i := strings.LastIndex(left, "@"); i >= 0 {
++		userinfo, host = left[:i+1], left[i+1:]
++		if !validConnectionUserinfo(userinfo[:len(userinfo)-1]) {
++			return "", false
++		}
++	}
++	if host == "" {
++		return "", false
++	}
++	if port == "" {
++		return userinfo + resolvedHost + ":" + path, true
++	}
++	return "ssh://" + userinfo + resolvedHost + port + "/~/" + path, true
++}
++
++// validConnectionUserinfo reports whether value can pass through into a
++// substituted connection URL without changing the URL structure: no
++// separator, whitespace, or control bytes. The loader already enforces
++// the lane username grammar; this is the fail-closed floor for
++// hand-built attempts.
++func validConnectionUserinfo(value string) bool {
++	if value == "" || len(value) > 64 {
++		return false
++	}
++	for _, r := range value {
++		if r > unicode.MaxASCII || unicode.IsSpace(r) || unicode.IsControl(r) || strings.ContainsRune("@/:", r) {
++			return false
++		}
++	}
++	return true
++}
++
+ // Resolution is the ordered attempt plan for one declaration. Attempts
+ // holds one or two entries in attempt order (exactly one when pinned or
+ // when no entry applies); Fallback is the effective mode after pin is
+diff --git a/internal/config/sourcepolicy_v2_test.go b/internal/config/sourcepolicy_v2_test.go
+index 9e00b047..8ff0884f 100644
+--- a/internal/config/sourcepolicy_v2_test.go
++++ b/internal/config/sourcepolicy_v2_test.go
+@@ -461,3 +461,157 @@ func TestResolveV2HandBuiltViolations(t *testing.T) {
+ 		t.Fatalf("unknown alias err=%v", err)
+ 	}
+ }
++
++// ConnectionURL applies the §5 alias substitution to the listed URL:
++// the resolved host with the resolved port, keeping scheme, userinfo,
++// and path. Attempts without an alias connect to the listed URL
++// verbatim, so legacy, port, and declared-mirror behavior is unchanged.
++func TestAttemptConnectionURL(t *testing.T) {
++	cases := []struct {
++		name    string
++		attempt Attempt
++		want    string
++	}{
++		{
++			name:    "legacy https passes through",
++			attempt: Attempt{URL: "https://example.org/kit.git"},
++			want:    "https://example.org/kit.git",
++		},
++		{
++			name:    "legacy scp passes through",
++			attempt: Attempt{URL: "git@example.org:kit.git"},
++			want:    "git@example.org:kit.git",
++		},
++		{
++			name:    "port endpoint passes through",
++			attempt: Attempt{URL: "https://example.org:8443/kit.git", ResolvedHost: "example.org", ResolvedPort: 8443, HasExplicitPort: true},
++			want:    "https://example.org:8443/kit.git",
++		},
++		{
++			name:    "declared mirror passes through",
++			attempt: Attempt{URL: "https://mirror.example.net/kit.git", MirrorOf: "example.org/kit", ResolvedHost: "mirror.example.net"},
++			want:    "https://mirror.example.net/kit.git",
++		},
++		{
++			name:    "https alias with port",
++			attempt: Attempt{URL: "https://example.org/kit.git", Alias: "corp-mirror", ResolvedHost: "mirror.corp.example", ResolvedPort: 8443, HasExplicitPort: true},
++			want:    "https://mirror.corp.example:8443/kit.git",
++		},
++		{
++			name:    "https alias without port",
++			attempt: Attempt{URL: "https://example.org/kit.git", Alias: "corp-mirror", ResolvedHost: "mirror.corp.example"},
++			want:    "https://mirror.corp.example/kit.git",
++		},
++		{
++			name:    "https URL port survives an unported alias",
++			attempt: Attempt{URL: "https://example.org:8443/kit.git", Alias: "corp-mirror", ResolvedHost: "mirror.corp.example", ResolvedPort: 8443, HasExplicitPort: true},
++			want:    "https://mirror.corp.example:8443/kit.git",
++		},
++		{
++			name:    "same-host alias applies the alias port",
++			attempt: Attempt{URL: "https://example.org/kit.git", Alias: "local-port", ResolvedHost: "example.org", ResolvedPort: 8443, HasExplicitPort: true},
++			want:    "https://example.org:8443/kit.git",
++		},
++		{
++			name:    "ssh URI alias keeps userinfo",
++			attempt: Attempt{URL: "ssh://git@example.org/kit.git", Alias: "corp-mirror", ResolvedHost: "mirror.corp.example", ResolvedPort: 2222, HasExplicitPort: true},
++			want:    "ssh://git@mirror.corp.example:2222/kit.git",
++		},
++		{
++			name:    "ssh URI alias without port or user",
++			attempt: Attempt{URL: "ssh://example.org/kit.git", Alias: "corp-mirror", ResolvedHost: "mirror.corp.example"},
++			want:    "ssh://mirror.corp.example/kit.git",
++		},
++		{
++			name:    "scp alias without port keeps the spelling",
++			attempt: Attempt{URL: "git@example.org:kit.git", Alias: "corp-mirror", ResolvedHost: "mirror.corp.example"},
++			want:    "git@mirror.corp.example:kit.git",
++		},
++		{
++			name:    "scp alias with port renders ssh with a home-relative path",
++			attempt: Attempt{URL: "git@example.org:teams/kit.git", Alias: "corp-mirror", ResolvedHost: "mirror.corp.example", ResolvedPort: 2222, HasExplicitPort: true},
++			want:    "ssh://git@mirror.corp.example:2222/~/teams/kit.git",
++		},
++		{
++			name:    "nested https path survives substitution",
++			attempt: Attempt{URL: "https://example.org/teams/kit.git", Alias: "corp-mirror", ResolvedHost: "mirror.corp.example", ResolvedPort: 8443, HasExplicitPort: true},
++			want:    "https://mirror.corp.example:8443/teams/kit.git",
++		},
++	}
++	for _, c := range cases {
++		t.Run(c.name, func(t *testing.T) {
++			target, ok := c.attempt.ConnectionURL()
++			if !ok {
++				t.Fatalf("ConnectionURL(%+v) refused a well-formed attempt", c.attempt)
++			}
++			if target != c.want {
++				t.Fatalf("ConnectionURL(%+v) = %q, want %q", c.attempt, target, c.want)
++			}
++		})
++	}
++}
++
++// ConnectionURL fails closed when a named alias cannot form a
++// connection target; the caller refuses before any network I/O rather
++// than connecting to the unsubstituted URL or a half-substituted one.
++func TestAttemptConnectionURLRefusesMistranslations(t *testing.T) {
++	valid := Attempt{URL: "https://example.org/kit.git", Alias: "corp-mirror", ResolvedHost: "mirror.corp.example", ResolvedPort: 8443, HasExplicitPort: true}
++	cases := []struct {
++		name    string
++		attempt Attempt
++	}{
++		{"empty resolved host", Attempt{URL: valid.URL, Alias: valid.Alias, ResolvedPort: valid.ResolvedPort, HasExplicitPort: true}},
++		{"uppercase resolved host", Attempt{URL: valid.URL, Alias: valid.Alias, ResolvedHost: "Mirror.Corp.Example", ResolvedPort: valid.ResolvedPort, HasExplicitPort: true}},
++		{"resolved host with port separator", Attempt{URL: valid.URL, Alias: valid.Alias, ResolvedHost: "mirror.corp.example:22", ResolvedPort: valid.ResolvedPort, HasExplicitPort: true}},
++		{"port flag without port value", Attempt{URL: valid.URL, Alias: valid.Alias, ResolvedHost: valid.ResolvedHost, HasExplicitPort: true}},
++		{"port value without port flag", Attempt{URL: valid.URL, Alias: valid.Alias, ResolvedHost: valid.ResolvedHost, ResolvedPort: 8443}},
++		{"zero port", Attempt{URL: valid.URL, Alias: valid.Alias, ResolvedHost: valid.ResolvedHost, ResolvedPort: 0, HasExplicitPort: true}},
++		{"out-of-range port", Attempt{URL: valid.URL, Alias: valid.Alias, ResolvedHost: valid.ResolvedHost, ResolvedPort: 65536, HasExplicitPort: true}},
++		{"empty URL", Attempt{URL: "", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost, ResolvedPort: valid.ResolvedPort, HasExplicitPort: true}},
++		{"non-URL", Attempt{URL: "not-a-url", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost, ResolvedPort: valid.ResolvedPort, HasExplicitPort: true}},
++		{"https without host", Attempt{URL: "https:///kit.git", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost, ResolvedPort: valid.ResolvedPort, HasExplicitPort: true}},
++		{"https without path", Attempt{URL: "https://example.org", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost, ResolvedPort: valid.ResolvedPort, HasExplicitPort: true}},
++		{"https with userinfo", Attempt{URL: "https://git@example.org/kit.git", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost, ResolvedPort: valid.ResolvedPort, HasExplicitPort: true}},
++		{"https with garbage port", Attempt{URL: "https://example.org:abc/kit.git", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost, ResolvedPort: valid.ResolvedPort, HasExplicitPort: true}},
++		{"https with query", Attempt{URL: "https://example.org/kit.git?x=1", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost}},
++		{"ssh URI with empty user", Attempt{URL: "ssh://@example.org/kit.git", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost}},
++		{"scp without path", Attempt{URL: "git@example.org:", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost}},
++		{"scp with absolute path", Attempt{URL: "git@example.org:/kit.git", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost}},
++		{"scp with second colon", Attempt{URL: "git@example.org:kit:evil.git", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost}},
++	}
++	for _, c := range cases {
++		t.Run(c.name, func(t *testing.T) {
++			if target, ok := c.attempt.ConnectionURL(); ok {
++				t.Fatalf("ConnectionURL(%+v) = %q, want refusal", c.attempt, target)
++			}
++		})
++	}
++}
++
++// Every loader-planned alias attempt forms the §5 connection target:
++// the alias host with the alias port when present, else the URL port
++// when present, else the transport default.
++func TestAttemptConnectionURLFollowsLoaderPlans(t *testing.T) {
++	docs := map[string]string{
++		"https://mirror.corp.example:8443/kit.git":     `{"schema_version":2,"repositories":{"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https","alias":"m","mirror_of":"example.org/kit"}],"fallback":"none"}},"aliases":{"m":{"host":"mirror.corp.example","port":8443,"authentication":"team-https"}}}`,
++		"git@mirror.corp.example:kit.git":              `{"schema_version":2,"repositories":{"example.org/kit":{"endpoints":[{"url":"git@example.org:kit.git","authentication":"team-ssh","alias":"m","mirror_of":"example.org/kit"}],"fallback":"none"}},"aliases":{"m":{"host":"mirror.corp.example","authentication":"team-ssh"}}}`,
++		"ssh://git@mirror.corp.example:2222/~/kit.git": `{"schema_version":2,"repositories":{"example.org/kit":{"endpoints":[{"url":"git@example.org:kit.git","authentication":"team-ssh","alias":"m","mirror_of":"example.org/kit"}],"fallback":"none"}},"aliases":{"m":{"host":"mirror.corp.example","port":2222,"authentication":"team-ssh"}}}`,
++	}
++	for want, doc := range docs {
++		policy, err := ParseSourcePolicy([]byte(doc), "source-policy.json")
++		if err != nil {
++			t.Fatalf("ParseSourcePolicy: %v", err)
++		}
++		resolved, err := ResolveRepositoryEndpoints(policy, "", "example.org/kit")
++		if err != nil {
++			t.Fatalf("ResolveRepositoryEndpoints: %v", err)
++		}
++		target, ok := resolved.Attempts[0].ConnectionURL()
++		if !ok {
++			t.Fatalf("ConnectionURL(%+v) refused a loader-planned attempt", resolved.Attempts[0])
++		}
++		if target != want {
++			t.Fatalf("ConnectionURL(%+v) = %q, want %q", resolved.Attempts[0], target, want)
++		}
++	}
++}
+diff --git a/internal/crossconformance/draftsources_semantic_test.go b/internal/crossconformance/draftsources_semantic_test.go
+index 76c6b89d..f2dbe59f 100644
+--- a/internal/crossconformance/draftsources_semantic_test.go
++++ b/internal/crossconformance/draftsources_semantic_test.go
+@@ -88,16 +88,6 @@ func semanticBound(t *testing.T, c draftSemanticCase, reason string) {
+ 	t.Logf("BOUND %s: expected %q: %s", c.ID, c.Expected, reason)
+ }
+ 
+-// semanticKnownGap records a driven row whose production behavior fails
+-// the draft expectation: a known product conformance gap, not a bound.
+-// The row locks the gap signature and fails when the gap is fixed; it
+-// is counted as known-gap, never as passing.
+-func semanticKnownGap(t *testing.T, c draftSemanticCase, reason string) {
+-	t.Helper()
+-	recordSemanticOutcome(c.ID, semanticOutcomeKnownGap)
+-	t.Logf("KNOWN-GAP %s: expected %q: %s", c.ID, c.Expected, reason)
+-}
+-
+ // Semantic outcome classes, one recorded per executed case id.
+ const (
+ 	semanticOutcomeDriven   = "driven"
+diff --git a/internal/crossconformance/draftsources_semantic_v2_test.go b/internal/crossconformance/draftsources_semantic_v2_test.go
+index 6526d963..4728d411 100644
+--- a/internal/crossconformance/draftsources_semantic_v2_test.go
++++ b/internal/crossconformance/draftsources_semantic_v2_test.go
+@@ -219,13 +219,11 @@ func driveV2MirrorFirst(t *testing.T, _ draftSemanticCase) {
+ 	v2LockIdentity(t, parts[1], parts[0])
+ }
+ 
+-// driveV2AliasResolution is a known product gap: the loader resolves the
+-// alias (alias + resolved host/port carried, identity canonical), but
+-// CLI resolve clones the listed URL literally and never connects to
+-// the substituted address, and no fetch-entry proof of substitution
+-// exists (in-package positives cover mirrors only). The row locks the
+-// gap signature; convert it to a drive when a fetch lane substitutes.
+-func driveV2AliasResolution(t *testing.T, c draftSemanticCase) {
++// driveV2AliasResolution drives the §5 substitution end to end: the
++// loader resolves the alias, CLI resolve connects to the substituted
++// address exactly once, the lock keeps the canonical identity, and the
++// substituted address never appears in user-facing diagnostics.
++func driveV2AliasResolution(t *testing.T, _ draftSemanticCase) {
+ 	aliases := `{"corp-mirror":{"host":"` + v2AliasHost + `","port":8443,"authentication":"team-https"}}`
+ 	doc := v2PolicyDoc(v2Entry(v2Endpoint(v2AliasEndpoint, "team-https", `"alias":"corp-mirror","mirror_of":"`+v2Identity+`"`), "none", ""), aliases)
+ 	resolved := v2Resolve(t, v2Parse(t, doc))
+@@ -239,16 +237,21 @@ func driveV2AliasResolution(t *testing.T, c draftSemanticCase) {
+ 	if resolved.Identity != v2Identity {
+ 		t.Fatalf("identity = %q, want the canonical key", resolved.Identity)
+ 	}
+-	code, stderr, clones, rest := v2CLIResolve(t, doc, "https://never.invalid/x.git", "fatal: unexpected", attempt.URL)
++	if target, ok := attempt.ConnectionURL(); !ok || target != v2AliasURL {
++		t.Fatalf("ConnectionURL = %q, %v, want %q", target, ok, v2AliasURL)
++	}
++	code, stderr, clones, rest := v2CLIResolve(t, doc, "https://never.invalid/x.git", "fatal: unexpected", v2AliasURL)
+ 	parts := strings.SplitN(rest, "|", 2)
+ 	if code != 0 {
+-		t.Fatalf("resolve = %d:\n%s", code, stderr)
++		t.Fatalf("resolve = %d, want success:\n%s", code, stderr)
++	}
++	if len(clones) != 1 || clones[0] != v2AliasURL {
++		t.Fatalf("clones = %v, want the substituted address once", clones)
+ 	}
+-	if len(clones) != 1 || clones[0] != v2AliasEndpoint {
+-		t.Fatalf("clones = %v, want the gap signature (listed URL once); convert the known gap to a drive", clones)
++	if strings.Contains(stderr, v2AliasHost) || strings.Contains(stderr, "corp-mirror") {
++		t.Fatalf("stderr leaks endpoint provenance:\n%s", stderr)
+ 	}
+ 	v2LockIdentity(t, parts[1], parts[0])
+-	semanticKnownGap(t, c, "CLI resolve clones the listed URL and ignores alias substitution (resolved mirror.corp.example:8443 never connected); no fetch entry proves the substituted connection (see results: alias-substitution gap)")
+ }
+ 
+ func driveV2ReaderAcceptsV1(t *testing.T, _ draftSemanticCase) {

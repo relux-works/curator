@@ -1,0 +1,1022 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index d82a9fda..ba3ce6b3 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -99,6 +99,21 @@ All notable implementation changes are recorded here.
+   reported as an invalid document rather than as one from a newer manager.
+   Schemas 3 and 4 are read by this release, so `upgrade the manager` was never
+   the remedy for them.
++- Draft Skillfile acquisition no longer consults user or system Git
++  configuration when cloning or fetching a literal `git:` source
++  (`project resolve`/`project refresh`). A hostile
++  `url.<evil>.insteadOf` (or `pushInsteadOf`, URL rewriting,
++  includes, credential helper, `core.sshCommand`) in the operator's
++  git configuration previously redirected the clone and the lock
++  bound the attacker's commit; the lane now runs every clone and
++  fetch with user and system configuration isolated, independent of
++  `HOME`, with no interactive prompt. Credentials come from the
++  invoking environment only (SSH agent via `SSH_AUTH_SOCK`,
++  `GIT_ASKPASS`, `GIT_SSH`/`GIT_SSH_COMMAND`): a private HTTPS
++  source that authenticated through a configured credential helper
++  now fails `repository_endpoint_unavailable` instead of prompting —
++  provide a non-interactive `GIT_ASKPASS` program or an SSH endpoint
++  with an agent (docs/cli.md, docs/troubleshooting.md).
+ 
+ ## 0.12.5 - 2026-07-14
+ 
+diff --git a/cmd/curator/draft_diagnostics_test.go b/cmd/curator/draft_diagnostics_test.go
+index 019f58c5..571d5792 100644
+--- a/cmd/curator/draft_diagnostics_test.go
++++ b/cmd/curator/draft_diagnostics_test.go
+@@ -1138,7 +1138,8 @@ func TestDraftDocsPinExamples(t *testing.T) {
+ 		`"availability-auth"`,
+ 		"curator project refresh",
+ 		"never rescan",
+-		"ambient Git credentials",
++		"credentials from the invoking environment",
++		"is never consulted",
+ 		"CURATOR_DRAFT_TRANSPORT_RESOLUTION",
+ 	} {
+ 		if !strings.Contains(cli, marker) {
+diff --git a/cmd/curator/project_resolve.go b/cmd/curator/project_resolve.go
+index f62410f4..b13fa67a 100644
+--- a/cmd/curator/project_resolve.go
++++ b/cmd/curator/project_resolve.go
+@@ -186,7 +186,9 @@ func acquireDraftGitRoots(home, projectRoot string, projectManifest *manifest.Ma
+ 
+ // fetchDraftRepoAllowingFallback brings repoDir onto the resolved
+ // endpoints: a fresh clone when no tree exists, otherwise a fetch of the
+-// existing tree. A positively classified availability/authentication
++// existing tree. Clone and fetch run user-configuration-isolated
++// (repository-transport: user configuration never consulted).
++// A positively classified availability/authentication
+ // failure advances to the next listed endpoint only under the
+ // availability-auth fallback; every other failure — and exhaustion —
+ // fails closed as repository_endpoint_unavailable with the sanitized
+@@ -196,7 +198,7 @@ func acquireDraftGitRoots(home, projectRoot string, projectManifest *manifest.Ma
+ // portable state.
+ func fetchDraftRepoAllowingFallback(repoDir string, resolution config.Resolution, alias string, stderr io.Writer) error {
+ 	if _, err := os.Stat(filepath.Join(repoDir, ".git")); err == nil {
+-		if err := gitops.Fetch(repoDir); err != nil {
++		if err := gitops.FetchIsolated(repoDir); err != nil {
+ 			class := buildrepo.ClassifyFetchOutput(gitFailureDetail(err))
+ 			if buildrepo.AllowSecondAttempt(resolution.Fallback, class) && len(resolution.Attempts) > 1 {
+ 				_, _ = fmt.Fprintf(stderr, "warning: %s: fetch failed (%s: %s); recloning from the alternate endpoint\n", alias, class, class.Reason())
+@@ -212,7 +214,7 @@ func fetchDraftRepoAllowingFallback(repoDir string, resolution config.Resolution
+ 	attempts := resolution.Attempts
+ 	classes := make([]buildrepo.FailureClass, 0, len(attempts))
+ 	for index, attempt := range attempts {
+-		cloneErr := gitops.Clone(attempt.URL, repoDir)
++		cloneErr := gitops.CloneIsolated(attempt.URL, repoDir)
+ 		if cloneErr == nil {
+ 			return nil
+ 		}
+diff --git a/docs/cli.md b/docs/cli.md
+index c5bd646e..b6980fd1 100644
+--- a/docs/cli.md
++++ b/docs/cli.md
+@@ -500,12 +500,20 @@ identity, ref, audit, and unclassified failures never fall back.
+ Named authentication providers (`source-providers.json` beside the
+ same configuration) apply to the external build lane under
+ `CURATOR_DRAFT_TRANSPORT_RESOLUTION`, not to Skillfile sources:
+-`project resolve` and `project refresh` clone and fetch with the
+-operator's ambient Git credentials, and the `authentication`
+-identifier on a Skillfile endpoint is validated but unused on this
+-lane. Never put secrets in these objects. An invalid or
+-unreadable policy fails `repository_policy_invalid` and is never
+-treated as absent.
++`project resolve` and `project refresh` clone and fetch with
++credentials from the invoking environment only (SSH agent via
++`SSH_AUTH_SOCK`, `GIT_ASKPASS`, `GIT_SSH`/`GIT_SSH_COMMAND`); user
++and system Git configuration — credential helpers,
++`insteadOf`/`pushInsteadOf`, URL rewriting and includes,
++`core.sshCommand` — is never consulted, and no interactive prompt
++occurs. The `authentication` identifier on a Skillfile endpoint is
++validated but unused on this lane. Never put secrets in these
++objects. An invalid or unreadable policy fails
++`repository_policy_invalid` and is never treated as absent. On
++Windows the isolation also drops Git for Windows' own system
++configuration (`http.sslBackend`, `http.sslCAInfo`); whether HTTPS
++verification still works there depends on the build's compiled
++defaults and is unverified.
+ 
+ For a package at the project root, each `root_inputs` entry is a
+ source-relative, portable, link-free path disjoint from outputs; every
+diff --git a/docs/troubleshooting.md b/docs/troubleshooting.md
+index 69be11d7..96b1da67 100644
+--- a/docs/troubleshooting.md
++++ b/docs/troubleshooting.md
+@@ -468,6 +468,13 @@ machine policy entry.
+ 
+ Remedy: verify the network path and operator authentication for the
+ listed endpoints, then retry with machine source-policy.json.
++A `credential.helper` from user or system Git configuration is
++never consulted on this lane and no prompt occurs, so a private
++HTTPS Skillfile source that relied on a helper fails here with an
++authentication clause: provide the credential through the invoking
++environment instead — a non-interactive `GIT_ASKPASS` program that
++prints the password, or an SSH endpoint with an agent via
++`SSH_AUTH_SOCK` — then retry the explicit attempt.
+ 
+ ### repository_policy_invalid
+ 
+diff --git a/internal/closure/resolve.go b/internal/closure/resolve.go
+index ddcfe4b0..7888339e 100644
+--- a/internal/closure/resolve.go
++++ b/internal/closure/resolve.go
+@@ -647,7 +647,11 @@ func pinGitAliases(cfg DraftResolveConfig, gitResolve func(string, string, strin
+ 		if cfg.Fetch {
+ 			fetch := cfg.FetchRepo
+ 			if fetch == nil {
+-				fetch = gitops.Fetch
++				// Alias trees are draft-lane acquisitions: the
++				// fallback fetch is user-configuration-isolated
++				// like the production alias acquisition, never
++				// the ambient variant (BUG-260920-3ukdk4).
++				fetch = gitops.FetchIsolated
+ 			}
+ 			// The dedup key is the shared closure repository key, so a
+ 			// tree the caller already refreshed (for example through the
+diff --git a/internal/closure/resolve_test.go b/internal/closure/resolve_test.go
+index 912614b6..75dc48f7 100644
+--- a/internal/closure/resolve_test.go
++++ b/internal/closure/resolve_test.go
+@@ -720,6 +720,172 @@ func TestResolveDraftResolvesEachGitAliasOnce(t *testing.T) {
+ 	}
+ }
+ 
++// TestResolveDraftAliasFetchFallbackIgnoresUserConfig proves the
++// pinGitAliases fallback fetch (FetchRepo nil) is the isolated
++// variant: with a hostile user git configuration redirecting the
++// alias remote to another repository, the fallback refresh must still
++// bind the declared tag, never evil's (BUG-260920-3ukdk4 N1).
++// Reverting the fallback to the ambient fetch must fail this test.
++func TestResolveDraftAliasFetchFallbackIgnoresUserConfig(t *testing.T) {
++	home := t.TempDir()
++	scratch := t.TempDir()
++	declared := draftGitRepo(t, map[string]string{"skills/review": "review"}, "v1")
++	declaredV1, err := gitops.Resolve(declared, "tag", "v1")
++	if err != nil {
++		t.Fatal(err)
++	}
++	declaredBare := filepath.Join(scratch, "declared.git")
++	gitCloneBare(t, declared, declaredBare)
++	declaredURL := "file://" + filepath.ToSlash(mustAbs(t, declaredBare))
++	evil := draftGitRepo(t, map[string]string{"skills/review": "review"}, "v1")
++	if err := os.WriteFile(filepath.Join(evil, "skills", "review", "references", "info.md"), []byte("evil"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	gitAt(t, evil, "add", ".")
++	gitAt(t, evil, "commit", "-qm", "evil")
++	gitAt(t, evil, "tag", "-f", "v1")
++	evilV1, err := gitops.Resolve(evil, "tag", "v1")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if evilV1.Commit == declaredV1.Commit {
++		t.Fatal("declared and evil tags collide")
++	}
++	evilBare := filepath.Join(scratch, "evil.git")
++	gitCloneBare(t, evil, evilBare)
++	evilURL := "file://" + filepath.ToSlash(mustAbs(t, evilBare))
++	// The alias tree carries a file:// origin so the insteadOf rule
++	// matches exactly the URL git fetches.
++	aliasRepo := filepath.Join(scratch, "alias")
++	gitCloneURL(t, declaredURL, aliasRepo)
++	hostile := filepath.Join(scratch, "hostile.gitconfig")
++	hostileBody := "[url \"" + evilURL + "\"]\n" +
++		"\tinsteadOf = " + declaredURL + "\n" +
++		"\tpushInsteadOf = " + declaredURL + "\n"
++	if err := os.WriteFile(hostile, []byte(hostileBody), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	// Positive control: a raw fetch of a clone of the declared tree
++	// under the hostile selectors binds evil's tag, proving the payload
++	// redirects fetches when it is consulted.
++	control := filepath.Join(scratch, "control")
++	gitCloneURL(t, declaredURL, control)
++	gitAt(t, control, "tag", "-d", "v1")
++	hostileEnv := gitEnvWithoutConfig(t,
++		"GIT_CONFIG_GLOBAL="+hostile,
++		"GIT_CONFIG_SYSTEM="+hostile,
++		"GIT_CONFIG_NOSYSTEM=0",
++		"HOME="+t.TempDir(),
++		"XDG_CONFIG_HOME="+t.TempDir(),
++	)
++	gitFetchEnv(t, control, hostileEnv)
++	controlV1, err := gitops.Resolve(control, "tag", "v1")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if controlV1.Commit != evilV1.Commit {
++		t.Fatalf("control tag v1 = %s, want evil %s (payload not live)", controlV1.Commit, evilV1.Commit)
++	}
++	t.Setenv("GIT_CONFIG_GLOBAL", hostile)
++	t.Setenv("GIT_CONFIG_SYSTEM", hostile)
++	t.Setenv("GIT_CONFIG_NOSYSTEM", "0")
++	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
++	payload := `{"schema_version":2,"sources":{"s":{"git":"https://example.org/kit.git","tag":"v1"}},"skills":[{"name":"review","from":"s","directory":"skills/review"}]}`
++	project := t.TempDir()
++	m, raw := parseDraftManifest(t, project, payload)
++	plan, err := ResolveDraft(DraftResolveConfig{
++		ProjectRoot:     project,
++		Home:            home,
++		Manifest:        m,
++		ManifestPayload: raw,
++		Expansion:       manifest.ExpansionOptions{GitRoots: map[string]string{"s": aliasRepo}},
++		Fetch:           true,
++		FetchRepo:       nil, // exercise the production fallback
++	})
++	if err != nil {
++		t.Fatalf("ResolveDraft with hostile user config = %v, want the declared bind", err)
++	}
++	member, ok := plan.Lock.Find("review")
++	if !ok {
++		t.Fatal("lock misses review")
++	}
++	if member.Package.Commit.Hex == evilV1.Commit {
++		t.Fatalf("lock binds the evil tag %s: the alias fallback fetch consulted user configuration", evilV1.Commit)
++	}
++	if member.Package.Commit.Hex != declaredV1.Commit {
++		t.Fatalf("lock binds %s, want the declared tag %s", member.Package.Commit.Hex, declaredV1.Commit)
++	}
++}
++
++// mustAbs returns the absolute path of p.
++func mustAbs(t *testing.T, p string) string {
++	t.Helper()
++	abs, err := filepath.Abs(p)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return abs
++}
++
++// gitCloneBare clones src to dest as a bare repository.
++func gitCloneBare(t *testing.T, src, dest string) {
++	t.Helper()
++	cmd := exec.Command("git", "clone", "--quiet", "--bare", "--", src, dest)
++	cmd.Env = append(os.Environ(),
++		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
++		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",
++	)
++	if out, err := cmd.CombinedOutput(); err != nil {
++		t.Fatalf("git clone --bare: %v\n%s", err, out)
++	}
++}
++
++// gitCloneURL clones srcURL to dest, preserving srcURL verbatim as the
++// origin URL.
++func gitCloneURL(t *testing.T, srcURL, dest string) {
++	t.Helper()
++	cmd := exec.Command("git", "clone", "--quiet", "--", srcURL, dest)
++	cmd.Env = append(os.Environ(),
++		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
++		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",
++	)
++	if out, err := cmd.CombinedOutput(); err != nil {
++		t.Fatalf("git clone: %v\n%s", err, out)
++	}
++}
++
++// gitEnvWithoutConfig returns the process environment with every
++// persistent-config selector removed and extra appended, so the caller
++// controls exactly which configuration git consults.
++func gitEnvWithoutConfig(t *testing.T, extra ...string) []string {
++	t.Helper()
++	var env []string
++	for _, entry := range os.Environ() {
++		name := entry
++		if index := strings.IndexByte(entry, '='); index >= 0 {
++			name = entry[:index]
++		}
++		switch name {
++		case "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_NOSYSTEM",
++			"GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS":
++			continue
++		}
++		env = append(env, entry)
++	}
++	return append(env, extra...)
++}
++
++// gitFetchEnv runs git fetch --all --tags in dir under env.
++func gitFetchEnv(t *testing.T, dir string, env []string) {
++	t.Helper()
++	cmd := exec.Command("git", "fetch", "--quiet", "--all", "--tags")
++	cmd.Dir = dir
++	cmd.Env = env
++	if out, err := cmd.CombinedOutput(); err != nil {
++		t.Fatalf("git fetch: %v\n%s", err, out)
++	}
++}
++
+ func TestOpenDraftFrozenGitTamperRefused(t *testing.T) {
+ 	setup := func(t *testing.T) (string, *sourcelock.Lock, string, FrozenOptions) {
+ 		t.Helper()
+diff --git a/internal/crossconformance/draftsources_semantic_v2_test.go b/internal/crossconformance/draftsources_semantic_v2_test.go
+index 812ecd5e..6526d963 100644
+--- a/internal/crossconformance/draftsources_semantic_v2_test.go
++++ b/internal/crossconformance/draftsources_semantic_v2_test.go
+@@ -22,9 +22,9 @@ import (
+ // the fetch behavior through the compiled CLI on unix (POSIX-only
+ // wrapper; the declared platform-control reason on Windows). Refusals
+ // carry zero clone attempts; positives bind the canonical lock
+-// identity. The two user-configuration rows are explicit bounds: the
+-// resolved lane isolates user git/ssh configuration (proven in-package),
+-// but CLI resolve inherits it (see results: CLI user-config gap).
++// identity. Both user-configuration rows are driven: the resolved lane
++// isolates user git/ssh configuration (proven in-package), and CLI
++// resolve isolates user git configuration on the literal-URL lane.
+ 
+ const (
+ 	v2Identity      = "fixture.test/kit"
+@@ -79,7 +79,7 @@ func init() {
+ 	registerDraftSemantic("v2-mirror-of-mismatch", driveV2MirrorOfMismatch)
+ 	registerDraftSemantic("v2-v1-reader-rejects-v2-policy", driveV2V1ReaderRejectsV2)
+ 	registerDraftSemantic("v2-user-ssh-alias-ignored", driveV2UserSSHAlias)
+-	registerDraftSemantic("v2-user-insteadof-ignored", driveV2UserInsteadOfGap)
++	registerDraftSemantic("v2-user-insteadof-ignored", driveV2UserInsteadOf)
+ 	registerDraftSemantic("v2-external-build-mirror-admitted", driveV2ExternalMirrorAdmitted)
+ 	registerDraftSemantic("v2-external-build-port-refused", driveV2ExternalPortRefused)
+ 	registerDraftSemantic("v2-external-build-alias-refused", driveV2ExternalAliasRefused)
+@@ -349,16 +349,20 @@ func driveV2V1ReaderRejectsV2(t *testing.T, _ draftSemanticCase) {
+ 	driveV2Refusal(t, `{"schema_version":1,"repositories":{"`+v2Identity+`":{"endpoints":[`+v2Endpoint(v2Primary, "team-https", `"mirror_of":"`+v2Identity+`"`)+`],"fallback":"none"}}}`, config.CodeRepositoryPolicyInvalid)
+ }
+ 
+-// driveV2UserInsteadOfGap is a known product gap: the resolved lane
+-// pins its git configuration (proven in-package by
+-// TestUserConfigIgnoredByResolvedLane), but CLI resolve inherits user
+-// configuration through gitops.Clone, so a hostile insteadOf redirects
+-// the fetch. The row reproduces the hostile flow and locks the gap
+-// signature (the lock binds the substituted commit); convert it to a
+-// drive when the CLI lane isolates user config.
+-func driveV2UserInsteadOfGap(t *testing.T, c draftSemanticCase) {
++// driveV2UserInsteadOf drives the spec case exactly: a literal URL
++// declaration with no machine policy entry and a hostile user git
++// configuration must attempt the declared URL once, literally, with the
++// insteadOf never applied. The transport shim stands in for the network
++// (the declared URL is served from the local bare fixture); the hostile
++// insteadOf targets the URL real git receives, so any consultation
++// redirects the clone to the evil fixture and the lock binds the evil
++// commit instead of the declared one. Hostile configuration is planted
++// through the GIT_CONFIG selectors and the child HOME file together, so
++// the row also proves the isolation is HOME-independent.
++func driveV2UserInsteadOf(t *testing.T, _ draftSemanticCase) {
+ 	realGit := requireGit(t)
+ 	root := t.TempDir()
++	bare, commit := draftCLIKitBare(t, root)
+ 	evilWork := filepath.Join(root, "evil-work")
+ 	evilBare := filepath.Join(root, "evil.git")
+ 	if err := os.MkdirAll(evilWork, 0o755); err != nil {
+@@ -371,35 +375,162 @@ func driveV2UserInsteadOfGap(t *testing.T, c draftSemanticCase) {
+ 	runDraftGit(t, evilWork, "tag", "v1")
+ 	runDraftGit(t, "", "clone", "--quiet", "--bare", "--", evilWork, evilBare)
+ 	evilCommit := draftGitOutput(t, "", "--git-dir", evilBare, "rev-parse", "v1^{commit}")
+-	fakeDir := t.TempDir()
+-	script := "#!/bin/sh\nexec '" + realGit + "' \"$@\"\n"
+-	if err := os.WriteFile(filepath.Join(fakeDir, "git"), []byte(script), 0o700); err != nil {
+-		t.Fatal(err)
++	if evilCommit == commit {
++		t.Fatal("declared and evil fixtures collide")
+ 	}
++	fakeDir, logPath := installDraftTransportShim(t, "https://never.invalid/x.git", "fatal: unexpected", v2Primary, bare, realGit)
++	pathEnv := draftTransportPATH(t, fakeDir)
++	hostileBody := "[url \"file://" + evilBare + "\"]\n" +
++		"\tinsteadOf = file://" + bare + "\n" +
++		"\tpushInsteadOf = file://" + bare + "\n" +
++		"[core]\n\tsshCommand = /nonexistent-evil-ssh\n"
+ 	hostile := filepath.Join(root, "hostile.gitconfig")
+-	if err := os.WriteFile(hostile, []byte("[url \"file://"+evilBare+"\"]\n\tinsteadOf = "+v2Primary+"\n"), 0o644); err != nil {
++	if err := os.WriteFile(hostile, []byte(hostileBody), 0o644); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	pathEnv := draftTransportPATH(t, fakeDir)
+ 	env := append(pathEnv, "GIT_CONFIG_GLOBAL="+hostile, "GIT_CONFIG_SYSTEM="+hostile, "GIT_CONFIG_NOSYSTEM=0")
+ 	configPath, project, home := setupCLIProject(t, root)
++	if err := os.WriteFile(filepath.Join(home, ".gitconfig"), []byte(hostileBody), 0o644); err != nil {
++		t.Fatal(err)
++	}
+ 	payload := `{"schema_version":2,"sources":{"kit":{"git":"` + v2Primary + `","tag":"v1"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
+ 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	code, stdout, stderr := runCurator(t, home, configPath, env, "project", "resolve", "app")
+ 	if code != 0 {
+-		t.Fatalf("resolve = %d, want the gap signature (success via substitution):\n%s\n%s", code, stdout, stderr)
++		t.Fatalf("resolve = %d, want success:\n%s\n%s", code, stdout, stderr)
++	}
++	if clones := draftCloneLog(t, logPath); len(clones) != 1 || clones[0] != v2Primary {
++		t.Fatalf("clones = %v, want the declared URL once, literally", clones)
++	}
++	lock, err := sourcelock.Read(filepath.Join(project, "Skillfile.lock.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	member, ok := lock.Find("review")
++	if !ok {
++		t.Fatal("lock misses review")
++	}
++	if member.Package.Commit.Hex == evilCommit {
++		t.Fatalf("lock binds the evil commit %s: user insteadOf was applied", evilCommit)
++	}
++	if member.Package.Commit.Hex != commit {
++		t.Fatalf("lock binds %s, want the declared commit %s", member.Package.Commit.Hex, commit)
++	}
++	if member.Package.Repository != v2Identity {
++		t.Fatalf("lock identity = %q, want the canonical key", member.Package.Repository)
++	}
++}
++
++// TestDraftLiteralRefreshIgnoresUserConfig pins the fetch half of the
++// draft literal-URL isolation (BUG-260920-3ukdk4) at the production
++// entry: after a clean resolve, a hostile user git configuration must
++// not redirect the refresh fetch to another repository. It is
++// intentionally NOT a corpus row (no registerDraftSemantic call): the
++// semantic ratio stays 94 and TestDraftSourcesSemanticCoverage is
++// unaffected.
++func TestDraftLiteralRefreshIgnoresUserConfig(t *testing.T) {
++	realGit := requireGit(t)
++	root := t.TempDir()
++	bare, commit := draftCLIKitBare(t, root)
++	work := filepath.Join(root, "kit-work")
++	evilWork := filepath.Join(root, "evil-work")
++	evilBare := filepath.Join(root, "evil.git")
++	if err := os.MkdirAll(evilWork, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	writeDraftSkill(t, filepath.Join(evilWork, "skills", "review"), "review")
++	runDraftGit(t, evilWork, "init", "-q", "-b", "main")
++	runDraftGit(t, evilWork, "add", ".")
++	runDraftGit(t, evilWork, "commit", "-qm", "evil")
++	runDraftGit(t, evilWork, "tag", "v1")
++	runDraftGit(t, "", "clone", "--quiet", "--bare", "--", evilWork, evilBare)
++	evilMain := draftGitOutput(t, "", "--git-dir", evilBare, "rev-parse", "main^{commit}")
++	if evilMain == commit {
++		t.Fatal("declared and evil fixtures collide")
++	}
++	fakeDir, logPath := installDraftTransportShim(t, "https://never.invalid/x.git", "fatal: unexpected", v2Primary, bare, realGit)
++	pathEnv := draftTransportPATH(t, fakeDir)
++	configPath, project, home := setupCLIProject(t, root)
++	payload := `{"schema_version":2,"sources":{"kit":{"git":"` + v2Primary + `","branch":"main"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
++	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if code, stdout, stderr := runCurator(t, home, configPath, pathEnv, "project", "resolve", "app"); code != 0 {
++		t.Fatalf("initial resolve = %d:\n%s\n%s", code, stdout, stderr)
+ 	}
+ 	lock, err := sourcelock.Read(filepath.Join(project, "Skillfile.lock.json"))
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	member, ok := lock.Find("review")
+-	if !ok || member.Package.Commit.Hex != evilCommit {
+-		t.Fatalf("lock binds %+v, want the substituted evil commit %s; convert the known gap to a drive", member.Package, evilCommit)
++	if !ok {
++		t.Fatal("lock misses review")
++	}
++	if member.Package.Commit.Hex != commit {
++		t.Fatalf("initial lock = %s, want %s", member.Package.Commit.Hex, commit)
++	}
++	// Advance the declared repository's main past the resolved commit.
++	if err := os.WriteFile(filepath.Join(work, "skills", "review", "references", "info.md"), []byte("advanced"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	runDraftGit(t, work, "add", ".")
++	runDraftGit(t, work, "commit", "-qm", "advance")
++	runDraftGit(t, work, "push", "-q", "--", bare, "main:main")
++	advanced := draftGitOutput(t, "", "--git-dir", bare, "rev-parse", "main^{commit}")
++	if advanced == commit || advanced == evilMain {
++		t.Fatal("fixture advance collided")
++	}
++	hostileBody := "[url \"file://" + evilBare + "\"]\n" +
++		"\tinsteadOf = file://" + bare + "\n" +
++		"\tpushInsteadOf = file://" + bare + "\n"
++	hostile := filepath.Join(root, "hostile.gitconfig")
++	if err := os.WriteFile(hostile, []byte(hostileBody), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(home, ".gitconfig"), []byte(hostileBody), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	hostileEnv := []string{"GIT_CONFIG_GLOBAL=" + hostile, "GIT_CONFIG_SYSTEM=" + hostile, "GIT_CONFIG_NOSYSTEM=0"}
++	// Positive control: a raw fetch of a clone of the declared tree
++	// under the hostile selectors lands on evil's main, proving the
++	// payload redirects fetches when it is consulted.
++	control := filepath.Join(t.TempDir(), "control")
++	if code, _, stderr := testcli.Run(t, "", nil, "", realGit, "clone", "--quiet", "--", "file://"+bare, control); code != 0 {
++		t.Fatalf("control clone: %s", stderr)
++	}
++	if code, _, stderr := testcli.Run(t, control, hostileEnv, "", realGit, "fetch", "--quiet", "--all"); code != 0 {
++		t.Fatalf("control fetch: %s", stderr)
++	}
++	if got := draftGitOutput(t, control, "rev-parse", "origin/main"); got != evilMain {
++		t.Fatalf("control origin/main = %s, want evil %s (payload not live)", got, evilMain)
++	}
++	env := append(pathEnv, hostileEnv...)
++	code, stdout, stderr := runCurator(t, home, configPath, env, "project", "refresh", "app")
++	if code != 0 {
++		t.Fatalf("refresh = %d:\n%s\n%s", code, stdout, stderr)
++	}
++	if clones := draftCloneLog(t, logPath); len(clones) != 1 {
++		t.Fatalf("clones = %v, want exactly the initial clone (refresh must fetch, not reclone)", clones)
++	}
++	lock, err = sourcelock.Read(filepath.Join(project, "Skillfile.lock.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	member, ok = lock.Find("review")
++	if !ok {
++		t.Fatal("lock misses review")
++	}
++	if member.Package.Commit.Hex == evilMain {
++		t.Fatalf("refresh lock binds evil main %s: user configuration was applied on the fetch path", evilMain)
++	}
++	if member.Package.Commit.Hex != advanced {
++		t.Fatalf("refresh lock = %s, want advanced declared %s", member.Package.Commit.Hex, advanced)
++	}
++	if member.Package.Repository != v2Identity {
++		t.Fatalf("lock identity = %q, want the canonical key", member.Package.Repository)
+ 	}
+-	semanticKnownGap(t, c, "CLI resolve honors user insteadOf (lock binds the substituted commit); resolved-lane isolation is proven in-package only (see results: CLI user-config gap)")
+ }
+ 
+ // driveV2UserSSHAlias drives the spec case exactly: a logical
+diff --git a/internal/gitops/gitops.go b/internal/gitops/gitops.go
+index 1b4e327c..4615cc81 100644
+--- a/internal/gitops/gitops.go
++++ b/internal/gitops/gitops.go
+@@ -35,11 +35,97 @@ type ResolvedRef struct {
+ }
+ 
+ func run(dir string, args ...string) (string, error) {
++	return runWithEnv(dir, append(os.Environ(), "GIT_ALLOW_PROTOCOL="+AllowedProtocols), args...)
++}
++
++// isolatedConfigEnv lists the environment channels that select persistent
++// git configuration. The draft literal-URL lane replaces every one of them
++// (repository-transport: user configuration never consulted); matching is
++// case-insensitive so a differently-cased spelling cannot survive on
++// Windows, where process environment names are case-insensitive.
++var isolatedConfigEnv = []string{
++	"GIT_CONFIG_GLOBAL",
++	"GIT_CONFIG_SYSTEM",
++	"GIT_CONFIG_NOSYSTEM",
++	"GIT_CONFIG_COUNT",
++	"GIT_CONFIG_PARAMETERS",
++	"GIT_ALLOW_PROTOCOL",
++	"GIT_TERMINAL_PROMPT",
++}
++
++// isolatedConfigEnvPrefixes lists the numbered environment channels that
++// carry command-line configuration pairs (GIT_CONFIG_KEY_<n> /
++// GIT_CONFIG_VALUE_<n>); every index is scrubbed.
++var isolatedConfigEnvPrefixes = []string{
++	"GIT_CONFIG_KEY_",
++	"GIT_CONFIG_VALUE_",
++}
++
++// scrubsGitConfigEnv reports whether an environment variable name selects
++// git configuration and must not reach the isolated lane.
++func scrubsGitConfigEnv(name string) bool {
++	for _, pinned := range isolatedConfigEnv {
++		if strings.EqualFold(name, pinned) {
++			return true
++		}
++	}
++	for _, prefix := range isolatedConfigEnvPrefixes {
++		if len(name) >= len(prefix) && strings.EqualFold(name[:len(prefix)], prefix) {
++			return true
++		}
++	}
++	return false
++}
++
++// isolatedGitEnv builds the environment for the draft literal-URL lane:
++// the ambient process environment with every git-configuration channel
++// replaced by pinned isolation. User and system configuration files are
++// pointed at a fresh empty file (created per call so no path is shared or
++// reused, and so the isolation never depends on HOME), config selection
++// from the environment is cleared, and interactive prompts stay disabled.
++// Per-invocation operator context (PATH, SSH agent/askpass, author
++// identity) is preserved: only persistent configuration is isolated.
++// The caller must run exactly the returned cleanup.
++func isolatedGitEnv() (env []string, cleanup func(), err error) {
++	empty, err := os.CreateTemp("", "curator-gitconfig-*")
++	if err != nil {
++		return nil, nil, fmt.Errorf("isolating git configuration: %w", err)
++	}
++	emptyName := empty.Name()
++	if err := empty.Close(); err != nil {
++		_ = os.Remove(emptyName)
++		return nil, nil, fmt.Errorf("isolating git configuration: %w", err)
++	}
++	cleanup = func() { _ = os.Remove(emptyName) }
++	ambient := os.Environ()
++	env = make([]string, 0, len(ambient)+8)
++	for _, entry := range ambient {
++		name := entry
++		if index := strings.IndexByte(entry, '='); index >= 0 {
++			name = entry[:index]
++		}
++		if scrubsGitConfigEnv(name) {
++			continue
++		}
++		env = append(env, entry)
++	}
++	env = append(env,
++		"GIT_CONFIG_GLOBAL="+emptyName,
++		"GIT_CONFIG_SYSTEM="+emptyName,
++		"GIT_CONFIG_NOSYSTEM=1",
++		"GIT_ALLOW_PROTOCOL="+AllowedProtocols,
++		"GIT_TERMINAL_PROMPT=0",
++	)
++	return env, cleanup, nil
++}
++
++// runWithEnv runs one git invocation with an explicit environment.
++func runWithEnv(dir string, env []string, args ...string) (string, error) {
+ 	cmd := exec.Command("git", args...) // #nosec G204 -- fixed binary, arguments are built by this package
+ 	if dir != "" {
+ 		cmd.Dir = dir
+ 	}
+-	cmd.Env = append(os.Environ(), "GIT_ALLOW_PROTOCOL="+AllowedProtocols)
++	cmd.Env = env
+ 	var stdout, stderr bytes.Buffer
+ 	cmd.Stdout = &stdout
+ 	cmd.Stderr = &stderr
+@@ -56,6 +142,25 @@ func run(dir string, args ...string) (string, error) {
+ // Clone clones a remote URL into destination. It refuses suspicious URLs
+ // (empty or dash-prefixed) and passes the URL positionally after "--".
+ func Clone(remoteURL, destination string) error {
++	return cloneWith(remoteURL, destination, run)
++}
++
++// CloneIsolated is the draft literal-URL lane's clone: identical to Clone
++// except the invocation never consults user or system git configuration
++// (no insteadOf/pushInsteadOf, url rewriting, helpers, includes, or
++// core.sshCommand from configuration files), independent of HOME.
++func CloneIsolated(remoteURL, destination string) error {
++	env, cleanup, err := isolatedGitEnv()
++	if err != nil {
++		return err
++	}
++	defer cleanup()
++	return cloneWith(remoteURL, destination, func(dir string, args ...string) (string, error) {
++		return runWithEnv(dir, env, args...)
++	})
++}
++
++func cloneWith(remoteURL, destination string, runFn func(dir string, args ...string) (string, error)) error {
+ 	trimmed := strings.TrimSpace(remoteURL)
+ 	if trimmed == "" || strings.HasPrefix(trimmed, "-") {
+ 		return fmt.Errorf("refusing to clone suspicious git URL: %q", remoteURL)
+@@ -66,7 +171,7 @@ func Clone(remoteURL, destination string) error {
+ 	if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
+ 		return err
+ 	}
+-	if _, err := run("", "clone", "--", trimmed, destination); err != nil {
++	if _, err := runFn("", "clone", "--", trimmed, destination); err != nil {
+ 		_ = os.RemoveAll(destination)
+ 		return fmt.Errorf("git clone failed for %s -> %s: %w", remoteURL, destination, err)
+ 	}
+@@ -126,7 +231,11 @@ func revParse(repo, spec string) (string, error) {
+ // reports (false, err) and Fetch propagates the error instead of
+ // succeeding with a stale tree.
+ func HasRemote(repo string) (bool, error) {
+-	out, err := run(repo, "remote")
++	return hasRemoteWith(repo, run)
++}
++
++func hasRemoteWith(repo string, runFn func(dir string, args ...string) (string, error)) (bool, error) {
++	out, err := runFn(repo, "remote")
+ 	if err != nil {
+ 		return false, err
+ 	}
+@@ -139,17 +248,35 @@ func HasRemote(repo string) (bool, error) {
+ // The origin-less skip happens only after a successful empty remote
+ // enumeration; a failed enumeration fails the fetch.
+ func Fetch(repo string) error {
++	return fetchWith(repo, run)
++}
++
++// FetchIsolated is the draft literal-URL lane's fetch: identical to Fetch
++// except the invocation never consults user or system git configuration,
++// independent of HOME.
++func FetchIsolated(repo string) error {
++	env, cleanup, err := isolatedGitEnv()
++	if err != nil {
++		return err
++	}
++	defer cleanup()
++	return fetchWith(repo, func(dir string, args ...string) (string, error) {
++		return runWithEnv(dir, env, args...)
++	})
++}
++
++func fetchWith(repo string, runFn func(dir string, args ...string) (string, error)) error {
+ 	if err := EnsureRepo(repo); err != nil {
+ 		return err
+ 	}
+-	has, err := HasRemote(repo)
++	has, err := hasRemoteWith(repo, runFn)
+ 	if err != nil {
+ 		return err
+ 	}
+ 	if !has {
+ 		return nil
+ 	}
+-	_, err = run(repo, "fetch", "--all", "--tags", "--prune")
++	_, err = runFn(repo, "fetch", "--all", "--tags", "--prune")
+ 	return err
+ }
+ 
+diff --git a/internal/gitops/isolated_test.go b/internal/gitops/isolated_test.go
+new file mode 100644
+index 00000000..3e9653c5
+--- /dev/null
++++ b/internal/gitops/isolated_test.go
+@@ -0,0 +1,283 @@
++package gitops
++
++import (
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++// fileURL renders an absolute directory as a file:// URL in slash form so
++// insteadOf rules match it on every platform.
++func fileURL(t *testing.T, dir string) string {
++	t.Helper()
++	abs, err := filepath.Abs(dir)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return "file://" + filepath.ToSlash(abs)
++}
++
++// hostileGitConfig writes a user-level gitconfig that redirects every
++// fetch of declared to evil, and returns its path.
++func hostileGitConfig(t *testing.T, declared, evil string) string {
++	t.Helper()
++	path := filepath.Join(t.TempDir(), "hostile.gitconfig")
++	body := "[url \"" + evil + "\"]\n" +
++		"\tinsteadOf = " + declared + "\n" +
++		"\tpushInsteadOf = " + declared + "\n" +
++		"[core]\n" +
++		"\tsshCommand = /nonexistent-evil-ssh\n"
++	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	return path
++}
++
++// cloneHead clones url into a fresh destination with env and returns the
++// cloned HEAD commit. It is the positive control: under hostile config
++// selection the HEAD must be evil's, proving the payload is live.
++func cloneHead(t *testing.T, env []string, url string) string {
++	t.Helper()
++	dest := filepath.Join(t.TempDir(), "control")
++	cmd := exec.Command("git", "clone", "--quiet", "--", url, dest)
++	cmd.Env = env
++	if out, err := cmd.CombinedOutput(); err != nil {
++		t.Fatalf("control clone: %v\n%s", err, out)
++	}
++	out, err := exec.Command("git", "-C", dest, "rev-parse", "HEAD").CombinedOutput()
++	if err != nil {
++		t.Fatalf("control rev-parse: %v\n%s", err, out)
++	}
++	return strings.TrimSpace(string(out))
++}
++
++func TestCloneIsolatedIgnoresUserConfig(t *testing.T) {
++	declared := makeRepo(t)
++	declaredURL := fileURL(t, declared)
++	declaredHead := gitRun(t, declared, "rev-parse", "HEAD")
++	evil := makeRepo(t)
++	if err := os.WriteFile(filepath.Join(evil, "SKILL.md"), []byte("evil"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	gitRun(t, evil, "commit", "-qam", "evil")
++	evilURL := fileURL(t, evil)
++	evilHead := gitRun(t, evil, "rev-parse", "HEAD")
++	if evilHead == declaredHead {
++		t.Fatal("fixtures collide")
++	}
++	hostile := hostileGitConfig(t, declaredURL, evilURL)
++
++	t.Run("global and system selectors", func(t *testing.T) {
++		t.Setenv("GIT_CONFIG_GLOBAL", hostile)
++		t.Setenv("GIT_CONFIG_SYSTEM", hostile)
++		t.Setenv("GIT_CONFIG_NOSYSTEM", "0")
++		if got := cloneHead(t, gitEnvHostile(t), declaredURL); got != evilHead {
++			t.Fatalf("control HEAD = %s, want evil %s (payload not live)", got, evilHead)
++		}
++		dest := filepath.Join(t.TempDir(), "clone")
++		if err := CloneIsolated(declaredURL, dest); err != nil {
++			t.Fatal(err)
++		}
++		if got := gitRun(t, dest, "rev-parse", "HEAD"); got != declaredHead {
++			t.Fatalf("HEAD = %s, want declared %s (evil %s)", got, declaredHead, evilHead)
++		}
++	})
++
++	t.Run("home file without selectors", func(t *testing.T) {
++		for _, key := range []string{"GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_NOSYSTEM", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS"} {
++			t.Setenv(key, "")
++			if err := os.Unsetenv(key); err != nil {
++				t.Fatal(err)
++			}
++		}
++		home := t.TempDir()
++		payload, err := os.ReadFile(hostile)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(filepath.Join(home, ".gitconfig"), payload, 0o644); err != nil {
++			t.Fatal(err)
++		}
++		t.Setenv("HOME", home)
++		t.Setenv("XDG_CONFIG_HOME", t.TempDir())
++		if got := cloneHead(t, gitEnvHome(t, home), declaredURL); got != evilHead {
++			t.Fatalf("control HEAD = %s, want evil %s (payload not live)", got, evilHead)
++		}
++		dest := filepath.Join(t.TempDir(), "clone")
++		if err := CloneIsolated(declaredURL, dest); err != nil {
++			t.Fatal(err)
++		}
++		if got := gitRun(t, dest, "rev-parse", "HEAD"); got != declaredHead {
++			t.Fatalf("HEAD = %s, want declared %s (evil %s)", got, declaredHead, evilHead)
++		}
++	})
++
++	t.Run("environment injected config", func(t *testing.T) {
++		t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(t.TempDir(), "empty"))
++		t.Setenv("GIT_CONFIG_SYSTEM", filepath.Join(t.TempDir(), "empty"))
++		t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
++		t.Setenv("GIT_CONFIG_COUNT", "1")
++		t.Setenv("GIT_CONFIG_KEY_0", "url."+evilURL+".insteadOf")
++		t.Setenv("GIT_CONFIG_VALUE_0", declaredURL)
++		if got := cloneHead(t, gitEnvParams(t), declaredURL); got != evilHead {
++			t.Fatalf("control HEAD = %s, want evil %s (payload not live)", got, evilHead)
++		}
++		dest := filepath.Join(t.TempDir(), "clone")
++		if err := CloneIsolated(declaredURL, dest); err != nil {
++			t.Fatal(err)
++		}
++		if got := gitRun(t, dest, "rev-parse", "HEAD"); got != declaredHead {
++			t.Fatalf("HEAD = %s, want declared %s (evil %s)", got, declaredHead, evilHead)
++		}
++	})
++}
++
++// gitEnvHostile is gitEnv with the hostile user/system selectors applied,
++// for the positive control only.
++func gitEnvHostile(t *testing.T) []string {
++	t.Helper()
++	return append(gitEnv(),
++		"GIT_CONFIG_GLOBAL="+os.Getenv("GIT_CONFIG_GLOBAL"),
++		"GIT_CONFIG_SYSTEM="+os.Getenv("GIT_CONFIG_SYSTEM"),
++		"GIT_CONFIG_NOSYSTEM=0",
++	)
++}
++
++// gitEnvHome is committer identity with HOME pointed at home and no
++// config selectors, for the positive control only.
++func gitEnvHome(t *testing.T, home string) []string {
++	t.Helper()
++	var env []string
++	for _, entry := range os.Environ() {
++		name := entry
++		if index := strings.IndexByte(entry, '='); index >= 0 {
++			name = entry[:index]
++		}
++		switch name {
++		case "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_NOSYSTEM",
++			"GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS":
++			continue
++		}
++		env = append(env, entry)
++	}
++	return append(env,
++		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
++		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",
++		"HOME="+home, "XDG_CONFIG_HOME="+os.Getenv("XDG_CONFIG_HOME"),
++	)
++}
++
++// gitEnvParams is committer identity with the environment-injected
++// insteadOf applied, for the positive control only.
++func gitEnvParams(t *testing.T) []string {
++	t.Helper()
++	return append(gitEnv(),
++		"GIT_CONFIG_NOSYSTEM=1",
++		"GIT_CONFIG_COUNT="+os.Getenv("GIT_CONFIG_COUNT"),
++		"GIT_CONFIG_KEY_0="+os.Getenv("GIT_CONFIG_KEY_0"),
++		"GIT_CONFIG_VALUE_0="+os.Getenv("GIT_CONFIG_VALUE_0"),
++	)
++}
++
++func TestFetchIsolatedIgnoresUserConfig(t *testing.T) {
++	declared := makeRepo(t)
++	declaredURL := fileURL(t, declared)
++	evil := makeRepo(t)
++	if err := os.WriteFile(filepath.Join(evil, "SKILL.md"), []byte("evil"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	gitRun(t, evil, "commit", "-qam", "evil")
++	evilURL := fileURL(t, evil)
++	evilHead := gitRun(t, evil, "rev-parse", "HEAD")
++	hostile := hostileGitConfig(t, declaredURL, evilURL)
++	t.Setenv("GIT_CONFIG_GLOBAL", hostile)
++	t.Setenv("GIT_CONFIG_SYSTEM", hostile)
++	t.Setenv("GIT_CONFIG_NOSYSTEM", "0")
++
++	dest := filepath.Join(t.TempDir(), "clone")
++	if err := CloneIsolated(declaredURL, dest); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(declared, "SKILL.md"), []byte("v3"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	gitRun(t, declared, "commit", "-qam", "three")
++	declaredHead := gitRun(t, declared, "rev-parse", "HEAD")
++	if err := FetchIsolated(dest); err != nil {
++		t.Fatal(err)
++	}
++	if got := gitRun(t, dest, "rev-parse", "origin/main"); got != declaredHead {
++		t.Fatalf("origin/main = %s, want declared %s (evil %s)", got, declaredHead, evilHead)
++	}
++}
++
++func TestIsolatedGitEnvPinsEmptyConfig(t *testing.T) {
++	hostile := filepath.Join(t.TempDir(), "hostile.gitconfig")
++	if err := os.WriteFile(hostile, []byte("[url \"https://evil.test/\"]\n\tinsteadOf = https://example.org/\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	t.Setenv("GIT_CONFIG_GLOBAL", hostile)
++	t.Setenv("GIT_CONFIG_SYSTEM", hostile)
++	t.Setenv("GIT_CONFIG_NOSYSTEM", "0")
++	t.Setenv("GIT_CONFIG_COUNT", "1")
++	t.Setenv("GIT_CONFIG_PARAMETERS", "'url.evil.insteadOf=x'")
++	t.Setenv("GIT_CONFIG_KEY_0", "url.evil.insteadOf")
++	t.Setenv("GIT_CONFIG_VALUE_0", "x")
++	t.Setenv("GIT_ALLOW_PROTOCOL", "all")
++	t.Setenv("GIT_TERMINAL_PROMPT", "1")
++	t.Setenv("CURATOR_TEST_KEEP", "kept")
++	t.Setenv("SSH_AUTH_SOCK", "/tmp/kept-agent.sock")
++
++	env, cleanup, err := isolatedGitEnv()
++	if err != nil {
++		t.Fatal(err)
++	}
++	values := map[string]string{}
++	for _, entry := range env {
++		name, value, _ := strings.Cut(entry, "=")
++		values[strings.ToUpper(name)] = value
++	}
++	global, ok := values["GIT_CONFIG_GLOBAL"]
++	if !ok {
++		t.Fatal("GIT_CONFIG_GLOBAL missing")
++	}
++	if global == hostile {
++		t.Fatal("GIT_CONFIG_GLOBAL still hostile")
++	}
++	if values["GIT_CONFIG_SYSTEM"] != global {
++		t.Fatalf("GIT_CONFIG_SYSTEM = %q, want %q", values["GIT_CONFIG_SYSTEM"], global)
++	}
++	info, err := os.Stat(global)
++	if err != nil {
++		t.Fatalf("pinned config unreadable: %v", err)
++	}
++	if info.Size() != 0 || !info.Mode().IsRegular() {
++		t.Fatalf("pinned config = size %d mode %s, want an empty regular file", info.Size(), info.Mode())
++	}
++	if values["GIT_CONFIG_NOSYSTEM"] != "1" {
++		t.Fatalf("GIT_CONFIG_NOSYSTEM = %q, want 1", values["GIT_CONFIG_NOSYSTEM"])
++	}
++	for _, forbidden := range []string{"GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0"} {
++		if value, ok := values[forbidden]; ok {
++			t.Fatalf("%s = %q, want it scrubbed", forbidden, value)
++		}
++	}
++	if values["GIT_ALLOW_PROTOCOL"] != AllowedProtocols {
++		t.Fatalf("GIT_ALLOW_PROTOCOL = %q, want %q", values["GIT_ALLOW_PROTOCOL"], AllowedProtocols)
++	}
++	if values["GIT_TERMINAL_PROMPT"] != "0" {
++		t.Fatalf("GIT_TERMINAL_PROMPT = %q, want 0", values["GIT_TERMINAL_PROMPT"])
++	}
++	if values["CURATOR_TEST_KEEP"] != "kept" || values["SSH_AUTH_SOCK"] != "/tmp/kept-agent.sock" {
++		t.Fatal("operator invocation context was not preserved")
++	}
++	if values["PATH"] != os.Getenv("PATH") {
++		t.Fatal("PATH was not preserved")
++	}
++	cleanup()
++	if _, err := os.Stat(global); !os.IsNotExist(err) {
++		t.Fatalf("cleanup left %s: %v", global, err)
++	}
++}

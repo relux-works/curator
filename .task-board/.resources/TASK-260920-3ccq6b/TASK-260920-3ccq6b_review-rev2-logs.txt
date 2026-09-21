@@ -1,0 +1,649 @@
+# TASK-260920-3ccq6b review rev2 — raw logs (reviewer Relux Bot / claude-opus-5)
+
+## driver1 (reruns, clone /tmp/rv-3ccq6b at gate commit 607b077a, tree 06956f33)
+[2026-09-20T21:20:37Z] START build :: go build ./...
+[2026-09-20T21:20:46Z] END build rc=0
+[2026-09-20T21:20:46Z] START vet :: go vet ./internal/gitops/ ./internal/crossconformance/ ./cmd/curator/
+[2026-09-20T21:20:48Z] END vet rc=0
+[2026-09-20T21:20:48Z] START gofmt :: gofmt -l internal/gitops/ internal/crossconformance/ cmd/curator/
+[2026-09-20T21:20:48Z] END gofmt rc=0
+[2026-09-20T21:20:48Z] START gitops :: go test ./internal/gitops/ -count=1 -v -timeout 300s
+[2026-09-20T21:21:01Z] END gitops rc=0
+[2026-09-20T21:21:01Z] START xconf-rows :: go test ./internal/crossconformance/ -run TestDraftLiteral|TestDraftSSH -count=1 -v -timeout 600s
+[2026-09-20T21:21:18Z] END xconf-rows rc=0
+[2026-09-20T21:21:18Z] START xconf-cov :: go test ./internal/crossconformance/ -run TestDraftSourcesSemanticCoverage$ -count=1 -v -timeout 300s
+[2026-09-20T21:21:19Z] END xconf-cov rc=0
+[2026-09-20T21:21:19Z] START xconf-sweep :: go test ./internal/crossconformance/ -run TestDraftSourcesSemanticCases$/(v2-|fallback-|pinned-auth|endpoint-identity-mismatch) -count=1 -v -timeout 900s
+[2026-09-20T21:21:51Z] END xconf-sweep rc=1
+[2026-09-20T21:21:51Z] START cmd-pins :: go test ./cmd/curator/ -run TestDraftDocsPinExamples$|TestProjectResolveLegacyUntouched$|TestDraftTransportLegacyGolden$ -count=1 -v -timeout 600s
+[2026-09-20T21:22:15Z] END cmd-pins rc=0
+[2026-09-20T21:22:15Z] TREE 06956f334c373984e8966f510da143cbd168b46f STATUS 0
+[2026-09-20T21:22:15Z] DRIVER1 DONE
+
+### gitops
+--- PASS: TestExtractReproducesByteExactVector (0.82s)
+--- PASS: TestExtractIgnoresWorkingTreeConversion (0.55s)
+--- PASS: TestExtractPreservesExecutableBit (0.54s)
+--- PASS: TestExtractRefusesSubmodules (0.18s)
+--- PASS: TestExtractRefusesEscapingPaths (0.76s)
+--- PASS: TestExtractRefusesOversizeBlob (0.26s)
+--- PASS: TestExtractRefusesDuplicatePlatformPaths (0.17s)
+--- PASS: TestExtractRefusesExistingDestinationEntries (0.21s)
+--- PASS: TestExtractRefusesSuspiciousCommit (0.25s)
+--- PASS: TestExtractRefusesOversizeBlobWithoutStreaming (0.22s)
+--- PASS: TestExtractRefusesDuplicatePlatformPathBeforeLargeBlob (0.30s)
+--- PASS: TestExtractRefusesEscapeBeforeLargeBlob (0.28s)
+--- PASS: TestExtractRefusesMissingObjectsFromListing (0.30s)
+--- PASS: TestExtractRemovesWrittenFilesOnMidStreamError (0.33s)
+--- PASS: TestPlanWritesRefusesCaseCollisionBeforeStreaming (0.00s)
+--- PASS: TestExtractTerminatesCatFileOnMidStreamFramingError (0.62s)
+--- PASS: TestExtractTerminatesCatFileOnWriteFailure (1.07s)
+--- PASS: TestExtractRefusesDotGitComponents (0.74s)
+--- PASS: TestExtractPreservesNestedExecutableBit (0.31s)
+--- PASS: TestCloneRefusesSuspiciousURLs (0.00s)
+--- PASS: TestCloneRefusesExistingDestination (0.00s)
+--- PASS: TestCloneAndResolve (0.38s)
+--- PASS: TestExtractProducesExactTree (0.29s)
+--- PASS: TestArchiveRejectsLinks (0.17s)
+--- PASS: TestFetchAndSubmodules (0.39s)
+--- PASS: TestCloneIsolatedIgnoresUserConfig (1.28s)
+--- PASS: TestFetchIsolatedIgnoresUserConfig (0.87s)
+--- PASS: TestIsolatedGitEnvPinsEmptyConfig (0.00s)
+--- PASS: TestIsolatedGitEnvAllowList (0.00s)
+--- PASS: TestIsolatedGitEnvWindowsCaseHonoursAllowed (0.00s)
+--- PASS: TestIsolatedGitEnvSSHCommand (0.00s)
+--- PASS: TestIsolatedGitConfigArgs (0.00s)
+--- PASS: TestShellQuoteEscapesSingleQuote (0.00s)
+--- PASS: TestCloneIsolatedIgnoresGitProxyCommand (0.43s)
+PASS
+ok  	github.com/relux-works/curator/internal/gitops	12.045s
+
+### xconf-rows
+--- PASS: TestDraftLiteralIgnoresGitSSHCommand (3.47s)
+--- PASS: TestDraftLiteralIgnoresGitSSH (0.94s)
+--- PASS: TestDraftLiteralDropsGitProxyCommand (1.00s)
+--- PASS: TestDraftLiteralIgnoresGitExecPath (0.96s)
+--- PASS: TestDraftLiteralIgnoresUserSSHConfig (0.95s)
+--- PASS: TestDraftSSHEmptyConfigIgnoresHostileFile (0.03s)
+--- PASS: TestDraftLiteralIgnoresProxyEnvironment (2.57s)
+--- PASS: TestDraftLiteralKeepsAgentAndAskpass (1.30s)
+--- PASS: TestDraftLiteralRefreshIgnoresUserConfig (2.82s)
+PASS
+ok  	github.com/relux-works/curator/internal/crossconformance	14.676s
+
+### xconf-cov
+--- PASS: TestDraftSourcesSemanticCoverage (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/crossconformance	0.546s
+
+### cmd-pins
+--- PASS: TestDraftDocsPinExamples (0.00s)
+--- PASS: TestProjectResolveLegacyUntouched (0.05s)
+--- PASS: TestDraftTransportLegacyGolden (20.57s)
+PASS
+ok  	github.com/relux-works/curator/cmd/curator	21.127s
+
+### xconf-sweep (34 subtests; parent tally guard by design)
+    draftsources_semantic_test.go:54: semantic cases: 34 driven, 0 known-gap, 0 bound, 0 skipped, 94 total
+    draftsources_semantic_test.go:57: executed(34) != total(94, want 94); run the full matrix without -run subtest filters
+    --- PASS: TestDraftSourcesSemanticCases/fallback-dns (2.87s)
+    --- PASS: TestDraftSourcesSemanticCases/fallback-auth-rejected (0.96s)
+    --- PASS: TestDraftSourcesSemanticCases/fallback-tls (0.66s)
+    --- PASS: TestDraftSourcesSemanticCases/fallback-host-key (0.72s)
+    --- PASS: TestDraftSourcesSemanticCases/fallback-integrity (0.80s)
+    --- PASS: TestDraftSourcesSemanticCases/fallback-identity (0.69s)
+    --- PASS: TestDraftSourcesSemanticCases/fallback-ref-moved (0.64s)
+    --- PASS: TestDraftSourcesSemanticCases/fallback-audit (0.74s)
+    --- PASS: TestDraftSourcesSemanticCases/fallback-unknown (0.67s)
+    --- PASS: TestDraftSourcesSemanticCases/fallback-policy-unreadable (0.35s)
+    --- PASS: TestDraftSourcesSemanticCases/fallback-http-404 (0.65s)
+    --- PASS: TestDraftSourcesSemanticCases/pinned-auth (0.65s)
+    --- PASS: TestDraftSourcesSemanticCases/endpoint-identity-mismatch (0.39s)
+    --- PASS: TestDraftSourcesSemanticCases/v2-port-endpoint (0.99s)
+    --- PASS: TestDraftSourcesSemanticCases/v2-declared-mirror (0.93s)
+    --- PASS: TestDraftSourcesSemanticCases/v2-mirror-first (1.01s)
+    --- PASS: TestDraftSourcesSemanticCases/v2-alias-resolution (1.06s)
+    --- PASS: TestDraftSourcesSemanticCases/v2-reader-accepts-v1-policy (1.05s)
+    --- PASS: TestDraftSourcesSemanticCases/v2-undeclared-mirror (0.41s)
+    --- PASS: TestDraftSourcesSemanticCases/v2-pin-port-mismatch (0.40s)
+    --- PASS: TestDraftSourcesSemanticCases/v2-alias-unknown (0.38s)
+    --- PASS: TestDraftSourcesSemanticCases/v2-alias-mirror-undeclared (0.35s)
+    --- PASS: TestDraftSourcesSemanticCases/v2-user-ssh-alias-ignored (0.11s)
+    --- PASS: TestDraftSourcesSemanticCases/v2-user-insteadof-ignored (1.36s)
+    --- PASS: TestDraftSourcesSemanticCases/v2-embedded-alias-host (0.34s)
+    --- PASS: TestDraftSourcesSemanticCases/v2-alias-auth-mismatch (0.74s)
+    --- PASS: TestDraftSourcesSemanticCases/v2-alias-chain (1.30s)
+    --- PASS: TestDraftSourcesSemanticCases/v2-double-port (0.39s)
+    --- PASS: TestDraftSourcesSemanticCases/v2-spurious-mirror-of (0.37s)
+    --- PASS: TestDraftSourcesSemanticCases/v2-mirror-of-mismatch (0.33s)
+    --- PASS: TestDraftSourcesSemanticCases/v2-v1-reader-rejects-v2-policy (0.43s)
+    --- PASS: TestDraftSourcesSemanticCases/v2-external-build-mirror-admitted (7.23s)
+    --- PASS: TestDraftSourcesSemanticCases/v2-external-build-port-refused (0.19s)
+    --- PASS: TestDraftSourcesSemanticCases/v2-external-build-alias-refused (0.23s)
+
+## hosted gate 35534261038
+headSha 607b077aa17aee09504f2a308e49c66c66a01101 parent 680a2f47 tree 06956f334c373984e8966f510da143cbd168b46f conclusion success
+windows skips-observed for new rows:
+internal/crossconformance	TestDraftLiteralDropsGitProxyCommand	platform-control	allowed-platform-control	test transport wrapper is POSIX-only
+internal/crossconformance	TestDraftLiteralIgnoresGitExecPath	platform-control	allowed-platform-control	test transport wrapper is POSIX-only
+internal/crossconformance	TestDraftLiteralIgnoresGitSSH	platform-control	allowed-platform-control	test transport wrapper is POSIX-only
+internal/crossconformance	TestDraftLiteralIgnoresGitSSHCommand	platform-control	allowed-platform-control	test transport wrapper is POSIX-only
+internal/crossconformance	TestDraftLiteralIgnoresUserSSHConfig	platform-control	allowed-platform-control	test transport wrapper is POSIX-only
+internal/crossconformance	TestDraftLiteralKeepsAgentAndAskpass	platform-control	allowed-platform-control	test transport wrapper is POSIX-only
+internal/crossconformance	TestDraftLiteralRefreshIgnoresUserConfig	platform-control	allowed-platform-control	test transport wrapper is POSIX-only
+internal/gitops	TestCloneIsolatedIgnoresGitProxyCommand	platform-control	allowed-platform-control	test transport wrapper is POSIX-only
+ratio lines:
+ubu: semantic cases: 92 driven, 0 known-gap, 1 bound, 1 skipped, 94 total
+win: semantic cases: 42 driven, 0 known-gap, 1 bound, 51 skipped, 94 total
+
+## reviewer probes (clone 2, unmutated)
+    zz_review_probe_test.go:67: configuration reads by the lane's real ssh:
+        debug1: Reading configuration data /var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/curator-sshconfig-2379978387
+    zz_review_probe_test.go:82: first lines:
+        OpenSSH_9.9p2, LibreSSL 3.3.6
+        debug1: Reading configuration data /var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/curator-sshconfig-2379978387
+        debug1: Authenticator provider $SSH_SK_PROVIDER did not resolve; disabling
+        debug1: Connecting to fixture.test port 22.
+        ssh: Could not resolve hostname fixture.test: nodename nor servname provided, or not known
+--- PASS: TestZZReviewRealSSHReadsOnlyLaneConfig (4.90s)
+    zz_review_probe_test.go:138: pinned clone=1 fetch=1 remote=1; unpinned clone/fetch=0
+--- PASS: TestZZReviewConfigPinsReachGit (1.62s)
+PASS
+ok  	github.com/relux-works/curator/internal/crossconformance	6.996s
+
+## ssh config-read control on this host
+$ ssh -v -G fixture.test 2>&1 | grep "Reading configuration data"
+debug1: Reading configuration data /Users/administrator/.ssh/config
+debug1: Reading configuration data /Users/administrator/.colima/ssh_config
+debug1: Reading configuration data /etc/ssh/ssh_config
+$ ssh -v -F /tmp/rv-3ccq6b-empty-sshconfig -G fixture.test 2>&1 | grep "Reading configuration data"
+debug1: Reading configuration data /tmp/rv-3ccq6b-empty-sshconfig
+
+## mutant campaign pass 1 (clone /tmp/rv-3ccq6b-mut at 607b077a; stall window hit M3–M6 — those four outcomes are superseded by pass 2)
+baseline gitops.go=9426d901c30afe11 project_resolve.go=01d6214729acae97
+[2026-09-20T21:25:29Z] M1-remove-allowlist-filter applied to internal/gitops/gitops.go (9426d901c30afe11 -> de380cc8fee46378)
+[2026-09-20T21:25:41Z] M1-remove-allowlist-filter restored (9426d901c30afe11)
+[2026-09-20T21:25:41Z] M2-drop-F applied to internal/gitops/gitops.go (9426d901c30afe11 -> e2b643a83dc76222)
+[2026-09-20T21:25:50Z] M2-drop-F restored (9426d901c30afe11)
+[2026-09-20T21:25:50Z] M3-drop-ProxyCommand-none applied to internal/gitops/gitops.go (9426d901c30afe11 -> 0467754b21fd33f2)
+[2026-09-20T21:28:55Z] M3-drop-ProxyCommand-none restored (9426d901c30afe11)
+[2026-09-20T21:28:55Z] M4-pass-ambient-GIT_SSH_COMMAND applied to internal/gitops/gitops.go (9426d901c30afe11 -> 27424e8bdedbb7d4)
+[2026-09-20T21:31:57Z] M4-pass-ambient-GIT_SSH_COMMAND restored (9426d901c30afe11)
+[2026-09-20T21:31:58Z] M5-allow-https_proxy applied to internal/gitops/gitops.go (9426d901c30afe11 -> c6aa5846121a1a0b)
+[2026-09-20T21:35:00Z] M5-allow-https_proxy restored (9426d901c30afe11)
+[2026-09-20T21:35:00Z] M6-drop-GIT_ASKPASS applied to internal/gitops/gitops.go (9426d901c30afe11 -> 6fd45ed4d05746e2)
+[2026-09-20T21:38:03Z] M6-drop-GIT_ASKPASS restored (9426d901c30afe11)
+[2026-09-20T21:38:03Z] M7-drop-SSH_AUTH_SOCK applied to internal/gitops/gitops.go (9426d901c30afe11 -> 5e80fcb605e477db)
+[2026-09-20T21:39:17Z] M7-drop-SSH_AUTH_SOCK restored (9426d901c30afe11)
+[2026-09-20T21:39:17Z] M9-EqualFold-to-exact applied to internal/gitops/gitops.go (9426d901c30afe11 -> ef529ca201929868)
+[2026-09-20T21:39:22Z] M9-EqualFold-to-exact restored (9426d901c30afe11)
+[2026-09-20T21:39:22Z] M11-StrictHostKeyChecking-accept-new applied to internal/gitops/gitops.go (9426d901c30afe11 -> c18b6819feca1515)
+[2026-09-20T21:39:30Z] M11-StrictHostKeyChecking-accept-new restored (9426d901c30afe11)
+[2026-09-20T21:39:30Z] M13-callsite-Clone-legacy applied to cmd/curator/project_resolve.go (01d6214729acae97 -> 79cb2498c5a3ab48)
+[2026-09-20T21:39:40Z] M13-callsite-Clone-legacy restored (01d6214729acae97)
+[2026-09-20T21:39:40Z] M14-callsite-Fetch-legacy applied to cmd/curator/project_resolve.go (01d6214729acae97 -> 17f476c67483a67d)
+[2026-09-20T21:39:49Z] M14-callsite-Fetch-legacy restored (01d6214729acae97)
+[2026-09-20T21:39:49Z] M15-drop-c-pins-at-callsites applied to internal/gitops/gitops.go (9426d901c30afe11 -> e41b37dc6202752d)
+[2026-09-20T21:40:18Z] M15-drop-c-pins-at-callsites restored (9426d901c30afe11)
+final gitops.go=9426d901c30afe11 project_resolve.go=01d6214729acae97 (baseline 9426d901c30afe11 / 01d6214729acae97)
+git status: ?? internal/crossconformance/zz_review_probe_test.go 
+HEAD tree: 06956f334c373984e8966f510da143cbd168b46f
+[2026-09-20T21:40:18Z] MUTANTS DONE
+
+M1-remove-allowlist-filter (internal/gitops/gitops.go):
+  M1-remove-allowlist-filter gitops rc=1 :: TestIsolatedGitEnvAllowList=FAIL  ::     isolated_test.go:377: GIT_SSH = ["evil-GIT_SSH"], want it absent by construction
+  M1-remove-allowlist-filter crossconformance rc=1 :: TestDraftLiteralIgnoresGitSSHCommand=FAIL TestDraftLiteralDropsGitProxyCommand=FAIL TestDraftLiteralIgnoresGitExecPath=FAIL TestDraftLiteralIgnoresProxyEnvironment=FAIL  ::     draftsources_literal_isolation_test.go:193: git saw the ambient GIT_SSH_COMMAND:
+M2-drop-F (internal/gitops/gitops.go):
+  M2-drop-F gitops rc=1 :: TestIsolatedGitEnvSSHCommand=FAIL  ::     isolated_test.go:479: GIT_SSH_COMMAND misses "ssh -F ": "ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ProxyCommand=none -o ProxyJump=none -o PermitL
+  M2-drop-F crossconformance rc=1 :: TestDraftLiteralIgnoresUserSSHConfig=FAIL  ::     draftsources_literal_isolation_test.go:412: ssh argv misses <-F>:
+M3-drop-ProxyCommand-none (internal/gitops/gitops.go):
+  M3-drop-ProxyCommand-none gitops rc=1 ::  :: 
+  M3-drop-ProxyCommand-none crossconformance rc=1 ::  :: 
+M4-pass-ambient-GIT_SSH_COMMAND (internal/gitops/gitops.go):
+  M4-pass-ambient-GIT_SSH_COMMAND gitops rc=1 ::  :: 
+  M4-pass-ambient-GIT_SSH_COMMAND crossconformance rc=1 ::  :: 
+M5-allow-https_proxy (internal/gitops/gitops.go):
+  M5-allow-https_proxy gitops rc=1 ::  :: 
+  M5-allow-https_proxy crossconformance rc=1 ::  :: 
+M6-drop-GIT_ASKPASS (internal/gitops/gitops.go):
+  M6-drop-GIT_ASKPASS gitops rc=1 ::  :: 
+  M6-drop-GIT_ASKPASS crossconformance rc=1 ::  :: 
+M7-drop-SSH_AUTH_SOCK (internal/gitops/gitops.go):
+  M7-drop-SSH_AUTH_SOCK gitops rc=1 :: TestIsolatedGitEnvPinsEmptyConfig=FAIL TestIsolatedGitEnvAllowList=FAIL  ::     isolated_test.go:282: SSH_AUTH_SOCK was not preserved
+  M7-drop-SSH_AUTH_SOCK crossconformance rc=1 :: TestDraftLiteralKeepsAgentAndAskpass=FAIL  ::     draftsources_literal_isolation_test.go:613: git missed SSH_AUTH_SOCK:
+M9-EqualFold-to-exact (internal/gitops/gitops.go):
+  M9-EqualFold-to-exact gitops rc=1 :: TestIsolatedGitEnvAllowList=PASS TestIsolatedGitEnvWindowsCaseHonoursAllowed=FAIL  ::     isolated_test.go:444: SSH_AUTH_SOCK entries = ["/private/tmp/com.apple.launchd.PXt8w1CCF2/Listeners"], want the mixed-case ambient value preserved
+M11-StrictHostKeyChecking-accept-new (internal/gitops/gitops.go):
+  M11-StrictHostKeyChecking-accept-new gitops rc=1 :: TestIsolatedGitEnvSSHCommand=FAIL  ::     isolated_test.go:479: GIT_SSH_COMMAND misses "StrictHostKeyChecking=yes": "ssh -F '/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/curator-sshconfig-143601
+  M11-StrictHostKeyChecking-accept-new crossconformance rc=1 :: TestDraftLiteralIgnoresUserSSHConfig=FAIL  ::     draftsources_literal_isolation_test.go:412: ssh argv misses <StrictHostKeyChecking=yes>:
+M13-callsite-Clone-legacy (cmd/curator/project_resolve.go):
+  M13-callsite-Clone-legacy crossconformance rc=1 :: TestDraftLiteralIgnoresGitSSHCommand=FAIL TestDraftLiteralIgnoresGitExecPath=FAIL TestDraftLiteralIgnoresProxyEnvironment=FAIL  ::     draftsources_literal_isolation_test.go:181: resolve succeeded with a hostile GIT_SSH_COMMAND, want the endpoint refusal:
+M14-callsite-Fetch-legacy (cmd/curator/project_resolve.go):
+  M14-callsite-Fetch-legacy crossconformance rc=1 :: TestDraftLiteralRefreshIgnoresUserConfig=FAIL  :: 
+M15-drop-c-pins-at-callsites (internal/gitops/gitops.go):
+  M15-drop-c-pins-at-callsites gitops rc=0 :: TestCloneIsolatedIgnoresUserConfig=PASS TestFetchIsolatedIgnoresUserConfig=PASS TestIsolatedGitEnvPinsEmptyConfig=PASS TestIsolatedGitEnvAllowList=PASS TestIsolatedGitEnvWindowsCaseHonoursAllowed=PASS TestIsolatedGitEnvSSHCommand=PASS TestIsolatedGitConfigArgs=PASS TestCloneIsolatedIgnoresGitProxyCommand=PASS  :: 
+  M15-drop-c-pins-at-callsites crossconformance rc=1 :: TestDraftLiteralIgnoresGitSSHCommand=PASS TestDraftLiteralIgnoresGitSSH=PASS TestDraftLiteralDropsGitProxyCommand=PASS TestDraftLiteralIgnoresGitExecPath=PASS TestDraftLiteralIgnoresUserSSHConfig=PASS TestDraftSSHEmptyConfigIgnoresHostileFile=PASS TestDraftLiteralIgnoresProxyEnvironment=PASS TestDraftLiteralKeepsAgentAndAskpass=PASS TestDraftLiteralRefreshIgnoresUserConfig=PASS TestZZReviewConfigPinsReachGit=FAIL  ::     draftsources_literal_isolation_test.go:521: control stderr lacks proxy wording; connection count 1 is the verdict:
+
+## mutant campaign pass 2 (health-gated re-execution of M3–M6)
+baseline gitops.go=9426d901c30afe11 project_resolve.go=01d6214729acae97
+[2026-09-20T21:40:58Z] host healthy
+[2026-09-20T21:40:58Z] M3-drop-ProxyCommand-none applied to internal/gitops/gitops.go (9426d901c30afe11 -> 0467754b21fd33f2)
+[2026-09-20T21:41:05Z] M3-drop-ProxyCommand-none restored (9426d901c30afe11)
+[2026-09-20T21:59:26Z] host healthy
+[2026-09-20T21:59:26Z] M4-pass-ambient-GIT_SSH_COMMAND applied to internal/gitops/gitops.go (9426d901c30afe11 -> 27424e8bdedbb7d4)
+[2026-09-20T22:00:10Z] M4-pass-ambient-GIT_SSH_COMMAND restored (9426d901c30afe11)
+[2026-09-20T22:00:13Z] host healthy
+[2026-09-20T22:00:13Z] M5-allow-https_proxy applied to internal/gitops/gitops.go (9426d901c30afe11 -> c6aa5846121a1a0b)
+[2026-09-20T22:05:48Z] M5-allow-https_proxy restored (9426d901c30afe11)
+[2026-09-20T22:05:49Z] host healthy
+[2026-09-20T22:05:49Z] M6-drop-GIT_ASKPASS applied to internal/gitops/gitops.go (9426d901c30afe11 -> 6fd45ed4d05746e2)
+[2026-09-20T22:05:57Z] M6-drop-GIT_ASKPASS restored (9426d901c30afe11)
+final gitops.go=9426d901c30afe11 project_resolve.go=01d6214729acae97 (baseline 9426d901c30afe11 / 01d6214729acae97)
+git status: ?? internal/crossconformance/zz_review_probe_test.go 
+HEAD tree: 06956f334c373984e8966f510da143cbd168b46f
+[2026-09-20T22:05:57Z] MUTANTS DONE
+
+M3-drop-ProxyCommand-none (internal/gitops/gitops.go):
+  M3-drop-ProxyCommand-none gitops rc=1 :: TestIsolatedGitEnvSSHCommand=FAIL  ::     isolated_test.go:479: GIT_SSH_COMMAND misses "ProxyCommand=none": "ssh -F '/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/curator-sshconfig-420421623' -o 
+  M3-drop-ProxyCommand-none crossconformance rc=1 :: TestDraftLiteralIgnoresUserSSHConfig=FAIL  ::     draftsources_literal_isolation_test.go:412: ssh argv misses <ProxyCommand=none>:
+M4-pass-ambient-GIT_SSH_COMMAND (internal/gitops/gitops.go):
+  M4-pass-ambient-GIT_SSH_COMMAND gitops rc=1 :: TestIsolatedGitEnvAllowList=FAIL TestIsolatedGitEnvSSHCommand=FAIL  ::     isolated_test.go:384: GIT_SSH_COMMAND entries = ["ssh -F '/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestIsolatedGitEnvAllowList2869062350/002/curator
+  M4-pass-ambient-GIT_SSH_COMMAND crossconformance rc=1 :: TestDraftLiteralIgnoresGitSSHCommand=FAIL  ::     draftsources_literal_isolation_test.go:181: resolve succeeded with a hostile GIT_SSH_COMMAND, want the endpoint refusal:
+M5-allow-https_proxy (internal/gitops/gitops.go):
+  M5-allow-https_proxy gitops rc=1 :: TestIsolatedGitEnvAllowList=FAIL  ::     isolated_test.go:397: https_proxy = ["http://127.0.0.1:9/" "http://127.0.0.1:9/"], want it absent by construction
+  M5-allow-https_proxy crossconformance rc=1 :: TestDraftLiteralIgnoresProxyEnvironment=FAIL  ::     draftsources_literal_isolation_test.go:521: control stderr lacks proxy wording; connection count 1 is the verdict:
+M6-drop-GIT_ASKPASS (internal/gitops/gitops.go):
+  M6-drop-GIT_ASKPASS gitops rc=1 :: TestIsolatedGitEnvPinsEmptyConfig=FAIL TestIsolatedGitEnvAllowList=FAIL  ::     isolated_test.go:285: GIT_ASKPASS was not preserved
+  M6-drop-GIT_ASKPASS crossconformance rc=1 :: TestDraftLiteralKeepsAgentAndAskpass=FAIL  ::     draftsources_literal_isolation_test.go:616: git missed GIT_ASKPASS:
+
+## per-mutant failure lines (pass 1 for M1,M2,M7,M9,M11,M13,M14,M15; pass 2 for M3–M6)
+### rv-3ccq6b-mut-M1-remove-allowlist-filter-crossconformance.out
+    draftsources_literal_isolation_test.go:193: git saw the ambient GIT_SSH_COMMAND:
+--- FAIL: TestDraftLiteralIgnoresGitSSHCommand (4.22s)
+    draftsources_literal_isolation_test.go:281: git saw the ambient GIT_PROXY_COMMAND:
+--- FAIL: TestDraftLiteralDropsGitProxyCommand (0.99s)
+    draftsources_literal_isolation_test.go:333: git saw the ambient GIT_EXEC_PATH:
+--- FAIL: TestDraftLiteralIgnoresGitExecPath (0.88s)
+    draftsources_literal_isolation_test.go:521: control stderr lacks proxy wording; connection count 1 is the verdict:
+    draftsources_literal_isolation_test.go:560: git saw the ambient proxy environment:
+--- FAIL: TestDraftLiteralIgnoresProxyEnvironment (0.79s)
+FAIL	github.com/relux-works/curator/internal/crossconformance	7.379s
+
+### rv-3ccq6b-mut-M1-remove-allowlist-filter-gitops.out
+    isolated_test.go:377: GIT_SSH = ["evil-GIT_SSH"], want it absent by construction
+--- FAIL: TestIsolatedGitEnvAllowList (0.00s)
+FAIL	github.com/relux-works/curator/internal/gitops	0.380s
+
+### rv-3ccq6b-mut-M2-drop-F-crossconformance.out
+    draftsources_literal_isolation_test.go:412: ssh argv misses <-F>:
+--- FAIL: TestDraftLiteralIgnoresUserSSHConfig (2.73s)
+FAIL	github.com/relux-works/curator/internal/crossconformance	3.253s
+
+### rv-3ccq6b-mut-M2-drop-F-gitops.out
+    isolated_test.go:479: GIT_SSH_COMMAND misses "ssh -F ": "ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ProxyCommand=none -o ProxyJump=none -o PermitLocalCommand=no -o ForwardAgent=no -o ClearAllForwardings=yes -o RequestTTY=no -o CanonicalizeHostnam
+--- FAIL: TestIsolatedGitEnvSSHCommand (0.03s)
+FAIL	github.com/relux-works/curator/internal/gitops	0.420s
+
+### rv-3ccq6b-mut2-M3-drop-ProxyCommand-none-crossconformance.out
+    draftsources_literal_isolation_test.go:412: ssh argv misses <ProxyCommand=none>:
+--- FAIL: TestDraftLiteralIgnoresUserSSHConfig (2.44s)
+FAIL	github.com/relux-works/curator/internal/crossconformance	2.910s
+
+### rv-3ccq6b-mut2-M3-drop-ProxyCommand-none-gitops.out
+    isolated_test.go:479: GIT_SSH_COMMAND misses "ProxyCommand=none": "ssh -F '/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/curator-sshconfig-420421623' -o BatchMode=yes -o StrictHostKeyChecking=yes -o ProxyJump=none -o PermitLocalCommand=no -o ForwardAgen
+--- FAIL: TestIsolatedGitEnvSSHCommand (0.00s)
+FAIL	github.com/relux-works/curator/internal/gitops	0.342s
+
+### rv-3ccq6b-mut2-M4-pass-ambient-GIT_SSH_COMMAND-crossconformance.out
+    draftsources_literal_isolation_test.go:181: resolve succeeded with a hostile GIT_SSH_COMMAND, want the endpoint refusal:
+--- FAIL: TestDraftLiteralIgnoresGitSSHCommand (20.71s)
+FAIL	github.com/relux-works/curator/internal/crossconformance	22.958s
+
+### rv-3ccq6b-mut2-M4-pass-ambient-GIT_SSH_COMMAND-gitops.out
+    isolated_test.go:384: GIT_SSH_COMMAND entries = ["ssh -F '/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestIsolatedGitEnvAllowList2869062350/002/curator-sshconfig-1661685712' -o BatchMode=yes -o StrictHostKeyChecking=yes -o ProxyCommand=none -o ProxyJu
+--- FAIL: TestIsolatedGitEnvAllowList (0.00s)
+    isolated_test.go:469: GIT_SSH_COMMAND carries the ambient payload: "/tmp/evil-ssh-command"
+--- FAIL: TestIsolatedGitEnvSSHCommand (0.00s)
+FAIL	github.com/relux-works/curator/internal/gitops	1.465s
+
+### rv-3ccq6b-mut2-M5-allow-https_proxy-crossconformance.out
+    draftsources_literal_isolation_test.go:521: control stderr lacks proxy wording; connection count 1 is the verdict:
+    draftsources_literal_isolation_test.go:560: git saw the ambient proxy environment:
+--- FAIL: TestDraftLiteralIgnoresProxyEnvironment (314.63s)
+FAIL	github.com/relux-works/curator/internal/crossconformance	317.199s
+
+### rv-3ccq6b-mut2-M5-allow-https_proxy-gitops.out
+    isolated_test.go:397: https_proxy = ["http://127.0.0.1:9/" "http://127.0.0.1:9/"], want it absent by construction
+--- FAIL: TestIsolatedGitEnvAllowList (0.00s)
+FAIL	github.com/relux-works/curator/internal/gitops	1.433s
+
+### rv-3ccq6b-mut2-M6-drop-GIT_ASKPASS-crossconformance.out
+    draftsources_literal_isolation_test.go:616: git missed GIT_ASKPASS:
+--- FAIL: TestDraftLiteralKeepsAgentAndAskpass (2.69s)
+FAIL	github.com/relux-works/curator/internal/crossconformance	3.220s
+
+### rv-3ccq6b-mut2-M6-drop-GIT_ASKPASS-gitops.out
+    isolated_test.go:285: GIT_ASKPASS was not preserved
+--- FAIL: TestIsolatedGitEnvPinsEmptyConfig (0.00s)
+    isolated_test.go:409: GIT_ASKPASS = [], want ["/operator/askpass"]
+--- FAIL: TestIsolatedGitEnvAllowList (0.00s)
+FAIL	github.com/relux-works/curator/internal/gitops	0.357s
+
+### rv-3ccq6b-mut-M7-drop-SSH_AUTH_SOCK-crossconformance.out
+    draftsources_literal_isolation_test.go:613: git missed SSH_AUTH_SOCK:
+--- FAIL: TestDraftLiteralKeepsAgentAndAskpass (3.16s)
+FAIL	github.com/relux-works/curator/internal/crossconformance	3.822s
+
+### rv-3ccq6b-mut-M7-drop-SSH_AUTH_SOCK-gitops.out
+    isolated_test.go:282: SSH_AUTH_SOCK was not preserved
+--- FAIL: TestIsolatedGitEnvPinsEmptyConfig (0.00s)
+    isolated_test.go:409: SSH_AUTH_SOCK = [], want ["/tmp/kept-agent.sock"]
+--- FAIL: TestIsolatedGitEnvAllowList (0.00s)
+FAIL	github.com/relux-works/curator/internal/gitops	64.192s
+
+### rv-3ccq6b-mut-M9-EqualFold-to-exact-gitops.out
+--- PASS: TestIsolatedGitEnvAllowList (0.00s)
+    isolated_test.go:444: SSH_AUTH_SOCK entries = ["/private/tmp/com.apple.launchd.PXt8w1CCF2/Listeners"], want the mixed-case ambient value preserved
+--- FAIL: TestIsolatedGitEnvWindowsCaseHonoursAllowed (0.00s)
+FAIL	github.com/relux-works/curator/internal/gitops	0.373s
+
+### rv-3ccq6b-mut-M11-StrictHostKeyChecking-accept-new-crossconformance.out
+    draftsources_literal_isolation_test.go:412: ssh argv misses <StrictHostKeyChecking=yes>:
+--- FAIL: TestDraftLiteralIgnoresUserSSHConfig (2.81s)
+FAIL	github.com/relux-works/curator/internal/crossconformance	3.468s
+
+### rv-3ccq6b-mut-M11-StrictHostKeyChecking-accept-new-gitops.out
+    isolated_test.go:479: GIT_SSH_COMMAND misses "StrictHostKeyChecking=yes": "ssh -F '/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/curator-sshconfig-1436016716' -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ProxyCommand=none -o ProxyJump=none -o
+--- FAIL: TestIsolatedGitEnvSSHCommand (0.00s)
+FAIL	github.com/relux-works/curator/internal/gitops	0.330s
+
+### rv-3ccq6b-mut-M13-callsite-Clone-legacy-crossconformance.out
+    draftsources_literal_isolation_test.go:181: resolve succeeded with a hostile GIT_SSH_COMMAND, want the endpoint refusal:
+--- FAIL: TestDraftLiteralIgnoresGitSSHCommand (4.65s)
+    draftsources_literal_isolation_test.go:333: git saw the ambient GIT_EXEC_PATH:
+--- FAIL: TestDraftLiteralIgnoresGitExecPath (0.92s)
+    draftsources_literal_isolation_test.go:521: control stderr lacks proxy wording; connection count 1 is the verdict:
+    draftsources_literal_isolation_test.go:560: git saw the ambient proxy environment:
+--- FAIL: TestDraftLiteralIgnoresProxyEnvironment (0.73s)
+FAIL	github.com/relux-works/curator/internal/crossconformance	7.080s
+
+### rv-3ccq6b-mut-M14-callsite-Fetch-legacy-crossconformance.out
+    draftsources_semantic_v2_test.go:515: refresh = 1:
+--- FAIL: TestDraftLiteralRefreshIgnoresUserConfig (4.56s)
+FAIL	github.com/relux-works/curator/internal/crossconformance	5.258s
+
+### rv-3ccq6b-mut-M15-drop-c-pins-at-callsites-crossconformance.out
+--- PASS: TestDraftLiteralIgnoresGitSSHCommand (4.71s)
+--- PASS: TestDraftLiteralIgnoresGitSSH (1.99s)
+--- PASS: TestDraftLiteralDropsGitProxyCommand (1.65s)
+--- PASS: TestDraftLiteralIgnoresGitExecPath (1.34s)
+--- PASS: TestDraftLiteralIgnoresUserSSHConfig (1.38s)
+--- PASS: TestDraftSSHEmptyConfigIgnoresHostileFile (0.05s)
+    draftsources_literal_isolation_test.go:521: control stderr lacks proxy wording; connection count 1 is the verdict:
+--- PASS: TestDraftLiteralIgnoresProxyEnvironment (2.76s)
+--- PASS: TestDraftLiteralKeepsAgentAndAskpass (1.67s)
+--- PASS: TestDraftLiteralRefreshIgnoresUserConfig (2.97s)
+    zz_review_probe_test.go:135: unpinned network invocation: <clone><--><https://fixture.test/kit.git></var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestZZReviewConfigPinsReachGit2819901750/001/cli-home/draft-git/346faaf33bbe9e33-kit>
+    zz_review_probe_test.go:135: unpinned network invocation: <fetch><--all><--tags><--prune>
+    zz_review_probe_test.go:138: pinned clone=0 fetch=0 remote=0; unpinned clone/fetch=2
+    zz_review_probe_test.go:140: pins missing at the production entry: clone=0 fetch=0 unpinned=2
+--- FAIL: TestZZReviewConfigPinsReachGit (1.55s)
+FAIL	github.com/relux-works/curator/internal/crossconformance	20.809s
+
+### rv-3ccq6b-mut-M15-drop-c-pins-at-callsites-gitops.out
+--- PASS: TestCloneIsolatedIgnoresUserConfig (2.21s)
+--- PASS: TestFetchIsolatedIgnoresUserConfig (1.11s)
+--- PASS: TestIsolatedGitEnvPinsEmptyConfig (0.00s)
+--- PASS: TestIsolatedGitEnvAllowList (0.00s)
+--- PASS: TestIsolatedGitEnvWindowsCaseHonoursAllowed (0.00s)
+--- PASS: TestIsolatedGitEnvSSHCommand (0.00s)
+--- PASS: TestIsolatedGitConfigArgs (0.00s)
+--- PASS: TestCloneIsolatedIgnoresGitProxyCommand (0.42s)
+ok  	github.com/relux-works/curator/internal/gitops	4.092s
+
+## mutant driver scripts
+### /tmp/rv-3ccq6b-mutants.sh
+#!/bin/bash
+set -o pipefail
+cd /tmp/rv-3ccq6b-mut || exit 99
+LOG=/tmp/rv-3ccq6b-mutants.log
+SUM=/tmp/rv-3ccq6b-mutants-summary.txt
+: > "$LOG"; : > "$SUM"
+ts() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+G=internal/gitops/gitops.go
+P=cmd/curator/project_resolve.go
+base_g=$(shasum -a 256 "$G" | cut -c1-16); base_p=$(shasum -a 256 "$P" | cut -c1-16)
+echo "baseline gitops.go=$base_g project_resolve.go=$base_p" >> "$LOG"
+
+run_killers() { # name pkg runmask
+  local name="$1" pkg="$2" mask="$3"
+  local out="/tmp/rv-3ccq6b-mut-$name-$(basename "$pkg").out"
+  go test "$pkg" -run "$mask" -count=1 -v -timeout 600s > "$out" 2>&1
+  local rc=$?
+  local verdicts
+  verdicts=$(command grep -E '^--- (PASS|FAIL|SKIP): ' "$out" | sed -E 's/^--- ([A-Z]+): ([^ ]+).*/\2=\1/' | tr '\n' ' ')
+  local reason
+  reason=$(command grep -E '^\s+[a-z_]+\.go:[0-9]+: ' "$out" | head -1 | sed -E 's/^\s+//' | cut -c1-160)
+  echo "  $name $(basename "$pkg") rc=$rc :: $verdicts :: $reason" >> "$SUM"
+}
+
+mutant() { # name file perl-expr
+  local name="$1" file="$2" expr="$3"; shift 3
+  local before after
+  before=$(shasum -a 256 "$file" | cut -c1-16)
+  perl -0pi -e "$expr" "$file"
+  after=$(shasum -a 256 "$file" | cut -c1-16)
+  if [ "$before" = "$after" ]; then echo "$name: MUTATION DID NOT APPLY" >> "$SUM"; return; fi
+  echo "[$(ts)] $name applied to $file ($before -> $after)" >> "$LOG"
+  echo "$name ($file):" >> "$SUM"
+  if ! go build ./... > "/tmp/rv-3ccq6b-mut-$name-build.out" 2>&1; then
+    echo "  COMPILE-FAIL (not a kill)" >> "$SUM"
+  else
+    while [ $# -gt 0 ]; do run_killers "$name" "$1" "$2"; shift 2; done
+  fi
+  git checkout -q -- "$file"
+  local restored
+  restored=$(shasum -a 256 "$file" | cut -c1-16)
+  echo "[$(ts)] $name restored ($restored)" >> "$LOG"
+  [ "$restored" = "$before" ] || echo "  RESTORE MISMATCH for $name" >> "$SUM"
+}
+
+XR=./internal/crossconformance/
+GO=./internal/gitops/
+
+mutant M1-remove-allowlist-filter "$G" 's/if !isDraftAllowedEnv\(name\) \{/if false \&\& !isDraftAllowedEnv(name) {/' \
+  "$GO" 'TestIsolatedGitEnvAllowList$' \
+  "$XR" 'TestDraftLiteralIgnoresGitSSHCommand$|TestDraftLiteralIgnoresGitExecPath$|TestDraftLiteralIgnoresProxyEnvironment$|TestDraftLiteralDropsGitProxyCommand$'
+mutant M2-drop-F "$G" 's/out\.WriteString\("ssh -F "\)\n\tout\.WriteString\(shellQuote\(emptyConfig\)\)/out.WriteString("ssh")/' \
+  "$GO" 'TestIsolatedGitEnvSSHCommand$' \
+  "$XR" 'TestDraftLiteralIgnoresUserSSHConfig$'
+mutant M3-drop-ProxyCommand-none "$G" 's/\t"ProxyCommand=none",\n//' \
+  "$GO" 'TestIsolatedGitEnvSSHCommand$' \
+  "$XR" 'TestDraftLiteralIgnoresUserSSHConfig$'
+mutant M4-pass-ambient-GIT_SSH_COMMAND "$G" 's/("GIT_SSH_COMMAND="\+draftSSHCommand\(emptySSHName\),\n\t\))/$1\n\tif v, ok := os.LookupEnv("GIT_SSH_COMMAND"); ok {\n\t\tenv = append(env, "GIT_SSH_COMMAND="+v)\n\t}/' \
+  "$GO" 'TestIsolatedGitEnvAllowList$|TestIsolatedGitEnvSSHCommand$' \
+  "$XR" 'TestDraftLiteralIgnoresGitSSHCommand$'
+mutant M5-allow-https_proxy "$G" 's/\t"GIT_ASKPASS",\n\}/\t"GIT_ASKPASS",\n\t"https_proxy",\n}/' \
+  "$GO" 'TestIsolatedGitEnvAllowList$' \
+  "$XR" 'TestDraftLiteralIgnoresProxyEnvironment$'
+mutant M6-drop-GIT_ASKPASS "$G" 's/\t"GIT_ASKPASS",\n//' \
+  "$GO" 'TestIsolatedGitEnvAllowList$|TestIsolatedGitEnvPinsEmptyConfig$' \
+  "$XR" 'TestDraftLiteralKeepsAgentAndAskpass$'
+mutant M7-drop-SSH_AUTH_SOCK "$G" 's/\t"SSH_AUTH_SOCK",\n//' \
+  "$GO" 'TestIsolatedGitEnvAllowList$|TestIsolatedGitEnvPinsEmptyConfig$' \
+  "$XR" 'TestDraftLiteralKeepsAgentAndAskpass$'
+mutant M9-EqualFold-to-exact "$G" 's/if strings\.EqualFold\(name, allowed\) \{/if name == allowed {/' \
+  "$GO" 'TestIsolatedGitEnvWindowsCaseHonoursAllowed$|TestIsolatedGitEnvAllowList$'
+mutant M11-StrictHostKeyChecking-accept-new "$G" 's/"StrictHostKeyChecking=yes"/"StrictHostKeyChecking=accept-new"/' \
+  "$GO" 'TestIsolatedGitEnvSSHCommand$' \
+  "$XR" 'TestDraftLiteralIgnoresUserSSHConfig$'
+mutant M13-callsite-Clone-legacy "$P" 's/gitops\.CloneIsolated\(targets\[index\], repoDir\)/gitops.Clone(targets[index], repoDir)/' \
+  "$XR" 'TestDraftLiteralIgnoresGitSSHCommand$|TestDraftLiteralIgnoresGitExecPath$|TestDraftLiteralIgnoresProxyEnvironment$'
+mutant M14-callsite-Fetch-legacy "$P" 's/gitops\.FetchIsolated\(repoDir\)/gitops.Fetch(repoDir)/' \
+  "$XR" 'TestDraftLiteralRefreshIgnoresUserConfig$'
+mutant M15-drop-c-pins-at-callsites "$G" 's/runWithEnv\(dir, env, withIsolatedConfigArgs\(args\)\.\.\.\)/runWithEnv(dir, env, args...)/g' \
+  "$GO" 'TestCloneIsolated|TestFetchIsolated|TestIsolatedGit' \
+  "$XR" 'TestDraftLiteral|TestDraftSSH|TestZZReviewConfigPinsReachGit$'
+
+echo "final gitops.go=$(shasum -a 256 "$G" | cut -c1-16) project_resolve.go=$(shasum -a 256 "$P" | cut -c1-16) (baseline $base_g / $base_p)" >> "$LOG"
+echo "git status: $(git status --short | tr '\n' ' ')" >> "$LOG"
+echo "HEAD tree: $(git rev-parse 'HEAD^{tree}')" >> "$LOG"
+echo "[$(ts)] MUTANTS DONE" >> "$LOG"
+
+### health probe
+#!/bin/bash
+# fresh Go binary exec probe (copies of platform binaries are always killed on this host, so cp /bin/echo is not a valid probe)
+d=$(mktemp -d /tmp/rv-hp.XXXXXX)
+printf 'package main\nfunc main(){ println("healthy") }\n' > "$d/main.go"
+printf 'module hp\n\ngo 1.22\n' > "$d/go.mod"
+if (cd "$d" && go build -o probe . >/dev/null 2>&1); then
+  out=$("$d/probe" 2>&1); rc=$?
+  if [ $rc -eq 0 ] && [ "$out" = "healthy" ]; then echo "healthy"; else echo "stalled rc=$rc"; fi
+else
+  echo "build-failed"
+fi
+rm -rf "$d"
+
+## reviewer probe source (throwaway, clone 2 only): internal/crossconformance/zz_review_probe_test.go
+package crossconformance
+
+import (
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+
+	"github.com/relux-works/curator/internal/config"
+	"github.com/relux-works/curator/internal/testcli"
+)
+
+// Reviewer probe A (row d, real OpenSSH at the production entry): a PATH
+// ssh wrapper execs the real ssh with -v and captures its stderr, so the
+// configuration files the lane's ssh actually reads are observable.
+func TestZZReviewRealSSHReadsOnlyLaneConfig(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test transport wrapper is POSIX-only")
+	}
+	realGit := requireGit(t)
+	realSSH, ok := testcli.LookPath("ssh")
+	if !ok {
+		t.Fatal("ssh is not available")
+	}
+	root := t.TempDir()
+	fakeDir, cloneLog, _ := literalIsolationGitShim(t, "", "", realGit)
+	verboseLog := filepath.Join(fakeDir, "ssh-verbose.log")
+	wrapper := "#!/bin/sh\nexec '" + realSSH + "' -v \"$@\" 2>>'" + verboseLog + "'\n"
+	if err := os.WriteFile(filepath.Join(fakeDir, "ssh"), []byte(wrapper), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	pathEnv := draftTransportPATH(t, fakeDir)
+	configPath, project, home := setupCLIProject(t, root)
+	// Hostile ~/.ssh/config under the child HOME, as row (d) plants it.
+	dotSSH := filepath.Join(home, ".ssh")
+	if err := os.MkdirAll(dotSSH, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dotSSH, "config"), []byte("Host fixture.test\n\tHostName evil.test\n\tProxyCommand /tmp/evil-proxy %h %p\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	payload := `{"schema_version":2,"sources":{"kit":{"git":"` + literalIsolationSSH + `","tag":"v1"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
+	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, stdout, stderr := runCurator(t, home, configPath, pathEnv, "project", "resolve", "app")
+	if code == 0 {
+		t.Fatalf("resolve succeeded, want the endpoint refusal:\n%s\n%s", stdout, stderr)
+	}
+	if !strings.Contains(stderr, config.CodeRepositoryEndpointUnavailable) {
+		t.Fatalf("stderr misses %s:\n%s", config.CodeRepositoryEndpointUnavailable, stderr)
+	}
+	if clones := draftCloneLog(t, cloneLog); len(clones) != 1 || clones[0] != literalIsolationSSH {
+		t.Fatalf("clones = %v", clones)
+	}
+	verbose, err := os.ReadFile(verboseLog)
+	if err != nil {
+		t.Fatalf("real ssh never ran through the lane: %v", err)
+	}
+	var reads []string
+	for _, line := range strings.Split(string(verbose), "\n") {
+		if strings.Contains(line, "Reading configuration data") {
+			reads = append(reads, strings.TrimSpace(line))
+		}
+	}
+	t.Logf("configuration reads by the lane's real ssh:\n%s", strings.Join(reads, "\n"))
+	if len(reads) != 1 || !strings.Contains(reads[0], "curator-sshconfig-") {
+		t.Fatalf("lane ssh read %d configuration files, want exactly the fresh empty lane file: %v", len(reads), reads)
+	}
+	userHome, _ := os.UserHomeDir()
+	for _, forbidden := range []string{filepath.Join(userHome, ".ssh", "config"), "/etc/ssh/ssh_config", filepath.Join(home, ".ssh", "config"), "evil.test", "Executing proxy command", "evil-proxy"} {
+		if strings.Contains(string(verbose), forbidden) {
+			t.Fatalf("lane ssh output mentions %q:\n%s", forbidden, verbose)
+		}
+	}
+	for _, want := range []string{"Connecting to fixture.test", "fixture.test"} {
+		if !strings.Contains(string(verbose), want) {
+			t.Logf("note: verbose output lacks %q (DNS may fail before connect)", want)
+		}
+	}
+	t.Logf("first lines:\n%s", strings.Join(strings.Split(string(verbose), "\n")[:6], "\n"))
+}
+
+// Reviewer probe B: the -c transport pins reach git at the production
+// entry (clone and fetch), observed through a git shim that logs argv.
+func TestZZReviewConfigPinsReachGit(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test transport wrapper is POSIX-only")
+	}
+	realGit := requireGit(t)
+	root := t.TempDir()
+	bare, _ := draftCLIKitBare(t, root)
+	fakeDir := t.TempDir()
+	argvLog := filepath.Join(fakeDir, "argv.log")
+	rewrite := literalIsolationHTTPS
+	var script strings.Builder
+	script.WriteString("#!/bin/sh\n")
+	script.WriteString("{ for arg in \"$@\"; do printf '<%s>' \"$arg\"; done; printf '\\n'; } >>'" + argvLog + "'\n")
+	script.WriteString("args=''; for arg in \"$@\"; do if [ \"$arg\" = '" + rewrite + "' ]; then arg='file://" + bare + "'; fi\n")
+	script.WriteString("args=\"$args\n$arg\"; done\n")
+	script.WriteString("oldifs=$IFS; IFS='\n'; set -- $args; IFS=$oldifs\n")
+	script.WriteString("exec '" + realGit + "' \"$@\"\n")
+	if err := os.WriteFile(filepath.Join(fakeDir, "git"), []byte(script.String()), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	pathEnv := draftTransportPATH(t, fakeDir)
+	configPath, project, home := setupCLIProject(t, root)
+	payload := `{"schema_version":2,"sources":{"kit":{"git":"` + literalIsolationHTTPS + `","tag":"v1"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
+	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code, stdout, stderr := runCurator(t, home, configPath, pathEnv, "project", "resolve", "app"); code != 0 {
+		t.Fatalf("resolve = %d:\n%s\n%s", code, stdout, stderr)
+	}
+	if code, stdout, stderr := runCurator(t, home, configPath, pathEnv, "project", "refresh", "app"); code != 0 {
+		t.Fatalf("refresh = %d:\n%s\n%s", code, stdout, stderr)
+	}
+	argv, err := os.ReadFile(argvLog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const pins = "<-c><http.sslVerify=true><-c><http.followRedirects=false><-c><credential.helper=>"
+	var clone, fetch, remote, other int
+	for _, line := range strings.Split(string(argv), "\n") {
+		switch {
+		case strings.HasPrefix(line, pins+"<clone>"):
+			clone++
+		case strings.HasPrefix(line, pins+"<fetch>"):
+			fetch++
+		case strings.HasPrefix(line, pins+"<remote>"):
+			remote++
+		case strings.Contains(line, "<clone>") || strings.Contains(line, "<fetch>"):
+			other++
+			t.Logf("unpinned network invocation: %s", line)
+		}
+	}
+	t.Logf("pinned clone=%d fetch=%d remote=%d; unpinned clone/fetch=%d", clone, fetch, remote, other)
+	if clone != 1 || fetch != 1 || other != 0 {
+		t.Fatalf("pins missing at the production entry: clone=%d fetch=%d unpinned=%d\n%s", clone, fetch, other, argv)
+	}
+}

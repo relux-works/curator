@@ -1,0 +1,687 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index bb62af63..21e5e7a0 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -55,6 +55,13 @@ All notable implementation changes are recorded here.
+ 
+ ### Changed
+ 
++- The install transaction engine now caches canonical namespace resolutions
++  per transaction across journal saves in one per-write recheck epoch
++  (invalidated by `checkBoundary` before every publication write; legacy
++  journals without a recheck keep walking every save). Behaviour-preserving
++  performance fix: the draft failure-at-every-target-class sweep and late
++  rollbacks spend far less time in `filepath.EvalSymlinks` on Windows, with
++  every rollback and boundary proof unchanged.
+ - A `go-v1` build root whose `vendor/modules.txt` carries a directory
+   replacement the command does not declare is now refused with
+   `build_module_root_directive_undeclared`. §4.2.3 requires a command with an
+diff --git a/internal/transaction/engine.go b/internal/transaction/engine.go
+index 19a0d155..9503964b 100644
+--- a/internal/transaction/engine.go
++++ b/internal/transaction/engine.go
+@@ -27,6 +27,26 @@ type Engine struct {
+ 	// restart re-verifies its durable proof instead, and only a legacy
+ 	// journal (nil proof) skips the gate.
+ 	guards map[string]BoundaryCheck
++	// nsCache retains canonical namespace resolutions per transaction,
++	// keyed by transaction id then the exact input path. Each entry holds
++	// the resolved path or the resolution error from the first walk in the
++	// current recheck epoch. checkBoundary invalidates the transaction's
++	// entry on every per-write recheck, so the next save re-walks the
++	// filesystem; legacy journals without a recheck bypass the cache and
++	// walk every save. The cache never crosses transactions or engines.
++	// All callers hold mu.
++	nsCache map[string]map[string]canonicalCacheEntry
++	// canonicalResolver resolves one absolute path for namespace
++	// validation. Nil means canonicalNamespacePath. Tests inject a
++	// counting wrapper to prove hit/miss behavior.
++	canonicalResolver func(string) (string, error)
++}
++
++// canonicalCacheEntry is one cached canonicalization: the resolved path on
++// success, or the resolution error the walk returned.
++type canonicalCacheEntry struct {
++	resolved string
++	err      error
+ }
+ 
+ // New constructs an engine without creating manager-home state.
+@@ -42,6 +62,7 @@ func New(home string, options ...Option) (*Engine, error) {
+ 		journalRoot:      filepath.Join(filepath.Clean(absolute), "state", "transactions", "v1"),
+ 		syncStagedParent: syncDirectory,
+ 		guards:           map[string]BoundaryCheck{},
++		nsCache:          map[string]map[string]canonicalCacheEntry{},
+ 	}
+ 	for _, option := range options {
+ 		if option != nil {
+@@ -488,7 +509,15 @@ func (engine *Engine) commitTarget(journal *Journal, index int) error {
+ // a legacy journal (nil proof) skips the gate. A protected journal whose
+ // proof cannot be restored fails closed. Rollback never calls this: a
+ // refusal must restore published state, not refuse the restoration.
++//
++// This is also the per-write invalidation seam for the canonical namespace
++// cache: the entry is dropped before the recheck runs, so the recheck
++// itself always re-walks the live filesystem and the next journal save
++// after it re-resolves every path. A symlink swapped between two saves in
++// one epoch is therefore still caught here, and the transaction refuses as
++// before.
+ func (engine *Engine) checkBoundary(journal *Journal, index int) error {
++	delete(engine.nsCache, journal.TransactionID)
+ 	if guard := engine.guards[journal.TransactionID]; guard != nil {
+ 		return guard(index, journal.Targets[index].LivePath)
+ 	}
+@@ -512,6 +541,88 @@ func (engine *Engine) checkBoundary(journal *Journal, index int) error {
+ 	return staging.RecheckDurableOne(staging.Target{LivePath: target.LivePath, Kind: stagingKind}, *proof)
+ }
+ 
++// namespaceRecheckPresent reports whether the transaction carries a
++// per-write recheck: an in-memory guard, a durable proof, or both. Only
++// then is the canonical cache allowed; legacy journals walk every save.
++func (engine *Engine) namespaceRecheckPresent(journal *Journal) bool {
++	if engine.guards[journal.TransactionID] != nil {
++		return true
++	}
++	return journal.BoundaryProof != nil
++}
++
++// resolveCanonical walks one path without caching, through the test seam
++// when one is installed.
++func (engine *Engine) resolveCanonical(path string) (string, error) {
++	if engine.canonicalResolver != nil {
++		return engine.canonicalResolver(path)
++	}
++	return canonicalNamespacePath(path)
++}
++
++// resolveTargetPath canonicalizes one target path without caching. It
++// mirrors canonicalNamespaceTargetPath exactly; the parent walk goes
++// through the same test seam as resolveCanonical.
++func (engine *Engine) resolveTargetPath(path string, entry bool) (string, error) {
++	if !entry {
++		return engine.resolveCanonical(path)
++	}
++	if path == "" || !validText(path) || !filepath.IsAbs(path) {
++		return "", fmt.Errorf("path is not valid absolute filesystem text")
++	}
++	absolute := filepath.Clean(path)
++	parent := filepath.Dir(absolute)
++	if parent == absolute {
++		return absolute, nil
++	}
++	resolvedParent, err := engine.resolveCanonical(parent)
++	if err != nil {
++		return "", err
++	}
++	return filepath.Join(resolvedParent, filepath.Base(absolute)), nil
++}
++
++// cachedCanonicalPath returns the cached resolution for the exact input
++// path, walking and storing it on the first use in the epoch.
++func (engine *Engine) cachedCanonicalPath(transactionID, path string) (string, error) {
++	if engine.nsCache == nil {
++		engine.nsCache = map[string]map[string]canonicalCacheEntry{}
++	}
++	cache := engine.nsCache[transactionID]
++	if cache == nil {
++		cache = map[string]canonicalCacheEntry{}
++		engine.nsCache[transactionID] = cache
++	}
++	if entry, ok := cache[path]; ok {
++		return entry.resolved, entry.err
++	}
++	resolved, err := engine.resolveCanonical(path)
++	cache[path] = canonicalCacheEntry{resolved: resolved, err: err}
++	return resolved, err
++}
++
++// cachedCanonicalTargetPath canonicalizes one target path with the parent
++// walk served from the transaction's cache. It mirrors
++// canonicalNamespaceTargetPath exactly.
++func (engine *Engine) cachedCanonicalTargetPath(transactionID, path string, entry bool) (string, error) {
++	if !entry {
++		return engine.cachedCanonicalPath(transactionID, path)
++	}
++	if path == "" || !validText(path) || !filepath.IsAbs(path) {
++		return "", fmt.Errorf("path is not valid absolute filesystem text")
++	}
++	absolute := filepath.Clean(path)
++	parent := filepath.Dir(absolute)
++	if parent == absolute {
++		return absolute, nil
++	}
++	resolvedParent, err := engine.cachedCanonicalPath(transactionID, parent)
++	if err != nil {
++		return "", err
++	}
++	return filepath.Join(resolvedParent, filepath.Base(absolute)), nil
++}
++
+ func (engine *Engine) recoverPendingBackup(target *TargetRecord) error {
+ 	backupDigest, err := target.digest(target.BackupPath)
+ 	if err != nil {
+diff --git a/internal/transaction/journal.go b/internal/transaction/journal.go
+index 91edeecd..39ec6eb8 100644
+--- a/internal/transaction/journal.go
++++ b/internal/transaction/journal.go
+@@ -227,6 +227,16 @@ func ensureJSONEOF(decoder *json.Decoder) error {
+ }
+ 
+ func validateJournal(journal *Journal) error {
++	return validateJournalWithResolver(journal, canonicalNamespaceTargetPath, canonicalNamespacePath)
++}
++
++func validateJournalWithResolver(journal *Journal, resolveTarget func(string, bool) (string, error), resolve func(string) (string, error)) error {
++	if resolveTarget == nil {
++		resolveTarget = canonicalNamespaceTargetPath
++	}
++	if resolve == nil {
++		resolve = canonicalNamespacePath
++	}
+ 	if journal == nil || journal.Schema != journalSchema || !transactionIDPattern.MatchString(journal.TransactionID) {
+ 		return journalf("schema or transaction id is invalid")
+ 	}
+@@ -341,7 +351,7 @@ func validateJournal(journal *Journal) error {
+ 			return journalf("target %d state %q is invalid", index, target.State)
+ 		}
+ 	}
+-	if err := validateIndependentTargetNamespaces(journal.Targets); err != nil {
++	if err := validateIndependentTargetNamespacesWithResolver(journal.Targets, resolveTarget, resolve); err != nil {
+ 		return journalf("target namespaces are not independent: %v", err)
+ 	}
+ 	if err := validateBoundaryProof(journal); err != nil {
+@@ -390,10 +400,32 @@ func validateBoundaryProof(journal *Journal) error {
+ }
+ 
+ func (engine *Engine) validateJournal(journal *Journal) error {
+-	if err := validateJournal(journal); err != nil {
++	// Guarded transactions share canonical resolutions across saves in one
++	// recheck epoch; legacy journals without a recheck walk every save so
++	// the independence proof never relies on a stale resolution.
++	transactionID := ""
++	useCache := false
++	if journal != nil {
++		transactionID = journal.TransactionID
++		useCache = engine.namespaceRecheckPresent(journal)
++	}
++	var resolveTarget func(string, bool) (string, error)
++	var resolve func(string) (string, error)
++	if useCache {
++		resolveTarget = func(path string, entry bool) (string, error) {
++			return engine.cachedCanonicalTargetPath(transactionID, path, entry)
++		}
++		resolve = func(path string) (string, error) {
++			return engine.cachedCanonicalPath(transactionID, path)
++		}
++	} else {
++		resolveTarget = engine.resolveTargetPath
++		resolve = engine.resolveCanonical
++	}
++	if err := validateJournalWithResolver(journal, resolveTarget, resolve); err != nil {
+ 		return err
+ 	}
+-	if err := validateIndependentTargetNamespaces(journal.Targets, targetNamespacePath{
++	if err := validateIndependentTargetNamespacesWithResolver(journal.Targets, resolveTarget, resolve, targetNamespacePath{
+ 		owner: "engine",
+ 		kind:  "journal namespace",
+ 		path:  engine.journalRoot,
+@@ -918,6 +950,7 @@ func (engine *Engine) removeJournalDurably(journal *Journal) error {
+ 	// journal for recovery, which resumes rollback or cleanup — neither
+ 	// commits new targets, so the gate is no longer needed either way.
+ 	delete(engine.guards, journal.TransactionID)
++	delete(engine.nsCache, journal.TransactionID)
+ 	digest, err := journalDigest(journal)
+ 	if err != nil {
+ 		return err
+diff --git a/internal/transaction/namespace.go b/internal/transaction/namespace.go
+index 9d168077..da30e522 100644
+--- a/internal/transaction/namespace.go
++++ b/internal/transaction/namespace.go
+@@ -85,6 +85,20 @@ func (resolved *resolvedNamespacePath) identity() (os.FileInfo, error) {
+ }
+ 
+ func validateIndependentTargetNamespaces(targets []TargetRecord, reserved ...targetNamespacePath) error {
++	return validateIndependentTargetNamespacesWithResolver(targets, canonicalNamespaceTargetPath, canonicalNamespacePath, reserved...)
++}
++
++// validateIndependentTargetNamespacesWithResolver is the resolver-injected
++// form of the independence sweep. The engine passes its per-transaction
++// cached resolvers so saves within one recheck epoch share resolutions;
++// the free wrapper above passes the direct walks.
++func validateIndependentTargetNamespacesWithResolver(targets []TargetRecord, resolveTarget func(string, bool) (string, error), resolve func(string) (string, error), reserved ...targetNamespacePath) error {
++	if resolveTarget == nil {
++		resolveTarget = canonicalNamespaceTargetPath
++	}
++	if resolve == nil {
++		resolve = canonicalNamespacePath
++	}
+ 	paths := make([]resolvedNamespacePath, 0, len(targets)*7+len(reserved))
+ 	for index := range targets {
+ 		target := &targets[index]
+@@ -101,7 +115,7 @@ func validateIndependentTargetNamespaces(targets []TargetRecord, reserved ...tar
+ 			if candidate.path == "" {
+ 				continue
+ 			}
+-			key, err := canonicalNamespaceTargetPath(candidate.path, entry)
++			key, err := resolveTarget(candidate.path, entry)
+ 			if err != nil {
+ 				return fmt.Errorf("target %d %s path: %w", index, candidate.kind, err)
+ 			}
+@@ -124,7 +138,7 @@ func validateIndependentTargetNamespaces(targets []TargetRecord, reserved ...tar
+ 			}))
+ 			if candidate.kind != "live" {
+ 				tombPath := candidate.path + ".delete"
+-				tombKey, err := canonicalNamespaceTargetPath(tombPath, entry)
++				tombKey, err := resolveTarget(tombPath, entry)
+ 				if err != nil {
+ 					return fmt.Errorf("target %d %s tomb path: %w", index, candidate.kind, err)
+ 				}
+@@ -141,7 +155,7 @@ func validateIndependentTargetNamespaces(targets []TargetRecord, reserved ...tar
+ 		}
+ 	}
+ 	for _, candidate := range reserved {
+-		key, err := canonicalNamespacePath(candidate.path)
++		key, err := resolve(candidate.path)
+ 		if err != nil {
+ 			return fmt.Errorf("%s %s path: %w", candidate.owner, candidate.kind, err)
+ 		}
+diff --git a/internal/transaction/namespace_cache_test.go b/internal/transaction/namespace_cache_test.go
+new file mode 100644
+index 00000000..f07be62b
+--- /dev/null
++++ b/internal/transaction/namespace_cache_test.go
+@@ -0,0 +1,394 @@
++package transaction
++
++import (
++	"fmt"
++	"os"
++	"path/filepath"
++	"strings"
++	"sync"
++	"testing"
++
++	"github.com/relux-works/curator/internal/staging"
++)
++
++// countingResolver wraps canonicalNamespacePath and records every walk by
++// exact input path. A cache hit never reaches the wrapped walk.
++type countingResolver struct {
++	mu      sync.Mutex
++	calls   map[string]int
++	resolve func(string) (string, error)
++}
++
++func newCountingResolver() *countingResolver {
++	return &countingResolver{
++		calls:   map[string]int{},
++		resolve: canonicalNamespacePath,
++	}
++}
++
++func (counter *countingResolver) fn(path string) (string, error) {
++	counter.mu.Lock()
++	counter.calls[path]++
++	counter.mu.Unlock()
++	return counter.resolve(path)
++}
++
++func (counter *countingResolver) total() int {
++	counter.mu.Lock()
++	defer counter.mu.Unlock()
++	total := 0
++	for _, count := range counter.calls {
++		total += count
++	}
++	return total
++}
++
++func (counter *countingResolver) distinct() int {
++	counter.mu.Lock()
++	defer counter.mu.Unlock()
++	return len(counter.calls)
++}
++
++func (counter *countingResolver) maxPerPath() int {
++	counter.mu.Lock()
++	defer counter.mu.Unlock()
++	peak := 0
++	for _, count := range counter.calls {
++		if count > peak {
++			peak = count
++		}
++	}
++	return peak
++}
++
++// TestCanonicalCacheSharesResolutionsWithinOneRecheckEpoch proves one save
++// with N targets walks each distinct path once (not once per validation
++// pass), K further saves in the same epoch walk nothing new, and the
++// per-write recheck resets the epoch so the next save re-walks.
++func TestCanonicalCacheSharesResolutionsWithinOneRecheckEpoch(t *testing.T) {
++	root := t.TempDir()
++	home := filepath.Join(root, "home")
++	liveRoot := filepath.Join(root, "live")
++	stageRoot := filepath.Join(root, "private-stage")
++	mustMkdirAll(t, liveRoot)
++	mustMkdirAll(t, stageRoot)
++
++	targets := []Target{
++		fileTarget(t, "a", "one", filepath.Join(liveRoot, "one"), filepath.Join(stageRoot, "one"), "old-1", "new-1"),
++		fileTarget(t, "a", "two", filepath.Join(liveRoot, "two"), filepath.Join(stageRoot, "two"), "old-2", "new-2"),
++		fileTarget(t, "b", "three", filepath.Join(liveRoot, "three"), filepath.Join(stageRoot, "three"), "old-3", "new-3"),
++	}
++	counter := newCountingResolver()
++	engine := mustEngine(t, home)
++	engine.canonicalResolver = counter.fn
++	guard := &recordingGuard{}
++
++	journal, err := engine.Prepare(testLock{}, Plan{
++		TransactionID:   "txn-cache-epoch",
++		ProjectIdentity: "/test/project",
++		Targets:         targets,
++		BoundaryCheck:   guard.check,
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	// Prepare runs buildJournal validation plus several saves (staging
++	// progress, prepared marker), each with two namespace passes. Every
++	// distinct path must still have been walked exactly once.
++	if got := counter.maxPerPath(); got != 1 {
++		t.Fatalf("max walks per path after prepare = %d, want 1 (one walk per distinct path per epoch)", got)
++	}
++	preparedTotal := counter.total()
++	preparedDistinct := counter.distinct()
++	t.Logf("prepare walked %d distinct paths, %d total walks", preparedDistinct, preparedTotal)
++	if preparedDistinct == 0 || preparedTotal != preparedDistinct {
++		t.Fatalf("prepare walks = %d total over %d distinct paths, want equal (no repeated walk)", preparedTotal, preparedDistinct)
++	}
++
++	// K further saves in the same epoch walk nothing new.
++	stored, err := engine.loadJournal(journal.TransactionID)
++	if err != nil {
++		t.Fatal(err)
++	}
++	for save := 0; save < 3; save++ {
++		if err := engine.saveJournal(stored); err != nil {
++			t.Fatal(err)
++		}
++	}
++	if got := counter.total(); got != preparedTotal {
++		t.Fatalf("walks after 3 same-epoch saves = %d, want %d (no new walk)", got, preparedTotal)
++	}
++
++	// The per-write recheck ends the epoch: the next save re-walks.
++	if err := engine.checkBoundary(stored, 0); err != nil {
++		t.Fatal(err)
++	}
++	if err := engine.saveJournal(stored); err != nil {
++		t.Fatal(err)
++	}
++	if got := counter.total(); got <= preparedTotal {
++		t.Fatalf("walks after recheck + save = %d, want more than %d (epoch reset re-walks)", got, preparedTotal)
++	}
++	if got := counter.maxPerPath(); got != 2 {
++		t.Fatalf("max walks per path after one reset epoch = %d, want 2", got)
++	}
++
++	// Terminal cleanup releases the transaction's cache entry with its guard.
++	if err := engine.Commit(testLock{}, journal.TransactionID); err != nil {
++		t.Fatal(err)
++	}
++	engine.mu.Lock()
++	_, cached := engine.nsCache[journal.TransactionID]
++	engine.mu.Unlock()
++	if cached {
++		t.Fatal("canonical cache entry survived terminal journal removal")
++	}
++}
++
++// TestCanonicalCacheSwappedSymlinkWithinEpochRefusesAtRecheck proves the
++// invalidation: a symlink swapped between two saves in one epoch is served
++// stale by the second save and still caught at the next per-write recheck,
++// and the transaction refuses with the boundary diagnostic as today. The
++// post-recheck save re-walks (dropping the invalidation fails this row).
++//
++// The swap replaces the live file with a link at the same path: the epoch
++// cache still serves the pre-swap resolution, while the recheck re-walks
++// and refuses the newly introduced final link.
++func TestCanonicalCacheSwappedSymlinkWithinEpochRefusesAtRecheck(t *testing.T) {
++	root := t.TempDir()
++	home := filepath.Join(root, "home")
++	liveRoot := filepath.Join(root, "live")
++	stageRoot := filepath.Join(root, "private-stage")
++	mustMkdirAll(t, liveRoot)
++	mustMkdirAll(t, stageRoot)
++	live := filepath.Join(liveRoot, "one")
++	target := fileTarget(t, "a", "one", live, filepath.Join(stageRoot, "one"), "old", "new")
++
++	st := staging.Target{LivePath: live}
++	snapshot, err := (staging.Plan{Targets: []staging.Target{st}}).Snapshot(nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	durable, err := snapshot.Durable()
++	if err != nil {
++		t.Fatal(err)
++	}
++	guard := func(_ int, _ string) error { return staging.RecheckOne(st, snapshot, nil) }
++
++	counter := newCountingResolver()
++	engine := mustEngine(t, home)
++	engine.canonicalResolver = counter.fn
++	prepared, err := engine.Prepare(testLock{}, Plan{
++		TransactionID: "txn-cache-swap", ProjectIdentity: "/test/project",
++		Targets: []Target{target}, BoundaryCheck: guard, BoundaryProof: &durable,
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	// loadJournal validates through the same epoch cache; count the epoch
++	// from after the load so the swap window is exactly save-swap-save.
++	stored, err := engine.loadJournal(prepared.TransactionID)
++	if err != nil {
++		t.Fatal(err)
++	}
++	beforeSwap := counter.total()
++
++	// Swap the live file for a link at the same path. The sidecar parent
++	// keeps no symlink ancestor (the engine's directory sync requires a
++	// real directory), while the live spelling itself now resolves
++	// elsewhere.
++	elsewhere := filepath.Join(root, "elsewhere")
++	mustWrite(t, elsewhere, "elsewhere")
++	shelved := filepath.Join(root, "shelved-old")
++	if err := os.Rename(live, shelved); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Symlink(elsewhere, live); err != nil {
++		_ = os.Rename(shelved, live)
++		t.Skipf("symlink unavailable: %v", err)
++	}
++	if err := engine.saveJournal(stored); err != nil {
++		t.Fatalf("same-epoch save after swap: %v", err)
++	}
++	if got := counter.total(); got != beforeSwap {
++		t.Fatalf("same-epoch save after swap walked %d new paths, want 0 (stale epoch cache)", got-beforeSwap)
++	}
++
++	// The next per-write recheck re-walks and refuses the new final link.
++	if err := engine.checkBoundary(stored, 0); err == nil || !strings.Contains(err.Error(), "source_output_overlap") {
++		t.Fatalf("recheck after swap err = %v, want source_output_overlap", err)
++	}
++
++	// The post-recheck save re-resolves (the epoch was reset).
++	if err := engine.saveJournal(stored); err != nil {
++		t.Fatal(err)
++	}
++	if got := counter.total(); got <= beforeSwap {
++		t.Fatal("post-recheck save did not re-walk the filesystem (invalidation missing)")
++	}
++
++	// The transaction refuses as today. Commit verifies the preimage
++	// before the recheck (commitTarget order), so it stops at the unknown
++	// concurrent link with the digest diagnostic; the direct recheck above
++	// proves the boundary gate catches the same swap with
++	// source_output_overlap when it runs. Either way nothing is written.
++	err = engine.Commit(testLock{}, prepared.TransactionID)
++	if err == nil {
++		t.Fatal("commit after swap succeeded, want refusal")
++	}
++	t.Logf("commit after swap refuses: %v", err)
++	if info, err := os.Lstat(live); err != nil || info.Mode()&os.ModeSymlink == 0 {
++		t.Fatalf("swapped live link was not preserved: %v %v", info, err)
++	}
++	if got := mustRead(t, shelved); got != "old" {
++		t.Fatalf("shelved preimage = %q, want old", got)
++	}
++	if _, err := os.Lstat(engine.journalPath(prepared.TransactionID)); !os.IsNotExist(err) {
++		t.Fatalf("refused journal remains: %v", err)
++	}
++}
++
++// TestCanonicalCacheIsolatedAcrossTransactions proves no entry crosses
++// transactions: a second transaction over the same live paths walks every
++// path again instead of hitting the first transaction's cache.
++func TestCanonicalCacheIsolatedAcrossTransactions(t *testing.T) {
++	root := t.TempDir()
++	home := filepath.Join(root, "home")
++	liveRoot := filepath.Join(root, "live")
++	stageRoot := filepath.Join(root, "private-stage")
++	mustMkdirAll(t, liveRoot)
++	mustMkdirAll(t, stageRoot)
++
++	build := func() []Target {
++		return []Target{
++			fileTarget(t, "a", "one", filepath.Join(liveRoot, "one"), filepath.Join(stageRoot, "one"), "old-1", "new-1"),
++			fileTarget(t, "a", "two", filepath.Join(liveRoot, "two"), filepath.Join(stageRoot, "two"), "old-2", "new-2"),
++		}
++	}
++	counter := newCountingResolver()
++	engine := mustEngine(t, home)
++	engine.canonicalResolver = counter.fn
++	guard := &recordingGuard{}
++
++	if _, err := engine.Prepare(testLock{}, Plan{
++		TransactionID: "txn-cache-first", ProjectIdentity: "/test/project",
++		Targets: build(), BoundaryCheck: guard.check,
++	}); err != nil {
++		t.Fatal(err)
++	}
++	firstTotal := counter.total()
++	if firstTotal == 0 {
++		t.Fatal("first transaction walked nothing")
++	}
++	// Same live paths, new transaction id: every path must be walked
++	// again. A cache keyed by path alone would serve the first
++	// transaction's entries and this row would fail.
++	if _, err := engine.Prepare(testLock{}, Plan{
++		TransactionID: "txn-cache-second", ProjectIdentity: "/test/project",
++		Targets: build(), BoundaryCheck: guard.check,
++	}); err != nil {
++		t.Fatal(err)
++	}
++	secondTotal := counter.total()
++	if secondTotal < 2*firstTotal {
++		t.Fatalf("walks after two same-path transactions = %d, want at least %d (no cross-transaction hit)", secondTotal, 2*firstTotal)
++	}
++	engine.mu.Lock()
++	_, firstCached := engine.nsCache["txn-cache-first"]
++	_, secondCached := engine.nsCache["txn-cache-second"]
++	engine.mu.Unlock()
++	if !firstCached || !secondCached {
++		t.Fatal("per-transaction cache entries are not isolated by transaction id")
++	}
++}
++
++// TestLegacyJournalBypassesCanonicalCache proves journals without a recheck
++// (no guard, nil proof) never use the cache: every save walks every path,
++// exactly as before the cache existed.
++func TestLegacyJournalBypassesCanonicalCache(t *testing.T) {
++	root := t.TempDir()
++	home := filepath.Join(root, "home")
++	liveRoot := filepath.Join(root, "live")
++	stageRoot := filepath.Join(root, "private-stage")
++	mustMkdirAll(t, liveRoot)
++	mustMkdirAll(t, stageRoot)
++
++	targets := []Target{
++		fileTarget(t, "a", "one", filepath.Join(liveRoot, "one"), filepath.Join(stageRoot, "one"), "old-1", "new-1"),
++	}
++	counter := newCountingResolver()
++	engine := mustEngine(t, home)
++	engine.canonicalResolver = counter.fn
++
++	journal, err := engine.Prepare(testLock{}, Plan{
++		TransactionID: "txn-cache-legacy", ProjectIdentity: "/test/project",
++		Targets: targets,
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	afterPrepare := counter.total()
++	stored, err := engine.loadJournal(journal.TransactionID)
++	if err != nil {
++		t.Fatal(err)
++	}
++	loadWalks := counter.total() - afterPrepare
++	if loadWalks == 0 {
++		t.Fatal("legacy loadJournal walked nothing (expected a full per-save walk)")
++	}
++	before := counter.total()
++	if err := engine.saveJournal(stored); err != nil {
++		t.Fatal(err)
++	}
++	after := counter.total()
++	if after <= before {
++		t.Fatal("legacy saveJournal served a cache entry (legacy must walk every save)")
++	}
++	engine.mu.Lock()
++	_, cached := engine.nsCache[journal.TransactionID]
++	engine.mu.Unlock()
++	if cached {
++		t.Fatal("legacy transaction populated the canonical cache")
++	}
++	if err := engine.Commit(testLock{}, journal.TransactionID); err != nil {
++		t.Fatal(err)
++	}
++}
++
++// TestCachedTargetPathMirrorsFreeFunction proves the cached entry-path join
++// matches canonicalNamespaceTargetPath on the same inputs, so the cache
++// changes only when paths are walked, never what they resolve to.
++func TestCachedTargetPathMirrorsFreeFunction(t *testing.T) {
++	root := t.TempDir()
++	home := filepath.Join(root, "home")
++	engine := mustEngine(t, home)
++	engine.canonicalResolver = canonicalNamespacePath
++
++	live := filepath.Join(root, "live", "one")
++	mustWrite(t, live, "old")
++	cases := []struct {
++		path  string
++		entry bool
++	}{
++		{path: live, entry: false},
++		{path: live, entry: true},
++		{path: filepath.Join(root, "live", "missing"), entry: false},
++		{path: filepath.Join(root, "live", "missing"), entry: true},
++	}
++	for _, testCase := range cases {
++		want, wantErr := canonicalNamespaceTargetPath(testCase.path, testCase.entry)
++		got, gotErr := engine.cachedCanonicalTargetPath("txn-mirror", testCase.path, testCase.entry)
++		if (wantErr == nil) != (gotErr == nil) || want != got {
++			t.Fatalf("path %q entry=%v: cached = (%q, %v), want (%q, %v)",
++				testCase.path, testCase.entry, got, gotErr, want, wantErr)
++		}
++		// Second call hits the cache and returns the identical answer.
++		again, againErr := engine.cachedCanonicalTargetPath("txn-mirror", testCase.path, testCase.entry)
++		if (wantErr == nil) != (againErr == nil) || want != again {
++			t.Fatalf("cached repeat for %q entry=%v = (%q, %v), want (%q, %v)",
++				testCase.path, testCase.entry, again, againErr, want, wantErr)
++		}
++	}
++}
++
++var _ = fmt.Sprintf

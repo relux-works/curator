@@ -1,0 +1,67 @@
+package install
+
+import (
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/relux-works/curator/internal/config"
+	"github.com/relux-works/curator/internal/gitops"
+	"github.com/relux-works/curator/internal/hashing"
+	"github.com/relux-works/curator/internal/identity"
+	"github.com/relux-works/curator/internal/snapshot"
+)
+
+// Reviewer probe (BUG-260920-2d9gfv rev1, not for commit): two trusted
+// registries, literal zero skew, strict policy. reg-a (first in order) is
+// slow -- its snapshot response crosses a whole-second boundary -- and
+// carries no audit record (pending => unknown). reg-b is instant, mints
+// created_at at serve time and holds the audited record. Every timestamp
+// here is at or behind the client's wall clock when it is checked, so a
+// bound "evaluated against a clock reading taken after the snapshot fetch"
+// (brief R1) must accept both registries and the install must succeed via
+// reg-b. A bound that only tolerates reg-b's OWN latency refuses reg-b as
+// "too far in the future" whenever its sibling's fetch crossed the boundary
+// -- deterministically here, and with probability (sibling latency)/1 s in
+// the field.
+func TestZZReviewSlowSiblingFlipsInstantRegistryUnderZeroSkew(t *testing.T) {
+	e := newEnv(t)
+	e.skill("skill-a")
+	e.declare("skill-a")
+	e.write(e.project, "Skillfile.json", `{
+		"schema_version": 1, "agents": ["claude_code"],
+		"skills": [{"name": "skill-a", "git": "git@git.example.com:skills/skill-a.git", "tag": "v1"}]
+	}`)
+	ref, err := gitops.Resolve(e.skillsRoot+"/skill-a", "tag", "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	snap, err := snapshot.Get(e.home, "skill-a", e.skillsRoot+"/skill-a", ref.Commit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contentHash, err := hashing.ContentSHA256(snap, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := identity.Canonical("git@git.example.com:skills/skill-a.git")
+	slow, slowKey := fakeRegistry(t, "pending", id, ref.Commit, contentHash, beforeSnapshotResponse(crossSecondBoundary))
+	defer slow.Close()
+	instant, instantKey := fakeRegistry(t, "audited", id, ref.Commit, contentHash, snapshotMintedAtServeTime())
+	defer instant.Close()
+	e.cfg.AuditRegistries = []config.Registry{
+		{Name: "reg-a", URL: slow.URL, PublicKeys: []string{slowKey}, Enabled: true},
+		{Name: "reg-b", URL: instant.URL, PublicKeys: []string{instantKey}, Enabled: true},
+	}
+	e.cfg.Audit.RegistryPolicy = "strict"
+	e.cfg.Audit.SnapshotClockSkewSeconds = 0
+	started := time.Now()
+	result := e.install(Options{})
+	t.Logf("install took %v; status=%s errors=%v messages=%v", time.Since(started), result.Status, result.Errors, result.Messages)
+	if joined := strings.Join(result.Messages, "\n"); strings.Contains(joined, "too far in the future") {
+		t.Fatalf("a snapshot at or behind the post-fetch clock was refused as future: %s", joined)
+	}
+	if result.Status != "ok" {
+		t.Fatalf("the audited registry must stay usable: %+v", result)
+	}
+}

@@ -1,0 +1,1416 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index ba3ce6b3..34ef7c5a 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -114,6 +114,28 @@ All notable implementation changes are recorded here.
+   now fails `repository_endpoint_unavailable` instead of prompting —
+   provide a non-interactive `GIT_ASKPASS` program or an SSH endpoint
+   with an agent (docs/cli.md, docs/troubleshooting.md).
++- Draft literal-URL acquisition now builds git's environment from an
++  explicit allow-list and runs SSH under a curator-owned command
++  (`project resolve`/`project refresh`). Per-invocation ambient
++  overrides (`GIT_SSH_COMMAND`, `GIT_SSH`, `GIT_PROXY_COMMAND`,
++  `GIT_EXEC_PATH`, every other `GIT_*` override) and the proxy
++  environment previously reached git, and the real ssh read the
++  user's `~/.ssh/config` (Host aliases, `ProxyCommand`); only the
++  contract-listed environment now reaches git (`PATH`,
++  `HOME`/`USERPROFILE` for default `known_hosts`/identities, temp
++  dirs, `TZ`, Windows process essentials, `SSH_AUTH_SOCK`,
++  `GIT_ASKPASS`), transport pins (`http.sslVerify`,
++  `http.followRedirects=false`, empty `credential.helper`,
++  `GIT_PROTOCOL_FROM_USER=0`) hold per invocation, and ssh runs with
++  an empty config (`-F`, `BatchMode`, `StrictHostKeyChecking=yes`,
++  `ProxyCommand=none`, `ProxyJump=none`, forwarding disabled;
++  host-key validation never disabled). Operator consequences: SSH
++  host aliases, `ProxyCommand`, and `IdentityFile` entries are not
++  read — use an agent (or a default-named key) and the literal host
++  name; unknown hosts fail closed (seed `known_hosts` with
++  `ssh-keyscan` or a first manual `ssh`); proxy environment is not
++  honoured. `GIT_ASKPASS` stays the only HTTPS credential channel
++  (docs/cli.md, docs/troubleshooting.md).
+ 
+ ## 0.12.5 - 2026-07-14
+ 
+diff --git a/cmd/curator/draft_diagnostics_test.go b/cmd/curator/draft_diagnostics_test.go
+index a4edd4e6..60ed6de7 100644
+--- a/cmd/curator/draft_diagnostics_test.go
++++ b/cmd/curator/draft_diagnostics_test.go
+@@ -1147,6 +1147,12 @@ func TestDraftDocsPinExamples(t *testing.T) {
+ 		"credentials from the invoking environment",
+ 		"is never consulted",
+ 		"CURATOR_DRAFT_TRANSPORT_RESOLUTION",
++		"allow-list",
++		"does not honour proxy",
++		"GIT_SSH_COMMAND",
++		"ProxyCommand=none",
++		"ssh-keyscan",
++		"answers git's username and password prompts",
+ 	} {
+ 		if !strings.Contains(cli, marker) {
+ 			t.Errorf("docs/cli.md misses %q", marker)
+@@ -1203,6 +1209,19 @@ func TestDraftDocsPinExamples(t *testing.T) {
+ 			t.Errorf("docs/troubleshooting.md misses the %s remedy keyword %q", class, keyword)
+ 		}
+ 	}
++	// Isolation wording (TASK-260920-3ccq6b): the askpass fix and the ssh
++	// and proxy operator consequences pinned in the endpoint remedy.
++	for _, marker := range []string{
++		"answers git's username and password prompts",
++		"embed the username in",
++		"are not read",
++		"ssh-keyscan",
++		"is not honoured on this lane",
++	} {
++		if !strings.Contains(trouble, marker) {
++			t.Errorf("docs/troubleshooting.md misses %q", marker)
++		}
++	}
+ }
+ 
+ // readRepoDoc reads one repository doc relative to the package directory.
+diff --git a/docs/cli.md b/docs/cli.md
+index b6980fd1..6d725208 100644
+--- a/docs/cli.md
++++ b/docs/cli.md
+@@ -502,11 +502,29 @@ same configuration) apply to the external build lane under
+ `CURATOR_DRAFT_TRANSPORT_RESOLUTION`, not to Skillfile sources:
+ `project resolve` and `project refresh` clone and fetch with
+ credentials from the invoking environment only (SSH agent via
+-`SSH_AUTH_SOCK`, `GIT_ASKPASS`, `GIT_SSH`/`GIT_SSH_COMMAND`); user
+-and system Git configuration — credential helpers,
+-`insteadOf`/`pushInsteadOf`, URL rewriting and includes,
++`SSH_AUTH_SOCK`, `GIT_ASKPASS` — the only HTTPS credential channel on
++this lane: it answers git's username and password prompts (or embed the
++username in the endpoint URL), it supplies credentials, it cannot
++redirect the endpoint); user and system Git configuration — credential
++helpers, `insteadOf`/`pushInsteadOf`, URL rewriting and includes,
+ `core.sshCommand` — is never consulted, and no interactive prompt
+-occurs. The `authentication` identifier on a Skillfile endpoint is
++occurs. Git's environment on this lane is built from an explicit
++allow-list (`PATH`; `HOME`/`USERPROFILE` only so OpenSSH finds its
++default `known_hosts` and default identity files; `TMPDIR`/`TMP`/`TEMP`;
++`TZ`; Windows process essentials; `SSH_AUTH_SOCK`; `GIT_ASKPASS`):
++every other ambient name — `GIT_SSH`/`GIT_SSH_COMMAND`,
++`GIT_PROXY_COMMAND`, `GIT_EXEC_PATH`, every other `GIT_*` override, and
++the proxy environment — is dropped by construction and cannot redirect
++or hijack the clone, so the draft lane does not honour proxy
++environment. SSH runs a curator-owned command with an empty ssh config
++(`-F` an empty file, `BatchMode`, `StrictHostKeyChecking=yes`,
++`ProxyCommand=none`, `ProxyJump=none`, forwarding disabled, host-key
++validation never disabled): host aliases, `ProxyCommand`, `IdentityFile`
++and every other `~/.ssh/config` entry are not read — use an agent (or a
++default-named key) and the literal host name; unknown hosts fail closed
++(seed `known_hosts` with `ssh-keyscan` or a first manual `ssh`). The
++`ssh` binary itself resolves through the honoured `PATH` (the lane's
++tooling bound). The `authentication` identifier on a Skillfile endpoint is
+ validated but unused on this lane. Never put secrets in these
+ objects. An invalid or unreadable policy fails
+ `repository_policy_invalid` and is never treated as absent. On
+diff --git a/docs/troubleshooting.md b/docs/troubleshooting.md
+index 6a788366..86b4a98c 100644
+--- a/docs/troubleshooting.md
++++ b/docs/troubleshooting.md
+@@ -473,8 +473,18 @@ never consulted on this lane and no prompt occurs, so a private
+ HTTPS Skillfile source that relied on a helper fails here with an
+ authentication clause: provide the credential through the invoking
+ environment instead — a non-interactive `GIT_ASKPASS` program that
+-prints the password, or an SSH endpoint with an agent via
++answers git's username and password prompts (or embed the username in
++the endpoint URL), or an SSH endpoint with an agent via
+ `SSH_AUTH_SOCK` — then retry the explicit attempt.
++SSH on this lane runs a curator-owned command with an empty ssh
++config: host aliases, `ProxyCommand`, `IdentityFile` and every other
++`~/.ssh/config` entry are not read, so an SSH source that relied on an
++alias or a `ProxyCommand` fails here — use an agent (or a
++default-named key) and the literal host name instead. Unknown hosts
++fail closed with a host-key clause: seed `known_hosts` with
++`ssh-keyscan` or a first manual `ssh`, then retry. The proxy
++environment is not honoured on this lane either: a source reachable
++only through a proxy fails here with an availability clause.
+ 
+ ### repository_policy_invalid
+ 
+diff --git a/internal/crossconformance/draftsources_literal_isolation_test.go b/internal/crossconformance/draftsources_literal_isolation_test.go
+new file mode 100644
+index 00000000..ffbd6504
+--- /dev/null
++++ b/internal/crossconformance/draftsources_literal_isolation_test.go
+@@ -0,0 +1,631 @@
++package crossconformance
++
++import (
++	"net"
++	"os"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"sync/atomic"
++	"testing"
++	"time"
++
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/sourcelock"
++	"github.com/relux-works/curator/internal/testcli"
++)
++
++// Draft literal-lane environment and ssh isolation (TASK-260920-3ccq6b).
++//
++// These rows are intentionally NOT corpus rows (no registerDraftSemantic
++// calls): the v2 semantic matrix stays 94 and
++// TestDraftSourcesSemanticCoverage is unaffected. The spec's
++// v2-user-ssh-alias-ignored case covers only the logical declaration
++// (planning refusal before any fetch); the literal ssh:// fetch isolation
++// below has no v2 semantic case, so local rows carry it.
++//
++// Every row drives the production entry (the compiled CLI's project
++// resolve/refresh, which runs CloneIsolated/FetchIsolated) with real git
++// on POSIX (shell shims; Windows skips like the sibling transport rows)
++// and asserts the fail-closed class, the evil fixture untouched, and
++// sanitized diagnostics. Mutants: remove the allow-list filter, drop -F,
++// drop ProxyCommand=none, pass the ambient GIT_SSH_COMMAND through — each
++// is killed by the named row below.
++
++const literalIsolationSSH = "ssh://git@fixture.test/kit.git"
++
++const literalIsolationHTTPS = "https://fixture.test/kit.git"
++
++// literalIsolationGitShim writes a fake git that logs every clone URL plus
++// the selected environment channels, then either rewrites rewriteURL to the
++// bare fixture (when set) or execs real git unchanged (direct network
++// attempt, for the fail-closed rows). It returns the PATH directory, the
++// clone log, and the env log.
++func literalIsolationGitShim(t *testing.T, rewriteURL, bare, realGit string) (fakeDir, cloneLog, envLog string) {
++	t.Helper()
++	if runtime.GOOS == "windows" {
++		t.Skip("test transport wrapper is POSIX-only")
++	}
++	fakeDir = t.TempDir()
++	cloneLog = filepath.Join(fakeDir, "clones.log")
++	envLog = filepath.Join(fakeDir, "env.log")
++	var script strings.Builder
++	script.WriteString("#!/bin/sh\n")
++	script.WriteString("cloneLog='" + cloneLog + "'\n")
++	script.WriteString("envLog='" + envLog + "'\n")
++	script.WriteString("is_clone=0; for arg in \"$@\"; do if [ \"$arg\" = \"clone\" ]; then is_clone=1; fi; done\n")
++	script.WriteString("if [ \"$is_clone\" = \"1\" ]; then\n")
++	script.WriteString("url=''; prev=''; for arg in \"$@\"; do if [ \"$prev\" = \"--\" ]; then url=\"$arg\"; break; fi; prev=\"$arg\"; done\n")
++	script.WriteString("printf '%s\\n' \"$url\" >>\"$cloneLog\"\n")
++	script.WriteString("{ printf 'GIT_SSH_COMMAND=%s\\n' \"${GIT_SSH_COMMAND-<absent>}\"; printf 'GIT_SSH=%s\\n' \"${GIT_SSH-<absent>}\"; printf 'GIT_PROXY_COMMAND=%s\\n' \"${GIT_PROXY_COMMAND-<absent>}\"; printf 'GIT_EXEC_PATH=%s\\n' \"${GIT_EXEC_PATH-<absent>}\"; printf 'SSH_AUTH_SOCK=%s\\n' \"${SSH_AUTH_SOCK-<absent>}\"; printf 'GIT_ASKPASS=%s\\n' \"${GIT_ASKPASS-<absent>}\"; printf 'https_proxy=%s\\n' \"${https_proxy-<absent>}\"; printf 'HTTPS_PROXY=%s\\n' \"${HTTPS_PROXY-<absent>}\"; } >>\"$envLog\"\n")
++	if rewriteURL != "" {
++		script.WriteString("if [ \"$url\" = '" + rewriteURL + "' ]; then\n")
++		script.WriteString("args=''; for arg in \"$@\"; do if [ \"$arg\" = '" + rewriteURL + "' ]; then arg='file://" + bare + "'; fi\n")
++		script.WriteString("args=\"$args\n$arg\"; done\n")
++		script.WriteString("oldifs=$IFS; IFS='\n'; set -- $args; IFS=$oldifs\n")
++		script.WriteString("exec '" + realGit + "' \"$@\"; fi\n")
++	}
++	script.WriteString("fi\n")
++	script.WriteString("exec '" + realGit + "' \"$@\"\n")
++	if err := os.WriteFile(filepath.Join(fakeDir, "git"), []byte(script.String()), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	return fakeDir, cloneLog, envLog
++}
++
++func literalIsolationEnvLog(t *testing.T, envLog string) string {
++	t.Helper()
++	payload, err := os.ReadFile(envLog)
++	if err != nil {
++		if os.IsNotExist(err) {
++			return ""
++		}
++		t.Fatal(err)
++	}
++	return string(payload)
++}
++
++// writeEvilSSHCommand writes an evil GIT_SSH_COMMAND target: it logs every
++// invocation, then serves the evil bare repository over the ssh transport
++// by exec'ing upload-pack locally, ignoring the requested host. When
++// honoured, an ssh:// clone succeeds with the evil commit; when ignored
++// (the isolated lane), it is never invoked.
++func writeEvilSSHCommand(t *testing.T, evilBare, realGit string) (evilSSH, invokedLog string) {
++	t.Helper()
++	dir := t.TempDir()
++	invokedLog = filepath.Join(dir, "evil-ssh-invoked.log")
++	evilSSH = filepath.Join(dir, "evil-ssh")
++	script := "#!/bin/sh\n" +
++		"echo \"invoked $@\" >>'" + invokedLog + "'\n" +
++		"exec '" + realGit + "' upload-pack '" + evilBare + "'\n"
++	if err := os.WriteFile(evilSSH, []byte(script), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	return evilSSH, invokedLog
++}
++
++// writeEvilBare builds a second kit fixture whose tag v1 binds a different
++// commit from the declared one.
++func writeEvilBare(t *testing.T, root string, declaredCommit string) (evilBare, evilCommit string) {
++	t.Helper()
++	evilWork := filepath.Join(root, "evil-work")
++	if err := os.MkdirAll(evilWork, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	writeDraftSkill(t, filepath.Join(evilWork, "skills", "review"), "review")
++	if err := os.WriteFile(filepath.Join(evilWork, "skills", "review", "references", "evil.md"), []byte("evil"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	runDraftGit(t, evilWork, "init", "-q", "-b", "main")
++	runDraftGit(t, evilWork, "add", ".")
++	runDraftGit(t, evilWork, "commit", "-qm", "evil")
++	runDraftGit(t, evilWork, "tag", "v1")
++	evilBare = filepath.Join(root, "evil.git")
++	runDraftGit(t, "", "clone", "--quiet", "--bare", "--", evilWork, evilBare)
++	evilCommit = draftGitOutput(t, "", "--git-dir", evilBare, "rev-parse", "v1^{commit}")
++	if evilCommit == declaredCommit {
++		t.Fatal("declared and evil fixtures collide")
++	}
++	return evilBare, evilCommit
++}
++
++func assertSanitized(t *testing.T, stderr string, forbidden ...string) {
++	t.Helper()
++	for _, leak := range forbidden {
++		if leak != "" && strings.Contains(stderr, leak) {
++			t.Fatalf("stderr leaks %q:\n%s", leak, stderr)
++		}
++	}
++}
++
++// TestDraftLiteralIgnoresGitSSHCommand is row (a): an ambient
++// GIT_SSH_COMMAND pointing at a script that would serve the evil
++// repository must not redirect the literal ssh:// clone. The lane fails
++// closed on the declared endpoint (no network to fixture.test) with the
++// evil script never invoked. Mutant "pass the ambient GIT_SSH_COMMAND
++// through" succeeds with the evil commit and is KILLED by the exit code,
++// the missing lock, and the invocation log.
++func TestDraftLiteralIgnoresGitSSHCommand(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("test transport wrapper is POSIX-only")
++	}
++	realGit := requireGit(t)
++	root := t.TempDir()
++	_, declaredCommit := draftCLIKitBare(t, root)
++	evilBare, evilCommit := writeEvilBare(t, root, declaredCommit)
++	evilSSH, invokedLog := writeEvilSSHCommand(t, evilBare, realGit)
++	// Positive control: raw git with the ambient evil command honoured
++	// binds the evil commit, proving the payload is live.
++	control := filepath.Join(t.TempDir(), "control")
++	if code, _, stderr := testcli.Run(t, "", []string{"GIT_SSH_COMMAND=" + evilSSH}, "", realGit, "clone", "--quiet", "--", literalIsolationSSH, control); code != 0 {
++		t.Fatalf("control clone with honoured GIT_SSH_COMMAND = %d, want success (payload not live):\n%s", code, stderr)
++	}
++	if got := draftGitOutput(t, control, "rev-parse", "HEAD"); got != evilCommit {
++		t.Fatalf("control HEAD = %s, want evil %s (payload not live)", got, evilCommit)
++	}
++	if probe, err := os.ReadFile(invokedLog); err != nil || len(probe) == 0 {
++		t.Fatal("control left no evil-ssh invocation (payload not live)")
++	}
++	_ = os.Remove(invokedLog)
++
++	fakeDir, cloneLog, envLog := literalIsolationGitShim(t, "", "", realGit)
++	pathEnv := draftTransportPATH(t, fakeDir)
++	configPath, project, home := setupCLIProject(t, root)
++	payload := `{"schema_version":2,"sources":{"kit":{"git":"` + literalIsolationSSH + `","tag":"v1"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
++	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	env := append(pathEnv, "GIT_SSH_COMMAND="+evilSSH, "GIT_SSH="+evilSSH)
++	code, stdout, stderr := runCurator(t, home, configPath, env, "project", "resolve", "app")
++	if code == 0 {
++		t.Fatalf("resolve succeeded with a hostile GIT_SSH_COMMAND, want the endpoint refusal:\n%s\n%s", stdout, stderr)
++	}
++	if !strings.Contains(stderr, config.CodeRepositoryEndpointUnavailable) {
++		t.Fatalf("stderr misses %s:\n%s", config.CodeRepositoryEndpointUnavailable, stderr)
++	}
++	assertSanitized(t, stderr, literalIsolationSSH, evilSSH, evilBare, "evil-ssh")
++	if clones := draftCloneLog(t, cloneLog); len(clones) != 1 || clones[0] != literalIsolationSSH {
++		t.Fatalf("clones = %v, want the declared literal endpoint once", clones)
++	}
++	// The pinned curator-owned command reaches git, never the ambient evil.
++	envSeen := literalIsolationEnvLog(t, envLog)
++	if strings.Contains(envSeen, evilSSH) {
++		t.Fatalf("git saw the ambient GIT_SSH_COMMAND:\n%s", envSeen)
++	}
++	if !strings.Contains(envSeen, "ssh -F ") || !strings.Contains(envSeen, "BatchMode=yes") {
++		t.Fatalf("git missed the pinned curator-owned command:\n%s", envSeen)
++	}
++	if probe, err := os.ReadFile(invokedLog); err == nil && len(probe) != 0 {
++		t.Fatalf("evil GIT_SSH_COMMAND was invoked: %q", probe)
++	}
++	if _, err := os.Stat(filepath.Join(project, "Skillfile.lock.json")); !os.IsNotExist(err) {
++		t.Fatal("refused resolve published a lock")
++	}
++}
++
++// TestDraftLiteralIgnoresGitSSH is the GIT_SSH half of row (a): git prefers
++// GIT_SSH_COMMAND, but the allow-list drops both, so an ambient GIT_SSH
++// alone must also never redirect the clone.
++func TestDraftLiteralIgnoresGitSSH(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("test transport wrapper is POSIX-only")
++	}
++	realGit := requireGit(t)
++	root := t.TempDir()
++	_, declaredCommit := draftCLIKitBare(t, root)
++	evilBare, _ := writeEvilBare(t, root, declaredCommit)
++	evilSSH, invokedLog := writeEvilSSHCommand(t, evilBare, realGit)
++	fakeDir, cloneLog, envLog := literalIsolationGitShim(t, "", "", realGit)
++	pathEnv := draftTransportPATH(t, fakeDir)
++	configPath, project, home := setupCLIProject(t, root)
++	payload := `{"schema_version":2,"sources":{"kit":{"git":"` + literalIsolationSSH + `","tag":"v1"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
++	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	env := append(pathEnv, "GIT_SSH="+evilSSH)
++	code, _, stderr := runCurator(t, home, configPath, env, "project", "resolve", "app")
++	if code == 0 {
++		t.Fatalf("resolve succeeded with a hostile GIT_SSH, want the endpoint refusal:\n%s", stderr)
++	}
++	if !strings.Contains(stderr, config.CodeRepositoryEndpointUnavailable) {
++		t.Fatalf("stderr misses %s:\n%s", config.CodeRepositoryEndpointUnavailable, stderr)
++	}
++	if clones := draftCloneLog(t, cloneLog); len(clones) != 1 || clones[0] != literalIsolationSSH {
++		t.Fatalf("clones = %v, want the declared literal endpoint once", clones)
++	}
++	if envSeen := literalIsolationEnvLog(t, envLog); strings.Contains(envSeen, evilSSH) {
++		t.Fatalf("git saw the ambient GIT_SSH:\n%s", envSeen)
++	}
++	if probe, err := os.ReadFile(invokedLog); err == nil && len(probe) != 0 {
++		t.Fatalf("evil GIT_SSH was invoked: %q", probe)
++	}
++}
++
++// TestDraftLiteralDropsGitProxyCommand is row (b). GIT_PROXY_COMMAND
++// (core.gitProxy) applies only to the git:// transport, which neither the
++// Skillfile git: grammar nor the policy endpoint grammar admits, so a
++// git:// production entry through project resolve is infeasible; the
++// behavioral git:// proof lives at the gitops layer
++// (TestCloneIsolatedIgnoresGitProxyCommand). This production-entry row
++// proves the allow-list drops the ambient value on the admitted https://
++// lane: the resolve succeeds with the declared bind and git never sees
++// the hostile value. Mutant "remove the allow-list filter" exposes the
++// evil value in the env log and is KILLED.
++func TestDraftLiteralDropsGitProxyCommand(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("test transport wrapper is POSIX-only")
++	}
++	realGit := requireGit(t)
++	root := t.TempDir()
++	bare, _ := draftCLIKitBare(t, root)
++	evilProxy := filepath.Join(t.TempDir(), "evil-proxy")
++	if err := os.WriteFile(evilProxy, []byte("#!/bin/sh\necho evil-proxy-invoked >&2\nexit 1\n"), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	fakeDir, cloneLog, envLog := literalIsolationGitShim(t, literalIsolationHTTPS, bare, realGit)
++	pathEnv := draftTransportPATH(t, fakeDir)
++	configPath, project, home := setupCLIProject(t, root)
++	payload := `{"schema_version":2,"sources":{"kit":{"git":"` + literalIsolationHTTPS + `","tag":"v1"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
++	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	env := append(pathEnv, "GIT_PROXY_COMMAND="+evilProxy)
++	code, stdout, stderr := runCurator(t, home, configPath, env, "project", "resolve", "app")
++	if code != 0 {
++		t.Fatalf("resolve = %d, want success with the proxy override dropped:\n%s\n%s", code, stdout, stderr)
++	}
++	if clones := draftCloneLog(t, cloneLog); len(clones) != 1 || clones[0] != literalIsolationHTTPS {
++		t.Fatalf("clones = %v, want the declared literal endpoint once", clones)
++	}
++	if envSeen := literalIsolationEnvLog(t, envLog); strings.Contains(envSeen, evilProxy) {
++		t.Fatalf("git saw the ambient GIT_PROXY_COMMAND:\n%s", envSeen)
++	}
++}
++
++// TestDraftLiteralIgnoresGitExecPath is row (c): an ambient GIT_EXEC_PATH
++// pointing at a directory with a poisoned git-remote-https shim must not
++// hijack the literal https:// clone. The lane uses the real helper, fails
++// closed on the declared endpoint (no network), and never invokes the
++// poisoned shim. Mutant "remove the allow-list filter" invokes it and is
++// KILLED by the invocation log.
++func TestDraftLiteralIgnoresGitExecPath(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("test transport wrapper is POSIX-only")
++	}
++	realGit := requireGit(t)
++	root := t.TempDir()
++	evilDir := t.TempDir()
++	invokedLog := filepath.Join(evilDir, "remote-https-invoked.log")
++	poisoned := "#!/bin/sh\necho \"invoked $@\" >>'" + invokedLog + "'\necho 'evil remote helper' >&2\nexit 128\n"
++	if err := os.WriteFile(filepath.Join(evilDir, "git-remote-https"), []byte(poisoned), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	// Positive control: raw git with the ambient exec-path honoured
++	// invokes the poisoned helper, proving the payload is live.
++	if code, _, _ := testcli.Run(t, "", []string{"GIT_EXEC_PATH=" + evilDir}, "", realGit, "ls-remote", literalIsolationHTTPS); code == 0 {
++		t.Fatal("control ls-remote succeeded, want failure (payload not live)")
++	}
++	if probe, err := os.ReadFile(invokedLog); err != nil || len(probe) == 0 {
++		t.Fatal("control left no poisoned-helper invocation (payload not live)")
++	}
++	_ = os.Remove(invokedLog)
++
++	fakeDir, cloneLog, envLog := literalIsolationGitShim(t, "", "", realGit)
++	pathEnv := draftTransportPATH(t, fakeDir)
++	configPath, project, home := setupCLIProject(t, root)
++	payload := `{"schema_version":2,"sources":{"kit":{"git":"` + literalIsolationHTTPS + `","tag":"v1"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
++	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	env := append(pathEnv, "GIT_EXEC_PATH="+evilDir)
++	code, stdout, stderr := runCurator(t, home, configPath, env, "project", "resolve", "app")
++	if code == 0 {
++		t.Fatalf("resolve succeeded with a hostile GIT_EXEC_PATH, want the endpoint refusal:\n%s\n%s", stdout, stderr)
++	}
++	if !strings.Contains(stderr, config.CodeRepositoryEndpointUnavailable) {
++		t.Fatalf("stderr misses %s:\n%s", config.CodeRepositoryEndpointUnavailable, stderr)
++	}
++	assertSanitized(t, stderr, literalIsolationHTTPS, evilDir, "evil remote helper")
++	if clones := draftCloneLog(t, cloneLog); len(clones) != 1 || clones[0] != literalIsolationHTTPS {
++		t.Fatalf("clones = %v, want the declared literal endpoint once", clones)
++	}
++	if envSeen := literalIsolationEnvLog(t, envLog); strings.Contains(envSeen, evilDir) {
++		t.Fatalf("git saw the ambient GIT_EXEC_PATH:\n%s", envSeen)
++	}
++	if probe, err := os.ReadFile(invokedLog); err == nil && len(probe) != 0 {
++		t.Fatalf("poisoned git-remote-https was invoked: %q", probe)
++	}
++	if _, err := os.Stat(filepath.Join(project, "Skillfile.lock.json")); !os.IsNotExist(err) {
++		t.Fatal("refused resolve published a lock")
++	}
++}
++
++// writeFakeSSH writes a stand-in ssh that logs its argv (one <arg> per word
++// per line) and fails closed like an unknown host, so the lane's ssh
++// argv is observable at the production entry without network.
++func writeFakeSSH(t *testing.T, fakeDir string) (argvLog string) {
++	t.Helper()
++	argvLog = filepath.Join(fakeDir, "ssh-argv.log")
++	script := "#!/bin/sh\n" +
++		"{ for arg in \"$@\"; do printf '<%s>' \"$arg\"; done; printf '\\n'; } >>'" + argvLog + "'\n" +
++		"echo 'ssh: Could not resolve hostname fixture.test: Name or service not known' >&2\n" +
++		"exit 255\n"
++	if err := os.WriteFile(filepath.Join(fakeDir, "ssh"), []byte(script), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	return argvLog
++}
++
++// TestDraftLiteralIgnoresUserSSHConfig is row (d): a hostile ~/.ssh/config
++// (Host alias to an evil HostName plus a ProxyCommand) under a temp HOME
++// must not redirect the literal ssh:// clone. The lane runs the
++// curator-owned command (-F empty, ProxyCommand=none, host-key validation
++// never disabled) resolved through PATH, fails closed on the declared
++// endpoint, and never invokes the evil ProxyCommand. Mutants "drop -F"
++// and "drop ProxyCommand=none" lose their argv markers and are KILLED;
++// "pass the ambient GIT_SSH_COMMAND through" bypasses the fake ssh and is
++// KILLED by its silence plus the evil invocation.
++func TestDraftLiteralIgnoresUserSSHConfig(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("test transport wrapper is POSIX-only")
++	}
++	realGit := requireGit(t)
++	root := t.TempDir()
++	fakeDir, cloneLog, _ := literalIsolationGitShim(t, "", "", realGit)
++	sshArgvLog := writeFakeSSH(t, fakeDir)
++	pathEnv := draftTransportPATH(t, fakeDir)
++	configPath, project, home := setupCLIProject(t, root)
++	evilProxy := filepath.Join(root, "evil-proxy")
++	proxyInvoked := filepath.Join(root, "evil-proxy-invoked.log")
++	if err := os.WriteFile(evilProxy, []byte("#!/bin/sh\necho \"invoked $@\" >>'"+proxyInvoked+"'\nexit 1\n"), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	dotSSH := filepath.Join(home, ".ssh")
++	if err := os.MkdirAll(dotSSH, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	hostileSSH := "Host fixture.test\n\tHostName evil.test\n\tProxyCommand " + evilProxy + " %h %p\n"
++	if err := os.WriteFile(filepath.Join(dotSSH, "config"), []byte(hostileSSH), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	payload := `{"schema_version":2,"sources":{"kit":{"git":"` + literalIsolationSSH + `","tag":"v1"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
++	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	code, stdout, stderr := runCurator(t, home, configPath, pathEnv, "project", "resolve", "app")
++	if code == 0 {
++		t.Fatalf("resolve succeeded with a hostile ~/.ssh/config, want the endpoint refusal:\n%s\n%s", stdout, stderr)
++	}
++	if !strings.Contains(stderr, config.CodeRepositoryEndpointUnavailable) {
++		t.Fatalf("stderr misses %s:\n%s", config.CodeRepositoryEndpointUnavailable, stderr)
++	}
++	assertSanitized(t, stderr, literalIsolationSSH, "evil.test", evilProxy, "evil-proxy")
++	if clones := draftCloneLog(t, cloneLog); len(clones) != 1 || clones[0] != literalIsolationSSH {
++		t.Fatalf("clones = %v, want the declared literal endpoint once", clones)
++	}
++	argv, err := os.ReadFile(sshArgvLog)
++	if err != nil || len(argv) == 0 {
++		t.Fatalf("fake ssh was never invoked (argv log missing): %v", err)
++	}
++	for _, want := range []string{"<-F>", "<BatchMode=yes>", "<StrictHostKeyChecking=yes>", "<ProxyCommand=none>", "<ProxyJump=none>"} {
++		if !strings.Contains(string(argv), want) {
++			t.Fatalf("ssh argv misses %s:\n%s", want, argv)
++		}
++	}
++	if strings.Contains(string(argv), "StrictHostKeyChecking=no") || strings.Contains(string(argv), "accept-new") {
++		t.Fatalf("ssh argv disables host-key validation:\n%s", argv)
++	}
++	if probe, err := os.ReadFile(proxyInvoked); err == nil && len(probe) != 0 {
++		t.Fatalf("evil ProxyCommand was invoked: %q", probe)
++	}
++	if _, err := os.Stat(filepath.Join(project, "Skillfile.lock.json")); !os.IsNotExist(err) {
++		t.Fatal("refused resolve published a lock")
++	}
++}
++
++// TestDraftSSHEmptyConfigIgnoresHostileFile proves the -F empty mechanism
++// with real ssh (no HOME dependence: OpenSSH resolves ~/.ssh/config from
++// the passwd entry, not $HOME, on macOS and Linux): a hostile file that
++// ssh honours via -F is ignored via -F empty, and ProxyCommand=none
++// overrides a hostile ProxyCommand. This is the behavioral leg behind row
++// (d)'s temp-HOME production entry.
++func TestDraftSSHEmptyConfigIgnoresHostileFile(t *testing.T) {
++	ssh, ok := testcli.LookPath("ssh")
++	if !ok {
++		t.Fatal("ssh is not available")
++	}
++	hostile := filepath.Join(t.TempDir(), "hostile-ssh-config")
++	if err := os.WriteFile(hostile, []byte("Host fixture.test\n\tHostName evil.test\n\tProxyCommand /tmp/evil-proxy %h %p\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	empty := filepath.Join(t.TempDir(), "empty-ssh-config")
++	if err := os.WriteFile(empty, nil, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	honoured := testcli.Output(t, "", nil, ssh, "-F", hostile, "-G", "fixture.test")
++	if !strings.Contains(honoured, "hostname evil.test") || !strings.Contains(strings.ToLower(honoured), "proxycommand") {
++		t.Fatalf("control ssh -F hostile misses the evil mapping (payload not live):\n%s", honoured)
++	}
++	isolated := testcli.Output(t, "", nil, ssh, "-F", empty, "-G", "fixture.test")
++	if strings.Contains(isolated, "evil.test") || strings.Contains(isolated, "evil-proxy") {
++		t.Fatalf("ssh -F empty consulted the hostile file:\n%s", isolated)
++	}
++	overridden := testcli.Output(t, "", nil, ssh, "-F", hostile, "-o", "ProxyCommand=none", "-G", "fixture.test")
++	if strings.Contains(overridden, "evil-proxy") {
++		t.Fatalf("ProxyCommand=none did not override the hostile file:\n%s", overridden)
++	}
++}
++
++// proxyListener starts a TCP listener that counts accepted connections.
++// It runs on every OS (no shell), so row (e) needs no Windows skip.
++func proxyListener(t *testing.T) (addr string, count *atomic.Int64, closeFn func()) {
++	t.Helper()
++	listener, err := net.Listen("tcp", "127.0.0.1:0")
++	if err != nil {
++		t.Skipf("this host cannot create a loopback listener the proxy row needs: %v", err)
++	}
++	count = &atomic.Int64{}
++	go func() {
++		for {
++			if err := listener.(*net.TCPListener).SetDeadline(time.Now().Add(10 * time.Second)); err != nil {
++				return
++			}
++			conn, err := listener.Accept()
++			if err != nil {
++				return
++			}
++			count.Add(1)
++			_ = conn.Close()
++		}
++	}()
++	return listener.Addr().String(), count, func() {
++		_ = listener.Close()
++	}
++}
++
++// TestDraftLiteralIgnoresProxyEnvironment is row (e): ambient proxy
++// variables pointing at a recording listener must produce zero connections
++// from the draft lane, which fails closed with a direct-DNS diagnostic
++// (not a proxy diagnostic). Mutant "remove the allow-list filter" connects
++// to the proxy and is KILLED by the connection count.
++func TestDraftLiteralIgnoresProxyEnvironment(t *testing.T) {
++	realGit := requireGit(t)
++	root := t.TempDir()
++	// Positive control on its own listener: raw git honours the proxy
++	// variables, proving the payload is live.
++	controlAddr, controlCount, closeControl := proxyListener(t)
++	controlProxy := "http://" + controlAddr
++	controlEnv := []string{
++		"http_proxy=" + controlProxy, "https_proxy=" + controlProxy,
++		"HTTP_PROXY=" + controlProxy, "HTTPS_PROXY=" + controlProxy,
++		"all_proxy=" + controlProxy, "ALL_PROXY=" + controlProxy,
++	}
++	code, _, controlStderr := testcli.Run(t, "", controlEnv, "", realGit, "ls-remote", literalIsolationHTTPS)
++	if code == 0 {
++		closeControl()
++		t.Fatalf("control ls-remote succeeded, want failure:\n%s", controlStderr)
++	}
++	deadline := time.Now().Add(5 * time.Second)
++	for controlCount.Load() == 0 && time.Now().Before(deadline) {
++		time.Sleep(50 * time.Millisecond)
++	}
++	closeControl()
++	if controlCount.Load() == 0 {
++		t.Fatalf("control left zero proxy connections (payload not live):\n%s", controlStderr)
++	}
++	if !strings.Contains(controlStderr, "Proxy") && !strings.Contains(controlStderr, "proxy") {
++		// curl-version phrasing (observed macOS: "Recv failure:
++		// Connection reset by peer" with no proxy word); the accepted
++		// connection above is the verdict that git honoured the proxy,
++		// since only git learned this listener's ephemeral port.
++		t.Logf("control stderr lacks proxy wording; connection count %d is the verdict:\n%s", controlCount.Load(), controlStderr)
++	}
++
++	addr, count, closeListener := proxyListener(t)
++	defer closeListener()
++	proxy := "http://" + addr
++	// On Windows the POSIX git shim is unavailable; the lane still runs
++	// real git directly and the proxy count is the verdict either way.
++	var pathEnv []string
++	var cloneLog, envLog string
++	if runtime.GOOS != "windows" {
++		var fakeDir string
++		fakeDir, cloneLog, envLog = literalIsolationGitShim(t, "", "", realGit)
++		pathEnv = draftTransportPATH(t, fakeDir)
++	}
++	configPath, project, home := setupCLIProject(t, root)
++	payload := `{"schema_version":2,"sources":{"kit":{"git":"` + literalIsolationHTTPS + `","tag":"v1"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
++	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	env := append(pathEnv,
++		"http_proxy="+proxy, "https_proxy="+proxy,
++		"HTTP_PROXY="+proxy, "HTTPS_PROXY="+proxy,
++		"all_proxy="+proxy, "ALL_PROXY="+proxy,
++		"no_proxy=", "NO_PROXY=",
++	)
++	code, stdout, stderr := runCurator(t, home, configPath, env, "project", "resolve", "app")
++	if code == 0 {
++		t.Fatalf("resolve succeeded with a hostile proxy, want the endpoint refusal:\n%s\n%s", stdout, stderr)
++	}
++	if !strings.Contains(stderr, config.CodeRepositoryEndpointUnavailable) {
++		t.Fatalf("stderr misses %s:\n%s", config.CodeRepositoryEndpointUnavailable, stderr)
++	}
++	assertSanitized(t, stderr, literalIsolationHTTPS, proxy, addr)
++	if runtime.GOOS != "windows" {
++		if clones := draftCloneLog(t, cloneLog); len(clones) != 1 || clones[0] != literalIsolationHTTPS {
++			t.Fatalf("clones = %v, want the declared literal endpoint once", clones)
++		}
++		if envSeen := literalIsolationEnvLog(t, envLog); strings.Contains(envSeen, proxy) {
++			t.Fatalf("git saw the ambient proxy environment:\n%s", envSeen)
++		}
++	}
++	// Give a leaked proxy dial time to arrive; the lane must stay silent.
++	deadline = time.Now().Add(2 * time.Second)
++	for time.Now().Before(deadline) {
++		if count.Load() != 0 {
++			break
++		}
++		time.Sleep(50 * time.Millisecond)
++	}
++	if got := count.Load(); got != 0 {
++		t.Fatalf("proxy connections = %d, want zero: the draft lane honoured the proxy environment", got)
++	}
++	if _, err := os.Stat(filepath.Join(project, "Skillfile.lock.json")); !os.IsNotExist(err) {
++		t.Fatal("refused resolve published a lock")
++	}
++}
++
++// TestDraftLiteralKeepsAgentAndAskpass is row (g): SSH_AUTH_SOCK and
++// GIT_ASKPASS still pass through on the draft lane. The resolve succeeds
++// with both set (file:// rewrite, so neither credential is consumed) and
++// git observes both values. Dropping either (narrowing the allow-list)
++// fails the env assertions.
++func TestDraftLiteralKeepsAgentAndAskpass(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("test transport wrapper is POSIX-only")
++	}
++	realGit := requireGit(t)
++	root := t.TempDir()
++	bare, commit := draftCLIKitBare(t, root)
++	fakeDir, cloneLog, envLog := literalIsolationGitShim(t, literalIsolationHTTPS, bare, realGit)
++	pathEnv := draftTransportPATH(t, fakeDir)
++	configPath, project, home := setupCLIProject(t, root)
++	payload := `{"schema_version":2,"sources":{"kit":{"git":"` + literalIsolationHTTPS + `","tag":"v1"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
++	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	agentSock := filepath.Join(t.TempDir(), "agent.sock")
++	askpass := filepath.Join(t.TempDir(), "askpass")
++	if err := os.WriteFile(askpass, []byte("#!/bin/sh\nexit 1\n"), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	env := append(pathEnv, "SSH_AUTH_SOCK="+agentSock, "GIT_ASKPASS="+askpass)
++	code, stdout, stderr := runCurator(t, home, configPath, env, "project", "resolve", "app")
++	if code != 0 {
++		t.Fatalf("resolve = %d, want success with agent/askpass set:\n%s\n%s", code, stdout, stderr)
++	}
++	if clones := draftCloneLog(t, cloneLog); len(clones) != 1 || clones[0] != literalIsolationHTTPS {
++		t.Fatalf("clones = %v, want the declared literal endpoint once", clones)
++	}
++	envSeen := literalIsolationEnvLog(t, envLog)
++	if !strings.Contains(envSeen, "SSH_AUTH_SOCK="+agentSock) {
++		t.Fatalf("git missed SSH_AUTH_SOCK:\n%s", envSeen)
++	}
++	if !strings.Contains(envSeen, "GIT_ASKPASS="+askpass) {
++		t.Fatalf("git missed GIT_ASKPASS:\n%s", envSeen)
++	}
++	lock, err := sourcelock.Read(filepath.Join(project, "Skillfile.lock.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	member, ok := lock.Find("review")
++	if !ok || member.Package.Commit.Hex != commit {
++		t.Fatalf("lock binds %+v, want the declared commit %s", member.Package, commit)
++	}
++	// Refresh (the fetch half) succeeds with the same credentials.
++	code, stdout, stderr = runCurator(t, home, configPath, env, "project", "refresh", "app")
++	if code != 0 {
++		t.Fatalf("refresh = %d, want success with agent/askpass set:\n%s\n%s", code, stdout, stderr)
++	}
++}
+diff --git a/internal/crossconformance/draftsources_semantic_transport_test.go b/internal/crossconformance/draftsources_semantic_transport_test.go
+index 345bff03..0de88d67 100644
+--- a/internal/crossconformance/draftsources_semantic_transport_test.go
++++ b/internal/crossconformance/draftsources_semantic_transport_test.go
+@@ -129,7 +129,8 @@ func installDraftTransportShim(t *testing.T, failURL, failStderr, rewriteURL, ba
+ 		script.WriteString("if [ \"$arg\" = '" + rewriteURL + "' ]; then rewrite=1; url=\"$arg\"; fi\n")
+ 	}
+ 	script.WriteString("done\n")
+-	script.WriteString("if [ \"$1\" = \"clone\" ]; then printf '%s\\n' \"$url\" >>\"$log\"\n")
++	script.WriteString("is_clone=0; for arg in \"$@\"; do if [ \"$arg\" = \"clone\" ]; then is_clone=1; fi; done\n")
++	script.WriteString("if [ \"$is_clone\" = \"1\" ]; then printf '%s\\n' \"$url\" >>\"$log\"\n")
+ 	script.WriteString("dest=''; for arg in \"$@\"; do dest=\"$arg\"; done\n")
+ 	script.WriteString("if [ \"$fail\" = \"1\" ]; then printf \"Cloning into '%s'...\\n\" \"$dest\" >&2\n")
+ 	script.WriteString("printf '%s\\n' \"" + failStderr + "\" >&2\n")
+diff --git a/internal/gitops/gitops.go b/internal/gitops/gitops.go
+index 4615cc81..d38bcd81 100644
+--- a/internal/gitops/gitops.go
++++ b/internal/gitops/gitops.go
+@@ -38,83 +38,185 @@ func run(dir string, args ...string) (string, error) {
+ 	return runWithEnv(dir, append(os.Environ(), "GIT_ALLOW_PROTOCOL="+AllowedProtocols), args...)
+ }
+ 
+-// isolatedConfigEnv lists the environment channels that select persistent
+-// git configuration. The draft literal-URL lane replaces every one of them
+-// (repository-transport: user configuration never consulted); matching is
++// draftAllowedEnv is the explicit allow-list of ambient names honoured on
++// the draft literal-URL lane (repository-transport §5: environment
++// overrides remain NOT imported). Every other ambient name is dropped by
++// construction, so no GIT_* override (GIT_SSH*, GIT_PROXY_COMMAND,
++// GIT_EXEC_PATH, GIT_DIR, GIT_SSL_*, GIT_CURL_*, GIT_TRACE*, GIT_HTTP_*,
++// GIT_CONFIG*, GIT_TEMPLATE_DIR, GIT_NAMESPACE,
++// GIT_ALTERNATE_OBJECT_DIRECTORIES, …) and no proxy name (http_proxy,
++// https_proxy, all_proxy, no_proxy in any case) can reach git. Matching is
+ // case-insensitive so a differently-cased spelling cannot survive on
+ // Windows, where process environment names are case-insensitive.
+-var isolatedConfigEnv = []string{
+-	"GIT_CONFIG_GLOBAL",
+-	"GIT_CONFIG_SYSTEM",
+-	"GIT_CONFIG_NOSYSTEM",
+-	"GIT_CONFIG_COUNT",
+-	"GIT_CONFIG_PARAMETERS",
+-	"GIT_ALLOW_PROTOCOL",
+-	"GIT_TERMINAL_PROMPT",
+-}
+-
+-// isolatedConfigEnvPrefixes lists the numbered environment channels that
+-// carry command-line configuration pairs (GIT_CONFIG_KEY_<n> /
+-// GIT_CONFIG_VALUE_<n>); every index is scrubbed.
+-var isolatedConfigEnvPrefixes = []string{
+-	"GIT_CONFIG_KEY_",
+-	"GIT_CONFIG_VALUE_",
++//
++// Honoured, and why: PATH (tooling; the ssh binary below resolves through
++// it — the draft lane's tooling bound, unlike the resolved lane's pinned
++// tooling); HOME/USERPROFILE (only so OpenSSH finds its compiled-in
++// default known_hosts and default identity files); TMPDIR/TMP/TEMP (temp
++// files); TZ (dates); SYSTEMROOT/WINDIR/COMSPEC/PATHEXT/SYSTEMDRIVE
++// (Windows process essentials); SSH_AUTH_SOCK (agent credentials);
++// GIT_ASKPASS (the only HTTPS credential channel on this lane: it supplies
++// credentials, it cannot redirect the endpoint). LOCALAPPDATA/APPDATA are
++// deliberately absent: git-for-windows needs them only for credential
++// helpers and caches, which this lane disables, so no entry requires them.
++// SSH_ASKPASS is absent: BatchMode below disables every prompt, so it is
++// inert. XDG_CONFIG_HOME is absent: the pinned GIT_CONFIG_GLOBAL below
++// already overrides it. Locale is pinned, not honoured (see below).
++var draftAllowedEnv = []string{
++	"PATH",
++	"HOME",
++	"USERPROFILE",
++	"TMPDIR",
++	"TMP",
++	"TEMP",
++	"TZ",
++	"SYSTEMROOT",
++	"WINDIR",
++	"COMSPEC",
++	"PATHEXT",
++	"SYSTEMDRIVE",
++	"SSH_AUTH_SOCK",
++	"GIT_ASKPASS",
+ }
+ 
+-// scrubsGitConfigEnv reports whether an environment variable name selects
+-// git configuration and must not reach the isolated lane.
+-func scrubsGitConfigEnv(name string) bool {
+-	for _, pinned := range isolatedConfigEnv {
+-		if strings.EqualFold(name, pinned) {
+-			return true
+-		}
+-	}
+-	for _, prefix := range isolatedConfigEnvPrefixes {
+-		if len(name) >= len(prefix) && strings.EqualFold(name[:len(prefix)], prefix) {
++// isDraftAllowedEnv reports whether an ambient name is honoured on the
++// draft lane. Case-insensitive for the Windows spelling.
++func isDraftAllowedEnv(name string) bool {
++	for _, allowed := range draftAllowedEnv {
++		if strings.EqualFold(name, allowed) {
+ 			return true
+ 		}
+ 	}
+ 	return false
+ }
+ 
+-// isolatedGitEnv builds the environment for the draft literal-URL lane:
+-// the ambient process environment with every git-configuration channel
+-// replaced by pinned isolation. User and system configuration files are
+-// pointed at a fresh empty file (created per call so no path is shared or
+-// reused, and so the isolation never depends on HOME), config selection
+-// from the environment is cleared, and interactive prompts stay disabled.
+-// Per-invocation operator context (PATH, SSH agent/askpass, author
+-// identity) is preserved: only persistent configuration is isolated.
+-// The caller must run exactly the returned cleanup.
++// draftSSHOptions is the curator-owned ssh hardening for the draft lane,
++// mirroring the resolved lane's ExactSSHCommand core where it applies
++// without pinned paths: no user or system ssh configuration is read
++// (-F empty below), no proxy or forwarding, no prompts, host-key
++// validation never disabled. Identities and known_hosts are deliberately
++// NOT pinned: the compiled-in defaults (~/.ssh/known_hosts, default
++// identity files) plus the agent stay in force.
++var draftSSHOptions = []string{
++	"BatchMode=yes",
++	"StrictHostKeyChecking=yes",
++	"ProxyCommand=none",
++	"ProxyJump=none",
++	"PermitLocalCommand=no",
++	"ForwardAgent=no",
++	"ClearAllForwardings=yes",
++	"RequestTTY=no",
++	"CanonicalizeHostname=no",
++	"UpdateHostKeys=no",
++	"ConnectionAttempts=1",
++}
++
++// draftSSHCommand renders the curator-owned ssh command for GIT_SSH_COMMAND
++// with the empty ssh config path shell-quoted. GIT_SSH_COMMAND (not a
++// GIT_SSH wrapper file) is used so no extra executable is materialized and
++// git-for-windows' bundled sh/ssh resolve through the honoured PATH; the
++// single-quoted POSIX form is honoured by that sh on every platform.
++func draftSSHCommand(emptyConfig string) string {
++	var out strings.Builder
++	out.WriteString("ssh -F ")
++	out.WriteString(shellQuote(emptyConfig))
++	for _, option := range draftSSHOptions {
++		out.WriteString(" -o ")
++		out.WriteString(option)
++	}
++	return out.String()
++}
++
++// shellQuote quotes one word for POSIX sh (and git-for-windows' bundled
++// sh): single quotes with embedded quotes escaped. Fixed option words need
++// no quoting; only the temp path is quoted.
++func shellQuote(word string) string {
++	return "'" + strings.ReplaceAll(word, "'", "'\\''") + "'"
++}
++
++// isolatedGitConfigArgs pins transport security per git invocation, before
++// the subcommand (git -c key=value clone/fetch/remote …). credential.helper
++// is already implied empty by the pinned empty user/system configuration
++// for a fresh clone, and http.sslVerify already defaults true, but the -c
++// pins also hold against a repo-local .git/config on the fetch path, which
++// the empty user/system pins do not cover. http.followRedirects is pinned
++// false so a redirect to an unlisted host never leaves the lane. Proxy
++// configuration is deliberately NOT pinned here: proxies are refused by the
++// allow-list (environment) plus the empty user/system configuration, and
++// the lane documents that it does not honour proxy environment; a repo-local
++// http.proxy in a curator-owned checkout is outside the user-configuration
++// threat model.
++var isolatedGitConfigArgs = []string{
++	"-c", "http.sslVerify=true",
++	"-c", "http.followRedirects=false",
++	"-c", "credential.helper=",
++}
++
++// withIsolatedConfigArgs prepends the transport pins before one git
++// subcommand's arguments.
++func withIsolatedConfigArgs(args []string) []string {
++	out := make([]string, 0, len(args)+len(isolatedGitConfigArgs))
++	out = append(out, isolatedGitConfigArgs...)
++	out = append(out, args...)
++	return out
++}
++
++// isolatedGitEnv builds the environment for the draft literal-URL lane
++// from the explicit allow-list plus pinned isolation. User and system git
++// configuration files are pointed at a fresh empty file (created per call
++// so no path is shared or reused), config selection from the environment is
++// absent by construction, interactive prompts stay disabled, the protocol
++// comes from the lane (GIT_PROTOCOL_FROM_USER=0), and ssh runs the
++// curator-owned command with a fresh empty ssh config (host aliases,
++// ProxyCommand, IdentityFile and every other ~/.ssh/config entry are not
++// read). The caller must run exactly the returned cleanup.
+ func isolatedGitEnv() (env []string, cleanup func(), err error) {
+-	empty, err := os.CreateTemp("", "curator-gitconfig-*")
++	emptyGit, err := os.CreateTemp("", "curator-gitconfig-*")
+ 	if err != nil {
+ 		return nil, nil, fmt.Errorf("isolating git configuration: %w", err)
+ 	}
+-	emptyName := empty.Name()
+-	if err := empty.Close(); err != nil {
+-		_ = os.Remove(emptyName)
++	emptyGitName := emptyGit.Name()
++	if err := emptyGit.Close(); err != nil {
++		_ = os.Remove(emptyGitName)
+ 		return nil, nil, fmt.Errorf("isolating git configuration: %w", err)
+ 	}
+-	cleanup = func() { _ = os.Remove(emptyName) }
++	emptySSH, err := os.CreateTemp("", "curator-sshconfig-*")
++	if err != nil {
++		_ = os.Remove(emptyGitName)
++		return nil, nil, fmt.Errorf("isolating ssh configuration: %w", err)
++	}
++	emptySSHName := emptySSH.Name()
++	if err := emptySSH.Close(); err != nil {
++		_ = os.Remove(emptyGitName)
++		_ = os.Remove(emptySSHName)
++		return nil, nil, fmt.Errorf("isolating ssh configuration: %w", err)
++	}
++	cleanup = func() {
++		_ = os.Remove(emptyGitName)
++		_ = os.Remove(emptySSHName)
++	}
+ 	ambient := os.Environ()
+-	env = make([]string, 0, len(ambient)+8)
++	env = make([]string, 0, len(ambient)+16)
+ 	for _, entry := range ambient {
+ 		name := entry
+ 		if index := strings.IndexByte(entry, '='); index >= 0 {
+ 			name = entry[:index]
+ 		}
+-		if scrubsGitConfigEnv(name) {
++		if !isDraftAllowedEnv(name) {
+ 			continue
+ 		}
+ 		env = append(env, entry)
+ 	}
+ 	env = append(env,
+-		"GIT_CONFIG_GLOBAL="+emptyName,
+-		"GIT_CONFIG_SYSTEM="+emptyName,
++		"LANG=C",
++		"LC_ALL=C",
++		"GIT_CONFIG_GLOBAL="+emptyGitName,
++		"GIT_CONFIG_SYSTEM="+emptyGitName,
+ 		"GIT_CONFIG_NOSYSTEM=1",
+ 		"GIT_ALLOW_PROTOCOL="+AllowedProtocols,
+ 		"GIT_TERMINAL_PROMPT=0",
++		"GIT_PROTOCOL_FROM_USER=0",
++		"GIT_SSH_COMMAND="+draftSSHCommand(emptySSHName),
+ 	)
+ 	return env, cleanup, nil
+ }
+@@ -146,9 +248,12 @@ func Clone(remoteURL, destination string) error {
+ }
+ 
+ // CloneIsolated is the draft literal-URL lane's clone: identical to Clone
+-// except the invocation never consults user or system git configuration
+-// (no insteadOf/pushInsteadOf, url rewriting, helpers, includes, or
+-// core.sshCommand from configuration files), independent of HOME.
++// except the invocation runs on the allow-list environment with pinned
++// transport (no user or system git configuration — no
++// insteadOf/pushInsteadOf, url rewriting, helpers, includes, or
++// core.sshCommand from configuration files — no ambient GIT_* override,
++// no proxy environment, and the curator-owned ssh command with an empty ssh
++// config), independent of HOME.
+ func CloneIsolated(remoteURL, destination string) error {
+ 	env, cleanup, err := isolatedGitEnv()
+ 	if err != nil {
+@@ -156,7 +261,7 @@ func CloneIsolated(remoteURL, destination string) error {
+ 	}
+ 	defer cleanup()
+ 	return cloneWith(remoteURL, destination, func(dir string, args ...string) (string, error) {
+-		return runWithEnv(dir, env, args...)
++		return runWithEnv(dir, env, withIsolatedConfigArgs(args)...)
+ 	})
+ }
+ 
+@@ -252,8 +357,8 @@ func Fetch(repo string) error {
+ }
+ 
+ // FetchIsolated is the draft literal-URL lane's fetch: identical to Fetch
+-// except the invocation never consults user or system git configuration,
+-// independent of HOME.
++// except the invocation runs on the allow-list environment with pinned
++// transport, like CloneIsolated, independent of HOME.
+ func FetchIsolated(repo string) error {
+ 	env, cleanup, err := isolatedGitEnv()
+ 	if err != nil {
+@@ -261,7 +366,7 @@ func FetchIsolated(repo string) error {
+ 	}
+ 	defer cleanup()
+ 	return fetchWith(repo, func(dir string, args ...string) (string, error) {
+-		return runWithEnv(dir, env, args...)
++		return runWithEnv(dir, env, withIsolatedConfigArgs(args)...)
+ 	})
+ }
+ 
+diff --git a/internal/gitops/isolated_test.go b/internal/gitops/isolated_test.go
+index 3e9653c5..0303ea17 100644
+--- a/internal/gitops/isolated_test.go
++++ b/internal/gitops/isolated_test.go
+@@ -4,6 +4,7 @@ import (
+ 	"os"
+ 	"os/exec"
+ 	"path/filepath"
++	"runtime"
+ 	"strings"
+ 	"testing"
+ )
+@@ -227,13 +228,14 @@ func TestIsolatedGitEnvPinsEmptyConfig(t *testing.T) {
+ 	t.Setenv("GIT_CONFIG_VALUE_0", "x")
+ 	t.Setenv("GIT_ALLOW_PROTOCOL", "all")
+ 	t.Setenv("GIT_TERMINAL_PROMPT", "1")
+-	t.Setenv("CURATOR_TEST_KEEP", "kept")
+ 	t.Setenv("SSH_AUTH_SOCK", "/tmp/kept-agent.sock")
++	t.Setenv("GIT_ASKPASS", "/operator/askpass")
+ 
+ 	env, cleanup, err := isolatedGitEnv()
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
++	defer cleanup()
+ 	values := map[string]string{}
+ 	for _, entry := range env {
+ 		name, value, _ := strings.Cut(entry, "=")
+@@ -261,7 +263,7 @@ func TestIsolatedGitEnvPinsEmptyConfig(t *testing.T) {
+ 	}
+ 	for _, forbidden := range []string{"GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0"} {
+ 		if value, ok := values[forbidden]; ok {
+-			t.Fatalf("%s = %q, want it scrubbed", forbidden, value)
++			t.Fatalf("%s = %q, want it dropped", forbidden, value)
+ 		}
+ 	}
+ 	if values["GIT_ALLOW_PROTOCOL"] != AllowedProtocols {
+@@ -270,14 +272,311 @@ func TestIsolatedGitEnvPinsEmptyConfig(t *testing.T) {
+ 	if values["GIT_TERMINAL_PROMPT"] != "0" {
+ 		t.Fatalf("GIT_TERMINAL_PROMPT = %q, want 0", values["GIT_TERMINAL_PROMPT"])
+ 	}
+-	if values["CURATOR_TEST_KEEP"] != "kept" || values["SSH_AUTH_SOCK"] != "/tmp/kept-agent.sock" {
+-		t.Fatal("operator invocation context was not preserved")
++	if values["GIT_PROTOCOL_FROM_USER"] != "0" {
++		t.Fatalf("GIT_PROTOCOL_FROM_USER = %q, want 0", values["GIT_PROTOCOL_FROM_USER"])
++	}
++	if values["LANG"] != "C" || values["LC_ALL"] != "C" {
++		t.Fatalf("locale = %q/%q, want C/C", values["LANG"], values["LC_ALL"])
++	}
++	if values["SSH_AUTH_SOCK"] != "/tmp/kept-agent.sock" {
++		t.Fatal("SSH_AUTH_SOCK was not preserved")
++	}
++	if values["GIT_ASKPASS"] != "/operator/askpass" {
++		t.Fatal("GIT_ASKPASS was not preserved")
+ 	}
+ 	if values["PATH"] != os.Getenv("PATH") {
+ 		t.Fatal("PATH was not preserved")
+ 	}
++	sshCommand, ok := values["GIT_SSH_COMMAND"]
++	if !ok || !strings.Contains(sshCommand, "-F ") {
++		t.Fatalf("GIT_SSH_COMMAND = %q, want the curator-owned command with -F", sshCommand)
++	}
+ 	cleanup()
+ 	if _, err := os.Stat(global); !os.IsNotExist(err) {
+ 		t.Fatalf("cleanup left %s: %v", global, err)
+ 	}
+ }
++
++// envValues returns every value in env whose name matches want
++// case-insensitively (the Windows spelling).
++func envValues(env []string, want string) []string {
++	var out []string
++	for _, entry := range env {
++		name, value, _ := strings.Cut(entry, "=")
++		if strings.EqualFold(name, want) {
++			out = append(out, value)
++		}
++	}
++	return out
++}
++
++// TestIsolatedGitEnvAllowList proves the allow-list by construction: every
++// ambient name outside the list is absent (including every GIT_* override
++// and proxy name, in hostile and Windows-mixed-case spellings), and every
++// listed name is present. Removing the filter (appending the ambient
++// environment) must fail this test.
++func TestIsolatedGitEnvAllowList(t *testing.T) {
++	hostileGit := []string{
++		"GIT_SSH", "GIT_SSH_COMMAND", "GIT_SSH_VARIANT",
++		"GIT_PROXY_COMMAND", "GIT_EXEC_PATH",
++		"GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR",
++		"GIT_OBJECT_DIRECTORY", "GIT_INDEX_FILE",
++		"GIT_SSL_CAINFO", "GIT_SSL_NO_VERIFY",
++		"GIT_CURL_VERBOSE", "GIT_TRACE", "GIT_TRACE_PACKET",
++		"GIT_HTTP_USER_AGENT", "GIT_CONFIG_COUNT",
++		"GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0",
++		"GIT_CONFIG_PARAMETERS", "GIT_TEMPLATE_DIR",
++		"GIT_NAMESPACE", "GIT_ALTERNATE_OBJECT_DIRECTORIES",
++		"GIT_PAGER", "GIT_EDITOR", "GIT_AUTHOR_NAME",
++	}
++	for _, name := range hostileGit {
++		t.Setenv(name, "evil-"+name)
++	}
++	// Windows-mixed-case spellings of the same overrides.
++	t.Setenv("git_ssh_command", "evil-lower")
++	t.Setenv("Git_Proxy_Command", "evil-mixed")
++	t.Setenv("gIt_eXeC_pAtH", "evil-mixed-exec")
++	for _, name := range []string{
++		"http_proxy", "https_proxy", "all_proxy", "no_proxy",
++		"HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY",
++	} {
++		t.Setenv(name, "http://127.0.0.1:9/")
++	}
++	t.Setenv("CURATOR_TEST_KEEP", "kept")
++	t.Setenv("SSH_ASKPASS", "/tmp/evil-ssh-askpass")
++	t.Setenv("XDG_CONFIG_HOME", "/tmp/evil-xdg")
++	t.Setenv("LANG", "evil.UTF-8")
++	t.Setenv("LC_ALL", "evil.UTF-8")
++	home := t.TempDir()
++	t.Setenv("HOME", home)
++	t.Setenv("USERPROFILE", home)
++	t.Setenv("TMPDIR", t.TempDir())
++	t.Setenv("TMP", t.TempDir())
++	t.Setenv("TEMP", t.TempDir())
++	t.Setenv("TZ", "UTC")
++	t.Setenv("SYSTEMROOT", `C:\Windows`)
++	t.Setenv("WINDIR", `C:\Windows`)
++	t.Setenv("COMSPEC", `C:\Windows\System32\cmd.exe`)
++	t.Setenv("PATHEXT", ".EXE")
++	t.Setenv("SYSTEMDRIVE", "C:")
++	t.Setenv("LOCALAPPDATA", `C:\evil`)
++	t.Setenv("APPDATA", `C:\evil-roam`)
++	t.Setenv("SSH_AUTH_SOCK", "/tmp/kept-agent.sock")
++	t.Setenv("GIT_ASKPASS", "/operator/askpass")
++
++	env, cleanup, err := isolatedGitEnv()
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer cleanup()
++	for _, name := range hostileGit {
++		if name == "GIT_SSH_COMMAND" {
++			continue
++		}
++		if got := envValues(env, name); len(got) != 0 {
++			t.Fatalf("%s = %q, want it absent by construction", name, got)
++		}
++	}
++	// GIT_SSH_COMMAND ambient values (every spelling) are replaced by the
++	// single curator-owned command: hostile payloads never survive.
++	sshValues := envValues(env, "GIT_SSH_COMMAND")
++	if len(sshValues) != 1 {
++		t.Fatalf("GIT_SSH_COMMAND entries = %q, want exactly the pinned command", sshValues)
++	}
++	for _, hostile := range []string{"evil-GIT_SSH_COMMAND", "evil-lower"} {
++		if strings.Contains(sshValues[0], hostile) {
++			t.Fatalf("GIT_SSH_COMMAND carries the ambient payload %q: %q", hostile, sshValues[0])
++		}
++	}
++	for _, name := range []string{
++		"http_proxy", "https_proxy", "all_proxy", "no_proxy",
++		"CURATOR_TEST_KEEP", "SSH_ASKPASS", "XDG_CONFIG_HOME",
++		"LOCALAPPDATA", "APPDATA",
++	} {
++		if got := envValues(env, name); len(got) != 0 {
++			t.Fatalf("%s = %q, want it absent by construction", name, got)
++		}
++	}
++	for name, want := range map[string]string{
++		"PATH": os.Getenv("PATH"), "HOME": home, "USERPROFILE": home,
++		"TZ": "UTC", "SYSTEMROOT": `C:\Windows`, "WINDIR": `C:\Windows`,
++		"COMSPEC": `C:\Windows\System32\cmd.exe`, "PATHEXT": ".EXE",
++		"SYSTEMDRIVE": "C:", "SSH_AUTH_SOCK": "/tmp/kept-agent.sock",
++		"GIT_ASKPASS": "/operator/askpass",
++	} {
++		got := envValues(env, name)
++		if len(got) != 1 || got[0] != want {
++			t.Fatalf("%s = %q, want [%q]", name, got, want)
++		}
++	}
++	for _, name := range []string{"TMPDIR", "TMP", "TEMP"} {
++		if got := envValues(env, name); len(got) != 1 || got[0] == "" {
++			t.Fatalf("%s = %q, want it preserved", name, got)
++		}
++	}
++	if got := envValues(env, "LANG"); len(got) != 1 || got[0] != "C" {
++		t.Fatalf("LANG = %q, want [C] (pinned, not honoured)", got)
++	}
++	if got := envValues(env, "LC_ALL"); len(got) != 1 || got[0] != "C" {
++		t.Fatalf("LC_ALL = %q, want [C] (pinned, not honoured)", got)
++	}
++}
++
++// TestIsolatedGitEnvWindowsCaseHonoursAllowed proves the allow-list matches
++// case-insensitively in the honour direction too: a Windows-cased allowed
++// spelling is preserved. On POSIX this coexists with the canonical entry;
++// on Windows there is only one entry and it is the same file.
++func TestIsolatedGitEnvWindowsCaseHonoursAllowed(t *testing.T) {
++	t.Setenv("sSh_AuTh_SoCk", "/tmp/mixed-agent.sock")
++	env, cleanup, err := isolatedGitEnv()
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer cleanup()
++	got := envValues(env, "SSH_AUTH_SOCK")
++	found := false
++	for _, value := range got {
++		if value == "/tmp/mixed-agent.sock" {
++			found = true
++		}
++	}
++	if !found {
++		t.Fatalf("SSH_AUTH_SOCK entries = %q, want the mixed-case ambient value preserved", got)
++	}
++}
++
++// TestIsolatedGitEnvSSHCommand pins the curator-owned ssh command: -F with
++// a fresh empty config, BatchMode, host-key validation never disabled, and
++// ProxyCommand/Jump none. Dropping -F or ProxyCommand=none must fail.
++func TestIsolatedGitEnvSSHCommand(t *testing.T) {
++	t.Setenv("GIT_SSH", "/tmp/evil-ssh")
++	t.Setenv("GIT_SSH_COMMAND", "/tmp/evil-ssh-command")
++	env, cleanup, err := isolatedGitEnv()
++	if err != nil {
++		t.Fatal(err)
++	}
++	values := map[string]string{}
++	for _, entry := range env {
++		name, value, _ := strings.Cut(entry, "=")
++		values[strings.ToUpper(name)] = value
++	}
++	command, ok := values["GIT_SSH_COMMAND"]
++	if !ok {
++		t.Fatal("GIT_SSH_COMMAND missing")
++	}
++	for _, evil := range []string{"/tmp/evil-ssh", "/tmp/evil-ssh-command"} {
++		if strings.Contains(command, evil) {
++			t.Fatalf("GIT_SSH_COMMAND carries the ambient payload: %q", command)
++		}
++	}
++	for _, want := range []string{
++		"ssh -F ", "BatchMode=yes", "StrictHostKeyChecking=yes",
++		"ProxyCommand=none", "ProxyJump=none", "PermitLocalCommand=no",
++		"ForwardAgent=no", "ClearAllForwardings=yes", "RequestTTY=no",
++		"CanonicalizeHostname=no", "UpdateHostKeys=no", "ConnectionAttempts=1",
++	} {
++		if !strings.Contains(command, want) {
++			t.Fatalf("GIT_SSH_COMMAND misses %q: %q", want, command)
++		}
++	}
++	for _, forbidden := range []string{
++		"StrictHostKeyChecking=no", "StrictHostKeyChecking=accept-new",
++		"StrictHostKeyChecking=off",
++	} {
++		if strings.Contains(command, forbidden) {
++			t.Fatalf("GIT_SSH_COMMAND disables host-key validation: %q", command)
++		}
++	}
++	if strings.Contains(command, "IdentityFile") || strings.Contains(command, "UserKnownHostsFile") {
++		t.Fatalf("GIT_SSH_COMMAND pins identities/known_hosts, want the compiled-in defaults: %q", command)
++	}
++	// The -F path names a fresh empty regular file, distinct from the
++	// pinned git config, and cleanup removes both.
++	gitConfig := values["GIT_CONFIG_GLOBAL"]
++	quoted := strings.TrimPrefix(strings.SplitN(command[strings.Index(command, "-F ")+3:], " -o ", 2)[0], "")
++	sshConfig := strings.Trim(quoted, "'")
++	sshConfig = strings.ReplaceAll(sshConfig, "'\\''", "'")
++	if sshConfig == "" || sshConfig == gitConfig {
++		t.Fatalf("ssh config %q collides with the git config %q", sshConfig, gitConfig)
++	}
++	info, err := os.Stat(sshConfig)
++	if err != nil {
++		t.Fatalf("pinned ssh config unreadable: %v", err)
++	}
++	if info.Size() != 0 || !info.Mode().IsRegular() {
++		t.Fatalf("pinned ssh config = size %d mode %s, want an empty regular file", info.Size(), info.Mode())
++	}
++	cleanup()
++	if _, err := os.Stat(sshConfig); !os.IsNotExist(err) {
++		t.Fatalf("cleanup left %s: %v", sshConfig, err)
++	}
++	if _, err := os.Stat(gitConfig); !os.IsNotExist(err) {
++		t.Fatalf("cleanup left %s: %v", gitConfig, err)
++	}
++}
++
++// TestIsolatedGitConfigArgs pins the per-invocation transport flags before
++// the subcommand.
++func TestIsolatedGitConfigArgs(t *testing.T) {
++	got := withIsolatedConfigArgs([]string{"clone", "--", "https://example.org/kit.git", "dest"})
++	want := []string{
++		"-c", "http.sslVerify=true",
++		"-c", "http.followRedirects=false",
++		"-c", "credential.helper=",
++		"clone", "--", "https://example.org/kit.git", "dest",
++	}
++	if strings.Join(got, "\x00") != strings.Join(want, "\x00") {
++		t.Fatalf("args = %q, want %q", got, want)
++	}
++}
++
++// TestShellQuoteEscapesSingleQuote proves the temp ssh-config path cannot
++// break out of the GIT_SSH_COMMAND quoting.
++func TestShellQuoteEscapesSingleQuote(t *testing.T) {
++	if got := shellQuote("/tmp/a'b"); got != "'/tmp/a'\\''b'" {
++		t.Fatalf("shellQuote = %q", got)
++	}
++	if got := draftSSHCommand("/tmp/a'b"); !strings.Contains(got, "'/tmp/a'\\''b'") {
++		t.Fatalf("ssh command = %q", got)
++	}
++}
++
++// TestCloneIsolatedIgnoresGitProxyCommand is the behavioral git:// leg of
++// row (b): GIT_PROXY_COMMAND applies only to the git:// transport, which
++// the Skillfile and policy grammars never admit, so no project-resolve
++// production entry can reach it. At the gitops layer with real git, an
++// ambient proxy command that would intercept the git:// dial must never be
++// invoked: the lane dials directly and fails closed on fixture.test.
++func TestCloneIsolatedIgnoresGitProxyCommand(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("test transport wrapper is POSIX-only")
++	}
++	evilDir := t.TempDir()
++	invokedLog := filepath.Join(evilDir, "proxy-invoked.log")
++	evilProxy := filepath.Join(evilDir, "evil-proxy")
++	if err := os.WriteFile(evilProxy, []byte("#!/bin/sh\necho \"invoked $@\" >>'"+invokedLog+"'\nexit 1\n"), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	// Positive control: raw git with the ambient proxy honoured invokes
++	// it, proving the payload is live.
++	controlEnv := append(gitEnv(), "GIT_PROXY_COMMAND="+evilProxy)
++	controlDest := filepath.Join(t.TempDir(), "control")
++	cmd := exec.Command("git", "clone", "--quiet", "--", "git://fixture.test/kit.git", controlDest)
++	cmd.Env = controlEnv
++	if err := cmd.Run(); err == nil {
++		t.Fatal("control clone succeeded, want failure (payload not live)")
++	}
++	if probe, err := os.ReadFile(invokedLog); err != nil || len(probe) == 0 {
++		t.Fatal("control left no proxy invocation (payload not live)")
++	}
++	_ = os.Remove(invokedLog)
++
++	t.Setenv("GIT_PROXY_COMMAND", evilProxy)
++	dest := filepath.Join(t.TempDir(), "clone")
++	if err := CloneIsolated("git://fixture.test/kit.git", dest); err == nil {
++		t.Fatal("CloneIsolated with a hostile GIT_PROXY_COMMAND succeeded, want the fail-closed error")
++	}
++	if probe, err := os.ReadFile(invokedLog); err == nil && len(probe) != 0 {
++		t.Fatalf("evil GIT_PROXY_COMMAND was invoked: %q", probe)
++	}
++}

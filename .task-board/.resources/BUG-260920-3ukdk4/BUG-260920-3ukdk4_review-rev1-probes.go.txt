@@ -1,0 +1,353 @@
+package crossconformance
+
+// Reviewer probes for BUG-260920-3ukdk4 revision 1 (NOT part of the
+// candidate; lives only in the disposable probe clone). Every probe
+// drives the production entry `curator project resolve|refresh` on the
+// draft literal-URL lane with a hostile git configuration planted
+// through one channel, keeps a raw-git positive control proving the
+// payload is live, and asserts the lock binds the declared commit.
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/relux-works/curator/internal/sourcelock"
+	"github.com/relux-works/curator/internal/testcli"
+)
+
+type reviewFixture struct {
+	root, work, bare, commit, evilBare, evilCommit, realGit string
+}
+
+func reviewFixtures(t *testing.T) reviewFixture {
+	t.Helper()
+	realGit := requireGit(t)
+	root := t.TempDir()
+	bare, commit := draftCLIKitBare(t, root)
+	evilWork := filepath.Join(root, "evil-work")
+	evilBare := filepath.Join(root, "evil.git")
+	if err := os.MkdirAll(evilWork, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeDraftSkill(t, filepath.Join(evilWork, "skills", "review"), "review")
+	if err := os.WriteFile(filepath.Join(evilWork, "skills", "review", "references", "info.md"), []byte("evil"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runDraftGit(t, evilWork, "init", "-q", "-b", "main")
+	runDraftGit(t, evilWork, "add", ".")
+	runDraftGit(t, evilWork, "commit", "-qm", "evil")
+	runDraftGit(t, evilWork, "tag", "v1")
+	runDraftGit(t, "", "clone", "--quiet", "--bare", "--", evilWork, evilBare)
+	evilCommit := draftGitOutput(t, "", "--git-dir", evilBare, "rev-parse", "v1^{commit}")
+	if evilCommit == commit {
+		t.Fatal("declared and evil fixtures collide")
+	}
+	return reviewFixture{root: root, work: filepath.Join(root, "kit-work"), bare: bare, commit: commit, evilBare: evilBare, evilCommit: evilCommit, realGit: realGit}
+}
+
+func (f reviewFixture) hostileBody() string {
+	return "[url \"file://" + f.evilBare + "\"]\n\tinsteadOf = file://" + f.bare + "\n"
+}
+
+func writeReviewFile(t *testing.T, path, body string) string {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// controlClone clones url with raw git under env and returns HEAD.
+func controlClone(t *testing.T, f reviewFixture, env []string, url string) string {
+	t.Helper()
+	dest := filepath.Join(t.TempDir(), "control")
+	if code, stdout, stderr := testcli.Run(t, "", env, "", f.realGit, "clone", "--quiet", "--", url, dest); code != 0 {
+		t.Fatalf("control clone = %d\n%s\n%s", code, stdout, stderr)
+	}
+	return draftGitOutput(t, dest, "rev-parse", "HEAD")
+}
+
+func reviewLockCommit(t *testing.T, project string) (string, string) {
+	t.Helper()
+	lock, err := sourcelock.Read(filepath.Join(project, "Skillfile.lock.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	member, ok := lock.Find("review")
+	if !ok {
+		t.Fatal("lock misses review")
+	}
+	return member.Package.Commit.Hex, member.Package.Repository
+}
+
+func reviewSkillfile(t *testing.T, project, decl string) {
+	t.Helper()
+	payload := `{"schema_version":2,"sources":{"kit":{` + decl + `}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
+	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// resolveDeclared runs project resolve under env through the shim and
+// asserts the declared commit is locked and the evil commit is not.
+func resolveDeclared(t *testing.T, f reviewFixture, env []string, configPath, project, home string, verb string) {
+	t.Helper()
+	code, stdout, stderr := runCurator(t, home, configPath, env, "project", verb, "app")
+	if code != 0 {
+		t.Fatalf("%s = %d, want success:\n%s\n%s", verb, code, stdout, stderr)
+	}
+	hex, repo := reviewLockCommit(t, project)
+	if hex == f.evilCommit {
+		t.Fatalf("lock binds the evil commit %s: user configuration was applied", f.evilCommit)
+	}
+	if hex != f.commit {
+		t.Fatalf("lock binds %s, want declared %s", hex, f.commit)
+	}
+	if repo != v2Identity {
+		t.Fatalf("identity = %q", repo)
+	}
+}
+
+func hostileSelectorEnv(hostile string) []string {
+	return []string{"GIT_CONFIG_GLOBAL=" + hostile, "GIT_CONFIG_SYSTEM=" + hostile, "GIT_CONFIG_NOSYSTEM=0"}
+}
+
+// P1: url rewriting reaches the global file only through include /
+// includeIf; the top-level file carries no insteadOf itself.
+func TestReviewProbeIncludeFileRewrite(t *testing.T) {
+	f := reviewFixtures(t)
+	payload := writeReviewFile(t, filepath.Join(f.root, "payload.inc"), f.hostileBody())
+	hostile := writeReviewFile(t, filepath.Join(f.root, "hostile.gitconfig"),
+		"[include]\n\tpath = "+payload+"\n[includeIf \"gitdir:"+f.root+"/**\"]\n\tpath = "+payload+"\n")
+	fakeDir, logPath := installDraftTransportShim(t, "https://never.invalid/x.git", "fatal: unexpected", v2Primary, f.bare, f.realGit)
+	env := append(draftTransportPATH(t, fakeDir), hostileSelectorEnv(hostile)...)
+	if got := controlClone(t, f, hostileSelectorEnv(hostile), "file://"+f.bare); got != f.evilCommit {
+		t.Fatalf("control HEAD = %s, want evil %s (payload not live)", got, f.evilCommit)
+	}
+	configPath, project, home := setupCLIProject(t, f.root)
+	reviewSkillfile(t, project, `"git":"`+v2Primary+`","tag":"v1"`)
+	resolveDeclared(t, f, env, configPath, project, home, "resolve")
+	if clones := draftCloneLog(t, logPath); len(clones) != 1 || clones[0] != v2Primary {
+		t.Fatalf("clones = %v", clones)
+	}
+}
+
+// P2: configuration-driven execution (core.hooksPath post-checkout
+// hook) alongside the redirect; the hook must never run.
+func TestReviewProbeHooksPathExecution(t *testing.T) {
+	f := reviewFixtures(t)
+	hooks := filepath.Join(f.root, "hooks")
+	marker := filepath.Join(f.root, "hook-ran.marker")
+	if err := os.MkdirAll(hooks, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(hooks, "post-checkout"), []byte("#!/bin/sh\necho ran >>'"+marker+"'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	hostile := writeReviewFile(t, filepath.Join(f.root, "hostile.gitconfig"), f.hostileBody()+"[core]\n\thooksPath = "+hooks+"\n")
+	fakeDir, _ := installDraftTransportShim(t, "https://never.invalid/x.git", "fatal: unexpected", v2Primary, f.bare, f.realGit)
+	env := append(draftTransportPATH(t, fakeDir), hostileSelectorEnv(hostile)...)
+	if got := controlClone(t, f, hostileSelectorEnv(hostile), "file://"+f.bare); got != f.evilCommit {
+		t.Fatalf("control HEAD = %s, want evil %s (payload not live)", got, f.evilCommit)
+	}
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatalf("control hook did not run: %v", err)
+	}
+	if err := os.Remove(marker); err != nil {
+		t.Fatal(err)
+	}
+	configPath, project, home := setupCLIProject(t, f.root)
+	reviewSkillfile(t, project, `"git":"`+v2Primary+`","tag":"v1"`)
+	resolveDeclared(t, f, env, configPath, project, home, "resolve")
+	if _, err := os.Stat(marker); err == nil {
+		t.Fatal("user-configured hook executed during production resolve")
+	}
+}
+
+// P3: the payload lives only at $XDG_CONFIG_HOME/git/config of the
+// child (no selectors, no ~/.gitconfig).
+func TestReviewProbeXDGChannel(t *testing.T) {
+	f := reviewFixtures(t)
+	for _, key := range []string{"GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_NOSYSTEM", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS"} {
+		t.Setenv(key, "")
+		if err := os.Unsetenv(key); err != nil {
+			t.Fatal(err)
+		}
+	}
+	xdg := filepath.Join(f.root, "xdg")
+	writeReviewFile(t, filepath.Join(xdg, "git", "config"), f.hostileBody())
+	fakeDir, _ := installDraftTransportShim(t, "https://never.invalid/x.git", "fatal: unexpected", v2Primary, f.bare, f.realGit)
+	channel := []string{"XDG_CONFIG_HOME=" + xdg, "GIT_CONFIG_NOSYSTEM=1"}
+	if got := controlClone(t, f, append(append([]string{}, channel...), "HOME="+t.TempDir()), "file://"+f.bare); got != f.evilCommit {
+		t.Fatalf("control HEAD = %s, want evil %s (payload not live)", got, f.evilCommit)
+	}
+	configPath, project, home := setupCLIProject(t, f.root)
+	reviewSkillfile(t, project, `"git":"`+v2Primary+`","tag":"v1"`)
+	resolveDeclared(t, f, append(draftTransportPATH(t, fakeDir), channel...), configPath, project, home, "resolve")
+}
+
+// P4: system-only planting (GIT_CONFIG_SYSTEM with NOSYSTEM=0, no
+// global payload).
+func TestReviewProbeSystemOnly(t *testing.T) {
+	f := reviewFixtures(t)
+	hostile := writeReviewFile(t, filepath.Join(f.root, "hostile.gitconfig"), f.hostileBody())
+	fakeDir, _ := installDraftTransportShim(t, "https://never.invalid/x.git", "fatal: unexpected", v2Primary, f.bare, f.realGit)
+	channel := []string{"GIT_CONFIG_SYSTEM=" + hostile, "GIT_CONFIG_NOSYSTEM=0"}
+	env := append(draftTransportPATH(t, fakeDir), channel...)
+	if got := controlClone(t, f, channel, "file://"+f.bare); got != f.evilCommit {
+		t.Fatalf("control HEAD = %s, want evil %s (payload not live)", got, f.evilCommit)
+	}
+	configPath, project, home := setupCLIProject(t, f.root)
+	reviewSkillfile(t, project, `"git":"`+v2Primary+`","tag":"v1"`)
+	resolveDeclared(t, f, env, configPath, project, home, "resolve")
+}
+
+// P5: core.sshCommand hijack on an ssh:// literal declaration: a
+// user-configured ssh stand-in serves the evil repository. Isolated,
+// git must run the real ssh (unresolvable host) and the lane fails
+// closed without ever invoking the stand-in.
+func TestReviewProbeCoreSSHCommand(t *testing.T) {
+	f := reviewFixtures(t)
+	invoked := filepath.Join(f.root, "evil-ssh.log")
+	evilSSH := filepath.Join(f.root, "evil-ssh")
+	script := "#!/bin/sh\necho \"invoked $@\" >>'" + invoked + "'\nexec '" + f.realGit + "' upload-pack '" + f.evilBare + "'\n"
+	if err := os.WriteFile(evilSSH, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	hostile := writeReviewFile(t, filepath.Join(f.root, "hostile.gitconfig"), "[core]\n\tsshCommand = "+evilSSH+"\n")
+	declared := "ssh://git@fixture.test/kit.git"
+	if got := controlClone(t, f, hostileSelectorEnv(hostile), declared); got != f.evilCommit {
+		t.Fatalf("control HEAD = %s, want evil %s (payload not live)", got, f.evilCommit)
+	}
+	if err := os.Remove(invoked); err != nil {
+		t.Fatal(err)
+	}
+	configPath, project, home := setupCLIProject(t, f.root)
+	if err := os.WriteFile(filepath.Join(home, ".gitconfig"), []byte("[core]\n\tsshCommand = "+evilSSH+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	reviewSkillfile(t, project, `"git":"`+declared+`","tag":"v1"`)
+	code, stdout, stderr := runCurator(t, home, configPath, hostileSelectorEnv(hostile), "project", "resolve", "app")
+	if code == 0 {
+		t.Fatalf("resolve succeeded through the user ssh stand-in:\n%s\n%s", stdout, stderr)
+	}
+	if probe, err := os.ReadFile(invoked); err == nil && len(probe) != 0 {
+		t.Fatalf("user core.sshCommand was executed: %q", probe)
+	}
+	if !strings.Contains(stderr, "repository_endpoint_unavailable") {
+		t.Fatalf("stderr misses the closed class:\n%s", stderr)
+	}
+	if strings.Contains(stderr, "ssh://") || strings.Contains(stderr, "git@") || strings.Contains(stderr, evilSSH) {
+		t.Fatalf("stderr leaks URL/tool detail:\n%s", stderr)
+	}
+	if _, err := os.Stat(filepath.Join(project, "Skillfile.lock.json")); err == nil {
+		t.Fatal("lock published after a failed acquisition")
+	}
+}
+
+// P6: the refresh path (existing acquired tree → fetch) with the
+// hostile redirect planted afterwards. The declared branch advances;
+// the lock must bind the declared new commit, never evil's main.
+func TestReviewProbeRefreshFetchIsolated(t *testing.T) {
+	f := reviewFixtures(t)
+	fakeDir, logPath := installDraftTransportShim(t, "https://never.invalid/x.git", "fatal: unexpected", v2Primary, f.bare, f.realGit)
+	pathEnv := draftTransportPATH(t, fakeDir)
+	configPath, project, home := setupCLIProject(t, f.root)
+	reviewSkillfile(t, project, `"git":"`+v2Primary+`","branch":"main"`)
+	if code, stdout, stderr := runCurator(t, home, configPath, pathEnv, "project", "resolve", "app"); code != 0 {
+		t.Fatalf("initial resolve = %d:\n%s\n%s", code, stdout, stderr)
+	}
+	if hex, _ := reviewLockCommit(t, project); hex != f.commit {
+		t.Fatalf("initial lock = %s, want %s", hex, f.commit)
+	}
+	// Advance the declared repository's main.
+	if err := os.WriteFile(filepath.Join(f.work, "skills", "review", "references", "info.md"), []byte("advanced"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runDraftGit(t, f.work, "add", ".")
+	runDraftGit(t, f.work, "commit", "-qm", "advance")
+	runDraftGit(t, f.work, "push", "-q", "--", f.bare, "main:main")
+	advanced := draftGitOutput(t, "", "--git-dir", f.bare, "rev-parse", "main^{commit}")
+	evilMain := draftGitOutput(t, "", "--git-dir", f.evilBare, "rev-parse", "main^{commit}")
+	if advanced == f.commit || advanced == evilMain {
+		t.Fatal("fixture advance collided")
+	}
+	hostile := writeReviewFile(t, filepath.Join(f.root, "hostile.gitconfig"), f.hostileBody())
+	if err := os.WriteFile(filepath.Join(home, ".gitconfig"), []byte(f.hostileBody()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Control: a raw fetch of a clone of the declared tree under the
+	// hostile selectors lands on evil's main.
+	control := filepath.Join(t.TempDir(), "control")
+	if code, _, stderr := testcli.Run(t, "", nil, "", f.realGit, "clone", "--quiet", "--", "file://"+f.bare, control); code != 0 {
+		t.Fatalf("control clone: %s", stderr)
+	}
+	if code, _, stderr := testcli.Run(t, control, hostileSelectorEnv(hostile), "", f.realGit, "fetch", "--quiet", "--all"); code != 0 {
+		t.Fatalf("control fetch: %s", stderr)
+	}
+	if got := draftGitOutput(t, control, "rev-parse", "origin/main"); got != evilMain {
+		t.Fatalf("control origin/main = %s, want evil %s (payload not live)", got, evilMain)
+	}
+	env := append(pathEnv, hostileSelectorEnv(hostile)...)
+	code, stdout, stderr := runCurator(t, home, configPath, env, "project", "refresh", "app")
+	if code != 0 {
+		t.Fatalf("refresh = %d:\n%s\n%s", code, stdout, stderr)
+	}
+	if clones := draftCloneLog(t, logPath); len(clones) != 1 {
+		t.Fatalf("clones = %v, want exactly the initial clone (refresh must fetch, not reclone)", clones)
+	}
+	hex, _ := reviewLockCommit(t, project)
+	if hex == evilMain {
+		t.Fatalf("refresh lock binds evil main %s: user configuration was applied on the fetch path", evilMain)
+	}
+	if hex != advanced {
+		t.Fatalf("refresh lock = %s, want advanced declared %s", hex, advanced)
+	}
+}
+
+// P7: environment-injected configuration (GIT_CONFIG_COUNT/KEY/VALUE)
+// at the production entry.
+func TestReviewProbeEnvInjectedConfig(t *testing.T) {
+	f := reviewFixtures(t)
+	fakeDir, _ := installDraftTransportShim(t, "https://never.invalid/x.git", "fatal: unexpected", v2Primary, f.bare, f.realGit)
+	channel := []string{"GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=url.file://" + f.evilBare + ".insteadOf", "GIT_CONFIG_VALUE_0=file://" + f.bare}
+	env := append(draftTransportPATH(t, fakeDir), channel...)
+	if got := controlClone(t, f, channel, "file://"+f.bare); got != f.evilCommit {
+		t.Fatalf("control HEAD = %s, want evil %s (payload not live)", got, f.evilCommit)
+	}
+	configPath, project, home := setupCLIProject(t, f.root)
+	reviewSkillfile(t, project, `"git":"`+v2Primary+`","tag":"v1"`)
+	resolveDeclared(t, f, env, configPath, project, home, "resolve")
+}
+
+// P8 (residual scan, not this leaf's AC): does the draft literal lane's
+// ssh:// clone consult the child's ~/.ssh/config? A ProxyCommand marker
+// records consultation; the resolve itself must still fail closed.
+func TestReviewProbeUserSSHConfigConsulted(t *testing.T) {
+	f := reviewFixtures(t)
+	marker := filepath.Join(f.root, "sshconfig-consulted.marker")
+	configPath, project, home := setupCLIProject(t, f.root)
+	dotSSH := filepath.Join(home, ".ssh")
+	if err := os.MkdirAll(dotSSH, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dotSSH, "config"), []byte("Host fixture.test\n\tProxyCommand sh -c 'echo consulted >> "+marker+"; exit 1'\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	reviewSkillfile(t, project, `"git":"ssh://git@fixture.test/kit.git","tag":"v1"`)
+	code, stdout, stderr := runCurator(t, home, configPath, nil, "project", "resolve", "app")
+	t.Logf("resolve exit=%d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	if code == 0 {
+		t.Fatalf("resolve unexpectedly succeeded")
+	}
+	if probe, err := os.ReadFile(marker); err == nil && len(probe) != 0 {
+		t.Logf("RESIDUAL: child ~/.ssh/config ProxyCommand executed by the draft literal ssh lane: %q", probe)
+	} else {
+		t.Logf("child ~/.ssh/config was not consulted (%v)", err)
+	}
+}

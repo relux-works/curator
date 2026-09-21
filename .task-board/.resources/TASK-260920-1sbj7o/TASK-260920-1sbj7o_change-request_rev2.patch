@@ -1,0 +1,181 @@
+diff --git a/cmd/curator/draft_diagnostics.go b/cmd/curator/draft_diagnostics.go
+index 010249d9..38e7c10d 100644
+--- a/cmd/curator/draft_diagnostics.go
++++ b/cmd/curator/draft_diagnostics.go
+@@ -38,9 +38,10 @@ type draftRemediation struct {
+ const draftEndpointRemediation = `verify the network path and operator authentication for the listed endpoints, then retry with machine source-policy.json`
+ 
+ // draftRemediations covers the nine skillfile-sources §5 classes, the four
+-// repository-transport §§2/6 classes, and the two source-audit-v1 outcome
+-// classes. Every value is static prose: nothing from the failing input is
+-// interpolated.
++// repository-transport §§2/6 classes, the two source-audit-v1 outcome
++// classes, and the strict-lane identity refusal surfaced through install
++// external planning. Every value is static prose: nothing from the failing
++// input is interpolated.
+ var draftRemediations = []struct {
+ 	class string
+ 	entry draftRemediation
+@@ -95,6 +96,9 @@ var draftRemediations = []struct {
+ 	{"source_audit_unavailable", draftRemediation{
+ 		remediation: `run the explicit attempt under trusted machine policy so the audit report is persisted`,
+ 	}},
++	{"build_repository_identity_invalid", draftRemediation{
++		remediation: `fix the endpoint entry in machine source-policy.json: the strict external-build lane admits no explicit port and no host alias, then retry the explicit attempt`,
++	}},
+ }
+ 
+ // withDraftRemediation appends the sanitized remediation of the first stable
+diff --git a/cmd/curator/draft_diagnostics_test.go b/cmd/curator/draft_diagnostics_test.go
+index 571d5792..8d263a32 100644
+--- a/cmd/curator/draft_diagnostics_test.go
++++ b/cmd/curator/draft_diagnostics_test.go
+@@ -57,6 +57,7 @@ func TestWithDraftRemediationTable(t *testing.T) {
+ 		{"alias", "repository_alias_unknown: ghost", `"aliases" table of machine source-policy.json`},
+ 		{"auditRejected", "review: source_audit_rejected: evidence mismatch", "re-resolve under trusted machine policy"},
+ 		{"auditUnavailable", "review: source_audit_unavailable: no binding", "run the explicit attempt under trusted machine policy"},
++		{"identityInvalid", "review.etool: build_repository_identity_invalid: transport plan endpoint 1 carries an explicit port or host alias outside the strict external-build lane grammar", "fix the endpoint entry in machine source-policy.json"},
+ 	}
+ 	for _, row := range rows {
+ 		got := withDraftRemediation(row.message)
+@@ -86,7 +87,7 @@ func TestWithDraftRemediationTable(t *testing.T) {
+ 	legacy := []string{
+ 		"Skillfile.json not found",
+ 		"up-to-date",
+-		"build_repository_identity_invalid: wrong identity",
++		"build_repository_source_unavailable: exact external source is unavailable",
+ 		"source is not a portable identifier",
+ 	}
+ 	for _, message := range legacy {
+diff --git a/cmd/curator/draft_transport_test.go b/cmd/curator/draft_transport_test.go
+index f6838e7c..365e6e43 100644
+--- a/cmd/curator/draft_transport_test.go
++++ b/cmd/curator/draft_transport_test.go
+@@ -724,6 +724,40 @@ func TestDraftTransportProviderAdmission(t *testing.T) {
+ 	})
+ }
+ 
++// TestDraftTransportIdentityInvalidSurfacesThroughCLI proves the strict-lane
++// §7 refusal reaches the CLI unchanged: a port-planned endpoint fails
++// install with build_repository_identity_invalid (never the masked
++// build_repository_source_unavailable) plus the sanitized remediation,
++// with zero fetch attempts.
++func TestDraftTransportIdentityInvalidSurfacesThroughCLI(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("test transport wrapper is POSIX-only; production code is platform-neutral")
++	}
++	fixture := setupDraftCLI(t)
++	fakeDir, logPath := fixture.installDraftFakeGit(t, draftCLISuccessArms(fixture), nil)
++	policy := `{"schema_version":2,"repositories":{` +
++		`"fixture.test/https-tools":{"endpoints":[{"url":"https://fixture.test:8443/https-tools.git","authentication":"operator-acme"}],"fallback":"none"},` +
++		`"fixture.test/ssh-tools":{"endpoints":[{"url":"ssh://git@fixture.test:2222/ssh-tools.git","authentication":"operator-acme"}],"fallback":"none"}}}`
++	operator := draftCLIOperatorProviders(fixture)
++	code, stdout, stderr, fetches := fixture.runDraftInstall(t, fakeDir, logPath, true, &policy, &operator)
++	if code == exitOK {
++		t.Fatalf("port-planned install exited 0\nstdout:\n%s", stdout)
++	}
++	combined := stdout + stderr
++	if !strings.Contains(combined, buildrepo.CodeIdentityInvalid) {
++		t.Fatalf("CLI misses the true class %s:\nstdout:\n%s\nstderr:\n%s", buildrepo.CodeIdentityInvalid, stdout, stderr)
++	}
++	if strings.Contains(combined, buildrepo.CodeSourceUnavailable) {
++		t.Fatalf("CLI masks the class as %s:\nstdout:\n%s\nstderr:\n%s", buildrepo.CodeSourceUnavailable, stdout, stderr)
++	}
++	if !strings.Contains(combined, "fix the endpoint entry in machine source-policy.json") {
++		t.Fatalf("CLI misses the sanitized remediation:\nstdout:\n%s\nstderr:\n%s", stdout, stderr)
++	}
++	if len(fetches) != 0 {
++		t.Fatalf("%d fetches, want 0:\n%s", len(fetches), strings.Join(fetches, "\n"))
++	}
++}
++
+ func TestProductionBinaryDispatchesSSHWrapper(t *testing.T) {
+ 	binary := filepath.Join(t.TempDir(), "curator"+productionBinarySuffix())
+ 	build := exec.Command("go", "build", "-o", binary, ".")
+diff --git a/internal/buildrepo/pipeline.go b/internal/buildrepo/pipeline.go
+index 0560ac49..8c2e51ef 100644
+--- a/internal/buildrepo/pipeline.go
++++ b/internal/buildrepo/pipeline.go
+@@ -208,6 +208,13 @@ func RunPipeline(ctx context.Context, request PipelineRequest) (PipelineResult,
+ 		if request.Operation == OperationSyntax {
+ 			return PipelineResult{State: "unverified-offline", Code: CodeUnverifiedOffline}, nil
+ 		}
++		// A deterministic identity refusal is not an availability failure:
++		// the planned endpoint is outside the strict-lane grammar, so no
++		// offline snapshot can substitute for it. Return the lane's own
++		// diagnostic unchanged instead of masking it as source-unavailable.
++		if ErrorCode(acquireErr) == CodeIdentityInvalid {
++			return result, acquireErr
++		}
+ 		// An untagged exact protected snapshot may support offline reinstall,
+ 		// but a declared tag requires a same-operation exact-tag assertion.
+ 		if request.Declared.Tag == "" && request.OfflineSnapshotKey != "" && request.Store != nil {
+diff --git a/internal/buildrepo/pipeline_test.go b/internal/buildrepo/pipeline_test.go
+index 3e58d214..3fb1d545 100644
+--- a/internal/buildrepo/pipeline_test.go
++++ b/internal/buildrepo/pipeline_test.go
+@@ -639,6 +639,32 @@ func TestPipelineFailuresStopBeforeCacheAndCompiler(t *testing.T) {
+ 	}
+ }
+ 
++func TestPipelinePreservesIdentityInvalidFromAcquisition(t *testing.T) {
++	_, declared, effective := pipelineFixture(t)
++	events := []string{}
++	planErr := admissionError(CodeIdentityInvalid, "transport plan endpoint 1 carries an explicit port or host alias outside the strict external-build lane grammar")
++	request := PipelineRequest{Operation: OperationInstall, Assurance: closureexec.PortableAssuranceBinding(), AssuranceCheck: allowTestAssurance, Command: "tool", Target: "tool", Declared: declared, Effective: effective,
++		OfflineSnapshotKey: "sha256:" + strings.Repeat("0", 64),
++		Store:              recordingStore{inner: &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "cache")}, events: &events},
++		Go:                 recordingGo{events: &events},
++		Acquire:            func(context.Context) (*Snapshot, error) { return nil, planErr },
++		Audit:              func(context.Context, AuditSubject) error { events = append(events, "audit-call"); return nil }}
++	_, err := RunPipeline(context.Background(), request)
++	if ErrorCode(err) != CodeIdentityInvalid {
++		t.Fatalf("error = %v, want the preserved class %s", err, CodeIdentityInvalid)
++	}
++	if err.Error() != planErr.Error() {
++		t.Fatalf("error = %q, want the lane diagnostic unchanged %q", err.Error(), planErr.Error())
++	}
++	// A deterministic refusal is not an availability failure: no offline
++	// snapshot may substitute for it and no audit may run past it.
++	for _, forbidden := range []string{"snapshot-load", "audit-call", "cache-call", "compiler-call", "artifact-store"} {
++		if contains(events, forbidden) {
++			t.Fatalf("events = %v, want no %s past a deterministic refusal", events, forbidden)
++		}
++	}
++}
++
+ func TestSigningPoliciesFailClosedBeforeSourceAndPackageInputs(t *testing.T) {
+ 	for _, testCase := range []struct {
+ 		name string
+diff --git a/internal/crossconformance/draftsources_semantic_v2_test.go b/internal/crossconformance/draftsources_semantic_v2_test.go
+index 4728d411..452b04d1 100644
+--- a/internal/crossconformance/draftsources_semantic_v2_test.go
++++ b/internal/crossconformance/draftsources_semantic_v2_test.go
+@@ -808,10 +808,8 @@ func driveV2ExternalMirrorAdmitted(t *testing.T, _ draftSemanticCase) {
+ // assumed), and the executor gate refuses the converted plan with
+ // build_repository_identity_invalid before any network I/O. Layer 2 runs
+ // on unix through install.Project: the run refuses with zero fetch
+-// attempts and preserves all state. The install-level diagnostic is
+-// logged, not asserted: the pipeline reports every acquire error as
+-// build_repository_source_unavailable (see results), so the true class
+-// is pinned at the executor gate, where it is observable.
++// attempts, preserves all state, and reports the true class end to end
++// instead of masking it as build_repository_source_unavailable.
+ func driveV2ExternalRefused(t *testing.T, skillGit, policyDoc, providersDoc string) {
+ 	policy := v2Parse(t, policyDoc)
+ 	resolved, err := config.ResolveRepositoryEndpoints(policy, skillGit, "")
+@@ -865,7 +863,13 @@ func driveV2ExternalRefused(t *testing.T, skillGit, policyDoc, providersDoc stri
+ 	if result.Status != "failed" {
+ 		t.Fatalf("install = %+v, want refusal", result)
+ 	}
+-	t.Logf("install-level diagnostic (masked class, true class pinned above): %s", strings.Join(result.Errors, ";"))
++	combined := strings.Join(result.Errors, ";")
++	if !strings.Contains(combined, buildrepo.CodeIdentityInvalid) {
++		t.Fatalf("install diagnostic = %q, want the true class %s", combined, buildrepo.CodeIdentityInvalid)
++	}
++	if strings.Contains(combined, buildrepo.CodeSourceUnavailable) {
++		t.Fatalf("install diagnostic masks the class as %s: %q", buildrepo.CodeSourceUnavailable, combined)
++	}
+ 	if fetches := v2FetchURLs(t, logPath); len(fetches) != 0 {
+ 		t.Fatalf("fetches = %q, want zero attempts", fetches)
+ 	}

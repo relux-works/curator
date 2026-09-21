@@ -1,0 +1,510 @@
+diff --git a/internal/crossconformance/draftsources_semantic_evidence_test.go b/internal/crossconformance/draftsources_semantic_evidence_test.go
+index 9c1c184b..8ca4bec7 100644
+--- a/internal/crossconformance/draftsources_semantic_evidence_test.go
++++ b/internal/crossconformance/draftsources_semantic_evidence_test.go
+@@ -38,11 +38,11 @@ import (
+ //     refresh cannot launder revoked evidence.
+ //  3. Compiled-CLI status (unix): status is nonzero and read-only.
+ //
+-// wrong-name and wrong-context are explicit bounds: frozen §13.3
+-// OR-matching (content, or identity+commit; name uncompared) accepts
+-// them as audited, while draft §4 demands exact name, repository,
+-// commit, and context matching. The bound rows lock the accepted
+-// behavior at the Resolve entry so the gap cannot widen silently.
++// wrong-name and wrong-context are driven through the exact draft §4
++// entry: frozen §13.3 OR-matching (content, or identity+commit; name
++// uncompared) still accepts them as audited behind registry.Resolve,
++// which the legacy lane keeps byte-identically, while the draft lane
++// resolves through registry.ResolveExact and refuses both shapes.
+ 
+ type attestCondition int
+ 
+@@ -56,6 +56,8 @@ const (
+ 	attestWrongRepository
+ 	attestWrongCommit
+ 	attestWrongKey
++	attestWrongName
++	attestWrongContext
+ )
+ 
+ type stubSigner struct {
+@@ -186,6 +188,12 @@ func (s *attestStub) serveRecords(w http.ResponseWriter, r *http.Request) {
+ 		}, s.good)
+ 	case attestWrongKey:
+ 		mint(nil, s.rogue)
++	case attestWrongName:
++		mint(func(body map[string]any) { body["name"] = "other" }, s.good)
++	case attestWrongContext:
++		mint(func(body map[string]any) {
++			body["content_sha256"] = "sha256:" + strings.Repeat("e", 64)
++		}, s.good)
+ 	default:
+ 		mint(nil, s.good)
+ 	}
+@@ -262,6 +270,8 @@ var draftEvidenceConditions = map[string]attestCondition{
+ 	"attestation-evidence-wrong-repository": attestWrongRepository,
+ 	"attestation-evidence-wrong-commit":     attestWrongCommit,
+ 	"attestation-evidence-wrong-key":        attestWrongKey,
++	"attestation-evidence-wrong-name":       attestWrongName,
++	"attestation-evidence-wrong-context":    attestWrongContext,
+ }
+ 
+ func init() {
+@@ -269,8 +279,6 @@ func init() {
+ 		id, condition := id, condition
+ 		registerDraftSemantic(id, func(t *testing.T, c draftSemanticCase) { driveAttestationEvidence(t, c, condition) })
+ 	}
+-	registerDraftSemantic("attestation-evidence-wrong-name", driveAttestationWrongNameGap)
+-	registerDraftSemantic("attestation-evidence-wrong-context", driveAttestationWrongContextGap)
+ }
+ 
+ func driveAttestationEvidence(t *testing.T, c draftSemanticCase, condition attestCondition) {
+@@ -324,6 +332,20 @@ func driveAttestationEvidence(t *testing.T, c draftSemanticCase, condition attes
+ 		}, stub.good)}, nil))
+ 	case attestWrongKey:
+ 		resolution = registry.Resolve(regs, identity, commit, content, static([]map[string]any{mintStatic(nil, stub.rogue)}, nil))
++	case attestWrongName:
++		payloads := []map[string]any{mintStatic(func(body map[string]any) { body["name"] = "other" }, stub.good)}
++		if legacy := registry.Resolve(regs, identity, commit, content, static(payloads, nil)); legacy.Result != registry.ResultAudited {
++			t.Fatalf("legacy Resolve(wrong-name) = %s, want the frozen audited outcome", legacy.Result)
++		}
++		resolution = registry.ResolveExact(regs, "review", identity, commit, content, static(payloads, nil))
++	case attestWrongContext:
++		payloads := []map[string]any{mintStatic(func(body map[string]any) {
++			body["content_sha256"] = "sha256:" + strings.Repeat("e", 64)
++		}, stub.good)}
++		if legacy := registry.Resolve(regs, identity, commit, content, static(payloads, nil)); legacy.Result != registry.ResultAudited {
++			t.Fatalf("legacy Resolve(wrong-context) = %s, want the frozen audited outcome", legacy.Result)
++		}
++		resolution = registry.ResolveExact(regs, "review", identity, commit, content, static(payloads, nil))
+ 	}
+ 	wantResult := registry.ResultUnknown
+ 	if condition == attestRevoked {
+@@ -474,34 +496,3 @@ func mergeRegistryConfig(t *testing.T, configPath string, stub *attestStub) {
+ 		t.Fatal(err)
+ 	}
+ }
+-
+-func driveAttestationWrongNameGap(t *testing.T, c draftSemanticCase) {
+-	stub := newAttestStub(t)
+-	identity, commit, content := "example.org/kit", strings.Repeat("a", 40), "sha256:"+strings.Repeat("d", 64)
+-	body := map[string]any{"name": "other", "source_identity": identity, "commit": commit, "content_sha256": content,
+-		"status": registry.StatusAudited, "audit": map[string]any{"auditor": "team"}}
+-	resolution := registry.Resolve(stub.registries(), identity, commit, content,
+-		func(_, _, _, _ string) ([]map[string]any, error) {
+-			return []map[string]any{stub.good.sign(body)}, nil
+-		})
+-	if resolution.Result != registry.ResultAudited {
+-		t.Fatalf("wrong-name Resolve = %s, want the locked audited outcome; convert the known gap to a drive", resolution.Result)
+-	}
+-	semanticKnownGap(t, c, "frozen §13.3 matching never compares record name, so a wrong-name record resolves audited; draft §4 exact-name matching is not implemented (see results: draft exact-match gap)")
+-}
+-
+-func driveAttestationWrongContextGap(t *testing.T, c draftSemanticCase) {
+-	stub := newAttestStub(t)
+-	identity, commit, content := "example.org/kit", strings.Repeat("a", 40), "sha256:"+strings.Repeat("d", 64)
+-	body := map[string]any{"name": "review", "source_identity": identity, "commit": commit,
+-		"content_sha256": "sha256:" + strings.Repeat("e", 64),
+-		"status":         registry.StatusAudited, "audit": map[string]any{"auditor": "team"}}
+-	resolution := registry.Resolve(stub.registries(), identity, commit, content,
+-		func(_, _, _, _ string) ([]map[string]any, error) {
+-			return []map[string]any{stub.good.sign(body)}, nil
+-		})
+-	if resolution.Result != registry.ResultAudited {
+-		t.Fatalf("wrong-context Resolve = %s, want the locked audited outcome; convert the known gap to a drive", resolution.Result)
+-	}
+-	semanticKnownGap(t, c, "frozen §13.3 OR-matching accepts identity+commit with a wrong context hash; draft §4 exact-context matching is not implemented (see results: draft exact-match gap)")
+-}
+diff --git a/internal/install/draftevidence_test.go b/internal/install/draftevidence_test.go
+new file mode 100644
+index 00000000..8b9f4cb0
+--- /dev/null
++++ b/internal/install/draftevidence_test.go
+@@ -0,0 +1,155 @@
++package install
++
++import (
++	"crypto/ed25519"
++	"encoding/base64"
++	"encoding/json"
++	"net/http"
++	"net/http/httptest"
++	"strings"
++	"testing"
++	"time"
++
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/marker"
++	"github.com/relux-works/curator/internal/registry"
++)
++
++// draftEvidenceStub serves one signed registry whose records echo the
++// query keys, with a programmable name/content override. It is the
++// install-package counterpart of the crossconformance attest stub,
++// narrowed to the draft §4 exact-matching bound.
++type draftEvidenceStub struct {
++	t       *testing.T
++	server  *httptest.Server
++	pinned  string
++	private ed25519.PrivateKey
++	mutate  func(body map[string]any)
++}
++
++func newDraftEvidenceStub(t *testing.T, mutate func(body map[string]any)) *draftEvidenceStub {
++	t.Helper()
++	public, private, err := ed25519.GenerateKey(nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	stub := &draftEvidenceStub{
++		t:       t,
++		pinned:  "ed25519:" + base64.StdEncoding.EncodeToString(public),
++		private: private,
++		mutate:  mutate,
++	}
++	mux := http.NewServeMux()
++	mux.HandleFunc("/v1/snapshot", stub.serveSnapshot)
++	mux.HandleFunc("/v1/records", stub.serveRecords)
++	stub.server = httptest.NewServer(mux)
++	t.Cleanup(stub.server.Close)
++	return stub
++}
++
++func (s *draftEvidenceStub) sign(body map[string]any) map[string]any {
++	record := map[string]any{}
++	for key, value := range body {
++		if key != "sig" {
++			record[key] = value
++		}
++	}
++	signature := ed25519.Sign(s.private, registry.CanonicalBytes(record))
++	public, err := registry.ParsePublicKey(s.pinned)
++	if err != nil {
++		s.t.Fatal(err)
++	}
++	record["sig"] = map[string]any{
++		"key_id":    registry.KeyID(public),
++		"algorithm": "ed25519",
++		"signature": base64.StdEncoding.EncodeToString(signature),
++	}
++	return record
++}
++
++func (s *draftEvidenceStub) serveSnapshot(w http.ResponseWriter, _ *http.Request) {
++	w.Header().Set("Content-Type", "application/json")
++	_ = json.NewEncoder(w).Encode(s.sign(map[string]any{
++		"schema_version": 1, "version": 1, "log_size": 0,
++		"head": strings.Repeat("ab", 32), "merkle_root": strings.Repeat("cd", 32),
++		"created_at": time.Now().UTC().Truncate(time.Second).Format("2006-01-02T15:04:05Z"),
++	}))
++}
++
++func (s *draftEvidenceStub) serveRecords(w http.ResponseWriter, r *http.Request) {
++	w.Header().Set("Content-Type", "application/json")
++	query := r.URL.Query()
++	body := map[string]any{
++		"name": "review", "source_identity": query.Get("source_identity"),
++		"commit": query.Get("commit"), "content_sha256": query.Get("content_sha256"),
++		"status": registry.StatusAudited, "audit": map[string]any{"auditor": "team"},
++	}
++	if s.mutate != nil {
++		s.mutate(body)
++	}
++	_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(body)}, "next_cursor": nil})
++}
++
++// TestDraftEvidenceExactMatch is the production-entry bound for draft §4
++// (install.Project -> resolveRegistries -> registry.ResolveExact): exact
++// evidence installs and lands its attestation in the marker, while a
++// wrong-name or wrong-context record is refused fail-closed under a
++// strict policy with the shared typed refusal, revealing no registry
++// endpoint or key material. Dropping the name comparison admits the
++// wrong-name row; dropping the context comparison admits the
++// wrong-context row.
++func TestDraftEvidenceExactMatch(t *testing.T) {
++	run := func(t *testing.T, mutate func(body map[string]any)) Result {
++		t.Helper()
++		project, home, _, _ := setupGitInstall(t)
++		stub := newDraftEvidenceStub(t, mutate)
++		cfg := draftTestConfig(home, t.TempDir())
++		cfg.Audit.RegistryPolicy = "strict"
++		cfg.AuditRegistries = []config.Registry{{Name: "one", URL: stub.server.URL, PublicKeys: []string{stub.pinned}, Enabled: true}}
++		cfg.Audit.CacheTTLSeconds = 0
++		cfg.Audit.OfflineGraceSeconds = 0
++		return Project(cfg, project, "test", Options{DraftSourcesV1: true, Platform: installPlatform()})
++	}
++	t.Run("exact-admits", func(t *testing.T) {
++		project, home, _, _ := setupGitInstall(t)
++		stub := newDraftEvidenceStub(t, nil)
++		cfg := draftTestConfig(home, t.TempDir())
++		cfg.Audit.RegistryPolicy = "strict"
++		cfg.AuditRegistries = []config.Registry{{Name: "one", URL: stub.server.URL, PublicKeys: []string{stub.pinned}, Enabled: true}}
++		cfg.Audit.CacheTTLSeconds = 0
++		cfg.Audit.OfflineGraceSeconds = 0
++		result := Project(cfg, project, "test", Options{DraftSourcesV1: true, Platform: installPlatform()})
++		if result.Status != "ok" {
++			t.Fatalf("exact evidence install = %+v, want ok", result)
++		}
++		recorded := marker.Read(project + "/.agents/skills/review")
++		if recorded == nil || recorded.Attestation == nil || recorded.Attestation.Status != registry.StatusAudited {
++			t.Fatalf("marker attestation = %+v, want audited", recorded)
++		}
++	})
++	for _, condition := range []struct {
++		name   string
++		mutate func(body map[string]any)
++	}{
++		{"wrong-name", func(body map[string]any) { body["name"] = "other" }},
++		{"wrong-context", func(body map[string]any) {
++			body["content_sha256"] = "sha256:" + strings.Repeat("e", 64)
++		}},
++	} {
++		t.Run(condition.name+"-refuses", func(t *testing.T) {
++			result := run(t, condition.mutate)
++			if result.Status != "failed" {
++				t.Fatalf("%s install = %+v, want refusal", condition.name, result)
++			}
++			joined := strings.Join(result.Errors, ";")
++			if !strings.Contains(joined, "is not audited by any trusted registry") {
++				t.Fatalf("%s errors = %q, want the strict typed refusal", condition.name, joined)
++			}
++			for _, secret := range []string{"http://", "https://", "ed25519:", "127.0.0.1"} {
++				if strings.Contains(joined, secret) {
++					t.Fatalf("%s refusal leaks %q: %q", condition.name, secret, joined)
++				}
++			}
++		})
++	}
++}
+diff --git a/internal/install/global.go b/internal/install/global.go
+index d2bf1c6d..0c6f1b3c 100644
+--- a/internal/install/global.go
++++ b/internal/install/global.go
+@@ -213,7 +213,7 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
+ 	resolveAttest := opts.ResolveAttest
+ 	if resolveAttest == nil {
+ 		resolveAttest = func(nodes []*closure.Node) (map[string]*marker.Attestation, []string, error) {
+-			return resolveRegistries(cfg, nodes, "global", !opts.DryRun)
++			return resolveRegistries(cfg, nodes, "global", !opts.DryRun, false)
+ 		}
+ 	}
+ 	attestations, regWarnings, regErr := resolveAttest(nodes)
+diff --git a/internal/install/install.go b/internal/install/install.go
+index dc540800..2a520a60 100644
+--- a/internal/install/install.go
++++ b/internal/install/install.go
+@@ -520,7 +520,7 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
+ 	resolveAttest := opts.ResolveAttest
+ 	if resolveAttest == nil {
+ 		resolveAttest = func(nodes []*closure.Node) (map[string]*marker.Attestation, []string, error) {
+-			return resolveRegistries(cfg, nodes, alias, !opts.DryRun)
++			return resolveRegistries(cfg, nodes, alias, !opts.DryRun, draftLock != nil)
+ 		}
+ 	}
+ 	attestations, regWarnings, regErr := resolveAttest(nodes)
+@@ -1311,8 +1311,12 @@ func mcpVerifier(env mcp.Env, agents []string, scope string) func([]*closure.Nod
+ // resolveRegistries applies the audit registry gate (Spec §13.3, §13.4):
+ // snapshot verification excludes tampered registries (all tampered fails),
+ // a verified revocation denies, strict policy fails unknown artifacts, and
+-// the authorizing attestation lands in the marker.
+-func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string, persist bool) (map[string]*marker.Attestation, []string, error) {
++// the authorizing attestation lands in the marker. On the draft lane
++// (draft true) network members resolve through the exact draft §4 entry:
++// a record authorizes only on exact name, canonical repository, commit,
++// and context hash matching. The frozen v1 lane keeps §13.3 OR-matching
++// byte-identically.
++func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string, persist bool, draft bool) (map[string]*marker.Attestation, []string, error) {
+ 	trusted := cfg.TrustedRegistries()
+ 	if len(trusted) == 0 {
+ 		return map[string]*marker.Attestation{}, nil, nil
+@@ -1390,7 +1394,12 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string,
+ 		if err != nil {
+ 			return nil, warnings, err
+ 		}
+-		resolution := registry.Resolve(usable, node.Identity, node.Resolved.Commit, contentHash, fetch)
++		var resolution registry.Resolution
++		if draft {
++			resolution = registry.ResolveExact(usable, node.Name, node.Identity, node.Resolved.Commit, contentHash, fetch)
++		} else {
++			resolution = registry.Resolve(usable, node.Identity, node.Resolved.Commit, contentHash, fetch)
++		}
+ 		for _, warning := range resolution.Warnings {
+ 			warnings = append(warnings, alias+": registry: "+warning)
+ 		}
+diff --git a/internal/registry/registry.go b/internal/registry/registry.go
+index 26cb1e58..12ff6870 100644
+--- a/internal/registry/registry.go
++++ b/internal/registry/registry.go
+@@ -301,6 +301,18 @@ func Matches(record Record, sourceIdentity, commit, contentSHA256 string) bool {
+ 	return record.SourceIdentity == sourceIdentity && record.Commit == commit
+ }
+ 
++// MatchesExact reports whether a record is the exact evidence for one
++// draft-lane network artifact: name, canonical source identity, commit,
++// and context hash must ALL match (skillfile-sources draft §4). Unlike
++// Matches, neither a content-only coincidence nor an identity+commit
++// coincidence admits the record, and the record name is always compared.
++func MatchesExact(record Record, name, sourceIdentity, commit, contentSHA256 string) bool {
++	return record.Name == name &&
++		record.SourceIdentity == sourceIdentity &&
++		record.Commit == commit &&
++		record.ContentSHA256 == contentSHA256
++}
++
+ // Resolve combines verified records from every trusted registry under
+ // deny-wins (Spec §13.3).
+ //
+@@ -313,6 +325,28 @@ func Resolve(registries []Registry, sourceIdentity, commit, contentSHA256 string
+ 	if sourceIdentity == "" && commit == "" {
+ 		return Resolution{Result: ResultUnknown}
+ 	}
++	return resolveMatched(registries, sourceIdentity, commit, contentSHA256, fetch, func(record Record) bool {
++		return Matches(record, sourceIdentity, commit, contentSHA256)
++	})
++}
++
++// ResolveExact combines verified records exactly like Resolve, but a
++// record authorizes only on an exact draft §4 match of name, canonical
++// repository, commit, and context hash. The draft install lane resolves
++// network members through this entry; the frozen v1 lane keeps Resolve
++// byte-identically.
++func ResolveExact(registries []Registry, name, sourceIdentity, commit, contentSHA256 string, fetch FetchFn) Resolution {
++	if sourceIdentity == "" && commit == "" {
++		return Resolution{Result: ResultUnknown}
++	}
++	return resolveMatched(registries, sourceIdentity, commit, contentSHA256, fetch, func(record Record) bool {
++		return MatchesExact(record, name, sourceIdentity, commit, contentSHA256)
++	})
++}
++
++// resolveMatched is the shared deny-wins combination behind Resolve and
++// ResolveExact: only the record-admission predicate differs.
++func resolveMatched(registries []Registry, sourceIdentity, commit, contentSHA256 string, fetch FetchFn, match func(Record) bool) Resolution {
+ 	var warnings []string
+ 	var audited, deprecated *Attestation
+ 	for _, reg := range registries {
+@@ -331,7 +365,7 @@ func Resolve(registries []Registry, sourceIdentity, commit, contentSHA256 string
+ 				warnings = append(warnings, fmt.Sprintf("registry %s returned a malformed record: %v", reg.Name, err))
+ 				continue
+ 			}
+-			if !Matches(record, sourceIdentity, commit, contentSHA256) {
++			if !match(record) {
+ 				continue
+ 			}
+ 			if !VerifySigned(payload, reg.PublicKeys) {
+diff --git a/internal/registry/registry_test.go b/internal/registry/registry_test.go
+index fab43cc0..fc9e1b2b 100644
+--- a/internal/registry/registry_test.go
++++ b/internal/registry/registry_test.go
+@@ -162,6 +162,111 @@ func TestMatches(t *testing.T) {
+ 	}
+ }
+ 
++// TestMatchesExact locks draft §4 admission: name, canonical repository,
++// commit, and context hash must ALL match. Each single-field mismatch
++// refuses, including the two shapes frozen §13.3 OR-matching admits (a
++// wrong name with identity+commit+content matching, and a wrong context
++// hash with name+identity+commit matching).
++func TestMatchesExact(t *testing.T) {
++	s := newSigner(t)
++	parsed, _ := ParseRecord(s.sign(record(StatusAudited)))
++	const name, repository = "skill-a", "git.example.com/skills/skill-a"
++	if !MatchesExact(parsed, name, repository, testCommit, testContentSHA256) {
++		t.Fatal("exact record must match")
++	}
++	for field, mutated := range map[string]struct {
++		name, repository, commit, content string
++	}{
++		"wrong name":       {name: "other", repository: repository, commit: testCommit, content: testContentSHA256},
++		"wrong repository": {name: name, repository: "other.test/kit", commit: testCommit, content: testContentSHA256},
++		"wrong commit":     {name: name, repository: repository, commit: strings.Repeat("b", 40), content: testContentSHA256},
++		"wrong context":    {name: name, repository: repository, commit: testCommit, content: "sha256:" + strings.Repeat("e", 64)},
++	} {
++		t.Run(field, func(t *testing.T) {
++			if MatchesExact(parsed, mutated.name, mutated.repository, mutated.commit, mutated.content) {
++				t.Fatalf("MatchesExact admitted a %s record", field)
++			}
++		})
++	}
++}
++
++// TestResolveExact drives the draft-lane resolution entry: an exact
++// record resolves audited, every single-field mismatch resolves unknown,
++// and an exact revocation still denies. It also locks the frozen legacy
++// entry: Resolve keeps admitting the wrong-name and wrong-context shapes
++// as audited, so the v1 lane is byte-identically unchanged.
++func TestResolveExact(t *testing.T) {
++	s := newSigner(t)
++	registries := []Registry{{Name: "one", URL: "https://one", PublicKeys: []string{s.pinned}}}
++	const name, repository = "skill-a", "git.example.com/skills/skill-a"
++	resolve := func(body map[string]any) (exact, legacy Resolution) {
++		fetch := staticFetch(map[string][]map[string]any{"https://one": {s.sign(body)}}, nil)
++		return ResolveExact(registries, name, repository, testCommit, testContentSHA256, fetch),
++			Resolve(registries, repository, testCommit, testContentSHA256, fetch)
++	}
++	mint := func(mut func(map[string]any)) map[string]any {
++		body := record(StatusAudited)
++		if mut != nil {
++			mut(body)
++		}
++		return body
++	}
++	exact, _ := resolve(mint(nil))
++	if exact.Result != ResultAudited || exact.Attestation == nil || exact.Attestation.Registry != "one" {
++		t.Fatalf("exact resolution: %+v", exact)
++	}
++	for field, mut := range map[string]func(map[string]any){
++		"wrong-name": func(body map[string]any) {
++			body["name"] = "other"
++		},
++		"wrong-repository": func(body map[string]any) {
++			body["source_identity"] = "other.test/kit"
++			body["commit"] = strings.Repeat("b", 40)
++			body["content_sha256"] = "sha256:" + strings.Repeat("e", 64)
++		},
++		"wrong-commit": func(body map[string]any) {
++			body["commit"] = strings.Repeat("b", 40)
++			body["content_sha256"] = "sha256:" + strings.Repeat("e", 64)
++		},
++		"wrong-context": func(body map[string]any) {
++			body["content_sha256"] = "sha256:" + strings.Repeat("e", 64)
++		},
++	} {
++		t.Run(field, func(t *testing.T) {
++			exact, _ := resolve(mint(mut))
++			if exact.Result != ResultUnknown {
++				t.Fatalf("ResolveExact(%s) = %s, want unknown", field, exact.Result)
++			}
++			if exact.Attestation != nil {
++				t.Fatalf("ResolveExact(%s) carried an attestation: %+v", field, exact.Attestation)
++			}
++		})
++	}
++	revoked, _ := resolve(mint(func(body map[string]any) { body["status"] = StatusRevoked }))
++	if revoked.Result != ResultRevoked {
++		t.Fatalf("exact revocation must deny: %+v", revoked)
++	}
++	// Frozen legacy entry: wrong-name and wrong-context still resolve
++	// audited under §13.3 OR-matching.
++	if legacy := func() Resolution {
++		_, legacy := resolve(mint(func(body map[string]any) { body["name"] = "other" }))
++		return legacy
++	}(); legacy.Result != ResultAudited {
++		t.Fatalf("legacy Resolve(wrong-name) = %s, want the frozen audited outcome", legacy.Result)
++	}
++	if legacy := func() Resolution {
++		_, legacy := resolve(mint(func(body map[string]any) {
++			body["content_sha256"] = "sha256:" + strings.Repeat("e", 64)
++		}))
++		return legacy
++	}(); legacy.Result != ResultAudited {
++		t.Fatalf("legacy Resolve(wrong-context) = %s, want the frozen audited outcome", legacy.Result)
++	}
++	if empty := ResolveExact(registries, name, "", "", testContentSHA256, staticFetch(nil, nil)); empty.Result != ResultUnknown {
++		t.Fatalf("identity-less query must stay unknown: %+v", empty)
++	}
++}
++
+ func staticFetch(payloads map[string][]map[string]any, errs map[string]error) FetchFn {
+ 	return func(url, _, _, _ string) ([]map[string]any, error) {
+ 		if err := errs[url]; err != nil {

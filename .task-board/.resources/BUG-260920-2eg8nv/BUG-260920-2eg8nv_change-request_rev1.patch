@@ -1,0 +1,486 @@
+diff --git a/internal/crossconformance/draftsources_schema_test.go b/internal/crossconformance/draftsources_schema_test.go
+index fb13c2d3..51c9fcdb 100644
+--- a/internal/crossconformance/draftsources_schema_test.go
++++ b/internal/crossconformance/draftsources_schema_test.go
+@@ -49,15 +49,11 @@ var draftSchemaBounds = map[string]string{
+ 	// Schema-valid but normatively inconsistent: builds:{} with a
+ 	// top-level build_source violates "build_source required exactly
+ 	// for active local go-v1 commands and absent otherwise"
+-	// (protocol/skillfile-sources.md), which marker.Read enforces in
+-	// validBuildState. The reader is right; the fixture cannot pass.
++	// (protocol/skillfile-sources.md §marker, which marker.Read enforces
++	// in validBuildState). The reader is right; the fixture cannot pass.
++	// Reported upstream to curator-spec (see BUG-260920-2eg8nv discrepancy
++	// text); the row stays a bound until the corpus is fixed.
+ 	"schema-cases/install-marker-v5/valid.json": "normatively inconsistent fixture (empty builds with build_source); reader refusal is correct",
+-	// The external go-repository-v1 arm admits absent `substituted`
+-	// (validDriverBuild enforces substituted==present(substitution)
+-	// consistency, not presence), while the schema requires the
+-	// Boolean. Reader-vs-contract gap; see the task finding. The row
+-	// locks the admitted behavior so the gap cannot widen silently.
+-	"schema-cases/install-marker-v5/invalid-external-missing-substituted.json": "reader admits absent substituted on the external arm; schema requires it",
+ }
+ 
+ // TestDraftSourcesSchemaCases drives all 115 pinned schema cases.
+@@ -190,11 +186,6 @@ func driveInstallMarkerV5Case(t *testing.T, dir string, entry draftSchemaEntry)
+ 		if got != nil {
+ 			t.Fatalf("bound fixture valid.json now accepted; convert the row to a drive")
+ 		}
+-	case "schema-cases/install-marker-v5/invalid-external-missing-substituted.json":
+-		// Bound: reader admits, schema refuses, see draftSchemaBounds.
+-		if got == nil {
+-			t.Fatalf("bound fixture invalid-external-missing-substituted.json now refused; convert the row to a drive")
+-		}
+ 	default:
+ 		if (got != nil) != entry.Valid {
+ 			t.Fatalf("valid=%v: marker.Read nil=%v", entry.Valid, got == nil)
+diff --git a/internal/marker/marker.go b/internal/marker/marker.go
+index fac0943d..7ceb50a9 100644
+--- a/internal/marker/marker.go
++++ b/internal/marker/marker.go
+@@ -442,6 +442,56 @@ var v5PackageArms = map[string]map[string]string{
+ // both strings.
+ var v5CommitShape = map[string]string{"object_format": "string", "hex": "string"}
+ 
++// v5ExternalBuildTypes is the closed member-to-JSON-type map of the v5
++// external go-repository-v1 build record arm (install-marker-v5.schema.json
++// external oneOf branch, receipt_schema_version 3). The decoded Build value
++// cannot tell an absent `substituted` from an explicit false, nor a null
++// member from an absent one; the raw object can, and must be checked before
++// the lossy decode, the same discipline as the package arms above.
++var v5ExternalBuildTypes = map[string]string{
++	"driver":                 "string",
++	"receipt_schema_version": "number",
++	"execution_policy":       "string",
++	"repository":             "string",
++	"declared_identity":      "object",
++	"declared_locked_commit": "object",
++	"effective_identity":     "object",
++	"object_format":          "string",
++	"commit":                 "string",
++	"substituted":            "boolean",
++	"build_source":           "object",
++	"descriptor_target":      "string",
++	"cache_key":              "string",
++	"receipt_sha256":         "string",
++	"artifact_sha256":        "string",
++	"artifact_path":          "string",
++	"declared_tag":           "string",
++	"substitution":           "object",
++}
++
++// v5ExternalBuildRequired is the required member set of the external arm:
++// every type member above except the optional declared_tag and the
++// substituted-conditional substitution.
++var v5ExternalBuildRequired = []string{
++	"driver", "receipt_schema_version", "execution_policy", "repository",
++	"declared_identity", "declared_locked_commit", "effective_identity",
++	"object_format", "commit", "substituted", "build_source",
++	"descriptor_target", "cache_key", "receipt_sha256", "artifact_sha256",
++	"artifact_path",
++}
++
++// Closed nested shapes of the external arm. Declared and effective
++// identities share the same member names (kind/value) across their
++// network/local variants; the const values stay the job of the decoded
++// validation. The locked commit reuses v5CommitShape.
++var (
++	v5IdentityShape            = map[string]string{"kind": "string", "value": "string"}
++	v5BuildSourceShape         = map[string]string{"algorithm": "string", "content_sha256": "string"}
++	v5SubstitutionLocalShape   = map[string]string{"type": "string"}
++	v5SubstitutionNetworkShape = map[string]string{"type": "string", "ref": "object"}
++	v5SubstitutionRefShape     = map[string]string{"kind": "string", "value": "string"}
++)
++
+ // validV5PackageShape validates the raw package object against the closed
+ // shape of its arm: every arm member present with the right JSON type,
+ // nothing else present even as null or empty, and the nested commit object
+@@ -485,8 +535,8 @@ func closedRawShape(object map[string]json.RawMessage, shape map[string]string)
+ 	return true
+ }
+ 
+-// rawJSONType names the JSON type of a raw value: string, object, or
+-// "" for anything else (null, numbers, booleans, arrays, malformed).
++// rawJSONType names the JSON type of a raw value: string, object,
++// boolean, number, or "" for anything else (null, arrays, malformed).
+ func rawJSONType(raw json.RawMessage) string {
+ 	trimmed := bytes.TrimSpace(raw)
+ 	switch {
+@@ -503,11 +553,100 @@ func rawJSONType(raw json.RawMessage) string {
+ 			return ""
+ 		}
+ 		return "object"
++	case trimmed[0] == 't' || trimmed[0] == 'f':
++		if bytes.Equal(trimmed, []byte("true")) || bytes.Equal(trimmed, []byte("false")) {
++			return "boolean"
++		}
++		return ""
++	case trimmed[0] == '-' || (trimmed[0] >= '0' && trimmed[0] <= '9'):
++		var n json.Number
++		if json.Unmarshal(trimmed, &n) != nil {
++			return ""
++		}
++		return "number"
+ 	default:
+ 		return ""
+ 	}
+ }
+ 
++// validV5ExternalBuildShape validates the raw external build record against
++// the closed shape of its arm: every required member present with the right
++// JSON type, nothing else present even as null, the substituted/substitution
++// conditional, and the nested identity, commit, build-source and substitution
++// objects closed the same way. Value grammars behind the member types stay
++// the job of the decoded validation; this check pins the closed shape, the
++// class that admitted an absent substituted as an explicit false.
++func validV5ExternalBuildShape(raw json.RawMessage) bool {
++	object, ok := rawObject(raw)
++	if !ok {
++		return false
++	}
++	for _, field := range v5ExternalBuildRequired {
++		if _, present := object[field]; !present {
++			return false
++		}
++	}
++	for member, value := range object {
++		want, allowed := v5ExternalBuildTypes[member]
++		if !allowed || rawJSONType(value) != want {
++			return false
++		}
++	}
++	// Presence of substituted was enforced by the required loop above,
++	// which is the single refusal point for an absent member: the decode
++	// below tolerates absence so a mutant dropping the requirement admits
++	// the record instead of surviving behind a redundant refusal.
++	var substituted bool
++	if subRaw, present := object["substituted"]; present {
++		if json.Unmarshal(subRaw, &substituted) != nil {
++			return false
++		}
++	}
++	_, hasSubstitution := object["substitution"]
++	if substituted != hasSubstitution {
++		return false
++	}
++	for _, field := range []string{"declared_identity", "effective_identity"} {
++		nested, ok := rawObject(object[field])
++		if !ok || !closedRawShape(nested, v5IdentityShape) {
++			return false
++		}
++	}
++	if nested, ok := rawObject(object["declared_locked_commit"]); !ok || !closedRawShape(nested, v5CommitShape) {
++		return false
++	}
++	if nested, ok := rawObject(object["build_source"]); !ok || !closedRawShape(nested, v5BuildSourceShape) {
++		return false
++	}
++	if subRaw, present := object["substitution"]; present {
++		sub, ok := rawObject(subRaw)
++		if !ok {
++			return false
++		}
++		var subType string
++		if typeRaw, present := sub["type"]; !present || json.Unmarshal(typeRaw, &subType) != nil {
++			return false
++		}
++		switch subType {
++		case "local-path":
++			if !closedRawShape(sub, v5SubstitutionLocalShape) {
++				return false
++			}
++		case "network-git":
++			if !closedRawShape(sub, v5SubstitutionNetworkShape) {
++				return false
++			}
++			ref, ok := rawObject(sub["ref"])
++			if !ok || !closedRawShape(ref, v5SubstitutionRefShape) {
++				return false
++			}
++		default:
++			return false
++		}
++	}
++	return true
++}
++
+ // validV5Package mirrors the disjoint source-types arms: a local snapshot
+ // never carries Git fields and a Git package never carries a snapshot
+ // digest. Digest forms are never substituted across arms.
+@@ -648,6 +787,12 @@ func validBuildState(m *Marker, raw map[string]json.RawMessage) bool {
+ 	} else if sourcePresent || m.BuildSource != nil {
+ 		return false
+ 	}
++	var buildsRaw map[string]json.RawMessage
++	if m.SchemaVersion == SchemaV5 {
++		if err := json.Unmarshal(raw["builds"], &buildsRaw); err != nil || buildsRaw == nil {
++			return false
++		}
++	}
+ 	for command, build := range m.Builds {
+ 		if !identifiers.Valid(command) || !containsString(m.Commands, command) ||
+ 			!markerSHA256RE.MatchString(string(build.CacheKey)) ||
+@@ -664,6 +809,12 @@ func validBuildState(m *Marker, raw map[string]json.RawMessage) bool {
+ 		// whatever the skill schema: its cache entries are receipt-3 package
+ 		// wrappers, so a legacy record shape can never describe them.
+ 		if m.SchemaVersion == SchemaV5 {
++			if build.Driver == "go-repository-v1" {
++				rawBuild, present := buildsRaw[command]
++				if !present || !validV5ExternalBuildShape(rawBuild) {
++					return false
++				}
++			}
+ 			if !validV5Build(build) {
+ 				return false
+ 			}
+diff --git a/internal/marker/marker_v5_builds_test.go b/internal/marker/marker_v5_builds_test.go
+index 3eefbe96..4c2e2eb7 100644
+--- a/internal/marker/marker_v5_builds_test.go
++++ b/internal/marker/marker_v5_builds_test.go
+@@ -1,6 +1,9 @@
+ package marker
+ 
+ import (
++	"encoding/json"
++	"os"
++	"path/filepath"
+ 	"strings"
+ 	"testing"
+ 
+@@ -108,3 +111,236 @@ func TestMarkerV5BuildsBindReceiptVersion3OnBothArms(t *testing.T) {
+ 		}
+ 	}
+ }
++
++// rewriteV5Build writes a recorded v5 marker back with one builds entry
++// replaced by the given JSON text, bypassing Write so the document carries
++// exactly the bytes a foreign writer could produce.
++func rewriteV5Build(t *testing.T, dir, command, buildJSON string) {
++	t.Helper()
++	payload, err := os.ReadFile(filepath.Join(dir, Name))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var raw map[string]json.RawMessage
++	if err := json.Unmarshal(payload, &raw); err != nil {
++		t.Fatal(err)
++	}
++	var builds map[string]json.RawMessage
++	if err := json.Unmarshal(raw["builds"], &builds); err != nil {
++		t.Fatal(err)
++	}
++	builds[command] = json.RawMessage(buildJSON)
++	rewrittenBuilds, err := json.Marshal(builds)
++	if err != nil {
++		t.Fatal(err)
++	}
++	raw["builds"] = rewrittenBuilds
++	rewritten, err := json.Marshal(raw)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(dir, Name), rewritten, 0o644); err != nil {
++		t.Fatal(err)
++	}
++}
++
++func mustExtJSON(t *testing.T, build Build) string {
++	t.Helper()
++	payload, err := json.Marshal(build)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return string(payload)
++}
++
++func mutateExtJSON(t *testing.T, base Build, mutate func(map[string]json.RawMessage)) string {
++	t.Helper()
++	var object map[string]json.RawMessage
++	if err := json.Unmarshal([]byte(mustExtJSON(t, base)), &object); err != nil {
++		t.Fatal(err)
++	}
++	mutate(object)
++	payload, err := json.Marshal(object)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return string(payload)
++}
++
++func mutateNestedJSON(t *testing.T, outer map[string]json.RawMessage, field string, mutate func(map[string]json.RawMessage)) {
++	t.Helper()
++	var nested map[string]json.RawMessage
++	if err := json.Unmarshal(outer[field], &nested); err != nil {
++		t.Fatal(err)
++	}
++	mutate(nested)
++	payload, err := json.Marshal(nested)
++	if err != nil {
++		t.Fatal(err)
++	}
++	outer[field] = payload
++}
++
++// TestMarkerV5ExternalBuildClosedShape is the reader regression for
++// BUG-260920-2eg8nv: an external go-repository-v1 record must match the
++// closed raw shape of its arm. An absent `substituted` decodes to the same
++// false as an explicit one, and a null member decodes to the same zero
++// value as an absent one, so the raw object is checked before the lossy
++// decode. Every row drives marker.Read, the production entry.
++func TestMarkerV5ExternalBuildClosedShape(t *testing.T) {
++	substitutedLocal := v5ExternalBuild()
++	substitutedLocal.Substituted = true
++	substitutedLocal.Substitution = &RepositorySubstitute{Type: "local-path"}
++	substitutedNetwork := v5ExternalBuild()
++	substitutedNetwork.Substituted = true
++	substitutedNetwork.Substitution = &RepositorySubstitute{
++		Type: "network-git",
++		Ref:  &RepositoryRef{Kind: "tag", Value: "v1.4.0"},
++	}
++	withTag := v5ExternalBuild()
++	withTag.DeclaredTag = "v1.4.0"
++
++	type row struct {
++		build  func(t *testing.T) string
++		readOK bool
++	}
++	rows := map[string]row{
++		"control-unsubstituted":       {func(t *testing.T) string { return mustExtJSON(t, v5ExternalBuild()) }, true},
++		"control-substituted-local":   {func(t *testing.T) string { return mustExtJSON(t, substitutedLocal) }, true},
++		"control-substituted-network": {func(t *testing.T) string { return mustExtJSON(t, substitutedNetwork) }, true},
++		"control-declared-tag":        {func(t *testing.T) string { return mustExtJSON(t, withTag) }, true},
++
++		"missing-substituted": {func(t *testing.T) string {
++			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { delete(o, "substituted") })
++		}, false},
++		"substituted-null": {func(t *testing.T) string {
++			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { o["substituted"] = json.RawMessage(`null`) })
++		}, false},
++		"substituted-string": {func(t *testing.T) string {
++			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { o["substituted"] = json.RawMessage(`"false"`) })
++		}, false},
++		"substituted-number": {func(t *testing.T) string {
++			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { o["substituted"] = json.RawMessage(`0`) })
++		}, false},
++		"substitution-null": {func(t *testing.T) string {
++			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { o["substitution"] = json.RawMessage(`null`) })
++		}, false},
++		"substituted-true-missing-substitution": {func(t *testing.T) string {
++			missing := v5ExternalBuild()
++			missing.Substituted = true
++			return mustExtJSON(t, missing)
++		}, false},
++		"substituted-false-with-substitution": {func(t *testing.T) string {
++			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) {
++				o["substitution"] = json.RawMessage(`{"type":"local-path"}`)
++			})
++		}, false},
++		"foreign-field": {func(t *testing.T) string {
++			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { o["extra"] = json.RawMessage(`1`) })
++		}, false},
++		"foreign-field-null": {func(t *testing.T) string {
++			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { o["extra"] = json.RawMessage(`null`) })
++		}, false},
++		"declared-tag-null": {func(t *testing.T) string {
++			return mutateExtJSON(t, withTag, func(o map[string]json.RawMessage) { o["declared_tag"] = json.RawMessage(`null`) })
++		}, false},
++		"declared-tag-number": {func(t *testing.T) string {
++			return mutateExtJSON(t, withTag, func(o map[string]json.RawMessage) { o["declared_tag"] = json.RawMessage(`123`) })
++		}, false},
++		"commit-null": {func(t *testing.T) string {
++			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { o["commit"] = json.RawMessage(`null`) })
++		}, false},
++		"repository-null": {func(t *testing.T) string {
++			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { o["repository"] = json.RawMessage(`null`) })
++		}, false},
++		"receipt-version-null": {func(t *testing.T) string {
++			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { o["receipt_schema_version"] = json.RawMessage(`null`) })
++		}, false},
++		"receipt-version-string": {func(t *testing.T) string {
++			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { o["receipt_schema_version"] = json.RawMessage(`"3"`) })
++		}, false},
++		"missing-repository": {func(t *testing.T) string {
++			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { delete(o, "repository") })
++		}, false},
++		"missing-commit": {func(t *testing.T) string {
++			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { delete(o, "commit") })
++		}, false},
++		"missing-build-source": {func(t *testing.T) string {
++			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { delete(o, "build_source") })
++		}, false},
++		"declared-identity-null": {func(t *testing.T) string {
++			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) { o["declared_identity"] = json.RawMessage(`null`) })
++		}, false},
++		"declared-identity-extra": {func(t *testing.T) string {
++			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) {
++				mutateNestedJSON(t, o, "declared_identity", func(n map[string]json.RawMessage) { n["extra"] = json.RawMessage(`1`) })
++			})
++		}, false},
++		"declared-identity-kind-null": {func(t *testing.T) string {
++			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) {
++				mutateNestedJSON(t, o, "declared_identity", func(n map[string]json.RawMessage) { n["kind"] = json.RawMessage(`null`) })
++			})
++		}, false},
++		"locked-commit-extra": {func(t *testing.T) string {
++			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) {
++				mutateNestedJSON(t, o, "declared_locked_commit", func(n map[string]json.RawMessage) { n["ref"] = json.RawMessage(`"main"`) })
++			})
++		}, false},
++		"locked-commit-hex-null": {func(t *testing.T) string {
++			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) {
++				mutateNestedJSON(t, o, "declared_locked_commit", func(n map[string]json.RawMessage) { n["hex"] = json.RawMessage(`null`) })
++			})
++		}, false},
++		"effective-identity-extra": {func(t *testing.T) string {
++			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) {
++				mutateNestedJSON(t, o, "effective_identity", func(n map[string]json.RawMessage) { n["extra"] = json.RawMessage(`1`) })
++			})
++		}, false},
++		"build-source-extra": {func(t *testing.T) string {
++			return mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) {
++				mutateNestedJSON(t, o, "build_source", func(n map[string]json.RawMessage) { n["extra"] = json.RawMessage(`1`) })
++			})
++		}, false},
++		"local-path-with-ref": {func(t *testing.T) string {
++			return mutateExtJSON(t, substitutedLocal, func(o map[string]json.RawMessage) {
++				mutateNestedJSON(t, o, "substitution", func(n map[string]json.RawMessage) {
++					n["ref"] = json.RawMessage(`{"kind":"tag","value":"v1.4.0"}`)
++				})
++			})
++		}, false},
++		"network-git-missing-ref": {func(t *testing.T) string {
++			return mutateExtJSON(t, substitutedNetwork, func(o map[string]json.RawMessage) {
++				mutateNestedJSON(t, o, "substitution", func(n map[string]json.RawMessage) { delete(n, "ref") })
++			})
++		}, false},
++		"network-git-ref-null": {func(t *testing.T) string {
++			return mutateExtJSON(t, substitutedNetwork, func(o map[string]json.RawMessage) {
++				mutateNestedJSON(t, o, "substitution", func(n map[string]json.RawMessage) { n["ref"] = json.RawMessage(`null`) })
++			})
++		}, false},
++		"substitution-unknown-type": {func(t *testing.T) string {
++			return mutateExtJSON(t, substitutedLocal, func(o map[string]json.RawMessage) {
++				mutateNestedJSON(t, o, "substitution", func(n map[string]json.RawMessage) { n["type"] = json.RawMessage(`"bad"`) })
++			})
++		}, false},
++		"substitution-missing-type": {func(t *testing.T) string {
++			return mutateExtJSON(t, substitutedLocal, func(o map[string]json.RawMessage) { o["substitution"] = json.RawMessage(`{}`) })
++		}, false},
++	}
++	for name, r := range rows {
++		t.Run(name, func(t *testing.T) {
++			dir, _ := writeV5(t, v5BuildMarker(true, true))
++			rewriteV5Build(t, dir, "ext", r.build(t))
++			got := Read(dir)
++			if (got != nil) != r.readOK {
++				t.Fatalf("Read = %v, want readable=%v", got, r.readOK)
++			}
++			if got == nil {
++				return
++			}
++			if got.Builds["ext"].Driver != "go-repository-v1" {
++				t.Fatalf("recorded ext driver = %q", got.Builds["ext"].Driver)
++			}
++		})
++	}
++}
