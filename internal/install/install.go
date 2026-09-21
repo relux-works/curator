@@ -260,6 +260,10 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 	// 3. Managed .gitignore gate.
 	required := adapters.RequiredGitignoreEntries(agents)
 	if err := gitignore.Ensure(projectRoot, required, opts.FixGitignore && !opts.DryRun); err != nil {
+		if !gitignore.IsNotIgnored(err) {
+			result.failf("%v", err)
+			return result, nil
+		}
 		result.Status = "skipped"
 		result.Messages = append(result.Messages, fmt.Sprintf("%s: %v; skipped", alias, err))
 		return result, nil
@@ -285,6 +289,10 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 			return result, nil
 		}
 		if err := gitignore.Ensure(projectRoot, []string{devsub.Name}, opts.FixGitignore && !opts.DryRun); err != nil {
+			if !gitignore.IsNotIgnored(err) {
+				result.failf("%v", err)
+				return result, nil
+			}
 			result.Status = "skipped"
 			result.Messages = append(result.Messages, fmt.Sprintf("%s: %v; skipped", alias, err))
 			return result, nil

@@ -5,6 +5,8 @@
 package gitignore
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,14 +17,53 @@ import (
 // BlockComment heads the appended entries.
 const BlockComment = "# Curator"
 
+// NotIgnoredError reports the policy outcome that entries are not ignored.
+// It is distinct from a tool failure: a git that cannot be executed (a
+// spawn error or a missing git binary) is returned as a plain wrapped
+// error, never as this type. Git's own verdicts, including "not a
+// repository", are policy outcomes as before.
+type NotIgnoredError struct {
+	Missing []string
+}
+
+func (e *NotIgnoredError) Error() string {
+	return fmt.Sprintf("generated paths are not ignored by git; missing entries: %s", strings.Join(e.Missing, ", "))
+}
+
+// IsNotIgnored reports whether err is the not-ignored policy outcome as
+// opposed to a git tool failure.
+func IsNotIgnored(err error) bool {
+	var target *NotIgnoredError
+	return errors.As(err, &target)
+}
+
 // Missing returns the entries not currently ignored in projectRoot.
+//
+// A git that cannot be executed — a spawn error or exec.ErrNotFound, i.e.
+// any cmd.Run() failure that is not an *exec.ExitError — is returned as an
+// error carrying the tool diagnostic, so callers never mistake a broken git
+// invocation for a policy outcome. Every exit status git itself reports
+// keeps the pre-existing behaviour: the entry is reported as not ignored,
+// whether the status is 1 (not ignored) or 128/other (not a repository, a
+// fatal git error). The diagnostic names only the entry, never the full
+// probe path, environment, or project root.
 func Missing(projectRoot string, entries []string) ([]string, error) {
 	var missing []string
 	for _, entry := range entries {
 		probe := strings.TrimSuffix(entry, "/") + "/.curator-probe"
 		cmd := exec.Command("git", "-C", projectRoot, "check-ignore", "-q", probe) // #nosec G204 -- fixed binary and flags
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
 		if err := cmd.Run(); err != nil {
-			missing = append(missing, entry)
+			var exitErr *exec.ExitError
+			if errors.As(err, &exitErr) {
+				missing = append(missing, entry)
+				continue
+			}
+			if detail := strings.TrimSpace(stderr.String()); detail != "" {
+				return nil, fmt.Errorf("git check-ignore failed for %q: %s: %w", entry, detail, err)
+			}
+			return nil, fmt.Errorf("git check-ignore failed for %q: %w", entry, err)
 		}
 	}
 	return missing, nil
@@ -50,7 +91,7 @@ func Ensure(projectRoot string, entries []string, fix bool) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("generated paths are not ignored by git; missing entries: %s", strings.Join(missing, ", "))
+	return &NotIgnoredError{Missing: missing}
 }
 
 // Append adds entries to the .gitignore under the managed comment, skipping

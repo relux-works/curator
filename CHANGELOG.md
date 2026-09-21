@@ -161,6 +161,14 @@ All notable implementation changes are recorded here.
   with the same class and text, and the stale check is unchanged. This
   removes the nondeterministic refusal-class flip on both the draft
   and legacy lanes (BUG-260920-2d9gfv).
+- A `git check-ignore` spawn failure in the managed `.gitignore` gate is no
+  longer reported as "generated paths are not ignored by git". A git that
+  cannot be executed (a spawn error or a missing git binary) returns a `git
+  check-ignore failed ...` error carrying the tool diagnostic, and the
+  install refuses with it (failed) instead of skipping with the policy
+  message. Git's own verdicts, including "not a repository", are policy
+  outcomes as before. The not-ignored message and the success path are
+  unchanged.
 
 ## 0.12.5 - 2026-07-14
 
