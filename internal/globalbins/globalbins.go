@@ -26,6 +26,11 @@ const (
 type Selection struct {
 	Path    string
 	Warning string
+	// Explicit reports whether Path came from CURATOR_GLOBAL_USER_BIN
+	// rather than the PATH scan: an explicitly configured directory is
+	// the operator-declared publishing location, while a scanned one is
+	// only a candidate until the manager publishes there.
+	Explicit bool
 }
 
 type ledger struct {
@@ -141,7 +146,7 @@ func Select(home, platform string, environment map[string]string, userHome strin
 				UserBinEnv, explicit,
 			)}
 		default:
-			return Selection{Path: explicit}
+			return Selection{Path: explicit, Explicit: true}
 		}
 	}
 
@@ -384,6 +389,24 @@ func ledgerPayload(entries map[string]bool) ([]byte, error) {
 		return nil, err
 	}
 	return append(payload, '\n'), nil
+}
+
+// PublishedShims reports whether the manager has established binDir as a
+// shim publication target: the ownership ledger exists there. The ledger
+// is written on every publication, so a missing ledger means the manager
+// never published into the directory; presence counts rather than
+// content, so an emptied or unreadable ledger still marks a directory
+// the manager claimed. Only a missing ledger — os.IsNotExist — reports
+// unpublished; any other read failure fails closed. The umbrella
+// provider lookup uses this to refuse the user-bin shim directory only
+// once the manager itself publishes there (environments §11), instead
+// of refusing any merely selected PATH entry.
+func PublishedShims(binDir string) bool {
+	_, err := os.Stat(filepath.Join(binDir, managedFile))
+	if err == nil {
+		return true
+	}
+	return !os.IsNotExist(err)
 }
 
 func readLedger(binDir string) map[string]bool {

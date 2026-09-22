@@ -185,9 +185,10 @@ func TestManagerConfigV2Vectors(t *testing.T) {
 				t.Fatal(err)
 			}
 			for key, want := range tc.Expected {
-				if !reflect.DeepEqual(got[key], want) {
+				gotValue := got[key]
+				if !reflect.DeepEqual(gotValue, want) {
 					wantJSON, _ := json.Marshal(want)
-					gotJSON, _ := json.Marshal(got[key])
+					gotJSON, _ := json.Marshal(gotValue)
 					t.Fatalf("member %q:\n got %s\nwant %s", key, gotJSON, wantJSON)
 				}
 			}

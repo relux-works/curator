@@ -10,6 +10,20 @@ import (
 	"github.com/relux-works/curator/internal/envregistry"
 )
 
+// machineFromConfig threads the effective machine knobs the resolve and
+// status rows read into the machine configuration: currently the
+// passable_env_names knob with its presence bit, so the S4 profile
+// default applies exactly when the knob is absent (§10.3, §12).
+func machineFromConfig(cfg *config.Config) envregistry.MachineConfig {
+	machine := envregistry.DefaultMachineConfig()
+	if cfg == nil {
+		return machine
+	}
+	machine.PassableEnvNames = cfg.Env.PassableEnvNames
+	machine.PassableEnvNamesSet = cfg.Env.PassableEnvNamesSet
+	return machine
+}
+
 func (c cli) cmdEnv(args []string) int {
 	if len(args) == 0 {
 		_, _ = fmt.Fprintln(c.stderr, "curator: env needs a subcommand: resolve | status | config")
@@ -61,7 +75,7 @@ func (c cli) cmdEnvResolve(cfg *config.Config, args []string) int {
 		Profile:   *profile,
 		EnvID:     envregistry.NormalizeEnvID(positional[0]),
 		LaunchDir: launchDir,
-		Machine:   envregistry.DefaultMachineConfig(),
+		Machine:   machineFromConfig(cfg),
 		Repair:    *repair,
 		Format:    *format,
 		Policy:    policy,
@@ -94,7 +108,7 @@ func (c cli) cmdEnvStatus(cfg *config.Config, args []string) int {
 	launchDir, _ := os.Getwd()
 	status, err := envprofile.StatusOf(envprofile.StatusRequest{
 		Home:      cfg.Home(),
-		Machine:   envregistry.DefaultMachineConfig(),
+		Machine:   machineFromConfig(cfg),
 		LaunchDir: launchDir,
 		Policy:    envprofile.PolicyFromConfig(cfg),
 	})
@@ -102,6 +116,7 @@ func (c cli) cmdEnvStatus(cfg *config.Config, args []string) int {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
+	attachProviderPosture(cfg, status)
 	if *asJSON {
 		payload, err := json.MarshalIndent(status, "", "  ")
 		if err != nil {

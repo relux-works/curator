@@ -1481,9 +1481,19 @@ func buildFragment(req *ResolveRequest, adapter envregistry.Adapter, verdict *ve
 		if adapter.MCP == nil {
 			return nil, fmt.Errorf("managed home carries an mcp surface the %s adapter declares no channel for", adapter.ID)
 		}
+		// The §10.3 S4 bound, once per resolution: the active profile
+		// bounds the requested names and warns — unlisted under
+		// s4-warn, dropped under s4-enforce — without failing.
+		passthrough := envfragment.ResolvePassthrough(
+			contextmaterialize.MCPEnvNames(set),
+			req.Machine.PassableEnvNames, req.Machine.PassableEnvNamesSet,
+			envfragment.ActiveS4Profile)
+		if passthrough.Warning != "" {
+			verdict.warnings = append(verdict.warnings, passthrough.Warning)
+		}
 		fragment.MCP = &envfragment.MCP{
 			Path:     filepath.Join(plan.homeDir, filepath.FromSlash(surface.Paths[0])),
-			EnvNames: envfragment.BoundEnvNames(contextmaterialize.MCPEnvNames(set), req.Machine.PassableEnvNames),
+			EnvNames: passthrough.Passed,
 			Channels: []envregistry.Channel{*adapter.MCP},
 		}
 	}
@@ -1780,11 +1790,18 @@ func copyTree(source, destination string) error {
 // (§5.5): the inert .agent-context/system-prompt.md, linked from the
 // store, plus the pi live channels machine configuration explicitly
 // materializes (off by default, so a plain launch carries no active
-// system prompt).
+// system prompt). The surface carries only admitted system modules (§3):
+// under drop every skipped module warns context_system_module_dropped
+// naming package and path, and under error the first skipped module
+// refuses the assembly with context_system_module_transitive.
 func (p *homePlan) systemPrompt(req *ResolveRequest, lock *contextlock.Lock, precedence contextmaterialize.Precedence, packages map[string]contextmaterialize.Package, surfaces map[string]envmarker.Surface) error {
-	document, written, err := contextmaterialize.SystemPrompt(lock, precedence, p.adapter.ID, packages)
+	document, written, dropped, err := contextmaterialize.SystemPrompt(lock, precedence, p.adapter.ID, packages, req.Policy.Admission())
 	if err != nil {
 		return err
+	}
+	for _, module := range dropped {
+		p.warnings = append(p.warnings, fmt.Sprintf("%s: package %s system module %s is transitive; skipped under the drop policy",
+			contextmaterialize.DiagSystemModuleDropped, module.Package, module.Path))
 	}
 	if !written {
 		return nil

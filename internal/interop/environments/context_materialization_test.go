@@ -61,7 +61,34 @@ type environmentsVector struct {
 			Expected string `json:"expected"`
 			SHA256   string `json:"sha256"`
 		} `json:"files"`
+		MachinePolicy *struct {
+			TransitiveSystemModules string `json:"transitive_system_modules"`
+			SystemModuleWaivers     []struct {
+				Package string `json:"package"`
+				Reason  string `json:"reason"`
+			} `json:"system_module_waivers"`
+		} `json:"machine_policy"`
+		Admitted     []vectorModuleRef `json:"admitted"`
+		Dropped      []vectorModuleRef `json:"dropped"`
+		Warnings     []vectorWarning   `json:"warnings"`
+		Error        string            `json:"error"`
+		ErrorPackage string            `json:"error_package"`
+		ErrorModule  string            `json:"error_module"`
 	} `json:"materialization_cases"`
+}
+
+// vectorModuleRef is one admitted or dropped system module of a
+// materialization case, by package and manifest path.
+type vectorModuleRef struct {
+	Package string `json:"package"`
+	Path    string `json:"path"`
+}
+
+// vectorWarning is one expected drop warning of a materialization case.
+type vectorWarning struct {
+	Diagnostic string `json:"diagnostic"`
+	Package    string `json:"package"`
+	Path       string `json:"path"`
 }
 
 func loadEnvironmentsVector(t *testing.T) (string, environmentsVector) {
@@ -195,12 +222,45 @@ func TestConformanceEnvironmentsMonolithic(t *testing.T) {
 				}
 			case "system-prompt":
 				var document []byte
-				document, written, err = contextmaterialize.SystemPrompt(lock, precedence, tc.Environment, packages)
+				admission := contextmaterialize.Admission{}
+				if tc.MachinePolicy != nil {
+					admission.Transitive = tc.MachinePolicy.TransitiveSystemModules
+					for _, waiver := range tc.MachinePolicy.SystemModuleWaivers {
+						if admission.Waivers == nil {
+							admission.Waivers = map[string]bool{}
+						}
+						admission.Waivers[waiver.Package] = true
+					}
+				}
+				var dropped []contextmaterialize.DroppedModule
+				document, written, dropped, err = contextmaterialize.SystemPrompt(lock, precedence, tc.Environment, packages, admission)
+				if tc.Error != "" {
+					if err == nil {
+						t.Fatalf("expected %s, got no error", tc.Error)
+					}
+					if !strings.Contains(err.Error(), tc.Error) ||
+						!strings.Contains(err.Error(), tc.ErrorPackage) ||
+						!strings.Contains(err.Error(), tc.ErrorModule) {
+						t.Fatalf("error %q names neither %s nor %s/%s", err, tc.Error, tc.ErrorPackage, tc.ErrorModule)
+					}
+					assertDroppedModules(t, dropped, tc.Dropped)
+					err = nil
+					break
+				}
 				if err == nil && written {
 					if len(tc.Files) != 1 {
 						t.Fatalf("expected exactly one file for a system-prompt surface, vector lists %d", len(tc.Files))
 					}
 					files[tc.Files[0].Path] = document
+				}
+				if tc.MachinePolicy != nil {
+					admitted, classified := contextmaterialize.ClassifySystemModules(lock, order, packages, tc.Environment, admission)
+					assertAdmittedModules(t, admitted, tc.Admitted)
+					assertDroppedModules(t, classified, tc.Dropped)
+					assertDroppedModules(t, dropped, tc.Dropped)
+					assertDropWarnings(t, dropped, tc.Warnings)
+				} else if len(dropped) != 0 {
+					t.Fatalf("a case without machine_policy dropped %+v", dropped)
 				}
 			case "mcp":
 				var servers []contextmaterialize.MCPServer
@@ -288,5 +348,58 @@ func TestConformanceEnvironmentsMonolithic(t *testing.T) {
 				t.Fatalf("surface hash %s, want %s", got, tc.SurfaceSHA256)
 			}
 		})
+	}
+}
+
+// assertAdmittedModules pins the admitted set: the production
+// classification must name exactly the vector's admitted modules in
+// emitted order.
+func assertAdmittedModules(t *testing.T, admitted []contextmaterialize.ClassifiedModule, want []vectorModuleRef) {
+	t.Helper()
+	got := make([]vectorModuleRef, 0, len(admitted))
+	for _, module := range admitted {
+		got = append(got, vectorModuleRef{Package: module.Package, Path: module.Module.Path})
+	}
+	if want == nil {
+		want = []vectorModuleRef{}
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("admitted %+v, want %+v", got, want)
+	}
+}
+
+// assertDroppedModules pins the dropped set in emitted order.
+func assertDroppedModules(t *testing.T, dropped []contextmaterialize.DroppedModule, want []vectorModuleRef) {
+	t.Helper()
+	got := make([]vectorModuleRef, 0, len(dropped))
+	for _, module := range dropped {
+		got = append(got, vectorModuleRef{Package: module.Package, Path: module.Path})
+	}
+	if want == nil {
+		want = []vectorModuleRef{}
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("dropped %+v, want %+v", got, want)
+	}
+}
+
+// assertDropWarnings pins the drop warnings: one
+// context_system_module_dropped per dropped module, in order, naming
+// package and path.
+func assertDropWarnings(t *testing.T, dropped []contextmaterialize.DroppedModule, want []vectorWarning) {
+	t.Helper()
+	got := make([]vectorWarning, 0, len(dropped))
+	for _, module := range dropped {
+		got = append(got, vectorWarning{
+			Diagnostic: contextmaterialize.DiagSystemModuleDropped,
+			Package:    module.Package,
+			Path:       module.Path,
+		})
+	}
+	if want == nil {
+		want = []vectorWarning{}
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("warnings %+v, want %+v", got, want)
 	}
 }

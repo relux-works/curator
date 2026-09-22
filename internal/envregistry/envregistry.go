@@ -540,7 +540,12 @@ type MachineConfig struct {
 	// XDGSeedAllowlist bounds the opencode XDG seeds.
 	XDGSeedAllowlist []string
 	// PassableEnvNames bounds env_names; nil means unbounded.
-	PassableEnvNames []string
+	// PassableEnvNamesSet distinguishes an absent knob (the S4 profile
+	// default applies) from an explicit null (unbounded, silent under
+	// both profiles). An explicitly configured empty list bounds to
+	// nothing under both profiles.
+	PassableEnvNames    []string
+	PassableEnvNamesSet bool
 	// ShadowAcknowledged holds env + home-relative path entries the
 	// operator recorded as deliberate.
 	ShadowAcknowledged []ShadowAck
