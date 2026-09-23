@@ -94,6 +94,10 @@ internal/gitops	TestExtractTerminatesCatFileOnWriteFailure	linux,darwin	windows	
 internal/gitops	TestExtractRemovesWrittenFilesOnMidStreamError	linux,darwin,windows	-	-	a truncated loose object makes cat-file die mid-body after one written file; that file is removed and the caller's pre-existing entries stay intact
 internal/gitops	TestExtractRefusesDotGitComponents	linux,darwin,windows	-	-	a `.git` path component in any case is refused like `.`/`..` (git verify_path), while `.gitattributes` and `git/` stay admitted
 internal/gitops	TestExtractPreservesNestedExecutableBit	linux,darwin	windows	platform-control	a nested 100755 blob is written with the executable bit and a nested 100644 sibling without it; Windows synthesizes permission bits with no execute bit
+internal/gitops	TestExtractRefusesDirectoryComponentFold	darwin,windows	linux	host-capability	Dir/x.txt + dir/y.txt is refused with the duplicate-platform-path diagnostic before cat-file starts on a case-folding filesystem, with nothing written; a case-sensitive host has no collision to refuse
+internal/gitops	TestExtractAdmitsDirectoryComponentFoldWhenCaseSensitive	linux	darwin,windows	host-capability	Dir/x.txt + dir/y.txt coexist with exact bytes on a case-sensitive filesystem; a case-folding host refuses the pair instead
+internal/gitops	TestExtractRefusesFileDirectoryFold	darwin,windows	linux	host-capability	a regular file folding onto a planned directory (a/x.txt + A, Dir/x.txt + dir) is refused with the duplicate-platform-path diagnostic on a case-folding filesystem, with nothing written; a case-sensitive host has no collision to refuse
+internal/gitops	TestExtractRefusesNestedDirectoryComponentFold	darwin,windows	linux	host-capability	A/B/x + a/b/y is refused with the duplicate-platform-path diagnostic before cat-file starts on a case-folding filesystem, with nothing written; a case-sensitive host has no collision to refuse
 
 # ===========================================================================
 # Read-only build source

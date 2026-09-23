@@ -156,6 +156,16 @@ All notable implementation changes are recorded here.
   before waiting on it and removes what the call wrote. Closure scratch
   snapshots are extracted into a sibling staging directory and renamed into
   place only on success.
+- Git snapshot extraction now folds directory components per component when
+  gating platform-path collisions. The gate compared only folded full paths,
+  so two tree entries whose directories fold together but whose basenames
+  differ (`Dir/x.txt` + `dir/y.txt`) were admitted and landed in one physical
+  directory on a case-folding filesystem, silently losing the committed tree's
+  identity. Every ancestor prefix of every planned target is now tracked
+  folded, and a prefix that folds onto another prefix or onto a planned file
+  is refused with the existing `duplicate platform path` diagnostic before
+  any byte is written; case-sensitive destinations still extract both
+  spellings with exact bytes.
 
 - Status no longer reports a successfully installed schema-8 skill as
   `needs-install`. Every reader that decides whether a recorded compiled

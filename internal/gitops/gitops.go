@@ -537,13 +537,31 @@ func safeTarget(destRoot, name string) (string, error) {
 // case-insensitive filesystems. When two planned targets fold to the same
 // key the destination filesystem is probed once; on a case-sensitive
 // filesystem the distinct paths coexist, on a case-insensitive one the pair
-// is refused (Spec core §2, §6.2). Any other folding a filesystem applies is
-// caught by the existence check writeBlobs repeats before each file.
+// is refused (Spec core §2, §6.2). The fold is compared per path component:
+// two entries whose directory prefixes fold together (Dir/x.txt + dir/y.txt),
+// or a file that folds onto a planned directory (Dir/x.txt + dir), collide on
+// a case-folding destination even though their full paths differ, so every
+// ancestor prefix of every planned target is tracked folded alongside the
+// folded full paths and any such collision is refused with the same
+// diagnostic. Any other folding a filesystem applies is caught by the
+// existence check writeBlobs repeats before each file.
 func planWrites(destRoot string, entries []treeEntry) ([]treeEntry, error) {
 	plan := make([]treeEntry, 0, len(entries))
 	exact := map[string]bool{}
 	folded := map[string]bool{}
+	foldedDirs := map[string]string{}
 	caseInsensitive, probed := false, false
+	foldedDest := func() (bool, error) {
+		if !probed {
+			var err error
+			caseInsensitive, err = destinationFoldsCase(destRoot)
+			if err != nil {
+				return false, err
+			}
+			probed = true
+		}
+		return caseInsensitive, nil
+	}
 	for _, entry := range entries {
 		target, err := safeTarget(destRoot, entry.path)
 		if err != nil {
@@ -558,18 +576,68 @@ func planWrites(destRoot string, entries []treeEntry) ([]treeEntry, error) {
 		exact[target] = true
 		key := strings.ToLower(target)
 		if folded[key] {
-			if !probed {
-				caseInsensitive, err = destinationFoldsCase(destRoot)
-				if err != nil {
-					return nil, err
-				}
-				probed = true
+			insensitive, err := foldedDest()
+			if err != nil {
+				return nil, err
 			}
-			if caseInsensitive {
+			if insensitive {
 				return nil, fmt.Errorf("duplicate platform path in git snapshot: %q", entry.path)
 			}
 		}
 		folded[key] = true
+		// A file that folds onto a planned directory prefix with a different
+		// spelling collides on a case-folding destination. An exact file over
+		// an exact planned prefix cannot come from a committed tree; it stays
+		// admitted here and is refused while streaming, as before.
+		if first, ok := foldedDirs[key]; ok && first != target {
+			insensitive, err := foldedDest()
+			if err != nil {
+				return nil, err
+			}
+			if insensitive {
+				return nil, fmt.Errorf("duplicate platform path in git snapshot: %q", entry.path)
+			}
+		}
+		components := strings.Split(entry.path, "/")
+		prefix := ""
+		for _, component := range components[:len(components)-1] {
+			if prefix == "" {
+				prefix = component
+			} else {
+				prefix += "/" + component
+			}
+			prefixTarget := filepath.Join(destRoot, filepath.FromSlash(prefix))
+			prefixKey := strings.ToLower(prefixTarget)
+			if first, ok := foldedDirs[prefixKey]; ok {
+				// The same directory shared by many entries is admitted;
+				// only a differently-spelled prefix that folds onto it
+				// collides. The first spelling is kept, so further
+				// spellings on a case-sensitive destination keep admitting
+				// against it exactly as their full paths do.
+				if first != prefixTarget {
+					insensitive, err := foldedDest()
+					if err != nil {
+						return nil, err
+					}
+					if insensitive {
+						return nil, fmt.Errorf("duplicate platform path in git snapshot: %q", entry.path)
+					}
+				}
+				continue
+			}
+			// A directory prefix that folds onto a planned file collides,
+			// the reverse order of the file-over-prefix check above.
+			if folded[prefixKey] {
+				insensitive, err := foldedDest()
+				if err != nil {
+					return nil, err
+				}
+				if insensitive {
+					return nil, fmt.Errorf("duplicate platform path in git snapshot: %q", entry.path)
+				}
+			}
+			foldedDirs[prefixKey] = prefixTarget
+		}
 		if _, err := os.Lstat(target); err == nil {
 			return nil, fmt.Errorf("duplicate platform path in git snapshot: %q", entry.path)
 		} else if !os.IsNotExist(err) {
