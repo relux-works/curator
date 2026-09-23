@@ -7,10 +7,13 @@
 # to prove the exclusion is real fail-closed behaviour rather than a quiet
 # omission.
 #
-# `default_excluded_on` is the fallback for a root that predates the vector.
-# The committed released pin is such a root: it publishes no qualification
-# vector at all, so without a fallback the default lane would lose an exclusion
-# that is a property of the implementation rather than of the root.
+# `default_excluded_on` is the fallback for a SUPPLIED root that predates the
+# vector (e.g. an older CURATOR_CONFORMANCE_ROOT passed explicitly). The
+# committed released pin is NOT such a root: it publishes
+# `vectors/conformance-claim-v3-qualification.json`, so on the default lane the
+# vector is authoritative and this fallback stays dormant. Without it, a
+# pre-vector root would lose an exclusion that is a property of the
+# implementation rather than of the root.
 # `internal/godriver` implements rc5-native-control-inventory-v1, which defines
 # control records for macOS and Windows only, so linux is excluded under any
 # root; the rc.5 vector states the same thing normatively, with
