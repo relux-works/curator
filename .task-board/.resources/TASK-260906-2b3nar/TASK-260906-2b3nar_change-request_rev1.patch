@@ -1,0 +1,290 @@
+diff --git a/.github/ci/platform-cases.tsv b/.github/ci/platform-cases.tsv
+index 1fe73242..b0d83572 100644
+--- a/.github/ci/platform-cases.tsv
++++ b/.github/ci/platform-cases.tsv
+@@ -94,6 +94,10 @@ internal/gitops	TestExtractTerminatesCatFileOnWriteFailure	linux,darwin	windows
+ internal/gitops	TestExtractRemovesWrittenFilesOnMidStreamError	linux,darwin,windows	-	-	a truncated loose object makes cat-file die mid-body after one written file; that file is removed and the caller's pre-existing entries stay intact
+ internal/gitops	TestExtractRefusesDotGitComponents	linux,darwin,windows	-	-	a `.git` path component in any case is refused like `.`/`..` (git verify_path), while `.gitattributes` and `git/` stay admitted
+ internal/gitops	TestExtractPreservesNestedExecutableBit	linux,darwin	windows	platform-control	a nested 100755 blob is written with the executable bit and a nested 100644 sibling without it; Windows synthesizes permission bits with no execute bit
++internal/gitops	TestExtractRefusesDirectoryComponentFold	darwin,windows	linux	host-capability	Dir/x.txt + dir/y.txt is refused with the duplicate-platform-path diagnostic before cat-file starts on a case-folding filesystem, with nothing written; a case-sensitive host has no collision to refuse
++internal/gitops	TestExtractAdmitsDirectoryComponentFoldWhenCaseSensitive	linux	darwin,windows	host-capability	Dir/x.txt + dir/y.txt coexist with exact bytes on a case-sensitive filesystem; a case-folding host refuses the pair instead
++internal/gitops	TestExtractRefusesFileDirectoryFold	darwin,windows	linux	host-capability	a regular file folding onto a planned directory (a/x.txt + A, Dir/x.txt + dir) is refused with the duplicate-platform-path diagnostic on a case-folding filesystem, with nothing written; a case-sensitive host has no collision to refuse
++internal/gitops	TestExtractRefusesNestedDirectoryComponentFold	darwin,windows	linux	host-capability	A/B/x + a/b/y is refused with the duplicate-platform-path diagnostic before cat-file starts on a case-folding filesystem, with nothing written; a case-sensitive host has no collision to refuse
+ 
+ # ===========================================================================
+ # Read-only build source
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 33e41ebd..35201a88 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -89,6 +89,16 @@ All notable implementation changes are recorded here.
+   before waiting on it and removes what the call wrote. Closure scratch
+   snapshots are extracted into a sibling staging directory and renamed into
+   place only on success.
++- Git snapshot extraction now folds directory components per component when
++  gating platform-path collisions. The gate compared only folded full paths,
++  so two tree entries whose directories fold together but whose basenames
++  differ (`Dir/x.txt` + `dir/y.txt`) were admitted and landed in one physical
++  directory on a case-folding filesystem, silently losing the committed tree's
++  identity. Every ancestor prefix of every planned target is now tracked
++  folded, and a prefix that folds onto another prefix or onto a planned file
++  is refused with the existing `duplicate platform path` diagnostic before
++  any byte is written; case-sensitive destinations still extract both
++  spellings with exact bytes.
+ 
+ - Status no longer reports a successfully installed schema-8 skill as
+   `needs-install`. Every reader that decides whether a recorded compiled
+diff --git a/internal/gitops/dirfold_test.go b/internal/gitops/dirfold_test.go
+new file mode 100644
+index 00000000..2d65d2a9
+--- /dev/null
++++ b/internal/gitops/dirfold_test.go
+@@ -0,0 +1,134 @@
++package gitops
++
++import (
++	"bytes"
++	"os"
++	"path/filepath"
++	"sort"
++	"strings"
++	"testing"
++)
++
++// commitCaseTree commits path->content pairs through update-index --cacheinfo
++// plus write-tree, so trees whose names fold on disk (Dir/x.txt + dir/y.txt)
++// still commit: only the index and the object database are touched, never the
++// working tree.
++func commitCaseTree(t *testing.T, files map[string]string) (string, string) {
++	t.Helper()
++	repo := t.TempDir()
++	gitRun(t, repo, "init", "-q", "-b", "main")
++	names := make([]string, 0, len(files))
++	for name := range files {
++		names = append(names, name)
++	}
++	sort.Strings(names)
++	for _, name := range names {
++		gitRun(t, repo, "update-index", "--add", "--cacheinfo", "100644,"+blobOID(t, repo, files[name])+","+name)
++	}
++	return repo, gitRun(t, repo, "commit-tree", gitRun(t, repo, "write-tree"), "-m", "case")
++}
++
++// TestExtractRefusesDirectoryComponentFold proves the platform-path gate folds
++// per path component: Dir/x.txt + dir/y.txt share no folded FULL path, but on
++// a case-folding destination they land in ONE physical directory, so the pair
++// is refused with the duplicate-platform-path diagnostic before cat-file
++// starts and nothing is written.
++func TestExtractRefusesDirectoryComponentFold(t *testing.T) {
++	files := map[string]string{"Dir/x.txt": "x-bytes", "dir/y.txt": "y-bytes"}
++	repo, commit := commitCaseTree(t, files)
++	parent := t.TempDir()
++	folds, err := destinationFoldsCase(parent)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !folds {
++		t.Skip("test filesystem is case-sensitive: Dir and dir coexist, no directory-component collision to refuse")
++	}
++	dest := filepath.Join(parent, "snap")
++	err = Extract(repo, commit, dest)
++	if err == nil || !strings.Contains(err.Error(), "duplicate platform path") {
++		t.Fatalf("err = %v, want directory-component fold refusal", err)
++	}
++	assertNothingWritten(t, parent, dest)
++}
++
++// TestExtractAdmitsDirectoryComponentFoldWhenCaseSensitive is the coexistence
++// half of the gate: the same Dir/x.txt + dir/y.txt tree extracts with exact
++// bytes on a case-sensitive destination.
++func TestExtractAdmitsDirectoryComponentFoldWhenCaseSensitive(t *testing.T) {
++	files := map[string]string{"Dir/x.txt": "x-bytes", "dir/y.txt": "y-bytes"}
++	repo, commit := commitCaseTree(t, files)
++	parent := t.TempDir()
++	folds, err := destinationFoldsCase(parent)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if folds {
++		t.Skip("test filesystem lacks case sensitivity: Dir and dir fold into one directory, no coexistence to assert")
++	}
++	dest := filepath.Join(parent, "snap")
++	if err := Extract(repo, commit, dest); err != nil {
++		t.Fatalf("case-distinct directories must coexist on a case-sensitive filesystem: %v", err)
++	}
++	for name, want := range files {
++		got, err := os.ReadFile(filepath.Join(dest, filepath.FromSlash(name)))
++		if err != nil {
++			t.Fatal(err)
++		}
++		if !bytes.Equal(got, []byte(want)) {
++			t.Fatalf("%s = %q, want %q", name, got, want)
++		}
++	}
++}
++
++// TestExtractRefusesFileDirectoryFold proves a regular file that folds onto a
++// planned directory is refused with the duplicate-platform-path diagnostic on
++// a case-folding destination, in both listing orders: the file sorts first
++// (a/x.txt + A) and the directory sorts first (Dir/x.txt + dir). The
++// file-first order is the discriminating one: without the pre-pass the file
++// streams first and the directory then fails mid-stream with a raw MkdirAll
++// error instead of the duplicate-platform-path class.
++func TestExtractRefusesFileDirectoryFold(t *testing.T) {
++	parent := t.TempDir()
++	folds, err := destinationFoldsCase(parent)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !folds {
++		t.Skip("test filesystem is case-sensitive: the folded file and directory coexist, no file-directory collision to refuse")
++	}
++	for _, files := range []map[string]string{
++		{"a/x.txt": "x-bytes", "A": "file-bytes"},
++		{"Dir/x.txt": "x-bytes", "dir": "file-bytes"},
++	} {
++		repo, commit := commitCaseTree(t, files)
++		dest := filepath.Join(parent, "snap")
++		err := Extract(repo, commit, dest)
++		if err == nil || !strings.Contains(err.Error(), "duplicate platform path") {
++			t.Fatalf("%v: err = %v, want file-directory fold refusal", files, err)
++		}
++		assertNothingWritten(t, parent, dest)
++	}
++}
++
++// TestExtractRefusesNestedDirectoryComponentFold proves the gate tracks every
++// ancestor prefix: A/B/x + a/b/y folds at the top component already and is
++// refused on a case-folding destination.
++func TestExtractRefusesNestedDirectoryComponentFold(t *testing.T) {
++	files := map[string]string{"A/B/x": "x-bytes", "a/b/y": "y-bytes"}
++	repo, commit := commitCaseTree(t, files)
++	parent := t.TempDir()
++	folds, err := destinationFoldsCase(parent)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !folds {
++		t.Skip("test filesystem is case-sensitive: A/B and a/b coexist, no nested directory-component collision to refuse")
++	}
++	dest := filepath.Join(parent, "snap")
++	err = Extract(repo, commit, dest)
++	if err == nil || !strings.Contains(err.Error(), "duplicate platform path") {
++		t.Fatalf("err = %v, want nested directory-component fold refusal", err)
++	}
++	assertNothingWritten(t, parent, dest)
++}
+diff --git a/internal/gitops/gitops.go b/internal/gitops/gitops.go
+index 1f0f21ca..50e506cf 100644
+--- a/internal/gitops/gitops.go
++++ b/internal/gitops/gitops.go
+@@ -537,13 +537,31 @@ func safeTarget(destRoot, name string) (string, error) {
+ // case-insensitive filesystems. When two planned targets fold to the same
+ // key the destination filesystem is probed once; on a case-sensitive
+ // filesystem the distinct paths coexist, on a case-insensitive one the pair
+-// is refused (Spec core §2, §6.2). Any other folding a filesystem applies is
+-// caught by the existence check writeBlobs repeats before each file.
++// is refused (Spec core §2, §6.2). The fold is compared per path component:
++// two entries whose directory prefixes fold together (Dir/x.txt + dir/y.txt),
++// or a file that folds onto a planned directory (Dir/x.txt + dir), collide on
++// a case-folding destination even though their full paths differ, so every
++// ancestor prefix of every planned target is tracked folded alongside the
++// folded full paths and any such collision is refused with the same
++// diagnostic. Any other folding a filesystem applies is caught by the
++// existence check writeBlobs repeats before each file.
+ func planWrites(destRoot string, entries []treeEntry) ([]treeEntry, error) {
+ 	plan := make([]treeEntry, 0, len(entries))
+ 	exact := map[string]bool{}
+ 	folded := map[string]bool{}
++	foldedDirs := map[string]string{}
+ 	caseInsensitive, probed := false, false
++	foldedDest := func() (bool, error) {
++		if !probed {
++			var err error
++			caseInsensitive, err = destinationFoldsCase(destRoot)
++			if err != nil {
++				return false, err
++			}
++			probed = true
++		}
++		return caseInsensitive, nil
++	}
+ 	for _, entry := range entries {
+ 		target, err := safeTarget(destRoot, entry.path)
+ 		if err != nil {
+@@ -558,18 +576,68 @@ func planWrites(destRoot string, entries []treeEntry) ([]treeEntry, error) {
+ 		exact[target] = true
+ 		key := strings.ToLower(target)
+ 		if folded[key] {
+-			if !probed {
+-				caseInsensitive, err = destinationFoldsCase(destRoot)
+-				if err != nil {
+-					return nil, err
+-				}
+-				probed = true
++			insensitive, err := foldedDest()
++			if err != nil {
++				return nil, err
+ 			}
+-			if caseInsensitive {
++			if insensitive {
+ 				return nil, fmt.Errorf("duplicate platform path in git snapshot: %q", entry.path)
+ 			}
+ 		}
+ 		folded[key] = true
++		// A file that folds onto a planned directory prefix with a different
++		// spelling collides on a case-folding destination. An exact file over
++		// an exact planned prefix cannot come from a committed tree; it stays
++		// admitted here and is refused while streaming, as before.
++		if first, ok := foldedDirs[key]; ok && first != target {
++			insensitive, err := foldedDest()
++			if err != nil {
++				return nil, err
++			}
++			if insensitive {
++				return nil, fmt.Errorf("duplicate platform path in git snapshot: %q", entry.path)
++			}
++		}
++		components := strings.Split(entry.path, "/")
++		prefix := ""
++		for _, component := range components[:len(components)-1] {
++			if prefix == "" {
++				prefix = component
++			} else {
++				prefix += "/" + component
++			}
++			prefixTarget := filepath.Join(destRoot, filepath.FromSlash(prefix))
++			prefixKey := strings.ToLower(prefixTarget)
++			if first, ok := foldedDirs[prefixKey]; ok {
++				// The same directory shared by many entries is admitted;
++				// only a differently-spelled prefix that folds onto it
++				// collides. The first spelling is kept, so further
++				// spellings on a case-sensitive destination keep admitting
++				// against it exactly as their full paths do.
++				if first != prefixTarget {
++					insensitive, err := foldedDest()
++					if err != nil {
++						return nil, err
++					}
++					if insensitive {
++						return nil, fmt.Errorf("duplicate platform path in git snapshot: %q", entry.path)
++					}
++				}
++				continue
++			}
++			// A directory prefix that folds onto a planned file collides,
++			// the reverse order of the file-over-prefix check above.
++			if folded[prefixKey] {
++				insensitive, err := foldedDest()
++				if err != nil {
++					return nil, err
++				}
++				if insensitive {
++					return nil, fmt.Errorf("duplicate platform path in git snapshot: %q", entry.path)
++				}
++			}
++			foldedDirs[prefixKey] = prefixTarget
++		}
+ 		if _, err := os.Lstat(target); err == nil {
+ 			return nil, fmt.Errorf("duplicate platform path in git snapshot: %q", entry.path)
+ 		} else if !os.IsNotExist(err) {
