@@ -1145,6 +1145,218 @@ else
 fi
 
 echo ''
+echo '=== goreleaser rc channel values: the lint lane runs the Go gate ==='
+# rev4: the rev1-rev3 awk gate (.github/ci/goreleaser-config-gate.sh) is
+# deleted -- a text walk cannot tell a block scalar body or a
+# first-position nested map from a real entry key (rev3 R1), and it
+# admitted duplicate keys yaml.v3 rejects (rev3 R2). tools/goreleaserconfig
+# (gopkg.in/yaml.v3) enforces the values; it runs in the lint job on every
+# push and in every go list ./... lane. This job has no setup-go step, so
+# this section pins what it can without Go: the awk gate stays deleted,
+# and ci.yml structurally carries exactly one live lint step running the
+# gate. The value negatives live as executed rows in
+# tools/goreleaserconfig/gate_test.go.
+if [ -e "$HERE/goreleaser-config-gate.sh" ]; then
+	bad 'the awk config gate stays deleted (values are enforced by tools/goreleaserconfig)' '.github/ci/goreleaser-config-gate.sh exists'
+else
+	ok 'the awk config gate stays deleted (values are enforced by tools/goreleaserconfig)'
+fi
+
+# Structural wiring pin (rev3 R3): the old substring grep counted a
+# commented-out run line and an if:false step as live invocations. This pin
+# walks the workflow structure -- jobs/lint/steps, one live step whose
+# parsed run value is the gate command and which carries no if key -- with
+# stdlib-only python3, present on all three runners. Quoting is YAML
+# syntax, so a quoted run value still counts; duplicate run keys in one
+# step disqualify it.
+GRW_PIN="$WORK/grw-pin.py"
+cat >"$GRW_PIN" <<'PYEOF'
+import sys
+
+EXPECTED = "go test -count=1 ./tools/goreleaserconfig/"
+
+KEY_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.-")
+
+
+def strip_comment(line):
+    out = []
+    quote = None
+    prev_ws = True
+    i = 0
+    while i < len(line):
+        c = line[i]
+        if quote is None:
+            if c == "#" and prev_ws:
+                break
+            if c == '"' or c == "'":
+                quote = c
+            out.append(c)
+            prev_ws = c == " " or c == "\t"
+        else:
+            out.append(c)
+            if quote == '"' and c == "\\" and i + 1 < len(line):
+                i += 1
+                out.append(line[i])
+            elif c == quote:
+                if quote == "'" and i + 1 < len(line) and line[i + 1] == "'":
+                    i += 1
+                    out.append(line[i])
+                else:
+                    quote = None
+            prev_ws = False
+        i += 1
+    return "".join(out)
+
+
+def unquote(value):
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+        inner = value[1:-1]
+        if value[0] == "'":
+            inner = inner.replace("''", "'")
+        return inner
+    return value
+
+
+def split_key(text):
+    cut = text.find(":")
+    if cut <= 0:
+        return None, None
+    key = text[:cut]
+    if not key or any(c not in KEY_CHARS for c in key):
+        return None, None
+    rest = text[cut + 1:]
+    if rest != "" and rest[0] != " " and rest[0] != "\t":
+        return None, None
+    return key, rest.strip()
+
+
+def main(path):
+    try:
+        with open(path, encoding="utf-8") as handle:
+            raw_lines = handle.read().splitlines()
+    except OSError as exc:
+        print("wiring-pin: cannot read %s: %s" % (path, exc))
+        return 1
+    in_jobs = False
+    job = None
+    in_steps = False
+    steps_indent = 0
+    step_open = False
+    run = None
+    run_keys = 0
+    has_if = False
+    live = 0
+
+    def flush():
+        nonlocal live, step_open, run, run_keys, has_if
+        if step_open and run_keys == 1 and not has_if and run == EXPECTED:
+            live += 1
+        step_open = False
+        run = None
+        run_keys = 0
+        has_if = False
+
+    def step_key(key, value):
+        nonlocal run, run_keys, has_if
+        if key == "run":
+            run_keys += 1
+            run = unquote(value)
+        elif key == "if":
+            has_if = True
+
+    for raw in raw_lines:
+        line = strip_comment(raw)
+        if not line.strip():
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        body = line.strip()
+        if indent == 0:
+            key, _ = split_key(body)
+            in_jobs = key == "jobs"
+            job = None
+            in_steps = False
+            flush()
+            continue
+        if not in_jobs:
+            continue
+        if body == "-" or (body.startswith("-") and body[1] in (" ", "\t")):
+            if in_steps and indent == steps_indent + 2:
+                flush()
+                step_open = True
+                rest = body[1:].strip()
+                if rest:
+                    key, value = split_key(rest)
+                    if key is not None:
+                        step_key(key, value)
+            continue
+        key, value = split_key(body)
+        if key is None:
+            continue
+        if indent == 2 and not in_steps:
+            job = key
+            in_steps = False
+            flush()
+            continue
+        if job != "lint":
+            continue
+        if indent == 4 and not in_steps and key == "steps":
+            in_steps = True
+            steps_indent = 4
+            flush()
+            continue
+        if in_steps and indent <= steps_indent:
+            in_steps = False
+            flush()
+            if indent == 2:
+                job = key
+            continue
+        if in_steps and step_open and indent == steps_indent + 4:
+            step_key(key, value)
+    flush()
+
+    if live == 1:
+        print("wiring-pin: %s: exactly one live lint step runs the gate" % path)
+        return 0
+    if live == 0:
+        print("wiring-pin: %s: no live lint step runs %s, want exactly one" % (path, EXPECTED))
+        return 1
+    print("wiring-pin: %s: %d live lint steps run %s, want exactly one" % (path, live, EXPECTED))
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else ".github/workflows/ci.yml"))
+PYEOF
+GRW='.github/workflows/ci.yml'
+if command -v python3 >/dev/null 2>&1; then
+	assert 'the lint job carries exactly one live gate step' 0 python3 "$GRW_PIN" "$GRW"
+	assert_contains 'the pin reports the live step' 'exactly one live lint step runs the gate' "$WORK/out.txt"
+	# R3 negatives, generated from the committed workflow at self-test
+	# time so they track the file: each must fail the pin.
+	sed 's|^\( *\)run: go test -count=1 \./tools/goreleaserconfig/$|\1# run: go test -count=1 ./tools/goreleaserconfig/|' "$GRW" >"$WORK/grw-commented.yml"
+	assert 'a commented-out run line is not a live invocation' 1 python3 "$GRW_PIN" "$WORK/grw-commented.yml"
+	assert_contains 'the pin names the miss' 'no live lint step runs' "$WORK/out.txt"
+	awk '{ print } index($0, "run: go test -count=1 ./tools/goreleaserconfig/") { print "        if: false" }' "$GRW" >"$WORK/grw-if-false.yml"
+	assert 'an if:false gate step is not live' 1 python3 "$GRW_PIN" "$WORK/grw-if-false.yml"
+	grep -v 'run: go test -count=1 ./tools/goreleaserconfig/' "$GRW" >"$WORK/grw-deleted.yml"
+	assert 'a deleted gate step fails the pin' 1 python3 "$GRW_PIN" "$WORK/grw-deleted.yml"
+	sed 's|./tools/goreleaserconfig/|./tools/othergate/|' "$GRW" >"$WORK/grw-otherpath.yml"
+	assert 'a changed gate path fails the pin' 1 python3 "$GRW_PIN" "$WORK/grw-otherpath.yml"
+	sed 's|run: go test -count=1 ./tools/goreleaserconfig/|run: "go test -count=1 ./tools/goreleaserconfig/"|' "$GRW" >"$WORK/grw-quoted.yml"
+	assert 'a quoted run value is the same invocation' 0 python3 "$GRW_PIN" "$WORK/grw-quoted.yml"
+	sed "s|run: go test -count=1 ./tools/goreleaserconfig/|run: 'go test -count=1 ./tools/goreleaserconfig/'|" "$GRW" >"$WORK/grw-squoted.yml"
+	assert 'a single-quoted run value is the same invocation' 0 python3 "$GRW_PIN" "$WORK/grw-squoted.yml"
+	sed 's|run: go test -count=1 ./tools/goreleaserconfig/$|run: go test -count=1 ./tools/goreleaserconfig/ # the rc channel guard|' "$GRW" >"$WORK/grw-trailing.yml"
+	assert 'a trailing comment on the run line still counts' 0 python3 "$GRW_PIN" "$WORK/grw-trailing.yml"
+	awk '{ print } index($0, "run: go test -count=1 ./tools/goreleaserconfig/") { print "        run: go test -count=1 ./tools/goreleaserconfig/" }' "$GRW" >"$WORK/grw-dup-run.yml"
+	assert 'duplicate run keys disqualify the step' 1 python3 "$GRW_PIN" "$WORK/grw-dup-run.yml"
+	assert 'an unreadable workflow fails the pin closed' 1 python3 "$GRW_PIN" "$WORK/grw-absent.yml"
+else
+	skip 'the lint wiring pin needs python3' 'python3 not on PATH (the lint lane still asserts its own wiring via TestCommittedWiring)'
+fi
+
+echo ''
 printf 'gate-selftest: %d passed, %d failed' "$PASS" "$FAIL"
 [ "$SKIPPED" -gt 0 ] && printf ', %d skipped (reported above, not hidden)' "$SKIPPED"
 printf '\n'

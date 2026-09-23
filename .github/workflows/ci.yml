@@ -481,6 +481,17 @@ jobs:
         shell: bash
         run: bash .github/ci/no-broad-suppression.sh
 
+      # The rc channel guard: every homebrew_casks/scoops skip_upload and
+      # release.prerelease must parse as exactly "auto", or a release
+      # candidate silently replaces the stable tap/bucket release (2026-08
+      # incident). The Go test parses .goreleaser.yml with gopkg.in/yaml.v3
+      # (a text walk cannot tell a block scalar body from a real key, rev3
+      # R1); gate-selftest.sh pins this exact step structurally, and the
+      # test also asserts its own wiring.
+      - name: Verify GoReleaser rc channel values
+        shell: bash
+        run: go test -count=1 ./tools/goreleaserconfig/
+
   # The gates are only worth their exit codes if they reject what they claim
   # to reject. This runs on all three runners because the gate scripts must
   # behave identically under Git Bash on Windows.

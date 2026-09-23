@@ -69,6 +69,16 @@ All notable implementation changes are recorded here.
   enforcing revision (`B-enforcing`,
   refuse without sourcing) follows in a later release
   (Manager profile §8).
+- CI guard for the GoReleaser rc channel values.
+  `tools/goreleaserconfig` parses `.goreleaser.yml` with `gopkg.in/yaml.v3`
+  (not a text search) and requires every `homebrew_casks`/`scoops` entry's
+  `skip_upload` and `release.prerelease` to be exactly the string `auto`,
+  case-sensitively, failing with the field, entry, and observed value.
+  `goreleaser check` validates names and types only and accepts every
+  wrong-value mutant, and an unset key is what published v0.14.0-rc.1 to
+  the tap and bucket. The check runs as a Go test in the lint lane on
+  every push (and in every `go list ./...` lane); `gate-selftest.sh`
+  pins the lint wiring structurally (TASK-260908-2kqa77).
 - E2: direct-only `class: system` modules. Only the system modules of direct
   packages — the root, the active overlays, and the packages their
   `requires.contexts` name — plus packages admitted by a
