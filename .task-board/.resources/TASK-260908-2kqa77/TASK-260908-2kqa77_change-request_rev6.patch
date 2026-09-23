@@ -1,0 +1,1236 @@
+diff --git a/.github/ci/gate-selftest.sh b/.github/ci/gate-selftest.sh
+index 76efafff..3def74a6 100755
+--- a/.github/ci/gate-selftest.sh
++++ b/.github/ci/gate-selftest.sh
+@@ -1144,6 +1144,218 @@ else
+ 	bad 'the rust behavioural cases have shipped streams to narrow' 'missing $WORK/shipped-darwin.json or $WORK/shipped-linux.json'
+ fi
+ 
++echo ''
++echo '=== goreleaser rc channel values: the lint lane runs the Go gate ==='
++# rev4: the rev1-rev3 awk gate (.github/ci/goreleaser-config-gate.sh) is
++# deleted -- a text walk cannot tell a block scalar body or a
++# first-position nested map from a real entry key (rev3 R1), and it
++# admitted duplicate keys yaml.v3 rejects (rev3 R2). tools/goreleaserconfig
++# (gopkg.in/yaml.v3) enforces the values; it runs in the lint job on every
++# push and in every go list ./... lane. This job has no setup-go step, so
++# this section pins what it can without Go: the awk gate stays deleted,
++# and ci.yml structurally carries exactly one live lint step running the
++# gate. The value negatives live as executed rows in
++# tools/goreleaserconfig/gate_test.go.
++if [ -e "$HERE/goreleaser-config-gate.sh" ]; then
++	bad 'the awk config gate stays deleted (values are enforced by tools/goreleaserconfig)' '.github/ci/goreleaser-config-gate.sh exists'
++else
++	ok 'the awk config gate stays deleted (values are enforced by tools/goreleaserconfig)'
++fi
++
++# Structural wiring pin (rev3 R3): the old substring grep counted a
++# commented-out run line and an if:false step as live invocations. This pin
++# walks the workflow structure -- jobs/lint/steps, one live step whose
++# parsed run value is the gate command and which carries no if key -- with
++# stdlib-only python3, present on all three runners. Quoting is YAML
++# syntax, so a quoted run value still counts; duplicate run keys in one
++# step disqualify it.
++GRW_PIN="$WORK/grw-pin.py"
++cat >"$GRW_PIN" <<'PYEOF'
++import sys
++
++EXPECTED = "go test -count=1 ./tools/goreleaserconfig/"
++
++KEY_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.-")
++
++
++def strip_comment(line):
++    out = []
++    quote = None
++    prev_ws = True
++    i = 0
++    while i < len(line):
++        c = line[i]
++        if quote is None:
++            if c == "#" and prev_ws:
++                break
++            if c == '"' or c == "'":
++                quote = c
++            out.append(c)
++            prev_ws = c == " " or c == "\t"
++        else:
++            out.append(c)
++            if quote == '"' and c == "\\" and i + 1 < len(line):
++                i += 1
++                out.append(line[i])
++            elif c == quote:
++                if quote == "'" and i + 1 < len(line) and line[i + 1] == "'":
++                    i += 1
++                    out.append(line[i])
++                else:
++                    quote = None
++            prev_ws = False
++        i += 1
++    return "".join(out)
++
++
++def unquote(value):
++    value = value.strip()
++    if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
++        inner = value[1:-1]
++        if value[0] == "'":
++            inner = inner.replace("''", "'")
++        return inner
++    return value
++
++
++def split_key(text):
++    cut = text.find(":")
++    if cut <= 0:
++        return None, None
++    key = text[:cut]
++    if not key or any(c not in KEY_CHARS for c in key):
++        return None, None
++    rest = text[cut + 1:]
++    if rest != "" and rest[0] != " " and rest[0] != "\t":
++        return None, None
++    return key, rest.strip()
++
++
++def main(path):
++    try:
++        with open(path, encoding="utf-8") as handle:
++            raw_lines = handle.read().splitlines()
++    except OSError as exc:
++        print("wiring-pin: cannot read %s: %s" % (path, exc))
++        return 1
++    in_jobs = False
++    job = None
++    in_steps = False
++    steps_indent = 0
++    step_open = False
++    run = None
++    run_keys = 0
++    has_if = False
++    live = 0
++
++    def flush():
++        nonlocal live, step_open, run, run_keys, has_if
++        if step_open and run_keys == 1 and not has_if and run == EXPECTED:
++            live += 1
++        step_open = False
++        run = None
++        run_keys = 0
++        has_if = False
++
++    def step_key(key, value):
++        nonlocal run, run_keys, has_if
++        if key == "run":
++            run_keys += 1
++            run = unquote(value)
++        elif key == "if":
++            has_if = True
++
++    for raw in raw_lines:
++        line = strip_comment(raw)
++        if not line.strip():
++            continue
++        indent = len(line) - len(line.lstrip(" "))
++        body = line.strip()
++        if indent == 0:
++            key, _ = split_key(body)
++            in_jobs = key == "jobs"
++            job = None
++            in_steps = False
++            flush()
++            continue
++        if not in_jobs:
++            continue
++        if body == "-" or (body.startswith("-") and body[1] in (" ", "\t")):
++            if in_steps and indent == steps_indent + 2:
++                flush()
++                step_open = True
++                rest = body[1:].strip()
++                if rest:
++                    key, value = split_key(rest)
++                    if key is not None:
++                        step_key(key, value)
++            continue
++        key, value = split_key(body)
++        if key is None:
++            continue
++        if indent == 2 and not in_steps:
++            job = key
++            in_steps = False
++            flush()
++            continue
++        if job != "lint":
++            continue
++        if indent == 4 and not in_steps and key == "steps":
++            in_steps = True
++            steps_indent = 4
++            flush()
++            continue
++        if in_steps and indent <= steps_indent:
++            in_steps = False
++            flush()
++            if indent == 2:
++                job = key
++            continue
++        if in_steps and step_open and indent == steps_indent + 4:
++            step_key(key, value)
++    flush()
++
++    if live == 1:
++        print("wiring-pin: %s: exactly one live lint step runs the gate" % path)
++        return 0
++    if live == 0:
++        print("wiring-pin: %s: no live lint step runs %s, want exactly one" % (path, EXPECTED))
++        return 1
++    print("wiring-pin: %s: %d live lint steps run %s, want exactly one" % (path, live, EXPECTED))
++    return 1
++
++
++if __name__ == "__main__":
++    sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else ".github/workflows/ci.yml"))
++PYEOF
++GRW='.github/workflows/ci.yml'
++if command -v python3 >/dev/null 2>&1; then
++	assert 'the lint job carries exactly one live gate step' 0 python3 "$GRW_PIN" "$GRW"
++	assert_contains 'the pin reports the live step' 'exactly one live lint step runs the gate' "$WORK/out.txt"
++	# R3 negatives, generated from the committed workflow at self-test
++	# time so they track the file: each must fail the pin.
++	sed 's|^\( *\)run: go test -count=1 \./tools/goreleaserconfig/$|\1# run: go test -count=1 ./tools/goreleaserconfig/|' "$GRW" >"$WORK/grw-commented.yml"
++	assert 'a commented-out run line is not a live invocation' 1 python3 "$GRW_PIN" "$WORK/grw-commented.yml"
++	assert_contains 'the pin names the miss' 'no live lint step runs' "$WORK/out.txt"
++	awk '{ print } index($0, "run: go test -count=1 ./tools/goreleaserconfig/") { print "        if: false" }' "$GRW" >"$WORK/grw-if-false.yml"
++	assert 'an if:false gate step is not live' 1 python3 "$GRW_PIN" "$WORK/grw-if-false.yml"
++	grep -v 'run: go test -count=1 ./tools/goreleaserconfig/' "$GRW" >"$WORK/grw-deleted.yml"
++	assert 'a deleted gate step fails the pin' 1 python3 "$GRW_PIN" "$WORK/grw-deleted.yml"
++	sed 's|./tools/goreleaserconfig/|./tools/othergate/|' "$GRW" >"$WORK/grw-otherpath.yml"
++	assert 'a changed gate path fails the pin' 1 python3 "$GRW_PIN" "$WORK/grw-otherpath.yml"
++	sed 's|run: go test -count=1 ./tools/goreleaserconfig/|run: "go test -count=1 ./tools/goreleaserconfig/"|' "$GRW" >"$WORK/grw-quoted.yml"
++	assert 'a quoted run value is the same invocation' 0 python3 "$GRW_PIN" "$WORK/grw-quoted.yml"
++	sed "s|run: go test -count=1 ./tools/goreleaserconfig/|run: 'go test -count=1 ./tools/goreleaserconfig/'|" "$GRW" >"$WORK/grw-squoted.yml"
++	assert 'a single-quoted run value is the same invocation' 0 python3 "$GRW_PIN" "$WORK/grw-squoted.yml"
++	sed 's|run: go test -count=1 ./tools/goreleaserconfig/$|run: go test -count=1 ./tools/goreleaserconfig/ # the rc channel guard|' "$GRW" >"$WORK/grw-trailing.yml"
++	assert 'a trailing comment on the run line still counts' 0 python3 "$GRW_PIN" "$WORK/grw-trailing.yml"
++	awk '{ print } index($0, "run: go test -count=1 ./tools/goreleaserconfig/") { print "        run: go test -count=1 ./tools/goreleaserconfig/" }' "$GRW" >"$WORK/grw-dup-run.yml"
++	assert 'duplicate run keys disqualify the step' 1 python3 "$GRW_PIN" "$WORK/grw-dup-run.yml"
++	assert 'an unreadable workflow fails the pin closed' 1 python3 "$GRW_PIN" "$WORK/grw-absent.yml"
++else
++	skip 'the lint wiring pin needs python3' 'python3 not on PATH (the lint lane still asserts its own wiring via TestCommittedWiring)'
++fi
++
+ echo ''
+ printf 'gate-selftest: %d passed, %d failed' "$PASS" "$FAIL"
+ [ "$SKIPPED" -gt 0 ] && printf ', %d skipped (reported above, not hidden)' "$SKIPPED"
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 5de50933..40ae9d74 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -481,6 +481,17 @@ jobs:
+         shell: bash
+         run: bash .github/ci/no-broad-suppression.sh
+ 
++      # The rc channel guard: every homebrew_casks/scoops skip_upload and
++      # release.prerelease must parse as exactly "auto", or a release
++      # candidate silently replaces the stable tap/bucket release (2026-08
++      # incident). The Go test parses .goreleaser.yml with gopkg.in/yaml.v3
++      # (a text walk cannot tell a block scalar body from a real key, rev3
++      # R1); gate-selftest.sh pins this exact step structurally, and the
++      # test also asserts its own wiring.
++      - name: Verify GoReleaser rc channel values
++        shell: bash
++        run: go test -count=1 ./tools/goreleaserconfig/
++
+   # The gates are only worth their exit codes if they reject what they claim
+   # to reject. This runs on all three runners because the gate scripts must
+   # behave identically under Git Bash on Windows.
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 2518c29a..17773d62 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -69,6 +69,16 @@ All notable implementation changes are recorded here.
+   enforcing revision (`B-enforcing`,
+   refuse without sourcing) follows in a later release
+   (Manager profile §8).
++- CI guard for the GoReleaser rc channel values.
++  `tools/goreleaserconfig` parses `.goreleaser.yml` with `gopkg.in/yaml.v3`
++  (not a text search) and requires every `homebrew_casks`/`scoops` entry's
++  `skip_upload` and `release.prerelease` to be exactly the string `auto`,
++  case-sensitively, failing with the field, entry, and observed value.
++  `goreleaser check` validates names and types only and accepts every
++  wrong-value mutant, and an unset key is what published v0.14.0-rc.1 to
++  the tap and bucket. The check runs as a Go test in the lint lane on
++  every push (and in every `go list ./...` lane); `gate-selftest.sh`
++  pins the lint wiring structurally (TASK-260908-2kqa77).
+ - E2: direct-only `class: system` modules. Only the system modules of direct
+   packages — the root, the active overlays, and the packages their
+   `requires.contexts` name — plus packages admitted by a
+diff --git a/tools/goreleaserconfig/gate.go b/tools/goreleaserconfig/gate.go
+new file mode 100644
+index 00000000..1774e30d
+--- /dev/null
++++ b/tools/goreleaserconfig/gate.go
+@@ -0,0 +1,159 @@
++// Package goreleaserconfig guards the GoReleaser rc channel values.
++//
++// A release candidate must not replace the stable install channels. In
++// .goreleaser.yml that rests on three parsed values: every
++// homebrew_casks/scoops entry's skip_upload and release.prerelease must be
++// exactly the string "auto" (TASK-260908-2kqa77). When the cask/scoop keys
++// were unset, v0.14.0-rc.1 reached the tap and the bucket as the served
++// release (2026-08 incident).
++//
++// The check parses with gopkg.in/yaml.v3 and compares each parsed scalar
++// against "auto" case-sensitively. A grep for the token "auto" cannot guard
++// this (the "Auto" mutant defeats it), and neither can an indentation walk:
++// a block scalar body or a first-position nested map is indistinguishable
++// from a real key without a real parser (rev3 R1). yaml.v3 also rejects
++// duplicate mapping keys, so a malformed document fails closed (rev3 R2).
++//
++// Field naming: the task AC says brews[*].skip_upload, but the config
++// declares no brews stanza; the publishing surfaces are homebrew_casks,
++// scoops and release. Those are what this package checks, every entry of
++// each list stanza.
++package goreleaserconfig
++
++import (
++	"fmt"
++	"os"
++
++	"gopkg.in/yaml.v3"
++)
++
++// Want is the only accepted channel value, compared case-sensitively.
++const Want = "auto"
++
++// Check parses data as a GoReleaser config and returns one failure message
++// per violated value. A nil slice means every checked value parses as
++// exactly "auto". Each message names the field, the entry and the observed
++// value.
++func Check(data []byte) []string {
++	// Decode into any first: that is the decode where yaml.v3 rejects
++	// duplicate mapping keys ("already defined"). A Node decode alone
++	// keeps both copies (first wins), so without this pass the R2
++	// fixture would be admitted.
++	var strict any
++	if err := yaml.Unmarshal(data, &strict); err != nil {
++		return []string{"invalid YAML: " + err.Error()}
++	}
++	var doc yaml.Node
++	if err := yaml.Unmarshal(data, &doc); err != nil {
++		return []string{"invalid YAML: " + err.Error()}
++	}
++	if len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
++		return []string{`top level is not a mapping, want channel entries with skip_upload "auto"`}
++	}
++	root := doc.Content[0]
++	var out []string
++	for _, stanza := range []string{"homebrew_casks", "scoops"} {
++		out = append(out, checkListStanza(root, stanza)...)
++	}
++	out = append(out, checkPrerelease(root)...)
++	return out
++}
++
++// CheckFile reads the config at path and returns the Check findings,
++// prefixed with path. An unreadable file fails closed.
++func CheckFile(path string) []string {
++	//nolint:gosec // The gate reads a caller-supplied config path (the repository file in CI); path traversal is not in a CI gate's threat model.
++	data, err := os.ReadFile(path)
++	if err != nil {
++		return []string{"cannot read " + path + ": " + err.Error()}
++	}
++	out := Check(data)
++	for i := range out {
++		out[i] = path + ": " + out[i]
++	}
++	return out
++}
++
++func checkListStanza(root *yaml.Node, stanza string) []string {
++	node := mappingValue(root, stanza)
++	if node == nil {
++		return []string{fmt.Sprintf("section %q is absent, want channel entries with skip_upload %q", stanza, Want)}
++	}
++	if node.Kind != yaml.SequenceNode {
++		// A bare `stanza:` key parses as null: that is an emptied
++		// stanza, not a mistyped one.
++		if node.Kind == yaml.ScalarNode && node.Tag == "!!null" {
++			return []string{fmt.Sprintf("section %q has no entries, want at least one with skip_upload %q", stanza, Want)}
++		}
++		return []string{fmt.Sprintf("section %q is not a list, want channel entries with skip_upload %q", stanza, Want)}
++	}
++	if len(node.Content) == 0 {
++		return []string{fmt.Sprintf("section %q has no entries, want at least one with skip_upload %q", stanza, Want)}
++	}
++	var out []string
++	for i, entry := range node.Content {
++		field := fmt.Sprintf("%s[%d].skip_upload", stanza, i)
++		if entry.Kind != yaml.MappingNode {
++			out = append(out, fmt.Sprintf("%s: entry is not a mapping, want %q", field, Want))
++			continue
++		}
++		val := mappingValue(entry, "skip_upload")
++		if val == nil {
++			out = append(out, fmt.Sprintf("%s is absent, want %q", field, Want))
++			continue
++		}
++		if val.Kind != yaml.ScalarNode {
++			out = append(out, fmt.Sprintf("%s is %s, want %q", field, kindName(val.Kind), Want))
++			continue
++		}
++		if val.Value != Want {
++			out = append(out, fmt.Sprintf("%s = %q, want %q", field, val.Value, Want))
++		}
++	}
++	return out
++}
++
++func checkPrerelease(root *yaml.Node) []string {
++	node := mappingValue(root, "release")
++	if node == nil {
++		return []string{fmt.Sprintf("section %q is absent, want release.prerelease %q", "release", Want)}
++	}
++	if node.Kind != yaml.MappingNode {
++		return []string{fmt.Sprintf("section %q is not a mapping, want release.prerelease %q", "release", Want)}
++	}
++	val := mappingValue(node, "prerelease")
++	if val == nil {
++		return []string{fmt.Sprintf("release.prerelease is absent, want %q", Want)}
++	}
++	if val.Kind != yaml.ScalarNode {
++		return []string{fmt.Sprintf("release.prerelease is %s, want %q", kindName(val.Kind), Want)}
++	}
++	if val.Value != Want {
++		return []string{fmt.Sprintf("release.prerelease = %q, want %q", val.Value, Want)}
++	}
++	return nil
++}
++
++// mappingValue returns the value of key in the mapping m, or nil. Duplicate
++// keys never reach this walk: yaml.Unmarshal rejects the document first.
++func mappingValue(m *yaml.Node, key string) *yaml.Node {
++	for i := 0; i+1 < len(m.Content); i += 2 {
++		if m.Content[i].Kind == yaml.ScalarNode && m.Content[i].Value == key {
++			return m.Content[i+1]
++		}
++	}
++	return nil
++}
++
++func kindName(k yaml.Kind) string {
++	switch k {
++	case yaml.MappingNode:
++		return "a mapping"
++	case yaml.SequenceNode:
++		return "a sequence"
++	case yaml.AliasNode:
++		return "an alias"
++	default:
++		return "not a scalar"
++	}
++}
+diff --git a/tools/goreleaserconfig/gate_test.go b/tools/goreleaserconfig/gate_test.go
+new file mode 100644
+index 00000000..5d350cdb
+--- /dev/null
++++ b/tools/goreleaserconfig/gate_test.go
+@@ -0,0 +1,404 @@
++package goreleaserconfig
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++// The value table. Every fail row asserts the exact finding count plus the
++// wording contract (field, entry, observed value); pass rows assert silence.
++// Fixture provenance: block_first.yml, committed_block_bypass.yml and
++// duplicate_good_last.yml are the rev3 reviewer's R1/R2 fixtures byte for
++// byte (TASK-260908-2kqa77_review-evidence-rev3.tar.gz); rows C and E are
++// the named negatives from the TASK-260908-1jv1h3 cycle-3 verdict.
++func TestCheck(t *testing.T) {
++	tests := []struct {
++		name      string
++		doc       string
++		file      string // testdata file instead of doc, when set
++		wantCount int
++		wantSubs  []string
++	}{
++		{
++			name: "minimal good document passes",
++			doc: `homebrew_casks:
++  - name: curator
++    skip_upload: "auto"
++scoops:
++  - name: curator
++    skip_upload: "auto"
++release:
++  prerelease: "auto"
++`,
++			wantCount: 0,
++		},
++		{
++			name: "row C: both skip_upload keys absent",
++			doc: `homebrew_casks:
++  - name: curator
++scoops:
++  - name: curator
++release:
++  prerelease: "auto"
++`,
++			wantCount: 2,
++			wantSubs: []string{
++				`homebrew_casks[0].skip_upload is absent`,
++				`scoops[0].skip_upload is absent`,
++			},
++		},
++		{
++			name: "row C narrowed: one entry losing its key is already a publish path",
++			doc: `homebrew_casks:
++  - name: curator
++scoops:
++  - name: curator
++    skip_upload: "auto"
++release:
++  prerelease: "auto"
++`,
++			wantCount: 1,
++			wantSubs:  []string{`homebrew_casks[0].skip_upload is absent, want "auto"`},
++		},
++		{
++			name: "row E: Auto in the cask entry fails case-sensitively",
++			doc: `homebrew_casks:
++  - name: curator
++    skip_upload: "Auto"
++scoops:
++  - name: curator
++    skip_upload: "auto"
++release:
++  prerelease: "auto"
++`,
++			wantCount: 1,
++			wantSubs:  []string{`homebrew_casks[0].skip_upload = "Auto"`, `want "auto"`},
++		},
++		{
++			name: "Auto in the scoop entry fails",
++			doc: `homebrew_casks:
++  - name: curator
++    skip_upload: "auto"
++scoops:
++  - name: curator
++    skip_upload: "Auto"
++release:
++  prerelease: "auto"
++`,
++			wantCount: 1,
++			wantSubs:  []string{`scoops[0].skip_upload = "Auto"`},
++		},
++		{
++			name: "sometimes fails",
++			doc: `homebrew_casks:
++  - name: curator
++    skip_upload: sometimes
++scoops:
++  - name: curator
++    skip_upload: "auto"
++release:
++  prerelease: "auto"
++`,
++			wantCount: 1,
++			wantSubs:  []string{`homebrew_casks[0].skip_upload = "sometimes"`},
++		},
++		{
++			name: "boolean true fails",
++			doc: `homebrew_casks:
++  - name: curator
++    skip_upload: true
++scoops:
++  - name: curator
++    skip_upload: "auto"
++release:
++  prerelease: "auto"
++`,
++			wantCount: 1,
++			wantSubs:  []string{`homebrew_casks[0].skip_upload = "true"`},
++		},
++		{
++			name: `quoted "true" fails too`,
++			doc: `homebrew_casks:
++  - name: curator
++    skip_upload: "true"
++scoops:
++  - name: curator
++    skip_upload: "auto"
++release:
++  prerelease: "auto"
++`,
++			wantCount: 1,
++			wantSubs:  []string{`homebrew_casks[0].skip_upload = "true"`},
++		},
++		{
++			name: `prerelease "ato" fails`,
++			doc: `homebrew_casks:
++  - name: curator
++    skip_upload: "auto"
++scoops:
++  - name: curator
++    skip_upload: "auto"
++release:
++  prerelease: "ato"
++`,
++			wantCount: 1,
++			wantSubs:  []string{`release.prerelease = "ato"`},
++		},
++		{
++			name: `prerelease "Auto" fails`,
++			doc: `homebrew_casks:
++  - name: curator
++    skip_upload: "auto"
++scoops:
++  - name: curator
++    skip_upload: "auto"
++release:
++  prerelease: "Auto"
++`,
++			wantCount: 1,
++			wantSubs:  []string{`release.prerelease = "Auto"`},
++		},
++		{
++			name: "absent prerelease fails",
++			doc: `homebrew_casks:
++  - name: curator
++    skip_upload: "auto"
++scoops:
++  - name: curator
++    skip_upload: "auto"
++release:
++  draft: false
++`,
++			wantCount: 1,
++			wantSubs:  []string{`release.prerelease is absent, want "auto"`},
++		},
++		{
++			name:      "R1a minimal: first-position block scalar body is not a key",
++			file:      "block_first.yml",
++			wantCount: 1,
++			wantSubs:  []string{`homebrew_casks[0].skip_upload is absent`},
++		},
++		{
++			name:      "R1a full config: committed-shaped block scalar bypass fails",
++			file:      "committed_block_bypass.yml",
++			wantCount: 1,
++			wantSubs:  []string{`homebrew_casks[0].skip_upload is absent`},
++		},
++		{
++			name: "R1b: first-position nested repository map is not a key",
++			doc: `homebrew_casks:
++  - repository:
++      skip_upload: auto
++    name: curator
++scoops:
++  - name: curator
++    skip_upload: auto
++release:
++  prerelease: auto
++`,
++			wantCount: 1,
++			wantSubs:  []string{`homebrew_casks[0].skip_upload is absent`},
++		},
++		{
++			name:      "R2: duplicate keys fail even when the last one reads auto",
++			file:      "duplicate_good_last.yml",
++			wantCount: 1,
++			wantSubs:  []string{"invalid YAML", "already defined"},
++		},
++		{
++			name: "a bad second entry fails naming its index",
++			doc: `homebrew_casks:
++  - name: curator
++    skip_upload: "auto"
++scoops:
++  - name: curator
++    skip_upload: "auto"
++  - name: extra
++    skip_upload: "sometimes"
++release:
++  prerelease: "auto"
++`,
++			wantCount: 1,
++			wantSubs:  []string{`scoops[1].skip_upload = "sometimes"`},
++		},
++		{
++			name: "a good second entry passes",
++			doc: `homebrew_casks:
++  - name: curator
++    skip_upload: "auto"
++scoops:
++  - name: curator
++    skip_upload: "auto"
++  - name: extra
++    skip_upload: "auto"
++release:
++  prerelease: "auto"
++`,
++			wantCount: 0,
++		},
++		{
++			name: "unquoted auto passes (same parsed string)",
++			doc: `homebrew_casks:
++  - name: curator
++    skip_upload: auto
++scoops:
++  - name: curator
++    skip_upload: auto
++release:
++  prerelease: auto
++`,
++			wantCount: 0,
++		},
++		{
++			name: "single-quoted auto passes",
++			doc: `homebrew_casks:
++  - name: curator
++    skip_upload: 'auto'
++scoops:
++  - name: curator
++    skip_upload: 'auto'
++release:
++  prerelease: 'auto'
++`,
++			wantCount: 0,
++		},
++		{
++			name: "trailing comments pass",
++			doc: `homebrew_casks:
++  - name: curator
++    skip_upload: "auto" # keep the rc out of the tap
++scoops:
++  - name: curator
++    skip_upload: "auto" # same
++release:
++  prerelease: "auto" # an rc says what it is
++`,
++			wantCount: 0,
++		},
++		{
++			name: "a nested skip_upload after an ordinary key does not satisfy the entry",
++			doc: `homebrew_casks:
++  - name: curator
++    repository:
++      skip_upload: "auto"
++scoops:
++  - name: curator
++    skip_upload: "auto"
++release:
++  prerelease: "auto"
++`,
++			wantCount: 1,
++			wantSubs:  []string{`homebrew_casks[0].skip_upload is absent`},
++		},
++		{
++			name: "a removed channel stanza fails",
++			doc: `scoops:
++  - name: curator
++    skip_upload: "auto"
++release:
++  prerelease: "auto"
++`,
++			wantCount: 1,
++			wantSubs:  []string{`section "homebrew_casks" is absent`},
++		},
++		{
++			name: "a null channel stanza has no entries",
++			doc: `homebrew_casks:
++scoops:
++  - name: curator
++    skip_upload: "auto"
++release:
++  prerelease: "auto"
++`,
++			wantCount: 1,
++			wantSubs:  []string{`section "homebrew_casks" has no entries`},
++		},
++		{
++			name: "an empty channel list has no entries",
++			doc: `homebrew_casks: []
++scoops:
++  - name: curator
++    skip_upload: "auto"
++release:
++  prerelease: "auto"
++`,
++			wantCount: 1,
++			wantSubs:  []string{`section "homebrew_casks" has no entries`},
++		},
++		{
++			name:      "tab indentation fails closed",
++			doc:       "homebrew_casks:\n\t- name: curator\n\t  skip_upload: auto\nscoops:\n  - name: curator\n    skip_upload: auto\nrelease:\n  prerelease: auto\n",
++			wantCount: 1,
++			wantSubs:  []string{"invalid YAML"},
++		},
++		{
++			name: `" auto " fails strictly`,
++			doc: `homebrew_casks:
++  - name: curator
++    skip_upload: " auto "
++scoops:
++  - name: curator
++    skip_upload: "auto"
++release:
++  prerelease: "auto"
++`,
++			wantCount: 1,
++			wantSubs:  []string{`homebrew_casks[0].skip_upload = " auto "`},
++		},
++		{
++			name: "a missing release section fails",
++			doc: `homebrew_casks:
++  - name: curator
++    skip_upload: "auto"
++scoops:
++  - name: curator
++    skip_upload: "auto"
++`,
++			wantCount: 1,
++			wantSubs:  []string{`section "release" is absent`},
++		},
++	}
++
++	for _, tc := range tests {
++		t.Run(tc.name, func(t *testing.T) {
++			doc := tc.doc
++			if tc.file != "" {
++				raw, err := os.ReadFile(filepath.Join("testdata", tc.file))
++				if err != nil {
++					t.Fatalf("read fixture %s: %v", tc.file, err)
++				}
++				doc = string(raw)
++			}
++			assertFindings(t, Check([]byte(doc)), tc.wantCount, tc.wantSubs)
++		})
++	}
++}
++
++// TestCommittedConfig is the gate's production row: the repository's own
++// .goreleaser.yml must parse with every channel value exactly "auto".
++func TestCommittedConfig(t *testing.T) {
++	got := CheckFile(filepath.Join("..", "..", ".goreleaser.yml"))
++	assertFindings(t, got, 0, nil)
++}
++
++// TestCheckFileMissing proves the gate fails closed on an unreadable file
++// instead of reporting a healthy empty finding set.
++func TestCheckFileMissing(t *testing.T) {
++	got := CheckFile(filepath.Join("testdata", "grl-absent.yml"))
++	assertFindings(t, got, 1, []string{"cannot read"})
++}
++
++func assertFindings(t *testing.T, got []string, wantCount int, wantSubs []string) {
++	t.Helper()
++	if len(got) != wantCount {
++		t.Fatalf("got %d finding(s), want %d:\n%s", len(got), wantCount, strings.Join(got, "\n"))
++	}
++	joined := strings.Join(got, "\n")
++	for _, sub := range wantSubs {
++		if !strings.Contains(joined, sub) {
++			t.Errorf("findings do not mention %q:\n%s", sub, joined)
++		}
++	}
++}
+diff --git a/tools/goreleaserconfig/testdata/block_first.yml b/tools/goreleaserconfig/testdata/block_first.yml
+new file mode 100644
+index 00000000..3f17970f
+--- /dev/null
++++ b/tools/goreleaserconfig/testdata/block_first.yml
+@@ -0,0 +1,9 @@
++homebrew_casks:
++  - description: |
++      skip_upload: auto
++    name: curator
++scoops:
++  - name: curator
++    skip_upload: auto
++release:
++  prerelease: auto
+diff --git a/tools/goreleaserconfig/testdata/committed_block_bypass.yml b/tools/goreleaserconfig/testdata/committed_block_bypass.yml
+new file mode 100644
+index 00000000..1b4e3f24
+--- /dev/null
++++ b/tools/goreleaserconfig/testdata/committed_block_bypass.yml
+@@ -0,0 +1,119 @@
++version: 2
++
++project_name: curator
++
++builds:
++  - id: curator
++    main: ./cmd/curator
++    binary: curator
++    env: [CGO_ENABLED=0]
++    goos: [darwin, linux, windows]
++    goarch: [amd64, arm64]
++    ldflags:
++      - -s -w -X github.com/relux-works/curator/internal/version.value=v{{ .Version }}
++
++archives:
++  - id: default
++    formats: [tar.gz]
++    format_overrides:
++      - goos: windows
++        formats: [zip]
++    files: [LICENSE, NOTICE, README.md]
++
++checksum:
++  name_template: checksums.txt
++
++sboms:
++  - artifacts: archive
++
++# macOS Developer ID signing (Relux Works, LLC). Notarization submission
++# activates once the App Store Connect API key secrets are present.
++notarize:
++  macos:
++    - enabled: '{{ isEnvSet "MACOS_SIGN_P12" }}'
++      ids: [curator]
++      sign:
++        certificate: "{{ .Env.MACOS_SIGN_P12 }}"
++        password: "{{ .Env.MACOS_SIGN_P12_PASSWORD }}"
++      notarize:
++        issuer_id: "{{ .Env.ASC_ISSUER_ID }}"
++        key_id: "{{ .Env.ASC_KEY_ID }}"
++        key: "{{ .Env.ASC_KEY_P8 }}"
++        wait: true
++        timeout: 20m
++
++# Keyless cosign signatures over the checksums file: verifying it transitively
++# verifies every artifact hash.
++signs:
++  - cmd: cosign
++    certificate: "${artifact}.pem"
++    args:
++      - sign-blob
++      - "--output-certificate=${certificate}"
++      - "--output-signature=${signature}"
++      - "${artifact}"
++      - "--yes"
++    artifacts: checksum
++    output: true
++
++nfpms:
++  - id: packages
++    package_name: curator
++    vendor: Relux Works, LLC
++    homepage: https://github.com/relux-works/curator
++    maintainer: Ivan Oparin <oparin@me.com>
++    license: Apache-2.0
++    formats: [deb, rpm]
++    bindir: /usr/bin
++
++homebrew_casks:
++  - description: |
++      skip_upload: auto
++    name: curator
++    # A release candidate must not replace the stable formula: `auto` skips the
++    # upload whenever the release is a prerelease. v0.14.0-rc.1 reached the tap
++    # because this was unset.
++    repository:
++      owner: relux-works
++      name: homebrew-tap
++      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
++    directory: Casks
++    homepage: https://github.com/relux-works/curator
++    license: Apache-2.0
++
++scoops:
++  - name: curator
++    # Same reason as the cask above.
++    skip_upload: "auto"
++    repository:
++      owner: relux-works
++      name: scoop-bucket
++      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
++    directory: bucket
++    homepage: https://github.com/relux-works/curator
++    description: Agent environment manager
++    license: Apache-2.0
++
++release:
++  github:
++    owner: relux-works
++    name: curator
++  draft: false
++  # `auto` marks the GitHub release as a prerelease when the tag carries a
++  # SemVer prerelease suffix, so an rc says what it is on the releases page
++  # instead of appearing as the latest stable download.
++  prerelease: "auto"
++  footer: |
++    ## Verify what you downloaded
++
++    ```bash
++    gh attestation verify <artifact> --owner relux-works
++    cosign verify-blob \
++      --certificate checksums.txt.pem --signature checksums.txt.sig \
++      --certificate-identity-regexp 'github.com/relux-works/curator' \
++      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
++      checksums.txt
++    ```
++
++changelog:
++  use: github
+diff --git a/tools/goreleaserconfig/testdata/duplicate_good_last.yml b/tools/goreleaserconfig/testdata/duplicate_good_last.yml
+new file mode 100644
+index 00000000..e29a7b95
+--- /dev/null
++++ b/tools/goreleaserconfig/testdata/duplicate_good_last.yml
+@@ -0,0 +1,9 @@
++homebrew_casks:
++  - name: curator
++    skip_upload: true
++    skip_upload: auto
++scoops:
++  - name: curator
++    skip_upload: auto
++release:
++  prerelease: auto
+diff --git a/tools/goreleaserconfig/wiring.go b/tools/goreleaserconfig/wiring.go
+new file mode 100644
+index 00000000..d32f1303
+--- /dev/null
++++ b/tools/goreleaserconfig/wiring.go
+@@ -0,0 +1,70 @@
++package goreleaserconfig
++
++import (
++	"fmt"
++
++	"gopkg.in/yaml.v3"
++)
++
++// GateRun is the exact lint-step command that enforces the rc channel values
++// on every push. Both this package's wiring test and gate-selftest.sh read
++// it back out of .github/workflows/ci.yml so the step cannot silently
++// disappear or be neutered.
++const GateRun = "go test -count=1 ./tools/goreleaserconfig/"
++
++// CheckWiring parses data as the CI workflow and verifies the lint job
++// carries exactly one live step running GateRun. A step counts as live only
++// when its parsed run value equals GateRun and it carries no if key: a
++// commented-out run line parses as no key at all, and any condition (even
++// `if: true`) needs human review before it may carry a must-run gate.
++// Returns one failure message per violation; nil means the wiring is
++// exactly as required.
++func CheckWiring(data []byte) []string {
++	// Strict decode first, as in Check: duplicate mapping keys must
++	// fail the pin rather than resolve by first/last wins.
++	var strict any
++	if err := yaml.Unmarshal(data, &strict); err != nil {
++		return []string{"invalid YAML: " + err.Error()}
++	}
++	var doc yaml.Node
++	if err := yaml.Unmarshal(data, &doc); err != nil {
++		return []string{"invalid YAML: " + err.Error()}
++	}
++	if len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
++		return []string{fmt.Sprintf("workflow is not a mapping, want jobs.lint.steps to run %q", GateRun)}
++	}
++	jobs := mappingValue(doc.Content[0], "jobs")
++	if jobs == nil || jobs.Kind != yaml.MappingNode {
++		return []string{fmt.Sprintf("section %q is absent, want jobs.lint.steps to run %q", "jobs", GateRun)}
++	}
++	lint := mappingValue(jobs, "lint")
++	if lint == nil || lint.Kind != yaml.MappingNode {
++		return []string{fmt.Sprintf("job %q is absent, want lint to run %q", "lint", GateRun)}
++	}
++	steps := mappingValue(lint, "steps")
++	if steps == nil || steps.Kind != yaml.SequenceNode {
++		return []string{fmt.Sprintf("job %q has no steps, want one step running %q", "lint", GateRun)}
++	}
++	live := 0
++	for _, step := range steps.Content {
++		if step.Kind != yaml.MappingNode {
++			continue
++		}
++		run := mappingValue(step, "run")
++		if run == nil || run.Kind != yaml.ScalarNode || run.Value != GateRun {
++			continue
++		}
++		if mappingValue(step, "if") != nil {
++			continue
++		}
++		live++
++	}
++	switch live {
++	case 1:
++		return nil
++	case 0:
++		return []string{fmt.Sprintf("no live lint step runs %q, want exactly one (a commented run: line or an if: condition does not count)", GateRun)}
++	default:
++		return []string{fmt.Sprintf("%d live lint steps run %q, want exactly one", live, GateRun)}
++	}
++}
+diff --git a/tools/goreleaserconfig/wiring_test.go b/tools/goreleaserconfig/wiring_test.go
+new file mode 100644
+index 00000000..0c029f6f
+--- /dev/null
++++ b/tools/goreleaserconfig/wiring_test.go
+@@ -0,0 +1,158 @@
++package goreleaserconfig
++
++import (
++	"os"
++	"path/filepath"
++	"testing"
++)
++
++// The wiring table. The gate only guards the committed file if a lane runs
++// it, so the lint job must carry exactly one live step running GateRun. The
++// commented-run and if:false rows are rev3 R3: the old substring pin
++// accepted both. Quoting and trailing comments are YAML syntax, not value,
++// so they still count as the same live invocation.
++func TestCheckWiring(t *testing.T) {
++	tests := []struct {
++		name      string
++		doc       string
++		wantCount int
++		wantSubs  []string
++	}{
++		{
++			name: "minimal live step passes",
++			doc: `jobs:
++  lint:
++    steps:
++      - name: Verify GoReleaser rc channel values
++        run: go test -count=1 ./tools/goreleaserconfig/
++`,
++			wantCount: 0,
++		},
++		{
++			name: "a commented-out run line is not a live invocation",
++			doc: `jobs:
++  lint:
++    steps:
++      - name: Verify GoReleaser rc channel values
++        # run: go test -count=1 ./tools/goreleaserconfig/
++`,
++			wantCount: 1,
++			wantSubs:  []string{"no live lint step runs"},
++		},
++		{
++			name: "an if:false step is not live",
++			doc: `jobs:
++  lint:
++    steps:
++      - name: Verify GoReleaser rc channel values
++        run: go test -count=1 ./tools/goreleaserconfig/
++        if: false
++`,
++			wantCount: 1,
++			wantSubs:  []string{"no live lint step runs"},
++		},
++		{
++			name: "any if condition needs human review, even if:true",
++			doc: `jobs:
++  lint:
++    steps:
++      - name: Verify GoReleaser rc channel values
++        run: go test -count=1 ./tools/goreleaserconfig/
++        if: true
++`,
++			wantCount: 1,
++			wantSubs:  []string{"no live lint step runs"},
++		},
++		{
++			name: "a deleted step fails",
++			doc: `jobs:
++  lint:
++    steps:
++      - name: No broad suppression
++        run: bash .github/ci/no-broad-suppression.sh
++`,
++			wantCount: 1,
++			wantSubs:  []string{"no live lint step runs"},
++		},
++		{
++			name: "a changed gate path fails",
++			doc: `jobs:
++  lint:
++    steps:
++      - name: Verify GoReleaser rc channel values
++        run: go test -count=1 ./tools/othergate/
++`,
++			wantCount: 1,
++			wantSubs:  []string{"no live lint step runs"},
++		},
++		{
++			name: "a quoted run value is the same invocation",
++			doc: `jobs:
++  lint:
++    steps:
++      - name: Verify GoReleaser rc channel values
++        run: "go test -count=1 ./tools/goreleaserconfig/"
++`,
++			wantCount: 0,
++		},
++		{
++			name: "a trailing comment on the run line still counts",
++			doc: `jobs:
++  lint:
++    steps:
++      - name: Verify GoReleaser rc channel values
++        run: go test -count=1 ./tools/goreleaserconfig/ # the rc channel guard
++`,
++			wantCount: 0,
++		},
++		{
++			name: "two live gate steps fail",
++			doc: `jobs:
++  lint:
++    steps:
++      - name: Verify GoReleaser rc channel values
++        run: go test -count=1 ./tools/goreleaserconfig/
++      - name: Verify GoReleaser rc channel values again
++        run: go test -count=1 ./tools/goreleaserconfig/
++`,
++			wantCount: 1,
++			wantSubs:  []string{"2 live lint steps"},
++		},
++		{
++			name: "duplicate run keys fail instead of resolving by first/last wins",
++			doc: `jobs:
++  lint:
++    steps:
++      - name: Verify GoReleaser rc channel values
++        run: go test -count=1 ./tools/goreleaserconfig/
++        run: go test -count=1 ./tools/goreleaserconfig/
++`,
++			wantCount: 1,
++			wantSubs:  []string{"invalid YAML", "already defined"},
++		},
++		{
++			name: "a workflow without jobs fails",
++			doc: `name: CI
++on: push
++`,
++			wantCount: 1,
++			wantSubs:  []string{`section "jobs" is absent`},
++		},
++	}
++
++	for _, tc := range tests {
++		t.Run(tc.name, func(t *testing.T) {
++			assertFindings(t, CheckWiring([]byte(tc.doc)), tc.wantCount, tc.wantSubs)
++		})
++	}
++}
++
++// TestCommittedWiring is the wiring production row: the repository's own
++// ci.yml must carry the live gate step.
++func TestCommittedWiring(t *testing.T) {
++	raw, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "ci.yml"))
++	if err != nil {
++		t.Fatalf("read ci.yml: %v", err)
++	}
++	assertFindings(t, CheckWiring(raw), 0, nil)
++}

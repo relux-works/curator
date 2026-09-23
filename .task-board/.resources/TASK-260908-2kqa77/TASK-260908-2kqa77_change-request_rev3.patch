@@ -1,0 +1,383 @@
+diff --git a/.github/ci/gate-selftest.sh b/.github/ci/gate-selftest.sh
+index 76efafff..20973798 100755
+--- a/.github/ci/gate-selftest.sh
++++ b/.github/ci/gate-selftest.sh
+@@ -1144,6 +1144,94 @@ else
+ 	bad 'the rust behavioural cases have shipped streams to narrow' 'missing $WORK/shipped-darwin.json or $WORK/shipped-linux.json'
+ fi
+ 
++echo ''
++echo '=== goreleaser-config-gate.sh: the rc channel values parse as exactly auto ==='
++GCG="$HERE/goreleaser-config-gate.sh"
++GR_SRC='.goreleaser.yml'
++assert 'the committed .goreleaser.yml passes the rc-channel gate' 0 bash "$GCG" "$GR_SRC"
++
++# Row C (TASK-260908-1jv1h3 cycle-3 verdict): the pre-change state that
++# published the rc -- channel entries with no skip_upload key at all.
++grep -v 'skip_upload:' "$GR_SRC" >"$WORK/grl-c-absent-both.yml"
++assert 'row C: entries with no skip_upload fail' 1 bash "$GCG" "$WORK/grl-c-absent-both.yml"
++
++# Narrowed: one entry losing its key is already a publish path.
++awk '{ if (!done && /skip_upload:/) { done=1; next } print }' "$GR_SRC" >"$WORK/grl-c-absent-one.yml"
++assert 'row C narrowed to one entry still fails' 1 bash "$GCG" "$WORK/grl-c-absent-one.yml"
++assert_contains 'the absence names the field and entry' 'homebrew_casks[0].skip_upload is absent' "$WORK/out.txt"
++
++# Row E: one capital letter defeats the guard, and defeats a token grep.
++awk '{ if (!done && /skip_upload: "auto"/) { sub(/"auto"/, "\"Auto\""); done=1 } print }' "$GR_SRC" >"$WORK/grl-e-auto-cask.yml"
++assert 'row E: "Auto" fails (case-sensitive)' 1 bash "$GCG" "$WORK/grl-e-auto-cask.yml"
++assert_contains 'the failure names the field, entry and observed value' 'homebrew_casks[0].skip_upload = "Auto"' "$WORK/out.txt"
++assert_contains 'the failure states the wanted value' 'want "auto"' "$WORK/out.txt"
++
++awk 'BEGIN{c=0} /skip_upload: "auto"/{c++} { if (c==2 && !done) { sub(/"auto"/, "\"Auto\""); done=1 } print }' "$GR_SRC" >"$WORK/grl-e-auto-scoop.yml"
++assert '"Auto" in the scoop entry fails' 1 bash "$GCG" "$WORK/grl-e-auto-scoop.yml"
++
++awk '{ if (!done && /skip_upload: "auto"/) { sub(/"auto"/, "sometimes"); done=1 } print }' "$GR_SRC" >"$WORK/grl-sometimes.yml"
++assert 'sometimes fails' 1 bash "$GCG" "$WORK/grl-sometimes.yml"
++
++awk '{ if (!done && /skip_upload: "auto"/) { sub(/"auto"/, "true"); done=1 } print }' "$GR_SRC" >"$WORK/grl-true.yml"
++assert 'boolean true fails' 1 bash "$GCG" "$WORK/grl-true.yml"
++
++sed 's/prerelease: "auto"/prerelease: "ato"/' "$GR_SRC" >"$WORK/grl-ato.yml"
++assert 'prerelease "ato" fails' 1 bash "$GCG" "$WORK/grl-ato.yml"
++assert_contains 'the prerelease failure names the observed value' 'release.prerelease = "ato"' "$WORK/out.txt"
++
++sed 's/prerelease: "auto"/prerelease: "Auto"/' "$GR_SRC" >"$WORK/grl-pre-auto.yml"
++assert 'prerelease "Auto" fails' 1 bash "$GCG" "$WORK/grl-pre-auto.yml"
++
++grep -v 'prerelease: "auto"' "$GR_SRC" >"$WORK/grl-pre-absent.yml"
++assert 'an absent prerelease fails' 1 bash "$GCG" "$WORK/grl-pre-absent.yml"
++
++# Every entry is checked, not just the first: a bad second entry fails by
++# index, a good one passes.
++awk '$0 ~ /^release:/ && ing == 1 { print "  - name: extra"; print "    skip_upload: \"sometimes\""; ing=0 } { print } $0 ~ /^scoops:/ { ing=1 }' "$GR_SRC" >"$WORK/grl-second-bad.yml"
++assert 'a bad second entry fails naming its index' 1 bash "$GCG" "$WORK/grl-second-bad.yml"
++assert_contains 'the second-entry failure names scoops[1]' 'scoops[1].skip_upload' "$WORK/out.txt"
++
++awk '$0 ~ /^release:/ && ing == 1 { print "  - name: extra"; print "    skip_upload: \"auto\""; ing=0 } { print } $0 ~ /^scoops:/ { ing=1 }' "$GR_SRC" >"$WORK/grl-second-good.yml"
++assert 'a good second entry passes' 0 bash "$GCG" "$WORK/grl-second-good.yml"
++
++# Parse-then-compare, not text match: quoting is syntax, so an unquoted
++# auto is the same string and passes.
++sed 's/skip_upload: "auto"/skip_upload: auto/; s/prerelease: "auto"/prerelease: auto/' "$GR_SRC" >"$WORK/grl-unquoted.yml"
++assert 'unquoted auto passes (same parsed string)' 0 bash "$GCG" "$WORK/grl-unquoted.yml"
++
++# Structure, not text: a skip_upload nested under repository: must not
++# satisfy the entry that lost its own key.
++awk '{ if (!done && /^    skip_upload:/) { print "    repository:"; print "      skip_upload: \"auto\""; done=1; next } print }' "$GR_SRC" >"$WORK/grl-nested.yml"
++assert 'a nested skip_upload does not satisfy the entry' 1 bash "$GCG" "$WORK/grl-nested.yml"
++
++# Fail closed: a deleted stanza or an unreadable file is never green.
++awk '/^homebrew_casks:/{skip=1} /^scoops:/{skip=0} !skip{print}' "$GR_SRC" >"$WORK/grl-no-stanza.yml"
++assert 'a removed channel stanza fails' 1 bash "$GCG" "$WORK/grl-no-stanza.yml"
++assert 'a missing config fails closed' 1 bash "$GCG" "$WORK/grl-absent.yml"
++
++# The gate only guards the committed file if a lane runs it. The lint job
++# runs the exact default invocation on every push; read that back so a
++# refactor cannot drop the step without this self-test noticing.
++gate_runs="$(grep -cF 'run: bash .github/ci/goreleaser-config-gate.sh' "$WORKFLOW")"
++if [ "$gate_runs" -eq 1 ]; then
++	ok 'ci.yml invokes the goreleaser config gate exactly once'
++else
++	bad 'ci.yml invokes the goreleaser config gate exactly once' "invocations: $gate_runs"
++fi
++
++# Awk-portability pin (rev1 postmortem, rework-1 item 4): the rev1 gate died
++# at parse time on gawk (ubuntu/windows) over a mid-class hyphen range while
++# BSD awk (macos) tolerated it, so every behavioural row above was green on
++# macos and red elsewhere -- behaviour alone cannot pin this on macos.
++# Assert on the source with grep -F (portable on all three runners) so a
++# bracket-range regression fails the self-test everywhere, Linux included.
++if grep -qF '[+-0-9]' "$GCG"; then
++	bad 'the gate has no mid-class hyphen range gawk rejects' 'literal [+-0-9] present in goreleaser-config-gate.sh'
++else
++	ok 'the gate has no mid-class hyphen range gawk rejects'
++fi
++assert_contains 'the block detector keeps the hyphen-last class' '[+0-9-]' "$GCG"
++
+ echo ''
+ printf 'gate-selftest: %d passed, %d failed' "$PASS" "$FAIL"
+ [ "$SKIPPED" -gt 0 ] && printf ', %d skipped (reported above, not hidden)' "$SKIPPED"
+diff --git a/.github/ci/goreleaser-config-gate.sh b/.github/ci/goreleaser-config-gate.sh
+new file mode 100755
+index 00000000..2d1b27ea
+--- /dev/null
++++ b/.github/ci/goreleaser-config-gate.sh
+@@ -0,0 +1,238 @@
++#!/usr/bin/env bash
++# GoReleaser rc-channel guard.
++#
++# A release candidate must not replace the stable install channels. In
++# .goreleaser.yml that rests on three parsed values: every
++# homebrew_casks/scoops entry's `skip_upload` and `release.prerelease` must be
++# exactly the string `auto`. When the cask/scoop keys were unset, v0.14.0-rc.1
++# reached the tap and the bucket as the served release (2026-08 incident).
++#
++# `goreleaser check` cannot guard this: it validates field names and types and
++# discriminated 0 of 6 wrong-value mutants (TASK-260908-1jv1h3 cycle-3
++# verdict section 5). Neither can a grep for the token `auto`: the `Auto`
++# mutant defeats it. So this gate PARSES the file -- an indentation-aware
++# structural walk, not a text search -- and compares each parsed scalar
++# against the exact string `auto`, case-sensitively.
++#
++# Field naming: the task AC says `brews[*].skip_upload`, but the config
++# declares no `brews` stanza; the publishing surfaces are `homebrew_casks`
++# and `scoops` (verdict section 3). Those two stanzas are what this gate
++# checks, every entry of each.
++#
++# Value semantics (parse-then-compare): quoting is YAML syntax, not value, so
++# an unquoted `auto` -- the same string -- passes. Anything else fails,
++# including `Auto`, `sometimes`, boolean `true`, `ato`, an empty value, and
++# an absent key. A read failure, a missing stanza, a stanza with no entries,
++# and tab indentation all fail closed: an unread gate is never a green gate.
++# Duplicate keys take the last, matching gopkg.in/yaml.v3.
++#
++# The parser is POSIX awk only (no match() captures, no \x escapes): it must
++# run identically under the BSD awk on macos-latest and Git Bash on
++# windows-latest, where gate-selftest.sh executes it on every push.
++#
++# Usage:
++#   bash .github/ci/goreleaser-config-gate.sh [config]
++#     config  GoReleaser config to check (default: .goreleaser.yml)
++#
++# Exit 0 when every checked value parses as exactly `auto`; exit 1 naming
++# the field, the entry and the observed value otherwise.
++
++set -u
++
++cfg="${1:-.goreleaser.yml}"
++
++[ -r "$cfg" ] || { echo "goreleaser-config-gate: cannot read $cfg" >&2; exit 1; }
++
++awk -v sq="'" '
++function trim(s) { sub(/^[ \t\r]+/, "", s); sub(/[ \t\r]+$/, "", s); return s }
++
++function indent_of(s) { match(s, /^ */); return RLENGTH }
++
++# Quote an observed scalar for the failure message.
++function dq(s) { gsub(/\\/, "\\\\", s); gsub(/"/, "\\\"", s); return "\"" s "\"" }
++
++# Split "key: value" at the first colon; sets _key/_raw, returns 1 on match.
++function split_key(s,   ci) {
++	ci = index(s, ":")
++	if (ci <= 1) return 0
++	_key = substr(s, 1, ci - 1)
++	if (_key !~ /^[A-Za-z0-9_.-]+$/) return 0
++	_raw = substr(s, ci + 1)
++	return 1
++}
++
++# Strip a trailing "# comment", honoring single/double quoting.
++function strip_comment(s,   out, i, c, q, prev) {
++	out = ""
++	q = ""
++	for (i = 1; i <= length(s); i++) {
++		c = substr(s, i, 1)
++		if (q == "") {
++			if (c == "#") {
++				prev = substr(s, i - 1, 1)
++				if (prev == " " || prev == "\t") return trim(out)
++				out = out c
++			} else if (c == sq || c == "\"") { q = c; out = out c }
++			else out = out c
++		} else {
++			out = out c
++			if (c == q) {
++				if (q == sq && substr(s, i + 1, 1) == sq) { out = out sq; i++ }
++				else q = ""
++			} else if (q == "\"" && c == "\\") { out = out substr(s, i + 1, 1); i++ }
++		}
++	}
++	return trim(out)
++}
++
++# Remove one layer of matching quotes; doubled single quotes unescape.
++function unquote(s,   q, inner, dbsq) {
++	if (length(s) >= 2) {
++		q = substr(s, 1, 1)
++		if ((q == sq || q == "\"") && substr(s, length(s), 1) == q) {
++			inner = substr(s, 2, length(s) - 2)
++			if (q == sq) { dbsq = sq sq; gsub(dbsq, sq, inner) }
++			else { gsub(/\\"/, "\"", inner); gsub(/\\\\/, "\\", inner) }
++			return inner
++		}
++	}
++	return s
++}
++
++function is_list_section(s) { return (s == "homebrew_casks" || s == "scoops") }
++
++# Hyphen-last keeps the "-" literal on every awk: with the hyphen in the
++# middle of the class, gawk in a UTF-8 locale rejects the whole program at
++# parse time ("Invalid range end") while BSD awk accepts it, which turned
++# the ubuntu/windows gate-selftest lanes red while macos stayed green
++# (rev1). Hyphen-last denotes the identical set on every awk.
++function is_block(v) { return (v ~ /^[|>][+0-9-]*$/) }
++
++# Record one parsed scalar for a channel key.
++function record(kind, idx, raw,   v) {
++	v = strip_comment(raw)
++	if (is_block(v)) v = "<multiline value>"
++	else if (v == "") v = "<empty>"
++	else v = unquote(v)
++	if (kind == "release") { saw_pre = 1; pre_val = v }
++	else { have[kind SUBSEP idx] = 1; val[kind SUBSEP idx] = v }
++}
++
++BEGIN {
++	section = ""
++	entries["homebrew_casks"] = -1; entries["scoops"] = -1
++	in_entry = 0; key_indent = -1; block_min = -1
++	saw_release = 0; saw_pre = 0; bad = 0; hard = 0
++}
++
++{
++	line = $0
++	sub(/\r$/, "", line)
++	if (line ~ /^[ \t]*\t/) {
++		print "goreleaser-config-gate: " FILENAME ": tab indentation is not valid YAML (line " NR ")" > "/dev/stderr"
++		hard = 1
++		exit 1
++	}
++	if (line ~ /^[ \t]*$/) next
++	ind = indent_of(line)
++	# Block-scalar content: every more-indented line, even one shaped
++	# like a key or a comment, is literal text. A dedent ends it.
++	if (block_min >= 0) {
++		if (ind > block_min) next
++		block_min = -1
++	}
++	if (line ~ /^[ \t]*#/) next
++	if (line ~ /^---([ \t]|$)/ || line ~ /^\.\.\.([ \t]|$)/ || line ~ /^%/) next
++
++	# Top-level key opens a section.
++	if (ind == 0) {
++		if (split_key(line)) {
++			section = _key; in_entry = 0; key_indent = -1
++			if (section == "release") saw_release = 1
++			if (section == "homebrew_casks" || section == "scoops") saw_list[section] = 1
++			if (is_block(strip_comment(_raw))) block_min = 0
++		}
++		next
++	}
++
++	# Dash line: only a dash at indent 2 under a channel stanza opens
++	# an entry; deeper dashes are nested list content.
++	if (line ~ /^[ ]+-[ \t]/ || line ~ /^[ ]+-[ \t]*$/) {
++		if (is_list_section(section) && ind == 2) {
++			idx = ++entries[section]
++			in_entry = 1; key_indent = -1
++			rest = line; sub(/^[ ]+-[ \t]*/, "", rest)
++			if (split_key(rest) && _key == "skip_upload")
++				record(section, idx, _raw)
++		}
++		next
++	}
++
++	# Plain key line.
++	stripped = line; sub(/^[ ]*/, "", stripped)
++	if (split_key(stripped)) {
++		key = _key; raw = _raw
++		if (is_block(strip_comment(raw))) {
++			block_min = ind
++			if (section == "release" && ind == 2 && key == "prerelease")
++				record("release", 0, raw)
++			else if (is_list_section(section) && in_entry && ind > 2 && key == "skip_upload") {
++				if (key_indent == -1) key_indent = ind
++				if (ind == key_indent) record(section, entries[section], raw)
++			}
++			next
++		}
++		if (section == "release" && ind == 2 && key == "prerelease") {
++			record("release", 0, raw)
++			next
++		}
++		if (is_list_section(section) && in_entry && ind > 2) {
++			if (key_indent == -1) key_indent = ind
++			if (ind == key_indent && key == "skip_upload")
++				record(section, entries[section], raw)
++			next
++		}
++		next
++	}
++}
++
++END {
++	if (hard) exit 1
++	names[1] = "homebrew_casks"; names[2] = "scoops"
++	for (k = 1; k <= 2; k++) {
++		s = names[k]
++		if (!(s in saw_list)) {
++			printf "goreleaser-config-gate: %s: section \"%s\" is absent, want channel entries with skip_upload \"auto\"\n", FILENAME, s > "/dev/stderr"
++			bad = 1
++			continue
++		}
++		if (entries[s] < 0) {
++			printf "goreleaser-config-gate: %s: section \"%s\" has no entries, want at least one with skip_upload \"auto\"\n", FILENAME, s > "/dev/stderr"
++			bad = 1
++			continue
++		}
++		for (i = 0; i <= entries[s]; i++) {
++			h = (s SUBSEP i)
++			if (!(h in have)) {
++				printf "goreleaser-config-gate: %s: %s[%d].skip_upload is absent, want \"auto\"\n", FILENAME, s, i > "/dev/stderr"
++				bad = 1
++			} else if (val[h] != "auto") {
++				printf "goreleaser-config-gate: %s: %s[%d].skip_upload = %s, want \"auto\"\n", FILENAME, s, i, dq(val[h]) > "/dev/stderr"
++				bad = 1
++			}
++		}
++	}
++	if (!saw_release) {
++		printf "goreleaser-config-gate: %s: section \"release\" is absent, want release.prerelease \"auto\"\n", FILENAME > "/dev/stderr"
++		bad = 1
++	} else if (!saw_pre) {
++		printf "goreleaser-config-gate: %s: release.prerelease is absent, want \"auto\"\n", FILENAME > "/dev/stderr"
++		bad = 1
++	} else if (pre_val != "auto") {
++		printf "goreleaser-config-gate: %s: release.prerelease = %s, want \"auto\"\n", FILENAME, dq(pre_val) > "/dev/stderr"
++		bad = 1
++	}
++	if (bad) exit 1
++	printf "goreleaser-config-gate: %s: %d channel entries and release.prerelease are \"auto\"\n", FILENAME, entries["homebrew_casks"] + entries["scoops"] + 2
++}
++' "$cfg"
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 380468fb..d4a6b8c7 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -480,6 +480,15 @@ jobs:
+         shell: bash
+         run: bash .github/ci/no-broad-suppression.sh
+ 
++      # The rc channel guard: every homebrew_casks/scoops skip_upload and
++      # release.prerelease must parse as exactly "auto", or a release
++      # candidate silently replaces the stable tap/bucket release (2026-08
++      # incident). Behaviourally pinned by gate-selftest.sh; this step
++      # enforces the committed file on every push.
++      - name: Verify GoReleaser rc channel values
++        shell: bash
++        run: bash .github/ci/goreleaser-config-gate.sh
++
+   # The gates are only worth their exit codes if they reject what they claim
+   # to reject. This runs on all three runners because the gate scripts must
+   # behave identically under Git Bash on Windows.
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 33e41ebd..ce7c079a 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -52,6 +52,15 @@ All notable implementation changes are recorded here.
+   enforcing revision (`B-enforcing`,
+   refuse without sourcing) follows in a later release
+   (Manager profile §8).
++- CI guard for the GoReleaser rc channel values.
++  `.github/ci/goreleaser-config-gate.sh` parses `.goreleaser.yml` (not a
++  text search) and requires every `homebrew_casks`/`scoops` entry's
++  `skip_upload` and `release.prerelease` to be exactly the string `auto`,
++  case-sensitively, failing with the field, entry, and observed value.
++  `goreleaser check` validates names and types only and accepts every
++  wrong-value mutant, and an unset key is what published v0.14.0-rc.1 to
++  the tap and bucket. The gate runs in the lint lane on every push and is
++  pinned by `gate-selftest.sh` (TASK-260908-2kqa77).
+ 
+ ### Changed
+ 
