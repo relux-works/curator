@@ -126,7 +126,7 @@ func TestPublishRejectsUnsafeDestination(t *testing.T) {
 	}
 }
 
-func TestGetCachesByCommit(t *testing.T) {
+func TestGetRejectsDifferentDestinationForSameCommit(t *testing.T) {
 	repo := t.TempDir()
 	gitRun(t, repo, "init", "-q", "-b", "main")
 	if err := os.WriteFile(filepath.Join(repo, "SKILL.md"), []byte("x"), 0o644); err != nil {
@@ -148,11 +148,14 @@ func TestGetCachesByCommit(t *testing.T) {
 		t.Fatalf("layout: %s", first)
 	}
 	// A cache hit is authenticated against the immutable commit archive.
-	marker := filepath.Join(first, "cache-hit-marker")
-	if err := os.WriteFile(marker, []byte("1"), 0o644); err != nil {
+	changedFile := filepath.Join(first, "SKILL.md")
+	if err := os.WriteFile(changedFile, []byte("tampered"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := Get(home, "internal/skill-a", repo, head.Commit); !errors.Is(err, ErrDestinationConflict) {
-		t.Fatalf("tampered cache hit error = %v, want ErrDestinationConflict", err)
+		t.Fatalf("Get() error for different cached destination = %v, want ErrDestinationConflict", err)
+	}
+	if got, err := os.ReadFile(changedFile); err != nil || string(got) != "tampered" {
+		t.Fatalf("Get() changed the conflicting destination: %q, %v", got, err)
 	}
 }
