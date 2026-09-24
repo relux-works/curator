@@ -528,8 +528,25 @@ func TestSubprocessExpectedAcquiredWithTinyDeadlineReportsBlocked(t *testing.T) 
 	}
 	home := t.TempDir()
 	project := t.TempDir()
-	if got := runHelperWithDeadline(t, "try-project", home, project, "", time.Nanosecond); got != "blocked" {
-		t.Fatalf("uncontended helper with tiny deadline = %q, want blocked", got)
+	manager, err := New(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity, err := CanonicalProject(project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lockPath := manager.projectLockPath(identity)
+	if _, err := os.Stat(lockPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("project lock path precondition: stat %q = %v, want not exist", lockPath, err)
+	}
+
+	// A negative timeout is already expired before the helper calls AcquireProjects.
+	if got := runHelperWithDeadline(t, "try-project", home, project, "", -time.Nanosecond); got != "blocked" {
+		t.Fatalf("helper with an already-expired deadline = %q, want blocked", got)
+	}
+	if _, err := os.Stat(lockPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expired helper created or acquired project lock %q: stat = %v, want not exist", lockPath, err)
 	}
 }
 
@@ -647,7 +664,7 @@ func TestManagerLockHelper(t *testing.T) {
 		return
 	}
 	deadline, err := time.ParseDuration(os.Getenv(helperDeadlineEnv))
-	if err != nil || deadline <= 0 {
+	if err != nil {
 		t.Fatalf("invalid helper deadline %q: %v", os.Getenv(helperDeadlineEnv), err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), deadline)
