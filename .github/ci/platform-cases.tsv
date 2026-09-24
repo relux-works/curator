@@ -118,6 +118,8 @@ internal/godriver	TestProbeSetGuardMatchesTheInventoryExactly	darwin,windows	-	-
 internal/godriver	TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes	darwin,windows	-	-	every native control seam failure rejects before the worker executes
 internal/godriver	TestPerFileSizeLimitIsReallyApplied	darwin	windows	platform-control	per-file-size-limit is a real kernel limit inherited by the compiler; the inventory defines it for macOS only
 internal/godriver	TestBuildFailsClosedWhenTheGoChildCannotStart	windows	darwin	platform-control	active-process-count-limit refuses the compiler natively; the inventory defines it for Windows only
+internal/godriver	TestWorkerRejectsMissingPrivateJobHandle	windows	-	-	the Windows worker refuses an unbound current-job query before compiler execution
+internal/godriver	TestWorkerRejectsForeignPrivateJobHandle	windows	-	-	the Windows worker refuses a matching-limits Job Object that does not contain it
 
 # ===========================================================================
 # Executable identity and executable behaviour
@@ -269,6 +271,7 @@ internal/godriver	TestFingerprintReportsUnreadableDirectoryIdentically	darwin,wi
 # skipping there on its own and only `must_run_on` below needs widening.
 # ===========================================================================
 cmd/curator	TestCompiledInstallFollowsTheNativeControlInventoryExactly	linux,darwin,windows	-	-	a compiled install succeeds on exactly the platforms rc5-native-control-inventory-v1 covers, and fails closed on the others
+cmd/curator	TestCLICompatibleVerifiedProviderOwnsBuildDispatchAndReceipt	darwin,windows	linux	platform-control	the CLI build-dispatch path completes the portable go-v1 seed build before verified-provider dispatch; Linux skips because rc5-native-control-inventory-v1 defines no record for that host
 cmd/curator	TestCompiledProjectStatusAndUntrustedRecovery	darwin,windows	linux	platform-control	compiled currentness and untrusted-state repair over one real installation
 cmd/curator	TestCompiledProjectRepairsCorruptCompiledState	darwin,windows	linux	platform-control	corrupt compiled-cache repair over one real installation
 cmd/curator	TestCompiledProjectRestoresCacheWhenCommitFails	darwin,windows	linux	platform-control	commit rollback restoring the displaced cache over one real installation
@@ -326,7 +329,89 @@ internal/godriver	TestModuleRootVectorsDriveTheWholeBuild	linux,darwin,windows	l
 internal/scriptpolicy	TestScriptHostExecutionPolicySectionsAreAllClassified	linux,darwin,windows	linux,darwin,windows	root-unset	every section of the published script-worker family is classified, so a new one cannot be ignored
 internal/scriptpolicy	TestScriptExecutionPolicyIdentityMatchesTheSuite	linux,darwin,windows	linux,darwin,windows	root-unset	the closed policy identity and interpreter set this build hard-codes are the suite's own
 internal/scriptpolicy	TestScriptExecutionOptInCases	linux,darwin,windows	linux,darwin,windows	root-unset	every published opt-in case decides manifest acceptance and enforced/declared-only classification
-internal/scriptpolicy	TestARefusalPrecedesEveryWorkerSurface	linux,darwin,windows	linux,darwin,windows	root-unset	every enforced shape the suite declares is refused with script_execution_policy_unsupported before any worker surface
+internal/scriptpolicy	TestEnforcedShapesProceedPastAdmission	linux,darwin,windows	linux,darwin,windows	root-unset	every enforced shape the suite declares is admitted now that the control table is complete, and an unknown policy keeps policy-unsupported
+internal/scriptpolicy	TestMandatoryControlsMatchTheSuite	linux,darwin,windows	linux,darwin,windows	root-unset	the 11-control preflight table this build enforces matches the published set in order
+internal/scriptpolicy	TestPreflightRefusalCases	linux,darwin,windows	linux,darwin,windows	root-unset	the install/invoke mandatory-control-unavailable cases refuse with control-unavailable and start no worker
+# R2 capability derivation and portable controls (TASK-260916-1h82gq) plus R3
+# native probes, evidence, and preflight (TASK-260916-1l44nd): the rows
+# below execute the real worker process. Platform-scoped inventory rows run
+# on their lanes and skip elsewhere only through the ledger vocabulary.
+internal/scriptpolicy	TestPreflightTableCompleteAdmitsEnforced	linux,darwin,windows	-	-	every mandatory control is implemented with no owner remaining, nothing is missing, and an enforced command is admitted
+internal/scriptpolicy	TestPreflightTableAccessorIsACopy	linux,darwin,windows	-	-	the R2 injection seam is removed and mutating the accessor copy cannot move the preflight table
+internal/scriptworker	TestCapabilityDerivationAllFieldsAbsentDenyByDefault	linux,darwin,windows	-	-	an absent declaration derives the offline environment, the interpreter-only PATH farm, and no project root
+internal/scriptworker	TestCapabilityDerivationNetworkHostsReportingOnly	linux,darwin,windows	-	-	declared network hosts are recorded reporting-only and never applied as a filter
+internal/scriptworker	TestCapabilityDerivationExecIsManagerResolved	linux,darwin,windows	-	-	the built PATH exposes exactly the resolved interpreter and manager-resolved exec names; inherited PATH is discarded
+internal/scriptworker	TestPathFarmPreservesSingleLinkIdentity	linux,darwin,windows	-	-	farm construction adds no filesystem link to a verified executable, so the launch-boundary check still verifies it
+internal/scriptworker	TestCapabilityDerivationSecretsRemainIdentifiers	linux,darwin,windows	-	-	secret identifiers never resolve to values and never widen the environment
+internal/scriptworker	TestManagerBuiltEnvironmentWithholdsReserved	linux,darwin,windows	-	-	every reserved name stays out of the interpreter environment with per-interpreter, macOS, and Windows scoping
+internal/scriptworker	TestOfflineScrubWhenNetworkNone	linux,darwin,windows	-	-	no proxy or resolver configuration survives when the derived network is none
+internal/scriptworker	TestInterpreterWithoutReservedSetIsRefused	linux,darwin,windows	-	-	an interpreter identifier without a reserved set never launches
+internal/scriptworker	TestOperationPrivateRuntimeAreaApplied	linux,darwin,windows	-	-	the working directory follows the filesystem derivation and the private roots are bound through the platform environment
+internal/scriptworker	TestWorkerRevalidatesDerivedEnvironment	linux,darwin,windows	-	-	a mis-derived environment refuses at the worker before the interpreter starts
+internal/scriptworker	TestWorkerWaitsForPermit	linux,darwin,windows	-	-	the interpreter never starts before the parent permit, and a declined permit ends cleanly
+internal/scriptworker	TestWorkerRejectsPermitWithForeignNonce	linux,darwin,windows	-	-	the permit frame is bound to the session nonce
+internal/scriptworker	TestParentWithholdsPermitOnProofMismatch	linux,darwin,windows	-	-	a forged worker proof earns no permit and the run refuses
+internal/scriptworker	TestParentRejectsWrongStartedCount	linux,darwin,windows	-	-	a worker reporting other than one started program refuses
+internal/scriptworker	TestLaunchDrivesDerivation	linux,darwin,windows	-	-	the production entry runs the derived profile with the complete table and the report records the derivation
+internal/scriptworker	TestProductionBinaryLaunchesWhenHostProvides	linux,darwin,windows	-	-	a fresh production process admits through skill check, an executed launcher with a bound interpreter runs, and an unbound one refuses control-unavailable
+internal/scriptworker	TestNativeLauncherWorkerModeWinsOverShimDispatch	linux,darwin,windows	-	-	a sidecar-paired launcher re-executed in worker mode speaks the worker protocol instead of redispatching
+internal/install	TestEnforcedScriptCommandInstallsNativeLauncher	linux,darwin,windows	-	-	install publishes a native launcher plus sidecar, records the derivation, and the launcher runs the derived profile
+internal/install	TestEnforcedToDeclaredOnlyFlipRemovesNativeLauncher	linux,darwin,windows	-	-	a flip to declared-only removes the native launcher and sidecar and restores the ordinary shim
+internal/scriptpolicy	TestHostControlErrorNamesUnavailableControls	linux,darwin,windows	-	-	the host preflight refusal carries control-unavailable and names the unavailable controls
+internal/scriptworker	TestScriptEvidenceMutationsRefuseBeforePermit	linux,darwin,windows	-	-	the twelve forged evidence records refuse before the permit with the vector diagnostic and earn no permit
+internal/scriptworker	TestScriptEvidenceMutationsRefuseBeforePermit/*	-	windows	platform-control	the host-conditional contradiction subtest skips on Windows, whose inventory has no host-conditional control
+internal/scriptworker	TestScriptEvidenceSecondRecordRefuses	linux,darwin,windows	-	-	a result carrying a second record refuses capability-evidence-invalid after the permit
+internal/scriptworker	TestScriptEvidenceValidRecordSucceeds	linux,darwin,windows	-	-	a valid invocation carries exactly one closed result-only record with probe-consistent statuses
+internal/scriptworker	TestPreflightRefusesUnavailableControlAtInvocation	linux,darwin,windows	-	-	an unavailable mandatory control refuses control-unavailable at invocation and starts no worker
+internal/scriptworker	TestLinuxPidsMaxProbeAvailableApplies	linux	darwin,windows	platform-control	a delegated cgroup hierarchy applies the aggregate limits and reports them applied on the Linux lane
+internal/scriptworker	TestLinuxPidsMaxProbeUnavailableSucceeds	linux	darwin,windows	platform-control	a hierarchy without delegation reports pids unavailable and the invocation still succeeds on the Linux lane
+internal/scriptworker	TestLinuxHostConditionalUnavailableSucceeds	linux	darwin,windows	platform-control	the true Linux probe determines every host-conditional control and absent ones report unavailable
+internal/scriptworker	TestLinuxHostProbeAndEvidenceAreConsistent	linux	darwin,windows	platform-control	two consecutive true Linux probes agree and the invocation record validates against them
+internal/scriptworker	TestLinuxLandlockConfinementMatchesProbe	linux	darwin,windows	platform-control	Landlock grants exactly the derived path set and the farm, proved by allowed and denied writes and spawns
+internal/scriptworker	TestLandlockHandledMaskFollowsABI	linux,darwin,windows	-	-	the handled mask gates every right on the probed ABI and never requests more than it provides
+internal/scriptworker	TestLandlockRuleRightsFollowObjectType	linux,darwin,windows	-	-	each rule carries only handled rights valid for its object type
+internal/scriptworker	TestReviewerABI1MutationRights	linux,darwin,windows	-	-	the ABI-1 handled set carries every creation/removal right since ABI 1 and requests no refer
+internal/scriptworker	TestLandlockConstructionConfirmsTypedRules	linux	darwin,windows	platform-control	the pre-ready confirmation builds the exact enforcement ruleset without restricting the caller
+internal/scriptworker	TestLinuxLandlockProbeFindsPresentControls	linux	darwin,windows	platform-control	the true Linux probe proves the full enforcement sequence and finds both Landlock controls present
+internal/scriptworker	TestLinuxLandlockProbeChildAnswersAtTheBoundary	linux	darwin,windows	platform-control	the re-executed probe child exits 0 over an owned directory and nonzero over a missing path
+internal/scriptworker	TestLinuxMissingDerivedPathRefusesWriteConfinement	linux	darwin,windows	platform-control	a derived path that cannot be ruled refuses its own control without voiding the execute denial
+internal/scriptworker	TestLinuxWriteConfinementTruncateMatchesProbe	linux	darwin,windows	platform-control	truncation outside the derived path set is denied with content preserved while a granted file truncates and overwrites
+internal/scriptworker	TestLinuxWriteConfinementDirectoryMutationMatchesProbe	linux	darwin,windows	platform-control	entry creation and removal outside the derived path set is denied with state preserved while the same operations inside a granted directory succeed
+internal/scriptworker	TestFixedUnavailableControlDoesNotReject	linux,darwin,windows	-	-	a fixed-unavailable control reports unavailable and the invocation succeeds
+internal/scriptworker	TestWindowsJobLimitsAppliedAndConfirmed	windows	linux,darwin	platform-control	the job-backed controls install on the private job, confirm by query, and report applied
+internal/scriptworker	TestHostProbeReportsClosedInventory	linux,darwin,windows	-	-	the per-invocation probe reports the eight closed controls with the table availabilities and timing
+internal/scriptworker	TestLoadShimSidecarRejectsMalformed	linux,darwin,windows	-	-	every malformed launcher contract refuses package-influence and the launcher exits 1
+internal/scriptworker	TestRunShimWritesDiagnosticsRecord	linux,darwin,windows	-	-	a successful launcher persists one result-only evidence and derivation record at the operator destination
+internal/scriptworker	TestRunShimToleratesUnusableDiagnosticsDir	linux,darwin,windows	-	-	an unusable diagnostics destination never fails the invocation
+internal/scriptworker	TestDerivedPathSetShapes	linux,darwin,windows	-	-	the carried path set is exactly the declared paths beneath the project root and escapes refuse
+internal/scriptworker	TestScriptEvidenceOrderMismatchRefuses	linux,darwin,windows	-	-	a reordered record refuses capability-evidence-invalid and earns no permit
+internal/scriptworker	TestFixedUnavailableControlsAreNeverProbed	linux,darwin,windows	-	-	faults injected for fixed-unavailable controls never fire and the invocation succeeds
+internal/scriptworker	TestWorkerRejectsMalformedInventory	linux,darwin,windows	-	-	every malformed inventory shape refuses at the worker before the interpreter runs
+internal/scriptworker	TestWorkerConfirmsFileSizeBound	linux,darwin	windows	platform-control	the worker confirms the installed per-file bound and reports the control applied
+internal/scriptworker	TestWorkerRejectsWrongFileSizeBound	linux,darwin,windows	-	-	a mismatched per-file bound refuses capability-evidence-invalid
+internal/install	TestEnforcedScriptCommandIsRefusedAtInstall	linux,darwin,windows	-	-	an unavailable mandatory control refuses control-unavailable at install and publishes nothing
+internal/install	TestActiveEnforcedScriptCommandsRefusesUnavailableHost	linux,darwin,windows	-	-	the enforced writer refuses control-unavailable naming the node and the control
+internal/install	TestScriptOptInCasesAtInstallEntry	linux,darwin,windows	-	-	the six opt-in shapes install or refuse at the production install entry
+internal/install	TestEnforcedInstallAndLaunchAtCLIEntry	linux,darwin,windows	-	-	the built binary installs by argv dispatch and the installed launcher runs the script
+internal/install	TestGlobalEnforcedInstallExcludesForwardingMirror	linux,darwin,windows	-	-	a global enforced install publishes the native launcher and no forwarding wrapper
+internal/runtimestore	TestManagedEnforcedShimDerivesNativeNames	linux,darwin,windows	-	-	enforced launcher destinations are native executable paths with a paired sidecar, never a .cmd wrapper
+internal/runtimestore	TestStageEnforcedShimTransitionStagesManagerCopies	linux,darwin,windows	-	-	staging materializes native manager copies plus sidecars and removes stale launchers
+internal/runtimestore	TestManagedEnforcedShimsInKeysBySidecar	linux,darwin,windows	-	-	enforced launcher enumeration follows sidecar presence
+internal/runtimestore	TestStageEnforcedShimTransitionRefusesBadInput	linux,darwin,windows	-	-	empty sidecars, duplicate launchers, and overlapping staging roots refuse
+# R1 script manager/worker invocation (TASK-260916-3dmjbc): the launch-path
+# rows below execute the real worker process on every runner, like the go-v1
+# worker rows. None of them skips: symlink-dependent rows stay out of the
+# ledger and run best-effort with host-capability skips.
+internal/scriptworker	TestRunSessionHappyPath	linux,darwin,windows	-	-	the manager launches the identity-verified script worker and returns verbatim args with the child exit status
+internal/scriptworker	TestRunSessionRechecksIdentityAtLaunchBoundary	linux,darwin,windows	-	-	a manager binary replaced between resolve and exec never runs
+internal/scriptworker	TestRunSessionTerminatesDescendants	linux,darwin,windows	-	-	an interpreter descendant that outlives the interpreter is reaped by the worker-domain teardown
+internal/scriptworker	TestRunSessionRejectsPATHInterpreter	linux,darwin,windows	-	-	the launch never consults the user PATH: unconfigured refuses and configured wins
+internal/scriptworker	TestBuiltCuratorWorkerHandshake	linux,darwin,windows	-	-	the built curator answers the fixed hidden script-worker mode with an identity proof and one invocation
+internal/scriptworker	TestScriptWorkerHappyPath	linux,darwin,windows	-	-	the hidden worker proves identity, verifies the interpreter, and runs the runtime entry
+internal/scriptworker	TestScriptWorkerRejectsTamperedInterpreter	linux,darwin,windows	-	-	a tampered interpreter file is refused before it runs
+internal/scriptworker	TestResolveInterpreterFromOperatorConfigOnly	linux,darwin,windows	-	-	both closed interpreter identifiers resolve from operator-trusted configuration only
+internal/scriptworker	TestResolveInterpreterRejectsWrapperImage	linux,darwin,windows	-	-	a wrapper or non-native interpreter binding is refused at resolution before any worker starts
+internal/scriptworker	TestScriptWorkerRejectsWrapperImage	linux,darwin,windows	-	-	a wrapper or non-native interpreter binding is refused by the worker before it runs
 internal/config	TestManagerConfigV2SchemaCases	linux,darwin,windows	-	-	the published manager-config-v2 family is accepted or rejected through the config reader
 internal/config	TestSystemConfigV2SchemaCases	linux,darwin,windows	-	-	the published system-config-v2 family merges or fails through the config loader
 internal/config	TestManagerConfigV2Vectors	linux,darwin,windows	-	-	the published manager-config-v2 vectors render the expected effective configuration
@@ -463,6 +548,8 @@ cmd/curator	TestProfileImportUseLockedRequireRefuses	linux,darwin,windows	-	-	im
 cmd/curator	TestProfileUpdateResyncPassesLockedRequire	linux,darwin,windows	-	-	an update that moves the lock re-switches the required profile through the same seam gate
 cmd/curator	TestProfileComposeAddWarnsWhenOverlaysForbidden	linux,darwin,windows	-	-	profile compose add under a forbidding overlays policy warns that the declaration is inert
 cmd/curator	TestEnvStatusReportsLockedRequire	linux,darwin,windows	-	-	env status reports the locked require_current_profile in JSON and text
+cmd/curator	TestProductionBinaryDispatchesNetNSProbe	linux	darwin,windows	platform-control	the hidden network-isolation probe mode dispatches before launcher dispatch and exits 0 on the Linux lane
+cmd/curator	TestProductionBinaryDispatchesLandlockProbe	linux,darwin,windows	-	-	the hidden Landlock probe mode dispatches before launcher dispatch and answers the probe silently
 
 # ===========================================================================
 # Real-pnpm integration (BUG-260916-2f3xbf landed)
@@ -497,3 +584,45 @@ internal/pnpmsource	TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization	linu
 # ===========================================================================
 internal/rustsource	TestProductionManagerCapturesRegistryFromRawPaths	darwin	linux,windows	host-capability	pinned-Rust registry capture executes on darwin; linux/windows have no operator-approved Cargo descriptor, so the host-capability absence skip is tolerated there
 internal/rustsource	TestProductionManagerCapturesGitWithoutCallerProjection	darwin	linux,windows	host-capability	pinned-Rust Git capture executes on darwin; linux/windows have no operator-approved Cargo descriptor, so the host-capability absence skip is tolerated there
+
+# ===========================================================================
+# Script-worker-v1 runtime conformance qualification (TASK-260916-2ok97n)
+#
+# These rows bind the R5 section/case-to-production map to tests that really
+# execute the manager, installer, audit path, worker, or native host controls.
+# Linux cgroup/Landlock/netns, macOS inventory, and Windows Job Object rows
+# require their native runner; no platform-specific control gets a new skip
+# class. The real Windows interpreter row requires both python.exe and
+# node.exe from windows-latest and a manager-resolved cmd.exe exec.
+# ===========================================================================
+internal/scriptpolicy	TestScriptHostExecutionPolicyProductionConsumersCoverAllCases	linux,darwin,windows	linux,darwin,windows	root-unset	the pinned script-worker vector has exactly 33 named cases mapped to registered production-entry rows and all 11 mandatory controls have ledger consumers
+internal/scriptworker	TestScriptWorkerRechecksInterpreterBeforeExec	linux,darwin,windows	-	-	a worker refuses an interpreter replaced after acceptance and before permit, before the interpreter runs
+internal/scriptworker	TestScriptWorkerBindsStandardInput	linux,darwin,windows	-	-	the worker binds a payload explicitly and maps an absent payload to the null device
+internal/scriptworker	TestScriptWorkerReturnsTheChildExitStatus	linux,darwin,windows	-	-	the worker returns interpreter exit status and stderr through its session result
+internal/scriptworker	TestMacOSNativeControlsAppliedAtInvocation	darwin	linux,windows	platform-control	the macOS invocation applies process-group teardown, RLIMIT_FSIZE, and inherited-handle restriction and truthfully reports the other controls unavailable
+internal/scriptworker	TestWindowsRealInterpretersRunDeclaredExec	windows	linux,darwin	platform-control	windows-latest runs real python.exe and node.exe through Launch with a declared cmd.exe, and an unbound real interpreter refuses
+internal/scriptworker	TestDefaultExecSearchDirsUsesManagerSystemRoot	linux,darwin,windows	-	-	Windows exec lookup uses manager SYSTEMROOT and searches System32 first
+internal/scriptworker	TestDeriveProfileUsesDefaultExecSearchDirsAndBuildsDeclaredExecFarm	linux,darwin,windows	-	-	with nil ExecSearchDirs and an injected Windows SYSTEMROOT, derivation resolves cmd.exe and places it beside the interpreter in the private farm
+internal/scriptworker	TestLaunchUnresolvedDeclaredExecReportedAndCallerPathDenied	linux,darwin,windows	-	-	Launch reports unresolved declarations, omits them from the PATH farm, and cannot reach a same-name caller-PATH executable
+internal/scriptpolicy	TestPlatformCaseLedgerRowsAcceptCRLFBlankLinesAndComments	linux,darwin,windows	-	-	the ledger parser tolerates CRLF line endings, blank lines, and comments on every hosted OS
+internal/audit	TestGateEmitsScriptAuditLabels	linux,darwin,windows	-	-	the production audit Gate emits the vector's warning classes for all four audit shapes
+internal/audit	TestGateScriptLabelsWarnUnderStrictPolicy	linux,darwin,windows	-	-	script audit labels stay warnings under strict policy
+internal/audit	TestGateScriptLabelsStayWarningsWhenBlocked	linux,darwin,windows	-	-	script audit labels stay warnings when findings block the audit
+internal/audit	TestGateScriptLabelsStayWarningsWhenPinned	linux,darwin,windows	-	-	script audit labels stay warnings for pinned audit policy
+internal/audit	TestGateScriptLabelsStayWarningsWhenRevoked	linux,darwin,windows	-	-	script audit labels stay warnings for revoked audit policy
+internal/audit	TestGateReadOnlyEmitsScriptLabelsWithoutWritingState	linux,darwin,windows	-	-	the production read-only audit Gate emits the same warnings without changing cached state
+internal/audit	TestGateDeclaredOnlyWithHostsCarriesNoNetworkLabel	linux,darwin,windows	-	-	declared-only commands never receive the enforced unfiltered-network warning
+internal/audit	TestScriptPolicyRecordsCoverEveryCommand	linux,darwin,windows	-	-	every command audit entry records its policy identity or explicit absence
+internal/audit	TestFormatScriptPolicyRendersIdentityOrExplicitAbsence	linux,darwin,windows	-	-	text audit output renders enforced identity and declared-only absence
+internal/audit	TestReportCarriesScriptPoliciesOnEveryPath	linux,darwin,windows	-	-	every audit report path preserves per-command policy identities
+internal/audit	TestStoredVerdictPersistsScriptPolicies	linux,darwin,windows	-	-	stored audit verdicts preserve per-command policy identities
+internal/skillcheck	TestValidateEmitsScriptAuditLabels	linux,darwin,windows	-	-	the production validation entry reports the vector's audit labels as warnings
+internal/skillcheck	TestValidateDeclaredOnlyWithHostsCarriesNoNetworkLabel	linux,darwin,windows	-	-	declared-only validation never receives the enforced unfiltered-network warning
+internal/install	TestScriptAuditLabelsAtInstallEntry	linux,darwin,windows	-	-	project install emits the four audit vector labels through validation and the production audit gate
+internal/install	TestScriptAuditLabelsAtGlobalInstallEntry	linux,darwin,windows	-	-	machine-wide install emits the four audit vector labels through the default production audit gate
+internal/install	TestDeclaredOnlyWithHostsGlobalInstallsWithOnlyDeclaredOnly	linux,darwin,windows	-	-	global declared-only install with hosts never receives the enforced network label
+internal/install	TestDeclaredOnlyWithHostsInstallsWithOnlyDeclaredOnly	linux,darwin,windows	-	-	project declared-only install with hosts never receives the enforced network label
+cmd/curator	TestCLIAuditEmitsScriptLabels	linux,darwin,windows	-	-	curator audit renders each vector warning at its command-line entry
+cmd/curator	TestCLIAuditMixedSkillRecordsBothPolicies	linux,darwin,windows	-	-	curator audit records enforced identity and explicit absence for a mixed skill
+cmd/curator	TestCLIAuditJSONCarriesScriptLabels	linux,darwin,windows	-	-	curator audit JSON carries warning labels and per-command policy identities
+cmd/curator	TestCLIAuditJSONRecordsExplicitAbsence	linux,darwin,windows	-	-	curator audit JSON records declared-only policy absence explicitly

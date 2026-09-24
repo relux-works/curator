@@ -839,6 +839,18 @@ curator audit --all --json
 
 The command evaluates security policies and fails if unvetted code is detected.
 
+Script commands additionally report two warning classes that never fail
+the audit: `script-command-declared-only` for commands without
+`execution_policy: "script-worker-v1"`, and
+`script-command-unfiltered-declared-network` for enforced commands with
+declared `network` hosts (reporting-only). Every script command also gets
+an informational audit-record entry — `audit info: <skill>: command
+'<name>' execution_policy=<script-worker-v1|(none)>` — carried under
+`script_policies` in `--json` output and in the stored verdict, so a
+reviewer can separate enforced commands from declared-only ones even when
+no warning fires. See
+[Troubleshooting](troubleshooting.md#script-audit-labels).
+
 ## Maintenance and shell integration
 
 ### curator gc

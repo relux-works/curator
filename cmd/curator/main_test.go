@@ -28,6 +28,7 @@ import (
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/rustsource"
+	"github.com/relux-works/curator/internal/scriptworker"
 	"github.com/relux-works/curator/internal/version"
 )
 
@@ -824,6 +825,57 @@ func TestHiddenWorkerModeIsNotAUserVisibleCommand(t *testing.T) {
 		if code := runCode(t, configPath, []string{mode, "extra"}); code != exitUsage {
 			t.Fatalf("run with %q and an extra argument = %d, want the unknown-command usage exit", mode, code)
 		}
+	}
+}
+
+// TestProductionBinaryDispatchesNetNSProbe proves the fixed hidden
+// network-isolation probe mode is dispatched before launcher dispatch in
+// the production binary: reaching it exits 0 without running any command,
+// and the mode never appears in the user-visible surface.
+func TestProductionBinaryDispatchesNetNSProbe(t *testing.T) {
+	t.Parallel()
+	if strings.Contains(usage, scriptworker.ScriptNetNSProbeMode) {
+		t.Fatalf("hidden probe mode %q appears in the user-visible command surface", scriptworker.ScriptNetNSProbeMode)
+	}
+	binary := filepath.Join(t.TempDir(), "curator"+productionBinarySuffix())
+	build := exec.Command("go", "build", "-o", binary, ".")
+	if output, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("build production curator: %v\n%s", err, output)
+	}
+	probe := exec.Command(binary, scriptworker.ScriptNetNSProbeMode)
+	if output, err := probe.CombinedOutput(); err != nil {
+		t.Fatalf("netns probe dispatch: %v\n%s", err, output)
+	}
+}
+
+// TestProductionBinaryDispatchesLandlockProbe proves the fixed hidden
+// Landlock probe mode is dispatched before launcher dispatch in the
+// production binary: on Linux the child performs the enforcement
+// sequence against the given directory and exits 0, elsewhere the stub
+// answers absent with a nonzero exit, the probe prints nothing either
+// way, and the mode never appears in the user-visible surface.
+func TestProductionBinaryDispatchesLandlockProbe(t *testing.T) {
+	t.Parallel()
+	if strings.Contains(usage, scriptworker.ScriptLandlockProbeMode) {
+		t.Fatalf("hidden probe mode %q appears in the user-visible command surface", scriptworker.ScriptLandlockProbeMode)
+	}
+	binary := filepath.Join(t.TempDir(), "curator"+productionBinarySuffix())
+	build := exec.Command("go", "build", "-o", binary, ".")
+	if output, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("build production curator: %v\n%s", err, output)
+	}
+	directory := t.TempDir()
+	probe := exec.Command(binary, scriptworker.ScriptLandlockProbeMode, directory)
+	output, err := probe.CombinedOutput()
+	if len(output) != 0 {
+		t.Fatalf("landlock probe dispatch printed %q, want silence", output)
+	}
+	if runtime.GOOS == "linux" {
+		if err != nil {
+			t.Fatalf("landlock probe dispatch: %v", err)
+		}
+	} else if err == nil {
+		t.Fatal("landlock probe dispatch exited 0 off Linux, want the absent exit")
 	}
 }
 

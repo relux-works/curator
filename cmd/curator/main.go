@@ -39,6 +39,7 @@ import (
 	"github.com/relux-works/curator/internal/registry"
 	"github.com/relux-works/curator/internal/rustsource"
 	"github.com/relux-works/curator/internal/scopes"
+	"github.com/relux-works/curator/internal/scriptworker"
 	"github.com/relux-works/curator/internal/shell"
 	"github.com/relux-works/curator/internal/skillcheck"
 	"github.com/relux-works/curator/internal/transaction"
@@ -88,6 +89,39 @@ codex_cli; every output keeps the canonical id.
 `
 
 func main() {
+	// The hidden worker mode wins over launcher dispatch: the worker is a
+	// re-execution of the manager (or of a native launcher copy) with
+	// exactly this argument vector, and the launcher it re-executes is
+	// sidecar-paired by construction. Checking the sidecar first would
+	// redispatch the worker into a second launcher and recurse.
+	if len(os.Args) == 2 && os.Args[1] == scriptworker.WorkerMode {
+		os.Exit(scriptworker.RunWorker(os.Stdin, os.Stdout))
+	}
+	// The network-isolation availability probe re-executes the manager in
+	// this fixed hidden mode with the exact namespace flags the
+	// interpreter child would use; reaching it proves the host provides
+	// the control. It wins over launcher dispatch for the same reason the
+	// worker mode does.
+	if len(os.Args) == 2 && os.Args[1] == scriptworker.ScriptNetNSProbeMode {
+		os.Exit(scriptworker.RunNetNSProbe())
+	}
+	// The Landlock availability probe re-executes the manager in this
+	// fixed hidden mode with a manager-owned directory: the child
+	// performs the exact enforcement sequence the interpreter spawn
+	// would use and exits 0 only when every step succeeds. It wins over
+	// launcher dispatch for the same reason the worker mode does.
+	if len(os.Args) == 3 && os.Args[1] == scriptworker.ScriptLandlockProbeMode {
+		os.Exit(scriptworker.RunLandlockProbe(os.Args[2]))
+	}
+	// An enforced native launcher is a manager copy paired with an
+	// install-published sidecar: it replays the manager role for one
+	// script-worker-v1 invocation instead of running the CLI. The sidecar
+	// beside the executable is the whole signal.
+	if executable, err := os.Executable(); err == nil {
+		if _, ok := scriptworker.ShimSidecarFor(executable); ok {
+			os.Exit(runEnforcedShim(executable, os.Args[1:]))
+		}
+	}
 	if handled, code := rustsource.DispatchInternalWorker(os.Args[1:], os.Stdin, os.Stdout); handled {
 		os.Exit(code)
 	}
@@ -105,6 +139,9 @@ func main() {
 	if len(os.Args) == 2 && os.Args[1] == godriver.WorkerMode {
 		os.Exit(godriver.RunWorker(os.Stdin, os.Stdout))
 	}
+	// The fixed hidden script-worker-v1 worker dispatches at the top of
+	// main, before launcher dispatch: the worker re-executes a
+	// sidecar-paired launcher, so the sidecar check must not see it.
 	// Resolve the environment-backed user path once at the process boundary.
 	// The command core receives an explicit source so independent invocations
 	// never consult CURATOR_CONFIG themselves.
@@ -137,6 +174,36 @@ func (c cli) newFlagSet(name string) *flag.FlagSet {
 	flags := flag.NewFlagSet(name, flag.ContinueOnError)
 	flags.SetOutput(c.stderr)
 	return flags
+}
+
+// runEnforcedShim runs this process as an enforced native launcher: load
+// the operator-trusted interpreter bindings and hand the invocation to
+// the script worker session. A configuration that cannot load leaves the
+// bindings empty, so interpreter resolution refuses closed rather than
+// guessing; configuration warnings stay silent here because the
+// launcher's streams belong to the caller's pipeline.
+func runEnforcedShim(executable string, args []string) int {
+	var interpreters map[string]string
+	var diagnosticsDir string
+	if loaded, err := config.Load(config.UserPath(), func(string) {}); err == nil {
+		interpreters = loaded.ScriptInterpreters
+		diagnosticsDir = loaded.ScriptDiagnosticsDir
+	}
+	stdinTerminal := false
+	if info, err := os.Stdin.Stat(); err == nil && info.Mode()&os.ModeCharDevice != 0 {
+		stdinTerminal = true
+	}
+	return scriptworker.RunShim(scriptworker.ShimRequest{
+		ExePath:         executable,
+		Args:            args,
+		Stdin:           os.Stdin,
+		StdinIsTerminal: stdinTerminal,
+		Stdout:          os.Stdout,
+		Stderr:          os.Stderr,
+		Environ:         os.Environ(),
+		Interpreters:    interpreters,
+		DiagnosticsDir:  diagnosticsDir,
+	})
 }
 
 // run executes one isolated CLI invocation. Its configuration source and
@@ -1819,19 +1886,23 @@ func (c cli) cmdAudit(args []string) int {
 	}
 
 	type auditOutput struct {
-		Scope    string   `json:"scope"`
-		Warnings []string `json:"warnings"`
-		Errors   []string `json:"errors"`
+		Scope          string                     `json:"scope"`
+		Warnings       []string                   `json:"warnings"`
+		Errors         []string                   `json:"errors"`
+		ScriptPolicies []audit.ScriptPolicyRecord `json:"script_policies"`
 	}
 	outputs := make([]auditOutput, 0, len(targets))
 	exitCode := exitOK
 	for _, target := range targets {
-		warnings, errors := auditTarget(cfg, target)
-		outputs = append(outputs, auditOutput{Scope: target.Alias, Warnings: warnings, Errors: errors})
+		warnings, errors, policies := auditTarget(cfg, target)
+		outputs = append(outputs, auditOutput{Scope: target.Alias, Warnings: warnings, Errors: errors, ScriptPolicies: policies})
 		if len(errors) > 0 {
 			exitCode = exitFail
 		}
 		if !*jsonOut {
+			for _, record := range policies {
+				_, _ = fmt.Fprintf(c.stdout, "%s: %s\n", target.Alias, audit.FormatScriptPolicy(record))
+			}
 			for _, warning := range warnings {
 				_, _ = fmt.Fprintf(c.stdout, "%s: %s\n", target.Alias, warning)
 			}
@@ -1850,26 +1921,26 @@ func (c cli) cmdAudit(args []string) int {
 	return exitCode
 }
 
-func auditTarget(cfg *config.Config, target projectTarget) ([]string, []string) {
+func auditTarget(cfg *config.Config, target projectTarget) ([]string, []string, []audit.ScriptPolicyRecord) {
 	projectManifest, err := manifest.Load(target.Root)
 	if err != nil {
-		return nil, []string{err.Error()}
+		return nil, []string{err.Error()}, nil
 	}
 	if projectManifest == nil {
-		return nil, []string{"Skillfile.json not found"}
+		return nil, []string{"Skillfile.json not found"}, nil
 	}
 	substitutions := map[string]devsub.Substitution{}
 	if target.Alias != "global" {
 		substitutions, err = devsub.Load(target.Root)
 		if err != nil {
-			return nil, []string{err.Error()}
+			return nil, []string{err.Error()}, nil
 		}
 	}
 	nodes, err := closure.Build(closure.Options{
 		SkillsRoot: cfg.SkillsRoot, Home: cfg.Home(), AllowedSources: cfg.AllowedSources,
 	}, projectManifest, substitutions)
 	if err != nil {
-		return nil, []string{err.Error()}
+		return nil, []string{err.Error()}, nil
 	}
 	subjects := make([]audit.Subject, 0, len(nodes))
 	for _, node := range nodes {
@@ -1877,9 +1948,11 @@ func auditTarget(cfg *config.Config, target projectTarget) ([]string, []string) 
 			Name: node.Name, Source: node.Decl.Source, Git: node.Decl.Git,
 			Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
 			SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
+			Commands: node.Spec.Commands,
 		})
 	}
-	return audit.Gate(cfg, subjects)
+	warnings, errs := audit.Gate(cfg, subjects)
+	return warnings, errs, audit.ScriptPolicyRecords(subjects)
 }
 
 // cmdGC runs maintenance under the exclusive manager-home mutation lock, so it

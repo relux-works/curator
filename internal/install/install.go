@@ -502,6 +502,7 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 					Name: node.Name, Source: node.Decl.Source, Git: node.Decl.Git,
 					Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
 					SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
+					Commands: node.Spec.Commands,
 				})
 			}
 			var warnings, errs []string
@@ -792,12 +793,13 @@ func stageProjectTargets(request projectTargetRequest) (scopeTargets, error) {
 	runtime, err := stageRuntimeAndShims(
 		stageRoot, request.cfg.Home(), request.binDir, request.nodes,
 		runtimestore.ProjectShim, request.platform, request.scoped, request.plan.plannedInputs(), request.external.entries, request.externalStoreRoot,
-		request.runtimeKeys,
+		request.runtimeKeys, request.projectRoot,
 	)
 	if err != nil {
 		return scopeTargets{}, err
 	}
 	targets.plan.Merge(runtime.plan)
+	targets.messages = append(targets.messages, runtime.messages...)
 	targets.plan.Merge(request.external.transactionPlan(request.externalStoreRoot))
 	targets.adoptions = request.external.adoptions(request.externalStoreRoot)
 	targets.referencedKeys = runtime.referencedKeys()

@@ -63,10 +63,14 @@ func TestValidateWarnsAboutRuntimePathInPromptContext(t *testing.T) {
 				},
 			}))
 			issues := Validate(dir, "")
-			if len(issues) != 2 ||
-				issues[0].Code != "skill.runtime_root_in_prompt_context" ||
-				issues[1].Code != "skill.command_resolution_contract_missing" {
+			if len(issues) != 3 ||
+				issues[0].Code != "script-command-declared-only" ||
+				issues[1].Code != "skill.runtime_root_in_prompt_context" ||
+				issues[2].Code != "skill.command_resolution_contract_missing" {
 				t.Fatalf("issues = %+v", issues)
+			}
+			if issues[0].Severity != "warning" || HasErrors(issues) {
+				t.Fatalf("the declared-only label must warn, never error: %+v", issues)
 			}
 		})
 	}
@@ -196,8 +200,14 @@ func TestValidateAcceptsCrossPlatformShellNeutralResolver(t *testing.T) {
 			},
 		},
 	}))
-	if issues := Validate(dir, ""); len(issues) != 0 {
+	// The shell-neutral resolver silences the prompt-context warnings; the
+	// script audit label remains as a warning, never an error.
+	issues := Validate(dir, "")
+	if len(issues) != 1 || issues[0].Code != "script-command-declared-only" {
 		t.Fatalf("shell-neutral skill warnings = %+v", issues)
+	}
+	if issues[0].Severity != "warning" || HasErrors(issues) {
+		t.Fatalf("the declared-only label must warn, never error: %+v", issues)
 	}
 }
 
@@ -247,28 +257,19 @@ func schema8ScriptSkill(t *testing.T, enforced bool) string {
 	return dir
 }
 
-// A schema-8 manifest that selects script-worker-v1 is a valid document, so it
-// parses; the manager still refuses it, because it has no worker and the
-// policy forbids installing the command declared-only.
-func TestValidateRejectsEnforcedScriptExecutionPolicy(t *testing.T) {
+// A schema-8 manifest that selects script-worker-v1 is a valid document,
+// so it parses and validates: the control table is complete, so admission
+// proceeds and only a host that cannot provide a mandatory control
+// refuses, at install and at invocation.
+func TestValidateAcceptsEnforcedScriptExecutionPolicy(t *testing.T) {
 	issues := Validate(schema8ScriptSkill(t, true), "")
-	var refusals []Issue
+	if HasErrors(issues) {
+		t.Fatalf("an enforced schema-8 skill reported errors: %+v", issues)
+	}
 	for _, issue := range issues {
-		if issue.Code == "script_execution_policy_unsupported" {
-			refusals = append(refusals, issue)
+		if issue.Code == "script_execution_policy_unsupported" || issue.Code == "script_execution_control_unavailable" {
+			t.Fatalf("an enforced command was refused at check: %+v", issue)
 		}
-		if issue.Code == "skill.manifest_invalid" {
-			t.Fatalf("the parser rejected a valid schema-8 manifest: %+v", issue)
-		}
-	}
-	if len(refusals) != 1 {
-		t.Fatalf("want exactly one execution-policy refusal, got %+v", issues)
-	}
-	if refusals[0].Severity != "error" || !HasErrors(issues) {
-		t.Fatalf("refusal is not an error: %+v", refusals[0])
-	}
-	if refusals[0].Path != "commands.tool.execution_policy" {
-		t.Fatalf("Path = %q", refusals[0].Path)
 	}
 }
 
@@ -280,7 +281,7 @@ func TestValidateAcceptsDeclaredOnlySchema8ScriptCommand(t *testing.T) {
 		t.Fatalf("a declared-only schema-8 skill reported errors: %+v", issues)
 	}
 	for _, issue := range issues {
-		if issue.Code == "script_execution_policy_unsupported" {
+		if issue.Code == "script_execution_policy_unsupported" || issue.Code == "script_execution_control_unavailable" {
 			t.Fatalf("a declared-only command was refused: %+v", issue)
 		}
 	}

@@ -1,6 +1,7 @@
 package install
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/runtimestore"
 	"github.com/relux-works/curator/internal/scriptpolicy"
+	"github.com/relux-works/curator/internal/scriptworker"
 	"github.com/relux-works/curator/internal/skillspec"
 	"github.com/relux-works/curator/internal/staging"
 	"github.com/relux-works/curator/internal/whitelist"
@@ -139,6 +141,11 @@ type runtimeStaging struct {
 	plan staging.Plan
 	// commands is the complete set of command names the scope publishes.
 	commands map[string]bool
+	// enforced names the published commands served by native enforced
+	// launchers rather than ordinary shims.
+	enforced map[string]bool
+	// messages carries the per-command derivation records install reports.
+	messages []string
 	// builds records, per node, the published build identity of each compiled
 	// command so the install marker can carry it.
 	builds map[string]map[string]marker.Build
@@ -165,9 +172,15 @@ func stageRuntimeAndShims(
 	external map[string]map[string]externalEntry,
 	externalRoot string,
 	runtimeKeys map[string]string,
+	projectRoot string,
 ) (runtimeStaging, error) {
-	result := runtimeStaging{commands: map[string]bool{}, builds: map[string]map[string]marker.Build{}}
+	result := runtimeStaging{
+		commands: map[string]bool{},
+		enforced: map[string]bool{},
+		builds:   map[string]map[string]marker.Build{},
+	}
 	var specs []runtimestore.ShimSpec
+	var enforcedSpecs []runtimestore.EnforcedShimSpec
 	for _, node := range nodes {
 		active := node.ActiveCommands()
 		if len(active) == 0 {
@@ -181,12 +194,18 @@ func stageRuntimeAndShims(
 		if err != nil {
 			return runtimeStaging{}, err
 		}
+		enforcedCommands, err := activeEnforcedScriptCommands(node, active)
+		if err != nil {
+			return runtimeStaging{}, err
+		}
 		targets := map[string]runtimestore.RuntimeTarget{}
-		if len(scriptCommands) > 0 {
+		scriptTargets := map[string]runtimestore.ScriptTarget{}
+		allScriptCommands := append(append([]skillspec.Command(nil), scriptCommands...), enforcedCommands...)
+		if len(allScriptCommands) > 0 {
 			runtimeKey := draftRuntimeKey(node, runtimeKeys)
 			runtimePlan, err := runtimestore.PrepareScriptRuntime(stageRoot, runtimestore.ScriptRuntimeSpec{
 				Home: home, SkillName: node.Name, Commit: runtimeKey, Snapshot: node.Snapshot,
-				RuntimeRoots: node.Spec.RuntimeRoots, Commands: scriptCommands, Platform: platform,
+				RuntimeRoots: node.Spec.RuntimeRoots, Commands: allScriptCommands, Platform: platform,
 			})
 			if err != nil {
 				return runtimeStaging{}, fmt.Errorf("%s: %w", node.Name, err)
@@ -198,6 +217,7 @@ func stageRuntimeAndShims(
 			}
 			for name, target := range runtimePlan.Commands {
 				targets[name] = target
+				scriptTargets[name] = target
 			}
 		}
 		for _, name := range node.ActiveCommandNames() {
@@ -253,7 +273,14 @@ func stageRuntimeAndShims(
 				ArtifactPath:   hit.Receipt.Artifact.Path,
 			}
 		}
+		enforced := map[string]bool{}
+		for _, command := range enforcedCommands {
+			enforced[command.Name] = true
+		}
 		for _, name := range node.ActiveCommandNames() {
+			if enforced[name] {
+				continue
+			}
 			target, selected := targets[name]
 			if !selected {
 				continue
@@ -267,33 +294,132 @@ func stageRuntimeAndShims(
 			})
 			result.commands[name] = true
 		}
+		if len(enforcedCommands) != 0 {
+			declaredRaw, err := rawDeclaredCapabilities(node.Snapshot)
+			if err != nil {
+				return runtimeStaging{}, fmt.Errorf("%s: %w", node.Name, err)
+			}
+			declared, err := scriptworker.ParseDeclaredCapabilities(declaredRaw)
+			if err != nil {
+				return runtimeStaging{}, fmt.Errorf("%s: %w", node.Name, err)
+			}
+			for _, command := range enforcedCommands {
+				target, selected := scriptTargets[command.Name]
+				if !selected {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: the enforced runtime target was not staged", node.Name, command.Name)
+				}
+				destination, err := runtimestore.NewManagedEnforcedShim(role, binDir, command.Name, platform)
+				if err != nil {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, command.Name, err)
+				}
+				sidecar, err := scriptworker.NewShimSidecar(
+					node.Name, command.Name, command.Interpreter,
+					target.ExecutablePath(), target.RuntimeDir(),
+					projectRoot, node.Spec.SchemaVersion, declaredRaw)
+				if err != nil {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, command.Name, err)
+				}
+				sidecarPayload, err := sidecar.Marshal()
+				if err != nil {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, command.Name, err)
+				}
+				enforcedSpecs = append(enforcedSpecs, runtimestore.EnforcedShimSpec{
+					Destination: destination, Sidecar: sidecarPayload,
+				})
+				result.commands[command.Name] = true
+				result.enforced[command.Name] = true
+				reports, err := enforcedDerivationMessages(node.Name, command, declared, home, binDir, node.Snapshot)
+				if err != nil {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, command.Name, err)
+				}
+				result.messages = append(result.messages, reports...)
+			}
+		}
 	}
 
 	currentlyManaged, err := runtimestore.ManagedShimsIn(binDir, role, platform)
 	if err != nil {
 		return runtimeStaging{}, err
 	}
-	transition, err := runtimestore.StageShimTransition(stageRoot, specs, currentlyManaged)
+	currentlyEnforced, err := runtimestore.ManagedEnforcedShimsIn(binDir, role, platform)
 	if err != nil {
 		return runtimeStaging{}, err
+	}
+	// Sidecar-paired launchers and the sidecars themselves belong to the
+	// enforced transition, so the ordinary transition must not also claim
+	// or remove them. (A sidecar filename parses as an ordinary shim
+	// name, which is exactly why the exclusion is explicit.)
+	enforcedPaths := map[string]bool{}
+	for _, shim := range currentlyEnforced {
+		enforcedPaths[shim.Path()] = true
+		enforcedPaths[shim.SidecarPath()] = true
+	}
+	ordinaryCurrent := currentlyManaged[:0]
+	for _, shim := range currentlyManaged {
+		if !enforcedPaths[shim.Path()] {
+			ordinaryCurrent = append(ordinaryCurrent, shim)
+		}
+	}
+	transition, err := runtimestore.StageShimTransition(stageRoot, specs, ordinaryCurrent)
+	if err != nil {
+		return runtimeStaging{}, err
+	}
+	enforcedTransition, err := runtimestore.StageEnforcedShimTransition(stageRoot, enforcedSpecs, currentlyEnforced)
+	if err != nil {
+		return runtimeStaging{}, err
+	}
+	// The two transitions are computed independently, so an enforcement
+	// flip emits a replacement from one side and a removal of the same
+	// live launcher from the other. The replacement always supersedes
+	// the removal: the commit overwrites the live path, and only the
+	// orphaned sidecar still needs its own removal.
+	replaced := map[string]bool{}
+	for _, desired := range transition.Desired {
+		replaced[desired.LivePath] = true
+	}
+	for _, desired := range enforcedTransition.Desired {
+		replaced[desired.LivePath] = true
 	}
 	for _, desired := range transition.Desired {
 		result.plan.Replace(staging.ClassCanonicalShim, desired.Command, desired.LivePath, desired.StagedPath)
 	}
 	for _, removal := range transition.Removals {
+		if replaced[removal.LivePath] {
+			continue
+		}
 		result.plan.Remove("shim/"+removal.Command, removal.LivePath)
+	}
+	for _, desired := range enforcedTransition.Desired {
+		identifier := enforcedPlanIdentifier(desired.Command, desired.LivePath)
+		result.plan.Replace(staging.ClassCanonicalShim, identifier, desired.LivePath, desired.StagedPath)
+	}
+	for _, removal := range enforcedTransition.Removals {
+		if replaced[removal.LivePath] {
+			continue
+		}
+		result.plan.Remove(enforcedPlanIdentifier(removal.Command, removal.LivePath), removal.LivePath)
 	}
 	return result, nil
 }
 
-// activeScriptCommands lists the active script commands of one node in
-// command-lexical order.
-//
-// It refuses an enforced command rather than returning it. The install
-// preflight already rejected the node through skillcheck, so reaching this
-// point means a caller skipped that gate; the shim writer must not be the
-// layer that decides, because the only thing it can do with an enforced
-// command is write the ordinary uncontained shim §4.1.1 forbids.
+// enforcedPlanIdentifier names one enforced launcher or sidecar target in
+// the transaction plan. The launcher and its sidecar share a command but
+// are distinct live paths, so they need distinct identifiers: one shared
+// identifier duplicates the removal target whenever both removals land,
+// which is exactly the Windows enforcement flip — the `.exe` launcher and
+// the `.cmd` shim are different paths, so no replacement suppresses
+// either removal. Desired and removal sides share this spelling so one
+// flip cannot collide with itself in either class.
+func enforcedPlanIdentifier(command, livePath string) string {
+	if strings.HasSuffix(livePath, ".curator-shim.json") {
+		return "enforced-sidecar/" + command
+	}
+	return "enforced-shim/" + command
+}
+
+// activeScriptCommands lists the active declared-only script commands of
+// one node in command-lexical order. Enforced commands are not returned
+// here; they stage through activeEnforcedScriptCommands below.
 func activeScriptCommands(node *closure.Node, active map[string]bool) ([]skillspec.Command, error) {
 	var commands []skillspec.Command
 	for _, name := range node.ActiveCommandNames() {
@@ -302,12 +428,95 @@ func activeScriptCommands(node *closure.Node, active map[string]bool) ([]skillsp
 			continue
 		}
 		if scriptpolicy.Enforced(command) {
-			return nil, fmt.Errorf("%s.%s: %w", node.Name, name,
-				scriptpolicy.Admit(map[string]skillspec.Command{name: command}))
+			continue
 		}
 		commands = append(commands, command)
 	}
 	return commands, nil
+}
+
+// activeEnforcedScriptCommands lists the active enforced script commands of
+// one node in command-lexical order. Admission refuses an unknown policy
+// and an incomplete control table; the host preflight then refuses with
+// `script_execution_control_unavailable` when this host cannot provide a
+// mandatory control, before anything is staged — rather than writing the
+// ordinary uncontained shim §4.1.1 forbids or publishing a launcher that
+// can never run. The host probe runs once per call, not once per command:
+// the host cannot differ between two commands of one install. Once both
+// gates pass the commands proceed to native launcher staging — the guard
+// never formats a nil admission, so it cannot degrade to a wrapped nil.
+func activeEnforcedScriptCommands(node *closure.Node, active map[string]bool) ([]skillspec.Command, error) {
+	var commands []skillspec.Command
+	for _, name := range node.ActiveCommandNames() {
+		command := node.Spec.Commands[name]
+		if command.Type != "script" || !active[name] {
+			continue
+		}
+		if !scriptpolicy.Enforced(command) {
+			continue
+		}
+		if err := scriptpolicy.Admit(map[string]skillspec.Command{name: command}); err != nil {
+			return nil, fmt.Errorf("%s.%s: %w", node.Name, name, err)
+		}
+		commands = append(commands, command)
+	}
+	if len(commands) != 0 {
+		if err := scriptworker.PreflightHostControls(); err != nil {
+			return nil, fmt.Errorf("%s: %w", node.Name, err)
+		}
+	}
+	return commands, nil
+}
+
+// rawDeclaredCapabilities re-reads the declared `capabilities` object of
+// one node snapshot. Derivation reads the declared manifest bytes rather
+// than the parsed schema defaults, so the sidecar stores the raw object
+// and the launcher derives presence from it. The bytes are re-validated
+// both here and at launch.
+func rawDeclaredCapabilities(snapshot string) (json.RawMessage, error) {
+	manifestPath := filepath.Join(snapshot, skillspec.ManifestSourcePath(snapshot))
+	payload, err := os.ReadFile(manifestPath) // #nosec G304 -- admitted node snapshot manifest
+	if err != nil {
+		return nil, fmt.Errorf("cannot read the declared capabilities: %w", err)
+	}
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &envelope); err != nil {
+		return nil, fmt.Errorf("cannot decode the declared capabilities: %w", err)
+	}
+	raw, present := envelope["capabilities"]
+	if !present {
+		return nil, nil
+	}
+	return raw, nil
+}
+
+// enforcedDerivationMessages records one enforced command's install-time
+// derivation: the breaking-change notice plus every withheld env_read
+// entry, recorded network host, and unresolvable exec name. The per-command
+// profile itself derives fresh at every invocation; this record describes
+// the install moment.
+func enforcedDerivationMessages(skill string, command skillspec.Command, declared scriptworker.DeclaredCapabilities, home, binDir, snapshot string) ([]string, error) {
+	report, err := scriptworker.DeriveStaticReport(declared, command.Interpreter, nil,
+		[]string{snapshot, home, binDir})
+	if err != nil {
+		return nil, err
+	}
+	prefix := skill + ": command '" + command.Name + "' is enforced (script-worker-v1): "
+	messages := []string{prefix +
+		"undeclared environment variables are absent and undeclared executables do not resolve at run time"}
+	if len(report.WithheldEnv) != 0 {
+		messages = append(messages, prefix+"withholds manager-owned env_read entries: "+
+			strings.Join(report.WithheldEnv, ", "))
+	}
+	if len(report.RecordedHosts) != 0 {
+		messages = append(messages, prefix+"declares network hosts, recorded reporting-only without filtering: "+
+			strings.Join(report.RecordedHosts, ", "))
+	}
+	if len(report.UnresolvedExec) != 0 {
+		messages = append(messages, prefix+"omits unresolvable exec names from PATH: "+
+			strings.Join(report.UnresolvedExec, ", "))
+	}
+	return messages, nil
 }
 
 // stageStaleSkillRemovals turns installed skills that the next closure does not

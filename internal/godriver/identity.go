@@ -129,3 +129,43 @@ func (identity ExecutableIdentity) matches(path, digest string, size int64) erro
 	}
 	return nil
 }
+
+// The entry points below are the shared executable-identity primitives
+// the script worker reuses. They are the same checks the go-v1 worker
+// applies to the manager executable — canonical physical path, regular file,
+// single link, open-then-hash, native image header — so both workers agree
+// on what an installed identity is and a fix to one reaches the other.
+
+// ResolveManagerIdentity canonicalizes path to the installed manager file,
+// rejects substitution, and hashes the bytes. See resolveExecutableIdentity.
+func ResolveManagerIdentity(path string) (ExecutableIdentity, error) {
+	return resolveExecutableIdentity(path)
+}
+
+// MatchesExpectation compares an identity proof carried over a worker
+// protocol to the recorded identity.
+func (identity ExecutableIdentity) MatchesExpectation(path, digest string, size int64) error {
+	return identity.matches(path, digest, size)
+}
+
+// CanonicalPhysicalPath resolves every link in path to the file it really
+// names, including Windows directory junctions EvalSymlinks cannot follow.
+func CanonicalPhysicalPath(path string) (string, error) {
+	return physicalPath(path)
+}
+
+// HasMultipleLinks reports whether the file carries more than one filesystem
+// link or is a reparse point, which is substitution rather than identity.
+func HasMultipleLinks(path string, info fs.FileInfo) (bool, error) {
+	return artifactHasMultipleLinks(path, info)
+}
+
+// NativeExecutableHeader reports whether header carries a native executable
+// image magic: ELF or Mach-O (including fat binaries) on unix, MZ on
+// Windows. It is the same judgment validateLauncher applies to the Go
+// launcher — a wrapper script or batch file is not a native executable —
+// shared so the script worker's interpreter gate cannot drift from the
+// go-v1 worker's.
+func NativeExecutableHeader(header []byte) bool {
+	return nativeExecutableHeader(header)
+}

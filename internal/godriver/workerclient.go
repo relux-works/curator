@@ -156,6 +156,7 @@ func launchWorker(ctx context.Context, plan workerPlan) (_ *workerClient, result
 		PrivateRoots:     plan.PrivateRoots,
 		Platform:         plan.Platform,
 		Probes:           plan.Probes,
+		ControlJobHandle: domain.workerJobHandleValue(),
 		Limits: wireLimits{
 			TimeoutMillis: plan.Limits.Timeout.Milliseconds(),
 			OutputBytes:   plan.Limits.OutputBytes,

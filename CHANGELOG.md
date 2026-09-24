@@ -6,6 +6,24 @@ All notable implementation changes are recorded here.
 
 ### Added
 
+- R5 script-worker-v1 runtime conformance qualification. All 33 named
+  behavioral vector cases and 11 mandatory controls map to registered
+  production-entry rows; launch, audit, control, and evidence cases are
+  required on Ubuntu, macOS, and Windows hosted lanes. Every declared exec
+  grant must resolve through the manager-owned search directories or Launch
+  refuses before the worker starts; Windows default lookup uses the captured
+  manager SYSTEMROOT and copies verified System32 hard-linked binaries into
+  the private PATH farm. The native inventory
+  matrix is Linux: process teardown, file-size, and handle controls available,
+  with cgroup, Landlock, and network namespace controls host-conditional;
+  macOS: teardown, file-size, and handle controls available, with aggregate
+  process/memory, descendant exec, filesystem, and network controls
+  unavailable; Windows: Job Object teardown/process/memory and inherited
+  handle controls available, with file-size, descendant exec, filesystem,
+  and network controls unavailable. Linux conditional controls remain
+  per-invocation probes. Piped input remains capped at 64 MiB and combined
+  captured output at 16 MiB; interactive and pass-through streams are outside
+  this bounded model.
 - E4: umbrella provider lookup from trust roots (warning release,
   revision A). Unknown subcommands still resolve `curator-<name>` on the
   ambient `PATH`, but the manager now computes the trust verdict against
@@ -23,6 +41,93 @@ All notable implementation changes are recorded here.
   non-current for `--check`. Revision B (trust roots only, `PATH`
   never selects) follows in a later release; this story blocks proposal
   0016 / `path_prepend`.
+- R4 script audit warning classes for `script-worker-v1` (manager profile
+  §7). Every declared-only script command — schema 7 and schema 8 without
+  `execution_policy` — now warns `script-command-declared-only` through
+  `curator audit`, the install-time audit gate, and `skill check`; every
+  enforced command with declared `network` hosts warns
+  `script-command-unfiltered-declared-network` (reporting-only, no portable
+  filtering applied or claimed). Both classes are always warnings in every
+  mode and never block: declared-only skills install exactly as before and
+  enforced skills keep their native launchers. Enforced commands are never
+  labelled declared-only, and the network label applies only to enforced
+  commands with non-empty declared hosts. For every script command the
+  audit record additionally carries the effective execution-policy
+  identity or its explicit absence (`audit info` lines, `script_policies`
+  in `audit --json`, and the stored verdict), independent of warning
+  eligibility. Operator guidance in `docs/troubleshooting.md`.
+- R3 native probes, capability evidence, and preflight for
+  `script-worker-v1`. Every enforced invocation probes the exhaustive
+  eight-control native inventory once, before the worker starts, with no
+  host-label, cache, or configuration substitution; applies exactly the
+  `available`/`host-conditional`-present controls (process-group and
+  Job Object teardown with exact limits, `RLIMIT_FSIZE`, handle hygiene,
+  and on Linux delegated cgroup v2 bounds, Landlock exec denial and
+  write confinement over the derived path set, and a network namespace
+  without interfaces); and returns exactly one closed result-only
+  `script-capability-evidence-v1` record, which the parent validates
+  against its own probe before permitting the run. A host that cannot
+  provide a mandatory control refuses install and invocation with
+  `script_execution_control_unavailable` before any worker starts;
+  record contradictions refuse with
+  `script_execution_capability_evidence_invalid`, and deferred-guarantee
+  or foreign-policy claims with
+  `script_execution_hardened_claim_forbidden`. The 11-control
+  implementation table is complete and the R2 table-injection seam is
+  removed, so enforced commands admit at `skill check`, install as
+  native launchers, and run end to end when the host provides the
+  mandatory controls. The invocation record and derivation report are
+  available through the new operator-selected `script_diagnostics_dir`
+  machine configuration. Stream behaviour stays bounded (64 MiB stdin
+  refusal, 16 MiB capture); piped or file stdin is fully buffered, terminal
+  stdin is null-bound, and stdout/stderr share the capture budget. Overflow
+  reports through the worker and refuses the invocation without forwarding partial capture; live
+  pass-through and interactive streams are unsupported. On Linux, a derived
+  filesystem path that cannot be ruled
+  refuses the invocation fail-closed
+  (`script_execution_worker_protocol_invalid` naming the control and
+  the offending path) rather than running with a probed-present
+  control left unenforced; write confinement grants the derived path
+  set, the operation-private area, and the null device, handling every
+  filesystem mutation right the probed Landlock ABI provides (write,
+  truncation, entry creation/removal/reparenting, device ioctl) while
+  reads stay unrestricted.
+- R2 declaration-derived enforcement for `script-worker-v1`. Every enforced
+  invocation derives its containment profile from the declared capabilities,
+  deny by default: a manager-built environment (empty bootstrap plus
+  manager-set values plus exactly the non-reserved `env_read` names, with
+  the portable, platform, and per-interpreter reserved sets enforced and an
+  interpreter without a reserved set refused), a manager-built `PATH` over a
+  manager-owned directory exposing exactly the resolved interpreter and the
+  manager-resolved declared exec names, offline network configuration with
+  proxy/resolver scrubbing when the derived network is none, a
+  manager-selected working directory with the private temporary,
+  configuration, and cache roots bound through the platform environment,
+  reporting-only declared network hosts, and secret identifiers that never
+  resolve to values. The worker revalidates the derived profile and starts
+  the interpreter only after the parent's permit frame. Enforced commands
+  install as native launchers (a manager copy plus a sidecar contract — no
+  shell, `.cmd`, or symlink shim) that replay the manager role, and install
+  records each command's derivation in its result messages. Operator
+  documentation for the `script_interpreters` bindings in
+  `docs/script-interpreters.md`.
+- R1 script manager/worker invocation path (`script-worker-v1`). The manager
+  resolves the closed `node-v1`/`python3-v1` interpreter identifiers from the
+  new operator-trusted `script_interpreters` machine-configuration mapping
+  only (never repository, runtime root, `.agents/bin`, user `PATH`, or
+  manifest), re-executes the installed manager in the fixed hidden
+  `__curator-script-worker-v1` mode with a fresh session nonce, identity
+  recheck at the launch boundary, explicit stream binding, a private runtime
+  area, and worker-domain teardown, reusing the go-v1 worker's executable
+  identity primitives. Admission now preflights the 11 mandatory portable
+  controls: unsupported policies keep refusing
+  `script_execution_policy_unsupported`, while `node-v1`/`python3-v1`
+  commands refuse `script_execution_control_unavailable` naming the missing
+  controls. Interpreter bindings must name native executable images (the
+  `.exe` itself on Windows); wrapper scripts and batch files are refused
+  at resolution and at the worker before the interpreter runs. Enforced
+  launch remains refused until the R2/R3 control set is complete; no
+  enforced script launches uncontained.
 - Scoped HTTPS credentials for external build repositories. A `build_https`
   configuration section maps a source scope to a token source — the operator's
   own Git credential for the host, a manager-namespaced keyring entry, or a

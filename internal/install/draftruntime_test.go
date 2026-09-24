@@ -13,6 +13,7 @@ import (
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/runtimestore"
+	"github.com/relux-works/curator/internal/scriptworker"
 	"github.com/relux-works/curator/internal/sourcelock"
 )
 
@@ -358,40 +359,71 @@ func assertNoInstallSideEffects(t *testing.T, project, home string) {
 }
 
 // TestDraftLocalEnforcedCommandRefused proves script-worker enforcement
-// stays mandatory for draft locals: an enforced command fails on the
-// mutating path before any publication.
+// stays mandatory for draft locals on the mutating path: when this host
+// cannot provide a mandatory control, an enforced command fails before
+// any publication. With a host that provides the controls the same draft
+// installs its enforced command as a native launcher — the R3 contract
+// change from universal refusal to host-conditional preflight.
 func TestDraftLocalEnforcedCommandRefused(t *testing.T) {
+	// Sequential by construction: the refusal phase forces the
+	// process-global probe fault. Never add t.Parallel here.
 	payload := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["review"]}]}`
-	project, home, _ := draftProject(t, payload, map[string]string{"skills/review": "review"})
-	dir := filepath.Join(project, "skills", "review")
-	if err := os.MkdirAll(filepath.Join(dir, "scripts"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "scripts", "tool"), []byte("#!/bin/sh\necho tool\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	spec := map[string]any{
-		"schema_version": 8,
-		"capabilities":   map[string]any{},
-		"runtime_roots":  []string{"scripts"},
-		"commands": map[string]any{
-			"tool": map[string]any{
-				"type": "script", "unix_path": "scripts/tool", "win_path": "scripts/tool",
-				"execution_policy": "script-worker-v1", "interpreter": "python3-v1",
+	setup := func(t *testing.T) (project, home string) {
+		t.Helper()
+		project, home, _ = draftProject(t, payload, map[string]string{"skills/review": "review"})
+		dir := filepath.Join(project, "skills", "review")
+		if err := os.MkdirAll(filepath.Join(dir, "scripts"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "scripts", "tool"), []byte("#!/bin/sh\necho tool\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		spec := map[string]any{
+			"schema_version": 8,
+			"capabilities":   map[string]any{},
+			"runtime_roots":  []string{"scripts"},
+			"commands": map[string]any{
+				"tool": map[string]any{
+					"type": "script", "unix_path": "scripts/tool", "win_path": "scripts/tool",
+					"execution_policy": "script-worker-v1", "interpreter": "python3-v1",
+				},
 			},
-		},
+		}
+		raw, _ := json.Marshal(spec)
+		if err := os.WriteFile(filepath.Join(dir, "agent-skill.json"), raw, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		resolveDraftForInstall(t, project, home, payload)
+		return project, home
 	}
-	raw, _ := json.Marshal(spec)
-	if err := os.WriteFile(filepath.Join(dir, "agent-skill.json"), raw, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	resolveDraftForInstall(t, project, home, payload)
+	// Phase 1: the host cannot provide a mandatory control, so the
+	// draft install refuses on the mutating path before any
+	// publication.
+	restore := scriptworker.OverrideScriptProbeFaultForTest(func(control string) error {
+		if control == scriptworker.ScriptControlDescendantDomainTermination {
+			return errInjectedProbeFailure
+		}
+		return nil
+	})
+	project, home := setup(t)
 	result := draftLocalInstall(t, home, project, false)
+	restore()
 	if result.Status != "failed" ||
-		!strings.Contains(strings.Join(result.Errors, ";"), "script_execution_policy_unsupported") {
+		!strings.Contains(strings.Join(result.Errors, ";"), "script_execution_control_unavailable") {
 		t.Fatalf("result = %+v, want scriptpolicy refusal", result)
 	}
 	assertNoInstallSideEffects(t, project, home)
+	// Phase 2: with a host that provides the controls, the same draft
+	// installs its enforced command as a native launcher.
+	project, home = setup(t)
+	result = draftLocalInstall(t, home, project, false)
+	if result.Status != "ok" {
+		t.Fatalf("result = %+v, want a staged draft install", result)
+	}
+	sidecars, err := filepath.Glob(filepath.Join(project, ".agents", "bin", "*"+scriptworker.ShimSidecarSuffix))
+	if err != nil || len(sidecars) == 0 {
+		t.Fatalf("the draft install published no native launcher sidecar: %v", err)
+	}
 }
 
 // TestDraftLocalMissingSystemCommandRefused proves system-command

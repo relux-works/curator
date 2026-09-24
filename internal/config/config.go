@@ -81,8 +81,16 @@ var managerKeys = map[string]bool{
 	"audit_registries": true, "disable_builtin_registries": true,
 	"execution": true,
 	"build_ssh": true, "build_https": true,
-	"environments": true,
+	"script_interpreters":    true,
+	"script_diagnostics_dir": true,
+	"environments":           true,
 }
+
+// ScriptInterpreterIDs is the closed identifier set the operator may bind to
+// a trusted executable. It mirrors the protocol's admitted interpreters; a
+// successor identifier is a specification revision, never a configuration
+// value, so an unknown key here is rejected rather than carried.
+var ScriptInterpreterIDs = map[string]bool{"node-v1": true, "python3-v1": true}
 
 // Project is a registered project entry.
 type Project struct {
@@ -172,6 +180,21 @@ type Config struct {
 	// selection that covers every external build repository below it
 	// (Spec §12.2).
 	BuildHTTPS map[string]BuildHTTPSCredential
+	// ScriptInterpreters maps a closed script interpreter identifier
+	// (node-v1, python3-v1) to the operator-trusted absolute executable
+	// path the enforced script worker launches. It is the only source
+	// the manager resolves an interpreter from: repository bytes, the
+	// runtime store, .agents/bin, the user PATH, and manifest values
+	// never select the executable (Protocol Core §4.1.1). Absent means
+	// no enforced script command can launch on this machine.
+	ScriptInterpreters map[string]string
+	// ScriptDiagnosticsDir is the operator-selected machine-local
+	// directory that receives one result-only invocation record per
+	// enforced script command (at most the most recent record per
+	// command). "" disables reporting. Package data can never choose
+	// it: only this operator-owned machine configuration selects the
+	// destination.
+	ScriptDiagnosticsDir string
 }
 
 // Home returns the directory holding the config file: the machine home for
@@ -536,6 +559,16 @@ func Parse(data map[string]any, path string) (*Config, error) {
 		return nil, err
 	}
 
+	scriptInterpreters, err := parseScriptInterpreters(data["script_interpreters"])
+	if err != nil {
+		return nil, err
+	}
+
+	diagnosticsDir, err := parseScriptDiagnosticsDir(data["script_diagnostics_dir"])
+	if err != nil {
+		return nil, err
+	}
+
 	disableBuiltin := false
 	if raw, present := data["disable_builtin_registries"]; present {
 		disableBuiltin, ok = raw.(bool)
@@ -619,6 +652,8 @@ func Parse(data map[string]any, path string) (*Config, error) {
 		DisableBuiltinRegistries: disableBuiltin,
 		BuildSSH:                 buildSSH,
 		BuildHTTPS:               buildHTTPS,
+		ScriptInterpreters:       scriptInterpreters,
+		ScriptDiagnosticsDir:     diagnosticsDir,
 	}, nil
 }
 
@@ -689,6 +724,58 @@ func parseExecution(raw any) (Execution, error) {
 		}
 	}
 	return execution, nil
+}
+
+// parseScriptInterpreters reads the operator-trusted interpreter bindings.
+// The mapping is optional and closed: only node-v1 and python3-v1 may be
+// bound, every value must be a non-empty absolute path, and a relative path
+// is rejected outright because it would resolve against a working directory
+// the package controls. Existence and file identity are per-invocation
+// checks at the launch boundary, not parse-time facts.
+func parseScriptInterpreters(raw any) (map[string]string, error) {
+	if raw == nil {
+		return nil, nil
+	}
+	obj, ok := raw.(map[string]any)
+	if !ok {
+		return nil, verr.New("script_interpreters", "must be an object")
+	}
+	bindings := map[string]string{}
+	for identifier, value := range obj {
+		label := "script_interpreters." + identifier
+		if !ScriptInterpreterIDs[identifier] {
+			return nil, verr.New(label, "must be one of node-v1, python3-v1")
+		}
+		path, ok := value.(string)
+		if !ok || path == "" || utf8.RuneCountInString(path) > 4096 {
+			return nil, verr.New(label, "requires a non-empty string")
+		}
+		expanded := expandHome(path)
+		if !filepath.IsAbs(expanded) {
+			return nil, verr.New(label, "must be an absolute executable path")
+		}
+		bindings[identifier] = expanded
+	}
+	return bindings, nil
+}
+
+// parseScriptDiagnosticsDir reads the operator-selected diagnostics
+// destination. It is optional; when set it must be a non-empty absolute
+// path, because a relative path would resolve against a working directory
+// the package controls. The directory itself is created at first use.
+func parseScriptDiagnosticsDir(raw any) (string, error) {
+	if raw == nil {
+		return "", nil
+	}
+	path, ok := raw.(string)
+	if !ok || path == "" || utf8.RuneCountInString(path) > 4096 {
+		return "", verr.New("script_diagnostics_dir", "requires a non-empty string")
+	}
+	expanded := expandHome(path)
+	if !filepath.IsAbs(expanded) {
+		return "", verr.New("script_diagnostics_dir", "must be an absolute directory path")
+	}
+	return expanded, nil
 }
 
 func validProviderText(value string, maximum int) bool {

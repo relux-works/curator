@@ -69,7 +69,11 @@ type workerRequest struct {
 	PrivateRoots     []string       `json:"private_roots"`
 	Platform         string         `json:"platform"`
 	Probes           []ControlProbe `json:"probes"`
-	Limits           wireLimits     `json:"limits"`
+	// ControlJobHandle is a query-only handle duplicated by the manager into
+	// the suspended worker. Windows uses this exact object handle to prove
+	// job membership and limits; it is zero on other platforms.
+	ControlJobHandle uint64     `json:"control_job_handle,omitempty"`
+	Limits           wireLimits `json:"limits"`
 }
 
 // workerReady proves the worker executable identity and reports the controls

@@ -95,7 +95,7 @@ func (session *workerSession) accept() error {
 	if err := session.validateRequest(); err != nil {
 		return err
 	}
-	confirmed, err := observeNativeControls(session.limits(), request.Probes, session.protocolFiles())
+	confirmed, err := observeNativeControls(session.limits(), request.Probes, session.protocolFiles(), request.ControlJobHandle)
 	if err != nil {
 		return err
 	}

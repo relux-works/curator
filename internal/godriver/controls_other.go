@@ -32,13 +32,15 @@ func (domain *controlDomain) launch(_ *exec.Cmd) error {
 
 func (domain *controlDomain) installedControls() []string { return nil }
 
+func (domain *controlDomain) workerJobHandleValue() uint64 { return 0 }
+
 // destroy has no counterpart here on purpose. The macOS and Windows domains
 // call their own destroy from inside their own launch; nothing in the shared
 // worker client does, so a stub on this build would be code no build can reach.
 
 func (domain *controlDomain) close() {}
 
-func observeNativeControls(_ ResourceLimits, _ []ControlProbe, _ []*os.File) ([]string, error) {
+func observeNativeControls(_ ResourceLimits, _ []ControlProbe, _ []*os.File, _ uint64) ([]string, error) {
 	return nil, diagnostic(CodeCapabilityEvidenceInvalid, "the portable execution policy is specified for macOS and Windows only")
 }
 

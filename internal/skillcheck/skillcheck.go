@@ -42,6 +42,7 @@ func Validate(skillDir, localeValue string) []Issue {
 		})
 	} else {
 		issues = append(issues, executionPolicyIssues(spec)...)
+		issues = append(issues, scriptAuditLabelIssues(spec)...)
 		issues = append(issues, runtimeRootReferenceWarnings(skillDir, spec)...)
 		issues = append(issues, buildRootReferenceWarnings(skillDir, spec)...)
 		issues = append(issues, commandResolutionWarnings(skillDir, spec)...)
@@ -73,6 +74,39 @@ func executionPolicyIssues(spec *skillspec.Spec) []Issue {
 		Path:     refusal.Path,
 		Message:  refusal.Detail,
 	}}
+}
+
+// scriptAuditLabelIssues reports the script audit warning classes (manager
+// profile §7) as validation warnings. Both classes are always warnings,
+// never errors: a declared-only skill still validates and still installs,
+// and an enforced skill with declared network hosts is admitted with its
+// reporting-only posture stated. The issue code is the closed class name,
+// pinned exactly as the conformance vector names it.
+func scriptAuditLabelIssues(spec *skillspec.Spec) []Issue {
+	var issues []Issue
+	for _, entry := range scriptpolicy.AuditLabelsForCommands(spec.Commands, spec.Capabilities.Network) {
+		for _, label := range entry.Labels {
+			switch label {
+			case scriptpolicy.LabelDeclaredOnly:
+				issues = append(issues, Issue{
+					Severity: "warning",
+					Code:     label,
+					Path:     "commands." + entry.Command + ".execution_policy",
+					Message: fmt.Sprintf("command '%s' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy %q with an interpreter to enforce containment",
+						entry.Command, skillspec.ScriptExecutionPolicy),
+				})
+			case scriptpolicy.LabelUnfilteredDeclaredNetwork:
+				issues = append(issues, Issue{
+					Severity: "warning",
+					Code:     label,
+					Path:     "commands." + entry.Command,
+					Message: fmt.Sprintf("command '%s' is enforced but its declared network hosts are reporting-only (no portable filtering is applied); declare only the hosts you need",
+						entry.Command),
+				})
+			}
+		}
+	}
+	return issues
 }
 
 func runtimeRootReferenceWarnings(skillDir string, spec *skillspec.Spec) []Issue {

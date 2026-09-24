@@ -18,6 +18,8 @@ import (
 	"github.com/relux-works/curator/internal/capabilities"
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/hashing"
+	"github.com/relux-works/curator/internal/scriptpolicy"
+	"github.com/relux-works/curator/internal/skillspec"
 )
 
 // Severities and decisions (Spec §12.1, §12.2).
@@ -63,6 +65,10 @@ type Subject struct {
 	Snapshot      string
 	SchemaVersion int
 	Capabilities  capabilities.Manifest
+	// Commands carries the skill's parsed commands for the script audit
+	// warning classes (manager profile §7). A nil map labels nothing,
+	// so callers without a parsed manifest keep the previous output.
+	Commands map[string]skillspec.Command
 }
 
 // Report is the audit outcome for one subject.
@@ -74,6 +80,49 @@ type Report struct {
 	Revoked       bool
 	Revocation    string
 	CacheHit      bool
+	// ScriptPolicies is the per-command execution-policy record
+	// (manager profile §7): every script command's effective policy
+	// identity or its explicit absence, independent of warning
+	// eligibility. It is computed fresh from the subject on every
+	// path, including cache hits, and persisted with the verdict.
+	ScriptPolicies []scriptpolicy.CommandAuditPolicy
+}
+
+// ScriptPolicyRecord is one entry of the production audit record: the
+// skill, the script command, and its effective execution-policy identity
+// or its explicit absence (an empty policy).
+type ScriptPolicyRecord struct {
+	Skill   string `json:"skill"`
+	Command string `json:"command"`
+	Policy  string `json:"policy"`
+}
+
+// ScriptPolicyRecords reports the per-command execution-policy record for
+// every subject in order. Commands without a warning keep their entry:
+// warning eligibility never drops a record entry.
+func ScriptPolicyRecords(subjects []Subject) []ScriptPolicyRecord {
+	var records []ScriptPolicyRecord
+	for _, subject := range subjects {
+		for _, entry := range scriptpolicy.AuditPoliciesForCommands(subject.Commands) {
+			records = append(records, ScriptPolicyRecord{
+				Skill: subject.Name, Command: entry.Command, Policy: entry.Policy,
+			})
+		}
+	}
+	return records
+}
+
+// FormatScriptPolicy renders one audit-record entry for terminal output.
+// It is informational, never a warning: absence renders as an explicit
+// `(none)` so a reviewer can separate enforced commands from
+// declared-only ones on the line itself.
+func FormatScriptPolicy(record ScriptPolicyRecord) string {
+	policy := record.Policy
+	if policy == "" {
+		policy = "(none)"
+	}
+	return fmt.Sprintf("audit info: %s: command '%s' execution_policy=%s",
+		record.Skill, record.Command, policy)
 }
 
 // Decide implements Spec §12.2 over findings.
@@ -121,27 +170,65 @@ func gate(cfg *config.Config, subjects []Subject, persist bool) (warnings []stri
 			errs = append(errs, fmt.Sprintf("audit blocked: %s: %v", subject.Name, err))
 			continue
 		}
+		// Script audit labels are not findings: they are always warnings
+		// in every mode, never block, and are never subject to `fail_on`,
+		// so they join the warnings on every decision, including allow
+		// and block. They are computed fresh per subject, never cached
+		// with the verdict findings.
+		scriptWarnings := scriptAuditWarnings(subject)
 		switch report.Decision {
 		case DecisionAllow:
+			warnings = append(warnings, scriptWarnings...)
 		case DecisionRequirePin:
 			errs = append(errs, fmt.Sprintf(
 				"audit requires pin: %s: schema v%d has no capabilities; migrate to agent-skill.json schema v3 or pin the content hash %s with a reason",
 				subject.Name, subject.SchemaVersion, report.ContentSHA256))
+			warnings = append(warnings, scriptWarnings...)
 		case DecisionBlock:
 			if report.Revoked {
 				errs = append(errs, fmt.Sprintf("audit blocked: %s: %s is revoked", subject.Name, report.Revocation))
+				warnings = append(warnings, scriptWarnings...)
 				continue
 			}
 			for _, finding := range report.Findings {
 				errs = append(errs, fmt.Sprintf("audit blocked: %s: %s %s - %s", subject.Name, finding.Severity, finding.ID, finding.Evidence))
 			}
+			warnings = append(warnings, scriptWarnings...)
 		default: // warn
 			for _, finding := range report.Findings {
 				warnings = append(warnings, fmt.Sprintf("audit warning: %s: %s %s - %s", subject.Name, finding.Severity, finding.ID, finding.Evidence))
 			}
+			warnings = append(warnings, scriptWarnings...)
 		}
 	}
 	return warnings, errs
+}
+
+// scriptAuditWarnings renders the script warning classes of one subject
+// (manager profile §7) as audit warnings. The label text is the closed
+// class name, pinned exactly as the conformance vector names it; the
+// evidence names the command and the operator action.
+func scriptAuditWarnings(subject Subject) []string {
+	labelled := scriptpolicy.AuditLabelsForCommands(subject.Commands, subject.Capabilities.Network)
+	var warnings []string
+	for _, entry := range labelled {
+		for _, label := range entry.Labels {
+			var evidence string
+			switch label {
+			case scriptpolicy.LabelDeclaredOnly:
+				evidence = fmt.Sprintf("command '%s' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy %q with an interpreter to enforce containment",
+					entry.Command, skillspec.ScriptExecutionPolicy)
+			case scriptpolicy.LabelUnfilteredDeclaredNetwork:
+				evidence = fmt.Sprintf("command '%s' is enforced but its declared network hosts are reporting-only (no portable filtering is applied); declare only the hosts you need",
+					entry.Command)
+			default:
+				evidence = fmt.Sprintf("command '%s' carries %s", entry.Command, label)
+			}
+			warnings = append(warnings, fmt.Sprintf("audit warning: %s: %s %s - %s",
+				subject.Name, SeverityLow, label, evidence))
+		}
+	}
+	return warnings
 }
 
 // auditSubject runs the pipeline of Spec §12.1 for one subject.
@@ -150,7 +237,10 @@ func auditSubject(cfg *config.Config, subject Subject, persist bool) (Report, er
 	if err != nil {
 		return Report{}, err
 	}
-	report := Report{Skill: subject.Name, ContentSHA256: contentHash}
+	report := Report{
+		Skill: subject.Name, ContentSHA256: contentHash,
+		ScriptPolicies: scriptpolicy.AuditPoliciesForCommands(subject.Commands),
+	}
 
 	// Local revocations block unconditionally (Spec §12.2).
 	if reason := revocationReason(cfg, contentHash, subject.Source, subject.Git); reason != "" {
@@ -166,12 +256,15 @@ func auditSubject(cfg *config.Config, subject Subject, persist bool) (Report, er
 		report.CacheHit = true
 		report.Findings = findings
 		report.Decision = decideWithPins(cfg, subject, contentHash, findings)
+		if persist {
+			backfillScriptPolicies(cfg, contentHash, subject, findings, report.ScriptPolicies)
+		}
 		return report, nil
 	}
 
 	findings := detect(subject.Snapshot, subject.Capabilities)
 	if persist {
-		storeCachedFindings(cfg, contentHash, subject, findings)
+		storeCachedFindings(cfg, contentHash, subject, findings, report.ScriptPolicies)
 	}
 	report.Findings = findings
 	report.Decision = decideWithPins(cfg, subject, contentHash, findings)
@@ -282,7 +375,40 @@ func loadCachedFindings(cfg *config.Config, contentHash string) ([]Finding, bool
 	return data.Findings, true
 }
 
-func storeCachedFindings(cfg *config.Config, contentHash string, subject Subject, findings []Finding) {
+// backfillScriptPolicies refreshes a cached verdict that predates the
+// per-command policy record (manager profile §7). Verdicts written before
+// the record existed carry no `script_policies` member; the first writable
+// audit rewrites the stored file with the cached findings unchanged and the
+// current per-command entries, so the file ends up as a fresh audit would
+// have written it. Verdicts that already record policies are left
+// untouched, so a subject without parsed commands never clobbers a stored
+// record; read-only callers never reach this path and never write.
+func backfillScriptPolicies(cfg *config.Config, contentHash string, subject Subject, findings []Finding, policies []scriptpolicy.CommandAuditPolicy) {
+	if verdictHasScriptPolicies(cfg, contentHash) {
+		return
+	}
+	storeCachedFindings(cfg, contentHash, subject, findings, policies)
+}
+
+// verdictHasScriptPolicies reports whether the stored verdict already
+// records the per-command entries. A missing member and an explicit null
+// both count as absent: null is the fresh-path encoding of "no script
+// commands", so a later subject that carries commands still backfills.
+func verdictHasScriptPolicies(cfg *config.Config, contentHash string) bool {
+	payload, err := os.ReadFile(verdictPath(cfg, contentHash)) // #nosec G304
+	if err != nil {
+		return false
+	}
+	var data struct {
+		ScriptPolicies *[]scriptpolicy.CommandAuditPolicy `json:"script_policies"`
+	}
+	if err := json.Unmarshal(payload, &data); err != nil {
+		return false
+	}
+	return data.ScriptPolicies != nil
+}
+
+func storeCachedFindings(cfg *config.Config, contentHash string, subject Subject, findings []Finding, policies []scriptpolicy.CommandAuditPolicy) {
 	dir := trustDir(cfg.Home(), contentHash)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return
@@ -297,6 +423,7 @@ func storeCachedFindings(cfg *config.Config, contentHash string, subject Subject
 		"prompt_version":  PromptVersion,
 		"ruleset_version": RulesetVersion,
 		"findings":        findings,
+		"script_policies": policies,
 	}, "", "  ")
 	if err != nil {
 		return

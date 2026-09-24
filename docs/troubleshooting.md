@@ -551,3 +551,301 @@ diagnostics keep their lane behavior and carry no appended guidance.
 Remedy: fix the endpoint entry in machine source-policy.json: the
 strict external-build lane admits no explicit port and no host alias,
 then retry the explicit attempt.
+
+## Enforced script execution diagnostics
+
+Enforced script commands (`execution_policy: "script-worker-v1"`) launch
+through the manager-owned script worker. Source locations:
+`internal/scriptpolicy/scriptpolicy.go` (admission and preflight),
+`internal/scriptworker/` (interpreter resolution and worker session).
+
+### script_execution_worker_protocol_invalid for stream bounds
+
+Symptom: an enforced launcher reports script_execution_worker_protocol_invalid
+with "launcher standard input exceeds the session bound" or "interpreter
+output exceeded the capture bound".
+
+Cause: piped or file standard input is read completely before the worker
+starts and is limited to 64 MiB. A terminal is bound to the null device,
+not forwarded interactively. Standard output and standard error are
+captured together under a 16 MiB budget; crossing it refuses the invocation
+and the partial capture is not forwarded.
+
+Remedy: keep piped input within the limit and reduce combined command
+output. Commands that need interactive input, live output, or larger output
+are outside the bounded script-worker stream model. If the input and output
+are within those limits and the refusal repeats, report it as a manager
+protocol failure.
+
+### script_execution_worker_protocol_invalid for worker setup
+
+Symptom: an enforced launcher reports script_execution_worker_protocol_invalid
+for a worker channel, session frame, manager-derived path, private runtime
+directory, or interpreter start failure.
+
+Cause: the manager and worker could not complete their fixed request/result
+session. This includes a malformed or out-of-order session message, an
+unknown session nonce, an invalid manager-owned working or private path, a
+failure to create the operation-private roots, or a worker channel/start
+failure. The launcher fails closed and does not forward child output when
+the session cannot return a valid result.
+
+Remedy: verify the manager executable is intact and the operator temporary
+directory is available and writable. If the paths and host are valid but
+the refusal repeats, report the diagnostic as a manager/worker protocol
+failure. See the stream and Linux Landlock sections below for those
+specific protocol-invalid diagnostics.
+
+### script_execution_control_unavailable
+
+Symptom: install of an enforced command, or an executed native launcher,
+reports `script_execution_control_unavailable` naming a native control
+such as `descendant-domain-termination`, and no worker starts.
+
+Cause: the control table is complete, but this host cannot provide the
+named mandatory control: the per-invocation native-control probe did not
+find its mechanism. Install probes before staging anything, and every
+invocation probes again before the worker starts, so the refusal names
+exactly the controls the host lacks. Host-conditional controls the probe
+does not find (Linux cgroup delegation, Landlock, network namespaces)
+never refuse: they are reported unavailable in the invocation's evidence
+record and the run proceeds. An unbound interpreter refuses with the same
+code because interpreter resolution cannot be applied on this host (see
+`docs/script-interpreters.md`).
+
+Remedy: provide the missing host capability (for example, run where the
+platform mechanism exists), or bind the interpreter when the detail names
+interpreter resolution. Do not work around the refusal by removing the
+`execution_policy` field: that silently downgrades the command to
+uncontained execution.
+
+Verify which controls this host provides:
+
+```bash
+curator skill check ./my-skill
+```
+
+Admission succeeds; only a host that cannot provide a mandatory control
+refuses, at install and at invocation.
+
+### script_execution_worker_protocol_invalid naming a Landlock control
+
+Symptom: on Linux, an enforced invocation reports
+`script_execution_worker_protocol_invalid` with `cannot install inventory
+control "filesystem-write-confinement"` (or `"descendant-exec-denial"`)
+followed by the cause naming the offending path, and the interpreter
+never runs.
+
+Cause: the write confinement rules the derived path set — the declared
+`filesystem` paths beneath the canonical project root — plus the
+operation-private area and the null device (which confined scripts and
+their descendants legitimately open for redirected standard streams),
+and a derived member that does not exist cannot be ruled. The worker
+refuses fail-closed rather than running with a control the probe found
+present left unenforced. Outside the ruled set, file writes and
+truncation, entry creation and removal (including `mkdir`, `unlink`,
+`rmdir`, `mkfifo`, and rename), and reparenting are all denied with
+`permission denied`; reads stay unrestricted.
+
+Remedy: declare paths that exist at invocation time. A `repo`
+filesystem always grants the project root itself; a path set grants
+exactly its members, so create the members before invoking, or narrow
+the declaration to the members the command needs.
+
+### script_execution_capability_evidence_invalid
+
+Symptom: an enforced invocation reports
+`script_execution_capability_evidence_invalid`.
+
+Cause: the worker's capability-evidence record contradicted this
+invocation's own probe — a missing, duplicated, or unknown entry, a
+status inconsistent with the probed availability, a foreign record
+version, a replayed install-generation timing, or a second record for
+one invocation. The parent validated the record before the permit, so
+the interpreter never ran.
+
+Remedy: none on the operator side beyond retrying on a stable host; a
+repeated refusal names a manager defect, not a package defect. The
+invocation's record, when one was produced, is result-only and never
+carries command output.
+
+### script_execution_hardened_claim_forbidden
+
+Symptom: an enforced invocation reports
+`script_execution_hardened_claim_forbidden`.
+
+Cause: the evidence record claimed a guarantee the policy defers — a
+foreign execution policy, or one of the thirteen deferred guarantees
+(seven `script-*` plus six build guarantees). The claim is rejected
+before the permit.
+
+Remedy: none; the record is rejected by construction. See Protocol Core
+§4.1.1 for the deferred list.
+
+### script_execution_policy_unsupported
+
+Symptom: install or `skill check` reports
+`script_execution_policy_unsupported` for an enforced command.
+
+Cause: the command selects an execution policy this manager does not
+implement. Protocol 1.0 admits exactly `script-worker-v1`, which this
+manager implements. A refusal with this code therefore points to a
+different selected policy, which must not be installed declared-only,
+downgraded, or ignored.
+
+Remedy: use the supported `script-worker-v1` policy with its co-required
+interpreter (`node-v1` or `python3-v1`), or remove both fields to keep the
+command declared-only. A supported policy can still refuse with
+`script_execution_control_unavailable` when a mandatory host control or
+operator interpreter binding is unavailable.
+
+### script_execution_worker_identity_invalid
+
+Symptom: an enforced invocation reports
+`script_execution_worker_identity_invalid`.
+
+Cause: the worker or interpreter executable failed identity verification:
+the file is not a canonical regular executable, carries multiple links
+or a reparse point, changed between resolution and the launch boundary,
+or does not hash to the recorded identity. The interpreter binding comes
+exclusively from the operator-trusted `script_interpreters` mapping in
+machine configuration — never from the repository, the runtime store,
+`.agents/bin`, the user `PATH`, or a manifest value. A binding that is
+not a native interpreter image is refused the same way: POSIX `#!`
+wrapper scripts (pyenv/asdf/volta-style shims) and Windows `.cmd`/`.bat`
+files would interpose another program between the worker and the
+interpreter, so only the native interpreter executable is accepted. On
+Windows the binding must name the `.exe` itself — an extensionless path
+would execute a different file than the verified one.
+
+Remedy: verify the `script_interpreters` entry for the command's
+identifier names the absolute path of the installed native interpreter
+executable, that no other process replaced the manager or interpreter
+files, and retry. If the binding names a shim or wrapper, replace it
+with the interpreter binary it launches. If the binding is absent, add
+it:
+
+```json
+{
+  "script_interpreters": {
+    "node-v1": "/opt/node/bin/node",
+    "python3-v1": "/usr/bin/python3"
+  }
+}
+```
+
+On Windows the values name the `.exe` files, for example
+`"node-v1": "C:\\tools\\node\\node.exe"`.
+
+The bindings are documented in full in [Operator-trusted script
+interpreter bindings](script-interpreters.md).
+
+### Enforced derivation reports
+
+Symptom: an enforced install prints `is enforced (script-worker-v1)`
+messages about withheld variables, recorded hosts, or unresolvable
+executables.
+
+Cause: this is the install record, not an invocation result. Every enforced
+invocation derives its environment, `PATH`, network configuration, and
+working directory from the command's declared capabilities, deny by
+default: manager-owned variable names (loaders, interpreter options,
+temporary and configuration roots, proxy and resolver configuration)
+never pass through, declared network hosts are recorded reporting-only
+without filtering, manager-resolved `exec` grants enter the private `PATH`
+farm, and secrets remain identifiers. The messages name each decision
+so nothing is dropped silently.
+
+Remedy: none required. If a withheld variable breaks a script, remove it
+from `env_read` and read the value through a different declared variable.
+
+### Unresolved declared `exec` name
+
+Symptom: an enforced install or invocation report names an unresolved
+`exec` grant.
+
+Cause: the manager could not verify that executable in its fixed search
+directories, so it is omitted from the private PATH farm and reported. The
+worker still starts, but the invocation cannot resolve that name through
+caller `PATH`, the repository, or script content. On Windows the default
+list is `%SystemRoot%\System32` followed by `%SystemRoot%`; the multiple-link
+allowance is limited to manager-resolved files physically below canonical
+`%SystemRoot%\System32` derived from the manager's captured `SYSTEMROOT`.
+
+Remedy: install the tool in a manager search directory, or remove its name
+from the command's `exec` declaration if the script does not need it. Do
+not add the caller's `PATH` to the search list.
+
+### script_execution_package_influence_forbidden
+
+Symptom: an enforced invocation reports
+`script_execution_package_influence_forbidden`.
+
+Cause: package-shaped input reached a boundary that refuses it: a
+tampered or corrupt launcher sidecar, an interpreter identifier outside
+the closed set, or a malformed capability declaration. The invocation
+runs nothing.
+
+Remedy: reinstall the skill so the manager republishes the launcher and
+its sidecar contract, verify the command's `interpreter` is `node-v1`
+or `python3-v1`, and validate the manifest's `capabilities` object
+against the schema.
+
+## Script audit labels
+
+`curator audit`, `skill check`, and install report two warning classes for
+script commands (manager profile §7). Both are always warnings in every
+mode and never block: neither is a finding about source content, neither
+is subject to `fail_on`, and neither may be reported as an applied
+control. Declared-only skills validate and install exactly as before; the
+warnings state the containment posture so reviewers and registries can
+gate on the distinction.
+
+### script-command-declared-only
+
+Symptom: audit or `skill check` warns `script-command-declared-only` for
+a command.
+
+Cause: the command does not declare `execution_policy:
+"script-worker-v1"` — every schema-7 script command and every schema-8
+script command without the field. Its capability declaration is
+documentation and bounds nothing at run time.
+
+Remedy: to enforce containment, adopt `execution_policy:
+"script-worker-v1"` with its co-required `interpreter` (`node-v1` or
+`python3-v1`). To keep the command declared-only, no action is required;
+the warning records the posture.
+
+### script-command-unfiltered-declared-network
+
+Symptom: audit or `skill check` warns
+`script-command-unfiltered-declared-network` for an enforced command.
+
+Cause: the command is enforced (`execution_policy: "script-worker-v1"`)
+and declares non-empty `network` hosts. The globs are recorded and
+reported; no portable filtering is applied and none is claimed. The
+command is still admitted so the `exec`, `filesystem`, and environment
+controls it can have are applied.
+
+Remedy: declare only the hosts you need — reporting only. A
+declared-only command with network hosts carries only
+`script-command-declared-only`: the network label is about enforcement,
+not declaration.
+
+### Per-command execution-policy record
+
+Symptom: `curator audit` prints `audit info: <skill>: command '<name>'
+execution_policy=<identity>` lines for commands that carry no warning.
+
+Cause: this is the audit record, not a finding. For every script command
+the record carries the effective execution-policy identity or its
+explicit absence — `script-worker-v1` for enforced commands, `(none)`
+for declared-only ones — independent of warning eligibility. The same
+entries are carried under `script_policies` in `curator audit --json`
+output and in the stored verdict file, so reviewers and registries can
+gate on the enforced/declared-only distinction directly.
+
+Remedy: no action is required. An enforced command with no declared
+`network` hosts audits clean and still records its identity; a
+declared-only entry that should be enforced calls for the same remedy as
+`script-command-declared-only` above.

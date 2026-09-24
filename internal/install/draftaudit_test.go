@@ -1250,7 +1250,13 @@ func TestDraftAuditClosedPackageShapeRefuses(t *testing.T) {
 	assertGatePassed(t, draftProjectResult(cfg, project, home, false))
 }
 
-func TestDraftAuditEnforcedScriptRefused(t *testing.T) {
+// TestDraftAuditEnforcedScriptAdmitted proves the draft audit gate admits an
+// enforced script command: the R3 control table is complete, so admission
+// proceeds and the gate records no script-policy refusal. The host
+// preflight refuses on the mutating path instead (see
+// TestDraftLocalEnforcedCommandRefused); a dry run stops before staging,
+// so it never probes the host.
+func TestDraftAuditEnforcedScriptAdmitted(t *testing.T) {
 	payload := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["tool"]}]}`
 	project, home, _ := draftProject(t, payload, map[string]string{"skills/tool": "tool"})
 	dir := filepath.Join(project, "skills", "tool")
@@ -1281,9 +1287,14 @@ func TestDraftAuditEnforcedScriptRefused(t *testing.T) {
 	resolveDraftForInstall(t, project, home, payload)
 	cfg := draftTestConfig(home, t.TempDir())
 	result := draftProjectResult(cfg, project, home, true)
-	if result.Status != "failed" ||
-		!strings.Contains(strings.Join(result.Errors, ";"), "script_execution_policy_unsupported") {
-		t.Fatalf("enforced result = %+v, want scriptpolicy refusal", result)
+	assertGatePassed(t, result)
+	joined := strings.Join(append(result.Errors, result.Messages...), ";")
+	if strings.Contains(joined, "script_execution_control_unavailable") ||
+		strings.Contains(joined, "script_execution_policy_unsupported") {
+		t.Fatalf("enforced result = %+v, want no script-policy refusal", result)
+	}
+	if result.Status == "failed" {
+		t.Fatalf("enforced result = %+v, want the gate to pass", result)
 	}
 }
 

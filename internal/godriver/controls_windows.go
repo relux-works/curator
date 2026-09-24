@@ -12,6 +12,9 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// JOB_OBJECT_QUERY is not currently exported by x/sys/windows.
+const jobObjectQueryAccess = 0x0004
+
 // jobLimitFlags maps one inventory control to the Job Object limit that carries
 // it. Only the three job-backed controls have an entry.
 func jobLimitFlags(name string) (uint32, error) {
@@ -103,11 +106,12 @@ func probeNativeControl(name string, limits ResourceLimits) (bool, error) {
 // applied after the worker begins executing, so CodeControlUnavailable cannot
 // first appear there.
 type controlDomain struct {
-	controls  []string
-	job       windows.Handle
-	flags     uint32
-	limits    ResourceLimits
-	installed bool
+	controls        []string
+	job             windows.Handle
+	flags           uint32
+	limits          ResourceLimits
+	workerJobHandle uint64
+	installed       bool
 }
 
 // prepareControlDomain builds the Windows domain from this operation's probes.
@@ -176,15 +180,35 @@ func (domain *controlDomain) attach(command *exec.Cmd) error {
 	}
 	pid := uint32(command.Process.Pid) // #nosec G115 -- the identifier was just proved positive
 	if domain.job != 0 {
-		process, err := windows.OpenProcess(windows.PROCESS_SET_QUOTA|windows.PROCESS_TERMINATE, false, pid)
+		process, err := windows.OpenProcess(windows.PROCESS_SET_QUOTA|windows.PROCESS_TERMINATE|windows.PROCESS_DUP_HANDLE|windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
 		if err != nil {
 			return diagnosticErr(CodeControlUnavailable, err, "cannot open the suspended worker for job assignment")
 		}
 		assignErr := windows.AssignProcessToJobObject(domain.job, process)
-		_ = windows.CloseHandle(process)
 		if assignErr != nil {
+			_ = windows.CloseHandle(process)
 			return diagnosticErr(CodeControlUnavailable, assignErr, "cannot assign the worker to its private job object")
 		}
+		inJob, membershipErr := processInJob(process, domain.job)
+		if membershipErr != nil || !inJob {
+			_ = windows.CloseHandle(process)
+			return diagnosticErr(CodeControlUnavailable, membershipErr,
+				"cannot confirm that the suspended worker belongs to its private job object")
+		}
+		if err := confirmJobLimits(domain.job, domain.flags, domain.limits); err != nil {
+			_ = windows.CloseHandle(process)
+			return diagnosticErr(CodeControlUnavailable, err,
+				"cannot confirm the limits on the manager-owned worker job object")
+		}
+		var workerJobHandle windows.Handle
+		if err := windows.DuplicateHandle(windows.CurrentProcess(), domain.job, process,
+			&workerJobHandle, jobObjectQueryAccess, false, 0); err != nil {
+			_ = windows.CloseHandle(process)
+			return diagnosticErr(CodeControlUnavailable, err,
+				"cannot give the worker query access to its private job object")
+		}
+		domain.workerJobHandle = uint64(workerJobHandle)
+		_ = windows.CloseHandle(process)
 	}
 	return resumeSuspendedProcess(pid)
 }
@@ -231,6 +255,13 @@ func (domain *controlDomain) installedControls() []string {
 	return append([]string(nil), domain.controls...)
 }
 
+func (domain *controlDomain) workerJobHandleValue() uint64 {
+	if domain == nil {
+		return 0
+	}
+	return domain.workerJobHandle
+}
+
 // destroy terminates a worker that was never released to run its session.
 func (domain *controlDomain) destroy(command *exec.Cmd) {
 	terminateWorkerDomain(command)
@@ -253,7 +284,7 @@ func (domain *controlDomain) close() {
 // the parent installed is really in effect here. It applies no availability
 // decision: a contradiction is an evidence fault, never a mandatory-control
 // rejection.
-func observeNativeControls(limits ResourceLimits, probes []ControlProbe, _ []*os.File) ([]string, error) {
+func observeNativeControls(limits ResourceLimits, probes []ControlProbe, _ []*os.File, controlJobHandle uint64) ([]string, error) {
 	names := installableControls(probes)
 	var wanted uint32
 	for _, name := range names {
@@ -261,9 +292,31 @@ func observeNativeControls(limits ResourceLimits, probes []ControlProbe, _ []*os
 			wanted |= flags
 		}
 	}
-	if wanted != 0 {
-		if err := confirmJobLimits(wanted, limits); err != nil {
+	if wanted == 0 {
+		if controlJobHandle != 0 {
+			return nil, diagnostic(CodeCapabilityEvidenceInvalid,
+				"a private Job Object handle was supplied without a job-backed control")
+		}
+	} else {
+		if controlJobHandle == 0 || uint64(uintptr(controlJobHandle)) != controlJobHandle {
+			return nil, diagnostic(CodeCapabilityEvidenceInvalid,
+				"the manager did not bind a query-only handle to its private worker job")
+		}
+		job := windows.Handle(uintptr(controlJobHandle))
+		inJob, err := processInJob(windows.CurrentProcess(), job)
+		if err != nil || !inJob {
+			return nil, diagnosticErr(CodeCapabilityEvidenceInvalid, err,
+				"the worker is not a member of the manager-owned private job object")
+		}
+		if err := confirmJobLimits(job, wanted, limits); err != nil {
 			return nil, err
+		}
+		// Release the query-only duplicate before acknowledging. The manager's
+		// original handle remains the last Job Object handle, preserving
+		// kill-on-close teardown.
+		if err := windows.CloseHandle(job); err != nil {
+			return nil, diagnosticErr(CodeCapabilityEvidenceInvalid, err,
+				"cannot release the worker's query-only job handle after confirmation")
 		}
 	}
 	confirmed := make([]string, 0, len(names))
@@ -288,16 +341,16 @@ func observeNativeControls(limits ResourceLimits, probes []ControlProbe, _ []*os
 
 // confirmJobLimits queries the job the worker was assigned to and requires the
 // exact limits the manager installed.
-func confirmJobLimits(wanted uint32, limits ResourceLimits) error {
+func confirmJobLimits(job windows.Handle, wanted uint32, limits ResourceLimits) error {
 	expected, err := jobLimitInformation(wanted, limits)
 	if err != nil {
 		return diagnosticErr(CodeCapabilityEvidenceInvalid, err, "cannot derive the expected worker job limits")
 	}
 	var actual windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION
 	var returned uint32
-	// A zero handle queries the job object of the calling process, which is the
-	// private job the manager assigned the worker to before resuming it.
-	if err := windows.QueryInformationJobObject(0, windows.JobObjectExtendedLimitInformation,
+	// Query the exact manager-owned object. A zero handle selects the current
+	// process's immediate job, which can be an ambient runner job.
+	if err := windows.QueryInformationJobObject(job, windows.JobObjectExtendedLimitInformation,
 		uintptr(unsafe.Pointer(&actual)), uint32(unsafe.Sizeof(actual)), &returned); err != nil {
 		return diagnosticErr(CodeCapabilityEvidenceInvalid, err, "the worker is not inside its private job object")
 	}
@@ -315,6 +368,22 @@ func confirmJobLimits(wanted uint32, limits ResourceLimits) error {
 			actual.JobMemoryLimit, expected.JobMemoryLimit)
 	}
 	return nil
+}
+
+var isProcessInJobProc = windows.NewLazySystemDLL("kernel32.dll").NewProc("IsProcessInJob")
+
+// processInJob proves membership against an explicit Job Object handle.
+func processInJob(process, job windows.Handle) (bool, error) {
+	var inJob int32
+	result, _, callErr := isProcessInJobProc.Call(
+		uintptr(process), uintptr(job), uintptr(unsafe.Pointer(&inJob)))
+	if result == 0 {
+		if callErr != nil && callErr != syscall.Errno(0) {
+			return false, callErr
+		}
+		return false, fmt.Errorf("IsProcessInJob failed without a Windows error")
+	}
+	return inJob != 0, nil
 }
 
 // compilerSysProcAttr adds no inherited handle, so os/exec's explicit handle

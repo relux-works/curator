@@ -211,6 +211,7 @@ func (scenario *workerScenario) start() *rawWorker {
 	}
 	worker := startRawWorkerFrom(scenario.fixture.t, launchPath, scenario.limits, scenario.probes)
 	request := scenario.request
+	request.ControlJobHandle = worker.domain.workerJobHandleValue()
 	worker.send(workerMessage{Kind: kindRequest, Nonce: scenario.nonce, Request: &request})
 	return worker
 }

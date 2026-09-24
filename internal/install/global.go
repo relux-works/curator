@@ -186,6 +186,7 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 					Name: node.Name, Source: node.Decl.Source, Git: node.Decl.Git,
 					Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
 					SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
+					Commands: node.Spec.Commands,
 				})
 			}
 			var warnings, errs []string
@@ -397,12 +398,13 @@ func stageGlobalTargets(request globalTargetRequest) (scopeTargets, error) {
 	runtime, err := stageRuntimeAndShims(
 		stageRoot, request.home, request.binDir, request.nodes,
 		runtimestore.GlobalCanonicalShim, request.platform, request.scoped, request.plan.plannedInputs(), request.external.entries, request.externalStoreRoot,
-		nil,
+		nil, "",
 	)
 	if err != nil {
 		return scopeTargets{}, err
 	}
 	targets.plan.Merge(runtime.plan)
+	targets.messages = append(targets.messages, runtime.messages...)
 	targets.plan.Merge(request.external.transactionPlan(request.externalStoreRoot))
 	targets.adoptions = request.external.adoptions(request.externalStoreRoot)
 	targets.referencedKeys = runtime.referencedKeys()
@@ -434,8 +436,18 @@ func stageGlobalTargets(request globalTargetRequest) (scopeTargets, error) {
 	}
 	targets.plan.Merge(staleSkills)
 
+	// Enforced commands stay out of the user-bin forwarding mirror: a
+	// forwarding shim is a shell wrapper, and no shell wrapper may stand
+	// in front of an enforced launcher. The canonical native launcher is
+	// the only published entry point.
+	forwardable := map[string]bool{}
+	for name := range runtime.commands {
+		if !runtime.enforced[name] {
+			forwardable[name] = true
+		}
+	}
 	forwarding, err := globalbins.StageForwarding(
-		stageRoot, request.home, runtime.commands, request.platform, nil, request.userHome)
+		stageRoot, request.home, forwardable, request.platform, nil, request.userHome)
 	if err != nil {
 		return scopeTargets{}, err
 	}

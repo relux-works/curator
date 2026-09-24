@@ -202,6 +202,8 @@ func (domain *controlDomain) installedControls() []string {
 	return append([]string(nil), domain.controls...)
 }
 
+func (domain *controlDomain) workerJobHandleValue() uint64 { return 0 }
+
 // destroy terminates a worker that was never released to run its session.
 func (domain *controlDomain) destroy(command *exec.Cmd) {
 	terminateWorkerDomain(command)
@@ -218,7 +220,10 @@ func (domain *controlDomain) close() {}
 // the parent installed is really in effect here and completes the worker's own
 // descriptor duty. It applies no availability decision: a contradiction is an
 // evidence fault, never a mandatory-control rejection.
-func observeNativeControls(limits ResourceLimits, probes []ControlProbe, protocol []*os.File) ([]string, error) {
+func observeNativeControls(limits ResourceLimits, probes []ControlProbe, protocol []*os.File, jobHandle uint64) ([]string, error) {
+	if jobHandle != 0 {
+		return nil, diagnostic(CodeCapabilityEvidenceInvalid, "a Windows Job Object handle was supplied on macOS")
+	}
 	confirmed := make([]string, 0, len(probes))
 	for _, name := range installableControls(probes) {
 		switch name {
