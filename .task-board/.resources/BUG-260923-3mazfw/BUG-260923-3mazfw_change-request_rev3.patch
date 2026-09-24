@@ -1,0 +1,230 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 2518c29a..76646d61 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -4,6 +4,11 @@ All notable implementation changes are recorded here.
+ 
+ ## Unreleased
+ 
++### Fixed
++
++- `git check-ignore` now retries one child-start `EACCES` after 100 ms, then
++  returns persistent permission errors so installation still fails closed.
++
+ ### Added
+ 
+ - E4: umbrella provider lookup from trust roots (warning release,
+diff --git a/internal/gitignore/gitignore.go b/internal/gitignore/gitignore.go
+index 2c87f375..bc3804c5 100644
+--- a/internal/gitignore/gitignore.go
++++ b/internal/gitignore/gitignore.go
+@@ -12,11 +12,19 @@ import (
+ 	"os/exec"
+ 	"path/filepath"
+ 	"strings"
++	"syscall"
++	"time"
+ )
+ 
+ // BlockComment heads the appended entries.
+ const BlockComment = "# Curator"
+ 
++const checkIgnoreEACCESRetryDelay = 100 * time.Millisecond
++
++// checkIgnoreCommandRunner is the production command seam. Tests replace it
++// to inject child-start errors without depending on runner filesystem state.
++var checkIgnoreCommandRunner = func(cmd *exec.Cmd) error { return cmd.Run() }
++
+ // NotIgnoredError reports the policy outcome that entries are not ignored.
+ // It is distinct from a tool failure: a git that cannot be executed (a
+ // spawn error or a missing git binary) is returned as a plain wrapped
+@@ -51,16 +59,14 @@ func Missing(projectRoot string, entries []string) ([]string, error) {
+ 	var missing []string
+ 	for _, entry := range entries {
+ 		probe := strings.TrimSuffix(entry, "/") + "/.curator-probe"
+-		cmd := exec.Command("git", "-C", projectRoot, "check-ignore", "-q", probe) // #nosec G204 -- fixed binary and flags
+-		var stderr bytes.Buffer
+-		cmd.Stderr = &stderr
+-		if err := cmd.Run(); err != nil {
++		stderr, err := runCheckIgnoreWithEACCESRetry(projectRoot, probe)
++		if err != nil {
+ 			var exitErr *exec.ExitError
+ 			if errors.As(err, &exitErr) {
+ 				missing = append(missing, entry)
+ 				continue
+ 			}
+-			if detail := strings.TrimSpace(stderr.String()); detail != "" {
++			if detail := strings.TrimSpace(stderr); detail != "" {
+ 				return nil, fmt.Errorf("git check-ignore failed for %q: %s: %w", entry, detail, err)
+ 			}
+ 			return nil, fmt.Errorf("git check-ignore failed for %q: %w", entry, err)
+@@ -69,6 +75,44 @@ func Missing(projectRoot string, entries []string) ([]string, error) {
+ 	return missing, nil
+ }
+ 
++// runCheckIgnoreWithEACCESRetry retries one child-start EACCES after a short
++// delay. It does not retry Git exit statuses or other spawn errors; a second
++// failure is returned so persistent permission errors still fail closed.
++func runCheckIgnoreWithEACCESRetry(projectRoot, probe string) (string, error) {
++	stderr, err := runCheckIgnoreAttempt(projectRoot, probe)
++	if !isCheckIgnoreSpawnEACCES(err) {
++		return stderr, err
++	}
++
++	firstErr := err
++	time.Sleep(checkIgnoreEACCESRetryDelay)
++	stderr, err = runCheckIgnoreAttempt(projectRoot, probe)
++	if err != nil {
++		return stderr, fmt.Errorf("git check-ignore still failed after one EACCES spawn retry (first attempt: %v): %w", firstErr, err)
++	}
++	return stderr, nil
++}
++
++func runCheckIgnoreAttempt(projectRoot, probe string) (string, error) {
++	cmd := exec.Command("git", "-C", projectRoot, "check-ignore", "-q", probe) // #nosec G204 -- fixed binary and flags
++	var stderr bytes.Buffer
++	cmd.Stderr = &stderr
++	err := checkIgnoreCommandRunner(cmd)
++	return stderr.String(), err
++}
++
++func isCheckIgnoreSpawnEACCES(err error) bool {
++	if err == nil {
++		return false
++	}
++	var exitErr *exec.ExitError
++	if errors.As(err, &exitErr) {
++		return false
++	}
++	var pathErr *os.PathError
++	return errors.As(err, &pathErr) && pathErr.Op == "fork/exec" && errors.Is(pathErr.Err, syscall.EACCES)
++}
++
+ // Ensure verifies the entries are ignored; with fix it appends the missing
+ // ones under the managed comment and re-checks.
+ func Ensure(projectRoot string, entries []string, fix bool) error {
+diff --git a/internal/gitignore/gitignore_test.go b/internal/gitignore/gitignore_test.go
+index 87dd7fd1..fed82acf 100644
+--- a/internal/gitignore/gitignore_test.go
++++ b/internal/gitignore/gitignore_test.go
+@@ -143,6 +143,120 @@ func TestMissingSpawnFailureIsToolError(t *testing.T) {
+ 	}
+ }
+ 
++func TestMissingRetriesOnceOnSpawnEACCES(t *testing.T) {
++	previousRunner := checkIgnoreCommandRunner
++	t.Cleanup(func() { checkIgnoreCommandRunner = previousRunner })
++
++	calls := 0
++	checkIgnoreCommandRunner = func(*exec.Cmd) error {
++		calls++
++		if calls == 1 {
++			return checkIgnoreSpawnError(syscall.EACCES)
++		}
++		return nil
++	}
++
++	missing, err := Missing(t.TempDir(), []string{".agents/"})
++	if err != nil {
++		t.Fatalf("Missing after transient EACCES: %v", err)
++	}
++	if len(missing) != 0 {
++		t.Fatalf("missing = %q, want no missing entries after successful retry", missing)
++	}
++	if calls != 2 {
++		t.Fatalf("runner calls = %d, want one retry after the first EACCES", calls)
++	}
++}
++
++func TestMissingDoesNotRetryGitExitStatus(t *testing.T) {
++	previousRunner := checkIgnoreCommandRunner
++	t.Cleanup(func() { checkIgnoreCommandRunner = previousRunner })
++
++	calls := 0
++	checkIgnoreCommandRunner = func(*exec.Cmd) error {
++		calls++
++		return &exec.ExitError{}
++	}
++
++	missing, err := Missing(t.TempDir(), []string{".agents/"})
++	if err != nil {
++		t.Fatalf("Missing after a Git exit status: %v", err)
++	}
++	if len(missing) != 1 || missing[0] != ".agents/" {
++		t.Fatalf("missing = %q, want the existing not-ignored policy result", missing)
++	}
++	if calls != 1 {
++		t.Fatalf("runner calls = %d, want no retry after Git starts and exits", calls)
++	}
++}
++
++func TestEnsurePersistentSpawnEACCESFailsClosedAfterOneRetry(t *testing.T) {
++	previousRunner := checkIgnoreCommandRunner
++	t.Cleanup(func() { checkIgnoreCommandRunner = previousRunner })
++
++	calls := 0
++	checkIgnoreCommandRunner = func(*exec.Cmd) error {
++		calls++
++		return checkIgnoreSpawnError(syscall.EACCES)
++	}
++
++	project := t.TempDir()
++	err := Ensure(project, []string{".agents/"}, true)
++	if err == nil {
++		t.Fatal("Ensure with persistent spawn EACCES must fail")
++	}
++	if IsNotIgnored(err) {
++		t.Fatalf("err = %q, want a tool error rather than a policy outcome", err)
++	}
++	if !errors.Is(err, syscall.EACCES) {
++		t.Fatalf("err = %q, want the persistent EACCES cause preserved", err)
++	}
++	if calls != 2 {
++		t.Fatalf("runner calls = %d, want exactly two attempts", calls)
++	}
++	if _, statErr := os.Stat(filepath.Join(project, ".gitignore")); !os.IsNotExist(statErr) {
++		t.Fatalf("persistent spawn error must not write .gitignore: %v", statErr)
++	}
++}
++
++func TestMissingDoesNotRetryOtherSpawnErrors(t *testing.T) {
++	for _, row := range []struct {
++		name      string
++		err       error
++		wantErrno syscall.Errno
++	}{
++		{"EPERM spawn", checkIgnoreSpawnError(syscall.EPERM), syscall.EPERM},
++		{"ENOENT spawn", checkIgnoreSpawnError(syscall.ENOENT), syscall.ENOENT},
++		{"EACCES outside fork-exec", &os.PathError{Op: "open", Path: "/opt/homebrew/bin/git", Err: syscall.EACCES}, syscall.EACCES},
++	} {
++		t.Run(row.name, func(t *testing.T) {
++			previousRunner := checkIgnoreCommandRunner
++			t.Cleanup(func() { checkIgnoreCommandRunner = previousRunner })
++
++			calls := 0
++			checkIgnoreCommandRunner = func(*exec.Cmd) error {
++				calls++
++				return row.err
++			}
++
++			_, err := Missing(t.TempDir(), []string{".agents/"})
++			if err == nil {
++				t.Fatal("Missing with a non-retryable spawn error must fail")
++			}
++			if !errors.Is(err, row.wantErrno) {
++				t.Fatalf("err = %q, want %v preserved", err, row.wantErrno)
++			}
++			if calls != 1 {
++				t.Fatalf("runner calls = %d, want no retry for %v", calls, row.name)
++			}
++		})
++	}
++}
++
++func checkIgnoreSpawnError(errno syscall.Errno) error {
++	return &os.PathError{Op: "fork/exec", Path: "/opt/homebrew/bin/git", Err: errno}
++}
++
+ // TestMissingNonRepositoryIsNotIgnored pins the exit-128 branch of
+ // BUG-260921-1fpaij (rework 1): a root that is not a git repository keeps the
+ // PRE-EXISTING outcome — git's own verdict, including "not a repository", is
