@@ -1,0 +1,2286 @@
+diff --git a/internal/closure/closure.go b/internal/closure/closure.go
+index a795f691..560bfd1c 100644
+--- a/internal/closure/closure.go
++++ b/internal/closure/closure.go
+@@ -8,6 +8,7 @@
+ package closure
+ 
+ import (
++	"errors"
+ 	"fmt"
+ 	"os"
+ 	"path/filepath"
+@@ -37,6 +38,7 @@ type Edge struct {
+ type Node struct {
+ 	Name        string
+ 	Decl        manifest.Decl
++	Directory   string // normalized package directory ("." for repository roots)
+ 	Resolved    gitops.ResolvedRef
+ 	Repo        string
+ 	Snapshot    string
+@@ -139,13 +141,15 @@ type Options struct {
+ }
+ 
+ type pending struct {
+-	name     string
+-	git      string
+-	ref      manifest.Ref
+-	source   string
+-	edge     Edge
+-	chain    string
+-	selected *Node
++	name          string
++	git           string
++	ref           manifest.Ref
++	source        string
++	directory     string
++	selectPackage bool
++	edge          Edge
++	chain         string
++	selected      *Node
+ }
+ 
+ // Build expands the manifest into an ordered closure.
+@@ -156,12 +160,13 @@ func Build(opts Options, projectManifest *manifest.Manifest, substitutions map[s
+ 			return nil, fmt.Errorf("source_selection_invalid: draft selectors require expansion and frozen package acquisition before Git closure resolution")
+ 		}
+ 		queue = append(queue, pending{
+-			name:   decl.Name,
+-			git:    decl.Git,
+-			ref:    decl.Ref,
+-			source: decl.Source,
+-			edge:   Edge{Consumer: ProjectEdge, Mode: "full"},
+-			chain:  ProjectEdge + " -> " + decl.Name,
++			name:      decl.Name,
++			git:       decl.Git,
++			ref:       decl.Ref,
++			source:    decl.Source,
++			directory: ".",
++			edge:      Edge{Consumer: ProjectEdge, Mode: "full"},
++			chain:     ProjectEdge + " -> " + decl.Name,
+ 		})
+ 	}
+ 
+@@ -170,6 +175,7 @@ func Build(opts Options, projectManifest *manifest.Manifest, substitutions map[s
+ 
+ func buildQueue(opts Options, queue []pending, substitutions map[string]devsub.Substitution, draft bool) ([]*Node, error) {
+ 	nodes := map[string]*Node{}
++	sharedRepositories := map[string]string{}
+ 	for len(queue) > 0 {
+ 		item := queue[0]
+ 		queue = queue[1:]
+@@ -178,7 +184,7 @@ func buildQueue(opts Options, queue []pending, substitutions map[string]devsub.S
+ 			resolved := item.selected
+ 			if resolved == nil {
+ 				var err error
+-				resolved, err = resolveNode(opts, item, substitutions)
++				resolved, err = resolveNode(opts, item, substitutions, sharedRepositories)
+ 				if err != nil {
+ 					return nil, err
+ 				}
+@@ -198,12 +204,14 @@ func buildQueue(opts Options, queue []pending, substitutions map[string]devsub.S
+ 			for _, name := range names {
+ 				requirement := node.Spec.Requirements[name]
+ 				queue = append(queue, pending{
+-					name:   requirement.Name,
+-					git:    requirement.Git,
+-					ref:    manifest.Ref{Kind: requirement.RefKind, Value: requirement.RefValue},
+-					source: requirement.Name,
+-					edge:   Edge{Consumer: item.name, Mode: requirement.Mode, Commands: requirement.Commands},
+-					chain:  item.chain + " -> " + requirement.Name,
++					name:          requirement.Name,
++					git:           requirement.Git,
++					ref:           manifest.Ref{Kind: requirement.RefKind, Value: requirement.RefValue},
++					source:        requirement.Name,
++					directory:     requirement.Directory,
++					selectPackage: node.Spec.SchemaVersion >= 9,
++					edge:          Edge{Consumer: item.name, Mode: requirement.Mode, Commands: requirement.Commands},
++					chain:         item.chain + " -> " + requirement.Name,
+ 				})
+ 			}
+ 		} else if err := unify(node, item); err != nil {
+@@ -241,12 +249,23 @@ func DetectActiveCommandCollisions(nodes []*Node) error {
+ // repository and the same commit (Spec §8.3). A substituted node skips
+ // unification: the substitution replaces every requirement of that name.
+ func unify(node *Node, item pending) error {
+-	if node.Decl.Selector != nil && (node.Resolved.Commit == "" || node.Decl.Selector.Directory != ".") {
++	if node.Decl.Selector != nil && (node.Resolved.Commit == "" || node.Identity == "") {
+ 		return fmt.Errorf("source_name_conflict: %s dependency cannot identify the selected local package or repository subdirectory", node.Name)
+ 	}
+ 	if node.Substituted != "" {
+ 		return nil
+ 	}
++	nodeDirectory := node.Directory
++	if nodeDirectory == "" {
++		nodeDirectory = "."
++	}
++	itemDirectory := item.directory
++	if itemDirectory == "" {
++		itemDirectory = "."
++	}
++	if nodeDirectory != itemDirectory {
++		return fmt.Errorf("source conflict for %s: selected directory %q (via %s) and %q (via %s) differ", node.Name, nodeDirectory, node.Chains[0], itemDirectory, item.chain)
++	}
+ 	if item.git != "" {
+ 		id, err := identity.Parse(item.git)
+ 		if err != nil {
+@@ -278,10 +297,14 @@ func unify(node *Node, item pending) error {
+ 	return nil
+ }
+ 
+-func resolveNode(opts Options, item pending, substitutions map[string]devsub.Substitution) (*Node, error) {
++func resolveNode(opts Options, item pending, substitutions map[string]devsub.Substitution, sharedRepositories map[string]string) (*Node, error) {
+ 	var repo string
+ 	var resolved gitops.ResolvedRef
+ 	substituted := ""
++	directory := item.directory
++	if directory == "" {
++		directory = "."
++	}
+ 
+ 	if substitution, present := substitutions[item.name]; present {
+ 		if substitution.Path != "" {
+@@ -311,11 +334,30 @@ func resolveNode(opts Options, item pending, substitutions map[string]devsub.Sub
+ 		}
+ 		substituted = substitution.Describe()
+ 	} else {
+-		localRepo, err := ensureRepo(opts, item)
+-		if err != nil {
+-			return nil, err
++		repositoryIdentity := ""
++		if item.selectPackage && directory != "." {
++			var err error
++			repositoryIdentity, err = identity.Parse(item.git)
++			if err != nil {
++				return nil, fmt.Errorf("invalid source for %s (via %s): %w", item.name, item.chain, err)
++			}
++			if repositoryIdentity == "" {
++				return nil, fmt.Errorf("source_selection_invalid: selecting a repository subdirectory requires a canonical network repository identity")
++			}
++		}
++		localRepo, shared := sharedRepositories[repositoryIdentity]
++		if repositoryIdentity != "" && shared {
++			repo = localRepo
++		} else {
++			localRepo, err := ensureRepo(opts, item)
++			if err != nil {
++				return nil, err
++			}
++			repo = localRepo
++			if repositoryIdentity != "" {
++				sharedRepositories[repositoryIdentity] = localRepo
++			}
+ 		}
+-		repo = localRepo
+ 		ref, err := gitops.Resolve(repo, item.ref.Kind, item.ref.Value)
+ 		if err != nil {
+ 			return nil, fmt.Errorf("cannot resolve %s %q for %s (via %s): %w", item.ref.Kind, item.ref.Value, item.name, item.chain, err)
+@@ -323,14 +365,28 @@ func resolveNode(opts Options, item pending, substitutions map[string]devsub.Sub
+ 		resolved = ref
+ 	}
+ 
+-	snap, err := snapshotFor(opts, item.source, repo, resolved.Commit)
++	cacheSource := item.source
++	if item.selectPackage && directory != "." {
++		cacheSource = identity.Canonical(item.git)
++	}
++	snap, err := snapshotFor(opts, cacheSource, repo, resolved.Commit)
+ 	if err != nil {
++		var linkErr *gitops.UnsupportedLinkError
++		if item.selectPackage && errors.As(err, &linkErr) && selectedPathIntersectsLink(directory, linkErr.Path) {
++			return nil, fmt.Errorf("source_selection_invalid: directory %q escapes source or contains symlink %q", directory, linkErr.Path)
++		}
+ 		return nil, err
+ 	}
+ 	if gitops.HasSubmodules(snap) {
+ 		return nil, fmt.Errorf("submodules are unsupported: %s", item.source)
+ 	}
+-	spec, err := skillspec.Load(snap)
++	packageSnapshot := snap
++	var spec *skillspec.Spec
++	if item.selectPackage {
++		packageSnapshot, spec, err = manifest.SelectSkillPackage(snap, directory, item.name)
++	} else {
++		spec, err = skillspec.Load(snap)
++	}
+ 	if err != nil {
+ 		return nil, fmt.Errorf("invalid skill manifest for %s %s %s -> %s (via %s): %w",
+ 			item.name, resolved.Kind, resolved.Ref, short(resolved.Commit), item.chain, err)
+@@ -346,15 +402,23 @@ func resolveNode(opts Options, item pending, substitutions map[string]devsub.Sub
+ 	return &Node{
+ 		Name:        item.name,
+ 		Decl:        manifest.Decl{Name: item.name, Source: item.source, Ref: manifest.Ref{Kind: resolved.Kind, Value: resolved.Ref}, Git: item.git},
++		Directory:   directory,
+ 		Resolved:    resolved,
+ 		Repo:        repo,
+-		Snapshot:    snap,
++		Snapshot:    packageSnapshot,
+ 		Spec:        spec,
+ 		Identity:    id,
+ 		Substituted: substituted,
+ 	}, nil
+ }
+ 
++func selectedPathIntersectsLink(directory, link string) bool {
++	if directory == "." {
++		return true
++	}
++	return link == directory || strings.HasPrefix(link, directory+"/") || strings.HasPrefix(directory, link+"/")
++}
++
+ func ensureRepo(opts Options, item pending) (string, error) {
+ 	repo := filepath.Join(opts.SkillsRoot, filepath.FromSlash(item.source))
+ 	if _, err := os.Stat(repo); err == nil {
+diff --git a/internal/closure/directory_dependency_test.go b/internal/closure/directory_dependency_test.go
+new file mode 100644
+index 00000000..9b46e78f
+--- /dev/null
++++ b/internal/closure/directory_dependency_test.go
+@@ -0,0 +1,386 @@
++package closure
++
++import (
++	"encoding/json"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/gitops"
++	"github.com/relux-works/curator/internal/sourcelock"
++)
++
++const directoryDependencyGit = "https://github.com/example/role-skills.git"
++
++func writeDirectoryDependencySkill(t *testing.T, dir, name string, schema int, requirements map[string]map[string]any) {
++	t.Helper()
++	if err := os.MkdirAll(filepath.Join(dir, "references"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	frontmatter := "---\nname: " + name + "\ndescription: Test " + name + "\n---\n# " + name + "\n"
++	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(frontmatter), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(dir, "references", "info.md"), []byte("context\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	spec := map[string]any{
++		"schema_version": schema,
++		"capabilities":   map[string]any{},
++		"commands":       map[string]any{},
++		"dependencies":   map[string]any{"skills": requirements},
++	}
++	payload, err := json.Marshal(spec)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(dir, "agent-skill.json"), payload, 0o644); err != nil {
++		t.Fatal(err)
++	}
++}
++
++func directoryRequirement(commit, directory string, includeDirectory bool) map[string]any {
++	entry := map[string]any{
++		"git": directoryDependencyGit,
++		"ref": map[string]any{"kind": "revision", "value": commit},
++	}
++	if includeDirectory {
++		entry["directory"] = directory
++	}
++	return entry
++}
++
++func resolveDirectoryDependencyFixture(t *testing.T, directory string, includeDirectory bool, repoDirs []string, repoFiles map[string]string, symlinks map[string]string) (*DraftPlan, error) {
++	t.Helper()
++	project := t.TempDir()
++	home := t.TempDir()
++	skillsRoot := t.TempDir()
++	repo := filepath.Join(skillsRoot, "developer")
++	if err := os.MkdirAll(repo, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	gitAt(t, repo, "init", "-q", "-b", "main")
++	for _, rel := range repoDirs {
++		dir := filepath.Join(repo, filepath.FromSlash(rel))
++		if _, isSymlink := symlinks[rel]; isSymlink {
++			continue
++		}
++		if err := os.MkdirAll(dir, 0o755); err != nil {
++			t.Fatal(err)
++		}
++		containsTrackedFile := false
++		for file := range repoFiles {
++			if strings.HasPrefix(file, strings.TrimSuffix(rel, "/")+"/") {
++				containsTrackedFile = true
++				break
++			}
++		}
++		if !containsTrackedFile {
++			if err := os.WriteFile(filepath.Join(dir, ".fixture"), []byte("directory fixture\n"), 0o644); err != nil {
++				t.Fatal(err)
++			}
++		}
++	}
++	for rel, content := range repoFiles {
++		path := filepath.Join(repo, filepath.FromSlash(rel))
++		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
++			t.Fatal(err)
++		}
++	}
++	for rel, target := range symlinks {
++		path := filepath.Join(repo, filepath.FromSlash(rel))
++		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Symlink(target, path); err != nil {
++			t.Fatal(err)
++		}
++	}
++	gitAt(t, repo, "add", ".")
++	gitAt(t, repo, "commit", "-qm", "provider")
++	resolved, err := gitops.Resolve(repo, "revision", "HEAD")
++	if err != nil {
++		t.Fatal(err)
++	}
++
++	appDir := filepath.Join(project, "skills", "app")
++	writeDirectoryDependencySkill(t, appDir, "app", 9, map[string]map[string]any{
++		"developer": directoryRequirement(resolved.Commit, directory, includeDirectory),
++	})
++	manifestPayload := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"name":"app","from":"s","directory":"skills/app"}]}`
++	m, raw := parseDraftManifest(t, project, manifestPayload)
++	plan, err := ResolveDraft(DraftResolveConfig{
++		ProjectRoot: project, Home: home, SkillsRoot: skillsRoot,
++		Manifest: m, ManifestPayload: raw,
++	})
++	return plan, err
++}
++
++func TestDraftManifestDependencyDirectoryResolutionVectors(t *testing.T) {
++	vectorPath := filepath.Join("..", "skillspec", "testdata", "draft-sources-v1", "manifest-dependency-directories.json")
++	payload, err := os.ReadFile(vectorPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var vector struct {
++		Cases []struct {
++			Name       string `json:"name"`
++			Dependency struct {
++				Directory string `json:"directory"`
++			} `json:"dependency"`
++			Snapshot struct {
++				Directories      []string          `json:"directories"`
++				Files            []string          `json:"files"`
++				FrontmatterNames map[string]string `json:"frontmatter_names"`
++				Symlinks         map[string]string `json:"symlinks"`
++			} `json:"snapshot"`
++			Expected struct {
++				Status        string `json:"status"`
++				Reason        string `json:"reason"`
++				LockDirectory string `json:"lock_directory"`
++				Identity      struct {
++					Directory string `json:"directory"`
++				} `json:"identity"`
++			} `json:"expected"`
++		} `json:"resolution_cases"`
++	}
++	if err := json.Unmarshal(payload, &vector); err != nil {
++		t.Fatal(err)
++	}
++	for _, testCase := range vector.Cases {
++		if strings.HasPrefix(testCase.Name, "diamond-") || strings.HasPrefix(testCase.Name, "same-name-") {
++			continue // Covered by production closure graph tests below.
++		}
++		t.Run(testCase.Name, func(t *testing.T) {
++			files := map[string]string{}
++			for _, rel := range testCase.Snapshot.Files {
++				name := testCase.Snapshot.FrontmatterNames[rel]
++				files[rel] = "---\nname: " + name + "\ndescription: vector fixture\n---\n# " + name + "\n"
++			}
++			plan, err := resolveDirectoryDependencyFixture(t, testCase.Dependency.Directory, testCase.Dependency.Directory != "", testCase.Snapshot.Directories, files, testCase.Snapshot.Symlinks)
++			if testCase.Expected.Status == "rejected" {
++				if err == nil {
++					t.Fatal("ResolveDraft accepted a rejected directory vector")
++				}
++				for _, diagnostic := range map[string][]string{
++					"directory-missing":            {"source_member_missing"},
++					"skill-md-missing":             {"no SKILL.md"},
++					"directory-escapes-repository": {"source_selection_invalid", "escapes source"},
++				}[testCase.Expected.Reason] {
++					if !strings.Contains(err.Error(), diagnostic) {
++						t.Fatalf("error %q does not include diagnostic %q", err, diagnostic)
++					}
++				}
++				return
++			}
++			if err != nil {
++				t.Fatal(err)
++			}
++			member, ok := plan.Lock.Find("developer")
++			if !ok {
++				t.Fatalf("lock misses selected dependency: %+v", plan.Lock.Members)
++			}
++			wantDirectory := testCase.Expected.LockDirectory
++			if wantDirectory == "" {
++				wantDirectory = testCase.Expected.Identity.Directory
++			}
++			if member.Directory != wantDirectory || member.Package.Directory != wantDirectory {
++				t.Fatalf("lock member directory=%q package directory=%q, want %q", member.Directory, member.Package.Directory, wantDirectory)
++			}
++		})
++	}
++}
++
++func TestDraftManifestDependencyDirectoryDiamondSharesRepositoryAndPackageNode(t *testing.T) {
++	project, home, skillsRoot := t.TempDir(), t.TempDir(), t.TempDir()
++	repo := filepath.Join(skillsRoot, "backend")
++	if err := os.MkdirAll(repo, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	gitAt(t, repo, "init", "-q", "-b", "main")
++	writeDirectoryDependencySkill(t, filepath.Join(repo, "skills", "backend"), "backend", 9, map[string]map[string]any{})
++	writeDirectoryDependencySkill(t, filepath.Join(repo, "skills", "frontend"), "frontend", 9, map[string]map[string]any{})
++	writeDirectoryDependencySkill(t, filepath.Join(repo, "skills", "shared"), "shared", 4, map[string]map[string]any{})
++	gitAt(t, repo, "add", ".")
++	gitAt(t, repo, "commit", "-qm", "base role packages")
++	resolved, err := gitops.Resolve(repo, "revision", "HEAD")
++	if err != nil {
++		t.Fatal(err)
++	}
++	baseCommit := resolved.Commit
++	// The role packages select shared from the base repository commit. Their
++	// selected bytes live at the next commit, while the shared ref remains an
++	// immutable non-cyclic pin.
++	requireShared := map[string]map[string]any{"shared": directoryRequirement(baseCommit, "skills/shared", true)}
++	writeDirectoryDependencySkill(t, filepath.Join(repo, "skills", "backend"), "backend", 9, requireShared)
++	writeDirectoryDependencySkill(t, filepath.Join(repo, "skills", "frontend"), "frontend", 9, requireShared)
++	gitAt(t, repo, "add", ".")
++	gitAt(t, repo, "commit", "-qm", "role dependencies")
++	resolved, err = gitops.Resolve(repo, "revision", "HEAD")
++	if err != nil {
++		t.Fatal(err)
++	}
++	roleCommit := resolved.Commit
++
++	writeDirectoryDependencySkill(t, filepath.Join(project, "skills", "app"), "app", 9, map[string]map[string]any{
++		"backend":  directoryRequirement(roleCommit, "skills/backend", true),
++		"frontend": directoryRequirement(roleCommit, "skills/frontend", true),
++	})
++	manifestPayload := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"name":"app","from":"s","directory":"skills/app"}]}`
++	m, raw := parseDraftManifest(t, project, manifestPayload)
++	plan, err := ResolveDraft(DraftResolveConfig{ProjectRoot: project, Home: home, SkillsRoot: skillsRoot, Manifest: m, ManifestPayload: raw})
++	if err != nil {
++		t.Fatal(err)
++	}
++	wantOrder := []string{"shared", "backend", "frontend", "app"}
++	if len(plan.Nodes) != len(wantOrder) {
++		t.Fatalf("nodes = %d, want %v: %+v", len(plan.Nodes), wantOrder, plan.Nodes)
++	}
++	for i, want := range wantOrder {
++		if plan.Nodes[i].Name != want {
++			got := make([]string, len(plan.Nodes))
++			for index, node := range plan.Nodes {
++				got[index] = node.Name
++			}
++			t.Fatalf("node order = %v, want %v", got, wantOrder)
++		}
++	}
++	for _, name := range []string{"backend", "frontend", "shared"} {
++		member, ok := plan.Lock.Find(name)
++		if !ok || member.Package.Repository != "github.com/example/role-skills" || member.Package.Directory == "." || member.Directory != member.Package.Directory {
++			t.Fatalf("%s lock package does not bind repo directory: %+v", name, member)
++		}
++	}
++	shared, ok := plan.Lock.Find("shared")
++	if !ok || shared.Package.Directory != "skills/shared" {
++		t.Fatalf("shared node was not unified at its selected folder: %+v", shared)
++	}
++	frozenNodes, _, err := LoadDraftFrozenNodes(home, plan.Lock, FrozenOptions{
++		GitRepos: map[string]string{"backend": repo, "frontend": repo, "shared": repo},
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(frozenNodes) != 4 {
++		t.Fatalf("frozen nodes = %d, want one shared node for the diamond", len(frozenNodes))
++	}
++}
++
++func TestDraftManifestDependencyDirectorySameNameDifferentFolderConflicts(t *testing.T) {
++	project, home, skillsRoot := t.TempDir(), t.TempDir(), t.TempDir()
++	repo := filepath.Join(skillsRoot, "backend")
++	if err := os.MkdirAll(repo, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	gitAt(t, repo, "init", "-q", "-b", "main")
++	writeDirectoryDependencySkill(t, filepath.Join(repo, "skills", "frontend"), "frontend", 9, map[string]map[string]any{})
++	writeDirectoryDependencySkill(t, filepath.Join(repo, "skills", "backend"), "backend", 9, map[string]map[string]any{})
++	writeDirectoryDependencySkill(t, filepath.Join(repo, "skills", "shared-a"), "shared", 4, map[string]map[string]any{})
++	writeDirectoryDependencySkill(t, filepath.Join(repo, "skills", "shared-b"), "shared", 4, map[string]map[string]any{})
++	gitAt(t, repo, "add", ".")
++	gitAt(t, repo, "commit", "-qm", "base same-name packages")
++	resolved, err := gitops.Resolve(repo, "revision", "HEAD")
++	if err != nil {
++		t.Fatal(err)
++	}
++	baseCommit := resolved.Commit
++	writeDirectoryDependencySkill(t, filepath.Join(repo, "skills", "frontend"), "frontend", 9, map[string]map[string]any{
++		"shared": directoryRequirement(baseCommit, "skills/shared-a", true),
++	})
++	writeDirectoryDependencySkill(t, filepath.Join(repo, "skills", "backend"), "backend", 9, map[string]map[string]any{
++		"shared": directoryRequirement(baseCommit, "skills/shared-b", true),
++	})
++	gitAt(t, repo, "add", ".")
++	gitAt(t, repo, "commit", "-qm", "conflicting folder requirements")
++	resolved, err = gitops.Resolve(repo, "revision", "HEAD")
++	if err != nil {
++		t.Fatal(err)
++	}
++	roleCommit := resolved.Commit
++	rootDir := filepath.Join(project, "skills", "app")
++	writeDirectoryDependencySkill(t, rootDir, "app", 9, map[string]map[string]any{
++		"backend":  directoryRequirement(roleCommit, "skills/backend", true),
++		"frontend": directoryRequirement(roleCommit, "skills/frontend", true),
++	})
++	manifestPayload := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"name":"app","from":"s","directory":"skills/app"}]}`
++	m, raw := parseDraftManifest(t, project, manifestPayload)
++	_, err = ResolveDraft(DraftResolveConfig{ProjectRoot: project, Home: home, SkillsRoot: skillsRoot, Manifest: m, ManifestPayload: raw})
++	if err == nil || !strings.Contains(err.Error(), "source_name_conflict") || !strings.Contains(err.Error(), "selected directory") {
++		t.Fatalf("same skill name at different package folders error = %v, want source_name_conflict", err)
++	}
++}
++
++func TestDraftManifestDependencyDirectoryRequiresMatchingSkillName(t *testing.T) {
++	_, err := resolveDirectoryDependencyFixture(t, "skills/developer", true, []string{"skills", "skills/developer"}, map[string]string{
++		"skills/developer/SKILL.md": "---\nname: another-skill\ndescription: Wrong package\n---\n# another-skill\n",
++	}, nil)
++	if err == nil || !strings.Contains(err.Error(), "differs from dependency name") {
++		t.Fatalf("mismatched SKILL.md name error = %v, want selected package name refusal", err)
++	}
++}
++
++func TestDraftManifestDependencyDirectoryOmittedLockShapeRemainsRoot(t *testing.T) {
++	plan, err := resolveDirectoryDependencyFixture(t, "", false, nil, map[string]string{"SKILL.md": "---\nname: developer\ndescription: root\n---\n# developer\n"}, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	member, ok := plan.Lock.Find("developer")
++	if !ok || member.Directory != "." || member.Package.Directory != "." || member.Package.Kind != sourcelock.KindNetworkGit {
++		t.Fatalf("omitted directory did not preserve root package identity: %+v", member)
++	}
++}
++
++func TestLegacyDependencyWithoutDirectoryLockBytes(t *testing.T) {
++	project, home, skillsRoot := t.TempDir(), t.TempDir(), t.TempDir()
++	provider := filepath.Join(skillsRoot, "provider")
++	if err := os.MkdirAll(provider, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	writeDraftSkill(t, provider, "provider", false, nil, nil)
++	gitAtFixedDate(t, provider, "init", "-q", "-b", "main")
++	gitAtFixedDate(t, provider, "add", ".")
++	gitAtFixedDate(t, provider, "commit", "-qm", "provider")
++	commit, err := gitops.Resolve(provider, "revision", "HEAD")
++	if err != nil {
++		t.Fatal(err)
++	}
++	writeDirectoryDependencySkill(t, filepath.Join(project, "skills", "app"), "app", 8, map[string]map[string]any{
++		"provider": directoryRequirement(commit.Commit, "", false),
++	})
++	manifestPayload := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"name":"app","from":"s","directory":"skills/app"}]}`
++	m, raw := parseDraftManifest(t, project, manifestPayload)
++	plan, err := ResolveDraft(DraftResolveConfig{ProjectRoot: project, Home: home, SkillsRoot: skillsRoot, Manifest: m, ManifestPayload: raw})
++	if err != nil {
++		t.Fatal(err)
++	}
++	member, ok := plan.Lock.Find("provider")
++	if !ok || member.Directory != "." || member.Package.Directory != "." {
++		t.Fatalf("legacy member = %+v, want repository-root package", member)
++	}
++	// This deterministic schema-8/no-directory lock hash is the output from
++	// the unmodified story base and pins byte-identical legacy serialization.
++	const baselineLockSHA256 = "sha256:685572494b1612df0e2f8be58102a9bb01037d404f513c0e756da5103fd5d66c"
++	if plan.Lock.LockSHA256 != baselineLockSHA256 {
++		t.Fatalf("legacy lock hash = %s, want unchanged baseline %s", plan.Lock.LockSHA256, baselineLockSHA256)
++	}
++}
++
++func gitAtFixedDate(t *testing.T, dir string, args ...string) {
++	t.Helper()
++	full := append([]string{"-c", "commit.gpgsign=false", "-c", "tag.gpgSign=false"}, args...)
++	cmd := exec.Command("git", full...)
++	cmd.Dir = dir
++	cmd.Env = append(os.Environ(),
++		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
++		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",
++		"GIT_AUTHOR_DATE=2000-01-01T00:00:00Z", "GIT_COMMITTER_DATE=2000-01-01T00:00:00Z",
++	)
++	if output, err := cmd.CombinedOutput(); err != nil {
++		t.Fatalf("git %v: %v\n%s", args, err, output)
++	}
++}
+diff --git a/internal/closure/resolve.go b/internal/closure/resolve.go
+index 7888339e..1c123f91 100644
+--- a/internal/closure/resolve.go
++++ b/internal/closure/resolve.go
+@@ -372,6 +372,9 @@ func gitCacheKey(member sourcelock.Member) string {
+ 	if member.Selection != nil {
+ 		return pkg.Repository
+ 	}
++	if member.Directory != "." {
++		return pkg.Repository
++	}
+ 	return member.Name
+ }
+ 
+@@ -413,7 +416,7 @@ func LoadDraftFrozenNodes(home string, lock *sourcelock.Lock, opts FrozenOptions
+ 		if content != member.ContentSHA256 {
+ 			return nil, nil, fmt.Errorf("source_snapshot_changed: stored snapshot for %s does not match its locked content", member.Name)
+ 		}
+-		node := &Node{Name: member.Name, Snapshot: tree, Spec: spec}
++		node := &Node{Name: member.Name, Directory: member.Directory, Snapshot: tree, Spec: spec}
+ 		if member.Selection != nil {
+ 			node.Decl = manifest.Decl{Name: member.Name, Selector: &manifest.Selector{Directory: member.Directory}}
+ 			node.Edges = []Edge{{Consumer: ProjectEdge, Mode: "full"}}
+@@ -597,7 +600,7 @@ func acquireLocal(cfg DraftResolveConfig, outputs []string, knownAliases map[str
+ 	if err != nil {
+ 		return nil, fmt.Errorf("source_member_invalid: %s: %w", sel.Decl.Name, err)
+ 	}
+-	node := &Node{Name: sel.Decl.Name, Snapshot: storePath, Spec: spec}
++	node := &Node{Name: sel.Decl.Name, Directory: sel.Directory, Snapshot: storePath, Spec: spec}
+ 	acquired[sel.Decl.Name] = &draftAcquired{node: node, pkg: pkg, frozen: storePath, snapshot: inventory.Snapshot}
+ 	return node, nil
+ }
+@@ -721,12 +724,13 @@ func acquireGitPinned(_ DraftResolveConfig, _ map[string]bool, sel manifest.Sele
+ 		return nil, fmt.Errorf("source_member_invalid: %s:%s: %w", alias, sel.Directory, err)
+ 	}
+ 	node := &Node{
+-		Name:     sel.Decl.Name,
+-		Resolved: resolved,
+-		Repo:     pin.repo,
+-		Snapshot: subtree,
+-		Spec:     spec,
+-		Identity: source.Identity,
++		Name:      sel.Decl.Name,
++		Directory: sel.Directory,
++		Resolved:  resolved,
++		Repo:      pin.repo,
++		Snapshot:  subtree,
++		Spec:      spec,
++		Identity:  source.Identity,
+ 	}
+ 	acquired[sel.Decl.Name] = &draftAcquired{node: node, pkg: pkg, frozen: subtree}
+ 	return node, nil
+@@ -757,6 +761,10 @@ func assemblePlan(cfg DraftResolveConfig, manifestSHA string, nodes []*Node, acq
+ }
+ 
+ func memberForNode(_ DraftResolveConfig, node *Node, acquired map[string]*draftAcquired, indexByName map[string]int, dirByName map[string]string) (sourcelock.Member, sourcelock.Package, string, error) {
++	directory := node.Directory
++	if directory == "" {
++		directory = "."
++	}
+ 	var selection *int
+ 	if index, ok := indexByName[node.Name]; ok {
+ 		// Collection siblings share the zero-based skills index.
+@@ -764,7 +772,11 @@ func memberForNode(_ DraftResolveConfig, node *Node, acquired map[string]*draftA
+ 		selection = &value
+ 	}
+ 	if acquiredEntry, ok := acquired[node.Name]; ok {
+-		directory := dirByName[node.Name]
++		selectedDirectory := dirByName[node.Name]
++		if directory != "." && directory != selectedDirectory {
++			return sourcelock.Member{}, sourcelock.Package{}, "", fmt.Errorf("source_member_invalid: selected directory for %s differs between acquisition and closure", node.Name)
++		}
++		directory = selectedDirectory
+ 		content, err := ContentHashFor(acquiredEntry.frozen, node.Spec)
+ 		if err != nil {
+ 			return sourcelock.Member{}, sourcelock.Package{}, "", err
+@@ -775,12 +787,10 @@ func memberForNode(_ DraftResolveConfig, node *Node, acquired map[string]*draftA
+ 		}
+ 		return member, acquiredEntry.pkg, acquiredEntry.frozen, nil
+ 	}
+-	// Legacy and transitive members flow through the existing Git lane.
+-	// Their directory is "." relative to the selected repository and
+-	// their package arm follows the canonical identity: a canonical
+-	// repository selects network-git, otherwise the scoped
+-	// configured-git identity. No snapshot digest ever enters a commit.
+-	directory := "."
++	// Legacy and transitive members flow through the Git lane. Schema-9
++	// transitive members retain their selected directory in both package
++	// identity and lock membership; older requirements normalize to ".".
++	// No snapshot digest ever enters a Git commit.
+ 	commit, err := commitFor(node.Resolved.Commit)
+ 	if err != nil {
+ 		return sourcelock.Member{}, sourcelock.Package{}, "", err
+@@ -789,6 +799,9 @@ func memberForNode(_ DraftResolveConfig, node *Node, acquired map[string]*draftA
+ 	if node.Identity != "" {
+ 		pkg, err = sourcelock.NetworkGitPackage(node.Identity, commit, directory)
+ 	} else {
++		if directory != "." {
++			return sourcelock.Member{}, sourcelock.Package{}, "", fmt.Errorf("source_selection_invalid: configured Git dependencies cannot lock a selected subdirectory")
++		}
+ 		source := node.Decl.Source
+ 		if source == "" {
+ 			source = node.Name
+diff --git a/internal/closure/selections.go b/internal/closure/selections.go
+index 39bf4613..ca6846b3 100644
+--- a/internal/closure/selections.go
++++ b/internal/closure/selections.go
+@@ -30,7 +30,7 @@ func BuildExpanded(opts Options, m *manifest.Manifest, expansion manifest.Expans
+ 	commits := map[string]string{}
+ 	for _, member := range members {
+ 		decl := member.Decl
+-		item := pending{name: decl.Name, git: decl.Git, ref: decl.Ref, source: decl.Source, edge: Edge{Consumer: ProjectEdge, Mode: "full"}, chain: ProjectEdge + " -> " + decl.Name}
++		item := pending{name: decl.Name, git: decl.Git, ref: decl.Ref, source: decl.Source, directory: member.Directory, edge: Edge{Consumer: ProjectEdge, Mode: "full"}, chain: ProjectEdge + " -> " + decl.Name}
+ 		if decl.Selector != nil {
+ 			if acquire == nil {
+ 				return nil, fmt.Errorf("source_selection_invalid: frozen package acquisition required for %s", decl.Name)
+diff --git a/internal/crossconformance/draftsources_cli_e2e_test.go b/internal/crossconformance/draftsources_cli_e2e_test.go
+index feb5c2bf..ecec9359 100644
+--- a/internal/crossconformance/draftsources_cli_e2e_test.go
++++ b/internal/crossconformance/draftsources_cli_e2e_test.go
+@@ -18,6 +18,7 @@ import (
+ 	"testing"
+ 
+ 	"github.com/relux-works/curator/internal/adapters"
++	"github.com/relux-works/curator/internal/audit"
+ 	"github.com/relux-works/curator/internal/marker"
+ 	"github.com/relux-works/curator/internal/runtimestore"
+ 	"github.com/relux-works/curator/internal/sourcelock"
+@@ -190,3 +191,141 @@ func TestDraftSourcesCLILocalSkillScriptDependencies(t *testing.T) {
+ 		}
+ 	})
+ }
++
++func TestDraftSourcesCLIDirectoryManifestDependencyInstallRefreshAndAudit(t *testing.T) {
++	root := t.TempDir()
++	configPath, project, home := setupCLIProject(t, root)
++	skillsRoot := filepath.Join(root, "skills-root")
++	providerRepo := filepath.Join(skillsRoot, "backend")
++	dependencyGit := "https://github.com/example/role-skills.git"
++	writeManifestDependencySkill(t, filepath.Join(providerRepo, "skills", "backend"), "backend", 9, map[string]map[string]any{})
++	writeManifestDependencySkill(t, filepath.Join(providerRepo, "skills", "frontend"), "frontend", 9, map[string]map[string]any{})
++	writeManifestDependencySkill(t, filepath.Join(providerRepo, "skills", "shared"), "shared", 4, map[string]map[string]any{})
++	runDraftGit(t, providerRepo, "init", "-q", "-b", "main")
++	runDraftGit(t, providerRepo, "add", ".")
++	runDraftGit(t, providerRepo, "commit", "-qm", "base role packages")
++	baseCommit := strings.TrimSpace(draftGitOutput(t, providerRepo, "rev-parse", "HEAD"))
++	sharedRequirement := map[string]map[string]any{
++		"shared": {
++			"git":       dependencyGit,
++			"ref":       map[string]any{"kind": "revision", "value": baseCommit},
++			"directory": "skills/shared",
++		},
++	}
++	writeManifestDependencySkill(t, filepath.Join(providerRepo, "skills", "backend"), "backend", 9, sharedRequirement)
++	writeManifestDependencySkill(t, filepath.Join(providerRepo, "skills", "frontend"), "frontend", 9, sharedRequirement)
++	runDraftGit(t, providerRepo, "add", ".")
++	runDraftGit(t, providerRepo, "commit", "-qm", "role dependencies")
++	roleCommit := strings.TrimSpace(draftGitOutput(t, providerRepo, "rev-parse", "HEAD"))
++
++	appDir := filepath.Join(project, "skills", "app")
++	writeManifestDependencySkill(t, appDir, "app", 9, map[string]map[string]any{
++		"backend": {
++			"git":       dependencyGit,
++			"ref":       map[string]any{"kind": "revision", "value": roleCommit},
++			"directory": "skills/backend",
++		},
++		"frontend": {
++			"git":       dependencyGit,
++			"ref":       map[string]any{"kind": "revision", "value": roleCommit},
++			"directory": "skills/frontend",
++		},
++	})
++	skillfile := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"name":"app","from":"s","directory":"skills/app"}]}`
++	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(skillfile), 0o644); err != nil {
++		t.Fatal(err)
++	}
++
++	configPayload, err := os.ReadFile(configPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var configDocument map[string]any
++	if err := json.Unmarshal(configPayload, &configDocument); err != nil {
++		t.Fatal(err)
++	}
++	configDocument["audit"] = map[string]any{
++		"enabled": true, "mode": "advisory", "backend": "null", "registry_policy": "advisory",
++	}
++	configPayload, err = json.MarshalIndent(configDocument, "", "  ")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(configPath, configPayload, 0o600); err != nil {
++		t.Fatal(err)
++	}
++
++	if code, stdout, stderr := runCurator(t, home, configPath, nil, "project", "resolve", "app"); code != 0 {
++		t.Fatalf("project resolve = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	lockPath := filepath.Join(project, "Skillfile.lock.json")
++	lock, err := sourcelock.Read(lockPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	assertDirectoryDependencyLock := func() {
++		t.Helper()
++		for _, name := range []string{"backend", "frontend", "shared"} {
++			member, ok := lock.Find(name)
++			if !ok || member.Package.Kind != sourcelock.KindNetworkGit || member.Directory != "skills/"+name || member.Package.Directory != "skills/"+name {
++				t.Fatalf("locked dependency %s does not bind selected directory: %+v", name, member)
++			}
++		}
++	}
++	assertDirectoryDependencyLock()
++
++	for _, operation := range [][]string{{"install", "app"}, {"project", "refresh", "app"}, {"install", "app"}} {
++		if code, stdout, stderr := runCurator(t, home, configPath, nil, operation...); code != 0 {
++			t.Fatalf("%v = %d\nstdout:\n%s\nstderr:\n%s", operation, code, stdout, stderr)
++		}
++		if operation[0] == "project" {
++			lock, err = sourcelock.Read(lockPath)
++			if err != nil {
++				t.Fatal(err)
++			}
++			assertDirectoryDependencyLock()
++		}
++	}
++
++	for _, name := range []string{"backend", "frontend", "shared"} {
++		installedPath := filepath.Join(project, ".agents", "skills", name)
++		installedSkill, err := os.ReadFile(filepath.Join(installedPath, "SKILL.md"))
++		if err != nil {
++			t.Fatal(err)
++		}
++		if !strings.Contains(string(installedSkill), name) {
++			t.Fatalf("installed context for %s does not come from selected folder: %s", name, installedSkill)
++		}
++		installedMarker := marker.Read(installedPath)
++		if installedMarker == nil || installedMarker.Package == nil || installedMarker.Package.Directory != "skills/"+name {
++			t.Fatalf("install marker for %s lost package directory: %+v", name, installedMarker)
++		}
++	}
++
++	objects, err := filepath.Glob(filepath.Join(home, "source-audit", "*.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	auditedDirectories := map[string]bool{}
++	for _, path := range objects {
++		if strings.HasSuffix(path, ".report.json") {
++			continue
++		}
++		payload, err := os.ReadFile(path)
++		if err != nil {
++			t.Fatal(err)
++		}
++		object, err := audit.ParseSourceAudit(payload)
++		if err != nil {
++			t.Fatalf("parse source audit %s: %v", path, err)
++		}
++		if object.Package.Kind == sourcelock.KindNetworkGit {
++			auditedDirectories[object.Package.Directory] = true
++		}
++	}
++	for _, directory := range []string{"skills/backend", "skills/frontend", "skills/shared"} {
++		if !auditedDirectories[directory] {
++			t.Fatalf("source-audit records omit selected package directory: %v", auditedDirectories)
++		}
++	}
++}
+diff --git a/internal/crossconformance/draftsources_fixtures_test.go b/internal/crossconformance/draftsources_fixtures_test.go
+index a7f2002e..6b3105dd 100644
+--- a/internal/crossconformance/draftsources_fixtures_test.go
++++ b/internal/crossconformance/draftsources_fixtures_test.go
+@@ -62,6 +62,34 @@ func writeDraftSkill(t *testing.T, dir, name string) {
+ 	}
+ }
+ 
++// writeManifestDependencySkill materializes a minimal package whose skill
++// manifest can carry schema-9 directory requirements.
++func writeManifestDependencySkill(t *testing.T, dir, name string, schema int, requirements map[string]map[string]any) {
++	t.Helper()
++	if err := os.MkdirAll(filepath.Join(dir, "references"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\nname: "+name+"\ndescription: Test "+name+"\n---\n# "+name+"\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(dir, "references", "info.md"), []byte("context\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	spec := map[string]any{
++		"schema_version": schema,
++		"capabilities":   map[string]any{},
++		"commands":       map[string]any{},
++		"dependencies":   map[string]any{"skills": requirements},
++	}
++	payload, err := json.Marshal(spec)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(dir, "agent-skill.json"), payload, 0o644); err != nil {
++		t.Fatal(err)
++	}
++}
++
+ // draftProject creates a git-initialized project with the given skill
+ // packages and Skillfile payload, plus an isolated manager home.
+ func draftProject(t *testing.T, payload string, skills map[string]string) (project, home string) {
+diff --git a/internal/gitops/gitops.go b/internal/gitops/gitops.go
+index 50e506cf..9518d156 100644
+--- a/internal/gitops/gitops.go
++++ b/internal/gitops/gitops.go
+@@ -461,6 +461,18 @@ type treeEntry struct {
+ 	target string
+ }
+ 
++// UnsupportedLinkError identifies a Git symbolic-link path that cannot be
++// materialized as an immutable regular-file snapshot. Callers that apply a
++// narrower source selection can refine this refusal when the link intersects
++// the selected package path, without weakening snapshot extraction.
++type UnsupportedLinkError struct {
++	Path string
++}
++
++func (e *UnsupportedLinkError) Error() string {
++	return fmt.Sprintf("links in git snapshots are unsupported: %q", e.Path)
++}
++
+ // listTree lists the recursive contents of tree and refuses every entry that
+ // is not a regular blob. Output framing (verified on git 2.50):
+ // "<mode> <type> <oid> <size>\t<path>\0" per entry under -l -z, the size
+@@ -490,7 +502,7 @@ func listTree(repo, tree string) ([]treeEntry, error) {
+ 		entry := treeEntry{mode: fields[0], kind: fields[1], oid: fields[2], path: string(path)}
+ 		switch {
+ 		case entry.mode == "120000":
+-			return nil, fmt.Errorf("links in git snapshots are unsupported: %q", entry.path)
++			return nil, &UnsupportedLinkError{Path: entry.path}
+ 		case entry.mode == "160000" || entry.kind == "commit":
+ 			return nil, fmt.Errorf("unsupported entry type in git snapshot (submodule): %q", entry.path)
+ 		case entry.kind != "blob" || (entry.mode != "100644" && entry.mode != "100755"):
+diff --git a/internal/identifiers/identifiers.go b/internal/identifiers/identifiers.go
+index c18679cf..d8c2c89b 100644
+--- a/internal/identifiers/identifiers.go
++++ b/internal/identifiers/identifiers.go
+@@ -72,6 +72,14 @@ func PortablePath(value string) bool {
+ 	return true
+ }
+ 
++// ValidDirectory applies the Skillfile schema-2 individual-selector grammar
++// to a selected skill directory. The repository root is represented by ".";
++// every other directory is a portable slash-separated path without glob
++// metacharacters.
++func ValidDirectory(value string) bool {
++	return value == "." || (PortablePath(value) && !strings.ContainsAny(value, "*?[]"))
++}
++
+ // ValidSourcePath reports whether value is a POSIX-style relative path whose
+ // every segment is a valid identifier (Spec §6.1). This rules out "..",
+ // absolute paths, backslashes, and option-like segments.
+diff --git a/internal/install/draftsources.go b/internal/install/draftsources.go
+index a56d22be..52453cbd 100644
+--- a/internal/install/draftsources.go
++++ b/internal/install/draftsources.go
+@@ -8,6 +8,7 @@ import (
+ 	"path/filepath"
+ 
+ 	"github.com/relux-works/curator/internal/closure"
++	"github.com/relux-works/curator/internal/gitops"
+ 	"github.com/relux-works/curator/internal/manifest"
+ 	"github.com/relux-works/curator/internal/sourcelock"
+ )
+@@ -192,20 +193,50 @@ func draftFrozenInput(home, projectRoot, skillsRoot string, payload []byte, lock
+ 		}
+ 		if pkg.IsGit() {
+ 			// Transitive members carry no alias: their bytes live in the
+-			// SkillsRoot checkout the legacy lane resolved them from.
++			// SkillsRoot checkout the legacy lane resolved them from. Members
++			// selected from one schema-9 repository share that checkout, so map
++			// each selected package to a same-repository member's checkout.
+ 			if skillsRoot == "" {
+ 				return opts, fmt.Errorf("source_snapshot_unavailable: snapshot for %s cannot be authenticated without its locked repository; capture it with an explicit attempt", member.Name)
+ 			}
+-			location := pkg.Source
+ 			if pkg.Kind == sourcelock.KindNetworkGit {
+-				location = member.Name
++				if member.Directory != "." {
++					location, err := lockedNetworkRepository(skillsRoot, lock, pkg.Repository)
++					if err != nil {
++						return opts, err
++					}
++					opts.GitRepos[member.Name] = location
++					continue
++				}
++				opts.GitRepos[member.Name] = filepath.Join(skillsRoot, filepath.FromSlash(member.Name))
++				continue
+ 			}
+-			opts.GitRepos[member.Name] = filepath.Join(skillsRoot, filepath.FromSlash(location))
++			opts.GitRepos[member.Name] = filepath.Join(skillsRoot, filepath.FromSlash(pkg.Source))
+ 		}
+ 	}
+ 	return opts, nil
+ }
+ 
++func lockedNetworkRepository(skillsRoot string, lock *sourcelock.Lock, repository string) (string, error) {
++	for _, candidate := range lock.Members {
++		if candidate.Package.Kind != sourcelock.KindNetworkGit || candidate.Package.Repository != repository {
++			continue
++		}
++		location := filepath.Join(skillsRoot, filepath.FromSlash(candidate.Name))
++		if _, err := os.Lstat(location); err != nil {
++			if os.IsNotExist(err) {
++				continue
++			}
++			return "", fmt.Errorf("source_snapshot_unavailable: cannot inspect repository checkout for %s: %w", candidate.Name, err)
++		}
++		if err := gitops.EnsureRepo(location); err != nil {
++			return "", fmt.Errorf("source_snapshot_unavailable: repository checkout for %s is unusable: %w", candidate.Name, err)
++		}
++		return location, nil
++	}
++	return "", fmt.Errorf("source_snapshot_unavailable: no checkout for locked repository %s", repository)
++}
++
+ // declaringGitSource recovers the declaring Git source alias of one locked
+ // root member from its selection index: skillfile-sources §3 binds each
+ // root member to its declaring selection, so the alias is the From of the
+diff --git a/internal/manifest/expand.go b/internal/manifest/expand.go
+index 738c972a..917a66a6 100644
+--- a/internal/manifest/expand.go
++++ b/internal/manifest/expand.go
+@@ -284,6 +284,75 @@ func selectionDirectory(root, directory string, outputs []string) (string, error
+ 	return physical, nil
+ }
+ 
++// SelectSkillPackage applies the Skillfile individual-selector directory
++// grammar and containment checks to a dependency package in a pinned
++// repository snapshot. The selected package must have a valid SKILL.md whose
++// name matches expectedName. It returns the physical selected directory and
++// its parsed skill manifest.
++func SelectSkillPackage(root, directory, expectedName string) (string, *skillspec.Spec, error) {
++	if !identifiers.ValidDirectory(directory) {
++		return "", nil, fmt.Errorf("source_selection_invalid: directory must be a portable contained path or '.'")
++	}
++	root, err := filepath.Abs(root)
++	if err != nil {
++		return "", nil, fmt.Errorf("source_member_invalid: cannot resolve repository snapshot: %w", err)
++	}
++	root, err = filepath.EvalSymlinks(root)
++	if err != nil {
++		if os.IsNotExist(err) {
++			return "", nil, fmt.Errorf("source_member_missing: repository snapshot is missing: %w", err)
++		}
++		return "", nil, fmt.Errorf("source_member_invalid: cannot inspect repository snapshot: %w", err)
++	}
++	if err := rejectDirectorySymlinks(root, directory); err != nil {
++		return "", nil, err
++	}
++	physical, err := selectionDirectory(root, directory, nil)
++	if err != nil {
++		return "", nil, err
++	}
++	name, spec, err := selectedPackage(physical)
++	if err != nil {
++		if os.IsNotExist(err) {
++			return "", nil, fmt.Errorf("source_member_invalid: selected directory %q has no SKILL.md: %w", directory, err)
++		}
++		return "", nil, fmt.Errorf("source_member_invalid: %s: %w", directory, err)
++	}
++	if name != expectedName {
++		return "", nil, fmt.Errorf("source_member_invalid: %s: SKILL.md name %q differs from dependency name %q", directory, name, expectedName)
++	}
++	return physical, spec, nil
++}
++
++func rejectDirectorySymlinks(root, directory string) error {
++	if directory == "." {
++		return nil
++	}
++	current := root
++	for _, component := range strings.Split(directory, "/") {
++		current = filepath.Join(current, component)
++		info, err := os.Lstat(current)
++		if err != nil {
++			if os.IsNotExist(err) {
++				continue // selectionDirectory reports the required missing-path diagnostic.
++			}
++			return fmt.Errorf("source_member_invalid: cannot inspect directory %q: %w", directory, err)
++		}
++		if info.Mode()&os.ModeSymlink == 0 {
++			continue
++		}
++		physical, err := filepath.EvalSymlinks(current)
++		if err == nil && !physicalWithin(root, physical) {
++			return fmt.Errorf("source_selection_invalid: directory %q escapes source", directory)
++		}
++		// Dependency directory selection requires a real, link-free folder.
++		// Mention escape in the diagnostic as well: a dangling or otherwise
++		// unresolvable link cannot establish containment and fails closed.
++		return fmt.Errorf("source_selection_invalid: directory %q escapes source or contains a symlink", directory)
++	}
++	return nil
++}
++
+ // SameFile ancestry uses the filesystem's actual case equivalence, including
+ // case-insensitive macOS volumes, rather than a GOOS-based string prefix.
+ func physicalWithin(root, candidate string) bool {
+diff --git a/internal/manifest/sources.go b/internal/manifest/sources.go
+index 195e2769..18b3c076 100644
+--- a/internal/manifest/sources.go
++++ b/internal/manifest/sources.go
+@@ -1,7 +1,6 @@
+ package manifest
+ 
+ import (
+-	"strings"
+ 	"unicode/utf8"
+ 
+ 	"github.com/relux-works/curator/internal/buildrepo"
+@@ -137,7 +136,7 @@ func parseSelector(entry map[string]any, sources map[string]Source, label string
+ 		return Decl{}, verr.New(label, "source_alias_unknown: %s", from)
+ 	}
+ 	directory, _ := entry["directory"].(string)
+-	if directory != "." && (!identifiers.PortablePath(directory) || strings.ContainsAny(directory, "*?[]")) {
++	if !identifiers.ValidDirectory(directory) {
+ 		return invalid("directory must be a portable contained path or '.'")
+ 	}
+ 	selector := &Selector{From: from, Directory: directory}
+diff --git a/internal/marker/marker.go b/internal/marker/marker.go
+index 7ceb50a9..200c203d 100644
+--- a/internal/marker/marker.go
++++ b/internal/marker/marker.go
+@@ -334,7 +334,7 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
+ 		(m.SchemaVersion == SchemaVersion && m.SkillSchemaVersion > 6) ||
+ 		(m.SchemaVersion == ExternalSchemaVersion && m.SkillSchemaVersion != 7) ||
+ 		(m.SchemaVersion == PolicySchemaVersion && m.SkillSchemaVersion != 8) ||
+-		(m.SchemaVersion == SchemaV5 && (m.SkillSchemaVersion < 1 || m.SkillSchemaVersion > 8)) {
++		(m.SchemaVersion == SchemaV5 && (m.SkillSchemaVersion < 1 || m.SkillSchemaVersion > 9)) {
+ 		return false
+ 	}
+ 	setsSorted := m.SchemaVersion == SchemaVersion || m.SchemaVersion == ExternalSchemaVersion ||
+diff --git a/internal/marker/marker_v5_schema_test.go b/internal/marker/marker_v5_schema_test.go
+index ccc3839a..d5fa1792 100644
+--- a/internal/marker/marker_v5_schema_test.go
++++ b/internal/marker/marker_v5_schema_test.go
+@@ -281,8 +281,8 @@ func validateV5AgainstSchema(t *testing.T, raw map[string]json.RawMessage) error
+ 	}
+ 	var skillSchema int
+ 	if err := json.Unmarshal(raw["skill_schema_version"], &skillSchema); err != nil ||
+-		skillSchema < 1 || skillSchema > 8 {
+-		return fmt.Errorf("skill_schema_version = %s, want 1..8", raw["skill_schema_version"])
++		skillSchema < 1 || skillSchema > 9 {
++		return fmt.Errorf("skill_schema_version = %s, want 1..9", raw["skill_schema_version"])
+ 	}
+ 	var pkg struct {
+ 		Kind string `json:"kind"`
+diff --git a/internal/marker/marker_v5_test.go b/internal/marker/marker_v5_test.go
+index d65fae7e..c74d1ce5 100644
+--- a/internal/marker/marker_v5_test.go
++++ b/internal/marker/marker_v5_test.go
+@@ -139,7 +139,7 @@ func TestMarkerV5RefusesMalformedIdentity(t *testing.T) {
+ 		"snapshot-and-git": func(m *Marker) { m.Package.Commit = &Commit{ObjectFormat: "sha1", Hex: strings.Repeat("33", 20)} },
+ 		"unknown-kind":     func(m *Marker) { m.Package.Kind = "bad-kind" },
+ 		"skill-schema-0":   func(m *Marker) { m.SkillSchemaVersion = 0 },
+-		"skill-schema-9":   func(m *Marker) { m.SkillSchemaVersion = 9 },
++		"skill-schema-10":  func(m *Marker) { m.SkillSchemaVersion = 10 },
+ 	}
+ 	for name, mutate := range cases {
+ 		t.Run(name, func(t *testing.T) {
+@@ -152,6 +152,15 @@ func TestMarkerV5RefusesMalformedIdentity(t *testing.T) {
+ 	}
+ }
+ 
++func TestMarkerV5AcceptsSkillSchema9(t *testing.T) {
++	m := v5LocalMarker()
++	m.SkillSchemaVersion = 9
++	_, recorded := writeV5(t, m)
++	if recorded.SchemaVersion != SchemaV5 || recorded.SkillSchemaVersion != 9 {
++		t.Fatalf("recorded marker = %+v, want marker schema 5 carrying skill schema 9", recorded)
++	}
++}
++
+ func TestMarkerV5GitArmShape(t *testing.T) {
+ 	m := v5LocalMarker()
+ 	m.Package = &Package{
+diff --git a/internal/marker/testdata/draft-sources-v1/install-marker-v5.schema.json b/internal/marker/testdata/draft-sources-v1/install-marker-v5.schema.json
+index 37233c4e..5c6a573c 100644
+--- a/internal/marker/testdata/draft-sources-v1/install-marker-v5.schema.json
++++ b/internal/marker/testdata/draft-sources-v1/install-marker-v5.schema.json
+@@ -54,7 +54,7 @@
+     "skill_schema_version": {
+       "type": "integer",
+       "minimum": 1,
+-      "maximum": 8
++      "maximum": 9
+     },
+     "package": {
+       "$ref": "source-types-v1.schema.json#/$defs/package"
+diff --git a/internal/skillspec/conformance_test.go b/internal/skillspec/conformance_test.go
+index 4cad3873..84d6db13 100644
+--- a/internal/skillspec/conformance_test.go
++++ b/internal/skillspec/conformance_test.go
+@@ -78,6 +78,91 @@ func TestReleasedSchemaCases(t *testing.T) {
+ 	}
+ }
+ 
++func TestDraftManifestDependencyDirectoryGrammar(t *testing.T) {
++	vectorPath := filepath.Join("testdata", "draft-sources-v1", "manifest-dependency-directories.json")
++	payload, err := os.ReadFile(vectorPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var vector struct {
++		DirectoryGrammarCases []struct {
++			Name  string `json:"name"`
++			Input string `json:"input"`
++			Valid bool   `json:"valid"`
++		} `json:"directory_grammar_cases"`
++	}
++	if err := json.Unmarshal(payload, &vector); err != nil {
++		t.Fatal(err)
++	}
++	if len(vector.DirectoryGrammarCases) != 9 {
++		t.Fatalf("directory grammar vector has %d cases, want 9", len(vector.DirectoryGrammarCases))
++	}
++	for _, testCase := range vector.DirectoryGrammarCases {
++		t.Run(testCase.Name, func(t *testing.T) {
++			manifest := map[string]any{
++				"schema_version": 9,
++				"capabilities":   map[string]any{},
++				"dependencies": map[string]any{"skills": map[string]any{
++					"developer": map[string]any{
++						"git":       "https://github.com/example/role-skills.git",
++						"ref":       map[string]any{"kind": "revision", "value": strings.Repeat("a", 40)},
++						"directory": testCase.Input,
++					},
++				}},
++			}
++			raw, err := json.Marshal(manifest)
++			if err != nil {
++				t.Fatal(err)
++			}
++			_, err = Load(writeSkill(t, string(raw), nil))
++			if (err == nil) != testCase.Valid {
++				t.Fatalf("valid=%v, error=%v", testCase.Valid, err)
++			}
++			if err != nil && !strings.Contains(err.Error(), "dependencies.skills.developer.directory") {
++				t.Fatalf("error %q does not identify the directory field", err)
++			}
++		})
++	}
++}
++
++func TestDraftManifestDependencyDirectorySchemaCases(t *testing.T) {
++	root := filepath.Join("testdata", "draft-sources-v1", "schema-cases")
++	for _, suite := range []struct{ directory, manifest string }{
++		{"agent-skill-v9", CanonicalManifestName},
++		{"csk-skill-v9", LegacyManifestName},
++	} {
++		entries, err := os.ReadDir(filepath.Join(root, suite.directory))
++		if err != nil {
++			t.Fatal(err)
++		}
++		consumed := 0
++		for _, entry := range entries {
++			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
++				continue
++			}
++			if entry.Name() == "valid.json" || entry.Name() == "invalid.json" {
++				continue // These pin schema-level version acceptance, not the parser's directory gate.
++			}
++			consumed++
++			t.Run(suite.directory+"/"+entry.Name(), func(t *testing.T) {
++				payload, err := os.ReadFile(filepath.Join(root, suite.directory, entry.Name()))
++				if err != nil {
++					t.Fatal(err)
++				}
++				snapshot := materializeManifestFixture(t, payload, suite.manifest)
++				_, err = Load(snapshot)
++				wantValid := strings.HasPrefix(entry.Name(), "valid")
++				if (err == nil) != wantValid {
++					t.Fatalf("valid=%v, error=%v", wantValid, err)
++				}
++			})
++		}
++		if consumed != 9 {
++			t.Fatalf("schema-cases/%s contains %d directory cases, want 9", suite.directory, consumed)
++		}
++	}
++}
++
+ // materializeManifestFixture lays out the snapshot a schema case describes:
+ // build roots with their go.mod, declared runtime roots, command source
+ // directories and script files, and the schema-8 declared module directories
+diff --git a/internal/skillspec/parse.go b/internal/skillspec/parse.go
+index fb1ec989..45e2106f 100644
+--- a/internal/skillspec/parse.go
++++ b/internal/skillspec/parse.go
+@@ -525,7 +525,7 @@ func parseDependencies(raw any, schema int) (map[string]CommandDependency, map[s
+ 		return nil, nil, nil, err
+ 	}
+ 
+-	requirements, err := parseRequirements(obj["skills"])
++	requirements, err := parseRequirements(obj["skills"], schema)
+ 	if err != nil {
+ 		return nil, nil, nil, err
+ 	}
+@@ -587,7 +587,7 @@ func parseDependencies(raw any, schema int) (map[string]CommandDependency, map[s
+ 	return dependencies, requirements, mcpServers, nil
+ }
+ 
+-func parseRequirements(raw any) (map[string]Requirement, error) {
++func parseRequirements(raw any, schema int) (map[string]Requirement, error) {
+ 	requirements := map[string]Requirement{}
+ 	if raw == nil {
+ 		return requirements, nil
+@@ -611,9 +611,24 @@ func parseRequirements(raw any) (map[string]Requirement, error) {
+ 		if _, present := entry["version"]; present {
+ 			return nil, verr.New(label, "declares 'version'; version ranges are not supported. Pin an exact ref: {\"kind\": \"tag\" | \"revision\", \"value\": ...}")
+ 		}
+-		if err := rejectUnknown(entry, map[string]bool{"git": true, "ref": true, "mode": true, "commands": true}, label); err != nil {
++		allowed := map[string]bool{"git": true, "ref": true, "mode": true, "commands": true}
++		if schema >= 9 {
++			allowed["directory"] = true
++		}
++		if err := rejectUnknown(entry, allowed, label); err != nil {
+ 			return nil, err
+ 		}
++		directory := ""
++		if schema >= 9 {
++			directory = "."
++			if rawDirectory, present := entry["directory"]; present {
++				value, ok := rawDirectory.(string)
++				if !ok || !identifiers.ValidDirectory(value) {
++					return nil, verr.New(label+".directory", "must be a portable contained path or '.'")
++				}
++				directory = value
++			}
++		}
+ 
+ 		git, ok := entry["git"].(string)
+ 		if !ok || git == "" {
+@@ -677,7 +692,7 @@ func parseRequirements(raw any) (map[string]Requirement, error) {
+ 			}
+ 		}
+ 
+-		requirements[name] = Requirement{Name: name, Git: git, RefKind: kind, RefValue: value, Mode: mode, Commands: commands}
++		requirements[name] = Requirement{Name: name, Git: git, RefKind: kind, RefValue: value, Directory: directory, Mode: mode, Commands: commands}
+ 	}
+ 	return requirements, nil
+ }
+diff --git a/internal/skillspec/parse_test.go b/internal/skillspec/parse_test.go
+index 2589cc31..60ad68bc 100644
+--- a/internal/skillspec/parse_test.go
++++ b/internal/skillspec/parse_test.go
+@@ -136,7 +136,7 @@ func TestCanonicalManifestResolution(t *testing.T) {
+ func TestSchemaVersionValidation(t *testing.T) {
+ 	mustFail(t, writeSkill(t, `{"schema_version": "3"}`, nil), "schema_version")
+ 	mustFail(t, writeSkill(t, `{"schema_version": 3.5}`, nil), "schema_version")
+-	mustFail(t, writeSkill(t, `{"schema_version": 9}`, nil), "schema_version")
++	mustFail(t, writeSkill(t, `{"schema_version": 99}`, nil), "schema_version")
+ 	mustFail(t, writeSkill(t, `{"schema_version": true}`, nil), "schema_version")
+ 	mustFail(t, writeSkill(t, `{}`, nil), "schema_version")
+ }
+@@ -292,6 +292,27 @@ func TestRequirements(t *testing.T) {
+ 	fail(`{"git": "u", "ref": {"kind": "tag", "value": "v1", "extra": 1}}`, "dependencies.skills.x.ref")
+ }
+ 
++func TestRequirementDirectorySchemaGateAndDefaults(t *testing.T) {
++	base := `{"schema_version":%d,"capabilities":{},"dependencies":{"skills":{"developer":{"git":"https://github.com/example/role-skills.git","ref":{"kind":"revision","value":"` + strings.Repeat("a", 40) + `"}%s}}}}`
++	legacy, err := Load(writeSkill(t, fmt.Sprintf(base, 8, ""), nil))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if got := legacy.Requirements["developer"].Directory; got != "" {
++		t.Fatalf("schema 8 absent directory = %q, want empty legacy representation", got)
++	}
++	newSchema, err := Load(writeSkill(t, fmt.Sprintf(base, 9, ""), nil))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if got := newSchema.Requirements["developer"].Directory; got != "." {
++		t.Fatalf("schema 9 absent directory = %q, want normalized root", got)
++	}
++	if _, err := Load(writeSkill(t, fmt.Sprintf(base, 8, `,"directory":"skills/developer"`), nil)); err == nil || !strings.Contains(err.Error(), "directory") {
++		t.Fatalf("schema 8 directory error = %v, want version-gate refusal", err)
++	}
++}
++
+ func TestMcpServers(t *testing.T) {
+ 	manifest := `{"schema_version": 5, "capabilities": {}, "dependencies": {"mcp_servers": {
+ 		"google-sheets": {"hint": "connect it", "transport": "http", "required_in": "all"},
+@@ -588,11 +609,17 @@ func TestScriptExecutionSurfaceRejectedOnOtherCommandTypes(t *testing.T) {
+ 	}
+ }
+ 
+-// TestSchema9IsNotAccepted keeps the supported range closed at the schema this
+-// build implements.
+-func TestSchema9IsNotAccepted(t *testing.T) {
++// TestSchema9IsAccepted covers the opt-in schema revision that adds package
++// directory selection to skill dependencies.
++func TestSchema9IsAccepted(t *testing.T) {
+ 	dir := writeSkill(t, `{"schema_version":9,"capabilities":{},"commands":{}}`, nil)
+-	mustFail(t, dir, "schema_version")
++	spec, err := Load(dir)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if spec.SchemaVersion != 9 {
++		t.Fatalf("schema_version = %d, want 9", spec.SchemaVersion)
++	}
+ }
+ 
+ // TestSchema1DoesNotAcquireSchema8Meaning proves the deployed schema-1
+diff --git a/internal/skillspec/testdata/draft-sources-v1/manifest-dependency-directories.json b/internal/skillspec/testdata/draft-sources-v1/manifest-dependency-directories.json
+new file mode 100644
+index 00000000..5eca136d
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v1/manifest-dependency-directories.json
+@@ -0,0 +1,367 @@
++{
++  "schema_version": 1,
++  "directory_grammar_cases": [
++    {
++      "name": "root-selector",
++      "input": ".",
++      "valid": true
++    },
++    {
++      "name": "portable-subfolder",
++      "input": "skills/developer",
++      "valid": true
++    },
++    {
++      "name": "empty",
++      "input": "",
++      "valid": false
++    },
++    {
++      "name": "absolute",
++      "input": "/skills/developer",
++      "valid": false
++    },
++    {
++      "name": "parent-escape",
++      "input": "../developer",
++      "valid": false
++    },
++    {
++      "name": "parent-component",
++      "input": "skills/../developer",
++      "valid": false
++    },
++    {
++      "name": "backslash",
++      "input": "skills\\developer",
++      "valid": false
++    },
++    {
++      "name": "drive-prefix",
++      "input": "C:/skills/developer",
++      "valid": false
++    },
++    {
++      "name": "glob",
++      "input": "skills/*",
++      "valid": false
++    }
++  ],
++  "resolution_cases": [
++    {
++      "name": "valid-subfolder-dependency",
++      "dependency": {
++        "name": "developer",
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/developer"
++      },
++      "snapshot": {
++        "directories": [
++          "skills",
++          "skills/developer"
++        ],
++        "files": [
++          "skills/developer/SKILL.md"
++        ],
++        "frontmatter_names": {
++          "skills/developer/SKILL.md": "developer"
++        }
++      },
++      "expected": {
++        "status": "accepted",
++        "normalized_directory": "skills/developer",
++        "identity": {
++          "kind": "network-git",
++          "repository": "github.com/example/role-skills",
++          "commit": {
++            "object_format": "sha1",
++            "hex": "0123456789abcdef0123456789abcdef01234567"
++          },
++          "directory": "skills/developer"
++        },
++        "lock_directory": "skills/developer",
++        "audit_package": {
++          "kind": "network-git",
++          "repository": "github.com/example/role-skills",
++          "commit": {
++            "object_format": "sha1",
++            "hex": "0123456789abcdef0123456789abcdef01234567"
++          },
++          "directory": "skills/developer"
++        },
++        "marker_schema_version": 5,
++        "marker_skill_schema_version": 9
++      }
++    },
++    {
++      "name": "absent-directory-selects-root",
++      "dependency": {
++        "name": "developer",
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        }
++      },
++      "snapshot": {
++        "directories": [],
++        "files": [
++          "SKILL.md"
++        ],
++        "frontmatter_names": {
++          "SKILL.md": "developer"
++        }
++      },
++      "expected": {
++        "status": "accepted",
++        "normalized_directory": ".",
++        "identity": {
++          "kind": "network-git",
++          "repository": "github.com/example/role-skills",
++          "commit": {
++            "object_format": "sha1",
++            "hex": "0123456789abcdef0123456789abcdef01234567"
++          },
++          "directory": "."
++        },
++        "lock_directory": ".",
++        "audit_package": {
++          "kind": "network-git",
++          "repository": "github.com/example/role-skills",
++          "commit": {
++            "object_format": "sha1",
++            "hex": "0123456789abcdef0123456789abcdef01234567"
++          },
++          "directory": "."
++        },
++        "marker_schema_version": 5,
++        "marker_skill_schema_version": 9
++      }
++    },
++    {
++      "name": "explicit-root-selects-root",
++      "dependency": {
++        "name": "developer",
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "."
++      },
++      "snapshot": {
++        "directories": [],
++        "files": [
++          "SKILL.md"
++        ],
++        "frontmatter_names": {
++          "SKILL.md": "developer"
++        }
++      },
++      "expected": {
++        "status": "accepted",
++        "normalized_directory": ".",
++        "identity": {
++          "kind": "network-git",
++          "repository": "github.com/example/role-skills",
++          "commit": {
++            "object_format": "sha1",
++            "hex": "0123456789abcdef0123456789abcdef01234567"
++          },
++          "directory": "."
++        },
++        "lock_directory": ".",
++        "audit_package": {
++          "kind": "network-git",
++          "repository": "github.com/example/role-skills",
++          "commit": {
++            "object_format": "sha1",
++            "hex": "0123456789abcdef0123456789abcdef01234567"
++          },
++          "directory": "."
++        },
++        "marker_schema_version": 5,
++        "marker_skill_schema_version": 9
++      }
++    },
++    {
++      "name": "missing-folder",
++      "dependency": {
++        "name": "developer",
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/missing"
++      },
++      "snapshot": {
++        "directories": [
++          "skills"
++        ],
++        "files": [],
++        "frontmatter_names": {}
++      },
++      "expected": {
++        "status": "rejected",
++        "reason": "directory-missing"
++      }
++    },
++    {
++      "name": "folder-without-skill-md",
++      "dependency": {
++        "name": "developer",
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/no-manifest"
++      },
++      "snapshot": {
++        "directories": [
++          "skills",
++          "skills/no-manifest"
++        ],
++        "files": [],
++        "frontmatter_names": {}
++      },
++      "expected": {
++        "status": "rejected",
++        "reason": "skill-md-missing"
++      }
++    },
++    {
++      "name": "symlinked-directory-escape",
++      "dependency": {
++        "name": "developer",
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/escape"
++      },
++      "snapshot": {
++        "directories": [
++          "skills",
++          "skills/escape"
++        ],
++        "files": [],
++        "frontmatter_names": {},
++        "symlinks": {
++          "skills/escape": "../outside"
++        }
++      },
++      "expected": {
++        "status": "rejected",
++        "reason": "directory-escapes-repository"
++      }
++    },
++    {
++      "name": "diamond-different-directories-same-repository",
++      "repository": "github.com/example/role-skills",
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "requirements": [
++        {
++          "requirer": "app",
++          "name": "frontend",
++          "directory": "skills/frontend"
++        },
++        {
++          "requirer": "app",
++          "name": "backend",
++          "directory": "skills/backend"
++        },
++        {
++          "requirer": "frontend",
++          "name": "shared",
++          "directory": "skills/shared"
++        },
++        {
++          "requirer": "backend",
++          "name": "shared",
++          "directory": "skills/shared"
++        }
++      ],
++      "snapshot": {
++        "directories": [
++          "skills",
++          "skills/backend",
++          "skills/frontend",
++          "skills/shared"
++        ],
++        "skill_names": {
++          "skills/backend": "backend",
++          "skills/frontend": "frontend",
++          "skills/shared": "shared"
++        }
++      },
++      "expected": {
++        "status": "accepted",
++        "provider_order": [
++          "shared",
++          "backend",
++          "frontend",
++          "app"
++        ],
++        "repository_acquisitions": 1,
++        "package_identities": [
++          {
++            "kind": "network-git",
++            "repository": "github.com/example/role-skills",
++            "commit": {
++              "object_format": "sha1",
++              "hex": "0123456789abcdef0123456789abcdef01234567"
++            },
++            "directory": "skills/backend"
++          },
++          {
++            "kind": "network-git",
++            "repository": "github.com/example/role-skills",
++            "commit": {
++              "object_format": "sha1",
++              "hex": "0123456789abcdef0123456789abcdef01234567"
++            },
++            "directory": "skills/frontend"
++          },
++          {
++            "kind": "network-git",
++            "repository": "github.com/example/role-skills",
++            "commit": {
++              "object_format": "sha1",
++              "hex": "0123456789abcdef0123456789abcdef01234567"
++            },
++            "directory": "skills/shared"
++          }
++        ],
++        "shared_package_nodes": 1
++      }
++    },
++    {
++      "name": "same-name-different-directory-conflicts",
++      "repository": "github.com/example/role-skills",
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "requirements": [
++        {
++          "requirer": "app",
++          "name": "shared",
++          "directory": "skills/shared-a"
++        },
++        {
++          "requirer": "app",
++          "name": "shared",
++          "directory": "skills/shared-b"
++        }
++      ],
++      "expected": {
++        "status": "rejected",
++        "reason": "package-identity-conflict"
++      }
++    }
++  ]
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/invalid-directory-absolute.json b/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/invalid-directory-absolute.json
+new file mode 100644
+index 00000000..363d0285
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/invalid-directory-absolute.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "/skills/developer"
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/invalid-directory-backslash.json b/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/invalid-directory-backslash.json
+new file mode 100644
+index 00000000..f191cafb
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/invalid-directory-backslash.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills\\developer"
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/invalid-directory-empty.json b/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/invalid-directory-empty.json
+new file mode 100644
+index 00000000..5e168a2f
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/invalid-directory-empty.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": ""
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/invalid-directory-escape.json b/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/invalid-directory-escape.json
+new file mode 100644
+index 00000000..73cc9399
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/invalid-directory-escape.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "../developer"
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/invalid-directory-glob.json b/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/invalid-directory-glob.json
+new file mode 100644
+index 00000000..94645d7f
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/invalid-directory-glob.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/*"
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/invalid-directory-parent-component.json b/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/invalid-directory-parent-component.json
+new file mode 100644
+index 00000000..3db678f8
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/invalid-directory-parent-component.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/../developer"
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/invalid.json b/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/invalid.json
+new file mode 100644
+index 00000000..4cc3b536
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/invalid.json
+@@ -0,0 +1,4 @@
++{
++  "schema_version": 8,
++  "capabilities": {}
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/valid-directory-absent.json b/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/valid-directory-absent.json
+new file mode 100644
+index 00000000..1dcaf3df
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/valid-directory-absent.json
+@@ -0,0 +1,15 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        }
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/valid-directory-root.json b/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/valid-directory-root.json
+new file mode 100644
+index 00000000..3a2ac539
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/valid-directory-root.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "."
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/valid-directory-subfolder.json b/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/valid-directory-subfolder.json
+new file mode 100644
+index 00000000..63c6c2a6
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/valid-directory-subfolder.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/developer"
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/valid.json b/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/valid.json
+new file mode 100644
+index 00000000..16ad2cff
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v1/schema-cases/agent-skill-v9/valid.json
+@@ -0,0 +1,4 @@
++{
++  "schema_version": 9,
++  "capabilities": {}
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/invalid-directory-absolute.json b/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/invalid-directory-absolute.json
+new file mode 100644
+index 00000000..363d0285
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/invalid-directory-absolute.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "/skills/developer"
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/invalid-directory-backslash.json b/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/invalid-directory-backslash.json
+new file mode 100644
+index 00000000..f191cafb
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/invalid-directory-backslash.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills\\developer"
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/invalid-directory-empty.json b/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/invalid-directory-empty.json
+new file mode 100644
+index 00000000..5e168a2f
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/invalid-directory-empty.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": ""
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/invalid-directory-escape.json b/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/invalid-directory-escape.json
+new file mode 100644
+index 00000000..73cc9399
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/invalid-directory-escape.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "../developer"
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/invalid-directory-glob.json b/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/invalid-directory-glob.json
+new file mode 100644
+index 00000000..94645d7f
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/invalid-directory-glob.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/*"
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/invalid-directory-parent-component.json b/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/invalid-directory-parent-component.json
+new file mode 100644
+index 00000000..3db678f8
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/invalid-directory-parent-component.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/../developer"
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/invalid.json b/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/invalid.json
+new file mode 100644
+index 00000000..4cc3b536
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/invalid.json
+@@ -0,0 +1,4 @@
++{
++  "schema_version": 8,
++  "capabilities": {}
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/valid-directory-absent.json b/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/valid-directory-absent.json
+new file mode 100644
+index 00000000..1dcaf3df
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/valid-directory-absent.json
+@@ -0,0 +1,15 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        }
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/valid-directory-root.json b/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/valid-directory-root.json
+new file mode 100644
+index 00000000..3a2ac539
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/valid-directory-root.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "."
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/valid-directory-subfolder.json b/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/valid-directory-subfolder.json
+new file mode 100644
+index 00000000..63c6c2a6
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/valid-directory-subfolder.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/developer"
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/valid.json b/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/valid.json
+new file mode 100644
+index 00000000..16ad2cff
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v1/schema-cases/csk-skill-v9/valid.json
+@@ -0,0 +1,4 @@
++{
++  "schema_version": 9,
++  "capabilities": {}
++}
+diff --git a/internal/skillspec/types.go b/internal/skillspec/types.go
+index f34edfad..605804d5 100644
+--- a/internal/skillspec/types.go
++++ b/internal/skillspec/types.go
+@@ -1,5 +1,5 @@
+ // Package skillspec parses and validates the portable skill machine manifest,
+-// schemas 1 through 8 (Spec §4), including legacy filename and runtime
++// schemas 1 through 9 (Spec §4), including legacy filename and runtime
+ // fallbacks.
+ package skillspec
+ 
+@@ -15,7 +15,7 @@ const (
+ )
+ 
+ // SupportedSchemaVersions is the accepted agent skill manifest schema range.
+-var SupportedSchemaVersions = map[int]bool{1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 7: true, 8: true}
++var SupportedSchemaVersions = map[int]bool{1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 7: true, 8: true, 9: true}
+ 
+ // ScriptExecutionPolicy is the single closed schema-8 script execution policy
+ // identity (Spec §4.1.1). It never aliases the compiled `manager-worker-v1`
+@@ -87,12 +87,13 @@ type CommandDependency struct {
+ 
+ // Requirement is a dependencies.skills entry (Spec §5.7).
+ type Requirement struct {
+-	Name     string
+-	Git      string
+-	RefKind  string // "tag" or "revision"
+-	RefValue string
+-	Mode     string // "full", "runtime", "context"
+-	Commands []string
++	Name      string
++	Git       string
++	RefKind   string // "tag" or "revision"
++	RefValue  string
++	Directory string // schema 9: selected package directory; omitted normalizes to "."
++	Mode      string // "full", "runtime", "context"
++	Commands  []string
+ }
+ 
+ // McpServer is a dependencies.mcp_servers entry (Spec §5.8).
