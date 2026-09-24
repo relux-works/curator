@@ -73,7 +73,10 @@ func resolveExecForPlatform(name string, searchDirs, forbiddenRoots []string, pl
 		directories = defaultExecSearchDirs(platform, managerEnvironment)
 	}
 	trustedSystem32Root := ""
-	if platform == "windows" && useDefaultSearchDirs {
+	// A nil environment lets the default search list consult the process
+	// environment, but it is not an explicit manager-captured snapshot. Keep
+	// that ambient value out of the System32 hard-link trust decision.
+	if platform == "windows" && useDefaultSearchDirs && managerEnvironment != nil {
 		trustedSystem32Root = windowsSystem32Directory(managerEnvironment)
 	}
 	for _, directory := range directories {
