@@ -284,6 +284,75 @@ func selectionDirectory(root, directory string, outputs []string) (string, error
 	return physical, nil
 }
 
+// SelectSkillPackage applies the Skillfile individual-selector directory
+// grammar and containment checks to a dependency package in a pinned
+// repository snapshot. The selected package must have a valid SKILL.md whose
+// name matches expectedName. It returns the physical selected directory and
+// its parsed skill manifest.
+func SelectSkillPackage(root, directory, expectedName string) (string, *skillspec.Spec, error) {
+	if !identifiers.ValidDirectory(directory) {
+		return "", nil, fmt.Errorf("source_selection_invalid: directory must be a portable contained path or '.'")
+	}
+	root, err := filepath.Abs(root)
+	if err != nil {
+		return "", nil, fmt.Errorf("source_member_invalid: cannot resolve repository snapshot: %w", err)
+	}
+	root, err = filepath.EvalSymlinks(root)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil, fmt.Errorf("source_member_missing: repository snapshot is missing: %w", err)
+		}
+		return "", nil, fmt.Errorf("source_member_invalid: cannot inspect repository snapshot: %w", err)
+	}
+	if err := rejectDirectorySymlinks(root, directory); err != nil {
+		return "", nil, err
+	}
+	physical, err := selectionDirectory(root, directory, nil)
+	if err != nil {
+		return "", nil, err
+	}
+	name, spec, err := selectedPackage(physical)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil, fmt.Errorf("source_member_invalid: selected directory %q has no SKILL.md: %w", directory, err)
+		}
+		return "", nil, fmt.Errorf("source_member_invalid: %s: %w", directory, err)
+	}
+	if name != expectedName {
+		return "", nil, fmt.Errorf("source_member_invalid: %s: SKILL.md name %q differs from dependency name %q", directory, name, expectedName)
+	}
+	return physical, spec, nil
+}
+
+func rejectDirectorySymlinks(root, directory string) error {
+	if directory == "." {
+		return nil
+	}
+	current := root
+	for _, component := range strings.Split(directory, "/") {
+		current = filepath.Join(current, component)
+		info, err := os.Lstat(current)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue // selectionDirectory reports the required missing-path diagnostic.
+			}
+			return fmt.Errorf("source_member_invalid: cannot inspect directory %q: %w", directory, err)
+		}
+		if info.Mode()&os.ModeSymlink == 0 {
+			continue
+		}
+		physical, err := filepath.EvalSymlinks(current)
+		if err == nil && !physicalWithin(root, physical) {
+			return fmt.Errorf("source_selection_invalid: directory %q escapes source", directory)
+		}
+		// Dependency directory selection requires a real, link-free folder.
+		// Mention escape in the diagnostic as well: a dangling or otherwise
+		// unresolvable link cannot establish containment and fails closed.
+		return fmt.Errorf("source_selection_invalid: directory %q escapes source or contains a symlink", directory)
+	}
+	return nil
+}
+
 // SameFile ancestry uses the filesystem's actual case equivalence, including
 // case-insensitive macOS volumes, rather than a GOOS-based string prefix.
 func physicalWithin(root, candidate string) bool {

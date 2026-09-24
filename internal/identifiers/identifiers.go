@@ -72,6 +72,14 @@ func PortablePath(value string) bool {
 	return true
 }
 
+// ValidDirectory applies the Skillfile schema-2 individual-selector grammar
+// to a selected skill directory. The repository root is represented by ".";
+// every other directory is a portable slash-separated path without glob
+// metacharacters.
+func ValidDirectory(value string) bool {
+	return value == "." || (PortablePath(value) && !strings.ContainsAny(value, "*?[]"))
+}
+
 // ValidSourcePath reports whether value is a POSIX-style relative path whose
 // every segment is a valid identifier (Spec §6.1). This rules out "..",
 // absolute paths, backslashes, and option-like segments.

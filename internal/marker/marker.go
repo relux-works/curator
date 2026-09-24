@@ -334,7 +334,7 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
 		(m.SchemaVersion == SchemaVersion && m.SkillSchemaVersion > 6) ||
 		(m.SchemaVersion == ExternalSchemaVersion && m.SkillSchemaVersion != 7) ||
 		(m.SchemaVersion == PolicySchemaVersion && m.SkillSchemaVersion != 8) ||
-		(m.SchemaVersion == SchemaV5 && (m.SkillSchemaVersion < 1 || m.SkillSchemaVersion > 8)) {
+		(m.SchemaVersion == SchemaV5 && (m.SkillSchemaVersion < 1 || m.SkillSchemaVersion > 9)) {
 		return false
 	}
 	setsSorted := m.SchemaVersion == SchemaVersion || m.SchemaVersion == ExternalSchemaVersion ||

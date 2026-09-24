@@ -461,6 +461,18 @@ type treeEntry struct {
 	target string
 }
 
+// UnsupportedLinkError identifies a Git symbolic-link path that cannot be
+// materialized as an immutable regular-file snapshot. Callers that apply a
+// narrower source selection can refine this refusal when the link intersects
+// the selected package path, without weakening snapshot extraction.
+type UnsupportedLinkError struct {
+	Path string
+}
+
+func (e *UnsupportedLinkError) Error() string {
+	return fmt.Sprintf("links in git snapshots are unsupported: %q", e.Path)
+}
+
 // listTree lists the recursive contents of tree and refuses every entry that
 // is not a regular blob. Output framing (verified on git 2.50):
 // "<mode> <type> <oid> <size>\t<path>\0" per entry under -l -z, the size
@@ -490,7 +502,7 @@ func listTree(repo, tree string) ([]treeEntry, error) {
 		entry := treeEntry{mode: fields[0], kind: fields[1], oid: fields[2], path: string(path)}
 		switch {
 		case entry.mode == "120000":
-			return nil, fmt.Errorf("links in git snapshots are unsupported: %q", entry.path)
+			return nil, &UnsupportedLinkError{Path: entry.path}
 		case entry.mode == "160000" || entry.kind == "commit":
 			return nil, fmt.Errorf("unsupported entry type in git snapshot (submodule): %q", entry.path)
 		case entry.kind != "blob" || (entry.mode != "100644" && entry.mode != "100755"):

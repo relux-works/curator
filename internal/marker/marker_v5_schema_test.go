@@ -281,8 +281,8 @@ func validateV5AgainstSchema(t *testing.T, raw map[string]json.RawMessage) error
 	}
 	var skillSchema int
 	if err := json.Unmarshal(raw["skill_schema_version"], &skillSchema); err != nil ||
-		skillSchema < 1 || skillSchema > 8 {
-		return fmt.Errorf("skill_schema_version = %s, want 1..8", raw["skill_schema_version"])
+		skillSchema < 1 || skillSchema > 9 {
+		return fmt.Errorf("skill_schema_version = %s, want 1..9", raw["skill_schema_version"])
 	}
 	var pkg struct {
 		Kind string `json:"kind"`

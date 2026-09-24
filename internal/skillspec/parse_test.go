@@ -136,7 +136,7 @@ func TestCanonicalManifestResolution(t *testing.T) {
 func TestSchemaVersionValidation(t *testing.T) {
 	mustFail(t, writeSkill(t, `{"schema_version": "3"}`, nil), "schema_version")
 	mustFail(t, writeSkill(t, `{"schema_version": 3.5}`, nil), "schema_version")
-	mustFail(t, writeSkill(t, `{"schema_version": 9}`, nil), "schema_version")
+	mustFail(t, writeSkill(t, `{"schema_version": 99}`, nil), "schema_version")
 	mustFail(t, writeSkill(t, `{"schema_version": true}`, nil), "schema_version")
 	mustFail(t, writeSkill(t, `{}`, nil), "schema_version")
 }
@@ -290,6 +290,27 @@ func TestRequirements(t *testing.T) {
 	fail(`{"git": "u", "ref": {"kind": "tag", "value": "v1"}, "commands": ["c"]}`, "dependencies.skills.x.commands")
 	fail(`{"git": "u", "ref": {"kind": "tag", "value": "v1"}, "mode": "runtime", "commands": []}`, "dependencies.skills.x.commands")
 	fail(`{"git": "u", "ref": {"kind": "tag", "value": "v1", "extra": 1}}`, "dependencies.skills.x.ref")
+}
+
+func TestRequirementDirectorySchemaGateAndDefaults(t *testing.T) {
+	base := `{"schema_version":%d,"capabilities":{},"dependencies":{"skills":{"developer":{"git":"https://github.com/example/role-skills.git","ref":{"kind":"revision","value":"` + strings.Repeat("a", 40) + `"}%s}}}}`
+	legacy, err := Load(writeSkill(t, fmt.Sprintf(base, 8, ""), nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := legacy.Requirements["developer"].Directory; got != "" {
+		t.Fatalf("schema 8 absent directory = %q, want empty legacy representation", got)
+	}
+	newSchema, err := Load(writeSkill(t, fmt.Sprintf(base, 9, ""), nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := newSchema.Requirements["developer"].Directory; got != "." {
+		t.Fatalf("schema 9 absent directory = %q, want normalized root", got)
+	}
+	if _, err := Load(writeSkill(t, fmt.Sprintf(base, 8, `,"directory":"skills/developer"`), nil)); err == nil || !strings.Contains(err.Error(), "directory") {
+		t.Fatalf("schema 8 directory error = %v, want version-gate refusal", err)
+	}
 }
 
 func TestMcpServers(t *testing.T) {
@@ -588,11 +609,17 @@ func TestScriptExecutionSurfaceRejectedOnOtherCommandTypes(t *testing.T) {
 	}
 }
 
-// TestSchema9IsNotAccepted keeps the supported range closed at the schema this
-// build implements.
-func TestSchema9IsNotAccepted(t *testing.T) {
+// TestSchema9IsAccepted covers the opt-in schema revision that adds package
+// directory selection to skill dependencies.
+func TestSchema9IsAccepted(t *testing.T) {
 	dir := writeSkill(t, `{"schema_version":9,"capabilities":{},"commands":{}}`, nil)
-	mustFail(t, dir, "schema_version")
+	spec, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.SchemaVersion != 9 {
+		t.Fatalf("schema_version = %d, want 9", spec.SchemaVersion)
+	}
 }
 
 // TestSchema1DoesNotAcquireSchema8Meaning proves the deployed schema-1

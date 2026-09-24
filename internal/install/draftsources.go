@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/relux-works/curator/internal/closure"
+	"github.com/relux-works/curator/internal/gitops"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/sourcelock"
 )
@@ -192,18 +193,48 @@ func draftFrozenInput(home, projectRoot, skillsRoot string, payload []byte, lock
 		}
 		if pkg.IsGit() {
 			// Transitive members carry no alias: their bytes live in the
-			// SkillsRoot checkout the legacy lane resolved them from.
+			// SkillsRoot checkout the legacy lane resolved them from. Members
+			// selected from one schema-9 repository share that checkout, so map
+			// each selected package to a same-repository member's checkout.
 			if skillsRoot == "" {
 				return opts, fmt.Errorf("source_snapshot_unavailable: snapshot for %s cannot be authenticated without its locked repository; capture it with an explicit attempt", member.Name)
 			}
-			location := pkg.Source
 			if pkg.Kind == sourcelock.KindNetworkGit {
-				location = member.Name
+				if member.Directory != "." {
+					location, err := lockedNetworkRepository(skillsRoot, lock, pkg.Repository)
+					if err != nil {
+						return opts, err
+					}
+					opts.GitRepos[member.Name] = location
+					continue
+				}
+				opts.GitRepos[member.Name] = filepath.Join(skillsRoot, filepath.FromSlash(member.Name))
+				continue
 			}
-			opts.GitRepos[member.Name] = filepath.Join(skillsRoot, filepath.FromSlash(location))
+			opts.GitRepos[member.Name] = filepath.Join(skillsRoot, filepath.FromSlash(pkg.Source))
 		}
 	}
 	return opts, nil
+}
+
+func lockedNetworkRepository(skillsRoot string, lock *sourcelock.Lock, repository string) (string, error) {
+	for _, candidate := range lock.Members {
+		if candidate.Package.Kind != sourcelock.KindNetworkGit || candidate.Package.Repository != repository {
+			continue
+		}
+		location := filepath.Join(skillsRoot, filepath.FromSlash(candidate.Name))
+		if _, err := os.Lstat(location); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return "", fmt.Errorf("source_snapshot_unavailable: cannot inspect repository checkout for %s: %w", candidate.Name, err)
+		}
+		if err := gitops.EnsureRepo(location); err != nil {
+			return "", fmt.Errorf("source_snapshot_unavailable: repository checkout for %s is unusable: %w", candidate.Name, err)
+		}
+		return location, nil
+	}
+	return "", fmt.Errorf("source_snapshot_unavailable: no checkout for locked repository %s", repository)
 }
 
 // declaringGitSource recovers the declaring Git source alias of one locked

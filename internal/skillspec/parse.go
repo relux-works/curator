@@ -525,7 +525,7 @@ func parseDependencies(raw any, schema int) (map[string]CommandDependency, map[s
 		return nil, nil, nil, err
 	}
 
-	requirements, err := parseRequirements(obj["skills"])
+	requirements, err := parseRequirements(obj["skills"], schema)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -587,7 +587,7 @@ func parseDependencies(raw any, schema int) (map[string]CommandDependency, map[s
 	return dependencies, requirements, mcpServers, nil
 }
 
-func parseRequirements(raw any) (map[string]Requirement, error) {
+func parseRequirements(raw any, schema int) (map[string]Requirement, error) {
 	requirements := map[string]Requirement{}
 	if raw == nil {
 		return requirements, nil
@@ -611,8 +611,23 @@ func parseRequirements(raw any) (map[string]Requirement, error) {
 		if _, present := entry["version"]; present {
 			return nil, verr.New(label, "declares 'version'; version ranges are not supported. Pin an exact ref: {\"kind\": \"tag\" | \"revision\", \"value\": ...}")
 		}
-		if err := rejectUnknown(entry, map[string]bool{"git": true, "ref": true, "mode": true, "commands": true}, label); err != nil {
+		allowed := map[string]bool{"git": true, "ref": true, "mode": true, "commands": true}
+		if schema >= 9 {
+			allowed["directory"] = true
+		}
+		if err := rejectUnknown(entry, allowed, label); err != nil {
 			return nil, err
+		}
+		directory := ""
+		if schema >= 9 {
+			directory = "."
+			if rawDirectory, present := entry["directory"]; present {
+				value, ok := rawDirectory.(string)
+				if !ok || !identifiers.ValidDirectory(value) {
+					return nil, verr.New(label+".directory", "must be a portable contained path or '.'")
+				}
+				directory = value
+			}
 		}
 
 		git, ok := entry["git"].(string)
@@ -677,7 +692,7 @@ func parseRequirements(raw any) (map[string]Requirement, error) {
 			}
 		}
 
-		requirements[name] = Requirement{Name: name, Git: git, RefKind: kind, RefValue: value, Mode: mode, Commands: commands}
+		requirements[name] = Requirement{Name: name, Git: git, RefKind: kind, RefValue: value, Directory: directory, Mode: mode, Commands: commands}
 	}
 	return requirements, nil
 }

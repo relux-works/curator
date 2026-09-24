@@ -30,7 +30,7 @@ func BuildExpanded(opts Options, m *manifest.Manifest, expansion manifest.Expans
 	commits := map[string]string{}
 	for _, member := range members {
 		decl := member.Decl
-		item := pending{name: decl.Name, git: decl.Git, ref: decl.Ref, source: decl.Source, edge: Edge{Consumer: ProjectEdge, Mode: "full"}, chain: ProjectEdge + " -> " + decl.Name}
+		item := pending{name: decl.Name, git: decl.Git, ref: decl.Ref, source: decl.Source, directory: member.Directory, edge: Edge{Consumer: ProjectEdge, Mode: "full"}, chain: ProjectEdge + " -> " + decl.Name}
 		if decl.Selector != nil {
 			if acquire == nil {
 				return nil, fmt.Errorf("source_selection_invalid: frozen package acquisition required for %s", decl.Name)

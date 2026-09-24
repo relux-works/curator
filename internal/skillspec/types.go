@@ -1,5 +1,5 @@
 // Package skillspec parses and validates the portable skill machine manifest,
-// schemas 1 through 8 (Spec §4), including legacy filename and runtime
+// schemas 1 through 9 (Spec §4), including legacy filename and runtime
 // fallbacks.
 package skillspec
 
@@ -15,7 +15,7 @@ const (
 )
 
 // SupportedSchemaVersions is the accepted agent skill manifest schema range.
-var SupportedSchemaVersions = map[int]bool{1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 7: true, 8: true}
+var SupportedSchemaVersions = map[int]bool{1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 7: true, 8: true, 9: true}
 
 // ScriptExecutionPolicy is the single closed schema-8 script execution policy
 // identity (Spec §4.1.1). It never aliases the compiled `manager-worker-v1`
@@ -87,12 +87,13 @@ type CommandDependency struct {
 
 // Requirement is a dependencies.skills entry (Spec §5.7).
 type Requirement struct {
-	Name     string
-	Git      string
-	RefKind  string // "tag" or "revision"
-	RefValue string
-	Mode     string // "full", "runtime", "context"
-	Commands []string
+	Name      string
+	Git       string
+	RefKind   string // "tag" or "revision"
+	RefValue  string
+	Directory string // schema 9: selected package directory; omitted normalizes to "."
+	Mode      string // "full", "runtime", "context"
+	Commands  []string
 }
 
 // McpServer is a dependencies.mcp_servers entry (Spec §5.8).

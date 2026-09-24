@@ -1,7 +1,6 @@
 package manifest
 
 import (
-	"strings"
 	"unicode/utf8"
 
 	"github.com/relux-works/curator/internal/buildrepo"
@@ -137,7 +136,7 @@ func parseSelector(entry map[string]any, sources map[string]Source, label string
 		return Decl{}, verr.New(label, "source_alias_unknown: %s", from)
 	}
 	directory, _ := entry["directory"].(string)
-	if directory != "." && (!identifiers.PortablePath(directory) || strings.ContainsAny(directory, "*?[]")) {
+	if !identifiers.ValidDirectory(directory) {
 		return invalid("directory must be a portable contained path or '.'")
 	}
 	selector := &Selector{From: from, Directory: directory}

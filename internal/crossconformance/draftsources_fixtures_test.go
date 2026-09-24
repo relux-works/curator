@@ -62,6 +62,34 @@ func writeDraftSkill(t *testing.T, dir, name string) {
 	}
 }
 
+// writeManifestDependencySkill materializes a minimal package whose skill
+// manifest can carry schema-9 directory requirements.
+func writeManifestDependencySkill(t *testing.T, dir, name string, schema int, requirements map[string]map[string]any) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(dir, "references"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\nname: "+name+"\ndescription: Test "+name+"\n---\n# "+name+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "references", "info.md"), []byte("context\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	spec := map[string]any{
+		"schema_version": schema,
+		"capabilities":   map[string]any{},
+		"commands":       map[string]any{},
+		"dependencies":   map[string]any{"skills": requirements},
+	}
+	payload, err := json.Marshal(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "agent-skill.json"), payload, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // draftProject creates a git-initialized project with the given skill
 // packages and Skillfile payload, plus an isolated manager home.
 func draftProject(t *testing.T, payload string, skills map[string]string) (project, home string) {

@@ -139,7 +139,7 @@ func TestMarkerV5RefusesMalformedIdentity(t *testing.T) {
 		"snapshot-and-git": func(m *Marker) { m.Package.Commit = &Commit{ObjectFormat: "sha1", Hex: strings.Repeat("33", 20)} },
 		"unknown-kind":     func(m *Marker) { m.Package.Kind = "bad-kind" },
 		"skill-schema-0":   func(m *Marker) { m.SkillSchemaVersion = 0 },
-		"skill-schema-9":   func(m *Marker) { m.SkillSchemaVersion = 9 },
+		"skill-schema-10":  func(m *Marker) { m.SkillSchemaVersion = 10 },
 	}
 	for name, mutate := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -149,6 +149,15 @@ func TestMarkerV5RefusesMalformedIdentity(t *testing.T) {
 				t.Fatalf("Write admitted a v5 marker with %s", name)
 			}
 		})
+	}
+}
+
+func TestMarkerV5AcceptsSkillSchema9(t *testing.T) {
+	m := v5LocalMarker()
+	m.SkillSchemaVersion = 9
+	_, recorded := writeV5(t, m)
+	if recorded.SchemaVersion != SchemaV5 || recorded.SkillSchemaVersion != 9 {
+		t.Fatalf("recorded marker = %+v, want marker schema 5 carrying skill schema 9", recorded)
 	}
 }
 

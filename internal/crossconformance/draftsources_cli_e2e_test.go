@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/adapters"
+	"github.com/relux-works/curator/internal/audit"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/runtimestore"
 	"github.com/relux-works/curator/internal/sourcelock"
@@ -189,4 +190,142 @@ func TestDraftSourcesCLILocalSkillScriptDependencies(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestDraftSourcesCLIDirectoryManifestDependencyInstallRefreshAndAudit(t *testing.T) {
+	root := t.TempDir()
+	configPath, project, home := setupCLIProject(t, root)
+	skillsRoot := filepath.Join(root, "skills-root")
+	providerRepo := filepath.Join(skillsRoot, "backend")
+	dependencyGit := "https://github.com/example/role-skills.git"
+	writeManifestDependencySkill(t, filepath.Join(providerRepo, "skills", "backend"), "backend", 9, map[string]map[string]any{})
+	writeManifestDependencySkill(t, filepath.Join(providerRepo, "skills", "frontend"), "frontend", 9, map[string]map[string]any{})
+	writeManifestDependencySkill(t, filepath.Join(providerRepo, "skills", "shared"), "shared", 4, map[string]map[string]any{})
+	runDraftGit(t, providerRepo, "init", "-q", "-b", "main")
+	runDraftGit(t, providerRepo, "add", ".")
+	runDraftGit(t, providerRepo, "commit", "-qm", "base role packages")
+	baseCommit := strings.TrimSpace(draftGitOutput(t, providerRepo, "rev-parse", "HEAD"))
+	sharedRequirement := map[string]map[string]any{
+		"shared": {
+			"git":       dependencyGit,
+			"ref":       map[string]any{"kind": "revision", "value": baseCommit},
+			"directory": "skills/shared",
+		},
+	}
+	writeManifestDependencySkill(t, filepath.Join(providerRepo, "skills", "backend"), "backend", 9, sharedRequirement)
+	writeManifestDependencySkill(t, filepath.Join(providerRepo, "skills", "frontend"), "frontend", 9, sharedRequirement)
+	runDraftGit(t, providerRepo, "add", ".")
+	runDraftGit(t, providerRepo, "commit", "-qm", "role dependencies")
+	roleCommit := strings.TrimSpace(draftGitOutput(t, providerRepo, "rev-parse", "HEAD"))
+
+	appDir := filepath.Join(project, "skills", "app")
+	writeManifestDependencySkill(t, appDir, "app", 9, map[string]map[string]any{
+		"backend": {
+			"git":       dependencyGit,
+			"ref":       map[string]any{"kind": "revision", "value": roleCommit},
+			"directory": "skills/backend",
+		},
+		"frontend": {
+			"git":       dependencyGit,
+			"ref":       map[string]any{"kind": "revision", "value": roleCommit},
+			"directory": "skills/frontend",
+		},
+	})
+	skillfile := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"name":"app","from":"s","directory":"skills/app"}]}`
+	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(skillfile), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	configPayload, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var configDocument map[string]any
+	if err := json.Unmarshal(configPayload, &configDocument); err != nil {
+		t.Fatal(err)
+	}
+	configDocument["audit"] = map[string]any{
+		"enabled": true, "mode": "advisory", "backend": "null", "registry_policy": "advisory",
+	}
+	configPayload, err = json.MarshalIndent(configDocument, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, configPayload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if code, stdout, stderr := runCurator(t, home, configPath, nil, "project", "resolve", "app"); code != 0 {
+		t.Fatalf("project resolve = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+	lockPath := filepath.Join(project, "Skillfile.lock.json")
+	lock, err := sourcelock.Read(lockPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertDirectoryDependencyLock := func() {
+		t.Helper()
+		for _, name := range []string{"backend", "frontend", "shared"} {
+			member, ok := lock.Find(name)
+			if !ok || member.Package.Kind != sourcelock.KindNetworkGit || member.Directory != "skills/"+name || member.Package.Directory != "skills/"+name {
+				t.Fatalf("locked dependency %s does not bind selected directory: %+v", name, member)
+			}
+		}
+	}
+	assertDirectoryDependencyLock()
+
+	for _, operation := range [][]string{{"install", "app"}, {"project", "refresh", "app"}, {"install", "app"}} {
+		if code, stdout, stderr := runCurator(t, home, configPath, nil, operation...); code != 0 {
+			t.Fatalf("%v = %d\nstdout:\n%s\nstderr:\n%s", operation, code, stdout, stderr)
+		}
+		if operation[0] == "project" {
+			lock, err = sourcelock.Read(lockPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertDirectoryDependencyLock()
+		}
+	}
+
+	for _, name := range []string{"backend", "frontend", "shared"} {
+		installedPath := filepath.Join(project, ".agents", "skills", name)
+		installedSkill, err := os.ReadFile(filepath.Join(installedPath, "SKILL.md"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(installedSkill), name) {
+			t.Fatalf("installed context for %s does not come from selected folder: %s", name, installedSkill)
+		}
+		installedMarker := marker.Read(installedPath)
+		if installedMarker == nil || installedMarker.Package == nil || installedMarker.Package.Directory != "skills/"+name {
+			t.Fatalf("install marker for %s lost package directory: %+v", name, installedMarker)
+		}
+	}
+
+	objects, err := filepath.Glob(filepath.Join(home, "source-audit", "*.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	auditedDirectories := map[string]bool{}
+	for _, path := range objects {
+		if strings.HasSuffix(path, ".report.json") {
+			continue
+		}
+		payload, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		object, err := audit.ParseSourceAudit(payload)
+		if err != nil {
+			t.Fatalf("parse source audit %s: %v", path, err)
+		}
+		if object.Package.Kind == sourcelock.KindNetworkGit {
+			auditedDirectories[object.Package.Directory] = true
+		}
+	}
+	for _, directory := range []string{"skills/backend", "skills/frontend", "skills/shared"} {
+		if !auditedDirectories[directory] {
+			t.Fatalf("source-audit records omit selected package directory: %v", auditedDirectories)
+		}
+	}
 }

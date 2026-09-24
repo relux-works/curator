@@ -372,6 +372,9 @@ func gitCacheKey(member sourcelock.Member) string {
 	if member.Selection != nil {
 		return pkg.Repository
 	}
+	if member.Directory != "." {
+		return pkg.Repository
+	}
 	return member.Name
 }
 
@@ -413,7 +416,7 @@ func LoadDraftFrozenNodes(home string, lock *sourcelock.Lock, opts FrozenOptions
 		if content != member.ContentSHA256 {
 			return nil, nil, fmt.Errorf("source_snapshot_changed: stored snapshot for %s does not match its locked content", member.Name)
 		}
-		node := &Node{Name: member.Name, Snapshot: tree, Spec: spec}
+		node := &Node{Name: member.Name, Directory: member.Directory, Snapshot: tree, Spec: spec}
 		if member.Selection != nil {
 			node.Decl = manifest.Decl{Name: member.Name, Selector: &manifest.Selector{Directory: member.Directory}}
 			node.Edges = []Edge{{Consumer: ProjectEdge, Mode: "full"}}
@@ -597,7 +600,7 @@ func acquireLocal(cfg DraftResolveConfig, outputs []string, knownAliases map[str
 	if err != nil {
 		return nil, fmt.Errorf("source_member_invalid: %s: %w", sel.Decl.Name, err)
 	}
-	node := &Node{Name: sel.Decl.Name, Snapshot: storePath, Spec: spec}
+	node := &Node{Name: sel.Decl.Name, Directory: sel.Directory, Snapshot: storePath, Spec: spec}
 	acquired[sel.Decl.Name] = &draftAcquired{node: node, pkg: pkg, frozen: storePath, snapshot: inventory.Snapshot}
 	return node, nil
 }
@@ -721,12 +724,13 @@ func acquireGitPinned(_ DraftResolveConfig, _ map[string]bool, sel manifest.Sele
 		return nil, fmt.Errorf("source_member_invalid: %s:%s: %w", alias, sel.Directory, err)
 	}
 	node := &Node{
-		Name:     sel.Decl.Name,
-		Resolved: resolved,
-		Repo:     pin.repo,
-		Snapshot: subtree,
-		Spec:     spec,
-		Identity: source.Identity,
+		Name:      sel.Decl.Name,
+		Directory: sel.Directory,
+		Resolved:  resolved,
+		Repo:      pin.repo,
+		Snapshot:  subtree,
+		Spec:      spec,
+		Identity:  source.Identity,
 	}
 	acquired[sel.Decl.Name] = &draftAcquired{node: node, pkg: pkg, frozen: subtree}
 	return node, nil
@@ -757,6 +761,10 @@ func assemblePlan(cfg DraftResolveConfig, manifestSHA string, nodes []*Node, acq
 }
 
 func memberForNode(_ DraftResolveConfig, node *Node, acquired map[string]*draftAcquired, indexByName map[string]int, dirByName map[string]string) (sourcelock.Member, sourcelock.Package, string, error) {
+	directory := node.Directory
+	if directory == "" {
+		directory = "."
+	}
 	var selection *int
 	if index, ok := indexByName[node.Name]; ok {
 		// Collection siblings share the zero-based skills index.
@@ -764,7 +772,11 @@ func memberForNode(_ DraftResolveConfig, node *Node, acquired map[string]*draftA
 		selection = &value
 	}
 	if acquiredEntry, ok := acquired[node.Name]; ok {
-		directory := dirByName[node.Name]
+		selectedDirectory := dirByName[node.Name]
+		if directory != "." && directory != selectedDirectory {
+			return sourcelock.Member{}, sourcelock.Package{}, "", fmt.Errorf("source_member_invalid: selected directory for %s differs between acquisition and closure", node.Name)
+		}
+		directory = selectedDirectory
 		content, err := ContentHashFor(acquiredEntry.frozen, node.Spec)
 		if err != nil {
 			return sourcelock.Member{}, sourcelock.Package{}, "", err
@@ -775,12 +787,10 @@ func memberForNode(_ DraftResolveConfig, node *Node, acquired map[string]*draftA
 		}
 		return member, acquiredEntry.pkg, acquiredEntry.frozen, nil
 	}
-	// Legacy and transitive members flow through the existing Git lane.
-	// Their directory is "." relative to the selected repository and
-	// their package arm follows the canonical identity: a canonical
-	// repository selects network-git, otherwise the scoped
-	// configured-git identity. No snapshot digest ever enters a commit.
-	directory := "."
+	// Legacy and transitive members flow through the Git lane. Schema-9
+	// transitive members retain their selected directory in both package
+	// identity and lock membership; older requirements normalize to ".".
+	// No snapshot digest ever enters a Git commit.
 	commit, err := commitFor(node.Resolved.Commit)
 	if err != nil {
 		return sourcelock.Member{}, sourcelock.Package{}, "", err
@@ -789,6 +799,9 @@ func memberForNode(_ DraftResolveConfig, node *Node, acquired map[string]*draftA
 	if node.Identity != "" {
 		pkg, err = sourcelock.NetworkGitPackage(node.Identity, commit, directory)
 	} else {
+		if directory != "." {
+			return sourcelock.Member{}, sourcelock.Package{}, "", fmt.Errorf("source_selection_invalid: configured Git dependencies cannot lock a selected subdirectory")
+		}
 		source := node.Decl.Source
 		if source == "" {
 			source = node.Name

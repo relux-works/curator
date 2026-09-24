@@ -8,6 +8,7 @@
 package closure
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -37,6 +38,7 @@ type Edge struct {
 type Node struct {
 	Name        string
 	Decl        manifest.Decl
+	Directory   string // normalized package directory ("." for repository roots)
 	Resolved    gitops.ResolvedRef
 	Repo        string
 	Snapshot    string
@@ -139,13 +141,15 @@ type Options struct {
 }
 
 type pending struct {
-	name     string
-	git      string
-	ref      manifest.Ref
-	source   string
-	edge     Edge
-	chain    string
-	selected *Node
+	name          string
+	git           string
+	ref           manifest.Ref
+	source        string
+	directory     string
+	selectPackage bool
+	edge          Edge
+	chain         string
+	selected      *Node
 }
 
 // Build expands the manifest into an ordered closure.
@@ -156,12 +160,13 @@ func Build(opts Options, projectManifest *manifest.Manifest, substitutions map[s
 			return nil, fmt.Errorf("source_selection_invalid: draft selectors require expansion and frozen package acquisition before Git closure resolution")
 		}
 		queue = append(queue, pending{
-			name:   decl.Name,
-			git:    decl.Git,
-			ref:    decl.Ref,
-			source: decl.Source,
-			edge:   Edge{Consumer: ProjectEdge, Mode: "full"},
-			chain:  ProjectEdge + " -> " + decl.Name,
+			name:      decl.Name,
+			git:       decl.Git,
+			ref:       decl.Ref,
+			source:    decl.Source,
+			directory: ".",
+			edge:      Edge{Consumer: ProjectEdge, Mode: "full"},
+			chain:     ProjectEdge + " -> " + decl.Name,
 		})
 	}
 
@@ -170,6 +175,7 @@ func Build(opts Options, projectManifest *manifest.Manifest, substitutions map[s
 
 func buildQueue(opts Options, queue []pending, substitutions map[string]devsub.Substitution, draft bool) ([]*Node, error) {
 	nodes := map[string]*Node{}
+	sharedRepositories := map[string]string{}
 	for len(queue) > 0 {
 		item := queue[0]
 		queue = queue[1:]
@@ -178,7 +184,7 @@ func buildQueue(opts Options, queue []pending, substitutions map[string]devsub.S
 			resolved := item.selected
 			if resolved == nil {
 				var err error
-				resolved, err = resolveNode(opts, item, substitutions)
+				resolved, err = resolveNode(opts, item, substitutions, sharedRepositories)
 				if err != nil {
 					return nil, err
 				}
@@ -198,12 +204,14 @@ func buildQueue(opts Options, queue []pending, substitutions map[string]devsub.S
 			for _, name := range names {
 				requirement := node.Spec.Requirements[name]
 				queue = append(queue, pending{
-					name:   requirement.Name,
-					git:    requirement.Git,
-					ref:    manifest.Ref{Kind: requirement.RefKind, Value: requirement.RefValue},
-					source: requirement.Name,
-					edge:   Edge{Consumer: item.name, Mode: requirement.Mode, Commands: requirement.Commands},
-					chain:  item.chain + " -> " + requirement.Name,
+					name:          requirement.Name,
+					git:           requirement.Git,
+					ref:           manifest.Ref{Kind: requirement.RefKind, Value: requirement.RefValue},
+					source:        requirement.Name,
+					directory:     requirement.Directory,
+					selectPackage: node.Spec.SchemaVersion >= 9,
+					edge:          Edge{Consumer: item.name, Mode: requirement.Mode, Commands: requirement.Commands},
+					chain:         item.chain + " -> " + requirement.Name,
 				})
 			}
 		} else if err := unify(node, item); err != nil {
@@ -241,11 +249,22 @@ func DetectActiveCommandCollisions(nodes []*Node) error {
 // repository and the same commit (Spec §8.3). A substituted node skips
 // unification: the substitution replaces every requirement of that name.
 func unify(node *Node, item pending) error {
-	if node.Decl.Selector != nil && (node.Resolved.Commit == "" || node.Decl.Selector.Directory != ".") {
+	if node.Decl.Selector != nil && (node.Resolved.Commit == "" || node.Identity == "") {
 		return fmt.Errorf("source_name_conflict: %s dependency cannot identify the selected local package or repository subdirectory", node.Name)
 	}
 	if node.Substituted != "" {
 		return nil
+	}
+	nodeDirectory := node.Directory
+	if nodeDirectory == "" {
+		nodeDirectory = "."
+	}
+	itemDirectory := item.directory
+	if itemDirectory == "" {
+		itemDirectory = "."
+	}
+	if nodeDirectory != itemDirectory {
+		return fmt.Errorf("source conflict for %s: selected directory %q (via %s) and %q (via %s) differ", node.Name, nodeDirectory, node.Chains[0], itemDirectory, item.chain)
 	}
 	if item.git != "" {
 		id, err := identity.Parse(item.git)
@@ -278,10 +297,14 @@ func unify(node *Node, item pending) error {
 	return nil
 }
 
-func resolveNode(opts Options, item pending, substitutions map[string]devsub.Substitution) (*Node, error) {
+func resolveNode(opts Options, item pending, substitutions map[string]devsub.Substitution, sharedRepositories map[string]string) (*Node, error) {
 	var repo string
 	var resolved gitops.ResolvedRef
 	substituted := ""
+	directory := item.directory
+	if directory == "" {
+		directory = "."
+	}
 
 	if substitution, present := substitutions[item.name]; present {
 		if substitution.Path != "" {
@@ -311,11 +334,30 @@ func resolveNode(opts Options, item pending, substitutions map[string]devsub.Sub
 		}
 		substituted = substitution.Describe()
 	} else {
-		localRepo, err := ensureRepo(opts, item)
-		if err != nil {
-			return nil, err
+		repositoryIdentity := ""
+		if item.selectPackage && directory != "." {
+			var err error
+			repositoryIdentity, err = identity.Parse(item.git)
+			if err != nil {
+				return nil, fmt.Errorf("invalid source for %s (via %s): %w", item.name, item.chain, err)
+			}
+			if repositoryIdentity == "" {
+				return nil, fmt.Errorf("source_selection_invalid: selecting a repository subdirectory requires a canonical network repository identity")
+			}
 		}
-		repo = localRepo
+		localRepo, shared := sharedRepositories[repositoryIdentity]
+		if repositoryIdentity != "" && shared {
+			repo = localRepo
+		} else {
+			localRepo, err := ensureRepo(opts, item)
+			if err != nil {
+				return nil, err
+			}
+			repo = localRepo
+			if repositoryIdentity != "" {
+				sharedRepositories[repositoryIdentity] = localRepo
+			}
+		}
 		ref, err := gitops.Resolve(repo, item.ref.Kind, item.ref.Value)
 		if err != nil {
 			return nil, fmt.Errorf("cannot resolve %s %q for %s (via %s): %w", item.ref.Kind, item.ref.Value, item.name, item.chain, err)
@@ -323,14 +365,28 @@ func resolveNode(opts Options, item pending, substitutions map[string]devsub.Sub
 		resolved = ref
 	}
 
-	snap, err := snapshotFor(opts, item.source, repo, resolved.Commit)
+	cacheSource := item.source
+	if item.selectPackage && directory != "." {
+		cacheSource = identity.Canonical(item.git)
+	}
+	snap, err := snapshotFor(opts, cacheSource, repo, resolved.Commit)
 	if err != nil {
+		var linkErr *gitops.UnsupportedLinkError
+		if item.selectPackage && errors.As(err, &linkErr) && selectedPathIntersectsLink(directory, linkErr.Path) {
+			return nil, fmt.Errorf("source_selection_invalid: directory %q escapes source or contains symlink %q", directory, linkErr.Path)
+		}
 		return nil, err
 	}
 	if gitops.HasSubmodules(snap) {
 		return nil, fmt.Errorf("submodules are unsupported: %s", item.source)
 	}
-	spec, err := skillspec.Load(snap)
+	packageSnapshot := snap
+	var spec *skillspec.Spec
+	if item.selectPackage {
+		packageSnapshot, spec, err = manifest.SelectSkillPackage(snap, directory, item.name)
+	} else {
+		spec, err = skillspec.Load(snap)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("invalid skill manifest for %s %s %s -> %s (via %s): %w",
 			item.name, resolved.Kind, resolved.Ref, short(resolved.Commit), item.chain, err)
@@ -346,13 +402,21 @@ func resolveNode(opts Options, item pending, substitutions map[string]devsub.Sub
 	return &Node{
 		Name:        item.name,
 		Decl:        manifest.Decl{Name: item.name, Source: item.source, Ref: manifest.Ref{Kind: resolved.Kind, Value: resolved.Ref}, Git: item.git},
+		Directory:   directory,
 		Resolved:    resolved,
 		Repo:        repo,
-		Snapshot:    snap,
+		Snapshot:    packageSnapshot,
 		Spec:        spec,
 		Identity:    id,
 		Substituted: substituted,
 	}, nil
+}
+
+func selectedPathIntersectsLink(directory, link string) bool {
+	if directory == "." {
+		return true
+	}
+	return link == directory || strings.HasPrefix(link, directory+"/") || strings.HasPrefix(directory, link+"/")
 }
 
 func ensureRepo(opts Options, item pending) (string, error) {

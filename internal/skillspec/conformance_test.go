@@ -78,6 +78,91 @@ func TestReleasedSchemaCases(t *testing.T) {
 	}
 }
 
+func TestDraftManifestDependencyDirectoryGrammar(t *testing.T) {
+	vectorPath := filepath.Join("testdata", "draft-sources-v1", "manifest-dependency-directories.json")
+	payload, err := os.ReadFile(vectorPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var vector struct {
+		DirectoryGrammarCases []struct {
+			Name  string `json:"name"`
+			Input string `json:"input"`
+			Valid bool   `json:"valid"`
+		} `json:"directory_grammar_cases"`
+	}
+	if err := json.Unmarshal(payload, &vector); err != nil {
+		t.Fatal(err)
+	}
+	if len(vector.DirectoryGrammarCases) != 9 {
+		t.Fatalf("directory grammar vector has %d cases, want 9", len(vector.DirectoryGrammarCases))
+	}
+	for _, testCase := range vector.DirectoryGrammarCases {
+		t.Run(testCase.Name, func(t *testing.T) {
+			manifest := map[string]any{
+				"schema_version": 9,
+				"capabilities":   map[string]any{},
+				"dependencies": map[string]any{"skills": map[string]any{
+					"developer": map[string]any{
+						"git":       "https://github.com/example/role-skills.git",
+						"ref":       map[string]any{"kind": "revision", "value": strings.Repeat("a", 40)},
+						"directory": testCase.Input,
+					},
+				}},
+			}
+			raw, err := json.Marshal(manifest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = Load(writeSkill(t, string(raw), nil))
+			if (err == nil) != testCase.Valid {
+				t.Fatalf("valid=%v, error=%v", testCase.Valid, err)
+			}
+			if err != nil && !strings.Contains(err.Error(), "dependencies.skills.developer.directory") {
+				t.Fatalf("error %q does not identify the directory field", err)
+			}
+		})
+	}
+}
+
+func TestDraftManifestDependencyDirectorySchemaCases(t *testing.T) {
+	root := filepath.Join("testdata", "draft-sources-v1", "schema-cases")
+	for _, suite := range []struct{ directory, manifest string }{
+		{"agent-skill-v9", CanonicalManifestName},
+		{"csk-skill-v9", LegacyManifestName},
+	} {
+		entries, err := os.ReadDir(filepath.Join(root, suite.directory))
+		if err != nil {
+			t.Fatal(err)
+		}
+		consumed := 0
+		for _, entry := range entries {
+			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+				continue
+			}
+			if entry.Name() == "valid.json" || entry.Name() == "invalid.json" {
+				continue // These pin schema-level version acceptance, not the parser's directory gate.
+			}
+			consumed++
+			t.Run(suite.directory+"/"+entry.Name(), func(t *testing.T) {
+				payload, err := os.ReadFile(filepath.Join(root, suite.directory, entry.Name()))
+				if err != nil {
+					t.Fatal(err)
+				}
+				snapshot := materializeManifestFixture(t, payload, suite.manifest)
+				_, err = Load(snapshot)
+				wantValid := strings.HasPrefix(entry.Name(), "valid")
+				if (err == nil) != wantValid {
+					t.Fatalf("valid=%v, error=%v", wantValid, err)
+				}
+			})
+		}
+		if consumed != 9 {
+			t.Fatalf("schema-cases/%s contains %d directory cases, want 9", suite.directory, consumed)
+		}
+	}
+}
+
 // materializeManifestFixture lays out the snapshot a schema case describes:
 // build roots with their go.mod, declared runtime roots, command source
 // directories and script files, and the schema-8 declared module directories
