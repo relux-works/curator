@@ -12,10 +12,18 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"time"
 )
 
 // BlockComment heads the appended entries.
 const BlockComment = "# Curator"
+
+const checkIgnoreEACCESRetryDelay = 100 * time.Millisecond
+
+// checkIgnoreCommandRunner is the production command seam. Tests replace it
+// to inject child-start errors without depending on runner filesystem state.
+var checkIgnoreCommandRunner = func(cmd *exec.Cmd) error { return cmd.Run() }
 
 // NotIgnoredError reports the policy outcome that entries are not ignored.
 // It is distinct from a tool failure: a git that cannot be executed (a
@@ -51,22 +59,58 @@ func Missing(projectRoot string, entries []string) ([]string, error) {
 	var missing []string
 	for _, entry := range entries {
 		probe := strings.TrimSuffix(entry, "/") + "/.curator-probe"
-		cmd := exec.Command("git", "-C", projectRoot, "check-ignore", "-q", probe) // #nosec G204 -- fixed binary and flags
-		var stderr bytes.Buffer
-		cmd.Stderr = &stderr
-		if err := cmd.Run(); err != nil {
+		stderr, err := runCheckIgnoreWithEACCESRetry(projectRoot, probe)
+		if err != nil {
 			var exitErr *exec.ExitError
 			if errors.As(err, &exitErr) {
 				missing = append(missing, entry)
 				continue
 			}
-			if detail := strings.TrimSpace(stderr.String()); detail != "" {
+			if detail := strings.TrimSpace(stderr); detail != "" {
 				return nil, fmt.Errorf("git check-ignore failed for %q: %s: %w", entry, detail, err)
 			}
 			return nil, fmt.Errorf("git check-ignore failed for %q: %w", entry, err)
 		}
 	}
 	return missing, nil
+}
+
+// runCheckIgnoreWithEACCESRetry retries one child-start EACCES after a short
+// delay. It does not retry Git exit statuses or other spawn errors; a second
+// failure is returned so persistent permission errors still fail closed.
+func runCheckIgnoreWithEACCESRetry(projectRoot, probe string) (string, error) {
+	stderr, err := runCheckIgnoreAttempt(projectRoot, probe)
+	if !isCheckIgnoreSpawnEACCES(err) {
+		return stderr, err
+	}
+
+	firstErr := err
+	time.Sleep(checkIgnoreEACCESRetryDelay)
+	stderr, err = runCheckIgnoreAttempt(projectRoot, probe)
+	if err != nil {
+		return stderr, fmt.Errorf("git check-ignore still failed after one EACCES spawn retry (first attempt: %v): %w", firstErr, err)
+	}
+	return stderr, nil
+}
+
+func runCheckIgnoreAttempt(projectRoot, probe string) (string, error) {
+	cmd := exec.Command("git", "-C", projectRoot, "check-ignore", "-q", probe) // #nosec G204 -- fixed binary and flags
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	err := checkIgnoreCommandRunner(cmd)
+	return stderr.String(), err
+}
+
+func isCheckIgnoreSpawnEACCES(err error) bool {
+	if err == nil {
+		return false
+	}
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		return false
+	}
+	var pathErr *os.PathError
+	return errors.As(err, &pathErr) && pathErr.Op == "fork/exec" && errors.Is(pathErr.Err, syscall.EACCES)
 }
 
 // Ensure verifies the entries are ignored; with fix it appends the missing

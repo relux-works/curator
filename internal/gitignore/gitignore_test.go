@@ -143,6 +143,120 @@ func TestMissingSpawnFailureIsToolError(t *testing.T) {
 	}
 }
 
+func TestMissingRetriesOnceOnSpawnEACCES(t *testing.T) {
+	previousRunner := checkIgnoreCommandRunner
+	t.Cleanup(func() { checkIgnoreCommandRunner = previousRunner })
+
+	calls := 0
+	checkIgnoreCommandRunner = func(*exec.Cmd) error {
+		calls++
+		if calls == 1 {
+			return checkIgnoreSpawnError(syscall.EACCES)
+		}
+		return nil
+	}
+
+	missing, err := Missing(t.TempDir(), []string{".agents/"})
+	if err != nil {
+		t.Fatalf("Missing after transient EACCES: %v", err)
+	}
+	if len(missing) != 0 {
+		t.Fatalf("missing = %q, want no missing entries after successful retry", missing)
+	}
+	if calls != 2 {
+		t.Fatalf("runner calls = %d, want one retry after the first EACCES", calls)
+	}
+}
+
+func TestMissingDoesNotRetryGitExitStatus(t *testing.T) {
+	previousRunner := checkIgnoreCommandRunner
+	t.Cleanup(func() { checkIgnoreCommandRunner = previousRunner })
+
+	calls := 0
+	checkIgnoreCommandRunner = func(*exec.Cmd) error {
+		calls++
+		return &exec.ExitError{}
+	}
+
+	missing, err := Missing(t.TempDir(), []string{".agents/"})
+	if err != nil {
+		t.Fatalf("Missing after a Git exit status: %v", err)
+	}
+	if len(missing) != 1 || missing[0] != ".agents/" {
+		t.Fatalf("missing = %q, want the existing not-ignored policy result", missing)
+	}
+	if calls != 1 {
+		t.Fatalf("runner calls = %d, want no retry after Git starts and exits", calls)
+	}
+}
+
+func TestEnsurePersistentSpawnEACCESFailsClosedAfterOneRetry(t *testing.T) {
+	previousRunner := checkIgnoreCommandRunner
+	t.Cleanup(func() { checkIgnoreCommandRunner = previousRunner })
+
+	calls := 0
+	checkIgnoreCommandRunner = func(*exec.Cmd) error {
+		calls++
+		return checkIgnoreSpawnError(syscall.EACCES)
+	}
+
+	project := t.TempDir()
+	err := Ensure(project, []string{".agents/"}, true)
+	if err == nil {
+		t.Fatal("Ensure with persistent spawn EACCES must fail")
+	}
+	if IsNotIgnored(err) {
+		t.Fatalf("err = %q, want a tool error rather than a policy outcome", err)
+	}
+	if !errors.Is(err, syscall.EACCES) {
+		t.Fatalf("err = %q, want the persistent EACCES cause preserved", err)
+	}
+	if calls != 2 {
+		t.Fatalf("runner calls = %d, want exactly two attempts", calls)
+	}
+	if _, statErr := os.Stat(filepath.Join(project, ".gitignore")); !os.IsNotExist(statErr) {
+		t.Fatalf("persistent spawn error must not write .gitignore: %v", statErr)
+	}
+}
+
+func TestMissingDoesNotRetryOtherSpawnErrors(t *testing.T) {
+	for _, row := range []struct {
+		name      string
+		err       error
+		wantErrno syscall.Errno
+	}{
+		{"EPERM spawn", checkIgnoreSpawnError(syscall.EPERM), syscall.EPERM},
+		{"ENOENT spawn", checkIgnoreSpawnError(syscall.ENOENT), syscall.ENOENT},
+		{"EACCES outside fork-exec", &os.PathError{Op: "open", Path: "/opt/homebrew/bin/git", Err: syscall.EACCES}, syscall.EACCES},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			previousRunner := checkIgnoreCommandRunner
+			t.Cleanup(func() { checkIgnoreCommandRunner = previousRunner })
+
+			calls := 0
+			checkIgnoreCommandRunner = func(*exec.Cmd) error {
+				calls++
+				return row.err
+			}
+
+			_, err := Missing(t.TempDir(), []string{".agents/"})
+			if err == nil {
+				t.Fatal("Missing with a non-retryable spawn error must fail")
+			}
+			if !errors.Is(err, row.wantErrno) {
+				t.Fatalf("err = %q, want %v preserved", err, row.wantErrno)
+			}
+			if calls != 1 {
+				t.Fatalf("runner calls = %d, want no retry for %v", calls, row.name)
+			}
+		})
+	}
+}
+
+func checkIgnoreSpawnError(errno syscall.Errno) error {
+	return &os.PathError{Op: "fork/exec", Path: "/opt/homebrew/bin/git", Err: errno}
+}
+
 // TestMissingNonRepositoryIsNotIgnored pins the exit-128 branch of
 // BUG-260921-1fpaij (rework 1): a root that is not a git repository keeps the
 // PRE-EXISTING outcome — git's own verdict, including "not a repository", is
