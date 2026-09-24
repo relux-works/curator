@@ -1,0 +1,38 @@
+Candidate extraction tracked blobs verified: 6770; mismatches: []
+
+## portable.log
+ok  	github.com/relux-works/curator/internal/scriptworker	5.277s
+
+
+## mutant-cached.log
+--- FAIL: TestScriptEvidenceMutationsRefuseBeforePermit (2.40s)
+    --- FAIL: TestScriptEvidenceMutationsRefuseBeforePermit/cached-probe-result (1.61s)
+        evidence_test.go:84: cached-probe-result error = script-worker-v1 script_execution_capability_evidence_invalid: worker capability evidence contradicts this invocation's probe, want it to name "probed_at"
+FAIL
+FAIL	github.com/relux-works/curator/internal/scriptworker	3.131s
+FAIL
+
+
+## restored.log
+ok  	github.com/relux-works/curator/internal/scriptworker	2.306s
+
+
+## reviewer-contract.log
+--- FAIL: TestReviewerTruncateUAPIIdentity (0.00s)
+    reviewer_contract_test.go:5: TRUNCATE = 0x1000, kernel UAPI requires 0x4000 (current value is MAKE_SYM)
+    reviewer_contract_test.go:6: real TRUNCATE is unhandled and therefore unrestricted
+--- FAIL: TestReviewerWriteConfinementMask (0.00s)
+    reviewer_contract_test.go:11: remove-file is unrestricted: handled mask 0x1002 omits 0x20
+    reviewer_contract_test.go:11: remove-dir is unrestricted: handled mask 0x1002 omits 0x10
+    reviewer_contract_test.go:11: make-dir is unrestricted: handled mask 0x1002 omits 0x80
+    reviewer_contract_test.go:11: make-reg is unrestricted: handled mask 0x1002 omits 0x100
+    reviewer_contract_test.go:11: make-fifo is unrestricted: handled mask 0x1002 omits 0x400
+--- FAIL: TestReviewerRegularFileTruncationGrant (0.00s)
+    reviewer_contract_test.go:17: regular-file write grant 0x2 strips its intended truncation bit
+FAIL
+FAIL	github.com/relux-works/curator/internal/scriptworker	0.417s
+FAIL
+
+
+## install-restored.log
+ok  	github.com/relux-works/curator/internal/install	121.637s

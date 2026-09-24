@@ -1,0 +1,4179 @@
+diff --git a/.github/ci/platform-cases.tsv b/.github/ci/platform-cases.tsv
+index 1fe73242..9f7fdcff 100644
+--- a/.github/ci/platform-cases.tsv
++++ b/.github/ci/platform-cases.tsv
+@@ -322,7 +322,23 @@ internal/godriver	TestModuleRootVectorsDriveTheWholeBuild	linux,darwin,windows	l
+ internal/scriptpolicy	TestScriptHostExecutionPolicySectionsAreAllClassified	linux,darwin,windows	linux,darwin,windows	root-unset	every section of the published script-worker family is classified, so a new one cannot be ignored
+ internal/scriptpolicy	TestScriptExecutionPolicyIdentityMatchesTheSuite	linux,darwin,windows	linux,darwin,windows	root-unset	the closed policy identity and interpreter set this build hard-codes are the suite's own
+ internal/scriptpolicy	TestScriptExecutionOptInCases	linux,darwin,windows	linux,darwin,windows	root-unset	every published opt-in case decides manifest acceptance and enforced/declared-only classification
+-internal/scriptpolicy	TestARefusalPrecedesEveryWorkerSurface	linux,darwin,windows	linux,darwin,windows	root-unset	every enforced shape the suite declares is refused with script_execution_policy_unsupported before any worker surface
++internal/scriptpolicy	TestARefusalPrecedesEveryWorkerSurface	linux,darwin,windows	linux,darwin,windows	root-unset	every enforced shape the suite declares is refused before any worker surface: control-unavailable for the implemented policy, policy-unsupported for an unknown one
++internal/scriptpolicy	TestMandatoryControlsMatchTheSuite	linux,darwin,windows	linux,darwin,windows	root-unset	the 11-control preflight table this build enforces matches the published set in order
++internal/scriptpolicy	TestPreflightRefusalCases	linux,darwin,windows	linux,darwin,windows	root-unset	the install/invoke mandatory-control-unavailable cases refuse with control-unavailable and start no worker
++# R1 script manager/worker invocation (TASK-260916-3dmjbc): the launch-path
++# rows below execute the real worker process on every runner, like the go-v1
++# worker rows. None of them skips: symlink-dependent rows stay out of the
++# ledger and run best-effort with host-capability skips.
++internal/scriptworker	TestRunSessionHappyPath	linux,darwin,windows	-	-	the manager launches the identity-verified script worker and returns verbatim args with the child exit status
++internal/scriptworker	TestRunSessionRechecksIdentityAtLaunchBoundary	linux,darwin,windows	-	-	a manager binary replaced between resolve and exec never runs
++internal/scriptworker	TestRunSessionTerminatesDescendants	linux,darwin,windows	-	-	an interpreter descendant that outlives the interpreter is reaped by the worker-domain teardown
++internal/scriptworker	TestRunSessionRejectsPATHInterpreter	linux,darwin,windows	-	-	the launch never consults the user PATH: unconfigured refuses and configured wins
++internal/scriptworker	TestBuiltCuratorWorkerHandshake	linux,darwin,windows	-	-	the built curator answers the fixed hidden script-worker mode with an identity proof and one invocation
++internal/scriptworker	TestScriptWorkerHappyPath	linux,darwin,windows	-	-	the hidden worker proves identity, verifies the interpreter, and runs the runtime entry
++internal/scriptworker	TestScriptWorkerRejectsTamperedInterpreter	linux,darwin,windows	-	-	a tampered interpreter file is refused before it runs
++internal/scriptworker	TestResolveInterpreterFromOperatorConfigOnly	linux,darwin,windows	-	-	both closed interpreter identifiers resolve from operator-trusted configuration only
++internal/scriptworker	TestResolveInterpreterRejectsWrapperImage	linux,darwin,windows	-	-	a wrapper or non-native interpreter binding is refused at resolution before any worker starts
++internal/scriptworker	TestScriptWorkerRejectsWrapperImage	linux,darwin,windows	-	-	a wrapper or non-native interpreter binding is refused by the worker before it runs
+ internal/config	TestManagerConfigV2SchemaCases	linux,darwin,windows	-	-	the published manager-config-v2 family is accepted or rejected through the config reader
+ internal/config	TestSystemConfigV2SchemaCases	linux,darwin,windows	-	-	the published system-config-v2 family merges or fails through the config loader
+ internal/config	TestManagerConfigV2Vectors	linux,darwin,windows	-	-	the published manager-config-v2 vectors render the expected effective configuration
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 9e1368c8..8dba6ccb 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -6,6 +6,23 @@ All notable implementation changes are recorded here.
+ 
+ ### Added
+ 
++- R1 script manager/worker invocation path (`script-worker-v1`). The manager
++  resolves the closed `node-v1`/`python3-v1` interpreter identifiers from the
++  new operator-trusted `script_interpreters` machine-configuration mapping
++  only (never repository, runtime root, `.agents/bin`, user `PATH`, or
++  manifest), re-executes the installed manager in the fixed hidden
++  `__curator-script-worker-v1` mode with a fresh session nonce, identity
++  recheck at the launch boundary, explicit stream binding, a private runtime
++  area, and worker-domain teardown, reusing the go-v1 worker's executable
++  identity primitives. Admission now preflights the 11 mandatory portable
++  controls: unsupported policies keep refusing
++  `script_execution_policy_unsupported`, while `node-v1`/`python3-v1`
++  commands refuse `script_execution_control_unavailable` naming the missing
++  controls. Interpreter bindings must name native executable images (the
++  `.exe` itself on Windows); wrapper scripts and batch files are refused
++  at resolution and at the worker before the interpreter runs. Enforced
++  launch remains refused until the R2/R3 control set is complete; no
++  enforced script launches uncontained.
+ - Scoped HTTPS credentials for external build repositories. A `build_https`
+   configuration section maps a source scope to a token source — the operator's
+   own Git credential for the host, a manager-namespaced keyring entry, or a
+diff --git a/cmd/curator/main.go b/cmd/curator/main.go
+index 9b243b0c..5d7b6d78 100644
+--- a/cmd/curator/main.go
++++ b/cmd/curator/main.go
+@@ -39,6 +39,7 @@ import (
+ 	"github.com/relux-works/curator/internal/registry"
+ 	"github.com/relux-works/curator/internal/rustsource"
+ 	"github.com/relux-works/curator/internal/scopes"
++	"github.com/relux-works/curator/internal/scriptworker"
+ 	"github.com/relux-works/curator/internal/shell"
+ 	"github.com/relux-works/curator/internal/skillcheck"
+ 	"github.com/relux-works/curator/internal/transaction"
+@@ -105,6 +106,13 @@ func main() {
+ 	if len(os.Args) == 2 && os.Args[1] == godriver.WorkerMode {
+ 		os.Exit(godriver.RunWorker(os.Stdin, os.Stdout))
+ 	}
++	// The fixed hidden script-worker-v1 worker is the same kind of
++	// implementation boundary as the go-v1 worker above: exactly this one
++	// manager-owned argument, never reachable through package data, PATH,
++	// shell, or user option.
++	if len(os.Args) == 2 && os.Args[1] == scriptworker.WorkerMode {
++		os.Exit(scriptworker.RunWorker(os.Stdin, os.Stdout))
++	}
+ 	// Resolve the environment-backed user path once at the process boundary.
+ 	// The command core receives an explicit source so independent invocations
+ 	// never consult CURATOR_CONFIG themselves.
+diff --git a/docs/troubleshooting.md b/docs/troubleshooting.md
+index 86b4a98c..0f03faf0 100644
+--- a/docs/troubleshooting.md
++++ b/docs/troubleshooting.md
+@@ -551,3 +551,94 @@ diagnostics keep their lane behavior and carry no appended guidance.
+ Remedy: fix the endpoint entry in machine source-policy.json: the
+ strict external-build lane admits no explicit port and no host alias,
+ then retry the explicit attempt.
++
++## Enforced script execution diagnostics
++
++Enforced script commands (`execution_policy: "script-worker-v1"`) launch
++through the manager-owned script worker. Source locations:
++`internal/scriptpolicy/scriptpolicy.go` (admission and preflight),
++`internal/scriptworker/` (interpreter resolution and worker session).
++
++### script_execution_control_unavailable
++
++Symptom: install or `skill check` reports
++`script_execution_control_unavailable` naming mandatory controls such as
++`manager-built-environment`, `manager-built-path`,
++`offline-network-configuration`, `inventory-controls-applied`, or
++`closed-script-capability-evidence-record`, and no shim is published for
++the enforced command.
++
++Cause: the manager implements the `script-worker-v1` policy but cannot
++apply every mandatory portable control yet, so the preflight refuses
++before any worker starts rather than launching the command uncontained.
++This is the expected R1 verdict for every enforced `node-v1`/`python3-v1`
++command: the launch path exists and is proven, and the remaining controls
++(declaration-derived environment and `PATH`, offline configuration,
++inventory application, closed evidence record) land in a later release.
++
++Remedy: none on this release — enforced launch stays refused until the
++control set is complete. Declared-only script commands (no
++`execution_policy` field) install unchanged. Do not work around the
++refusal by removing the `execution_policy` field: that silently
++downgrades the command to uncontained execution.
++
++Verify the refusal names the missing controls:
++
++```bash
++curator skill check ./my-skill
++```
++
++The output carries one `script_execution_control_unavailable` error per
++enforced command with the missing control names in its detail.
++
++### script_execution_policy_unsupported
++
++Symptom: install or `skill check` reports
++`script_execution_policy_unsupported` for an enforced command.
++
++Cause: the command selects an execution policy this manager does not
++implement. Protocol 1.0 admits exactly `script-worker-v1`; any other
++value is rejected here rather than installed declared-only, downgraded,
++or ignored.
++
++Remedy: set the command's `execution_policy` to `script-worker-v1` with
++its co-required `interpreter` (`node-v1` or `python3-v1`), or remove both
++fields to keep the command declared-only.
++
++### script_execution_worker_identity_invalid
++
++Symptom: an enforced invocation reports
++`script_execution_worker_identity_invalid`.
++
++Cause: the worker or interpreter executable failed identity verification:
++the file is not a canonical regular executable, carries multiple links
++or a reparse point, changed between resolution and the launch boundary,
++or does not hash to the recorded identity. The interpreter binding comes
++exclusively from the operator-trusted `script_interpreters` mapping in
++machine configuration — never from the repository, the runtime store,
++`.agents/bin`, the user `PATH`, or a manifest value. A binding that is
++not a native interpreter image is refused the same way: POSIX `#!`
++wrapper scripts (pyenv/asdf/volta-style shims) and Windows `.cmd`/`.bat`
++files would interpose another program between the worker and the
++interpreter, so only the native interpreter executable is accepted. On
++Windows the binding must name the `.exe` itself — an extensionless path
++would execute a different file than the verified one.
++
++Remedy: verify the `script_interpreters` entry for the command's
++identifier names the absolute path of the installed native interpreter
++executable, that no other process replaced the manager or interpreter
++files, and retry. If the binding names a shim or wrapper, replace it
++with the interpreter binary it launches. If the binding is absent, add
++it:
++
++```json
++{
++  "script_interpreters": {
++    "node-v1": "/opt/node/bin/node",
++    "python3-v1": "/usr/bin/python3"
++  }
++}
++```
++
++On Windows the values name the `.exe` files, for example
++`"node-v1": "C:\\tools\\node\\node.exe"`.
+diff --git a/internal/config/config.go b/internal/config/config.go
+index 15db809c..f9c9912c 100644
+--- a/internal/config/config.go
++++ b/internal/config/config.go
+@@ -79,9 +79,16 @@ var managerKeys = map[string]bool{
+ 	"audit_registries": true, "disable_builtin_registries": true,
+ 	"execution": true,
+ 	"build_ssh": true, "build_https": true,
+-	"environments": true,
++	"script_interpreters": true,
++	"environments":        true,
+ }
+ 
++// ScriptInterpreterIDs is the closed identifier set the operator may bind to
++// a trusted executable. It mirrors the protocol's admitted interpreters; a
++// successor identifier is a specification revision, never a configuration
++// value, so an unknown key here is rejected rather than carried.
++var ScriptInterpreterIDs = map[string]bool{"node-v1": true, "python3-v1": true}
++
+ // Project is a registered project entry.
+ type Project struct {
+ 	Alias         string
+@@ -170,6 +177,14 @@ type Config struct {
+ 	// selection that covers every external build repository below it
+ 	// (Spec §12.2).
+ 	BuildHTTPS map[string]BuildHTTPSCredential
++	// ScriptInterpreters maps a closed script interpreter identifier
++	// (node-v1, python3-v1) to the operator-trusted absolute executable
++	// path the enforced script worker launches. It is the only source
++	// the manager resolves an interpreter from: repository bytes, the
++	// runtime store, .agents/bin, the user PATH, and manifest values
++	// never select the executable (Protocol Core §4.1.1). Absent means
++	// no enforced script command can launch on this machine.
++	ScriptInterpreters map[string]string
+ }
+ 
+ // Home returns the directory holding the config file: the machine home for
+@@ -534,6 +549,11 @@ func Parse(data map[string]any, path string) (*Config, error) {
+ 		return nil, err
+ 	}
+ 
++	scriptInterpreters, err := parseScriptInterpreters(data["script_interpreters"])
++	if err != nil {
++		return nil, err
++	}
++
+ 	disableBuiltin := false
+ 	if raw, present := data["disable_builtin_registries"]; present {
+ 		disableBuiltin, ok = raw.(bool)
+@@ -617,6 +637,7 @@ func Parse(data map[string]any, path string) (*Config, error) {
+ 		DisableBuiltinRegistries: disableBuiltin,
+ 		BuildSSH:                 buildSSH,
+ 		BuildHTTPS:               buildHTTPS,
++		ScriptInterpreters:       scriptInterpreters,
+ 	}, nil
+ }
+ 
+@@ -689,6 +710,39 @@ func parseExecution(raw any) (Execution, error) {
+ 	return execution, nil
+ }
+ 
++// parseScriptInterpreters reads the operator-trusted interpreter bindings.
++// The mapping is optional and closed: only node-v1 and python3-v1 may be
++// bound, every value must be a non-empty absolute path, and a relative path
++// is rejected outright because it would resolve against a working directory
++// the package controls. Existence and file identity are per-invocation
++// checks at the launch boundary, not parse-time facts.
++func parseScriptInterpreters(raw any) (map[string]string, error) {
++	if raw == nil {
++		return nil, nil
++	}
++	obj, ok := raw.(map[string]any)
++	if !ok {
++		return nil, verr.New("script_interpreters", "must be an object")
++	}
++	bindings := map[string]string{}
++	for identifier, value := range obj {
++		label := "script_interpreters." + identifier
++		if !ScriptInterpreterIDs[identifier] {
++			return nil, verr.New(label, "must be one of node-v1, python3-v1")
++		}
++		path, ok := value.(string)
++		if !ok || path == "" || utf8.RuneCountInString(path) > 4096 {
++			return nil, verr.New(label, "requires a non-empty string")
++		}
++		expanded := expandHome(path)
++		if !filepath.IsAbs(expanded) {
++			return nil, verr.New(label, "must be an absolute executable path")
++		}
++		bindings[identifier] = expanded
++	}
++	return bindings, nil
++}
++
+ func validProviderText(value string, maximum int) bool {
+ 	if value == "" || len(value) > maximum || strings.TrimSpace(value) != value {
+ 		return false
+diff --git a/internal/config/scriptinterpreters_test.go b/internal/config/scriptinterpreters_test.go
+new file mode 100644
+index 00000000..f1914eae
+--- /dev/null
++++ b/internal/config/scriptinterpreters_test.go
+@@ -0,0 +1,91 @@
++package config
++
++import (
++	"path/filepath"
++	"runtime"
++	"strconv"
++	"strings"
++	"testing"
++)
++
++// TestParseScriptInterpreters proves the operator-trusted interpreter
++// bindings parse, and that the mapping is closed and absolute: an unknown
++// identifier, a relative path, or a non-object is rejected rather than
++// carried into a launch.
++func TestParseScriptInterpreters(t *testing.T) {
++	load := func(t *testing.T, text string) (*Config, error) {
++		t.Helper()
++		return Load(writeConfig(t, t.TempDir(), "config.json", text), nil)
++	}
++	base := `{"schema_version": 1, "skills_root": "/tmp/skills", "projects": {}`
++
++	config, err := load(t, base+`}`)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(config.ScriptInterpreters) != 0 {
++		t.Fatalf("absent bindings = %v, want empty", config.ScriptInterpreters)
++	}
++
++	// The accepted bindings are built from the host temp dir so they are
++	// absolute on every OS: a POSIX literal such as /opt/... is not
++	// absolute on Windows, where filepath.IsAbs needs a volume. On
++	// Windows this row is therefore also the volume-absolute acceptance
++	// row (e.g. C:\Users\...\node).
++	binDir := t.TempDir()
++	nodePath := filepath.Join(binDir, "node")
++	pythonPath := filepath.Join(binDir, "python3")
++	config, err = load(t, base+`, "script_interpreters": {"node-v1": `+strconv.Quote(nodePath)+`, "python3-v1": `+strconv.Quote(pythonPath)+`}}`)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if config.ScriptInterpreters["node-v1"] != nodePath || config.ScriptInterpreters["python3-v1"] != pythonPath {
++		t.Fatalf("bindings = %v", config.ScriptInterpreters)
++	}
++	if !managerKeys["script_interpreters"] {
++		t.Fatal("script_interpreters is not a known manager key")
++	}
++	if LockableKeys["script_interpreters"] {
++		t.Fatal("interpreter bindings are operator-owned executable selections and must never be lockable")
++	}
++
++	type rejection struct {
++		name  string
++		value string
++		want  string
++	}
++	cases := []rejection{
++		{"unknown identifier", `{"bash-v1": "/bin/bash"}`, "script_interpreters.bash-v1"},
++		{"empty identifier set is fine but null is not an object", `null`, ""},
++		{"non-object", `["/bin/python3"]`, "script_interpreters"},
++		{"empty path", `{"node-v1": ""}`, "script_interpreters.node-v1"},
++		{"relative path", `{"node-v1": "bin/node"}`, "absolute"},
++		{"non-string path", `{"node-v1": 42}`, "script_interpreters.node-v1"},
++	}
++	// Windows has two more not-absolute shapes the production check
++	// (filepath.IsAbs) must reject exactly like a relative POSIX path: a
++	// drive-relative path and a rooted path without a volume.
++	if runtime.GOOS == "windows" {
++		cases = append(cases,
++			rejection{"drive-relative path", `{"node-v1": "C:tools\\node.exe"}`, "absolute"},
++			rejection{"rooted path without a volume", `{"node-v1": "\\tools\\node.exe"}`, "absolute"},
++		)
++	}
++	for _, testCase := range cases {
++		t.Run(testCase.name, func(t *testing.T) {
++			config, err := load(t, base+`, "script_interpreters": `+testCase.value+`}`)
++			if testCase.want == "" {
++				if err != nil {
++					t.Fatalf("null bindings were rejected: %v", err)
++				}
++				if len(config.ScriptInterpreters) != 0 {
++					t.Fatalf("null bindings = %v, want empty", config.ScriptInterpreters)
++				}
++				return
++			}
++			if err == nil || !strings.Contains(err.Error(), testCase.want) {
++				t.Fatalf("err = %v, want mention of %q", err, testCase.want)
++			}
++		})
++	}
++}
+diff --git a/internal/godriver/identity.go b/internal/godriver/identity.go
+index 24828b48..c7e3cd22 100644
+--- a/internal/godriver/identity.go
++++ b/internal/godriver/identity.go
+@@ -129,3 +129,43 @@ func (identity ExecutableIdentity) matches(path, digest string, size int64) erro
+ 	}
+ 	return nil
+ }
++
++// The entry points below are the shared executable-identity primitives
++// the script worker reuses. They are the same checks the go-v1 worker
++// applies to the manager executable — canonical physical path, regular file,
++// single link, open-then-hash, native image header — so both workers agree
++// on what an installed identity is and a fix to one reaches the other.
++
++// ResolveManagerIdentity canonicalizes path to the installed manager file,
++// rejects substitution, and hashes the bytes. See resolveExecutableIdentity.
++func ResolveManagerIdentity(path string) (ExecutableIdentity, error) {
++	return resolveExecutableIdentity(path)
++}
++
++// MatchesExpectation compares an identity proof carried over a worker
++// protocol to the recorded identity.
++func (identity ExecutableIdentity) MatchesExpectation(path, digest string, size int64) error {
++	return identity.matches(path, digest, size)
++}
++
++// CanonicalPhysicalPath resolves every link in path to the file it really
++// names, including Windows directory junctions EvalSymlinks cannot follow.
++func CanonicalPhysicalPath(path string) (string, error) {
++	return physicalPath(path)
++}
++
++// HasMultipleLinks reports whether the file carries more than one filesystem
++// link or is a reparse point, which is substitution rather than identity.
++func HasMultipleLinks(path string, info fs.FileInfo) (bool, error) {
++	return artifactHasMultipleLinks(path, info)
++}
++
++// NativeExecutableHeader reports whether header carries a native executable
++// image magic: ELF or Mach-O (including fat binaries) on unix, MZ on
++// Windows. It is the same judgment validateLauncher applies to the Go
++// launcher — a wrapper script or batch file is not a native executable —
++// shared so the script worker's interpreter gate cannot drift from the
++// go-v1 worker's.
++func NativeExecutableHeader(header []byte) bool {
++	return nativeExecutableHeader(header)
++}
+diff --git a/internal/install/draftaudit_test.go b/internal/install/draftaudit_test.go
+index b59dac82..0694d0b2 100644
+--- a/internal/install/draftaudit_test.go
++++ b/internal/install/draftaudit_test.go
+@@ -1282,7 +1282,7 @@ func TestDraftAuditEnforcedScriptRefused(t *testing.T) {
+ 	cfg := draftTestConfig(home, t.TempDir())
+ 	result := draftProjectResult(cfg, project, home, true)
+ 	if result.Status != "failed" ||
+-		!strings.Contains(strings.Join(result.Errors, ";"), "script_execution_policy_unsupported") {
++		!strings.Contains(strings.Join(result.Errors, ";"), "script_execution_control_unavailable") {
+ 		t.Fatalf("enforced result = %+v, want scriptpolicy refusal", result)
+ 	}
+ }
+diff --git a/internal/install/draftruntime_test.go b/internal/install/draftruntime_test.go
+index dfed597f..cfd6756c 100644
+--- a/internal/install/draftruntime_test.go
++++ b/internal/install/draftruntime_test.go
+@@ -388,7 +388,7 @@ func TestDraftLocalEnforcedCommandRefused(t *testing.T) {
+ 	resolveDraftForInstall(t, project, home, payload)
+ 	result := draftLocalInstall(t, home, project, false)
+ 	if result.Status != "failed" ||
+-		!strings.Contains(strings.Join(result.Errors, ";"), "script_execution_policy_unsupported") {
++		!strings.Contains(strings.Join(result.Errors, ";"), "script_execution_control_unavailable") {
+ 		t.Fatalf("result = %+v, want scriptpolicy refusal", result)
+ 	}
+ 	assertNoInstallSideEffects(t, project, home)
+diff --git a/internal/install/scriptpolicy_test.go b/internal/install/scriptpolicy_test.go
+index dec0cf45..f550f1d5 100644
+--- a/internal/install/scriptpolicy_test.go
++++ b/internal/install/scriptpolicy_test.go
+@@ -14,8 +14,9 @@ import (
+ 
+ // schema8ScriptSkill creates a tagged schema-8 skill whose single script
+ // command is enforced or declared-only. It is the install-side twin of the
+-// suite's valid-script-worker-enforced schema case.
+-func (e *env) schema8ScriptSkill(name string, enforced bool) {
++// suite's valid-script-worker-enforced schema case. The enforced arm binds
++// the given closed interpreter identifier.
++func (e *env) schema8ScriptSkill(name string, enforced bool, interpreter ...string) {
+ 	e.t.Helper()
+ 	dir := filepath.Join(e.skillsRoot, name)
+ 	if err := os.MkdirAll(dir, 0o755); err != nil {
+@@ -30,8 +31,12 @@ func (e *env) schema8ScriptSkill(name string, enforced bool) {
+ 		"win_path":  "scripts/" + name + "-tool",
+ 	}
+ 	if enforced {
++		bound := "python3-v1"
++		if len(interpreter) != 0 {
++			bound = interpreter[0]
++		}
+ 		command["execution_policy"] = skillspec.ScriptExecutionPolicy
+-		command["interpreter"] = "python3-v1"
++		command["interpreter"] = bound
+ 	}
+ 	payload, _ := json.MarshalIndent(map[string]any{
+ 		"schema_version": 8,
+@@ -50,27 +55,40 @@ func (e *env) schema8ScriptSkill(name string, enforced bool) {
+ 
+ // An enforced command must not reach a shim. Before the policy existed the
+ // manifest was rejected outright by the supported-schema gate; admitting
+-// schema 8 removed that accident, so the refusal has to be deliberate.
++// schema 8 removed that accident, so the refusal has to be deliberate. The
++// implemented policy now refuses in the preflight with
++// `script_execution_control_unavailable` naming the missing controls, for
++// each closed interpreter identifier.
+ func TestEnforcedScriptCommandIsRefusedAtInstall(t *testing.T) {
+ 	t.Parallel()
+-	e := newEnv(t)
+-	e.schema8ScriptSkill("enforced-skill", true)
+-	e.declare("enforced-skill")
++	for _, interpreter := range []string{"node-v1", "python3-v1"} {
++		t.Run(interpreter, func(t *testing.T) {
++			t.Parallel()
++			e := newEnv(t)
++			e.schema8ScriptSkill("enforced-skill", true, interpreter)
++			e.declare("enforced-skill")
+ 
+-	result := e.install(Options{})
+-	if result.Status == "ok" {
+-		t.Fatalf("an enforced script command installed: %+v", result)
+-	}
+-	reported := strings.Join(append(result.Errors, result.Messages...), "\n")
+-	if !strings.Contains(reported, scriptpolicy.PolicyUnsupported) {
+-		t.Fatalf("install did not report %s: %s", scriptpolicy.PolicyUnsupported, reported)
+-	}
+-	// The forbidden outcome is the shim, not just the exit status: a partial
+-	// install that still published the launcher would run the package code
+-	// uncontained even though the run reported a failure.
+-	shim := filepath.Join(e.project, ".agents", "bin", shimName("enforced-skill-tool"))
+-	if _, err := os.Lstat(shim); err == nil {
+-		t.Fatal("a shim was published for an enforced script command")
++			result := e.install(Options{})
++			if result.Status == "ok" {
++				t.Fatalf("an enforced script command installed: %+v", result)
++			}
++			reported := strings.Join(append(result.Errors, result.Messages...), "\n")
++			if !strings.Contains(reported, scriptpolicy.ControlUnavailable) {
++				t.Fatalf("install did not report %s: %s", scriptpolicy.ControlUnavailable, reported)
++			}
++			for _, missing := range scriptpolicy.MissingControls() {
++				if !strings.Contains(reported, missing) {
++					t.Fatalf("install refusal does not name missing control %q: %s", missing, reported)
++				}
++			}
++			// The forbidden outcome is the shim, not just the exit status: a partial
++			// install that still published the launcher would run the package code
++			// uncontained even though the run reported a failure.
++			shim := filepath.Join(e.project, ".agents", "bin", shimName("enforced-skill-tool"))
++			if _, err := os.Lstat(shim); err == nil {
++				t.Fatal("a shim was published for an enforced script command")
++			}
++		})
+ 	}
+ }
+ 
+@@ -114,15 +132,32 @@ func TestActiveScriptCommandsRefusesEnforcedCommand(t *testing.T) {
+ 	if err == nil {
+ 		t.Fatal("the shim writer accepted an enforced script command")
+ 	}
+-	if scriptpolicy.Code(err) != scriptpolicy.PolicyUnsupported {
+-		t.Fatalf("Code = %q, want %q", scriptpolicy.Code(err), scriptpolicy.PolicyUnsupported)
++	if scriptpolicy.Code(err) != scriptpolicy.ControlUnavailable {
++		t.Fatalf("Code = %q, want %q", scriptpolicy.Code(err), scriptpolicy.ControlUnavailable)
+ 	}
+ 	if !strings.Contains(err.Error(), "skill.enforced") {
+ 		t.Fatalf("refusal does not name the command: %v", err)
+ 	}
+ 
++	// An unknown policy keeps the original refusal at this layer too.
++	node.Spec.Commands["enforced"] = skillspec.Command{
++		Name: "enforced", Type: "script", UnixPath: "scripts/enforced",
++		ExecutionPolicy: "script-worker-v9", Interpreter: "node-v1",
++	}
++	_, err = activeScriptCommands(node, node.ActiveCommands())
++	if err == nil {
++		t.Fatal("the shim writer accepted an unknown execution policy")
++	}
++	if scriptpolicy.Code(err) != scriptpolicy.PolicyUnsupported {
++		t.Fatalf("Code = %q, want %q", scriptpolicy.Code(err), scriptpolicy.PolicyUnsupported)
++	}
++
+ 	// An enforced command that no edge activates is not staged at all, so the
+ 	// remaining declared-only command still reaches the writer normally.
++	node.Spec.Commands["enforced"] = skillspec.Command{
++		Name: "enforced", Type: "script", UnixPath: "scripts/enforced",
++		ExecutionPolicy: skillspec.ScriptExecutionPolicy, Interpreter: "node-v1",
++	}
+ 	node.Edges = []closure.Edge{{Consumer: closure.ProjectEdge, Mode: "runtime", Commands: []string{"plain"}}}
+ 	commands, err := activeScriptCommands(node, node.ActiveCommands())
+ 	if err != nil {
+diff --git a/internal/scriptpolicy/conformance_test.go b/internal/scriptpolicy/conformance_test.go
+index 8cbdab4f..adf1ef3a 100644
+--- a/internal/scriptpolicy/conformance_test.go
++++ b/internal/scriptpolicy/conformance_test.go
+@@ -2,6 +2,7 @@ package scriptpolicy
+ 
+ import (
+ 	"encoding/json"
++	"errors"
+ 	"os"
+ 	"path/filepath"
+ 	"sort"
+@@ -16,11 +17,12 @@ import (
+ // the file is checked by name in TestScriptHostExecutionPolicySectionsAreAllClassified,
+ // so a section this build does not read can never arrive unnoticed.
+ type scriptHostExecutionPolicyVector struct {
+-	SchemaVersion   int      `json:"schema_version"`
+-	ProtocolVersion string   `json:"protocol_version"`
+-	ExecutionPolicy string   `json:"execution_policy"`
+-	Interpreters    []string `json:"interpreters"`
+-	OptInCases      []struct {
++	SchemaVersion    int      `json:"schema_version"`
++	ProtocolVersion  string   `json:"protocol_version"`
++	ExecutionPolicy  string   `json:"execution_policy"`
++	Interpreters     []string `json:"interpreters"`
++	MandatoryControl []string `json:"mandatory_controls"`
++	OptInCases       []struct {
+ 		Name            string  `json:"name"`
+ 		ManifestSchema  int     `json:"manifest_schema"`
+ 		ExecutionPolicy *string `json:"execution_policy"`
+@@ -28,6 +30,17 @@ type scriptHostExecutionPolicyVector struct {
+ 		Mode            *string `json:"mode"`
+ 		Accepted        bool    `json:"accepted"`
+ 	} `json:"opt_in_cases"`
++	PreflightCases []struct {
++		Name                  string  `json:"name"`
++		Operation             string  `json:"operation"`
++		ExpectedError         *string `json:"expected_error"`
++		InvocationSucceeds    bool    `json:"invocation_succeeds"`
++		WorkerStarted         bool    `json:"worker_started"`
++		MandatoryControlAvail *bool   `json:"mandatory_control_available"`
++		InventoryAvailability *string `json:"inventory_availability"`
++		ProbeResult           *string `json:"probe_result"`
++		EvidenceStatus        *string `json:"evidence_status"`
++	} `json:"preflight_cases"`
+ }
+ 
+ // Section classifications. Every top-level section of the published family
+@@ -37,11 +50,18 @@ const (
+ 	// consumedHere: this file drives the section against curator's behaviour.
+ 	consumedHere = "consumed by this package"
+ 	// refusedBeforeReached: the section describes worker behaviour that only a
+-	// manager implementing script-worker-v1 can exhibit. curator refuses every
+-	// enforced command at admission (manager profile §3.6), so no run of this
+-	// build can reach it. TestARefusalPrecedesEveryWorkerSurface asserts the
+-	// refusal that makes that true, instead of leaving the section unread.
++	// manager past the preflight can exhibit. curator refuses every enforced
++	// command at admission — with control-unavailable while mandatory
++	// controls are missing, with policy-unsupported for an unknown policy —
++	// so no run of this build can reach it. TestARefusalPrecedesEveryWorkerSurface
++	// asserts the refusals that make that true, instead of leaving the
++	// section unread.
+ 	refusedBeforeReached = "unreachable: curator refuses enforced commands before any worker surface"
++	// preflightPartial: R1 drives the two mandatory-control-unavailable
++	// refusal cases (install and invoke) and records the three
++	// host-conditional success cases as R3-owned. A new case fails the
++	// consumer rather than being silently ignored.
++	preflightPartial = "partially consumed: install/invoke refusal driven here, host-conditional success owned by R3"
+ 	// notImplementedYet: real curator surface that this build does not yet
+ 	// carry. Named with its owner so the gap is declared, not silent.
+ 	notImplementedYet = "not implemented: audit warning classes, owned by STORY-260822-2h0v9j"
+@@ -53,13 +73,13 @@ var scriptHostExecutionPolicySections = map[string]string{
+ 	"execution_policy":            consumedHere,
+ 	"interpreters":                consumedHere,
+ 	"opt_in_cases":                consumedHere,
++	"mandatory_controls":          consumedHere,
++	"preflight_cases":             preflightPartial,
+ 	"audit_label_cases":           notImplementedYet,
+ 	"capability_derivation_cases": refusedBeforeReached,
+ 	"capability_evidence_cases":   refusedBeforeReached,
+ 	"capability_evidence_record":  refusedBeforeReached,
+-	"mandatory_controls":          refusedBeforeReached,
+ 	"native_control_inventory":    refusedBeforeReached,
+-	"preflight_cases":             refusedBeforeReached,
+ }
+ 
+ // loadScriptHostExecutionPolicyVector reads the published family. The read is
+@@ -152,8 +172,9 @@ func TestScriptExecutionPolicyIdentityMatchesTheSuite(t *testing.T) {
+ // TestScriptExecutionOptInCases runs every published opt-in case through the
+ // two decisions curator owns: whether the manifest parses, and -- when it does
+ // -- whether the command is enforced or declared-only. An enforced command
+-// must additionally be refused with the closed §4.1.1 diagnostic, because this
+-// manager has no worker and the profile forbids installing it anyway.
++// must additionally be refused by the preflight with
++// `script_execution_control_unavailable`, because R1 cannot apply every
++// mandatory control and the profile forbids installing it anyway.
+ func TestScriptExecutionOptInCases(t *testing.T) {
+ 	_, payload := loadScriptHostExecutionPolicyVector(t)
+ 	var vector scriptHostExecutionPolicyVector
+@@ -203,8 +224,8 @@ func TestScriptExecutionOptInCases(t *testing.T) {
+ 				}
+ 				return
+ 			}
+-			if Code(admission) != PolicyUnsupported {
+-				t.Fatalf("Admit code = %q, want %q (error %v)", Code(admission), PolicyUnsupported, admission)
++			if Code(admission) != ControlUnavailable {
++				t.Fatalf("Admit code = %q, want %q (error %v)", Code(admission), ControlUnavailable, admission)
+ 			}
+ 			if parsed.Interpreter == "" {
+ 				t.Fatal("an enforced command parsed without its bound interpreter")
+@@ -217,9 +238,10 @@ func TestScriptExecutionOptInCases(t *testing.T) {
+ // classified `refusedBeforeReached` rest on. Every enforced shape the suite
+ // itself declares -- the closed policy identity against each published
+ // interpreter -- is refused at admission, so no control probe, no capability
+-// derivation, no evidence record and no preflight of this family is reachable
+-// from this build. When the worker lands, this test is what has to change
+-// first.
++// derivation, and no evidence record of this family is reachable from this
++// build. The implemented policy refuses with the preflight diagnostic
++// `script_execution_control_unavailable`; an unknown policy keeps the
++// unconditional `script_execution_policy_unsupported`.
+ func TestARefusalPrecedesEveryWorkerSurface(t *testing.T) {
+ 	_, payload := loadScriptHostExecutionPolicyVector(t)
+ 	var vector scriptHostExecutionPolicyVector
+@@ -240,8 +262,116 @@ func TestARefusalPrecedesEveryWorkerSurface(t *testing.T) {
+ 			if err != nil {
+ 				t.Fatalf("the suite's own enforced shape did not parse: %v", err)
+ 			}
+-			if Code(Admit(spec.Commands)) != PolicyUnsupported {
+-				t.Fatalf("an enforced %s command was not refused with %s", interpreter, PolicyUnsupported)
++			if Code(Admit(spec.Commands)) != ControlUnavailable {
++				t.Fatalf("an enforced %s command was not refused with %s", interpreter, ControlUnavailable)
++			}
++		})
++	}
++	t.Run("unknown-policy", func(t *testing.T) {
++		err := Admit(map[string]skillspec.Command{
++			"tool": {Name: "tool", Type: "script", ExecutionPolicy: "script-worker-v9", Interpreter: "python3-v1"},
++		})
++		if Code(err) != PolicyUnsupported {
++			t.Fatalf("an unknown policy was not refused with %s: %v", PolicyUnsupported, err)
++		}
++	})
++}
++
++// TestMandatoryControlsMatchTheSuite binds the 11-control implementation
++// table this build preflights to the suite's own bytes, in order. A protocol
++// that renamed, reordered, added, or removed a control would otherwise leave
++// curator preflighting a different set than the suite names.
++func TestMandatoryControlsMatchTheSuite(t *testing.T) {
++	_, payload := loadScriptHostExecutionPolicyVector(t)
++	var vector scriptHostExecutionPolicyVector
++	if err := json.Unmarshal(payload, &vector); err != nil {
++		t.Fatal(err)
++	}
++	if len(vector.MandatoryControl) == 0 {
++		t.Fatal("the suite published no mandatory controls")
++	}
++	table := make([]string, 0, len(MandatoryControls))
++	for _, control := range MandatoryControls {
++		table = append(table, control.Name)
++	}
++	if strings.Join(vector.MandatoryControl, ",") != strings.Join(table, ",") {
++		t.Fatalf("the suite publishes mandatory controls [%s]; this build preflights [%s]",
++			strings.Join(vector.MandatoryControl, ", "), strings.Join(table, ", "))
++	}
++	if len(MissingControls()) == 0 {
++		t.Fatal("the preflight reports every mandatory control implemented; R2/R3 own the remaining rows")
++	}
++}
++
++// TestPreflightRefusalCases drives the two mandatory-control-unavailable
++// cases of the published preflight family: install and invoke refuse with
++// `script_execution_control_unavailable` and start no worker. The three
++// host-conditional success cases are R3-owned; they are asserted present by
++// name so a renamed suite fails here rather than being silently skipped.
++func TestPreflightRefusalCases(t *testing.T) {
++	_, payload := loadScriptHostExecutionPolicyVector(t)
++	var vector scriptHostExecutionPolicyVector
++	if err := json.Unmarshal(payload, &vector); err != nil {
++		t.Fatal(err)
++	}
++	if len(vector.PreflightCases) == 0 {
++		t.Fatal("the suite published no preflight cases")
++	}
++	byName := map[string]int{}
++	for index, testCase := range vector.PreflightCases {
++		byName[testCase.Name] = index
++	}
++	for _, name := range []string{
++		"mandatory-control-unavailable-at-install",
++		"mandatory-control-unavailable-at-invocation",
++		"linux-pids-max-probe-available-evidence-applied-invocation-succeeds",
++		"linux-pids-max-probe-unavailable-evidence-unavailable-invocation-succeeds",
++		"fixed-unavailable-control-does-not-reject",
++	} {
++		if _, ok := byName[name]; !ok {
++			t.Fatalf("the suite no longer publishes preflight case %q", name)
++		}
++	}
++	if len(vector.PreflightCases) != 5 {
++		names := make([]string, 0, len(vector.PreflightCases))
++		for _, testCase := range vector.PreflightCases {
++			names = append(names, testCase.Name)
++		}
++		t.Fatalf("the suite publishes preflight cases [%s]; this build classifies exactly five", strings.Join(names, ", "))
++	}
++	for _, name := range []string{
++		"mandatory-control-unavailable-at-install",
++		"mandatory-control-unavailable-at-invocation",
++	} {
++		t.Run(name, func(t *testing.T) {
++			testCase := vector.PreflightCases[byName[name]]
++			if testCase.ExpectedError == nil || *testCase.ExpectedError != ControlUnavailable {
++				t.Fatalf("case %q expects error %v, want %q", name, testCase.ExpectedError, ControlUnavailable)
++			}
++			if testCase.InvocationSucceeds || testCase.WorkerStarted {
++				t.Fatalf("case %q succeeds or starts a worker, want refusal before any worker", name)
++			}
++			spec, err := skillspec.Load(materializeScriptSkill(t, 8, map[string]any{
++				"type":             "script",
++				"unix_path":        "scripts/tool",
++				"execution_policy": vector.ExecutionPolicy,
++				"interpreter":      "python3-v1",
++			}))
++			if err != nil {
++				t.Fatalf("the suite's own enforced shape did not parse: %v", err)
++			}
++			admission := Admit(spec.Commands)
++			if Code(admission) != ControlUnavailable {
++				t.Fatalf("Admit code = %q, want %q (error %v)", Code(admission), ControlUnavailable, admission)
++			}
++			var refusal *Error
++			if !errors.As(admission, &refusal) {
++				t.Fatalf("Admit did not produce a *scriptpolicy.Error: %T", admission)
++			}
++			for _, missing := range MissingControls() {
++				if !strings.Contains(refusal.Detail, missing) {
++					t.Fatalf("refusal detail %q does not name missing control %q", refusal.Detail, missing)
++				}
+ 			}
+ 		})
+ 	}
+diff --git a/internal/scriptpolicy/scriptpolicy.go b/internal/scriptpolicy/scriptpolicy.go
+index 18d841ac..effbd352 100644
+--- a/internal/scriptpolicy/scriptpolicy.go
++++ b/internal/scriptpolicy/scriptpolicy.go
+@@ -2,11 +2,12 @@
+ // script execution policy `script-worker-v1` (Spec §4.1.1, manager profile
+ // §3.6).
+ //
+-// curator parses the policy and does not implement it. Those are two separate
++// curator parses the policy and admits it in two tiers. Those are two separate
+ // statements and the spec treats them separately: a schema-8 manifest that
+ // selects the policy is a valid document, so `skillspec.Load` accepts it and
+ // the published schema cases that mark it valid stay green. Admission is the
+-// manager's own answer, and the profile leaves it no room —
++// manager's own answer, and the profile leaves it no room for an unknown
++// policy —
+ //
+ //	A manager that does not implement this policy MUST reject such a command
+ //	with `script_execution_policy_unsupported`. It MUST NOT install the
+@@ -18,27 +19,92 @@
+ // merely reads a package's commands back to an operator, asks this package
+ // first and fails closed on an enforced command.
+ //
+-// Refusal is unconditional because this manager has no worker. When the worker
+-// lands, this package is where the refusal is replaced by real containment;
+-// nothing above it has to move, because nothing above it decides the policy.
++// For the implemented `script-worker-v1` policy the manager enters the spec's
++// preflight instead: it enumerates the 11 mandatory portable controls in
++// MandatoryControls, and while any control is unimplemented the install and
++// the invocation refuse with `script_execution_control_unavailable` naming
++// the missing controls, before any worker starts. No enforced script launches
++// uncontained while that list is non-empty.
+ package scriptpolicy
+ 
+ import (
+ 	"errors"
+ 	"sort"
++	"strings"
+ 
+ 	"github.com/relux-works/curator/internal/skillspec"
+ )
+ 
+-// PolicyUnsupported is the closed §4.1.1 diagnostic for an enforced command
+-// read by a manager that does not implement `script-worker-v1`. State and
+-// Severity are the manager profile's fixed pair for it.
++// Closed §4.1.1 diagnostics for an enforced command. State and Severity are
++// the manager profile's fixed pairs for them.
+ const (
++	// PolicyUnsupported is read by a manager that does not implement the
++	// selected execution policy at all.
+ 	PolicyUnsupported = "script_execution_policy_unsupported"
+-	StateUnsupported  = "unsupported"
+-	SeverityError     = "error"
++	// ControlUnavailable is read when the policy is implemented but a
++	// mandatory portable control cannot be applied on this host, at shim
++	// install or update and again before worker launch.
++	ControlUnavailable = "script_execution_control_unavailable"
++	StateUnsupported   = "unsupported"
++	SeverityError      = "error"
+ )
+ 
++// MandatoryControl is one entry of the 11-control implementation table. The
++// order is the vector order of `mandatory_controls` in
++// script-host-execution-policy.json. Owner names the residual leaf that
++// delivers an unimplemented control; it is empty once Implemented is true.
++type MandatoryControl struct {
++	Name        string
++	Implemented bool
++	Owner       string
++}
++
++// MandatoryControls is the R1 implementation table. The six launch-path
++// controls are production code behind scriptworker; the five
++// declaration-derived and evidence controls are owned by R2/R3, so every
++// install and every invocation of an enforced command still refuses until
++// those leaves flip their rows.
++var MandatoryControls = []MandatoryControl{
++	{Name: "fixed-process-graph", Implemented: true},
++	{Name: "worker-identity-verification", Implemented: true},
++	{Name: "interpreter-resolution-and-identity-verification", Implemented: true},
++	{Name: "manager-built-environment", Owner: "R2"},
++	{Name: "manager-built-path", Owner: "R2"},
++	{Name: "offline-network-configuration", Owner: "R2"},
++	{Name: "operation-private-runtime-area", Implemented: true},
++	{Name: "explicit-standard-stream-binding", Implemented: true},
++	{Name: "inventory-controls-applied", Owner: "R3"},
++	{Name: "closed-script-capability-evidence-record", Owner: "R3"},
++	{Name: "worker-domain-teardown", Implemented: true},
++}
++
++// MissingControls lists the mandatory portable controls this build cannot yet
++// apply, in vector order. A non-empty list means the worker must not launch.
++func MissingControls() []string {
++	var missing []string
++	for _, control := range MandatoryControls {
++		if !control.Implemented {
++			missing = append(missing, control.Name)
++		}
++	}
++	return missing
++}
++
++// ControlError builds the preflight refusal naming the missing controls.
++// Path is the manifest field path at install, or "" at invocation where no
++// manifest field is being read.
++func ControlError(path string) *Error {
++	return &Error{
++		DiagnosticCode: ControlUnavailable,
++		State:          StateUnsupported,
++		Severity:       SeverityError,
++		Path:           path,
++		Detail: "this manager cannot apply mandatory controls: " +
++			strings.Join(MissingControls(), ", ") +
++			"; enforced launch is refused until the control set is complete",
++	}
++}
++
+ // Error is an execution-policy refusal bound to a closed diagnostic. Path is
+ // the manifest field path that carries the policy, so an operator is pointed
+ // at the field rather than at the command.
+@@ -82,6 +148,11 @@ func Enforced(command skillspec.Command) bool {
+ // command-lexical order, so the reported command is the same on every host and
+ // every run. A nil return means every command is declared-only and installs
+ // through the ordinary schema-7 path unchanged.
++//
++// An unknown policy is refused with `script_execution_policy_unsupported`
++// exactly as before. The implemented `script-worker-v1` policy enters the
++// preflight: while MandatoryControls names missing controls the refusal is
++// `script_execution_control_unavailable` instead, and no shim is published.
+ func Admit(commands map[string]skillspec.Command) error {
+ 	names := make([]string, 0, len(commands))
+ 	for name := range commands {
+@@ -93,13 +164,18 @@ func Admit(commands map[string]skillspec.Command) error {
+ 		if !Enforced(command) {
+ 			continue
+ 		}
+-		return &Error{
+-			DiagnosticCode: PolicyUnsupported,
+-			State:          StateUnsupported,
+-			Severity:       SeverityError,
+-			Path:           "commands." + name + ".execution_policy",
+-			Detail: "this manager does not implement " + command.ExecutionPolicy +
+-				", and the policy forbids installing the command declared-only, downgrading it, or ignoring the field",
++		if command.ExecutionPolicy != skillspec.ScriptExecutionPolicy {
++			return &Error{
++				DiagnosticCode: PolicyUnsupported,
++				State:          StateUnsupported,
++				Severity:       SeverityError,
++				Path:           "commands." + name + ".execution_policy",
++				Detail: "this manager does not implement " + command.ExecutionPolicy +
++					", and the policy forbids installing the command declared-only, downgrading it, or ignoring the field",
++			}
++		}
++		if missing := MissingControls(); len(missing) != 0 {
++			return ControlError("commands." + name + ".execution_policy")
+ 		}
+ 	}
+ 	return nil
+diff --git a/internal/scriptpolicy/scriptpolicy_test.go b/internal/scriptpolicy/scriptpolicy_test.go
+index d78bb257..0ed476a4 100644
+--- a/internal/scriptpolicy/scriptpolicy_test.go
++++ b/internal/scriptpolicy/scriptpolicy_test.go
+@@ -37,8 +37,11 @@ func TestAdmitRefusesEnforcedCommandWithClosedDiagnostic(t *testing.T) {
+ 	if err == nil {
+ 		t.Fatal("an enforced command was admitted")
+ 	}
+-	if Code(err) != PolicyUnsupported {
+-		t.Fatalf("Code = %q, want %q", Code(err), PolicyUnsupported)
++	// The implemented policy enters the preflight: R1 cannot apply every
++	// mandatory control, so the refusal names control-unavailable and the
++	// missing controls rather than policy-unsupported.
++	if Code(err) != ControlUnavailable {
++		t.Fatalf("Code = %q, want %q", Code(err), ControlUnavailable)
+ 	}
+ 	var refusal *Error
+ 	if !errors.As(err, &refusal) {
+@@ -53,11 +56,44 @@ func TestAdmitRefusesEnforcedCommandWithClosedDiagnostic(t *testing.T) {
+ 	}
+ 	// The rendered message leads with the closed code so an operator reading a
+ 	// bare install failure sees the diagnostic without a JSON surface.
+-	if !strings.Contains(err.Error(), PolicyUnsupported) {
+-		t.Fatalf("Error() = %q, want it to name %q", err.Error(), PolicyUnsupported)
++	if !strings.Contains(err.Error(), ControlUnavailable) {
++		t.Fatalf("Error() = %q, want it to name %q", err.Error(), ControlUnavailable)
++	}
++	// The refusal names every missing control, so the operator reads what the
++	// manager cannot apply rather than a bare verdict.
++	for _, missing := range MissingControls() {
++		if !strings.Contains(refusal.Detail, missing) {
++			t.Fatalf("Detail = %q, want it to name %q", refusal.Detail, missing)
++		}
++	}
++}
++
++// An unknown execution policy keeps the original unconditional refusal: the
++// manager does not implement it at all, so the preflight never starts and
++// the message states the three things the policy forbids.
++func TestAdmitRefusesUnknownPolicyUnchanged(t *testing.T) {
++	command := skillspec.Command{
++		Name: "future-tool", Type: "script", UnixPath: "scripts/future",
++		ExecutionPolicy: "script-worker-v9", Interpreter: "python3-v1",
++	}
++	err := Admit(map[string]skillspec.Command{"future-tool": command})
++	if err == nil {
++		t.Fatal("an unknown execution policy was admitted")
++	}
++	if Code(err) != PolicyUnsupported {
++		t.Fatalf("Code = %q, want %q", Code(err), PolicyUnsupported)
++	}
++	var refusal *Error
++	if !errors.As(err, &refusal) {
++		t.Fatalf("Admit did not produce a *scriptpolicy.Error: %T", err)
++	}
++	if refusal.State != StateUnsupported || refusal.Severity != SeverityError {
++		t.Fatalf("state/severity = %q/%q, want %q/%q",
++			refusal.State, refusal.Severity, StateUnsupported, SeverityError)
++	}
++	if refusal.Path != "commands.future-tool.execution_policy" {
++		t.Fatalf("Path = %q", refusal.Path)
+ 	}
+-	// The refusal states the three things the policy forbids, so the message
+-	// cannot be read as "curator chose not to install this".
+ 	for _, forbidden := range []string{"declared-only", "downgrading", "ignoring"} {
+ 		if !strings.Contains(refusal.Detail, forbidden) {
+ 			t.Fatalf("Detail = %q, want it to name %q", refusal.Detail, forbidden)
+@@ -95,9 +131,15 @@ func TestCodeIgnoresForeignErrors(t *testing.T) {
+ 	wrapped := fmt.Errorf("skill.command: %w", Admit(map[string]skillspec.Command{
+ 		"t": {Name: "t", Type: "script", ExecutionPolicy: skillspec.ScriptExecutionPolicy},
+ 	}))
+-	if Code(wrapped) != PolicyUnsupported {
++	if Code(wrapped) != ControlUnavailable {
+ 		t.Fatalf("Code(wrapped) = %q", Code(wrapped))
+ 	}
++	unimplemented := fmt.Errorf("skill.command: %w", Admit(map[string]skillspec.Command{
++		"t": {Name: "t", Type: "script", ExecutionPolicy: "script-worker-v9"},
++	}))
++	if Code(unimplemented) != PolicyUnsupported {
++		t.Fatalf("Code(unimplemented) = %q", Code(unimplemented))
++	}
+ }
+ 
+ func TestErrorRendersWithoutPath(t *testing.T) {
+diff --git a/internal/scriptworker/buffer.go b/internal/scriptworker/buffer.go
+new file mode 100644
+index 00000000..ad439330
+--- /dev/null
++++ b/internal/scriptworker/buffer.go
+@@ -0,0 +1,50 @@
++package scriptworker
++
++import (
++	"bytes"
++	"errors"
++	"io"
++	"sync"
++)
++
++var errOutputLimit = errors.New("interpreter output limit exceeded")
++
++type boundedBuffer struct {
++	buffer bytes.Buffer
++	budget *outputBudget
++	err    error
++}
++
++type outputBudget struct {
++	mu        sync.Mutex
++	remaining int64
++	err       error
++}
++
++func (buffer *boundedBuffer) Write(payload []byte) (int, error) {
++	buffer.budget.mu.Lock()
++	defer buffer.budget.mu.Unlock()
++	if buffer.budget.remaining <= 0 {
++		buffer.err = errOutputLimit
++		buffer.budget.err = errOutputLimit
++		return 0, buffer.err
++	}
++	written := len(payload)
++	if int64(written) > buffer.budget.remaining {
++		written = int(buffer.budget.remaining)
++	}
++	_, _ = buffer.buffer.Write(payload[:written])
++	buffer.budget.remaining -= int64(written)
++	if written != len(payload) {
++		buffer.err = errOutputLimit
++		buffer.budget.err = errOutputLimit
++		return written, buffer.err
++	}
++	return written, nil
++}
++
++func (buffer *boundedBuffer) Bytes() []byte {
++	return append([]byte(nil), buffer.buffer.Bytes()...)
++}
++
++var _ io.Writer = (*boundedBuffer)(nil)
+diff --git a/internal/scriptworker/client.go b/internal/scriptworker/client.go
+new file mode 100644
+index 00000000..fd17e412
+--- /dev/null
++++ b/internal/scriptworker/client.go
+@@ -0,0 +1,364 @@
++package scriptworker
++
++import (
++	"context"
++	"crypto/rand"
++	"encoding/hex"
++	"io"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strings"
++	"time"
++
++	"github.com/relux-works/curator/internal/godriver"
++)
++
++// workerStderrLimit bounds the worker's own diagnostic stream.
++const workerStderrLimit = int64(64 * 1024)
++
++// workerShutdownGrace bounds the join after the session completes.
++const workerShutdownGrace = 5 * time.Second
++
++// defaultOutputLimit bounds one captured interpreter output. Direct
++// pass-through streaming stays permitted where the manager binds the streams
++// itself; this bound covers only what the session captures.
++const defaultOutputLimit = int64(16 * 1024 * 1024)
++
++// launchHooks carries test-only seams. afterResolve runs after the initial
++// identity resolution and before the launch-boundary recheck, so a test can
++// replace the manager bytes in that window and prove the recheck refuses.
++// Production passes nil. The hook cannot skip any check; it only makes the
++// race under test deterministic.
++type launchHooks struct {
++	afterResolve func()
++}
++
++// runSession performs the manager half of one worker session: it resolves
++// the manager and interpreter identities, creates the operation-private
++// runtime area, re-verifies identity at the launch boundary, starts exactly
++// that executable in the fixed hidden mode, sends one canonical bounded
++// request with a fresh nonce, requires the identity proof, runs the single
++// invocation, and terminates the complete worker domain before returning.
++func runSession(ctx context.Context, request LaunchRequest, hooks *launchHooks) (Result, error) {
++	managerPath := request.ManagerPath
++	if managerPath == "" {
++		if path, err := os.Executable(); err == nil {
++			managerPath = path
++		} else {
++			managerPath = os.Args[0]
++		}
++	}
++	identity, err := godriver.ResolveManagerIdentity(managerPath)
++	if err != nil {
++		return Result{}, workerDiagnostic(err)
++	}
++	interpreter, err := ResolveInterpreter(request.InterpreterID, request.Interpreters, request.ForbiddenRoots)
++	if err != nil {
++		return Result{}, err
++	}
++	if err := checkLaunchRequest(request); err != nil {
++		return Result{}, err
++	}
++	private, err := createPrivateArea(request.PrivateBase, request.ForbiddenRoots)
++	if err != nil {
++		return Result{}, err
++	}
++	defer func() { _ = os.RemoveAll(private.base) }()
++
++	nonce, err := sessionToken()
++	if err != nil {
++		return Result{}, diagnosticErr(CodeWorkerProtocolInvalid, err, "cannot derive a session nonce")
++	}
++	if hooks != nil && hooks.afterResolve != nil {
++		hooks.afterResolve()
++	}
++	// Re-verify immediately before launch so a replacement race between the
++	// first check and exec cannot widen the process graph.
++	if err := identity.Verify(); err != nil {
++		return Result{}, workerDiagnostic(err)
++	}
++	if err := VerifyInterpreter(interpreter); err != nil {
++		return Result{}, err
++	}
++
++	client := &workerClient{nonce: nonce}
++	domain, err := prepareScriptDomain()
++	if err != nil {
++		return Result{}, err
++	}
++	client.domain = domain
++	defer client.teardown()
++
++	command := exec.CommandContext(ctx, identity.Path, WorkerMode) // #nosec G204 -- identity-verified re-execution of this manager
++	command.Dir = filepath.Dir(identity.Path)
++	command.Env = scriptWorkerEnvironment()
++	command.SysProcAttr = scriptWorkerSysProcAttr()
++	command.Cancel = func() error {
++		terminateScriptDomain(command, domain)
++		return nil
++	}
++	command.WaitDelay = workerShutdownGrace
++	client.stderr = &boundedBuffer{budget: &outputBudget{remaining: workerStderrLimit}}
++	command.Stderr = client.stderr
++	stdin, err := command.StdinPipe()
++	if err != nil {
++		return Result{}, diagnosticErr(CodeWorkerProtocolInvalid, err, "cannot open the worker request channel")
++	}
++	stdout, err := command.StdoutPipe()
++	if err != nil {
++		return Result{}, diagnosticErr(CodeWorkerProtocolInvalid, err, "cannot open the worker response channel")
++	}
++	client.command, client.stdin, client.stdout = command, stdin, stdout
++	if err := domain.launch(command); err != nil {
++		return Result{}, err
++	}
++
++	wire := workerRequest{
++		Version:          protocolVersion,
++		ExecutablePath:   identity.Path,
++		ExecutableSHA256: identity.SHA256,
++		ExecutableSize:   identity.Size,
++		InterpreterID:    interpreter.ID,
++		InterpreterPath:  interpreter.Path,
++		InterpreterSHA:   interpreter.SHA256,
++		InterpreterSize:  interpreter.Size,
++		RuntimeEntry:     request.RuntimeEntry,
++		Args:             append([]string(nil), request.Args...),
++		Environment:      append([]string(nil), request.Environment...),
++		WorkingDir:       request.WorkingDir,
++		PrivateTmp:       private.tmp,
++		PrivateConfig:    private.config,
++		PrivateCache:     private.cache,
++		Stdin:            append([]byte(nil), request.Stdin...),
++		StdinIsNull:      request.Stdin == nil,
++		OutputLimit:      defaultOutputLimit,
++	}
++	if err := client.send(workerMessage{Kind: kindRequest, Nonce: nonce, Request: &wire}); err != nil {
++		return Result{}, err
++	}
++	ready, err := client.receive(kindReady)
++	if err != nil {
++		return Result{}, err
++	}
++	if ready.Ready == nil {
++		return Result{}, diagnostic(CodeWorkerProtocolInvalid, "worker acknowledgement carries no identity proof")
++	}
++	if err := identity.MatchesExpectation(ready.Ready.ExecutablePath, ready.Ready.ExecutableSHA256, ready.Ready.ExecutableSize); err != nil {
++		return Result{}, workerDiagnostic(err)
++	}
++	if err := interpreter.matchesExpectation(interpreter.Path, ready.Ready.InterpreterSHA, ready.Ready.InterpreterSize); err != nil {
++		return Result{}, err
++	}
++	message, err := client.receive(kindResult)
++	if err != nil {
++		return Result{}, err
++	}
++	if message.Result == nil {
++		return Result{}, diagnostic(CodeWorkerProtocolInvalid, "worker result carries no invocation result")
++	}
++	result := message.Result
++	if result.Started != 1 {
++		return Result{}, diagnostic(CodeWorkerIdentityInvalid,
++			"worker started %d programs in this session, want exactly 1", result.Started)
++	}
++	if result.Overflow {
++		return Result{}, diagnostic(CodeWorkerProtocolInvalid, "interpreter output exceeded the capture bound")
++	}
++	return Result{Stdout: result.Stdout, Stderr: result.Stderr, ExitCode: result.ExitCode}, nil
++}
++
++// checkLaunchRequest fails fast on a malformed manager-side request before
++// any worker exists. The worker re-validates everything; this check only
++// moves the refusal earlier.
++func checkLaunchRequest(request LaunchRequest) error {
++	if request.RuntimeEntry == "" || !filepath.IsAbs(request.RuntimeEntry) {
++		return diagnostic(CodePackageInfluenceForbidden, "runtime entry is not an absolute manager-derived path")
++	}
++	for _, arg := range request.Args {
++		if strings.ContainsRune(arg, 0) {
++			return diagnostic(CodeWorkerProtocolInvalid, "argument vector carries a NUL byte")
++		}
++	}
++	if err := validateSessionEnvironment(request.Environment); err != nil {
++		return err
++	}
++	if request.WorkingDir == "" || !filepath.IsAbs(request.WorkingDir) {
++		return diagnostic(CodeWorkerProtocolInvalid, "working directory is not absolute")
++	}
++	if info, err := os.Stat(request.WorkingDir); err != nil || !info.IsDir() {
++		return diagnostic(CodeWorkerProtocolInvalid, "working directory is not a directory")
++	}
++	if request.PrivateBase == "" || !filepath.IsAbs(request.PrivateBase) {
++		return diagnostic(CodeWorkerProtocolInvalid, "private base is not absolute")
++	}
++	return nil
++}
++
++// privateArea is the operation-private runtime area: temporary,
++// configuration, and cache roots resolved independently of package data.
++type privateArea struct {
++	base   string
++	tmp    string
++	config string
++	cache  string
++}
++
++// createPrivateArea creates the operation-private runtime area below an
++// absolute manager-owned base outside every forbidden root.
++func createPrivateArea(base string, forbiddenRoots []string) (privateArea, error) {
++	physical, err := godriver.CanonicalPhysicalPath(base)
++	if err != nil {
++		return privateArea{}, diagnosticErr(CodeWorkerProtocolInvalid, err, "private base is unavailable")
++	}
++	info, err := os.Lstat(physical)
++	if err != nil || !info.IsDir() {
++		return privateArea{}, diagnosticErr(CodeWorkerProtocolInvalid, err, "private base is not a directory")
++	}
++	for _, root := range forbiddenRoots {
++		resolved, resolveErr := godriver.CanonicalPhysicalPath(root)
++		if resolveErr != nil {
++			continue
++		}
++		if physical == resolved || isBelow(physical, resolved) {
++			return privateArea{}, diagnostic(CodeWorkerProtocolInvalid, "private base is under a repository or runtime root")
++		}
++	}
++	operation, err := os.MkdirTemp(physical, ".curator-script-")
++	if err != nil {
++		return privateArea{}, diagnosticErr(CodeWorkerProtocolInvalid, err, "cannot create the operation-private runtime area")
++	}
++	area := privateArea{base: operation}
++	for _, leaf := range []struct {
++		name   string
++		target *string
++	}{
++		{"tmp", &area.tmp}, {"config", &area.config}, {"cache", &area.cache},
++	} {
++		path := filepath.Join(operation, leaf.name)
++		if err := os.Mkdir(path, 0o700); err != nil {
++			_ = os.RemoveAll(operation)
++			return privateArea{}, diagnosticErr(CodeWorkerProtocolInvalid, err, "cannot create the operation-private %s root", leaf.name)
++		}
++		*leaf.target = path
++	}
++	return area, nil
++}
++
++// workerClient is one parent-side worker session.
++type workerClient struct {
++	command *exec.Cmd
++	domain  *scriptDomain
++	stdin   io.WriteCloser
++	stdout  io.ReadCloser
++	stderr  *boundedBuffer
++
++	nonce string
++
++	finished bool
++	drained  bool
++}
++
++func (client *workerClient) send(message workerMessage) error {
++	if err := writeMessage(client.stdin, message); err != nil {
++		if code := DiagnosticCode(err); code != "" {
++			return err
++		}
++		return client.protocolFailure(err, "cannot send the %s message", message.Kind)
++	}
++	return nil
++}
++
++func (client *workerClient) receive(kind string) (workerMessage, error) {
++	message, err := readMessage(client.stdout)
++	if err != nil {
++		return workerMessage{}, client.protocolFailure(err, "cannot read the %s message", kind)
++	}
++	if message.Kind == kindFailure {
++		if message.Failure == nil || message.Failure.Code == "" {
++			return workerMessage{}, diagnostic(CodeWorkerProtocolInvalid, "worker reported an unstructured failure")
++		}
++		return workerMessage{}, &Diagnostic{Code: message.Failure.Code, Detail: message.Failure.Detail}
++	}
++	if message.Kind != kind {
++		return workerMessage{}, diagnostic(CodeWorkerProtocolInvalid, "worker sent %q, want %q", message.Kind, kind)
++	}
++	if message.Nonce != client.nonce {
++		return workerMessage{}, diagnostic(CodeWorkerProtocolInvalid, "worker response carries an unknown nonce")
++	}
++	return message, nil
++}
++
++// protocolFailure prefers the worker's own stable diagnostic when the session
++// channel closed because the worker rejected the session.
++func (client *workerClient) protocolFailure(cause error, format string, args ...any) error {
++	if detail := string(client.stderr.Bytes()); detail != "" {
++		return diagnosticErr(CodeWorkerProtocolInvalid, cause, format+": %s", append(args, detail)...)
++	}
++	return diagnosticErr(CodeWorkerProtocolInvalid, cause, format, args...)
++}
++
++// teardown terminates and joins the complete worker domain and discards the
++// session channel. It is safe to call more than once. The domain is
++// terminated before the worker is reaped, so no interpreter descendant can
++// outlive the invocation.
++func (client *workerClient) teardown() {
++	if client.finished {
++		return
++	}
++	client.finished = true
++	if client.stdin != nil {
++		_ = writeMessage(client.stdin, workerMessage{Kind: kindShutdown, Nonce: client.nonce})
++		_ = client.stdin.Close()
++	}
++	if client.command != nil && client.command.Process != nil {
++		if !client.drained {
++			drained := make(chan struct{})
++			go func() {
++				if client.stdout != nil {
++					_, _ = io.Copy(io.Discard, client.stdout)
++				}
++				close(drained)
++			}()
++			select {
++			case <-drained:
++			case <-time.After(workerShutdownGrace):
++			}
++		}
++		terminateScriptDomain(client.command, client.domain)
++		_ = client.command.Wait()
++	}
++	if client.stdout != nil {
++		_ = client.stdout.Close()
++	}
++	if client.domain != nil {
++		client.domain.close()
++	}
++}
++
++func sessionToken() (string, error) {
++	var raw [32]byte
++	if _, err := rand.Read(raw[:]); err != nil {
++		return "", err
++	}
++	return hex.EncodeToString(raw[:]), nil
++}
++
++// scriptWorkerEnvironment is the fixed bootstrap environment of the worker
++// process itself. It carries only indispensable operating-system process
++// variables.
++func scriptWorkerEnvironment() []string {
++	values := indispensableScriptEnvironment()
++	if values == nil {
++		values = map[string]string{}
++	}
++	keys := make([]string, 0, len(values))
++	for key := range values {
++		keys = append(keys, key)
++	}
++	environment := make([]string, 0, len(keys))
++	for _, key := range keys {
++		environment = append(environment, key+"="+values[key])
++	}
++	return environment
++}
+diff --git a/internal/scriptworker/client_test.go b/internal/scriptworker/client_test.go
+new file mode 100644
+index 00000000..121d7095
+--- /dev/null
++++ b/internal/scriptworker/client_test.go
+@@ -0,0 +1,309 @@
++package scriptworker
++
++import (
++	"bytes"
++	"context"
++	"encoding/json"
++	"errors"
++	"io"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"runtime"
++	"strconv"
++	"strings"
++	"testing"
++	"time"
++
++	"github.com/relux-works/curator/internal/godriver"
++	"github.com/relux-works/curator/internal/scriptpolicy"
++)
++
++// TestLaunchRefusesAtPreflight proves the production entry refuses before
++// anything starts while mandatory controls are missing, naming them.
++func TestLaunchRefusesAtPreflight(t *testing.T) {
++	result, err := Launch(context.Background(), LaunchRequest{})
++	if DiagnosticCode(err) != scriptpolicy.ControlUnavailable {
++		t.Fatalf("Launch error = %v, want %s", err, scriptpolicy.ControlUnavailable)
++	}
++	if len(result.Stdout) != 0 || len(result.Stderr) != 0 || result.ExitCode != 0 {
++		t.Fatalf("Launch result = %+v, want zero", result)
++	}
++	var refusal *scriptpolicy.Error
++	if !errors.As(err, &refusal) {
++		t.Fatalf("Launch error %T does not carry a *scriptpolicy.Error: %v", err, err)
++	}
++	for _, missing := range scriptpolicy.MissingControls() {
++		if !strings.Contains(refusal.Detail, missing) {
++			t.Fatalf("refusal detail %q does not name %q", refusal.Detail, missing)
++		}
++	}
++}
++
++// launchFixture is one manager-side session input over the stub interpreter.
++type launchFixture struct {
++	request LaunchRequest
++	stub    string
++	entry   string
++}
++
++func newLaunchFixture(t *testing.T, managerPath string) *launchFixture {
++	t.Helper()
++	root := mustPhysical(t, t.TempDir())
++	entry := filepath.Join(root, "store", "skill", "commit", "scripts", "tool")
++	writeTestFile(t, entry, []byte("print('tool')\n"), 0o644)
++	workDir := filepath.Join(root, "work")
++	if err := os.MkdirAll(workDir, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	privateBase := filepath.Join(root, "private")
++	if err := os.MkdirAll(privateBase, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	stub := mustPhysical(t, stubInterpreterBinary(t))
++	return &launchFixture{
++		request: LaunchRequest{
++			ManagerPath:    managerPath,
++			Interpreters:   map[string]string{"python3-v1": stub, "node-v1": stub},
++			ForbiddenRoots: []string{filepath.Join(root, "repo")},
++			InterpreterID:  "python3-v1",
++			RuntimeEntry:   entry,
++			Environment:    []string{"PATH=/nonexistent"},
++			WorkingDir:     workDir,
++			PrivateBase:    privateBase,
++		},
++		stub:  stub,
++		entry: entry,
++	}
++}
++
++// TestRunSessionHappyPath proves the manager half of the fixed session at
++// the real process boundary: launch-boundary recheck, fresh nonce,
++// identity proof, verbatim arguments, exit status, explicit environment
++// without inheritance, and private-area cleanup.
++func TestRunSessionHappyPath(t *testing.T) {
++	t.Setenv("STUB_INHERIT_PROBE", "leaked")
++	fixture := newLaunchFixture(t, os.Args[0])
++	fixture.request.Args = []string{"--verbose", "two words"}
++	fixture.request.Environment = append(fixture.request.Environment, "STUB_EXIT=0")
++	fixture.request.Stdin = []byte("hello\n")
++
++	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
++	defer cancel()
++	result, err := runSession(ctx, fixture.request, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if result.ExitCode != 0 {
++		t.Fatalf("exit code = %d, want 0 (stderr %q)", result.ExitCode, result.Stderr)
++	}
++	var report stubReport
++	if err := json.Unmarshal(result.Stdout, &report); err != nil {
++		t.Fatalf("cannot decode the stub report %q: %v", result.Stdout, err)
++	}
++	wantArgv := []string{fixture.stub, fixture.entry, "--verbose", "two words"}
++	if strings.Join(report.Argv, "\x00") != strings.Join(wantArgv, "\x00") {
++		t.Fatalf("argv = %q, want %q", report.Argv, wantArgv)
++	}
++	if report.Executable != fixture.stub {
++		t.Fatalf("executable = %q, want the resolved interpreter %q", report.Executable, fixture.stub)
++	}
++	if report.Stdin != "hello\n" {
++		t.Fatalf("stdin = %q, want the explicit payload", report.Stdin)
++	}
++	if report.Probe != "" {
++		t.Fatalf("probe = %q, want no inherited environment", report.Probe)
++	}
++	// The operation-private area is removed before the invocation returns.
++	entries, err := os.ReadDir(fixture.request.PrivateBase)
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, item := range entries {
++		if strings.HasPrefix(item.Name(), ".curator-script-") {
++			t.Fatalf("operation-private area %q outlived the invocation", item.Name())
++		}
++	}
++}
++
++// TestRunSessionRechecksIdentityAtLaunchBoundary proves a manager binary
++// replaced between the first check and exec never runs: the recheck refuses
++// with worker-identity-invalid, and the replacement's bytes are not what the
++// session speaks to. Dropping the recheck turns this refusal into a
++// protocol failure against the replacement's output.
++func TestRunSessionRechecksIdentityAtLaunchBoundary(t *testing.T) {
++	managerCopy := filepath.Join(mustPhysical(t, t.TempDir()), executableFixtureName("curator-manager"))
++	copyTestFile(t, mustPhysical(t, os.Args[0]), managerCopy)
++	fixture := newLaunchFixture(t, managerCopy)
++
++	replacement := stubInterpreterBinary(t)
++	hooks := &launchHooks{afterResolve: func() {
++		payload, err := os.ReadFile(replacement) // #nosec G304 -- test-owned stub path
++		if err != nil {
++			panic(err)
++		}
++		if err := os.WriteFile(managerCopy, payload, 0o755); err != nil {
++			panic(err)
++		}
++	}}
++
++	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
++	defer cancel()
++	_, err := runSession(ctx, fixture.request, hooks)
++	if DiagnosticCode(err) != CodeWorkerIdentityInvalid {
++		t.Fatalf("replaced-manager error = %v, want %s", err, CodeWorkerIdentityInvalid)
++	}
++}
++
++// TestClientRejectsUnknownNonce proves the parent binds every worker message
++// to the fresh session nonce. Dropping the comparison accepts a replayed
++// recording as the live worker's proof.
++func TestClientRejectsUnknownNonce(t *testing.T) {
++	nonce := strings.Repeat("ab", 32)
++	frame := func(kind, frameNonce string) []byte {
++		var buffer bytes.Buffer
++		if err := writeMessage(&buffer, workerMessage{Kind: kind, Nonce: frameNonce, Ready: &workerReady{}}); err != nil {
++			t.Fatal(err)
++		}
++		return buffer.Bytes()
++	}
++	client := &workerClient{nonce: nonce, stdout: io.NopCloser(bytes.NewReader(frame(kindReady, strings.Repeat("00", 32))))}
++	if _, err := client.receive(kindReady); DiagnosticCode(err) != CodeWorkerProtocolInvalid {
++		t.Fatalf("foreign-nonce error = %v, want %s", err, CodeWorkerProtocolInvalid)
++	}
++	// The control: the bound nonce is accepted.
++	bound := &workerClient{nonce: nonce, stdout: io.NopCloser(bytes.NewReader(frame(kindReady, nonce)))}
++	message, err := bound.receive(kindReady)
++	if err != nil {
++		t.Fatalf("bound nonce was refused: %v", err)
++	}
++	if message.Nonce != nonce {
++		t.Fatalf("nonce = %q, want the session nonce", message.Nonce)
++	}
++	// A worker failure still surfaces the worker's own stable code.
++	var failures bytes.Buffer
++	if err := writeMessage(&failures, workerMessage{
++		Kind: kindFailure, Nonce: nonce,
++		Failure: &workerFailure{Code: CodeWorkerIdentityInvalid, Detail: "proof mismatch"},
++	}); err != nil {
++		t.Fatal(err)
++	}
++	failing := &workerClient{nonce: nonce, stdout: io.NopCloser(bytes.NewReader(failures.Bytes()))}
++	if _, err := failing.receive(kindReady); DiagnosticCode(err) != CodeWorkerIdentityInvalid {
++		t.Fatalf("failure error = %v, want %s", err, CodeWorkerIdentityInvalid)
++	}
++}
++
++// TestRunSessionTerminatesDescendants proves the worker-domain teardown
++// reaps an interpreter descendant that outlives the interpreter itself.
++// Skipping the teardown leaves the descendant alive past the return.
++func TestRunSessionTerminatesDescendants(t *testing.T) {
++	fixture := newLaunchFixture(t, os.Args[0])
++	pidFile := filepath.Join(mustPhysical(t, t.TempDir()), "descendant.pid")
++	fixture.request.Environment = append(fixture.request.Environment,
++		"STUB_SPAWN_PIDFILE="+pidFile, "STUB_SPAWN_SECONDS=120")
++
++	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
++	defer cancel()
++	if _, err := runSession(ctx, fixture.request, nil); err != nil {
++		t.Fatal(err)
++	}
++	payload, err := os.ReadFile(pidFile) // #nosec G304 -- test-owned path
++	if err != nil {
++		t.Fatalf("the interpreter descendant did not publish its identity: %v", err)
++	}
++	pid, err := strconv.Atoi(strings.TrimSpace(string(payload)))
++	if err != nil {
++		t.Fatal(err)
++	}
++	deadline := time.Now().Add(15 * time.Second)
++	for processAlive(pid) && time.Now().Before(deadline) {
++		time.Sleep(50 * time.Millisecond)
++	}
++	if processAlive(pid) {
++		t.Fatalf("descendant %d outlived the worker domain teardown", pid)
++	}
++}
++
++// TestRunSessionRejectsPATHInterpreter proves the launch never consults the
++// user PATH: without a binding the session refuses even when PATH names a
++// working interpreter, and with a binding the configured file is what runs.
++// Falling back to a PATH lookup turns the first refusal into a launch.
++func TestRunSessionRejectsPATHInterpreter(t *testing.T) {
++	decoyDir := mustPhysical(t, t.TempDir())
++	decoy := filepath.Join(decoyDir, "python3")
++	if runtime.GOOS == "windows" {
++		decoy += ".exe"
++	}
++	copyTestFile(t, stubInterpreterBinary(t), decoy)
++	t.Setenv("PATH", decoyDir+string(os.PathListSeparator)+os.Getenv("PATH"))
++
++	fixture := newLaunchFixture(t, os.Args[0])
++	fixture.request.Interpreters = nil
++	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
++	defer cancel()
++	if _, err := runSession(ctx, fixture.request, nil); DiagnosticCode(err) != scriptpolicy.ControlUnavailable {
++		t.Fatalf("unconfigured launch with PATH decoy = %v, want %s", err, scriptpolicy.ControlUnavailable)
++	}
++
++	bound := newLaunchFixture(t, os.Args[0])
++	result, err := runSession(ctx, bound.request, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var report stubReport
++	if err := json.Unmarshal(result.Stdout, &report); err != nil {
++		t.Fatal(err)
++	}
++	if report.Executable != bound.stub {
++		t.Fatalf("executable = %q, want the configured file %q, not the PATH decoy", report.Executable, bound.stub)
++	}
++}
++
++// TestBuiltCuratorWorkerHandshake proves the production binary wires the
++// fixed hidden mode: the built curator answers the manager's session
++// protocol with an identity proof and runs one invocation, and the mode is
++// selected by exactly that one argument.
++func TestBuiltCuratorWorkerHandshake(t *testing.T) {
++	curator := mustPhysical(t, builtCuratorBinary(t))
++	identity, err := godriver.ResolveManagerIdentity(curator)
++	if err != nil {
++		t.Fatal(err)
++	}
++	worker := startRawWorker(t, curator)
++	fixture := newWorkerFixture(t, curator)
++	if fixture.manager.SHA256 != identity.SHA256 {
++		t.Fatalf("fixture identity does not match the built binary")
++	}
++	wire := fixture.request()
++	wire.Args = []string{"production"}
++	worker.send(workerMessage{Kind: kindRequest, Nonce: fixture.nonce, Request: wire})
++	ready := worker.receive()
++	if ready.Kind != kindReady || ready.Ready == nil {
++		t.Fatalf("built curator sent %q, want ready", ready.Kind)
++	}
++	if ready.Ready.ExecutableSHA256 != identity.SHA256 {
++		t.Fatalf("built curator proved %s, want %s", ready.Ready.ExecutableSHA256, identity.SHA256)
++	}
++	result := worker.receive()
++	if result.Kind != kindResult || result.Result == nil || result.Result.ExitCode != 0 {
++		t.Fatalf("built curator result = %+v, want one clean run", result.Result)
++	}
++	report := decodeStubReport(t, result.Result.Stdout)
++	if len(report.Argv) != 3 || report.Argv[2] != "production" {
++		t.Fatalf("argv = %q, want the verbatim argument", report.Argv)
++	}
++	worker.send(workerMessage{Kind: kindShutdown, Nonce: fixture.nonce})
++
++	// The mode takes exactly one argument: anything else never reaches the
++	// worker.
++	extra := exec.Command(curator, WorkerMode, "extra")
++	extra.Env = os.Environ()
++	output, err := extra.CombinedOutput()
++	if err == nil {
++		t.Fatalf("extra-argument worker invocation exited 0: %s", output)
++	}
++	if exitErr, ok := err.(*exec.ExitError); !ok || exitErr.ExitCode() == 0 {
++		t.Fatalf("extra-argument worker invocation error = %v", err)
++	}
++}
+diff --git a/internal/scriptworker/interpreter.go b/internal/scriptworker/interpreter.go
+new file mode 100644
+index 00000000..c9a12ca5
+--- /dev/null
++++ b/internal/scriptworker/interpreter.go
+@@ -0,0 +1,215 @@
++package scriptworker
++
++import (
++	"crypto/sha256"
++	"encoding/hex"
++	"errors"
++	"io"
++	"io/fs"
++	"os"
++	"path/filepath"
++	"strings"
++
++	"github.com/relux-works/curator/internal/godriver"
++	"github.com/relux-works/curator/internal/scriptpolicy"
++)
++
++// Closed interpreter identifiers of protocol 1.0. Admitting another
++// identifier is a specification revision, never a manager configuration
++// option, so resolution rejects anything outside this set without consulting
++// any other source.
++var closedInterpreters = map[string]bool{"node-v1": true, "python3-v1": true}
++
++// maxInterpreterBytes bounds the interpreter executable hashed at the launch
++// boundary. An interpreter installation is host-owned, so the bound is the
++// same ceiling the manager identity uses rather than a tighter claim about
++// any one interpreter's size.
++const maxInterpreterBytes = int64(512 * 1024 * 1024)
++
++// InterpreterIdentity is the strong per-invocation identity of the resolved
++// interpreter executable file.
++type InterpreterIdentity struct {
++	ID     string
++	Path   string
++	SHA256 string
++	Size   int64
++}
++
++// ResolveInterpreter resolves the declared closed identifier to an
++// operator-trusted executable, once per invocation, before the manager enters
++// any package-controlled directory.
++//
++// The mapping is the whole input: an identifier absent from it is refused,
++// and no other source is consulted — not the repository, a runtime root,
++// .agents/bin, the user PATH, a manifest value, or a script byte. The
++// resolved target must be a canonical regular native executable image;
++// symlink, reparse-point, and hard-link substitution are rejected, wrapper
++// scripts and batch files are refused (they would interpose another program
++// between the worker and the interpreter), strong file identity is recorded,
++// and the bytes are hashed. The caller re-checks the returned identity at
++// the launch boundary, and the worker re-verifies it before the interpreter
++// starts.
++func ResolveInterpreter(identifier string, mapping map[string]string, forbiddenRoots []string) (InterpreterIdentity, error) {
++	if !closedInterpreters[identifier] {
++		return InterpreterIdentity{}, diagnostic(CodePackageInfluenceForbidden,
++			"interpreter identifier %q is not an admitted closed identifier", identifier)
++	}
++	configured, ok := mapping[identifier]
++	if !ok || configured == "" {
++		return InterpreterIdentity{}, &scriptpolicy.Error{
++			DiagnosticCode: scriptpolicy.ControlUnavailable,
++			State:          scriptpolicy.StateUnsupported,
++			Severity:       scriptpolicy.SeverityError,
++			Detail: "interpreter " + identifier +
++				" has no operator-trusted machine configuration entry, so interpreter resolution cannot be applied",
++		}
++	}
++	if !filepath.IsAbs(configured) {
++		return InterpreterIdentity{}, diagnostic(CodeWorkerIdentityInvalid,
++			"interpreter %s binding %q is not absolute", identifier, configured)
++	}
++	canonical, err := godriver.CanonicalPhysicalPath(configured)
++	if err != nil {
++		return InterpreterIdentity{}, diagnosticErr(CodeWorkerIdentityInvalid, err,
++			"cannot canonicalize the resolved interpreter %s", identifier)
++	}
++	for _, root := range forbiddenRoots {
++		resolved, resolveErr := godriver.CanonicalPhysicalPath(root)
++		if resolveErr != nil {
++			continue
++		}
++		if canonical == resolved || isBelow(canonical, resolved) {
++			return InterpreterIdentity{}, diagnostic(CodePackageInfluenceForbidden,
++				"interpreter %s resolves under a repository or runtime root", identifier)
++		}
++	}
++	identity, err := readInterpreterIdentity(identifier, canonical)
++	if err != nil {
++		return InterpreterIdentity{}, err
++	}
++	return identity, nil
++}
++
++// readInterpreterIdentity records the strong identity of one canonical
++// interpreter path: regular file, single link, native image, open-then-hash.
++// It reuses the go-v1 worker's canonicalization, link, and image-header
++// primitives so both workers agree on what substitution is.
++func readInterpreterIdentity(identifier, canonical string) (InterpreterIdentity, error) {
++	info, err := os.Lstat(canonical)
++	if err != nil || !info.Mode().IsRegular() || info.Mode()&fs.ModeSymlink != 0 {
++		return InterpreterIdentity{}, diagnosticErr(CodeWorkerIdentityInvalid, err,
++			"the resolved interpreter %s is not a canonical regular file", identifier)
++	}
++	if info.Size() <= 0 || info.Size() > maxInterpreterBytes {
++		return InterpreterIdentity{}, diagnostic(CodeWorkerIdentityInvalid,
++			"the resolved interpreter %s has an unusable size %d", identifier, info.Size())
++	}
++	if !interpreterExecutable(info.Mode()) {
++		return InterpreterIdentity{}, diagnostic(CodeWorkerIdentityInvalid,
++			"the resolved interpreter %s is not executable", identifier)
++	}
++	if !interpreterImageNameOK(canonical) {
++		return InterpreterIdentity{}, diagnostic(CodeWorkerIdentityInvalid,
++			"the resolved interpreter %s binding must name the native .exe image itself", identifier)
++	}
++	multiple, err := godriver.HasMultipleLinks(canonical, info)
++	if err != nil {
++		return InterpreterIdentity{}, diagnosticErr(CodeWorkerIdentityInvalid, err,
++			"cannot inspect the resolved interpreter %s link count", identifier)
++	}
++	if multiple {
++		return InterpreterIdentity{}, diagnostic(CodeWorkerIdentityInvalid,
++			"the resolved interpreter %s has multiple filesystem links or is a reparse point", identifier)
++	}
++	file, err := os.Open(canonical) // #nosec G304 -- canonical operator-configured interpreter path
++	if err != nil {
++		return InterpreterIdentity{}, diagnosticErr(CodeWorkerIdentityInvalid, err,
++			"cannot open the resolved interpreter %s", identifier)
++	}
++	defer func() { _ = file.Close() }()
++	opened, err := file.Stat()
++	if err != nil || !opened.Mode().IsRegular() || !os.SameFile(info, opened) {
++		return InterpreterIdentity{}, diagnosticErr(CodeWorkerIdentityInvalid, err,
++			"the resolved interpreter %s changed while opening", identifier)
++	}
++	// The native-image gate: a wrapper script (a POSIX shebang shim, a
++	// Windows batch file) would interpose another program between the
++	// worker and the interpreter, so only a native executable image is
++	// accepted. The header judgment is the go-v1 worker's own, read from
++	// the same open handle that is hashed below. ReadAt leaves the read
++	// offset untouched for the hash.
++	var header [8]byte
++	read, readErr := file.ReadAt(header[:], 0)
++	if readErr != nil && !errors.Is(readErr, io.EOF) && !errors.Is(readErr, io.ErrUnexpectedEOF) {
++		return InterpreterIdentity{}, diagnosticErr(CodeWorkerIdentityInvalid, readErr,
++			"cannot inspect the resolved interpreter %s", identifier)
++	}
++	if !godriver.NativeExecutableHeader(header[:read]) {
++		return InterpreterIdentity{}, diagnostic(CodeWorkerIdentityInvalid,
++			"the resolved interpreter %s is not a native interpreter image", identifier)
++	}
++	digest := sha256.New()
++	written, err := io.CopyN(digest, file, opened.Size())
++	var extra [1]byte
++	extraCount, extraErr := file.Read(extra[:])
++	if err != nil || written != opened.Size() || extraCount != 0 || (extraErr != nil && !errors.Is(extraErr, io.EOF)) {
++		return InterpreterIdentity{}, diagnosticErr(CodeWorkerIdentityInvalid, err,
++			"the resolved interpreter %s changed while hashing", identifier)
++	}
++	return InterpreterIdentity{
++		ID:     identifier,
++		Path:   canonical,
++		SHA256: "sha256:" + hex.EncodeToString(digest.Sum(nil)),
++		Size:   opened.Size(),
++	}, nil
++}
++
++// interpreterImageNameOK reports whether path names a file the platform
++// executes itself. Windows rewrites an extensionless absolute path to a
++// neighboring PATHEXT sibling (os/exec lookExtensions), so the binding must
++// carry the .exe extension there or the verified file and the executed file
++// differ. Elsewhere any name is accepted and the image header decides.
++func interpreterImageNameOK(path string) bool {
++	if !platformRequiresExecutableExtension {
++		return true
++	}
++	return hasWindowsExecutableExtension(path)
++}
++
++// hasWindowsExecutableExtension reports whether path carries the .exe
++// extension, so lookExtensions returns it unchanged and the verified file
++// is the executed file.
++func hasWindowsExecutableExtension(path string) bool {
++	return strings.EqualFold(filepath.Ext(path), ".exe")
++}
++
++// VerifyInterpreter re-proves a resolved interpreter identity at the launch
++// boundary, so a replacement race between resolution and exec cannot widen
++// the process graph.
++func VerifyInterpreter(identity InterpreterIdentity) error {
++	current, err := readInterpreterIdentity(identity.ID, identity.Path)
++	if err != nil {
++		return err
++	}
++	if current.SHA256 != identity.SHA256 || current.Size != identity.Size {
++		return diagnostic(CodeWorkerIdentityInvalid,
++			"the resolved interpreter %s content changed", identity.ID)
++	}
++	return nil
++}
++
++// matchesExpectation compares a worker-observed interpreter identity to the
++// manager's expectation carried over the session protocol.
++func (identity InterpreterIdentity) matchesExpectation(path, digest string, size int64) error {
++	if identity.Path != path || identity.SHA256 != digest || identity.Size != size {
++		return diagnostic(CodeWorkerIdentityInvalid,
++			"interpreter identity proof %s/%s/%d does not match %s/%s/%d",
++			path, digest, size, identity.Path, identity.SHA256, identity.Size)
++	}
++	return nil
++}
++
++func isBelow(path, root string) bool {
++	rel, err := filepath.Rel(root, path)
++	return err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)
++}
+diff --git a/internal/scriptworker/interpreter_test.go b/internal/scriptworker/interpreter_test.go
+new file mode 100644
+index 00000000..a59ae0bc
+--- /dev/null
++++ b/internal/scriptworker/interpreter_test.go
+@@ -0,0 +1,323 @@
++package scriptworker
++
++import (
++	"os"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/godriver"
++	"github.com/relux-works/curator/internal/scriptpolicy"
++)
++
++// TestResolveInterpreterFromOperatorConfigOnly proves the two closed
++// identifiers resolve from the operator-trusted mapping and nowhere else:
++// the returned identity is the configured file's canonical path, hash, and
++// size.
++func TestResolveInterpreterFromOperatorConfigOnly(t *testing.T) {
++	stub := mustPhysical(t, stubInterpreterBinary(t))
++	for _, identifier := range []string{"node-v1", "python3-v1"} {
++		t.Run(identifier, func(t *testing.T) {
++			mapping := map[string]string{identifier: stub}
++			identity, err := ResolveInterpreter(identifier, mapping, nil)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if identity.ID != identifier || identity.Path != stub {
++				t.Fatalf("identity = %+v, want id %q path %q", identity, identifier, stub)
++			}
++			if !strings.HasPrefix(identity.SHA256, "sha256:") || len(identity.SHA256) != len("sha256:")+64 {
++				t.Fatalf("identity digest = %q, want a canonical sha256 identity", identity.SHA256)
++			}
++			if identity.Size <= 0 {
++				t.Fatalf("identity size = %d, want positive", identity.Size)
++			}
++			// The mapping is per identifier: configuring one does not
++			// resolve the other.
++			other := "node-v1"
++			if identifier == "node-v1" {
++				other = "python3-v1"
++			}
++			if _, err := ResolveInterpreter(other, mapping, nil); DiagnosticCode(err) != scriptpolicy.ControlUnavailable {
++				t.Fatalf("unconfigured %s error = %v, want %s", other, err, scriptpolicy.ControlUnavailable)
++			}
++		})
++	}
++}
++
++// TestResolveInterpreterRejectsUnknownIdentifier proves resolution outside
++// the closed set is refused as package influence without consulting any
++// other source: even a configured binding for it cannot exist.
++func TestResolveInterpreterRejectsUnknownIdentifier(t *testing.T) {
++	stub := mustPhysical(t, stubInterpreterBinary(t))
++	for _, identifier := range []string{"bash-v1", "powershell-v1", "node-v2", "", "python3-v1 "} {
++		if _, err := ResolveInterpreter(identifier, map[string]string{identifier: stub}, nil); DiagnosticCode(err) != CodePackageInfluenceForbidden {
++			t.Fatalf("identifier %q error = %v, want %s", identifier, err, CodePackageInfluenceForbidden)
++		}
++	}
++}
++
++// TestResolveInterpreterIgnoresUserPATH proves the user PATH never selects
++// the executable. With no configured binding the resolution refuses even
++// when PATH names a working interpreter; with a binding the configured
++// file wins over anything on PATH.
++func TestResolveInterpreterIgnoresUserPATH(t *testing.T) {
++	stub := mustPhysical(t, stubInterpreterBinary(t))
++	decoyDir := t.TempDir()
++	decoy := filepath.Join(decoyDir, "python3")
++	if runtime.GOOS == "windows" {
++		decoy += ".exe"
++	}
++	copyTestFile(t, stub, decoy)
++	t.Setenv("PATH", decoyDir+string(os.PathListSeparator)+os.Getenv("PATH"))
++
++	if _, err := ResolveInterpreter("python3-v1", nil, nil); DiagnosticCode(err) != scriptpolicy.ControlUnavailable {
++		t.Fatalf("unconfigured resolution with PATH decoy = %v, want %s", err, scriptpolicy.ControlUnavailable)
++	}
++	identity, err := ResolveInterpreter("python3-v1", map[string]string{"python3-v1": stub}, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if identity.Path != stub {
++		t.Fatalf("resolved path = %q, want the configured file %q, not the PATH decoy", identity.Path, stub)
++	}
++}
++
++// TestResolveInterpreterRejectsManifestSelection proves a manifest value
++// cannot select the executable. The resolution signature takes only the
++// closed identifier and the operator mapping; this row pins that a manifest
++// naming a different path changes nothing.
++func TestResolveInterpreterRejectsManifestSelection(t *testing.T) {
++	stub := mustPhysical(t, stubInterpreterBinary(t))
++	manifestDir := t.TempDir()
++	manifestPath := filepath.Join(manifestDir, "agent-skill.json")
++	writeTestFile(t, manifestPath, []byte(`{"commands":{"tool":{"interpreter_path":`+strconvQuote(filepath.Join(manifestDir, "evil"))+`}}}`), 0o644)
++	decoy := filepath.Join(manifestDir, "evil")
++	copyTestFile(t, stub, decoy)
++
++	// The manifest-named path is never consulted: without a binding the
++	// resolution refuses, with a binding it returns the configured file.
++	if _, err := ResolveInterpreter("node-v1", nil, nil); DiagnosticCode(err) != scriptpolicy.ControlUnavailable {
++		t.Fatalf("unconfigured resolution with manifest decoy = %v, want %s", err, scriptpolicy.ControlUnavailable)
++	}
++	identity, err := ResolveInterpreter("node-v1", map[string]string{"node-v1": stub}, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if identity.Path != stub {
++		t.Fatalf("resolved path = %q, want the configured file %q", identity.Path, stub)
++	}
++}
++
++func strconvQuote(value string) string {
++	return "\"" + strings.ReplaceAll(value, `"`, `\"`) + "\""
++}
++
++// TestResolveInterpreterRejectsRuntimeRoot proves an interpreter resolving
++// under a repository or runtime root is refused as package influence, even
++// when the operator mapping names it: configuration cannot bless a
++// package-controlled location.
++func TestResolveInterpreterRejectsRuntimeRoot(t *testing.T) {
++	stub := stubInterpreterBinary(t)
++	runtimeRoot := mustPhysical(t, t.TempDir())
++	nested := filepath.Join(runtimeRoot, "bin", filepath.Base(stub))
++	copyTestFile(t, stub, nested)
++	nested = mustPhysical(t, nested)
++
++	for _, root := range []string{runtimeRoot, filepath.Dir(nested)} {
++		mapping := map[string]string{"python3-v1": nested}
++		if _, err := ResolveInterpreter("python3-v1", mapping, []string{root}); DiagnosticCode(err) != CodePackageInfluenceForbidden {
++			t.Fatalf("runtime-root interpreter under %q error = %v, want %s", root, err, CodePackageInfluenceForbidden)
++		}
++	}
++	// The same file outside every forbidden root resolves normally.
++	identity, err := ResolveInterpreter("python3-v1", map[string]string{"python3-v1": nested}, []string{mustPhysical(t, t.TempDir())})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if identity.Path != nested {
++		t.Fatalf("resolved path = %q, want %q", identity.Path, nested)
++	}
++}
++
++// TestResolveInterpreterResolvesABindingThroughALink proves a binding that
++// names the interpreter through a launcher link resolves to the physical
++// file, exactly like the manager's own launcher-link handling: what the
++// checks reject is substitution of that file, not the link.
++func TestResolveInterpreterResolvesABindingThroughALink(t *testing.T) {
++	stub := mustPhysical(t, stubInterpreterBinary(t))
++	link := filepath.Join(mustPhysical(t, t.TempDir()), "interp-link")
++	if err := os.Symlink(stub, link); err != nil {
++		t.Skipf("this host forbids symlink creation: %v", err)
++	}
++	identity, err := ResolveInterpreter("node-v1", map[string]string{"node-v1": link}, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if identity.Path != stub {
++		t.Fatalf("resolved path = %q, want the physical file %q", identity.Path, stub)
++	}
++}
++
++// TestResolveInterpreterRejectsSubstitution proves hard-link and non-regular
++// bindings are refused before any hash is trusted, including through a
++// launcher link: resolving the link does not trust what it reaches.
++func TestResolveInterpreterRejectsSubstitution(t *testing.T) {
++	stub := mustPhysical(t, stubInterpreterBinary(t))
++	directory := mustPhysical(t, t.TempDir())
++
++	// The target names the native image itself (with the platform
++	// executable suffix on Windows) so the refusal below proves the
++	// link-count gate, not the name gate.
++	hardTarget := filepath.Join(directory, executableFixtureName("interp-hard"))
++	copyTestFile(t, stub, hardTarget)
++	if err := os.Link(hardTarget, filepath.Join(directory, executableFixtureName("interp-hard-alias"))); err != nil {
++		t.Logf("this host cannot create a hard link, skipping that row: %v", err)
++	} else {
++		if _, err := ResolveInterpreter("node-v1", map[string]string{"node-v1": hardTarget}, nil); DiagnosticCode(err) != CodeWorkerIdentityInvalid {
++			t.Fatalf("hard-link binding error = %v, want %s", err, CodeWorkerIdentityInvalid)
++		}
++		link := filepath.Join(directory, "interp-hard-link")
++		if err := os.Symlink(hardTarget, link); err != nil {
++			t.Skipf("this host forbids symlink creation: %v", err)
++		}
++		if _, err := ResolveInterpreter("node-v1", map[string]string{"node-v1": link}, nil); DiagnosticCode(err) != CodeWorkerIdentityInvalid {
++			t.Fatalf("link-to-hard-link binding error = %v, want %s", err, CodeWorkerIdentityInvalid)
++		}
++	}
++
++	if _, err := ResolveInterpreter("node-v1", map[string]string{"node-v1": directory}, nil); DiagnosticCode(err) != CodeWorkerIdentityInvalid {
++		t.Fatalf("directory binding error = %v, want %s", err, CodeWorkerIdentityInvalid)
++	}
++	if _, err := ResolveInterpreter("node-v1", map[string]string{"node-v1": "relative/interp"}, nil); DiagnosticCode(err) != CodeWorkerIdentityInvalid {
++		t.Fatalf("relative binding error = %v, want %s", err, CodeWorkerIdentityInvalid)
++	}
++	if _, err := ResolveInterpreter("node-v1", map[string]string{"node-v1": filepath.Join(directory, "absent")}, nil); DiagnosticCode(err) != CodeWorkerIdentityInvalid {
++		t.Fatalf("absent binding error = %v, want %s", err, CodeWorkerIdentityInvalid)
++	}
++}
++
++// TestVerifyInterpreterDetectsReplacement proves the launch-boundary
++// re-proof catches bytes that changed after resolution.
++func TestVerifyInterpreterDetectsReplacement(t *testing.T) {
++	stub := stubInterpreterBinary(t)
++	target := filepath.Join(mustPhysical(t, t.TempDir()), filepath.Base(stub))
++	copyTestFile(t, stub, target)
++	target = mustPhysical(t, target)
++	identity, err := ResolveInterpreter("python3-v1", map[string]string{"python3-v1": target}, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := VerifyInterpreter(identity); err != nil {
++		t.Fatalf("unchanged interpreter failed re-proof: %v", err)
++	}
++	payload, err := os.ReadFile(target) // #nosec G304 -- test-owned path
++	if err != nil {
++		t.Fatal(err)
++	}
++	payload[0] ^= 0xff
++	if err := os.WriteFile(target, payload, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := VerifyInterpreter(identity); DiagnosticCode(err) != CodeWorkerIdentityInvalid {
++		t.Fatalf("replaced interpreter error = %v, want %s", err, CodeWorkerIdentityInvalid)
++	}
++}
++
++// TestInterpreterIdentityReusesTheManagerPrimitives proves the interpreter
++// canonicalization agrees with the go-v1 worker's on the same host: a path
++// through a launcher link resolves to the same physical file both workers
++// would hash.
++func TestInterpreterIdentityReusesTheManagerPrimitives(t *testing.T) {
++	stub := mustPhysical(t, stubInterpreterBinary(t))
++	directory := mustPhysical(t, t.TempDir())
++	link := filepath.Join(directory, "launcher")
++	if err := os.Symlink(stub, link); err != nil {
++		t.Skipf("this host forbids symlink creation: %v", err)
++	}
++	physical, err := godriver.CanonicalPhysicalPath(link)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if physical != stub {
++		t.Fatalf("canonical path = %q, want the physical file %q", physical, stub)
++	}
++}
++
++// TestResolveInterpreterRejectsWrapperImage proves a binding that is not a
++// native executable image is refused at resolution, before any worker
++// exists. A POSIX shebang wrapper (the pyenv/asdf/volta shim shape) would
++// interpose another program between the worker and the interpreter; on
++// Windows a .cmd/.bat binding would run through cmd.exe, and an
++// extensionless path would execute a different file than the verified one,
++// so the binding must name the native .exe image itself.
++func TestResolveInterpreterRejectsWrapperImage(t *testing.T) {
++	directory := mustPhysical(t, t.TempDir())
++	stub := mustPhysical(t, stubInterpreterBinary(t))
++	type binding struct {
++		name string
++		path string
++	}
++	var bindings []binding
++	if runtime.GOOS == "windows" {
++		cmdWrapper := filepath.Join(directory, "interp.cmd")
++		writeTestFile(t, cmdWrapper, []byte("@echo off\r\necho wrapper\r\n"), 0o644)
++		bindings = append(bindings, binding{"cmd-wrapper", cmdWrapper})
++		batWrapper := filepath.Join(directory, "interp.bat")
++		writeTestFile(t, batWrapper, []byte("@echo off\r\necho wrapper\r\n"), 0o644)
++		bindings = append(bindings, binding{"bat-wrapper", batWrapper})
++		// A native image without the .exe extension passes the header
++		// gate and fails the name gate: Go would execute a neighboring
++		// PATHEXT sibling instead of this file.
++		extensionless := filepath.Join(directory, "interp")
++		copyTestFile(t, stub, extensionless)
++		bindings = append(bindings, binding{"extensionless-native-image", extensionless})
++		// A .exe name over non-image bytes fails the header gate: this is
++		// the arm a dropped header check would admit.
++		fake := filepath.Join(directory, "fake.exe")
++		writeTestFile(t, fake, []byte("@echo off\r\necho wrapper\r\n"), 0o644)
++		bindings = append(bindings, binding{"exe-named-text", fake})
++	} else {
++		wrapper := filepath.Join(directory, "interp")
++		writeTestFile(t, wrapper, []byte("#!/bin/sh\nexec \""+stub+"\" \"$@\"\n"), 0o755)
++		bindings = append(bindings, binding{"shebang-wrapper", wrapper})
++		plain := filepath.Join(directory, "plain")
++		writeTestFile(t, plain, []byte("not an executable image\n"), 0o755)
++		bindings = append(bindings, binding{"plain-text", plain})
++	}
++	for _, testCase := range bindings {
++		t.Run(testCase.name, func(t *testing.T) {
++			path := mustPhysical(t, testCase.path)
++			if _, err := ResolveInterpreter("python3-v1", map[string]string{"python3-v1": path}, nil); DiagnosticCode(err) != CodeWorkerIdentityInvalid {
++				t.Fatalf("wrapper binding %q error = %v, want %s", testCase.name, err, CodeWorkerIdentityInvalid)
++			}
++		})
++	}
++}
++
++// TestHasWindowsExecutableExtension pins the Windows name gate the
++// resolution and worker boundaries share: only a binding that names the
++// .exe itself is returned unchanged by Go's lookExtensions. It runs on
++// every OS; the production-boundary arms run on windows-latest.
++func TestHasWindowsExecutableExtension(t *testing.T) {
++	for _, testCase := range []struct {
++		path string
++		want bool
++	}{
++		{`C:\tools\node.exe`, true},
++		{`C:\tools\NODE.EXE`, true},
++		{`C:\tools\Node.Exe`, true},
++		{`\\server\share\python.exe`, true},
++		{`C:\tools\node`, false},
++		{`C:\tools\node.cmd`, false},
++		{`C:\tools\node.bat`, false},
++		{`C:\tools\node.com`, false},
++		{`C:\tools\node.exe.backup`, false},
++		{`C:\tools\nodeexe`, false},
++	} {
++		if got := hasWindowsExecutableExtension(testCase.path); got != testCase.want {
++			t.Errorf("hasWindowsExecutableExtension(%q) = %v, want %v", testCase.path, got, testCase.want)
++		}
++	}
++}
+diff --git a/internal/scriptworker/interpreter_unix.go b/internal/scriptworker/interpreter_unix.go
+new file mode 100644
+index 00000000..13cc6626
+--- /dev/null
++++ b/internal/scriptworker/interpreter_unix.go
+@@ -0,0 +1,12 @@
++//go:build !windows
++
++package scriptworker
++
++import "io/fs"
++
++// platformRequiresExecutableExtension is false on unix: the kernel executes
++// the verified path itself however it is named, so the image header alone
++// decides.
++const platformRequiresExecutableExtension = false
++
++func interpreterExecutable(mode fs.FileMode) bool { return mode.Perm()&0o111 != 0 }
+diff --git a/internal/scriptworker/interpreter_windows.go b/internal/scriptworker/interpreter_windows.go
+new file mode 100644
+index 00000000..83f6a2af
+--- /dev/null
++++ b/internal/scriptworker/interpreter_windows.go
+@@ -0,0 +1,12 @@
++//go:build windows
++
++package scriptworker
++
++import "io/fs"
++
++// platformRequiresExecutableExtension is true on Windows: os/exec rewrites
++// an extensionless absolute path to a neighboring PATHEXT sibling, so only
++// a binding that names the .exe itself executes the verified file.
++const platformRequiresExecutableExtension = true
++
++func interpreterExecutable(mode fs.FileMode) bool { return mode.IsRegular() }
+diff --git a/internal/scriptworker/main_test.go b/internal/scriptworker/main_test.go
+new file mode 100644
+index 00000000..982d31a6
+--- /dev/null
++++ b/internal/scriptworker/main_test.go
+@@ -0,0 +1,160 @@
++package scriptworker
++
++import (
++	"go/build"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"runtime"
++	"sync"
++	"testing"
++
++	"github.com/relux-works/curator/internal/godriver"
++)
++
++// TestMain gives the test binary the same fixed hidden script-worker mode
++// the installed manager has, so every worker test launches a real
++// identity-verified process instead of an in-process mock.
++func TestMain(m *testing.M) {
++	if len(os.Args) == 2 && os.Args[1] == WorkerMode {
++		os.Exit(RunWorker(os.Stdin, os.Stdout))
++	}
++	code := m.Run()
++	if stubOnce.directory != "" {
++		_ = os.RemoveAll(stubOnce.directory)
++	}
++	if curatorOnce.directory != "" {
++		_ = os.RemoveAll(curatorOnce.directory)
++	}
++	os.Exit(code)
++}
++
++var stubOnce struct {
++	sync.Once
++	directory string
++	path      string
++	err       error
++}
++
++// stubInterpreterBinary compiles testdata/stubinterp once per package test
++// run with the real toolchain, so the fake interpreter is a real native
++// executable with a stable identity.
++func stubInterpreterBinary(t *testing.T) string {
++	t.Helper()
++	stubOnce.Do(func() {
++		directory, err := os.MkdirTemp("", "curator-stubinterp-")
++		if err != nil {
++			stubOnce.err = err
++			return
++		}
++		stubOnce.directory = directory
++		output := filepath.Join(directory, "stubinterp")
++		if runtime.GOOS == "windows" {
++			output += ".exe"
++		}
++		command := exec.Command(filepath.Join(build.Default.GOROOT, "bin", goBinaryName()), "build", "-o", output, "./testdata/stubinterp") // #nosec G204 -- fixed test-only build of the local test double
++		command.Env = os.Environ()
++		if combined, err := command.CombinedOutput(); err != nil {
++			stubOnce.err = err
++			t.Logf("stubinterp build output: %s", combined)
++			return
++		}
++		stubOnce.path = output
++	})
++	if stubOnce.err != nil {
++		t.Fatalf("cannot build the stub interpreter: %v", stubOnce.err)
++	}
++	return stubOnce.path
++}
++
++func goBinaryName() string {
++	if runtime.GOOS == "windows" {
++		return "go.exe"
++	}
++	return "go"
++}
++
++// executableFixtureName appends the platform executable suffix so a copied
++// manager binary stays launchable on Windows, mirroring the go-v1 worker
++// rows (internal/godriver/identity_test.go launcher fixtures). Without the
++// suffix the copy is not executable there and the launch fails before the
++// worker can refuse with its own diagnostic.
++func executableFixtureName(base string) string {
++	if runtime.GOOS == "windows" {
++		return base + ".exe"
++	}
++	return base
++}
++
++var curatorOnce struct {
++	sync.Once
++	directory string
++	path      string
++	err       error
++}
++
++// builtCuratorBinary compiles the real ./cmd/curator once per package test
++// run, so the production dispatch wiring is proven against the shipped
++// binary rather than assumed from shared code.
++func builtCuratorBinary(t *testing.T) string {
++	t.Helper()
++	curatorOnce.Do(func() {
++		directory, err := os.MkdirTemp("", "curator-scriptworker-prod-")
++		if err != nil {
++			curatorOnce.err = err
++			return
++		}
++		curatorOnce.directory = directory
++		output := filepath.Join(directory, "curator")
++		if runtime.GOOS == "windows" {
++			output += ".exe"
++		}
++		command := exec.Command(filepath.Join(build.Default.GOROOT, "bin", goBinaryName()), "build", "-o", output, "../../cmd/curator") // #nosec G204 -- fixed test-only build of the production binary under test
++		command.Env = os.Environ()
++		if combined, err := command.CombinedOutput(); err != nil {
++			curatorOnce.err = err
++			t.Logf("curator build output: %s", combined)
++			return
++		}
++		curatorOnce.path = output
++	})
++	if curatorOnce.err != nil {
++		t.Fatalf("cannot build the production curator binary: %v", curatorOnce.err)
++	}
++	return curatorOnce.path
++}
++
++func writeTestFile(t *testing.T, path string, payload []byte, mode os.FileMode) {
++	t.Helper()
++	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(path, payload, mode); err != nil {
++		t.Fatal(err)
++	}
++}
++
++func copyTestFile(t *testing.T, source, destination string) {
++	t.Helper()
++	payload, err := os.ReadFile(source) // #nosec G304 -- test-owned source path
++	if err != nil {
++		t.Fatal(err)
++	}
++	info, err := os.Stat(source)
++	if err != nil {
++		t.Fatal(err)
++	}
++	writeTestFile(t, destination, payload, info.Mode().Perm())
++}
++
++// mustPhysical resolves path the way the launch boundary does, so fixtures
++// compare canonical paths on hosts where TempDir itself travels through a
++// link (macOS /var -> /private/var, Windows junctions).
++func mustPhysical(t *testing.T, path string) string {
++	t.Helper()
++	physical, err := godriver.CanonicalPhysicalPath(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return physical
++}
+diff --git a/internal/scriptworker/process_alive_unix_test.go b/internal/scriptworker/process_alive_unix_test.go
+new file mode 100644
+index 00000000..69c2677b
+--- /dev/null
++++ b/internal/scriptworker/process_alive_unix_test.go
+@@ -0,0 +1,9 @@
++//go:build !windows
++
++package scriptworker
++
++import "syscall"
++
++// processAlive reports whether the process still exists. Signal 0 performs
++// the permission and existence check only.
++func processAlive(pid int) bool { return syscall.Kill(pid, 0) == nil }
+diff --git a/internal/scriptworker/process_alive_windows_test.go b/internal/scriptworker/process_alive_windows_test.go
+new file mode 100644
+index 00000000..6ea74094
+--- /dev/null
++++ b/internal/scriptworker/process_alive_windows_test.go
+@@ -0,0 +1,19 @@
++//go:build windows
++
++package scriptworker
++
++import "golang.org/x/sys/windows"
++
++// processAlive reports whether the process still exists.
++func processAlive(pid int) bool {
++	handle, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid))
++	if err != nil {
++		return false
++	}
++	defer windows.CloseHandle(handle)
++	var code uint32
++	if err := windows.GetExitCodeProcess(handle, &code); err != nil {
++		return false
++	}
++	return code == 259 // STILL_ACTIVE
++}
+diff --git a/internal/scriptworker/protocol.go b/internal/scriptworker/protocol.go
+new file mode 100644
+index 00000000..1ec02f8c
+--- /dev/null
++++ b/internal/scriptworker/protocol.go
+@@ -0,0 +1,153 @@
++package scriptworker
++
++import (
++	"bytes"
++	"encoding/binary"
++	"encoding/json"
++	"errors"
++	"io"
++)
++
++// WorkerMode is the fixed hidden mode that re-executes the installed manager
++// as the script-worker-v1 worker. It is an implementation boundary, not a
++// user-visible command surface: no package file, manifest value, environment
++// value, PATH lookup, shell, or user option selects it.
++const WorkerMode = "__curator-script-worker-v1"
++
++// protocolVersion pins the framing and message vocabulary of one session.
++const protocolVersion = "curator-script-worker-v1"
++
++// maxProtocolFrame bounds every framed message. The result frame carries the
++// bounded captured child output, so the ceiling sits above the largest
++// permitted capture and below any value that could exhaust the worker.
++const maxProtocolFrame = int64(64 * 1024 * 1024)
++
++// sessionNonceLength is the exact length of the hex-encoded fresh nonce that
++// binds every message of one session.
++const sessionNonceLength = 64
++
++// Message kinds. The session state machine admits no other kind.
++const (
++	kindRequest  = "request"
++	kindReady    = "ready"
++	kindResult   = "result"
++	kindShutdown = "shutdown"
++	kindFailure  = "failure"
++)
++
++// workerRequest is the single length-bounded canonical request. Every value
++// is manager-owned; package bytes select nothing here.
++type workerRequest struct {
++	Version          string   `json:"version"`
++	ExecutablePath   string   `json:"executable_path"`
++	ExecutableSHA256 string   `json:"executable_sha256"`
++	ExecutableSize   int64    `json:"executable_size"`
++	InterpreterID    string   `json:"interpreter_id"`
++	InterpreterPath  string   `json:"interpreter_path"`
++	InterpreterSHA   string   `json:"interpreter_sha256"`
++	InterpreterSize  int64    `json:"interpreter_size"`
++	RuntimeEntry     string   `json:"runtime_entry"`
++	Args             []string `json:"args"`
++	Environment      []string `json:"environment"`
++	WorkingDir       string   `json:"working_dir"`
++	PrivateTmp       string   `json:"private_tmp"`
++	PrivateConfig    string   `json:"private_config"`
++	PrivateCache     string   `json:"private_cache"`
++	Stdin            []byte   `json:"stdin"`
++	StdinIsNull      bool     `json:"stdin_is_null"`
++	OutputLimit      int64    `json:"output_limit"`
++}
++
++// workerReady proves the worker executable identity and acknowledges the
++// session nonce. The interpreter verification it reports is the worker's own
++// launch-boundary check, performed before the interpreter starts.
++type workerReady struct {
++	ExecutablePath   string `json:"executable_path"`
++	ExecutableSHA256 string `json:"executable_sha256"`
++	ExecutableSize   int64  `json:"executable_size"`
++	InterpreterSHA   string `json:"interpreter_sha256"`
++	InterpreterSize  int64  `json:"interpreter_size"`
++}
++
++// workerResult is one bounded interpreter result. Started counts how many
++// times the worker used its single permitted process-creation site in this
++// session, so an extra program below the worker is detected. Overflow marks
++// a capture bound the session enforced; the output it carries is truncated.
++type workerResult struct {
++	Stdout   []byte `json:"stdout"`
++	Stderr   []byte `json:"stderr"`
++	ExitCode int    `json:"exit_code"`
++	Started  int    `json:"started"`
++	Overflow bool   `json:"overflow"`
++}
++
++// workerFailure carries one stable diagnostic across the session boundary.
++type workerFailure struct {
++	Code   string `json:"code"`
++	Detail string `json:"detail"`
++}
++
++// workerMessage is the only framed value on the session channel.
++type workerMessage struct {
++	Kind    string         `json:"kind"`
++	Nonce   string         `json:"nonce"`
++	Request *workerRequest `json:"request,omitempty"`
++	Ready   *workerReady   `json:"ready,omitempty"`
++	Result  *workerResult  `json:"result,omitempty"`
++	Failure *workerFailure `json:"failure,omitempty"`
++}
++
++var errProtocolClosed = errors.New("worker session channel closed")
++
++// writeMessage writes one length-prefixed canonical frame.
++func writeMessage(writer io.Writer, message workerMessage) error {
++	payload, err := json.Marshal(message)
++	if err != nil {
++		return err
++	}
++	if int64(len(payload)) > maxProtocolFrame {
++		return diagnostic(CodeWorkerProtocolInvalid, "outgoing %s frame exceeds the session bound", message.Kind)
++	}
++	var header [4]byte
++	binary.BigEndian.PutUint32(header[:], uint32(len(payload))) // #nosec G115 -- the length was just bounded by maxProtocolFrame
++	if _, err := writer.Write(header[:]); err != nil {
++		return err
++	}
++	_, err = writer.Write(payload)
++	return err
++}
++
++// readMessage reads one length-prefixed canonical frame. An oversize declared
++// length is rejected before any payload byte is buffered.
++func readMessage(reader io.Reader) (workerMessage, error) {
++	var header [4]byte
++	if _, err := io.ReadFull(reader, header[:]); err != nil {
++		if errors.Is(err, io.EOF) {
++			return workerMessage{}, errProtocolClosed
++		}
++		return workerMessage{}, diagnosticErr(CodeWorkerProtocolInvalid, err, "cannot read a session frame header")
++	}
++	length := int64(binary.BigEndian.Uint32(header[:]))
++	if length == 0 || length > maxProtocolFrame {
++		return workerMessage{}, diagnostic(CodeWorkerProtocolInvalid, "session frame length %d is outside the bound", length)
++	}
++	payload := make([]byte, length)
++	if _, err := io.ReadFull(reader, payload); err != nil {
++		return workerMessage{}, diagnosticErr(CodeWorkerProtocolInvalid, err, "cannot read a session frame payload")
++	}
++	decoder := json.NewDecoder(bytes.NewReader(payload))
++	decoder.DisallowUnknownFields()
++	var message workerMessage
++	if err := decoder.Decode(&message); err != nil {
++		return workerMessage{}, diagnosticErr(CodeWorkerProtocolInvalid, err, "session frame is not a known message")
++	}
++	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
++		return workerMessage{}, diagnostic(CodeWorkerProtocolInvalid, "session frame has trailing data")
++	}
++	switch message.Kind {
++	case kindRequest, kindReady, kindResult, kindShutdown, kindFailure:
++	default:
++		return workerMessage{}, diagnostic(CodeWorkerProtocolInvalid, "unknown session message kind %q", message.Kind)
++	}
++	return message, nil
++}
+diff --git a/internal/scriptworker/scriptworker.go b/internal/scriptworker/scriptworker.go
+new file mode 100644
+index 00000000..bedece3d
+--- /dev/null
++++ b/internal/scriptworker/scriptworker.go
+@@ -0,0 +1,144 @@
++// Package scriptworker implements the enforced `script-worker-v1` command
++// launch path of Protocol Core §4.1.1 and manager profile §3.1: the fixed
++// hidden-mode re-execution of the installed manager as the script worker,
++// interpreter resolution from operator-trusted machine configuration, and
++// worker-domain teardown.
++//
++// The fixed process graph of one enforced invocation is:
++//
++//	manager parent
++//	  -> identity-verified manager-owned script worker
++//	       -> identity-verified interpreter for the declared identifier
++//
++// A fourth node for manager-resolved `exec` names exists only when `exec`
++// names executables; R1 carries no `exec` derivation (R2), so the graph is
++// exactly three nodes.
++//
++// Launch is the production entry. It preflights the mandatory portable
++// controls through scriptpolicy before anything starts: while that table
++// names missing controls the invocation refuses with
++// `script_execution_control_unavailable` and no worker exists. The worker
++// session behind the preflight is real production code — resolve and bind
++// the interpreter, recheck identity at the launch boundary, prove identity
++// over a fresh session nonce, bind streams explicitly, run the interpreter
++// against the commit-keyed runtime entry with verbatim arguments, return
++// the child's exit status, and terminate the complete worker domain — and
++// is proven at the real process boundary by this package's tests calling
++// the session directly. There is no environment, flag, or configuration
++// switch that opens the preflight: it opens only when the control table is
++// complete.
++package scriptworker
++
++import (
++	"context"
++	"errors"
++	"fmt"
++
++	"github.com/relux-works/curator/internal/scriptpolicy"
++)
++
++// Stable execution-boundary diagnostics of manager profile §3.1. The
++// policy-level `script_execution_control_unavailable` and
++// `script_execution_policy_unsupported` live in scriptpolicy, which owns
++// admission; the three worker-session codes live here, mirroring the
++// equivalent `build_execution_*` codes of §2.2.1.
++const (
++	CodeWorkerIdentityInvalid     = "script_execution_worker_identity_invalid"
++	CodeWorkerProtocolInvalid     = "script_execution_worker_protocol_invalid"
++	CodePackageInfluenceForbidden = "script_execution_package_influence_forbidden"
++)
++
++// Diagnostic is a stable, machine-testable failure at a script execution
++// boundary. Detail is intended for operators; callers branch on Code.
++type Diagnostic struct {
++	Code   string
++	Detail string
++	Err    error
++}
++
++func (err *Diagnostic) Error() string {
++	message := "script-worker-v1 " + err.Code
++	if err.Detail != "" {
++		message += ": " + err.Detail
++	}
++	return message
++}
++
++func (err *Diagnostic) Unwrap() error { return err.Err }
++
++func diagnostic(code, format string, args ...any) error {
++	return &Diagnostic{Code: code, Detail: fmt.Sprintf(format, args...)}
++}
++
++func diagnosticErr(code string, err error, format string, args ...any) error {
++	return &Diagnostic{Code: code, Detail: fmt.Sprintf(format, args...), Err: err}
++}
++
++// DiagnosticCode returns the stable script-worker code carried by err, or an
++// empty string when err did not originate at a script trust boundary. It also
++// recognizes the admission codes scriptpolicy owns, so one call classifies
++// every refusal of this execution path.
++func DiagnosticCode(err error) string {
++	var failure *Diagnostic
++	if errors.As(err, &failure) {
++		return failure.Code
++	}
++	return scriptpolicy.Code(err)
++}
++
++// LaunchRequest is the complete manager-owned launch input. Nothing here is
++// derived from package bytes: the interpreter mapping is the operator-trusted
++// machine configuration, the runtime entry is the manager-derived
++// commit-keyed path, and the environment, working directory, and private base
++// are manager-selected.
++type LaunchRequest struct {
++	// ManagerPath names the installed manager executable to re-execute. Empty
++	// resolves the running process, which is what production passes.
++	ManagerPath string
++	// Interpreters is the operator-trusted identifier-to-path mapping from
++	// machine configuration. It is the only source the interpreter is
++	// resolved from.
++	Interpreters map[string]string
++	// ForbiddenRoots are package-controlled or runtime roots the interpreter
++	// must never resolve under: snapshots, the runtime store, .agents/bin.
++	ForbiddenRoots []string
++	// InterpreterID is the command's declared closed identifier.
++	InterpreterID string
++	// RuntimeEntry is the manager-derived commit-keyed script path the
++	// interpreter runs.
++	RuntimeEntry string
++	// Args are forwarded to the interpreter verbatim after the runtime entry.
++	Args []string
++	// Environment is the manager-built environment. R1 applies what the
++	// caller supplies; the declaration-derived builder is R2, and the
++	// preflight refuses production until it lands.
++	Environment []string
++	// WorkingDir is the manager-selected working directory.
++	WorkingDir string
++	// Stdin is the explicit standard-input payload. Nil binds the platform
++	// null device instead of an inherited descriptor.
++	Stdin []byte
++	// PrivateBase holds the operation-private runtime area. It must be an
++	// absolute manager-owned directory outside every forbidden root.
++	PrivateBase string
++}
++
++// Result is one completed enforced invocation.
++type Result struct {
++	Stdout   []byte
++	Stderr   []byte
++	ExitCode int
++}
++
++// Launch runs one enforced script invocation through the fixed
++// manager-owned worker. It preflights the mandatory portable controls
++// first: while scriptpolicy names missing controls the invocation refuses
++// with `script_execution_control_unavailable` before any worker starts and
++// runs nothing. The context is an operator or invocation-level bound, never
++// a policy control.
++func Launch(ctx context.Context, request LaunchRequest) (Result, error) {
++	if missing := scriptpolicy.MissingControls(); len(missing) != 0 {
++		return Result{}, scriptpolicy.ControlError("")
++	}
++	return runSession(ctx, request, nil)
++}
+diff --git a/internal/scriptworker/teardown_unix.go b/internal/scriptworker/teardown_unix.go
+new file mode 100644
+index 00000000..8c9010c3
+--- /dev/null
++++ b/internal/scriptworker/teardown_unix.go
+@@ -0,0 +1,49 @@
++//go:build !windows
++
++package scriptworker
++
++import (
++	"os/exec"
++	"syscall"
++)
++
++// scriptDomain is the manager-owned worker domain on Unix: the worker's own
++// process group and session, which every interpreter descendant inherits.
++type scriptDomain struct{}
++
++// prepareScriptDomain creates the domain handle. The group itself comes into
++// existence with the worker fork below.
++func prepareScriptDomain() (*scriptDomain, error) { return &scriptDomain{}, nil }
++
++// launch starts the worker in its own session, so its process group is
++// private to this invocation and teardown can address the whole domain.
++func (domain *scriptDomain) launch(command *exec.Cmd) error {
++	if err := command.Start(); err != nil {
++		return diagnosticErr(CodeWorkerProtocolInvalid, err, "cannot start the script worker")
++	}
++	return nil
++}
++
++func (domain *scriptDomain) close() {}
++
++// scriptWorkerSysProcAttr places the worker in a new session.
++func scriptWorkerSysProcAttr() *syscall.SysProcAttr { return &syscall.SysProcAttr{Setsid: true} }
++
++// interpreterSysProcAttr keeps the interpreter inside the worker's process
++// group, so the domain teardown below reaches every descendant.
++func interpreterSysProcAttr() *syscall.SysProcAttr { return &syscall.SysProcAttr{} }
++
++// terminateScriptDomain kills the worker's process group first so no
++// interpreter descendant outlives the invocation, then the worker itself.
++func terminateScriptDomain(command *exec.Cmd, _ *scriptDomain) {
++	if command == nil || command.Process == nil {
++		return
++	}
++	pid := command.Process.Pid
++	if pid > 0 {
++		_ = syscall.Kill(-pid, syscall.SIGKILL)
++	}
++	_ = command.Process.Kill()
++}
++
++func indispensableScriptEnvironment() map[string]string { return nil }
+diff --git a/internal/scriptworker/teardown_windows.go b/internal/scriptworker/teardown_windows.go
+new file mode 100644
+index 00000000..81539bec
+--- /dev/null
++++ b/internal/scriptworker/teardown_windows.go
+@@ -0,0 +1,96 @@
++//go:build windows
++
++package scriptworker
++
++import (
++	"os"
++	"os/exec"
++	"syscall"
++	"unsafe"
++
++	"golang.org/x/sys/windows"
++)
++
++// scriptDomain is the manager-owned worker domain on Windows: a private Job
++// Object with kill-on-close, which every interpreter descendant joins.
++type scriptDomain struct {
++	job windows.Handle
++}
++
++// prepareScriptDomain creates the private job with kill-on-close, so closing
++// the last handle terminates every process still inside it.
++func prepareScriptDomain() (*scriptDomain, error) {
++	job, err := windows.CreateJobObject(nil, nil)
++	if err != nil {
++		return nil, diagnosticErr(CodeWorkerProtocolInvalid, err, "cannot create the script worker domain")
++	}
++	info := windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION{
++		BasicLimitInformation: windows.JOBOBJECT_BASIC_LIMIT_INFORMATION{
++			LimitFlags: windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
++		},
++	}
++	_, err = windows.SetInformationJobObject(job, windows.JobObjectExtendedLimitInformation,
++		uintptr(unsafe.Pointer(&info)), uint32(unsafe.Sizeof(info)))
++	if err != nil {
++		_ = windows.CloseHandle(job)
++		return nil, diagnosticErr(CodeWorkerProtocolInvalid, err, "cannot arm the script worker domain")
++	}
++	return &scriptDomain{job: job}, nil
++}
++
++// launch starts the worker and assigns it to the private job before any
++// session byte flows, so the interpreter it starts is born inside the
++// domain. No suspended start is needed: the worker's first act is a
++// blocking read of the request, which the manager sends only after this
++// assignment returns, so no interpreter can exist outside the job.
++func (domain *scriptDomain) launch(command *exec.Cmd) error {
++	if err := command.Start(); err != nil {
++		return diagnosticErr(CodeWorkerProtocolInvalid, err, "cannot start the script worker")
++	}
++	handle, err := windows.OpenProcess(windows.PROCESS_SET_QUOTA|windows.PROCESS_TERMINATE, false, uint32(command.Process.Pid))
++	if err != nil {
++		terminateScriptDomain(command, domain)
++		_ = command.Wait()
++		return diagnosticErr(CodeWorkerProtocolInvalid, err, "cannot open the script worker for domain assignment")
++	}
++	defer windows.CloseHandle(handle)
++	if err := windows.AssignProcessToJobObject(domain.job, handle); err != nil {
++		terminateScriptDomain(command, domain)
++		_ = command.Wait()
++		return diagnosticErr(CodeWorkerProtocolInvalid, err, "cannot assign the script worker to its domain")
++	}
++	return nil
++}
++
++// close releases the private job. Kill-on-close terminates every process
++// still inside it, so no interpreter descendant can outlive the invocation.
++func (domain *scriptDomain) close() {
++	if domain == nil || domain.job == 0 {
++		return
++	}
++	_ = windows.CloseHandle(domain.job)
++	domain.job = 0
++}
++
++func scriptWorkerSysProcAttr() *syscall.SysProcAttr { return &syscall.SysProcAttr{} }
++
++func interpreterSysProcAttr() *syscall.SysProcAttr { return &syscall.SysProcAttr{} }
++
++// terminateScriptDomain terminates the worker; closing the private job
++// handle then reaps every descendant that outlived it.
++func terminateScriptDomain(command *exec.Cmd, _ *scriptDomain) {
++	if command == nil || command.Process == nil {
++		return
++	}
++	_ = command.Process.Kill()
++}
++
++func indispensableScriptEnvironment() map[string]string {
++	result := make(map[string]string, 2)
++	for _, key := range []string{"SYSTEMROOT", "WINDIR"} {
++		if value, present := os.LookupEnv(key); present && value != "" {
++			result[key] = value
++		}
++	}
++	return result
++}
+diff --git a/internal/scriptworker/testdata/stubinterp/main.go b/internal/scriptworker/testdata/stubinterp/main.go
+new file mode 100644
+index 00000000..76f64188
+--- /dev/null
++++ b/internal/scriptworker/testdata/stubinterp/main.go
+@@ -0,0 +1,92 @@
++// Command stubinterp is a test-only stand-in for a script interpreter. It
++// records how the worker started it — argument vector, executable path,
++// working directory, standard input — so tests prove verbatim forwarding,
++// stream binding, and exit-status return without depending on a host
++// node or python installation. Behaviour is driven by STUB_* environment
++// variables the test sets in the session environment.
++package main
++
++import (
++	"encoding/json"
++	"io"
++	"os"
++	"os/exec"
++	"strconv"
++	"time"
++)
++
++type report struct {
++	Executable string   `json:"executable"`
++	Argv       []string `json:"argv"`
++	Cwd        string   `json:"cwd"`
++	Stdin      string   `json:"stdin"`
++	Probe      string   `json:"probe"`
++}
++
++func main() {
++	os.Exit(run())
++}
++
++func run() int {
++	if os.Getenv("STUB_SLEEP_CHILD") == "1" {
++		pidFile := os.Getenv("STUB_SPIDFILE")
++		if pidFile != "" {
++			_ = os.WriteFile(pidFile, []byte(strconv.Itoa(os.Getpid())+"\n"), 0o644)
++		}
++		seconds, _ := strconv.Atoi(os.Getenv("STUB_SPAWN_SECONDS"))
++		if seconds <= 0 {
++			seconds = 120
++		}
++		time.Sleep(time.Duration(seconds) * time.Second)
++		return 0
++	}
++	if marker := os.Getenv("STUB_MARKER"); marker != "" {
++		file, err := os.OpenFile(marker, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
++		if err == nil {
++			_, _ = file.WriteString("ran\n")
++			_ = file.Close()
++		}
++	}
++	if pidFile := os.Getenv("STUB_SPAWN_PIDFILE"); pidFile != "" {
++		child := exec.Command(os.Args[0], "sleep-child")
++		child.Env = append(os.Environ(), "STUB_SLEEP_CHILD=1", "STUB_SPIDFILE="+pidFile)
++		_ = child.Start()
++		// Deliberately not waited: the descendant must outlive this
++		// interpreter so the test proves the worker-domain teardown reaps
++		// it. The process table entry is released when the test binary's
++		// teardown kills the group.
++		if child.Process != nil {
++			_ = child.Process.Release()
++		}
++		// Let the child publish its identity before this interpreter
++		// exits, so the teardown is observed against a live process
++		// rather than racing its startup.
++		deadline := time.Now().Add(10 * time.Second)
++		for time.Now().Before(deadline) {
++			if info, err := os.Stat(pidFile); err == nil && !info.IsDir() {
++				break
++			}
++			time.Sleep(10 * time.Millisecond)
++		}
++	}
++	stdin, _ := io.ReadAll(os.Stdin)
++	cwd, _ := os.Getwd()
++	payload, _ := json.Marshal(report{
++		Executable: os.Args[0],
++		Argv:       append([]string(nil), os.Args...),
++		Cwd:        cwd,
++		Stdin:      string(stdin),
++		Probe:      os.Getenv("STUB_INHERIT_PROBE"),
++	})
++	_, _ = os.Stdout.Write(append(payload, '\n'))
++	if text := os.Getenv("STUB_STDERR"); text != "" {
++		_, _ = os.Stderr.WriteString(text)
++	}
++	if raw := os.Getenv("STUB_EXIT"); raw != "" {
++		if code, err := strconv.Atoi(raw); err == nil {
++			return code
++		}
++		return 1
++	}
++	return 0
++}
+diff --git a/internal/scriptworker/worker.go b/internal/scriptworker/worker.go
+new file mode 100644
+index 00000000..8f8e8c79
+--- /dev/null
++++ b/internal/scriptworker/worker.go
+@@ -0,0 +1,324 @@
++package scriptworker
++
++import (
++	"bytes"
++	"errors"
++	"io"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strings"
++
++	"github.com/relux-works/curator/internal/godriver"
++)
++
++// RunWorker is the fixed hidden script-worker mode of the installed manager.
++// It reads one length-bounded session from input, proves its own executable
++// identity, verifies the resolved interpreter file's identity, binds the
++// standard streams explicitly, runs the interpreter exactly once against the
++// manager-derived runtime entry, and starts no other program.
++//
++// It returns the process exit code; 0 means the session completed as
++// specified. The interpreter's own exit status travels in the result message,
++// never in this code.
++func RunWorker(input io.Reader, output io.Writer) int {
++	session := &workerSession{input: input, output: output}
++	if err := session.run(); err != nil {
++		code := DiagnosticCode(err)
++		if code == "" {
++			code = CodeWorkerProtocolInvalid
++		}
++		_ = writeMessage(output, workerMessage{
++			Kind: kindFailure, Nonce: session.nonce,
++			Failure: &workerFailure{Code: code, Detail: err.Error()},
++		})
++		return exitWorkerFailure
++	}
++	return 0
++}
++
++const exitWorkerFailure = 3
++
++type workerSession struct {
++	input  io.Reader
++	output io.Writer
++
++	nonce   string
++	request *workerRequest
++	started int
++}
++
++func (session *workerSession) run() error {
++	if err := session.accept(); err != nil {
++		return err
++	}
++	result, err := session.serveRun()
++	if err != nil {
++		return err
++	}
++	if err := writeMessage(session.output, workerMessage{Kind: kindResult, Nonce: session.nonce, Result: result}); err != nil {
++		return err
++	}
++	return session.awaitShutdown()
++}
++
++// accept validates the single request, proves the worker's own executable
++// identity, verifies the interpreter file, and acknowledges the nonce.
++func (session *workerSession) accept() error {
++	message, err := readMessage(session.input)
++	if err != nil {
++		return err
++	}
++	if message.Kind != kindRequest || message.Request == nil {
++		return diagnostic(CodeWorkerProtocolInvalid, "session must open with a request, got %q", message.Kind)
++	}
++	request := message.Request
++	if request.Version != protocolVersion {
++		return diagnostic(CodeWorkerProtocolInvalid, "unsupported worker protocol version %q", request.Version)
++	}
++	if len(message.Nonce) != sessionNonceLength || !isHex(message.Nonce) {
++		return diagnostic(CodeWorkerProtocolInvalid, "session nonce is malformed")
++	}
++	session.nonce = message.Nonce
++	session.request = request
++
++	identity, err := godriver.ResolveManagerIdentity(workerExecutable())
++	if err != nil {
++		return workerDiagnostic(err)
++	}
++	if err := identity.MatchesExpectation(request.ExecutablePath, request.ExecutableSHA256, request.ExecutableSize); err != nil {
++		return workerDiagnostic(err)
++	}
++	if err := session.validateRequest(); err != nil {
++		return err
++	}
++	observed, err := verifyInterpreterFile(request)
++	if err != nil {
++		return err
++	}
++	return writeMessage(session.output, workerMessage{
++		Kind: kindReady, Nonce: session.nonce,
++		Ready: &workerReady{
++			ExecutablePath: identity.Path, ExecutableSHA256: identity.SHA256, ExecutableSize: identity.Size,
++			InterpreterSHA: observed.SHA256, InterpreterSize: observed.Size,
++		},
++	})
++}
++
++func (session *workerSession) serveRun() (*workerResult, error) {
++	// The launch-boundary recheck: the interpreter file is re-verified
++	// immediately before exec so a replacement between accept and exec cannot
++	// widen the graph. Accept already verified it once; this second proof is
++	// the one the exec depends on.
++	if _, err := verifyInterpreterFile(session.request); err != nil {
++		return nil, err
++	}
++	return session.runInterpreter()
++}
++
++func (session *workerSession) awaitShutdown() error {
++	message, err := readMessage(session.input)
++	if err != nil {
++		return err
++	}
++	if message.Kind != kindShutdown {
++		return diagnostic(CodeWorkerProtocolInvalid, "session expected %q, got %q", kindShutdown, message.Kind)
++	}
++	if message.Nonce != session.nonce {
++		return diagnostic(CodeWorkerProtocolInvalid, "session message carries a replayed or unknown nonce")
++	}
++	return nil
++}
++
++// workerExecutable resolves the running worker binary from the process itself.
++func workerExecutable() string {
++	if path, err := os.Executable(); err == nil {
++		return path
++	}
++	return os.Args[0]
++}
++
++// workerDiagnostic re-codes a godriver identity failure at the script
++// boundary. The check is shared; the diagnostic names the policy that
++// refused.
++func workerDiagnostic(err error) error {
++	if godriver.DiagnosticCode(err) == "" {
++		return err
++	}
++	return &Diagnostic{Code: CodeWorkerIdentityInvalid, Detail: err.Error(), Err: err}
++}
++
++// validateRequest is the worker's own guard over everything it was asked to
++// do. A malformed version, path, argument vector, environment, root, or limit
++// is rejected before the interpreter starts. Package-shaped values — a
++// non-closed interpreter identifier, a non-absolute runtime entry, a runtime
++// entry that is not a regular file — are refused as package influence,
++// because the only thing that may select the executed program is the
++// manager's own derivation.
++func (session *workerSession) validateRequest() error {
++	request := session.request
++	if !closedInterpreters[request.InterpreterID] {
++		return diagnostic(CodePackageInfluenceForbidden,
++			"request selects interpreter identifier %q outside the closed set", request.InterpreterID)
++	}
++	if request.InterpreterPath == "" || !filepath.IsAbs(request.InterpreterPath) {
++		return diagnostic(CodePackageInfluenceForbidden, "request interpreter path is not an absolute manager-derived path")
++	}
++	if !isDigest(request.InterpreterSHA) || request.InterpreterSize <= 0 {
++		return diagnostic(CodeWorkerProtocolInvalid, "request carries a malformed interpreter expectation")
++	}
++	if request.RuntimeEntry == "" || !filepath.IsAbs(request.RuntimeEntry) {
++		return diagnostic(CodePackageInfluenceForbidden, "request runtime entry is not an absolute manager-derived path")
++	}
++	if strings.ContainsRune(request.RuntimeEntry, 0) {
++		return diagnostic(CodePackageInfluenceForbidden, "request runtime entry carries a NUL byte")
++	}
++	info, err := os.Lstat(request.RuntimeEntry)
++	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
++		return diagnostic(CodePackageInfluenceForbidden,
++			"request runtime entry is not a regular manager-staged file")
++	}
++	for _, arg := range request.Args {
++		if strings.ContainsRune(arg, 0) {
++			return diagnostic(CodeWorkerProtocolInvalid, "request argument vector carries a NUL byte")
++		}
++	}
++	if err := validateSessionEnvironment(request.Environment); err != nil {
++		return err
++	}
++	if request.WorkingDir == "" || !filepath.IsAbs(request.WorkingDir) {
++		return diagnostic(CodeWorkerProtocolInvalid, "request working directory is not absolute")
++	}
++	if info, err := os.Stat(request.WorkingDir); err != nil || !info.IsDir() {
++		return diagnostic(CodeWorkerProtocolInvalid, "request working directory is not a directory")
++	}
++	for _, root := range []string{request.PrivateTmp, request.PrivateConfig, request.PrivateCache} {
++		if root == "" || !filepath.IsAbs(root) {
++			return diagnostic(CodeWorkerProtocolInvalid, "request private runtime area is not absolute")
++		}
++		if info, err := os.Stat(root); err != nil || !info.IsDir() {
++			return diagnostic(CodeWorkerProtocolInvalid, "request private runtime root %q is not a directory", root)
++		}
++	}
++	if request.OutputLimit <= 0 || request.OutputLimit > maxProtocolFrame {
++		return diagnostic(CodeWorkerProtocolInvalid, "request output bound %d is outside the session bound", request.OutputLimit)
++	}
++	if int64(len(request.Stdin)) > maxProtocolFrame {
++		return diagnostic(CodeWorkerProtocolInvalid, "request standard-input payload exceeds the session bound")
++	}
++	return nil
++}
++
++// validateSessionEnvironment checks the closed form of the session
++// environment: KEY=value entries, no NUL, no repeated key. R1 applies what
++// the manager sends; the declaration-derived closed value set is R2.
++func validateSessionEnvironment(environment []string) error {
++	seen := make(map[string]bool, len(environment))
++	for _, item := range environment {
++		key, _, present := strings.Cut(item, "=")
++		if !present || key == "" {
++			return diagnostic(CodeWorkerProtocolInvalid, "session environment contains a malformed entry")
++		}
++		if strings.ContainsRune(item, 0) {
++			return diagnostic(CodeWorkerProtocolInvalid, "session environment contains a NUL byte")
++		}
++		if seen[key] {
++			return diagnostic(CodeWorkerProtocolInvalid, "session environment repeats %s", key)
++		}
++		seen[key] = true
++	}
++	return nil
++}
++
++// verifyInterpreterFile proves the resolved interpreter file's identity: a
++// canonical regular native executable image, single-linked, whose bytes hash
++// to the manager's expectation. A wrapper — a POSIX shebang shim, a Windows
++// batch file — would interpose another program between the worker and the
++// interpreter, and an extensionless Windows path would execute a different
++// file than the verified one, so wrappers are refused and the path below is
++// the executed program. (The runtime entry's own bytes stay inert: the entry
++// travels as an argument to the interpreter, never as an executed program.)
++func verifyInterpreterFile(request *workerRequest) (InterpreterIdentity, error) {
++	canonical, err := godriver.CanonicalPhysicalPath(request.InterpreterPath)
++	if err != nil || canonical != request.InterpreterPath {
++		return InterpreterIdentity{}, diagnosticErr(CodeWorkerIdentityInvalid, err,
++			"the resolved interpreter path is not canonical and link-free")
++	}
++	observed, err := readInterpreterIdentity(request.InterpreterID, canonical)
++	if err != nil {
++		return InterpreterIdentity{}, err
++	}
++	expected := InterpreterIdentity{
++		ID: request.InterpreterID, Path: request.InterpreterPath,
++		SHA256: request.InterpreterSHA, Size: request.InterpreterSize,
++	}
++	if err := expected.matchesExpectation(observed.Path, observed.SHA256, observed.Size); err != nil {
++		return InterpreterIdentity{}, err
++	}
++	return observed, nil
++}
++
++// runInterpreter starts exactly the verified interpreter against the
++// manager-derived runtime entry. It is the worker's only process-creation
++// site. Standard input is bound explicitly — to the request payload or to
++// the platform null device — and the child's exit status is returned
++// without reinterpretation.
++func (session *workerSession) runInterpreter() (*workerResult, error) {
++	request := session.request
++	session.started++
++	argv := append([]string{request.RuntimeEntry}, request.Args...)
++
++	command := exec.Command(request.InterpreterPath, argv...) // #nosec G204 -- verified interpreter against a verified runtime entry, both manager-derived
++	command.Dir = request.WorkingDir
++	command.Env = append([]string(nil), request.Environment...)
++	if request.StdinIsNull || request.Stdin == nil {
++		null, err := os.Open(os.DevNull)
++		if err != nil {
++			return nil, diagnosticErr(CodeWorkerProtocolInvalid, err, "cannot bind standard input to the null device")
++		}
++		defer func() { _ = null.Close() }()
++		command.Stdin = null
++	} else {
++		command.Stdin = bytes.NewReader(request.Stdin)
++	}
++	command.SysProcAttr = interpreterSysProcAttr()
++	budget := &outputBudget{remaining: request.OutputLimit}
++	stdout := &boundedBuffer{budget: budget}
++	stderr := &boundedBuffer{budget: budget}
++	command.Stdout = stdout
++	command.Stderr = stderr
++
++	runErr := command.Run()
++	result := &workerResult{Stdout: stdout.Bytes(), Stderr: stderr.Bytes(), Started: session.started}
++	if errors.Is(stdout.err, errOutputLimit) || errors.Is(stderr.err, errOutputLimit) || errors.Is(budget.err, errOutputLimit) {
++		result.Overflow = true
++	}
++	if runErr != nil {
++		if state := command.ProcessState; state != nil {
++			result.ExitCode = state.ExitCode()
++		} else {
++			result.ExitCode = -1
++		}
++	}
++	return result, nil
++}
++
++func isHex(value string) bool {
++	if len(value) == 0 {
++		return false
++	}
++	for _, character := range value {
++		if !strings.ContainsRune("0123456789abcdefABCDEF", character) {
++			return false
++		}
++	}
++	return true
++}
++
++func isDigest(value string) bool {
++	digest, ok := strings.CutPrefix(value, "sha256:")
++	if !ok || len(digest) != 64 {
++		return false
++	}
++	return isHex(digest)
++}
+diff --git a/internal/scriptworker/worker_test.go b/internal/scriptworker/worker_test.go
+new file mode 100644
+index 00000000..0003c3ec
+--- /dev/null
++++ b/internal/scriptworker/worker_test.go
+@@ -0,0 +1,656 @@
++package scriptworker
++
++import (
++	"crypto/sha256"
++	"encoding/hex"
++	"encoding/json"
++	"io"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/godriver"
++)
++
++// rawWorker drives a real hidden-mode script worker process over the session
++// channel with complete control over the framing, so every identity and
++// protocol rejection is proved against the shipped worker rather than a mock.
++type rawWorker struct {
++	t       *testing.T
++	command *exec.Cmd
++	stdin   io.WriteCloser
++	stdout  io.ReadCloser
++}
++
++func startRawWorker(t *testing.T, launchPath string) *rawWorker {
++	t.Helper()
++	command := exec.Command(launchPath, WorkerMode) // #nosec G204 -- identity-verified re-execution of the test binary
++	command.Env = scriptWorkerEnvironment()
++	command.SysProcAttr = scriptWorkerSysProcAttr()
++	stdin, err := command.StdinPipe()
++	if err != nil {
++		t.Fatal(err)
++	}
++	stdout, err := command.StdoutPipe()
++	if err != nil {
++		t.Fatal(err)
++	}
++	command.Stderr = os.Stderr
++	if err := command.Start(); err != nil {
++		t.Fatal(err)
++	}
++	worker := &rawWorker{t: t, command: command, stdin: stdin, stdout: stdout}
++	t.Cleanup(worker.close)
++	return worker
++}
++
++func (worker *rawWorker) send(message workerMessage) {
++	worker.t.Helper()
++	if err := writeMessage(worker.stdin, message); err != nil {
++		worker.t.Fatalf("cannot send %s: %v", message.Kind, err)
++	}
++}
++
++func (worker *rawWorker) receive() workerMessage {
++	worker.t.Helper()
++	message, err := readMessage(worker.stdout)
++	if err != nil {
++		worker.t.Fatalf("cannot read a worker message: %v", err)
++	}
++	return message
++}
++
++// expectFailure requires the worker to reject with the given stable
++// diagnostic before the interpreter runs.
++func (worker *rawWorker) expectFailure(code string) {
++	worker.t.Helper()
++	message := worker.receive()
++	if message.Kind != kindFailure || message.Failure == nil {
++		worker.t.Fatalf("worker sent %q, want a failure", message.Kind)
++	}
++	if message.Failure.Code != code {
++		worker.t.Fatalf("worker failure code = %q (%s), want %q", message.Failure.Code, message.Failure.Detail, code)
++	}
++}
++
++// expectFailureDetail requires the worker to reject with the given stable
++// code and a detail naming the expected cause, before the interpreter runs.
++// The detail pins which gate refused, so a row cannot pass on the wrong
++// refusal (for example the name or image gate firing before the tamper the
++// row wants to prove).
++func (worker *rawWorker) expectFailureDetail(code, wantDetail string) {
++	worker.t.Helper()
++	message := worker.receive()
++	if message.Kind != kindFailure || message.Failure == nil {
++		worker.t.Fatalf("worker sent %q, want a failure", message.Kind)
++	}
++	if message.Failure.Code != code {
++		worker.t.Fatalf("worker failure code = %q (%s), want %q", message.Failure.Code, message.Failure.Detail, code)
++	}
++	if !strings.Contains(message.Failure.Detail, wantDetail) {
++		worker.t.Fatalf("worker failure detail = %q, want it to name %q", message.Failure.Detail, wantDetail)
++	}
++}
++
++func (worker *rawWorker) close() {
++	_ = worker.stdin.Close()
++	terminateScriptDomain(worker.command, nil)
++	_ = worker.command.Wait()
++}
++
++// workerFixture is one valid session input: a stub interpreter, a runtime
++// entry, and manager-owned directories.
++type workerFixture struct {
++	manager     godriver.ExecutableIdentity
++	interpreter InterpreterIdentity
++	entry       string
++	workDir     string
++	tmp         string
++	config      string
++	cache       string
++	nonce       string
++}
++
++func newWorkerFixture(t *testing.T, launchPath string) *workerFixture {
++	t.Helper()
++	root := mustPhysical(t, t.TempDir())
++	entry := filepath.Join(root, "runtime", "tool")
++	writeTestFile(t, entry, []byte("print('tool')\n"), 0o644)
++	workDir := filepath.Join(root, "work")
++	if err := os.MkdirAll(workDir, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	private := filepath.Join(root, "private")
++	for _, leaf := range []string{"tmp", "config", "cache"} {
++		if err := os.MkdirAll(filepath.Join(private, leaf), 0o700); err != nil {
++			t.Fatal(err)
++		}
++	}
++	manager, err := godriver.ResolveManagerIdentity(launchPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	stub := mustPhysical(t, stubInterpreterBinary(t))
++	interpreter, err := ResolveInterpreter("python3-v1", map[string]string{"python3-v1": stub}, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return &workerFixture{
++		manager: manager, interpreter: interpreter, entry: entry,
++		workDir: workDir,
++		tmp:     filepath.Join(private, "tmp"),
++		config:  filepath.Join(private, "config"),
++		cache:   filepath.Join(private, "cache"),
++		nonce:   strings.Repeat("ab", 32),
++	}
++}
++
++func (fixture *workerFixture) request() *workerRequest {
++	return &workerRequest{
++		Version:          protocolVersion,
++		ExecutablePath:   fixture.manager.Path,
++		ExecutableSHA256: fixture.manager.SHA256,
++		ExecutableSize:   fixture.manager.Size,
++		InterpreterID:    fixture.interpreter.ID,
++		InterpreterPath:  fixture.interpreter.Path,
++		InterpreterSHA:   fixture.interpreter.SHA256,
++		InterpreterSize:  fixture.interpreter.Size,
++		RuntimeEntry:     fixture.entry,
++		Environment:      []string{"PATH=/nonexistent"},
++		WorkingDir:       fixture.workDir,
++		PrivateTmp:       fixture.tmp,
++		PrivateConfig:    fixture.config,
++		PrivateCache:     fixture.cache,
++		StdinIsNull:      true,
++		OutputLimit:      defaultOutputLimit,
++	}
++}
++
++// stubReport decodes what the stub interpreter recorded about its launch.
++type stubReport struct {
++	Executable string   `json:"executable"`
++	Argv       []string `json:"argv"`
++	Cwd        string   `json:"cwd"`
++	Stdin      string   `json:"stdin"`
++	Probe      string   `json:"probe"`
++}
++
++func decodeStubReport(t *testing.T, stdout []byte) stubReport {
++	t.Helper()
++	var report stubReport
++	if err := json.Unmarshal(stdout, &report); err != nil {
++		t.Fatalf("cannot decode the stub report %q: %v", stdout, err)
++	}
++	return report
++}
++
++// TestScriptWorkerHappyPath proves the fixed worker session at the real
++// process boundary: identity proof, interpreter verification, runtime-entry
++// execution with verbatim arguments, and the child's exit status.
++func TestScriptWorkerHappyPath(t *testing.T) {
++	worker := startRawWorker(t, os.Args[0])
++	fixture := newWorkerFixture(t, os.Args[0])
++	wire := fixture.request()
++	wire.Args = []string{"--count", "3", "hello world", "ünicode", "-x"}
++	wire.Environment = append(wire.Environment, "STUB_EXIT=0")
++
++	worker.send(workerMessage{Kind: kindRequest, Nonce: fixture.nonce, Request: wire})
++	ready := worker.receive()
++	if ready.Kind != kindReady || ready.Ready == nil {
++		t.Fatalf("worker sent %q, want ready", ready.Kind)
++	}
++	if ready.Nonce != fixture.nonce {
++		t.Fatal("worker acknowledgement carries a foreign nonce")
++	}
++	if ready.Ready.ExecutableSHA256 != fixture.manager.SHA256 || ready.Ready.InterpreterSHA != fixture.interpreter.SHA256 {
++		t.Fatalf("worker proof = %+v, want the session identities", ready.Ready)
++	}
++	result := worker.receive()
++	if result.Kind != kindResult || result.Result == nil {
++		t.Fatalf("worker sent %q, want result", result.Kind)
++	}
++	if result.Nonce != fixture.nonce {
++		t.Fatal("worker result carries a foreign nonce")
++	}
++	if result.Result.ExitCode != 0 || result.Result.Started != 1 || result.Result.Overflow {
++		t.Fatalf("result = %+v, want one clean run", result.Result)
++	}
++	report := decodeStubReport(t, result.Result.Stdout)
++	wantArgv := append([]string{fixture.interpreter.Path, fixture.entry}, wire.Args...)
++	if strings.Join(report.Argv, "\x00") != strings.Join(wantArgv, "\x00") {
++		t.Fatalf("argv = %q, want %q", report.Argv, wantArgv)
++	}
++	if report.Cwd != fixture.workDir {
++		t.Fatalf("cwd = %q, want %q", report.Cwd, fixture.workDir)
++	}
++	worker.send(workerMessage{Kind: kindShutdown, Nonce: fixture.nonce})
++}
++
++// TestScriptWorkerReturnsTheChildExitStatus proves the interpreter's exit
++// status and stderr return without reinterpretation.
++func TestScriptWorkerReturnsTheChildExitStatus(t *testing.T) {
++	worker := startRawWorker(t, os.Args[0])
++	fixture := newWorkerFixture(t, os.Args[0])
++	wire := fixture.request()
++	wire.Environment = append(wire.Environment, "STUB_EXIT=7", "STUB_STDERR=boom\n")
++
++	worker.send(workerMessage{Kind: kindRequest, Nonce: fixture.nonce, Request: wire})
++	if ready := worker.receive(); ready.Kind != kindReady {
++		t.Fatalf("worker sent %q, want ready", ready.Kind)
++	}
++	result := worker.receive()
++	if result.Kind != kindResult || result.Result == nil {
++		t.Fatalf("worker sent %q, want result", result.Kind)
++	}
++	if result.Result.ExitCode != 7 {
++		t.Fatalf("exit code = %d, want 7", result.Result.ExitCode)
++	}
++	if string(result.Result.Stderr) != "boom\n" {
++		t.Fatalf("stderr = %q, want %q", result.Result.Stderr, "boom\n")
++	}
++	worker.send(workerMessage{Kind: kindShutdown, Nonce: fixture.nonce})
++}
++
++// TestScriptWorkerBindsStandardInput proves explicit stream binding: a
++// request payload reaches the interpreter's standard input, and a null
++// binding reads EOF rather than an inherited descriptor.
++func TestScriptWorkerBindsStandardInput(t *testing.T) {
++	worker := startRawWorker(t, os.Args[0])
++	fixture := newWorkerFixture(t, os.Args[0])
++	wire := fixture.request()
++	wire.Stdin = []byte("payload-bytes\n")
++	wire.StdinIsNull = false
++
++	worker.send(workerMessage{Kind: kindRequest, Nonce: fixture.nonce, Request: wire})
++	if ready := worker.receive(); ready.Kind != kindReady {
++		t.Fatalf("worker sent %q, want ready", ready.Kind)
++	}
++	result := worker.receive()
++	if result.Kind != kindResult || result.Result == nil {
++		t.Fatalf("worker sent %q, want result", result.Kind)
++	}
++	if report := decodeStubReport(t, result.Result.Stdout); report.Stdin != "payload-bytes\n" {
++		t.Fatalf("stdin = %q, want the request payload", report.Stdin)
++	}
++	worker.send(workerMessage{Kind: kindShutdown, Nonce: fixture.nonce})
++
++	// The null arm: the stub reads EOF, which an inherited descriptor would
++	// only produce by accident of the test host.
++	second := startRawWorker(t, os.Args[0])
++	other := newWorkerFixture(t, os.Args[0])
++	nullWire := other.request()
++	second.send(workerMessage{Kind: kindRequest, Nonce: other.nonce, Request: nullWire})
++	if ready := second.receive(); ready.Kind != kindReady {
++		t.Fatalf("worker sent %q, want ready", ready.Kind)
++	}
++	nullResult := second.receive()
++	if nullResult.Kind != kindResult || nullResult.Result == nil {
++		t.Fatalf("worker sent %q, want result", nullResult.Kind)
++	}
++	if report := decodeStubReport(t, nullResult.Result.Stdout); report.Stdin != "" {
++		t.Fatalf("null stdin read %q, want EOF", report.Stdin)
++	}
++	second.send(workerMessage{Kind: kindShutdown, Nonce: other.nonce})
++}
++
++// TestScriptWorkerIgnoresTheShebang proves the executed program is the
++// resolved interpreter, never anything the script bytes name.
++func TestScriptWorkerIgnoresTheShebang(t *testing.T) {
++	worker := startRawWorker(t, os.Args[0])
++	fixture := newWorkerFixture(t, os.Args[0])
++	marker := filepath.Join(fixture.workDir, "ran")
++	writeTestFile(t, fixture.entry, []byte("#!/bin/sh\nexit 99\n"), 0o755)
++	wire := fixture.request()
++	wire.Environment = append(wire.Environment, "STUB_MARKER="+marker)
++
++	worker.send(workerMessage{Kind: kindRequest, Nonce: fixture.nonce, Request: wire})
++	if ready := worker.receive(); ready.Kind != kindReady {
++		t.Fatalf("worker sent %q, want ready", ready.Kind)
++	}
++	result := worker.receive()
++	if result.Kind != kindResult || result.Result == nil {
++		t.Fatalf("worker sent %q, want result", result.Kind)
++	}
++	if result.Result.ExitCode != 0 {
++		t.Fatalf("exit code = %d, want the interpreter's 0, not the shebang's 99", result.Result.ExitCode)
++	}
++	if _, err := os.Stat(marker); err != nil {
++		t.Fatal("the configured interpreter never ran")
++	}
++	worker.send(workerMessage{Kind: kindShutdown, Nonce: fixture.nonce})
++}
++
++// TestScriptWorkerRejectsMalformedSessions proves framing, version, and
++// nonce failures refuse before any identity proof and before the
++// interpreter runs.
++func TestScriptWorkerRejectsMalformedSessions(t *testing.T) {
++	marker := filepath.Join(t.TempDir(), "ran")
++	build := func(t *testing.T, mutate func(*workerRequest, *string)) (*rawWorker, workerMessage) {
++		worker := startRawWorker(t, os.Args[0])
++		fixture := newWorkerFixture(t, os.Args[0])
++		wire := fixture.request()
++		wire.Environment = append(wire.Environment, "STUB_MARKER="+marker)
++		nonce := fixture.nonce
++		mutate(wire, &nonce)
++		return worker, workerMessage{Kind: kindRequest, Nonce: nonce, Request: wire}
++	}
++	for _, testCase := range []struct {
++		name   string
++		mutate func(*workerRequest, *string)
++	}{
++		{"short-nonce", func(_ *workerRequest, nonce *string) { *nonce = "ab" }},
++		{"non-hex-nonce", func(_ *workerRequest, nonce *string) { *nonce = strings.Repeat("zz", 32) }},
++		{"empty-nonce", func(_ *workerRequest, nonce *string) { *nonce = "" }},
++		{"wrong-version", func(wire *workerRequest, _ *string) { wire.Version = "curator-go-worker-v1" }},
++		{"empty-version", func(wire *workerRequest, _ *string) { wire.Version = "" }},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			worker, message := build(t, testCase.mutate)
++			worker.send(message)
++			worker.expectFailure(CodeWorkerProtocolInvalid)
++		})
++	}
++	if _, err := os.Stat(marker); err == nil {
++		t.Fatal("the interpreter ran for a malformed session")
++	}
++}
++
++// TestScriptWorkerRejectsForgedWorkerIdentity proves a copied or modified
++// manager binary cannot pass as the expected worker: the proof binds path,
++// hash, and size together.
++func TestScriptWorkerRejectsForgedWorkerIdentity(t *testing.T) {
++	// A copied binary launched in worker mode proves its own bytes, which
++	// do not match the original's expectation.
++	original := mustPhysical(t, os.Args[0])
++	copied := filepath.Join(mustPhysical(t, t.TempDir()), executableFixtureName("curator-copy"))
++	copyTestFile(t, original, copied)
++	worker := startRawWorker(t, copied)
++	fixture := newWorkerFixture(t, original)
++	marker := filepath.Join(fixture.workDir, "ran")
++	wire := fixture.request()
++	wire.Environment = append(wire.Environment, "STUB_MARKER="+marker)
++
++	worker.send(workerMessage{Kind: kindRequest, Nonce: fixture.nonce, Request: wire})
++	worker.expectFailure(CodeWorkerIdentityInvalid)
++	if _, err := os.Stat(marker); err == nil {
++		t.Fatal("the interpreter ran for a forged worker identity")
++	}
++
++	// A modified binary fails the same way: the bytes no longer hash to
++	// the recorded identity.
++	modified := filepath.Join(mustPhysical(t, t.TempDir()), executableFixtureName("curator-modified"))
++	copyTestFile(t, original, modified)
++	payload, err := os.ReadFile(modified) // #nosec G304 -- test-owned copy
++	if err != nil {
++		t.Fatal(err)
++	}
++	payload[len(payload)-1] ^= 0xff
++	if err := os.WriteFile(modified, payload, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	second := startRawWorker(t, modified)
++	other := newWorkerFixture(t, original)
++	otherWire := other.request()
++	otherWire.Environment = append(otherWire.Environment, "STUB_MARKER="+marker)
++	second.send(workerMessage{Kind: kindRequest, Nonce: other.nonce, Request: otherWire})
++	second.expectFailure(CodeWorkerIdentityInvalid)
++	if _, err := os.Stat(marker); err == nil {
++		t.Fatal("the interpreter ran for a modified worker binary")
++	}
++}
++
++// TestScriptWorkerRejectsSubstitutedManager proves a worker started through
++// a launcher link still proves the installed identity, and a retargeted
++// link cannot move it.
++func TestScriptWorkerRejectsSubstitutedManager(t *testing.T) {
++	directory := mustPhysical(t, t.TempDir())
++	installed := filepath.Join(directory, executableFixtureName("curator-real"))
++	copyTestFile(t, mustPhysical(t, os.Args[0]), installed)
++	other := filepath.Join(directory, executableFixtureName("curator-other"))
++	copyTestFile(t, installed, other)
++	payload, err := os.ReadFile(other) // #nosec G304 -- test-owned copy
++	if err != nil {
++		t.Fatal(err)
++	}
++	payload[len(payload)-1] ^= 0xff
++	if err := os.WriteFile(other, payload, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	link := filepath.Join(directory, executableFixtureName("curator"))
++	if err := os.Symlink(installed, link); err != nil {
++		t.Skipf("this host forbids symlink creation: %v", err)
++	}
++
++	// Through the link at the installed file: the worker proves that file.
++	worker := startRawWorker(t, link)
++	fixture := newWorkerFixture(t, installed)
++	wire := fixture.request()
++	worker.send(workerMessage{Kind: kindRequest, Nonce: fixture.nonce, Request: wire})
++	if ready := worker.receive(); ready.Kind != kindReady {
++		t.Fatalf("worker launched through a link sent %q, want ready", ready.Kind)
++	}
++	result := worker.receive()
++	if result.Kind != kindResult {
++		t.Fatalf("worker launched through a link sent %q, want result", result.Kind)
++	}
++	worker.send(workerMessage{Kind: kindShutdown, Nonce: fixture.nonce})
++
++	// Retarget the link at the attacker's bytes: the recorded identity no
++	// longer matches what the worker proves.
++	if err := os.Remove(link); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Symlink(other, link); err != nil {
++		t.Fatal(err)
++	}
++	substituted := startRawWorker(t, link)
++	second := newWorkerFixture(t, installed)
++	secondWire := second.request()
++	substituted.send(workerMessage{Kind: kindRequest, Nonce: second.nonce, Request: secondWire})
++	substituted.expectFailure(CodeWorkerIdentityInvalid)
++}
++
++// TestScriptWorkerRejectsTamperedInterpreter proves the interpreter file is
++// verified before it runs: a hash the bytes no longer match refuses, and a
++// replacement of the file between sessions refuses too.
++func TestScriptWorkerRejectsTamperedInterpreter(t *testing.T) {
++	worker := startRawWorker(t, os.Args[0])
++	fixture := newWorkerFixture(t, os.Args[0])
++	marker := filepath.Join(fixture.workDir, "ran")
++	wire := fixture.request()
++	wire.Environment = append(wire.Environment, "STUB_MARKER="+marker)
++	wire.InterpreterSHA = "sha256:" + strings.Repeat("0", 64)
++
++	worker.send(workerMessage{Kind: kindRequest, Nonce: fixture.nonce, Request: wire})
++	worker.expectFailureDetail(CodeWorkerIdentityInvalid, "interpreter identity proof")
++	if _, err := os.Stat(marker); err == nil {
++		t.Fatal("the interpreter ran for a tampered identity")
++	}
++
++	// A file replaced after the expectation was recorded refuses the same
++	// way, even though the expectation itself is well-formed. The copy
++	// names the native image itself (with the platform executable suffix
++	// on Windows) so the pre-tamper resolution succeeds there; the tamper
++	// then flips the last byte, keeping the image header intact, so the
++	// refusal names the proof mismatch rather than the image gate.
++	stub := stubInterpreterBinary(t)
++	replaced := filepath.Join(mustPhysical(t, t.TempDir()), executableFixtureName("interp"))
++	copyTestFile(t, stub, replaced)
++	replaced = mustPhysical(t, replaced)
++	recorded, err := ResolveInterpreter("node-v1", map[string]string{"node-v1": replaced}, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	payload, err := os.ReadFile(replaced) // #nosec G304 -- test-owned copy
++	if err != nil {
++		t.Fatal(err)
++	}
++	payload[len(payload)-1] ^= 0xff
++	if err := os.WriteFile(replaced, payload, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	second := startRawWorker(t, os.Args[0])
++	other := newWorkerFixture(t, os.Args[0])
++	otherWire := other.request()
++	otherWire.InterpreterID = recorded.ID
++	otherWire.InterpreterPath = recorded.Path
++	otherWire.InterpreterSHA = recorded.SHA256
++	otherWire.InterpreterSize = recorded.Size
++	otherWire.Environment = append(otherWire.Environment, "STUB_MARKER="+marker)
++	second.send(workerMessage{Kind: kindRequest, Nonce: other.nonce, Request: otherWire})
++	second.expectFailureDetail(CodeWorkerIdentityInvalid, "interpreter identity proof")
++	if _, err := os.Stat(marker); err == nil {
++		t.Fatal("the interpreter ran after its file was replaced")
++	}
++}
++
++// TestScriptWorkerRejectsWrapperImage proves the worker refuses a non-native
++// interpreter binding at the real process boundary — expectFailure with the
++// interpreter-never-ran marker — even when the request carries the wrapper's
++// own correct hash and size: an identity proof is not a license to run a
++// wrapper. The POSIX arm is a working shebang wrapper that would exec the
++// stub; the Windows arms are a .cmd wrapper, an extensionless native copy,
++// and an .exe name over non-image bytes.
++func TestScriptWorkerRejectsWrapperImage(t *testing.T) {
++	directory := mustPhysical(t, t.TempDir())
++	stub := mustPhysical(t, stubInterpreterBinary(t))
++	marker := filepath.Join(directory, "ran")
++	type binding struct {
++		name string
++		path string
++	}
++	var bindings []binding
++	if runtime.GOOS == "windows" {
++		cmdWrapper := filepath.Join(directory, "wrapper.cmd")
++		writeTestFile(t, cmdWrapper, []byte("@echo off\r\necho ran>> \""+marker+"\"\r\n"), 0o644)
++		bindings = append(bindings, binding{"cmd-wrapper", cmdWrapper})
++		extensionless := filepath.Join(directory, "interp")
++		copyTestFile(t, stub, extensionless)
++		bindings = append(bindings, binding{"extensionless-native-image", extensionless})
++		fake := filepath.Join(directory, "fake.exe")
++		writeTestFile(t, fake, []byte("@echo off\r\necho ran>> \""+marker+"\"\r\n"), 0o644)
++		bindings = append(bindings, binding{"exe-named-text", fake})
++	} else {
++		wrapper := filepath.Join(directory, "wrapper")
++		writeTestFile(t, wrapper, []byte("#!/bin/sh\necho ran >> \""+marker+"\"\nexec \""+stub+"\" \"$@\"\n"), 0o755)
++		bindings = append(bindings, binding{"shebang-wrapper", wrapper})
++	}
++	for _, testCase := range bindings {
++		t.Run(testCase.name, func(t *testing.T) {
++			path := mustPhysical(t, testCase.path)
++			payload, err := os.ReadFile(path) // #nosec G304 -- test-owned path
++			if err != nil {
++				t.Fatal(err)
++			}
++			digest := sha256.Sum256(payload)
++			worker := startRawWorker(t, os.Args[0])
++			fixture := newWorkerFixture(t, os.Args[0])
++			wire := fixture.request()
++			wire.InterpreterPath = path
++			wire.InterpreterSHA = "sha256:" + hex.EncodeToString(digest[:])
++			wire.InterpreterSize = int64(len(payload))
++			wire.Environment = append(wire.Environment, "STUB_MARKER="+marker)
++			worker.send(workerMessage{Kind: kindRequest, Nonce: fixture.nonce, Request: wire})
++			worker.expectFailure(CodeWorkerIdentityInvalid)
++		})
++	}
++	if _, err := os.Stat(marker); err == nil {
++		t.Fatal("a wrapper interpreter ran")
++	}
++}
++
++// TestScriptWorkerRejectsPackageSelectedPrograms proves package-shaped
++// values — a non-closed interpreter identifier, a non-absolute or
++// non-regular runtime entry — refuse as package influence before the
++// interpreter runs.
++func TestScriptWorkerRejectsPackageSelectedPrograms(t *testing.T) {
++	marker := filepath.Join(t.TempDir(), "ran")
++	for _, testCase := range []struct {
++		name   string
++		mutate func(t *testing.T, fixture *workerFixture, wire *workerRequest)
++	}{
++		{"shell-interpreter", func(_ *testing.T, _ *workerFixture, wire *workerRequest) {
++			wire.InterpreterID = "bash-v1"
++		}},
++		{"empty-interpreter", func(_ *testing.T, _ *workerFixture, wire *workerRequest) {
++			wire.InterpreterID = ""
++		}},
++		{"relative-runtime-entry", func(_ *testing.T, _ *workerFixture, wire *workerRequest) {
++			wire.RuntimeEntry = "scripts/tool"
++		}},
++		{"empty-runtime-entry", func(_ *testing.T, _ *workerFixture, wire *workerRequest) {
++			wire.RuntimeEntry = ""
++		}},
++		{"directory-runtime-entry", func(_ *testing.T, fixture *workerFixture, wire *workerRequest) {
++			wire.RuntimeEntry = fixture.workDir
++		}},
++		{"symlink-runtime-entry", func(t *testing.T, fixture *workerFixture, wire *workerRequest) {
++			link := filepath.Join(fixture.workDir, "tool-link")
++			if err := os.Symlink(fixture.entry, link); err != nil {
++				t.Skipf("this host forbids symlink creation: %v", err)
++			}
++			wire.RuntimeEntry = link
++		}},
++		{"relative-interpreter-path", func(_ *testing.T, _ *workerFixture, wire *workerRequest) {
++			wire.InterpreterPath = "bin/python3"
++		}},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			worker := startRawWorker(t, os.Args[0])
++			fixture := newWorkerFixture(t, os.Args[0])
++			wire := fixture.request()
++			wire.Environment = append(wire.Environment, "STUB_MARKER="+marker)
++			testCase.mutate(t, fixture, wire)
++			worker.send(workerMessage{Kind: kindRequest, Nonce: fixture.nonce, Request: wire})
++			worker.expectFailure(CodePackageInfluenceForbidden)
++		})
++	}
++	if _, err := os.Stat(marker); err == nil {
++		t.Fatal("the interpreter ran for a package-selected program")
++	}
++}
++
++// TestScriptWorkerRejectsReplayedNonce proves the session binds every
++// message to the fresh request nonce: a shutdown under another nonce
++// tears the session down without a second run.
++func TestScriptWorkerRejectsReplayedNonce(t *testing.T) {
++	worker := startRawWorker(t, os.Args[0])
++	fixture := newWorkerFixture(t, os.Args[0])
++	wire := fixture.request()
++	worker.send(workerMessage{Kind: kindRequest, Nonce: fixture.nonce, Request: wire})
++	if ready := worker.receive(); ready.Kind != kindReady {
++		t.Fatalf("worker sent %q, want ready", ready.Kind)
++	}
++	if result := worker.receive(); result.Kind != kindResult {
++		t.Fatalf("worker sent %q, want result", result.Kind)
++	}
++	worker.send(workerMessage{Kind: kindShutdown, Nonce: strings.Repeat("00", 32)})
++	worker.expectFailure(CodeWorkerProtocolInvalid)
++}
++
++// TestScriptWorkerModeIsNotReachableThroughPackageData proves the hidden
++// mode is an argv-selected implementation boundary: no request field names
++// it, and a request carrying it as data is still just data.
++func TestScriptWorkerModeIsNotReachableThroughPackageData(t *testing.T) {
++	worker := startRawWorker(t, os.Args[0])
++	fixture := newWorkerFixture(t, os.Args[0])
++	wire := fixture.request()
++	wire.Args = []string{WorkerMode}
++	wire.Environment = append(wire.Environment, "STUB_EXIT=0")
++	worker.send(workerMessage{Kind: kindRequest, Nonce: fixture.nonce, Request: wire})
++	if ready := worker.receive(); ready.Kind != kindReady {
++		t.Fatalf("worker sent %q, want ready", ready.Kind)
++	}
++	result := worker.receive()
++	if result.Kind != kindResult || result.Result == nil {
++		t.Fatalf("worker sent %q, want result", result.Kind)
++	}
++	report := decodeStubReport(t, result.Result.Stdout)
++	if len(report.Argv) == 0 || report.Argv[len(report.Argv)-1] != WorkerMode {
++		t.Fatalf("argv = %q, want the mode carried as inert data", report.Argv)
++	}
++	worker.send(workerMessage{Kind: kindShutdown, Nonce: fixture.nonce})
++}
+diff --git a/internal/skillcheck/skillcheck_test.go b/internal/skillcheck/skillcheck_test.go
+index 77a4f146..fa28ac16 100644
+--- a/internal/skillcheck/skillcheck_test.go
++++ b/internal/skillcheck/skillcheck_test.go
+@@ -248,13 +248,14 @@ func schema8ScriptSkill(t *testing.T, enforced bool) string {
+ }
+ 
+ // A schema-8 manifest that selects script-worker-v1 is a valid document, so it
+-// parses; the manager still refuses it, because it has no worker and the
+-// policy forbids installing the command declared-only.
++// parses; the manager still refuses it, because the preflight cannot apply
++// every mandatory control and the policy forbids installing the command
++// declared-only.
+ func TestValidateRejectsEnforcedScriptExecutionPolicy(t *testing.T) {
+ 	issues := Validate(schema8ScriptSkill(t, true), "")
+ 	var refusals []Issue
+ 	for _, issue := range issues {
+-		if issue.Code == "script_execution_policy_unsupported" {
++		if issue.Code == "script_execution_control_unavailable" {
+ 			refusals = append(refusals, issue)
+ 		}
+ 		if issue.Code == "skill.manifest_invalid" {
+@@ -280,7 +281,7 @@ func TestValidateAcceptsDeclaredOnlySchema8ScriptCommand(t *testing.T) {
+ 		t.Fatalf("a declared-only schema-8 skill reported errors: %+v", issues)
+ 	}
+ 	for _, issue := range issues {
+-		if issue.Code == "script_execution_policy_unsupported" {
++		if issue.Code == "script_execution_policy_unsupported" || issue.Code == "script_execution_control_unavailable" {
+ 			t.Fatalf("a declared-only command was refused: %+v", issue)
+ 		}
+ 	}

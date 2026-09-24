@@ -1,0 +1,2248 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 3f614b1f..a696f7c6 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -6,6 +6,21 @@ All notable implementation changes are recorded here.
+ 
+ ### Added
+ 
++- R4 script audit warning classes for `script-worker-v1` (manager profile
++  §7). Every declared-only script command — schema 7 and schema 8 without
++  `execution_policy` — now warns `script-command-declared-only` through
++  `curator audit`, the install-time audit gate, and `skill check`; every
++  enforced command with declared `network` hosts warns
++  `script-command-unfiltered-declared-network` (reporting-only, no portable
++  filtering applied or claimed). Both classes are always warnings in every
++  mode and never block: declared-only skills install exactly as before and
++  enforced skills keep their native launchers. Enforced commands are never
++  labelled declared-only, and the network label applies only to enforced
++  commands with non-empty declared hosts. For every script command the
++  audit record additionally carries the effective execution-policy
++  identity or its explicit absence (`audit info` lines, `script_policies`
++  in `audit --json`, and the stored verdict), independent of warning
++  eligibility. Operator guidance in `docs/troubleshooting.md`.
+ - R3 native probes, capability evidence, and preflight for
+   `script-worker-v1`. Every enforced invocation probes the exhaustive
+   eight-control native inventory once, before the worker starts, with no
+diff --git a/cmd/curator/auditlabels_test.go b/cmd/curator/auditlabels_test.go
+new file mode 100644
+index 00000000..5568b919
+--- /dev/null
++++ b/cmd/curator/auditlabels_test.go
+@@ -0,0 +1,337 @@
++package main
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/manifest"
++)
++
++// auditLabelProject lays out a project declaring one single-command skill
++// shaped like an audit-label vector case, and returns the config path that
++// points the CLI at it. enforced selects the `script-worker-v1` policy with
++// the closed `python3-v1` interpreter; network selects the declared
++// `network` hosts (nil declares none).
++func auditLabelProject(t *testing.T, schema int, enforced bool, network []string) string {
++	t.Helper()
++	root := t.TempDir()
++	configPath := filepath.Join(root, "home", "config.json")
++	skillsRoot := filepath.Join(root, "skills")
++	project := filepath.Join(root, "project")
++	skillRepo := filepath.Join(skillsRoot, "label-skill")
++	if err := os.MkdirAll(skillRepo, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.MkdirAll(project, 0o755); err != nil {
++		t.Fatal(err)
++	}
++
++	runGit(t, skillRepo, "init", "-q", "-b", "main")
++	if err := os.WriteFile(filepath.Join(skillRepo, "SKILL.md"),
++		[]byte("---\nname: label-skill\ndescription: d\n---\n# Label\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.MkdirAll(filepath.Join(skillRepo, "scripts"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(skillRepo, "scripts", "tool"),
++		[]byte("#!/bin/sh\necho ok\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	command := map[string]any{"type": "script", "unix_path": "scripts/tool", "win_path": "scripts/tool"}
++	if enforced {
++		command["execution_policy"] = "script-worker-v1"
++		command["interpreter"] = "python3-v1"
++	}
++	declaredNetwork := any("none")
++	if network != nil {
++		declaredNetwork = network
++	}
++	skillManifest, err := json.Marshal(map[string]any{
++		"schema_version": schema,
++		"capabilities": map[string]any{
++			"env_read": []string{}, "exec": "none", "filesystem": "repo",
++			"network": declaredNetwork, "secrets": "none",
++		},
++		"runtime_roots": []string{"scripts"},
++		"commands":      map[string]any{"tool": command},
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(skillRepo, "agent-skill.json"), skillManifest, 0o644); err != nil {
++		t.Fatal(err)
++	}
++	runGit(t, skillRepo, "add", ".")
++	runGit(t, skillRepo, "commit", "-qm", "initial skill")
++	runGit(t, skillRepo, "tag", "v1")
++
++	runGit(t, project, "init", "-q", "-b", "main")
++	if err := os.WriteFile(filepath.Join(project, ".gitignore"),
++		[]byte(".agents/\n.codex/skills/\nSkillfile.dev.json\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(project, manifest.Name), []byte(
++		`{"schema_version":1,"agents":["codex_cli"],"skills":[{"name":"label-skill","tag":"v1"}]}`), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := config.Bootstrap(configPath, skillsRoot, "", []string{"codex_cli"}, false); err != nil {
++		t.Fatal(err)
++	}
++	if err := config.AddProject(configPath, "app", project, []string{"codex_cli"}); err != nil {
++		t.Fatal(err)
++	}
++	return configPath
++}
++
++// auditLabelMixedProject lays out a project declaring one schema-8 skill
++// with two script commands: a declared-only `tool` and an enforced
++// `guarded` with no declared network hosts.
++func auditLabelMixedProject(t *testing.T) string {
++	t.Helper()
++	root := t.TempDir()
++	configPath := filepath.Join(root, "home", "config.json")
++	skillsRoot := filepath.Join(root, "skills")
++	project := filepath.Join(root, "project")
++	skillRepo := filepath.Join(skillsRoot, "label-skill")
++	if err := os.MkdirAll(skillRepo, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.MkdirAll(project, 0o755); err != nil {
++		t.Fatal(err)
++	}
++
++	runGit(t, skillRepo, "init", "-q", "-b", "main")
++	if err := os.WriteFile(filepath.Join(skillRepo, "SKILL.md"),
++		[]byte("---\nname: label-skill\ndescription: d\n---\n# Label\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.MkdirAll(filepath.Join(skillRepo, "scripts"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	for _, script := range []string{"tool", "guarded"} {
++		if err := os.WriteFile(filepath.Join(skillRepo, "scripts", script),
++			[]byte("#!/bin/sh\necho ok\n"), 0o644); err != nil {
++			t.Fatal(err)
++		}
++	}
++	skillManifest, err := json.Marshal(map[string]any{
++		"schema_version": 8,
++		"capabilities": map[string]any{
++			"env_read": []string{}, "exec": "none", "filesystem": "repo",
++			"network": "none", "secrets": "none",
++		},
++		"runtime_roots": []string{"scripts"},
++		"commands": map[string]any{
++			"tool":    map[string]any{"type": "script", "unix_path": "scripts/tool", "win_path": "scripts/tool"},
++			"guarded": map[string]any{"type": "script", "unix_path": "scripts/guarded", "win_path": "scripts/guarded", "execution_policy": "script-worker-v1", "interpreter": "python3-v1"},
++		},
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(skillRepo, "agent-skill.json"), skillManifest, 0o644); err != nil {
++		t.Fatal(err)
++	}
++	runGit(t, skillRepo, "add", ".")
++	runGit(t, skillRepo, "commit", "-qm", "initial skill")
++	runGit(t, skillRepo, "tag", "v1")
++
++	runGit(t, project, "init", "-q", "-b", "main")
++	if err := os.WriteFile(filepath.Join(project, ".gitignore"),
++		[]byte(".agents/\n.codex/skills/\nSkillfile.dev.json\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(project, manifest.Name), []byte(
++		`{"schema_version":1,"agents":["codex_cli"],"skills":[{"name":"label-skill","tag":"v1"}]}`), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := config.Bootstrap(configPath, skillsRoot, "", []string{"codex_cli"}, false); err != nil {
++		t.Fatal(err)
++	}
++	if err := config.AddProject(configPath, "app", project, []string{"codex_cli"}); err != nil {
++		t.Fatal(err)
++	}
++	return configPath
++}
++
++// TestCLIAuditEmitsScriptLabels drives the four audit-label shapes through
++// the production `curator audit` entry. Labelled skills warn with the exact
++// vector text and exit zero; the enforced skill with no declared hosts
++// audits clean. Every row also carries its per-command record entry: the
++// exact `script-worker-v1` identity or the explicit `(none)` absence.
++func TestCLIAuditEmitsScriptLabels(t *testing.T) {
++	t.Parallel()
++	for _, testCase := range []struct {
++		name       string
++		schema     int
++		enforced   bool
++		network    []string
++		wantLabel  string
++		wantPolicy string
++	}{
++		{"schema7-script", 7, false, nil, "script-command-declared-only", "(none)"},
++		{"schema8-declared-only-script", 8, false, nil, "script-command-declared-only", "(none)"},
++		{"schema8-enforced-script", 8, true, nil, "", "script-worker-v1"},
++		{"schema8-enforced-unfiltered-network", 8, true, []string{"audit-label.example.com"},
++			"script-command-unfiltered-declared-network", "script-worker-v1"},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			t.Parallel()
++			configPath := auditLabelProject(t, testCase.schema, testCase.enforced, testCase.network)
++			code, stdout, stderr := capture(t, configPath, "audit", "app")
++			if code != exitOK {
++				t.Fatalf("audit = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitOK, stdout, stderr)
++			}
++			if stderr != "" {
++				t.Fatalf("audit wrote errors for a labelled skill:\n%s", stderr)
++			}
++			wantRecord := "app: audit info: label-skill: command 'tool' execution_policy=" + testCase.wantPolicy
++			if !strings.Contains(stdout, wantRecord) {
++				t.Fatalf("audit output does not carry the record entry %q:\n%s", wantRecord, stdout)
++			}
++			if testCase.wantLabel == "" {
++				want := wantRecord + "\napp: audit clean\n"
++				if stdout != want {
++					t.Fatalf("an enforced skill with no declared hosts audited:\n%s\nwant exactly:\n%s", stdout, want)
++				}
++				for _, label := range []string{"script-command-declared-only", "script-command-unfiltered-declared-network"} {
++					if strings.Contains(stdout, label) {
++						t.Fatalf("a warning-free audit rendered %q:\n%s", label, stdout)
++					}
++				}
++				return
++			}
++			if !strings.Contains(stdout, testCase.wantLabel) {
++				t.Fatalf("audit output does not carry %q:\n%s", testCase.wantLabel, stdout)
++			}
++			if !strings.Contains(stdout, "audit warning:") {
++				t.Fatalf("the label is not an audit warning:\n%s", stdout)
++			}
++			if testCase.enforced && strings.Contains(stdout, "script-command-declared-only") {
++				t.Fatalf("an enforced audit rendered declared-only:\n%s", stdout)
++			}
++		})
++	}
++}
++
++// TestCLIAuditMixedSkillRecordsBothPolicies drives a two-command skill —
++// one declared-only and one enforced — through `curator audit`. Both
++// record entries render with the exact identity or the explicit absence,
++// while only the declared-only command warns.
++func TestCLIAuditMixedSkillRecordsBothPolicies(t *testing.T) {
++	t.Parallel()
++	configPath := auditLabelMixedProject(t)
++	code, stdout, stderr := capture(t, configPath, "audit", "app")
++	if code != exitOK {
++		t.Fatalf("audit = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitOK, stdout, stderr)
++	}
++	if stderr != "" {
++		t.Fatalf("audit wrote errors:\n%s", stderr)
++	}
++	for _, want := range []string{
++		"app: audit info: label-skill: command 'guarded' execution_policy=script-worker-v1",
++		"app: audit info: label-skill: command 'tool' execution_policy=(none)",
++	} {
++		if !strings.Contains(stdout, want) {
++			t.Fatalf("audit output does not carry the record entry %q:\n%s", want, stdout)
++		}
++	}
++	if !strings.Contains(stdout, "script-command-declared-only") {
++		t.Fatalf("the declared-only command did not warn:\n%s", stdout)
++	}
++	if strings.Contains(stdout, "script-command-unfiltered-declared-network") {
++		t.Fatalf("the enforced no-host command earned the network label:\n%s", stdout)
++	}
++	if strings.Count(stdout, "audit warning:") != 1 {
++		t.Fatalf("a mixed skill must warn exactly once:\n%s", stdout)
++	}
++}
++
++// TestCLIAuditJSONCarriesScriptLabels proves the machine-readable audit
++// output renders the classes as warnings, never errors.
++func TestCLIAuditJSONCarriesScriptLabels(t *testing.T) {
++	t.Parallel()
++	configPath := auditLabelProject(t, 8, true, []string{"audit-label.example.com"})
++	code, stdout, stderr := capture(t, configPath, "audit", "app", "--json")
++	if code != exitOK {
++		t.Fatalf("audit = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitOK, stdout, stderr)
++	}
++	if stderr != "" {
++		t.Fatalf("audit wrote errors:\n%s", stderr)
++	}
++	var outputs []struct {
++		Scope    string   `json:"scope"`
++		Warnings []string `json:"warnings"`
++		Errors   []string `json:"errors"`
++		Policies []struct {
++			Skill   string `json:"skill"`
++			Command string `json:"command"`
++			Policy  string `json:"policy"`
++		} `json:"script_policies"`
++	}
++	if err := json.Unmarshal([]byte(stdout), &outputs); err != nil {
++		t.Fatalf("audit --json is not machine-readable: %v\n%s", err, stdout)
++	}
++	if len(outputs) != 1 || outputs[0].Scope != "app" {
++		t.Fatalf("audit --json scopes = %+v", outputs)
++	}
++	if len(outputs[0].Errors) != 0 {
++		t.Fatalf("audit --json errors = %v", outputs[0].Errors)
++	}
++	if !strings.Contains(strings.Join(outputs[0].Warnings, "\n"), "script-command-unfiltered-declared-network") {
++		t.Fatalf("audit --json warnings = %v", outputs[0].Warnings)
++	}
++	if len(outputs[0].Policies) != 1 {
++		t.Fatalf("audit --json script_policies = %+v, want the enforced entry", outputs[0].Policies)
++	}
++	entry := outputs[0].Policies[0]
++	if entry.Skill != "label-skill" || entry.Command != "tool" || entry.Policy != "script-worker-v1" {
++		t.Fatalf("audit --json script_policies = %+v, want the exact enforced identity", outputs[0].Policies)
++	}
++}
++
++// TestCLIAuditJSONRecordsExplicitAbsence proves the machine-readable
++// audit output carries the explicit policy absence for a declared-only
++// command alongside its warning.
++func TestCLIAuditJSONRecordsExplicitAbsence(t *testing.T) {
++	t.Parallel()
++	configPath := auditLabelProject(t, 8, false, nil)
++	code, stdout, stderr := capture(t, configPath, "audit", "app", "--json")
++	if code != exitOK {
++		t.Fatalf("audit = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitOK, stdout, stderr)
++	}
++	if stderr != "" {
++		t.Fatalf("audit wrote errors:\n%s", stderr)
++	}
++	var outputs []struct {
++		Scope    string   `json:"scope"`
++		Warnings []string `json:"warnings"`
++		Errors   []string `json:"errors"`
++		Policies []struct {
++			Skill   string `json:"skill"`
++			Command string `json:"command"`
++			Policy  string `json:"policy"`
++		} `json:"script_policies"`
++	}
++	if err := json.Unmarshal([]byte(stdout), &outputs); err != nil {
++		t.Fatalf("audit --json is not machine-readable: %v\n%s", err, stdout)
++	}
++	if len(outputs) != 1 {
++		t.Fatalf("audit --json scopes = %+v", outputs)
++	}
++	if !strings.Contains(strings.Join(outputs[0].Warnings, "\n"), "script-command-declared-only") {
++		t.Fatalf("audit --json warnings = %v", outputs[0].Warnings)
++	}
++	if len(outputs[0].Policies) != 1 {
++		t.Fatalf("audit --json script_policies = %+v, want the declared-only entry", outputs[0].Policies)
++	}
++	entry := outputs[0].Policies[0]
++	if entry.Skill != "label-skill" || entry.Command != "tool" || entry.Policy != "" {
++		t.Fatalf("audit --json script_policies = %+v, want the explicit absence", outputs[0].Policies)
++	}
++}
+diff --git a/cmd/curator/main.go b/cmd/curator/main.go
+index 4865c919..93b3ad3b 100644
+--- a/cmd/curator/main.go
++++ b/cmd/curator/main.go
+@@ -1884,19 +1884,23 @@ func (c cli) cmdAudit(args []string) int {
+ 	}
+ 
+ 	type auditOutput struct {
+-		Scope    string   `json:"scope"`
+-		Warnings []string `json:"warnings"`
+-		Errors   []string `json:"errors"`
++		Scope          string                     `json:"scope"`
++		Warnings       []string                   `json:"warnings"`
++		Errors         []string                   `json:"errors"`
++		ScriptPolicies []audit.ScriptPolicyRecord `json:"script_policies"`
+ 	}
+ 	outputs := make([]auditOutput, 0, len(targets))
+ 	exitCode := exitOK
+ 	for _, target := range targets {
+-		warnings, errors := auditTarget(cfg, target)
+-		outputs = append(outputs, auditOutput{Scope: target.Alias, Warnings: warnings, Errors: errors})
++		warnings, errors, policies := auditTarget(cfg, target)
++		outputs = append(outputs, auditOutput{Scope: target.Alias, Warnings: warnings, Errors: errors, ScriptPolicies: policies})
+ 		if len(errors) > 0 {
+ 			exitCode = exitFail
+ 		}
+ 		if !*jsonOut {
++			for _, record := range policies {
++				_, _ = fmt.Fprintf(c.stdout, "%s: %s\n", target.Alias, audit.FormatScriptPolicy(record))
++			}
+ 			for _, warning := range warnings {
+ 				_, _ = fmt.Fprintf(c.stdout, "%s: %s\n", target.Alias, warning)
+ 			}
+@@ -1915,26 +1919,26 @@ func (c cli) cmdAudit(args []string) int {
+ 	return exitCode
+ }
+ 
+-func auditTarget(cfg *config.Config, target projectTarget) ([]string, []string) {
++func auditTarget(cfg *config.Config, target projectTarget) ([]string, []string, []audit.ScriptPolicyRecord) {
+ 	projectManifest, err := manifest.Load(target.Root)
+ 	if err != nil {
+-		return nil, []string{err.Error()}
++		return nil, []string{err.Error()}, nil
+ 	}
+ 	if projectManifest == nil {
+-		return nil, []string{"Skillfile.json not found"}
++		return nil, []string{"Skillfile.json not found"}, nil
+ 	}
+ 	substitutions := map[string]devsub.Substitution{}
+ 	if target.Alias != "global" {
+ 		substitutions, err = devsub.Load(target.Root)
+ 		if err != nil {
+-			return nil, []string{err.Error()}
++			return nil, []string{err.Error()}, nil
+ 		}
+ 	}
+ 	nodes, err := closure.Build(closure.Options{
+ 		SkillsRoot: cfg.SkillsRoot, Home: cfg.Home(), AllowedSources: cfg.AllowedSources,
+ 	}, projectManifest, substitutions)
+ 	if err != nil {
+-		return nil, []string{err.Error()}
++		return nil, []string{err.Error()}, nil
+ 	}
+ 	subjects := make([]audit.Subject, 0, len(nodes))
+ 	for _, node := range nodes {
+@@ -1942,9 +1946,11 @@ func auditTarget(cfg *config.Config, target projectTarget) ([]string, []string)
+ 			Name: node.Name, Source: node.Decl.Source, Git: node.Decl.Git,
+ 			Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
+ 			SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
++			Commands: node.Spec.Commands,
+ 		})
+ 	}
+-	return audit.Gate(cfg, subjects)
++	warnings, errs := audit.Gate(cfg, subjects)
++	return warnings, errs, audit.ScriptPolicyRecords(subjects)
+ }
+ 
+ // cmdGC runs maintenance under the exclusive manager-home mutation lock, so it
+diff --git a/docs/cli.md b/docs/cli.md
+index 6d725208..1e653c36 100644
+--- a/docs/cli.md
++++ b/docs/cli.md
+@@ -839,6 +839,18 @@ curator audit --all --json
+ 
+ The command evaluates security policies and fails if unvetted code is detected.
+ 
++Script commands additionally report two warning classes that never fail
++the audit: `script-command-declared-only` for commands without
++`execution_policy: "script-worker-v1"`, and
++`script-command-unfiltered-declared-network` for enforced commands with
++declared `network` hosts (reporting-only). Every script command also gets
++an informational audit-record entry — `audit info: <skill>: command
++'<name>' execution_policy=<script-worker-v1|(none)>` — carried under
++`script_policies` in `--json` output and in the stored verdict, so a
++reviewer can separate enforced commands from declared-only ones even when
++no warning fires. See
++[Troubleshooting](troubleshooting.md#script-audit-labels).
++
+ ## Maintenance and shell integration
+ 
+ ### curator gc
+diff --git a/docs/troubleshooting.md b/docs/troubleshooting.md
+index ea4d57b3..fe9bb63f 100644
+--- a/docs/troubleshooting.md
++++ b/docs/troubleshooting.md
+@@ -735,3 +735,62 @@ Remedy: reinstall the skill so the manager republishes the launcher and
+ its sidecar contract, verify the command's `interpreter` is `node-v1`
+ or `python3-v1`, and validate the manifest's `capabilities` object
+ against the schema.
++
++## Script audit labels
++
++`curator audit`, `skill check`, and install report two warning classes for
++script commands (manager profile §7). Both are always warnings in every
++mode and never block: neither is a finding about source content, neither
++is subject to `fail_on`, and neither may be reported as an applied
++control. Declared-only skills validate and install exactly as before; the
++warnings state the containment posture so reviewers and registries can
++gate on the distinction.
++
++### script-command-declared-only
++
++Symptom: audit or `skill check` warns `script-command-declared-only` for
++a command.
++
++Cause: the command does not declare `execution_policy:
++"script-worker-v1"` — every schema-7 script command and every schema-8
++script command without the field. Its capability declaration is
++documentation and bounds nothing at run time.
++
++Remedy: to enforce containment, adopt `execution_policy:
++"script-worker-v1"` with its co-required `interpreter` (`node-v1` or
++`python3-v1`). To keep the command declared-only, no action is required;
++the warning records the posture.
++
++### script-command-unfiltered-declared-network
++
++Symptom: audit or `skill check` warns
++`script-command-unfiltered-declared-network` for an enforced command.
++
++Cause: the command is enforced (`execution_policy: "script-worker-v1"`)
++and declares non-empty `network` hosts. The globs are recorded and
++reported; no portable filtering is applied and none is claimed. The
++command is still admitted so the `exec`, `filesystem`, and environment
++controls it can have are applied.
++
++Remedy: declare only the hosts you need — reporting only. A
++declared-only command with network hosts carries only
++`script-command-declared-only`: the network label is about enforcement,
++not declaration.
++
++### Per-command execution-policy record
++
++Symptom: `curator audit` prints `audit info: <skill>: command '<name>'
++execution_policy=<identity>` lines for commands that carry no warning.
++
++Cause: this is the audit record, not a finding. For every script command
++the record carries the effective execution-policy identity or its
++explicit absence — `script-worker-v1` for enforced commands, `(none)`
++for declared-only ones — independent of warning eligibility. The same
++entries are carried under `script_policies` in `curator audit --json`
++output and in the stored verdict file, so reviewers and registries can
++gate on the enforced/declared-only distinction directly.
++
++Remedy: no action is required. An enforced command with no declared
++`network` hosts audits clean and still records its identity; a
++declared-only entry that should be enforced calls for the same remedy as
++`script-command-declared-only` above.
+diff --git a/internal/audit/audit.go b/internal/audit/audit.go
+index 0e9c2c4c..14afbe1b 100644
+--- a/internal/audit/audit.go
++++ b/internal/audit/audit.go
+@@ -18,6 +18,8 @@ import (
+ 	"github.com/relux-works/curator/internal/capabilities"
+ 	"github.com/relux-works/curator/internal/config"
+ 	"github.com/relux-works/curator/internal/hashing"
++	"github.com/relux-works/curator/internal/scriptpolicy"
++	"github.com/relux-works/curator/internal/skillspec"
+ )
+ 
+ // Severities and decisions (Spec §12.1, §12.2).
+@@ -63,6 +65,10 @@ type Subject struct {
+ 	Snapshot      string
+ 	SchemaVersion int
+ 	Capabilities  capabilities.Manifest
++	// Commands carries the skill's parsed commands for the script audit
++	// warning classes (manager profile §7). A nil map labels nothing,
++	// so callers without a parsed manifest keep the previous output.
++	Commands map[string]skillspec.Command
+ }
+ 
+ // Report is the audit outcome for one subject.
+@@ -74,6 +80,49 @@ type Report struct {
+ 	Revoked       bool
+ 	Revocation    string
+ 	CacheHit      bool
++	// ScriptPolicies is the per-command execution-policy record
++	// (manager profile §7): every script command's effective policy
++	// identity or its explicit absence, independent of warning
++	// eligibility. It is computed fresh from the subject on every
++	// path, including cache hits, and persisted with the verdict.
++	ScriptPolicies []scriptpolicy.CommandAuditPolicy
++}
++
++// ScriptPolicyRecord is one entry of the production audit record: the
++// skill, the script command, and its effective execution-policy identity
++// or its explicit absence (an empty policy).
++type ScriptPolicyRecord struct {
++	Skill   string `json:"skill"`
++	Command string `json:"command"`
++	Policy  string `json:"policy"`
++}
++
++// ScriptPolicyRecords reports the per-command execution-policy record for
++// every subject in order. Commands without a warning keep their entry:
++// warning eligibility never drops a record entry.
++func ScriptPolicyRecords(subjects []Subject) []ScriptPolicyRecord {
++	var records []ScriptPolicyRecord
++	for _, subject := range subjects {
++		for _, entry := range scriptpolicy.AuditPoliciesForCommands(subject.Commands) {
++			records = append(records, ScriptPolicyRecord{
++				Skill: subject.Name, Command: entry.Command, Policy: entry.Policy,
++			})
++		}
++	}
++	return records
++}
++
++// FormatScriptPolicy renders one audit-record entry for terminal output.
++// It is informational, never a warning: absence renders as an explicit
++// `(none)` so a reviewer can separate enforced commands from
++// declared-only ones on the line itself.
++func FormatScriptPolicy(record ScriptPolicyRecord) string {
++	policy := record.Policy
++	if policy == "" {
++		policy = "(none)"
++	}
++	return fmt.Sprintf("audit info: %s: command '%s' execution_policy=%s",
++		record.Skill, record.Command, policy)
+ }
+ 
+ // Decide implements Spec §12.2 over findings.
+@@ -121,36 +170,77 @@ func gate(cfg *config.Config, subjects []Subject, persist bool) (warnings []stri
+ 			errs = append(errs, fmt.Sprintf("audit blocked: %s: %v", subject.Name, err))
+ 			continue
+ 		}
++		// Script audit labels are not findings: they are always warnings
++		// in every mode, never block, and are never subject to `fail_on`,
++		// so they join the warnings on every decision, including allow
++		// and block. They are computed fresh per subject, never cached
++		// with the verdict findings.
++		scriptWarnings := scriptAuditWarnings(subject)
+ 		switch report.Decision {
+ 		case DecisionAllow:
++			warnings = append(warnings, scriptWarnings...)
+ 		case DecisionRequirePin:
+ 			errs = append(errs, fmt.Sprintf(
+ 				"audit requires pin: %s: schema v%d has no capabilities; migrate to agent-skill.json schema v3 or pin the content hash %s with a reason",
+ 				subject.Name, subject.SchemaVersion, report.ContentSHA256))
++			warnings = append(warnings, scriptWarnings...)
+ 		case DecisionBlock:
+ 			if report.Revoked {
+ 				errs = append(errs, fmt.Sprintf("audit blocked: %s: %s is revoked", subject.Name, report.Revocation))
++				warnings = append(warnings, scriptWarnings...)
+ 				continue
+ 			}
+ 			for _, finding := range report.Findings {
+ 				errs = append(errs, fmt.Sprintf("audit blocked: %s: %s %s - %s", subject.Name, finding.Severity, finding.ID, finding.Evidence))
+ 			}
++			warnings = append(warnings, scriptWarnings...)
+ 		default: // warn
+ 			for _, finding := range report.Findings {
+ 				warnings = append(warnings, fmt.Sprintf("audit warning: %s: %s %s - %s", subject.Name, finding.Severity, finding.ID, finding.Evidence))
+ 			}
++			warnings = append(warnings, scriptWarnings...)
+ 		}
+ 	}
+ 	return warnings, errs
+ }
+ 
++// scriptAuditWarnings renders the script warning classes of one subject
++// (manager profile §7) as audit warnings. The label text is the closed
++// class name, pinned exactly as the conformance vector names it; the
++// evidence names the command and the operator action.
++func scriptAuditWarnings(subject Subject) []string {
++	labelled := scriptpolicy.AuditLabelsForCommands(subject.Commands, subject.Capabilities.Network)
++	var warnings []string
++	for _, entry := range labelled {
++		for _, label := range entry.Labels {
++			var evidence string
++			switch label {
++			case scriptpolicy.LabelDeclaredOnly:
++				evidence = fmt.Sprintf("command '%s' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy %q with an interpreter to enforce containment",
++					entry.Command, skillspec.ScriptExecutionPolicy)
++			case scriptpolicy.LabelUnfilteredDeclaredNetwork:
++				evidence = fmt.Sprintf("command '%s' is enforced but its declared network hosts are reporting-only (no portable filtering is applied); declare only the hosts you need",
++					entry.Command)
++			default:
++				evidence = fmt.Sprintf("command '%s' carries %s", entry.Command, label)
++			}
++			warnings = append(warnings, fmt.Sprintf("audit warning: %s: %s %s - %s",
++				subject.Name, SeverityLow, label, evidence))
++		}
++	}
++	return warnings
++}
++
+ // auditSubject runs the pipeline of Spec §12.1 for one subject.
+ func auditSubject(cfg *config.Config, subject Subject, persist bool) (Report, error) {
+ 	contentHash, err := hashing.ContentSHA256(subject.Snapshot, nil)
+ 	if err != nil {
+ 		return Report{}, err
+ 	}
+-	report := Report{Skill: subject.Name, ContentSHA256: contentHash}
++	report := Report{
++		Skill: subject.Name, ContentSHA256: contentHash,
++		ScriptPolicies: scriptpolicy.AuditPoliciesForCommands(subject.Commands),
++	}
+ 
+ 	// Local revocations block unconditionally (Spec §12.2).
+ 	if reason := revocationReason(cfg, contentHash, subject.Source, subject.Git); reason != "" {
+@@ -171,7 +261,7 @@ func auditSubject(cfg *config.Config, subject Subject, persist bool) (Report, er
+ 
+ 	findings := detect(subject.Snapshot, subject.Capabilities)
+ 	if persist {
+-		storeCachedFindings(cfg, contentHash, subject, findings)
++		storeCachedFindings(cfg, contentHash, subject, findings, report.ScriptPolicies)
+ 	}
+ 	report.Findings = findings
+ 	report.Decision = decideWithPins(cfg, subject, contentHash, findings)
+@@ -282,7 +372,7 @@ func loadCachedFindings(cfg *config.Config, contentHash string) ([]Finding, bool
+ 	return data.Findings, true
+ }
+ 
+-func storeCachedFindings(cfg *config.Config, contentHash string, subject Subject, findings []Finding) {
++func storeCachedFindings(cfg *config.Config, contentHash string, subject Subject, findings []Finding, policies []scriptpolicy.CommandAuditPolicy) {
+ 	dir := trustDir(cfg.Home(), contentHash)
+ 	if err := os.MkdirAll(dir, 0o755); err != nil {
+ 		return
+@@ -297,6 +387,7 @@ func storeCachedFindings(cfg *config.Config, contentHash string, subject Subject
+ 		"prompt_version":  PromptVersion,
+ 		"ruleset_version": RulesetVersion,
+ 		"findings":        findings,
++		"script_policies": policies,
+ 	}, "", "  ")
+ 	if err != nil {
+ 		return
+diff --git a/internal/audit/auditlabels_test.go b/internal/audit/auditlabels_test.go
+new file mode 100644
+index 00000000..6ee92bd0
+--- /dev/null
++++ b/internal/audit/auditlabels_test.go
+@@ -0,0 +1,398 @@
++package audit
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/capabilities"
++	"github.com/relux-works/curator/internal/skillspec"
++)
++
++// scriptSubject lays out a snapshot carrying one benign script and binds the
++// given parsed commands and capabilities, so the gate's verdict comes only
++// from the script warning classes and never from a detector finding.
++func scriptSubject(t *testing.T, commands map[string]skillspec.Command, caps capabilities.Manifest, schema int) Subject {
++	t.Helper()
++	snapshot := t.TempDir()
++	if err := os.MkdirAll(filepath.Join(snapshot, "scripts"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(snapshot, "scripts", "tool"), []byte("echo ok\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	return Subject{
++		Name: "skill-a", Source: "skill-a", Git: "git@git.example.com:skills/skill-a.git",
++		Commit: "abc", Snapshot: snapshot, SchemaVersion: schema, Capabilities: caps,
++		Commands: commands,
++	}
++}
++
++func declaredOnlyCommands() map[string]skillspec.Command {
++	return map[string]skillspec.Command{
++		"tool": {Name: "tool", Type: "script", UnixPath: "scripts/tool"},
++	}
++}
++
++func enforcedCommands() map[string]skillspec.Command {
++	return map[string]skillspec.Command{
++		"tool": {
++			Name: "tool", Type: "script", UnixPath: "scripts/tool",
++			ExecutionPolicy: skillspec.ScriptExecutionPolicy, Interpreter: "python3-v1",
++		},
++	}
++}
++
++// TestGateEmitsScriptAuditLabels drives the four audit-label shapes through
++// the production gate and its read-only twin. The label text is asserted as
++// a literal, exactly as the conformance vector names it, so a rename in the
++// implementation fails here rather than following a constant.
++func TestGateEmitsScriptAuditLabels(t *testing.T) {
++	cases := []struct {
++		name     string
++		commands map[string]skillspec.Command
++		caps     capabilities.Manifest
++		schema   int
++		want     []string
++	}{
++		{"schema7-script", declaredOnlyCommands(), capabilities.ImplicitNone(), 7,
++			[]string{"script-command-declared-only"}},
++		{"schema8-declared-only-script", declaredOnlyCommands(), capabilities.ImplicitNone(), 8,
++			[]string{"script-command-declared-only"}},
++		{"schema8-enforced-script", enforcedCommands(), capabilities.ImplicitNone(), 8, nil},
++		{"schema8-enforced-unfiltered-network", enforcedCommands(),
++			capabilities.Manifest{Network: []string{"api.example.com"}}, 8,
++			[]string{"script-command-unfiltered-declared-network"}},
++	}
++	for _, testCase := range cases {
++		t.Run(testCase.name, func(t *testing.T) {
++			for _, gate := range []struct {
++				name string
++				call func() ([]string, []string)
++			}{
++				{"gate", func() ([]string, []string) {
++					return Gate(newCfg(t, "advisory", "high"),
++						[]Subject{scriptSubject(t, testCase.commands, testCase.caps, testCase.schema)})
++				}},
++				{"read-only", func() ([]string, []string) {
++					return GateReadOnly(newCfg(t, "advisory", "high"),
++						[]Subject{scriptSubject(t, testCase.commands, testCase.caps, testCase.schema)})
++				}},
++			} {
++				t.Run(gate.name, func(t *testing.T) {
++					warnings, errs := gate.call()
++					if len(errs) != 0 {
++						t.Fatalf("script labels must never error: errs=%v", errs)
++					}
++					joined := strings.Join(warnings, "\n")
++					for _, label := range testCase.want {
++						if !strings.Contains(joined, label) {
++							t.Fatalf("warnings do not carry %q: %v", label, warnings)
++						}
++					}
++					if len(testCase.want) == 0 && len(warnings) != 0 {
++						t.Fatalf("an enforced script with no declared hosts must be silent: %v", warnings)
++					}
++					for _, warning := range warnings {
++						if !strings.HasPrefix(warning, "audit warning: ") {
++							t.Fatalf("script label is not an audit warning: %q", warning)
++						}
++					}
++				})
++			}
++		})
++	}
++}
++
++// TestGateScriptLabelsWarnUnderStrictPolicy proves the classes are always
++// warnings, never blocks, and never subject to `fail_on`: under the
++// strictest policy a labelled subject with no findings still warns.
++func TestGateScriptLabelsWarnUnderStrictPolicy(t *testing.T) {
++	subjects := []Subject{
++		scriptSubject(t, declaredOnlyCommands(), capabilities.ImplicitNone(), 8),
++		scriptSubject(t, enforcedCommands(), capabilities.Manifest{Network: []string{"api.example.com"}}, 8),
++	}
++	warnings, errs := Gate(newCfg(t, "strict", "low"), subjects)
++	if len(errs) != 0 {
++		t.Fatalf("script labels must never block, even strict/low: errs=%v", errs)
++	}
++	joined := strings.Join(warnings, "\n")
++	for _, label := range []string{"script-command-declared-only", "script-command-unfiltered-declared-network"} {
++		if !strings.Contains(joined, label) {
++			t.Fatalf("strict warnings do not carry %q: %v", label, warnings)
++		}
++	}
++}
++
++// TestGateScriptLabelsStayWarningsWhenBlocked proves the classes stay
++// warnings on the block path: a subject that blocks on a detector finding
++// still reports its script label as a warning, never as a second error.
++func TestGateScriptLabelsStayWarningsWhenBlocked(t *testing.T) {
++	subject := subjectWith(t, "curl https://exfil.example.net/x\n", capabilities.ImplicitNone(), 3)
++	subject.Commands = declaredOnlyCommands()
++	warnings, errs := Gate(newCfg(t, "strict", "high"), []Subject{subject})
++	if len(errs) == 0 || !strings.Contains(strings.Join(errs, "\n"), "network-undeclared") {
++		t.Fatalf("the finding must still block: warnings=%v errs=%v", warnings, errs)
++	}
++	if !strings.Contains(strings.Join(warnings, "\n"), "script-command-declared-only") {
++		t.Fatalf("the block path dropped the script warning: warnings=%v", warnings)
++	}
++	for _, err := range errs {
++		if strings.Contains(err, "script-command-declared-only") {
++			t.Fatalf("the script label escaped into the errors: %v", errs)
++		}
++	}
++}
++
++// TestGateScriptLabelsStayWarningsWhenPinned proves the require-pin path
++// keeps the script warning: a pre-capability schema still warns about its
++// declared-only command while the pin refusal stays an error.
++func TestGateScriptLabelsStayWarningsWhenPinned(t *testing.T) {
++	subject := subjectWith(t, "echo ok\n", capabilities.ImplicitNone(), 2)
++	subject.Commands = declaredOnlyCommands()
++	_, errs := Gate(newCfg(t, "strict", "high"), []Subject{subject})
++	if len(errs) != 1 || !strings.Contains(errs[0], "requires pin") {
++		t.Fatalf("errs: %v", errs)
++	}
++	warnings, _ := Gate(newCfg(t, "strict", "high"), []Subject{subject})
++	if !strings.Contains(strings.Join(warnings, "\n"), "script-command-declared-only") {
++		t.Fatalf("the require-pin path dropped the script warning: warnings=%v", warnings)
++	}
++}
++
++// TestGateScriptLabelsStayWarningsWhenRevoked proves revocation keeps the
++// script warning alongside its unconditional block.
++func TestGateScriptLabelsStayWarningsWhenRevoked(t *testing.T) {
++	subject := scriptSubject(t, declaredOnlyCommands(), capabilities.ImplicitNone(), 8)
++	cfg := newCfg(t, "advisory", "high")
++	cfg.Audit.Revocations = []string{"source:git@git.example.com:skills/*"}
++	warnings, errs := Gate(cfg, []Subject{subject})
++	if len(errs) != 1 || !strings.Contains(errs[0], "revoked") {
++		t.Fatalf("revocation must still block: warnings=%v errs=%v", warnings, errs)
++	}
++	if !strings.Contains(strings.Join(warnings, "\n"), "script-command-declared-only") {
++		t.Fatalf("the revoked path dropped the script warning: warnings=%v", warnings)
++	}
++}
++
++// TestGateEnforcedIsNeverDeclaredOnly is the gate-level negative row for
++// the declared-only class: enforced commands never render it, with or
++// without declared hosts.
++func TestGateEnforcedIsNeverDeclaredOnly(t *testing.T) {
++	for _, caps := range []capabilities.Manifest{
++		capabilities.ImplicitNone(),
++		{Network: []string{"api.example.com"}},
++	} {
++		warnings, errs := Gate(newCfg(t, "advisory", "high"),
++			[]Subject{scriptSubject(t, enforcedCommands(), caps, 8)})
++		if len(errs) != 0 {
++			t.Fatalf("errs=%v", errs)
++		}
++		for _, warning := range warnings {
++			if strings.Contains(warning, "script-command-declared-only") {
++				t.Fatalf("an enforced command was labelled declared-only: %v", warnings)
++			}
++		}
++	}
++}
++
++// TestGateDeclaredOnlyWithHostsCarriesNoNetworkLabel is the gate-level
++// negative row for the network class: a declared-only command with hosts
++// renders only declared-only.
++func TestGateDeclaredOnlyWithHostsCarriesNoNetworkLabel(t *testing.T) {
++	warnings, errs := Gate(newCfg(t, "advisory", "high"), []Subject{
++		scriptSubject(t, declaredOnlyCommands(), capabilities.Manifest{Network: []string{"api.example.com"}}, 8),
++	})
++	if len(errs) != 0 {
++		t.Fatalf("errs=%v", errs)
++	}
++	joined := strings.Join(warnings, "\n")
++	if !strings.Contains(joined, "script-command-declared-only") {
++		t.Fatalf("warnings=%v", warnings)
++	}
++	if strings.Contains(joined, "script-command-unfiltered-declared-network") {
++		t.Fatalf("a declared-only command earned the network label: %v", warnings)
++	}
++}
++
++// TestScriptPolicyRecordsCoverEveryCommand proves the production audit
++// record carries every script command's execution-policy identity or its
++// explicit absence, independent of warning eligibility: the enforced
++// no-host command keeps its exact `script-worker-v1` entry while the
++// declared-only command records an empty policy, and the mixed order is
++// lexical across subjects.
++func TestScriptPolicyRecordsCoverEveryCommand(t *testing.T) {
++	subjects := []Subject{
++		scriptSubject(t, map[string]skillspec.Command{
++			"tool": {Name: "tool", Type: "script", UnixPath: "scripts/tool"},
++			"guarded": {
++				Name: "guarded", Type: "script", UnixPath: "scripts/guarded",
++				ExecutionPolicy: skillspec.ScriptExecutionPolicy, Interpreter: "python3-v1",
++			},
++			"sys": {Name: "sys", Type: "system", Command: "git"},
++		}, capabilities.ImplicitNone(), 8),
++	}
++	got := ScriptPolicyRecords(subjects)
++	want := []ScriptPolicyRecord{
++		{Skill: "skill-a", Command: "guarded", Policy: "script-worker-v1"},
++		{Skill: "skill-a", Command: "tool", Policy: ""},
++	}
++	if len(got) != len(want) {
++		t.Fatalf("policy records = %+v, want %+v", got, want)
++	}
++	for index := range want {
++		if got[index] != want[index] {
++			t.Fatalf("policy records = %+v, want %+v", got, want)
++		}
++	}
++}
++
++// TestFormatScriptPolicyRendersIdentityOrExplicitAbsence pins the
++// terminal rendering: the exact policy identity for enforced commands
++// and an explicit `(none)` for declared-only ones, always as `audit
++// info`, never as a warning.
++func TestFormatScriptPolicyRendersIdentityOrExplicitAbsence(t *testing.T) {
++	enforced := FormatScriptPolicy(ScriptPolicyRecord{Skill: "skill-a", Command: "guarded", Policy: "script-worker-v1"})
++	if enforced != "audit info: skill-a: command 'guarded' execution_policy=script-worker-v1" {
++		t.Fatalf("enforced line = %q", enforced)
++	}
++	absent := FormatScriptPolicy(ScriptPolicyRecord{Skill: "skill-a", Command: "tool", Policy: ""})
++	if absent != "audit info: skill-a: command 'tool' execution_policy=(none)" {
++		t.Fatalf("absence line = %q", absent)
++	}
++	for _, line := range []string{enforced, absent} {
++		if strings.Contains(line, "warning") {
++			t.Fatalf("the record entry escaped into a warning: %q", line)
++		}
++	}
++}
++
++// TestReportCarriesScriptPoliciesOnEveryPath proves the audit outcome
++// carries the per-command record on the fresh path and on the cache-hit
++// path alike: the record is computed from the subject, never from the
++// cached findings.
++func TestReportCarriesScriptPoliciesOnEveryPath(t *testing.T) {
++	cfg := newCfg(t, "advisory", "high")
++	commands := map[string]skillspec.Command{
++		"tool": {Name: "tool", Type: "script", UnixPath: "scripts/tool"},
++		"guarded": {
++			Name: "guarded", Type: "script", UnixPath: "scripts/guarded",
++			ExecutionPolicy: skillspec.ScriptExecutionPolicy, Interpreter: "python3-v1",
++		},
++	}
++	subject := scriptSubject(t, commands, capabilities.ImplicitNone(), 8)
++	first, err := auditSubject(cfg, subject, true)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if first.CacheHit {
++		t.Fatal("the first audit must not be a cache hit")
++	}
++	second, err := auditSubject(cfg, subject, true)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !second.CacheHit {
++		t.Fatal("the second audit must be a cache hit")
++	}
++	for _, report := range []Report{first, second} {
++		if len(report.ScriptPolicies) != 2 {
++			t.Fatalf("report policies = %+v, want both commands", report.ScriptPolicies)
++		}
++		byCommand := map[string]string{}
++		for _, entry := range report.ScriptPolicies {
++			byCommand[entry.Command] = entry.Policy
++		}
++		if byCommand["guarded"] != "script-worker-v1" {
++			t.Fatalf("report policies = %+v, want the exact enforced identity", report.ScriptPolicies)
++		}
++		if policy, ok := byCommand["tool"]; !ok || policy != "" {
++			t.Fatalf("report policies = %+v, want the explicit absence for tool", report.ScriptPolicies)
++		}
++	}
++}
++
++// TestStoredVerdictPersistsScriptPolicies proves the persisted verdict
++// file records the per-command entries: the enforced no-host command
++// keeps its exact identity and the declared-only command its explicit
++// absence.
++func TestStoredVerdictPersistsScriptPolicies(t *testing.T) {
++	cfg := newCfg(t, "advisory", "high")
++	commands := map[string]skillspec.Command{
++		"tool": {Name: "tool", Type: "script", UnixPath: "scripts/tool"},
++		"guarded": {
++			Name: "guarded", Type: "script", UnixPath: "scripts/guarded",
++			ExecutionPolicy: skillspec.ScriptExecutionPolicy, Interpreter: "python3-v1",
++		},
++	}
++	if _, errs := Gate(cfg, []Subject{scriptSubject(t, commands, capabilities.ImplicitNone(), 8)}); len(errs) != 0 {
++		t.Fatalf("errs=%v", errs)
++	}
++	matches, err := filepath.Glob(filepath.Join(cfg.Home(), "audit", "*", "verdict-*.json"))
++	if err != nil || len(matches) != 1 {
++		t.Fatalf("verdict files = %v, err = %v", matches, err)
++	}
++	payload, err := os.ReadFile(matches[0]) // #nosec G304 -- test-owned verdict path
++	if err != nil {
++		t.Fatal(err)
++	}
++	var verdict struct {
++		Skill          string `json:"skill"`
++		ScriptPolicies []struct {
++			Command string `json:"command"`
++			Policy  string `json:"policy"`
++		} `json:"script_policies"`
++	}
++	if err := json.Unmarshal(payload, &verdict); err != nil {
++		t.Fatalf("the stored verdict is not machine-readable: %v\n%s", err, payload)
++	}
++	if len(verdict.ScriptPolicies) != 2 {
++		t.Fatalf("stored script_policies = %+v, want both commands", verdict.ScriptPolicies)
++	}
++	byCommand := map[string]string{}
++	for _, entry := range verdict.ScriptPolicies {
++		byCommand[entry.Command] = entry.Policy
++	}
++	if byCommand["guarded"] != "script-worker-v1" {
++		t.Fatalf("stored script_policies = %+v, want the exact enforced identity", verdict.ScriptPolicies)
++	}
++	if policy, ok := byCommand["tool"]; !ok || policy != "" {
++		t.Fatalf("stored script_policies = %+v, want the explicit absence for tool", verdict.ScriptPolicies)
++	}
++}
++
++// TestNoWarningCommandKeepsItsRecordWithoutWarnings proves the record and
++// the warnings stay independent: an enforced no-host skill audits with no
++// warnings at all while its policy record still names the command and its
++// exact identity.
++func TestNoWarningCommandKeepsItsRecordWithoutWarnings(t *testing.T) {
++	subject := scriptSubject(t, enforcedCommands(), capabilities.ImplicitNone(), 8)
++	warnings, errs := Gate(newCfg(t, "advisory", "high"), []Subject{subject})
++	if len(errs) != 0 || len(warnings) != 0 {
++		t.Fatalf("an enforced no-host skill must audit silently: warnings=%v errs=%v", warnings, errs)
++	}
++	records := ScriptPolicyRecords([]Subject{subject})
++	if len(records) != 1 || records[0].Command != "tool" || records[0].Policy != "script-worker-v1" {
++		t.Fatalf("policy records = %+v, want the silent command's exact identity", records)
++	}
++}
++
++// TestGateReadOnlyEmitsScriptLabelsWithoutWritingState proves the dry-run
++// gate renders the classes while leaving verdict and trust state alone.
++func TestGateReadOnlyEmitsScriptLabelsWithoutWritingState(t *testing.T) {
++	cfg := newCfg(t, "advisory", "high")
++	warnings, errs := GateReadOnly(cfg, []Subject{
++		scriptSubject(t, declaredOnlyCommands(), capabilities.ImplicitNone(), 8),
++	})
++	if len(errs) != 0 {
++		t.Fatalf("errs=%v", errs)
++	}
++	if !strings.Contains(strings.Join(warnings, "\n"), "script-command-declared-only") {
++		t.Fatalf("warnings=%v", warnings)
++	}
++	if _, err := os.Stat(filepath.Join(cfg.Home(), "audit")); !os.IsNotExist(err) {
++		t.Fatalf("read-only gate wrote audit state: %v", err)
++	}
++}
+diff --git a/internal/install/auditlabels_test.go b/internal/install/auditlabels_test.go
+new file mode 100644
+index 00000000..9950e32b
+--- /dev/null
++++ b/internal/install/auditlabels_test.go
+@@ -0,0 +1,369 @@
++package install
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/scriptworker"
++)
++
++// schema7ScriptSkill creates a tagged schema-7 skill whose single script
++// command is declared-only by construction: schema 7 cannot declare an
++// execution policy. networkHosts selects the declared `network` value: nil
++// declares none, otherwise the given host list.
++func (e *env) schema7ScriptSkill(name string, networkHosts []string) {
++	e.t.Helper()
++	dir := filepath.Join(e.skillsRoot, name)
++	if err := os.MkdirAll(dir, 0o755); err != nil {
++		e.t.Fatal(err)
++	}
++	e.git(dir, "init", "-q", "-b", "main")
++	e.write(dir, "SKILL.md", "---\nname: "+name+"\ndescription: d\n---\n# "+name+"\n")
++	e.write(dir, "scripts/"+name+"-tool", "#!/bin/sh\necho "+name+"\n")
++	network := any("none")
++	if networkHosts != nil {
++		network = networkHosts
++	}
++	payload, _ := json.MarshalIndent(map[string]any{
++		"schema_version": 7,
++		"capabilities": map[string]any{
++			"env_read": []string{}, "exec": "none", "filesystem": "repo",
++			"network": network, "secrets": "none",
++		},
++		"runtime_roots": []string{"scripts"},
++		"commands": map[string]any{name + "-tool": map[string]any{
++			"type": "script", "unix_path": "scripts/" + name + "-tool", "win_path": "scripts/" + name + "-tool",
++		}},
++	}, "", "  ")
++	e.write(dir, "agent-skill.json", string(payload))
++	e.git(dir, "add", ".")
++	e.git(dir, "commit", "-qm", "init")
++	e.git(dir, "tag", "v1")
++}
++
++// schema8DeclaredOnlySkillWithNetwork creates a tagged schema-8 skill whose
++// single script command omits the execution policy. networkHosts selects
++// the declared `network` value like schema7ScriptSkill.
++func (e *env) schema8DeclaredOnlySkillWithNetwork(name string, networkHosts []string) {
++	e.t.Helper()
++	dir := filepath.Join(e.skillsRoot, name)
++	if err := os.MkdirAll(dir, 0o755); err != nil {
++		e.t.Fatal(err)
++	}
++	e.git(dir, "init", "-q", "-b", "main")
++	e.write(dir, "SKILL.md", "---\nname: "+name+"\ndescription: d\n---\n# "+name+"\n")
++	e.write(dir, "scripts/"+name+"-tool", "#!/bin/sh\necho "+name+"\n")
++	network := any("none")
++	if networkHosts != nil {
++		network = networkHosts
++	}
++	payload, _ := json.MarshalIndent(map[string]any{
++		"schema_version": 8,
++		"capabilities": map[string]any{
++			"env_read": []string{}, "exec": "none", "filesystem": "repo",
++			"network": network, "secrets": "none",
++		},
++		"runtime_roots": []string{"scripts"},
++		"commands": map[string]any{name + "-tool": map[string]any{
++			"type": "script", "unix_path": "scripts/" + name + "-tool", "win_path": "scripts/" + name + "-tool",
++		}},
++	}, "", "  ")
++	e.write(dir, "agent-skill.json", string(payload))
++	e.git(dir, "add", ".")
++	e.git(dir, "commit", "-qm", "init")
++	e.git(dir, "tag", "v1")
++}
++
++// TestScriptAuditLabelsAtInstallEntry drives the four audit-label shapes
++// through the production install: the validation messages (skill check)
++// and the install-time audit gate both render the warning classes as
++// warnings, never as errors, and every shape still installs — declared-only
++// skills keep their ordinary shim, enforced skills their native launcher.
++func TestScriptAuditLabelsAtInstallEntry(t *testing.T) {
++	t.Parallel()
++	for _, testCase := range []struct {
++		name         string
++		skill        string
++		setup        func(e *env)
++		wantLabels   []string
++		wantLauncher bool
++	}{
++		{name: "schema7-script", skill: "auditlabel-schema7",
++			setup:      func(e *env) { e.schema7ScriptSkill("auditlabel-schema7", nil) },
++			wantLabels: []string{"script-command-declared-only"}},
++		{name: "schema8-declared-only-script", skill: "auditlabel-declared",
++			setup:      func(e *env) { e.schema8DeclaredOnlySkillWithNetwork("auditlabel-declared", nil) },
++			wantLabels: []string{"script-command-declared-only"}},
++		{name: "schema8-enforced-script", skill: "auditlabel-enforced",
++			setup:        func(e *env) { e.schema8ScriptSkill("auditlabel-enforced", true) },
++			wantLauncher: true},
++		{name: "schema8-enforced-unfiltered-network", skill: "auditlabel-unfiltered",
++			setup: func(e *env) {
++				e.schema8EnforcedSkillWithCaps("auditlabel-unfiltered", map[string]any{
++					"network": []string{"audit-label.example.com"},
++				})
++			},
++			wantLabels:   []string{"script-command-unfiltered-declared-network"},
++			wantLauncher: true},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			t.Parallel()
++			e := newEnv(t)
++			testCase.setup(e)
++			e.declare(testCase.skill)
++			e.cfg.Audit.Enabled = true
++			e.cfg.Audit.Mode = "advisory"
++
++			result := e.install(Options{})
++			if result.Status != "ok" {
++				t.Fatalf("a labelled skill failed to install: %+v", result)
++			}
++			messages := strings.Join(result.Messages, "\n")
++			errors := strings.Join(result.Errors, "\n")
++			for _, label := range testCase.wantLabels {
++				if !strings.Contains(messages, label) {
++					t.Fatalf("install messages do not carry %q: %s", label, messages)
++				}
++				// Both install-time surfaces render the class: the
++				// validation report and the audit gate.
++				if !strings.Contains(messages, "warning: "+label) {
++					t.Fatalf("no validation warning carries %q: %s", label, messages)
++				}
++				if !strings.Contains(messages, "audit warning:") || !strings.Contains(messages, label) {
++					t.Fatalf("no audit-gate warning carries %q: %s", label, messages)
++				}
++				if strings.Contains(errors, label) {
++					t.Fatalf("the label escaped into install errors: %s", errors)
++				}
++			}
++			if len(testCase.wantLabels) == 0 {
++				for _, label := range []string{"script-command-declared-only", "script-command-unfiltered-declared-network"} {
++					if strings.Contains(messages, label) {
++						t.Fatalf("an enforced script with no declared hosts was labelled %q: %s", label, messages)
++					}
++				}
++			}
++			// The negative rows: enforced commands never render
++			// declared-only, and the unfiltered row renders nothing else.
++			if testCase.wantLauncher {
++				if strings.Contains(messages, "script-command-declared-only") {
++					t.Fatalf("an enforced install rendered declared-only: %s", messages)
++				}
++			}
++			if testCase.name == "schema8-enforced-unfiltered-network" &&
++				strings.Count(messages, "script-command-unfiltered-declared-network") == 0 {
++				t.Fatalf("the unfiltered row rendered no network label: %s", messages)
++			}
++			launcher := testCase.skill + "-tool"
++			if testCase.wantLauncher {
++				launcher = nativeLauncherName(launcher)
++			} else {
++				launcher = shimName(launcher)
++			}
++			if _, err := os.Lstat(filepath.Join(e.project, ".agents", "bin", launcher)); err != nil {
++				t.Fatalf("no launcher was published: %v", err)
++			}
++			if testCase.wantLauncher {
++				if _, err := os.Lstat(filepath.Join(e.project, ".agents", "bin", launcher) + scriptworker.ShimSidecarSuffix); err != nil {
++					t.Fatalf("the enforced shape published no sidecar: %v", err)
++				}
++			} else if _, err := os.Lstat(filepath.Join(e.project, ".agents", "bin", launcher) + scriptworker.ShimSidecarSuffix); err == nil {
++				t.Fatal("a declared-only shape published a native launcher sidecar")
++			}
++		})
++	}
++}
++
++// linesWith selects the message lines containing every given part.
++func linesWith(messages []string, parts ...string) []string {
++	var selected []string
++outer:
++	for _, message := range messages {
++		for _, part := range parts {
++			if !strings.Contains(message, part) {
++				continue outer
++			}
++		}
++		selected = append(selected, message)
++	}
++	return selected
++}
++
++// TestScriptAuditLabelsAtGlobalInstallEntry drives the four audit-label
++// shapes through the machine-wide install with its DEFAULT production
++// audit gate (no AuditGate override), so the global.go Subject wiring is
++// exercised exactly as shipped. Each label renders on its own audit-gate
++// line carrying the exact vector text, distinct from the skillcheck
++// validation line, and every shape still installs its legacy launcher.
++func TestScriptAuditLabelsAtGlobalInstallEntry(t *testing.T) {
++	t.Parallel()
++	for _, testCase := range []struct {
++		name         string
++		skill        string
++		setup        func(e *env)
++		wantLabels   []string
++		wantLauncher bool
++	}{
++		{name: "schema7-script", skill: "gauditlabel-schema7",
++			setup:      func(e *env) { e.schema7ScriptSkill("gauditlabel-schema7", nil) },
++			wantLabels: []string{"script-command-declared-only"}},
++		{name: "schema8-declared-only-script", skill: "gauditlabel-declared",
++			setup:      func(e *env) { e.schema8DeclaredOnlySkillWithNetwork("gauditlabel-declared", nil) },
++			wantLabels: []string{"script-command-declared-only"}},
++		{name: "schema8-enforced-script", skill: "gauditlabel-enforced",
++			setup:        func(e *env) { e.schema8ScriptSkill("gauditlabel-enforced", true) },
++			wantLauncher: true},
++		{name: "schema8-enforced-unfiltered-network", skill: "gauditlabel-unfiltered",
++			setup: func(e *env) {
++				e.schema8EnforcedSkillWithCaps("gauditlabel-unfiltered", map[string]any{
++					"network": []string{"audit-label.example.com"},
++				})
++			},
++			wantLabels:   []string{"script-command-unfiltered-declared-network"},
++			wantLauncher: true},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			t.Parallel()
++			e := newEnv(t)
++			testCase.setup(e)
++			if _, err := GlobalInit(e.home); err != nil {
++				t.Fatal(err)
++			}
++			if err := manifestAddGlobal(e, testCase.skill); err != nil {
++				t.Fatal(err)
++			}
++			e.cfg.Audit.Enabled = true
++			e.cfg.Audit.Mode = "advisory"
++
++			result := Global(e.cfg, t.TempDir(), Options{Platform: installPlatform()})
++			if result.Status != "ok" {
++				t.Fatalf("a labelled skill failed the global install: %+v", result)
++			}
++			errors := strings.Join(result.Errors, "\n")
++			for _, label := range testCase.wantLabels {
++				// The audit-gate warning carries the exact label on
++				// the same message line. A global wiring that drops
++				// the parsed commands still validates (the
++				// skillcheck line below survives) but renders no
++				// such line, so this assertion kills it.
++				auditLines := linesWith(result.Messages, "audit warning:", label)
++				if len(auditLines) == 0 {
++					t.Fatalf("no global audit-gate warning carries %q: %s",
++						label, strings.Join(result.Messages, "\n"))
++				}
++				checkLines := linesWith(result.Messages, "warning: "+label)
++				if len(checkLines) == 0 {
++					t.Fatalf("no global validation warning carries %q: %s",
++						label, strings.Join(result.Messages, "\n"))
++				}
++				for _, auditLine := range auditLines {
++					for _, checkLine := range checkLines {
++						if auditLine == checkLine {
++							t.Fatalf("the audit and validation warnings share a line: %q", auditLine)
++						}
++					}
++				}
++				if strings.Contains(errors, label) {
++					t.Fatalf("the label escaped into global install errors: %s", errors)
++				}
++			}
++			if len(testCase.wantLabels) == 0 {
++				messages := strings.Join(result.Messages, "\n")
++				for _, label := range []string{"script-command-declared-only", "script-command-unfiltered-declared-network"} {
++					if strings.Contains(messages, label) {
++						t.Fatalf("an enforced script with no declared hosts was labelled %q: %s", label, messages)
++					}
++				}
++			}
++			if testCase.wantLauncher {
++				if messages := strings.Join(result.Messages, "\n"); strings.Contains(messages, "script-command-declared-only") {
++					t.Fatalf("an enforced global install rendered declared-only: %s", messages)
++				}
++			}
++			launcher := testCase.skill + "-tool"
++			if testCase.wantLauncher {
++				launcher = nativeLauncherName(launcher)
++			} else {
++				launcher = shimName(launcher)
++			}
++			globalBin := filepath.Join(e.home, "global", "bin", launcher)
++			if _, err := os.Lstat(globalBin); err != nil {
++				t.Fatalf("no global launcher was published: %v", err)
++			}
++			if testCase.wantLauncher {
++				if _, err := os.Lstat(globalBin + scriptworker.ShimSidecarSuffix); err != nil {
++					t.Fatalf("the enforced shape published no global sidecar: %v", err)
++				}
++			} else if _, err := os.Lstat(globalBin + scriptworker.ShimSidecarSuffix); err == nil {
++				t.Fatal("a declared-only shape published a global native launcher sidecar")
++			}
++		})
++	}
++}
++
++// TestDeclaredOnlyWithHostsGlobalInstallsWithOnlyDeclaredOnly is the
++// global negative row for the network class: a declared-only command
++// that declares network hosts installs unchanged and renders only the
++// declared-only warning, on both the audit-gate and validation lines.
++func TestDeclaredOnlyWithHostsGlobalInstallsWithOnlyDeclaredOnly(t *testing.T) {
++	t.Parallel()
++	e := newEnv(t)
++	e.schema8DeclaredOnlySkillWithNetwork("gauditlabel-hosts", []string{"audit-label.example.com"})
++	if _, err := GlobalInit(e.home); err != nil {
++		t.Fatal(err)
++	}
++	if err := manifestAddGlobal(e, "gauditlabel-hosts"); err != nil {
++		t.Fatal(err)
++	}
++	e.cfg.Audit.Enabled = true
++	e.cfg.Audit.Mode = "advisory"
++
++	result := Global(e.cfg, t.TempDir(), Options{Platform: installPlatform()})
++	if result.Status != "ok" {
++		t.Fatalf("a declared-only skill failed the global install: %+v", result)
++	}
++	messages := strings.Join(result.Messages, "\n")
++	if len(linesWith(result.Messages, "audit warning:", "script-command-declared-only")) == 0 {
++		t.Fatalf("no global audit-gate warning carries declared-only: %s", messages)
++	}
++	if len(linesWith(result.Messages, "warning: script-command-declared-only")) == 0 {
++		t.Fatalf("no global validation warning carries declared-only: %s", messages)
++	}
++	if strings.Contains(messages, "script-command-unfiltered-declared-network") {
++		t.Fatalf("a declared-only global install earned the network label: %s", messages)
++	}
++	if _, err := os.Lstat(filepath.Join(e.home, "global", "bin", shimName("gauditlabel-hosts-tool"))); err != nil {
++		t.Fatalf("global shim missing for a declared-only command: %v", err)
++	}
++}
++
++// TestDeclaredOnlyWithHostsInstallsWithOnlyDeclaredOnly is the install
++// negative row for the network class: a declared-only command that
++// declares network hosts installs unchanged and renders only the
++// declared-only warning.
++func TestDeclaredOnlyWithHostsInstallsWithOnlyDeclaredOnly(t *testing.T) {
++	t.Parallel()
++	e := newEnv(t)
++	e.schema8DeclaredOnlySkillWithNetwork("auditlabel-hosts", []string{"audit-label.example.com"})
++	e.declare("auditlabel-hosts")
++	e.cfg.Audit.Enabled = true
++	e.cfg.Audit.Mode = "advisory"
++
++	result := e.install(Options{})
++	if result.Status != "ok" {
++		t.Fatalf("a declared-only skill failed to install: %+v", result)
++	}
++	messages := strings.Join(result.Messages, "\n")
++	if !strings.Contains(messages, "script-command-declared-only") {
++		t.Fatalf("install messages do not carry declared-only: %s", messages)
++	}
++	if strings.Contains(messages, "script-command-unfiltered-declared-network") {
++		t.Fatalf("a declared-only install earned the network label: %s", messages)
++	}
++	if _, err := os.Lstat(filepath.Join(e.project, ".agents", "bin", shimName("auditlabel-hosts-tool"))); err != nil {
++		t.Fatalf("shim missing for a declared-only command: %v", err)
++	}
++}
+diff --git a/internal/install/global.go b/internal/install/global.go
+index f7ebdbaf..061b3ae7 100644
+--- a/internal/install/global.go
++++ b/internal/install/global.go
+@@ -186,6 +186,7 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
+ 					Name: node.Name, Source: node.Decl.Source, Git: node.Decl.Git,
+ 					Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
+ 					SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
++					Commands: node.Spec.Commands,
+ 				})
+ 			}
+ 			var warnings, errs []string
+diff --git a/internal/install/install.go b/internal/install/install.go
+index 861aad0a..49804428 100644
+--- a/internal/install/install.go
++++ b/internal/install/install.go
+@@ -494,6 +494,7 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
+ 					Name: node.Name, Source: node.Decl.Source, Git: node.Decl.Git,
+ 					Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
+ 					SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
++					Commands: node.Spec.Commands,
+ 				})
+ 			}
+ 			var warnings, errs []string
+diff --git a/internal/scriptpolicy/conformance_test.go b/internal/scriptpolicy/conformance_test.go
+index 12e23c24..55c40c27 100644
+--- a/internal/scriptpolicy/conformance_test.go
++++ b/internal/scriptpolicy/conformance_test.go
+@@ -41,6 +41,12 @@ type scriptHostExecutionPolicyVector struct {
+ 		ProbeResult           *string `json:"probe_result"`
+ 		EvidenceStatus        *string `json:"evidence_status"`
+ 	} `json:"preflight_cases"`
++	AuditLabelCases []struct {
++		Name            string   `json:"name"`
++		ManifestSchema  int      `json:"manifest_schema"`
++		ExecutionPolicy *string  `json:"execution_policy"`
++		Labels          []string `json:"labels"`
++	} `json:"audit_label_cases"`
+ }
+ 
+ // Section classifications. Every top-level section of the published family
+@@ -49,9 +55,6 @@ type scriptHostExecutionPolicyVector struct {
+ const (
+ 	// consumedHere: this file drives the section against curator's behaviour.
+ 	consumedHere = "consumed by this package"
+-	// notImplementedYet: real curator surface that this build does not yet
+-	// carry. Named with its owner so the gap is declared, not silent.
+-	notImplementedYet = "not implemented: audit warning classes, owned by STORY-260822-2h0v9j"
+ 	// consumedAtEntry: R3 drives the section at the production entry in the
+ 	// packages that own the worker path and the installer:
+ 	// internal/scriptworker proves the derived profile, the inventory
+@@ -60,6 +63,14 @@ const (
+ 	// table-injection seam is removed, so every row runs against the
+ 	// complete production table.
+ 	consumedAtEntry = "consumed at the production entry by internal/scriptworker and internal/install"
++	// consumedAtAuditEntry: R4 drives the section at the production audit
++	// and validation entries: internal/audit renders the warning classes
++	// through Gate and GateReadOnly and the per-command execution-policy
++	// record through the CLI and the stored verdict, internal/skillcheck
++	// reports the classes as validation warnings, and internal/install
++	// and cmd/curator prove the install-time gate and the `curator audit`
++	// output.
++	consumedAtAuditEntry = "consumed at the production entry by internal/audit, internal/skillcheck, internal/install and cmd/curator"
+ )
+ 
+ var scriptHostExecutionPolicySections = map[string]string{
+@@ -70,7 +81,7 @@ var scriptHostExecutionPolicySections = map[string]string{
+ 	"opt_in_cases":                consumedHere,
+ 	"mandatory_controls":          consumedHere,
+ 	"preflight_cases":             consumedAtEntry,
+-	"audit_label_cases":           notImplementedYet,
++	"audit_label_cases":           consumedAtAuditEntry,
+ 	"capability_derivation_cases": consumedAtEntry,
+ 	"capability_evidence_cases":   consumedAtEntry,
+ 	"capability_evidence_record":  consumedAtEntry,
+@@ -448,6 +459,14 @@ const capabilitiesRequiredFrom = 3
+ // manifest schema and lays out the script the command names, so a case fails
+ // for its execution-policy rule rather than for a missing file.
+ func materializeScriptSkill(t *testing.T, schema int, command map[string]any) string {
++	t.Helper()
++	return materializeScriptSkillWithCaps(t, schema, command, map[string]any{})
++}
++
++// materializeScriptSkillWithCaps is materializeScriptSkill with an explicit
++// declared `capabilities` object, for cases whose labels depend on the
++// declaration. A nil object keeps the schema default (empty from schema 3).
++func materializeScriptSkillWithCaps(t *testing.T, schema int, command map[string]any, caps map[string]any) string {
+ 	t.Helper()
+ 	dir := t.TempDir()
+ 	if path, ok := command["unix_path"].(string); ok {
+@@ -464,7 +483,10 @@ func materializeScriptSkill(t *testing.T, schema int, command map[string]any) st
+ 		"commands":       map[string]any{"tool": command},
+ 	}
+ 	if schema >= capabilitiesRequiredFrom {
+-		manifest["capabilities"] = map[string]any{}
++		if caps == nil {
++			caps = map[string]any{}
++		}
++		manifest["capabilities"] = caps
+ 	}
+ 	payload, err := json.Marshal(manifest)
+ 	if err != nil {
+@@ -475,3 +497,106 @@ func materializeScriptSkill(t *testing.T, schema int, command map[string]any) st
+ 	}
+ 	return dir
+ }
++
++// TestScriptAuditLabelCases pins the published audit-label family and drives
++// every case through the label helper against a parsed manifest: schema-7
++// and schema-8 declared-only scripts carry `script-command-declared-only`,
++// an enforced script with no declared hosts carries nothing, and an
++// enforced script with declared hosts carries only
++// `script-command-unfiltered-declared-network`. The vector names the policy
++// but not the interpreter or the declared hosts, so the enforced rows bind
++// the closed `python3-v1` interpreter the suite itself publishes, and the
++// unfiltered row declares one host glob while its twin declares none — the
++// case name is the distinguishing input, and the suite's two enforced rows
++// would be identical manifests without it. The warning rendering lives at
++// the production entries: internal/audit, internal/skillcheck,
++// internal/install, and cmd/curator. Each case also pins its
++// per-command audit-record entry here (identity or explicit absence).
++func TestScriptAuditLabelCases(t *testing.T) {
++	_, payload := loadScriptHostExecutionPolicyVector(t)
++	var vector scriptHostExecutionPolicyVector
++	if err := json.Unmarshal(payload, &vector); err != nil {
++		t.Fatal(err)
++	}
++	if len(vector.AuditLabelCases) == 0 {
++		t.Fatal("the suite published no audit-label cases")
++	}
++	byName := map[string]int{}
++	for index, testCase := range vector.AuditLabelCases {
++		byName[testCase.Name] = index
++	}
++	for _, name := range []string{
++		"schema7-script",
++		"schema8-declared-only-script",
++		"schema8-enforced-script",
++		"schema8-enforced-unfiltered-network",
++	} {
++		if _, ok := byName[name]; !ok {
++			t.Fatalf("the suite no longer publishes audit-label case %q", name)
++		}
++	}
++	if len(vector.AuditLabelCases) != 4 {
++		names := make([]string, 0, len(vector.AuditLabelCases))
++		for _, testCase := range vector.AuditLabelCases {
++			names = append(names, testCase.Name)
++		}
++		t.Fatalf("the suite publishes audit-label cases [%s]; this build classifies exactly four", strings.Join(names, ", "))
++	}
++	for _, testCase := range vector.AuditLabelCases {
++		t.Run(testCase.Name, func(t *testing.T) {
++			for _, label := range testCase.Labels {
++				if label != LabelDeclaredOnly && label != LabelUnfilteredDeclaredNetwork {
++					t.Fatalf("case %q names unknown label %q", testCase.Name, label)
++				}
++			}
++			command := map[string]any{"type": "script", "unix_path": "scripts/tool"}
++			if testCase.ExecutionPolicy != nil {
++				if *testCase.ExecutionPolicy != skillspec.ScriptExecutionPolicy {
++					t.Fatalf("case %q selects policy %q, want %q or null",
++						testCase.Name, *testCase.ExecutionPolicy, skillspec.ScriptExecutionPolicy)
++				}
++				command["execution_policy"] = *testCase.ExecutionPolicy
++				command["interpreter"] = "python3-v1"
++			}
++			caps := map[string]any{}
++			if testCase.Name == "schema8-enforced-unfiltered-network" {
++				caps["network"] = []string{"audit-label.example.com"}
++			}
++			spec, err := skillspec.Load(materializeScriptSkillWithCaps(t, testCase.ManifestSchema, command, caps))
++			if err != nil {
++				t.Fatalf("the suite's own audit-label shape did not parse: %v", err)
++			}
++			labelled := AuditLabelsForCommands(spec.Commands, spec.Capabilities.Network)
++			var got []string
++			if len(labelled) == 1 && labelled[0].Command == "tool" {
++				got = labelled[0].Labels
++			} else if len(labelled) != 0 {
++				t.Fatalf("labelled commands = %+v, want only tool", labelled)
++			}
++			if strings.Join(got, ",") != strings.Join(testCase.Labels, ",") {
++				t.Fatalf("labels = %q, want the suite's %q", got, testCase.Labels)
++			}
++			// The audit record carries the case's command whether or not
++			// it earns a warning: the exact policy identity for enforced
++			// rows, the explicit absence for declared-only rows.
++			policies := AuditPoliciesForCommands(spec.Commands)
++			if len(policies) != 1 || policies[0].Command != "tool" {
++				t.Fatalf("policy record = %+v, want the tool entry", policies)
++			}
++			var wantPolicy string
++			if testCase.ExecutionPolicy != nil {
++				wantPolicy = *testCase.ExecutionPolicy
++			}
++			if policies[0].Policy != wantPolicy {
++				t.Fatalf("policy record = %+v, want policy %q", policies, wantPolicy)
++			}
++			if testCase.ExecutionPolicy != nil {
++				for _, label := range got {
++					if label == LabelDeclaredOnly {
++						t.Fatalf("an enforced command was labelled declared-only")
++					}
++				}
++			}
++		})
++	}
++}
+diff --git a/internal/scriptpolicy/labels.go b/internal/scriptpolicy/labels.go
+index 93595f97..9a0769e3 100644
+--- a/internal/scriptpolicy/labels.go
++++ b/internal/scriptpolicy/labels.go
+@@ -1,5 +1,31 @@
+ package scriptpolicy
+ 
++import (
++	"sort"
++
++	"github.com/relux-works/curator/internal/skillspec"
++)
++
++// Closed script audit warning classes (manager profile §7). Both are always
++// `warn` in every mode and never block: neither is a finding about source
++// content, neither is subject to `fail_on`, and neither may be reported as
++// an applied control.
++const (
++	// LabelDeclaredOnly marks a script command that does not declare
++	// `execution_policy: "script-worker-v1"`: every schema-7 script
++	// command and every schema-8 script command without the field. Its
++	// capability declaration is documentation and bounds nothing at run
++	// time.
++	LabelDeclaredOnly = "script-command-declared-only"
++	// LabelUnfilteredDeclaredNetwork marks an enforced script command
++	// whose declared `network` hosts are non-empty. The globs are
++	// recorded and reported; no portable filtering is applied and none
++	// is claimed. A declared-only command with network hosts carries
++	// only LabelDeclaredOnly: the network label is about enforcement,
++	// not declaration.
++	LabelUnfilteredDeclaredNetwork = "script-command-unfiltered-declared-network"
++)
++
+ // EffectiveLabels reports the closed script-policy labels a source-audit
+ // evidence report binds. This manager does not implement script-worker-v1,
+ // so every enforced command is refused at admission; the label records that
+@@ -11,3 +37,82 @@ func EffectiveLabels() []string {
+ 		"script-worker-v1:" + StateUnsupported,
+ 	}
+ }
++
++// AuditLabels reports the audit warning classes for one command. Only
++// script commands are labelled; build and system commands never carry
++// either class. An enforced command is never labelled declared-only, and
++// the unfiltered-network label applies only to enforced commands whose
++// declared network hosts are non-empty. An unknown execution policy is
++// refused at admission, so it carries no audit label here.
++func AuditLabels(command skillspec.Command, networkHosts []string) []string {
++	if command.Type != "script" {
++		return nil
++	}
++	if command.ExecutionPolicy == "" {
++		return []string{LabelDeclaredOnly}
++	}
++	if command.ExecutionPolicy == skillspec.ScriptExecutionPolicy && len(networkHosts) != 0 {
++		return []string{LabelUnfilteredDeclaredNetwork}
++	}
++	return nil
++}
++
++// CommandAuditLabels is one command's audit warning classes.
++type CommandAuditLabels struct {
++	Command string
++	Labels  []string
++}
++
++// CommandAuditPolicy is one script command's entry in the audit record
++// (manager profile §7): the effective execution-policy identity or its
++// explicit absence. Policy carries the declared identity verbatim — the
++// closed `script-worker-v1` for an enforced command — and is empty when
++// the command declares no policy. Unlike CommandAuditLabels, every script
++// command has an entry whether or not it earns a warning class, so a
++// reviewer can separate enforced commands from declared-only ones without
++// consulting the warnings.
++type CommandAuditPolicy struct {
++	Command string `json:"command"`
++	Policy  string `json:"policy"`
++}
++
++// AuditPoliciesForCommands reports the audit-record entry for every script
++// command in command-lexical order, so the CLI, the stored verdict, and
++// every host list the same commands in the same order. Commands without a
++// warning are included: warning eligibility never drops a record entry.
++// Build and system commands carry no execution policy and are omitted.
++func AuditPoliciesForCommands(commands map[string]skillspec.Command) []CommandAuditPolicy {
++	names := make([]string, 0, len(commands))
++	for name := range commands {
++		names = append(names, name)
++	}
++	sort.Strings(names)
++	var policies []CommandAuditPolicy
++	for _, name := range names {
++		command := commands[name]
++		if command.Type != "script" {
++			continue
++		}
++		policies = append(policies, CommandAuditPolicy{Command: name, Policy: command.ExecutionPolicy})
++	}
++	return policies
++}
++
++// AuditLabelsForCommands reports the audit warning classes for every
++// labelled command in command-lexical order, so the audit gate and the
++// validation output list the same commands in the same order on every
++// host and every run. Commands without a label are omitted.
++func AuditLabelsForCommands(commands map[string]skillspec.Command, networkHosts []string) []CommandAuditLabels {
++	names := make([]string, 0, len(commands))
++	for name := range commands {
++		names = append(names, name)
++	}
++	sort.Strings(names)
++	var labelled []CommandAuditLabels
++	for _, name := range names {
++		if labels := AuditLabels(commands[name], networkHosts); len(labels) != 0 {
++			labelled = append(labelled, CommandAuditLabels{Command: name, Labels: labels})
++		}
++	}
++	return labelled
++}
+diff --git a/internal/scriptpolicy/labels_test.go b/internal/scriptpolicy/labels_test.go
+index 9118d6e6..6555ae07 100644
+--- a/internal/scriptpolicy/labels_test.go
++++ b/internal/scriptpolicy/labels_test.go
+@@ -3,6 +3,8 @@ package scriptpolicy
+ import (
+ 	"strings"
+ 	"testing"
++
++	"github.com/relux-works/curator/internal/skillspec"
+ )
+ 
+ func TestEffectiveLabels(t *testing.T) {
+@@ -22,3 +24,189 @@ func TestEffectiveLabels(t *testing.T) {
+ 		seen[label] = true
+ 	}
+ }
++
++// TestAuditLabelConstantsPinTheVectorText pins the closed warning-class
++// names as string literals, independent of the conformance vector read.
++// The vector consumer (TestScriptAuditLabelCases) binds these same names
++// to the suite's own bytes; a rename on either side fails exactly one of
++// the two tests.
++func TestAuditLabelConstantsPinTheVectorText(t *testing.T) {
++	if LabelDeclaredOnly != "script-command-declared-only" {
++		t.Fatalf("LabelDeclaredOnly = %q", LabelDeclaredOnly)
++	}
++	if LabelUnfilteredDeclaredNetwork != "script-command-unfiltered-declared-network" {
++		t.Fatalf("LabelUnfilteredDeclaredNetwork = %q", LabelUnfilteredDeclaredNetwork)
++	}
++}
++
++// TestAuditLabelsVectorShapes drives the four audit-label shapes through
++// the label helper: schema-7 and schema-8 declared-only scripts carry the
++// declared-only class, an enforced script with no declared hosts carries
++// nothing, and an enforced script with declared hosts carries only the
++// unfiltered-network class.
++func TestAuditLabelsVectorShapes(t *testing.T) {
++	declared := skillspec.Command{Name: "tool", Type: "script", UnixPath: "scripts/tool"}
++	enforced := skillspec.Command{
++		Name: "tool", Type: "script", UnixPath: "scripts/tool",
++		ExecutionPolicy: skillspec.ScriptExecutionPolicy, Interpreter: "python3-v1",
++	}
++	hosts := []string{"api.example.com"}
++	for _, testCase := range []struct {
++		name    string
++		command skillspec.Command
++		network []string
++		want    []string
++	}{
++		{"schema7-script", declared, nil, []string{LabelDeclaredOnly}},
++		{"schema8-declared-only-script", declared, nil, []string{LabelDeclaredOnly}},
++		{"schema8-enforced-script", enforced, nil, nil},
++		{"schema8-enforced-unfiltered-network", enforced, hosts, []string{LabelUnfilteredDeclaredNetwork}},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			got := AuditLabels(testCase.command, testCase.network)
++			if strings.Join(got, ",") != strings.Join(testCase.want, ",") {
++				t.Fatalf("AuditLabels = %q, want %q", got, testCase.want)
++			}
++		})
++	}
++}
++
++// TestAuditLabelsEnforcedIsNeverDeclaredOnly is the negative row for the
++// declared-only class: an enforced command carries no declared-only label
++// whether or not it declares network hosts. Labelling enforced commands
++// declared-only fails here.
++func TestAuditLabelsEnforcedIsNeverDeclaredOnly(t *testing.T) {
++	enforced := skillspec.Command{
++		Name: "tool", Type: "script", UnixPath: "scripts/tool",
++		ExecutionPolicy: skillspec.ScriptExecutionPolicy, Interpreter: "node-v1",
++	}
++	for _, network := range [][]string{nil, {"api.example.com"}} {
++		for _, label := range AuditLabels(enforced, network) {
++			if label == LabelDeclaredOnly {
++				t.Fatalf("an enforced command was labelled declared-only (network %q)", network)
++			}
++		}
++	}
++}
++
++// TestAuditLabelsDeclaredOnlyWithHostsCarriesNoNetworkLabel is the
++// negative row for the network class: a declared-only command with
++// network hosts carries only declared-only. The network label is about
++// enforcement, not declaration.
++func TestAuditLabelsDeclaredOnlyWithHostsCarriesNoNetworkLabel(t *testing.T) {
++	declared := skillspec.Command{Name: "tool", Type: "script", UnixPath: "scripts/tool"}
++	got := AuditLabels(declared, []string{"api.example.com"})
++	if len(got) != 1 || got[0] != LabelDeclaredOnly {
++		t.Fatalf("a declared-only command with hosts was labelled %q, want only %q", got, LabelDeclaredOnly)
++	}
++}
++
++// TestAuditLabelsIgnoreNonScriptCommands proves build and system commands
++// never carry either script class, even when a manifest declares network
++// hosts.
++func TestAuditLabelsIgnoreNonScriptCommands(t *testing.T) {
++	commands := map[string]skillspec.Command{
++		"build": {Name: "build", Type: "build", Driver: "go-v1", SourceDir: "cmd/build"},
++		"sys":   {Name: "sys", Type: "system", Command: "git"},
++	}
++	if got := AuditLabelsForCommands(commands, []string{"api.example.com"}); len(got) != 0 {
++		t.Fatalf("non-script commands were labelled: %+v", got)
++	}
++}
++
++// TestAuditLabelsUnknownPolicyCarriesNoLabel proves a command selecting an
++// unknown execution policy carries no audit label: it is refused at
++// admission, so neither the declared-only nor the enforced-network class
++// describes it.
++func TestAuditLabelsUnknownPolicyCarriesNoLabel(t *testing.T) {
++	future := skillspec.Command{
++		Name: "tool", Type: "script", UnixPath: "scripts/tool",
++		ExecutionPolicy: "script-worker-v9", Interpreter: "python3-v1",
++	}
++	for _, network := range [][]string{nil, {"api.example.com"}} {
++		if got := AuditLabels(future, network); len(got) != 0 {
++			t.Fatalf("an unknown policy was labelled %q (network %q)", got, network)
++		}
++	}
++}
++
++// TestAuditPoliciesForCommandsCoversEveryScriptCommand proves the audit
++// record carries every script command's execution-policy identity or its
++// explicit absence, independent of warning eligibility: the enforced
++// no-host command earns no warning class yet keeps its exact
++// `script-worker-v1` entry, the declared-only command records an empty
++// policy, and build/system commands are omitted.
++func TestAuditPoliciesForCommandsCoversEveryScriptCommand(t *testing.T) {
++	commands := map[string]skillspec.Command{
++		"tool": {Name: "tool", Type: "script", UnixPath: "scripts/tool"},
++		"guarded": {
++			Name: "guarded", Type: "script", UnixPath: "scripts/guarded",
++			ExecutionPolicy: skillspec.ScriptExecutionPolicy, Interpreter: "python3-v1",
++		},
++		"net": {
++			Name: "net", Type: "script", UnixPath: "scripts/net",
++			ExecutionPolicy: skillspec.ScriptExecutionPolicy, Interpreter: "node-v1",
++		},
++		"build": {Name: "build", Type: "build", Driver: "go-v1", SourceDir: "cmd/build"},
++		"sys":   {Name: "sys", Type: "system", Command: "git"},
++	}
++	got := AuditPoliciesForCommands(commands)
++	want := []CommandAuditPolicy{
++		{Command: "guarded", Policy: "script-worker-v1"},
++		{Command: "net", Policy: "script-worker-v1"},
++		{Command: "tool", Policy: ""},
++	}
++	if len(got) != len(want) {
++		t.Fatalf("policy record = %+v, want %+v", got, want)
++	}
++	for index := range want {
++		if got[index] != want[index] {
++			t.Fatalf("policy record = %+v, want %+v", got, want)
++		}
++	}
++	// The no-warning command keeps its entry while earning no label.
++	if labelled := AuditLabelsForCommands(commands, nil); len(labelled) != 1 || labelled[0].Command != "tool" {
++		t.Fatalf("labelled commands = %+v, want only tool", labelled)
++	}
++}
++
++// TestAuditPoliciesForCommandsRecordsUnknownPolicyVerbatim proves a
++// command selecting an unknown execution policy records its declared
++// identity verbatim rather than collapsing to absence: it is refused at
++// admission, not declared-only, and the record must not suggest otherwise.
++func TestAuditPoliciesForCommandsRecordsUnknownPolicyVerbatim(t *testing.T) {
++	commands := map[string]skillspec.Command{
++		"tool": {
++			Name: "tool", Type: "script", UnixPath: "scripts/tool",
++			ExecutionPolicy: "script-worker-v9", Interpreter: "python3-v1",
++		},
++	}
++	got := AuditPoliciesForCommands(commands)
++	if len(got) != 1 || got[0].Command != "tool" || got[0].Policy != "script-worker-v9" {
++		t.Fatalf("policy record = %+v, want the verbatim unknown identity", got)
++	}
++}
++
++// TestAuditLabelsForCommandsIsLexical proves the multi-command report
++// lists labelled commands in bytewise lexical order and omits unlabelled
++// ones, so the audit gate and the validation output agree on every host.
++func TestAuditLabelsForCommandsIsLexical(t *testing.T) {
++	commands := map[string]skillspec.Command{
++		"zulu":  {Name: "zulu", Type: "script", UnixPath: "scripts/zulu"},
++		"alpha": {Name: "alpha", Type: "script", UnixPath: "scripts/alpha"},
++		"mike": {
++			Name: "mike", Type: "script", UnixPath: "scripts/mike",
++			ExecutionPolicy: skillspec.ScriptExecutionPolicy, Interpreter: "node-v1",
++		},
++		"sys": {Name: "sys", Type: "system", Command: "git"},
++	}
++	got := AuditLabelsForCommands(commands, nil)
++	if len(got) != 2 || got[0].Command != "alpha" || got[1].Command != "zulu" {
++		t.Fatalf("labelled commands = %+v, want alpha then zulu", got)
++	}
++	for _, entry := range got {
++		if len(entry.Labels) != 1 || entry.Labels[0] != LabelDeclaredOnly {
++			t.Fatalf("command %q labels = %q, want only %q", entry.Command, entry.Labels, LabelDeclaredOnly)
++		}
++	}
++}
+diff --git a/internal/skillcheck/auditlabels_test.go b/internal/skillcheck/auditlabels_test.go
+new file mode 100644
+index 00000000..b7c54f8e
+--- /dev/null
++++ b/internal/skillcheck/auditlabels_test.go
+@@ -0,0 +1,124 @@
++package skillcheck
++
++import (
++	"testing"
++)
++
++// auditLabelSkill lays out a one-command skill at the requested manifest
++// schema: a declared-only or enforced script command with the given declared
++// network hosts. The prompt text carries the shell-neutral resolver, so the
++// only warnings the fixture can produce are the script audit classes.
++func auditLabelSkill(t *testing.T, schema int, enforced bool, network []string) string {
++	t.Helper()
++	dir := t.TempDir()
++	writeSkillFile(t, dir, "SKILL.md", "---\nname: skill\ndescription: d\n---\n"+
++		"Resolve the command from project .agents/bin (tool.cmd on Windows), then the manager global/bin fallback, "+
++		"then a validated bare command with command -v or Get-Command.\n")
++	writeSkillFile(t, dir, "scripts/tool", "#!/bin/sh\necho ok\n")
++	command := map[string]any{"type": "script", "unix_path": "scripts/tool"}
++	if enforced {
++		command["execution_policy"] = "script-worker-v1"
++		command["interpreter"] = "python3-v1"
++	}
++	caps := map[string]any{}
++	if network != nil {
++		caps["network"] = network
++	}
++	writeSkillFile(t, dir, "agent-skill.json", marshal(t, map[string]any{
++		"schema_version": schema,
++		"capabilities":   caps,
++		"runtime_roots":  []string{"scripts"},
++		"commands":       map[string]any{"tool": command},
++	}))
++	return dir
++}
++
++// scriptLabelIssues selects the script audit warning classes from a
++// validation report.
++func scriptLabelIssues(issues []Issue) []Issue {
++	var selected []Issue
++	for _, issue := range issues {
++		if issue.Code == "script-command-declared-only" ||
++			issue.Code == "script-command-unfiltered-declared-network" {
++			selected = append(selected, issue)
++		}
++	}
++	return selected
++}
++
++// TestValidateEmitsScriptAuditLabels drives the four audit-label shapes
++// through the validation entry. The issue code is asserted as a literal,
++// exactly as the conformance vector names it; every label is a warning and
++// none is an error, so declared-only skills keep validating.
++func TestValidateEmitsScriptAuditLabels(t *testing.T) {
++	for _, testCase := range []struct {
++		name     string
++		schema   int
++		enforced bool
++		network  []string
++		wantCode string
++		wantPath string
++	}{
++		{"schema7-script", 7, false, nil, "script-command-declared-only", "commands.tool.execution_policy"},
++		{"schema8-declared-only-script", 8, false, nil, "script-command-declared-only", "commands.tool.execution_policy"},
++		{"schema8-enforced-script", 8, true, nil, "", ""},
++		{"schema8-enforced-unfiltered-network", 8, true, []string{"api.example.com"},
++			"script-command-unfiltered-declared-network", "commands.tool"},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			issues := Validate(auditLabelSkill(t, testCase.schema, testCase.enforced, testCase.network), "")
++			if HasErrors(issues) {
++				t.Fatalf("a labelled skill reported errors: %+v", issues)
++			}
++			selected := scriptLabelIssues(issues)
++			if testCase.wantCode == "" {
++				if len(selected) != 0 {
++					t.Fatalf("an enforced script with no declared hosts was labelled: %+v", selected)
++				}
++				return
++			}
++			if len(selected) != 1 {
++				t.Fatalf("script labels = %+v, want exactly %q (all issues: %+v)",
++					selected, testCase.wantCode, issues)
++			}
++			if selected[0].Code != testCase.wantCode {
++				t.Fatalf("code = %q, want %q", selected[0].Code, testCase.wantCode)
++			}
++			if selected[0].Severity != "warning" {
++				t.Fatalf("severity = %q, want warning: %+v", selected[0].Severity, selected[0])
++			}
++			if selected[0].Path != testCase.wantPath {
++				t.Fatalf("path = %q, want %q: %+v", selected[0].Path, testCase.wantPath, selected[0])
++			}
++		})
++	}
++}
++
++// TestValidateEnforcedIsNeverDeclaredOnly is the validation-level negative
++// row for the declared-only class.
++func TestValidateEnforcedIsNeverDeclaredOnly(t *testing.T) {
++	for _, network := range [][]string{nil, {"api.example.com"}} {
++		issues := Validate(auditLabelSkill(t, 8, true, network), "")
++		if HasErrors(issues) {
++			t.Fatalf("an enforced skill reported errors: %+v", issues)
++		}
++		for _, issue := range scriptLabelIssues(issues) {
++			if issue.Code == "script-command-declared-only" {
++				t.Fatalf("an enforced command was labelled declared-only: %+v", issues)
++			}
++		}
++	}
++}
++
++// TestValidateDeclaredOnlyWithHostsCarriesNoNetworkLabel is the
++// validation-level negative row for the network class.
++func TestValidateDeclaredOnlyWithHostsCarriesNoNetworkLabel(t *testing.T) {
++	issues := Validate(auditLabelSkill(t, 8, false, []string{"api.example.com"}), "")
++	if HasErrors(issues) {
++		t.Fatalf("a declared-only skill reported errors: %+v", issues)
++	}
++	selected := scriptLabelIssues(issues)
++	if len(selected) != 1 || selected[0].Code != "script-command-declared-only" {
++		t.Fatalf("a declared-only command with hosts was labelled %+v", selected)
++	}
++}
+diff --git a/internal/skillcheck/skillcheck.go b/internal/skillcheck/skillcheck.go
+index 1665b435..7ec97704 100644
+--- a/internal/skillcheck/skillcheck.go
++++ b/internal/skillcheck/skillcheck.go
+@@ -42,6 +42,7 @@ func Validate(skillDir, localeValue string) []Issue {
+ 		})
+ 	} else {
+ 		issues = append(issues, executionPolicyIssues(spec)...)
++		issues = append(issues, scriptAuditLabelIssues(spec)...)
+ 		issues = append(issues, runtimeRootReferenceWarnings(skillDir, spec)...)
+ 		issues = append(issues, buildRootReferenceWarnings(skillDir, spec)...)
+ 		issues = append(issues, commandResolutionWarnings(skillDir, spec)...)
+@@ -75,6 +76,39 @@ func executionPolicyIssues(spec *skillspec.Spec) []Issue {
+ 	}}
+ }
+ 
++// scriptAuditLabelIssues reports the script audit warning classes (manager
++// profile §7) as validation warnings. Both classes are always warnings,
++// never errors: a declared-only skill still validates and still installs,
++// and an enforced skill with declared network hosts is admitted with its
++// reporting-only posture stated. The issue code is the closed class name,
++// pinned exactly as the conformance vector names it.
++func scriptAuditLabelIssues(spec *skillspec.Spec) []Issue {
++	var issues []Issue
++	for _, entry := range scriptpolicy.AuditLabelsForCommands(spec.Commands, spec.Capabilities.Network) {
++		for _, label := range entry.Labels {
++			switch label {
++			case scriptpolicy.LabelDeclaredOnly:
++				issues = append(issues, Issue{
++					Severity: "warning",
++					Code:     label,
++					Path:     "commands." + entry.Command + ".execution_policy",
++					Message: fmt.Sprintf("command '%s' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy %q with an interpreter to enforce containment",
++						entry.Command, skillspec.ScriptExecutionPolicy),
++				})
++			case scriptpolicy.LabelUnfilteredDeclaredNetwork:
++				issues = append(issues, Issue{
++					Severity: "warning",
++					Code:     label,
++					Path:     "commands." + entry.Command,
++					Message: fmt.Sprintf("command '%s' is enforced but its declared network hosts are reporting-only (no portable filtering is applied); declare only the hosts you need",
++						entry.Command),
++				})
++			}
++		}
++	}
++	return issues
++}
++
+ func runtimeRootReferenceWarnings(skillDir string, spec *skillspec.Spec) []Issue {
+ 	hasProviderRuntime := false
+ 	for _, dependency := range spec.Dependencies {
+diff --git a/internal/skillcheck/skillcheck_test.go b/internal/skillcheck/skillcheck_test.go
+index 60a1f94d..b193944d 100644
+--- a/internal/skillcheck/skillcheck_test.go
++++ b/internal/skillcheck/skillcheck_test.go
+@@ -63,11 +63,15 @@ func TestValidateWarnsAboutRuntimePathInPromptContext(t *testing.T) {
+ 				},
+ 			}))
+ 			issues := Validate(dir, "")
+-			if len(issues) != 2 ||
+-				issues[0].Code != "skill.runtime_root_in_prompt_context" ||
+-				issues[1].Code != "skill.command_resolution_contract_missing" {
++			if len(issues) != 3 ||
++				issues[0].Code != "script-command-declared-only" ||
++				issues[1].Code != "skill.runtime_root_in_prompt_context" ||
++				issues[2].Code != "skill.command_resolution_contract_missing" {
+ 				t.Fatalf("issues = %+v", issues)
+ 			}
++			if issues[0].Severity != "warning" || HasErrors(issues) {
++				t.Fatalf("the declared-only label must warn, never error: %+v", issues)
++			}
+ 		})
+ 	}
+ }
+@@ -196,9 +200,15 @@ func TestValidateAcceptsCrossPlatformShellNeutralResolver(t *testing.T) {
+ 			},
+ 		},
+ 	}))
+-	if issues := Validate(dir, ""); len(issues) != 0 {
++	// The shell-neutral resolver silences the prompt-context warnings; the
++	// script audit label remains as a warning, never an error.
++	issues := Validate(dir, "")
++	if len(issues) != 1 || issues[0].Code != "script-command-declared-only" {
+ 		t.Fatalf("shell-neutral skill warnings = %+v", issues)
+ 	}
++	if issues[0].Severity != "warning" || HasErrors(issues) {
++		t.Fatalf("the declared-only label must warn, never error: %+v", issues)
++	}
+ }
+ 
+ func writeSkillFile(t *testing.T, root, relative, content string) {

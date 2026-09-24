@@ -1,0 +1,17 @@
+# Republish unchanged — TASK-260916-1xib1x revision 4 → 5 (bound developer run)
+
+The rev4 gate (run 35713206841) failed only on ubuntu-latest `Test` with a PACKAGE TIMEOUT, not a test
+failure: `FAIL github.com/relux-works/curator/internal/install 1800.165s` (GO_TEST_TIMEOUT=30m) with
+`TestScriptAuditLabelsAtGlobalInstallEntry` and `TestScriptOptInCasesAtInstallEntry` still executing.
+The hosted timeline proves a slow runner, not a hang: every parallel test in the package took 2.1× the
+rev3 time (e.g. TestPlanLinesRedactAnUntrustedReason 761 s → 1600 s; TestScriptAuditLabelsAtInstallEntry
+835 s → 1778 s), the global-install rows started at 1556 s and were passing one by one
+(schema7-script 1732 s, schema8-declared-only 1799.7 s) when the budget expired. rev3 (identical bytes)
+passed the same lane in 926 s. The orchestrator files the budget issue separately.
+
+Do NOT change any file. Verify `git status --short` in the Story worktree
+(.temp/STORY-260822-2h0v9j/worktree) lists exactly the rev4 paths (12 modified + 4 untracked
+auditlabels_test.go files), add one line to results.md ("revision 5 = revision 4 unchanged; gate rerun
+after an ubuntu internal/install package timeout on a 2× slow runner"), then
+`task-board handoff TASK-260916-1xib1x --role developer`. If the rerun fails on the SAME package
+timeout again, attach the failure and stop (the orchestrator handles the budget).

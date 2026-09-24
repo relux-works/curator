@@ -1,5 +1,5 @@
 ## Status
-integrating
+done
 
 ## Review
 required
@@ -29,4 +29,4 @@ External spec dependency is unblocked for implementation: consume immutable cura
 2026-08-22T14:51:31Z
 
 ## Last Update
-2026-09-15T21:00:30Z
+2026-09-24T05:55:48Z

@@ -1,0 +1,231 @@
+Revision 6 independent reviewer command logs
+Candidate: e33bfbf7aa455dbbd9fdbd92f5233eae69d4775f
+Shell: zsh; Go 1.26.0 darwin/amd64
+
+
+=== portable-tests.log ===
+ok  	github.com/relux-works/curator/internal/scriptworker	0.510s
+
+=== build.log ===
+
+=== prior-contracts.log ===
+=== RUN   TestReviewerTruncateUAPIIdentity
+--- PASS: TestReviewerTruncateUAPIIdentity (0.00s)
+=== RUN   TestReviewerWriteConfinementMask
+--- PASS: TestReviewerWriteConfinementMask (0.00s)
+=== RUN   TestReviewerRegularFileTruncationGrant
+--- PASS: TestReviewerRegularFileTruncationGrant (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/scriptworker	0.377s
+
+=== abi1-contract.log ===
+=== RUN   TestReviewerABI1MutationRights
+=== RUN   TestReviewerABI1MutationRights/REMOVE_DIR
+    reviewer_abi1_test.go:19: ABI 1 supports REMOVE_DIR=0x10 but production handled mask 0x2 leaves it unrestricted
+=== RUN   TestReviewerABI1MutationRights/MAKE_CHAR
+    reviewer_abi1_test.go:19: ABI 1 supports MAKE_CHAR=0x40 but production handled mask 0x2 leaves it unrestricted
+=== RUN   TestReviewerABI1MutationRights/MAKE_SOCK
+    reviewer_abi1_test.go:19: ABI 1 supports MAKE_SOCK=0x200 but production handled mask 0x2 leaves it unrestricted
+=== RUN   TestReviewerABI1MutationRights/MAKE_SYM
+    reviewer_abi1_test.go:19: ABI 1 supports MAKE_SYM=0x1000 but production handled mask 0x2 leaves it unrestricted
+=== RUN   TestReviewerABI1MutationRights/REMOVE_FILE
+    reviewer_abi1_test.go:19: ABI 1 supports REMOVE_FILE=0x20 but production handled mask 0x2 leaves it unrestricted
+=== RUN   TestReviewerABI1MutationRights/MAKE_DIR
+    reviewer_abi1_test.go:19: ABI 1 supports MAKE_DIR=0x80 but production handled mask 0x2 leaves it unrestricted
+=== RUN   TestReviewerABI1MutationRights/MAKE_REG
+    reviewer_abi1_test.go:19: ABI 1 supports MAKE_REG=0x100 but production handled mask 0x2 leaves it unrestricted
+=== RUN   TestReviewerABI1MutationRights/MAKE_FIFO
+    reviewer_abi1_test.go:19: ABI 1 supports MAKE_FIFO=0x400 but production handled mask 0x2 leaves it unrestricted
+=== RUN   TestReviewerABI1MutationRights/MAKE_BLOCK
+    reviewer_abi1_test.go:19: ABI 1 supports MAKE_BLOCK=0x800 but production handled mask 0x2 leaves it unrestricted
+=== NAME  TestReviewerABI1MutationRights
+    reviewer_abi1_test.go:24: ABI 1 write mask = 0x2; want 0x1ff2
+--- FAIL: TestReviewerABI1MutationRights (0.00s)
+    --- FAIL: TestReviewerABI1MutationRights/REMOVE_DIR (0.00s)
+    --- FAIL: TestReviewerABI1MutationRights/MAKE_CHAR (0.00s)
+    --- FAIL: TestReviewerABI1MutationRights/MAKE_SOCK (0.00s)
+    --- FAIL: TestReviewerABI1MutationRights/MAKE_SYM (0.00s)
+    --- FAIL: TestReviewerABI1MutationRights/REMOVE_FILE (0.00s)
+    --- FAIL: TestReviewerABI1MutationRights/MAKE_DIR (0.00s)
+    --- FAIL: TestReviewerABI1MutationRights/MAKE_REG (0.00s)
+    --- FAIL: TestReviewerABI1MutationRights/MAKE_FIFO (0.00s)
+    --- FAIL: TestReviewerABI1MutationRights/MAKE_BLOCK (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/scriptworker	0.366s
+FAIL
+
+=== omit-MAKE_DIR.log ===
+--- FAIL: TestLandlockHandledMaskFollowsABI (0.00s)
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-2-adds-mutation (0.00s)
+        landlock_test.go:85: handled mask = 0x3f73, want 0x3ff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-3-adds-truncate (0.00s)
+        landlock_test.go:85: handled mask = 0x7f73, want 0x7ff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-4-adds-no-filesystem-right (0.00s)
+        landlock_test.go:85: handled mask = 0x7f73, want 0x7ff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-5-adds-ioctl-dev (0.00s)
+        landlock_test.go:85: handled mask = 0xff73, want 0xfff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-6-keeps-the-set (0.00s)
+        landlock_test.go:85: handled mask = 0xff73, want 0xfff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-9-keeps-the-set (0.00s)
+        landlock_test.go:85: handled mask = 0xff73, want 0xfff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/exec-only (0.00s)
+        landlock_test.go:91: write access = 0x7f72, want 0x7ff2
+    --- FAIL: TestLandlockHandledMaskFollowsABI/write-only (0.00s)
+        landlock_test.go:85: handled mask = 0x7f72, want 0x7ff2
+    --- FAIL: TestLandlockHandledMaskFollowsABI/no-control-handles-nothing (0.00s)
+        landlock_test.go:91: write access = 0x7f72, want 0x7ff2
+FAIL
+FAIL	github.com/relux-works/curator/internal/scriptworker	0.382s
+FAIL
+
+=== omit-MAKE_FIFO.log ===
+--- FAIL: TestLandlockHandledMaskFollowsABI (0.00s)
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-2-adds-mutation (0.00s)
+        landlock_test.go:85: handled mask = 0x3bf3, want 0x3ff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-3-adds-truncate (0.00s)
+        landlock_test.go:85: handled mask = 0x7bf3, want 0x7ff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-4-adds-no-filesystem-right (0.00s)
+        landlock_test.go:85: handled mask = 0x7bf3, want 0x7ff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-5-adds-ioctl-dev (0.00s)
+        landlock_test.go:85: handled mask = 0xfbf3, want 0xfff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-6-keeps-the-set (0.00s)
+        landlock_test.go:85: handled mask = 0xfbf3, want 0xfff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-9-keeps-the-set (0.00s)
+        landlock_test.go:85: handled mask = 0xfbf3, want 0xfff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/exec-only (0.00s)
+        landlock_test.go:91: write access = 0x7bf2, want 0x7ff2
+    --- FAIL: TestLandlockHandledMaskFollowsABI/write-only (0.00s)
+        landlock_test.go:85: handled mask = 0x7bf2, want 0x7ff2
+    --- FAIL: TestLandlockHandledMaskFollowsABI/no-control-handles-nothing (0.00s)
+        landlock_test.go:91: write access = 0x7bf2, want 0x7ff2
+FAIL
+FAIL	github.com/relux-works/curator/internal/scriptworker	0.391s
+FAIL
+
+=== omit-MAKE_REG.log ===
+--- FAIL: TestLandlockHandledMaskFollowsABI (0.00s)
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-2-adds-mutation (0.00s)
+        landlock_test.go:85: handled mask = 0x3ef3, want 0x3ff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-3-adds-truncate (0.00s)
+        landlock_test.go:85: handled mask = 0x7ef3, want 0x7ff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-4-adds-no-filesystem-right (0.00s)
+        landlock_test.go:85: handled mask = 0x7ef3, want 0x7ff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-5-adds-ioctl-dev (0.00s)
+        landlock_test.go:85: handled mask = 0xfef3, want 0xfff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-6-keeps-the-set (0.00s)
+        landlock_test.go:85: handled mask = 0xfef3, want 0xfff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-9-keeps-the-set (0.00s)
+        landlock_test.go:85: handled mask = 0xfef3, want 0xfff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/exec-only (0.00s)
+        landlock_test.go:91: write access = 0x7ef2, want 0x7ff2
+    --- FAIL: TestLandlockHandledMaskFollowsABI/write-only (0.00s)
+        landlock_test.go:85: handled mask = 0x7ef2, want 0x7ff2
+    --- FAIL: TestLandlockHandledMaskFollowsABI/no-control-handles-nothing (0.00s)
+        landlock_test.go:91: write access = 0x7ef2, want 0x7ff2
+FAIL
+FAIL	github.com/relux-works/curator/internal/scriptworker	0.403s
+FAIL
+
+=== omit-REMOVE_DIR.log ===
+--- FAIL: TestLandlockHandledMaskFollowsABI (0.00s)
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-2-adds-mutation (0.00s)
+        landlock_test.go:85: handled mask = 0x3fe3, want 0x3ff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-3-adds-truncate (0.00s)
+        landlock_test.go:85: handled mask = 0x7fe3, want 0x7ff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-4-adds-no-filesystem-right (0.00s)
+        landlock_test.go:85: handled mask = 0x7fe3, want 0x7ff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-5-adds-ioctl-dev (0.00s)
+        landlock_test.go:85: handled mask = 0xffe3, want 0xfff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-6-keeps-the-set (0.00s)
+        landlock_test.go:85: handled mask = 0xffe3, want 0xfff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-9-keeps-the-set (0.00s)
+        landlock_test.go:85: handled mask = 0xffe3, want 0xfff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/exec-only (0.00s)
+        landlock_test.go:91: write access = 0x7fe2, want 0x7ff2
+    --- FAIL: TestLandlockHandledMaskFollowsABI/write-only (0.00s)
+        landlock_test.go:85: handled mask = 0x7fe2, want 0x7ff2
+    --- FAIL: TestLandlockHandledMaskFollowsABI/no-control-handles-nothing (0.00s)
+        landlock_test.go:91: write access = 0x7fe2, want 0x7ff2
+FAIL
+FAIL	github.com/relux-works/curator/internal/scriptworker	0.370s
+FAIL
+
+=== omit-REMOVE_FILE.log ===
+--- FAIL: TestLandlockHandledMaskFollowsABI (0.00s)
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-2-adds-mutation (0.00s)
+        landlock_test.go:85: handled mask = 0x3fd3, want 0x3ff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-3-adds-truncate (0.00s)
+        landlock_test.go:85: handled mask = 0x7fd3, want 0x7ff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-4-adds-no-filesystem-right (0.00s)
+        landlock_test.go:85: handled mask = 0x7fd3, want 0x7ff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-5-adds-ioctl-dev (0.00s)
+        landlock_test.go:85: handled mask = 0xffd3, want 0xfff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-6-keeps-the-set (0.00s)
+        landlock_test.go:85: handled mask = 0xffd3, want 0xfff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-9-keeps-the-set (0.00s)
+        landlock_test.go:85: handled mask = 0xffd3, want 0xfff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/exec-only (0.00s)
+        landlock_test.go:91: write access = 0x7fd2, want 0x7ff2
+    --- FAIL: TestLandlockHandledMaskFollowsABI/write-only (0.00s)
+        landlock_test.go:85: handled mask = 0x7fd2, want 0x7ff2
+    --- FAIL: TestLandlockHandledMaskFollowsABI/no-control-handles-nothing (0.00s)
+        landlock_test.go:91: write access = 0x7fd2, want 0x7ff2
+FAIL
+FAIL	github.com/relux-works/curator/internal/scriptworker	0.380s
+FAIL
+
+=== omit-TRUNCATE.log ===
+--- FAIL: TestLandlockHandledMaskFollowsABI (0.00s)
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-3-adds-truncate (0.00s)
+        landlock_test.go:85: handled mask = 0x3ff3, want 0x7ff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-4-adds-no-filesystem-right (0.00s)
+        landlock_test.go:85: handled mask = 0x3ff3, want 0x7ff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-5-adds-ioctl-dev (0.00s)
+        landlock_test.go:85: handled mask = 0xbff3, want 0xfff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-6-keeps-the-set (0.00s)
+        landlock_test.go:85: handled mask = 0xbff3, want 0xfff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/abi-9-keeps-the-set (0.00s)
+        landlock_test.go:85: handled mask = 0xbff3, want 0xfff3
+    --- FAIL: TestLandlockHandledMaskFollowsABI/exec-only (0.00s)
+        landlock_test.go:91: write access = 0x3ff2, want 0x7ff2
+    --- FAIL: TestLandlockHandledMaskFollowsABI/write-only (0.00s)
+        landlock_test.go:85: handled mask = 0x3ff2, want 0x7ff2
+    --- FAIL: TestLandlockHandledMaskFollowsABI/no-control-handles-nothing (0.00s)
+        landlock_test.go:91: write access = 0x3ff2, want 0x7ff2
+FAIL
+FAIL	github.com/relux-works/curator/internal/scriptworker	0.372s
+FAIL
+
+=== mutation summary ===
+[
+  {
+    "mutant": "omit-TRUNCATE",
+    "exit": 1,
+    "scope": "pure mask test; not Linux worker enforcement"
+  },
+  {
+    "mutant": "omit-REMOVE_FILE",
+    "exit": 1,
+    "scope": "pure mask test; not Linux worker enforcement"
+  },
+  {
+    "mutant": "omit-REMOVE_DIR",
+    "exit": 1,
+    "scope": "pure mask test; not Linux worker enforcement"
+  },
+  {
+    "mutant": "omit-MAKE_DIR",
+    "exit": 1,
+    "scope": "pure mask test; not Linux worker enforcement"
+  },
+  {
+    "mutant": "omit-MAKE_REG",
+    "exit": 1,
+    "scope": "pure mask test; not Linux worker enforcement"
+  },
+  {
+    "mutant": "omit-MAKE_FIFO",
+    "exit": 1,
+    "scope": "pure mask test; not Linux worker enforcement"
+  }
+]
