@@ -1,0 +1,157 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 17773d62..592129a3 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -193,6 +193,10 @@ All notable implementation changes are recorded here.
+   reported as an invalid document rather than as one from a newer manager.
+   Schemas 3 and 4 are read by this release, so `upgrade the manager` was never
+   the remedy for them.
++- Draft marker-v5 build records now validate the closed raw shape of local
++  `go-v1` builds, refusing external-only fields even when their JSON value is
++  `null`. External `declared_tag` values must be non-empty valid Git ref names;
++  marker schemas 1 through 4 keep their existing rules.
+ - A snapshot-extraction spawn failure of `git cat-file --batch` is now
+   reported with its operation context (`git cat-file --batch failed in ...`)
+   like every other product git spawn, instead of surfacing the bare fork/exec
+diff --git a/internal/marker/marker.go b/internal/marker/marker.go
+index 7ceb50a9..b271fc20 100644
+--- a/internal/marker/marker.go
++++ b/internal/marker/marker.go
+@@ -24,6 +24,7 @@ import (
+ 	"github.com/relux-works/curator/internal/closureexec"
+ 	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/identifiers"
++	"github.com/relux-works/curator/internal/identity"
+ 	"github.com/relux-works/curator/internal/protocoljson"
+ )
+ 
+@@ -469,6 +470,19 @@ var v5ExternalBuildTypes = map[string]string{
+ 	"substitution":           "object",
+ }
+ 
++// v5LocalBuildShape is the complete local go-v1 record from the marker-v5
++// schema. Keep this raw shape closed so nullable external-only members cannot
++// disappear into zero values during JSON decoding.
++var v5LocalBuildShape = map[string]string{
++	"driver":                 "string",
++	"receipt_schema_version": "number",
++	"execution_policy":       "string",
++	"cache_key":              "string",
++	"receipt_sha256":         "string",
++	"artifact_sha256":        "string",
++	"artifact_path":          "string",
++}
++
+ // v5ExternalBuildRequired is the required member set of the external arm:
+ // every type member above except the optional declared_tag and the
+ // substituted-conditional substitution.
+@@ -592,6 +606,12 @@ func validV5ExternalBuildShape(raw json.RawMessage) bool {
+ 			return false
+ 		}
+ 	}
++	if tagRaw, present := object["declared_tag"]; present {
++		var tag string
++		if json.Unmarshal(tagRaw, &tag) != nil || !identity.DraftSourceRefName(tag) {
++			return false
++		}
++	}
+ 	// Presence of substituted was enforced by the required loop above,
+ 	// which is the single refusal point for an absent member: the decode
+ 	// below tolerates absence so a mutant dropping the requirement admits
+@@ -647,6 +667,14 @@ func validV5ExternalBuildShape(raw json.RawMessage) bool {
+ 	return true
+ }
+ 
++// validV5LocalBuildShape validates the complete, closed local go-v1 record.
++// This must inspect the raw object because encoding/json maps null string,
++// Boolean, and pointer members to the same zero values as absent members.
++func validV5LocalBuildShape(raw json.RawMessage) bool {
++	object, ok := rawObject(raw)
++	return ok && closedRawShape(object, v5LocalBuildShape)
++}
++
+ // validV5Package mirrors the disjoint source-types arms: a local snapshot
+ // never carries Git fields and a Git package never carries a snapshot
+ // digest. Digest forms are never substituted across arms.
+@@ -809,9 +837,17 @@ func validBuildState(m *Marker, raw map[string]json.RawMessage) bool {
+ 		// whatever the skill schema: its cache entries are receipt-3 package
+ 		// wrappers, so a legacy record shape can never describe them.
+ 		if m.SchemaVersion == SchemaV5 {
+-			if build.Driver == "go-repository-v1" {
+-				rawBuild, present := buildsRaw[command]
+-				if !present || !validV5ExternalBuildShape(rawBuild) {
++			rawBuild, present := buildsRaw[command]
++			if !present {
++				return false
++			}
++			switch build.Driver {
++			case buildmeta.DriverGoV1:
++				if !validV5LocalBuildShape(rawBuild) {
++					return false
++				}
++			case "go-repository-v1":
++				if !validV5ExternalBuildShape(rawBuild) {
+ 					return false
+ 				}
+ 			}
+diff --git a/internal/marker/marker_v5_builds_test.go b/internal/marker/marker_v5_builds_test.go
+index 4c2e2eb7..9ede335d 100644
+--- a/internal/marker/marker_v5_builds_test.go
++++ b/internal/marker/marker_v5_builds_test.go
+@@ -344,3 +344,56 @@ func TestMarkerV5ExternalBuildClosedShape(t *testing.T) {
+ 		})
+ 	}
+ }
++
++// TestMarkerV5LocalBuildClosedShape proves the local go-v1 arm is validated
++// from raw JSON at marker.Read: external-only values cannot disappear into
++// the decoded struct's zero values. Each row rewrites bytes after a valid
++// marker has been written, bypassing Write like a foreign marker producer.
++func TestMarkerV5LocalBuildClosedShape(t *testing.T) {
++	for field := range map[string]struct{}{
++		"repository":   {},
++		"substituted":  {},
++		"substitution": {},
++	} {
++		t.Run(field+"-null", func(t *testing.T) {
++			dir, _ := writeV5(t, v5BuildMarker(true, false))
++			build := mutateExtJSON(t, v5LocalBuild(), func(o map[string]json.RawMessage) {
++				o[field] = json.RawMessage(`null`)
++			})
++			rewriteV5Build(t, dir, "tool", build)
++			if got := Read(dir); got != nil {
++				t.Fatalf("Read admitted local go-v1 build with %s:null: %+v", field, got.Builds["tool"])
++			}
++		})
++	}
++}
++
++// TestMarkerV5DeclaredTagRequiresValidGitRef drives empty and malformed tag
++// names through marker.Read. The same validator is used for draft Skillfile
++// source refs, so marker summaries cannot retain a value the locked source
++// contract would reject.
++func TestMarkerV5DeclaredTagRequiresValidGitRef(t *testing.T) {
++	for name, tag := range map[string]string{
++		"empty":     `""`,
++		"malformed": `"release..next"`,
++	} {
++		t.Run(name, func(t *testing.T) {
++			dir, _ := writeV5(t, v5BuildMarker(false, true))
++			build := mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) {
++				o["declared_tag"] = json.RawMessage(tag)
++			})
++			rewriteV5Build(t, dir, "ext", build)
++			if got := Read(dir); got != nil {
++				t.Fatalf("Read admitted declared_tag %s: %+v", tag, got.Builds["ext"])
++			}
++		})
++	}
++
++	withValidTag := v5ExternalBuild()
++	withValidTag.DeclaredTag = "release/v1.4.0"
++	dir, _ := writeV5(t, v5BuildMarker(false, true))
++	rewriteV5Build(t, dir, "ext", mustExtJSON(t, withValidTag))
++	if got := Read(dir); got == nil || got.Builds["ext"].DeclaredTag != withValidTag.DeclaredTag {
++		t.Fatalf("Read did not preserve a valid declared_tag: got=%+v", got)
++	}
++}
