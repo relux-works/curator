@@ -1,0 +1,273 @@
+diff --git a/internal/snapshot/destination_sharing_violation_other.go b/internal/snapshot/destination_sharing_violation_other.go
+new file mode 100644
+index 00000000..a362004c
+--- /dev/null
++++ b/internal/snapshot/destination_sharing_violation_other.go
+@@ -0,0 +1,7 @@
++//go:build !windows
++
++package snapshot
++
++func isDestinationSharingViolation(error) bool {
++	return false
++}
+diff --git a/internal/snapshot/destination_sharing_violation_windows.go b/internal/snapshot/destination_sharing_violation_windows.go
+new file mode 100644
+index 00000000..eb0720b1
+--- /dev/null
++++ b/internal/snapshot/destination_sharing_violation_windows.go
+@@ -0,0 +1,13 @@
++//go:build windows
++
++package snapshot
++
++import (
++	"errors"
++
++	"golang.org/x/sys/windows"
++)
++
++func isDestinationSharingViolation(err error) bool {
++	return errors.Is(err, windows.ERROR_SHARING_VIOLATION)
++}
+diff --git a/internal/snapshot/snapshot.go b/internal/snapshot/snapshot.go
+index a1395144..e1aa0b26 100644
+--- a/internal/snapshot/snapshot.go
++++ b/internal/snapshot/snapshot.go
+@@ -8,6 +8,7 @@ import (
+ 	"io/fs"
+ 	"os"
+ 	"path/filepath"
++	"time"
+ 
+ 	"github.com/relux-works/curator/internal/gitops"
+ 	"github.com/relux-works/curator/internal/transaction"
+@@ -17,6 +18,13 @@ import (
+ // could not be authenticated as the exact snapshot being published.
+ var ErrDestinationConflict = errors.New("snapshot destination conflicts with immutable commit")
+ 
++// digestSnapshotDestination is a narrow seam for exercising transient
++// destination-open failures. Production uses transaction.DigestPath.
++var digestSnapshotDestination = transaction.DigestPath
++
++const destinationSharingViolationRetries = 3
++const destinationSharingViolationRetryDelay = 10 * time.Millisecond
++
+ // Dir returns the cache location for a source at a commit.
+ func Dir(home, source, commit string) string {
+ 	return filepath.Join(home, "cache", filepath.FromSlash(source), commit, "snapshot")
+@@ -158,7 +166,7 @@ func authenticateDestination(expected, destination string) error {
+ 	if err != nil {
+ 		return fmt.Errorf("%w: authenticate expected snapshot: %v", ErrDestinationConflict, err)
+ 	}
+-	destinationDigest, err := transaction.DigestPath(destination)
++	destinationDigest, err := digestDestinationWithSharingRetry(destination)
+ 	if err != nil {
+ 		return fmt.Errorf("%w: authenticate destination: %v", ErrDestinationConflict, err)
+ 	}
+@@ -167,3 +175,16 @@ func authenticateDestination(expected, destination string) error {
+ 	}
+ 	return nil
+ }
++
++// digestDestinationWithSharingRetry handles a short Windows sharing violation
++// while another Get is publishing the immutable destination. All other read
++// errors, and a sharing violation that outlasts this bound, fail closed.
++func digestDestinationWithSharingRetry(destination string) (string, error) {
++	for retry := 0; ; retry++ {
++		digest, err := digestSnapshotDestination(destination)
++		if err == nil || !isDestinationSharingViolation(err) || retry == destinationSharingViolationRetries {
++			return digest, err
++		}
++		time.Sleep(destinationSharingViolationRetryDelay)
++	}
++}
+diff --git a/internal/snapshot/snapshot_test.go b/internal/snapshot/snapshot_test.go
+index f8ff1428..0df0397a 100644
+--- a/internal/snapshot/snapshot_test.go
++++ b/internal/snapshot/snapshot_test.go
+@@ -126,7 +126,7 @@ func TestPublishRejectsUnsafeDestination(t *testing.T) {
+ 	}
+ }
+ 
+-func TestGetCachesByCommit(t *testing.T) {
++func TestGetRejectsDifferentDestinationForSameCommit(t *testing.T) {
+ 	repo := t.TempDir()
+ 	gitRun(t, repo, "init", "-q", "-b", "main")
+ 	if err := os.WriteFile(filepath.Join(repo, "SKILL.md"), []byte("x"), 0o644); err != nil {
+@@ -148,11 +148,14 @@ func TestGetCachesByCommit(t *testing.T) {
+ 		t.Fatalf("layout: %s", first)
+ 	}
+ 	// A cache hit is authenticated against the immutable commit archive.
+-	marker := filepath.Join(first, "cache-hit-marker")
+-	if err := os.WriteFile(marker, []byte("1"), 0o644); err != nil {
++	changedFile := filepath.Join(first, "SKILL.md")
++	if err := os.WriteFile(changedFile, []byte("tampered"), 0o644); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	if _, err := Get(home, "internal/skill-a", repo, head.Commit); !errors.Is(err, ErrDestinationConflict) {
+-		t.Fatalf("tampered cache hit error = %v, want ErrDestinationConflict", err)
++		t.Fatalf("Get() error for different cached destination = %v, want ErrDestinationConflict", err)
++	}
++	if got, err := os.ReadFile(changedFile); err != nil || string(got) != "tampered" {
++		t.Fatalf("Get() changed the conflicting destination: %q, %v", got, err)
+ 	}
+ }
+diff --git a/internal/snapshot/snapshot_windows_test.go b/internal/snapshot/snapshot_windows_test.go
+new file mode 100644
+index 00000000..3b5bb550
+--- /dev/null
++++ b/internal/snapshot/snapshot_windows_test.go
+@@ -0,0 +1,152 @@
++//go:build windows
++
++package snapshot
++
++import (
++	"errors"
++	"fmt"
++	"os"
++	"path/filepath"
++	"strings"
++	"sync"
++	"sync/atomic"
++	"testing"
++
++	"github.com/relux-works/curator/internal/gitops"
++	"github.com/relux-works/curator/internal/transaction"
++	"golang.org/x/sys/windows"
++)
++
++func windowsSharingFixture(t *testing.T) (home, repo, commit string) {
++	t.Helper()
++
++	repo = t.TempDir()
++	gitRun(t, repo, "init", "-q", "-b", "main")
++	if err := os.WriteFile(filepath.Join(repo, "SKILL.md"), []byte("concurrent"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	gitRun(t, repo, "add", ".")
++	gitRun(t, repo, "commit", "-qm", "one")
++	head, err := gitops.Resolve(repo, "revision", "HEAD")
++	if err != nil {
++		t.Fatal(err)
++	}
++	return t.TempDir(), repo, head.Commit
++}
++
++func replaceDestinationDigestForTest(replacement func(string) (string, error)) func() {
++	previous := digestSnapshotDestination
++	digestSnapshotDestination = replacement
++	return func() { digestSnapshotDestination = previous }
++}
++
++func TestConcurrentGetRetriesInjectedWindowsSharingViolation(t *testing.T) {
++	firstHome, repo, commit := windowsSharingFixture(t)
++	const repetitions = 5
++	for repetition := 0; repetition < repetitions; repetition++ {
++		t.Run(fmt.Sprintf("iteration_%02d", repetition+1), func(t *testing.T) {
++			home := firstHome
++			if repetition > 0 {
++				home = t.TempDir()
++			}
++			want := Dir(home, "internal/skill-a", commit)
++			var injected atomic.Bool
++			var destinationDigestCalls atomic.Int32
++			restore := replaceDestinationDigestForTest(func(path string) (string, error) {
++				if path == want {
++					destinationDigestCalls.Add(1)
++					if injected.CompareAndSwap(false, true) {
++						return "", &os.PathError{Op: "open", Path: path, Err: windows.ERROR_SHARING_VIOLATION}
++					}
++				}
++				return transaction.DigestPath(path)
++			})
++			defer restore()
++
++			const workers = 16
++			start := make(chan struct{})
++			results := make([]string, workers)
++			errorsByWorker := make([]error, workers)
++			var group sync.WaitGroup
++			for index := 0; index < workers; index++ {
++				group.Add(1)
++				go func(index int) {
++					defer group.Done()
++					<-start
++					results[index], errorsByWorker[index] = Get(home, "internal/skill-a", repo, commit)
++				}(index)
++			}
++			close(start)
++			group.Wait()
++
++			if !injected.Load() {
++				t.Fatal("concurrent publication did not exercise the injected sharing violation")
++			}
++			if destinationDigestCalls.Load() < 2 {
++				t.Fatalf("destination digest calls = %d, want retry after injected sharing violation", destinationDigestCalls.Load())
++			}
++			for index := range results {
++				if errorsByWorker[index] != nil || results[index] != want {
++					t.Fatalf("worker %d = %q, %v; want %q", index, results[index], errorsByWorker[index], want)
++				}
++			}
++			payload, err := os.ReadFile(filepath.Join(want, "SKILL.md"))
++			if err != nil || string(payload) != "concurrent" {
++				t.Fatalf("published snapshot = %q, %v", payload, err)
++			}
++		})
++	}
++}
++
++func TestGetFailsClosedAfterPersistentWindowsSharingViolation(t *testing.T) {
++	home, repo, commit := windowsSharingFixture(t)
++	if _, err := Get(home, "internal/skill-a", repo, commit); err != nil {
++		t.Fatal(err)
++	}
++	want := Dir(home, "internal/skill-a", commit)
++	var destinationDigestCalls atomic.Int32
++	restore := replaceDestinationDigestForTest(func(path string) (string, error) {
++		if path == want {
++			destinationDigestCalls.Add(1)
++			return "", &os.PathError{Op: "open", Path: path, Err: windows.ERROR_SHARING_VIOLATION}
++		}
++		return transaction.DigestPath(path)
++	})
++	defer restore()
++
++	_, err := Get(home, "internal/skill-a", repo, commit)
++	if !errors.Is(err, ErrDestinationConflict) {
++		t.Fatalf("Get() error = %v; want destination conflict", err)
++	}
++	if got, wantCalls := destinationDigestCalls.Load(), int32(destinationSharingViolationRetries+1); got != wantCalls {
++		t.Fatalf("destination digest calls = %d; want bounded %d attempts", got, wantCalls)
++	}
++}
++
++func TestGetDoesNotRetryWindowsAccessDenied(t *testing.T) {
++	home, repo, commit := windowsSharingFixture(t)
++	if _, err := Get(home, "internal/skill-a", repo, commit); err != nil {
++		t.Fatal(err)
++	}
++	want := Dir(home, "internal/skill-a", commit)
++	var destinationDigestCalls atomic.Int32
++	restore := replaceDestinationDigestForTest(func(path string) (string, error) {
++		if path == want {
++			destinationDigestCalls.Add(1)
++			return "", &os.PathError{Op: "open", Path: path, Err: windows.ERROR_ACCESS_DENIED}
++		}
++		return transaction.DigestPath(path)
++	})
++	defer restore()
++
++	_, err := Get(home, "internal/skill-a", repo, commit)
++	if !errors.Is(err, ErrDestinationConflict) {
++		t.Fatalf("Get() error = %v; want destination conflict", err)
++	}
++	if got := destinationDigestCalls.Load(); got != 1 {
++		t.Fatalf("destination digest calls = %d; want access denied to fail without retry", got)
++	}
++	if !strings.Contains(err.Error(), windows.ERROR_ACCESS_DENIED.Error()) {
++		t.Fatalf("Get() error = %v; want access-denied cause preserved", err)
++	}
++}

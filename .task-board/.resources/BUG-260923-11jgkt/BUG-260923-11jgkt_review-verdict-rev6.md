@@ -1,0 +1,16 @@
+# BUG-260923-11jgkt review verdict — rev6: ACCEPTED
+
+Carry-forward delta review per binding note (nochangelog-delta-review-note.md).
+
+- Patch resource sha256 cc8289af…7c4b == `git diff 948ae7c9 1ebb5d81 | shasum -a 256` (byte-identical to candidate tree delta).
+- Per-file `git patch-id --stable`, last accepted content revision (rev4, with CHANGELOG) vs rev6:
+  - destination_sharing_violation_other.go 7da7a290… = 7da7a290…
+  - destination_sharing_violation_windows.go 44fcc3ad… = 44fcc3ad…
+  - snapshot.go ce694531… = ce694531…
+  - snapshot_test.go 61ceb539… = 61ceb539…
+  - snapshot_windows_test.go 092c56cf… = 092c56cf…
+  - CHANGELOG.md a99bae8d… (rev4) → absent (rev6) — the one intended difference. rev5 also identical on all five paths.
+- CHANGELOG entry text present in BUG-260923-11jgkt_results.md §"CHANGELOG entry (for release prep)" (line 207).
+- No stray files: 5 changed paths, all internal/snapshot; worktree status matches.
+- rev6 validation log: Test (windows-latest) success, exit 0, required=1 green=1 failed=0.
+Findings: none. No LOGBOOK per note.

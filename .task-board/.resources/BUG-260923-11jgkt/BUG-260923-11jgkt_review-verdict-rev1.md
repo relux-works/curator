@@ -1,0 +1,11 @@
+# BUG-260923-11jgkt review verdict — CR rev1 — ACCEPTED
+
+Reviewer: claude-opus-5-5 (low), read-only. Candidate tree ef61df07 vs base 48da2690 (5 paths), inspected in full.
+
+1. Root cause: evidenced from hosted run 35855672743 windows-latest go-test-served.json — `authenticate destination: open ...\snapshot: The process cannot access the file because it is being used by another process.` (= ERROR_SHARING_VIOLATION 32). Product defect: authenticateDestination mapped every digest read error to ErrDestinationConflict, so a legitimate concurrent Get was refused. Fix targets exactly that call (snapshot.go digestDestinationWithSharingRetry).
+2. No guarantee weakened: classifier is errors.Is(err, windows.ERROR_SHARING_VIOLATION) only (non-Windows: always false); bounded 3 retries x 10 ms; the digest comparison is unchanged, so a different destination still fails closed; no skip, no assertion loosened.
+3. Rows executed on Windows in the candidate gate run 35874011891 (downloaded test-evidence-windows-latest, go-test.json and go-test-served.json): pass TestConcurrentGetRetriesInjectedWindowsSharingViolation (5 iterations), TestGetFailsClosedAfterPersistentWindowsSharingViolation (exact 4 attempts), TestGetDoesNotRetryWindowsAccessDenied (exactly 1 attempt, cause preserved), TestConcurrentGetAcceptsOneImmutablePublisher. Genuine-different-content refusal: existing TestGetCachesByCommit (tamper).
+4. Mutant (disposable copy /tmp/m11, darwin): removed the `!isDestinationSharingViolation(err)` guard (retry any error). Probe with generic error: base calls=1 PASS; mutant calls=4 FAIL. The committed access-denied row asserts calls==1 through Get, so it kills this mutant on Windows (reasoned, not executed locally — no Windows host). Retry-forever / dropped bound is killed by the persistent row's exact-4 assertion; dropping the retry is killed by the injected transient row.
+5. Hosted gate 35874011891: success on all jobs including Test (windows-latest).
+
+Bounds: the 30 ms window is an empirical bound on the publisher rename window; a longer sharing violation still fails closed (conflict), not silently. Only one post-fix hosted run observed (AC4 "repeated" covered by 5 in-run iterations + one gate). CHANGELOG Fixed entry present.
