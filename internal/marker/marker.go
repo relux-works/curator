@@ -24,6 +24,7 @@ import (
 	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/protocoljson"
 )
 
@@ -469,6 +470,19 @@ var v5ExternalBuildTypes = map[string]string{
 	"substitution":           "object",
 }
 
+// v5LocalBuildShape is the complete local go-v1 record from the marker-v5
+// schema. Keep this raw shape closed so nullable external-only members cannot
+// disappear into zero values during JSON decoding.
+var v5LocalBuildShape = map[string]string{
+	"driver":                 "string",
+	"receipt_schema_version": "number",
+	"execution_policy":       "string",
+	"cache_key":              "string",
+	"receipt_sha256":         "string",
+	"artifact_sha256":        "string",
+	"artifact_path":          "string",
+}
+
 // v5ExternalBuildRequired is the required member set of the external arm:
 // every type member above except the optional declared_tag and the
 // substituted-conditional substitution.
@@ -592,6 +606,12 @@ func validV5ExternalBuildShape(raw json.RawMessage) bool {
 			return false
 		}
 	}
+	if tagRaw, present := object["declared_tag"]; present {
+		var tag string
+		if json.Unmarshal(tagRaw, &tag) != nil || !identity.DraftSourceRefName(tag) {
+			return false
+		}
+	}
 	// Presence of substituted was enforced by the required loop above,
 	// which is the single refusal point for an absent member: the decode
 	// below tolerates absence so a mutant dropping the requirement admits
@@ -645,6 +665,14 @@ func validV5ExternalBuildShape(raw json.RawMessage) bool {
 		}
 	}
 	return true
+}
+
+// validV5LocalBuildShape validates the complete, closed local go-v1 record.
+// This must inspect the raw object because encoding/json maps null string,
+// Boolean, and pointer members to the same zero values as absent members.
+func validV5LocalBuildShape(raw json.RawMessage) bool {
+	object, ok := rawObject(raw)
+	return ok && closedRawShape(object, v5LocalBuildShape)
 }
 
 // validV5Package mirrors the disjoint source-types arms: a local snapshot
@@ -809,9 +837,17 @@ func validBuildState(m *Marker, raw map[string]json.RawMessage) bool {
 		// whatever the skill schema: its cache entries are receipt-3 package
 		// wrappers, so a legacy record shape can never describe them.
 		if m.SchemaVersion == SchemaV5 {
-			if build.Driver == "go-repository-v1" {
-				rawBuild, present := buildsRaw[command]
-				if !present || !validV5ExternalBuildShape(rawBuild) {
+			rawBuild, present := buildsRaw[command]
+			if !present {
+				return false
+			}
+			switch build.Driver {
+			case buildmeta.DriverGoV1:
+				if !validV5LocalBuildShape(rawBuild) {
+					return false
+				}
+			case "go-repository-v1":
+				if !validV5ExternalBuildShape(rawBuild) {
 					return false
 				}
 			}

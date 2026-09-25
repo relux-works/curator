@@ -344,3 +344,56 @@ func TestMarkerV5ExternalBuildClosedShape(t *testing.T) {
 		})
 	}
 }
+
+// TestMarkerV5LocalBuildClosedShape proves the local go-v1 arm is validated
+// from raw JSON at marker.Read: external-only values cannot disappear into
+// the decoded struct's zero values. Each row rewrites bytes after a valid
+// marker has been written, bypassing Write like a foreign marker producer.
+func TestMarkerV5LocalBuildClosedShape(t *testing.T) {
+	for field := range map[string]struct{}{
+		"repository":   {},
+		"substituted":  {},
+		"substitution": {},
+	} {
+		t.Run(field+"-null", func(t *testing.T) {
+			dir, _ := writeV5(t, v5BuildMarker(true, false))
+			build := mutateExtJSON(t, v5LocalBuild(), func(o map[string]json.RawMessage) {
+				o[field] = json.RawMessage(`null`)
+			})
+			rewriteV5Build(t, dir, "tool", build)
+			if got := Read(dir); got != nil {
+				t.Fatalf("Read admitted local go-v1 build with %s:null: %+v", field, got.Builds["tool"])
+			}
+		})
+	}
+}
+
+// TestMarkerV5DeclaredTagRequiresValidGitRef drives empty and malformed tag
+// names through marker.Read. The same validator is used for draft Skillfile
+// source refs, so marker summaries cannot retain a value the locked source
+// contract would reject.
+func TestMarkerV5DeclaredTagRequiresValidGitRef(t *testing.T) {
+	for name, tag := range map[string]string{
+		"empty":     `""`,
+		"malformed": `"release..next"`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir, _ := writeV5(t, v5BuildMarker(false, true))
+			build := mutateExtJSON(t, v5ExternalBuild(), func(o map[string]json.RawMessage) {
+				o["declared_tag"] = json.RawMessage(tag)
+			})
+			rewriteV5Build(t, dir, "ext", build)
+			if got := Read(dir); got != nil {
+				t.Fatalf("Read admitted declared_tag %s: %+v", tag, got.Builds["ext"])
+			}
+		})
+	}
+
+	withValidTag := v5ExternalBuild()
+	withValidTag.DeclaredTag = "release/v1.4.0"
+	dir, _ := writeV5(t, v5BuildMarker(false, true))
+	rewriteV5Build(t, dir, "ext", mustExtJSON(t, withValidTag))
+	if got := Read(dir); got == nil || got.Builds["ext"].DeclaredTag != withValidTag.DeclaredTag {
+		t.Fatalf("Read did not preserve a valid declared_tag: got=%+v", got)
+	}
+}
