@@ -1,0 +1,2836 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 17773d62..e7baad12 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -4,6 +4,11 @@ All notable implementation changes are recorded here.
+ 
+ ## Unreleased
+ 
++### Changed
++
++- Skillfile schema 2 source handling is supported by default for projects.
++  Schema 1 retains its exact meaning, and no on-disk migration is implicit.
++
+ ### Added
+ 
+ - E4: umbrella provider lookup from trust roots (warning release,
+diff --git a/README.md b/README.md
+index c5586dce..727dd9ea 100644
+--- a/README.md
++++ b/README.md
+@@ -227,15 +227,12 @@ curator config build-https  # configure HTTPS credentials for external build rep
+ 
+ </details>
+ 
+-## Draft Skillfile sources (opt-in, unreleased)
++## Skillfile schema 2 project sources
+ 
+-Skillfile schema 2 with local and Git sources is draft functionality
+-behind the operator-owned switch `CURATOR_DRAFT_SOURCES_V1=1`. It is
+-not part of the released v1 behavior: with the switch off, schema 2
+-fails closed and frozen v1 behaves byte-identically.
++Skillfile schema 2 source declarations are supported by default for
++projects. Schema 1 retains its exact meaning, and no on-disk migration is implicit.
+ 
+ ```bash
+-export CURATOR_DRAFT_SOURCES_V1=1
+ curator project resolve .   # freeze sources into Skillfile.lock.json
+ curator install .           # materialize the locked snapshot (repairs drift)
+ curator status .            # compare installed state against the lock
+@@ -256,16 +253,15 @@ curator project refresh .   # re-resolve explicitly, then install again
+ }
+ ```
+ 
+-Local paths freeze working-tree bytes (never Git HEAD); Git aliases
+-pin exactly one tag, branch, or revision; collections select immediate
+-child directories. Installed shims execute the frozen runtime — launch
+-and status never rescan live inputs. Git endpoint selection and root
++Local paths freeze working-tree bytes (never Git HEAD); Git aliases pin
++exactly one tag, branch, or revision; collections select immediate child
++directories. Installed shims execute the frozen runtime — launch and
++status never rescan live inputs. Git endpoint selection and root
+ admission come from operator-owned `source-policy.json` beside the
+-manager configuration. See [Draft Skillfile
+-sources](docs/cli.md#draft-skillfile-sources-opt-in-unreleased) for
+-local, absolute, Git, and collection examples with machine policy
+-setup, and [Draft source and transport
+-diagnostics](docs/troubleshooting.md#draft-source-and-transport-diagnostics)
++manager configuration. See [Skillfile schema 2 sources](docs/cli.md#skillfile-schema-2-project-sources)
++for local, absolute, Git, and collection examples with machine policy
++setup, and [Skillfile source and transport
++diagnostics](docs/troubleshooting.md#skillfile-source-and-transport-diagnostics)
+ for the stable error classes.
+ 
+ ## An open protocol
+diff --git a/cmd/curator/draft_diagnostics.go b/cmd/curator/draft_diagnostics.go
+index 9bc8e3e0..3b790c37 100644
+--- a/cmd/curator/draft_diagnostics.go
++++ b/cmd/curator/draft_diagnostics.go
+@@ -53,7 +53,6 @@ var draftRemediations = []struct {
+ 	}},
+ 	{"source_selection_invalid", draftRemediation{
+ 		remediation: `fix the named selector (directory, include/exclude, and ref rules in docs/cli.md), then retry the explicit attempt`,
+-		already:     []string{"requires the draft lane"},
+ 	}},
+ 	{"source_member_missing", draftRemediation{
+ 		remediation: `add the named member directory with valid SKILL.md, or drop it from "include", then run: curator project resolve`,
+diff --git a/cmd/curator/draft_diagnostics_test.go b/cmd/curator/draft_diagnostics_test.go
+index 60ed6de7..38887c93 100644
+--- a/cmd/curator/draft_diagnostics_test.go
++++ b/cmd/curator/draft_diagnostics_test.go
+@@ -20,7 +20,6 @@ import (
+ 
+ 	"github.com/relux-works/curator/internal/buildrepo"
+ 	"github.com/relux-works/curator/internal/config"
+-	"github.com/relux-works/curator/internal/install"
+ 	"github.com/relux-works/curator/internal/sourcelock"
+ )
+ 
+@@ -77,7 +76,6 @@ func TestWithDraftRemediationTable(t *testing.T) {
+ 		"source_lock_stale: Skillfile changed since lock; explicit refresh required",
+ 		"source_snapshot_changed: admitted membership changed during capture; retry the explicit attempt",
+ 		"repository_endpoint_unavailable: identity x: down; verify the network path and operator authentication for the listed endpoints, then retry with machine source-policy.json",
+-		"source_selection_invalid: Skillfile schema 2 requires the draft lane; unset CURATOR_DRAFT_SOURCES_V1 keeps frozen v1",
+ 	}
+ 	for _, message := range already {
+ 		if got := withDraftRemediation(message); got != message {
+@@ -179,11 +177,9 @@ func TestEndpointExhaustionCarriesRemediation(t *testing.T) {
+ 	}
+ }
+ 
+-// TestDraftProjectResolveHelp covers both halves of the -h rule at the
+-// CLI entry: with the switch off the flag spellings fall through to the
+-// frozen v1 path byte-identically, and with the switch on they print the
+-// workflow golden. The bare word "help" is never a help flag: it resolves
+-// as a project alias in both states.
++// TestDraftProjectResolveHelp pins the project command help at the CLI entry.
++// The flag spellings print the schema-2 workflow; the bare word "help"
++// continues to resolve as a project alias.
+ func TestDraftProjectResolveHelp(t *testing.T) {
+ 	root := t.TempDir()
+ 	configPath, _ := setupCLIProject(t, root)
+@@ -202,102 +198,48 @@ func TestDraftProjectResolveHelp(t *testing.T) {
+ 		"\nskills: " + filepath.Join(helpDir, ".agents", "skills") +
+ 		"\nbin: " + filepath.Join(helpDir, ".agents", "bin") + "\n"
+ 
+-	// Switch off: the flag spellings fall through to the frozen path,
+-	// byte-identical to the bare verb, with no draft text; the bare
+-	// word resolves the alias instead of printing help.
+-	savedSwitch, hadSwitch := os.LookupEnv(install.EnvDraftSourcesV1)
+-	if err := os.Unsetenv(install.EnvDraftSourcesV1); err != nil {
+-		t.Fatal(err)
+-	}
+-	t.Cleanup(func() {
+-		if hadSwitch {
+-			_ = os.Setenv(install.EnvDraftSourcesV1, savedSwitch)
+-		}
+-	})
+-	for _, verb := range []string{"resolve", "refresh"} {
+-		baseCode, baseOut, baseErr := capture(t, configPath, "project", verb)
+-		for _, spelling := range []string{"-h", "--help"} {
+-			code, stdout, stderr := capture(t, configPath, "project", verb, spelling)
+-			if code != baseCode || stdout != baseOut || stderr != baseErr {
+-				t.Fatalf("project %s %s (switch off) differs from the bare verb:\ncode %d stdout %q stderr %q\nwant code %d stdout %q stderr %q",
+-					verb, spelling, code, stdout, stderr, baseCode, baseOut, baseErr)
+-			}
+-			for _, marker := range []string{"Draft Skillfile", "source-policy"} {
+-				if strings.Contains(stdout, marker) || strings.Contains(stderr, marker) {
+-					t.Fatalf("project %s %s (switch off) leaks draft text %q", verb, spelling, marker)
+-				}
+-			}
+-		}
+-		code, stdout, stderr := capture(t, configPath, "project", verb, "help")
+-		if code != exitOK || stdout != wantReport || stderr != "" {
+-			t.Fatalf("project %s help (switch off) = code %d, stdout %q, stderr %q; want the v1 report for alias help",
+-				verb, code, stdout, stderr)
+-		}
+-	}
+-
+-	// Switch on: the flag spellings print the workflow golden, while the
+-	// bare word still resolves the alias instead of printing help.
+-	t.Setenv(install.EnvDraftSourcesV1, "1")
+ 	for _, verb := range []string{"resolve", "refresh"} {
+ 		for _, spelling := range []string{"-h", "--help"} {
+ 			code, stdout, stderr := capture(t, configPath, "project", verb, spelling)
+ 			if code != exitOK || stdout != projectResolveUsage || stderr != "" {
+-				t.Fatalf("project %s %s (switch on) = code %d, stdout %d bytes, stderr %q; want the help golden on stdout",
+-					verb, spelling, code, len(stdout), stderr)
++				t.Fatalf("project %s %s = code %d, stdout %d bytes, stderr %q; want the help golden on stdout", verb, spelling, code, len(stdout), stderr)
+ 			}
+ 		}
+ 		code, stdout, stderr := capture(t, configPath, "project", verb, "help")
+ 		if code != exitOK || stdout != wantReport || stderr != "" {
+-			t.Fatalf("project %s help (switch on) = code %d, stdout %q, stderr %q; want the v1 report for alias help",
+-				verb, code, stdout, stderr)
++			t.Fatalf("project %s help = code %d, stdout %q, stderr %q; want the v1 report for alias help", verb, code, stdout, stderr)
+ 		}
+ 	}
+-	// The golden names the opt-in switch, the five verbs, every
+-	// documented shape, and the frozen-launch rule, all labelled draft.
+ 	for _, marker := range []string{
+-		"CURATOR_DRAFT_SOURCES_V1=1",
++		"Skillfile schema 2 project sources",
++		"Skillfile schema 1 retains its exact meaning; no on-disk migration is implicit",
+ 		"project resolve", "project refresh", "curator install", "curator status",
+ 		`{"path": "./agents"}`, `{"path": "/work/shared-agents"}`,
+ 		`{"git": "https://example.org/kit.git", "tag": "v1.2.0"}`,
+ 		`{"repository": "example.org/kit", "branch": "main"}`,
+ 		`{"from": "team", "directory": "skills", "include": ["*"]}`,
+-		"source-policy.json", `"root_inputs"`,
+-		"never rescan", "unreleased",
++		"source-policy.json", `"root_inputs"`, "never rescan",
+ 	} {
+ 		if !strings.Contains(projectResolveUsage, marker) {
+ 			t.Errorf("help golden misses %q", marker)
+ 		}
+ 	}
++	for _, stale := range []string{"deprecated opt-out", "unreleased"} {
++		if strings.Contains(projectResolveUsage, stale) {
++			t.Errorf("help golden retains stale switch wording %q", stale)
++		}
++	}
+ }
+ 
+-func TestDraftInstallStatusHelpGated(t *testing.T) {
++func TestDraftInstallStatusHelpIncludesSchema2Workflow(t *testing.T) {
+ 	configPath := filepath.Join(t.TempDir(), "config.json")
+ 	for _, command := range []string{"install", "status"} {
+-		// Switch off: exactly the flag defaults, no draft marker.
+ 		code, _, stderr := capture(t, configPath, command, "-h")
+ 		if code != exitUsage {
+-			t.Fatalf("%s -h (switch off) = %d, want %d", command, exitUsage, exitUsage)
++			t.Fatalf("%s -h = %d, want %d", command, code, exitUsage)
+ 		}
+-		for _, marker := range []string{"CURATOR_DRAFT_SOURCES_V1", "Draft Skillfile", "source-policy"} {
+-			if strings.Contains(stderr, marker) {
+-				t.Fatalf("%s -h (switch off) leaks draft text %q:\n%s", command, marker, stderr)
+-			}
+-		}
+-		if !strings.Contains(stderr, "Usage of "+command+":") {
+-			t.Fatalf("%s -h (switch off) lost the flag defaults:\n%s", command, stderr)
+-		}
+-	}
+-	t.Setenv(install.EnvDraftSourcesV1, "1")
+-	for _, command := range []string{"install", "status"} {
+-		code, _, stderr := capture(t, configPath, command, "-h")
+-		if code != exitUsage {
+-			t.Fatalf("%s -h (switch on) = %d, want %d", command, exitUsage, exitUsage)
+-		}
+-		if !strings.Contains(stderr, "Usage of "+command+":") {
+-			t.Fatalf("%s -h (switch on) lost the flag defaults:\n%s", command, stderr)
+-		}
+-		if !strings.Contains(stderr, draftWorkflowSection) {
+-			t.Fatalf("%s -h (switch on) misses the draft workflow section:\n%s", command, stderr)
++		if !strings.Contains(stderr, "Usage of "+command+":") || !strings.Contains(stderr, draftWorkflowSection) {
++			t.Fatalf("%s -h misses usage or schema-2 workflow help:\n%s", command, stderr)
+ 		}
+ 	}
+ }
+@@ -317,7 +259,6 @@ func writeDocPkgs(t *testing.T, pkgs string) {
+ // acquisition shape through the real verbs: resolve, install --dry-run,
+ // install, and status. The relative row is docs/cli.md verbatim.
+ func TestDraftDocumentedLocalShapesThroughCLI(t *testing.T) {
+-	withDraftSourcesSwitch(t)
+ 	rows := []struct {
+ 		name    string
+ 		payload func(project, pkgs string) string
+@@ -415,7 +356,6 @@ func quotePath(path string) string {
+ // machine source-policy.json from the test home, never the operator's.
+ func setupRemediationProject(t *testing.T) (configPath, project, home string) {
+ 	t.Helper()
+-	withDraftSourcesSwitch(t)
+ 	root := t.TempDir()
+ 	configPath, project = setupCLIProject(t, root)
+ 	t.Setenv("CURATOR_CONFIG", configPath)
+@@ -768,7 +708,6 @@ func withDraftGitArms(t *testing.T, failingURL, failingStderr, rewriteURL, bare
+ // installed marker binds the policy-selected commit. A malformed pin in
+ // the same file fails closed with remediation and publishes nothing.
+ func TestDraftMachinePolicySetupThroughCLI(t *testing.T) {
+-	withDraftSourcesSwitch(t)
+ 	root := t.TempDir()
+ 	bare, commit := setupKitBare(t, root)
+ 	const declaredURL = "https://fixture.test/kit.git"
+@@ -831,7 +770,6 @@ func TestDraftMachinePolicySetupThroughCLI(t *testing.T) {
+ // TestDraftDocumentedGitRevisionThroughCLI runs the documented revision
+ // pin through the real verbs: resolve, install, and status.
+ func TestDraftDocumentedGitRevisionThroughCLI(t *testing.T) {
+-	withDraftSourcesSwitch(t)
+ 	root := t.TempDir()
+ 	bare, commit := setupKitBare(t, root)
+ 	const declaredURL = "https://fixture.test/kit.git"
+@@ -900,7 +838,6 @@ func TestDraftFetchFailureSanitizedThroughCLI(t *testing.T) {
+ // documented fixture, so resolve exits 0 with the lock bound to the
+ // alternate commit and only the first attempt rendered as a failure.
+ func TestDraftAvailabilityFallbackThroughCLI(t *testing.T) {
+-	withDraftSourcesSwitch(t)
+ 	const failingURL = "https://fixture.test/kit.git"
+ 	const failingFatal = "fatal: unable to access 'https://fixture.test/kit.git/': Could not resolve host: fixture.test"
+ 	const alternateURL = "git@fixture.test:kit.git"
+@@ -988,7 +925,6 @@ func TestDraftLaunchConsumesFrozenRuntimeThroughCLI(t *testing.T) {
+ 	if runtime.GOOS == "windows" {
+ 		t.Skip("executes POSIX skill commands")
+ 	}
+-	withDraftSourcesSwitch(t)
+ 	root := t.TempDir()
+ 	configPath, project := setupCLIProject(t, root)
+ 	t.Setenv("CURATOR_CONFIG", configPath)
+@@ -1116,12 +1052,13 @@ func TestDraftRepairRestoresDriftedContentThroughCLI(t *testing.T) {
+ }
+ 
+ // TestDraftDocsPinExamples pins the documented contract in the
+-// repository docs: every exercised acquisition shape, the opt-in
++// repository docs: every exercised acquisition shape, the default project lane,
+ // label, the machine policy setup, and every stable class remedy.
+ func TestDraftDocsPinExamples(t *testing.T) {
+ 	cli := readRepoDoc(t, "docs", "cli.md")
+ 	readme := readRepoDoc(t, "README.md")
+ 	trouble := readRepoDoc(t, "docs", "troubleshooting.md")
++	changelog := readRepoDoc(t, "CHANGELOG.md")
+ 	compact := compactJSON(cli)
+ 	for _, shape := range []string{
+ 		docLocalRelativePayload,
+@@ -1137,8 +1074,8 @@ func TestDraftDocsPinExamples(t *testing.T) {
+ 		}
+ 	}
+ 	for _, marker := range []string{
+-		"CURATOR_DRAFT_SOURCES_V1=1",
+-		"opt-in, unreleased",
++		"Skillfile schema 2 is the default project reader and install path",
++		"no on-disk migration is implicit",
+ 		"source-policy.json",
+ 		`"root_inputs"`,
+ 		`"availability-auth"`,
+@@ -1159,9 +1096,8 @@ func TestDraftDocsPinExamples(t *testing.T) {
+ 		}
+ 	}
+ 	for _, marker := range []string{
+-		"CURATOR_DRAFT_SOURCES_V1=1",
+-		"Draft Skillfile sources",
+-		"unreleased",
++		"Skillfile schema 2 source declarations are supported by default",
++		"no on-disk migration is implicit",
+ 		`"path": "./pkgs"`,
+ 		"source-policy.json",
+ 		"never rescan live inputs",
+@@ -1184,6 +1120,13 @@ func TestDraftDocsPinExamples(t *testing.T) {
+ 			t.Errorf("docs/troubleshooting.md misses section %s", class)
+ 		}
+ 	}
++	for _, marker := range []string{
++		"These stable classes describe schema-2 project source resolution",
++	} {
++		if !strings.Contains(trouble, marker) {
++			t.Errorf("docs/troubleshooting.md misses %q", marker)
++		}
++	}
+ 	// Each remedy keyword below is asserted verbatim against the CLI
+ 	// remediation output by TestWithDraftRemediationTable and
+ 	// TestDraftRemediationThroughCLI; the docs must carry the same words.
+@@ -1222,6 +1165,13 @@ func TestDraftDocsPinExamples(t *testing.T) {
+ 			t.Errorf("docs/troubleshooting.md misses %q", marker)
+ 		}
+ 	}
++	for _, marker := range []string{
++		"Skillfile schema 2 source handling is supported by default for projects",
++	} {
++		if !strings.Contains(changelog, marker) {
++			t.Errorf("CHANGELOG.md misses %q", marker)
++		}
++	}
+ }
+ 
+ // readRepoDoc reads one repository doc relative to the package directory.
+diff --git a/cmd/curator/draft_help.go b/cmd/curator/draft_help.go
+index ae47dd98..261a15e6 100644
+--- a/cmd/curator/draft_help.go
++++ b/cmd/curator/draft_help.go
+@@ -1,14 +1,10 @@
+ package main
+ 
+-// Draft source workflow help (skillfile-sources revision 1, unreleased):
+-// the existing-command UX for the opt-in lane.
++// Skillfile schema-2 source workflow help for the existing commands.
+ //
+ // Nothing here adds a command or flag. `project resolve` and `project
+-// refresh` answer `-h` and `--help` with the workflow golden only while
+-// the draft switch is set — with the switch off those spellings fall
+-// through to the frozen v1 path — and `install`/`status` usage appends
+-// the workflow section under the same rule, so frozen v1 help bytes are
+-// unchanged with the switch off. The bare word `help` is never
++// refresh` answer `-h` and `--help` with the workflow help. `install` and
++// `status` append the same workflow section. The bare word `help` is never
+ // intercepted: it resolves as a project alias or path. Every example
+ // below is exercised through run() by draft_diagnostics_test.go; the full
+ // reference with machine policy setup lives in docs/cli.md.
+@@ -17,18 +13,13 @@ import (
+ 	"flag"
+ 	"fmt"
+ 	"io"
+-	"os"
+-
+-	"github.com/relux-works/curator/internal/install"
+ )
+ 
+-// draftWorkflowSection is the shared opt-in workflow summary appended to
+-// per-command help. It names the switch, the five existing verbs that
+-// move a schema-2 project, and the frozen-launch rule.
+-const draftWorkflowSection = `Draft Skillfile sources (opt-in, unreleased):
+-  Skillfile schema 2 resolves only with CURATOR_DRAFT_SOURCES_V1=1. The
+-  switch is operator-owned: package data can neither set nor observe it.
+-  Without it, schema 2 fails closed and frozen v1 behaves byte-identically.
++// draftWorkflowSection is the shared workflow summary appended to
++// per-command help. It describes schema-2 project verbs and the frozen-launch rule.
++const draftWorkflowSection = `Skillfile schema 2 project sources:
++  Schema 2 source declarations resolve with the project commands below.
++  Skillfile schema 1 retains its exact meaning; no on-disk migration is implicit.
+ 
+   curator project resolve [path]   freeze declared sources into Skillfile.lock.json
+   curator install [path]           materialize the locked snapshot (repairs drift)
+@@ -46,7 +37,7 @@ const draftWorkflowSection = `Draft Skillfile sources (opt-in, unreleased):
+ // draftExamplesSection shows one acquisition shape per line. Each shape
+ // is a value of one "sources" alias or one "skills" selector; docs/cli.md
+ // carries the same shapes as complete manifests.
+-const draftExamplesSection = `Draft source examples (one alias or selector value per line):
++const draftExamplesSection = `Schema 2 source examples (one alias or selector value per line):
+   {"path": "./agents"}              local directory, relative to Skillfile.json
+   {"path": "/work/shared-agents"}   local directory, absolute
+   {"git": "https://example.org/kit.git", "tag": "v1.2.0"}   Git source at a tag
+@@ -59,27 +50,26 @@ const draftExamplesSection = `Draft source examples (one alias or selector value
+   Machine policy (operator-owned, beside the manager configuration):
+   source-policy.json maps canonical host/path entries to one or two
+   endpoints plus fallback, and admits root packages via "root_inputs".
+-  See "Draft Skillfile sources" in docs/cli.md.
++  See "Skillfile schema 2 project sources" in docs/cli.md.
+ `
+ 
+ // projectResolveUsage is the explicit help for the two existing verbs
+-// that run the explicit draft attempt. It describes the frozen v1
+-// behavior first, then the opt-in lane.
++// that run the explicit schema-2 attempt. It describes frozen v1
++// behavior first, then the default lane.
+ const projectResolveUsage = `curator project resolve: resolve transitive dependencies for a project closure
+ 
+ Usage:
+   curator project resolve [path]
+   curator project refresh [path]
+ 
+-Frozen v1: prints the alias, project path, Skillfile path, and managed
++Schema 1: prints the alias, project path, Skillfile path, and managed
+ skill and bin directories without modifying disk state.
+ 
+ ` + draftWorkflowSection + `
+ ` + draftExamplesSection
+ 
+ // appendDraftUsage wraps the flag defaults of one existing command with
+-// the draft workflow section while the opt-in switch is set. With the
+-// switch off the output is exactly the flag defaults.
++// the schema-2 project workflow section.
+ func appendDraftUsage(flags *flag.FlagSet, out io.Writer, name string) {
+ 	defaults := func() {
+ 		_, _ = fmt.Fprintf(out, "Usage of %s:\n", name)
+@@ -87,8 +77,6 @@ func appendDraftUsage(flags *flag.FlagSet, out io.Writer, name string) {
+ 	}
+ 	flags.Usage = func() {
+ 		defaults()
+-		if install.DraftSourcesEnabled(os.Getenv) {
+-			_, _ = fmt.Fprint(out, "\n"+draftWorkflowSection)
+-		}
++		_, _ = fmt.Fprint(out, "\n"+draftWorkflowSection)
+ 	}
+ }
+diff --git a/cmd/curator/draft_sources_test.go b/cmd/curator/draft_sources_test.go
+index 5a1fbdf3..1c863c92 100644
+--- a/cmd/curator/draft_sources_test.go
++++ b/cmd/curator/draft_sources_test.go
+@@ -3,7 +3,7 @@ package main
+ // Draft source closure at the CLI production entry.
+ //
+ // These tests drive `project resolve` / `project refresh` and `install
+-// --dry-run` through run() with the draft switch set in-process. The lock
++// --dry-run` through run() with the source lane enabled. The lock
+ // is always created through the CLI itself, never by calling the closure
+ // helper under test. Git selections additionally run behind a stand-in
+ // git on PATH that rewrites one fixture https URL to a local bare
+@@ -26,20 +26,6 @@ import (
+ 	"github.com/relux-works/curator/internal/sourcelock"
+ )
+ 
+-// withDraftSourcesSwitch pins the draft lane for one test and restores the
+-// process environment afterwards.
+-func withDraftSourcesSwitch(t *testing.T) {
+-	t.Helper()
+-	if value, ok := os.LookupEnv(install.EnvDraftSourcesV1); ok {
+-		t.Cleanup(func() { _ = os.Setenv(install.EnvDraftSourcesV1, value) })
+-	} else {
+-		t.Cleanup(func() { _ = os.Unsetenv(install.EnvDraftSourcesV1) })
+-	}
+-	if err := os.Setenv(install.EnvDraftSourcesV1, "1"); err != nil {
+-		t.Fatal(err)
+-	}
+-}
+-
+ func writeCLISkill(t *testing.T, dir, name string) {
+ 	t.Helper()
+ 	if err := os.MkdirAll(filepath.Join(dir, "references"), 0o755); err != nil {
+@@ -105,7 +91,6 @@ func setupCLIProject(t *testing.T, root string) (configPath, project string) {
+ }
+ 
+ func TestProjectResolveLocalCreatesLockThroughCLI(t *testing.T) {
+-	withDraftSourcesSwitch(t)
+ 	root := t.TempDir()
+ 	configPath, project := setupCLIProject(t, root)
+ 	payload := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["review"]}]}`
+@@ -126,6 +111,12 @@ func TestProjectResolveLocalCreatesLockThroughCLI(t *testing.T) {
+ 	}
+ 	firstSHA := lock.LockSHA256
+ 
++	if code, _, stderr := capture(t, configPath, "install", "app"); code != exitOK {
++		t.Fatalf("install = %d\nstderr:\n%s", code, stderr)
++	}
++	if code, stdout, stderr := capture(t, configPath, "status", "app"); code != exitOK || !strings.Contains(stdout, "review up-to-date") {
++		t.Fatalf("status = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
+ 	if code, _, stderr := capture(t, configPath, "install", "app", "--dry-run"); code != exitOK {
+ 		t.Fatalf("install --dry-run = %d\nstderr:\n%s", code, stderr)
+ 	}
+@@ -171,26 +162,24 @@ func TestProjectResolveLocalCreatesLockThroughCLI(t *testing.T) {
+ 	}
+ }
+ 
+-func TestProjectResolveLegacyUntouched(t *testing.T) {
+-	withDraftSourcesSwitch(t)
++func TestProjectResolveSchema1KeepsReadOnlyMeaning(t *testing.T) {
+ 	root := t.TempDir()
+ 	configPath, project := setupCLIProject(t, root)
+ 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(`{"schema_version":1,"agents":["codex_cli"],"skills":[]}`), 0o644); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	code, stdout, _ := capture(t, configPath, "project", "resolve", "app")
+-	if code != exitOK {
+-		t.Fatalf("legacy project resolve = %d", code)
+-	}
+-	if !strings.Contains(stdout, "alias: app\n") || !strings.Contains(stdout, "skillfile: ") {
+-		t.Fatalf("legacy output changed:\n%s", stdout)
++	code, stdout, stderr := capture(t, configPath, "project", "resolve", "app")
++	want := "alias: app\npath: " + project + "\nskillfile: " + filepath.Join(project, "Skillfile.json") + "\nskills: " + filepath.Join(project, ".agents", "skills") + "\nbin: " + filepath.Join(project, ".agents", "bin") + "\n"
++	if code != exitOK || stdout != want || stderr != "" {
++		t.Fatalf("schema-1 resolve = (%d, %q, %q), want (%d, %q, empty)", code, stdout, stderr, exitOK, want)
+ 	}
+ 	if _, err := os.Stat(filepath.Join(project, "Skillfile.lock.json")); !os.IsNotExist(err) {
+-		t.Fatalf("legacy resolve wrote a lock: %v", err)
++		t.Fatalf("schema-1 resolve wrote a lock: %v", err)
+ 	}
+ }
+ 
+-func TestProjectResolveDraftOffRefuses(t *testing.T) {
++func TestProjectResolveIgnoresRemovedSwitch(t *testing.T) {
++	t.Setenv("CURATOR_DRAFT_SOURCES_V1", "0")
+ 	root := t.TempDir()
+ 	configPath, project := setupCLIProject(t, root)
+ 	payload := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["review"]}]}`
+@@ -198,11 +187,12 @@ func TestProjectResolveDraftOffRefuses(t *testing.T) {
+ 		t.Fatal(err)
+ 	}
+ 	writeCLISkill(t, filepath.Join(project, "skills", "review"), "review")
+-	if value, ok := os.LookupEnv(install.EnvDraftSourcesV1); ok && value == "1" {
+-		t.Skip("draft switch is set in the ambient environment")
++	code, stdout, stderr := capture(t, configPath, "project", "resolve", "app")
++	if code != exitOK || !strings.Contains(stdout, "resolve app: 1 skills") || stderr != "" {
++		t.Fatalf("schema-2 resolve with the removed variable set = (%d, %q, %q), want successful default resolution", code, stdout, stderr)
+ 	}
+-	if code, _, _ := capture(t, configPath, "project", "resolve", "app"); code != exitFail {
+-		t.Fatalf("draft-off resolve = %d, want %d", code, exitFail)
++	if _, err := sourcelock.Read(filepath.Join(project, "Skillfile.lock.json")); err != nil {
++		t.Fatalf("schema-2 resolve with the removed variable set wrote no lock: %v", err)
+ 	}
+ }
+ 
+@@ -229,7 +219,6 @@ func TestProjectResolveGitSelectionThroughCLI(t *testing.T) {
+ 	if err != nil {
+ 		t.Skip("git is not available")
+ 	}
+-	withDraftSourcesSwitch(t)
+ 	root := t.TempDir()
+ 	// Fixture repository holding one package under skills/review.
+ 	work := filepath.Join(root, "kit-work")
+@@ -311,7 +300,6 @@ func setupScriptGitCLI(t *testing.T) (configPath, project, commit, cachedScript,
+ 	if err != nil {
+ 		t.Skip("git is not available")
+ 	}
+-	withDraftSourcesSwitch(t)
+ 	root := t.TempDir()
+ 	work := filepath.Join(root, "kit-work")
+ 	bare = filepath.Join(root, "kit.git")
+@@ -429,7 +417,6 @@ const cliConsumerPayload = `{"schema_version":2,"sources":{"s":{"path":"."}},"sk
+ // temp config's skills root, so the explicit attempt must resolve with
+ // zero acquisitions and the frozen install must stay green.
+ func TestProjectResolveTransitiveProviderUsesConfiguredRootThroughCLI(t *testing.T) {
+-	withDraftSourcesSwitch(t)
+ 	root := t.TempDir()
+ 	configPath, project := setupCLIProject(t, root)
+ 	initCLIProviderRepo(t, filepath.Join(root, "skills-root", "provider"))
+@@ -462,7 +449,6 @@ func TestProjectResolveTransitiveProviderUsesConfiguredRootThroughCLI(t *testing
+ // CWD while the configured root has none, so the explicit attempt must
+ // fall through to acquisition and fail instead of finding the CWD copy.
+ func TestProjectResolveTransitiveProviderIgnoresProcessCWDThroughCLI(t *testing.T) {
+-	withDraftSourcesSwitch(t)
+ 	root := t.TempDir()
+ 	configPath, project := setupCLIProject(t, root)
+ 	writeCLIConsumerSkill(t, filepath.Join(project, "pkgs", "review"), "review")
+@@ -559,7 +545,6 @@ func TestProjectResolveGitAliasSelectionThroughCLI(t *testing.T) {
+ 	if err != nil {
+ 		t.Skip("git is not available")
+ 	}
+-	withDraftSourcesSwitch(t)
+ 	root := t.TempDir()
+ 	work := filepath.Join(root, "kit-work")
+ 	bare := filepath.Join(root, "kit.git")
+@@ -656,7 +641,6 @@ func initCLILegacyRepo(t *testing.T, dir, name string) {
+ func TestProjectResolveLegacyConfiguredGitThroughCLI(t *testing.T) {
+ 	for _, mode := range []string{"default", "custom-source"} {
+ 		t.Run(mode, func(t *testing.T) {
+-			withDraftSourcesSwitch(t)
+ 			root := t.TempDir()
+ 			configPath, project := setupCLIProject(t, root)
+ 			skillsRoot := filepath.Join(root, "skills-root")
+@@ -723,7 +707,6 @@ func TestProjectResolveLegacyConfiguredGitThroughCLI(t *testing.T) {
+ func TestProjectResolveLegacyNetworkGitThroughCLI(t *testing.T) {
+ 	for _, mode := range []string{"default", "custom-source"} {
+ 		t.Run(mode, func(t *testing.T) {
+-			withDraftSourcesSwitch(t)
+ 			root := t.TempDir()
+ 			configPath, project := setupCLIProject(t, root)
+ 			skillsRoot := filepath.Join(root, "skills-root")
+@@ -794,7 +777,6 @@ func TestProjectResolveLegacyNetworkGitThroughCLI(t *testing.T) {
+ // schema-2 marker); real-install and pinned-reinstall coverage for the
+ // legacy member lives in the dedicated legacy tests above.
+ func TestProjectResolveLegacyMixedThroughCLI(t *testing.T) {
+-	withDraftSourcesSwitch(t)
+ 	root := t.TempDir()
+ 	configPath, project := setupCLIProject(t, root)
+ 	skillsRoot := filepath.Join(root, "skills-root")
+@@ -901,7 +883,6 @@ func cloneBareResolveCommit(t *testing.T, root, work, declaredURL, realGit strin
+ // attempt; the pinned resolve must lock tag v1 and install it for real.
+ func TestProjectResolveGitTagDiffersFromHEADThroughCLI(t *testing.T) {
+ 	realGit := requireRealGit(t)
+-	withDraftSourcesSwitch(t)
+ 	root := t.TempDir()
+ 	work := filepath.Join(root, "kit-work")
+ 	if err := os.MkdirAll(work, 0o755); err != nil {
+@@ -945,13 +926,60 @@ func TestProjectResolveGitTagDiffersFromHEADThroughCLI(t *testing.T) {
+ 	}
+ }
+ 
++// TestProjectResolveCanonicalRepositorySourceThroughCLI exercises the
++// canonical repository identity arm (rather than a declared Git URL)
++// through resolve, install, refresh, and reinstall. The transport is a
++// local bare repository behind the same fixture-only Git shim used above.
++func TestProjectResolveCanonicalRepositorySourceThroughCLI(t *testing.T) {
++	realGit := requireRealGit(t)
++	root := t.TempDir()
++	work := filepath.Join(root, "kit-work")
++	if err := os.MkdirAll(work, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	writeTagFixture(t, work, map[string]string{"skills/review": "review"})
++	const declaredURL = "https://fixture.test/kit.git"
++	configPath, project, _, commit := cloneBareResolveCommit(t, root, work, declaredURL, realGit)
++	t.Setenv("CURATOR_CONFIG", configPath)
++	policy := `{"schema_version":1,"repositories":{"fixture.test/kit":{"endpoints":[{"url":"` + declaredURL + `","authentication":"team-https"}],"fallback":"none"}}}`
++	if err := os.WriteFile(filepath.Join(filepath.Dir(configPath), "source-policy.json"), []byte(policy), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	payload := `{"schema_version":2,"sources":{"s":{"repository":"fixture.test/kit","tag":"v1"}},"skills":[{"name":"review","from":"s","directory":"skills/review"}]}`
++	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if code, _, stderr := capture(t, configPath, "project", "resolve", "app"); code != exitOK {
++		t.Fatalf("project resolve = %d\nstderr:\n%s", code, stderr)
++	}
++	lock, err := sourcelock.Read(filepath.Join(project, "Skillfile.lock.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	member, ok := lock.Find("review")
++	if !ok {
++		t.Fatalf("lock misses review: %+v", lock.Members)
++	}
++	if member.Package.Repository != "fixture.test/kit" || member.Package.Commit.Hex != commit {
++		t.Fatalf("repository pin = %+v, want fixture.test/kit at %s", member.Package, commit)
++	}
++	if code, _, stderr := capture(t, configPath, "install", "app"); code != exitOK {
++		t.Fatalf("install = %d\nstderr:\n%s", code, stderr)
++	}
++	if code, _, stderr := capture(t, configPath, "project", "refresh", "app"); code != exitOK {
++		t.Fatalf("project refresh = %d\nstderr:\n%s", code, stderr)
++	}
++	if code, _, stderr := capture(t, configPath, "install", "app"); code != exitOK {
++		t.Fatalf("pinned reinstall = %d\nstderr:\n%s", code, stderr)
++	}
++}
++
+ // TestProjectResolveGitCollectionPinnedToTagThroughCLI proves collection
+ // membership comes from the declared tag's tree: tag v1 holds alpha and
+ // beta while HEAD removed beta. A checkout-based expansion would silently
+ // lock alpha alone; the pinned resolve must lock both and consume them.
+ func TestProjectResolveGitCollectionPinnedToTagThroughCLI(t *testing.T) {
+ 	realGit := requireRealGit(t)
+-	withDraftSourcesSwitch(t)
+ 	root := t.TempDir()
+ 	work := filepath.Join(root, "kit-work")
+ 	if err := os.MkdirAll(work, 0o755); err != nil {
+@@ -1007,7 +1035,6 @@ func TestProjectResolveGitCollectionPinnedToTagThroughCLI(t *testing.T) {
+ // pinned reinstall.
+ func TestProjectRefreshGitBranchMembershipChangeThroughCLI(t *testing.T) {
+ 	realGit := requireRealGit(t)
+-	withDraftSourcesSwitch(t)
+ 	root := t.TempDir()
+ 	work := filepath.Join(root, "kit-work")
+ 	if err := os.MkdirAll(work, 0o755); err != nil {
+@@ -1171,7 +1198,6 @@ func writeCLIConsumerSkillWithGit(t *testing.T, dir, name, gitURL string) {
+ // the allowed control resolves from the SkillsRoot checkout.
+ func TestProjectResolveDraftAllowlistLegacyThroughCLI(t *testing.T) {
+ 	realGit := requireRealGit(t)
+-	withDraftSourcesSwitch(t)
+ 	const deniedURL = "https://denied.test/review.git"
+ 	t.Run("denied", func(t *testing.T) {
+ 		root := t.TempDir()
+@@ -1245,7 +1271,6 @@ func TestProjectResolveDraftAllowlistLegacyThroughCLI(t *testing.T) {
+ // checkout with zero acquisitions.
+ func TestProjectResolveDraftAllowlistTransitiveThroughCLI(t *testing.T) {
+ 	realGit := requireRealGit(t)
+-	withDraftSourcesSwitch(t)
+ 	const providerURL = "https://denied.test/provider.git"
+ 	t.Run("denied", func(t *testing.T) {
+ 		root := t.TempDir()
+@@ -1394,7 +1419,6 @@ func setupLegacyBranchRefresh(t *testing.T, payload string) (configPath, project
+ // to succeed there.
+ func setupLegacyBranchRefreshWithSkill(t *testing.T, payload string, writeSkill func(t *testing.T, dir, name string)) (configPath, project, home, work, bare, checkout, oldCommit string) {
+ 	t.Helper()
+-	withDraftSourcesSwitch(t)
+ 	root := t.TempDir()
+ 	work = filepath.Join(root, "upstream-work")
+ 	writeSkill(t, work, "review")
+@@ -1577,7 +1601,6 @@ func TestProjectRefreshLegacyNetworkGitBranchThroughCLI(t *testing.T) {
+ // stays stale, so only a fetch of the transitive repository can resolve
+ // the refresh.
+ func TestProjectRefreshTransitiveTagAdvanceThroughCLI(t *testing.T) {
+-	withDraftSourcesSwitch(t)
+ 	root := t.TempDir()
+ 	const providerURL = "https://fixture.test/provider.git"
+ 	providerWork := filepath.Join(root, "provider-work")
+@@ -1809,7 +1832,6 @@ func TestProjectRefreshRemoteEnumerationFailurePreservesStateThroughCLI(t *testi
+ // succeeds from the local tag while the git call log carries no fetch.
+ func TestProjectResolveOriginLessSkipsFetchThroughCLI(t *testing.T) {
+ 	realGit := requireRealGit(t)
+-	withDraftSourcesSwitch(t)
+ 	root := t.TempDir()
+ 	configPath, project := setupCLIProject(t, root)
+ 	initCLILegacyRepo(t, filepath.Join(root, "skills-root", "review"), "review")
+@@ -1885,7 +1907,6 @@ func countFetchLogLines(t *testing.T, logPath string) int {
+ // resolve clones, so it must fetch zero times; the refresh fetches once.
+ func TestProjectRefreshAliasFetchDedupedThroughCLI(t *testing.T) {
+ 	realGit := requireRealGit(t)
+-	withDraftSourcesSwitch(t)
+ 	root := t.TempDir()
+ 	work := filepath.Join(root, "kit-work")
+ 	if err := os.MkdirAll(work, 0o755); err != nil {
+diff --git a/cmd/curator/draft_status.go b/cmd/curator/draft_status.go
+index 2cec1a1d..4ec760f9 100644
+--- a/cmd/curator/draft_status.go
++++ b/cmd/curator/draft_status.go
+@@ -23,7 +23,6 @@ import (
+ 	"reflect"
+ 
+ 	"github.com/relux-works/curator/internal/hashing"
+-	"github.com/relux-works/curator/internal/install"
+ 	"github.com/relux-works/curator/internal/manifest"
+ 	"github.com/relux-works/curator/internal/marker"
+ 	"github.com/relux-works/curator/internal/sourcelock"
+@@ -33,14 +32,9 @@ import (
+ // manifest no longer parses as the schema-2 document the caller peeked.
+ var errDraftManifestMoved = errors.New("the Skillfile changed while status was classifying it; re-run status")
+ 
+-// draftStatusApplies reports whether one project takes the draft status
+-// lane: a schema-2 manifest with the draft switch enabled. Every other
+-// shape — including a schema-2 manifest without the switch — keeps the
+-// legacy surface byte-identically.
++// draftStatusApplies reports whether one project takes the schema-2 status
++// lane. Schema 1 and missing manifests keep the legacy surface.
+ func draftStatusApplies(manifestRoot string) bool {
+-	if !install.DraftSourcesEnabled(os.Getenv) {
+-		return false
+-	}
+ 	payload, err := os.ReadFile(manifest.PathIn(manifestRoot)) // #nosec G304 -- operator-selected project Skillfile
+ 	if err != nil {
+ 		return false
+@@ -66,7 +60,7 @@ func draftStatusDrift(manifestRoot, skillsDir string, effective map[string]*mark
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	projectManifest, err := manifest.ParseBytesWithOptions(payload, manifest.PathIn(manifestRoot), manifest.ParseOptions{DraftSourcesV1: true})
++	projectManifest, err := manifest.ParseBytes(payload, manifest.PathIn(manifestRoot))
+ 	if err != nil {
+ 		return nil, err
+ 	}
+diff --git a/cmd/curator/draft_status_test.go b/cmd/curator/draft_status_test.go
+index fb8779dd..cef982f7 100644
+--- a/cmd/curator/draft_status_test.go
++++ b/cmd/curator/draft_status_test.go
+@@ -3,7 +3,7 @@ package main
+ // Draft source currentness at the CLI production entry.
+ //
+ // These tests drive `project resolve`, `install`, and `status` through
+-// run() with the draft switch set in-process. Status consumes the frozen
++// run() with the source lane enabled. Status consumes the frozen
+ // lock only: changed package, lock, attestation, substitution, or
+ // declared ref is non-current, live-byte mutation without refresh stays
+ // current, and every check stays read-only with a nonzero --check exit
+@@ -28,7 +28,6 @@ const draftStatusPayload = `{"schema_version":2,"sources":{"s":{"path":"."}},"sk
+ // returns the config path and project root.
+ func setupDraftStatusProject(t *testing.T) (configPath, project string) {
+ 	t.Helper()
+-	withDraftSourcesSwitch(t)
+ 	root := t.TempDir()
+ 	configPath, project = setupCLIProject(t, root)
+ 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(draftStatusPayload), 0o644); err != nil {
+@@ -279,7 +278,6 @@ func TestDraftStatusStaleManifestRefuses(t *testing.T) {
+ // resolved nor installed, so status prints the refusal and --check is
+ // nonzero — never an empty, silent success.
+ func TestDraftStatusStaleEmptyLockRefuses(t *testing.T) {
+-	withDraftSourcesSwitch(t)
+ 	root := t.TempDir()
+ 	configPath, project := setupCLIProject(t, root)
+ 	empty := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[]}`
+@@ -486,10 +484,10 @@ func draftStatusRecorded(snapshot, lockSHA string) *marker.Marker {
+ 	}
+ }
+ 
+-// TestDraftStatusAppliesKeepsLegacyProjectsUntouched pins the diversion
+-// guard: only a schema-2 manifest with the draft switch takes the draft
+-// lane. Every other shape keeps the legacy surface byte-identically.
+-func TestDraftStatusAppliesKeepsLegacyProjectsUntouched(t *testing.T) {
++// TestDraftStatusAppliesKeepsSchema1ProjectsUntouched pins the default
++// diversion: schema 2 takes the locked status path while schema 1 and
++// missing manifests keep the legacy surface.
++func TestDraftStatusAppliesKeepsSchema1ProjectsUntouched(t *testing.T) {
+ 	write := func(t *testing.T, payload string) string {
+ 		t.Helper()
+ 		dir := t.TempDir()
+@@ -501,21 +499,14 @@ func TestDraftStatusAppliesKeepsLegacyProjectsUntouched(t *testing.T) {
+ 	schema2 := write(t, `{"schema_version":2,"sources":{},"skills":[]}`)
+ 	schema1 := write(t, `{"schema_version":1,"skills":[]}`)
+ 
+-	if draftStatusApplies(schema2) {
+-		t.Fatalf("schema-2 without the switch takes the draft lane")
++	if !draftStatusApplies(schema2) {
++		t.Fatalf("schema 2 does not take the locked status path")
+ 	}
+ 	if draftStatusApplies(schema1) {
+-		t.Fatalf("schema-1 takes the draft lane")
++		t.Fatalf("schema-1 takes the schema-2 lane")
+ 	}
+ 	if draftStatusApplies(t.TempDir()) {
+-		t.Fatalf("a missing manifest takes the draft lane")
+-	}
+-	withDraftSourcesSwitch(t)
+-	if !draftStatusApplies(schema2) {
+-		t.Fatalf("schema-2 with the switch keeps the legacy lane")
+-	}
+-	if draftStatusApplies(schema1) {
+-		t.Fatalf("schema-1 with the switch takes the draft lane")
++		t.Fatalf("a missing manifest takes the schema-2 lane")
+ 	}
+ }
+ 
+diff --git a/cmd/curator/global_status_test.go b/cmd/curator/global_status_test.go
+index 2b091228..d1863e7b 100644
+--- a/cmd/curator/global_status_test.go
++++ b/cmd/curator/global_status_test.go
+@@ -63,6 +63,17 @@ func globalScopeDeclaring(t *testing.T, declarations string) string {
+ 	return home
+ }
+ 
++func TestGlobalStatusRejectsSchema2SkillfileThroughCLI(t *testing.T) {
++	home := globalScopeDeclaring(t, "")
++	writeFile(t, filepath.Join(install.GlobalRoot(home), manifest.Name),
++		`{"schema_version":2,"sources":{},"skills":[]}`)
++	configPath := filepath.Join(home, "config.json")
++	code, _, stderr := capture(t, configPath, "global", "status")
++	if code != exitFail || !strings.Contains(stderr, "global scope requires schema 1") {
++		t.Fatalf("global status with schema 2 = (%d, %q), want schema-1 scope refusal", code, stderr)
++	}
++}
++
+ // compiledGlobalScope declares one skill that exports a schema 6 go-v1 build
+ // command, so the machine-wide scope activates a compiled command.
+ func compiledGlobalScope(t *testing.T) string {
+diff --git a/cmd/curator/main.go b/cmd/curator/main.go
+index f96ec04c..963b32ae 100644
+--- a/cmd/curator/main.go
++++ b/cmd/curator/main.go
+@@ -1040,6 +1040,11 @@ func scopeStatusDrift(cfg *config.Config, manifestRoot, skillsDir string) map[st
+ 		return drift
+ 	}
+ 	for _, decl := range projectManifest.Skills {
++		if decl.Name == "" {
++			// Collection selectors derive their member names from the lock.
++			// This legacy drift surface has no declaration name to compare.
++			continue
++		}
+ 		installed := filepath.Join(skillsDir, decl.Name)
+ 		if _, err := os.Stat(installed); err != nil {
+ 			drift[decl.Name] = stateNotInstalled
+@@ -1127,6 +1132,9 @@ func (c cli) cmdList() int {
+ 		_, _ = fmt.Fprintf(c.stdout, "%s\t%s\n", alias, project.Path)
+ 		if projectManifest, err := manifest.Load(project.Path); err == nil && projectManifest != nil {
+ 			for _, decl := range projectManifest.Skills {
++				if decl.Name == "" {
++					continue
++				}
+ 				_, _ = fmt.Fprintf(c.stdout, "  %s %s %s\n", decl.Name, decl.Ref.Kind, decl.Ref.Value)
+ 			}
+ 		}
+@@ -1173,12 +1181,10 @@ func (c cli) cmdProject(args []string) int {
+ 		_, _ = fmt.Fprintf(c.stdout, "added project %s: %s\n", positional[0], root)
+ 		return exitOK
+ 	case "resolve", "refresh":
+-		// The explicit -h surface exists only on the opt-in lane, the
+-		// same rule as appendDraftUsage: with the switch off the flag
+-		// spellings fall through to the frozen v1 path untouched. The
++		// The explicit -h surface describes schema-2 project resolution. The
+ 		// bare word "help" is never intercepted, so it keeps resolving
+ 		// as a project alias or path.
+-		if install.DraftSourcesEnabled(os.Getenv) && len(args) > 1 && (args[1] == "-h" || args[1] == "--help") {
++		if len(args) > 1 && (args[1] == "-h" || args[1] == "--help") {
+ 			_, _ = fmt.Fprint(c.stdout, projectResolveUsage)
+ 			return exitOK
+ 		}
+@@ -1238,6 +1244,13 @@ func (c cli) cmdGlobal(args []string) int {
+ 	if code != exitOK {
+ 		return code
+ 	}
++	if args[0] != "init" {
++		globalManifest, err := manifest.Load(install.GlobalRoot(cfg.Home()))
++		if err == nil && globalManifest != nil && globalManifest.SchemaVersion != manifest.SchemaVersion {
++			_, _ = fmt.Fprintf(c.stderr, "curator: global Skillfile schema %d is unsupported; global scope requires schema %d\n", globalManifest.SchemaVersion, manifest.SchemaVersion)
++			return exitFail
++		}
++	}
+ 	switch args[0] {
+ 	case "init":
+ 		path, err := install.GlobalInit(cfg.Home())
+diff --git a/cmd/curator/project_resolve.go b/cmd/curator/project_resolve.go
+index 99713355..9f6909de 100644
+--- a/cmd/curator/project_resolve.go
++++ b/cmd/curator/project_resolve.go
+@@ -64,13 +64,7 @@ func (c cli) cmdProjectResolve(cfg *config.Config, target projectTarget, verb st
+ 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitFail
+ 	}
+-	draft := install.DraftSourcesEnabled(os.Getenv)
+-	var projectManifest *manifest.Manifest
+-	if draft {
+-		projectManifest, err = manifest.ParseBytesWithOptions(payload, manifest.PathIn(target.Root), manifest.ParseOptions{DraftSourcesV1: true})
+-	} else {
+-		projectManifest, err = manifest.ParseBytes(payload, manifest.PathIn(target.Root))
+-	}
++	projectManifest, err := manifest.ParseBytes(payload, manifest.PathIn(target.Root))
+ 	if err != nil {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator:", withDraftRemediation(err.Error()))
+ 		return exitFail
+@@ -81,10 +75,6 @@ func (c cli) cmdProjectResolve(cfg *config.Config, target projectTarget, verb st
+ 		_, _ = fmt.Fprintf(c.stdout, "skills: %s\nbin: %s\n", filepath.Join(target.Root, ".agents", "skills"), filepath.Join(target.Root, ".agents", "bin"))
+ 		return exitOK
+ 	}
+-	if !draft {
+-		_, _ = fmt.Fprintf(c.stderr, "curator: source_selection_invalid: Skillfile schema 2 requires the draft lane; unset %s keeps frozen v1\n", install.EnvDraftSourcesV1)
+-		return exitFail
+-	}
+ 	plan, lockPath, bindingsPath, err := c.resolveDraftPlan(cfg, target, projectManifest, payload)
+ 	if err != nil {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator:", withDraftRemediation(err.Error()))
+diff --git a/docs/cli.md b/docs/cli.md
+index 6d725208..61a59eb0 100644
+--- a/docs/cli.md
++++ b/docs/cli.md
+@@ -144,11 +144,10 @@ curator install --dry-run
+ 
+ The command prints planned installation steps without modifying disk files.
+ 
+-For schema-2 projects with the draft opt-in switch set, `install`
+-materializes the locked snapshot and repairs drifted bytes from the
+-lock without touching the lock itself; see [Draft Skillfile
+-sources](#draft-skillfile-sources-opt-in-unreleased). Run `install -h`
+-with the switch set for the workflow summary.
++For schema-2 projects, `install` materializes the locked snapshot and
++repairs drifted bytes from the lock without touching the lock itself;
++see [Skillfile schema 2 project sources](#skillfile-schema-2-project-sources).
++Run `install -h` for the workflow summary.
+ 
+ ### curator update
+ 
+@@ -223,11 +222,10 @@ curator status --json
+ 
+ The command prints status diagnostics for declared skills and compiled commands.
+ 
+-For schema-2 projects with the draft opt-in switch set, `status`
+-compares installed state against the frozen lock only — it never
+-rescans collections, advances branches, or replaces a local snapshot;
+-see [Draft Skillfile sources](#draft-skillfile-sources-opt-in-unreleased).
+-Run `status -h` with the switch set for the workflow summary.
++For schema-2 projects, `status` compares installed state against the
++frozen lock only — it never rescans collections, advances branches, or
++replaces a local snapshot; see [Skillfile schema 2 project sources](#skillfile-schema-2-project-sources).
++Run `status -h` for the workflow summary.
+ 
+ `curator status` also reports the shell-hook trust posture (Manager profile
+ §8.6): one `shell-hook-trust:` row per known project env file — every
+@@ -306,18 +304,16 @@ curator project resolve .
+ 
+ The command updates `Skillfile.lock` with resolved dependency commits and content hashes.
+ 
+-For frozen v1 projects the command prints the alias, project path,
++For schema-1 projects the command prints the alias, project path,
+ Skillfile path, and managed skill and bin directories without modifying
+-disk state. For schema-2 projects with the draft opt-in switch set (see
+-[Draft Skillfile sources](#draft-skillfile-sources-opt-in-unreleased)),
+-it runs the explicit attempt: it acquires every Git source alias,
+-freezes local bytes and Git commits into a locked plan, and publishes
+-`Skillfile.lock.json` plus the machine bindings transactionally after
+-every gate succeeds. With `CURATOR_DRAFT_SOURCES_V1=1`, `curator project
+-resolve -h` prints the draft workflow; with the switch off the `-h` and
+-`--help` spellings keep the frozen v1 behavior (they resolve the current
+-project exactly as before). The bare word `help` is never a help flag:
+-it resolves as a project alias or path.
++disk state. Schema-2 projects use the workflow described in
++[Skillfile schema 2 project sources](#skillfile-schema-2-project-sources);
++it acquires every Git source alias, freezes local bytes and Git commits
++into a locked plan, and publishes `Skillfile.lock.json` plus the machine
++bindings transactionally after every gate succeeds.
++`curator project resolve -h` prints the workflow. Schema 1 keeps its
++exact meaning; no on-disk migration is implicit. The bare word `help` is
++never a help flag: it resolves as a project alias or path.
+ 
+ ### curator project refresh
+ 
+@@ -334,7 +330,7 @@ Synopsis:
+ curator project refresh [path]
+ ```
+ 
+-Refresh a draft lock after editing sources or after upstream refs moved:
++Refresh a schema-2 lock after editing sources or after upstream refs moved:
+ 
+ ```bash
+ curator project refresh .
+@@ -343,21 +339,12 @@ curator install .
+ 
+ Refresh alone changes nothing live: run `curator install` afterwards to
+ materialize the refreshed lock. Launch and status never refresh on
+-their own. Run `curator project refresh -h` for the workflow (draft
+-switch on; with the switch off the flag spellings keep the frozen v1
+-behavior, as for `resolve`).
++their own. Run `curator project refresh -h` for the workflow.
+ 
+-## Draft Skillfile sources (opt-in, unreleased)
++## Skillfile schema 2 project sources
+ 
+-Skillfile schema 2 with local and Git sources is draft functionality
+-behind the operator-owned opt-in switch. It is not part of the released
+-v1 behavior: package data can neither set nor observe the switch, and
+-with the switch off schema 2 fails closed while frozen v1 behaves
+-byte-identically.
+-
+-```bash
+-export CURATOR_DRAFT_SOURCES_V1=1
+-```
++Skillfile schema 2 is the default project reader and install path. Schema
++1 retains its exact meaning, and no on-disk migration is implicit.
+ 
+ ### Workflow
+ 
+@@ -378,8 +365,8 @@ edited after resolve fails `source_lock_stale` until refresh; running
+ install again after refresh repairs drifted bytes from the lock while
+ the lock bytes stay identical. Every stable `source_*` and
+ `repository_*` failure prints a sanitized remediation naming the fix;
+-see [Draft source and transport
+-diagnostics](troubleshooting.md#draft-source-and-transport-diagnostics).
++see [Skillfile source and transport
++diagnostics](troubleshooting.md#skillfile-source-and-transport-diagnostics).
+ 
+ ### Local sources
+ 
+@@ -515,7 +502,7 @@ default `known_hosts` and default identity files; `TMPDIR`/`TMP`/`TEMP`;
+ every other ambient name — `GIT_SSH`/`GIT_SSH_COMMAND`,
+ `GIT_PROXY_COMMAND`, `GIT_EXEC_PATH`, every other `GIT_*` override, and
+ the proxy environment — is dropped by construction and cannot redirect
+-or hijack the clone, so the draft lane does not honour proxy
++or hijack the clone, so this source acquisition path does not honour proxy
+ environment. SSH runs a curator-owned command with an empty ssh config
+ (`-F` an empty file, `BatchMode`, `StrictHostKeyChecking=yes`,
+ `ProxyCommand=none`, `ProxyJump=none`, forwarding disabled, host-key
+diff --git a/docs/draft-source-expansion.md b/docs/draft-source-expansion.md
+index 27124748..9ded05a8 100644
+--- a/docs/draft-source-expansion.md
++++ b/docs/draft-source-expansion.md
+@@ -1,48 +1,50 @@
+-# Draft source expansion boundary
++# Skillfile schema 2 source expansion
+ 
+-This is an internal implementation of unreleased `skillfile-sources-v1` §1,
+-not an enabled schema-2 installation path. The default manifest reader still
+-rejects schema 2. Frozen v1 and release qualification are unchanged.
++Schema 2 source declarations are parsed by default in the project path.
++Schema 1 keeps its exact meaning, and no on-disk migration is implicit.
++Global scope continues to require schema 1.
+ 
+-`manifest.Expand` consumes a manifest parsed with `DraftSourcesV1`. Local paths
+-are literal and relative to the declaring Skillfile; Git aliases require an
+-already acquired tree in `ExpansionOptions.GitRoots`. It performs no network
+-operation. The acquisition owner supplies machine runtime/cache/snapshot/staging
+-boundaries through `OutputRoots`; project `.agents`, adapter outputs and `.git`
+-metadata are excluded internally. Boundary paths must be absolute.
++`manifest.Expand` consumes a parsed schema-2 manifest. Local paths are
++literal and relative to the declaring Skillfile; Git aliases use an
++already acquired tree in `ExpansionOptions.GitRoots`. Expansion performs
++no network operation. The project resolver owns acquisition and supplies
++runtime, cache, snapshot, and staging boundaries through `OutputRoots`;
++project `.agents`, adapter outputs, and `.git` metadata are excluded.
++Boundary paths must be absolute.
+ 
+-Each result retains the original selection index, individual declaration,
+-source-relative directory, observed physical path and parsed skill manifest.
+-Collections enumerate immediate directories in UTF-8 byte order. Explicit
+-literals are checked before exclusion; invalid remaining packages fail the
+-whole result. Names come from validated SKILL.md YAML and must agree with an
+-individual selector and any optional legacy manifest name. Duplicate installed
+-names and case-equivalent portable destinations fail across all direct entries.
++Each result retains its selection index, individual declaration,
++source-relative directory, observed physical path, and parsed skill
++manifest. Collections enumerate immediate directories in UTF-8 byte
++order. Explicit literals are checked before exclusion; invalid remaining
++packages fail the whole result. Names come from validated `SKILL.md`
++YAML and must agree with an individual selector and any optional legacy
++manifest name. Duplicate installed names and case-equivalent portable
++destinations fail across all direct entries.
+ 
+-`closure.BuildExpanded` connects expansion to the existing provider-first
+-closure walk through an explicit `AcquireSelection` boundary. That acquisition
+-owner must freeze package bytes, validate the acquired spec and supply its
+-snapshot. Git nodes retain their repository identity/ref/commit, and all members
+-of one alias must agree on the commit. Local nodes leave Git fields empty.
+-Identical transitive Git requirements still unify, including diamonds; local
+-packages and repository subdirectories cannot be identified by a legacy
+-root-repository dependency of the same installed name. Version/source conflicts,
+-cycles and command-narrowing validation remain in the existing closure walk.
+-Legacy `closure.Build` refuses unresolved selectors before acquisition.
++`closure.BuildExpanded` connects expansion to the provider-first closure
++walk through an explicit `AcquireSelection` boundary. Acquisition freezes
++package bytes, validates the acquired spec, and supplies its snapshot. Git
++nodes retain repository identity, ref, and commit; all members of one
++alias must agree on the commit. Local nodes leave Git fields empty.
++Identical transitive Git requirements still unify, including diamonds;
++local packages and repository subdirectories cannot be identified by a
++legacy root-repository dependency of the same installed name.
++Version/source conflicts, cycles, and command-narrowing validation remain
++in the existing closure walk. Legacy `closure.Build` refuses unresolved
++selectors before acquisition.
+ 
+-## Deliberate integration bounds
++## Identity and installation boundary
+ 
+-Expansion paths are observations, not immutable package identities. This task
+-adds neither a local snapshot capturer nor a lock writer, transport resolver,
+-publication path, root-input policy, audit bypass or marker migration. A caller
+-must implement those independently before enabling schema-2 CLI installation.
+-In particular, acquisition must revalidate membership and package inputs,
+-apply root-input policy and recheck destination separation before publication.
+-Do not pass these nodes to legacy marker or runtime-store writers. The
+-`AcquireSelection` callback is a trusted internal acquisition interface, not
+-package-provided code or attestation evidence.
++Expansion paths are observations, not immutable package identities. The
++project installation path authenticates local snapshots and Git commits,
++freezes membership and package inputs, applies root-input policy, writes
++a Skillfile lock and machine-private bindings on explicit resolve, and
++consumes those frozen records during install. It does not pass schema-2
++nodes to the legacy marker or runtime-store writers. The acquisition
++callback is an internal trusted boundary; it is not package-provided code
++or attestation evidence.
+ 
+-Tests drive `manifest.Expand`, `closure.BuildExpanded`, and the legacy `Build`
+-refusal path. Acquisition fixtures are immutable temporary directories; tests
+-of expansion and closure are not evidence of snapshot capture, lock replay,
+-transport authentication or installation. Those remain separate delivery work.
++Tests cover the published schema-2 manifest corpus, `manifest.Expand`,
++`closure.BuildExpanded`, and the legacy `Build` refusal path. Production
++CLI tests separately cover lock creation, install, status, refresh, and
++frozen replay using local fixtures.
+diff --git a/docs/draft-source-policy.md b/docs/draft-source-policy.md
+index fcd79846..8293f219 100644
+--- a/docs/draft-source-policy.md
++++ b/docs/draft-source-policy.md
+@@ -1,8 +1,8 @@
+-# Draft repository endpoint policy boundary
++# Repository endpoint policy for Skillfile schema 2
+ 
+-This is an internal implementation of unreleased `repository-transport`
+-revisions 1 and 2 (machine policy loading and attempt planning), not an
+-enabled fetch path. Frozen v1 and release qualification are unchanged.
++Skillfile schema-2 project resolution uses the accepted `repository-transport`
++revisions 1 and 2 policy reader and endpoint planner by default. Schema-1
++Skillfiles keep their existing meaning and are not migrated.
+ 
+ `config.LoadSourcePolicy` reads the operator-owned `source-policy.json`
+ beside the manager configuration; `config.ParseSourcePolicy` validates
+@@ -13,8 +13,7 @@ violations). Schema 2 (`schema_version: 2`) loads as the additive
+ superset of §4: port-bearing endpoint and pin URLs, per-endpoint
+ `mirror_of` attestation, and the operator host-alias table.
+ 
+-Entries are keyed by exact canonical identity
+-(`identity.DraftCanonicalKey`, no normalization); each lists one or two
++Entries are keyed by exact canonical identity without normalization; each lists one or two
+ distinct endpoints, an opaque operator provider reference per endpoint
+ (`gitcred.ValidProvider`, never a command or path), and a closed
+ fallback mode. `pin` selects exactly one listed URL by exact string
+@@ -46,9 +45,7 @@ once with no policy provider; a logical identity without an entry fails
+ `repository_policy_invalid` before any acquisition. Package declarations
+ stay canonical and logical and never name aliases.
+ 
+-This layer plans only. Attempt bounds over ports/mirrors/aliases, the
+-§6 failure classification beyond the loader's fail-closed rows,
+-provenance recording, and the strict external-build lane refusals (§7)
+-are implemented by the sibling resolution leaf
+-(`buildrepo.AcquireNetworkResolved` behind
+-`install.acquireDraftNetwork`); see `docs/draft-transport-resolution.md`.
++This layer plans only. Project source acquisition applies the bounded
++attempt rules and failure classification from the transport contract. The
++strict external-build lane has a separate opt-in gate; its execution and
++provenance details are in `docs/draft-transport-resolution.md`.
+diff --git a/docs/draft-transport-resolution.md b/docs/draft-transport-resolution.md
+index f07063cc..6a82e115 100644
+--- a/docs/draft-transport-resolution.md
++++ b/docs/draft-transport-resolution.md
+@@ -1,9 +1,10 @@
+-# Draft bounded transport resolution boundary
++# Bounded repository transport resolution
+ 
+-This is an internal implementation of unreleased `repository-transport-v1`
+-revision 1 §2 (bounded authenticated endpoint resolution) on the strict
+-external-repository lane, not an enabled fetch path. Frozen v1 and release
+-qualification are unchanged.
++This documents bounded repository endpoint resolution under
++`repository-transport` revisions 1 and 2. Project Skillfile source
++resolution uses the policy planner by default. External build-repository
++resolution remains behind the separate `CURATOR_DRAFT_TRANSPORT_RESOLUTION`
++operator gate and is outside the Skillfile source default.
+ 
+ `buildrepo.AcquireNetworkResolved` applies a `TransportPlan` — one or two
+ closed-grammar endpoints for one canonical identity, an opaque operator
+@@ -113,11 +114,11 @@ configuration (`~/.ssh/config` Host aliases, `insteadOf`,
+ the lane pins its own configuration paths, broker, and wrapper, and
+ fetches the declared URL literally when no policy entry applies.
+ 
+-## Production caller (draft)
++## External build-repository caller
+ 
+ The external-repository lane (repository-transport §3: an existing lane
+ using its URL declaration with an admitted machine policy) selects this
+-executor behind the draft/opt-in switch
++executor behind the separate opt-in switch
+ `CURATOR_DRAFT_TRANSPORT_RESOLUTION=1`, read once at the CLI boundary into
+ `install.ExternalDeps`. The logical `repository` spelling stays parser-only:
+ no caller here mints it, so resolution always starts from the declared URL.
+@@ -128,8 +129,8 @@ manager configuration, resolves the declared URL with
+ `TransportPlan` field-for-field — including the revision-2 `mirror_of`,
+ `alias`, and resolved connection address — and calls
+ `AcquireNetworkResolved`. A present policy selects the resolved lane; an
+-absent policy file, or the switch off, runs `AcquireNetwork` with the
+-exact legacy request — the switch-off path never opens the policy file.
++absent policy file, or the gate disabled, runs `AcquireNetwork` with the
++exact legacy request — the disabled-gate path never opens the policy file.
+ A present-but-invalid policy fails `repository_policy_invalid` before
+ any fetch; an unattested mirror fails `repository_mirror_undeclared`
+ and a dangling alias fails `repository_alias_unknown`, both with zero
+@@ -147,7 +148,7 @@ manager-home operation diagnostics log
+ only: canonical identity, listed URL, resolved host and port, alias and
+ `mirror_of` when used, lane transport, provider identifier, outcome) —
+ never portable artifacts. The legacy lane never invokes it, so
+-switch-off runs create no file.
++disabled-gate runs create no file.
+ 
+ Policy-named providers resolve only through the operator's provider table,
+ `source-providers.json` beside the manager configuration, read through
+@@ -178,4 +179,4 @@ The wiring also repairs the declared-URL threading the lane needs to fetch
+ at all: the default closure used to pass the repository's configured name
+ where the lane requires the URL, so every unfetched acquisition refused in
+ admission. `ExternalSource` now carries the declared URL and the legacy lane
+-fetches it. The switch-off golden pins the repaired legacy bytes.
++fetches it. The disabled-gate regression test pins the legacy bytes.
+diff --git a/docs/troubleshooting.md b/docs/troubleshooting.md
+index 86b4a98c..3e0be176 100644
+--- a/docs/troubleshooting.md
++++ b/docs/troubleshooting.md
+@@ -353,11 +353,11 @@ curator install --verbose
+ 
+ The command prints detailed execution diagnostic messages.
+ 
+-## Draft source and transport diagnostics
++## Skillfile source and transport diagnostics
+ 
+-These stable classes appear only on the draft Skillfile lane
+-(`CURATOR_DRAFT_SOURCES_V1=1`). Each names the selector or member and
+-the reason without secrets, and the CLI appends a sanitized
++These stable classes describe schema-2 project source resolution and
++installation. Each class names the selector or member and the reason
++without secrets, and the CLI appends a sanitized
+ remediation. Fetch failures report one closed-vocabulary clause per
+ attempted endpoint (`availability`, `auth`, `tls`, `host-key`,
+ `ref-moved`, `identity`, `integrity`, `audit`, `http-404`,
+diff --git a/internal/closure/resolve_test.go b/internal/closure/resolve_test.go
+index 75dc48f7..1d6a9c97 100644
+--- a/internal/closure/resolve_test.go
++++ b/internal/closure/resolve_test.go
+@@ -102,7 +102,7 @@ func writeDraftSkill(t *testing.T, dir string, name string, withCommand bool, ru
+ func parseDraftManifest(t *testing.T, projectRoot, payload string) (*manifest.Manifest, []byte) {
+ 	t.Helper()
+ 	path := filepath.Join(projectRoot, manifest.Name)
+-	m, err := manifest.ParseBytesWithOptions([]byte(payload), path, manifest.ParseOptions{DraftSourcesV1: true})
++	m, err := manifest.ParseBytes([]byte(payload), path)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -296,7 +296,7 @@ func TestResolveDraftRefusals(t *testing.T) {
+ 				writeDraftSkill(t, filepath.Join(project, "b", "review"), "review", false, nil, nil)
+ 				payload := `{"schema_version":2,"sources":{"a":{"path":"./a"},"b":{"path":"./b"}},"skills":[{"name":"review","from":"a","directory":"review"},{"name":"review","from":"b","directory":"review"}]}`
+ 				// The parser already retains the repeated-selection refusal.
+-				if _, err := manifest.ParseBytesWithOptions([]byte(payload), filepath.Join(project, manifest.Name), manifest.ParseOptions{DraftSourcesV1: true}); err == nil || !strings.Contains(err.Error(), "source_name_conflict") {
++				if _, err := manifest.ParseBytes([]byte(payload), filepath.Join(project, manifest.Name)); err == nil || !strings.Contains(err.Error(), "source_name_conflict") {
+ 					t.Fatalf("err = %v, want source_name_conflict", err)
+ 				}
+ 			case "case-conflict":
+diff --git a/internal/closure/selections_test.go b/internal/closure/selections_test.go
+index 9f825ca0..0a4f1869 100644
+--- a/internal/closure/selections_test.go
++++ b/internal/closure/selections_test.go
+@@ -30,7 +30,7 @@ func selectionProject(t *testing.T, root string, names []string, requirements ma
+ 			t.Fatal(err)
+ 		}
+ 	}
+-	m, err := manifest.ParseBytesWithOptions([]byte(`{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["*"]}]}`), filepath.Join(root, manifest.Name), manifest.ParseOptions{DraftSourcesV1: true})
++	m, err := manifest.ParseBytes([]byte(`{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["*"]}]}`), filepath.Join(root, manifest.Name))
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+diff --git a/internal/crossconformance/draftsources_fixtures_test.go b/internal/crossconformance/draftsources_fixtures_test.go
+index a7f2002e..9d099864 100644
+--- a/internal/crossconformance/draftsources_fixtures_test.go
++++ b/internal/crossconformance/draftsources_fixtures_test.go
+@@ -83,7 +83,7 @@ func draftProject(t *testing.T, payload string, skills map[string]string) (proje
+ 
+ func draftManifest(t *testing.T, project, payload string) *manifest.Manifest {
+ 	t.Helper()
+-	m, err := manifest.ParseBytesWithOptions([]byte(payload), filepath.Join(project, "Skillfile.json"), manifest.ParseOptions{DraftSourcesV1: true})
++	m, err := manifest.ParseBytes([]byte(payload), filepath.Join(project, "Skillfile.json"))
+ 	if err != nil {
+ 		t.Fatalf("parse draft manifest: %v", err)
+ 	}
+@@ -144,7 +144,6 @@ func draftCLIConfig(t *testing.T, root, configPath string) *config.Config {
+ // draftInstall runs the production project installer on the draft lane.
+ func draftInstall(t *testing.T, project, home string, opts install.Options) install.Result {
+ 	t.Helper()
+-	opts.DraftSourcesV1 = true
+ 	if opts.Platform == "" {
+ 		opts.Platform = runtimestore.Platform()
+ 	}
+@@ -314,7 +313,6 @@ func runCurator(t *testing.T, home, configPath string, extraEnv []string, args .
+ 		"HOME=" + home,
+ 		"USERPROFILE=" + home,
+ 		"CURATOR_CONFIG=" + configPath,
+-		"CURATOR_DRAFT_SOURCES_V1=1",
+ 	}, extraEnv...)
+ 	return testcli.Run(t, "", env, "", bin, args...)
+ }
+diff --git a/internal/crossconformance/draftsources_schema_test.go b/internal/crossconformance/draftsources_schema_test.go
+index 51c9fcdb..01f0ba09 100644
+--- a/internal/crossconformance/draftsources_schema_test.go
++++ b/internal/crossconformance/draftsources_schema_test.go
+@@ -101,9 +101,9 @@ func driveSkillfileV2Case(t *testing.T, dir string, entry draftSchemaEntry) {
+ 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), payload, 0o644); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	_, err := manifest.LoadWithOptions(project, manifest.ParseOptions{DraftSourcesV1: true})
++	_, err := manifest.Load(project)
+ 	if (err == nil) != entry.Valid {
+-		t.Fatalf("valid=%v: LoadWithOptions err=%v", entry.Valid, err)
++		t.Fatalf("valid=%v: Load err=%v", entry.Valid, err)
+ 	}
+ }
+ 
+diff --git a/internal/crossconformance/draftsources_semantic_capture_test.go b/internal/crossconformance/draftsources_semantic_capture_test.go
+index 36ad43b2..700b9367 100644
+--- a/internal/crossconformance/draftsources_semantic_capture_test.go
++++ b/internal/crossconformance/draftsources_semantic_capture_test.go
+@@ -273,7 +273,7 @@ func driveStrictNetworkAttestationLocal(t *testing.T, _ draftSemanticCase) {
+ 	before := treeDigest(t, project) + treeDigest(t, home)
+ 	cfg := draftInstallConfig(home)
+ 	cfg.Audit.RegistryPolicy = "strict"
+-	result := install.Project(cfg, project, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform()})
++	result := install.Project(cfg, project, "test", install.Options{Platform: draftPlatform()})
+ 	if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "no network attestation identity") {
+ 		t.Fatalf("install = %+v, want the local attestation refusal", result)
+ 	}
+diff --git a/internal/crossconformance/draftsources_semantic_currentness_test.go b/internal/crossconformance/draftsources_semantic_currentness_test.go
+index 36985601..31bbbb98 100644
+--- a/internal/crossconformance/draftsources_semantic_currentness_test.go
++++ b/internal/crossconformance/draftsources_semantic_currentness_test.go
+@@ -242,7 +242,7 @@ func driveSelectorSubstitutionForbidden(t *testing.T, _ draftSemanticCase) {
+ 	}
+ 	before := treeDigest(t, project) + treeDigest(t, home)
+ 	cfg := draftInstallConfig(home)
+-	result := install.Project(cfg, project, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform()})
++	result := install.Project(cfg, project, "test", install.Options{Platform: draftPlatform()})
+ 	if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "source_selection_invalid") {
+ 		t.Fatalf("install = %+v, want the from-selector substitution refusal", result)
+ 	}
+@@ -261,7 +261,7 @@ func driveLocalRequiredRegistry(t *testing.T, _ draftSemanticCase) {
+ 	cfg := draftInstallConfig(home)
+ 	cfg.Audit.RegistryPolicy = "strict"
+ 	before := treeDigest(t, project) + treeDigest(t, home)
+-	result := install.Project(cfg, project, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform()})
++	result := install.Project(cfg, project, "test", install.Options{Platform: draftPlatform()})
+ 	if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "no network attestation identity") {
+ 		t.Fatalf("install = %+v, want the local attestation refusal", result)
+ 	}
+@@ -281,7 +281,7 @@ func driveExternalSubstitutionStrict(t *testing.T, _ draftSemanticCase) {
+ 	cfg.Audit.Enabled = true
+ 	cfg.Audit.Mode = "strict"
+ 	before := treeDigest(t, project) + treeDigest(t, home)
+-	result := install.Project(cfg, project, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform()})
++	result := install.Project(cfg, project, "test", install.Options{Platform: draftPlatform()})
+ 	if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "strict audit refuses substituted installs") {
+ 		t.Fatalf("install = %+v, want the strict substitution refusal", result)
+ 	}
+diff --git a/internal/crossconformance/draftsources_semantic_evidence_test.go b/internal/crossconformance/draftsources_semantic_evidence_test.go
+index 8ca4bec7..ad78d4e7 100644
+--- a/internal/crossconformance/draftsources_semantic_evidence_test.go
++++ b/internal/crossconformance/draftsources_semantic_evidence_test.go
+@@ -360,7 +360,7 @@ func driveAttestationEvidence(t *testing.T, c draftSemanticCase, condition attes
+ 	stub.set(condition)
+ 	freshBefore := draftInstallStateDigest(t, project, home)
+ 	cfg := draftStrictRegistryConfig(home, stub)
+-	fresh := install.Project(cfg, project, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform()})
++	fresh := install.Project(cfg, project, "test", install.Options{Platform: draftPlatform()})
+ 	if fresh.Status != "failed" {
+ 		t.Fatalf("fresh install = %+v, want refusal", fresh)
+ 	}
+@@ -382,7 +382,7 @@ func driveAttestationEvidence(t *testing.T, c draftSemanticCase, condition attes
+ 	stub.set(attestGood)
+ 	repairProject, repairHome, repairRepo := draftGitProject(t, "https://example.org/kit.git")
+ 	repairCfg := draftStrictRegistryConfig(repairHome, stub)
+-	if result := install.Project(repairCfg, repairProject, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform()}); result.Status != "ok" {
++	if result := install.Project(repairCfg, repairProject, "test", install.Options{Platform: draftPlatform()}); result.Status != "ok" {
+ 		t.Fatalf("baseline install = %+v", result)
+ 	}
+ 	recorded := marker.Read(filepath.Join(repairProject, ".agents", "skills", "review"))
+@@ -391,7 +391,7 @@ func driveAttestationEvidence(t *testing.T, c draftSemanticCase, condition attes
+ 	}
+ 	stub.set(condition)
+ 	repairBefore := draftInstallStateDigest(t, repairProject, repairHome)
+-	repair := install.Project(repairCfg, repairProject, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform()})
++	repair := install.Project(repairCfg, repairProject, "test", install.Options{Platform: draftPlatform()})
+ 	if repair.Status != "failed" || !strings.Contains(strings.Join(repair.Errors, ";"), wantErr) {
+ 		t.Fatalf("repair install = %+v, want the %q refusal", repair, wantErr)
+ 	}
+@@ -411,7 +411,7 @@ func driveAttestationEvidence(t *testing.T, c draftSemanticCase, condition attes
+ 	if after := draftRefreshPreservedDigest(t, repairProject, repairHome); after != gatedBefore {
+ 		t.Fatal("refresh under bad evidence touched install-gated state")
+ 	}
+-	again := install.Project(repairCfg, repairProject, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform()})
++	again := install.Project(repairCfg, repairProject, "test", install.Options{Platform: draftPlatform()})
+ 	if again.Status != "failed" || !strings.Contains(strings.Join(again.Errors, ";"), wantErr) {
+ 		t.Fatalf("install after refresh = %+v, want the %q refusal", again, wantErr)
+ 	}
+diff --git a/internal/crossconformance/draftsources_semantic_external_test.go b/internal/crossconformance/draftsources_semantic_external_test.go
+index c8bb229d..c4bef3a6 100644
+--- a/internal/crossconformance/draftsources_semantic_external_test.go
++++ b/internal/crossconformance/draftsources_semantic_external_test.go
+@@ -65,7 +65,7 @@ func externalBaseline(t *testing.T, substituted bool) (project, home string, arm
+ 		writeDevSubstitution(t, project, `{"schema_version":2,"substitutions":{},"build_repository_substitutions":{"review":{"tools":{"git":"https://git.example.com/skills/tools-mirror.git","ref":{"kind":"tag","value":"v9"}}}}}`)
+ 	}
+ 	deps, _ := xbBuildDeps(t)
+-	result := install.Project(draftInstallConfig(home), project, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform(), Build: deps, External: xbExternalDeps()})
++	result := install.Project(draftInstallConfig(home), project, "test", install.Options{Platform: draftPlatform(), Build: deps, External: xbExternalDeps()})
+ 	if result.Status != "ok" {
+ 		t.Fatalf("baseline install = %+v", result)
+ 	}
+@@ -375,7 +375,7 @@ func driveExternalMismatch(t *testing.T, _ draftSemanticCase, field string) {
+ 			t.Fatal("package tamper did not land")
+ 		}
+ 		deps, builder := xbBuildDeps(t)
+-		result := install.Project(draftInstallConfig(home), project, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform(), Build: deps, External: xbExternalDeps()})
++		result := install.Project(draftInstallConfig(home), project, "test", install.Options{Platform: draftPlatform(), Build: deps, External: xbExternalDeps()})
+ 		if result.Status != "ok" {
+ 			t.Fatalf("repair = %+v, want rebuild success", result)
+ 		}
+@@ -404,7 +404,7 @@ func driveExternalMismatch(t *testing.T, _ draftSemanticCase, field string) {
+ 		externalFieldBinding(t, mutated, receipt, field)
+ 	}
+ 	deps, _ := xbBuildDeps(t)
+-	result := install.Project(draftInstallConfig(home), project, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform(), Build: deps, External: xbExternalDeps()})
++	result := install.Project(draftInstallConfig(home), project, "test", install.Options{Platform: draftPlatform(), Build: deps, External: xbExternalDeps()})
+ 	if result.Status != "ok" {
+ 		t.Fatalf("repair = %+v, want re-derivation success", result)
+ 	}
+@@ -464,7 +464,7 @@ func TestDraftExternalStatusFailsClosedWithoutSource(t *testing.T) {
+ 	resolveDraftPlan(t, project, home, payload)
+ 	cfg := draftCLIConfig(t, root, configPath)
+ 	deps, _ := xbBuildDeps(t)
+-	result := install.Project(cfg, project, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform(), Build: deps, External: xbExternalDeps()})
++	result := install.Project(cfg, project, "test", install.Options{Platform: draftPlatform(), Build: deps, External: xbExternalDeps()})
+ 	if result.Status != "ok" {
+ 		t.Fatalf("install = %+v", result)
+ 	}
+diff --git a/internal/crossconformance/draftsources_semantic_selection_test.go b/internal/crossconformance/draftsources_semantic_selection_test.go
+index 0f2ad30c..7496617d 100644
+--- a/internal/crossconformance/draftsources_semantic_selection_test.go
++++ b/internal/crossconformance/draftsources_semantic_selection_test.go
+@@ -29,7 +29,7 @@ func driveUnknownAlias(t *testing.T, _ draftSemanticCase) {
+ 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	_, err := manifest.LoadWithOptions(project, manifest.ParseOptions{DraftSourcesV1: true})
++	_, err := manifest.Load(project)
+ 	if err == nil || !strings.Contains(err.Error(), "source_alias_unknown") {
+ 		t.Fatalf("err = %v, want source_alias_unknown", err)
+ 	}
+@@ -51,7 +51,7 @@ func draftCollectionProject(t *testing.T, payload string, setup func(collections
+ 
+ func expandDraft(t *testing.T, project string) ([]manifest.Selection, error) {
+ 	t.Helper()
+-	m, err := manifest.LoadWithOptions(project, manifest.ParseOptions{DraftSourcesV1: true})
++	m, err := manifest.Load(project)
+ 	if err != nil {
+ 		t.Fatalf("parse: %v", err)
+ 	}
+diff --git a/internal/crossconformance/draftsources_semantic_v2_test.go b/internal/crossconformance/draftsources_semantic_v2_test.go
+index 452b04d1..b01d20bf 100644
+--- a/internal/crossconformance/draftsources_semantic_v2_test.go
++++ b/internal/crossconformance/draftsources_semantic_v2_test.go
+@@ -783,7 +783,7 @@ func driveV2ExternalMirrorAdmitted(t *testing.T, _ draftSemanticCase) {
+ 	deps, _ := xbBuildDeps(t)
+ 	external := install.ExternalDeps{GitTool: tool, DraftTransportResolution: true, DraftPolicyPath: policyPath, DraftProvidersPath: providersPath,
+ 		Audit: func(_ context.Context, _ buildrepo.AuditSubject) error { return nil }}
+-	result := install.Project(draftInstallConfig(home), project, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform(), Build: deps, External: external})
++	result := install.Project(draftInstallConfig(home), project, "test", install.Options{Platform: draftPlatform(), Build: deps, External: external})
+ 	if result.Status != "ok" {
+ 		t.Fatalf("install = %+v", result)
+ 	}
+@@ -859,7 +859,7 @@ func driveV2ExternalRefused(t *testing.T, skillGit, policyDoc, providersDoc stri
+ 	external := install.ExternalDeps{GitTool: tool, DraftTransportResolution: true, DraftPolicyPath: policyPath, DraftProvidersPath: providersPath,
+ 		Audit: func(_ context.Context, _ buildrepo.AuditSubject) error { return nil }}
+ 	before := treeDigest(t, project) + treeDigest(t, home)
+-	result := install.Project(draftInstallConfig(home), project, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform(), Build: deps, External: external})
++	result := install.Project(draftInstallConfig(home), project, "test", install.Options{Platform: draftPlatform(), Build: deps, External: external})
+ 	if result.Status != "failed" {
+ 		t.Fatalf("install = %+v, want refusal", result)
+ 	}
+diff --git a/internal/envprofile/boundaries_test.go b/internal/envprofile/boundaries_test.go
+index 7478c364..42376b59 100644
+--- a/internal/envprofile/boundaries_test.go
++++ b/internal/envprofile/boundaries_test.go
+@@ -3,15 +3,11 @@ package envprofile
+ import (
+ 	"os"
+ 	"path/filepath"
+-	"strings"
+ 	"testing"
+ )
+ 
+-// Production data-flow proof for the draft path-source boundary gate: every
+-// test drives the public Install entry with the draft switch explicitly on
+-// or off. The switch-off tests pin the legacy semantics byte-identically;
+-// the switch-on tests prove the admission gate runs before the store
+-// traverses anything.
++// Profile path-source behavior follows environments §1 and remains outside
++// the project Skillfile source protocol.
+ 
+ func writeSeedPackage(t *testing.T, root, name string) {
+ 	t.Helper()
+@@ -21,35 +17,16 @@ func writeSeedPackage(t *testing.T, root, name string) {
+ 		map[string]string{"a.md": name + "\n"})
+ }
+ 
+-// TestLegacyPathInstallIgnoresStoreOverlap pins the legacy contract: with
+-// the draft switch off (the zero Policy, the only behavior a machine
+-// configuration produces today), a path operand inside the context store
+-// installs exactly as before. The draft gate would refuse this operand,
+-// so success here proves the gate is fully out of the legacy path.
+-func TestLegacyPathInstallIgnoresStoreOverlap(t *testing.T) {
+-	home := t.TempDir()
+-	pinHomes(t)
+-	seed := filepath.Join(home, "contexts", "operand-seed")
+-	writeSeedPackage(t, seed, "seeded")
+-	info, _, _, err := Install(home, InstallOptions{Operand: seed})
+-	if err != nil {
+-		t.Fatalf("legacy install of a store-internal path: %v", err)
+-	}
+-	if info.Name != "seeded" {
+-		t.Fatalf("profile %q, want seeded", info.Name)
+-	}
+-}
+-
+-// TestDraftPathInstallAdmitsOrdinaryDirectory proves the draft gate does
+-// not false-refuse: an ordinary directory installs with the switch on.
+-func TestDraftPathInstallAdmitsOrdinaryDirectory(t *testing.T) {
++// TestPathInstallAdmitsOrdinaryDirectory proves ordinary profile paths remain
++// available through the environment context store.
++func TestPathInstallAdmitsOrdinaryDirectory(t *testing.T) {
+ 	home := t.TempDir()
+ 	pinHomes(t)
+ 	root := filepath.Join(t.TempDir(), "root")
+ 	writeSeedPackage(t, root, "acme")
+-	info, _, _, err := Install(home, InstallOptions{Operand: root, Policy: Policy{DraftSourcesV1: true}})
++	info, _, _, err := Install(home, InstallOptions{Operand: root})
+ 	if err != nil {
+-		t.Fatalf("draft install of an ordinary path: %v", err)
++		t.Fatalf("profile install of an ordinary path: %v", err)
+ 	}
+ 	if info.Name != "acme" {
+ 		t.Fatalf("profile %q, want acme", info.Name)
+@@ -59,30 +36,26 @@ func TestDraftPathInstallAdmitsOrdinaryDirectory(t *testing.T) {
+ 	}
+ }
+ 
+-// TestDraftPathInstallRefusesStoreOverlap proves the gate runs before the
+-// store traversal on the production path-install entry: the same operand
+-// the legacy test installs is refused with the spec section 5 diagnostic
+-// leading, and nothing is published.
+-func TestDraftPathInstallRefusesStoreOverlap(t *testing.T) {
++// TestLegacyPathInstallIgnoresStoreOverlap pins the environment profile
++// contract: profile path sources use the environment context store and do
++// not inherit project Skillfile source admission rules.
++func TestLegacyPathInstallIgnoresStoreOverlap(t *testing.T) {
+ 	home := t.TempDir()
+ 	pinHomes(t)
+ 	seed := filepath.Join(home, "contexts", "operand-seed")
+ 	writeSeedPackage(t, seed, "seeded")
+-	_, _, _, err := Install(home, InstallOptions{Operand: seed, Policy: Policy{DraftSourcesV1: true}})
+-	if err == nil || !strings.HasPrefix(err.Error(), "source_output_overlap") {
+-		t.Fatalf("draft install of a store-internal path err = %v, want leading source_output_overlap", err)
+-	}
+-	if _, statErr := os.Stat(lockPath(home, "seeded")); !os.IsNotExist(statErr) {
+-		t.Fatalf("refused install published a lock: %v", statErr)
++	info, _, _, err := Install(home, InstallOptions{Operand: seed})
++	if err != nil {
++		t.Fatalf("profile install from a context-store path: %v", err)
+ 	}
+-	if _, statErr := os.Stat(sourcePath(home, "seeded")); !os.IsNotExist(statErr) {
+-		t.Fatalf("refused install published a source record: %v", statErr)
++	if info.Name != "seeded" {
++		t.Fatalf("profile %q, want seeded", info.Name)
+ 	}
+ }
+ 
+-// TestDraftPathOverlayAdmitsOrdinaryDirectory proves path overlays keep
+-// joining the closure with the switch on.
+-func TestDraftPathOverlayAdmitsOrdinaryDirectory(t *testing.T) {
++// TestPathOverlayAdmitsOrdinaryDirectory proves path overlays keep joining
++// the profile closure through the environment context store.
++func TestPathOverlayAdmitsOrdinaryDirectory(t *testing.T) {
+ 	home := t.TempDir()
+ 	pinHomes(t)
+ 	root := filepath.Join(t.TempDir(), "root")
+@@ -93,52 +66,13 @@ func TestDraftPathOverlayAdmitsOrdinaryDirectory(t *testing.T) {
+ 		OverlaysAllowed:      true,
+ 		OverlayDefaultWeight: 1000,
+ 		Overlays:             map[string][]OverlaySpec{"acme": {{Source: overlay}}},
+-		DraftSourcesV1:       true,
+ 	}
+ 	info, _, _, err := Install(home, InstallOptions{Operand: root, Policy: policy})
+ 	if err != nil {
+-		t.Fatalf("draft install with an ordinary overlay: %v", err)
++		t.Fatalf("path install with an ordinary overlay: %v", err)
+ 	}
+ 	member, ok := lockMember(info.Lock, "personal")
+ 	if !ok || !member.Overlay {
+ 		t.Fatalf("lock members %+v carry no overlay", info.Lock.Members)
+ 	}
+ }
+-
+-// TestDraftPathOverlayRefusesStoreOverlap proves the overlay funnel runs
+-// the same gate: an overlay declared inside the profile store refuses the
+-// whole install with the boundary diagnostic.
+-func TestDraftPathOverlayRefusesStoreOverlap(t *testing.T) {
+-	home := t.TempDir()
+-	pinHomes(t)
+-	root := filepath.Join(t.TempDir(), "root")
+-	writeSeedPackage(t, root, "acme")
+-	overlay := filepath.Join(home, "profiles", "operand-seed")
+-	writeSeedPackage(t, overlay, "personal")
+-	policy := Policy{
+-		OverlaysAllowed:      true,
+-		OverlayDefaultWeight: 1000,
+-		Overlays:             map[string][]OverlaySpec{"acme": {{Source: overlay}}},
+-		DraftSourcesV1:       true,
+-	}
+-	_, _, _, err := Install(home, InstallOptions{Operand: root, Policy: policy})
+-	if err == nil || !strings.Contains(err.Error(), "source_output_overlap") {
+-		t.Fatalf("draft install with a store-internal overlay err = %v, want source_output_overlap", err)
+-	}
+-	if _, statErr := os.Stat(lockPath(home, "acme")); !os.IsNotExist(statErr) {
+-		t.Fatalf("refused install published a lock: %v", statErr)
+-	}
+-}
+-
+-// TestAdmitPathSourceRefusesManagerHome pins the owning-root mapping: the
+-// manager home itself selects the owning root, which would need operator
+-// root_inputs that profiles do not carry, so it is refused. The
+-// production funnel (Install through stateForPath) is proven by the
+-// overlap tests above; this pins the root-inputs branch of the mapping.
+-func TestAdmitPathSourceRefusesManagerHome(t *testing.T) {
+-	home := t.TempDir()
+-	_, err := admitPathSource(home, "acme", home)
+-	if err == nil || !strings.HasPrefix(err.Error(), "source_output_overlap") {
+-		t.Fatalf("admitPathSource(home) err = %v, want leading source_output_overlap", err)
+-	}
+-}
+diff --git a/internal/envprofile/draft_capture_test.go b/internal/envprofile/draft_capture_test.go
+deleted file mode 100644
+index de913907..00000000
+--- a/internal/envprofile/draft_capture_test.go
++++ /dev/null
+@@ -1,138 +0,0 @@
+-package envprofile
+-
+-// Production-path proof for draft local-snapshot capture (revision 1):
+-// every test drives the public Install entry with DraftSourcesV1 on.
+-// The draft install must freeze the admitted bytes at capture and
+-// install from the frozen snapshot, never the live directory.
+-
+-import (
+-	"os"
+-	"os/exec"
+-	"path/filepath"
+-	"strings"
+-	"testing"
+-
+-	"github.com/relux-works/curator/internal/contextstore"
+-	"github.com/relux-works/curator/internal/snapshot"
+-)
+-
+-// draftGit runs git inside dir, skipping when git is unavailable.
+-func draftGit(t *testing.T, dir string, args ...string) {
+-	t.Helper()
+-	if _, err := exec.LookPath("git"); err != nil {
+-		t.Skip("no git on PATH")
+-	}
+-	cmd := exec.Command("git", args...)
+-	cmd.Dir = dir
+-	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
+-		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+-	if out, err := cmd.CombinedOutput(); err != nil {
+-		t.Fatalf("git %v: %v\n%s", args, err, out)
+-	}
+-}
+-
+-// TestDraftInstallFreezesLiveMutations proves the install consumes the
+-// captured snapshot, not the live directory: the live source is mutated
+-// after the snapshot freezes but before the store consumes it, inside a
+-// single Install, and the installed entry must still carry the frozen
+-// bytes. Installing the live directory instead of the snapshot serves
+-// the mutated bytes, so that narrowing must fail this test.
+-func TestDraftInstallFreezesLiveMutations(t *testing.T) {
+-	home := t.TempDir()
+-	pinHomes(t)
+-	root := filepath.Join(t.TempDir(), "root")
+-	writeSeedPackage(t, root, "acme")
+-	var hookErr error
+-	admitPathSourceAfterFreezeHook = func() {
+-		hookErr = os.WriteFile(filepath.Join(root, "context", "a.md"), []byte("mutated\n"), 0o644)
+-	}
+-	defer func() { admitPathSourceAfterFreezeHook = nil }()
+-	info, _, _, err := Install(home, InstallOptions{Operand: root, Policy: Policy{DraftSourcesV1: true}})
+-	if hookErr != nil {
+-		t.Fatalf("race hook: %v", hookErr)
+-	}
+-	if err != nil {
+-		t.Fatalf("draft install: %v", err)
+-	}
+-	member, ok := lockMember(info.Lock, "acme")
+-	if !ok {
+-		t.Fatalf("lock members %+v carry no root", info.Lock.Members)
+-	}
+-	entry := contextstore.EntryDir(home, member.Kind, member.Name, member.StateHash)
+-	installed, err := os.ReadFile(filepath.Join(entry, "context", "a.md"))
+-	if err != nil || string(installed) != "acme\n" {
+-		t.Fatalf("installed a.md = %q, %v; want frozen acme bytes, not the live mutation", installed, err)
+-	}
+-	// Sanity: the live mutation really landed before consumption, so a
+-	// live-directory install would have served it.
+-	if live, err := os.ReadFile(filepath.Join(root, "context", "a.md")); err != nil || string(live) != "mutated\n" {
+-		t.Fatalf("live a.md = %q, %v; want the raced mutated bytes", live, err)
+-	}
+-	// The capture must have published exactly one immutable snapshot
+-	// below the manager home.
+-	store, err := os.ReadDir(snapshot.LocalStoreDir(home))
+-	if err != nil || len(store) != 1 {
+-		t.Fatalf("local-snapshots = %v, %v; want one immutable entry", store, err)
+-	}
+-}
+-
+-// TestDraftInstallAdmitsDirtyUntrackedInsideGit proves the draft path
+-// install snapshots dirty and untracked bytes even when the source is
+-// a Git checkout: the installed entry carries the live bytes, not
+-// HEAD.
+-func TestDraftInstallAdmitsDirtyUntrackedInsideGit(t *testing.T) {
+-	home := t.TempDir()
+-	pinHomes(t)
+-	root := filepath.Join(t.TempDir(), "root")
+-	writeSeedPackage(t, root, "acme")
+-	draftGit(t, root, "init", "-q", "-b", "main")
+-	draftGit(t, root, "add", ".")
+-	draftGit(t, root, "commit", "-qm", "one")
+-	if err := os.WriteFile(filepath.Join(root, "context", "a.md"), []byte("dirty\n"), 0o644); err != nil {
+-		t.Fatal(err)
+-	}
+-	if err := os.WriteFile(filepath.Join(root, "context", "untracked.md"), []byte("untracked\n"), 0o644); err != nil {
+-		t.Fatal(err)
+-	}
+-	info, _, _, err := Install(home, InstallOptions{Operand: root, Policy: Policy{DraftSourcesV1: true}})
+-	if err != nil {
+-		t.Fatalf("draft install of a dirty checkout: %v", err)
+-	}
+-	member, ok := lockMember(info.Lock, "acme")
+-	if !ok {
+-		t.Fatalf("lock members %+v carry no root", info.Lock.Members)
+-	}
+-	entry := contextstore.EntryDir(home, member.Kind, member.Name, member.StateHash)
+-	if payload, err := os.ReadFile(filepath.Join(entry, "context", "a.md")); err != nil || string(payload) != "dirty\n" {
+-		t.Fatalf("installed a.md = %q, %v; want dirty bytes, not HEAD", payload, err)
+-	}
+-	if payload, err := os.ReadFile(filepath.Join(entry, "context", "untracked.md")); err != nil || string(payload) != "untracked\n" {
+-		t.Fatalf("installed untracked.md = %q, %v; want untracked bytes", payload, err)
+-	}
+-	if _, err := os.Lstat(filepath.Join(entry, ".git")); !os.IsNotExist(err) {
+-		t.Fatalf("installed entry carries .git metadata: %v", err)
+-	}
+-}
+-
+-// TestDraftInstallRefusesSnapshotInsideStore proves the snapshot
+-// store itself is a managed output: selecting a package inside it is
+-// refused with the boundary diagnostic and publishes nothing.
+-func TestDraftInstallRefusesSnapshotInsideStore(t *testing.T) {
+-	home := t.TempDir()
+-	pinHomes(t)
+-	root := filepath.Join(t.TempDir(), "root")
+-	writeSeedPackage(t, root, "acme")
+-	if _, _, _, err := Install(home, InstallOptions{Operand: root, Policy: Policy{DraftSourcesV1: true}}); err != nil {
+-		t.Fatalf("seed install: %v", err)
+-	}
+-	entries, err := os.ReadDir(snapshot.LocalStoreDir(home))
+-	if err != nil || len(entries) != 1 {
+-		t.Fatalf("local-snapshots = %v, %v; want the seeded snapshot", entries, err)
+-	}
+-	// A package rooted inside the snapshot store is managed output.
+-	inner := filepath.Join(snapshot.LocalStoreDir(home), entries[0].Name(), "snapshot")
+-	_, _, _, err = Install(home, InstallOptions{Operand: inner, Policy: Policy{DraftSourcesV1: true}})
+-	if err == nil || !strings.Contains(err.Error(), "source_output_overlap") {
+-		t.Fatalf("install inside the snapshot store err = %v, want source_output_overlap", err)
+-	}
+-}
+diff --git a/internal/envprofile/envprofile.go b/internal/envprofile/envprofile.go
+index 3662522d..500ee1ef 100644
+--- a/internal/envprofile/envprofile.go
++++ b/internal/envprofile/envprofile.go
+@@ -50,7 +50,6 @@ import (
+ 	"github.com/relux-works/curator/internal/identity"
+ 	"github.com/relux-works/curator/internal/manifest"
+ 	"github.com/relux-works/curator/internal/protocoljson"
+-	"github.com/relux-works/curator/internal/snapshot"
+ )
+ 
+ // Diagnostics (environments §1.1, §2.1, §9.7, manager profile §12.3).
+@@ -441,17 +440,6 @@ type Policy struct {
+ 	// the operation fails rather than overwrite. It is operation-scoped
+ 	// and never set from machine configuration.
+ 	Takeover bool
+-	// DraftSourcesV1 opts path-source capture into the draft
+-	// skillfile-sources revision 1 boundary admission: with it, every
+-	// path install and path overlay is validated by
+-	// snapshot.PrepareLocalAcquisition before the store traverses it,
+-	// and overlap with managed outputs is refused with the spec
+-	// section 5 diagnostic. Without it (the default, and the only
+-	// behavior with a machine configuration today) path capture keeps
+-	// its legacy semantics byte-identically. The schema-2 install
+-	// integration leaf owns threading a user-facing switch through;
+-	// until then only explicit Policy construction enables it.
+-	DraftSourcesV1 bool
+ }
+ 
+ // OverlaySpec is one machine overlay declaration for a profile
+@@ -666,7 +654,7 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
+ 		if name == "" {
+ 			name = manifest.Name
+ 		}
+-		state, err := stateForPath(home, manifest.Name, options.Operand, options.Policy.DraftSourcesV1)
++		state, err := stateForPath(home, manifest.Name, options.Operand)
+ 		if err != nil {
+ 			return Info{}, false, false, err
+ 		}
+@@ -1444,24 +1432,11 @@ func pathManifestDiag(operand string, err error) error {
+ // profile_source_invalid (§8.4: unreadable evidence is reported as
+ // unreadable, never as something else).
+ //
+-// With draftSourcesV1 the path runs the draft skillfile-sources
+-// revision 1 local pipeline first (admitPathSource: boundary admission,
+-// byte capture of the admitted dirty/untracked tree, immutable snapshot
+-// publication) and the store then installs the frozen snapshot, never
+-// the live directory; a refusal carries the spec section 5 diagnostic
+-// unwrapped, so the exact failure class leads. Without it the store
+-// traversal of the live directory is the first and only read, exactly
+-// as before.
+-func stateForPath(home, name, dir string, draftSourcesV1 bool) (*contextresolve.StatePackage, error) {
+-	source := dir
+-	if draftSourcesV1 {
+-		stored, err := admitPathSource(home, name, dir)
+-		if err != nil {
+-			return nil, err
+-		}
+-		source = stored
+-	}
+-	entry, hash, err := contextstore.EnsureState(home, contextlock.KindContext, name, source)
++// Environment profile path sources follow environments §1 and §9.4. The
++// project Skillfile source snapshot protocol does not apply to this scope;
++// the environment context store owns the immutable profile snapshot.
++func stateForPath(home, name, dir string) (*contextresolve.StatePackage, error) {
++	entry, hash, err := contextstore.EnsureState(home, contextlock.KindContext, name, dir)
+ 	if err != nil {
+ 		return nil, preservePathDiag(err)
+ 	}
+@@ -1472,65 +1447,6 @@ func stateForPath(home, name, dir string, draftSourcesV1 bool) (*contextresolve.
+ 	return &contextresolve.StatePackage{StateHash: hash, Manifest: packageOf(manifest)}, nil
+ }
+ 
+-// draftPathOutputs lists the managed outputs the draft local pipeline
+-// prunes and refuses against: the profile store, the context store, the
+-// profile git cache and the local-snapshot store itself.
+-func draftPathOutputs(home string) []string {
+-	return []string{ProfilesDir(home), contextstore.Root(home), profileReposDir(home), snapshot.LocalStoreDir(home)}
+-}
+-
+-// admitPathSource runs the draft local-source pipeline for one operator
+-// path source (a path install operand or a path overlay declaration)
+-// before the store traverses anything, and returns the frozen snapshot
+-// directory the store must install. The mapping is the profile analogue
+-// of a Skillfile local source: the operand is the source root selected
+-// at ".", the manager home is the owning root (selecting the home
+-// itself would need operator root_inputs, which profiles do not carry,
+-// so it is refused), and the managed outputs are draftPathOutputs. A
+-// refusal names the skillfile-sources section 5 class.
+-//
+-// admitPathSourceAfterFreezeHook is a test-only deterministic scheduling
+-// seam: when non-nil it runs after the snapshot freezes (capture and
+-// publication) but before the caller consumes it, so a test can mutate
+-// the live directory inside one Install and prove the install serves the
+-// frozen bytes. Production code leaves it nil.
+-var admitPathSourceAfterFreezeHook func()
+-
+-// Admission (snapshot.PrepareLocalAcquisition) validates boundaries
+-// before traversal; Capture freezes the admitted dirty/untracked bytes
+-// — whether or not .git exists — into private staging with race
+-// detection; PublishLocal commits the frozen copy to the immutable
+-// snapshot store. No Git commit is synthesized at any step, and the
+-// caller consumes the returned directory, never the live original.
+-func admitPathSource(home, name, dir string) (string, error) {
+-	absolute, err := filepath.Abs(dir)
+-	if err != nil {
+-		return "", fmt.Errorf("%s: resolve path %q: %v", DiagSourceInvalid, dir, err)
+-	}
+-	acquisition, err := snapshot.PrepareLocalAcquisition(absolute, ".", home, name, draftPathOutputs(home), nil, nil, "")
+-	if err != nil {
+-		return "", err
+-	}
+-	defer func() { _ = acquisition.Close() }()
+-	inventory, err := snapshot.Capture(acquisition)
+-	if err != nil {
+-		return "", err
+-	}
+-	if _, err := snapshot.PublishLocal(home, acquisition.Staging, inventory); err != nil {
+-		return "", err
+-	}
+-	// Resolve through the store, never the just-written path: the
+-	// install consumes the authenticated frozen tree.
+-	stored, err := snapshot.OpenLocal(home, inventory.Snapshot)
+-	if err != nil {
+-		return "", err
+-	}
+-	if admitPathSourceAfterFreezeHook != nil {
+-		admitPathSourceAfterFreezeHook()
+-	}
+-	return stored, nil
+-}
+-
+ // preservePathDiag keeps a store error's leading §1.1 diagnostic: an
+ // error the store already classified (missing, unreadable, invalid) is
+ // returned as-is so the specific diagnostic leads; any other failure is
+diff --git a/internal/envprofile/overlays.go b/internal/envprofile/overlays.go
+index 0124cef5..73942cbe 100644
+--- a/internal/envprofile/overlays.go
++++ b/internal/envprofile/overlays.go
+@@ -34,7 +34,7 @@ func resolveOverlays(home string, manager *gitManager, profile string, policy Po
+ 	}
+ 	overlays := make([]contextresolve.Overlay, 0, len(decls))
+ 	for index, decl := range decls {
+-		overlay, err := resolveOverlay(home, manager, decl, policy.DraftSourcesV1)
++		overlay, err := resolveOverlay(home, manager, decl)
+ 		if err != nil {
+ 			return nil, fmt.Errorf("overlay %d of profile %q: %v", index, profile, err)
+ 		}
+@@ -48,7 +48,7 @@ func resolveOverlays(home string, manager *gitManager, profile string, policy Po
+ // same one the config reader and `profile compose add` use — so a
+ // declaration classified `path` at the reader can never resolve as `git`
+ // here, and no filesystem probe can move it between the two.
+-func resolveOverlay(home string, manager *gitManager, decl OverlaySpec, draftSourcesV1 bool) (contextresolve.Overlay, error) {
++func resolveOverlay(home string, manager *gitManager, decl OverlaySpec) (contextresolve.Overlay, error) {
+ 	weight := decl.Weight
+ 	kind := identity.ClassifySource(decl.Source)
+ 	if kind == identity.SourceInvalid {
+@@ -62,7 +62,7 @@ func resolveOverlay(home string, manager *gitManager, decl OverlaySpec, draftSou
+ 		if err != nil {
+ 			return contextresolve.Overlay{}, pathManifestDiag(decl.Source, err)
+ 		}
+-		state, err := stateForPath(home, manifest.Name, decl.Source, draftSourcesV1)
++		state, err := stateForPath(home, manifest.Name, decl.Source)
+ 		if err != nil {
+ 			return contextresolve.Overlay{}, err
+ 		}
+diff --git a/internal/envprofile/path_capture_test.go b/internal/envprofile/path_capture_test.go
+new file mode 100644
+index 00000000..c368fd85
+--- /dev/null
++++ b/internal/envprofile/path_capture_test.go
+@@ -0,0 +1,66 @@
++package envprofile
++
++// Profile path-source fixtures for the accepted environments snapshot
++// contract; these do not exercise the project Skillfile source protocol.
++
++import (
++	"os"
++	"os/exec"
++	"path/filepath"
++	"testing"
++
++	"github.com/relux-works/curator/internal/contextstore"
++)
++
++// pathSourceGit runs git inside dir, skipping when git is unavailable.
++func pathSourceGit(t *testing.T, dir string, args ...string) {
++	t.Helper()
++	if _, err := exec.LookPath("git"); err != nil {
++		t.Skip("no git on PATH")
++	}
++	cmd := exec.Command("git", args...)
++	cmd.Dir = dir
++	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
++		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
++	if out, err := cmd.CombinedOutput(); err != nil {
++		t.Fatalf("git %v: %v\n%s", args, err, out)
++	}
++}
++
++// TestPathInstallCapturesDirtyUntrackedInsideGit proves profile path
++// installs preserve the environment contract when the source is a Git
++// checkout: the installed entry carries dirty and untracked bytes, not
++// only the Git HEAD tree.
++func TestPathInstallCapturesDirtyUntrackedInsideGit(t *testing.T) {
++	home := t.TempDir()
++	pinHomes(t)
++	root := filepath.Join(t.TempDir(), "root")
++	writeSeedPackage(t, root, "acme")
++	pathSourceGit(t, root, "init", "-q", "-b", "main")
++	pathSourceGit(t, root, "add", ".")
++	pathSourceGit(t, root, "commit", "-qm", "one")
++	if err := os.WriteFile(filepath.Join(root, "context", "a.md"), []byte("dirty\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(root, "context", "untracked.md"), []byte("untracked\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	info, _, _, err := Install(home, InstallOptions{Operand: root})
++	if err != nil {
++		t.Fatalf("path install of a dirty checkout: %v", err)
++	}
++	member, ok := lockMember(info.Lock, "acme")
++	if !ok {
++		t.Fatalf("lock members %+v carry no root", info.Lock.Members)
++	}
++	entry := contextstore.EntryDir(home, member.Kind, member.Name, member.StateHash)
++	if payload, err := os.ReadFile(filepath.Join(entry, "context", "a.md")); err != nil || string(payload) != "dirty\n" {
++		t.Fatalf("installed a.md = %q, %v; want dirty bytes, not HEAD", payload, err)
++	}
++	if payload, err := os.ReadFile(filepath.Join(entry, "context", "untracked.md")); err != nil || string(payload) != "untracked\n" {
++		t.Fatalf("installed untracked.md = %q, %v; want untracked bytes", payload, err)
++	}
++	if _, err := os.Lstat(filepath.Join(entry, ".git")); !os.IsNotExist(err) {
++		t.Fatalf("installed entry carries .git metadata: %v", err)
++	}
++}
+diff --git a/internal/install/draftatomic_test.go b/internal/install/draftatomic_test.go
+index 56f520d2..dd01caa9 100644
+--- a/internal/install/draftatomic_test.go
++++ b/internal/install/draftatomic_test.go
+@@ -65,7 +65,7 @@ func draftSweepProject(t *testing.T, payload string) (string, string) {
+ // publishes the lock plus machine bindings, exactly like the CLI.
+ func refreshDraftLocked(t *testing.T, project, home, payload string, gitRoots map[string]string) *closure.DraftPlan {
+ 	t.Helper()
+-	m, err := manifest.ParseBytesWithOptions([]byte(payload), filepath.Join(project, "Skillfile.json"), manifest.ParseOptions{DraftSourcesV1: true})
++	m, err := manifest.ParseBytes([]byte(payload), filepath.Join(project, "Skillfile.json"))
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -82,7 +82,6 @@ func refreshDraftLocked(t *testing.T, project, home, payload string, gitRoots ma
+ func draftSweepInstall(t *testing.T, home, project string, opts Options) Result {
+ 	t.Helper()
+ 	cfg := draftTestConfig(home, t.TempDir())
+-	opts.DraftSourcesV1 = true
+ 	opts.Platform = installPlatform()
+ 	return Project(cfg, project, "test", opts)
+ }
+diff --git a/internal/install/draftaudit_test.go b/internal/install/draftaudit_test.go
+index b59dac82..4a9d45de 100644
+--- a/internal/install/draftaudit_test.go
++++ b/internal/install/draftaudit_test.go
+@@ -41,7 +41,7 @@ func draftAuditConfig(home string) *config.Config {
+ }
+ 
+ func draftProjectResult(cfg *config.Config, project, _ string, dryRun bool) Result {
+-	return Project(cfg, project, "test", Options{DryRun: dryRun, DraftSourcesV1: true, Platform: installPlatform()})
++	return Project(cfg, project, "test", Options{DryRun: dryRun, Platform: installPlatform()})
+ }
+ 
+ // A strict registry policy requires a network attestation that local
+diff --git a/internal/install/draftbuild_test.go b/internal/install/draftbuild_test.go
+index 93e2e71c..c475dc3b 100644
+--- a/internal/install/draftbuild_test.go
++++ b/internal/install/draftbuild_test.go
+@@ -115,7 +115,7 @@ func draftExternalDeps(t *testing.T) ExternalDeps {
+ func draftBuildInstall(t *testing.T, home, project string, deps BuildDeps, external ExternalDeps) Result {
+ 	t.Helper()
+ 	cfg := draftTestConfig(home, t.TempDir())
+-	return Project(cfg, project, "test", Options{DraftSourcesV1: true, Platform: installPlatform(), Build: deps, External: external})
++	return Project(cfg, project, "test", Options{Platform: installPlatform(), Build: deps, External: external})
+ }
+ 
+ func readReceiptObject(t *testing.T, path string) map[string]any {
+@@ -407,10 +407,10 @@ func TestDraftBuildToolchainFailureBehaviorIsPreserved(t *testing.T) {
+ 	}
+ }
+ 
+-// TestLegacyBuildsKeepReceipt1WithTheSwitchOff pins the frozen v1 lane: a
+-// Git skill installed without the draft switch publishes a schema-1 receipt
+-// under the legacy namespace and no receipt-3 namespace exists.
+-func TestLegacyBuildsKeepReceipt1WithTheSwitchOff(t *testing.T) {
++// TestLegacyBuildsKeepReceipt1 pins the schema-1 receipt contract: a Git
++// skill publishes a schema-1 receipt under the legacy namespace and no
++// receipt-3 namespace exists.
++func TestLegacyBuildsKeepReceipt1(t *testing.T) {
+ 	e := newEnv(t)
+ 	e.buildSkill("build-skill", "alpha")
+ 	e.declare("build-skill")
+diff --git a/internal/install/draftevidence_test.go b/internal/install/draftevidence_test.go
+index 8b9f4cb0..f2986c47 100644
+--- a/internal/install/draftevidence_test.go
++++ b/internal/install/draftevidence_test.go
+@@ -108,7 +108,7 @@ func TestDraftEvidenceExactMatch(t *testing.T) {
+ 		cfg.AuditRegistries = []config.Registry{{Name: "one", URL: stub.server.URL, PublicKeys: []string{stub.pinned}, Enabled: true}}
+ 		cfg.Audit.CacheTTLSeconds = 0
+ 		cfg.Audit.OfflineGraceSeconds = 0
+-		return Project(cfg, project, "test", Options{DraftSourcesV1: true, Platform: installPlatform()})
++		return Project(cfg, project, "test", Options{Platform: installPlatform()})
+ 	}
+ 	t.Run("exact-admits", func(t *testing.T) {
+ 		project, home, _, _ := setupGitInstall(t)
+@@ -118,7 +118,7 @@ func TestDraftEvidenceExactMatch(t *testing.T) {
+ 		cfg.AuditRegistries = []config.Registry{{Name: "one", URL: stub.server.URL, PublicKeys: []string{stub.pinned}, Enabled: true}}
+ 		cfg.Audit.CacheTTLSeconds = 0
+ 		cfg.Audit.OfflineGraceSeconds = 0
+-		result := Project(cfg, project, "test", Options{DraftSourcesV1: true, Platform: installPlatform()})
++		result := Project(cfg, project, "test", Options{Platform: installPlatform()})
+ 		if result.Status != "ok" {
+ 			t.Fatalf("exact evidence install = %+v, want ok", result)
+ 		}
+diff --git a/internal/install/draftmarker_git_test.go b/internal/install/draftmarker_git_test.go
+index 2f8f8c81..74281931 100644
+--- a/internal/install/draftmarker_git_test.go
++++ b/internal/install/draftmarker_git_test.go
+@@ -40,7 +40,7 @@ func setupGitScriptInstall(t *testing.T) (project, home, repo string) {
+ 	testGit(t, repo, "add", ".")
+ 	testGit(t, repo, "commit", "-qm", "fixture")
+ 	testGit(t, repo, "tag", "v1")
+-	m, err := manifest.ParseBytesWithOptions([]byte(payload), filepath.Join(project, "Skillfile.json"), manifest.ParseOptions{DraftSourcesV1: true})
++	m, err := manifest.ParseBytes([]byte(payload), filepath.Join(project, "Skillfile.json"))
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -76,7 +76,7 @@ func setupGitBuildInstall(t *testing.T) (project, home string) {
+ 	testGit(t, repo, "add", ".")
+ 	testGit(t, repo, "commit", "-qm", "fixture")
+ 	testGit(t, repo, "tag", "v1")
+-	m, err := manifest.ParseBytesWithOptions([]byte(payload), filepath.Join(project, "Skillfile.json"), manifest.ParseOptions{DraftSourcesV1: true})
++	m, err := manifest.ParseBytes([]byte(payload), filepath.Join(project, "Skillfile.json"))
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -103,7 +103,6 @@ func setupGitBuildInstall(t *testing.T) (project, home string) {
+ func draftRealInstall(t *testing.T, project, home string, opts Options) Result {
+ 	t.Helper()
+ 	cfg := draftTestConfig(home, t.TempDir())
+-	opts.DraftSourcesV1 = true
+ 	opts.Platform = installPlatform()
+ 	return Project(cfg, project, "test", opts)
+ }
+@@ -248,7 +247,7 @@ func TestDraftGitMarkerLockBindingRoundTrip(t *testing.T) {
+ 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(movedPayload), 0o644); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	moved, err := manifest.ParseBytesWithOptions([]byte(movedPayload), filepath.Join(project, "Skillfile.json"), manifest.ParseOptions{DraftSourcesV1: true})
++	moved, err := manifest.ParseBytes([]byte(movedPayload), filepath.Join(project, "Skillfile.json"))
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -581,7 +580,7 @@ func TestDraftSelectorSubstitutionForbidden(t *testing.T) {
+ 		cfg := draftTestConfig(home, t.TempDir())
+ 		cfg.Audit.Enabled = true
+ 		cfg.Audit.Mode = "strict"
+-		result := Project(cfg, project, "test", Options{DraftSourcesV1: true, Platform: installPlatform()})
++		result := Project(cfg, project, "test", Options{Platform: installPlatform()})
+ 		if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "strict audit refuses substituted installs") {
+ 			t.Fatalf("install = %+v, want the strict refusal", result)
+ 		}
+diff --git a/internal/install/draftpublish_test.go b/internal/install/draftpublish_test.go
+index b3dcc18f..0369c167 100644
+--- a/internal/install/draftpublish_test.go
++++ b/internal/install/draftpublish_test.go
+@@ -413,7 +413,7 @@ func TestDraftInstallFailsStaleBindingsGeneration(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	m, err := manifest.ParseBytesWithOptions(payload, filepath.Join(project, "Skillfile.json"), manifest.ParseOptions{DraftSourcesV1: true})
++	m, err := manifest.ParseBytes(payload, filepath.Join(project, "Skillfile.json"))
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+diff --git a/internal/install/draftruntime_test.go b/internal/install/draftruntime_test.go
+index dfed597f..0201e81d 100644
+--- a/internal/install/draftruntime_test.go
++++ b/internal/install/draftruntime_test.go
+@@ -71,7 +71,7 @@ func writeDraftScriptSkill(t *testing.T, dir, name, command, scriptBody string,
+ func draftLocalInstall(t *testing.T, cfgHome, project string, dryRun bool) Result {
+ 	t.Helper()
+ 	cfg := draftTestConfig(cfgHome, t.TempDir())
+-	return Project(cfg, project, "test", Options{DryRun: dryRun, DraftSourcesV1: true, Platform: installPlatform()})
++	return Project(cfg, project, "test", Options{DryRun: dryRun, Platform: installPlatform()})
+ }
+ 
+ func draftLockedRuntimeKey(t *testing.T, project, name string) (lock *sourcelock.Lock, key string) {
+@@ -471,7 +471,7 @@ func TestDraftLocalInvalidCapabilitiesRefuseAtResolve(t *testing.T) {
+ 	if err := os.WriteFile(filepath.Join(project, "skills", "review", "agent-skill.json"), encoded, 0o644); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	m, err := manifest.ParseBytesWithOptions(raw, filepath.Join(project, "Skillfile.json"), manifest.ParseOptions{DraftSourcesV1: true})
++	m, err := manifest.ParseBytes(raw, filepath.Join(project, "Skillfile.json"))
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+diff --git a/internal/install/draftsources.go b/internal/install/draftsources.go
+index a56d22be..9b619212 100644
+--- a/internal/install/draftsources.go
++++ b/internal/install/draftsources.go
+@@ -12,29 +12,9 @@ import (
+ 	"github.com/relux-works/curator/internal/sourcelock"
+ )
+ 
+-// EnvDraftSourcesV1 names the draft/opt-in switch for Skillfile schema 2
+-// source closure (skillfile-sources revision 1). Exactly "1" enables the
+-// frozen resolution lane; every other value, including unset and empty,
+-// keeps the frozen v1 lane byte-identically. The switch is operator-owned:
+-// package data can neither set it nor observe it.
+-const EnvDraftSourcesV1 = "CURATOR_DRAFT_SOURCES_V1"
+-
+-// DraftSourcesEnabled reports whether the switch selects the draft lane.
+-func DraftSourcesEnabled(getenv func(string) string) bool {
+-	return getenv != nil && getenv(EnvDraftSourcesV1) == "1"
+-}
+-
+-func draftSourcesEnabled(opts Options) bool {
+-	if opts.DraftSourcesV1 {
+-		return true
+-	}
+-	return DraftSourcesEnabled(os.Getenv)
+-}
+-
+-// readManifestDocumentDraft reads one Skillfile with explicit draft
+-// admission. Without admission a schema-2 manifest fails with the
+-// parser upgrade error and the frozen lane is never entered.
+-func readManifestDocumentDraft(root string, draft bool) (*manifest.Manifest, string, []byte, error) {
++// readManifestDocument reads one Skillfile. Schema 2 source declarations
++// are part of the default project reader path.
++func readProjectManifestDocument(root string) (*manifest.Manifest, string, []byte, error) {
+ 	path := manifest.PathIn(root)
+ 	current, err := readDocument(path)
+ 	if err != nil {
+@@ -43,14 +23,7 @@ func readManifestDocumentDraft(root string, draft bool) (*manifest.Manifest, str
+ 	if !current.exists {
+ 		return nil, current.generation, nil, nil
+ 	}
+-	if !draft {
+-		parsed, err := manifest.ParseBytes(current.payload, path)
+-		if err != nil {
+-			return nil, "", nil, err
+-		}
+-		return parsed, current.generation, current.payload, nil
+-	}
+-	parsed, err := manifest.ParseBytesWithOptions(current.payload, path, manifest.ParseOptions{DraftSourcesV1: true})
++	parsed, err := manifest.ParseBytes(current.payload, path)
+ 	if err != nil {
+ 		return nil, "", nil, err
+ 	}
+@@ -114,7 +87,7 @@ func draftFrozenNodes(home, projectRoot, skillsRoot string, payload []byte) ([]*
+ // consumption without network or live adoption.
+ func draftFrozenInput(home, projectRoot, skillsRoot string, payload []byte, lock *sourcelock.Lock) (closure.FrozenOptions, error) {
+ 	opts := closure.FrozenOptions{GitRepos: map[string]string{}, Refs: map[string]closure.FrozenRef{}, GitKeys: map[string]string{}}
+-	projectManifest, err := manifest.ParseBytesWithOptions(payload, manifest.PathIn(projectRoot), manifest.ParseOptions{DraftSourcesV1: true})
++	projectManifest, err := manifest.ParseBytes(payload, manifest.PathIn(projectRoot))
+ 	if err != nil {
+ 		return opts, err
+ 	}
+diff --git a/internal/install/draftsources_test.go b/internal/install/draftsources_test.go
+index 5494d0c4..e6806ef4 100644
+--- a/internal/install/draftsources_test.go
++++ b/internal/install/draftsources_test.go
+@@ -66,7 +66,7 @@ func draftProject(t *testing.T, payload string, skills map[string]string) (strin
+ 
+ func resolveDraftForInstall(t *testing.T, project, home, payload string) *closure.DraftPlan {
+ 	t.Helper()
+-	m, err := manifest.ParseBytesWithOptions([]byte(payload), filepath.Join(project, "Skillfile.json"), manifest.ParseOptions{DraftSourcesV1: true})
++	m, err := manifest.ParseBytes([]byte(payload), filepath.Join(project, "Skillfile.json"))
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -88,7 +88,7 @@ func TestDraftInstallMissingLockFails(t *testing.T) {
+ 	payload := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["review"]}]}`
+ 	project, home, _ := draftProject(t, payload, map[string]string{"skills/review": "review"})
+ 	cfg := draftTestConfig(home, t.TempDir())
+-	result := Project(cfg, project, "test", Options{DryRun: true, DraftSourcesV1: true, Platform: installPlatform()})
++	result := Project(cfg, project, "test", Options{DryRun: true, Platform: installPlatform()})
+ 	if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "source_snapshot_unavailable") {
+ 		t.Fatalf("result = %+v, want source_snapshot_unavailable", result)
+ 	}
+@@ -105,7 +105,7 @@ func TestDraftInstallStaleLockFails(t *testing.T) {
+ 		t.Fatal(err)
+ 	}
+ 	cfg := draftTestConfig(home, t.TempDir())
+-	result := Project(cfg, project, "test", Options{DryRun: true, DraftSourcesV1: true, Platform: installPlatform()})
++	result := Project(cfg, project, "test", Options{DryRun: true, Platform: installPlatform()})
+ 	if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "source_lock_stale") {
+ 		t.Fatalf("result = %+v, want source_lock_stale", result)
+ 	}
+@@ -121,7 +121,7 @@ func TestDraftInstallMissingSnapshotFails(t *testing.T) {
+ 		}
+ 	}
+ 	cfg := draftTestConfig(home, t.TempDir())
+-	result := Project(cfg, project, "test", Options{DryRun: true, DraftSourcesV1: true, Platform: installPlatform()})
++	result := Project(cfg, project, "test", Options{DryRun: true, Platform: installPlatform()})
+ 	if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "source_snapshot_unavailable") {
+ 		t.Fatalf("result = %+v, want source_snapshot_unavailable", result)
+ 	}
+@@ -132,7 +132,7 @@ func TestDraftInstallUsesPinnedBytes(t *testing.T) {
+ 	project, home, _ := draftProject(t, payload, map[string]string{"skills/review": "review"})
+ 	plan := resolveDraftForInstall(t, project, home, payload)
+ 	cfg := draftTestConfig(home, t.TempDir())
+-	first := Project(cfg, project, "test", Options{DryRun: true, DraftSourcesV1: true, Platform: installPlatform()})
++	first := Project(cfg, project, "test", Options{DryRun: true, Platform: installPlatform()})
+ 	if first.Status != "ok" {
+ 		t.Fatalf("first install = %+v", first)
+ 	}
+@@ -142,7 +142,7 @@ func TestDraftInstallUsesPinnedBytes(t *testing.T) {
+ 	if err := os.WriteFile(filepath.Join(project, "skills", "review", "references", "extra.md"), []byte("live"), 0o644); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	second := Project(cfg, project, "test", Options{DryRun: true, DraftSourcesV1: true, Platform: installPlatform()})
++	second := Project(cfg, project, "test", Options{DryRun: true, Platform: installPlatform()})
+ 	if second.Status != "ok" {
+ 		t.Fatalf("pinned reinstall = %+v, want ok on locked bytes", second)
+ 	}
+@@ -157,10 +157,8 @@ func TestDraftInstallUsesPinnedBytes(t *testing.T) {
+ 	_ = locked
+ }
+ 
+-func TestLegacyInstallUntouchedWhenDraftOff(t *testing.T) {
+-	// Golden for the frozen v1 path: a schema-2 manifest without opt-in
+-	// fails at parse time with the upgrade diagnostic, and a schema-1
+-	// install behaves exactly as before (dry-run ok).
++func TestSchema2InstallRequiresLockAndLegacyStillWorks(t *testing.T) {
++	// Schema 1 keeps its existing install path.
+ 	e := newEnv(t)
+ 	e.skill("legacy")
+ 	e.declare("legacy")
+@@ -168,20 +166,21 @@ func TestLegacyInstallUntouchedWhenDraftOff(t *testing.T) {
+ 	if got.Status != "ok" {
+ 		t.Fatalf("legacy dry-run = %+v, want ok", got)
+ 	}
+-	project := t.TempDir()
+-	home := t.TempDir()
+-	writeDraftPackage(t, filepath.Join(project, "skills", "review"), "review")
+-	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(`{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["review"]}]}`), 0o644); err != nil {
+-		t.Fatal(err)
+-	}
++	payload := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["review"]}]}`
++	project, home, _ := draftProject(t, payload, map[string]string{"skills/review": "review"})
+ 	cfg := draftTestConfig(home, t.TempDir())
+ 	result := Project(cfg, project, "test", Options{DryRun: true, Platform: installPlatform()})
+ 	if result.Status != "failed" {
+-		t.Fatalf("draft-off install = %+v, want failed", result)
++		t.Fatalf("schema-2 install without a lock = %+v, want failed", result)
+ 	}
+ 	joined := strings.Join(result.Errors, ";")
+-	if !strings.Contains(joined, "source_selection_invalid") && !strings.Contains(joined, "schema_version") && !strings.Contains(joined, "newer tool") {
+-		t.Fatalf("draft-off errors = %q, want schema-2 refusal", joined)
++	if !strings.Contains(joined, "source_snapshot_unavailable") {
++		t.Fatalf("schema-2 errors = %q, want the missing-lock diagnostic", joined)
++	}
++	resolveDraftForInstall(t, project, home, payload)
++	result = Project(cfg, project, "test", Options{DryRun: true, Platform: installPlatform()})
++	if result.Status != "ok" {
++		t.Fatalf("schema-2 install after resolve = %+v, want ok", result)
+ 	}
+ }
+ 
+@@ -198,7 +197,7 @@ func setupGitInstall(t *testing.T) (project, home, repo, repoRoot string) {
+ 	testGit(t, repo, "add", ".")
+ 	testGit(t, repo, "commit", "-qm", "fixture")
+ 	testGit(t, repo, "tag", "v1")
+-	m, err := manifest.ParseBytesWithOptions([]byte(payload), filepath.Join(project, "Skillfile.json"), manifest.ParseOptions{DraftSourcesV1: true})
++	m, err := manifest.ParseBytes([]byte(payload), filepath.Join(project, "Skillfile.json"))
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -233,7 +232,7 @@ func setupGitInstall(t *testing.T) (project, home, repo, repoRoot string) {
+ func draftInstallResult(t *testing.T, project, home string) string {
+ 	t.Helper()
+ 	cfg := draftTestConfig(home, t.TempDir())
+-	result := Project(cfg, project, "test", Options{DryRun: true, DraftSourcesV1: true, Platform: installPlatform()})
++	result := Project(cfg, project, "test", Options{DryRun: true, Platform: installPlatform()})
+ 	if result.Status != "ok" {
+ 		t.Fatalf("install = %+v", result)
+ 	}
+@@ -262,7 +261,7 @@ func TestDraftInstallGitTamperRefused(t *testing.T) {
+ 			t.Fatal(err)
+ 		}
+ 		cfg := draftTestConfig(home, t.TempDir())
+-		result := Project(cfg, project, "test", Options{DryRun: true, DraftSourcesV1: true, Platform: installPlatform()})
++		result := Project(cfg, project, "test", Options{DryRun: true, Platform: installPlatform()})
+ 		if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "source_snapshot_changed") {
+ 			t.Fatalf("result = %+v, want source_snapshot_changed", result)
+ 		}
+@@ -275,7 +274,7 @@ func TestDraftInstallGitTamperRefused(t *testing.T) {
+ 			t.Fatal(err)
+ 		}
+ 		cfg := draftTestConfig(home, t.TempDir())
+-		result := Project(cfg, project, "test", Options{DryRun: true, DraftSourcesV1: true, Platform: installPlatform()})
++		result := Project(cfg, project, "test", Options{DryRun: true, Platform: installPlatform()})
+ 		if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "source_snapshot_changed") {
+ 			t.Fatalf("result = %+v, want source_snapshot_changed", result)
+ 		}
+@@ -286,21 +285,9 @@ func TestDraftInstallGitTamperRefused(t *testing.T) {
+ 			t.Fatal(err)
+ 		}
+ 		cfg := draftTestConfig(home, t.TempDir())
+-		result := Project(cfg, project, "test", Options{DryRun: true, DraftSourcesV1: true, Platform: installPlatform()})
++		result := Project(cfg, project, "test", Options{DryRun: true, Platform: installPlatform()})
+ 		if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "source_snapshot_changed") {
+ 			t.Fatalf("result = %+v, want source_snapshot_changed", result)
+ 		}
+ 	})
+ }
+-
+-func TestDraftSourcesSwitch(t *testing.T) {
+-	if !DraftSourcesEnabled(func(string) string { return "1" }) {
+-		t.Fatalf("enabled with 1")
+-	}
+-	if DraftSourcesEnabled(func(string) string { return "" }) {
+-		t.Fatalf("enabled with empty")
+-	}
+-	if DraftSourcesEnabled(nil) {
+-		t.Fatalf("enabled with nil")
+-	}
+-}
+diff --git a/internal/install/global.go b/internal/install/global.go
+index 0c6f1b3c..0808181b 100644
+--- a/internal/install/global.go
++++ b/internal/install/global.go
+@@ -89,6 +89,10 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
+ 		result.Messages = append(result.Messages, "global: Skillfile.json not found; run 'curator global init' first")
+ 		return result, nil
+ 	}
++	if globalManifest.SchemaVersion != manifest.SchemaVersion {
++		result.failf("global: Skillfile schema %d is unsupported; global scope requires schema %d", globalManifest.SchemaVersion, manifest.SchemaVersion)
++		return result, nil
++	}
+ 
+ 	agents := globalManifest.Agents
+ 	if len(agents) == 0 {
+diff --git a/internal/install/install.go b/internal/install/install.go
+index d90d2e42..e69dde7f 100644
+--- a/internal/install/install.go
++++ b/internal/install/install.go
+@@ -73,10 +73,6 @@ type Options struct {
+ 	VerifyMcp     func(nodes []*closure.Node) (map[string]map[string][]string, []string, error)
+ 	AuditGate     func(nodes []*closure.Node) (warnings []string, errs []string)
+ 	ResolveAttest func(nodes []*closure.Node) (map[string]*marker.Attestation, []string, error)
+-	// DraftSourcesV1 opts the frozen Skillfile schema 2 lane into
+-	// draft source closure. False preserves the frozen v1 behavior
+-	// byte-identically; schema-2 manifests then fail at parse time.
+-	DraftSourcesV1 bool
+ }
+ 
+ func (o Options) context() context.Context {
+@@ -231,7 +227,7 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
+ 	// the locked checkout: `curator add` and `curator remove` rewrite it while
+ 	// holding no operation lock, so it can gain, lose, or retarget a
+ 	// declaration at any point during this run.
+-	projectManifest, projectManifestGeneration, projectManifestPayload, err := readManifestDocumentDraft(projectRoot, draftSourcesEnabled(opts))
++	projectManifest, projectManifestGeneration, projectManifestPayload, err := readProjectManifestDocument(projectRoot)
+ 	if err != nil {
+ 		result.failf("%v", err)
+ 		return result, nil
+@@ -387,10 +383,6 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
+ 	var nodes []*closure.Node
+ 	var draftLock *sourcelock.Lock
+ 	if effectiveManifest.SchemaVersion == 2 {
+-		if !draftSourcesEnabled(opts) {
+-			result.failf("source_selection_invalid: Skillfile schema 2 requires the draft lane; unset %s keeps frozen v1", EnvDraftSourcesV1)
+-			return result, nil
+-		}
+ 		if len(hybridDirect) > 0 {
+ 			result.failf("source_selection_invalid: hybrid activation is not admitted with a draft lock; resolve it explicitly")
+ 			return result, nil
+diff --git a/internal/install/install_test.go b/internal/install/install_test.go
+index 7374dff0..cceb7240 100644
+--- a/internal/install/install_test.go
++++ b/internal/install/install_test.go
+@@ -767,6 +767,22 @@ func TestGlobalInstall(t *testing.T) {
+ 	}
+ }
+ 
++func TestGlobalInstallRejectsSchema2Skillfile(t *testing.T) {
++	e := newEnv(t)
++	if _, err := GlobalInit(e.home); err != nil {
++		t.Fatal(err)
++	}
++	globalSkillfile := filepath.Join(GlobalRoot(e.home), manifestpkg.Name)
++	if err := os.WriteFile(globalSkillfile, []byte(`{"schema_version":2,"sources":{},"skills":[]}`), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	result := Global(e.cfg, t.TempDir(), Options{DryRun: true, Platform: installPlatform()})
++	joined := strings.Join(result.Errors, ";")
++	if result.Status != "failed" || !strings.Contains(joined, "global scope requires schema 1") {
++		t.Fatalf("global schema-2 install = %+v, want global-scope schema-1 refusal", result)
++	}
++}
++
+ func TestGlobalUpgradeDryRunLeavesPersistentStateUnchanged(t *testing.T) {
+ 	t.Parallel()
+ 	e := newEnv(t)
+diff --git a/internal/manifest/expand_test.go b/internal/manifest/expand_test.go
+index dd2fc6e5..a41b5eb4 100644
+--- a/internal/manifest/expand_test.go
++++ b/internal/manifest/expand_test.go
+@@ -22,7 +22,7 @@ func packageAt(t *testing.T, root, folder, name string) string {
+ }
+ func expandFixture(t *testing.T, root, selectors string) (*Manifest, error) {
+ 	t.Helper()
+-	return ParseBytesWithOptions([]byte(fmt.Sprintf(`{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[%s]}`, selectors)), filepath.Join(root, Name), draftOptions)
++	return ParseBytes([]byte(fmt.Sprintf(`{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[%s]}`, selectors)), filepath.Join(root, Name))
+ }
+ func TestExpandOrderedIndividualAndCollections(t *testing.T) {
+ 	root := t.TempDir()
+@@ -176,7 +176,7 @@ func TestExpandAcquiredGitAndLiteralPath(t *testing.T) {
+ 	root := t.TempDir()
+ 	gitTree := t.TempDir()
+ 	packageAt(t, gitTree, ".", "root-skill")
+-	m, err := ParseBytesWithOptions([]byte(`{"schema_version":2,"sources":{"s":{"repository":"example.org/kit","tag":"v1"}},"skills":[{"name":"root-skill","from":"s","directory":"."}]}`), filepath.Join(root, Name), draftOptions)
++	m, err := ParseBytes([]byte(`{"schema_version":2,"sources":{"s":{"repository":"example.org/kit","tag":"v1"}},"skills":[{"name":"root-skill","from":"s","directory":"."}]}`), filepath.Join(root, Name))
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+diff --git a/internal/manifest/manifest.go b/internal/manifest/manifest.go
+index 0a5fc3c0..38632b48 100644
+--- a/internal/manifest/manifest.go
++++ b/internal/manifest/manifest.go
+@@ -1,5 +1,5 @@
+-// Package manifest parses the project manifest Skillfile.json, frozen schema 1
+-// (Spec §6.1) and explicitly opted-in draft schema 2, and edits legacy declarations.
++// Package manifest parses project Skillfile.json schema 1 and schema 2
++// declarations and edits legacy schema-1 declarations.
+ package manifest
+ 
+ import (
+@@ -17,7 +17,7 @@ import (
+ 	"github.com/relux-works/curator/internal/verr"
+ )
+ 
+-// SchemaVersion is the default, frozen Skillfile schema.
++// SchemaVersion is the legacy Skillfile schema and the required global schema.
+ const SchemaVersion = 1
+ 
+ // Name is the manifest file name at the project root.
+@@ -36,8 +36,8 @@ type Decl struct {
+ 	Source string // path under skills_root; defaults to Name
+ 	Ref    Ref
+ 	Git    string // optional clone URL
+-	// Selector is non-nil only for an opt-in draft source selection. Legacy
+-	// Source, Git and Ref remain empty for that arm.
++	// Selector is non-nil only for a schema-2 source selection. Legacy Source,
++	// Git and Ref remain empty for that arm.
+ 	Selector *Selector
+ }
+ 
+@@ -60,11 +60,6 @@ func PathIn(projectRoot string) string {
+ // Load reads and parses the project manifest. A missing file returns
+ // (nil, nil): the project is simply not initialized.
+ func Load(projectRoot string) (*Manifest, error) {
+-	return LoadWithOptions(projectRoot, ParseOptions{})
+-}
+-
+-// LoadWithOptions reads a root project with explicitly admitted draft capabilities.
+-func LoadWithOptions(projectRoot string, options ParseOptions) (*Manifest, error) {
+ 	filePath := PathIn(projectRoot)
+ 	payload, err := os.ReadFile(filePath) // #nosec G304 -- path is derived from the project root
+ 	if os.IsNotExist(err) {
+@@ -73,7 +68,7 @@ func LoadWithOptions(projectRoot string, options ParseOptions) (*Manifest, error
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	return ParseBytesWithOptions(payload, filePath, options)
++	return ParseBytes(payload, filePath)
+ }
+ 
+ // ParseBytes parses one manifest payload that a caller already read. It is the
+@@ -82,11 +77,6 @@ func LoadWithOptions(projectRoot string, options ParseOptions) (*Manifest, error
+ // the file once and parse those bytes, instead of reading the path a second time
+ // and parsing a possibly different generation.
+ func ParseBytes(payload []byte, filePath string) (*Manifest, error) {
+-	return ParseBytesWithOptions(payload, filePath, ParseOptions{})
+-}
+-
+-// ParseBytesWithOptions validates the entire declaration without source I/O.
+-func ParseBytesWithOptions(payload []byte, filePath string, options ParseOptions) (*Manifest, error) {
+ 	if err := protocoljson.Validate(payload); err != nil {
+ 		return nil, fmt.Errorf("malformed JSON in %s: %w", filePath, err)
+ 	}
+@@ -98,16 +88,11 @@ func ParseBytesWithOptions(payload []byte, filePath string, options ParseOptions
+ 	if !ok {
+ 		return nil, fmt.Errorf("%s must contain a JSON object", filePath)
+ 	}
+-	return ParseWithOptions(obj, filePath, options)
++	return Parse(obj, filePath)
+ }
+ 
+ // Parse validates a raw manifest object (Spec §6.1).
+ func Parse(obj map[string]any, filePath string) (*Manifest, error) {
+-	return ParseWithOptions(obj, filePath, ParseOptions{})
+-}
+-
+-// ParseWithOptions admits schema 2 only for a reader supporting the draft.
+-func ParseWithOptions(obj map[string]any, filePath string, options ParseOptions) (*Manifest, error) {
+ 	schema, present := obj["schema_version"]
+ 	if !present {
+ 		return nil, verr.New("schema_version", "missing required field")
+@@ -116,7 +101,7 @@ func ParseWithOptions(obj map[string]any, filePath string, options ParseOptions)
+ 	if !ok || number != float64(int(number)) {
+ 		return nil, verr.New("schema_version", "must be an integer, got %v", schema)
+ 	}
+-	if number != SchemaVersion && !(number == 2 && options.DraftSourcesV1) {
++	if number != SchemaVersion && number != 2 {
+ 		return nil, verr.New("schema_version", "unsupported Skillfile schema_version %d; this Skillfile requires a newer tool", int(number))
+ 	}
+ 
+diff --git a/internal/manifest/manifest_test.go b/internal/manifest/manifest_test.go
+index 03cf3020..9c4d230e 100644
+--- a/internal/manifest/manifest_test.go
++++ b/internal/manifest/manifest_test.go
+@@ -76,7 +76,7 @@ func TestParseRejections(t *testing.T) {
+ 	}{
+ 		{"no schema", `{"skills": []}`, "schema_version"},
+ 		{"schema string", `{"schema_version": "1", "skills": []}`, "schema_version"},
+-		{"schema future", `{"schema_version": 2, "skills": []}`, "schema_version"},
++		{"schema future", `{"schema_version": 3, "skills": []}`, "schema_version"},
+ 		{"skills missing", `{"schema_version": 1}`, "skills"},
+ 		{"agents type", `{"schema_version": 1, "agents": "all", "skills": []}`, "agents"},
+ 		{"locale type", `{"schema_version": 1, "locale": 5, "skills": []}`, "locale"},
+diff --git a/internal/manifest/sources.go b/internal/manifest/sources.go
+index 195e2769..ed4a4815 100644
+--- a/internal/manifest/sources.go
++++ b/internal/manifest/sources.go
+@@ -10,11 +10,6 @@ import (
+ 	"github.com/relux-works/curator/internal/verr"
+ )
+ 
+-// ParseOptions is reader-owned capability admission, never a manifest field.
+-// This opts into unreleased skillfile-sources-v1 parsing only; callers must
+-// implement resolution/locking before consuming selectors for installation.
+-type ParseOptions struct{ DraftSourcesV1 bool }
+-
+ // Source is the closed acquisition union. Path is literal native filesystem
+ // syntax relative to the declaring Skillfile (or absolute), without expansion.
+ // Network arms retain the declaration separately from canonical identity.
+diff --git a/internal/manifest/sources_test.go b/internal/manifest/sources_test.go
+index a8999197..ece5fbf9 100644
+--- a/internal/manifest/sources_test.go
++++ b/internal/manifest/sources_test.go
+@@ -9,9 +9,7 @@ import (
+ 	"testing"
+ )
+ 
+-var draftOptions = ParseOptions{DraftSourcesV1: true}
+-
+-func TestDraftPublishedSchemaCases(t *testing.T) {
++func TestSchema2PublishedSchemaCases(t *testing.T) {
+ 	files, err := filepath.Glob("testdata/draft-sources-v1/skillfile-v2/*.json")
+ 	if err != nil || len(files) != 41 {
+ 		t.Fatalf("published corpus: %d files, %v", len(files), err)
+@@ -23,7 +21,7 @@ func TestDraftPublishedSchemaCases(t *testing.T) {
+ 				t.Fatal(err)
+ 			}
+ 			root := writeManifest(t, string(payload))
+-			_, err = LoadWithOptions(root, draftOptions)
++			_, err = Load(root)
+ 			want := strings.HasPrefix(filepath.Base(file), "valid-")
+ 			if (err == nil) != want {
+ 				t.Fatalf("valid=%v: %v", want, err)
+@@ -32,26 +30,21 @@ func TestDraftPublishedSchemaCases(t *testing.T) {
+ 	}
+ }
+ 
+-func TestDraftCapabilityAdmission(t *testing.T) {
++func TestSchemaVersionAdmission(t *testing.T) {
+ 	for _, version := range []string{"0", "1", "2", "3", "2.5", "null", `"2"`, "1e100"} {
+ 		payload := []byte(`{"schema_version":` + version + `,"skills":[]}`)
+-		for _, opted := range []bool{false, true} {
+-			_, err := ParseBytesWithOptions(payload, "/missing/Skillfile.json", ParseOptions{DraftSourcesV1: opted})
+-			want := version == "1" || version == "2" && opted
+-			if (err == nil) != want {
+-				t.Errorf("version=%s opted=%v err=%v", version, opted, err)
+-			}
++		_, err := ParseBytes(payload, "/missing/Skillfile.json")
++		want := version == "1" || version == "2"
++		if (err == nil) != want {
++			t.Errorf("version=%s err=%v", version, err)
+ 		}
+ 	}
+ 	root := writeManifest(t, `{"schema_version":2,"skills":[]}`)
+-	if _, err := Load(root); err == nil {
+-		t.Fatal("legacy Load accepted draft")
+-	}
+-	if _, err := ParseBytes([]byte(`{"schema_version":2,"skills":[]}`), "Skillfile.json"); err == nil {
+-		t.Fatal("legacy ParseBytes accepted draft")
++	if m, err := Load(root); err != nil || m == nil || m.SchemaVersion != 2 {
++		t.Fatalf("Load schema 2 = (%+v, %v), want accepted schema 2", m, err)
+ 	}
+-	if _, err := Parse(map[string]any{"schema_version": float64(2), "skills": []any{}}, "Skillfile.json"); err == nil {
+-		t.Fatal("legacy Parse accepted draft")
++	if m, err := Parse(map[string]any{"schema_version": float64(2), "skills": []any{}}, "Skillfile.json"); err != nil || m.SchemaVersion != 2 {
++		t.Fatalf("Parse schema 2 = (%+v, %v), want accepted schema 2", m, err)
+ 	}
+ }
+ 
+@@ -61,7 +54,7 @@ func TestDraftPreservesEveryLegacyField(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	draft, err := ParseBytesWithOptions([]byte(strings.Replace(payload, `"schema_version":1`, `"schema_version":2`, 1)), "/project/Skillfile.json", draftOptions)
++	draft, err := ParseBytes([]byte(strings.Replace(payload, `"schema_version":1`, `"schema_version":2`, 1)), "/project/Skillfile.json")
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -76,7 +69,7 @@ func TestDraftPreservesEveryLegacyField(t *testing.T) {
+ 
+ func TestDraftSourceUnionAndSelectors(t *testing.T) {
+ 	payload := `{"schema_version":2,"sources":{"rel":{"path":"../$HOME/~kit"},"abs":{"path":"/missing/kit"},"url":{"git":"ssh://git@EXAMPLE.org/team/kit.git","branch":"feature/work"},"logical":{"repository":"example.org/team/kit","revision":"` + strings.Repeat("a", 64) + `"}},"skills":[{"name":"one","from":"rel","directory":"."},{"from":"logical","directory":"skills","include":["*","two"],"exclude":["three"]}]}`
+-	m, err := LoadWithOptions(writeManifest(t, payload), draftOptions)
++	m, err := Load(writeManifest(t, payload))
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -100,7 +93,7 @@ func TestDraftNegativeAdmission(t *testing.T) {
+ 		`{"s":{"repository":"example.org/a","tag":"foo.lock"}}`, `{"s":{"repository":"example.org/a","branch":null}}`,
+ 	}
+ 	for _, source := range sources {
+-		_, err := ParseBytesWithOptions([]byte(`{"schema_version":2,"sources":`+source+`,"skills":[]}`), "/nonexistent/Skillfile.json", draftOptions)
++		_, err := ParseBytes([]byte(`{"schema_version":2,"sources":`+source+`,"skills":[]}`), "/nonexistent/Skillfile.json")
+ 		if err == nil {
+ 			t.Errorf("accepted sources %s", source)
+ 		}
+@@ -116,7 +109,7 @@ func TestDraftNegativeAdmission(t *testing.T) {
+ 		selections = append(selections, `{"name":"a","from":"s","directory":`+string(encoded)+`}`)
+ 	}
+ 	for _, selection := range selections {
+-		_, err := ParseBytesWithOptions([]byte(`{"schema_version":2,"sources":{"s":{"path":"/nonexistent"}},"skills":[`+selection+`]}`), "/nonexistent/Skillfile.json", draftOptions)
++		_, err := ParseBytes([]byte(`{"schema_version":2,"sources":{"s":{"path":"/nonexistent"}},"skills":[`+selection+`]}`), "/nonexistent/Skillfile.json")
+ 		if err == nil {
+ 			t.Errorf("accepted selection %s", selection)
+ 		}
+@@ -125,10 +118,10 @@ func TestDraftNegativeAdmission(t *testing.T) {
+ 		`{"schema_version":2,"schema_version":1,"skills":[]}`,
+ 		`{"schema_version":2,"sources":{"s":{"path":"a","path":"b"}},"skills":[]}`,
+ 		`{"schema_version":1,"sources":{},"skills":[]}`,
+-		`{"schema_version":2,"DraftSourcesV1":true,"skills":[]}`,
++		`{"schema_version":2,"unsupported_toggle":true,"skills":[]}`,
+ 		`{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"name":"a","tag":"v1"},{"name":"a","from":"s","directory":"."}]}`,
+ 	} {
+-		if _, err := ParseBytesWithOptions([]byte(payload), "/missing/Skillfile.json", draftOptions); err == nil {
++		if _, err := ParseBytes([]byte(payload), "/missing/Skillfile.json"); err == nil {
+ 			t.Errorf("accepted %s", payload)
+ 		}
+ 	}
+@@ -138,7 +131,7 @@ func TestDraftValidRefsAndEndpoints(t *testing.T) {
+ 	for _, endpoint := range []string{`"git":"https://EXAMPLE.org/a.git"`, `"git":"ssh://git@example.org/a"`, `"git":"git@example.org:a"`, `"repository":"example.org/a"`} {
+ 		for _, ref := range []string{`"tag":"v1"`, `"branch":"feature/x"`, `"revision":"` + strings.Repeat("a", 40) + `"`, `"revision":"` + strings.Repeat("b", 64) + `"`} {
+ 			payload := `{"schema_version":2,"sources":{"s":{` + endpoint + `,` + ref + `}},"skills":[]}`
+-			if _, err := ParseBytesWithOptions([]byte(payload), "/missing/Skillfile.json", draftOptions); err != nil {
++			if _, err := ParseBytes([]byte(payload), "/missing/Skillfile.json"); err != nil {
+ 				t.Errorf("%s: %v", payload, err)
+ 			}
+ 		}
+@@ -150,14 +143,14 @@ func TestDraftRefGrammarBounds(t *testing.T) {
+ 		for _, value := range []string{"@", "/a", "a/", "a.", "a//b", "a..b", "a@{b", "a b", "a\x7fb", "a~b", "a^b", "a:b", "a?b", "a*b", "a[b", `a\b`, ".a", "x/.a", "x/a.lock", strings.Repeat("é", 256)} {
+ 			raw, _ := json.Marshal(value)
+ 			payload := `{"schema_version":2,"sources":{"s":{"repository":"example.org/a","` + kind + `":` + string(raw) + `}},"skills":[]}`
+-			if _, err := ParseBytesWithOptions([]byte(payload), "/missing/Skillfile.json", draftOptions); err == nil {
++			if _, err := ParseBytes([]byte(payload), "/missing/Skillfile.json"); err == nil {
+ 				t.Errorf("accepted %s %q", kind, value)
+ 			}
+ 		}
+ 		for _, value := range []string{"a", "é", strings.Repeat("é", 255), "heads/a", "a.locked"} {
+ 			raw, _ := json.Marshal(value)
+ 			payload := `{"schema_version":2,"sources":{"s":{"repository":"example.org/a","` + kind + `":` + string(raw) + `}},"skills":[]}`
+-			if _, err := ParseBytesWithOptions([]byte(payload), "/missing/Skillfile.json", draftOptions); err != nil {
++			if _, err := ParseBytes([]byte(payload), "/missing/Skillfile.json"); err != nil {
+ 				t.Errorf("rejected %s %q: %v", kind, value, err)
+ 			}
+ 		}
+diff --git a/internal/sourcelock/sourcelock_test.go b/internal/sourcelock/sourcelock_test.go
+index 4fb4ccd0..79b87704 100644
+--- a/internal/sourcelock/sourcelock_test.go
++++ b/internal/sourcelock/sourcelock_test.go
+@@ -93,7 +93,7 @@ func mustCanonical(t *testing.T, value any) []byte {
+ 
+ func TestManifestDigestGolden(t *testing.T) {
+ 	payload := []byte(goldenManifest)
+-	parsed, err := manifest.ParseBytesWithOptions(payload, "Skillfile.json", manifest.ParseOptions{DraftSourcesV1: true})
++	parsed, err := manifest.ParseBytes(payload, "Skillfile.json")
+ 	if err != nil {
+ 		t.Fatalf("golden manifest must parse as draft schema 2: %v", err)
+ 	}

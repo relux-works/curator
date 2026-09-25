@@ -1,0 +1,70 @@
+{
+  "base_switch": "CURATOR_DRAFT_SOURCES_V1=1",
+  "candidate_switch": "unset",
+  "fixture": "schema-1 Skillfile with preinstalled tagged local Git skill; each CLI invocation starts from identical restored state",
+  "comparison_count": 4,
+  "equal_count": 4,
+  "comparisons": [
+    {
+      "argv": [
+        "project",
+        "resolve",
+        "app"
+      ],
+      "base_exit": 0,
+      "candidate_exit": 0,
+      "stdout_equal": true,
+      "stderr_equal": true,
+      "all_equal": true,
+      "stdout_sha256": "b1619c0f7e952e23cc56668fb08954b217e3f43a10b350f6a8c10174e3713b51",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 707,
+      "stderr_bytes": 0
+    },
+    {
+      "argv": [
+        "list"
+      ],
+      "base_exit": 0,
+      "candidate_exit": 0,
+      "stdout_equal": true,
+      "stderr_equal": true,
+      "all_equal": true,
+      "stdout_sha256": "83fc7f4b8086db984dafb7b109713f3aa89801b46cb4e732c2ab31efe8d24717",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 177,
+      "stderr_bytes": 0
+    },
+    {
+      "argv": [
+        "install",
+        "app"
+      ],
+      "base_exit": 0,
+      "candidate_exit": 0,
+      "stdout_equal": true,
+      "stderr_equal": true,
+      "all_equal": true,
+      "stdout_sha256": "7eafdad94322ea4fd3e3b28144622e2200f12f82b7eca56da85b529c75432d29",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 77,
+      "stderr_bytes": 0
+    },
+    {
+      "argv": [
+        "status",
+        "app",
+        "--check"
+      ],
+      "base_exit": 0,
+      "candidate_exit": 0,
+      "stdout_equal": true,
+      "stderr_equal": true,
+      "all_equal": true,
+      "stdout_sha256": "1c9021f3fefd5a939208c6f358f31011a46ae99fdb96213c231f579cbf8c7cb0",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 467,
+      "stderr_bytes": 0
+    }
+  ]
+}
