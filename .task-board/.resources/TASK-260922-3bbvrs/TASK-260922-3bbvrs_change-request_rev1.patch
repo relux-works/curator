@@ -1,0 +1,4171 @@
+diff --git a/.github/ci/conformance-case-counts.tsv b/.github/ci/conformance-case-counts.tsv
+new file mode 100644
+index 00000000..a06eb9d3
+--- /dev/null
++++ b/.github/ci/conformance-case-counts.tsv
+@@ -0,0 +1,57 @@
++# Published case counts at the committed curator-spec rc.12 pin, plus the
++# separately pinned draft-sources-v1 corpus consumed by internal/crossconformance.
++family	expected_cases
++manager-config-v2/vectors	48
++manager-config-v2/schema-cases	80
++system-config-v2/schema-cases	28
++draft-sources-v1/semantic-cases	94
++draft-sources-v1/schema-cases	115
++draft-sources-v1/snapshot-cases	3
++agent-environment-marker-v1/schema-cases	53
++launch-env-fragment-v1/schema-cases	49
++portable-paths/vectors	18
++agent-skill-v7/schema-cases	37
++csk-skill-v7/schema-cases	37
++agent-skill-v8/schema-cases	66
++csk-skill-v8/schema-cases	66
++module-roots/vectors	10
++script-host-execution-policy/opt-in-cases	6
++shell-hook-trust/vectors	14
++build-source/build-source-cases	10
++build-drivers/positive-cases	8
++build-drivers/rejection-cases	77
++build-drivers/argv-cases	5
++build-drivers/fixed-environment-cases	3
++build-drivers/toolchain-cases	12
++go-host-execution-policy/capability-evidence-cases	11
++go-host-execution-policy/identity-and-protocol-cases	14
++go-host-execution-policy/package-influence-cases	8
++source-identities/vectors	10
++marker/install-marker-v2/schema-cases	14
++marker/install-marker-v4/schema-cases	27
++install/dry-run-cases	3
++external-repository-lifecycle/status-repair-gc-cases	5
++closure/ordering-cases	3
++manager-lifecycle/build-order-cases	1
++manager-lifecycle/launcher-cases	2
++interop/canonical-valid-vectors	3
++interop/canonical-invalid-vectors	5
++interop/source-identity-vectors	10
++interop/identifier-vectors	13
++interop/locale-selector-vectors	10
++interop/manager-config-vectors	15
++context-versions/version-cases	15
++context-versions/ordering-cases	1
++context-versions/range-cases	50
++context-versions/satisfies-cases	63
++context-versions/lock-cases	3
++context-versions/resolution-cases	23
++context-detectors/cases	12
++snapshot-acquisition/cases	1
++environments/header-cases	4
++environments/materialization-cases	24
++environments-env-passthrough/default-resolution-cases	7
++environments-env-passthrough/allowlist-empty-cases	6
++environments-env-passthrough/schema-cases	4
++environments-env-passthrough/surfacing-cases	6
++environments-env-passthrough/surfacing-order-cases	2
+diff --git a/.github/ci/conformance-gaps.tsv b/.github/ci/conformance-gaps.tsv
+new file mode 100644
+index 00000000..1e027e35
+--- /dev/null
++++ b/.github/ci/conformance-gaps.tsv
+@@ -0,0 +1,8 @@
++# A row is an owed implementation, not an accepted deviation. Remove it only
++# after the named published case passes its production-entry consumer.
++family	case_id	owner	reason
++marker/install-marker-v4/schema-cases	invalid-external-declared-effective-mismatch.json	BUG-260923-2afgyq	marker.Read admits unequal declared and effective external repository identities
++marker/install-marker-v4/schema-cases	invalid-marker-local-identity-kind-mismatch.json	BUG-260923-2afgyq	marker.Read admits a local marker identity with the wrong repository identity kind
++marker/install-marker-v4/schema-cases	invalid-marker-network-identity-kind-mismatch.json	BUG-260923-2afgyq	marker.Read admits a network marker identity with the wrong repository identity kind
++marker/install-marker-v4/schema-cases	invalid-marker-sha1-effective-revision-width.json	BUG-260923-2afgyq	marker.Read admits a SHA-1 external revision with the wrong effective width
++marker/install-marker-v4/schema-cases	invalid-marker-sha256-effective-revision-width.json	BUG-260923-2afgyq	marker.Read admits a SHA-256 external revision with the wrong effective width
+diff --git a/.github/ci/root-artifacts.tsv b/.github/ci/root-artifacts.tsv
+index b572573d..58b74ae0 100644
+--- a/.github/ci/root-artifacts.tsv
++++ b/.github/ci/root-artifacts.tsv
+@@ -56,13 +56,20 @@
+ #
+ # package	artefacts	note
+ internal/buildsource	vectors/build-drivers.json	TestBuildSourceConformanceVectors reads the vector directly
++internal/buildrepo	vectors/source-identities.json	TestReleasedSourceIdentityVectors drives every published source identity
++internal/godriver	vectors/build-drivers.json,vectors/go-host-execution-policy.json,vectors/module-roots.json	full-list go-v1 identity, policy and module-root consumers read each published case
+ internal/buildcache	vectors/build-drivers.json	TestCandidateCacheOutcomeVocabulary reads the vector directly
+ internal/scopes	vectors/external-repository-lifecycle.json	TestAuthoritativeGarbageCollectionRootsAreRetained reads the vector directly
++internal/closure	vectors/closures.json,vectors/manager-lifecycle.json	TestClosureOrderingConformanceVector and TestBuildCommandOrderingConformanceVector read every case group they bind
++internal/runtimestore	vectors/manager-lifecycle.json	launcher contract consumers bind the complete launcher_cases family
++internal/contextmaterialize	vectors/environments.json	TestSystemModuleAdmissionVectors binds the published materialization family
+ internal/marker	schema-cases/install-marker-v2,schema-cases/install-marker-v4,expected/build-driver/marker.json	the marker v2 and v4 schema cases and the authoritative compiled marker
+ internal/whitelist	fixtures/go-build-skill,expected/build-driver/context_files.json	the build-root context exclusion fixture and its expected file list
+ internal/moduleroots	vectors/module-roots.json	TestModuleRootVectors reads the vector directly
+ internal/scriptpolicy	vectors/script-host-execution-policy.json	the schema-8 script execution-policy family is read directly by every case in conformance_test.go
+-internal/skillspec	schema-cases/agent-skill-v6,schema-cases/agent-skill-v8,schema-cases/csk-skill-v8,fixtures/go-build-skill	the schema v6 cases, BOTH schema-8 manifest families and the go-build skill fixture
++internal/envprofile	vectors/environments-env-passthrough.json	TestEnvironmentsEnvPassthroughVectors consumes every published case group
++internal/shell	vectors/shell-hook-trust.json	TestShellHookTrustVectors consumes every published trust case
++internal/skillspec	schema-cases/agent-skill-v6,schema-cases/agent-skill-v7,schema-cases/csk-skill-v7,schema-cases/agent-skill-v8,schema-cases/csk-skill-v8,vectors/portable-paths.json,fixtures/go-build-skill	the schema v6 and v7 cases, BOTH schema-8 manifest families, portable-path vectors and the go-build skill fixture
+ internal/install	vectors/build-drivers.json,vectors/manager-lifecycle.json	TestAuthoritativeCacheOutcomesDriveInstallation and the dry-run bindings read the vectors directly
+ internal/envfragment	schema-cases/launch-env-fragment-v1	TestFragmentAuthoritativeSchemaCases and TestFragmentEmissionMatchesReference read the fragment family directly
+ internal/envmarker	schema-cases/agent-environment-marker-v1	TestParseAuthoritativeEnvMarkerSchemaCases reads the marker family directly
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 4c241afe..ebd7ee6a 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -6,6 +6,13 @@ All notable implementation changes are recorded here.
+ 
+ ### Added
+ 
++- Published-case consumers now share a counted outcome harness. The rc.12
++  config, marker, build/cache/lifecycle, skill, environment, closure and interop
++  vector/schema families, plus the vendored draft-sources-v1
++  semantic/schema/snapshot families, are checked against committed case-count
++  pins. A single gap ledger rejects unlisted failures, stale passing rows, and
++  vanished listed cases. A gap row records work still owed and is never an
++  accepted deviation.
+ - E4: umbrella provider lookup from trust roots (warning release,
+   revision A). Unknown subcommands still resolve `curator-<name>` on the
+   ambient `PATH`, but the manager now computes the trust verdict against
+diff --git a/TASK-260922-3bbvrs_results.md b/TASK-260922-3bbvrs_results.md
+new file mode 100644
+index 00000000..c87f2863
+--- /dev/null
++++ b/TASK-260922-3bbvrs_results.md
+@@ -0,0 +1,61 @@
++# TASK-260922-3bbvrs results
++
++## Changes
++
++- Added `internal/conformancecoverage`: one runner for driven, known-gap, bound, and skipped outcomes; committed family count pins; one ledger loader; exact tally, duplicate, missing, extra, stale-row, unlisted-failure, and passing-gap checks.
++- Migrated complete published-case consumers across manager/system config, draft-sources, marker schemas, skillspec and environment schemas, build drivers, source identities, module roots, manager lifecycle, environment profile, shell trust, closure/GC, and interop/context vectors. The semantic draft-sources matrix uses four parallel workers; every case still runs and the parent checks the complete tally after all case tests finish.
++- Added `.github/ci/conformance-case-counts.tsv` for the committed curator-spec rc.12 root (`dced9b8317e0e8af79edf2d0539b32bd22b6c85b`) and the separately pinned draft-sources corpus (`802caee548ddc8b19408746d26c7972d39b39cc2`). `SPEC_PIN` was not changed.
++- Added five marker v4 schema gaps to `.github/ci/conformance-gaps.tsv`, each owned by `BUG-260923-2afgyq`, with a one-line reason. This bug tracks the five external identity/kind/revision checks currently admitted by `marker.Read`.
++- Added the owed-implementation rule to `docs/ci-gates.md` and `CHANGELOG.md`; updated root-artifact declarations for the newly covered root consumers. No product behavior changed.
++
++Creating `BUG-260923-2afgyq` under `STORY-260822-2lvw0e` automatically reopened that story and `EPIC-260822-18ylpq` from done to backlog. This records the outstanding implementation work for the five ledger rows; the board transition was left intact.
++
++## Validation
++
++All commands below were run as standalone processes. Commands using `CURATOR_CONFORMANCE_ROOT` used:
++
++`/Users/administrator/Developer/ReluxWorks/curator/curator/.temp/STORY-260922-2goxjs/worktree/.temp/conformance-spec-pinned/conformance/v1`
++
++The temporary checkout was removed after validation.
++
++| Command | Exit | Result |
++| --- | ---: | --- |
++| `go test -count=1 ./internal/conformancecoverage` | 0 | Coverage fixtures and committed policy parse pass. |
++| `go test -count=1 -parallel=4 -run '^TestDraftSourcesSemanticCases$' ./internal/crossconformance` | 0 | All 94 semantic cases; 347.338s. |
++| `go test -count=1 -run '^TestDraftSourcesSchemaCases$' ./internal/crossconformance` | 0 | All 115 schema cases. |
++| `go test -count=1 -run '^TestDraftSourcesSnapshotVectors$' ./internal/crossconformance` | 0 | All 3 snapshot vectors. |
++| `go test -count=1 -run '^(TestDraftSourcesPin|TestDraftSourcesCorpusCounts|TestDraftSourcesSemanticCoverage)$' ./internal/crossconformance` | 0 | Corpus pin, counts, and driver matrix. |
++| `CURATOR_CONFORMANCE_ROOT=<pinned-root> go test -count=1 ./internal/config ./internal/marker ./internal/skillspec ./internal/envmarker ./internal/envfragment ./internal/scriptpolicy ./internal/shell ./internal/moduleroots` | 0 | Config, marker, schema, script, shell, and module-root groups. |
++| `CURATOR_CONFORMANCE_ROOT=<pinned-root> go test -count=1 ./internal/interop ./internal/interop/environments ./internal/contextmaterialize ./internal/closure ./internal/runtimestore` | 0 | Interop, environment, materialization, closure, and lifecycle groups. |
++| `CURATOR_CONFORMANCE_ROOT=<pinned-root> go test -count=1 -run '^TestEnvironmentsEnvPassthroughVectors$' ./internal/envprofile` | 0 | Full environment pass-through family. |
++| `CURATOR_CONFORMANCE_ROOT=<pinned-root> go test -count=1 ./internal/buildsource ./internal/buildcache ./internal/scopes` | 0 | Build-source, cache rejection, and GC families. |
++| `CURATOR_CONFORMANCE_ROOT=<pinned-root> go test -count=1 -run '^(TestValidPackageGraphVectors|TestFixedEnvironmentAndFiveDirectArgvFormsVector|TestToolchainIdentityVectors|TestModuleRootVectorsDriveTheWholeBuild|TestCapabilityEvidenceCasesMatchTheAcceptedVector|TestIdentityProtocolAndPackageInfluenceCodesMatchTheAcceptedVector)$' ./internal/godriver` | 0 | Full positive, argv, fixed-environment, toolchain, module-root, and host-policy case groups. |
++| `CURATOR_CONFORMANCE_ROOT=<pinned-root> go test -count=1 -run '^TestReleasedSourceIdentityVectors$' ./internal/buildrepo` | 0 | All 10 source-identity vectors. |
++| `CURATOR_CONFORMANCE_ROOT=<pinned-root> go test -count=1 -run '^(TestAuthoritativeDryRunCasesMutateNothingPersistent|TestAuthoritativeCacheOutcomesDriveInstallation|TestAuthoritativeCacheRejectionsAreRebuiltNeverAdopted)$' ./internal/install` | 0 | Dry-run, cache-positive, and all rejection cases; 134.133s. |
++| `go build ./...` | 0 | Repository builds. |
++| `golangci-lint run` | 0 | 0 issues. The linter printed a non-fatal stale-path warning for a removed neighboring worktree. |
++| `git diff --check` | 0 | No whitespace errors. |
++| `gofmt -l internal` | 0 | No files listed. |
++
++### Narrowing mutants
++
++Each mutant was temporary and reverted immediately after its standalone test run.
++
++| Mutant removed | Named test | Exit | Expected failure |
++| --- | --- | ---: | --- |
++| `ValidateTally` call | `TestPublishedCaseTallyRejectsMissingClassification` | 1 | A missing result returned no error. |
++| Refusal for an unlisted failure | `TestUnlistedFailingCaseIsRejected` | 1 | An unlisted failing case returned no error. |
++| Refusal when a listed gap passes | `TestPassingKnownGapIsRejected` | 1 | The stale ledger row returned no error. |
++
++`TestVanishedGapCaseIsRejected` and `TestPinnedCountRejectsVanishedPublishedCase` pass in the helper suite and cover vanished ledger and published cases.
++
++### Corrected intermediate attempts
++
++- The initial config group used a relative `CURATOR_CONFORMANCE_ROOT` and exited 1 because Go package working directories resolved it incorrectly; rerunning with the absolute pinned path exited 0.
++- The first interop/materialization group exited 1 on a compile error and a selected-case bookkeeping error; after fixes, the narrowed rerun exited 0.
++- The first combined env-profile/build-source/cache/GC run was interrupted with exit 1 after surfacing a build-cache compile error. The cache issue was fixed; the env-profile family and build-source/cache/GC groups then passed in bounded commands.
++- The first install vector run exited 1 on a stale import; removing it and rerunning the selected install group exited 0.
++- The first serial semantic matrix exited 1 at Go's 10-minute timeout. The parallel case runner was added for this matrix only; rerunning all 94 cases exited 0 in 347.338s.
++- The first lint run exited 1 on unchecked file closes, missing trusted-path annotations, and an unused helper. Those were fixed; the final lint run exited 0.
++
++The hosted landing gate was not run locally. The handoff runtime owns its single hosted CI run. Work remains uncommitted in the Story worktree for handoff.
+diff --git a/docs/ci-gates.md b/docs/ci-gates.md
+index d4e59b7a..0800c733 100644
+--- a/docs/ci-gates.md
++++ b/docs/ci-gates.md
+@@ -50,6 +50,10 @@ For schema 8, artifacts include `agent-skill-v8`, `csk-skill-v8`, `install-marke
+ 
+ The committed protocol-suite pin is declared as `SPEC_PIN` in the workflow `env:` block. Candidate suites enter via the `candidate-conformance` workflow on explicit `workflow_dispatch` calls supplying a full 40-character revision or materialized root. That job sets `CI_REQUIRE_FULL_ROOT=1` to enforce complete package coverage, and emitted artifacts are stamped as candidate-only evidence, proving neither a published release nor a conformance claim.
+ 
++## Published case accounting
++
++Consumers that iterate a complete published case family use the shared case-coverage harness. [`conformance-case-counts.tsv`](../.github/ci/conformance-case-counts.tsv) pins the expected case count for each family at its selected corpus revision; each run classifies every published case as driven, known-gap, bound, or skipped and requires the tally to equal that count. [`conformance-gaps.tsv`](../.github/ci/conformance-gaps.tsv) is the only place a known gap may be declared. A row is an owed implementation, never an accepted deviation: an unlisted failure fails the test, a listed case that starts passing fails until its row is removed, and a row whose case disappears fails the count or row-presence check.
++
+ ## Self-hosted runner prerequisites
+ 
+ The rose-air lane needs exactly one thing installed on the runner by hand:
+diff --git a/internal/buildcache/builddriver_rejection_conformance_test.go b/internal/buildcache/builddriver_rejection_conformance_test.go
+index 4d76d135..2deea73a 100644
+--- a/internal/buildcache/builddriver_rejection_conformance_test.go
++++ b/internal/buildcache/builddriver_rejection_conformance_test.go
+@@ -11,6 +11,7 @@ import (
+ 	"testing"
+ 
+ 	"github.com/relux-works/curator/internal/buildmeta"
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ 	"github.com/relux-works/curator/internal/protocoljson"
+ )
+ 
+@@ -27,7 +28,7 @@ type cacheRejectionVector struct {
+ 	} `json:"expected"`
+ }
+ 
+-func loadCacheRejections(t *testing.T) map[string]cacheRejectionVector {
++func loadCacheRejectionCases(t *testing.T) []cacheRejectionVector {
+ 	t.Helper()
+ 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+ 	if root == "" {
+@@ -46,11 +47,7 @@ func loadCacheRejections(t *testing.T) map[string]cacheRejectionVector {
+ 	if err := json.Unmarshal(payload, &vectors); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	indexed := make(map[string]cacheRejectionVector, len(vectors.RejectionCases))
+-	for _, testCase := range vectors.RejectionCases {
+-		indexed[testCase.Name] = testCase
+-	}
+-	return indexed
++	return vectors.RejectionCases
+ }
+ 
+ // cacheRejection is the Curator half of one cache-boundary mapping.
+@@ -262,27 +259,30 @@ func cacheRejectionMappings() map[string]cacheRejection {
+ // authoritative cache-boundary rejection reaches a stable non-reusable Curator
+ // outcome and that the cached artifact is never handed back for execution.
+ func TestCacheRejectionClustersMapToStableCuratorOutcomes(t *testing.T) {
+-	published := loadCacheRejections(t)
+-	owned := cacheRejectionMappings()
+-
+-	names := make([]string, 0, len(published))
+-	for name, vector := range published {
+-		// The forged-provenance vector is a boundary case with its own
+-		// protected-state assertions; it is owned by the untrusted-cache tests.
+-		if vector.Boundary == "cache" && name != "self-consistent-forged-receipt-outside-protected-state" {
+-			names = append(names, name)
+-		}
++	publishedCases := loadCacheRejectionCases(t)
++	published := make(map[string]cacheRejectionVector, len(publishedCases))
++	for _, vector := range publishedCases {
++		published[vector.Name] = vector
+ 	}
+-	sort.Strings(names)
++	owned := cacheRejectionMappings()
+ 
+-	for _, name := range names {
+-		vector := published[name]
+-		mapping, ok := owned[name]
+-		if !ok {
+-			t.Errorf("authoritative cache rejection %q has no Curator mapping", name)
+-			continue
+-		}
+-		t.Run(name, func(t *testing.T) {
++	sort.Slice(publishedCases, func(i, j int) bool { return publishedCases[i].Name < publishedCases[j].Name })
++	conformancecoverage.RunOutcomes(t, "build-drivers/rejection-cases", publishedCases,
++		func(tc cacheRejectionVector) string { return tc.Name }, func(t *testing.T, vector cacheRejectionVector) conformancecoverage.Observation {
++			name := vector.Name
++			if vector.Boundary != "cache" {
++				return conformancecoverage.Observation{BoundReason: "rejection belongs to a non-cache boundary"}
++			}
++			// The forged-provenance vector has its own protected-state assertion in
++			// TestUntrustedCacheEntryIsRebuiltAndNeverReused.
++			if name == "self-consistent-forged-receipt-outside-protected-state" {
++				return conformancecoverage.Observation{BoundReason: "forged-provenance case is exercised by the protected-state test"}
++			}
++			mapping, ok := owned[name]
++			if !ok {
++				t.Errorf("authoritative cache rejection %q has no Curator mapping", name)
++				return conformancecoverage.Observation{}
++			}
+ 			if vector.Expected.Result != "reject" || vector.Expected.Reuse || vector.Expected.ArtifactExecuted {
+ 				t.Fatalf("vector %q no longer fails closed: %+v", name, vector.Expected)
+ 			}
+@@ -314,7 +314,7 @@ func TestCacheRejectionClustersMapToStableCuratorOutcomes(t *testing.T) {
+ 				if conflict.Key != publishedResult.CacheKey {
+ 					t.Fatalf("%s conflict names %q", name, conflict.Key)
+ 				}
+-				return
++				return conformancecoverage.Observation{}
+ 			}
+ 
+ 			if mapping.mutate != nil {
+@@ -340,8 +340,8 @@ func TestCacheRejectionClustersMapToStableCuratorOutcomes(t *testing.T) {
+ 			if mapping.reason != "" && !strings.Contains(result.Reason, mapping.reason) {
+ 				t.Fatalf("%s reason = %q, want it to name %q", name, result.Reason, mapping.reason)
+ 			}
++			return conformancecoverage.Observation{}
+ 		})
+-	}
+ 
+ 	for name := range owned {
+ 		if _, ok := published[name]; !ok {
+diff --git a/internal/buildrepo/buildrepo_test.go b/internal/buildrepo/buildrepo_test.go
+index c84fade4..1c5d6ad4 100644
+--- a/internal/buildrepo/buildrepo_test.go
++++ b/internal/buildrepo/buildrepo_test.go
+@@ -6,6 +6,8 @@ import (
+ 	"path/filepath"
+ 	"strings"
+ 	"testing"
++
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ )
+ 
+ func TestReleasedSkillBuildSchemaCases(t *testing.T) {
+@@ -61,6 +63,12 @@ func TestCanonicalRepositorySourceVectors(t *testing.T) {
+ 	}
+ }
+ 
++type releasedSourceIdentityVector struct {
++	Input    string  `json:"input"`
++	Identity *string `json:"identity"`
++	Error    string  `json:"error"`
++}
++
+ func TestReleasedSourceIdentityVectors(t *testing.T) {
+ 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+ 	if root == "" {
+@@ -70,16 +78,12 @@ func TestReleasedSourceIdentityVectors(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	var vectors []struct {
+-		Input    string  `json:"input"`
+-		Identity *string `json:"identity"`
+-		Error    string  `json:"error"`
+-	}
++	var vectors []releasedSourceIdentityVector
+ 	if err := json.Unmarshal(payload, &vectors); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	for _, vector := range vectors {
+-		t.Run(vector.Input, func(t *testing.T) {
++	conformancecoverage.Run(t, "source-identities/vectors", vectors,
++		func(vector releasedSourceIdentityVector) string { return vector.Input }, func(t *testing.T, vector releasedSourceIdentityVector) {
+ 			source, err := ParseSource(vector.Input)
+ 			if vector.Identity == nil {
+ 				if err == nil {
+@@ -94,7 +98,6 @@ func TestReleasedSourceIdentityVectors(t *testing.T) {
+ 				t.Fatalf("identity = %q, want %q", source.Identity, *vector.Identity)
+ 			}
+ 		})
+-	}
+ }
+ 
+ func TestRepositorySourceRejectsNonRC5Forms(t *testing.T) {
+diff --git a/internal/buildsource/builddriver_conformance_test.go b/internal/buildsource/builddriver_conformance_test.go
+index 2114b67d..a2580a3a 100644
+--- a/internal/buildsource/builddriver_conformance_test.go
++++ b/internal/buildsource/builddriver_conformance_test.go
+@@ -12,6 +12,7 @@ import (
+ 	"time"
+ 	"unicode/utf8"
+ 
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ 	"github.com/relux-works/curator/internal/hashing"
+ )
+ 
+@@ -129,9 +130,8 @@ func TestBuildSourceIdentityVectors(t *testing.T) {
+ 	if len(cases) == 0 {
+ 		t.Skip("this conformance root publishes no build-source cases")
+ 	}
+-	for _, testCase := range cases {
+-		testCase := testCase
+-		t.Run(testCase.Name, func(t *testing.T) {
++	conformancecoverage.Run(t, "build-source/build-source-cases", cases,
++		func(tc buildSourceCase) string { return tc.Name }, func(t *testing.T, testCase buildSourceCase) {
+ 			switch testCase.Name {
+ 			case "fixture-exact-build-source", "domain-prefix-ordering-framing-empty-binary-and-root-marker":
+ 				// Both accepted framing vectors are already reproduced from the
+@@ -271,7 +271,6 @@ func TestBuildSourceIdentityVectors(t *testing.T) {
+ 				t.Fatalf("authoritative build-source case %q has no Curator assertion", testCase.Name)
+ 			}
+ 		})
+-	}
+ }
+ 
+ // invalidUnicodeNames lists the byte spellings that can carry an invalid
+diff --git a/internal/buildsource/conformance_test.go b/internal/buildsource/conformance_test.go
+index 9c17731a..37b2f53a 100644
+--- a/internal/buildsource/conformance_test.go
++++ b/internal/buildsource/conformance_test.go
+@@ -6,6 +6,8 @@ import (
+ 	"os"
+ 	"path/filepath"
+ 	"testing"
++
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ )
+ 
+ func TestBuildSourceConformanceVectors(t *testing.T) {
+@@ -34,15 +36,15 @@ func TestBuildSourceConformanceVectors(t *testing.T) {
+ 	if err := json.Unmarshal(payload, &vectors); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	for _, testCase := range vectors.BuildSourceCases {
+-		records := testCase.Records
+-		if len(records) == 0 {
+-			records = testCase.InputOrder
+-		}
+-		if testCase.Result != "accepted" || len(records) == 0 {
+-			continue
+-		}
+-		t.Run(testCase.Name, func(t *testing.T) {
++	conformancecoverage.Run(t, "build-source/build-source-cases", vectors.BuildSourceCases,
++		func(tc vectorCase) string { return tc.Name }, func(t *testing.T, testCase vectorCase) {
++			records := testCase.Records
++			if len(records) == 0 {
++				records = testCase.InputOrder
++			}
++			if testCase.Result != "accepted" || len(records) == 0 {
++				t.Skip("this case is outside the accepted non-empty record identity assertion")
++			}
+ 			tree := t.TempDir()
+ 			for _, item := range records {
+ 				content, err := base64.StdEncoding.DecodeString(item.ContentBase64)
+@@ -56,5 +58,4 @@ func TestBuildSourceConformanceVectors(t *testing.T) {
+ 				t.Fatalf("digest = %s, want %s", got, testCase.ContentSHA256)
+ 			}
+ 		})
+-	}
+ }
+diff --git a/internal/closure/conformance_test.go b/internal/closure/conformance_test.go
+index 0ab56cc0..80a6eb47 100644
+--- a/internal/closure/conformance_test.go
++++ b/internal/closure/conformance_test.go
+@@ -5,11 +5,34 @@ import (
+ 	"os"
+ 	"path/filepath"
+ 	"reflect"
++	"strings"
+ 	"testing"
+ 
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ 	"github.com/relux-works/curator/internal/skillspec"
+ )
+ 
++type closureOrderCase struct {
++	Name     string     `json:"name"`
++	Nodes    []string   `json:"nodes"`
++	Edges    [][]string `json:"edges"`
++	Expected []string   `json:"expected_provider_order"`
++	Error    string     `json:"error"`
++}
++
++type closureBuildOrderEdge struct {
++	Consumer string `json:"consumer"`
++	Provider string `json:"provider"`
++}
++
++type closureBuildOrderCase struct {
++	Name                  string                  `json:"name"`
++	ActiveBuildCommands   map[string][]string     `json:"active_build_commands"`
++	ClosureEdges          []closureBuildOrderEdge `json:"closure_edges"`
++	ExpectedProviderOrder []string                `json:"expected_provider_order"`
++	ExpectedBuildOrder    []string                `json:"expected_build_order"`
++}
++
+ func TestClosureOrderingConformanceVector(t *testing.T) {
+ 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+ 	if root == "" {
+@@ -19,39 +42,51 @@ func TestClosureOrderingConformanceVector(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	var cases []struct {
+-		Name     string     `json:"name"`
+-		Nodes    []string   `json:"nodes"`
+-		Edges    [][]string `json:"edges"`
+-		Expected []string   `json:"expected_provider_order"`
+-	}
++	var cases []closureOrderCase
+ 	if err := json.Unmarshal(payload, &cases); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	for _, testCase := range cases {
+-		if testCase.Name != "deterministic-diamond" {
+-			continue
+-		}
+-		nodes := map[string]*Node{}
+-		for _, name := range testCase.Nodes {
+-			nodes[name] = &Node{Name: name}
+-		}
+-		for _, edge := range testCase.Edges {
+-			consumer, provider := edge[0], edge[1]
+-			nodes[provider].Edges = append(nodes[provider].Edges, Edge{Consumer: consumer})
+-		}
+-		ordered, err := topologicalOrder(nodes)
+-		if err != nil {
+-			t.Fatal(err)
+-		}
+-		got := make([]string, len(ordered))
+-		for index, node := range ordered {
+-			got[index] = node.Name
+-		}
+-		if !reflect.DeepEqual(got, testCase.Expected) {
+-			t.Fatalf("provider order = %v, want %v", got, testCase.Expected)
+-		}
+-	}
++	conformancecoverage.RunOutcomes(t, "closure/ordering-cases", cases,
++		func(tc closureOrderCase) string { return tc.Name }, func(t *testing.T, testCase closureOrderCase) conformancecoverage.Observation {
++			if testCase.Name == "commit-conflict" {
++				return conformancecoverage.Observation{BoundReason: "commit conflict is resolved before the topological ordering entry point"}
++			}
++			nodes := map[string]*Node{}
++			for _, name := range testCase.Nodes {
++				nodes[name] = &Node{Name: name}
++			}
++			for _, edge := range testCase.Edges {
++				if len(edge) != 2 {
++					t.Fatalf("closure vector edge has %d members, want consumer and provider", len(edge))
++				}
++				consumer, provider := edge[0], edge[1]
++				if nodes[consumer] == nil {
++					nodes[consumer] = &Node{Name: consumer}
++				}
++				if nodes[provider] == nil {
++					nodes[provider] = &Node{Name: provider}
++				}
++				nodes[provider].Edges = append(nodes[provider].Edges, Edge{Consumer: consumer})
++			}
++			ordered, err := topologicalOrder(nodes)
++			if testCase.Error != "" {
++				if err == nil || !strings.Contains(err.Error(), "dependency cycle") {
++					t.Fatalf("topologicalOrder error = %v, want %s", err, testCase.Error)
++				}
++				return conformancecoverage.Observation{}
++			}
++			if err != nil {
++				t.Fatal(err)
++			}
++			got := make([]string, len(ordered))
++			for index, node := range ordered {
++				got[index] = node.Name
++			}
++			if !reflect.DeepEqual(got, testCase.Expected) {
++				t.Fatalf("provider order = %v, want %v", got, testCase.Expected)
++			}
++			return conformancecoverage.Observation{}
++		})
+ }
+ 
+ func TestBuildCommandOrderingConformanceVector(t *testing.T) {
+@@ -64,66 +99,45 @@ func TestBuildCommandOrderingConformanceVector(t *testing.T) {
+ 		t.Fatal(err)
+ 	}
+ 	var document struct {
+-		BuildOrderCases []struct {
+-			Name                string              `json:"name"`
+-			ActiveBuildCommands map[string][]string `json:"active_build_commands"`
+-			ClosureEdges        []struct {
+-				Consumer string `json:"consumer"`
+-				Provider string `json:"provider"`
+-			} `json:"closure_edges"`
+-			ExpectedProviderOrder []string `json:"expected_provider_order"`
+-			ExpectedBuildOrder    []string `json:"expected_build_order"`
+-		} `json:"build_order_cases"`
++		BuildOrderCases []closureBuildOrderCase `json:"build_order_cases"`
+ 	}
+ 	if err := json.Unmarshal(payload, &document); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if len(document.BuildOrderCases) == 0 {
+-		// The accepted rc.5 manager-lifecycle surface publishes only the
+-		// bootstrap, dry-run, launcher, and upgrade groups. Curator's own
+-		// provider-first, command-lexical build order stays under test in
+-		// TestStagingRunsProviderFirstAndCommandLexical; only the shared
+-		// cross-manager wording is unavailable from this root.
+-		t.Skip("this conformance root publishes no build_order_cases group")
+-	}
+-	for _, testCase := range document.BuildOrderCases {
+-		if testCase.Name != "provider-first-and-lexical-command-order" {
+-			continue
+-		}
+-		nodes := map[string]*Node{}
+-		for name, commands := range testCase.ActiveBuildCommands {
+-			exported := map[string]skillspec.Command{}
+-			for _, command := range commands {
+-				exported[command] = skillspec.Command{Name: command, Type: "build"}
++	conformancecoverage.Run(t, "manager-lifecycle/build-order-cases", document.BuildOrderCases,
++		func(tc closureBuildOrderCase) string { return tc.Name }, func(t *testing.T, testCase closureBuildOrderCase) {
++			nodes := map[string]*Node{}
++			for name, commands := range testCase.ActiveBuildCommands {
++				exported := map[string]skillspec.Command{}
++				for _, command := range commands {
++					exported[command] = skillspec.Command{Name: command, Type: "build"}
++				}
++				nodes[name] = &Node{
++					Name:  name,
++					Spec:  &skillspec.Spec{Commands: exported},
++					Edges: []Edge{{Consumer: ProjectEdge, Mode: "full"}},
++				}
+ 			}
+-			nodes[name] = &Node{
+-				Name:  name,
+-				Spec:  &skillspec.Spec{Commands: exported},
+-				Edges: []Edge{{Consumer: ProjectEdge, Mode: "full"}},
++			for _, edge := range testCase.ClosureEdges {
++				nodes[edge.Provider].Edges = append(nodes[edge.Provider].Edges, Edge{Consumer: edge.Consumer, Mode: "full"})
+ 			}
+-		}
+-		for _, edge := range testCase.ClosureEdges {
+-			nodes[edge.Provider].Edges = append(nodes[edge.Provider].Edges, Edge{Consumer: edge.Consumer, Mode: "full"})
+-		}
+-		ordered, err := topologicalOrder(nodes)
+-		if err != nil {
+-			t.Fatal(err)
+-		}
+-		providerOrder := make([]string, 0, len(ordered))
+-		var buildOrder []string
+-		for _, node := range ordered {
+-			providerOrder = append(providerOrder, node.Name)
+-			for _, command := range node.ActiveCommandNames() {
+-				buildOrder = append(buildOrder, node.Name+"/"+command)
++			ordered, err := topologicalOrder(nodes)
++			if err != nil {
++				t.Fatal(err)
+ 			}
+-		}
+-		if !reflect.DeepEqual(providerOrder, testCase.ExpectedProviderOrder) {
+-			t.Fatalf("provider order = %v, want %v", providerOrder, testCase.ExpectedProviderOrder)
+-		}
+-		if !reflect.DeepEqual(buildOrder, testCase.ExpectedBuildOrder) {
+-			t.Fatalf("build order = %v, want %v", buildOrder, testCase.ExpectedBuildOrder)
+-		}
+-		return
+-	}
+-	t.Fatal("provider-first-and-lexical-command-order conformance case missing")
++			providerOrder := make([]string, 0, len(ordered))
++			var buildOrder []string
++			for _, node := range ordered {
++				providerOrder = append(providerOrder, node.Name)
++				for _, command := range node.ActiveCommandNames() {
++					buildOrder = append(buildOrder, node.Name+"/"+command)
++				}
++			}
++			if !reflect.DeepEqual(providerOrder, testCase.ExpectedProviderOrder) {
++				t.Fatalf("provider order = %v, want %v", providerOrder, testCase.ExpectedProviderOrder)
++			}
++			if !reflect.DeepEqual(buildOrder, testCase.ExpectedBuildOrder) {
++				t.Fatalf("build order = %v, want %v", buildOrder, testCase.ExpectedBuildOrder)
++			}
++		})
+ }
+diff --git a/internal/config/environments_conformance_test.go b/internal/config/environments_conformance_test.go
+index 91990e8b..9f5b524b 100644
+--- a/internal/config/environments_conformance_test.go
++++ b/internal/config/environments_conformance_test.go
+@@ -7,6 +7,8 @@ import (
+ 	"reflect"
+ 	"strings"
+ 	"testing"
++
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ )
+ 
+ // Schema-2 conformance drivers. Every manager-config-v2 and
+@@ -32,6 +34,11 @@ type schemaIndexEntry struct {
+ 	Valid    bool   `json:"valid"`
+ }
+ 
++type namedSchemaCase struct {
++	Name  string
++	Valid bool
++}
++
+ func conformanceRoot(t *testing.T) string {
+ 	t.Helper()
+ 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+@@ -45,7 +52,7 @@ func conformanceRoot(t *testing.T) string {
+ // validity of each instance in the family. The index — not the file-name
+ // prefix — decides: an unindexed file is logged and skipped, and a family
+ // the root publishes with no indexed cases fails instead of passing empty.
+-func schemaCaseValidity(t *testing.T, root, family string) map[string]bool {
++func schemaCaseValidity(t *testing.T, root, family string) []namedSchemaCase {
+ 	t.Helper()
+ 	payload, err := os.ReadFile(filepath.Join(root, "schema-cases", "index.json")) // #nosec G304 -- explicit conformance input
+ 	if err != nil {
+@@ -55,14 +62,14 @@ func schemaCaseValidity(t *testing.T, root, family string) map[string]bool {
+ 	if err := json.Unmarshal(payload, &entries); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	validity := map[string]bool{}
++	var cases []namedSchemaCase
+ 	indexed := map[string]bool{}
+ 	for _, entry := range entries {
+ 		if !strings.HasPrefix(entry.Instance, family+"/") {
+ 			continue
+ 		}
+ 		name := strings.TrimPrefix(entry.Instance, family+"/")
+-		validity[name] = entry.Valid
++		cases = append(cases, namedSchemaCase{Name: name, Valid: entry.Valid})
+ 		indexed[name] = true
+ 	}
+ 	disk, err := os.ReadDir(filepath.Join(root, "schema-cases", family))
+@@ -83,7 +90,7 @@ func schemaCaseValidity(t *testing.T, root, family string) map[string]bool {
+ 	if seen == 0 {
+ 		t.Fatalf("the root publishes schema-cases/%s but it contains no cases", family)
+ 	}
+-	return validity
++	return cases
+ }
+ 
+ // TestManagerConfigV2SchemaCases runs the published manager-config-v2
+@@ -91,23 +98,22 @@ func schemaCaseValidity(t *testing.T, root, family string) map[string]bool {
+ // invalid case is rejected.
+ func TestManagerConfigV2SchemaCases(t *testing.T) {
+ 	root := conformanceRoot(t)
+-	for name, wantValid := range schemaCaseValidity(t, root, "manager-config-v2") {
+-		name, wantValid := name, wantValid
+-		t.Run(name, func(t *testing.T) {
+-			payload, err := os.ReadFile(filepath.Join(root, "schema-cases", "manager-config-v2", name)) // #nosec G304 -- explicit conformance input
++	cases := schemaCaseValidity(t, root, "manager-config-v2")
++	conformancecoverage.Run(t, "manager-config-v2/schema-cases", cases,
++		func(tc namedSchemaCase) string { return tc.Name }, func(t *testing.T, tc namedSchemaCase) {
++			payload, err := os.ReadFile(filepath.Join(root, "schema-cases", "manager-config-v2", tc.Name)) // #nosec G304 -- explicit conformance input
+ 			if err != nil {
+ 				t.Fatal(err)
+ 			}
+ 			path := writeConfig(t, t.TempDir(), "config.json", string(payload))
+ 			_, err = Load(path, nil)
+-			if wantValid && err != nil {
++			if tc.Valid && err != nil {
+ 				t.Fatalf("valid case rejected: %v", err)
+ 			}
+-			if !wantValid && err == nil {
++			if !tc.Valid && err == nil {
+ 				t.Fatalf("invalid case accepted")
+ 			}
+ 		})
+-	}
+ }
+ 
+ // TestSystemConfigV2SchemaCases runs the published system-config-v2 family
+@@ -117,10 +123,10 @@ func TestManagerConfigV2SchemaCases(t *testing.T) {
+ func TestSystemConfigV2SchemaCases(t *testing.T) {
+ 	root := conformanceRoot(t)
+ 	const user = `{"schema_version": 2, "skills_root": "/tmp/skills", "projects": {}}`
+-	for name, wantValid := range schemaCaseValidity(t, root, "system-config-v2") {
+-		name, wantValid := name, wantValid
+-		t.Run(name, func(t *testing.T) {
+-			payload, err := os.ReadFile(filepath.Join(root, "schema-cases", "system-config-v2", name)) // #nosec G304 -- explicit conformance input
++	cases := schemaCaseValidity(t, root, "system-config-v2")
++	conformancecoverage.Run(t, "system-config-v2/schema-cases", cases,
++		func(tc namedSchemaCase) string { return tc.Name }, func(t *testing.T, tc namedSchemaCase) {
++			payload, err := os.ReadFile(filepath.Join(root, "schema-cases", "system-config-v2", tc.Name)) // #nosec G304 -- explicit conformance input
+ 			if err != nil {
+ 				t.Fatal(err)
+ 			}
+@@ -129,14 +135,13 @@ func TestSystemConfigV2SchemaCases(t *testing.T) {
+ 			systemPath := writeConfig(t, dir, "system.json", string(payload))
+ 			t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
+ 			_, err = Load(userPath, nil)
+-			if wantValid && err != nil {
++			if tc.Valid && err != nil {
+ 				t.Fatalf("valid case rejected: %v", err)
+ 			}
+-			if !wantValid && err == nil {
++			if !tc.Valid && err == nil {
+ 				t.Fatalf("invalid case accepted")
+ 			}
+ 		})
+-	}
+ }
+ 
+ // TestManagerConfigV2Vectors runs the published manager-config-v2 vector
+@@ -155,9 +160,8 @@ func TestManagerConfigV2Vectors(t *testing.T) {
+ 	if len(cases) == 0 {
+ 		t.Fatalf("vectors/manager-config-v2.json publishes no cases")
+ 	}
+-	for _, tc := range cases {
+-		tc := tc
+-		t.Run(tc.Name, func(t *testing.T) {
++	conformancecoverage.Run(t, "manager-config-v2/vectors", cases,
++		func(tc vectorCase) string { return tc.Name }, func(t *testing.T, tc vectorCase) {
+ 			roundTrip, err := json.Marshal(tc.Input)
+ 			if err != nil {
+ 				t.Fatal(err)
+@@ -193,5 +197,4 @@ func TestManagerConfigV2Vectors(t *testing.T) {
+ 				}
+ 			}
+ 		})
+-	}
+ }
+diff --git a/internal/conformancecoverage/coverage.go b/internal/conformancecoverage/coverage.go
+new file mode 100644
+index 00000000..e14ec76f
+--- /dev/null
++++ b/internal/conformancecoverage/coverage.go
+@@ -0,0 +1,384 @@
++// Package conformancecoverage classifies published case consumers at their
++// production-entry tests and enforces the committed count pins and gap ledger.
++package conformancecoverage
++
++import (
++	"bufio"
++	"fmt"
++	"os"
++	"path/filepath"
++	"strconv"
++	"strings"
++	"testing"
++)
++
++// Gap is an owed implementation recorded in .github/ci/conformance-gaps.tsv.
++type Gap struct {
++	Family string
++	CaseID string
++	Owner  string
++	Reason string
++}
++
++// Observation is the result of one published case. A failure may be accepted
++// only when the ledger names this family and case. Bounds and skips are
++// explicit classifications, never passes.
++type Observation struct {
++	FailureReason string
++	BoundReason   string
++	SkipReason    string
++}
++
++// Tally reports one classification per published case.
++type Tally struct {
++	Driven   int
++	KnownGap int
++	Bound    int
++	Skipped  int
++}
++
++// Total returns the number of classified cases.
++func (t Tally) Total() int { return t.Driven + t.KnownGap + t.Bound + t.Skipped }
++
++// Result associates an observation with the published case id.
++type Result struct {
++	CaseID        string
++	FailureReason string
++	BoundReason   string
++	SkipReason    string
++}
++
++// Check requires the case list to match its count pin and one result per case.
++// It rejects stale ledger rows, unlisted failures, and rows whose case now
++// passes. The count check intentionally happens after classifying supplied
++// results, so TestPublishedCaseTallyRejectsMissingClassification proves the
++// tally itself is the missing-case gate.
++func Check(family string, caseIDs []string, results []Result, gaps []Gap, expectedCount int) (Tally, error) {
++	var tally Tally
++	if family == "" {
++		return tally, fmt.Errorf("published-case family is empty")
++	}
++	if expectedCount < 0 {
++		return tally, fmt.Errorf("published-case count pin for %q is negative: %d", family, expectedCount)
++	}
++
++	published := make(map[string]struct{}, len(caseIDs))
++	for _, id := range caseIDs {
++		if id == "" {
++			return tally, fmt.Errorf("family %q contains an empty case id", family)
++		}
++		if _, exists := published[id]; exists {
++			return tally, fmt.Errorf("family %q publishes duplicate case id %q", family, id)
++		}
++		published[id] = struct{}{}
++	}
++	if len(caseIDs) != expectedCount {
++		return tally, fmt.Errorf("family %q publishes %d cases, want pinned count %d", family, len(caseIDs), expectedCount)
++	}
++
++	rows := make(map[string]Gap)
++	for _, gap := range gaps {
++		if gap.Family != family {
++			continue
++		}
++		key := gap.Family + "\x00" + gap.CaseID
++		if _, exists := rows[key]; exists {
++			return tally, fmt.Errorf("duplicate gap ledger row for %s/%s", family, gap.CaseID)
++		}
++		rows[key] = gap
++		if _, exists := published[gap.CaseID]; !exists {
++			return tally, fmt.Errorf("gap ledger case %s/%s vanished from the published case list", family, gap.CaseID)
++		}
++	}
++
++	seen := make(map[string]struct{}, len(results))
++	for _, result := range results {
++		if _, exists := published[result.CaseID]; !exists {
++			return tally, fmt.Errorf("family %q produced a result for unpublished case %q", family, result.CaseID)
++		}
++		if _, exists := seen[result.CaseID]; exists {
++			return tally, fmt.Errorf("family %q classified case %q more than once", family, result.CaseID)
++		}
++		seen[result.CaseID] = struct{}{}
++		key := family + "\x00" + result.CaseID
++		gap, listed := rows[key]
++
++		classes := 0
++		if result.FailureReason != "" {
++			classes++
++		}
++		if result.BoundReason != "" {
++			classes++
++		}
++		if result.SkipReason != "" {
++			classes++
++		}
++		if classes > 1 {
++			return tally, fmt.Errorf("family %q case %q has conflicting outcome classifications", family, result.CaseID)
++		}
++
++		switch {
++		case result.SkipReason != "":
++			if listed {
++				return tally, fmt.Errorf("known-gap case %s/%s was skipped, so its failure is unverified", family, result.CaseID)
++			}
++			tally.Skipped++
++		case result.BoundReason != "":
++			if listed {
++				return tally, fmt.Errorf("known-gap case %s/%s was classified as bound", family, result.CaseID)
++			}
++			tally.Bound++
++		case result.FailureReason != "":
++			if !listed {
++				return tally, fmt.Errorf("failing published case %s/%s is not listed in the gap ledger: %s", family, result.CaseID, result.FailureReason)
++			}
++			_ = gap // owner and reason are validated while loading the ledger.
++			tally.KnownGap++
++		default:
++			if listed {
++				return tally, fmt.Errorf("known-gap case %s/%s now passes; remove its ledger row", family, result.CaseID)
++			}
++			tally.Driven++
++		}
++	}
++
++	if err := ValidateTally(tally, expectedCount); err != nil {
++		return tally, fmt.Errorf("family %q: %w", family, err)
++	}
++	return tally, nil
++}
++
++// ValidateTally is the explicit ratchet against omitted classifications.
++func ValidateTally(tally Tally, publishedCount int) error {
++	if total := tally.Total(); total != publishedCount {
++		return fmt.Errorf("driven(%d)+known-gap(%d)+bound(%d)+skipped(%d)=%d, want published count %d",
++			tally.Driven, tally.KnownGap, tally.Bound, tally.Skipped, total, publishedCount)
++	}
++	return nil
++}
++
++// Run executes and classifies every case in one published family.
++func Run[T any](t *testing.T, family string, cases []T, caseID func(T) string, drive func(*testing.T, T)) Tally {
++	t.Helper()
++	return RunOutcomes(t, family, cases, caseID, func(caseT *testing.T, testCase T) Observation {
++		drive(caseT, testCase)
++		return Observation{}
++	})
++}
++
++// RunOutcomes is Run with explicit bound, skip, or expected-failure
++// observations for consumers that need those classes.
++func RunOutcomes[T any](t *testing.T, family string, cases []T, caseID func(T) string, drive func(*testing.T, T) Observation) Tally {
++	return runOutcomes(t, family, cases, caseID, drive, false)
++}
++
++// RunOutcomesParallel is RunOutcomes with parallel case subtests. The
++// aggregate check runs in parent cleanup, after every parallel child finishes.
++func RunOutcomesParallel[T any](t *testing.T, family string, cases []T, caseID func(T) string, drive func(*testing.T, T) Observation) {
++	t.Helper()
++	_ = runOutcomes(t, family, cases, caseID, drive, true)
++}
++
++func runOutcomes[T any](t *testing.T, family string, cases []T, caseID func(T) string, drive func(*testing.T, T) Observation, parallel bool) Tally {
++	t.Helper()
++	counts, gaps, err := Load()
++	if err != nil {
++		t.Fatalf("load published-case coverage policy: %v", err)
++	}
++	expectedCount, ok := counts[family]
++	if !ok {
++		t.Fatalf("published-case family %q has no committed count pin", family)
++	}
++
++	ids := make([]string, len(cases))
++	results := make([]Result, len(cases))
++	check := func() Tally {
++		tally, err := Check(family, ids, results, gaps, expectedCount)
++		if err != nil {
++			t.Errorf("published-case coverage: %v", err)
++		}
++		t.Logf("published cases %s: %d driven, %d known-gap, %d bound, %d skipped, %d total",
++			family, tally.Driven, tally.KnownGap, tally.Bound, tally.Skipped, tally.Total())
++		return tally
++	}
++	if parallel {
++		t.Cleanup(func() { check() })
++	}
++	for i, testCase := range cases {
++		i, testCase := i, testCase
++		ids[i] = caseID(testCase)
++		var observation Observation
++		t.Run(ids[i], func(caseT *testing.T) {
++			if parallel {
++				caseT.Parallel()
++			}
++			defer func() {
++				if caseT.Skipped() {
++					reason := observation.SkipReason
++					if reason == "" {
++						reason = "case test skipped"
++					}
++					observation = Observation{SkipReason: reason}
++				} else if caseT.Failed() && observation.FailureReason == "" {
++					observation.FailureReason = "case test failed"
++				}
++				results[i] = Result{
++					CaseID:        ids[i],
++					FailureReason: observation.FailureReason,
++					BoundReason:   observation.BoundReason,
++					SkipReason:    observation.SkipReason,
++				}
++			}()
++			observation = drive(caseT, testCase)
++			if observation.SkipReason != "" {
++				caseT.Skip(observation.SkipReason)
++			}
++		})
++	}
++	if parallel {
++		return Tally{}
++	}
++	return check()
++}
++
++// Load reads the only gap ledger and the committed per-family count pins.
++func Load() (map[string]int, []Gap, error) {
++	root, err := repositoryRoot()
++	if err != nil {
++		return nil, nil, err
++	}
++	counts, err := readCounts(filepath.Join(root, ".github", "ci", "conformance-case-counts.tsv"))
++	if err != nil {
++		return nil, nil, err
++	}
++	gaps, err := readGaps(filepath.Join(root, ".github", "ci", "conformance-gaps.tsv"))
++	if err != nil {
++		return nil, nil, err
++	}
++	for _, gap := range gaps {
++		if _, ok := counts[gap.Family]; !ok {
++			return nil, nil, fmt.Errorf("gap ledger family %q has no count pin", gap.Family)
++		}
++	}
++	return counts, gaps, nil
++}
++
++func repositoryRoot() (string, error) {
++	current, err := os.Getwd()
++	if err != nil {
++		return "", err
++	}
++	for dir := current; ; dir = filepath.Dir(dir) {
++		if _, err := os.Stat(filepath.Join(dir, ".github", "ci", "conformance-case-counts.tsv")); err == nil {
++			return dir, nil
++		}
++		parent := filepath.Dir(dir)
++		if parent == dir {
++			return "", fmt.Errorf("cannot locate repository root above %s", current)
++		}
++	}
++}
++
++func readCounts(path string) (map[string]int, error) {
++	file, err := os.Open(path) // #nosec G304 -- path is fixed beneath the discovered repository root
++	if err != nil {
++		return nil, fmt.Errorf("read count pins %s: %w", path, err)
++	}
++	defer func() { _ = file.Close() }()
++	scanner := bufio.NewScanner(file)
++	counts := map[string]int{}
++	header := false
++	lineNo := 0
++	for scanner.Scan() {
++		lineNo++
++		line := strings.TrimSuffix(scanner.Text(), "\r")
++		if line == "" || strings.HasPrefix(line, "#") {
++			continue
++		}
++		fields := strings.Split(line, "\t")
++		if !header {
++			if len(fields) != 2 || fields[0] != "family" || fields[1] != "expected_cases" {
++				return nil, fmt.Errorf("%s:%d: expected family<TAB>expected_cases header", path, lineNo)
++			}
++			header = true
++			continue
++		}
++		if len(fields) != 2 || fields[0] == "" {
++			return nil, fmt.Errorf("%s:%d: malformed count pin", path, lineNo)
++		}
++		count, err := strconv.Atoi(fields[1])
++		if err != nil || count <= 0 {
++			return nil, fmt.Errorf("%s:%d: expected positive case count, got %q", path, lineNo, fields[1])
++		}
++		if _, duplicate := counts[fields[0]]; duplicate {
++			return nil, fmt.Errorf("%s:%d: duplicate family %q", path, lineNo, fields[0])
++		}
++		counts[fields[0]] = count
++	}
++	if err := scanner.Err(); err != nil {
++		return nil, fmt.Errorf("read count pins %s: %w", path, err)
++	}
++	if !header {
++		return nil, fmt.Errorf("%s: missing header", path)
++	}
++	if len(counts) == 0 {
++		return nil, fmt.Errorf("%s: no case counts", path)
++	}
++	return counts, nil
++}
++
++func readGaps(path string) ([]Gap, error) {
++	file, err := os.Open(path) // #nosec G304 -- path is fixed beneath the discovered repository root
++	if err != nil {
++		return nil, fmt.Errorf("read gap ledger %s: %w", path, err)
++	}
++	defer func() { _ = file.Close() }()
++	scanner := bufio.NewScanner(file)
++	var gaps []Gap
++	seen := map[string]struct{}{}
++	header := false
++	lineNo := 0
++	for scanner.Scan() {
++		lineNo++
++		line := strings.TrimSuffix(scanner.Text(), "\r")
++		if line == "" || strings.HasPrefix(line, "#") {
++			continue
++		}
++		fields := strings.Split(line, "\t")
++		if !header {
++			want := []string{"family", "case_id", "owner", "reason"}
++			if len(fields) != len(want) {
++				return nil, fmt.Errorf("%s:%d: expected family<TAB>case_id<TAB>owner<TAB>reason header", path, lineNo)
++			}
++			for i := range want {
++				if fields[i] != want[i] {
++					return nil, fmt.Errorf("%s:%d: invalid gap ledger header", path, lineNo)
++				}
++			}
++			header = true
++			continue
++		}
++		if len(fields) != 4 {
++			return nil, fmt.Errorf("%s:%d: gap row must have exactly four tab-separated fields", path, lineNo)
++		}
++		for _, field := range fields {
++			if strings.TrimSpace(field) == "" || strings.ContainsAny(field, "\r\n") {
++				return nil, fmt.Errorf("%s:%d: gap row fields must be non-empty and one line", path, lineNo)
++			}
++		}
++		gap := Gap{Family: fields[0], CaseID: fields[1], Owner: fields[2], Reason: fields[3]}
++		key := gap.Family + "\x00" + gap.CaseID
++		if _, duplicate := seen[key]; duplicate {
++			return nil, fmt.Errorf("%s:%d: duplicate gap row for %s/%s", path, lineNo, gap.Family, gap.CaseID)
++		}
++		seen[key] = struct{}{}
++		gaps = append(gaps, gap)
++	}
++	if err := scanner.Err(); err != nil {
++		return nil, fmt.Errorf("read gap ledger %s: %w", path, err)
++	}
++	if !header {
++		return nil, fmt.Errorf("%s: missing header", path)
++	}
++	return gaps, nil
++}
+diff --git a/internal/conformancecoverage/coverage_test.go b/internal/conformancecoverage/coverage_test.go
+new file mode 100644
+index 00000000..f291d8b6
+--- /dev/null
++++ b/internal/conformancecoverage/coverage_test.go
+@@ -0,0 +1,85 @@
++package conformancecoverage
++
++import (
++	"strings"
++	"testing"
++)
++
++func TestPublishedCaseTallyRejectsMissingClassification(t *testing.T) {
++	_, err := Check("fixture/family", []string{"case-a", "case-b"}, []Result{
++		{CaseID: "case-a"},
++	}, nil, 2)
++	if err == nil || !strings.Contains(err.Error(), "want published count 2") {
++		t.Fatalf("Check error = %v, want tally mismatch for omitted case-b", err)
++	}
++}
++
++func TestUnlistedFailingCaseIsRejected(t *testing.T) {
++	_, err := Check("fixture/family", []string{"case-a"}, []Result{
++		{CaseID: "case-a", FailureReason: "production entry rejected the published case"},
++	}, nil, 1)
++	if err == nil || !strings.Contains(err.Error(), "not listed in the gap ledger") {
++		t.Fatalf("Check error = %v, want unlisted failing case refusal", err)
++	}
++}
++
++func TestPassingKnownGapIsRejected(t *testing.T) {
++	_, err := Check("fixture/family", []string{"case-a"}, []Result{
++		{CaseID: "case-a"},
++	}, []Gap{{Family: "fixture/family", CaseID: "case-a", Owner: "TASK-1", Reason: "owed"}}, 1)
++	if err == nil || !strings.Contains(err.Error(), "now passes; remove its ledger row") {
++		t.Fatalf("Check error = %v, want stale passing gap refusal", err)
++	}
++}
++
++func TestVanishedGapCaseIsRejected(t *testing.T) {
++	_, err := Check("fixture/family", []string{"case-b"}, []Result{
++		{CaseID: "case-b"},
++	}, []Gap{{Family: "fixture/family", CaseID: "case-a", Owner: "TASK-1", Reason: "owed"}}, 1)
++	if err == nil || !strings.Contains(err.Error(), "case-a vanished") {
++		t.Fatalf("Check error = %v, want vanished ledger case refusal", err)
++	}
++}
++
++func TestPinnedCountRejectsVanishedPublishedCase(t *testing.T) {
++	_, err := Check("fixture/family", []string{"case-a"}, []Result{
++		{CaseID: "case-a"},
++	}, nil, 2)
++	if err == nil || !strings.Contains(err.Error(), "want pinned count 2") {
++		t.Fatalf("Check error = %v, want vanished published case refusal", err)
++	}
++}
++
++func TestCoverageCountsEveryOutcomeClassOnce(t *testing.T) {
++	ids := []string{"driven", "gap", "bound", "skip"}
++	results := []Result{
++		{CaseID: "driven"},
++		{CaseID: "gap", FailureReason: "still fails"},
++		{CaseID: "bound", BoundReason: "no production entry exists"},
++		{CaseID: "skip", SkipReason: "platform does not expose this property"},
++	}
++	gaps := []Gap{{Family: "fixture/family", CaseID: "gap", Owner: "TASK-1", Reason: "owed"}}
++	tally, err := Check("fixture/family", ids, results, gaps, len(ids))
++	if err != nil {
++		t.Fatal(err)
++	}
++	want := (Tally{Driven: 1, KnownGap: 1, Bound: 1, Skipped: 1})
++	if tally != want {
++		t.Fatalf("tally = %+v, want %+v", tally, want)
++	}
++}
++
++func TestCommittedCoveragePolicyParses(t *testing.T) {
++	counts, gaps, err := Load()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if _, ok := counts["manager-config-v2/vectors"]; !ok {
++		t.Fatal("manager-config-v2 vector count pin is missing")
++	}
++	for _, gap := range gaps {
++		if counts[gap.Family] == 0 || gap.CaseID == "" || gap.Owner == "" || gap.Reason == "" {
++			t.Fatalf("malformed committed gap row: %+v", gap)
++		}
++	}
++}
+diff --git a/internal/contextmaterialize/system_module_admission_test.go b/internal/contextmaterialize/system_module_admission_test.go
+index 020089d6..903e054d 100644
+--- a/internal/contextmaterialize/system_module_admission_test.go
++++ b/internal/contextmaterialize/system_module_admission_test.go
+@@ -26,6 +26,7 @@ import (
+ 	"strings"
+ 	"testing"
+ 
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ 	"github.com/relux-works/curator/internal/contextlock"
+ 	"github.com/relux-works/curator/internal/contextpkg"
+ )
+@@ -114,11 +115,13 @@ func TestSystemModuleAdmissionVectors(t *testing.T) {
+ 		t.Fatal(err)
+ 	}
+ 	byName := map[string]admissionVectorCase{}
++	selectedNames := map[string]bool{}
+ 	for _, tc := range vector.MaterializationCases {
+ 		byName[tc.Name] = tc
+ 	}
+ 	var missing []string
+ 	for _, name := range systemModuleAdmissionCases {
++		selectedNames[name] = true
+ 		if _, ok := byName[name]; !ok {
+ 			missing = append(missing, name)
+ 		}
+@@ -127,11 +130,14 @@ func TestSystemModuleAdmissionVectors(t *testing.T) {
+ 		t.Fatalf("conformance root %s publishes only %d of %d system-module admission cases, missing %s",
+ 			root, len(systemModuleAdmissionCases)-len(missing), len(systemModuleAdmissionCases), strings.Join(missing, ", "))
+ 	}
+-	for _, name := range systemModuleAdmissionCases {
+-		t.Run(name, func(t *testing.T) {
+-			runAdmissionVectorCase(t, root, byName[name])
++	conformancecoverage.RunOutcomes(t, "environments/materialization-cases", vector.MaterializationCases,
++		func(tc admissionVectorCase) string { return tc.Name }, func(t *testing.T, tc admissionVectorCase) conformancecoverage.Observation {
++			if !selectedNames[tc.Name] {
++				return conformancecoverage.Observation{BoundReason: "non-system-module materialization surfaces are driven by the full environments vector consumer"}
++			}
++			runAdmissionVectorCase(t, root, tc)
++			return conformancecoverage.Observation{}
+ 		})
+-	}
+ }
+ 
+ // runAdmissionVectorCase executes one admission case through SystemPrompt
+diff --git a/internal/crossconformance/draftsources_corpus_test.go b/internal/crossconformance/draftsources_corpus_test.go
+index c7fc408b..c0cdbace 100644
+--- a/internal/crossconformance/draftsources_corpus_test.go
++++ b/internal/crossconformance/draftsources_corpus_test.go
+@@ -8,6 +8,8 @@ import (
+ 	"path/filepath"
+ 	"strings"
+ 	"testing"
++
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ )
+ 
+ // draftSourcesPin is the exact curator-spec revision the vendored draft
+@@ -23,9 +25,6 @@ const draftSourcesPin = "802caee548ddc8b19408746d26c7972d39b39cc2"
+ // corpus covers the acceptance corpus as a subset; the tests assert
+ // both the exact pinned counts and the subset membership.
+ const (
+-	wantSchemaCases   = 115
+-	wantSemanticCases = 94
+-	wantSnapshotCases = 3
+ 	wantACSchemaCases = 102
+ 	wantACSemantic    = 73
+ )
+@@ -171,9 +170,13 @@ func TestDraftSourcesPin(t *testing.T) {
+ // (a4fcaf0) case lists are covered by the pinned corpus.
+ func TestDraftSourcesCorpusCounts(t *testing.T) {
+ 	dir := draftCorpusDir(t)
++	countPins, _, err := conformancecoverage.Load()
++	if err != nil {
++		t.Fatal(err)
++	}
+ 	entries := loadDraftIndex(t)
+-	if len(entries) != wantSchemaCases {
+-		t.Fatalf("schema cases = %d, want %d at pin %s", len(entries), wantSchemaCases, draftSourcesPin)
++	if len(entries) != countPins["draft-sources-v1/schema-cases"] {
++		t.Fatalf("schema cases = %d, want %d at pin %s", len(entries), countPins["draft-sources-v1/schema-cases"], draftSourcesPin)
+ 	}
+ 	instances := map[string]bool{}
+ 	for _, entry := range entries {
+@@ -183,8 +186,8 @@ func TestDraftSourcesCorpusCounts(t *testing.T) {
+ 		}
+ 	}
+ 	semantic := loadDraftSemantic(t)
+-	if len(semantic) != wantSemanticCases {
+-		t.Fatalf("semantic cases = %d, want %d at pin %s", len(semantic), wantSemanticCases, draftSourcesPin)
++	if len(semantic) != countPins["draft-sources-v1/semantic-cases"] {
++		t.Fatalf("semantic cases = %d, want %d at pin %s", len(semantic), countPins["draft-sources-v1/semantic-cases"], draftSourcesPin)
+ 	}
+ 	ids := map[string]bool{}
+ 	for _, c := range semantic {
+@@ -194,8 +197,8 @@ func TestDraftSourcesCorpusCounts(t *testing.T) {
+ 		ids[c.ID] = true
+ 	}
+ 	vectors := loadDraftSnapshots(t)
+-	if len(vectors) != wantSnapshotCases {
+-		t.Fatalf("snapshot vectors = %d, want %d at pin %s", len(vectors), wantSnapshotCases, draftSourcesPin)
++	if len(vectors) != countPins["draft-sources-v1/snapshot-cases"] {
++		t.Fatalf("snapshot vectors = %d, want %d at pin %s", len(vectors), countPins["draft-sources-v1/snapshot-cases"], draftSourcesPin)
+ 	}
+ 	acSchema := readDraftLines(t, filepath.Join(draftSourcesTestdata, "ac-schema-cases.txt"))
+ 	if len(acSchema) != wantACSchemaCases {
+diff --git a/internal/crossconformance/draftsources_schema_test.go b/internal/crossconformance/draftsources_schema_test.go
+index 51c9fcdb..6e2615aa 100644
+--- a/internal/crossconformance/draftsources_schema_test.go
++++ b/internal/crossconformance/draftsources_schema_test.go
+@@ -11,6 +11,7 @@ import (
+ 	"github.com/relux-works/curator/internal/audit"
+ 	"github.com/relux-works/curator/internal/buildmeta"
+ 	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ 	"github.com/relux-works/curator/internal/manifest"
+ 	"github.com/relux-works/curator/internal/marker"
+ 	"github.com/relux-works/curator/internal/protocoljson"
+@@ -60,38 +61,27 @@ var draftSchemaBounds = map[string]string{
+ func TestDraftSourcesSchemaCases(t *testing.T) {
+ 	dir := draftCorpusDir(t)
+ 	entries := loadDraftIndex(t)
+-	if len(entries) != wantSchemaCases {
+-		t.Fatalf("schema cases = %d, want %d", len(entries), wantSchemaCases)
+-	}
+-	var driven, bound int
+ 	seenBounds := map[string]bool{}
+-	for _, entry := range entries {
+-		driver, ok := draftSchemaDrivers[entry.Schema]
+-		if !ok {
+-			t.Fatalf("schema %q has no production-entry driver", entry.Schema)
+-		}
+-		entry := entry
+-		t.Run(entry.Instance, func(t *testing.T) {
++	conformancecoverage.RunOutcomes(t, "draft-sources-v1/schema-cases", entries,
++		func(entry draftSchemaEntry) string { return entry.Instance }, func(t *testing.T, entry draftSchemaEntry) conformancecoverage.Observation {
++			driver, ok := draftSchemaDrivers[entry.Schema]
++			if !ok {
++				t.Fatalf("schema %q has no production-entry driver", entry.Schema)
++			}
+ 			if reason, isBound := draftSchemaBounds[entry.Instance]; isBound {
+ 				seenBounds[entry.Instance] = true
+-				bound++
+ 				driver(t, dir, entry)
+ 				t.Logf("BOUND: %s", reason)
+-				return
++				return conformancecoverage.Observation{BoundReason: reason}
+ 			}
+-			driven++
+ 			driver(t, dir, entry)
++			return conformancecoverage.Observation{}
+ 		})
+-	}
+ 	for instance := range draftSchemaBounds {
+ 		if !seenBounds[instance] {
+ 			t.Errorf("bound case %q not present in the pinned index", instance)
+ 		}
+ 	}
+-	t.Logf("schema cases: %d driven, %d bounds, %d total", driven, bound, len(entries))
+-	if driven+bound != len(entries) {
+-		t.Fatalf("driven(%d)+bound(%d) != total(%d)", driven, bound, len(entries))
+-	}
+ }
+ 
+ func driveSkillfileV2Case(t *testing.T, dir string, entry draftSchemaEntry) {
+diff --git a/internal/crossconformance/draftsources_semantic_test.go b/internal/crossconformance/draftsources_semantic_test.go
+index f2dbe59f..da887a43 100644
+--- a/internal/crossconformance/draftsources_semantic_test.go
++++ b/internal/crossconformance/draftsources_semantic_test.go
+@@ -3,6 +3,8 @@ package crossconformance
+ import (
+ 	"sync"
+ 	"testing"
++
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ )
+ 
+ // draftSemanticDrivers maps every pinned semantic case id to the row
+@@ -20,26 +22,12 @@ func registerDraftSemantic(id string, drive func(t *testing.T, _ draftSemanticCa
+ 	draftSemanticDrivers[id] = drive
+ }
+ 
+-// TestDraftSourcesSemanticCases drives all 94 pinned semantic cases.
++// TestDraftSourcesSemanticCases drives every pinned semantic case.
+ func TestDraftSourcesSemanticCases(t *testing.T) {
+ 	cases := loadDraftSemantic(t)
+-	if len(cases) != wantSemanticCases {
+-		t.Fatalf("semantic cases = %d, want %d", len(cases), wantSemanticCases)
+-	}
+ 	resetSemanticOutcomes()
+-	for _, c := range cases {
+-		c := c
+-		t.Run(c.ID, func(t *testing.T) {
+-			// The cleanup observes the final subtest state even
+-			// when the driver stops early (t.Skip/t.FailNow), so
+-			// every iterated case is classified exactly once.
+-			t.Cleanup(func() {
+-				if t.Skipped() {
+-					recordSemanticSkipped(c.ID)
+-					return
+-				}
+-				recordSemanticOutcomeDefault(c.ID, semanticOutcomeDriven)
+-			})
++	conformancecoverage.RunOutcomesParallel(t, "draft-sources-v1/semantic-cases", cases,
++		func(c draftSemanticCase) string { return c.ID }, func(t *testing.T, c draftSemanticCase) conformancecoverage.Observation {
+ 			drive, ok := draftSemanticDrivers[c.ID]
+ 			if !ok {
+ 				t.Fatalf("semantic case %q has no production-entry row", c.ID)
+@@ -48,15 +36,8 @@ func TestDraftSourcesSemanticCases(t *testing.T) {
+ 				t.Fatalf("case %q carries no expected outcome", c.ID)
+ 			}
+ 			drive(t, c)
++			return semanticObservation(c.ID)
+ 		})
+-	}
+-	driven, knownGap, bound, skipped := tallySemanticOutcomes()
+-	t.Logf("semantic cases: %d driven, %d known-gap, %d bound, %d skipped, %d total",
+-		driven, knownGap, bound, skipped, len(cases))
+-	if executed := driven + knownGap + bound + skipped; executed != len(cases) || len(cases) != wantSemanticCases {
+-		t.Fatalf("executed(%d) != total(%d, want %d); run the full matrix without -run subtest filters",
+-			executed, len(cases), wantSemanticCases)
+-	}
+ }
+ 
+ // TestDraftSourcesSemanticCoverage fails when the row matrix and the
+@@ -84,78 +65,34 @@ func TestDraftSourcesSemanticCoverage(t *testing.T) {
+ // never as passing.
+ func semanticBound(t *testing.T, c draftSemanticCase, reason string) {
+ 	t.Helper()
+-	recordSemanticOutcome(c.ID, semanticOutcomeBound)
++	recordSemanticBound(c.ID, reason)
+ 	t.Logf("BOUND %s: expected %q: %s", c.ID, c.Expected, reason)
+ }
+ 
+-// Semantic outcome classes, one recorded per executed case id.
+-const (
+-	semanticOutcomeDriven   = "driven"
+-	semanticOutcomeKnownGap = "known-gap"
+-	semanticOutcomeBound    = "bound"
+-	semanticOutcomeSkipped  = "skipped"
+-)
+-
+-// draftSemanticOutcomes classifies every case the runner iterates. The
+-// subtests run sequentially, but the registry is still mutex-guarded so
+-// a future t.Parallel cannot corrupt the tally.
++// draftSemanticBounds carries only explicit bounds. Known gaps are read from
++// the committed ledger by conformancecoverage.Run; no driver may declare one.
+ var draftSemanticOutcomes = struct {
+ 	sync.Mutex
+-	byID map[string]string
+-}{byID: map[string]string{}}
++	byID map[string]conformancecoverage.Observation
++}{byID: map[string]conformancecoverage.Observation{}}
+ 
+ func resetSemanticOutcomes() {
+ 	draftSemanticOutcomes.Lock()
+ 	defer draftSemanticOutcomes.Unlock()
+-	draftSemanticOutcomes.byID = map[string]string{}
+-}
+-
+-// recordSemanticOutcome classifies one case explicitly (bound or
+-// known-gap). A conflicting second classification panics: the harness
+-// must never report one row under two classes.
+-func recordSemanticOutcome(id, class string) {
+-	draftSemanticOutcomes.Lock()
+-	defer draftSemanticOutcomes.Unlock()
+-	if prev, ok := draftSemanticOutcomes.byID[id]; ok && prev != class {
+-		panic("semantic case " + id + " classified twice: " + prev + " then " + class)
+-	}
+-	draftSemanticOutcomes.byID[id] = class
++	draftSemanticOutcomes.byID = map[string]conformancecoverage.Observation{}
+ }
+ 
+-// recordSemanticOutcomeDefault classifies one case only when no
+-// explicit class was recorded: a completed row without a bound or gap
+-// marker is a driven pass.
+-func recordSemanticOutcomeDefault(id, class string) {
++func recordSemanticBound(id, reason string) {
+ 	draftSemanticOutcomes.Lock()
+ 	defer draftSemanticOutcomes.Unlock()
+-	if _, ok := draftSemanticOutcomes.byID[id]; !ok {
+-		draftSemanticOutcomes.byID[id] = class
++	if prev, ok := draftSemanticOutcomes.byID[id]; ok && prev.BoundReason != reason {
++		panic("semantic case " + id + " classified twice: " + prev.BoundReason + " then " + reason)
+ 	}
++	draftSemanticOutcomes.byID[id] = conformancecoverage.Observation{BoundReason: reason}
+ }
+ 
+-// recordSemanticSkipped reports the row as skipped. Skip is the final
+-// Go-reported state, so it wins over an earlier explicit marker when a
+-// row records one and then skips at a later layer.
+-func recordSemanticSkipped(id string) {
++func semanticObservation(id string) conformancecoverage.Observation {
+ 	draftSemanticOutcomes.Lock()
+ 	defer draftSemanticOutcomes.Unlock()
+-	draftSemanticOutcomes.byID[id] = semanticOutcomeSkipped
+-}
+-
+-func tallySemanticOutcomes() (driven, knownGap, bound, skipped int) {
+-	draftSemanticOutcomes.Lock()
+-	defer draftSemanticOutcomes.Unlock()
+-	for _, class := range draftSemanticOutcomes.byID {
+-		switch class {
+-		case semanticOutcomeDriven:
+-			driven++
+-		case semanticOutcomeKnownGap:
+-			knownGap++
+-		case semanticOutcomeBound:
+-			bound++
+-		case semanticOutcomeSkipped:
+-			skipped++
+-		}
+-	}
+-	return driven, knownGap, bound, skipped
++	return draftSemanticOutcomes.byID[id]
+ }
+diff --git a/internal/crossconformance/draftsources_snapshot_test.go b/internal/crossconformance/draftsources_snapshot_test.go
+index c2f1b5ce..601d6193 100644
+--- a/internal/crossconformance/draftsources_snapshot_test.go
++++ b/internal/crossconformance/draftsources_snapshot_test.go
+@@ -6,6 +6,7 @@ import (
+ 	"runtime"
+ 	"testing"
+ 
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ 	"github.com/relux-works/curator/internal/snapshot"
+ )
+ 
+@@ -16,14 +17,10 @@ import (
+ // executable flag, and inventory digest must equal the pinned values.
+ func TestDraftSourcesSnapshotVectors(t *testing.T) {
+ 	vectors := loadDraftSnapshots(t)
+-	if len(vectors) != wantSnapshotCases {
+-		t.Fatalf("snapshot vectors = %d, want %d", len(vectors), wantSnapshotCases)
+-	}
+ 	seenSkill := ""
+ 	seenSnapshots := map[string]string{}
+-	for _, vector := range vectors {
+-		vector := vector
+-		t.Run(vector.ID, func(t *testing.T) {
++	conformancecoverage.Run(t, "draft-sources-v1/snapshot-cases", vectors,
++		func(vector draftSnapshotVector) string { return vector.ID }, func(t *testing.T, vector draftSnapshotVector) {
+ 			base := t.TempDir()
+ 			pkg := filepath.Join(base, "pkg")
+ 			materializeSnapshotVector(t, pkg, vector)
+@@ -56,22 +53,23 @@ func TestDraftSourcesSnapshotVectors(t *testing.T) {
+ 				t.Fatalf("snapshot = %s, want %s", inventory.Snapshot, vector.Inventory.Snapshot)
+ 			}
+ 		})
++	for _, vector := range vectors {
+ 		for _, entry := range vector.Inventory.Files {
+ 			if entry.Path == "SKILL.md" {
+ 				if seenSkill == "" {
+ 					seenSkill = entry.SHA256
+ 				} else if entry.SHA256 != seenSkill {
+-					t.Fatalf("%s changed SKILL.md bytes %s, want the frozen %s", vector.ID, entry.SHA256, seenSkill)
++					t.Errorf("%s changed SKILL.md bytes %s, want the frozen %s", vector.ID, entry.SHA256, seenSkill)
+ 				}
+ 			}
+ 		}
+ 		if prior, ok := seenSnapshots[vector.Inventory.Snapshot]; ok {
+-			t.Fatalf("snapshot collision: %s and %s share %s", prior, vector.ID, vector.Inventory.Snapshot)
++			t.Errorf("snapshot collision: %s and %s share %s", prior, vector.ID, vector.Inventory.Snapshot)
+ 		}
+ 		seenSnapshots[vector.Inventory.Snapshot] = vector.ID
+ 	}
+-	if len(seenSnapshots) != wantSnapshotCases {
+-		t.Fatalf("want %d distinct package identities, got %v", wantSnapshotCases, seenSnapshots)
++	if len(seenSnapshots) != len(vectors) {
++		t.Fatalf("want %d distinct package identities, got %v", len(vectors), seenSnapshots)
+ 	}
+ }
+ 
+diff --git a/internal/envfragment/fragment_schema_test.go b/internal/envfragment/fragment_schema_test.go
+index bed495e4..01c5edce 100644
+--- a/internal/envfragment/fragment_schema_test.go
++++ b/internal/envfragment/fragment_schema_test.go
+@@ -9,6 +9,7 @@ import (
+ 	"strings"
+ 	"testing"
+ 
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ 	"github.com/relux-works/curator/internal/contextpkg"
+ 	"github.com/relux-works/curator/internal/envregistry"
+ 	"github.com/relux-works/curator/internal/protocoljson"
+@@ -291,30 +292,33 @@ func TestFragmentAuthoritativeSchemaCases(t *testing.T) {
+ 	if err := json.Unmarshal(payload, &entries); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	seen := 0
++	type indexedCase struct {
++		Name  string
++		Path  string
++		Valid bool
++	}
++	var cases []indexedCase
+ 	for _, entry := range entries {
+ 		if !strings.HasPrefix(entry.Instance, "launch-env-fragment-v1/") {
+ 			continue
+ 		}
+ 		name := strings.TrimPrefix(entry.Instance, "launch-env-fragment-v1/")
+-		seen++
+-		t.Run(name, func(t *testing.T) {
+-			raw, err := os.ReadFile(filepath.Join(root, "schema-cases", entry.Instance)) // #nosec G304 -- explicit conformance input
++		cases = append(cases, indexedCase{Name: name, Path: entry.Instance, Valid: entry.Valid})
++	}
++	conformancecoverage.Run(t, "launch-env-fragment-v1/schema-cases", cases,
++		func(tc indexedCase) string { return tc.Name }, func(t *testing.T, tc indexedCase) {
++			raw, err := os.ReadFile(filepath.Join(root, "schema-cases", tc.Path)) // #nosec G304 -- explicit conformance input
+ 			if err != nil {
+ 				t.Fatal(err)
+ 			}
+ 			err = validateFragmentCase(raw, "/manager/environments")
+-			if entry.Valid && err != nil {
++			if tc.Valid && err != nil {
+ 				t.Fatalf("valid case rejected: %v", err)
+ 			}
+-			if !entry.Valid && err == nil {
++			if !tc.Valid && err == nil {
+ 				t.Fatal("invalid case accepted")
+ 			}
+ 		})
+-	}
+-	if seen == 0 {
+-		t.Fatal("the root publishes no launch-env-fragment-v1 cases")
+-	}
+ }
+ 
+ // TestFragmentEmissionMatchesReference proves the production emitter
+diff --git a/internal/envmarker/marker_env_schema_test.go b/internal/envmarker/marker_env_schema_test.go
+index 6cc9322a..386d7ab5 100644
+--- a/internal/envmarker/marker_env_schema_test.go
++++ b/internal/envmarker/marker_env_schema_test.go
+@@ -6,6 +6,8 @@ import (
+ 	"path/filepath"
+ 	"strings"
+ 	"testing"
++
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ )
+ 
+ // schemaIndexEntry is one row of the published schema-cases index.
+@@ -15,11 +17,16 @@ type schemaIndexEntry struct {
+ 	Valid    bool   `json:"valid"`
+ }
+ 
++type namedSchemaCase struct {
++	Name  string
++	Valid bool
++}
++
+ // schemaCaseValidity loads the published index and reports the recorded
+ // validity of each instance in the family. The index — not the file-name
+ // prefix — decides: an unindexed file fails the test instead of silently
+ // passing or skipping.
+-func schemaCaseValidity(t *testing.T, root, family string) map[string]bool {
++func schemaCaseValidity(t *testing.T, root, family string) []namedSchemaCase {
+ 	t.Helper()
+ 	payload, err := os.ReadFile(filepath.Join(root, "schema-cases", "index.json")) // #nosec G304 -- explicit conformance input
+ 	if err != nil {
+@@ -29,14 +36,14 @@ func schemaCaseValidity(t *testing.T, root, family string) map[string]bool {
+ 	if err := json.Unmarshal(payload, &entries); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	validity := map[string]bool{}
++	var cases []namedSchemaCase
+ 	indexed := map[string]bool{}
+ 	for _, entry := range entries {
+ 		if !strings.HasPrefix(entry.Instance, family+"/") {
+ 			continue
+ 		}
+ 		name := strings.TrimPrefix(entry.Instance, family+"/")
+-		validity[name] = entry.Valid
++		cases = append(cases, namedSchemaCase{Name: name, Valid: entry.Valid})
+ 		indexed[name] = true
+ 	}
+ 	disk, err := os.ReadDir(filepath.Join(root, "schema-cases", family))
+@@ -60,7 +67,7 @@ func schemaCaseValidity(t *testing.T, root, family string) map[string]bool {
+ 	if seen == 0 {
+ 		t.Fatalf("the root publishes schema-cases/%s but it contains no cases", family)
+ 	}
+-	return validity
++	return cases
+ }
+ 
+ // TestParseAuthoritativeEnvMarkerSchemaCases runs the published
+@@ -75,20 +82,19 @@ func TestParseAuthoritativeEnvMarkerSchemaCases(t *testing.T) {
+ 	if root == "" {
+ 		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
+ 	}
+-	validity := schemaCaseValidity(t, root, "agent-environment-marker-v1")
+-	for name, wantValid := range validity {
+-		t.Run(name, func(t *testing.T) {
+-			payload, err := os.ReadFile(filepath.Join(root, "schema-cases", "agent-environment-marker-v1", name)) // #nosec G304 -- explicit conformance input
++	cases := schemaCaseValidity(t, root, "agent-environment-marker-v1")
++	conformancecoverage.Run(t, "agent-environment-marker-v1/schema-cases", cases,
++		func(tc namedSchemaCase) string { return tc.Name }, func(t *testing.T, tc namedSchemaCase) {
++			payload, err := os.ReadFile(filepath.Join(root, "schema-cases", "agent-environment-marker-v1", tc.Name)) // #nosec G304 -- explicit conformance input
+ 			if err != nil {
+ 				t.Fatal(err)
+ 			}
+ 			_, err = Parse(payload)
+-			if wantValid && err != nil {
++			if tc.Valid && err != nil {
+ 				t.Fatalf("valid case rejected: %v", err)
+ 			}
+-			if !wantValid && err == nil {
++			if !tc.Valid && err == nil {
+ 				t.Fatalf("invalid case accepted")
+ 			}
+ 		})
+-	}
+ }
+diff --git a/internal/envprofile/envpassthrough_conformance_test.go b/internal/envprofile/envpassthrough_conformance_test.go
+index 110dedd1..44d3adba 100644
+--- a/internal/envprofile/envpassthrough_conformance_test.go
++++ b/internal/envprofile/envpassthrough_conformance_test.go
+@@ -10,6 +10,7 @@ import (
+ 	"testing"
+ 
+ 	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ 	"github.com/relux-works/curator/internal/contextlock"
+ 	"github.com/relux-works/curator/internal/contextmaterialize"
+ 	"github.com/relux-works/curator/internal/contextresolve"
+@@ -67,36 +68,26 @@ func TestEnvironmentsEnvPassthroughVectors(t *testing.T) {
+ 	if len(vectors.Order) == 0 {
+ 		t.Fatal("vectors/environments-env-passthrough.json publishes no surfacing_order_cases")
+ 	}
+-	for _, tc := range vectors.DefaultResolution {
+-		tc := tc
+-		t.Run("resolution/"+tc.Name, func(t *testing.T) {
++	conformancecoverage.Run(t, "environments-env-passthrough/default-resolution-cases", vectors.DefaultResolution,
++		func(tc passthroughVectorCase) string { return "resolution/" + tc.Name }, func(t *testing.T, tc passthroughVectorCase) {
+ 			runPassthroughVectorCase(t, tc)
+ 		})
+-	}
+-	for _, tc := range vectors.AllowlistEmpty {
+-		tc := tc
+-		t.Run("allowlist/"+tc.Name, func(t *testing.T) {
++	conformancecoverage.Run(t, "environments-env-passthrough/allowlist-empty-cases", vectors.AllowlistEmpty,
++		func(tc allowlistVectorCase) string { return "allowlist/" + tc.Name }, func(t *testing.T, tc allowlistVectorCase) {
+ 			runAllowlistVectorCase(t, tc)
+ 		})
+-	}
+-	for _, tc := range vectors.Schema {
+-		tc := tc
+-		t.Run("schema/"+tc.Name, func(t *testing.T) {
++	conformancecoverage.Run(t, "environments-env-passthrough/schema-cases", vectors.Schema,
++		func(tc schemaVectorCase) string { return "schema/" + tc.Name }, func(t *testing.T, tc schemaVectorCase) {
+ 			runPassthroughSchemaCase(t, tc)
+ 		})
+-	}
+-	for _, tc := range vectors.Surfacing {
+-		tc := tc
+-		t.Run("surfacing/"+tc.Name, func(t *testing.T) {
++	conformancecoverage.Run(t, "environments-env-passthrough/surfacing-cases", vectors.Surfacing,
++		func(tc surfacingVectorCase) string { return "surfacing/" + tc.Name }, func(t *testing.T, tc surfacingVectorCase) {
+ 			runSurfacingVectorCase(t, tc)
+ 		})
+-	}
+-	for _, tc := range vectors.Order {
+-		tc := tc
+-		t.Run("order/"+tc.Name, func(t *testing.T) {
++	conformancecoverage.Run(t, "environments-env-passthrough/surfacing-order-cases", vectors.Order,
++		func(tc surfacingOrderCase) string { return "order/" + tc.Name }, func(t *testing.T, tc surfacingOrderCase) {
+ 			runSurfacingOrderCase(t, tc)
+ 		})
+-	}
+ }
+ 
+ // passthroughVectorCase is one default_resolution_cases entry: the knob
+diff --git a/internal/godriver/build_conformance_test.go b/internal/godriver/build_conformance_test.go
+index eb5fe8dc..2f515c0e 100644
+--- a/internal/godriver/build_conformance_test.go
++++ b/internal/godriver/build_conformance_test.go
+@@ -8,8 +8,41 @@ import (
+ 	"testing"
+ 
+ 	"github.com/relux-works/curator/internal/buildmeta"
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ )
+ 
++type capabilityEvidenceCase struct {
++	Name                   string `json:"name"`
++	Control                string `json:"control"`
++	Availability           string `json:"availability"`
++	Status                 string `json:"status"`
++	EntryCount             int    `json:"entry_count"`
++	InInventory            bool   `json:"in_inventory"`
++	RecordVersion          string `json:"record_version"`
++	RecordExecutionPolicy  string `json:"record_execution_policy"`
++	HardenedGuaranteeClaim bool   `json:"hardened_guarantee_claimed"`
++	RecordValid            bool   `json:"record_valid"`
++	BuildPermitted         bool   `json:"build_permitted"`
++	ChangesCacheKey        bool   `json:"changes_cache_key"`
++	ExpectedError          string `json:"expected_error"`
++}
++
++type identityProtocolCase struct {
++	Name            string `json:"name"`
++	ExpectedError   string `json:"expected_error"`
++	WorkerStarted   bool   `json:"worker_started"`
++	CompilerStarted bool   `json:"compiler_started"`
++	Published       bool   `json:"published"`
++}
++
++type packageInfluenceCase struct {
++	Name            string `json:"name"`
++	ExpectedError   string `json:"expected_error"`
++	WorkerStarted   bool   `json:"worker_started"`
++	CompilerStarted bool   `json:"compiler_started"`
++	Published       bool   `json:"published"`
++}
++
+ // hostExecutionVector is the accepted rc.5 authority for the portable
+ // manager-worker-v1 execution policy.
+ type hostExecutionVector struct {
+@@ -73,21 +106,7 @@ type hostExecutionVector struct {
+ 		} `json:"examples"`
+ 	} `json:"capability_evidence_record"`
+ 
+-	CapabilityEvidenceCases []struct {
+-		Name                   string `json:"name"`
+-		Control                string `json:"control"`
+-		Availability           string `json:"availability"`
+-		Status                 string `json:"status"`
+-		EntryCount             int    `json:"entry_count"`
+-		InInventory            bool   `json:"in_inventory"`
+-		RecordVersion          string `json:"record_version"`
+-		RecordExecutionPolicy  string `json:"record_execution_policy"`
+-		HardenedGuaranteeClaim bool   `json:"hardened_guarantee_claimed"`
+-		RecordValid            bool   `json:"record_valid"`
+-		BuildPermitted         bool   `json:"build_permitted"`
+-		ChangesCacheKey        bool   `json:"changes_cache_key"`
+-		ExpectedError          string `json:"expected_error"`
+-	} `json:"capability_evidence_cases"`
++	CapabilityEvidenceCases []capabilityEvidenceCase `json:"capability_evidence_cases"`
+ 
+ 	DeferredHardenedGuarantees []struct {
+ 		Name                  string `json:"name"`
+@@ -112,21 +131,9 @@ type hostExecutionVector struct {
+ 		RejectsBuild  bool   `json:"rejects_build"`
+ 	} `json:"failure_boundary"`
+ 
+-	IdentityAndProtocolCases []struct {
+-		Name            string `json:"name"`
+-		ExpectedError   string `json:"expected_error"`
+-		WorkerStarted   bool   `json:"worker_started"`
+-		CompilerStarted bool   `json:"compiler_started"`
+-		Published       bool   `json:"published"`
+-	} `json:"identity_and_protocol_cases"`
++	IdentityAndProtocolCases []identityProtocolCase `json:"identity_and_protocol_cases"`
+ 
+-	PackageInfluenceCases []struct {
+-		Name            string `json:"name"`
+-		ExpectedError   string `json:"expected_error"`
+-		WorkerStarted   bool   `json:"worker_started"`
+-		CompilerStarted bool   `json:"compiler_started"`
+-		Published       bool   `json:"published"`
+-	} `json:"package_influence_cases"`
++	PackageInfluenceCases []packageInfluenceCase `json:"package_influence_cases"`
+ 
+ 	CacheIdentity struct {
+ 		Aliases  bool `json:"aliases"`
+@@ -305,11 +312,8 @@ func TestCapabilityEvidenceRecordMatchesTheAcceptedVector(t *testing.T) {
+ 
+ func TestCapabilityEvidenceCasesMatchTheAcceptedVector(t *testing.T) {
+ 	vector := loadHostExecutionVector(t)
+-	if len(vector.CapabilityEvidenceCases) != 11 {
+-		t.Fatalf("evidence cases = %d, want the exact rc.5 inventory of 11", len(vector.CapabilityEvidenceCases))
+-	}
+-	for _, testCase := range vector.CapabilityEvidenceCases {
+-		t.Run(testCase.Name, func(t *testing.T) {
++	conformancecoverage.Run(t, "go-host-execution-policy/capability-evidence-cases", vector.CapabilityEvidenceCases,
++		func(testCase capabilityEvidenceCase) string { return testCase.Name }, func(t *testing.T, testCase capabilityEvidenceCase) {
+ 			if testCase.ChangesCacheKey {
+ 				t.Fatal("capability evidence must never change a cache key")
+ 			}
+@@ -356,7 +360,6 @@ func TestCapabilityEvidenceCasesMatchTheAcceptedVector(t *testing.T) {
+ 				t.Fatalf("hardened claim %q was not rejected as a hardened claim", testCase.Name)
+ 			}
+ 		})
+-	}
+ }
+ 
+ func TestDeferredGuaranteesAndFailureBoundaryMatchTheAcceptedVector(t *testing.T) {
+@@ -408,22 +411,23 @@ func TestIdentityProtocolAndPackageInfluenceCodesMatchTheAcceptedVector(t *testi
+ 		CodeControlUnavailable: true, CodeCapabilityEvidenceInvalid: true,
+ 		CodeHardenedClaimForbidden: true, CodePackageInfluenceForbidden: true,
+ 	}
+-	for _, testCase := range vector.IdentityAndProtocolCases {
+-		if !implemented[testCase.ExpectedError] {
+-			t.Fatalf("case %q expects unimplemented diagnostic %q", testCase.Name, testCase.ExpectedError)
+-		}
+-		if testCase.Published {
+-			t.Fatalf("case %q publishes", testCase.Name)
+-		}
+-	}
+-	if len(vector.PackageInfluenceCases) != 8 {
+-		t.Fatalf("package influence cases = %d, want eight", len(vector.PackageInfluenceCases))
+-	}
+-	for _, testCase := range vector.PackageInfluenceCases {
+-		if testCase.ExpectedError != CodePackageInfluenceForbidden || testCase.WorkerStarted || testCase.CompilerStarted || testCase.Published {
+-			t.Fatalf("package influence case %+v", testCase)
+-		}
+-	}
++	conformancecoverage.RunOutcomes(t, "go-host-execution-policy/identity-and-protocol-cases", vector.IdentityAndProtocolCases,
++		func(testCase identityProtocolCase) string { return testCase.Name }, func(t *testing.T, testCase identityProtocolCase) conformancecoverage.Observation {
++			if !implemented[testCase.ExpectedError] {
++				t.Fatalf("case %q expects unimplemented diagnostic %q", testCase.Name, testCase.ExpectedError)
++			}
++			if testCase.Published {
++				t.Fatalf("case %q publishes", testCase.Name)
++			}
++			return conformancecoverage.Observation{BoundReason: "this consumer checks the published diagnostic metadata; it does not drive the worker protocol failure path"}
++		})
++	conformancecoverage.RunOutcomes(t, "go-host-execution-policy/package-influence-cases", vector.PackageInfluenceCases,
++		func(testCase packageInfluenceCase) string { return testCase.Name }, func(t *testing.T, testCase packageInfluenceCase) conformancecoverage.Observation {
++			if testCase.ExpectedError != CodePackageInfluenceForbidden || testCase.WorkerStarted || testCase.CompilerStarted || testCase.Published {
++				t.Fatalf("package influence case %+v", testCase)
++			}
++			return conformancecoverage.Observation{BoundReason: "this consumer checks the published package-influence boundary metadata; it does not submit a package-influence request to the worker"}
++		})
+ }
+ 
+ func TestCacheIdentityMatchesTheAcceptedVector(t *testing.T) {
+diff --git a/internal/godriver/builddriver_positive_conformance_test.go b/internal/godriver/builddriver_positive_conformance_test.go
+index df105e65..ba9fbf0b 100644
+--- a/internal/godriver/builddriver_positive_conformance_test.go
++++ b/internal/godriver/builddriver_positive_conformance_test.go
+@@ -13,6 +13,8 @@ import (
+ 	"testing"
+ 	"time"
+ 	"unicode/utf8"
++
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ )
+ 
+ // toolchainCase is one authoritative toolchain identity vector.
+@@ -59,26 +61,28 @@ type argvCase struct {
+ 	SourceAware bool     `json:"source_aware"`
+ }
+ 
++type positivePackageCase struct {
++	Name    string `json:"name"`
++	Result  string `json:"result"`
++	Package struct {
++		Name              string   `json:"name"`
++		MainPackages      int      `json:"main_packages"`
++		Dependencies      []string `json:"dependencies"`
++		VendorRequired    bool     `json:"vendor_required"`
++		VendorMode        string   `json:"vendor_mode"`
++		ModuleRoot        string   `json:"module_root"`
++		TransitivePackage string   `json:"transitive_package"`
++		VendoredPackage   string   `json:"vendored_package"`
++		EmbeddedInputs    []string `json:"embedded_inputs"`
++	} `json:"package"`
++}
++
+ type positiveVectors struct {
+ 	FixedEnvironment      map[string]string      `json:"fixed_environment"`
+ 	FixedEnvironmentCases []fixedEnvironmentCase `json:"fixed_environment_cases"`
+ 	Argv                  []argvCase             `json:"argv"`
+ 	ToolchainCases        []toolchainCase        `json:"toolchain_cases"`
+-	PositiveCases         []struct {
+-		Name    string `json:"name"`
+-		Result  string `json:"result"`
+-		Package struct {
+-			Name              string   `json:"name"`
+-			MainPackages      int      `json:"main_packages"`
+-			Dependencies      []string `json:"dependencies"`
+-			VendorRequired    bool     `json:"vendor_required"`
+-			VendorMode        string   `json:"vendor_mode"`
+-			ModuleRoot        string   `json:"module_root"`
+-			TransitivePackage string   `json:"transitive_package"`
+-			VendoredPackage   string   `json:"vendored_package"`
+-			EmbeddedInputs    []string `json:"embedded_inputs"`
+-		} `json:"package"`
+-	} `json:"positive_cases"`
++	PositiveCases         []positivePackageCase  `json:"positive_cases"`
+ }
+ 
+ type fixedEnvironmentCase struct {
+@@ -123,13 +127,6 @@ func decodeBase64(t *testing.T, value string) []byte {
+ // published ones, including which forms are source-aware.
+ func TestFixedEnvironmentAndFiveDirectArgvFormsVector(t *testing.T) {
+ 	vectors := loadPositiveVectors(t)
+-	if len(vectors.Argv) == 0 {
+-		t.Skip("this conformance root publishes no fixed argument vectors")
+-	}
+-	if len(vectors.Argv) != 5 {
+-		t.Fatalf("suite publishes %d argument-vector forms, want the exact five", len(vectors.Argv))
+-	}
+-
+ 	// Curator's own inventory of package-independent probe forms plus the two
+ 	// source-aware forms.
+ 	probes := map[string][]string{
+@@ -137,9 +134,8 @@ func TestFixedEnvironmentAndFiveDirectArgvFormsVector(t *testing.T) {
+ 		"version":       {"version"},
+ 		"env":           append([]string{"env", "-json"}, probeEnvNames...),
+ 	}
+-	for _, testCase := range vectors.Argv {
+-		testCase := testCase
+-		t.Run(testCase.Name, func(t *testing.T) {
++	conformancecoverage.RunOutcomes(t, "build-drivers/argv-cases", vectors.Argv,
++		func(testCase argvCase) string { return testCase.Name }, func(t *testing.T, testCase argvCase) conformancecoverage.Observation {
+ 			if len(testCase.Argv) == 0 {
+ 				t.Fatal("vector publishes an empty argument vector")
+ 			}
+@@ -177,44 +173,61 @@ func TestFixedEnvironmentAndFiveDirectArgvFormsVector(t *testing.T) {
+ 					t.Fatalf("%s argv = %q, Curator uses %q", testCase.Name, arguments, want)
+ 				}
+ 			}
++			return conformancecoverage.Observation{BoundReason: "this consumer compares each published argv form to Curator's fixed command contract; the live process entry is exercised by build-driver consumers"}
+ 		})
++
++	if len(vectors.FixedEnvironmentCases) == 0 {
++		t.Run("fixed environment", func(t *testing.T) {
++			expected, optional := fixedEnvironmentForHost(t, vectors, runtime.GOOS, runtime.GOARCH)
++			assertFixedEnvironment(t, expected, optional)
++		})
++		return
+ 	}
++	conformancecoverage.RunOutcomes(t, "build-drivers/fixed-environment-cases", vectors.FixedEnvironmentCases,
++		func(testCase fixedEnvironmentCase) string { return testCase.Name }, func(t *testing.T, testCase fixedEnvironmentCase) conformancecoverage.Observation {
++			if testCase.GOOS != runtime.GOOS || testCase.GOARCH != runtime.GOARCH {
++				return conformancecoverage.Observation{SkipReason: "fixed environment case is exercised on its native runner"}
++			}
++			optional := make(map[string]bool, len(testCase.OptionalVariables))
++			for _, key := range testCase.OptionalVariables {
++				optional[key] = true
++			}
++			assertFixedEnvironment(t, testCase.Environment, optional)
++			return conformancecoverage.Observation{BoundReason: "this consumer inspects the worker session through a test fixture rather than launching the manager entry point"}
++		})
++}
+ 
+-	t.Run("fixed environment", func(t *testing.T) {
+-		expected, optional := fixedEnvironmentForHost(t, vectors, runtime.GOOS, runtime.GOARCH)
+-		if len(expected) == 0 {
+-			t.Skip("this conformance root publishes no fixed environment")
+-		}
+-		fixture := newSnapshotFixture(t)
+-		fixture.start(stubScript{ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact"})
+-		values := environmentMap(fixture.session.Environment())
++func assertFixedEnvironment(t *testing.T, expected map[string]string, optional map[string]bool) {
++	t.Helper()
++	fixture := newSnapshotFixture(t)
++	fixture.start(stubScript{ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact"})
++	values := environmentMap(fixture.session.Environment())
+ 
+-		published := make([]string, 0, len(expected))
+-		for key := range expected {
+-			published = append(published, key)
++	published := make([]string, 0, len(expected))
++	for key := range expected {
++		published = append(published, key)
++	}
++	sort.Strings(published)
++	for _, key := range published {
++		want := expected[key]
++		got, present := values[key]
++		if !present {
++			t.Fatalf("Curator's closed environment omits %s", key)
+ 		}
+-		sort.Strings(published)
+-		for _, key := range published {
+-			want := expected[key]
+-			got, present := values[key]
+-			if !present {
+-				t.Fatalf("Curator's closed environment omits %s", key)
+-			}
+-			// Manager-derived locations are host-specific by construction; the
+-			// suite marks them with a placeholder rather than a literal value.
+-			if want == "" || want[0] == '<' {
+-				continue
+-			}
+-			if got != want {
+-				t.Fatalf("closed environment %s = %q, the suite publishes %q", key, got, want)
+-			}
++		// Manager-derived locations are host-specific by construction; the
++		// suite marks them with a placeholder rather than a literal value.
++		if want == "" || want[0] == '<' {
++			continue
+ 		}
+-		for key := range values {
+-			if _, ok := expected[key]; !ok && !optional[key] {
+-				t.Fatalf("Curator's closed environment carries %s, which the suite does not publish", key)
+-			}
++		if got != want {
++			t.Fatalf("closed environment %s = %q, the suite publishes %q", key, got, want)
++		}
++	}
++	for key := range values {
++		if _, ok := expected[key]; !ok && !optional[key] {
++			t.Fatalf("Curator's closed environment carries %s, which the suite does not publish", key)
+ 		}
+-	})
++	}
+ }
+ 
+ func fixedEnvironmentForHost(t *testing.T, vectors positiveVectors, goos, goarch string) (map[string]string, map[string]bool) {
+@@ -260,12 +273,8 @@ func TestFixedEnvironmentForHostSelectsNativeCase(t *testing.T) {
+ // case, positive and negative, is executable against Curator's fingerprint.
+ func TestToolchainIdentityVectors(t *testing.T) {
+ 	vectors := loadPositiveVectors(t)
+-	if len(vectors.ToolchainCases) == 0 {
+-		t.Skip("this conformance root publishes no toolchain cases")
+-	}
+-	for _, testCase := range vectors.ToolchainCases {
+-		testCase := testCase
+-		t.Run(testCase.Name, func(t *testing.T) {
++	conformancecoverage.Run(t, "build-drivers/toolchain-cases", vectors.ToolchainCases,
++		func(testCase toolchainCase) string { return testCase.Name }, func(t *testing.T, testCase toolchainCase) {
+ 			switch testCase.Name {
+ 			case "unsorted-directories-files-and-internal-link":
+ 				root := materializeToolchain(t, testCase)
+@@ -354,7 +363,6 @@ func TestToolchainIdentityVectors(t *testing.T) {
+ 				t.Fatalf("authoritative toolchain case %q has no Curator assertion", testCase.Name)
+ 			}
+ 		})
+-	}
+ }
+ 
+ // invalidUnicodeNames lists the byte spellings that can carry an invalid
+@@ -485,12 +493,11 @@ func toolchainVariantTime(t *testing.T, value string) time.Time {
+ // is proved without compiling or starting any package code.
+ func TestValidPackageGraphVectors(t *testing.T) {
+ 	vectors := loadPositiveVectors(t)
+-	for _, testCase := range vectors.PositiveCases {
+-		if testCase.Name != "valid-standard-library-only-main" && testCase.Name != "valid-vendor-only-main-with-transitive-embed" {
+-			continue
+-		}
+-		testCase := testCase
+-		t.Run(testCase.Name, func(t *testing.T) {
++	conformancecoverage.RunOutcomes(t, "build-drivers/positive-cases", vectors.PositiveCases,
++		func(testCase positivePackageCase) string { return testCase.Name }, func(t *testing.T, testCase positivePackageCase) conformancecoverage.Observation {
++			if testCase.Name != "valid-standard-library-only-main" && testCase.Name != "valid-vendor-only-main-with-transitive-embed" {
++				return conformancecoverage.Observation{BoundReason: "this consumer drives the standard-library-only and vendor-only graph shapes; other positive package outcomes are outside its graph-validation entry"}
++			}
+ 			if testCase.Result != "accepted" {
+ 				t.Fatalf("vector result = %q, want accepted", testCase.Result)
+ 			}
+@@ -534,8 +541,8 @@ func TestValidPackageGraphVectors(t *testing.T) {
+ 			if err := validatePackageGraph(encodePackages(t, items...), validation); err != nil {
+ 				t.Fatalf("accepted package shape was rejected: %v", err)
+ 			}
++			return conformancecoverage.Observation{}
+ 		})
+-	}
+ }
+ 
+ // vendoredPackage returns a checked-in vendored dependency of the root package,
+diff --git a/internal/godriver/moduleroots_test.go b/internal/godriver/moduleroots_test.go
+index c05fb3dd..490c8480 100644
+--- a/internal/godriver/moduleroots_test.go
++++ b/internal/godriver/moduleroots_test.go
+@@ -12,6 +12,7 @@ import (
+ 	"time"
+ 
+ 	"github.com/relux-works/curator/internal/buildsource"
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ )
+ 
+ // moduleRootsFixture is a frozen multi-module snapshot: one build root whose
+@@ -734,8 +735,8 @@ func TestModuleRootVectorsDriveTheWholeBuild(t *testing.T) {
+ 	if len(suite.Cases) == 0 {
+ 		t.Fatal("the module-roots vector family published no cases")
+ 	}
+-	for _, testCase := range suite.Cases {
+-		t.Run(testCase.Name, func(t *testing.T) {
++	conformancecoverage.Run(t, "module-roots/vectors", suite.Cases,
++		func(testCase moduleRootVectorCase) string { return testCase.Name }, func(t *testing.T, testCase moduleRootVectorCase) {
+ 			fixture := newVectorFixture(t, testCase)
+ 			fixture.start(stubScript{
+ 				ListStdout: string(encodePackages(t, fixture.rootPackage())),
+@@ -766,7 +767,6 @@ func TestModuleRootVectorsDriveTheWholeBuild(t *testing.T) {
+ 				t.Fatalf("code = %q, want %s (error %v)", code, testCase.ExpectedError, buildErr)
+ 			}
+ 		})
+-	}
+ }
+ 
+ // newVectorFixture materializes one vector's snapshot and presents its
+diff --git a/internal/install/cache_conformance_test.go b/internal/install/cache_conformance_test.go
+index f099a301..357bef81 100644
+--- a/internal/install/cache_conformance_test.go
++++ b/internal/install/cache_conformance_test.go
+@@ -4,10 +4,10 @@ import (
+ 	"encoding/json"
+ 	"os"
+ 	"path/filepath"
+-	"sort"
+ 	"testing"
+ 
+ 	"github.com/relux-works/curator/internal/buildcache"
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ )
+ 
+ // The published build-driver document is the only source of expected values in
+@@ -62,28 +62,26 @@ func authoritativeDriverCases(t *testing.T) authoritativeDriverDocument {
+ func TestAuthoritativeCacheOutcomesDriveInstallation(t *testing.T) {
+ 	t.Parallel()
+ 	document := authoritativeDriverCases(t)
+-	bound := 0
+-	for _, published := range document.PositiveCases {
+-		published := published
+-		switch published.Result {
+-		case "":
+-			continue
+-		case "accepted":
+-			// Plain acceptance is the identity, environment, argv, and context
+-			// cluster, owned by the driver and manifest consumers. It carries no
+-			// cache verdict for an installation to reproduce.
+-			continue
+-		case string(BuildCacheHit):
+-			bound++
+-			t.Run(published.Name, func(t *testing.T) { runPublishedCacheHit(t, published) })
+-		case string(BuildWouldPreflightAndBuild):
+-			bound++
+-			t.Run(published.Name, func(t *testing.T) { runPublishedCompilerFreeMiss(t, published) })
+-		default:
+-			t.Fatalf("published cache outcome %q has no executable binding", published.Result)
+-		}
+-	}
+-	if bound == 0 {
++	tally := conformancecoverage.RunOutcomes(t, "build-drivers/positive-cases", document.PositiveCases,
++		func(tc authoritativePositiveCase) string { return tc.Name }, func(t *testing.T, published authoritativePositiveCase) conformancecoverage.Observation {
++			switch published.Result {
++			case "":
++				return conformancecoverage.Observation{BoundReason: "published case carries no cache outcome"}
++			case "accepted":
++				// Plain acceptance is the identity, environment, argv, and context
++				// cluster, owned by the driver and manifest consumers. It carries no
++				// cache verdict for an installation to reproduce.
++				return conformancecoverage.Observation{BoundReason: "plain acceptance is consumed by build-source and manifest tests"}
++			case string(BuildCacheHit):
++				runPublishedCacheHit(t, published)
++			case string(BuildWouldPreflightAndBuild):
++				runPublishedCompilerFreeMiss(t, published)
++			default:
++				t.Fatalf("published cache outcome %q has no executable binding", published.Result)
++			}
++			return conformancecoverage.Observation{}
++		})
++	if tally.Driven == 0 {
+ 		t.Fatal("the authoritative suite published no cache outcome to bind")
+ 	}
+ }
+@@ -177,28 +175,24 @@ var nonReusableStatuses = []buildcache.Status{buildcache.Corrupt, buildcache.Unt
+ func TestAuthoritativeCacheRejectionsAreRebuiltNeverAdopted(t *testing.T) {
+ 	t.Parallel()
+ 	document := authoritativeDriverCases(t)
+-	var cases []authoritativeRejectionCase
+-	for _, published := range document.RejectionCases {
+-		if published.Boundary == "cache" {
+-			cases = append(cases, published)
+-		}
+-	}
+-	if len(cases) == 0 {
+-		t.Fatal("the authoritative suite published no cache-boundary rejection to bind")
+-	}
+-	sort.Slice(cases, func(i, j int) bool { return cases[i].Name < cases[j].Name })
+-
+ 	exercised := map[buildcache.Status]bool{}
+-	for index, published := range cases {
+-		published := published
+-		status := nonReusableStatuses[index%len(nonReusableStatuses)]
+-		exercised[status] = true
+-		t.Run(published.Name, func(t *testing.T) {
++	var cacheCases int
++	tally := conformancecoverage.RunOutcomes(t, "build-drivers/rejection-cases", document.RejectionCases,
++		func(tc authoritativeRejectionCase) string { return tc.Name }, func(t *testing.T, published authoritativeRejectionCase) conformancecoverage.Observation {
++			if published.Boundary != "cache" {
++				return conformancecoverage.Observation{BoundReason: "rejection belongs to a non-cache boundary"}
++			}
++			cacheCases++
++			status := nonReusableStatuses[(cacheCases-1)%len(nonReusableStatuses)]
++			exercised[status] = true
+ 			if published.Expected.Result != "reject" || published.Expected.Reuse || published.Expected.ArtifactExecuted {
+ 				t.Fatalf("published rejection %q no longer fails closed: %+v", published.Name, published.Expected)
+ 			}
+ 			runRefusedCacheEntry(t, published, status)
++			return conformancecoverage.Observation{}
+ 		})
++	if tally.Driven == 0 || cacheCases == 0 {
++		t.Fatal("the authoritative suite published no cache-boundary rejection to bind")
+ 	}
+ 	for _, status := range nonReusableStatuses {
+ 		if !exercised[status] {
+diff --git a/internal/install/dryrun_conformance_test.go b/internal/install/dryrun_conformance_test.go
+index e188b4c9..fa029bfa 100644
+--- a/internal/install/dryrun_conformance_test.go
++++ b/internal/install/dryrun_conformance_test.go
+@@ -18,6 +18,7 @@ import (
+ 	"github.com/relux-works/curator/internal/adapters"
+ 	"github.com/relux-works/curator/internal/buildmeta"
+ 	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ 	"github.com/relux-works/curator/internal/envfiles"
+ 	"github.com/relux-works/curator/internal/managerlock"
+ 	"github.com/relux-works/curator/internal/manifest"
+@@ -267,9 +268,8 @@ func (baseline *dryRunBaseline) declareEvery(t *testing.T, root string, extra ..
+ func TestAuthoritativeDryRunCasesMutateNothingPersistent(t *testing.T) {
+ 	testtoolchain.LockHostGOROOT(t)
+ 	document := authoritativeLifecycle(t)
+-	for _, published := range document.DryRunCases {
+-		published := published
+-		t.Run(published.Name, func(t *testing.T) {
++	conformancecoverage.Run(t, "install/dry-run-cases", document.DryRunCases,
++		func(tc authoritativeDryRunCase) string { return tc.Name }, func(t *testing.T, published authoritativeDryRunCase) {
+ 			if len(published.ForbiddenPersistentEffects) == 0 {
+ 				t.Fatalf("published dry-run case %q forbids nothing", published.Name)
+ 			}
+@@ -326,7 +326,6 @@ func TestAuthoritativeDryRunCasesMutateNothingPersistent(t *testing.T) {
+ 			}
+ 			baseline.assertNoOperationPrivateState(t, published)
+ 		})
+-	}
+ }
+ 
+ // planEveryProject binds the published multi-project scope to Curator's own
+diff --git a/internal/interop/environments/context_detectors_test.go b/internal/interop/environments/context_detectors_test.go
+index a6174be9..e076e1de 100644
+--- a/internal/interop/environments/context_detectors_test.go
++++ b/internal/interop/environments/context_detectors_test.go
+@@ -7,10 +7,44 @@ import (
+ 	"reflect"
+ 	"testing"
+ 
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ 	"github.com/relux-works/curator/internal/contextaudit"
+ 	"github.com/relux-works/curator/internal/contextpkg"
+ )
+ 
++type contextDetectorCase struct {
++	Name           string                  `json:"name"`
++	PackageKind    string                  `json:"package_kind"`
++	Pin            string                  `json:"pin"`
++	ContentHashPin bool                    `json:"content_hash_pin"`
++	Files          map[string]string       `json:"files"`
++	Waivers        []contextDetectorWaiver `json:"waivers"`
++	Expected       contextDetectorExpected `json:"expected"`
++}
++
++type contextDetectorWaiver struct {
++	Pin    string `json:"pin"`
++	File   string `json:"file"`
++	Span   [2]int `json:"span"`
++	Reason string `json:"reason"`
++}
++
++type contextDetectorExpected struct {
++	Installs bool                     `json:"installs"`
++	Findings []contextDetectorFinding `json:"findings"`
++	Warnings []map[string]any         `json:"warnings"`
++}
++
++type contextDetectorFinding struct {
++	Class        string `json:"class"`
++	File         string `json:"file"`
++	Pattern      string `json:"pattern"`
++	Severity     string `json:"severity"`
++	Span         [2]int `json:"span"`
++	Waived       bool   `json:"waived"`
++	WaiverReason string `json:"waiver_reason"`
++}
++
+ type contextDetectorsVector struct {
+ 	PatternClasses []struct {
+ 		Pattern           string `json:"pattern"`
+@@ -18,33 +52,8 @@ type contextDetectorsVector struct {
+ 		Group             int    `json:"group"`
+ 		PlaceholderPrefix string `json:"placeholder_prefix"`
+ 	} `json:"pattern_classes"`
+-	Scope []string `json:"scope"`
+-	Cases []struct {
+-		Name           string            `json:"name"`
+-		PackageKind    string            `json:"package_kind"`
+-		Pin            string            `json:"pin"`
+-		ContentHashPin bool              `json:"content_hash_pin"`
+-		Files          map[string]string `json:"files"`
+-		Waivers        []struct {
+-			Pin    string `json:"pin"`
+-			File   string `json:"file"`
+-			Span   [2]int `json:"span"`
+-			Reason string `json:"reason"`
+-		} `json:"waivers"`
+-		Expected struct {
+-			Installs bool `json:"installs"`
+-			Findings []struct {
+-				Class        string `json:"class"`
+-				File         string `json:"file"`
+-				Pattern      string `json:"pattern"`
+-				Severity     string `json:"severity"`
+-				Span         [2]int `json:"span"`
+-				Waived       bool   `json:"waived"`
+-				WaiverReason string `json:"waiver_reason"`
+-			} `json:"findings"`
+-			Warnings []map[string]any `json:"warnings"`
+-		} `json:"expected"`
+-	} `json:"cases"`
++	Scope []string              `json:"scope"`
++	Cases []contextDetectorCase `json:"cases"`
+ }
+ 
+ // TestConformanceContextDetectors drives contextaudit.Detect — the production
+@@ -84,8 +93,8 @@ func TestConformanceContextDetectors(t *testing.T) {
+ 			}
+ 		}
+ 	})
+-	for _, tc := range vector.Cases {
+-		t.Run(tc.Name, func(t *testing.T) {
++	conformancecoverage.Run(t, "context-detectors/cases", vector.Cases,
++		func(tc contextDetectorCase) string { return tc.Name }, func(t *testing.T, tc contextDetectorCase) {
+ 			snapshot := t.TempDir()
+ 			for path, content := range tc.Files {
+ 				full := filepath.Join(snapshot, filepath.FromSlash(path))
+@@ -150,5 +159,4 @@ func TestConformanceContextDetectors(t *testing.T) {
+ 				t.Fatalf("warnings %v, want %v", gotWarnings, tc.Expected.Warnings)
+ 			}
+ 		})
+-	}
+ }
+diff --git a/internal/interop/environments/context_materialization_test.go b/internal/interop/environments/context_materialization_test.go
+index f781af4d..74a6d411 100644
+--- a/internal/interop/environments/context_materialization_test.go
++++ b/internal/interop/environments/context_materialization_test.go
+@@ -8,73 +8,95 @@ import (
+ 	"strings"
+ 	"testing"
+ 
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ 	"github.com/relux-works/curator/internal/contextlock"
+ 	"github.com/relux-works/curator/internal/contextmaterialize"
+ 	"github.com/relux-works/curator/internal/contextpkg"
+ )
+ 
++type vectorPrecedence struct {
++	Winner    string `json:"winner"`
++	Placement string `json:"placement"`
++}
++
++type environmentsHeaderCase struct {
++	Name          string           `json:"name"`
++	Lock          vectorLock       `json:"lock"`
++	LockSHA256    string           `json:"lock_sha256"`
++	Precedence    vectorPrecedence `json:"precedence"`
++	EmittedOrder  []string         `json:"emitted_order"`
++	ExpectedBytes string           `json:"expected_bytes"`
++	LineCount     int              `json:"line_count"`
++	SHA256        string           `json:"sha256"`
++}
++
++type environmentsMaterializationCase struct {
++	Name          string                              `json:"name"`
++	Surface       string                              `json:"surface"`
++	Form          string                              `json:"form"`
++	Environment   string                              `json:"environment"`
++	Lock          vectorLock                          `json:"lock"`
++	LockSHA256    string                              `json:"lock_sha256"`
++	Precedence    vectorPrecedence                    `json:"precedence"`
++	Packages      map[string]materializationPackage   `json:"packages"`
++	MCPServers    map[string]materializationMCPServer `json:"mcp_servers"`
++	MCPSet        []string                            `json:"mcp_set"`
++	EnvNames      []string                            `json:"env_names"`
++	EmittedOrder  []string                            `json:"emitted_order"`
++	FileWritten   bool                                `json:"file_written"`
++	SurfaceSHA256 string                              `json:"surface_sha256"`
++	Files         []materializationFile               `json:"files"`
++	MachinePolicy *materializationPolicy              `json:"machine_policy"`
++	Admitted      []vectorModuleRef                   `json:"admitted"`
++	Dropped       []vectorModuleRef                   `json:"dropped"`
++	Warnings      []vectorWarning                     `json:"warnings"`
++	Error         string                              `json:"error"`
++	ErrorPackage  string                              `json:"error_package"`
++	ErrorModule   string                              `json:"error_module"`
++}
++
++type materializationPackage struct {
++	HasContext bool                    `json:"has_context"`
++	Modules    []materializationModule `json:"modules"`
++}
++
++type materializationModule struct {
++	Path         string   `json:"path"`
++	Class        string   `json:"class"`
++	Environments []string `json:"environments"`
++	Content      string   `json:"content"`
++}
++
++type materializationMCPServer struct {
++	Transport    string   `json:"transport"`
++	Command      string   `json:"command"`
++	Args         []string `json:"args"`
++	URL          string   `json:"url"`
++	EnvNames     []string `json:"env_names"`
++	Environments []string `json:"environments"`
++}
++
++type materializationFile struct {
++	Path     string `json:"path"`
++	Bytes    int    `json:"bytes"`
++	Expected string `json:"expected"`
++	SHA256   string `json:"sha256"`
++}
++
++type materializationPolicy struct {
++	TransitiveSystemModules string                  `json:"transitive_system_modules"`
++	SystemModuleWaivers     []materializationWaiver `json:"system_module_waivers"`
++}
++
++type materializationWaiver struct {
++	Package string `json:"package"`
++	Reason  string `json:"reason"`
++}
++
+ type environmentsVector struct {
+-	HeaderTypeLine string `json:"header_type_line"`
+-	HeaderCases    []struct {
+-		Name          string     `json:"name"`
+-		Lock          vectorLock `json:"lock"`
+-		LockSHA256    string     `json:"lock_sha256"`
+-		Precedence    struct{ Winner, Placement string }
+-		EmittedOrder  []string `json:"emitted_order"`
+-		ExpectedBytes string   `json:"expected_bytes"`
+-		LineCount     int      `json:"line_count"`
+-		SHA256        string   `json:"sha256"`
+-	} `json:"header_cases"`
+-	MaterializationCases []struct {
+-		Name        string     `json:"name"`
+-		Surface     string     `json:"surface"`
+-		Form        string     `json:"form"`
+-		Environment string     `json:"environment"`
+-		Lock        vectorLock `json:"lock"`
+-		LockSHA256  string     `json:"lock_sha256"`
+-		Precedence  struct{ Winner, Placement string }
+-		Packages    map[string]struct {
+-			HasContext bool `json:"has_context"`
+-			Modules    []struct {
+-				Path         string   `json:"path"`
+-				Class        string   `json:"class"`
+-				Environments []string `json:"environments"`
+-				Content      string   `json:"content"`
+-			} `json:"modules"`
+-		} `json:"packages"`
+-		MCPServers map[string]struct {
+-			Transport    string   `json:"transport"`
+-			Command      string   `json:"command"`
+-			Args         []string `json:"args"`
+-			URL          string   `json:"url"`
+-			EnvNames     []string `json:"env_names"`
+-			Environments []string `json:"environments"`
+-		} `json:"mcp_servers"`
+-		MCPSet        []string `json:"mcp_set"`
+-		EnvNames      []string `json:"env_names"`
+-		EmittedOrder  []string `json:"emitted_order"`
+-		FileWritten   bool     `json:"file_written"`
+-		SurfaceSHA256 string   `json:"surface_sha256"`
+-		Files         []struct {
+-			Path     string `json:"path"`
+-			Bytes    int    `json:"bytes"`
+-			Expected string `json:"expected"`
+-			SHA256   string `json:"sha256"`
+-		} `json:"files"`
+-		MachinePolicy *struct {
+-			TransitiveSystemModules string `json:"transitive_system_modules"`
+-			SystemModuleWaivers     []struct {
+-				Package string `json:"package"`
+-				Reason  string `json:"reason"`
+-			} `json:"system_module_waivers"`
+-		} `json:"machine_policy"`
+-		Admitted     []vectorModuleRef `json:"admitted"`
+-		Dropped      []vectorModuleRef `json:"dropped"`
+-		Warnings     []vectorWarning   `json:"warnings"`
+-		Error        string            `json:"error"`
+-		ErrorPackage string            `json:"error_package"`
+-		ErrorModule  string            `json:"error_module"`
+-	} `json:"materialization_cases"`
++	HeaderTypeLine       string                            `json:"header_type_line"`
++	HeaderCases          []environmentsHeaderCase          `json:"header_cases"`
++	MaterializationCases []environmentsMaterializationCase `json:"materialization_cases"`
+ }
+ 
+ // vectorModuleRef is one admitted or dropped system module of a
+@@ -125,8 +147,8 @@ func TestConformanceEnvironmentsHeader(t *testing.T) {
+ 	if len(vector.HeaderCases) == 0 {
+ 		t.Fatal("the vector declares no header cases")
+ 	}
+-	for _, tc := range vector.HeaderCases {
+-		t.Run(tc.Name, func(t *testing.T) {
++	conformancecoverage.Run(t, "environments/header-cases", vector.HeaderCases,
++		func(tc environmentsHeaderCase) string { return tc.Name }, func(t *testing.T, tc environmentsHeaderCase) {
+ 			lock := vectorLockToLock(t, tc.Lock)
+ 			hash, err := lock.Hash()
+ 			if err != nil {
+@@ -157,7 +179,6 @@ func TestConformanceEnvironmentsHeader(t *testing.T) {
+ 				t.Fatalf("header sha256 %s, want %s", got, tc.SHA256)
+ 			}
+ 		})
+-	}
+ }
+ 
+ // TestConformanceEnvironmentsMonolithic drives the production assemblers
+@@ -172,8 +193,8 @@ func TestConformanceEnvironmentsMonolithic(t *testing.T) {
+ 	if len(vector.MaterializationCases) == 0 {
+ 		t.Fatal("the vector declares no materialization cases")
+ 	}
+-	for _, tc := range vector.MaterializationCases {
+-		t.Run(tc.Name, func(t *testing.T) {
++	conformancecoverage.Run(t, "environments/materialization-cases", vector.MaterializationCases,
++		func(tc environmentsMaterializationCase) string { return tc.Name }, func(t *testing.T, tc environmentsMaterializationCase) {
+ 			lock := vectorLockToLock(t, tc.Lock)
+ 			hash, err := lock.Hash()
+ 			if err != nil {
+@@ -348,7 +369,6 @@ func TestConformanceEnvironmentsMonolithic(t *testing.T) {
+ 				t.Fatalf("surface hash %s, want %s", got, tc.SurfaceSHA256)
+ 			}
+ 		})
+-	}
+ }
+ 
+ // assertAdmittedModules pins the admitted set: the production
+diff --git a/internal/interop/environments/context_resolution_test.go b/internal/interop/environments/context_resolution_test.go
+index 1a571946..d5bd441f 100644
+--- a/internal/interop/environments/context_resolution_test.go
++++ b/internal/interop/environments/context_resolution_test.go
+@@ -8,6 +8,7 @@ import (
+ 	"sort"
+ 	"testing"
+ 
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ 	"github.com/relux-works/curator/internal/contextlock"
+ 	"github.com/relux-works/curator/internal/contextresolve"
+ 	"github.com/relux-works/curator/internal/pkgversion"
+@@ -45,45 +46,57 @@ type vectorPackage struct {
+ 	Commits map[string]*vectorCommit `json:"commits"`
+ }
+ 
+-type contextResolutionVector struct {
+-	ResolutionCases []struct {
++type contextResolutionCase struct {
++	Name     string                    `json:"name"`
++	Expected contextResolutionExpected `json:"expected"`
++	Input    contextResolutionInput    `json:"input"`
++}
++
++type contextResolutionExpected struct {
++	Lock       *vectorLock      `json:"lock"`
++	LockSHA256 string           `json:"lock_sha256"`
++	Warnings   []map[string]any `json:"warnings"`
++	Error      string           `json:"error"`
++	Detail     map[string]any   `json:"detail"`
++}
++
++type contextResolutionInput struct {
++	Install struct {
+ 		Name     string `json:"name"`
+-		Expected struct {
+-			Lock       *vectorLock      `json:"lock"`
+-			LockSHA256 string           `json:"lock_sha256"`
+-			Warnings   []map[string]any `json:"warnings"`
+-			Error      string           `json:"error"`
+-			Detail     map[string]any   `json:"detail"`
+-		} `json:"expected"`
+-		Input struct {
+-			Install struct {
+-				Name     string `json:"name"`
+-				Range    string `json:"range"`
+-				Tag      string `json:"tag"`
+-				Revision string `json:"revision"`
+-			} `json:"install"`
+-			OverlayDefaultWeight int64 `json:"overlay_default_weight"`
+-			Overlays             []struct {
+-				Name     string `json:"name"`
+-				Range    string `json:"range"`
+-				Tag      string `json:"tag"`
+-				Revision string `json:"revision"`
+-				Weight   *int64 `json:"weight"`
+-				Path     *struct {
+-					StateSHA256 string       `json:"state_sha256"`
+-					Manifest    vectorCommit `json:"manifest"`
+-				} `json:"path"`
+-			} `json:"overlays"`
+-			Packages map[string]vectorPackage `json:"packages"`
+-		} `json:"input"`
+-	} `json:"resolution_cases"`
+-	LockCases []struct {
+-		Name       string     `json:"name"`
+-		Lock       vectorLock `json:"lock"`
+-		CCJ1Bytes  string     `json:"ccj1_bytes"`
+-		ByteLength int        `json:"byte_length"`
+-		LockSHA256 string     `json:"lock_sha256"`
+-	} `json:"lock_cases"`
++		Range    string `json:"range"`
++		Tag      string `json:"tag"`
++		Revision string `json:"revision"`
++	} `json:"install"`
++	OverlayDefaultWeight int64                      `json:"overlay_default_weight"`
++	Overlays             []contextResolutionOverlay `json:"overlays"`
++	Packages             map[string]vectorPackage   `json:"packages"`
++}
++
++type contextResolutionOverlay struct {
++	Name     string                 `json:"name"`
++	Range    string                 `json:"range"`
++	Tag      string                 `json:"tag"`
++	Revision string                 `json:"revision"`
++	Weight   *int64                 `json:"weight"`
++	Path     *contextResolutionPath `json:"path"`
++}
++
++type contextResolutionPath struct {
++	StateSHA256 string       `json:"state_sha256"`
++	Manifest    vectorCommit `json:"manifest"`
++}
++
++type contextLockCase struct {
++	Name       string     `json:"name"`
++	Lock       vectorLock `json:"lock"`
++	CCJ1Bytes  string     `json:"ccj1_bytes"`
++	ByteLength int        `json:"byte_length"`
++	LockSHA256 string     `json:"lock_sha256"`
++}
++
++type contextResolutionVector struct {
++	ResolutionCases []contextResolutionCase `json:"resolution_cases"`
++	LockCases       []contextLockCase       `json:"lock_cases"`
+ }
+ 
+ // vectorSource serves the in-memory package graph of one resolution case.
+@@ -181,88 +194,82 @@ func TestConformanceContextResolution(t *testing.T) {
+ 		t.Fatalf("%s declares an empty family", vectorPath)
+ 	}
+ 
+-	t.Run("lock_cases", func(t *testing.T) {
+-		for _, tc := range vector.LockCases {
+-			t.Run(tc.Name, func(t *testing.T) {
+-				lock := vectorLockToLock(t, tc.Lock)
+-				canonical, err := lock.Canonical()
+-				if err != nil {
+-					t.Fatal(err)
+-				}
+-				if string(canonical) != tc.CCJ1Bytes || len(canonical) != tc.ByteLength {
+-					t.Fatalf("CCJ-1 bytes differ:\n got %s\nwant %s", canonical, tc.CCJ1Bytes)
+-				}
+-				if err := protocoljson.RequireCanonical(canonical); err != nil {
+-					t.Fatal(err)
+-				}
+-				hash, err := lock.Hash()
+-				if err != nil {
+-					t.Fatal(err)
+-				}
+-				if hash != tc.LockSHA256 {
+-					t.Fatalf("lock hash %s, want %s", hash, tc.LockSHA256)
+-				}
+-			})
+-		}
+-	})
++	conformancecoverage.Run(t, "context-versions/lock-cases", vector.LockCases,
++		func(tc contextLockCase) string { return tc.Name }, func(t *testing.T, tc contextLockCase) {
++			lock := vectorLockToLock(t, tc.Lock)
++			canonical, err := lock.Canonical()
++			if err != nil {
++				t.Fatal(err)
++			}
++			if string(canonical) != tc.CCJ1Bytes || len(canonical) != tc.ByteLength {
++				t.Fatalf("CCJ-1 bytes differ:\n got %s\nwant %s", canonical, tc.CCJ1Bytes)
++			}
++			if err := protocoljson.RequireCanonical(canonical); err != nil {
++				t.Fatal(err)
++			}
++			hash, err := lock.Hash()
++			if err != nil {
++				t.Fatal(err)
++			}
++			if hash != tc.LockSHA256 {
++				t.Fatalf("lock hash %s, want %s", hash, tc.LockSHA256)
++			}
++		})
+ 
+-	t.Run("resolution_cases", func(t *testing.T) {
+-		for _, tc := range vector.ResolutionCases {
+-			t.Run(tc.Name, func(t *testing.T) {
+-				input := contextresolve.Input{
+-					Root: contextresolve.Requirement{Name: tc.Input.Install.Name, Range: tc.Input.Install.Range,
+-						Tag: tc.Input.Install.Tag, Revision: tc.Input.Install.Revision},
+-					OverlayDefaultWeight: tc.Input.OverlayDefaultWeight,
++	conformancecoverage.Run(t, "context-versions/resolution-cases", vector.ResolutionCases,
++		func(tc contextResolutionCase) string { return tc.Name }, func(t *testing.T, tc contextResolutionCase) {
++			input := contextresolve.Input{
++				Root: contextresolve.Requirement{Name: tc.Input.Install.Name, Range: tc.Input.Install.Range,
++					Tag: tc.Input.Install.Tag, Revision: tc.Input.Install.Revision},
++				OverlayDefaultWeight: tc.Input.OverlayDefaultWeight,
++			}
++			for _, overlay := range tc.Input.Overlays {
++				declaration := contextresolve.Overlay{Name: overlay.Name, Range: overlay.Range, Tag: overlay.Tag,
++					Revision: overlay.Revision, Weight: overlay.Weight}
++				if overlay.Path != nil {
++					declaration.State = &contextresolve.StatePackage{StateHash: overlay.Path.StateSHA256,
++						Manifest: convertVectorPackage(overlay.Path.Manifest)}
+ 				}
+-				for _, overlay := range tc.Input.Overlays {
+-					declaration := contextresolve.Overlay{Name: overlay.Name, Range: overlay.Range, Tag: overlay.Tag,
+-						Revision: overlay.Revision, Weight: overlay.Weight}
+-					if overlay.Path != nil {
+-						declaration.State = &contextresolve.StatePackage{StateHash: overlay.Path.StateSHA256,
+-							Manifest: convertVectorPackage(overlay.Path.Manifest)}
+-					}
+-					input.Overlays = append(input.Overlays, declaration)
++				input.Overlays = append(input.Overlays, declaration)
++			}
++			result, err := contextresolve.Resolve(vectorSource{packages: tc.Input.Packages}, input)
++			if tc.Expected.Error != "" {
++				var resolveErr *contextresolve.Error
++				if err == nil || !errors.As(err, &resolveErr) {
++					t.Fatalf("resolved; want %s (err=%v)", tc.Expected.Error, err)
+ 				}
+-				result, err := contextresolve.Resolve(vectorSource{packages: tc.Input.Packages}, input)
+-				if tc.Expected.Error != "" {
+-					var resolveErr *contextresolve.Error
+-					if err == nil || !errors.As(err, &resolveErr) {
+-						t.Fatalf("resolved; want %s (err=%v)", tc.Expected.Error, err)
+-					}
+-					if resolveErr.Diagnostic != tc.Expected.Error {
+-						t.Fatalf("diagnostic %s, want %s (%v)", resolveErr.Diagnostic, tc.Expected.Error, err)
+-					}
+-					assertDetail(t, resolveErr, tc.Expected.Detail)
+-					return
++				if resolveErr.Diagnostic != tc.Expected.Error {
++					t.Fatalf("diagnostic %s, want %s (%v)", resolveErr.Diagnostic, tc.Expected.Error, err)
+ 				}
+-				if err != nil {
+-					t.Fatalf("resolve: %v", err)
++				assertDetail(t, resolveErr, tc.Expected.Detail)
++				return
++			}
++			if err != nil {
++				t.Fatalf("resolve: %v", err)
++			}
++			got := lockToVector(t, result.Lock)
++			if !reflect.DeepEqual(got, *tc.Expected.Lock) {
++				gotJSON, _ := json.MarshalIndent(got, "", " ")
++				wantJSON, _ := json.MarshalIndent(tc.Expected.Lock, "", " ")
++				t.Fatalf("lock differs:\n got %s\nwant %s", gotJSON, wantJSON)
++			}
++			if result.LockHash != tc.Expected.LockSHA256 {
++				t.Fatalf("lock hash %s, want %s", result.LockHash, tc.Expected.LockSHA256)
++			}
++			var gotWarnings []map[string]any
++			for _, warning := range result.Warnings {
++				entry := map[string]any{"diagnostic": warning.Diagnostic, "name": warning.Name}
++				var requirers []any
++				for _, requirer := range warning.Requirers {
++					requirers = append(requirers, map[string]any{"requirer": requirer.Requirer, "weight": float64(requirer.Weight)})
+ 				}
+-				got := lockToVector(t, result.Lock)
+-				if !reflect.DeepEqual(got, *tc.Expected.Lock) {
+-					gotJSON, _ := json.MarshalIndent(got, "", " ")
+-					wantJSON, _ := json.MarshalIndent(tc.Expected.Lock, "", " ")
+-					t.Fatalf("lock differs:\n got %s\nwant %s", gotJSON, wantJSON)
+-				}
+-				if result.LockHash != tc.Expected.LockSHA256 {
+-					t.Fatalf("lock hash %s, want %s", result.LockHash, tc.Expected.LockSHA256)
+-				}
+-				var gotWarnings []map[string]any
+-				for _, warning := range result.Warnings {
+-					entry := map[string]any{"diagnostic": warning.Diagnostic, "name": warning.Name}
+-					var requirers []any
+-					for _, requirer := range warning.Requirers {
+-						requirers = append(requirers, map[string]any{"requirer": requirer.Requirer, "weight": float64(requirer.Weight)})
+-					}
+-					entry["requirers"] = requirers
+-					gotWarnings = append(gotWarnings, entry)
+-				}
+-				if len(gotWarnings) != len(tc.Expected.Warnings) || (len(gotWarnings) > 0 && !reflect.DeepEqual(gotWarnings, tc.Expected.Warnings)) {
+-					t.Fatalf("warnings %v, want %v", gotWarnings, tc.Expected.Warnings)
+-				}
+-			})
+-		}
+-	})
++				entry["requirers"] = requirers
++				gotWarnings = append(gotWarnings, entry)
++			}
++			if len(gotWarnings) != len(tc.Expected.Warnings) || (len(gotWarnings) > 0 && !reflect.DeepEqual(gotWarnings, tc.Expected.Warnings)) {
++				t.Fatalf("warnings %v, want %v", gotWarnings, tc.Expected.Warnings)
++			}
++		})
+ }
+ 
+ func assertDetail(t *testing.T, err *contextresolve.Error, want map[string]any) {
+diff --git a/internal/interop/environments/context_versions_test.go b/internal/interop/environments/context_versions_test.go
+index 3182ef32..8afdacf8 100644
+--- a/internal/interop/environments/context_versions_test.go
++++ b/internal/interop/environments/context_versions_test.go
+@@ -6,38 +6,47 @@ import (
+ 	"reflect"
+ 	"testing"
+ 
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ 	"github.com/relux-works/curator/internal/pkgversion"
+ )
+ 
+ // contextVersionsVector mirrors vectors/context-versions.json (environments
+ // §1.4). The resolution and lock families of the same file are consumed by
+ // context_resolution_test.go.
++type contextVersionCase struct {
++	Tag        string   `json:"tag"`
++	Candidate  bool     `json:"candidate"`
++	Version    string   `json:"version"`
++	Major      int64    `json:"major"`
++	Minor      int64    `json:"minor"`
++	Patch      int64    `json:"patch"`
++	Prerelease []string `json:"prerelease"`
++}
++
++type contextOrderingCase struct {
++	Name              string   `json:"name"`
++	Input             []string `json:"input"`
++	ExpectedAscending []string `json:"expected_ascending"`
++}
++
++type contextRangeCase struct {
++	Range          string     `json:"range"`
++	Valid          bool       `json:"valid"`
++	ComparatorSets [][]string `json:"comparator_sets"`
++	Error          string     `json:"error"`
++}
++
++type contextSatisfiesCase struct {
++	Range     string `json:"range"`
++	Version   string `json:"version"`
++	Satisfies bool   `json:"satisfies"`
++}
++
+ type contextVersionsVector struct {
+-	VersionCases []struct {
+-		Tag        string   `json:"tag"`
+-		Candidate  bool     `json:"candidate"`
+-		Version    string   `json:"version"`
+-		Major      int64    `json:"major"`
+-		Minor      int64    `json:"minor"`
+-		Patch      int64    `json:"patch"`
+-		Prerelease []string `json:"prerelease"`
+-	} `json:"version_cases"`
+-	OrderingCases []struct {
+-		Name              string   `json:"name"`
+-		Input             []string `json:"input"`
+-		ExpectedAscending []string `json:"expected_ascending"`
+-	} `json:"ordering_cases"`
+-	RangeCases []struct {
+-		Range          string     `json:"range"`
+-		Valid          bool       `json:"valid"`
+-		ComparatorSets [][]string `json:"comparator_sets"`
+-		Error          string     `json:"error"`
+-	} `json:"range_cases"`
+-	SatisfiesCases []struct {
+-		Range     string `json:"range"`
+-		Version   string `json:"version"`
+-		Satisfies bool   `json:"satisfies"`
+-	} `json:"satisfies_cases"`
++	VersionCases   []contextVersionCase   `json:"version_cases"`
++	OrderingCases  []contextOrderingCase  `json:"ordering_cases"`
++	RangeCases     []contextRangeCase     `json:"range_cases"`
++	SatisfiesCases []contextSatisfiesCase `json:"satisfies_cases"`
+ }
+ 
+ func loadContextVersionsVector(t *testing.T) (string, contextVersionsVector) {
+@@ -60,14 +69,14 @@ func TestConformanceContextVersions(t *testing.T) {
+ 	if len(vector.VersionCases) == 0 || len(vector.RangeCases) == 0 || len(vector.SatisfiesCases) == 0 || len(vector.OrderingCases) == 0 {
+ 		t.Fatalf("%s declares an empty family", vectorPath)
+ 	}
+-	t.Run("version_cases", func(t *testing.T) {
+-		for _, tc := range vector.VersionCases {
++	conformancecoverage.Run(t, "context-versions/version-cases", vector.VersionCases,
++		func(tc contextVersionCase) string { return "version/" + tc.Tag }, func(t *testing.T, tc contextVersionCase) {
+ 			version, candidate := pkgversion.ParseTag(tc.Tag)
+ 			if candidate != tc.Candidate {
+ 				t.Fatalf("tag %q: candidate=%v, want %v", tc.Tag, candidate, tc.Candidate)
+ 			}
+ 			if !tc.Candidate {
+-				continue
++				return
+ 			}
+ 			prerelease := version.Prerelease
+ 			if prerelease == nil {
+@@ -76,10 +85,9 @@ func TestConformanceContextVersions(t *testing.T) {
+ 			if version.String() != tc.Version || version.Major != tc.Major || version.Minor != tc.Minor || version.Patch != tc.Patch || !reflect.DeepEqual(prerelease, tc.Prerelease) {
+ 				t.Fatalf("tag %q parsed as %+v, want %s", tc.Tag, version, tc.Version)
+ 			}
+-		}
+-	})
+-	t.Run("ordering_cases", func(t *testing.T) {
+-		for _, tc := range vector.OrderingCases {
++		})
++	conformancecoverage.Run(t, "context-versions/ordering-cases", vector.OrderingCases,
++		func(tc contextOrderingCase) string { return "ordering/" + tc.Name }, func(t *testing.T, tc contextOrderingCase) {
+ 			var versions []pkgversion.Version
+ 			for _, raw := range tc.Input {
+ 				version, err := pkgversion.ParseVersion(raw)
+@@ -96,10 +104,9 @@ func TestConformanceContextVersions(t *testing.T) {
+ 			if !reflect.DeepEqual(got, tc.ExpectedAscending) {
+ 				t.Fatalf("%s: sorted %v, want %v", tc.Name, got, tc.ExpectedAscending)
+ 			}
+-		}
+-	})
+-	t.Run("range_cases", func(t *testing.T) {
+-		for _, tc := range vector.RangeCases {
++		})
++	conformancecoverage.Run(t, "context-versions/range-cases", vector.RangeCases,
++		func(tc contextRangeCase) string { return "range/" + tc.Range }, func(t *testing.T, tc contextRangeCase) {
+ 			parsed, err := pkgversion.ParseRange(tc.Range)
+ 			if !tc.Valid {
+ 				if err == nil {
+@@ -108,7 +115,7 @@ func TestConformanceContextVersions(t *testing.T) {
+ 				if tc.Error != "profile_source_invalid" || !errors.Is(err, pkgversion.ErrInvalidRange) {
+ 					t.Fatalf("range %q: error %v, want %s", tc.Range, err, tc.Error)
+ 				}
+-				continue
++				return
+ 			}
+ 			if err != nil {
+ 				t.Fatalf("range %q: %v", tc.Range, err)
+@@ -116,10 +123,9 @@ func TestConformanceContextVersions(t *testing.T) {
+ 			if got := parsed.ComparatorSets(); !reflect.DeepEqual(got, tc.ComparatorSets) {
+ 				t.Fatalf("range %q: comparator sets %v, want %v", tc.Range, got, tc.ComparatorSets)
+ 			}
+-		}
+-	})
+-	t.Run("satisfies_cases", func(t *testing.T) {
+-		for _, tc := range vector.SatisfiesCases {
++		})
++	conformancecoverage.Run(t, "context-versions/satisfies-cases", vector.SatisfiesCases,
++		func(tc contextSatisfiesCase) string { return "satisfies/" + tc.Range + "@" + tc.Version }, func(t *testing.T, tc contextSatisfiesCase) {
+ 			parsed, err := pkgversion.ParseRange(tc.Range)
+ 			if err != nil {
+ 				t.Fatalf("range %q: %v", tc.Range, err)
+@@ -131,6 +137,5 @@ func TestConformanceContextVersions(t *testing.T) {
+ 			if got := parsed.Satisfies(version); got != tc.Satisfies {
+ 				t.Fatalf("%q satisfies %q = %v, want %v", tc.Version, tc.Range, got, tc.Satisfies)
+ 			}
+-		}
+-	})
++		})
+ }
+diff --git a/internal/interop/environments/snapshot_acquisition_test.go b/internal/interop/environments/snapshot_acquisition_test.go
+index 9f3e1396..69da3d45 100644
+--- a/internal/interop/environments/snapshot_acquisition_test.go
++++ b/internal/interop/environments/snapshot_acquisition_test.go
+@@ -13,24 +13,28 @@ import (
+ 	"strings"
+ 	"testing"
+ 
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ 	"github.com/relux-works/curator/internal/gitops"
+ 	"github.com/relux-works/curator/internal/hashing"
+ )
+ 
++// snapshotAcquisitionCase mirrors one case of vectors/snapshot-acquisition.json.
++type snapshotAcquisitionCase struct {
++	Name           string `json:"name"`
++	Fixture        string `json:"fixture"`
++	Expected       string `json:"expected"`
++	ExpectedSHA256 string `json:"expected_sha256"`
++	Files          []struct {
++		Path   string `json:"path"`
++		Bytes  int64  `json:"bytes"`
++		SHA256 string `json:"sha256"`
++	} `json:"files"`
++}
++
+ // snapshotAcquisitionVector mirrors vectors/snapshot-acquisition.json
+ // (environments §1.2). Fields the test does not consume are left undeclared.
+ type snapshotAcquisitionVector struct {
+-	Cases []struct {
+-		Name           string `json:"name"`
+-		Fixture        string `json:"fixture"`
+-		Expected       string `json:"expected"`
+-		ExpectedSHA256 string `json:"expected_sha256"`
+-		Files          []struct {
+-			Path   string `json:"path"`
+-			Bytes  int64  `json:"bytes"`
+-			SHA256 string `json:"sha256"`
+-		} `json:"files"`
+-	} `json:"cases"`
++	Cases []snapshotAcquisitionCase `json:"cases"`
+ }
+ 
+ func acquisitionGit(t *testing.T, dir string, args ...string) string {
+@@ -69,8 +73,8 @@ func TestConformanceSnapshotAcquisition(t *testing.T) {
+ 	if len(vector.Cases) == 0 {
+ 		t.Fatalf("%s declares no cases", vectorPath)
+ 	}
+-	for _, tc := range vector.Cases {
+-		t.Run(tc.Name, func(t *testing.T) {
++	conformancecoverage.Run(t, "snapshot-acquisition/cases", vector.Cases,
++		func(tc snapshotAcquisitionCase) string { return tc.Name }, func(t *testing.T, tc snapshotAcquisitionCase) {
+ 			fixture := rootPath(t, root, tc.Fixture)
+ 			wantHash := readRootFile(t, root, tc.Expected)
+ 			if wantHash != tc.ExpectedSHA256 {
+@@ -157,5 +161,4 @@ func TestConformanceSnapshotAcquisition(t *testing.T) {
+ 				})
+ 			}
+ 		})
+-	}
+ }
+diff --git a/internal/interop/golden_test.go b/internal/interop/golden_test.go
+index db6cf73f..c188dc60 100644
+--- a/internal/interop/golden_test.go
++++ b/internal/interop/golden_test.go
+@@ -20,10 +20,12 @@ import (
+ 	"os"
+ 	"path/filepath"
+ 	"reflect"
++	"strconv"
+ 	"strings"
+ 	"testing"
+ 
+ 	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ 	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/identifiers"
+ 	"github.com/relux-works/curator/internal/identity"
+@@ -172,6 +174,49 @@ func TestGoldenRegistryObjects(t *testing.T) {
+ 	}
+ }
+ 
++type canonicalValidVectorCase struct {
++	Name      string         `json:"name"`
++	Input     map[string]any `json:"input"`
++	Canonical string         `json:"canonical_utf8"`
++}
++
++type canonicalInvalidVectorCase struct {
++	Name      string `json:"name"`
++	InputText string `json:"input_text"`
++}
++
++type sourceIdentityVectorCase struct {
++	Input    string  `json:"input"`
++	Identity *string `json:"identity"`
++	Error    string  `json:"error"`
++}
++
++type simpleValidityVectorCase struct {
++	ID    string
++	Input string `json:"input"`
++	Valid bool   `json:"valid"`
++}
++
++type managerConfigVectorCase struct {
++	Name     string                      `json:"name"`
++	Input    map[string]any              `json:"input"`
++	Valid    bool                        `json:"valid"`
++	Expected managerConfigVectorExpected `json:"expected"`
++}
++
++type managerConfigVectorExpected struct {
++	DefaultAgents            []string `json:"default_agents"`
++	AdapterMode              string   `json:"adapter_mode"`
++	ProjectAlias             string   `json:"project_alias"`
++	CheckoutAlias            string   `json:"checkout_alias"`
++	RegistryURLs             []string `json:"registry_urls"`
++	SnapshotMaxAgeSeconds    int      `json:"snapshot_max_age_seconds"`
++	SnapshotClockSkewSeconds int      `json:"snapshot_clock_skew_seconds"`
++	CacheTTLSeconds          int      `json:"cache_ttl_seconds"`
++	OfflineGraceSeconds      int      `json:"offline_grace_seconds"`
++	MaxRequestBytes          int      `json:"max_request_bytes"`
++}
++
+ func TestCanonicalJSONVectors(t *testing.T) {
+ 	payload, err := os.ReadFile(golden(t, "vectors/canonical-valid.json"))
+ 	if err != nil {
+@@ -179,50 +224,45 @@ func TestCanonicalJSONVectors(t *testing.T) {
+ 	}
+ 	decoder := json.NewDecoder(bytes.NewReader(payload))
+ 	decoder.UseNumber()
+-	var cases []struct {
+-		Name      string         `json:"name"`
+-		Input     map[string]any `json:"input"`
+-		Canonical string         `json:"canonical_utf8"`
+-	}
++	var cases []canonicalValidVectorCase
+ 	if err := decoder.Decode(&cases); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	for _, testCase := range cases {
+-		got, err := registry.CanonicalBytesChecked(testCase.Input)
+-		if err != nil {
+-			t.Fatalf("%s: %v", testCase.Name, err)
+-		}
+-		if string(got) != testCase.Canonical {
+-			t.Fatalf("%s canonical bytes:\n got %s\nwant %s", testCase.Name, got, testCase.Canonical)
+-		}
+-	}
++	conformancecoverage.Run(t, "interop/canonical-valid-vectors", cases,
++		func(tc canonicalValidVectorCase) string { return tc.Name }, func(t *testing.T, testCase canonicalValidVectorCase) {
++			got, err := registry.CanonicalBytesChecked(testCase.Input)
++			if err != nil {
++				t.Fatalf("%s: %v", testCase.Name, err)
++			}
++			if string(got) != testCase.Canonical {
++				t.Fatalf("%s canonical bytes:\n got %s\nwant %s", testCase.Name, got, testCase.Canonical)
++			}
++		})
+ 
+ 	invalidPayload, err := os.ReadFile(golden(t, "vectors/canonical-invalid.json"))
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	var invalidCases []struct {
+-		Name      string `json:"name"`
+-		InputText string `json:"input_text"`
+-	}
++	var invalidCases []canonicalInvalidVectorCase
+ 	if err := json.Unmarshal(invalidPayload, &invalidCases); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	for _, testCase := range invalidCases {
+-		raw := []byte(testCase.InputText)
+-		if err := protocoljson.Validate(raw); err != nil {
+-			continue
+-		}
+-		var input map[string]any
+-		decoder := json.NewDecoder(bytes.NewReader(raw))
+-		decoder.UseNumber()
+-		if err := decoder.Decode(&input); err != nil {
+-			continue
+-		}
+-		if _, err := registry.CanonicalBytesChecked(input); err == nil {
+-			t.Errorf("%s CCJ-1 input was accepted, want rejection", testCase.Name)
+-		}
+-	}
++	conformancecoverage.Run(t, "interop/canonical-invalid-vectors", invalidCases,
++		func(tc canonicalInvalidVectorCase) string { return tc.Name }, func(t *testing.T, testCase canonicalInvalidVectorCase) {
++			raw := []byte(testCase.InputText)
++			if err := protocoljson.Validate(raw); err != nil {
++				return
++			}
++			var input map[string]any
++			decoder := json.NewDecoder(bytes.NewReader(raw))
++			decoder.UseNumber()
++			if err := decoder.Decode(&input); err != nil {
++				t.Fatalf("protocoljson.Validate accepted input that JSON decoding rejects: %v", err)
++			}
++			if _, err := registry.CanonicalBytesChecked(input); err == nil {
++				t.Errorf("%s CCJ-1 input was accepted, want rejection", testCase.Name)
++			}
++		})
+ }
+ 
+ func TestSourceIdentityVectors(t *testing.T) {
+@@ -230,34 +270,50 @@ func TestSourceIdentityVectors(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	var cases []struct {
+-		Input    string  `json:"input"`
+-		Identity *string `json:"identity"`
+-		Error    string  `json:"error"`
+-	}
++	var cases []sourceIdentityVectorCase
+ 	if err := json.Unmarshal(payload, &cases); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	for _, testCase := range cases {
+-		got, err := identity.Parse(testCase.Input)
+-		if testCase.Error != "" {
+-			if err == nil {
+-				t.Errorf("Parse(%q) = %q, want error %s", testCase.Input, got, testCase.Error)
++	indexed := make([]struct {
++		ID   string
++		Case sourceIdentityVectorCase
++	}, len(cases))
++	for i, testCase := range cases {
++		indexed[i] = struct {
++			ID   string
++			Case sourceIdentityVectorCase
++		}{ID: "case-" + strconv.Itoa(i+1), Case: testCase}
++	}
++	conformancecoverage.Run(t, "interop/source-identity-vectors", indexed,
++		func(tc struct {
++			ID   string
++			Case sourceIdentityVectorCase
++		}) string {
++			return tc.ID
++		}, func(t *testing.T, row struct {
++			ID   string
++			Case sourceIdentityVectorCase
++		}) {
++			testCase := row.Case
++			got, err := identity.Parse(testCase.Input)
++			if testCase.Error != "" {
++				if err == nil {
++					t.Errorf("Parse(%q) = %q, want error %s", testCase.Input, got, testCase.Error)
++				}
++				return
+ 			}
+-			continue
+-		}
+-		if err != nil {
+-			t.Errorf("Parse(%q): %v", testCase.Input, err)
+-			continue
+-		}
+-		want := ""
+-		if testCase.Identity != nil {
+-			want = *testCase.Identity
+-		}
+-		if got != want {
+-			t.Errorf("Parse(%q) = %q, want %q", testCase.Input, got, want)
+-		}
+-	}
++			if err != nil {
++				t.Errorf("Parse(%q): %v", testCase.Input, err)
++				return
++			}
++			want := ""
++			if testCase.Identity != nil {
++				want = *testCase.Identity
++			}
++			if got != want {
++				t.Errorf("Parse(%q) = %q, want %q", testCase.Input, got, want)
++			}
++		})
+ }
+ 
+ func TestIdentifierVectors(t *testing.T) {
+@@ -265,18 +321,26 @@ func TestIdentifierVectors(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	var cases []struct {
+-		Input string `json:"input"`
+-		Valid bool   `json:"valid"`
+-	}
+-	if err := json.Unmarshal(payload, &cases); err != nil {
++	var published []simpleValidityVectorCase
++	if err := json.Unmarshal(payload, &published); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	for _, testCase := range cases {
+-		if got := identifiers.Valid(testCase.Input); got != testCase.Valid {
+-			t.Errorf("identifier %q valid=%v, want %v", testCase.Input, got, testCase.Valid)
+-		}
++	cases := indexSimpleCases(published)
++	conformancecoverage.Run(t, "interop/identifier-vectors", cases,
++		func(tc simpleValidityVectorCase) string { return tc.ID }, func(t *testing.T, testCase simpleValidityVectorCase) {
++			if got := identifiers.Valid(testCase.Input); got != testCase.Valid {
++				t.Errorf("identifier %q valid=%v, want %v", testCase.Input, got, testCase.Valid)
++			}
++		})
++}
++
++func indexSimpleCases(published []simpleValidityVectorCase) []simpleValidityVectorCase {
++	cases := make([]simpleValidityVectorCase, len(published))
++	for i, testCase := range published {
++		testCase.ID = "case-" + strconv.Itoa(i+1)
++		cases[i] = testCase
+ 	}
++	return cases
+ }
+ 
+ func TestLocaleSelectorVectors(t *testing.T) {
+@@ -284,18 +348,17 @@ func TestLocaleSelectorVectors(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	var cases []struct {
+-		Input string `json:"input"`
+-		Valid bool   `json:"valid"`
+-	}
+-	if err := json.Unmarshal(payload, &cases); err != nil {
++	var published []simpleValidityVectorCase
++	if err := json.Unmarshal(payload, &published); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	for _, testCase := range cases {
+-		if got := identifiers.ValidLocale(testCase.Input); got != testCase.Valid {
+-			t.Errorf("locale selector %q valid=%v, want %v", testCase.Input, got, testCase.Valid)
+-		}
+-	}
++	cases := indexSimpleCases(published)
++	conformancecoverage.Run(t, "interop/locale-selector-vectors", cases,
++		func(tc simpleValidityVectorCase) string { return tc.ID }, func(t *testing.T, testCase simpleValidityVectorCase) {
++			if got := identifiers.ValidLocale(testCase.Input); got != testCase.Valid {
++				t.Errorf("locale selector %q valid=%v, want %v", testCase.Input, got, testCase.Valid)
++			}
++		})
+ }
+ 
+ func TestManagerConfigVectors(t *testing.T) {
+@@ -303,28 +366,12 @@ func TestManagerConfigVectors(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	var cases []struct {
+-		Name     string         `json:"name"`
+-		Input    map[string]any `json:"input"`
+-		Valid    bool           `json:"valid"`
+-		Expected struct {
+-			DefaultAgents            []string `json:"default_agents"`
+-			AdapterMode              string   `json:"adapter_mode"`
+-			ProjectAlias             string   `json:"project_alias"`
+-			CheckoutAlias            string   `json:"checkout_alias"`
+-			RegistryURLs             []string `json:"registry_urls"`
+-			SnapshotMaxAgeSeconds    int      `json:"snapshot_max_age_seconds"`
+-			SnapshotClockSkewSeconds int      `json:"snapshot_clock_skew_seconds"`
+-			CacheTTLSeconds          int      `json:"cache_ttl_seconds"`
+-			OfflineGraceSeconds      int      `json:"offline_grace_seconds"`
+-			MaxRequestBytes          int      `json:"max_request_bytes"`
+-		} `json:"expected"`
+-	}
++	var cases []managerConfigVectorCase
+ 	if err := json.Unmarshal(payload, &cases); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	for _, testCase := range cases {
+-		t.Run(testCase.Name, func(t *testing.T) {
++	conformancecoverage.Run(t, "interop/manager-config-vectors", cases,
++		func(tc managerConfigVectorCase) string { return tc.Name }, func(t *testing.T, testCase managerConfigVectorCase) {
+ 			parsed, err := config.Parse(testCase.Input, "config.json")
+ 			if !testCase.Valid {
+ 				if err == nil {
+@@ -362,7 +409,6 @@ func TestManagerConfigVectors(t *testing.T) {
+ 				t.Fatalf("audit defaults = %+v, want %+v", parsed.Audit, testCase.Expected)
+ 			}
+ 		})
+-	}
+ }
+ 
+ func TestGoldenFederationSemantics(t *testing.T) {
+diff --git a/internal/marker/marker_v2_test.go b/internal/marker/marker_v2_test.go
+index d7ffd708..e8b103dd 100644
+--- a/internal/marker/marker_v2_test.go
++++ b/internal/marker/marker_v2_test.go
+@@ -30,42 +30,6 @@ func validMarkerV2() *Marker {
+ 	}
+ }
+ 
+-func TestReadAuthoritativeMarkerV2SchemaCases(t *testing.T) {
+-	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+-	if root == "" {
+-		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
+-	}
+-	casesDir := filepath.Join(root, "schema-cases", "install-marker-v2")
+-	entries, err := os.ReadDir(casesDir)
+-	if err != nil {
+-		t.Fatal(err)
+-	}
+-	seen := 0
+-	for _, entry := range entries {
+-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+-			continue
+-		}
+-		seen++
+-		t.Run(entry.Name(), func(t *testing.T) {
+-			dir := t.TempDir()
+-			payload, err := os.ReadFile(filepath.Join(casesDir, entry.Name()))
+-			if err != nil {
+-				t.Fatal(err)
+-			}
+-			if err := os.WriteFile(filepath.Join(dir, Name), payload, 0o644); err != nil {
+-				t.Fatal(err)
+-			}
+-			wantValid := strings.HasPrefix(entry.Name(), "valid")
+-			if got := Read(dir) != nil; got != wantValid {
+-				t.Fatalf("Read valid = %v, want %v", got, wantValid)
+-			}
+-		})
+-	}
+-	if seen < 10 {
+-		t.Fatalf("only %d authoritative marker cases found", seen)
+-	}
+-}
+-
+ func TestWriteAlwaysProducesCanonicalMarkerV2(t *testing.T) {
+ 	dir := t.TempDir()
+ 	m := validMarkerV2()
+diff --git a/internal/marker/marker_v4_test.go b/internal/marker/marker_v4_test.go
+index 99eeae51..50f676d9 100644
+--- a/internal/marker/marker_v4_test.go
++++ b/internal/marker/marker_v4_test.go
+@@ -159,73 +159,3 @@ func TestMarkerV4LocalBuildRequiresBuildSource(t *testing.T) {
+ 		t.Fatal(err)
+ 	}
+ }
+-
+-// markerV4CasesThisReaderDoesNotModel are the published marker cases this
+-// reader accepts even though the suite marks them invalid. Every one of them
+-// is an external-repository cross-field rule of MARKER V3 -- declared/effective
+-// identity equality when unsubstituted, effective identity kind against
+-// substitution type, and substitution revision width against object format --
+-// which validV3Build has never implemented. Marker v4 is v3 with the version
+-// bumped and nothing else changed, so it inherits the gap exactly; schema 8
+-// neither introduces nor widens it. The same five cases fail identically
+-// against schema-cases/install-marker-v3, which no test consumes today, which
+-// is why the gap has been invisible.
+-//
+-// The list is asserted in both directions: a case that starts being rejected
+-// fails here too, so closing the gap deletes its entry rather than leaving a
+-// stale allowance behind.
+-var markerV4CasesThisReaderDoesNotModel = map[string]bool{
+-	"invalid-external-declared-effective-mismatch.json":   true,
+-	"invalid-marker-local-identity-kind-mismatch.json":    true,
+-	"invalid-marker-network-identity-kind-mismatch.json":  true,
+-	"invalid-marker-sha1-effective-revision-width.json":   true,
+-	"invalid-marker-sha256-effective-revision-width.json": true,
+-}
+-
+-// TestReadAuthoritativeMarkerV4SchemaCases runs the published marker-v4
+-// family through the reader. The family is named explicitly, so a root that
+-// stops publishing it fails here instead of quietly narrowing the check.
+-func TestReadAuthoritativeMarkerV4SchemaCases(t *testing.T) {
+-	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+-	if root == "" {
+-		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
+-	}
+-	casesDir := filepath.Join(root, "schema-cases", "install-marker-v4")
+-	entries, err := os.ReadDir(casesDir)
+-	if err != nil {
+-		t.Fatal(err)
+-	}
+-	seen := 0
+-	for _, entry := range entries {
+-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+-			continue
+-		}
+-		seen++
+-		t.Run(entry.Name(), func(t *testing.T) {
+-			dir := t.TempDir()
+-			payload, err := os.ReadFile(filepath.Join(casesDir, entry.Name()))
+-			if err != nil {
+-				t.Fatal(err)
+-			}
+-			if err := os.WriteFile(filepath.Join(dir, Name), payload, 0o644); err != nil {
+-				t.Fatal(err)
+-			}
+-			wantValid := strings.HasPrefix(entry.Name(), "valid")
+-			if markerV4CasesThisReaderDoesNotModel[entry.Name()] {
+-				if wantValid {
+-					t.Fatalf("%s is listed as unmodelled but the suite marks it valid", entry.Name())
+-				}
+-				if Read(dir) == nil {
+-					t.Fatalf("%s is now rejected; delete its entry from markerV4CasesThisReaderDoesNotModel", entry.Name())
+-				}
+-				return
+-			}
+-			if got := Read(dir) != nil; got != wantValid {
+-				t.Fatalf("Read valid = %v, want %v", got, wantValid)
+-			}
+-		})
+-	}
+-	if seen == 0 {
+-		t.Fatal("the root publishes schema-cases/install-marker-v4 but it contains no cases")
+-	}
+-}
+diff --git a/internal/marker/schema_coverage_test.go b/internal/marker/schema_coverage_test.go
+new file mode 100644
+index 00000000..2fbe32bc
+--- /dev/null
++++ b/internal/marker/schema_coverage_test.go
+@@ -0,0 +1,74 @@
++package marker
++
++import (
++	"fmt"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/conformancecoverage"
++)
++
++type markerSchemaCase struct {
++	Name  string
++	Valid bool
++	Bytes []byte
++}
++
++func loadMarkerSchemaCases(t *testing.T, family string) []markerSchemaCase {
++	t.Helper()
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	casesDir := filepath.Join(root, "schema-cases", family)
++	entries, err := os.ReadDir(casesDir)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var cases []markerSchemaCase
++	for _, entry := range entries {
++		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
++			continue
++		}
++		payload, err := os.ReadFile(filepath.Join(casesDir, entry.Name()))
++		if err != nil {
++			t.Fatal(err)
++		}
++		cases = append(cases, markerSchemaCase{
++			Name:  entry.Name(),
++			Valid: strings.HasPrefix(entry.Name(), "valid"),
++			Bytes: payload,
++		})
++	}
++	if len(cases) == 0 {
++		t.Fatalf("the root publishes schema-cases/%s but it contains no cases", family)
++	}
++	return cases
++}
++
++func runMarkerSchemaCases(t *testing.T, family string) {
++	t.Helper()
++	cases := loadMarkerSchemaCases(t, family)
++	conformancecoverage.RunOutcomes(t, "marker/"+family+"/schema-cases", cases,
++		func(tc markerSchemaCase) string { return tc.Name }, func(t *testing.T, tc markerSchemaCase) conformancecoverage.Observation {
++			dir := t.TempDir()
++			if err := os.WriteFile(filepath.Join(dir, Name), tc.Bytes, 0o644); err != nil {
++				t.Fatal(err)
++			}
++			gotValid := Read(dir) != nil
++			if gotValid != tc.Valid {
++				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("Read valid=%v, suite expects %v", gotValid, tc.Valid)}
++			}
++			return conformancecoverage.Observation{}
++		})
++}
++
++func TestReadAuthoritativeMarkerV2SchemaCases(t *testing.T) {
++	runMarkerSchemaCases(t, "install-marker-v2")
++}
++
++func TestReadAuthoritativeMarkerV4SchemaCases(t *testing.T) {
++	runMarkerSchemaCases(t, "install-marker-v4")
++}
+diff --git a/internal/moduleroots/conformance_test.go b/internal/moduleroots/conformance_test.go
+index ec3af27b..a3b41a07 100644
+--- a/internal/moduleroots/conformance_test.go
++++ b/internal/moduleroots/conformance_test.go
+@@ -6,8 +6,36 @@ import (
+ 	"path/filepath"
+ 	"strings"
+ 	"testing"
++
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ )
+ 
++type moduleRootVectorCase struct {
++	Name        string `json:"name"`
++	Declaration struct {
++		BuildRoot    string   `json:"build_root"`
++		BuildRoots   []string `json:"build_roots"`
++		Modules      []string `json:"modules"`
++		RuntimeRoots []string `json:"runtime_roots"`
++	} `json:"declaration"`
++	Snapshot struct {
++		Directories []string          `json:"directories"`
++		GoModFiles  []string          `json:"go_mod_files"`
++		LinkPaths   []json.RawMessage `json:"link_paths"`
++	} `json:"snapshot"`
++	VendorModuleAnnotations []string `json:"vendor_module_annotations"`
++	ExpectedError           string   `json:"expected_error"`
++	FailsBefore             string   `json:"fails_before"`
++	BuildPermitted          bool     `json:"build_permitted"`
++	GoListStarted           bool     `json:"go_list_started"`
++	GoBuildStarted          bool     `json:"go_build_started"`
++}
++
++type moduleRootVectorSuite struct {
++	EvaluationOrder []string               `json:"evaluation_order"`
++	Cases           []moduleRootVectorCase `json:"cases"`
++}
++
+ // TestModuleRootVectors runs the published module-roots family against the two
+ // halves of Spec §4.2.3 that this package owns, in the order the vector file
+ // itself declares: declaration and containment before the fixed `go list`,
+@@ -27,37 +55,15 @@ func TestModuleRootVectors(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	var suite struct {
+-		EvaluationOrder []string `json:"evaluation_order"`
+-		Cases           []struct {
+-			Name        string `json:"name"`
+-			Declaration struct {
+-				BuildRoot    string   `json:"build_root"`
+-				BuildRoots   []string `json:"build_roots"`
+-				Modules      []string `json:"modules"`
+-				RuntimeRoots []string `json:"runtime_roots"`
+-			} `json:"declaration"`
+-			Snapshot struct {
+-				Directories []string          `json:"directories"`
+-				GoModFiles  []string          `json:"go_mod_files"`
+-				LinkPaths   []json.RawMessage `json:"link_paths"`
+-			} `json:"snapshot"`
+-			VendorModuleAnnotations []string `json:"vendor_module_annotations"`
+-			ExpectedError           string   `json:"expected_error"`
+-			FailsBefore             string   `json:"fails_before"`
+-			BuildPermitted          bool     `json:"build_permitted"`
+-			GoListStarted           bool     `json:"go_list_started"`
+-			GoBuildStarted          bool     `json:"go_build_started"`
+-		} `json:"cases"`
+-	}
++	var suite moduleRootVectorSuite
+ 	if err := json.Unmarshal(payload, &suite); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	if len(suite.Cases) == 0 {
+ 		t.Fatal("the module-roots vector family published no cases")
+ 	}
+-	for _, testCase := range suite.Cases {
+-		t.Run(testCase.Name, func(t *testing.T) {
++	conformancecoverage.Run(t, "module-roots/vectors", suite.Cases,
++		func(tc moduleRootVectorCase) string { return tc.Name }, func(t *testing.T, testCase moduleRootVectorCase) {
+ 			if len(testCase.Snapshot.LinkPaths) != 0 {
+ 				// Silently ignoring a link fixture would report a green run for
+ 				// a rule this test never exercised.
+@@ -111,5 +117,4 @@ func TestModuleRootVectors(t *testing.T) {
+ 			}
+ 			wantCode(t, replaceErr, "")
+ 		})
+-	}
+ }
+diff --git a/internal/runtimestore/conformance_test.go b/internal/runtimestore/conformance_test.go
+index 285b12d6..1b492ba3 100644
+--- a/internal/runtimestore/conformance_test.go
++++ b/internal/runtimestore/conformance_test.go
+@@ -6,6 +6,8 @@ import (
+ 	"path/filepath"
+ 	"strings"
+ 	"testing"
++
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ )
+ 
+ func TestCandidateManagerLauncherContract(t *testing.T) {
+@@ -18,14 +20,7 @@ func TestCandidateManagerLauncherContract(t *testing.T) {
+ 		t.Fatal(err)
+ 	}
+ 	var document struct {
+-		LauncherCases []struct {
+-			Name                  string   `json:"name"`
+-			Platforms             []string `json:"platforms"`
+-			ForwardArguments      bool     `json:"forward_arguments"`
+-			PreserveExitStatus    bool     `json:"preserve_exit_status"`
+-			PreserveInheritedPath bool     `json:"preserve_inherited_path"`
+-			RequiredPathRoles     []string `json:"required_path_roles"`
+-		} `json:"launcher_cases"`
++		LauncherCases []authoritativeLauncherCase `json:"launcher_cases"`
+ 	}
+ 	if err := json.Unmarshal(payload, &document); err != nil {
+ 		t.Fatal(err)
+@@ -34,17 +29,19 @@ func TestCandidateManagerLauncherContract(t *testing.T) {
+ 		"skill-command-without-shell-activation":  false,
+ 		"declared-system-command-without-profile": false,
+ 	}
+-	for _, testCase := range document.LauncherCases {
+-		if _, relevant := wantCases[testCase.Name]; !relevant {
+-			continue
+-		}
+-		wantCases[testCase.Name] = true
+-		if !testCase.ForwardArguments || !testCase.PreserveExitStatus || !testCase.PreserveInheritedPath ||
+-			strings.Join(testCase.Platforms, ",") != "unix,windows" ||
+-			strings.Join(testCase.RequiredPathRoles, ",") != "command_directory,implementation_runtime,system_dependencies" {
+-			t.Fatalf("candidate launcher contract changed: %+v", testCase)
+-		}
+-	}
++	conformancecoverage.RunOutcomes(t, "manager-lifecycle/launcher-cases", document.LauncherCases,
++		func(tc authoritativeLauncherCase) string { return tc.Name }, func(t *testing.T, testCase authoritativeLauncherCase) conformancecoverage.Observation {
++			if _, relevant := wantCases[testCase.Name]; !relevant {
++				return conformancecoverage.Observation{BoundReason: "launcher case is outside this runtime-store contract check"}
++			}
++			wantCases[testCase.Name] = true
++			if !testCase.ForwardArguments || !testCase.PreserveExitStatus || !testCase.PreserveInheritedPath ||
++				strings.Join(testCase.Platforms, ",") != "unix,windows" ||
++				strings.Join(testCase.RequiredPathRoles, ",") != "command_directory,implementation_runtime,system_dependencies" {
++				t.Fatalf("candidate launcher contract changed: %+v", testCase)
++			}
++			return conformancecoverage.Observation{}
++		})
+ 	for name, found := range wantCases {
+ 		if !found {
+ 			t.Fatalf("candidate launcher case %q is absent", name)
+diff --git a/internal/runtimestore/launcher_conformance_test.go b/internal/runtimestore/launcher_conformance_test.go
+index 586ee4db..edc213b9 100644
+--- a/internal/runtimestore/launcher_conformance_test.go
++++ b/internal/runtimestore/launcher_conformance_test.go
+@@ -11,6 +11,7 @@ import (
+ 	"strings"
+ 	"testing"
+ 
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ 	"github.com/relux-works/curator/internal/skillspec"
+ )
+ 
+@@ -178,16 +179,15 @@ func wantLauncherArgs() string {
+ // must have its own executable proof.
+ func TestAuthoritativeLauncherCasesForwardArgvPathRolesAndExitStatus(t *testing.T) {
+ 	cases := authoritativeLauncherCases(t)
+-	for _, published := range cases {
+-		published := published
+-		binding, bound := launcherBindings[published.Name]
+-		if !bound {
+-			t.Fatalf("published launcher case %q has no executable binding", published.Name)
+-		}
+-		if len(published.Platforms) == 0 {
+-			t.Fatalf("published launcher case %q names no platform", published.Name)
+-		}
+-		t.Run(published.Name, func(t *testing.T) {
++	conformancecoverage.Run(t, "manager-lifecycle/launcher-cases", cases,
++		func(tc authoritativeLauncherCase) string { return tc.Name }, func(t *testing.T, published authoritativeLauncherCase) {
++			binding, bound := launcherBindings[published.Name]
++			if !bound {
++				t.Fatalf("published launcher case %q has no executable binding", published.Name)
++			}
++			if len(published.Platforms) == 0 {
++				t.Fatalf("published launcher case %q names no platform", published.Name)
++			}
+ 			for _, platform := range published.Platforms {
+ 				switch platform {
+ 				case "unix":
+@@ -203,7 +203,6 @@ func TestAuthoritativeLauncherCasesForwardArgvPathRolesAndExitStatus(t *testing.
+ 				}
+ 			}
+ 		})
+-	}
+ }
+ 
+ func runUnixLauncherCase(t *testing.T, published authoritativeLauncherCase, binding launcherBinding) {
+diff --git a/internal/scopes/gc_conformance_test.go b/internal/scopes/gc_conformance_test.go
+index 2f719260..5436a67f 100644
+--- a/internal/scopes/gc_conformance_test.go
++++ b/internal/scopes/gc_conformance_test.go
+@@ -9,6 +9,7 @@ import (
+ 	"time"
+ 
+ 	"github.com/relux-works/curator/internal/buildcache"
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ 	"github.com/relux-works/curator/internal/marker"
+ )
+ 
+@@ -45,20 +46,10 @@ func authoritativeGCCases(t *testing.T) []authoritativeGCCase {
+ 	if err := json.Unmarshal(payload, &document); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	// Only the retention case belongs to this package. The remaining published
+-	// cases are external-repository status and repair codes, which this manager
+-	// does not implement: it accepts skill schemas 1 through 6 and publishes no
+-	// build_repository_* code at all. They are routed, not bound here.
+-	var retention []authoritativeGCCase
+-	for _, published := range document.Cases {
+-		if len(published.Roots) > 0 {
+-			retention = append(retention, published)
+-		}
+-	}
+-	if len(retention) == 0 {
+-		t.Fatal("the authoritative suite publishes no maintenance retention case to bind")
++	if len(document.Cases) == 0 {
++		t.Fatal("the authoritative suite publishes no status/repair/GC cases")
+ 	}
+-	return retention
++	return document.Cases
+ }
+ 
+ // TestAuthoritativeGarbageCollectionRootsAreRetained binds every published
+@@ -66,15 +57,17 @@ func authoritativeGCCases(t *testing.T) []authoritativeGCCase {
+ // root gets its own executable proof, and an unpublished root fails rather
+ // than passing unasserted.
+ func TestAuthoritativeGarbageCollectionRootsAreRetained(t *testing.T) {
+-	for _, published := range authoritativeGCCases(t) {
+-		published := published
+-		t.Run(published.Name, func(t *testing.T) {
++	conformancecoverage.RunOutcomes(t, "external-repository-lifecycle/status-repair-gc-cases", authoritativeGCCases(t),
++		func(tc authoritativeGCCase) string { return tc.Name }, func(t *testing.T, published authoritativeGCCase) conformancecoverage.Observation {
++			if len(published.Roots) == 0 {
++				return conformancecoverage.Observation{BoundReason: "status and repair codes belong to the external-repository manager surface"}
++			}
+ 			for _, root := range published.Roots {
+ 				root := root
+ 				t.Run(root, func(t *testing.T) { assertRootRetained(t, root) })
+ 			}
++			return conformancecoverage.Observation{}
+ 		})
+-	}
+ }
+ 
+ func assertRootRetained(t *testing.T, root string) {
+diff --git a/internal/scriptpolicy/conformance_test.go b/internal/scriptpolicy/conformance_test.go
+index 8cbdab4f..65c2e429 100644
+--- a/internal/scriptpolicy/conformance_test.go
++++ b/internal/scriptpolicy/conformance_test.go
+@@ -8,6 +8,7 @@ import (
+ 	"strings"
+ 	"testing"
+ 
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ 	"github.com/relux-works/curator/internal/skillspec"
+ )
+ 
+@@ -15,19 +16,21 @@ import (
+ // family. Only the sections curator's surface answers are decoded; the rest of
+ // the file is checked by name in TestScriptHostExecutionPolicySectionsAreAllClassified,
+ // so a section this build does not read can never arrive unnoticed.
++type scriptExecutionOptInCase struct {
++	Name            string  `json:"name"`
++	ManifestSchema  int     `json:"manifest_schema"`
++	ExecutionPolicy *string `json:"execution_policy"`
++	Interpreter     *string `json:"interpreter"`
++	Mode            *string `json:"mode"`
++	Accepted        bool    `json:"accepted"`
++}
++
+ type scriptHostExecutionPolicyVector struct {
+-	SchemaVersion   int      `json:"schema_version"`
+-	ProtocolVersion string   `json:"protocol_version"`
+-	ExecutionPolicy string   `json:"execution_policy"`
+-	Interpreters    []string `json:"interpreters"`
+-	OptInCases      []struct {
+-		Name            string  `json:"name"`
+-		ManifestSchema  int     `json:"manifest_schema"`
+-		ExecutionPolicy *string `json:"execution_policy"`
+-		Interpreter     *string `json:"interpreter"`
+-		Mode            *string `json:"mode"`
+-		Accepted        bool    `json:"accepted"`
+-	} `json:"opt_in_cases"`
++	SchemaVersion   int                        `json:"schema_version"`
++	ProtocolVersion string                     `json:"protocol_version"`
++	ExecutionPolicy string                     `json:"execution_policy"`
++	Interpreters    []string                   `json:"interpreters"`
++	OptInCases      []scriptExecutionOptInCase `json:"opt_in_cases"`
+ }
+ 
+ // Section classifications. Every top-level section of the published family
+@@ -42,9 +45,9 @@ const (
+ 	// build can reach it. TestARefusalPrecedesEveryWorkerSurface asserts the
+ 	// refusal that makes that true, instead of leaving the section unread.
+ 	refusedBeforeReached = "unreachable: curator refuses enforced commands before any worker surface"
+-	// notImplementedYet: real curator surface that this build does not yet
+-	// carry. Named with its owner so the gap is declared, not silent.
+-	notImplementedYet = "not implemented: audit warning classes, owned by STORY-260822-2h0v9j"
++	// separateAuditFamily: this test classifies document sections only; it does
++	// not execute the separate audit-label case list.
++	separateAuditFamily = "separate audit-label cases, outside this consumer"
+ )
+ 
+ var scriptHostExecutionPolicySections = map[string]string{
+@@ -53,7 +56,7 @@ var scriptHostExecutionPolicySections = map[string]string{
+ 	"execution_policy":            consumedHere,
+ 	"interpreters":                consumedHere,
+ 	"opt_in_cases":                consumedHere,
+-	"audit_label_cases":           notImplementedYet,
++	"audit_label_cases":           separateAuditFamily,
+ 	"capability_derivation_cases": refusedBeforeReached,
+ 	"capability_evidence_cases":   refusedBeforeReached,
+ 	"capability_evidence_record":  refusedBeforeReached,
+@@ -163,8 +166,8 @@ func TestScriptExecutionOptInCases(t *testing.T) {
+ 	if len(vector.OptInCases) == 0 {
+ 		t.Fatal("the script-host-execution-policy family published no opt-in cases")
+ 	}
+-	for _, testCase := range vector.OptInCases {
+-		t.Run(testCase.Name, func(t *testing.T) {
++	conformancecoverage.Run(t, "script-host-execution-policy/opt-in-cases", vector.OptInCases,
++		func(tc scriptExecutionOptInCase) string { return tc.Name }, func(t *testing.T, testCase scriptExecutionOptInCase) {
+ 			command := map[string]any{"type": "script", "unix_path": "scripts/tool"}
+ 			if testCase.ExecutionPolicy != nil {
+ 				command["execution_policy"] = *testCase.ExecutionPolicy
+@@ -210,7 +213,6 @@ func TestScriptExecutionOptInCases(t *testing.T) {
+ 				t.Fatal("an enforced command parsed without its bound interpreter")
+ 			}
+ 		})
+-	}
+ }
+ 
+ // TestARefusalPrecedesEveryWorkerSurface is the assertion the sections
+diff --git a/internal/shell/shell_hook_trust_test.go b/internal/shell/shell_hook_trust_test.go
+index 94caffbf..d2987868 100644
+--- a/internal/shell/shell_hook_trust_test.go
++++ b/internal/shell/shell_hook_trust_test.go
+@@ -13,6 +13,7 @@ import (
+ 	"testing"
+ 	"time"
+ 
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ 	"github.com/relux-works/curator/internal/hookapproval"
+ )
+ 
+@@ -92,11 +93,10 @@ func TestShellHookTrustVectors(t *testing.T) {
+ 	if len(vectors.Cases) == 0 {
+ 		t.Fatal("shell-hook-trust vector publishes no cases")
+ 	}
+-	for _, c := range vectors.Cases {
+-		t.Run(c.Name, func(t *testing.T) {
++	conformancecoverage.Run(t, "shell-hook-trust/vectors", vectors.Cases,
++		func(tc hookTrustCase) string { return tc.Name }, func(t *testing.T, c hookTrustCase) {
+ 			runHookTrustCase(t, c, vectors.Fixtures)
+ 		})
+-	}
+ }
+ 
+ func runHookTrustCase(t *testing.T, c hookTrustCase, fixtures map[string]hookTrustFixture) {
+diff --git a/internal/skillspec/conformance_test.go b/internal/skillspec/conformance_test.go
+index 4cad3873..ebd5674c 100644
+--- a/internal/skillspec/conformance_test.go
++++ b/internal/skillspec/conformance_test.go
+@@ -4,9 +4,11 @@ import (
+ 	"encoding/json"
+ 	"os"
+ 	"path/filepath"
++	"strconv"
+ 	"strings"
+ 	"testing"
+ 
++	"github.com/relux-works/curator/internal/conformancecoverage"
+ 	"github.com/relux-works/curator/internal/identifiers"
+ )
+ 
+@@ -19,19 +21,29 @@ func TestPortablePathConformanceVectors(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	var cases []struct {
++	var published []struct {
+ 		Input string `json:"input"`
+ 		Valid bool   `json:"valid"`
+ 	}
+-	if err := json.Unmarshal(payload, &cases); err != nil {
++	if err := json.Unmarshal(payload, &published); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	for _, testCase := range cases {
+-		_, err := validateRelativePath(testCase.Input, "path", true)
+-		if (err == nil) != testCase.Valid {
+-			t.Errorf("path %q valid=%v, error=%v", testCase.Input, testCase.Valid, err)
+-		}
++	type portablePathCase struct {
++		ID    string
++		Input string
++		Valid bool
++	}
++	cases := make([]portablePathCase, len(published))
++	for i, testCase := range published {
++		cases[i] = portablePathCase{ID: "case-" + strconv.Itoa(i+1), Input: testCase.Input, Valid: testCase.Valid}
+ 	}
++	conformancecoverage.Run(t, "portable-paths/vectors", cases,
++		func(tc portablePathCase) string { return tc.ID }, func(t *testing.T, testCase portablePathCase) {
++			_, err := validateRelativePath(testCase.Input, "path", true)
++			if (err == nil) != testCase.Valid {
++				t.Errorf("path %q valid=%v, error=%v", testCase.Input, testCase.Valid, err)
++			}
++		})
+ }
+ 
+ // TestReleasedSchemaCases runs the published schema-case families of the
+@@ -53,28 +65,27 @@ func TestReleasedSchemaCases(t *testing.T) {
+ 		if err != nil {
+ 			t.Fatal(err)
+ 		}
+-		consumed := 0
++		type schemaCase struct{ Name string }
++		var cases []schemaCase
+ 		for _, entry := range entries {
+ 			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+ 				continue
+ 			}
+-			consumed++
+-			t.Run(suite.directory+"/"+entry.Name(), func(t *testing.T) {
+-				payload, err := os.ReadFile(filepath.Join(root, "schema-cases", suite.directory, entry.Name()))
++			cases = append(cases, schemaCase{Name: entry.Name()})
++		}
++		conformancecoverage.Run(t, suite.directory+"/schema-cases", cases,
++			func(tc schemaCase) string { return tc.Name }, func(t *testing.T, testCase schemaCase) {
++				payload, err := os.ReadFile(filepath.Join(root, "schema-cases", suite.directory, testCase.Name))
+ 				if err != nil {
+ 					t.Fatal(err)
+ 				}
+ 				snapshot := materializeManifestFixture(t, payload, suite.manifest)
+ 				_, err = Load(snapshot)
+-				wantValid := strings.HasPrefix(entry.Name(), "valid")
++				wantValid := strings.HasPrefix(testCase.Name, "valid")
+ 				if (err == nil) != wantValid {
+ 					t.Fatalf("valid=%v, error=%v", wantValid, err)
+ 				}
+ 			})
+-		}
+-		if consumed == 0 {
+-			t.Fatalf("the root publishes schema-cases/%s but it contains no cases", suite.directory)
+-		}
+ 	}
+ }
+ 
