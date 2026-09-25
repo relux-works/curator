@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +15,7 @@ import (
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/registry"
+	"github.com/relux-works/curator/internal/sourcelock"
 )
 
 // draftEvidenceStub serves one signed registry whose records echo the
@@ -93,22 +96,44 @@ func (s *draftEvidenceStub) serveRecords(w http.ResponseWriter, r *http.Request)
 // TestDraftEvidenceExactMatch is the production-entry bound for draft §4
 // (install.Project -> resolveRegistries -> registry.ResolveExact): exact
 // evidence installs and lands its attestation in the marker, while a
-// wrong-name or wrong-context record is refused fail-closed under a
-// strict policy with the shared typed refusal, revealing no registry
-// endpoint or key material. Dropping the name comparison admits the
-// wrong-name row; dropping the context comparison admits the
-// wrong-context row.
+// wrong-name, wrong-repository, wrong-commit, or wrong-context record is
+// refused fail-closed under a strict policy with the shared typed refusal,
+// preserving the prior lock and install and revealing no registry endpoint
+// or key material. Narrowing either the repository or commit comparison to
+// a non-empty check admits its corresponding single-field mismatch row.
 func TestDraftEvidenceExactMatch(t *testing.T) {
-	run := func(t *testing.T, mutate func(body map[string]any)) Result {
+	run := func(t *testing.T, mutate func(body map[string]any)) (Result, *draftEvidenceStub, map[string][]byte) {
 		t.Helper()
 		project, home, _, _ := setupGitInstall(t)
+		skillsRoot := t.TempDir()
+		installOpts := Options{Platform: installPlatform()}
+		prior := Project(draftTestConfig(home, skillsRoot), project, "test", installOpts)
+		if prior.Status != "ok" {
+			t.Fatalf("seed install = %+v, want ok", prior)
+		}
+		installed := filepath.Join(project, ".agents", "skills", "review")
+		statePaths := []string{
+			sourcelock.PathIn(project),
+			DraftBindingsPath(home, project),
+			filepath.Join(installed, marker.Name),
+			filepath.Join(installed, "SKILL.md"),
+			filepath.Join(installed, "references", "info.md"),
+		}
+		priorState := make(map[string][]byte, len(statePaths))
+		for _, path := range statePaths {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("read seeded state %s: %v", path, err)
+			}
+			priorState[path] = data
+		}
 		stub := newDraftEvidenceStub(t, mutate)
-		cfg := draftTestConfig(home, t.TempDir())
+		cfg := draftTestConfig(home, skillsRoot)
 		cfg.Audit.RegistryPolicy = "strict"
 		cfg.AuditRegistries = []config.Registry{{Name: "one", URL: stub.server.URL, PublicKeys: []string{stub.pinned}, Enabled: true}}
 		cfg.Audit.CacheTTLSeconds = 0
 		cfg.Audit.OfflineGraceSeconds = 0
-		return Project(cfg, project, "test", Options{Platform: installPlatform()})
+		return Project(cfg, project, "test", Options{Platform: installPlatform()}), stub, priorState
 	}
 	t.Run("exact-admits", func(t *testing.T) {
 		project, home, _, _ := setupGitInstall(t)
@@ -135,9 +160,15 @@ func TestDraftEvidenceExactMatch(t *testing.T) {
 		{"wrong-context", func(body map[string]any) {
 			body["content_sha256"] = "sha256:" + strings.Repeat("e", 64)
 		}},
+		{"wrong-repository-only", func(body map[string]any) {
+			body["source_identity"] = "unrelated.test/kit"
+		}},
+		{"wrong-commit-only", func(body map[string]any) {
+			body["commit"] = strings.Repeat("e", 40)
+		}},
 	} {
 		t.Run(condition.name+"-refuses", func(t *testing.T) {
-			result := run(t, condition.mutate)
+			result, stub, priorState := run(t, condition.mutate)
 			if result.Status != "failed" {
 				t.Fatalf("%s install = %+v, want refusal", condition.name, result)
 			}
@@ -145,9 +176,22 @@ func TestDraftEvidenceExactMatch(t *testing.T) {
 			if !strings.Contains(joined, "is not audited by any trusted registry") {
 				t.Fatalf("%s errors = %q, want the strict typed refusal", condition.name, joined)
 			}
-			for _, secret := range []string{"http://", "https://", "ed25519:", "127.0.0.1"} {
-				if strings.Contains(joined, secret) {
-					t.Fatalf("%s refusal leaks %q: %q", condition.name, secret, joined)
+			if len(result.Attestations) != 0 {
+				t.Fatalf("%s refusal exposed attestations: %+v", condition.name, result.Attestations)
+			}
+			diagnostics := strings.Join(append(append([]string(nil), result.Errors...), result.Messages...), ";")
+			for _, secret := range []string{stub.server.URL, stub.pinned, "ed25519:", "127.0.0.1"} {
+				if strings.Contains(diagnostics, secret) {
+					t.Fatalf("%s refusal leaks %q: %q", condition.name, secret, diagnostics)
+				}
+			}
+			for path, before := range priorState {
+				after, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatalf("%s refusal removed prior state %s: %v", condition.name, path, err)
+				}
+				if string(after) != string(before) {
+					t.Fatalf("%s refusal changed prior state %s", condition.name, path)
 				}
 			}
 		})
