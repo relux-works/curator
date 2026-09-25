@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/config"
+	"github.com/relux-works/curator/internal/conformancecoverage"
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextmaterialize"
 	"github.com/relux-works/curator/internal/contextresolve"
@@ -67,36 +68,26 @@ func TestEnvironmentsEnvPassthroughVectors(t *testing.T) {
 	if len(vectors.Order) == 0 {
 		t.Fatal("vectors/environments-env-passthrough.json publishes no surfacing_order_cases")
 	}
-	for _, tc := range vectors.DefaultResolution {
-		tc := tc
-		t.Run("resolution/"+tc.Name, func(t *testing.T) {
+	conformancecoverage.Run(t, "environments-env-passthrough/default-resolution-cases", vectors.DefaultResolution,
+		func(tc passthroughVectorCase) string { return "resolution/" + tc.Name }, func(t *testing.T, tc passthroughVectorCase) {
 			runPassthroughVectorCase(t, tc)
 		})
-	}
-	for _, tc := range vectors.AllowlistEmpty {
-		tc := tc
-		t.Run("allowlist/"+tc.Name, func(t *testing.T) {
+	conformancecoverage.Run(t, "environments-env-passthrough/allowlist-empty-cases", vectors.AllowlistEmpty,
+		func(tc allowlistVectorCase) string { return "allowlist/" + tc.Name }, func(t *testing.T, tc allowlistVectorCase) {
 			runAllowlistVectorCase(t, tc)
 		})
-	}
-	for _, tc := range vectors.Schema {
-		tc := tc
-		t.Run("schema/"+tc.Name, func(t *testing.T) {
+	conformancecoverage.Run(t, "environments-env-passthrough/schema-cases", vectors.Schema,
+		func(tc schemaVectorCase) string { return "schema/" + tc.Name }, func(t *testing.T, tc schemaVectorCase) {
 			runPassthroughSchemaCase(t, tc)
 		})
-	}
-	for _, tc := range vectors.Surfacing {
-		tc := tc
-		t.Run("surfacing/"+tc.Name, func(t *testing.T) {
+	conformancecoverage.Run(t, "environments-env-passthrough/surfacing-cases", vectors.Surfacing,
+		func(tc surfacingVectorCase) string { return "surfacing/" + tc.Name }, func(t *testing.T, tc surfacingVectorCase) {
 			runSurfacingVectorCase(t, tc)
 		})
-	}
-	for _, tc := range vectors.Order {
-		tc := tc
-		t.Run("order/"+tc.Name, func(t *testing.T) {
+	conformancecoverage.Run(t, "environments-env-passthrough/surfacing-order-cases", vectors.Order,
+		func(tc surfacingOrderCase) string { return "order/" + tc.Name }, func(t *testing.T, tc surfacingOrderCase) {
 			runSurfacingOrderCase(t, tc)
 		})
-	}
 }
 
 // passthroughVectorCase is one default_resolution_cases entry: the knob

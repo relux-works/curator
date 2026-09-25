@@ -10,7 +10,8 @@ import (
 
 // The closed v5 shape is pinned against the accepted schemas vendored
 // under testdata/draft-sources-v1 (byte-identical to curator-spec
-// schemas/draft-sources-v1 at 802caee, landed in a4fcaf0). The drift
+// schemas/draft-sources-v1 at dcc7f01, including the accepted marker-v5
+// fixture correction). The drift
 // rows below fail when the spec moves; the written-bytes rows fail when
 // this implementation emits a document the schema refuses — the exact
 // class revision 2 shipped on the Git arm (the five replaced legacy

@@ -6,38 +6,47 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/relux-works/curator/internal/conformancecoverage"
 	"github.com/relux-works/curator/internal/pkgversion"
 )
 
 // contextVersionsVector mirrors vectors/context-versions.json (environments
 // §1.4). The resolution and lock families of the same file are consumed by
 // context_resolution_test.go.
+type contextVersionCase struct {
+	Tag        string   `json:"tag"`
+	Candidate  bool     `json:"candidate"`
+	Version    string   `json:"version"`
+	Major      int64    `json:"major"`
+	Minor      int64    `json:"minor"`
+	Patch      int64    `json:"patch"`
+	Prerelease []string `json:"prerelease"`
+}
+
+type contextOrderingCase struct {
+	Name              string   `json:"name"`
+	Input             []string `json:"input"`
+	ExpectedAscending []string `json:"expected_ascending"`
+}
+
+type contextRangeCase struct {
+	Range          string     `json:"range"`
+	Valid          bool       `json:"valid"`
+	ComparatorSets [][]string `json:"comparator_sets"`
+	Error          string     `json:"error"`
+}
+
+type contextSatisfiesCase struct {
+	Range     string `json:"range"`
+	Version   string `json:"version"`
+	Satisfies bool   `json:"satisfies"`
+}
+
 type contextVersionsVector struct {
-	VersionCases []struct {
-		Tag        string   `json:"tag"`
-		Candidate  bool     `json:"candidate"`
-		Version    string   `json:"version"`
-		Major      int64    `json:"major"`
-		Minor      int64    `json:"minor"`
-		Patch      int64    `json:"patch"`
-		Prerelease []string `json:"prerelease"`
-	} `json:"version_cases"`
-	OrderingCases []struct {
-		Name              string   `json:"name"`
-		Input             []string `json:"input"`
-		ExpectedAscending []string `json:"expected_ascending"`
-	} `json:"ordering_cases"`
-	RangeCases []struct {
-		Range          string     `json:"range"`
-		Valid          bool       `json:"valid"`
-		ComparatorSets [][]string `json:"comparator_sets"`
-		Error          string     `json:"error"`
-	} `json:"range_cases"`
-	SatisfiesCases []struct {
-		Range     string `json:"range"`
-		Version   string `json:"version"`
-		Satisfies bool   `json:"satisfies"`
-	} `json:"satisfies_cases"`
+	VersionCases   []contextVersionCase   `json:"version_cases"`
+	OrderingCases  []contextOrderingCase  `json:"ordering_cases"`
+	RangeCases     []contextRangeCase     `json:"range_cases"`
+	SatisfiesCases []contextSatisfiesCase `json:"satisfies_cases"`
 }
 
 func loadContextVersionsVector(t *testing.T) (string, contextVersionsVector) {
@@ -60,14 +69,14 @@ func TestConformanceContextVersions(t *testing.T) {
 	if len(vector.VersionCases) == 0 || len(vector.RangeCases) == 0 || len(vector.SatisfiesCases) == 0 || len(vector.OrderingCases) == 0 {
 		t.Fatalf("%s declares an empty family", vectorPath)
 	}
-	t.Run("version_cases", func(t *testing.T) {
-		for _, tc := range vector.VersionCases {
+	conformancecoverage.Run(t, "context-versions/version-cases", vector.VersionCases,
+		func(tc contextVersionCase) string { return "version/" + tc.Tag }, func(t *testing.T, tc contextVersionCase) {
 			version, candidate := pkgversion.ParseTag(tc.Tag)
 			if candidate != tc.Candidate {
 				t.Fatalf("tag %q: candidate=%v, want %v", tc.Tag, candidate, tc.Candidate)
 			}
 			if !tc.Candidate {
-				continue
+				return
 			}
 			prerelease := version.Prerelease
 			if prerelease == nil {
@@ -76,10 +85,9 @@ func TestConformanceContextVersions(t *testing.T) {
 			if version.String() != tc.Version || version.Major != tc.Major || version.Minor != tc.Minor || version.Patch != tc.Patch || !reflect.DeepEqual(prerelease, tc.Prerelease) {
 				t.Fatalf("tag %q parsed as %+v, want %s", tc.Tag, version, tc.Version)
 			}
-		}
-	})
-	t.Run("ordering_cases", func(t *testing.T) {
-		for _, tc := range vector.OrderingCases {
+		})
+	conformancecoverage.Run(t, "context-versions/ordering-cases", vector.OrderingCases,
+		func(tc contextOrderingCase) string { return "ordering/" + tc.Name }, func(t *testing.T, tc contextOrderingCase) {
 			var versions []pkgversion.Version
 			for _, raw := range tc.Input {
 				version, err := pkgversion.ParseVersion(raw)
@@ -96,10 +104,9 @@ func TestConformanceContextVersions(t *testing.T) {
 			if !reflect.DeepEqual(got, tc.ExpectedAscending) {
 				t.Fatalf("%s: sorted %v, want %v", tc.Name, got, tc.ExpectedAscending)
 			}
-		}
-	})
-	t.Run("range_cases", func(t *testing.T) {
-		for _, tc := range vector.RangeCases {
+		})
+	conformancecoverage.Run(t, "context-versions/range-cases", vector.RangeCases,
+		func(tc contextRangeCase) string { return "range/" + tc.Range }, func(t *testing.T, tc contextRangeCase) {
 			parsed, err := pkgversion.ParseRange(tc.Range)
 			if !tc.Valid {
 				if err == nil {
@@ -108,7 +115,7 @@ func TestConformanceContextVersions(t *testing.T) {
 				if tc.Error != "profile_source_invalid" || !errors.Is(err, pkgversion.ErrInvalidRange) {
 					t.Fatalf("range %q: error %v, want %s", tc.Range, err, tc.Error)
 				}
-				continue
+				return
 			}
 			if err != nil {
 				t.Fatalf("range %q: %v", tc.Range, err)
@@ -116,10 +123,9 @@ func TestConformanceContextVersions(t *testing.T) {
 			if got := parsed.ComparatorSets(); !reflect.DeepEqual(got, tc.ComparatorSets) {
 				t.Fatalf("range %q: comparator sets %v, want %v", tc.Range, got, tc.ComparatorSets)
 			}
-		}
-	})
-	t.Run("satisfies_cases", func(t *testing.T) {
-		for _, tc := range vector.SatisfiesCases {
+		})
+	conformancecoverage.Run(t, "context-versions/satisfies-cases", vector.SatisfiesCases,
+		func(tc contextSatisfiesCase) string { return "satisfies/" + tc.Range + "@" + tc.Version }, func(t *testing.T, tc contextSatisfiesCase) {
 			parsed, err := pkgversion.ParseRange(tc.Range)
 			if err != nil {
 				t.Fatalf("range %q: %v", tc.Range, err)
@@ -131,6 +137,5 @@ func TestConformanceContextVersions(t *testing.T) {
 			if got := parsed.Satisfies(version); got != tc.Satisfies {
 				t.Fatalf("%q satisfies %q = %v, want %v", tc.Version, tc.Range, got, tc.Satisfies)
 			}
-		}
-	})
+		})
 }

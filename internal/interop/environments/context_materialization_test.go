@@ -8,73 +8,95 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/relux-works/curator/internal/conformancecoverage"
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextmaterialize"
 	"github.com/relux-works/curator/internal/contextpkg"
 )
 
+type vectorPrecedence struct {
+	Winner    string `json:"winner"`
+	Placement string `json:"placement"`
+}
+
+type environmentsHeaderCase struct {
+	Name          string           `json:"name"`
+	Lock          vectorLock       `json:"lock"`
+	LockSHA256    string           `json:"lock_sha256"`
+	Precedence    vectorPrecedence `json:"precedence"`
+	EmittedOrder  []string         `json:"emitted_order"`
+	ExpectedBytes string           `json:"expected_bytes"`
+	LineCount     int              `json:"line_count"`
+	SHA256        string           `json:"sha256"`
+}
+
+type environmentsMaterializationCase struct {
+	Name          string                              `json:"name"`
+	Surface       string                              `json:"surface"`
+	Form          string                              `json:"form"`
+	Environment   string                              `json:"environment"`
+	Lock          vectorLock                          `json:"lock"`
+	LockSHA256    string                              `json:"lock_sha256"`
+	Precedence    vectorPrecedence                    `json:"precedence"`
+	Packages      map[string]materializationPackage   `json:"packages"`
+	MCPServers    map[string]materializationMCPServer `json:"mcp_servers"`
+	MCPSet        []string                            `json:"mcp_set"`
+	EnvNames      []string                            `json:"env_names"`
+	EmittedOrder  []string                            `json:"emitted_order"`
+	FileWritten   bool                                `json:"file_written"`
+	SurfaceSHA256 string                              `json:"surface_sha256"`
+	Files         []materializationFile               `json:"files"`
+	MachinePolicy *materializationPolicy              `json:"machine_policy"`
+	Admitted      []vectorModuleRef                   `json:"admitted"`
+	Dropped       []vectorModuleRef                   `json:"dropped"`
+	Warnings      []vectorWarning                     `json:"warnings"`
+	Error         string                              `json:"error"`
+	ErrorPackage  string                              `json:"error_package"`
+	ErrorModule   string                              `json:"error_module"`
+}
+
+type materializationPackage struct {
+	HasContext bool                    `json:"has_context"`
+	Modules    []materializationModule `json:"modules"`
+}
+
+type materializationModule struct {
+	Path         string   `json:"path"`
+	Class        string   `json:"class"`
+	Environments []string `json:"environments"`
+	Content      string   `json:"content"`
+}
+
+type materializationMCPServer struct {
+	Transport    string   `json:"transport"`
+	Command      string   `json:"command"`
+	Args         []string `json:"args"`
+	URL          string   `json:"url"`
+	EnvNames     []string `json:"env_names"`
+	Environments []string `json:"environments"`
+}
+
+type materializationFile struct {
+	Path     string `json:"path"`
+	Bytes    int    `json:"bytes"`
+	Expected string `json:"expected"`
+	SHA256   string `json:"sha256"`
+}
+
+type materializationPolicy struct {
+	TransitiveSystemModules string                  `json:"transitive_system_modules"`
+	SystemModuleWaivers     []materializationWaiver `json:"system_module_waivers"`
+}
+
+type materializationWaiver struct {
+	Package string `json:"package"`
+	Reason  string `json:"reason"`
+}
+
 type environmentsVector struct {
-	HeaderTypeLine string `json:"header_type_line"`
-	HeaderCases    []struct {
-		Name          string     `json:"name"`
-		Lock          vectorLock `json:"lock"`
-		LockSHA256    string     `json:"lock_sha256"`
-		Precedence    struct{ Winner, Placement string }
-		EmittedOrder  []string `json:"emitted_order"`
-		ExpectedBytes string   `json:"expected_bytes"`
-		LineCount     int      `json:"line_count"`
-		SHA256        string   `json:"sha256"`
-	} `json:"header_cases"`
-	MaterializationCases []struct {
-		Name        string     `json:"name"`
-		Surface     string     `json:"surface"`
-		Form        string     `json:"form"`
-		Environment string     `json:"environment"`
-		Lock        vectorLock `json:"lock"`
-		LockSHA256  string     `json:"lock_sha256"`
-		Precedence  struct{ Winner, Placement string }
-		Packages    map[string]struct {
-			HasContext bool `json:"has_context"`
-			Modules    []struct {
-				Path         string   `json:"path"`
-				Class        string   `json:"class"`
-				Environments []string `json:"environments"`
-				Content      string   `json:"content"`
-			} `json:"modules"`
-		} `json:"packages"`
-		MCPServers map[string]struct {
-			Transport    string   `json:"transport"`
-			Command      string   `json:"command"`
-			Args         []string `json:"args"`
-			URL          string   `json:"url"`
-			EnvNames     []string `json:"env_names"`
-			Environments []string `json:"environments"`
-		} `json:"mcp_servers"`
-		MCPSet        []string `json:"mcp_set"`
-		EnvNames      []string `json:"env_names"`
-		EmittedOrder  []string `json:"emitted_order"`
-		FileWritten   bool     `json:"file_written"`
-		SurfaceSHA256 string   `json:"surface_sha256"`
-		Files         []struct {
-			Path     string `json:"path"`
-			Bytes    int    `json:"bytes"`
-			Expected string `json:"expected"`
-			SHA256   string `json:"sha256"`
-		} `json:"files"`
-		MachinePolicy *struct {
-			TransitiveSystemModules string `json:"transitive_system_modules"`
-			SystemModuleWaivers     []struct {
-				Package string `json:"package"`
-				Reason  string `json:"reason"`
-			} `json:"system_module_waivers"`
-		} `json:"machine_policy"`
-		Admitted     []vectorModuleRef `json:"admitted"`
-		Dropped      []vectorModuleRef `json:"dropped"`
-		Warnings     []vectorWarning   `json:"warnings"`
-		Error        string            `json:"error"`
-		ErrorPackage string            `json:"error_package"`
-		ErrorModule  string            `json:"error_module"`
-	} `json:"materialization_cases"`
+	HeaderTypeLine       string                            `json:"header_type_line"`
+	HeaderCases          []environmentsHeaderCase          `json:"header_cases"`
+	MaterializationCases []environmentsMaterializationCase `json:"materialization_cases"`
 }
 
 // vectorModuleRef is one admitted or dropped system module of a
@@ -125,8 +147,8 @@ func TestConformanceEnvironmentsHeader(t *testing.T) {
 	if len(vector.HeaderCases) == 0 {
 		t.Fatal("the vector declares no header cases")
 	}
-	for _, tc := range vector.HeaderCases {
-		t.Run(tc.Name, func(t *testing.T) {
+	conformancecoverage.Run(t, "environments/header-cases", vector.HeaderCases,
+		func(tc environmentsHeaderCase) string { return tc.Name }, func(t *testing.T, tc environmentsHeaderCase) {
 			lock := vectorLockToLock(t, tc.Lock)
 			hash, err := lock.Hash()
 			if err != nil {
@@ -157,7 +179,6 @@ func TestConformanceEnvironmentsHeader(t *testing.T) {
 				t.Fatalf("header sha256 %s, want %s", got, tc.SHA256)
 			}
 		})
-	}
 }
 
 // TestConformanceEnvironmentsMonolithic drives the production assemblers
@@ -172,8 +193,8 @@ func TestConformanceEnvironmentsMonolithic(t *testing.T) {
 	if len(vector.MaterializationCases) == 0 {
 		t.Fatal("the vector declares no materialization cases")
 	}
-	for _, tc := range vector.MaterializationCases {
-		t.Run(tc.Name, func(t *testing.T) {
+	conformancecoverage.Run(t, "environments/materialization-cases", vector.MaterializationCases,
+		func(tc environmentsMaterializationCase) string { return tc.Name }, func(t *testing.T, tc environmentsMaterializationCase) {
 			lock := vectorLockToLock(t, tc.Lock)
 			hash, err := lock.Hash()
 			if err != nil {
@@ -348,7 +369,6 @@ func TestConformanceEnvironmentsMonolithic(t *testing.T) {
 				t.Fatalf("surface hash %s, want %s", got, tc.SurfaceSHA256)
 			}
 		})
-	}
 }
 
 // assertAdmittedModules pins the admitted set: the production

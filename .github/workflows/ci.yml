@@ -33,24 +33,15 @@ permissions:
   contents: read
 
 env:
-  # The one immutable committed protocol-suite pin, referenced by every job.
-  # It stays on the currently qualified released revision; promoting it is
-  # owned by TASK-260720-38l1sy, after TASK-260720-25d05o qualifies the
-  # release. This pin is the revision the signed released tag v1.0.0-rc.12
-  # names on curator-spec: it publishes protocol 1.0.0-rc.9, whose
-  # conformance/v1/manifest.json is
-  # sha256:ea9dd5a0030b889079cf5655517056e66a0f1d61812f8c2920b4beddc1fd24ed
-  # -- the exact digest release/1.0.0-rc.9.json requires of a downstream
-  # consumer in downstream_consumption.required_manifest_sha256. It claims no
-  # later revision. A candidate suite never appears here -- it enters through
-  # the non-default `candidate-conformance` job below and nowhere else.
-  #
-  # This root serves the WHOLE module: `suite-plan.sh` defers nothing against
-  # it. The umbrella-provider-resolution, environments-env-passthrough and
-  # system-module E2 families that the previous pin did not publish now run
-  # with the root exported on every default lane, instead of taking their
-  # root-content skip path there.
-  SPEC_PIN: dced9b8317e0e8af79edf2d0539b32bd22b6c85b
+  # The one immutable committed conformance-root pin, referenced by every
+  # default and comparison job. This is curator-spec commit
+  # dcc7f015e2d97edf2d52928afb6fd79ec8129e8b: current spec main 3d2c611 plus
+  # accepted erratum TASK-260924-mcmova. Its conformance/v1 manifest digest is
+  # sha256:cb7a98e97543282cdde75f04c55fb15acb91062f8ba6510e3d603db42f1c1ab2.
+  # The pin is not a release qualification or a conformance claim. Candidate
+  # suites enter through the non-default `candidate-conformance` job only.
+  # The root serves the whole module; suite-plan.sh defers nothing against it.
+  SPEC_PIN: dcc7f015e2d97edf2d52928afb6fd79ec8129e8b
   # actions/setup-go only began forcing GOTOOLCHAIN=local in v6.0.0; this
   # workflow pins @v5, so without these two lines a job may download a
   # toolchain or read a per-user go env file. The identity step below reads
@@ -82,7 +73,7 @@ env:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # The default lane, against the committed released pin, on all three runners.
+  # The default lane, against the committed conformance pin, on all three runners.
   #
   # `test-gate.sh` plans the run from that root alone. The committed pin
   # publishes every artefact `.github/ci/root-artifacts.tsv` declares, so the
@@ -611,10 +602,10 @@ jobs:
           ref: ${{ inputs.candidate_ref }}
           path: candidate-spec
 
-      # The committed released pin is checked out here only so the candidate
+      # The committed conformance pin is checked out here only so the candidate
       # can be proved to differ from it. This job never runs against it and
       # never modifies it.
-      - name: Checkout the committed released pin for comparison
+      - name: Checkout the committed conformance pin for comparison
         uses: actions/checkout@v4
         with:
           repository: relux-works/curator-spec

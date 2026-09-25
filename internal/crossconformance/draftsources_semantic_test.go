@@ -3,6 +3,8 @@ package crossconformance
 import (
 	"sync"
 	"testing"
+
+	"github.com/relux-works/curator/internal/conformancecoverage"
 )
 
 // draftSemanticDrivers maps every pinned semantic case id to the row
@@ -20,26 +22,12 @@ func registerDraftSemantic(id string, drive func(t *testing.T, _ draftSemanticCa
 	draftSemanticDrivers[id] = drive
 }
 
-// TestDraftSourcesSemanticCases drives all 94 pinned semantic cases.
+// TestDraftSourcesSemanticCases drives every pinned semantic case.
 func TestDraftSourcesSemanticCases(t *testing.T) {
 	cases := loadDraftSemantic(t)
-	if len(cases) != wantSemanticCases {
-		t.Fatalf("semantic cases = %d, want %d", len(cases), wantSemanticCases)
-	}
 	resetSemanticOutcomes()
-	for _, c := range cases {
-		c := c
-		t.Run(c.ID, func(t *testing.T) {
-			// The cleanup observes the final subtest state even
-			// when the driver stops early (t.Skip/t.FailNow), so
-			// every iterated case is classified exactly once.
-			t.Cleanup(func() {
-				if t.Skipped() {
-					recordSemanticSkipped(c.ID)
-					return
-				}
-				recordSemanticOutcomeDefault(c.ID, semanticOutcomeDriven)
-			})
+	conformancecoverage.RunOutcomesParallel(t, "draft-sources-v1/semantic-cases", cases,
+		func(c draftSemanticCase) string { return c.ID }, func(t *testing.T, c draftSemanticCase) conformancecoverage.Observation {
 			drive, ok := draftSemanticDrivers[c.ID]
 			if !ok {
 				t.Fatalf("semantic case %q has no production-entry row", c.ID)
@@ -48,15 +36,8 @@ func TestDraftSourcesSemanticCases(t *testing.T) {
 				t.Fatalf("case %q carries no expected outcome", c.ID)
 			}
 			drive(t, c)
+			return semanticObservation(c.ID)
 		})
-	}
-	driven, knownGap, bound, skipped := tallySemanticOutcomes()
-	t.Logf("semantic cases: %d driven, %d known-gap, %d bound, %d skipped, %d total",
-		driven, knownGap, bound, skipped, len(cases))
-	if executed := driven + knownGap + bound + skipped; executed != len(cases) || len(cases) != wantSemanticCases {
-		t.Fatalf("executed(%d) != total(%d, want %d); run the full matrix without -run subtest filters",
-			executed, len(cases), wantSemanticCases)
-	}
 }
 
 // TestDraftSourcesSemanticCoverage fails when the row matrix and the
@@ -84,78 +65,34 @@ func TestDraftSourcesSemanticCoverage(t *testing.T) {
 // never as passing.
 func semanticBound(t *testing.T, c draftSemanticCase, reason string) {
 	t.Helper()
-	recordSemanticOutcome(c.ID, semanticOutcomeBound)
+	recordSemanticBound(c.ID, reason)
 	t.Logf("BOUND %s: expected %q: %s", c.ID, c.Expected, reason)
 }
 
-// Semantic outcome classes, one recorded per executed case id.
-const (
-	semanticOutcomeDriven   = "driven"
-	semanticOutcomeKnownGap = "known-gap"
-	semanticOutcomeBound    = "bound"
-	semanticOutcomeSkipped  = "skipped"
-)
-
-// draftSemanticOutcomes classifies every case the runner iterates. The
-// subtests run sequentially, but the registry is still mutex-guarded so
-// a future t.Parallel cannot corrupt the tally.
+// draftSemanticBounds carries only explicit bounds. Known gaps are read from
+// the committed ledger by conformancecoverage.Run; no driver may declare one.
 var draftSemanticOutcomes = struct {
 	sync.Mutex
-	byID map[string]string
-}{byID: map[string]string{}}
+	byID map[string]conformancecoverage.Observation
+}{byID: map[string]conformancecoverage.Observation{}}
 
 func resetSemanticOutcomes() {
 	draftSemanticOutcomes.Lock()
 	defer draftSemanticOutcomes.Unlock()
-	draftSemanticOutcomes.byID = map[string]string{}
+	draftSemanticOutcomes.byID = map[string]conformancecoverage.Observation{}
 }
 
-// recordSemanticOutcome classifies one case explicitly (bound or
-// known-gap). A conflicting second classification panics: the harness
-// must never report one row under two classes.
-func recordSemanticOutcome(id, class string) {
+func recordSemanticBound(id, reason string) {
 	draftSemanticOutcomes.Lock()
 	defer draftSemanticOutcomes.Unlock()
-	if prev, ok := draftSemanticOutcomes.byID[id]; ok && prev != class {
-		panic("semantic case " + id + " classified twice: " + prev + " then " + class)
+	if prev, ok := draftSemanticOutcomes.byID[id]; ok && prev.BoundReason != reason {
+		panic("semantic case " + id + " classified twice: " + prev.BoundReason + " then " + reason)
 	}
-	draftSemanticOutcomes.byID[id] = class
+	draftSemanticOutcomes.byID[id] = conformancecoverage.Observation{BoundReason: reason}
 }
 
-// recordSemanticOutcomeDefault classifies one case only when no
-// explicit class was recorded: a completed row without a bound or gap
-// marker is a driven pass.
-func recordSemanticOutcomeDefault(id, class string) {
+func semanticObservation(id string) conformancecoverage.Observation {
 	draftSemanticOutcomes.Lock()
 	defer draftSemanticOutcomes.Unlock()
-	if _, ok := draftSemanticOutcomes.byID[id]; !ok {
-		draftSemanticOutcomes.byID[id] = class
-	}
-}
-
-// recordSemanticSkipped reports the row as skipped. Skip is the final
-// Go-reported state, so it wins over an earlier explicit marker when a
-// row records one and then skips at a later layer.
-func recordSemanticSkipped(id string) {
-	draftSemanticOutcomes.Lock()
-	defer draftSemanticOutcomes.Unlock()
-	draftSemanticOutcomes.byID[id] = semanticOutcomeSkipped
-}
-
-func tallySemanticOutcomes() (driven, knownGap, bound, skipped int) {
-	draftSemanticOutcomes.Lock()
-	defer draftSemanticOutcomes.Unlock()
-	for _, class := range draftSemanticOutcomes.byID {
-		switch class {
-		case semanticOutcomeDriven:
-			driven++
-		case semanticOutcomeKnownGap:
-			knownGap++
-		case semanticOutcomeBound:
-			bound++
-		case semanticOutcomeSkipped:
-			skipped++
-		}
-	}
-	return driven, knownGap, bound, skipped
+	return draftSemanticOutcomes.byID[id]
 }

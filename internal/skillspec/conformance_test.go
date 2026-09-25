@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/relux-works/curator/internal/conformancecoverage"
 	"github.com/relux-works/curator/internal/identifiers"
 )
 
@@ -19,19 +21,29 @@ func TestPortablePathConformanceVectors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var cases []struct {
+	var published []struct {
 		Input string `json:"input"`
 		Valid bool   `json:"valid"`
 	}
-	if err := json.Unmarshal(payload, &cases); err != nil {
+	if err := json.Unmarshal(payload, &published); err != nil {
 		t.Fatal(err)
 	}
-	for _, testCase := range cases {
-		_, err := validateRelativePath(testCase.Input, "path", true)
-		if (err == nil) != testCase.Valid {
-			t.Errorf("path %q valid=%v, error=%v", testCase.Input, testCase.Valid, err)
-		}
+	type portablePathCase struct {
+		ID    string
+		Input string
+		Valid bool
 	}
+	cases := make([]portablePathCase, len(published))
+	for i, testCase := range published {
+		cases[i] = portablePathCase{ID: "case-" + strconv.Itoa(i+1), Input: testCase.Input, Valid: testCase.Valid}
+	}
+	conformancecoverage.Run(t, "portable-paths/vectors", cases,
+		func(tc portablePathCase) string { return tc.ID }, func(t *testing.T, testCase portablePathCase) {
+			_, err := validateRelativePath(testCase.Input, "path", true)
+			if (err == nil) != testCase.Valid {
+				t.Errorf("path %q valid=%v, error=%v", testCase.Input, testCase.Valid, err)
+			}
+		})
 }
 
 // TestReleasedSchemaCases runs the published schema-case families of the
@@ -53,28 +65,27 @@ func TestReleasedSchemaCases(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		consumed := 0
+		type schemaCase struct{ Name string }
+		var cases []schemaCase
 		for _, entry := range entries {
 			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
 				continue
 			}
-			consumed++
-			t.Run(suite.directory+"/"+entry.Name(), func(t *testing.T) {
-				payload, err := os.ReadFile(filepath.Join(root, "schema-cases", suite.directory, entry.Name()))
+			cases = append(cases, schemaCase{Name: entry.Name()})
+		}
+		conformancecoverage.Run(t, suite.directory+"/schema-cases", cases,
+			func(tc schemaCase) string { return tc.Name }, func(t *testing.T, testCase schemaCase) {
+				payload, err := os.ReadFile(filepath.Join(root, "schema-cases", suite.directory, testCase.Name))
 				if err != nil {
 					t.Fatal(err)
 				}
 				snapshot := materializeManifestFixture(t, payload, suite.manifest)
 				_, err = Load(snapshot)
-				wantValid := strings.HasPrefix(entry.Name(), "valid")
+				wantValid := strings.HasPrefix(testCase.Name, "valid")
 				if (err == nil) != wantValid {
 					t.Fatalf("valid=%v, error=%v", wantValid, err)
 				}
 			})
-		}
-		if consumed == 0 {
-			t.Fatalf("the root publishes schema-cases/%s but it contains no cases", suite.directory)
-		}
 	}
 }
 

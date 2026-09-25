@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/relux-works/curator/internal/conformancecoverage"
 	"github.com/relux-works/curator/internal/hookapproval"
 )
 
@@ -92,11 +93,10 @@ func TestShellHookTrustVectors(t *testing.T) {
 	if len(vectors.Cases) == 0 {
 		t.Fatal("shell-hook-trust vector publishes no cases")
 	}
-	for _, c := range vectors.Cases {
-		t.Run(c.Name, func(t *testing.T) {
+	conformancecoverage.Run(t, "shell-hook-trust/vectors", vectors.Cases,
+		func(tc hookTrustCase) string { return tc.Name }, func(t *testing.T, c hookTrustCase) {
 			runHookTrustCase(t, c, vectors.Fixtures)
 		})
-	}
 }
 
 func runHookTrustCase(t *testing.T, c hookTrustCase, fixtures map[string]hookTrustFixture) {

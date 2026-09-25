@@ -9,7 +9,7 @@
 #
 # `default_excluded_on` is the fallback for a SUPPLIED root that predates the
 # vector (e.g. an older CURATOR_CONFORMANCE_ROOT passed explicitly). The
-# committed released pin is NOT such a root: it publishes
+# committed conformance pin is NOT such a root: it publishes
 # `vectors/conformance-claim-v3-qualification.json`, so on the default lane the
 # vector is authoritative and this fallback stays dormant. Without it, a
 # pre-vector root would lose an exclusion that is a property of the

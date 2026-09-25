@@ -41,7 +41,7 @@ Later contention events show why 30m was insufficient: Test (ubuntu-latest) reac
 
 ## Protocol-suite pin and verification
 
-The module's immutable release pin ([`internal/buildrepo/release_pin.go`](../internal/buildrepo/release_pin.go), verified by `curator-spec-pin`) is curator-spec `v1.0.0-rc.8`; CI's conformance suite pin has since been promoted to the rc.9 release commit; see `SPEC_PIN` in [../.github/workflows/ci.yml](../.github/workflows/ci.yml), which owns that promotion. Aligning the module release pin to rc.9 is tracked with the promotion task named there.
+The module's immutable release pin ([`internal/buildrepo/release_pin.go`](../internal/buildrepo/release_pin.go), verified by `curator-spec-pin`) remains curator-spec `v1.0.0-rc.8`. The CI conformance pin is independent and currently follows curator-spec commit `dcc7f015e2d97edf2d52928afb6fd79ec8129e8b`, selected from current spec main plus accepted erratum TASK-260924-mcmova; see `SPEC_PIN` in [../.github/workflows/ci.yml](../.github/workflows/ci.yml). This is a conformance root pin, not a release qualification.
 
 The released suite is pinned to curator-spec `v1.0.0-rc.8` at commit `f8c405aa3ad0a39d260c2ed93684e55c5a346359`. `curator-spec-pin` verifies the suite manifest SHA-256 `d14e3a16bb4a01ff282791f08e3aefa269210234f41072beae6fe59b642595a1` and release metadata SHA-256 `293f101d10665061aa049efa72141f9e3c5d608bbde300e882f6e3e095e31ede`, including the empty published implementation, platform, and conformance claim sets. Run it locally with `make verify-spec-pin SPEC_PIN=f8c405aa3ad0a39d260c2ed93684e55c5a346359 CURATOR_CONFORMANCE_ROOT=/path/to/curator-spec/conformance/v1`.
 
@@ -64,6 +64,14 @@ Publishing a family in a conformance root does not prove that a build reads it. 
 For schema 8, artifacts include `agent-skill-v8`, `csk-skill-v8`, `install-marker-v4`, `vectors/module-roots.json`, and `vectors/script-host-execution-policy.json`. These are consumed by `internal/skillspec`, `internal/marker`, `internal/moduleroots`, `internal/godriver`, and `internal/scriptpolicy`.
 
 The committed protocol-suite pin is declared as `SPEC_PIN` in the workflow `env:` block. Candidate suites enter via the `candidate-conformance` workflow on explicit `workflow_dispatch` calls supplying a full 40-character revision or materialized root. That job sets `CI_REQUIRE_FULL_ROOT=1` to enforce complete package coverage, and emitted artifacts are stamped as candidate-only evidence, proving neither a published release nor a conformance claim.
+
+## Published case accounting
+
+Consumers that iterate a complete published case family use the shared case-coverage harness. [`conformance-case-counts.tsv`](../.github/ci/conformance-case-counts.tsv) pins the expected case count for each family at its selected corpus revision; each run classifies every published case as driven, known-gap, bound, or skipped and requires the tally to equal that count. [`conformance-gaps.tsv`](../.github/ci/conformance-gaps.tsv) is the only place a known gap may be declared. A row is an owed implementation, never an accepted deviation: an unlisted failure fails the test, a listed case that starts passing fails until its row is removed, and a row whose case disappears fails the count or row-presence check.
+
+The current root publishes the complete `skillfile-dev-v2` and `skill-build-v1` schema lists, external-repository fixtures, and the newly promoted config, environment marker, security-posture and launch-fragment cases. The task result records the measured family tallies and owned gaps for commit `dcc7f015e2d97edf2d52928afb6fd79ec8129e8b`. Tests that select one named case from a broader published vector set remain targeted checks; they do not claim to account for the complete family.
+
+The 28 manager-config overlay gaps are attributed to the unsupported `permissions`, `source_signers`, and `require_source_signers` members added by 0017/0018 and E1. Those members are present in the updated overlay cases, so `Load` can report either new blocker first; it does not indicate an overlay path-kind failure. The config regression test checks all 14 schema inputs and 14 vectors against their production results and checks both owners in each ledger row. The dcc script-worker root also publishes eight Windows executable-identity cases: the manager resolver drives all eight, with two known gaps where the current System32 exception cannot establish component-store link targets or platform ownership.
 
 ## Self-hosted runner prerequisites
 

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/relux-works/curator/internal/conformancecoverage"
 	"github.com/relux-works/curator/internal/skillspec"
 )
 
@@ -178,16 +179,15 @@ func wantLauncherArgs() string {
 // must have its own executable proof.
 func TestAuthoritativeLauncherCasesForwardArgvPathRolesAndExitStatus(t *testing.T) {
 	cases := authoritativeLauncherCases(t)
-	for _, published := range cases {
-		published := published
-		binding, bound := launcherBindings[published.Name]
-		if !bound {
-			t.Fatalf("published launcher case %q has no executable binding", published.Name)
-		}
-		if len(published.Platforms) == 0 {
-			t.Fatalf("published launcher case %q names no platform", published.Name)
-		}
-		t.Run(published.Name, func(t *testing.T) {
+	conformancecoverage.Run(t, "manager-lifecycle/launcher-cases", cases,
+		func(tc authoritativeLauncherCase) string { return tc.Name }, func(t *testing.T, published authoritativeLauncherCase) {
+			binding, bound := launcherBindings[published.Name]
+			if !bound {
+				t.Fatalf("published launcher case %q has no executable binding", published.Name)
+			}
+			if len(published.Platforms) == 0 {
+				t.Fatalf("published launcher case %q names no platform", published.Name)
+			}
 			for _, platform := range published.Platforms {
 				switch platform {
 				case "unix":
@@ -203,7 +203,6 @@ func TestAuthoritativeLauncherCasesForwardArgvPathRolesAndExitStatus(t *testing.
 				}
 			}
 		})
-	}
 }
 
 func runUnixLauncherCase(t *testing.T, published authoritativeLauncherCase, binding launcherBinding) {

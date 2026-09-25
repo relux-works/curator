@@ -600,6 +600,7 @@ internal/scriptworker	TestScriptWorkerRechecksInterpreterBeforeExec	linux,darwin
 internal/scriptworker	TestScriptWorkerBindsStandardInput	linux,darwin,windows	-	-	the worker binds a payload explicitly and maps an absent payload to the null device
 internal/scriptworker	TestScriptWorkerReturnsTheChildExitStatus	linux,darwin,windows	-	-	the worker returns interpreter exit status and stderr through its session result
 internal/scriptworker	TestMacOSNativeControlsAppliedAtInvocation	darwin	linux,windows	platform-control	the macOS invocation applies process-group teardown, RLIMIT_FSIZE, and inherited-handle restriction and truthfully reports the other controls unavailable
+internal/scriptworker	TestExecutableIdentityCasesAtProductionEntry	linux,darwin,windows	-	-	The published Windows hard-link identity cases are driven through ResolveInterpreter and manager exec derivation using an injected Windows platform
 internal/scriptworker	TestWindowsRealInterpretersRunDeclaredExec	windows	linux,darwin	platform-control	windows-latest runs real python.exe and node.exe through Launch with a declared cmd.exe, and an unbound real interpreter refuses
 internal/scriptworker	TestDefaultExecSearchDirsUsesManagerSystemRoot	linux,darwin,windows	-	-	Windows exec lookup uses manager SYSTEMROOT and searches System32 first
 internal/scriptworker	TestDeriveProfileUsesDefaultExecSearchDirsAndBuildsDeclaredExecFarm	linux,darwin,windows	-	-	with nil ExecSearchDirs and an injected Windows SYSTEMROOT, derivation resolves cmd.exe and places it beside the interpreter in the private farm

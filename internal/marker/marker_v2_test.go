@@ -30,42 +30,6 @@ func validMarkerV2() *Marker {
 	}
 }
 
-func TestReadAuthoritativeMarkerV2SchemaCases(t *testing.T) {
-	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
-	if root == "" {
-		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
-	}
-	casesDir := filepath.Join(root, "schema-cases", "install-marker-v2")
-	entries, err := os.ReadDir(casesDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	seen := 0
-	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
-			continue
-		}
-		seen++
-		t.Run(entry.Name(), func(t *testing.T) {
-			dir := t.TempDir()
-			payload, err := os.ReadFile(filepath.Join(casesDir, entry.Name()))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(filepath.Join(dir, Name), payload, 0o644); err != nil {
-				t.Fatal(err)
-			}
-			wantValid := strings.HasPrefix(entry.Name(), "valid")
-			if got := Read(dir) != nil; got != wantValid {
-				t.Fatalf("Read valid = %v, want %v", got, wantValid)
-			}
-		})
-	}
-	if seen < 10 {
-		t.Fatalf("only %d authoritative marker cases found", seen)
-	}
-}
-
 func TestWriteAlwaysProducesCanonicalMarkerV2(t *testing.T) {
 	dir := t.TempDir()
 	m := validMarkerV2()

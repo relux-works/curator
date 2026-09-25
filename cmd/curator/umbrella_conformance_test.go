@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/conformancecoverage"
 )
 
 // Umbrella provider trust-root vectors (environments §11, §13). Every
@@ -74,18 +76,14 @@ func TestUmbrellaProviderResolutionVectors(t *testing.T) {
 	if err := json.Unmarshal(payload, &family); err != nil {
 		t.Fatal(err)
 	}
-	if len(family.Cases) == 0 {
-		t.Fatalf("vectors/umbrella-provider-resolution.json publishes no cases")
-	}
 	markPresentRoots(t, raw, family.Cases)
-	for _, tc := range family.Cases {
-		tc := tc
-		t.Run(tc.Name, func(t *testing.T) {
-			sandbox := materializeUmbrellaCase(t, tc)
-			checkUmbrellaRevision(t, sandbox, tc, providerRevisionA, tc.RevisionA)
-			checkUmbrellaRevision(t, sandbox, tc, providerRevisionB, tc.RevisionB)
+	conformancecoverage.Run(t, "umbrella-provider-resolution/cases", family.Cases,
+		func(tc umbrellaVectorCase) string { return tc.Name },
+		func(caseT *testing.T, tc umbrellaVectorCase) {
+			sandbox := materializeUmbrellaCase(caseT, tc)
+			checkUmbrellaRevision(caseT, sandbox, tc, providerRevisionA, tc.RevisionA)
+			checkUmbrellaRevision(caseT, sandbox, tc, providerRevisionB, tc.RevisionB)
 		})
-	}
 }
 
 // markPresentRoots records which expectations carry an explicit

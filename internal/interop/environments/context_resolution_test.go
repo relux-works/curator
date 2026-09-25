@@ -8,6 +8,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/relux-works/curator/internal/conformancecoverage"
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextresolve"
 	"github.com/relux-works/curator/internal/pkgversion"
@@ -45,45 +46,57 @@ type vectorPackage struct {
 	Commits map[string]*vectorCommit `json:"commits"`
 }
 
-type contextResolutionVector struct {
-	ResolutionCases []struct {
+type contextResolutionCase struct {
+	Name     string                    `json:"name"`
+	Expected contextResolutionExpected `json:"expected"`
+	Input    contextResolutionInput    `json:"input"`
+}
+
+type contextResolutionExpected struct {
+	Lock       *vectorLock      `json:"lock"`
+	LockSHA256 string           `json:"lock_sha256"`
+	Warnings   []map[string]any `json:"warnings"`
+	Error      string           `json:"error"`
+	Detail     map[string]any   `json:"detail"`
+}
+
+type contextResolutionInput struct {
+	Install struct {
 		Name     string `json:"name"`
-		Expected struct {
-			Lock       *vectorLock      `json:"lock"`
-			LockSHA256 string           `json:"lock_sha256"`
-			Warnings   []map[string]any `json:"warnings"`
-			Error      string           `json:"error"`
-			Detail     map[string]any   `json:"detail"`
-		} `json:"expected"`
-		Input struct {
-			Install struct {
-				Name     string `json:"name"`
-				Range    string `json:"range"`
-				Tag      string `json:"tag"`
-				Revision string `json:"revision"`
-			} `json:"install"`
-			OverlayDefaultWeight int64 `json:"overlay_default_weight"`
-			Overlays             []struct {
-				Name     string `json:"name"`
-				Range    string `json:"range"`
-				Tag      string `json:"tag"`
-				Revision string `json:"revision"`
-				Weight   *int64 `json:"weight"`
-				Path     *struct {
-					StateSHA256 string       `json:"state_sha256"`
-					Manifest    vectorCommit `json:"manifest"`
-				} `json:"path"`
-			} `json:"overlays"`
-			Packages map[string]vectorPackage `json:"packages"`
-		} `json:"input"`
-	} `json:"resolution_cases"`
-	LockCases []struct {
-		Name       string     `json:"name"`
-		Lock       vectorLock `json:"lock"`
-		CCJ1Bytes  string     `json:"ccj1_bytes"`
-		ByteLength int        `json:"byte_length"`
-		LockSHA256 string     `json:"lock_sha256"`
-	} `json:"lock_cases"`
+		Range    string `json:"range"`
+		Tag      string `json:"tag"`
+		Revision string `json:"revision"`
+	} `json:"install"`
+	OverlayDefaultWeight int64                      `json:"overlay_default_weight"`
+	Overlays             []contextResolutionOverlay `json:"overlays"`
+	Packages             map[string]vectorPackage   `json:"packages"`
+}
+
+type contextResolutionOverlay struct {
+	Name     string                 `json:"name"`
+	Range    string                 `json:"range"`
+	Tag      string                 `json:"tag"`
+	Revision string                 `json:"revision"`
+	Weight   *int64                 `json:"weight"`
+	Path     *contextResolutionPath `json:"path"`
+}
+
+type contextResolutionPath struct {
+	StateSHA256 string       `json:"state_sha256"`
+	Manifest    vectorCommit `json:"manifest"`
+}
+
+type contextLockCase struct {
+	Name       string     `json:"name"`
+	Lock       vectorLock `json:"lock"`
+	CCJ1Bytes  string     `json:"ccj1_bytes"`
+	ByteLength int        `json:"byte_length"`
+	LockSHA256 string     `json:"lock_sha256"`
+}
+
+type contextResolutionVector struct {
+	ResolutionCases []contextResolutionCase `json:"resolution_cases"`
+	LockCases       []contextLockCase       `json:"lock_cases"`
 }
 
 // vectorSource serves the in-memory package graph of one resolution case.
@@ -181,88 +194,82 @@ func TestConformanceContextResolution(t *testing.T) {
 		t.Fatalf("%s declares an empty family", vectorPath)
 	}
 
-	t.Run("lock_cases", func(t *testing.T) {
-		for _, tc := range vector.LockCases {
-			t.Run(tc.Name, func(t *testing.T) {
-				lock := vectorLockToLock(t, tc.Lock)
-				canonical, err := lock.Canonical()
-				if err != nil {
-					t.Fatal(err)
-				}
-				if string(canonical) != tc.CCJ1Bytes || len(canonical) != tc.ByteLength {
-					t.Fatalf("CCJ-1 bytes differ:\n got %s\nwant %s", canonical, tc.CCJ1Bytes)
-				}
-				if err := protocoljson.RequireCanonical(canonical); err != nil {
-					t.Fatal(err)
-				}
-				hash, err := lock.Hash()
-				if err != nil {
-					t.Fatal(err)
-				}
-				if hash != tc.LockSHA256 {
-					t.Fatalf("lock hash %s, want %s", hash, tc.LockSHA256)
-				}
-			})
-		}
-	})
+	conformancecoverage.Run(t, "context-versions/lock-cases", vector.LockCases,
+		func(tc contextLockCase) string { return tc.Name }, func(t *testing.T, tc contextLockCase) {
+			lock := vectorLockToLock(t, tc.Lock)
+			canonical, err := lock.Canonical()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(canonical) != tc.CCJ1Bytes || len(canonical) != tc.ByteLength {
+				t.Fatalf("CCJ-1 bytes differ:\n got %s\nwant %s", canonical, tc.CCJ1Bytes)
+			}
+			if err := protocoljson.RequireCanonical(canonical); err != nil {
+				t.Fatal(err)
+			}
+			hash, err := lock.Hash()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if hash != tc.LockSHA256 {
+				t.Fatalf("lock hash %s, want %s", hash, tc.LockSHA256)
+			}
+		})
 
-	t.Run("resolution_cases", func(t *testing.T) {
-		for _, tc := range vector.ResolutionCases {
-			t.Run(tc.Name, func(t *testing.T) {
-				input := contextresolve.Input{
-					Root: contextresolve.Requirement{Name: tc.Input.Install.Name, Range: tc.Input.Install.Range,
-						Tag: tc.Input.Install.Tag, Revision: tc.Input.Install.Revision},
-					OverlayDefaultWeight: tc.Input.OverlayDefaultWeight,
+	conformancecoverage.Run(t, "context-versions/resolution-cases", vector.ResolutionCases,
+		func(tc contextResolutionCase) string { return tc.Name }, func(t *testing.T, tc contextResolutionCase) {
+			input := contextresolve.Input{
+				Root: contextresolve.Requirement{Name: tc.Input.Install.Name, Range: tc.Input.Install.Range,
+					Tag: tc.Input.Install.Tag, Revision: tc.Input.Install.Revision},
+				OverlayDefaultWeight: tc.Input.OverlayDefaultWeight,
+			}
+			for _, overlay := range tc.Input.Overlays {
+				declaration := contextresolve.Overlay{Name: overlay.Name, Range: overlay.Range, Tag: overlay.Tag,
+					Revision: overlay.Revision, Weight: overlay.Weight}
+				if overlay.Path != nil {
+					declaration.State = &contextresolve.StatePackage{StateHash: overlay.Path.StateSHA256,
+						Manifest: convertVectorPackage(overlay.Path.Manifest)}
 				}
-				for _, overlay := range tc.Input.Overlays {
-					declaration := contextresolve.Overlay{Name: overlay.Name, Range: overlay.Range, Tag: overlay.Tag,
-						Revision: overlay.Revision, Weight: overlay.Weight}
-					if overlay.Path != nil {
-						declaration.State = &contextresolve.StatePackage{StateHash: overlay.Path.StateSHA256,
-							Manifest: convertVectorPackage(overlay.Path.Manifest)}
-					}
-					input.Overlays = append(input.Overlays, declaration)
+				input.Overlays = append(input.Overlays, declaration)
+			}
+			result, err := contextresolve.Resolve(vectorSource{packages: tc.Input.Packages}, input)
+			if tc.Expected.Error != "" {
+				var resolveErr *contextresolve.Error
+				if err == nil || !errors.As(err, &resolveErr) {
+					t.Fatalf("resolved; want %s (err=%v)", tc.Expected.Error, err)
 				}
-				result, err := contextresolve.Resolve(vectorSource{packages: tc.Input.Packages}, input)
-				if tc.Expected.Error != "" {
-					var resolveErr *contextresolve.Error
-					if err == nil || !errors.As(err, &resolveErr) {
-						t.Fatalf("resolved; want %s (err=%v)", tc.Expected.Error, err)
-					}
-					if resolveErr.Diagnostic != tc.Expected.Error {
-						t.Fatalf("diagnostic %s, want %s (%v)", resolveErr.Diagnostic, tc.Expected.Error, err)
-					}
-					assertDetail(t, resolveErr, tc.Expected.Detail)
-					return
+				if resolveErr.Diagnostic != tc.Expected.Error {
+					t.Fatalf("diagnostic %s, want %s (%v)", resolveErr.Diagnostic, tc.Expected.Error, err)
 				}
-				if err != nil {
-					t.Fatalf("resolve: %v", err)
+				assertDetail(t, resolveErr, tc.Expected.Detail)
+				return
+			}
+			if err != nil {
+				t.Fatalf("resolve: %v", err)
+			}
+			got := lockToVector(t, result.Lock)
+			if !reflect.DeepEqual(got, *tc.Expected.Lock) {
+				gotJSON, _ := json.MarshalIndent(got, "", " ")
+				wantJSON, _ := json.MarshalIndent(tc.Expected.Lock, "", " ")
+				t.Fatalf("lock differs:\n got %s\nwant %s", gotJSON, wantJSON)
+			}
+			if result.LockHash != tc.Expected.LockSHA256 {
+				t.Fatalf("lock hash %s, want %s", result.LockHash, tc.Expected.LockSHA256)
+			}
+			var gotWarnings []map[string]any
+			for _, warning := range result.Warnings {
+				entry := map[string]any{"diagnostic": warning.Diagnostic, "name": warning.Name}
+				var requirers []any
+				for _, requirer := range warning.Requirers {
+					requirers = append(requirers, map[string]any{"requirer": requirer.Requirer, "weight": float64(requirer.Weight)})
 				}
-				got := lockToVector(t, result.Lock)
-				if !reflect.DeepEqual(got, *tc.Expected.Lock) {
-					gotJSON, _ := json.MarshalIndent(got, "", " ")
-					wantJSON, _ := json.MarshalIndent(tc.Expected.Lock, "", " ")
-					t.Fatalf("lock differs:\n got %s\nwant %s", gotJSON, wantJSON)
-				}
-				if result.LockHash != tc.Expected.LockSHA256 {
-					t.Fatalf("lock hash %s, want %s", result.LockHash, tc.Expected.LockSHA256)
-				}
-				var gotWarnings []map[string]any
-				for _, warning := range result.Warnings {
-					entry := map[string]any{"diagnostic": warning.Diagnostic, "name": warning.Name}
-					var requirers []any
-					for _, requirer := range warning.Requirers {
-						requirers = append(requirers, map[string]any{"requirer": requirer.Requirer, "weight": float64(requirer.Weight)})
-					}
-					entry["requirers"] = requirers
-					gotWarnings = append(gotWarnings, entry)
-				}
-				if len(gotWarnings) != len(tc.Expected.Warnings) || (len(gotWarnings) > 0 && !reflect.DeepEqual(gotWarnings, tc.Expected.Warnings)) {
-					t.Fatalf("warnings %v, want %v", gotWarnings, tc.Expected.Warnings)
-				}
-			})
-		}
-	})
+				entry["requirers"] = requirers
+				gotWarnings = append(gotWarnings, entry)
+			}
+			if len(gotWarnings) != len(tc.Expected.Warnings) || (len(gotWarnings) > 0 && !reflect.DeepEqual(gotWarnings, tc.Expected.Warnings)) {
+				t.Fatalf("warnings %v, want %v", gotWarnings, tc.Expected.Warnings)
+			}
+		})
 }
 
 func assertDetail(t *testing.T, err *contextresolve.Error, want map[string]any) {

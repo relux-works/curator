@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/buildmeta"
+	"github.com/relux-works/curator/internal/conformancecoverage"
 	"github.com/relux-works/curator/internal/protocoljson"
 )
 
@@ -27,7 +28,7 @@ type cacheRejectionVector struct {
 	} `json:"expected"`
 }
 
-func loadCacheRejections(t *testing.T) map[string]cacheRejectionVector {
+func loadCacheRejectionCases(t *testing.T) []cacheRejectionVector {
 	t.Helper()
 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
 	if root == "" {
@@ -46,11 +47,7 @@ func loadCacheRejections(t *testing.T) map[string]cacheRejectionVector {
 	if err := json.Unmarshal(payload, &vectors); err != nil {
 		t.Fatal(err)
 	}
-	indexed := make(map[string]cacheRejectionVector, len(vectors.RejectionCases))
-	for _, testCase := range vectors.RejectionCases {
-		indexed[testCase.Name] = testCase
-	}
-	return indexed
+	return vectors.RejectionCases
 }
 
 // cacheRejection is the Curator half of one cache-boundary mapping.
@@ -262,27 +259,30 @@ func cacheRejectionMappings() map[string]cacheRejection {
 // authoritative cache-boundary rejection reaches a stable non-reusable Curator
 // outcome and that the cached artifact is never handed back for execution.
 func TestCacheRejectionClustersMapToStableCuratorOutcomes(t *testing.T) {
-	published := loadCacheRejections(t)
+	publishedCases := loadCacheRejectionCases(t)
+	published := make(map[string]cacheRejectionVector, len(publishedCases))
+	for _, vector := range publishedCases {
+		published[vector.Name] = vector
+	}
 	owned := cacheRejectionMappings()
 
-	names := make([]string, 0, len(published))
-	for name, vector := range published {
-		// The forged-provenance vector is a boundary case with its own
-		// protected-state assertions; it is owned by the untrusted-cache tests.
-		if vector.Boundary == "cache" && name != "self-consistent-forged-receipt-outside-protected-state" {
-			names = append(names, name)
-		}
-	}
-	sort.Strings(names)
-
-	for _, name := range names {
-		vector := published[name]
-		mapping, ok := owned[name]
-		if !ok {
-			t.Errorf("authoritative cache rejection %q has no Curator mapping", name)
-			continue
-		}
-		t.Run(name, func(t *testing.T) {
+	sort.Slice(publishedCases, func(i, j int) bool { return publishedCases[i].Name < publishedCases[j].Name })
+	conformancecoverage.RunOutcomes(t, "build-drivers/rejection-cases", publishedCases,
+		func(tc cacheRejectionVector) string { return tc.Name }, func(t *testing.T, vector cacheRejectionVector) conformancecoverage.Observation {
+			name := vector.Name
+			if vector.Boundary != "cache" {
+				return conformancecoverage.Observation{BoundReason: "rejection belongs to a non-cache boundary"}
+			}
+			// The forged-provenance vector has its own protected-state assertion in
+			// TestUntrustedCacheEntryIsRebuiltAndNeverReused.
+			if name == "self-consistent-forged-receipt-outside-protected-state" {
+				return conformancecoverage.Observation{BoundReason: "forged-provenance case is exercised by the protected-state test"}
+			}
+			mapping, ok := owned[name]
+			if !ok {
+				t.Errorf("authoritative cache rejection %q has no Curator mapping", name)
+				return conformancecoverage.Observation{}
+			}
 			if vector.Expected.Result != "reject" || vector.Expected.Reuse || vector.Expected.ArtifactExecuted {
 				t.Fatalf("vector %q no longer fails closed: %+v", name, vector.Expected)
 			}
@@ -314,7 +314,7 @@ func TestCacheRejectionClustersMapToStableCuratorOutcomes(t *testing.T) {
 				if conflict.Key != publishedResult.CacheKey {
 					t.Fatalf("%s conflict names %q", name, conflict.Key)
 				}
-				return
+				return conformancecoverage.Observation{}
 			}
 
 			if mapping.mutate != nil {
@@ -340,8 +340,8 @@ func TestCacheRejectionClustersMapToStableCuratorOutcomes(t *testing.T) {
 			if mapping.reason != "" && !strings.Contains(result.Reason, mapping.reason) {
 				t.Fatalf("%s reason = %q, want it to name %q", name, result.Reason, mapping.reason)
 			}
+			return conformancecoverage.Observation{}
 		})
-	}
 
 	for name := range owned {
 		if _, ok := published[name]; !ok {

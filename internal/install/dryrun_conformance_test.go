@@ -18,6 +18,7 @@ import (
 	"github.com/relux-works/curator/internal/adapters"
 	"github.com/relux-works/curator/internal/buildmeta"
 	"github.com/relux-works/curator/internal/config"
+	"github.com/relux-works/curator/internal/conformancecoverage"
 	"github.com/relux-works/curator/internal/envfiles"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/manifest"
@@ -267,9 +268,8 @@ func (baseline *dryRunBaseline) declareEvery(t *testing.T, root string, extra ..
 func TestAuthoritativeDryRunCasesMutateNothingPersistent(t *testing.T) {
 	testtoolchain.LockHostGOROOT(t)
 	document := authoritativeLifecycle(t)
-	for _, published := range document.DryRunCases {
-		published := published
-		t.Run(published.Name, func(t *testing.T) {
+	conformancecoverage.Run(t, "install/dry-run-cases", document.DryRunCases,
+		func(tc authoritativeDryRunCase) string { return tc.Name }, func(t *testing.T, published authoritativeDryRunCase) {
 			if len(published.ForbiddenPersistentEffects) == 0 {
 				t.Fatalf("published dry-run case %q forbids nothing", published.Name)
 			}
@@ -326,7 +326,6 @@ func TestAuthoritativeDryRunCasesMutateNothingPersistent(t *testing.T) {
 			}
 			baseline.assertNoOperationPrivateState(t, published)
 		})
-	}
 }
 
 // planEveryProject binds the published multi-project scope to Curator's own

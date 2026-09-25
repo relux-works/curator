@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 	"unicode/utf8"
+
+	"github.com/relux-works/curator/internal/conformancecoverage"
 )
 
 // toolchainCase is one authoritative toolchain identity vector.
@@ -59,26 +61,28 @@ type argvCase struct {
 	SourceAware bool     `json:"source_aware"`
 }
 
+type positivePackageCase struct {
+	Name    string `json:"name"`
+	Result  string `json:"result"`
+	Package struct {
+		Name              string   `json:"name"`
+		MainPackages      int      `json:"main_packages"`
+		Dependencies      []string `json:"dependencies"`
+		VendorRequired    bool     `json:"vendor_required"`
+		VendorMode        string   `json:"vendor_mode"`
+		ModuleRoot        string   `json:"module_root"`
+		TransitivePackage string   `json:"transitive_package"`
+		VendoredPackage   string   `json:"vendored_package"`
+		EmbeddedInputs    []string `json:"embedded_inputs"`
+	} `json:"package"`
+}
+
 type positiveVectors struct {
 	FixedEnvironment      map[string]string      `json:"fixed_environment"`
 	FixedEnvironmentCases []fixedEnvironmentCase `json:"fixed_environment_cases"`
 	Argv                  []argvCase             `json:"argv"`
 	ToolchainCases        []toolchainCase        `json:"toolchain_cases"`
-	PositiveCases         []struct {
-		Name    string `json:"name"`
-		Result  string `json:"result"`
-		Package struct {
-			Name              string   `json:"name"`
-			MainPackages      int      `json:"main_packages"`
-			Dependencies      []string `json:"dependencies"`
-			VendorRequired    bool     `json:"vendor_required"`
-			VendorMode        string   `json:"vendor_mode"`
-			ModuleRoot        string   `json:"module_root"`
-			TransitivePackage string   `json:"transitive_package"`
-			VendoredPackage   string   `json:"vendored_package"`
-			EmbeddedInputs    []string `json:"embedded_inputs"`
-		} `json:"package"`
-	} `json:"positive_cases"`
+	PositiveCases         []positivePackageCase  `json:"positive_cases"`
 }
 
 type fixedEnvironmentCase struct {
@@ -123,13 +127,6 @@ func decodeBase64(t *testing.T, value string) []byte {
 // published ones, including which forms are source-aware.
 func TestFixedEnvironmentAndFiveDirectArgvFormsVector(t *testing.T) {
 	vectors := loadPositiveVectors(t)
-	if len(vectors.Argv) == 0 {
-		t.Skip("this conformance root publishes no fixed argument vectors")
-	}
-	if len(vectors.Argv) != 5 {
-		t.Fatalf("suite publishes %d argument-vector forms, want the exact five", len(vectors.Argv))
-	}
-
 	// Curator's own inventory of package-independent probe forms plus the two
 	// source-aware forms.
 	probes := map[string][]string{
@@ -137,9 +134,8 @@ func TestFixedEnvironmentAndFiveDirectArgvFormsVector(t *testing.T) {
 		"version":       {"version"},
 		"env":           append([]string{"env", "-json"}, probeEnvNames...),
 	}
-	for _, testCase := range vectors.Argv {
-		testCase := testCase
-		t.Run(testCase.Name, func(t *testing.T) {
+	conformancecoverage.RunOutcomes(t, "build-drivers/argv-cases", vectors.Argv,
+		func(testCase argvCase) string { return testCase.Name }, func(t *testing.T, testCase argvCase) conformancecoverage.Observation {
 			if len(testCase.Argv) == 0 {
 				t.Fatal("vector publishes an empty argument vector")
 			}
@@ -177,44 +173,61 @@ func TestFixedEnvironmentAndFiveDirectArgvFormsVector(t *testing.T) {
 					t.Fatalf("%s argv = %q, Curator uses %q", testCase.Name, arguments, want)
 				}
 			}
+			return conformancecoverage.Observation{BoundReason: "this consumer compares each published argv form to Curator's fixed command contract; the live process entry is exercised by build-driver consumers"}
 		})
+
+	if len(vectors.FixedEnvironmentCases) == 0 {
+		t.Run("fixed environment", func(t *testing.T) {
+			expected, optional := fixedEnvironmentForHost(t, vectors, runtime.GOOS, runtime.GOARCH)
+			assertFixedEnvironment(t, expected, optional)
+		})
+		return
 	}
+	conformancecoverage.RunOutcomes(t, "build-drivers/fixed-environment-cases", vectors.FixedEnvironmentCases,
+		func(testCase fixedEnvironmentCase) string { return testCase.Name }, func(t *testing.T, testCase fixedEnvironmentCase) conformancecoverage.Observation {
+			if testCase.GOOS != runtime.GOOS || testCase.GOARCH != runtime.GOARCH {
+				return conformancecoverage.Observation{SkipReason: "fixed environment case is exercised on its native runner"}
+			}
+			optional := make(map[string]bool, len(testCase.OptionalVariables))
+			for _, key := range testCase.OptionalVariables {
+				optional[key] = true
+			}
+			assertFixedEnvironment(t, testCase.Environment, optional)
+			return conformancecoverage.Observation{BoundReason: "this consumer inspects the worker session through a test fixture rather than launching the manager entry point"}
+		})
+}
 
-	t.Run("fixed environment", func(t *testing.T) {
-		expected, optional := fixedEnvironmentForHost(t, vectors, runtime.GOOS, runtime.GOARCH)
-		if len(expected) == 0 {
-			t.Skip("this conformance root publishes no fixed environment")
-		}
-		fixture := newSnapshotFixture(t)
-		fixture.start(stubScript{ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact"})
-		values := environmentMap(fixture.session.Environment())
+func assertFixedEnvironment(t *testing.T, expected map[string]string, optional map[string]bool) {
+	t.Helper()
+	fixture := newSnapshotFixture(t)
+	fixture.start(stubScript{ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact"})
+	values := environmentMap(fixture.session.Environment())
 
-		published := make([]string, 0, len(expected))
-		for key := range expected {
-			published = append(published, key)
+	published := make([]string, 0, len(expected))
+	for key := range expected {
+		published = append(published, key)
+	}
+	sort.Strings(published)
+	for _, key := range published {
+		want := expected[key]
+		got, present := values[key]
+		if !present {
+			t.Fatalf("Curator's closed environment omits %s", key)
 		}
-		sort.Strings(published)
-		for _, key := range published {
-			want := expected[key]
-			got, present := values[key]
-			if !present {
-				t.Fatalf("Curator's closed environment omits %s", key)
-			}
-			// Manager-derived locations are host-specific by construction; the
-			// suite marks them with a placeholder rather than a literal value.
-			if want == "" || want[0] == '<' {
-				continue
-			}
-			if got != want {
-				t.Fatalf("closed environment %s = %q, the suite publishes %q", key, got, want)
-			}
+		// Manager-derived locations are host-specific by construction; the
+		// suite marks them with a placeholder rather than a literal value.
+		if want == "" || want[0] == '<' {
+			continue
 		}
-		for key := range values {
-			if _, ok := expected[key]; !ok && !optional[key] {
-				t.Fatalf("Curator's closed environment carries %s, which the suite does not publish", key)
-			}
+		if got != want {
+			t.Fatalf("closed environment %s = %q, the suite publishes %q", key, got, want)
 		}
-	})
+	}
+	for key := range values {
+		if _, ok := expected[key]; !ok && !optional[key] {
+			t.Fatalf("Curator's closed environment carries %s, which the suite does not publish", key)
+		}
+	}
 }
 
 func fixedEnvironmentForHost(t *testing.T, vectors positiveVectors, goos, goarch string) (map[string]string, map[string]bool) {
@@ -260,12 +273,8 @@ func TestFixedEnvironmentForHostSelectsNativeCase(t *testing.T) {
 // case, positive and negative, is executable against Curator's fingerprint.
 func TestToolchainIdentityVectors(t *testing.T) {
 	vectors := loadPositiveVectors(t)
-	if len(vectors.ToolchainCases) == 0 {
-		t.Skip("this conformance root publishes no toolchain cases")
-	}
-	for _, testCase := range vectors.ToolchainCases {
-		testCase := testCase
-		t.Run(testCase.Name, func(t *testing.T) {
+	conformancecoverage.Run(t, "build-drivers/toolchain-cases", vectors.ToolchainCases,
+		func(testCase toolchainCase) string { return testCase.Name }, func(t *testing.T, testCase toolchainCase) {
 			switch testCase.Name {
 			case "unsorted-directories-files-and-internal-link":
 				root := materializeToolchain(t, testCase)
@@ -354,7 +363,6 @@ func TestToolchainIdentityVectors(t *testing.T) {
 				t.Fatalf("authoritative toolchain case %q has no Curator assertion", testCase.Name)
 			}
 		})
-	}
 }
 
 // invalidUnicodeNames lists the byte spellings that can carry an invalid
@@ -485,12 +493,11 @@ func toolchainVariantTime(t *testing.T, value string) time.Time {
 // is proved without compiling or starting any package code.
 func TestValidPackageGraphVectors(t *testing.T) {
 	vectors := loadPositiveVectors(t)
-	for _, testCase := range vectors.PositiveCases {
-		if testCase.Name != "valid-standard-library-only-main" && testCase.Name != "valid-vendor-only-main-with-transitive-embed" {
-			continue
-		}
-		testCase := testCase
-		t.Run(testCase.Name, func(t *testing.T) {
+	conformancecoverage.RunOutcomes(t, "build-drivers/positive-cases", vectors.PositiveCases,
+		func(testCase positivePackageCase) string { return testCase.Name }, func(t *testing.T, testCase positivePackageCase) conformancecoverage.Observation {
+			if testCase.Name != "valid-standard-library-only-main" && testCase.Name != "valid-vendor-only-main-with-transitive-embed" {
+				return conformancecoverage.Observation{BoundReason: "this consumer drives the standard-library-only and vendor-only graph shapes; other positive package outcomes are outside its graph-validation entry"}
+			}
 			if testCase.Result != "accepted" {
 				t.Fatalf("vector result = %q, want accepted", testCase.Result)
 			}
@@ -534,8 +541,8 @@ func TestValidPackageGraphVectors(t *testing.T) {
 			if err := validatePackageGraph(encodePackages(t, items...), validation); err != nil {
 				t.Fatalf("accepted package shape was rejected: %v", err)
 			}
+			return conformancecoverage.Observation{}
 		})
-	}
 }
 
 // vendoredPackage returns a checked-in vendored dependency of the root package,

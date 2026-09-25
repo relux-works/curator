@@ -202,7 +202,7 @@ if [ -f "$EV" ]; then
 	assert_contains 'evidence records a tree digest'         'tree_sha256             sha256:'  "$EV"
 	assert_contains 'evidence records the file count'        'file_count              2'        "$EV"
 	assert_contains 'evidence records the protocol version'  '1.0.0-rc.5'            "$EV"
-	assert_contains 'evidence records the committed pin'     "committed_released_pin  $PIN"     "$EV"
+	assert_contains 'evidence records the committed pin'     "committed_conformance_pin  $PIN"     "$EV"
 else
 	bad 'record wrote its evidence file' "missing: $EV"
 fi

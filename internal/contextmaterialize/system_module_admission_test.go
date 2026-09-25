@@ -26,6 +26,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/relux-works/curator/internal/conformancecoverage"
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextpkg"
 )
@@ -114,11 +115,13 @@ func TestSystemModuleAdmissionVectors(t *testing.T) {
 		t.Fatal(err)
 	}
 	byName := map[string]admissionVectorCase{}
+	selectedNames := map[string]bool{}
 	for _, tc := range vector.MaterializationCases {
 		byName[tc.Name] = tc
 	}
 	var missing []string
 	for _, name := range systemModuleAdmissionCases {
+		selectedNames[name] = true
 		if _, ok := byName[name]; !ok {
 			missing = append(missing, name)
 		}
@@ -127,11 +130,14 @@ func TestSystemModuleAdmissionVectors(t *testing.T) {
 		t.Fatalf("conformance root %s publishes only %d of %d system-module admission cases, missing %s",
 			root, len(systemModuleAdmissionCases)-len(missing), len(systemModuleAdmissionCases), strings.Join(missing, ", "))
 	}
-	for _, name := range systemModuleAdmissionCases {
-		t.Run(name, func(t *testing.T) {
-			runAdmissionVectorCase(t, root, byName[name])
+	conformancecoverage.RunOutcomes(t, "environments/materialization-cases", vector.MaterializationCases,
+		func(tc admissionVectorCase) string { return tc.Name }, func(t *testing.T, tc admissionVectorCase) conformancecoverage.Observation {
+			if !selectedNames[tc.Name] {
+				return conformancecoverage.Observation{BoundReason: "non-system-module materialization surfaces are driven by the full environments vector consumer"}
+			}
+			runAdmissionVectorCase(t, root, tc)
+			return conformancecoverage.Observation{}
 		})
-	}
 }
 
 // runAdmissionVectorCase executes one admission case through SystemPrompt

@@ -6,7 +6,35 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/conformancecoverage"
 )
+
+type moduleRootVectorCase struct {
+	Name        string `json:"name"`
+	Declaration struct {
+		BuildRoot    string   `json:"build_root"`
+		BuildRoots   []string `json:"build_roots"`
+		Modules      []string `json:"modules"`
+		RuntimeRoots []string `json:"runtime_roots"`
+	} `json:"declaration"`
+	Snapshot struct {
+		Directories []string          `json:"directories"`
+		GoModFiles  []string          `json:"go_mod_files"`
+		LinkPaths   []json.RawMessage `json:"link_paths"`
+	} `json:"snapshot"`
+	VendorModuleAnnotations []string `json:"vendor_module_annotations"`
+	ExpectedError           string   `json:"expected_error"`
+	FailsBefore             string   `json:"fails_before"`
+	BuildPermitted          bool     `json:"build_permitted"`
+	GoListStarted           bool     `json:"go_list_started"`
+	GoBuildStarted          bool     `json:"go_build_started"`
+}
+
+type moduleRootVectorSuite struct {
+	EvaluationOrder []string               `json:"evaluation_order"`
+	Cases           []moduleRootVectorCase `json:"cases"`
+}
 
 // TestModuleRootVectors runs the published module-roots family against the two
 // halves of Spec §4.2.3 that this package owns, in the order the vector file
@@ -27,37 +55,15 @@ func TestModuleRootVectors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var suite struct {
-		EvaluationOrder []string `json:"evaluation_order"`
-		Cases           []struct {
-			Name        string `json:"name"`
-			Declaration struct {
-				BuildRoot    string   `json:"build_root"`
-				BuildRoots   []string `json:"build_roots"`
-				Modules      []string `json:"modules"`
-				RuntimeRoots []string `json:"runtime_roots"`
-			} `json:"declaration"`
-			Snapshot struct {
-				Directories []string          `json:"directories"`
-				GoModFiles  []string          `json:"go_mod_files"`
-				LinkPaths   []json.RawMessage `json:"link_paths"`
-			} `json:"snapshot"`
-			VendorModuleAnnotations []string `json:"vendor_module_annotations"`
-			ExpectedError           string   `json:"expected_error"`
-			FailsBefore             string   `json:"fails_before"`
-			BuildPermitted          bool     `json:"build_permitted"`
-			GoListStarted           bool     `json:"go_list_started"`
-			GoBuildStarted          bool     `json:"go_build_started"`
-		} `json:"cases"`
-	}
+	var suite moduleRootVectorSuite
 	if err := json.Unmarshal(payload, &suite); err != nil {
 		t.Fatal(err)
 	}
 	if len(suite.Cases) == 0 {
 		t.Fatal("the module-roots vector family published no cases")
 	}
-	for _, testCase := range suite.Cases {
-		t.Run(testCase.Name, func(t *testing.T) {
+	conformancecoverage.Run(t, "module-roots/vectors", suite.Cases,
+		func(tc moduleRootVectorCase) string { return tc.Name }, func(t *testing.T, testCase moduleRootVectorCase) {
 			if len(testCase.Snapshot.LinkPaths) != 0 {
 				// Silently ignoring a link fixture would report a green run for
 				// a rule this test never exercised.
@@ -111,5 +117,4 @@ func TestModuleRootVectors(t *testing.T) {
 			}
 			wantCode(t, replaceErr, "")
 		})
-	}
 }

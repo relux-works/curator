@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/relux-works/curator/internal/buildcache"
+	"github.com/relux-works/curator/internal/conformancecoverage"
 	"github.com/relux-works/curator/internal/marker"
 )
 
@@ -45,20 +46,10 @@ func authoritativeGCCases(t *testing.T) []authoritativeGCCase {
 	if err := json.Unmarshal(payload, &document); err != nil {
 		t.Fatal(err)
 	}
-	// Only the retention case belongs to this package. The remaining published
-	// cases are external-repository status and repair codes, which this manager
-	// does not implement: it accepts skill schemas 1 through 6 and publishes no
-	// build_repository_* code at all. They are routed, not bound here.
-	var retention []authoritativeGCCase
-	for _, published := range document.Cases {
-		if len(published.Roots) > 0 {
-			retention = append(retention, published)
-		}
+	if len(document.Cases) == 0 {
+		t.Fatal("the authoritative suite publishes no status/repair/GC cases")
 	}
-	if len(retention) == 0 {
-		t.Fatal("the authoritative suite publishes no maintenance retention case to bind")
-	}
-	return retention
+	return document.Cases
 }
 
 // TestAuthoritativeGarbageCollectionRootsAreRetained binds every published
@@ -66,15 +57,17 @@ func authoritativeGCCases(t *testing.T) []authoritativeGCCase {
 // root gets its own executable proof, and an unpublished root fails rather
 // than passing unasserted.
 func TestAuthoritativeGarbageCollectionRootsAreRetained(t *testing.T) {
-	for _, published := range authoritativeGCCases(t) {
-		published := published
-		t.Run(published.Name, func(t *testing.T) {
+	conformancecoverage.RunOutcomes(t, "external-repository-lifecycle/status-repair-gc-cases", authoritativeGCCases(t),
+		func(tc authoritativeGCCase) string { return tc.Name }, func(t *testing.T, published authoritativeGCCase) conformancecoverage.Observation {
+			if len(published.Roots) == 0 {
+				return conformancecoverage.Observation{BoundReason: "status and repair codes belong to the external-repository manager surface"}
+			}
 			for _, root := range published.Roots {
 				root := root
 				t.Run(root, func(t *testing.T) { assertRootRetained(t, root) })
 			}
+			return conformancecoverage.Observation{}
 		})
-	}
 }
 
 func assertRootRetained(t *testing.T, root string) {

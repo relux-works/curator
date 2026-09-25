@@ -32,18 +32,20 @@ var systemModuleSchemaCases = []struct {
 	family string
 	file   string
 	knob   string
+	valid  bool
 }{
-	{"manager-config-v2", "valid-system-module-waiver.json", ""},
-	{"manager-config-v2", "invalid-transitive-system-modules-value.json", "transitive_system_modules"},
-	{"manager-config-v2", "invalid-system-module-waiver-missing-reason.json", "system_module_waivers"},
-	{"manager-config-v2", "invalid-system-module-waiver-package-grammar.json", "system_module_waivers"},
-	{"manager-config-v2", "invalid-system-module-waiver-unknown-field.json", "system_module_waivers"},
-	{"system-config-v2", "invalid-transitive-system-modules-drop-direction.json", "transitive_system_modules"},
-	{"system-config-v2", "invalid-transitive-system-modules-value.json", "transitive_system_modules"},
+	{"manager-config-v2", "valid-system-module-waiver.json", "", true},
+	{"manager-config-v2", "invalid-transitive-system-modules-value.json", "transitive_system_modules", false},
+	{"manager-config-v2", "invalid-system-module-waiver-missing-reason.json", "system_module_waivers", false},
+	{"manager-config-v2", "invalid-system-module-waiver-package-grammar.json", "system_module_waivers", false},
+	{"manager-config-v2", "invalid-system-module-waiver-unknown-field.json", "system_module_waivers", false},
+	{"system-config-v2", "invalid-transitive-system-modules-drop-direction.json", "transitive_system_modules", false},
+	{"system-config-v2", "invalid-transitive-system-modules-value.json", "transitive_system_modules", false},
 }
 
-// TestSystemModuleSchemaSubset drives the seven E2 schema cases through
-// Load with exact published bytes.
+// TestSystemModuleSchemaSubset requires all seven E2 cases to remain
+// published. The counted manager/system family tests drive their exact bytes
+// through Load and assert both rejection and the E2 diagnostic.
 func TestSystemModuleSchemaSubset(t *testing.T) {
 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
 	if root == "" {
@@ -65,7 +67,10 @@ func TestSystemModuleSchemaSubset(t *testing.T) {
 	var missing []string
 	present := 0
 	for _, tc := range systemModuleSchemaCases {
-		if _, ok := validity[tc.family+"/"+tc.file]; ok {
+		if valid, ok := validity[tc.family+"/"+tc.file]; ok {
+			if valid != tc.valid {
+				t.Errorf("%s/%s validity = %v, want %v", tc.family, tc.file, valid, tc.valid)
+			}
 			present++
 		} else {
 			missing = append(missing, tc.family+"/"+tc.file)
@@ -74,38 +79,5 @@ func TestSystemModuleSchemaSubset(t *testing.T) {
 	if len(missing) != 0 {
 		t.Fatalf("conformance root %s publishes only %d of %d system-module schema cases, missing %s",
 			root, present, len(systemModuleSchemaCases), strings.Join(missing, ", "))
-	}
-	for _, tc := range systemModuleSchemaCases {
-		t.Run(tc.family+"/"+tc.file, func(t *testing.T) {
-			casePayload, err := os.ReadFile(filepath.Join(root, "schema-cases", tc.family, tc.file)) // #nosec G304 -- explicit conformance input
-			if err != nil {
-				t.Fatal(err)
-			}
-			var errLoad error
-			if tc.family == "system-config-v2" {
-				const user = `{"schema_version": 2, "skills_root": "/tmp/skills", "projects": {}}`
-				dir := t.TempDir()
-				userPath := writeConfig(t, dir, "config.json", user)
-				systemPath := writeConfig(t, dir, "system.json", string(casePayload))
-				t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
-				_, errLoad = Load(userPath, nil)
-			} else {
-				path := writeConfig(t, t.TempDir(), "config.json", string(casePayload))
-				_, errLoad = Load(path, nil)
-			}
-			wantValid := validity[tc.family+"/"+tc.file]
-			if wantValid && errLoad != nil {
-				t.Fatalf("valid case rejected: %v", errLoad)
-			}
-			if !wantValid {
-				if errLoad == nil {
-					t.Fatalf("invalid case accepted")
-				}
-				if !strings.Contains(errLoad.Error(), tc.knob) {
-					t.Fatalf("rejected for %q, naming no %q: the E2 defect is not what refused this case",
-						errLoad, tc.knob)
-				}
-			}
-		})
 	}
 }

@@ -10,7 +10,7 @@
 # The supplied conformance root's own
 # `vectors/conformance-claim-v3-qualification.json` is authoritative when it
 # exists. `default_excluded_on` in `.github/ci/platform-exclusions.tsv` applies
-# only to a root that predates that vector -- the committed released pin is
+# only to a root that predates that vector -- the committed conformance pin is
 # such a root.
 #
 # Usage:

@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"sort"
 	"testing"
 
 	"github.com/relux-works/curator/internal/buildcache"
+	"github.com/relux-works/curator/internal/conformancecoverage"
 )
 
 // The published build-driver document is the only source of expected values in
@@ -62,28 +62,26 @@ func authoritativeDriverCases(t *testing.T) authoritativeDriverDocument {
 func TestAuthoritativeCacheOutcomesDriveInstallation(t *testing.T) {
 	t.Parallel()
 	document := authoritativeDriverCases(t)
-	bound := 0
-	for _, published := range document.PositiveCases {
-		published := published
-		switch published.Result {
-		case "":
-			continue
-		case "accepted":
-			// Plain acceptance is the identity, environment, argv, and context
-			// cluster, owned by the driver and manifest consumers. It carries no
-			// cache verdict for an installation to reproduce.
-			continue
-		case string(BuildCacheHit):
-			bound++
-			t.Run(published.Name, func(t *testing.T) { runPublishedCacheHit(t, published) })
-		case string(BuildWouldPreflightAndBuild):
-			bound++
-			t.Run(published.Name, func(t *testing.T) { runPublishedCompilerFreeMiss(t, published) })
-		default:
-			t.Fatalf("published cache outcome %q has no executable binding", published.Result)
-		}
-	}
-	if bound == 0 {
+	tally := conformancecoverage.RunOutcomes(t, "build-drivers/positive-cases", document.PositiveCases,
+		func(tc authoritativePositiveCase) string { return tc.Name }, func(t *testing.T, published authoritativePositiveCase) conformancecoverage.Observation {
+			switch published.Result {
+			case "":
+				return conformancecoverage.Observation{BoundReason: "published case carries no cache outcome"}
+			case "accepted":
+				// Plain acceptance is the identity, environment, argv, and context
+				// cluster, owned by the driver and manifest consumers. It carries no
+				// cache verdict for an installation to reproduce.
+				return conformancecoverage.Observation{BoundReason: "plain acceptance is consumed by build-source and manifest tests"}
+			case string(BuildCacheHit):
+				runPublishedCacheHit(t, published)
+			case string(BuildWouldPreflightAndBuild):
+				runPublishedCompilerFreeMiss(t, published)
+			default:
+				t.Fatalf("published cache outcome %q has no executable binding", published.Result)
+			}
+			return conformancecoverage.Observation{}
+		})
+	if tally.Driven == 0 {
 		t.Fatal("the authoritative suite published no cache outcome to bind")
 	}
 }
@@ -177,28 +175,24 @@ var nonReusableStatuses = []buildcache.Status{buildcache.Corrupt, buildcache.Unt
 func TestAuthoritativeCacheRejectionsAreRebuiltNeverAdopted(t *testing.T) {
 	t.Parallel()
 	document := authoritativeDriverCases(t)
-	var cases []authoritativeRejectionCase
-	for _, published := range document.RejectionCases {
-		if published.Boundary == "cache" {
-			cases = append(cases, published)
-		}
-	}
-	if len(cases) == 0 {
-		t.Fatal("the authoritative suite published no cache-boundary rejection to bind")
-	}
-	sort.Slice(cases, func(i, j int) bool { return cases[i].Name < cases[j].Name })
-
 	exercised := map[buildcache.Status]bool{}
-	for index, published := range cases {
-		published := published
-		status := nonReusableStatuses[index%len(nonReusableStatuses)]
-		exercised[status] = true
-		t.Run(published.Name, func(t *testing.T) {
+	var cacheCases int
+	tally := conformancecoverage.RunOutcomes(t, "build-drivers/rejection-cases", document.RejectionCases,
+		func(tc authoritativeRejectionCase) string { return tc.Name }, func(t *testing.T, published authoritativeRejectionCase) conformancecoverage.Observation {
+			if published.Boundary != "cache" {
+				return conformancecoverage.Observation{BoundReason: "rejection belongs to a non-cache boundary"}
+			}
+			cacheCases++
+			status := nonReusableStatuses[(cacheCases-1)%len(nonReusableStatuses)]
+			exercised[status] = true
 			if published.Expected.Result != "reject" || published.Expected.Reuse || published.Expected.ArtifactExecuted {
 				t.Fatalf("published rejection %q no longer fails closed: %+v", published.Name, published.Expected)
 			}
 			runRefusedCacheEntry(t, published, status)
+			return conformancecoverage.Observation{}
 		})
+	if tally.Driven == 0 || cacheCases == 0 {
+		t.Fatal("the authoritative suite published no cache-boundary rejection to bind")
 	}
 	for _, status := range nonReusableStatuses {
 		if !exercised[status] {

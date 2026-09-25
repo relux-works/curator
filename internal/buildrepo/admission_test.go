@@ -16,6 +16,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/relux-works/curator/internal/conformancecoverage"
 )
 
 func TestNetworkAndLocalSHA1SHA256RawObjectParity(t *testing.T) {
@@ -175,27 +177,28 @@ func TestRawObjectAndLFSPinnedConformanceFixtures(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	type rawObjectCase struct {
+		Name          string `json:"name"`
+		ObjectFormat  string `json:"object_format"`
+		ObjectID      string `json:"object_id"`
+		ObjectType    string `json:"object_type"`
+		ContentBase64 string `json:"content_base64"`
+		ExpectedError string `json:"expected_error"`
+	}
 	var raw struct {
-		Cases []struct {
-			Name          string `json:"name"`
-			ObjectFormat  string `json:"object_format"`
-			ObjectID      string `json:"object_id"`
-			ObjectType    string `json:"object_type"`
-			ContentBase64 string `json:"content_base64"`
-			ExpectedError string `json:"expected_error"`
-		} `json:"cases"`
+		Cases []rawObjectCase `json:"cases"`
 	}
 	if err := json.Unmarshal(rawData, &raw); err != nil {
 		t.Fatal(err)
 	}
-	for _, testCase := range raw.Cases {
-		t.Run(testCase.Name, func(t *testing.T) {
+	conformancecoverage.RunOutcomes(t, "external-repository/raw-objects", raw.Cases,
+		func(tc rawObjectCase) string { return tc.Name }, func(t *testing.T, testCase rawObjectCase) conformancecoverage.Observation {
 			content, err := base64.StdEncoding.DecodeString(testCase.ContentBase64)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if got := computeOID(testCase.ObjectFormat, testCase.ObjectType, content); got != testCase.ObjectID {
-				t.Fatalf("object identity = %s, want %s", got, testCase.ObjectID)
+				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("object identity = %s, want %s", got, testCase.ObjectID)}
 			}
 			object := rawObject{oid: testCase.ObjectID, kind: testCase.ObjectType, data: content}
 			var parseErr error
@@ -214,35 +217,41 @@ func TestRawObjectAndLFSPinnedConformanceFixtures(t *testing.T) {
 				parseErr = validateTreeSyntax(object.data, testCase.ObjectFormat)
 			}
 			if testCase.ExpectedError == "" && parseErr != nil {
-				t.Fatalf("valid fixture rejected: %v", parseErr)
+				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("valid fixture rejected: %v", parseErr)}
 			}
 			if testCase.ExpectedError != "" && ErrorCode(parseErr) != testCase.ExpectedError {
-				t.Fatalf("error = %v (%s), want %s", parseErr, ErrorCode(parseErr), testCase.ExpectedError)
+				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("error = %v (%s), want %s", parseErr, ErrorCode(parseErr), testCase.ExpectedError)}
 			}
+			return conformancecoverage.Observation{}
 		})
-	}
 
 	lfsPath := filepath.Join(root, "fixtures", "external-repository", "lfs-pointers.json")
 	lfsData, err := os.ReadFile(lfsPath)
 	if err != nil {
 		t.Fatal(err)
 	}
+	type lfsPointerCase struct {
+		Name          string `json:"name"`
+		BytesBase64   string `json:"bytes_base64"`
+		ExpectedError string `json:"expected_error"`
+	}
 	var lfs struct {
-		Cases []struct {
-			Name          string `json:"name"`
-			BytesBase64   string `json:"bytes_base64"`
-			ExpectedError string `json:"expected_error"`
-		} `json:"cases"`
+		Cases []lfsPointerCase `json:"cases"`
 	}
 	if err := json.Unmarshal(lfsData, &lfs); err != nil {
 		t.Fatal(err)
 	}
-	for _, testCase := range lfs.Cases {
-		data, _ := base64.StdEncoding.DecodeString(testCase.BytesBase64)
-		if got, want := isLFSPointer(data), testCase.ExpectedError == CodeLFSUnsupported; got != want {
-			t.Errorf("LFS case %s classified %v, want %v", testCase.Name, got, want)
-		}
-	}
+	conformancecoverage.RunOutcomes(t, "external-repository/lfs-pointers", lfs.Cases,
+		func(tc lfsPointerCase) string { return tc.Name }, func(t *testing.T, testCase lfsPointerCase) conformancecoverage.Observation {
+			data, err := base64.StdEncoding.DecodeString(testCase.BytesBase64)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got, want := isLFSPointer(data), testCase.ExpectedError == CodeLFSUnsupported; got != want {
+				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("LFS pointer=%v, want %v", got, want)}
+			}
+			return conformancecoverage.Observation{}
+		})
 }
 
 func TestLocalConfigAndAdministrationAdversarialBoundaries(t *testing.T) {
@@ -257,28 +266,37 @@ func TestLocalConfigAndAdministrationAdversarialBoundaries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	type localConfigCase struct {
+		Name          string            `json:"name"`
+		ExpectedError string            `json:"expected_error"`
+		Files         map[string]string `json:"files_base64"`
+	}
 	var fixtures struct {
-		Cases []struct {
-			Name, ExpectedError string
-			Files               map[string]string `json:"files_base64"`
-		} `json:"cases"`
+		Cases []localConfigCase `json:"cases"`
 	}
 	if err := json.Unmarshal(payload, &fixtures); err != nil {
 		t.Fatal(err)
 	}
-	for _, testCase := range fixtures.Cases {
-		if encoded, ok := testCase.Files["config"]; ok {
-			config, _ := base64.StdEncoding.DecodeString(encoded)
-			_, err := parseLocalConfig(config)
+	conformancecoverage.RunOutcomes(t, "external-repository/local-config-and-refs", fixtures.Cases,
+		func(tc localConfigCase) string { return tc.Name }, func(t *testing.T, testCase localConfigCase) conformancecoverage.Observation {
+			encoded, ok := testCase.Files["config"]
+			if !ok {
+				return conformancecoverage.Observation{BoundReason: "parseLocalConfig consumes config bytes; this case publishes no config file"}
+			}
+			config, err := base64.StdEncoding.DecodeString(encoded)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = parseLocalConfig(config)
 			configShouldFail := testCase.Name == "reject-bare-layout" || testCase.Name == "reject-config-include" || testCase.Name == "reject-partial-clone-config" || testCase.Name == "reject-reftable"
 			if configShouldFail && err == nil {
-				t.Errorf("%s config unexpectedly admitted", testCase.Name)
+				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("%s config unexpectedly admitted", testCase.Name)}
 			}
 			if !configShouldFail && err != nil {
-				t.Errorf("%s inert/admitted config rejected: %v", testCase.Name, err)
+				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("%s inert/admitted config rejected: %v", testCase.Name, err)}
 			}
-		}
-	}
+			return conformancecoverage.Observation{}
+		})
 
 	fixture := makeGitFixture(t, "sha1", false)
 	tool := realGitTool(t)
@@ -400,37 +418,46 @@ func TestPackIndexConformanceAndExactSSHWrapper(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	type packIndexCase struct {
+		Name          string `json:"name"`
+		ObjectFormat  string `json:"object_format"`
+		PackHex       string `json:"pack_hex"`
+		IndexHex      string `json:"index_hex"`
+		ExpectedError string `json:"expected_error"`
+	}
 	var fixture struct {
-		Cases []struct {
-			Name          string `json:"name"`
-			ObjectFormat  string `json:"object_format"`
-			PackHex       string `json:"pack_hex"`
-			IndexHex      string `json:"index_hex"`
-			ExpectedError string `json:"expected_error"`
-		} `json:"cases"`
+		Cases []packIndexCase `json:"cases"`
 	}
 	if err := json.Unmarshal(payload, &fixture); err != nil {
 		t.Fatal(err)
 	}
-	for _, testCase := range fixture.Cases {
-		if testCase.PackHex == "" || testCase.IndexHex == "" {
-			continue
-		}
-		pack, _ := hex.DecodeString(testCase.PackHex)
-		index, _ := hex.DecodeString(testCase.IndexHex)
-		hashBytes := 20
-		if testCase.ObjectFormat == "sha256" {
-			hashBytes = 32
-		}
-		if len(pack) < hashBytes {
-			t.Fatalf("bad fixture %s", testCase.Name)
-		}
-		base := "pack-" + hex.EncodeToString(pack[len(pack)-hashBytes:])
-		err := validatePackIndex(base, pack, index, testCase.ObjectFormat)
-		if (testCase.ExpectedError == "") != (err == nil) {
-			t.Errorf("%s: err=%v expected=%s", testCase.Name, err, testCase.ExpectedError)
-		}
-	}
+	conformancecoverage.RunOutcomes(t, "external-repository/pack-index", fixture.Cases,
+		func(tc packIndexCase) string { return tc.Name }, func(t *testing.T, testCase packIndexCase) conformancecoverage.Observation {
+			if testCase.PackHex == "" || testCase.IndexHex == "" {
+				return conformancecoverage.Observation{BoundReason: "validatePackIndex requires the pack and index byte pair; this case publishes no index"}
+			}
+			pack, err := hex.DecodeString(testCase.PackHex)
+			if err != nil {
+				t.Fatal(err)
+			}
+			index, err := hex.DecodeString(testCase.IndexHex)
+			if err != nil {
+				t.Fatal(err)
+			}
+			hashBytes := 20
+			if testCase.ObjectFormat == "sha256" {
+				hashBytes = 32
+			}
+			if len(pack) < hashBytes {
+				t.Fatalf("bad fixture %s", testCase.Name)
+			}
+			base := "pack-" + hex.EncodeToString(pack[len(pack)-hashBytes:])
+			err = validatePackIndex(base, pack, index, testCase.ObjectFormat)
+			if (testCase.ExpectedError == "") != (err == nil) {
+				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("%s: err=%v expected=%s", testCase.Name, err, testCase.ExpectedError)}
+			}
+			return conformancecoverage.Observation{}
+		})
 
 	policyRoot := t.TempDir()
 	policy := SSHPolicy{

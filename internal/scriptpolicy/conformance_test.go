@@ -9,8 +9,32 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/relux-works/curator/internal/conformancecoverage"
 	"github.com/relux-works/curator/internal/skillspec"
 )
+
+type scriptExecutionOptInCase struct {
+	Name            string  `json:"name"`
+	ManifestSchema  int     `json:"manifest_schema"`
+	ExecutionPolicy *string `json:"execution_policy"`
+	Interpreter     *string `json:"interpreter"`
+	Mode            *string `json:"mode"`
+	Accepted        bool    `json:"accepted"`
+}
+
+type scriptExecutableIdentityCase struct {
+	Name            string  `json:"name"`
+	Accepted        bool    `json:"accepted"`
+	AdditionalLinks string  `json:"additional_links"`
+	Platform        string  `json:"platform"`
+	PlatformOwned   bool    `json:"platform_owned"`
+	Reason          string  `json:"reason"`
+	Resolution      string  `json:"resolution"`
+	SystemRoot      *string `json:"system_root"`
+	Target          string  `json:"target"`
+	Use             string  `json:"use"`
+	Interpreter     *string `json:"interpreter"`
+}
 
 // scriptHostExecutionPolicyVector is the published script-worker-v1 behavioural
 // family. Only the sections curator's surface answers are decoded; the rest of
@@ -40,15 +64,10 @@ type scriptHostExecutionPolicyVector struct {
 	CapabilityEvidenceCases []struct {
 		Name string `json:"name"`
 	} `json:"capability_evidence_cases"`
-	OptInCases []struct {
-		Name            string  `json:"name"`
-		ManifestSchema  int     `json:"manifest_schema"`
-		ExecutionPolicy *string `json:"execution_policy"`
-		Interpreter     *string `json:"interpreter"`
-		Mode            *string `json:"mode"`
-		Accepted        bool    `json:"accepted"`
-	} `json:"opt_in_cases"`
-	PreflightCases []struct {
+	OptInCases              []scriptExecutionOptInCase     `json:"opt_in_cases"`
+	ExecutableIdentityCases []scriptExecutableIdentityCase `json:"executable_identity_cases"`
+	HardLinkSubstitution    string                         `json:"hard_link_substitution_definition"`
+	PreflightCases          []struct {
 		Name                  string  `json:"name"`
 		Operation             string  `json:"operation"`
 		ExpectedError         *string `json:"expected_error"`
@@ -147,11 +166,17 @@ var scriptHostExecutionPolicySections = map[string]scriptSectionClassification{
 		productionRow("internal/scriptworker", "TestMacOSNativeControlsAppliedAtInvocation"),
 		productionRow("internal/scriptworker", "TestWindowsJobLimitsAppliedAndConfirmed"),
 	}},
+	"executable_identity_cases": {consumedAtProductionEntry, []platformCaseRow{
+		productionRow("internal/scriptworker", "TestExecutableIdentityCasesAtProductionEntry"),
+	}},
+	"hard_link_substitution_definition": {consumedAtProductionEntry, []platformCaseRow{
+		productionRow("internal/scriptworker", "TestExecutableIdentityCasesAtProductionEntry"),
+	}},
 }
 
 // Each named vector case maps to a registered production-entry test. The
 // case names are derived from the pinned vector in the test below; a new or
-// removed vector row therefore changes the measured 33/33 ratio.
+// removed vector row therefore changes the measured 41/41 ratio.
 var scriptVectorCaseConsumers = map[string]platformCaseRow{
 	"opt_in_cases/schema8-explicit-opt-in":                                                      productionRow("internal/install", "TestScriptOptInCasesAtInstallEntry"),
 	"opt_in_cases/schema8-absent-policy":                                                        productionRow("internal/install", "TestScriptOptInCasesAtInstallEntry"),
@@ -186,6 +211,14 @@ var scriptVectorCaseConsumers = map[string]platformCaseRow{
 	"audit_label_cases/schema8-declared-only-script":                                            productionRow("internal/install", "TestScriptAuditLabelsAtInstallEntry"),
 	"audit_label_cases/schema8-enforced-script":                                                 productionRow("internal/install", "TestScriptAuditLabelsAtInstallEntry"),
 	"audit_label_cases/schema8-enforced-unfiltered-network":                                     productionRow("internal/install", "TestScriptAuditLabelsAtInstallEntry"),
+	"executable_identity_cases/windows-system32-exec-platform-owned-component-store-hardlinks":  productionRow("internal/scriptworker", "TestExecutableIdentityCasesAtProductionEntry"),
+	"executable_identity_cases/windows-exec-outside-system32-hardlinks":                         productionRow("internal/scriptworker", "TestExecutableIdentityCasesAtProductionEntry"),
+	"executable_identity_cases/windows-exec-noncomponent-store-hardlinks":                       productionRow("internal/scriptworker", "TestExecutableIdentityCasesAtProductionEntry"),
+	"executable_identity_cases/windows-exec-nondefault-search-hardlinks":                        productionRow("internal/scriptworker", "TestExecutableIdentityCasesAtProductionEntry"),
+	"executable_identity_cases/windows-exec-uncaptured-systemroot-hardlinks":                    productionRow("internal/scriptworker", "TestExecutableIdentityCasesAtProductionEntry"),
+	"executable_identity_cases/windows-exec-unowned-file-hardlinks":                             productionRow("internal/scriptworker", "TestExecutableIdentityCasesAtProductionEntry"),
+	"executable_identity_cases/windows-python3-interpreter-hardlinks":                           productionRow("internal/scriptworker", "TestExecutableIdentityCasesAtProductionEntry"),
+	"executable_identity_cases/windows-node-interpreter-hardlinks":                              productionRow("internal/scriptworker", "TestExecutableIdentityCasesAtProductionEntry"),
 }
 
 var scriptMandatoryControlConsumers = map[string][]platformCaseRow{
@@ -381,18 +414,29 @@ func TestScriptHostExecutionPolicyProductionConsumersCoverAllCases(t *testing.T)
 	for _, testCase := range vector.AuditLabelCases {
 		auditNames = append(auditNames, testCase.Name)
 	}
+	identityNames := make([]string, 0, len(vector.ExecutableIdentityCases))
+	for _, testCase := range vector.ExecutableIdentityCases {
+		identityNames = append(identityNames, testCase.Name)
+	}
 	addCases("opt_in_cases", optInNames)
 	addCases("capability_derivation_cases", caseNames(vector.CapabilityDerivationCases))
 	addCases("capability_evidence_cases", caseNames(vector.CapabilityEvidenceCases))
 	addCases("preflight_cases", preflightNames)
 	addCases("audit_label_cases", auditNames)
+	addCases("executable_identity_cases", identityNames)
 	for key := range scriptVectorCaseConsumers {
 		if !expectedCases[key] {
 			t.Errorf("production consumer mapping %q names no case in the pinned vector", key)
 		}
 	}
-	if len(expectedCases) != 33 || len(scriptVectorCaseConsumers) != 33 {
-		t.Errorf("named behavioral case coverage = %d vector cases / %d mapped rows, want 33/33", len(expectedCases), len(scriptVectorCaseConsumers))
+	if len(expectedCases) != 41 || len(scriptVectorCaseConsumers) != 41 {
+		t.Errorf("named behavioral case coverage = %d vector cases / %d mapped rows, want 41/41", len(expectedCases), len(scriptVectorCaseConsumers))
+	}
+	if len(vector.ExecutableIdentityCases) != 8 {
+		t.Errorf("executable identity vector has %d cases, want the eight cases published at dcc7f015", len(vector.ExecutableIdentityCases))
+	}
+	if strings.TrimSpace(vector.HardLinkSubstitution) == "" {
+		t.Error("the root published an empty hard_link_substitution_definition")
 	}
 
 	controls := append([]string(nil), vector.MandatoryControl...)
@@ -501,8 +545,8 @@ func TestScriptExecutionOptInCases(t *testing.T) {
 	if len(vector.OptInCases) == 0 {
 		t.Fatal("the script-host-execution-policy family published no opt-in cases")
 	}
-	for _, testCase := range vector.OptInCases {
-		t.Run(testCase.Name, func(t *testing.T) {
+	conformancecoverage.Run(t, "script-host-execution-policy/opt-in-cases", vector.OptInCases,
+		func(testCase scriptExecutionOptInCase) string { return testCase.Name }, func(t *testing.T, testCase scriptExecutionOptInCase) {
 			command := map[string]any{"type": "script", "unix_path": "scripts/tool"}
 			if testCase.ExecutionPolicy != nil {
 				command["execution_policy"] = *testCase.ExecutionPolicy
@@ -548,7 +592,6 @@ func TestScriptExecutionOptInCases(t *testing.T) {
 				t.Fatal("an enforced command parsed without its bound interpreter")
 			}
 		})
-	}
 }
 
 // TestEnforcedShapesProceedPastAdmission proves admission honesty: every

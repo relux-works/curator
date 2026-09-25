@@ -17,10 +17,12 @@ import (
 
 // buildSourceCase is one authoritative build-source identity vector.
 type buildSourceCase struct {
-	Name          string `json:"name"`
-	Result        string `json:"result"`
-	Boundary      string `json:"boundary"`
-	ContentSHA256 string `json:"content_sha256"`
+	Name          string              `json:"name"`
+	Result        string              `json:"result"`
+	Boundary      string              `json:"boundary"`
+	ContentSHA256 string              `json:"content_sha256"`
+	Records       []buildSourceRecord `json:"records"`
+	InputOrder    []buildSourceRecord `json:"input_order"`
 	Variants      []struct {
 		Name          string `json:"name"`
 		Mode          string `json:"mode"`
@@ -54,6 +56,11 @@ type buildSourceCase struct {
 		Reuse            bool   `json:"reuse"`
 		ArtifactExecuted bool   `json:"artifact_executed"`
 	} `json:"expected"`
+}
+
+type buildSourceRecord struct {
+	Path          string `json:"path"`
+	ContentBase64 string `json:"content_base64"`
 }
 
 // markerRegressionVariants returns the marker payloads the authoritative
@@ -122,155 +129,147 @@ func decodeVectorBytes(t *testing.T, value string) []byte {
 	return payload
 }
 
-// TestBuildSourceIdentityVectors gives every authoritative build-source case,
-// accepted and rejected, an executable assertion. No Go child is involved.
-func TestBuildSourceIdentityVectors(t *testing.T) {
-	cases := loadBuildSourceCases(t)
-	if len(cases) == 0 {
-		t.Skip("this conformance root publishes no build-source cases")
-	}
-	for _, testCase := range cases {
-		testCase := testCase
-		t.Run(testCase.Name, func(t *testing.T) {
-			switch testCase.Name {
-			case "fixture-exact-build-source", "domain-prefix-ordering-framing-empty-binary-and-root-marker":
-				// Both accepted framing vectors are already reproduced from the
-				// suite's own records by TestBuildSourceConformanceVectors.
-				if testCase.Result != "accepted" {
-					t.Fatalf("vector result = %q, want accepted", testCase.Result)
-				}
-			case "mode-and-timestamp-are-non-inputs":
-				if len(testCase.Variants) < 2 {
-					t.Fatal("vector publishes fewer than two variants")
-				}
-				var digests []string
-				for _, variant := range testCase.Variants {
-					tree := t.TempDir()
-					writeTestFile(t, tree, "member", []byte("content"))
-					path := filepath.Join(tree, "member")
-					mode, err := strconv.ParseUint(variant.Mode, 8, 32)
-					if err != nil {
-						t.Fatalf("vector mode %q: %v", variant.Mode, err)
-					}
-					if err := os.Chmod(path, os.FileMode(uint32(mode))); err != nil {
-						t.Fatal(err)
-					}
-					stamp, err := time.Parse(time.RFC3339, variant.MTime)
-					if err != nil {
-						t.Fatalf("vector mtime %q: %v", variant.MTime, err)
-					}
-					if err := os.Chtimes(path, stamp, stamp); err != nil {
-						t.Fatal(err)
-					}
-					digests = append(digests, validateTestTree(t, tree).Identity().ContentSHA256)
-				}
-				for _, digest := range digests[1:] {
-					if digest != digests[0] {
-						t.Fatalf("mode or timestamp changed the build-source identity: %v", digests)
-					}
-				}
-			case "legacy-nul-stream-structural-collision":
-				if testCase.FramedHashesEqual || !testCase.LegacyStreamsEqual {
-					t.Fatalf("vector no longer describes a legacy collision: %+v", testCase)
-				}
-				if len(testCase.FramedContentSHA256) != 2 {
-					t.Fatalf("vector publishes %d framed digests", len(testCase.FramedContentSHA256))
-				}
-				one := treeFromRecords(t, testCase.OneFile)
-				two := treeFromRecords(t, testCase.TwoFiles)
-				left := validateTestTree(t, one).Identity().ContentSHA256
-				right := validateTestTree(t, two).Identity().ContentSHA256
-				if left == right {
-					t.Fatal("the framed build-source identity collides on the legacy NUL stream")
-				}
-				if left != testCase.FramedContentSHA256[0] || right != testCase.FramedContentSHA256[1] {
-					t.Fatalf("framed digests = %s / %s, the suite publishes %v", left, right, testCase.FramedContentSHA256)
-				}
-			case "root-marker-bytes-are-build-input":
-				if testCase.BuildSourceHashesEqual || !testCase.LegacyInstalledTreeHashesEqual {
-					t.Fatalf("vector no longer describes the marker regression: %+v", testCase)
-				}
-				if len(testCase.Variants) < 2 {
-					t.Fatal("vector publishes fewer than two marker variants")
-				}
-				markers := markerRegressionVariants(t)
-				if len(markers) < 2 {
-					t.Skip("this conformance root publishes no install-marker regression payloads")
-				}
-				var legacy, build []string
-				for _, marker := range markers {
-					tree := t.TempDir()
-					writeTestFile(t, tree, "go.mod", []byte("module example\n"))
-					writeTestFile(t, tree, hashing.MarkerName, marker)
-					legacyHash, err := hashing.ContentSHA256(tree, nil)
-					if err != nil {
-						t.Fatal(err)
-					}
-					legacy = append(legacy, legacyHash)
-					build = append(build, validateTestTree(t, tree).Identity().ContentSHA256)
-				}
-				if legacy[0] != legacy[1] {
-					t.Fatalf("legacy installed-tree hashes differ: %v", legacy)
-				}
-				if build[0] == build[1] {
-					t.Fatal("root marker bytes must change the build-source identity")
-				}
-			case "invalid-unicode-build-source-path":
-				tree := t.TempDir()
-				if !writeInvalidUnicodeMember(t, tree, decodeVectorBytes(t, testCase.Input.PathBytesBase64)) {
-					t.Skip("this host cannot create a member whose name is not valid Unicode")
-				}
-				requireBuildSourceRejection(t, testCase, tree)
-			case "duplicate-build-source-path":
-				// A POSIX directory cannot hold the same name twice, so the
-				// reachable form of this vector is a case- or normalization-
-				// insensitive host presenting one encoded path from two members.
-				if len(testCase.Input.Paths) != 2 || testCase.Input.Paths[0] != testCase.Input.Paths[1] {
-					t.Fatalf("vector paths = %q, want one repeated path", testCase.Input.Paths)
-				}
-				tree := t.TempDir()
-				name := testCase.Input.Paths[0]
-				writeTestFile(t, tree, name, []byte("first"))
-				second := filepath.Join(tree, strings.ToUpper(name))
-				if err := os.WriteFile(second, []byte("second"), 0o644); err != nil { // #nosec G306 -- deliberate alias probe
-					t.Fatalf("cannot create the alias the vector needs: %v", err)
-				}
-				if sameEncodedMember(t, tree, name) {
-					t.Skip("this host folds the alias into one directory member, so no duplicate encoded path is reachable")
-				}
-				// Distinct members with distinct encoded paths are admitted; the
-				// guard only has to refuse a repeated encoded claim.
-				if _, err := Validate(tree); err != nil {
-					t.Fatalf("distinct members were rejected: %v", err)
-				}
-			case "build-source-symbolic-link":
-				tree := t.TempDir()
-				writeTestFile(t, tree, "target", []byte("content"))
-				if err := os.Symlink("target", filepath.Join(tree, testCase.Input.Path)); err != nil {
-					t.Skipf("this host cannot create the symbolic link the vector needs: %v", err)
-				}
-				requireBuildSourceRejection(t, testCase, tree)
-			case "build-source-special-file":
-				if testCase.Input.Type != "fifo" {
-					t.Fatalf("vector member type = %q", testCase.Input.Type)
-				}
-				tree := t.TempDir()
-				if !makeBuildSourceSpecialFile(t, filepath.Join(tree, testCase.Input.Path)) {
-					t.Skip("this host cannot create the FIFO the vector needs")
-				}
-				requireBuildSourceRejection(t, testCase, tree)
-			case "build-source-mutation-during-use":
-				tree := t.TempDir()
-				writeTestFile(t, tree, "member", []byte("content"))
-				token := validateTestTree(t, tree)
-				writeTestFile(t, tree, "member", []byte("mutated"))
-				if err := token.Recheck(); err == nil {
-					t.Fatalf("%s was accepted, want the %s rejection", testCase.Name, testCase.Expected.Error)
-				}
-			default:
-				t.Fatalf("authoritative build-source case %q has no Curator assertion", testCase.Name)
+// assertBuildSourceIdentityVector gives one authoritative build-source case,
+// accepted or rejected, an executable assertion. No Go child is involved.
+func assertBuildSourceIdentityVector(t *testing.T, testCase buildSourceCase) {
+	t.Helper()
+	switch testCase.Name {
+	case "fixture-exact-build-source", "domain-prefix-ordering-framing-empty-binary-and-root-marker":
+		// Both accepted framing vectors are already reproduced from the
+		// suite's own records by TestBuildSourceConformanceVectors.
+		if testCase.Result != "accepted" {
+			t.Fatalf("vector result = %q, want accepted", testCase.Result)
+		}
+	case "mode-and-timestamp-are-non-inputs":
+		if len(testCase.Variants) < 2 {
+			t.Fatal("vector publishes fewer than two variants")
+		}
+		var digests []string
+		for _, variant := range testCase.Variants {
+			tree := t.TempDir()
+			writeTestFile(t, tree, "member", []byte("content"))
+			path := filepath.Join(tree, "member")
+			mode, err := strconv.ParseUint(variant.Mode, 8, 32)
+			if err != nil {
+				t.Fatalf("vector mode %q: %v", variant.Mode, err)
 			}
-		})
+			if err := os.Chmod(path, os.FileMode(uint32(mode))); err != nil {
+				t.Fatal(err)
+			}
+			stamp, err := time.Parse(time.RFC3339, variant.MTime)
+			if err != nil {
+				t.Fatalf("vector mtime %q: %v", variant.MTime, err)
+			}
+			if err := os.Chtimes(path, stamp, stamp); err != nil {
+				t.Fatal(err)
+			}
+			digests = append(digests, validateTestTree(t, tree).Identity().ContentSHA256)
+		}
+		for _, digest := range digests[1:] {
+			if digest != digests[0] {
+				t.Fatalf("mode or timestamp changed the build-source identity: %v", digests)
+			}
+		}
+	case "legacy-nul-stream-structural-collision":
+		if testCase.FramedHashesEqual || !testCase.LegacyStreamsEqual {
+			t.Fatalf("vector no longer describes a legacy collision: %+v", testCase)
+		}
+		if len(testCase.FramedContentSHA256) != 2 {
+			t.Fatalf("vector publishes %d framed digests", len(testCase.FramedContentSHA256))
+		}
+		one := treeFromRecords(t, testCase.OneFile)
+		two := treeFromRecords(t, testCase.TwoFiles)
+		left := validateTestTree(t, one).Identity().ContentSHA256
+		right := validateTestTree(t, two).Identity().ContentSHA256
+		if left == right {
+			t.Fatal("the framed build-source identity collides on the legacy NUL stream")
+		}
+		if left != testCase.FramedContentSHA256[0] || right != testCase.FramedContentSHA256[1] {
+			t.Fatalf("framed digests = %s / %s, the suite publishes %v", left, right, testCase.FramedContentSHA256)
+		}
+	case "root-marker-bytes-are-build-input":
+		if testCase.BuildSourceHashesEqual || !testCase.LegacyInstalledTreeHashesEqual {
+			t.Fatalf("vector no longer describes the marker regression: %+v", testCase)
+		}
+		if len(testCase.Variants) < 2 {
+			t.Fatal("vector publishes fewer than two marker variants")
+		}
+		markers := markerRegressionVariants(t)
+		if len(markers) < 2 {
+			t.Skip("this conformance root publishes no install-marker regression payloads")
+		}
+		var legacy, build []string
+		for _, marker := range markers {
+			tree := t.TempDir()
+			writeTestFile(t, tree, "go.mod", []byte("module example\n"))
+			writeTestFile(t, tree, hashing.MarkerName, marker)
+			legacyHash, err := hashing.ContentSHA256(tree, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			legacy = append(legacy, legacyHash)
+			build = append(build, validateTestTree(t, tree).Identity().ContentSHA256)
+		}
+		if legacy[0] != legacy[1] {
+			t.Fatalf("legacy installed-tree hashes differ: %v", legacy)
+		}
+		if build[0] == build[1] {
+			t.Fatal("root marker bytes must change the build-source identity")
+		}
+	case "invalid-unicode-build-source-path":
+		tree := t.TempDir()
+		if !writeInvalidUnicodeMember(t, tree, decodeVectorBytes(t, testCase.Input.PathBytesBase64)) {
+			t.Skip("this host cannot create a member whose name is not valid Unicode")
+		}
+		requireBuildSourceRejection(t, testCase, tree)
+	case "duplicate-build-source-path":
+		// A POSIX directory cannot hold the same name twice, so the
+		// reachable form of this vector is a case- or normalization-
+		// insensitive host presenting one encoded path from two members.
+		if len(testCase.Input.Paths) != 2 || testCase.Input.Paths[0] != testCase.Input.Paths[1] {
+			t.Fatalf("vector paths = %q, want one repeated path", testCase.Input.Paths)
+		}
+		tree := t.TempDir()
+		name := testCase.Input.Paths[0]
+		writeTestFile(t, tree, name, []byte("first"))
+		second := filepath.Join(tree, strings.ToUpper(name))
+		if err := os.WriteFile(second, []byte("second"), 0o644); err != nil { // #nosec G306 -- deliberate alias probe
+			t.Fatalf("cannot create the alias the vector needs: %v", err)
+		}
+		if sameEncodedMember(t, tree, name) {
+			t.Skip("this host folds the alias into one directory member, so no duplicate encoded path is reachable")
+		}
+		// Distinct members with distinct encoded paths are admitted; the
+		// guard only has to refuse a repeated encoded claim.
+		if _, err := Validate(tree); err != nil {
+			t.Fatalf("distinct members were rejected: %v", err)
+		}
+	case "build-source-symbolic-link":
+		tree := t.TempDir()
+		writeTestFile(t, tree, "target", []byte("content"))
+		if err := os.Symlink("target", filepath.Join(tree, testCase.Input.Path)); err != nil {
+			t.Skipf("this host cannot create the symbolic link the vector needs: %v", err)
+		}
+		requireBuildSourceRejection(t, testCase, tree)
+	case "build-source-special-file":
+		if testCase.Input.Type != "fifo" {
+			t.Fatalf("vector member type = %q", testCase.Input.Type)
+		}
+		tree := t.TempDir()
+		if !makeBuildSourceSpecialFile(t, filepath.Join(tree, testCase.Input.Path)) {
+			t.Skip("this host cannot create the FIFO the vector needs")
+		}
+		requireBuildSourceRejection(t, testCase, tree)
+	case "build-source-mutation-during-use":
+		tree := t.TempDir()
+		writeTestFile(t, tree, "member", []byte("content"))
+		token := validateTestTree(t, tree)
+		writeTestFile(t, tree, "member", []byte("mutated"))
+		if err := token.Recheck(); err == nil {
+			t.Fatalf("%s was accepted, want the %s rejection", testCase.Name, testCase.Expected.Error)
+		}
+	default:
+		t.Fatalf("authoritative build-source case %q has no Curator assertion", testCase.Name)
 	}
 }
 

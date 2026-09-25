@@ -30,7 +30,7 @@
 #   CANDIDATE_REF                     full 40-hex revision the root came from
 #   CANDIDATE_EXPECTED_MANIFEST_SHA256  expected sha256 of <root>/manifest.json
 #   CANDIDATE_EXPECTED_TREE_SHA256      expected aggregate digest of the tree
-#   SPEC_PIN                          committed released pin, for the anti-confusion check
+#   SPEC_PIN                          committed conformance pin, for the anti-confusion check
 
 set -u
 
@@ -88,7 +88,7 @@ verify_ref() {
 		0000000000000000000000000000000000000000) die 'candidate revision is the null commit' ;;
 	esac
 	if [ -n "${SPEC_PIN:-}" ] && [ "$ref" = "$SPEC_PIN" ]; then
-		die "candidate revision equals the committed released pin $SPEC_PIN; a candidate run must not impersonate the qualified pin"
+		die "candidate revision equals the committed conformance pin $SPEC_PIN; a candidate run must not impersonate the default pin"
 	fi
 	echo "candidate-suite: revision accepted (immutable, full 40-hex): $ref"
 }
@@ -162,7 +162,7 @@ record() {
 		echo "manifest_sha256         sha256:$manifest_sha"
 		echo "tree_sha256             sha256:$tree_sha"
 		echo "file_count              $files"
-		echo "committed_released_pin  ${SPEC_PIN:-<unset>}"
+		echo "committed_conformance_pin  ${SPEC_PIN:-<unset>}"
 		echo "runner_goos             $(go env GOOS 2>/dev/null || echo '<unknown>')"
 		echo "runner_goarch           $(go env GOARCH 2>/dev/null || echo '<unknown>')"
 		echo 'evidence_class          candidate-only'

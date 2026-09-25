@@ -8,7 +8,40 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/buildmeta"
+	"github.com/relux-works/curator/internal/conformancecoverage"
 )
+
+type capabilityEvidenceCase struct {
+	Name                   string `json:"name"`
+	Control                string `json:"control"`
+	Availability           string `json:"availability"`
+	Status                 string `json:"status"`
+	EntryCount             int    `json:"entry_count"`
+	InInventory            bool   `json:"in_inventory"`
+	RecordVersion          string `json:"record_version"`
+	RecordExecutionPolicy  string `json:"record_execution_policy"`
+	HardenedGuaranteeClaim bool   `json:"hardened_guarantee_claimed"`
+	RecordValid            bool   `json:"record_valid"`
+	BuildPermitted         bool   `json:"build_permitted"`
+	ChangesCacheKey        bool   `json:"changes_cache_key"`
+	ExpectedError          string `json:"expected_error"`
+}
+
+type identityProtocolCase struct {
+	Name            string `json:"name"`
+	ExpectedError   string `json:"expected_error"`
+	WorkerStarted   bool   `json:"worker_started"`
+	CompilerStarted bool   `json:"compiler_started"`
+	Published       bool   `json:"published"`
+}
+
+type packageInfluenceCase struct {
+	Name            string `json:"name"`
+	ExpectedError   string `json:"expected_error"`
+	WorkerStarted   bool   `json:"worker_started"`
+	CompilerStarted bool   `json:"compiler_started"`
+	Published       bool   `json:"published"`
+}
 
 // hostExecutionVector is the accepted rc.5 authority for the portable
 // manager-worker-v1 execution policy.
@@ -73,21 +106,7 @@ type hostExecutionVector struct {
 		} `json:"examples"`
 	} `json:"capability_evidence_record"`
 
-	CapabilityEvidenceCases []struct {
-		Name                   string `json:"name"`
-		Control                string `json:"control"`
-		Availability           string `json:"availability"`
-		Status                 string `json:"status"`
-		EntryCount             int    `json:"entry_count"`
-		InInventory            bool   `json:"in_inventory"`
-		RecordVersion          string `json:"record_version"`
-		RecordExecutionPolicy  string `json:"record_execution_policy"`
-		HardenedGuaranteeClaim bool   `json:"hardened_guarantee_claimed"`
-		RecordValid            bool   `json:"record_valid"`
-		BuildPermitted         bool   `json:"build_permitted"`
-		ChangesCacheKey        bool   `json:"changes_cache_key"`
-		ExpectedError          string `json:"expected_error"`
-	} `json:"capability_evidence_cases"`
+	CapabilityEvidenceCases []capabilityEvidenceCase `json:"capability_evidence_cases"`
 
 	DeferredHardenedGuarantees []struct {
 		Name                  string `json:"name"`
@@ -112,21 +131,9 @@ type hostExecutionVector struct {
 		RejectsBuild  bool   `json:"rejects_build"`
 	} `json:"failure_boundary"`
 
-	IdentityAndProtocolCases []struct {
-		Name            string `json:"name"`
-		ExpectedError   string `json:"expected_error"`
-		WorkerStarted   bool   `json:"worker_started"`
-		CompilerStarted bool   `json:"compiler_started"`
-		Published       bool   `json:"published"`
-	} `json:"identity_and_protocol_cases"`
+	IdentityAndProtocolCases []identityProtocolCase `json:"identity_and_protocol_cases"`
 
-	PackageInfluenceCases []struct {
-		Name            string `json:"name"`
-		ExpectedError   string `json:"expected_error"`
-		WorkerStarted   bool   `json:"worker_started"`
-		CompilerStarted bool   `json:"compiler_started"`
-		Published       bool   `json:"published"`
-	} `json:"package_influence_cases"`
+	PackageInfluenceCases []packageInfluenceCase `json:"package_influence_cases"`
 
 	CacheIdentity struct {
 		Aliases  bool `json:"aliases"`
@@ -305,11 +312,8 @@ func TestCapabilityEvidenceRecordMatchesTheAcceptedVector(t *testing.T) {
 
 func TestCapabilityEvidenceCasesMatchTheAcceptedVector(t *testing.T) {
 	vector := loadHostExecutionVector(t)
-	if len(vector.CapabilityEvidenceCases) != 11 {
-		t.Fatalf("evidence cases = %d, want the exact rc.5 inventory of 11", len(vector.CapabilityEvidenceCases))
-	}
-	for _, testCase := range vector.CapabilityEvidenceCases {
-		t.Run(testCase.Name, func(t *testing.T) {
+	conformancecoverage.Run(t, "go-host-execution-policy/capability-evidence-cases", vector.CapabilityEvidenceCases,
+		func(testCase capabilityEvidenceCase) string { return testCase.Name }, func(t *testing.T, testCase capabilityEvidenceCase) {
 			if testCase.ChangesCacheKey {
 				t.Fatal("capability evidence must never change a cache key")
 			}
@@ -356,7 +360,6 @@ func TestCapabilityEvidenceCasesMatchTheAcceptedVector(t *testing.T) {
 				t.Fatalf("hardened claim %q was not rejected as a hardened claim", testCase.Name)
 			}
 		})
-	}
 }
 
 func TestDeferredGuaranteesAndFailureBoundaryMatchTheAcceptedVector(t *testing.T) {
@@ -408,22 +411,23 @@ func TestIdentityProtocolAndPackageInfluenceCodesMatchTheAcceptedVector(t *testi
 		CodeControlUnavailable: true, CodeCapabilityEvidenceInvalid: true,
 		CodeHardenedClaimForbidden: true, CodePackageInfluenceForbidden: true,
 	}
-	for _, testCase := range vector.IdentityAndProtocolCases {
-		if !implemented[testCase.ExpectedError] {
-			t.Fatalf("case %q expects unimplemented diagnostic %q", testCase.Name, testCase.ExpectedError)
-		}
-		if testCase.Published {
-			t.Fatalf("case %q publishes", testCase.Name)
-		}
-	}
-	if len(vector.PackageInfluenceCases) != 8 {
-		t.Fatalf("package influence cases = %d, want eight", len(vector.PackageInfluenceCases))
-	}
-	for _, testCase := range vector.PackageInfluenceCases {
-		if testCase.ExpectedError != CodePackageInfluenceForbidden || testCase.WorkerStarted || testCase.CompilerStarted || testCase.Published {
-			t.Fatalf("package influence case %+v", testCase)
-		}
-	}
+	conformancecoverage.RunOutcomes(t, "go-host-execution-policy/identity-and-protocol-cases", vector.IdentityAndProtocolCases,
+		func(testCase identityProtocolCase) string { return testCase.Name }, func(t *testing.T, testCase identityProtocolCase) conformancecoverage.Observation {
+			if !implemented[testCase.ExpectedError] {
+				t.Fatalf("case %q expects unimplemented diagnostic %q", testCase.Name, testCase.ExpectedError)
+			}
+			if testCase.Published {
+				t.Fatalf("case %q publishes", testCase.Name)
+			}
+			return conformancecoverage.Observation{BoundReason: "this consumer checks the published diagnostic metadata; it does not drive the worker protocol failure path"}
+		})
+	conformancecoverage.RunOutcomes(t, "go-host-execution-policy/package-influence-cases", vector.PackageInfluenceCases,
+		func(testCase packageInfluenceCase) string { return testCase.Name }, func(t *testing.T, testCase packageInfluenceCase) conformancecoverage.Observation {
+			if testCase.ExpectedError != CodePackageInfluenceForbidden || testCase.WorkerStarted || testCase.CompilerStarted || testCase.Published {
+				t.Fatalf("package influence case %+v", testCase)
+			}
+			return conformancecoverage.Observation{BoundReason: "this consumer checks the published package-influence boundary metadata; it does not submit a package-influence request to the worker"}
+		})
 }
 
 func TestCacheIdentityMatchesTheAcceptedVector(t *testing.T) {

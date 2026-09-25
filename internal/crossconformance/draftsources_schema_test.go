@@ -11,6 +11,7 @@ import (
 	"github.com/relux-works/curator/internal/audit"
 	"github.com/relux-works/curator/internal/buildmeta"
 	"github.com/relux-works/curator/internal/config"
+	"github.com/relux-works/curator/internal/conformancecoverage"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/protocoljson"
@@ -46,51 +47,32 @@ var draftSchemaBounds = map[string]string{
 	"schema-cases/local-snapshot-v1/valid.json":                     "no byte-reader production entry for inventory documents; shape proven by Capture vectors",
 	"schema-cases/local-snapshot-v1/invalid-algorithm.json":         "no byte-reader production entry for inventory documents; shape proven by Capture vectors",
 	"schema-cases/local-snapshot-v1/invalid-unknown-top-level.json": "no byte-reader production entry for inventory documents; shape proven by Capture vectors",
-	// Schema-valid but normatively inconsistent: builds:{} with a
-	// top-level build_source violates "build_source required exactly
-	// for active local go-v1 commands and absent otherwise"
-	// (protocol/skillfile-sources.md §marker, which marker.Read enforces
-	// in validBuildState). The reader is right; the fixture cannot pass.
-	// Reported upstream to curator-spec (see BUG-260920-2eg8nv discrepancy
-	// text); the row stays a bound until the corpus is fixed.
-	"schema-cases/install-marker-v5/valid.json": "normatively inconsistent fixture (empty builds with build_source); reader refusal is correct",
 }
 
-// TestDraftSourcesSchemaCases drives all 115 pinned schema cases.
+// TestDraftSourcesSchemaCases drives all 116 pinned schema cases.
 func TestDraftSourcesSchemaCases(t *testing.T) {
 	dir := draftCorpusDir(t)
 	entries := loadDraftIndex(t)
-	if len(entries) != wantSchemaCases {
-		t.Fatalf("schema cases = %d, want %d", len(entries), wantSchemaCases)
-	}
-	var driven, bound int
 	seenBounds := map[string]bool{}
-	for _, entry := range entries {
-		driver, ok := draftSchemaDrivers[entry.Schema]
-		if !ok {
-			t.Fatalf("schema %q has no production-entry driver", entry.Schema)
-		}
-		entry := entry
-		t.Run(entry.Instance, func(t *testing.T) {
+	conformancecoverage.RunOutcomes(t, "draft-sources-v1/schema-cases", entries,
+		func(entry draftSchemaEntry) string { return entry.Instance }, func(t *testing.T, entry draftSchemaEntry) conformancecoverage.Observation {
+			driver, ok := draftSchemaDrivers[entry.Schema]
+			if !ok {
+				t.Fatalf("schema %q has no production-entry driver", entry.Schema)
+			}
 			if reason, isBound := draftSchemaBounds[entry.Instance]; isBound {
 				seenBounds[entry.Instance] = true
-				bound++
 				driver(t, dir, entry)
 				t.Logf("BOUND: %s", reason)
-				return
+				return conformancecoverage.Observation{BoundReason: reason}
 			}
-			driven++
 			driver(t, dir, entry)
+			return conformancecoverage.Observation{}
 		})
-	}
 	for instance := range draftSchemaBounds {
 		if !seenBounds[instance] {
 			t.Errorf("bound case %q not present in the pinned index", instance)
 		}
-	}
-	t.Logf("schema cases: %d driven, %d bounds, %d total", driven, bound, len(entries))
-	if driven+bound != len(entries) {
-		t.Fatalf("driven(%d)+bound(%d) != total(%d)", driven, bound, len(entries))
 	}
 }
 
@@ -180,16 +162,8 @@ func driveInstallMarkerV5Case(t *testing.T, dir string, entry draftSchemaEntry) 
 		t.Fatal(err)
 	}
 	got := marker.Read(installed)
-	switch entry.Instance {
-	case "schema-cases/install-marker-v5/valid.json":
-		// Bound: normatively inconsistent fixture, see draftSchemaBounds.
-		if got != nil {
-			t.Fatalf("bound fixture valid.json now accepted; convert the row to a drive")
-		}
-	default:
-		if (got != nil) != entry.Valid {
-			t.Fatalf("valid=%v: marker.Read nil=%v", entry.Valid, got == nil)
-		}
+	if (got != nil) != entry.Valid {
+		t.Fatalf("valid=%v: marker.Read nil=%v", entry.Valid, got == nil)
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/config"
+	"github.com/relux-works/curator/internal/conformancecoverage"
 	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/manifest"
 )
@@ -61,15 +62,12 @@ const invalidConfigBytes = "this is intentionally not valid JSON\n"
 // case to a real CLI invocation. The published flags build the argument vector
 // and the published outcome selects the assertion, so neither can drift from
 // the suite without failing here.
-func TestAuthoritativeBootstrapCasesAreExecutable(t *testing.T) {
+func TestAuthoritativeLifecycleBootstrapCasesAreExecutable(t *testing.T) {
 	t.Parallel()
 	document := authoritativeLifecycleDocument(t)
-	if len(document.BootstrapCases) == 0 {
-		t.Fatal("the authoritative suite publishes no bootstrap case to bind")
-	}
-	for _, published := range document.BootstrapCases {
-		published := published
-		t.Run(published.Name, func(t *testing.T) {
+	conformancecoverage.Run(t, "manager-lifecycle/bootstrap-cases", document.BootstrapCases,
+		func(published authoritativeBootstrapCase) string { return published.Name },
+		func(caseT *testing.T, published authoritativeBootstrapCase) {
 			// "either" means the outcome may not depend on the configuration, so
 			// both configurations are exercised rather than one of them chosen.
 			states := []string{published.Config}
@@ -77,10 +75,9 @@ func TestAuthoritativeBootstrapCasesAreExecutable(t *testing.T) {
 				states = []string{"missing", "existing-invalid"}
 			}
 			for _, state := range states {
-				runBootstrapCase(t, published, state)
+				runBootstrapCase(caseT, published, state)
 			}
 		})
-	}
 }
 
 func runBootstrapCase(t *testing.T, published authoritativeBootstrapCase, state string) {
@@ -297,28 +294,24 @@ func (fixture upgradeFixture) declareGlobal(t *testing.T, names ...string) {
 // to the CLI selection it names, then proves the published closure was fetched,
 // the published exclusion was never reached, and — where the case requires it —
 // a repository shared by two selected scopes is fetched exactly once.
-func TestAuthoritativeUpgradeCasesAreExecutable(t *testing.T) {
+func TestAuthoritativeLifecycleUpgradeCasesAreExecutable(t *testing.T) {
 	t.Parallel()
 	document := authoritativeLifecycleDocument(t)
-	if len(document.UpgradeCases) == 0 {
-		t.Fatal("the authoritative suite publishes no upgrade case to bind")
-	}
-	for _, published := range document.UpgradeCases {
-		published := published
-		t.Run(published.Name, func(t *testing.T) {
+	conformancecoverage.Run(t, "manager-lifecycle/upgrade-cases", document.UpgradeCases,
+		func(published authoritativeUpgradeCase) string { return published.Name },
+		func(caseT *testing.T, published authoritativeUpgradeCase) {
 			switch {
 			case published.Scope == "project" && published.Selection == "one":
-				runSelectedProjectUpgrade(t, published)
+				runSelectedProjectUpgrade(caseT, published)
 			case published.Scope == "project" && published.Selection == "all":
-				runAllProjectsUpgrade(t, published)
+				runAllProjectsUpgrade(caseT, published)
 			case published.Scope == "global" && published.Selection == "global":
-				runGlobalUpgrade(t, published)
+				runGlobalUpgrade(caseT, published)
 			default:
-				t.Fatalf("published upgrade case %q (scope %q, selection %q) has no executable binding",
+				caseT.Fatalf("published upgrade case %q (scope %q, selection %q) has no executable binding",
 					published.Name, published.Scope, published.Selection)
 			}
 		})
-	}
 }
 
 func runSelectedProjectUpgrade(t *testing.T, published authoritativeUpgradeCase) {

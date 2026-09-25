@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/relux-works/curator/internal/conformancecoverage"
 	"github.com/relux-works/curator/internal/snapshot"
 )
 
@@ -16,14 +17,10 @@ import (
 // executable flag, and inventory digest must equal the pinned values.
 func TestDraftSourcesSnapshotVectors(t *testing.T) {
 	vectors := loadDraftSnapshots(t)
-	if len(vectors) != wantSnapshotCases {
-		t.Fatalf("snapshot vectors = %d, want %d", len(vectors), wantSnapshotCases)
-	}
 	seenSkill := ""
 	seenSnapshots := map[string]string{}
-	for _, vector := range vectors {
-		vector := vector
-		t.Run(vector.ID, func(t *testing.T) {
+	conformancecoverage.Run(t, "draft-sources-v1/snapshot-cases", vectors,
+		func(vector draftSnapshotVector) string { return vector.ID }, func(t *testing.T, vector draftSnapshotVector) {
 			base := t.TempDir()
 			pkg := filepath.Join(base, "pkg")
 			materializeSnapshotVector(t, pkg, vector)
@@ -56,22 +53,23 @@ func TestDraftSourcesSnapshotVectors(t *testing.T) {
 				t.Fatalf("snapshot = %s, want %s", inventory.Snapshot, vector.Inventory.Snapshot)
 			}
 		})
+	for _, vector := range vectors {
 		for _, entry := range vector.Inventory.Files {
 			if entry.Path == "SKILL.md" {
 				if seenSkill == "" {
 					seenSkill = entry.SHA256
 				} else if entry.SHA256 != seenSkill {
-					t.Fatalf("%s changed SKILL.md bytes %s, want the frozen %s", vector.ID, entry.SHA256, seenSkill)
+					t.Errorf("%s changed SKILL.md bytes %s, want the frozen %s", vector.ID, entry.SHA256, seenSkill)
 				}
 			}
 		}
 		if prior, ok := seenSnapshots[vector.Inventory.Snapshot]; ok {
-			t.Fatalf("snapshot collision: %s and %s share %s", prior, vector.ID, vector.Inventory.Snapshot)
+			t.Errorf("snapshot collision: %s and %s share %s", prior, vector.ID, vector.Inventory.Snapshot)
 		}
 		seenSnapshots[vector.Inventory.Snapshot] = vector.ID
 	}
-	if len(seenSnapshots) != wantSnapshotCases {
-		t.Fatalf("want %d distinct package identities, got %v", wantSnapshotCases, seenSnapshots)
+	if len(seenSnapshots) != len(vectors) {
+		t.Fatalf("want %d distinct package identities, got %v", len(vectors), seenSnapshots)
 	}
 }
 

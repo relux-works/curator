@@ -2,10 +2,13 @@ package buildrepo
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/conformancecoverage"
 )
 
 func TestReleasedSkillBuildSchemaCases(t *testing.T) {
@@ -21,22 +24,34 @@ func TestReleasedSkillBuildSchemaCases(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	type schemaCase struct {
+		name    string
+		valid   bool
+		payload []byte
+	}
+	cases := make([]schemaCase, 0, len(entries))
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
 			continue
 		}
-		t.Run(entry.Name(), func(t *testing.T) {
-			payload, err := os.ReadFile(filepath.Join(directory, entry.Name()))
-			if err != nil {
-				t.Fatal(err)
-			}
-			_, err = ParseDescriptor(payload)
-			wantValid := strings.HasPrefix(entry.Name(), "valid")
-			if (err == nil) != wantValid {
-				t.Fatalf("valid=%v, error=%v", wantValid, err)
-			}
+		payload, err := os.ReadFile(filepath.Join(directory, entry.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		cases = append(cases, schemaCase{
+			name:    entry.Name(),
+			valid:   strings.HasPrefix(entry.Name(), "valid"),
+			payload: payload,
 		})
 	}
+	conformancecoverage.RunOutcomes(t, "skill-build-v1/schema-cases", cases,
+		func(tc schemaCase) string { return tc.name }, func(_ *testing.T, tc schemaCase) conformancecoverage.Observation {
+			_, err := ParseDescriptor(tc.payload)
+			if (err == nil) != tc.valid {
+				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("ParseDescriptor valid=%v, want %v: %v", err == nil, tc.valid, err)}
+			}
+			return conformancecoverage.Observation{}
+		})
 }
 
 func TestCanonicalRepositorySourceVectors(t *testing.T) {
@@ -61,6 +76,12 @@ func TestCanonicalRepositorySourceVectors(t *testing.T) {
 	}
 }
 
+type releasedSourceIdentityVector struct {
+	Input    string  `json:"input"`
+	Identity *string `json:"identity"`
+	Error    string  `json:"error"`
+}
+
 func TestReleasedSourceIdentityVectors(t *testing.T) {
 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
 	if root == "" {
@@ -70,16 +91,12 @@ func TestReleasedSourceIdentityVectors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var vectors []struct {
-		Input    string  `json:"input"`
-		Identity *string `json:"identity"`
-		Error    string  `json:"error"`
-	}
+	var vectors []releasedSourceIdentityVector
 	if err := json.Unmarshal(payload, &vectors); err != nil {
 		t.Fatal(err)
 	}
-	for _, vector := range vectors {
-		t.Run(vector.Input, func(t *testing.T) {
+	conformancecoverage.Run(t, "source-identities/vectors", vectors,
+		func(vector releasedSourceIdentityVector) string { return vector.Input }, func(t *testing.T, vector releasedSourceIdentityVector) {
 			source, err := ParseSource(vector.Input)
 			if vector.Identity == nil {
 				if err == nil {
@@ -94,7 +111,6 @@ func TestReleasedSourceIdentityVectors(t *testing.T) {
 				t.Fatalf("identity = %q, want %q", source.Identity, *vector.Identity)
 			}
 		})
-	}
 }
 
 func TestRepositorySourceRejectsNonRC5Forms(t *testing.T) {

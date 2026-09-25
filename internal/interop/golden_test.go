@@ -20,10 +20,12 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/relux-works/curator/internal/config"
+	"github.com/relux-works/curator/internal/conformancecoverage"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/identity"
@@ -172,6 +174,49 @@ func TestGoldenRegistryObjects(t *testing.T) {
 	}
 }
 
+type canonicalValidVectorCase struct {
+	Name      string         `json:"name"`
+	Input     map[string]any `json:"input"`
+	Canonical string         `json:"canonical_utf8"`
+}
+
+type canonicalInvalidVectorCase struct {
+	Name      string `json:"name"`
+	InputText string `json:"input_text"`
+}
+
+type sourceIdentityVectorCase struct {
+	Input    string  `json:"input"`
+	Identity *string `json:"identity"`
+	Error    string  `json:"error"`
+}
+
+type simpleValidityVectorCase struct {
+	ID    string
+	Input string `json:"input"`
+	Valid bool   `json:"valid"`
+}
+
+type managerConfigVectorCase struct {
+	Name     string                      `json:"name"`
+	Input    map[string]any              `json:"input"`
+	Valid    bool                        `json:"valid"`
+	Expected managerConfigVectorExpected `json:"expected"`
+}
+
+type managerConfigVectorExpected struct {
+	DefaultAgents            []string `json:"default_agents"`
+	AdapterMode              string   `json:"adapter_mode"`
+	ProjectAlias             string   `json:"project_alias"`
+	CheckoutAlias            string   `json:"checkout_alias"`
+	RegistryURLs             []string `json:"registry_urls"`
+	SnapshotMaxAgeSeconds    int      `json:"snapshot_max_age_seconds"`
+	SnapshotClockSkewSeconds int      `json:"snapshot_clock_skew_seconds"`
+	CacheTTLSeconds          int      `json:"cache_ttl_seconds"`
+	OfflineGraceSeconds      int      `json:"offline_grace_seconds"`
+	MaxRequestBytes          int      `json:"max_request_bytes"`
+}
+
 func TestCanonicalJSONVectors(t *testing.T) {
 	payload, err := os.ReadFile(golden(t, "vectors/canonical-valid.json"))
 	if err != nil {
@@ -179,50 +224,45 @@ func TestCanonicalJSONVectors(t *testing.T) {
 	}
 	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.UseNumber()
-	var cases []struct {
-		Name      string         `json:"name"`
-		Input     map[string]any `json:"input"`
-		Canonical string         `json:"canonical_utf8"`
-	}
+	var cases []canonicalValidVectorCase
 	if err := decoder.Decode(&cases); err != nil {
 		t.Fatal(err)
 	}
-	for _, testCase := range cases {
-		got, err := registry.CanonicalBytesChecked(testCase.Input)
-		if err != nil {
-			t.Fatalf("%s: %v", testCase.Name, err)
-		}
-		if string(got) != testCase.Canonical {
-			t.Fatalf("%s canonical bytes:\n got %s\nwant %s", testCase.Name, got, testCase.Canonical)
-		}
-	}
+	conformancecoverage.Run(t, "interop/canonical-valid-vectors", cases,
+		func(tc canonicalValidVectorCase) string { return tc.Name }, func(t *testing.T, testCase canonicalValidVectorCase) {
+			got, err := registry.CanonicalBytesChecked(testCase.Input)
+			if err != nil {
+				t.Fatalf("%s: %v", testCase.Name, err)
+			}
+			if string(got) != testCase.Canonical {
+				t.Fatalf("%s canonical bytes:\n got %s\nwant %s", testCase.Name, got, testCase.Canonical)
+			}
+		})
 
 	invalidPayload, err := os.ReadFile(golden(t, "vectors/canonical-invalid.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	var invalidCases []struct {
-		Name      string `json:"name"`
-		InputText string `json:"input_text"`
-	}
+	var invalidCases []canonicalInvalidVectorCase
 	if err := json.Unmarshal(invalidPayload, &invalidCases); err != nil {
 		t.Fatal(err)
 	}
-	for _, testCase := range invalidCases {
-		raw := []byte(testCase.InputText)
-		if err := protocoljson.Validate(raw); err != nil {
-			continue
-		}
-		var input map[string]any
-		decoder := json.NewDecoder(bytes.NewReader(raw))
-		decoder.UseNumber()
-		if err := decoder.Decode(&input); err != nil {
-			continue
-		}
-		if _, err := registry.CanonicalBytesChecked(input); err == nil {
-			t.Errorf("%s CCJ-1 input was accepted, want rejection", testCase.Name)
-		}
-	}
+	conformancecoverage.Run(t, "interop/canonical-invalid-vectors", invalidCases,
+		func(tc canonicalInvalidVectorCase) string { return tc.Name }, func(t *testing.T, testCase canonicalInvalidVectorCase) {
+			raw := []byte(testCase.InputText)
+			if err := protocoljson.Validate(raw); err != nil {
+				return
+			}
+			var input map[string]any
+			decoder := json.NewDecoder(bytes.NewReader(raw))
+			decoder.UseNumber()
+			if err := decoder.Decode(&input); err != nil {
+				t.Fatalf("protocoljson.Validate accepted input that JSON decoding rejects: %v", err)
+			}
+			if _, err := registry.CanonicalBytesChecked(input); err == nil {
+				t.Errorf("%s CCJ-1 input was accepted, want rejection", testCase.Name)
+			}
+		})
 }
 
 func TestSourceIdentityVectors(t *testing.T) {
@@ -230,34 +270,50 @@ func TestSourceIdentityVectors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var cases []struct {
-		Input    string  `json:"input"`
-		Identity *string `json:"identity"`
-		Error    string  `json:"error"`
-	}
+	var cases []sourceIdentityVectorCase
 	if err := json.Unmarshal(payload, &cases); err != nil {
 		t.Fatal(err)
 	}
-	for _, testCase := range cases {
-		got, err := identity.Parse(testCase.Input)
-		if testCase.Error != "" {
-			if err == nil {
-				t.Errorf("Parse(%q) = %q, want error %s", testCase.Input, got, testCase.Error)
-			}
-			continue
-		}
-		if err != nil {
-			t.Errorf("Parse(%q): %v", testCase.Input, err)
-			continue
-		}
-		want := ""
-		if testCase.Identity != nil {
-			want = *testCase.Identity
-		}
-		if got != want {
-			t.Errorf("Parse(%q) = %q, want %q", testCase.Input, got, want)
-		}
+	indexed := make([]struct {
+		ID   string
+		Case sourceIdentityVectorCase
+	}, len(cases))
+	for i, testCase := range cases {
+		indexed[i] = struct {
+			ID   string
+			Case sourceIdentityVectorCase
+		}{ID: "case-" + strconv.Itoa(i+1), Case: testCase}
 	}
+	conformancecoverage.Run(t, "interop/source-identity-vectors", indexed,
+		func(tc struct {
+			ID   string
+			Case sourceIdentityVectorCase
+		}) string {
+			return tc.ID
+		}, func(t *testing.T, row struct {
+			ID   string
+			Case sourceIdentityVectorCase
+		}) {
+			testCase := row.Case
+			got, err := identity.Parse(testCase.Input)
+			if testCase.Error != "" {
+				if err == nil {
+					t.Errorf("Parse(%q) = %q, want error %s", testCase.Input, got, testCase.Error)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("Parse(%q): %v", testCase.Input, err)
+				return
+			}
+			want := ""
+			if testCase.Identity != nil {
+				want = *testCase.Identity
+			}
+			if got != want {
+				t.Errorf("Parse(%q) = %q, want %q", testCase.Input, got, want)
+			}
+		})
 }
 
 func TestIdentifierVectors(t *testing.T) {
@@ -265,18 +321,26 @@ func TestIdentifierVectors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var cases []struct {
-		Input string `json:"input"`
-		Valid bool   `json:"valid"`
-	}
-	if err := json.Unmarshal(payload, &cases); err != nil {
+	var published []simpleValidityVectorCase
+	if err := json.Unmarshal(payload, &published); err != nil {
 		t.Fatal(err)
 	}
-	for _, testCase := range cases {
-		if got := identifiers.Valid(testCase.Input); got != testCase.Valid {
-			t.Errorf("identifier %q valid=%v, want %v", testCase.Input, got, testCase.Valid)
-		}
+	cases := indexSimpleCases(published)
+	conformancecoverage.Run(t, "interop/identifier-vectors", cases,
+		func(tc simpleValidityVectorCase) string { return tc.ID }, func(t *testing.T, testCase simpleValidityVectorCase) {
+			if got := identifiers.Valid(testCase.Input); got != testCase.Valid {
+				t.Errorf("identifier %q valid=%v, want %v", testCase.Input, got, testCase.Valid)
+			}
+		})
+}
+
+func indexSimpleCases(published []simpleValidityVectorCase) []simpleValidityVectorCase {
+	cases := make([]simpleValidityVectorCase, len(published))
+	for i, testCase := range published {
+		testCase.ID = "case-" + strconv.Itoa(i+1)
+		cases[i] = testCase
 	}
+	return cases
 }
 
 func TestLocaleSelectorVectors(t *testing.T) {
@@ -284,18 +348,17 @@ func TestLocaleSelectorVectors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var cases []struct {
-		Input string `json:"input"`
-		Valid bool   `json:"valid"`
-	}
-	if err := json.Unmarshal(payload, &cases); err != nil {
+	var published []simpleValidityVectorCase
+	if err := json.Unmarshal(payload, &published); err != nil {
 		t.Fatal(err)
 	}
-	for _, testCase := range cases {
-		if got := identifiers.ValidLocale(testCase.Input); got != testCase.Valid {
-			t.Errorf("locale selector %q valid=%v, want %v", testCase.Input, got, testCase.Valid)
-		}
-	}
+	cases := indexSimpleCases(published)
+	conformancecoverage.Run(t, "interop/locale-selector-vectors", cases,
+		func(tc simpleValidityVectorCase) string { return tc.ID }, func(t *testing.T, testCase simpleValidityVectorCase) {
+			if got := identifiers.ValidLocale(testCase.Input); got != testCase.Valid {
+				t.Errorf("locale selector %q valid=%v, want %v", testCase.Input, got, testCase.Valid)
+			}
+		})
 }
 
 func TestManagerConfigVectors(t *testing.T) {
@@ -303,28 +366,12 @@ func TestManagerConfigVectors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var cases []struct {
-		Name     string         `json:"name"`
-		Input    map[string]any `json:"input"`
-		Valid    bool           `json:"valid"`
-		Expected struct {
-			DefaultAgents            []string `json:"default_agents"`
-			AdapterMode              string   `json:"adapter_mode"`
-			ProjectAlias             string   `json:"project_alias"`
-			CheckoutAlias            string   `json:"checkout_alias"`
-			RegistryURLs             []string `json:"registry_urls"`
-			SnapshotMaxAgeSeconds    int      `json:"snapshot_max_age_seconds"`
-			SnapshotClockSkewSeconds int      `json:"snapshot_clock_skew_seconds"`
-			CacheTTLSeconds          int      `json:"cache_ttl_seconds"`
-			OfflineGraceSeconds      int      `json:"offline_grace_seconds"`
-			MaxRequestBytes          int      `json:"max_request_bytes"`
-		} `json:"expected"`
-	}
+	var cases []managerConfigVectorCase
 	if err := json.Unmarshal(payload, &cases); err != nil {
 		t.Fatal(err)
 	}
-	for _, testCase := range cases {
-		t.Run(testCase.Name, func(t *testing.T) {
+	conformancecoverage.Run(t, "interop/manager-config-vectors", cases,
+		func(tc managerConfigVectorCase) string { return tc.Name }, func(t *testing.T, testCase managerConfigVectorCase) {
 			parsed, err := config.Parse(testCase.Input, "config.json")
 			if !testCase.Valid {
 				if err == nil {
@@ -362,7 +409,6 @@ func TestManagerConfigVectors(t *testing.T) {
 				t.Fatalf("audit defaults = %+v, want %+v", parsed.Audit, testCase.Expected)
 			}
 		})
-	}
 }
 
 func TestGoldenFederationSemantics(t *testing.T) {

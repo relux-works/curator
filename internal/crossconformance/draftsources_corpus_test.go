@@ -8,24 +8,21 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/conformancecoverage"
 )
 
 // draftSourcesPin is the exact curator-spec revision the vendored draft
-// corpus is taken from. Consumer schema pinning: the corpus bytes,
-// the case counts, and the per-case rows below are all asserted against
-// this revision, so the gate runs the draft suites without needing a
-// SPEC_PIN that publishes them (the committed SPEC_PIN predates the
-// draft corpus; promoting it is release qualification's own decision).
-const draftSourcesPin = "802caee548ddc8b19408746d26c7972d39b39cc2"
+// corpus is taken from. The draft corpus lives beside conformance/v1, so it
+// keeps an explicit byte pin even though this campaign's SPEC_PIN selects the
+// same revision.
+const draftSourcesPin = "dcc7f015e2d97edf2d52928afb6fd79ec8129e8b"
 
 // Accepted-contract counts (a4fcaf0) and pinned counts (draftSourcesPin).
 // The delta is purely additive (transport revision 2), so the pinned
 // corpus covers the acceptance corpus as a subset; the tests assert
 // both the exact pinned counts and the subset membership.
 const (
-	wantSchemaCases   = 115
-	wantSemanticCases = 94
-	wantSnapshotCases = 3
 	wantACSchemaCases = 102
 	wantACSemantic    = 73
 )
@@ -171,9 +168,13 @@ func TestDraftSourcesPin(t *testing.T) {
 // (a4fcaf0) case lists are covered by the pinned corpus.
 func TestDraftSourcesCorpusCounts(t *testing.T) {
 	dir := draftCorpusDir(t)
+	countPins, _, err := conformancecoverage.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
 	entries := loadDraftIndex(t)
-	if len(entries) != wantSchemaCases {
-		t.Fatalf("schema cases = %d, want %d at pin %s", len(entries), wantSchemaCases, draftSourcesPin)
+	if len(entries) != countPins["draft-sources-v1/schema-cases"] {
+		t.Fatalf("schema cases = %d, want %d at pin %s", len(entries), countPins["draft-sources-v1/schema-cases"], draftSourcesPin)
 	}
 	instances := map[string]bool{}
 	for _, entry := range entries {
@@ -183,8 +184,8 @@ func TestDraftSourcesCorpusCounts(t *testing.T) {
 		}
 	}
 	semantic := loadDraftSemantic(t)
-	if len(semantic) != wantSemanticCases {
-		t.Fatalf("semantic cases = %d, want %d at pin %s", len(semantic), wantSemanticCases, draftSourcesPin)
+	if len(semantic) != countPins["draft-sources-v1/semantic-cases"] {
+		t.Fatalf("semantic cases = %d, want %d at pin %s", len(semantic), countPins["draft-sources-v1/semantic-cases"], draftSourcesPin)
 	}
 	ids := map[string]bool{}
 	for _, c := range semantic {
@@ -194,8 +195,8 @@ func TestDraftSourcesCorpusCounts(t *testing.T) {
 		ids[c.ID] = true
 	}
 	vectors := loadDraftSnapshots(t)
-	if len(vectors) != wantSnapshotCases {
-		t.Fatalf("snapshot vectors = %d, want %d at pin %s", len(vectors), wantSnapshotCases, draftSourcesPin)
+	if len(vectors) != countPins["draft-sources-v1/snapshot-cases"] {
+		t.Fatalf("snapshot vectors = %d, want %d at pin %s", len(vectors), countPins["draft-sources-v1/snapshot-cases"], draftSourcesPin)
 	}
 	acSchema := readDraftLines(t, filepath.Join(draftSourcesTestdata, "ac-schema-cases.txt"))
 	if len(acSchema) != wantACSchemaCases {

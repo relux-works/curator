@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/relux-works/curator/internal/buildsource"
+	"github.com/relux-works/curator/internal/conformancecoverage"
 )
 
 // moduleRootsFixture is a frozen multi-module snapshot: one build root whose
@@ -734,8 +735,8 @@ func TestModuleRootVectorsDriveTheWholeBuild(t *testing.T) {
 	if len(suite.Cases) == 0 {
 		t.Fatal("the module-roots vector family published no cases")
 	}
-	for _, testCase := range suite.Cases {
-		t.Run(testCase.Name, func(t *testing.T) {
+	conformancecoverage.Run(t, "module-roots/vectors", suite.Cases,
+		func(testCase moduleRootVectorCase) string { return testCase.Name }, func(t *testing.T, testCase moduleRootVectorCase) {
 			fixture := newVectorFixture(t, testCase)
 			fixture.start(stubScript{
 				ListStdout: string(encodePackages(t, fixture.rootPackage())),
@@ -766,7 +767,6 @@ func TestModuleRootVectorsDriveTheWholeBuild(t *testing.T) {
 				t.Fatalf("code = %q, want %s (error %v)", code, testCase.ExpectedError, buildErr)
 			}
 		})
-	}
 }
 
 // newVectorFixture materializes one vector's snapshot and presents its

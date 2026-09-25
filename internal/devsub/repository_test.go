@@ -1,10 +1,13 @@
 package devsub
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/conformancecoverage"
 )
 
 func TestSchema2BuildRepositorySubstitutions(t *testing.T) {
@@ -27,7 +30,7 @@ func TestSchema2BuildRepositorySubstitutions(t *testing.T) {
 	}
 }
 
-func TestReleasedSchema2Cases(t *testing.T) {
+func TestSkillfileDevV2PublishedCasesUseCoverageRatchet(t *testing.T) {
 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
 	if root == "" {
 		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
@@ -40,22 +43,34 @@ func TestReleasedSchema2Cases(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	type schemaCase struct {
+		name    string
+		valid   bool
+		payload []byte
+	}
+	cases := make([]schemaCase, 0, len(entries))
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
 			continue
 		}
-		t.Run(entry.Name(), func(t *testing.T) {
-			payload, err := os.ReadFile(filepath.Join(directory, entry.Name()))
-			if err != nil {
-				t.Fatal(err)
-			}
-			_, err = ParseManifestBytes(payload, "/project")
-			wantValid := strings.HasPrefix(entry.Name(), "valid")
-			if (err == nil) != wantValid {
-				t.Fatalf("valid=%v, error=%v", wantValid, err)
-			}
+		payload, err := os.ReadFile(filepath.Join(directory, entry.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		cases = append(cases, schemaCase{
+			name:    entry.Name(),
+			valid:   strings.HasPrefix(entry.Name(), "valid"),
+			payload: payload,
 		})
 	}
+	conformancecoverage.RunOutcomes(t, "skillfile-dev-v2/schema-cases", cases,
+		func(tc schemaCase) string { return tc.name }, func(_ *testing.T, tc schemaCase) conformancecoverage.Observation {
+			_, err := ParseManifestBytes(tc.payload, "/project")
+			if (err == nil) != tc.valid {
+				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("ParseManifestBytes valid=%v, want %v: %v", err == nil, tc.valid, err)}
+			}
+			return conformancecoverage.Observation{}
+		})
 }
 
 func TestSchema2BuildRepositorySubstitutionClosedShape(t *testing.T) {

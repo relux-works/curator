@@ -7,16 +7,15 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strconv"
 	"testing"
 )
 
 //go:embed testdata/executable_identity_cases.json
-var executableIdentityFixture embed.FS
+var pinnedExecutableIdentityFixture embed.FS
 
-const executableIdentityFixtureSHA256 = "sha256:124e00757b3add8c2ba639a8403cba97eec7f5d1bdd923d14b51db9a104292a2"
+const pinnedExecutableIdentityFixtureSHA256 = "sha256:124e00757b3add8c2ba639a8403cba97eec7f5d1bdd923d14b51db9a104292a2"
 
-type executableIdentityCase struct {
+type pinnedExecutableIdentityCase struct {
 	Accepted       bool    `json:"accepted"`
 	AdditionalLink string  `json:"additional_links"`
 	Interpreter    *string `json:"interpreter"`
@@ -30,80 +29,48 @@ type executableIdentityCase struct {
 	Use            string  `json:"use"`
 }
 
-// TestExecutableIdentityCasesAtProductionEntry drives the pinned executable
-// identity cases through the same Windows-platform derivation and interpreter
-// resolvers used by Launch. Injecting Windows plus SYSTEMROOT keeps the
-// manager-capture boundary testable on non-Windows hosts.
-func TestExecutableIdentityCasesAtProductionEntry(t *testing.T) {
-	payload, err := executableIdentityFixture.ReadFile("testdata/executable_identity_cases.json")
+// TestUncapturedSystemRootHardlinkRegression proves an ambient SYSTEMROOT
+// cannot authorize the System32 hard-link exception. The exhaustive family
+// driver accounts for the other published cases, including known gaps.
+func TestUncapturedSystemRootHardlinkRegression(t *testing.T) {
+	payload, err := pinnedExecutableIdentityFixture.ReadFile("testdata/executable_identity_cases.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	digest := sha256.Sum256(payload)
-	if got := "sha256:" + hex.EncodeToString(digest[:]); got != executableIdentityFixtureSHA256 {
-		t.Fatalf("executable identity fixture digest = %s, want %s", got, executableIdentityFixtureSHA256)
+	if got := "sha256:" + hex.EncodeToString(digest[:]); got != pinnedExecutableIdentityFixtureSHA256 {
+		t.Fatalf("executable identity fixture digest = %s, want %s", got, pinnedExecutableIdentityFixtureSHA256)
 	}
-	var cases []executableIdentityCase
+	var cases []pinnedExecutableIdentityCase
 	if err := json.Unmarshal(payload, &cases); err != nil {
 		t.Fatal(err)
 	}
 	if len(cases) != 8 {
 		t.Fatalf("executable identity case count = %d, want 8", len(cases))
 	}
-	seen := make(map[string]struct{}, len(cases))
-	for _, testCase := range cases {
-		testCase := testCase
-		if _, ok := seen[testCase.Name]; ok {
-			t.Fatalf("duplicate executable identity case %q", testCase.Name)
+	var target *pinnedExecutableIdentityCase
+	for i := range cases {
+		if cases[i].Name != "windows-exec-uncaptured-systemroot-hardlinks" {
+			continue
 		}
-		seen[testCase.Name] = struct{}{}
-		t.Run(testCase.Name, func(t *testing.T) {
-			if testCase.Platform != "windows" {
-				t.Fatalf("case platform = %q, want windows", testCase.Platform)
-			}
-			switch testCase.Use {
-			case "interpreter":
-				if testCase.Interpreter == nil {
-					t.Fatal("interpreter case has no interpreter id")
-				}
-				fixture := newLaunchFixture(t, os.Args[0])
-				interpreterPath := fixture.request.Interpreters[*testCase.Interpreter]
-				if interpreterPath == "" {
-					t.Fatalf("fixture has no interpreter %q", *testCase.Interpreter)
-				}
-				alias := filepath.Join(t.TempDir(), filepath.Base(interpreterPath)+"-alias")
-				if err := os.Link(interpreterPath, alias); err != nil {
-					t.Fatalf("create interpreter hard-link fixture: %v", err)
-				}
-				_, err := ResolveInterpreter(*testCase.Interpreter, fixture.request.Interpreters, fixture.request.ForbiddenRoots)
-				if testCase.Accepted {
-					if err != nil {
-						t.Fatalf("ResolveInterpreter refused accepted case: %v", err)
-					}
-				} else if DiagnosticCode(err) != CodeWorkerIdentityInvalid {
-					t.Fatalf("ResolveInterpreter error = %v, want %s", err, CodeWorkerIdentityInvalid)
-				}
-			case "declared-exec-name":
-				got := driveDeclaredExecIdentityCase(t, testCase)
-				want := testCase.Accepted
-				// These two negatives remain owned gaps in the existing R5
-				// conformance ledger; preserve their current behavior here.
-				switch testCase.Name {
-				case "windows-exec-noncomponent-store-hardlinks", "windows-exec-unowned-file-hardlinks":
-					want = true
-				}
-				if got != want {
-					t.Fatalf("production resolver accepted = %s, want %s (reason %s; platform_owned=%s)",
-						strconv.FormatBool(got), strconv.FormatBool(want), testCase.Reason, strconv.FormatBool(testCase.PlatformOwned))
-				}
-			default:
-				t.Fatalf("unsupported executable identity use %q", testCase.Use)
-			}
-		})
+		if target != nil {
+			t.Fatal("pinned identity fixture repeats the uncaptured-SystemRoot case")
+		}
+		target = &cases[i]
+	}
+	if target == nil {
+		t.Fatal("pinned identity fixture omits the uncaptured-SystemRoot case")
+	}
+	if target.Platform != "windows" || target.Use != "declared-exec-name" ||
+		target.Accepted || target.SystemRoot == nil || *target.SystemRoot != "caller-or-package-value" {
+		t.Fatalf("uncaptured-SystemRoot case has unexpected contract: %+v", *target)
+	}
+	if drivePinnedDeclaredExecIdentityCase(t, *target) {
+		t.Fatalf("production resolver accepted uncaptured SystemRoot hard-link case (reason %s)", target.Reason)
 	}
 }
 
-func driveDeclaredExecIdentityCase(t *testing.T, testCase executableIdentityCase) bool {
+func drivePinnedDeclaredExecIdentityCase(t *testing.T, testCase pinnedExecutableIdentityCase) bool {
 	t.Helper()
 	fixture := newLaunchFixture(t, os.Args[0])
 	root := mustPhysical(t, t.TempDir())

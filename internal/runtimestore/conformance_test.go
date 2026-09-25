@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/conformancecoverage"
 )
 
 func TestCandidateManagerLauncherContract(t *testing.T) {
@@ -18,14 +20,7 @@ func TestCandidateManagerLauncherContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	var document struct {
-		LauncherCases []struct {
-			Name                  string   `json:"name"`
-			Platforms             []string `json:"platforms"`
-			ForwardArguments      bool     `json:"forward_arguments"`
-			PreserveExitStatus    bool     `json:"preserve_exit_status"`
-			PreserveInheritedPath bool     `json:"preserve_inherited_path"`
-			RequiredPathRoles     []string `json:"required_path_roles"`
-		} `json:"launcher_cases"`
+		LauncherCases []authoritativeLauncherCase `json:"launcher_cases"`
 	}
 	if err := json.Unmarshal(payload, &document); err != nil {
 		t.Fatal(err)
@@ -34,17 +29,19 @@ func TestCandidateManagerLauncherContract(t *testing.T) {
 		"skill-command-without-shell-activation":  false,
 		"declared-system-command-without-profile": false,
 	}
-	for _, testCase := range document.LauncherCases {
-		if _, relevant := wantCases[testCase.Name]; !relevant {
-			continue
-		}
-		wantCases[testCase.Name] = true
-		if !testCase.ForwardArguments || !testCase.PreserveExitStatus || !testCase.PreserveInheritedPath ||
-			strings.Join(testCase.Platforms, ",") != "unix,windows" ||
-			strings.Join(testCase.RequiredPathRoles, ",") != "command_directory,implementation_runtime,system_dependencies" {
-			t.Fatalf("candidate launcher contract changed: %+v", testCase)
-		}
-	}
+	conformancecoverage.RunOutcomes(t, "manager-lifecycle/launcher-cases", document.LauncherCases,
+		func(tc authoritativeLauncherCase) string { return tc.Name }, func(t *testing.T, testCase authoritativeLauncherCase) conformancecoverage.Observation {
+			if _, relevant := wantCases[testCase.Name]; !relevant {
+				return conformancecoverage.Observation{BoundReason: "launcher case is outside this runtime-store contract check"}
+			}
+			wantCases[testCase.Name] = true
+			if !testCase.ForwardArguments || !testCase.PreserveExitStatus || !testCase.PreserveInheritedPath ||
+				strings.Join(testCase.Platforms, ",") != "unix,windows" ||
+				strings.Join(testCase.RequiredPathRoles, ",") != "command_directory,implementation_runtime,system_dependencies" {
+				t.Fatalf("candidate launcher contract changed: %+v", testCase)
+			}
+			return conformancecoverage.Observation{}
+		})
 	for name, found := range wantCases {
 		if !found {
 			t.Fatalf("candidate launcher case %q is absent", name)

@@ -13,24 +13,28 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/relux-works/curator/internal/conformancecoverage"
 	"github.com/relux-works/curator/internal/gitops"
 	"github.com/relux-works/curator/internal/hashing"
 )
 
+// snapshotAcquisitionCase mirrors one case of vectors/snapshot-acquisition.json.
+type snapshotAcquisitionCase struct {
+	Name           string `json:"name"`
+	Fixture        string `json:"fixture"`
+	Expected       string `json:"expected"`
+	ExpectedSHA256 string `json:"expected_sha256"`
+	Files          []struct {
+		Path   string `json:"path"`
+		Bytes  int64  `json:"bytes"`
+		SHA256 string `json:"sha256"`
+	} `json:"files"`
+}
+
 // snapshotAcquisitionVector mirrors vectors/snapshot-acquisition.json
 // (environments §1.2). Fields the test does not consume are left undeclared.
 type snapshotAcquisitionVector struct {
-	Cases []struct {
-		Name           string `json:"name"`
-		Fixture        string `json:"fixture"`
-		Expected       string `json:"expected"`
-		ExpectedSHA256 string `json:"expected_sha256"`
-		Files          []struct {
-			Path   string `json:"path"`
-			Bytes  int64  `json:"bytes"`
-			SHA256 string `json:"sha256"`
-		} `json:"files"`
-	} `json:"cases"`
+	Cases []snapshotAcquisitionCase `json:"cases"`
 }
 
 func acquisitionGit(t *testing.T, dir string, args ...string) string {
@@ -69,8 +73,8 @@ func TestConformanceSnapshotAcquisition(t *testing.T) {
 	if len(vector.Cases) == 0 {
 		t.Fatalf("%s declares no cases", vectorPath)
 	}
-	for _, tc := range vector.Cases {
-		t.Run(tc.Name, func(t *testing.T) {
+	conformancecoverage.Run(t, "snapshot-acquisition/cases", vector.Cases,
+		func(tc snapshotAcquisitionCase) string { return tc.Name }, func(t *testing.T, tc snapshotAcquisitionCase) {
 			fixture := rootPath(t, root, tc.Fixture)
 			wantHash := readRootFile(t, root, tc.Expected)
 			if wantHash != tc.ExpectedSHA256 {
@@ -157,5 +161,4 @@ func TestConformanceSnapshotAcquisition(t *testing.T) {
 				})
 			}
 		})
-	}
 }

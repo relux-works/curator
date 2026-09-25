@@ -7,9 +7,43 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/relux-works/curator/internal/conformancecoverage"
 	"github.com/relux-works/curator/internal/contextaudit"
 	"github.com/relux-works/curator/internal/contextpkg"
 )
+
+type contextDetectorCase struct {
+	Name           string                  `json:"name"`
+	PackageKind    string                  `json:"package_kind"`
+	Pin            string                  `json:"pin"`
+	ContentHashPin bool                    `json:"content_hash_pin"`
+	Files          map[string]string       `json:"files"`
+	Waivers        []contextDetectorWaiver `json:"waivers"`
+	Expected       contextDetectorExpected `json:"expected"`
+}
+
+type contextDetectorWaiver struct {
+	Pin    string `json:"pin"`
+	File   string `json:"file"`
+	Span   [2]int `json:"span"`
+	Reason string `json:"reason"`
+}
+
+type contextDetectorExpected struct {
+	Installs bool                     `json:"installs"`
+	Findings []contextDetectorFinding `json:"findings"`
+	Warnings []map[string]any         `json:"warnings"`
+}
+
+type contextDetectorFinding struct {
+	Class        string `json:"class"`
+	File         string `json:"file"`
+	Pattern      string `json:"pattern"`
+	Severity     string `json:"severity"`
+	Span         [2]int `json:"span"`
+	Waived       bool   `json:"waived"`
+	WaiverReason string `json:"waiver_reason"`
+}
 
 type contextDetectorsVector struct {
 	PatternClasses []struct {
@@ -18,33 +52,8 @@ type contextDetectorsVector struct {
 		Group             int    `json:"group"`
 		PlaceholderPrefix string `json:"placeholder_prefix"`
 	} `json:"pattern_classes"`
-	Scope []string `json:"scope"`
-	Cases []struct {
-		Name           string            `json:"name"`
-		PackageKind    string            `json:"package_kind"`
-		Pin            string            `json:"pin"`
-		ContentHashPin bool              `json:"content_hash_pin"`
-		Files          map[string]string `json:"files"`
-		Waivers        []struct {
-			Pin    string `json:"pin"`
-			File   string `json:"file"`
-			Span   [2]int `json:"span"`
-			Reason string `json:"reason"`
-		} `json:"waivers"`
-		Expected struct {
-			Installs bool `json:"installs"`
-			Findings []struct {
-				Class        string `json:"class"`
-				File         string `json:"file"`
-				Pattern      string `json:"pattern"`
-				Severity     string `json:"severity"`
-				Span         [2]int `json:"span"`
-				Waived       bool   `json:"waived"`
-				WaiverReason string `json:"waiver_reason"`
-			} `json:"findings"`
-			Warnings []map[string]any `json:"warnings"`
-		} `json:"expected"`
-	} `json:"cases"`
+	Scope []string              `json:"scope"`
+	Cases []contextDetectorCase `json:"cases"`
 }
 
 // TestConformanceContextDetectors drives contextaudit.Detect — the production
@@ -84,8 +93,8 @@ func TestConformanceContextDetectors(t *testing.T) {
 			}
 		}
 	})
-	for _, tc := range vector.Cases {
-		t.Run(tc.Name, func(t *testing.T) {
+	conformancecoverage.Run(t, "context-detectors/cases", vector.Cases,
+		func(tc contextDetectorCase) string { return tc.Name }, func(t *testing.T, tc contextDetectorCase) {
 			snapshot := t.TempDir()
 			for path, content := range tc.Files {
 				full := filepath.Join(snapshot, filepath.FromSlash(path))
@@ -150,5 +159,4 @@ func TestConformanceContextDetectors(t *testing.T) {
 				t.Fatalf("warnings %v, want %v", gotWarnings, tc.Expected.Warnings)
 			}
 		})
-	}
 }

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/relux-works/curator/internal/conformancecoverage"
 	"github.com/relux-works/curator/internal/contextpkg"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/protocoljson"
@@ -291,30 +292,33 @@ func TestFragmentAuthoritativeSchemaCases(t *testing.T) {
 	if err := json.Unmarshal(payload, &entries); err != nil {
 		t.Fatal(err)
 	}
-	seen := 0
+	type indexedCase struct {
+		Name  string
+		Path  string
+		Valid bool
+	}
+	var cases []indexedCase
 	for _, entry := range entries {
 		if !strings.HasPrefix(entry.Instance, "launch-env-fragment-v1/") {
 			continue
 		}
 		name := strings.TrimPrefix(entry.Instance, "launch-env-fragment-v1/")
-		seen++
-		t.Run(name, func(t *testing.T) {
-			raw, err := os.ReadFile(filepath.Join(root, "schema-cases", entry.Instance)) // #nosec G304 -- explicit conformance input
+		cases = append(cases, indexedCase{Name: name, Path: entry.Instance, Valid: entry.Valid})
+	}
+	conformancecoverage.Run(t, "launch-env-fragment-v1/schema-cases", cases,
+		func(tc indexedCase) string { return tc.Name }, func(t *testing.T, tc indexedCase) {
+			raw, err := os.ReadFile(filepath.Join(root, "schema-cases", tc.Path)) // #nosec G304 -- explicit conformance input
 			if err != nil {
 				t.Fatal(err)
 			}
 			err = validateFragmentCase(raw, "/manager/environments")
-			if entry.Valid && err != nil {
+			if tc.Valid && err != nil {
 				t.Fatalf("valid case rejected: %v", err)
 			}
-			if !entry.Valid && err == nil {
+			if !tc.Valid && err == nil {
 				t.Fatal("invalid case accepted")
 			}
 		})
-	}
-	if seen == 0 {
-		t.Fatal("the root publishes no launch-env-fragment-v1 cases")
-	}
 }
 
 // TestFragmentEmissionMatchesReference proves the production emitter

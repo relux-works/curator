@@ -16,7 +16,7 @@
 # `CI_REQUIRE_FULL_ROOT=1` asserts in the candidate lane, so a candidate run can
 # never report success while a package quietly ran without its vectors.
 #
-# The committed SPEC_PIN is now such a root: it publishes every artefact this
+# The committed SPEC_PIN is such a root: it publishes every artefact this
 # table declares, so `suite-plan.sh` defers nothing on the default lanes either
 # and the deferred column of the plan is empty on every hosted runner. The
 # deferral shapes below are therefore the CANDIDATE story and the partial-root
@@ -55,14 +55,24 @@
 #   package  artefact[,artefact...]  note
 #
 # package	artefacts	note
+cmd/curator	vectors/umbrella-provider-resolution.json,vectors/manager-lifecycle.json	TestUmbrellaProviderResolutionVectors and both authoritative lifecycle consumers execute complete published case families
 internal/buildsource	vectors/build-drivers.json	TestBuildSourceConformanceVectors reads the vector directly
+internal/buildrepo	schema-cases/skill-build-v1,fixtures/external-repository/raw-objects.json,fixtures/external-repository/lfs-pointers.json,fixtures/external-repository/pack-index.json,fixtures/external-repository/local-config-and-refs.json,vectors/source-identities.json	complete skill-build-v1 and external-repository case consumers plus every published source identity
+internal/devsub	schema-cases/skillfile-dev-v2	TestSkillfileDevV2PublishedCasesUseCoverageRatchet drives every published developer Skillfile schema case
+internal/godriver	vectors/build-drivers.json,vectors/go-host-execution-policy.json,vectors/module-roots.json	full-list go-v1 identity, policy and module-root consumers read each published case
 internal/buildcache	vectors/build-drivers.json	TestCandidateCacheOutcomeVocabulary reads the vector directly
 internal/scopes	vectors/external-repository-lifecycle.json	TestAuthoritativeGarbageCollectionRootsAreRetained reads the vector directly
+internal/closure	vectors/closures.json,vectors/manager-lifecycle.json	TestClosureOrderingConformanceVector and TestBuildCommandOrderingConformanceVector read every case group they bind
+internal/runtimestore	vectors/manager-lifecycle.json	launcher contract consumers bind the complete launcher_cases family
+internal/contextmaterialize	vectors/environments.json	TestSystemModuleAdmissionVectors binds the published materialization family
 internal/marker	schema-cases/install-marker-v2,schema-cases/install-marker-v4,expected/build-driver/marker.json	the marker v2 and v4 schema cases and the authoritative compiled marker
 internal/whitelist	fixtures/go-build-skill,expected/build-driver/context_files.json	the build-root context exclusion fixture and its expected file list
 internal/moduleroots	vectors/module-roots.json	TestModuleRootVectors reads the vector directly
+internal/scriptworker	vectors/script-host-execution-policy.json	TestExecutableIdentityCasesAtProductionEntry drives the published executable identity cases through the manager resolver
 internal/scriptpolicy	vectors/script-host-execution-policy.json	the schema-8 script execution-policy family is read directly by every case in conformance_test.go
-internal/skillspec	schema-cases/agent-skill-v6,schema-cases/agent-skill-v8,schema-cases/csk-skill-v8,fixtures/go-build-skill	the schema v6 cases, BOTH schema-8 manifest families and the go-build skill fixture
+internal/envprofile	vectors/environments-env-passthrough.json	TestEnvironmentsEnvPassthroughVectors consumes every published case group
+internal/shell	vectors/shell-hook-trust.json	TestShellHookTrustVectors consumes every published trust case
+internal/skillspec	schema-cases/agent-skill-v6,schema-cases/agent-skill-v7,schema-cases/csk-skill-v7,schema-cases/agent-skill-v8,schema-cases/csk-skill-v8,vectors/portable-paths.json,fixtures/go-build-skill	the schema v6 and v7 cases, BOTH schema-8 manifest families, portable-path vectors and the go-build skill fixture
 internal/install	vectors/build-drivers.json,vectors/manager-lifecycle.json	TestAuthoritativeCacheOutcomesDriveInstallation and the dry-run bindings read the vectors directly
 internal/envfragment	schema-cases/launch-env-fragment-v1	TestFragmentAuthoritativeSchemaCases and TestFragmentEmissionMatchesReference read the fragment family directly
 internal/envmarker	schema-cases/agent-environment-marker-v1	TestParseAuthoritativeEnvMarkerSchemaCases reads the marker family directly

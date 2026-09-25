@@ -2,10 +2,13 @@ package envmarker
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/conformancecoverage"
 )
 
 // schemaIndexEntry is one row of the published schema-cases index.
@@ -15,11 +18,16 @@ type schemaIndexEntry struct {
 	Valid    bool   `json:"valid"`
 }
 
+type namedSchemaCase struct {
+	Name  string
+	Valid bool
+}
+
 // schemaCaseValidity loads the published index and reports the recorded
 // validity of each instance in the family. The index — not the file-name
 // prefix — decides: an unindexed file fails the test instead of silently
 // passing or skipping.
-func schemaCaseValidity(t *testing.T, root, family string) map[string]bool {
+func schemaCaseValidity(t *testing.T, root, family string) []namedSchemaCase {
 	t.Helper()
 	payload, err := os.ReadFile(filepath.Join(root, "schema-cases", "index.json")) // #nosec G304 -- explicit conformance input
 	if err != nil {
@@ -29,14 +37,14 @@ func schemaCaseValidity(t *testing.T, root, family string) map[string]bool {
 	if err := json.Unmarshal(payload, &entries); err != nil {
 		t.Fatal(err)
 	}
-	validity := map[string]bool{}
+	var cases []namedSchemaCase
 	indexed := map[string]bool{}
 	for _, entry := range entries {
 		if !strings.HasPrefix(entry.Instance, family+"/") {
 			continue
 		}
 		name := strings.TrimPrefix(entry.Instance, family+"/")
-		validity[name] = entry.Valid
+		cases = append(cases, namedSchemaCase{Name: name, Valid: entry.Valid})
 		indexed[name] = true
 	}
 	disk, err := os.ReadDir(filepath.Join(root, "schema-cases", family))
@@ -60,7 +68,7 @@ func schemaCaseValidity(t *testing.T, root, family string) map[string]bool {
 	if seen == 0 {
 		t.Fatalf("the root publishes schema-cases/%s but it contains no cases", family)
 	}
-	return validity
+	return cases
 }
 
 // TestParseAuthoritativeEnvMarkerSchemaCases runs the published
@@ -75,20 +83,20 @@ func TestParseAuthoritativeEnvMarkerSchemaCases(t *testing.T) {
 	if root == "" {
 		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
 	}
-	validity := schemaCaseValidity(t, root, "agent-environment-marker-v1")
-	for name, wantValid := range validity {
-		t.Run(name, func(t *testing.T) {
-			payload, err := os.ReadFile(filepath.Join(root, "schema-cases", "agent-environment-marker-v1", name)) // #nosec G304 -- explicit conformance input
+	cases := schemaCaseValidity(t, root, "agent-environment-marker-v1")
+	conformancecoverage.RunOutcomes(t, "agent-environment-marker-v1/schema-cases", cases,
+		func(tc namedSchemaCase) string { return tc.Name }, func(t *testing.T, tc namedSchemaCase) conformancecoverage.Observation {
+			payload, err := os.ReadFile(filepath.Join(root, "schema-cases", "agent-environment-marker-v1", tc.Name)) // #nosec G304 -- explicit conformance input
 			if err != nil {
 				t.Fatal(err)
 			}
 			_, err = Parse(payload)
-			if wantValid && err != nil {
-				t.Fatalf("valid case rejected: %v", err)
+			if tc.Valid && err != nil {
+				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("Parse rejected published-valid case: %v", err)}
 			}
-			if !wantValid && err == nil {
-				t.Fatalf("invalid case accepted")
+			if !tc.Valid && err == nil {
+				return conformancecoverage.Observation{FailureReason: "Parse accepted published-invalid case"}
 			}
+			return conformancecoverage.Observation{}
 		})
-	}
 }
