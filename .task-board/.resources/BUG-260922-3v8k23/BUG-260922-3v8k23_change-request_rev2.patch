@@ -1,0 +1,460 @@
+diff --git a/.github/ci/gate-selftest.sh b/.github/ci/gate-selftest.sh
+index 3def74a6..7e696d21 100755
+--- a/.github/ci/gate-selftest.sh
++++ b/.github/ci/gate-selftest.sh
+@@ -6,9 +6,9 @@
+ # asserts a REAL exit code for every case -- including the negative cases,
+ # which are the ones a gate silently loses when it is refactored.
+ #
+-# It needs no conformance root, no network and no Go build. The handful of
+-# cases that need a `go` launcher are named and reported when one is absent,
+-# never quietly dropped.
++# It needs no conformance root or network. One timeout regression builds and
++# runs a tiny synthetic Go package; cases that need a `go` launcher are named
++# and reported when one is absent, never quietly dropped.
+ #
+ # Usage:
+ #   gate-selftest.sh
+@@ -667,75 +667,239 @@ make_stub "$WANT_GO" local "$WORK/user.env"
+ assert 'a per-user go env file is rejected'         1 env PATH="$STUBROOT/bin:$PATH" bash "$TI"
+ 
+ echo ''
+-echo '=== ci.yml: every windows lane that runs test-gate.sh buys the slower runner its own budget ==='
++echo '=== ci.yml: every test-gate lane pins its per-package timeout ==='
+ 
+-# A per-package timeout is a hosted-runner budget, and the Windows runner needs
+-# a bigger one than the unix runners for the same passing work. That budget
+-# lives in the workflow, so a refactor can drop it without any gate noticing --
+-# the run just dies at the old deadline and the ledger reports the truncated
+-# cases as cases that never ran. These cases read the wiring back.
+-#
+-# Emits one "<job> <windows-lane?> <has-timeout?>" record per test-gate.sh step.
++# Every workflow lane must retain the selected deadline. The matrix expression
++# covers its Windows value explicitly; fixed-host and race lanes are pinned
++# separately. Adding a lane or changing a timeout requires updating these pins.
+ gate_lane_records() {
+ 	awk '
+-		/^  [a-z][a-z0-9-]*:[ \t\r]*$/ { job = $1; sub(/:[ \t\r]*$/, "", job) }
+-		/^[ \t]*os:[ \t]*\[/           { if ($0 ~ /windows-latest/) win[job] = 1 }
+-		/^      - name:/               { timeout = 0 }
+-		/^[ \t]*GO_TEST_TIMEOUT:/      { timeout = 1 }
++		/^  [a-z][a-z0-9-]*:[ \t\r]*$/ {
++			job = $1
++			sub(/:[ \t\r]*$/, "", job)
++		}
++		/^      - name:/ {
++			step = $0
++			sub(/^      - name:[ \t]*/, "", step)
++			timeout = ""
++		}
++		/^[ \t]*GO_TEST_TIMEOUT:/ {
++			timeout = $0
++			sub(/^[ \t]*GO_TEST_TIMEOUT:[ \t]*/, "", timeout)
++			sub(/[ \t\r]*$/, "", timeout)
++		}
+ 		/test-gate\.sh/ && /^[ \t]*run:/ {
+-			printf "%s %d %d\n", job, (win[job] ? 1 : 0), timeout
++			printf "%s\t%s\t%s\n", job, step, timeout
+ 		}
+ 	' "$WORKFLOW"
+ }
+ 
+ lane_records="$(gate_lane_records)"
+-if [ -z "$lane_records" ]; then
+-	bad 'the workflow still runs test-gate.sh' 'no test-gate.sh step found in .github/workflows/ci.yml'
++lane_count="$(printf '%s\n' "$lane_records" | awk 'NF { count++ } END { print count + 0 }')"
++if [ "$lane_count" -eq 4 ]; then
++	ok 'the workflow has four explicitly budgeted test-gate lanes'
+ else
+-	unbudgeted=''
+-	while read -r job is_win has_timeout; do
+-		[ -n "$job" ] || continue
+-		[ "$is_win" = '1' ] || continue
+-		[ "$has_timeout" = '1' ] || unbudgeted="$unbudgeted $job"
+-	done <<-RECORDS
+-	$lane_records
+-	RECORDS
+-	if [ -z "$unbudgeted" ]; then
+-		ok 'every windows test-gate.sh lane declares GO_TEST_TIMEOUT'
++	bad 'the workflow has four explicitly budgeted test-gate lanes' \
++		"found $lane_count lanes; records: $(printf '%s ' "$lane_records")"
++fi
++
++WINDOWS_MATRIX_TIMEOUT="\${{ runner.os == 'Windows' && '120m' || '60m' }}"
++WINDOWS_MATRIX_DRIFT="\${{ runner.os == 'Windows' && '90m' || '60m' }}"
++
++observed_lane_timeout() {
++	records="$1"; job="$2"
++	printf '%s\n' "$records" | awk -F '\t' -v want="$job" \
++		'$1 == want { count++; value = $3 } END { if (count == 1) print value }'
++}
++
++lane_timeout_matches() {
++	[ "$(observed_lane_timeout "$1" "$2")" = "$3" ]
++}
++
++workflow_timeouts_match() {
++	records="$1"
++	count="$(printf '%s\n' "$records" | awk 'NF { count++ } END { print count + 0 }')"
++	[ "$count" -eq 4 ] || return 1
++	lane_timeout_matches "$records" test "$WINDOWS_MATRIX_TIMEOUT" &&
++		lane_timeout_matches "$records" test-self-hosted '60m' &&
++		lane_timeout_matches "$records" race '60m' &&
++		lane_timeout_matches "$records" candidate-conformance "$WINDOWS_MATRIX_TIMEOUT"
++}
++
++check_lane_timeout() {
++	job="$1"; expected="$2"
++	actual="$(observed_lane_timeout "$lane_records" "$job")"
++	if [ "$actual" = "$expected" ]; then
++		ok "$job timeout is pinned to $expected"
+ 	else
+-		bad 'every windows test-gate.sh lane declares GO_TEST_TIMEOUT' \
+-			"lanes running on windows-latest with no GO_TEST_TIMEOUT:$unbudgeted"
++		bad "$job timeout is pinned to $expected" "observed: ${actual:-missing or duplicate lane}"
+ 	fi
++}
++
++if workflow_timeouts_match "$lane_records"; then
++	ok 'the self-test enforces all four workflow lane timeout pins'
++else
++	bad 'the self-test enforces all four workflow lane timeout pins' 'one or more lane expressions drifted'
+ fi
++check_lane_timeout test "$WINDOWS_MATRIX_TIMEOUT"
++check_lane_timeout test-self-hosted '60m'
++check_lane_timeout race '60m'
++# The candidate matrix pin includes its Windows value as well as Ubuntu/macOS.
++check_lane_timeout candidate-conformance "$WINDOWS_MATRIX_TIMEOUT"
++
++mutate_timeout_lane() {
++	target_job="$1"; output="$2"; replacement="$3"
++	awk -v target="$target_job" -v replacement="$replacement" '
++		/^  [a-z][a-z0-9-]*:[ \t\r]*$/ {
++			job = $1
++			sub(/:[ \t\r]*$/, "", job)
++		}
++		job == target && /^[ \t]*GO_TEST_TIMEOUT:/ {
++			line = $0
++			sub(/GO_TEST_TIMEOUT:.*/, "", line)
++			print line "GO_TEST_TIMEOUT: " replacement
++			changed++
++			next
++		}
++		{ print }
++		END { if (changed != 1) exit 2 }
++	' "$WORKFLOW" >"$output"
++}
+ 
+-# minutes <duration>  -- "60m" and "1h" both answer 60; anything else answers -1.
+-minutes() {
+-	case "$1" in
+-	*m) printf '%s\n' "${1%m}" ;;
+-	*h) printf '%s\n' "$(( ${1%h} * 60 ))" ;;
+-	*)  printf '%s\n' '-1' ;;
+-	esac
++check_timeout_drift_rejected() {
++	name="$1"; job="$2"; expected="$3"; replacement="$4"
++	mutant="$WORK/timeout-mutant-$job.yml"
++	if ! mutate_timeout_lane "$job" "$mutant" "$replacement"; then
++		bad "$name" "could not produce a single-lane $job mutant"
++		return
++	fi
++	original_workflow="$WORKFLOW"
++	WORKFLOW="$mutant"
++	mutant_records="$(gate_lane_records)"
++	WORKFLOW="$original_workflow"
++	if ! workflow_timeouts_match "$mutant_records" && \
++		! lane_timeout_matches "$mutant_records" "$job" "$expected"; then
++		ok "$name"
++	else
++		bad "$name" "the changed $job timeout remained admitted"
++	fi
+ }
+ 
+-GATE_DEFAULT_TIMEOUT="$(awk -F'-' '/^GO_TEST_TIMEOUT=/{print $2; exit}' "$HERE/test-gate.sh" | tr -d '}"')"
+-win_timeout="$(awk -F"'" '/GO_TEST_TIMEOUT:.*Windows/{print $4; exit}' "$WORKFLOW")"
+-other_timeout="$(awk -F"'" '/GO_TEST_TIMEOUT:.*Windows/{print $6; exit}' "$WORKFLOW")"
+-win_minutes="$(minutes "$win_timeout")"
+-other_minutes="$(minutes "$other_timeout")"
+-default_minutes="$(minutes "$GATE_DEFAULT_TIMEOUT")"
++check_timeout_drift_rejected 'the self-test rejects Test timeout drift' test "$WINDOWS_MATRIX_TIMEOUT" '30m'
++check_timeout_drift_rejected 'the self-test rejects self-hosted Test timeout drift' test-self-hosted '60m' '30m'
++check_timeout_drift_rejected 'the self-test rejects Race timeout drift' race '60m' '30m'
++check_timeout_drift_rejected 'the self-test rejects candidate timeout drift' candidate-conformance "$WINDOWS_MATRIX_TIMEOUT" '30m'
++check_timeout_drift_rejected 'the self-test rejects Windows candidate budget drift' \
++	candidate-conformance "$WINDOWS_MATRIX_TIMEOUT" "$WINDOWS_MATRIX_DRIFT"
+ 
+-if [ "$win_minutes" -gt 0 ] && [ "$other_minutes" -gt 0 ] && [ "$win_minutes" -gt "$other_minutes" ]; then
+-	ok 'the windows per-package budget is larger than the unix one'
++GATE_DEFAULT_TIMEOUT="$(awk -F ':-' '/^GO_TEST_TIMEOUT=/{value=$2; sub(/}.*/, "", value); print value; exit}' "$HERE/test-gate.sh")"
++if [ "$GATE_DEFAULT_TIMEOUT" = '60m' ]; then
++	ok 'test-gate.sh defaults to the 60m per-package budget'
+ else
+-	bad 'the windows per-package budget is larger than the unix one' \
+-		"windows='$win_timeout' other='$other_timeout'"
++	bad 'test-gate.sh defaults to the 60m per-package budget' "observed: ${GATE_DEFAULT_TIMEOUT:-missing}"
++fi
++MAKEFILE_DEFAULT_TIMEOUT="$(awk '/^GO_TEST_TIMEOUT[ \t]*\?=/{print $3; exit}' Makefile)"
++if [ "$MAKEFILE_DEFAULT_TIMEOUT" = '60m' ]; then
++	ok 'Makefile CI gate targets default to the 60m per-package budget'
++else
++	bad 'Makefile CI gate targets default to the 60m per-package budget' "observed: ${MAKEFILE_DEFAULT_TIMEOUT:-missing}"
+ fi
+ 
+-if [ "$default_minutes" -gt 0 ] && [ "$other_minutes" -eq "$default_minutes" ]; then
+-	ok 'the unix per-package budget still matches the gate default'
++echo ''
++echo '=== test-gate.sh: a synthetic hanging package still fails at its deadline ==='
++if command -v go >/dev/null 2>&1; then
++	SYNTHETIC_MODULE="$MODULE_PATH"
++	SYNTHETIC_PACKAGE="$MODULE_PATH/internal/gatefixture"
++	SYNTHETIC_FIXTURE="$WORK/gate-timeout-fixture"
++	SYNTHETIC_ROOT="$WORK/gate-timeout-root"
++	SYNTHETIC_GO="$WORK/gate-timeout-go"
++	SYNTHETIC_CAPTURE="$WORK/gate-timeout-captured-budget.txt"
++	SYNTHETIC_EVIDENCE="$WORK/gate-timeout-evidence"
++	# The workflow-level self-test jobs do not install the repository toolchain,
++	# and GOTOOLCHAIN=local intentionally forbids downloading it. Give this
++	# standalone fixture the running launcher version so a lagging hosted image
++	# still reaches the real test timeout instead of refusing its go.mod.
++	REAL_GO="$(command -v go)"
++	MODULE_GO_VERSION="$("$REAL_GO" env GOVERSION)"
++	MODULE_GO_VERSION="${MODULE_GO_VERSION#go}"
++	mkdir -p "$SYNTHETIC_FIXTURE" "$SYNTHETIC_ROOT"
++	printf 'module %s\n\ngo %s\n' "$SYNTHETIC_PACKAGE" "$MODULE_GO_VERSION" >"$SYNTHETIC_FIXTURE/go.mod"
++	cat >"$SYNTHETIC_FIXTURE/hang_test.go" <<'GO'
++package gatefixture
++
++import "testing"
++
++func TestSyntheticHang(t *testing.T) {
++	select {}
++}
++GO
++	printf '{"synthetic":"timeout-test"}\n' >"$SYNTHETIC_ROOT/manifest.json"
++	printf 'internal/gatefixture\tTestSyntheticHang\tlinux\t-\t-\tgate timeout negative case\n' >"$WORK/gate-timeout-ledger.tsv"
++	cat >"$SYNTHETIC_GO" <<'GO'
++#!/usr/bin/env bash
++set -u
++case "${1:-}" in
++list)
++	printf '%s\n' "${SYNTHETIC_PACKAGE:?}"
++	;;
++test)
++	timeout=''
++	while [ "$#" -gt 0 ]; do
++		if [ "$1" = '-timeout' ]; then
++			[ "$#" -ge 2 ] || exit 2
++			timeout="$2"
++			shift 2
++			continue
++		fi
++		shift
++	done
++	[ -n "$timeout" ] || { echo 'synthetic go: missing -timeout' >&2; exit 2; }
++	printf '%s\n' "$timeout" >"${SYNTHETIC_CAPTURE:?}"
++	cd "${SYNTHETIC_FIXTURE:?}" || exit 2
++	exec "${REAL_GO:?}" test -json -count=1 -timeout "$timeout" .
++	;;
++*)
++	exec "${REAL_GO:?}" "$@"
++	;;
++esac
++GO
++	chmod +x "$SYNTHETIC_GO"
++
++	HANG_STARTED="$SECONDS"
++	env \
++		GO="$SYNTHETIC_GO" REAL_GO="$REAL_GO" \
++		SYNTHETIC_MODULE="$SYNTHETIC_MODULE" SYNTHETIC_PACKAGE="$SYNTHETIC_PACKAGE" \
++		SYNTHETIC_FIXTURE="$SYNTHETIC_FIXTURE" \
++		SYNTHETIC_CAPTURE="$SYNTHETIC_CAPTURE" GO_TEST_TIMEOUT=2s \
++		CURATOR_CONFORMANCE_ROOT="$SYNTHETIC_ROOT" CI_GATE_GOOS=linux \
++		CI_GATE_MODULE="$MODULE_PATH" CI_PLATFORM_CASES="$WORK/gate-timeout-ledger.tsv" \
++		CI_SKIP_CLASSES="$HERE/skip-classes.tsv" \
++		bash "$HERE/test-gate.sh" "$SYNTHETIC_EVIDENCE" >"$WORK/gate-timeout.out" 2>&1
++	HANG_RC=$?
++	HANG_ELAPSED=$((SECONDS - HANG_STARTED))
++	if [ "$HANG_RC" -eq 1 ]; then
++		PASS=$((PASS + 1)); printf 'ok    synthetic package hang fails test-gate (exit=%s)\n' "$HANG_RC"
++	else
++		bad 'synthetic package hang fails test-gate (exit=1)' "real exit=$HANG_RC"
++	fi
++	if [ -f "$SYNTHETIC_CAPTURE" ] && [ "$(cat "$SYNTHETIC_CAPTURE")" = '2s' ]; then
++		ok 'test-gate forwards the configured 2s package deadline to go test'
++	else
++		bad 'test-gate forwards the configured 2s package deadline to go test' 'captured timeout missing or changed'
++	fi
++	if [ -f "$SYNTHETIC_EVIDENCE/go-test.json" ] && \
++		grep -qF 'panic: test timed out after 2s' "$SYNTHETIC_EVIDENCE/go-test.json"; then
++		ok 'the synthetic Go test fails because its package deadline expires'
++	else
++		observed="$(awk 'NR <= 8 { print substr($0, 1, 180) }' \
++			"$SYNTHETIC_EVIDENCE/go-test.json" 2>/dev/null)"
++		gate_output="$(awk 'NR <= 8 { print substr($0, 1, 180) }' "$WORK/gate-timeout.out" 2>/dev/null)"
++		bad 'the synthetic Go test fails because its package deadline expires' \
++			"timed-out test output not found; Go stream: ${observed:-missing}; test-gate: ${gate_output:-missing}"
++	fi
++	ok "synthetic gate failure elapsed ${HANG_ELAPSED}s including compilation"
+ else
+-	bad 'the unix per-package budget still matches the gate default' \
+-		"workflow='$other_timeout' test-gate.sh default='$GATE_DEFAULT_TIMEOUT'"
++	skip 'synthetic package timeout negative case' 'no usable Go launcher on this runner'
+ fi
+ 
+ echo ''
+diff --git a/.github/ci/test-gate.sh b/.github/ci/test-gate.sh
+index 08dedb06..e262215c 100755
+--- a/.github/ci/test-gate.sh
++++ b/.github/ci/test-gate.sh
+@@ -25,7 +25,7 @@
+ #
+ # Environment:
+ #   GO                       go launcher             (default: go)
+-#   GO_TEST_TIMEOUT          per-package timeout     (default: 30m)
++#   GO_TEST_TIMEOUT          per-package timeout     (default: 60m)
+ #   GO_TEST_FLAGS            extra flags, word split (e.g. "-race")
+ #   CURATOR_CONFORMANCE_ROOT required; forwarded to the served packages untouched
+ #   CI_REQUIRE_FULL_ROOT     1 = the root must serve every package
+@@ -35,7 +35,7 @@
+ set -u
+ 
+ GO="${GO:-go}"
+-GO_TEST_TIMEOUT="${GO_TEST_TIMEOUT:-30m}"
++GO_TEST_TIMEOUT="${GO_TEST_TIMEOUT:-60m}"
+ HERE="$(cd "$(dirname "$0")" && pwd)"
+ 
+ if [ "$#" -ne 1 ]; then
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 40ae9d74..56bf908c 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -201,20 +201,21 @@ jobs:
+       # anywhere in the run is classified and recorded by name.
+       #
+       # The per-package deadline is a hosted-runner budget, not a behavioural
+-      # bar: the Windows runner pays a real syscall and process-spawn cost that
+-      # the unix runners do not. Measured on run 32648313266 (windows-latest):
+-      # cmd/curator 1099s and internal/install/atomicity 1027s here against
+-      # 454s and 125s for the same packages on macOS. After the transactional
+-      # publication sweep the Windows internal/install package reached 3516 s
+-      # of the 60m budget on gate run 35424565415 (97.7%; rev2 run 35418260010
+-      # timed out at 60m), with a baseline-speed extrapolation of ~79 min, so
+-      # Windows gets 120m and every other runner keeps 30m. A hang is still
+-      # bounded and still fatal.
++      # bar. Windows still gets 120m: on run 32648313266 its cmd/curator and
++      # internal/install/atomicity packages took 1099s and 1027s against 454s
++      # and 125s on macOS; after the transactional publication sweep,
++      # internal/install reached 3516s of the 60m budget on run 35424565415.
++      # Ubuntu and macOS get 60m. On green run 35709048693, internal/install
++      # took 926.106s (Test/ubuntu), 558.623s (Test/macOS), 1114.886s
++      # (Race/ubuntu), and 537.885s (Race/macOS). Their fractions of 60m are
++      # 25.7%, 15.5%, 31.0%, and 14.9%. Run 35713206841 hit 1800.165s in
++      # Test/ubuntu and run 35994653101 hit 1800.100s in Race/ubuntu during
++      # runner contention. Every lane retains Go's fatal per-package timeout.
+       - name: go test + platform-case gate
+         shell: bash
+         env:
+           CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+-          GO_TEST_TIMEOUT: ${{ runner.os == 'Windows' && '120m' || '30m' }}
++          GO_TEST_TIMEOUT: ${{ runner.os == 'Windows' && '120m' || '60m' }}
+         run: bash .github/ci/test-gate.sh .temp/ci-evidence/test
+ 
+       - name: Upload gate evidence
+@@ -335,7 +336,7 @@ jobs:
+         shell: bash
+         env:
+           CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+-          GO_TEST_TIMEOUT: 30m
++          GO_TEST_TIMEOUT: 60m
+         run: bash .github/ci/test-gate.sh .temp/ci-evidence/test
+ 
+       - name: Upload gate evidence
+@@ -432,15 +433,17 @@ jobs:
+         shell: bash
+         run: bash .github/ci/toolchain-identity.sh
+ 
+-      # internal/install/atomicity is the long pole under -race: 115.687s on
+-      # the accepted candidate's macOS measurement, against a 480s acceptance
+-      # bar. The 30m per-package timeout is headroom for a slower hosted
+-      # runner, not a licence for an unbounded test.
++      # internal/install took 1114.886s on ubuntu-latest and 537.885s on
++      # macos-latest in green Race jobs on gate run 35709048693. Both fit under
++      # half of the 60m per-package timeout. Run 35994653101 later reached the
++      # old 30m deadline during ubuntu runner contention; the timeout still
++      # expires and fails a package that genuinely hangs.
+       - name: go test -race + platform-case gate
+         shell: bash
+         env:
+           CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+           GO_TEST_FLAGS: -race
++          GO_TEST_TIMEOUT: 60m
+         run: bash .github/ci/test-gate.sh .temp/ci-evidence/race
+ 
+       - name: Upload race evidence
+@@ -700,21 +703,16 @@ jobs:
+       # additionally forbids the package deferral the default lane would permit
+       # against a root that published less than the committed pin does.
+       #
+-      # The committed pin now serves the whole module, so the default lane
+-      # already runs one served invocation and this lane's load is no longer
+-      # the heavier of the two. The Windows deadline stays where the measured
+-      # contention put it: on run 32648313266, cmd/curator and
+-      # internal/install/atomicity ran past 1800s in a single invocation on
+-      # four Windows cores with every executed case passing, which the ledger
+-      # then read as two required Windows cases that never ran. Windows gets
+-      # the same 120m as the default lane; the deadline is still fixed and
+-      # still fatal.
++      # The committed pin serves the whole module, so the default and candidate
++      # lanes have the same package plan. Ubuntu/macOS use 60m for the measured
++      # internal/install load; Windows retains 120m for its slower syscall and
++      # process-spawn path. The per-package deadline is fixed and fatal.
+       - name: Candidate suite + platform-case gate
+         shell: bash
+         env:
+           CURATOR_CONFORMANCE_ROOT: ${{ steps.candidate.outputs.root }}
+           CI_REQUIRE_FULL_ROOT: "1"
+-          GO_TEST_TIMEOUT: ${{ runner.os == 'Windows' && '120m' || '30m' }}
++          GO_TEST_TIMEOUT: ${{ runner.os == 'Windows' && '120m' || '60m' }}
+         run: bash .github/ci/test-gate.sh .temp/ci-evidence/test
+ 
+       - name: Upload candidate evidence
+diff --git a/Makefile b/Makefile
+index c1ab9625..fbdd12ec 100644
+--- a/Makefile
++++ b/Makefile
+@@ -6,7 +6,7 @@ LDFLAGS := -X github.com/relux-works/curator/internal/version.value=$(VERSION)
+ # `go test -json` stream, its suite plan and its platform-case report, so a
+ # claim about a gate can always be checked against the run that produced it.
+ EVIDENCE ?= .temp/ci-evidence
+-GO_TEST_TIMEOUT ?= 30m
++GO_TEST_TIMEOUT ?= 60m
+ TEST_GATE := .github/ci/test-gate.sh
+ CANDIDATE := .github/ci/candidate-suite.sh
+ 
+diff --git a/docs/ci-gates.md b/docs/ci-gates.md
+index d4e59b7a..cdb8ff0f 100644
+--- a/docs/ci-gates.md
++++ b/docs/ci-gates.md
+@@ -24,6 +24,21 @@ Every gate below is a script under `.github/ci/`, called directly by [../.github
+ 
+ Executing `make ci-test`, `make race`, and `make check-ci` requires setting `CURATOR_CONFORMANCE_ROOT` to a materialized `<curator-spec>/conformance/v1` directory. The Makefile targets refuse execution without this variable set, preventing unconfigured runs.
+ 
++## Per-package Go timeout budget
++
++`test-gate.sh` passes `GO_TEST_TIMEOUT` to every `go test` invocation. The script and local Makefile gate targets default to `60m`; all Ubuntu/macOS Test, Race, and candidate-suite lanes use `60m`, while Windows keeps `120m`. These remain Go per-package timeouts, so a package that hangs still fails when its deadline expires. The self-hosted macOS Test lane also uses `60m`.
++
++The green jobs in hosted gate run [35709048693](https://github.com/relux-works/curator/actions/runs/35709048693) recorded these `internal/install` package times:
++
++| Lane | Elapsed | Original 30m budget | Chosen 60m budget |
++| --- | ---: | ---: | ---: |
++| Test (ubuntu-latest) | 926.106s | 51.5% | 25.7% |
++| Test (macos-latest) | 558.623s | 31.0% | 15.5% |
++| Race (ubuntu-latest) | 1114.886s | 61.9% | 31.0% |
++| Race (macos-latest) | 537.885s | 29.9% | 14.9% |
++
++Later contention events show why 30m was insufficient: Test (ubuntu-latest) reached 1800.165s on run 35713206841, and Race (ubuntu-latest) reached 1800.100s on run 35994653101. The larger timeout preserves the bounded, fatal hang behavior while providing at least 2x headroom over each measured green baseline.
++
+ ## Protocol-suite pin and verification
+ 
+ The module's immutable release pin ([`internal/buildrepo/release_pin.go`](../internal/buildrepo/release_pin.go), verified by `curator-spec-pin`) is curator-spec `v1.0.0-rc.8`; CI's conformance suite pin has since been promoted to the rc.9 release commit; see `SPEC_PIN` in [../.github/workflows/ci.yml](../.github/workflows/ci.yml), which owns that promotion. Aligning the module release pin to rc.9 is tracked with the promotion task named there.
