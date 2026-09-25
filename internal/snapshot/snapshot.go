@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/relux-works/curator/internal/gitops"
 	"github.com/relux-works/curator/internal/transaction"
@@ -16,6 +17,13 @@ import (
 // ErrDestinationConflict reports that an existing commit-keyed cache entry
 // could not be authenticated as the exact snapshot being published.
 var ErrDestinationConflict = errors.New("snapshot destination conflicts with immutable commit")
+
+// digestSnapshotDestination is a narrow seam for exercising transient
+// destination-open failures. Production uses transaction.DigestPath.
+var digestSnapshotDestination = transaction.DigestPath
+
+const destinationSharingViolationRetries = 3
+const destinationSharingViolationRetryDelay = 10 * time.Millisecond
 
 // Dir returns the cache location for a source at a commit.
 func Dir(home, source, commit string) string {
@@ -158,7 +166,7 @@ func authenticateDestination(expected, destination string) error {
 	if err != nil {
 		return fmt.Errorf("%w: authenticate expected snapshot: %v", ErrDestinationConflict, err)
 	}
-	destinationDigest, err := transaction.DigestPath(destination)
+	destinationDigest, err := digestDestinationWithSharingRetry(destination)
 	if err != nil {
 		return fmt.Errorf("%w: authenticate destination: %v", ErrDestinationConflict, err)
 	}
@@ -166,4 +174,17 @@ func authenticateDestination(expected, destination string) error {
 		return fmt.Errorf("%w: destination tree does not match expected snapshot", ErrDestinationConflict)
 	}
 	return nil
+}
+
+// digestDestinationWithSharingRetry handles a short Windows sharing violation
+// while another Get is publishing the immutable destination. All other read
+// errors, and a sharing violation that outlasts this bound, fail closed.
+func digestDestinationWithSharingRetry(destination string) (string, error) {
+	for retry := 0; ; retry++ {
+		digest, err := digestSnapshotDestination(destination)
+		if err == nil || !isDestinationSharingViolation(err) || retry == destinationSharingViolationRetries {
+			return digest, err
+		}
+		time.Sleep(destinationSharingViolationRetryDelay)
+	}
 }
