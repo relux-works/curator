@@ -6,9 +6,9 @@
 # asserts a REAL exit code for every case -- including the negative cases,
 # which are the ones a gate silently loses when it is refactored.
 #
-# It needs no conformance root, no network and no Go build. The handful of
-# cases that need a `go` launcher are named and reported when one is absent,
-# never quietly dropped.
+# It needs no conformance root or network. One timeout regression builds and
+# runs a tiny synthetic Go package; cases that need a `go` launcher are named
+# and reported when one is absent, never quietly dropped.
 #
 # Usage:
 #   gate-selftest.sh
@@ -667,75 +667,239 @@ make_stub "$WANT_GO" local "$WORK/user.env"
 assert 'a per-user go env file is rejected'         1 env PATH="$STUBROOT/bin:$PATH" bash "$TI"
 
 echo ''
-echo '=== ci.yml: every windows lane that runs test-gate.sh buys the slower runner its own budget ==='
+echo '=== ci.yml: every test-gate lane pins its per-package timeout ==='
 
-# A per-package timeout is a hosted-runner budget, and the Windows runner needs
-# a bigger one than the unix runners for the same passing work. That budget
-# lives in the workflow, so a refactor can drop it without any gate noticing --
-# the run just dies at the old deadline and the ledger reports the truncated
-# cases as cases that never ran. These cases read the wiring back.
-#
-# Emits one "<job> <windows-lane?> <has-timeout?>" record per test-gate.sh step.
+# Every workflow lane must retain the selected deadline. The matrix expression
+# covers its Windows value explicitly; fixed-host and race lanes are pinned
+# separately. Adding a lane or changing a timeout requires updating these pins.
 gate_lane_records() {
 	awk '
-		/^  [a-z][a-z0-9-]*:[ \t\r]*$/ { job = $1; sub(/:[ \t\r]*$/, "", job) }
-		/^[ \t]*os:[ \t]*\[/           { if ($0 ~ /windows-latest/) win[job] = 1 }
-		/^      - name:/               { timeout = 0 }
-		/^[ \t]*GO_TEST_TIMEOUT:/      { timeout = 1 }
+		/^  [a-z][a-z0-9-]*:[ \t\r]*$/ {
+			job = $1
+			sub(/:[ \t\r]*$/, "", job)
+		}
+		/^      - name:/ {
+			step = $0
+			sub(/^      - name:[ \t]*/, "", step)
+			timeout = ""
+		}
+		/^[ \t]*GO_TEST_TIMEOUT:/ {
+			timeout = $0
+			sub(/^[ \t]*GO_TEST_TIMEOUT:[ \t]*/, "", timeout)
+			sub(/[ \t\r]*$/, "", timeout)
+		}
 		/test-gate\.sh/ && /^[ \t]*run:/ {
-			printf "%s %d %d\n", job, (win[job] ? 1 : 0), timeout
+			printf "%s\t%s\t%s\n", job, step, timeout
 		}
 	' "$WORKFLOW"
 }
 
 lane_records="$(gate_lane_records)"
-if [ -z "$lane_records" ]; then
-	bad 'the workflow still runs test-gate.sh' 'no test-gate.sh step found in .github/workflows/ci.yml'
+lane_count="$(printf '%s\n' "$lane_records" | awk 'NF { count++ } END { print count + 0 }')"
+if [ "$lane_count" -eq 4 ]; then
+	ok 'the workflow has four explicitly budgeted test-gate lanes'
 else
-	unbudgeted=''
-	while read -r job is_win has_timeout; do
-		[ -n "$job" ] || continue
-		[ "$is_win" = '1' ] || continue
-		[ "$has_timeout" = '1' ] || unbudgeted="$unbudgeted $job"
-	done <<-RECORDS
-	$lane_records
-	RECORDS
-	if [ -z "$unbudgeted" ]; then
-		ok 'every windows test-gate.sh lane declares GO_TEST_TIMEOUT'
-	else
-		bad 'every windows test-gate.sh lane declares GO_TEST_TIMEOUT' \
-			"lanes running on windows-latest with no GO_TEST_TIMEOUT:$unbudgeted"
-	fi
+	bad 'the workflow has four explicitly budgeted test-gate lanes' \
+		"found $lane_count lanes; records: $(printf '%s ' "$lane_records")"
 fi
 
-# minutes <duration>  -- "60m" and "1h" both answer 60; anything else answers -1.
-minutes() {
-	case "$1" in
-	*m) printf '%s\n' "${1%m}" ;;
-	*h) printf '%s\n' "$(( ${1%h} * 60 ))" ;;
-	*)  printf '%s\n' '-1' ;;
-	esac
+WINDOWS_MATRIX_TIMEOUT="\${{ runner.os == 'Windows' && '120m' || '60m' }}"
+WINDOWS_MATRIX_DRIFT="\${{ runner.os == 'Windows' && '90m' || '60m' }}"
+
+observed_lane_timeout() {
+	records="$1"; job="$2"
+	printf '%s\n' "$records" | awk -F '\t' -v want="$job" \
+		'$1 == want { count++; value = $3 } END { if (count == 1) print value }'
 }
 
-GATE_DEFAULT_TIMEOUT="$(awk -F'-' '/^GO_TEST_TIMEOUT=/{print $2; exit}' "$HERE/test-gate.sh" | tr -d '}"')"
-win_timeout="$(awk -F"'" '/GO_TEST_TIMEOUT:.*Windows/{print $4; exit}' "$WORKFLOW")"
-other_timeout="$(awk -F"'" '/GO_TEST_TIMEOUT:.*Windows/{print $6; exit}' "$WORKFLOW")"
-win_minutes="$(minutes "$win_timeout")"
-other_minutes="$(minutes "$other_timeout")"
-default_minutes="$(minutes "$GATE_DEFAULT_TIMEOUT")"
+lane_timeout_matches() {
+	[ "$(observed_lane_timeout "$1" "$2")" = "$3" ]
+}
 
-if [ "$win_minutes" -gt 0 ] && [ "$other_minutes" -gt 0 ] && [ "$win_minutes" -gt "$other_minutes" ]; then
-	ok 'the windows per-package budget is larger than the unix one'
+workflow_timeouts_match() {
+	records="$1"
+	count="$(printf '%s\n' "$records" | awk 'NF { count++ } END { print count + 0 }')"
+	[ "$count" -eq 4 ] || return 1
+	lane_timeout_matches "$records" test "$WINDOWS_MATRIX_TIMEOUT" &&
+		lane_timeout_matches "$records" test-self-hosted '60m' &&
+		lane_timeout_matches "$records" race '60m' &&
+		lane_timeout_matches "$records" candidate-conformance "$WINDOWS_MATRIX_TIMEOUT"
+}
+
+check_lane_timeout() {
+	job="$1"; expected="$2"
+	actual="$(observed_lane_timeout "$lane_records" "$job")"
+	if [ "$actual" = "$expected" ]; then
+		ok "$job timeout is pinned to $expected"
+	else
+		bad "$job timeout is pinned to $expected" "observed: ${actual:-missing or duplicate lane}"
+	fi
+}
+
+if workflow_timeouts_match "$lane_records"; then
+	ok 'the self-test enforces all four workflow lane timeout pins'
 else
-	bad 'the windows per-package budget is larger than the unix one' \
-		"windows='$win_timeout' other='$other_timeout'"
+	bad 'the self-test enforces all four workflow lane timeout pins' 'one or more lane expressions drifted'
+fi
+check_lane_timeout test "$WINDOWS_MATRIX_TIMEOUT"
+check_lane_timeout test-self-hosted '60m'
+check_lane_timeout race '60m'
+# The candidate matrix pin includes its Windows value as well as Ubuntu/macOS.
+check_lane_timeout candidate-conformance "$WINDOWS_MATRIX_TIMEOUT"
+
+mutate_timeout_lane() {
+	target_job="$1"; output="$2"; replacement="$3"
+	awk -v target="$target_job" -v replacement="$replacement" '
+		/^  [a-z][a-z0-9-]*:[ \t\r]*$/ {
+			job = $1
+			sub(/:[ \t\r]*$/, "", job)
+		}
+		job == target && /^[ \t]*GO_TEST_TIMEOUT:/ {
+			line = $0
+			sub(/GO_TEST_TIMEOUT:.*/, "", line)
+			print line "GO_TEST_TIMEOUT: " replacement
+			changed++
+			next
+		}
+		{ print }
+		END { if (changed != 1) exit 2 }
+	' "$WORKFLOW" >"$output"
+}
+
+check_timeout_drift_rejected() {
+	name="$1"; job="$2"; expected="$3"; replacement="$4"
+	mutant="$WORK/timeout-mutant-$job.yml"
+	if ! mutate_timeout_lane "$job" "$mutant" "$replacement"; then
+		bad "$name" "could not produce a single-lane $job mutant"
+		return
+	fi
+	original_workflow="$WORKFLOW"
+	WORKFLOW="$mutant"
+	mutant_records="$(gate_lane_records)"
+	WORKFLOW="$original_workflow"
+	if ! workflow_timeouts_match "$mutant_records" && \
+		! lane_timeout_matches "$mutant_records" "$job" "$expected"; then
+		ok "$name"
+	else
+		bad "$name" "the changed $job timeout remained admitted"
+	fi
+}
+
+check_timeout_drift_rejected 'the self-test rejects Test timeout drift' test "$WINDOWS_MATRIX_TIMEOUT" '30m'
+check_timeout_drift_rejected 'the self-test rejects self-hosted Test timeout drift' test-self-hosted '60m' '30m'
+check_timeout_drift_rejected 'the self-test rejects Race timeout drift' race '60m' '30m'
+check_timeout_drift_rejected 'the self-test rejects candidate timeout drift' candidate-conformance "$WINDOWS_MATRIX_TIMEOUT" '30m'
+check_timeout_drift_rejected 'the self-test rejects Windows candidate budget drift' \
+	candidate-conformance "$WINDOWS_MATRIX_TIMEOUT" "$WINDOWS_MATRIX_DRIFT"
+
+GATE_DEFAULT_TIMEOUT="$(awk -F ':-' '/^GO_TEST_TIMEOUT=/{value=$2; sub(/}.*/, "", value); print value; exit}' "$HERE/test-gate.sh")"
+if [ "$GATE_DEFAULT_TIMEOUT" = '60m' ]; then
+	ok 'test-gate.sh defaults to the 60m per-package budget'
+else
+	bad 'test-gate.sh defaults to the 60m per-package budget' "observed: ${GATE_DEFAULT_TIMEOUT:-missing}"
+fi
+MAKEFILE_DEFAULT_TIMEOUT="$(awk '/^GO_TEST_TIMEOUT[ \t]*\?=/{print $3; exit}' Makefile)"
+if [ "$MAKEFILE_DEFAULT_TIMEOUT" = '60m' ]; then
+	ok 'Makefile CI gate targets default to the 60m per-package budget'
+else
+	bad 'Makefile CI gate targets default to the 60m per-package budget' "observed: ${MAKEFILE_DEFAULT_TIMEOUT:-missing}"
 fi
 
-if [ "$default_minutes" -gt 0 ] && [ "$other_minutes" -eq "$default_minutes" ]; then
-	ok 'the unix per-package budget still matches the gate default'
+echo ''
+echo '=== test-gate.sh: a synthetic hanging package still fails at its deadline ==='
+if command -v go >/dev/null 2>&1; then
+	SYNTHETIC_MODULE="$MODULE_PATH"
+	SYNTHETIC_PACKAGE="$MODULE_PATH/internal/gatefixture"
+	SYNTHETIC_FIXTURE="$WORK/gate-timeout-fixture"
+	SYNTHETIC_ROOT="$WORK/gate-timeout-root"
+	SYNTHETIC_GO="$WORK/gate-timeout-go"
+	SYNTHETIC_CAPTURE="$WORK/gate-timeout-captured-budget.txt"
+	SYNTHETIC_EVIDENCE="$WORK/gate-timeout-evidence"
+	# The workflow-level self-test jobs do not install the repository toolchain,
+	# and GOTOOLCHAIN=local intentionally forbids downloading it. Give this
+	# standalone fixture the running launcher version so a lagging hosted image
+	# still reaches the real test timeout instead of refusing its go.mod.
+	REAL_GO="$(command -v go)"
+	MODULE_GO_VERSION="$("$REAL_GO" env GOVERSION)"
+	MODULE_GO_VERSION="${MODULE_GO_VERSION#go}"
+	mkdir -p "$SYNTHETIC_FIXTURE" "$SYNTHETIC_ROOT"
+	printf 'module %s\n\ngo %s\n' "$SYNTHETIC_PACKAGE" "$MODULE_GO_VERSION" >"$SYNTHETIC_FIXTURE/go.mod"
+	cat >"$SYNTHETIC_FIXTURE/hang_test.go" <<'GO'
+package gatefixture
+
+import "testing"
+
+func TestSyntheticHang(t *testing.T) {
+	select {}
+}
+GO
+	printf '{"synthetic":"timeout-test"}\n' >"$SYNTHETIC_ROOT/manifest.json"
+	printf 'internal/gatefixture\tTestSyntheticHang\tlinux\t-\t-\tgate timeout negative case\n' >"$WORK/gate-timeout-ledger.tsv"
+	cat >"$SYNTHETIC_GO" <<'GO'
+#!/usr/bin/env bash
+set -u
+case "${1:-}" in
+list)
+	printf '%s\n' "${SYNTHETIC_PACKAGE:?}"
+	;;
+test)
+	timeout=''
+	while [ "$#" -gt 0 ]; do
+		if [ "$1" = '-timeout' ]; then
+			[ "$#" -ge 2 ] || exit 2
+			timeout="$2"
+			shift 2
+			continue
+		fi
+		shift
+	done
+	[ -n "$timeout" ] || { echo 'synthetic go: missing -timeout' >&2; exit 2; }
+	printf '%s\n' "$timeout" >"${SYNTHETIC_CAPTURE:?}"
+	cd "${SYNTHETIC_FIXTURE:?}" || exit 2
+	exec "${REAL_GO:?}" test -json -count=1 -timeout "$timeout" .
+	;;
+*)
+	exec "${REAL_GO:?}" "$@"
+	;;
+esac
+GO
+	chmod +x "$SYNTHETIC_GO"
+
+	HANG_STARTED="$SECONDS"
+	env \
+		GO="$SYNTHETIC_GO" REAL_GO="$REAL_GO" \
+		SYNTHETIC_MODULE="$SYNTHETIC_MODULE" SYNTHETIC_PACKAGE="$SYNTHETIC_PACKAGE" \
+		SYNTHETIC_FIXTURE="$SYNTHETIC_FIXTURE" \
+		SYNTHETIC_CAPTURE="$SYNTHETIC_CAPTURE" GO_TEST_TIMEOUT=2s \
+		CURATOR_CONFORMANCE_ROOT="$SYNTHETIC_ROOT" CI_GATE_GOOS=linux \
+		CI_GATE_MODULE="$MODULE_PATH" CI_PLATFORM_CASES="$WORK/gate-timeout-ledger.tsv" \
+		CI_SKIP_CLASSES="$HERE/skip-classes.tsv" \
+		bash "$HERE/test-gate.sh" "$SYNTHETIC_EVIDENCE" >"$WORK/gate-timeout.out" 2>&1
+	HANG_RC=$?
+	HANG_ELAPSED=$((SECONDS - HANG_STARTED))
+	if [ "$HANG_RC" -eq 1 ]; then
+		PASS=$((PASS + 1)); printf 'ok    synthetic package hang fails test-gate (exit=%s)\n' "$HANG_RC"
+	else
+		bad 'synthetic package hang fails test-gate (exit=1)' "real exit=$HANG_RC"
+	fi
+	if [ -f "$SYNTHETIC_CAPTURE" ] && [ "$(cat "$SYNTHETIC_CAPTURE")" = '2s' ]; then
+		ok 'test-gate forwards the configured 2s package deadline to go test'
+	else
+		bad 'test-gate forwards the configured 2s package deadline to go test' 'captured timeout missing or changed'
+	fi
+	if [ -f "$SYNTHETIC_EVIDENCE/go-test.json" ] && \
+		grep -qF 'panic: test timed out after 2s' "$SYNTHETIC_EVIDENCE/go-test.json"; then
+		ok 'the synthetic Go test fails because its package deadline expires'
+	else
+		observed="$(awk 'NR <= 8 { print substr($0, 1, 180) }' \
+			"$SYNTHETIC_EVIDENCE/go-test.json" 2>/dev/null)"
+		gate_output="$(awk 'NR <= 8 { print substr($0, 1, 180) }' "$WORK/gate-timeout.out" 2>/dev/null)"
+		bad 'the synthetic Go test fails because its package deadline expires' \
+			"timed-out test output not found; Go stream: ${observed:-missing}; test-gate: ${gate_output:-missing}"
+	fi
+	ok "synthetic gate failure elapsed ${HANG_ELAPSED}s including compilation"
 else
-	bad 'the unix per-package budget still matches the gate default' \
-		"workflow='$other_timeout' test-gate.sh default='$GATE_DEFAULT_TIMEOUT'"
+	skip 'synthetic package timeout negative case' 'no usable Go launcher on this runner'
 fi
 
 echo ''

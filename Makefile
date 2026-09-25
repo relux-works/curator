@@ -6,7 +6,7 @@ LDFLAGS := -X github.com/relux-works/curator/internal/version.value=$(VERSION)
 # `go test -json` stream, its suite plan and its platform-case report, so a
 # claim about a gate can always be checked against the run that produced it.
 EVIDENCE ?= .temp/ci-evidence
-GO_TEST_TIMEOUT ?= 30m
+GO_TEST_TIMEOUT ?= 60m
 TEST_GATE := .github/ci/test-gate.sh
 CANDIDATE := .github/ci/candidate-suite.sh
 

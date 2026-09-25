@@ -24,6 +24,21 @@ Every gate below is a script under `.github/ci/`, called directly by [../.github
 
 Executing `make ci-test`, `make race`, and `make check-ci` requires setting `CURATOR_CONFORMANCE_ROOT` to a materialized `<curator-spec>/conformance/v1` directory. The Makefile targets refuse execution without this variable set, preventing unconfigured runs.
 
+## Per-package Go timeout budget
+
+`test-gate.sh` passes `GO_TEST_TIMEOUT` to every `go test` invocation. The script and local Makefile gate targets default to `60m`; all Ubuntu/macOS Test, Race, and candidate-suite lanes use `60m`, while Windows keeps `120m`. These remain Go per-package timeouts, so a package that hangs still fails when its deadline expires. The self-hosted macOS Test lane also uses `60m`.
+
+The green jobs in hosted gate run [35709048693](https://github.com/relux-works/curator/actions/runs/35709048693) recorded these `internal/install` package times:
+
+| Lane | Elapsed | Original 30m budget | Chosen 60m budget |
+| --- | ---: | ---: | ---: |
+| Test (ubuntu-latest) | 926.106s | 51.5% | 25.7% |
+| Test (macos-latest) | 558.623s | 31.0% | 15.5% |
+| Race (ubuntu-latest) | 1114.886s | 61.9% | 31.0% |
+| Race (macos-latest) | 537.885s | 29.9% | 14.9% |
+
+Later contention events show why 30m was insufficient: Test (ubuntu-latest) reached 1800.165s on run 35713206841, and Race (ubuntu-latest) reached 1800.100s on run 35994653101. The larger timeout preserves the bounded, fatal hang behavior while providing at least 2x headroom over each measured green baseline.
+
 ## Protocol-suite pin and verification
 
 The module's immutable release pin ([`internal/buildrepo/release_pin.go`](../internal/buildrepo/release_pin.go), verified by `curator-spec-pin`) is curator-spec `v1.0.0-rc.8`; CI's conformance suite pin has since been promoted to the rc.9 release commit; see `SPEC_PIN` in [../.github/workflows/ci.yml](../.github/workflows/ci.yml), which owns that promotion. Aligning the module release pin to rc.9 is tracked with the promotion task named there.

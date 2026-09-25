@@ -25,7 +25,7 @@
 #
 # Environment:
 #   GO                       go launcher             (default: go)
-#   GO_TEST_TIMEOUT          per-package timeout     (default: 30m)
+#   GO_TEST_TIMEOUT          per-package timeout     (default: 60m)
 #   GO_TEST_FLAGS            extra flags, word split (e.g. "-race")
 #   CURATOR_CONFORMANCE_ROOT required; forwarded to the served packages untouched
 #   CI_REQUIRE_FULL_ROOT     1 = the root must serve every package
@@ -35,7 +35,7 @@
 set -u
 
 GO="${GO:-go}"
-GO_TEST_TIMEOUT="${GO_TEST_TIMEOUT:-30m}"
+GO_TEST_TIMEOUT="${GO_TEST_TIMEOUT:-60m}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
 if [ "$#" -ne 1 ]; then
