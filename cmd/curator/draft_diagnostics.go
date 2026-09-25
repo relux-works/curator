@@ -53,7 +53,6 @@ var draftRemediations = []struct {
 	}},
 	{"source_selection_invalid", draftRemediation{
 		remediation: `fix the named selector (directory, include/exclude, and ref rules in docs/cli.md), then retry the explicit attempt`,
-		already:     []string{"requires the draft lane"},
 	}},
 	{"source_member_missing", draftRemediation{
 		remediation: `add the named member directory with valid SKILL.md, or drop it from "include", then run: curator project resolve`,
@@ -68,12 +67,12 @@ var draftRemediations = []struct {
 		remediation: `move the authored package out of managed output, or admit a root package via "root_inputs" in machine source-policy.json, then run: curator project resolve`,
 	}},
 	{"source_snapshot_changed", draftRemediation{
-		remediation: `inputs changed during capture; retry the explicit attempt without editing mid-run`,
+		remediation: `restore the declared source to the package identity and content_sha256 in Skillfile.lock.json, then retry install; run curator project refresh only to intentionally change the lock`,
 		already:     []string{"retry the explicit attempt"},
 	}},
 	{"source_snapshot_unavailable", draftRemediation{
-		remediation: `run the explicit attempt first: curator project resolve`,
-		already:     []string{"run explicit resolve first", "explicit attempt"},
+		remediation: `restore access to the declared path or Git source, then retry install`,
+		already:     []string{"run explicit resolve first"},
 	}},
 	{"source_lock_stale", draftRemediation{
 		remediation: `the Skillfile changed since the lock; run: curator project refresh`,

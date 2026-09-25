@@ -111,7 +111,7 @@ func draftProject(t *testing.T, payload string, skills map[string]string) (proje
 
 func draftManifest(t *testing.T, project, payload string) *manifest.Manifest {
 	t.Helper()
-	m, err := manifest.ParseBytesWithOptions([]byte(payload), filepath.Join(project, "Skillfile.json"), manifest.ParseOptions{DraftSourcesV1: true})
+	m, err := manifest.ParseBytes([]byte(payload), filepath.Join(project, "Skillfile.json"))
 	if err != nil {
 		t.Fatalf("parse draft manifest: %v", err)
 	}
@@ -172,7 +172,6 @@ func draftCLIConfig(t *testing.T, root, configPath string) *config.Config {
 // draftInstall runs the production project installer on the draft lane.
 func draftInstall(t *testing.T, project, home string, opts install.Options) install.Result {
 	t.Helper()
-	opts.DraftSourcesV1 = true
 	if opts.Platform == "" {
 		opts.Platform = runtimestore.Platform()
 	}
@@ -342,7 +341,6 @@ func runCurator(t *testing.T, home, configPath string, extraEnv []string, args .
 		"HOME=" + home,
 		"USERPROFILE=" + home,
 		"CURATOR_CONFIG=" + configPath,
-		"CURATOR_DRAFT_SOURCES_V1=1",
 	}, extraEnv...)
 	return testcli.Run(t, "", env, "", bin, args...)
 }

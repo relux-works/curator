@@ -72,7 +72,7 @@ func writeDraftScriptSkill(t *testing.T, dir, name, command, scriptBody string, 
 func draftLocalInstall(t *testing.T, cfgHome, project string, dryRun bool) Result {
 	t.Helper()
 	cfg := draftTestConfig(cfgHome, t.TempDir())
-	return Project(cfg, project, "test", Options{DryRun: dryRun, DraftSourcesV1: true, Platform: installPlatform()})
+	return Project(cfg, project, "test", Options{DryRun: dryRun, Platform: installPlatform()})
 }
 
 func draftLockedRuntimeKey(t *testing.T, project, name string) (lock *sourcelock.Lock, key string) {
@@ -330,9 +330,10 @@ func TestDraftLocalTamperedFrozenRuntimeRefuses(t *testing.T) {
 	assertNoInstallSideEffects(t, project, home)
 }
 
-// TestDraftLocalMissingSnapshotRefuses proves a missing locked snapshot
-// fails unavailable on the mutating path without publishing partial state.
-func TestDraftLocalMissingSnapshotRefuses(t *testing.T) {
+// TestDraftLocalMissingSnapshotReplays proves a missing locked snapshot is
+// restored from the declared path on the mutating install path without
+// rewriting the committed lock.
+func TestDraftLocalMissingSnapshotReplays(t *testing.T) {
 	project, home, _ := draftProject(t, draftLocalCollectionPayload, nil)
 	writeDraftScriptSkill(t, filepath.Join(project, "skills", "provider"), "provider", "ptool", "#!/bin/sh\necho v1\n", nil)
 	plan := resolveDraftForInstall(t, project, home, draftLocalCollectionPayload)
@@ -341,11 +342,29 @@ func TestDraftLocalMissingSnapshotRefuses(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	result := draftLocalInstall(t, home, project, false)
-	if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "source_snapshot_unavailable") {
-		t.Fatalf("result = %+v, want source_snapshot_unavailable", result)
+	lockBefore, err := os.ReadFile(sourcelock.PathIn(project))
+	if err != nil {
+		t.Fatal(err)
 	}
-	assertNoInstallSideEffects(t, project, home)
+	result := draftLocalInstall(t, home, project, false)
+	if result.Status != "ok" {
+		t.Fatalf("result = %+v, want replayed install", result)
+	}
+	lockAfter, err := os.ReadFile(sourcelock.PathIn(project))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(lockAfter) != string(lockBefore) {
+		t.Fatal("install replay modified Skillfile.lock.json")
+	}
+	lock, key := draftLockedRuntimeKey(t, project, "provider")
+	member, _ := lock.Find("provider")
+	if _, err := os.Stat(filepath.Join(home, "runtime", "provider", key, "scripts", "ptool.sh")); err != nil {
+		t.Fatalf("replayed runtime missing: %v", err)
+	}
+	if member.Package.Snapshot == "" {
+		t.Fatal("replayed member lost its locked package identity")
+	}
 }
 
 func assertNoInstallSideEffects(t *testing.T, project, home string) {
@@ -503,7 +522,7 @@ func TestDraftLocalInvalidCapabilitiesRefuseAtResolve(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(project, "skills", "review", "agent-skill.json"), encoded, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	m, err := manifest.ParseBytesWithOptions(raw, filepath.Join(project, "Skillfile.json"), manifest.ParseOptions{DraftSourcesV1: true})
+	m, err := manifest.ParseBytes(raw, filepath.Join(project, "Skillfile.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

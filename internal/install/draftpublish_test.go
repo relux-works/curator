@@ -413,7 +413,7 @@ func TestDraftInstallFailsStaleBindingsGeneration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, err := manifest.ParseBytesWithOptions(payload, filepath.Join(project, "Skillfile.json"), manifest.ParseOptions{DraftSourcesV1: true})
+	m, err := manifest.ParseBytes(payload, filepath.Join(project, "Skillfile.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -783,7 +783,7 @@ func driveV2ExternalMirrorAdmitted(t *testing.T, _ draftSemanticCase) {
 	deps, _ := xbBuildDeps(t)
 	external := install.ExternalDeps{GitTool: tool, DraftTransportResolution: true, DraftPolicyPath: policyPath, DraftProvidersPath: providersPath,
 		Audit: func(_ context.Context, _ buildrepo.AuditSubject) error { return nil }}
-	result := install.Project(draftInstallConfig(home), project, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform(), Build: deps, External: external})
+	result := install.Project(draftInstallConfig(home), project, "test", install.Options{Platform: draftPlatform(), Build: deps, External: external})
 	if result.Status != "ok" {
 		t.Fatalf("install = %+v", result)
 	}
@@ -859,7 +859,7 @@ func driveV2ExternalRefused(t *testing.T, skillGit, policyDoc, providersDoc stri
 	external := install.ExternalDeps{GitTool: tool, DraftTransportResolution: true, DraftPolicyPath: policyPath, DraftProvidersPath: providersPath,
 		Audit: func(_ context.Context, _ buildrepo.AuditSubject) error { return nil }}
 	before := treeDigest(t, project) + treeDigest(t, home)
-	result := install.Project(draftInstallConfig(home), project, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform(), Build: deps, External: external})
+	result := install.Project(draftInstallConfig(home), project, "test", install.Options{Platform: draftPlatform(), Build: deps, External: external})
 	if result.Status != "failed" {
 		t.Fatalf("install = %+v, want refusal", result)
 	}

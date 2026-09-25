@@ -41,7 +41,7 @@ func draftAuditConfig(home string) *config.Config {
 }
 
 func draftProjectResult(cfg *config.Config, project, _ string, dryRun bool) Result {
-	return Project(cfg, project, "test", Options{DryRun: dryRun, DraftSourcesV1: true, Platform: installPlatform()})
+	return Project(cfg, project, "test", Options{DryRun: dryRun, Platform: installPlatform()})
 }
 
 // A strict registry policy requires a network attestation that local

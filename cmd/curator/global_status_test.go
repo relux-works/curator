@@ -63,6 +63,17 @@ func globalScopeDeclaring(t *testing.T, declarations string) string {
 	return home
 }
 
+func TestGlobalStatusRejectsSchema2SkillfileThroughCLI(t *testing.T) {
+	home := globalScopeDeclaring(t, "")
+	writeFile(t, filepath.Join(install.GlobalRoot(home), manifest.Name),
+		`{"schema_version":2,"sources":{},"skills":[]}`)
+	configPath := filepath.Join(home, "config.json")
+	code, _, stderr := capture(t, configPath, "global", "status")
+	if code != exitFail || !strings.Contains(stderr, "global scope requires schema 1") {
+		t.Fatalf("global status with schema 2 = (%d, %q), want schema-1 scope refusal", code, stderr)
+	}
+}
+
 // compiledGlobalScope declares one skill that exports a schema 6 go-v1 build
 // command, so the machine-wide scope activates a compiled command.
 func compiledGlobalScope(t *testing.T) string {

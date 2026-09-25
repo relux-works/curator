@@ -1,8 +1,8 @@
-# Draft repository endpoint policy boundary
+# Repository endpoint policy for Skillfile schema 2
 
-This is an internal implementation of unreleased `repository-transport`
-revisions 1 and 2 (machine policy loading and attempt planning), not an
-enabled fetch path. Frozen v1 and release qualification are unchanged.
+Skillfile schema-2 project resolution uses the accepted `repository-transport`
+revisions 1 and 2 policy reader and endpoint planner by default. Schema-1
+Skillfiles keep their existing meaning and are not migrated.
 
 `config.LoadSourcePolicy` reads the operator-owned `source-policy.json`
 beside the manager configuration; `config.ParseSourcePolicy` validates
@@ -13,8 +13,7 @@ violations). Schema 2 (`schema_version: 2`) loads as the additive
 superset of §4: port-bearing endpoint and pin URLs, per-endpoint
 `mirror_of` attestation, and the operator host-alias table.
 
-Entries are keyed by exact canonical identity
-(`identity.DraftCanonicalKey`, no normalization); each lists one or two
+Entries are keyed by exact canonical identity without normalization; each lists one or two
 distinct endpoints, an opaque operator provider reference per endpoint
 (`gitcred.ValidProvider`, never a command or path), and a closed
 fallback mode. `pin` selects exactly one listed URL by exact string
@@ -46,9 +45,7 @@ once with no policy provider; a logical identity without an entry fails
 `repository_policy_invalid` before any acquisition. Package declarations
 stay canonical and logical and never name aliases.
 
-This layer plans only. Attempt bounds over ports/mirrors/aliases, the
-§6 failure classification beyond the loader's fail-closed rows,
-provenance recording, and the strict external-build lane refusals (§7)
-are implemented by the sibling resolution leaf
-(`buildrepo.AcquireNetworkResolved` behind
-`install.acquireDraftNetwork`); see `docs/draft-transport-resolution.md`.
+This layer plans only. Project source acquisition applies the bounded
+attempt rules and failure classification from the transport contract. The
+strict external-build lane has a separate opt-in gate; its execution and
+provenance details are in `docs/draft-transport-resolution.md`.

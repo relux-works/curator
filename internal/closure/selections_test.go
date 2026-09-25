@@ -30,7 +30,7 @@ func selectionProject(t *testing.T, root string, names []string, requirements ma
 			t.Fatal(err)
 		}
 	}
-	m, err := manifest.ParseBytesWithOptions([]byte(`{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["*"]}]}`), filepath.Join(root, manifest.Name), manifest.ParseOptions{DraftSourcesV1: true})
+	m, err := manifest.ParseBytes([]byte(`{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["*"]}]}`), filepath.Join(root, manifest.Name))
 	if err != nil {
 		t.Fatal(err)
 	}

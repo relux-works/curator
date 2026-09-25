@@ -65,7 +65,7 @@ func draftSweepProject(t *testing.T, payload string) (string, string) {
 // publishes the lock plus machine bindings, exactly like the CLI.
 func refreshDraftLocked(t *testing.T, project, home, payload string, gitRoots map[string]string) *closure.DraftPlan {
 	t.Helper()
-	m, err := manifest.ParseBytesWithOptions([]byte(payload), filepath.Join(project, "Skillfile.json"), manifest.ParseOptions{DraftSourcesV1: true})
+	m, err := manifest.ParseBytes([]byte(payload), filepath.Join(project, "Skillfile.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,6 @@ func refreshDraftLocked(t *testing.T, project, home, payload string, gitRoots ma
 func draftSweepInstall(t *testing.T, home, project string, opts Options) Result {
 	t.Helper()
 	cfg := draftTestConfig(home, t.TempDir())
-	opts.DraftSourcesV1 = true
 	opts.Platform = installPlatform()
 	return Project(cfg, project, "test", opts)
 }

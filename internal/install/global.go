@@ -89,6 +89,10 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 		result.Messages = append(result.Messages, "global: Skillfile.json not found; run 'curator global init' first")
 		return result, nil
 	}
+	if globalManifest.SchemaVersion != manifest.SchemaVersion {
+		result.failf("global: Skillfile schema %d is unsupported; global scope requires schema %d", globalManifest.SchemaVersion, manifest.SchemaVersion)
+		return result, nil
+	}
 
 	agents := globalManifest.Agents
 	if len(agents) == 0 {

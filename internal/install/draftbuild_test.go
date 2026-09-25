@@ -115,7 +115,7 @@ func draftExternalDeps(t *testing.T) ExternalDeps {
 func draftBuildInstall(t *testing.T, home, project string, deps BuildDeps, external ExternalDeps) Result {
 	t.Helper()
 	cfg := draftTestConfig(home, t.TempDir())
-	return Project(cfg, project, "test", Options{DraftSourcesV1: true, Platform: installPlatform(), Build: deps, External: external})
+	return Project(cfg, project, "test", Options{Platform: installPlatform(), Build: deps, External: external})
 }
 
 func readReceiptObject(t *testing.T, path string) map[string]any {
@@ -407,10 +407,10 @@ func TestDraftBuildToolchainFailureBehaviorIsPreserved(t *testing.T) {
 	}
 }
 
-// TestLegacyBuildsKeepReceipt1WithTheSwitchOff pins the frozen v1 lane: a
-// Git skill installed without the draft switch publishes a schema-1 receipt
-// under the legacy namespace and no receipt-3 namespace exists.
-func TestLegacyBuildsKeepReceipt1WithTheSwitchOff(t *testing.T) {
+// TestLegacyBuildsKeepReceipt1 pins the schema-1 receipt contract: a Git
+// skill publishes a schema-1 receipt under the legacy namespace and no
+// receipt-3 namespace exists.
+func TestLegacyBuildsKeepReceipt1(t *testing.T) {
 	e := newEnv(t)
 	e.buildSkill("build-skill", "alpha")
 	e.declare("build-skill")

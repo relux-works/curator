@@ -9,9 +9,7 @@ import (
 	"testing"
 )
 
-var draftOptions = ParseOptions{DraftSourcesV1: true}
-
-func TestDraftPublishedSchemaCases(t *testing.T) {
+func TestSchema2PublishedSchemaCases(t *testing.T) {
 	files, err := filepath.Glob("testdata/draft-sources-v1/skillfile-v2/*.json")
 	if err != nil || len(files) != 41 {
 		t.Fatalf("published corpus: %d files, %v", len(files), err)
@@ -23,7 +21,7 @@ func TestDraftPublishedSchemaCases(t *testing.T) {
 				t.Fatal(err)
 			}
 			root := writeManifest(t, string(payload))
-			_, err = LoadWithOptions(root, draftOptions)
+			_, err = Load(root)
 			want := strings.HasPrefix(filepath.Base(file), "valid-")
 			if (err == nil) != want {
 				t.Fatalf("valid=%v: %v", want, err)
@@ -32,26 +30,21 @@ func TestDraftPublishedSchemaCases(t *testing.T) {
 	}
 }
 
-func TestDraftCapabilityAdmission(t *testing.T) {
+func TestSchemaVersionAdmission(t *testing.T) {
 	for _, version := range []string{"0", "1", "2", "3", "2.5", "null", `"2"`, "1e100"} {
 		payload := []byte(`{"schema_version":` + version + `,"skills":[]}`)
-		for _, opted := range []bool{false, true} {
-			_, err := ParseBytesWithOptions(payload, "/missing/Skillfile.json", ParseOptions{DraftSourcesV1: opted})
-			want := version == "1" || version == "2" && opted
-			if (err == nil) != want {
-				t.Errorf("version=%s opted=%v err=%v", version, opted, err)
-			}
+		_, err := ParseBytes(payload, "/missing/Skillfile.json")
+		want := version == "1" || version == "2"
+		if (err == nil) != want {
+			t.Errorf("version=%s err=%v", version, err)
 		}
 	}
 	root := writeManifest(t, `{"schema_version":2,"skills":[]}`)
-	if _, err := Load(root); err == nil {
-		t.Fatal("legacy Load accepted draft")
+	if m, err := Load(root); err != nil || m == nil || m.SchemaVersion != 2 {
+		t.Fatalf("Load schema 2 = (%+v, %v), want accepted schema 2", m, err)
 	}
-	if _, err := ParseBytes([]byte(`{"schema_version":2,"skills":[]}`), "Skillfile.json"); err == nil {
-		t.Fatal("legacy ParseBytes accepted draft")
-	}
-	if _, err := Parse(map[string]any{"schema_version": float64(2), "skills": []any{}}, "Skillfile.json"); err == nil {
-		t.Fatal("legacy Parse accepted draft")
+	if m, err := Parse(map[string]any{"schema_version": float64(2), "skills": []any{}}, "Skillfile.json"); err != nil || m.SchemaVersion != 2 {
+		t.Fatalf("Parse schema 2 = (%+v, %v), want accepted schema 2", m, err)
 	}
 }
 
@@ -61,7 +54,7 @@ func TestDraftPreservesEveryLegacyField(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	draft, err := ParseBytesWithOptions([]byte(strings.Replace(payload, `"schema_version":1`, `"schema_version":2`, 1)), "/project/Skillfile.json", draftOptions)
+	draft, err := ParseBytes([]byte(strings.Replace(payload, `"schema_version":1`, `"schema_version":2`, 1)), "/project/Skillfile.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +69,7 @@ func TestDraftPreservesEveryLegacyField(t *testing.T) {
 
 func TestDraftSourceUnionAndSelectors(t *testing.T) {
 	payload := `{"schema_version":2,"sources":{"rel":{"path":"../$HOME/~kit"},"abs":{"path":"/missing/kit"},"url":{"git":"ssh://git@EXAMPLE.org/team/kit.git","branch":"feature/work"},"logical":{"repository":"example.org/team/kit","revision":"` + strings.Repeat("a", 64) + `"}},"skills":[{"name":"one","from":"rel","directory":"."},{"from":"logical","directory":"skills","include":["*","two"],"exclude":["three"]}]}`
-	m, err := LoadWithOptions(writeManifest(t, payload), draftOptions)
+	m, err := Load(writeManifest(t, payload))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +93,7 @@ func TestDraftNegativeAdmission(t *testing.T) {
 		`{"s":{"repository":"example.org/a","tag":"foo.lock"}}`, `{"s":{"repository":"example.org/a","branch":null}}`,
 	}
 	for _, source := range sources {
-		_, err := ParseBytesWithOptions([]byte(`{"schema_version":2,"sources":`+source+`,"skills":[]}`), "/nonexistent/Skillfile.json", draftOptions)
+		_, err := ParseBytes([]byte(`{"schema_version":2,"sources":`+source+`,"skills":[]}`), "/nonexistent/Skillfile.json")
 		if err == nil {
 			t.Errorf("accepted sources %s", source)
 		}
@@ -116,7 +109,7 @@ func TestDraftNegativeAdmission(t *testing.T) {
 		selections = append(selections, `{"name":"a","from":"s","directory":`+string(encoded)+`}`)
 	}
 	for _, selection := range selections {
-		_, err := ParseBytesWithOptions([]byte(`{"schema_version":2,"sources":{"s":{"path":"/nonexistent"}},"skills":[`+selection+`]}`), "/nonexistent/Skillfile.json", draftOptions)
+		_, err := ParseBytes([]byte(`{"schema_version":2,"sources":{"s":{"path":"/nonexistent"}},"skills":[`+selection+`]}`), "/nonexistent/Skillfile.json")
 		if err == nil {
 			t.Errorf("accepted selection %s", selection)
 		}
@@ -125,10 +118,10 @@ func TestDraftNegativeAdmission(t *testing.T) {
 		`{"schema_version":2,"schema_version":1,"skills":[]}`,
 		`{"schema_version":2,"sources":{"s":{"path":"a","path":"b"}},"skills":[]}`,
 		`{"schema_version":1,"sources":{},"skills":[]}`,
-		`{"schema_version":2,"DraftSourcesV1":true,"skills":[]}`,
+		`{"schema_version":2,"unsupported_toggle":true,"skills":[]}`,
 		`{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"name":"a","tag":"v1"},{"name":"a","from":"s","directory":"."}]}`,
 	} {
-		if _, err := ParseBytesWithOptions([]byte(payload), "/missing/Skillfile.json", draftOptions); err == nil {
+		if _, err := ParseBytes([]byte(payload), "/missing/Skillfile.json"); err == nil {
 			t.Errorf("accepted %s", payload)
 		}
 	}
@@ -138,7 +131,7 @@ func TestDraftValidRefsAndEndpoints(t *testing.T) {
 	for _, endpoint := range []string{`"git":"https://EXAMPLE.org/a.git"`, `"git":"ssh://git@example.org/a"`, `"git":"git@example.org:a"`, `"repository":"example.org/a"`} {
 		for _, ref := range []string{`"tag":"v1"`, `"branch":"feature/x"`, `"revision":"` + strings.Repeat("a", 40) + `"`, `"revision":"` + strings.Repeat("b", 64) + `"`} {
 			payload := `{"schema_version":2,"sources":{"s":{` + endpoint + `,` + ref + `}},"skills":[]}`
-			if _, err := ParseBytesWithOptions([]byte(payload), "/missing/Skillfile.json", draftOptions); err != nil {
+			if _, err := ParseBytes([]byte(payload), "/missing/Skillfile.json"); err != nil {
 				t.Errorf("%s: %v", payload, err)
 			}
 		}
@@ -150,14 +143,14 @@ func TestDraftRefGrammarBounds(t *testing.T) {
 		for _, value := range []string{"@", "/a", "a/", "a.", "a//b", "a..b", "a@{b", "a b", "a\x7fb", "a~b", "a^b", "a:b", "a?b", "a*b", "a[b", `a\b`, ".a", "x/.a", "x/a.lock", strings.Repeat("é", 256)} {
 			raw, _ := json.Marshal(value)
 			payload := `{"schema_version":2,"sources":{"s":{"repository":"example.org/a","` + kind + `":` + string(raw) + `}},"skills":[]}`
-			if _, err := ParseBytesWithOptions([]byte(payload), "/missing/Skillfile.json", draftOptions); err == nil {
+			if _, err := ParseBytes([]byte(payload), "/missing/Skillfile.json"); err == nil {
 				t.Errorf("accepted %s %q", kind, value)
 			}
 		}
 		for _, value := range []string{"a", "é", strings.Repeat("é", 255), "heads/a", "a.locked"} {
 			raw, _ := json.Marshal(value)
 			payload := `{"schema_version":2,"sources":{"s":{"repository":"example.org/a","` + kind + `":` + string(raw) + `}},"skills":[]}`
-			if _, err := ParseBytesWithOptions([]byte(payload), "/missing/Skillfile.json", draftOptions); err != nil {
+			if _, err := ParseBytes([]byte(payload), "/missing/Skillfile.json"); err != nil {
 				t.Errorf("rejected %s %q: %v", kind, value, err)
 			}
 		}

@@ -144,11 +144,10 @@ curator install --dry-run
 
 The command prints planned installation steps without modifying disk files.
 
-For schema-2 projects with the draft opt-in switch set, `install`
-materializes the locked snapshot and repairs drifted bytes from the
-lock without touching the lock itself; see [Draft Skillfile
-sources](#draft-skillfile-sources-opt-in-unreleased). Run `install -h`
-with the switch set for the workflow summary.
+For schema-2 projects, `install` materializes the locked snapshot and
+repairs drifted bytes from the lock without touching the lock itself;
+see [Skillfile schema 2 project sources](#skillfile-schema-2-project-sources).
+Run `install -h` for the workflow summary.
 
 ### curator update
 
@@ -196,7 +195,10 @@ Upgrade project dependencies:
 curator upgrade .
 ```
 
-The command resolves updated revisions, updates `Skillfile.lock`, and materializes skill packages.
+For schema-2 projects, upgrade consumes the committed lock without resolving
+tags or branches again. It re-materializes missing snapshots from their
+declared source at the locked revision and leaves the lock unchanged. Use
+`curator project refresh` to explicitly resolve refs and replace the lock.
 
 ### curator status
 
@@ -223,11 +225,10 @@ curator status --json
 
 The command prints status diagnostics for declared skills and compiled commands.
 
-For schema-2 projects with the draft opt-in switch set, `status`
-compares installed state against the frozen lock only — it never
-rescans collections, advances branches, or replaces a local snapshot;
-see [Draft Skillfile sources](#draft-skillfile-sources-opt-in-unreleased).
-Run `status -h` with the switch set for the workflow summary.
+For schema-2 projects, `status` compares installed state against the
+frozen lock only — it never rescans collections, advances branches, or
+replaces a local snapshot; see [Skillfile schema 2 project sources](#skillfile-schema-2-project-sources).
+Run `status -h` for the workflow summary.
 
 `curator status` also reports the shell-hook trust posture (Manager profile
 §8.6): one `shell-hook-trust:` row per known project env file — every
@@ -304,20 +305,22 @@ Resolve project dependencies:
 curator project resolve .
 ```
 
-The command updates `Skillfile.lock` with resolved dependency commits and content hashes.
+Schema-2 projects use the committed `Skillfile.lock.json` described below.
+Schema-1 projects retain their existing behavior.
 
-For frozen v1 projects the command prints the alias, project path,
+For schema-1 projects the command prints the alias, project path,
 Skillfile path, and managed skill and bin directories without modifying
-disk state. For schema-2 projects with the draft opt-in switch set (see
-[Draft Skillfile sources](#draft-skillfile-sources-opt-in-unreleased)),
-it runs the explicit attempt: it acquires every Git source alias,
-freezes local bytes and Git commits into a locked plan, and publishes
-`Skillfile.lock.json` plus the machine bindings transactionally after
-every gate succeeds. With `CURATOR_DRAFT_SOURCES_V1=1`, `curator project
-resolve -h` prints the draft workflow; with the switch off the `-h` and
-`--help` spellings keep the frozen v1 behavior (they resolve the current
-project exactly as before). The bare word `help` is never a help flag:
-it resolves as a project alias or path.
+disk state. Schema-2 projects use the workflow described in
+[Skillfile schema 2 project sources](#skillfile-schema-2-project-sources);
+it acquires every Git source alias, freezes local bytes and Git commits
+into a locked plan, and publishes `Skillfile.lock.json` plus the machine
+bindings transactionally after every gate succeeds.
+Commit `Skillfile.lock.json` with `Skillfile.json`, like
+`package-lock.json`. The lock contains portable package identities; the
+machine-local source bindings stay outside the project.
+`curator project resolve -h` prints the workflow. Schema 1 keeps its
+exact meaning; no on-disk migration is implicit. The bare word `help` is
+never a help flag: it resolves as a project alias or path.
 
 ### curator project refresh
 
@@ -334,7 +337,7 @@ Synopsis:
 curator project refresh [path]
 ```
 
-Refresh a draft lock after editing sources or after upstream refs moved:
+Refresh a schema-2 lock after editing sources or after upstream refs moved:
 
 ```bash
 curator project refresh .
@@ -343,25 +346,22 @@ curator install .
 
 Refresh alone changes nothing live: run `curator install` afterwards to
 materialize the refreshed lock. Launch and status never refresh on
-their own. Run `curator project refresh -h` for the workflow (draft
-switch on; with the switch off the flag spellings keep the frozen v1
-behavior, as for `resolve`).
+their own. Run `curator project refresh -h` for the workflow.
 
-## Draft Skillfile sources (opt-in, unreleased)
+## Skillfile schema 2 project sources
 
-Skillfile schema 2 with local and Git sources is draft functionality
-behind the operator-owned opt-in switch. It is not part of the released
-v1 behavior: package data can neither set nor observe the switch, and
-with the switch off schema 2 fails closed while frozen v1 behaves
-byte-identically.
-
-```bash
-export CURATOR_DRAFT_SOURCES_V1=1
-```
+Skillfile schema 2 is the default project reader and install path. Schema
+1 retains its exact meaning, and no on-disk migration is implicit.
 
 ### Workflow
 
 Five existing verbs move a schema-2 project; no new command is added:
+
+Commit `Skillfile.lock.json` with `Skillfile.json`, like
+`package-lock.json`. When a local snapshot is missing, install and upgrade
+re-read the declared path bytes or fetch the exact locked Git revision. They
+continue only when package identity and `content_sha256` match the lock, do
+not resolve a tag or branch again, and leave the lock bytes unchanged.
 
 ```bash
 curator project resolve .   # freeze declared sources into Skillfile.lock.json
@@ -378,8 +378,8 @@ edited after resolve fails `source_lock_stale` until refresh; running
 install again after refresh repairs drifted bytes from the lock while
 the lock bytes stay identical. Every stable `source_*` and
 `repository_*` failure prints a sanitized remediation naming the fix;
-see [Draft source and transport
-diagnostics](troubleshooting.md#draft-source-and-transport-diagnostics).
+see [Skillfile source and transport
+diagnostics](troubleshooting.md#skillfile-source-and-transport-diagnostics).
 
 ### Local sources
 
@@ -515,7 +515,7 @@ default `known_hosts` and default identity files; `TMPDIR`/`TMP`/`TEMP`;
 every other ambient name — `GIT_SSH`/`GIT_SSH_COMMAND`,
 `GIT_PROXY_COMMAND`, `GIT_EXEC_PATH`, every other `GIT_*` override, and
 the proxy environment — is dropped by construction and cannot redirect
-or hijack the clone, so the draft lane does not honour proxy
+or hijack the clone, so this source acquisition path does not honour proxy
 environment. SSH runs a curator-owned command with an empty ssh config
 (`-F` an empty file, `BatchMode`, `StrictHostKeyChecking=yes`,
 `ProxyCommand=none`, `ProxyJump=none`, forwarding disabled, host-key

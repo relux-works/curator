@@ -214,6 +214,25 @@ func TestFetchIsolatedIgnoresUserConfig(t *testing.T) {
 	}
 }
 
+func TestFetchCommitFromURLIsolatedRequestsLockedObjectWithoutTags(t *testing.T) {
+	source := makeRepo(t)
+	locked := gitRun(t, source, "rev-parse", "refs/tags/v1^{commit}")
+	destination := filepath.Join(t.TempDir(), "replay")
+	if err := FetchCommitFromURLIsolated(destination, fileURL(t, source), locked); err != nil {
+		t.Fatal(err)
+	}
+	if got := gitRun(t, destination, "show", locked+":SKILL.md"); got != "v1" {
+		t.Fatalf("locked tree content = %q, want v1", got)
+	}
+	tags, err := os.ReadDir(filepath.Join(destination, ".git", "refs", "tags"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tags) != 0 {
+		t.Fatalf("exact-object fetch unexpectedly populated tag refs: %v", tags)
+	}
+}
+
 func TestIsolatedGitEnvPinsEmptyConfig(t *testing.T) {
 	hostile := filepath.Join(t.TempDir(), "hostile.gitconfig")
 	if err := os.WriteFile(hostile, []byte("[url \"https://evil.test/\"]\n\tinsteadOf = https://example.org/\n"), 0o644); err != nil {

@@ -64,13 +64,7 @@ func (c cli) cmdProjectResolve(cfg *config.Config, target projectTarget, verb st
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
-	draft := install.DraftSourcesEnabled(os.Getenv)
-	var projectManifest *manifest.Manifest
-	if draft {
-		projectManifest, err = manifest.ParseBytesWithOptions(payload, manifest.PathIn(target.Root), manifest.ParseOptions{DraftSourcesV1: true})
-	} else {
-		projectManifest, err = manifest.ParseBytes(payload, manifest.PathIn(target.Root))
-	}
+	projectManifest, err := manifest.ParseBytes(payload, manifest.PathIn(target.Root))
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", withDraftRemediation(err.Error()))
 		return exitFail
@@ -80,10 +74,6 @@ func (c cli) cmdProjectResolve(cfg *config.Config, target projectTarget, verb st
 		_, _ = fmt.Fprintf(c.stdout, "alias: %s\npath: %s\nskillfile: %s\n", target.Alias, target.Root, filepath.Join(target.Root, manifest.Name))
 		_, _ = fmt.Fprintf(c.stdout, "skills: %s\nbin: %s\n", filepath.Join(target.Root, ".agents", "skills"), filepath.Join(target.Root, ".agents", "bin"))
 		return exitOK
-	}
-	if !draft {
-		_, _ = fmt.Fprintf(c.stderr, "curator: source_selection_invalid: Skillfile schema 2 requires the draft lane; unset %s keeps frozen v1\n", install.EnvDraftSourcesV1)
-		return exitFail
 	}
 	plan, lockPath, bindingsPath, err := c.resolveDraftPlan(cfg, target, projectManifest, payload)
 	if err != nil {

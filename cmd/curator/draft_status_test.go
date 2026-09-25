@@ -3,7 +3,7 @@ package main
 // Draft source currentness at the CLI production entry.
 //
 // These tests drive `project resolve`, `install`, and `status` through
-// run() with the draft switch set in-process. Status consumes the frozen
+// run() with the source lane enabled. Status consumes the frozen
 // lock only: changed package, lock, attestation, substitution, or
 // declared ref is non-current, live-byte mutation without refresh stays
 // current, and every check stays read-only with a nonzero --check exit
@@ -28,7 +28,6 @@ const draftStatusPayload = `{"schema_version":2,"sources":{"s":{"path":"."}},"sk
 // returns the config path and project root.
 func setupDraftStatusProject(t *testing.T) (configPath, project string) {
 	t.Helper()
-	withDraftSourcesSwitch(t)
 	root := t.TempDir()
 	configPath, project = setupCLIProject(t, root)
 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(draftStatusPayload), 0o644); err != nil {
@@ -279,7 +278,6 @@ func TestDraftStatusStaleManifestRefuses(t *testing.T) {
 // resolved nor installed, so status prints the refusal and --check is
 // nonzero — never an empty, silent success.
 func TestDraftStatusStaleEmptyLockRefuses(t *testing.T) {
-	withDraftSourcesSwitch(t)
 	root := t.TempDir()
 	configPath, project := setupCLIProject(t, root)
 	empty := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[]}`
@@ -486,10 +484,10 @@ func draftStatusRecorded(snapshot, lockSHA string) *marker.Marker {
 	}
 }
 
-// TestDraftStatusAppliesKeepsLegacyProjectsUntouched pins the diversion
-// guard: only a schema-2 manifest with the draft switch takes the draft
-// lane. Every other shape keeps the legacy surface byte-identically.
-func TestDraftStatusAppliesKeepsLegacyProjectsUntouched(t *testing.T) {
+// TestDraftStatusAppliesKeepsSchema1ProjectsUntouched pins the default
+// diversion: schema 2 takes the locked status path while schema 1 and
+// missing manifests keep the legacy surface.
+func TestDraftStatusAppliesKeepsSchema1ProjectsUntouched(t *testing.T) {
 	write := func(t *testing.T, payload string) string {
 		t.Helper()
 		dir := t.TempDir()
@@ -501,21 +499,14 @@ func TestDraftStatusAppliesKeepsLegacyProjectsUntouched(t *testing.T) {
 	schema2 := write(t, `{"schema_version":2,"sources":{},"skills":[]}`)
 	schema1 := write(t, `{"schema_version":1,"skills":[]}`)
 
-	if draftStatusApplies(schema2) {
-		t.Fatalf("schema-2 without the switch takes the draft lane")
+	if !draftStatusApplies(schema2) {
+		t.Fatalf("schema 2 does not take the locked status path")
 	}
 	if draftStatusApplies(schema1) {
-		t.Fatalf("schema-1 takes the draft lane")
+		t.Fatalf("schema-1 takes the schema-2 lane")
 	}
 	if draftStatusApplies(t.TempDir()) {
-		t.Fatalf("a missing manifest takes the draft lane")
-	}
-	withDraftSourcesSwitch(t)
-	if !draftStatusApplies(schema2) {
-		t.Fatalf("schema-2 with the switch keeps the legacy lane")
-	}
-	if draftStatusApplies(schema1) {
-		t.Fatalf("schema-1 with the switch takes the draft lane")
+		t.Fatalf("a missing manifest takes the schema-2 lane")
 	}
 }
 

@@ -353,11 +353,11 @@ curator install --verbose
 
 The command prints detailed execution diagnostic messages.
 
-## Draft source and transport diagnostics
+## Skillfile source and transport diagnostics
 
-These stable classes appear only on the draft Skillfile lane
-(`CURATOR_DRAFT_SOURCES_V1=1`). Each names the selector or member and
-the reason without secrets, and the CLI appends a sanitized
+These stable classes describe schema-2 project source resolution and
+installation. Each class names the selector or member and the reason
+without secrets, and the CLI appends a sanitized
 remediation. Fetch failures report one closed-vocabulary clause per
 attempted endpoint (`availability`, `auth`, `tls`, `host-key`,
 `ref-moved`, `identity`, `integrity`, `audit`, `http-404`,
@@ -432,20 +432,24 @@ run `curator project resolve`.
 
 Symptom: `source_snapshot_changed` with the member name.
 
-Cause: admitted inputs changed during capture — a concurrent edit, a
-membership change mid-collection, or a store tree that no longer
-matches its locked content.
+Cause: admitted inputs changed during capture, or a source replay
+produced a package identity or `content_sha256` that differs from the
+committed lock.
 
-Remedy: retry the explicit attempt without editing mid-run.
+Remedy: restore the declared source to the package identity and
+`content_sha256` in `Skillfile.lock.json`, then retry install. Run
+`curator project refresh` only when intentionally changing the lock.
 
 ### source_snapshot_unavailable
 
 Symptom: `source_snapshot_unavailable` with the member name.
 
-Cause: install or status found no lock, no machine bindings, or no
-frozen snapshot for the member.
+Cause: the declared path or Git source cannot be reached to replay the
+locked package. A missing local snapshot and machine bindings are
+expected on a fresh machine when the source is available.
 
-Remedy: run the explicit attempt first: `curator project resolve`.
+Remedy: restore access to the declared path or Git source, then retry
+install.
 
 ### source_lock_stale
 

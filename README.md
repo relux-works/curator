@@ -58,7 +58,7 @@ gh attestation verify <artifact> --owner relux-works
 Curator controls environment dependencies and runtime delivery:
 
 - **Skill packages**: `SKILL.md` plus context directories, with an implementation-neutral machine manifest (`agent-skill.json`, schemas 1 through 8) declaring commands, runtime layout, capabilities, and dependencies. The legacy `csk-skill.json` filename remains readable. See [Authoring CLI commands](docs/authoring-cli-commands.md) for command declarations, drivers, and worked examples.
-- **Project manifests**: `Skillfile.json` with exact git references; non-committed development substitutions.
+- **Project manifests**: `Skillfile.json` and committed `Skillfile.lock.json`, like `package-lock.json`; machine source bindings and development substitutions remain private.
 - **Resolution**: Transitive dependency closures unified to one commit and one source identity per name, with activation modes.
 - **Installation**: Context and runtime separation, install markers with content hashes, a commit-keyed runtime store, command shims, managed per-agent adapters.
 - **Scopes**: Project, global, and hybrid (machine-stored, per-project activation).
@@ -227,15 +227,12 @@ curator config build-https  # configure HTTPS credentials for external build rep
 
 </details>
 
-## Draft Skillfile sources (opt-in, unreleased)
+## Skillfile schema 2 project sources
 
-Skillfile schema 2 with local and Git sources is draft functionality
-behind the operator-owned switch `CURATOR_DRAFT_SOURCES_V1=1`. It is
-not part of the released v1 behavior: with the switch off, schema 2
-fails closed and frozen v1 behaves byte-identically.
+Skillfile schema 2 source declarations are supported by default for
+projects. Schema 1 retains its exact meaning, and no on-disk migration is implicit.
 
 ```bash
-export CURATOR_DRAFT_SOURCES_V1=1
 curator project resolve .   # freeze sources into Skillfile.lock.json
 curator install .           # materialize the locked snapshot (repairs drift)
 curator status .            # compare installed state against the lock
@@ -256,16 +253,15 @@ curator project refresh .   # re-resolve explicitly, then install again
 }
 ```
 
-Local paths freeze working-tree bytes (never Git HEAD); Git aliases
-pin exactly one tag, branch, or revision; collections select immediate
-child directories. Installed shims execute the frozen runtime — launch
-and status never rescan live inputs. Git endpoint selection and root
+Local paths freeze working-tree bytes (never Git HEAD); Git aliases pin
+exactly one tag, branch, or revision; collections select immediate child
+directories. Installed shims execute the frozen runtime — launch and
+status never rescan live inputs. Git endpoint selection and root
 admission come from operator-owned `source-policy.json` beside the
-manager configuration. See [Draft Skillfile
-sources](docs/cli.md#draft-skillfile-sources-opt-in-unreleased) for
-local, absolute, Git, and collection examples with machine policy
-setup, and [Draft source and transport
-diagnostics](docs/troubleshooting.md#draft-source-and-transport-diagnostics)
+manager configuration. See [Skillfile schema 2 sources](docs/cli.md#skillfile-schema-2-project-sources)
+for local, absolute, Git, and collection examples with machine policy
+setup, and [Skillfile source and transport
+diagnostics](docs/troubleshooting.md#skillfile-source-and-transport-diagnostics)
 for the stable error classes.
 
 ## An open protocol

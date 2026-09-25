@@ -1,9 +1,10 @@
-# Draft bounded transport resolution boundary
+# Bounded repository transport resolution
 
-This is an internal implementation of unreleased `repository-transport-v1`
-revision 1 §2 (bounded authenticated endpoint resolution) on the strict
-external-repository lane, not an enabled fetch path. Frozen v1 and release
-qualification are unchanged.
+This documents bounded repository endpoint resolution under
+`repository-transport` revisions 1 and 2. Project Skillfile source
+resolution uses the policy planner by default. External build-repository
+resolution remains behind the separate `CURATOR_DRAFT_TRANSPORT_RESOLUTION`
+operator gate and is outside the Skillfile source default.
 
 `buildrepo.AcquireNetworkResolved` applies a `TransportPlan` — one or two
 closed-grammar endpoints for one canonical identity, an opaque operator
@@ -113,11 +114,11 @@ configuration (`~/.ssh/config` Host aliases, `insteadOf`,
 the lane pins its own configuration paths, broker, and wrapper, and
 fetches the declared URL literally when no policy entry applies.
 
-## Production caller (draft)
+## External build-repository caller
 
 The external-repository lane (repository-transport §3: an existing lane
 using its URL declaration with an admitted machine policy) selects this
-executor behind the draft/opt-in switch
+executor behind the separate opt-in switch
 `CURATOR_DRAFT_TRANSPORT_RESOLUTION=1`, read once at the CLI boundary into
 `install.ExternalDeps`. The logical `repository` spelling stays parser-only:
 no caller here mints it, so resolution always starts from the declared URL.
@@ -128,8 +129,8 @@ manager configuration, resolves the declared URL with
 `TransportPlan` field-for-field — including the revision-2 `mirror_of`,
 `alias`, and resolved connection address — and calls
 `AcquireNetworkResolved`. A present policy selects the resolved lane; an
-absent policy file, or the switch off, runs `AcquireNetwork` with the
-exact legacy request — the switch-off path never opens the policy file.
+absent policy file, or the gate disabled, runs `AcquireNetwork` with the
+exact legacy request — the disabled-gate path never opens the policy file.
 A present-but-invalid policy fails `repository_policy_invalid` before
 any fetch; an unattested mirror fails `repository_mirror_undeclared`
 and a dangling alias fails `repository_alias_unknown`, both with zero
@@ -147,7 +148,7 @@ manager-home operation diagnostics log
 only: canonical identity, listed URL, resolved host and port, alias and
 `mirror_of` when used, lane transport, provider identifier, outcome) —
 never portable artifacts. The legacy lane never invokes it, so
-switch-off runs create no file.
+disabled-gate runs create no file.
 
 Policy-named providers resolve only through the operator's provider table,
 `source-providers.json` beside the manager configuration, read through
@@ -178,4 +179,4 @@ The wiring also repairs the declared-URL threading the lane needs to fetch
 at all: the default closure used to pass the repository's configured name
 where the lane requires the URL, so every unfetched acquisition refused in
 admission. `ExternalSource` now carries the declared URL and the legacy lane
-fetches it. The switch-off golden pins the repaired legacy bytes.
+fetches it. The disabled-gate regression test pins the legacy bytes.

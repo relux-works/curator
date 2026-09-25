@@ -40,7 +40,7 @@ func setupGitScriptInstall(t *testing.T) (project, home, repo string) {
 	testGit(t, repo, "add", ".")
 	testGit(t, repo, "commit", "-qm", "fixture")
 	testGit(t, repo, "tag", "v1")
-	m, err := manifest.ParseBytesWithOptions([]byte(payload), filepath.Join(project, "Skillfile.json"), manifest.ParseOptions{DraftSourcesV1: true})
+	m, err := manifest.ParseBytes([]byte(payload), filepath.Join(project, "Skillfile.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func setupGitBuildInstall(t *testing.T) (project, home string) {
 	testGit(t, repo, "add", ".")
 	testGit(t, repo, "commit", "-qm", "fixture")
 	testGit(t, repo, "tag", "v1")
-	m, err := manifest.ParseBytesWithOptions([]byte(payload), filepath.Join(project, "Skillfile.json"), manifest.ParseOptions{DraftSourcesV1: true})
+	m, err := manifest.ParseBytes([]byte(payload), filepath.Join(project, "Skillfile.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +103,6 @@ func setupGitBuildInstall(t *testing.T) (project, home string) {
 func draftRealInstall(t *testing.T, project, home string, opts Options) Result {
 	t.Helper()
 	cfg := draftTestConfig(home, t.TempDir())
-	opts.DraftSourcesV1 = true
 	opts.Platform = installPlatform()
 	return Project(cfg, project, "test", opts)
 }
@@ -248,7 +247,7 @@ func TestDraftGitMarkerLockBindingRoundTrip(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(movedPayload), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	moved, err := manifest.ParseBytesWithOptions([]byte(movedPayload), filepath.Join(project, "Skillfile.json"), manifest.ParseOptions{DraftSourcesV1: true})
+	moved, err := manifest.ParseBytes([]byte(movedPayload), filepath.Join(project, "Skillfile.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -581,7 +580,7 @@ func TestDraftSelectorSubstitutionForbidden(t *testing.T) {
 		cfg := draftTestConfig(home, t.TempDir())
 		cfg.Audit.Enabled = true
 		cfg.Audit.Mode = "strict"
-		result := Project(cfg, project, "test", Options{DraftSourcesV1: true, Platform: installPlatform()})
+		result := Project(cfg, project, "test", Options{Platform: installPlatform()})
 		if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "strict audit refuses substituted installs") {
 			t.Fatalf("install = %+v, want the strict refusal", result)
 		}

@@ -242,7 +242,7 @@ func driveSelectorSubstitutionForbidden(t *testing.T, _ draftSemanticCase) {
 	}
 	before := treeDigest(t, project) + treeDigest(t, home)
 	cfg := draftInstallConfig(home)
-	result := install.Project(cfg, project, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform()})
+	result := install.Project(cfg, project, "test", install.Options{Platform: draftPlatform()})
 	if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "source_selection_invalid") {
 		t.Fatalf("install = %+v, want the from-selector substitution refusal", result)
 	}
@@ -261,7 +261,7 @@ func driveLocalRequiredRegistry(t *testing.T, _ draftSemanticCase) {
 	cfg := draftInstallConfig(home)
 	cfg.Audit.RegistryPolicy = "strict"
 	before := treeDigest(t, project) + treeDigest(t, home)
-	result := install.Project(cfg, project, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform()})
+	result := install.Project(cfg, project, "test", install.Options{Platform: draftPlatform()})
 	if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "no network attestation identity") {
 		t.Fatalf("install = %+v, want the local attestation refusal", result)
 	}
@@ -281,7 +281,7 @@ func driveExternalSubstitutionStrict(t *testing.T, _ draftSemanticCase) {
 	cfg.Audit.Enabled = true
 	cfg.Audit.Mode = "strict"
 	before := treeDigest(t, project) + treeDigest(t, home)
-	result := install.Project(cfg, project, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform()})
+	result := install.Project(cfg, project, "test", install.Options{Platform: draftPlatform()})
 	if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "strict audit refuses substituted installs") {
 		t.Fatalf("install = %+v, want the strict substitution refusal", result)
 	}

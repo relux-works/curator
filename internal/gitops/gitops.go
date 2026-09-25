@@ -370,6 +370,76 @@ func FetchIsolated(repo string) error {
 	})
 }
 
+// FetchCommitIsolated requests one locked object ID from the repository's
+// origin. It does not fetch tags or branches, so callers cannot accidentally
+// advance a symbolic reference while replaying a lock.
+func FetchCommitIsolated(repo, commit string) error {
+	if err := validateLockedCommit(commit); err != nil {
+		return err
+	}
+	env, cleanup, err := isolatedGitEnv()
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+	if err := EnsureRepo(repo); err != nil {
+		return err
+	}
+	_, err = runWithEnv(repo, env, withIsolatedConfigArgs([]string{"fetch", "--no-tags", "--no-write-fetch-head", "origin", commit})...)
+	return err
+}
+
+// FetchCommitFromURLIsolated initializes a private object database when
+// needed, then requests only the given locked object ID from remoteURL. The
+// repository path is retained so subsequent frozen reads can authenticate the
+// same object without consulting a tag or branch.
+func FetchCommitFromURLIsolated(repo, remoteURL, commit string) error {
+	if err := validateLockedCommit(commit); err != nil {
+		return err
+	}
+	trimmed := strings.TrimSpace(remoteURL)
+	if trimmed == "" || strings.HasPrefix(trimmed, "-") {
+		return fmt.Errorf("refusing to fetch from suspicious git URL")
+	}
+	created := false
+	if _, err := os.Lstat(repo); err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(repo), 0o755); err != nil {
+			return err
+		}
+		created = true
+	}
+	env, cleanup, err := isolatedGitEnv()
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+	if created {
+		if _, err := runWithEnv("", env, withIsolatedConfigArgs([]string{"init", "--quiet", repo})...); err != nil {
+			_ = os.RemoveAll(repo)
+			return err
+		}
+	} else if err := EnsureRepo(repo); err != nil {
+		return err
+	}
+	_, err = runWithEnv(repo, env, withIsolatedConfigArgs([]string{"fetch", "--no-tags", "--no-write-fetch-head", trimmed, commit})...)
+	return err
+}
+
+func validateLockedCommit(commit string) error {
+	if len(commit) != 40 && len(commit) != 64 {
+		return fmt.Errorf("refusing non-full locked Git object ID")
+	}
+	for _, character := range commit {
+		if (character < '0' || character > '9') && (character < 'a' || character > 'f') {
+			return fmt.Errorf("refusing non-canonical locked Git object ID")
+		}
+	}
+	return nil
+}
+
 func fetchWith(repo string, runFn func(dir string, args ...string) (string, error)) error {
 	if err := EnsureRepo(repo); err != nil {
 		return err

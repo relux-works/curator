@@ -22,7 +22,7 @@ func packageAt(t *testing.T, root, folder, name string) string {
 }
 func expandFixture(t *testing.T, root, selectors string) (*Manifest, error) {
 	t.Helper()
-	return ParseBytesWithOptions([]byte(fmt.Sprintf(`{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[%s]}`, selectors)), filepath.Join(root, Name), draftOptions)
+	return ParseBytes([]byte(fmt.Sprintf(`{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[%s]}`, selectors)), filepath.Join(root, Name))
 }
 func TestExpandOrderedIndividualAndCollections(t *testing.T) {
 	root := t.TempDir()
@@ -176,7 +176,7 @@ func TestExpandAcquiredGitAndLiteralPath(t *testing.T) {
 	root := t.TempDir()
 	gitTree := t.TempDir()
 	packageAt(t, gitTree, ".", "root-skill")
-	m, err := ParseBytesWithOptions([]byte(`{"schema_version":2,"sources":{"s":{"repository":"example.org/kit","tag":"v1"}},"skills":[{"name":"root-skill","from":"s","directory":"."}]}`), filepath.Join(root, Name), draftOptions)
+	m, err := ParseBytes([]byte(`{"schema_version":2,"sources":{"s":{"repository":"example.org/kit","tag":"v1"}},"skills":[{"name":"root-skill","from":"s","directory":"."}]}`), filepath.Join(root, Name))
 	if err != nil {
 		t.Fatal(err)
 	}

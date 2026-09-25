@@ -273,7 +273,7 @@ func driveStrictNetworkAttestationLocal(t *testing.T, _ draftSemanticCase) {
 	before := treeDigest(t, project) + treeDigest(t, home)
 	cfg := draftInstallConfig(home)
 	cfg.Audit.RegistryPolicy = "strict"
-	result := install.Project(cfg, project, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform()})
+	result := install.Project(cfg, project, "test", install.Options{Platform: draftPlatform()})
 	if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "no network attestation identity") {
 		t.Fatalf("install = %+v, want the local attestation refusal", result)
 	}

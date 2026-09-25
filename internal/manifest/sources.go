@@ -9,11 +9,6 @@ import (
 	"github.com/relux-works/curator/internal/verr"
 )
 
-// ParseOptions is reader-owned capability admission, never a manifest field.
-// This opts into unreleased skillfile-sources-v1 parsing only; callers must
-// implement resolution/locking before consuming selectors for installation.
-type ParseOptions struct{ DraftSourcesV1 bool }
-
 // Source is the closed acquisition union. Path is literal native filesystem
 // syntax relative to the declaring Skillfile (or absolute), without expansion.
 // Network arms retain the declaration separately from canonical identity.

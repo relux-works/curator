@@ -23,7 +23,6 @@ import (
 	"reflect"
 
 	"github.com/relux-works/curator/internal/hashing"
-	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/sourcelock"
@@ -33,14 +32,9 @@ import (
 // manifest no longer parses as the schema-2 document the caller peeked.
 var errDraftManifestMoved = errors.New("the Skillfile changed while status was classifying it; re-run status")
 
-// draftStatusApplies reports whether one project takes the draft status
-// lane: a schema-2 manifest with the draft switch enabled. Every other
-// shape — including a schema-2 manifest without the switch — keeps the
-// legacy surface byte-identically.
+// draftStatusApplies reports whether one project takes the schema-2 status
+// lane. Schema 1 and missing manifests keep the legacy surface.
 func draftStatusApplies(manifestRoot string) bool {
-	if !install.DraftSourcesEnabled(os.Getenv) {
-		return false
-	}
 	payload, err := os.ReadFile(manifest.PathIn(manifestRoot)) // #nosec G304 -- operator-selected project Skillfile
 	if err != nil {
 		return false
@@ -66,7 +60,7 @@ func draftStatusDrift(manifestRoot, skillsDir string, effective map[string]*mark
 	if err != nil {
 		return nil, err
 	}
-	projectManifest, err := manifest.ParseBytesWithOptions(payload, manifest.PathIn(manifestRoot), manifest.ParseOptions{DraftSourcesV1: true})
+	projectManifest, err := manifest.ParseBytes(payload, manifest.PathIn(manifestRoot))
 	if err != nil {
 		return nil, err
 	}

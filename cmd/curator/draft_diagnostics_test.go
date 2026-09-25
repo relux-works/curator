@@ -20,7 +20,6 @@ import (
 
 	"github.com/relux-works/curator/internal/buildrepo"
 	"github.com/relux-works/curator/internal/config"
-	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/sourcelock"
 )
 
@@ -48,8 +47,8 @@ func TestWithDraftRemediationTable(t *testing.T) {
 		{"invalid", "source_member_invalid: review: bad frontmatter", "fix the named package"},
 		{"conflict", "source_name_conflict: review twice", "exactly one selection"},
 		{"overlap", "source_output_overlap: .agents/skills", "move the authored package out of managed output"},
-		{"changed", "source_snapshot_changed: stored snapshot diverged", "retry the explicit attempt without editing mid-run"},
-		{"unavailable", "source_snapshot_unavailable: no lock", "run the explicit attempt first: curator project resolve"},
+		{"changed", "source_snapshot_changed: stored snapshot diverged", "restore the declared source to the package identity and content_sha256 in Skillfile.lock.json"},
+		{"unavailable", "source_snapshot_unavailable: declared path source cannot be reached", "restore access to the declared path or Git source, then retry install"},
 		{"stale", "source_lock_stale: manifest differs", "run: curator project refresh"},
 		{"endpoint", "repository_endpoint_unavailable: identity x: down", "verify the network path and operator authentication"},
 		{"policy", "repository_policy_invalid: bad schema", "fix machine source-policy.json"},
@@ -77,7 +76,6 @@ func TestWithDraftRemediationTable(t *testing.T) {
 		"source_lock_stale: Skillfile changed since lock; explicit refresh required",
 		"source_snapshot_changed: admitted membership changed during capture; retry the explicit attempt",
 		"repository_endpoint_unavailable: identity x: down; verify the network path and operator authentication for the listed endpoints, then retry with machine source-policy.json",
-		"source_selection_invalid: Skillfile schema 2 requires the draft lane; unset CURATOR_DRAFT_SOURCES_V1 keeps frozen v1",
 	}
 	for _, message := range already {
 		if got := withDraftRemediation(message); got != message {
@@ -179,11 +177,9 @@ func TestEndpointExhaustionCarriesRemediation(t *testing.T) {
 	}
 }
 
-// TestDraftProjectResolveHelp covers both halves of the -h rule at the
-// CLI entry: with the switch off the flag spellings fall through to the
-// frozen v1 path byte-identically, and with the switch on they print the
-// workflow golden. The bare word "help" is never a help flag: it resolves
-// as a project alias in both states.
+// TestDraftProjectResolveHelp pins the project command help at the CLI entry.
+// The flag spellings print the schema-2 workflow; the bare word "help"
+// continues to resolve as a project alias.
 func TestDraftProjectResolveHelp(t *testing.T) {
 	root := t.TempDir()
 	configPath, _ := setupCLIProject(t, root)
@@ -202,102 +198,48 @@ func TestDraftProjectResolveHelp(t *testing.T) {
 		"\nskills: " + filepath.Join(helpDir, ".agents", "skills") +
 		"\nbin: " + filepath.Join(helpDir, ".agents", "bin") + "\n"
 
-	// Switch off: the flag spellings fall through to the frozen path,
-	// byte-identical to the bare verb, with no draft text; the bare
-	// word resolves the alias instead of printing help.
-	savedSwitch, hadSwitch := os.LookupEnv(install.EnvDraftSourcesV1)
-	if err := os.Unsetenv(install.EnvDraftSourcesV1); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if hadSwitch {
-			_ = os.Setenv(install.EnvDraftSourcesV1, savedSwitch)
-		}
-	})
-	for _, verb := range []string{"resolve", "refresh"} {
-		baseCode, baseOut, baseErr := capture(t, configPath, "project", verb)
-		for _, spelling := range []string{"-h", "--help"} {
-			code, stdout, stderr := capture(t, configPath, "project", verb, spelling)
-			if code != baseCode || stdout != baseOut || stderr != baseErr {
-				t.Fatalf("project %s %s (switch off) differs from the bare verb:\ncode %d stdout %q stderr %q\nwant code %d stdout %q stderr %q",
-					verb, spelling, code, stdout, stderr, baseCode, baseOut, baseErr)
-			}
-			for _, marker := range []string{"Draft Skillfile", "source-policy"} {
-				if strings.Contains(stdout, marker) || strings.Contains(stderr, marker) {
-					t.Fatalf("project %s %s (switch off) leaks draft text %q", verb, spelling, marker)
-				}
-			}
-		}
-		code, stdout, stderr := capture(t, configPath, "project", verb, "help")
-		if code != exitOK || stdout != wantReport || stderr != "" {
-			t.Fatalf("project %s help (switch off) = code %d, stdout %q, stderr %q; want the v1 report for alias help",
-				verb, code, stdout, stderr)
-		}
-	}
-
-	// Switch on: the flag spellings print the workflow golden, while the
-	// bare word still resolves the alias instead of printing help.
-	t.Setenv(install.EnvDraftSourcesV1, "1")
 	for _, verb := range []string{"resolve", "refresh"} {
 		for _, spelling := range []string{"-h", "--help"} {
 			code, stdout, stderr := capture(t, configPath, "project", verb, spelling)
 			if code != exitOK || stdout != projectResolveUsage || stderr != "" {
-				t.Fatalf("project %s %s (switch on) = code %d, stdout %d bytes, stderr %q; want the help golden on stdout",
-					verb, spelling, code, len(stdout), stderr)
+				t.Fatalf("project %s %s = code %d, stdout %d bytes, stderr %q; want the help golden on stdout", verb, spelling, code, len(stdout), stderr)
 			}
 		}
 		code, stdout, stderr := capture(t, configPath, "project", verb, "help")
 		if code != exitOK || stdout != wantReport || stderr != "" {
-			t.Fatalf("project %s help (switch on) = code %d, stdout %q, stderr %q; want the v1 report for alias help",
-				verb, code, stdout, stderr)
+			t.Fatalf("project %s help = code %d, stdout %q, stderr %q; want the v1 report for alias help", verb, code, stdout, stderr)
 		}
 	}
-	// The golden names the opt-in switch, the five verbs, every
-	// documented shape, and the frozen-launch rule, all labelled draft.
 	for _, marker := range []string{
-		"CURATOR_DRAFT_SOURCES_V1=1",
+		"Skillfile schema 2 project sources",
+		"Skillfile schema 1 retains its exact meaning; no on-disk migration is implicit",
 		"project resolve", "project refresh", "curator install", "curator status",
 		`{"path": "./agents"}`, `{"path": "/work/shared-agents"}`,
 		`{"git": "https://example.org/kit.git", "tag": "v1.2.0"}`,
 		`{"repository": "example.org/kit", "branch": "main"}`,
 		`{"from": "team", "directory": "skills", "include": ["*"]}`,
-		"source-policy.json", `"root_inputs"`,
-		"never rescan", "unreleased",
+		"source-policy.json", `"root_inputs"`, "never rescan",
 	} {
 		if !strings.Contains(projectResolveUsage, marker) {
 			t.Errorf("help golden misses %q", marker)
 		}
 	}
-}
-
-func TestDraftInstallStatusHelpGated(t *testing.T) {
-	configPath := filepath.Join(t.TempDir(), "config.json")
-	for _, command := range []string{"install", "status"} {
-		// Switch off: exactly the flag defaults, no draft marker.
-		code, _, stderr := capture(t, configPath, command, "-h")
-		if code != exitUsage {
-			t.Fatalf("%s -h (switch off) = %d, want %d", command, exitUsage, exitUsage)
-		}
-		for _, marker := range []string{"CURATOR_DRAFT_SOURCES_V1", "Draft Skillfile", "source-policy"} {
-			if strings.Contains(stderr, marker) {
-				t.Fatalf("%s -h (switch off) leaks draft text %q:\n%s", command, marker, stderr)
-			}
-		}
-		if !strings.Contains(stderr, "Usage of "+command+":") {
-			t.Fatalf("%s -h (switch off) lost the flag defaults:\n%s", command, stderr)
+	for _, stale := range []string{"deprecated opt-out", "unreleased"} {
+		if strings.Contains(projectResolveUsage, stale) {
+			t.Errorf("help golden retains stale switch wording %q", stale)
 		}
 	}
-	t.Setenv(install.EnvDraftSourcesV1, "1")
+}
+
+func TestDraftInstallStatusHelpIncludesSchema2Workflow(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
 	for _, command := range []string{"install", "status"} {
 		code, _, stderr := capture(t, configPath, command, "-h")
 		if code != exitUsage {
-			t.Fatalf("%s -h (switch on) = %d, want %d", command, exitUsage, exitUsage)
+			t.Fatalf("%s -h = %d, want %d", command, code, exitUsage)
 		}
-		if !strings.Contains(stderr, "Usage of "+command+":") {
-			t.Fatalf("%s -h (switch on) lost the flag defaults:\n%s", command, stderr)
-		}
-		if !strings.Contains(stderr, draftWorkflowSection) {
-			t.Fatalf("%s -h (switch on) misses the draft workflow section:\n%s", command, stderr)
+		if !strings.Contains(stderr, "Usage of "+command+":") || !strings.Contains(stderr, draftWorkflowSection) {
+			t.Fatalf("%s -h misses usage or schema-2 workflow help:\n%s", command, stderr)
 		}
 	}
 }
@@ -317,7 +259,6 @@ func writeDocPkgs(t *testing.T, pkgs string) {
 // acquisition shape through the real verbs: resolve, install --dry-run,
 // install, and status. The relative row is docs/cli.md verbatim.
 func TestDraftDocumentedLocalShapesThroughCLI(t *testing.T) {
-	withDraftSourcesSwitch(t)
 	rows := []struct {
 		name    string
 		payload func(project, pkgs string) string
@@ -415,7 +356,6 @@ func quotePath(path string) string {
 // machine source-policy.json from the test home, never the operator's.
 func setupRemediationProject(t *testing.T) (configPath, project, home string) {
 	t.Helper()
-	withDraftSourcesSwitch(t)
 	root := t.TempDir()
 	configPath, project = setupCLIProject(t, root)
 	t.Setenv("CURATOR_CONFIG", configPath)
@@ -505,7 +445,7 @@ func TestDraftRemediationThroughCLI(t *testing.T) {
 			payload: `{"schema_version":2,"sources":{"s":{"path":"./pkgs"}},"skills":[{"name":"review","from":"s","directory":"review"}]}`,
 			verb:    []string{"install", "app", "--dry-run"},
 			class:   "source_snapshot_changed",
-			remedy:  "retry the explicit attempt without editing mid-run",
+			remedy:  "restore the declared source to the package identity and content_sha256 in Skillfile.lock.json",
 			setup: func(t *testing.T, configPath, project, home string) {
 				if code, _, stderr := capture(t, configPath, "project", "resolve", "app"); code != exitOK {
 					t.Fatalf("project resolve = %d\nstderr:\n%s", code, stderr)
@@ -530,8 +470,18 @@ func TestDraftRemediationThroughCLI(t *testing.T) {
 			payload: `{"schema_version":2,"sources":{"s":{"path":"./pkgs"}},"skills":[{"name":"review","from":"s","directory":"review"}]}`,
 			verb:    []string{"install", "app", "--dry-run"},
 			class:   "source_snapshot_unavailable",
-			remedy:  "run explicit resolve first",
-			absent:  "run the explicit attempt first",
+			remedy:  "restore access to the declared path or Git source, then retry install",
+			setup: func(t *testing.T, configPath, project, home string) {
+				if code, _, stderr := capture(t, configPath, "project", "resolve", "app"); code != exitOK {
+					t.Fatalf("project resolve = %d\nstderr:\n%s", code, stderr)
+				}
+				if err := os.RemoveAll(filepath.Join(project, "pkgs")); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.RemoveAll(filepath.Join(home, "local-snapshots")); err != nil {
+					t.Fatal(err)
+				}
+			},
 		},
 		{
 			name:    "lock-stale",
@@ -768,7 +718,6 @@ func withDraftGitArms(t *testing.T, failingURL, failingStderr, rewriteURL, bare 
 // installed marker binds the policy-selected commit. A malformed pin in
 // the same file fails closed with remediation and publishes nothing.
 func TestDraftMachinePolicySetupThroughCLI(t *testing.T) {
-	withDraftSourcesSwitch(t)
 	root := t.TempDir()
 	bare, commit := setupKitBare(t, root)
 	const declaredURL = "https://fixture.test/kit.git"
@@ -831,7 +780,6 @@ func TestDraftMachinePolicySetupThroughCLI(t *testing.T) {
 // TestDraftDocumentedGitRevisionThroughCLI runs the documented revision
 // pin through the real verbs: resolve, install, and status.
 func TestDraftDocumentedGitRevisionThroughCLI(t *testing.T) {
-	withDraftSourcesSwitch(t)
 	root := t.TempDir()
 	bare, commit := setupKitBare(t, root)
 	const declaredURL = "https://fixture.test/kit.git"
@@ -900,7 +848,6 @@ func TestDraftFetchFailureSanitizedThroughCLI(t *testing.T) {
 // documented fixture, so resolve exits 0 with the lock bound to the
 // alternate commit and only the first attempt rendered as a failure.
 func TestDraftAvailabilityFallbackThroughCLI(t *testing.T) {
-	withDraftSourcesSwitch(t)
 	const failingURL = "https://fixture.test/kit.git"
 	const failingFatal = "fatal: unable to access 'https://fixture.test/kit.git/': Could not resolve host: fixture.test"
 	const alternateURL = "git@fixture.test:kit.git"
@@ -988,7 +935,6 @@ func TestDraftLaunchConsumesFrozenRuntimeThroughCLI(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("executes POSIX skill commands")
 	}
-	withDraftSourcesSwitch(t)
 	root := t.TempDir()
 	configPath, project := setupCLIProject(t, root)
 	t.Setenv("CURATOR_CONFIG", configPath)
@@ -1116,7 +1062,7 @@ func TestDraftRepairRestoresDriftedContentThroughCLI(t *testing.T) {
 }
 
 // TestDraftDocsPinExamples pins the documented contract in the
-// repository docs: every exercised acquisition shape, the opt-in
+// repository docs: every exercised acquisition shape, the default project lane,
 // label, the machine policy setup, and every stable class remedy.
 func TestDraftDocsPinExamples(t *testing.T) {
 	cli := readRepoDoc(t, "docs", "cli.md")
@@ -1137,8 +1083,8 @@ func TestDraftDocsPinExamples(t *testing.T) {
 		}
 	}
 	for _, marker := range []string{
-		"CURATOR_DRAFT_SOURCES_V1=1",
-		"opt-in, unreleased",
+		"Skillfile schema 2 is the default project reader and install path",
+		"no on-disk migration is implicit",
 		"source-policy.json",
 		`"root_inputs"`,
 		`"availability-auth"`,
@@ -1159,9 +1105,8 @@ func TestDraftDocsPinExamples(t *testing.T) {
 		}
 	}
 	for _, marker := range []string{
-		"CURATOR_DRAFT_SOURCES_V1=1",
-		"Draft Skillfile sources",
-		"unreleased",
+		"Skillfile schema 2 source declarations are supported by default",
+		"no on-disk migration is implicit",
 		`"path": "./pkgs"`,
 		"source-policy.json",
 		"never rescan live inputs",
@@ -1184,6 +1129,13 @@ func TestDraftDocsPinExamples(t *testing.T) {
 			t.Errorf("docs/troubleshooting.md misses section %s", class)
 		}
 	}
+	for _, marker := range []string{
+		"These stable classes describe schema-2 project source resolution",
+	} {
+		if !strings.Contains(trouble, marker) {
+			t.Errorf("docs/troubleshooting.md misses %q", marker)
+		}
+	}
 	// Each remedy keyword below is asserted verbatim against the CLI
 	// remediation output by TestWithDraftRemediationTable and
 	// TestDraftRemediationThroughCLI; the docs must carry the same words.
@@ -1194,8 +1146,8 @@ func TestDraftDocsPinExamples(t *testing.T) {
 		"source_member_invalid":             "fix the named package",
 		"source_name_conflict":              "exactly one selection",
 		"source_output_overlap":             "move the authored package out of managed output",
-		"source_snapshot_changed":           "without editing mid-run",
-		"source_snapshot_unavailable":       "run the explicit attempt first",
+		"source_snapshot_changed":           "restore the declared source to the package identity and",
+		"source_snapshot_unavailable":       "restore access to the declared path or Git source",
 		"source_lock_stale":                 "curator project refresh",
 		"repository_endpoint_unavailable":   "verify the network path",
 		"repository_policy_invalid":         "fix machine source-policy.json",

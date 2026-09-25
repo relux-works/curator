@@ -102,7 +102,7 @@ func writeDraftSkill(t *testing.T, dir string, name string, withCommand bool, ru
 func parseDraftManifest(t *testing.T, projectRoot, payload string) (*manifest.Manifest, []byte) {
 	t.Helper()
 	path := filepath.Join(projectRoot, manifest.Name)
-	m, err := manifest.ParseBytesWithOptions([]byte(payload), path, manifest.ParseOptions{DraftSourcesV1: true})
+	m, err := manifest.ParseBytes([]byte(payload), path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -296,7 +296,7 @@ func TestResolveDraftRefusals(t *testing.T) {
 				writeDraftSkill(t, filepath.Join(project, "b", "review"), "review", false, nil, nil)
 				payload := `{"schema_version":2,"sources":{"a":{"path":"./a"},"b":{"path":"./b"}},"skills":[{"name":"review","from":"a","directory":"review"},{"name":"review","from":"b","directory":"review"}]}`
 				// The parser already retains the repeated-selection refusal.
-				if _, err := manifest.ParseBytesWithOptions([]byte(payload), filepath.Join(project, manifest.Name), manifest.ParseOptions{DraftSourcesV1: true}); err == nil || !strings.Contains(err.Error(), "source_name_conflict") {
+				if _, err := manifest.ParseBytes([]byte(payload), filepath.Join(project, manifest.Name)); err == nil || !strings.Contains(err.Error(), "source_name_conflict") {
 					t.Fatalf("err = %v, want source_name_conflict", err)
 				}
 			case "case-conflict":

@@ -1107,6 +1107,11 @@ func scopeStatusDrift(cfg *config.Config, manifestRoot, skillsDir string) map[st
 		return drift
 	}
 	for _, decl := range projectManifest.Skills {
+		if decl.Name == "" {
+			// Collection selectors derive their member names from the lock.
+			// This legacy drift surface has no declaration name to compare.
+			continue
+		}
 		installed := filepath.Join(skillsDir, decl.Name)
 		if _, err := os.Stat(installed); err != nil {
 			drift[decl.Name] = stateNotInstalled
@@ -1194,6 +1199,9 @@ func (c cli) cmdList() int {
 		_, _ = fmt.Fprintf(c.stdout, "%s\t%s\n", alias, project.Path)
 		if projectManifest, err := manifest.Load(project.Path); err == nil && projectManifest != nil {
 			for _, decl := range projectManifest.Skills {
+				if decl.Name == "" {
+					continue
+				}
 				_, _ = fmt.Fprintf(c.stdout, "  %s %s %s\n", decl.Name, decl.Ref.Kind, decl.Ref.Value)
 			}
 		}
@@ -1240,12 +1248,10 @@ func (c cli) cmdProject(args []string) int {
 		_, _ = fmt.Fprintf(c.stdout, "added project %s: %s\n", positional[0], root)
 		return exitOK
 	case "resolve", "refresh":
-		// The explicit -h surface exists only on the opt-in lane, the
-		// same rule as appendDraftUsage: with the switch off the flag
-		// spellings fall through to the frozen v1 path untouched. The
+		// The explicit -h surface describes schema-2 project resolution. The
 		// bare word "help" is never intercepted, so it keeps resolving
 		// as a project alias or path.
-		if install.DraftSourcesEnabled(os.Getenv) && len(args) > 1 && (args[1] == "-h" || args[1] == "--help") {
+		if len(args) > 1 && (args[1] == "-h" || args[1] == "--help") {
 			_, _ = fmt.Fprint(c.stdout, projectResolveUsage)
 			return exitOK
 		}
@@ -1304,6 +1310,13 @@ func (c cli) cmdGlobal(args []string) int {
 	cfg, code := c.loadConfig()
 	if code != exitOK {
 		return code
+	}
+	if args[0] != "init" {
+		globalManifest, err := manifest.Load(install.GlobalRoot(cfg.Home()))
+		if err == nil && globalManifest != nil && globalManifest.SchemaVersion != manifest.SchemaVersion {
+			_, _ = fmt.Fprintf(c.stderr, "curator: global Skillfile schema %d is unsupported; global scope requires schema %d\n", globalManifest.SchemaVersion, manifest.SchemaVersion)
+			return exitFail
+		}
 	}
 	switch args[0] {
 	case "init":

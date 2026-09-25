@@ -65,7 +65,7 @@ func externalBaseline(t *testing.T, substituted bool) (project, home string, arm
 		writeDevSubstitution(t, project, `{"schema_version":2,"substitutions":{},"build_repository_substitutions":{"review":{"tools":{"git":"https://git.example.com/skills/tools-mirror.git","ref":{"kind":"tag","value":"v9"}}}}}`)
 	}
 	deps, _ := xbBuildDeps(t)
-	result := install.Project(draftInstallConfig(home), project, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform(), Build: deps, External: xbExternalDeps()})
+	result := install.Project(draftInstallConfig(home), project, "test", install.Options{Platform: draftPlatform(), Build: deps, External: xbExternalDeps()})
 	if result.Status != "ok" {
 		t.Fatalf("baseline install = %+v", result)
 	}
@@ -375,7 +375,7 @@ func driveExternalMismatch(t *testing.T, _ draftSemanticCase, field string) {
 			t.Fatal("package tamper did not land")
 		}
 		deps, builder := xbBuildDeps(t)
-		result := install.Project(draftInstallConfig(home), project, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform(), Build: deps, External: xbExternalDeps()})
+		result := install.Project(draftInstallConfig(home), project, "test", install.Options{Platform: draftPlatform(), Build: deps, External: xbExternalDeps()})
 		if result.Status != "ok" {
 			t.Fatalf("repair = %+v, want rebuild success", result)
 		}
@@ -404,7 +404,7 @@ func driveExternalMismatch(t *testing.T, _ draftSemanticCase, field string) {
 		externalFieldBinding(t, mutated, receipt, field)
 	}
 	deps, _ := xbBuildDeps(t)
-	result := install.Project(draftInstallConfig(home), project, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform(), Build: deps, External: xbExternalDeps()})
+	result := install.Project(draftInstallConfig(home), project, "test", install.Options{Platform: draftPlatform(), Build: deps, External: xbExternalDeps()})
 	if result.Status != "ok" {
 		t.Fatalf("repair = %+v, want re-derivation success", result)
 	}
@@ -464,7 +464,7 @@ func TestDraftExternalStatusFailsClosedWithoutSource(t *testing.T) {
 	resolveDraftPlan(t, project, home, payload)
 	cfg := draftCLIConfig(t, root, configPath)
 	deps, _ := xbBuildDeps(t)
-	result := install.Project(cfg, project, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform(), Build: deps, External: xbExternalDeps()})
+	result := install.Project(cfg, project, "test", install.Options{Platform: draftPlatform(), Build: deps, External: xbExternalDeps()})
 	if result.Status != "ok" {
 		t.Fatalf("install = %+v", result)
 	}

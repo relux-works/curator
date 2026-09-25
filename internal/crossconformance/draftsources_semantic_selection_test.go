@@ -29,7 +29,7 @@ func driveUnknownAlias(t *testing.T, _ draftSemanticCase) {
 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, err := manifest.LoadWithOptions(project, manifest.ParseOptions{DraftSourcesV1: true})
+	_, err := manifest.Load(project)
 	if err == nil || !strings.Contains(err.Error(), "source_alias_unknown") {
 		t.Fatalf("err = %v, want source_alias_unknown", err)
 	}
@@ -51,7 +51,7 @@ func draftCollectionProject(t *testing.T, payload string, setup func(collections
 
 func expandDraft(t *testing.T, project string) ([]manifest.Selection, error) {
 	t.Helper()
-	m, err := manifest.LoadWithOptions(project, manifest.ParseOptions{DraftSourcesV1: true})
+	m, err := manifest.Load(project)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

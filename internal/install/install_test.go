@@ -767,6 +767,22 @@ func TestGlobalInstall(t *testing.T) {
 	}
 }
 
+func TestGlobalInstallRejectsSchema2Skillfile(t *testing.T) {
+	e := newEnv(t)
+	if _, err := GlobalInit(e.home); err != nil {
+		t.Fatal(err)
+	}
+	globalSkillfile := filepath.Join(GlobalRoot(e.home), manifestpkg.Name)
+	if err := os.WriteFile(globalSkillfile, []byte(`{"schema_version":2,"sources":{},"skills":[]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	result := Global(e.cfg, t.TempDir(), Options{DryRun: true, Platform: installPlatform()})
+	joined := strings.Join(result.Errors, ";")
+	if result.Status != "failed" || !strings.Contains(joined, "global scope requires schema 1") {
+		t.Fatalf("global schema-2 install = %+v, want global-scope schema-1 refusal", result)
+	}
+}
+
 func TestGlobalUpgradeDryRunLeavesPersistentStateUnchanged(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)

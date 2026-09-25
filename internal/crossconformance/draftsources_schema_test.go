@@ -101,9 +101,9 @@ func driveSkillfileV2Case(t *testing.T, dir string, entry draftSchemaEntry) {
 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), payload, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, err := manifest.LoadWithOptions(project, manifest.ParseOptions{DraftSourcesV1: true})
+	_, err := manifest.Load(project)
 	if (err == nil) != entry.Valid {
-		t.Fatalf("valid=%v: LoadWithOptions err=%v", entry.Valid, err)
+		t.Fatalf("valid=%v: Load err=%v", entry.Valid, err)
 	}
 }
 

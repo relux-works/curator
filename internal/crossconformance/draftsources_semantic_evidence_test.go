@@ -360,7 +360,7 @@ func driveAttestationEvidence(t *testing.T, c draftSemanticCase, condition attes
 	stub.set(condition)
 	freshBefore := draftInstallStateDigest(t, project, home)
 	cfg := draftStrictRegistryConfig(home, stub)
-	fresh := install.Project(cfg, project, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform()})
+	fresh := install.Project(cfg, project, "test", install.Options{Platform: draftPlatform()})
 	if fresh.Status != "failed" {
 		t.Fatalf("fresh install = %+v, want refusal", fresh)
 	}
@@ -382,7 +382,7 @@ func driveAttestationEvidence(t *testing.T, c draftSemanticCase, condition attes
 	stub.set(attestGood)
 	repairProject, repairHome, repairRepo := draftGitProject(t, "https://example.org/kit.git")
 	repairCfg := draftStrictRegistryConfig(repairHome, stub)
-	if result := install.Project(repairCfg, repairProject, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform()}); result.Status != "ok" {
+	if result := install.Project(repairCfg, repairProject, "test", install.Options{Platform: draftPlatform()}); result.Status != "ok" {
 		t.Fatalf("baseline install = %+v", result)
 	}
 	recorded := marker.Read(filepath.Join(repairProject, ".agents", "skills", "review"))
@@ -391,7 +391,7 @@ func driveAttestationEvidence(t *testing.T, c draftSemanticCase, condition attes
 	}
 	stub.set(condition)
 	repairBefore := draftInstallStateDigest(t, repairProject, repairHome)
-	repair := install.Project(repairCfg, repairProject, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform()})
+	repair := install.Project(repairCfg, repairProject, "test", install.Options{Platform: draftPlatform()})
 	if repair.Status != "failed" || !strings.Contains(strings.Join(repair.Errors, ";"), wantErr) {
 		t.Fatalf("repair install = %+v, want the %q refusal", repair, wantErr)
 	}
@@ -411,7 +411,7 @@ func driveAttestationEvidence(t *testing.T, c draftSemanticCase, condition attes
 	if after := draftRefreshPreservedDigest(t, repairProject, repairHome); after != gatedBefore {
 		t.Fatal("refresh under bad evidence touched install-gated state")
 	}
-	again := install.Project(repairCfg, repairProject, "test", install.Options{DraftSourcesV1: true, Platform: draftPlatform()})
+	again := install.Project(repairCfg, repairProject, "test", install.Options{Platform: draftPlatform()})
 	if again.Status != "failed" || !strings.Contains(strings.Join(again.Errors, ";"), wantErr) {
 		t.Fatalf("install after refresh = %+v, want the %q refusal", again, wantErr)
 	}

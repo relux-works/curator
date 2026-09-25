@@ -1,5 +1,5 @@
-// Package manifest parses the project manifest Skillfile.json, frozen schema 1
-// (Spec §6.1) and explicitly opted-in draft schema 2, and edits legacy declarations.
+// Package manifest parses project Skillfile.json schema 1 and schema 2
+// declarations and edits legacy schema-1 declarations.
 package manifest
 
 import (
@@ -17,7 +17,7 @@ import (
 	"github.com/relux-works/curator/internal/verr"
 )
 
-// SchemaVersion is the default, frozen Skillfile schema.
+// SchemaVersion is the legacy Skillfile schema and the required global schema.
 const SchemaVersion = 1
 
 // Name is the manifest file name at the project root.
@@ -36,8 +36,8 @@ type Decl struct {
 	Source string // path under skills_root; defaults to Name
 	Ref    Ref
 	Git    string // optional clone URL
-	// Selector is non-nil only for an opt-in draft source selection. Legacy
-	// Source, Git and Ref remain empty for that arm.
+	// Selector is non-nil only for a schema-2 source selection. Legacy Source,
+	// Git and Ref remain empty for that arm.
 	Selector *Selector
 }
 
@@ -60,11 +60,6 @@ func PathIn(projectRoot string) string {
 // Load reads and parses the project manifest. A missing file returns
 // (nil, nil): the project is simply not initialized.
 func Load(projectRoot string) (*Manifest, error) {
-	return LoadWithOptions(projectRoot, ParseOptions{})
-}
-
-// LoadWithOptions reads a root project with explicitly admitted draft capabilities.
-func LoadWithOptions(projectRoot string, options ParseOptions) (*Manifest, error) {
 	filePath := PathIn(projectRoot)
 	payload, err := os.ReadFile(filePath) // #nosec G304 -- path is derived from the project root
 	if os.IsNotExist(err) {
@@ -73,7 +68,7 @@ func LoadWithOptions(projectRoot string, options ParseOptions) (*Manifest, error
 	if err != nil {
 		return nil, err
 	}
-	return ParseBytesWithOptions(payload, filePath, options)
+	return ParseBytes(payload, filePath)
 }
 
 // ParseBytes parses one manifest payload that a caller already read. It is the
@@ -82,11 +77,6 @@ func LoadWithOptions(projectRoot string, options ParseOptions) (*Manifest, error
 // the file once and parse those bytes, instead of reading the path a second time
 // and parsing a possibly different generation.
 func ParseBytes(payload []byte, filePath string) (*Manifest, error) {
-	return ParseBytesWithOptions(payload, filePath, ParseOptions{})
-}
-
-// ParseBytesWithOptions validates the entire declaration without source I/O.
-func ParseBytesWithOptions(payload []byte, filePath string, options ParseOptions) (*Manifest, error) {
 	if err := protocoljson.Validate(payload); err != nil {
 		return nil, fmt.Errorf("malformed JSON in %s: %w", filePath, err)
 	}
@@ -98,16 +88,11 @@ func ParseBytesWithOptions(payload []byte, filePath string, options ParseOptions
 	if !ok {
 		return nil, fmt.Errorf("%s must contain a JSON object", filePath)
 	}
-	return ParseWithOptions(obj, filePath, options)
+	return Parse(obj, filePath)
 }
 
 // Parse validates a raw manifest object (Spec §6.1).
 func Parse(obj map[string]any, filePath string) (*Manifest, error) {
-	return ParseWithOptions(obj, filePath, ParseOptions{})
-}
-
-// ParseWithOptions admits schema 2 only for a reader supporting the draft.
-func ParseWithOptions(obj map[string]any, filePath string, options ParseOptions) (*Manifest, error) {
 	schema, present := obj["schema_version"]
 	if !present {
 		return nil, verr.New("schema_version", "missing required field")
@@ -116,7 +101,7 @@ func ParseWithOptions(obj map[string]any, filePath string, options ParseOptions)
 	if !ok || number != float64(int(number)) {
 		return nil, verr.New("schema_version", "must be an integer, got %v", schema)
 	}
-	if number != SchemaVersion && !(number == 2 && options.DraftSourcesV1) {
+	if number != SchemaVersion && number != 2 {
 		return nil, verr.New("schema_version", "unsupported Skillfile schema_version %d; this Skillfile requires a newer tool", int(number))
 	}
 

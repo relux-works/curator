@@ -108,7 +108,7 @@ func TestDraftEvidenceExactMatch(t *testing.T) {
 		cfg.AuditRegistries = []config.Registry{{Name: "one", URL: stub.server.URL, PublicKeys: []string{stub.pinned}, Enabled: true}}
 		cfg.Audit.CacheTTLSeconds = 0
 		cfg.Audit.OfflineGraceSeconds = 0
-		return Project(cfg, project, "test", Options{DraftSourcesV1: true, Platform: installPlatform()})
+		return Project(cfg, project, "test", Options{Platform: installPlatform()})
 	}
 	t.Run("exact-admits", func(t *testing.T) {
 		project, home, _, _ := setupGitInstall(t)
@@ -118,7 +118,7 @@ func TestDraftEvidenceExactMatch(t *testing.T) {
 		cfg.AuditRegistries = []config.Registry{{Name: "one", URL: stub.server.URL, PublicKeys: []string{stub.pinned}, Enabled: true}}
 		cfg.Audit.CacheTTLSeconds = 0
 		cfg.Audit.OfflineGraceSeconds = 0
-		result := Project(cfg, project, "test", Options{DraftSourcesV1: true, Platform: installPlatform()})
+		result := Project(cfg, project, "test", Options{Platform: installPlatform()})
 		if result.Status != "ok" {
 			t.Fatalf("exact evidence install = %+v, want ok", result)
 		}

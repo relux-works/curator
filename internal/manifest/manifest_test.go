@@ -76,7 +76,7 @@ func TestParseRejections(t *testing.T) {
 	}{
 		{"no schema", `{"skills": []}`, "schema_version"},
 		{"schema string", `{"schema_version": "1", "skills": []}`, "schema_version"},
-		{"schema future", `{"schema_version": 2, "skills": []}`, "schema_version"},
+		{"schema future", `{"schema_version": 3, "skills": []}`, "schema_version"},
 		{"skills missing", `{"schema_version": 1}`, "skills"},
 		{"agents type", `{"schema_version": 1, "agents": "all", "skills": []}`, "agents"},
 		{"locale type", `{"schema_version": 1, "locale": 5, "skills": []}`, "locale"},

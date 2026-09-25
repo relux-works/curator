@@ -93,7 +93,7 @@ func mustCanonical(t *testing.T, value any) []byte {
 
 func TestManifestDigestGolden(t *testing.T) {
 	payload := []byte(goldenManifest)
-	parsed, err := manifest.ParseBytesWithOptions(payload, "Skillfile.json", manifest.ParseOptions{DraftSourcesV1: true})
+	parsed, err := manifest.ParseBytes(payload, "Skillfile.json")
 	if err != nil {
 		t.Fatalf("golden manifest must parse as draft schema 2: %v", err)
 	}
