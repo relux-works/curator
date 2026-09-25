@@ -1,0 +1,44 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 17773d62..3b7ac9d7 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -4,6 +4,15 @@ All notable implementation changes are recorded here.
+ 
+ ## Unreleased
+ 
++### Fixed
++
++- Stabilized the audit-registry exact future-bound test on Windows by creating
++  its empty rollback-state catalog before calling the checker. The checker's
++  elapsed-time allowance includes cache initialization, whose durable file
++  sync could take longer than the one-second test edge. The test still drives
++  `CheckSnapshotsWithPolicy` with an isolated cache and retains the same
++  inside, exact-bound, one-second-past, and far-future assertions.
++
+ ### Added
+ 
+ - E4: umbrella provider lookup from trust roots (warning release,
+diff --git a/internal/registry/registry_test.go b/internal/registry/registry_test.go
+index 3e2b9fd7..301e5782 100644
+--- a/internal/registry/registry_test.go
++++ b/internal/registry/registry_test.go
+@@ -727,8 +727,18 @@ func TestSnapshotFutureBoundIsExactAtEveryConfiguredSkew(t *testing.T) {
+ 				body := snapshotBody(5, now.Add(skew).Add(tc.offset))
+ 				fetch := func(string) (map[string]any, error) { return s.sign(body), nil }
+ 				reg := Registry{Name: "one", URL: "https://one", PublicKeys: []string{s.pinned}}
++				cacheDir := t.TempDir()
++				// A new persistent cache writes and syncs its empty catalog before
++				// checking the timestamp. The checker includes that setup time in
++				// its latency allowance; on Windows, the sync can exceed this test's
++				// one-second exact edge. Keep each row isolated, but seed the empty
++				// catalog before entering the checker so cache initialization does
++				// not widen the bound this row is meant to pin.
++				if err := writeSnapshotStateCatalog(cacheDir, map[string]bool{}); err != nil {
++					t.Fatal(err)
++				}
+ 				tampered, warnings := CheckSnapshotsWithPolicy(
+-					[]Registry{reg}, t.TempDir(), fetch, now, 0, skew)
++					[]Registry{reg}, cacheDir, fetch, now, 0, skew)
+ 				joined := strings.Join(warnings, "\n")
+ 				if tampered[reg.URL] != tc.refused {
+ 					t.Fatalf("skew %v offset %v: refused=%v want %v (%v)",
