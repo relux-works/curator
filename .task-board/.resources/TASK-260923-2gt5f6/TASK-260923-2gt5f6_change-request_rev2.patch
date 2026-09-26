@@ -1,0 +1,1455 @@
+diff --git a/.github/ci/conformance-case-counts.tsv b/.github/ci/conformance-case-counts.tsv
+index e03a5e9d..ea0d9ff0 100644
+--- a/.github/ci/conformance-case-counts.tsv
++++ b/.github/ci/conformance-case-counts.tsv
+@@ -8,6 +8,7 @@ draft-sources-v1/semantic-cases	94
+ draft-sources-v1/schema-cases	116
+ draft-sources-v1/snapshot-cases	3
+ agent-environment-marker-v1/schema-cases	61
++agent-environment-marker-v2/schema-cases	26
+ launch-env-fragment-v1/schema-cases	50
+ portable-paths/vectors	18
+ agent-skill-v7/schema-cases	37
+diff --git a/.github/ci/platform-cases.tsv b/.github/ci/platform-cases.tsv
+index 00ed32e6..15c7e775 100644
+--- a/.github/ci/platform-cases.tsv
++++ b/.github/ci/platform-cases.tsv
+@@ -702,6 +702,7 @@ cmd/curator	TestEnvResolveRepairNeedsMigration	linux,darwin,windows	windows	host
+ cmd/curator	TestEnvMigrateUsage	linux,darwin,windows	-	-	env migrate operand and phase gates refuse as usage through the CLI
+ cmd/curator	TestEnvMigrateApplyRequiresPlan	linux,darwin,windows	windows	host-capability	--apply without a prior --plan hash is a usage refusal through the CLI with the link untouched
+ cmd/curator	TestEnvMigratePrintBeforeWrite	linux,darwin,windows	windows	host-capability	the locked plan reaches CLI stdout before the first link mutation
++cmd/curator	TestEnvResolveCredentialRecordIsolatedKeychain	darwin	linux,windows	platform-control	isolated Claude credential records omit path on the supported macOS Keychain backend
+ cmd/curator	TestEnvResolveRepairFailedOnUninspectable	linux,darwin	windows	host-capability	env resolve --repair surfaces environment_repair_failed for an uninspectable target through the CLI
+ 
+ # ===========================================================================
+diff --git a/.github/ci/root-artifacts.tsv b/.github/ci/root-artifacts.tsv
+index 0e1e1dc0..243e24ad 100644
+--- a/.github/ci/root-artifacts.tsv
++++ b/.github/ci/root-artifacts.tsv
+@@ -76,5 +76,6 @@ internal/skillspec	schema-cases/agent-skill-v6,schema-cases/agent-skill-v7,schem
+ internal/install	vectors/build-drivers.json,vectors/manager-lifecycle.json	TestAuthoritativeCacheOutcomesDriveInstallation and the dry-run bindings read the vectors directly
+ internal/envfragment	schema-cases/launch-env-fragment-v1	TestFragmentAuthoritativeSchemaCases and TestFragmentEmissionMatchesReference read the fragment family directly
+ internal/envmarker	schema-cases/agent-environment-marker-v1	TestParseAuthoritativeEnvMarkerSchemaCases reads the marker family directly
++internal/envmarker	schema-cases/agent-environment-marker-v2	TestParseAuthoritativeEnvMarkerV2SchemaCases reads the marker family directly
+ internal/config	schema-cases/manager-config-v2,schema-cases/system-config-v2,vectors/manager-config-v2.json	the schema-2 families and vector drive the config reader directly
+ internal/interop/environments	vectors/environments.json,vectors/context-versions.json,vectors/context-detectors.json,vectors/snapshot-acquisition.json,expected/environments,expected/byte-exact-snapshot_sha256.txt,fixtures/byte-exact	the four environments vector families, plus the two trees and the one expected file those vectors name by path; every conformance case in the package reads one of them with no per-family guard -- the contract cases beside them read no root artefact at all -- so a root missing any one defers the package and fails a CI_REQUIRE_FULL_ROOT lane by name
+diff --git a/.github/ci/skip-classes.tsv b/.github/ci/skip-classes.tsv
+index 178aa069..1be6b142 100644
+--- a/.github/ci/skip-classes.tsv
++++ b/.github/ci/skip-classes.tsv
+@@ -68,6 +68,7 @@ platform-control	Windows does not expose portable executable permission bits	all
+ platform-control	Linux-only control in script-worker-v1-native-control-inventory-v1	allow	the script inventory defines this control for Linux only; the behaviour is asserted on ubuntu-latest
+ platform-control	Windows-only control in script-worker-v1-native-control-inventory-v1	allow	the script inventory defines this control for Windows only; the behaviour is asserted on windows-latest
+ platform-control	unix-only script-inventory fixture in script-worker-v1-native-control-inventory-v1	allow	the script-inventory fixture needs unix process primitives; the behaviour is asserted on the unix runners
++platform-control	Claude's per-home Keychain strategy is supported on macOS	allow	the isolated Claude Keychain backend is supported only on macOS; its schema-2 credential record is exercised there
+ 
+ # --- host capability --------------------------------------------------------
+ host-capability	(symlink|symlinks|hard links|named pipes|symlink canonical-prefix test) unavailable	allow	the runner filesystem provides no such link
+diff --git a/cmd/curator/env_credential_marker_test.go b/cmd/curator/env_credential_marker_test.go
+new file mode 100644
+index 00000000..3fc216eb
+--- /dev/null
++++ b/cmd/curator/env_credential_marker_test.go
+@@ -0,0 +1,188 @@
++package main
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"runtime"
++	"testing"
++
++	"github.com/relux-works/curator/internal/envmarker"
++)
++
++func installCLIEnvProfile(t *testing.T, source stubConfigSource) {
++	t.Helper()
++	writeNativeCredentials(t)
++	pkg := t.TempDir()
++	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
++	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
++		t.Fatalf("profile install = %d\nstderr:\n%s", code, stderr)
++	}
++}
++
++func cliEnvMarker(t *testing.T, source stubConfigSource, env string) (string, []byte, *envmarker.Marker) {
++	t.Helper()
++	path := filepath.Join(source.cfg.Home(), "environments", "acme", env, envmarker.Name)
++	payload, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	marker, err := envmarker.Parse(payload)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return path, payload, marker
++}
++
++func requireCLICodexRecord(t *testing.T, marker *envmarker.Marker, provenance, backend string) {
++	t.Helper()
++	if marker.Version != envmarker.VersionV2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
++		t.Fatalf("expected one schema-2 credential record, got %+v", marker)
++	}
++	record := (*marker.Passthrough)[0]
++	if record.Path != "auth.json" || record.Isolation != "shared" || record.Strategy != "keyring-preferred" ||
++		record.SourceRole != "native" || record.Backend != backend || record.BackendVersion != "0.153.2" || record.Provenance != provenance {
++		t.Fatalf("Codex credential record = %+v", record)
++	}
++}
++
++// TestEnvResolveCredentialRecordProvisionAndRepair drives both mutation
++// origins through the CLI production entry point.
++func TestEnvResolveCredentialRecordProvisionAndRepair(t *testing.T) {
++	source, _ := profileHome(t)
++	installCLIEnvProfile(t, source)
++	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
++		t.Fatalf("resolve --repair provision = %d\nstderr:\n%s", code, stderr)
++	}
++	markerPath, _, marker := cliEnvMarker(t, source, "codex_cli")
++	requireCLICodexRecord(t, marker, "provisioned", "file")
++	if err := os.Remove(filepath.Join(filepath.Dir(markerPath), "AGENTS.md")); err != nil {
++		t.Fatal(err)
++	}
++	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
++		t.Fatalf("resolve --repair repair = %d\nstderr:\n%s", code, stderr)
++	}
++	_, _, marker = cliEnvMarker(t, source, "codex_cli")
++	requireCLICodexRecord(t, marker, "repaired", "file")
++}
++
++// TestEnvResolveCredentialRecordPathlessKeyring proves a keyring backend is
++// recorded as ambient without a path through the CLI production entry point.
++func TestEnvResolveCredentialRecordPathlessKeyring(t *testing.T) {
++	source, _ := profileHome(t)
++	writeNativeCredentials(t)
++	if err := os.WriteFile(filepath.Join(os.Getenv("CODEX_HOME"), "config.toml"), []byte("cli_auth_credentials_store = \"keyring\"\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	pkg := t.TempDir()
++	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
++	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
++		t.Fatalf("profile install = %d\nstderr:\n%s", code, stderr)
++	}
++	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
++		t.Fatalf("resolve --repair = %d\nstderr:\n%s", code, stderr)
++	}
++	_, payload, marker := cliEnvMarker(t, source, "codex_cli")
++	if marker.Version != envmarker.VersionV2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
++		t.Fatalf("expected a schema-2 pathless record: %+v", marker)
++	}
++	record := (*marker.Passthrough)[0]
++	if record.Path != "" || record.Isolation != "shared" || record.Strategy != "keyring-preferred" || record.SourceRole != "native" || record.Backend != "ambient" || record.BackendVersion != "0.153.2" || record.Provenance != "provisioned" {
++		t.Fatalf("keyring credential record = %+v", record)
++	}
++	var object map[string]any
++	if err := json.Unmarshal(payload, &object); err != nil {
++		t.Fatal(err)
++	}
++	entries, _ := object["passthrough"].([]any)
++	fields, _ := entries[0].(map[string]any)
++	if _, exists := fields["path"]; exists {
++		t.Fatalf("the keyring record omits path: %s", payload)
++	}
++}
++
++// TestEnvResolveCredentialRecordIsolatedKeychain drives the other supported
++// linkless passthrough strategy through the CLI production entry point.
++func TestEnvResolveCredentialRecordIsolatedKeychain(t *testing.T) {
++	if runtime.GOOS != "darwin" {
++		t.Skip("Claude's per-home Keychain strategy is supported on macOS")
++	}
++	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
++	installCLIEnvProfile(t, source)
++	if code, _, stderr := runProfile(t, source, "env", "config", "set", "isolation", `{"acme": {"claude_code": "isolated"}}`); code != exitOK {
++		t.Fatalf("set isolated mode = %d\nstderr:\n%s", code, stderr)
++	}
++	if code, _, stderr := runProfile(t, source, "env", "resolve", "claude_code", "--repair"); code != exitOK {
++		t.Fatalf("resolve --repair = %d\nstderr:\n%s", code, stderr)
++	}
++	_, payload, marker := cliEnvMarker(t, source, "claude_code")
++	if marker.Version != envmarker.VersionV2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
++		t.Fatalf("expected one schema-2 credential record: %+v", marker)
++	}
++	record := (*marker.Passthrough)[0]
++	if record.Path != "" || record.Isolation != "isolated" || record.Strategy != "per-home-keychain" ||
++		record.SourceRole != "managed" || record.Backend != "keychain" || record.BackendVersion != "2.1.261" || record.Provenance != "provisioned" {
++		t.Fatalf("isolated Claude credential record = %+v", record)
++	}
++	var object map[string]any
++	if err := json.Unmarshal(payload, &object); err != nil {
++		t.Fatal(err)
++	}
++	entries, _ := object["passthrough"].([]any)
++	fields, _ := entries[0].(map[string]any)
++	if _, exists := fields["path"]; exists {
++		t.Fatalf("the per-home Keychain record omits path: %s", payload)
++	}
++}
++
++// TestEnvResolveKeepsSchema1BytesForMetadataOnly proves an explicit repair
++// does not upgrade a schema-1 marker when its legacy state is unchanged.
++func TestEnvResolveKeepsSchema1BytesForMetadataOnly(t *testing.T) {
++	source, _ := profileHome(t)
++	installCLIEnvProfile(t, source)
++	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
++		t.Fatalf("resolve --repair provision = %d\nstderr:\n%s", code, stderr)
++	}
++	markerPath, payload, _ := cliEnvMarker(t, source, "codex_cli")
++	var object map[string]any
++	if err := json.Unmarshal(payload, &object); err != nil {
++		t.Fatal(err)
++	}
++	object["version"] = float64(envmarker.VersionV1)
++	modern, _ := object["passthrough"].([]any)
++	legacy := make([]any, 0, len(modern))
++	for _, value := range modern {
++		fields, _ := value.(map[string]any)
++		path, _ := fields["path"].(string)
++		strategy, _ := fields["strategy"].(string)
++		if strategy == "keyring-preferred" && fields["backend"] == "file" {
++			strategy = "file-link"
++		}
++		legacy = append(legacy, map[string]any{"path": path, "strategy": strategy})
++	}
++	object["passthrough"] = legacy
++	legacyBytes, err := json.MarshalIndent(object, "", "  ")
++	if err != nil {
++		t.Fatal(err)
++	}
++	legacyBytes = append(legacyBytes, '\n')
++	if _, err := envmarker.Parse(legacyBytes); err != nil {
++		t.Fatalf("schema-1 fixture must parse: %v", err)
++	}
++	if err := os.WriteFile(markerPath, legacyBytes, 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Remove(filepath.Join(filepath.Dir(markerPath), "AGENTS.md")); err != nil {
++		t.Fatal(err)
++	}
++	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
++		t.Fatalf("schema-1 repair = %d\nstderr:\n%s", code, stderr)
++	}
++	after, err := os.ReadFile(markerPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if string(after) != string(legacyBytes) {
++		t.Fatalf("metadata-only upgrade changed schema-1 marker bytes:\n%s", after)
++	}
++}
+diff --git a/cmd/curator/env_migrate_test.go b/cmd/curator/env_migrate_test.go
+index 065f16b2..97fed037 100644
+--- a/cmd/curator/env_migrate_test.go
++++ b/cmd/curator/env_migrate_test.go
+@@ -7,6 +7,8 @@ import (
+ 	"runtime"
+ 	"strings"
+ 	"testing"
++
++	"github.com/relux-works/curator/internal/envmarker"
+ )
+ 
+ // These tests drive the production run() entry point for the env
+@@ -121,6 +123,23 @@ func TestEnvMigratePlanApplyPi(t *testing.T) {
+ 	if payload, err := os.ReadFile(agentAuth); err != nil || string(payload) != string(want) {
+ 		t.Fatalf("native bytes preserved: %q (%v)", payload, err)
+ 	}
++	markerPath := filepath.Join(source.cfg.Home(), "environments", "acme", "pi", envmarker.Name)
++	markerBytes, err := os.ReadFile(markerPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	marker, err := envmarker.Parse(markerBytes)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if marker.Version != envmarker.VersionV2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
++		t.Fatalf("migration marker carries one schema-2 record: %+v", marker)
++	}
++	credential := (*marker.Passthrough)[0]
++	if credential.Path != "auth.json" || credential.Isolation != "shared" || credential.Strategy != "file-link" ||
++		credential.SourceRole != "native" || credential.Backend != "file" || credential.BackendVersion != "0.84.2" || credential.Provenance != "migrated" {
++		t.Fatalf("migration credential record: %+v", credential)
++	}
+ 	if code, _, stderr := runProfile(t, source, "env", "resolve", "pi"); code != exitOK {
+ 		t.Fatalf("the migrated home resolves bare: %d\n%s", code, stderr)
+ 	}
+diff --git a/docs/environment-config.md b/docs/environment-config.md
+index 1aeea40f..52acc695 100644
+--- a/docs/environment-config.md
++++ b/docs/environment-config.md
+@@ -26,6 +26,24 @@ All three knobs sit under one `environments` object:
+ 
+ `env status` reports the effective state of every knob below.
+ 
++## Managed-home credential records
++
++Managed-home `.agent-environment.json` markers use schema 2 for new
++provisions. Each recorded credential strategy carries its effective
++isolation, strategy, byte owner, backend, verified backend release, and the
++mutation that last wrote the record. A record with an ambient backend or
++strategy, or an isolated per-home Keychain strategy, has no `path`; other
++records carry their home-relative credential path. This lets linkless
++credentials remain visible without treating them as filesystem entries.
++
++Existing schema-1 markers remain byte-for-byte untouched when the only
++change would add schema-2 credential metadata. If another successful
++mutation already needs to replace a schema-1 marker, Curator publishes the
++complete schema-2 record in that same manager-home transaction. Marker
++publication runs under the manager-home lock with journaled sibling staging
++and atomic rename, so an interrupted write is recovered on the next
++operation.
++
+ ## Transitive system modules (E2)
+ 
+ `transitive_system_modules` is exactly `drop` (default) or `error`.
+diff --git a/internal/envmarker/envmarker.go b/internal/envmarker/envmarker.go
+index a793d53d..fbdf4180 100644
+--- a/internal/envmarker/envmarker.go
++++ b/internal/envmarker/envmarker.go
+@@ -1,8 +1,9 @@
+ // Package envmarker reads and writes the environment marker of environments
+-// §8.2, agent-environment-marker-v1: the per-home ledger of record for
+-// environment surfaces (.agent-environment.json). Readers reject an
+-// unsupported version and unknown fields; an unreadable or invalid marker
+-// fails closed and is reported as environment_marker_invalid.
++// §8.2, agent-environment-marker-v1 and agent-environment-marker-v2: the
++// per-home ledger of record for environment surfaces
++// (.agent-environment.json). Readers reject an unsupported version and
++// unknown fields; an unreadable or invalid marker fails closed and is
++// reported as environment_marker_invalid.
+ package envmarker
+ 
+ import (
+@@ -21,8 +22,16 @@ import (
+ // Name is the marker file name beside the managed surfaces.
+ const Name = ".agent-environment.json"
+ 
+-// Version is the only marker version this release reads or writes.
+-const Version = 1
++// Marker schema versions supported by the reader. New managed-home
++// provisioning writes VersionV2; linked and copied markers retain v1 until
++// their owning writer migrates them independently.
++const (
++	VersionV1 = 1
++	VersionV2 = 2
++	// Version is the legacy writer version for marker paths outside managed
++	// homes. Keep those call sites explicit until their own schema-2 work.
++	Version = VersionV1
++)
+ 
+ // Modes (environments §8.1).
+ const (
+@@ -105,20 +114,21 @@ type Surface struct {
+ 	Copies *[]Copy `json:"copies,omitempty"`
+ }
+ 
+-// Marker is one agent-environment-marker-v1 object. The managed-home members
+-// (passthrough, seeds, seeded_projects, seed_links) are declared so a reader
+-// accepts a managed-home marker; this stage writes in-place markers only.
++// Marker is one agent-environment-marker-v1 or v2 object. The managed-home
++// members (passthrough, seeds, seeded_projects, seed_links) are declared so a
++// reader accepts a managed-home marker; callers decide which schema to write.
+ type Marker struct {
+-	Version        int                `json:"version"`
+-	Profile        Profile            `json:"profile"`
+-	Members        []Member           `json:"members"`
+-	Precedence     Precedence         `json:"precedence"`
+-	Mode           string             `json:"mode"`
+-	Surfaces       map[string]Surface `json:"surfaces"`
+-	Passthrough    *[]Passthrough     `json:"passthrough,omitempty"`
+-	Seeds          *[]string          `json:"seeds,omitempty"`
+-	SeededProjects []string           `json:"seeded_projects,omitempty"`
+-	SeedLinks      []string           `json:"seed_links,omitempty"`
++	Version         int                `json:"version"`
++	Profile         Profile            `json:"profile"`
++	Members         []Member           `json:"members"`
++	Precedence      Precedence         `json:"precedence"`
++	Mode            string             `json:"mode"`
++	Surfaces        map[string]Surface `json:"surfaces"`
++	Passthrough     *[]Passthrough     `json:"passthrough,omitempty"`
++	Seeds           *[]string          `json:"seeds,omitempty"`
++	SeededProjects  []string           `json:"seeded_projects,omitempty"`
++	SeedLinks       []string           `json:"seed_links,omitempty"`
++	CodexSeedRecord *CodexSeedRecord   `json:"codex_seed_record,omitempty"`
+ 	// surfaceOrder is the source order of the surfaces keys, captured at
+ 	// parse: surface keys are sorted (§8.2).
+ 	surfaceOrder []string
+@@ -126,8 +136,21 @@ type Marker struct {
+ 
+ // Passthrough is one recorded credential passthrough entry of a managed home.
+ type Passthrough struct {
+-	Path     string `json:"path"`
+-	Strategy string `json:"strategy"`
++	Path           string `json:"path,omitempty"`
++	Isolation      string `json:"isolation,omitempty"`
++	Strategy       string `json:"strategy"`
++	SourceRole     string `json:"source_role,omitempty"`
++	Backend        string `json:"backend,omitempty"`
++	BackendVersion string `json:"backend_version,omitempty"`
++	Provenance     string `json:"provenance,omitempty"`
++	pathSet        bool
++}
++
++// CodexSeedRecord is the schema-v2 snapshot of native MCP server names
++// preserved by a managed Codex home.
++type CodexSeedRecord struct {
++	Revision         string   `json:"revision"`
++	NativeMCPServers []string `json:"native_mcp_servers"`
+ }
+ 
+ var (
+@@ -138,7 +161,7 @@ var (
+ 
+ // Validate applies the schema rules.
+ func (m *Marker) Validate() error {
+-	if m.Version != Version {
++	if m.Version != VersionV1 && m.Version != VersionV2 {
+ 		return fmt.Errorf("unsupported marker version %d", m.Version)
+ 	}
+ 	if !identifiers.Valid(m.Profile.Name) || !identifiers.Valid(m.Profile.Root) {
+@@ -226,14 +249,42 @@ func (m *Marker) Validate() error {
+ 			return fmt.Errorf("surface keys are sorted")
+ 		}
+ 		for _, entry := range *m.Passthrough {
+-			switch entry.Strategy {
+-			case "per-home-keychain", "ambient", "keyring-preferred", "file-link":
+-			default:
+-				return fmt.Errorf("passthrough strategy %q is unknown", entry.Strategy)
++			if m.Version == VersionV1 {
++				if entry.Isolation != "" || entry.SourceRole != "" || entry.Backend != "" || entry.BackendVersion != "" || entry.Provenance != "" {
++					return fmt.Errorf("schema-1 passthrough carries only path and strategy")
++				}
++				switch entry.Strategy {
++				case "per-home-keychain", "ambient", "keyring-preferred", "file-link":
++				default:
++					return fmt.Errorf("passthrough strategy %q is unknown", entry.Strategy)
++				}
++				if entry.Path == "" || !identifiers.PortablePath(entry.Path) {
++					return fmt.Errorf("schema-1 passthrough path %q is not a portable path", entry.Path)
++				}
++				continue
++			}
++			if err := validateCredentialRecord(entry); err != nil {
++				return err
++			}
++		}
++		if m.CodexSeedRecord != nil {
++			if m.Version != VersionV2 {
++				return fmt.Errorf("codex_seed_record requires schema 2")
++			}
++			if m.CodexSeedRecord.Revision != "A" && m.CodexSeedRecord.Revision != "B" {
++				return fmt.Errorf("codex_seed_record revision is not A or B")
++			}
++			if m.CodexSeedRecord.NativeMCPServers == nil || !sort.StringsAreSorted(m.CodexSeedRecord.NativeMCPServers) {
++				return fmt.Errorf("codex_seed_record native_mcp_servers is not a sorted array")
++			}
++			for index, name := range m.CodexSeedRecord.NativeMCPServers {
++				if name == "" || (index > 0 && m.CodexSeedRecord.NativeMCPServers[index-1] == name) {
++					return fmt.Errorf("codex_seed_record native_mcp_servers contains an empty or repeated name")
++				}
+ 			}
+ 		}
+ 	case ModeLinked, ModeCopied:
+-		if m.Passthrough != nil || m.Seeds != nil || m.SeededProjects != nil || m.SeedLinks != nil {
++		if m.Passthrough != nil || m.Seeds != nil || m.SeededProjects != nil || m.SeedLinks != nil || m.CodexSeedRecord != nil {
+ 			return fmt.Errorf("an in-place marker carries no managed-home members")
+ 		}
+ 	default:
+@@ -288,6 +339,51 @@ func (m *Marker) Validate() error {
+ 	return nil
+ }
+ 
++// validateCredentialRecord implements the schema-v2 passthrough record
++// contract. Ambient records and an isolated per-home keychain have no home
++// path; every other strategy records its portable home-relative path.
++func validateCredentialRecord(entry Passthrough) error {
++	switch entry.Isolation {
++	case "shared", "isolated":
++	default:
++		return fmt.Errorf("passthrough isolation %q is unknown", entry.Isolation)
++	}
++	switch entry.Strategy {
++	case "per-home-keychain", "ambient", "keyring-preferred", "file-link", "in-place":
++	default:
++		return fmt.Errorf("passthrough strategy %q is unknown", entry.Strategy)
++	}
++	switch entry.SourceRole {
++	case "native", "managed":
++	default:
++		return fmt.Errorf("passthrough source_role %q is unknown", entry.SourceRole)
++	}
++	switch entry.Backend {
++	case "file", "keychain", "ambient":
++	default:
++		return fmt.Errorf("passthrough backend %q is unknown", entry.Backend)
++	}
++	if entry.BackendVersion == "" {
++		return fmt.Errorf("passthrough backend_version is empty")
++	}
++	switch entry.Provenance {
++	case "provisioned", "repaired", "migrated":
++	default:
++		return fmt.Errorf("passthrough provenance %q is unknown", entry.Provenance)
++	}
++	hasPath := entry.Path != "" || entry.pathSet
++	linkless := entry.Strategy == "ambient" || entry.Backend == "ambient" ||
++		(entry.Strategy == "per-home-keychain" && entry.Isolation == "isolated")
++	if linkless {
++		if hasPath {
++			return fmt.Errorf("linkless passthrough record carries a path")
++		}
++	} else if !identifiers.PortablePath(entry.Path) {
++		return fmt.Errorf("passthrough path %q is not a portable path", entry.Path)
++	}
++	return nil
++}
++
+ // Marshal renders the marker bytes: indented JSON with sorted keys and one
+ // trailing LF.
+ func (m *Marker) Marshal() ([]byte, error) {
+@@ -316,12 +412,18 @@ func Parse(payload []byte) (*Marker, error) {
+ 		Profile struct {
+ 			ImportedFromNative *bool `json:"imported_from_native"`
+ 		} `json:"profile"`
+-		Surfaces json.RawMessage `json:"surfaces"`
++		Surfaces    json.RawMessage              `json:"surfaces"`
++		Passthrough []map[string]json.RawMessage `json:"passthrough"`
+ 	}
+ 	if err := json.Unmarshal(payload, &shadow); err != nil {
+ 		return nil, fmt.Errorf("%s: %w", DiagMarkerInvalid, err)
+ 	}
+ 	marker.Profile.importedSet = shadow.Profile.ImportedFromNative != nil
++	if marker.Passthrough != nil && len(shadow.Passthrough) == len(*marker.Passthrough) {
++		for index := range *marker.Passthrough {
++			_, (*marker.Passthrough)[index].pathSet = shadow.Passthrough[index]["path"]
++		}
++	}
+ 	order, err := objectKeys(shadow.Surfaces)
+ 	if err != nil {
+ 		return nil, fmt.Errorf("%s: %w", DiagMarkerInvalid, err)
+diff --git a/internal/envmarker/envmarker_test.go b/internal/envmarker/envmarker_test.go
+index 5317aa86..11e43ece 100644
+--- a/internal/envmarker/envmarker_test.go
++++ b/internal/envmarker/envmarker_test.go
+@@ -1,6 +1,7 @@
+ package envmarker
+ 
+ import (
++	"encoding/json"
+ 	"os"
+ 	"path/filepath"
+ 	"strings"
+@@ -48,20 +49,61 @@ func TestRoundTrip(t *testing.T) {
+ 
+ // TestUnsupportedVersionIsRejected narrows the version gate: readers reject
+ // an unsupported marker version and never infer newer semantics. A mutant
+-// that accepts version 2 must fail this test.
++// that accepts version 3 must fail this test.
+ func TestUnsupportedVersionIsRejected(t *testing.T) {
+ 	payload, err := testMarker().Marshal()
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	future := strings.Replace(string(payload), `"version": 1`, `"version": 2`, 1)
++	future := strings.Replace(string(payload), `"version": 1`, `"version": 3`, 1)
+ 	if _, err := Parse([]byte(future)); err == nil {
+-		t.Fatal("version 2 must be rejected")
++		t.Fatal("version 3 must be rejected")
+ 	} else if !strings.Contains(err.Error(), DiagMarkerInvalid) {
+ 		t.Fatalf("error %v carries no %s", err, DiagMarkerInvalid)
+ 	}
+ }
+ 
++func TestSchema2PathlessCredentialRecordOmitsPath(t *testing.T) {
++	marker := testMarker()
++	marker.Version = VersionV2
++	marker.Mode = ModeManagedHome
++	entries := []Passthrough{{
++		Isolation: "shared", Strategy: "keyring-preferred", SourceRole: "native",
++		Backend: "ambient", BackendVersion: "0.153.2", Provenance: "provisioned",
++	}}
++	marker.Passthrough = &entries
++	seeds := []string{}
++	marker.Seeds = &seeds
++	payload, err := marker.Marshal()
++	if err != nil {
++		t.Fatal(err)
++	}
++	parsed, err := Parse(payload)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var decoded map[string]any
++	if err := json.Unmarshal(payload, &decoded); err != nil {
++		t.Fatal(err)
++	}
++	passthrough, _ := decoded["passthrough"].([]any)
++	entry, _ := passthrough[0].(map[string]any)
++	if _, exists := entry["path"]; exists {
++		t.Fatalf("ambient credentials are recorded without path: %s", payload)
++	}
++	if parsed.Version != VersionV2 || (*parsed.Passthrough)[0].Backend != "ambient" {
++		t.Fatalf("parsed schema-2 credential record: %+v", parsed.Passthrough)
++	}
++	decoded["passthrough"].([]any)[0].(map[string]any)["path"] = ""
++	invalid, err := json.Marshal(decoded)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if _, err := Parse(invalid); err == nil {
++		t.Fatal("a present empty path is not a pathless record; linkless records omit the member")
++	}
++}
++
+ // TestUnknownFieldsAreRejected narrows the strict-reader gate: unknown
+ // fields must fail, so newer semantics are never silently inferred.
+ func TestUnknownFieldsAreRejected(t *testing.T) {
+diff --git a/internal/envmarker/marker_env_schema_test.go b/internal/envmarker/marker_env_schema_test.go
+index ea8199be..5f03fc5b 100644
+--- a/internal/envmarker/marker_env_schema_test.go
++++ b/internal/envmarker/marker_env_schema_test.go
+@@ -91,6 +91,38 @@ func TestParseAuthoritativeEnvMarkerSchemaCases(t *testing.T) {
+ 				t.Fatal(err)
+ 			}
+ 			_, err = Parse(payload)
++			if tc.Name == "invalid-version.json" {
++				if err != nil {
++					return conformancecoverage.Observation{FailureReason: fmt.Sprintf("dual-version Parse rejected schema-v2 case: %v", err)}
++				}
++				return conformancecoverage.Observation{BoundReason: "schema-v2 markers are now supported; version 3 rejection is covered by TestUnsupportedVersionIsRejected"}
++			}
++			if tc.Valid && err != nil {
++				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("Parse rejected published-valid case: %v", err)}
++			}
++			if !tc.Valid && err == nil {
++				return conformancecoverage.Observation{FailureReason: "Parse accepted published-invalid case"}
++			}
++			return conformancecoverage.Observation{}
++		})
++}
++
++// TestParseAuthoritativeEnvMarkerV2SchemaCases executes the pinned v2 marker
++// family through Parse. This keeps the production reader aligned with the
++// schema-2 credential record contract, including pathless ambient records.
++func TestParseAuthoritativeEnvMarkerV2SchemaCases(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	cases := schemaCaseValidity(t, root, "agent-environment-marker-v2")
++	conformancecoverage.RunOutcomes(t, "agent-environment-marker-v2/schema-cases", cases,
++		func(tc namedSchemaCase) string { return tc.Name }, func(t *testing.T, tc namedSchemaCase) conformancecoverage.Observation {
++			payload, err := os.ReadFile(filepath.Join(root, "schema-cases", "agent-environment-marker-v2", tc.Name)) // #nosec G304 -- explicit conformance input
++			if err != nil {
++				t.Fatal(err)
++			}
++			_, err = Parse(payload)
+ 			if tc.Valid && err != nil {
+ 				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("Parse rejected published-valid case: %v", err)}
+ 			}
+diff --git a/internal/envprofile/credential_link_test.go b/internal/envprofile/credential_link_test.go
+index f4008042..8d97599e 100644
+--- a/internal/envprofile/credential_link_test.go
++++ b/internal/envprofile/credential_link_test.go
+@@ -12,6 +12,7 @@ import (
+ 	"strings"
+ 	"testing"
+ 
++	"github.com/relux-works/curator/internal/envmarker"
+ 	"github.com/relux-works/curator/internal/envregistry"
+ )
+ 
+@@ -443,11 +444,12 @@ func TestPiProvisionTargetsAgentRoot(t *testing.T) {
+ 		t.Fatalf("the pending finding is not a conflict: %q", resolved)
+ 	}
+ 	marker := readManagedMarker(t, fx, "pi")
+-	if marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
++	if marker.Version != envmarker.VersionV2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
+ 		t.Fatalf("one passthrough entry recorded: %+v", marker.Passthrough)
+ 	}
+ 	entry := (*marker.Passthrough)[0]
+-	if entry.Path != "auth.json" || entry.Strategy != envregistry.StrategyFileLink {
++	if entry.Path != "auth.json" || entry.Isolation != envregistry.IsolationShared || entry.Strategy != envregistry.StrategyFileLink ||
++		entry.SourceRole != "native" || entry.Backend != "file" || entry.BackendVersion != "0.84.2" || entry.Provenance != "provisioned" {
+ 		t.Fatalf("recorded entry %+v", entry)
+ 	}
+ 	payload, err := json.Marshal(marker.Passthrough)
+@@ -459,8 +461,8 @@ func TestPiProvisionTargetsAgentRoot(t *testing.T) {
+ 		t.Fatal(err)
+ 	}
+ 	for key := range decoded[0] {
+-		if key != "path" && key != "strategy" {
+-			t.Fatalf("frozen v1 records path and strategy only, found %q in %s", key, payload)
++		if key != "path" && key != "isolation" && key != "strategy" && key != "source_role" && key != "backend" && key != "backend_version" && key != "provenance" {
++			t.Fatalf("schema-v2 credential record has an unknown field %q in %s", key, payload)
+ 		}
+ 	}
+ 	// With the native credential present the link reads through.
+@@ -556,8 +558,12 @@ func TestCredentialLinkUnrecordedSymlinkRefuses(t *testing.T) {
+ 	}
+ 	provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
+ 	marker := readManagedMarker(t, fx, "codex_cli")
+-	if marker.Passthrough == nil || len(*marker.Passthrough) != 0 {
+-		t.Fatalf("a keyring home records no passthrough: %+v", marker.Passthrough)
++	if marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
++		t.Fatalf("a keyring home records its linkless credential strategy: %+v", marker.Passthrough)
++	}
++	entry := (*marker.Passthrough)[0]
++	if entry.Path != "" || entry.Isolation != envregistry.IsolationShared || entry.Strategy != envregistry.StrategyKeyringPreferred || entry.Backend != "ambient" || entry.SourceRole != "native" || entry.BackendVersion != "0.153.2" {
++		t.Fatalf("keyring home records a pathless ambient credential: %+v", entry)
+ 	}
+ 	// The native store turns to file, and the operator's own symlink sits
+ 	// at the now-wanted link path.
+diff --git a/internal/envprofile/credential_record_test.go b/internal/envprofile/credential_record_test.go
+new file mode 100644
+index 00000000..2cf0d432
+--- /dev/null
++++ b/internal/envprofile/credential_record_test.go
+@@ -0,0 +1,131 @@
++package envprofile
++
++import (
++	"context"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++	"time"
++
++	"github.com/relux-works/curator/internal/envmarker"
++	"github.com/relux-works/curator/internal/managerlock"
++	"github.com/relux-works/curator/internal/transaction"
++)
++
++// TestResolvePublishesCredentialMarkerThroughLockedJournal drives Resolve's
++// production provisioning path. The marker transaction's before-install event
++// observes a sibling staged file while a second manager-home lock acquisition
++// is refused.
++func TestResolvePublishesCredentialMarkerThroughLockedJournal(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	seedLiveNativeCredentials(t, fx)
++	req := fx.request("codex_cli")
++	req.Repair = true
++	markerPath := filepath.Join(ManagedHomeDir(fx.home, fx.profile, "codex_cli"), envmarker.Name)
++	var reachedMarkerInstall, stagedBesideMarker, secondLockRefused bool
++	req.transactionOptions = []transaction.Option{transaction.WithHooks(transaction.Hooks{
++		Observe: func(event transaction.Event) {
++			if event.Point != transaction.PointBeforeInstall || event.LivePath != markerPath {
++				return
++			}
++			reachedMarkerInstall = true
++			if _, err := os.Lstat(markerPath); !os.IsNotExist(err) {
++				t.Errorf("the preimage remains absent before the atomic marker rename: %v", err)
++			}
++			entries, err := os.ReadDir(filepath.Dir(markerPath))
++			if err != nil {
++				t.Errorf("read marker directory: %v", err)
++			} else {
++				for _, entry := range entries {
++					if strings.HasPrefix(entry.Name(), ".curator-txn-") && strings.HasSuffix(entry.Name(), ".desired") {
++						stagedBesideMarker = true
++					}
++				}
++			}
++			manager, err := managerlock.New(fx.home)
++			if err != nil {
++				t.Errorf("construct concurrent lock: %v", err)
++				return
++			}
++			ctx, cancel := context.WithTimeout(t.Context(), 25*time.Millisecond)
++			defer cancel()
++			second, err := manager.AcquireHomeOnly(ctx, false)
++			if err != nil {
++				secondLockRefused = true
++				return
++			}
++			_ = second.Close()
++		},
++	})}
++	if _, err := Resolve(req); err != nil {
++		t.Fatal(err)
++	}
++	if !reachedMarkerInstall || !stagedBesideMarker || !secondLockRefused {
++		t.Fatalf("marker publication evidence: install=%t sibling_stage=%t second_lock_refused=%t", reachedMarkerInstall, stagedBesideMarker, secondLockRefused)
++	}
++	marker := readManagedMarker(t, fx, "codex_cli")
++	if marker.Version != envmarker.VersionV2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
++		t.Fatalf("provision writes one schema-2 record: %+v", marker)
++	}
++	entry := (*marker.Passthrough)[0]
++	if entry.Path != "auth.json" || entry.Isolation != "shared" || entry.Strategy != "keyring-preferred" ||
++		entry.SourceRole != "native" || entry.Backend != "file" || entry.BackendVersion != "0.153.2" || entry.Provenance != "provisioned" {
++		t.Fatalf("provisioned credential record: %+v", entry)
++	}
++}
++
++// TestResolveRecoversCredentialMarkerAfterRenameCrash leaves the transaction
++// journal and same-directory staging file at the exact before-rename boundary,
++// then drives Resolve again to recover and verify the complete v2 marker.
++func TestResolveRecoversCredentialMarkerAfterRenameCrash(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	seedLiveNativeCredentials(t, fx)
++	req := fx.request("codex_cli")
++	req.Repair = true
++	markerPath := filepath.Join(ManagedHomeDir(fx.home, fx.profile, "codex_cli"), envmarker.Name)
++	var interrupted bool
++	req.transactionOptions = []transaction.Option{transaction.WithHooks(transaction.Hooks{
++		Fault: func(event transaction.Event) error {
++			if event.Point == transaction.PointBeforeInstall && event.LivePath == markerPath {
++				interrupted = true
++				panic("simulated process stop before marker rename")
++			}
++			return nil
++		},
++	})}
++	func() {
++		defer func() { _ = recover() }()
++		_, _ = Resolve(req)
++	}()
++	if !interrupted {
++		t.Fatal("the injected interruption reached the marker's before-install boundary")
++	}
++	if _, err := os.Lstat(markerPath); !os.IsNotExist(err) {
++		t.Fatalf("the marker was not installed before the simulated crash: %v", err)
++	}
++	staged, err := filepath.Glob(filepath.Join(filepath.Dir(markerPath), ".curator-txn-*.desired"))
++	if err != nil || len(staged) != 1 {
++		t.Fatalf("one same-directory marker stage survives the crash: %v (%v)", staged, err)
++	}
++	journals, err := os.ReadDir(filepath.Join(fx.home, "state", "transactions", "v1"))
++	if err != nil || len(journals) != 1 {
++		t.Fatalf("the durable recovery journal survives the crash: %v (%v)", journals, err)
++	}
++	req.transactionOptions = nil
++	if _, err := Resolve(req); err != nil {
++		t.Fatalf("the next resolve recovers and verifies the marker: %v", err)
++	}
++	marker := readManagedMarker(t, fx, "codex_cli")
++	if marker.Version != envmarker.VersionV2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 || (*marker.Passthrough)[0].Provenance != "provisioned" {
++		t.Fatalf("recovery installs the complete intended marker: %+v", marker)
++	}
++	journals, err = os.ReadDir(filepath.Join(fx.home, "state", "transactions", "v1"))
++	if err != nil || len(journals) != 0 {
++		t.Fatalf("recovery removes the committed journal: %v (%v)", journals, err)
++	}
++	staged, err = filepath.Glob(filepath.Join(filepath.Dir(markerPath), ".curator-txn-*.desired"))
++	if err != nil || len(staged) != 0 {
++		t.Fatalf("recovery removes marker staging files: %v (%v)", staged, err)
++	}
++}
+diff --git a/internal/envprofile/lock.go b/internal/envprofile/lock.go
+index ffe8abe9..914b2fdc 100644
+--- a/internal/envprofile/lock.go
++++ b/internal/envprofile/lock.go
+@@ -33,7 +33,7 @@ type operation struct {
+ // The per-entry agent-home payloads are not transaction targets in this
+ // stage (see the switch.go package doc for why); they stay direct writes
+ // under the held lock.
+-func beginOperation(home string) (*operation, error) {
++func beginOperation(home string, options ...transaction.Option) (*operation, error) {
+ 	ctx, cancel := context.WithTimeout(context.Background(), lockTimeout)
+ 	defer cancel()
+ 	manager, err := managerlock.New(home)
+@@ -44,7 +44,7 @@ func beginOperation(home string) (*operation, error) {
+ 	if err != nil {
+ 		return nil, fmt.Errorf("%s: acquire the manager-home mutation lock: %v", DiagLockUnavailable, err)
+ 	}
+-	engine, err := transaction.New(home)
++	engine, err := transaction.New(home, options...)
+ 	if err != nil {
+ 		_ = lock.Close()
+ 		return nil, err
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index a59aafe2..445d4cf1 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -34,6 +34,7 @@ import (
+ 	"github.com/relux-works/curator/internal/envregistry"
+ 	"github.com/relux-works/curator/internal/identifiers"
+ 	"github.com/relux-works/curator/internal/protocoljson"
++	"github.com/relux-works/curator/internal/transaction"
+ )
+ 
+ // Diagnostics for managed homes and resolution (environments §7.7, §8.5,
+@@ -92,6 +93,9 @@ type ResolveRequest struct {
+ 	// OperatorXDG is the operator's effective XDG config home; empty
+ 	// means resolve it from the process environment.
+ 	OperatorXDG string
++	// transactionOptions is a fault-injection seam for recovery tests. CLI
++	// requests leave it nil and use the production transaction engine.
++	transactionOptions []transaction.Option
+ }
+ 
+ // ResolveResult is the outcome: exactly one of Document and StaleErr is
+@@ -532,6 +536,87 @@ func (req *ResolveRequest) effectivePassthrough(adapter envregistry.Adapter, iso
+ 	return links, strategies, nil
+ }
+ 
++// credentialRecords computes the schema-v2 record for each declared
++// credential strategy. It records links plus supported linkless strategies;
++// the latter deliberately have no Path and never enter link inventory.
++func (req *ResolveRequest) credentialRecords(adapter envregistry.Adapter, isolation, provenance string) ([]envmarker.Passthrough, error) {
++	if isolation == envregistry.IsolationIsolated {
++		if adapter.ID == envregistry.ClaudeCode && runtime.GOOS == "darwin" {
++			return []envmarker.Passthrough{{
++				Isolation: isolation, Strategy: envregistry.StrategyPerHomeKeychain,
++				SourceRole: "managed", Backend: "keychain", BackendVersion: adapter.VerifiedRelease,
++				Provenance: provenance,
++			}}, nil
++		}
++		return []envmarker.Passthrough{}, nil
++	}
++	if isolation != envregistry.IsolationShared {
++		return nil, fmt.Errorf("unsupported credential isolation %q", isolation)
++	}
++	entries := adapter.PassthroughFor(runtime.GOOS)
++	if len(entries) == 0 {
++		return []envmarker.Passthrough{}, nil
++	}
++	if adapter.VerifiedRelease == "" {
++		return nil, fmt.Errorf("%s: %s has no verified credential backend release", envregistry.DiagCredentialUnsupported, adapter.ID)
++	}
++	native, err := req.nativeHome(adapter.ID)
++	if err != nil {
++		return nil, err
++	}
++	links, _, err := req.effectivePassthrough(adapter, isolation)
++	if err != nil {
++		return nil, err
++	}
++	var codexStore string
++	for _, entry := range entries {
++		if entry.Strategy == envregistry.StrategyKeyringPreferred {
++			codexStore, err = codexCredentialStore(native)
++			if err != nil {
++				return nil, err
++			}
++			break
++		}
++	}
++	records := make([]envmarker.Passthrough, 0, len(entries))
++	for _, entry := range entries {
++		record := envmarker.Passthrough{
++			Isolation: isolation, Strategy: entry.Strategy, SourceRole: "native",
++			Backend: "file", BackendVersion: adapter.VerifiedRelease, Provenance: provenance,
++		}
++		switch entry.Strategy {
++		case envregistry.StrategyFileLink:
++			record.Path = entry.Path
++		case envregistry.StrategyKeyringPreferred:
++			if codexStore == "keyring" {
++				record.Backend = "ambient"
++			} else {
++				record.Path = entry.Path
++			}
++		case envregistry.StrategyAmbient:
++			record.Backend = "ambient"
++		case envregistry.StrategyPerHomeKeychain:
++			record.SourceRole = "managed"
++			record.Backend = "keychain"
++		default:
++			return nil, fmt.Errorf("%s: %s declares unsupported credential strategy %q", envregistry.DiagCredentialUnsupported, adapter.ID, entry.Strategy)
++		}
++		if record.Path != "" {
++			if _, linked := links[record.Path]; !linked {
++				return nil, fmt.Errorf("%s: %s credential path %s has no effective link", envregistry.DiagCredentialUnsupported, adapter.ID, record.Path)
++			}
++		}
++		records = append(records, record)
++	}
++	sort.Slice(records, func(i, j int) bool {
++		if records[i].Path != records[j].Path {
++			return records[i].Path < records[j].Path
++		}
++		return records[i].Strategy < records[j].Strategy
++	})
++	return records, nil
++}
++
+ // codexCredentialStore resolves the operator's native codex credential
+ // store: the top-level cli_auth_credentials_store selector when the
+ // native config.toml carries one, else the platform default file — an
+@@ -859,7 +944,7 @@ func sameStoreTree(target, storeRoot string) bool {
+ // store documents, copies, links (with copy fallback for files), seed
+ // files, and the marker. Managed paths the plan no longer wants are
+ // removed; files the marker does not record are never touched.
+-func applyPlan(req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded map[string]bool, prior *envmarker.Marker, provisioned bool) error {
++func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded map[string]bool, prior *envmarker.Marker, provisioned bool) error {
+ 	if err := os.MkdirAll(plan.homeDir, 0o755); err != nil {
+ 		return err
+ 	}
+@@ -956,7 +1041,11 @@ func applyPlan(req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded
+ 			}
+ 		}
+ 	}
+-	marker, err := finalizeMarker(req, plan, seeds, prior)
++	provenance := "repaired"
++	if provisioned {
++		provenance = "provisioned"
++	}
++	marker, err := finalizeMarker(req, plan, seeds, prior, provenance)
+ 	if err != nil {
+ 		return err
+ 	}
+@@ -964,8 +1053,11 @@ func applyPlan(req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded
+ 	if err != nil {
+ 		return err
+ 	}
+-	_ = os.Remove(filepath.Join(plan.homeDir, envmarker.Name))
+-	return os.WriteFile(filepath.Join(plan.homeDir, envmarker.Name), payload, 0o644)
++	markerPath := filepath.Join(plan.homeDir, envmarker.Name)
++	if prior != nil && prior.Version == envmarker.VersionV1 && legacyMarkerProjectionMatches(prior, marker) {
++		return nil
++	}
++	return op.publish(map[string][]byte{markerPath: payload})
+ }
+ 
+ // isSeedPath reports whether a recorded path is seed-owned tool state the
+@@ -988,9 +1080,10 @@ func isSeedPath(plan *homePlan, path string) bool {
+ // entries are seeded and recorded, recorded seeds whose target is gone are
+ // removed, and unrecorded entries shadowing allowlisted operator entries
+ // warn environment_seed_shadowed and are never touched (§7.1, §7.4).
+-func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prior *envmarker.Marker) (*envmarker.Marker, error) {
++func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prior *envmarker.Marker, provenance string) (*envmarker.Marker, error) {
+ 	marker := plan.marker
+-	links, strategies, err := req.effectivePassthrough(plan.adapter, plan.isolation)
++	marker.Version = envmarker.VersionV2
++	links, _, err := req.effectivePassthrough(plan.adapter, plan.isolation)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+@@ -1001,7 +1094,9 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
+ 	recordedLinks := map[string]bool{}
+ 	if prior != nil && prior.Passthrough != nil {
+ 		for _, entry := range *prior.Passthrough {
+-			recordedLinks[entry.Path] = true
++			if entry.Path != "" {
++				recordedLinks[entry.Path] = true
++			}
+ 		}
+ 	}
+ 	migrateCmd := fmt.Sprintf("curator env migrate --plan --profile %s --env %s, then curator env migrate --apply --expect <plan-hash> --profile %s --env %s", req.Profile, plan.adapter.ID, req.Profile, plan.adapter.ID)
+@@ -1013,9 +1108,9 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
+ 	if err := removeStaleCredentialLinks(plan.adapter, plan.homeDir, native, prior, links, migrateCmd); err != nil {
+ 		return nil, err
+ 	}
+-	passthrough := []envmarker.Passthrough{}
+-	for _, path := range sortedKeys(links) {
+-		passthrough = append(passthrough, envmarker.Passthrough{Path: path, Strategy: strategies[path]})
++	passthrough, err := req.credentialRecords(plan.adapter, plan.isolation, provenance)
++	if err != nil {
++		return nil, err
+ 	}
+ 	marker.Passthrough = &passthrough
+ 	// Copy-seed records survive repair: the tool owns the files, and
+@@ -1070,6 +1165,70 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
+ 	return marker, nil
+ }
+ 
++// legacyMarkerProjectionMatches checks whether publishing a schema-2 marker
++// would change any schema-1 state beyond adding credential metadata. A true
++// result keeps the original schema-1 bytes untouched; any unrelated marker
++// change is published as one complete schema-2 replacement.
++func legacyMarkerProjectionMatches(prior, candidate *envmarker.Marker) bool {
++	if prior == nil || prior.Version != envmarker.VersionV1 || candidate == nil {
++		return false
++	}
++	legacyEntries := []envmarker.Passthrough{}
++	if candidate.Passthrough != nil {
++		for _, entry := range *candidate.Passthrough {
++			if entry.Path == "" {
++				continue
++			}
++			strategy := entry.Strategy
++			if strategy == envregistry.StrategyKeyringPreferred && entry.Backend == "file" {
++				strategy = envregistry.StrategyFileLink
++			}
++			legacyEntries = append(legacyEntries, envmarker.Passthrough{Path: entry.Path, Strategy: strategy})
++		}
++	}
++	projected := *candidate
++	projected.Version = envmarker.VersionV1
++	projected.Passthrough = &legacyEntries
++	projected.CodexSeedRecord = nil
++	priorPayload, err := prior.Marshal()
++	if err != nil {
++		return false
++	}
++	projectedPayload, err := projected.Marshal()
++	if err != nil {
++		return false
++	}
++	return bytes.Equal(priorPayload, projectedPayload)
++}
++
++// sameCredentialRecordSet compares all durable record fields except
++// provenance, which describes the last successful mutation and therefore
++// changes on repair and migration without changing credential identity.
++func sameCredentialRecordSet(left, right []envmarker.Passthrough) bool {
++	if len(left) != len(right) {
++		return false
++	}
++	identityCounts := func(records []envmarker.Passthrough) map[string]int {
++		counts := make(map[string]int, len(records))
++		for _, record := range records {
++			record.Provenance = ""
++			payload, _ := json.Marshal(record)
++			counts[string(payload)]++
++		}
++		return counts
++	}
++	a, b := identityCounts(left), identityCounts(right)
++	if len(a) != len(b) {
++		return false
++	}
++	for key, count := range a {
++		if b[key] != count {
++			return false
++		}
++	}
++	return true
++}
++
+ // ensureCredentialLink fix-first ensures one wanted credential link (§7.4,
+ // §10.1): an absent link path is linked, a symlink still targeting the
+ // declared native store is left alone, and an empty directory is replaced
+@@ -1143,6 +1302,9 @@ func removeStaleCredentialLinks(adapter envregistry.Adapter, homeDir, native str
+ 		return nil
+ 	}
+ 	for _, entry := range *prior.Passthrough {
++		if entry.Path == "" {
++			continue
++		}
+ 		if _, wanted := links[entry.Path]; wanted {
+ 			continue
+ 		}
+@@ -1550,10 +1712,27 @@ func (v *verification) checkPassthrough(req *ResolveRequest, plan *homePlan, mar
+ 		v.reasons = append(v.reasons, fmt.Sprintf("passthrough: %v", err))
+ 		return
+ 	}
++	if marker.Version == envmarker.VersionV2 {
++		expected, err := req.credentialRecords(plan.adapter, plan.isolation, "provisioned")
++		if err != nil {
++			v.reasons = append(v.reasons, fmt.Sprintf("passthrough: %v", err))
++			return
++		}
++		var recorded []envmarker.Passthrough
++		if marker.Passthrough != nil {
++			recorded = *marker.Passthrough
++		}
++		if !sameCredentialRecordSet(expected, recorded) {
++			v.reasons = append(v.reasons, "passthrough credential records do not match the effective set")
++			return
++		}
++	}
+ 	recorded := map[string]string{}
+ 	if marker.Passthrough != nil {
+ 		for _, entry := range *marker.Passthrough {
+-			recorded[entry.Path] = entry.Strategy
++			if entry.Path != "" {
++				recorded[entry.Path] = entry.Strategy
++			}
+ 		}
+ 	}
+ 	if len(recorded) != len(links) {
+@@ -1562,7 +1741,7 @@ func (v *verification) checkPassthrough(req *ResolveRequest, plan *homePlan, mar
+ 	}
+ 	for path, target := range links {
+ 		strategy, ok := recorded[path]
+-		if !ok || strategy != strategies[path] {
++		if !ok || (marker.Version == envmarker.VersionV1 && strategy != strategies[path]) {
+ 			v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s is not recorded", path))
+ 			continue
+ 		}
+@@ -1867,7 +2046,7 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
+ // repair restores managed bytes from the store and never adopts candidate
+ // bytes found in the home.
+ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source Source, lock *contextlock.Lock, hash string) (*ResolveResult, error) {
+-	op, err := beginOperation(req.Home)
++	op, err := beginOperation(req.Home, req.transactionOptions...)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+@@ -1946,7 +2125,7 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
+ 			}
+ 		}
+ 	}
+-	if err := applyPlan(req, plan, seeds, recorded, verdict.marker, provisioned); err != nil {
++	if err := applyPlan(op, req, plan, seeds, recorded, verdict.marker, provisioned); err != nil {
+ 		if provisioned {
+ 			return nil, err
+ 		}
+diff --git a/internal/envprofile/managed_test.go b/internal/envprofile/managed_test.go
+index 35a8e055..15b6ab42 100644
+--- a/internal/envprofile/managed_test.go
++++ b/internal/envprofile/managed_test.go
+@@ -560,7 +560,11 @@ func TestCodexKeyringAmbient(t *testing.T) {
+ 			marker := readManagedMarker(t, fx, "codex_cli")
+ 			links := 0
+ 			if marker.Passthrough != nil {
+-				links = len(*marker.Passthrough)
++				for _, entry := range *marker.Passthrough {
++					if entry.Path != "" {
++						links++
++					}
++				}
+ 			}
+ 			if tc.linked && links != 1 {
+ 				t.Fatalf("a %s store links auth.json, records %d", tc.name, links)
+@@ -568,6 +572,11 @@ func TestCodexKeyringAmbient(t *testing.T) {
+ 			if !tc.linked && links != 0 {
+ 				t.Fatalf("a keyring store is ambient, records %d", links)
+ 			}
++			if tc.name == "keyring" {
++				if marker.Passthrough == nil || len(*marker.Passthrough) != 1 || (*marker.Passthrough)[0].Path != "" || (*marker.Passthrough)[0].Backend != "ambient" {
++					t.Fatalf("a keyring store records one pathless ambient credential: %+v", marker.Passthrough)
++				}
++			}
+ 			if _, err := Resolve(fx.request("codex_cli")); err != nil {
+ 				t.Fatalf("the home is current: %v", err)
+ 			}
+diff --git a/internal/envprofile/migrate.go b/internal/envprofile/migrate.go
+index 09ed0fa4..4b96092c 100644
+--- a/internal/envprofile/migrate.go
++++ b/internal/envprofile/migrate.go
+@@ -205,9 +205,10 @@ type MigrateHome struct {
+ 	Conflicts []MigrateConflict
+ 	Warnings  []string
+ 
+-	provisioned bool
+-	marker      *envmarker.Marker
+-	markerRaw   []byte
++	provisioned       bool
++	marker            *envmarker.Marker
++	markerRaw         []byte
++	credentialRecords []envmarker.Passthrough
+ }
+ 
+ // MigrateRecovery summarizes a leftover migration journal from an
+@@ -420,6 +421,13 @@ func inventoryHome(req *MigrateRequest, profile string, adapter envregistry.Adap
+ 			"fix the native credential configuration out of band and re-run")
+ 		return home
+ 	}
++	credentials, err := rr.credentialRecords(adapter, isolation, "migrated")
++	if err != nil {
++		home.addConflict("", fmt.Sprintf("cannot establish the credential record: %v", err),
++			"fix the credential configuration out of band and re-run")
++		return home
++	}
++	home.credentialRecords = credentials
+ 	native, err := rr.nativeHome(adapter.ID)
+ 	if err != nil {
+ 		home.addConflict("", fmt.Sprintf("cannot resolve the native home: %v", err),
+@@ -429,7 +437,9 @@ func inventoryHome(req *MigrateRequest, profile string, adapter envregistry.Adap
+ 	recorded := map[string]string{}
+ 	if marker.Passthrough != nil {
+ 		for _, entry := range *marker.Passthrough {
+-			recorded[entry.Path] = entry.Strategy
++			if entry.Path != "" {
++				recorded[entry.Path] = entry.Strategy
++			}
+ 		}
+ 	}
+ 	paths := map[string]bool{}
+@@ -705,6 +715,10 @@ func migrationHash(report *MigrateReport) string {
+ 		for _, warning := range home.Warnings {
+ 			fmt.Fprintf(&canonical, "warning %s %s %s\n", home.Profile, home.EnvID, warning)
+ 		}
++		if len(home.credentialRecords) > 0 {
++			payload, _ := json.Marshal(home.credentialRecords)
++			fmt.Fprintf(&canonical, "credentials %s %s %s\n", home.Profile, home.EnvID, payload)
++		}
+ 	}
+ 	if report.Recovery != nil {
+ 		if report.Recovery.Broken != "" {
+@@ -1198,11 +1212,11 @@ func validateMigrationOp(full string, op MigrateOp) error {
+ 	return nil
+ }
+ 
+-// changedMarkers renders the marker updates for homes with unlink
+-// operations (relinks keep the identical record and need no rewrite):
+-// the prior marker minus the unlinked entries, everything else
+-// preserved byte-for-byte in content. It also returns the prior raw
+-// bytes for rollback.
++// changedMarkers renders marker updates for every schema-2 home with a
++// migration operation so provenance records the migration, plus schema-1
++// homes whose unlink operation requires changing the legacy marker. A
++// schema-1 relink keeps its exact bytes because no marker replacement is
++// otherwise required. Prior raw bytes are returned for rollback.
+ func changedMarkers(report *MigrateReport) (map[string][]byte, map[string][]byte, error) {
+ 	changed := map[string][]byte{}
+ 	priors := map[string][]byte{}
+@@ -1213,23 +1227,16 @@ func changedMarkers(report *MigrateReport) (map[string][]byte, map[string][]byte
+ 				dropped = append(dropped, op.Path)
+ 			}
+ 		}
+-		if len(dropped) == 0 {
++		if len(home.Ops) == 0 || home.marker == nil {
+ 			continue
+ 		}
+-		drop := map[string]bool{}
+-		for _, path := range dropped {
+-			drop[path] = true
+-		}
+-		kept := []envmarker.Passthrough{}
+-		if home.marker.Passthrough != nil {
+-			for _, entry := range *home.marker.Passthrough {
+-				if !drop[entry.Path] {
+-					kept = append(kept, entry)
+-				}
+-			}
++		if home.marker.Version == envmarker.VersionV1 && len(dropped) == 0 {
++			continue
+ 		}
+ 		updated := *home.marker
+-		updated.Passthrough = &kept
++		updated.Version = envmarker.VersionV2
++		complete := append([]envmarker.Passthrough{}, home.credentialRecords...)
++		updated.Passthrough = &complete
+ 		payload, err := updated.Marshal()
+ 		if err != nil {
+ 			return nil, nil, fmt.Errorf("render the migrated marker for %s/%s: %v", home.Profile, home.EnvID, err)
+diff --git a/internal/envprofile/migrate_test.go b/internal/envprofile/migrate_test.go
+index f1bcfb49..39c0e152 100644
+--- a/internal/envprofile/migrate_test.go
++++ b/internal/envprofile/migrate_test.go
+@@ -160,7 +160,8 @@ func sha256Of(t *testing.T, path string) string {
+ // home linked at the pre-0017 native root migrates to ~/.pi/agent with
+ // bytes preserved and mode intact, printing the plan before applying.
+ // The plan is deterministic (same hash and bytes across runs); apply
+-// relinks (a symlink, never a copy) and rewrites no marker.
++// relinks (a symlink, never a copy) and records migration provenance in
++// the schema-2 marker.
+ func TestMigratePiWrongTargetToAgentRoot(t *testing.T) {
+ 	requireLinkCapability(t)
+ 	fx := writeManagedFixture(t, "acme")
+@@ -252,8 +253,12 @@ func TestMigratePiWrongTargetToAgentRoot(t *testing.T) {
+ 	if _, err := os.Lstat(oldTarget); !os.IsNotExist(err) {
+ 		t.Fatalf("migration creates nothing at the old target: %v", err)
+ 	}
+-	if payload, err := os.ReadFile(markerPath); err != nil || string(payload) != string(markerBefore) {
+-		t.Fatal("a relink rewrites no marker bytes")
++	if payload, err := os.ReadFile(markerPath); err != nil || string(payload) == string(markerBefore) {
++		t.Fatal("a schema-2 relink records migration provenance in the marker")
++	}
++	migratedMarker := readManagedMarker(t, fx, "pi")
++	if migratedMarker.Passthrough == nil || len(*migratedMarker.Passthrough) != 1 || (*migratedMarker.Passthrough)[0].Provenance != "migrated" {
++		t.Fatalf("migration publishes a complete credential record: %+v", migratedMarker.Passthrough)
+ 	}
+ 	after, err := PlanMigration(fx.migrateRequest())
+ 	if err != nil {
+@@ -273,8 +278,69 @@ func TestMigratePiWrongTargetToAgentRoot(t *testing.T) {
+ 	if len(added) != 0 || len(removed) != 0 {
+ 		t.Fatalf("migration adds and removes no files: added=%v removed=%v", added, removed)
+ 	}
+-	if len(changed) != 1 || changed[0] != link {
+-		t.Fatalf("only the link target changes: %v", changed)
++	changedSet := map[string]bool{}
++	for _, path := range changed {
++		changedSet[path] = true
++	}
++	if len(changed) != 2 || !changedSet[link] || !changedSet[markerPath] {
++		t.Fatalf("the link target and migration provenance marker change: %v", changed)
++	}
++}
++
++// TestMigrateSchema1UnlinkPublishesCompleteSchema2Marker proves that a
++// schema-1 marker stays old until migration already requires a marker update
++// for an unlink; that replacement upgrades once and records the complete v2
++// credential set for the new isolated state.
++func TestMigrateSchema1UnlinkPublishesCompleteSchema2Marker(t *testing.T) {
++	requireLinkCapability(t)
++	fx := writeManagedFixture(t, "acme")
++	seedLiveNativeCredentials(t, fx)
++	provision(t, fx, "pi", envregistry.DefaultMachineConfig())
++	markerPath := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), envmarker.Name)
++	marker := readManagedMarker(t, fx, "pi")
++	legacyEntries := []envmarker.Passthrough{}
++	if marker.Passthrough != nil {
++		for _, entry := range *marker.Passthrough {
++			if entry.Path != "" {
++				legacyEntries = append(legacyEntries, envmarker.Passthrough{Path: entry.Path, Strategy: entry.Strategy})
++			}
++		}
++	}
++	legacy := *marker
++	legacy.Version = envmarker.VersionV1
++	legacy.Passthrough = &legacyEntries
++	legacyBytes, err := legacy.Marshal()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(markerPath, legacyBytes, 0o644); err != nil {
++		t.Fatal(err)
++	}
++	link := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), "auth.json")
++	if _, err := os.Lstat(link); err != nil {
++		t.Fatalf("schema-1 marker's recorded link is present: %v", err)
++	}
++	config := envregistry.DefaultMachineConfig()
++	config.Isolation = map[string]map[string]string{"acme": {"pi": envregistry.IsolationIsolated}}
++	req := fx.migrateRequest()
++	req.Machine = config
++	report, err := PlanMigration(req)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(report.Ops()) != 1 || report.Ops()[0].Kind != MigrateOpUnlink || report.Ops()[0].Path != "auth.json" {
++		t.Fatalf("migration requires an unlink marker update: %+v", report.Ops())
++	}
++	req.Expect = report.Hash
++	if _, err := ApplyMigration(req); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := os.Lstat(link); !os.IsNotExist(err) {
++		t.Fatalf("the migration unlinks the recorded passthrough: %v", err)
++	}
++	upgraded := readManagedMarker(t, fx, "pi")
++	if upgraded.Version != envmarker.VersionV2 || upgraded.Passthrough == nil || len(*upgraded.Passthrough) != 0 {
++		t.Fatalf("marker replacement upgrades with the complete isolated record set: %+v", upgraded)
+ 	}
+ }
+ 
+@@ -313,6 +379,7 @@ func TestMigrateNoSecretCopies(t *testing.T) {
+ 	if err := os.Symlink(oldTarget, piLink); err != nil {
+ 		t.Fatal(err)
+ 	}
++	piMarker := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), envmarker.Name)
+ 	codexLink := filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), "auth.json")
+ 	codexMarker := filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), envmarker.Name)
+ 	isolated := envregistry.DefaultMachineConfig()
+@@ -382,8 +449,12 @@ func TestMigrateNoSecretCopies(t *testing.T) {
+ 	for _, path := range changed {
+ 		changedSet[path] = true
+ 	}
+-	if len(changed) != 2 || !changedSet[piLink] || !changedSet[codexMarker] {
+-		t.Fatalf("only the relinked link and the codex marker change: %v", changed)
++	if len(changed) != 3 || !changedSet[piLink] || !changedSet[piMarker] || !changedSet[codexMarker] {
++		t.Fatalf("the relinked link and each migrated home's marker change: %v", changed)
++	}
++	piRecord := readManagedMarker(t, fx, "pi")
++	if piRecord.Passthrough == nil || len(*piRecord.Passthrough) != 1 || (*piRecord.Passthrough)[0].Provenance != "migrated" {
++		t.Fatalf("the relinked Pi credential records migration provenance: %+v", piRecord.Passthrough)
+ 	}
+ 	// The migrated homes are current under their preserved modes.
+ 	if _, err := Resolve(fx.request("pi")); err != nil {
+diff --git a/internal/envprofile/status.go b/internal/envprofile/status.go
+index d6796a9d..8ee08fdd 100644
+--- a/internal/envprofile/status.go
++++ b/internal/envprofile/status.go
+@@ -411,7 +411,11 @@ func homeState(req StatusRequest, profile string, adapter envregistry.Adapter) H
+ 	}
+ 	if marker.Passthrough != nil {
+ 		for _, entry := range *marker.Passthrough {
+-			state.Passthrough = append(state.Passthrough, entry.Path+" ("+entry.Strategy+")")
++			if entry.Path == "" {
++				state.Passthrough = append(state.Passthrough, entry.Strategy)
++			} else {
++				state.Passthrough = append(state.Passthrough, entry.Path+" ("+entry.Strategy+")")
++			}
+ 		}
+ 	}
+ 	if marker.Seeds != nil {
