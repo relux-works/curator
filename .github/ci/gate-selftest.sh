@@ -1140,6 +1140,18 @@ assert 'the installer finds rustup under CARGO_HOME/bin without PATH help' 0 \
 	    CI_RUST_TOOLCHAIN_FILE="$WORK/rust-install-channel.toml" "$BASH_ABS" "$IRS"
 assert_contains 'the CARGO_HOME-only install names the filed channel' 'toolchain install 1.92.0 --profile minimal' "$WORK/rustup-log-cargo.txt"
 assert_contains 'the CARGO_HOME bin dir is recorded for the rest of the lane' "$WORK/fake-cargo-only/bin" "$WORK/github-path-cargo.txt"
+assert_contains 'the CARGO_HOME-only success still names its rustup' 'rust-pin: using rustup at' "$WORK/out.txt"
+if [ "$(cat "$WORK/github-path-cargo.txt")" = "$WORK/fake-cargo-only/bin" ]; then
+	ok 'the CARGO_HOME-only GITHUB_PATH write is exactly the shim dir'
+else
+	bad 'the CARGO_HOME-only GITHUB_PATH write is exactly the shim dir' \
+		"got: $(tr '\n' ' ' <"$WORK/github-path-cargo.txt" | cut -c1-200)"
+fi
+if grep -q 'runner diagnostics:' "$WORK/out.txt"; then
+	bad 'the CARGO_HOME-only success prints no diagnostics block' "$(tr '\n' ' ' <"$WORK/out.txt" | cut -c1-200)"
+else
+	ok 'the CARGO_HOME-only success prints no diagnostics block'
+fi
 
 # rustup present ONLY under a Homebrew prefix: the Homebrew formula keeps
 # the rustup binary at $HOMEBREW_PREFIX/bin and puts only the toolchain
@@ -1160,6 +1172,18 @@ assert 'the installer finds rustup under the Homebrew prefix without PATH help' 
 assert_contains 'the Homebrew-prefix install names the filed channel' 'toolchain install 1.92.0 --profile minimal' "$WORK/rustup-log-brew.txt"
 assert_contains 'the Homebrew bin dir is recorded for the rest of the lane' "$WORK/fake-brew/bin" "$WORK/github-path-brew.txt"
 assert_contains 'the CARGO_HOME bin dir (proxies) is still recorded alongside it' "$WORK/fake-cargo-brew/bin" "$WORK/github-path-brew.txt"
+_brew_want="$(printf '%s\n%s' "$WORK/fake-cargo-brew/bin" "$WORK/fake-brew/bin")"
+if [ "$(cat "$WORK/github-path-brew.txt")" = "$_brew_want" ]; then
+	ok 'the Homebrew-prefix GITHUB_PATH writes are the shim dirs in order'
+else
+	bad 'the Homebrew-prefix GITHUB_PATH writes are the shim dirs in order' \
+		"got: $(tr '\n' ' ' <"$WORK/github-path-brew.txt" | cut -c1-200)"
+fi
+if grep -q 'runner diagnostics:' "$WORK/out.txt"; then
+	bad 'the Homebrew-prefix success prints no diagnostics block' "$(tr '\n' ' ' <"$WORK/out.txt" | cut -c1-200)"
+else
+	ok 'the Homebrew-prefix success prints no diagnostics block'
+fi
 
 # Absent from PATH, CARGO_HOME/bin and the Homebrew prefix: CARGO_HOME and
 # HOMEBREW_PREFIX point at empty prefixes so neither a real ~/.cargo/bin nor
@@ -1168,13 +1192,133 @@ assert_contains 'the CARGO_HOME bin dir (proxies) is still recorded alongside it
 # PATH entries: the row is skipped (named) on a host that ships rustup
 # there, since the script cannot be told to ignore them.
 mkdir -p "$WORK/empty-cargo/bin" "$WORK/empty-brew/bin"
+# A present-but-not-executable rustup under the Homebrew prefix: resolution
+# ([ -x ]) skips it, so the row still fails, and the diagnostics must name
+# the middle state exactly.
+: >"$WORK/empty-brew/bin/rustup"
+chmod -x "$WORK/empty-brew/bin/rustup" 2>/dev/null || true
 if [ -x /opt/homebrew/bin/rustup ] || [ -x /usr/local/bin/rustup ]; then
 	skip 'a runner without rustup fails' 'this host ships rustup under /opt/homebrew/bin or /usr/local/bin, which the script probes unconditionally; the row runs on the hosted lanes'
+	skip 'rustup-absent diagnostics rows' 'same host rustup; the block, the defaulted-CARGO_HOME fixture and the narrowing mutant run on the hosted lanes'
 else
 	assert 'a runner without rustup fails' 1 \
 		env PATH="$NORUSTPATH" GITHUB_PATH="$WORK/github-path.txt" CARGO_HOME="$WORK/empty-cargo" HOMEBREW_PREFIX="$WORK/empty-brew" \
+		    RUNNER_NAME='fake-rose-air' RUNNER_OS='fake-macOS' \
 		    CI_RUST_TOOLCHAIN_FILE="$WORK/rust-install-channel.toml" "$BASH_ABS" "$IRS"
 	assert_contains 'the failure names the runner-setup note' 'docs/self-hosted-runner-setup.md' "$WORK/out.txt"
+	assert_contains 'the failure prints the runner diagnostics block' 'rust-pin: rustup not found; runner diagnostics:' "$WORK/out.txt"
+	assert_contains 'the failure names RUNNER_NAME' 'rust-pin:   RUNNER_NAME=fake-rose-air' "$WORK/out.txt"
+	assert_contains 'the failure names RUNNER_OS' 'rust-pin:   RUNNER_OS=fake-macOS' "$WORK/out.txt"
+	assert_contains 'the failure names hostname' 'rust-pin:   hostname=' "$WORK/out.txt"
+	assert_contains 'the failure names whoami' 'rust-pin:   whoami=' "$WORK/out.txt"
+	assert_contains 'the failure names HOME' 'rust-pin:   HOME=' "$WORK/out.txt"
+	assert_contains 'the failure names a set CARGO_HOME' "rust-pin:   CARGO_HOME=$WORK/empty-cargo (set)" "$WORK/out.txt"
+	assert_contains 'the failure names HOMEBREW_PREFIX' "rust-pin:   HOMEBREW_PREFIX=$WORK/empty-brew" "$WORK/out.txt"
+	assert_contains 'the failure names the searched PATH' 'rust-pin:   PATH=' "$WORK/out.txt"
+	assert_contains 'the failure lists the CARGO_HOME candidate as absent' "rust-pin:   candidate $WORK/empty-cargo/bin/rustup: absent" "$WORK/out.txt"
+	assert_contains 'the failure lists the Homebrew-prefix candidate as not executable' "rust-pin:   candidate $WORK/empty-brew/bin/rustup: exists-not-executable" "$WORK/out.txt"
+	assert_contains 'the failure lists the Apple-silicon Homebrew candidate' 'rust-pin:   candidate /opt/homebrew/bin/rustup:' "$WORK/out.txt"
+	assert_contains 'the failure lists the Intel Homebrew candidate' 'rust-pin:   candidate /usr/local/bin/rustup:' "$WORK/out.txt"
+	assert_contains 'the failure lists the empty CARGO_HOME bin dir' "rust-pin:   listing $WORK/empty-cargo/bin: no names containing rust or cargo" "$WORK/out.txt"
+	assert_contains 'the failure lists the Apple-silicon Homebrew bin dir' 'rust-pin:   listing /opt/homebrew/bin' "$WORK/out.txt"
+	assert_contains 'the failure lists the Intel Homebrew bin dir' 'rust-pin:   listing /usr/local/bin' "$WORK/out.txt"
+	assert_contains 'the failure reports command -v rustup' 'rust-pin:   command -v rustup:' "$WORK/out.txt"
+	assert_contains 'the failure reports type -a rustup' 'rust-pin:   type -a rustup:' "$WORK/out.txt"
+	_diag_last="$(tail -n 1 "$WORK/out.txt")"
+	if [ "$_diag_last" = 'rust-pin: rustup is not installed on this runner; install it once per docs/self-hosted-runner-setup.md, then re-run this lane' ]; then
+		ok 'the remedy sentence is still the last line of the failure'
+	else
+		bad 'the remedy sentence is still the last line of the failure' "last line: $(printf '%s' "$_diag_last" | cut -c1-200)"
+	fi
+
+	# CARGO_HOME unset and HOMEBREW_PREFIX unset: HOME points at an empty
+	# fixture home so the defaulted $HOME/.cargo/bin resolves inside the
+	# fixture, and the conditional Homebrew-prefix candidate drops out of
+	# both the resolution and the enumeration -- three candidate lines, not
+	# four. A diagnostics enumeration that hardcoded all four would fail
+	# the count below.
+	mkdir -p "$WORK/empty-home"
+	assert 'a runner without rustup and without CARGO_HOME fails' 1 \
+		env -u CARGO_HOME -u HOMEBREW_PREFIX -u RUNNER_NAME -u RUNNER_OS \
+		    PATH="$NORUSTPATH" HOME="$WORK/empty-home" GITHUB_PATH="$WORK/github-path.txt" \
+		    CI_RUST_TOOLCHAIN_FILE="$WORK/rust-install-channel.toml" "$BASH_ABS" "$IRS"
+	assert_contains 'the failure names a defaulted CARGO_HOME' "rust-pin:   CARGO_HOME=$WORK/empty-home/.cargo (defaulted)" "$WORK/out.txt"
+	assert_contains 'the failure names an unset RUNNER_NAME' 'rust-pin:   RUNNER_NAME=unset' "$WORK/out.txt"
+	assert_contains 'the failure names an unset HOMEBREW_PREFIX' 'rust-pin:   HOMEBREW_PREFIX=unset' "$WORK/out.txt"
+	assert_contains 'the failure lists the defaulted candidate as absent' "rust-pin:   candidate $WORK/empty-home/.cargo/bin/rustup: absent" "$WORK/out.txt"
+	_diag_count="$(grep -c 'rust-pin:   candidate ' "$WORK/out.txt")"
+	if [ "$_diag_count" -eq 3 ]; then
+		ok 'the failure lists exactly the three probed candidates when HOMEBREW_PREFIX is unset'
+	else
+		bad 'the failure lists exactly the three probed candidates when HOMEBREW_PREFIX is unset' "candidate lines: $_diag_count, want 3"
+	fi
+
+	# Bounded listing: 25 rust-matching names under CARGO_HOME/bin must
+	# surface at most 20 entry lines. The row still fails -- none of the
+	# 25 is named rustup -- with the remedy sentence last.
+	mkdir -p "$WORK/many-cargo/bin"
+	_seed=1
+	while [ "$_seed" -le 25 ]; do
+		: >"$WORK/many-cargo/bin/rust-tool-$(printf '%02d' "$_seed")"
+		_seed=$((_seed + 1))
+	done
+	assert 'a runner with many rust-named files still fails' 1 \
+		env PATH="$NORUSTPATH" GITHUB_PATH="$WORK/github-path.txt" CARGO_HOME="$WORK/many-cargo" HOMEBREW_PREFIX="$WORK/empty-brew" \
+		    CI_RUST_TOOLCHAIN_FILE="$WORK/rust-install-channel.toml" "$BASH_ABS" "$IRS"
+	assert_contains 'the failure lists the seeded CARGO_HOME bin dir' "rust-pin:   listing $WORK/many-cargo/bin:" "$WORK/out.txt"
+	_many_count="$(grep -c 'rust-tool-' "$WORK/out.txt")"
+	if [ "$_many_count" -eq 20 ]; then
+		ok 'the bounded listing shows exactly 20 of the 25 rust-named entries'
+	else
+		bad 'the bounded listing shows exactly 20 of the 25 rust-named entries' "entry lines: $_many_count, want 20"
+	fi
+	_many_last="$(tail -n 1 "$WORK/out.txt")"
+	if [ "$_many_last" = 'rust-pin: rustup is not installed on this runner; install it once per docs/self-hosted-runner-setup.md, then re-run this lane' ]; then
+		ok 'the remedy sentence is still the last line after the bounded listing'
+	else
+		bad 'the remedy sentence is still the last line after the bounded listing' "last line: $(printf '%s' "$_many_last" | cut -c1-200)"
+	fi
+
+	# Narrowing mutant: drop the /opt/homebrew/bin candidate from the
+	# DIAGNOSTIC enumeration only (production call site:
+	# print_rustup_diagnostics in .github/ci/install-rust-toolchain.sh,
+	# reached from the `Install pinned Rust toolchain via rustup` lane
+	# step in .github/workflows/ci.yml). A middle line of the loop is
+	# dropped so the mutant stays syntactically valid -- dropping the
+	# last word would take `; do` with it and fail for the wrong reason.
+	# The mutant must still exit 1 -- resolution is untouched -- and the
+	# named Apple-silicon-candidate row above must fail against it,
+	# proving the row kills the narrowing rather than passing vacuously.
+	_diag_prod_count="$(grep -c '/opt/homebrew/bin/rustup' "$IRS")"
+	_mutant="$WORK/install-rust-mutant.sh"
+	awk 'BEGIN{in_fn=0} /^print_rustup_diagnostics\(\)/{in_fn=1} in_fn && /^}/{in_fn=0} in_fn && /\/opt\/homebrew\/bin\/rustup/{next} {print}' "$IRS" >"$_mutant"
+	_diag_mutant_count="$(grep -c '/opt/homebrew/bin/rustup' "$_mutant")"
+	if [ "$_diag_prod_count" -eq 2 ] && [ "$_diag_mutant_count" -eq 1 ]; then
+		ok 'the narrowing mutant drops exactly the diagnostic Apple-silicon candidate'
+	else
+		bad 'the narrowing mutant drops exactly the diagnostic Apple-silicon candidate' \
+			"production occurrences: $_diag_prod_count (want 2), mutant: $_diag_mutant_count (want 1)"
+	fi
+	if "$BASH_ABS" -n "$_mutant"; then
+		ok 'the narrowing mutant is syntactically valid'
+	else
+		bad 'the narrowing mutant is syntactically valid' 'bash -n failed; the kill below would prove nothing'
+	fi
+	env PATH="$NORUSTPATH" GITHUB_PATH="$WORK/github-path.txt" CARGO_HOME="$WORK/empty-cargo" HOMEBREW_PREFIX="$WORK/empty-brew" \
+	    CI_RUST_TOOLCHAIN_FILE="$WORK/rust-install-channel.toml" "$BASH_ABS" "$_mutant" >"$WORK/mutant-out.txt" 2>&1
+	_mutant_got=$?
+	if [ "$_mutant_got" -eq 1 ]; then
+		ok 'the narrowed mutant still exits 1'
+	else
+		bad 'the narrowed mutant still exits 1' "exit $_mutant_got, want 1"
+	fi
+	if grep -qF 'rust-pin:   candidate /opt/homebrew/bin/rustup:' "$WORK/mutant-out.txt"; then
+		bad 'the named Apple-silicon-candidate row kills the narrowing mutant' \
+			'the /opt/homebrew/bin candidate line still appears in the mutant output, so the row would pass vacuously'
+	else
+		ok 'the named Apple-silicon-candidate row kills the narrowing mutant'
+	fi
+	assert_contains 'the narrowed mutant keeps its other candidate lines' 'rust-pin:   candidate /usr/local/bin/rustup:' "$WORK/mutant-out.txt"
 fi
 
 if grep -nE '[0-9]+\.[0-9]+\.[0-9]+' "$IRS" >"$WORK/out.txt"; then

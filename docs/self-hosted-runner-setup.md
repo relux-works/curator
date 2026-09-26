@@ -33,6 +33,17 @@ this; as an alternative, the runner's `.path` file (in the runner
 directory, read by the service at start) may carry `/opt/homebrew/bin`,
 but the lane does not depend on it.
 
+When no probed location holds `rustup`, the step fails with one
+diagnostics block before the remedy note: the runner name (`RUNNER_NAME`),
+`hostname`, `whoami`, `HOME`, `CARGO_HOME` (set or defaulted),
+`HOMEBREW_PREFIX`, the `PATH` it searched, one
+executable/exists-not-executable/absent line per probed candidate, a
+bounded rust/cargo listing of the searched bin directories, and
+`command -v` / `type -a` for `rustup`. The next red run is therefore
+self-diagnosing: the block tells whether the job landed on a different
+machine, a different service user, or a `rustup` outside the probed
+paths.
+
 Nothing else is installed by hand: Go and Node come from the
 `actions/setup-go` / `actions/setup-node` steps, pnpm is installed per lane
 into a lane-local prefix, and the Rust toolchain comes from rustup as above.

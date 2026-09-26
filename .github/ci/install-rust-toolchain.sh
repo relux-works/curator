@@ -23,7 +23,9 @@
 # any rustup call; $CARGO_HOME/bin stays on both too because the proxies
 # live there. Resolution never uses RUSTUP_HOME. A runner without rustup in
 # any of those places fails here with that note named (rose-air run
-# 35306933411), not with a generic rustc-not-found later.
+# 35306933411), not with a generic rustc-not-found later; the failure
+# prints the runner diagnostics (runner name, searched PATH, per-candidate
+# state) before the note so the next red run is self-diagnosing.
 #
 # Usage (as a CI lane step; GITHUB_PATH must be set):
 #   bash .github/ci/install-rust-toolchain.sh
@@ -65,7 +67,73 @@ else
 		fi
 	done
 fi
-[ -n "$rustup_bin" ] || fail "rustup is not installed on this runner; install it once per docs/self-hosted-runner-setup.md, then re-run this lane"
+
+# Failure-path diagnostics (BUG-260922-306v4m): the remedy sentence alone
+# cannot tell a different runner (the label set is self-hosted+macOS+ARM64
+# at organisation level, so the machine the operator checked may not be the
+# machine that ran), a different service user ($HOME/.cargo/bin resolving
+# elsewhere), or a rustup living somewhere the probe does not look (an
+# asdf/mise shim, ~/.local/bin, /usr/local/cargo/bin, /opt/rust/bin)
+# apart -- rose-air runs 35663049586 and 35725359745 failed every main push
+# with no evidence of which. The failure therefore names the runner and
+# everything it searched before the remedy sentence. Failure path only: the
+# success path below is untouched. Every probe here is guarded so the
+# diagnostics cannot fail under `set -euo pipefail`; only the named
+# variables are printed, never the whole environment.
+print_rustup_diagnostics() {
+	_diag_host="$(hostname 2>/dev/null || echo unknown)"
+	_diag_user="$(whoami 2>/dev/null || echo unknown)"
+	if [ -n "${CARGO_HOME:-}" ]; then
+		_diag_cargo_note='set'
+	else
+		_diag_cargo_note='defaulted'
+	fi
+	echo "rust-pin: rustup not found; runner diagnostics:"
+	echo "rust-pin:   RUNNER_NAME=${RUNNER_NAME:-unset}"
+	echo "rust-pin:   RUNNER_OS=${RUNNER_OS:-unset}"
+	echo "rust-pin:   hostname=$_diag_host"
+	echo "rust-pin:   whoami=$_diag_user"
+	echo "rust-pin:   HOME=$HOME"
+	echo "rust-pin:   CARGO_HOME=$cargo_home ($_diag_cargo_note)"
+	echo "rust-pin:   HOMEBREW_PREFIX=${HOMEBREW_PREFIX:-unset}"
+	echo "rust-pin:   PATH=$PATH"
+	for _diag_candidate in \
+		"$cargo_home/bin/rustup" \
+		${HOMEBREW_PREFIX:+"$HOMEBREW_PREFIX/bin/rustup"} \
+		/opt/homebrew/bin/rustup \
+		/usr/local/bin/rustup; do
+		if [ -x "$_diag_candidate" ]; then
+			_diag_state='executable'
+		elif [ -e "$_diag_candidate" ] || [ -L "$_diag_candidate" ]; then
+			_diag_state='exists-not-executable'
+		else
+			_diag_state='absent'
+		fi
+		echo "rust-pin:   candidate $_diag_candidate: $_diag_state"
+	done
+	for _diag_dir in "$cargo_home/bin" /opt/homebrew/bin /usr/local/bin; do
+		if [ ! -d "$_diag_dir" ]; then
+			echo "rust-pin:   listing $_diag_dir: absent"
+			continue
+		fi
+		_diag_hits="$(ls -1 "$_diag_dir" 2>/dev/null | grep -i -E 'rust|cargo' | head -n 20 || true)"
+		if [ -z "$_diag_hits" ]; then
+			echo "rust-pin:   listing $_diag_dir: no names containing rust or cargo"
+		else
+			echo "rust-pin:   listing $_diag_dir:"
+			printf '%s\n' "$_diag_hits" | sed 's/^/rust-pin:     /'
+		fi
+	done
+	_diag_v="$(command -v rustup 2>/dev/null || echo '(no rustup on PATH)')"
+	echo "rust-pin:   command -v rustup: $_diag_v"
+	echo "rust-pin:   type -a rustup:"
+	type -a rustup 2>&1 | sed 's/^/rust-pin:     /' || true
+}
+
+if [ -z "$rustup_bin" ]; then
+	print_rustup_diagnostics >&2
+	fail "rustup is not installed on this runner; install it once per docs/self-hosted-runner-setup.md, then re-run this lane"
+fi
 
 rustup_dir="$(dirname "$rustup_bin")"
 if [ "$rustup_dir" != "$cargo_home/bin" ]; then
