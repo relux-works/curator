@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/relux-works/curator/internal/adapters"
@@ -92,6 +93,8 @@ type draftReplaySource struct {
 	RootInputs []string
 	HasBinding bool
 }
+
+var errLockedNetworkRepositoryMissing = errors.New("locked network repository checkout is absent")
 
 // draftFrozenInput maps every locked Git member to the local repository
 // that proves its bytes and every locked root member to its accepted
@@ -200,22 +203,39 @@ func draftFrozenInput(home, projectRoot, skillsRoot string, payload []byte, lock
 		if pkg.IsGit() {
 			// Transitive members carry no alias: their bytes live in the
 			// SkillsRoot checkout the legacy lane resolved them from. Members
-			// selected from one schema-9 repository share that checkout, so map
-			// each selected package to a same-repository member's checkout.
-			if skillsRoot == "" {
-				return opts, sources, nil, fmt.Errorf("source_snapshot_unavailable: snapshot for %s cannot be authenticated without its locked repository; capture it with an explicit attempt", member.Name)
-			}
+			// selected from one schema-9 repository share that checkout when
+			// this machine has one. On a fresh machine, the source is recovered
+			// from the locked requirer's frozen manifest below.
 			if pkg.Kind == sourcelock.KindNetworkGit {
+				if skillsRoot == "" {
+					continue
+				}
 				if member.Directory != "." {
 					location, err := lockedNetworkRepository(skillsRoot, lock, pkg.Repository)
 					if err != nil {
+						if errors.Is(err, errLockedNetworkRepositoryMissing) {
+							continue
+						}
 						return opts, sources, nil, err
 					}
 					opts.GitRepos[member.Name] = location
 					continue
 				}
-				opts.GitRepos[member.Name] = filepath.Join(skillsRoot, filepath.FromSlash(member.Name))
+				location := filepath.Join(skillsRoot, filepath.FromSlash(member.Name))
+				if _, err := os.Lstat(location); err != nil {
+					if os.IsNotExist(err) {
+						continue
+					}
+					return opts, sources, nil, fmt.Errorf("source_snapshot_unavailable: cannot inspect repository checkout for %s: %w", member.Name, err)
+				}
+				if err := gitops.EnsureRepo(location); err != nil {
+					return opts, sources, nil, fmt.Errorf("source_snapshot_unavailable: repository checkout for %s is unusable: %w", member.Name, err)
+				}
+				opts.GitRepos[member.Name] = location
 				continue
+			}
+			if skillsRoot == "" {
+				return opts, sources, nil, fmt.Errorf("source_snapshot_unavailable: snapshot for %s cannot be authenticated without its locked repository; capture it with an explicit attempt", member.Name)
 			}
 			opts.GitRepos[member.Name] = filepath.Join(skillsRoot, filepath.FromSlash(pkg.Source))
 		}
@@ -240,7 +260,7 @@ func lockedNetworkRepository(skillsRoot string, lock *sourcelock.Lock, repositor
 		}
 		return location, nil
 	}
-	return "", fmt.Errorf("source_snapshot_unavailable: no checkout for locked repository %s", repository)
+	return "", fmt.Errorf("source_snapshot_unavailable: no checkout for locked repository %s: %w", repository, errLockedNetworkRepositoryMissing)
 }
 
 // declaringGitSource recovers the declaring Git source alias of one locked
@@ -296,47 +316,207 @@ func readOptionalFreshBindings(home, projectRoot string, lock *sourcelock.Lock) 
 // replayMissingDraftSnapshots restores missing caches from the declared source.
 // Existing but changed cache entries remain refusals and are never overwritten.
 func replayMissingDraftSnapshots(cfg *config.Config, projectRoot string, lock *sourcelock.Lock, opts closure.FrozenOptions, sources map[string]draftReplaySource, projectManifest *manifest.Manifest) error {
+	var roots []sourcelock.Member
+	var pending []sourcelock.Member
 	for _, member := range lock.Members {
-		pkg := member.Package
-		switch pkg.Kind {
-		case sourcelock.KindLocalSnapshot:
-			if _, err := snapshot.OpenLocal(cfg.Home(), pkg.Snapshot); err == nil {
-				continue
-			} else if !strings.HasPrefix(err.Error(), "source_snapshot_unavailable:") {
-				return err
-			}
-			source, ok := sources[member.Name]
-			if !ok {
-				return fmt.Errorf("source_snapshot_unavailable: no declared path source can replay %s", member.Name)
-			}
-			if err := replayLocalDraftSnapshot(cfg, projectRoot, member, source, projectManifest); err != nil {
-				return err
-			}
-		case sourcelock.KindNetworkGit, sourcelock.KindConfiguredGit:
-			key := lockedGitCacheKey(member)
-			if override := opts.GitKeys[member.Name]; override != "" {
-				key = override
-			}
-			repo := opts.GitRepos[member.Name]
-			if _, err := snapshot.AuthenticateGit(cfg.Home(), key, repo, pkg.Commit.Hex); err == nil {
-				continue
-			} else if !strings.HasPrefix(err.Error(), "source_snapshot_unavailable:") {
-				return err
-			}
-			if pkg.Kind == sourcelock.KindNetworkGit && member.Selection != nil {
-				source, ok := sources[member.Name]
-				if !ok || source.Source.Identity != pkg.Repository {
-					return fmt.Errorf("source_snapshot_changed: declared repository identity for %s differs from the lock", member.Name)
-				}
-			}
-			if err := replayGitDraftSnapshot(cfg, projectRoot, member, key, repo, sources[member.Name], opts.GitRepos); err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("source_selection_invalid: unknown package kind %q", pkg.Kind)
+		if member.Selection != nil || opts.Refs[member.Name].Git != "" || opts.Refs[member.Name].Kind != "" {
+			roots = append(roots, member)
+		} else {
+			pending = append(pending, member)
 		}
 	}
+	for _, member := range roots {
+		if err := replayMissingDraftSnapshot(cfg, projectRoot, member, opts, sources[member.Name], projectManifest); err != nil {
+			return err
+		}
+	}
+
+	// Requirers can be read only after their own committed snapshots have been
+	// replayed. Discover dependencies from those frozen manifests, then repeat
+	// so a transitive skill may itself declare another exact repository source.
+	for len(pending) > 0 {
+		declared, err := declaredDependencyReplaySources(cfg, lock, opts)
+		if err != nil {
+			return err
+		}
+		next := make([]sourcelock.Member, 0, len(pending))
+		progress := false
+		for _, member := range pending {
+			source, hasSource := declared[member.Name]
+			_, hasCheckout := opts.GitRepos[member.Name]
+			if !hasSource && !hasCheckout {
+				next = append(next, member)
+				continue
+			}
+			if err := replayMissingDraftSnapshot(cfg, projectRoot, member, opts, source, projectManifest); err != nil {
+				return err
+			}
+			progress = true
+		}
+		if !progress && len(next) > 0 {
+			// Let the regular refusal path provide its stable diagnostic for a
+			// member with neither a frozen declaration nor a local checkout.
+			return replayMissingDraftSnapshot(cfg, projectRoot, next[0], opts, draftReplaySource{}, projectManifest)
+		}
+		pending = next
+	}
 	return nil
+}
+
+func replayMissingDraftSnapshot(cfg *config.Config, projectRoot string, member sourcelock.Member, opts closure.FrozenOptions, source draftReplaySource, projectManifest *manifest.Manifest) error {
+	pkg := member.Package
+	switch pkg.Kind {
+	case sourcelock.KindLocalSnapshot:
+		if _, err := snapshot.OpenLocal(cfg.Home(), pkg.Snapshot); err == nil {
+			return nil
+		} else if !strings.HasPrefix(err.Error(), "source_snapshot_unavailable:") {
+			return err
+		}
+		if source.Source.Path == "" {
+			return fmt.Errorf("source_snapshot_unavailable: no declared path source can replay %s", member.Name)
+		}
+		return replayLocalDraftSnapshot(cfg, projectRoot, member, source, projectManifest)
+	case sourcelock.KindNetworkGit, sourcelock.KindConfiguredGit:
+		key := lockedGitCacheKey(member)
+		if override := opts.GitKeys[member.Name]; override != "" {
+			key = override
+		}
+		repo := opts.GitRepos[member.Name]
+		if _, err := snapshot.AuthenticateGit(cfg.Home(), key, repo, pkg.Commit.Hex); err == nil {
+			return nil
+		} else if !strings.HasPrefix(err.Error(), "source_snapshot_unavailable:") {
+			return err
+		}
+		if pkg.Kind == sourcelock.KindNetworkGit && source.Source.Identity != "" && source.Source.Identity != pkg.Repository {
+			return fmt.Errorf("source_snapshot_changed: declared repository identity for %s differs from the lock", member.Name)
+		}
+		return replayGitDraftSnapshot(cfg, projectRoot, member, key, repo, source, opts.GitRepos)
+	default:
+		return fmt.Errorf("source_selection_invalid: unknown package kind %q", pkg.Kind)
+	}
+}
+
+func declaredDependencyReplaySources(cfg *config.Config, lock *sourcelock.Lock, opts closure.FrozenOptions) (map[string]draftReplaySource, error) {
+	declared := map[string]draftReplaySource{}
+	var policy *config.SourcePolicy
+	policyLoaded := false
+	members := append([]sourcelock.Member(nil), lock.Members...)
+	sort.Slice(members, func(i, j int) bool { return members[i].Name < members[j].Name })
+	for _, consumer := range members {
+		if consumer.Package.Kind == sourcelock.KindLocalSnapshot && consumer.Selection == nil {
+			continue
+		}
+		if consumer.Package.Kind != sourcelock.KindLocalSnapshot && !consumer.Package.IsGit() {
+			continue
+		}
+		if consumer.Selection == nil && (opts.Refs[consumer.Name].Git != "" || opts.Refs[consumer.Name].Kind != "") {
+			continue // a schema-1 or unchanged legacy root declaration
+		}
+		if consumer.Package.IsGit() && opts.GitRepos[consumer.Name] == "" {
+			continue
+		}
+		tree, err := lockedMemberSkillTree(cfg.Home(), consumer, opts)
+		if err != nil {
+			if strings.HasPrefix(err.Error(), "source_snapshot_unavailable:") {
+				continue
+			}
+			return nil, err
+		}
+		spec, err := skillspec.Load(tree)
+		if err != nil {
+			return nil, fmt.Errorf("source_snapshot_changed: locked requirer %s no longer has a valid manifest: %v", consumer.Name, err)
+		}
+		requirementNames := make([]string, 0, len(spec.Requirements))
+		for name := range spec.Requirements {
+			requirementNames = append(requirementNames, name)
+		}
+		sort.Strings(requirementNames)
+		for _, requirementName := range requirementNames {
+			requirement := spec.Requirements[requirementName]
+			target, ok := lock.Find(requirement.Name)
+			if !ok || target.Selection != nil || opts.Refs[target.Name].Git != "" || opts.Refs[target.Name].Kind != "" {
+				continue
+			}
+			if target.Package.Kind != sourcelock.KindNetworkGit {
+				continue
+			}
+			directory := requirement.Directory
+			if directory == "" {
+				directory = "."
+			}
+			if directory != target.Package.Directory {
+				return nil, fmt.Errorf("source_snapshot_changed: locked dependency %s selects %q, but %s declares %q", target.Name, target.Package.Directory, consumer.Name, directory)
+			}
+			if !policyLoaded {
+				policy, err = loadReplaySourcePolicy(cfg)
+				if err != nil {
+					return nil, err
+				}
+				policyLoaded = true
+			}
+			resolution, err := config.ResolveRepositoryEndpoints(policy, requirement.Git, "")
+			if err != nil {
+				return nil, err
+			}
+			if resolution.Identity != target.Package.Repository {
+				return nil, fmt.Errorf("source_snapshot_changed: locked dependency %s repository differs from %s manifest", target.Name, consumer.Name)
+			}
+			if _, exists := declared[target.Name]; exists {
+				continue // stable first consumer wins, matching closure identity recovery
+			}
+			declared[target.Name] = draftReplaySource{
+				Alias:     consumer.Name + ":" + requirementName,
+				Directory: directory,
+				Source: manifest.Source{
+					Git:      requirement.Git,
+					Identity: resolution.Identity,
+					Ref:      manifest.Ref{Kind: requirement.RefKind, Value: requirement.RefValue},
+				},
+			}
+		}
+	}
+	return declared, nil
+}
+
+func lockedMemberSkillTree(home string, member sourcelock.Member, opts closure.FrozenOptions) (string, error) {
+	pkg := member.Package
+	if pkg.Kind == sourcelock.KindLocalSnapshot {
+		tree, err := snapshot.OpenLocal(home, pkg.Snapshot)
+		if err != nil {
+			return "", err
+		}
+		spec, err := skillspec.Load(tree)
+		if err != nil {
+			return "", fmt.Errorf("source_snapshot_changed: locked package %s no longer has a valid manifest: %v", member.Name, err)
+		}
+		content, err := closure.ContentHashFor(tree, spec)
+		if err != nil {
+			return "", err
+		}
+		if content != member.ContentSHA256 {
+			return "", fmt.Errorf("source_snapshot_changed: locked package %s no longer matches its context digest", member.Name)
+		}
+		return tree, nil
+	}
+	key := lockedGitCacheKey(member)
+	if override := opts.GitKeys[member.Name]; override != "" {
+		key = override
+	}
+	repo := opts.GitRepos[member.Name]
+	if repo == "" {
+		return "", fmt.Errorf("source_snapshot_unavailable: no locked repository is available for %s", member.Name)
+	}
+	if _, err := snapshot.AuthenticateGit(home, key, repo, pkg.Commit.Hex); err != nil {
+		return "", err
+	}
+	if err := verifyLockedGitMember(repo, member); err != nil {
+		return "", err
+	}
+	tree := snapshot.Dir(home, key, pkg.Commit.Hex)
+	if member.Directory != "." {
+		tree = filepath.Join(tree, filepath.FromSlash(member.Directory))
+	}
+	return tree, nil
 }
 
 func replayLocalDraftSnapshot(cfg *config.Config, projectRoot string, member sourcelock.Member, source draftReplaySource, projectManifest *manifest.Manifest) error {
@@ -403,7 +583,7 @@ func replayLocalDraftSnapshot(cfg *config.Config, projectRoot string, member sou
 func replayGitDraftSnapshot(cfg *config.Config, projectRoot string, member sourcelock.Member, key, repo string, source draftReplaySource, gitRepos map[string]string) error {
 	commit := member.Package.Commit.Hex
 	if repo == "" {
-		if member.Package.Kind != sourcelock.KindNetworkGit || member.Selection == nil {
+		if member.Package.Kind != sourcelock.KindNetworkGit || (source.Source.Git == "" && source.Source.Repository == "") {
 			return fmt.Errorf("source_snapshot_unavailable: no local repository can replay %s", member.Name)
 		}
 		var err error
@@ -424,7 +604,7 @@ func replayGitDraftSnapshot(cfg *config.Config, projectRoot string, member sourc
 			if err != nil {
 				return err
 			}
-		} else if member.Package.Kind == sourcelock.KindNetworkGit && member.Selection != nil {
+		} else if member.Package.Kind == sourcelock.KindNetworkGit && (source.Source.Git != "" || source.Source.Repository != "") {
 			freshRepo, sourceErr := fetchLockedCommitFromDeclaredSource(cfg, projectRoot, source, member)
 			if sourceErr != nil {
 				return sourceErr
@@ -442,6 +622,9 @@ func replayGitDraftSnapshot(cfg *config.Config, projectRoot string, member sourc
 	if _, err := snapshot.Get(cfg.Home(), key, repo, commit); err != nil {
 		if strings.Contains(err.Error(), "source_snapshot_changed") {
 			return err
+		}
+		if errors.Is(err, snapshot.ErrDestinationConflict) {
+			return fmt.Errorf("source_snapshot_changed: stored snapshot for %s at %s does not match its locked commit", member.Name, commit)
 		}
 		return fmt.Errorf("source_snapshot_unavailable: declared Git source for %s cannot provide the locked revision", member.Name)
 	}
@@ -539,6 +722,9 @@ func lockedGitCacheKey(member sourcelock.Member) string {
 		return member.Package.Source
 	}
 	if member.Selection != nil {
+		return member.Package.Repository
+	}
+	if member.Package.Kind == sourcelock.KindNetworkGit && member.Package.Directory != "." {
 		return member.Package.Repository
 	}
 	return member.Name
