@@ -376,7 +376,6 @@ func TestSystemV2Refusals(t *testing.T) {
 		{"unlockable knob locked", `{"schema_version": 2, "locked": ["environments.current_profile"], "environments": {"current_profile": "a"}}`, "cannot lock"},
 		{"bare environments locked", `{"schema_version": 2, "locked": ["environments"]}`, "cannot lock"},
 		{"locked but unset", `{"schema_version": 2, "locked": ["environments.precedence"]}`, "locks"},
-		{"isolated direction", `{"schema_version": 2, "locked": ["environments.isolation"], "environments": {"isolation": {"a": {"pi": "isolated"}}}}`, "only toward shared"},
 		{"bad value grammar", `{"schema_version": 2, "environments": {"overlays_allowed": "yes"}}`, "overlays_allowed"},
 		{"env under schema 1", `{"schema_version": 1, "locked": [], "environments": {"backup_retention": 1}}`, "environments"},
 		{"env lock under schema 1", `{"schema_version": 1, "locked": ["environments.backup_retention"]}`, "schema_version 1"},
@@ -388,6 +387,24 @@ func TestSystemV2Refusals(t *testing.T) {
 				t.Fatalf("err = %v, want mention of %q", err, tc.want)
 			}
 		})
+	}
+}
+
+// TestSystemV2IsolationLockAcceptsIsolated proves the system-config-v2
+// environments.isolation lock admits isolated and keeps the user's explicit
+// value available to the environment manager for the lock-conflict check.
+func TestSystemV2IsolationLockAcceptsIsolated(t *testing.T) {
+	cfg, _, err := loadWithSystem(t,
+		`{"schema_version": 2, "skills_root": "x", "projects": {}, "environments": {"isolation": {"acme": {"pi": "shared"}}}}`,
+		`{"schema_version": 2, "locked": ["environments.isolation"], "environments": {"isolation": {"acme": {"pi": "isolated"}}}}`)
+	if err != nil {
+		t.Fatalf("isolated system lock was rejected: %v", err)
+	}
+	if !cfg.Locked["environments.isolation"] || cfg.Env.Isolation["acme"]["pi"] != "isolated" {
+		t.Fatalf("effective locked isolation = %+v, locked=%v", cfg.Env.Isolation, cfg.Locked)
+	}
+	if cfg.UserIsolation["acme"]["pi"] != "shared" {
+		t.Fatalf("explicit user isolation was not preserved: %+v", cfg.UserIsolation)
 	}
 }
 

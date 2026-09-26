@@ -236,7 +236,7 @@ func parseEnvironments(raw any) (Environments, error) {
 		env.Targets = targets
 	}
 	if rawIsolation, present := obj["isolation"]; present && rawIsolation != nil {
-		isolation, err := parseIsolation(rawIsolation, false)
+		isolation, err := parseIsolation(rawIsolation)
 		if err != nil {
 			return Environments{}, err
 		}
@@ -627,9 +627,9 @@ func parseTargets(raw any) (map[string]TargetConfig, error) {
 }
 
 // parseIsolation validates isolation.<profile>.<env> with values shared or
-// isolated; systemOnly restricts values to shared, the one direction
-// environments §12.2 makes lockable.
-func parseIsolation(raw any, systemOnly bool) (map[string]map[string]string, error) {
+// isolated. System configuration uses the same grammar because environments
+// §12.2 makes both directions lockable.
+func parseIsolation(raw any) (map[string]map[string]string, error) {
 	entries, ok := raw.(map[string]any)
 	if !ok {
 		return nil, verr.New("environments.isolation", "must be an object")
@@ -649,10 +649,7 @@ func parseIsolation(raw any, systemOnly bool) (map[string]map[string]string, err
 				return nil, verr.New("environments.isolation."+profile, "environment %q %s", env, identifiers.Rule)
 			}
 			mode, ok := rawMode.(string)
-			if !ok || (mode != "shared" && mode != "isolated") || (systemOnly && mode != "shared") {
-				if systemOnly {
-					return nil, verr.New("environments.isolation."+profile+"."+env, "a system file locks isolation only toward shared")
-				}
+			if !ok || (mode != "shared" && mode != "isolated") {
 				return nil, verr.New("environments.isolation."+profile+"."+env, "must be shared or isolated")
 			}
 			modes[env] = mode
@@ -914,9 +911,8 @@ func (c *Config) LockedBySystem(key string) bool {
 }
 
 // parseSystemEnvironments validates the system file's environments object:
-// exactly the §12.2 lockable subset with the §12.1 value grammars, and
-// isolation only toward shared. Anything else is not carriable by the
-// system file (manager §1 rule 1).
+// exactly the §12.2 lockable subset with the §12.1 value grammars. Anything
+// else is not carriable by the system file (manager §1 rule 1).
 func parseSystemEnvironments(raw any) (map[string]any, error) {
 	obj, ok := raw.(map[string]any)
 	if !ok {
@@ -932,7 +928,7 @@ func parseSystemEnvironments(raw any) (map[string]any, error) {
 		return nil, err
 	}
 	if rawIsolation, present := obj["isolation"]; present && rawIsolation != nil {
-		if _, err := parseIsolation(rawIsolation, true); err != nil {
+		if _, err := parseIsolation(rawIsolation); err != nil {
 			return nil, err
 		}
 	}

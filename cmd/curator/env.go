@@ -10,10 +10,9 @@ import (
 	"github.com/relux-works/curator/internal/envregistry"
 )
 
-// machineFromConfig threads the effective machine knobs the resolve and
-// status rows read into the machine configuration: currently the
-// passable_env_names knob with its presence bit, so the S4 profile
-// default applies exactly when the knob is absent (§10.3, §12).
+// machineFromConfig threads the effective machine knobs used by environment
+// resolution and status: passable_env_names with its presence bit, and the
+// isolation map, pre-overlay user values, and system-lock source.
 func machineFromConfig(cfg *config.Config) envregistry.MachineConfig {
 	machine := envregistry.DefaultMachineConfig()
 	if cfg == nil {
@@ -21,6 +20,10 @@ func machineFromConfig(cfg *config.Config) envregistry.MachineConfig {
 	}
 	machine.PassableEnvNames = cfg.Env.PassableEnvNames
 	machine.PassableEnvNamesSet = cfg.Env.PassableEnvNamesSet
+	machine.Isolation = cfg.Env.Isolation
+	machine.UserIsolation = cfg.UserIsolation
+	machine.IsolationLocked = cfg.Locked["environments.isolation"]
+	machine.IsolationLockSource = cfg.SystemConfigPath
 	return machine
 }
 

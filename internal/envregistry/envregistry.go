@@ -52,6 +52,7 @@ const (
 	DiagFormUnsupported       = "environment_form_unsupported"
 	DiagIsolatedUnsupported   = "environment_isolated_unsupported"
 	DiagSharedUnsupported     = "environment_shared_unsupported"
+	DiagIsolationLockConflict = "environment_isolation_lock_conflict"
 	DiagTargetUnknown         = "environment_target_unknown"
 	DiagTargetConsent         = "environment_target_consent_required"
 	DiagShadowingPresent      = "environment_shadowing_path_present"
@@ -537,6 +538,14 @@ type MachineConfig struct {
 	Forms map[string]string
 	// Isolation maps profile to env-id to the configured isolation mode.
 	Isolation map[string]map[string]string
+	// UserIsolation retains explicit machine-file values before the system
+	// overlay. It lets a locked isolated direction reject an explicit shared
+	// request even though the effective Isolation map contains the system value.
+	UserIsolation map[string]map[string]string
+	// IsolationLocked says the system configuration locks the entire
+	// environments.isolation map; IsolationLockSource identifies that policy.
+	IsolationLocked     bool
+	IsolationLockSource string
 	// InPlaceMode maps env-id to linked or copied.
 	InPlaceMode map[string]string
 	// SystemPromptFiles maps profile to off, append, or replace (pi only).
@@ -610,6 +619,16 @@ func (c MachineConfig) EffectiveIsolation(profile string, adapter Adapter, atOrA
 	configured := ""
 	if perProfile, ok := c.Isolation[profile]; ok {
 		configured = perProfile[adapter.ID]
+	}
+	if c.IsolationLocked && configured == IsolationIsolated {
+		if perProfile, ok := c.UserIsolation[profile]; ok && perProfile[adapter.ID] == IsolationShared {
+			source := c.IsolationLockSource
+			if source == "" {
+				source = "system configuration"
+			}
+			return "", fmt.Errorf("%s: profile %q environment %q explicitly requests shared, but %s locks environments.isolation to isolated",
+				DiagIsolationLockConflict, profile, adapter.ID, source)
+		}
 	}
 	return adapter.ResolveIsolation(configured, atOrAbovePinned)
 }

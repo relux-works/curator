@@ -156,6 +156,11 @@ type Config struct {
 	// Env is the effective environments §12.1 machine configuration with
 	// the §12.1 defaults applied. A schema-1 file carries every default.
 	Env Environments
+	// UserIsolation preserves the machine file's explicit isolation entries
+	// before system overlays. A locked isolated direction still wins as the
+	// effective setting, but the environment manager uses this snapshot to
+	// refuse an explicit shared request with the isolation-lock diagnostic.
+	UserIsolation map[string]map[string]string
 	// Locked names the manager §1 locked keys the system file enforces,
 	// including environments.<key> entries.
 	Locked map[string]bool
@@ -278,6 +283,7 @@ func Load(path string, warn func(string)) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	userIsolation := userIsolationFromConfig(userData)
 	locked := map[string]bool{}
 	systemPath := ""
 	if resolved := SystemPath(); resolved != "" {
@@ -298,7 +304,29 @@ func Load(path string, warn func(string)) (*Config, error) {
 	}
 	cfg.Locked = locked
 	cfg.SystemConfigPath = systemPath
+	cfg.UserIsolation = userIsolation
 	return cfg, nil
+}
+
+// userIsolationFromConfig retains valid, explicitly configured machine
+// isolation entries before applySystem replaces a locked environments knob.
+// A malformed value hidden by a whole-knob system lock is not interpreted as
+// an explicit mode here; the effective configuration remains subject to the
+// ordinary merged-config parser below.
+func userIsolationFromConfig(data map[string]any) map[string]map[string]string {
+	env, ok := data["environments"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	raw, present := env["isolation"]
+	if !present || raw == nil {
+		return nil
+	}
+	isolation, err := parseIsolation(raw)
+	if err != nil {
+		return nil
+	}
+	return isolation
 }
 
 // applySystem overlays the system config (Spec §7.2, manager §1): locked
@@ -344,7 +372,7 @@ func applySystem(systemData, userData map[string]any, systemPath string, warn fu
 		locked[key] = true
 	}
 	// A system file carries only the lockable environments subset with the
-	// §12.1 value grammars; isolation locks only toward shared (§12.2).
+	// §12.1 value grammars; isolation is lockable in either direction (§12.2).
 	if rawEnv, present := systemData["environments"]; present && rawEnv != nil {
 		if systemSchema != SchemaVersion2 {
 			return nil, nil, verr.New("environments", "system config %s carries environments under schema_version 1", systemPath)
@@ -638,6 +666,7 @@ func Parse(data map[string]any, path string) (*Config, error) {
 		Path:                     path,
 		Schema:                   schema,
 		Env:                      env,
+		UserIsolation:            env.Isolation,
 		Locked:                   map[string]bool{},
 		SkillsRoot:               expandHome(skillsRoot),
 		PreferredLocale:          preferredLocale,

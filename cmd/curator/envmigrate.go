@@ -62,7 +62,7 @@ func (c cli) cmdEnvMigrate(cfg *config.Config, args []string) int {
 		Home:    cfg.Home(),
 		Profile: *profile,
 		EnvID:   envID,
-		Machine: envregistry.DefaultMachineConfig(),
+		Machine: machineFromConfig(cfg),
 		Expect:  *expect,
 	}
 	if *apply {

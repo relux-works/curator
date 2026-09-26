@@ -94,6 +94,144 @@ func TestEnvResolveUnknowns(t *testing.T) {
 	}
 }
 
+func loadEnvironmentIsolationConfig(t *testing.T, source stubConfigSource, userJSON, systemJSON string) stubConfigSource {
+	t.Helper()
+	if err := os.WriteFile(source.path, []byte(userJSON), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if systemJSON == "" {
+		t.Setenv("CURATOR_SYSTEM_CONFIG", "")
+	} else {
+		systemPath := filepath.Join(filepath.Dir(source.path), "system.json")
+		if err := os.WriteFile(systemPath, []byte(systemJSON), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
+	}
+	cfg, err := config.Load(source.path, nil)
+	if err != nil {
+		t.Fatalf("config.Load rejected isolation fixture: %v", err)
+	}
+	source.cfg = cfg
+	return source
+}
+
+func installEnvTestProfile(t *testing.T, source stubConfigSource) {
+	t.Helper()
+	pkg := t.TempDir()
+	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
+	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
+		t.Fatalf("profile install = %d\nstderr:\n%s", code, stderr)
+	}
+}
+
+// TestEnvResolveIsolatedSystemLockUsesDirection drives system-config-v2
+// environments.isolation through the CLI. With no user isolation entry, the
+// locked isolated direction provisions a managed home without shared auth
+// passthrough.
+func TestEnvResolveIsolatedSystemLockUsesDirection(t *testing.T) {
+	source, _ := profileHome(t)
+	writeNativeCredentials(t)
+	user := `{"schema_version": 2, "skills_root": "x", "projects": {}}`
+	system := `{"schema_version": 2, "locked": ["environments.isolation"], "environments": {"isolation": {"acme": {"codex_cli": "isolated"}}}}`
+	source = loadEnvironmentIsolationConfig(t, source, user, system)
+	if !source.cfg.Locked["environments.isolation"] || source.cfg.Env.Isolation["acme"]["codex_cli"] != "isolated" {
+		t.Fatalf("loaded isolation lock = %+v, locked=%v", source.cfg.Env.Isolation, source.cfg.Locked)
+	}
+	installEnvTestProfile(t, source)
+	code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair")
+	if code != exitOK {
+		t.Fatalf("resolve under isolated lock = %d\nstderr:\n%s", code, stderr)
+	}
+	link := filepath.Join(source.cfg.Home(), "environments", "acme", "codex_cli", "auth.json")
+	if _, err := os.Lstat(link); !os.IsNotExist(err) {
+		t.Fatalf("isolated locked home has no shared auth passthrough: %s (%v)", link, err)
+	}
+}
+
+// TestEnvResolveExplicitSharedConflictsWithIsolatedSystemLock proves an
+// explicit shared user value is rejected through env resolve, with the
+// profile, environment, and system policy source in the diagnostic.
+func TestEnvResolveExplicitSharedConflictsWithIsolatedSystemLock(t *testing.T) {
+	source, _ := profileHome(t)
+	writeNativeCredentials(t)
+	base := `{"schema_version": 2, "skills_root": "x", "projects": {}}`
+	source = loadEnvironmentIsolationConfig(t, source, base, "")
+	installEnvTestProfile(t, source)
+	user := `{"schema_version": 2, "skills_root": "x", "projects": {}, "environments": {"isolation": {"acme": {"codex_cli": "shared"}}}}`
+	system := `{"schema_version": 2, "locked": ["environments.isolation"], "environments": {"isolation": {"acme": {"codex_cli": "isolated"}}}}`
+	source = loadEnvironmentIsolationConfig(t, source, user, system)
+	code, stdout, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair")
+	if code != exitFail {
+		t.Fatalf("resolve with explicit shared under isolated lock = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+	for _, want := range []string{"environment_isolation_lock_conflict", "acme", "codex_cli", source.cfg.SystemConfigPath} {
+		if !strings.Contains(stderr, want) {
+			t.Fatalf("lock refusal misses %q:\n%s", want, stderr)
+		}
+	}
+	if stdout != "" {
+		t.Fatalf("conflicting resolve emits no fragment: %q", stdout)
+	}
+}
+
+// TestEnvResolveLockedIsolationRequiresMigration provisions a shared home,
+// engages an isolated system lock with machine isolation silent, and proves
+// resolve refuses without moving the recorded passthrough. The exact F-C2
+// migration named by the refusal then plans and applies the unlink.
+func TestEnvResolveLockedIsolationRequiresMigration(t *testing.T) {
+	requireLinkCapability(t)
+	source, _ := profileHome(t)
+	writeNativeCredentials(t)
+	user := `{"schema_version": 2, "skills_root": "x", "projects": {}}`
+	source = loadEnvironmentIsolationConfig(t, source, user, "")
+	installEnvTestProfile(t, source)
+	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
+		t.Fatalf("shared provision = %d\nstderr:\n%s", code, stderr)
+	}
+	link := filepath.Join(source.cfg.Home(), "environments", "acme", "codex_cli", "auth.json")
+	nativeAuth := filepath.Join(os.Getenv("CODEX_HOME"), "auth.json")
+	target := nativeAuth
+	if got, err := os.Readlink(link); err != nil || got != target {
+		t.Fatalf("shared passthrough target = %q (%v), want %q", got, err, target)
+	}
+	nativeBytes, err := os.ReadFile(nativeAuth)
+	if err != nil {
+		t.Fatal(err)
+	}
+	system := `{"schema_version": 2, "locked": ["environments.isolation"], "environments": {"isolation": {"acme": {"codex_cli": "isolated"}}}}`
+	source = loadEnvironmentIsolationConfig(t, source, user, system)
+	code, stdout, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair")
+	if code != exitFail {
+		t.Fatalf("resolve with existing shared passthrough = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+	for _, want := range []string{"environment_credential_conflict", "migration needed", "env migrate --plan --profile acme --env codex_cli", "env migrate --apply --expect <plan-hash> --profile acme --env codex_cli"} {
+		if !strings.Contains(stderr, want) {
+			t.Fatalf("migration refusal misses %q:\n%s", want, stderr)
+		}
+	}
+	if got, err := os.Readlink(link); err != nil || got != target {
+		t.Fatalf("refused resolve preserves shared link: %q (%v)", got, err)
+	}
+	if got, err := os.ReadFile(nativeAuth); err != nil || string(got) != string(nativeBytes) {
+		t.Fatalf("refused resolve preserves native credential bytes: %q (%v)", got, err)
+	}
+	code, plan, stderr := runProfile(t, source, "env", "migrate", "--plan", "--profile", "acme", "--env", "codex_cli")
+	if code != exitOK || !strings.Contains(plan, "unlink") || !strings.Contains(plan, "auth.json") {
+		t.Fatalf("F-C2 plan = %d\nplan:\n%s\nstderr:\n%s", code, plan, stderr)
+	}
+	code, applied, stderr := runProfile(t, source, "env", "migrate", "--apply", "--expect", planHash(t, plan), "--profile", "acme", "--env", "codex_cli")
+	if code != exitOK {
+		t.Fatalf("F-C2 apply = %d\nstdout:\n%s\nstderr:\n%s", code, applied, stderr)
+	}
+	if _, err := os.Lstat(link); !os.IsNotExist(err) {
+		t.Fatalf("F-C2 migration removes the shared passthrough: %s (%v)", link, err)
+	}
+	if got, err := os.ReadFile(nativeAuth); err != nil || string(got) != string(nativeBytes) {
+		t.Fatalf("F-C2 migration preserves native credential bytes: %q (%v)", got, err)
+	}
+}
+
 // TestEnvStatusMatrix drives status before and after provisioning, with
 // --check and --json.
 func TestEnvStatusMatrix(t *testing.T) {

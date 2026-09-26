@@ -158,6 +158,77 @@ func TestSystemConfigV2SchemaCases(t *testing.T) {
 		})
 }
 
+// TestSystemConfigV2IsolationDirectionsFromPinnedCases drives the isolation
+// members of both published system-config-v2 direction cases through Load.
+// The full cases are also driven above; at the current pin those documents
+// carry source_signers and permissions locks outside this implementation's
+// task scope, so this companion projects only the published isolation knob
+// and its required locked entry rather than treating those unrelated gaps as
+// evidence about isolation.
+func TestSystemConfigV2IsolationDirectionsFromPinnedCases(t *testing.T) {
+	root := conformanceRoot(t)
+	for _, tc := range []struct {
+		name string
+		mode string
+	}{
+		{name: "valid-isolation-shared-direction.json", mode: "shared"},
+		{name: "valid-isolation-isolated-direction.json", mode: "isolated"},
+	} {
+		t.Run(tc.mode, func(t *testing.T) {
+			payload, err := os.ReadFile(filepath.Join(root, "schema-cases", "system-config-v2", tc.name)) // #nosec G304 -- pinned conformance input
+			if err != nil {
+				t.Fatal(err)
+			}
+			var published map[string]any
+			if err := json.Unmarshal(payload, &published); err != nil {
+				t.Fatalf("decode published system case: %v", err)
+			}
+			publishedEnv, ok := published["environments"].(map[string]any)
+			if !ok {
+				t.Fatal("published system case has no environments object")
+			}
+			isolation, ok := publishedEnv["isolation"]
+			if !ok {
+				t.Fatal("published system case has no isolation knob")
+			}
+			system, err := json.Marshal(map[string]any{
+				"schema_version": float64(2),
+				"locked":         []any{"environments.isolation"},
+				"environments":   map[string]any{"isolation": isolation},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			dir := t.TempDir()
+			userPath := writeConfig(t, dir, "config.json", `{"schema_version": 2, "skills_root": "/tmp/skills", "projects": {}}`)
+			systemPath := writeConfig(t, dir, "system.json", string(system))
+			t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
+			cfg, err := Load(userPath, nil)
+			if err != nil {
+				t.Fatalf("Load rejected projected published isolation case: %v", err)
+			}
+			wantJSON, err := json.Marshal(isolation)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var want map[string]map[string]string
+			if err := json.Unmarshal(wantJSON, &want); err != nil {
+				t.Fatal(err)
+			}
+			if !cfg.Locked["environments.isolation"] || !reflect.DeepEqual(cfg.Env.Isolation, want) {
+				t.Fatalf("Load isolation = %+v, locked=%v; want %s projection %+v", cfg.Env.Isolation, cfg.Locked, tc.mode, want)
+			}
+			for profile, environments := range want {
+				for env, mode := range environments {
+					if mode != tc.mode {
+						t.Fatalf("published %s case has %s for %s/%s", tc.mode, mode, profile, env)
+					}
+				}
+			}
+		})
+	}
+}
+
 // TestManagerConfigV2Vectors runs the published manager-config-v2 vector
 // family through Parse: every valid case renders the expected effective
 // configuration and every invalid case is rejected.
