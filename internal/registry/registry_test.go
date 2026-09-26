@@ -8,9 +8,12 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // signer builds signed registry objects for tests.
@@ -486,6 +489,30 @@ func TestSnapshotRollbackStateCorruptionFailsClosedAndMigrates(t *testing.T) {
 	tampered, warnings = CheckSnapshots([]Registry{reg}, stateDir, fetch, now, 0)
 	if !tampered[reg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "rollback state is unreadable") {
 		t.Fatalf("corrupt state did not fail closed: %v %v", tampered, warnings)
+	}
+}
+
+func TestProtectedRollbackStateDistinguishesAbsentAndUnreadable(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "known-registries.json")
+	if _, exists, err := readProtectedStateFile(path); err != nil || exists {
+		t.Fatalf("absent protected state = (exists=%v, err=%v), want absent without error", exists, err)
+	}
+	if runtime.GOOS == "windows" {
+		t.Skip("platform-control: POSIX mode-bit unreadability")
+	}
+	if err := os.WriteFile(path, []byte(`{"schema_version":1,"states":[]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0); err != nil {
+		t.Skipf("this environment cannot set unreadable mode: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(path, 0o600) })
+	if _, err := os.ReadFile(path); err == nil {
+		t.Skip("this environment can read a mode-000 file; unreadability is untestable here")
+	}
+	if _, exists, err := readProtectedStateFile(path); err == nil || !exists || !strings.Contains(err.Error(), stateread.DiagUnreadable) || !strings.Contains(err.Error(), path) {
+		t.Fatalf("unreadable protected state = (exists=%v, err=%v), want typed unreadable error for %s", exists, err, path)
 	}
 }
 

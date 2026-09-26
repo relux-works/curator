@@ -163,6 +163,25 @@ func TestAttestRootLegacyMarkersUnchanged(t *testing.T) {
 	}
 }
 
+func TestAttestRootKeepsInvalidMarkerDistinctFromAbsence(t *testing.T) {
+	root := t.TempDir()
+	installed := filepath.Join(root, "broken")
+	if err := os.MkdirAll(installed, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if results := AttestRoot("test", root, nil, nil); len(results) != 0 {
+		t.Fatalf("absent marker attestation = %+v, want no row", results)
+	}
+	path := filepath.Join(installed, marker.Name)
+	if err := os.WriteFile(path, []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	results := AttestRoot("test", root, nil, nil)
+	if len(results) != 1 || results[0].Skill != "broken" || results[0].Result != ResultUnknown || !strings.Contains(results[0].Detail, marker.DiagInvalid) || strings.Contains(results[0].Detail, "manager_state_unreadable") {
+		t.Fatalf("invalid marker attestation = %+v, want unknown with %s and no unreadable diagnostic", results, marker.DiagInvalid)
+	}
+}
+
 // TestV5AttestIdentityRefusesUnprovableMarkers pins the helper seam:
 // shapes the marker reader must refuse (empty repository, missing
 // commit, missing hash) never attest, so a defect in the reader still

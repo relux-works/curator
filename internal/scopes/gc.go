@@ -11,6 +11,7 @@ import (
 	"github.com/relux-works/curator/internal/buildrepo"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/runtimestore"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // CollectRuntime removes runtime store entries referenced by no marker of
@@ -259,101 +260,107 @@ type scopeMarks struct {
 // name a build key that must not be swept.
 func readScope(skillsDir string) scopeMarks {
 	var scope scopeMarks
-	info, err := os.Lstat(skillsDir)
+	metadata, err := stateread.Lstat(skillsDir)
 	switch {
-	case errors.Is(err, os.ErrNotExist):
+	case err == nil && metadata.Kind == stateread.KindAbsent:
 		return scope
 	case err != nil:
 		scope.uncertain = append(scope.uncertain, fmt.Sprintf(
 			"skill directory %s cannot be inspected: %v", skillsDir, err))
 		return scope
-	case isRedirect(info):
+	case isRedirect(metadata.Info):
 		scope.uncertain = append(scope.uncertain, fmt.Sprintf(
 			"skill directory %s is a symbolic link or reparse point; maintenance cannot prove which installations it holds",
 			skillsDir))
 		return scope
-	case !info.Mode().IsDir():
+	case !metadata.Info.Mode().IsDir():
 		scope.uncertain = append(scope.uncertain, fmt.Sprintf(
 			"skill directory %s is not a directory; repair or remove it", skillsDir))
 		return scope
 	}
 
-	entries, err := os.ReadDir(skillsDir)
+	listing, err := stateread.ReadDir(skillsDir)
 	if err != nil {
 		scope.uncertain = append(scope.uncertain, fmt.Sprintf(
 			"skill directory %s is unreadable: %v", skillsDir, err))
 		return scope
 	}
-	for _, entry := range entries {
+	if listing.Kind == stateread.KindAbsent {
+		scope.uncertain = append(scope.uncertain, fmt.Sprintf(
+			"skill directory %s became absent during inspection: %s", skillsDir, stateread.DiagAbsent))
+		return scope
+	}
+	for _, entry := range listing.Entries {
 		installedDir := filepath.Join(skillsDir, entry.Name())
-		member, err := entry.Info()
+		member, err := stateread.Lstat(installedDir)
 		switch {
-		case errors.Is(err, os.ErrNotExist):
+		case err == nil && member.Kind == stateread.KindAbsent:
 			continue // removed while the directory was being read
 		case err != nil:
 			scope.uncertain = append(scope.uncertain, fmt.Sprintf(
 				"installed skill %s cannot be inspected: %v", installedDir, err))
 			continue
-		case isRedirect(member):
+		case isRedirect(member.Info):
 			scope.uncertain = append(scope.uncertain, fmt.Sprintf(
 				"installed skill %s is a symbolic link or reparse point; maintenance cannot prove what it installs",
 				installedDir))
 			continue
-		case !member.Mode().IsDir():
+		case !member.Info.Mode().IsDir():
 			// A non-directory member cannot hold an install marker, so it hides
 			// no reference; it is reported so an operator can clean it up.
 			scope.notes = append(scope.notes, fmt.Sprintf(
 				"ignored non-directory member %s of skill directory %s", entry.Name(), skillsDir))
 			continue
 		}
-		if installed := marker.Read(installedDir); installed != nil {
-			scope.markers = append(scope.markers, installed)
+		installed, kind, markerErr := marker.ReadState(installedDir)
+		if markerErr != nil {
+			readDescription := "is unreadable or invalid"
+			diagnostic := stateread.DiagUnreadable
+			var invalid *marker.InvalidError
+			if errors.As(markerErr, &invalid) {
+				readDescription = "is invalid"
+				diagnostic = marker.DiagInvalid
+			}
+			var pathErr *os.PathError
+			if diagnostic == stateread.DiagUnreadable && errors.As(markerErr, &pathErr) {
+				readDescription = "cannot be inspected"
+			}
+			scope.uncertain = append(scope.uncertain, fmt.Sprintf(
+				"install marker %s %s (%s): %v; repair or remove that installation",
+				filepath.Join(installedDir, marker.Name), readDescription, diagnostic, markerErr))
 			continue
 		}
-		scope.uncertain = append(scope.uncertain, unreadableMarker(installedDir)...)
+		if kind == stateread.KindAbsent {
+			continue
+		}
+		scope.markers = append(scope.markers, installed)
 	}
 	return scope
 }
 
-// unreadableMarker classifies why an installed directory produced no valid
-// marker. Only a plainly absent marker means "not an installation".
-func unreadableMarker(installedDir string) []string {
-	markerPath := filepath.Join(installedDir, marker.Name)
-	info, err := os.Lstat(markerPath)
-	switch {
-	case errors.Is(err, os.ErrNotExist):
-		return nil
-	case err != nil:
-		return []string{fmt.Sprintf(
-			"install marker %s cannot be inspected: %v; repair or remove that installation", markerPath, err)}
-	case isRedirect(info) || !info.Mode().IsRegular():
-		return []string{fmt.Sprintf(
-			"install marker %s is not a regular file; repair or remove that installation", markerPath)}
-	default:
-		return []string{fmt.Sprintf(
-			"install marker %s is unreadable or invalid; repair or remove that installation", markerPath)}
-	}
-}
-
 func sweepRuntime(home string, referenced map[string]bool) ([]string, error) {
 	runtimeRoot := filepath.Join(home, "runtime")
-	skills, err := os.ReadDir(runtimeRoot)
-	if os.IsNotExist(err) {
-		return nil, nil
-	}
+	listing, err := stateread.ReadDir(runtimeRoot)
 	if err != nil {
 		return nil, err
 	}
+	if listing.Kind == stateread.KindAbsent {
+		return nil, nil
+	}
 	var removed []string
-	for _, skill := range skills {
+	for _, skill := range listing.Entries {
 		if !skill.IsDir() {
 			continue
 		}
-		commits, err := os.ReadDir(filepath.Join(runtimeRoot, skill.Name()))
+		skillPath := filepath.Join(runtimeRoot, skill.Name())
+		commitListing, err := stateread.ReadDir(skillPath)
 		if err != nil {
+			return removed, err
+		}
+		if commitListing.Kind == stateread.KindAbsent {
 			continue
 		}
-		for _, commit := range commits {
+		for _, commit := range commitListing.Entries {
 			if !commit.IsDir() {
 				continue
 			}
@@ -365,9 +372,12 @@ func sweepRuntime(home string, referenced map[string]bool) ([]string, error) {
 				removed = append(removed, key)
 			}
 		}
-		remaining, _ := os.ReadDir(filepath.Join(runtimeRoot, skill.Name()))
-		if len(remaining) == 0 {
-			_ = os.Remove(filepath.Join(runtimeRoot, skill.Name()))
+		remaining, err := stateread.ReadDir(skillPath)
+		if err != nil {
+			return removed, err
+		}
+		if remaining.Kind == stateread.KindAbsent || len(remaining.Entries) == 0 {
+			_ = os.Remove(skillPath)
 		}
 	}
 	return removed, nil

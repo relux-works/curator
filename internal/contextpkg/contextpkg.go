@@ -19,6 +19,7 @@ import (
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/pkgversion"
 	"github.com/relux-works/curator/internal/protocoljson"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // File names fixed by the protocol.
@@ -127,21 +128,29 @@ func SortedNames(requirements map[string]Requirement) []string {
 
 // LoadManifest reads and validates the manifest at the package root.
 func LoadManifest(root string) (*Manifest, error) {
-	payload, err := os.ReadFile(filepath.Join(root, ManifestName)) // #nosec G304 -- package root chosen by the caller
+	manifestPath := filepath.Join(root, ManifestName)
+	file, err := stateread.ReadFile(manifestPath) // #nosec G304 -- package root chosen by the caller
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, invalid(DiagManifestInvalid, "%s is absent at %s", ManifestName, root)
-		}
-		return nil, fmt.Errorf("read %s: %w", ManifestName, err)
+		return nil, fmt.Errorf("%s: %w", DiagManifestInvalid, err)
 	}
-	manifest, err := ParseManifest(payload)
+	if file.Kind == stateread.KindAbsent {
+		return nil, fmt.Errorf("%s: %w", DiagManifestInvalid, stateread.AbsentError(manifestPath))
+	}
+	manifest, err := ParseManifest(file.Bytes)
 	if err != nil {
 		return nil, err
 	}
 	if manifest.HasContext {
-		info, err := os.Stat(filepath.Join(root, ContextDir))
-		if err != nil || !info.IsDir() {
-			return nil, invalid(DiagManifestInvalid, "package %s declares context but has no %s/ directory", manifest.Name, ContextDir)
+		contextPath := filepath.Join(root, ContextDir)
+		metadata, err := stateread.Stat(contextPath)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", DiagManifestInvalid, err)
+		}
+		if metadata.Kind == stateread.KindAbsent {
+			return nil, fmt.Errorf("%s: %w", DiagManifestInvalid, stateread.AbsentError(contextPath))
+		}
+		if !metadata.Info.IsDir() {
+			return nil, invalid(DiagManifestInvalid, "package %s declares context but %s is not a directory", manifest.Name, ContextDir)
 		}
 	}
 	return manifest, nil

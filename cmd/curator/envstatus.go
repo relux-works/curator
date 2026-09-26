@@ -25,6 +25,9 @@ func printEnvStatus(stdout io.Writer, status *envprofile.Status) {
 	for _, warning := range status.ShellHookTrustWarnings {
 		_, _ = fmt.Fprintf(stdout, "shell-hook-trust: warning: %s\n", warning)
 	}
+	for _, diagnostic := range status.Diagnostics {
+		_, _ = fmt.Fprintf(stdout, "diagnostic %s: %s: %s\n", diagnostic.Code, diagnostic.Path, diagnostic.Detail)
+	}
 	for _, row := range status.ShellHookTrust {
 		_, _ = fmt.Fprintln(stdout, formatTrustRow(row))
 	}
@@ -72,17 +75,25 @@ func printEnvStatus(stdout io.Writer, status *envprofile.Status) {
 		if len(home.SeededProjects) > 0 {
 			_, _ = fmt.Fprintf(stdout, "  seeded-projects: %s\n", joinComma(home.SeededProjects))
 		}
-		if home.Backups > 0 {
+		if !home.BackupsKnown {
+			_, _ = fmt.Fprintln(stdout, "  backups: unknown")
+		} else if home.Backups > 0 {
 			_, _ = fmt.Fprintf(stdout, "  backups: %d generations, oldest %s, newest %s\n", home.Backups, home.BackupsOldest, home.BackupsNewest)
 		}
 	}
 	for _, scope := range status.Scopes {
-		provisioned := "unprovisioned"
-		if scope.Provisioned {
-			provisioned = "provisioned"
+		provisioned := "unknown"
+		if scope.ProvisionedKnown {
+			provisioned = "unprovisioned"
+			if scope.Provisioned {
+				provisioned = "provisioned"
+			}
 		}
 		_, _ = fmt.Fprintf(stdout, "scope %s: profile %s env %s native %s managed %s (%s)\n",
 			scope.Scope, scope.Profile, scope.Environment, scope.Native, scope.Managed, provisioned)
+		if scope.Diagnostic != nil {
+			_, _ = fmt.Fprintf(stdout, "  diagnostic %s: %s: %s\n", scope.Diagnostic.Code, scope.Diagnostic.Path, scope.Diagnostic.Detail)
+		}
 	}
 	for _, adapter := range status.Adapters {
 		_, _ = fmt.Fprintf(stdout, "tool %s: recorded %s detected %s\n", adapter.ID, adapter.Recorded, adapter.Detected)
@@ -155,7 +166,12 @@ func attachProviderPosture(cfg *config.Config, status *envprofile.Status) {
 		projectBins = append(projectBins, filepath.Join(project.Path, ".agents", "bin"))
 	}
 	sort.Strings(projectBins)
-	status.Providers = providerPosture(cfg.Home(), cfg.Env.ProviderDirectories, projectBins)
+	var diagnostic *envprofile.StateDiagnostic
+	status.Providers, diagnostic = providerPosture(cfg.Home(), cfg.Env.ProviderDirectories, projectBins)
+	if diagnostic != nil {
+		status.Diagnostics = append(status.Diagnostics, *diagnostic)
+		status.NonCurrent = true
+	}
 	for _, provider := range status.Providers {
 		if !provider.Current {
 			status.NonCurrent = true

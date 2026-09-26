@@ -32,6 +32,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/relux-works/curator/internal/stateread"
+
 	"github.com/relux-works/curator/internal/capabilities"
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/protocoljson"
@@ -900,12 +902,12 @@ const (
 // present and read-failure identically (refuse); the split exists so a
 // read failure can never collapse into absence.
 func probeSourceAuditEntry(path string) sourceAuditEntryPresence {
-	_, err := os.Lstat(path)
+	metadata, err := stateread.Lstat(path)
 	if err == nil {
+		if metadata.Kind == stateread.KindAbsent {
+			return sourceAuditEntryAbsent
+		}
 		return sourceAuditEntryPresent
-	}
-	if os.IsNotExist(err) {
-		return sourceAuditEntryAbsent
 	}
 	return sourceAuditEntryReadFailure
 }
@@ -1005,14 +1007,14 @@ func LoadSourceAudit(home string, pkg SourcePackage) (SourceAudit, []byte, error
 	if err != nil {
 		return SourceAudit{}, nil, err
 	}
-	raw, err := os.ReadFile(objectPath) // #nosec G304 -- machine-private store path
+	objectRead, err := stateread.ReadFile(objectPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return SourceAudit{}, nil, fmt.Errorf("source_audit_unavailable: no machine binding for this package; run an install first")
-		}
-		return SourceAudit{}, nil, fmt.Errorf("source_audit_unavailable: binding is unreadable: %v", err)
+		return SourceAudit{}, nil, fmt.Errorf("source_audit_unavailable: binding is unreadable: %w", err)
 	}
-	object, err := ParseSourceAudit(raw)
+	if objectRead.Kind == stateread.KindAbsent {
+		return SourceAudit{}, nil, fmt.Errorf("source_audit_unavailable: no machine binding for this package; run an install first")
+	}
+	object, err := ParseSourceAudit(objectRead.Bytes)
 	if err != nil {
 		return SourceAudit{}, nil, err
 	}
@@ -1020,14 +1022,14 @@ func LoadSourceAudit(home string, pkg SourcePackage) (SourceAudit, []byte, error
 	if err != nil {
 		return SourceAudit{}, nil, err
 	}
-	evidence, err := os.ReadFile(evidencePath) // #nosec G304 -- machine-private store path
+	evidenceRead, err := stateread.ReadFile(evidencePath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return SourceAudit{}, nil, fmt.Errorf("source_audit_unavailable: audit report is absent; re-run the gates")
-		}
-		return SourceAudit{}, nil, fmt.Errorf("source_audit_unavailable: audit report is unreadable: %v", err)
+		return SourceAudit{}, nil, fmt.Errorf("source_audit_unavailable: audit report is unreadable: %w", err)
 	}
-	return object, evidence, nil
+	if evidenceRead.Kind == stateread.KindAbsent {
+		return SourceAudit{}, nil, fmt.Errorf("source_audit_unavailable: audit report is absent; re-run the gates")
+	}
+	return object, evidenceRead.Bytes, nil
 }
 
 // SourceSubject is one draft member under source-audit validation.

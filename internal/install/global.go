@@ -262,7 +262,11 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 	for _, node := range nodes {
 		observed.observe("marker/global/"+node.Name, filepath.Join(skillsDir, node.Name, marker.Name))
 	}
-	movedTags := detectMovedTagsIn(skillsDir, nodes, deps.Generation)
+	movedTags, movedTagsErr := detectMovedTagsIn(skillsDir, nodes, deps.Generation)
+	if movedTagsErr != nil {
+		result.failf("inspect installed markers for moved tags: %v", movedTagsErr)
+		return result, nil
+	}
 	if len(movedTags) > 0 {
 		if opts.StrictTags {
 			result.failf("%s", strings.Join(movedTags, "; "))

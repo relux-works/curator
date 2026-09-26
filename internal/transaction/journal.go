@@ -14,6 +14,8 @@ import (
 	"sort"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 func (engine *Engine) journalPath(transactionID string) string {
@@ -42,15 +44,16 @@ func (engine *Engine) ensureJournalRoot() error {
 }
 
 func makeDurableDirectories(path string) error {
-	info, err := os.Lstat(path)
-	if err == nil {
+	metadata, err := stateread.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if metadata.Kind == stateread.KindPresent {
+		info := metadata.Info
 		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 			return fmt.Errorf("transaction state path is not a safe directory: %s", path)
 		}
 		return nil
-	}
-	if !os.IsNotExist(err) {
-		return err
 	}
 	parent := filepath.Dir(path)
 	if parent == path {
@@ -80,10 +83,12 @@ func (engine *Engine) saveJournal(journal *Journal) error {
 		return err
 	}
 	path := engine.journalPath(journal.TransactionID)
-	if _, err := os.Lstat(path + ".delete"); err == nil {
-		return corruptionf("journal cleanup tomb exists while saving transaction %s", journal.TransactionID)
-	} else if !os.IsNotExist(err) {
+	tombState, err := stateread.Lstat(path + ".delete")
+	if err != nil {
 		return err
+	}
+	if tombState.Kind == stateread.KindPresent {
+		return corruptionf("journal cleanup tomb exists while saving transaction %s", journal.TransactionID)
 	}
 	temporary, err := os.CreateTemp(engine.journalRoot, ".journal-*.tmp")
 	if err != nil {
@@ -109,16 +114,18 @@ func (engine *Engine) saveJournal(journal *Journal) error {
 	if err := temporary.Close(); err != nil {
 		return err
 	}
-	if _, err := os.Lstat(path); err == nil {
+	pathState, err := stateread.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if pathState.Kind == stateread.KindPresent {
 		if err := durableReplaceFile(temporaryPath, path); err != nil {
 			return err
 		}
-	} else if os.IsNotExist(err) {
+	} else {
 		if err := durableRenameNoReplace(temporaryPath, path); err != nil {
 			return err
 		}
-	} else {
-		return err
 	}
 	ok = true
 	return nil
@@ -192,16 +199,16 @@ func (engine *Engine) loadJournal(transactionID string) (*Journal, error) {
 func (engine *Engine) journalRecordPath(transactionID string) (string, bool, error) {
 	path := engine.journalPath(transactionID)
 	tomb := path + ".delete"
-	_, pathErr := os.Lstat(path)
-	_, tombErr := os.Lstat(tomb)
-	pathExists := pathErr == nil
-	tombExists := tombErr == nil
-	if pathErr != nil && !os.IsNotExist(pathErr) {
+	pathState, pathErr := stateread.Lstat(path)
+	if pathErr != nil {
 		return "", false, pathErr
 	}
-	if tombErr != nil && !os.IsNotExist(tombErr) {
+	tombState, tombErr := stateread.Lstat(tomb)
+	if tombErr != nil {
 		return "", false, tombErr
 	}
+	pathExists := pathState.Kind == stateread.KindPresent
+	tombExists := tombState.Kind == stateread.KindPresent
 	if pathExists && tombExists {
 		return "", false, corruptionf("transaction %s has both journal and cleanup tomb", transactionID)
 	}
@@ -529,13 +536,14 @@ func validateRemovalEntries(entries []RemovalEntry) error {
 }
 
 func (engine *Engine) journalIDs() ([]string, error) {
-	entries, err := os.ReadDir(engine.journalRoot)
-	if os.IsNotExist(err) {
-		return nil, nil
-	}
+	listing, err := stateread.ReadDir(engine.journalRoot)
 	if err != nil {
 		return nil, err
 	}
+	if listing.Kind == stateread.KindAbsent {
+		return nil, nil
+	}
+	entries := listing.Entries
 	seen := make(map[string]string, len(entries))
 	for _, entry := range entries {
 		name := entry.Name()

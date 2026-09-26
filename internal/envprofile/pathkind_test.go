@@ -9,6 +9,7 @@ import (
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/hashing"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // Production entry point under test: Install. Every fixture builds paths
@@ -438,7 +439,7 @@ func TestUpdatePathMissingSnapshotIsSourceInvalid(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, _, err = UpdateWithPolicy(home, "pk", Policy{})
-	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) || !strings.Contains(err.Error(), "path snapshot cannot be read") {
+	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) || !strings.Contains(err.Error(), stateread.DiagAbsent) || !strings.Contains(err.Error(), "path snapshot cannot be read") {
 		t.Fatalf("err = %v, want %s naming the unreadable snapshot", err, DiagSourceInvalid)
 	}
 }

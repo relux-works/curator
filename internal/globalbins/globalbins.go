@@ -13,6 +13,7 @@ import (
 
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/runtimestore"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 const (
@@ -69,7 +70,10 @@ func Refresh(home string, expected map[string]bool, platform string, environment
 		)}
 	}
 
-	managed := readLedger(target)
+	managed, err := readLedger(target)
+	if err != nil {
+		return []string{fmt.Sprintf("global: user-bin ownership ledger cannot be read in %s: %v", target, err)}
+	}
 	nextManaged := map[string]bool{}
 	var messages []string
 	for name := range managed {
@@ -395,37 +399,45 @@ func ledgerPayload(entries map[string]bool) ([]byte, error) {
 // shim publication target: the ownership ledger exists there. The ledger
 // is written on every publication, so a missing ledger means the manager
 // never published into the directory; presence counts rather than
-// content, so an emptied or unreadable ledger still marks a directory
-// the manager claimed. Only a missing ledger — os.IsNotExist — reports
-// unpublished; any other read failure fails closed. The umbrella
-// provider lookup uses this to refuse the user-bin shim directory only
-// once the manager itself publishes there (environments §11), instead
-// of refusing any merely selected PATH entry.
-func PublishedShims(binDir string) bool {
-	_, err := os.Stat(filepath.Join(binDir, managedFile))
-	if err == nil {
-		return true
+// content. A failed metadata read returns a typed error; callers fail
+// closed and retain the unreadable diagnostic instead of treating it as
+// a missing publication record. The umbrella provider lookup uses this
+// to refuse the user-bin shim directory only once the manager itself
+// publishes there (environments §11), instead of refusing any merely
+// selected PATH entry.
+func PublishedShims(binDir string) (bool, error) {
+	path := filepath.Join(binDir, managedFile)
+	metadata, err := stateread.Stat(path) // #nosec G304 -- binDir is selected from trusted manager state
+	if err != nil {
+		return false, err
 	}
-	return !os.IsNotExist(err)
+	return metadata.Kind != stateread.KindAbsent, nil
 }
 
-func readLedger(binDir string) map[string]bool {
-	payload, err := os.ReadFile(filepath.Join(binDir, managedFile)) // #nosec G304 -- binDir is selected from trusted manager state
+func readLedger(binDir string) (map[string]bool, error) {
+	path := filepath.Join(binDir, managedFile)
+	state, err := stateread.ReadFile(path) // #nosec G304 -- binDir is selected from trusted manager state
 	if err != nil {
-		return map[string]bool{}
+		return nil, err
+	}
+	if state.Kind == stateread.KindAbsent {
+		return map[string]bool{}, nil
 	}
 	var value ledger
-	if json.Unmarshal(payload, &value) != nil || value.SchemaVersion != ledgerSchema {
-		return map[string]bool{}
+	if err := json.Unmarshal(state.Bytes, &value); err != nil {
+		return nil, stateread.UnusableError(path, err)
+	}
+	if value.SchemaVersion != ledgerSchema || value.Entries == nil {
+		return nil, stateread.UnusableError(path, fmt.Errorf("invalid ownership ledger schema or entries"))
 	}
 	managed := map[string]bool{}
 	for _, entry := range value.Entries {
 		if !identifiers.Valid(entry) || managed[entry] {
-			return map[string]bool{}
+			return nil, stateread.UnusableError(path, fmt.Errorf("invalid or repeated ownership entry %q", entry))
 		}
 		managed[entry] = true
 	}
-	return managed
+	return managed, nil
 }
 
 func writeLedger(binDir string, entries map[string]bool) error {

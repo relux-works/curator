@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // ambiguousRegistry renders a registry whose consumers member is stated twice:
@@ -84,7 +85,7 @@ func runFailSafeAcrossTwoPasses(t *testing.T, test failSafeCase) {
 // the next pass visit its markers again.
 func registryKeeps(t *testing.T, home, project string) {
 	t.Helper()
-	consumers := LoadConsumers(home)
+	consumers := mustLoadConsumers(t, home)
 	if !slices.Contains(consumers, project) {
 		t.Fatalf("an uncertain consumer was dropped from the registry: %v", consumers)
 	}
@@ -152,7 +153,7 @@ func TestCollectStaysFailSafeAcrossConsecutivePasses(t *testing.T) {
 					t.Fatal(err)
 				}
 			},
-			warning: "is unreadable or invalid",
+			warning: marker.DiagInvalid,
 			verify:  registryKeeps,
 		},
 		"unreadable installed skill directory": {
@@ -161,6 +162,7 @@ func TestCollectStaysFailSafeAcrossConsecutivePasses(t *testing.T) {
 				if err := os.MkdirAll(dir, 0o755); err != nil {
 					t.Fatal(err)
 				}
+				requirePOSIXModeBitUnreadability(t)
 				if err := os.Chmod(dir, 0o000); err != nil {
 					t.Fatal(err)
 				}
@@ -396,8 +398,8 @@ func TestWritersRefuseARepeatedRegistryMember(t *testing.T) {
 	if got := readTestFile(t, registry); got != string(ambiguous) {
 		t.Fatalf("the ambiguous registry was rewritten as %q", got)
 	}
-	if consumers := LoadConsumers(home); len(consumers) != 0 {
-		t.Fatalf("an ambiguous registry read as a consumer list: %v", consumers)
+	if consumers, err := LoadConsumers(home); err == nil || len(consumers) != 0 || !strings.Contains(err.Error(), stateread.DiagUnreadable) {
+		t.Fatalf("an ambiguous registry result = (%v, %v), want typed unreadable state", consumers, err)
 	}
 }
 

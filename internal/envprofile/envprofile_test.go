@@ -739,11 +739,11 @@ func TestEnsureDefaultMigratesGlobalSkills(t *testing.T) {
 	if member == nil || member.Name != "sk" || member.Commit == "" || member.Source != "example.com/skills/hello" {
 		t.Fatalf("migrated skill member %+v", lock.Members)
 	}
-	if !contextstore.Exists(home, contextlock.KindSkill, "sk", member.Commit) {
+	if exists, err := contextstore.Exists(home, contextlock.KindSkill, "sk", member.Commit); err != nil || !exists {
 		t.Fatal("migrated skill pins a store entry that does not exist")
 	}
 	root, ok := lock.RootMember()
-	if !ok || !contextstore.Exists(home, root.Kind, root.Name, root.StateHash) {
+	if exists, err := contextstore.Exists(home, root.Kind, root.Name, root.StateHash); !ok || err != nil || !exists {
 		t.Fatalf("default root pins a store entry that does not exist: %+v", lock.Members)
 	}
 }

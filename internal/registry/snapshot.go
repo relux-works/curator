@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // DefaultSnapshotMaxAge is the staleness bound: an older reachable snapshot
@@ -206,14 +208,14 @@ func MigrateSnapshotStates(legacyDir, stateDir string) error {
 		return err
 	}
 	_ = os.Chmod(stateDir, 0o700) // #nosec G302 -- owner-only directory access requires traversal bits
-	entries, err := os.ReadDir(legacyDir)
+	listing, err := stateread.ReadDir(legacyDir)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return rebuildSnapshotStateCatalog(stateDir)
-		}
 		return err
 	}
-	for _, entry := range entries {
+	if listing.Kind == stateread.KindAbsent {
+		return rebuildSnapshotStateCatalog(stateDir)
+	}
+	for _, entry := range listing.Entries {
 		if entry.IsDir() || !snapshotStateNameRE.MatchString(entry.Name()) {
 			continue
 		}
@@ -343,14 +345,14 @@ func loadSnapshotStateCatalogReadOnly(stateDir string) (map[string]bool, error) 
 		return nil, err
 	}
 	if !exists {
-		entries, readErr := os.ReadDir(stateDir)
-		if os.IsNotExist(readErr) {
-			return map[string]bool{}, nil
-		}
+		listing, readErr := stateread.ReadDir(stateDir)
 		if readErr != nil {
 			return nil, readErr
 		}
-		for _, entry := range entries {
+		if listing.Kind == stateread.KindAbsent {
+			return map[string]bool{}, nil
+		}
+		for _, entry := range listing.Entries {
 			if !entry.IsDir() && snapshotStateNameRE.MatchString(entry.Name()) {
 				return nil, fmt.Errorf("catalog is missing while rollback state exists")
 			}
@@ -418,21 +420,28 @@ func writeSnapshotStateCatalog(stateDir string, known map[string]bool) error {
 }
 
 func readProtectedStateFile(path string) ([]byte, bool, error) {
-	info, err := os.Lstat(path)
+	metadata, err := stateread.Lstat(path)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, false, nil
-		}
 		return nil, false, err
 	}
+	if metadata.Kind == stateread.KindAbsent {
+		return nil, false, nil
+	}
+	info := metadata.Info
 	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
 		return nil, true, fmt.Errorf("security state is not a regular file")
 	}
 	if runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0 {
 		return nil, true, fmt.Errorf("security state permissions are too broad")
 	}
-	payload, err := os.ReadFile(path) // #nosec G304 -- protected state under the machine home
-	return payload, true, err
+	state, err := stateread.ReadFile(path)
+	if err != nil {
+		return nil, true, err
+	}
+	if state.Kind == stateread.KindAbsent {
+		return nil, true, stateread.UnusableError(path, os.ErrNotExist)
+	}
+	return state.Bytes, true, nil
 }
 
 func writeProtectedStateFile(path string, payload []byte) error {

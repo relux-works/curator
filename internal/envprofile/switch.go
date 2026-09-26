@@ -49,6 +49,7 @@ import (
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // Diagnostics for switching (environments §8.5, §9.7).
@@ -658,17 +659,18 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 // generation that already exists fails with environment_backup_exists.
 func openBackup(native string, want map[string]bool) (int, error) {
 	base := filepath.Join(native, ".agent-environment-backup")
-	entries, err := os.ReadDir(base)
+	listing, err := stateread.ReadDir(base)
 	highest := 0
-	if err == nil {
-		for _, entry := range entries {
+	if err != nil {
+		return 0, err
+	}
+	if listing.Kind == stateread.KindPresent {
+		for _, entry := range listing.Entries {
 			var n int
 			if _, err := fmt.Sscanf(entry.Name(), "%d", &n); err == nil && n > highest {
 				highest = n
 			}
 		}
-	} else if !os.IsNotExist(err) {
-		return 0, err
 	}
 	next := highest + 1
 	generation := filepath.Join(base, fmt.Sprintf("%d", next))
@@ -759,22 +761,35 @@ func replaceLink(target, storeFile string) error {
 // homes with their markers and backups after the notice (environments
 // §9.2). Retained homes without a profile are orphans env status reports.
 func purgeHomes(home, profile string) error {
+	type purgeTarget struct {
+		native string
+		marker *envmarker.Marker
+	}
+	var targets []purgeTarget
 	for _, adapter := range Adapters {
 		native, err := NativeHome(adapter)
 		if err != nil {
 			continue
 		}
 		marker, err := envmarker.Read(native)
-		if err != nil || marker == nil || marker.Profile.Name != profile {
+		if err != nil {
+			// Inspect every marker before the first write. A failed read is
+			// not evidence that this home has no surfaces for the profile.
+			return err
+		}
+		if marker == nil || marker.Profile.Name != profile {
 			continue
 		}
-		for _, surface := range marker.Surfaces {
+		targets = append(targets, purgeTarget{native: native, marker: marker})
+	}
+	for _, target := range targets {
+		for _, surface := range target.marker.Surfaces {
 			for _, path := range surface.Paths {
-				_ = os.Remove(filepath.Join(native, path))
+				_ = os.Remove(filepath.Join(target.native, path))
 			}
 		}
-		_ = os.Remove(filepath.Join(native, envmarker.Name))
-		_ = os.RemoveAll(filepath.Join(native, ".agent-environment-backup"))
+		_ = os.Remove(filepath.Join(target.native, envmarker.Name))
+		_ = os.RemoveAll(filepath.Join(target.native, ".agent-environment-backup"))
 	}
 	// Managed homes hold the operator's session data and are retained
 	// unless purged; a purge removes the profile's environments directory

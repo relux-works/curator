@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -14,6 +15,7 @@ import (
 	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/protocoljson"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // External-evidence semantic rows (§11): each recorded field of an
@@ -42,6 +44,13 @@ func init() {
 		})
 	}
 	registerDraftSemantic("external-only-current", driveExternalOnlyCurrent)
+}
+
+// TestDraftExternalExecutionPolicyInvalidMarkerReDerives keeps the
+// execution_policy regression independently runnable while the pinned
+// 94-row semantic matrix continues to require an unfiltered full run.
+func TestDraftExternalExecutionPolicyInvalidMarkerReDerives(t *testing.T) {
+	driveExternalMismatch(t, draftSemanticCase{ID: "external-evidence-mismatch-execution_policy"}, "execution_policy")
 }
 
 // externalBaseline installs one external etool skill with the fake
@@ -392,13 +401,15 @@ func driveExternalMismatch(t *testing.T, _ draftSemanticCase, field string) {
 	mutated := readExternalArm(t, project)
 	if field == "execution_policy" {
 		// execution_policy is a fixed constant in the closed arm shape,
-		// so the mutation voids the marker itself: status refuses the
-		// document and repair records a fresh honest one.
-		if marker.Read(filepath.Join(project, ".agents", "skills", "review")) != nil {
-			t.Fatal("voided marker still reads")
+		// so the mutation voids the marker itself. The bytes are present and
+		// readable but invalid; repair must re-derive a fresh honest marker.
+		_, kind, readErr := marker.ReadState(filepath.Join(project, ".agents", "skills", "review"))
+		var invalid *marker.InvalidError
+		if kind != stateread.KindPresent || !errors.As(readErr, &invalid) {
+			t.Fatalf("voided marker outcome = (%q, %v), want present bytes with typed invalid-marker error", kind, readErr)
 		}
 	} else {
-		if marker.Read(filepath.Join(project, ".agents", "skills", "review")) == nil {
+		if recorded, kind, err := marker.ReadState(filepath.Join(project, ".agents", "skills", "review")); err != nil || kind != stateread.KindPresent || recorded == nil {
 			t.Fatalf("mutation of %s voided the marker; want a valid mismatch", field)
 		}
 		externalFieldBinding(t, mutated, receipt, field)

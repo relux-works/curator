@@ -36,6 +36,8 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+
+	"github.com/relux-works/curator/internal/stateread"
 	"time"
 )
 
@@ -243,13 +245,14 @@ func (r Record) Validate() error {
 // List reads every approval record. An absent state file is an empty set; a
 // malformed line or an unreadable file is an error, never an empty set.
 func List(home string) ([]Record, error) {
-	payload, err := os.ReadFile(ApprovalsPath(home)) // #nosec G304 -- manager-home state path
+	state, err := stateread.ReadFile(ApprovalsPath(home))
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
 		return nil, fmt.Errorf("hookapproval: read state: %w", err)
 	}
+	if state.Kind == stateread.KindAbsent {
+		return nil, nil
+	}
+	payload := state.Bytes
 	if len(payload) == 0 {
 		return nil, nil
 	}
@@ -388,13 +391,14 @@ func Revoke(home, path string) (bool, error) {
 // List stays the strict reader for trust decisions (Lookup, Upsert, Revoke):
 // a malformed line fails closed there rather than being skipped.
 func Scan(home string) (records []Record, malformed []int, err error) {
-	payload, err := os.ReadFile(ApprovalsPath(home)) // #nosec G304 -- manager-home state path
+	state, err := stateread.ReadFile(ApprovalsPath(home))
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil, nil
-		}
 		return nil, nil, fmt.Errorf("hookapproval: read state: %w", err)
 	}
+	if state.Kind == stateread.KindAbsent {
+		return nil, nil, nil
+	}
+	payload := state.Bytes
 	if len(payload) == 0 {
 		return nil, nil, nil
 	}

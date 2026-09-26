@@ -10,7 +10,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/relux-works/curator/internal/closure"
@@ -31,6 +33,90 @@ func testGit(t *testing.T, dir string, args ...string) string {
 		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",
 	})
 	return dir
+}
+
+func TestLockedNetworkRepositoryDistinguishesAbsentAndUnreadableCheckouts(t *testing.T) {
+	const repository = "github.com/example/role-skills"
+	makeLock := func(first string) *sourcelock.Lock {
+		return &sourcelock.Lock{Members: []sourcelock.Member{
+			{Name: first, Package: sourcelock.Package{Kind: sourcelock.KindNetworkGit, Repository: repository}},
+			{Name: "later", Package: sourcelock.Package{Kind: sourcelock.KindNetworkGit, Repository: repository}},
+		}}
+	}
+	makeLaterCheckout := func(t *testing.T, skillsRoot string) string {
+		t.Helper()
+		path := filepath.Join(skillsRoot, "later")
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		testGit(t, path, "init", "-q")
+		return path
+	}
+
+	t.Run("absent_checkout_permits_fallback", func(t *testing.T) {
+		skillsRoot := t.TempDir()
+		want := makeLaterCheckout(t, skillsRoot)
+		got, err := lockedNetworkRepository(skillsRoot, makeLock("missing"), repository)
+		if err != nil || got != want {
+			t.Fatalf("lockedNetworkRepository = (%q, %v), want later checkout %q", got, err, want)
+		}
+	})
+
+	t.Run("lstat_failure_stops_fallback", func(t *testing.T) {
+		skillsRoot := t.TempDir()
+		makeLaterCheckout(t, skillsRoot)
+		first := filepath.Join("blocked", "child")
+		// A regular-file parent makes Lstat("blocked/child") fail with
+		// ENOTDIR on POSIX and ERROR_PATH_NOT_FOUND on Windows. The latter
+		// is os.IsNotExist-shaped, but it is not absence: an existing file
+		// blocks traversal, so stateread.Lstat must keep it unreadable.
+		if err := os.WriteFile(filepath.Join(skillsRoot, "blocked"), []byte("not a directory"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		got, err := lockedNetworkRepository(skillsRoot, makeLock(first), repository)
+		var readErr *stateread.Error
+		wantPath := filepath.Join(skillsRoot, first)
+		if !errors.As(err, &readErr) || readErr.Kind != stateread.KindUnreadable || readErr.Path != wantPath || !strings.Contains(err.Error(), stateread.DiagUnreadable) {
+			t.Fatalf("lockedNetworkRepository error = %v, want typed manager_state_unreadable for checkout %q (not absence)", err, wantPath)
+		}
+		if !strings.HasPrefix(err.Error(), stateread.DiagUnreadable+":") {
+			t.Fatalf("lockedNetworkRepository error = %v, want manager_state_unreadable as the outer diagnostic", err)
+		}
+		if got != "" {
+			t.Fatalf("lockedNetworkRepository = %q, want no fallback after unreadable checkout %q", got, wantPath)
+		}
+		var pathErr *os.PathError
+		wantOp := "lstat"
+		if runtime.GOOS == "windows" {
+			wantOp = "GetFileAttributesEx"
+		}
+		if !errors.As(err, &pathErr) || pathErr.Op != wantOp || pathErr.Path != wantPath {
+			t.Fatalf("lockedNetworkRepository error = %v, want underlying Lstat failure on %q (%s)", err, wantPath, wantOp)
+		}
+		if runtime.GOOS == "windows" {
+			var winErrno syscall.Errno
+			if !errors.As(pathErr.Err, &winErrno) || winErrno != syscall.Errno(3) || !os.IsNotExist(pathErr) {
+				t.Fatalf("underlying Windows Lstat error = %v, want ERROR_PATH_NOT_FOUND (3), which is not absence below a regular-file parent", pathErr.Err)
+			}
+		}
+	})
+
+	t.Run("present_but_unusable_stops_fallback", func(t *testing.T) {
+		skillsRoot := t.TempDir()
+		makeLaterCheckout(t, skillsRoot)
+		first := filepath.Join(skillsRoot, "blocked")
+		if err := os.WriteFile(first, []byte("not a repository"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		got, err := lockedNetworkRepository(skillsRoot, makeLock("blocked"), repository)
+		var unusableErr *stateread.Error
+		if !errors.As(err, &unusableErr) || unusableErr.Kind != stateread.KindUnreadable || unusableErr.Path != first || !strings.Contains(err.Error(), "repository checkout for blocked is unusable") || !strings.Contains(err.Error(), stateread.DiagUnreadable) {
+			t.Fatalf("lockedNetworkRepository error = %v, want stateread.UnusableError for %s", err, first)
+		}
+		if got != "" {
+			t.Fatalf("lockedNetworkRepository = %q, want no fallback after present-but-unusable checkout %q", got, first)
+		}
+	})
 }
 
 func writeDraftPackage(t *testing.T, dir, name string) {
@@ -91,73 +177,6 @@ func resolveDraftForInstall(t *testing.T, project, home, payload string) *closur
 
 func draftTestConfig(home, skillsRoot string) *config.Config {
 	return &config.Config{Path: filepath.Join(home, "config.json"), SkillsRoot: skillsRoot, DefaultAgents: []string{"claude_code"}, AdapterMode: "auto"}
-}
-
-func TestLockedNetworkRepositoryDistinguishesAbsentAndUnreadableCheckouts(t *testing.T) {
-	const repository = "example.test/kit"
-	member := func(name string) sourcelock.Member {
-		return sourcelock.Member{
-			Name: name,
-			Package: sourcelock.Package{
-				Kind:       sourcelock.KindNetworkGit,
-				Repository: repository,
-			},
-		}
-	}
-	lock := func(names ...string) *sourcelock.Lock {
-		result := &sourcelock.Lock{}
-		for _, name := range names {
-			result.Members = append(result.Members, member(name))
-		}
-		return result
-	}
-
-	t.Run("absent-checkout-falls-back", func(t *testing.T) {
-		root := t.TempDir()
-		later := filepath.Join(root, "later")
-		if err := os.MkdirAll(later, 0o755); err != nil {
-			t.Fatal(err)
-		}
-		testGit(t, later, "init", "-q")
-		got, err := lockedNetworkRepository(root, lock("absent", "later"), repository)
-		if err != nil || got != later {
-			t.Fatalf("lockedNetworkRepository = (%q, %v), want later checkout %q", got, err, later)
-		}
-	})
-
-	t.Run("failed-lstat-stops-fallback", func(t *testing.T) {
-		root := t.TempDir()
-		blocker := filepath.Join(root, "not-a-directory")
-		if err := os.WriteFile(blocker, []byte("blocker"), 0o600); err != nil {
-			t.Fatal(err)
-		}
-		skillsRoot := filepath.Join(blocker, "skills")
-		_, err := lockedNetworkRepository(skillsRoot, lock("first", "later"), repository)
-		var stateErr *stateread.Error
-		if !errors.As(err, &stateErr) || stateErr.Kind != stateread.KindUnreadable ||
-			!strings.Contains(err.Error(), stateread.DiagUnreadable) || stateErr.Path != filepath.Join(skillsRoot, "first") {
-			t.Fatalf("blocked checkout error = %v, want typed unreadable and no fallback", err)
-		}
-	})
-
-	t.Run("present-but-unusable-stops-fallback", func(t *testing.T) {
-		root := t.TempDir()
-		first := filepath.Join(root, "first")
-		if err := os.MkdirAll(first, 0o755); err != nil {
-			t.Fatal(err)
-		}
-		later := filepath.Join(root, "later")
-		if err := os.MkdirAll(later, 0o755); err != nil {
-			t.Fatal(err)
-		}
-		testGit(t, later, "init", "-q")
-		_, err := lockedNetworkRepository(root, lock("first", "later"), repository)
-		var stateErr *stateread.Error
-		if !errors.As(err, &stateErr) || stateErr.Kind != stateread.KindUnreadable ||
-			!strings.Contains(err.Error(), stateread.DiagUnreadable) || stateErr.Path != first {
-			t.Fatalf("unusable checkout error = %v, want typed unreadable and no fallback", err)
-		}
-	})
 }
 
 func TestDraftInstallMissingLockFails(t *testing.T) {

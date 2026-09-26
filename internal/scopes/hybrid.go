@@ -9,6 +9,7 @@ import (
 
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/protocoljson"
+	"github.com/relux-works/curator/internal/stateread"
 	"github.com/relux-works/curator/internal/verr"
 )
 
@@ -32,14 +33,18 @@ func HybridSkillsRoot(home string) string {
 // required non-empty per-skill targets list (Spec §9.3).
 func LoadHybridDecls(home string) ([]HybridDecl, error) {
 	path := HybridManifestPath(home)
-	payload, err := os.ReadFile(path) // #nosec G304 -- machine home
-	if os.IsNotExist(err) {
+	state, err := stateread.ReadFile(path) // #nosec G304 -- machine home
+	if err != nil {
+		return nil, fmt.Errorf("read hybrid manifest: %w", err)
+	}
+	if state.Kind == stateread.KindAbsent {
 		return nil, nil
 	}
+	decls, err := ParseHybridDecls(state.Bytes, path)
 	if err != nil {
-		return nil, err
+		return nil, stateread.UnusableError(path, err)
 	}
-	return ParseHybridDecls(payload, path)
+	return decls, nil
 }
 
 // ParseHybridDecls parses one hybrid manifest payload that a caller already
@@ -139,19 +144,23 @@ func AppliesToProject(decl HybridDecl, aliases []string, projectPath string) boo
 func AddHybridDecl(home, name, refKind, refValue, git string, targets []string) error {
 	path := HybridManifestPath(home)
 	obj := map[string]any{"schema_version": float64(manifest.SchemaVersion), "skills": []any{}}
-	// #nosec G304 -- the path is derived from the manager home, not user input.
-	recorded, readErr := os.ReadFile(path)
-	if readErr == nil {
-		if err := protocoljson.Validate(recorded); err != nil {
-			return fmt.Errorf("malformed JSON in %s: %w", path, err)
+	state, err := stateread.ReadFile(path) // #nosec G304 -- the path is derived from the manager home, not user input.
+	if err != nil {
+		return fmt.Errorf("read hybrid manifest: %w", err)
+	}
+	if state.Kind == stateread.KindPresent {
+		if _, err := ParseHybridDecls(state.Bytes, path); err != nil {
+			return stateread.UnusableError(path, err)
 		}
 		var raw any
-		if err := json.Unmarshal(recorded, &raw); err != nil {
-			return fmt.Errorf("malformed JSON in %s: %w", path, err)
+		if err := json.Unmarshal(state.Bytes, &raw); err != nil {
+			return stateread.UnusableError(path, err)
 		}
-		if existing, ok := raw.(map[string]any); ok {
-			obj = existing
+		existing, ok := raw.(map[string]any)
+		if !ok {
+			return stateread.UnusableError(path, fmt.Errorf("hybrid manifest must contain a JSON object"))
 		}
+		obj = existing
 	}
 	entry := map[string]any{"name": name, refKind: refValue, "targets": toAny(targets)}
 	if git != "" {
@@ -215,20 +224,23 @@ func withoutHybridTargets(object map[string]any) map[string]any {
 // RemoveHybridDecl removes a hybrid declaration by name.
 func RemoveHybridDecl(home, name string) error {
 	path := HybridManifestPath(home)
-	payload, err := os.ReadFile(path) // #nosec G304 -- machine home
+	state, err := stateread.ReadFile(path) // #nosec G304 -- machine home
 	if err != nil {
-		return fmt.Errorf("skill not declared in hybrid Skillfile: %s", name)
+		return fmt.Errorf("read hybrid manifest: %w", err)
 	}
-	if err := protocoljson.Validate(payload); err != nil {
-		return fmt.Errorf("malformed JSON in %s: %w", path, err)
+	if state.Kind == stateread.KindAbsent {
+		return fmt.Errorf("skill not declared in hybrid Skillfile: %s: %w", name, stateread.AbsentError(path))
+	}
+	if _, err := ParseHybridDecls(state.Bytes, path); err != nil {
+		return stateread.UnusableError(path, err)
 	}
 	var raw any
-	if err := json.Unmarshal(payload, &raw); err != nil {
-		return fmt.Errorf("malformed JSON in %s: %w", path, err)
+	if err := json.Unmarshal(state.Bytes, &raw); err != nil {
+		return stateread.UnusableError(path, err)
 	}
 	obj, ok := raw.(map[string]any)
 	if !ok {
-		return fmt.Errorf("%s must contain a JSON object", path)
+		return stateread.UnusableError(path, fmt.Errorf("hybrid manifest must contain a JSON object"))
 	}
 	skills, _ := obj["skills"].([]any)
 	kept := make([]any, 0, len(skills))

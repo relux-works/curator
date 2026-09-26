@@ -111,7 +111,10 @@ func stage(stageRoot string, adapterRoots map[string]string, groups []Group, mod
 
 func (mirror *Mirror) stageRoot(stageRoot, adapterRoot string, groups []Group, expected map[string]bool, mode string) error {
 	key := rootKey(adapterRoot)
-	managed := readLedger(adapterRoot)
+	managed, err := readLedger(adapterRoot)
+	if err != nil {
+		return fmt.Errorf("read adapter ownership ledger in %s: %w", adapterRoot, err)
+	}
 
 	var stale []string
 	for name := range managed {

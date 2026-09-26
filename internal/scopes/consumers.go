@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // ConsumersName is the machine-level registry of project checkouts.
@@ -21,15 +23,10 @@ const ConsumersName = "consumers.json"
 const consumersSchemaVersion = 1
 
 // LoadConsumers returns the registered checkout paths for read-only callers.
-// An absent or untrustworthy registry reads as no consumers; every caller that
-// rewrites the registry uses readConsumers instead, which distinguishes the two
-// so an unreadable registry is never overwritten.
-func LoadConsumers(home string) []string {
-	consumers, err := readConsumers(home)
-	if err != nil {
-		return nil
-	}
-	return consumers
+// It reports an absent registry as an empty set and preserves read or decode
+// failures as errors, so callers do not confuse unknown consumers with none.
+func LoadConsumers(home string) ([]string, error) {
+	return readConsumers(home)
 }
 
 // RecordConsumer adds a checkout to the registry, deduplicated and sorted.
@@ -98,14 +95,19 @@ func ConsumersPayload(set map[string]bool) ([]byte, error) {
 // that exists but cannot be trusted as an error, so a caller can tell "no
 // consumers" from "unknown consumers".
 func readConsumers(home string) ([]string, error) {
-	payload, err := os.ReadFile(filepath.Join(home, ConsumersName)) // #nosec G304 -- machine home
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil
-	}
+	path := filepath.Join(home, ConsumersName)
+	state, err := stateread.ReadFile(path) // #nosec G304 -- machine home
 	if err != nil {
 		return nil, err
 	}
-	return parseConsumers(payload)
+	if state.Kind == stateread.KindAbsent {
+		return nil, nil
+	}
+	consumers, err := parseConsumers(state.Bytes)
+	if err != nil {
+		return nil, stateread.UnusableError(path, err)
+	}
+	return consumers, nil
 }
 
 // parseConsumers accepts only the exact registry shape Curator writes.

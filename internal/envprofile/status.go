@@ -10,6 +10,7 @@
 package envprofile
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,6 +26,7 @@ import (
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/hookapproval"
 	"github.com/relux-works/curator/internal/manifest"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // SurfaceState is one recorded surface row.
@@ -52,6 +54,7 @@ type HomeState struct {
 	Seeds          []string       `json:"seeds"`
 	SeedLinks      []string       `json:"seed_links"`
 	SeededProjects []string       `json:"seeded_projects"`
+	BackupsKnown   bool           `json:"backups_known"`
 	Backups        int            `json:"backups"`
 	BackupsOldest  string         `json:"backups_oldest"`
 	BackupsNewest  string         `json:"backups_newest"`
@@ -62,12 +65,22 @@ type HomeState struct {
 // ScopeHome carries both doors of a current profile (§8.1): the native
 // home and the managed home with its provisioning state.
 type ScopeHome struct {
-	Scope       string `json:"scope"`
-	Profile     string `json:"profile"`
-	Environment string `json:"environment"`
-	Native      string `json:"native"`
-	Managed     string `json:"managed"`
-	Provisioned bool   `json:"provisioned"`
+	Scope            string           `json:"scope"`
+	Profile          string           `json:"profile"`
+	Environment      string           `json:"environment"`
+	Native           string           `json:"native"`
+	Managed          string           `json:"managed"`
+	Provisioned      bool             `json:"provisioned"`
+	ProvisionedKnown bool             `json:"provisioned_known"`
+	Diagnostic       *StateDiagnostic `json:"diagnostic,omitempty"`
+}
+
+// StateDiagnostic identifies a manager-owned read that prevented status
+// from establishing a row's state.
+type StateDiagnostic struct {
+	Code   string `json:"code"`
+	Path   string `json:"path"`
+	Detail string `json:"detail,omitempty"`
 }
 
 // AdapterState carries the recorded and detected tool release per adapter
@@ -169,16 +182,17 @@ type DeclarationScope struct {
 
 // Status is the whole matrix.
 type Status struct {
-	Homes                    []HomeState     `json:"homes"`
-	Scopes                   []ScopeHome     `json:"scopes"`
-	Adapters                 []AdapterState  `json:"adapters"`
-	Targets                  []TargetState   `json:"targets"`
-	Profiles                 []ProfileState  `json:"profiles"`
-	Providers                []ProviderState `json:"providers"`
-	UnregisteredEnvironments []string        `json:"unregistered_environments"`
-	Orphans                  []string        `json:"orphans"`
-	Notes                    []string        `json:"notes"`
-	NonCurrent               bool            `json:"non_current"`
+	Homes                    []HomeState       `json:"homes"`
+	Scopes                   []ScopeHome       `json:"scopes"`
+	Adapters                 []AdapterState    `json:"adapters"`
+	Targets                  []TargetState     `json:"targets"`
+	Profiles                 []ProfileState    `json:"profiles"`
+	Providers                []ProviderState   `json:"providers"`
+	UnregisteredEnvironments []string          `json:"unregistered_environments"`
+	Orphans                  []string          `json:"orphans"`
+	Diagnostics              []StateDiagnostic `json:"diagnostics,omitempty"`
+	Notes                    []string          `json:"notes"`
+	NonCurrent               bool              `json:"non_current"`
 	// ShellHookTrust is the shell-hook trust posture (Manager profile
 	// §8.6): one row per known project env file. A changed file, or a
 	// recorded file whose bytes are missing or unreadable, makes the
@@ -271,12 +285,22 @@ func StatusOf(req StatusRequest) (*Status, error) {
 			status.NonCurrent = true
 		}
 	}
-	status.Scopes = scopeHomes(req, installed)
+	status.Scopes, status.Diagnostics = scopeHomes(req, installed)
+	for _, scope := range status.Scopes {
+		if scope.Diagnostic != nil {
+			status.NonCurrent = true
+		}
+	}
 	status.Adapters = adapterStates(req)
 	status.Targets = targetStates(req)
 	status.Profiles = profileStates(req, infos)
 	status.UnregisteredEnvironments = unregisteredEnvironments(req.Machine)
-	status.Orphans = orphanHomes(req.Home, installed)
+	var orphanDiagnostics []StateDiagnostic
+	status.Orphans, orphanDiagnostics = orphanHomes(req.Home, installed)
+	status.Diagnostics = append(status.Diagnostics, orphanDiagnostics...)
+	if len(status.Diagnostics) > 0 {
+		status.NonCurrent = true
+	}
 	// §12 posture: the active S4 profile with the effective
 	// passable_env_names, the allowlist-empty warning row, and the
 	// §2.3 surfacing rows for the current profile of each reported
@@ -318,6 +342,15 @@ func StatusOf(req StatusRequest) (*Status, error) {
 		return status.Homes[i].Environment < status.Homes[j].Environment
 	})
 	sort.Strings(status.Orphans)
+	sort.Slice(status.Diagnostics, func(i, j int) bool {
+		if status.Diagnostics[i].Path != status.Diagnostics[j].Path {
+			return status.Diagnostics[i].Path < status.Diagnostics[j].Path
+		}
+		if status.Diagnostics[i].Code != status.Diagnostics[j].Code {
+			return status.Diagnostics[i].Code < status.Diagnostics[j].Code
+		}
+		return status.Diagnostics[i].Detail < status.Diagnostics[j].Detail
+	})
 	return status, nil
 }
 
@@ -386,6 +419,12 @@ func homeState(req StatusRequest, profile string, adapter envregistry.Adapter) H
 		return state
 	}
 	state.LockHash = hash
+	state.Backups, state.BackupsOldest, state.BackupsNewest, err = backupAges(state.Home)
+	if err != nil {
+		state.Findings = append(state.Findings, envregistry.DiagBackupRecordUnreadable+": "+err.Error())
+	} else {
+		state.BackupsKnown = true
+	}
 	verdict := verifyHome(&resolve, adapter, source, lock, hash)
 	state.Warnings = append(state.Warnings, verdict.warnings...)
 	if verdict.marker == nil {
@@ -423,7 +462,6 @@ func homeState(req StatusRequest, profile string, adapter envregistry.Adapter) H
 	}
 	state.SeedLinks = append([]string{}, marker.SeedLinks...)
 	state.SeededProjects = append([]string{}, marker.SeededProjects...)
-	state.Backups, state.BackupsOldest, state.BackupsNewest = backupAges(state.Home)
 	for _, reason := range verdict.reasons {
 		diagnostic := reason
 		if strings.HasPrefix(reason, "passthrough entry") && strings.Contains(reason, "is detached") {
@@ -458,19 +496,23 @@ func markerForm(marker *envmarker.Marker) string {
 
 // backupAges counts the versioned backup generations beside the marker
 // and reports the oldest and newest ages (§8.3, §12).
-func backupAges(homeDir string) (int, string, string) {
-	entries, err := os.ReadDir(filepath.Join(homeDir, ".agent-environment-backup"))
+func backupAges(homeDir string) (int, string, string, error) {
+	root := filepath.Join(homeDir, ".agent-environment-backup")
+	listing, err := stateread.ReadDir(root)
 	if err != nil {
-		return 0, "-", "-"
+		return 0, "-", "-", err
+	}
+	if listing.Kind == stateread.KindAbsent {
+		return 0, "-", "-", nil
 	}
 	count := 0
 	var oldest, newest time.Time
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
+	for _, entry := range listing.Entries {
 		info, err := entry.Info()
 		if err != nil {
+			return 0, "-", "-", stateread.UnusableError(filepath.Join(root, entry.Name()), err)
+		}
+		if !info.IsDir() {
 			continue
 		}
 		count++
@@ -482,10 +524,10 @@ func backupAges(homeDir string) (int, string, string) {
 		}
 	}
 	if count == 0 {
-		return 0, "-", "-"
+		return 0, "-", "-", nil
 	}
 	now := time.Now()
-	return count, ageString(now.Sub(oldest)), ageString(now.Sub(newest))
+	return count, ageString(now.Sub(oldest)), ageString(now.Sub(newest)), nil
 }
 
 func ageString(duration time.Duration) string {
@@ -638,10 +680,18 @@ func unregisteredEnvironments(machine envregistry.MachineConfig) []string {
 }
 
 // scopeHomes reports both homes of the current profile per scope.
-func scopeHomes(req StatusRequest, installed map[string]bool) []ScopeHome {
+func scopeHomes(req StatusRequest, installed map[string]bool) ([]ScopeHome, []StateDiagnostic) {
 	var out []ScopeHome
-	machine, _ := Current(req.Home)
-	scoped, _ := ScopedCurrents(req.Home)
+	var diagnostics []StateDiagnostic
+	machine, machineErr := Current(req.Home)
+	if machineErr != nil {
+		diagnostics = append(diagnostics, stateReadDiagnostic(machineErr))
+	}
+	scoped, scopedErr := ScopedCurrents(req.Home)
+	if scopedErr != nil {
+		diagnostics = append(diagnostics, stateReadDiagnostic(scopedErr))
+		scoped = map[string]string{}
+	}
 	type scope struct{ name, profile string }
 	scopes := []scope{{"machine", machine}}
 	for key, profile := range scoped {
@@ -659,15 +709,19 @@ func scopeHomes(req StatusRequest, installed map[string]bool) []ScopeHome {
 				native, _ = NativeHome(legacy)
 			}
 			managed := ManagedHomeDir(req.Home, item.profile, adapter.ID)
-			provisioned := false
-			if marker, err := envmarker.Read(managed); err == nil && marker != nil {
-				provisioned = true
-			}
-			out = append(out, ScopeHome{
+			marker, markerErr := envmarker.Read(managed)
+			scope := ScopeHome{
 				Scope: item.name, Profile: item.profile,
 				Environment: adapter.ID, Native: native,
-				Managed: managed, Provisioned: provisioned,
-			})
+				Managed: managed, ProvisionedKnown: markerErr == nil,
+			}
+			if markerErr != nil {
+				diagnostic := markerReadDiagnostic(filepath.Join(managed, envmarker.Name), markerErr)
+				scope.Diagnostic = &diagnostic
+			} else if marker != nil {
+				scope.Provisioned = true
+			}
+			out = append(out, scope)
 		}
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -676,7 +730,19 @@ func scopeHomes(req StatusRequest, installed map[string]bool) []ScopeHome {
 		}
 		return out[i].Environment < out[j].Environment
 	})
-	return out
+	return out, diagnostics
+}
+
+func stateReadDiagnostic(err error) StateDiagnostic {
+	var stateErr *stateread.Error
+	if errors.As(err, &stateErr) {
+		code := stateread.DiagUnreadable
+		if stateErr.Kind == stateread.KindAbsent {
+			code = stateread.DiagAbsent
+		}
+		return StateDiagnostic{Code: code, Path: stateErr.Path, Detail: err.Error()}
+	}
+	return StateDiagnostic{Code: stateread.DiagUnreadable, Detail: err.Error()}
 }
 
 // declarationScopes repeats the §2.3 surfacing rows for the current
@@ -787,22 +853,37 @@ func targetStates(req StatusRequest) []TargetState {
 
 // orphanHomes reports managed homes whose profile is no longer installed
 // (§9.2): retained homes without a profile, removable by a later --purge.
-func orphanHomes(home string, installed map[string]bool) []string {
+func orphanHomes(home string, installed map[string]bool) ([]string, []StateDiagnostic) {
 	var out []string
-	entries, err := os.ReadDir(EnvRoot(home))
+	var diagnostics []StateDiagnostic
+	root := EnvRoot(home)
+	listing, err := stateread.ReadDir(root)
 	if err != nil {
-		return nil
+		return nil, []StateDiagnostic{{Code: stateread.DiagUnreadable, Path: root, Detail: err.Error()}}
+	}
+	if listing.Kind == stateread.KindAbsent {
+		return nil, nil
 	}
 	seen := map[string]bool{}
-	for _, entry := range entries {
-		if !entry.IsDir() || seen[entry.Name()] {
+	for _, entry := range listing.Entries {
+		info, err := entry.Info()
+		if err != nil {
+			path := filepath.Join(root, entry.Name())
+			diagnostics = append(diagnostics, StateDiagnostic{Code: stateread.DiagUnreadable, Path: path, Detail: stateread.UnusableError(path, err).Error()})
+			continue
+		}
+		if !info.IsDir() || seen[entry.Name()] {
 			continue
 		}
 		seen[entry.Name()] = true
 		for _, adapter := range envregistry.Registry {
 			managed := ManagedHomeDir(home, entry.Name(), adapter.ID)
 			marker, err := envmarker.Read(managed)
-			if err != nil || marker == nil {
+			if err != nil {
+				diagnostics = append(diagnostics, markerReadDiagnostic(filepath.Join(managed, envmarker.Name), err))
+				continue
+			}
+			if marker == nil {
 				continue
 			}
 			if !installed[marker.Profile.Name] {
@@ -810,5 +891,13 @@ func orphanHomes(home string, installed map[string]bool) []string {
 			}
 		}
 	}
-	return out
+	return out, diagnostics
+}
+
+func markerReadDiagnostic(path string, err error) StateDiagnostic {
+	code := envmarker.DiagMarkerUnreadable
+	if strings.HasPrefix(err.Error(), envmarker.DiagMarkerInvalid+":") {
+		code = envmarker.DiagMarkerInvalid
+	}
+	return StateDiagnostic{Code: code, Path: path, Detail: err.Error()}
 }

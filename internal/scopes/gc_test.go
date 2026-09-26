@@ -306,7 +306,7 @@ func TestCollectSkipsTheBuildSweepOnUnprovableReferences(t *testing.T) {
 					t.Fatal(err)
 				}
 			},
-			warning: "is unreadable or invalid",
+			warning: marker.DiagInvalid,
 		},
 		{
 			name: "corrupt consumer registry",
@@ -324,6 +324,7 @@ func TestCollectSkipsTheBuildSweepOnUnprovableReferences(t *testing.T) {
 				if err := os.MkdirAll(dir, 0o755); err != nil {
 					t.Fatal(err)
 				}
+				requirePOSIXModeBitUnreadability(t)
 				if err := os.Chmod(dir, 0o000); err != nil {
 					t.Fatal(err)
 				}
@@ -383,7 +384,7 @@ func TestCollectRequiresTheHomeLock(t *testing.T) {
 	if cache.calls != 0 {
 		t.Fatal("an unlocked pass swept the build cache")
 	}
-	if consumers := LoadConsumers(home); len(consumers) != 1 {
+	if consumers := mustLoadConsumers(t, home); len(consumers) != 1 {
 		t.Fatalf("an unlocked pass pruned consumers: %v", consumers)
 	}
 }
@@ -406,7 +407,7 @@ func TestCollectPrunesConsumersInsideTheSamePass(t *testing.T) {
 	if _, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: cache}); err != nil {
 		t.Fatal(err)
 	}
-	consumers := LoadConsumers(home)
+	consumers := mustLoadConsumers(t, home)
 	if len(consumers) != 1 || consumers[0] != live {
 		t.Fatalf("consumers = %v, want only %s", consumers, live)
 	}

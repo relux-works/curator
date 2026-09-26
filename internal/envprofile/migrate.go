@@ -40,6 +40,7 @@ import (
 
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // Migration render phases for MigrateReport.Text. Inspect prints the
@@ -331,23 +332,32 @@ func migrationProfiles(home, explicit string) ([]string, error) {
 // with a valid name carrying source.json. Reserved state (scoped/) and
 // anything else in the store directory is not a profile.
 func installedProfiles(home string) ([]string, error) {
-	entries, err := os.ReadDir(ProfilesDir(home))
+	profilesDir := ProfilesDir(home)
+	state, err := stateread.ReadDir(profilesDir)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
 		return nil, err
 	}
+	if state.Kind == stateread.KindAbsent {
+		return nil, nil
+	}
+	if state.Kind != stateread.KindPresent {
+		return nil, stateread.UnusableError(profilesDir, fmt.Errorf("unknown directory state %q", state.Kind))
+	}
 	var out []string
-	for _, entry := range entries {
+	for _, entry := range state.Entries {
 		if !entry.IsDir() || !validProfileName(entry.Name()) {
 			continue
 		}
-		if _, err := os.Lstat(sourcePath(home, entry.Name())); err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
+		source := sourcePath(home, entry.Name())
+		metadata, err := stateread.Lstat(source)
+		if err != nil {
 			return nil, err
+		}
+		if metadata.Kind == stateread.KindAbsent {
+			continue
+		}
+		if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
+			return nil, stateread.UnusableError(source, fmt.Errorf("unknown source metadata state %q", metadata.Kind))
 		}
 		out = append(out, entry.Name())
 	}
@@ -379,15 +389,22 @@ func inventoryHome(req *MigrateRequest, profile string, adapter envregistry.Adap
 		HomeDir: ManagedHomeDir(req.Home, profile, adapter.ID),
 		PiOld:   MigrateRootNA, PiNew: MigrateRootNA,
 	}
-	payload, err := os.ReadFile(filepath.Join(home.HomeDir, envmarker.Name)) // #nosec G304 -- managed marker below the resolved home
+	markerPath := filepath.Join(home.HomeDir, envmarker.Name)
+	markerFile, err := stateread.ReadFile(markerPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return home
-		}
 		home.addConflict("", fmt.Sprintf("marker is unreadable: %v", err),
 			"restore access to the marker out of band (back it up first) and re-run")
 		return home
 	}
+	if markerFile.Kind == stateread.KindAbsent {
+		return home
+	}
+	if markerFile.Kind != stateread.KindPresent {
+		home.addConflict("", fmt.Sprintf("marker is unreadable: %v", stateread.UnusableError(markerPath, fmt.Errorf("unknown file state %q", markerFile.Kind))),
+			"restore access to the marker out of band (back it up first) and re-run")
+		return home
+	}
+	payload := markerFile.Bytes
 	marker, err := envmarker.Parse(payload)
 	if err != nil {
 		home.addConflict("", fmt.Sprintf("marker is invalid: %v", err),
@@ -492,15 +509,15 @@ func (h *MigrateHome) classifyPath(adapter envregistry.Adapter, native, path str
 		entry.Strategy = "-"
 	}
 	full := filepath.Join(h.HomeDir, filepath.FromSlash(path))
-	info, err := os.Lstat(full)
+	metadata, err := stateread.Lstat(full)
 	if err != nil {
-		if !os.IsNotExist(err) {
-			entry.State = MigrateUninspectable
-			h.Entries = append(h.Entries, entry)
-			h.addConflict(path, fmt.Sprintf("%s cannot be inspected: %v", full, err),
-				"restore access to the link path out of band and re-run")
-			return
-		}
+		entry.State = MigrateUninspectable
+		h.Entries = append(h.Entries, entry)
+		h.addConflict(path, fmt.Sprintf("%s cannot be inspected: %v", full, err),
+			"restore access to the link path out of band and re-run")
+		return
+	}
+	if metadata.Kind == stateread.KindAbsent {
 		if wanted {
 			entry.State = MigrateAbsent
 			entry.Note = "repair re-links the absent path"
@@ -515,6 +532,14 @@ func (h *MigrateHome) classifyPath(adapter envregistry.Adapter, native, path str
 		h.Ops = append(h.Ops, MigrateOp{Profile: h.Profile, EnvID: h.EnvID, Kind: MigrateOpUnlink, Path: path})
 		return
 	}
+	if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
+		entry.State = MigrateUninspectable
+		h.Entries = append(h.Entries, entry)
+		h.addConflict(path, fmt.Sprintf("%s cannot be inspected: %v", full, stateread.UnusableError(full, fmt.Errorf("unknown metadata state %q", metadata.Kind))),
+			"restore access to the link path out of band and re-run")
+		return
+	}
+	info := metadata.Info
 	if info.Mode()&os.ModeSymlink != 0 {
 		h.classifyLink(adapter, native, full, &entry, wantedTarget, recorded, wanted)
 		return
@@ -575,16 +600,24 @@ func (h *MigrateHome) classifyLink(adapter envregistry.Adapter, native, full str
 	entry.Current = got
 	if wanted {
 		if got == wantedTarget {
-			if _, err := os.Stat(wantedTarget); err != nil {
-				if os.IsNotExist(err) {
-					entry.State = MigratePending
-					entry.Note = "dangling-to-declared: nothing to migrate; log in to populate the native target"
-					h.Entries = append(h.Entries, *entry)
-					return
-				}
+			metadata, err := stateread.Stat(wantedTarget)
+			if err != nil {
 				entry.State = MigrateUninspectable
 				h.Entries = append(h.Entries, *entry)
 				h.addConflict(entry.Path, fmt.Sprintf("%s target %s cannot be inspected: %v", full, wantedTarget, err),
+					"restore access to the native target out of band and re-run")
+				return
+			}
+			if metadata.Kind == stateread.KindAbsent {
+				entry.State = MigratePending
+				entry.Note = "dangling-to-declared: nothing to migrate; log in to populate the native target"
+				h.Entries = append(h.Entries, *entry)
+				return
+			}
+			if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
+				entry.State = MigrateUninspectable
+				h.Entries = append(h.Entries, *entry)
+				h.addConflict(entry.Path, fmt.Sprintf("%s target %s cannot be inspected: %v", full, wantedTarget, stateread.UnusableError(wantedTarget, fmt.Errorf("unknown metadata state %q", metadata.Kind))),
 					"restore access to the native target out of band and re-run")
 				return
 			}
@@ -672,13 +705,19 @@ func (h *MigrateHome) inventoryPiRoots(native string) {
 // Absence and a failed read are different facts; only NotExist is
 // absence.
 func statRoot(path string) string {
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			return MigrateRootAbsent
-		}
+	metadata, err := stateread.Stat(path)
+	if err != nil {
 		return MigrateRootUninspectable
 	}
-	return MigrateRootPresent
+	switch metadata.Kind {
+	case stateread.KindAbsent:
+		return MigrateRootAbsent
+	case stateread.KindPresent:
+		if metadata.Info != nil {
+			return MigrateRootPresent
+		}
+	}
+	return MigrateRootUninspectable
 }
 
 // migrationHash hashes the canonical plan bytes: every inventoried home
@@ -1119,10 +1158,15 @@ func atomicRelinkJournaled(home string, journal *migrationJournal, index int, fu
 	dir := filepath.Dir(full)
 	for attempt := 0; attempt < 10; attempt++ {
 		tmp := filepath.Join(dir, ".migrate-"+migrationRandHex()+".tmp")
-		if _, err := os.Lstat(tmp); err == nil {
-			continue
-		} else if !os.IsNotExist(err) {
+		metadata, err := stateread.Lstat(tmp)
+		if err != nil {
 			return err
+		}
+		if metadata.Kind == stateread.KindPresent {
+			continue
+		}
+		if metadata.Kind != stateread.KindAbsent {
+			return stateread.UnusableError(tmp, fmt.Errorf("unknown temporary metadata state %q", metadata.Kind))
 		}
 		journal.Ops[index].Temp = tmp
 		journal.Ops[index].TempTarget = target
@@ -1153,13 +1197,17 @@ func atomicRelinkJournaled(home string, journal *migrationJournal, index int, fu
 // file, directory, or symlink to any other target is never deleted and
 // reports a mismatch for the caller to refuse on.
 func removeOwnedTemp(tmp, want string) error {
-	info, err := os.Lstat(tmp)
+	metadata, err := stateread.Lstat(tmp)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
 		return err
 	}
+	if metadata.Kind == stateread.KindAbsent {
+		return nil
+	}
+	if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
+		return stateread.UnusableError(tmp, fmt.Errorf("unknown temporary metadata state %q", metadata.Kind))
+	}
+	info := metadata.Info
 	if info.Mode()&os.ModeSymlink == 0 {
 		shape := "a regular file"
 		if info.IsDir() {
@@ -1192,13 +1240,17 @@ func migrationRandHex() string {
 // execution time: the link must still be exactly as inventoried. The
 // lock rules out legitimate races, so a mismatch fails closed.
 func validateMigrationOp(full string, op MigrateOp) error {
-	info, err := os.Lstat(full)
+	metadata, err := stateread.Lstat(full)
 	if err != nil {
-		if os.IsNotExist(err) && op.Kind == MigrateOpUnlink && op.From == "" {
-			return nil
-		}
 		return fmt.Errorf("%s %s: link path changed since the plan: %v", op.Kind, op.Path, err)
 	}
+	if metadata.Kind == stateread.KindAbsent && op.Kind == MigrateOpUnlink && op.From == "" {
+		return nil
+	}
+	if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
+		return fmt.Errorf("%s %s: link path changed since the plan: %v", op.Kind, op.Path, stateread.UnusableError(full, fmt.Errorf("unknown metadata state %q", metadata.Kind)))
+	}
+	info := metadata.Info
 	if op.Kind == MigrateOpUnlink && op.From == "" {
 		return fmt.Errorf("%s %s: link path changed since the plan: expected absent", op.Kind, op.Path)
 	}
@@ -1260,15 +1312,20 @@ func changedMarkers(report *MigrateReport) (map[string][]byte, map[string][]byte
 func validateRecoveryInventory(home string, journal *migrationJournal) error {
 	var failures []string
 	for _, marker := range journal.Markers {
-		current, err := os.ReadFile(marker.Live) // #nosec G304 -- journaled manager record below the resolved home
+		markerFile, err := stateread.ReadFile(marker.Live)
 		if err != nil {
-			if os.IsNotExist(err) {
-				failures = append(failures, fmt.Sprintf("marker %s is missing (expected the prior or the intended bytes): restore it out of band from backup and re-run", marker.Live))
-			} else {
-				failures = append(failures, fmt.Sprintf("marker %s cannot be inspected: %v; restore access out of band and re-run", marker.Live, err))
-			}
+			failures = append(failures, fmt.Sprintf("marker %s cannot be inspected: %v; restore access out of band and re-run", marker.Live, err))
 			continue
 		}
+		if markerFile.Kind == stateread.KindAbsent {
+			failures = append(failures, fmt.Sprintf("marker %s is missing (expected the prior or the intended bytes): restore it out of band from backup and re-run", marker.Live))
+			continue
+		}
+		if markerFile.Kind != stateread.KindPresent {
+			failures = append(failures, fmt.Sprintf("marker %s cannot be inspected: %v; restore access out of band and re-run", marker.Live, stateread.UnusableError(marker.Live, fmt.Errorf("unknown file state %q", markerFile.Kind))))
+			continue
+		}
+		current := markerFile.Bytes
 		if !bytes.Equal(current, marker.Prior) && !bytes.Equal(current, marker.New) {
 			failures = append(failures, fmt.Sprintf("marker %s was edited out of band (neither the prior nor the intended bytes): decide which bytes win, back %s up out of band, reconcile it by hand, and re-run", marker.Live, marker.Live))
 		}
@@ -1276,12 +1333,12 @@ func validateRecoveryInventory(home string, journal *migrationJournal) error {
 	for _, op := range journal.Ops {
 		full := filepath.Join(ManagedHomeDir(home, op.Profile, op.EnvID), filepath.FromSlash(op.Path))
 		where := fmt.Sprintf("profile %s, environment %s, %s", op.Profile, op.EnvID, op.Path)
-		info, err := os.Lstat(full)
+		metadata, err := stateread.Lstat(full)
 		if err != nil {
-			if !os.IsNotExist(err) {
-				failures = append(failures, fmt.Sprintf("%s (%s) cannot be inspected: %v; restore access out of band and re-run", op.Path, where, err))
-				continue
-			}
+			failures = append(failures, fmt.Sprintf("%s (%s) cannot be inspected: %v; restore access out of band and re-run", op.Path, where, err))
+			continue
+		}
+		if metadata.Kind == stateread.KindAbsent {
 			switch {
 			case op.Kind == MigrateOpRelink:
 				failures = append(failures, fmt.Sprintf("%s (%s) is missing (expected a link to %s or %s): restore the recorded link out of band and re-run", op.Path, where, op.From, op.To))
@@ -1292,6 +1349,11 @@ func validateRecoveryInventory(home string, journal *migrationJournal) error {
 			}
 			continue
 		}
+		if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
+			failures = append(failures, fmt.Sprintf("%s (%s) cannot be inspected: %v; restore access out of band and re-run", op.Path, where, stateread.UnusableError(full, fmt.Errorf("unknown metadata state %q", metadata.Kind))))
+			continue
+		}
+		info := metadata.Info
 		if info.Mode()&os.ModeSymlink == 0 {
 			shape := "a regular file"
 			if info.IsDir() {
@@ -1322,13 +1384,19 @@ func validateRecoveryInventory(home string, journal *migrationJournal) error {
 		if op.Temp == "" {
 			continue
 		}
-		info, err := os.Lstat(op.Temp)
+		metadata, err := stateread.Lstat(op.Temp)
 		if err != nil {
-			if !os.IsNotExist(err) {
-				failures = append(failures, fmt.Sprintf("temporary path %s cannot be inspected: %v; restore access out of band and re-run", op.Temp, err))
-			}
+			failures = append(failures, fmt.Sprintf("temporary path %s cannot be inspected: %v; restore access out of band and re-run", op.Temp, err))
 			continue
 		}
+		if metadata.Kind == stateread.KindAbsent {
+			continue
+		}
+		if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
+			failures = append(failures, fmt.Sprintf("temporary path %s cannot be inspected: %v; restore access out of band and re-run", op.Temp, stateread.UnusableError(op.Temp, fmt.Errorf("unknown metadata state %q", metadata.Kind))))
+			continue
+		}
+		info := metadata.Info
 		if info.Mode()&os.ModeSymlink == 0 {
 			shape := "a regular file"
 			if info.IsDir() {
@@ -1397,11 +1465,11 @@ func reconcileJournalLinks(home string, journal *migrationJournal, symlink func(
 func reconcileLinkToPriorJournaled(home string, journal *migrationJournal, index int, full string, op migrationJournalOp, symlink func(string, string) error, rename func(string, string) error) error {
 	want := op.From
 	rel := op.Path
-	info, err := os.Lstat(full)
+	metadata, err := stateread.Lstat(full)
 	if err != nil {
-		if !os.IsNotExist(err) {
-			return fmt.Errorf("%s: cannot inspect the link path: %v; restore access out of band and re-run", rel, err)
-		}
+		return fmt.Errorf("%s: cannot inspect the link path: %v; restore access out of band and re-run", rel, err)
+	}
+	if metadata.Kind == stateread.KindAbsent {
 		if op.Kind == MigrateOpRelink {
 			return fmt.Errorf("%s: is missing (expected a link to %s or %s): restore the recorded link out of band and re-run", rel, op.From, op.To)
 		}
@@ -1410,6 +1478,10 @@ func reconcileLinkToPriorJournaled(home string, journal *migrationJournal, index
 		}
 		return nil
 	}
+	if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
+		return fmt.Errorf("%s: cannot inspect the link path: %v; restore access out of band and re-run", rel, stateread.UnusableError(full, fmt.Errorf("unknown metadata state %q", metadata.Kind)))
+	}
+	info := metadata.Info
 	if info.Mode()&os.ModeSymlink == 0 {
 		shape := "a regular file"
 		if info.IsDir() {
@@ -1607,13 +1679,18 @@ func writeMigrationJournal(home string, journal *migrationJournal) error {
 // was interrupted. An unreadable or invalid journal is an error, never
 // silence — the caller refuses and names the out-of-band fix.
 func readMigrationJournal(home string) (*migrationJournal, error) {
-	payload, err := os.ReadFile(migrationJournalPath(home)) // #nosec G304 -- fixed manager-state path below the resolved home
+	journalPath := migrationJournalPath(home)
+	state, err := stateread.ReadFile(journalPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
 		return nil, fmt.Errorf("cannot read: %v", err)
 	}
+	if state.Kind == stateread.KindAbsent {
+		return nil, nil
+	}
+	if state.Kind != stateread.KindPresent {
+		return nil, stateread.UnusableError(journalPath, fmt.Errorf("unknown file state %q", state.Kind))
+	}
+	payload := state.Bytes
 	var journal migrationJournal
 	if err := json.Unmarshal(payload, &journal); err != nil {
 		return nil, fmt.Errorf("invalid JSON: %v", err)

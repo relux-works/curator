@@ -181,8 +181,8 @@ func assertMarkerRootRetained(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(home, "runtime", "skill-a", unreferenced)); err == nil {
 		t.Fatalf("the pass swept nothing, so marker retention proves nothing: %v", result.RemovedRuntime)
 	}
-	if !containsString(LoadConsumers(home), project) {
-		t.Fatalf("the consumer holding the marker was pruned: %v", LoadConsumers(home))
+	if !containsString(mustLoadConsumers(t, home), project) {
+		t.Fatalf("the consumer holding the marker was pruned: %v", mustLoadConsumers(t, home))
 	}
 }
 
@@ -260,8 +260,8 @@ func assertUncertainRootRetained(t *testing.T) {
 	}
 	// The uncertain consumer is not forgotten either, so a second pass sees the
 	// same uncertainty instead of inheriting a quietly emptied registry.
-	if !containsString(LoadConsumers(home), project) {
-		t.Fatalf("the uncertain consumer was pruned: %v", LoadConsumers(home))
+	if !containsString(mustLoadConsumers(t, home), project) {
+		t.Fatalf("the uncertain consumer was pruned: %v", mustLoadConsumers(t, home))
 	}
 }
 

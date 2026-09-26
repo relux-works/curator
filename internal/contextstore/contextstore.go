@@ -20,6 +20,7 @@ import (
 	"github.com/relux-works/curator/internal/gitops"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // Diagnostics for state trees (environments §1.1). A missing path operand
@@ -42,10 +43,14 @@ func EntryDir(home, kind, name, pinKey string) string {
 	return filepath.Join(Root(home), kind, name, pinKey)
 }
 
-// Exists reports whether the entry is present.
-func Exists(home, kind, name, pinKey string) bool {
-	info, err := os.Stat(EntryDir(home, kind, name, pinKey))
-	return err == nil && info.IsDir()
+// Exists reports whether the entry is present. Read failures stay errors so
+// callers cannot mistake an unreadable store entry for absence.
+func Exists(home, kind, name, pinKey string) (bool, error) {
+	state, err := stateread.Stat(EntryDir(home, kind, name, pinKey))
+	if err != nil {
+		return false, err
+	}
+	return state.Kind == stateread.KindPresent && state.Info.IsDir(), nil
 }
 
 // ContentHash is the core §8 content hash of a store entry (no exclusions:

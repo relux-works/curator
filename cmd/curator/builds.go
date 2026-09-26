@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // Stable currentness codes.
@@ -377,7 +379,11 @@ func classifySkillBuilds(installedDir string, recorded *marker.Marker, planned [
 			recorded.SchemaVersion))
 	}
 
-	if exposure := contextExposure(installedDir, recorded); exposure != "" {
+	exposure, exposureErr := contextExposure(installedDir, recorded)
+	if exposureErr != nil {
+		return stateUnresolvable, plannedRows(planned, stateUnresolvable, "", exposureErr.Error())
+	}
+	if exposure != "" {
 		return buildContextExposed, plannedRows(planned, buildContextExposed, "", exposure)
 	}
 
@@ -413,6 +419,15 @@ func classifySkillBuilds(installedDir string, recorded *marker.Marker, planned [
 		}
 	}
 	return skillState, reports
+}
+
+func classifySkillBuildsFromDisk(installedDir string, planned []buildFacts) (string, []buildReport) {
+	recorded, _, err := marker.ReadState(installedDir)
+	if err != nil {
+		state, detail := markerReadFailure(installedDir, err)
+		return state, plannedRows(planned, state, "", detail)
+	}
+	return classifySkillBuilds(installedDir, recorded, planned)
 }
 
 // classifyBuildCommand is the per-command decision procedure. It returns the
@@ -535,11 +550,16 @@ func containsString(values []string, want string) bool {
 // told, so a document from a newer manager and a document with a driver outside
 // the closed set do not both collapse into "invalid".
 func markerRefusal(installedDir string) (string, string) {
-	payload, err := os.ReadFile(filepath.Join(installedDir, marker.Name)) // #nosec G304 -- path derives from an installed skill directory
+	path := filepath.Join(installedDir, marker.Name)
+	result, err := stateread.ReadFile(path) // #nosec G304 -- path derives from an installed skill directory
 	if err != nil {
-		return stateInvalidMarker,
-			"the installed skill has no readable install marker, so no compiled command can be proven current"
+		return stateUnresolvable, err.Error()
 	}
+	if result.Kind == stateread.KindAbsent {
+		return stateInvalidMarker,
+			"the installed skill has no install marker, so no compiled command can be proven current"
+	}
+	payload := result.Bytes
 	var refused struct {
 		SchemaVersion *int `json:"schema_version"`
 		Builds        map[string]struct {
@@ -569,26 +589,43 @@ func markerRefusal(installedDir string) (string, string) {
 	return stateInvalidMarker, "the install marker is present but is not a valid install marker document"
 }
 
+func markerReadFailure(installedDir string, readErr error) (string, string) {
+	var pathErr *os.PathError
+	if errors.As(readErr, &pathErr) {
+		return stateUnresolvable, readErr.Error()
+	}
+	state, detail := markerRefusal(installedDir)
+	if detail == "" {
+		detail = readErr.Error()
+	}
+	return state, detail
+}
+
 // contextExposure reports the build-root exclusion violation of one installed
 // skill, or an empty string when the boundary is intact. Both directions are
 // checked: the file set the marker recorded and what is on disk right now.
-func contextExposure(installedDir string, recorded *marker.Marker) string {
+func contextExposure(installedDir string, recorded *marker.Marker) (string, error) {
 	if len(recorded.Builds) == 0 {
-		return ""
+		return "", nil
 	}
 	for _, file := range recorded.Files {
 		for _, root := range recorded.BuildRoots {
 			if file == root || strings.HasPrefix(file, root+"/") {
-				return fmt.Sprintf("install marker records context file %q inside build root %q", file, root)
+				return fmt.Sprintf("install marker records context file %q inside build root %q", file, root), nil
 			}
 		}
 	}
 	for _, root := range recorded.BuildRoots {
-		if _, err := os.Lstat(filepath.Join(installedDir, filepath.FromSlash(root))); err == nil {
-			return fmt.Sprintf("build root %q is materialized in agent-facing context", root)
+		path := filepath.Join(installedDir, filepath.FromSlash(root))
+		metadata, err := stateread.Lstat(path)
+		if err != nil {
+			return "", err
+		}
+		if metadata.Kind == stateread.KindPresent {
+			return fmt.Sprintf("build root %q is materialized in agent-facing context", root), nil
 		}
 	}
-	return ""
+	return "", nil
 }
 
 func withReason(detail, reason string) string {
@@ -656,18 +693,26 @@ func unionKeys(recorded map[string]marker.Build, planned map[string]buildFacts) 
 func markerDigests(stores ...string) map[string]string {
 	digests := map[string]string{}
 	for _, store := range stores {
-		entries, err := os.ReadDir(store)
+		listing, err := stateread.ReadDir(store)
 		if err != nil {
+			digests["store:"+store] = err.Error()
 			continue
 		}
-		for _, entry := range entries {
+		if listing.Kind == stateread.KindAbsent {
+			continue
+		}
+		for _, entry := range listing.Entries {
 			path := filepath.Join(store, entry.Name(), marker.Name)
-			payload, readErr := os.ReadFile(path) // #nosec G304 -- path derives from a manager-owned store
+			result, readErr := stateread.ReadFile(path) // #nosec G304 -- path derives from a manager-owned store
 			if readErr != nil {
-				digests[path] = "absent"
+				digests[path] = readErr.Error()
 				continue
 			}
-			sum := sha256.Sum256(payload)
+			if result.Kind == stateread.KindAbsent {
+				digests[path] = stateread.DiagAbsent
+				continue
+			}
+			sum := sha256.Sum256(result.Bytes)
 			digests[path] = hex.EncodeToString(sum[:])
 		}
 	}

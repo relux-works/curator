@@ -15,6 +15,7 @@ import (
 	"github.com/relux-works/curator/internal/buildsource"
 	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // TestCollectSweepsOnlyUnreferencedProtectedEntries drives the whole chain —
@@ -106,7 +107,9 @@ func TestCollectRetainsBuildEntriesWhenAMarkerCannotBeRead(t *testing.T) {
 	if err := os.MkdirAll(broken, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(broken, marker.Name), []byte("{"), 0o644); err != nil {
+	// A directory at the marker path is a portable read failure: its exact
+	// path exists, but os.ReadFile cannot return marker bytes from it.
+	if err := os.Mkdir(filepath.Join(broken, marker.Name), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := RecordConsumer(home, project); err != nil {
@@ -123,7 +126,7 @@ func TestCollectRetainsBuildEntriesWhenAMarkerCannotBeRead(t *testing.T) {
 	if _, err := os.Lstat(realEntryPath(home, orphan)); err != nil {
 		t.Fatalf("an entry was removed despite an unreadable marker: %v", err)
 	}
-	if !warned(result, "is unreadable or invalid") {
+	if !warned(result, stateread.DiagUnreadable) {
 		t.Fatalf("the unreadable marker was not reported: %v", result.Warnings)
 	}
 }

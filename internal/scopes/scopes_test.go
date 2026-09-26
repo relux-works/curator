@@ -3,12 +3,14 @@ package scopes
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 func TestConsumersRoundTrip(t *testing.T) {
@@ -22,9 +24,104 @@ func TestConsumersRoundTrip(t *testing.T) {
 	if err := RecordConsumer(home, "/c"); err != nil {
 		t.Fatal(err)
 	}
-	consumers := LoadConsumers(home)
+	consumers := mustLoadConsumers(t, home)
 	if len(consumers) != 2 {
 		t.Fatalf("consumers: %v", consumers)
+	}
+}
+
+func mustLoadConsumers(t *testing.T, home string) []string {
+	t.Helper()
+	consumers, err := LoadConsumers(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return consumers
+}
+
+func makeScopesStateUnreadable(t *testing.T, path string, directory bool) {
+	t.Helper()
+	requirePOSIXModeBitUnreadability(t)
+	mode := os.FileMode(0o644)
+	if directory {
+		mode = 0o755
+	}
+	if err := os.Chmod(path, 0o000); err != nil {
+		t.Skipf("this host cannot create mode-000 manager state: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(path, mode) })
+	if directory {
+		if _, err := os.ReadDir(path); err == nil {
+			t.Skip("this environment can read a mode-000 directory; unreadability is untestable here")
+		}
+	} else if _, err := os.ReadFile(path); err == nil {
+		t.Skip("this environment can read a mode-000 file; unreadability is untestable here")
+	}
+}
+
+func requirePOSIXModeBitUnreadability(t testing.TB) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("platform-control: POSIX mode-bit unreadability")
+	}
+}
+
+func TestConsumerRegistryAbsenceAndUnreadabilityDiffer(t *testing.T) {
+	home := t.TempDir()
+	if consumers, err := LoadConsumers(home); err != nil || len(consumers) != 0 {
+		t.Fatalf("absent consumer registry = (%v, %v), want empty and nil", consumers, err)
+	}
+	project := t.TempDir()
+	if err := RecordConsumer(home, project); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(home, ConsumersName)
+	original, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	makeScopesStateUnreadable(t, path, false)
+	if consumers, err := LoadConsumers(home); err == nil || len(consumers) != 0 || !strings.Contains(err.Error(), stateread.DiagUnreadable) {
+		t.Fatalf("unreadable consumer registry = (%v, %v), want typed unreadable state", consumers, err)
+	}
+	if err := RecordConsumer(home, t.TempDir()); err == nil || !strings.Contains(err.Error(), stateread.DiagUnreadable) {
+		t.Fatalf("record over unreadable consumer registry = %v, want typed unreadable refusal", err)
+	}
+	if err := os.Chmod(path, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil || string(got) != string(original) {
+		t.Fatalf("unreadable registry changed = (%q, %v), want original bytes", got, err)
+	}
+}
+
+func TestSweepRuntimeAbsenceAndUnreadabilityDiffer(t *testing.T) {
+	home := t.TempDir()
+	removed, err := CollectRuntime(home)
+	if err != nil || len(removed) != 0 {
+		t.Fatalf("absent runtime root = (%v, %v), want empty and nil", removed, err)
+	}
+	runtimeRoot := filepath.Join(home, "runtime")
+	if err := os.MkdirAll(runtimeRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	makeScopesStateUnreadable(t, runtimeRoot, true)
+	if _, err := CollectRuntime(home); err == nil || !strings.Contains(err.Error(), stateread.DiagUnreadable) || !strings.Contains(err.Error(), runtimeRoot) {
+		t.Fatalf("unreadable runtime root error = %v, want typed unreadable state for %s", err, runtimeRoot)
+	}
+}
+
+func TestSweepRuntimeUnreadableSkillInventoryIsNotIgnored(t *testing.T) {
+	home := t.TempDir()
+	runtimeRoot := filepath.Join(home, "runtime")
+	skillRoot := filepath.Join(runtimeRoot, "skill-a")
+	if err := os.MkdirAll(filepath.Join(skillRoot, strings.Repeat("1", 40)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	makeScopesStateUnreadable(t, skillRoot, true)
+	if _, err := CollectRuntime(home); err == nil || !strings.Contains(err.Error(), stateread.DiagUnreadable) || !strings.Contains(err.Error(), skillRoot) {
+		t.Fatalf("unreadable runtime skill inventory error = %v, want typed unreadable state for %s", err, skillRoot)
 	}
 }
 
@@ -99,7 +196,7 @@ func TestGcPrunesDeadConsumers(t *testing.T) {
 	if _, err := CollectRuntime(home); err != nil {
 		t.Fatal(err)
 	}
-	consumers := LoadConsumers(home)
+	consumers := mustLoadConsumers(t, home)
 	if len(consumers) != 1 {
 		t.Fatalf("dead consumer not pruned: %v", consumers)
 	}
@@ -130,6 +227,38 @@ func TestHybridDeclsRequireTargets(t *testing.T) {
 	decls, err := LoadHybridDecls(home)
 	if err != nil || len(decls) != 1 || decls[0].Targets[0] != "my-alias" {
 		t.Fatalf("decls: %+v, %v", decls, err)
+	}
+}
+
+func TestHybridManifestAbsenceAndUnreadabilityDiffer(t *testing.T) {
+	home := t.TempDir()
+	if decls, err := LoadHybridDecls(home); err != nil || len(decls) != 0 {
+		t.Fatalf("absent hybrid manifest = (%v, %v), want empty and nil", decls, err)
+	}
+	if err := AddHybridDecl(home, "skill-h", "tag", "v1", "", []string{"alias-a"}); err != nil {
+		t.Fatalf("add with absent manifest: %v", err)
+	}
+	path := HybridManifestPath(home)
+	original, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	makeScopesStateUnreadable(t, path, false)
+	if _, err := LoadHybridDecls(home); err == nil || !strings.Contains(err.Error(), stateread.DiagUnreadable) {
+		t.Fatalf("load unreadable hybrid manifest error = %v, want typed unreadable state", err)
+	}
+	if err := AddHybridDecl(home, "skill-b", "tag", "v2", "", []string{"alias-b"}); err == nil || !strings.Contains(err.Error(), stateread.DiagUnreadable) {
+		t.Fatalf("add over unreadable hybrid manifest error = %v, want typed unreadable refusal", err)
+	}
+	if err := RemoveHybridDecl(home, "skill-h"); err == nil || !strings.Contains(err.Error(), stateread.DiagUnreadable) {
+		t.Fatalf("remove from unreadable hybrid manifest error = %v, want typed unreadable refusal", err)
+	}
+	if err := os.Chmod(path, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil || string(got) != string(original) {
+		t.Fatalf("unreadable hybrid manifest changed = (%q, %v), want original bytes", got, err)
 	}
 }
 

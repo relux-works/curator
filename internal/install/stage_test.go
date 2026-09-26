@@ -385,9 +385,10 @@ func (clock fixedClock) Now() time.Time { return clock.at }
 // state through the injected reader and never opens it directly.
 type countingGeneration struct{ reads int }
 
-func (generation *countingGeneration) InstalledMarker(installedDir string) *marker.Marker {
+func (generation *countingGeneration) InstalledMarker(installedDir string) (*marker.Marker, error) {
 	generation.reads++
-	return marker.Read(installedDir)
+	recorded, _, err := marker.ReadState(installedDir)
+	return recorded, err
 }
 
 // testTarget is the native target of the host running the tests. A manager only

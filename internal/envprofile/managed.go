@@ -34,6 +34,7 @@ import (
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/protocoljson"
+	"github.com/relux-works/curator/internal/stateread"
 	"github.com/relux-works/curator/internal/transaction"
 )
 
@@ -633,13 +634,18 @@ func (req *ResolveRequest) credentialRecords(adapter envregistry.Adapter, isolat
 // native effective storage only: a diverged managed config.toml changes
 // nothing and is never realigned.
 func codexCredentialStore(native string) (string, error) {
-	payload, err := os.ReadFile(filepath.Join(native, "config.toml")) // #nosec G304 -- native home resolved from the registry
+	path := filepath.Join(native, "config.toml")
+	state, err := stateread.ReadFile(path)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return "file", nil
-		}
 		return "", fmt.Errorf("codex native config.toml is unreadable: %v", err)
 	}
+	if state.Kind == stateread.KindAbsent {
+		return "file", nil
+	}
+	if state.Kind != stateread.KindPresent {
+		return "", stateread.UnusableError(path, fmt.Errorf("unknown file state %q", state.Kind))
+	}
+	payload := state.Bytes
 	var doc map[string]any
 	if err := toml.Unmarshal(payload, &doc); err != nil {
 		return "", fmt.Errorf("codex native config.toml is not valid TOML: %v", err)
@@ -1242,11 +1248,11 @@ func sameCredentialRecordSet(left, right []envmarker.Passthrough) bool {
 // same way, removing nothing. Native bytes are never touched.
 func ensureCredentialLink(homeDir, path, target string, recorded bool, migrateCmd string) error {
 	full := filepath.Join(homeDir, filepath.FromSlash(path))
-	info, err := os.Lstat(full)
+	metadata, err := stateread.Lstat(full)
 	if err != nil {
-		if !os.IsNotExist(err) {
-			return fmt.Errorf("%s: %s cannot be inspected: %v: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full, err)
-		}
+		return fmt.Errorf("%s: %s cannot be inspected: %v: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full, err)
+	}
+	if metadata.Kind == stateread.KindAbsent {
 		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
 			return err
 		}
@@ -1255,6 +1261,10 @@ func ensureCredentialLink(homeDir, path, target string, recorded bool, migrateCm
 		}
 		return nil
 	}
+	if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
+		return fmt.Errorf("%s: %s cannot be inspected: %v: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full, stateread.UnusableError(full, fmt.Errorf("unknown metadata state %q", metadata.Kind)))
+	}
+	info := metadata.Info
 	if info.Mode()&os.ModeSymlink != 0 {
 		got, err := os.Readlink(full)
 		if err != nil {
@@ -1309,13 +1319,17 @@ func removeStaleCredentialLinks(adapter envregistry.Adapter, homeDir, native str
 			continue
 		}
 		full := filepath.Join(homeDir, filepath.FromSlash(entry.Path))
-		info, err := os.Lstat(full)
+		metadata, err := stateread.Lstat(full)
 		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
 			return fmt.Errorf("%s: %s cannot be inspected: %v: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full, err)
 		}
+		if metadata.Kind == stateread.KindAbsent {
+			continue
+		}
+		if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
+			return fmt.Errorf("%s: %s cannot be inspected: %v: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full, stateread.UnusableError(full, fmt.Errorf("unknown metadata state %q", metadata.Kind)))
+		}
+		info := metadata.Info
 		if info.Mode()&os.ModeSymlink == 0 {
 			if info.IsDir() {
 				return fmt.Errorf("%s: %s holds a directory where the recorded credential link %s was: refusing to remove it; clear the directory out of band and re-run", envregistry.DiagCredentialConflict, full, entry.Path)
@@ -1776,12 +1790,20 @@ func (v *verification) checkPassthrough(req *ResolveRequest, plan *homePlan, mar
 		// loudly without going stale. An inspection failure is a
 		// conflict/inspection diagnostic and stays stale, never
 		// absence and never silence.
-		if _, err := os.Stat(target); err != nil {
-			if os.IsNotExist(err) {
-				v.warnings = append(v.warnings, fmt.Sprintf("passthrough entry %s is detached-pending: link target %s does not exist yet — log in to %s to populate it", path, target, plan.adapter.ID))
-			} else {
-				v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s target %s cannot be inspected: %v (%s)", path, target, err, envregistry.DiagCredentialConflict))
+		metadata, err := stateread.Stat(target)
+		if err != nil {
+			v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s target %s cannot be inspected: %v (%s)", path, target, err, envregistry.DiagCredentialConflict))
+			continue
+		}
+		switch metadata.Kind {
+		case stateread.KindAbsent:
+			v.warnings = append(v.warnings, fmt.Sprintf("passthrough entry %s is detached-pending: link target %s does not exist yet — log in to %s to populate it", path, target, plan.adapter.ID))
+		case stateread.KindPresent:
+			if metadata.Info == nil {
+				v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s target %s cannot be inspected: %v (%s)", path, target, stateread.UnusableError(target, fmt.Errorf("present target has no metadata")), envregistry.DiagCredentialConflict))
 			}
+		default:
+			v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s target %s cannot be inspected: %v (%s)", path, target, stateread.UnusableError(target, fmt.Errorf("unknown metadata state %q", metadata.Kind)), envregistry.DiagCredentialConflict))
 		}
 	}
 }
@@ -1987,13 +2009,17 @@ func currentProfileFor(home, envID, named string) (string, error) {
 		return named, nil
 	}
 	scoped, err := ScopedCurrents(home)
-	if err == nil {
-		if profile, ok := scoped["env:"+envID]; ok && profile != "" {
-			return profile, nil
-		}
+	if err != nil {
+		return "", fmt.Errorf("%s: read scoped current profile: %w", DiagProfileUnknown, err)
+	}
+	if profile, ok := scoped["env:"+envID]; ok && profile != "" {
+		return profile, nil
 	}
 	current, err := Current(home)
-	if err != nil || current == "" {
+	if err != nil {
+		return "", fmt.Errorf("%s: read machine current profile: %w", DiagProfileUnknown, err)
+	}
+	if current == "" {
 		return "", fmt.Errorf("%s: no profile is current", DiagProfileUnknown)
 	}
 	return current, nil

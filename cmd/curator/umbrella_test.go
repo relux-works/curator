@@ -9,6 +9,7 @@ import (
 
 	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/globalbins"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // These tests drive the production §11 lookup: resolveProvider directly
@@ -562,7 +563,7 @@ func TestProviderInputsForHostPublishedBinRefuses(t *testing.T) {
 		t.Fatal(err)
 	}
 	globalbins.Refresh(managerHome, map[string]bool{"alpha": true}, platform, map[string]string{"PATH": providerDir}, fakeHome)
-	if !globalbins.PublishedShims(providerDir) {
+	if published, err := globalbins.PublishedShims(providerDir); err != nil || !published {
 		t.Fatal("the publish did not establish the ownership ledger")
 	}
 	t.Setenv("PATH", providerDir)
@@ -573,6 +574,19 @@ func TestProviderInputsForHostPublishedBinRefuses(t *testing.T) {
 	outcome := resolveProvider("run", in)
 	if outcome.resolved != "" || outcome.diagnostic != providerDiagnosticUntrusted || outcome.untrustedPath != planted {
 		t.Fatalf("outcome = %+v, want an untrusted refusal of the published dir", outcome)
+	}
+}
+
+func TestProviderPostureReportsUnreadablePublishedShimLedger(t *testing.T) {
+	managerHome, _, providerDir := hostBinFixture(t)
+	t.Setenv("PATH", providerDir)
+	ledger := filepath.Join(providerDir, ".curator-managed.json")
+	if err := os.Symlink(ledger, ledger); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	rows, diagnostic := providerPosture(managerHome, nil, nil)
+	if len(rows) != 0 || diagnostic == nil || diagnostic.Code != stateread.DiagUnreadable || diagnostic.Path != ledger {
+		t.Fatalf("provider posture = (%+v, %+v), want a typed unreadable diagnostic for %s", rows, diagnostic, ledger)
 	}
 }
 

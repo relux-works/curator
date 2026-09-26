@@ -100,7 +100,7 @@ type Clock interface{ Now() time.Time }
 // GenerationReader reads the persistent installation generation recorded for
 // one installed directory. Implementations must never write.
 type GenerationReader interface {
-	InstalledMarker(installedDir string) *marker.Marker
+	InstalledMarker(installedDir string) (*marker.Marker, error)
 }
 
 // BuildDeps injects the narrow boundaries the plan and staging phases use. The
@@ -165,8 +165,9 @@ func installedAt(clock Clock) string {
 
 type markerGeneration struct{}
 
-func (markerGeneration) InstalledMarker(installedDir string) *marker.Marker {
-	return marker.Read(installedDir)
+func (markerGeneration) InstalledMarker(installedDir string) (*marker.Marker, error) {
+	recorded, _, err := marker.ReadState(installedDir)
+	return recorded, err
 }
 
 // goToolchain is the real trusted-toolchain boundary. Every operation gets its

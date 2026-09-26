@@ -26,10 +26,45 @@ import (
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/protocoljson"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // Name is the marker file name inside an installed skill directory.
 const Name = ".csk-install.json"
+
+// DiagInvalid identifies marker bytes that were read successfully but do not
+// describe a valid install marker.
+const DiagInvalid = "install_marker_invalid"
+
+// InvalidError reports a present marker document that failed decoding or
+// schema validation. It is distinct from a failed filesystem read: callers
+// may re-derive an invalid or stale marker, but must not treat an unreadable
+// marker as absent.
+type InvalidError struct {
+	Path  string
+	Cause error
+}
+
+func (e *InvalidError) Error() string {
+	if e == nil {
+		return ""
+	}
+	if e.Cause == nil {
+		return fmt.Sprintf("%s: %s", DiagInvalid, e.Path)
+	}
+	return fmt.Sprintf("%s: %s: %v", DiagInvalid, e.Path, e.Cause)
+}
+
+func (e *InvalidError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Cause
+}
+
+func invalidMarkerError(path string, cause error) *InvalidError {
+	return &InvalidError{Path: path, Cause: cause}
+}
 
 const (
 	// LegacySchemaVersion is the historical marker schema retained for reads.
@@ -260,27 +295,44 @@ func (m Marker) MarshalJSON() ([]byte, error) {
 	return json.Marshal(object)
 }
 
-// Read loads the marker of an installed directory; nil when absent or
-// unreadable (an unreadable marker simply means "not current").
-func Read(installedDir string) *Marker {
-	payload, err := os.ReadFile(filepath.Join(installedDir, Name)) // #nosec G304 -- path derives from the install root
+// ReadState loads an installed marker and reports absence separately from a
+// failed read or invalid document. An invalid document returns KindPresent and
+// an InvalidError because its bytes were read successfully. Callers that make
+// absence-sensitive decisions must preserve all three outcomes.
+func ReadState(installedDir string) (*Marker, stateread.Kind, error) {
+	path := filepath.Join(installedDir, Name)
+	result, err := stateread.ReadFile(path) // #nosec G304 -- path derives from the install root
 	if err != nil {
-		return nil
+		return nil, stateread.KindUnreadable, err
 	}
+	if result.Kind == stateread.KindAbsent {
+		return nil, stateread.KindAbsent, nil
+	}
+	payload := result.Bytes
 	if err := protocoljson.Validate(payload); err != nil {
-		return nil
+		return nil, stateread.KindPresent, invalidMarkerError(path, err)
 	}
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(payload, &raw); err != nil {
-		return nil
+		return nil, stateread.KindPresent, invalidMarkerError(path, err)
 	}
 	var m Marker
 	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&m); err != nil || !validMarker(&m, raw) {
-		return nil
+		if err == nil {
+			err = errors.New("install marker is not valid for its schema")
+		}
+		return nil, stateread.KindPresent, invalidMarkerError(path, err)
 	}
-	return &m
+	return &m, stateread.KindPresent, nil
+}
+
+// Read is retained for read-only legacy callers and tests. Production code
+// uses ReadState so it cannot treat an unreadable marker as absent.
+func Read(installedDir string) *Marker {
+	read, _, _ := ReadState(installedDir)
+	return read
 }
 
 func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
@@ -1115,11 +1167,29 @@ func Current(installedDir string, expected *Marker, buildState ...BuildCurrentne
 	if len(buildState) > 1 {
 		return false, errors.New("multiple build currentness values supplied")
 	}
-	if version, ok := markerSchemaVersion(installedDir); ok && !SupportedSchema(version) {
+	version, kind, schemaErr := markerSchemaVersion(installedDir)
+	if schemaErr != nil {
+		var invalid *InvalidError
+		if errors.As(schemaErr, &invalid) {
+			return false, nil
+		}
+		return false, schemaErr
+	}
+	if kind == stateread.KindAbsent {
+		return false, nil
+	}
+	if !SupportedSchema(version) {
 		return false, fmt.Errorf("unsupported installed marker schema in %s", filepath.Join(installedDir, Name))
 	}
-	recorded := Read(installedDir)
-	if recorded == nil {
+	recorded, kind, err := ReadState(installedDir)
+	if err != nil {
+		var invalid *InvalidError
+		if errors.As(err, &invalid) {
+			return false, nil
+		}
+		return false, err
+	}
+	if kind == stateread.KindAbsent {
 		return false, nil
 	}
 	if !SupportedSchema(recorded.SchemaVersion) {
@@ -1365,20 +1435,28 @@ func normalizedBuilds(values map[string]Build) map[string]Build {
 	return values
 }
 
-func markerSchemaVersion(installedDir string) (int, bool) {
-	payload, err := os.ReadFile(filepath.Join(installedDir, Name)) // #nosec G304 -- path derives from the install root
-	if err != nil || protocoljson.Validate(payload) != nil {
-		return 0, false
+func markerSchemaVersion(installedDir string) (int, stateread.Kind, error) {
+	path := filepath.Join(installedDir, Name)
+	result, err := stateread.ReadFile(path) // #nosec G304 -- path derives from the install root
+	if err != nil {
+		return 0, stateread.KindUnreadable, err
+	}
+	if result.Kind == stateread.KindAbsent {
+		return 0, stateread.KindAbsent, nil
+	}
+	payload := result.Bytes
+	if err := protocoljson.Validate(payload); err != nil {
+		return 0, stateread.KindPresent, invalidMarkerError(path, err)
 	}
 	var object map[string]json.RawMessage
-	if json.Unmarshal(payload, &object) != nil {
-		return 0, false
+	if err := json.Unmarshal(payload, &object); err != nil {
+		return 0, stateread.KindPresent, invalidMarkerError(path, err)
 	}
 	var version int
-	if json.Unmarshal(object["schema_version"], &version) != nil {
-		return 0, false
+	if err := json.Unmarshal(object["schema_version"], &version); err != nil {
+		return 0, stateread.KindPresent, invalidMarkerError(path, err)
 	}
-	return version, true
+	return version, stateread.KindPresent, nil
 }
 
 // ReplaceDir atomically swaps newDir into target: back up, rename, roll back

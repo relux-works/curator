@@ -42,6 +42,7 @@ import (
 	"github.com/relux-works/curator/internal/scriptworker"
 	"github.com/relux-works/curator/internal/shell"
 	"github.com/relux-works/curator/internal/skillcheck"
+	"github.com/relux-works/curator/internal/stateread"
 	"github.com/relux-works/curator/internal/transaction"
 	"github.com/relux-works/curator/internal/ui"
 	"github.com/relux-works/curator/internal/version"
@@ -1042,7 +1043,13 @@ func classifyScopeBuilds(
 	verdicts := make([]verdict, 0, len(skills))
 	for _, skill := range skills {
 		facts := bySkill[skill]
-		installed, present := installedSkillDir(scope, skill)
+		installed, present, installErr := installedSkillDir(scope, skill)
+		if installErr != nil {
+			state := stateUnresolvable
+			verdicts = append(verdicts, verdict{skill: skill, installed: installed, facts: facts,
+				state: state, rows: plannedRows(facts, state, "", installErr.Error())})
+			continue
+		}
 		if !present {
 			verdicts = append(verdicts, verdict{skill: skill, installed: installed, facts: facts,
 				state: stateNotInstalled,
@@ -1050,7 +1057,7 @@ func classifyScopeBuilds(
 					"the compiled command belongs to a skill that is not installed")})
 			continue
 		}
-		state, rows := classifySkillBuilds(installed, marker.Read(installed), facts)
+		state, rows := classifySkillBuildsFromDisk(installed, facts)
 		verdicts = append(verdicts, verdict{skill: skill, installed: installed, facts: facts, state: state, rows: rows})
 	}
 
@@ -1107,14 +1114,18 @@ func demoteSkill(drift map[string]string, skill, state string) {
 // installedSkillDir resolves the store that holds one installed skill: the
 // scope's own context store, or another store the scope reads for a node no
 // declaration in it reaches.
-func installedSkillDir(scope statusScope, skill string) (string, bool) {
+func installedSkillDir(scope statusScope, skill string) (string, bool, error) {
 	for _, store := range scope.stores {
 		candidate := filepath.Join(store, skill)
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate, true
+		metadata, err := stateread.Stat(candidate)
+		if err != nil {
+			return candidate, true, err
+		}
+		if metadata.Kind == stateread.KindPresent {
+			return candidate, true, nil
 		}
 	}
-	return filepath.Join(scope.skillsDir, skill), false
+	return filepath.Join(scope.skillsDir, skill), false, nil
 }
 
 func scopeStatusDrift(cfg *config.Config, manifestRoot, skillsDir string) map[string]string {
@@ -1130,12 +1141,22 @@ func scopeStatusDrift(cfg *config.Config, manifestRoot, skillsDir string) map[st
 			continue
 		}
 		installed := filepath.Join(skillsDir, decl.Name)
-		if _, err := os.Stat(installed); err != nil {
+		metadata, statErr := stateread.Stat(installed)
+		if statErr != nil {
+			drift[decl.Name] = stateUnresolvable
+			continue
+		}
+		if metadata.Kind == stateread.KindAbsent {
 			drift[decl.Name] = stateNotInstalled
 			continue
 		}
-		recorded := marker.Read(installed)
-		if recorded == nil {
+		recorded, kind, readErr := marker.ReadState(installed)
+		if readErr != nil {
+			state, _ := markerReadFailure(installed, readErr)
+			drift[decl.Name] = state
+			continue
+		}
+		if kind == stateread.KindAbsent {
 			// Marker schema 1 stays readable, so an unchanged schema 1 through 5
 			// installation remains current under it. Only a marker the reader
 			// refuses reaches here, and the refusal itself carries the stable
@@ -1809,15 +1830,20 @@ func (c cli) cmdHybrid(args []string) int {
 		}
 		store := scopes.HybridSkillsRoot(cfg.Home())
 		for _, entry := range decls {
-			state := "not-installed"
+			var state string
 			installed := filepath.Join(store, entry.Decl.Name)
-			if recorded := marker.Read(installed); recorded != nil {
+			recorded, kind, readErr := marker.ReadState(installed)
+			if readErr != nil {
+				state, _ = markerReadFailure(installed, readErr)
+			} else if kind == stateread.KindPresent {
 				actual, hashErr := hashing.ContentSHA256(installed, nil)
 				if hashErr != nil || actual != recorded.ContentSHA256 {
 					state = "content-drift"
 				} else {
 					state = "installed"
 				}
+			} else {
+				state = "not-installed"
 			}
 			_, _ = fmt.Fprintf(c.stdout, "%s %s targets=%s\n", entry.Decl.Name, state, strings.Join(entry.Targets, ","))
 		}

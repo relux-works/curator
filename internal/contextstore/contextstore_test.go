@@ -26,7 +26,7 @@ func TestStateEntryIsContentKeyed(t *testing.T) {
 	if len(key) != 64 || first != EntryDir(home, "context", "acme", key) {
 		t.Fatalf("entry %q key %q", first, key)
 	}
-	if !Exists(home, "context", "acme", key) {
+	if exists, err := Exists(home, "context", "acme", key); err != nil || !exists {
 		t.Fatal("entry must exist after install")
 	}
 	second, key2, err := EnsureState(home, "context", "acme", source)

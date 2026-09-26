@@ -258,7 +258,7 @@ func lockedNetworkRepository(skillsRoot string, lock *sourcelock.Lock, repositor
 		location := filepath.Join(skillsRoot, filepath.FromSlash(candidate.Name))
 		metadata, err := stateread.Lstat(location)
 		if err != nil {
-			return "", fmt.Errorf("source_snapshot_unavailable: cannot inspect repository checkout for %s: %w", candidate.Name, err)
+			return "", err
 		}
 		if metadata.Kind == stateread.KindAbsent {
 			continue

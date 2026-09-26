@@ -5,6 +5,7 @@ package adapters
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/protocoljson"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // AgentPaths maps agent identifiers to their project-relative adapter
@@ -164,31 +166,38 @@ func casingAliasUnmanaged(target string) bool {
 	return false
 }
 
-func readLedger(adapterRoot string) map[string]bool {
-	payload, err := os.ReadFile(filepath.Join(adapterRoot, LedgerName)) // #nosec G304 -- adapter root is tool-managed
+func readLedger(adapterRoot string) (map[string]bool, error) {
+	path := filepath.Join(adapterRoot, LedgerName)
+	state, err := stateread.ReadFile(path) // #nosec G304 -- adapter root is tool-managed
 	if err != nil {
-		return map[string]bool{}
+		return nil, err
 	}
-	if err := protocoljson.Validate(payload); err != nil {
-		return map[string]bool{}
+	if state.Kind == stateread.KindAbsent {
+		return map[string]bool{}, nil
+	}
+	if err := protocoljson.Validate(state.Bytes); err != nil {
+		return nil, stateread.UnusableError(path, err)
 	}
 	var data struct {
 		SchemaVersion int      `json:"schema_version"`
 		Entries       []string `json:"entries"`
 	}
-	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder := json.NewDecoder(bytes.NewReader(state.Bytes))
 	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&data); err != nil || data.SchemaVersion != LedgerSchemaVersion || data.Entries == nil {
-		return map[string]bool{}
+	if err := decoder.Decode(&data); err != nil {
+		return nil, stateread.UnusableError(path, err)
+	}
+	if data.SchemaVersion != LedgerSchemaVersion || data.Entries == nil {
+		return nil, stateread.UnusableError(path, fmt.Errorf("invalid adapter ledger schema or entries"))
 	}
 	entries := map[string]bool{}
 	for _, entry := range data.Entries {
 		if !identifiers.Valid(entry) || entries[entry] {
-			return map[string]bool{}
+			return nil, stateread.UnusableError(path, fmt.Errorf("invalid or repeated adapter entry %q", entry))
 		}
 		entries[entry] = true
 	}
-	return entries
+	return entries, nil
 }
 
 // ledgerPayload renders the canonical ownership ledger bytes.

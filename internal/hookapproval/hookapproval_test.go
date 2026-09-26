@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 var (
@@ -29,6 +31,33 @@ func TestLookupOnAbsentStateIsEmpty(t *testing.T) {
 	}
 	if records, err := List(home); err != nil || len(records) != 0 {
 		t.Fatalf("List on absent state = %v, %v", records, err)
+	}
+}
+
+func TestListDistinguishesAbsentAndUnreadableState(t *testing.T) {
+	home := t.TempDir()
+	if records, err := List(home); err != nil || len(records) != 0 {
+		t.Fatalf("List on absent state = %v, %v; want an empty set", records, err)
+	}
+	if runtime.GOOS == "windows" {
+		t.Skip("platform-control: POSIX mode-bit unreadability")
+	}
+	path := ApprovalsPath(home)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(""), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0); err != nil {
+		t.Skipf("this environment cannot set unreadable mode: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(path, 0o600) })
+	if _, err := os.ReadFile(path); err == nil {
+		t.Skip("this environment can read a mode-000 file; unreadability is untestable here")
+	}
+	if records, err := List(home); err == nil || records != nil || !strings.Contains(err.Error(), stateread.DiagUnreadable) || !strings.Contains(err.Error(), path) {
+		t.Fatalf("List on unreadable state = (%v, %v); want typed unreadable error for %s", records, err, path)
 	}
 }
 

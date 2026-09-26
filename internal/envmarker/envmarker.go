@@ -10,13 +10,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/protocoljson"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // Name is the marker file name beside the managed surfaces.
@@ -57,6 +57,10 @@ const (
 // DiagMarkerInvalid is the fail-closed diagnostic for an unreadable,
 // malformed, or unsupported marker.
 const DiagMarkerInvalid = "environment_marker_invalid"
+
+// DiagMarkerUnreadable is the fail-closed diagnostic for a marker path that
+// exists but cannot be read. Absence remains a separate outcome.
+const DiagMarkerUnreadable = "environment_marker_unreadable"
 
 // Requirement is the declared requirement of a git root, as written.
 type Requirement struct {
@@ -651,16 +655,18 @@ func (s *keyScanner) skipValue() error {
 }
 
 // Read loads the marker of a home. It distinguishes absence (nil, nil) from a
-// failed or invalid read (nil, error carrying DiagMarkerInvalid).
+// failed filesystem read (nil, error carrying DiagMarkerUnreadable) and an
+// invalid marker document (nil, error carrying DiagMarkerInvalid).
 func Read(home string) (*Marker, error) {
-	payload, err := os.ReadFile(filepath.Join(home, Name)) // #nosec G304 -- home chosen by the caller
+	path := filepath.Join(home, Name)
+	result, err := stateread.ReadFile(path) // #nosec G304 -- home chosen by the caller
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("%s: %w", DiagMarkerInvalid, err)
+		return nil, fmt.Errorf("%s: %w", DiagMarkerUnreadable, err)
 	}
-	return Parse(payload)
+	if result.Kind == stateread.KindAbsent {
+		return nil, nil
+	}
+	return Parse(result.Bytes)
 }
 
 // SortedSurfaceKeys returns the surface keys in bytewise order.

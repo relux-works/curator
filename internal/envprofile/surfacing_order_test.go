@@ -25,12 +25,14 @@ const orderToolRow = `mcp-declaration tool 1.0.0 stdio command=npx args=["-y","t
 // profile lock's filesystem state when the first row arrives: whether
 // lock.json exists and its exact bytes at that instant.
 type lockObservingSink struct {
-	lock     string
-	rows     []string
-	pending  string
-	observed bool
-	existed  bool
-	bytes    []byte
+	lock          string
+	rows          []string
+	pending       string
+	observed      bool
+	existed       bool
+	bytes         []byte
+	onFirstRow    func() error
+	onFirstRowErr error
 }
 
 func (w *lockObservingSink) Write(p []byte) (int, error) {
@@ -51,6 +53,10 @@ func (w *lockObservingSink) Write(p []byte) (int, error) {
 			w.bytes = payload
 		}
 		w.rows = append(w.rows, line)
+		if w.onFirstRow != nil {
+			w.onFirstRowErr = w.onFirstRow()
+			w.onFirstRow = nil
+		}
 	}
 	return len(p), nil
 }
@@ -244,11 +250,11 @@ func TestReinstallEmitsSurfacingBeforePublication(t *testing.T) {
 	}
 }
 
-// TestSurfacingEmittedDespitePublicationFailure obstructs the candidate
-// profile directory with a regular file, so the journal's directory
-// creation fails and publication fails on every platform. The install
-// fails — but the §2.3 rows were already printed: a failure after the
-// emission point must not discard them.
+// TestSurfacingEmittedDespitePublicationFailure creates a publication
+// obstruction from the sink after it receives the first §2.3 row. The
+// source.json probe therefore observes genuine absence before resolution;
+// the later journal publication fails, but the row has already reached
+// the sink.
 func TestSurfacingEmittedDespitePublicationFailure(t *testing.T) {
 	home := t.TempDir()
 	pinHomes(t)
@@ -258,17 +264,25 @@ func TestSurfacingEmittedDespitePublicationFailure(t *testing.T) {
 	if _, _, _, err := Install(home, InstallOptions{Operand: seed}); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(ProfileDir(home, "withmcp"), []byte("obstruction"), 0o644); err != nil {
-		t.Fatal(err)
-	}
 	operand := serveOrderRoot(t, ids, "withmcp", serveOrderTool(t, ids))
-	sink := &lockObservingSink{lock: lockPath(home, "withmcp")}
+	sink := &lockObservingSink{
+		lock: lockPath(home, "withmcp"),
+		onFirstRow: func() error {
+			return os.WriteFile(ProfileDir(home, "withmcp"), []byte("obstruction"), 0o644)
+		},
+	}
 	_, _, _, err := Install(home, InstallOptions{Operand: operand, SurfacingSink: sink})
 	if err == nil {
 		t.Fatal("an install onto an obstructed profile directory must fail")
 	}
+	if sink.onFirstRowErr != nil {
+		t.Fatalf("could not create the post-surfacing publication obstruction: %v", sink.onFirstRowErr)
+	}
 	if !sink.observed {
 		t.Fatalf("no §2.3 row reached the sink before the failure: %v", err)
+	}
+	if !strings.Contains(err.Error(), ProfileDir(home, "withmcp")) {
+		t.Fatalf("install error = %v, want the obstructed profile publication path %s", err, ProfileDir(home, "withmcp"))
 	}
 	if !equalOrdered(sink.rows, []string{orderToolRow}) {
 		t.Fatalf("emitted rows = %v, want %v", sink.rows, []string{orderToolRow})

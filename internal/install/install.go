@@ -584,7 +584,11 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 	// On the draft lane install never re-resolves refs, so a tag move is
 	// observable only at explicit refresh; schema-5 markers never match
 	// the gate below (see detectMovedTagsIn).
-	movedTags := detectMovedTags(projectRoot, nodes, deps.Generation)
+	movedTags, movedTagsErr := detectMovedTags(projectRoot, nodes, deps.Generation)
+	if movedTagsErr != nil {
+		result.failf("inspect installed markers for moved tags: %v", movedTagsErr)
+		return result, nil
+	}
 	if len(movedTags) > 0 {
 		if opts.StrictTags {
 			result.failf("%s", strings.Join(movedTags, "; "))
@@ -1221,7 +1225,7 @@ func checkLegacySkillDependencies(nodes []*closure.Node) error {
 	return nil
 }
 
-func detectMovedTags(projectRoot string, nodes []*closure.Node, generation GenerationReader) []string {
+func detectMovedTags(projectRoot string, nodes []*closure.Node, generation GenerationReader) ([]string, error) {
 	return detectMovedTagsIn(filepath.Join(projectRoot, ".agents", "skills"), nodes, generation)
 }
 
@@ -1234,13 +1238,24 @@ func detectMovedTags(projectRoot string, nodes []*closure.Node, generation Gener
 // declared a different tag". On the draft lane install never re-resolves
 // refs — the frozen lock binds the declared ref — so a tag move is
 // observable only at explicit refresh, never here.
-func detectMovedTagsIn(skillsDir string, nodes []*closure.Node, generation GenerationReader) []string {
+func detectMovedTagsIn(skillsDir string, nodes []*closure.Node, generation GenerationReader) ([]string, error) {
 	var warnings []string
 	for _, node := range nodes {
 		if node.Resolved.Kind != "tag" {
 			continue
 		}
-		recorded := generation.InstalledMarker(filepath.Join(skillsDir, node.Name))
+		recorded, err := generation.InstalledMarker(filepath.Join(skillsDir, node.Name))
+		if err != nil {
+			var invalid *marker.InvalidError
+			if errors.As(err, &invalid) {
+				// Present but invalid marker bytes cannot prove a prior tag
+				// generation. Treat that stale evidence as no recorded marker;
+				// stageNode will re-derive it. A failed filesystem read still
+				// returns below and cannot activate this fallback.
+				continue
+			}
+			return nil, err
+		}
 		if recorded == nil {
 			continue
 		}
@@ -1252,7 +1267,7 @@ func detectMovedTagsIn(skillsDir string, nodes []*closure.Node, generation Gener
 				"moved tag for %s: %s %s -> %s", node.Name, node.Resolved.Ref, recorded.Commit, node.Resolved.Commit))
 		}
 	}
-	return warnings
+	return warnings, nil
 }
 
 func nodeSummary(node *closure.Node) string {

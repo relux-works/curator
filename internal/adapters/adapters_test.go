@@ -3,10 +3,12 @@ package adapters
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/relux-works/curator/internal/staging"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 func makeSkill(t *testing.T, root, name string) {
@@ -96,6 +98,38 @@ func TestStageProjectJournalsEveryMirrorAndTheLedger(t *testing.T) {
 		if _, found := find(plan, live); !found {
 			t.Fatalf("ownership ledger of %s is not a journaled target", rel)
 		}
+	}
+}
+
+func TestStageProjectRefusesAnUnreadableAdapterLedger(t *testing.T) {
+	project := t.TempDir()
+	stageRoot := t.TempDir()
+	adapterRoot := filepath.Join(project, ".claude", "skills")
+	writeLedgerFor(t, adapterRoot, "stale-skill")
+	ledgerPath := filepath.Join(adapterRoot, LedgerName)
+	original, err := os.ReadFile(ledgerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS == "windows" {
+		t.Skip("platform-control: POSIX mode-bit unreadability")
+	}
+	if err := os.Chmod(ledgerPath, 0o000); err != nil {
+		t.Skipf("this host cannot create mode-000 manager state: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(ledgerPath, 0o644) })
+	if _, err := os.ReadFile(ledgerPath); err == nil {
+		t.Skip("this environment can read a mode-000 file; unreadability is untestable here")
+	}
+	if _, err := StageProject(stageRoot, project, []string{"claude_code"}, nil, "copy"); err == nil || !strings.Contains(err.Error(), stateread.DiagUnreadable) {
+		t.Fatalf("StageProject with unreadable adapter ledger error = %v, want typed unreadable refusal", err)
+	}
+	if err := os.Chmod(ledgerPath, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(ledgerPath)
+	if err != nil || string(got) != string(original) {
+		t.Fatalf("unreadable adapter ledger changed = (%q, %v), want original bytes", got, err)
 	}
 }
 

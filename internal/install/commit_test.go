@@ -28,6 +28,15 @@ import (
 // so the tests below compare whole snapshots rather than individual paths.
 type sharedState map[string]string
 
+func mustRegisteredConsumers(t *testing.T, home string) []string {
+	t.Helper()
+	consumers, err := scopes.LoadConsumers(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return consumers
+}
+
 func snapshotState(t *testing.T, e *env) sharedState {
 	t.Helper()
 	paths := map[string]string{
@@ -255,7 +264,7 @@ func TestConsumerLedgerIsAbsentAfterAFailedFirstInstallAndCommitsLastOnSuccess(t
 	if result := e.install(Options{}); result.Status != "ok" {
 		t.Fatalf("second install failed: %+v", result)
 	}
-	registered := scopes.LoadConsumers(e.home)
+	registered := mustRegisteredConsumers(t, e.home)
 	if len(registered) != 1 || registered[0] != e.project {
 		t.Fatalf("consumers = %v, want exactly the installed checkout %q", registered, e.project)
 	}
@@ -752,7 +761,7 @@ func TestConcurrentProjectInstallsPreserveBothConsumers(t *testing.T) {
 			t.Fatalf("concurrent install %d failed: %v", index, err)
 		}
 	}
-	registered := scopes.LoadConsumers(home)
+	registered := mustRegisteredConsumers(t, home)
 	for _, want := range []string{first.project, second.project} {
 		if !containsString(registered, want) {
 			t.Fatalf("consumers = %v, want both checkouts including %q", registered, want)
@@ -819,7 +828,7 @@ func TestRollbackCannotRestoreOverAnotherProjectsCommittedSharedTargets(t *testi
 		t.Fatalf("install status = %q, want failed: %+v", result.Status, result)
 	}
 
-	registered := scopes.LoadConsumers(home)
+	registered := mustRegisteredConsumers(t, home)
 	if !containsString(registered, winner.project) {
 		t.Fatalf("consumers = %v, want the committed checkout %q to survive the other project's rollback",
 			registered, winner.project)
@@ -1032,7 +1041,7 @@ func TestGlobalCommitCarriesNoConsumerLedger(t *testing.T) {
 	}
 	// Post-commit maintenance may still normalize the registry file; what the
 	// global scope must never do is register a checkout in it.
-	if registered := scopes.LoadConsumers(e.home); len(registered) != 0 {
+	if registered := mustRegisteredConsumers(t, e.home); len(registered) != 0 {
 		t.Fatalf("the global scope registered consumers %v", registered)
 	}
 }

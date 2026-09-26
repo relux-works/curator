@@ -19,6 +19,7 @@ import (
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/pkgversion"
 	"github.com/relux-works/curator/internal/protocoljson"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // SchemaVersion is the only lock schema this release reads or writes.
@@ -319,16 +320,20 @@ func Parse(payload []byte) (*Lock, error) {
 // Read loads a lock file. The file holds exactly the CCJ-1 bytes, so the
 // bytes on disk hash to the lock hash.
 func Read(path string) (*Lock, string, error) {
-	payload, err := os.ReadFile(path) // #nosec G304 -- manager-home path
+	result, err := stateread.ReadFile(path) // #nosec G304 -- manager-home path
 	if err != nil {
 		return nil, "", err
 	}
+	if result.Kind == stateread.KindAbsent {
+		return nil, "", stateread.AbsentError(path)
+	}
+	payload := result.Bytes
 	if err := protocoljson.RequireCanonical(payload); err != nil {
-		return nil, "", fmt.Errorf("lock %s: %w", path, err)
+		return nil, "", stateread.UnusableError(path, fmt.Errorf("lock %s: %w", path, err))
 	}
 	lock, err := Parse(payload)
 	if err != nil {
-		return nil, "", fmt.Errorf("lock %s: %w", path, err)
+		return nil, "", stateread.UnusableError(path, fmt.Errorf("lock %s: %w", path, err))
 	}
 	return lock, HashBytes(payload), nil
 }

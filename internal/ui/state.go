@@ -5,12 +5,12 @@
 package ui
 
 import (
-	"os"
 	"path/filepath"
 	"sort"
 
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // SkillRow is one installed skill in the view.
@@ -22,6 +22,7 @@ type SkillRow struct {
 	Commands    []string
 	Attestation string // "registry/status" or ""
 	Substituted bool
+	Diagnostic  string
 }
 
 // ProjectRow is one project with its installed skills.
@@ -119,17 +120,24 @@ func LoadState(cfg *config.Config) State {
 }
 
 func skillsUnder(skillsDir string) []SkillRow {
-	entries, err := os.ReadDir(skillsDir)
+	listing, err := stateread.ReadDir(skillsDir)
 	if err != nil {
+		return []SkillRow{{Name: "skills inventory", Diagnostic: err.Error()}}
+	}
+	if listing.Kind == stateread.KindAbsent {
 		return nil
 	}
 	var rows []SkillRow
-	for _, entry := range entries {
+	for _, entry := range listing.Entries {
 		if !entry.IsDir() {
 			continue
 		}
-		recorded := marker.Read(filepath.Join(skillsDir, entry.Name()))
-		if recorded == nil {
+		recorded, kind, readErr := marker.ReadState(filepath.Join(skillsDir, entry.Name()))
+		if readErr != nil {
+			rows = append(rows, SkillRow{Name: entry.Name(), Diagnostic: readErr.Error()})
+			continue
+		}
+		if kind == stateread.KindAbsent {
 			continue
 		}
 		row := SkillRow{

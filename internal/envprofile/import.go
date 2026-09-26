@@ -20,6 +20,7 @@ import (
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // envAdapterByID resolves the registry adapter for import skills-surface
@@ -306,13 +307,14 @@ func readRootSurface(envID, native, path string) ([]byte, *ImportLoss) {
 	if marker != nil {
 		return nil, nil
 	}
-	payload, err := os.ReadFile(path) // #nosec G304 -- native home file named by the adapter registry
+	file, err := stateread.ReadFile(path) // #nosec G304 -- native home file named by the adapter registry
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
 		return nil, &ImportLoss{Adapter: envID, Path: path, Reason: "cannot be read: " + err.Error()}
 	}
+	if file.Kind == stateread.KindAbsent {
+		return nil, nil
+	}
+	payload := file.Bytes
 	if !utf8.Valid(payload) {
 		return nil, &ImportLoss{Adapter: envID, Path: path, Reason: "is not valid UTF-8"}
 	}
@@ -327,12 +329,12 @@ func readRootSurface(envID, native, path string) ([]byte, *ImportLoss) {
 // (§8.4): the manager cannot prove any entry unledgered, so the surface
 // contributes no skills and the ledger file itself is the loss.
 func readSkillsSurface(home, envID, dir string) ([]detectedSkill, []ImportLoss) {
-	entries, err := os.ReadDir(dir)
+	listing, err := stateread.ReadDir(dir)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
 		return nil, []ImportLoss{{Adapter: envID, Path: dir, Reason: "cannot be read: " + err.Error()}}
+	}
+	if listing.Kind == stateread.KindAbsent {
+		return nil, nil
 	}
 	ledgered, ledgerErr := readSkillsLedger(dir)
 	if ledgerErr != nil {
@@ -341,7 +343,7 @@ func readSkillsSurface(home, envID, dir string) ([]detectedSkill, []ImportLoss) 
 	}
 	var skills []detectedSkill
 	var losses []ImportLoss
-	for _, entry := range entries {
+	for _, entry := range listing.Entries {
 		name := entry.Name()
 		if name == ".csk-managed.json" {
 			continue
@@ -375,24 +377,25 @@ func readSkillsSurface(home, envID, dir string) ([]detectedSkill, []ImportLoss) 
 // cannot prove unledgered.
 func readSkillsLedger(dir string) (map[string]bool, error) {
 	recorded := map[string]bool{}
-	payload, err := os.ReadFile(filepath.Join(dir, ".csk-managed.json")) // #nosec G304 -- ledger beside the scanned surface
+	path := filepath.Join(dir, ".csk-managed.json")
+	file, err := stateread.ReadFile(path) // #nosec G304 -- ledger beside the scanned surface
 	if err != nil {
-		if os.IsNotExist(err) {
-			return recorded, nil
-		}
 		return nil, err
+	}
+	if file.Kind == stateread.KindAbsent {
+		return recorded, nil
 	}
 	var data struct {
 		SchemaVersion int      `json:"schema_version"`
 		Entries       []string `json:"entries"`
 	}
-	decoder := json.NewDecoder(strings.NewReader(string(payload)))
+	decoder := json.NewDecoder(strings.NewReader(string(file.Bytes)))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&data); err != nil {
-		return nil, err
+		return nil, stateread.UnusableError(path, err)
 	}
 	if data.SchemaVersion != 1 || data.Entries == nil {
-		return nil, fmt.Errorf("adapter ledger is not a schema_version 1 entry list")
+		return nil, stateread.UnusableError(path, fmt.Errorf("adapter ledger is not a schema_version 1 entry list"))
 	}
 	for _, entry := range data.Entries {
 		if identifiers.Valid(entry) {
@@ -425,7 +428,11 @@ func isStoreEntry(home, path string) bool {
 // ref, and resolved commit, or a git checkout whose origin canonicalizes
 // and whose HEAD carries no staged, dirty, or untracked bytes.
 func recoverSkill(entry string) (string, string, bool) {
-	if m := marker.Read(entry); m != nil {
+	m, _, markerErr := marker.ReadState(entry)
+	if markerErr != nil {
+		return "", "", false
+	}
+	if m != nil {
 		source := m.Git
 		if source == "" {
 			source = m.Source

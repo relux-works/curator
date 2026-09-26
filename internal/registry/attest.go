@@ -1,11 +1,11 @@
 package registry
 
 import (
-	"os"
 	"path/filepath"
 
 	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // AttestResult is one re-check outcome (Spec §13.3, status --attest).
@@ -21,17 +21,25 @@ type AttestResult struct {
 // the trusted registries. It reads markers, not sources, so a revocation
 // issued after install surfaces without reinstalling.
 func AttestRoot(scope, skillsRoot string, registries []Registry, fetch FetchFn) []AttestResult {
-	entries, err := os.ReadDir(skillsRoot)
+	listing, err := stateread.ReadDir(skillsRoot)
 	if err != nil {
+		return []AttestResult{{Scope: scope, Result: ResultUnknown, Detail: err.Error()}}
+	}
+	if listing.Kind == stateread.KindAbsent {
 		return nil
 	}
 	var results []AttestResult
-	for _, entry := range entries {
+	for _, entry := range listing.Entries {
 		if !entry.IsDir() {
 			continue
 		}
-		recorded := marker.Read(filepath.Join(skillsRoot, entry.Name()))
-		if recorded == nil {
+		installed := filepath.Join(skillsRoot, entry.Name())
+		recorded, kind, markerErr := marker.ReadState(installed)
+		if markerErr != nil {
+			results = append(results, AttestResult{Scope: scope, Skill: entry.Name(), Result: ResultUnknown, Detail: markerErr.Error()})
+			continue
+		}
+		if kind == stateread.KindAbsent {
 			continue
 		}
 		if len(registries) == 0 {

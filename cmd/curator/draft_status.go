@@ -26,6 +26,7 @@ import (
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/sourcelock"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // errDraftManifestMoved fails a draft status check closed when the
@@ -94,13 +95,18 @@ func draftStatusDrift(manifestRoot, skillsDir string, effective map[string]*mark
 // match is up-to-date.
 func classifyDraftMember(skillsDir string, member sourcelock.Member, lockSHA256 string, effective *marker.Attestation) string {
 	installed := filepath.Join(skillsDir, member.Name)
-	if _, err := os.Lstat(installed); err != nil {
-		if os.IsNotExist(err) {
-			return stateNotInstalled
-		}
+	metadata, err := stateread.Lstat(installed)
+	if err != nil {
 		return stateUnresolvable
 	}
-	recorded := marker.Read(installed)
+	if metadata.Kind == stateread.KindAbsent {
+		return stateNotInstalled
+	}
+	recorded, _, err := marker.ReadState(installed)
+	if err != nil {
+		state, _ := markerReadFailure(installed, err)
+		return state
+	}
 	if recorded == nil {
 		state, _ := markerRefusal(installed)
 		return state

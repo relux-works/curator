@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,6 +16,7 @@ import (
 	"github.com/relux-works/curator/internal/globalbins"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/install"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // Umbrella subcommand discovery (environments §11): a CLI subcommand the
@@ -390,8 +392,14 @@ func providerInputsForHost(home string, providerDirs, projectBinDirs []string, r
 	published := []labeledDir{}
 	userHome, _ := os.UserHomeDir()
 	selection := globalbins.Select(home, runtime.GOOS, pathEnvironment(), userHome)
-	if selection.Path != "" && userBinShimRefused(selection) {
-		published = append(published, labeledDir{path: selection.Path, label: "the user-bin shim directory"})
+	if selection.Path != "" {
+		refused, err := userBinShimRefused(selection)
+		if err != nil {
+			return providerInputs{}, err
+		}
+		if refused {
+			published = append(published, labeledDir{path: selection.Path, label: "the user-bin shim directory"})
+		}
 	}
 	published = append(published, labeledDir{path: filepath.Join(install.GlobalRoot(home), "bin"), label: "a managed skill bin directory"})
 	for _, dir := range projectBinDirs {
@@ -440,8 +448,11 @@ func windowsPathExt() []string {
 // first safe PATH entry, which may be any operator directory — holds
 // no manager-written content, so providers there warn under revision A
 // instead of refusing.
-func userBinShimRefused(selection globalbins.Selection) bool {
-	return selection.Explicit || globalbins.PublishedShims(selection.Path)
+func userBinShimRefused(selection globalbins.Selection) (bool, error) {
+	if selection.Explicit {
+		return true, nil
+	}
+	return globalbins.PublishedShims(selection.Path)
 }
 
 // pathEnvironment carries the process PATH and the explicit user-bin
@@ -572,12 +583,20 @@ func discoverProviderNames(in providerInputs) []string {
 // verdict (§12): trusted, the revision-A outside-roots warning, a
 // refusal, missing, or an unreadable trust root. A refused or failed
 // provider row is non-current; the warning row stays current.
-func providerPosture(home string, providerDirs, projectBinDirs []string) []envprofile.ProviderState {
+func providerPosture(home string, providerDirs, projectBinDirs []string) ([]envprofile.ProviderState, *envprofile.StateDiagnostic) {
 	in, err := providerInputsForHost(home, providerDirs, projectBinDirs, activeProviderRevision)
 	if err != nil {
-		return nil
+		var stateErr *stateread.Error
+		if errors.As(err, &stateErr) {
+			code := stateread.DiagUnreadable
+			if stateErr.Kind == stateread.KindAbsent {
+				code = stateread.DiagAbsent
+			}
+			return nil, &envprofile.StateDiagnostic{Code: code, Path: stateErr.Path, Detail: err.Error()}
+		}
+		return nil, nil
 	}
-	return providerPostureFor(in)
+	return providerPostureFor(in), nil
 }
 
 // providerPostureFor is the test seam behind providerPosture.

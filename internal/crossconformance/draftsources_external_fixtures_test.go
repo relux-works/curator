@@ -115,8 +115,9 @@ func (c xbClock) Now() time.Time { return c.at }
 
 type xbGeneration struct{}
 
-func (g *xbGeneration) InstalledMarker(installedDir string) *marker.Marker {
-	return marker.Read(installedDir)
+func (g *xbGeneration) InstalledMarker(installedDir string) (*marker.Marker, error) {
+	recorded, _, err := marker.ReadState(installedDir)
+	return recorded, err
 }
 
 func xbTestTarget() buildmeta.Target {

@@ -90,6 +90,10 @@ func (m Model) skillsView() string {
 		if index == m.State.Cursor {
 			marker = cursorStyle.Render("> ")
 		}
+		if skill.Diagnostic != "" {
+			fmt.Fprintf(&b, "%s%s  diagnostic: %s\n", marker, skill.Name, skill.Diagnostic)
+			continue
+		}
 		context := "context:no"
 		if skill.Context {
 			context = "context:yes"

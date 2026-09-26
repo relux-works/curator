@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // testDigest builds a distinct, well-formed sha256 identity per seed so a
@@ -482,6 +484,60 @@ func TestClassifySkillBuildsRefusesAMarkerThatCannotDescribeABuild(t *testing.T)
 	state, rows = classifySkillBuilds(t.TempDir(), legacy, facts)
 	if state != stateNeedsInstall || len(rows) != 1 || rows[0].State != stateNeedsInstall {
 		t.Fatalf("legacy marker: state = %q rows = %+v", state, rows)
+	}
+}
+
+func TestMarkerDigestsDistinguishesAbsentAndUnreadable(t *testing.T) {
+	t.Parallel()
+	store := t.TempDir()
+	installed := filepath.Join(store, "skill-a")
+	if err := os.Mkdir(installed, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(installed, marker.Name)
+	absent := markerDigests(store)[path]
+	if absent != stateread.DiagAbsent {
+		t.Fatalf("absent marker digest = %q, want %q", absent, stateread.DiagAbsent)
+	}
+	if err := os.Mkdir(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	unreadable := markerDigests(store)[path]
+	if !strings.Contains(unreadable, stateread.DiagUnreadable) {
+		t.Fatalf("directory at marker path digest = %q, want typed unreadable diagnostic", unreadable)
+	}
+	if unreadable == absent {
+		t.Fatalf("unreadable marker collapsed to absent value %q", absent)
+	}
+}
+
+func TestContextExposureDistinguishesAbsentAndUnreadableBuildRoots(t *testing.T) {
+	t.Parallel()
+	installed := t.TempDir()
+	recorded := &marker.Marker{
+		BuildRoots: []string{"assets/build-tool"},
+		Builds:     map[string]marker.Build{"build-tool": {}},
+	}
+	assets := filepath.Join(installed, "assets")
+	if err := os.Mkdir(assets, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if exposure, err := contextExposure(installed, recorded); err != nil || exposure != "" {
+		t.Fatalf("absent build root = (%q, %v), want empty, nil", exposure, err)
+	}
+	if runtime.GOOS == "windows" {
+		t.Skip("platform-control: POSIX mode-bit unreadability")
+	}
+	if err := os.Chmod(assets, 0o000); err != nil {
+		t.Skipf("host-capability: cannot create a mode-000 build-root parent: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(assets, 0o755) })
+	buildRoot := filepath.Join(assets, "build-tool")
+	if _, err := os.Lstat(buildRoot); err == nil {
+		t.Skip("host-capability: this environment can traverse a mode-000 directory")
+	}
+	if exposure, err := contextExposure(installed, recorded); err == nil || exposure != "" || !strings.Contains(err.Error(), stateread.DiagUnreadable) {
+		t.Fatalf("unreadable build-root path = (%q, %v), want typed unreadable error", exposure, err)
 	}
 }
 

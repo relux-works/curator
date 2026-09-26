@@ -338,6 +338,35 @@ internal/godriver	TestProbeRejectsAnUncoveredPlatformBeforeTheWorker	linux,darwi
 # ===========================================================================
 internal/skillspec	TestReleasedSchemaCases	linux,darwin,windows	linux,darwin,windows	root-unset	the published agent-skill-v8 and csk-skill-v8 families are loaded, and every case in them is consumed
 internal/marker	TestReadAuthoritativeMarkerV4SchemaCases	linux,darwin,windows	linux,darwin,windows	root-unset	the published install-marker-v4 family is read back through the marker reader
+cmd/curator	TestContextExposureDistinguishesAbsentAndUnreadableBuildRoots	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves a failed build-root metadata read
+internal/adapters	TestStageProjectRefusesAnUnreadableAdapterLedger	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves adapter staging preserves ledger read failures
+internal/contextlock	TestReadDistinguishesAbsentAndUnreadableLock	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves context lock reads preserve failures
+internal/contextstore	TestExistsDistinguishesAbsentFromUnreadable	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves context entry metadata failures
+internal/envprofile	TestCurrentPointerAbsenceAndUnreadabilityDiffer	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves current pointer read failures
+internal/envprofile	TestScopedCurrentAbsenceAndUnreadabilityDiffer	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves scoped current read failures
+internal/envprofile	TestScopedCurrentReadFailureDoesNotFallBackToMachineCurrent	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves scoped current failures do not fall back
+internal/envprofile	TestProfileSourceAbsenceAndUnreadabilityDiffer	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves profile source failures
+internal/envprofile	TestUnreadableDefaultProfileSourceDoesNotRecreateDefault	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves default source failures stop recreation
+internal/envprofile	TestOverlayOwnerLockAbsenceAndUnreadabilityDiffer	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves lock read failures
+internal/envprofile	TestImportAbsentAndUnreadableRootSurfaceDiffer/unreadable_is_a_typed_loss	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves import root read failures
+internal/envprofile	TestImportAbsentAndUnreadableSkillsLedgerDiffer/unreadable_ledger_is_a_typed_loss	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves import ledger read failures
+internal/envprofile	TestImportAbsentAndUnreadableSkillsSurfaceDiffer/unreadable_skills_directory_is_a_typed_loss	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves import skill inventory read failures
+internal/envprofile	TestUpdatePathSnapshotUnreadableIsNotAbsent	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves path snapshot read failures
+internal/envprofile	TestStatusScopeMarkerAbsenceAndUnreadabilityDiffer/unreadable_marker_is_unknown_with_a_typed_diagnostic	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves status marker read failures
+internal/envprofile	TestStatusOrphanMarkerAbsenceAndUnreadabilityDiffer/unreadable_marker_is_reported,_not_treated_as_absence	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves orphan marker read failures
+internal/envprofile	TestStatusUnreadableOrphanInventoryIsNotEmpty	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves orphan inventory read failures
+internal/envprofile	TestStatusBackupInventoryAbsenceAndUnreadabilityDiffer/unreadable_backup_inventory_is_unknown_and_non-current	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves backup inventory read failures
+internal/envprofile	TestRemovePurgeMarkerAbsenceAndUnreadabilityDiffer/unreadable_marker_refuses_before_purge_writes	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves purge marker preflight failures
+internal/globalbins	TestRefreshAndStageRefuseAnUnreadableOwnershipLedger	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves refresh and staging preserve ledger read failures
+internal/scopes	TestConsumerRegistryAbsenceAndUnreadabilityDiffer	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves consumer registry failures
+internal/scopes	TestSweepRuntimeAbsenceAndUnreadabilityDiffer	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves runtime root inventory failures
+internal/scopes	TestSweepRuntimeUnreadableSkillInventoryIsNotIgnored	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves runtime skill inventory failures
+internal/scopes	TestHybridManifestAbsenceAndUnreadabilityDiffer	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves hybrid manifest failures
+internal/scopes	TestCollectStaysFailSafeAcrossConsecutivePasses/unreadable_installed_skill_directory	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves GC retains state when a skill directory cannot be read
+internal/scopes	TestCollectSkipsTheBuildSweepOnUnprovableReferences/unreadable_global_skills_directory	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves GC refuses an unprovable skill inventory
+internal/marker	TestCurrentDistinguishesAbsentAndUnreadable	linux,darwin	windows	platform-control	POSIX mode-bit unreadability is the fixture used to prove Current preserves failed reads
+internal/marker	TestReadStateDistinguishesAbsentAndUnreadable	linux,darwin	windows	platform-control	POSIX mode-bit unreadability is the fixture used to prove ReadState preserves failed reads
+internal/ui	TestSkillsUnderDistinguishesAbsentAndUnreadableMarkers	linux,darwin	windows	platform-control	POSIX mode-bit unreadability is the fixture used to prove the skills view preserves failed reads
 internal/moduleroots	TestModuleRootVectors	linux,darwin,windows	linux,darwin,windows	root-unset	the published module-roots family drives declaration/containment and the replace bijection at their own failure boundaries
 internal/godriver	TestModuleRootVectorsDriveTheWholeBuild	linux,darwin,windows	linux,darwin,windows	root-content	the published module-roots family drives the go-v1 driver to the exact process state each case records
 internal/scriptpolicy	TestScriptHostExecutionPolicySectionsAreAllClassified	linux,darwin,windows	linux,darwin,windows	root-unset	every section of the published script-worker family is classified, so a new one cannot be ignored
@@ -637,6 +666,9 @@ internal/install	TestScriptAuditLabelsAtInstallEntry	linux,darwin,windows	-	-	pr
 internal/install	TestScriptAuditLabelsAtGlobalInstallEntry	linux,darwin,windows	-	-	machine-wide install emits the four audit vector labels through the default production audit gate
 internal/install	TestDeclaredOnlyWithHostsGlobalInstallsWithOnlyDeclaredOnly	linux,darwin,windows	-	-	global declared-only install with hosts never receives the enforced network label
 internal/install	TestDeclaredOnlyWithHostsInstallsWithOnlyDeclaredOnly	linux,darwin,windows	-	-	project declared-only install with hosts never receives the enforced network label
+internal/install	TestLockedNetworkRepositoryDistinguishesAbsentAndUnreadableCheckouts/absent_checkout_permits_fallback	linux,darwin,windows	-	-	absent locked-network checkout permits fallback to a later repository checkout
+internal/install	TestLockedNetworkRepositoryDistinguishesAbsentAndUnreadableCheckouts/lstat_failure_stops_fallback	linux,darwin,windows	-	-	A regular-file parent makes Lstat fail with POSIX ENOTDIR or Windows ERROR_PATH_NOT_FOUND; both remain typed manager_state_unreadable and stop fallback
+internal/install	TestLockedNetworkRepositoryDistinguishesAbsentAndUnreadableCheckouts/present_but_unusable_stops_fallback	linux,darwin,windows	-	-	present but unusable locked-network checkout returns stateread.UnusableError and stops fallback
 cmd/curator	TestCLIAuditEmitsScriptLabels	linux,darwin,windows	-	-	curator audit renders each vector warning at its command-line entry
 cmd/curator	TestCLIAuditMixedSkillRecordsBothPolicies	linux,darwin,windows	-	-	curator audit records enforced identity and explicit absence for a mixed skill
 cmd/curator	TestCLIAuditJSONCarriesScriptLabels	linux,darwin,windows	-	-	curator audit JSON carries warning labels and per-command policy identities

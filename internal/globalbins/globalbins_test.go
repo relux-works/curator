@@ -2,6 +2,7 @@ package globalbins
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/relux-works/curator/internal/runtimestore"
 	"github.com/relux-works/curator/internal/skillspec"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 func TestRefreshPublishesAndRemovesManagedUnixShims(t *testing.T) {
@@ -56,6 +58,46 @@ func TestRefreshPublishesAndRemovesManagedUnixShims(t *testing.T) {
 	Refresh(managerHome, map[string]bool{}, "unix", map[string]string{"PATH": userBin}, userHome)
 	if _, err := os.Lstat(published); !os.IsNotExist(err) {
 		t.Fatalf("stale managed shim survived: %v", err)
+	}
+}
+
+func TestRefreshAndStageRefuseAnUnreadableOwnershipLedger(t *testing.T) {
+	root := t.TempDir()
+	managerHome := filepath.Join(root, "manager")
+	userHome := filepath.Join(root, "user")
+	userBin := filepath.Join(userHome, "bin")
+	if err := os.MkdirAll(userBin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ledgerPath := filepath.Join(userBin, managedFile)
+	original := []byte(`{"schema_version":1,"entries":["old-tool"]}` + "\n")
+	if err := os.WriteFile(ledgerPath, original, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS == "windows" {
+		t.Skip("platform-control: POSIX mode-bit unreadability")
+	}
+	if err := os.Chmod(ledgerPath, 0o000); err != nil {
+		t.Skipf("this host cannot create mode-000 manager state: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(ledgerPath, 0o600) })
+	if _, err := os.ReadFile(ledgerPath); err == nil {
+		t.Skip("this environment can read a mode-000 file; unreadability is untestable here")
+	}
+	environment := map[string]string{"PATH": userBin}
+	messages := Refresh(managerHome, map[string]bool{}, "unix", environment, userHome)
+	if !containsMessage(messages, stateread.DiagUnreadable) {
+		t.Fatalf("refresh messages for unreadable ledger = %v, want %s", messages, stateread.DiagUnreadable)
+	}
+	if _, err := StageForwarding(t.TempDir(), managerHome, map[string]bool{}, "unix", environment, userHome); err == nil || !strings.Contains(err.Error(), stateread.DiagUnreadable) {
+		t.Fatalf("stage with unreadable ledger error = %v, want %s", err, stateread.DiagUnreadable)
+	}
+	if err := os.Chmod(ledgerPath, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(ledgerPath)
+	if err != nil || string(got) != string(original) {
+		t.Fatalf("unreadable ledger was overwritten = (%q, %v), want original bytes", got, err)
 	}
 }
 
@@ -282,11 +324,27 @@ func TestPublishedShimsTracksTheLedger(t *testing.T) {
 	if err := os.MkdirAll(fresh, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if PublishedShims(fresh) {
+	if published, err := PublishedShims(fresh); err != nil || published {
 		t.Fatal("a directory with no ledger reports published")
 	}
-	if PublishedShims(filepath.Join(root, "missing")) {
+	if published, err := PublishedShims(filepath.Join(root, "missing")); err != nil || published {
 		t.Fatal("a missing directory reports published")
+	}
+	unreadable := filepath.Join(root, "unreadable")
+	if err := os.MkdirAll(unreadable, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	loop := filepath.Join(unreadable, managedFile)
+	if err := os.Symlink(loop, loop); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	if published, err := PublishedShims(unreadable); published || err == nil {
+		t.Fatalf("unreadable ledger = (%v, %v), want false and typed read failure", published, err)
+	} else {
+		var readErr *stateread.Error
+		if !errors.As(err, &readErr) || readErr.Kind != stateread.KindUnreadable || readErr.Path != loop {
+			t.Fatalf("unreadable ledger error = %v, want typed unreadable for %s", err, loop)
+		}
 	}
 	published := filepath.Join(root, "published")
 	if err := os.MkdirAll(published, 0o755); err != nil {
@@ -295,13 +353,13 @@ func TestPublishedShimsTracksTheLedger(t *testing.T) {
 	if err := writeLedger(published, map[string]bool{"tool": true}); err != nil {
 		t.Fatal(err)
 	}
-	if !PublishedShims(published) {
+	if got, err := PublishedShims(published); err != nil || !got {
 		t.Fatal("a directory carrying the ownership ledger reports unpublished")
 	}
 	if err := writeLedger(published, map[string]bool{}); err != nil {
 		t.Fatal(err)
 	}
-	if !PublishedShims(published) {
+	if got, err := PublishedShims(published); err != nil || !got {
 		t.Fatal("an emptied ledger stops marking its directory as published")
 	}
 }

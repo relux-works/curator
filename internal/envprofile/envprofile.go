@@ -183,22 +183,29 @@ func validProfileName(name string) bool { return identifiers.Valid(name) }
 
 // readSource loads a profile's install record.
 func readSource(home, name string) (Source, error) {
-	payload, err := os.ReadFile(sourcePath(home, name)) // #nosec G304 -- profile name validated by callers
+	path := sourcePath(home, name)
+	result, err := stateread.ReadFile(path) // #nosec G304 -- profile name validated by callers
 	if err != nil {
-		if os.IsNotExist(err) {
-			return Source{}, fmt.Errorf("%s: no installed profile %q", DiagNotFound, name)
-		}
 		return Source{}, err
 	}
+	if result.Kind == stateread.KindAbsent {
+		return Source{}, fmt.Errorf("%s: %w: no installed profile %q", DiagNotFound, stateread.AbsentError(path), name)
+	}
+	payload := result.Bytes
 	if err := protocoljson.Validate(payload); err != nil {
-		return Source{}, fmt.Errorf("%s: profile %q source is malformed: %v", DiagSourceInvalid, name, err)
+		return Source{}, fmt.Errorf("%s: %w: profile %q source is malformed: %v", DiagSourceInvalid, stateread.UnusableError(path, err), name, err)
 	}
 	var source Source
 	decoder := json.NewDecoder(strings.NewReader(string(payload)))
 	if err := decoder.Decode(&source); err != nil {
-		return Source{}, fmt.Errorf("%s: profile %q source is malformed: %v", DiagSourceInvalid, name, err)
+		return Source{}, fmt.Errorf("%s: %w: profile %q source is malformed: %v", DiagSourceInvalid, stateread.UnusableError(path, err), name, err)
 	}
 	return source, nil
+}
+
+func isStateAbsent(err error) bool {
+	var stateErr *stateread.Error
+	return errors.As(err, &stateErr) && stateErr.Kind == stateread.KindAbsent
 }
 
 // marshalSource renders a profile's install record. Records reach the
@@ -244,20 +251,23 @@ func listLocked(op *operation, home string, policy Policy) ([]Info, error) {
 	if err := ensureDefault(op, home, policy); err != nil {
 		return nil, err
 	}
-	entries, err := os.ReadDir(ProfilesDir(home))
+	listing, err := stateread.ReadDir(ProfilesDir(home))
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
 		return nil, err
 	}
-	machine, _ := Current(home)
+	if listing.Kind == stateread.KindAbsent {
+		return nil, nil
+	}
+	machine, err := Current(home)
+	if err != nil {
+		return nil, err
+	}
 	scoped, err := ScopedCurrents(home)
 	if err != nil {
 		return nil, err
 	}
 	var out []Info
-	for _, entry := range entries {
+	for _, entry := range listing.Entries {
 		if !entry.IsDir() {
 			continue
 		}
@@ -265,11 +275,12 @@ func listLocked(op *operation, home string, policy Policy) ([]Info, error) {
 		if !validProfileName(name) {
 			continue
 		}
-		if _, err := os.Stat(sourcePath(home, name)); err != nil {
-			if os.IsNotExist(err) {
-				continue // reserved state (scoped/) is not a profile
-			}
+		sourceState, err := stateread.Stat(sourcePath(home, name))
+		if err != nil {
 			return nil, fmt.Errorf("profile %q: %v", name, err)
+		}
+		if sourceState.Kind == stateread.KindAbsent {
+			continue // reserved state (scoped/) is not a profile
 		}
 		source, err := readSource(home, name)
 		if err != nil {
@@ -294,14 +305,14 @@ func listLocked(op *operation, home string, policy Policy) ([]Info, error) {
 
 // Current returns the machine current profile name, or "" when none is set.
 func Current(home string) (string, error) {
-	payload, err := os.ReadFile(CurrentFile(home)) // #nosec G304 -- manager home path
+	result, err := stateread.ReadFile(CurrentFile(home)) // #nosec G304 -- manager home path
 	if err != nil {
-		if os.IsNotExist(err) {
-			return "", nil
-		}
 		return "", err
 	}
-	return strings.TrimSpace(string(payload)), nil
+	if result.Kind == stateread.KindAbsent {
+		return "", nil
+	}
+	return strings.TrimSpace(string(result.Bytes)), nil
 }
 
 // SetCurrent records the machine current profile.
@@ -318,26 +329,30 @@ func SetCurrent(home, name string) error {
 // wins — a new write always supersedes the stale spelling.
 func ScopedCurrents(home string) (map[string]string, error) {
 	out := map[string]string{}
-	entries, err := os.ReadDir(ScopedDir(home))
+	listing, err := stateread.ReadDir(ScopedDir(home))
 	if err != nil {
-		if os.IsNotExist(err) {
-			return out, nil
-		}
 		return nil, err
 	}
-	for _, entry := range entries {
+	if listing.Kind == stateread.KindAbsent {
+		return out, nil
+	}
+	for _, entry := range listing.Entries {
 		if entry.IsDir() {
 			continue
 		}
-		payload, err := os.ReadFile(filepath.Join(ScopedDir(home), entry.Name())) // #nosec G304 -- scoped key file
+		path := filepath.Join(ScopedDir(home), entry.Name())
+		result, err := stateread.ReadFile(path) // #nosec G304 -- scoped key file
 		if err != nil {
 			return nil, err
+		}
+		if result.Kind == stateread.KindAbsent {
+			return nil, stateread.AbsentError(path)
 		}
 		key := scopeKeyName(entry.Name())
 		if _, seen := out[key]; seen && entry.Name() != scopeFileName(key) {
 			continue
 		}
-		out[key] = strings.TrimSpace(string(payload))
+		out[key] = strings.TrimSpace(string(result.Bytes))
 	}
 	return out, nil
 }
@@ -688,7 +703,11 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 	if !validProfileName(name) {
 		return Info{}, false, false, fmt.Errorf("%s: profile name %q is not a portable identifier", DiagSourceInvalid, name)
 	}
-	if prior, err := readSource(home, name); err == nil {
+	prior, priorErr := readSource(home, name)
+	if priorErr != nil && !isStateAbsent(priorErr) {
+		return Info{}, false, false, priorErr
+	}
+	if priorErr == nil {
 		// Re-installing an installed source with the same requirement
 		// re-resolves and is reported as an update; a different source
 		// under the same name is taken. A git reinstall is an update, so
@@ -702,11 +721,19 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 			if isPath {
 				return reinstallPathLocked(op, home, name, source, input, options)
 			}
-			info, moved, err := updateLocked(op, home, name, options.Policy, options.SurfacingSink)
+			info, _, err := updateLocked(op, home, name, options.Policy, options.SurfacingSink)
 			if err != nil {
 				return Info{}, false, false, err
 			}
-			_ = moved
+			// The update phase above already re-materialized every
+			// scope on this profile when the lock moved; the install
+			// row's activation still runs below whether the pin moved
+			// or not, exactly as on a path reinstall.
+			if activate, err := reinstallActivation(home, name, options.Use); err != nil {
+				return Info{}, false, false, err
+			} else if activate {
+				return activateReinstall(op, home, name, info.Source, info.Lock, info.LockHash, info.Warnings, info.Surfacing, options.Policy)
+			}
 			return info, false, true, nil
 		}
 		return Info{}, false, false, fmt.Errorf("%s: profile %q is already installed", DiagNameTaken, name)
@@ -776,7 +803,10 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 	// useLocked publishes the current through the journal on success and
 	// leaves it unchanged with profile_use_partial on failure.
 	results, switchErr := useLocked(op, home, name, "", "", false, options.Policy)
-	machine, _ = Current(home)
+	machine, err = Current(home)
+	if err != nil {
+		return Info{}, false, false, err
+	}
 	info := Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: machine == name, Warnings: warnings, Surfacing: surfacing, Activation: results}
 	if switchErr != nil {
 		return info, false, false, switchErr
@@ -868,7 +898,10 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input 
 		} else if activate {
 			return activateReinstall(op, home, name, source, result.Lock, oldHash, warnings, surfacing, policy)
 		}
-		machine, _ := Current(home)
+		machine, err := Current(home)
+		if err != nil {
+			return Info{}, false, false, err
+		}
 		info := Info{Name: name, Source: source, Lock: result.Lock, LockHash: oldHash, Current: machine == name, Warnings: warnings, Surfacing: surfacing}
 		return info, false, true, nil
 	}
@@ -909,7 +942,10 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input 
 	if err := resyncCurrentScopes(op, home, name, policy); err != nil {
 		return Info{}, false, false, err
 	}
-	machine, _ := Current(home)
+	machine, err := Current(home)
+	if err != nil {
+		return Info{}, false, false, err
+	}
 	return Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: machine == name, Warnings: warnings, Surfacing: surfacing}, false, true, nil
 }
 
@@ -940,7 +976,10 @@ func reinstallActivation(home, name string, use bool) (bool, error) {
 // when the pin moved) still stands.
 func activateReinstall(op *operation, home, name string, source Source, lock *contextlock.Lock, hash string, warnings, surfacing []string, policy Policy) (Info, bool, bool, error) {
 	results, switchErr := useLocked(op, home, name, "", "", false, policy)
-	machine, _ := Current(home)
+	machine, err := Current(home)
+	if err != nil {
+		return Info{}, false, true, err
+	}
 	info := Info{Name: name, Source: source, Lock: lock, LockHash: hash, Current: machine == name, Warnings: warnings, Surfacing: surfacing, Activation: results}
 	if switchErr != nil {
 		return info, false, true, switchErr
@@ -948,7 +987,10 @@ func activateReinstall(op *operation, home, name string, source Source, lock *co
 	if err := resyncScopedScopes(op, home, name, policy); err != nil {
 		return info, false, true, err
 	}
-	machine, _ = Current(home)
+	machine, err = Current(home)
+	if err != nil {
+		return Info{}, false, true, err
+	}
 	info.Current = machine == name
 	return info, true, true, nil
 }
@@ -1022,7 +1064,10 @@ func updateLocked(op *operation, home, name string, policy Policy, sink io.Write
 	switch source.Kind {
 	case KindGit:
 		if source.Req.Tag != "" || source.Req.Revision != "" {
-			machine, _ := Current(home)
+			machine, err := Current(home)
+			if err != nil {
+				return Info{}, false, err
+			}
 			info := Info{Name: name, Source: source, Lock: oldLock, Current: machine == name}
 			if _, hash, err := readLock(home, name); err == nil {
 				info.LockHash = hash
@@ -1103,17 +1148,20 @@ func updateLocked(op *operation, home, name string, policy Policy, sink io.Write
 		return Info{}, false, err
 	}
 	if result.LockHash == oldHash {
-		// The lock is unchanged and nothing is published, but the
-		// candidate set is still surfaced: the audit gate passed and
-		// the candidate is what the machine runs.
-		machine, _ := Current(home)
+		machine, err := Current(home)
+		if err != nil {
+			return Info{}, false, err
+		}
+		// The lock is unchanged and nothing is published, but the candidate
+		// set is still surfaced: the audit gate passed and the candidate is
+		// what the machine runs.
 		surfacing, unreadable := surfacingRows(home, manager, result.Lock)
 		warnings := append([]string{}, unreadable...)
 		if warning := AllowlistEmptyWarning(policy.MCPAllowlist); warning != "" {
 			warnings = append(warnings, warning)
 		}
-		// The §2.3 emission point: nothing is published on this path,
-		// but the rows still print exactly once.
+		// The §2.3 emission point: nothing is published on this path, but
+		// the rows still print exactly once.
 		surfacing = carrySurfacing(sink, surfacing)
 		return Info{Name: name, Source: source, Lock: result.Lock, LockHash: oldHash, Current: machine == name, Warnings: warnings, Surfacing: surfacing}, false, nil
 	}
@@ -1154,7 +1202,10 @@ func updateLocked(op *operation, home, name string, policy Policy, sink io.Write
 	if err := resyncCurrentScopes(op, home, name, policy); err != nil {
 		return Info{}, false, err
 	}
-	machine, _ := Current(home)
+	machine, err := Current(home)
+	if err != nil {
+		return Info{}, false, err
+	}
 	return Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: machine == name, Warnings: warnings, Surfacing: surfacing}, true, nil
 }
 
@@ -1183,7 +1234,11 @@ func Remove(home, name string, purge bool) error {
 	// A profile that is an overlay member of another installed profile's
 	// lock stays until that profile stops declaring it (environments
 	// §9.2): removal would strand the overlay declaration.
-	if owner, ok := overlayOwner(home, name); ok {
+	owner, ok, ownerErr := overlayOwner(home, name)
+	if ownerErr != nil {
+		return ownerErr
+	}
+	if ok {
 		return fmt.Errorf("%s: profile %q is named as an overlay of installed profile %q", DiagInUse, name, owner)
 	}
 	if purge {
@@ -1199,24 +1254,40 @@ func Remove(home, name string, purge bool) error {
 // Locks are ground truth: a machine overlay declaration resolves into an
 // overlay-flagged lock member, so a lock scan sees exactly what resolution
 // joined.
-func overlayOwner(home, name string) (string, bool) {
+func overlayOwner(home, name string) (string, bool, error) {
 	rootLock, _, err := readLock(home, name)
-	if err != nil || rootLock == nil {
-		return "", false
-	}
-	entries, err := os.ReadDir(ProfilesDir(home))
 	if err != nil {
-		return "", false
+		return "", false, fmt.Errorf("profile %q lock: %w", name, err)
+	}
+	if rootLock == nil {
+		return "", false, fmt.Errorf("profile %q lock is absent", name)
+	}
+	listing, err := stateread.ReadDir(ProfilesDir(home))
+	if err != nil {
+		return "", false, err
+	}
+	if listing.Kind == stateread.KindAbsent {
+		return "", false, stateread.AbsentError(ProfilesDir(home))
 	}
 	owners := []string{}
-	for _, entry := range entries {
+	for _, entry := range listing.Entries {
 		other := entry.Name()
 		if !entry.IsDir() || other == name || !validProfileName(other) {
 			continue
 		}
-		otherLock, _, err := readLock(home, other)
-		if err != nil || otherLock == nil {
+		sourceState, err := stateread.ReadFile(sourcePath(home, other))
+		if err != nil {
+			return "", false, fmt.Errorf("profile %q source: %w", other, err)
+		}
+		if sourceState.Kind == stateread.KindAbsent {
 			continue
+		}
+		otherLock, _, err := readLock(home, other)
+		if err != nil {
+			return "", false, fmt.Errorf("profile %q lock: %w", other, err)
+		}
+		if otherLock == nil {
+			return "", false, fmt.Errorf("profile %q lock is absent", other)
 		}
 		for _, member := range otherLock.Members {
 			if member.Overlay && member.Name == rootLock.Root {
@@ -1227,9 +1298,9 @@ func overlayOwner(home, name string) (string, bool) {
 	}
 	sort.Strings(owners)
 	if len(owners) == 0 {
-		return "", false
+		return "", false, nil
 	}
-	return owners[0], true
+	return owners[0], true, nil
 }
 
 // auditAndStore audits every resolved member always-strict and installs its
@@ -1606,6 +1677,8 @@ func EnsureDefaultWithPolicy(home string, policy Policy) error {
 func ensureDefault(op *operation, home string, policy Policy) error {
 	if _, err := readSource(home, DefaultProfile); err == nil {
 		return nil
+	} else if !isStateAbsent(err) {
+		return err
 	}
 	staging, err := os.MkdirTemp("", "curator-default-root-*")
 	if err != nil {

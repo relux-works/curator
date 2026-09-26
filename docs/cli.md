@@ -246,6 +246,12 @@ check. The `--json` document carries the same rows under `shell_hook_trust`
 (malformed lines, unreadable state) under `shell_hook_trust_warnings`.
 `curator env status` reports the same posture rows with the same `--check`
 semantics.
+For managed-home provisioning, an unreadable marker is reported as unknown,
+not unprovisioned: the scope row carries `provisioned_known: false` and an
+`environment_marker_unreadable` diagnostic, and `--check` returns non-zero.
+Unreadable backup inventories show `backups: unknown` with
+`environment_backup_record_unreadable`; unreadable orphan inventory is
+reported in the JSON `diagnostics` list instead of appearing empty.
 
 ### curator list
 

@@ -73,7 +73,10 @@ func StageForwarding(
 	}
 	forwarding.Path = target
 
-	managed := readLedger(target)
+	managed, err := readLedger(target)
+	if err != nil {
+		return Forwarding{}, fmt.Errorf("read the user-bin ownership ledger in %s: %w", target, err)
+	}
 	var currentlyManaged []runtimestore.ManagedShim
 	for _, name := range expectedNames(managed) {
 		published := shimPath(target, name, platform)

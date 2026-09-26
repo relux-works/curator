@@ -57,6 +57,15 @@ func gcHome(t *testing.T) string {
 	return home
 }
 
+func mustLoadConsumers(t *testing.T, home string) []string {
+	t.Helper()
+	consumers, err := scopes.LoadConsumers(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return consumers
+}
+
 // TestGCPrunesDeadConsumersUnderTheHomeLock proves the standalone command does
 // the same serialized maintenance an install does.
 func TestGCPrunesDeadConsumersUnderTheHomeLock(t *testing.T) {
@@ -73,7 +82,7 @@ func TestGCPrunesDeadConsumersUnderTheHomeLock(t *testing.T) {
 	if code := run([]string{"gc"}, fileConfigSource(filepath.Join(home, "config.json")), io.Discard, io.Discard); code != exitOK {
 		t.Fatalf("gc = %d", code)
 	}
-	if consumers := scopes.LoadConsumers(home); len(consumers) != 0 {
+	if consumers := mustLoadConsumers(t, home); len(consumers) != 0 {
 		t.Fatalf("dead consumer survived gc: %v", consumers)
 	}
 	if _, err := os.Stat(filepath.Join(home, "runtime", "skill-x")); err == nil {
@@ -115,7 +124,7 @@ func TestGCWaitsForTheHomeLock(t *testing.T) {
 		t.Fatalf("gc ran while the home lock was held (exit %d)", code)
 	case <-time.After(250 * time.Millisecond):
 	}
-	if consumers := scopes.LoadConsumers(home); len(consumers) != 1 {
+	if consumers := mustLoadConsumers(t, home); len(consumers) != 1 {
 		t.Fatalf("a blocked gc still pruned consumers: %v", consumers)
 	}
 
@@ -131,7 +140,7 @@ func TestGCWaitsForTheHomeLock(t *testing.T) {
 	case <-time.After(30 * time.Second):
 		t.Fatal("gc did not resume after the home lock was released")
 	}
-	if consumers := scopes.LoadConsumers(home); len(consumers) != 0 {
+	if consumers := mustLoadConsumers(t, home); len(consumers) != 0 {
 		t.Fatalf("gc did not prune after acquiring the lock: %v", consumers)
 	}
 }
@@ -167,7 +176,7 @@ func TestGCRunsSerializedAcrossConcurrentInvocations(t *testing.T) {
 			t.Fatalf("concurrent gc %d = %d", index, code)
 		}
 	}
-	consumers := scopes.LoadConsumers(home)
+	consumers := mustLoadConsumers(t, home)
 	if len(consumers) != 1 || consumers[0] != live {
 		t.Fatalf("concurrent maintenance lost a consumer update: %v", consumers)
 	}
