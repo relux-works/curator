@@ -57,7 +57,7 @@ func acquisitionGit(t *testing.T, dir string, args ...string) string {
 // acquisition path of internal/snapshot and internal/closure) against the
 // suite's byte-exact vector. vectors/snapshot-acquisition.json is declared for
 // this package in .github/ci/root-artifacts.tsv, so a root that publishes no
-// such vector (the pinned rc.9 suite) defers the whole package and this case
+// such vector (the historical rc.9 suite) defers the whole package and this case
 // records the `root-unset` skip -- the one class .github/ci/skip-classes.tsv
 // admits only for a deferred package. A root that serves the package and then
 // omits the vector never reaches `go test`: suite-plan.sh names the missing

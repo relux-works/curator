@@ -45,7 +45,7 @@ func loadExecutableIdentityVector(t *testing.T) executableIdentityVector {
 	return vector
 }
 
-// TestExecutableIdentityCasesAtProductionEntry drives the dcc7f015 identity
+// TestExecutableIdentityCasesAtProductionEntry drives the rc.13 identity
 // vectors through ResolveInterpreter and deriveProfileForPlatform, the same
 // resolver used to build the manager-owned exec PATH farm. The platform is
 // injected as Windows so the filesystem cases run on all three CI hosts.

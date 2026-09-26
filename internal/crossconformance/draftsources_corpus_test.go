@@ -12,9 +12,9 @@ import (
 	"github.com/relux-works/curator/internal/conformancecoverage"
 )
 
-// skillfileSourcesPin is the exact curator-spec main revision carrying
-// Decision 0022 and the released skillfile-sources-v1 corpus.
-const skillfileSourcesPin = "574636785c9da22757095ca279e8a9da801156ec"
+// skillfileSourcesPin is the exact curator-spec v1.0.0-rc.13 tag commit
+// carrying Decision 0022 and the released skillfile-sources-v1 corpus.
+const skillfileSourcesPin = "23435129ebc4c29e5b7f75ec72a0aa0cd3f16065"
 
 const skillfileSourcesTestdata = "testdata/skillfile-sources-v1"
 

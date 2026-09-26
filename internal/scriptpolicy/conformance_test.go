@@ -433,7 +433,7 @@ func TestScriptHostExecutionPolicyProductionConsumersCoverAllCases(t *testing.T)
 		t.Errorf("named behavioral case coverage = %d vector cases / %d mapped rows, want 41/41", len(expectedCases), len(scriptVectorCaseConsumers))
 	}
 	if len(vector.ExecutableIdentityCases) != 8 {
-		t.Errorf("executable identity vector has %d cases, want the eight cases published at dcc7f015", len(vector.ExecutableIdentityCases))
+		t.Errorf("executable identity vector has %d cases, want the eight cases published by curator-spec v1.0.0-rc.13", len(vector.ExecutableIdentityCases))
 	}
 	if strings.TrimSpace(vector.HardLinkSubstitution) == "" {
 		t.Error("the root published an empty hard_link_substitution_definition")
@@ -493,10 +493,9 @@ func TestScriptHostExecutionPolicyProductionConsumersCoverAllCases(t *testing.T)
 	}
 }
 
-// rc.13 changes the release label only; its script-worker-v1 identity is
-// unchanged from the rc.12-pinned protocol (labelled rc.9 in the pinned suite).
-// Keep the accepted labels closed so an unrelated future protocol is not
-// admitted on the strength of the policy name alone.
+// The rc.13 suite changes only the release label for the unchanged
+// script-worker-v1 identity. Keep the current and legacy labels closed so
+// an unrelated future protocol is not admitted on the policy name alone.
 func scriptWorkerProtocolVersionSupported(version string) bool {
 	switch version {
 	case "1.0.0-rc.9", "1.0.0-rc.13":
@@ -512,7 +511,7 @@ func TestScriptWorkerProtocolVersionAcceptanceIsClosed(t *testing.T) {
 		version string
 		want    bool
 	}{
-		{name: "pinned rc.9", version: "1.0.0-rc.9", want: true},
+		{name: "legacy rc.9 label", version: "1.0.0-rc.9", want: true},
 		{name: "rc.13 with unchanged identity", version: "1.0.0-rc.13", want: true},
 		{name: "future rc.14", version: "1.0.0-rc.14", want: false},
 	}
