@@ -1,0 +1,945 @@
+diff --git a/.github/ci/platform-cases.tsv b/.github/ci/platform-cases.tsv
+index edc1bb62..3f3f67ae 100644
+--- a/.github/ci/platform-cases.tsv
++++ b/.github/ci/platform-cases.tsv
+@@ -70,6 +70,16 @@ internal/buildcache	TestUnixProtectedStateMatrix	linux,darwin	-	-	unix ownership
+ internal/buildcache	TestUnixProtectionHelperFailuresFailClosed	linux,darwin	-	-	unix protection helpers fail closed rather than degrading the boundary
+ internal/config	TestBootstrapAndAddProject	linux,darwin,windows	-	-	asserts the manager config is written with private (0o600) ownership bits on unix
+ 
++# ===========================================================================
++# Profile source paths: absence and read failures stay distinct
++# ===========================================================================
++cmd/curator	TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable/missing_operand	linux,darwin,windows	-	-	a missing profile source operand reports profile_source_path_missing only
++cmd/curator	TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable/unreadable_root	linux,darwin	windows	platform-control	the unreadable case uses POSIX mode bits; Windows ACL unreadability is not reproducible for the runner account
++cmd/curator	TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable/unreadable_module_directory	linux,darwin	windows	platform-control	the unreadable case uses POSIX mode bits; Windows ACL unreadability is not reproducible for the runner account
++cmd/curator	TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable/regular_file	linux,darwin,windows	-	-	a regular file source operand reports profile_source_invalid, never a path-read diagnostic
++internal/envprofile	TestLoadMachinePolicyTreatsOnlyAbsentConfigAsDefault/absent_config	linux,darwin,windows	-	-	an absent user configuration alone selects the default machine policy
++internal/envprofile	TestLoadMachinePolicyTreatsOnlyAbsentConfigAsDefault/unreadable_config	linux,darwin	windows	platform-control	the unreadable case uses POSIX mode bits; Windows ACL unreadability is not reproducible for the runner account
++
+ # ===========================================================================
+ # No-follow: link traversal is refused, never followed
+ # ===========================================================================
+diff --git a/.github/ci/skip-classes.tsv b/.github/ci/skip-classes.tsv
+index 1d548519..178aa069 100644
+--- a/.github/ci/skip-classes.tsv
++++ b/.github/ci/skip-classes.tsv
+@@ -50,6 +50,7 @@ root-content	is a pre-revision root	allow	the supplied root predates this artefa
+ root-content	publishes a release other than the pinned 	allow	CI's SPEC_PIN and the module's immutable release pin are promoted by separate owners; the module pin is asserted against its own release and declares any other one
+ 
+ # --- protocol / platform-defined controls -----------------------------------
++platform-control	the unreadable case uses POSIX mode bits; Windows ACL unreadability is not reproducible for the runner account	allow	the unreadable fixture uses POSIX mode-bit semantics unavailable to the hosted Windows runner account
+ platform-control	available only on (Windows|macOS) in rc5-native-control-inventory-v1	allow	the inventory defines this control for one platform only
+ platform-control	rc5-native-control-inventory-v1 defines no record for host 	allow	the inventory covers macOS and Windows only, so this host cannot complete a compiled build; the refusal is asserted on that runner by TestCompiledInstallFollowsTheNativeControlInventoryExactly
+ platform-control	(is|are) exercised (on|by) 	allow	the behaviour is asserted on its own platform's runner
+diff --git a/cmd/curator/profile.go b/cmd/curator/profile.go
+index 01726992..17e54928 100644
+--- a/cmd/curator/profile.go
++++ b/cmd/curator/profile.go
+@@ -131,11 +131,16 @@ func (c cli) cmdProfileInstall(cfg *config.Config, args []string) int {
+ 		printEntryResult(c, result)
+ 	}
+ 	if err != nil {
+-		// An install activation that could not materialize the whole
+-		// scope leaves the lock installed but the current unchanged;
+-		// report the partial switch like profile use does.
+-		if len(info.Activation) > 0 && info.Name != "" {
+-			_, _ = fmt.Fprintf(c.stdout, "installed profile %s (lock %s)\n", info.Name, info.LockHash)
++		// Info.Name is populated only after the profile records are
++		// published. Activation can fail before materializeScope returns
++		// any per-adapter results (for example, a locked current-profile
++		// refusal), so the lock still needs an operator-visible line.
++		if info.Name != "" {
++			verb := "installed"
++			if updated {
++				verb = "updated"
++			}
++			_, _ = fmt.Fprintf(c.stdout, "%s profile %s (lock %s)\n", verb, info.Name, info.LockHash)
+ 		}
+ 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitFail
+@@ -245,6 +250,9 @@ func (c cli) cmdProfileUse(cfg *config.Config, args []string) int {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitFail
+ 	}
++	if len(results) == 0 && *env == "" && *target == "" && !*clearScope {
++		_, _ = fmt.Fprintln(c.stdout, "No adapter homes were switched; every registered adapter had a scoped current.")
++	}
+ 	return exitOK
+ }
+ 
+diff --git a/cmd/curator/profile_path_permissions_test.go b/cmd/curator/profile_path_permissions_test.go
+new file mode 100644
+index 00000000..a8e1614b
+--- /dev/null
++++ b/cmd/curator/profile_path_permissions_test.go
+@@ -0,0 +1,36 @@
++package main
++
++import (
++	"os"
++	"testing"
++)
++
++func makeProfileTestPathUnreadable(t *testing.T, path string, directory bool) func() {
++	t.Helper()
++	kind := "file"
++	mode := os.FileMode(0o644)
++	if directory {
++		kind = "directory"
++		mode = 0o755
++	}
++	if err := os.Chmod(path, 0); err != nil {
++		t.Skipf("this host cannot create a mode-000 %s: %v", kind, err)
++	}
++	readable := func() bool {
++		if directory {
++			_, err := os.ReadDir(path)
++			return err == nil
++		}
++		_, err := os.ReadFile(path)
++		return err == nil
++	}
++	if readable() {
++		_ = os.Chmod(path, mode)
++		t.Skipf("this environment can read a mode-000 %s; unreadability is untestable here", kind)
++	}
++	return func() {
++		if err := os.Chmod(path, mode); err != nil {
++			t.Errorf("restore %s permissions: %v", path, err)
++		}
++	}
++}
+diff --git a/cmd/curator/profile_test.go b/cmd/curator/profile_test.go
+index 7f971d92..bb83bd5b 100644
+--- a/cmd/curator/profile_test.go
++++ b/cmd/curator/profile_test.go
+@@ -4,6 +4,7 @@ import (
+ 	"os"
+ 	"os/exec"
+ 	"path/filepath"
++	"runtime"
+ 	"strings"
+ 	"testing"
+ 
+@@ -122,6 +123,87 @@ func TestProfileInstallListUse(t *testing.T) {
+ 	}
+ }
+ 
++// TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable drives
++// four path forms through the production CLI entry point: an absent operand,
++// an unreadable root, an unreadable module directory, and a regular file.
++// Absence and failed reads must never report each other's diagnostic.
++func TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable(t *testing.T) {
++	tests := []struct {
++		name          string
++		want          string
++		forbidden     []string
++		skipOnWindows bool
++		preparePath   func(*testing.T) (string, func())
++	}{
++		{
++			name:      "missing_operand",
++			want:      "profile_source_path_missing",
++			forbidden: []string{"profile_source_path_unreadable"},
++			preparePath: func(t *testing.T) (string, func()) {
++				return filepath.Join(t.TempDir(), "absent"), func() {}
++			},
++		},
++		{
++			name:          "unreadable_root",
++			want:          "profile_source_path_unreadable",
++			forbidden:     []string{"profile_source_path_missing", "profile_source_invalid"},
++			skipOnWindows: true,
++			preparePath: func(t *testing.T) (string, func()) {
++				pkg := t.TempDir()
++				writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
++				return pkg, makeProfileTestPathUnreadable(t, pkg, true)
++			},
++		},
++		{
++			name:          "unreadable_module_directory",
++			want:          "profile_source_path_unreadable",
++			forbidden:     []string{"profile_source_path_missing", "profile_source_invalid"},
++			skipOnWindows: true,
++			preparePath: func(t *testing.T) (string, func()) {
++				pkg := t.TempDir()
++				writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
++				modules := filepath.Join(pkg, "context")
++				cleanup := makeProfileTestPathUnreadable(t, modules, true)
++				return pkg, cleanup
++			},
++		},
++		{
++			name:      "regular_file",
++			want:      "profile_source_invalid",
++			forbidden: []string{"profile_source_path_missing", "profile_source_path_unreadable"},
++			preparePath: func(t *testing.T) (string, func()) {
++				file := filepath.Join(t.TempDir(), "package")
++				if err := os.WriteFile(file, []byte("not a context package\n"), 0o644); err != nil {
++					t.Fatal(err)
++				}
++				return file, func() {}
++			},
++		},
++	}
++	for _, test := range tests {
++		t.Run(test.name, func(t *testing.T) {
++			if test.skipOnWindows && runtime.GOOS == "windows" {
++				t.Skip("the unreadable case uses POSIX mode bits; Windows ACL unreadability is not reproducible for the runner account")
++			}
++			source, _ := profileHome(t)
++			path, cleanup := test.preparePath(t)
++			defer cleanup()
++			code, _, stderr := runProfile(t, source, "profile", "install", path)
++			if code != exitFail {
++				t.Fatalf("install %q = %d, want failure; stderr:\n%s", path, code, stderr)
++			}
++			if !strings.Contains(stderr, test.want) {
++				t.Fatalf("stderr %q does not contain %q", stderr, test.want)
++			}
++			for _, forbidden := range test.forbidden {
++				if strings.Contains(stderr, forbidden) {
++					t.Fatalf("stderr %q must not contain %q", stderr, forbidden)
++				}
++			}
++		})
++	}
++}
++
+ // TestProfileUseUnknownIsAFailure narrows the lookup gate: switching to a
+ // profile that is not installed fails with exit 1, never success.
+ func TestProfileUseUnknownIsAFailure(t *testing.T) {
+@@ -389,6 +471,9 @@ func TestProfileMachineUseSkipsScopedAdapter(t *testing.T) {
+ 	if code, _, stderr := runProfile(t, source, "profile", "use", "two", "--env", "codex_cli"); code != exitOK {
+ 		t.Fatalf("scoped use stderr:\n%s", stderr)
+ 	}
++	if code, _, stderr := runProfile(t, source, "profile", "use", "two", "--env", "opencode"); code != exitOK {
++		t.Fatalf("opencode scoped use stderr:\n%s", stderr)
++	}
+ 	if code, _, stderr := runProfile(t, source, "profile", "install", three); code != exitOK {
+ 		t.Fatalf("install three stderr:\n%s", stderr)
+ 	}
+@@ -396,8 +481,8 @@ func TestProfileMachineUseSkipsScopedAdapter(t *testing.T) {
+ 	if code != exitOK {
+ 		t.Fatalf("use three = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+ 	}
+-	if strings.Contains(stdout, "codex_cli") {
+-		t.Fatalf("machine use must skip the scoped adapter, stdout:\n%s", stdout)
++	if strings.Contains(stdout, "codex_cli") || strings.Contains(stdout, "opencode: switched") {
++		t.Fatalf("machine use must skip both scoped adapters, stdout:\n%s", stdout)
+ 	}
+ 	codexDoc, err := os.ReadFile(filepath.Join(os.Getenv("CODEX_HOME"), "AGENTS.md")) // #nosec G304 -- test home
+ 	if err != nil {
+@@ -410,6 +495,15 @@ func TestProfileMachineUseSkipsScopedAdapter(t *testing.T) {
+ 	if err != nil || codexMarker == nil || codexMarker.Profile.Name != "two" {
+ 		t.Fatalf("codex marker %+v %v", codexMarker, err)
+ 	}
++	opencodeHome := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode")
++	opencodeDoc, err := os.ReadFile(filepath.Join(opencodeHome, "AGENTS.md")) // #nosec G304 -- test home
++	if err != nil || !strings.Contains(string(opencodeDoc), "## Context: two 1.0.0") {
++		t.Fatalf("opencode AGENTS.md err=%v, content:\n%s", err, opencodeDoc)
++	}
++	opencodeMarker, err := envmarker.Read(opencodeHome)
++	if err != nil || opencodeMarker == nil || opencodeMarker.Profile.Name != "two" {
++		t.Fatalf("opencode marker %+v %v", opencodeMarker, err)
++	}
+ 	claudeDoc, err := os.ReadFile(filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "CLAUDE.md")) // #nosec G304 -- test home
+ 	if err != nil {
+ 		t.Fatal(err)
+@@ -418,15 +512,15 @@ func TestProfileMachineUseSkipsScopedAdapter(t *testing.T) {
+ 		t.Fatalf("claude home does not carry three:\n%s", claudeDoc)
+ 	}
+ 	_, stdout, _ = runProfile(t, source, "profile", "list")
+-	if !strings.Contains(stdout, "env:codex_cli=two") {
++	if !strings.Contains(stdout, "env:codex_cli=two") || !strings.Contains(stdout, "env:opencode=two") {
+ 		t.Fatalf("list stdout:\n%s", stdout)
+ 	}
+ 	code, stdout, stderr = runProfile(t, source, "profile", "install", four, "--use")
+ 	if code != exitOK {
+ 		t.Fatalf("install four --use = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+ 	}
+-	if strings.Contains(stdout, "codex_cli") {
+-		t.Fatalf("install --use must skip the scoped adapter, stdout:\n%s", stdout)
++	if strings.Contains(stdout, "codex_cli") || strings.Contains(stdout, "opencode: switched") {
++		t.Fatalf("install --use must skip both scoped adapters, stdout:\n%s", stdout)
+ 	}
+ 	codexDoc, err = os.ReadFile(filepath.Join(os.Getenv("CODEX_HOME"), "AGENTS.md")) // #nosec G304 -- test home
+ 	if err != nil {
+@@ -442,6 +536,55 @@ func TestProfileMachineUseSkipsScopedAdapter(t *testing.T) {
+ 	if !strings.Contains(string(claudeDoc), "## Context: four 1.0.0") {
+ 		t.Fatalf("claude home does not carry four:\n%s", claudeDoc)
+ 	}
++	opencodeDoc, err = os.ReadFile(filepath.Join(opencodeHome, "AGENTS.md")) // #nosec G304 -- test home
++	if err != nil || !strings.Contains(string(opencodeDoc), "## Context: two 1.0.0") {
++		t.Fatalf("opencode home changed after install --use: err=%v\n%s", err, opencodeDoc)
++	}
++}
++
++// TestProfileUseReportsAllAdaptersAlreadyScoped drives the machine-scope
++// use command through run() when every registered adapter has a scoped
++// current. The empty materialization set must produce an operator-visible
++// line instead of a silent success.
++func TestProfileUseReportsAllAdaptersAlreadyScoped(t *testing.T) {
++	source, _ := profileHome(t)
++	one, two, three := t.TempDir(), t.TempDir(), t.TempDir()
++	writeContextPackage(t, one, "one", "1.0.0", "one\n")
++	writeContextPackage(t, two, "two", "1.0.0", "two\n")
++	writeContextPackage(t, three, "three", "1.0.0", "three\n")
++	for _, pkg := range []string{one, two} {
++		if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
++			t.Fatalf("install stderr:\n%s", stderr)
++		}
++	}
++	for _, adapter := range []string{"claude_code", "codex_cli", "opencode", "pi"} {
++		if code, _, stderr := runProfile(t, source, "profile", "use", "two", "--env", adapter); code != exitOK {
++			t.Fatalf("scope %s stderr:\n%s", adapter, stderr)
++		}
++	}
++	if code, _, stderr := runProfile(t, source, "profile", "install", three); code != exitOK {
++		t.Fatalf("install three stderr:\n%s", stderr)
++	}
++
++	code, stdout, stderr := runProfile(t, source, "profile", "use", "three")
++	if code != exitOK {
++		t.Fatalf("machine use three = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	if !strings.Contains(stdout, "No adapter homes were switched; every registered adapter had a scoped current.") {
++		t.Fatalf("empty machine switch was silent or unclear; stdout:\n%s", stdout)
++	}
++	if strings.Contains(stdout, ": switched (") {
++		t.Fatalf("a machine switch with all adapters scoped reported a surface write:\n%s", stdout)
++	}
++	listCode, listOut, listErr := runProfile(t, source, "profile", "list")
++	if listCode != exitOK || strings.Contains(listErr, "curator:") {
++		t.Fatalf("profile list = %d\nstderr:\n%s", listCode, listErr)
++	}
++	for _, adapter := range []string{"claude_code", "codex_cli", "opencode", "pi"} {
++		if !strings.Contains(listOut, "env:"+adapter+"=two") {
++			t.Fatalf("scope %s did not remain visible:\n%s", adapter, listOut)
++		}
++	}
+ }
+ 
+ // TestProfileInstallFileOperandIsRefused checks F12 through run(): a file://
+@@ -568,14 +711,17 @@ func TestProfileInstallUsePartialLeavesCurrent(t *testing.T) {
+ 	if err := os.WriteFile(claude, []byte("blocker"), 0o644); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	code, _, stderr := runProfile(t, source, "profile", "install", second, "--use")
++	code, stdout, stderr := runProfile(t, source, "profile", "install", second, "--use")
+ 	if code != exitFail {
+-		t.Fatalf("install beta --use = %d, want %d\nstderr:\n%s", code, exitFail, stderr)
++		t.Fatalf("install beta --use = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitFail, stdout, stderr)
+ 	}
+ 	if !strings.Contains(stderr, "profile_use_partial") {
+ 		t.Fatalf("stderr:\n%s", stderr)
+ 	}
+-	_, stdout, _ := runProfile(t, source, "profile", "list")
++	if !strings.Contains(stdout, "installed profile beta (lock ") {
++		t.Fatalf("partial install must report its persisted profile, stdout:\n%s", stdout)
++	}
++	_, stdout, _ = runProfile(t, source, "profile", "list")
+ 	alphaCurrent, betaCurrent := false, false
+ 	for _, line := range strings.Split(stdout, "\n") {
+ 		if strings.HasPrefix(line, "alpha\t") && strings.Contains(line, "current") {
+@@ -593,6 +739,76 @@ func TestProfileInstallUsePartialLeavesCurrent(t *testing.T) {
+ 	}
+ }
+ 
++// TestProfileInstallFirstActivationFailureReportsPersistedProfile drives
++// the early activation-refusal path through run(): the new profile lock is
++// published, then the machine policy refuses the activation before
++// materializeScope can return adapter rows. The CLI must still name the
++// installed profile. Requiring an Activation row to print it is the
++// narrowing mutant this test is intended to kill.
++func TestProfileInstallFirstActivationFailureReportsPersistedProfile(t *testing.T) {
++	source, home := profileHome(t)
++	required := "required"
++	source.cfg.Env.RequireCurrent = &required
++	source.cfg.Locked = map[string]bool{"environments.require_current_profile": true}
++	pkg := t.TempDir()
++	writeContextPackage(t, pkg, "beta", "1.0.0", "beta\n")
++
++	code, stdout, stderr := runProfile(t, source, "profile", "install", pkg, "--use")
++	if code != exitFail {
++		t.Fatalf("first install --use = %d, want policy refusal\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	if !strings.Contains(stderr, "requires current profile \"required\"") {
++		t.Fatalf("stderr does not show the pre-materialization refusal:\n%s", stderr)
++	}
++	if !strings.Contains(stdout, "installed profile beta (lock ") {
++		t.Fatalf("persisted first install was not reported:\n%s", stdout)
++	}
++	if strings.Contains(stdout, "switched (") {
++		t.Fatalf("activation was refused before materialization but reported an adapter switch:\n%s", stdout)
++	}
++	if _, err := os.Stat(filepath.Join(home, "profiles", "beta", "lock.json")); err != nil {
++		t.Fatalf("profile lock was not persisted before activation refusal: %v", err)
++	}
++	listCode, listOut, listErr := runProfile(t, source, "profile", "list")
++	if listCode != exitOK || !strings.Contains(listOut, "beta\tbeta\tpath") {
++		t.Fatalf("persisted profile list = %d\nstdout:\n%s\nstderr:\n%s", listCode, listOut, listErr)
++	}
++}
++
++// TestProfileReinstallActivationFailureKeepsUpdatedWording pins the
++// reinstall wording while using the same pre-materialization refusal path:
++// a changed path snapshot is published, activation is refused, and the CLI
++// reports updated profile rather than relabeling it as a fresh install.
++func TestProfileReinstallActivationFailureKeepsUpdatedWording(t *testing.T) {
++	source, _ := profileHome(t)
++	alpha, beta := t.TempDir(), t.TempDir()
++	writeContextPackage(t, alpha, "alpha", "1.0.0", "alpha\n")
++	writeContextPackage(t, beta, "beta", "1.0.0", "beta\n")
++	if code, _, stderr := runProfile(t, source, "profile", "install", alpha); code != exitOK {
++		t.Fatalf("install alpha stderr:\n%s", stderr)
++	}
++	if code, _, stderr := runProfile(t, source, "profile", "install", beta); code != exitOK {
++		t.Fatalf("install beta stderr:\n%s", stderr)
++	}
++	if err := os.WriteFile(filepath.Join(beta, "context", "a.md"), []byte("beta changed\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	required := "alpha"
++	source.cfg.Env.RequireCurrent = &required
++	source.cfg.Locked = map[string]bool{"environments.require_current_profile": true}
++
++	code, stdout, stderr := runProfile(t, source, "profile", "install", beta, "--use")
++	if code != exitFail {
++		t.Fatalf("reinstall --use = %d, want policy refusal\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	if !strings.Contains(stdout, "updated profile beta (lock ") {
++		t.Fatalf("partial reinstall lost its updated wording:\n%s", stdout)
++	}
++	if strings.Contains(stdout, "installed profile beta (lock ") {
++		t.Fatalf("partial reinstall was labeled as a fresh install:\n%s", stdout)
++	}
++}
++
+ func writeTestProfileConfig(t *testing.T, path, payload string) {
+ 	t.Helper()
+ 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+diff --git a/internal/envprofile/envprofile.go b/internal/envprofile/envprofile.go
+index 3662522d..0bc2c6d5 100644
+--- a/internal/envprofile/envprofile.go
++++ b/internal/envprofile/envprofile.go
+@@ -1806,7 +1806,10 @@ func migrateGlobalSkills(home string, policy Policy) ([]contextlock.Member, erro
+ // the caller — a failed read is never an empty policy.
+ func loadMachinePolicy() (Policy, error) {
+ 	path := config.UserPath()
+-	if _, err := os.Stat(path); err != nil {
++	// Lstat classifies only a truly absent path as the legacy default. Stat
++	// would also call a dangling symlink absent, allowing an existing but
++	// unreadable configuration entry to take the empty-policy fallback.
++	if _, err := os.Lstat(path); err != nil {
+ 		if os.IsNotExist(err) {
+ 			return Policy{OverlaysAllowed: true}, nil
+ 		}
+diff --git a/internal/envprofile/envprofile_f10f11f12_test.go b/internal/envprofile/envprofile_f10f11f12_test.go
+index 33d03d2b..4cfa93a9 100644
+--- a/internal/envprofile/envprofile_f10f11f12_test.go
++++ b/internal/envprofile/envprofile_f10f11f12_test.go
+@@ -3,6 +3,7 @@ package envprofile
+ import (
+ 	"os"
+ 	"path/filepath"
++	"runtime"
+ 	"strings"
+ 	"testing"
+ )
+@@ -173,6 +174,62 @@ func TestMachinePolicyLoadFailureFailsMigration(t *testing.T) {
+ 	}
+ }
+ 
++// TestLoadMachinePolicyTreatsOnlyAbsentConfigAsDefault drives the production
++// policy loader directly: a path with no filesystem entry yields the
++// documented permissive default, while an unreadable existing file refuses
++// instead of taking that fallback.
++func TestLoadMachinePolicyTreatsOnlyAbsentConfigAsDefault(t *testing.T) {
++	configPath := filepath.Join(t.TempDir(), "config.json")
++	t.Setenv("CURATOR_CONFIG", configPath)
++	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
++
++	t.Run("absent_config", func(t *testing.T) {
++		policy, err := loadMachinePolicy()
++		if err != nil {
++			t.Fatalf("absent configuration: %v", err)
++		}
++		if !policy.OverlaysAllowed || len(policy.AllowedSources) != 0 || len(policy.Revocations) != 0 {
++			t.Fatalf("absent configuration policy %+v, want the documented empty policy", policy)
++		}
++		if _, err := List(t.TempDir()); err != nil {
++			t.Fatalf("production List entry with absent machine configuration: %v", err)
++		}
++	})
++
++	t.Run("unreadable_config", func(t *testing.T) {
++		if runtime.GOOS == "windows" {
++			t.Skip("the unreadable case uses POSIX mode bits; Windows ACL unreadability is not reproducible for the runner account")
++		}
++		writeTestConfig(t, configPath, permissiveUserConfig)
++		cleanup := makeEnvprofileTestPathUnreadable(t, configPath)
++		defer cleanup()
++
++		policy, err := loadMachinePolicy()
++		if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) || !strings.Contains(err.Error(), "machine configuration") {
++			t.Fatalf("unreadable configuration policy=%+v err=%v, want refusal with machine-configuration diagnostic", policy, err)
++		}
++	})
++}
++
++// TestLoadMachinePolicyRejectsDanglingConfigSymlink distinguishes an
++// existing configuration entry whose target cannot be read from a path that
++// is genuinely absent. The Lstat presence probe must not let a dangling link
++// select the empty-policy fallback.
++func TestLoadMachinePolicyRejectsDanglingConfigSymlink(t *testing.T) {
++	root := t.TempDir()
++	configPath := filepath.Join(root, "config.json")
++	if err := os.Symlink(filepath.Join(root, "missing-target.json"), configPath); err != nil {
++		t.Skipf("host cannot create symlinks: %v", err)
++	}
++	t.Setenv("CURATOR_CONFIG", configPath)
++	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
++
++	policy, err := loadMachinePolicy()
++	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) || !strings.Contains(err.Error(), "machine configuration") {
++		t.Fatalf("dangling configuration symlink policy=%+v err=%v, want a refused read failure", policy, err)
++	}
++}
++
+ // TestSourceAllowlistRejectsAdjacentPathSegment narrows the F9 allowlist
+ // gate (review F11): an allowlist entry example.com/org must not admit
+ // example.com/org-evil/pkg — same host, adjacent path segment. A mutant that
+diff --git a/internal/envprofile/envprofile_f16_test.go b/internal/envprofile/envprofile_f16_test.go
+index 5d16a006..0e49d4ab 100644
+--- a/internal/envprofile/envprofile_f16_test.go
++++ b/internal/envprofile/envprofile_f16_test.go
+@@ -20,8 +20,9 @@ import (
+ // case) overwrites the scoped home with the machine profile and must fail
+ // these tests.
+ 
+-// scopeFixture installs alpha (machine current) and beta (scoped to
+-// codex_cli), leaving the machine current on alpha.
++// scopeFixture installs alpha (machine current) and beta scoped to two
++// adapters, leaving the machine current on alpha. Two scopes make a mutant
++// that skips at most one scoped adapter observable.
+ func scopeFixture(t *testing.T, home string) {
+ 	t.Helper()
+ 	alpha, beta := t.TempDir(), t.TempDir()
+@@ -33,8 +34,10 @@ func scopeFixture(t *testing.T, home string) {
+ 	if _, _, _, err := Install(home, InstallOptions{Operand: beta}); err != nil {
+ 		t.Fatalf("install beta: %v", err)
+ 	}
+-	if _, err := Use(home, "beta", "codex_cli", "", false); err != nil {
+-		t.Fatalf("scoped use beta: %v", err)
++	for _, adapter := range []string{"codex_cli", "opencode"} {
++		if _, err := Use(home, "beta", adapter, "", false); err != nil {
++			t.Fatalf("scoped use beta in %s: %v", adapter, err)
++		}
+ 	}
+ }
+ 
+@@ -57,11 +60,10 @@ func homeMarker(t *testing.T, dir string) *envmarker.Marker {
+ }
+ 
+ // TestMachineUseSkipsScopedAdapter drives the production Use for a
+-// machine-scope switch while env:codex_cli is scoped to beta: the codex home
+-// stays on beta (bytes and marker), the other three homes move to gamma, the
+-// machine current moves to gamma, and the listing still reports
+-// env:codex_cli=beta. A mutant that restores the unconditional machine pass
+-// overwrites the codex home with gamma and must fail this test.
++// machine-scope switch while codex_cli and opencode are scoped to beta: both
++// homes stay on beta (bytes and markers), the other two homes move to gamma,
++// the machine current moves to gamma, and the listing keeps both scope rows.
++// A mutant that skips at most one scoped adapter must fail this test.
+ func TestMachineUseSkipsScopedAdapter(t *testing.T) {
+ 	home := t.TempDir()
+ 	homes := pinHomes(t)
+@@ -76,20 +78,20 @@ func TestMachineUseSkipsScopedAdapter(t *testing.T) {
+ 		t.Fatalf("machine use gamma: %v (%+v)", err, results)
+ 	}
+ 	for _, result := range results {
+-		if result.Adapter == "codex_cli" {
+-			t.Fatalf("machine pass must skip the scoped adapter, results %+v", results)
++		if result.Adapter == "codex_cli" || result.Adapter == "opencode" {
++			t.Fatalf("machine pass must skip both scoped adapters, results %+v", results)
+ 		}
+ 		if !result.OK {
+ 			t.Fatalf("result %+v", result)
+ 		}
+ 	}
+-	if len(results) != len(Adapters)-1 {
+-		t.Fatalf("results %+v, want every adapter but the scoped one", results)
++	if len(results) != len(Adapters)-2 {
++		t.Fatalf("results %+v, want only the two unscoped adapters", results)
+ 	}
+ 	if current, _ := Current(home); current != "gamma" {
+ 		t.Fatalf("current=%q, want gamma", current)
+ 	}
+-	if scoped, err := ScopedCurrents(home); err != nil || scoped["env:codex_cli"] != "beta" {
++	if scoped, err := ScopedCurrents(home); err != nil || scoped["env:codex_cli"] != "beta" || scoped["env:opencode"] != "beta" {
+ 		t.Fatalf("scoped %+v %v", scoped, err)
+ 	}
+ 	if got := homeBytes(t, homes["codex_cli"], "AGENTS.md"); !strings.Contains(got, "## Context: beta 1.0.0") {
+@@ -98,7 +100,13 @@ func TestMachineUseSkipsScopedAdapter(t *testing.T) {
+ 	if marker := homeMarker(t, homes["codex_cli"]); marker.Profile.Name != "beta" {
+ 		t.Fatalf("codex marker names %q, want beta", marker.Profile.Name)
+ 	}
+-	for id, file := range map[string]string{"claude_code": "CLAUDE.md", "opencode": "AGENTS.md", "pi": "AGENTS.md"} {
++	if got := homeBytes(t, homes["opencode"], "AGENTS.md"); !strings.Contains(got, "## Context: beta 1.0.0") {
++		t.Fatalf("opencode home does not carry beta:\n%s", got)
++	}
++	if marker := homeMarker(t, homes["opencode"]); marker.Profile.Name != "beta" {
++		t.Fatalf("opencode marker names %q, want beta", marker.Profile.Name)
++	}
++	for id, file := range map[string]string{"claude_code": "CLAUDE.md", "pi": "AGENTS.md"} {
+ 		if got := homeBytes(t, homes[id], file); !strings.Contains(got, "## Context: gamma 1.0.0") {
+ 			t.Fatalf("%s home does not carry gamma:\n%s", id, got)
+ 		}
+@@ -126,12 +134,61 @@ func TestMachineUseSkipsScopedAdapter(t *testing.T) {
+ 	if !found {
+ 		t.Fatalf("beta ScopedFor %+v, want env:codex_cli", byName["beta"].ScopedFor)
+ 	}
++	found = false
++	for _, scope := range byName["beta"].ScopedFor {
++		if scope == "env:opencode" {
++			found = true
++		}
++	}
++	if !found {
++		t.Fatalf("beta ScopedFor %+v, want env:opencode", byName["beta"].ScopedFor)
++	}
+ }
+ 
+-// TestInstallUseSkipsScopedAdapter drives the same shape through the
+-// production Install activation: install --use performs the §9.2 switch, so
+-// it skips the scoped home exactly like profile use does. The mutant from
+-// TestMachineUseSkipsScopedAdapter must fail this test too.
++// TestMachineUseClearsEveryScopeEqualToNewDefault drives the production
++// Use path with two scope records already naming the requested machine
++// profile. Both records must be removed in the same journaled publish as the
++// machine current; a narrowing mutant that clears only one leaves the other
++// equal-default record behind.
++func TestMachineUseClearsEveryScopeEqualToNewDefault(t *testing.T) {
++	home := t.TempDir()
++	homes := pinHomes(t)
++	scopeFixture(t, home)
++	gamma := t.TempDir()
++	writePackage(t, gamma, "gamma", "1.0.0", "gamma\n")
++	if _, _, _, err := Install(home, InstallOptions{Operand: gamma}); err != nil {
++		t.Fatalf("install gamma: %v", err)
++	}
++	if _, err := Use(home, "gamma", "pi", "", false); err != nil {
++		t.Fatalf("scope pi to gamma: %v", err)
++	}
++	results, err := Use(home, "beta", "", "", false)
++	if err != nil {
++		t.Fatalf("machine use beta: %v (%+v)", err, results)
++	}
++	if current, _ := Current(home); current != "beta" {
++		t.Fatalf("current=%q, want beta", current)
++	}
++	scoped, err := ScopedCurrents(home)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(scoped) != 1 || scoped["env:pi"] != "gamma" {
++		t.Fatalf("scope records %+v, want only env:pi=gamma after clearing equal-default records", scoped)
++	}
++	for _, adapter := range []string{"codex_cli", "opencode"} {
++		if got := homeBytes(t, homes[adapter], "AGENTS.md"); !strings.Contains(got, "## Context: beta 1.0.0") {
++			t.Fatalf("%s home changed while clearing its equal-default scope:\n%s", adapter, got)
++		}
++		if marker := homeMarker(t, homes[adapter]); marker.Profile.Name != "beta" {
++			t.Fatalf("%s marker names %q, want beta", adapter, marker.Profile.Name)
++		}
++	}
++}
++
++// TestInstallUseSkipsScopedAdapter drives the same two-scope shape through
++// the production Install activation: install --use performs the §9.2 switch,
++// so it skips both scoped homes exactly like profile use does.
+ func TestInstallUseSkipsScopedAdapter(t *testing.T) {
+ 	home := t.TempDir()
+ 	homes := pinHomes(t)
+@@ -146,13 +203,16 @@ func TestInstallUseSkipsScopedAdapter(t *testing.T) {
+ 		t.Fatal("install --use must report activated")
+ 	}
+ 	for _, result := range info.Activation {
+-		if result.Adapter == "codex_cli" {
+-			t.Fatalf("activation must skip the scoped adapter, results %+v", info.Activation)
++		if result.Adapter == "codex_cli" || result.Adapter == "opencode" {
++			t.Fatalf("activation must skip both scoped adapters, results %+v", info.Activation)
+ 		}
+ 		if !result.OK {
+ 			t.Fatalf("activation %+v", result)
+ 		}
+ 	}
++	if len(info.Activation) != len(Adapters)-2 {
++		t.Fatalf("activation results %+v, want only the two unscoped adapters", info.Activation)
++	}
+ 	if current, _ := Current(home); current != "gamma" {
+ 		t.Fatalf("current=%q, want gamma", current)
+ 	}
+@@ -162,6 +222,12 @@ func TestInstallUseSkipsScopedAdapter(t *testing.T) {
+ 	if marker := homeMarker(t, homes["codex_cli"]); marker.Profile.Name != "beta" {
+ 		t.Fatalf("codex marker names %q, want beta", marker.Profile.Name)
+ 	}
++	if got := homeBytes(t, homes["opencode"], "AGENTS.md"); !strings.Contains(got, "## Context: beta 1.0.0") {
++		t.Fatalf("opencode home does not carry beta:\n%s", got)
++	}
++	if marker := homeMarker(t, homes["opencode"]); marker.Profile.Name != "beta" {
++		t.Fatalf("opencode marker names %q, want beta", marker.Profile.Name)
++	}
+ 	if got := homeBytes(t, homes["claude_code"], "CLAUDE.md"); !strings.Contains(got, "## Context: gamma 1.0.0") {
+ 		t.Fatalf("claude home does not carry gamma:\n%s", got)
+ 	}
+@@ -199,6 +265,9 @@ func TestScopedUseStillSwitchesOnlyThatHome(t *testing.T) {
+ 	if scoped, err := ScopedCurrents(home); err != nil || scoped["env:codex_cli"] != "delta" {
+ 		t.Fatalf("scoped %+v %v", scoped, err)
+ 	}
++	if scoped, err := ScopedCurrents(home); err != nil || scoped["env:opencode"] != "beta" {
++		t.Fatalf("opencode scoped current %+v %v, want beta", scoped, err)
++	}
+ 	if got := homeBytes(t, homes["codex_cli"], "AGENTS.md"); !strings.Contains(got, "## Context: delta 1.0.0") {
+ 		t.Fatalf("codex home does not carry delta:\n%s", got)
+ 	}
+@@ -211,11 +280,10 @@ func TestScopedUseStillSwitchesOnlyThatHome(t *testing.T) {
+ }
+ 
+ // TestSyncWritesScopedHomeOnce pins the sync half of the fix: the machine
+-// pass skips the scoped home and the scoped pass writes it once, so every
++// pass skips both scoped homes and the scoped pass writes each once, so every
+ // adapter appears exactly once in the results and every home gains exactly
+-// one backup generation. The unconditional-pass mutant writes the scoped
+-// home twice (two results entries, two generations) and must fail this
+-// test.
++// one backup generation. The unconditional-pass mutant writes scoped homes
++// twice (duplicate results and backup generations) and must fail this test.
+ func TestSyncWritesScopedHomeOnce(t *testing.T) {
+ 	home := t.TempDir()
+ 	homes := pinHomes(t)
+diff --git a/internal/envprofile/lock.go b/internal/envprofile/lock.go
+index 38691bac..ffe8abe9 100644
+--- a/internal/envprofile/lock.go
++++ b/internal/envprofile/lock.go
+@@ -63,19 +63,35 @@ func (op *operation) close() error {
+ 	return op.lock.Close()
+ }
+ 
+-// publish commits manager-home record files as one journaled transaction:
+-// every path's desired bytes are staged and swapped under the held lock,
+-// so a crash mid-publication resumes from the journal on the next
+-// operation instead of stranding a half-written record.
+-func (op *operation) publish(files map[string][]byte) error {
+-	if len(files) == 0 {
++// publish commits manager-home record writes and removals as one journaled
++// transaction. Write paths are staged and swapped under the held lock;
++// removal paths use the transaction engine's absent desired state. A crash
++// mid-publication resumes from the journal on the next operation instead of
++// stranding a half-written record set.
++func (op *operation) publish(files map[string][]byte, removals ...string) error {
++	if len(files) == 0 && len(removals) == 0 {
+ 		return nil
+ 	}
+-	paths := make([]string, 0, len(files))
++	type change struct {
++		path    string
++		payload []byte
++		remove  bool
++	}
++	changesByPath := make(map[string]change, len(files)+len(removals))
+ 	for path := range files {
+-		paths = append(paths, path)
++		changesByPath[path] = change{path: path, payload: files[path]}
++	}
++	for _, path := range removals {
++		if _, exists := changesByPath[path]; exists {
++			return fmt.Errorf("profile transaction both writes and removes %s", path)
++		}
++		changesByPath[path] = change{path: path, remove: true}
++	}
++	changes := make([]change, 0, len(changesByPath))
++	for _, item := range changesByPath {
++		changes = append(changes, item)
+ 	}
+-	sort.Strings(paths)
++	sort.Slice(changes, func(i, j int) bool { return changes[i].path < changes[j].path })
+ 	var temps []string
+ 	defer func() {
+ 		for _, temp := range temps {
+@@ -83,30 +99,35 @@ func (op *operation) publish(files map[string][]byte) error {
+ 		}
+ 	}()
+ 	plan := transaction.Plan{TransactionID: newTransactionID(), ProjectIdentity: "profiles"}
+-	for _, live := range paths {
++	for _, item := range changes {
++		live := item.path
+ 		if err := os.MkdirAll(filepath.Dir(live), 0o755); err != nil {
+ 			return err
+ 		}
+-		temp, err := os.CreateTemp("", "curator-profile-record-*")
+-		if err != nil {
+-			return err
+-		}
+-		temps = append(temps, temp.Name())
+-		if _, err := temp.Write(files[live]); err != nil {
+-			_ = temp.Close()
+-			return err
+-		}
+-		if err := temp.Close(); err != nil {
+-			return err
+-		}
+ 		preimage, err := transaction.DigestTarget(transaction.KindBytes, live)
+ 		if err != nil {
+ 			return fmt.Errorf("read the current state of %s: %w", live, err)
+ 		}
+-		plan.Targets = append(plan.Targets, transaction.Target{
++		target := transaction.Target{
+ 			Class: "profile", Identifier: live, Kind: transaction.KindBytes,
+-			LivePath: live, StagedSource: temp.Name(), PreimageDigest: preimage,
+-		})
++			LivePath: live, PreimageDigest: preimage,
++		}
++		if !item.remove {
++			temp, err := os.CreateTemp("", "curator-profile-record-*")
++			if err != nil {
++				return err
++			}
++			temps = append(temps, temp.Name())
++			if _, err := temp.Write(item.payload); err != nil {
++				_ = temp.Close()
++				return err
++			}
++			if err := temp.Close(); err != nil {
++				return err
++			}
++			target.StagedSource = temp.Name()
++		}
++		plan.Targets = append(plan.Targets, target)
+ 	}
+ 	if _, err := op.engine.Prepare(op.lock, plan); err != nil {
+ 		return fmt.Errorf("prepare profile records: %w", err)
+diff --git a/internal/envprofile/path_permissions_test.go b/internal/envprofile/path_permissions_test.go
+new file mode 100644
+index 00000000..73c6b1df
+--- /dev/null
++++ b/internal/envprofile/path_permissions_test.go
+@@ -0,0 +1,22 @@
++package envprofile
++
++import (
++	"os"
++	"testing"
++)
++
++func makeEnvprofileTestPathUnreadable(t *testing.T, path string) func() {
++	t.Helper()
++	if err := os.Chmod(path, 0); err != nil {
++		t.Skipf("this host cannot create a mode-000 file: %v", err)
++	}
++	if _, err := os.ReadFile(path); err == nil {
++		_ = os.Chmod(path, 0o644)
++		t.Skip("this environment can read a mode-000 file; unreadability is untestable here")
++	}
++	return func() {
++		if err := os.Chmod(path, 0o644); err != nil {
++			t.Errorf("restore test configuration permissions: %v", err)
++		}
++	}
++}
+diff --git a/internal/envprofile/switch.go b/internal/envprofile/switch.go
+index 6a093bac..568bd66f 100644
+--- a/internal/envprofile/switch.go
++++ b/internal/envprofile/switch.go
+@@ -131,11 +131,12 @@ type EntryResult struct {
+ 
+ // Use switches the machine scope (environment and target both empty) or one
+ // narrowed scope to name. A machine-scope switch skips adapters that carry
+-// a scope record: those homes stay on their scoped profiles. With clear,
+-// the scope record is dropped and the scope re-materializes from the
+-// machine default. It returns the per-entry results; when any entry failed
+-// the recorded current is unchanged and the error carries
+-// profile_use_partial.
++// a scope record: those homes stay on their scoped profiles. A scope record
++// equal to the new machine default is removed in the same journaled publish
++// as the machine current. With clear, the scope record is dropped and the
++// scope re-materializes from the machine default. It returns the per-entry
++// results; when any entry failed the recorded current is unchanged and the
++// error carries profile_use_partial.
+ // Use holds the manager-home mutation lock (see lock.go) and records the
+ // new current through the operation journal only when the whole scope
+ // materialized.
+@@ -245,7 +246,11 @@ func useLocked(op *operation, home, name, environment, target string, clearScope
+ 	// itself a partial switch: the entries no longer match the recorded
+ 	// current.
+ 	if scope == "" {
+-		if err := op.publish(map[string][]byte{CurrentFile(home): []byte(effective + "\n")}); err != nil {
++		removals, err := scopeRecordsEqualToProfile(home, effective)
++		if err != nil {
++			return results, err
++		}
++		if err := op.publish(map[string][]byte{CurrentFile(home): []byte(effective + "\n")}, removals...); err != nil {
+ 			return results, fmt.Errorf("%s: the scope is partially switched; the recorded current is unchanged", DiagUsePartial)
+ 		}
+ 	} else {
+@@ -267,6 +272,59 @@ func useLocked(op *operation, home, name, environment, target string, clearScope
+ 	return results, nil
+ }
+ 
++// scopeRecordsEqualToProfile returns every on-disk spelling of each scope
++// record whose value equals profile. The machine current and these removals
++// are passed to one operation.publish call so the section 9.3 invariant is
++// durable as one journaled state transition.
++func scopeRecordsEqualToProfile(home, profile string) ([]string, error) {
++	scoped, err := ScopedCurrents(home)
++	if err != nil {
++		return nil, err
++	}
++	scopes := make([]string, 0, len(scoped))
++	for scope, current := range scoped {
++		if current == profile {
++			scopes = append(scopes, scope)
++		}
++	}
++	sort.Strings(scopes)
++
++	var removals []string
++	for _, scope := range scopes {
++		paths, err := scopeRecordPaths(home, scope)
++		if err != nil {
++			return nil, err
++		}
++		removals = append(removals, paths...)
++	}
++	sort.Strings(removals)
++	return removals, nil
++}
++
++// scopeRecordPaths lists all existing filename spellings for one decoded
++// scope key, including a legacy literal spelling when present. The caller
++// has already read the records through ScopedCurrents; an absent directory
++// or vanished matching entry here is a changed record, not a reason to leave
++// the equal-default invariant partially applied.
++func scopeRecordPaths(home, scope string) ([]string, error) {
++	dir := ScopedDir(home)
++	entries, err := os.ReadDir(dir)
++	if err != nil {
++		return nil, err
++	}
++	var paths []string
++	for _, entry := range entries {
++		if entry.IsDir() || scopeKeyName(entry.Name()) != scope {
++			continue
++		}
++		paths = append(paths, filepath.Join(dir, entry.Name()))
++	}
++	if len(paths) == 0 {
++		return nil, fmt.Errorf("%s: scoped current %q changed while switching", DiagSourceInvalid, scope)
++	}
++	return paths, nil
++}
++
+ // Sync re-materializes the machine scope and every scoped current from
+ // their profiles' locks: the stage-(a) actualization path. The machine pass
+ // skips adapters that carry a scope record and the scoped pass writes each
