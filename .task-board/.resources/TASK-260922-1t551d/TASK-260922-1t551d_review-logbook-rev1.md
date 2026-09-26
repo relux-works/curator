@@ -1,0 +1,3 @@
+# Review logbook — TASK-260922-1t551d revision 1
+
+2026-09-22: Independently reproduced two acceptance failures on tree 2b179a7af518b9b73c5b0566d828676146977eca: correctly targeted dangling Pi links are silently current; single-quoted Codex storage selectors bypass isolation/unsupported refusals. The producer results claim full dangling coverage but explicitly defer it to F-C3 and test currentness; binding R2 assigns this behavior to F-C1. Gate run 35678477038 is green on the exact candidate tree, demonstrating a coverage gap rather than stale gate evidence. Changes requested; no external decision is needed. See task-scoped review verdict, probes and evidence. No control-root LOGBOOK.md was edited.

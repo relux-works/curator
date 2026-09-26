@@ -1,0 +1,1696 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 33e41ebd..b47641af 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -70,9 +70,43 @@ All notable implementation changes are recorded here.
+   directive exactly as it does for a used one. A schema-6 or schema-7 skill
+   that carried an unused directory `replace` therefore built before and now
+   fails; declare the directory under `modules`, or drop the directive.
++- `codex_cli` `isolated` is now admitted under effective `file` credential
++  storage only (Spec environments §7.4, Decision 0017). The native
++  `config.toml` is parsed as TOML and only the top-level
++  `cli_auth_credentials_store` key counts, in any valid spelling; an
++  absent file or key resolves to the platform default `file`, so
++  `isolated` stays admitted; `keyring` or `auto` is refused with
++  `environment_isolated_unsupported`; a selector outside the verified
++  `file`/`keyring`/`auto` set fails closed with
++  `environment_credential_unsupported` at provisioning and repair, and a
++  `config.toml` that does not parse fails closed naming the file instead
++  of reading as absent.
++- New `pi` managed homes link `auth.json` at the corrected native root
++  `~/.pi/agent` (Spec environments §7.4, Decision 0017 choice 3). Existing
++  homes linked at the old `~/.pi/auth.json` target are reported detached
++  with `environment_credential_conflict`-class wording, and repair
++  re-points the recorded link at the declared root without touching bytes.
+ 
+ ### Fixed
+ 
++- Credential-link repairs are fix-first and never destroy bytes (Spec
++  environments §7.4/§10.1, manager §12.4, Decision 0017). A stale recorded
++  link (`shared`→`isolated`, or a store gone ambient) is unlinked only
++  when it is still a symlink targeting the declared native store; a
++  regular file, a foreign link, or a directory there refuses with
++  `environment_credential_conflict` naming the path, removing nothing —
++  previously the path was unconditionally removed and re-linked. A
++  mis-targeted recorded link (for example a `pi` home still aimed at the
++  pre-0017 native root) is reported detached with conflict-class wording
++  by `env status` and `env resolve`, and repair re-points the recorded
++  symlink at the declared store without touching bytes; only a regular
++  file, an unrecorded symlink, or a non-empty directory at the link path
++  refuses. A correctly targeted link whose native target does not exist
++  yet is the distinct detached-pending state — the normal pre-login shape
++  — reported as a warning by provisioning, repair, and bare resolve, which
++  all succeed loudly; it is never stale and never a conflict. A native
++  target that cannot be inspected stays a stale conflict/inspection
++  diagnostic.
+ - Git snapshots are extracted from the object database (`git ls-tree -r -z`
+   plus `git cat-file --batch`) instead of `git archive`, so every regular file
+   carries exactly its committed blob bytes. `git archive` applied
+diff --git a/cmd/curator/env_test.go b/cmd/curator/env_test.go
+index 61eb0069..65f51a05 100644
+--- a/cmd/curator/env_test.go
++++ b/cmd/curator/env_test.go
+@@ -39,6 +39,7 @@ func TestEnvResolveBareStaleIsAFailure(t *testing.T) {
+ // current with identical bytes.
+ func TestEnvResolveRepairEmitsFragment(t *testing.T) {
+ 	source, _ := profileHome(t)
++	writeNativeCredentials(t)
+ 	pkg := t.TempDir()
+ 	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
+ 	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
+@@ -95,6 +96,7 @@ func TestEnvResolveUnknowns(t *testing.T) {
+ // --check and --json.
+ func TestEnvStatusMatrix(t *testing.T) {
+ 	source, _ := profileHome(t)
++	writeNativeCredentials(t)
+ 	pkg := t.TempDir()
+ 	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
+ 	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
+diff --git a/cmd/curator/envalias_test.go b/cmd/curator/envalias_test.go
+index dcc930b5..2fca77f7 100644
+--- a/cmd/curator/envalias_test.go
++++ b/cmd/curator/envalias_test.go
+@@ -22,6 +22,7 @@ import (
+ // name the canonical home variable.
+ func TestEnvResolveAcceptsAliases(t *testing.T) {
+ 	source, _ := profileHome(t)
++	writeNativeCredentials(t)
+ 	pkg := t.TempDir()
+ 	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
+ 	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
+diff --git a/cmd/curator/hook_posture_test.go b/cmd/curator/hook_posture_test.go
+index de95ae78..ac025f8d 100644
+--- a/cmd/curator/hook_posture_test.go
++++ b/cmd/curator/hook_posture_test.go
+@@ -327,6 +327,7 @@ func TestStatusUnreadableApprovalStateSurfaced(t *testing.T) {
+ func provisionedEnvMatrix(t *testing.T) (stubConfigSource, string) {
+ 	t.Helper()
+ 	source, home := profileHome(t)
++	writeNativeCredentials(t)
+ 	pkg := t.TempDir()
+ 	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
+ 	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
+diff --git a/cmd/curator/hook_test.go b/cmd/curator/hook_test.go
+index 21dbb908..836076f5 100644
+--- a/cmd/curator/hook_test.go
++++ b/cmd/curator/hook_test.go
+@@ -624,6 +624,7 @@ func TestEnvStatusReportsShellHookTrustPosture(t *testing.T) {
+ 	// No t.Parallel: profileHome sets process environment, exactly like
+ 	// the other env matrix tests.
+ 	source, _ := profileHome(t)
++	writeNativeCredentials(t)
+ 	pkg := t.TempDir()
+ 	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
+ 	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
+diff --git a/cmd/curator/profile_test.go b/cmd/curator/profile_test.go
+index 7f971d92..69bc987b 100644
+--- a/cmd/curator/profile_test.go
++++ b/cmd/curator/profile_test.go
+@@ -50,6 +50,39 @@ func runProfile(t *testing.T, source stubConfigSource, args ...string) (int, str
+ 	return code, stdout.String(), stderr.String()
+ }
+ 
++// writeNativeCredentials seeds live native credential targets for the
++// homes profileHome redirects: codex auth.json, the pi agent-root
++// auth.json, and the Linux claude_code credentials file. The seeds keep
++// the detached-pending finding out of tests about other behaviors, and
++// the writes are harmless where an adapter links nothing.
++func writeNativeCredentials(t *testing.T) {
++	t.Helper()
++	if dir := os.Getenv("CODEX_HOME"); dir != "" {
++		if err := os.MkdirAll(dir, 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(filepath.Join(dir, "auth.json"), []byte("{\"t\":\"operator\"}\n"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++	}
++	if dir := os.Getenv("PI_CODING_AGENT_DIR"); dir != "" {
++		if err := os.MkdirAll(filepath.Join(dir, "agent"), 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(filepath.Join(dir, "agent", "auth.json"), []byte("{\"t\":\"operator-pi\"}\n"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++	}
++	if dir := os.Getenv("CLAUDE_CONFIG_DIR"); dir != "" {
++		if err := os.MkdirAll(dir, 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(filepath.Join(dir, ".credentials.json"), []byte("{\"t\":\"operator-claude\"}\n"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++	}
++}
++
+ // gitFileURL renders a local fixture repository path as the file:// remote
+ // a git [url ...] section matches. The value is written into git
+ // configuration, where a backslash is an escape: a raw Windows temporary
+diff --git a/docs/troubleshooting.md b/docs/troubleshooting.md
+index 86b4a98c..1dc32a50 100644
+--- a/docs/troubleshooting.md
++++ b/docs/troubleshooting.md
+@@ -551,3 +551,63 @@ diagnostics keep their lane behavior and carry no appended guidance.
+ Remedy: fix the endpoint entry in machine source-policy.json: the
+ strict external-build lane admits no explicit port and no host alias,
+ then retry the explicit attempt.
++
++## Environment credential links
++
++### environment_credential_conflict
++
++Symptom: `env resolve --repair` stops with
++`environment_credential_conflict` naming a managed link path such as
++`.../environments/<profile>/<env>/auth.json`, and emits no fragment.
++`env status` (and a bare `env resolve`) report the same state as a
++detached passthrough entry with conflict-class wording.
++
++Cause: the link path holds something repair must not displace — a
++regular file (the tool severed the link by writing over it, or the
++managed home holds its own credential bytes), an unrecorded symlink to
++an unexpected target, or a non-empty directory. A stale recorded link
++(`shared`→`isolated`, or a store gone ambient) is unlinked only when it
++is still a symlink targeting the declared native store, preserving the
++native bytes; anything else at the stale path refuses the same way. A
++mis-targeted *recorded* link — for example a `pi` home still aimed at
++the pre-0017 native `~/.pi/auth.json` instead of `~/.pi/agent/auth.json`
++— is reported detached with conflict-class wording but is re-pointed by
++repair, not refused.
++
++Not this error: a correctly targeted link whose native target does not
++exist yet is the detached-pending warning (`link target ... does not
++exist yet — log in to <tool> to populate it`), not a conflict —
++provisioning, repair, and bare resolve all succeed loudly. Establish the
++native credential — log in natively, or log in inside the managed home —
++and the finding clears on the next run.
++
++Remedy: resolve the conflict out of band, then re-run. Inspect both
++sides — the managed path the diagnostic names and the declared native
++target — decide which credential bytes win, move the loser aside
++yourself (the manager never moves credential bytes), and re-run with
++`--repair`. Do not re-point a mis-targeted recorded link by hand to
++silence the finding: re-run with `--repair` and let the manager move the
++link itself.
++
++### environment_credential_unsupported
++
++Symptom: provisioning or repairing a `codex_cli` home fails with
++`environment_credential_unsupported` naming the native
++`cli_auth_credentials_store` selector.
++
++Cause: the operator's native `config.toml` selects a credential store
++outside the verified `file`/`keyring`/`auto` set, so the manager cannot
++establish the credential strategy and fails closed. Only the top-level
++`cli_auth_credentials_store` key counts, in any valid TOML spelling; a
++same-named key nested inside a table is not the selector. An absent
++file or an absent key is not this error: both resolve to the platform
++default `file` store. A `config.toml` that does not parse, or a
++non-string value for the key, fails closed the same way instead of
++reading as absent.
++
++Remedy: set `cli_auth_credentials_store` in the **native**
++`config.toml` to one of `file`, `keyring`, or `auto` (or remove the key
++for the `file` default) and retry. Sharing is defined by the native
++effective storage only: editing the managed copy changes nothing. Note
++that `isolated` is admitted under `file` storage only; under `keyring`
++or `auto` it is refused with `environment_isolated_unsupported`.
+diff --git a/internal/envprofile/credential_link_test.go b/internal/envprofile/credential_link_test.go
+new file mode 100644
+index 00000000..3b32e6ee
+--- /dev/null
++++ b/internal/envprofile/credential_link_test.go
+@@ -0,0 +1,838 @@
++// Production entry points under test: Resolve and StatusOf for the
++// Decision 0017 fix-first credential-link repairs (environments §7.4,
++// §10.1; manager §12.4). Every row drives a production entry on a
++// temporary store; helper-direct assertions are bounds, not rows.
++package envprofile
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/envregistry"
++)
++
++// TestSharedToIsolatedRemovesStaleLink is row (a): a shared→isolated turn
++// leaves no stale recorded link behind. The removal set covers recorded
++// credential links, not only marker surfaces (the first 0017 hazard), and
++// unlinking preserves the native bytes. A mutant that skips the
++// recorded-link removal leaves the link on disk and fails the absence
++// assertion; one that drops the record without unlinking fails it too.
++func TestSharedToIsolatedRemovesStaleLink(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	nativeAuth := []byte("{\"t\":\"operator-credential\"}\n")
++	if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "auth.json"), nativeAuth, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
++	link := filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), "auth.json")
++	if _, err := os.Readlink(link); err != nil {
++		t.Fatalf("shared provision links auth.json: %v", err)
++	}
++	isolated := envregistry.DefaultMachineConfig()
++	isolated.Isolation = map[string]map[string]string{"acme": {"codex_cli": "isolated"}}
++	stale := fx.request("codex_cli")
++	stale.Machine = isolated
++	if _, err := Resolve(stale); err == nil || !strings.Contains(err.Error(), DiagHomeStale) {
++		t.Fatalf("the mode turn must be stale, got %v", err)
++	}
++	repair := fx.request("codex_cli")
++	repair.Machine = isolated
++	repair.Repair = true
++	if _, err := Resolve(repair); err != nil {
++		t.Fatalf("repair applies the isolated turn: %v", err)
++	}
++	if _, err := os.Lstat(link); !os.IsNotExist(err) {
++		t.Fatalf("no stale link survives shared→isolated, lstat: %v", err)
++	}
++	if payload, err := os.ReadFile(filepath.Join(fx.native["codex_cli"], "auth.json")); err != nil || string(payload) != string(nativeAuth) {
++		t.Fatalf("unlinking preserves the native bytes: %q (%v)", payload, err)
++	}
++	marker := readManagedMarker(t, fx, "codex_cli")
++	if marker.Passthrough == nil || len(*marker.Passthrough) != 0 {
++		t.Fatalf("the record drops the stale entry: %+v", marker.Passthrough)
++	}
++	if _, err := Resolve(stale); err != nil {
++		t.Fatalf("the isolated home is current: %v", err)
++	}
++}
++
++// TestCredentialLinkRegularFileRefuses is row (b): a regular file at a
++// wanted link path refuses with environment_credential_conflict naming
++// the path, and the bytes — managed and native — are untouched. The
++// empty-file subtest is the narrowing killer for a mutant that refuses
++// only non-empty files; restoring the unconditional Remove passes
++// neither subtest.
++func TestCredentialLinkRegularFileRefuses(t *testing.T) {
++	for _, tc := range []struct {
++		name  string
++		bytes []byte
++	}{
++		{"non-empty", []byte("detached-credential\n")},
++		{"empty", []byte{}},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			fx := writeManagedFixture(t, "acme")
++			nativeAuth := []byte("{\"t\":\"operator-credential\"}\n")
++			if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "auth.json"), nativeAuth, 0o600); err != nil {
++				t.Fatal(err)
++			}
++			provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
++			link := filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), "auth.json")
++			_ = os.Remove(link)
++			if err := os.WriteFile(link, tc.bytes, 0o600); err != nil {
++				t.Fatal(err)
++			}
++			stale, err := Resolve(fx.request("codex_cli"))
++			if err == nil || !strings.Contains(err.Error(), DiagHomeStale) {
++				t.Fatalf("a file at the link path must be stale, got %v", err)
++			}
++			reasons := strings.Join(stale.StaleReasons, "; ")
++			if !strings.Contains(reasons, envregistry.DiagCredentialConflict) || !strings.Contains(reasons, "auth.json") {
++				t.Fatalf("stale reasons carry conflict-class wording: %q", reasons)
++			}
++			req := fx.request("codex_cli")
++			req.Repair = true
++			_, err = Resolve(req)
++			if err == nil || !strings.Contains(err.Error(), envregistry.DiagCredentialConflict) {
++				t.Fatalf("repair must refuse with %s, got %v", envregistry.DiagCredentialConflict, err)
++			}
++			if !strings.Contains(err.Error(), link) {
++				t.Fatalf("the refusal names the path %s: %v", link, err)
++			}
++			if strings.Contains(err.Error(), DiagRepairFailed) {
++				t.Fatalf("a credential refusal is not wrapped as %s: %v", DiagRepairFailed, err)
++			}
++			info, err := os.Lstat(link)
++			if err != nil || info.Mode()&os.ModeSymlink != 0 {
++				t.Fatalf("the managed file is untouched, still a regular file: %v", err)
++			}
++			if payload, err := os.ReadFile(link); err != nil || string(payload) != string(tc.bytes) {
++				t.Fatalf("managed bytes untouched: %q (%v)", payload, err)
++			}
++			if payload, err := os.ReadFile(filepath.Join(fx.native["codex_cli"], "auth.json")); err != nil || string(payload) != string(nativeAuth) {
++				t.Fatalf("native bytes untouched: %q (%v)", payload, err)
++			}
++		})
++	}
++}
++
++// TestStaleCredentialLinkRefusals pins the fix-first bound on the removal
++// side: a stale recorded link path holding a regular file, a foreign
++// symlink, or a directory refuses with
++// environment_credential_conflict naming the path, removing nothing. The
++// foreign symlink shares the expected basename on purpose: a mutant that
++// compares basenames instead of full targets unlinks it and fails.
++func TestStaleCredentialLinkRefusals(t *testing.T) {
++	setup := func(t *testing.T) (*managedFixture, string) {
++		t.Helper()
++		fx := writeManagedFixture(t, "acme")
++		if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "auth.json"), []byte("{\"t\":\"operator\"}\n"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++		provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
++		return fx, filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), "auth.json")
++	}
++	isolatedRepair := func(fx *managedFixture) ResolveRequest {
++		machine := envregistry.DefaultMachineConfig()
++		machine.Isolation = map[string]map[string]string{"acme": {"codex_cli": "isolated"}}
++		req := fx.request("codex_cli")
++		req.Machine = machine
++		req.Repair = true
++		return req
++	}
++	t.Run("regular file", func(t *testing.T) {
++		fx, link := setup(t)
++		_ = os.Remove(link)
++		managed := []byte("managed-credential\n")
++		if err := os.WriteFile(link, managed, 0o600); err != nil {
++			t.Fatal(err)
++		}
++		if _, err := Resolve(isolatedRepair(fx)); err == nil || !strings.Contains(err.Error(), envregistry.DiagCredentialConflict) {
++			t.Fatalf("a file at the stale path must refuse, got %v", err)
++		} else if !strings.Contains(err.Error(), link) {
++			t.Fatalf("the refusal names the path: %v", err)
++		}
++		if payload, err := os.ReadFile(link); err != nil || string(payload) != string(managed) {
++			t.Fatalf("managed bytes untouched: %q (%v)", payload, err)
++		}
++	})
++	t.Run("foreign symlink", func(t *testing.T) {
++		fx, link := setup(t)
++		foreign := filepath.Join(t.TempDir(), "auth.json")
++		if err := os.WriteFile(foreign, []byte("foreign\n"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++		_ = os.Remove(link)
++		if err := os.Symlink(foreign, link); err != nil {
++			t.Fatal(err)
++		}
++		if _, err := Resolve(isolatedRepair(fx)); err == nil || !strings.Contains(err.Error(), envregistry.DiagCredentialConflict) {
++			t.Fatalf("a foreign link at the stale path must refuse, got %v", err)
++		} else if !strings.Contains(err.Error(), link) {
++			t.Fatalf("the refusal names the path: %v", err)
++		}
++		if target, err := os.Readlink(link); err != nil || target != foreign {
++			t.Fatalf("the foreign link is untouched: %q (%v)", target, err)
++		}
++	})
++	t.Run("directory", func(t *testing.T) {
++		fx, link := setup(t)
++		_ = os.Remove(link)
++		if err := os.Mkdir(link, 0o755); err != nil {
++			t.Fatal(err)
++		}
++		kept := filepath.Join(link, "kept")
++		if err := os.WriteFile(kept, []byte("kept\n"), 0o644); err != nil {
++			t.Fatal(err)
++		}
++		if _, err := Resolve(isolatedRepair(fx)); err == nil || !strings.Contains(err.Error(), envregistry.DiagCredentialConflict) {
++			t.Fatalf("a directory at the stale path must refuse, got %v", err)
++		} else if !strings.Contains(err.Error(), link) {
++			t.Fatalf("the refusal names the path: %v", err)
++		}
++		if payload, err := os.ReadFile(kept); err != nil || string(payload) != "kept\n" {
++			t.Fatalf("directory contents untouched: %q (%v)", payload, err)
++		}
++	})
++}
++
++// TestDanglingPiLinkReportedDetached is row (c), the operator-machine
++// reproduction: the managed Pi link still targets the pre-0017 native
++// path, which does not exist, while the real credential lives at the
++// agent root. Status and resolve report the recorded passthrough as
++// detached with environment_credential_conflict-class wording — never
++// silence — and repair re-points the recorded symlink at the declared
++// agent root without touching bytes (rework-2 refinement: only a
++// regular file at the link path refuses). A mutant that restores the
++// old Pi target or compares basenames only reports current and fails;
++// one that refuses the re-point fails the repair below.
++func TestDanglingPiLinkReportedDetached(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	native := fx.native["pi"]
++	agentAuth := filepath.Join(native, "agent", "auth.json")
++	if err := os.MkdirAll(filepath.Dir(agentAuth), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(agentAuth, []byte("{\"t\":\"operator-pi-credential\"}\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	provision(t, fx, "pi", envregistry.DefaultMachineConfig())
++	link := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), "auth.json")
++	// Reproduce the operator state: the managed link targets the old
++	// native path, which exists nowhere.
++	_ = os.Remove(link)
++	oldTarget := filepath.Join(native, "auth.json")
++	if err := os.Symlink(oldTarget, link); err != nil {
++		t.Fatal(err)
++	}
++	status, err := StatusOf(statusRequest(fx))
++	if err != nil {
++		t.Fatal(err)
++	}
++	row := findHome(status, "acme", "pi")
++	if row == nil || row.Current {
++		t.Fatalf("the mis-targeted Pi home is non-current: %+v", row)
++	}
++	findings := strings.Join(row.Findings, "; ")
++	for _, want := range []string{envregistry.DiagPassthroughDetached, envregistry.DiagCredentialConflict, "auth.json", agentAuth} {
++		if !strings.Contains(findings, want) {
++			t.Fatalf("status findings carry detached conflict-class wording, want %q in %q", want, findings)
++		}
++	}
++	stale, err := Resolve(fx.request("pi"))
++	if err == nil || !strings.Contains(err.Error(), DiagHomeStale) {
++		t.Fatalf("the mis-targeted Pi home must be stale, got %v", err)
++	}
++	reasons := strings.Join(stale.StaleReasons, "; ")
++	for _, want := range []string{"is detached", envregistry.DiagCredentialConflict, "auth.json", agentAuth} {
++		if !strings.Contains(reasons, want) {
++			t.Fatalf("stale reasons carry detached conflict-class wording, want %q in %q", want, reasons)
++		}
++	}
++	req := fx.request("pi")
++	req.Repair = true
++	if _, err := Resolve(req); err != nil {
++		t.Fatalf("repair re-points the recorded link at the declared root: %v", err)
++	}
++	if target, err := os.Readlink(link); err != nil || target != agentAuth {
++		t.Fatalf("the link now targets the declared root: %q (%v), want %q", target, err, agentAuth)
++	}
++	if payload, err := os.ReadFile(agentAuth); err != nil || string(payload) != "{\"t\":\"operator-pi-credential\"}\n" {
++		t.Fatalf("native bytes untouched: %q (%v)", payload, err)
++	}
++	if _, err := os.Lstat(oldTarget); !os.IsNotExist(err) {
++		t.Fatalf("repair creates nothing at the old target: %v", err)
++	}
++	if _, err := Resolve(fx.request("pi")); err != nil {
++		t.Fatalf("the re-pointed home is current: %v", err)
++	}
++}
++
++// TestCodexIsolatedAdmission is row (d): codex_cli isolated is admitted
++// under effective file storage only. An absent config file and an absent
++// key both resolve to file; keyring and auto refuse with
++// environment_isolated_unsupported; any other selector fails closed with
++// environment_credential_unsupported — under shared too. A mutant that
++// drops the auto arm admits auto; one that broadens the gate to
++// store-is-not-file reports the unknown selector as isolated-unsupported
++// instead of credential-unsupported; both fail below.
++func TestCodexIsolatedAdmission(t *testing.T) {
++	for _, tc := range []struct {
++		name    string
++		config  *string
++		wantErr string
++	}{
++		{"absent file admits", nil, ""},
++		{"absent key admits", strptr("model = \"o3\"\n"), ""},
++		{"file admits", strptr("cli_auth_credentials_store = \"file\"\n"), ""},
++		{"keyring refuses", strptr("cli_auth_credentials_store = \"keyring\"\n"), envregistry.DiagIsolatedUnsupported},
++		{"auto refuses", strptr("cli_auth_credentials_store = \"auto\"\n"), envregistry.DiagIsolatedUnsupported},
++		{"unknown fails closed", strptr("cli_auth_credentials_store = \"ephemeral\"\n"), envregistry.DiagCredentialUnsupported},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			fx := writeManagedFixture(t, "acme")
++			if tc.config != nil {
++				if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte(*tc.config), 0o644); err != nil {
++					t.Fatal(err)
++				}
++			}
++			machine := envregistry.DefaultMachineConfig()
++			machine.Isolation = map[string]map[string]string{"acme": {"codex_cli": "isolated"}}
++			req := fx.request("codex_cli")
++			req.Machine = machine
++			req.Repair = true
++			_, err := Resolve(req)
++			if tc.wantErr == "" {
++				if err != nil {
++					t.Fatalf("isolated must be admitted: %v", err)
++				}
++				marker := readManagedMarker(t, fx, "codex_cli")
++				if marker.Passthrough == nil || len(*marker.Passthrough) != 0 {
++					t.Fatalf("an isolated home records no passthrough: %+v", marker.Passthrough)
++				}
++				if _, err := os.Lstat(filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), "auth.json")); !os.IsNotExist(err) {
++					t.Fatalf("an isolated home links nothing: %v", err)
++				}
++				return
++			}
++			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
++				t.Fatalf("want %s, got %v", tc.wantErr, err)
++			}
++			if tc.wantErr == envregistry.DiagIsolatedUnsupported && !strings.Contains(err.Error(), "codex_cli") {
++				t.Fatalf("the refusal names the environment: %v", err)
++			}
++		})
++	}
++}
++
++// TestCodexUnknownStoreSharedRefuses pins the shared side of the unknown
++// selector: provisioning with a storage selector outside the verified
++// file/keyring/auto set fails closed with
++// environment_credential_unsupported before the first write, so fixing
++// the selector and re-running provisions cleanly.
++func TestCodexUnknownStoreSharedRefuses(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	config := filepath.Join(fx.native["codex_cli"], "config.toml")
++	if err := os.WriteFile(config, []byte("cli_auth_credentials_store = \"ephemeral\"\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	req := fx.request("codex_cli")
++	req.Repair = true
++	if _, err := Resolve(req); err == nil || !strings.Contains(err.Error(), envregistry.DiagCredentialUnsupported) {
++		t.Fatalf("an unknown selector must fail closed, got %v", err)
++	}
++	if _, err := os.Lstat(ManagedHomeDir(fx.home, "acme", "codex_cli")); !os.IsNotExist(err) {
++		t.Fatalf("a refused provisioning writes nothing: %v", err)
++	}
++	if err := os.WriteFile(config, []byte("cli_auth_credentials_store = \"file\"\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := Resolve(req); err != nil {
++		t.Fatalf("fixing the selector provisions: %v", err)
++	}
++}
++
++// TestPiProvisionTargetsAgentRoot is row (e): new Pi provisioning links
++// the managed auth.json at the 0017 native root ~/.pi/agent, and the
++// marker records path and strategy only — the frozen v1 schema gains no
++// fields. Provisioning with no native credential yet succeeds — the link
++// is established, the native side is the operator's — warning loudly
++// with the detached-pending state; bare resolve succeeds the same way
++// until the native credential exists. The pending warning carries no
++// conflict diagnostic: it is the expected pre-login shape, not a
++// refusal. A mutant that reports the pending link stale fails the bare
++// resolve; one that silences it fails the warning assertions.
++func TestPiProvisionTargetsAgentRoot(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	req := fx.request("pi")
++	req.Repair = true
++	provisioned, err := Resolve(req)
++	if err != nil {
++		t.Fatalf("provisioning with no native credential yet succeeds: %v", err)
++	}
++	warnings := strings.Join(provisioned.Warnings, "; ")
++	for _, want := range []string{"detached-pending", "does not exist yet", "pi"} {
++		if !strings.Contains(warnings, want) {
++			t.Fatalf("provision warns loudly about the pending target, want %q in %q", want, warnings)
++		}
++	}
++	if strings.Contains(warnings, envregistry.DiagCredentialConflict) {
++		t.Fatalf("the pending warning is not a conflict: %q", warnings)
++	}
++	link := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), "auth.json")
++	want := filepath.Join(fx.native["pi"], "agent", "auth.json")
++	if target, err := os.Readlink(link); err != nil || target != want {
++		t.Fatalf("new Pi homes link the agent root: %q (%v), want %q", target, err, want)
++	}
++	current, err := Resolve(fx.request("pi"))
++	if err != nil {
++		t.Fatalf("a dangling-but-correct link succeeds with its finding, got %v", err)
++	}
++	resolved := strings.Join(current.Warnings, "; ")
++	for _, want := range []string{"detached-pending", "does not exist yet", "pi"} {
++		if !strings.Contains(resolved, want) {
++			t.Fatalf("bare resolve carries the pending finding, want %q in %q", want, resolved)
++		}
++	}
++	if strings.Contains(resolved, envregistry.DiagCredentialConflict) {
++		t.Fatalf("the pending finding is not a conflict: %q", resolved)
++	}
++	marker := readManagedMarker(t, fx, "pi")
++	if marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
++		t.Fatalf("one passthrough entry recorded: %+v", marker.Passthrough)
++	}
++	entry := (*marker.Passthrough)[0]
++	if entry.Path != "auth.json" || entry.Strategy != envregistry.StrategyFileLink {
++		t.Fatalf("recorded entry %+v", entry)
++	}
++	payload, err := json.Marshal(marker.Passthrough)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var decoded []map[string]any
++	if err := json.Unmarshal(payload, &decoded); err != nil {
++		t.Fatal(err)
++	}
++	for key := range decoded[0] {
++		if key != "path" && key != "strategy" {
++			t.Fatalf("frozen v1 records path and strategy only, found %q in %s", key, payload)
++		}
++	}
++	// With the native credential present the link reads through.
++	if err := os.MkdirAll(filepath.Join(fx.native["pi"], "agent"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	nativeAuth := []byte("{\"t\":\"pi-credential\"}\n")
++	if err := os.WriteFile(want, nativeAuth, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if payload, err := os.ReadFile(link); err != nil || string(payload) != string(nativeAuth) {
++		t.Fatalf("the link serves the agent-root bytes: %q (%v)", payload, err)
++	}
++	healed, err := Resolve(fx.request("pi"))
++	if err != nil {
++		t.Fatalf("the linked home is current: %v", err)
++	}
++	if warnings := strings.Join(healed.Warnings, "; "); strings.Contains(warnings, "detached-pending") {
++		t.Fatalf("the pending finding clears once the native target exists: %q", warnings)
++	}
++}
++
++// TestCredentialLinkDirectory pins the §7.4 directory rule through
++// Resolve: an empty directory at a wanted link path is replaced by the
++// link, while a non-empty one refuses with
++// environment_credential_conflict and its contents are untouched.
++func TestCredentialLinkDirectory(t *testing.T) {
++	t.Run("empty is re-linked", func(t *testing.T) {
++		fx := writeManagedFixture(t, "acme")
++		seedLiveNativeCredentials(t, fx)
++		provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
++		link := filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), "auth.json")
++		_ = os.Remove(link)
++		if err := os.Mkdir(link, 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if _, err := Resolve(fx.request("codex_cli")); err == nil || !strings.Contains(err.Error(), DiagHomeStale) {
++			t.Fatalf("a directory at the link path must be stale, got %v", err)
++		}
++		req := fx.request("codex_cli")
++		req.Repair = true
++		if _, err := Resolve(req); err != nil {
++			t.Fatalf("repair re-links over an empty directory: %v", err)
++		}
++		if target, err := os.Readlink(link); err != nil || target != filepath.Join(fx.native["codex_cli"], "auth.json") {
++			t.Fatalf("repair left %q (%v)", target, err)
++		}
++	})
++	t.Run("non-empty refuses", func(t *testing.T) {
++		fx := writeManagedFixture(t, "acme")
++		seedLiveNativeCredentials(t, fx)
++		provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
++		link := filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), "auth.json")
++		_ = os.Remove(link)
++		if err := os.Mkdir(link, 0o755); err != nil {
++			t.Fatal(err)
++		}
++		kept := filepath.Join(link, "kept")
++		if err := os.WriteFile(kept, []byte("kept\n"), 0o644); err != nil {
++			t.Fatal(err)
++		}
++		req := fx.request("codex_cli")
++		req.Repair = true
++		_, err := Resolve(req)
++		if err == nil || !strings.Contains(err.Error(), envregistry.DiagCredentialConflict) {
++			t.Fatalf("a non-empty directory must refuse, got %v", err)
++		}
++		if !strings.Contains(err.Error(), link) {
++			t.Fatalf("the refusal names the path: %v", err)
++		}
++		if payload, err := os.ReadFile(kept); err != nil || string(payload) != "kept\n" {
++			t.Fatalf("directory contents untouched: %q (%v)", payload, err)
++		}
++	})
++}
++
++// TestCredentialLinkUnrecordedSymlinkRefuses pins the recorded-only bound
++// on the re-point: a symlink to an unexpected target at a wanted link
++// path the marker does NOT record is foreign, so repair refuses with
++// environment_credential_conflict naming the path, removing nothing. The
++// setup turns a keyring-ambient codex home (nothing linked, nothing
++// recorded) into a file-link home while the operator's own symlink sits
++// at the link path. A mutant that drops the recorded check and re-points
++// every symlink unlinks the foreign link and fails; one that refuses
++// every re-point fails TestDanglingPiLinkReportedDetached instead.
++func TestCredentialLinkUnrecordedSymlinkRefuses(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte("cli_auth_credentials_store = \"keyring\"\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
++	marker := readManagedMarker(t, fx, "codex_cli")
++	if marker.Passthrough == nil || len(*marker.Passthrough) != 0 {
++		t.Fatalf("a keyring home records no passthrough: %+v", marker.Passthrough)
++	}
++	// The native store turns to file, and the operator's own symlink sits
++	// at the now-wanted link path.
++	if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte("cli_auth_credentials_store = \"file\"\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "auth.json"), []byte("{\"t\":\"operator\"}\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	link := filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), "auth.json")
++	foreign := filepath.Join(t.TempDir(), "auth.json")
++	if err := os.WriteFile(foreign, []byte("foreign\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Symlink(foreign, link); err != nil {
++		t.Fatal(err)
++	}
++	req := fx.request("codex_cli")
++	req.Repair = true
++	_, err := Resolve(req)
++	if err == nil || !strings.Contains(err.Error(), envregistry.DiagCredentialConflict) {
++		t.Fatalf("an unrecorded symlink at the wanted path must refuse, got %v", err)
++	}
++	if !strings.Contains(err.Error(), link) {
++		t.Fatalf("the refusal names the path: %v", err)
++	}
++	if target, err := os.Readlink(link); err != nil || target != foreign {
++		t.Fatalf("the foreign link is untouched: %q (%v)", target, err)
++	}
++}
++
++func strptr(value string) *string { return &value }
++
++// TestReviewerDanglingExpectedTarget is the revision-1 reviewer's probe,
++// revised under rework-2 as the detached-pending row: a recorded Pi link
++// pointing at the declared agent-root target with no native file is
++// REPORTED — never silently current — but no longer fails. StatusOf and
++// Resolve both surface the detached-pending finding; Resolve succeeds
++// with it as a warning. The probe's original stale-plus-conflict
++// expectation now belongs to the mis-targeted state only
++// (TestDanglingPiLinkReportedDetached).
++func TestReviewerDanglingExpectedTarget(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	provision(t, fx, "pi", envregistry.DefaultMachineConfig())
++	status, err := StatusOf(statusRequest(fx))
++	if err != nil {
++		t.Fatal(err)
++	}
++	row := findHome(status, "acme", "pi")
++	if row == nil {
++		t.Fatal("the pi home row is missing")
++	}
++	reported := strings.Join(row.Findings, ";") + ";" + strings.Join(row.Warnings, ";")
++	for _, want := range []string{"detached-pending", "does not exist yet"} {
++		if !strings.Contains(reported, want) {
++			t.Errorf("dangling expected target must be reported, want %q in %+v", want, row)
++		}
++	}
++	if strings.Contains(reported, envregistry.DiagCredentialConflict) {
++		t.Errorf("the pending finding is not a conflict: %+v", row)
++	}
++	current, err := Resolve(fx.request("pi"))
++	if err != nil {
++		t.Errorf("Resolve surfaces the pending finding without failing, got %v", err)
++	} else if warnings := strings.Join(current.Warnings, "; "); !strings.Contains(warnings, "detached-pending") {
++		t.Errorf("Resolve warnings carry the pending finding: %q", warnings)
++	}
++}
++
++// TestReviewerLiteralCodexSelector is the revision-1 reviewer's probe,
++// committed verbatim: valid TOML literal spellings of the native
++// cli_auth_credentials_store selector refuse exactly like the
++// double-quoted spelling — keyring and auto with
++// environment_isolated_unsupported, any other value with
++// environment_credential_unsupported — never read as absent.
++func TestReviewerLiteralCodexSelector(t *testing.T) {
++	for _, value := range []string{"keyring", "auto", "ephemeral"} {
++		t.Run(value, func(t *testing.T) {
++			fx := writeManagedFixture(t, "acme")
++			config := "cli_auth_credentials_store = '" + value + "'\n"
++			if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte(config), 0600); err != nil {
++				t.Fatal(err)
++			}
++			req := fx.request("codex_cli")
++			req.Repair = true
++			req.Machine = envregistry.DefaultMachineConfig()
++			req.Machine.Isolation = map[string]map[string]string{"acme": {"codex_cli": "isolated"}}
++			_, err := Resolve(req)
++			want := envregistry.DiagIsolatedUnsupported
++			if value == "ephemeral" {
++				want = envregistry.DiagCredentialUnsupported
++			}
++			if err == nil || !strings.Contains(err.Error(), want) {
++				t.Fatalf("valid TOML literal selector must refuse with %s, got %v", want, err)
++			}
++		})
++	}
++}
++
++// TestDanglingExpectedTargetRepairSucceeds pins the repair half of the
++// detached-pending contract (rework-2): a correctly targeted link whose
++// native target went missing is already exactly what repair would
++// establish, so repair leaves the link untouched and SUCCEEDS, carrying
++// the pending finding as a warning — restoring the native target clears
++// it. This is the narrowing partner of TestDanglingPiLinkReportedDetached:
++// a mutant that collapses mis-targeted and dangling-to-declared into one
++// state fails one of the two — stale-plus-conflict-plus-relink here
++// breaks the success below, pending-warning there breaks the Pi staleness.
++func TestDanglingExpectedTargetRepairSucceeds(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	nativeAuth := filepath.Join(fx.native["codex_cli"], "auth.json")
++	if err := os.WriteFile(nativeAuth, []byte("{\"t\":\"operator\"}\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
++	link := filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), "auth.json")
++	if _, err := Resolve(fx.request("codex_cli")); err != nil {
++		t.Fatalf("the live home is current: %v", err)
++	}
++	// The native credential goes missing: the link dangles with the
++	// expected target.
++	if err := os.Remove(nativeAuth); err != nil {
++		t.Fatal(err)
++	}
++	current, err := Resolve(fx.request("codex_cli"))
++	if err != nil {
++		t.Fatalf("a dangling-to-declared link succeeds with its finding, got %v", err)
++	}
++	warnings := strings.Join(current.Warnings, "; ")
++	for _, want := range []string{"detached-pending", "does not exist yet", "auth.json"} {
++		if !strings.Contains(warnings, want) {
++			t.Fatalf("resolve warnings carry the pending finding, want %q in %q", want, warnings)
++		}
++	}
++	if strings.Contains(warnings, envregistry.DiagCredentialConflict) {
++		t.Fatalf("the pending finding is not a conflict: %q", warnings)
++	}
++	req := fx.request("codex_cli")
++	req.Repair = true
++	repaired, err := Resolve(req)
++	if err != nil {
++		t.Fatalf("repair of a dangling-to-declared link succeeds: %v", err)
++	}
++	if warnings := strings.Join(repaired.Warnings, "; "); !strings.Contains(warnings, "detached-pending") {
++		t.Fatalf("repair carries the pending finding: %q", warnings)
++	}
++	if target, err := os.Readlink(link); err != nil || target != nativeAuth {
++		t.Fatalf("repair touches nothing: %q (%v)", target, err)
++	}
++	// Restoring the native target clears the finding.
++	if err := os.WriteFile(nativeAuth, []byte("{\"t\":\"operator\"}\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	healed, err := Resolve(req)
++	if err != nil {
++		t.Fatalf("repair converges once the native target is back: %v", err)
++	}
++	if warnings := strings.Join(healed.Warnings, "; "); strings.Contains(warnings, "detached-pending") {
++		t.Fatalf("the pending finding clears once the native target is back: %q", warnings)
++	}
++	if _, err := Resolve(fx.request("codex_cli")); err != nil {
++		t.Fatalf("the healed home is current: %v", err)
++	}
++}
++
++// TestCredentialLinkTargetInspectionFailure pins the absent-versus-
++// uninspectable distinction: a correctly targeted link whose native
++// target cannot be inspected is a conflict/inspection diagnostic — never
++// silence, and never the "does not exist" absence wording. A regular file
++// where the agent directory should be fails the target stat
++// deterministically on Unix, even as root; Windows maps a stat through a
++// file to path-not-found, so the row is Unix-only and Windows keeps the
++// absence wording there as a stated bound.
++func TestCredentialLinkTargetInspectionFailure(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("this host cannot create an uninspectable link target: Windows maps a stat through a file to path-not-found, so the inspection diagnostic runs on the unix runners")
++	}
++	fx := writeManagedFixture(t, "acme")
++	native := fx.native["pi"]
++	agentAuth := filepath.Join(native, "agent", "auth.json")
++	if err := os.MkdirAll(filepath.Dir(agentAuth), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(agentAuth, []byte("{\"t\":\"operator-pi\"}\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	provision(t, fx, "pi", envregistry.DefaultMachineConfig())
++	if _, err := Resolve(fx.request("pi")); err != nil {
++		t.Fatalf("the live home is current: %v", err)
++	}
++	// Break the target's parent: a file where the agent directory was.
++	if err := os.RemoveAll(filepath.Join(native, "agent")); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(native, "agent"), []byte("not a directory\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	stale, err := Resolve(fx.request("pi"))
++	if err == nil || !strings.Contains(err.Error(), DiagHomeStale) {
++		t.Fatalf("an uninspectable target must be stale, got %v", err)
++	}
++	reasons := strings.Join(stale.StaleReasons, "; ")
++	for _, want := range []string{"cannot be inspected", envregistry.DiagCredentialConflict, "auth.json"} {
++		if !strings.Contains(reasons, want) {
++			t.Fatalf("stale reasons carry the inspection diagnostic, want %q in %q", want, reasons)
++		}
++	}
++	if strings.Contains(reasons, "does not exist") {
++		t.Fatalf("an inspection failure is not absence: %q", reasons)
++	}
++	status, err := StatusOf(statusRequest(fx))
++	if err != nil {
++		t.Fatal(err)
++	}
++	row := findHome(status, "acme", "pi")
++	if row == nil || row.Current {
++		t.Fatalf("the uninspectable home is non-current: %+v", row)
++	}
++	findings := strings.Join(row.Findings, "; ")
++	for _, want := range []string{"cannot be inspected", envregistry.DiagCredentialConflict} {
++		if !strings.Contains(findings, want) {
++			t.Fatalf("status findings carry the inspection diagnostic, want %q in %q", want, findings)
++		}
++	}
++}
++
++// TestCodexCredentialStoreTOMLSpellings drives the native selector reader
++// through isolated Resolve at the production entry: every valid TOML
++// spelling of the top-level key resolves identically, a nested same-named
++// key is not the selector and stays absent, and malformed or mistyped
++// config fails closed instead of reading as absent. Narrowing killers: a
++// mutant that drops single-quote handling admits the literal rows; one
++// that matches nested keys refuses the table rows; one that defaults
++// invalid TOML to file admits the malformed row.
++func TestCodexCredentialStoreTOMLSpellings(t *testing.T) {
++	for _, tc := range []struct {
++		name    string
++		config  string
++		wantErr string
++	}{
++		{"single-quoted file admits", "cli_auth_credentials_store = 'file'\n", ""},
++		{"multi-line basic keyring refuses", "cli_auth_credentials_store = \"\"\"keyring\"\"\"\n", envregistry.DiagIsolatedUnsupported},
++		{"multi-line literal auto refuses", "cli_auth_credentials_store = '''auto'''\n", envregistry.DiagIsolatedUnsupported},
++		{"indented keyring refuses", "  cli_auth_credentials_store = \"keyring\"\n", envregistry.DiagIsolatedUnsupported},
++		{"trailing comment auto refuses", "cli_auth_credentials_store = \"auto\" # operator note\n", envregistry.DiagIsolatedUnsupported},
++		{"nested table key stays absent", "[profile]\ncli_auth_credentials_store = \"keyring\"\n", ""},
++		{"dotted key stays absent", "profile.cli_auth_credentials_store = \"keyring\"\n", ""},
++		{"invalid TOML fails closed", "cli_auth_credentials_store = \n", "not valid TOML"},
++		{"integer selector fails closed", "cli_auth_credentials_store = 42\n", envregistry.DiagCredentialUnsupported},
++		{"boolean selector fails closed", "cli_auth_credentials_store = true\n", envregistry.DiagCredentialUnsupported},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			fx := writeManagedFixture(t, "acme")
++			if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte(tc.config), 0o644); err != nil {
++				t.Fatal(err)
++			}
++			machine := envregistry.DefaultMachineConfig()
++			machine.Isolation = map[string]map[string]string{"acme": {"codex_cli": "isolated"}}
++			req := fx.request("codex_cli")
++			req.Machine = machine
++			req.Repair = true
++			_, err := Resolve(req)
++			if tc.wantErr == "" {
++				if err != nil {
++					t.Fatalf("isolated must be admitted: %v", err)
++				}
++				return
++			}
++			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
++				t.Fatalf("want %s, got %v", tc.wantErr, err)
++			}
++		})
++	}
++}
++
++// TestCodexMalformedStoreSharedRefuses pins the shared side of malformed
++// native config: invalid TOML and non-string selectors fail closed with a
++// diagnostic naming the file before the first write — never the file
++// default — so fixing the config and re-running provisions cleanly.
++func TestCodexMalformedStoreSharedRefuses(t *testing.T) {
++	for _, tc := range []struct {
++		name      string
++		config    string
++		wantErr   string
++		namesFile bool
++	}{
++		{"invalid TOML", "cli_auth_credentials_store = \n", "not valid TOML", true},
++		{"integer selector", "cli_auth_credentials_store = 42\n", envregistry.DiagCredentialUnsupported, false},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			fx := writeManagedFixture(t, "acme")
++			config := filepath.Join(fx.native["codex_cli"], "config.toml")
++			if err := os.WriteFile(config, []byte(tc.config), 0o644); err != nil {
++				t.Fatal(err)
++			}
++			req := fx.request("codex_cli")
++			req.Repair = true
++			_, err := Resolve(req)
++			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
++				t.Fatalf("malformed config must fail closed, got %v", err)
++			}
++			// A file-level failure names the file; a value-level
++			// failure names the key, like the unknown-selector
++			// diagnostic it shares the class with.
++			if tc.namesFile && !strings.Contains(err.Error(), "config.toml") {
++				t.Fatalf("the refusal names the file: %v", err)
++			}
++			if !tc.namesFile && !strings.Contains(err.Error(), "cli_auth_credentials_store") {
++				t.Fatalf("the refusal names the key: %v", err)
++			}
++			if _, err := os.Lstat(ManagedHomeDir(fx.home, "acme", "codex_cli")); !os.IsNotExist(err) {
++				t.Fatalf("a refused provisioning writes nothing: %v", err)
++			}
++			if err := os.WriteFile(config, []byte("cli_auth_credentials_store = \"file\"\n"), 0o644); err != nil {
++				t.Fatal(err)
++			}
++			if _, err := Resolve(req); err != nil {
++				t.Fatalf("fixing the config provisions: %v", err)
++			}
++		})
++	}
++}
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index 9ee5e345..9b5056d5 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -24,6 +24,7 @@ import (
+ 	"strings"
+ 	"time"
+ 
++	"github.com/BurntSushi/toml"
+ 	"github.com/relux-works/curator/internal/contextlock"
+ 	"github.com/relux-works/curator/internal/contextmaterialize"
+ 	"github.com/relux-works/curator/internal/contextpkg"
+@@ -274,6 +275,9 @@ func assembleHome(req *ResolveRequest, source Source, lock *contextlock.Lock, ha
+ 	if err != nil {
+ 		return nil, err
+ 	}
++	if err := req.checkIsolatedCredentialStore(adapter, isolation); err != nil {
++		return nil, err
++	}
+ 	plan := &homePlan{
+ 		adapter:    adapter,
+ 		parent:     ManagedParent(req.Home, req.Profile, adapter.ID),
+@@ -492,8 +496,10 @@ func (p *homePlan) publishDocs() error {
+ // (§7.4). isolated homes link nothing; keyring-backed codex homes are
+ // ambient and link nothing; every file-shaped strategy is watched by the
+ // liveness row. The native config.toml read is read-only: an absent file
+-// means the default file store, while an unreadable one fails instead of
+-// defaulting — absence and a failed read are different facts (§8.4).
++// or an absent key means the default file store, while an unreadable file
++// fails instead of defaulting — absence and a failed read are different
++// facts (§8.4) — and a selector outside the verified file/keyring/auto
++// set fails closed with environment_credential_unsupported.
+ func (req *ResolveRequest) effectivePassthrough(adapter envregistry.Adapter, isolation string) (map[string]string, map[string]string, error) {
+ 	links := map[string]string{}
+ 	strategies := map[string]string{}
+@@ -509,40 +515,98 @@ func (req *ResolveRequest) effectivePassthrough(adapter envregistry.Adapter, iso
+ 		case envregistry.StrategyPerHomeKeychain, envregistry.StrategyAmbient:
+ 			continue
+ 		case envregistry.StrategyKeyringPreferred:
+-			keyring, err := codexKeyring(native)
++			store, err := codexCredentialStore(native)
+ 			if err != nil {
+ 				return nil, nil, err
+ 			}
+-			if keyring {
++			if store == "keyring" {
+ 				continue
+ 			}
+-			links[entry.Path] = filepath.Join(native, entry.FileLinkTarget)
++			links[entry.Path] = filepath.Join(native, filepath.FromSlash(entry.FileLinkTarget))
+ 			strategies[entry.Path] = envregistry.StrategyFileLink
+ 		case envregistry.StrategyFileLink:
+-			links[entry.Path] = filepath.Join(native, entry.FileLinkTarget)
++			links[entry.Path] = filepath.Join(native, filepath.FromSlash(entry.FileLinkTarget))
+ 			strategies[entry.Path] = envregistry.StrategyFileLink
+ 		}
+ 	}
+ 	return links, strategies, nil
+ }
+ 
+-// codexKeyring reports whether the operator's native config.toml selects
+-// the keyring credential store, in which case the credential is ambient
+-// and no entry is linked (§7.4). An absent file means the default file
+-// store; an unreadable file is an error, never absence.
+-func codexKeyring(native string) (bool, error) {
++// codexCredentialStore resolves the operator's native codex credential
++// store: the top-level cli_auth_credentials_store selector when the
++// native config.toml carries one, else the platform default file — an
++// absent file and an absent key both mean file (§7.4). The file is
++// parsed as TOML, so every valid spelling of the key — double-quoted,
++// single-quoted, multi-line — resolves identically, while the same key
++// nested inside a table is not the top-level selector and stays absent.
++// Under keyring the credential is ambient and no entry is linked; under
++// file or auto the managed auth.json is a file-link. An unreadable file
++// or invalid TOML refuses with a diagnostic naming the file, never
++// absence, and a parsed value outside the verified file/keyring/auto
++// set — any other string or any non-string TOML value — fails closed
++// with environment_credential_unsupported. Sharing is defined by the
++// native effective storage only: a diverged managed config.toml changes
++// nothing and is never realigned.
++func codexCredentialStore(native string) (string, error) {
+ 	payload, err := os.ReadFile(filepath.Join(native, "config.toml")) // #nosec G304 -- native home resolved from the registry
+ 	if err != nil {
+ 		if os.IsNotExist(err) {
+-			return false, nil
++			return "file", nil
+ 		}
+-		return false, fmt.Errorf("codex native config.toml is unreadable: %v", err)
++		return "", fmt.Errorf("codex native config.toml is unreadable: %v", err)
++	}
++	var doc map[string]any
++	if err := toml.Unmarshal(payload, &doc); err != nil {
++		return "", fmt.Errorf("codex native config.toml is not valid TOML: %v", err)
++	}
++	raw, ok := doc["cli_auth_credentials_store"]
++	if !ok {
++		return "file", nil
++	}
++	store, ok := raw.(string)
++	if !ok {
++		return "", fmt.Errorf("%s: codex native cli_auth_credentials_store must be one of \"file\", \"keyring\", or \"auto\", got TOML type %T", envregistry.DiagCredentialUnsupported, raw)
++	}
++	switch store {
++	case "file", "keyring", "auto":
++		return store, nil
++	default:
++		return "", fmt.Errorf("%s: codex native cli_auth_credentials_store %q is outside the verified file, keyring, and auto set", envregistry.DiagCredentialUnsupported, store)
+ 	}
+-	matches := keyringSetting.FindSubmatch(payload)
+-	return len(matches) == 2 && string(matches[1]) == "keyring", nil
+ }
+ 
+-var keyringSetting = regexp.MustCompile(`(?m)^\s*cli_auth_credentials_store\s*=\s*"([^"]*)"`)
++// checkIsolatedCredentialStore gates codex_cli isolated on the native
++// effective store (§7.4): isolated is admitted under file storage only —
++// including an absent cli_auth_credentials_store key, which resolves to
++// effective file. Under keyring or auto storage the keyring identity is
++// assumed operator-global, so isolated is
++// environment_isolated_unsupported; a selector outside the verified set
++// fails closed with environment_credential_unsupported from the store
++// reader. Every other adapter × mode passes here: the static matrix in
++// the registry already decided it.
++func (req *ResolveRequest) checkIsolatedCredentialStore(adapter envregistry.Adapter, isolation string) error {
++	if adapter.ID != envregistry.CodexCLI || isolation != envregistry.IsolationIsolated {
++		return nil
++	}
++	native, err := req.nativeHome(adapter.ID)
++	if err != nil {
++		return err
++	}
++	store, err := codexCredentialStore(native)
++	if err != nil {
++		return err
++	}
++	switch store {
++	case "file":
++		return nil
++	case "keyring":
++		return fmt.Errorf("%s: isolated is unsupported for codex_cli under native keyring storage: the keyring identity is operator-global, independent of CODEX_HOME", envregistry.DiagIsolatedUnsupported)
++	case "auto":
++		return fmt.Errorf("%s: isolated is unsupported for codex_cli under native auto storage: the tool uses the keyring when one is available, so an isolated home on a keyring host would authenticate through the operator-global keyring", envregistry.DiagIsolatedUnsupported)
++	default:
++		return fmt.Errorf("%s: codex native cli_auth_credentials_store %q is outside the verified file, keyring, and auto set", envregistry.DiagCredentialUnsupported, store)
++	}
++}
+ 
+ // seedBundle is the one-time provisioning class (§7.4): non-credential
+ // files copied from the native home exactly once, at provisioning, never
+@@ -930,13 +994,26 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	passthrough := []envmarker.Passthrough{}
++	native, err := req.nativeHome(plan.adapter.ID)
++	if err != nil {
++		return nil, err
++	}
++	recordedLinks := map[string]bool{}
++	if prior != nil && prior.Passthrough != nil {
++		for _, entry := range *prior.Passthrough {
++			recordedLinks[entry.Path] = true
++		}
++	}
+ 	for _, path := range sortedKeys(links) {
+-		full := filepath.Join(plan.homeDir, filepath.FromSlash(path))
+-		_ = os.Remove(full)
+-		if err := os.Symlink(links[path], full); err != nil {
+-			return nil, fmt.Errorf("passthrough %s: %v", path, err)
++		if err := ensureCredentialLink(plan.homeDir, path, links[path], recordedLinks[path]); err != nil {
++			return nil, err
+ 		}
++	}
++	if err := removeStaleCredentialLinks(plan.adapter, plan.homeDir, native, prior, links); err != nil {
++		return nil, err
++	}
++	passthrough := []envmarker.Passthrough{}
++	for _, path := range sortedKeys(links) {
+ 		passthrough = append(passthrough, envmarker.Passthrough{Path: path, Strategy: strategies[path]})
+ 	}
+ 	marker.Passthrough = &passthrough
+@@ -992,6 +1069,138 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
+ 	return marker, nil
+ }
+ 
++// ensureCredentialLink fix-first ensures one wanted credential link (§7.4,
++// §10.1): an absent link path is linked, a symlink still targeting the
++// declared native store is left alone, a recorded symlink to any other
++// target — the mis-targeted state, including a Pi home still linked at
++// the pre-0017 native root — is re-pointed at the declared store, and an
++// empty directory is replaced by the link. A regular file, an unrecorded
++// symlink to an unexpected target, a non-empty directory, or a link whose
++// state cannot be established refuses with
++// environment_credential_conflict naming the path, removing nothing.
++// Native bytes are never touched: only the managed link itself is ever
++// created, re-pointed, or replaced.
++func ensureCredentialLink(homeDir, path, target string, recorded bool) error {
++	full := filepath.Join(homeDir, filepath.FromSlash(path))
++	info, err := os.Lstat(full)
++	if err != nil {
++		if !os.IsNotExist(err) {
++			return fmt.Errorf("%s: %s cannot be inspected: %v: refusing to touch it", envregistry.DiagCredentialConflict, full, err)
++		}
++		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
++			return err
++		}
++		if err := os.Symlink(target, full); err != nil {
++			return fmt.Errorf("passthrough %s: %v", path, err)
++		}
++		return nil
++	}
++	if info.Mode()&os.ModeSymlink != 0 {
++		got, err := os.Readlink(full)
++		if err != nil {
++			return fmt.Errorf("%s: %s link target cannot be read: refusing to touch it", envregistry.DiagCredentialConflict, full)
++		}
++		if got == target {
++			return nil
++		}
++		if !recorded {
++			return fmt.Errorf("%s: %s links to %s, expected %s: refusing to remove or re-point it", envregistry.DiagCredentialConflict, full, got, target)
++		}
++		if err := os.Remove(full); err != nil {
++			return fmt.Errorf("passthrough %s: %v", path, err)
++		}
++		if err := os.Symlink(target, full); err != nil {
++			return fmt.Errorf("passthrough %s: %v", path, err)
++		}
++		return nil
++	}
++	if info.IsDir() {
++		entries, err := os.ReadDir(full)
++		if err != nil {
++			return fmt.Errorf("%s: %s holds a directory that cannot be listed: refusing to touch it", envregistry.DiagCredentialConflict, full)
++		}
++		if len(entries) != 0 {
++			return fmt.Errorf("%s: %s holds a non-empty directory, expected a link to %s: refusing to remove it", envregistry.DiagCredentialConflict, full, target)
++		}
++		_ = os.Remove(full)
++		if err := os.Symlink(target, full); err != nil {
++			return fmt.Errorf("passthrough %s: %v", path, err)
++		}
++		return nil
++	}
++	return fmt.Errorf("%s: %s holds a regular file, expected a link to %s: refusing to remove or replace it", envregistry.DiagCredentialConflict, full, target)
++}
++
++// removeStaleCredentialLinks unlinks recorded credential links the
++// effective set no longer wants — the shared→isolated turn, or a native
++// store gone ambient — fix-first (§7.4): only a recorded symlink still
++// targeting the declared native store is unlinked, preserving the native
++// bytes, and an already-absent path is already gone. Anything else — a
++// regular file, a symlink to any other target, or a directory — refuses
++// with environment_credential_conflict naming the path, removing nothing:
++// the operator resolves the conflict out of band and re-runs. The caller
++// rewrites the record after every removal, so no stale recorded link
++// survives behind the new configuration.
++func removeStaleCredentialLinks(adapter envregistry.Adapter, homeDir, native string, prior *envmarker.Marker, links map[string]string) error {
++	if prior == nil || prior.Passthrough == nil {
++		return nil
++	}
++	for _, entry := range *prior.Passthrough {
++		if _, wanted := links[entry.Path]; wanted {
++			continue
++		}
++		full := filepath.Join(homeDir, filepath.FromSlash(entry.Path))
++		info, err := os.Lstat(full)
++		if err != nil {
++			if os.IsNotExist(err) {
++				continue
++			}
++			return fmt.Errorf("%s: %s cannot be inspected: %v: refusing to touch it", envregistry.DiagCredentialConflict, full, err)
++		}
++		if info.Mode()&os.ModeSymlink == 0 {
++			if info.IsDir() {
++				return fmt.Errorf("%s: %s holds a directory where the recorded credential link %s was: refusing to remove it", envregistry.DiagCredentialConflict, full, entry.Path)
++			}
++			return fmt.Errorf("%s: %s holds a regular file where the recorded credential link %s was: refusing to remove it", envregistry.DiagCredentialConflict, full, entry.Path)
++		}
++		got, err := os.Readlink(full)
++		if err != nil {
++			return fmt.Errorf("%s: %s link target cannot be read: refusing to touch it", envregistry.DiagCredentialConflict, full)
++		}
++		declared, ok := declaredPassthroughTarget(adapter, native, entry.Path)
++		if !ok {
++			return fmt.Errorf("%s: %s has no declared native store for the recorded credential link %s: refusing to remove it", envregistry.DiagCredentialConflict, full, entry.Path)
++		}
++		if got != declared {
++			return fmt.Errorf("%s: %s links to %s, not the recorded credential target %s: refusing to remove it", envregistry.DiagCredentialConflict, full, got, declared)
++		}
++		if err := os.Remove(full); err != nil {
++			return fmt.Errorf("passthrough %s: %v", entry.Path, err)
++		}
++	}
++	return nil
++}
++
++// declaredPassthroughTarget reconstructs the native target a recorded
++// credential link must still point at: the adapter entry's file target
++// below the native home. It reports false where the recorded path names
++// no linkable adapter entry, in which case nothing at the path can be
++// proven ours and repair refuses rather than unlinks.
++func declaredPassthroughTarget(adapter envregistry.Adapter, native, path string) (string, bool) {
++	for _, entry := range adapter.PassthroughFor(runtime.GOOS) {
++		if entry.Path != path {
++			continue
++		}
++		switch entry.Strategy {
++		case envregistry.StrategyFileLink, envregistry.StrategyKeyringPreferred:
++			return filepath.Join(native, filepath.FromSlash(entry.FileLinkTarget)), true
++		default:
++			return "", false
++		}
++	}
++	return "", false
++}
++
+ // shadowWarnings reports unrecorded parent entries shadowing allowlisted
+ // operator entries as environment_seed_shadowed, left as they are (§7.1).
+ func shadowWarnings(req *ResolveRequest, plan *homePlan, recorded []string) []string {
+@@ -1325,8 +1534,21 @@ func equalStrings(a, b []string) bool {
+ }
+ 
+ // checkPassthrough runs the liveness row: every recorded entry must still
+-// be a symlink targeting the native entry, and the recorded set must match
+-// the effective one (§7.4).
++// be a symlink targeting the native entry, and the recorded set must
++// match the effective one (§7.4). A missing link path is plain detached
++// and is re-linked by --repair; a link path holding a regular file or a
++// symlink to an unexpected target — including a Pi home still linked at
++// the pre-0017 native target — is detached with
++// environment_credential_conflict-class wording, never silence:
++// --repair relinks a recorded symlink to the declared path without
++// touching bytes and refuses a regular file without touching it. A
++// correctly targeted link whose native target does not exist yet is the
++// distinct detached-pending state — the normal provisioning shape before
++// the first login (claude_code on Linux) — reported as a warning, never
++// a stale reason and never silence: provisioning, repair, and bare
++// resolve all succeed loudly. A native target that cannot be inspected
++// is a conflict/inspection diagnostic and stays stale, never absence
++// and never silence.
+ func (v *verification) checkPassthrough(req *ResolveRequest, plan *homePlan, marker *envmarker.Marker) {
+ 	links, strategies, err := req.effectivePassthrough(plan.adapter, plan.isolation)
+ 	if err != nil {
+@@ -1350,9 +1572,42 @@ func (v *verification) checkPassthrough(req *ResolveRequest, plan *homePlan, mar
+ 			continue
+ 		}
+ 		full := filepath.Join(plan.homeDir, filepath.FromSlash(path))
++		info, err := os.Lstat(full)
++		if err != nil {
++			v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s is detached", path))
++			continue
++		}
++		if info.Mode()&os.ModeSymlink == 0 {
++			if !info.IsDir() {
++				v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s is detached: link path holds a regular file, expected a link to %s (%s)", path, target, envregistry.DiagCredentialConflict))
++				continue
++			}
++			v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s is detached", path))
++			continue
++		}
+ 		got, err := os.Readlink(full)
+-		if err != nil || got != target {
++		if err != nil {
+ 			v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s is detached", path))
++			continue
++		}
++		if got != target {
++			v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s is detached: link targets %s, expected %s (%s)", path, got, target, envregistry.DiagCredentialConflict))
++			continue
++		}
++		// The link targets the declared native store; liveness asks
++		// whether the native target itself exists — a stat of the
++		// target, never a read of credential bytes. An absent target
++		// is detached-pending: the link is correct and the native
++		// credential simply is not there yet, so the state warns
++		// loudly without going stale. An inspection failure is a
++		// conflict/inspection diagnostic and stays stale, never
++		// absence and never silence.
++		if _, err := os.Stat(target); err != nil {
++			if os.IsNotExist(err) {
++				v.warnings = append(v.warnings, fmt.Sprintf("passthrough entry %s is detached-pending: link target %s does not exist yet — log in to %s to populate it", path, target, plan.adapter.ID))
++			} else {
++				v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s target %s cannot be inspected: %v (%s)", path, target, err, envregistry.DiagCredentialConflict))
++			}
+ 		}
+ 	}
+ }
+@@ -1643,6 +1898,16 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
+ 	if err != nil {
+ 		return nil, err
+ 	}
++	// The credential store must be established before the first write: an
++	// unknown native selector fails here, not halfway through applyPlan
++	// leaving a markerless partial home behind that the §9.5 inventory
++	// would then refuse to provision over.
++	if _, _, err := req.effectivePassthrough(adapter, plan.isolation); err != nil {
++		if provisioned || isCredentialRefusal(err) {
++			return nil, err
++		}
++		return nil, fmt.Errorf("%s: %v", DiagRepairFailed, err)
++	}
+ 	if provisioned {
+ 		want := map[string]bool{}
+ 		for path := range plan.copies {
+@@ -1680,6 +1945,12 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
+ 		if provisioned {
+ 			return nil, err
+ 		}
++		// A credential refusal is not a store failure: the repair
++		// stops with the refusal diagnostic itself (§10.4), not
++		// wrapped as environment_repair_failed.
++		if isCredentialRefusal(err) {
++			return nil, err
++		}
+ 		return nil, fmt.Errorf("%s: %v", DiagRepairFailed, err)
+ 	}
+ 	after := verifyHome(req, adapter, source, lock, hash)
+@@ -1701,6 +1972,14 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
+ 	return result, nil
+ }
+ 
++// isCredentialRefusal reports whether a repair error is already a §7.7
++// credential refusal, which surfaces as itself rather than wrapped in
++// environment_repair_failed.
++func isCredentialRefusal(err error) bool {
++	return err != nil && (strings.Contains(err.Error(), envregistry.DiagCredentialConflict) ||
++		strings.Contains(err.Error(), envregistry.DiagCredentialUnsupported))
++}
++
+ // checkProfileCollision fails provisioning with environment_path_collision
+ // when two profile names map to one platform path below the environments
+ // root (§5).
+diff --git a/internal/envprofile/managed_test.go b/internal/envprofile/managed_test.go
+index 5fb2c0a8..35a8e055 100644
+--- a/internal/envprofile/managed_test.go
++++ b/internal/envprofile/managed_test.go
+@@ -91,6 +91,28 @@ func writeStoreEntry(t *testing.T, home, kind, name, pin string, files map[strin
+ 	}
+ }
+ 
++// seedLiveNativeCredentials writes live native credential targets for
++// every file-linked adapter — codex auth.json, the pi agent-root
++// auth.json, and the Linux claude_code credentials file — so tests about
++// other behaviors provision homes without the detached-pending finding.
++// The writes are harmless where an adapter links nothing on the platform.
++func seedLiveNativeCredentials(t *testing.T, fx *managedFixture) {
++	t.Helper()
++	if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "auth.json"), []byte("{\"t\":\"operator\"}\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	agentAuth := filepath.Join(fx.native["pi"], "agent", "auth.json")
++	if err := os.MkdirAll(filepath.Dir(agentAuth), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(agentAuth, []byte("{\"t\":\"operator-pi\"}\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(fx.native["claude_code"], ".credentials.json"), []byte("{\"t\":\"operator-claude\"}\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++}
++
+ func (fx *managedFixture) request(envID string) ResolveRequest {
+ 	return ResolveRequest{
+ 		Home:      fx.home,
+@@ -128,6 +150,7 @@ func readManagedMarker(t *testing.T, fx *managedFixture, envID string) *envmarke
+ // current and emits identical bytes without repair.
+ func TestResolveProvisionRepair(t *testing.T) {
+ 	fx := writeManagedFixture(t, "acme")
++	seedLiveNativeCredentials(t, fx)
+ 	req := fx.request("codex_cli")
+ 	req.Repair = true
+ 	result, err := Resolve(req)
+@@ -229,6 +252,7 @@ func TestResolveDefaultProfile(t *testing.T) {
+ // candidate bytes.
+ func TestResolveDriftRepair(t *testing.T) {
+ 	fx := writeManagedFixture(t, "acme")
++	seedLiveNativeCredentials(t, fx)
+ 	req := fx.request("claude_code")
+ 	req.Repair = true
+ 	if _, err := Resolve(req); err != nil {
+@@ -290,6 +314,7 @@ func TestResolveDriftRepair(t *testing.T) {
+ 		{"pi", ""},
+ 	} {
+ 		probe := writeManagedFixture(t, "acme")
++		seedLiveNativeCredentials(t, probe)
+ 		provision := probe.request(tc.env)
+ 		if tc.form != "" {
+ 			provision.Machine.Forms = map[string]string{tc.env: tc.form}
+@@ -344,8 +369,13 @@ func TestResolveDriftRepair(t *testing.T) {
+ 	}
+ }
+ 
+-// TestResolvePassthroughLiveness severs a file-link passthrough entry and
+-// proves the liveness row goes stale and --repair re-links it.
++// TestResolvePassthroughLiveness removes a file-link passthrough entry and
++// proves the liveness row goes stale and --repair re-links the absent
++// link. A severed link replaced by a regular file is the separate
++// environment_credential_conflict refusal (Decision 0017, §7.4/§10.1):
++// repair never removes or replaces the file. That refusal half moved to
++// TestCredentialLinkRegularFileRefuses with the 0017 contract; this test
++// keeps the absent-link re-link half.
+ func TestResolvePassthroughLiveness(t *testing.T) {
+ 	fx := writeManagedFixture(t, "acme")
+ 	if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "auth.json"), []byte(`{"openai_api_key":null}`+"\n"), 0o600); err != nil {
+@@ -361,9 +391,6 @@ func TestResolvePassthroughLiveness(t *testing.T) {
+ 		t.Fatalf("passthrough link targets %q (%v)", target, err)
+ 	}
+ 	_ = os.Remove(link)
+-	if err := os.WriteFile(link, []byte("detached\n"), 0o600); err != nil {
+-		t.Fatal(err)
+-	}
+ 	if _, err := Resolve(fx.request("codex_cli")); err == nil || !strings.Contains(err.Error(), DiagHomeStale) {
+ 		t.Fatalf("a detached passthrough must be stale, got %v", err)
+ 	}
+@@ -519,6 +546,12 @@ func TestCodexKeyringAmbient(t *testing.T) {
+ 					t.Fatal(err)
+ 				}
+ 			}
++			// The linked stores get a live native target so the
++			// detached-pending finding stays out of this test, which
++			// is about ambient-versus-linked, not dangling.
++			if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "auth.json"), []byte("{\"t\":\"operator\"}\n"), 0o600); err != nil {
++				t.Fatal(err)
++			}
+ 			req := fx.request("codex_cli")
+ 			req.Repair = true
+ 			if _, err := Resolve(req); err != nil {
+@@ -587,6 +620,11 @@ func TestRepairNeverRefreshesSeeds(t *testing.T) {
+ 	if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), nativeSeed, 0o644); err != nil {
+ 		t.Fatal(err)
+ 	}
++	// The linked credential gets a live native target so the
++	// detached-pending finding stays out of this seed test.
++	if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "auth.json"), []byte("{\"t\":\"operator\"}\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
+ 	req := fx.request("codex_cli")
+ 	req.Repair = true
+ 	if _, err := Resolve(req); err != nil {
+@@ -664,6 +702,7 @@ func TestResolveLockContention(t *testing.T) {
+ // TestResolveFormats renders env and shell through Resolve.
+ func TestResolveFormats(t *testing.T) {
+ 	fx := writeManagedFixture(t, "acme")
++	seedLiveNativeCredentials(t, fx)
+ 	req := fx.request("pi")
+ 	req.Repair = true
+ 	if _, err := Resolve(req); err != nil {
+diff --git a/internal/envprofile/status.go b/internal/envprofile/status.go
+index 1f3d3fd1..19fe923f 100644
+--- a/internal/envprofile/status.go
++++ b/internal/envprofile/status.go
+@@ -334,7 +334,7 @@ func homeState(req StatusRequest, profile string, adapter envregistry.Adapter) H
+ 	state.Backups, state.BackupsOldest, state.BackupsNewest = backupAges(state.Home)
+ 	for _, reason := range verdict.reasons {
+ 		diagnostic := reason
+-		if strings.HasPrefix(reason, "passthrough entry") && strings.HasSuffix(reason, "is detached") {
++		if strings.HasPrefix(reason, "passthrough entry") && strings.Contains(reason, "is detached") {
+ 			diagnostic = envregistry.DiagPassthroughDetached + ": " + reason
+ 		}
+ 		state.Findings = append(state.Findings, diagnostic)
+diff --git a/internal/envprofile/status_test.go b/internal/envprofile/status_test.go
+index 7a0ddcba..833f0221 100644
+--- a/internal/envprofile/status_test.go
++++ b/internal/envprofile/status_test.go
+@@ -104,6 +104,16 @@ func TestStatusOrphanRetention(t *testing.T) {
+ // shadow_acknowledged.
+ func TestStatusShadowAcknowledgment(t *testing.T) {
+ 	fx := writeManagedFixture(t, "acme")
++	// The shadow row needs an otherwise-quiet home: the linked
++	// credential gets a live native target so the detached-pending
++	// finding stays out of this test.
++	agentAuth := filepath.Join(fx.native["pi"], "agent", "auth.json")
++	if err := os.MkdirAll(filepath.Dir(agentAuth), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(agentAuth, []byte("{\"t\":\"operator-pi\"}\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
+ 	provision(t, fx, "pi", envregistry.DefaultMachineConfig())
+ 	homeDir := ManagedHomeDir(fx.home, "acme", "pi")
+ 	if err := os.WriteFile(filepath.Join(homeDir, "AGENTS.override.md"), []byte("override\n"), 0o644); err != nil {
+diff --git a/internal/envregistry/envregistry.go b/internal/envregistry/envregistry.go
+index d5281bcc..4d0cd1cd 100644
+--- a/internal/envregistry/envregistry.go
++++ b/internal/envregistry/envregistry.go
+@@ -48,19 +48,21 @@ func NormalizeEnvID(id string) string {
+ 
+ // Diagnostics (environments §7.7, §10.4, §11.1).
+ const (
+-	DiagUnknown              = "environment_unknown"
+-	DiagFormUnsupported      = "environment_form_unsupported"
+-	DiagIsolatedUnsupported  = "environment_isolated_unsupported"
+-	DiagSharedUnsupported    = "environment_shared_unsupported"
+-	DiagTargetUnknown        = "environment_target_unknown"
+-	DiagTargetConsent        = "environment_target_consent_required"
+-	DiagShadowingPresent     = "environment_shadowing_path_present"
+-	DiagPassthroughDetached  = "environment_passthrough_detached"
+-	DiagSeedUnreadable       = "environment_seed_unreadable"
+-	DiagSeedShadowed         = "environment_seed_shadowed"
+-	DiagToolVersionUnverifed = "environment_tool_version_unverified"
+-	DiagSizeExceeded         = "environment_context_size_exceeded"
+-	DiagReservedCommand      = "environment_reserved_command_name"
++	DiagUnknown               = "environment_unknown"
++	DiagFormUnsupported       = "environment_form_unsupported"
++	DiagIsolatedUnsupported   = "environment_isolated_unsupported"
++	DiagSharedUnsupported     = "environment_shared_unsupported"
++	DiagTargetUnknown         = "environment_target_unknown"
++	DiagTargetConsent         = "environment_target_consent_required"
++	DiagShadowingPresent      = "environment_shadowing_path_present"
++	DiagPassthroughDetached   = "environment_passthrough_detached"
++	DiagCredentialConflict    = "environment_credential_conflict"
++	DiagCredentialUnsupported = "environment_credential_unsupported"
++	DiagSeedUnreadable        = "environment_seed_unreadable"
++	DiagSeedShadowed          = "environment_seed_shadowed"
++	DiagToolVersionUnverifed  = "environment_tool_version_unverified"
++	DiagSizeExceeded          = "environment_context_size_exceeded"
++	DiagReservedCommand       = "environment_reserved_command_name"
+ )
+ 
+ // Forms (environments §7.2).
+@@ -282,7 +284,13 @@ var Registry = []Adapter{
+ 		},
+ 		MCP: nil,
+ 		Passthrough: map[string][]Passthrough{
+-			"default": {{Path: "auth.json", Strategy: StrategyFileLink, FileLinkTarget: "auth.json"}},
++			// Decision 0017 choice 3: the native credential root is
++			// ~/.pi/agent, not ~/.pi — the managed auth.json links to
++			// the agent-root auth.json. Existing homes linked at the
++			// old target are reported detached, never silently
++			// re-pointed; the move itself is the explicit F-C2
++			// migration.
++			"default": {{Path: "auth.json", Strategy: StrategyFileLink, FileLinkTarget: "agent/auth.json"}},
+ 		},
+ 		Seeds:             []string{"settings.json", "models.json"},
+ 		SeedWritten:       map[string]bool{},

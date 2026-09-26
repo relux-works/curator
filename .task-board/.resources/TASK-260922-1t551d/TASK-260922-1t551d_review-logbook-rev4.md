@@ -1,0 +1,7 @@
+# TASK-260922-1t551d review logbook — revision 4
+
+2026-09-22: Independent review confirms both revision-1 defects are addressed under the refined rework-2 contract: declared-target absence reports pending without blocking login/provisioning; valid TOML literal selectors cannot bypass isolated admission. Recorded mis-targeted repair follows the explicitly revised ruling, while stale removal and unrecorded foreign links retain conservative checks. Eleven independently exercised mutations fail behavioral assertions.
+
+Verification anomalies: broad package reruns stopped before timeout in unrelated overlay/profile-install work, not counted as green; first extra CLI probe timed out on shared host GOROOT lock. Initial unreadable-config reviewer expectation wrongly required the selector-reader wording in shared mode; gatherSeeds already refuses with environment_seed_unreadable before home creation. Corrected production-entry probe passes both modes. Full-suite/platform evidence is the verified exact-candidate hosted run 35690797842; rose-air was skipped. No human action or production-code change needed for these review-harness limits.
+
+Nonblocking documentation nit: envregistry Pi strategy comment still mentions F-C2-only re-pointing; the binding rework-2 ruling, production behavior, CHANGELOG and troubleshooting all permit repair to re-point a recorded mis-targeted link without moving bytes.

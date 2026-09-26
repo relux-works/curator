@@ -1,0 +1,50 @@
+review-1t551d-candidate-rows.log
+candidate-rows: exit=0
+ok  	github.com/relux-works/curator/internal/envprofile	8.712s
+
+
+review-1t551d-narrow-target-basename.log
+narrow-target-basename: exit=1
+--- FAIL: TestDanglingPiLinkReportedDetached (0.65s)
+    credential_link_test.go:235: the mis-targeted Pi home is non-current: &{Profile:acme Environment:pi Mode:managed-home Form:monolithic Home:/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestDanglingPiLinkReportedDetached4253342764/001/environments/acme/pi Provisioned:true Current:true LockHash:sha256:f26a10122121ce35251a8bde82bbd7c7c03c1ea985e7e616014f35dbcc8c9c2f MarkerHash:f26a10122121ce35251a8bde82bbd7c7c03c1ea985e7e616014f35dbcc8c9c2f Surfaces:[{Key:root-context Paths:[AGENTS.md] Form:monolithic State:current Detail:current} {Key:skills Paths:[skills/myskill] Form: State:current Detail:current} {Key:system-prompt Paths:[.agent-context/system-prompt.md] Form: State:current Detail:current}] Passthrough:[auth.json (file-link)] Seeds:[] SeedLinks:[] SeededProjects:[] Backups:0 BackupsOldest:- BackupsNewest:- Findings:[] Warnings:[environment_tool_version_unverified: pi detected release unknown, recorded 0.84.2]}
+FAIL
+FAIL	github.com/relux-works/curator/internal/envprofile	1.047s
+FAIL
+
+
+review-1t551d-reviewer-probes.log
+reviewer-probes: exit=1
+--- FAIL: TestReviewerDanglingExpectedTarget (2.62s)
+    reviewer_probe_test.go:14: dangling target must be detached with conflict: &{Profile:acme Environment:pi Mode:managed-home Form:monolithic Home:/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestReviewerDanglingExpectedTarget3281053425/001/environments/acme/pi Provisioned:true Current:true LockHash:sha256:f26a10122121ce35251a8bde82bbd7c7c03c1ea985e7e616014f35dbcc8c9c2f MarkerHash:f26a10122121ce35251a8bde82bbd7c7c03c1ea985e7e616014f35dbcc8c9c2f Surfaces:[{Key:root-context Paths:[AGENTS.md] Form:monolithic State:current Detail:current} {Key:skills Paths:[skills/myskill] Form: State:current Detail:current} {Key:system-prompt Paths:[.agent-context/system-prompt.md] Form: State:current Detail:current}] Passthrough:[auth.json (file-link)] Seeds:[] SeedLinks:[] SeededProjects:[] Backups:0 BackupsOldest:- BackupsNewest:- Findings:[] Warnings:[environment_tool_version_unverified: pi detected release unknown, recorded 0.84.2]}
+    reviewer_probe_test.go:16: Resolve silently admits dangling target
+--- FAIL: TestReviewerLiteralCodexSelector (1.66s)
+    --- FAIL: TestReviewerLiteralCodexSelector/keyring (0.78s)
+        reviewer_probe_test.go:28: valid TOML literal selector must refuse with environment_isolated_unsupported, got <nil>
+    --- FAIL: TestReviewerLiteralCodexSelector/auto (0.65s)
+        reviewer_probe_test.go:28: valid TOML literal selector must refuse with environment_isolated_unsupported, got <nil>
+    --- FAIL: TestReviewerLiteralCodexSelector/ephemeral (0.23s)
+        reviewer_probe_test.go:28: valid TOML literal selector must refuse with environment_credential_unsupported, got <nil>
+FAIL
+FAIL	github.com/relux-works/curator/internal/envprofile	4.742s
+FAIL
+
+
+review-1t551d-skip-recorded-removal.log
+skip-recorded-removal: exit=1
+--- FAIL: TestSharedToIsolatedRemovesStaleLink (0.17s)
+    credential_link_test.go:48: no stale link survives shared→isolated, lstat: <nil>
+FAIL
+FAIL	github.com/relux-works/curator/internal/envprofile	0.622s
+FAIL
+
+
+review-1t551d-unconditional-remove.log
+unconditional-remove: exit=1
+--- FAIL: TestCredentialLinkRegularFileRefuses (0.78s)
+    --- FAIL: TestCredentialLinkRegularFileRefuses/non-empty (0.34s)
+        credential_link_test.go:100: repair must refuse with environment_credential_conflict, got <nil>
+    --- FAIL: TestCredentialLinkRegularFileRefuses/empty (0.43s)
+        credential_link_test.go:100: repair must refuse with environment_credential_conflict, got <nil>
+FAIL
+FAIL	github.com/relux-works/curator/internal/envprofile	1.193s
+FAIL

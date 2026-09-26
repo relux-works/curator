@@ -1,0 +1,2851 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index b47641af..88239516 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -52,6 +52,22 @@ All notable implementation changes are recorded here.
+   enforcing revision (`B-enforcing`,
+   refuse without sourcing) follows in a later release
+   (Manager profile §8).
++- Explicit credential migration: `curator env migrate
++  --inspect|--plan|--apply` (Spec environments §7.4/§10.1, manager
++  §12.4/§12.5, Decision 0017). Inspect inventories the old marker, every
++  recorded link target, and both Pi roots (`~/.pi/auth.json` and
++  `~/.pi/agent/auth.json`) per profile and environment, read-only and
++  without reading credential bytes; plan prints the exact operations
++  (relink a recorded symlink at the declared native path, unlink a
++  stale recorded link) with a plan hash; apply executes exactly the
++  printed plan under the manager-home mutation lock, journaled and
++  rollback-safe, refusing on plan drift (`--expect`) and on conflicts.
++  Conflicts that need the operator — an isolated→shared account choice,
++  a regular file at a link path, two live Pi credentials — refuse with
++  `environment_credential_conflict` naming the exact out-of-band
++  decision. No step copies, moves, or rewrites credential bytes; the
++  effective mode is preserved and the v1 marker still records path and
++  strategy only.
+ 
+ ### Changed
+ 
+@@ -84,29 +100,35 @@ All notable implementation changes are recorded here.
+ - New `pi` managed homes link `auth.json` at the corrected native root
+   `~/.pi/agent` (Spec environments §7.4, Decision 0017 choice 3). Existing
+   homes linked at the old `~/.pi/auth.json` target are reported detached
+-  with `environment_credential_conflict`-class wording, and repair
+-  re-points the recorded link at the declared root without touching bytes.
++  with `environment_credential_conflict`-class wording; the move to the
++  agent root runs as the explicit `curator env migrate` step, which
++  repair points at instead of re-pointing silently.
++- `env resolve --repair` no longer migrates credential ownership (Spec
++  environments §10.1, manager §12.4). A recorded link aimed at the wrong
++  native target (for example a `pi` home still linked at the pre-0017
++  root) and a stale recorded link left behind by a mode change now
++  refuse with `environment_credential_conflict` pointing at `curator env
++  migrate --apply` instead of being re-pointed or unlinked silently;
++  previously repair moved them itself. Repair still re-links an absent
++  path and replaces an empty directory, and still refuses a regular
++  file, a foreign link, or a non-empty directory without touching bytes.
+ 
+ ### Fixed
+ 
+ - Credential-link repairs are fix-first and never destroy bytes (Spec
+   environments §7.4/§10.1, manager §12.4, Decision 0017). A stale recorded
+-  link (`shared`→`isolated`, or a store gone ambient) is unlinked only
+-  when it is still a symlink targeting the declared native store; a
+-  regular file, a foreign link, or a directory there refuses with
+-  `environment_credential_conflict` naming the path, removing nothing —
+-  previously the path was unconditionally removed and re-linked. A
+-  mis-targeted recorded link (for example a `pi` home still aimed at the
+-  pre-0017 native root) is reported detached with conflict-class wording
+-  by `env status` and `env resolve`, and repair re-points the recorded
+-  symlink at the declared store without touching bytes; only a regular
+-  file, an unrecorded symlink, or a non-empty directory at the link path
+-  refuses. A correctly targeted link whose native target does not exist
+-  yet is the distinct detached-pending state — the normal pre-login shape
+-  — reported as a warning by provisioning, repair, and bare resolve, which
+-  all succeed loudly; it is never stale and never a conflict. A native
+-  target that cannot be inspected stays a stale conflict/inspection
+-  diagnostic.
++  link (`shared`→`isolated`, or a store gone ambient) and a mis-targeted
++  recorded link (for example a `pi` home still aimed at the pre-0017
++  native root) refuse with `environment_credential_conflict` naming the
++  path and pointing at the explicit `curator env migrate` step, removing
++  nothing — previously the path was unconditionally removed and
++  re-linked. A regular file, a foreign link, or a directory at a link
++  path refuses the same way. A correctly targeted link whose native
++  target does not exist yet is the distinct detached-pending state — the
++  normal pre-login shape — reported as a warning by provisioning, repair,
++  and bare resolve, which all succeed loudly; it is never stale and never
++  a conflict. A native target that cannot be inspected stays a stale
++  conflict/inspection diagnostic.
+ - Git snapshots are extracted from the object database (`git ls-tree -r -z`
+   plus `git cat-file --batch`) instead of `git archive`, so every regular file
+   carries exactly its committed blob bytes. `git archive` applied
+diff --git a/cmd/curator/env.go b/cmd/curator/env.go
+index 96a10b66..08ab49ef 100644
+--- a/cmd/curator/env.go
++++ b/cmd/curator/env.go
+@@ -12,7 +12,7 @@ import (
+ 
+ func (c cli) cmdEnv(args []string) int {
+ 	if len(args) == 0 {
+-		_, _ = fmt.Fprintln(c.stderr, "curator: env needs a subcommand: resolve | status | config")
++		_, _ = fmt.Fprintln(c.stderr, "curator: env needs a subcommand: resolve | status | config | migrate")
+ 		return exitUsage
+ 	}
+ 	cfg, code := c.loadConfig()
+@@ -26,6 +26,8 @@ func (c cli) cmdEnv(args []string) int {
+ 		return c.cmdEnvStatus(cfg, args[1:])
+ 	case "config":
+ 		return c.cmdEnvConfig(cfg, args[1:])
++	case "migrate":
++		return c.cmdEnvMigrate(cfg, args[1:])
+ 	}
+ 	_, _ = fmt.Fprintf(c.stderr, "curator: unknown env subcommand %q\n", args[0])
+ 	return exitUsage
+diff --git a/cmd/curator/env_migrate_test.go b/cmd/curator/env_migrate_test.go
+new file mode 100644
+index 00000000..36a8e4bd
+--- /dev/null
++++ b/cmd/curator/env_migrate_test.go
+@@ -0,0 +1,214 @@
++package main
++
++import (
++	"os"
++	"path/filepath"
++	"regexp"
++	"strings"
++	"testing"
++)
++
++// These tests drive the production run() entry point for the env
++// migrate rows: the explicit credential migration step on temporary
++// stores (environments §7.4, §10.1; manager §12.4).
++
++// installPiProfile installs the acme profile and provisions its Pi
++// home through the CLI, returning the managed link, the old native
++// target, and the agent-root target.
++func installPiProfile(t *testing.T, source stubConfigSource) (link, oldTarget, agentAuth string) {
++	t.Helper()
++	writeNativeCredentials(t)
++	pkg := t.TempDir()
++	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
++	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
++		t.Fatalf("install stderr:\n%s", stderr)
++	}
++	if code, _, stderr := runProfile(t, source, "env", "resolve", "pi", "--repair"); code != exitOK {
++		t.Fatalf("resolve pi --repair = %d\nstderr:\n%s", code, stderr)
++	}
++	managed := filepath.Join(source.cfg.Home(), "environments", "acme", "pi")
++	link = filepath.Join(managed, "auth.json")
++	native := os.Getenv("PI_CODING_AGENT_DIR")
++	oldTarget = filepath.Join(native, "auth.json")
++	agentAuth = filepath.Join(native, "agent", "auth.json")
++	if target, err := os.Readlink(link); err != nil || target != agentAuth {
++		t.Fatalf("provisioned Pi link targets %q (%v), want %q", target, err, agentAuth)
++	}
++	return link, oldTarget, agentAuth
++}
++
++func planHash(t *testing.T, plan string) string {
++	t.Helper()
++	match := regexp.MustCompile(`credential migration plan ([0-9a-f]{64})`).FindStringSubmatch(plan)
++	if match == nil {
++		t.Fatalf("plan prints its hash:\n%s", plan)
++	}
++	return match[1]
++}
++
++// TestEnvMigratePlanApplyPi migrates the operator's Pi case through the
++// CLI: the mis-targeted home plans a printed relink, apply executes
++// exactly that plan with bytes preserved, and a second plan/apply round
++// proves drift refusal on a stale hash.
++func TestEnvMigratePlanApplyPi(t *testing.T) {
++	source, _ := profileHome(t)
++	link, oldTarget, agentAuth := installPiProfile(t, source)
++	want, err := os.ReadFile(agentAuth)
++	if err != nil {
++		t.Fatal(err)
++	}
++	_ = os.Remove(link)
++	if err := os.Symlink(oldTarget, link); err != nil {
++		t.Fatal(err)
++	}
++	code, inspect, _ := runProfile(t, source, "env", "migrate", "--inspect")
++	if code != exitOK {
++		t.Fatalf("migrate --inspect = %d\n%s", code, inspect)
++	}
++	for _, want := range []string{"mis-targeted", oldTarget, agentAuth, "native Pi roots"} {
++		if !strings.Contains(inspect, want) {
++			t.Fatalf("inspect inventories the case, want %q in:\n%s", want, inspect)
++		}
++	}
++	code, plan, _ := runProfile(t, source, "env", "migrate", "--plan")
++	if code != exitOK {
++		t.Fatalf("migrate --plan = %d\n%s", code, plan)
++	}
++	hash := planHash(t, plan)
++	for _, want := range []string{"relink auth.json", oldTarget, agentAuth, "--expect " + hash} {
++		if !strings.Contains(plan, want) {
++			t.Fatalf("plan prints the exact operation, want %q in:\n%s", want, plan)
++		}
++	}
++	if code, again, _ := runProfile(t, source, "env", "migrate", "--plan"); code != exitOK || again != plan {
++		t.Fatalf("planning is deterministic: %d, identical bytes: %v", code, again == plan)
++	}
++	code, applied, stderr := runProfile(t, source, "env", "migrate", "--apply", "--expect", hash)
++	if code != exitOK {
++		t.Fatalf("migrate --apply = %d\nstdout:\n%s\nstderr:\n%s", code, applied, stderr)
++	}
++	if !strings.Contains(applied, plan) {
++		t.Fatalf("apply prints the plan before applying:\n%s", applied)
++	}
++	if !strings.Contains(applied, "migration complete") {
++		t.Fatalf("apply reports completion:\n%s", applied)
++	}
++	if target, err := os.Readlink(link); err != nil || target != agentAuth {
++		t.Fatalf("the link now targets the agent root: %q (%v)", target, err)
++	}
++	if payload, err := os.ReadFile(agentAuth); err != nil || string(payload) != string(want) {
++		t.Fatalf("native bytes preserved: %q (%v)", payload, err)
++	}
++	if code, _, stderr := runProfile(t, source, "env", "resolve", "pi"); code != exitOK {
++		t.Fatalf("the migrated home resolves bare: %d\n%s", code, stderr)
++	}
++	// A second round proves drift refusal through the CLI: plan clean,
++	// break the link, apply with the stale hash.
++	_, cleanPlan, _ := runProfile(t, source, "env", "migrate", "--plan")
++	cleanHash := planHash(t, cleanPlan)
++	_ = os.Remove(link)
++	if err := os.Symlink(oldTarget, link); err != nil {
++		t.Fatal(err)
++	}
++	code, _, stderr = runProfile(t, source, "env", "migrate", "--apply", "--expect", cleanHash)
++	if code != exitFail || !strings.Contains(stderr, "plan drift") {
++		t.Fatalf("a stale --expect refuses with plan drift: %d\n%s", code, stderr)
++	}
++	if target, err := os.Readlink(link); err != nil || target != oldTarget {
++		t.Fatalf("a drifted apply writes nothing: %q (%v)", target, err)
++	}
++}
++
++// TestEnvMigrateConflictRefuses proves a regular file at a link path
++// refuses through the CLI naming the operator choice, with bytes
++// untouched.
++func TestEnvMigrateConflictRefuses(t *testing.T) {
++	source, _ := profileHome(t)
++	writeNativeCredentials(t)
++	pkg := t.TempDir()
++	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
++	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
++		t.Fatalf("install stderr:\n%s", stderr)
++	}
++	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
++		t.Fatalf("resolve codex_cli --repair = %d\nstderr:\n%s", code, stderr)
++	}
++	link := filepath.Join(source.cfg.Home(), "environments", "acme", "codex_cli", "auth.json")
++	_ = os.Remove(link)
++	managed := []byte("managed-credential\n")
++	if err := os.WriteFile(link, managed, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	nativeAuth := filepath.Join(os.Getenv("CODEX_HOME"), "auth.json")
++	native, err := os.ReadFile(nativeAuth)
++	if err != nil {
++		t.Fatal(err)
++	}
++	code, plan, _ := runProfile(t, source, "env", "migrate", "--plan")
++	if code != exitOK || !strings.Contains(plan, "blocked:") {
++		t.Fatalf("a conflicted plan prints blocked: %d\n%s", code, plan)
++	}
++	code, _, stderr := runProfile(t, source, "env", "migrate", "--apply")
++	if code != exitFail {
++		t.Fatalf("apply = %d, want %d", code, exitFail)
++	}
++	combined := plan + "\n" + stderr
++	for _, want := range []string{"environment_credential_conflict", "decide which credential bytes win", link} {
++		if !strings.Contains(combined, want) {
++			t.Fatalf("the refusal names %q in:\n%s", want, combined)
++		}
++	}
++	if payload, err := os.ReadFile(link); err != nil || string(payload) != string(managed) {
++		t.Fatalf("managed bytes untouched: %q (%v)", payload, err)
++	}
++	if payload, err := os.ReadFile(nativeAuth); err != nil || string(payload) != string(native) {
++		t.Fatalf("native bytes untouched: %q (%v)", payload, err)
++	}
++}
++
++// TestEnvResolveRepairNeedsMigration proves repair never migrates
++// through the CLI: a mis-targeted Pi home refuses pointing at the
++// explicit step, with the link untouched.
++func TestEnvResolveRepairNeedsMigration(t *testing.T) {
++	source, _ := profileHome(t)
++	link, oldTarget, agentAuth := installPiProfile(t, source)
++	_ = os.Remove(link)
++	if err := os.Symlink(oldTarget, link); err != nil {
++		t.Fatal(err)
++	}
++	code, _, stderr := runProfile(t, source, "env", "resolve", "pi", "--repair")
++	if code != exitFail {
++		t.Fatalf("resolve --repair = %d, want %d", code, exitFail)
++	}
++	for _, want := range []string{"environment_credential_conflict", "migration needed", "env migrate", link, oldTarget, agentAuth} {
++		if !strings.Contains(stderr, want) {
++			t.Fatalf("the refusal points at the explicit step, want %q in:\n%s", want, stderr)
++		}
++	}
++	if target, err := os.Readlink(link); err != nil || target != oldTarget {
++		t.Fatalf("the refused link is untouched: %q (%v)", target, err)
++	}
++}
++
++// TestEnvMigrateUsage covers the operand gates through the CLI.
++func TestEnvMigrateUsage(t *testing.T) {
++	source, _ := profileHome(t)
++	if code, _, _ := runProfile(t, source, "env", "migrate"); code != exitUsage {
++		t.Fatalf("migrate without a phase = %d, want %d", code, exitUsage)
++	}
++	if code, _, _ := runProfile(t, source, "env", "migrate", "--plan", "--apply"); code != exitUsage {
++		t.Fatalf("migrate with two phases = %d, want %d", code, exitUsage)
++	}
++	if code, _, stderr := runProfile(t, source, "env", "migrate", "--plan", "--expect", "abc"); code != exitUsage || !strings.Contains(stderr, "--expect applies only with --apply") {
++		t.Fatalf("migrate --plan --expect = %d\n%s", code, stderr)
++	}
++	if code, _, stderr := runProfile(t, source, "env", "migrate", "--plan", "--env", "cursor"); code != exitFail || !strings.Contains(stderr, "environment_unknown") {
++		t.Fatalf("migrate --env cursor = %d\n%s", code, stderr)
++	}
++	if code, _, stderr := runProfile(t, source, "env", "migrate", "--plan", "--profile", "ghost"); code != exitFail || !strings.Contains(stderr, "profile_unknown") {
++		t.Fatalf("migrate --profile ghost = %d\n%s", code, stderr)
++	}
++	if code, stdout, _ := runProfile(t, source, "env", "migrate", "--inspect"); code != exitOK || !strings.Contains(stdout, "credential migration inventory") {
++		t.Fatalf("migrate --inspect = %d\n%s", code, stdout)
++	}
++}
+diff --git a/cmd/curator/envmigrate.go b/cmd/curator/envmigrate.go
+new file mode 100644
+index 00000000..77c7fe84
+--- /dev/null
++++ b/cmd/curator/envmigrate.go
+@@ -0,0 +1,91 @@
++package main
++
++import (
++	"fmt"
++
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/envprofile"
++	"github.com/relux-works/curator/internal/envregistry"
++)
++
++// cmdEnvMigrate runs the explicit credential migration step
++// (environments §7.4, §10.1; manager §12.4): inspect inventories,
++// plan prints the exact operations with their hash, and apply executes
++// exactly the printed plan under the manager lock after the drift and
++// conflict checks. Inspect and plan are read-only; only apply mutates.
++func (c cli) cmdEnvMigrate(cfg *config.Config, args []string) int {
++	flags := c.newFlagSet("env migrate")
++	inspect := flags.Bool("inspect", false, "print the credential inventory per profile and environment")
++	plan := flags.Bool("plan", false, "print the exact migration operations with the plan hash")
++	apply := flags.Bool("apply", false, "execute the printed plan under the manager lock")
++	profile := flags.String("profile", "", "migrate one profile (default: every installed profile)")
++	env := flags.String("env", "", "migrate one environment (default: every registered environment)")
++	expect := flags.String("expect", "", "refuse unless the inventory still hashes to this plan hash (only with --apply)")
++	positional, err := parseInterspersed(flags, args)
++	if err != nil || len(positional) != 0 {
++		_, _ = fmt.Fprintln(c.stderr, "curator: env migrate --inspect|--plan|--apply [--profile <name>] [--env <env-id>] [--expect <plan-hash>]")
++		_, _ = fmt.Fprintln(c.stderr, envAliasUsage)
++		return exitUsage
++	}
++	phases := 0
++	for _, selected := range []bool{*inspect, *plan, *apply} {
++		if selected {
++			phases++
++		}
++	}
++	if phases != 1 {
++		_, _ = fmt.Fprintln(c.stderr, "curator: env migrate needs exactly one of --inspect, --plan, or --apply")
++		return exitUsage
++	}
++	// --expect anchors a printed plan to its apply: without an apply
++	// there is no drift to check, mirroring --takeover with --repair.
++	if *expect != "" && !*apply {
++		_, _ = fmt.Fprintln(c.stderr, "curator: env migrate --expect applies only with --apply")
++		return exitUsage
++	}
++	envID := ""
++	if *env != "" {
++		envID = envregistry.NormalizeEnvID(*env)
++	}
++	req := envprofile.MigrateRequest{
++		Home:    cfg.Home(),
++		Profile: *profile,
++		EnvID:   envID,
++		Machine: envregistry.DefaultMachineConfig(),
++		Expect:  *expect,
++	}
++	if *apply {
++		result, err := envprofile.ApplyMigration(req)
++		if result != nil && result.Report != nil {
++			_, _ = fmt.Fprint(c.stdout, result.Report.Text(envprofile.MigratePhasePlan))
++			if err == nil && len(result.Applied) > 0 {
++				_, _ = fmt.Fprintf(c.stdout, "applied migration plan %s: %d operations\n", result.Report.Hash, len(result.Applied))
++				for _, op := range result.Applied {
++					switch op.Kind {
++					case envprofile.MigrateOpRelink:
++						_, _ = fmt.Fprintf(c.stdout, "  relinked profile %s, environment %s, %s -> %s\n", op.Profile, op.EnvID, op.Path, op.To)
++					case envprofile.MigrateOpUnlink:
++						_, _ = fmt.Fprintf(c.stdout, "  unlinked profile %s, environment %s, %s\n", op.Profile, op.EnvID, op.Path)
++					}
++				}
++				_, _ = fmt.Fprintln(c.stdout, "migration complete")
++			}
++		}
++		if err != nil {
++			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
++			return exitFail
++		}
++		return exitOK
++	}
++	report, err := envprofile.PlanMigration(req)
++	if err != nil {
++		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
++		return exitFail
++	}
++	phase := envprofile.MigratePhasePlan
++	if *inspect {
++		phase = envprofile.MigratePhaseInspect
++	}
++	_, _ = fmt.Fprint(c.stdout, report.Text(phase))
++	return exitOK
++}
+diff --git a/docs/cli.md b/docs/cli.md
+index 6d725208..3746b44e 100644
+--- a/docs/cli.md
++++ b/docs/cli.md
+@@ -928,6 +928,50 @@ Synopsis:
+ curator hook revoke <path>
+ ```
+ 
++### curator env migrate
++
++`curator env migrate` runs the explicit credential migration step (Spec
++environments §7.4/§10.1, manager §12.4): a mode change or a native-root
++correction that leaves a recorded credential link behind is never applied
++by `env resolve --repair` — repair re-links an absent path and refuses
++anything else, pointing here. Migration inventories the old marker, every
++recorded link target, and both Pi roots (`~/.pi/auth.json` and
++`~/.pi/agent/auth.json`); preserves the effective mode; relinks recorded
++symlinks at the declared native path and unlinks stale recorded links;
++and never copies, moves, or rewrites credential bytes.
++
++Synopsis:
++
++```bash
++curator env migrate --inspect|--plan|--apply [--profile <name>] [--env <env-id>] [--expect <plan-hash>]
++```
++
++- `--inspect` prints the read-only inventory per profile and environment:
++  the marker, the effective mode, every recorded link with its current
++  target and classification, and both Pi roots. It takes no lock and
++  changes nothing.
++- `--plan` prints the exact operations with the plan hash, plus every
++  conflict with the operator choice it needs. Conflicts block `--apply`,
++  not `--plan`.
++- `--apply` re-inventories under the manager-home mutation lock, refuses
++  when `--expect` no longer matches the inventory (plan drift) or when
++  conflicts remain, prints the plan, then executes exactly the printed
++  operations and publishes changed markers as one journaled transaction,
++  rolling back links and markers on failure.
++
++Migrate one Pi home, printing the plan before applying it:
++
++```bash
++curator env migrate --plan --env pi
++curator env migrate --apply --expect <plan-hash> --env pi
++```
++
++Conflicts that need the operator — an isolated→shared account choice, a
++regular file at a link path, two live Pi credentials — refuse with
++`environment_credential_conflict` naming the exact out-of-band decision;
++resolve them and re-run. The v1 marker still records path and strategy
++only.
++
+ ### curator ui
+ 
+ `curator ui` opens an interactive terminal view over installed environment state.
+diff --git a/docs/troubleshooting.md b/docs/troubleshooting.md
+index 1dc32a50..817c990b 100644
+--- a/docs/troubleshooting.md
++++ b/docs/troubleshooting.md
+@@ -566,13 +566,12 @@ Cause: the link path holds something repair must not displace — a
+ regular file (the tool severed the link by writing over it, or the
+ managed home holds its own credential bytes), an unrecorded symlink to
+ an unexpected target, or a non-empty directory. A stale recorded link
+-(`shared`→`isolated`, or a store gone ambient) is unlinked only when it
+-is still a symlink targeting the declared native store, preserving the
+-native bytes; anything else at the stale path refuses the same way. A
+-mis-targeted *recorded* link — for example a `pi` home still aimed at
+-the pre-0017 native `~/.pi/auth.json` instead of `~/.pi/agent/auth.json`
+-— is reported detached with conflict-class wording but is re-pointed by
+-repair, not refused.
++(`shared`→`isolated`, or a store gone ambient) and a mis-targeted
++*recorded* link — for example a `pi` home still aimed at the pre-0017
++native `~/.pi/auth.json` instead of `~/.pi/agent/auth.json` — are
++reported detached with conflict-class wording, but repair never moves
++them: the refusal says `migration needed` and names the `curator env
++migrate --apply` invocation that performs the move.
+ 
+ Not this error: a correctly targeted link whose native target does not
+ exist yet is the detached-pending warning (`link target ... does not
+@@ -581,13 +580,47 @@ provisioning, repair, and bare resolve all succeed loudly. Establish the
+ native credential — log in natively, or log in inside the managed home —
+ and the finding clears on the next run.
+ 
+-Remedy: resolve the conflict out of band, then re-run. Inspect both
+-sides — the managed path the diagnostic names and the declared native
+-target — decide which credential bytes win, move the loser aside
+-yourself (the manager never moves credential bytes), and re-run with
+-`--repair`. Do not re-point a mis-targeted recorded link by hand to
+-silence the finding: re-run with `--repair` and let the manager move the
+-link itself.
++Remedy: when the refusal says `migration needed`, run `curator env
++migrate --plan` to print the exact operations, then `curator env
++migrate --apply --expect <plan-hash>` to execute them; do not re-point
++the link by hand to silence the finding. Otherwise resolve the conflict
++out of band, then re-run: inspect both sides — the managed path the
++diagnostic names and the declared native target — decide which
++credential bytes win, move the loser aside yourself (the manager never
++moves credential bytes), and re-run with `--repair`.
++
++### Migration conflicts
++
++Symptom: `curator env migrate --apply` refuses with
++`environment_credential_conflict`, and the printed plan ends with
++`blocked:`.
++
++Cause: a state the migration must not touch without an operator
++decision. The plan names the exact choice: an isolated→shared account
++choice (the managed home holds its own credential bytes at the link
++path — decide which bytes win and move the loser aside yourself); a
++regular file at a link path (same choice); two live Pi credentials
++(`~/.pi/auth.json` and `~/.pi/agent/auth.json` both hold bytes — decide
++which holds the live credential and reconcile them yourself); a foreign
++or uninspectable link (remove it or restore access yourself). The
++manager never copies, moves, or deletes credential bytes at any step.
++
++Remedy: carry out the named choice out of band, then re-run
++`--plan` and `--apply`. Bytes at the old Pi root alone (with the agent
++root empty) are not a conflict: the migration relinks and warns, leaving
++the old bytes untouched — move them yourself if they are live.
++
++### Migration plan drift
++
++Symptom: `curator env migrate --apply --expect <hash>` refuses with
++`environment_credential_conflict: migration plan drift`.
++
++Cause: the inventory changed after `--plan` printed — another operation
++moved a link, a native file appeared or vanished, or the hash was copied
++wrong. The refusal writes nothing.
++
++Remedy: re-run `curator env migrate --plan` (with the same scope flags)
++and apply with the new hash it prints.
+ 
+ ### environment_credential_unsupported
+ 
+diff --git a/internal/envprofile/credential_link_test.go b/internal/envprofile/credential_link_test.go
+index 3b32e6ee..70739e1a 100644
+--- a/internal/envprofile/credential_link_test.go
++++ b/internal/envprofile/credential_link_test.go
+@@ -16,11 +16,12 @@ import (
+ )
+ 
+ // TestSharedToIsolatedRemovesStaleLink is row (a): a shared→isolated turn
+-// leaves no stale recorded link behind. The removal set covers recorded
+-// credential links, not only marker surfaces (the first 0017 hazard), and
+-// unlinking preserves the native bytes. A mutant that skips the
+-// recorded-link removal leaves the link on disk and fails the absence
+-// assertion; one that drops the record without unlinking fails it too.
++// leaves no stale recorded link behind. Repair never migrates: it
++// refuses the stale link with environment_credential_conflict pointing
++// at the explicit migration, which unlinks it preserving the native
++// bytes. A mutant that restores the unlink inside repair makes the
++// repair succeed and fails the refusal; one that skips the migration
++// unlink leaves the link on disk and fails the absence assertion.
+ func TestSharedToIsolatedRemovesStaleLink(t *testing.T) {
+ 	fx := writeManagedFixture(t, "acme")
+ 	nativeAuth := []byte("{\"t\":\"operator-credential\"}\n")
+@@ -42,8 +43,31 @@ func TestSharedToIsolatedRemovesStaleLink(t *testing.T) {
+ 	repair := fx.request("codex_cli")
+ 	repair.Machine = isolated
+ 	repair.Repair = true
+-	if _, err := Resolve(repair); err != nil {
+-		t.Fatalf("repair applies the isolated turn: %v", err)
++	_, err := Resolve(repair)
++	if err == nil || !strings.Contains(err.Error(), envregistry.DiagCredentialConflict) {
++		t.Fatalf("repair must refuse the stale link with %s, got %v", envregistry.DiagCredentialConflict, err)
++	}
++	for _, want := range []string{"migration needed", "env migrate", link} {
++		if !strings.Contains(err.Error(), want) {
++			t.Fatalf("the refusal points at the explicit migration, want %q in %v", want, err)
++		}
++	}
++	if target, err := os.Readlink(link); err != nil {
++		t.Fatalf("the refused link is untouched: %v", err)
++	} else if target != filepath.Join(fx.native["codex_cli"], "auth.json") {
++		t.Fatalf("the refused link still targets the declared store: %q", target)
++	}
++	mreq := fx.migrateRequest()
++	mreq.Machine = isolated
++	report, err := PlanMigration(mreq)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(report.Ops()) != 1 || report.Ops()[0].Kind != MigrateOpUnlink {
++		t.Fatalf("the migration plans the unlink: %+v", report.Ops())
++	}
++	if _, err := ApplyMigration(mreq); err != nil {
++		t.Fatalf("the migration applies the isolated turn: %v", err)
+ 	}
+ 	if _, err := os.Lstat(link); !os.IsNotExist(err) {
+ 		t.Fatalf("no stale link survives shared→isolated, lstat: %v", err)
+@@ -205,11 +229,12 @@ func TestStaleCredentialLinkRefusals(t *testing.T) {
+ // path, which does not exist, while the real credential lives at the
+ // agent root. Status and resolve report the recorded passthrough as
+ // detached with environment_credential_conflict-class wording — never
+-// silence — and repair re-points the recorded symlink at the declared
+-// agent root without touching bytes (rework-2 refinement: only a
+-// regular file at the link path refuses). A mutant that restores the
+-// old Pi target or compares basenames only reports current and fails;
+-// one that refuses the re-point fails the repair below.
++// silence — and repair refuses without touching bytes, pointing at the
++// explicit migration that heals the home
++// (TestMigratePiWrongTargetToAgentRoot). A mutant that restores the old
++// Pi target or compares basenames only reports current and fails; one
++// that re-points inside repair makes the repair succeed and fails the
++// refusal below.
+ func TestDanglingPiLinkReportedDetached(t *testing.T) {
+ 	fx := writeManagedFixture(t, "acme")
+ 	native := fx.native["pi"]
+@@ -255,11 +280,20 @@ func TestDanglingPiLinkReportedDetached(t *testing.T) {
+ 	}
+ 	req := fx.request("pi")
+ 	req.Repair = true
+-	if _, err := Resolve(req); err != nil {
+-		t.Fatalf("repair re-points the recorded link at the declared root: %v", err)
++	_, err = Resolve(req)
++	if err == nil || !strings.Contains(err.Error(), envregistry.DiagCredentialConflict) {
++		t.Fatalf("repair must refuse the mis-targeted link with %s, got %v", envregistry.DiagCredentialConflict, err)
++	}
++	for _, want := range []string{"migration needed", "env migrate", link, oldTarget, agentAuth} {
++		if !strings.Contains(err.Error(), want) {
++			t.Fatalf("the refusal points at the explicit migration, want %q in %v", want, err)
++		}
++	}
++	if strings.Contains(err.Error(), DiagRepairFailed) {
++		t.Fatalf("a credential refusal is not wrapped as %s: %v", DiagRepairFailed, err)
+ 	}
+-	if target, err := os.Readlink(link); err != nil || target != agentAuth {
+-		t.Fatalf("the link now targets the declared root: %q (%v), want %q", target, err, agentAuth)
++	if target, err := os.Readlink(link); err != nil || target != oldTarget {
++		t.Fatalf("the refused link is untouched: %q (%v), want %q", target, err, oldTarget)
+ 	}
+ 	if payload, err := os.ReadFile(agentAuth); err != nil || string(payload) != "{\"t\":\"operator-pi-credential\"}\n" {
+ 		t.Fatalf("native bytes untouched: %q (%v)", payload, err)
+@@ -267,8 +301,8 @@ func TestDanglingPiLinkReportedDetached(t *testing.T) {
+ 	if _, err := os.Lstat(oldTarget); !os.IsNotExist(err) {
+ 		t.Fatalf("repair creates nothing at the old target: %v", err)
+ 	}
+-	if _, err := Resolve(fx.request("pi")); err != nil {
+-		t.Fatalf("the re-pointed home is current: %v", err)
++	if _, err := Resolve(fx.request("pi")); err == nil || !strings.Contains(err.Error(), DiagHomeStale) {
++		t.Fatalf("the refused home stays stale, got %v", err)
+ 	}
+ }
+ 
+@@ -497,14 +531,15 @@ func TestCredentialLinkDirectory(t *testing.T) {
+ }
+ 
+ // TestCredentialLinkUnrecordedSymlinkRefuses pins the recorded-only bound
+-// on the re-point: a symlink to an unexpected target at a wanted link
+-// path the marker does NOT record is foreign, so repair refuses with
+-// environment_credential_conflict naming the path, removing nothing. The
+-// setup turns a keyring-ambient codex home (nothing linked, nothing
+-// recorded) into a file-link home while the operator's own symlink sits
+-// at the link path. A mutant that drops the recorded check and re-points
+-// every symlink unlinks the foreign link and fails; one that refuses
+-// every re-point fails TestDanglingPiLinkReportedDetached instead.
++// on the migration re-point: a symlink to an unexpected target at a
++// wanted link path the marker does NOT record is foreign, so repair (and
++// the migration) refuse with environment_credential_conflict naming the
++// path, removing nothing. The setup turns a keyring-ambient codex home
++// (nothing linked, nothing recorded) into a file-link home while the
++// operator's own symlink sits at the link path. A mutant that drops the
++// recorded check and re-points every symlink unlinks the foreign link
++// and fails; the recorded re-point itself lives in the explicit
++// migration (TestMigratePiWrongTargetToAgentRoot).
+ func TestCredentialLinkUnrecordedSymlinkRefuses(t *testing.T) {
+ 	fx := writeManagedFixture(t, "acme")
+ 	if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte("cli_auth_credentials_store = \"keyring\"\n"), 0o644); err != nil {
+@@ -620,8 +655,8 @@ func TestReviewerLiteralCodexSelector(t *testing.T) {
+ // the pending finding as a warning — restoring the native target clears
+ // it. This is the narrowing partner of TestDanglingPiLinkReportedDetached:
+ // a mutant that collapses mis-targeted and dangling-to-declared into one
+-// state fails one of the two — stale-plus-conflict-plus-relink here
+-// breaks the success below, pending-warning there breaks the Pi staleness.
++// state fails one of the two — stale-plus-conflict here breaks the
++// success below, pending-warning there breaks the Pi staleness.
+ func TestDanglingExpectedTargetRepairSucceeds(t *testing.T) {
+ 	fx := writeManagedFixture(t, "acme")
+ 	nativeAuth := filepath.Join(fx.native["codex_cli"], "auth.json")
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index 9b5056d5..2e0e4eb5 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -1004,12 +1004,13 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
+ 			recordedLinks[entry.Path] = true
+ 		}
+ 	}
++	migrateCmd := fmt.Sprintf("curator env migrate --apply --profile %s --env %s", req.Profile, plan.adapter.ID)
+ 	for _, path := range sortedKeys(links) {
+-		if err := ensureCredentialLink(plan.homeDir, path, links[path], recordedLinks[path]); err != nil {
++		if err := ensureCredentialLink(plan.homeDir, path, links[path], recordedLinks[path], migrateCmd); err != nil {
+ 			return nil, err
+ 		}
+ 	}
+-	if err := removeStaleCredentialLinks(plan.adapter, plan.homeDir, native, prior, links); err != nil {
++	if err := removeStaleCredentialLinks(plan.adapter, plan.homeDir, native, prior, links, migrateCmd); err != nil {
+ 		return nil, err
+ 	}
+ 	passthrough := []envmarker.Passthrough{}
+@@ -1071,21 +1072,21 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
+ 
+ // ensureCredentialLink fix-first ensures one wanted credential link (§7.4,
+ // §10.1): an absent link path is linked, a symlink still targeting the
+-// declared native store is left alone, a recorded symlink to any other
+-// target — the mis-targeted state, including a Pi home still linked at
+-// the pre-0017 native root — is re-pointed at the declared store, and an
+-// empty directory is replaced by the link. A regular file, an unrecorded
+-// symlink to an unexpected target, a non-empty directory, or a link whose
+-// state cannot be established refuses with
+-// environment_credential_conflict naming the path, removing nothing.
+-// Native bytes are never touched: only the managed link itself is ever
+-// created, re-pointed, or replaced.
+-func ensureCredentialLink(homeDir, path, target string, recorded bool) error {
++// declared native store is left alone, and an empty directory is replaced
++// by the link — none of which moves credential ownership. A recorded
++// symlink to any other target — the mis-targeted state, including a Pi
++// home still linked at the pre-0017 native root — is never re-pointed
++// here: repair refuses with environment_credential_conflict naming the
++// path and points at the explicit migration (migrateCmd). A regular
++// file, an unrecorded symlink to an unexpected target, a non-empty
++// directory, or a link whose state cannot be established refuses the
++// same way, removing nothing. Native bytes are never touched.
++func ensureCredentialLink(homeDir, path, target string, recorded bool, migrateCmd string) error {
+ 	full := filepath.Join(homeDir, filepath.FromSlash(path))
+ 	info, err := os.Lstat(full)
+ 	if err != nil {
+ 		if !os.IsNotExist(err) {
+-			return fmt.Errorf("%s: %s cannot be inspected: %v: refusing to touch it", envregistry.DiagCredentialConflict, full, err)
++			return fmt.Errorf("%s: %s cannot be inspected: %v: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full, err)
+ 		}
+ 		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+ 			return err
+@@ -1098,29 +1099,23 @@ func ensureCredentialLink(homeDir, path, target string, recorded bool) error {
+ 	if info.Mode()&os.ModeSymlink != 0 {
+ 		got, err := os.Readlink(full)
+ 		if err != nil {
+-			return fmt.Errorf("%s: %s link target cannot be read: refusing to touch it", envregistry.DiagCredentialConflict, full)
++			return fmt.Errorf("%s: %s link target cannot be read: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full)
+ 		}
+ 		if got == target {
+ 			return nil
+ 		}
+ 		if !recorded {
+-			return fmt.Errorf("%s: %s links to %s, expected %s: refusing to remove or re-point it", envregistry.DiagCredentialConflict, full, got, target)
++			return fmt.Errorf("%s: %s links to %s, expected %s: refusing to remove or re-point it; remove the unrecorded link out of band and re-run", envregistry.DiagCredentialConflict, full, got, target)
+ 		}
+-		if err := os.Remove(full); err != nil {
+-			return fmt.Errorf("passthrough %s: %v", path, err)
+-		}
+-		if err := os.Symlink(target, full); err != nil {
+-			return fmt.Errorf("passthrough %s: %v", path, err)
+-		}
+-		return nil
++		return fmt.Errorf("%s: %s links to %s, expected %s: migration needed: re-point the recorded link with `%s`; refusing to re-point it here", envregistry.DiagCredentialConflict, full, got, target, migrateCmd)
+ 	}
+ 	if info.IsDir() {
+ 		entries, err := os.ReadDir(full)
+ 		if err != nil {
+-			return fmt.Errorf("%s: %s holds a directory that cannot be listed: refusing to touch it", envregistry.DiagCredentialConflict, full)
++			return fmt.Errorf("%s: %s holds a directory that cannot be listed: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full)
+ 		}
+ 		if len(entries) != 0 {
+-			return fmt.Errorf("%s: %s holds a non-empty directory, expected a link to %s: refusing to remove it", envregistry.DiagCredentialConflict, full, target)
++			return fmt.Errorf("%s: %s holds a non-empty directory, expected a link to %s: refusing to remove it; clear the directory out of band and re-run", envregistry.DiagCredentialConflict, full, target)
+ 		}
+ 		_ = os.Remove(full)
+ 		if err := os.Symlink(target, full); err != nil {
+@@ -1128,20 +1123,22 @@ func ensureCredentialLink(homeDir, path, target string, recorded bool) error {
+ 		}
+ 		return nil
+ 	}
+-	return fmt.Errorf("%s: %s holds a regular file, expected a link to %s: refusing to remove or replace it", envregistry.DiagCredentialConflict, full, target)
++	return fmt.Errorf("%s: %s holds a regular file, expected a link to %s: refusing to remove or replace it; decide which credential bytes win and move the loser aside out of band (the manager never moves credential bytes)", envregistry.DiagCredentialConflict, full, target)
+ }
+ 
+-// removeStaleCredentialLinks unlinks recorded credential links the
++// removeStaleCredentialLinks refuses recorded credential links the
+ // effective set no longer wants — the shared→isolated turn, or a native
+-// store gone ambient — fix-first (§7.4): only a recorded symlink still
+-// targeting the declared native store is unlinked, preserving the native
+-// bytes, and an already-absent path is already gone. Anything else — a
+-// regular file, a symlink to any other target, or a directory — refuses
+-// with environment_credential_conflict naming the path, removing nothing:
+-// the operator resolves the conflict out of band and re-runs. The caller
+-// rewrites the record after every removal, so no stale recorded link
+-// survives behind the new configuration.
+-func removeStaleCredentialLinks(adapter envregistry.Adapter, homeDir, native string, prior *envmarker.Marker, links map[string]string) error {
++// store gone ambient (§7.4, §10.1): a mode change that leaves a recorded
++// link behind it is the explicit migration, never silent inside repair.
++// A stale recorded symlink still targeting the declared native store
++// refuses with environment_credential_conflict naming the path and
++// points at the explicit migration (migrateCmd); an already-absent path
++// is already gone and the caller drops the record, so hand-removed and
++// crash-recovery shapes converge here. Anything else — a regular file,
++// a symlink to any other target, or a directory — refuses the same way,
++// removing nothing: the operator resolves the conflict out of band and
++// re-runs.
++func removeStaleCredentialLinks(adapter envregistry.Adapter, homeDir, native string, prior *envmarker.Marker, links map[string]string, migrateCmd string) error {
+ 	if prior == nil || prior.Passthrough == nil {
+ 		return nil
+ 	}
+@@ -1155,28 +1152,26 @@ func removeStaleCredentialLinks(adapter envregistry.Adapter, homeDir, native str
+ 			if os.IsNotExist(err) {
+ 				continue
+ 			}
+-			return fmt.Errorf("%s: %s cannot be inspected: %v: refusing to touch it", envregistry.DiagCredentialConflict, full, err)
++			return fmt.Errorf("%s: %s cannot be inspected: %v: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full, err)
+ 		}
+ 		if info.Mode()&os.ModeSymlink == 0 {
+ 			if info.IsDir() {
+-				return fmt.Errorf("%s: %s holds a directory where the recorded credential link %s was: refusing to remove it", envregistry.DiagCredentialConflict, full, entry.Path)
++				return fmt.Errorf("%s: %s holds a directory where the recorded credential link %s was: refusing to remove it; clear the directory out of band and re-run", envregistry.DiagCredentialConflict, full, entry.Path)
+ 			}
+-			return fmt.Errorf("%s: %s holds a regular file where the recorded credential link %s was: refusing to remove it", envregistry.DiagCredentialConflict, full, entry.Path)
++			return fmt.Errorf("%s: %s holds a regular file where the recorded credential link %s was: refusing to remove it; decide which credential bytes win and move the loser aside out of band (the manager never moves credential bytes)", envregistry.DiagCredentialConflict, full, entry.Path)
+ 		}
+ 		got, err := os.Readlink(full)
+ 		if err != nil {
+-			return fmt.Errorf("%s: %s link target cannot be read: refusing to touch it", envregistry.DiagCredentialConflict, full)
++			return fmt.Errorf("%s: %s link target cannot be read: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full)
+ 		}
+ 		declared, ok := declaredPassthroughTarget(adapter, native, entry.Path)
+ 		if !ok {
+-			return fmt.Errorf("%s: %s has no declared native store for the recorded credential link %s: refusing to remove it", envregistry.DiagCredentialConflict, full, entry.Path)
++			return fmt.Errorf("%s: %s has no declared native store for the recorded credential link %s: refusing to remove it; remove the link out of band and re-run", envregistry.DiagCredentialConflict, full, entry.Path)
+ 		}
+ 		if got != declared {
+-			return fmt.Errorf("%s: %s links to %s, not the recorded credential target %s: refusing to remove it", envregistry.DiagCredentialConflict, full, got, declared)
+-		}
+-		if err := os.Remove(full); err != nil {
+-			return fmt.Errorf("passthrough %s: %v", entry.Path, err)
++			return fmt.Errorf("%s: %s links to %s, not the recorded credential target %s: refusing to remove it; remove the link out of band and re-run", envregistry.DiagCredentialConflict, full, got, declared)
+ 		}
++		return fmt.Errorf("%s: %s is a stale recorded credential link (still targeting the declared store %s): migration needed: unlink it with `%s`; refusing to unlink it here", envregistry.DiagCredentialConflict, full, declared, migrateCmd)
+ 	}
+ 	return nil
+ }
+@@ -1540,8 +1535,8 @@ func equalStrings(a, b []string) bool {
+ // symlink to an unexpected target — including a Pi home still linked at
+ // the pre-0017 native target — is detached with
+ // environment_credential_conflict-class wording, never silence:
+-// --repair relinks a recorded symlink to the declared path without
+-// touching bytes and refuses a regular file without touching it. A
++// --repair refuses without touching bytes and points at the explicit
++// migration where it can fix the state. A
+ // correctly targeted link whose native target does not exist yet is the
+ // distinct detached-pending state — the normal provisioning shape before
+ // the first login (claude_code on Linux) — reported as a warning, never
+diff --git a/internal/envprofile/migrate.go b/internal/envprofile/migrate.go
+new file mode 100644
+index 00000000..4e2016d4
+--- /dev/null
++++ b/internal/envprofile/migrate.go
+@@ -0,0 +1,978 @@
++// Package envprofile credential migration runs the explicit inspect →
++// plan → apply step (environments §7.4, §10.1; manager §12.4; decision
++// 0017 choice 3). A mode change or a native-root correction that leaves
++// a recorded credential link behind is
++// never applied by resolve --repair: repair re-links an absent link and
++// refuses anything else, pointing at this step where the explicit
++// migration can fix it. The migration inventories the old marker, every
++// recorded link target, and both Pi roots; preserves the effective mode;
++// relinks recorded symlinks at the declared native path and unlinks
++// stale recorded links; and never copies, moves, or rewrites credential
++// bytes — a relink moves the pointer, never the file.
++//
++// Inspect and plan share one read-only computation (no lock, never a
++// credential-byte read) and differ only in what they print; apply takes
++// the manager-home mutation lock, refuses on plan drift (the --expect
++// hash) and on conflicts, prints the plan before applying, and publishes
++// changed markers through the journaled record publication, rolling back
++// links and markers on failure.
++package envprofile
++
++import (
++	"crypto/sha256"
++	"encoding/hex"
++	"fmt"
++	"os"
++	"path/filepath"
++	"sort"
++	"strings"
++
++	"github.com/relux-works/curator/internal/envmarker"
++	"github.com/relux-works/curator/internal/envregistry"
++)
++
++// Migration render phases for MigrateReport.Text. Inspect prints the
++// inventory detail; plan prints the operations, conflicts, and hash.
++const (
++	MigratePhaseInspect = "inspect"
++	MigratePhasePlan    = "plan"
++)
++
++// Migration operation kinds.
++const (
++	MigrateOpRelink = "relink"
++	MigrateOpUnlink = "unlink"
++)
++
++// Migration fault points for the MigrateRequest.InjectFault seam:
++// after each applied link operation ("link"), and after the marker
++// publication ("publish", only when markers changed).
++const (
++	MigrateFaultLink    = "link"
++	MigrateFaultPublish = "publish"
++)
++
++// Entry classifications for one recorded-or-wanted credential path.
++const (
++	MigrateCurrent        = "current"
++	MigratePending        = "dangling-to-declared"
++	MigrateMistargeted    = "mis-targeted"
++	MigrateStaleRecorded  = "stale-recorded"
++	MigrateRegularFile    = "regular-file-at-link"
++	MigrateForeign        = "foreign"
++	MigrateAbsent         = "absent"
++	MigrateEmptyDir       = "empty-dir"
++	MigrateDirConflict    = "directory-at-link"
++	MigrateUninspectable  = "uninspectable"
++	MigrateNoDeclaredRoot = "no-declared-root"
++)
++
++// Native-root states for the Pi inventory: the path stats present,
++// absent, or fails to stat (fail-closed, never read as absent).
++const (
++	MigrateRootPresent       = "present"
++	MigrateRootAbsent        = "absent"
++	MigrateRootUninspectable = "uninspectable"
++	MigrateRootNA            = "-"
++)
++
++// MigrateRequest scopes one credential migration operation. Profile and
++// EnvID filter the scope; empty means every installed profile or every
++// registered environment. Expect carries the plan hash a previous --plan
++// printed; apply refuses when the recomputed hash differs (plan drift),
++// while empty disables the check. InjectFault is a test seam:
++// production never sets it.
++type MigrateRequest struct {
++	Home         string
++	Profile      string
++	EnvID        string
++	Machine      envregistry.MachineConfig
++	Detect       func(envregistry.Adapter) string
++	NativeHomeOf func(string) (string, error)
++	Expect       string
++	InjectFault  func(point string, applied int) error
++}
++
++// resolveFor builds the resolve shim the migration reuses for the native
++// home, release detection, and effective-passthrough computation, so the
++// migration and repair cannot disagree about the declared targets.
++func (req *MigrateRequest) resolveFor(profile, envID string) *ResolveRequest {
++	return &ResolveRequest{
++		Home:         req.Home,
++		Profile:      profile,
++		EnvID:        envID,
++		Machine:      req.Machine,
++		Detect:       req.Detect,
++		NativeHomeOf: req.NativeHomeOf,
++	}
++}
++
++// MigrateOp is one exact link operation: relink moves a recorded symlink
++// from its current target to the declared native path, unlink removes a
++// stale recorded link (From empty means the link is already gone and
++// only the marker record is dropped). To is empty for unlink.
++type MigrateOp struct {
++	Profile string
++	EnvID   string
++	Kind    string
++	Path    string
++	From    string
++	To      string
++}
++
++// MigrateConflict is one state the operator must resolve out of band
++// before apply runs: Detail reports both sides, Choice names the exact
++// operator action. Any conflict in scope blocks the whole apply.
++type MigrateConflict struct {
++	Profile string
++	EnvID   string
++	Path    string
++	Detail  string
++	Choice  string
++}
++
++// MigrateEntry is one inventoried recorded-or-wanted path: its record
++// and wanted state, its classification, and the current versus declared
++// link target ("-" where none applies).
++type MigrateEntry struct {
++	Path     string
++	Strategy string
++	Recorded bool
++	Wanted   bool
++	State    string
++	Current  string
++	Declared string
++	Note     string
++}
++
++// MigrateHome is one profile × environment inventory: the marker and
++// effective mode, every entry, the Pi native roots (pi homes only;
++// "-" otherwise), and the derived operations, conflicts, and warnings.
++type MigrateHome struct {
++	Profile   string
++	EnvID     string
++	HomeDir   string
++	Isolation string
++	Mode      string
++	Entries   []MigrateEntry
++	PiOldPath string
++	PiNewPath string
++	PiOld     string
++	PiNew     string
++	Ops       []MigrateOp
++	Conflicts []MigrateConflict
++	Warnings  []string
++
++	provisioned bool
++	marker      *envmarker.Marker
++	markerRaw   []byte
++}
++
++// MigrateReport is the migration plan over the requested scope: every
++// inventoried home plus the plan hash over the canonical inventory,
++// operations, and conflicts.
++type MigrateReport struct {
++	Home      string
++	ScopeProf string
++	ScopeEnv  string
++	Homes     []MigrateHome
++	Hash      string
++}
++
++// Ops flattens the report's operations in plan order.
++func (r *MigrateReport) Ops() []MigrateOp {
++	var out []MigrateOp
++	for _, home := range r.Homes {
++		out = append(out, home.Ops...)
++	}
++	return out
++}
++
++// Conflicts flattens the report's conflicts in plan order.
++func (r *MigrateReport) Conflicts() []MigrateConflict {
++	var out []MigrateConflict
++	for _, home := range r.Homes {
++		out = append(out, home.Conflicts...)
++	}
++	return out
++}
++
++// PlanMigration inventories the scope and derives the exact operations,
++// conflicts, and plan hash. Read-only: it takes no lock and never reads
++// credential bytes (lstat/readlink/stat only). It serves both the
++// inspect and the plan renderings; use MigrateReport.Text to print.
++func PlanMigration(req MigrateRequest) (*MigrateReport, error) {
++	profiles, err := migrationProfiles(req.Home, req.Profile)
++	if err != nil {
++		return nil, err
++	}
++	adapters, err := migrationAdapters(req.EnvID)
++	if err != nil {
++		return nil, err
++	}
++	report := &MigrateReport{Home: req.Home, ScopeProf: req.Profile, ScopeEnv: req.EnvID}
++	for _, profile := range profiles {
++		for _, adapter := range adapters {
++			report.Homes = append(report.Homes, inventoryHome(&req, profile, adapter))
++		}
++	}
++	report.Hash = migrationHash(report)
++	return report, nil
++}
++
++// migrationProfiles resolves the profile scope without touching the
++// manager lock and without creating the default profile: inspect and
++// plan are read-only, so unlike List they never ensure anything.
++func migrationProfiles(home, explicit string) ([]string, error) {
++	if explicit != "" {
++		installed, err := installedProfiles(home)
++		if err != nil {
++			return nil, err
++		}
++		for _, name := range installed {
++			if name == explicit {
++				return []string{explicit}, nil
++			}
++		}
++		return nil, fmt.Errorf("%s: profile %q is not installed", DiagProfileUnknown, explicit)
++	}
++	return installedProfiles(home)
++}
++
++// installedProfiles enumerates installed profiles lock-free: a directory
++// with a valid name carrying source.json. Reserved state (scoped/) and
++// anything else in the store directory is not a profile.
++func installedProfiles(home string) ([]string, error) {
++	entries, err := os.ReadDir(ProfilesDir(home))
++	if err != nil {
++		if os.IsNotExist(err) {
++			return nil, nil
++		}
++		return nil, err
++	}
++	var out []string
++	for _, entry := range entries {
++		if !entry.IsDir() || !validProfileName(entry.Name()) {
++			continue
++		}
++		if _, err := os.Lstat(sourcePath(home, entry.Name())); err != nil {
++			if os.IsNotExist(err) {
++				continue
++			}
++			return nil, err
++		}
++		out = append(out, entry.Name())
++	}
++	sort.Strings(out)
++	return out, nil
++}
++
++// migrationAdapters resolves the environment scope in closed-registry
++// order, so plans are deterministic across machines.
++func migrationAdapters(explicit string) ([]envregistry.Adapter, error) {
++	if explicit != "" {
++		adapter, err := envregistry.ByID(explicit)
++		if err != nil {
++			return nil, err
++		}
++		return []envregistry.Adapter{adapter}, nil
++	}
++	return append([]envregistry.Adapter{}, envregistry.Registry...), nil
++}
++
++// inventoryHome inventories one profile × environment. It never fails:
++// anything that prevents planning the home — an invalid marker, an
++// unresolvable native home, a refused configuration, an unreadable
++// native selector — becomes a conflict naming the out-of-band fix, so
++// apply blocks instead of guessing.
++func inventoryHome(req *MigrateRequest, profile string, adapter envregistry.Adapter) MigrateHome {
++	home := MigrateHome{
++		Profile: profile, EnvID: adapter.ID,
++		HomeDir: ManagedHomeDir(req.Home, profile, adapter.ID),
++		PiOld:   MigrateRootNA, PiNew: MigrateRootNA,
++	}
++	payload, err := os.ReadFile(filepath.Join(home.HomeDir, envmarker.Name)) // #nosec G304 -- managed marker below the resolved home
++	if err != nil {
++		if os.IsNotExist(err) {
++			return home
++		}
++		home.addConflict("", fmt.Sprintf("marker is unreadable: %v", err),
++			"restore access to the marker out of band (back it up first) and re-run")
++		return home
++	}
++	marker, err := envmarker.Parse(payload)
++	if err != nil {
++		home.addConflict("", fmt.Sprintf("marker is invalid: %v", err),
++			"back the marker up, remove it, and re-run `curator env resolve --repair` to re-provision")
++		return home
++	}
++	home.provisioned = true
++	home.marker = marker
++	home.markerRaw = payload
++	home.Mode = marker.Mode
++	rr := req.resolveFor(profile, adapter.ID)
++	atAbove := true
++	if ok, known := adapter.AtOrAbovePinned(rr.detected(adapter)); known {
++		atAbove = ok
++	}
++	isolation, err := req.Machine.EffectiveIsolation(profile, adapter, atAbove)
++	if err != nil {
++		home.addConflict("", fmt.Sprintf("machine configuration refused: %v", err),
++			"fix the isolation setting out of band and re-run")
++		return home
++	}
++	home.Isolation = isolation
++	if err := rr.checkIsolatedCredentialStore(adapter, isolation); err != nil {
++		home.addConflict("", fmt.Sprintf("machine configuration refused: %v", err),
++			"fix the isolation setting out of band and re-run")
++		return home
++	}
++	links, strategies, err := rr.effectivePassthrough(adapter, isolation)
++	if err != nil {
++		home.addConflict("", fmt.Sprintf("cannot establish the credential strategy: %v", err),
++			"fix the native credential configuration out of band and re-run")
++		return home
++	}
++	native, err := rr.nativeHome(adapter.ID)
++	if err != nil {
++		home.addConflict("", fmt.Sprintf("cannot resolve the native home: %v", err),
++			"restore the native home out of band and re-run")
++		return home
++	}
++	recorded := map[string]string{}
++	if marker.Passthrough != nil {
++		for _, entry := range *marker.Passthrough {
++			recorded[entry.Path] = entry.Strategy
++		}
++	}
++	paths := map[string]bool{}
++	for path := range recorded {
++		paths[path] = true
++	}
++	for path := range links {
++		paths[path] = true
++	}
++	for _, path := range sortedKeysBool(paths) {
++		_, isRecorded := recorded[path]
++		wantedTarget, isWanted := links[path]
++		home.classifyPath(adapter, native, path, isRecorded, isWanted, wantedTarget, strategies[path])
++	}
++	if adapter.ID == envregistry.Pi {
++		home.inventoryPiRoots(native)
++	}
++	return home
++}
++
++func sortedKeysBool(values map[string]bool) []string {
++	keys := make([]string, 0, len(values))
++	for key := range values {
++		keys = append(keys, key)
++	}
++	sort.Strings(keys)
++	return keys
++}
++
++func (h *MigrateHome) addConflict(path, detail, choice string) {
++	h.Conflicts = append(h.Conflicts, MigrateConflict{
++		Profile: h.Profile, EnvID: h.EnvID, Path: path, Detail: detail, Choice: choice,
++	})
++}
++
++// classifyPath classifies one recorded-or-wanted path by inspection only
++// (lstat/readlink/stat — never a credential-byte read) and derives at
++// most one operation. Anything the migration must not touch — a regular
++// file, a foreign link, a non-empty directory, an uninspectable path —
++// becomes a conflict naming the operator choice instead of an operation.
++func (h *MigrateHome) classifyPath(adapter envregistry.Adapter, native, path string, recorded, wanted bool, wantedTarget, strategy string) {
++	if strategy == "" {
++		strategy = "-"
++	}
++	entry := MigrateEntry{Path: path, Strategy: strategy, Recorded: recorded, Wanted: wanted, Current: "-", Declared: "-"}
++	if wanted {
++		entry.Declared = wantedTarget
++	}
++	if !recorded && strategy == "" {
++		entry.Strategy = "-"
++	}
++	full := filepath.Join(h.HomeDir, filepath.FromSlash(path))
++	info, err := os.Lstat(full)
++	if err != nil {
++		if !os.IsNotExist(err) {
++			entry.State = MigrateUninspectable
++			h.Entries = append(h.Entries, entry)
++			h.addConflict(path, fmt.Sprintf("%s cannot be inspected: %v", full, err),
++				"restore access to the link path out of band and re-run")
++			return
++		}
++		if wanted {
++			entry.State = MigrateAbsent
++			entry.Note = "repair re-links the absent path"
++			h.Entries = append(h.Entries, entry)
++			return
++		}
++		// A stale record whose link is already gone needs only the
++		// record drop (crash-recovery and hand-removed shapes converge
++		// here); there is no link to remove.
++		entry.State = MigrateStaleRecorded
++		h.Entries = append(h.Entries, entry)
++		h.Ops = append(h.Ops, MigrateOp{Profile: h.Profile, EnvID: h.EnvID, Kind: MigrateOpUnlink, Path: path})
++		return
++	}
++	if info.Mode()&os.ModeSymlink != 0 {
++		h.classifyLink(adapter, native, full, &entry, wantedTarget, recorded, wanted)
++		return
++	}
++	if info.IsDir() {
++		entries, err := os.ReadDir(full)
++		if err != nil {
++			entry.State = MigrateUninspectable
++			h.Entries = append(h.Entries, entry)
++			h.addConflict(path, fmt.Sprintf("%s holds a directory that cannot be listed: %v", full, err),
++				"restore access to the link path out of band and re-run")
++			return
++		}
++		if len(entries) == 0 && wanted {
++			entry.State = MigrateEmptyDir
++			entry.Note = "repair replaces the empty directory with the declared link"
++			h.Entries = append(h.Entries, entry)
++			return
++		}
++		entry.State = MigrateDirConflict
++		h.Entries = append(h.Entries, entry)
++		shape := "a non-empty directory"
++		if len(entries) == 0 {
++			shape = "an empty directory where no link is wanted"
++		}
++		h.addConflict(path, fmt.Sprintf("%s holds %s", full, shape),
++			"clear the directory out of band and re-run")
++		return
++	}
++	entry.State = MigrateRegularFile
++	h.Entries = append(h.Entries, entry)
++	nativeSide := h.staleDeclaredTarget(adapter, native, path)
++	if wanted {
++		nativeSide = wantedTarget
++	}
++	if nativeSide == "" {
++		nativeSide = "the declared native store"
++	}
++	h.addConflict(path,
++		fmt.Sprintf("%s holds a regular file (the managed home holds its own credential bytes — e.g. after running isolated, or the tool severed the link), expected a link to %s", full, nativeSide),
++		fmt.Sprintf("decide which credential bytes win (managed %s vs native %s); move the loser aside out of band (the manager never moves credential bytes) and re-run", full, nativeSide))
++}
++
++// classifyLink classifies a symlink at a recorded-or-wanted path: a
++// recorded link to the wrong target is re-pointed, a stale recorded
++// link to the declared store is unlinked, and anything unprovable is a
++// conflict. A correctly targeted link is current, or pending when the
++// native target does not exist yet — pending entries get no operation.
++func (h *MigrateHome) classifyLink(adapter envregistry.Adapter, native, full string, entry *MigrateEntry, wantedTarget string, recorded, wanted bool) {
++	got, err := os.Readlink(full)
++	if err != nil {
++		entry.State = MigrateUninspectable
++		h.Entries = append(h.Entries, *entry)
++		h.addConflict(entry.Path, fmt.Sprintf("%s link target cannot be read", full),
++			"restore access to the link out of band and re-run")
++		return
++	}
++	entry.Current = got
++	if wanted {
++		if got == wantedTarget {
++			if _, err := os.Stat(wantedTarget); err != nil {
++				if os.IsNotExist(err) {
++					entry.State = MigratePending
++					entry.Note = "dangling-to-declared: nothing to migrate; log in to populate the native target"
++					h.Entries = append(h.Entries, *entry)
++					return
++				}
++				entry.State = MigrateUninspectable
++				h.Entries = append(h.Entries, *entry)
++				h.addConflict(entry.Path, fmt.Sprintf("%s target %s cannot be inspected: %v", full, wantedTarget, err),
++					"restore access to the native target out of band and re-run")
++				return
++			}
++			entry.State = MigrateCurrent
++			if !recorded {
++				entry.Note = "unrecorded; repair adopts the record"
++			}
++			h.Entries = append(h.Entries, *entry)
++			return
++		}
++		if !recorded {
++			entry.State = MigrateForeign
++			h.Entries = append(h.Entries, *entry)
++			h.addConflict(entry.Path, fmt.Sprintf("%s links to %s, expected %s", full, got, wantedTarget),
++				"remove the unrecorded link out of band and re-run (repair then links the declared store)")
++			return
++		}
++		entry.State = MigrateMistargeted
++		h.Entries = append(h.Entries, *entry)
++		h.Ops = append(h.Ops, MigrateOp{Profile: h.Profile, EnvID: h.EnvID, Kind: MigrateOpRelink, Path: entry.Path, From: got, To: wantedTarget})
++		return
++	}
++	declared, ok := declaredPassthroughTarget(adapter, native, entry.Path)
++	if !ok {
++		entry.State = MigrateNoDeclaredRoot
++		h.Entries = append(h.Entries, *entry)
++		h.addConflict(entry.Path, fmt.Sprintf("%s has no declared native store for the recorded credential link %s", full, entry.Path),
++			"remove the link out of band and re-run")
++		return
++	}
++	if got != declared {
++		entry.State = MigrateForeign
++		h.Entries = append(h.Entries, *entry)
++		h.addConflict(entry.Path, fmt.Sprintf("%s links to %s, not the recorded credential target %s", full, got, declared),
++			"remove the link out of band and re-run")
++		return
++	}
++	entry.State = MigrateStaleRecorded
++	h.Entries = append(h.Entries, *entry)
++	h.Ops = append(h.Ops, MigrateOp{Profile: h.Profile, EnvID: h.EnvID, Kind: MigrateOpUnlink, Path: entry.Path, From: got})
++}
++
++// staleDeclaredTarget reconstructs the declared target of a stale
++// recorded path for conflict wording, or "" where none is declared.
++func (h *MigrateHome) staleDeclaredTarget(adapter envregistry.Adapter, native, path string) string {
++	declared, ok := declaredPassthroughTarget(adapter, native, path)
++	if !ok {
++		return ""
++	}
++	return declared
++}
++
++// inventoryPiRoots stats both Pi native roots without reading bytes. Two
++// live roots block a re-point (the operator chooses the account); bytes
++// at the old root alone warn (the relink orphans them and the manager
++// never touches native files). Roots are informational where no
++// re-point is planned.
++func (h *MigrateHome) inventoryPiRoots(native string) {
++	h.PiOldPath = filepath.Join(native, "auth.json")
++	h.PiNewPath = filepath.Join(native, "agent", "auth.json")
++	h.PiOld = statRoot(h.PiOldPath)
++	h.PiNew = statRoot(h.PiNewPath)
++	relink := false
++	for _, op := range h.Ops {
++		if op.Kind == MigrateOpRelink {
++			relink = true
++		}
++	}
++	if relink && (h.PiOld == MigrateRootUninspectable || h.PiNew == MigrateRootUninspectable) {
++		h.addConflict("", fmt.Sprintf("Pi native roots cannot be inspected (old %s: %s; new %s: %s)", h.PiOldPath, h.PiOld, h.PiNewPath, h.PiNew),
++			"restore access to the native roots out of band and re-run")
++		return
++	}
++	if relink && h.PiOld == MigrateRootPresent && h.PiNew == MigrateRootPresent {
++		h.addConflict("", fmt.Sprintf("two live Pi credentials: %s and %s both hold bytes", h.PiOldPath, h.PiNewPath),
++			fmt.Sprintf("decide which of %s and %s holds the live credential; reconcile out of band (the manager never copies, moves, or deletes credential bytes) and re-run", h.PiOldPath, h.PiNewPath))
++		return
++	}
++	if h.PiOld == MigrateRootPresent {
++		h.Warnings = append(h.Warnings, fmt.Sprintf("native bytes exist at the old Pi root %s (declared root %s): the relink leaves them untouched — if they are live, move them out of band (the manager never copies credential bytes)", h.PiOldPath, h.PiNewPath))
++	}
++}
++
++// statRoot stats one native path: present, absent, or uninspectable.
++// Absence and a failed read are different facts; only NotExist is
++// absence.
++func statRoot(path string) string {
++	if _, err := os.Stat(path); err != nil {
++		if os.IsNotExist(err) {
++			return MigrateRootAbsent
++		}
++		return MigrateRootUninspectable
++	}
++	return MigrateRootPresent
++}
++
++// migrationHash hashes the canonical plan bytes: every inventoried home
++// (marker, mode, entries with targets, Pi roots), every operation, and
++// every conflict with its choice. Any inventory change re-hashes, so
++// --expect refuses on plan drift.
++func migrationHash(report *MigrateReport) string {
++	var canonical strings.Builder
++	canonical.WriteString("migration-plan-v1\n")
++	for _, home := range report.Homes {
++		provisioned := "0"
++		if home.provisioned {
++			provisioned = "1"
++		}
++		fmt.Fprintf(&canonical, "home %s %s provisioned=%s isolation=%s mode=%s\n", home.Profile, home.EnvID, provisioned, home.Isolation, home.Mode)
++		for _, entry := range home.Entries {
++			fmt.Fprintf(&canonical, "entry %s %s %s recorded=%t wanted=%t strategy=%s state=%s current=%s declared=%s\n",
++				home.Profile, home.EnvID, entry.Path, entry.Recorded, entry.Wanted, entry.Strategy, entry.State, entry.Current, entry.Declared)
++		}
++		if home.EnvID == envregistry.Pi && home.provisioned {
++			fmt.Fprintf(&canonical, "piroots %s old=%s new=%s\n", home.Profile, home.PiOld, home.PiNew)
++		}
++		for _, op := range home.Ops {
++			fmt.Fprintf(&canonical, "op %s %s %s %s from=%s to=%s\n", op.Profile, op.EnvID, op.Kind, op.Path, op.From, op.To)
++		}
++		for _, conflict := range home.Conflicts {
++			fmt.Fprintf(&canonical, "conflict %s %s %s detail=%s choice=%s\n", conflict.Profile, conflict.EnvID, conflict.Path, conflict.Detail, conflict.Choice)
++		}
++		for _, warning := range home.Warnings {
++			fmt.Fprintf(&canonical, "warning %s %s %s\n", home.Profile, home.EnvID, warning)
++		}
++	}
++	sum := sha256.Sum256([]byte(canonical.String()))
++	return hex.EncodeToString(sum[:])
++}
++
++// Text renders the report deterministically for one phase: the inspect
++// inventory detail, or the plan with operations, conflicts, warnings,
++// and hash. Apply prints the plan text before executing it.
++func (r *MigrateReport) Text(phase string) string {
++	var out strings.Builder
++	if phase == MigratePhaseInspect {
++		fmt.Fprintf(&out, "credential migration inventory: manager home %s\n", r.Home)
++		for _, home := range r.Homes {
++			home.writeInventory(&out)
++		}
++	} else {
++		fmt.Fprintf(&out, "credential migration plan %s: manager home %s\n", r.Hash, r.Home)
++		shown := false
++		for _, home := range r.Homes {
++			if len(home.Ops) == 0 && len(home.Conflicts) == 0 && len(home.Warnings) == 0 {
++				continue
++			}
++			shown = true
++			fmt.Fprintf(&out, "profile %s, environment %s:\n", home.Profile, home.EnvID)
++			for _, op := range home.Ops {
++				op.writePlan(&out)
++			}
++			for _, warning := range home.Warnings {
++				fmt.Fprintf(&out, "  warning: %s\n", warning)
++			}
++			for _, conflict := range home.Conflicts {
++				conflict.writePlan(&out)
++			}
++		}
++		if !shown {
++			out.WriteString("no operations, conflicts, or warnings\n")
++		}
++	}
++	ops := len(r.Ops())
++	conflicts := len(r.Conflicts())
++	migrating := 0
++	for _, home := range r.Homes {
++		if len(home.Ops) > 0 || len(home.Conflicts) > 0 {
++			migrating++
++		}
++	}
++	fmt.Fprintf(&out, "summary: %d homes inventoried, %d need migration, %d operations, %d conflicts\n",
++		len(r.Homes), migrating, ops, conflicts)
++	if phase != MigratePhaseInspect {
++		switch {
++		case conflicts > 0:
++			fmt.Fprintf(&out, "blocked: resolve the conflicts out of band, then re-run `curator env migrate --plan%s`\n", r.scopeFlags())
++		case ops > 0:
++			fmt.Fprintf(&out, "ready: run `curator env migrate --apply --expect %s%s`\n", r.Hash, r.scopeFlags())
++		default:
++			out.WriteString("nothing to migrate\n")
++		}
++	}
++	return out.String()
++}
++
++// scopeFlags renders the scope back as CLI flags for re-runnable
++// commands, or "" for the full scope.
++func (r *MigrateReport) scopeFlags() string {
++	var flags strings.Builder
++	if r.ScopeProf != "" {
++		fmt.Fprintf(&flags, " --profile %s", r.ScopeProf)
++	}
++	if r.ScopeEnv != "" {
++		fmt.Fprintf(&flags, " --env %s", r.ScopeEnv)
++	}
++	return flags.String()
++}
++
++func (h *MigrateHome) writeInventory(out *strings.Builder) {
++	if !h.provisioned {
++		fmt.Fprintf(out, "profile %s, environment %s: not provisioned, nothing to migrate\n", h.Profile, h.EnvID)
++		return
++	}
++	fmt.Fprintf(out, "profile %s, environment %s: provisioned, effective isolation %s, marker mode %s\n",
++		h.Profile, h.EnvID, h.Isolation, h.Mode)
++	for _, entry := range h.Entries {
++		recorded := "unrecorded"
++		if entry.Recorded {
++			recorded = "recorded"
++		}
++		wanted := "unwanted"
++		if entry.Wanted {
++			wanted = "wanted"
++		}
++		fmt.Fprintf(out, "  %s (%s, %s, %s): %s", entry.Path, recorded, wanted, entry.Strategy, entry.State)
++		switch entry.State {
++		case MigrateCurrent:
++			fmt.Fprintf(out, ": link targets the declared %s", entry.Declared)
++		case MigratePending:
++			fmt.Fprintf(out, ": link targets the declared %s, which does not exist yet", entry.Declared)
++		case MigrateMistargeted:
++			fmt.Fprintf(out, ": link targets %s, declared %s", entry.Current, entry.Declared)
++		case MigrateStaleRecorded:
++			if entry.Current == "-" {
++				fmt.Fprintf(out, ": recorded link already gone, record still present")
++			} else {
++				fmt.Fprintf(out, ": recorded link targets %s, no longer wanted", entry.Current)
++			}
++		case MigrateRegularFile, MigrateForeign, MigrateDirConflict, MigrateUninspectable, MigrateNoDeclaredRoot:
++			fmt.Fprintf(out, ": see conflict below")
++		case MigrateAbsent, MigrateEmptyDir:
++			fmt.Fprintf(out, ": %s", entry.Note)
++		}
++		if entry.Note != "" && (entry.State == MigrateCurrent) {
++			fmt.Fprintf(out, " (%s)", entry.Note)
++		}
++		out.WriteString("\n")
++	}
++	if h.EnvID == envregistry.Pi {
++		fmt.Fprintf(out, "  native Pi roots: %s %s; %s %s\n", h.PiOldPath, h.PiOld, h.PiNewPath, h.PiNew)
++	}
++	for _, warning := range h.Warnings {
++		fmt.Fprintf(out, "  warning: %s\n", warning)
++	}
++	for _, conflict := range h.Conflicts {
++		conflict.writePlan(out)
++	}
++}
++
++func (op MigrateOp) writePlan(out *strings.Builder) {
++	switch op.Kind {
++	case MigrateOpRelink:
++		fmt.Fprintf(out, "  relink %s: %s -> %s\n", op.Path, op.From, op.To)
++	case MigrateOpUnlink:
++		if op.From == "" {
++			fmt.Fprintf(out, "  unlink %s: link already gone, drop the record\n", op.Path)
++		} else {
++			fmt.Fprintf(out, "  unlink %s (%s)\n", op.Path, op.From)
++		}
++	}
++}
++
++func (c MigrateConflict) writePlan(out *strings.Builder) {
++	where := fmt.Sprintf("profile %s, environment %s", c.Profile, c.EnvID)
++	if c.Path != "" {
++		where += ", " + c.Path
++	}
++	fmt.Fprintf(out, "  conflict %s: %s. Operator choice: %s\n", where, c.Detail, c.Choice)
++}
++
++// MigrateApplyResult carries the recomputed plan apply printed before
++// executing, plus the operations it applied.
++type MigrateApplyResult struct {
++	Report  *MigrateReport
++	Applied []MigrateOp
++}
++
++// ApplyMigration executes the migration under the manager-home mutation
++// lock: it re-inventories, refuses on plan drift (Expect) and on
++// conflicts with zero writes, prints the plan (the caller prints
++// Report.Text), then executes exactly the printed operations link by
++// link and publishes changed markers as one journaled transaction. A
++// link-phase failure rolls links back; a post-publish failure restores
++// the prior markers first, then the links, so every outcome is either
++// the prior state or the migrated state, never a mix. A marker-publish
++// failure itself leaves the link operations standing (re-running
++// converges) instead of rolling back into a journal replay.
++func ApplyMigration(req MigrateRequest) (*MigrateApplyResult, error) {
++	op, err := beginOperation(req.Home)
++	if err != nil {
++		return nil, err
++	}
++	defer func() { _ = op.close() }()
++	report, err := PlanMigration(req)
++	if err != nil {
++		return nil, err
++	}
++	result := &MigrateApplyResult{Report: report}
++	if req.Expect != "" && !strings.EqualFold(report.Hash, strings.TrimSpace(req.Expect)) {
++		return result, fmt.Errorf("%s: migration plan drift: expected plan %s, the inventory now hashes %s; re-run `curator env migrate --plan%s` and apply with the new hash",
++			envregistry.DiagCredentialConflict, strings.TrimSpace(req.Expect), report.Hash, report.scopeFlags())
++	}
++	if conflicts := report.Conflicts(); len(conflicts) > 0 {
++		first := conflicts[0]
++		where := fmt.Sprintf("profile %s, environment %s", first.Profile, first.EnvID)
++		if first.Path != "" {
++			where += ", " + first.Path
++		}
++		extra := ""
++		if len(conflicts) > 1 {
++			extra = fmt.Sprintf(" (+%d more; see plan)", len(conflicts)-1)
++		}
++		return result, fmt.Errorf("%s: migration blocked by %d conflicts: %s: %s. Operator choice: %s%s",
++			envregistry.DiagCredentialConflict, len(conflicts), where, first.Detail, first.Choice, extra)
++	}
++	ops := report.Ops()
++	if len(ops) == 0 {
++		return result, nil
++	}
++	applied, err := executeMigrationOps(req, ops)
++	if err != nil {
++		rollbackErr := rollbackMigrationLinks(req.Home, applied)
++		return result, migrationFaultError(err, rollbackErr)
++	}
++	result.Applied = applied
++	changed, priors, err := changedMarkers(report)
++	if err != nil {
++		rollbackErr := rollbackMigrationLinks(req.Home, applied)
++		return result, migrationFaultError(err, rollbackErr)
++	}
++	if len(changed) > 0 {
++		if err := op.publish(changed); err != nil {
++			return result, fmt.Errorf("migration marker publish failed; the %d link operations stand: %v; re-run `curator env migrate --apply%s` to converge",
++				len(applied), err, report.scopeFlags())
++		}
++	}
++	if req.InjectFault != nil {
++		if err := req.InjectFault(MigrateFaultPublish, len(applied)); err != nil {
++			if len(priors) > 0 {
++				if rbErr := op.publish(priors); rbErr != nil {
++					return result, fmt.Errorf("migration apply failed: %v; rollback could not restore the prior markers: %v; the migrated state stands, re-run `curator env migrate --plan%s` to confirm",
++						err, rbErr, report.scopeFlags())
++				}
++			}
++			rollbackErr := rollbackMigrationLinks(req.Home, applied)
++			return result, migrationFaultError(err, rollbackErr)
++		}
++	}
++	return result, nil
++}
++
++// executeMigrationOps re-validates each operation against live state
++// under the held lock and executes it; any mismatch or failure aborts
++// with the operations applied so far for rollback. Only symlink and
++// unlink syscalls run here — credential bytes are never read.
++func executeMigrationOps(req MigrateRequest, ops []MigrateOp) ([]MigrateOp, error) {
++	var applied []MigrateOp
++	for _, op := range ops {
++		full := filepath.Join(ManagedHomeDir(req.Home, op.Profile, op.EnvID), filepath.FromSlash(op.Path))
++		if err := validateMigrationOp(full, op); err != nil {
++			return applied, err
++		}
++		switch op.Kind {
++		case MigrateOpRelink:
++			if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
++				return applied, fmt.Errorf("relink %s: %v", op.Path, err)
++			}
++			_ = os.Remove(full)
++			if err := os.Symlink(op.To, full); err != nil {
++				return applied, fmt.Errorf("relink %s: %v", op.Path, err)
++			}
++		case MigrateOpUnlink:
++			if op.From != "" {
++				if err := os.Remove(full); err != nil {
++					return applied, fmt.Errorf("unlink %s: %v", op.Path, err)
++				}
++			}
++		default:
++			return applied, fmt.Errorf("unknown migration operation %q", op.Kind)
++		}
++		applied = append(applied, op)
++		if req.InjectFault != nil {
++			if err := req.InjectFault(MigrateFaultLink, len(applied)); err != nil {
++				return applied, err
++			}
++		}
++	}
++	return applied, nil
++}
++
++// validateMigrationOp re-checks one operation's preconditions at
++// execution time: the link must still be exactly as inventoried. The
++// lock rules out legitimate races, so a mismatch fails closed.
++func validateMigrationOp(full string, op MigrateOp) error {
++	info, err := os.Lstat(full)
++	if err != nil {
++		if os.IsNotExist(err) && op.Kind == MigrateOpUnlink && op.From == "" {
++			return nil
++		}
++		return fmt.Errorf("%s %s: link path changed since the plan: %v", op.Kind, op.Path, err)
++	}
++	if op.Kind == MigrateOpUnlink && op.From == "" {
++		return fmt.Errorf("%s %s: link path changed since the plan: expected absent", op.Kind, op.Path)
++	}
++	if info.Mode()&os.ModeSymlink == 0 {
++		return fmt.Errorf("%s %s: link path changed since the plan: not a symlink", op.Kind, op.Path)
++	}
++	got, err := os.Readlink(full)
++	if err != nil || got != op.From {
++		return fmt.Errorf("%s %s: link path changed since the plan", op.Kind, op.Path)
++	}
++	return nil
++}
++
++// changedMarkers renders the marker updates for homes with unlink
++// operations (relinks keep the identical record and need no rewrite):
++// the prior marker minus the unlinked entries, everything else
++// preserved byte-for-byte in content. It also returns the prior raw
++// bytes for rollback.
++func changedMarkers(report *MigrateReport) (map[string][]byte, map[string][]byte, error) {
++	changed := map[string][]byte{}
++	priors := map[string][]byte{}
++	for _, home := range report.Homes {
++		var dropped []string
++		for _, op := range home.Ops {
++			if op.Kind == MigrateOpUnlink {
++				dropped = append(dropped, op.Path)
++			}
++		}
++		if len(dropped) == 0 {
++			continue
++		}
++		drop := map[string]bool{}
++		for _, path := range dropped {
++			drop[path] = true
++		}
++		kept := []envmarker.Passthrough{}
++		if home.marker.Passthrough != nil {
++			for _, entry := range *home.marker.Passthrough {
++				if !drop[entry.Path] {
++					kept = append(kept, entry)
++				}
++			}
++		}
++		updated := *home.marker
++		updated.Passthrough = &kept
++		payload, err := updated.Marshal()
++		if err != nil {
++			return nil, nil, fmt.Errorf("render the migrated marker for %s/%s: %v", home.Profile, home.EnvID, err)
++		}
++		live := filepath.Join(home.HomeDir, envmarker.Name)
++		changed[live] = payload
++		priors[live] = home.markerRaw
++	}
++	return changed, priors, nil
++}
++
++// rollbackMigrationLinks restores applied link operations in reverse:
++// relinks move back to their prior target, unlinks re-create the prior
++// link. Best effort per link; failures are collected and reported.
++func rollbackMigrationLinks(home string, applied []MigrateOp) error {
++	var failures []string
++	for i := len(applied) - 1; i >= 0; i-- {
++		op := applied[i]
++		if op.Kind == MigrateOpUnlink && op.From == "" {
++			continue
++		}
++		homeDir := ManagedHomeDir(home, op.Profile, op.EnvID)
++		full := filepath.Join(homeDir, filepath.FromSlash(op.Path))
++		_ = os.Remove(full)
++		if err := os.Symlink(op.From, full); err != nil {
++			failures = append(failures, fmt.Sprintf("%s: %v", op.Path, err))
++		}
++	}
++	if len(failures) > 0 {
++		return fmt.Errorf("rollback could not restore %d links: %s", len(failures), strings.Join(failures, "; "))
++	}
++	return nil
++}
++
++// migrationFaultError joins an apply failure with its rollback outcome.
++func migrationFaultError(fault, rollback error) error {
++	if rollback != nil {
++		return fmt.Errorf("migration apply failed: %v; %v", fault, rollback)
++	}
++	return fmt.Errorf("migration apply failed and was rolled back: %v", fault)
++}
+diff --git a/internal/envprofile/migrate_test.go b/internal/envprofile/migrate_test.go
+new file mode 100644
+index 00000000..b71ef391
+--- /dev/null
++++ b/internal/envprofile/migrate_test.go
+@@ -0,0 +1,978 @@
++// Production entry points under test: PlanMigration and ApplyMigration
++// for the Decision 0017 explicit credential migration (environments
++// §7.4, §10.1; manager §12.4). Every row drives a production entry on a
++// temporary store; helper-direct assertions are bounds, not rows.
++package envprofile
++
++import (
++	"crypto/sha256"
++	"encoding/hex"
++	"io/fs"
++	"os"
++	"path/filepath"
++	"regexp"
++	"runtime"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/envmarker"
++	"github.com/relux-works/curator/internal/envregistry"
++)
++
++func (fx *managedFixture) migrateRequest() MigrateRequest {
++	return MigrateRequest{
++		Home:    fx.home,
++		Machine: envregistry.DefaultMachineConfig(),
++		Detect:  func(envregistry.Adapter) string { return "unknown" },
++		NativeHomeOf: func(id string) (string, error) {
++			if id == "opencode" {
++				return fx.native["opencode-native"], nil
++			}
++			return fx.native[id], nil
++		},
++	}
++}
++
++func findMigrateHome(report *MigrateReport, profile, env string) *MigrateHome {
++	for i := range report.Homes {
++		if report.Homes[i].Profile == profile && report.Homes[i].EnvID == env {
++			return &report.Homes[i]
++		}
++	}
++	return nil
++}
++
++// fileSnapshot records every non-directory entry below the credential
++// scope: regular files by sha256, symlinks by target. The manager
++// state directory (locks, journals) is excluded: the mutation lock and
++// the journal legitimately write there on every mutating operation.
++type fileSnapshot map[string]string
++
++func snapshotCredentialScope(t *testing.T, fx *managedFixture) fileSnapshot {
++	t.Helper()
++	snap := fileSnapshot{}
++	roots := []string{filepath.Join(fx.home, "environments"), filepath.Join(fx.home, "profiles")}
++	for _, dir := range fx.native {
++		roots = append(roots, dir)
++	}
++	for _, root := range roots {
++		err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
++			if err != nil {
++				return err
++			}
++			if entry.IsDir() {
++				return nil
++			}
++			if entry.Type()&os.ModeSymlink != 0 {
++				target, err := os.Readlink(path)
++				if err != nil {
++					return err
++				}
++				snap[path] = "link->" + target
++				return nil
++			}
++			payload, err := os.ReadFile(path)
++			if err != nil {
++				return err
++			}
++			sum := sha256.Sum256(payload)
++			snap[path] = "file:" + hex.EncodeToString(sum[:])
++			return nil
++		})
++		if err != nil && !os.IsNotExist(err) {
++			t.Fatal(err)
++		}
++	}
++	return snap
++}
++
++// snapshotDiff partitions the before/after snapshots into added,
++// removed, and changed paths.
++func snapshotDiff(before, after fileSnapshot) (added, removed, changed []string) {
++	for path, digest := range after {
++		prior, ok := before[path]
++		if !ok {
++			added = append(added, path)
++		} else if prior != digest {
++			changed = append(changed, path)
++		}
++	}
++	for path := range before {
++		if _, ok := after[path]; !ok {
++			removed = append(removed, path)
++		}
++	}
++	return added, removed, changed
++}
++
++// credentialHolders returns the regular files under the credential
++// scope whose bytes contain the sentinel.
++func credentialHolders(t *testing.T, fx *managedFixture, sentinel string) map[string]bool {
++	t.Helper()
++	holders := map[string]bool{}
++	roots := []string{filepath.Join(fx.home, "environments"), filepath.Join(fx.home, "profiles")}
++	for _, dir := range fx.native {
++		roots = append(roots, dir)
++	}
++	for _, root := range roots {
++		err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
++			if err != nil {
++				return err
++			}
++			if entry.IsDir() || entry.Type()&os.ModeSymlink != 0 {
++				return nil
++			}
++			payload, err := os.ReadFile(path)
++			if err != nil {
++				return err
++			}
++			if strings.Contains(string(payload), sentinel) {
++				holders[path] = true
++			}
++			return nil
++		})
++		if err != nil && !os.IsNotExist(err) {
++			t.Fatal(err)
++		}
++	}
++	return holders
++}
++
++func sha256Of(t *testing.T, path string) string {
++	t.Helper()
++	payload, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	sum := sha256.Sum256(payload)
++	return hex.EncodeToString(sum[:])
++}
++
++// TestMigratePiWrongTargetToAgentRoot is the operator-case row: a Pi
++// home linked at the pre-0017 native root migrates to ~/.pi/agent with
++// bytes preserved and mode intact, printing the plan before applying.
++// The plan is deterministic (same hash and bytes across runs); apply
++// relinks (a symlink, never a copy) and rewrites no marker.
++func TestMigratePiWrongTargetToAgentRoot(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	native := fx.native["pi"]
++	agentAuth := filepath.Join(native, "agent", "auth.json")
++	if err := os.MkdirAll(filepath.Dir(agentAuth), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	credential := []byte("{\"t\":\"operator-pi-credential\"}\n")
++	if err := os.WriteFile(agentAuth, credential, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	provision(t, fx, "pi", envregistry.DefaultMachineConfig())
++	link := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), "auth.json")
++	oldTarget := filepath.Join(native, "auth.json")
++	_ = os.Remove(link)
++	if err := os.Symlink(oldTarget, link); err != nil {
++		t.Fatal(err)
++	}
++	markerPath := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), envmarker.Name)
++	markerBefore, err := os.ReadFile(markerPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	wantDigest := sha256Of(t, agentAuth)
++
++	report, err := PlanMigration(fx.migrateRequest())
++	if err != nil {
++		t.Fatal(err)
++	}
++	inspect := report.Text(MigratePhaseInspect)
++	for _, want := range []string{"mis-targeted", oldTarget, agentAuth, "effective isolation shared", "native Pi roots", "absent", "present"} {
++		if !strings.Contains(inspect, want) {
++			t.Fatalf("inspect inventories the mis-targeted link and both Pi roots, want %q in:\n%s", want, inspect)
++		}
++	}
++	home := findMigrateHome(report, "acme", "pi")
++	if home == nil || home.Isolation != envregistry.IsolationShared || home.Mode != envmarker.ModeManagedHome {
++		t.Fatalf("the Pi home inventories shared/managed-home: %+v", home)
++	}
++	if home.PiOld != MigrateRootAbsent || home.PiNew != MigrateRootPresent {
++		t.Fatalf("Pi roots inventoried old=%s new=%s", home.PiOld, home.PiNew)
++	}
++	if len(report.Ops()) != 1 || len(report.Conflicts()) != 0 {
++		t.Fatalf("one relink op, no conflicts: ops=%+v conflicts=%+v", report.Ops(), report.Conflicts())
++	}
++	op := report.Ops()[0]
++	if op.Kind != MigrateOpRelink || op.Path != "auth.json" || op.From != oldTarget || op.To != agentAuth {
++		t.Fatalf("relink op %+v", op)
++	}
++	plan := report.Text(MigratePhasePlan)
++	matched, err := regexp.MatchString(`credential migration plan [0-9a-f]{64}`, plan)
++	if err != nil || !matched {
++		t.Fatalf("plan prints its hash:\n%s", plan)
++	}
++	for _, want := range []string{"relink auth.json", oldTarget, agentAuth, "--expect " + report.Hash} {
++		if !strings.Contains(plan, want) {
++			t.Fatalf("plan prints the exact operation, want %q in:\n%s", want, plan)
++		}
++	}
++	again, err := PlanMigration(fx.migrateRequest())
++	if err != nil {
++		t.Fatal(err)
++	}
++	if again.Hash != report.Hash || again.Text(MigratePhasePlan) != plan {
++		t.Fatal("the plan is deterministic: same hash and bytes across runs")
++	}
++
++	before := snapshotCredentialScope(t, fx)
++	req := fx.migrateRequest()
++	req.Expect = report.Hash
++	result, err := ApplyMigration(req)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(result.Applied) != 1 || result.Applied[0] != op {
++		t.Fatalf("apply executes exactly the printed plan: %+v", result.Applied)
++	}
++	info, err := os.Lstat(link)
++	if err != nil || info.Mode()&os.ModeSymlink == 0 {
++		t.Fatalf("the migrated link is a symlink, never a copy: %v", err)
++	}
++	if target, err := os.Readlink(link); err != nil || target != agentAuth {
++		t.Fatalf("the link now targets the agent root: %q (%v)", target, err)
++	}
++	if digest := sha256Of(t, agentAuth); digest != wantDigest {
++		t.Fatal("native credential bytes are byte-identical after migration")
++	}
++	if _, err := os.Lstat(oldTarget); !os.IsNotExist(err) {
++		t.Fatalf("migration creates nothing at the old target: %v", err)
++	}
++	if payload, err := os.ReadFile(markerPath); err != nil || string(payload) != string(markerBefore) {
++		t.Fatal("a relink rewrites no marker bytes")
++	}
++	after, err := PlanMigration(fx.migrateRequest())
++	if err != nil {
++		t.Fatal(err)
++	}
++	healed := findMigrateHome(after, "acme", "pi")
++	if healed == nil || healed.Isolation != envregistry.IsolationShared || healed.Mode != envmarker.ModeManagedHome {
++		t.Fatalf("the effective mode is preserved on upgrade: %+v", healed)
++	}
++	if len(after.Ops()) != 0 || len(after.Conflicts()) != 0 {
++		t.Fatalf("the migrated home plans nothing: %+v %+v", after.Ops(), after.Conflicts())
++	}
++	if _, err := Resolve(fx.request("pi")); err != nil {
++		t.Fatalf("the migrated home is current: %v", err)
++	}
++	added, removed, changed := snapshotDiff(before, snapshotCredentialScope(t, fx))
++	if len(added) != 0 || len(removed) != 0 {
++		t.Fatalf("migration adds and removes no files: added=%v removed=%v", added, removed)
++	}
++	if len(changed) != 1 || changed[0] != link {
++		t.Fatalf("only the link target changes: %v", changed)
++	}
++}
++
++// TestMigrateNoSecretCopies is the no-copy row: across a relink and an
++// unlink in one apply, native credential bytes stay byte-identical, no
++// new file appears anywhere in scope, and no file newly contains
++// credential content — the only changed bytes are the link itself and
++// the marker record that drops the unlinked entry.
++func TestMigrateNoSecretCopies(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	piNative := fx.native["pi"]
++	agentAuth := filepath.Join(piNative, "agent", "auth.json")
++	if err := os.MkdirAll(filepath.Dir(agentAuth), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	piCredential := "CRED-SENTINEL-PI-7f3a\n"
++	if err := os.WriteFile(agentAuth, []byte(piCredential), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	codexAuth := filepath.Join(fx.native["codex_cli"], "auth.json")
++	codexCredential := "CRED-SENTINEL-CODEX-9e1b\n"
++	if err := os.WriteFile(codexAuth, []byte(codexCredential), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	provision(t, fx, "pi", envregistry.DefaultMachineConfig())
++	provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
++	piLink := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), "auth.json")
++	oldTarget := filepath.Join(piNative, "auth.json")
++	_ = os.Remove(piLink)
++	if err := os.Symlink(oldTarget, piLink); err != nil {
++		t.Fatal(err)
++	}
++	codexLink := filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), "auth.json")
++	codexMarker := filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), envmarker.Name)
++	isolated := envregistry.DefaultMachineConfig()
++	isolated.Isolation = map[string]map[string]string{"acme": {"codex_cli": "isolated"}}
++
++	wantPi := sha256Of(t, agentAuth)
++	wantCodex := sha256Of(t, codexAuth)
++	before := snapshotCredentialScope(t, fx)
++	piHoldersBefore := credentialHolders(t, fx, piCredential)
++	codexHoldersBefore := credentialHolders(t, fx, codexCredential)
++	if len(piHoldersBefore) != 1 || !piHoldersBefore[agentAuth] {
++		t.Fatalf("the Pi credential lives in exactly its native file: %v", piHoldersBefore)
++	}
++	if len(codexHoldersBefore) != 1 || !codexHoldersBefore[codexAuth] {
++		t.Fatalf("the codex credential lives in exactly its native file: %v", codexHoldersBefore)
++	}
++
++	req := fx.migrateRequest()
++	req.Machine = isolated
++	report, err := PlanMigration(req)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(report.Ops()) != 2 || len(report.Conflicts()) != 0 {
++		t.Fatalf("one relink plus one unlink, no conflicts: %+v %+v", report.Ops(), report.Conflicts())
++	}
++	result, err := ApplyMigration(req)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(result.Applied) != 2 {
++		t.Fatalf("both operations applied: %+v", result.Applied)
++	}
++	if digest := sha256Of(t, agentAuth); digest != wantPi {
++		t.Fatal("Pi native bytes are byte-identical after migration")
++	}
++	if digest := sha256Of(t, codexAuth); digest != wantCodex {
++		t.Fatal("codex native bytes are byte-identical after migration")
++	}
++	if _, err := os.Lstat(codexLink); !os.IsNotExist(err) {
++		t.Fatalf("the stale link is unlinked: %v", err)
++	}
++	marker := readManagedMarker(t, fx, "codex_cli")
++	if marker.Passthrough == nil || len(*marker.Passthrough) != 0 {
++		t.Fatalf("the record drops the unlinked entry: %+v", marker.Passthrough)
++	}
++	if marker.Mode != envmarker.ModeManagedHome {
++		t.Fatalf("the marker mode is intact: %s", marker.Mode)
++	}
++	piHoldersAfter := credentialHolders(t, fx, piCredential)
++	codexHoldersAfter := credentialHolders(t, fx, codexCredential)
++	if len(piHoldersAfter) != 1 || !piHoldersAfter[agentAuth] {
++		t.Fatalf("no new file carries Pi credential content: %v", piHoldersAfter)
++	}
++	if len(codexHoldersAfter) != 1 || !codexHoldersAfter[codexAuth] {
++		t.Fatalf("no new file carries codex credential content: %v", codexHoldersAfter)
++	}
++	added, removed, changed := snapshotDiff(before, snapshotCredentialScope(t, fx))
++	if len(added) != 0 {
++		t.Fatalf("migration adds no files: %v", added)
++	}
++	if len(removed) != 1 || removed[0] != codexLink {
++		t.Fatalf("only the stale link is removed: %v", removed)
++	}
++	changedSet := map[string]bool{}
++	for _, path := range changed {
++		changedSet[path] = true
++	}
++	if len(changed) != 2 || !changedSet[piLink] || !changedSet[codexMarker] {
++		t.Fatalf("only the relinked link and the codex marker change: %v", changed)
++	}
++	// The migrated homes are current under their preserved modes.
++	if _, err := Resolve(fx.request("pi")); err != nil {
++		t.Fatalf("the migrated Pi home is current: %v", err)
++	}
++	check := fx.request("codex_cli")
++	check.Machine = isolated
++	if _, err := Resolve(check); err != nil {
++		t.Fatalf("the migrated codex home is current: %v", err)
++	}
++	after, err := PlanMigration(req)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if got := findMigrateHome(after, "acme", "pi"); got == nil || got.Isolation != envregistry.IsolationShared {
++		t.Fatalf("Pi stays shared: %+v", got)
++	}
++	if got := findMigrateHome(after, "acme", "codex_cli"); got == nil || got.Isolation != envregistry.IsolationIsolated {
++		t.Fatalf("codex stays isolated: %+v", got)
++	}
++}
++
++// TestMigrateConflictsRefuse drives every migration refusal through the
++// production entries: the plan lists the conflict with the exact
++// operator choice, apply refuses with environment_credential_conflict
++// naming it, and zero bytes change anywhere in scope. The empty-file
++// subtest is the narrowing killer for a mutant that refuses only
++// non-empty files.
++func TestMigrateConflictsRefuse(t *testing.T) {
++	for _, tc := range []struct {
++		name       string
++		bytes      []byte
++		wantDetail []string
++		wantChoice []string
++	}{
++		{"regular file non-empty", []byte("managed-credential\n"),
++			[]string{"holds a regular file", "auth.json"},
++			[]string{"decide which credential bytes win", "move the loser aside"}},
++		{"regular file empty", []byte{},
++			[]string{"holds a regular file", "auth.json"},
++			[]string{"decide which credential bytes win", "move the loser aside"}},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			fx := writeManagedFixture(t, "acme")
++			nativeAuth := []byte("{\"t\":\"operator-credential\"}\n")
++			if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "auth.json"), nativeAuth, 0o600); err != nil {
++				t.Fatal(err)
++			}
++			provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
++			link := filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), "auth.json")
++			_ = os.Remove(link)
++			if err := os.WriteFile(link, tc.bytes, 0o600); err != nil {
++				t.Fatal(err)
++			}
++			assertMigrateConflict(t, fx, fx.migrateRequest(), link, tc.wantDetail, tc.wantChoice)
++			if payload, err := os.ReadFile(link); err != nil || string(payload) != string(tc.bytes) {
++				t.Fatalf("managed bytes untouched: %q (%v)", payload, err)
++			}
++			if payload, err := os.ReadFile(filepath.Join(fx.native["codex_cli"], "auth.json")); err != nil || string(payload) != string(nativeAuth) {
++				t.Fatalf("native bytes untouched: %q (%v)", payload, err)
++			}
++		})
++	}
++	t.Run("foreign symlink", func(t *testing.T) {
++		fx := writeManagedFixture(t, "acme")
++		if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte("cli_auth_credentials_store = \"keyring\"\n"), 0o644); err != nil {
++			t.Fatal(err)
++		}
++		provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
++		if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte("cli_auth_credentials_store = \"file\"\n"), 0o644); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "auth.json"), []byte("{\"t\":\"operator\"}\n"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++		link := filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), "auth.json")
++		foreign := filepath.Join(t.TempDir(), "auth.json")
++		if err := os.WriteFile(foreign, []byte("foreign\n"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Symlink(foreign, link); err != nil {
++			t.Fatal(err)
++		}
++		assertMigrateConflict(t, fx, fx.migrateRequest(), link,
++			[]string{"links to", foreign}, []string{"remove the unrecorded link out of band"})
++		if target, err := os.Readlink(link); err != nil || target != foreign {
++			t.Fatalf("the foreign link is untouched: %q (%v)", target, err)
++		}
++	})
++	t.Run("stale foreign symlink", func(t *testing.T) {
++		fx := writeManagedFixture(t, "acme")
++		if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "auth.json"), []byte("{\"t\":\"operator\"}\n"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++		provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
++		link := filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), "auth.json")
++		foreign := filepath.Join(t.TempDir(), "auth.json")
++		if err := os.WriteFile(foreign, []byte("foreign\n"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++		_ = os.Remove(link)
++		if err := os.Symlink(foreign, link); err != nil {
++			t.Fatal(err)
++		}
++		isolated := envregistry.DefaultMachineConfig()
++		isolated.Isolation = map[string]map[string]string{"acme": {"codex_cli": "isolated"}}
++		req := fx.migrateRequest()
++		req.Machine = isolated
++		assertMigrateConflict(t, fx, req, link,
++			[]string{"not the recorded credential target", foreign}, []string{"remove the link out of band"})
++		if target, err := os.Readlink(link); err != nil || target != foreign {
++			t.Fatalf("the foreign link is untouched: %q (%v)", target, err)
++		}
++	})
++	t.Run("two live pi credentials", func(t *testing.T) {
++		fx := writeManagedFixture(t, "acme")
++		native := fx.native["pi"]
++		agentAuth := filepath.Join(native, "agent", "auth.json")
++		if err := os.MkdirAll(filepath.Dir(agentAuth), 0o755); err != nil {
++			t.Fatal(err)
++		}
++		oldAuth := filepath.Join(native, "auth.json")
++		if err := os.WriteFile(agentAuth, []byte("{\"t\":\"agent-credential\"}\n"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(oldAuth, []byte("{\"t\":\"old-credential\"}\n"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++		provision(t, fx, "pi", envregistry.DefaultMachineConfig())
++		link := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), "auth.json")
++		_ = os.Remove(link)
++		if err := os.Symlink(oldAuth, link); err != nil {
++			t.Fatal(err)
++		}
++		assertMigrateConflict(t, fx, fx.migrateRequest(), "",
++			[]string{"two live Pi credentials", oldAuth, agentAuth},
++			[]string{"decide which of", oldAuth, agentAuth, "never copies, moves, or deletes"})
++		if target, err := os.Readlink(link); err != nil || target != oldAuth {
++			t.Fatalf("the link is untouched: %q (%v)", target, err)
++		}
++		if payload, err := os.ReadFile(oldAuth); err != nil || string(payload) != "{\"t\":\"old-credential\"}\n" {
++			t.Fatalf("old-root bytes untouched: %q (%v)", payload, err)
++		}
++		if payload, err := os.ReadFile(agentAuth); err != nil || string(payload) != "{\"t\":\"agent-credential\"}\n" {
++			t.Fatalf("agent-root bytes untouched: %q (%v)", payload, err)
++		}
++	})
++	t.Run("non-empty directory", func(t *testing.T) {
++		fx := writeManagedFixture(t, "acme")
++		seedLiveNativeCredentials(t, fx)
++		provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
++		link := filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), "auth.json")
++		_ = os.Remove(link)
++		if err := os.Mkdir(link, 0o755); err != nil {
++			t.Fatal(err)
++		}
++		kept := filepath.Join(link, "kept")
++		if err := os.WriteFile(kept, []byte("kept\n"), 0o644); err != nil {
++			t.Fatal(err)
++		}
++		assertMigrateConflict(t, fx, fx.migrateRequest(), link,
++			[]string{"non-empty directory"}, []string{"clear the directory out of band"})
++		if payload, err := os.ReadFile(kept); err != nil || string(payload) != "kept\n" {
++			t.Fatalf("directory contents untouched: %q (%v)", payload, err)
++		}
++	})
++	t.Run("invalid marker", func(t *testing.T) {
++		fx := writeManagedFixture(t, "acme")
++		seedLiveNativeCredentials(t, fx)
++		provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
++		markerPath := filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), envmarker.Name)
++		if err := os.WriteFile(markerPath, []byte("{not a marker"), 0o644); err != nil {
++			t.Fatal(err)
++		}
++		assertMigrateConflict(t, fx, fx.migrateRequest(), "",
++			[]string{"marker is invalid"}, []string{"back the marker up"})
++	})
++	t.Run("unknown credential store", func(t *testing.T) {
++		fx := writeManagedFixture(t, "acme")
++		seedLiveNativeCredentials(t, fx)
++		provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
++		if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte("cli_auth_credentials_store = \"ephemeral\"\n"), 0o644); err != nil {
++			t.Fatal(err)
++		}
++		assertMigrateConflict(t, fx, fx.migrateRequest(), "",
++			[]string{"cannot establish the credential strategy"}, []string{"fix the native credential configuration out of band"})
++	})
++}
++
++// assertMigrateConflict proves one migration refusal end to end: the
++// plan lists the conflict with its operator choice and prints blocked,
++// apply refuses with environment_credential_conflict naming them, and
++// the filesystem is byte-identical before and after both entries.
++func assertMigrateConflict(t *testing.T, fx *managedFixture, req MigrateRequest, link string, wantDetail, wantChoice []string) {
++	t.Helper()
++	before := snapshotCredentialScope(t, fx)
++	report, err := PlanMigration(req)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(report.Conflicts()) == 0 {
++		t.Fatalf("the plan lists the conflict: %+v", report.Ops())
++	}
++	plan := report.Text(MigratePhasePlan)
++	if !strings.Contains(plan, "blocked:") {
++		t.Fatalf("a conflicted plan prints blocked:\n%s", plan)
++	}
++	for _, want := range append(append([]string{}, wantDetail...), wantChoice...) {
++		if !strings.Contains(plan, want) {
++			t.Fatalf("the plan names %q in:\n%s", want, plan)
++		}
++	}
++	if link != "" && !strings.Contains(plan, link) {
++		t.Fatalf("the plan names the path %s in:\n%s", link, plan)
++	}
++	result, err := ApplyMigration(req)
++	if err == nil || !strings.Contains(err.Error(), envregistry.DiagCredentialConflict) {
++		t.Fatalf("apply must refuse with %s, got %v", envregistry.DiagCredentialConflict, err)
++	}
++	if result == nil || result.Report == nil {
++		t.Fatal("a refused apply still returns the printed plan")
++	}
++	for _, want := range append(append([]string{}, wantDetail...), wantChoice...) {
++		if !strings.Contains(err.Error(), want) {
++			t.Fatalf("the refusal names %q: %v", want, err)
++		}
++	}
++	if len(result.Applied) != 0 {
++		t.Fatalf("a refused apply executes nothing: %+v", result.Applied)
++	}
++	added, removed, changed := snapshotDiff(before, snapshotCredentialScope(t, fx))
++	if len(added) != 0 || len(removed) != 0 || len(changed) != 0 {
++		t.Fatalf("a refused apply writes nothing: added=%v removed=%v changed=%v", added, removed, changed)
++	}
++}
++
++// TestMigratePiRootInspectionFailure pins the absent-versus-
++// uninspectable distinction for the Pi roots inventory: a re-point
++// planned while a native root cannot be statted is a conflict carrying
++// the inspection diagnostic — never silence, and never the absence
++// wording. A regular file where the agent directory should be fails the
++// target stat deterministically on Unix, even as root; Windows maps a
++// stat through a file to path-not-found, so the row is Unix-only.
++func TestMigratePiRootInspectionFailure(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("this host cannot create an uninspectable Pi root: Windows maps a stat through a file to path-not-found, so the inspection diagnostic runs on the unix runners")
++	}
++	fx := writeManagedFixture(t, "acme")
++	native := fx.native["pi"]
++	agentAuth := filepath.Join(native, "agent", "auth.json")
++	if err := os.MkdirAll(filepath.Dir(agentAuth), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(agentAuth, []byte("{\"t\":\"operator-pi\"}\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	provision(t, fx, "pi", envregistry.DefaultMachineConfig())
++	link := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), "auth.json")
++	oldTarget := filepath.Join(native, "auth.json")
++	_ = os.Remove(link)
++	if err := os.Symlink(oldTarget, link); err != nil {
++		t.Fatal(err)
++	}
++	// Break the new root's parent: a file where the agent directory was.
++	if err := os.RemoveAll(filepath.Join(native, "agent")); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(native, "agent"), []byte("not a directory\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	assertMigrateConflict(t, fx, fx.migrateRequest(), "",
++		[]string{"cannot be inspected", agentAuth}, []string{"restore access to the native roots out of band"})
++	report, err := PlanMigration(fx.migrateRequest())
++	if err != nil {
++		t.Fatal(err)
++	}
++	if plan := report.Text(MigratePhasePlan); strings.Contains(plan, "does not exist") {
++		t.Fatalf("an inspection failure is not absence:\n%s", plan)
++	}
++	if target, err := os.Readlink(link); err != nil || target != oldTarget {
++		t.Fatalf("the link is untouched: %q (%v)", target, err)
++	}
++}
++
++// TestMigratePlanDriftRefuses proves apply refuses when the inventory
++// changed since the plan: a stale --expect hash fails closed with zero
++// writes, a truncated hash is not accepted (full-hash narrowing
++// killer), and applying without --expect proceeds on the fresh plan.
++func TestMigratePlanDriftRefuses(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	native := fx.native["pi"]
++	agentAuth := filepath.Join(native, "agent", "auth.json")
++	if err := os.MkdirAll(filepath.Dir(agentAuth), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(agentAuth, []byte("{\"t\":\"operator-pi\"}\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	provision(t, fx, "pi", envregistry.DefaultMachineConfig())
++	link := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), "auth.json")
++	oldTarget := filepath.Join(native, "auth.json")
++	_ = os.Remove(link)
++	if err := os.Symlink(oldTarget, link); err != nil {
++		t.Fatal(err)
++	}
++	report, err := PlanMigration(fx.migrateRequest())
++	if err != nil {
++		t.Fatal(err)
++	}
++	stale := report.Hash
++	// The world moves after the plan: the link is fixed by hand.
++	_ = os.Remove(link)
++	if err := os.Symlink(agentAuth, link); err != nil {
++		t.Fatal(err)
++	}
++	before := snapshotCredentialScope(t, fx)
++	req := fx.migrateRequest()
++	req.Expect = stale
++	result, err := ApplyMigration(req)
++	if err == nil || !strings.Contains(err.Error(), envregistry.DiagCredentialConflict) {
++		t.Fatalf("a drifted apply must refuse with %s, got %v", envregistry.DiagCredentialConflict, err)
++	}
++	for _, want := range []string{"plan drift", stale, "re-run"} {
++		if !strings.Contains(err.Error(), want) {
++			t.Fatalf("the drift refusal names %q: %v", want, err)
++		}
++	}
++	if result == nil || result.Report == nil || len(result.Applied) != 0 {
++		t.Fatalf("a drifted apply executes nothing: %+v", result)
++	}
++	added, removed, changed := snapshotDiff(before, snapshotCredentialScope(t, fx))
++	if len(added) != 0 || len(removed) != 0 || len(changed) != 0 {
++		t.Fatalf("a drifted apply writes nothing: added=%v removed=%v changed=%v", added, removed, changed)
++	}
++	// A truncated hash is not the plan hash: prefix matching would
++	// admit it, so it must refuse too.
++	fresh, err := PlanMigration(fx.migrateRequest())
++	if err != nil {
++		t.Fatal(err)
++	}
++	prefix := fx.migrateRequest()
++	prefix.Expect = fresh.Hash[:16]
++	if _, err := ApplyMigration(prefix); err == nil || !strings.Contains(err.Error(), "plan drift") {
++		t.Fatalf("a truncated --expect must refuse with plan drift, got %v", err)
++	}
++	// Without --expect there is no prior plan to drift from: apply
++	// proceeds on the fresh inventory (already converged, zero ops).
++	clean, err := ApplyMigration(fx.migrateRequest())
++	if err != nil {
++		t.Fatalf("apply without --expect proceeds on the fresh plan: %v", err)
++	}
++	if len(clean.Applied) != 0 {
++		t.Fatalf("the hand-fixed home needs no operations: %+v", clean.Applied)
++	}
++}
++
++// TestMigrateRollbackRestoresPriorState injects apply failures and
++// proves every outcome is the prior state, never a mix: links move
++// back, prior markers restore byte-identical, native bytes are
++// untouched. The link-phase fault fires before any marker publish;
++// the post-publish fault fires after, exercising the marker rollback.
++func TestMigrateRollbackRestoresPriorState(t *testing.T) {
++	setup := func(t *testing.T) (*managedFixture, MigrateRequest, map[string]string, map[string]string) {
++		t.Helper()
++		fx := writeManagedFixture(t, "acme")
++		piNative := fx.native["pi"]
++		agentAuth := filepath.Join(piNative, "agent", "auth.json")
++		if err := os.MkdirAll(filepath.Dir(agentAuth), 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(agentAuth, []byte("{\"t\":\"operator-pi\"}\n"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++		codexAuth := filepath.Join(fx.native["codex_cli"], "auth.json")
++		if err := os.WriteFile(codexAuth, []byte("{\"t\":\"operator\"}\n"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++		provision(t, fx, "pi", envregistry.DefaultMachineConfig())
++		provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
++		piLink := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), "auth.json")
++		_ = os.Remove(piLink)
++		if err := os.Symlink(filepath.Join(piNative, "auth.json"), piLink); err != nil {
++			t.Fatal(err)
++		}
++		isolated := envregistry.DefaultMachineConfig()
++		isolated.Isolation = map[string]map[string]string{"acme": {"codex_cli": "isolated"}}
++		req := fx.migrateRequest()
++		req.Machine = isolated
++		report, err := PlanMigration(req)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if len(report.Ops()) != 2 {
++			t.Fatalf("the rollback plan carries two operations: %+v", report.Ops())
++		}
++		markers := map[string]string{}
++		for _, env := range []string{"pi", "codex_cli"} {
++			payload, err := os.ReadFile(filepath.Join(ManagedHomeDir(fx.home, fx.profile, env), envmarker.Name))
++			if err != nil {
++				t.Fatal(err)
++			}
++			markers[env] = string(payload)
++		}
++		natives := map[string]string{
++			agentAuth: sha256Of(t, agentAuth),
++			codexAuth: sha256Of(t, codexAuth),
++		}
++		return fx, req, markers, natives
++	}
++	assertRolledBack := func(t *testing.T, fx *managedFixture, markers, natives map[string]string) {
++		t.Helper()
++		piLink := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), "auth.json")
++		if target, err := os.Readlink(piLink); err != nil || target != filepath.Join(fx.native["pi"], "auth.json") {
++			t.Fatalf("the Pi link moves back to its prior target: %q (%v)", target, err)
++		}
++		codexLink := filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), "auth.json")
++		if target, err := os.Readlink(codexLink); err != nil || target != filepath.Join(fx.native["codex_cli"], "auth.json") {
++			t.Fatalf("the codex link is re-created at its prior target: %q (%v)", target, err)
++		}
++		for _, env := range []string{"pi", "codex_cli"} {
++			payload, err := os.ReadFile(filepath.Join(ManagedHomeDir(fx.home, fx.profile, env), envmarker.Name))
++			if err != nil || string(payload) != markers[env] {
++				t.Fatalf("the prior %s marker restores byte-identical", env)
++			}
++		}
++		for path, want := range natives {
++			if digest := sha256Of(t, path); digest != want {
++				t.Fatalf("native bytes untouched: %s", path)
++			}
++		}
++	}
++	t.Run("link phase", func(t *testing.T) {
++		fx, req, markers, natives := setup(t)
++		req.InjectFault = func(point string, applied int) error {
++			if point == MigrateFaultLink && applied >= 1 {
++				return os.ErrInvalid
++			}
++			return nil
++		}
++		if _, err := ApplyMigration(req); err == nil || !strings.Contains(err.Error(), "rolled back") {
++			t.Fatalf("the injected fault fails rolled back, got %v", err)
++		}
++		assertRolledBack(t, fx, markers, natives)
++	})
++	t.Run("post publish", func(t *testing.T) {
++		fx, req, markers, natives := setup(t)
++		req.InjectFault = func(point string, _ int) error {
++			if point == MigrateFaultPublish {
++				return os.ErrInvalid
++			}
++			return nil
++		}
++		if _, err := ApplyMigration(req); err == nil || !strings.Contains(err.Error(), "rolled back") {
++			t.Fatalf("the injected fault fails rolled back, got %v", err)
++		}
++		assertRolledBack(t, fx, markers, natives)
++	})
++}
++
++// TestMigrateOldRootBytesWarnAndProceed proves bytes at the old Pi root
++// alone (agent root empty) warn loudly but do not block: the relink
++// leaves the old bytes untouched, the manager never moves them, and the
++// re-pointed link dangles pending until the operator moves the live
++// bytes out of band. The narrowing killer for a mutant that refuses
++// whenever the old root holds bytes.
++func TestMigrateOldRootBytesWarnAndProceed(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	native := fx.native["pi"]
++	if err := os.MkdirAll(filepath.Join(native, "agent"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	oldAuth := filepath.Join(native, "auth.json")
++	oldBytes := []byte("{\"t\":\"old-credential\"}\n")
++	if err := os.WriteFile(oldAuth, oldBytes, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	provision(t, fx, "pi", envregistry.DefaultMachineConfig())
++	link := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), "auth.json")
++	agentAuth := filepath.Join(native, "agent", "auth.json")
++	_ = os.Remove(link)
++	if err := os.Symlink(oldAuth, link); err != nil {
++		t.Fatal(err)
++	}
++	report, err := PlanMigration(fx.migrateRequest())
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(report.Ops()) != 1 || len(report.Conflicts()) != 0 {
++		t.Fatalf("one relink op, no conflicts: %+v %+v", report.Ops(), report.Conflicts())
++	}
++	plan := report.Text(MigratePhasePlan)
++	for _, want := range []string{"native bytes exist at the old Pi root", oldAuth, "never copies"} {
++		if !strings.Contains(plan, want) {
++			t.Fatalf("the plan warns about the orphaned old bytes, want %q in:\n%s", want, plan)
++		}
++	}
++	if _, err := ApplyMigration(fx.migrateRequest()); err != nil {
++		t.Fatalf("old-root bytes alone do not block: %v", err)
++	}
++	if target, err := os.Readlink(link); err != nil || target != agentAuth {
++		t.Fatalf("the link targets the declared root: %q (%v)", target, err)
++	}
++	if payload, err := os.ReadFile(oldAuth); err != nil || string(payload) != string(oldBytes) {
++		t.Fatalf("old-root bytes untouched: %q (%v)", payload, err)
++	}
++	current, err := Resolve(fx.request("pi"))
++	if err != nil {
++		t.Fatalf("the re-pointed home succeeds pending: %v", err)
++	}
++	if warnings := strings.Join(current.Warnings, "; "); !strings.Contains(warnings, "detached-pending") {
++		t.Fatalf("the pending finding reports loudly: %q", warnings)
++	}
++}
++
++// TestMigratePendingNeedsNothing proves dangling-to-declared entries
++// get no operation: the plan is empty, apply succeeds applying nothing,
++// and the pending link is untouched.
++func TestMigratePendingNeedsNothing(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	provision(t, fx, "pi", envregistry.DefaultMachineConfig())
++	link := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), "auth.json")
++	want := filepath.Join(fx.native["pi"], "agent", "auth.json")
++	report, err := PlanMigration(fx.migrateRequest())
++	if err != nil {
++		t.Fatal(err)
++	}
++	home := findMigrateHome(report, "acme", "pi")
++	if home == nil || len(home.Ops) != 0 || len(home.Conflicts) != 0 {
++		t.Fatalf("pending plans nothing: %+v", home)
++	}
++	found := false
++	for _, entry := range home.Entries {
++		if entry.Path == "auth.json" && entry.State == MigratePending {
++			found = true
++		}
++	}
++	if !found {
++		t.Fatalf("the entry classifies dangling-to-declared: %+v", home.Entries)
++	}
++	if plan := report.Text(MigratePhasePlan); !strings.Contains(plan, "nothing to migrate") {
++		t.Fatalf("an empty plan says so:\n%s", plan)
++	}
++	result, err := ApplyMigration(fx.migrateRequest())
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(result.Applied) != 0 {
++		t.Fatalf("apply executes nothing: %+v", result.Applied)
++	}
++	if target, err := os.Readlink(link); err != nil || target != want {
++		t.Fatalf("the pending link is untouched: %q (%v)", target, err)
++	}
++}
++
++// TestMigrateUnknownOperands covers the scope gates.
++func TestMigrateUnknownOperands(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	req := fx.migrateRequest()
++	req.Profile = "ghost"
++	if _, err := PlanMigration(req); err == nil || !strings.Contains(err.Error(), DiagProfileUnknown) {
++		t.Fatalf("an uninstalled profile must fail with %s, got %v", DiagProfileUnknown, err)
++	}
++	req = fx.migrateRequest()
++	req.EnvID = "cursor"
++	if _, err := PlanMigration(req); err == nil || !strings.Contains(err.Error(), envregistry.DiagUnknown) {
++		t.Fatalf("an unregistered environment must fail with %s, got %v", envregistry.DiagUnknown, err)
++	}
++	if _, err := ApplyMigration(req); err == nil || !strings.Contains(err.Error(), envregistry.DiagUnknown) {
++		t.Fatalf("apply gates the environment too, got %v", err)
++	}
++}
++
++// TestMigrateInspectIsReadOnly proves planning writes nothing: no file
++// changes anywhere in scope, and no default profile is created (unlike
++// List, planning never ensures anything).
++func TestMigrateInspectIsReadOnly(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	seedLiveNativeCredentials(t, fx)
++	provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
++	before := snapshotCredentialScope(t, fx)
++	profilesBefore, err := os.ReadDir(ProfilesDir(fx.home))
++	if err != nil {
++		t.Fatal(err)
++	}
++	report, err := PlanMigration(fx.migrateRequest())
++	if err != nil {
++		t.Fatal(err)
++	}
++	_ = report.Text(MigratePhaseInspect)
++	_ = report.Text(MigratePhasePlan)
++	if _, err := PlanMigration(fx.migrateRequest()); err != nil {
++		t.Fatal(err)
++	}
++	added, removed, changed := snapshotDiff(before, snapshotCredentialScope(t, fx))
++	if len(added) != 0 || len(removed) != 0 || len(changed) != 0 {
++		t.Fatalf("planning writes nothing: added=%v removed=%v changed=%v", added, removed, changed)
++	}
++	profilesAfter, err := os.ReadDir(ProfilesDir(fx.home))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(profilesAfter) != len(profilesBefore) {
++		t.Fatalf("planning creates no profile: %v vs %v", profilesBefore, profilesAfter)
++	}
++	if _, err := os.Stat(sourcePath(fx.home, "default")); !os.IsNotExist(err) {
++		t.Fatalf("planning creates no default profile: %v", err)
++	}
++}
+diff --git a/internal/envregistry/envregistry.go b/internal/envregistry/envregistry.go
+index 4d0cd1cd..78d9c28a 100644
+--- a/internal/envregistry/envregistry.go
++++ b/internal/envregistry/envregistry.go
+@@ -288,8 +288,8 @@ var Registry = []Adapter{
+ 			// ~/.pi/agent, not ~/.pi — the managed auth.json links to
+ 			// the agent-root auth.json. Existing homes linked at the
+ 			// old target are reported detached, never silently
+-			// re-pointed; the move itself is the explicit F-C2
+-			// migration.
++			// re-pointed by repair; the move itself runs as the
++			// explicit `env migrate` step (environments §7.4).
+ 			"default": {{Path: "auth.json", Strategy: StrategyFileLink, FileLinkTarget: "agent/auth.json"}},
+ 		},
+ 		Seeds:             []string{"settings.json", "models.json"},

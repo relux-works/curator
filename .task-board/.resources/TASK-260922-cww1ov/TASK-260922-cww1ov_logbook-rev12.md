@@ -1,0 +1,7 @@
+# TASK-260922-cww1ov — Revision 12 logbook
+
+- Refreshed the candidate onto trunk `60498052` and checked the resulting worktree scope against that base. The prescribed `git apply --3way` attempt exited 1 on stale index context in `platform-cases.tsv` and `draftsources.go`; the clean merge-tree result was applied and the overlapping draft source file was merged with both sides retained. `task-board worktree refresh-candidate` then advanced the candidate successfully.
+- Migrated trunk-added machine-policy and frozen-snapshot readers to `stateread` so only proven absence invokes missing-state fallback. Added production-path refusal regressions and registered their lane rows; ledger consistency checked 417 rows across Linux, macOS, and Windows.
+- The new unreadable-state narrowing mutants all killed their named regressions with exit 1; production sources were restored, and the focused green witnesses, lint, build, vet, Windows vet, and playbook acceptance row passed.
+- One exploratory blocked-root checkout fixture failed because it created an alias-selected root and bypassed the legacy transitive-member branch. The experiment and its row were removed; it is not counted as evidence. The existing registered `lockedNetworkRepository` row directly tests absent, unreadable, and present-but-unusable checkout classification.
+- Revision 12 hosted test/race lanes were not run in this developer session. Revision 11 hosted evidence predates the refreshed tree, so current hosted status remains unverified for review handoff.
