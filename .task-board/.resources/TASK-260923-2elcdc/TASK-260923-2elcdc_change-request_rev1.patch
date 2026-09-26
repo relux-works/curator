@@ -1,0 +1,486 @@
+diff --git a/cmd/curator/env.go b/cmd/curator/env.go
+index b899ed0e..658b0339 100644
+--- a/cmd/curator/env.go
++++ b/cmd/curator/env.go
+@@ -10,10 +10,9 @@ import (
+ 	"github.com/relux-works/curator/internal/envregistry"
+ )
+ 
+-// machineFromConfig threads the effective machine knobs the resolve and
+-// status rows read into the machine configuration: currently the
+-// passable_env_names knob with its presence bit, so the S4 profile
+-// default applies exactly when the knob is absent (§10.3, §12).
++// machineFromConfig threads the effective machine knobs used by environment
++// resolution and status: passable_env_names with its presence bit, and the
++// isolation map, pre-overlay user values, and system-lock source.
+ func machineFromConfig(cfg *config.Config) envregistry.MachineConfig {
+ 	machine := envregistry.DefaultMachineConfig()
+ 	if cfg == nil {
+@@ -21,6 +20,10 @@ func machineFromConfig(cfg *config.Config) envregistry.MachineConfig {
+ 	}
+ 	machine.PassableEnvNames = cfg.Env.PassableEnvNames
+ 	machine.PassableEnvNamesSet = cfg.Env.PassableEnvNamesSet
++	machine.Isolation = cfg.Env.Isolation
++	machine.UserIsolation = cfg.UserIsolation
++	machine.IsolationLocked = cfg.Locked["environments.isolation"]
++	machine.IsolationLockSource = cfg.SystemConfigPath
+ 	return machine
+ }
+ 
+diff --git a/cmd/curator/env_test.go b/cmd/curator/env_test.go
+index 0ea21e43..0fb9a9fc 100644
+--- a/cmd/curator/env_test.go
++++ b/cmd/curator/env_test.go
+@@ -94,6 +94,144 @@ func TestEnvResolveUnknowns(t *testing.T) {
+ 	}
+ }
+ 
++func loadEnvironmentIsolationConfig(t *testing.T, source stubConfigSource, userJSON, systemJSON string) stubConfigSource {
++	t.Helper()
++	if err := os.WriteFile(source.path, []byte(userJSON), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if systemJSON == "" {
++		t.Setenv("CURATOR_SYSTEM_CONFIG", "")
++	} else {
++		systemPath := filepath.Join(filepath.Dir(source.path), "system.json")
++		if err := os.WriteFile(systemPath, []byte(systemJSON), 0o600); err != nil {
++			t.Fatal(err)
++		}
++		t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
++	}
++	cfg, err := config.Load(source.path, nil)
++	if err != nil {
++		t.Fatalf("config.Load rejected isolation fixture: %v", err)
++	}
++	source.cfg = cfg
++	return source
++}
++
++func installEnvTestProfile(t *testing.T, source stubConfigSource) {
++	t.Helper()
++	pkg := t.TempDir()
++	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
++	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
++		t.Fatalf("profile install = %d\nstderr:\n%s", code, stderr)
++	}
++}
++
++// TestEnvResolveIsolatedSystemLockUsesDirection drives system-config-v2
++// environments.isolation through the CLI. With no user isolation entry, the
++// locked isolated direction provisions a managed home without shared auth
++// passthrough.
++func TestEnvResolveIsolatedSystemLockUsesDirection(t *testing.T) {
++	source, _ := profileHome(t)
++	writeNativeCredentials(t)
++	user := `{"schema_version": 2, "skills_root": "x", "projects": {}}`
++	system := `{"schema_version": 2, "locked": ["environments.isolation"], "environments": {"isolation": {"acme": {"codex_cli": "isolated"}}}}`
++	source = loadEnvironmentIsolationConfig(t, source, user, system)
++	if !source.cfg.Locked["environments.isolation"] || source.cfg.Env.Isolation["acme"]["codex_cli"] != "isolated" {
++		t.Fatalf("loaded isolation lock = %+v, locked=%v", source.cfg.Env.Isolation, source.cfg.Locked)
++	}
++	installEnvTestProfile(t, source)
++	code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair")
++	if code != exitOK {
++		t.Fatalf("resolve under isolated lock = %d\nstderr:\n%s", code, stderr)
++	}
++	link := filepath.Join(source.cfg.Home(), "environments", "acme", "codex_cli", "auth.json")
++	if _, err := os.Lstat(link); !os.IsNotExist(err) {
++		t.Fatalf("isolated locked home has no shared auth passthrough: %s (%v)", link, err)
++	}
++}
++
++// TestEnvResolveExplicitSharedConflictsWithIsolatedSystemLock proves an
++// explicit shared user value is rejected through env resolve, with the
++// profile, environment, and system policy source in the diagnostic.
++func TestEnvResolveExplicitSharedConflictsWithIsolatedSystemLock(t *testing.T) {
++	source, _ := profileHome(t)
++	writeNativeCredentials(t)
++	base := `{"schema_version": 2, "skills_root": "x", "projects": {}}`
++	source = loadEnvironmentIsolationConfig(t, source, base, "")
++	installEnvTestProfile(t, source)
++	user := `{"schema_version": 2, "skills_root": "x", "projects": {}, "environments": {"isolation": {"acme": {"codex_cli": "shared"}}}}`
++	system := `{"schema_version": 2, "locked": ["environments.isolation"], "environments": {"isolation": {"acme": {"codex_cli": "isolated"}}}}`
++	source = loadEnvironmentIsolationConfig(t, source, user, system)
++	code, stdout, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair")
++	if code != exitFail {
++		t.Fatalf("resolve with explicit shared under isolated lock = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	for _, want := range []string{"environment_isolation_lock_conflict", "acme", "codex_cli", source.cfg.SystemConfigPath} {
++		if !strings.Contains(stderr, want) {
++			t.Fatalf("lock refusal misses %q:\n%s", want, stderr)
++		}
++	}
++	if stdout != "" {
++		t.Fatalf("conflicting resolve emits no fragment: %q", stdout)
++	}
++}
++
++// TestEnvResolveLockedIsolationRequiresMigration provisions a shared home,
++// engages an isolated system lock with machine isolation silent, and proves
++// resolve refuses without moving the recorded passthrough. The exact F-C2
++// migration named by the refusal then plans and applies the unlink.
++func TestEnvResolveLockedIsolationRequiresMigration(t *testing.T) {
++	requireLinkCapability(t)
++	source, _ := profileHome(t)
++	writeNativeCredentials(t)
++	user := `{"schema_version": 2, "skills_root": "x", "projects": {}}`
++	source = loadEnvironmentIsolationConfig(t, source, user, "")
++	installEnvTestProfile(t, source)
++	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
++		t.Fatalf("shared provision = %d\nstderr:\n%s", code, stderr)
++	}
++	link := filepath.Join(source.cfg.Home(), "environments", "acme", "codex_cli", "auth.json")
++	nativeAuth := filepath.Join(os.Getenv("CODEX_HOME"), "auth.json")
++	target := nativeAuth
++	if got, err := os.Readlink(link); err != nil || got != target {
++		t.Fatalf("shared passthrough target = %q (%v), want %q", got, err, target)
++	}
++	nativeBytes, err := os.ReadFile(nativeAuth)
++	if err != nil {
++		t.Fatal(err)
++	}
++	system := `{"schema_version": 2, "locked": ["environments.isolation"], "environments": {"isolation": {"acme": {"codex_cli": "isolated"}}}}`
++	source = loadEnvironmentIsolationConfig(t, source, user, system)
++	code, stdout, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair")
++	if code != exitFail {
++		t.Fatalf("resolve with existing shared passthrough = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	for _, want := range []string{"environment_credential_conflict", "migration needed", "env migrate --plan --profile acme --env codex_cli", "env migrate --apply --expect <plan-hash> --profile acme --env codex_cli"} {
++		if !strings.Contains(stderr, want) {
++			t.Fatalf("migration refusal misses %q:\n%s", want, stderr)
++		}
++	}
++	if got, err := os.Readlink(link); err != nil || got != target {
++		t.Fatalf("refused resolve preserves shared link: %q (%v)", got, err)
++	}
++	if got, err := os.ReadFile(nativeAuth); err != nil || string(got) != string(nativeBytes) {
++		t.Fatalf("refused resolve preserves native credential bytes: %q (%v)", got, err)
++	}
++	code, plan, stderr := runProfile(t, source, "env", "migrate", "--plan", "--profile", "acme", "--env", "codex_cli")
++	if code != exitOK || !strings.Contains(plan, "unlink") || !strings.Contains(plan, "auth.json") {
++		t.Fatalf("F-C2 plan = %d\nplan:\n%s\nstderr:\n%s", code, plan, stderr)
++	}
++	code, applied, stderr := runProfile(t, source, "env", "migrate", "--apply", "--expect", planHash(t, plan), "--profile", "acme", "--env", "codex_cli")
++	if code != exitOK {
++		t.Fatalf("F-C2 apply = %d\nstdout:\n%s\nstderr:\n%s", code, applied, stderr)
++	}
++	if _, err := os.Lstat(link); !os.IsNotExist(err) {
++		t.Fatalf("F-C2 migration removes the shared passthrough: %s (%v)", link, err)
++	}
++	if got, err := os.ReadFile(nativeAuth); err != nil || string(got) != string(nativeBytes) {
++		t.Fatalf("F-C2 migration preserves native credential bytes: %q (%v)", got, err)
++	}
++}
++
+ // TestEnvStatusMatrix drives status before and after provisioning, with
+ // --check and --json.
+ func TestEnvStatusMatrix(t *testing.T) {
+diff --git a/cmd/curator/envmigrate.go b/cmd/curator/envmigrate.go
+index bca66fc0..6ac6dac6 100644
+--- a/cmd/curator/envmigrate.go
++++ b/cmd/curator/envmigrate.go
+@@ -62,7 +62,7 @@ func (c cli) cmdEnvMigrate(cfg *config.Config, args []string) int {
+ 		Home:    cfg.Home(),
+ 		Profile: *profile,
+ 		EnvID:   envID,
+-		Machine: envregistry.DefaultMachineConfig(),
++		Machine: machineFromConfig(cfg),
+ 		Expect:  *expect,
+ 	}
+ 	if *apply {
+diff --git a/internal/config/config.go b/internal/config/config.go
+index 3e4de1a9..db4dd1ec 100644
+--- a/internal/config/config.go
++++ b/internal/config/config.go
+@@ -156,6 +156,11 @@ type Config struct {
+ 	// Env is the effective environments §12.1 machine configuration with
+ 	// the §12.1 defaults applied. A schema-1 file carries every default.
+ 	Env Environments
++	// UserIsolation preserves the machine file's explicit isolation entries
++	// before system overlays. A locked isolated direction still wins as the
++	// effective setting, but the environment manager uses this snapshot to
++	// refuse an explicit shared request with the isolation-lock diagnostic.
++	UserIsolation map[string]map[string]string
+ 	// Locked names the manager §1 locked keys the system file enforces,
+ 	// including environments.<key> entries.
+ 	Locked map[string]bool
+@@ -278,6 +283,7 @@ func Load(path string, warn func(string)) (*Config, error) {
+ 	if err != nil {
+ 		return nil, err
+ 	}
++	userIsolation := userIsolationFromConfig(userData)
+ 	locked := map[string]bool{}
+ 	systemPath := ""
+ 	if resolved := SystemPath(); resolved != "" {
+@@ -298,9 +304,31 @@ func Load(path string, warn func(string)) (*Config, error) {
+ 	}
+ 	cfg.Locked = locked
+ 	cfg.SystemConfigPath = systemPath
++	cfg.UserIsolation = userIsolation
+ 	return cfg, nil
+ }
+ 
++// userIsolationFromConfig retains valid, explicitly configured machine
++// isolation entries before applySystem replaces a locked environments knob.
++// A malformed value hidden by a whole-knob system lock is not interpreted as
++// an explicit mode here; the effective configuration remains subject to the
++// ordinary merged-config parser below.
++func userIsolationFromConfig(data map[string]any) map[string]map[string]string {
++	env, ok := data["environments"].(map[string]any)
++	if !ok {
++		return nil
++	}
++	raw, present := env["isolation"]
++	if !present || raw == nil {
++		return nil
++	}
++	isolation, err := parseIsolation(raw)
++	if err != nil {
++		return nil
++	}
++	return isolation
++}
++
+ // applySystem overlays the system config (Spec §7.2, manager §1): locked
+ // keys win over the user value with a warning naming the system file;
+ // unlocked keys act as defaults; a locked but unset key is a configuration
+@@ -344,7 +372,7 @@ func applySystem(systemData, userData map[string]any, systemPath string, warn fu
+ 		locked[key] = true
+ 	}
+ 	// A system file carries only the lockable environments subset with the
+-	// §12.1 value grammars; isolation locks only toward shared (§12.2).
++	// §12.1 value grammars; isolation is lockable in either direction (§12.2).
+ 	if rawEnv, present := systemData["environments"]; present && rawEnv != nil {
+ 		if systemSchema != SchemaVersion2 {
+ 			return nil, nil, verr.New("environments", "system config %s carries environments under schema_version 1", systemPath)
+@@ -638,6 +666,7 @@ func Parse(data map[string]any, path string) (*Config, error) {
+ 		Path:                     path,
+ 		Schema:                   schema,
+ 		Env:                      env,
++		UserIsolation:            env.Isolation,
+ 		Locked:                   map[string]bool{},
+ 		SkillsRoot:               expandHome(skillsRoot),
+ 		PreferredLocale:          preferredLocale,
+diff --git a/internal/config/environments.go b/internal/config/environments.go
+index 06e063f4..d43e7d65 100644
+--- a/internal/config/environments.go
++++ b/internal/config/environments.go
+@@ -236,7 +236,7 @@ func parseEnvironments(raw any) (Environments, error) {
+ 		env.Targets = targets
+ 	}
+ 	if rawIsolation, present := obj["isolation"]; present && rawIsolation != nil {
+-		isolation, err := parseIsolation(rawIsolation, false)
++		isolation, err := parseIsolation(rawIsolation)
+ 		if err != nil {
+ 			return Environments{}, err
+ 		}
+@@ -627,9 +627,9 @@ func parseTargets(raw any) (map[string]TargetConfig, error) {
+ }
+ 
+ // parseIsolation validates isolation.<profile>.<env> with values shared or
+-// isolated; systemOnly restricts values to shared, the one direction
+-// environments §12.2 makes lockable.
+-func parseIsolation(raw any, systemOnly bool) (map[string]map[string]string, error) {
++// isolated. System configuration uses the same grammar because environments
++// §12.2 makes both directions lockable.
++func parseIsolation(raw any) (map[string]map[string]string, error) {
+ 	entries, ok := raw.(map[string]any)
+ 	if !ok {
+ 		return nil, verr.New("environments.isolation", "must be an object")
+@@ -649,10 +649,7 @@ func parseIsolation(raw any, systemOnly bool) (map[string]map[string]string, err
+ 				return nil, verr.New("environments.isolation."+profile, "environment %q %s", env, identifiers.Rule)
+ 			}
+ 			mode, ok := rawMode.(string)
+-			if !ok || (mode != "shared" && mode != "isolated") || (systemOnly && mode != "shared") {
+-				if systemOnly {
+-					return nil, verr.New("environments.isolation."+profile+"."+env, "a system file locks isolation only toward shared")
+-				}
++			if !ok || (mode != "shared" && mode != "isolated") {
+ 				return nil, verr.New("environments.isolation."+profile+"."+env, "must be shared or isolated")
+ 			}
+ 			modes[env] = mode
+@@ -914,9 +911,8 @@ func (c *Config) LockedBySystem(key string) bool {
+ }
+ 
+ // parseSystemEnvironments validates the system file's environments object:
+-// exactly the §12.2 lockable subset with the §12.1 value grammars, and
+-// isolation only toward shared. Anything else is not carriable by the
+-// system file (manager §1 rule 1).
++// exactly the §12.2 lockable subset with the §12.1 value grammars. Anything
++// else is not carriable by the system file (manager §1 rule 1).
+ func parseSystemEnvironments(raw any) (map[string]any, error) {
+ 	obj, ok := raw.(map[string]any)
+ 	if !ok {
+@@ -932,7 +928,7 @@ func parseSystemEnvironments(raw any) (map[string]any, error) {
+ 		return nil, err
+ 	}
+ 	if rawIsolation, present := obj["isolation"]; present && rawIsolation != nil {
+-		if _, err := parseIsolation(rawIsolation, true); err != nil {
++		if _, err := parseIsolation(rawIsolation); err != nil {
+ 			return nil, err
+ 		}
+ 	}
+diff --git a/internal/config/environments_conformance_test.go b/internal/config/environments_conformance_test.go
+index 06a381d5..51b26e15 100644
+--- a/internal/config/environments_conformance_test.go
++++ b/internal/config/environments_conformance_test.go
+@@ -158,6 +158,77 @@ func TestSystemConfigV2SchemaCases(t *testing.T) {
+ 		})
+ }
+ 
++// TestSystemConfigV2IsolationDirectionsFromPinnedCases drives the isolation
++// members of both published system-config-v2 direction cases through Load.
++// The full cases are also driven above; at the current pin those documents
++// carry source_signers and permissions locks outside this implementation's
++// task scope, so this companion projects only the published isolation knob
++// and its required locked entry rather than treating those unrelated gaps as
++// evidence about isolation.
++func TestSystemConfigV2IsolationDirectionsFromPinnedCases(t *testing.T) {
++	root := conformanceRoot(t)
++	for _, tc := range []struct {
++		name string
++		mode string
++	}{
++		{name: "valid-isolation-shared-direction.json", mode: "shared"},
++		{name: "valid-isolation-isolated-direction.json", mode: "isolated"},
++	} {
++		t.Run(tc.mode, func(t *testing.T) {
++			payload, err := os.ReadFile(filepath.Join(root, "schema-cases", "system-config-v2", tc.name)) // #nosec G304 -- pinned conformance input
++			if err != nil {
++				t.Fatal(err)
++			}
++			var published map[string]any
++			if err := json.Unmarshal(payload, &published); err != nil {
++				t.Fatalf("decode published system case: %v", err)
++			}
++			publishedEnv, ok := published["environments"].(map[string]any)
++			if !ok {
++				t.Fatal("published system case has no environments object")
++			}
++			isolation, ok := publishedEnv["isolation"]
++			if !ok {
++				t.Fatal("published system case has no isolation knob")
++			}
++			system, err := json.Marshal(map[string]any{
++				"schema_version": float64(2),
++				"locked":         []any{"environments.isolation"},
++				"environments":   map[string]any{"isolation": isolation},
++			})
++			if err != nil {
++				t.Fatal(err)
++			}
++			dir := t.TempDir()
++			userPath := writeConfig(t, dir, "config.json", `{"schema_version": 2, "skills_root": "/tmp/skills", "projects": {}}`)
++			systemPath := writeConfig(t, dir, "system.json", string(system))
++			t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
++			cfg, err := Load(userPath, nil)
++			if err != nil {
++				t.Fatalf("Load rejected projected published isolation case: %v", err)
++			}
++			wantJSON, err := json.Marshal(isolation)
++			if err != nil {
++				t.Fatal(err)
++			}
++			var want map[string]map[string]string
++			if err := json.Unmarshal(wantJSON, &want); err != nil {
++				t.Fatal(err)
++			}
++			if !cfg.Locked["environments.isolation"] || !reflect.DeepEqual(cfg.Env.Isolation, want) {
++				t.Fatalf("Load isolation = %+v, locked=%v; want %s projection %+v", cfg.Env.Isolation, cfg.Locked, tc.mode, want)
++			}
++			for profile, environments := range want {
++				for env, mode := range environments {
++					if mode != tc.mode {
++						t.Fatalf("published %s case has %s for %s/%s", tc.mode, mode, profile, env)
++					}
++				}
++			}
++		})
++	}
++}
++
+ // TestManagerConfigV2Vectors runs the published manager-config-v2 vector
+ // family through Parse: every valid case renders the expected effective
+ // configuration and every invalid case is rejected.
+diff --git a/internal/config/environments_test.go b/internal/config/environments_test.go
+index 11757246..1b1ddc31 100644
+--- a/internal/config/environments_test.go
++++ b/internal/config/environments_test.go
+@@ -376,7 +376,6 @@ func TestSystemV2Refusals(t *testing.T) {
+ 		{"unlockable knob locked", `{"schema_version": 2, "locked": ["environments.current_profile"], "environments": {"current_profile": "a"}}`, "cannot lock"},
+ 		{"bare environments locked", `{"schema_version": 2, "locked": ["environments"]}`, "cannot lock"},
+ 		{"locked but unset", `{"schema_version": 2, "locked": ["environments.precedence"]}`, "locks"},
+-		{"isolated direction", `{"schema_version": 2, "locked": ["environments.isolation"], "environments": {"isolation": {"a": {"pi": "isolated"}}}}`, "only toward shared"},
+ 		{"bad value grammar", `{"schema_version": 2, "environments": {"overlays_allowed": "yes"}}`, "overlays_allowed"},
+ 		{"env under schema 1", `{"schema_version": 1, "locked": [], "environments": {"backup_retention": 1}}`, "environments"},
+ 		{"env lock under schema 1", `{"schema_version": 1, "locked": ["environments.backup_retention"]}`, "schema_version 1"},
+@@ -391,6 +390,24 @@ func TestSystemV2Refusals(t *testing.T) {
+ 	}
+ }
+ 
++// TestSystemV2IsolationLockAcceptsIsolated proves the system-config-v2
++// environments.isolation lock admits isolated and keeps the user's explicit
++// value available to the environment manager for the lock-conflict check.
++func TestSystemV2IsolationLockAcceptsIsolated(t *testing.T) {
++	cfg, _, err := loadWithSystem(t,
++		`{"schema_version": 2, "skills_root": "x", "projects": {}, "environments": {"isolation": {"acme": {"pi": "shared"}}}}`,
++		`{"schema_version": 2, "locked": ["environments.isolation"], "environments": {"isolation": {"acme": {"pi": "isolated"}}}}`)
++	if err != nil {
++		t.Fatalf("isolated system lock was rejected: %v", err)
++	}
++	if !cfg.Locked["environments.isolation"] || cfg.Env.Isolation["acme"]["pi"] != "isolated" {
++		t.Fatalf("effective locked isolation = %+v, locked=%v", cfg.Env.Isolation, cfg.Locked)
++	}
++	if cfg.UserIsolation["acme"]["pi"] != "shared" {
++		t.Fatalf("explicit user isolation was not preserved: %+v", cfg.UserIsolation)
++	}
++}
++
+ // TestSystemV2DefaultsUnderSchema1User proves the manager §1 rule-3
+ // promotion: a schema-1 user file over system environments defaults keeps
+ // its on-disk version but the effective configuration carries the knobs.
+diff --git a/internal/envregistry/envregistry.go b/internal/envregistry/envregistry.go
+index a6011c5e..e5c48aeb 100644
+--- a/internal/envregistry/envregistry.go
++++ b/internal/envregistry/envregistry.go
+@@ -52,6 +52,7 @@ const (
+ 	DiagFormUnsupported       = "environment_form_unsupported"
+ 	DiagIsolatedUnsupported   = "environment_isolated_unsupported"
+ 	DiagSharedUnsupported     = "environment_shared_unsupported"
++	DiagIsolationLockConflict = "environment_isolation_lock_conflict"
+ 	DiagTargetUnknown         = "environment_target_unknown"
+ 	DiagTargetConsent         = "environment_target_consent_required"
+ 	DiagShadowingPresent      = "environment_shadowing_path_present"
+@@ -537,6 +538,14 @@ type MachineConfig struct {
+ 	Forms map[string]string
+ 	// Isolation maps profile to env-id to the configured isolation mode.
+ 	Isolation map[string]map[string]string
++	// UserIsolation retains explicit machine-file values before the system
++	// overlay. It lets a locked isolated direction reject an explicit shared
++	// request even though the effective Isolation map contains the system value.
++	UserIsolation map[string]map[string]string
++	// IsolationLocked says the system configuration locks the entire
++	// environments.isolation map; IsolationLockSource identifies that policy.
++	IsolationLocked     bool
++	IsolationLockSource string
+ 	// InPlaceMode maps env-id to linked or copied.
+ 	InPlaceMode map[string]string
+ 	// SystemPromptFiles maps profile to off, append, or replace (pi only).
+@@ -611,6 +620,16 @@ func (c MachineConfig) EffectiveIsolation(profile string, adapter Adapter, atOrA
+ 	if perProfile, ok := c.Isolation[profile]; ok {
+ 		configured = perProfile[adapter.ID]
+ 	}
++	if c.IsolationLocked && configured == IsolationIsolated {
++		if perProfile, ok := c.UserIsolation[profile]; ok && perProfile[adapter.ID] == IsolationShared {
++			source := c.IsolationLockSource
++			if source == "" {
++				source = "system configuration"
++			}
++			return "", fmt.Errorf("%s: profile %q environment %q explicitly requests shared, but %s locks environments.isolation to isolated",
++				DiagIsolationLockConflict, profile, adapter.ID, source)
++		}
++	}
+ 	return adapter.ResolveIsolation(configured, atOrAbovePinned)
+ }
+ 
