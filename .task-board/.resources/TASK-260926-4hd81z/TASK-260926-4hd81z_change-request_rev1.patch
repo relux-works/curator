@@ -1,0 +1,64 @@
+diff --git a/internal/scriptpolicy/conformance_test.go b/internal/scriptpolicy/conformance_test.go
+index a858071b..ec1727e5 100644
+--- a/internal/scriptpolicy/conformance_test.go
++++ b/internal/scriptpolicy/conformance_test.go
+@@ -493,10 +493,44 @@ func TestScriptHostExecutionPolicyProductionConsumersCoverAllCases(t *testing.T)
+ 	}
+ }
+ 
+-// TestScriptExecutionPolicyIdentityMatchesTheSuite binds the two closed
+-// identities this build hard-codes to the suite's own bytes. A protocol that
+-// renamed the policy or widened the interpreter set would otherwise leave
+-// curator silently accepting the old spelling and rejecting the new one.
++// rc.13 changes the release label only; its script-worker-v1 identity is
++// unchanged from the rc.12-pinned protocol (labelled rc.9 in the pinned suite).
++// Keep the accepted labels closed so an unrelated future protocol is not
++// admitted on the strength of the policy name alone.
++func scriptWorkerProtocolVersionSupported(version string) bool {
++	switch version {
++	case "1.0.0-rc.9", "1.0.0-rc.13":
++		return true
++	default:
++		return false
++	}
++}
++
++func TestScriptWorkerProtocolVersionAcceptanceIsClosed(t *testing.T) {
++	tests := []struct {
++		name    string
++		version string
++		want    bool
++	}{
++		{name: "pinned rc.9", version: "1.0.0-rc.9", want: true},
++		{name: "rc.13 with unchanged identity", version: "1.0.0-rc.13", want: true},
++		{name: "future rc.14", version: "1.0.0-rc.14", want: false},
++	}
++	for _, test := range tests {
++		t.Run(test.name, func(t *testing.T) {
++			if got := scriptWorkerProtocolVersionSupported(test.version); got != test.want {
++				t.Fatalf("scriptWorkerProtocolVersionSupported(%q) = %v, want %v",
++					test.version, got, test.want)
++			}
++		})
++	}
++}
++
++// TestScriptExecutionPolicyIdentityMatchesTheSuite binds the closed protocol
++// version set and the policy/interpreter identities this build hard-codes to
++// the suite's own bytes. A renamed policy or widened interpreter set would
++// otherwise leave curator silently accepting the old spelling and rejecting
++// the new one.
+ func TestScriptExecutionPolicyIdentityMatchesTheSuite(t *testing.T) {
+ 	_, payload := loadScriptHostExecutionPolicyVector(t)
+ 	var vector scriptHostExecutionPolicyVector
+@@ -506,8 +540,8 @@ func TestScriptExecutionPolicyIdentityMatchesTheSuite(t *testing.T) {
+ 	if vector.SchemaVersion != 1 {
+ 		t.Fatalf("the suite schema_version = %d, want 1", vector.SchemaVersion)
+ 	}
+-	if vector.ProtocolVersion != "1.0.0-rc.9" {
+-		t.Fatalf("the pinned suite protocol_version = %q, want the rc.12-pinned script-worker-v1 protocol 1.0.0-rc.9", vector.ProtocolVersion)
++	if !scriptWorkerProtocolVersionSupported(vector.ProtocolVersion) {
++		t.Fatalf("the suite protocol_version = %q, want one of the unchanged script-worker-v1 labels [1.0.0-rc.9, 1.0.0-rc.13]", vector.ProtocolVersion)
+ 	}
+ 	if vector.ExecutionPolicy != skillspec.ScriptExecutionPolicy {
+ 		t.Fatalf("the suite names execution policy %q; this build hard-codes %q",
