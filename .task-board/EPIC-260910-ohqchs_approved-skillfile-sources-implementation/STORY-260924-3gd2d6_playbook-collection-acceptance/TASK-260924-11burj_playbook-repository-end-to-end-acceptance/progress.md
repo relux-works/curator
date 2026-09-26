@@ -77,6 +77,17 @@ Bound integration preconditions confirmed for TASK-260924-11burj (revision 2, st
 Attached `TASK-260924-11burj_integration-land.md` as the task-scoped outcome resource. Per the integration assignment, `worktree integrate` was not executed here — landing is left to the runner.
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260926-684c80, pid=90897, exit=0)
+spawn run RUN-260926-684c80 failed; operator action required; failure: board_publication_pending: runner integrate refused: board_publication_pending: STORY-260924-3gd2d6 is landed and its board state is committed as 9f0da708350c15e78b7c900022629aa8e42e5e12 on the local trunk, but the publication push did not land (board_publish_local_trunk_unproven); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: 9f0da708350c15e78b7c900022629aa8e42e5e12
+  cause_code: board_publish_local_trunk_unproven
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: 0f363230e8f1886663b5453229bc5f8822784792
+  story_id: STORY-260924-3gd2d6
+  cause: board_publish_local_trunk_unproven: the local trunk holds an unpublished link 9f0da708350c15e78b7c900022629aa8e42e5e12 that is not this repository's own board-state record (the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key); a stable content digest is never ownership proof — nothing was projected and nothing was pushed
+  link_oid: 9f0da708350c15e78b7c900022629aa8e42e5e12
+  reason: the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key
+  remedy: land the unproven commits through integrate/reconcile-trunk, not through this command
 
 ## Precondition Resources
 - [campaign-producer-rules.md](file://TASK-260924-11burj/campaign-producer-rules.md)
@@ -104,7 +115,7 @@ spawn run completed: muse (run=RUN-260926-684c80, pid=90897, exit=0)
 2026-09-24T03:51:45Z
 
 ## Last Update
-2026-09-26T00:19:11Z
+2026-09-26T00:52:55Z
 
 ## Assigned To
 [implementer] developer (muse)
