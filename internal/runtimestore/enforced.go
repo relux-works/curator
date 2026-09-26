@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // Enforced launcher staging for `script-worker-v1` commands (Protocol Core
@@ -98,13 +99,17 @@ func (shim ManagedEnforcedShim) SidecarPath() string { return shim.sidecar }
 // its paired launcher, whether or not the launcher bytes are still there,
 // so partial state still converges.
 func ManagedEnforcedShimsIn(binDir string, role ShimRole, platform string) ([]ManagedEnforcedShim, error) {
-	entries, err := os.ReadDir(binDir)
-	if os.IsNotExist(err) {
-		return nil, nil
-	}
+	listing, err := stateread.ReadDir(binDir)
 	if err != nil {
 		return nil, err
 	}
+	if listing.Kind == stateread.KindAbsent {
+		return nil, nil
+	}
+	if listing.Kind != stateread.KindPresent {
+		return nil, stateread.UnusableError(binDir, fmt.Errorf("unknown directory read state %q", listing.Kind))
+	}
+	entries := listing.Entries
 	var shims []ManagedEnforcedShim
 	for _, entry := range entries {
 		if entry.IsDir() {

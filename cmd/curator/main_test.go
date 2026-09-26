@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -29,6 +30,7 @@ import (
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/rustsource"
 	"github.com/relux-works/curator/internal/scriptworker"
+	"github.com/relux-works/curator/internal/stateread"
 	"github.com/relux-works/curator/internal/version"
 )
 
@@ -42,6 +44,24 @@ func (source stubConfigSource) Path() string { return source.path }
 
 func (source stubConfigSource) Load(func(string)) (*config.Config, error) {
 	return source.cfg, source.err
+}
+
+func TestEnforcedShimDispatchRefusesUnreadableSidecar(t *testing.T) {
+	blocker := filepath.Join(t.TempDir(), "not-a-directory")
+	if err := os.WriteFile(blocker, []byte("blocker"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	executable := filepath.Join(blocker, "curator")
+	handled, code, err := dispatchEnforcedShim(executable, nil)
+	if !handled || code != exitFail || err == nil {
+		t.Fatalf("dispatchEnforcedShim = (%v, %d, %v), want handled refusal", handled, code, err)
+	}
+	var stateErr *stateread.Error
+	if scriptworker.DiagnosticCode(err) != scriptworker.CodeWorkerProtocolInvalid ||
+		!errors.As(err, &stateErr) || stateErr.Kind != stateread.KindUnreadable ||
+		stateErr.Path != executable+scriptworker.ShimSidecarSuffix {
+		t.Fatalf("dispatch error = %v, want worker-protocol refusal with unreadable sidecar path", err)
+	}
 }
 
 func TestRunUsesInjectedConfigSourceAndWriters(t *testing.T) {

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/relux-works/curator/internal/gitops"
+	"github.com/relux-works/curator/internal/stateread"
 	"github.com/relux-works/curator/internal/transaction"
 )
 
@@ -42,18 +43,35 @@ func Dir(home, source, commit string) string {
 // member subtrees from it.
 func AuthenticateGit(home, source, repo, commit string) (string, error) {
 	target := Dir(home, source, commit)
-	info, err := os.Lstat(target)
+	metadata, err := stateread.Lstat(target)
 	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return "", fmt.Errorf("source_snapshot_unavailable: snapshot for %s at %s is not in the store; capture it with an explicit attempt", source, commit)
-		}
 		return "", err
 	}
+	if metadata.Kind == stateread.KindAbsent {
+		return "", fmt.Errorf("source_snapshot_unavailable: snapshot for %s at %s is not in the store; capture it with an explicit attempt", source, commit)
+	}
+	if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
+		return "", stateread.UnusableError(target, fmt.Errorf("invalid snapshot metadata state %q", metadata.Kind))
+	}
+	info := metadata.Info
 	if !info.IsDir() || info.Mode()&fs.ModeSymlink != 0 {
 		return "", fmt.Errorf("source_snapshot_changed: stored snapshot for %s at %s is not a directory", source, commit)
 	}
-	if err := gitops.EnsureRepo(repo); err != nil {
+	if repo == "" {
 		return "", fmt.Errorf("source_snapshot_unavailable: cannot authenticate snapshot for %s at %s without its locked repository; capture it with an explicit attempt", source, commit)
+	}
+	repoMetadata, err := stateread.Lstat(repo)
+	if err != nil {
+		return "", err
+	}
+	if repoMetadata.Kind == stateread.KindAbsent {
+		return "", fmt.Errorf("source_snapshot_unavailable: cannot authenticate snapshot for %s at %s without its locked repository; capture it with an explicit attempt", source, commit)
+	}
+	if repoMetadata.Kind != stateread.KindPresent || repoMetadata.Info == nil {
+		return "", stateread.UnusableError(repo, fmt.Errorf("invalid repository metadata state %q", repoMetadata.Kind))
+	}
+	if err := gitops.EnsureRepo(repo); err != nil {
+		return "", stateread.UnusableError(repo, err)
 	}
 	parent := filepath.Dir(target)
 	if err := os.MkdirAll(parent, 0o755); err != nil {

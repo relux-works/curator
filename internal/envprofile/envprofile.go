@@ -50,6 +50,7 @@ import (
 	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/protocoljson"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // Diagnostics (environments §1.1, §2.1, §9.7, manager profile §12.3).
@@ -1722,14 +1723,16 @@ func migrateGlobalSkills(home string, policy Policy) ([]contextlock.Member, erro
 // the caller — a failed read is never an empty policy.
 func loadMachinePolicy() (Policy, error) {
 	path := config.UserPath()
-	// Lstat classifies only a truly absent path as the legacy default. Stat
-	// would also call a dangling symlink absent, allowing an existing but
-	// unreadable configuration entry to take the empty-policy fallback.
-	if _, err := os.Lstat(path); err != nil {
-		if os.IsNotExist(err) {
-			return Policy{OverlaysAllowed: true}, nil
-		}
-		return Policy{}, fmt.Errorf("%s: read the machine configuration: %v", DiagSourceInvalid, err)
+	metadata, err := stateread.Lstat(path)
+	if err != nil {
+		return Policy{}, fmt.Errorf("%s: read the machine configuration: %w", DiagSourceInvalid, err)
+	}
+	if metadata.Kind == stateread.KindAbsent {
+		return Policy{OverlaysAllowed: true}, nil
+	}
+	if metadata.Kind != stateread.KindPresent {
+		return Policy{}, fmt.Errorf("%s: read the machine configuration: %w", DiagSourceInvalid,
+			stateread.UnusableError(path, fmt.Errorf("unknown metadata state %q", metadata.Kind)))
 	}
 	cfg, err := config.Load(path, nil)
 	if err != nil {

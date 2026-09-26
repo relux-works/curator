@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/BurntSushi/toml"
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextmaterialize"
 	"github.com/relux-works/curator/internal/contextpkg"
@@ -274,6 +275,9 @@ func assembleHome(req *ResolveRequest, source Source, lock *contextlock.Lock, ha
 	if err != nil {
 		return nil, err
 	}
+	if err := req.checkIsolatedCredentialStore(adapter, isolation); err != nil {
+		return nil, err
+	}
 	plan := &homePlan{
 		adapter:    adapter,
 		parent:     ManagedParent(req.Home, req.Profile, adapter.ID),
@@ -492,8 +496,10 @@ func (p *homePlan) publishDocs() error {
 // (§7.4). isolated homes link nothing; keyring-backed codex homes are
 // ambient and link nothing; every file-shaped strategy is watched by the
 // liveness row. The native config.toml read is read-only: an absent file
-// means the default file store, while an unreadable one fails instead of
-// defaulting — absence and a failed read are different facts (§8.4).
+// or an absent key means the default file store, while an unreadable file
+// fails instead of defaulting — absence and a failed read are different
+// facts (§8.4) — and a selector outside the verified file/keyring/auto
+// set fails closed with environment_credential_unsupported.
 func (req *ResolveRequest) effectivePassthrough(adapter envregistry.Adapter, isolation string) (map[string]string, map[string]string, error) {
 	links := map[string]string{}
 	strategies := map[string]string{}
@@ -509,40 +515,98 @@ func (req *ResolveRequest) effectivePassthrough(adapter envregistry.Adapter, iso
 		case envregistry.StrategyPerHomeKeychain, envregistry.StrategyAmbient:
 			continue
 		case envregistry.StrategyKeyringPreferred:
-			keyring, err := codexKeyring(native)
+			store, err := codexCredentialStore(native)
 			if err != nil {
 				return nil, nil, err
 			}
-			if keyring {
+			if store == "keyring" {
 				continue
 			}
-			links[entry.Path] = filepath.Join(native, entry.FileLinkTarget)
+			links[entry.Path] = filepath.Join(native, filepath.FromSlash(entry.FileLinkTarget))
 			strategies[entry.Path] = envregistry.StrategyFileLink
 		case envregistry.StrategyFileLink:
-			links[entry.Path] = filepath.Join(native, entry.FileLinkTarget)
+			links[entry.Path] = filepath.Join(native, filepath.FromSlash(entry.FileLinkTarget))
 			strategies[entry.Path] = envregistry.StrategyFileLink
 		}
 	}
 	return links, strategies, nil
 }
 
-// codexKeyring reports whether the operator's native config.toml selects
-// the keyring credential store, in which case the credential is ambient
-// and no entry is linked (§7.4). An absent file means the default file
-// store; an unreadable file is an error, never absence.
-func codexKeyring(native string) (bool, error) {
+// codexCredentialStore resolves the operator's native codex credential
+// store: the top-level cli_auth_credentials_store selector when the
+// native config.toml carries one, else the platform default file — an
+// absent file and an absent key both mean file (§7.4). The file is
+// parsed as TOML, so every valid spelling of the key — double-quoted,
+// single-quoted, multi-line — resolves identically, while the same key
+// nested inside a table is not the top-level selector and stays absent.
+// Under keyring the credential is ambient and no entry is linked; under
+// file or auto the managed auth.json is a file-link. An unreadable file
+// or invalid TOML refuses with a diagnostic naming the file, never
+// absence, and a parsed value outside the verified file/keyring/auto
+// set — any other string or any non-string TOML value — fails closed
+// with environment_credential_unsupported. Sharing is defined by the
+// native effective storage only: a diverged managed config.toml changes
+// nothing and is never realigned.
+func codexCredentialStore(native string) (string, error) {
 	payload, err := os.ReadFile(filepath.Join(native, "config.toml")) // #nosec G304 -- native home resolved from the registry
 	if err != nil {
 		if os.IsNotExist(err) {
-			return false, nil
+			return "file", nil
 		}
-		return false, fmt.Errorf("codex native config.toml is unreadable: %v", err)
+		return "", fmt.Errorf("codex native config.toml is unreadable: %v", err)
 	}
-	matches := keyringSetting.FindSubmatch(payload)
-	return len(matches) == 2 && string(matches[1]) == "keyring", nil
+	var doc map[string]any
+	if err := toml.Unmarshal(payload, &doc); err != nil {
+		return "", fmt.Errorf("codex native config.toml is not valid TOML: %v", err)
+	}
+	raw, ok := doc["cli_auth_credentials_store"]
+	if !ok {
+		return "file", nil
+	}
+	store, ok := raw.(string)
+	if !ok {
+		return "", fmt.Errorf("%s: codex native cli_auth_credentials_store must be one of \"file\", \"keyring\", or \"auto\", got TOML type %T", envregistry.DiagCredentialUnsupported, raw)
+	}
+	switch store {
+	case "file", "keyring", "auto":
+		return store, nil
+	default:
+		return "", fmt.Errorf("%s: codex native cli_auth_credentials_store %q is outside the verified file, keyring, and auto set", envregistry.DiagCredentialUnsupported, store)
+	}
 }
 
-var keyringSetting = regexp.MustCompile(`(?m)^\s*cli_auth_credentials_store\s*=\s*"([^"]*)"`)
+// checkIsolatedCredentialStore gates codex_cli isolated on the native
+// effective store (§7.4): isolated is admitted under file storage only —
+// including an absent cli_auth_credentials_store key, which resolves to
+// effective file. Under keyring or auto storage the keyring identity is
+// assumed operator-global, so isolated is
+// environment_isolated_unsupported; a selector outside the verified set
+// fails closed with environment_credential_unsupported from the store
+// reader. Every other adapter × mode passes here: the static matrix in
+// the registry already decided it.
+func (req *ResolveRequest) checkIsolatedCredentialStore(adapter envregistry.Adapter, isolation string) error {
+	if adapter.ID != envregistry.CodexCLI || isolation != envregistry.IsolationIsolated {
+		return nil
+	}
+	native, err := req.nativeHome(adapter.ID)
+	if err != nil {
+		return err
+	}
+	store, err := codexCredentialStore(native)
+	if err != nil {
+		return err
+	}
+	switch store {
+	case "file":
+		return nil
+	case "keyring":
+		return fmt.Errorf("%s: isolated is unsupported for codex_cli under native keyring storage: the keyring identity is operator-global, independent of CODEX_HOME", envregistry.DiagIsolatedUnsupported)
+	case "auto":
+		return fmt.Errorf("%s: isolated is unsupported for codex_cli under native auto storage: the tool uses the keyring when one is available, so an isolated home on a keyring host would authenticate through the operator-global keyring", envregistry.DiagIsolatedUnsupported)
+	default:
+		return fmt.Errorf("%s: codex native cli_auth_credentials_store %q is outside the verified file, keyring, and auto set", envregistry.DiagCredentialUnsupported, store)
+	}
+}
 
 // seedBundle is the one-time provisioning class (§7.4): non-credential
 // files copied from the native home exactly once, at provisioning, never
@@ -930,13 +994,27 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
 	if err != nil {
 		return nil, err
 	}
+	native, err := req.nativeHome(plan.adapter.ID)
+	if err != nil {
+		return nil, err
+	}
+	recordedLinks := map[string]bool{}
+	if prior != nil && prior.Passthrough != nil {
+		for _, entry := range *prior.Passthrough {
+			recordedLinks[entry.Path] = true
+		}
+	}
+	migrateCmd := fmt.Sprintf("curator env migrate --plan --profile %s --env %s, then curator env migrate --apply --expect <plan-hash> --profile %s --env %s", req.Profile, plan.adapter.ID, req.Profile, plan.adapter.ID)
+	for _, path := range sortedKeys(links) {
+		if err := ensureCredentialLink(plan.homeDir, path, links[path], recordedLinks[path], migrateCmd); err != nil {
+			return nil, err
+		}
+	}
+	if err := removeStaleCredentialLinks(plan.adapter, plan.homeDir, native, prior, links, migrateCmd); err != nil {
+		return nil, err
+	}
 	passthrough := []envmarker.Passthrough{}
 	for _, path := range sortedKeys(links) {
-		full := filepath.Join(plan.homeDir, filepath.FromSlash(path))
-		_ = os.Remove(full)
-		if err := os.Symlink(links[path], full); err != nil {
-			return nil, fmt.Errorf("passthrough %s: %v", path, err)
-		}
 		passthrough = append(passthrough, envmarker.Passthrough{Path: path, Strategy: strategies[path]})
 	}
 	marker.Passthrough = &passthrough
@@ -990,6 +1068,132 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
 	}
 	marker.SeedLinks = seedLinks
 	return marker, nil
+}
+
+// ensureCredentialLink fix-first ensures one wanted credential link (§7.4,
+// §10.1): an absent link path is linked, a symlink still targeting the
+// declared native store is left alone, and an empty directory is replaced
+// by the link — none of which moves credential ownership. A recorded
+// symlink to any other target — the mis-targeted state, including a Pi
+// home still linked at the pre-0017 native root — is never re-pointed
+// here: repair refuses with environment_credential_conflict naming the
+// path and points at the explicit migration (migrateCmd). A regular
+// file, an unrecorded symlink to an unexpected target, a non-empty
+// directory, or a link whose state cannot be established refuses the
+// same way, removing nothing. Native bytes are never touched.
+func ensureCredentialLink(homeDir, path, target string, recorded bool, migrateCmd string) error {
+	full := filepath.Join(homeDir, filepath.FromSlash(path))
+	info, err := os.Lstat(full)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("%s: %s cannot be inspected: %v: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full, err)
+		}
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			return err
+		}
+		if err := os.Symlink(target, full); err != nil {
+			return fmt.Errorf("passthrough %s: %v", path, err)
+		}
+		return nil
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		got, err := os.Readlink(full)
+		if err != nil {
+			return fmt.Errorf("%s: %s link target cannot be read: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full)
+		}
+		if got == target {
+			return nil
+		}
+		if !recorded {
+			return fmt.Errorf("%s: %s links to %s, expected %s: refusing to remove or re-point it; remove the unrecorded link out of band and re-run", envregistry.DiagCredentialConflict, full, got, target)
+		}
+		return fmt.Errorf("%s: %s links to %s, expected %s: migration needed: re-point the recorded link with `%s`; refusing to re-point it here", envregistry.DiagCredentialConflict, full, got, target, migrateCmd)
+	}
+	if info.IsDir() {
+		entries, err := os.ReadDir(full)
+		if err != nil {
+			return fmt.Errorf("%s: %s holds a directory that cannot be listed: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full)
+		}
+		if len(entries) != 0 {
+			return fmt.Errorf("%s: %s holds a non-empty directory, expected a link to %s: refusing to remove it; clear the directory out of band and re-run", envregistry.DiagCredentialConflict, full, target)
+		}
+		_ = os.Remove(full)
+		if err := os.Symlink(target, full); err != nil {
+			return fmt.Errorf("passthrough %s: %v", path, err)
+		}
+		return nil
+	}
+	return fmt.Errorf("%s: %s holds a regular file, expected a link to %s: refusing to remove or replace it; decide which credential bytes win and move the loser aside out of band (the manager never moves credential bytes)", envregistry.DiagCredentialConflict, full, target)
+}
+
+// removeStaleCredentialLinks refuses recorded credential links the
+// effective set no longer wants — the shared→isolated turn, or a native
+// store gone ambient (§7.4, §10.1): a mode change that leaves a recorded
+// link behind it is the explicit migration, never silent inside repair.
+// A stale recorded symlink still targeting the declared native store
+// refuses with environment_credential_conflict naming the path and
+// points at the explicit migration (migrateCmd); an already-absent path
+// is already gone and the caller drops the record, so hand-removed and
+// crash-recovery shapes converge here. Anything else — a regular file,
+// a symlink to any other target, or a directory — refuses the same way,
+// removing nothing: the operator resolves the conflict out of band and
+// re-runs.
+func removeStaleCredentialLinks(adapter envregistry.Adapter, homeDir, native string, prior *envmarker.Marker, links map[string]string, migrateCmd string) error {
+	if prior == nil || prior.Passthrough == nil {
+		return nil
+	}
+	for _, entry := range *prior.Passthrough {
+		if _, wanted := links[entry.Path]; wanted {
+			continue
+		}
+		full := filepath.Join(homeDir, filepath.FromSlash(entry.Path))
+		info, err := os.Lstat(full)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return fmt.Errorf("%s: %s cannot be inspected: %v: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full, err)
+		}
+		if info.Mode()&os.ModeSymlink == 0 {
+			if info.IsDir() {
+				return fmt.Errorf("%s: %s holds a directory where the recorded credential link %s was: refusing to remove it; clear the directory out of band and re-run", envregistry.DiagCredentialConflict, full, entry.Path)
+			}
+			return fmt.Errorf("%s: %s holds a regular file where the recorded credential link %s was: refusing to remove it; decide which credential bytes win and move the loser aside out of band (the manager never moves credential bytes)", envregistry.DiagCredentialConflict, full, entry.Path)
+		}
+		got, err := os.Readlink(full)
+		if err != nil {
+			return fmt.Errorf("%s: %s link target cannot be read: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full)
+		}
+		declared, ok := declaredPassthroughTarget(adapter, native, entry.Path)
+		if !ok {
+			return fmt.Errorf("%s: %s has no declared native store for the recorded credential link %s: refusing to remove it; remove the link out of band and re-run", envregistry.DiagCredentialConflict, full, entry.Path)
+		}
+		if got != declared {
+			return fmt.Errorf("%s: %s links to %s, not the recorded credential target %s: refusing to remove it; remove the link out of band and re-run", envregistry.DiagCredentialConflict, full, got, declared)
+		}
+		return fmt.Errorf("%s: %s is a stale recorded credential link (still targeting the declared store %s): migration needed: unlink it with `%s`; refusing to unlink it here", envregistry.DiagCredentialConflict, full, declared, migrateCmd)
+	}
+	return nil
+}
+
+// declaredPassthroughTarget reconstructs the native target a recorded
+// credential link must still point at: the adapter entry's file target
+// below the native home. It reports false where the recorded path names
+// no linkable adapter entry, in which case nothing at the path can be
+// proven ours and repair refuses rather than unlinks.
+func declaredPassthroughTarget(adapter envregistry.Adapter, native, path string) (string, bool) {
+	for _, entry := range adapter.PassthroughFor(runtime.GOOS) {
+		if entry.Path != path {
+			continue
+		}
+		switch entry.Strategy {
+		case envregistry.StrategyFileLink, envregistry.StrategyKeyringPreferred:
+			return filepath.Join(native, filepath.FromSlash(entry.FileLinkTarget)), true
+		default:
+			return "", false
+		}
+	}
+	return "", false
 }
 
 // shadowWarnings reports unrecorded parent entries shadowing allowlisted
@@ -1325,8 +1529,21 @@ func equalStrings(a, b []string) bool {
 }
 
 // checkPassthrough runs the liveness row: every recorded entry must still
-// be a symlink targeting the native entry, and the recorded set must match
-// the effective one (§7.4).
+// be a symlink targeting the native entry, and the recorded set must
+// match the effective one (§7.4). A missing link path is plain detached
+// and is re-linked by --repair; a link path holding a regular file or a
+// symlink to an unexpected target — including a Pi home still linked at
+// the pre-0017 native target — is detached with
+// environment_credential_conflict-class wording, never silence:
+// --repair refuses without touching bytes and points at the explicit
+// migration where it can fix the state. A
+// correctly targeted link whose native target does not exist yet is the
+// distinct detached-pending state — the normal provisioning shape before
+// the first login (claude_code on Linux) — reported as a warning, never
+// a stale reason and never silence: provisioning, repair, and bare
+// resolve all succeed loudly. A native target that cannot be inspected
+// is a conflict/inspection diagnostic and stays stale, never absence
+// and never silence.
 func (v *verification) checkPassthrough(req *ResolveRequest, plan *homePlan, marker *envmarker.Marker) {
 	links, strategies, err := req.effectivePassthrough(plan.adapter, plan.isolation)
 	if err != nil {
@@ -1350,9 +1567,42 @@ func (v *verification) checkPassthrough(req *ResolveRequest, plan *homePlan, mar
 			continue
 		}
 		full := filepath.Join(plan.homeDir, filepath.FromSlash(path))
-		got, err := os.Readlink(full)
-		if err != nil || got != target {
+		info, err := os.Lstat(full)
+		if err != nil {
 			v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s is detached", path))
+			continue
+		}
+		if info.Mode()&os.ModeSymlink == 0 {
+			if !info.IsDir() {
+				v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s is detached: link path holds a regular file, expected a link to %s (%s)", path, target, envregistry.DiagCredentialConflict))
+				continue
+			}
+			v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s is detached", path))
+			continue
+		}
+		got, err := os.Readlink(full)
+		if err != nil {
+			v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s is detached", path))
+			continue
+		}
+		if got != target {
+			v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s is detached: link targets %s, expected %s (%s)", path, got, target, envregistry.DiagCredentialConflict))
+			continue
+		}
+		// The link targets the declared native store; liveness asks
+		// whether the native target itself exists — a stat of the
+		// target, never a read of credential bytes. An absent target
+		// is detached-pending: the link is correct and the native
+		// credential simply is not there yet, so the state warns
+		// loudly without going stale. An inspection failure is a
+		// conflict/inspection diagnostic and stays stale, never
+		// absence and never silence.
+		if _, err := os.Stat(target); err != nil {
+			if os.IsNotExist(err) {
+				v.warnings = append(v.warnings, fmt.Sprintf("passthrough entry %s is detached-pending: link target %s does not exist yet — log in to %s to populate it", path, target, plan.adapter.ID))
+			} else {
+				v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s target %s cannot be inspected: %v (%s)", path, target, err, envregistry.DiagCredentialConflict))
+			}
 		}
 	}
 }
@@ -1653,6 +1903,16 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 	if err != nil {
 		return nil, err
 	}
+	// The credential store must be established before the first write: an
+	// unknown native selector fails here, not halfway through applyPlan
+	// leaving a markerless partial home behind that the §9.5 inventory
+	// would then refuse to provision over.
+	if _, _, err := req.effectivePassthrough(adapter, plan.isolation); err != nil {
+		if provisioned || isCredentialRefusal(err) {
+			return nil, err
+		}
+		return nil, fmt.Errorf("%s: %v", DiagRepairFailed, err)
+	}
 	if provisioned {
 		want := map[string]bool{}
 		for path := range plan.copies {
@@ -1690,6 +1950,12 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 		if provisioned {
 			return nil, err
 		}
+		// A credential refusal is not a store failure: the repair
+		// stops with the refusal diagnostic itself (§10.4), not
+		// wrapped as environment_repair_failed.
+		if isCredentialRefusal(err) {
+			return nil, err
+		}
 		return nil, fmt.Errorf("%s: %v", DiagRepairFailed, err)
 	}
 	after := verifyHome(req, adapter, source, lock, hash)
@@ -1709,6 +1975,14 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 		result.Notice = firstResolveNotice(adapter, plan)
 	}
 	return result, nil
+}
+
+// isCredentialRefusal reports whether a repair error is already a §7.7
+// credential refusal, which surfaces as itself rather than wrapped in
+// environment_repair_failed.
+func isCredentialRefusal(err error) bool {
+	return err != nil && (strings.Contains(err.Error(), envregistry.DiagCredentialConflict) ||
+		strings.Contains(err.Error(), envregistry.DiagCredentialUnsupported))
 }
 
 // checkProfileCollision fails provisioning with environment_path_collision

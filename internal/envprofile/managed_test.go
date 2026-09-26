@@ -91,6 +91,28 @@ func writeStoreEntry(t *testing.T, home, kind, name, pin string, files map[strin
 	}
 }
 
+// seedLiveNativeCredentials writes live native credential targets for
+// every file-linked adapter — codex auth.json, the pi agent-root
+// auth.json, and the Linux claude_code credentials file — so tests about
+// other behaviors provision homes without the detached-pending finding.
+// The writes are harmless where an adapter links nothing on the platform.
+func seedLiveNativeCredentials(t *testing.T, fx *managedFixture) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "auth.json"), []byte("{\"t\":\"operator\"}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	agentAuth := filepath.Join(fx.native["pi"], "agent", "auth.json")
+	if err := os.MkdirAll(filepath.Dir(agentAuth), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(agentAuth, []byte("{\"t\":\"operator-pi\"}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(fx.native["claude_code"], ".credentials.json"), []byte("{\"t\":\"operator-claude\"}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func (fx *managedFixture) request(envID string) ResolveRequest {
 	return ResolveRequest{
 		Home:      fx.home,
@@ -128,6 +150,7 @@ func readManagedMarker(t *testing.T, fx *managedFixture, envID string) *envmarke
 // current and emits identical bytes without repair.
 func TestResolveProvisionRepair(t *testing.T) {
 	fx := writeManagedFixture(t, "acme")
+	seedLiveNativeCredentials(t, fx)
 	req := fx.request("codex_cli")
 	req.Repair = true
 	result, err := Resolve(req)
@@ -229,6 +252,7 @@ func TestResolveDefaultProfile(t *testing.T) {
 // candidate bytes.
 func TestResolveDriftRepair(t *testing.T) {
 	fx := writeManagedFixture(t, "acme")
+	seedLiveNativeCredentials(t, fx)
 	req := fx.request("claude_code")
 	req.Repair = true
 	if _, err := Resolve(req); err != nil {
@@ -290,6 +314,7 @@ func TestResolveDriftRepair(t *testing.T) {
 		{"pi", ""},
 	} {
 		probe := writeManagedFixture(t, "acme")
+		seedLiveNativeCredentials(t, probe)
 		provision := probe.request(tc.env)
 		if tc.form != "" {
 			provision.Machine.Forms = map[string]string{tc.env: tc.form}
@@ -344,8 +369,13 @@ func TestResolveDriftRepair(t *testing.T) {
 	}
 }
 
-// TestResolvePassthroughLiveness severs a file-link passthrough entry and
-// proves the liveness row goes stale and --repair re-links it.
+// TestResolvePassthroughLiveness removes a file-link passthrough entry and
+// proves the liveness row goes stale and --repair re-links the absent
+// link. A severed link replaced by a regular file is the separate
+// environment_credential_conflict refusal (Decision 0017, §7.4/§10.1):
+// repair never removes or replaces the file. That refusal half moved to
+// TestCredentialLinkRegularFileRefuses with the 0017 contract; this test
+// keeps the absent-link re-link half.
 func TestResolvePassthroughLiveness(t *testing.T) {
 	fx := writeManagedFixture(t, "acme")
 	if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "auth.json"), []byte(`{"openai_api_key":null}`+"\n"), 0o600); err != nil {
@@ -361,9 +391,6 @@ func TestResolvePassthroughLiveness(t *testing.T) {
 		t.Fatalf("passthrough link targets %q (%v)", target, err)
 	}
 	_ = os.Remove(link)
-	if err := os.WriteFile(link, []byte("detached\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
 	if _, err := Resolve(fx.request("codex_cli")); err == nil || !strings.Contains(err.Error(), DiagHomeStale) {
 		t.Fatalf("a detached passthrough must be stale, got %v", err)
 	}
@@ -519,6 +546,12 @@ func TestCodexKeyringAmbient(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			// The linked stores get a live native target so the
+			// detached-pending finding stays out of this test, which
+			// is about ambient-versus-linked, not dangling.
+			if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "auth.json"), []byte("{\"t\":\"operator\"}\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
 			req := fx.request("codex_cli")
 			req.Repair = true
 			if _, err := Resolve(req); err != nil {
@@ -585,6 +618,11 @@ func TestRepairNeverRefreshesSeeds(t *testing.T) {
 	fx := writeManagedFixture(t, "acme")
 	nativeSeed := []byte("operator = true\n")
 	if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), nativeSeed, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// The linked credential gets a live native target so the
+	// detached-pending finding stays out of this seed test.
+	if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "auth.json"), []byte("{\"t\":\"operator\"}\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	req := fx.request("codex_cli")
@@ -664,6 +702,7 @@ func TestResolveLockContention(t *testing.T) {
 // TestResolveFormats renders env and shell through Resolve.
 func TestResolveFormats(t *testing.T) {
 	fx := writeManagedFixture(t, "acme")
+	seedLiveNativeCredentials(t, fx)
 	req := fx.request("pi")
 	req.Repair = true
 	if _, err := Resolve(req); err != nil {

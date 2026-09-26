@@ -48,19 +48,21 @@ func NormalizeEnvID(id string) string {
 
 // Diagnostics (environments §7.7, §10.4, §11.1).
 const (
-	DiagUnknown              = "environment_unknown"
-	DiagFormUnsupported      = "environment_form_unsupported"
-	DiagIsolatedUnsupported  = "environment_isolated_unsupported"
-	DiagSharedUnsupported    = "environment_shared_unsupported"
-	DiagTargetUnknown        = "environment_target_unknown"
-	DiagTargetConsent        = "environment_target_consent_required"
-	DiagShadowingPresent     = "environment_shadowing_path_present"
-	DiagPassthroughDetached  = "environment_passthrough_detached"
-	DiagSeedUnreadable       = "environment_seed_unreadable"
-	DiagSeedShadowed         = "environment_seed_shadowed"
-	DiagToolVersionUnverifed = "environment_tool_version_unverified"
-	DiagSizeExceeded         = "environment_context_size_exceeded"
-	DiagReservedCommand      = "environment_reserved_command_name"
+	DiagUnknown               = "environment_unknown"
+	DiagFormUnsupported       = "environment_form_unsupported"
+	DiagIsolatedUnsupported   = "environment_isolated_unsupported"
+	DiagSharedUnsupported     = "environment_shared_unsupported"
+	DiagTargetUnknown         = "environment_target_unknown"
+	DiagTargetConsent         = "environment_target_consent_required"
+	DiagShadowingPresent      = "environment_shadowing_path_present"
+	DiagPassthroughDetached   = "environment_passthrough_detached"
+	DiagCredentialConflict    = "environment_credential_conflict"
+	DiagCredentialUnsupported = "environment_credential_unsupported"
+	DiagSeedUnreadable        = "environment_seed_unreadable"
+	DiagSeedShadowed          = "environment_seed_shadowed"
+	DiagToolVersionUnverifed  = "environment_tool_version_unverified"
+	DiagSizeExceeded          = "environment_context_size_exceeded"
+	DiagReservedCommand       = "environment_reserved_command_name"
 )
 
 // Forms (environments §7.2).
@@ -282,7 +284,13 @@ var Registry = []Adapter{
 		},
 		MCP: nil,
 		Passthrough: map[string][]Passthrough{
-			"default": {{Path: "auth.json", Strategy: StrategyFileLink, FileLinkTarget: "auth.json"}},
+			// Decision 0017 choice 3: the native credential root is
+			// ~/.pi/agent, not ~/.pi — the managed auth.json links to
+			// the agent-root auth.json. Existing homes linked at the
+			// old target are reported detached, never silently
+			// re-pointed by repair; the move itself runs as the
+			// explicit `env migrate` step (environments §7.4).
+			"default": {{Path: "auth.json", Strategy: StrategyFileLink, FileLinkTarget: "agent/auth.json"}},
 		},
 		Seeds:             []string{"settings.json", "models.json"},
 		SeedWritten:       map[string]bool{},

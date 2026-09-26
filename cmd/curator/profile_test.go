@@ -51,6 +51,39 @@ func runProfile(t *testing.T, source stubConfigSource, args ...string) (int, str
 	return code, stdout.String(), stderr.String()
 }
 
+// writeNativeCredentials seeds live native credential targets for the
+// homes profileHome redirects: codex auth.json, the pi agent-root
+// auth.json, and the Linux claude_code credentials file. The seeds keep
+// the detached-pending finding out of tests about other behaviors, and
+// the writes are harmless where an adapter links nothing.
+func writeNativeCredentials(t *testing.T) {
+	t.Helper()
+	if dir := os.Getenv("CODEX_HOME"); dir != "" {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "auth.json"), []byte("{\"t\":\"operator\"}\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if dir := os.Getenv("PI_CODING_AGENT_DIR"); dir != "" {
+		if err := os.MkdirAll(filepath.Join(dir, "agent"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "agent", "auth.json"), []byte("{\"t\":\"operator-pi\"}\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if dir := os.Getenv("CLAUDE_CONFIG_DIR"); dir != "" {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, ".credentials.json"), []byte("{\"t\":\"operator-claude\"}\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 // gitFileURL renders a local fixture repository path as the file:// remote
 // a git [url ...] section matches. The value is written into git
 // configuration, where a backslash is an escape: a raw Windows temporary

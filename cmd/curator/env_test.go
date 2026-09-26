@@ -41,6 +41,7 @@ func TestEnvResolveBareStaleIsAFailure(t *testing.T) {
 // current with identical bytes.
 func TestEnvResolveRepairEmitsFragment(t *testing.T) {
 	source, _ := profileHome(t)
+	writeNativeCredentials(t)
 	pkg := t.TempDir()
 	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
 	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
@@ -97,6 +98,7 @@ func TestEnvResolveUnknowns(t *testing.T) {
 // --check and --json.
 func TestEnvStatusMatrix(t *testing.T) {
 	source, _ := profileHome(t)
+	writeNativeCredentials(t)
 	// The §12 provider rows join the matrix: run and session are always
 	// reported, and a missing row is non-current — so the post-repair
 	// --check plants stub providers, which warn outside the trust

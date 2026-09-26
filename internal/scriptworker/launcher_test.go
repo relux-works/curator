@@ -3,11 +3,14 @@ package scriptworker
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // TestLoadShimSidecarRejectsMalformed proves the launcher contract gate:
@@ -75,6 +78,27 @@ func TestLoadShimSidecarRejectsMalformed(t *testing.T) {
 				t.Fatalf("LoadShimSidecar error = %v, want %s", err, CodePackageInfluenceForbidden)
 			}
 		})
+	}
+}
+
+func TestLoadShimSidecarRefusesUnreadablePath(t *testing.T) {
+	blocker := filepath.Join(t.TempDir(), "not-a-directory")
+	writeTestFile(t, blocker, []byte("blocker"), 0o600)
+	path := filepath.Join(blocker, "sidecar"+ShimSidecarSuffix)
+	_, err := LoadShimSidecar(path)
+	var stateErr *stateread.Error
+	if DiagnosticCode(err) != CodeWorkerProtocolInvalid || !errors.As(err, &stateErr) ||
+		stateErr.Kind != stateread.KindUnreadable || stateErr.Path != path {
+		t.Fatalf("LoadShimSidecar error = %v, want worker-protocol refusal with typed unreadable path", err)
+	}
+
+	executable := filepath.Join(blocker, "curator")
+	var stderr bytes.Buffer
+	if code := RunShim(ShimRequest{ExePath: executable, Stderr: &stderr}); code != 1 {
+		t.Fatalf("RunShim exit = %d, want refusal for unreadable sidecar (stderr=%q)", code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "cannot inspect the enforced launcher sidecar") {
+		t.Fatalf("RunShim stderr = %q, want the unreadable-sidecar diagnostic", stderr.String())
 	}
 }
 

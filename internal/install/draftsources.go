@@ -20,6 +20,7 @@ import (
 	"github.com/relux-works/curator/internal/skillspec"
 	"github.com/relux-works/curator/internal/snapshot"
 	"github.com/relux-works/curator/internal/sourcelock"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // readManifestDocument reads one Skillfile. Schema 2 source declarations
@@ -222,14 +223,20 @@ func draftFrozenInput(home, projectRoot, skillsRoot string, payload []byte, lock
 					continue
 				}
 				location := filepath.Join(skillsRoot, filepath.FromSlash(member.Name))
-				if _, err := os.Lstat(location); err != nil {
-					if os.IsNotExist(err) {
-						continue
-					}
+				metadata, err := stateread.Lstat(location)
+				if err != nil {
 					return opts, sources, nil, fmt.Errorf("source_snapshot_unavailable: cannot inspect repository checkout for %s: %w", member.Name, err)
 				}
+				if metadata.Kind == stateread.KindAbsent {
+					continue
+				}
+				if metadata.Kind != stateread.KindPresent {
+					return opts, sources, nil, fmt.Errorf("source_snapshot_unavailable: cannot inspect repository checkout for %s: %w",
+						member.Name, stateread.UnusableError(location, fmt.Errorf("unknown metadata state %q", metadata.Kind)))
+				}
 				if err := gitops.EnsureRepo(location); err != nil {
-					return opts, sources, nil, fmt.Errorf("source_snapshot_unavailable: repository checkout for %s is unusable: %w", member.Name, err)
+					return opts, sources, nil, fmt.Errorf("source_snapshot_unavailable: repository checkout for %s is unusable: %w",
+						member.Name, stateread.UnusableError(location, err))
 				}
 				opts.GitRepos[member.Name] = location
 				continue
@@ -249,14 +256,20 @@ func lockedNetworkRepository(skillsRoot string, lock *sourcelock.Lock, repositor
 			continue
 		}
 		location := filepath.Join(skillsRoot, filepath.FromSlash(candidate.Name))
-		if _, err := os.Lstat(location); err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
+		metadata, err := stateread.Lstat(location)
+		if err != nil {
 			return "", fmt.Errorf("source_snapshot_unavailable: cannot inspect repository checkout for %s: %w", candidate.Name, err)
 		}
+		if metadata.Kind == stateread.KindAbsent {
+			continue
+		}
+		if metadata.Kind != stateread.KindPresent {
+			return "", fmt.Errorf("source_snapshot_unavailable: cannot inspect repository checkout for %s: %w",
+				candidate.Name, stateread.UnusableError(location, fmt.Errorf("unknown metadata state %q", metadata.Kind)))
+		}
 		if err := gitops.EnsureRepo(location); err != nil {
-			return "", fmt.Errorf("source_snapshot_unavailable: repository checkout for %s is unusable: %w", candidate.Name, err)
+			return "", fmt.Errorf("source_snapshot_unavailable: repository checkout for %s is unusable: %w",
+				candidate.Name, stateread.UnusableError(location, err))
 		}
 		return location, nil
 	}

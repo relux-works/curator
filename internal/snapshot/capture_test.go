@@ -7,13 +7,48 @@ package snapshot
 // from conformance/draft-sources-v1/snapshot-cases.json.
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/stateread"
 )
+
+func TestFrozenSnapshotReadersRefuseBlockedParents(t *testing.T) {
+	t.Run("local_snapshot", func(t *testing.T) {
+		home := t.TempDir()
+		store := LocalStoreDir(home)
+		if err := os.WriteFile(store, []byte("blocker"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		digest := "sha256:" + strings.Repeat("a", 64)
+		_, err := OpenLocal(home, digest)
+		assertUnreadableSnapshotState(t, err, localSnapshotDir(home, digest))
+	})
+
+	t.Run("git_snapshot", func(t *testing.T) {
+		home := t.TempDir()
+		cacheRoot := filepath.Join(home, "cache")
+		if err := os.WriteFile(cacheRoot, []byte("blocker"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		commit := strings.Repeat("a", 40)
+		_, err := AuthenticateGit(home, "example.org/kit", "", commit)
+		assertUnreadableSnapshotState(t, err, Dir(home, "example.org/kit", commit))
+	})
+}
+
+func assertUnreadableSnapshotState(t *testing.T, err error, path string) {
+	t.Helper()
+	var stateErr *stateread.Error
+	if !errors.As(err, &stateErr) || stateErr.Kind != stateread.KindUnreadable || stateErr.Path != path {
+		t.Fatalf("snapshot state error = %v, want typed unreadable for %s", err, path)
+	}
+}
 
 // normativeVector is one hand-pinned row of the accepted snapshot
 // byte vectors: exact file bytes, per-file hashes with executable

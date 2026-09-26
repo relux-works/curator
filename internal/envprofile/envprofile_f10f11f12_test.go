@@ -6,6 +6,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // Production entry points under test: Install, List, EnsureDefault,
@@ -179,11 +181,11 @@ func TestMachinePolicyLoadFailureFailsMigration(t *testing.T) {
 // documented permissive default, while an unreadable existing file refuses
 // instead of taking that fallback.
 func TestLoadMachinePolicyTreatsOnlyAbsentConfigAsDefault(t *testing.T) {
-	configPath := filepath.Join(t.TempDir(), "config.json")
-	t.Setenv("CURATOR_CONFIG", configPath)
 	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
 
 	t.Run("absent_config", func(t *testing.T) {
+		configPath := filepath.Join(t.TempDir(), "config.json")
+		t.Setenv("CURATOR_CONFIG", configPath)
 		policy, err := loadMachinePolicy()
 		if err != nil {
 			t.Fatalf("absent configuration: %v", err)
@@ -200,6 +202,8 @@ func TestLoadMachinePolicyTreatsOnlyAbsentConfigAsDefault(t *testing.T) {
 		if runtime.GOOS == "windows" {
 			t.Skip("the unreadable case uses POSIX mode bits; Windows ACL unreadability is not reproducible for the runner account")
 		}
+		configPath := filepath.Join(t.TempDir(), "config.json")
+		t.Setenv("CURATOR_CONFIG", configPath)
 		writeTestConfig(t, configPath, permissiveUserConfig)
 		cleanup := makeEnvprofileTestPathUnreadable(t, configPath)
 		defer cleanup()
@@ -207,6 +211,22 @@ func TestLoadMachinePolicyTreatsOnlyAbsentConfigAsDefault(t *testing.T) {
 		policy, err := loadMachinePolicy()
 		if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) || !strings.Contains(err.Error(), "machine configuration") {
 			t.Fatalf("unreadable configuration policy=%+v err=%v, want refusal with machine-configuration diagnostic", policy, err)
+		}
+	})
+
+	t.Run("blocked_parent", func(t *testing.T) {
+		root := t.TempDir()
+		blocker := filepath.Join(root, "regular-file-parent")
+		if err := os.WriteFile(blocker, []byte("parent is not a directory"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("CURATOR_CONFIG", filepath.Join(blocker, "config.json"))
+
+		policy, err := loadMachinePolicy()
+		if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) ||
+			!strings.Contains(err.Error(), stateread.DiagUnreadable) ||
+			strings.Contains(err.Error(), "source_snapshot_unavailable") {
+			t.Fatalf("blocked-parent policy=%+v err=%v, want typed unreadable refusal", policy, err)
 		}
 	})
 }

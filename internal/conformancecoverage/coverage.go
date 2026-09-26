@@ -4,12 +4,15 @@ package conformancecoverage
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // Gap is an owed implementation recorded in .github/ci/conformance-gaps.tsv.
@@ -268,9 +271,25 @@ func repositoryRoot() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return repositoryRootFrom(current)
+}
+
+func repositoryRootFrom(current string) (string, error) {
 	for dir := current; ; dir = filepath.Dir(dir) {
-		if _, err := os.Stat(filepath.Join(dir, ".github", "ci", "conformance-case-counts.tsv")); err == nil {
+		marker := filepath.Join(dir, ".github", "ci", "conformance-case-counts.tsv")
+		metadata, err := stateread.Stat(marker)
+		if err != nil {
+			return "", fmt.Errorf("inspect repository root marker %s: %w", marker, err)
+		}
+		switch metadata.Kind {
+		case stateread.KindPresent:
 			return dir, nil
+		case stateread.KindAbsent:
+			// Keep searching only after the seam proves this marker absent.
+		case stateread.KindUnreadable:
+			return "", stateread.UnusableError(marker, fmt.Errorf("stat returned unreadable state without an error"))
+		default:
+			return "", stateread.UnusableError(marker, fmt.Errorf("unknown metadata state %q", metadata.Kind))
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
@@ -280,12 +299,11 @@ func repositoryRoot() (string, error) {
 }
 
 func readCounts(path string) (map[string]int, error) {
-	file, err := os.Open(path) // #nosec G304 -- path is fixed beneath the discovered repository root
+	data, err := readStateBytes(path)
 	if err != nil {
 		return nil, fmt.Errorf("read count pins %s: %w", path, err)
 	}
-	defer func() { _ = file.Close() }()
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(bytes.NewReader(data))
 	counts := map[string]int{}
 	header := false
 	lineNo := 0
@@ -328,12 +346,11 @@ func readCounts(path string) (map[string]int, error) {
 }
 
 func readGaps(path string) ([]Gap, error) {
-	file, err := os.Open(path) // #nosec G304 -- path is fixed beneath the discovered repository root
+	data, err := readStateBytes(path)
 	if err != nil {
 		return nil, fmt.Errorf("read gap ledger %s: %w", path, err)
 	}
-	defer func() { _ = file.Close() }()
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(bytes.NewReader(data))
 	var gaps []Gap
 	seen := map[string]struct{}{}
 	header := false
@@ -381,4 +398,21 @@ func readGaps(path string) ([]Gap, error) {
 		return nil, fmt.Errorf("%s: missing header", path)
 	}
 	return gaps, nil
+}
+
+func readStateBytes(path string) ([]byte, error) {
+	file, err := stateread.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	switch file.Kind {
+	case stateread.KindPresent:
+		return file.Bytes, nil
+	case stateread.KindAbsent:
+		return nil, stateread.AbsentError(path)
+	case stateread.KindUnreadable:
+		return nil, stateread.UnusableError(path, fmt.Errorf("read returned unreadable state without an error"))
+	default:
+		return nil, stateread.UnusableError(path, fmt.Errorf("unknown file state %q", file.Kind))
+	}
 }

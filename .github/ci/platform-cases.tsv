@@ -79,6 +79,10 @@ cmd/curator	TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable/unr
 cmd/curator	TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable/regular_file	linux,darwin,windows	-	-	a regular file source operand reports profile_source_invalid, never a path-read diagnostic
 internal/envprofile	TestLoadMachinePolicyTreatsOnlyAbsentConfigAsDefault/absent_config	linux,darwin,windows	-	-	an absent user configuration alone selects the default machine policy
 internal/envprofile	TestLoadMachinePolicyTreatsOnlyAbsentConfigAsDefault/unreadable_config	linux,darwin	windows	platform-control	the unreadable case uses POSIX mode bits; Windows ACL unreadability is not reproducible for the runner account
+internal/envprofile	TestLoadMachinePolicyTreatsOnlyAbsentConfigAsDefault/blocked_parent	linux,darwin,windows	-	-	a config path below a regular-file parent is typed unreadable and cannot take the absent-policy fallback
+internal/snapshot	TestFrozenSnapshotReadersRefuseBlockedParents	linux,darwin,windows	-	-	local and Git snapshot readers classify blocked store parents as unreadable state
+internal/install	TestDraftReplayRefusesUnreadableGitSnapshotCache	linux,darwin,windows	-	-	production install refuses an unreadable Git snapshot cache parent before declared-source replay
+internal/install	TestDraftInstallRefusesUnreadableLocalSnapshotCache	linux,darwin,windows	-	-	production install refuses an unreadable local snapshot store parent before path replay
 
 # ===========================================================================
 # No-follow: link traversal is refused, never followed
@@ -637,3 +641,81 @@ cmd/curator	TestCLIAuditEmitsScriptLabels	linux,darwin,windows	-	-	curator audit
 cmd/curator	TestCLIAuditMixedSkillRecordsBothPolicies	linux,darwin,windows	-	-	curator audit records enforced identity and explicit absence for a mixed skill
 cmd/curator	TestCLIAuditJSONCarriesScriptLabels	linux,darwin,windows	-	-	curator audit JSON carries warning labels and per-command policy identities
 cmd/curator	TestCLIAuditJSONRecordsExplicitAbsence	linux,darwin,windows	-	-	curator audit JSON records declared-only policy absence explicitly
+
+# ===========================================================================
+# Decision 0017 credential-link repairs and explicit migration (F-C1/F-C2/F-C3).
+#
+# Production-entry rows on temporary stores: the two 0017 hazards, the
+# mis-targeted vs dangling-to-declared split, the inspect -> plan ->
+# apply migration with journal/recovery and no-copy, every repair
+# refusal class with the codex admission table, and no silent repair.
+# Rows whose fixture or production repair needs symlinks probe the host
+# first (requireLinkCapability) and skip with the existing
+# host-capability "this host cannot create symlinks" reason where the
+# Windows host forbids unprivileged creation; the three hosted lanes
+# are the arbiter and every row is required on all of them. The four
+# ENOTDIR inspection rows are unix-only: Windows maps a stat through a
+# file to path-not-found, so the artefact is unproducible there.
+# ===========================================================================
+internal/envprofile	TestSharedToIsolatedRemovesStaleLink	linux,darwin,windows	windows	host-capability	repair refuses the stale shared link pointing at migration, which unlinks it with native bytes intact
+internal/envprofile	TestCredentialLinkRegularFileRefuses	linux,darwin,windows	windows	host-capability	a regular file at a link path refuses with environment_credential_conflict naming the path, bytes intact
+internal/envprofile	TestStaleCredentialLinkRefusals	linux,darwin,windows	windows	host-capability	a file, foreign link, or directory at a stale link path refuses with environment_credential_conflict, removing nothing
+internal/envprofile	TestDanglingPiLinkReportedDetached	linux,darwin,windows	windows	host-capability	a mis-targeted Pi link is detached with conflict-class wording and repair refuses pointing at migration
+internal/envprofile	TestCodexIsolatedAdmission	linux,darwin,windows	-	-	codex_cli isolated admits file storage only; keyring/auto refuse isolated-unsupported, unknown fails closed
+internal/envprofile	TestCodexUnknownStoreSharedRefuses	linux,darwin,windows	windows	host-capability	an unknown codex selector fails closed before the first write; fixing it provisions
+internal/envprofile	TestPiProvisionTargetsAgentRoot	linux,darwin,windows	windows	host-capability	new Pi homes link the agent root with a path+strategy-only record and a pending warning while dangling
+internal/envprofile	TestCredentialLinkDirectory	linux,darwin,windows	windows	host-capability	an empty directory at a link path is re-linked; a non-empty one refuses with environment_credential_conflict
+internal/envprofile	TestCredentialLinkUnrecordedSymlinkRefuses	linux,darwin,windows	windows	host-capability	an unrecorded symlink at a wanted link path refuses with environment_credential_conflict, link untouched
+internal/envprofile	TestReviewerDanglingExpectedTarget	linux,darwin,windows	windows	host-capability	a dangling-to-declared link is reported pending in status and resolve warnings, never silently current
+internal/envprofile	TestReviewerLiteralCodexSelector	linux,darwin,windows	-	-	single-quoted codex selectors refuse exactly like the double-quoted spelling, never as absent
+internal/envprofile	TestDanglingExpectedTargetRepairSucceeds	linux,darwin,windows	windows	host-capability	repair of a dangling-to-declared link succeeds carrying the pending finding; restoring the target clears it
+internal/envprofile	TestCredentialLinkTargetInspectionFailure	linux,darwin	windows	host-capability	an uninspectable link target is stale with the conflict inspection diagnostic, never absence wording
+internal/envprofile	TestCodexCredentialStoreTOMLSpellings	linux,darwin,windows	-	-	every valid TOML spelling of the codex selector resolves identically; nested keys stay absent, malformed fails closed
+internal/envprofile	TestCodexMalformedStoreSharedRefuses	linux,darwin,windows	windows	host-capability	malformed native codex config fails closed naming the file before the first write; fixing it provisions
+internal/envprofile	TestCredentialLinkInspectionRepairFails	linux,darwin	windows	host-capability	repair of an uninspectable target fails with environment_repair_failed carrying the inspection reason
+internal/envprofile	TestMigratePiWrongTargetToAgentRoot	linux,darwin,windows	windows	host-capability	inspect, plan, and apply migrate the mis-targeted Pi link to the agent root with byte-identical natives
+internal/envprofile	TestMigrateNoSecretCopies	linux,darwin,windows	windows	host-capability	a relink plus an unlink copies no credential bytes anywhere in scope
+internal/envprofile	TestMigrateConflictsRefuse	linux,darwin,windows	windows	host-capability	every migration conflict plans blocked with its choice and apply refuses with environment_credential_conflict
+internal/envprofile	TestMigratePiRootInspectionFailure	linux,darwin	windows	host-capability	uninspectable Pi roots are a migration conflict with the inspection diagnostic, never absence
+internal/envprofile	TestMigratePlanDriftRefuses	linux,darwin,windows	windows	host-capability	a stale or truncated --expect hash refuses with plan drift and zero writes; a fresh hash converges
+internal/envprofile	TestMigrateRollbackRestoresPriorState	linux,darwin,windows	windows	host-capability	link-phase and post-publish faults restore the exact prior links, markers, and natives
+internal/envprofile	TestMigrateOldRootBytesWarnAndProceed	linux,darwin,windows	windows	host-capability	old-root bytes alone warn loudly without blocking; the relink leaves them untouched
+internal/envprofile	TestMigratePendingNeedsNothing	linux,darwin,windows	windows	host-capability	dangling-to-declared entries plan nothing and apply untouched
+internal/envprofile	TestMigrateUnknownOperands	linux,darwin,windows	-	-	unknown profile and environment operands fail at the scope gates
+internal/envprofile	TestMigrateInspectIsReadOnly	linux,darwin,windows	windows	host-capability	inspect and plan write nothing and create no profile
+internal/envprofile	TestMigrateApplyRequiresPlan	linux,darwin,windows	windows	host-capability	apply without a prior plan hash refuses with zero writes and names --plan/--expect
+internal/envprofile	TestMigratePrintFailureRefusesBeforeMutation	linux,darwin,windows	windows	host-capability	an undeliverable locked plan fails the apply before anything changes
+internal/envprofile	TestMigrateMarkerDriftRefuses	linux,darwin,windows	windows	host-capability	a marker edit after the plan refuses with plan drift and zero writes
+internal/envprofile	TestMigrateSyscallFailureRollsBack	linux,darwin,windows	windows	host-capability	injected symlink and rename failures leave the old link standing with the journal deleted
+internal/envprofile	TestMigrateInterruptedApplyRecovers	linux,darwin,windows	windows	host-capability	a crash after the first operation recovers to prior state then executes the whole plan
+internal/envprofile	TestMigratePublishFailureRevertsLinks	linux,darwin,windows	windows	host-capability	a failed marker publication reverts every link with prior markers byte-identical
+internal/envprofile	TestMigrateSealedJournalDeletesWithoutTouching	linux,darwin,windows	windows	host-capability	a sealed journal deletes without touching completed work; the retry honestly drift-refuses
+internal/envprofile	TestMigrateBrokenJournalRefuses	linux,darwin,windows	windows	host-capability	an unusable journal banners blocked and apply refuses naming backup-first with the journal kept
+internal/envprofile	TestMigrateRecoveryRefusesUnexpectedTarget	linux,darwin,windows	windows	host-capability	recovery validates the whole inventory before any write and refuses out-of-band link moves
+internal/envprofile	TestMigrateRecoveryCleansOwnedTemp	linux,darwin,windows	windows	host-capability	recovery cleans exactly the journaled owned temp, then executes the plan
+internal/envprofile	TestReviewerRecoveryMarkerDrift	linux,darwin,windows	windows	host-capability	recovery refuses a marker edited out of band without overwriting it
+internal/envprofile	TestReviewerRecoveryPreservesRegularTemp	linux,darwin,windows	windows	host-capability	recovery preserves a foreign regular file at a temp-shaped path and still converges
+internal/envprofile	TestMigrateApplyLockContention	linux,darwin,windows	windows	host-capability	a contended apply refuses with the lock-acquisition diagnostic, never repair_failed, with zero writes
+cmd/curator	TestEnvMigratePlanApplyPi	linux,darwin,windows	windows	host-capability	the CLI migrates the mis-targeted Pi home inspect to plan to apply with bytes preserved
+cmd/curator	TestEnvMigrateConflictRefuses	linux,darwin,windows	windows	host-capability	a regular file at a link path refuses through the CLI naming the operator choice, bytes intact
+cmd/curator	TestEnvResolveRepairNeedsMigration	linux,darwin,windows	windows	host-capability	repair never migrates through the CLI: the mis-targeted home refuses pointing at env migrate
+cmd/curator	TestEnvMigrateUsage	linux,darwin,windows	-	-	env migrate operand and phase gates refuse as usage through the CLI
+cmd/curator	TestEnvMigrateApplyRequiresPlan	linux,darwin,windows	windows	host-capability	--apply without a prior --plan hash is a usage refusal through the CLI with the link untouched
+cmd/curator	TestEnvMigratePrintBeforeWrite	linux,darwin,windows	windows	host-capability	the locked plan reaches CLI stdout before the first link mutation
+cmd/curator	TestEnvResolveRepairFailedOnUninspectable	linux,darwin	windows	host-capability	env resolve --repair surfaces environment_repair_failed for an uninspectable target through the CLI
+
+# ===========================================================================
+
+
+# ===========================================================================
+# State-reader seam on trunk refresh readers (TASK-260922-cww1ov)
+#
+# These rows drive the R5 sidecar and shim inventory readers plus schema-9
+# locked checkout replay. The blocked-parent shape is portable across all
+# hosted lanes; missing leaves still take only their documented absence path.
+# ===========================================================================
+internal/stateread	TestReadsDistinguishAbsentFromBlockedParent	linux,darwin,windows	-	-	a missing leaf is absent, while file/directory/metadata reads below a regular-file ancestor are typed unreadable
+internal/scriptworker	TestLoadShimSidecarRefusesUnreadablePath	linux,darwin,windows	-	-	loading an enforced sidecar below a regular-file ancestor refuses with manager_state_unreadable
+cmd/curator	TestEnforcedShimDispatchRefusesUnreadableSidecar	linux,darwin,windows	-	-	main executable dispatch refuses unreadable sidecar state instead of falling through to ordinary CLI dispatch
+internal/runtimestore	TestManagedEnforcedShimsInRefusesUnreadableInventory	linux,darwin,windows	-	-	shim inventory listing below a regular-file ancestor is a typed read failure rather than an absent bin
+internal/install	TestLockedNetworkRepositoryDistinguishesAbsentAndUnreadableCheckouts	linux,darwin,windows	-	-	proven checkout absence falls back while blocked or present-unusable locked repositories fail closed

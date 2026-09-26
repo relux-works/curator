@@ -104,6 +104,16 @@ func TestStatusOrphanRetention(t *testing.T) {
 // shadow_acknowledged.
 func TestStatusShadowAcknowledgment(t *testing.T) {
 	fx := writeManagedFixture(t, "acme")
+	// The shadow row needs an otherwise-quiet home: the linked
+	// credential gets a live native target so the detached-pending
+	// finding stays out of this test.
+	agentAuth := filepath.Join(fx.native["pi"], "agent", "auth.json")
+	if err := os.MkdirAll(filepath.Dir(agentAuth), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(agentAuth, []byte("{\"t\":\"operator-pi\"}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	provision(t, fx, "pi", envregistry.DefaultMachineConfig())
 	homeDir := ManagedHomeDir(fx.home, "acme", "pi")
 	if err := os.WriteFile(filepath.Join(homeDir, "AGENTS.override.md"), []byte("override\n"), 0o644); err != nil {

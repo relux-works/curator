@@ -451,6 +451,19 @@ expected on a fresh machine when the source is available.
 Remedy: restore access to the declared path or Git source, then retry
 install.
 
+### manager_state_unreadable
+
+Symptom: `manager_state_unreadable`, sometimes nested under a higher-level
+diagnostic such as `environment_source_invalid` or `source_snapshot_unavailable`.
+
+Cause: a manager-owned state path or one of its parent directories cannot be
+inspected or read reliably. This is different from a missing state entry, so
+the fresh-machine default or snapshot replay fallback does not apply.
+
+Remedy: restore the expected file and directory structure and access to the
+state path, then retry the command. Do not remove or recreate the state until
+you have confirmed which manager record is unreadable.
+
 ### source_lock_stale
 
 Symptom: `source_lock_stale`.
@@ -556,6 +569,142 @@ Remedy: fix the endpoint entry in machine source-policy.json: the
 strict external-build lane admits no explicit port and no host alias,
 then retry the explicit attempt.
 
+## Environment credential links
+
+### environment_credential_conflict
+
+Symptom: `env resolve --repair` stops with
+`environment_credential_conflict` naming a managed link path such as
+`.../environments/<profile>/<env>/auth.json`, and emits no fragment.
+`env status` (and a bare `env resolve`) report the same state as a
+detached passthrough entry with conflict-class wording.
+
+Cause: the link path holds something repair must not displace — a
+regular file (the tool severed the link by writing over it, or the
+managed home holds its own credential bytes), an unrecorded symlink to
+an unexpected target, or a non-empty directory. A stale recorded link
+(`shared`→`isolated`, or a store gone ambient) and a mis-targeted
+*recorded* link — for example a `pi` home still aimed at the pre-0017
+native `~/.pi/auth.json` instead of `~/.pi/agent/auth.json` — are
+reported detached with conflict-class wording, but repair never moves
+them: the refusal says `migration needed` and names the `curator env
+migrate --plan` / `--apply --expect <plan-hash>` invocations that print
+and perform the move.
+
+Not this error: a correctly targeted link whose native target does not
+exist yet is the detached-pending warning (`link target ... does not
+exist yet — log in to <tool> to populate it`), not a conflict —
+provisioning, repair, and bare resolve all succeed loudly. Establish the
+native credential — log in natively, or log in inside the managed home —
+and the finding clears on the next run.
+
+Remedy: when the refusal says `migration needed`, run `curator env
+migrate --plan` to print the exact operations, then `curator env
+migrate --apply --expect <plan-hash>` to execute them; do not re-point
+the link by hand to silence the finding. Otherwise resolve the conflict
+out of band, then re-run: inspect both sides — the managed path the
+diagnostic names and the declared native target — decide which
+credential bytes win, move the loser aside yourself (the manager never
+moves credential bytes), and re-run with `--repair`.
+
+### Migration conflicts
+
+Symptom: `curator env migrate --apply --expect <hash>` refuses with
+`environment_credential_conflict`, and the printed plan ends with
+`blocked:`.
+
+Cause: a state the migration must not touch without an operator
+decision. The plan names the exact choice: an isolated→shared account
+choice (the managed home holds its own credential bytes at the link
+path — decide which bytes win and move the loser aside yourself); a
+regular file at a link path (same choice); two live Pi credentials
+(`~/.pi/auth.json` and `~/.pi/agent/auth.json` both hold bytes — decide
+which holds the live credential and reconcile them yourself); a foreign
+or uninspectable link (remove it or restore access yourself). The
+manager never copies, moves, or deletes credential bytes at any step.
+
+Remedy: carry out the named choice out of band, then re-run
+`--plan` and `--apply --expect <plan-hash>`. Bytes at the old Pi root
+alone (with the agent root empty) are not a conflict: the migration
+relinks and warns, leaving the old bytes untouched — move them yourself
+if they are live.
+
+### Migration plan drift
+
+Symptom: `curator env migrate --apply --expect <hash>` refuses with
+`environment_credential_conflict: migration plan drift`, or `--apply`
+without `--expect` is rejected outright.
+
+Cause: every apply requires the hash of a prior complete plan. A bare
+`--apply` is a usage error (the library refuses it the same way before
+any mutation). A drift refusal means the inventory changed after `--plan`
+printed — another operation moved a link, a marker was edited (the hash
+covers the marker identities), a native file appeared or vanished, or
+the hash was copied wrong. The refusal writes nothing.
+
+Remedy: re-run `curator env migrate --plan` (with the same scope flags)
+and apply with the new hash it prints.
+
+### Interrupted migration apply
+
+Symptom: `curator env migrate --inspect` or `--plan` banners an
+`interrupted migration apply` and the plan ends with `recover:` instead
+of `ready:`.
+
+Cause: a previous `--apply` was killed between mutations (or failed
+where the rollback could not complete). The durable journal below
+manager state records the intent and the rollback data; the
+read-only commands report it and recover nothing.
+
+Remedy: run `curator env migrate --apply --expect <plan-hash>` with the
+hash the banner names. The apply recovers to the prior state under the
+manager lock, announcing the recovery before mutating, then executes
+the plan. If the banner instead says the journal is unusable, back the
+journal file up out of band, verify every managed link by hand, and
+only then remove the journal and re-run `--plan`.
+
+### environment_credential_unsupported
+
+Symptom: provisioning or repairing a `codex_cli` home fails with
+`environment_credential_unsupported` naming the native
+`cli_auth_credentials_store` selector.
+
+Cause: the operator's native `config.toml` selects a credential store
+outside the verified `file`/`keyring`/`auto` set, so the manager cannot
+establish the credential strategy and fails closed. Only the top-level
+`cli_auth_credentials_store` key counts, in any valid TOML spelling; a
+same-named key nested inside a table is not the selector. An absent
+file or an absent key is not this error: both resolve to the platform
+default `file` store. A `config.toml` that does not parse, or a
+non-string value for the key, fails closed the same way instead of
+reading as absent.
+
+Remedy: set `cli_auth_credentials_store` in the **native**
+`config.toml` to one of `file`, `keyring`, or `auto` (or remove the key
+for the `file` default) and retry. Sharing is defined by the native
+effective storage only: editing the managed copy changes nothing. Note
+that `isolated` is admitted under `file` storage only; under `keyring`
+or `auto` it is refused with `environment_isolated_unsupported`.
+
+### environment_repair_failed on an uninspectable credential target
+
+Symptom: `env resolve --repair` stops with
+`environment_repair_failed` carrying `cannot be inspected` and
+`environment_credential_conflict` for a managed link path, and emits no
+fragment. A bare `env resolve` (and `env status`) report the same home
+stale with the inspection diagnostic.
+
+Cause: the managed link correctly targets the declared native store,
+but the native target itself cannot be statted — permissions, I/O, or
+a broken parent — so there is no re-link that heals it and repair
+fails instead of guessing. This is distinct from absence: a target
+that does not exist yet is the detached-pending warning, never this
+error. Nothing is moved, removed, or re-pointed.
+
+Remedy: restore access to the native target out of band — fix the
+permissions or parent, or restore the file — then re-run with
+`--repair`: repair converges and the link reads through once the
+target stats again.
 ## Enforced script execution diagnostics
 
 Enforced script commands (`execution_policy: "script-worker-v1"`) launch

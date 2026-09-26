@@ -940,6 +940,59 @@ Synopsis:
 curator hook revoke <path>
 ```
 
+### curator env migrate
+
+`curator env migrate` runs the explicit credential migration step (Spec
+environments §7.4/§10.1, manager §12.4): a mode change or a native-root
+correction that leaves a recorded credential link behind is never applied
+by `env resolve --repair` — repair re-links an absent path and refuses
+anything else, pointing here. Migration inventories the old marker, every
+recorded link target, and both Pi roots (`~/.pi/auth.json` and
+`~/.pi/agent/auth.json`); preserves the effective mode; relinks recorded
+symlinks at the declared native path and unlinks stale recorded links;
+and never copies, moves, or rewrites credential bytes.
+
+Synopsis:
+
+```bash
+curator env migrate --inspect|--plan|--apply [--profile <name>] [--env <env-id>] [--expect <plan-hash>]
+```
+
+- `--inspect` prints the read-only inventory per profile and environment:
+  the marker, the effective mode, every recorded link with its current
+  target and classification, and both Pi roots. It takes no lock and
+  changes nothing.
+- `--plan` prints the exact operations with the plan hash, plus every
+  conflict with the operator choice it needs. Conflicts block `--apply`,
+  not `--plan`.
+- `--apply` requires the `--expect` hash of a prior `--plan` (without it
+  the command is a usage error and the library refuses before any
+  mutation). Under the manager-home mutation lock it recovers any
+  leftover journal from an interrupted apply back to the prior state,
+  re-inventories, prints the locked, revalidated plan *before* the first
+  mutation (an undeliverable print fails before anything changes),
+  refuses when `--expect` no longer matches the inventory (plan drift —
+  the hash covers the marker identities too) or when conflicts remain,
+  then journals the intent and executes exactly the printed operations —
+  each relink as a temp-link + atomic rename — publishing changed
+  markers as one journaled transaction. A syscall failure mid-op or a
+  failed marker publication reverts the links; a kill between mutations
+  leaves the journal for the next `--apply --expect <plan-hash>` to
+  recover.
+
+Migrate one Pi home, printing the plan before applying it:
+
+```bash
+curator env migrate --plan --env pi
+curator env migrate --apply --expect <plan-hash> --env pi
+```
+
+Conflicts that need the operator — an isolated→shared account choice, a
+regular file at a link path, two live Pi credentials — refuse with
+`environment_credential_conflict` naming the exact out-of-band decision;
+resolve them and re-run. The v1 marker still records path and strategy
+only.
+
 ### curator ui
 
 `curator ui` opens an interactive terminal view over installed environment state.

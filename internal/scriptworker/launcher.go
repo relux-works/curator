@@ -13,6 +13,7 @@ import (
 
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/scriptpolicy"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // ShimSidecarSuffix is the filename suffix of the manager-published sidecar
@@ -77,11 +78,20 @@ func (sidecar ShimSidecar) Marshal() ([]byte, error) {
 // anything it carries that is not well-formed refuses rather than widening
 // the invocation.
 func LoadShimSidecar(path string) (ShimSidecar, error) {
-	payload, err := os.ReadFile(path) // #nosec G304 -- manager-published sidecar beside the launcher
+	state, err := stateread.ReadFile(path) // #nosec G304 -- manager-published sidecar beside the launcher
 	if err != nil {
 		return ShimSidecar{}, diagnosticErr(CodeWorkerProtocolInvalid, err,
 			"cannot read the enforced launcher sidecar")
 	}
+	if state.Kind == stateread.KindAbsent {
+		return ShimSidecar{}, diagnosticErr(CodeWorkerProtocolInvalid, stateread.AbsentError(path),
+			"cannot read the enforced launcher sidecar")
+	}
+	if state.Kind != stateread.KindPresent {
+		return ShimSidecar{}, diagnostic(CodeWorkerProtocolInvalid,
+			"the enforced launcher sidecar has an unknown read state")
+	}
+	payload := state.Bytes
 	var sidecar ShimSidecar
 	decoder := json.NewDecoder(strings.NewReader(string(payload)))
 	decoder.DisallowUnknownFields()
@@ -140,16 +150,28 @@ func SidecarPathForExecutable(executable string) string {
 // by the presence of its manager-published sidecar. The sidecar is the
 // whole signal: a launcher without one is an ordinary binary, and the
 // executable name alone never selects shim mode.
-func ShimSidecarFor(executable string) (string, bool) {
+func ShimSidecarFor(executable string) (string, bool, error) {
 	if executable == "" {
-		return "", false
+		return "", false, nil
 	}
 	sidecar := SidecarPathForExecutable(executable)
-	info, err := os.Stat(sidecar)
-	if err != nil || !info.Mode().IsRegular() {
-		return "", false
+	metadata, err := stateread.Lstat(sidecar)
+	if err != nil {
+		return "", false, diagnosticErr(CodeWorkerProtocolInvalid, err,
+			"cannot inspect the enforced launcher sidecar")
 	}
-	return sidecar, true
+	if metadata.Kind == stateread.KindAbsent {
+		return "", false, nil
+	}
+	if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
+		return "", false, diagnostic(CodeWorkerProtocolInvalid,
+			"the enforced launcher sidecar has an unknown metadata state")
+	}
+	if !metadata.Info.Mode().IsRegular() {
+		return "", false, diagnostic(CodePackageInfluenceForbidden,
+			"the enforced launcher sidecar is not a regular file")
+	}
+	return sidecar, true, nil
 }
 
 // ShimRequest is one enforced launcher invocation. The executable replays
@@ -187,7 +209,11 @@ type ShimRequest struct {
 // or 1 with a stable diagnostic on the launcher's standard error when the
 // session itself refuses. Captured child output is written verbatim.
 func RunShim(request ShimRequest) int {
-	sidecarPath, ok := ShimSidecarFor(request.ExePath)
+	sidecarPath, ok, err := ShimSidecarFor(request.ExePath)
+	if err != nil {
+		writeShimDiagnostic(request.Stderr, err)
+		return 1
+	}
 	if !ok {
 		_, _ = fmt.Fprintf(request.Stderr, "script-worker-v1 %s: no enforced launcher sidecar beside this executable\n", CodeWorkerProtocolInvalid)
 		return 1

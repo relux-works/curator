@@ -36,6 +36,7 @@ import (
 	"strings"
 
 	"github.com/relux-works/curator/internal/protocoljson"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // InventoryAlgorithm is the local-snapshot-v1 algorithm identifier
@@ -388,10 +389,7 @@ func OpenLocal(home, digest string) (string, error) {
 		return "", err
 	}
 	target := localSnapshotDir(home, normalized)
-	if _, err := os.Lstat(target); err != nil {
-		if os.IsNotExist(err) {
-			return "", fmt.Errorf("source_snapshot_unavailable: snapshot %s is not in the store; capture it with an explicit attempt", normalized)
-		}
+	if _, err := localSnapshotMetadata(target, normalized); err != nil {
 		return "", err
 	}
 	if err := authenticateLocalSnapshot(target, normalized); err != nil {
@@ -400,16 +398,31 @@ func OpenLocal(home, digest string) (string, error) {
 	return target, nil
 }
 
+func localSnapshotMetadata(target, normalized string) (os.FileInfo, error) {
+	metadata, err := stateread.Lstat(target)
+	if err != nil {
+		return nil, err
+	}
+	switch metadata.Kind {
+	case stateread.KindAbsent:
+		return nil, fmt.Errorf("source_snapshot_unavailable: snapshot %s is not in the store; capture it with an explicit attempt", normalized)
+	case stateread.KindPresent:
+		if metadata.Info == nil {
+			return nil, stateread.UnusableError(target, fmt.Errorf("present snapshot has no metadata"))
+		}
+		return metadata.Info, nil
+	default:
+		return nil, stateread.UnusableError(target, fmt.Errorf("unknown metadata state %q", metadata.Kind))
+	}
+}
+
 // authenticateLocalSnapshot proves a store tree is exactly the snapshot
 // digest: a real link-free directory whose complete byte inventory
 // digests to normalized. Anything else fails with
 // source_snapshot_changed and is never passed to installers.
 func authenticateLocalSnapshot(target, normalized string) error {
-	info, err := os.Lstat(target)
+	info, err := localSnapshotMetadata(target, normalized)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("source_snapshot_unavailable: snapshot %s is not in the store; capture it with an explicit attempt", normalized)
-		}
 		return err
 	}
 	if !info.IsDir() || info.Mode()&fs.ModeSymlink != 0 {

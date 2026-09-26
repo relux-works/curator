@@ -344,6 +344,7 @@ func provisionedEnvMatrix(t *testing.T) (stubConfigSource, string) {
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	source, home := profileHome(t)
+	writeNativeCredentials(t)
 	pkg := t.TempDir()
 	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
 	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {

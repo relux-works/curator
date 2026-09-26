@@ -422,7 +422,7 @@ func homeState(req StatusRequest, profile string, adapter envregistry.Adapter) H
 	state.Backups, state.BackupsOldest, state.BackupsNewest = backupAges(state.Home)
 	for _, reason := range verdict.reasons {
 		diagnostic := reason
-		if strings.HasPrefix(reason, "passthrough entry") && strings.HasSuffix(reason, "is detached") {
+		if strings.HasPrefix(reason, "passthrough entry") && strings.Contains(reason, "is detached") {
 			diagnostic = envregistry.DiagPassthroughDetached + ": " + reason
 		}
 		state.Findings = append(state.Findings, diagnostic)

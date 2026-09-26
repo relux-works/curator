@@ -118,8 +118,13 @@ func main() {
 	// script-worker-v1 invocation instead of running the CLI. The sidecar
 	// beside the executable is the whole signal.
 	if executable, err := os.Executable(); err == nil {
-		if _, ok := scriptworker.ShimSidecarFor(executable); ok {
-			os.Exit(runEnforcedShim(executable, os.Args[1:]))
+		handled, code, dispatchErr := dispatchEnforcedShim(executable, os.Args[1:])
+		if dispatchErr != nil {
+			fmt.Fprintln(os.Stderr, dispatchErr)
+			os.Exit(code)
+		}
+		if handled {
+			os.Exit(code)
 		}
 	}
 	if handled, code := rustsource.DispatchInternalWorker(os.Args[1:], os.Stdin, os.Stdout); handled {
@@ -146,6 +151,18 @@ func main() {
 	// The command core receives an explicit source so independent invocations
 	// never consult CURATOR_CONFIG themselves.
 	os.Exit(run(os.Args[1:], fileConfigSource(config.UserPath()), os.Stdout, os.Stderr))
+}
+
+// dispatchEnforcedShim preserves sidecar read failures at the production
+// executable boundary. An unreadable manager-published sidecar must not be
+// treated as the absence that selects ordinary CLI dispatch.
+func dispatchEnforcedShim(executable string, args []string) (bool, int, error) {
+	if _, ok, err := scriptworker.ShimSidecarFor(executable); err != nil {
+		return true, exitFail, err
+	} else if !ok {
+		return false, 0, nil
+	}
+	return true, runEnforcedShim(executable, args), nil
 }
 
 // configSource is the injectable configuration seam used by one CLI invocation.

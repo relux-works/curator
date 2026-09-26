@@ -22,6 +22,7 @@ import (
 // name the canonical home variable.
 func TestEnvResolveAcceptsAliases(t *testing.T) {
 	source, _ := profileHome(t)
+	writeNativeCredentials(t)
 	pkg := t.TempDir()
 	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
 	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {

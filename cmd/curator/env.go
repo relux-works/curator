@@ -26,7 +26,7 @@ func machineFromConfig(cfg *config.Config) envregistry.MachineConfig {
 
 func (c cli) cmdEnv(args []string) int {
 	if len(args) == 0 {
-		_, _ = fmt.Fprintln(c.stderr, "curator: env needs a subcommand: resolve | status | config")
+		_, _ = fmt.Fprintln(c.stderr, "curator: env needs a subcommand: resolve | status | config | migrate")
 		return exitUsage
 	}
 	cfg, code := c.loadConfig()
@@ -40,6 +40,8 @@ func (c cli) cmdEnv(args []string) int {
 		return c.cmdEnvStatus(cfg, args[1:])
 	case "config":
 		return c.cmdEnvConfig(cfg, args[1:])
+	case "migrate":
+		return c.cmdEnvMigrate(cfg, args[1:])
 	}
 	_, _ = fmt.Fprintf(c.stderr, "curator: unknown env subcommand %q\n", args[0])
 	return exitUsage

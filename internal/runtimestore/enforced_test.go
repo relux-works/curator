@@ -1,6 +1,7 @@
 package runtimestore
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -8,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/godriver"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // TestManagedEnforcedShimDerivesNativeNames proves enforced launcher
@@ -171,6 +173,20 @@ func TestManagedEnforcedShimsInKeysBySidecar(t *testing.T) {
 	missing, err := ManagedEnforcedShimsIn(filepath.Join(binDir, "absent"), ProjectShim, platform)
 	if err != nil || len(missing) != 0 {
 		t.Fatalf("absent bin = %+v, %v, want empty", missing, err)
+	}
+}
+
+func TestManagedEnforcedShimsInRefusesUnreadableInventory(t *testing.T) {
+	root := t.TempDir()
+	blocker := filepath.Join(root, "not-a-directory")
+	if err := os.WriteFile(blocker, []byte("blocker"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(blocker, "bin")
+	shims, err := ManagedEnforcedShimsIn(path, ProjectShim, "unix")
+	var stateErr *stateread.Error
+	if len(shims) != 0 || !errors.As(err, &stateErr) || stateErr.Kind != stateread.KindUnreadable || stateErr.Path != path {
+		t.Fatalf("unreadable inventory = (%+v, %v), want typed unreadable for %s", shims, err, path)
 	}
 }
 

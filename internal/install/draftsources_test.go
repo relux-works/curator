@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -19,6 +20,7 @@ import (
 	"github.com/relux-works/curator/internal/skillspec"
 	"github.com/relux-works/curator/internal/snapshot"
 	"github.com/relux-works/curator/internal/sourcelock"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 func testGit(t *testing.T, dir string, args ...string) string {
@@ -91,6 +93,73 @@ func draftTestConfig(home, skillsRoot string) *config.Config {
 	return &config.Config{Path: filepath.Join(home, "config.json"), SkillsRoot: skillsRoot, DefaultAgents: []string{"claude_code"}, AdapterMode: "auto"}
 }
 
+func TestLockedNetworkRepositoryDistinguishesAbsentAndUnreadableCheckouts(t *testing.T) {
+	const repository = "example.test/kit"
+	member := func(name string) sourcelock.Member {
+		return sourcelock.Member{
+			Name: name,
+			Package: sourcelock.Package{
+				Kind:       sourcelock.KindNetworkGit,
+				Repository: repository,
+			},
+		}
+	}
+	lock := func(names ...string) *sourcelock.Lock {
+		result := &sourcelock.Lock{}
+		for _, name := range names {
+			result.Members = append(result.Members, member(name))
+		}
+		return result
+	}
+
+	t.Run("absent-checkout-falls-back", func(t *testing.T) {
+		root := t.TempDir()
+		later := filepath.Join(root, "later")
+		if err := os.MkdirAll(later, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		testGit(t, later, "init", "-q")
+		got, err := lockedNetworkRepository(root, lock("absent", "later"), repository)
+		if err != nil || got != later {
+			t.Fatalf("lockedNetworkRepository = (%q, %v), want later checkout %q", got, err, later)
+		}
+	})
+
+	t.Run("failed-lstat-stops-fallback", func(t *testing.T) {
+		root := t.TempDir()
+		blocker := filepath.Join(root, "not-a-directory")
+		if err := os.WriteFile(blocker, []byte("blocker"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		skillsRoot := filepath.Join(blocker, "skills")
+		_, err := lockedNetworkRepository(skillsRoot, lock("first", "later"), repository)
+		var stateErr *stateread.Error
+		if !errors.As(err, &stateErr) || stateErr.Kind != stateread.KindUnreadable ||
+			!strings.Contains(err.Error(), stateread.DiagUnreadable) || stateErr.Path != filepath.Join(skillsRoot, "first") {
+			t.Fatalf("blocked checkout error = %v, want typed unreadable and no fallback", err)
+		}
+	})
+
+	t.Run("present-but-unusable-stops-fallback", func(t *testing.T) {
+		root := t.TempDir()
+		first := filepath.Join(root, "first")
+		if err := os.MkdirAll(first, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		later := filepath.Join(root, "later")
+		if err := os.MkdirAll(later, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		testGit(t, later, "init", "-q")
+		_, err := lockedNetworkRepository(root, lock("first", "later"), repository)
+		var stateErr *stateread.Error
+		if !errors.As(err, &stateErr) || stateErr.Kind != stateread.KindUnreadable ||
+			!strings.Contains(err.Error(), stateread.DiagUnreadable) || stateErr.Path != first {
+			t.Fatalf("unusable checkout error = %v, want typed unreadable and no fallback", err)
+		}
+	})
+}
+
 func TestDraftInstallMissingLockFails(t *testing.T) {
 	payload := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["review"]}]}`
 	project, home, _ := draftProject(t, payload, map[string]string{"skills/review": "review"})
@@ -146,6 +215,81 @@ func TestDraftInstallReplaysMissingLocalSnapshot(t *testing.T) {
 	member, _ := plan.Lock.Find("review")
 	if _, err := snapshot.OpenLocal(home, member.Package.Snapshot); err != nil {
 		t.Fatalf("replay did not restore the locked snapshot: %v", err)
+	}
+}
+
+// TestDraftReplayRefusesUnreadableGitSnapshotCache drives the real project
+// install entry with a blocked cache parent. A missing snapshot may be
+// replayed, but a cache path whose parent is a regular file is an unreadable
+// state read and must stop before declared-source replay.
+func TestDraftReplayRefusesUnreadableGitSnapshotCache(t *testing.T) {
+	project, home, _, _, _ := setupDraftGitSource(t, `{"git":"https://example.org/kit.git","tag":"v1"}`)
+	cacheRoot := filepath.Join(home, "cache")
+	if err := os.RemoveAll(cacheRoot); err != nil {
+		t.Fatal(err)
+	}
+	const blockerContents = "cache parent is a regular file"
+	if err := os.WriteFile(cacheRoot, []byte(blockerContents), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	lockBefore, err := os.ReadFile(sourcelock.PathIn(project))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result := Project(draftTestConfig(home, t.TempDir()), project, "test", Options{DryRun: true, Platform: installPlatform()})
+	detail := strings.Join(result.Errors, "; ")
+	if result.Status != "failed" || !strings.Contains(detail, stateread.DiagUnreadable) || strings.Contains(detail, "snapshot is not in the store") {
+		t.Fatalf("production install = %+v, want blocked cache read without replay fallback", result)
+	}
+	lockAfter, err := os.ReadFile(sourcelock.PathIn(project))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(lockAfter) != string(lockBefore) {
+		t.Fatal("blocked cache read changed Skillfile.lock.json")
+	}
+	blockerAfter, err := os.ReadFile(cacheRoot)
+	if err != nil || string(blockerAfter) != blockerContents {
+		t.Fatalf("cache blocker changed to %q, %v", blockerAfter, err)
+	}
+}
+
+// TestDraftInstallRefusesUnreadableLocalSnapshotCache drives the production
+// install entry with a blocked local-snapshot store. It proves the declared
+// path fallback is limited to a genuinely absent snapshot.
+func TestDraftInstallRefusesUnreadableLocalSnapshotCache(t *testing.T) {
+	payload := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["review"]}]}`
+	project, home, _ := draftProject(t, payload, map[string]string{"skills/review": "review"})
+	resolveDraftForInstall(t, project, home, payload)
+	store := snapshot.LocalStoreDir(home)
+	if err := os.RemoveAll(store); err != nil {
+		t.Fatal(err)
+	}
+	const blockerContents = "local snapshot parent is a regular file"
+	if err := os.WriteFile(store, []byte(blockerContents), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	lockBefore, err := os.ReadFile(sourcelock.PathIn(project))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result := Project(draftTestConfig(home, t.TempDir()), project, "test", Options{DryRun: true, Platform: installPlatform()})
+	detail := strings.Join(result.Errors, "; ")
+	if result.Status != "failed" || !strings.Contains(detail, stateread.DiagUnreadable) || strings.Contains(detail, "snapshot is not in the store") {
+		t.Fatalf("production install = %+v, want blocked cache read without path replay", result)
+	}
+	lockAfter, err := os.ReadFile(sourcelock.PathIn(project))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(lockAfter) != string(lockBefore) {
+		t.Fatal("blocked cache read changed Skillfile.lock.json")
+	}
+	blockerAfter, err := os.ReadFile(store)
+	if err != nil || string(blockerAfter) != blockerContents {
+		t.Fatalf("local snapshot blocker changed to %q, %v", blockerAfter, err)
 	}
 }
 
