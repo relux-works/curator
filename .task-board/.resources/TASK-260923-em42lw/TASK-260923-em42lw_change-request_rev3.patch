@@ -1,0 +1,3263 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 4c241afe..92a10a03 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -6,6 +6,12 @@ All notable implementation changes are recorded here.
+ 
+ ### Added
+ 
++- Permission mode transport: `env resolve --format json` now emits
++  `launch-env-fragment-v2` with the required closed `permissions` member.
++  `permissions.<profile>` accepts `native` or `yolo`; absence stays silent,
++  and a system-file lock replaces the machine map, warns on an overridden
++  machine value, and forces `native` with `source: "global"` and
++  `locked: true`.
+ - E4: umbrella provider lookup from trust roots (warning release,
+   revision A). Unknown subcommands still resolve `curator-<name>` on the
+   ambient `PATH`, but the manager now computes the trust verdict against
+diff --git a/cmd/curator/env.go b/cmd/curator/env.go
+index 5a16a831..391d1467 100644
+--- a/cmd/curator/env.go
++++ b/cmd/curator/env.go
+@@ -21,6 +21,8 @@ func machineFromConfig(cfg *config.Config) envregistry.MachineConfig {
+ 	}
+ 	machine.PassableEnvNames = cfg.Env.PassableEnvNames
+ 	machine.PassableEnvNamesSet = cfg.Env.PassableEnvNamesSet
++	machine.Permissions = cfg.Env.Permissions
++	machine.PermissionsLocked = cfg.Locked["environments.permissions"]
+ 	return machine
+ }
+ 
+diff --git a/cmd/curator/env_permissions_test.go b/cmd/curator/env_permissions_test.go
+new file mode 100644
+index 00000000..bc6e667e
+--- /dev/null
++++ b/cmd/curator/env_permissions_test.go
+@@ -0,0 +1,253 @@
++package main
++
++import (
++	"crypto/sha256"
++	"encoding/hex"
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"runtime"
++	"sort"
++	"strings"
++	"testing"
++
++	"github.com/dlclark/regexp2"
++	"github.com/santhosh-tekuri/jsonschema/v6"
++)
++
++const launchEnvFragmentV2SchemaSHA256 = "4d26b5e2a89452eb3c7fe6945f19dd16dda557382be15972ab9c57cb02d38d40"
++
++type ecmaRegexp regexp2.Regexp
++
++func (re *ecmaRegexp) MatchString(value string) bool {
++	matched, err := (*regexp2.Regexp)(re).MatchString(value)
++	return err == nil && matched
++}
++
++func (re *ecmaRegexp) String() string {
++	return (*regexp2.Regexp)(re).String()
++}
++
++func compileECMARegexp(pattern string) (jsonschema.Regexp, error) {
++	re, err := regexp2.Compile(pattern, regexp2.ECMAScript)
++	if err != nil {
++		return nil, err
++	}
++	return (*ecmaRegexp)(re), nil
++}
++
++func launchEnvFragmentV2FixtureRoots(t *testing.T) (string, string) {
++	t.Helper()
++	_, source, _, ok := runtime.Caller(0)
++	if !ok {
++		t.Fatal("runtime.Caller could not locate this test")
++	}
++	repo := filepath.Join(filepath.Dir(source), "..", "..")
++	fixture := filepath.Join(repo, "internal", "envfragment", "testdata", "curator-spec-main")
++	return filepath.Join(fixture, "schemas", "v1"), filepath.Join(fixture, "conformance", "v1", "schema-cases", "launch-env-fragment-v2")
++}
++
++func launchEnvFragmentV2Schema(t *testing.T) *jsonschema.Schema {
++	t.Helper()
++	schemaDir, _ := launchEnvFragmentV2FixtureRoots(t)
++	names := []string{
++		"agent-context-v1.schema.json",
++		"agent-environment-marker-v1.schema.json",
++		"agent-mcp-v1.schema.json",
++		"common.schema.json",
++		"context-lock-v1.schema.json",
++		"launch-env-fragment-v2.schema.json",
++	}
++	compiler := jsonschema.NewCompiler()
++	compiler.UseRegexpEngine(compileECMARegexp)
++	mainID := ""
++	for _, name := range names {
++		path := filepath.Join(schemaDir, name)
++		raw, err := os.ReadFile(path) // #nosec G304 -- the input is a task-owned, explicit schema fixture
++		if err != nil {
++			t.Fatalf("read schema fixture %s: %v", path, err)
++		}
++		if name == "launch-env-fragment-v2.schema.json" {
++			hash := sha256.Sum256(raw)
++			if got := hex.EncodeToString(hash[:]); got != launchEnvFragmentV2SchemaSHA256 {
++				t.Fatalf("v2 schema fixture hash = %s, want copied spec-main hash %s", got, launchEnvFragmentV2SchemaSHA256)
++			}
++		}
++		var document map[string]any
++		if err := json.Unmarshal(raw, &document); err != nil {
++			t.Fatalf("parse schema fixture %s: %v", path, err)
++		}
++		id, ok := document["$id"].(string)
++		if !ok || id == "" {
++			t.Fatalf("schema fixture %s has no $id", path)
++		}
++		if err := compiler.AddResource(id, document); err != nil {
++			t.Fatalf("register schema fixture %s: %v", path, err)
++		}
++		if name == "launch-env-fragment-v2.schema.json" {
++			mainID = id
++		}
++	}
++	if mainID == "" {
++		t.Fatal("launch-env-fragment-v2 schema is missing from the fixture set")
++	}
++	compiled, err := compiler.Compile(mainID)
++	if err != nil {
++		t.Fatalf("compile copied spec-main v2 schema: %v", err)
++	}
++	return compiled
++}
++
++func validateLaunchEnvFragmentV2(t *testing.T, schema *jsonschema.Schema, payload []byte) {
++	t.Helper()
++	var instance any
++	if err := json.Unmarshal(payload, &instance); err != nil {
++		t.Fatalf("fragment output is not JSON: %v\n%s", err, payload)
++	}
++	if err := schema.Validate(instance); err != nil {
++		t.Fatalf("fragment output does not validate against copied curator-spec main schema: %v\n%s", err, payload)
++	}
++}
++
++func TestCuratorSpecMainLaunchEnvFragmentV2SchemaCases(t *testing.T) {
++	schema := launchEnvFragmentV2Schema(t)
++	_, casesDir := launchEnvFragmentV2FixtureRoots(t)
++	expected := map[string]bool{
++		"valid.json":                                     true,
++		"valid-permissions-yolo-unlocked.json":           true,
++		"valid-permissions-native-locked.json":           true,
++		"valid-permissions-native-silent.json":           true,
++		"invalid.json":                                   false,
++		"invalid-permissions-locked-profile-source.json": false,
++		"invalid-permissions-missing-mode.json":          false,
++		"invalid-permissions-unknown-field.json":         false,
++		"invalid-permissions-yolo-silent.json":           false,
++		"invalid-permissions-global-unlocked.json":       false,
++		"invalid-permissions-unknown-source.json":        false,
++		"invalid-permissions-absent.json":                false,
++		"invalid-permissions-yolo-locked.json":           false,
++		"invalid-permissions-unknown-mode.json":          false,
++	}
++	paths, err := filepath.Glob(filepath.Join(casesDir, "*.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(paths) != len(expected) {
++		t.Fatalf("copied spec-main schema case count = %d, want %d", len(paths), len(expected))
++	}
++	sort.Strings(paths)
++	for _, path := range paths {
++		name := filepath.Base(path)
++		wantValid, known := expected[name]
++		if !known {
++			t.Fatalf("unexpected copied spec-main schema case %q", name)
++		}
++		raw, err := os.ReadFile(path) // #nosec G304 -- filenames are constrained by the explicit fixture glob
++		if err != nil {
++			t.Fatal(err)
++		}
++		t.Run(name, func(t *testing.T) {
++			var instance any
++			if err := json.Unmarshal(raw, &instance); err != nil {
++				t.Fatal(err)
++			}
++			err := schema.Validate(instance)
++			if wantValid && err != nil {
++				t.Fatalf("spec-main valid case rejected: %v", err)
++			}
++			if !wantValid && err == nil {
++				t.Fatal("spec-main invalid case accepted")
++			}
++		})
++	}
++}
++
++func runFileConfigProfile(t *testing.T, configPath string, args ...string) (int, string, string) {
++	t.Helper()
++	var stdout, stderr strings.Builder
++	code := run(args, fileConfigSource(configPath), &stdout, &stderr)
++	return code, stdout.String(), stderr.String()
++}
++
++func TestEnvResolveEmitsPermissionsV2AtProductionEntry(t *testing.T) {
++	schema := launchEnvFragmentV2Schema(t)
++	cases := []struct {
++		name              string
++		machinePermission string
++		locked            bool
++		wantMode          string
++		wantLocked        bool
++		wantSource        string
++		wantWarning       bool
++	}{
++		{name: "permissions-yolo-profile", machinePermission: "yolo", wantMode: "yolo", wantSource: "profile"},
++		{name: "permissions-native-profile", machinePermission: "native", wantMode: "native", wantSource: "profile"},
++		{name: "permissions-absent-default", wantMode: "native", wantSource: "default"},
++		{name: "permissions-system-lock-global", machinePermission: "yolo", locked: true, wantMode: "native", wantLocked: true, wantSource: "global", wantWarning: true},
++	}
++	for _, tc := range cases {
++		t.Run(tc.name, func(t *testing.T) {
++			source, home := profileHome(t)
++			machine := map[string]any{
++				"schema_version": 2,
++				"skills_root":    filepath.Join(home, "skills"),
++				"projects":       map[string]any{},
++			}
++			if tc.machinePermission != "" {
++				machine["environments"] = map[string]any{
++					"permissions": map[string]any{"acme": tc.machinePermission},
++				}
++			}
++			machinePayload, err := json.Marshal(machine)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(source.path, machinePayload, 0o600); err != nil {
++				t.Fatal(err)
++			}
++			systemPath := filepath.Join(t.TempDir(), "system.json")
++			system := map[string]any{"schema_version": 2, "locked": []string{}}
++			if tc.locked {
++				system["locked"] = []string{"environments.permissions"}
++				system["environments"] = map[string]any{"permissions": map[string]any{}}
++			}
++			systemPayload, err := json.Marshal(system)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(systemPath, systemPayload, 0o600); err != nil {
++				t.Fatal(err)
++			}
++			t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
++
++			pkg := t.TempDir()
++			writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
++			if code, _, stderr := runFileConfigProfile(t, source.path, "profile", "install", pkg); code != exitOK {
++				t.Fatalf("install = %d\nstderr:\n%s", code, stderr)
++			}
++			code, stdout, stderr := runFileConfigProfile(t, source.path,
++				"env", "resolve", "codex_cli", "--repair", "--format", "json")
++			if code != exitOK {
++				t.Fatalf("env resolve = %d\nstderr:\n%s", code, stderr)
++			}
++			if tc.wantWarning && (!strings.Contains(stderr, `config key "environments.permissions"`) || !strings.Contains(stderr, systemPath)) {
++				t.Fatalf("locked resolve warning = %q, want manager §1 locked-key warning naming %s", stderr, systemPath)
++			}
++			var fragment map[string]any
++			if err := json.Unmarshal([]byte(stdout), &fragment); err != nil {
++				t.Fatalf("env resolve emitted malformed JSON: %v\n%s", err, stdout)
++			}
++			if fragment["fragment"] != "launch-env-fragment-v2" {
++				t.Fatalf("fragment token = %v, want launch-env-fragment-v2", fragment["fragment"])
++			}
++			permission, ok := fragment["permissions"].(map[string]any)
++			if !ok {
++				t.Fatalf("v2 permissions member missing or malformed: %v", fragment["permissions"])
++			}
++			if permission["mode"] != tc.wantMode || permission["locked"] != tc.wantLocked || permission["source"] != tc.wantSource {
++				t.Fatalf("permissions = %v for profile %v, want mode=%s locked=%t source=%s", permission, fragment["profile"], tc.wantMode, tc.wantLocked, tc.wantSource)
++			}
++			validateLaunchEnvFragmentV2(t, schema, []byte(stdout))
++		})
++	}
++}
+diff --git a/cmd/curator/env_test.go b/cmd/curator/env_test.go
+index 4c3ee625..013976ce 100644
+--- a/cmd/curator/env_test.go
++++ b/cmd/curator/env_test.go
+@@ -57,7 +57,7 @@ func TestEnvResolveRepairEmitsFragment(t *testing.T) {
+ 	if err := json.Unmarshal([]byte(stdout), &fragment); err != nil {
+ 		t.Fatalf("fragment is not JSON: %v\nstdout:\n%s", err, stdout)
+ 	}
+-	if fragment["fragment"] != "launch-env-fragment-v1" || fragment["environment"] != "codex_cli" {
++	if fragment["fragment"] != "launch-env-fragment-v2" || fragment["environment"] != "codex_cli" {
+ 		t.Fatalf("fragment header: %v", fragment)
+ 	}
+ 	code, again, _ := runProfile(t, source, "env", "resolve", "codex_cli")
+diff --git a/docs/environment-config.md b/docs/environment-config.md
+index 1aeea40f..f98195c3 100644
+--- a/docs/environment-config.md
++++ b/docs/environment-config.md
+@@ -1,12 +1,13 @@
+ # Environment machine configuration
+ 
+ Operator reference for the `environments` knobs of `manager-config`
+-schema 2: the transitive system-module policy (E2), the provider trust
+-roots (E4), and the MCP environment passthrough bound (S4). Knob names,
+-values, and diagnostics are spelled exactly as `protocol/environments.md`
+-at the pinned conformance revision spells them. The historical audit
+-narrative lives in [docs/security-audit-2026-09.md](security-audit-2026-09.md)
+-and stays history; this file is the current usage reference.
++schema 2, including permission mode (environments §10.1/§10.2/§12.1/§12.2),
++the transitive system-module policy (E2), provider trust roots (E4), and
++the MCP environment passthrough bound (S4). Knob names, values, and
++diagnostics follow `protocol/environments.md` and manager profile §1. The
++historical audit narrative lives in
++[docs/security-audit-2026-09.md](security-audit-2026-09.md) and stays
++history; this file is the current usage reference.
+ 
+ All three knobs sit under one `environments` object:
+ 
+@@ -19,13 +20,50 @@ All three knobs sit under one `environments` object:
+     "transitive_system_modules": "drop",
+     "system_module_waivers": [],
+     "provider_directories": [],
+-    "passable_env_names": ["FIGMA_API_KEY"]
++    "passable_env_names": ["FIGMA_API_KEY"],
++    "permissions": {"companyA": "yolo"}
+   }
+ }
+ ```
+ 
+ `env status` reports the effective state of every knob below.
+ 
++## Permission mode
++
++`permissions` maps profile names to `native` or `yolo`. An absent profile
++entry is silent; it leaves the launcher's own global default available.
++For example:
++
++```json
++"permissions": {
++  "interactive": "yolo",
++  "restricted": "native"
++}
++```
++
++`env resolve --format json` emits `launch-env-fragment-v2` and its required
++closed `permissions` member. A configured profile entry is emitted with
++`source: "profile"` and `locked: false`. An absent entry is emitted as
++`mode: "native"`, `source: "default"`, and `locked: false`; that native mode
++is a silence placeholder, not an explicit profile override.
++
++A system configuration may lock `environments.permissions` only toward
++`native`. The system file's map replaces the machine map whole, and a
++differing machine value produces the manager §1 warning naming the system
++file. While the lock is engaged, `env resolve` emits
++`mode: "native"`, `source: "global"`, and `locked: true` for the resolved
++profile, including when that profile has no entry in the system map. The
++launcher receives lock engagement in the fragment; this Curator setting
++does not write launcher configuration.
++
++```json
++{
++  "schema_version": 2,
++  "locked": ["environments.permissions"],
++  "environments": {"permissions": {}}
++}
++```
++
+ ## Transitive system modules (E2)
+ 
+ `transitive_system_modules` is exactly `drop` (default) or `error`.
+diff --git a/go.mod b/go.mod
+index d76d6cb4..9f4d0d29 100644
+--- a/go.mod
++++ b/go.mod
+@@ -7,9 +7,11 @@ require (
+ 	github.com/charmbracelet/bubbletea v1.3.10
+ 	github.com/charmbracelet/lipgloss v1.1.0
+ 	github.com/charmbracelet/x/term v0.2.1
++	github.com/dlclark/regexp2 v1.11.0
+ 	github.com/relux-works/skill-go-testing-tools/tuitestkit v0.1.1
++	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
+ 	golang.org/x/sys v0.36.0
+-	golang.org/x/text v0.3.8
++	golang.org/x/text v0.14.0
+ 	gopkg.in/yaml.v3 v3.0.1
+ )
+ 
+diff --git a/go.sum b/go.sum
+index f3eb2f97..aa734108 100644
+--- a/go.sum
++++ b/go.sum
+@@ -14,6 +14,8 @@ github.com/charmbracelet/x/cellbuf v0.0.13-0.20250311204145-2c3ea96c31dd h1:vy0G
+ github.com/charmbracelet/x/cellbuf v0.0.13-0.20250311204145-2c3ea96c31dd/go.mod h1:xe0nKWGd3eJgtqZRaN9RjMtK7xUYchjzPr7q6kcvCCs=
+ github.com/charmbracelet/x/term v0.2.1 h1:AQeHeLZ1OqSXhrAWpYUtZyX1T3zVxfpZuEQMIQaGIAQ=
+ github.com/charmbracelet/x/term v0.2.1/go.mod h1:oQ4enTYFV7QN4m0i9mzHrViD7TQKvNEEkHUMCmsxdUg=
++github.com/dlclark/regexp2 v1.11.0 h1:G/nrcoOa7ZXlpoa/91N3X7mM3r8eIlMBBJZvsz/mxKI=
++github.com/dlclark/regexp2 v1.11.0/go.mod h1:DHkYz0B9wPfa6wondMfaivmHpzrQ3v9q8cnmRbL6yW8=
+ github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f h1:Y/CXytFA4m6baUTXGLOoWe4PQhGxaX0KpnayAqC48p4=
+ github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f/go.mod h1:vw97MGsxSvLiUE2X8qFplwetxpGLQrlU1Q9AUEIzCaM=
+ github.com/lucasb-eyer/go-colorful v1.2.0 h1:1nnpGOrhyZZuNyfu1QjKiUICQ74+3FNCN69Aj6K7nkY=
+@@ -35,6 +37,8 @@ github.com/relux-works/skill-go-testing-tools/tuitestkit v0.1.1/go.mod h1:eskmRa
+ github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
+ github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=
+ github.com/rivo/uniseg v0.4.7/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
++github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 h1:1EYB5IzjZawrrnELUi78f9fPu57HuXjmddZPjrls/28=
++github.com/santhosh-tekuri/jsonschema/v6 v6.0.3/go.mod h1:JXeL+ps8p7/KNMjDQk3TCwPpBy0wYklyWTfbkIzdIFU=
+ github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e h1:JVG44RsyaB9T2KIHavMF/ppJZNG9ZpyihvCd0w101no=
+ github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e/go.mod h1:RbqR21r5mrJuqunuUZ/Dhy/avygyECGrLceyNeo4LiM=
+ golang.org/x/exp v0.0.0-20220909182711-5c715a9e8561 h1:MDc5xs78ZrZr3HMQugiXOAkSZtfTpbJLDr/lwfgO53E=
+@@ -43,8 +47,8 @@ golang.org/x/sys v0.0.0-20210809222454-d867a43fc93e/go.mod h1:oPkhp1MJrh7nUepCBc
+ golang.org/x/sys v0.6.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+ golang.org/x/sys v0.36.0 h1:KVRy2GtZBrk1cBYA7MKu5bEZFxQk4NIDV6RLVcC8o0k=
+ golang.org/x/sys v0.36.0/go.mod h1:OgkHotnGiDImocRcuBABYBEXf8A9a87e/uXjp9XT3ks=
+-golang.org/x/text v0.3.8 h1:nAL+RVCQ9uMn3vJZbV+MRnydTJFPf8qqY42YiA6MrqY=
+-golang.org/x/text v0.3.8/go.mod h1:E6s5w1FMmriuDzIBO73fBruAKo1PCIq6d2Q6DHfQ8WQ=
++golang.org/x/text v0.14.0 h1:ScX5w1eTa3QqT8oi6+ziP7dTV1S2+ALU0bI+0zXKWiQ=
++golang.org/x/text v0.14.0/go.mod h1:18ZOQIKpY8NJVqYksKHtTdi31H5itFRjB5/qKTNYzSU=
+ gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=
+ gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
+ gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
+diff --git a/internal/config/config.go b/internal/config/config.go
+index 286a09e6..b918d6bf 100644
+--- a/internal/config/config.go
++++ b/internal/config/config.go
+@@ -64,6 +64,7 @@ var LockableKeys = map[string]bool{
+ 	"environments.isolation":                 true,
+ 	"environments.transitive_system_modules": true,
+ 	"environments.provider_directories":      true,
++	"environments.permissions":               true,
+ }
+ 
+ var (
+diff --git a/internal/config/environments.go b/internal/config/environments.go
+index 06e063f4..cc319671 100644
+--- a/internal/config/environments.go
++++ b/internal/config/environments.go
+@@ -25,9 +25,13 @@ type Environments struct {
+ 	Precedence           Precedence
+ 	Forms                map[string]string
+ 	SystemPromptFiles    map[string]SystemPromptFiles
+-	Targets              map[string]TargetConfig
+-	Isolation            map[string]map[string]string
+-	XDGSeedAllowlist     []string
++	// Permissions maps profile names to the section 12.1 permission mode.
++	// An absent entry is a silent profile level; the system lock replaces
++	// this whole map and forces native for every profile.
++	Permissions      map[string]string
++	Targets          map[string]TargetConfig
++	Isolation        map[string]map[string]string
++	XDGSeedAllowlist []string
+ 	// PassableEnvNames is the passable_env_names knob (§12.1, default
+ 	// []): nil with PassableEnvNamesSet false means the knob is absent;
+ 	// nil with PassableEnvNamesSet true is the explicit null (unbounded);
+@@ -125,6 +129,7 @@ var LockableEnvKeys = map[string]bool{
+ 	"environments.isolation":                 true,
+ 	"environments.transitive_system_modules": true,
+ 	"environments.provider_directories":      true,
++	"environments.permissions":               true,
+ }
+ 
+ // systemEnvKnobs are the environments keys a system file may carry at all:
+@@ -154,6 +159,7 @@ func defaultEnvironments() Environments {
+ 		Precedence:              Precedence{Winner: "higher-weight", Placement: "winner-last"},
+ 		Forms:                   map[string]string{},
+ 		SystemPromptFiles:       map[string]SystemPromptFiles{},
++		Permissions:             map[string]string{},
+ 		Targets:                 map[string]TargetConfig{},
+ 		Isolation:               map[string]map[string]string{},
+ 		XDGSeedAllowlist:        []string{"git", "gh", "ssh"},
+@@ -228,6 +234,14 @@ func parseEnvironments(raw any) (Environments, error) {
+ 		}
+ 		env.SystemPromptFiles = spf
+ 	}
++	if rawPermissions, present := obj["permissions"]; present {
++		if rawPermissions == nil {
++			return Environments{}, verr.New("environments.permissions", "must be an object")
++		}
++		if err := parseEnumMap(obj, "permissions", map[string]bool{"native": true, "yolo": true}, env.Permissions); err != nil {
++			return Environments{}, err
++		}
++	}
+ 	if rawTargets, present := obj["targets"]; present && rawTargets != nil {
+ 		targets, err := parseTargets(rawTargets)
+ 		if err != nil {
+@@ -337,7 +351,7 @@ var EnvKnobNames = []string{
+ 	"mcp_package_allowlist", "shadow_acknowledged", "secret_material_waivers",
+ 	"transitive_system_modules", "system_module_waivers",
+ 	"backup_retention", "require_current_profile", "in_place_mode",
+-	"provider_directories",
++	"provider_directories", "permissions",
+ }
+ 
+ // envKnob reports whether key is a §12.1 knob name.
+@@ -914,9 +928,9 @@ func (c *Config) LockedBySystem(key string) bool {
+ }
+ 
+ // parseSystemEnvironments validates the system file's environments object:
+-// exactly the §12.2 lockable subset with the §12.1 value grammars, and
+-// isolation only toward shared. Anything else is not carriable by the
+-// system file (manager §1 rule 1).
++// exactly the §12.2 lockable subset with the §12.1 value grammars,
++// isolation only toward shared, and permissions only toward native.
++// Anything else is not carriable by the system file (manager §1 rule 1).
+ func parseSystemEnvironments(raw any) (map[string]any, error) {
+ 	obj, ok := raw.(map[string]any)
+ 	if !ok {
+@@ -944,6 +958,14 @@ func parseSystemEnvironments(raw any) (map[string]any, error) {
+ 			return nil, verr.New("environments.transitive_system_modules", "a system file locks transitive_system_modules only toward error")
+ 		}
+ 	}
++	if _, present := obj["permissions"]; present {
++		if obj["permissions"] == nil {
++			return nil, verr.New("environments.permissions", "must be an object")
++		}
++		if err := parseEnumMap(obj, "permissions", map[string]bool{"native": true}, map[string]string{}); err != nil {
++			return nil, err
++		}
++	}
+ 	return obj, nil
+ }
+ 
+@@ -1078,6 +1100,10 @@ func (e Environments) render() map[string]any {
+ 	if e.RequireCurrent != nil {
+ 		require = *e.RequireCurrent
+ 	}
++	permissions := map[string]any{}
++	for profile, mode := range e.Permissions {
++		permissions[profile] = mode
++	}
+ 	return map[string]any{
+ 		"current_profile": current, "scoped_current": scoped, "overlays": overlays,
+ 		"overlay_default_weight": e.OverlayDefaultWeight, "overlays_allowed": e.OverlaysAllowed,
+@@ -1089,7 +1115,7 @@ func (e Environments) render() map[string]any {
+ 		"transitive_system_modules": e.TransitiveSystemModules, "system_module_waivers": systemWaivers,
+ 		"backup_retention":        e.BackupRetention,
+ 		"require_current_profile": require, "in_place_mode": inPlace,
+-		"provider_directories": providerDirs,
++		"provider_directories": providerDirs, "permissions": permissions,
+ 	}
+ }
+ 
+@@ -1107,7 +1133,7 @@ func EnvLockKey(knob string) string {
+ 		return "environments.precedence"
+ 	case "isolation":
+ 		return "environments.isolation"
+-	case "overlays_allowed", "mcp_package_allowlist", "passable_env_names", "require_current_profile", "transitive_system_modules", "provider_directories":
++	case "overlays_allowed", "mcp_package_allowlist", "passable_env_names", "require_current_profile", "transitive_system_modules", "provider_directories", "permissions":
+ 		return "environments." + head
+ 	}
+ 	return ""
+diff --git a/internal/config/environments_conformance_test.go b/internal/config/environments_conformance_test.go
+index 91990e8b..3a5a84f4 100644
+--- a/internal/config/environments_conformance_test.go
++++ b/internal/config/environments_conformance_test.go
+@@ -3,6 +3,7 @@ package config
+ import (
+ 	"encoding/json"
+ 	"os"
++	"os/exec"
+ 	"path/filepath"
+ 	"reflect"
+ 	"strings"
+@@ -41,6 +42,53 @@ func conformanceRoot(t *testing.T) string {
+ 	return root
+ }
+ 
++func conformanceRevision(t *testing.T, root string) string {
++	t.Helper()
++	output, err := exec.Command("git", "-C", root, "rev-parse", "--short=12", "HEAD").Output()
++	if err != nil {
++		t.Fatalf("read conformance root revision: %v", err)
++	}
++	revision := strings.TrimSpace(string(output))
++	if revision == "" {
++		t.Fatal("conformance root revision is empty")
++	}
++	return revision
++}
++
++// managerConfigVectorMemberEqual permits the single forward difference
++// introduced after decision 0018: a root whose expected environments object
++// predates permissions may omit the empty effective default. A configured
++// permission value is never hidden by this comparison.
++func managerConfigVectorMemberEqual(key string, got, want any) (equal, acceptedDefaultPermissions bool) {
++	if key != "environments" {
++		return reflect.DeepEqual(got, want), false
++	}
++	gotEnvironments, gotOK := got.(map[string]any)
++	wantEnvironments, wantOK := want.(map[string]any)
++	if !gotOK || !wantOK {
++		return reflect.DeepEqual(got, want), false
++	}
++	if _, expectedHasPermissions := wantEnvironments["permissions"]; expectedHasPermissions {
++		return reflect.DeepEqual(gotEnvironments, wantEnvironments), false
++	}
++	permissions, gotPermissions := gotEnvironments["permissions"]
++	emptyPermissions, isObject := permissions.(map[string]any)
++	if !gotPermissions || !isObject || len(emptyPermissions) != 0 {
++		return reflect.DeepEqual(gotEnvironments, wantEnvironments), false
++	}
++
++	withoutDefault := make(map[string]any, len(gotEnvironments)-1)
++	for member, value := range gotEnvironments {
++		if member != "permissions" {
++			withoutDefault[member] = value
++		}
++	}
++	if reflect.DeepEqual(withoutDefault, wantEnvironments) {
++		return true, true
++	}
++	return false, false
++}
++
+ // schemaCaseValidity loads the published index and reports the recorded
+ // validity of each instance in the family. The index — not the file-name
+ // prefix — decides: an unindexed file is logged and skipped, and a family
+@@ -155,6 +203,14 @@ func TestManagerConfigV2Vectors(t *testing.T) {
+ 	if len(cases) == 0 {
+ 		t.Fatalf("vectors/manager-config-v2.json publishes no cases")
+ 	}
++	validCount := 0
++	for _, tc := range cases {
++		if tc.Valid {
++			validCount++
++		}
++	}
++	revision := conformanceRevision(t, root)
++	t.Logf("manager-config-v2 root revision %s: %d vectors (%d valid, %d invalid)", revision, len(cases), validCount, len(cases)-validCount)
+ 	for _, tc := range cases {
+ 		tc := tc
+ 		t.Run(tc.Name, func(t *testing.T) {
+@@ -186,7 +242,11 @@ func TestManagerConfigV2Vectors(t *testing.T) {
+ 			}
+ 			for key, want := range tc.Expected {
+ 				gotValue := got[key]
+-				if !reflect.DeepEqual(gotValue, want) {
++				equal, acceptedDefaultPermissions := managerConfigVectorMemberEqual(key, gotValue, want)
++				if acceptedDefaultPermissions {
++					t.Logf("root revision %s: accepted the empty permissions default omitted by vector %q", revision, tc.Name)
++				}
++				if !equal {
+ 					wantJSON, _ := json.Marshal(want)
+ 					gotJSON, _ := json.Marshal(gotValue)
+ 					t.Fatalf("member %q:\n got %s\nwant %s", key, gotJSON, wantJSON)
+@@ -195,3 +255,45 @@ func TestManagerConfigV2Vectors(t *testing.T) {
+ 		})
+ 	}
+ }
++
++func TestManagerConfigV2VectorDefaultPermissionsAccommodationIsNarrow(t *testing.T) {
++	pre0018Expected := map[string]any{
++		"backup_retention":          5,
++		"transitive_system_modules": "drop",
++	}
++	defaultGot := map[string]any{
++		"backup_retention":          5,
++		"transitive_system_modules": "drop",
++		"permissions":               map[string]any{},
++	}
++	if equal, accommodated := managerConfigVectorMemberEqual("environments", defaultGot, pre0018Expected); !equal || !accommodated {
++		t.Fatalf("empty default permissions difference = (%t, %t), want (true, true)", equal, accommodated)
++	}
++
++	nonDefaultGot := map[string]any{
++		"backup_retention":          5,
++		"transitive_system_modules": "drop",
++		"permissions":               map[string]any{"companyA": "yolo"},
++	}
++	if equal, accommodated := managerConfigVectorMemberEqual("environments", nonDefaultGot, pre0018Expected); equal || accommodated {
++		t.Fatalf("non-default permissions difference = (%t, %t), want (false, false)", equal, accommodated)
++	}
++
++	otherMismatch := map[string]any{
++		"backup_retention":          30,
++		"transitive_system_modules": "drop",
++		"permissions":               map[string]any{},
++	}
++	if equal, accommodated := managerConfigVectorMemberEqual("environments", otherMismatch, pre0018Expected); equal || accommodated {
++		t.Fatalf("unrelated environment mismatch = (%t, %t), want (false, false)", equal, accommodated)
++	}
++
++	currentExpected := map[string]any{
++		"backup_retention":          5,
++		"transitive_system_modules": "drop",
++		"permissions":               map[string]any{},
++	}
++	if equal, accommodated := managerConfigVectorMemberEqual("environments", currentExpected, currentExpected); !equal || accommodated {
++		t.Fatalf("current-root permissions comparison = (%t, %t), want (true, false)", equal, accommodated)
++	}
++}
+diff --git a/internal/config/environments_test.go b/internal/config/environments_test.go
+index 11757246..b79503fa 100644
+--- a/internal/config/environments_test.go
++++ b/internal/config/environments_test.go
+@@ -67,7 +67,7 @@ func TestSchema2Defaults(t *testing.T) {
+ 		"targets": len(env.Targets), "isolation": len(env.Isolation),
+ 		"mcp": len(env.MCPPackageAllowlist), "shadow": len(env.ShadowAcknowledged),
+ 		"waivers": len(env.SecretWaivers), "inplace": len(env.InPlaceMode),
+-		"providerdirs": len(env.ProviderDirectories),
++		"providerdirs": len(env.ProviderDirectories), "permissions": len(env.Permissions),
+ 	} {
+ 		if value != 0 {
+ 			t.Fatalf("%s default must be empty, got %d", name, value)
+@@ -140,6 +140,10 @@ func TestSchema2KnobRejections(t *testing.T) {
+ 		{"in-place value", `{"in_place_mode": {"pi": "fax"}}`, "in_place_mode.pi"},
+ 		{"system prompt env", `{"system_prompt_files": {"a": {"codex_cli": "append"}}}`, "unsupported"},
+ 		{"system prompt value", `{"system_prompt_files": {"a": {"pi": "sometimes"}}}`, "system_prompt_files.a.pi"},
++		{"permissions profile grammar", `{"permissions": {"-bad": "yolo"}}`, "permissions"},
++		{"permissions value", `{"permissions": {"a": "bypass"}}`, "permissions.a"},
++		{"permissions not object", `{"permissions": ["yolo"]}`, "permissions"},
++		{"permissions null", `{"permissions": null}`, "permissions"},
+ 		{"target participation", `{"targets": {"t": {"participation": "maybe"}}}`, "participation"},
+ 		{"target consented type", `{"targets": {"t": {"consented": "yes"}}}`, "consented"},
+ 		{"target unknown", `{"targets": {"t": {"mood": "x"}}}`, "unsupported"},
+@@ -184,6 +188,7 @@ func TestSchema2EveryKnobParses(t *testing.T) {
+ 		"forms": {"claude_code": "referenced"}, "system_prompt_files": {"companyA": {"pi": "append"}},
+ 		"targets": {"xcode-coding-assistant": {"participation": "enabled", "consented": true}},
+ 		"isolation": {"companyA": {"pi": "isolated"}},
++		"permissions": {"companyA": "yolo", "personal": "native"},
+ 		"xdg_seed_allowlist": ["git"], "passable_env_names": ["A_B"],
+ 		"mcp_package_allowlist": ["https://example.com/m"],
+ 		"shadow_acknowledged": [{"env": "pi", "path": "AGENTS.override.md"}],
+@@ -208,6 +213,9 @@ func TestSchema2EveryKnobParses(t *testing.T) {
+ 	if env.Forms["claude_code"] != "referenced" || env.SystemPromptFiles["companyA"].Pi != "append" {
+ 		t.Fatalf("forms/spf: %+v %+v", env.Forms, env.SystemPromptFiles)
+ 	}
++	if env.Permissions["companyA"] != "yolo" || env.Permissions["personal"] != "native" {
++		t.Fatalf("permissions: %+v", env.Permissions)
++	}
+ 	if env.Targets["xcode-coding-assistant"] != (TargetConfig{Participation: "enabled", Consented: true}) {
+ 		t.Fatalf("targets: %+v", env.Targets)
+ 	}
+@@ -344,6 +352,29 @@ func TestSystemV2LockedKnobs(t *testing.T) {
+ 	}
+ }
+ 
++// TestSystemV2PermissionsForceNative proves that the §12.2 lock replaces
++// the machine permissions map whole and emits the manager §1 warning when
++// it discards a differing machine value.
++func TestSystemV2PermissionsForceNative(t *testing.T) {
++	cfg, warnings, err := loadWithSystem(t,
++		`{"schema_version": 2, "skills_root": "x", "projects": {},
++		  "environments": {"permissions": {"default": "yolo", "other": "native"}}}`,
++		`{"schema_version": 2, "locked": ["environments.permissions"],
++		  "environments": {"permissions": {}}}`)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(cfg.Env.Permissions) != 0 {
++		t.Fatalf("locked permissions map = %+v, want whole-map replacement with empty map", cfg.Env.Permissions)
++	}
++	if !cfg.LockedBySystem("environments.permissions") {
++		t.Fatalf("permissions lock bit is not recorded: %v", cfg.Locked)
++	}
++	if len(warnings) != 1 || !strings.Contains(warnings[0], `config key "environments.permissions"`) || !strings.Contains(warnings[0], "system.json") {
++		t.Fatalf("warnings = %v, want manager §1 override warning naming the system file", warnings)
++	}
++}
++
+ func TestSystemV2UnlockedEnvIsDefault(t *testing.T) {
+ 	cfg, warnings, err := loadWithSystem(t,
+ 		`{"schema_version": 2, "skills_root": "x", "projects": {},
+@@ -376,6 +407,8 @@ func TestSystemV2Refusals(t *testing.T) {
+ 		{"unlockable knob locked", `{"schema_version": 2, "locked": ["environments.current_profile"], "environments": {"current_profile": "a"}}`, "cannot lock"},
+ 		{"bare environments locked", `{"schema_version": 2, "locked": ["environments"]}`, "cannot lock"},
+ 		{"locked but unset", `{"schema_version": 2, "locked": ["environments.precedence"]}`, "locks"},
++		{"permissions yolo direction", `{"schema_version": 2, "locked": ["environments.permissions"], "environments": {"permissions": {"a": "yolo"}}}`, "permissions.a"},
++		{"permissions null", `{"schema_version": 2, "locked": ["environments.permissions"], "environments": {"permissions": null}}`, "permissions"},
+ 		{"isolated direction", `{"schema_version": 2, "locked": ["environments.isolation"], "environments": {"isolation": {"a": {"pi": "isolated"}}}}`, "only toward shared"},
+ 		{"bad value grammar", `{"schema_version": 2, "environments": {"overlays_allowed": "yes"}}`, "overlays_allowed"},
+ 		{"env under schema 1", `{"schema_version": 1, "locked": [], "environments": {"backup_retention": 1}}`, "environments"},
+@@ -479,15 +512,16 @@ func TestSystemV2LockableSubsetIsClassWide(t *testing.T) {
+ 		"require_current_profile":   `{"require_current_profile": "acme"}`,
+ 		"in_place_mode":             `{"in_place_mode": {"codex_cli": "linked"}}`,
+ 		"provider_directories":      `{"provider_directories": ["/opt/curator/providers"]}`,
++		"permissions":               `{"permissions": {"acme": "native"}}`,
+ 	}
+ 	if len(payloads) != len(EnvKnobNames) {
+ 		t.Fatalf("payloads cover %d knobs, EnvKnobNames carries %d: keep the two in step", len(payloads), len(EnvKnobNames))
+ 	}
+-	// The §12.2 transcription: exactly the eight keys the specification
++	// The §12.2 transcription: exactly the nine keys the specification
+ 	// states ("overlays_allowed, precedence, mcp_package_allowlist,
+ 	// passable_env_names, require_current_profile, transitive_system_modules,
+-	// isolation, and provider_directories" — the last carried by the §11
+-	// trust-root rule). This literal is the spec sentence; LockableEnvKeys
++	// isolation, provider_directories, and permissions" — provider_directories
++	// is carried by the §11 trust-root rule. This literal is the spec sentence; LockableEnvKeys
+ 	// is the implementation. Either drifting — a widening that would reach
+ 	// §9.1 secret material or §12.1 waivers, or a narrowing that would drop
+ 	// a fleet-policy knob — fails below.
+@@ -500,6 +534,7 @@ func TestSystemV2LockableSubsetIsClassWide(t *testing.T) {
+ 		"environments.transitive_system_modules": true,
+ 		"environments.isolation":                 true,
+ 		"environments.provider_directories":      true,
++		"environments.permissions":               true,
+ 	}
+ 	if len(LockableEnvKeys) != len(transcribed) {
+ 		t.Fatalf("LockableEnvKeys carries %d keys, §12.2 transcribes %d: a widening or narrowing without spec standing fails here", len(LockableEnvKeys), len(transcribed))
+@@ -557,7 +592,7 @@ func TestEffectiveJSONShape(t *testing.T) {
+ 		"passable_env_names", "mcp_package_allowlist", "shadow_acknowledged",
+ 		"secret_material_waivers", "transitive_system_modules",
+ 		"system_module_waivers", "backup_retention", "require_current_profile",
+-		"in_place_mode", "provider_directories"} {
++		"in_place_mode", "provider_directories", "permissions"} {
+ 		if _, present := env[knob]; !present {
+ 			t.Fatalf("rendered environments lack %q", knob)
+ 		}
+@@ -684,6 +719,9 @@ func TestSystemTransitiveDirection(t *testing.T) {
+ 	if lock := EnvLockKey("system_module_waivers"); lock != "" {
+ 		t.Fatalf("EnvLockKey(system_module_waivers) = %q, want no lock", lock)
+ 	}
++	if lock := EnvLockKey("permissions.default"); lock != "environments.permissions" {
++		t.Fatalf("EnvLockKey(permissions.default) = %q", lock)
++	}
+ }
+ 
+ // TestProviderDirectoriesDefaultRendersEmptyList pins the §12.1 default:
+diff --git a/internal/envfragment/envfragment.go b/internal/envfragment/envfragment.go
+index cb71e710..f06ab59a 100644
+--- a/internal/envfragment/envfragment.go
++++ b/internal/envfragment/envfragment.go
+@@ -1,7 +1,7 @@
+-// Package envfragment builds and renders the launch-env-fragment-v1 object
++// Package envfragment builds and renders the launch-env-fragment-v2 object
+ // (environments §10.2): the closed fragment a launcher consumes, with
+-// profile.lock_sha256, the precedence object, env, system_prompt, mcp (path,
+-// sorted env_names union, channel descriptor), and the reserved
++// profile.lock_sha256, precedence, permissions, env, system_prompt, mcp
++// (path, sorted env_names union, channel descriptor), and optional
+ // path_prepend. Resolution launches nothing and applies no channel; the
+ // fragment is data about channels. The §10.3 profile-influence boundary is
+ // enforced at build: variable names come only from the closed adapter
+@@ -20,8 +20,16 @@ import (
+ 	"github.com/relux-works/curator/internal/protocoljson"
+ )
+ 
+-// Version is the only fragment version this release emits.
+-const Version = "launch-env-fragment-v1"
++// Version is the fragment version emitted by this manager release.
++const Version = "launch-env-fragment-v2"
++
++// Permissions is the resolved per-profile permission policy carried by
++// launch-env-fragment-v2 (environments §10.2).
++type Permissions struct {
++	Mode   string
++	Locked bool
++	Source string
++}
+ 
+ // SystemPrompt carries the inert §5.5 file path and the adapter's §7.3
+ // channel descriptors. It is present exactly when the lock carries at
+@@ -41,12 +49,13 @@ type MCP struct {
+ 	Channels []envregistry.Channel
+ }
+ 
+-// Fragment is one launch-env-fragment-v1 object. PathPrepend is reserved
+-// and never emitted in revision 1 (environments §10.2).
++// Fragment is one launch-env-fragment-v2 object. This resolver omits the
++// optional path_prepend member (environments §10.2).
+ type Fragment struct {
+ 	Environment  string
+ 	Profile      string
+ 	LockSHA256   string
++	Permissions  Permissions
+ 	Winner       string
+ 	Placement    string
+ 	Env          map[string]string
+@@ -93,6 +102,7 @@ func (f *Fragment) Object() map[string]any {
+ 		"fragment":    Version,
+ 		"environment": f.Environment,
+ 		"profile":     map[string]any{"name": f.Profile, "lock_sha256": f.LockSHA256},
++		"permissions": map[string]any{"mode": f.Permissions.Mode, "locked": f.Permissions.Locked, "source": f.Permissions.Source},
+ 		"precedence":  map[string]any{"winner": f.Winner, "placement": f.Placement},
+ 	}
+ 	env := map[string]any{}
+diff --git a/internal/envfragment/envfragment_test.go b/internal/envfragment/envfragment_test.go
+index 8c0a89a0..039d210e 100644
+--- a/internal/envfragment/envfragment_test.go
++++ b/internal/envfragment/envfragment_test.go
+@@ -13,6 +13,7 @@ func testFragment() *Fragment {
+ 		Environment: "claude_code",
+ 		Profile:     "companyA",
+ 		LockSHA256:  "0305581b4f24d74ce271f9809d24f77b794b5ef9ad004bcc5c398fa2ea2e54ab",
++		Permissions: Permissions{Mode: "yolo", Source: "profile"},
+ 		Winner:      "higher-weight",
+ 		Placement:   "winner-last",
+ 		Env:         map[string]string{"CLAUDE_CONFIG_DIR": "/manager/environments/companyA/claude_code"},
+@@ -45,7 +46,7 @@ func TestFragmentJSONCanonical(t *testing.T) {
+ 	if !strings.HasSuffix(text, "}\n") || strings.HasSuffix(text, "\n\n") {
+ 		t.Fatalf("fragment json is not CCJ-1 plus one LF: %q", text)
+ 	}
+-	want := `{"env":{"CLAUDE_CONFIG_DIR":"/manager/environments/companyA/claude_code"},"environment":"claude_code","fragment":"launch-env-fragment-v1","mcp":{"channels":[{"argument":"path","flag":"--mcp-config","kind":"flag","with":["--strict-mcp-config"]}],"env_names":["FIGMA_API_KEY"],"path":"/manager/environments/companyA/claude_code/.agent-context/mcp/claude_code.json"},"precedence":{"placement":"winner-last","winner":"higher-weight"},"profile":{"lock_sha256":"0305581b4f24d74ce271f9809d24f77b794b5ef9ad004bcc5c398fa2ea2e54ab","name":"companyA"},"system_prompt":{"channels":[{"argument":"path","flag":"--append-system-prompt-file","kind":"flag","semantics":"append"},{"argument":"path","flag":"--system-prompt-file","kind":"flag","semantics":"replace"}],"path":"/manager/environments/companyA/claude_code/.agent-context/system-prompt.md"}}` + "\n"
++	want := `{"env":{"CLAUDE_CONFIG_DIR":"/manager/environments/companyA/claude_code"},"environment":"claude_code","fragment":"launch-env-fragment-v2","mcp":{"channels":[{"argument":"path","flag":"--mcp-config","kind":"flag","with":["--strict-mcp-config"]}],"env_names":["FIGMA_API_KEY"],"path":"/manager/environments/companyA/claude_code/.agent-context/mcp/claude_code.json"},"permissions":{"locked":false,"mode":"yolo","source":"profile"},"precedence":{"placement":"winner-last","winner":"higher-weight"},"profile":{"lock_sha256":"0305581b4f24d74ce271f9809d24f77b794b5ef9ad004bcc5c398fa2ea2e54ab","name":"companyA"},"system_prompt":{"channels":[{"argument":"path","flag":"--append-system-prompt-file","kind":"flag","semantics":"append"},{"argument":"path","flag":"--system-prompt-file","kind":"flag","semantics":"replace"}],"path":"/manager/environments/companyA/claude_code/.agent-context/system-prompt.md"}}` + "\n"
+ 	if text != want {
+ 		t.Fatalf("fragment bytes differ:\n got %q\nwant %q", text, want)
+ 	}
+@@ -56,6 +57,7 @@ func TestFragmentCodexNameChannel(t *testing.T) {
+ 		Environment: "codex_cli",
+ 		Profile:     "companyA",
+ 		LockSHA256:  strings.Repeat("a", 64),
++		Permissions: Permissions{Mode: "native", Source: "default"},
+ 		Winner:      "higher-weight",
+ 		Placement:   "winner-last",
+ 		Env:         map[string]string{"CODEX_HOME": "/manager/environments/companyA/codex_cli"},
+diff --git a/internal/envfragment/fragment_schema_test.go b/internal/envfragment/fragment_schema_test.go
+index bed495e4..63879c47 100644
+--- a/internal/envfragment/fragment_schema_test.go
++++ b/internal/envfragment/fragment_schema_test.go
+@@ -317,16 +317,12 @@ func TestFragmentAuthoritativeSchemaCases(t *testing.T) {
+ 	}
+ }
+ 
+-// TestFragmentEmissionMatchesReference proves the production emitter
+-// agrees with the published reference: the canonical claude fragment
+-// re-encodes the valid.json reference bytes exactly once the profile pin
+-// is normalized.
++// TestFragmentEmissionMatchesReference keeps the required platform-ledger
++// contract: the v2 emitter must reproduce the copied curator-spec main
++// reference after substituting the fixture's profile lock hash.
+ func TestFragmentEmissionMatchesReference(t *testing.T) {
+-	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+-	if root == "" {
+-		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
+-	}
+-	raw, err := os.ReadFile(filepath.Join(root, "schema-cases", "launch-env-fragment-v1", "valid.json")) // #nosec G304 -- explicit conformance input
++	root := filepath.Join("testdata", "curator-spec-main", "conformance", "v1", "schema-cases", "launch-env-fragment-v2")
++	raw, err := os.ReadFile(filepath.Join(root, "valid-permissions-yolo-unlocked.json")) // #nosec G304 -- explicit copied spec fixture
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -334,7 +330,10 @@ func TestFragmentEmissionMatchesReference(t *testing.T) {
+ 	if err := json.Unmarshal(raw, &reference); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	profile := reference["profile"].(map[string]any)
++	profile, ok := reference["profile"].(map[string]any)
++	if !ok {
++		t.Fatalf("reference profile has unexpected shape: %T", reference["profile"])
++	}
+ 	fragment := testFragment()
+ 	profile["lock_sha256"] = fragment.LockSHA256
+ 	want, err := protocoljson.MarshalCanonical(reference)
+@@ -346,6 +345,6 @@ func TestFragmentEmissionMatchesReference(t *testing.T) {
+ 		t.Fatal(err)
+ 	}
+ 	if !bytes.Equal(got, want) {
+-		t.Fatalf("emission differs from the reference:\n got %q\nwant %q", got, want)
++		t.Fatalf("emission differs from the curator-spec v2 reference:\n got %q\nwant %q", got, want)
+ 	}
+ }
+diff --git a/internal/envfragment/testdata/curator-spec-main/README.md b/internal/envfragment/testdata/curator-spec-main/README.md
+new file mode 100644
+index 00000000..574431dd
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-main/README.md
+@@ -0,0 +1,13 @@
++# Curator spec main fixture
++
++Copied byte-for-byte from the local curator-spec checkout at commit
++`eadb1c06480f4438f01b2b0a973caf775a188f41` (main, after `ec8dc656`).
++
++- Schema source: `schemas/v1/launch-env-fragment-v2.schema.json`
++- Fixture path: `internal/envfragment/testdata/curator-spec-main/schemas/v1/launch-env-fragment-v2.schema.json`
++- SHA-256: `4d26b5e2a89452eb3c7fe6945f19dd16dda557382be15972ab9c57cb02d38d40`
++- Conformance cases: `conformance/v1/schema-cases/launch-env-fragment-v2/`
++
++The test registers the copied external schema dependencies locally and validates
++both the copied valid/invalid cases and `curator env resolve --format json`
++output. It does not use curator's pinned rc.12 conformance checkout for v2.
+diff --git a/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-absent.json b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-absent.json
+new file mode 100644
+index 00000000..6628ef89
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-absent.json
+@@ -0,0 +1,48 @@
++{
++  "env": {
++    "CLAUDE_CONFIG_DIR": "/manager/environments/companyA/claude_code"
++  },
++  "environment": "claude_code",
++  "fragment": "launch-env-fragment-v2",
++  "mcp": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--mcp-config",
++        "kind": "flag",
++        "with": [
++          "--strict-mcp-config"
++        ]
++      }
++    ],
++    "env_names": [
++      "FIGMA_API_KEY"
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/mcp/claude_code.json"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "system_prompt": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--append-system-prompt-file",
++        "kind": "flag",
++        "semantics": "append"
++      },
++      {
++        "argument": "path",
++        "flag": "--system-prompt-file",
++        "kind": "flag",
++        "semantics": "replace"
++      }
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/system-prompt.md"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-global-unlocked.json b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-global-unlocked.json
+new file mode 100644
+index 00000000..80fedf35
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-global-unlocked.json
+@@ -0,0 +1,53 @@
++{
++  "env": {
++    "CLAUDE_CONFIG_DIR": "/manager/environments/companyA/claude_code"
++  },
++  "environment": "claude_code",
++  "fragment": "launch-env-fragment-v2",
++  "mcp": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--mcp-config",
++        "kind": "flag",
++        "with": [
++          "--strict-mcp-config"
++        ]
++      }
++    ],
++    "env_names": [
++      "FIGMA_API_KEY"
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/mcp/claude_code.json"
++  },
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "global"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "system_prompt": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--append-system-prompt-file",
++        "kind": "flag",
++        "semantics": "append"
++      },
++      {
++        "argument": "path",
++        "flag": "--system-prompt-file",
++        "kind": "flag",
++        "semantics": "replace"
++      }
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/system-prompt.md"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-locked-profile-source.json b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-locked-profile-source.json
+new file mode 100644
+index 00000000..4a9e9442
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-locked-profile-source.json
+@@ -0,0 +1,53 @@
++{
++  "env": {
++    "CLAUDE_CONFIG_DIR": "/manager/environments/companyA/claude_code"
++  },
++  "environment": "claude_code",
++  "fragment": "launch-env-fragment-v2",
++  "mcp": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--mcp-config",
++        "kind": "flag",
++        "with": [
++          "--strict-mcp-config"
++        ]
++      }
++    ],
++    "env_names": [
++      "FIGMA_API_KEY"
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/mcp/claude_code.json"
++  },
++  "permissions": {
++    "locked": true,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "system_prompt": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--append-system-prompt-file",
++        "kind": "flag",
++        "semantics": "append"
++      },
++      {
++        "argument": "path",
++        "flag": "--system-prompt-file",
++        "kind": "flag",
++        "semantics": "replace"
++      }
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/system-prompt.md"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-missing-mode.json b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-missing-mode.json
+new file mode 100644
+index 00000000..09188827
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-missing-mode.json
+@@ -0,0 +1,52 @@
++{
++  "env": {
++    "CLAUDE_CONFIG_DIR": "/manager/environments/companyA/claude_code"
++  },
++  "environment": "claude_code",
++  "fragment": "launch-env-fragment-v2",
++  "mcp": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--mcp-config",
++        "kind": "flag",
++        "with": [
++          "--strict-mcp-config"
++        ]
++      }
++    ],
++    "env_names": [
++      "FIGMA_API_KEY"
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/mcp/claude_code.json"
++  },
++  "permissions": {
++    "locked": false,
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "system_prompt": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--append-system-prompt-file",
++        "kind": "flag",
++        "semantics": "append"
++      },
++      {
++        "argument": "path",
++        "flag": "--system-prompt-file",
++        "kind": "flag",
++        "semantics": "replace"
++      }
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/system-prompt.md"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-unknown-field.json b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-unknown-field.json
+new file mode 100644
+index 00000000..e5b2531c
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-unknown-field.json
+@@ -0,0 +1,54 @@
++{
++  "env": {
++    "CLAUDE_CONFIG_DIR": "/manager/environments/companyA/claude_code"
++  },
++  "environment": "claude_code",
++  "fragment": "launch-env-fragment-v2",
++  "mcp": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--mcp-config",
++        "kind": "flag",
++        "with": [
++          "--strict-mcp-config"
++        ]
++      }
++    ],
++    "env_names": [
++      "FIGMA_API_KEY"
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/mcp/claude_code.json"
++  },
++  "permissions": {
++    "level": "profile",
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "system_prompt": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--append-system-prompt-file",
++        "kind": "flag",
++        "semantics": "append"
++      },
++      {
++        "argument": "path",
++        "flag": "--system-prompt-file",
++        "kind": "flag",
++        "semantics": "replace"
++      }
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/system-prompt.md"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-unknown-mode.json b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-unknown-mode.json
+new file mode 100644
+index 00000000..2f762f00
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-unknown-mode.json
+@@ -0,0 +1,53 @@
++{
++  "env": {
++    "CLAUDE_CONFIG_DIR": "/manager/environments/companyA/claude_code"
++  },
++  "environment": "claude_code",
++  "fragment": "launch-env-fragment-v2",
++  "mcp": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--mcp-config",
++        "kind": "flag",
++        "with": [
++          "--strict-mcp-config"
++        ]
++      }
++    ],
++    "env_names": [
++      "FIGMA_API_KEY"
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/mcp/claude_code.json"
++  },
++  "permissions": {
++    "locked": false,
++    "mode": "auto",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "system_prompt": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--append-system-prompt-file",
++        "kind": "flag",
++        "semantics": "append"
++      },
++      {
++        "argument": "path",
++        "flag": "--system-prompt-file",
++        "kind": "flag",
++        "semantics": "replace"
++      }
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/system-prompt.md"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-unknown-source.json b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-unknown-source.json
+new file mode 100644
+index 00000000..eb68cfd4
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-unknown-source.json
+@@ -0,0 +1,53 @@
++{
++  "env": {
++    "CLAUDE_CONFIG_DIR": "/manager/environments/companyA/claude_code"
++  },
++  "environment": "claude_code",
++  "fragment": "launch-env-fragment-v2",
++  "mcp": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--mcp-config",
++        "kind": "flag",
++        "with": [
++          "--strict-mcp-config"
++        ]
++      }
++    ],
++    "env_names": [
++      "FIGMA_API_KEY"
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/mcp/claude_code.json"
++  },
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "flag"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "system_prompt": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--append-system-prompt-file",
++        "kind": "flag",
++        "semantics": "append"
++      },
++      {
++        "argument": "path",
++        "flag": "--system-prompt-file",
++        "kind": "flag",
++        "semantics": "replace"
++      }
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/system-prompt.md"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-yolo-locked.json b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-yolo-locked.json
+new file mode 100644
+index 00000000..9968d676
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-yolo-locked.json
+@@ -0,0 +1,53 @@
++{
++  "env": {
++    "CLAUDE_CONFIG_DIR": "/manager/environments/companyA/claude_code"
++  },
++  "environment": "claude_code",
++  "fragment": "launch-env-fragment-v2",
++  "mcp": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--mcp-config",
++        "kind": "flag",
++        "with": [
++          "--strict-mcp-config"
++        ]
++      }
++    ],
++    "env_names": [
++      "FIGMA_API_KEY"
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/mcp/claude_code.json"
++  },
++  "permissions": {
++    "locked": true,
++    "mode": "yolo",
++    "source": "global"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "system_prompt": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--append-system-prompt-file",
++        "kind": "flag",
++        "semantics": "append"
++      },
++      {
++        "argument": "path",
++        "flag": "--system-prompt-file",
++        "kind": "flag",
++        "semantics": "replace"
++      }
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/system-prompt.md"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-yolo-silent.json b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-yolo-silent.json
+new file mode 100644
+index 00000000..01049aa0
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid-permissions-yolo-silent.json
+@@ -0,0 +1,53 @@
++{
++  "env": {
++    "CLAUDE_CONFIG_DIR": "/manager/environments/companyA/claude_code"
++  },
++  "environment": "claude_code",
++  "fragment": "launch-env-fragment-v2",
++  "mcp": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--mcp-config",
++        "kind": "flag",
++        "with": [
++          "--strict-mcp-config"
++        ]
++      }
++    ],
++    "env_names": [
++      "FIGMA_API_KEY"
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/mcp/claude_code.json"
++  },
++  "permissions": {
++    "locked": false,
++    "mode": "yolo",
++    "source": "default"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "system_prompt": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--append-system-prompt-file",
++        "kind": "flag",
++        "semantics": "append"
++      },
++      {
++        "argument": "path",
++        "flag": "--system-prompt-file",
++        "kind": "flag",
++        "semantics": "replace"
++      }
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/system-prompt.md"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid.json b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid.json
+new file mode 100644
+index 00000000..c409a07f
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/invalid.json
+@@ -0,0 +1,50 @@
++{
++  "environment": "claude_code",
++  "fragment": "launch-env-fragment-v2",
++  "mcp": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--mcp-config",
++        "kind": "flag",
++        "with": [
++          "--strict-mcp-config"
++        ]
++      }
++    ],
++    "env_names": [
++      "FIGMA_API_KEY"
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/mcp/claude_code.json"
++  },
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "system_prompt": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--append-system-prompt-file",
++        "kind": "flag",
++        "semantics": "append"
++      },
++      {
++        "argument": "path",
++        "flag": "--system-prompt-file",
++        "kind": "flag",
++        "semantics": "replace"
++      }
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/system-prompt.md"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/valid-permissions-native-locked.json b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/valid-permissions-native-locked.json
+new file mode 100644
+index 00000000..b6961c7f
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/valid-permissions-native-locked.json
+@@ -0,0 +1,53 @@
++{
++  "env": {
++    "CLAUDE_CONFIG_DIR": "/manager/environments/companyA/claude_code"
++  },
++  "environment": "claude_code",
++  "fragment": "launch-env-fragment-v2",
++  "mcp": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--mcp-config",
++        "kind": "flag",
++        "with": [
++          "--strict-mcp-config"
++        ]
++      }
++    ],
++    "env_names": [
++      "FIGMA_API_KEY"
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/mcp/claude_code.json"
++  },
++  "permissions": {
++    "locked": true,
++    "mode": "native",
++    "source": "global"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "system_prompt": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--append-system-prompt-file",
++        "kind": "flag",
++        "semantics": "append"
++      },
++      {
++        "argument": "path",
++        "flag": "--system-prompt-file",
++        "kind": "flag",
++        "semantics": "replace"
++      }
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/system-prompt.md"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/valid-permissions-native-silent.json b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/valid-permissions-native-silent.json
+new file mode 100644
+index 00000000..debe5dab
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/valid-permissions-native-silent.json
+@@ -0,0 +1,53 @@
++{
++  "env": {
++    "CLAUDE_CONFIG_DIR": "/manager/environments/companyA/claude_code"
++  },
++  "environment": "claude_code",
++  "fragment": "launch-env-fragment-v2",
++  "mcp": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--mcp-config",
++        "kind": "flag",
++        "with": [
++          "--strict-mcp-config"
++        ]
++      }
++    ],
++    "env_names": [
++      "FIGMA_API_KEY"
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/mcp/claude_code.json"
++  },
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "default"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "system_prompt": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--append-system-prompt-file",
++        "kind": "flag",
++        "semantics": "append"
++      },
++      {
++        "argument": "path",
++        "flag": "--system-prompt-file",
++        "kind": "flag",
++        "semantics": "replace"
++      }
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/system-prompt.md"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/valid-permissions-yolo-unlocked.json b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/valid-permissions-yolo-unlocked.json
+new file mode 100644
+index 00000000..a71538bb
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/valid-permissions-yolo-unlocked.json
+@@ -0,0 +1,53 @@
++{
++  "env": {
++    "CLAUDE_CONFIG_DIR": "/manager/environments/companyA/claude_code"
++  },
++  "environment": "claude_code",
++  "fragment": "launch-env-fragment-v2",
++  "mcp": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--mcp-config",
++        "kind": "flag",
++        "with": [
++          "--strict-mcp-config"
++        ]
++      }
++    ],
++    "env_names": [
++      "FIGMA_API_KEY"
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/mcp/claude_code.json"
++  },
++  "permissions": {
++    "locked": false,
++    "mode": "yolo",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "system_prompt": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--append-system-prompt-file",
++        "kind": "flag",
++        "semantics": "append"
++      },
++      {
++        "argument": "path",
++        "flag": "--system-prompt-file",
++        "kind": "flag",
++        "semantics": "replace"
++      }
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/system-prompt.md"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/valid.json b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/valid.json
+new file mode 100644
+index 00000000..19e3cc10
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-main/conformance/v1/schema-cases/launch-env-fragment-v2/valid.json
+@@ -0,0 +1,53 @@
++{
++  "env": {
++    "CLAUDE_CONFIG_DIR": "/manager/environments/companyA/claude_code"
++  },
++  "environment": "claude_code",
++  "fragment": "launch-env-fragment-v2",
++  "mcp": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--mcp-config",
++        "kind": "flag",
++        "with": [
++          "--strict-mcp-config"
++        ]
++      }
++    ],
++    "env_names": [
++      "FIGMA_API_KEY"
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/mcp/claude_code.json"
++  },
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "system_prompt": {
++    "channels": [
++      {
++        "argument": "path",
++        "flag": "--append-system-prompt-file",
++        "kind": "flag",
++        "semantics": "append"
++      },
++      {
++        "argument": "path",
++        "flag": "--system-prompt-file",
++        "kind": "flag",
++        "semantics": "replace"
++      }
++    ],
++    "path": "/manager/environments/companyA/claude_code/.agent-context/system-prompt.md"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-main/schemas/v1/agent-context-v1.schema.json b/internal/envfragment/testdata/curator-spec-main/schemas/v1/agent-context-v1.schema.json
+new file mode 100644
+index 00000000..138dc95e
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-main/schemas/v1/agent-context-v1.schema.json
+@@ -0,0 +1,138 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://relux-works.github.io/curator-spec/schemas/v1/agent-context-v1.schema.json",
++  "title": "agent-context.json schema 1",
++  "type": "object",
++  "required": ["schema_version", "name", "version"],
++  "properties": {
++    "schema_version": {"const": 1},
++    "name": {"$ref": "common.schema.json#/$defs/identifier"},
++    "version": {"$ref": "#/$defs/packageVersion"},
++    "weight": {"$ref": "#/$defs/weight"},
++    "weights": {
++      "type": "object",
++      "propertyNames": {"$ref": "common.schema.json#/$defs/identifier"},
++      "additionalProperties": {"$ref": "#/$defs/weight"}
++    },
++    "context": {
++      "type": "object",
++      "required": ["modules"],
++      "properties": {
++        "modules": {
++          "type": "array",
++          "items": {"$ref": "#/$defs/module"}
++        }
++      },
++      "additionalProperties": false
++    },
++    "requires": {
++      "type": "object",
++      "properties": {
++        "contexts": {
++          "type": "object",
++          "propertyNames": {"$ref": "common.schema.json#/$defs/identifier"},
++          "additionalProperties": {"$ref": "#/$defs/contextRequirement"}
++        },
++        "skills": {
++          "type": "object",
++          "propertyNames": {"$ref": "common.schema.json#/$defs/identifier"},
++          "additionalProperties": {"$ref": "#/$defs/skillRequirement"}
++        },
++        "mcp": {
++          "type": "object",
++          "propertyNames": {"$ref": "common.schema.json#/$defs/identifier"},
++          "additionalProperties": {"$ref": "#/$defs/mcpRequirement"}
++        }
++      },
++      "additionalProperties": false
++    }
++  },
++  "additionalProperties": false,
++  "$defs": {
++    "packageVersion": {
++      "type": "string",
++      "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?$"
++    },
++    "weight": {"type": "integer", "minimum": 0, "maximum": 2147483647},
++    "range": {
++      "type": "string",
++      "minLength": 1,
++      "maxLength": 1024,
++      "pattern": "^(?:latest|(?:(?:>=|<=|>|<|=|\\^|~)?(?:\\*|x|X|0|[1-9][0-9]*)(?:\\.(?:\\*|x|X|0|[1-9][0-9]*)(?:\\.(?:\\*|x|X|0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?)?)?)(?: +(?:>=|<=|>|<|=|\\^|~)?(?:\\*|x|X|0|[1-9][0-9]*)(?:\\.(?:\\*|x|X|0|[1-9][0-9]*)(?:\\.(?:\\*|x|X|0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?)?)?)*(?: *\\|\\| *(?:(?:>=|<=|>|<|=|\\^|~)?(?:\\*|x|X|0|[1-9][0-9]*)(?:\\.(?:\\*|x|X|0|[1-9][0-9]*)(?:\\.(?:\\*|x|X|0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?)?)?)(?: +(?:>=|<=|>|<|=|\\^|~)?(?:\\*|x|X|0|[1-9][0-9]*)(?:\\.(?:\\*|x|X|0|[1-9][0-9]*)(?:\\.(?:\\*|x|X|0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?)?)?)*)*)$"
++    },
++    "module": {
++      "type": "object",
++      "required": ["path"],
++      "properties": {
++        "path": {"$ref": "common.schema.json#/$defs/portablePath"},
++        "environments": {
++          "type": "array",
++          "minItems": 1,
++          "uniqueItems": true,
++          "items": {"$ref": "common.schema.json#/$defs/identifier"}
++        },
++        "class": {"enum": ["root", "system"]}
++      },
++      "additionalProperties": false
++    },
++    "requirementForm": {
++      "oneOf": [
++        {"required": ["range"], "not": {"anyOf": [{"required": ["tag"]}, {"required": ["revision"]}]}},
++        {"required": ["tag"], "not": {"anyOf": [{"required": ["range"]}, {"required": ["revision"]}]}},
++        {"required": ["revision"], "not": {"anyOf": [{"required": ["range"]}, {"required": ["tag"]}]}}
++      ]
++    },
++    "contextRequirement": {
++      "type": "object",
++      "required": ["git"],
++      "properties": {
++        "git": {"$ref": "common.schema.json#/$defs/nonEmptyString"},
++        "range": {"$ref": "#/$defs/range"},
++        "tag": {"$ref": "common.schema.json#/$defs/gitRefName"},
++        "revision": {"$ref": "common.schema.json#/$defs/commit"},
++        "directory": {"$ref": "common.schema.json#/$defs/portablePath"},
++        "weight": {"$ref": "#/$defs/weight"}
++      },
++      "additionalProperties": false,
++      "allOf": [{"$ref": "#/$defs/requirementForm"}]
++    },
++    "skillRequirement": {
++      "type": "object",
++      "required": ["git"],
++      "properties": {
++        "git": {"$ref": "common.schema.json#/$defs/nonEmptyString"},
++        "range": {"$ref": "#/$defs/range"},
++        "tag": {"$ref": "common.schema.json#/$defs/gitRefName"},
++        "revision": {"$ref": "common.schema.json#/$defs/commit"},
++        "mode": {"enum": ["full", "runtime", "context"]},
++        "commands": {
++          "type": "array",
++          "minItems": 1,
++          "uniqueItems": true,
++          "items": {"$ref": "common.schema.json#/$defs/identifier"}
++        }
++      },
++      "additionalProperties": false,
++      "allOf": [
++        {"$ref": "#/$defs/requirementForm"},
++        {
++          "if": {"required": ["commands"]},
++          "then": {"properties": {"mode": {"const": "runtime"}}, "required": ["mode"]}
++        }
++      ]
++    },
++    "mcpRequirement": {
++      "type": "object",
++      "required": ["git"],
++      "properties": {
++        "git": {"$ref": "common.schema.json#/$defs/nonEmptyString"},
++        "range": {"$ref": "#/$defs/range"},
++        "tag": {"$ref": "common.schema.json#/$defs/gitRefName"},
++        "revision": {"$ref": "common.schema.json#/$defs/commit"},
++        "directory": {"$ref": "common.schema.json#/$defs/portablePath"}
++      },
++      "additionalProperties": false,
++      "allOf": [{"$ref": "#/$defs/requirementForm"}]
++    }
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-main/schemas/v1/agent-environment-marker-v1.schema.json b/internal/envfragment/testdata/curator-spec-main/schemas/v1/agent-environment-marker-v1.schema.json
+new file mode 100644
+index 00000000..85ca5809
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-main/schemas/v1/agent-environment-marker-v1.schema.json
+@@ -0,0 +1,203 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://relux-works.github.io/curator-spec/schemas/v1/agent-environment-marker-v1.schema.json",
++  "title": ".agent-environment.json schema 1",
++  "type": "object",
++  "required": ["version", "profile", "members", "precedence", "mode", "surfaces"],
++  "properties": {
++    "version": {"const": 1},
++    "profile": {
++      "oneOf": [
++        {
++          "type": "object",
++          "required": ["name", "root", "kind", "lock_sha256", "source", "requirement"],
++          "properties": {
++            "name": {"$ref": "common.schema.json#/$defs/identifier"},
++            "root": {"$ref": "common.schema.json#/$defs/identifier"},
++            "kind": {"const": "git"},
++            "lock_sha256": {"$ref": "common.schema.json#/$defs/hex256"},
++            "source": {"$ref": "context-lock-v1.schema.json#/$defs/sourceIdentity"},
++            "requirement": {"$ref": "#/$defs/requirement"},
++            "directory": {"$ref": "common.schema.json#/$defs/portablePath"}
++          },
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": ["name", "root", "kind", "lock_sha256"],
++          "properties": {
++            "name": {"$ref": "common.schema.json#/$defs/identifier"},
++            "root": {"$ref": "common.schema.json#/$defs/identifier"},
++            "kind": {"const": "local"},
++            "lock_sha256": {"$ref": "common.schema.json#/$defs/hex256"}
++          },
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": ["name", "root", "kind", "lock_sha256", "source_path"],
++          "properties": {
++            "name": {"$ref": "common.schema.json#/$defs/identifier"},
++            "root": {"$ref": "common.schema.json#/$defs/identifier"},
++            "kind": {"const": "path"},
++            "lock_sha256": {"$ref": "common.schema.json#/$defs/hex256"},
++            "source_path": {"$ref": "common.schema.json#/$defs/nonEmptyString"},
++            "imported_from_native": {"const": true}
++          },
++          "additionalProperties": false
++        }
++      ]
++    },
++    "members": {
++      "type": "array",
++      "minItems": 1,
++      "items": {"$ref": "#/$defs/member"}
++    },
++    "precedence": {"$ref": "#/$defs/precedence"},
++    "mode": {"enum": ["managed-home", "linked", "copied"]},
++    "surfaces": {
++      "type": "object",
++      "properties": {
++        "mcp": {"$ref": "#/$defs/surfaceEntry"},
++        "root-context": {"$ref": "#/$defs/rootContextSurfaceEntry"},
++        "skills": {"$ref": "#/$defs/surfaceEntry"},
++        "system-prompt": {"$ref": "#/$defs/surfaceEntry"}
++      },
++      "additionalProperties": false
++    },
++    "passthrough": {
++      "type": "array",
++      "items": {
++        "type": "object",
++        "required": ["path", "strategy"],
++        "properties": {
++          "path": {"$ref": "common.schema.json#/$defs/portablePath"},
++          "strategy": {"enum": ["per-home-keychain", "file-link", "keyring-preferred", "ambient", "in-place"]}
++        },
++        "additionalProperties": false
++      }
++    },
++    "seeds": {"$ref": "common.schema.json#/$defs/pathSet"},
++    "seeded_projects": {
++      "type": "array",
++      "uniqueItems": true,
++      "items": {"$ref": "common.schema.json#/$defs/nonEmptyString"}
++    },
++    "seed_links": {"$ref": "common.schema.json#/$defs/pathSet"},
++    "codex_seed_record": {
++      "type": "object",
++      "required": ["revision", "native_mcp_servers"],
++      "properties": {
++        "revision": {"enum": ["A", "B"]},
++        "native_mcp_servers": {
++          "type": "array",
++          "uniqueItems": true,
++          "items": {"$ref": "common.schema.json#/$defs/nonEmptyString"}
++        }
++      },
++      "additionalProperties": false
++    }
++  },
++  "allOf": [
++    {
++      "if": {"properties": {"mode": {"const": "copied"}}, "required": ["mode"]},
++      "then": {
++        "properties": {
++          "surfaces": {"additionalProperties": {"not": {"required": ["copies"]}}}
++        }
++      },
++      "else": {
++        "properties": {
++          "surfaces": {"additionalProperties": {"required": ["copies"]}}
++        }
++      }
++    },
++    {
++      "if": {"properties": {"mode": {"const": "managed-home"}}, "required": ["mode"]},
++      "then": {"required": ["passthrough", "seeds"]},
++      "else": {
++        "properties": {
++          "passthrough": false,
++          "seeds": false,
++          "seeded_projects": false,
++          "seed_links": false,
++          "codex_seed_record": false
++        }
++      }
++    }
++  ],
++  "additionalProperties": false,
++  "$defs": {
++    "requirement": {
++      "type": "object",
++      "properties": {
++        "range": {"$ref": "agent-context-v1.schema.json#/$defs/range"},
++        "tag": {"$ref": "common.schema.json#/$defs/gitRefName"},
++        "revision": {"$ref": "common.schema.json#/$defs/commit"}
++      },
++      "additionalProperties": false,
++      "minProperties": 1,
++      "maxProperties": 1
++    },
++    "precedence": {
++      "type": "object",
++      "required": ["winner", "placement"],
++      "properties": {
++        "winner": {"enum": ["higher-weight", "lower-weight"]},
++        "placement": {"enum": ["winner-last", "winner-first"]}
++      },
++      "additionalProperties": false
++    },
++    "member": {
++      "type": "object",
++      "required": ["name", "version", "weight", "overlay"],
++      "properties": {
++        "name": {"$ref": "common.schema.json#/$defs/identifier"},
++        "version": {"$ref": "agent-context-v1.schema.json#/$defs/packageVersion"},
++        "commit": {"$ref": "common.schema.json#/$defs/commit"},
++        "state_sha256": {"$ref": "common.schema.json#/$defs/hex256"},
++        "weight": {"$ref": "agent-context-v1.schema.json#/$defs/weight"},
++        "overlay": {"type": "boolean"},
++        "source_path": {"$ref": "common.schema.json#/$defs/nonEmptyString"}
++      },
++      "additionalProperties": false,
++      "oneOf": [
++        {"required": ["commit"], "not": {"anyOf": [{"required": ["state_sha256"]}, {"required": ["source_path"]}]}},
++        {"required": ["state_sha256"], "not": {"required": ["commit"]}}
++      ]
++    },
++    "rootContextSurfaceEntry": {
++      "type": "object",
++      "required": ["paths", "form", "content_sha256"],
++      "properties": {
++        "paths": {"$ref": "common.schema.json#/$defs/pathSet"},
++        "form": {"enum": ["monolithic", "referenced"]},
++        "content_sha256": {"$ref": "common.schema.json#/$defs/sha256"},
++        "copies": {"$ref": "#/$defs/copies"}
++      },
++      "additionalProperties": false
++    },
++    "surfaceEntry": {
++      "type": "object",
++      "required": ["paths", "content_sha256"],
++      "properties": {
++        "paths": {"$ref": "common.schema.json#/$defs/pathSet"},
++        "content_sha256": {"$ref": "common.schema.json#/$defs/sha256"},
++        "copies": {"$ref": "#/$defs/copies"}
++      },
++      "additionalProperties": false
++    },
++    "copies": {
++      "type": "array",
++      "items": {
++        "type": "object",
++        "required": ["path", "reason"],
++        "properties": {
++          "path": {"$ref": "common.schema.json#/$defs/portablePath"},
++          "reason": {"enum": ["symlink-fallback", "claude-code-root-context"]}
++        },
++        "additionalProperties": false
++      }
++    }
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-main/schemas/v1/agent-mcp-v1.schema.json b/internal/envfragment/testdata/curator-spec-main/schemas/v1/agent-mcp-v1.schema.json
+new file mode 100644
+index 00000000..e7e6c2f7
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-main/schemas/v1/agent-mcp-v1.schema.json
+@@ -0,0 +1,70 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://relux-works.github.io/curator-spec/schemas/v1/agent-mcp-v1.schema.json",
++  "title": "agent-mcp.json schema 1",
++  "type": "object",
++  "required": ["schema_version", "name", "version", "server"],
++  "properties": {
++    "schema_version": {"const": 1},
++    "name": {"$ref": "common.schema.json#/$defs/identifier"},
++    "version": {"$ref": "agent-context-v1.schema.json#/$defs/packageVersion"},
++    "server": {
++      "oneOf": [
++        {
++          "type": "object",
++          "required": ["transport", "command", "args"],
++          "properties": {
++            "transport": {"const": "stdio"},
++            "command": {"$ref": "#/$defs/bareCommand"},
++            "args": {"type": "array", "items": {"type": "string", "maxLength": 8192}},
++            "env_names": {"$ref": "#/$defs/envNames"},
++            "environments": {"$ref": "#/$defs/environments"}
++          },
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": ["transport", "url"],
++          "properties": {
++            "transport": {"const": "http"},
++            "url": {"$ref": "#/$defs/httpsUrl"},
++            "env_names": {"$ref": "#/$defs/envNames"},
++            "environments": {"$ref": "#/$defs/environments"}
++          },
++          "additionalProperties": false
++        }
++      ]
++    }
++  },
++  "additionalProperties": false,
++  "$defs": {
++    "bareCommand": {
++      "type": "string",
++      "minLength": 1,
++      "maxLength": 255,
++      "pattern": "^(?!\\.{1,2}$)[^/\\\\\\s\\u0000-\\u001f\\u007f]+$"
++    },
++    "httpsUrl": {
++      "type": "string",
++      "minLength": 9,
++      "maxLength": 4096,
++      "pattern": "^https://[A-Za-z0-9][A-Za-z0-9.-]*(?::[0-9]{1,5})?(?:/[^\\s?#@]*)?$"
++    },
++    "envNames": {
++      "type": "array",
++      "uniqueItems": true,
++      "items": {
++        "allOf": [
++          {"$ref": "common.schema.json#/$defs/identifier"},
++          {"not": {"pattern": "^(?:PATH|HOME|TMPDIR|TEMP|TMP|XDG_CONFIG_HOME|XDG_CACHE_HOME|XDG_DATA_HOME|XDG_STATE_HOME|HTTP_PROXY|HTTPS_PROXY|ALL_PROXY|FTP_PROXY|NO_PROXY|http_proxy|https_proxy|all_proxy|ftp_proxy|no_proxy|RES_OPTIONS|HOSTALIASES|LOCALDOMAIN|IFS|CSK_PROJECT_ROOT|USERPROFILE|APPDATA|LOCALAPPDATA|PATHEXT|COMSPEC|WINDIR|SYSTEMROOT|__PYVENV_LAUNCHER__|LD_.*|DYLD_.*|PYTHON.*|NODE_.*|NPM_CONFIG_.*)$"}}
++        ]
++      }
++    },
++    "environments": {
++      "type": "array",
++      "minItems": 1,
++      "uniqueItems": true,
++      "items": {"$ref": "common.schema.json#/$defs/identifier"}
++    }
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-main/schemas/v1/common.schema.json b/internal/envfragment/testdata/curator-spec-main/schemas/v1/common.schema.json
+new file mode 100644
+index 00000000..50b0a606
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-main/schemas/v1/common.schema.json
+@@ -0,0 +1,665 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://relux-works.github.io/curator-spec/schemas/v1/common.schema.json",
++  "title": "Curator Protocol common definitions",
++  "$defs": {
++    "identifier": {
++      "allOf": [
++        {"type": "string", "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9_-])?$", "maxLength": 128},
++        {"not": {"pattern": "^(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][1-9]|[Ll][Pp][Tt][1-9])(?:\\.|$)"}}
++      ]
++    },
++    "portablePath": {
++      "type": "string",
++      "minLength": 1,
++      "maxLength": 4096,
++      "pattern": "^[^/\\\\:\\u0000-\\u001f\\u007f-\\u009f](?:[^\\\\:\\u0000-\\u001f\\u007f-\\u009f]*[^/ .\\\\:\\u0000-\\u001f\\u007f-\\u009f])?$",
++      "not": {"pattern": "(?:^|/)(?:\\.{1,2}|[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][1-9]|[Ll][Pp][Tt][1-9])(?:\\.|/|$)|//"}
++    },
++    "nonEmptyString": {"type": "string", "minLength": 1, "maxLength": 8192},
++    "projectAlias": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"},
++    "locale": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}[A-Za-z0-9])?$"},
++    "safeInteger": {"type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991},
++    "nonNegativeSafeInteger": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
++    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
++    "hex256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
++    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}(?:[0-9a-f]{24})?$"},
++    "timestamp": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"},
++    "stringSet": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
++    "identifierSet": {"type": "array", "items": {"$ref": "#/$defs/identifier"}, "uniqueItems": true},
++    "pathSet": {"type": "array", "items": {"$ref": "#/$defs/portablePath"}, "uniqueItems": true},
++    "ref": {
++      "type": "object",
++      "required": ["kind", "value"],
++      "properties": {
++        "kind": {"enum": ["tag", "revision"]},
++        "value": {"type": "string", "minLength": 1, "maxLength": 1024, "pattern": "^[^\\s\\^~><*]+$"}
++      },
++      "additionalProperties": false
++    },
++    "devRef": {
++      "type": "object",
++      "required": ["kind", "value"],
++      "properties": {
++        "kind": {"enum": ["tag", "revision", "branch"]},
++        "value": {"type": "string", "minLength": 1, "maxLength": 1024}
++      },
++      "additionalProperties": false
++    },
++    "scriptCommand": {
++      "type": "object",
++      "required": ["type"],
++      "properties": {
++        "type": {"const": "script"},
++        "unix_path": {"$ref": "#/$defs/portablePath"},
++        "win_path": {"$ref": "#/$defs/portablePath"}
++      },
++      "anyOf": [{"required": ["unix_path"]}, {"required": ["win_path"]}],
++      "additionalProperties": false
++    },
++    "systemCommand": {
++      "type": "object",
++      "required": ["type", "command"],
++      "properties": {
++        "type": {"const": "system"},
++        "command": {"$ref": "#/$defs/identifier"},
++        "hint": {"$ref": "#/$defs/nonEmptyString"}
++      },
++      "additionalProperties": false
++    },
++    "command": {"oneOf": [{"$ref": "#/$defs/scriptCommand"}, {"$ref": "#/$defs/systemCommand"}]},
++    "buildCommandV6": {
++      "type": "object",
++      "required": ["type", "driver", "source_dir"],
++      "properties": {
++        "type": {"const": "build"},
++        "driver": {"const": "go-v1"},
++        "source_dir": {"$ref": "#/$defs/portablePath"}
++      },
++      "additionalProperties": false
++    },
++    "commandV6": {"oneOf": [{"$ref": "#/$defs/scriptCommand"}, {"$ref": "#/$defs/systemCommand"}, {"$ref": "#/$defs/buildCommandV6"}]},
++    "rootOrPortablePath": {
++      "oneOf": [
++        {"const": "."},
++        {"$ref": "#/$defs/portablePath"}
++      ]
++    },
++    "repositoryGit": {
++      "type": "string",
++      "minLength": 1,
++      "maxLength": 4096,
++      "pattern": "^(?:https://[A-Za-z0-9][A-Za-z0-9.-]*/(?!(?:\\.{1,2})(?:/|$))[^\\s%?#\\\\/:\\u0000-\\u001f\\u007f-\\u009f]+(?:/(?!(?:\\.{1,2})(?:/|$))[^\\s%?#\\\\/:\\u0000-\\u001f\\u007f-\\u009f]+)*|ssh://(?:[A-Za-z0-9][A-Za-z0-9._-]{0,63}@)?[A-Za-z0-9][A-Za-z0-9.-]*/(?!(?:\\.{1,2})(?:/|$))[A-Za-z0-9._-]+(?:/(?!(?:\\.{1,2})(?:/|$))[A-Za-z0-9._-]+)*|(?:[A-Za-z0-9][A-Za-z0-9._-]{0,63}@)?[A-Za-z0-9][A-Za-z0-9.-]*:(?!(?:\\.{1,2})(?:/|$))[A-Za-z0-9._-]+(?:/(?!(?:\\.{1,2})(?:/|$))[A-Za-z0-9._-]+)*)$"
++    },
++    "gitRefName": {
++      "type": "string",
++      "minLength": 1,
++      "maxLength": 255,
++      "pattern": "^(?!/)(?!.*//)(?!.*\\.\\.)(?!.*@\\{)(?!.*(?:^|/)\\.)(?!.*(?:^|/)[^/]*\\.lock(?:/|$))(?!.*[\\u0000-\\u0020\\u007f~^:?*\\[\\\\])(?!@$).*[^/.]$"
++    },
++    "lockedCommit": {
++      "oneOf": [
++        {
++          "type": "object",
++          "required": ["object_format", "hex"],
++          "properties": {
++            "object_format": {"const": "sha1"},
++            "hex": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
++          },
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": ["object_format", "hex"],
++          "properties": {
++            "object_format": {"const": "sha256"},
++            "hex": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
++          },
++          "additionalProperties": false
++        }
++      ]
++    },
++    "buildRepositoryV1": {
++      "type": "object",
++      "required": ["git", "locked_commit"],
++      "properties": {
++        "git": {"$ref": "#/$defs/repositoryGit"},
++        "locked_commit": {"$ref": "#/$defs/lockedCommit"},
++        "tag": {"$ref": "#/$defs/gitRefName"}
++      },
++      "additionalProperties": false
++    },
++    "repositoryBuildCommandV1": {
++      "type": "object",
++      "required": ["type", "driver", "repository", "target"],
++      "properties": {
++        "type": {"const": "build"},
++        "driver": {"const": "go-repository-v1"},
++        "repository": {"$ref": "#/$defs/identifier"},
++        "target": {"$ref": "#/$defs/identifier"}
++      },
++      "additionalProperties": false
++    },
++    "commandV7": {
++      "oneOf": [
++        {"$ref": "#/$defs/scriptCommand"},
++        {"$ref": "#/$defs/systemCommand"},
++        {"$ref": "#/$defs/buildCommandV6"},
++        {"$ref": "#/$defs/repositoryBuildCommandV1"}
++      ]
++    },
++    "scriptExecutionPolicyV1": {"const": "script-worker-v1"},
++    "scriptInterpreterV1": {"enum": ["node-v1", "python3-v1"]},
++    "scriptCommandV8": {
++      "type": "object",
++      "required": ["type"],
++      "properties": {
++        "type": {"const": "script"},
++        "unix_path": {"$ref": "#/$defs/portablePath"},
++        "win_path": {"$ref": "#/$defs/portablePath"},
++        "execution_policy": {"$ref": "#/$defs/scriptExecutionPolicyV1"},
++        "interpreter": {"$ref": "#/$defs/scriptInterpreterV1"}
++      },
++      "anyOf": [{"required": ["unix_path"]}, {"required": ["win_path"]}],
++      "dependentRequired": {
++        "execution_policy": ["interpreter"],
++        "interpreter": ["execution_policy"]
++      },
++      "additionalProperties": false
++    },
++    "buildCommandV8": {
++      "type": "object",
++      "required": ["type", "driver", "source_dir"],
++      "properties": {
++        "type": {"const": "build"},
++        "driver": {"const": "go-v1"},
++        "source_dir": {"$ref": "#/$defs/portablePath"},
++        "modules": {"$ref": "#/$defs/pathSet"}
++      },
++      "additionalProperties": false
++    },
++    "commandV8": {
++      "oneOf": [
++        {"$ref": "#/$defs/scriptCommandV8"},
++        {"$ref": "#/$defs/systemCommand"},
++        {"$ref": "#/$defs/buildCommandV8"},
++        {"$ref": "#/$defs/repositoryBuildCommandV1"}
++      ]
++    },
++    "skillBuildTargetV1": {
++      "type": "object",
++      "required": ["driver", "build_root", "source_dir"],
++      "properties": {
++        "driver": {"const": "go-repository-v1"},
++        "build_root": {"$ref": "#/$defs/rootOrPortablePath"},
++        "source_dir": {"$ref": "#/$defs/rootOrPortablePath"}
++      },
++      "additionalProperties": false
++    },
++    "repositoryStructuredRef": {
++      "oneOf": [
++        {
++          "type": "object",
++          "required": ["kind", "value"],
++          "properties": {
++            "kind": {"const": "revision"},
++            "value": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"}
++          },
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": ["kind", "value"],
++          "properties": {
++            "kind": {"enum": ["tag", "branch"]},
++            "value": {"$ref": "#/$defs/gitRefName"}
++          },
++          "additionalProperties": false
++        }
++      ]
++    },
++    "buildRepositorySubstitution": {
++      "oneOf": [
++        {
++          "type": "object",
++          "required": ["path"],
++          "properties": {"path": {"$ref": "#/$defs/nonEmptyString"}},
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": ["git", "ref"],
++          "properties": {
++            "git": {"$ref": "#/$defs/repositoryGit"},
++            "ref": {"$ref": "#/$defs/repositoryStructuredRef"}
++          },
++          "additionalProperties": false
++        }
++      ]
++    },
++    "networkSourceIdentity": {
++      "type": "object",
++      "required": ["kind", "value"],
++      "properties": {
++        "kind": {"const": "network-git"},
++        "value": {
++          "type": "string",
++          "minLength": 3,
++          "maxLength": 4096,
++          "pattern": "^(?!.*\\.git$)[a-z0-9][a-z0-9.-]*/(?!(?:\\.{1,2})(?:/|$))[^\\s%?#\\\\/:\\u0000-\\u001f\\u007f-\\u009f]+(?:/(?!(?:\\.{1,2})(?:/|$))[^\\s%?#\\\\/:\\u0000-\\u001f\\u007f-\\u009f]+)*$"
++        }
++      },
++      "additionalProperties": false
++    },
++    "localSourceIdentity": {
++      "type": "object",
++      "required": ["kind", "value"],
++      "properties": {
++        "kind": {"const": "operator-local-git"},
++        "value": {"$ref": "#/$defs/sha256"}
++      },
++      "additionalProperties": false
++    },
++    "declaredRepositorySourceV1": {
++      "type": "object",
++      "required": ["identity", "transport", "locked_commit"],
++      "properties": {
++        "identity": {"$ref": "#/$defs/networkSourceIdentity"},
++        "transport": {"enum": ["https", "ssh"]},
++        "locked_commit": {"$ref": "#/$defs/lockedCommit"},
++        "tag": {"$ref": "#/$defs/gitRefName"}
++      },
++      "additionalProperties": false
++    },
++    "effectiveRepositorySourceV1": {
++      "type": "object",
++      "required": ["identity", "object_format", "commit", "substituted", "build_source"],
++      "properties": {
++        "identity": {
++          "oneOf": [
++            {"$ref": "#/$defs/networkSourceIdentity"},
++            {"$ref": "#/$defs/localSourceIdentity"}
++          ]
++        },
++        "transport": {"enum": ["https", "ssh"]},
++        "object_format": {"enum": ["sha1", "sha256"]},
++        "commit": {"$ref": "#/$defs/commit"},
++        "substituted": {"type": "boolean"},
++        "substitution": {
++          "oneOf": [
++            {
++              "type": "object",
++              "required": ["type"],
++              "properties": {"type": {"const": "local-path"}},
++              "additionalProperties": false
++            },
++            {
++              "type": "object",
++              "required": ["type", "ref"],
++              "properties": {
++                "type": {"const": "network-git"},
++                "ref": {"$ref": "#/$defs/repositoryStructuredRef"}
++              },
++              "additionalProperties": false
++            }
++          ]
++        },
++        "build_source": {"$ref": "#/$defs/buildSourceIdentity"}
++      },
++      "allOf": [
++        {
++          "if": {"properties": {"object_format": {"const": "sha1"}}, "required": ["object_format"]},
++          "then": {"properties": {"commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"}}},
++          "else": {"properties": {"commit": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}}
++        },
++        {
++          "if": {"properties": {"substituted": {"const": true}}, "required": ["substituted"]},
++          "then": {"required": ["substitution"]},
++          "else": {"not": {"required": ["substitution"]}}
++        },
++        {
++          "if": {"properties": {"identity": {"properties": {"kind": {"const": "network-git"}}, "required": ["kind"]}}},
++          "then": {"required": ["transport"]},
++          "else": {"not": {"required": ["transport"]}}
++        }
++      ],
++      "additionalProperties": false
++    },
++    "repositoryDescriptorSelectionV1": {
++      "type": "object",
++      "required": ["path", "target"],
++      "properties": {
++        "path": {"const": "skill-build.json"},
++        "target": {"$ref": "#/$defs/identifier"}
++      },
++      "additionalProperties": false
++    },
++    "buildSourceIdentity": {
++      "type": "object",
++      "required": ["algorithm", "content_sha256"],
++      "properties": {
++        "algorithm": {"const": "curator-build-source-v1"},
++        "content_sha256": {"$ref": "#/$defs/sha256"}
++      },
++      "additionalProperties": false
++    },
++    "goNativeTargetV1": {
++      "type": "object",
++      "required": ["goos", "goarch", "tuning"],
++      "properties": {
++        "goos": {"$ref": "#/$defs/identifier"},
++        "goarch": {"$ref": "#/$defs/identifier"},
++        "tuning": {
++          "type": "object",
++          "maxProperties": 1,
++          "propertyNames": {"enum": ["GO386", "GOAMD64", "GOARM", "GOARM64", "GOMIPS", "GOMIPS64", "GOPPC64", "GORISCV64", "GOWASM"]},
++          "additionalProperties": {"$ref": "#/$defs/nonEmptyString"}
++        }
++      },
++      "additionalProperties": false
++    },
++    "goToolchainIdentityV1": {
++      "type": "object",
++      "required": ["algorithm", "go_relpath", "go_version", "content_sha256"],
++      "properties": {
++        "algorithm": {"const": "curator-go-toolchain-v1"},
++        "go_relpath": {"const": "bin/go"},
++        "go_version": {"type": "string", "minLength": 1, "maxLength": 4096, "pattern": "^[^\\r\\n\\u0000]+$"},
++        "content_sha256": {"$ref": "#/$defs/sha256"}
++      },
++      "additionalProperties": false
++    },
++    "goExecutionPolicyV1": {"const": "manager-worker-v1"},
++    "goBuildPolicyV1": {
++      "type": "object",
++      "required": ["module_mode", "network", "workspace", "cgo", "compiler_directives", "target_mode", "link_mode", "libgcc", "package_assembly", "host_objects", "telemetry", "execution_policy"],
++      "properties": {
++        "module_mode": {"const": "vendor"},
++        "network": {"const": "none"},
++        "workspace": {"const": false},
++        "cgo": {"const": false},
++        "compiler_directives": {"const": "reject-nonstandard-cgo-import-dynamic-v1"},
++        "target_mode": {"const": "native"},
++        "link_mode": {"const": "internal"},
++        "libgcc": {"const": "none"},
++        "package_assembly": {"const": false},
++        "host_objects": {"const": false},
++        "telemetry": {"const": "off-private"},
++        "execution_policy": {"$ref": "#/$defs/goExecutionPolicyV1"}
++      },
++      "additionalProperties": false
++    },
++    "goRepositoryBuildPolicyV1": {
++      "type": "object",
++      "required": ["module_mode", "network", "workspace", "cgo", "compiler_directives", "target_mode", "link_mode", "libgcc", "package_assembly", "host_objects", "telemetry", "execution_policy", "source_kind"],
++      "properties": {
++        "module_mode": {"const": "vendor"},
++        "network": {"const": "none"},
++        "workspace": {"const": false},
++        "cgo": {"const": false},
++        "compiler_directives": {"const": "reject-nonstandard-cgo-import-dynamic-v1"},
++        "target_mode": {"const": "native"},
++        "link_mode": {"const": "internal"},
++        "libgcc": {"const": "none"},
++        "package_assembly": {"const": false},
++        "host_objects": {"const": false},
++        "telemetry": {"const": "off-private"},
++        "execution_policy": {"$ref": "#/$defs/goExecutionPolicyV1"},
++        "source_kind": {"const": "locked-external-git-v1"}
++      },
++      "additionalProperties": false
++    },
++    "goBuildInputV1": {
++      "type": "object",
++      "required": ["schema_version", "driver", "build_source", "build_root", "command", "source_dir", "target", "toolchain", "policy"],
++      "properties": {
++        "schema_version": {"const": 1},
++        "driver": {"const": "go-v1"},
++        "build_source": {"$ref": "#/$defs/buildSourceIdentity"},
++        "build_root": {"$ref": "#/$defs/portablePath"},
++        "command": {"$ref": "#/$defs/identifier"},
++        "source_dir": {"$ref": "#/$defs/portablePath"},
++        "target": {"$ref": "#/$defs/goNativeTargetV1"},
++        "toolchain": {"$ref": "#/$defs/goToolchainIdentityV1"},
++        "policy": {"$ref": "#/$defs/goBuildPolicyV1"}
++      },
++      "additionalProperties": false
++    },
++    "goRepositoryBuildInputV1": {
++      "type": "object",
++      "required": ["schema_version", "driver", "source", "command", "build_root", "source_dir", "target", "toolchain", "policy"],
++      "properties": {
++        "schema_version": {"const": 2},
++        "driver": {"const": "go-repository-v1"},
++        "source": {
++          "type": "object",
++          "required": ["repository", "declared", "effective", "descriptor"],
++          "properties": {
++            "repository": {"$ref": "#/$defs/identifier"},
++            "declared": {"$ref": "#/$defs/declaredRepositorySourceV1"},
++            "effective": {"$ref": "#/$defs/effectiveRepositorySourceV1"},
++            "descriptor": {"$ref": "#/$defs/repositoryDescriptorSelectionV1"}
++          },
++          "additionalProperties": false
++        },
++        "command": {"$ref": "#/$defs/identifier"},
++        "build_root": {"$ref": "#/$defs/rootOrPortablePath"},
++        "source_dir": {"$ref": "#/$defs/rootOrPortablePath"},
++        "target": {"$ref": "#/$defs/goNativeTargetV1"},
++        "toolchain": {"$ref": "#/$defs/goToolchainIdentityV1"},
++        "policy": {"$ref": "#/$defs/goRepositoryBuildPolicyV1"}
++      },
++      "additionalProperties": false
++    },
++    "buildArtifactV1": {
++      "type": "object",
++      "required": ["path", "sha256", "size"],
++      "properties": {
++        "path": {"$ref": "#/$defs/portablePath"},
++        "sha256": {"$ref": "#/$defs/sha256"},
++        "size": {"$ref": "#/$defs/nonNegativeSafeInteger"}
++      },
++      "additionalProperties": false
++    },
++    "buildRecordV1": {
++      "type": "object",
++      "required": ["driver", "cache_key", "receipt_sha256", "artifact_sha256", "artifact_path"],
++      "properties": {
++        "driver": {"const": "go-v1"},
++        "cache_key": {"$ref": "#/$defs/sha256"},
++        "receipt_sha256": {"$ref": "#/$defs/sha256"},
++        "artifact_sha256": {"$ref": "#/$defs/sha256"},
++        "artifact_path": {"$ref": "#/$defs/portablePath"}
++      },
++      "additionalProperties": false
++    },
++    "buildRecordV1WithReceiptVersion": {
++      "type": "object",
++      "required": ["driver", "receipt_schema_version", "execution_policy", "cache_key", "receipt_sha256", "artifact_sha256", "artifact_path"],
++      "properties": {
++        "driver": {"const": "go-v1"},
++        "receipt_schema_version": {"const": 1},
++        "execution_policy": {"$ref": "#/$defs/goExecutionPolicyV1"},
++        "cache_key": {"$ref": "#/$defs/sha256"},
++        "receipt_sha256": {"$ref": "#/$defs/sha256"},
++        "artifact_sha256": {"$ref": "#/$defs/sha256"},
++        "artifact_path": {"$ref": "#/$defs/portablePath"}
++      },
++      "additionalProperties": false
++    },
++    "buildRecordV2": {
++      "type": "object",
++      "required": ["driver", "receipt_schema_version", "execution_policy", "repository", "declared_identity", "declared_locked_commit", "effective_identity", "object_format", "commit", "substituted", "build_source", "descriptor_target", "cache_key", "receipt_sha256", "artifact_sha256", "artifact_path"],
++      "properties": {
++        "driver": {"const": "go-repository-v1"},
++        "receipt_schema_version": {"const": 2},
++        "execution_policy": {"$ref": "#/$defs/goExecutionPolicyV1"},
++        "repository": {"$ref": "#/$defs/identifier"},
++        "declared_identity": {"$ref": "#/$defs/networkSourceIdentity"},
++        "declared_locked_commit": {"$ref": "#/$defs/lockedCommit"},
++        "declared_tag": {"$ref": "#/$defs/gitRefName"},
++        "effective_identity": {
++          "oneOf": [
++            {"$ref": "#/$defs/networkSourceIdentity"},
++            {"$ref": "#/$defs/localSourceIdentity"}
++          ]
++        },
++        "object_format": {"enum": ["sha1", "sha256"]},
++        "commit": {"$ref": "#/$defs/commit"},
++        "substituted": {"type": "boolean"},
++        "substitution": {
++          "oneOf": [
++            {
++              "type": "object",
++              "required": ["type"],
++              "properties": {"type": {"const": "local-path"}},
++              "additionalProperties": false
++            },
++            {
++              "type": "object",
++              "required": ["type", "ref"],
++              "properties": {
++                "type": {"const": "network-git"},
++                "ref": {"$ref": "#/$defs/repositoryStructuredRef"}
++              },
++              "additionalProperties": false
++            }
++          ]
++        },
++        "build_source": {"$ref": "#/$defs/buildSourceIdentity"},
++        "descriptor_target": {"$ref": "#/$defs/identifier"},
++        "cache_key": {"$ref": "#/$defs/sha256"},
++        "receipt_sha256": {"$ref": "#/$defs/sha256"},
++        "artifact_sha256": {"$ref": "#/$defs/sha256"},
++        "artifact_path": {"$ref": "#/$defs/portablePath"}
++      },
++      "allOf": [
++        {
++          "if": {"properties": {"object_format": {"const": "sha1"}}, "required": ["object_format"]},
++          "then": {"properties": {"commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"}}},
++          "else": {"properties": {"commit": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}}
++        },
++        {
++          "if": {"properties": {"substituted": {"const": true}}, "required": ["substituted"]},
++          "then": {"required": ["substitution"]},
++          "else": {"not": {"required": ["substitution"]}}
++        }
++      ],
++      "additionalProperties": false
++    },
++    "legacySkillCommand": {
++      "type": "object",
++      "required": ["type", "skill", "command"],
++      "properties": {
++        "type": {"const": "skill"},
++        "skill": {"$ref": "#/$defs/identifier"},
++        "command": {"$ref": "#/$defs/identifier"},
++        "hint": {"$ref": "#/$defs/nonEmptyString"}
++      },
++      "additionalProperties": false
++    },
++    "capabilities": {
++      "type": "object",
++      "properties": {
++        "network": {
++          "oneOf": [
++            {"const": "none"},
++            {"type": "array", "items": {"type": "string", "minLength": 1, "pattern": "^[^\\s/\\\\]+$"}, "uniqueItems": true}
++          ],
++          "default": "none"
++        },
++        "filesystem": {
++          "oneOf": [
++            {"enum": ["repo", "home-config"]},
++            {"$ref": "#/$defs/pathSet"}
++          ],
++          "default": "repo"
++        },
++        "exec": {
++          "oneOf": [{"const": "none"}, {"$ref": "#/$defs/identifierSet"}],
++          "default": "none"
++        },
++        "secrets": {
++          "oneOf": [{"const": "none"}, {"$ref": "#/$defs/stringSet"}],
++          "default": "none"
++        },
++        "env_read": {
++          "type": "array",
++          "items": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
++          "uniqueItems": true,
++          "default": []
++        },
++        "prompt_scope": {"$ref": "#/$defs/nonEmptyString"}
++      },
++      "additionalProperties": false
++    },
++    "skillRequirement": {
++      "type": "object",
++      "required": ["git", "ref"],
++      "properties": {
++        "git": {"$ref": "#/$defs/nonEmptyString"},
++        "ref": {"$ref": "#/$defs/ref"},
++        "mode": {"enum": ["full", "runtime", "context"], "default": "full"},
++        "commands": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/identifier"}, "uniqueItems": true}
++      },
++      "allOf": [
++        {"if": {"required": ["commands"]}, "then": {"properties": {"mode": {"const": "runtime"}}, "required": ["mode"]}}
++      ],
++      "additionalProperties": false
++    },
++    "mcpRequirement": {
++      "type": "object",
++      "required": ["hint"],
++      "properties": {
++        "hint": {"$ref": "#/$defs/nonEmptyString"},
++        "transport": {"enum": ["stdio", "http"]},
++        "required_in": {"enum": ["any", "all"], "default": "any"}
++      },
++      "additionalProperties": false
++    },
++    "dependenciesV2": {
++      "type": "object",
++      "properties": {
++        "commands": {"type": "object", "additionalProperties": {"oneOf": [{"$ref": "#/$defs/systemCommand"}, {"$ref": "#/$defs/legacySkillCommand"}]}}
++      },
++      "additionalProperties": false
++    },
++    "dependenciesV4": {
++      "type": "object",
++      "properties": {
++        "commands": {"type": "object", "additionalProperties": {"oneOf": [{"$ref": "#/$defs/systemCommand"}, {"$ref": "#/$defs/legacySkillCommand"}]}},
++        "skills": {"type": "object", "additionalProperties": {"$ref": "#/$defs/skillRequirement"}}
++      },
++      "additionalProperties": false
++    },
++    "dependenciesV5": {
++      "type": "object",
++      "properties": {
++        "commands": {"type": "object", "additionalProperties": {"oneOf": [{"$ref": "#/$defs/systemCommand"}, {"$ref": "#/$defs/legacySkillCommand"}]}},
++        "skills": {"type": "object", "additionalProperties": {"$ref": "#/$defs/skillRequirement"}},
++        "mcp_servers": {"type": "object", "additionalProperties": {"$ref": "#/$defs/mcpRequirement"}}
++      },
++      "additionalProperties": false
++    },
++    "signature": {
++      "type": "object",
++      "required": ["algorithm", "key_id", "signature"],
++      "properties": {
++        "algorithm": {"const": "ed25519"},
++        "key_id": {"type": "string", "pattern": "^[0-9a-f]{16}$"},
++        "signature": {"type": "string", "pattern": "^[A-Za-z0-9+/]{86}==$"}
++      },
++      "additionalProperties": false
++    },
++    "canonicalValue": {
++      "oneOf": [
++        {"type": "null"},
++        {"type": "boolean"},
++        {"$ref": "#/$defs/safeInteger"},
++        {"type": "string"},
++        {"type": "array", "items": {"$ref": "#/$defs/canonicalValue"}},
++        {"type": "object", "additionalProperties": {"$ref": "#/$defs/canonicalValue"}}
++      ]
++    }
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-main/schemas/v1/context-lock-v1.schema.json b/internal/envfragment/testdata/curator-spec-main/schemas/v1/context-lock-v1.schema.json
+new file mode 100644
+index 00000000..1a1bfd94
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-main/schemas/v1/context-lock-v1.schema.json
+@@ -0,0 +1,59 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://relux-works.github.io/curator-spec/schemas/v1/context-lock-v1.schema.json",
++  "title": "context-lock-v1",
++  "type": "object",
++  "required": ["schema_version", "root", "members"],
++  "properties": {
++    "schema_version": {"const": 1},
++    "root": {"$ref": "common.schema.json#/$defs/identifier"},
++    "members": {
++      "type": "array",
++      "minItems": 1,
++      "items": {"$ref": "#/$defs/member"}
++    }
++  },
++  "additionalProperties": false,
++  "$defs": {
++    "sourceIdentity": {"$ref": "common.schema.json#/$defs/networkSourceIdentity/properties/value"},
++    "member": {
++      "type": "object",
++      "required": ["kind", "name", "weight", "required_by", "overlay"],
++      "properties": {
++        "kind": {"enum": ["context", "mcp", "skill"]},
++        "name": {"$ref": "common.schema.json#/$defs/identifier"},
++        "source": {"$ref": "#/$defs/sourceIdentity"},
++        "directory": {"$ref": "common.schema.json#/$defs/portablePath"},
++        "version": {"$ref": "agent-context-v1.schema.json#/$defs/packageVersion"},
++        "commit": {"$ref": "common.schema.json#/$defs/commit"},
++        "state_sha256": {"$ref": "common.schema.json#/$defs/hex256"},
++        "weight": {"$ref": "agent-context-v1.schema.json#/$defs/weight"},
++        "required_by": {"$ref": "common.schema.json#/$defs/identifierSet"},
++        "overlay": {"type": "boolean"}
++      },
++      "additionalProperties": false,
++      "oneOf": [
++        {
++          "required": ["source", "commit"],
++          "not": {"required": ["state_sha256"]}
++        },
++        {
++          "required": ["state_sha256"],
++          "properties": {"kind": {"const": "context"}},
++          "not": {"anyOf": [{"required": ["source"]}, {"required": ["commit"]}, {"required": ["directory"]}]}
++        }
++      ],
++      "allOf": [
++        {
++          "if": {"properties": {"kind": {"const": "skill"}}},
++          "then": {"not": {"required": ["directory"]}},
++          "else": {"required": ["version"]}
++        },
++        {
++          "if": {"properties": {"overlay": {"const": true}}},
++          "then": {"properties": {"kind": {"const": "context"}}}
++        }
++      ]
++    }
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-main/schemas/v1/launch-env-fragment-v2.schema.json b/internal/envfragment/testdata/curator-spec-main/schemas/v1/launch-env-fragment-v2.schema.json
+new file mode 100644
+index 00000000..f49b4434
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-main/schemas/v1/launch-env-fragment-v2.schema.json
+@@ -0,0 +1,222 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://relux-works.github.io/curator-spec/schemas/v1/launch-env-fragment-v2.schema.json",
++  "title": "launch-env-fragment-v2",
++  "type": "object",
++  "required": ["fragment", "environment", "profile", "precedence", "env", "permissions"],
++  "properties": {
++    "fragment": {"const": "launch-env-fragment-v2"},
++    "environment": {"enum": ["claude_code", "codex_cli", "opencode", "pi"]},
++    "profile": {
++      "type": "object",
++      "required": ["name", "lock_sha256"],
++      "properties": {
++        "name": {"$ref": "common.schema.json#/$defs/identifier"},
++        "lock_sha256": {"$ref": "common.schema.json#/$defs/hex256"}
++      },
++      "additionalProperties": false
++    },
++    "precedence": {"$ref": "agent-environment-marker-v1.schema.json#/$defs/precedence"},
++    "env": {
++      "type": "object",
++      "minProperties": 1,
++      "maxProperties": 1,
++      "propertyNames": {"enum": ["CLAUDE_CONFIG_DIR", "CODEX_HOME", "XDG_CONFIG_HOME", "PI_CODING_AGENT_DIR"]},
++      "additionalProperties": {"$ref": "#/$defs/absolutePath"}
++    },
++    "system_prompt": {
++      "type": "object",
++      "required": ["path", "channels"],
++      "properties": {
++        "path": {"$ref": "#/$defs/absolutePath"},
++        "channels": {
++          "type": "array",
++          "items": {"$ref": "#/$defs/systemPromptDescriptor"}
++        }
++      },
++      "additionalProperties": false
++    },
++    "mcp": {
++      "type": "object",
++      "required": ["path", "env_names", "channels"],
++      "properties": {
++        "path": {"$ref": "#/$defs/absolutePath"},
++        "env_names": {"$ref": "agent-mcp-v1.schema.json#/$defs/envNames"},
++        "channels": {
++          "type": "array",
++          "minItems": 1,
++          "maxItems": 1,
++          "items": {"$ref": "#/$defs/mcpDescriptor"}
++        }
++      },
++      "additionalProperties": false
++    },
++    "path_prepend": {"$ref": "#/$defs/absolutePath"},
++    "permissions": {
++      "type": "object",
++      "required": ["mode", "locked", "source"],
++      "properties": {
++        "mode": {"enum": ["native", "yolo"]},
++        "locked": {"type": "boolean"},
++        "source": {"enum": ["profile", "global", "default"]}
++      },
++      "additionalProperties": false,
++      "allOf": [
++        {
++          "if": {"properties": {"locked": {"const": true}}},
++          "then": {"properties": {"source": {"const": "global"}}}
++        },
++        {
++          "if": {"properties": {"source": {"const": "global"}}},
++          "then": {"properties": {"locked": {"const": true}}}
++        },
++        {
++          "if": {"properties": {"source": {"enum": ["global", "default"]}}},
++          "then": {"properties": {"mode": {"const": "native"}}}
++        }
++      ]
++    }
++  },
++  "allOf": [
++    {
++      "if": {"properties": {"environment": {"const": "claude_code"}}},
++      "then": {"properties": {"env": {"required": ["CLAUDE_CONFIG_DIR"]}}}
++    },
++    {
++      "if": {"properties": {"environment": {"const": "codex_cli"}}},
++      "then": {"properties": {"env": {"required": ["CODEX_HOME"]}}}
++    },
++    {
++      "if": {"properties": {"environment": {"const": "opencode"}}},
++      "then": {"properties": {"env": {"required": ["XDG_CONFIG_HOME"]}}}
++    },
++    {
++      "if": {"properties": {"environment": {"const": "pi"}}},
++      "then": {"properties": {"env": {"required": ["PI_CODING_AGENT_DIR"]}, "mcp": false}}
++    }
++  ],
++  "additionalProperties": false,
++  "$defs": {
++    "absolutePath": {
++      "type": "string",
++      "minLength": 2,
++      "maxLength": 4096,
++      "pattern": "^/[^\\u0000]*$",
++      "not": {"pattern": "(?:^|/)\\.\\.(?:/|$)"}
++    },
++    "flagArgument": {"enum": ["path", "contents", "name"]},
++    "flagDescriptorCore": {
++      "properties": {
++        "kind": {"const": "flag"},
++        "flag": {"type": "string", "minLength": 2, "maxLength": 128, "pattern": "^-[^\\s]+$"},
++        "argument": {"$ref": "#/$defs/flagArgument"},
++        "name": {"$ref": "common.schema.json#/$defs/identifier"},
++        "with": {
++          "type": "array",
++          "minItems": 1,
++          "uniqueItems": true,
++          "items": {"type": "string", "minLength": 2, "maxLength": 128, "pattern": "^-[^\\s]+$"}
++        }
++      },
++      "allOf": [
++        {
++          "if": {"properties": {"argument": {"const": "name"}}},
++          "then": {"required": ["name"]},
++          "else": {"not": {"required": ["name"]}}
++        }
++      ]
++    },
++    "systemPromptDescriptor": {
++      "oneOf": [
++        {
++          "type": "object",
++          "required": ["kind", "semantics", "flag", "argument"],
++          "properties": {
++            "kind": {"const": "flag"},
++            "semantics": {"enum": ["append", "replace"]},
++            "flag": true,
++            "argument": true,
++            "name": true,
++            "with": true
++          },
++          "additionalProperties": false,
++          "allOf": [{"$ref": "#/$defs/flagDescriptorCore"}]
++        },
++        {
++          "type": "object",
++          "required": ["kind", "semantics", "key"],
++          "properties": {
++            "kind": {"const": "config-key"},
++            "semantics": {"enum": ["append", "replace"]},
++            "key": {"$ref": "common.schema.json#/$defs/identifier"}
++          },
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": ["kind", "semantics", "variable"],
++          "properties": {
++            "kind": {"const": "variable"},
++            "semantics": {"enum": ["append", "replace"]},
++            "variable": {"$ref": "common.schema.json#/$defs/identifier"}
++          },
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": ["kind", "semantics", "filename"],
++          "properties": {
++            "kind": {"const": "file"},
++            "semantics": {"enum": ["append", "replace"]},
++            "filename": {"$ref": "common.schema.json#/$defs/portablePath"}
++          },
++          "additionalProperties": false
++        }
++      ]
++    },
++    "mcpDescriptor": {
++      "oneOf": [
++        {
++          "type": "object",
++          "required": ["kind", "flag", "argument"],
++          "properties": {
++            "kind": {"const": "flag"},
++            "flag": true,
++            "argument": true,
++            "name": true,
++            "with": true
++          },
++          "additionalProperties": false,
++          "allOf": [{"$ref": "#/$defs/flagDescriptorCore"}]
++        },
++        {
++          "type": "object",
++          "required": ["kind", "key"],
++          "properties": {
++            "kind": {"const": "config-key"},
++            "key": {"$ref": "common.schema.json#/$defs/identifier"}
++          },
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": ["kind", "variable"],
++          "properties": {
++            "kind": {"const": "variable"},
++            "variable": {"$ref": "common.schema.json#/$defs/identifier"}
++          },
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": ["kind", "filename"],
++          "properties": {
++            "kind": {"const": "file"},
++            "filename": {"$ref": "common.schema.json#/$defs/portablePath"}
++          },
++          "additionalProperties": false
++        }
++      ]
++    }
++  }
++}
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index 37db00ae..4f1bb563 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -1452,11 +1452,12 @@ func recordedRelease(adapter envregistry.Adapter) string {
+ }
+ 
+ // buildFragment assembles the launch fragment from a current home (§10.2):
+-// profile.lock_sha256, the precedence object, env, the system_prompt
+-// section exactly when the home carries the inert file, and the mcp
++// profile.lock_sha256, precedence, the effective profile permission mode,
++// env, the system_prompt section exactly when the home carries the inert
++// file, and the mcp
+ // section exactly when the home carries the channel file, with the sorted
+-// env_names union under the §10.3 double bound. path_prepend is never
+-// emitted in revision 1.
++// env_names union under the §10.3 double bound. The optional path_prepend
++// member is not produced by this resolver.
+ func buildFragment(req *ResolveRequest, adapter envregistry.Adapter, verdict *verification) (*envfragment.Fragment, error) {
+ 	plan := verdict.plan
+ 	fragment := &envfragment.Fragment{
+@@ -1467,6 +1468,13 @@ func buildFragment(req *ResolveRequest, adapter envregistry.Adapter, verdict *ve
+ 		Placement:   req.Policy.Precedence().Placement,
+ 		Env:         map[string]string{adapter.EnvVar: plan.parent},
+ 	}
++	if req.Machine.PermissionsLocked {
++		fragment.Permissions = envfragment.Permissions{Mode: "native", Locked: true, Source: "global"}
++	} else if mode, configured := req.Machine.Permissions[req.Profile]; configured {
++		fragment.Permissions = envfragment.Permissions{Mode: mode, Source: "profile"}
++	} else {
++		fragment.Permissions = envfragment.Permissions{Mode: "native", Source: "default"}
++	}
+ 	if _, ok := plan.marker.Surfaces[envmarker.SurfaceSystemPrompt]; ok {
+ 		fragment.SystemPrompt = &envfragment.SystemPrompt{
+ 			Path:     filepath.Join(plan.homeDir, ".agent-context", "system-prompt.md"),
+diff --git a/internal/envregistry/envregistry.go b/internal/envregistry/envregistry.go
+index 1639c89a..78712d5e 100644
+--- a/internal/envregistry/envregistry.go
++++ b/internal/envregistry/envregistry.go
+@@ -520,10 +520,9 @@ func (a Adapter) AtOrAbovePinned(detected string) (bool, bool) {
+ 	return comparison >= 0, true
+ }
+ 
+-// MachineConfig carries the section 12.1 environments knobs. Manager-config
+-// schema 2 (a later batch) persists these; until then every knob takes its
+-// stated default when absent, which this constructor applies. Profile bytes
+-// never populate this struct.
++// MachineConfig carries the section 12.1 environments knobs persisted by
++// manager-config schema 2. DefaultMachineConfig applies their defaults;
++// profile bytes never populate this struct.
+ type MachineConfig struct {
+ 	// Forms maps env-id to the configured root-context form.
+ 	Forms map[string]string
+@@ -533,6 +532,12 @@ type MachineConfig struct {
+ 	InPlaceMode map[string]string
+ 	// SystemPromptFiles maps profile to off, append, or replace (pi only).
+ 	SystemPromptFiles map[string]string
++	// Permissions maps profile to its configured native/yolo mode. An
++	// absent profile is silent and leaves launcher defaults available.
++	Permissions map[string]string
++	// PermissionsLocked records the system-file force-native lock, which
++	// applies to every profile even when its map entry is absent.
++	PermissionsLocked bool
+ 	// TargetParticipation maps target-id to auto, off, or enabled.
+ 	TargetParticipation map[string]string
+ 	// TargetConsented maps target-id to recorded one-time consent.
+@@ -573,6 +578,7 @@ func DefaultMachineConfig() MachineConfig {
+ 		Isolation:           map[string]map[string]string{},
+ 		InPlaceMode:         map[string]string{},
+ 		SystemPromptFiles:   map[string]string{},
++		Permissions:         map[string]string{},
+ 		TargetParticipation: map[string]string{},
+ 		TargetConsented:     map[string]bool{},
+ 		XDGSeedAllowlist:    append([]string{}, DefaultXDGSeedAllowlist...),
