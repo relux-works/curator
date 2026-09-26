@@ -64,6 +64,7 @@ var LockableKeys = map[string]bool{
 	"environments.isolation":                 true,
 	"environments.transitive_system_modules": true,
 	"environments.provider_directories":      true,
+	"environments.permissions":               true,
 }
 
 var (

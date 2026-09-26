@@ -300,9 +300,10 @@ func systemModuleSchemaFailure(family, file string, err error) string {
 }
 
 // TestOverlayGapOwnersMatchFirstProductionBlocker keeps the 28 legacy
-// path-kind overlay rows attributed to the new fields that actually block
-// them at the pinned root. Schema cases are driven through Load; vectors are
-// driven through Parse and compared with their published EffectiveJSON.
+// path-kind overlay rows attributed to the source_signers fields that still
+// block them at the pinned root. Permissions are now parsed. Schema cases are
+// driven through Load; vectors are driven through Parse and compared with
+// their published EffectiveJSON.
 func TestOverlayGapOwnersMatchFirstProductionBlocker(t *testing.T) {
 	root := conformanceRoot(t)
 	_, gaps, err := conformancecoverage.Load()
@@ -362,17 +363,20 @@ func TestOverlayGapOwnersMatchFirstProductionBlocker(t *testing.T) {
 			continue
 		}
 		gap := lookup(managerSchema, tc.Name)
-		const wantOwners = "STORY-260916-ioemse+STORY-260922-1cenbr"
+		const wantOwners = "STORY-260916-ioemse"
 		if gap.Owner != wantOwners {
-			t.Errorf("%s owner = %q, the case contains both E1 and 0017/0018 fields; want %q", tc.Name, gap.Owner, wantOwners)
+			t.Errorf("%s owner = %q, the first unsupported signer field is owned by E1; want %q", tc.Name, gap.Owner, wantOwners)
 		}
 		if !strings.Contains(loadErr.Error(), field) {
 			t.Errorf("%s first Load blocker %q is not present in observed error %v", tc.Name, field, loadErr)
 		}
-		for _, requiredField := range []string{"permissions", "source_signers", "require_source_signers"} {
+		for _, requiredField := range []string{"source_signers", "require_source_signers"} {
 			if !strings.Contains(gap.Reason, requiredField) {
 				t.Errorf("%s reason %q omits unsupported field %q", tc.Name, gap.Reason, requiredField)
 			}
+		}
+		if strings.Contains(gap.Reason, "permissions") {
+			t.Errorf("%s reason %q still attributes the now-supported permissions field", tc.Name, gap.Reason)
 		}
 		if strings.Contains(gap.Reason, "path-kind") {
 			t.Errorf("%s reason %q misattributes the Load failure to path-kind", tc.Name, gap.Reason)
@@ -436,28 +440,18 @@ func TestOverlayGapOwnersMatchFirstProductionBlocker(t *testing.T) {
 			}
 		}
 		differences := jsonDifferencePaths("environments", gotEnv, wantEnv)
-		changed := map[string]bool{}
-		for _, path := range differences {
-			switch {
-			case strings.Contains(path, "permissions"):
-				changed["permissions"] = true
-			case strings.Contains(path, "source_signers"), strings.Contains(path, "require_source_signers"):
-				changed["source_signers"] = true
-			default:
-				t.Errorf("%s differs at unrelated EffectiveJSON field %s", tc.Name, path)
-			}
-		}
-		if !changed["permissions"] || !changed["source_signers"] {
-			t.Errorf("%s differences = %v, want both permissions and source_signers fields", tc.Name, differences)
+		wantDifferences := []string{"environments.require_source_signers", "environments.source_signers"}
+		if !reflect.DeepEqual(differences, wantDifferences) {
+			t.Errorf("%s differences = %v, want only %v", tc.Name, differences, wantDifferences)
 			continue
 		}
 		gap := lookup(managerVectors, tc.Name)
-		const wantOwners = "STORY-260916-ioemse+STORY-260922-1cenbr"
+		const wantOwners = "STORY-260916-ioemse"
 		if gap.Owner != wantOwners {
-			t.Errorf("%s owner = %q, changed fields are owned by %q", tc.Name, gap.Owner, wantOwners)
+			t.Errorf("%s owner = %q, changed source_signers fields are owned by %q", tc.Name, gap.Owner, wantOwners)
 		}
-		if !strings.Contains(gap.Reason, "permissions") || !strings.Contains(gap.Reason, "source_signers") || strings.Contains(gap.Reason, "path-kind") {
-			t.Errorf("%s reason %q does not describe both changed fields", tc.Name, gap.Reason)
+		if strings.Contains(gap.Reason, "permissions") || !strings.Contains(gap.Reason, "source_signers") || !strings.Contains(gap.Reason, "require_source_signers") || strings.Contains(gap.Reason, "path-kind") {
+			t.Errorf("%s reason %q does not describe only the changed source_signers fields", tc.Name, gap.Reason)
 		}
 	}
 	if vectorCases != 14 {
@@ -468,8 +462,6 @@ func TestOverlayGapOwnersMatchFirstProductionBlocker(t *testing.T) {
 func overlaySchemaFailureOwner(err error) (owner, field string) {
 	message := err.Error()
 	switch {
-	case strings.Contains(message, `unsupported field "permissions"`):
-		return "STORY-260922-1cenbr", "permissions"
 	case strings.Contains(message, `unsupported field "source_signers"`):
 		return "STORY-260916-ioemse", "source_signers"
 	case strings.Contains(message, `unsupported field "require_source_signers"`):

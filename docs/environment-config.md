@@ -1,12 +1,13 @@
 # Environment machine configuration
 
 Operator reference for the `environments` knobs of `manager-config`
-schema 2: the transitive system-module policy (E2), the provider trust
-roots (E4), and the MCP environment passthrough bound (S4). Knob names,
-values, and diagnostics are spelled exactly as `protocol/environments.md`
-at the pinned conformance revision spells them. The historical audit
-narrative lives in [docs/security-audit-2026-09.md](security-audit-2026-09.md)
-and stays history; this file is the current usage reference.
+schema 2, including permission mode (environments §10.1/§10.2/§12.1/§12.2),
+the transitive system-module policy (E2), provider trust roots (E4), and
+the MCP environment passthrough bound (S4). Knob names, values, and
+diagnostics follow `protocol/environments.md` and manager profile §1. The
+historical audit narrative lives in
+[docs/security-audit-2026-09.md](security-audit-2026-09.md) and stays
+history; this file is the current usage reference.
 
 All three knobs sit under one `environments` object:
 
@@ -19,13 +20,49 @@ All three knobs sit under one `environments` object:
     "transitive_system_modules": "drop",
     "system_module_waivers": [],
     "provider_directories": [],
-    "passable_env_names": ["FIGMA_API_KEY"]
+    "passable_env_names": ["FIGMA_API_KEY"],
+    "permissions": {"companyA": "yolo"}
   }
 }
 ```
 
 `env status` reports the effective state of every knob below.
 
+## Permission mode
+
+`permissions` maps profile names to `native` or `yolo`. An absent profile
+entry is silent; it leaves the launcher's own global default available.
+For example:
+
+```json
+"permissions": {
+  "interactive": "yolo",
+  "restricted": "native"
+}
+```
+
+`env resolve --format json` emits `launch-env-fragment-v2` and its required
+closed `permissions` member. A configured profile entry is emitted with
+`source: "profile"` and `locked: false`. An absent entry is emitted as
+`mode: "native"`, `source: "default"`, and `locked: false`; that native mode
+is a silence placeholder, not an explicit profile override.
+
+A system configuration may lock `environments.permissions` only toward
+`native`. The system file's map replaces the machine map whole, and a
+differing machine value produces the manager §1 warning naming the system
+file. While the lock is engaged, `env resolve` emits
+`mode: "native"`, `source: "global"`, and `locked: true` for the resolved
+profile, including when that profile has no entry in the system map. The
+launcher receives lock engagement in the fragment; this Curator setting
+does not write launcher configuration.
+
+```json
+{
+  "schema_version": 2,
+  "locked": ["environments.permissions"],
+  "environments": {"permissions": {}}
+}
+```
 ## Managed-home credential records
 
 Managed-home `.agent-environment.json` markers use schema 2 for new

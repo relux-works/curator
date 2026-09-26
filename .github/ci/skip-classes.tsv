@@ -52,6 +52,7 @@ root-content	publishes a release other than the pinned 	allow	CI's SPEC_PIN and 
 # --- protocol / platform-defined controls -----------------------------------
 platform-control	the unreadable case uses POSIX mode bits; Windows ACL unreadability is not reproducible for the runner account	allow	the unreadable fixture uses POSIX mode-bit semantics unavailable to the hosted Windows runner account
 platform-control	available only on (Windows|macOS) in rc5-native-control-inventory-v1	allow	the inventory defines this control for one platform only
+platform-control	launch-env-fragment-v2 schema gap	allow	the v2 absolutePath schema has no Windows path form; production-entry permissions assertions still run on Windows
 platform-control	rc5-native-control-inventory-v1 defines no record for host 	allow	the inventory covers macOS and Windows only, so this host cannot complete a compiled build; the refusal is asserted on that runner by TestCompiledInstallFollowsTheNativeControlInventoryExactly
 platform-control	(is|are) exercised (on|by) 	allow	the behaviour is asserted on its own platform's runner
 platform-control	is covered by PowerShell on Windows	allow	the behaviour is asserted on the Windows runner

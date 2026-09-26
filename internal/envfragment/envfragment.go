@@ -1,7 +1,7 @@
-// Package envfragment builds and renders the launch-env-fragment-v1 object
+// Package envfragment builds and renders the launch-env-fragment-v2 object
 // (environments §10.2): the closed fragment a launcher consumes, with
-// profile.lock_sha256, the precedence object, env, system_prompt, mcp (path,
-// sorted env_names union, channel descriptor), and the reserved
+// profile.lock_sha256, precedence, permissions, env, system_prompt, mcp
+// (path, sorted env_names union, channel descriptor), and optional
 // path_prepend. Resolution launches nothing and applies no channel; the
 // fragment is data about channels. The §10.3 profile-influence boundary is
 // enforced at build: variable names come only from the closed adapter
@@ -20,8 +20,16 @@ import (
 	"github.com/relux-works/curator/internal/protocoljson"
 )
 
-// Version is the only fragment version this release emits.
-const Version = "launch-env-fragment-v1"
+// Version is the fragment version emitted by this manager release.
+const Version = "launch-env-fragment-v2"
+
+// Permissions is the resolved per-profile permission policy carried by
+// launch-env-fragment-v2 (environments §10.2).
+type Permissions struct {
+	Mode   string
+	Locked bool
+	Source string
+}
 
 // SystemPrompt carries the inert §5.5 file path and the adapter's §7.3
 // channel descriptors. It is present exactly when the lock carries at
@@ -41,12 +49,13 @@ type MCP struct {
 	Channels []envregistry.Channel
 }
 
-// Fragment is one launch-env-fragment-v1 object. PathPrepend is reserved
-// and never emitted in revision 1 (environments §10.2).
+// Fragment is one launch-env-fragment-v2 object. This resolver omits the
+// optional path_prepend member (environments §10.2).
 type Fragment struct {
 	Environment  string
 	Profile      string
 	LockSHA256   string
+	Permissions  Permissions
 	Winner       string
 	Placement    string
 	Env          map[string]string
@@ -93,6 +102,7 @@ func (f *Fragment) Object() map[string]any {
 		"fragment":    Version,
 		"environment": f.Environment,
 		"profile":     map[string]any{"name": f.Profile, "lock_sha256": f.LockSHA256},
+		"permissions": map[string]any{"mode": f.Permissions.Mode, "locked": f.Permissions.Locked, "source": f.Permissions.Source},
 		"precedence":  map[string]any{"winner": f.Winner, "placement": f.Placement},
 	}
 	env := map[string]any{}

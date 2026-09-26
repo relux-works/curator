@@ -530,10 +530,9 @@ func (a Adapter) AtOrAbovePinned(detected string) (bool, bool) {
 	return comparison >= 0, true
 }
 
-// MachineConfig carries the section 12.1 environments knobs. Manager-config
-// schema 2 (a later batch) persists these; until then every knob takes its
-// stated default when absent, which this constructor applies. Profile bytes
-// never populate this struct.
+// MachineConfig carries the section 12.1 environments knobs persisted by
+// manager-config schema 2. DefaultMachineConfig applies their defaults;
+// profile bytes never populate this struct.
 type MachineConfig struct {
 	// Forms maps env-id to the configured root-context form.
 	Forms map[string]string
@@ -551,6 +550,12 @@ type MachineConfig struct {
 	InPlaceMode map[string]string
 	// SystemPromptFiles maps profile to off, append, or replace (pi only).
 	SystemPromptFiles map[string]string
+	// Permissions maps profile to its configured native/yolo mode. An
+	// absent profile is silent and leaves launcher defaults available.
+	Permissions map[string]string
+	// PermissionsLocked records the system-file force-native lock, which
+	// applies to every profile even when its map entry is absent.
+	PermissionsLocked bool
 	// TargetParticipation maps target-id to auto, off, or enabled.
 	TargetParticipation map[string]string
 	// TargetConsented maps target-id to recorded one-time consent.
@@ -591,6 +596,7 @@ func DefaultMachineConfig() MachineConfig {
 		Isolation:           map[string]map[string]string{},
 		InPlaceMode:         map[string]string{},
 		SystemPromptFiles:   map[string]string{},
+		Permissions:         map[string]string{},
 		TargetParticipation: map[string]string{},
 		TargetConsented:     map[string]bool{},
 		XDGSeedAllowlist:    append([]string{}, DefaultXDGSeedAllowlist...),

@@ -67,7 +67,7 @@ func TestSchema2Defaults(t *testing.T) {
 		"targets": len(env.Targets), "isolation": len(env.Isolation),
 		"mcp": len(env.MCPPackageAllowlist), "shadow": len(env.ShadowAcknowledged),
 		"waivers": len(env.SecretWaivers), "inplace": len(env.InPlaceMode),
-		"providerdirs": len(env.ProviderDirectories),
+		"providerdirs": len(env.ProviderDirectories), "permissions": len(env.Permissions),
 	} {
 		if value != 0 {
 			t.Fatalf("%s default must be empty, got %d", name, value)
@@ -140,6 +140,10 @@ func TestSchema2KnobRejections(t *testing.T) {
 		{"in-place value", `{"in_place_mode": {"pi": "fax"}}`, "in_place_mode.pi"},
 		{"system prompt env", `{"system_prompt_files": {"a": {"codex_cli": "append"}}}`, "unsupported"},
 		{"system prompt value", `{"system_prompt_files": {"a": {"pi": "sometimes"}}}`, "system_prompt_files.a.pi"},
+		{"permissions profile grammar", `{"permissions": {"-bad": "yolo"}}`, "permissions"},
+		{"permissions value", `{"permissions": {"a": "bypass"}}`, "permissions.a"},
+		{"permissions not object", `{"permissions": ["yolo"]}`, "permissions"},
+		{"permissions null", `{"permissions": null}`, "permissions"},
 		{"target participation", `{"targets": {"t": {"participation": "maybe"}}}`, "participation"},
 		{"target consented type", `{"targets": {"t": {"consented": "yes"}}}`, "consented"},
 		{"target unknown", `{"targets": {"t": {"mood": "x"}}}`, "unsupported"},
@@ -184,6 +188,7 @@ func TestSchema2EveryKnobParses(t *testing.T) {
 		"forms": {"claude_code": "referenced"}, "system_prompt_files": {"companyA": {"pi": "append"}},
 		"targets": {"xcode-coding-assistant": {"participation": "enabled", "consented": true}},
 		"isolation": {"companyA": {"pi": "isolated"}},
+		"permissions": {"companyA": "yolo", "personal": "native"},
 		"xdg_seed_allowlist": ["git"], "passable_env_names": ["A_B"],
 		"mcp_package_allowlist": ["https://example.com/m"],
 		"shadow_acknowledged": [{"env": "pi", "path": "AGENTS.override.md"}],
@@ -207,6 +212,9 @@ func TestSchema2EveryKnobParses(t *testing.T) {
 	}
 	if env.Forms["claude_code"] != "referenced" || env.SystemPromptFiles["companyA"].Pi != "append" {
 		t.Fatalf("forms/spf: %+v %+v", env.Forms, env.SystemPromptFiles)
+	}
+	if env.Permissions["companyA"] != "yolo" || env.Permissions["personal"] != "native" {
+		t.Fatalf("permissions: %+v", env.Permissions)
 	}
 	if env.Targets["xcode-coding-assistant"] != (TargetConfig{Participation: "enabled", Consented: true}) {
 		t.Fatalf("targets: %+v", env.Targets)
@@ -344,6 +352,29 @@ func TestSystemV2LockedKnobs(t *testing.T) {
 	}
 }
 
+// TestSystemV2PermissionsForceNative proves that the §12.2 lock replaces
+// the machine permissions map whole and emits the manager §1 warning when
+// it discards a differing machine value.
+func TestSystemV2PermissionsForceNative(t *testing.T) {
+	cfg, warnings, err := loadWithSystem(t,
+		`{"schema_version": 2, "skills_root": "x", "projects": {},
+		  "environments": {"permissions": {"default": "yolo", "other": "native"}}}`,
+		`{"schema_version": 2, "locked": ["environments.permissions"],
+		  "environments": {"permissions": {}}}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Env.Permissions) != 0 {
+		t.Fatalf("locked permissions map = %+v, want whole-map replacement with empty map", cfg.Env.Permissions)
+	}
+	if !cfg.LockedBySystem("environments.permissions") {
+		t.Fatalf("permissions lock bit is not recorded: %v", cfg.Locked)
+	}
+	if len(warnings) != 1 || !strings.Contains(warnings[0], `config key "environments.permissions"`) || !strings.Contains(warnings[0], "system.json") {
+		t.Fatalf("warnings = %v, want manager §1 override warning naming the system file", warnings)
+	}
+}
+
 func TestSystemV2UnlockedEnvIsDefault(t *testing.T) {
 	cfg, warnings, err := loadWithSystem(t,
 		`{"schema_version": 2, "skills_root": "x", "projects": {},
@@ -376,6 +407,8 @@ func TestSystemV2Refusals(t *testing.T) {
 		{"unlockable knob locked", `{"schema_version": 2, "locked": ["environments.current_profile"], "environments": {"current_profile": "a"}}`, "cannot lock"},
 		{"bare environments locked", `{"schema_version": 2, "locked": ["environments"]}`, "cannot lock"},
 		{"locked but unset", `{"schema_version": 2, "locked": ["environments.precedence"]}`, "locks"},
+		{"permissions yolo direction", `{"schema_version": 2, "locked": ["environments.permissions"], "environments": {"permissions": {"a": "yolo"}}}`, "permissions.a"},
+		{"permissions null", `{"schema_version": 2, "locked": ["environments.permissions"], "environments": {"permissions": null}}`, "permissions"},
 		{"bad value grammar", `{"schema_version": 2, "environments": {"overlays_allowed": "yes"}}`, "overlays_allowed"},
 		{"env under schema 1", `{"schema_version": 1, "locked": [], "environments": {"backup_retention": 1}}`, "environments"},
 		{"env lock under schema 1", `{"schema_version": 1, "locked": ["environments.backup_retention"]}`, "schema_version 1"},
@@ -496,15 +529,16 @@ func TestSystemV2LockableSubsetIsClassWide(t *testing.T) {
 		"require_current_profile":   `{"require_current_profile": "acme"}`,
 		"in_place_mode":             `{"in_place_mode": {"codex_cli": "linked"}}`,
 		"provider_directories":      `{"provider_directories": ["/opt/curator/providers"]}`,
+		"permissions":               `{"permissions": {"acme": "native"}}`,
 	}
 	if len(payloads) != len(EnvKnobNames) {
 		t.Fatalf("payloads cover %d knobs, EnvKnobNames carries %d: keep the two in step", len(payloads), len(EnvKnobNames))
 	}
-	// The §12.2 transcription: exactly the eight keys the specification
+	// The §12.2 transcription: exactly the nine keys the specification
 	// states ("overlays_allowed, precedence, mcp_package_allowlist,
 	// passable_env_names, require_current_profile, transitive_system_modules,
-	// isolation, and provider_directories" — the last carried by the §11
-	// trust-root rule). This literal is the spec sentence; LockableEnvKeys
+	// isolation, provider_directories, and permissions" — provider_directories
+	// is carried by the §11 trust-root rule. This literal is the spec sentence; LockableEnvKeys
 	// is the implementation. Either drifting — a widening that would reach
 	// §9.1 secret material or §12.1 waivers, or a narrowing that would drop
 	// a fleet-policy knob — fails below.
@@ -517,6 +551,7 @@ func TestSystemV2LockableSubsetIsClassWide(t *testing.T) {
 		"environments.transitive_system_modules": true,
 		"environments.isolation":                 true,
 		"environments.provider_directories":      true,
+		"environments.permissions":               true,
 	}
 	if len(LockableEnvKeys) != len(transcribed) {
 		t.Fatalf("LockableEnvKeys carries %d keys, §12.2 transcribes %d: a widening or narrowing without spec standing fails here", len(LockableEnvKeys), len(transcribed))
@@ -574,7 +609,7 @@ func TestEffectiveJSONShape(t *testing.T) {
 		"passable_env_names", "mcp_package_allowlist", "shadow_acknowledged",
 		"secret_material_waivers", "transitive_system_modules",
 		"system_module_waivers", "backup_retention", "require_current_profile",
-		"in_place_mode", "provider_directories"} {
+		"in_place_mode", "provider_directories", "permissions"} {
 		if _, present := env[knob]; !present {
 			t.Fatalf("rendered environments lack %q", knob)
 		}
@@ -700,6 +735,9 @@ func TestSystemTransitiveDirection(t *testing.T) {
 	}
 	if lock := EnvLockKey("system_module_waivers"); lock != "" {
 		t.Fatalf("EnvLockKey(system_module_waivers) = %q, want no lock", lock)
+	}
+	if lock := EnvLockKey("permissions.default"); lock != "environments.permissions" {
+		t.Fatalf("EnvLockKey(permissions.default) = %q", lock)
 	}
 }
 

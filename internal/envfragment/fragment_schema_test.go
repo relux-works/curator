@@ -37,6 +37,8 @@ type fragmentCase struct {
 	PathPrepend  string            `json:"path_prepend"`
 }
 
+const fragmentV1Version = "launch-env-fragment-v1"
+
 type profileCase struct {
 	Name        string `json:"name"`
 	LockSHA256  string `json:"lock_sha256"`
@@ -169,7 +171,7 @@ func validateFragmentCase(raw []byte, root string) error {
 	if err := decoder.Decode(&instance); err != nil {
 		return err
 	}
-	if instance.Fragment != Version {
+	if instance.Fragment != fragmentV1Version {
 		return &caseError{"fragment identity"}
 	}
 	adapter, err := envregistry.ByID(instance.Environment)
@@ -321,16 +323,12 @@ func TestFragmentAuthoritativeSchemaCases(t *testing.T) {
 		})
 }
 
-// TestFragmentEmissionMatchesReference proves the production emitter
-// agrees with the published reference: the canonical claude fragment
-// re-encodes the valid.json reference bytes exactly once the profile pin
-// is normalized.
+// TestFragmentEmissionMatchesReference keeps the required platform-ledger
+// contract: the v2 emitter must reproduce the copied curator-spec main
+// reference after substituting the fixture's profile lock hash.
 func TestFragmentEmissionMatchesReference(t *testing.T) {
-	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
-	if root == "" {
-		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
-	}
-	raw, err := os.ReadFile(filepath.Join(root, "schema-cases", "launch-env-fragment-v1", "valid.json")) // #nosec G304 -- explicit conformance input
+	root := filepath.Join("testdata", "curator-spec-main", "conformance", "v1", "schema-cases", "launch-env-fragment-v2")
+	raw, err := os.ReadFile(filepath.Join(root, "valid-permissions-yolo-unlocked.json")) // #nosec G304 -- explicit copied spec fixture
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -338,7 +336,10 @@ func TestFragmentEmissionMatchesReference(t *testing.T) {
 	if err := json.Unmarshal(raw, &reference); err != nil {
 		t.Fatal(err)
 	}
-	profile := reference["profile"].(map[string]any)
+	profile, ok := reference["profile"].(map[string]any)
+	if !ok {
+		t.Fatalf("reference profile has unexpected shape: %T", reference["profile"])
+	}
 	fragment := testFragment()
 	profile["lock_sha256"] = fragment.LockSHA256
 	want, err := protocoljson.MarshalCanonical(reference)
@@ -350,6 +351,6 @@ func TestFragmentEmissionMatchesReference(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(got, want) {
-		t.Fatalf("emission differs from the reference:\n got %q\nwant %q", got, want)
+		t.Fatalf("emission differs from the curator-spec v2 reference:\n got %q\nwant %q", got, want)
 	}
 }
