@@ -1,0 +1,1291 @@
+diff --git a/internal/install/atomicity/fixture_test.go b/internal/install/atomicity/fixture_test.go
+index 015eea3c..1d94e5b9 100644
+--- a/internal/install/atomicity/fixture_test.go
++++ b/internal/install/atomicity/fixture_test.go
+@@ -4,7 +4,6 @@ import (
+ 	"encoding/json"
+ 	"fmt"
+ 	"os"
+-	"os/exec"
+ 	"path/filepath"
+ 	"sort"
+ 	"strings"
+@@ -53,15 +52,10 @@ func (e *env) git(dir string, args ...string) {
+ 	// Keep lifecycle fixtures independent of workstation signing policy and
+ 	// prevent signing credentials from entering any staged package input.
+ 	gitArgs := append([]string{"-c", "commit.gpgsign=false", "-c", "tag.gpgSign=false"}, args...)
+-	cmd := exec.Command("git", gitArgs...)
+-	cmd.Dir = dir
+-	cmd.Env = append(os.Environ(),
++	gitFixture(e.t, dir, args, gitArgs, []string{
+ 		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
+ 		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",
+-	)
+-	if out, err := cmd.CombinedOutput(); err != nil {
+-		e.t.Fatalf("git %v: %v\n%s", args, err, out)
+-	}
++	})
+ }
+ 
+ func (e *env) write(root, rel, content string) {
+diff --git a/internal/install/atomicity/gitfixture_retry_test.go b/internal/install/atomicity/gitfixture_retry_test.go
+new file mode 100644
+index 00000000..733060ac
+--- /dev/null
++++ b/internal/install/atomicity/gitfixture_retry_test.go
+@@ -0,0 +1,267 @@
++package atomicity
++
++import (
++	"fmt"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"syscall"
++	"testing"
++	"time"
++)
++
++// gitFixtureScript replays canned spawn results: each call returns the next
++// entry, repeating the last one once the script is exhausted.
++type gitFixtureScript struct {
++	results []struct {
++		output []byte
++		err    error
++	}
++	calls int
++}
++
++func (s *gitFixtureScript) runner(*exec.Cmd) ([]byte, error) {
++	s.calls++
++	i := s.calls - 1
++	if i >= len(s.results) {
++		i = len(s.results) - 1
++	}
++	return s.results[i].output, s.results[i].err
++}
++
++func spawnErr(errno syscall.Errno) error {
++	return &os.PathError{Op: "fork/exec", Path: "/opt/homebrew/bin/git", Err: errno}
++}
++
++func TestGitFixtureRetriesOnceOnSpawnEACCES(t *testing.T) {
++	t.Parallel()
++	script := &gitFixtureScript{results: []struct {
++		output []byte
++		err    error
++	}{{nil, spawnErr(syscall.EACCES)}, {[]byte("ok"), nil}}}
++	var logs []string
++	var sleeps []time.Duration
++	outcome := runGitFixture(t.TempDir(), []string{"add", "."}, nil, gitFixtureConfig{
++		runner: script.runner,
++		sleep:  func(d time.Duration) { sleeps = append(sleeps, d) },
++		logf:   func(format string, args ...any) { logs = append(logs, fmt.Sprintf(format, args...)) },
++	})
++	if outcome.fatal != "" {
++		t.Fatalf("fatal = %q, want success on retry", outcome.fatal)
++	}
++	if outcome.attempts != 2 || script.calls != 2 {
++		t.Fatalf("attempts = %d, runner calls = %d, want 2 and 2", outcome.attempts, script.calls)
++	}
++	if string(outcome.output) != "ok" {
++		t.Fatalf("output = %q, want the retry output", outcome.output)
++	}
++	if len(sleeps) != 1 || sleeps[0] != gitFixtureBackoff {
++		t.Fatalf("sleeps = %v, want one %s backoff", sleeps, gitFixtureBackoff)
++	}
++	if len(logs) != 2 || !strings.Contains(logs[0], "retrying once") || !strings.Contains(logs[1], "succeeded on retry") {
++		t.Fatalf("logs = %q, want the retry line and the success line", logs)
++	}
++}
++
++func TestGitFixtureRetriesOnceOnSpawnEAGAIN(t *testing.T) {
++	t.Parallel()
++	script := &gitFixtureScript{results: []struct {
++		output []byte
++		err    error
++	}{{nil, spawnErr(syscall.EAGAIN)}, {[]byte("ok"), nil}}}
++	outcome := runGitFixture(t.TempDir(), []string{"add", "."}, nil, gitFixtureConfig{runner: script.runner})
++	if outcome.fatal != "" || outcome.attempts != 2 {
++		t.Fatalf("outcome = %+v, want success on the second attempt", outcome)
++	}
++}
++
++func TestGitFixtureNeverRetriesNonZeroExit(t *testing.T) {
++	t.Parallel()
++	if _, err := exec.LookPath("git"); err != nil {
++		t.Skip("git is not available")
++	}
++	var logs []string
++	sleeps := 0
++	// A real git process that runs and exits non-zero: an unknown global
++	// flag needs no repository, no network, and fails deterministically.
++	outcome := runGitFixture(t.TempDir(), []string{"--not-a-git-flag-xyz"}, nil, gitFixtureConfig{
++		sleep: func(time.Duration) { sleeps++ },
++		logf:  func(format string, _ ...any) { logs = append(logs, format) },
++	})
++	if outcome.attempts != 1 {
++		t.Fatalf("attempts = %d, want 1: a non-zero git exit must never be retried", outcome.attempts)
++	}
++	if outcome.fatal == "" || !strings.Contains(outcome.fatal, "exit") {
++		t.Fatalf("fatal = %q, want the exit failure", outcome.fatal)
++	}
++	if strings.Contains(outcome.fatal, "gitfixture diagnostic") {
++		t.Fatalf("fatal = %q, want no spawn diagnostic for a git exit", outcome.fatal)
++	}
++	if sleeps != 0 || len(logs) != 0 {
++		t.Fatalf("sleeps = %d, logs = %q, want no backoff and no retry log", sleeps, logs)
++	}
++}
++
++func TestGitFixtureNeverRetriesWrappedExitError(t *testing.T) {
++	t.Parallel()
++	if _, err := exec.LookPath("git"); err != nil {
++		t.Skip("git is not available")
++	}
++	// Capture a genuine *exec.ExitError through the real runner, then prove
++	// the policy recognises it through a wrapping layer.
++	_, _, realErr := gitAttempt("git", t.TempDir(), []string{"--not-a-git-flag-xyz"}, nil, realGitRunner)
++	if realErr == nil || !isGitExitError(realErr) {
++		t.Fatalf("test control: no real exit error captured: %v", realErr)
++	}
++	script := &gitFixtureScript{results: []struct {
++		output []byte
++		err    error
++	}{{nil, fmt.Errorf("launch: %w", realErr)}}}
++	outcome := runGitFixture(t.TempDir(), []string{"add", "."}, nil, gitFixtureConfig{runner: script.runner})
++	if outcome.attempts != 1 || outcome.fatal == "" {
++		t.Fatalf("outcome = %+v, want a single unretried attempt", outcome)
++	}
++	if strings.Contains(outcome.fatal, "gitfixture diagnostic") {
++		t.Fatalf("fatal = %q, want no spawn diagnostic for a git exit", outcome.fatal)
++	}
++}
++
++func TestGitFixtureRetryPredicate(t *testing.T) {
++	t.Parallel()
++	if _, err := exec.LookPath("git"); err != nil {
++		t.Skip("git is not available")
++	}
++	_, _, realErr := gitAttempt("git", t.TempDir(), []string{"--not-a-git-flag-xyz"}, nil, realGitRunner)
++	if realErr == nil || !isGitExitError(realErr) {
++		t.Fatalf("test control: no real exit error captured: %v", realErr)
++	}
++	rows := []struct {
++		name string
++		err  error
++		want bool
++	}{
++		{"nil", nil, false},
++		{"exit", realErr, false},
++		{"wrapped exit", fmt.Errorf("launch: %w", realErr), false},
++		{"EACCES", spawnErr(syscall.EACCES), true},
++		{"EAGAIN", spawnErr(syscall.EAGAIN), true},
++		{"ENOENT", spawnErr(syscall.ENOENT), false},
++		{"wrapped EACCES", fmt.Errorf("spawn: %w", spawnErr(syscall.EACCES)), true},
++		{"lookup failure", &exec.Error{Name: "git", Err: exec.ErrNotFound}, false},
++	}
++	for _, row := range rows {
++		if got := isRetryableSpawnError(row.err); got != row.want {
++			t.Errorf("isRetryableSpawnError(%s) = %v, want %v", row.name, got, row.want)
++		}
++	}
++}
++
++func TestGitFixturePersistentSpawnFailureCarriesDiagnostic(t *testing.T) {
++	t.Parallel()
++	script := &gitFixtureScript{results: []struct {
++		output []byte
++		err    error
++	}{{nil, spawnErr(syscall.EACCES)}}}
++	dir := t.TempDir()
++	outcome := runGitFixture(dir, []string{"add", "."}, nil, gitFixtureConfig{runner: script.runner})
++	if outcome.attempts != 2 {
++		t.Fatalf("attempts = %d, want the bounded two", outcome.attempts)
++	}
++	for _, want := range []string{
++		"gitfixture diagnostic",
++		"resolved:",
++		"binary:",
++		"dir ",
++		"cwd:",
++		"PATH:",
++		"rlimits:",
++		"first attempt:",
++	} {
++		if !strings.Contains(outcome.fatal, want) {
++			t.Fatalf("fatal = %q, want it to contain %q", outcome.fatal, want)
++		}
++	}
++}
++
++func TestGitFixtureNonRetryableSpawnErrorFailsFastWithDiagnostic(t *testing.T) {
++	t.Parallel()
++	script := &gitFixtureScript{results: []struct {
++		output []byte
++		err    error
++	}{{nil, spawnErr(syscall.ENOENT)}}}
++	sleeps := 0
++	outcome := runGitFixture(t.TempDir(), []string{"add", "."}, nil, gitFixtureConfig{
++		runner: script.runner,
++		sleep:  func(time.Duration) { sleeps++ },
++	})
++	if outcome.attempts != 1 || script.calls != 1 {
++		t.Fatalf("attempts = %d, want a single attempt for a non-retryable errno", outcome.attempts)
++	}
++	if !strings.Contains(outcome.fatal, "gitfixture diagnostic") {
++		t.Fatalf("fatal = %q, want the spawn diagnostic", outcome.fatal)
++	}
++	if sleeps != 0 {
++		t.Fatalf("sleeps = %d, want no backoff without a retry", sleeps)
++	}
++}
++
++func TestGitFixtureRealSpawnEACCESRetriesOnce(t *testing.T) {
++	t.Parallel()
++	if runtime.GOOS == "windows" {
++		t.Skip("executable-bit spawn refusal is exercised on the unix runners")
++	}
++	// A real kernel EACCES through the real runner: an absolute binary path
++	// skips the PATH lookup, so the non-executable mode surfaces as the
++	// fork/exec refusal the gate observed, not a lookup failure.
++	blocker := filepath.Join(t.TempDir(), "non-executable-git")
++	if err := os.WriteFile(blocker, []byte("#!/bin/sh\nexit 0\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Chmod(blocker, 0o644); err != nil {
++		t.Fatal(err)
++	}
++	var logs []string
++	outcome := runGitFixture(t.TempDir(), []string{"--version"}, nil, gitFixtureConfig{
++		binary: blocker,
++		sleep:  func(time.Duration) {},
++		logf:   func(format string, args ...any) { logs = append(logs, fmt.Sprintf(format, args...)) },
++	})
++	if outcome.attempts != 2 {
++		t.Fatalf("attempts = %d, want the bounded two for a real EACCES", outcome.attempts)
++	}
++	if !strings.Contains(outcome.fatal, "permission denied") {
++		t.Fatalf("fatal = %q, want the kernel refusal", outcome.fatal)
++	}
++	if len(logs) == 0 || !strings.Contains(logs[0], "retrying once") {
++		t.Fatalf("logs = %q, want the retry line", logs)
++	}
++}
++
++func TestGitFixtureUnresolvableGitFailsFastWithDiagnostic(t *testing.T) {
++	// Sequential by construction: it rewrites PATH for the process, which
++	// t.Setenv forbids under a parallel ancestor. An empty PATH directory
++	// proves the lookup-failure forensics, the counterpart of the spawn
++	// refusal above.
++	t.Setenv("PATH", t.TempDir())
++	outcome := runGitFixture(t.TempDir(), []string{"--version"}, nil, gitFixtureConfig{})
++	if outcome.attempts != 1 {
++		t.Fatalf("attempts = %d, want a single attempt for an unresolvable binary", outcome.attempts)
++	}
++	if !strings.Contains(outcome.fatal, "unresolved:") || !strings.Contains(outcome.fatal, "gitfixture diagnostic") {
++		t.Fatalf("fatal = %q, want the unresolved-binary diagnostic", outcome.fatal)
++	}
++}
++
++func TestGitFixtureOuterEntryRunsRealGit(t *testing.T) {
++	t.Parallel()
++	if _, err := exec.LookPath("git"); err != nil {
++		t.Skip("git is not available")
++	}
++	// Drives the exact entry point the wired fixture helpers call.
++	out := gitFixture(t, t.TempDir(), []string{"--version"}, []string{"--version"}, nil)
++	if !strings.Contains(string(out), "git version") {
++		t.Fatalf("output = %q, want the git version", out)
++	}
++}
+diff --git a/internal/install/atomicity/gitfixture_rlimit_darwin_test.go b/internal/install/atomicity/gitfixture_rlimit_darwin_test.go
+new file mode 100644
+index 00000000..4b021a04
+--- /dev/null
++++ b/internal/install/atomicity/gitfixture_rlimit_darwin_test.go
+@@ -0,0 +1,24 @@
++//go:build darwin
++
++package atomicity
++
++import (
++	"fmt"
++
++	"golang.org/x/sys/unix"
++)
++
++func gitFixtureRlimits() string {
++	var nofile unix.Rlimit
++	nofileErr := unix.Getrlimit(unix.RLIMIT_NOFILE, &nofile)
++	nofileText := fmt.Sprintf("cur=%d max=%d", nofile.Cur, nofile.Max)
++	if nofileErr != nil {
++		nofileText = nofileErr.Error()
++	}
++	// Darwin has no RLIMIT_NPROC; the maxproc ceiling is a sysctl.
++	maxproc, maxprocErr := unix.Sysctl("kern.maxproc")
++	if maxprocErr != nil {
++		maxproc = maxprocErr.Error()
++	}
++	return fmt.Sprintf("NOFILE %s; NPROC n/a on darwin (kern.maxproc=%s)", nofileText, maxproc)
++}
+diff --git a/internal/install/atomicity/gitfixture_rlimit_linux_test.go b/internal/install/atomicity/gitfixture_rlimit_linux_test.go
+new file mode 100644
+index 00000000..05f6b1c7
+--- /dev/null
++++ b/internal/install/atomicity/gitfixture_rlimit_linux_test.go
+@@ -0,0 +1,24 @@
++//go:build linux
++
++package atomicity
++
++import (
++	"fmt"
++
++	"golang.org/x/sys/unix"
++)
++
++func gitFixtureRlimits() string {
++	var nofile, nproc unix.Rlimit
++	nofileErr := unix.Getrlimit(unix.RLIMIT_NOFILE, &nofile)
++	nprocErr := unix.Getrlimit(unix.RLIMIT_NPROC, &nproc)
++	nofileText := fmt.Sprintf("cur=%d max=%d", nofile.Cur, nofile.Max)
++	if nofileErr != nil {
++		nofileText = nofileErr.Error()
++	}
++	nprocText := fmt.Sprintf("cur=%d max=%d", nproc.Cur, nproc.Max)
++	if nprocErr != nil {
++		nprocText = nprocErr.Error()
++	}
++	return fmt.Sprintf("NOFILE %s; NPROC %s", nofileText, nprocText)
++}
+diff --git a/internal/install/atomicity/gitfixture_rlimit_other_test.go b/internal/install/atomicity/gitfixture_rlimit_other_test.go
+new file mode 100644
+index 00000000..33d5629d
+--- /dev/null
++++ b/internal/install/atomicity/gitfixture_rlimit_other_test.go
+@@ -0,0 +1,12 @@
++//go:build !linux && !darwin
++
++package atomicity
++
++import (
++	"fmt"
++	"runtime"
++)
++
++func gitFixtureRlimits() string {
++	return fmt.Sprintf("unavailable on %s", runtime.GOOS)
++}
+diff --git a/internal/install/atomicity/gitfixture_test.go b/internal/install/atomicity/gitfixture_test.go
+new file mode 100644
+index 00000000..a60e34ed
+--- /dev/null
++++ b/internal/install/atomicity/gitfixture_test.go
+@@ -0,0 +1,237 @@
++// Shared fixture-git spawn path for the atomicity test binary.
++//
++// This is the same helper as internal/install's gitfixture_test.go, kept as a
++// per-package copy because Go test files cannot be imported across packages.
++// Keep the retry policy and diagnostic keys in sync between the two.
++//
++// Hosted macos-latest gate runs 35340496757, 35481906193 and 35510984798 each
++// failed one test with `fork/exec /opt/homebrew/bin/git: permission denied`
++// from a git spawn. Go reports every child-startup failure (exec, in-child
++// chdir into cmd.Dir, dup) as `fork/exec <binary>: <errno>`, so the bare
++// error cannot tell a transient spawn refusal from a broken image binary.
++// Every fixture git invocation in this package therefore goes through
++// gitFixture, which adds two things and nothing else:
++//
++//  1. An in-process diagnostic captured at the moment a spawn fails: the
++//     PATH resolution of git, lstat/stat of the resolved binary and of
++//     cmd.Dir, the working directory, and the NOFILE/NPROC rlimits. The
++//     next occurrence proves its cause from the go-test stream.
++//  2. One bounded retry, only when the spawn itself fails with EACCES or
++//     EAGAIN, after a short backoff, recorded in the test log. A non-zero
++//     git exit is never retried: that is a fixture or behaviour signal,
++//     not a spawn flake.
++//
++// Success-path behaviour is unchanged: same argv, same environment, same
++// working directory, same combined output.
++package atomicity
++
++import (
++	"errors"
++	"fmt"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strings"
++	"syscall"
++	"testing"
++	"time"
++)
++
++// gitFixtureBackoff is the single wait before the one bounded retry of a
++// fixture git spawn that failed with EACCES/EAGAIN. It only ever delays a
++// test that would otherwise have failed outright.
++const gitFixtureBackoff = 200 * time.Millisecond
++
++// gitRunner runs one prepared git command. The nil runner is the real
++// exec runner; tests inject fakes to drive the retry policy.
++type gitRunner func(cmd *exec.Cmd) ([]byte, error)
++
++// gitFixtureConfig carries the test seams of runGitFixture. The zero value is
++// the real path: PATH-resolved "git", the real exec runner, a real backoff
++// sleep, and no logging. Tests override binary with an absolute path to
++// drive a real kernel spawn failure, and runner/sleep/logf with fakes.
++type gitFixtureConfig struct {
++	binary string
++	runner gitRunner
++	sleep  func(time.Duration)
++	logf   func(string, ...any)
++}
++
++func realGitRunner(cmd *exec.Cmd) ([]byte, error) {
++	return cmd.CombinedOutput()
++}
++
++// gitFixtureOutcome is the assertable result of one fixture git invocation.
++type gitFixtureOutcome struct {
++	output   []byte
++	attempts int
++	// fatal is the message body after "git <args>: ". Empty on success.
++	fatal string
++}
++
++// gitFixture runs one fixture git command and returns its combined output.
++// displayArgs names the invocation in failure messages (the caller's own
++// args, without the signing-policy prefix); gitArgs is the full argv after
++// "git". Any failure is fatal to the calling test.
++func gitFixture(t *testing.T, dir string, displayArgs, gitArgs, extraEnv []string) []byte {
++	t.Helper()
++	return gitFixtureWithBinary(t, "", dir, displayArgs, gitArgs, extraEnv)
++}
++
++// gitFixtureWithBinary is gitFixture with an explicit binary. An empty binary
++// is the default "git" PATH lookup; callers that pre-resolve git (the draft
++// transport wrapper fixtures) pass their resolved absolute path through
++// unchanged.
++func gitFixtureWithBinary(t *testing.T, binary, dir string, displayArgs, gitArgs, extraEnv []string) []byte {
++	t.Helper()
++	outcome := runGitFixture(dir, gitArgs, extraEnv, gitFixtureConfig{binary: binary})
++	if outcome.fatal == "" {
++		return outcome.output
++	}
++	t.Fatalf("git %v: %s", displayArgs, outcome.fatal)
++	return nil
++}
++
++// runGitFixture executes one fixture git invocation with the bounded retry
++// policy. It never fails the test itself, so unit rows can assert attempts,
++// fatal text and logging directly.
++func runGitFixture(dir string, gitArgs, extraEnv []string, cfg gitFixtureConfig) gitFixtureOutcome {
++	binary := cfg.binary
++	if binary == "" {
++		binary = "git"
++	}
++	runner := cfg.runner
++	if runner == nil {
++		runner = realGitRunner
++	}
++	sleep := cfg.sleep
++	if sleep == nil {
++		sleep = time.Sleep
++	}
++	logf := cfg.logf
++	if logf == nil {
++		logf = func(string, ...any) {}
++	}
++
++	output, resolved, err := gitAttempt(binary, dir, gitArgs, extraEnv, runner)
++	if err == nil {
++		return gitFixtureOutcome{output: output, attempts: 1}
++	}
++	if isGitExitError(err) {
++		// A git process ran and reported failure. That is a fixture or
++		// behaviour signal; retrying would weaken the test.
++		return gitFixtureOutcome{output: output, attempts: 1, fatal: fmt.Sprintf("%v\n%s", err, output)}
++	}
++	if !isRetryableSpawnError(err) {
++		return gitFixtureOutcome{output: output, attempts: 1, fatal: fmt.Sprintf("%v\n%s\n%s", err, output, describeGitSpawnFailure(binary, resolved, dir))}
++	}
++	firstErr := err
++	firstDiagnostic := describeGitSpawnFailure(binary, resolved, dir)
++	logf("gitfixture: git %v spawn failed (%v); retrying once after %s\n%s", gitArgs, firstErr, gitFixtureBackoff, firstDiagnostic)
++	sleep(gitFixtureBackoff)
++
++	output, resolved, err = gitAttempt(binary, dir, gitArgs, extraEnv, runner)
++	if err == nil {
++		logf("gitfixture: git %v succeeded on retry", gitArgs)
++		return gitFixtureOutcome{output: output, attempts: 2}
++	}
++	if isGitExitError(err) {
++		return gitFixtureOutcome{output: output, attempts: 2, fatal: fmt.Sprintf("%v (first spawn attempt failed: %v, retried once)\n%s", err, firstErr, output)}
++	}
++	return gitFixtureOutcome{output: output, attempts: 2, fatal: fmt.Sprintf("%v (first attempt: %v)\n%s\n%s", err, firstErr, output, describeGitSpawnFailure(binary, resolved, dir))}
++}
++
++// gitAttempt builds and runs one fixture git invocation.
++func gitAttempt(binary, dir string, gitArgs, extraEnv []string, runner gitRunner) (output []byte, resolved string, err error) {
++	cmd := exec.Command(binary, gitArgs...)
++	if dir != "" {
++		cmd.Dir = dir
++	}
++	cmd.Env = append(os.Environ(), extraEnv...)
++	resolved = resolveGitFixture(binary)
++	output, err = runner(cmd)
++	return output, resolved, err
++}
++
++// resolveGitFixture resolves the fixture binary the way Start will, for
++// diagnostics. An absolute binary needs no lookup.
++func resolveGitFixture(binary string) string {
++	if filepath.IsAbs(binary) {
++		return binary
++	}
++	resolved, err := exec.LookPath(binary)
++	if err != nil {
++		return "unresolved: " + err.Error()
++	}
++	return resolved
++}
++
++// isGitExitError reports whether a git process ran and exited non-zero, as
++// opposed to the spawn itself failing.
++func isGitExitError(err error) bool {
++	var exit *exec.ExitError
++	return errors.As(err, &exit)
++}
++
++// isRetryableSpawnError reports a child-startup EACCES/EAGAIN: the process
++// never ran. Every other error, including any non-zero git exit, is not
++// retried.
++func isRetryableSpawnError(err error) bool {
++	if err == nil || isGitExitError(err) {
++		return false
++	}
++	return errors.Is(err, syscall.EACCES) || errors.Is(err, syscall.EAGAIN)
++}
++
++// describeGitSpawnFailure gathers the in-process facts that discriminate a
++// transient spawn refusal (EACCES/EAGAIN at exec) from a revoked cmd.Dir,
++// a rewritten PATH, and a genuinely broken git binary.
++func describeGitSpawnFailure(binary, resolved, dir string) string {
++	var b strings.Builder
++	b.WriteString("gitfixture diagnostic (spawn failed, no git process ran):")
++	fmt.Fprintf(&b, "\n  argv0 %q resolved: %s", binary, resolved)
++	if !strings.HasPrefix(resolved, "unresolved: ") {
++		fmt.Fprintf(&b, "\n  binary: %s", statGitFixture(resolved))
++	}
++	if dir == "" {
++		if cwd, err := os.Getwd(); err == nil {
++			fmt.Fprintf(&b, "\n  dir: (inherited) %s: %s", cwd, statGitFixture(cwd))
++		} else {
++			fmt.Fprintf(&b, "\n  dir: (inherited) getwd: %v", err)
++		}
++	} else {
++		fmt.Fprintf(&b, "\n  dir %q: %s", dir, statGitFixture(dir))
++	}
++	if cwd, err := os.Getwd(); err == nil {
++		fmt.Fprintf(&b, "\n  cwd: %s", cwd)
++	} else {
++		fmt.Fprintf(&b, "\n  cwd: getwd: %v", err)
++	}
++	fmt.Fprintf(&b, "\n  PATH: %s", os.Getenv("PATH"))
++	fmt.Fprintf(&b, "\n  rlimits: %s", gitFixtureRlimits())
++	return b.String()
++}
++
++// statGitFixture renders the lstat/stat facts for one diagnostic path.
++func statGitFixture(path string) string {
++	linfo, lerr := os.Lstat(path)
++	if lerr != nil {
++		return "lstat: " + lerr.Error()
++	}
++	sinfo, serr := os.Stat(path)
++	if serr != nil {
++		return fmt.Sprintf("lstat: mode=%s; stat: %v", linfo.Mode(), serr)
++	}
++	target := ""
++	if linfo.Mode()&os.ModeSymlink != 0 {
++		if link, err := os.Readlink(path); err == nil {
++			target = " -> " + link
++		} else {
++			target = " -> (readlink: " + err.Error() + ")"
++		}
++		if eval, err := filepath.EvalSymlinks(path); err == nil {
++			target += " (eval: " + eval + ")"
++		}
++	}
++	return fmt.Sprintf("lstat: mode=%s%s; stat: mode=%s size=%d", linfo.Mode(), target, sinfo.Mode(), sinfo.Size())
++}
+diff --git a/internal/install/draftsources_test.go b/internal/install/draftsources_test.go
+index 2469a418..5494d0c4 100644
+--- a/internal/install/draftsources_test.go
++++ b/internal/install/draftsources_test.go
+@@ -3,7 +3,6 @@ package install
+ import (
+ 	"encoding/json"
+ 	"os"
+-	"os/exec"
+ 	"path/filepath"
+ 	"strings"
+ 	"testing"
+@@ -18,15 +17,10 @@ import (
+ func testGit(t *testing.T, dir string, args ...string) string {
+ 	t.Helper()
+ 	gitArgs := append([]string{"-c", "commit.gpgsign=false", "-c", "tag.gpgSign=false"}, args...)
+-	cmd := exec.Command("git", gitArgs...)
+-	cmd.Dir = dir
+-	cmd.Env = append(os.Environ(),
++	gitFixture(t, dir, args, gitArgs, []string{
+ 		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
+ 		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",
+-	)
+-	if out, err := cmd.CombinedOutput(); err != nil {
+-		t.Fatalf("git %v: %v\n%s", args, err, out)
+-	}
++	})
+ 	return dir
+ }
+ 
+diff --git a/internal/install/drafttransport_test.go b/internal/install/drafttransport_test.go
+index e8ad6dd6..64a47f70 100644
+--- a/internal/install/drafttransport_test.go
++++ b/internal/install/drafttransport_test.go
+@@ -477,18 +477,12 @@ func draftBareFixture(t *testing.T) (bare, commit string) {
+ 	bare = filepath.Join(root, "remote.git")
+ 	run := func(dir string, args ...string) string {
+ 		t.Helper()
+-		command := exec.Command(git, args...)
+-		command.Dir = dir
+-		command.Env = append(os.Environ(),
++		output := gitFixtureWithBinary(t, git, dir, args, args, []string{
+ 			"GIT_AUTHOR_NAME=Fixture", "GIT_AUTHOR_EMAIL=fixture@example.test",
+ 			"GIT_COMMITTER_NAME=Fixture", "GIT_COMMITTER_EMAIL=fixture@example.test",
+ 			"GIT_AUTHOR_DATE=2006-01-02T15:04:05Z", "GIT_COMMITTER_DATE=2006-01-02T15:04:05Z",
+ 			"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
+-		)
+-		output, err := command.CombinedOutput()
+-		if err != nil {
+-			t.Fatalf("git %v: %v\n%s", args, err, output)
+-		}
++		})
+ 		return strings.TrimSpace(string(output))
+ 	}
+ 	run("", "init", "--quiet", "--object-format=sha1", work)
+diff --git a/internal/install/gitfixture_retry_test.go b/internal/install/gitfixture_retry_test.go
+new file mode 100644
+index 00000000..01ac727c
+--- /dev/null
++++ b/internal/install/gitfixture_retry_test.go
+@@ -0,0 +1,267 @@
++package install
++
++import (
++	"fmt"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"syscall"
++	"testing"
++	"time"
++)
++
++// gitFixtureScript replays canned spawn results: each call returns the next
++// entry, repeating the last one once the script is exhausted.
++type gitFixtureScript struct {
++	results []struct {
++		output []byte
++		err    error
++	}
++	calls int
++}
++
++func (s *gitFixtureScript) runner(*exec.Cmd) ([]byte, error) {
++	s.calls++
++	i := s.calls - 1
++	if i >= len(s.results) {
++		i = len(s.results) - 1
++	}
++	return s.results[i].output, s.results[i].err
++}
++
++func spawnErr(errno syscall.Errno) error {
++	return &os.PathError{Op: "fork/exec", Path: "/opt/homebrew/bin/git", Err: errno}
++}
++
++func TestGitFixtureRetriesOnceOnSpawnEACCES(t *testing.T) {
++	t.Parallel()
++	script := &gitFixtureScript{results: []struct {
++		output []byte
++		err    error
++	}{{nil, spawnErr(syscall.EACCES)}, {[]byte("ok"), nil}}}
++	var logs []string
++	var sleeps []time.Duration
++	outcome := runGitFixture(t.TempDir(), []string{"add", "."}, nil, gitFixtureConfig{
++		runner: script.runner,
++		sleep:  func(d time.Duration) { sleeps = append(sleeps, d) },
++		logf:   func(format string, args ...any) { logs = append(logs, fmt.Sprintf(format, args...)) },
++	})
++	if outcome.fatal != "" {
++		t.Fatalf("fatal = %q, want success on retry", outcome.fatal)
++	}
++	if outcome.attempts != 2 || script.calls != 2 {
++		t.Fatalf("attempts = %d, runner calls = %d, want 2 and 2", outcome.attempts, script.calls)
++	}
++	if string(outcome.output) != "ok" {
++		t.Fatalf("output = %q, want the retry output", outcome.output)
++	}
++	if len(sleeps) != 1 || sleeps[0] != gitFixtureBackoff {
++		t.Fatalf("sleeps = %v, want one %s backoff", sleeps, gitFixtureBackoff)
++	}
++	if len(logs) != 2 || !strings.Contains(logs[0], "retrying once") || !strings.Contains(logs[1], "succeeded on retry") {
++		t.Fatalf("logs = %q, want the retry line and the success line", logs)
++	}
++}
++
++func TestGitFixtureRetriesOnceOnSpawnEAGAIN(t *testing.T) {
++	t.Parallel()
++	script := &gitFixtureScript{results: []struct {
++		output []byte
++		err    error
++	}{{nil, spawnErr(syscall.EAGAIN)}, {[]byte("ok"), nil}}}
++	outcome := runGitFixture(t.TempDir(), []string{"add", "."}, nil, gitFixtureConfig{runner: script.runner})
++	if outcome.fatal != "" || outcome.attempts != 2 {
++		t.Fatalf("outcome = %+v, want success on the second attempt", outcome)
++	}
++}
++
++func TestGitFixtureNeverRetriesNonZeroExit(t *testing.T) {
++	t.Parallel()
++	if _, err := exec.LookPath("git"); err != nil {
++		t.Skip("git is not available")
++	}
++	var logs []string
++	sleeps := 0
++	// A real git process that runs and exits non-zero: an unknown global
++	// flag needs no repository, no network, and fails deterministically.
++	outcome := runGitFixture(t.TempDir(), []string{"--not-a-git-flag-xyz"}, nil, gitFixtureConfig{
++		sleep: func(time.Duration) { sleeps++ },
++		logf:  func(format string, _ ...any) { logs = append(logs, format) },
++	})
++	if outcome.attempts != 1 {
++		t.Fatalf("attempts = %d, want 1: a non-zero git exit must never be retried", outcome.attempts)
++	}
++	if outcome.fatal == "" || !strings.Contains(outcome.fatal, "exit") {
++		t.Fatalf("fatal = %q, want the exit failure", outcome.fatal)
++	}
++	if strings.Contains(outcome.fatal, "gitfixture diagnostic") {
++		t.Fatalf("fatal = %q, want no spawn diagnostic for a git exit", outcome.fatal)
++	}
++	if sleeps != 0 || len(logs) != 0 {
++		t.Fatalf("sleeps = %d, logs = %q, want no backoff and no retry log", sleeps, logs)
++	}
++}
++
++func TestGitFixtureNeverRetriesWrappedExitError(t *testing.T) {
++	t.Parallel()
++	if _, err := exec.LookPath("git"); err != nil {
++		t.Skip("git is not available")
++	}
++	// Capture a genuine *exec.ExitError through the real runner, then prove
++	// the policy recognises it through a wrapping layer.
++	_, _, realErr := gitAttempt("git", t.TempDir(), []string{"--not-a-git-flag-xyz"}, nil, realGitRunner)
++	if realErr == nil || !isGitExitError(realErr) {
++		t.Fatalf("test control: no real exit error captured: %v", realErr)
++	}
++	script := &gitFixtureScript{results: []struct {
++		output []byte
++		err    error
++	}{{nil, fmt.Errorf("launch: %w", realErr)}}}
++	outcome := runGitFixture(t.TempDir(), []string{"add", "."}, nil, gitFixtureConfig{runner: script.runner})
++	if outcome.attempts != 1 || outcome.fatal == "" {
++		t.Fatalf("outcome = %+v, want a single unretried attempt", outcome)
++	}
++	if strings.Contains(outcome.fatal, "gitfixture diagnostic") {
++		t.Fatalf("fatal = %q, want no spawn diagnostic for a git exit", outcome.fatal)
++	}
++}
++
++func TestGitFixtureRetryPredicate(t *testing.T) {
++	t.Parallel()
++	if _, err := exec.LookPath("git"); err != nil {
++		t.Skip("git is not available")
++	}
++	_, _, realErr := gitAttempt("git", t.TempDir(), []string{"--not-a-git-flag-xyz"}, nil, realGitRunner)
++	if realErr == nil || !isGitExitError(realErr) {
++		t.Fatalf("test control: no real exit error captured: %v", realErr)
++	}
++	rows := []struct {
++		name string
++		err  error
++		want bool
++	}{
++		{"nil", nil, false},
++		{"exit", realErr, false},
++		{"wrapped exit", fmt.Errorf("launch: %w", realErr), false},
++		{"EACCES", spawnErr(syscall.EACCES), true},
++		{"EAGAIN", spawnErr(syscall.EAGAIN), true},
++		{"ENOENT", spawnErr(syscall.ENOENT), false},
++		{"wrapped EACCES", fmt.Errorf("spawn: %w", spawnErr(syscall.EACCES)), true},
++		{"lookup failure", &exec.Error{Name: "git", Err: exec.ErrNotFound}, false},
++	}
++	for _, row := range rows {
++		if got := isRetryableSpawnError(row.err); got != row.want {
++			t.Errorf("isRetryableSpawnError(%s) = %v, want %v", row.name, got, row.want)
++		}
++	}
++}
++
++func TestGitFixturePersistentSpawnFailureCarriesDiagnostic(t *testing.T) {
++	t.Parallel()
++	script := &gitFixtureScript{results: []struct {
++		output []byte
++		err    error
++	}{{nil, spawnErr(syscall.EACCES)}}}
++	dir := t.TempDir()
++	outcome := runGitFixture(dir, []string{"add", "."}, nil, gitFixtureConfig{runner: script.runner})
++	if outcome.attempts != 2 {
++		t.Fatalf("attempts = %d, want the bounded two", outcome.attempts)
++	}
++	for _, want := range []string{
++		"gitfixture diagnostic",
++		"resolved:",
++		"binary:",
++		"dir ",
++		"cwd:",
++		"PATH:",
++		"rlimits:",
++		"first attempt:",
++	} {
++		if !strings.Contains(outcome.fatal, want) {
++			t.Fatalf("fatal = %q, want it to contain %q", outcome.fatal, want)
++		}
++	}
++}
++
++func TestGitFixtureNonRetryableSpawnErrorFailsFastWithDiagnostic(t *testing.T) {
++	t.Parallel()
++	script := &gitFixtureScript{results: []struct {
++		output []byte
++		err    error
++	}{{nil, spawnErr(syscall.ENOENT)}}}
++	sleeps := 0
++	outcome := runGitFixture(t.TempDir(), []string{"add", "."}, nil, gitFixtureConfig{
++		runner: script.runner,
++		sleep:  func(time.Duration) { sleeps++ },
++	})
++	if outcome.attempts != 1 || script.calls != 1 {
++		t.Fatalf("attempts = %d, want a single attempt for a non-retryable errno", outcome.attempts)
++	}
++	if !strings.Contains(outcome.fatal, "gitfixture diagnostic") {
++		t.Fatalf("fatal = %q, want the spawn diagnostic", outcome.fatal)
++	}
++	if sleeps != 0 {
++		t.Fatalf("sleeps = %d, want no backoff without a retry", sleeps)
++	}
++}
++
++func TestGitFixtureRealSpawnEACCESRetriesOnce(t *testing.T) {
++	t.Parallel()
++	if runtime.GOOS == "windows" {
++		t.Skip("executable-bit spawn refusal is exercised on the unix runners")
++	}
++	// A real kernel EACCES through the real runner: an absolute binary path
++	// skips the PATH lookup, so the non-executable mode surfaces as the
++	// fork/exec refusal the gate observed, not a lookup failure.
++	blocker := filepath.Join(t.TempDir(), "non-executable-git")
++	if err := os.WriteFile(blocker, []byte("#!/bin/sh\nexit 0\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Chmod(blocker, 0o644); err != nil {
++		t.Fatal(err)
++	}
++	var logs []string
++	outcome := runGitFixture(t.TempDir(), []string{"--version"}, nil, gitFixtureConfig{
++		binary: blocker,
++		sleep:  func(time.Duration) {},
++		logf:   func(format string, args ...any) { logs = append(logs, fmt.Sprintf(format, args...)) },
++	})
++	if outcome.attempts != 2 {
++		t.Fatalf("attempts = %d, want the bounded two for a real EACCES", outcome.attempts)
++	}
++	if !strings.Contains(outcome.fatal, "permission denied") {
++		t.Fatalf("fatal = %q, want the kernel refusal", outcome.fatal)
++	}
++	if len(logs) == 0 || !strings.Contains(logs[0], "retrying once") {
++		t.Fatalf("logs = %q, want the retry line", logs)
++	}
++}
++
++func TestGitFixtureUnresolvableGitFailsFastWithDiagnostic(t *testing.T) {
++	// Sequential by construction: it rewrites PATH for the process, which
++	// t.Setenv forbids under a parallel ancestor. An empty PATH directory
++	// proves the lookup-failure forensics, the counterpart of the spawn
++	// refusal above.
++	t.Setenv("PATH", t.TempDir())
++	outcome := runGitFixture(t.TempDir(), []string{"--version"}, nil, gitFixtureConfig{})
++	if outcome.attempts != 1 {
++		t.Fatalf("attempts = %d, want a single attempt for an unresolvable binary", outcome.attempts)
++	}
++	if !strings.Contains(outcome.fatal, "unresolved:") || !strings.Contains(outcome.fatal, "gitfixture diagnostic") {
++		t.Fatalf("fatal = %q, want the unresolved-binary diagnostic", outcome.fatal)
++	}
++}
++
++func TestGitFixtureOuterEntryRunsRealGit(t *testing.T) {
++	t.Parallel()
++	if _, err := exec.LookPath("git"); err != nil {
++		t.Skip("git is not available")
++	}
++	// Drives the exact entry point the wired fixture helpers call.
++	out := gitFixture(t, t.TempDir(), []string{"--version"}, []string{"--version"}, nil)
++	if !strings.Contains(string(out), "git version") {
++		t.Fatalf("output = %q, want the git version", out)
++	}
++}
+diff --git a/internal/install/gitfixture_rlimit_darwin_test.go b/internal/install/gitfixture_rlimit_darwin_test.go
+new file mode 100644
+index 00000000..7970744b
+--- /dev/null
++++ b/internal/install/gitfixture_rlimit_darwin_test.go
+@@ -0,0 +1,24 @@
++//go:build darwin
++
++package install
++
++import (
++	"fmt"
++
++	"golang.org/x/sys/unix"
++)
++
++func gitFixtureRlimits() string {
++	var nofile unix.Rlimit
++	nofileErr := unix.Getrlimit(unix.RLIMIT_NOFILE, &nofile)
++	nofileText := fmt.Sprintf("cur=%d max=%d", nofile.Cur, nofile.Max)
++	if nofileErr != nil {
++		nofileText = nofileErr.Error()
++	}
++	// Darwin has no RLIMIT_NPROC; the maxproc ceiling is a sysctl.
++	maxproc, maxprocErr := unix.Sysctl("kern.maxproc")
++	if maxprocErr != nil {
++		maxproc = maxprocErr.Error()
++	}
++	return fmt.Sprintf("NOFILE %s; NPROC n/a on darwin (kern.maxproc=%s)", nofileText, maxproc)
++}
+diff --git a/internal/install/gitfixture_rlimit_linux_test.go b/internal/install/gitfixture_rlimit_linux_test.go
+new file mode 100644
+index 00000000..19d37624
+--- /dev/null
++++ b/internal/install/gitfixture_rlimit_linux_test.go
+@@ -0,0 +1,24 @@
++//go:build linux
++
++package install
++
++import (
++	"fmt"
++
++	"golang.org/x/sys/unix"
++)
++
++func gitFixtureRlimits() string {
++	var nofile, nproc unix.Rlimit
++	nofileErr := unix.Getrlimit(unix.RLIMIT_NOFILE, &nofile)
++	nprocErr := unix.Getrlimit(unix.RLIMIT_NPROC, &nproc)
++	nofileText := fmt.Sprintf("cur=%d max=%d", nofile.Cur, nofile.Max)
++	if nofileErr != nil {
++		nofileText = nofileErr.Error()
++	}
++	nprocText := fmt.Sprintf("cur=%d max=%d", nproc.Cur, nproc.Max)
++	if nprocErr != nil {
++		nprocText = nprocErr.Error()
++	}
++	return fmt.Sprintf("NOFILE %s; NPROC %s", nofileText, nprocText)
++}
+diff --git a/internal/install/gitfixture_rlimit_other_test.go b/internal/install/gitfixture_rlimit_other_test.go
+new file mode 100644
+index 00000000..a56460af
+--- /dev/null
++++ b/internal/install/gitfixture_rlimit_other_test.go
+@@ -0,0 +1,12 @@
++//go:build !linux && !darwin
++
++package install
++
++import (
++	"fmt"
++	"runtime"
++)
++
++func gitFixtureRlimits() string {
++	return fmt.Sprintf("unavailable on %s", runtime.GOOS)
++}
+diff --git a/internal/install/gitfixture_test.go b/internal/install/gitfixture_test.go
+new file mode 100644
+index 00000000..78252b2d
+--- /dev/null
++++ b/internal/install/gitfixture_test.go
+@@ -0,0 +1,233 @@
++// Shared fixture-git spawn path for the install test binary.
++//
++// Hosted macos-latest gate runs 35340496757, 35481906193 and 35510984798 each
++// failed one test with `fork/exec /opt/homebrew/bin/git: permission denied`
++// from a git spawn. Go reports every child-startup failure (exec, in-child
++// chdir into cmd.Dir, dup) as `fork/exec <binary>: <errno>`, so the bare
++// error cannot tell a transient spawn refusal from a broken image binary.
++// Every fixture git invocation in this package therefore goes through
++// gitFixture, which adds two things and nothing else:
++//
++//  1. An in-process diagnostic captured at the moment a spawn fails: the
++//     PATH resolution of git, lstat/stat of the resolved binary and of
++//     cmd.Dir, the working directory, and the NOFILE/NPROC rlimits. The
++//     next occurrence proves its cause from the go-test stream.
++//  2. One bounded retry, only when the spawn itself fails with EACCES or
++//     EAGAIN, after a short backoff, recorded in the test log. A non-zero
++//     git exit is never retried: that is a fixture or behaviour signal,
++//     not a spawn flake.
++//
++// Success-path behaviour is unchanged: same argv, same environment, same
++// working directory, same combined output.
++package install
++
++import (
++	"errors"
++	"fmt"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strings"
++	"syscall"
++	"testing"
++	"time"
++)
++
++// gitFixtureBackoff is the single wait before the one bounded retry of a
++// fixture git spawn that failed with EACCES/EAGAIN. It only ever delays a
++// test that would otherwise have failed outright.
++const gitFixtureBackoff = 200 * time.Millisecond
++
++// gitRunner runs one prepared git command. The nil runner is the real
++// exec runner; tests inject fakes to drive the retry policy.
++type gitRunner func(cmd *exec.Cmd) ([]byte, error)
++
++// gitFixtureConfig carries the test seams of runGitFixture. The zero value is
++// the real path: PATH-resolved "git", the real exec runner, a real backoff
++// sleep, and no logging. Tests override binary with an absolute path to
++// drive a real kernel spawn failure, and runner/sleep/logf with fakes.
++type gitFixtureConfig struct {
++	binary string
++	runner gitRunner
++	sleep  func(time.Duration)
++	logf   func(string, ...any)
++}
++
++func realGitRunner(cmd *exec.Cmd) ([]byte, error) {
++	return cmd.CombinedOutput()
++}
++
++// gitFixtureOutcome is the assertable result of one fixture git invocation.
++type gitFixtureOutcome struct {
++	output   []byte
++	attempts int
++	// fatal is the message body after "git <args>: ". Empty on success.
++	fatal string
++}
++
++// gitFixture runs one fixture git command and returns its combined output.
++// displayArgs names the invocation in failure messages (the caller's own
++// args, without the signing-policy prefix); gitArgs is the full argv after
++// "git". Any failure is fatal to the calling test.
++func gitFixture(t *testing.T, dir string, displayArgs, gitArgs, extraEnv []string) []byte {
++	t.Helper()
++	return gitFixtureWithBinary(t, "", dir, displayArgs, gitArgs, extraEnv)
++}
++
++// gitFixtureWithBinary is gitFixture with an explicit binary. An empty binary
++// is the default "git" PATH lookup; callers that pre-resolve git (the draft
++// transport wrapper fixtures) pass their resolved absolute path through
++// unchanged.
++func gitFixtureWithBinary(t *testing.T, binary, dir string, displayArgs, gitArgs, extraEnv []string) []byte {
++	t.Helper()
++	outcome := runGitFixture(dir, gitArgs, extraEnv, gitFixtureConfig{binary: binary})
++	if outcome.fatal == "" {
++		return outcome.output
++	}
++	t.Fatalf("git %v: %s", displayArgs, outcome.fatal)
++	return nil
++}
++
++// runGitFixture executes one fixture git invocation with the bounded retry
++// policy. It never fails the test itself, so unit rows can assert attempts,
++// fatal text and logging directly.
++func runGitFixture(dir string, gitArgs, extraEnv []string, cfg gitFixtureConfig) gitFixtureOutcome {
++	binary := cfg.binary
++	if binary == "" {
++		binary = "git"
++	}
++	runner := cfg.runner
++	if runner == nil {
++		runner = realGitRunner
++	}
++	sleep := cfg.sleep
++	if sleep == nil {
++		sleep = time.Sleep
++	}
++	logf := cfg.logf
++	if logf == nil {
++		logf = func(string, ...any) {}
++	}
++
++	output, resolved, err := gitAttempt(binary, dir, gitArgs, extraEnv, runner)
++	if err == nil {
++		return gitFixtureOutcome{output: output, attempts: 1}
++	}
++	if isGitExitError(err) {
++		// A git process ran and reported failure. That is a fixture or
++		// behaviour signal; retrying would weaken the test.
++		return gitFixtureOutcome{output: output, attempts: 1, fatal: fmt.Sprintf("%v\n%s", err, output)}
++	}
++	if !isRetryableSpawnError(err) {
++		return gitFixtureOutcome{output: output, attempts: 1, fatal: fmt.Sprintf("%v\n%s\n%s", err, output, describeGitSpawnFailure(binary, resolved, dir))}
++	}
++	firstErr := err
++	firstDiagnostic := describeGitSpawnFailure(binary, resolved, dir)
++	logf("gitfixture: git %v spawn failed (%v); retrying once after %s\n%s", gitArgs, firstErr, gitFixtureBackoff, firstDiagnostic)
++	sleep(gitFixtureBackoff)
++
++	output, resolved, err = gitAttempt(binary, dir, gitArgs, extraEnv, runner)
++	if err == nil {
++		logf("gitfixture: git %v succeeded on retry", gitArgs)
++		return gitFixtureOutcome{output: output, attempts: 2}
++	}
++	if isGitExitError(err) {
++		return gitFixtureOutcome{output: output, attempts: 2, fatal: fmt.Sprintf("%v (first spawn attempt failed: %v, retried once)\n%s", err, firstErr, output)}
++	}
++	return gitFixtureOutcome{output: output, attempts: 2, fatal: fmt.Sprintf("%v (first attempt: %v)\n%s\n%s", err, firstErr, output, describeGitSpawnFailure(binary, resolved, dir))}
++}
++
++// gitAttempt builds and runs one fixture git invocation.
++func gitAttempt(binary, dir string, gitArgs, extraEnv []string, runner gitRunner) (output []byte, resolved string, err error) {
++	cmd := exec.Command(binary, gitArgs...)
++	if dir != "" {
++		cmd.Dir = dir
++	}
++	cmd.Env = append(os.Environ(), extraEnv...)
++	resolved = resolveGitFixture(binary)
++	output, err = runner(cmd)
++	return output, resolved, err
++}
++
++// resolveGitFixture resolves the fixture binary the way Start will, for
++// diagnostics. An absolute binary needs no lookup.
++func resolveGitFixture(binary string) string {
++	if filepath.IsAbs(binary) {
++		return binary
++	}
++	resolved, err := exec.LookPath(binary)
++	if err != nil {
++		return "unresolved: " + err.Error()
++	}
++	return resolved
++}
++
++// isGitExitError reports whether a git process ran and exited non-zero, as
++// opposed to the spawn itself failing.
++func isGitExitError(err error) bool {
++	var exit *exec.ExitError
++	return errors.As(err, &exit)
++}
++
++// isRetryableSpawnError reports a child-startup EACCES/EAGAIN: the process
++// never ran. Every other error, including any non-zero git exit, is not
++// retried.
++func isRetryableSpawnError(err error) bool {
++	if err == nil || isGitExitError(err) {
++		return false
++	}
++	return errors.Is(err, syscall.EACCES) || errors.Is(err, syscall.EAGAIN)
++}
++
++// describeGitSpawnFailure gathers the in-process facts that discriminate a
++// transient spawn refusal (EACCES/EAGAIN at exec) from a revoked cmd.Dir,
++// a rewritten PATH, and a genuinely broken git binary.
++func describeGitSpawnFailure(binary, resolved, dir string) string {
++	var b strings.Builder
++	b.WriteString("gitfixture diagnostic (spawn failed, no git process ran):")
++	fmt.Fprintf(&b, "\n  argv0 %q resolved: %s", binary, resolved)
++	if !strings.HasPrefix(resolved, "unresolved: ") {
++		fmt.Fprintf(&b, "\n  binary: %s", statGitFixture(resolved))
++	}
++	if dir == "" {
++		if cwd, err := os.Getwd(); err == nil {
++			fmt.Fprintf(&b, "\n  dir: (inherited) %s: %s", cwd, statGitFixture(cwd))
++		} else {
++			fmt.Fprintf(&b, "\n  dir: (inherited) getwd: %v", err)
++		}
++	} else {
++		fmt.Fprintf(&b, "\n  dir %q: %s", dir, statGitFixture(dir))
++	}
++	if cwd, err := os.Getwd(); err == nil {
++		fmt.Fprintf(&b, "\n  cwd: %s", cwd)
++	} else {
++		fmt.Fprintf(&b, "\n  cwd: getwd: %v", err)
++	}
++	fmt.Fprintf(&b, "\n  PATH: %s", os.Getenv("PATH"))
++	fmt.Fprintf(&b, "\n  rlimits: %s", gitFixtureRlimits())
++	return b.String()
++}
++
++// statGitFixture renders the lstat/stat facts for one diagnostic path.
++func statGitFixture(path string) string {
++	linfo, lerr := os.Lstat(path)
++	if lerr != nil {
++		return "lstat: " + lerr.Error()
++	}
++	sinfo, serr := os.Stat(path)
++	if serr != nil {
++		return fmt.Sprintf("lstat: mode=%s; stat: %v", linfo.Mode(), serr)
++	}
++	target := ""
++	if linfo.Mode()&os.ModeSymlink != 0 {
++		if link, err := os.Readlink(path); err == nil {
++			target = " -> " + link
++		} else {
++			target = " -> (readlink: " + err.Error() + ")"
++		}
++		if eval, err := filepath.EvalSymlinks(path); err == nil {
++			target += " (eval: " + eval + ")"
++		}
++	}
++	return fmt.Sprintf("lstat: mode=%s%s; stat: mode=%s size=%d", linfo.Mode(), target, sinfo.Mode(), sinfo.Size())
++}
+diff --git a/internal/install/install_test.go b/internal/install/install_test.go
+index e51e2f1e..7374dff0 100644
+--- a/internal/install/install_test.go
++++ b/internal/install/install_test.go
+@@ -45,15 +45,10 @@ func (e *env) git(dir string, args ...string) {
+ 	// from making the suite non-interactive, this keeps developer credentials
+ 	// outside every fixture that later becomes a build/package input.
+ 	gitArgs := append([]string{"-c", "commit.gpgsign=false", "-c", "tag.gpgSign=false"}, args...)
+-	cmd := exec.Command("git", gitArgs...)
+-	cmd.Dir = dir
+-	cmd.Env = append(os.Environ(),
++	gitFixture(e.t, dir, args, gitArgs, []string{
+ 		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
+ 		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",
+-	)
+-	if out, err := cmd.CombinedOutput(); err != nil {
+-		e.t.Fatalf("git %v: %v\n%s", args, err, out)
+-	}
++	})
+ }
+ 
+ func (e *env) write(root, rel, content string) {

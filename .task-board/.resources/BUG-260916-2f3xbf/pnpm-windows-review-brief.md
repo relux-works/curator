@@ -1,0 +1,2 @@
+# Review brief — BUG-260916-2f3xbf
+Verify the exact candidate tree; the hosted windows-latest gate ran the two real-pnpm cases (not deferred, not skipped) and they passed; the registry declaration is closed and platform-conditional (no wildcard admission; narrowing mutant: admit any member → the undeclared-member negative test must fail); POSIX behaviour unchanged (goldens); or, if refusal was chosen, the typed diagnostic at the production entry with a test. Verdict ACCEPT (accept_cr with your own evidence resource) or CHANGES_REQUESTED. Bounded local commands.

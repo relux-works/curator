@@ -1,0 +1,581 @@
+diff --git a/.github/ci/gate-selftest.sh b/.github/ci/gate-selftest.sh
+index 292f8c41..76efafff 100755
+--- a/.github/ci/gate-selftest.sh
++++ b/.github/ci/gate-selftest.sh
+@@ -819,104 +819,75 @@ else
+ fi
+ 
+ echo ''
+-echo '=== platform-cases.tsv: the Windows-deferred pnpm cases are narrow and classified ==='
++echo '=== platform-cases.tsv: the real-pnpm cases are required on windows with no deferral ==='
+ #
+-# BUG-260916-2f3xbf defers exactly two real-pnpm cases on Windows (rev2 gate
+-# run 35098955988: the writable store registry does not declare a member pnpm
+-# writes there). The deferral is three coordinated parts -- the Go skip, the
+-# class-table row admitting its reason, and the ledger rows requiring the
+-# cases on unix while tolerating that class on windows only -- and these cases
+-# read all three back from the shipped files, so a reworded reason, a widened
+-# column, or a third deferral fails here instead of silently changing what
+-# windows-latest proves. The reason is extracted from the Go source, never
+-# restated, so the behavioural cases drive the gate with the exact text the
+-# tests print.
+-DEFER_GO='internal/pnpmsource/conformance_test.go'
+-DEFER_CASES='TestRealPinnedPNPMLockSupersetSnapshotDependencies TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization'
+-
+-defer_reason="$(sed -n 's/.*t\.Skip("\(.*BUG-260916-2f3xbf.*\)").*/\1/p' "$DEFER_GO" | head -n 1)"
+-if [ -z "$defer_reason" ]; then
+-	bad 'the Go suite prints a bug-naming deferral reason' "no t.Skip naming BUG-260916-2f3xbf in $DEFER_GO"
+-	defer_reason='BUG-260916-2f3xbf reason unextractable; the behavioural cases below fail'
++# BUG-260916-2f3xbf declared pnpm's Windows junction spelling of the
++# writable-store registry and the materialized links, so the two install cases
++# that gate run 35098955988 deferred are required on windows-latest exactly as
++# on unix. These cases read the shipped files back, so a resurrected skip, a
++# narrowed column, or a reworded row fails here instead of silently changing
++# what windows-latest proves.
++PNPM_GO='internal/pnpmsource/conformance_test.go'
++PNPM_CASES='TestRealPinnedPNPMLockSupersetSnapshotDependencies TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization'
++
++if grep -q 'BUG-260916-2f3xbf\|skipOnWindowsForStoreRegistryGap' "$PNPM_GO"; then
++	bad 'the Go suite carries no Windows pnpm deferral' "deferral text survives in $PNPM_GO"
+ else
+-	ok 'the Go suite prints a bug-naming deferral reason'
++	ok 'the Go suite carries no Windows pnpm deferral'
+ fi
+ 
+-# The deferral call sites, by enclosing Test: exactly the two failing cases.
+-# (The awk tracks `func Test*` headers; the helper's own definition is not a
+-# Test and its body never self-calls, so only real call sites are listed.)
+-defer_callers="$(awk '/^func Test[A-Za-z0-9_]*\(/{fn=$2; sub(/\(.*/, "", fn)} /skipOnWindowsForStoreRegistryGap\(t\)/{print fn}' "$DEFER_GO" | LC_ALL=C sort | tr '\n' ' ')"
+-if [ "$defer_callers" = 'TestRealPinnedPNPMLockSupersetSnapshotDependencies TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization ' ]; then
+-	ok 'the Go suite defers exactly the two failing cases, nowhere else'
++if grep -v '^[ \t]*#' "$CLASSES" | grep -q 'BUG-260916-2f3xbf'; then
++	bad 'the class table carries no bug-naming deferral row' "deferral row survives in $CLASSES"
+ else
+-	bad 'the Go suite defers exactly the two failing cases, nowhere else' "callers: ${defer_callers:-<none>}"
++	ok 'the class table carries no bug-naming deferral row'
+ fi
+ 
+-# First-match-wins, exactly as platform-case-gate.sh classifies: no earlier
+-# row may shadow the deferral reason into another class.
+-defer_class="$(awk -F'\t' -v reason="$defer_reason" '/^[ \t]*#/ || /^[ \t]*$/ {next} reason ~ $2 {print $1; exit}' "$CLASSES")"
+-if [ "$defer_class" = 'stage-deferred' ]; then
+-	ok 'the class table admits the printed reason as stage-deferred'
+-else
+-	bad 'the class table admits the printed reason as stage-deferred' "first match: ${defer_class:-<none>}"
+-fi
+-
+-for dcase in $DEFER_CASES; do
+-	row="$(awk -F'\t' -v c="$dcase" '$1 == "internal/pnpmsource" && $2 == c {print $3"|"$4"|"$5}' "$SHIPPED")"
+-	if [ "$row" = 'linux,darwin|windows|stage-deferred' ]; then
+-		ok "the ledger requires $dcase on unix and tolerates stage-deferred on windows only"
++for pcase in $PNPM_CASES; do
++	row="$(awk -F'\t' -v c="$pcase" '$1 == "internal/pnpmsource" && $2 == c {print $3"|"$4"|"$5}' "$SHIPPED")"
++	if [ "$row" = 'linux,darwin,windows|-|-' ]; then
++		ok "the ledger requires $pcase on every runner and tolerates no skip"
+ 	else
+-		bad "the ledger requires $dcase on unix and tolerates stage-deferred on windows only" "row: ${row:-<missing>}"
++		bad "the ledger requires $pcase on every runner and tolerates no skip" "row: ${row:-<missing>}"
+ 	fi
+ done
+ 
+ # Behavioural: the shipped streams the satisfiability loop above built are the
+-# otherwise-passing runs; narrow exactly the two deferred cases inside them.
++# otherwise-passing runs; narrow exactly the two install cases inside them.
++# The gate counts a pass as satisfied, so the pass events are removed first
++# and the verdicts below rest on the skip alone.
+ if [ -f "$WORK/shipped-windows.json" ] && [ -f "$WORK/shipped-linux.json" ]; then
+-	win_stream="$WORK/defer-windows.json"
+-	cp "$WORK/shipped-windows.json" "$win_stream"
+-	for dcase in $DEFER_CASES; do
+-		evout internal/pnpmsource "$dcase" "$defer_reason" >>"$win_stream"
+-		ev skip internal/pnpmsource "$dcase" >>"$win_stream"
++	win_stream="$WORK/pnpm-windows-skip.json"
++	grep -v -e TestRealPinnedPNPMLockSupersetSnapshotDependencies -e TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization \
++		"$WORK/shipped-windows.json" >"$win_stream"
++	for pcase in $PNPM_CASES; do
++		evout internal/pnpmsource "$pcase" 'pinned pnpm executable unavailable' >>"$win_stream"
++		ev skip internal/pnpmsource "$pcase" >>"$win_stream"
+ 	done
+-	assert 'the two bug-naming skips are tolerated on windows' 0 \
++	assert 'a pnpm-absent skip of an install case fails on windows' 1 \
+ 		env CI_GATE_GOOS=windows CI_PLATFORM_CASES="$SHIPPED" CI_SKIP_CLASSES="$CLASSES" \
+-		    CI_GATE_MODULE='github.com/relux-works/curator' bash "$GATE" "$win_stream" "$WORK/defer-ev-win"
+-	if [ -f "$WORK/defer-ev-win/skips-observed.tsv" ]; then
+-		for dcase in $DEFER_CASES; do
+-			assert_contains "windows records $dcase as ledger-tolerated stage-deferred" \
+-				"$(printf '%s\tstage-deferred\ttolerated-by-ledger' "$dcase")" "$WORK/defer-ev-win/skips-observed.tsv"
++		    CI_GATE_MODULE='github.com/relux-works/curator' bash "$GATE" "$win_stream" "$WORK/pnpm-ev-win"
++	if [ -f "$WORK/pnpm-ev-win/skips-observed.tsv" ]; then
++		for pcase in $PNPM_CASES; do
++			assert_contains "windows records $pcase as ledger-refused, not tolerated" \
++				"$(printf '%s\thost-capability\tFATAL-not-tolerated' "$pcase")" "$WORK/pnpm-ev-win/skips-observed.tsv"
+ 		done
+ 	else
+-		bad 'the windows run recorded its skip verdicts' 'missing $WORK/defer-ev-win/skips-observed.tsv'
++		bad 'the windows run recorded its skip verdicts' 'missing $WORK/pnpm-ev-win/skips-observed.tsv'
+ 	fi
+ 
+-	# The same skip on linux is fatal: the deferral is windows-only.
+-	lin_stream="$WORK/defer-linux.json"
++	lin_stream="$WORK/pnpm-linux-skip.json"
+ 	grep -v -e TestRealPinnedPNPMLockSupersetSnapshotDependencies -e TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization \
+ 		"$WORK/shipped-linux.json" >"$lin_stream"
+-	for dcase in $DEFER_CASES; do
+-		evout internal/pnpmsource "$dcase" "$defer_reason" >>"$lin_stream"
+-		ev skip internal/pnpmsource "$dcase" >>"$lin_stream"
++	for pcase in $PNPM_CASES; do
++		evout internal/pnpmsource "$pcase" 'pinned pnpm executable unavailable' >>"$lin_stream"
++		ev skip internal/pnpmsource "$pcase" >>"$lin_stream"
+ 	done
+-	assert 'the same skip on linux fails the gate' 1 \
++	assert 'the same skip fails on linux too' 1 \
+ 		env CI_GATE_GOOS=linux CI_EXCLUDED_PKGS=internal/godriver \
+ 		    CI_PLATFORM_CASES="$SHIPPED" CI_SKIP_CLASSES="$CLASSES" \
+-		    CI_GATE_MODULE='github.com/relux-works/curator' bash "$GATE" "$lin_stream" "$WORK/defer-ev-lin"
+-
+-	# A different reason on windows is fatal too: the ledger pins the class,
+-	# so a pnpm-absent skip cannot masquerade as the bug deferral.
+-	cls_stream="$WORK/defer-windows-wrongclass.json"
+-	cp "$WORK/shipped-windows.json" "$cls_stream"
+-	for dcase in $DEFER_CASES; do
+-		evout internal/pnpmsource "$dcase" 'pinned pnpm executable unavailable' >>"$cls_stream"
+-		ev skip internal/pnpmsource "$dcase" >>"$cls_stream"
+-	done
+-	assert 'a non-deferral skip of a deferred case fails on windows' 1 \
+-		env CI_GATE_GOOS=windows CI_PLATFORM_CASES="$SHIPPED" CI_SKIP_CLASSES="$CLASSES" \
+-		    CI_GATE_MODULE='github.com/relux-works/curator' bash "$GATE" "$cls_stream" "$WORK/defer-ev-cls"
++		    CI_GATE_MODULE='github.com/relux-works/curator' bash "$GATE" "$lin_stream" "$WORK/pnpm-ev-lin"
+ else
+-	bad 'the deferral behavioural cases have shipped streams to narrow' 'missing $WORK/shipped-windows.json or $WORK/shipped-linux.json'
++	bad 'the pnpm behavioural cases have shipped streams to narrow' 'missing $WORK/shipped-windows.json or $WORK/shipped-linux.json'
+ fi
+ 
+ echo ''
+@@ -1162,7 +1133,7 @@ if [ -f "$WORK/shipped-darwin.json" ] && [ -f "$WORK/shipped-linux.json" ]; then
+ 	rust_cls_stream="$WORK/rust-linux-wrongclass.json"
+ 	cp "$WORK/shipped-linux.json" "$rust_cls_stream"
+ 	for rcase in $RUST_CASES; do
+-		evout internal/rustsource "$rcase" 'deferred on windows pending BUG-260916-2f3xbf' >>"$rust_cls_stream"
++		evout internal/rustsource "$rcase" 'CURATOR_CONFORMANCE_ROOT is not set' >>"$rust_cls_stream"
+ 		ev skip internal/rustsource "$rcase" >>"$rust_cls_stream"
+ 	done
+ 	assert 'a non-absence skip of a production rust case fails on linux' 1 \
+diff --git a/.github/ci/platform-cases.tsv b/.github/ci/platform-cases.tsv
+index daed3486..1fe73242 100644
+--- a/.github/ci/platform-cases.tsv
++++ b/.github/ci/platform-cases.tsv
+@@ -461,26 +461,20 @@ cmd/curator	TestProfileComposeAddWarnsWhenOverlaysForbidden	linux,darwin,windows
+ cmd/curator	TestEnvStatusReportsLockedRequire	linux,darwin,windows	-	-	env status reports the locked require_current_profile in JSON and text
+ 
+ # ===========================================================================
+-# Real-pnpm integration -- Windows store-registry gap (BUG-260916-2f3xbf)
++# Real-pnpm integration (BUG-260916-2f3xbf landed)
+ #
+ # The pnpm pin (TASK-260916-5aqozl) installs pnpm 10.33.0 in every suite lane
+-# so the three TestRealPinnedPNPM* cases execute instead of skipping. On
+-# windows-latest two of them fail with `closure_input_undeclared: pnpm
+-# writable store registry contains an undeclared member` (gate run 35098955988):
+-# pnpm writes a store member on Windows that the closure registry does not
+-# declare. That is a product gap, not a CI gap, filed as BUG-260916-2f3xbf.
+-#
+-# Until the bug lands, exactly these two cases are Windows-deferred: required
+-# on linux,darwin, where they pass against the pinned pnpm, and tolerating the
+-# bug-naming stage-deferred skip on windows only. A skip of either case on a
+-# unix runner, or for any other reason on Windows, is fatal. The third case
++# so the three TestRealPinnedPNPM* cases execute instead of skipping. pnpm
++# links directories through symlink-dir, which creates junctions on Windows;
++# BUG-260916-2f3xbf declared that spelling in the writable-store registry and
++# the materialized-link validators (internal/pnpmsource linkentry_*.go), so
++# both install cases below are required on windows-latest exactly as on unix.
++# Any skip of either case, on any runner, is fatal. The third case
+ # (TestRealPinnedPNPMTargetPrunedUnreachableRejectsBeforeInstall) passes on all
+-# three runners and carries no row. Removal: BUG-260916-2f3xbf's AC is green on
+-# windows-latest with no ledger deferral -- widen must_run_on to windows and
+-# delete the Go skip with it.
++# three runners and carries no row.
+ # ===========================================================================
+-internal/pnpmsource	TestRealPinnedPNPMLockSupersetSnapshotDependencies	linux,darwin	windows	stage-deferred	pinned-pnpm lock-superset case executes on unix; deferred on windows pending BUG-260916-2f3xbf (undeclared writable-store member), asserted there once the bug lands
+-internal/pnpmsource	TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization	linux,darwin	windows	stage-deferred	pinned-pnpm private-store and offline-materialization case executes on unix; deferred on windows pending BUG-260916-2f3xbf (undeclared writable-store member), asserted there once the bug lands
++internal/pnpmsource	TestRealPinnedPNPMLockSupersetSnapshotDependencies	linux,darwin,windows	-	-	pinned-pnpm lock-superset case executes against the pinned pnpm on every runner, including the Windows junction spelling of the store registry
++internal/pnpmsource	TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization	linux,darwin,windows	-	-	pinned-pnpm private-store and offline-materialization case executes against the pinned pnpm on every runner, including the Windows junction spelling of the store registry
+ 
+ # ===========================================================================
+ # Pinned-Rust production cases (TASK-260916-vygif0)
+diff --git a/.github/ci/skip-classes.tsv b/.github/ci/skip-classes.tsv
+index a18d8850..f2368d1f 100644
+--- a/.github/ci/skip-classes.tsv
++++ b/.github/ci/skip-classes.tsv
+@@ -103,7 +103,9 @@ opt-in	cross-check env not set	allow	enabled by an explicit developer environmen
+ opt-in	hashes the whole host GOROOT	allow	a whole-GOROOT probe, not part of the gate
+ 
+ # --- deferred delivery stages -------------------------------------------------
+-stage-deferred	deferred on windows pending BUG-260916-2f3xbf	allow	the Windows pnpm writable-store member BUG-260916-2f3xbf owns; asserted on windows-latest once the bug lands, never as a pass here
++# No stage is currently deferred. BUG-260916-2f3xbf's Windows pnpm deferral was
++# the only row here; it was removed when the bug landed and the two real-pnpm
++# cases became required on windows-latest.
+ 
+ # --- go test plumbing -------------------------------------------------------
+ helper-process	helper process	allow	the go test helper-process re-exec pattern
+diff --git a/internal/pnpmsource/conformance_test.go b/internal/pnpmsource/conformance_test.go
+index f3068d23..839bebd0 100644
+--- a/internal/pnpmsource/conformance_test.go
++++ b/internal/pnpmsource/conformance_test.go
+@@ -870,7 +870,6 @@ func TestRealPinnedPNPMLockSupersetSnapshotDependencies(t *testing.T) {
+ 	fixture := newTargetPrunedSnapshotDependencyFixture(t)
+ 	capture := captureFixture(t, fixture)
+ 	runner := newConcretePNPMRunner(t)
+-	skipOnWindowsForStoreRegistryGap(t)
+ 	runner.context = makeExecutionContext(t, capture, runner)
+ 	storeRoot := filepath.Join(t.TempDir(), "store")
+ 	store, err := DerivePrivateStore(t.Context(), capture, storeRoot, runner.context)
+@@ -1106,7 +1105,15 @@ func TestWritableStoreOverlayAllowsOnlyExactProjectRegistration(t *testing.T) {
+ 		if err := os.WriteFile(filepath.Join(registry, "rogue"), []byte("x"), 0o600); err != nil {
+ 			t.Fatal(err)
+ 		}
+-		assertCode(t, reconcileWritableStoreOverlay(store, project, expected), CodeInputUndeclared)
++		assertUndeclaredMemberRefusal(t, reconcileWritableStoreOverlay(store, project, expected))
++	})
++	t.Run("plain directory member refused", func(t *testing.T) {
++		store, project, expected := makeFixture(t)
++		registry := filepath.Join(store, "v10", "projects")
++		if err := os.Mkdir(filepath.Join(registry, "c8805e97311ac3a64fd7c507d26b47dc"), 0o700); err != nil {
++			t.Fatal(err)
++		}
++		assertUndeclaredMemberRefusal(t, reconcileWritableStoreOverlay(store, project, expected))
+ 	})
+ 	t.Run("frozen content drift", func(t *testing.T) {
+ 		store, project, expected := makeFixture(t)
+@@ -1124,7 +1131,6 @@ func TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization(t *testing.T) {
+ 	fixture := newHostPNPMFixture(t)
+ 	capture := captureFixture(t, fixture)
+ 	runner := newConcretePNPMRunner(t)
+-	skipOnWindowsForStoreRegistryGap(t)
+ 	runner.context = makeExecutionContext(t, capture, runner)
+ 	storeRoot := filepath.Join(t.TempDir(), "store")
+ 	store, err := DerivePrivateStore(t.Context(), capture, storeRoot, runner.context)
+@@ -1286,31 +1292,6 @@ func TestResolveWindowsPNPMEntrypoint(t *testing.T) {
+ 	})
+ }
+ 
+-// skipOnWindowsForStoreRegistryGap defers the real-pnpm cases whose Windows
+-// store writes the closure registry does not yet declare.
+-//
+-// Gate run 35098955988 (rev2 of the pnpm pin): with real pnpm 10.33.0
+-// available on windows-latest for the first time, two of the three
+-// TestRealPinnedPNPM* cases fail in DerivePrivateStore/Materialize with
+-// `closure_input_undeclared: pnpm writable store registry contains an
+-// undeclared member` -- pnpm writes a store member on Windows that the
+-// registry does not declare. That is a product gap, filed as
+-// BUG-260916-2f3xbf and out of scope for the pin task, so the orchestrator
+-// defers exactly those two cases on Windows until the bug lands: the
+-// platform-case ledger requires them on linux,darwin and tolerates this skip
+-// on windows under class stage-deferred, and the skip reason names the bug so
+-// the deferral is visible in skips-observed.tsv. The call sits after
+-// newConcretePNPMRunner so a missing or unpinned pnpm still skips with the
+-// existing host-capability reason; it fires only when pnpm is present on
+-// Windows. Removal: delete the calls and this helper when BUG-260916-2f3xbf
+-// lands -- the bug's AC is green on windows-latest with no ledger deferral.
+-func skipOnWindowsForStoreRegistryGap(t *testing.T) {
+-	t.Helper()
+-	if runtime.GOOS == "windows" {
+-		t.Skip("deferred on windows pending BUG-260916-2f3xbf: pnpm writable store registry contains an undeclared member")
+-	}
+-}
+-
+ func newConcretePNPMRunner(t *testing.T) *concretePNPMRunner {
+ 	t.Helper()
+ 	pnpmCommand, err := exec.LookPath("pnpm")
+@@ -1827,6 +1808,20 @@ func assertCode(t *testing.T, err error, want string) {
+ 		t.Fatalf("code=%q want=%q err=%v", ErrorCode(err), want, err)
+ 	}
+ }
++
++// assertUndeclaredMemberRefusal pins the kind gate, not just the code: a
++// non-link registry member must be refused as an undeclared member. The
++// narrowing mutant that admits every member still fails closed at the target
++// check, but with the wrong diagnostic, so it fails this assertion.
++func assertUndeclaredMemberRefusal(t *testing.T, err error) {
++	t.Helper()
++	assertCode(t, err, CodeInputUndeclared)
++	diagnostic, ok := err.(*Error)
++	if !ok || !strings.Contains(diagnostic.Detail, "contains an undeclared member") {
++		t.Fatalf("rogue registry member refused by the wrong gate: %v", err)
++	}
++}
++
+ func cloneBytesMap(values map[string][]byte) map[string][]byte {
+ 	result := map[string][]byte{}
+ 	for key, value := range values {
+diff --git a/internal/pnpmsource/linkentry_unix.go b/internal/pnpmsource/linkentry_unix.go
+new file mode 100644
+index 00000000..612c4d68
+--- /dev/null
++++ b/internal/pnpmsource/linkentry_unix.go
+@@ -0,0 +1,18 @@
++//go:build unix
++
++package pnpmsource
++
++import "io/fs"
++
++// admittedLink reports whether a store-registry member or materialized
++// dependency entry is pnpm's directory-link spelling. pnpm links directories
++// through symlinks on Unix.
++func admittedLink(info fs.FileInfo, _ string) bool {
++	return info.Mode()&fs.ModeSymlink != 0
++}
++
++// normalizeTreeLink is the identity on Unix: symlink components are resolved
++// by filepath.EvalSymlinks at the call site.
++func normalizeTreeLink(path string, _ fs.FileInfo) (string, error) {
++	return path, nil
++}
+diff --git a/internal/pnpmsource/linkentry_windows.go b/internal/pnpmsource/linkentry_windows.go
+new file mode 100644
+index 00000000..6f789443
+--- /dev/null
++++ b/internal/pnpmsource/linkentry_windows.go
+@@ -0,0 +1,47 @@
++//go:build windows
++
++package pnpmsource
++
++import (
++	"io/fs"
++	"os"
++
++	"golang.org/x/sys/windows"
++)
++
++// admittedLink reports whether a store-registry member or materialized
++// dependency entry is pnpm's directory-link spelling. pnpm links directories
++// through symlink-dir, which creates junctions on Windows, and Go reports a
++// junction as ModeIrregular rather than ModeSymlink, so the junction shape is
++// read back from the attributes: a reparse point that is also a directory.
++// Any other irregular node stays refused.
++func admittedLink(info fs.FileInfo, path string) bool {
++	if info.Mode()&fs.ModeSymlink != 0 {
++		return true
++	}
++	return info.Mode().Type() == fs.ModeIrregular && directoryJunction(path)
++}
++
++func directoryJunction(path string) bool {
++	path16, err := windows.UTF16PtrFromString(path)
++	if err != nil {
++		return false
++	}
++	attributes, err := windows.GetFileAttributes(path16)
++	if err != nil {
++		return false
++	}
++	return attributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 &&
++		attributes&windows.FILE_ATTRIBUTE_DIRECTORY != 0
++}
++
++// normalizeTreeLink resolves pnpm's junction spelling of a directory link to
++// its stated target before comparison. filepath.EvalSymlinks does not
++// evaluate junctions, while os.Readlink resolves the junction itself; the
++// target comparison downstream still decides whether the link is admissible.
++func normalizeTreeLink(path string, info fs.FileInfo) (string, error) {
++	if info.Mode().Type() == fs.ModeIrregular && directoryJunction(path) {
++		return os.Readlink(path)
++	}
++	return path, nil
++}
+diff --git a/internal/pnpmsource/linkentry_windows_test.go b/internal/pnpmsource/linkentry_windows_test.go
+new file mode 100644
+index 00000000..d86bc9eb
+--- /dev/null
++++ b/internal/pnpmsource/linkentry_windows_test.go
+@@ -0,0 +1,135 @@
++//go:build windows
++
++package pnpmsource
++
++import (
++	"os"
++	"os/exec"
++	"path/filepath"
++	"testing"
++)
++
++func makeTestJunction(t *testing.T, link, target string) {
++	t.Helper()
++	// mklink /J is the unprivileged way to create a junction; the symlink forms
++	// need SeCreateSymbolicLinkPrivilege, which a hosted runner may not grant.
++	output, err := exec.Command("cmd", "/c", "mklink", "/J", link, target).CombinedOutput()
++	if err != nil {
++		t.Skipf("this host cannot create a directory junction: %v: %s", err, output)
++	}
++}
++
++func makeJunctionStoreFixture(t *testing.T) (store, project string, expected []StoreFile) {
++	t.Helper()
++	store = filepath.Join(t.TempDir(), "store")
++	project = filepath.Join(t.TempDir(), "project")
++	if err := os.MkdirAll(filepath.Join(store, "v10", "files"), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.MkdirAll(project, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(store, "v10", "files", "content"), []byte("source\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	var err error
++	expected, err = inventoryStore(store)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return store, project, expected
++}
++
++// TestWritableStoreOverlayAdmitsWindowsJunctionRegistration feeds the exact
++// member shape pnpm 10.33.0 writes on Windows to the registry: registerProject
++// links the project through symlink-dir, which creates a junction (Go reports
++// ModeIrregular, and filepath.EvalSymlinks does not follow it), named with the
++// 32-hex createShortHash of the project directory.
++func TestWritableStoreOverlayAdmitsWindowsJunctionRegistration(t *testing.T) {
++	store, project, expected := makeJunctionStoreFixture(t)
++	registry := filepath.Join(store, "v10", "projects")
++	if err := os.MkdirAll(registry, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	makeTestJunction(t, filepath.Join(registry, "c8805e97311ac3a64fd7c507d26b47dc"), project)
++	if err := reconcileWritableStoreOverlay(store, project, expected); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := os.Lstat(registry); !os.IsNotExist(err) {
++		t.Fatalf("registry was not removed: %v", err)
++	}
++}
++
++func TestWritableStoreOverlayRefusesMisdirectedWindowsJunction(t *testing.T) {
++	store, project, expected := makeJunctionStoreFixture(t)
++	registry := filepath.Join(store, "v10", "projects")
++	if err := os.MkdirAll(registry, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	other := filepath.Join(t.TempDir(), "other")
++	if err := os.MkdirAll(other, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	makeTestJunction(t, filepath.Join(registry, "4990f83e93c63b5b58405c5ac8c8ca6a"), other)
++	assertCode(t, reconcileWritableStoreOverlay(store, project, expected), CodeInputUndeclared)
++}
++
++func TestAdmittedLinkCoversWindowsJunctionShape(t *testing.T) {
++	target := filepath.Join(t.TempDir(), "target")
++	if err := os.MkdirAll(target, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	link := filepath.Join(t.TempDir(), "link")
++	makeTestJunction(t, link, target)
++	info, err := os.Lstat(link)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !admittedLink(info, link) {
++		t.Fatal("junction is not an admitted link")
++	}
++	resolved, err := normalizeTreeLink(link, info)
++	if err != nil {
++		t.Fatal(err)
++	}
++	want, err := filepath.EvalSymlinks(target)
++	if err != nil {
++		t.Fatal(err)
++	}
++	got, err := filepath.EvalSymlinks(resolved)
++	if err != nil || got != want {
++		t.Fatalf("junction resolved to %q (%v), want %q", got, err, want)
++	}
++	plain, err := os.Lstat(target)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if admittedLink(plain, target) {
++		t.Fatal("plain directory is an admitted link")
++	}
++	if resolved, err := normalizeTreeLink(target, plain); err != nil || resolved != target {
++		t.Fatalf("plain directory normalized to %q (%v), want identity", resolved, err)
++	}
++}
++
++func TestDirectNodeModulesAdmitWindowsJunctionLinks(t *testing.T) {
++	root := t.TempDir()
++	nodeModules := filepath.Join(root, "node_modules")
++	target := filepath.Join(root, "target-pkg")
++	if err := os.MkdirAll(filepath.Join(nodeModules, ".pnpm"), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.MkdirAll(target, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(nodeModules, ".modules.yaml"), []byte("layoutVersion: 10\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(nodeModules, ".pnpm-workspace-state-v1.json"), []byte(`{"settings":{}}`), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	makeTestJunction(t, filepath.Join(nodeModules, "dep"), target)
++	if err := validateDirectNodeModules(nodeModules, true, map[string]string{"dep": target}); err != nil {
++		t.Fatal(err)
++	}
++}
+diff --git a/internal/pnpmsource/materialize.go b/internal/pnpmsource/materialize.go
+index 3a034c38..8369343e 100644
+--- a/internal/pnpmsource/materialize.go
++++ b/internal/pnpmsource/materialize.go
+@@ -438,10 +438,14 @@ func reconcileWritableStoreOverlay(storeRoot, projectRoot string, expected []Sto
+ 	for _, entry := range entries {
+ 		link := filepath.Join(registry, entry.Name())
+ 		info, statErr := os.Lstat(link)
+-		if statErr != nil || info.Mode()&fs.ModeSymlink == 0 {
++		if statErr != nil || !admittedLink(info, link) {
+ 			return fail(CodeInputUndeclared, "pnpm writable store registry contains an undeclared member", map[string]string{"entry": entry.Name()})
+ 		}
+-		target, evalErr := filepath.EvalSymlinks(link)
++		resolved, resolveErr := normalizeTreeLink(link, info)
++		if resolveErr != nil {
++			return fail(CodeInputUndeclared, "pnpm writable store registry link cannot be resolved", map[string]string{"entry": entry.Name()})
++		}
++		target, evalErr := filepath.EvalSymlinks(resolved)
+ 		if evalErr != nil {
+ 			return fail(CodeInputUndeclared, "pnpm writable store registry link cannot be resolved", map[string]string{"entry": entry.Name()})
+ 		}
+@@ -795,10 +799,14 @@ func validateDirectNodeModules(nodeModules string, root bool, expected map[strin
+ 			return fmt.Errorf("direct dependency link %q is missing", name)
+ 		}
+ 		info, statErr := os.Lstat(link)
+-		if statErr != nil || info.Mode()&fs.ModeSymlink == 0 {
++		if statErr != nil || !admittedLink(info, link) {
+ 			return fmt.Errorf("direct dependency member %q is not a link", name)
+ 		}
+-		actual, evalErr := filepath.EvalSymlinks(link)
++		resolved, resolveErr := normalizeTreeLink(link, info)
++		if resolveErr != nil {
++			return fmt.Errorf("direct dependency link %q cannot be resolved", name)
++		}
++		actual, evalErr := filepath.EvalSymlinks(resolved)
+ 		if evalErr != nil {
+ 			return fmt.Errorf("direct dependency link %q cannot be resolved", name)
+ 		}
+@@ -855,10 +863,14 @@ func validateSnapshotInstance(ctx context.Context, projectRoot, virtual string,
+ 			return fail(CodeGraphIncomplete, "pnpm snapshot dependency link is missing", map[string]string{"snapshot": snapshot.Key, "dependency": name})
+ 		}
+ 		linkInfo, err := os.Lstat(link)
+-		if err != nil || linkInfo.Mode()&fs.ModeSymlink == 0 {
++		if err != nil || !admittedLink(linkInfo, link) {
+ 			return fail(CodeGraphIncomplete, "pnpm snapshot dependency member is not an exact link", map[string]string{"snapshot": snapshot.Key, "dependency": name})
+ 		}
+-		actualTarget, err := filepath.EvalSymlinks(link)
++		resolved, resolveErr := normalizeTreeLink(link, linkInfo)
++		if resolveErr != nil {
++			return fail(CodeGraphIncomplete, "pnpm snapshot dependency link cannot be resolved", map[string]string{"snapshot": snapshot.Key, "dependency": name})
++		}
++		actualTarget, err := filepath.EvalSymlinks(resolved)
+ 		if err != nil {
+ 			return fail(CodeGraphIncomplete, "pnpm snapshot dependency link cannot be resolved", map[string]string{"snapshot": snapshot.Key, "dependency": name})
+ 		}

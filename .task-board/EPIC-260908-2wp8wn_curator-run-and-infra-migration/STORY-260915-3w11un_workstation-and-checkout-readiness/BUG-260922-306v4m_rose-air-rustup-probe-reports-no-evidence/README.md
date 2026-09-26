@@ -1,0 +1,10 @@
+# BUG-260922-306v4m: rose-air-rustup-probe-reports-no-evidence
+
+## Description
+Operator checked rose-air on 2026-09-22 and rustup IS installed there, yet .github/ci/install-rust-toolchain.sh still fails with 'rustup is not installed on this runner' on every main push since 2026-09-21T22:30Z (runs 35663049586, 35725359745). The probe order is PATH, then CARGO_HOME/bin (default HOME/.cargo/bin), HOMEBREW_PREFIX/bin, /opt/homebrew/bin, /usr/local/bin — so one of these is true and the failure message hides which: (a) the job ran on a DIFFERENT self-hosted ARM64 mac than the one the operator checked (the label set is self-hosted+macOS+ARM64 and the runner is registered at organisation level; the GitHub API reports runnerName null for that job), (b) the runner service user is not the user that has rustup, so HOME/.cargo/bin points elsewhere, (c) rustup lives somewhere the probe does not look (asdf/mise shim, ~/.local/bin, /usr/local/cargo/bin, /opt/rust/bin). The failure must name the evidence instead of the remedy.
+
+## Scope
+.github/ci/install-rust-toolchain.sh failure path and its gate-selftest rows; docs/self-hosted-runner-setup.md if a probe path is added. No product code, no change to the successful path's behaviour.
+
+## Acceptance Criteria
+1) on failure the script prints, as one diagnostic block: RUNNER_NAME, hostname, whoami, HOME, CARGO_HOME, HOMEBREW_PREFIX, the PATH it searched, and for EVERY probed candidate the path with exists/executable/absent, plus a bounded listing of CARGO_HOME/bin and the Homebrew prefixes when they exist; 2) the success path is byte-identical in behaviour (same PATH/GITHUB_PATH writes, same 'rust-pin: using rustup at' line); 3) gate-selftest rows: a fixture where rustup is absent everywhere must show the block and still exit 1 with the same remedy sentence, and a fixture where rustup is only under a probed candidate must still succeed; 4) if the evidence from the next main push shows rustup in a place the probe does not cover, the probe gains that path in the same leaf and docs/self-hosted-runner-setup.md records it

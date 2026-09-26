@@ -1,0 +1,336 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index e06ebc61..9ac9b445 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -104,6 +104,13 @@ All notable implementation changes are recorded here.
+   like every other product git spawn, instead of surfacing the bare fork/exec
+   text. The underlying cause is preserved in the message and the error chain;
+   success-path behaviour is unchanged.
++- A `git check-ignore` tool failure in the managed `.gitignore` gate is no
++  longer reported as "generated paths are not ignored by git". Only exit
++  status 1 means not ignored; a spawn failure, a missing git binary, or any
++  other exit (including 128 outside a repository) returns a `git check-ignore
++  failed ...` error carrying the tool diagnostic, and the install refuses
++  with it (failed) instead of skipping with the policy message. The
++  not-ignored message and the success path are unchanged.
+ 
+ ## 0.12.5 - 2026-07-14
+ 
+diff --git a/internal/gitignore/gitignore.go b/internal/gitignore/gitignore.go
+index 38a53eca..a65a7752 100644
+--- a/internal/gitignore/gitignore.go
++++ b/internal/gitignore/gitignore.go
+@@ -5,6 +5,8 @@
+ package gitignore
+ 
+ import (
++	"bytes"
++	"errors"
+ 	"fmt"
+ 	"os"
+ 	"os/exec"
+@@ -15,14 +17,49 @@ import (
+ // BlockComment heads the appended entries.
+ const BlockComment = "# Curator"
+ 
++// NotIgnoredError reports the policy outcome that entries are not ignored.
++// It is distinct from a tool failure: a spawn error, a missing git binary,
++// or any check-ignore exit other than 1 is returned as a plain wrapped
++// error, never as this type.
++type NotIgnoredError struct {
++	Missing []string
++}
++
++func (e *NotIgnoredError) Error() string {
++	return fmt.Sprintf("generated paths are not ignored by git; missing entries: %s", strings.Join(e.Missing, ", "))
++}
++
++// IsNotIgnored reports whether err is the not-ignored policy outcome as
++// opposed to a git tool failure.
++func IsNotIgnored(err error) bool {
++	var target *NotIgnoredError
++	return errors.As(err, &target)
++}
++
+ // Missing returns the entries not currently ignored in projectRoot.
++//
++// check-ignore exit status 1 means not ignored. Any other failure — a spawn
++// error, exec.ErrNotFound, exit 128 or any other non-1 exit — is returned as
++// an error carrying the tool diagnostic, so callers never mistake a broken
++// git invocation for a policy outcome. The diagnostic names only the entry,
++// never the full probe path, environment, or project root.
+ func Missing(projectRoot string, entries []string) ([]string, error) {
+ 	var missing []string
+ 	for _, entry := range entries {
+ 		probe := strings.TrimSuffix(entry, "/") + "/.curator-probe"
+ 		cmd := exec.Command("git", "-C", projectRoot, "check-ignore", "-q", probe) // #nosec G204 -- fixed binary and flags
++		var stderr bytes.Buffer
++		cmd.Stderr = &stderr
+ 		if err := cmd.Run(); err != nil {
+-			missing = append(missing, entry)
++			var exitErr *exec.ExitError
++			if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
++				missing = append(missing, entry)
++				continue
++			}
++			if detail := strings.TrimSpace(stderr.String()); detail != "" {
++				return nil, fmt.Errorf("git check-ignore failed for %q: %s: %w", entry, detail, err)
++			}
++			return nil, fmt.Errorf("git check-ignore failed for %q: %w", entry, err)
+ 		}
+ 	}
+ 	return missing, nil
+@@ -50,7 +87,7 @@ func Ensure(projectRoot string, entries []string, fix bool) error {
+ 			return nil
+ 		}
+ 	}
+-	return fmt.Errorf("generated paths are not ignored by git; missing entries: %s", strings.Join(missing, ", "))
++	return &NotIgnoredError{Missing: missing}
+ }
+ 
+ // Append adds entries to the .gitignore under the managed comment, skipping
+diff --git a/internal/gitignore/gitignore_test.go b/internal/gitignore/gitignore_test.go
+index a2ead5cd..58abeb2c 100644
+--- a/internal/gitignore/gitignore_test.go
++++ b/internal/gitignore/gitignore_test.go
+@@ -1,10 +1,13 @@
+ package gitignore
+ 
+ import (
++	"errors"
+ 	"os"
+ 	"os/exec"
+ 	"path/filepath"
++	"runtime"
+ 	"strings"
++	"syscall"
+ 	"testing"
+ )
+ 
+@@ -55,3 +58,139 @@ func TestEnsurePassesWhenAlreadyIgnored(t *testing.T) {
+ 		t.Fatalf("already-ignored entry reported missing: %v", err)
+ 	}
+ }
++
++// TestMissingExitOneIsNotIgnored pins the policy outcome: check-ignore exit 1
++// still means "not ignored", reported as a NotIgnoredError, never as a tool
++// failure.
++func TestMissingExitOneIsNotIgnored(t *testing.T) {
++	project := gitProject(t)
++	missing, err := Missing(project, []string{".agents/"})
++	if err != nil {
++		t.Fatalf("Missing on an unignored entry: %v", err)
++	}
++	if len(missing) != 1 || missing[0] != ".agents/" {
++		t.Fatalf("missing = %q, want [\".agents/\"]", missing)
++	}
++	err = Ensure(project, []string{".agents/"}, false)
++	if err == nil {
++		t.Fatal("Ensure on an unignored entry must fail")
++	}
++	if !IsNotIgnored(err) {
++		t.Fatalf("err = %v (%T), want a NotIgnoredError", err, err)
++	}
++	if !strings.Contains(err.Error(), "generated paths are not ignored by git") {
++		t.Fatalf("err = %q, want the stable policy message", err)
++	}
++}
++
++// TestMissingSpawnFailureIsToolError pins the conflation fix (BUG-260921-1fpaij):
++// a git spawn failure is a tool error carrying the kernel diagnostic, never
++// the "not ignored" policy outcome. The injected git is the shape the hosted
++// gate observed: a PATH-resolvable 0755 script whose shebang interpreter is
++// 0644, so the kernel refuses the exec with EACCES.
++func TestMissingSpawnFailureIsToolError(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("executable-bit spawn refusal is exercised on the unix runners")
++	}
++	project := gitProject(t)
++	shimDir := t.TempDir()
++	interp := filepath.Join(shimDir, "interp")
++	if err := os.WriteFile(interp, []byte("#!/bin/sh\nexit 0\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Chmod(interp, 0o644); err != nil {
++		t.Fatal(err)
++	}
++	git := filepath.Join(shimDir, "git")
++	if err := os.WriteFile(git, []byte("#!"+interp+"\nexit 0\n"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	// Sequential by construction: it rewrites PATH for the process, which
++	// t.Setenv forbids under a parallel ancestor.
++	t.Setenv("PATH", shimDir+string(os.PathListSeparator)+os.Getenv("PATH"))
++
++	if _, err := Missing(project, []string{".agents/"}); err == nil {
++		t.Fatal("Missing with a non-executable git must fail")
++	} else {
++		if IsNotIgnored(err) {
++			t.Fatalf("err = %q, want a tool error, not the policy outcome", err)
++		}
++		if !strings.Contains(err.Error(), "git check-ignore failed") {
++			t.Fatalf("err = %q, want the wrapped operation context", err)
++		}
++		if !strings.Contains(err.Error(), ".agents/") {
++			t.Fatalf("err = %q, want the entry name for context", err)
++		}
++		if strings.Contains(err.Error(), ".curator-probe") {
++			t.Fatalf("err = %q, must not leak the probe path", err)
++		}
++		if !strings.Contains(err.Error(), "permission denied") {
++			t.Fatalf("err = %q, want the kernel refusal preserved", err)
++		}
++		if !errors.Is(err, syscall.EACCES) {
++			t.Fatalf("err = %q, want the EACCES chain preserved for callers", err)
++		}
++	}
++	if err := Ensure(project, []string{".agents/"}, false); err == nil {
++		t.Fatal("Ensure with a non-executable git must fail")
++	} else {
++		if IsNotIgnored(err) {
++			t.Fatalf("err = %q, want a tool error, not the policy outcome", err)
++		}
++		if strings.Contains(err.Error(), "generated paths are not ignored") {
++			t.Fatalf("err = %q, must never carry the policy message", err)
++		}
++	}
++}
++
++// TestMissingNonRepositoryIsToolError pins the exit-128 branch: a root that
++// is not a git repository is a tool error with the git fatal text, never
++// "not ignored".
++func TestMissingNonRepositoryIsToolError(t *testing.T) {
++	plain := t.TempDir()
++	if _, err := Missing(plain, []string{".agents/"}); err == nil {
++		t.Fatal("Missing outside a repository must fail")
++	} else {
++		if IsNotIgnored(err) {
++			t.Fatalf("err = %q, want a tool error, not the policy outcome", err)
++		}
++		if !strings.Contains(err.Error(), "git check-ignore failed") {
++			t.Fatalf("err = %q, want the wrapped operation context", err)
++		}
++		var exitErr *exec.ExitError
++		if !errors.As(err, &exitErr) || exitErr.ExitCode() != 128 {
++			t.Fatalf("err = %q, want the exit-128 chain preserved", err)
++		}
++	}
++	if err := Ensure(plain, []string{".agents/"}, false); err == nil {
++		t.Fatal("Ensure outside a repository must fail")
++	} else {
++		if IsNotIgnored(err) {
++			t.Fatalf("err = %q, want a tool error, not the policy outcome", err)
++		}
++		if strings.Contains(err.Error(), "generated paths are not ignored") {
++			t.Fatalf("err = %q, must never carry the policy message", err)
++		}
++	}
++}
++
++// TestMissingGitAbsentIsToolError pins exec.ErrNotFound: git absent from PATH
++// is a tool error, never "not ignored".
++func TestMissingGitAbsentIsToolError(t *testing.T) {
++	project := gitProject(t)
++	empty := t.TempDir()
++	t.Setenv("PATH", empty)
++	if _, err := Missing(project, []string{".agents/"}); err == nil {
++		t.Fatal("Missing without a git binary must fail")
++	} else {
++		if IsNotIgnored(err) {
++			t.Fatalf("err = %q, want a tool error, not the policy outcome", err)
++		}
++		if !strings.Contains(err.Error(), "git check-ignore failed") {
++			t.Fatalf("err = %q, want the wrapped operation context", err)
++		}
++		if !errors.Is(err, exec.ErrNotFound) {
++			t.Fatalf("err = %q, want the ErrNotFound chain preserved", err)
++		}
++	}
++}
+diff --git a/internal/install/gitignore_spawn_test.go b/internal/install/gitignore_spawn_test.go
+new file mode 100644
+index 00000000..25cf7477
+--- /dev/null
++++ b/internal/install/gitignore_spawn_test.go
+@@ -0,0 +1,55 @@
++package install
++
++import (
++	"os"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++)
++
++// TestProjectRefusesOnGitignoreSpawnFailure pins the production entry of
++// BUG-260921-1fpaij: when git check-ignore cannot spawn, install.Project
++// refuses with the spawn diagnostic (status failed), never with the
++// "not ignored" policy message (status skipped). The injected git is the
++// shape the hosted gate observed: a PATH-resolvable 0755 script whose
++// shebang interpreter is 0644, so the kernel refuses the exec with EACCES.
++func TestProjectRefusesOnGitignoreSpawnFailure(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("executable-bit spawn refusal is exercised on the unix runners")
++	}
++	e := newEnv(t)
++	e.skill("skill-a")
++	e.declare("skill-a")
++
++	shimDir := t.TempDir()
++	interp := filepath.Join(shimDir, "interp")
++	if err := os.WriteFile(interp, []byte("#!/bin/sh\nexit 0\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Chmod(interp, 0o644); err != nil {
++		t.Fatal(err)
++	}
++	git := filepath.Join(shimDir, "git")
++	if err := os.WriteFile(git, []byte("#!"+interp+"\nexit 0\n"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	// Sequential by construction: it rewrites PATH for the process, which
++	// t.Setenv forbids under a parallel ancestor.
++	t.Setenv("PATH", shimDir+string(os.PathListSeparator)+os.Getenv("PATH"))
++
++	result := e.install(Options{})
++	if result.Status != "failed" {
++		t.Fatalf("status = %q, want failed: %+v", result.Status, result)
++	}
++	joined := strings.Join(append(append([]string{}, result.Errors...), result.Messages...), "\n")
++	if !strings.Contains(joined, "git check-ignore failed") {
++		t.Fatalf("refusal = %q, want the spawn operation context: %+v", joined, result)
++	}
++	if !strings.Contains(joined, "permission denied") {
++		t.Fatalf("refusal = %q, want the kernel refusal preserved: %+v", joined, result)
++	}
++	if strings.Contains(joined, "generated paths are not ignored") {
++		t.Fatalf("refusal = %q, must never carry the policy message: %+v", joined, result)
++	}
++}
+diff --git a/internal/install/install.go b/internal/install/install.go
+index dc540800..4c53b0ae 100644
+--- a/internal/install/install.go
++++ b/internal/install/install.go
+@@ -260,6 +260,10 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
+ 	// 3. Managed .gitignore gate.
+ 	required := adapters.RequiredGitignoreEntries(agents)
+ 	if err := gitignore.Ensure(projectRoot, required, opts.FixGitignore && !opts.DryRun); err != nil {
++		if !gitignore.IsNotIgnored(err) {
++			result.failf("%v", err)
++			return result, nil
++		}
+ 		result.Status = "skipped"
+ 		result.Messages = append(result.Messages, fmt.Sprintf("%s: %v; skipped", alias, err))
+ 		return result, nil
+@@ -285,6 +289,10 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
+ 			return result, nil
+ 		}
+ 		if err := gitignore.Ensure(projectRoot, []string{devsub.Name}, opts.FixGitignore && !opts.DryRun); err != nil {
++			if !gitignore.IsNotIgnored(err) {
++				result.failf("%v", err)
++				return result, nil
++			}
+ 			result.Status = "skipped"
+ 			result.Messages = append(result.Messages, fmt.Sprintf("%s: %v; skipped", alias, err))
+ 			return result, nil
