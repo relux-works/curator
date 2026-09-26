@@ -1722,7 +1722,10 @@ func migrateGlobalSkills(home string, policy Policy) ([]contextlock.Member, erro
 // the caller — a failed read is never an empty policy.
 func loadMachinePolicy() (Policy, error) {
 	path := config.UserPath()
-	if _, err := os.Stat(path); err != nil {
+	// Lstat classifies only a truly absent path as the legacy default. Stat
+	// would also call a dangling symlink absent, allowing an existing but
+	// unreadable configuration entry to take the empty-policy fallback.
+	if _, err := os.Lstat(path); err != nil {
 		if os.IsNotExist(err) {
 			return Policy{OverlaysAllowed: true}, nil
 		}

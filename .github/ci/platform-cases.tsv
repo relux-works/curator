@@ -71,6 +71,16 @@ internal/buildcache	TestUnixProtectionHelperFailuresFailClosed	linux,darwin	-	-	
 internal/config	TestBootstrapAndAddProject	linux,darwin,windows	-	-	asserts the manager config is written with private (0o600) ownership bits on unix
 
 # ===========================================================================
+# Profile source paths: absence and read failures stay distinct
+# ===========================================================================
+cmd/curator	TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable/missing_operand	linux,darwin,windows	-	-	a missing profile source operand reports profile_source_path_missing only
+cmd/curator	TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable/unreadable_root	linux,darwin	windows	platform-control	the unreadable case uses POSIX mode bits; Windows ACL unreadability is not reproducible for the runner account
+cmd/curator	TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable/unreadable_module_directory	linux,darwin	windows	platform-control	the unreadable case uses POSIX mode bits; Windows ACL unreadability is not reproducible for the runner account
+cmd/curator	TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable/regular_file	linux,darwin,windows	-	-	a regular file source operand reports profile_source_invalid, never a path-read diagnostic
+internal/envprofile	TestLoadMachinePolicyTreatsOnlyAbsentConfigAsDefault/absent_config	linux,darwin,windows	-	-	an absent user configuration alone selects the default machine policy
+internal/envprofile	TestLoadMachinePolicyTreatsOnlyAbsentConfigAsDefault/unreadable_config	linux,darwin	windows	platform-control	the unreadable case uses POSIX mode bits; Windows ACL unreadability is not reproducible for the runner account
+
+# ===========================================================================
 # No-follow: link traversal is refused, never followed
 # ===========================================================================
 internal/buildcache	TestSweepDoesNotFollowSymlinkedEntries	linux,darwin	-	-	cache sweep refuses to traverse symlinked entries

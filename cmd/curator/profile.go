@@ -131,11 +131,16 @@ func (c cli) cmdProfileInstall(cfg *config.Config, args []string) int {
 		printEntryResult(c, result)
 	}
 	if err != nil {
-		// An install activation that could not materialize the whole
-		// scope leaves the lock installed but the current unchanged;
-		// report the partial switch like profile use does.
-		if len(info.Activation) > 0 && info.Name != "" {
-			_, _ = fmt.Fprintf(c.stdout, "installed profile %s (lock %s)\n", info.Name, info.LockHash)
+		// Info.Name is populated only after the profile records are
+		// published. Activation can fail before materializeScope returns
+		// any per-adapter results (for example, a locked current-profile
+		// refusal), so the lock still needs an operator-visible line.
+		if info.Name != "" {
+			verb := "installed"
+			if updated {
+				verb = "updated"
+			}
+			_, _ = fmt.Fprintf(c.stdout, "%s profile %s (lock %s)\n", verb, info.Name, info.LockHash)
 		}
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
@@ -244,6 +249,9 @@ func (c cli) cmdProfileUse(cfg *config.Config, args []string) int {
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
+	}
+	if len(results) == 0 && *env == "" && *target == "" && !*clearScope {
+		_, _ = fmt.Fprintln(c.stdout, "No adapter homes were switched; every registered adapter had a scoped current.")
 	}
 	return exitOK
 }

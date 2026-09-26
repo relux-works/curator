@@ -3,6 +3,7 @@ package envprofile
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -170,6 +171,62 @@ func TestMachinePolicyLoadFailureFailsMigration(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "machine configuration") {
 		t.Fatalf("migration err = %v, want the configuration reason", err)
+	}
+}
+
+// TestLoadMachinePolicyTreatsOnlyAbsentConfigAsDefault drives the production
+// policy loader directly: a path with no filesystem entry yields the
+// documented permissive default, while an unreadable existing file refuses
+// instead of taking that fallback.
+func TestLoadMachinePolicyTreatsOnlyAbsentConfigAsDefault(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	t.Setenv("CURATOR_CONFIG", configPath)
+	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
+
+	t.Run("absent_config", func(t *testing.T) {
+		policy, err := loadMachinePolicy()
+		if err != nil {
+			t.Fatalf("absent configuration: %v", err)
+		}
+		if !policy.OverlaysAllowed || len(policy.AllowedSources) != 0 || len(policy.Revocations) != 0 {
+			t.Fatalf("absent configuration policy %+v, want the documented empty policy", policy)
+		}
+		if _, err := List(t.TempDir()); err != nil {
+			t.Fatalf("production List entry with absent machine configuration: %v", err)
+		}
+	})
+
+	t.Run("unreadable_config", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("the unreadable case uses POSIX mode bits; Windows ACL unreadability is not reproducible for the runner account")
+		}
+		writeTestConfig(t, configPath, permissiveUserConfig)
+		cleanup := makeEnvprofileTestPathUnreadable(t, configPath)
+		defer cleanup()
+
+		policy, err := loadMachinePolicy()
+		if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) || !strings.Contains(err.Error(), "machine configuration") {
+			t.Fatalf("unreadable configuration policy=%+v err=%v, want refusal with machine-configuration diagnostic", policy, err)
+		}
+	})
+}
+
+// TestLoadMachinePolicyRejectsDanglingConfigSymlink distinguishes an
+// existing configuration entry whose target cannot be read from a path that
+// is genuinely absent. The Lstat presence probe must not let a dangling link
+// select the empty-policy fallback.
+func TestLoadMachinePolicyRejectsDanglingConfigSymlink(t *testing.T) {
+	root := t.TempDir()
+	configPath := filepath.Join(root, "config.json")
+	if err := os.Symlink(filepath.Join(root, "missing-target.json"), configPath); err != nil {
+		t.Skipf("host cannot create symlinks: %v", err)
+	}
+	t.Setenv("CURATOR_CONFIG", configPath)
+	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
+
+	policy, err := loadMachinePolicy()
+	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) || !strings.Contains(err.Error(), "machine configuration") {
+		t.Fatalf("dangling configuration symlink policy=%+v err=%v, want a refused read failure", policy, err)
 	}
 }
 

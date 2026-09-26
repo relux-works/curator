@@ -20,8 +20,9 @@ import (
 // case) overwrites the scoped home with the machine profile and must fail
 // these tests.
 
-// scopeFixture installs alpha (machine current) and beta (scoped to
-// codex_cli), leaving the machine current on alpha.
+// scopeFixture installs alpha (machine current) and beta scoped to two
+// adapters, leaving the machine current on alpha. Two scopes make a mutant
+// that skips at most one scoped adapter observable.
 func scopeFixture(t *testing.T, home string) {
 	t.Helper()
 	alpha, beta := t.TempDir(), t.TempDir()
@@ -33,8 +34,10 @@ func scopeFixture(t *testing.T, home string) {
 	if _, _, _, err := Install(home, InstallOptions{Operand: beta}); err != nil {
 		t.Fatalf("install beta: %v", err)
 	}
-	if _, err := Use(home, "beta", "codex_cli", "", false); err != nil {
-		t.Fatalf("scoped use beta: %v", err)
+	for _, adapter := range []string{"codex_cli", "opencode"} {
+		if _, err := Use(home, "beta", adapter, "", false); err != nil {
+			t.Fatalf("scoped use beta in %s: %v", adapter, err)
+		}
 	}
 }
 
@@ -57,11 +60,10 @@ func homeMarker(t *testing.T, dir string) *envmarker.Marker {
 }
 
 // TestMachineUseSkipsScopedAdapter drives the production Use for a
-// machine-scope switch while env:codex_cli is scoped to beta: the codex home
-// stays on beta (bytes and marker), the other three homes move to gamma, the
-// machine current moves to gamma, and the listing still reports
-// env:codex_cli=beta. A mutant that restores the unconditional machine pass
-// overwrites the codex home with gamma and must fail this test.
+// machine-scope switch while codex_cli and opencode are scoped to beta: both
+// homes stay on beta (bytes and markers), the other two homes move to gamma,
+// the machine current moves to gamma, and the listing keeps both scope rows.
+// A mutant that skips at most one scoped adapter must fail this test.
 func TestMachineUseSkipsScopedAdapter(t *testing.T) {
 	home := t.TempDir()
 	homes := pinHomes(t)
@@ -76,20 +78,20 @@ func TestMachineUseSkipsScopedAdapter(t *testing.T) {
 		t.Fatalf("machine use gamma: %v (%+v)", err, results)
 	}
 	for _, result := range results {
-		if result.Adapter == "codex_cli" {
-			t.Fatalf("machine pass must skip the scoped adapter, results %+v", results)
+		if result.Adapter == "codex_cli" || result.Adapter == "opencode" {
+			t.Fatalf("machine pass must skip both scoped adapters, results %+v", results)
 		}
 		if !result.OK {
 			t.Fatalf("result %+v", result)
 		}
 	}
-	if len(results) != len(Adapters)-1 {
-		t.Fatalf("results %+v, want every adapter but the scoped one", results)
+	if len(results) != len(Adapters)-2 {
+		t.Fatalf("results %+v, want only the two unscoped adapters", results)
 	}
 	if current, _ := Current(home); current != "gamma" {
 		t.Fatalf("current=%q, want gamma", current)
 	}
-	if scoped, err := ScopedCurrents(home); err != nil || scoped["env:codex_cli"] != "beta" {
+	if scoped, err := ScopedCurrents(home); err != nil || scoped["env:codex_cli"] != "beta" || scoped["env:opencode"] != "beta" {
 		t.Fatalf("scoped %+v %v", scoped, err)
 	}
 	if got := homeBytes(t, homes["codex_cli"], "AGENTS.md"); !strings.Contains(got, "## Context: beta 1.0.0") {
@@ -98,7 +100,13 @@ func TestMachineUseSkipsScopedAdapter(t *testing.T) {
 	if marker := homeMarker(t, homes["codex_cli"]); marker.Profile.Name != "beta" {
 		t.Fatalf("codex marker names %q, want beta", marker.Profile.Name)
 	}
-	for id, file := range map[string]string{"claude_code": "CLAUDE.md", "opencode": "AGENTS.md", "pi": "AGENTS.md"} {
+	if got := homeBytes(t, homes["opencode"], "AGENTS.md"); !strings.Contains(got, "## Context: beta 1.0.0") {
+		t.Fatalf("opencode home does not carry beta:\n%s", got)
+	}
+	if marker := homeMarker(t, homes["opencode"]); marker.Profile.Name != "beta" {
+		t.Fatalf("opencode marker names %q, want beta", marker.Profile.Name)
+	}
+	for id, file := range map[string]string{"claude_code": "CLAUDE.md", "pi": "AGENTS.md"} {
 		if got := homeBytes(t, homes[id], file); !strings.Contains(got, "## Context: gamma 1.0.0") {
 			t.Fatalf("%s home does not carry gamma:\n%s", id, got)
 		}
@@ -126,12 +134,61 @@ func TestMachineUseSkipsScopedAdapter(t *testing.T) {
 	if !found {
 		t.Fatalf("beta ScopedFor %+v, want env:codex_cli", byName["beta"].ScopedFor)
 	}
+	found = false
+	for _, scope := range byName["beta"].ScopedFor {
+		if scope == "env:opencode" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("beta ScopedFor %+v, want env:opencode", byName["beta"].ScopedFor)
+	}
 }
 
-// TestInstallUseSkipsScopedAdapter drives the same shape through the
-// production Install activation: install --use performs the §9.2 switch, so
-// it skips the scoped home exactly like profile use does. The mutant from
-// TestMachineUseSkipsScopedAdapter must fail this test too.
+// TestMachineUseClearsEveryScopeEqualToNewDefault drives the production
+// Use path with two scope records already naming the requested machine
+// profile. Both records must be removed in the same journaled publish as the
+// machine current; a narrowing mutant that clears only one leaves the other
+// equal-default record behind.
+func TestMachineUseClearsEveryScopeEqualToNewDefault(t *testing.T) {
+	home := t.TempDir()
+	homes := pinHomes(t)
+	scopeFixture(t, home)
+	gamma := t.TempDir()
+	writePackage(t, gamma, "gamma", "1.0.0", "gamma\n")
+	if _, _, _, err := Install(home, InstallOptions{Operand: gamma}); err != nil {
+		t.Fatalf("install gamma: %v", err)
+	}
+	if _, err := Use(home, "gamma", "pi", "", false); err != nil {
+		t.Fatalf("scope pi to gamma: %v", err)
+	}
+	results, err := Use(home, "beta", "", "", false)
+	if err != nil {
+		t.Fatalf("machine use beta: %v (%+v)", err, results)
+	}
+	if current, _ := Current(home); current != "beta" {
+		t.Fatalf("current=%q, want beta", current)
+	}
+	scoped, err := ScopedCurrents(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(scoped) != 1 || scoped["env:pi"] != "gamma" {
+		t.Fatalf("scope records %+v, want only env:pi=gamma after clearing equal-default records", scoped)
+	}
+	for _, adapter := range []string{"codex_cli", "opencode"} {
+		if got := homeBytes(t, homes[adapter], "AGENTS.md"); !strings.Contains(got, "## Context: beta 1.0.0") {
+			t.Fatalf("%s home changed while clearing its equal-default scope:\n%s", adapter, got)
+		}
+		if marker := homeMarker(t, homes[adapter]); marker.Profile.Name != "beta" {
+			t.Fatalf("%s marker names %q, want beta", adapter, marker.Profile.Name)
+		}
+	}
+}
+
+// TestInstallUseSkipsScopedAdapter drives the same two-scope shape through
+// the production Install activation: install --use performs the §9.2 switch,
+// so it skips both scoped homes exactly like profile use does.
 func TestInstallUseSkipsScopedAdapter(t *testing.T) {
 	home := t.TempDir()
 	homes := pinHomes(t)
@@ -146,12 +203,15 @@ func TestInstallUseSkipsScopedAdapter(t *testing.T) {
 		t.Fatal("install --use must report activated")
 	}
 	for _, result := range info.Activation {
-		if result.Adapter == "codex_cli" {
-			t.Fatalf("activation must skip the scoped adapter, results %+v", info.Activation)
+		if result.Adapter == "codex_cli" || result.Adapter == "opencode" {
+			t.Fatalf("activation must skip both scoped adapters, results %+v", info.Activation)
 		}
 		if !result.OK {
 			t.Fatalf("activation %+v", result)
 		}
+	}
+	if len(info.Activation) != len(Adapters)-2 {
+		t.Fatalf("activation results %+v, want only the two unscoped adapters", info.Activation)
 	}
 	if current, _ := Current(home); current != "gamma" {
 		t.Fatalf("current=%q, want gamma", current)
@@ -161,6 +221,12 @@ func TestInstallUseSkipsScopedAdapter(t *testing.T) {
 	}
 	if marker := homeMarker(t, homes["codex_cli"]); marker.Profile.Name != "beta" {
 		t.Fatalf("codex marker names %q, want beta", marker.Profile.Name)
+	}
+	if got := homeBytes(t, homes["opencode"], "AGENTS.md"); !strings.Contains(got, "## Context: beta 1.0.0") {
+		t.Fatalf("opencode home does not carry beta:\n%s", got)
+	}
+	if marker := homeMarker(t, homes["opencode"]); marker.Profile.Name != "beta" {
+		t.Fatalf("opencode marker names %q, want beta", marker.Profile.Name)
 	}
 	if got := homeBytes(t, homes["claude_code"], "CLAUDE.md"); !strings.Contains(got, "## Context: gamma 1.0.0") {
 		t.Fatalf("claude home does not carry gamma:\n%s", got)
@@ -199,6 +265,9 @@ func TestScopedUseStillSwitchesOnlyThatHome(t *testing.T) {
 	if scoped, err := ScopedCurrents(home); err != nil || scoped["env:codex_cli"] != "delta" {
 		t.Fatalf("scoped %+v %v", scoped, err)
 	}
+	if scoped, err := ScopedCurrents(home); err != nil || scoped["env:opencode"] != "beta" {
+		t.Fatalf("opencode scoped current %+v %v, want beta", scoped, err)
+	}
 	if got := homeBytes(t, homes["codex_cli"], "AGENTS.md"); !strings.Contains(got, "## Context: delta 1.0.0") {
 		t.Fatalf("codex home does not carry delta:\n%s", got)
 	}
@@ -211,11 +280,10 @@ func TestScopedUseStillSwitchesOnlyThatHome(t *testing.T) {
 }
 
 // TestSyncWritesScopedHomeOnce pins the sync half of the fix: the machine
-// pass skips the scoped home and the scoped pass writes it once, so every
+// pass skips both scoped homes and the scoped pass writes each once, so every
 // adapter appears exactly once in the results and every home gains exactly
-// one backup generation. The unconditional-pass mutant writes the scoped
-// home twice (two results entries, two generations) and must fail this
-// test.
+// one backup generation. The unconditional-pass mutant writes scoped homes
+// twice (duplicate results and backup generations) and must fail this test.
 func TestSyncWritesScopedHomeOnce(t *testing.T) {
 	home := t.TempDir()
 	homes := pinHomes(t)

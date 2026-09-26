@@ -131,11 +131,12 @@ type EntryResult struct {
 
 // Use switches the machine scope (environment and target both empty) or one
 // narrowed scope to name. A machine-scope switch skips adapters that carry
-// a scope record: those homes stay on their scoped profiles. With clear,
-// the scope record is dropped and the scope re-materializes from the
-// machine default. It returns the per-entry results; when any entry failed
-// the recorded current is unchanged and the error carries
-// profile_use_partial.
+// a scope record: those homes stay on their scoped profiles. A scope record
+// equal to the new machine default is removed in the same journaled publish
+// as the machine current. With clear, the scope record is dropped and the
+// scope re-materializes from the machine default. It returns the per-entry
+// results; when any entry failed the recorded current is unchanged and the
+// error carries profile_use_partial.
 // Use holds the manager-home mutation lock (see lock.go) and records the
 // new current through the operation journal only when the whole scope
 // materialized.
@@ -245,7 +246,11 @@ func useLocked(op *operation, home, name, environment, target string, clearScope
 	// itself a partial switch: the entries no longer match the recorded
 	// current.
 	if scope == "" {
-		if err := op.publish(map[string][]byte{CurrentFile(home): []byte(effective + "\n")}); err != nil {
+		removals, err := scopeRecordsEqualToProfile(home, effective)
+		if err != nil {
+			return results, err
+		}
+		if err := op.publish(map[string][]byte{CurrentFile(home): []byte(effective + "\n")}, removals...); err != nil {
 			return results, fmt.Errorf("%s: the scope is partially switched; the recorded current is unchanged", DiagUsePartial)
 		}
 	} else {
@@ -265,6 +270,59 @@ func useLocked(op *operation, home, name, environment, target string, clearScope
 		}
 	}
 	return results, nil
+}
+
+// scopeRecordsEqualToProfile returns every on-disk spelling of each scope
+// record whose value equals profile. The machine current and these removals
+// are passed to one operation.publish call so the section 9.3 invariant is
+// durable as one journaled state transition.
+func scopeRecordsEqualToProfile(home, profile string) ([]string, error) {
+	scoped, err := ScopedCurrents(home)
+	if err != nil {
+		return nil, err
+	}
+	scopes := make([]string, 0, len(scoped))
+	for scope, current := range scoped {
+		if current == profile {
+			scopes = append(scopes, scope)
+		}
+	}
+	sort.Strings(scopes)
+
+	var removals []string
+	for _, scope := range scopes {
+		paths, err := scopeRecordPaths(home, scope)
+		if err != nil {
+			return nil, err
+		}
+		removals = append(removals, paths...)
+	}
+	sort.Strings(removals)
+	return removals, nil
+}
+
+// scopeRecordPaths lists all existing filename spellings for one decoded
+// scope key, including a legacy literal spelling when present. The caller
+// has already read the records through ScopedCurrents; an absent directory
+// or vanished matching entry here is a changed record, not a reason to leave
+// the equal-default invariant partially applied.
+func scopeRecordPaths(home, scope string) ([]string, error) {
+	dir := ScopedDir(home)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	var paths []string
+	for _, entry := range entries {
+		if entry.IsDir() || scopeKeyName(entry.Name()) != scope {
+			continue
+		}
+		paths = append(paths, filepath.Join(dir, entry.Name()))
+	}
+	if len(paths) == 0 {
+		return nil, fmt.Errorf("%s: scoped current %q changed while switching", DiagSourceInvalid, scope)
+	}
+	return paths, nil
 }
 
 // Sync re-materializes the machine scope and every scoped current from

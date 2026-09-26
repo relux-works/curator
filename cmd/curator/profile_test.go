@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -119,6 +120,87 @@ func TestProfileInstallListUse(t *testing.T) {
 	marker, err := envmarker.Read(os.Getenv("CLAUDE_CONFIG_DIR"))
 	if err != nil || marker == nil || marker.Profile.Name != "acme" {
 		t.Fatalf("marker %+v %v", marker, err)
+	}
+}
+
+// TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable drives
+// four path forms through the production CLI entry point: an absent operand,
+// an unreadable root, an unreadable module directory, and a regular file.
+// Absence and failed reads must never report each other's diagnostic.
+func TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable(t *testing.T) {
+	tests := []struct {
+		name          string
+		want          string
+		forbidden     []string
+		skipOnWindows bool
+		preparePath   func(*testing.T) (string, func())
+	}{
+		{
+			name:      "missing_operand",
+			want:      "profile_source_path_missing",
+			forbidden: []string{"profile_source_path_unreadable"},
+			preparePath: func(t *testing.T) (string, func()) {
+				return filepath.Join(t.TempDir(), "absent"), func() {}
+			},
+		},
+		{
+			name:          "unreadable_root",
+			want:          "profile_source_path_unreadable",
+			forbidden:     []string{"profile_source_path_missing", "profile_source_invalid"},
+			skipOnWindows: true,
+			preparePath: func(t *testing.T) (string, func()) {
+				pkg := t.TempDir()
+				writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
+				return pkg, makeProfileTestPathUnreadable(t, pkg, true)
+			},
+		},
+		{
+			name:          "unreadable_module_directory",
+			want:          "profile_source_path_unreadable",
+			forbidden:     []string{"profile_source_path_missing", "profile_source_invalid"},
+			skipOnWindows: true,
+			preparePath: func(t *testing.T) (string, func()) {
+				pkg := t.TempDir()
+				writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
+				modules := filepath.Join(pkg, "context")
+				cleanup := makeProfileTestPathUnreadable(t, modules, true)
+				return pkg, cleanup
+			},
+		},
+		{
+			name:      "regular_file",
+			want:      "profile_source_invalid",
+			forbidden: []string{"profile_source_path_missing", "profile_source_path_unreadable"},
+			preparePath: func(t *testing.T) (string, func()) {
+				file := filepath.Join(t.TempDir(), "package")
+				if err := os.WriteFile(file, []byte("not a context package\n"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				return file, func() {}
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if test.skipOnWindows && runtime.GOOS == "windows" {
+				t.Skip("the unreadable case uses POSIX mode bits; Windows ACL unreadability is not reproducible for the runner account")
+			}
+			source, _ := profileHome(t)
+			path, cleanup := test.preparePath(t)
+			defer cleanup()
+			code, _, stderr := runProfile(t, source, "profile", "install", path)
+			if code != exitFail {
+				t.Fatalf("install %q = %d, want failure; stderr:\n%s", path, code, stderr)
+			}
+			if !strings.Contains(stderr, test.want) {
+				t.Fatalf("stderr %q does not contain %q", stderr, test.want)
+			}
+			for _, forbidden := range test.forbidden {
+				if strings.Contains(stderr, forbidden) {
+					t.Fatalf("stderr %q must not contain %q", stderr, forbidden)
+				}
+			}
+		})
 	}
 }
 
@@ -389,6 +471,9 @@ func TestProfileMachineUseSkipsScopedAdapter(t *testing.T) {
 	if code, _, stderr := runProfile(t, source, "profile", "use", "two", "--env", "codex_cli"); code != exitOK {
 		t.Fatalf("scoped use stderr:\n%s", stderr)
 	}
+	if code, _, stderr := runProfile(t, source, "profile", "use", "two", "--env", "opencode"); code != exitOK {
+		t.Fatalf("opencode scoped use stderr:\n%s", stderr)
+	}
 	if code, _, stderr := runProfile(t, source, "profile", "install", three); code != exitOK {
 		t.Fatalf("install three stderr:\n%s", stderr)
 	}
@@ -396,8 +481,8 @@ func TestProfileMachineUseSkipsScopedAdapter(t *testing.T) {
 	if code != exitOK {
 		t.Fatalf("use three = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 	}
-	if strings.Contains(stdout, "codex_cli") {
-		t.Fatalf("machine use must skip the scoped adapter, stdout:\n%s", stdout)
+	if strings.Contains(stdout, "codex_cli") || strings.Contains(stdout, "opencode: switched") {
+		t.Fatalf("machine use must skip both scoped adapters, stdout:\n%s", stdout)
 	}
 	codexDoc, err := os.ReadFile(filepath.Join(os.Getenv("CODEX_HOME"), "AGENTS.md")) // #nosec G304 -- test home
 	if err != nil {
@@ -410,6 +495,15 @@ func TestProfileMachineUseSkipsScopedAdapter(t *testing.T) {
 	if err != nil || codexMarker == nil || codexMarker.Profile.Name != "two" {
 		t.Fatalf("codex marker %+v %v", codexMarker, err)
 	}
+	opencodeHome := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode")
+	opencodeDoc, err := os.ReadFile(filepath.Join(opencodeHome, "AGENTS.md")) // #nosec G304 -- test home
+	if err != nil || !strings.Contains(string(opencodeDoc), "## Context: two 1.0.0") {
+		t.Fatalf("opencode AGENTS.md err=%v, content:\n%s", err, opencodeDoc)
+	}
+	opencodeMarker, err := envmarker.Read(opencodeHome)
+	if err != nil || opencodeMarker == nil || opencodeMarker.Profile.Name != "two" {
+		t.Fatalf("opencode marker %+v %v", opencodeMarker, err)
+	}
 	claudeDoc, err := os.ReadFile(filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "CLAUDE.md")) // #nosec G304 -- test home
 	if err != nil {
 		t.Fatal(err)
@@ -418,15 +512,15 @@ func TestProfileMachineUseSkipsScopedAdapter(t *testing.T) {
 		t.Fatalf("claude home does not carry three:\n%s", claudeDoc)
 	}
 	_, stdout, _ = runProfile(t, source, "profile", "list")
-	if !strings.Contains(stdout, "env:codex_cli=two") {
+	if !strings.Contains(stdout, "env:codex_cli=two") || !strings.Contains(stdout, "env:opencode=two") {
 		t.Fatalf("list stdout:\n%s", stdout)
 	}
 	code, stdout, stderr = runProfile(t, source, "profile", "install", four, "--use")
 	if code != exitOK {
 		t.Fatalf("install four --use = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 	}
-	if strings.Contains(stdout, "codex_cli") {
-		t.Fatalf("install --use must skip the scoped adapter, stdout:\n%s", stdout)
+	if strings.Contains(stdout, "codex_cli") || strings.Contains(stdout, "opencode: switched") {
+		t.Fatalf("install --use must skip both scoped adapters, stdout:\n%s", stdout)
 	}
 	codexDoc, err = os.ReadFile(filepath.Join(os.Getenv("CODEX_HOME"), "AGENTS.md")) // #nosec G304 -- test home
 	if err != nil {
@@ -441,6 +535,55 @@ func TestProfileMachineUseSkipsScopedAdapter(t *testing.T) {
 	}
 	if !strings.Contains(string(claudeDoc), "## Context: four 1.0.0") {
 		t.Fatalf("claude home does not carry four:\n%s", claudeDoc)
+	}
+	opencodeDoc, err = os.ReadFile(filepath.Join(opencodeHome, "AGENTS.md")) // #nosec G304 -- test home
+	if err != nil || !strings.Contains(string(opencodeDoc), "## Context: two 1.0.0") {
+		t.Fatalf("opencode home changed after install --use: err=%v\n%s", err, opencodeDoc)
+	}
+}
+
+// TestProfileUseReportsAllAdaptersAlreadyScoped drives the machine-scope
+// use command through run() when every registered adapter has a scoped
+// current. The empty materialization set must produce an operator-visible
+// line instead of a silent success.
+func TestProfileUseReportsAllAdaptersAlreadyScoped(t *testing.T) {
+	source, _ := profileHome(t)
+	one, two, three := t.TempDir(), t.TempDir(), t.TempDir()
+	writeContextPackage(t, one, "one", "1.0.0", "one\n")
+	writeContextPackage(t, two, "two", "1.0.0", "two\n")
+	writeContextPackage(t, three, "three", "1.0.0", "three\n")
+	for _, pkg := range []string{one, two} {
+		if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
+			t.Fatalf("install stderr:\n%s", stderr)
+		}
+	}
+	for _, adapter := range []string{"claude_code", "codex_cli", "opencode", "pi"} {
+		if code, _, stderr := runProfile(t, source, "profile", "use", "two", "--env", adapter); code != exitOK {
+			t.Fatalf("scope %s stderr:\n%s", adapter, stderr)
+		}
+	}
+	if code, _, stderr := runProfile(t, source, "profile", "install", three); code != exitOK {
+		t.Fatalf("install three stderr:\n%s", stderr)
+	}
+
+	code, stdout, stderr := runProfile(t, source, "profile", "use", "three")
+	if code != exitOK {
+		t.Fatalf("machine use three = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+	if !strings.Contains(stdout, "No adapter homes were switched; every registered adapter had a scoped current.") {
+		t.Fatalf("empty machine switch was silent or unclear; stdout:\n%s", stdout)
+	}
+	if strings.Contains(stdout, ": switched (") {
+		t.Fatalf("a machine switch with all adapters scoped reported a surface write:\n%s", stdout)
+	}
+	listCode, listOut, listErr := runProfile(t, source, "profile", "list")
+	if listCode != exitOK || strings.Contains(listErr, "curator:") {
+		t.Fatalf("profile list = %d\nstderr:\n%s", listCode, listErr)
+	}
+	for _, adapter := range []string{"claude_code", "codex_cli", "opencode", "pi"} {
+		if !strings.Contains(listOut, "env:"+adapter+"=two") {
+			t.Fatalf("scope %s did not remain visible:\n%s", adapter, listOut)
+		}
 	}
 }
 
@@ -568,14 +711,17 @@ func TestProfileInstallUsePartialLeavesCurrent(t *testing.T) {
 	if err := os.WriteFile(claude, []byte("blocker"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	code, _, stderr := runProfile(t, source, "profile", "install", second, "--use")
+	code, stdout, stderr := runProfile(t, source, "profile", "install", second, "--use")
 	if code != exitFail {
-		t.Fatalf("install beta --use = %d, want %d\nstderr:\n%s", code, exitFail, stderr)
+		t.Fatalf("install beta --use = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitFail, stdout, stderr)
 	}
 	if !strings.Contains(stderr, "profile_use_partial") {
 		t.Fatalf("stderr:\n%s", stderr)
 	}
-	_, stdout, _ := runProfile(t, source, "profile", "list")
+	if !strings.Contains(stdout, "installed profile beta (lock ") {
+		t.Fatalf("partial install must report its persisted profile, stdout:\n%s", stdout)
+	}
+	_, stdout, _ = runProfile(t, source, "profile", "list")
 	alphaCurrent, betaCurrent := false, false
 	for _, line := range strings.Split(stdout, "\n") {
 		if strings.HasPrefix(line, "alpha\t") && strings.Contains(line, "current") {
@@ -590,6 +736,76 @@ func TestProfileInstallUsePartialLeavesCurrent(t *testing.T) {
 	}
 	if betaCurrent {
 		t.Fatalf("beta must not be current, list stdout:\n%s", stdout)
+	}
+}
+
+// TestProfileInstallFirstActivationFailureReportsPersistedProfile drives
+// the early activation-refusal path through run(): the new profile lock is
+// published, then the machine policy refuses the activation before
+// materializeScope can return adapter rows. The CLI must still name the
+// installed profile. Requiring an Activation row to print it is the
+// narrowing mutant this test is intended to kill.
+func TestProfileInstallFirstActivationFailureReportsPersistedProfile(t *testing.T) {
+	source, home := profileHome(t)
+	required := "required"
+	source.cfg.Env.RequireCurrent = &required
+	source.cfg.Locked = map[string]bool{"environments.require_current_profile": true}
+	pkg := t.TempDir()
+	writeContextPackage(t, pkg, "beta", "1.0.0", "beta\n")
+
+	code, stdout, stderr := runProfile(t, source, "profile", "install", pkg, "--use")
+	if code != exitFail {
+		t.Fatalf("first install --use = %d, want policy refusal\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+	if !strings.Contains(stderr, "requires current profile \"required\"") {
+		t.Fatalf("stderr does not show the pre-materialization refusal:\n%s", stderr)
+	}
+	if !strings.Contains(stdout, "installed profile beta (lock ") {
+		t.Fatalf("persisted first install was not reported:\n%s", stdout)
+	}
+	if strings.Contains(stdout, "switched (") {
+		t.Fatalf("activation was refused before materialization but reported an adapter switch:\n%s", stdout)
+	}
+	if _, err := os.Stat(filepath.Join(home, "profiles", "beta", "lock.json")); err != nil {
+		t.Fatalf("profile lock was not persisted before activation refusal: %v", err)
+	}
+	listCode, listOut, listErr := runProfile(t, source, "profile", "list")
+	if listCode != exitOK || !strings.Contains(listOut, "beta\tbeta\tpath") {
+		t.Fatalf("persisted profile list = %d\nstdout:\n%s\nstderr:\n%s", listCode, listOut, listErr)
+	}
+}
+
+// TestProfileReinstallActivationFailureKeepsUpdatedWording pins the
+// reinstall wording while using the same pre-materialization refusal path:
+// a changed path snapshot is published, activation is refused, and the CLI
+// reports updated profile rather than relabeling it as a fresh install.
+func TestProfileReinstallActivationFailureKeepsUpdatedWording(t *testing.T) {
+	source, _ := profileHome(t)
+	alpha, beta := t.TempDir(), t.TempDir()
+	writeContextPackage(t, alpha, "alpha", "1.0.0", "alpha\n")
+	writeContextPackage(t, beta, "beta", "1.0.0", "beta\n")
+	if code, _, stderr := runProfile(t, source, "profile", "install", alpha); code != exitOK {
+		t.Fatalf("install alpha stderr:\n%s", stderr)
+	}
+	if code, _, stderr := runProfile(t, source, "profile", "install", beta); code != exitOK {
+		t.Fatalf("install beta stderr:\n%s", stderr)
+	}
+	if err := os.WriteFile(filepath.Join(beta, "context", "a.md"), []byte("beta changed\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	required := "alpha"
+	source.cfg.Env.RequireCurrent = &required
+	source.cfg.Locked = map[string]bool{"environments.require_current_profile": true}
+
+	code, stdout, stderr := runProfile(t, source, "profile", "install", beta, "--use")
+	if code != exitFail {
+		t.Fatalf("reinstall --use = %d, want policy refusal\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+	if !strings.Contains(stdout, "updated profile beta (lock ") {
+		t.Fatalf("partial reinstall lost its updated wording:\n%s", stdout)
+	}
+	if strings.Contains(stdout, "installed profile beta (lock ") {
+		t.Fatalf("partial reinstall was labeled as a fresh install:\n%s", stdout)
 	}
 }
 

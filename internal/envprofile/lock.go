@@ -63,19 +63,35 @@ func (op *operation) close() error {
 	return op.lock.Close()
 }
 
-// publish commits manager-home record files as one journaled transaction:
-// every path's desired bytes are staged and swapped under the held lock,
-// so a crash mid-publication resumes from the journal on the next
-// operation instead of stranding a half-written record.
-func (op *operation) publish(files map[string][]byte) error {
-	if len(files) == 0 {
+// publish commits manager-home record writes and removals as one journaled
+// transaction. Write paths are staged and swapped under the held lock;
+// removal paths use the transaction engine's absent desired state. A crash
+// mid-publication resumes from the journal on the next operation instead of
+// stranding a half-written record set.
+func (op *operation) publish(files map[string][]byte, removals ...string) error {
+	if len(files) == 0 && len(removals) == 0 {
 		return nil
 	}
-	paths := make([]string, 0, len(files))
-	for path := range files {
-		paths = append(paths, path)
+	type change struct {
+		path    string
+		payload []byte
+		remove  bool
 	}
-	sort.Strings(paths)
+	changesByPath := make(map[string]change, len(files)+len(removals))
+	for path := range files {
+		changesByPath[path] = change{path: path, payload: files[path]}
+	}
+	for _, path := range removals {
+		if _, exists := changesByPath[path]; exists {
+			return fmt.Errorf("profile transaction both writes and removes %s", path)
+		}
+		changesByPath[path] = change{path: path, remove: true}
+	}
+	changes := make([]change, 0, len(changesByPath))
+	for _, item := range changesByPath {
+		changes = append(changes, item)
+	}
+	sort.Slice(changes, func(i, j int) bool { return changes[i].path < changes[j].path })
 	var temps []string
 	defer func() {
 		for _, temp := range temps {
@@ -83,30 +99,35 @@ func (op *operation) publish(files map[string][]byte) error {
 		}
 	}()
 	plan := transaction.Plan{TransactionID: newTransactionID(), ProjectIdentity: "profiles"}
-	for _, live := range paths {
+	for _, item := range changes {
+		live := item.path
 		if err := os.MkdirAll(filepath.Dir(live), 0o755); err != nil {
-			return err
-		}
-		temp, err := os.CreateTemp("", "curator-profile-record-*")
-		if err != nil {
-			return err
-		}
-		temps = append(temps, temp.Name())
-		if _, err := temp.Write(files[live]); err != nil {
-			_ = temp.Close()
-			return err
-		}
-		if err := temp.Close(); err != nil {
 			return err
 		}
 		preimage, err := transaction.DigestTarget(transaction.KindBytes, live)
 		if err != nil {
 			return fmt.Errorf("read the current state of %s: %w", live, err)
 		}
-		plan.Targets = append(plan.Targets, transaction.Target{
+		target := transaction.Target{
 			Class: "profile", Identifier: live, Kind: transaction.KindBytes,
-			LivePath: live, StagedSource: temp.Name(), PreimageDigest: preimage,
-		})
+			LivePath: live, PreimageDigest: preimage,
+		}
+		if !item.remove {
+			temp, err := os.CreateTemp("", "curator-profile-record-*")
+			if err != nil {
+				return err
+			}
+			temps = append(temps, temp.Name())
+			if _, err := temp.Write(item.payload); err != nil {
+				_ = temp.Close()
+				return err
+			}
+			if err := temp.Close(); err != nil {
+				return err
+			}
+			target.StagedSource = temp.Name()
+		}
+		plan.Targets = append(plan.Targets, target)
 	}
 	if _, err := op.engine.Prepare(op.lock, plan); err != nil {
 		return fmt.Errorf("prepare profile records: %w", err)
