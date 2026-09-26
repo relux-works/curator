@@ -451,6 +451,178 @@ func setupDraftGitSource(t *testing.T, sourceDeclaration string) (project, home,
 	return project, home, repo, remote, plan
 }
 
+type draftTransitiveReplayFixture struct {
+	project          string
+	rootRemote       string
+	dependencyRemote string
+	plan             *closure.DraftPlan
+}
+
+func setupDraftTransitiveReplayFixture(t *testing.T) draftTransitiveReplayFixture {
+	t.Helper()
+	const rootURL = "https://example.org/kit.git"
+	const dependencyURL = "https://example.org/roles.git"
+	const payload = `{"schema_version":2,"sources":{"s":{"git":"` + rootURL + `","tag":"v1"}},"skills":[{"name":"review","from":"s","directory":"skills/review"}]}`
+	project, home, _ := draftProject(t, payload, nil)
+
+	rootRepo := t.TempDir()
+	rootSkill := filepath.Join(rootRepo, "skills", "review")
+	writeDraftPackage(t, rootSkill, "review")
+	rootSpec := `{"schema_version":9,"capabilities":{},"commands":{},"dependencies":{"skills":{"qa":{"git":"` + dependencyURL + `","directory":"roles/qa","ref":{"kind":"tag","value":"v1"},"mode":"full"}}}}`
+	if err := os.WriteFile(filepath.Join(rootSkill, "agent-skill.json"), []byte(rootSpec), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	testGit(t, rootRepo, "init", "-q", "-b", "main")
+	testGit(t, rootRepo, "add", ".")
+	testGit(t, rootRepo, "commit", "-qm", "root requirer")
+	testGit(t, rootRepo, "tag", "v1")
+	rootRemote := filepath.Join(t.TempDir(), "root.git")
+	if err := os.MkdirAll(rootRemote, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	testGit(t, rootRemote, "init", "--bare", "-q")
+	testGit(t, rootRepo, "remote", "add", "origin", rootRemote)
+	testGit(t, rootRepo, "push", "-q", "origin", "main", "--tags")
+
+	skillsRoot := t.TempDir()
+	dependencyRepo := filepath.Join(skillsRoot, "qa")
+	writeDraftPackage(t, filepath.Join(dependencyRepo, "roles", "qa"), "qa")
+	testGit(t, dependencyRepo, "init", "-q", "-b", "main")
+	testGit(t, dependencyRepo, "add", ".")
+	testGit(t, dependencyRepo, "commit", "-qm", "transitive package")
+	testGit(t, dependencyRepo, "tag", "v1")
+	dependencyRemote := filepath.Join(t.TempDir(), "roles.git")
+	if err := os.MkdirAll(dependencyRemote, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	testGit(t, dependencyRemote, "init", "--bare", "-q")
+	testGit(t, dependencyRepo, "remote", "add", "origin", dependencyRemote)
+	testGit(t, dependencyRepo, "push", "-q", "origin", "main", "--tags")
+
+	m, err := manifest.ParseBytes([]byte(payload), filepath.Join(project, "Skillfile.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := closure.ResolveDraft(closure.DraftResolveConfig{
+		ProjectRoot: project, Home: home, SkillsRoot: skillsRoot, Manifest: m, ManifestPayload: []byte(payload),
+		Expansion: manifest.ExpansionOptions{GitRoots: map[string]string{"s": rootRepo}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sourcelock.Write(sourcelock.PathIn(project), plan.Lock); err != nil {
+		t.Fatal(err)
+	}
+	if err := sourcelock.WriteBindings(DraftBindingsPath(home, project), plan.Bindings); err != nil {
+		t.Fatal(err)
+	}
+	dependency, ok := plan.Lock.Find("qa")
+	if !ok || dependency.Package.Kind != sourcelock.KindNetworkGit || dependency.Directory != "roles/qa" {
+		t.Fatalf("resolved qa member = %+v, want transitive network Git member at roles/qa", dependency)
+	}
+	return draftTransitiveReplayFixture{
+		project: project, rootRemote: rootRemote, dependencyRemote: dependencyRemote, plan: plan,
+	}
+}
+
+func rewriteDraftLock(t *testing.T, project string, lock *sourcelock.Lock, mutate func(*sourcelock.Member)) *sourcelock.Lock {
+	t.Helper()
+	members := append([]sourcelock.Member(nil), lock.Members...)
+	found := false
+	for i := range members {
+		if members[i].Name == "qa" {
+			mutate(&members[i])
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("qa lock member missing")
+	}
+	updated, err := sourcelock.New(lock.ManifestSHA256, members)
+	if err != nil {
+		t.Fatalf("rebuild lock with declaration drift: %v", err)
+	}
+	if err := sourcelock.Write(sourcelock.PathIn(project), updated); err != nil {
+		t.Fatal(err)
+	}
+	return updated
+}
+
+func TestDraftFreshMachineTransitiveReplaySourceGuards(t *testing.T) {
+	tests := []struct {
+		name       string
+		mutateLock func(*testing.T, draftTransitiveReplayFixture) *sourcelock.Lock
+		wantError  string
+	}{
+		{
+			name: "directory-mismatch",
+			mutateLock: func(t *testing.T, fixture draftTransitiveReplayFixture) *sourcelock.Lock {
+				return rewriteDraftLock(t, fixture.project, fixture.plan.Lock, func(member *sourcelock.Member) {
+					member.Directory = "roles/not-qa"
+					member.Package.Directory = "roles/not-qa"
+				})
+			},
+			wantError: `source_snapshot_changed: locked dependency qa selects "roles/not-qa", but review declares "roles/qa"`,
+		},
+		{
+			name: "repository-identity-mismatch",
+			mutateLock: func(t *testing.T, fixture draftTransitiveReplayFixture) *sourcelock.Lock {
+				return rewriteDraftLock(t, fixture.project, fixture.plan.Lock, func(member *sourcelock.Member) {
+					member.Package.Repository = "example.org/other"
+				})
+			},
+			wantError: `source_snapshot_changed: locked dependency qa repository differs from review manifest`,
+		},
+		{
+			name: "matching-declaration-replays-dependency",
+			mutateLock: func(_ *testing.T, fixture draftTransitiveReplayFixture) *sourcelock.Lock {
+				return fixture.plan.Lock
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fixture := setupDraftTransitiveReplayFixture(t)
+			lock := test.mutateLock(t, fixture)
+			home := freshDraftGitHome(t, fixture.project, lock, fixture.rootRemote)
+			cfg := draftTestConfig(home, t.TempDir())
+			seedDraftReplaySource(t, cfg, fixture.project, "s", "https://example.org/kit.git", "", fixture.rootRemote)
+			if test.wantError == "" {
+				seedDraftReplaySource(t, cfg, fixture.project, "review:qa", "https://example.org/roles.git", "", fixture.dependencyRemote)
+			}
+
+			lockBefore, err := os.ReadFile(sourcelock.PathIn(fixture.project))
+			if err != nil {
+				t.Fatal(err)
+			}
+			result := Project(cfg, fixture.project, "test", Options{DryRun: true, Platform: installPlatform()})
+			joined := strings.Join(result.Errors, ";")
+			if test.wantError != "" {
+				if result.Status != "failed" || !strings.Contains(joined, test.wantError) {
+					t.Fatalf("Project() = %+v, want exact declaration guard diagnostic %q", result, test.wantError)
+				}
+			} else if result.Status != "ok" {
+				t.Fatalf("Project() = %+v, want successful replay through the declared transitive source", result)
+			}
+			lockAfter, err := os.ReadFile(sourcelock.PathIn(fixture.project))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(lockAfter) != string(lockBefore) {
+				t.Fatal("fresh-machine transitive replay modified Skillfile.lock.json")
+			}
+			if test.wantError == "" {
+				member, _ := lock.Find("qa")
+				tree := snapshot.Dir(home, member.Package.Repository, member.Package.Commit.Hex)
+				got, err := os.ReadFile(filepath.Join(tree, "roles", "qa", "references", "info.md"))
+				if err != nil || string(got) != "context" {
+					t.Fatalf("replayed qa bytes = %q, %v; want locked content", got, err)
+				}
+			}
+		})
+	}
+}
+
 func freshDraftGitHome(t *testing.T, project string, lock *sourcelock.Lock, remote string) string {
 	t.Helper()
 	home := t.TempDir()
