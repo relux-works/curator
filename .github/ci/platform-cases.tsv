@@ -702,6 +702,7 @@ cmd/curator	TestEnvResolveRepairNeedsMigration	linux,darwin,windows	windows	host
 cmd/curator	TestEnvMigrateUsage	linux,darwin,windows	-	-	env migrate operand and phase gates refuse as usage through the CLI
 cmd/curator	TestEnvMigrateApplyRequiresPlan	linux,darwin,windows	windows	host-capability	--apply without a prior --plan hash is a usage refusal through the CLI with the link untouched
 cmd/curator	TestEnvMigratePrintBeforeWrite	linux,darwin,windows	windows	host-capability	the locked plan reaches CLI stdout before the first link mutation
+cmd/curator	TestEnvResolveCredentialRecordIsolatedKeychain	darwin	linux,windows	platform-control	isolated Claude credential records omit path on the supported macOS Keychain backend
 cmd/curator	TestEnvResolveRepairFailedOnUninspectable	linux,darwin	windows	host-capability	env resolve --repair surfaces environment_repair_failed for an uninspectable target through the CLI
 
 # ===========================================================================

@@ -560,13 +560,22 @@ func TestCodexKeyringAmbient(t *testing.T) {
 			marker := readManagedMarker(t, fx, "codex_cli")
 			links := 0
 			if marker.Passthrough != nil {
-				links = len(*marker.Passthrough)
+				for _, entry := range *marker.Passthrough {
+					if entry.Path != "" {
+						links++
+					}
+				}
 			}
 			if tc.linked && links != 1 {
 				t.Fatalf("a %s store links auth.json, records %d", tc.name, links)
 			}
 			if !tc.linked && links != 0 {
 				t.Fatalf("a keyring store is ambient, records %d", links)
+			}
+			if tc.name == "keyring" {
+				if marker.Passthrough == nil || len(*marker.Passthrough) != 1 || (*marker.Passthrough)[0].Path != "" || (*marker.Passthrough)[0].Backend != "ambient" {
+					t.Fatalf("a keyring store records one pathless ambient credential: %+v", marker.Passthrough)
+				}
 			}
 			if _, err := Resolve(fx.request("codex_cli")); err != nil {
 				t.Fatalf("the home is current: %v", err)

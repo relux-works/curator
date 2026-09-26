@@ -68,6 +68,7 @@ platform-control	Windows does not expose portable executable permission bits	all
 platform-control	Linux-only control in script-worker-v1-native-control-inventory-v1	allow	the script inventory defines this control for Linux only; the behaviour is asserted on ubuntu-latest
 platform-control	Windows-only control in script-worker-v1-native-control-inventory-v1	allow	the script inventory defines this control for Windows only; the behaviour is asserted on windows-latest
 platform-control	unix-only script-inventory fixture in script-worker-v1-native-control-inventory-v1	allow	the script-inventory fixture needs unix process primitives; the behaviour is asserted on the unix runners
+platform-control	Claude's per-home Keychain strategy is supported on macOS	allow	the isolated Claude Keychain backend is supported only on macOS; its schema-2 credential record is exercised there
 
 # --- host capability --------------------------------------------------------
 host-capability	(symlink|symlinks|hard links|named pipes|symlink canonical-prefix test) unavailable	allow	the runner filesystem provides no such link

@@ -160,7 +160,8 @@ func sha256Of(t *testing.T, path string) string {
 // home linked at the pre-0017 native root migrates to ~/.pi/agent with
 // bytes preserved and mode intact, printing the plan before applying.
 // The plan is deterministic (same hash and bytes across runs); apply
-// relinks (a symlink, never a copy) and rewrites no marker.
+// relinks (a symlink, never a copy) and records migration provenance in
+// the schema-2 marker.
 func TestMigratePiWrongTargetToAgentRoot(t *testing.T) {
 	requireLinkCapability(t)
 	fx := writeManagedFixture(t, "acme")
@@ -252,8 +253,12 @@ func TestMigratePiWrongTargetToAgentRoot(t *testing.T) {
 	if _, err := os.Lstat(oldTarget); !os.IsNotExist(err) {
 		t.Fatalf("migration creates nothing at the old target: %v", err)
 	}
-	if payload, err := os.ReadFile(markerPath); err != nil || string(payload) != string(markerBefore) {
-		t.Fatal("a relink rewrites no marker bytes")
+	if payload, err := os.ReadFile(markerPath); err != nil || string(payload) == string(markerBefore) {
+		t.Fatal("a schema-2 relink records migration provenance in the marker")
+	}
+	migratedMarker := readManagedMarker(t, fx, "pi")
+	if migratedMarker.Passthrough == nil || len(*migratedMarker.Passthrough) != 1 || (*migratedMarker.Passthrough)[0].Provenance != "migrated" {
+		t.Fatalf("migration publishes a complete credential record: %+v", migratedMarker.Passthrough)
 	}
 	after, err := PlanMigration(fx.migrateRequest())
 	if err != nil {
@@ -273,8 +278,69 @@ func TestMigratePiWrongTargetToAgentRoot(t *testing.T) {
 	if len(added) != 0 || len(removed) != 0 {
 		t.Fatalf("migration adds and removes no files: added=%v removed=%v", added, removed)
 	}
-	if len(changed) != 1 || changed[0] != link {
-		t.Fatalf("only the link target changes: %v", changed)
+	changedSet := map[string]bool{}
+	for _, path := range changed {
+		changedSet[path] = true
+	}
+	if len(changed) != 2 || !changedSet[link] || !changedSet[markerPath] {
+		t.Fatalf("the link target and migration provenance marker change: %v", changed)
+	}
+}
+
+// TestMigrateSchema1UnlinkPublishesCompleteSchema2Marker proves that a
+// schema-1 marker stays old until migration already requires a marker update
+// for an unlink; that replacement upgrades once and records the complete v2
+// credential set for the new isolated state.
+func TestMigrateSchema1UnlinkPublishesCompleteSchema2Marker(t *testing.T) {
+	requireLinkCapability(t)
+	fx := writeManagedFixture(t, "acme")
+	seedLiveNativeCredentials(t, fx)
+	provision(t, fx, "pi", envregistry.DefaultMachineConfig())
+	markerPath := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), envmarker.Name)
+	marker := readManagedMarker(t, fx, "pi")
+	legacyEntries := []envmarker.Passthrough{}
+	if marker.Passthrough != nil {
+		for _, entry := range *marker.Passthrough {
+			if entry.Path != "" {
+				legacyEntries = append(legacyEntries, envmarker.Passthrough{Path: entry.Path, Strategy: entry.Strategy})
+			}
+		}
+	}
+	legacy := *marker
+	legacy.Version = envmarker.VersionV1
+	legacy.Passthrough = &legacyEntries
+	legacyBytes, err := legacy.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(markerPath, legacyBytes, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), "auth.json")
+	if _, err := os.Lstat(link); err != nil {
+		t.Fatalf("schema-1 marker's recorded link is present: %v", err)
+	}
+	config := envregistry.DefaultMachineConfig()
+	config.Isolation = map[string]map[string]string{"acme": {"pi": envregistry.IsolationIsolated}}
+	req := fx.migrateRequest()
+	req.Machine = config
+	report, err := PlanMigration(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Ops()) != 1 || report.Ops()[0].Kind != MigrateOpUnlink || report.Ops()[0].Path != "auth.json" {
+		t.Fatalf("migration requires an unlink marker update: %+v", report.Ops())
+	}
+	req.Expect = report.Hash
+	if _, err := ApplyMigration(req); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(link); !os.IsNotExist(err) {
+		t.Fatalf("the migration unlinks the recorded passthrough: %v", err)
+	}
+	upgraded := readManagedMarker(t, fx, "pi")
+	if upgraded.Version != envmarker.VersionV2 || upgraded.Passthrough == nil || len(*upgraded.Passthrough) != 0 {
+		t.Fatalf("marker replacement upgrades with the complete isolated record set: %+v", upgraded)
 	}
 }
 
@@ -313,6 +379,7 @@ func TestMigrateNoSecretCopies(t *testing.T) {
 	if err := os.Symlink(oldTarget, piLink); err != nil {
 		t.Fatal(err)
 	}
+	piMarker := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), envmarker.Name)
 	codexLink := filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), "auth.json")
 	codexMarker := filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), envmarker.Name)
 	isolated := envregistry.DefaultMachineConfig()
@@ -382,8 +449,12 @@ func TestMigrateNoSecretCopies(t *testing.T) {
 	for _, path := range changed {
 		changedSet[path] = true
 	}
-	if len(changed) != 2 || !changedSet[piLink] || !changedSet[codexMarker] {
-		t.Fatalf("only the relinked link and the codex marker change: %v", changed)
+	if len(changed) != 3 || !changedSet[piLink] || !changedSet[piMarker] || !changedSet[codexMarker] {
+		t.Fatalf("the relinked link and each migrated home's marker change: %v", changed)
+	}
+	piRecord := readManagedMarker(t, fx, "pi")
+	if piRecord.Passthrough == nil || len(*piRecord.Passthrough) != 1 || (*piRecord.Passthrough)[0].Provenance != "migrated" {
+		t.Fatalf("the relinked Pi credential records migration provenance: %+v", piRecord.Passthrough)
 	}
 	// The migrated homes are current under their preserved modes.
 	if _, err := Resolve(fx.request("pi")); err != nil {

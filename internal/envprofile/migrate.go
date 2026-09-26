@@ -205,9 +205,10 @@ type MigrateHome struct {
 	Conflicts []MigrateConflict
 	Warnings  []string
 
-	provisioned bool
-	marker      *envmarker.Marker
-	markerRaw   []byte
+	provisioned       bool
+	marker            *envmarker.Marker
+	markerRaw         []byte
+	credentialRecords []envmarker.Passthrough
 }
 
 // MigrateRecovery summarizes a leftover migration journal from an
@@ -420,6 +421,13 @@ func inventoryHome(req *MigrateRequest, profile string, adapter envregistry.Adap
 			"fix the native credential configuration out of band and re-run")
 		return home
 	}
+	credentials, err := rr.credentialRecords(adapter, isolation, "migrated")
+	if err != nil {
+		home.addConflict("", fmt.Sprintf("cannot establish the credential record: %v", err),
+			"fix the credential configuration out of band and re-run")
+		return home
+	}
+	home.credentialRecords = credentials
 	native, err := rr.nativeHome(adapter.ID)
 	if err != nil {
 		home.addConflict("", fmt.Sprintf("cannot resolve the native home: %v", err),
@@ -429,7 +437,9 @@ func inventoryHome(req *MigrateRequest, profile string, adapter envregistry.Adap
 	recorded := map[string]string{}
 	if marker.Passthrough != nil {
 		for _, entry := range *marker.Passthrough {
-			recorded[entry.Path] = entry.Strategy
+			if entry.Path != "" {
+				recorded[entry.Path] = entry.Strategy
+			}
 		}
 	}
 	paths := map[string]bool{}
@@ -704,6 +714,10 @@ func migrationHash(report *MigrateReport) string {
 		}
 		for _, warning := range home.Warnings {
 			fmt.Fprintf(&canonical, "warning %s %s %s\n", home.Profile, home.EnvID, warning)
+		}
+		if len(home.credentialRecords) > 0 {
+			payload, _ := json.Marshal(home.credentialRecords)
+			fmt.Fprintf(&canonical, "credentials %s %s %s\n", home.Profile, home.EnvID, payload)
 		}
 	}
 	if report.Recovery != nil {
@@ -1198,11 +1212,11 @@ func validateMigrationOp(full string, op MigrateOp) error {
 	return nil
 }
 
-// changedMarkers renders the marker updates for homes with unlink
-// operations (relinks keep the identical record and need no rewrite):
-// the prior marker minus the unlinked entries, everything else
-// preserved byte-for-byte in content. It also returns the prior raw
-// bytes for rollback.
+// changedMarkers renders marker updates for every schema-2 home with a
+// migration operation so provenance records the migration, plus schema-1
+// homes whose unlink operation requires changing the legacy marker. A
+// schema-1 relink keeps its exact bytes because no marker replacement is
+// otherwise required. Prior raw bytes are returned for rollback.
 func changedMarkers(report *MigrateReport) (map[string][]byte, map[string][]byte, error) {
 	changed := map[string][]byte{}
 	priors := map[string][]byte{}
@@ -1213,23 +1227,16 @@ func changedMarkers(report *MigrateReport) (map[string][]byte, map[string][]byte
 				dropped = append(dropped, op.Path)
 			}
 		}
-		if len(dropped) == 0 {
+		if len(home.Ops) == 0 || home.marker == nil {
 			continue
 		}
-		drop := map[string]bool{}
-		for _, path := range dropped {
-			drop[path] = true
-		}
-		kept := []envmarker.Passthrough{}
-		if home.marker.Passthrough != nil {
-			for _, entry := range *home.marker.Passthrough {
-				if !drop[entry.Path] {
-					kept = append(kept, entry)
-				}
-			}
+		if home.marker.Version == envmarker.VersionV1 && len(dropped) == 0 {
+			continue
 		}
 		updated := *home.marker
-		updated.Passthrough = &kept
+		updated.Version = envmarker.VersionV2
+		complete := append([]envmarker.Passthrough{}, home.credentialRecords...)
+		updated.Passthrough = &complete
 		payload, err := updated.Marshal()
 		if err != nil {
 			return nil, nil, fmt.Errorf("render the migrated marker for %s/%s: %v", home.Profile, home.EnvID, err)

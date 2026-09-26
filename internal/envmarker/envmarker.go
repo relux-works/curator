@@ -1,8 +1,9 @@
 // Package envmarker reads and writes the environment marker of environments
-// §8.2, agent-environment-marker-v1: the per-home ledger of record for
-// environment surfaces (.agent-environment.json). Readers reject an
-// unsupported version and unknown fields; an unreadable or invalid marker
-// fails closed and is reported as environment_marker_invalid.
+// §8.2, agent-environment-marker-v1 and agent-environment-marker-v2: the
+// per-home ledger of record for environment surfaces
+// (.agent-environment.json). Readers reject an unsupported version and
+// unknown fields; an unreadable or invalid marker fails closed and is
+// reported as environment_marker_invalid.
 package envmarker
 
 import (
@@ -21,8 +22,16 @@ import (
 // Name is the marker file name beside the managed surfaces.
 const Name = ".agent-environment.json"
 
-// Version is the only marker version this release reads or writes.
-const Version = 1
+// Marker schema versions supported by the reader. New managed-home
+// provisioning writes VersionV2; linked and copied markers retain v1 until
+// their owning writer migrates them independently.
+const (
+	VersionV1 = 1
+	VersionV2 = 2
+	// Version is the legacy writer version for marker paths outside managed
+	// homes. Keep those call sites explicit until their own schema-2 work.
+	Version = VersionV1
+)
 
 // Modes (environments §8.1).
 const (
@@ -105,20 +114,21 @@ type Surface struct {
 	Copies *[]Copy `json:"copies,omitempty"`
 }
 
-// Marker is one agent-environment-marker-v1 object. The managed-home members
-// (passthrough, seeds, seeded_projects, seed_links) are declared so a reader
-// accepts a managed-home marker; this stage writes in-place markers only.
+// Marker is one agent-environment-marker-v1 or v2 object. The managed-home
+// members (passthrough, seeds, seeded_projects, seed_links) are declared so a
+// reader accepts a managed-home marker; callers decide which schema to write.
 type Marker struct {
-	Version        int                `json:"version"`
-	Profile        Profile            `json:"profile"`
-	Members        []Member           `json:"members"`
-	Precedence     Precedence         `json:"precedence"`
-	Mode           string             `json:"mode"`
-	Surfaces       map[string]Surface `json:"surfaces"`
-	Passthrough    *[]Passthrough     `json:"passthrough,omitempty"`
-	Seeds          *[]string          `json:"seeds,omitempty"`
-	SeededProjects []string           `json:"seeded_projects,omitempty"`
-	SeedLinks      []string           `json:"seed_links,omitempty"`
+	Version         int                `json:"version"`
+	Profile         Profile            `json:"profile"`
+	Members         []Member           `json:"members"`
+	Precedence      Precedence         `json:"precedence"`
+	Mode            string             `json:"mode"`
+	Surfaces        map[string]Surface `json:"surfaces"`
+	Passthrough     *[]Passthrough     `json:"passthrough,omitempty"`
+	Seeds           *[]string          `json:"seeds,omitempty"`
+	SeededProjects  []string           `json:"seeded_projects,omitempty"`
+	SeedLinks       []string           `json:"seed_links,omitempty"`
+	CodexSeedRecord *CodexSeedRecord   `json:"codex_seed_record,omitempty"`
 	// surfaceOrder is the source order of the surfaces keys, captured at
 	// parse: surface keys are sorted (§8.2).
 	surfaceOrder []string
@@ -126,8 +136,21 @@ type Marker struct {
 
 // Passthrough is one recorded credential passthrough entry of a managed home.
 type Passthrough struct {
-	Path     string `json:"path"`
-	Strategy string `json:"strategy"`
+	Path           string `json:"path,omitempty"`
+	Isolation      string `json:"isolation,omitempty"`
+	Strategy       string `json:"strategy"`
+	SourceRole     string `json:"source_role,omitempty"`
+	Backend        string `json:"backend,omitempty"`
+	BackendVersion string `json:"backend_version,omitempty"`
+	Provenance     string `json:"provenance,omitempty"`
+	pathSet        bool
+}
+
+// CodexSeedRecord is the schema-v2 snapshot of native MCP server names
+// preserved by a managed Codex home.
+type CodexSeedRecord struct {
+	Revision         string   `json:"revision"`
+	NativeMCPServers []string `json:"native_mcp_servers"`
 }
 
 var (
@@ -138,7 +161,7 @@ var (
 
 // Validate applies the schema rules.
 func (m *Marker) Validate() error {
-	if m.Version != Version {
+	if m.Version != VersionV1 && m.Version != VersionV2 {
 		return fmt.Errorf("unsupported marker version %d", m.Version)
 	}
 	if !identifiers.Valid(m.Profile.Name) || !identifiers.Valid(m.Profile.Root) {
@@ -226,14 +249,42 @@ func (m *Marker) Validate() error {
 			return fmt.Errorf("surface keys are sorted")
 		}
 		for _, entry := range *m.Passthrough {
-			switch entry.Strategy {
-			case "per-home-keychain", "ambient", "keyring-preferred", "file-link":
-			default:
-				return fmt.Errorf("passthrough strategy %q is unknown", entry.Strategy)
+			if m.Version == VersionV1 {
+				if entry.Isolation != "" || entry.SourceRole != "" || entry.Backend != "" || entry.BackendVersion != "" || entry.Provenance != "" {
+					return fmt.Errorf("schema-1 passthrough carries only path and strategy")
+				}
+				switch entry.Strategy {
+				case "per-home-keychain", "ambient", "keyring-preferred", "file-link":
+				default:
+					return fmt.Errorf("passthrough strategy %q is unknown", entry.Strategy)
+				}
+				if entry.Path == "" || !identifiers.PortablePath(entry.Path) {
+					return fmt.Errorf("schema-1 passthrough path %q is not a portable path", entry.Path)
+				}
+				continue
+			}
+			if err := validateCredentialRecord(entry); err != nil {
+				return err
+			}
+		}
+		if m.CodexSeedRecord != nil {
+			if m.Version != VersionV2 {
+				return fmt.Errorf("codex_seed_record requires schema 2")
+			}
+			if m.CodexSeedRecord.Revision != "A" && m.CodexSeedRecord.Revision != "B" {
+				return fmt.Errorf("codex_seed_record revision is not A or B")
+			}
+			if m.CodexSeedRecord.NativeMCPServers == nil || !sort.StringsAreSorted(m.CodexSeedRecord.NativeMCPServers) {
+				return fmt.Errorf("codex_seed_record native_mcp_servers is not a sorted array")
+			}
+			for index, name := range m.CodexSeedRecord.NativeMCPServers {
+				if name == "" || (index > 0 && m.CodexSeedRecord.NativeMCPServers[index-1] == name) {
+					return fmt.Errorf("codex_seed_record native_mcp_servers contains an empty or repeated name")
+				}
 			}
 		}
 	case ModeLinked, ModeCopied:
-		if m.Passthrough != nil || m.Seeds != nil || m.SeededProjects != nil || m.SeedLinks != nil {
+		if m.Passthrough != nil || m.Seeds != nil || m.SeededProjects != nil || m.SeedLinks != nil || m.CodexSeedRecord != nil {
 			return fmt.Errorf("an in-place marker carries no managed-home members")
 		}
 	default:
@@ -288,6 +339,51 @@ func (m *Marker) Validate() error {
 	return nil
 }
 
+// validateCredentialRecord implements the schema-v2 passthrough record
+// contract. Ambient records and an isolated per-home keychain have no home
+// path; every other strategy records its portable home-relative path.
+func validateCredentialRecord(entry Passthrough) error {
+	switch entry.Isolation {
+	case "shared", "isolated":
+	default:
+		return fmt.Errorf("passthrough isolation %q is unknown", entry.Isolation)
+	}
+	switch entry.Strategy {
+	case "per-home-keychain", "ambient", "keyring-preferred", "file-link", "in-place":
+	default:
+		return fmt.Errorf("passthrough strategy %q is unknown", entry.Strategy)
+	}
+	switch entry.SourceRole {
+	case "native", "managed":
+	default:
+		return fmt.Errorf("passthrough source_role %q is unknown", entry.SourceRole)
+	}
+	switch entry.Backend {
+	case "file", "keychain", "ambient":
+	default:
+		return fmt.Errorf("passthrough backend %q is unknown", entry.Backend)
+	}
+	if entry.BackendVersion == "" {
+		return fmt.Errorf("passthrough backend_version is empty")
+	}
+	switch entry.Provenance {
+	case "provisioned", "repaired", "migrated":
+	default:
+		return fmt.Errorf("passthrough provenance %q is unknown", entry.Provenance)
+	}
+	hasPath := entry.Path != "" || entry.pathSet
+	linkless := entry.Strategy == "ambient" || entry.Backend == "ambient" ||
+		(entry.Strategy == "per-home-keychain" && entry.Isolation == "isolated")
+	if linkless {
+		if hasPath {
+			return fmt.Errorf("linkless passthrough record carries a path")
+		}
+	} else if !identifiers.PortablePath(entry.Path) {
+		return fmt.Errorf("passthrough path %q is not a portable path", entry.Path)
+	}
+	return nil
+}
+
 // Marshal renders the marker bytes: indented JSON with sorted keys and one
 // trailing LF.
 func (m *Marker) Marshal() ([]byte, error) {
@@ -316,12 +412,18 @@ func Parse(payload []byte) (*Marker, error) {
 		Profile struct {
 			ImportedFromNative *bool `json:"imported_from_native"`
 		} `json:"profile"`
-		Surfaces json.RawMessage `json:"surfaces"`
+		Surfaces    json.RawMessage              `json:"surfaces"`
+		Passthrough []map[string]json.RawMessage `json:"passthrough"`
 	}
 	if err := json.Unmarshal(payload, &shadow); err != nil {
 		return nil, fmt.Errorf("%s: %w", DiagMarkerInvalid, err)
 	}
 	marker.Profile.importedSet = shadow.Profile.ImportedFromNative != nil
+	if marker.Passthrough != nil && len(shadow.Passthrough) == len(*marker.Passthrough) {
+		for index := range *marker.Passthrough {
+			_, (*marker.Passthrough)[index].pathSet = shadow.Passthrough[index]["path"]
+		}
+	}
 	order, err := objectKeys(shadow.Surfaces)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", DiagMarkerInvalid, err)

@@ -33,7 +33,7 @@ type operation struct {
 // The per-entry agent-home payloads are not transaction targets in this
 // stage (see the switch.go package doc for why); they stay direct writes
 // under the held lock.
-func beginOperation(home string) (*operation, error) {
+func beginOperation(home string, options ...transaction.Option) (*operation, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), lockTimeout)
 	defer cancel()
 	manager, err := managerlock.New(home)
@@ -44,7 +44,7 @@ func beginOperation(home string) (*operation, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: acquire the manager-home mutation lock: %v", DiagLockUnavailable, err)
 	}
-	engine, err := transaction.New(home)
+	engine, err := transaction.New(home, options...)
 	if err != nil {
 		_ = lock.Close()
 		return nil, err

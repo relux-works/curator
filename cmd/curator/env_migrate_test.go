@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/envmarker"
 )
 
 // These tests drive the production run() entry point for the env
@@ -120,6 +122,23 @@ func TestEnvMigratePlanApplyPi(t *testing.T) {
 	}
 	if payload, err := os.ReadFile(agentAuth); err != nil || string(payload) != string(want) {
 		t.Fatalf("native bytes preserved: %q (%v)", payload, err)
+	}
+	markerPath := filepath.Join(source.cfg.Home(), "environments", "acme", "pi", envmarker.Name)
+	markerBytes, err := os.ReadFile(markerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	marker, err := envmarker.Parse(markerBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if marker.Version != envmarker.VersionV2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
+		t.Fatalf("migration marker carries one schema-2 record: %+v", marker)
+	}
+	credential := (*marker.Passthrough)[0]
+	if credential.Path != "auth.json" || credential.Isolation != "shared" || credential.Strategy != "file-link" ||
+		credential.SourceRole != "native" || credential.Backend != "file" || credential.BackendVersion != "0.84.2" || credential.Provenance != "migrated" {
+		t.Fatalf("migration credential record: %+v", credential)
 	}
 	if code, _, stderr := runProfile(t, source, "env", "resolve", "pi"); code != exitOK {
 		t.Fatalf("the migrated home resolves bare: %d\n%s", code, stderr)

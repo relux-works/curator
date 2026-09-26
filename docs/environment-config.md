@@ -26,6 +26,24 @@ All three knobs sit under one `environments` object:
 
 `env status` reports the effective state of every knob below.
 
+## Managed-home credential records
+
+Managed-home `.agent-environment.json` markers use schema 2 for new
+provisions. Each recorded credential strategy carries its effective
+isolation, strategy, byte owner, backend, verified backend release, and the
+mutation that last wrote the record. A record with an ambient backend or
+strategy, or an isolated per-home Keychain strategy, has no `path`; other
+records carry their home-relative credential path. This lets linkless
+credentials remain visible without treating them as filesystem entries.
+
+Existing schema-1 markers remain byte-for-byte untouched when the only
+change would add schema-2 credential metadata. If another successful
+mutation already needs to replace a schema-1 marker, Curator publishes the
+complete schema-2 record in that same manager-home transaction. Marker
+publication runs under the manager-home lock with journaled sibling staging
+and atomic rename, so an interrupted write is recovered on the next
+operation.
+
 ## Transitive system modules (E2)
 
 `transitive_system_modules` is exactly `drop` (default) or `error`.

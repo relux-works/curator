@@ -411,7 +411,11 @@ func homeState(req StatusRequest, profile string, adapter envregistry.Adapter) H
 	}
 	if marker.Passthrough != nil {
 		for _, entry := range *marker.Passthrough {
-			state.Passthrough = append(state.Passthrough, entry.Path+" ("+entry.Strategy+")")
+			if entry.Path == "" {
+				state.Passthrough = append(state.Passthrough, entry.Strategy)
+			} else {
+				state.Passthrough = append(state.Passthrough, entry.Path+" ("+entry.Strategy+")")
+			}
 		}
 	}
 	if marker.Seeds != nil {

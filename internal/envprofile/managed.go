@@ -34,6 +34,7 @@ import (
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/protocoljson"
+	"github.com/relux-works/curator/internal/transaction"
 )
 
 // Diagnostics for managed homes and resolution (environments §7.7, §8.5,
@@ -92,6 +93,9 @@ type ResolveRequest struct {
 	// OperatorXDG is the operator's effective XDG config home; empty
 	// means resolve it from the process environment.
 	OperatorXDG string
+	// transactionOptions is a fault-injection seam for recovery tests. CLI
+	// requests leave it nil and use the production transaction engine.
+	transactionOptions []transaction.Option
 }
 
 // ResolveResult is the outcome: exactly one of Document and StaleErr is
@@ -532,6 +536,87 @@ func (req *ResolveRequest) effectivePassthrough(adapter envregistry.Adapter, iso
 	return links, strategies, nil
 }
 
+// credentialRecords computes the schema-v2 record for each declared
+// credential strategy. It records links plus supported linkless strategies;
+// the latter deliberately have no Path and never enter link inventory.
+func (req *ResolveRequest) credentialRecords(adapter envregistry.Adapter, isolation, provenance string) ([]envmarker.Passthrough, error) {
+	if isolation == envregistry.IsolationIsolated {
+		if adapter.ID == envregistry.ClaudeCode && runtime.GOOS == "darwin" {
+			return []envmarker.Passthrough{{
+				Isolation: isolation, Strategy: envregistry.StrategyPerHomeKeychain,
+				SourceRole: "managed", Backend: "keychain", BackendVersion: adapter.VerifiedRelease,
+				Provenance: provenance,
+			}}, nil
+		}
+		return []envmarker.Passthrough{}, nil
+	}
+	if isolation != envregistry.IsolationShared {
+		return nil, fmt.Errorf("unsupported credential isolation %q", isolation)
+	}
+	entries := adapter.PassthroughFor(runtime.GOOS)
+	if len(entries) == 0 {
+		return []envmarker.Passthrough{}, nil
+	}
+	if adapter.VerifiedRelease == "" {
+		return nil, fmt.Errorf("%s: %s has no verified credential backend release", envregistry.DiagCredentialUnsupported, adapter.ID)
+	}
+	native, err := req.nativeHome(adapter.ID)
+	if err != nil {
+		return nil, err
+	}
+	links, _, err := req.effectivePassthrough(adapter, isolation)
+	if err != nil {
+		return nil, err
+	}
+	var codexStore string
+	for _, entry := range entries {
+		if entry.Strategy == envregistry.StrategyKeyringPreferred {
+			codexStore, err = codexCredentialStore(native)
+			if err != nil {
+				return nil, err
+			}
+			break
+		}
+	}
+	records := make([]envmarker.Passthrough, 0, len(entries))
+	for _, entry := range entries {
+		record := envmarker.Passthrough{
+			Isolation: isolation, Strategy: entry.Strategy, SourceRole: "native",
+			Backend: "file", BackendVersion: adapter.VerifiedRelease, Provenance: provenance,
+		}
+		switch entry.Strategy {
+		case envregistry.StrategyFileLink:
+			record.Path = entry.Path
+		case envregistry.StrategyKeyringPreferred:
+			if codexStore == "keyring" {
+				record.Backend = "ambient"
+			} else {
+				record.Path = entry.Path
+			}
+		case envregistry.StrategyAmbient:
+			record.Backend = "ambient"
+		case envregistry.StrategyPerHomeKeychain:
+			record.SourceRole = "managed"
+			record.Backend = "keychain"
+		default:
+			return nil, fmt.Errorf("%s: %s declares unsupported credential strategy %q", envregistry.DiagCredentialUnsupported, adapter.ID, entry.Strategy)
+		}
+		if record.Path != "" {
+			if _, linked := links[record.Path]; !linked {
+				return nil, fmt.Errorf("%s: %s credential path %s has no effective link", envregistry.DiagCredentialUnsupported, adapter.ID, record.Path)
+			}
+		}
+		records = append(records, record)
+	}
+	sort.Slice(records, func(i, j int) bool {
+		if records[i].Path != records[j].Path {
+			return records[i].Path < records[j].Path
+		}
+		return records[i].Strategy < records[j].Strategy
+	})
+	return records, nil
+}
+
 // codexCredentialStore resolves the operator's native codex credential
 // store: the top-level cli_auth_credentials_store selector when the
 // native config.toml carries one, else the platform default file — an
@@ -859,7 +944,7 @@ func sameStoreTree(target, storeRoot string) bool {
 // store documents, copies, links (with copy fallback for files), seed
 // files, and the marker. Managed paths the plan no longer wants are
 // removed; files the marker does not record are never touched.
-func applyPlan(req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded map[string]bool, prior *envmarker.Marker, provisioned bool) error {
+func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded map[string]bool, prior *envmarker.Marker, provisioned bool) error {
 	if err := os.MkdirAll(plan.homeDir, 0o755); err != nil {
 		return err
 	}
@@ -956,7 +1041,11 @@ func applyPlan(req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded 
 			}
 		}
 	}
-	marker, err := finalizeMarker(req, plan, seeds, prior)
+	provenance := "repaired"
+	if provisioned {
+		provenance = "provisioned"
+	}
+	marker, err := finalizeMarker(req, plan, seeds, prior, provenance)
 	if err != nil {
 		return err
 	}
@@ -964,8 +1053,11 @@ func applyPlan(req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded 
 	if err != nil {
 		return err
 	}
-	_ = os.Remove(filepath.Join(plan.homeDir, envmarker.Name))
-	return os.WriteFile(filepath.Join(plan.homeDir, envmarker.Name), payload, 0o644)
+	markerPath := filepath.Join(plan.homeDir, envmarker.Name)
+	if prior != nil && prior.Version == envmarker.VersionV1 && legacyMarkerProjectionMatches(prior, marker) {
+		return nil
+	}
+	return op.publish(map[string][]byte{markerPath: payload})
 }
 
 // isSeedPath reports whether a recorded path is seed-owned tool state the
@@ -988,9 +1080,10 @@ func isSeedPath(plan *homePlan, path string) bool {
 // entries are seeded and recorded, recorded seeds whose target is gone are
 // removed, and unrecorded entries shadowing allowlisted operator entries
 // warn environment_seed_shadowed and are never touched (§7.1, §7.4).
-func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prior *envmarker.Marker) (*envmarker.Marker, error) {
+func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prior *envmarker.Marker, provenance string) (*envmarker.Marker, error) {
 	marker := plan.marker
-	links, strategies, err := req.effectivePassthrough(plan.adapter, plan.isolation)
+	marker.Version = envmarker.VersionV2
+	links, _, err := req.effectivePassthrough(plan.adapter, plan.isolation)
 	if err != nil {
 		return nil, err
 	}
@@ -1001,7 +1094,9 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
 	recordedLinks := map[string]bool{}
 	if prior != nil && prior.Passthrough != nil {
 		for _, entry := range *prior.Passthrough {
-			recordedLinks[entry.Path] = true
+			if entry.Path != "" {
+				recordedLinks[entry.Path] = true
+			}
 		}
 	}
 	migrateCmd := fmt.Sprintf("curator env migrate --plan --profile %s --env %s, then curator env migrate --apply --expect <plan-hash> --profile %s --env %s", req.Profile, plan.adapter.ID, req.Profile, plan.adapter.ID)
@@ -1013,9 +1108,9 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
 	if err := removeStaleCredentialLinks(plan.adapter, plan.homeDir, native, prior, links, migrateCmd); err != nil {
 		return nil, err
 	}
-	passthrough := []envmarker.Passthrough{}
-	for _, path := range sortedKeys(links) {
-		passthrough = append(passthrough, envmarker.Passthrough{Path: path, Strategy: strategies[path]})
+	passthrough, err := req.credentialRecords(plan.adapter, plan.isolation, provenance)
+	if err != nil {
+		return nil, err
 	}
 	marker.Passthrough = &passthrough
 	// Copy-seed records survive repair: the tool owns the files, and
@@ -1068,6 +1163,70 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
 	}
 	marker.SeedLinks = seedLinks
 	return marker, nil
+}
+
+// legacyMarkerProjectionMatches checks whether publishing a schema-2 marker
+// would change any schema-1 state beyond adding credential metadata. A true
+// result keeps the original schema-1 bytes untouched; any unrelated marker
+// change is published as one complete schema-2 replacement.
+func legacyMarkerProjectionMatches(prior, candidate *envmarker.Marker) bool {
+	if prior == nil || prior.Version != envmarker.VersionV1 || candidate == nil {
+		return false
+	}
+	legacyEntries := []envmarker.Passthrough{}
+	if candidate.Passthrough != nil {
+		for _, entry := range *candidate.Passthrough {
+			if entry.Path == "" {
+				continue
+			}
+			strategy := entry.Strategy
+			if strategy == envregistry.StrategyKeyringPreferred && entry.Backend == "file" {
+				strategy = envregistry.StrategyFileLink
+			}
+			legacyEntries = append(legacyEntries, envmarker.Passthrough{Path: entry.Path, Strategy: strategy})
+		}
+	}
+	projected := *candidate
+	projected.Version = envmarker.VersionV1
+	projected.Passthrough = &legacyEntries
+	projected.CodexSeedRecord = nil
+	priorPayload, err := prior.Marshal()
+	if err != nil {
+		return false
+	}
+	projectedPayload, err := projected.Marshal()
+	if err != nil {
+		return false
+	}
+	return bytes.Equal(priorPayload, projectedPayload)
+}
+
+// sameCredentialRecordSet compares all durable record fields except
+// provenance, which describes the last successful mutation and therefore
+// changes on repair and migration without changing credential identity.
+func sameCredentialRecordSet(left, right []envmarker.Passthrough) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	identityCounts := func(records []envmarker.Passthrough) map[string]int {
+		counts := make(map[string]int, len(records))
+		for _, record := range records {
+			record.Provenance = ""
+			payload, _ := json.Marshal(record)
+			counts[string(payload)]++
+		}
+		return counts
+	}
+	a, b := identityCounts(left), identityCounts(right)
+	if len(a) != len(b) {
+		return false
+	}
+	for key, count := range a {
+		if b[key] != count {
+			return false
+		}
+	}
+	return true
 }
 
 // ensureCredentialLink fix-first ensures one wanted credential link (§7.4,
@@ -1143,6 +1302,9 @@ func removeStaleCredentialLinks(adapter envregistry.Adapter, homeDir, native str
 		return nil
 	}
 	for _, entry := range *prior.Passthrough {
+		if entry.Path == "" {
+			continue
+		}
 		if _, wanted := links[entry.Path]; wanted {
 			continue
 		}
@@ -1550,10 +1712,27 @@ func (v *verification) checkPassthrough(req *ResolveRequest, plan *homePlan, mar
 		v.reasons = append(v.reasons, fmt.Sprintf("passthrough: %v", err))
 		return
 	}
+	if marker.Version == envmarker.VersionV2 {
+		expected, err := req.credentialRecords(plan.adapter, plan.isolation, "provisioned")
+		if err != nil {
+			v.reasons = append(v.reasons, fmt.Sprintf("passthrough: %v", err))
+			return
+		}
+		var recorded []envmarker.Passthrough
+		if marker.Passthrough != nil {
+			recorded = *marker.Passthrough
+		}
+		if !sameCredentialRecordSet(expected, recorded) {
+			v.reasons = append(v.reasons, "passthrough credential records do not match the effective set")
+			return
+		}
+	}
 	recorded := map[string]string{}
 	if marker.Passthrough != nil {
 		for _, entry := range *marker.Passthrough {
-			recorded[entry.Path] = entry.Strategy
+			if entry.Path != "" {
+				recorded[entry.Path] = entry.Strategy
+			}
 		}
 	}
 	if len(recorded) != len(links) {
@@ -1562,7 +1741,7 @@ func (v *verification) checkPassthrough(req *ResolveRequest, plan *homePlan, mar
 	}
 	for path, target := range links {
 		strategy, ok := recorded[path]
-		if !ok || strategy != strategies[path] {
+		if !ok || (marker.Version == envmarker.VersionV1 && strategy != strategies[path]) {
 			v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s is not recorded", path))
 			continue
 		}
@@ -1867,7 +2046,7 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
 // repair restores managed bytes from the store and never adopts candidate
 // bytes found in the home.
 func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source Source, lock *contextlock.Lock, hash string) (*ResolveResult, error) {
-	op, err := beginOperation(req.Home)
+	op, err := beginOperation(req.Home, req.transactionOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -1946,7 +2125,7 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 			}
 		}
 	}
-	if err := applyPlan(req, plan, seeds, recorded, verdict.marker, provisioned); err != nil {
+	if err := applyPlan(op, req, plan, seeds, recorded, verdict.marker, provisioned); err != nil {
 		if provisioned {
 			return nil, err
 		}

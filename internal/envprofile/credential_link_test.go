@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
 )
 
@@ -443,11 +444,12 @@ func TestPiProvisionTargetsAgentRoot(t *testing.T) {
 		t.Fatalf("the pending finding is not a conflict: %q", resolved)
 	}
 	marker := readManagedMarker(t, fx, "pi")
-	if marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
+	if marker.Version != envmarker.VersionV2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
 		t.Fatalf("one passthrough entry recorded: %+v", marker.Passthrough)
 	}
 	entry := (*marker.Passthrough)[0]
-	if entry.Path != "auth.json" || entry.Strategy != envregistry.StrategyFileLink {
+	if entry.Path != "auth.json" || entry.Isolation != envregistry.IsolationShared || entry.Strategy != envregistry.StrategyFileLink ||
+		entry.SourceRole != "native" || entry.Backend != "file" || entry.BackendVersion != "0.84.2" || entry.Provenance != "provisioned" {
 		t.Fatalf("recorded entry %+v", entry)
 	}
 	payload, err := json.Marshal(marker.Passthrough)
@@ -459,8 +461,8 @@ func TestPiProvisionTargetsAgentRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 	for key := range decoded[0] {
-		if key != "path" && key != "strategy" {
-			t.Fatalf("frozen v1 records path and strategy only, found %q in %s", key, payload)
+		if key != "path" && key != "isolation" && key != "strategy" && key != "source_role" && key != "backend" && key != "backend_version" && key != "provenance" {
+			t.Fatalf("schema-v2 credential record has an unknown field %q in %s", key, payload)
 		}
 	}
 	// With the native credential present the link reads through.
@@ -556,8 +558,12 @@ func TestCredentialLinkUnrecordedSymlinkRefuses(t *testing.T) {
 	}
 	provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
 	marker := readManagedMarker(t, fx, "codex_cli")
-	if marker.Passthrough == nil || len(*marker.Passthrough) != 0 {
-		t.Fatalf("a keyring home records no passthrough: %+v", marker.Passthrough)
+	if marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
+		t.Fatalf("a keyring home records its linkless credential strategy: %+v", marker.Passthrough)
+	}
+	entry := (*marker.Passthrough)[0]
+	if entry.Path != "" || entry.Isolation != envregistry.IsolationShared || entry.Strategy != envregistry.StrategyKeyringPreferred || entry.Backend != "ambient" || entry.SourceRole != "native" || entry.BackendVersion != "0.153.2" {
+		t.Fatalf("keyring home records a pathless ambient credential: %+v", entry)
 	}
 	// The native store turns to file, and the operator's own symlink sits
 	// at the now-wanted link path.

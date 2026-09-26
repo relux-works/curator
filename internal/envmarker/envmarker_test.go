@@ -1,6 +1,7 @@
 package envmarker
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -48,17 +49,58 @@ func TestRoundTrip(t *testing.T) {
 
 // TestUnsupportedVersionIsRejected narrows the version gate: readers reject
 // an unsupported marker version and never infer newer semantics. A mutant
-// that accepts version 2 must fail this test.
+// that accepts version 3 must fail this test.
 func TestUnsupportedVersionIsRejected(t *testing.T) {
 	payload, err := testMarker().Marshal()
 	if err != nil {
 		t.Fatal(err)
 	}
-	future := strings.Replace(string(payload), `"version": 1`, `"version": 2`, 1)
+	future := strings.Replace(string(payload), `"version": 1`, `"version": 3`, 1)
 	if _, err := Parse([]byte(future)); err == nil {
-		t.Fatal("version 2 must be rejected")
+		t.Fatal("version 3 must be rejected")
 	} else if !strings.Contains(err.Error(), DiagMarkerInvalid) {
 		t.Fatalf("error %v carries no %s", err, DiagMarkerInvalid)
+	}
+}
+
+func TestSchema2PathlessCredentialRecordOmitsPath(t *testing.T) {
+	marker := testMarker()
+	marker.Version = VersionV2
+	marker.Mode = ModeManagedHome
+	entries := []Passthrough{{
+		Isolation: "shared", Strategy: "keyring-preferred", SourceRole: "native",
+		Backend: "ambient", BackendVersion: "0.153.2", Provenance: "provisioned",
+	}}
+	marker.Passthrough = &entries
+	seeds := []string{}
+	marker.Seeds = &seeds
+	payload, err := marker.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := Parse(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(payload, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	passthrough, _ := decoded["passthrough"].([]any)
+	entry, _ := passthrough[0].(map[string]any)
+	if _, exists := entry["path"]; exists {
+		t.Fatalf("ambient credentials are recorded without path: %s", payload)
+	}
+	if parsed.Version != VersionV2 || (*parsed.Passthrough)[0].Backend != "ambient" {
+		t.Fatalf("parsed schema-2 credential record: %+v", parsed.Passthrough)
+	}
+	decoded["passthrough"].([]any)[0].(map[string]any)["path"] = ""
+	invalid, err := json.Marshal(decoded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Parse(invalid); err == nil {
+		t.Fatal("a present empty path is not a pathless record; linkless records omit the member")
 	}
 }
 

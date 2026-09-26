@@ -91,6 +91,38 @@ func TestParseAuthoritativeEnvMarkerSchemaCases(t *testing.T) {
 				t.Fatal(err)
 			}
 			_, err = Parse(payload)
+			if tc.Name == "invalid-version.json" {
+				if err != nil {
+					return conformancecoverage.Observation{FailureReason: fmt.Sprintf("dual-version Parse rejected schema-v2 case: %v", err)}
+				}
+				return conformancecoverage.Observation{BoundReason: "schema-v2 markers are now supported; version 3 rejection is covered by TestUnsupportedVersionIsRejected"}
+			}
+			if tc.Valid && err != nil {
+				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("Parse rejected published-valid case: %v", err)}
+			}
+			if !tc.Valid && err == nil {
+				return conformancecoverage.Observation{FailureReason: "Parse accepted published-invalid case"}
+			}
+			return conformancecoverage.Observation{}
+		})
+}
+
+// TestParseAuthoritativeEnvMarkerV2SchemaCases executes the pinned v2 marker
+// family through Parse. This keeps the production reader aligned with the
+// schema-2 credential record contract, including pathless ambient records.
+func TestParseAuthoritativeEnvMarkerV2SchemaCases(t *testing.T) {
+	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+	if root == "" {
+		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
+	}
+	cases := schemaCaseValidity(t, root, "agent-environment-marker-v2")
+	conformancecoverage.RunOutcomes(t, "agent-environment-marker-v2/schema-cases", cases,
+		func(tc namedSchemaCase) string { return tc.Name }, func(t *testing.T, tc namedSchemaCase) conformancecoverage.Observation {
+			payload, err := os.ReadFile(filepath.Join(root, "schema-cases", "agent-environment-marker-v2", tc.Name)) // #nosec G304 -- explicit conformance input
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = Parse(payload)
 			if tc.Valid && err != nil {
 				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("Parse rejected published-valid case: %v", err)}
 			}
