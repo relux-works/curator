@@ -1903,11 +1903,12 @@ func recordedRelease(adapter envregistry.Adapter) string {
 }
 
 // buildFragment assembles the launch fragment from a current home (§10.2):
-// profile.lock_sha256, the precedence object, env, the system_prompt
-// section exactly when the home carries the inert file, and the mcp
+// profile.lock_sha256, precedence, the effective profile permission mode,
+// env, the system_prompt section exactly when the home carries the inert
+// file, and the mcp
 // section exactly when the home carries the channel file, with the sorted
-// env_names union under the §10.3 double bound. path_prepend is never
-// emitted in revision 1.
+// env_names union under the §10.3 double bound. The optional path_prepend
+// member is not produced by this resolver.
 func buildFragment(req *ResolveRequest, adapter envregistry.Adapter, verdict *verification) (*envfragment.Fragment, error) {
 	plan := verdict.plan
 	fragment := &envfragment.Fragment{
@@ -1917,6 +1918,13 @@ func buildFragment(req *ResolveRequest, adapter envregistry.Adapter, verdict *ve
 		Winner:      req.Policy.Precedence().Winner,
 		Placement:   req.Policy.Precedence().Placement,
 		Env:         map[string]string{adapter.EnvVar: plan.parent},
+	}
+	if req.Machine.PermissionsLocked {
+		fragment.Permissions = envfragment.Permissions{Mode: "native", Locked: true, Source: "global"}
+	} else if mode, configured := req.Machine.Permissions[req.Profile]; configured {
+		fragment.Permissions = envfragment.Permissions{Mode: mode, Source: "profile"}
+	} else {
+		fragment.Permissions = envfragment.Permissions{Mode: "native", Source: "default"}
 	}
 	if _, ok := plan.marker.Surfaces[envmarker.SurfaceSystemPrompt]; ok {
 		fragment.SystemPrompt = &envfragment.SystemPrompt{

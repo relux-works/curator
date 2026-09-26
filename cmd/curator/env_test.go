@@ -58,7 +58,7 @@ func TestEnvResolveRepairEmitsFragment(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &fragment); err != nil {
 		t.Fatalf("fragment is not JSON: %v\nstdout:\n%s", err, stdout)
 	}
-	if fragment["fragment"] != "launch-env-fragment-v1" || fragment["environment"] != "codex_cli" {
+	if fragment["fragment"] != "launch-env-fragment-v2" || fragment["environment"] != "codex_cli" {
 		t.Fatalf("fragment header: %v", fragment)
 	}
 	code, again, _ := runProfile(t, source, "env", "resolve", "codex_cli")

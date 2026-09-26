@@ -13,6 +13,7 @@ func testFragment() *Fragment {
 		Environment: "claude_code",
 		Profile:     "companyA",
 		LockSHA256:  "0305581b4f24d74ce271f9809d24f77b794b5ef9ad004bcc5c398fa2ea2e54ab",
+		Permissions: Permissions{Mode: "yolo", Source: "profile"},
 		Winner:      "higher-weight",
 		Placement:   "winner-last",
 		Env:         map[string]string{"CLAUDE_CONFIG_DIR": "/manager/environments/companyA/claude_code"},
@@ -45,7 +46,7 @@ func TestFragmentJSONCanonical(t *testing.T) {
 	if !strings.HasSuffix(text, "}\n") || strings.HasSuffix(text, "\n\n") {
 		t.Fatalf("fragment json is not CCJ-1 plus one LF: %q", text)
 	}
-	want := `{"env":{"CLAUDE_CONFIG_DIR":"/manager/environments/companyA/claude_code"},"environment":"claude_code","fragment":"launch-env-fragment-v1","mcp":{"channels":[{"argument":"path","flag":"--mcp-config","kind":"flag","with":["--strict-mcp-config"]}],"env_names":["FIGMA_API_KEY"],"path":"/manager/environments/companyA/claude_code/.agent-context/mcp/claude_code.json"},"precedence":{"placement":"winner-last","winner":"higher-weight"},"profile":{"lock_sha256":"0305581b4f24d74ce271f9809d24f77b794b5ef9ad004bcc5c398fa2ea2e54ab","name":"companyA"},"system_prompt":{"channels":[{"argument":"path","flag":"--append-system-prompt-file","kind":"flag","semantics":"append"},{"argument":"path","flag":"--system-prompt-file","kind":"flag","semantics":"replace"}],"path":"/manager/environments/companyA/claude_code/.agent-context/system-prompt.md"}}` + "\n"
+	want := `{"env":{"CLAUDE_CONFIG_DIR":"/manager/environments/companyA/claude_code"},"environment":"claude_code","fragment":"launch-env-fragment-v2","mcp":{"channels":[{"argument":"path","flag":"--mcp-config","kind":"flag","with":["--strict-mcp-config"]}],"env_names":["FIGMA_API_KEY"],"path":"/manager/environments/companyA/claude_code/.agent-context/mcp/claude_code.json"},"permissions":{"locked":false,"mode":"yolo","source":"profile"},"precedence":{"placement":"winner-last","winner":"higher-weight"},"profile":{"lock_sha256":"0305581b4f24d74ce271f9809d24f77b794b5ef9ad004bcc5c398fa2ea2e54ab","name":"companyA"},"system_prompt":{"channels":[{"argument":"path","flag":"--append-system-prompt-file","kind":"flag","semantics":"append"},{"argument":"path","flag":"--system-prompt-file","kind":"flag","semantics":"replace"}],"path":"/manager/environments/companyA/claude_code/.agent-context/system-prompt.md"}}` + "\n"
 	if text != want {
 		t.Fatalf("fragment bytes differ:\n got %q\nwant %q", text, want)
 	}
@@ -56,6 +57,7 @@ func TestFragmentCodexNameChannel(t *testing.T) {
 		Environment: "codex_cli",
 		Profile:     "companyA",
 		LockSHA256:  strings.Repeat("a", 64),
+		Permissions: Permissions{Mode: "native", Source: "default"},
 		Winner:      "higher-weight",
 		Placement:   "winner-last",
 		Env:         map[string]string{"CODEX_HOME": "/manager/environments/companyA/codex_cli"},

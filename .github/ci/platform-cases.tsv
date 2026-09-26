@@ -488,6 +488,12 @@ internal/envfragment	TestFragmentEnvCarriesOnlyEnvObject	linux,darwin,windows	-	
 internal/envmarker	TestParseAuthoritativeEnvMarkerSchemaCases	linux,darwin,windows	-	-	the published environment marker family parses under the managed-home rules and every invalid case is rejected
 internal/envfragment	TestFragmentAuthoritativeSchemaCases	linux,darwin,windows	-	-	the published fragment family validates against the closed adapter registry and the profile-influence boundary
 internal/envfragment	TestFragmentEmissionMatchesReference	linux,darwin,windows	-	-	the emitted canonical fragment re-encodes the published reference bytes exactly
+cmd/curator	TestEnvResolveEmitsPermissionsV2AtProductionEntry	linux,darwin,windows	-	-	env resolve emits and checks all v2 permissions lattice rows through the CLI
+cmd/curator	TestEnvResolveEmitsPermissionsV2AtProductionEntry/permissions-yolo-profile	linux,darwin,windows	-	-	the production resolve row asserts profile yolo provenance and unlocked mode
+cmd/curator	TestEnvResolveEmitsPermissionsV2AtProductionEntry/permissions-native-profile	linux,darwin,windows	-	-	the production resolve row asserts profile native provenance and unlocked mode
+cmd/curator	TestEnvResolveEmitsPermissionsV2AtProductionEntry/permissions-absent-default	linux,darwin,windows	-	-	the production resolve row asserts silent profile default provenance and native mode
+cmd/curator	TestEnvResolveEmitsPermissionsV2AtProductionEntry/permissions-system-lock-global	linux,darwin,windows	-	-	the production resolve row asserts the global lock forces native mode and warning
+cmd/curator	TestEnvResolveEmitsPermissionsV2AtProductionEntry/*	linux,darwin	windows	platform-control	Windows keeps each emitted permissions-lattice assertion but skips full-fragment validation for the POSIX-only v2 absolutePath schema
 cmd/curator	TestEnvResolveRepairEmitsFragment	linux,darwin,windows	-	-	env resolve --repair provisions through the CLI and emits the launch fragment with the managed home
 cmd/curator	TestEnvStatusMatrix	linux,darwin,windows	-	-	env status reports the profile by environment by surface matrix with --check and --json
 cmd/curator	TestUmbrellaMissingProvider	linux,darwin,windows	-	-	an unknown subcommand with no provider names the executable and the installation guidance

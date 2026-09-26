@@ -24,6 +24,8 @@ func machineFromConfig(cfg *config.Config) envregistry.MachineConfig {
 	machine.UserIsolation = cfg.UserIsolation
 	machine.IsolationLocked = cfg.Locked["environments.isolation"]
 	machine.IsolationLockSource = cfg.SystemConfigPath
+	machine.Permissions = cfg.Env.Permissions
+	machine.PermissionsLocked = cfg.Locked["environments.permissions"]
 	return machine
 }
 

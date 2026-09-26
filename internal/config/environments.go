@@ -25,9 +25,13 @@ type Environments struct {
 	Precedence           Precedence
 	Forms                map[string]string
 	SystemPromptFiles    map[string]SystemPromptFiles
-	Targets              map[string]TargetConfig
-	Isolation            map[string]map[string]string
-	XDGSeedAllowlist     []string
+	// Permissions maps profile names to the section 12.1 permission mode.
+	// An absent entry is a silent profile level; the system lock replaces
+	// this whole map and forces native for every profile.
+	Permissions      map[string]string
+	Targets          map[string]TargetConfig
+	Isolation        map[string]map[string]string
+	XDGSeedAllowlist []string
 	// PassableEnvNames is the passable_env_names knob (§12.1, default
 	// []): nil with PassableEnvNamesSet false means the knob is absent;
 	// nil with PassableEnvNamesSet true is the explicit null (unbounded);
@@ -125,6 +129,7 @@ var LockableEnvKeys = map[string]bool{
 	"environments.isolation":                 true,
 	"environments.transitive_system_modules": true,
 	"environments.provider_directories":      true,
+	"environments.permissions":               true,
 }
 
 // systemEnvKnobs are the environments keys a system file may carry at all:
@@ -154,6 +159,7 @@ func defaultEnvironments() Environments {
 		Precedence:              Precedence{Winner: "higher-weight", Placement: "winner-last"},
 		Forms:                   map[string]string{},
 		SystemPromptFiles:       map[string]SystemPromptFiles{},
+		Permissions:             map[string]string{},
 		Targets:                 map[string]TargetConfig{},
 		Isolation:               map[string]map[string]string{},
 		XDGSeedAllowlist:        []string{"git", "gh", "ssh"},
@@ -227,6 +233,14 @@ func parseEnvironments(raw any) (Environments, error) {
 			return Environments{}, err
 		}
 		env.SystemPromptFiles = spf
+	}
+	if rawPermissions, present := obj["permissions"]; present {
+		if rawPermissions == nil {
+			return Environments{}, verr.New("environments.permissions", "must be an object")
+		}
+		if err := parseEnumMap(obj, "permissions", map[string]bool{"native": true, "yolo": true}, env.Permissions); err != nil {
+			return Environments{}, err
+		}
 	}
 	if rawTargets, present := obj["targets"]; present && rawTargets != nil {
 		targets, err := parseTargets(rawTargets)
@@ -337,7 +351,7 @@ var EnvKnobNames = []string{
 	"mcp_package_allowlist", "shadow_acknowledged", "secret_material_waivers",
 	"transitive_system_modules", "system_module_waivers",
 	"backup_retention", "require_current_profile", "in_place_mode",
-	"provider_directories",
+	"provider_directories", "permissions",
 }
 
 // envKnob reports whether key is a §12.1 knob name.
@@ -911,8 +925,9 @@ func (c *Config) LockedBySystem(key string) bool {
 }
 
 // parseSystemEnvironments validates the system file's environments object:
-// exactly the §12.2 lockable subset with the §12.1 value grammars. Anything
-// else is not carriable by the system file (manager §1 rule 1).
+// exactly the §12.2 lockable subset with the §12.1 value grammars,
+// and permissions only toward native.
+// Anything else is not carriable by the system file (manager §1 rule 1).
 func parseSystemEnvironments(raw any) (map[string]any, error) {
 	obj, ok := raw.(map[string]any)
 	if !ok {
@@ -938,6 +953,14 @@ func parseSystemEnvironments(raw any) (map[string]any, error) {
 	if rawTransitive, present := obj["transitive_system_modules"]; present && rawTransitive != nil {
 		if transitive, _ := rawTransitive.(string); transitive == "drop" {
 			return nil, verr.New("environments.transitive_system_modules", "a system file locks transitive_system_modules only toward error")
+		}
+	}
+	if _, present := obj["permissions"]; present {
+		if obj["permissions"] == nil {
+			return nil, verr.New("environments.permissions", "must be an object")
+		}
+		if err := parseEnumMap(obj, "permissions", map[string]bool{"native": true}, map[string]string{}); err != nil {
+			return nil, err
 		}
 	}
 	return obj, nil
@@ -1074,6 +1097,10 @@ func (e Environments) render() map[string]any {
 	if e.RequireCurrent != nil {
 		require = *e.RequireCurrent
 	}
+	permissions := map[string]any{}
+	for profile, mode := range e.Permissions {
+		permissions[profile] = mode
+	}
 	return map[string]any{
 		"current_profile": current, "scoped_current": scoped, "overlays": overlays,
 		"overlay_default_weight": e.OverlayDefaultWeight, "overlays_allowed": e.OverlaysAllowed,
@@ -1085,7 +1112,7 @@ func (e Environments) render() map[string]any {
 		"transitive_system_modules": e.TransitiveSystemModules, "system_module_waivers": systemWaivers,
 		"backup_retention":        e.BackupRetention,
 		"require_current_profile": require, "in_place_mode": inPlace,
-		"provider_directories": providerDirs,
+		"provider_directories": providerDirs, "permissions": permissions,
 	}
 }
 
@@ -1103,7 +1130,7 @@ func EnvLockKey(knob string) string {
 		return "environments.precedence"
 	case "isolation":
 		return "environments.isolation"
-	case "overlays_allowed", "mcp_package_allowlist", "passable_env_names", "require_current_profile", "transitive_system_modules", "provider_directories":
+	case "overlays_allowed", "mcp_package_allowlist", "passable_env_names", "require_current_profile", "transitive_system_modules", "provider_directories", "permissions":
 		return "environments." + head
 	}
 	return ""
