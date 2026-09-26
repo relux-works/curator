@@ -1,0 +1,89 @@
+diff --git a/.github/ci/implementation-coverage.tsv b/.github/ci/implementation-coverage.tsv
+index 7b9ac0f..9e9e439 100644
+--- a/.github/ci/implementation-coverage.tsv
++++ b/.github/ci/implementation-coverage.tsv
+@@ -43,9 +43,10 @@ go	internal/skillspec.TestReleasedSchemaCases	schema-cases/index.json,schema-cas
+ go	internal/marker.TestReadAuthoritativeMarkerV4SchemaCases	schema-cases/index.json,schema-cases/install-marker-v4	every published install-marker-v4 case is read back through the marker reader
+ go	internal/moduleroots.TestModuleRootVectors	vectors/module-roots.json	every published module-roots case drives declaration, containment and the declared/effective replace bijection to its own failure boundary
+ go	internal/scriptpolicy.TestScriptHostExecutionPolicySectionsAreAllClassified	vectors/script-host-execution-policy.json	every top-level section of the published script-worker family is classified, so a section this specification adds cannot be ignored
++go	internal/scriptpolicy.TestScriptHostExecutionPolicyProductionConsumersCoverAllCases	vectors/script-host-execution-policy.json	every published behavioral case, including executable identity, maps to a production row and the hard-link substitution definition is present
+ go	internal/scriptpolicy.TestScriptExecutionPolicyIdentityMatchesTheSuite	vectors/script-host-execution-policy.json	the closed policy identity and interpreter set the implementation hard-codes are read back from the suite's own bytes
+ go	internal/scriptpolicy.TestScriptExecutionOptInCases	vectors/script-host-execution-policy.json	every published opt-in case decides manifest acceptance and the enforced/declared-only classification
+-go	internal/scriptpolicy.TestARefusalPrecedesEveryWorkerSurface	vectors/script-host-execution-policy.json	every enforced shape the suite declares is refused before any worker surface
++go	internal/scriptpolicy.TestPreflightRefusalCases	vectors/script-host-execution-policy.json	the mandatory-control-unavailable install and invocation shapes refuse before starting a worker, while the three non-refusal shapes succeed
+ manager	tests/test_schema8_candidate_conformance.py::test_every_declared_schema8_artefact_is_published	schema-cases/index.json	the presence ledger is decided against this suite's manifest inside the run that consumes it
+ manager	tests/test_schema8_candidate_conformance.py::test_both_manifest_families_are_consumed_in_full	schema-cases/agent-skill-v8,schema-cases/csk-skill-v8	every published agent-skill-v8 and csk-skill-v8 case is collected, and neither family is empty
+ manager	tests/test_schema8_candidate_conformance.py::test_schema8_manifest_case	schema-cases/agent-skill-v8,schema-cases/csk-skill-v8	every published schema-8 manifest case decides acceptance through the real skill-spec loader
+diff --git a/.github/workflows/implementations.yml b/.github/workflows/implementations.yml
+index e3ee69a..f635a41 100644
+--- a/.github/workflows/implementations.yml
++++ b/.github/workflows/implementations.yml
+@@ -31,14 +31,19 @@ jobs:
+         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+         with:
+           repository: relux-works/curator
+-          # relux-works/curator main at PR 37, the commit that stopped treating
+-          # a family's presence in the conformance root as evidence that
+-          # anything read it. It declares the schema-8 artefacts its packages
+-          # consume and adds `internal/scriptpolicy`; qualified against this
+-          # suite by candidate dispatch 32689488293.
+-          ref: a3abcf3468b4854904313295672eef6f7d8826fd
++          # Curator 0a628621 classifies executable_identity_cases and the
++          # hard_link_substitution_definition added by PR #88. Keep this pin
++          # in lockstep with that suite erratum and its production consumer.
++          ref: 0a62862130fd6cbd9db8b246da63fdb5aecdfaaf
+           path: implementations/go
+           submodules: true
++          # The Go suite does not use the board state. Excluding its deep paths
++          # avoids Windows checkout path-length failures while retaining all
++          # implementation sources and declared submodules.
++          sparse-checkout: |
++            /*
++            !/.task-board/
++          sparse-checkout-cone-mode: false
+ 
+       - name: Checkout Python manager
+         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 543d3fb..c2056c2 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -595,6 +595,11 @@ Versioning for the complete specification set.
+ 
+ ### Changed
+ 
++- Updated the Implementations workflow to pin curator 0a628621 in lockstep
++  with PR #88's executable identity and hard-link erratum, require curator's
++  production consumer-map case, replace the renamed preflight case,
++  and sparse-checkout the curator source without `.task-board/` for Windows.
++
+ - Clarified Skillfile-source security requirements: positive registry evidence
+   requires the exact name/repository/commit/raw package-tree hash tuple while
+   verified matching revocations remain deny-wins under advisory policy;
+diff --git a/tools/test_implementation_coverage.py b/tools/test_implementation_coverage.py
+index 5eb55bf..a048f86 100644
+--- a/tools/test_implementation_coverage.py
++++ b/tools/test_implementation_coverage.py
+@@ -56,6 +56,22 @@ class LedgerShapeTests(unittest.TestCase):
+         self.assertTrue(rows)
+         self.assertEqual({row.implementation for row in rows}, {"go", "manager"})
+ 
++    def test_shipped_ledger_tracks_curator_main_script_policy_consumers(self) -> None:
++        identities = {
++            row.identity
++            for row in coverage.load_ledger()
++            if row.implementation == "go"
++        }
++        self.assertIn(
++            "internal/scriptpolicy.TestScriptHostExecutionPolicyProductionConsumersCoverAllCases",
++            identities,
++        )
++        self.assertIn("internal/scriptpolicy.TestPreflightRefusalCases", identities)
++        self.assertNotIn(
++            "internal/scriptpolicy.TestARefusalPrecedesEveryWorkerSurface",
++            identities,
++        )
++
+     def test_comments_and_blank_lines_are_not_rows(self) -> None:
+         rows = coverage.load_ledger(self.write(LEDGER + "\n#  trailing note\n"))
+         self.assertEqual(len(rows), 2)

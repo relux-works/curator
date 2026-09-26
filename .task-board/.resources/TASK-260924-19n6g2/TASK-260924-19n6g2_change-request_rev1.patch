@@ -1,0 +1,2067 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 204b5d8..77129a6 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -53,7 +53,7 @@ jobs:
+         run: go run ./tools/generate-vectors -root .
+ 
+       - name: Prove deterministic regeneration
+-        run: git diff --exit-code -- conformance/v1 release/1.0.0-rc.5.json release/1.0.0-rc.6.json release/1.0.0-rc.7.json release/1.0.0-rc.8.json release/1.0.0-rc.9.json
++        run: git diff --exit-code -- conformance/v1 release/1.0.0-rc.5.json release/1.0.0-rc.6.json release/1.0.0-rc.7.json release/1.0.0-rc.8.json release/1.0.0-rc.9.json release/1.0.0-rc.13.json conformance/skillfile-sources-v1/manifest.json
+ 
+   formatting:
+     name: Formatting
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index 0daae9b..1a0307a 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -49,7 +49,7 @@ jobs:
+           python -B -m unittest discover -s tools -p 'test_*.py'
+           go test ./tools/...
+           go run ./tools/generate-vectors -root .
+-          git diff --exit-code -- conformance/v1 release/1.0.0-rc.5.json release/1.0.0-rc.6.json release/1.0.0-rc.7.json release/1.0.0-rc.8.json release/1.0.0-rc.9.json
++          git diff --exit-code -- conformance/v1 release/1.0.0-rc.5.json release/1.0.0-rc.6.json release/1.0.0-rc.7.json release/1.0.0-rc.8.json release/1.0.0-rc.9.json release/1.0.0-rc.13.json conformance/skillfile-sources-v1/manifest.json
+           version="${GITHUB_REF_NAME#v}"
+           python tools/release_gate.py --version "$version" --commit "$GITHUB_SHA"
+ 
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 534277c..fa2927c 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -3,7 +3,7 @@
+ All notable protocol changes are recorded here. Versions follow Semantic
+ Versioning for the complete specification set.
+ 
+-## Unreleased
++## 1.0.0-rc.13 - 2026-09-26
+ 
+ ### Added
+ 
+@@ -467,7 +467,10 @@ Versioning for the complete specification set.
+   re-materializes a missing path snapshot from current bytes only when package
+   identity and content hash match, and fetches Git/repository members at the
+   locked commit without re-resolving refs or rewriting the lock. The dedicated
+-  schema and vector namespace remains separate from `conformance/v1`.
++  schema and vector namespace remains separate from `conformance/v1`; its
++  generated manifest and release metadata pin it independently, with the
++  Python manager's declared partial scope consumable against the rc.10 core
++  suite. No manifest schema v9 `directory` field is added to the core suite.
+ - Amended draft Decision 0018 (proposed — not adopted, no normative
+   change): the `curator run` permission mode is configured (launcher
+   `defaults.json` v2 member, environments §12.1 per-profile knob, CLI
+@@ -595,12 +598,15 @@ Versioning for the complete specification set.
+ 
+ ### Changed
+ 
+-- Updated the Implementations workflow to pin curator 0a628621 in lockstep
+-  with PR #88's executable identity and hard-link erratum, require curator's
+-  production consumer-map case, and sparse-checkout curator without
+-  `.task-board/` for Windows. Qualified cocoaskills 4a88aa0e against its
+-  declared core v1.0.0-rc.10 plus the candidate skillfile-sources-v1 corpus
+-  and schemas, while keeping the draft suite on its supported POSIX lanes.
++- Advanced the generated core suite, release metadata, README version, and
++  compatibility record to v1.0.0-rc.13 while preserving rc.9 and earlier
++  release metadata as frozen history.
++- Updated the Implementations workflow to check each manager against its
++  declared claim and pin curator 0a628621 in lockstep with PR #88's executable
++  identity and hard-link erratum. It requires curator's production
++  consumer-map case, and qualifies cocoaskills 4a88aa0e against its declared
++  core v1.0.0-rc.10 plus the separately pinned skillfile-sources-v1 corpus and
++  schemas on its supported POSIX lanes.
+ 
+ - Clarified Skillfile-source security requirements: positive registry evidence
+   requires the exact name/repository/commit/raw package-tree hash tuple while
+diff --git a/COMPATIBILITY.md b/COMPATIBILITY.md
+index a27e2b0..d9b3a15 100644
+--- a/COMPATIBILITY.md
++++ b/COMPATIBILITY.md
+@@ -178,12 +178,13 @@ Install marker schema 4 is written for skills installed from a schema-8
+ manifest. Marker schemas 1 through 3 keep their exact bytes and their existing
+ readers, and a manager reads back an older marker without rewriting it.
+ 
+-Rc.9 supersedes rc.8 as the live suite manifest pin without changing one byte
+-of rc.8. `release/1.0.0-rc.8.json` and the `v1.0.0-rc.8` tag stay exactly as
+-published; `release/1.0.0-rc.9.json` records rc.8's metadata digest as its
+-historical predecessor rather than replacing it. A consumer pinned to rc.8
+-therefore keeps its qualification and advances by an explicit pin change, never
+-implicitly.
++At release, rc.9 superseded rc.8 as the live suite manifest pin without
++changing one byte of rc.8. `release/1.0.0-rc.8.json` and the
++`v1.0.0-rc.8` tag stay exactly as published;
++`release/1.0.0-rc.9.json` records rc.8's metadata digest as its historical
++predecessor rather than replacing it. Rc.13 now owns the live suite pin. A
++consumer pinned to rc.8 therefore keeps its qualification and advances by an
++explicit pin change, never implicitly.
+ 
+ ## Manager configuration schema 2
+ 
+@@ -246,3 +247,25 @@ identity; their security semantics are preserved. Revision 2 admits non-default
+ ports, declared mirrors and operator host aliases as machine-policy endpoint
+ properties; reusable alias registries and user-configuration import remain
+ unsupported. The source schemas and vectors stay separate from `conformance/v1`.
++
++## Rc.13 release boundary
++
++Rc.13 advances the generated core suite and its release metadata while keeping
++the accepted Skillfile source and repository transport revisions in their own
++`skillfile-sources-v1` suite. Its independent manifest covers the accepted
++protocol documents, schemas, and vectors; release metadata pins that manifest
++separately and records compatibility with the v1.0.0-rc.10 core manifest. The
++Python manager's scope remains partial: rc.10 core plus this source suite.
++
++The core suite does not add manifest schema v9 or a `directory` field to a
++skill manifest. The source extension's collection-directory selector remains
++in its separately versioned Skillfile schema. Rc.13 also includes the script
++host hard-link correction: only the specified Windows System32 executable
++case is exempt from the hard-link refusal; interpreter rules are unchanged.
++Implementation CI checks each manager's declared claim against its own suite
++root and observed consumer cases.
++
++Rc.9 and earlier release metadata remain byte-frozen. The rc.13 candidate
++metadata records rc.9 as the preceding protocol release, and the signed
++v1.0.0-rc.13 tag is created only on the release-prep merge commit after its
++required checks pass.
+diff --git a/Makefile b/Makefile
+index 79dd945..5128a4e 100644
+--- a/Makefile
++++ b/Makefile
+@@ -10,7 +10,7 @@ regenerate:
+ 
+ regenerate-check:
+ 	go run ./tools/generate-vectors -root .
+-	git diff --exit-code -- conformance/v1 release/1.0.0-rc.5.json release/1.0.0-rc.6.json release/1.0.0-rc.7.json release/1.0.0-rc.8.json release/1.0.0-rc.9.json
++	git diff --exit-code -- conformance/v1 release/1.0.0-rc.5.json release/1.0.0-rc.6.json release/1.0.0-rc.7.json release/1.0.0-rc.8.json release/1.0.0-rc.9.json release/1.0.0-rc.13.json conformance/skillfile-sources-v1/manifest.json
+ 
+ release-check: validate regenerate-check
+ 	test -n "$(VERSION)"
+diff --git a/README.md b/README.md
+index 73bf5a9..3bebe5b 100644
+--- a/README.md
++++ b/README.md
+@@ -1,8 +1,8 @@
+ # Curator Protocol Specification
+ 
+-**Version:** 1.0.0-rc.9
++**Version:** 1.0.0-rc.13
+ 
+-**Date:** 2026-08-23
++**Date:** 2026-09-26
+ 
+ **Status:** Draft release candidate
+ 
+@@ -80,8 +80,9 @@ and vectors remain in their own namespace; they are not merged into
+   in the conformance README linked above. Store local logs in `.temp/`.
+ - Go: `go test ./tools/...` tests specification tooling;
+   `go run ./tools/generate-vectors -root .` regenerates the released corpus
+-  under `conformance/v1/` and its release metadata. Do not use regeneration
+-  to fold accepted source-extension vectors into the frozen `conformance/v1` corpus.
++  under `conformance/v1/`, its release metadata, and the independent
++  `conformance/skillfile-sources-v1/manifest.json` pin. It does not fold the
++  accepted source-extension vectors into the core corpus.
+ - Make: `make validate` runs the existing Python/Go checks;
+   `make regenerate-check` checks generator reproducibility against Git.
+ 
+@@ -108,16 +109,19 @@ own result stream and against this suite's published manifest.
+ 
+ ## Release status
+ 
+-`1.0.0-rc.9` is a draft candidate. Portable remains the default CLI-only mode.
++`1.0.0-rc.13` is a draft candidate. Portable remains the default CLI-only mode.
+ Verified mode is explicit, requires the platform-neutral
+ `host-execution-provider-v1` contract, and fails before execution rather than
+ silently downgrading. Provider binaries are separately installed trusted host
+ components and are never skill-vendored artifacts. This candidate specifies
+ the common contract for macOS, Linux, and Windows but ships no provider and
+-emits no verified platform claim. Exact candidate-suite identity is recorded in
+-[`release/1.0.0-rc.9.json`](release/1.0.0-rc.9.json); rc.8 and earlier release
+-metadata remain byte-frozen historical evidence. Review evidence is published
+-under [`reviews/`](reviews/). See
++emits no verified platform claim. Exact core-suite and accepted
++skillfile-sources-v1 identities are recorded in
++[`release/1.0.0-rc.13.json`](release/1.0.0-rc.13.json). The source suite is
++separately pinnable and remains consumable with core v1.0.0-rc.10; it does not
++add a manifest schema v9 `directory` field to the core suite. Rc.9 and earlier
++release metadata remain byte-frozen historical evidence. Review evidence is
++published under [`reviews/`](reviews/). See
+ [COMPATIBILITY.md](COMPATIBILITY.md),
+ [SECURITY.md](SECURITY.md), and [GOVERNANCE.md](GOVERNANCE.md).
+ 
+diff --git a/conformance/skillfile-sources-v1/README.md b/conformance/skillfile-sources-v1/README.md
+index 7d7ee4c..cf932bf 100644
+--- a/conformance/skillfile-sources-v1/README.md
++++ b/conformance/skillfile-sources-v1/README.md
+@@ -1,7 +1,10 @@
+ # Skillfile source and repository transport conformance
+ 
+ This dedicated corpus specifies the accepted source and transport revisions
+-separately from the frozen `conformance/v1` suite. [The source contract](../../protocol/skillfile-sources.md)
++separately from the core `conformance/v1` suite. The generated
++[`manifest.json`](manifest.json) pins this corpus, its schemas, and protocol
++documents independently; release metadata records that pin and its rc.10 core
++compatibility baseline. [The source contract](../../protocol/skillfile-sources.md)
+ and [transport protocol](../../protocol/repository-transport.md) define its
+ required outcomes. `index.json` lists structural positives and negatives;
+ `snapshot-cases.json` contains concrete byte inventories and expected hashes;
+diff --git a/conformance/skillfile-sources-v1/manifest.json b/conformance/skillfile-sources-v1/manifest.json
+new file mode 100644
+index 0000000..8aece18
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/manifest.json
+@@ -0,0 +1,557 @@
++{
++  "files": [
++    {
++      "path": "conformance/skillfile-sources-v1/README.md",
++      "sha256": "sha256:dd3621a7c57d43cf54ce04dd52e0f7b596661455b9ef8ce35440f8b2bc1cef9b"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/index.json",
++      "sha256": "sha256:654707af529bffc5104e92e98d4ab6fb910163b187861152bfd7fa769d852575"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/build-receipt-v3/invalid-kind.json",
++      "sha256": "sha256:4934f9d47028c095e8ffa488c8bda3c43bd9d18415ca1281c83a6686bb6f4aae"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/build-receipt-v3/invalid-policy.json",
++      "sha256": "sha256:cdf4abf438fc77afc21f743b4ac50b3d2ef785ac94669f6a1a7becdcfabec512"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/build-receipt-v3/invalid-unknown-top-level.json",
++      "sha256": "sha256:af8d8fffa8456032d9f56fe213a234308898561f234fcda1a6457df1ece21738"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/build-receipt-v3/valid.json",
++      "sha256": "sha256:4249b5735724a5166e526089077ea62728a6f3c96b263ad73c5a70f48c50e411"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-attestation-empty-registry.json",
++      "sha256": "sha256:f80e420ad30a28a4baef5293d961834099e47503a3686bccb689011957ab6276"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-attestation-extra.json",
++      "sha256": "sha256:bb63fa02e88aa2a56c9bba11df4936915e672d5a017a6ccd8167df3f4fe9fbcd"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-attestation-key.json",
++      "sha256": "sha256:b698fa90e4b5a677cbc24e35cd6df6b88eb70fa56d9e5282101d169ae7d4e167"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-attestation-missing-status.json",
++      "sha256": "sha256:a4795fd5fdca54f11dc14045ca5080009861b72fb501e35188da1a70ea18d428"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-attestation-unknown-status.json",
++      "sha256": "sha256:bae4b063a73e75eb50bbd1ee40ce2b7fc567e022f791cbd364ce499c550a2337"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-external-bad-commit.json",
++      "sha256": "sha256:6232fa03b2d9acad28267305b3090be5b83c9b4c557a7269ade882d6685f9d83"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-external-declared-tag-empty.json",
++      "sha256": "sha256:1e2b49af312149703652b6c94e5dbfb3a40f87a5bef52416c157a72349521e6f"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-external-declared-tag-invalid-refname.json",
++      "sha256": "sha256:97389264d7b8382c837784523394f1c13ac93ee320b703816c748acf9021ecfe"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-external-legacy-receipt.json",
++      "sha256": "sha256:b5324e41cd741a7c61628c5eca4c248ecb5f6cc4915f559fca4d32773291e500"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-external-missing-artifact_path.json",
++      "sha256": "sha256:f27b6ffda972ceee1c2dbce81e6071cacb5b8553357b09a3cf873a99e66a646e"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-external-missing-artifact_sha256.json",
++      "sha256": "sha256:f0cc3b7fec33698de477b91328894d73afc74d9f851f5c87ffd23aa7f9bf1385"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-external-missing-build_source.json",
++      "sha256": "sha256:a910dd070a5954984dbd4b44c0ffd56e6f5b4307937946f6e4be8987625a6713"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-external-missing-cache_key.json",
++      "sha256": "sha256:d8cf9f3ecd5f8e13641779371a4ea9c06a2f827ab954797c351f95884ec58b84"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-external-missing-commit.json",
++      "sha256": "sha256:b435021f54bb1488bc97e62f0cd538b60fc18243e3d32be3c03ad31b0a79728d"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-external-missing-declared_identity.json",
++      "sha256": "sha256:7e667a8a1fd67e6d489237434455ccf8fe8955e44e51d17c65a1e78d5026bc28"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-external-missing-declared_locked_commit.json",
++      "sha256": "sha256:061e454ff257eda7e4b445465d014182fb74f51fa5ccf0a8d867e3cfc0a8321f"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-external-missing-descriptor_target.json",
++      "sha256": "sha256:5a044fbc98d93659de5c0a75e13492f4b66b89fcf19bd732080554749e6b56ce"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-external-missing-driver.json",
++      "sha256": "sha256:3250ee7a0939cc630345f087c07712a295c345446b576ae0f64967290d9096b7"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-external-missing-effective_identity.json",
++      "sha256": "sha256:05530ae838c84694af657cb698945549ffe0e5cc3c471b96c816c7a3a7a58fe5"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-external-missing-execution_policy.json",
++      "sha256": "sha256:60637e44f99918e6e02a5fd762cc65773036b52c9c4a1deeabf8680648f6f23d"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-external-missing-object_format.json",
++      "sha256": "sha256:b773aa1f9c01b27b5c7487ba63da77d86633bbc8fe068ffb9e024d3d65d73545"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-external-missing-receipt_schema_version.json",
++      "sha256": "sha256:9edc7e0d90d960803419b7a9dd8cbfe9a27285bf5f6f2004db3866d639af5e85"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-external-missing-receipt_sha256.json",
++      "sha256": "sha256:3f4fc91490e1d7f6266986a249b0b6bd545fc0ed848f64a0da95033326194e9e"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-external-missing-repository.json",
++      "sha256": "sha256:7c0c91f1ead49a44c2ffc54f5bfab8762dca76c610b5c3949a7ab36c6a850dee"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-external-missing-substituted.json",
++      "sha256": "sha256:0e40fc4015bf35cb14cca18f73c67c5a358e2311ccc7435d2ce6393d348fd52a"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-external-missing-substitution.json",
++      "sha256": "sha256:66cf8f4742b2c739d83abe94e3ce6de6825e6cca62d8f218a2c45dc54f81f5a4"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-external-unexpected-substitution.json",
++      "sha256": "sha256:3cf7fc285604ccf53c2dfeb7bd6f189d3b7051348aa9129b44b890c2f193dccd"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-fake-commit.json",
++      "sha256": "sha256:c7f2e6cb7c32e47d5521a0b9e556969db69628ce4bd2b0622e01f1d5e6c94e98"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-local-attestation.json",
++      "sha256": "sha256:8292e14cae474e5de8189ae3bbcefcf6aadd91b89da87542ef161b220e13bc32"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-local-repository-null.json",
++      "sha256": "sha256:dd60b49d78202d3bdfd2ad186f6fa38141b33d5c93699ab85c82da7656819a91"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-local-substituted-null.json",
++      "sha256": "sha256:0cabc196ec825bd4354b1657810d3a28838e0d6fc02324f088300a683b74d734"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-local-substituted.json",
++      "sha256": "sha256:63c03d92cad08c80072ea00ce85f41f294df85c0f171864729da7ec53884c6d4"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-local-substitution-null.json",
++      "sha256": "sha256:3516ae179ec8644ce9644e407a3bb7c843c026eabf50ef9798e06e5aa138f8fa"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-substitution-boolean.json",
++      "sha256": "sha256:990b509bdcb2e1eb252733572a5f0c2f2fe256e7b7c927bbe55be197c521a99d"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-substitution-empty.json",
++      "sha256": "sha256:bb8ded2f0df4d42b3ac294c7f1f19ee37189b8147d7035e7a602343c72dd091b"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-unknown-top-level.json",
++      "sha256": "sha256:dcf0ce677bff6a961d14d97a4263b3fceb3a13faed5840b654f41a2390d814d5"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/valid-attested-configured.json",
++      "sha256": "sha256:e9f1e80949b28e91bf1af54183098d375d4fac53533ec68e046ae0ac604162d2"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/valid-attested-network.json",
++      "sha256": "sha256:3c45d63d8e46905792a5fbf7a94c14150ec03bcd9e9117f448b439c3eb1b699d"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/valid-deprecated-network.json",
++      "sha256": "sha256:2538532c24cc6ccecbf4c7393ede9c6f9a240657e153be6071f754857c132261"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/valid-external-substitution.json",
++      "sha256": "sha256:b0f0d70dc335f46384ad3a03dd28e122ea6bbe47960cd8045877997591f33d5a"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/valid-legacy-substitution.json",
++      "sha256": "sha256:d3279b7fb166f177daa580359e77202187c978c5f278959cb6622a20cad90df9"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/valid-local-mixed-builds.json",
++      "sha256": "sha256:984d95744e492c965a1245d84aa976f2ae14434045a4dbff9b779ce86de89630"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/valid-no-builds.json",
++      "sha256": "sha256:5c5002d0457c9eddf162113008875261423f09c054ded9df82c2c1282765f161"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/valid.json",
++      "sha256": "sha256:0d26f65031caf466217d192303c0196982aeede9faaf4440cff699cc05d9333a"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/local-snapshot-v1/invalid-algorithm.json",
++      "sha256": "sha256:4e927ab70268d9fc0a4db30529f6339814a8d411df1cb2fb41c8b65a6ff6b549"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/local-snapshot-v1/invalid-unknown-top-level.json",
++      "sha256": "sha256:d4a5921a44821f739f9e0ffc950614683355eac706fe4b541c89ee19f70442e2"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/local-snapshot-v1/valid.json",
++      "sha256": "sha256:ab530341bc5d50c4069981603ad2a5cc975abda957a9c30eece2c64f6e4821fa"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-lock-v1/invalid-commit-format.json",
++      "sha256": "sha256:54d2e4ebca07335f088f757433782287ca463d4e1e45b41bf0df15da6ba881d8"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-lock-v1/invalid-configured-escape.json",
++      "sha256": "sha256:5f0af4a654afc5979a3924fa45f341542de654ea4db7dd088ea43103df89379c"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-lock-v1/invalid-fake-commit.json",
++      "sha256": "sha256:c037ccdd11cf84aa2492aed07be8d4dc725e445bd34be34ae9ea760037810085"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-lock-v1/invalid-unknown-top-level.json",
++      "sha256": "sha256:79730aa0bb621a2c05f54625bfb5fcd0994ce80f7700048d994d838e2f179ad6"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-lock-v1/valid-configured-git.json",
++      "sha256": "sha256:fe69fa386641d0f70eda164f87be0e04be77273d0074375703d0a1411399723d"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-lock-v1/valid-git.json",
++      "sha256": "sha256:d5c5d87db858bb5ccdfacff88392b6dd08d0bd63945f80c639aaae19a8fcc596"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-lock-v1/valid.json",
++      "sha256": "sha256:2807faa0a7c7ca6d6a7bcd46342e5920e744ac5756329bba1c8e0dbecb8330e1"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-directory-0.json",
++      "sha256": "sha256:c734a90c50619b2b13b389030cabd7d0d5d259430a0f14d4b1f3ab50121a7246"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-directory-1.json",
++      "sha256": "sha256:a928f977644c19dd2c6f7f7223bd370d2d6df65964182731c9e00c3d5483bf7f"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-directory-10.json",
++      "sha256": "sha256:c5e89127383dc4af6ca8040556452c4f8f5ee31189da63764c58b29682596577"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-directory-11.json",
++      "sha256": "sha256:9cdcc14555513a4e1511c06b62482cc684fbfdf16a8a924ee28b673b3de46dd6"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-directory-12.json",
++      "sha256": "sha256:f8ecfe293e4c233e569fb64fed36078e5402faccc8aea3e33e556f84b7d42333"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-directory-13.json",
++      "sha256": "sha256:cf8465b94f9a4f69053faac77ef2d68eef424ce3e9a60a39da3a049e76a30697"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-directory-2.json",
++      "sha256": "sha256:4e9c79de7b17e53a62fd74528095743fcc536bef967730c1e9a868d7f217e9b2"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-directory-3.json",
++      "sha256": "sha256:1f566db688c3000ca9119e67c17707631341ca562928062cb5d51e1bafe30f85"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-directory-4.json",
++      "sha256": "sha256:d8d177d5ef26b3e5aa8df01af7087462d774917b14a83d122bc9ab10c1942762"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-directory-5.json",
++      "sha256": "sha256:7e4922bd837c4e0bedf46e3f4f7a9d11ab151b59cf3598b96255dbd41328412c"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-directory-6.json",
++      "sha256": "sha256:01901d2e5329a8d661aafad2106f2737a8c74920fa7aa6a4b69c0a1264c66bce"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-directory-7.json",
++      "sha256": "sha256:b932d5592dd46c0d9738bcb2211f74508a3b88b83aef59902027a6e7f578f99b"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-directory-8.json",
++      "sha256": "sha256:1e9b658d8233c89674f4ba6021fbcdd92161020bced8379007aa64f1b9c5b7fb"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-directory-9.json",
++      "sha256": "sha256:1591df0dd03d5d900f90817aa7e5b7867b18da377aef381d3385518e62d4afa1"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-duplicate.json",
++      "sha256": "sha256:9bf1dd34ea279f7a5e7b02363fa88354161012119d464dceebec0c0984751dd0"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-empty.json",
++      "sha256": "sha256:9ca8630bf91460f70a6a070d426e58a55481e633756356e41a091670e3fe357e"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-mixed-collection.json",
++      "sha256": "sha256:e3052cd31e0a09fa85d3f40e846b058162f6cfb8256b0f2131c98a1664dc54bd"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-mixed-git.json",
++      "sha256": "sha256:664daa1da82237c667140cfd61582a3427255d40fec2bff406070d0f85dba086"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-mixed-ref.json",
++      "sha256": "sha256:d3fbd6d23833bf489a67f64b620d4d720ec9c1a1d4e1290d7eaa38941bd11498"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-mixed-source.json",
++      "sha256": "sha256:85d404db77256b547a799f9642911e3a3bd77ba7d7dde35d5ae5c14e110212c1"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-partial.json",
++      "sha256": "sha256:dcf8ed12f8339611af7bf93d1e5fef3928d98a066f9179d03467abbc8464bc90"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-path.json",
++      "sha256": "sha256:b65545a59b94c94e76f2ad464b001f66ba6543bef2777dd3998c82e5e2b31dc6"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-recursive.json",
++      "sha256": "sha256:7894bf46e8c121e09b07009ded27ccb9d4f4b0abfbbe6dd171f3555b51e74486"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-source-0.json",
++      "sha256": "sha256:d174a4e749e2e8831a66186b3b3a2b7df0e08289ebb430897cb10dbdd1e7d471"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-source-1.json",
++      "sha256": "sha256:59892d40eb8584a4ab5c8d18998c32dbfe6ecceb49237f5e4503db39228fe094"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-source-2.json",
++      "sha256": "sha256:f0b5cd5ab20ed76f976d174a7fda78c33135f377bd25448916e62bb5ea43d7f6"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-source-3.json",
++      "sha256": "sha256:484023e4262e62d75e4fe609bcb0b4cf4af1640134ff50212fcaee9f805c233b"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-source-4.json",
++      "sha256": "sha256:fb285c34eb9cabddae4a480589e4d581b31c5470fa5c772c55db33ffa1280098"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-source-5.json",
++      "sha256": "sha256:47bdc9ebd29a7bc5331f69ec73992fb57609b145278aeeaf0e23181924793e45"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-source-6.json",
++      "sha256": "sha256:3d334eca8ab07e47ddb41754b54090177d7dbcae91e27e2d9e378ac29f9d7787"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-source-7.json",
++      "sha256": "sha256:17d26094e124aea32875d59e7b49b49775b722ecaddce99a16a14c2e56148835"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-source-8.json",
++      "sha256": "sha256:8993f2bd092ee9365088fd44da065401c63721ef2486cdf2687e351b2a12e2d4"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-source-9.json",
++      "sha256": "sha256:093c43252f0778795856620df46d0ade2117a9e6845422b099f054099ccb306a"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-unknown.json",
++      "sha256": "sha256:3c97eae28fc38ab958d91e65f4afc83ae5839ed75f1259f9a56a221e28d6830d"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/invalid-wildcard-exclude.json",
++      "sha256": "sha256:147d03c915994071e895b43c3b02a173e35071050c1ef87709fb4fcc07f3644d"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/valid-absolute.json",
++      "sha256": "sha256:e2ebdbcafd213362cab2f2e8b5eb7bba0abb7e70d5f461c898e5f3daaca815c7"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/valid-https.json",
++      "sha256": "sha256:78de47cab44545a585933435528aa7da01f269dda572f650162af17868358723"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/valid-legacy-only.json",
++      "sha256": "sha256:ee5d21856c9825d17df185fdd565e4eeef9e14439842dc4fece0f3461d4daa7b"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/valid-mixed.json",
++      "sha256": "sha256:15194d5ebadc4b1602df08f7e026404d34f0ef04a7c02fbfc5851bca0faa1c84"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/valid-relative.json",
++      "sha256": "sha256:a3bb55be1b152ce5e41062a42ffbf7328b40099cd8ebc9454d234ff3cee3801b"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/skillfile-v2/valid-ssh.json",
++      "sha256": "sha256:b27bbb269e404c53d3946062a2e69d166e5a764d6aee576574aa0a2601189776"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/source-audit-v1/invalid-decision.json",
++      "sha256": "sha256:0d0d5bb25e4084187a500d7d487d8664d616eaa84fabf1936a922d4a963af75e"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/source-audit-v1/invalid-no-evidence.json",
++      "sha256": "sha256:86da032b288461e5cd22dcdf0e8b57e27294817d3f47e2a401f4010c608841d4"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/source-audit-v1/invalid-unknown-top-level.json",
++      "sha256": "sha256:35caed1cdd9927d5c369c167abf95be5c900c17f152020ac4823d7ea503dd90f"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/source-audit-v1/valid.json",
++      "sha256": "sha256:4877ffd7c5a34b6e601d44fff2b79dd0d89127603ddd9158d0a9c83ddc03748a"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/source-policy-v1/invalid-fallback.json",
++      "sha256": "sha256:085076969730dc5d7e5c00056e290f8da078bcc40ffa76af2667373288222cba"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/source-policy-v1/invalid-helper.json",
++      "sha256": "sha256:c5aaf8699194f3cddc0a11e56c872ce3ce79e97193e34940a9e206ea2e463c8d"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/source-policy-v1/invalid-too-many.json",
++      "sha256": "sha256:00d13f7c6479d9f4dc30a99ecd2cabbbd482565fef68c29b5708d086327b5fae"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/source-policy-v1/invalid-unknown-top-level.json",
++      "sha256": "sha256:08891f094b92e8ab28f8a34c4ad1204f85f7f544b5a8208665a8ec9fbb5033b7"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/source-policy-v1/valid.json",
++      "sha256": "sha256:1234c2333e64935e6a962a99118994418cf9cad6f6458e676de45dc03a6dd10d"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/source-policy-v2/invalid-alias-missing-auth.json",
++      "sha256": "sha256:c84e10c76e6342d74049312138795f770c7f9f1539d96fde63b95618295e9000"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/source-policy-v2/invalid-alias-name.json",
++      "sha256": "sha256:f2d487136d9dcc869060ae9039dc2a3ac3a8b6d959a1fb8a55c077c328e862f1"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/source-policy-v2/invalid-alias-port-string.json",
++      "sha256": "sha256:5909d3c855a7942a3ee2362383124cff5ab98f6a6b3a9030005eac5374da95b5"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/source-policy-v2/invalid-endpoint-extra.json",
++      "sha256": "sha256:6a55b50bf352e05a95310b05ce90c79b2b4943eddfebcb199cee9aa308c9fc0d"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/source-policy-v2/invalid-mirror-of-pattern.json",
++      "sha256": "sha256:f8094e4706279933ce5d3f031c24ed5efe608a7f43c3b048b723bf1692c73d95"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/source-policy-v2/invalid-port-leading-zero.json",
++      "sha256": "sha256:4131c4082a5fc04c332ba0e19dc8535f82e6d6e2288940b4c053b18ace612db2"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/source-policy-v2/invalid-port-range-ssh.json",
++      "sha256": "sha256:f7d25da8f8a7d891d50332ce7ed2f5535ec403339c6dcfb5a1c160e74d199451"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/source-policy-v2/invalid-port-range.json",
++      "sha256": "sha256:5a67c6cab7ddfb248f59e0050ab5aa69189b6c8f76d7cb89f3953bf22482a2d7"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/source-policy-v2/invalid-unknown-top-level.json",
++      "sha256": "sha256:b4e7b83fde158d83bad2746cf2fd7fc86161af4a310f98c0c30a21bd25688b2a"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/source-policy-v2/valid-alias.json",
++      "sha256": "sha256:9f23c38e4b5009c6d3745659c140e39bb076af53fb73360eeffd9b6d13db6d53"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/source-policy-v2/valid-mirror.json",
++      "sha256": "sha256:4a1838b11bd92a2d329873dfeae48ed651ebb2cdd73bc9a63f7d0046063cf678"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/source-policy-v2/valid-port.json",
++      "sha256": "sha256:10c39319e2e72fa6fef7ebece2941052fee1c817bb046d174c94609949423cbd"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/source-policy-v2/valid-v1-shape.json",
++      "sha256": "sha256:12f7ba49d3d0447f990ed7699e7f874dd8abec04b04b0b9fd6e4b7910b0cf0fa"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/semantic-cases.json",
++      "sha256": "sha256:12ae1318a25a96a21333bccb65b07fcd70b8bb1bf165bbd4b006f092806488c8"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/snapshot-cases.json",
++      "sha256": "sha256:1922256efe21f934b667ec913f34a2af3b16004ecb00c63ee8712eacaf347999"
++    },
++    {
++      "path": "docs/skillfile-sources.md",
++      "sha256": "sha256:a8e32a7a657795baec989baa12f61aae7676065d550a30e4066e0a884aa7d9f6"
++    },
++    {
++      "path": "protocol/repository-transport.md",
++      "sha256": "sha256:d7ca91bf07ca9c1ccd40914ffbf1e8c42e00abb512d2be2a76d495565a04d54e"
++    },
++    {
++      "path": "protocol/skillfile-sources.md",
++      "sha256": "sha256:f31eb9178edc877d8ec8c3456dbd77fb999bd0af77fb0108a209d0e805d21483"
++    },
++    {
++      "path": "schemas/skillfile-sources-v1/README.md",
++      "sha256": "sha256:33f1192658d3f0e93a414de8c5c0efff0e66920a5cfc24bff4a5a3b20af4a601"
++    },
++    {
++      "path": "schemas/skillfile-sources-v1/build-receipt-v3.schema.json",
++      "sha256": "sha256:92821ea9901ea1cd8d7f2c448fbfa5b71d70ee408c717ef34d5f9ab2e8d3dfb3"
++    },
++    {
++      "path": "schemas/skillfile-sources-v1/install-marker-v5.schema.json",
++      "sha256": "sha256:8510cf629b510bc7216cd9e88055d3d253511c1339e823e51b1e6edb60e31fd2"
++    },
++    {
++      "path": "schemas/skillfile-sources-v1/local-snapshot-v1.schema.json",
++      "sha256": "sha256:2ab2e2783ad86bcc7891166b6d492ac93f73d3ad36513ae86a62d4db2e79cff4"
++    },
++    {
++      "path": "schemas/skillfile-sources-v1/skillfile-lock-v1.schema.json",
++      "sha256": "sha256:c730f00a82ff9360c68217ca0db04907372066f60f26375827bea8125faa9251"
++    },
++    {
++      "path": "schemas/skillfile-sources-v1/skillfile-v2.schema.json",
++      "sha256": "sha256:75b0b444edec99f87506689b91c5a03295b6dd402a2e09dd12b26746ab92c8fd"
++    },
++    {
++      "path": "schemas/skillfile-sources-v1/source-audit-v1.schema.json",
++      "sha256": "sha256:fef6d707fd47ee7ffea61a312006452842a3be1990fd739f35a6784bb2fe02fb"
++    },
++    {
++      "path": "schemas/skillfile-sources-v1/source-policy-v1.schema.json",
++      "sha256": "sha256:1381dcd65a4d9039c4dc8a3f4345c988a50c5741c9e30846a4df83248b6d2c62"
++    },
++    {
++      "path": "schemas/skillfile-sources-v1/source-policy-v2.schema.json",
++      "sha256": "sha256:7f61a8ce7ebd83e54d73a2897fe468444d47546870a1ab1d549b7947faf7ebec"
++    },
++    {
++      "path": "schemas/skillfile-sources-v1/source-types-v1.schema.json",
++      "sha256": "sha256:2facd5672aaa7eaaa428e700080d50d7900237ed980b10b47d5602c212f87d49"
++    }
++  ],
++  "suite": "skillfile-sources-v1"
++}
+diff --git a/conformance/v1/manifest.json b/conformance/v1/manifest.json
+index 0d7f2d2..c6a7d2d 100644
+--- a/conformance/v1/manifest.json
++++ b/conformance/v1/manifest.json
+@@ -4546,27 +4546,27 @@
+     },
+     {
+       "path": "vectors/conformance-claim-v3-qualification.json",
+-      "sha256": "sha256:aefa6ee21c70cb46e5552f3fd608849d0f69b0ea034428f81eacd00d9d1fffe1"
++      "sha256": "sha256:a601d4b561332b98ffbcc40c295bc7925f7cff1bd50bc892b6b31d6411075826"
+     },
+     {
+       "path": "vectors/context-detectors.json",
+-      "sha256": "sha256:c2121ee654643a4f2896c15faf9eb46c770cf1e649a12160eb4ef68b643074c0"
++      "sha256": "sha256:e6cd7b1ef381afdabb533ad4530fd531931280c1ccda544a6f1f39d4b0de4d1f"
+     },
+     {
+       "path": "vectors/context-versions.json",
+-      "sha256": "sha256:4eac87963ac86c6e56d418a9e33cf0375cf7670619f560d97763e51fbb05c6b6"
++      "sha256": "sha256:bfbfb84be9a56d8af38aff70f089d5b11074f38e22d3b1861051007727330fb0"
+     },
+     {
+       "path": "vectors/environments-codex-seed.json",
+-      "sha256": "sha256:d7a6e24f783b72eecd5bed3e13db5ab7a0a286bca10289b8034a73d3f36b750f"
++      "sha256": "sha256:e8fefe0f7eb8fe5692d3a5858367fbe3254f79c7acd4144635f726a35d081c83"
+     },
+     {
+       "path": "vectors/environments-dotfile-managers.json",
+-      "sha256": "sha256:9c883a3dbc8f3210450adf9f9c23439c1289fa7aedefbe8e89d9cd3a6453edc4"
++      "sha256": "sha256:2a1501ea4af0f34955b3df8588a91c39acc4ee0649be3e044c74d61460f64d2e"
+     },
+     {
+       "path": "vectors/environments-env-passthrough.json",
+-      "sha256": "sha256:1953748e548d4f335f9defa4baa1524998d29dab4bf36647fb8c8bcbdcabf6db"
++      "sha256": "sha256:14af7a2647807280522ffc6d51d6607418c32408861932a59dc0f42d36381155"
+     },
+     {
+       "path": "vectors/environments-path-kind-admission.json",
+@@ -4574,11 +4574,11 @@
+     },
+     {
+       "path": "vectors/environments-read-failure.json",
+-      "sha256": "sha256:b3efcf7d3f2b1521fc4c889f4c2280367079a25a36d98661b0121eb78bc81977"
++      "sha256": "sha256:d46cf7f5ca619bf0f9b6993d77171c2f95912f6f2b43bcc3c9b1043371a8a87d"
+     },
+     {
+       "path": "vectors/environments-source-signers.json",
+-      "sha256": "sha256:fb59e44c33183fc5cf7c698c65038f49a8f1e2d2404137c80cb6d252d46f8d9c"
++      "sha256": "sha256:672c5e1a3dd28e493dbdaf7e120df422d7449c6df923e2b39931d0e517a54e10"
+     },
+     {
+       "path": "vectors/environments-store-boundary.json",
+@@ -4586,15 +4586,15 @@
+     },
+     {
+       "path": "vectors/environments-write-nofollow.json",
+-      "sha256": "sha256:c28e72bc698d852864ee98237c6f8962e7cfa75daecbc60638fd354bfaa9044c"
++      "sha256": "sha256:f29c25c0f25f763a37718eff0f4b1d8b065d41ec1eb290a03961f3bb854e89b0"
+     },
+     {
+       "path": "vectors/environments.json",
+-      "sha256": "sha256:08b3ad8fcd89c35389328c142d8fb8329c86b2d0ef73d444ccf47d62736e2f51"
++      "sha256": "sha256:569423d3f19454fa821be512d7d2252520edf641749855cbcb5b7439fec98115"
+     },
+     {
+       "path": "vectors/external-repository-acquisition.json",
+-      "sha256": "sha256:df29609d2b29dd07d4b3ebedda229fe554142bf3e4457375b57c5aa44d3b403a"
++      "sha256": "sha256:e8fb4420bb1d17322a50a4a87fa2dfc4ac87991afb59cab784549fd0bd35e0f1"
+     },
+     {
+       "path": "vectors/external-repository-lifecycle.json",
+@@ -4602,7 +4602,7 @@
+     },
+     {
+       "path": "vectors/go-host-execution-policy.json",
+-      "sha256": "sha256:a4995233b78042f4bc290510efcbb7d350d23247e25f1213743b2d57a97e7efd"
++      "sha256": "sha256:7ad40f1158fd086e5f255628f92059971fcbbfe15f15b034c0c2cde81e97a718"
+     },
+     {
+       "path": "vectors/identifiers.json",
+@@ -4626,7 +4626,7 @@
+     },
+     {
+       "path": "vectors/module-roots.json",
+-      "sha256": "sha256:3c8a3ba5986723e6179205e2be779ceb766b0b05e011f4f62121be5defa22d1b"
++      "sha256": "sha256:b435878ac0c181fa655f0f3f23af400bbff969a6232e686b7ceece59df3c54b3"
+     },
+     {
+       "path": "vectors/portable-paths.json",
+@@ -4650,15 +4650,15 @@
+     },
+     {
+       "path": "vectors/script-host-execution-policy.json",
+-      "sha256": "sha256:7b6f5b406fde44e55ef666dd8dd465dfad138c213f0e79f6fd6968d0628b7f9f"
++      "sha256": "sha256:ae9373879fbdc780cabaadb8ccd2a8ad2b1802f2c8caa56861163547fd4d9d00"
+     },
+     {
+       "path": "vectors/security-posture.json",
+-      "sha256": "sha256:708a9da9dde0ba05300ef3e5ad3087e2ee81add0338b7a5e9c59e085759cbcbd"
++      "sha256": "sha256:1195bd85d46e877f1388bc8d7e07069a59bbc2ea9021bec22661f68f8460e0fa"
+     },
+     {
+       "path": "vectors/shell-hook-trust.json",
+-      "sha256": "sha256:ce0d3c593aa52973c21834222e2d85ad101ad5f070e1978e1e015badd0b41fcd"
++      "sha256": "sha256:5aae6282a7d20705cced934e811da9135dfa7e222c7411b212b1f73288c0238c"
+     },
+     {
+       "path": "vectors/skill-manifest-resolution.json",
+@@ -4666,7 +4666,7 @@
+     },
+     {
+       "path": "vectors/snapshot-acquisition.json",
+-      "sha256": "sha256:98b2533f96e378b525c22c9c2f8be59da3c8a0de386670e99496c911d64e03ec"
++      "sha256": "sha256:3c8b36fd7b7b188c216f67e4761f5635d5e32a6b167f66563d01f9acdcab7aab"
+     },
+     {
+       "path": "vectors/source-identities.json",
+@@ -4674,10 +4674,10 @@
+     },
+     {
+       "path": "vectors/umbrella-provider-resolution.json",
+-      "sha256": "sha256:ece3c85bf95f0c20ead30cf07c6acd653773802a3e0586f60791368ab2ae4e37"
++      "sha256": "sha256:5758af70c9231261892ba102fe018ca1d9efad636e4443db7b0e61a4d768b332"
+     }
+   ],
+   "generated_at": "2026-07-13T00:00:00Z",
+   "generator": "tools/generate-vectors",
+-  "protocol_version": "1.0.0-rc.9"
++  "protocol_version": "1.0.0-rc.13"
+ }
+diff --git a/conformance/v1/vectors/conformance-claim-v3-qualification.json b/conformance/v1/vectors/conformance-claim-v3-qualification.json
+index 221ed1f..59d7b36 100644
+--- a/conformance/v1/vectors/conformance-claim-v3-qualification.json
++++ b/conformance/v1/vectors/conformance-claim-v3-qualification.json
+@@ -16,7 +16,7 @@
+       "status": "pending-downstream-native-evidence"
+     }
+   ],
+-  "protocol_version": "1.0.0-rc.9",
++  "protocol_version": "1.0.0-rc.13",
+   "rules": [
+     {
+       "name": "schema-valid-is-not-qualified",
+diff --git a/conformance/v1/vectors/context-detectors.json b/conformance/v1/vectors/context-detectors.json
+index 9ea7432..99790cd 100644
+--- a/conformance/v1/vectors/context-detectors.json
++++ b/conformance/v1/vectors/context-detectors.json
+@@ -393,7 +393,7 @@
+     }
+   ],
+   "placeholder_rule": "a match whose body, after the class's placeholder_prefix, is one repeated character or ends in EXAMPLE is a placeholder and is not reported",
+-  "protocol_version": "1.0.0-rc.9",
++  "protocol_version": "1.0.0-rc.13",
+   "schema_version": 1,
+   "scope": [
+     "context/**",
+diff --git a/conformance/v1/vectors/context-versions.json b/conformance/v1/vectors/context-versions.json
+index 50d2feb..ffb9da3 100644
+--- a/conformance/v1/vectors/context-versions.json
++++ b/conformance/v1/vectors/context-versions.json
+@@ -218,7 +218,7 @@
+       "name": "semver-precedence"
+     }
+   ],
+-  "protocol_version": "1.0.0-rc.9",
++  "protocol_version": "1.0.0-rc.13",
+   "range_cases": [
+     {
+       "comparator_sets": [
+diff --git a/conformance/v1/vectors/environments-codex-seed.json b/conformance/v1/vectors/environments-codex-seed.json
+index 08ea594..235062e 100644
+--- a/conformance/v1/vectors/environments-codex-seed.json
++++ b/conformance/v1/vectors/environments-codex-seed.json
+@@ -1,6 +1,6 @@
+ {
+   "schema_version": 1,
+-  "protocol_version": "1.0.0-rc.9",
++  "protocol_version": "1.0.0-rc.13",
+   "capability": "agent-environments",
+   "capability_revision": 1,
+   "rule": "codex provisioning seed mcp_servers handling (sections 7.4, 7.7, 7.8, 8.2, 12)",
+diff --git a/conformance/v1/vectors/environments-dotfile-managers.json b/conformance/v1/vectors/environments-dotfile-managers.json
+index b6369d2..5e8a8d5 100644
+--- a/conformance/v1/vectors/environments-dotfile-managers.json
++++ b/conformance/v1/vectors/environments-dotfile-managers.json
+@@ -455,7 +455,7 @@
+     "linux",
+     "windows"
+   ],
+-  "protocol_version": "1.0.0-rc.9",
++  "protocol_version": "1.0.0-rc.13",
+   "rule": "environments section 9.5 dotfile-manager state table",
+   "schema_version": 1,
+   "table": [
+diff --git a/conformance/v1/vectors/environments-env-passthrough.json b/conformance/v1/vectors/environments-env-passthrough.json
+index 7a19dce..469d0bd 100644
+--- a/conformance/v1/vectors/environments-env-passthrough.json
++++ b/conformance/v1/vectors/environments-env-passthrough.json
+@@ -173,7 +173,7 @@
+       ]
+     }
+   ],
+-  "protocol_version": "1.0.0-rc.9",
++  "protocol_version": "1.0.0-rc.13",
+   "s4_profiles": [
+     "s4-enforce",
+     "s4-warn"
+diff --git a/conformance/v1/vectors/environments-read-failure.json b/conformance/v1/vectors/environments-read-failure.json
+index 81da988..49481e5 100644
+--- a/conformance/v1/vectors/environments-read-failure.json
++++ b/conformance/v1/vectors/environments-read-failure.json
+@@ -601,7 +601,7 @@
+     "absent",
+     "present"
+   ],
+-  "protocol_version": "1.0.0-rc.9",
++  "protocol_version": "1.0.0-rc.13",
+   "rule": "protocol/environments.md section 8.4.1: a failed read, stat, or parse of any state or surface file is never reported as absence. Each case pins one file class (marker, lock, provisioning seed, credential passthrough entry, backup-record inventory) to its typed, present-or-absent discriminating inputs and the expected diagnostic. Failure classes: permission-denied (EACCES-class), io-error (EIO-class), unparseable-content (bytes fail decoding or parsing), schema-invalid-content (parsed content fails schema validation for a reason other than version), symlink-where-regular-required, directory-where-file-expected, parent-not-directory (ENOTDIR-class: the entry exists but a path component above it is not a directory, so the open fails). presence/entry_kind are ground truth: permission-denied and io-error strike at the open/read stage after lstat. Boundary verification precedes readability classification (sections 1.3, 4, 8.2, 10.1): a marker failure that violates the section 4 contract, or that prevents proving the boundary (symlink, directory, or unstatable marker path), is environment_store_untrusted and is outside this family; the marker cases therefore cover the open/read/parse stages only. Seed unparseable-content applies where the seed path parses (the codex_cli revision-B mcp_servers strip, which MUST parse as TOML); elsewhere seeds are unparsed byte copies. Passthrough entries carry no content and require a link, so unparseable-content, schema-invalid-content, and symlink-where-regular-required do not apply to them; a directory at the entry path is 'no longer a symlink' and stays detached-side. currency 'unknown' pins the section 8.4.1 rule that an unreadable file makes the affected row non-current with currency unknown; absence-side outcomes carry currency 'known'. repair_relinks pins that --repair re-links a detached entry and leaves an unreadable entry untouched. repair is env resolve --repair and update is profile update (sections 10.1, 9.2): against an unreadable lock both refuse with environment_store_untrusted and rebuild nothing (rebuilt) and write nothing (written), repair emitting no fragment; restore restores the newest backup generation (env unmanage --restore-backups, section 9.2) and stops before mutating (written) when the generations inventory cannot be established. The backup-record class covers the generations inventory: an unreadable inventory is environment_backup_record_unreadable with currency unknown, while a known-empty inventory is current with currency known.",
+   "schema_version": 1,
+   "story": "STORY-260916-1ll22r"
+diff --git a/conformance/v1/vectors/environments-source-signers.json b/conformance/v1/vectors/environments-source-signers.json
+index bd3923a..3e0728b 100644
+--- a/conformance/v1/vectors/environments-source-signers.json
++++ b/conformance/v1/vectors/environments-source-signers.json
+@@ -1,6 +1,6 @@
+ {
+   "schema_version": 1,
+-  "protocol_version": "1.0.0-rc.9",
++  "protocol_version": "1.0.0-rc.13",
+   "capability": "agent-environments",
+   "capability_revision": 1,
+   "rule": "source signer allowlist and update-delta confirmation (sections 1.4, 9.2, 12)",
+diff --git a/conformance/v1/vectors/environments-write-nofollow.json b/conformance/v1/vectors/environments-write-nofollow.json
+index db5fefb..6cd84e5 100644
+--- a/conformance/v1/vectors/environments-write-nofollow.json
++++ b/conformance/v1/vectors/environments-write-nofollow.json
+@@ -288,7 +288,7 @@
+     "replaced",
+     "refused"
+   ],
+-  "protocol_version": "1.0.0-rc.9",
++  "protocol_version": "1.0.0-rc.13",
+   "rule": "protocol/environments.md section 8.3.1: a materialization, takeover, repair, or backup write replaces the directory entry (operation-private temp file plus rename) and MUST NOT follow a symlink at the target path or at any path component below the managed root that the manager did not create in this operation. link_points 'outside' means outside the managed root (hence outside the profile store, the section 9.5 foreign-manager stop); link_points 'store' means into the profile store.",
+   "schema_version": 1,
+   "target_kinds": [
+diff --git a/conformance/v1/vectors/environments.json b/conformance/v1/vectors/environments.json
+index 9d94b8f..7dcac66 100644
+--- a/conformance/v1/vectors/environments.json
++++ b/conformance/v1/vectors/environments.json
+@@ -2857,6 +2857,6 @@
+     }
+   ],
+   "part_rule": "every part ends with exactly one LF; the document is the parts joined with exactly one additional LF between adjacent parts",
+-  "protocol_version": "1.0.0-rc.9",
++  "protocol_version": "1.0.0-rc.13",
+   "schema_version": 1
+ }
+diff --git a/conformance/v1/vectors/external-repository-acquisition.json b/conformance/v1/vectors/external-repository-acquisition.json
+index f65672d..1f07cc8 100644
+--- a/conformance/v1/vectors/external-repository-acquisition.json
++++ b/conformance/v1/vectors/external-repository-acquisition.json
+@@ -209,5 +209,5 @@
+     "stdin-refspec",
+     "tag-auto-follow"
+   ],
+-  "protocol_version": "1.0.0-rc.9"
++  "protocol_version": "1.0.0-rc.13"
+ }
+diff --git a/conformance/v1/vectors/go-host-execution-policy.json b/conformance/v1/vectors/go-host-execution-policy.json
+index d23200d..f91da7a 100644
+--- a/conformance/v1/vectors/go-host-execution-policy.json
++++ b/conformance/v1/vectors/go-host-execution-policy.json
+@@ -1050,7 +1050,7 @@
+     "fingerprinted-goroot-bin-go",
+     "fingerprinted-goroot-pkg-tool-child"
+   ],
+-  "protocol_version": "1.0.0-rc.9",
++  "protocol_version": "1.0.0-rc.13",
+   "reserved_hardened_execution_policy": "hardened-worker-v1",
+   "schema_version": 1,
+   "session_states": [
+diff --git a/conformance/v1/vectors/module-roots.json b/conformance/v1/vectors/module-roots.json
+index 3507462..68e893c 100644
+--- a/conformance/v1/vectors/module-roots.json
++++ b/conformance/v1/vectors/module-roots.json
+@@ -388,6 +388,6 @@
+     "go-list-vendor-consistency",
+     "directive-form-and-bijection-before-go-build"
+   ],
+-  "protocol_version": "1.0.0-rc.9",
++  "protocol_version": "1.0.0-rc.13",
+   "schema_version": 1
+ }
+diff --git a/conformance/v1/vectors/script-host-execution-policy.json b/conformance/v1/vectors/script-host-execution-policy.json
+index 46624ae..52c976a 100644
+--- a/conformance/v1/vectors/script-host-execution-policy.json
++++ b/conformance/v1/vectors/script-host-execution-policy.json
+@@ -799,6 +799,6 @@
+       "worker_started": true
+     }
+   ],
+-  "protocol_version": "1.0.0-rc.9",
++  "protocol_version": "1.0.0-rc.13",
+   "schema_version": 1
+ }
+diff --git a/conformance/v1/vectors/security-posture.json b/conformance/v1/vectors/security-posture.json
+index edda882..f4abc95 100644
+--- a/conformance/v1/vectors/security-posture.json
++++ b/conformance/v1/vectors/security-posture.json
+@@ -1,6 +1,6 @@
+ {
+   "schema_version": 1,
+-  "protocol_version": "1.0.0-rc.9",
++  "protocol_version": "1.0.0-rc.13",
+   "capability": "security-posture",
+   "findings": [
+     "S1",
+diff --git a/conformance/v1/vectors/shell-hook-trust.json b/conformance/v1/vectors/shell-hook-trust.json
+index c2b008e..d58f0ae 100644
+--- a/conformance/v1/vectors/shell-hook-trust.json
++++ b/conformance/v1/vectors/shell-hook-trust.json
+@@ -36,7 +36,7 @@
+     ".agents/env.ps1"
+   ],
+   "finding": "S6",
+-  "protocol_version": "1.0.0-rc.9",
++  "protocol_version": "1.0.0-rc.13",
+   "rollout_profiles": [
+     {
+       "description": "Revision A warning release: sources unapproved and changed files but emits the diagnostic with a migration hint naming curator hook approve <path>; shipped first",
+diff --git a/conformance/v1/vectors/snapshot-acquisition.json b/conformance/v1/vectors/snapshot-acquisition.json
+index 470ded5..32af49d 100644
+--- a/conformance/v1/vectors/snapshot-acquisition.json
++++ b/conformance/v1/vectors/snapshot-acquisition.json
+@@ -42,7 +42,7 @@
+       "name": "byte-exact-snapshot"
+     }
+   ],
+-  "protocol_version": "1.0.0-rc.9",
++  "protocol_version": "1.0.0-rc.13",
+   "rule": "environments.md section 1.2: a snapshot produced from a commit contains, for every regular-file entry of the commit's tree, exactly the committed blob bytes; working-tree conversion and attribute-driven archive processing never alter, add, or omit an entry",
+   "schema_version": 1
+ }
+diff --git a/conformance/v1/vectors/umbrella-provider-resolution.json b/conformance/v1/vectors/umbrella-provider-resolution.json
+index 836463a..5e80025 100644
+--- a/conformance/v1/vectors/umbrella-provider-resolution.json
++++ b/conformance/v1/vectors/umbrella-provider-resolution.json
+@@ -590,7 +590,7 @@
+       "unreadable_dirs": []
+     }
+   ],
+-  "protocol_version": "1.0.0-rc.9",
++  "protocol_version": "1.0.0-rc.13",
+   "revision_a_profile": "warning release: PATH selects, outside trust roots warns with subcommand_provider_outside_trust_roots",
+   "revision_b_profile": "flip release: trust roots only, PATH probe diagnostic, refused with subcommand_provider_untrusted",
+   "rule": "umbrella provider trust roots (section 11)",
+diff --git a/release/1.0.0-rc.13.json b/release/1.0.0-rc.13.json
+new file mode 100644
+index 0000000..e70f929
+--- /dev/null
++++ b/release/1.0.0-rc.13.json
+@@ -0,0 +1,47 @@
++{
++  "assurance": {
++    "default_mode": "portable",
++    "portable_execution_policy": "manager-worker-v1",
++    "portable_policy": "portable-cli-policy-v1",
++    "silent_downgrade_permitted": false,
++    "skill_vendored_provider_allowed": false,
++    "verified_execution_policy": "verified-provider-execution-v1",
++    "verified_implementations": [],
++    "verified_platform_claims": [],
++    "verified_policy": "verified-provider-policy-v1",
++    "verified_provider_contract": "host-execution-provider-v1"
++  },
++  "candidate_protocol_pin": {
++    "manifest_sha256": "sha256:be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca",
++    "suite_root": "conformance/v1"
++  },
++  "claim_v5": {
++    "claim_protocol_version": "1.0.0-rc.9",
++    "claims_emitted": [],
++    "schema": "schemas/v1/conformance-claim-v5.schema.json"
++  },
++  "created_at": "2026-09-26T00:00:00Z",
++  "downstream_consumption": {
++    "committed_release_pin_advanced": false,
++    "environment": "CURATOR_CONFORMANCE_ROOT",
++    "required_manifest_sha256": "sha256:be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca"
++  },
++  "historical_release": {
++    "immutable": true,
++    "metadata_path": "release/1.0.0-rc.9.json",
++    "metadata_sha256": "sha256:a0c58ff5e44bc93c013e4c7526573c2fc7e2467a67455b6898647db6a0879f82",
++    "protocol_version": "1.0.0-rc.9",
++    "source_commit": "0ed5c691e9208eea52f21db2fc05e226ce3516fd"
++  },
++  "legacy_release": "1.0.0-rc.9",
++  "protocol_version": "1.0.0-rc.13",
++  "skillfile_sources_v1": {
++    "compatible_core": {
++      "manifest_sha256": "sha256:803918bf8672f76cf990985e51db213b826674cd5bb54fbf47731b8404b44403",
++      "tag": "v1.0.0-rc.10"
++    },
++    "manifest_path": "conformance/skillfile-sources-v1/manifest.json",
++    "manifest_sha256": "sha256:061ec05ddb1746b72168d157f81d2930047cd62371ffa46cf585844da61ee6be"
++  },
++  "source_baseline_commit": "0ed5c691e9208eea52f21db2fc05e226ce3516fd"
++}
+diff --git a/release/1.0.0-rc.9.json b/release/1.0.0-rc.9.json
+index 7982472..91feea2 100644
+--- a/release/1.0.0-rc.9.json
++++ b/release/1.0.0-rc.9.json
+@@ -12,7 +12,7 @@
+     "verified_provider_contract": "host-execution-provider-v1"
+   },
+   "candidate_protocol_pin": {
+-    "manifest_sha256": "sha256:cb7a98e97543282cdde75f04c55fb15acb91062f8ba6510e3d603db42f1c1ab2",
++    "manifest_sha256": "sha256:803918bf8672f76cf990985e51db213b826674cd5bb54fbf47731b8404b44403",
+     "suite_root": "conformance/v1"
+   },
+   "claim_v5": {
+@@ -24,7 +24,7 @@
+   "downstream_consumption": {
+     "committed_release_pin_advanced": false,
+     "environment": "CURATOR_CONFORMANCE_ROOT",
+-    "required_manifest_sha256": "sha256:cb7a98e97543282cdde75f04c55fb15acb91062f8ba6510e3d603db42f1c1ab2"
++    "required_manifest_sha256": "sha256:803918bf8672f76cf990985e51db213b826674cd5bb54fbf47731b8404b44403"
+   },
+   "historical_release": {
+     "immutable": true,
+diff --git a/tools/generate-vectors/main.go b/tools/generate-vectors/main.go
+index bacb859..5b845dd 100644
+--- a/tools/generate-vectors/main.go
++++ b/tools/generate-vectors/main.go
+@@ -23,13 +23,14 @@ import (
+ )
+ 
+ const (
+-	protocolVersion                   = "1.0.0-rc.9"
++	protocolVersion                   = "1.0.0-rc.13"
++	conformanceClaimV5ProtocolVersion = "1.0.0-rc.9"
+ 	conformanceClaimV1ProtocolVersion = "1.0.0-rc.3"
+ 	conformanceClaimV2ProtocolVersion = "1.0.0-rc.4"
+ 	conformanceClaimV3ProtocolVersion = "1.0.0-rc.5"
+ 	conformanceClaimV4ProtocolVersion = "1.0.0-rc.8"
+ 	conformanceClaimV2CreatedAt       = "2026-07-20T00:00:00Z"
+-	rc9CreatedAt                      = "2026-08-23T00:00:00Z"
++	rc13CreatedAt                     = "2026-09-26T00:00:00Z"
+ 	fixedCommit                       = "0123456789abcdef0123456789abcdef01234567"
+ 	fixedTime                         = "2026-07-13T00:00:00Z"
+ 	genesis                           = "0000000000000000000000000000000000000000000000000000000000000000"
+@@ -41,6 +42,9 @@ const (
+ 	rc7SourceCommit                   = "99f70947d6f2447366d6c996127b73eca37a9159"
+ 	rc8ReleaseMetadataSHA256          = "sha256:293f101d10665061aa049efa72141f9e3c5d608bbde300e882f6e3e095e31ede"
+ 	rc8SourceCommit                   = "f8c405aa3ad0a39d260c2ed93684e55c5a346359"
++	rc9ReleaseMetadataSHA256          = "sha256:a0c58ff5e44bc93c013e4c7526573c2fc7e2467a67455b6898647db6a0879f82"
++	rc9SourceCommit                   = "0ed5c691e9208eea52f21db2fc05e226ce3516fd"
++	rc10CoreManifestSHA256            = "sha256:803918bf8672f76cf990985e51db213b826674cd5bb54fbf47731b8404b44403"
+ 
+ 	// portableExecutionPolicy is the only execution-policy identity that
+ 	// protocol 1.0 defines for go-v1 and go-repository-v1.
+@@ -201,7 +205,8 @@ func main() {
+ 	writeSchemaCases(suite, marker, ledger, audited, snapshot, entries[0], bundle, pinned)
+ 	writeExternalRepositoryExpected(expected, marker)
+ 	writeManifest(suite)
+-	writeRC9ReleaseMetadata(*root, suite)
++	skillfileSourcesManifestSHA256 := writeSkillfileSourcesManifest(*root)
++	writeRC13ReleaseMetadata(*root, suite, skillfileSourcesManifestSHA256)
+ }
+ 
+ // writeModuleRootVectors emits the filesystem and build-graph cases that JSON
+@@ -2211,25 +2216,25 @@ func writeAssuranceVectors(dir string) {
+ 	})
+ }
+ 
+-func writeRC9ReleaseMetadata(root, suite string) {
++func writeRC13ReleaseMetadata(root, suite, skillfileSourcesManifestSHA256 string) {
+ 	manifest, err := os.ReadFile(filepath.Join(suite, "manifest.json"))
+ 	must(err)
+ 	digest := sha256.Sum256(manifest)
+ 	pin := "sha256:" + hex.EncodeToString(digest[:])
+-	writeJSON(filepath.Join(root, "release", "1.0.0-rc.9.json"), map[string]any{
++	writeJSON(filepath.Join(root, "release", "1.0.0-rc.13.json"), map[string]any{
+ 		"protocol_version": protocolVersion,
+-		"created_at":       rc9CreatedAt,
++		"created_at":       rc13CreatedAt,
+ 		"candidate_protocol_pin": map[string]any{
+ 			"suite_root":      "conformance/v1",
+ 			"manifest_sha256": pin,
+ 		},
+-		"source_baseline_commit": rc8SourceCommit,
+-		"legacy_release":         "1.0.0-rc.8",
++		"source_baseline_commit": rc9SourceCommit,
++		"legacy_release":         conformanceClaimV5ProtocolVersion,
+ 		"historical_release": map[string]any{
+-			"protocol_version": "1.0.0-rc.8",
+-			"metadata_path":    "release/1.0.0-rc.8.json",
+-			"metadata_sha256":  rc8ReleaseMetadataSHA256,
+-			"source_commit":    rc8SourceCommit,
++			"protocol_version": conformanceClaimV5ProtocolVersion,
++			"metadata_path":    "release/1.0.0-rc.9.json",
++			"metadata_sha256":  rc9ReleaseMetadataSHA256,
++			"source_commit":    rc9SourceCommit,
+ 			"immutable":        true,
+ 		},
+ 		"assurance": map[string]any{
+@@ -2249,14 +2254,83 @@ func writeRC9ReleaseMetadata(root, suite string) {
+ 			"required_manifest_sha256":       pin,
+ 			"committed_release_pin_advanced": false,
+ 		},
++		"skillfile_sources_v1": map[string]any{
++			"manifest_path":   "conformance/skillfile-sources-v1/manifest.json",
++			"manifest_sha256": skillfileSourcesManifestSHA256,
++			"compatible_core": map[string]any{
++				"tag":             "v1.0.0-rc.10",
++				"manifest_sha256": rc10CoreManifestSHA256,
++			},
++		},
+ 		"claim_v5": map[string]any{
+-			"claim_protocol_version": protocolVersion,
++			"claim_protocol_version": conformanceClaimV5ProtocolVersion,
+ 			"schema":                 "schemas/v1/conformance-claim-v5.schema.json",
+ 			"claims_emitted":         []any{},
+ 		},
+ 	})
+ }
+ 
++// writeSkillfileSourcesManifest pins the accepted source-extension suite and
++// its schemas independently of the generated conformance/v1 core suite.
++func writeSkillfileSourcesManifest(root string) string {
++	const manifestPath = "conformance/skillfile-sources-v1/manifest.json"
++	inputs := []string{
++		"protocol/skillfile-sources.md",
++		"protocol/repository-transport.md",
++		"docs/skillfile-sources.md",
++		"schemas/skillfile-sources-v1",
++		"conformance/skillfile-sources-v1",
++	}
++	files := make([]string, 0)
++	for _, input := range inputs {
++		path := filepath.Join(root, filepath.FromSlash(input))
++		info, err := os.Stat(path)
++		must(err)
++		if !info.IsDir() {
++			payload, readErr := os.ReadFile(path)
++			must(readErr)
++			sum := sha256.Sum256(payload)
++			files = append(files, input+"\tsha256:"+hex.EncodeToString(sum[:]))
++			continue
++		}
++		must(filepath.WalkDir(path, func(path string, entry os.DirEntry, walkErr error) error {
++			if walkErr != nil {
++				return walkErr
++			}
++			if entry.IsDir() || !entry.Type().IsRegular() {
++				return nil
++			}
++			rel, relErr := filepath.Rel(root, path)
++			if relErr != nil {
++				return relErr
++			}
++			rel = filepath.ToSlash(rel)
++			if rel == manifestPath {
++				return nil
++			}
++			payload, readErr := os.ReadFile(path)
++			if readErr != nil {
++				return readErr
++			}
++			sum := sha256.Sum256(payload)
++			files = append(files, rel+"\tsha256:"+hex.EncodeToString(sum[:]))
++			return nil
++		}))
++	}
++	sort.Strings(files)
++	entries := make([]any, 0, len(files))
++	for _, line := range files {
++		parts := strings.SplitN(line, "\t", 2)
++		entries = append(entries, map[string]any{"path": parts[0], "sha256": parts[1]})
++	}
++	manifest := map[string]any{"suite": "skillfile-sources-v1", "files": entries}
++	writeJSON(filepath.Join(root, filepath.FromSlash(manifestPath)), manifest)
++	payload, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(manifestPath)))
++	must(err)
++	sum := sha256.Sum256(payload)
++	return "sha256:" + hex.EncodeToString(sum[:])
++}
++
+ type treeFixtureEntry struct {
+ 	mode     string
+ 	name     string
+@@ -2629,10 +2703,10 @@ func writeSchemaCases(suite string, marker, ledger, audited, snapshot, logEntry,
+ 	cases["conformance-claim-v4.schema.json"] = schemaCase{claimV4, invalidClaimV4}
+ 	claimV5 := cloneMap(claimV4)
+ 	claimV5["schema_version"] = 5
+-	claimV5["protocol_version"] = protocolVersion
++	claimV5["protocol_version"] = conformanceClaimV5ProtocolVersion
+ 	invalidClaimV5 := cloneMap(invalidClaimV4)
+ 	invalidClaimV5["schema_version"] = 5
+-	invalidClaimV5["protocol_version"] = protocolVersion
++	invalidClaimV5["protocol_version"] = conformanceClaimV5ProtocolVersion
+ 	cases["conformance-claim-v5.schema.json"] = schemaCase{claimV5, invalidClaimV5}
+ 	agentContext := validAgentContextV1()
+ 	cases["agent-context-v1.schema.json"] = schemaCase{agentContext, without(agentContext, "name")}
+diff --git a/tools/generate-vectors/main_test.go b/tools/generate-vectors/main_test.go
+index 41878af..469ff7a 100644
+--- a/tools/generate-vectors/main_test.go
++++ b/tools/generate-vectors/main_test.go
+@@ -834,7 +834,18 @@ func TestRC8ReleaseMetadataRemainsByteFrozen(t *testing.T) {
+ 	}
+ }
+ 
+-func TestRC9ReleaseMetadataPinsSuiteWithoutClaimFabrication(t *testing.T) {
++func TestRC9ReleaseMetadataRemainsByteFrozen(t *testing.T) {
++	root := repositoryRoot(t)
++	metadata, err := os.ReadFile(filepath.Join(root, "release", "1.0.0-rc.9.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if got := sha256Identity(metadata); got != rc9ReleaseMetadataSHA256 {
++		t.Fatalf("historical rc.9 metadata digest = %s, want %s", got, rc9ReleaseMetadataSHA256)
++	}
++}
++
++func TestRC13ReleaseMetadataPinsCoreAndAcceptedSourceSuites(t *testing.T) {
+ 	root := repositoryRoot(t)
+ 	manifest, err := os.ReadFile(filepath.Join(root, "conformance", "v1", "manifest.json"))
+ 	if err != nil {
+@@ -842,28 +853,42 @@ func TestRC9ReleaseMetadataPinsSuiteWithoutClaimFabrication(t *testing.T) {
+ 	}
+ 	sum := sha256.Sum256(manifest)
+ 	manifestIdentity := "sha256:" + hex.EncodeToString(sum[:])
+-	metadata := readObject(t, filepath.Join(root, "release", "1.0.0-rc.9.json"))
++	metadata := readObject(t, filepath.Join(root, "release", "1.0.0-rc.13.json"))
+ 	if metadata["protocol_version"] != protocolVersion {
+-		t.Fatalf("rc.9 release protocol_version = %v, want %s", metadata["protocol_version"], protocolVersion)
++		t.Fatalf("rc.13 release protocol_version = %v, want %s", metadata["protocol_version"], protocolVersion)
+ 	}
+ 	pin := metadata["candidate_protocol_pin"].(map[string]any)
+ 	downstream := metadata["downstream_consumption"].(map[string]any)
+ 	if pin["manifest_sha256"] != manifestIdentity || downstream["required_manifest_sha256"] != manifestIdentity {
+-		t.Fatalf("rc.9 release does not pin manifest %s", manifestIdentity)
++		t.Fatalf("rc.13 release does not pin core manifest %s", manifestIdentity)
++	}
++	sourceManifest, err := os.ReadFile(filepath.Join(root, "conformance", "skillfile-sources-v1", "manifest.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	sourceIdentity := sha256Identity(sourceManifest)
++	sourcePin := metadata["skillfile_sources_v1"].(map[string]any)
++	compatibleCore := sourcePin["compatible_core"].(map[string]any)
++	if sourcePin["manifest_path"] != "conformance/skillfile-sources-v1/manifest.json" ||
++		sourcePin["manifest_sha256"] != sourceIdentity ||
++		compatibleCore["tag"] != "v1.0.0-rc.10" ||
++		compatibleCore["manifest_sha256"] != rc10CoreManifestSHA256 {
++		t.Fatalf("rc.13 source-suite pin is incomplete or not separately tied to rc.10: %#v", sourcePin)
+ 	}
+ 	history := metadata["historical_release"].(map[string]any)
+-	if history["protocol_version"] != "1.0.0-rc.8" ||
+-		history["metadata_sha256"] != rc8ReleaseMetadataSHA256 ||
+-		history["source_commit"] != rc8SourceCommit ||
++	if history["protocol_version"] != conformanceClaimV5ProtocolVersion ||
++		history["metadata_path"] != "release/1.0.0-rc.9.json" ||
++		history["metadata_sha256"] != rc9ReleaseMetadataSHA256 ||
++		history["source_commit"] != rc9SourceCommit ||
+ 		history["immutable"] != true {
+-		t.Fatalf("rc.9 historical rc.8 identity is invalid: %#v", history)
++		t.Fatalf("rc.13 historical rc.9 identity is invalid: %#v", history)
+ 	}
+ 	claim := metadata["claim_v5"].(map[string]any)
+ 	claims, ok := claim["claims_emitted"].([]any)
+-	if claim["claim_protocol_version"] != protocolVersion ||
++	if claim["claim_protocol_version"] != conformanceClaimV5ProtocolVersion ||
+ 		claim["schema"] != "schemas/v1/conformance-claim-v5.schema.json" ||
+ 		!ok || len(claims) != 0 {
+-		t.Fatalf("rc.9 release fabricates claim evidence: %#v", claim)
++		t.Fatalf("rc.13 release fabricates claim evidence: %#v", claim)
+ 	}
+ }
+ 
+@@ -907,7 +932,7 @@ func TestAssuranceModesAreClosedFailClosedAndNonAliasing(t *testing.T) {
+ 		}
+ 	}
+ 	if claims := vector["release_claims"].([]any); len(claims) != 0 {
+-		t.Fatalf("rc.9 fabricates verified claims: %#v", claims)
++		t.Fatalf("rc.13 fabricates verified claims: %#v", claims)
+ 	}
+ }
+ 
+diff --git a/tools/release_gate.py b/tools/release_gate.py
+index 33007df..e6cf9f4 100644
+--- a/tools/release_gate.py
++++ b/tools/release_gate.py
+@@ -39,7 +39,8 @@ RETIRED_DESCRIPTOR_STEM = "curator" + "-build"
+ # The schema-6 build-source digest algorithm namespace shares the retired stem
+ # but is a different, byte-frozen identifier.
+ BUILD_SOURCE_ALGORITHM_NAMESPACE = RETIRED_DESCRIPTOR_STEM + "-source"
+-PROTOCOL_VERSION = "1.0.0-rc.9"
++PROTOCOL_VERSION = "1.0.0-rc.13"
++RC9_PROTOCOL_VERSION = "1.0.0-rc.9"
+ RC8_PROTOCOL_VERSION = "1.0.0-rc.8"
+ RC7_PROTOCOL_VERSION = "1.0.0-rc.7"
+ RC6_PROTOCOL_VERSION = "1.0.0-rc.6"
+@@ -60,12 +61,19 @@ RC8_RELEASE_METADATA_SHA256 = (
+     "sha256:293f101d10665061aa049efa72141f9e3c5d608bbde300e882f6e3e095e31ede"
+ )
+ RC8_SOURCE_COMMIT = "f8c405aa3ad0a39d260c2ed93684e55c5a346359"
++RC9_RELEASE_METADATA_SHA256 = (
++    "sha256:a0c58ff5e44bc93c013e4c7526573c2fc7e2467a67455b6898647db6a0879f82"
++)
++RC9_SOURCE_COMMIT = "0ed5c691e9208eea52f21db2fc05e226ce3516fd"
++RC10_CORE_MANIFEST_SHA256 = (
++    "sha256:803918bf8672f76cf990985e51db213b826674cd5bb54fbf47731b8404b44403"
++)
+ CLAIM_PROTOCOL_VERSIONS = {
+     1: "1.0.0-rc.3",
+     2: "1.0.0-rc.4",
+     3: RC5_PROTOCOL_VERSION,
+     4: RC8_PROTOCOL_VERSION,
+-    5: PROTOCOL_VERSION,
++    5: RC9_PROTOCOL_VERSION,
+ }
+ CLAIM_HISTORY_FROZEN_SHA256 = {
+     "schemas/v1/conformance-claim-v1.schema.json": "c9f49460618ccc8b1d7d2dfaf760fc6ad3a53a870a6685a685ddc148d3c87b3f",
+@@ -518,22 +526,49 @@ def validate_protocol_artifacts(version: str) -> None:
+ 
+     validate_assurance_release_surface()
+ 
+-    release = load_json(ROOT / "release" / "1.0.0-rc.9.json")
++    rc9_metadata_path = ROOT / "release" / "1.0.0-rc.9.json"
++    if sha256_identity(rc9_metadata_path) != RC9_RELEASE_METADATA_SHA256:
++        raise ReleaseFailure("published rc.9 release metadata changed")
++    rc9 = load_json(rc9_metadata_path)
++    rc9_history = rc9.get("historical_release", {})
++    rc9_claim = rc9.get("claim_v5", {})
++    rc9_pin = rc9.get("candidate_protocol_pin", {})
++    rc9_downstream = rc9.get("downstream_consumption", {})
++    if (
++        rc9.get("protocol_version") != RC9_PROTOCOL_VERSION
++        or rc9.get("source_baseline_commit") != RC8_SOURCE_COMMIT
++        or rc9.get("legacy_release") != RC8_PROTOCOL_VERSION
++        or not isinstance(rc9_history, dict)
++        or rc9_history.get("protocol_version") != RC8_PROTOCOL_VERSION
++        or rc9_history.get("metadata_path") != "release/1.0.0-rc.8.json"
++        or rc9_history.get("metadata_sha256") != RC8_RELEASE_METADATA_SHA256
++        or rc9_history.get("source_commit") != RC8_SOURCE_COMMIT
++        or rc9_history.get("immutable") is not True
++        or not isinstance(rc9_claim, dict)
++        or rc9_claim.get("claim_protocol_version") != RC9_PROTOCOL_VERSION
++        or not isinstance(rc9_pin, dict)
++        or rc9_pin.get("manifest_sha256") != RC10_CORE_MANIFEST_SHA256
++        or not isinstance(rc9_downstream, dict)
++        or rc9_downstream.get("required_manifest_sha256") != RC10_CORE_MANIFEST_SHA256
++    ):
++        raise ReleaseFailure("rc.9 metadata does not preserve its published suite identity")
++
++    release = load_json(ROOT / "release" / f"{PROTOCOL_VERSION}.json")
+     history = release.get("historical_release", {})
+     claim = release.get("claim_v5", {})
+     assurance = release.get("assurance", {})
+     if (
+         release.get("protocol_version") != PROTOCOL_VERSION
+-        or release.get("source_baseline_commit") != RC8_SOURCE_COMMIT
+-        or release.get("legacy_release") != RC8_PROTOCOL_VERSION
++        or release.get("source_baseline_commit") != RC9_SOURCE_COMMIT
++        or release.get("legacy_release") != RC9_PROTOCOL_VERSION
+         or not isinstance(history, dict)
+-        or history.get("protocol_version") != RC8_PROTOCOL_VERSION
+-        or history.get("metadata_path") != "release/1.0.0-rc.8.json"
+-        or history.get("metadata_sha256") != RC8_RELEASE_METADATA_SHA256
+-        or history.get("source_commit") != RC8_SOURCE_COMMIT
++        or history.get("protocol_version") != RC9_PROTOCOL_VERSION
++        or history.get("metadata_path") != "release/1.0.0-rc.9.json"
++        or history.get("metadata_sha256") != RC9_RELEASE_METADATA_SHA256
++        or history.get("source_commit") != RC9_SOURCE_COMMIT
+         or history.get("immutable") is not True
+         or not isinstance(claim, dict)
+-        or claim.get("claim_protocol_version") != PROTOCOL_VERSION
++        or claim.get("claim_protocol_version") != RC9_PROTOCOL_VERSION
+         or claim.get("schema") != "schemas/v1/conformance-claim-v5.schema.json"
+         or claim.get("claims_emitted") != []
+         or not isinstance(assurance, dict)
+@@ -544,8 +579,9 @@ def validate_protocol_artifacts(version: str) -> None:
+         or assurance.get("skill_vendored_provider_allowed") is not False
+     ):
+         raise ReleaseFailure(
+-            "rc.9 metadata rewrites rc.8 evidence or fabricates a verified claim"
++            "rc.13 metadata rewrites rc.9 evidence or fabricates a verified claim"
+         )
++    validate_skillfile_sources_manifest(release)
+ 
+     validate_manager_lifecycle_release_surface()
+     validate_shared_fixture_marker_release_surface()
+@@ -578,6 +614,69 @@ def validate_protocol_artifacts(version: str) -> None:
+             )
+ 
+ 
++def validate_skillfile_sources_manifest(release: dict[str, Any]) -> None:
++    manifest_path = ROOT / "conformance" / "skillfile-sources-v1" / "manifest.json"
++    manifest = load_json(manifest_path)
++    if (
++        not isinstance(manifest, dict)
++        or set(manifest) != {"suite", "files"}
++        or manifest.get("suite") != "skillfile-sources-v1"
++    ):
++        raise ReleaseFailure("skillfile-sources-v1 manifest has the wrong identity")
++
++    expected_paths: set[str] = set()
++    roots = (
++        ROOT / "protocol" / "skillfile-sources.md",
++        ROOT / "protocol" / "repository-transport.md",
++        ROOT / "docs" / "skillfile-sources.md",
++        ROOT / "schemas" / "skillfile-sources-v1",
++        ROOT / "conformance" / "skillfile-sources-v1",
++    )
++    for path in roots:
++        if not path.exists():
++            raise ReleaseFailure(f"skillfile-sources-v1 suite input is missing: {path}")
++        candidates = path.rglob("*") if path.is_dir() else (path,)
++        for candidate in candidates:
++            if not candidate.is_file() or candidate.is_symlink() or candidate == manifest_path:
++                continue
++            expected_paths.add(candidate.relative_to(ROOT).as_posix())
++
++    entries = manifest.get("files")
++    if not isinstance(entries, list):
++        raise ReleaseFailure("skillfile-sources-v1 manifest files must be an array")
++    paths: list[str] = []
++    for entry in entries:
++        if not isinstance(entry, dict) or set(entry) != {"path", "sha256"}:
++            raise ReleaseFailure("skillfile-sources-v1 manifest entry is malformed")
++        path = entry["path"]
++        digest = entry["sha256"]
++        if not isinstance(path, str) or not isinstance(digest, str):
++            raise ReleaseFailure("skillfile-sources-v1 manifest entry is malformed")
++        if path not in expected_paths:
++            raise ReleaseFailure(f"skillfile-sources-v1 manifest lists an out-of-scope path: {path}")
++        paths.append(path)
++        target = ROOT / path
++        if not target.is_file() or sha256_identity(target) != digest:
++            raise ReleaseFailure(f"skillfile-sources-v1 manifest digest mismatch: {path}")
++    if paths != sorted(paths) or len(paths) != len(set(paths)) or set(paths) != expected_paths:
++        raise ReleaseFailure("skillfile-sources-v1 manifest inventory is incomplete or unsorted")
++
++    metadata_pin = release.get("skillfile_sources_v1")
++    expected_manifest_sha256 = sha256_identity(manifest_path)
++    if (
++        not isinstance(metadata_pin, dict)
++        or metadata_pin.get("manifest_path")
++        != "conformance/skillfile-sources-v1/manifest.json"
++        or metadata_pin.get("manifest_sha256") != expected_manifest_sha256
++        or metadata_pin.get("compatible_core")
++        != {
++            "tag": "v1.0.0-rc.10",
++            "manifest_sha256": RC10_CORE_MANIFEST_SHA256,
++        }
++    ):
++        raise ReleaseFailure("rc.13 metadata does not pin the accepted source suite separately")
++
++
+ def validate_conformance_claim(path: Path, version: str) -> None:
+     schema_version = {
+         protocol_version: version_number
+diff --git a/tools/test_release_gate.py b/tools/test_release_gate.py
+index f4c66cb..c4de32e 100644
+--- a/tools/test_release_gate.py
++++ b/tools/test_release_gate.py
+@@ -272,8 +272,8 @@ class StableReleaseGateTests(unittest.TestCase):
+                 release_gate.validate_version(version)
+ 
+ 
+-class ProtocolRC9ReleaseGateTests(unittest.TestCase):
+-    VERSION = "1.0.0-rc.9"
++class ProtocolRC13ReleaseGateTests(unittest.TestCase):
++    VERSION = "1.0.0-rc.13"
+ 
+     def setUp(self) -> None:
+         self.temporary = tempfile.TemporaryDirectory()
+@@ -310,9 +310,37 @@ class ProtocolRC9ReleaseGateTests(unittest.TestCase):
+             self.fail(f"manifest does not list {relative}")
+         self._write_json(manifest_path, manifest)
+ 
+-    def test_accepts_complete_rc9_artifact_set(self) -> None:
++    def test_accepts_complete_rc13_artifact_set(self) -> None:
+         release_gate.validate_protocol_artifacts(self.VERSION)
+ 
++    def test_rejects_changed_published_rc9_release_metadata(self) -> None:
++        path = self.root / "release" / "1.0.0-rc.9.json"
++        metadata = json.loads(path.read_text(encoding="utf-8"))
++        metadata["created_at"] = "2026-09-26T00:00:00Z"
++        self._write_json(path, metadata)
++        with self.assertRaisesRegex(
++            release_gate.ReleaseFailure, "published rc.9 release metadata changed"
++        ):
++            release_gate.validate_protocol_artifacts(self.VERSION)
++
++    def test_rejects_changed_skillfile_sources_suite_member(self) -> None:
++        path = self.root / "protocol" / "skillfile-sources.md"
++        path.write_text(path.read_text(encoding="utf-8") + "\nDrift.\n", encoding="utf-8")
++        with self.assertRaisesRegex(
++            release_gate.ReleaseFailure, "skillfile-sources-v1 manifest digest mismatch"
++        ):
++            release_gate.validate_protocol_artifacts(self.VERSION)
++
++    def test_rejects_skillfile_sources_release_pin_drift(self) -> None:
++        path = self.root / "release" / f"{self.VERSION}.json"
++        metadata = json.loads(path.read_text(encoding="utf-8"))
++        metadata["skillfile_sources_v1"]["manifest_sha256"] = "sha256:" + "0" * 64
++        self._write_json(path, metadata)
++        with self.assertRaisesRegex(
++            release_gate.ReleaseFailure, "does not pin the accepted source suite separately"
++        ):
++            release_gate.validate_protocol_artifacts(self.VERSION)
++
+     def test_release_gate_rejects_every_assurance_relational_mutation(self) -> None:
+         path = self.root / "conformance" / "v1" / "vectors" / "assurance-modes.json"
+         vector = json.loads(path.read_text(encoding="utf-8"))
+@@ -443,14 +471,14 @@ class ProtocolRC9ReleaseGateTests(unittest.TestCase):
+         ):
+             release_gate.validate_protocol_artifacts(self.VERSION)
+ 
+-    def test_rejects_rc9_history_rewriting_rc8_identity(self) -> None:
++    def test_rejects_rc13_history_rewriting_rc9_identity(self) -> None:
+         path = self.root / "release" / f"{self.VERSION}.json"
+         metadata = json.loads(path.read_text(encoding="utf-8"))
+         metadata["historical_release"]["metadata_sha256"] = "sha256:" + "0" * 64
+         self._write_json(path, metadata)
+         with self.assertRaisesRegex(
+             release_gate.ReleaseFailure,
+-            "rewrites rc.8 evidence or fabricates a verified claim",
++            "rewrites rc.9 evidence or fabricates a verified claim",
+         ):
+             release_gate.validate_protocol_artifacts(self.VERSION)
+ 
+@@ -463,7 +491,7 @@ class ProtocolRC9ReleaseGateTests(unittest.TestCase):
+         ):
+             release_gate.validate_conformance_claim(path, "1.0.0-rc.6")
+ 
+-    def test_rejects_stale_rc8_suite_pin(self) -> None:
++    def test_rejects_stale_rc13_suite_pin(self) -> None:
+         path = self.root / "release" / f"{self.VERSION}.json"
+         metadata = json.loads(path.read_text(encoding="utf-8"))
+         metadata["candidate_protocol_pin"]["manifest_sha256"] = (
+@@ -475,7 +503,7 @@ class ProtocolRC9ReleaseGateTests(unittest.TestCase):
+         ):
+             release_gate.validate_version(self.VERSION)
+ 
+-    def test_rejects_rc8_silent_downgrade_or_claim_fabrication(self) -> None:
++    def test_rejects_rc13_silent_downgrade_or_claim_fabrication(self) -> None:
+         path = self.root / "release" / f"{self.VERSION}.json"
+         base = json.loads(path.read_text(encoding="utf-8"))
+         for field, value in (
+diff --git a/tools/test_validate.py b/tools/test_validate.py
+index c3c6ab8..2c3c9df 100644
+--- a/tools/test_validate.py
++++ b/tools/test_validate.py
+@@ -1358,6 +1358,50 @@ class SharedFixtureMarkerTests(unittest.TestCase):
+             validate.validate_shared_fixture_markers(self.expected)
+ 
+ 
++class SkillfileSourcesSuiteManifestTests(unittest.TestCase):
++    def run_validation(self) -> tuple[int, str]:
++        stdout, stderr = io.StringIO(), io.StringIO()
++        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
++            status = validate.main()
++        return status, stderr.getvalue()
++
++    def test_source_contract_bytes_are_pinned_through_main(self) -> None:
++        path = validate.ROOT / "protocol" / "skillfile-sources.md"
++        original = path.read_bytes()
++        try:
++            path.write_bytes(original + b"\nSuite-pin mutation.\n")
++            status, stderr = self.run_validation()
++            self.assertEqual(status, 1)
++            self.assertIn("skillfile-sources-v1 manifest digest mismatch", stderr)
++        finally:
++            path.write_bytes(original)
++
++    def test_manifest_cannot_omit_a_case_even_with_a_recomputed_release_pin(self) -> None:
++        manifest_path = validate.ROOT / "conformance" / "skillfile-sources-v1" / "manifest.json"
++        release_path = validate.ROOT / "release" / f"{validate.PROTOCOL_VERSION}.json"
++        originals = {path: path.read_bytes() for path in (manifest_path, release_path)}
++        try:
++            manifest = json.loads(originals[manifest_path].decode("utf-8"))
++            manifest["files"] = manifest["files"][1:]
++            manifest_bytes = (json.dumps(manifest, indent=2) + "\n").encode("utf-8")
++            manifest_path.write_bytes(manifest_bytes)
++            release = json.loads(originals[release_path].decode("utf-8"))
++            release["skillfile_sources_v1"]["manifest_sha256"] = (
++                "sha256:" + hashlib.sha256(manifest_bytes).hexdigest()
++            )
++            release_path.write_bytes(
++                (json.dumps(release, indent=2) + "\n").encode("utf-8")
++            )
++            status, stderr = self.run_validation()
++            self.assertEqual(status, 1)
++            self.assertIn("skillfile-sources-v1 manifest inventory is incomplete", stderr)
++        finally:
++            for path, payload in originals.items():
++                path.write_bytes(payload)
++            for path, payload in originals.items():
++                self.assertEqual(path.read_bytes(), payload)
++
++
+ class WorkflowRegenerationScopeTests(unittest.TestCase):
+     GENERATED_FILE_INVENTORY = (
+         "conformance/v1",
+@@ -1366,6 +1410,8 @@ class WorkflowRegenerationScopeTests(unittest.TestCase):
+         "release/1.0.0-rc.7.json",
+         "release/1.0.0-rc.8.json",
+         "release/1.0.0-rc.9.json",
++        "release/1.0.0-rc.13.json",
++        "conformance/skillfile-sources-v1/manifest.json",
+     )
+ 
+     def regeneration_diff_scope(self, path: Path) -> tuple[str, ...]:
+@@ -4138,14 +4184,14 @@ class WriteNofollowVectorTests(unittest.TestCase):
+         """Run the real validate.main() against a substituted on-disk corpus.
+ 
+         The mutated vector is written to the worktree with the manifest and
+-        rc.9 pins recomputed around it, so the only failing check can be the
++        rc.13 pins recomputed around it, so the only failing check can be the
+         nofollow gate itself; all three files are restored byte-identical
+         afterwards.
+         """
+         vector_path = validate.SUITE / "vectors" / "environments-write-nofollow.json"
+         manifest_path = validate.SUITE / "manifest.json"
+-        rc9_path = validate.ROOT / "release" / "1.0.0-rc.9.json"
+-        originals = {path: path.read_bytes() for path in (vector_path, manifest_path, rc9_path)}
++        rc13_path = validate.ROOT / "release" / "1.0.0-rc.13.json"
++        originals = {path: path.read_bytes() for path in (vector_path, manifest_path, rc13_path)}
+         try:
+             vector_bytes = (json.dumps(vector, indent=2, sort_keys=True) + "\n").encode("utf-8")
+             vector_path.write_bytes(vector_bytes)
+@@ -4155,11 +4201,11 @@ class WriteNofollowVectorTests(unittest.TestCase):
+                     entry["sha256"] = "sha256:" + hashlib.sha256(vector_bytes).hexdigest()
+             manifest_bytes = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode("utf-8")
+             manifest_path.write_bytes(manifest_bytes)
+-            release = json.loads(originals[rc9_path].decode("utf-8"))
++            release = json.loads(originals[rc13_path].decode("utf-8"))
+             manifest_digest = "sha256:" + hashlib.sha256(manifest_bytes).hexdigest()
+             release["candidate_protocol_pin"]["manifest_sha256"] = manifest_digest
+             release["downstream_consumption"]["required_manifest_sha256"] = manifest_digest
+-            rc9_path.write_bytes((json.dumps(release, indent=2, sort_keys=True) + "\n").encode("utf-8"))
++            rc13_path.write_bytes((json.dumps(release, indent=2, sort_keys=True) + "\n").encode("utf-8"))
+             stdout, stderr = io.StringIO(), io.StringIO()
+             with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                 status = validate.main()
+@@ -4308,14 +4354,14 @@ class DotfileManagersVectorTests(unittest.TestCase):
+         """Run the real validate.main() against a substituted on-disk corpus.
+ 
+         The mutated vector is written to the worktree with the manifest and
+-        rc.9 pins recomputed around it, so the only failing check can be the
++        rc.13 pins recomputed around it, so the only failing check can be the
+         dotfile-managers gate itself; all three files are restored
+         byte-identical afterwards.
+         """
+         vector_path = validate.SUITE / self.VECTOR_PATH
+         manifest_path = validate.SUITE / "manifest.json"
+-        rc9_path = validate.ROOT / "release" / "1.0.0-rc.9.json"
+-        originals = {path: path.read_bytes() for path in (vector_path, manifest_path, rc9_path)}
++        rc13_path = validate.ROOT / "release" / "1.0.0-rc.13.json"
++        originals = {path: path.read_bytes() for path in (vector_path, manifest_path, rc13_path)}
+         try:
+             vector_bytes = (json.dumps(vector, indent=2, sort_keys=True) + "\n").encode("utf-8")
+             vector_path.write_bytes(vector_bytes)
+@@ -4325,11 +4371,11 @@ class DotfileManagersVectorTests(unittest.TestCase):
+                     entry["sha256"] = "sha256:" + hashlib.sha256(vector_bytes).hexdigest()
+             manifest_bytes = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode("utf-8")
+             manifest_path.write_bytes(manifest_bytes)
+-            release = json.loads(originals[rc9_path].decode("utf-8"))
++            release = json.loads(originals[rc13_path].decode("utf-8"))
+             manifest_digest = "sha256:" + hashlib.sha256(manifest_bytes).hexdigest()
+             release["candidate_protocol_pin"]["manifest_sha256"] = manifest_digest
+             release["downstream_consumption"]["required_manifest_sha256"] = manifest_digest
+-            rc9_path.write_bytes((json.dumps(release, indent=2, sort_keys=True) + "\n").encode("utf-8"))
++            rc13_path.write_bytes((json.dumps(release, indent=2, sort_keys=True) + "\n").encode("utf-8"))
+             stdout, stderr = io.StringIO(), io.StringIO()
+             with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                 status = validate.main()
+@@ -4541,14 +4587,14 @@ class ReadFailureVectorTests(unittest.TestCase):
+         """Run the real validate.main() against a substituted on-disk corpus.
+ 
+         The mutated vector is written to the worktree with the manifest and
+-        rc.9 pins recomputed around it, so the only failing check can be the
++        rc.13 pins recomputed around it, so the only failing check can be the
+         read-failure gate itself; all three files are restored byte-identical
+         afterwards.
+         """
+         vector_path = validate.SUITE / "vectors" / "environments-read-failure.json"
+         manifest_path = validate.SUITE / "manifest.json"
+-        rc9_path = validate.ROOT / "release" / "1.0.0-rc.9.json"
+-        originals = {path: path.read_bytes() for path in (vector_path, manifest_path, rc9_path)}
++        rc13_path = validate.ROOT / "release" / "1.0.0-rc.13.json"
++        originals = {path: path.read_bytes() for path in (vector_path, manifest_path, rc13_path)}
+         try:
+             vector_bytes = (json.dumps(vector, indent=2, sort_keys=True) + "\n").encode("utf-8")
+             vector_path.write_bytes(vector_bytes)
+@@ -4558,11 +4604,11 @@ class ReadFailureVectorTests(unittest.TestCase):
+                     entry["sha256"] = "sha256:" + hashlib.sha256(vector_bytes).hexdigest()
+             manifest_bytes = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode("utf-8")
+             manifest_path.write_bytes(manifest_bytes)
+-            release = json.loads(originals[rc9_path].decode("utf-8"))
++            release = json.loads(originals[rc13_path].decode("utf-8"))
+             manifest_digest = "sha256:" + hashlib.sha256(manifest_bytes).hexdigest()
+             release["candidate_protocol_pin"]["manifest_sha256"] = manifest_digest
+             release["downstream_consumption"]["required_manifest_sha256"] = manifest_digest
+-            rc9_path.write_bytes((json.dumps(release, indent=2, sort_keys=True) + "\n").encode("utf-8"))
++            rc13_path.write_bytes((json.dumps(release, indent=2, sort_keys=True) + "\n").encode("utf-8"))
+             stdout, stderr = io.StringIO(), io.StringIO()
+             with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                 status = validate.main()
+diff --git a/tools/validate.py b/tools/validate.py
+index e7f7578..6dab77e 100644
+--- a/tools/validate.py
++++ b/tools/validate.py
+@@ -25,7 +25,8 @@ SUITE = ROOT / "conformance" / "v1"
+ REVIEWS = ROOT / "reviews"
+ _VALID_SCHEMA_DOCUMENTS: set[bytes] = set()
+ SAFE_INTEGER = 9_007_199_254_740_991
+-PROTOCOL_VERSION = "1.0.0-rc.9"
++PROTOCOL_VERSION = "1.0.0-rc.13"
++RC9_PROTOCOL_VERSION = "1.0.0-rc.9"
+ RC8_PROTOCOL_VERSION = "1.0.0-rc.8"
+ RC7_PROTOCOL_VERSION = "1.0.0-rc.7"
+ RC6_PROTOCOL_VERSION = "1.0.0-rc.6"
+@@ -46,6 +47,13 @@ RC8_RELEASE_METADATA_SHA256 = (
+     "sha256:293f101d10665061aa049efa72141f9e3c5d608bbde300e882f6e3e095e31ede"
+ )
+ RC8_SOURCE_COMMIT = "f8c405aa3ad0a39d260c2ed93684e55c5a346359"
++RC9_RELEASE_METADATA_SHA256 = (
++    "sha256:a0c58ff5e44bc93c013e4c7526573c2fc7e2467a67455b6898647db6a0879f82"
++)
++RC9_SOURCE_COMMIT = "0ed5c691e9208eea52f21db2fc05e226ce3516fd"
++RC10_CORE_MANIFEST_SHA256 = (
++    "sha256:803918bf8672f76cf990985e51db213b826674cd5bb54fbf47731b8404b44403"
++)
+ 
+ # The single execution-policy identity that protocol 1.0 defines for the
+ # compiled-build drivers, the identity reserved for the separately tracked
+@@ -871,40 +879,82 @@ def validate_manifest() -> None:
+     if rc8_digest != RC8_RELEASE_METADATA_SHA256:
+         raise ValidationFailure("historical rc.8 release metadata changed")
+ 
+-    release = load_json(ROOT / "release" / "1.0.0-rc.9.json")
++    rc9_path = ROOT / "release" / "1.0.0-rc.9.json"
++    rc9_digest = "sha256:" + hashlib.sha256(rc9_path.read_bytes()).hexdigest()
++    if rc9_digest != RC9_RELEASE_METADATA_SHA256:
++        raise ValidationFailure("published rc.9 release metadata changed")
++    rc9 = load_json(rc9_path)
++    rc9_pin = rc9.get("candidate_protocol_pin", {})
++    rc9_downstream = rc9.get("downstream_consumption", {})
++    rc9_history = rc9.get("historical_release", {})
++    rc9_claim = rc9.get("claim_v5", {})
++    if (
++        rc9.get("protocol_version") != RC9_PROTOCOL_VERSION
++        or not isinstance(rc9_pin, dict)
++        or rc9_pin.get("manifest_sha256") != RC10_CORE_MANIFEST_SHA256
++        or not isinstance(rc9_downstream, dict)
++        or rc9_downstream.get("required_manifest_sha256") != RC10_CORE_MANIFEST_SHA256
++        or not isinstance(rc9_history, dict)
++        or rc9_history.get("protocol_version") != RC8_PROTOCOL_VERSION
++        or rc9_history.get("metadata_path") != "release/1.0.0-rc.8.json"
++        or rc9_history.get("metadata_sha256") != RC8_RELEASE_METADATA_SHA256
++        or rc9_history.get("source_commit") != RC8_SOURCE_COMMIT
++        or rc9_history.get("immutable") is not True
++        or rc9.get("source_baseline_commit") != RC8_SOURCE_COMMIT
++        or rc9.get("legacy_release") != RC8_PROTOCOL_VERSION
++        or not isinstance(rc9_claim, dict)
++        or rc9_claim.get("claim_protocol_version") != RC9_PROTOCOL_VERSION
++    ):
++        raise ValidationFailure("rc.9 metadata does not preserve its published suite identity")
++
++    skillfile_sources_manifest_sha256 = validate_skillfile_sources_manifest()
++    release = load_json(ROOT / f"release/{PROTOCOL_VERSION}.json")
+     manifest_digest = "sha256:" + hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+     if release.get("protocol_version") != PROTOCOL_VERSION:
+-        raise ValidationFailure("rc.9 release metadata identifies the wrong protocol version")
++        raise ValidationFailure("rc.13 release metadata identifies the wrong protocol version")
+     pin = release.get("candidate_protocol_pin", {})
+     if not isinstance(pin, dict) or pin.get("manifest_sha256") != manifest_digest:
+-        raise ValidationFailure("rc.9 downstream candidate pin does not match the suite manifest")
++        raise ValidationFailure("rc.13 candidate pin does not match the suite manifest")
+     downstream = release.get("downstream_consumption", {})
+     if (
+         not isinstance(downstream, dict)
+         or downstream.get("required_manifest_sha256") != manifest_digest
+         or downstream.get("committed_release_pin_advanced") is not False
+     ):
+-        raise ValidationFailure("rc.9 downstream consumption metadata is incomplete")
++        raise ValidationFailure("rc.13 downstream consumption metadata is incomplete")
+     history = release.get("historical_release", {})
+     if (
+         not isinstance(history, dict)
+-        or history.get("protocol_version") != RC8_PROTOCOL_VERSION
+-        or history.get("metadata_path") != "release/1.0.0-rc.8.json"
+-        or history.get("metadata_sha256") != RC8_RELEASE_METADATA_SHA256
+-        or history.get("source_commit") != RC8_SOURCE_COMMIT
++        or history.get("protocol_version") != RC9_PROTOCOL_VERSION
++        or history.get("metadata_path") != "release/1.0.0-rc.9.json"
++        or history.get("metadata_sha256") != RC9_RELEASE_METADATA_SHA256
++        or history.get("source_commit") != RC9_SOURCE_COMMIT
+         or history.get("immutable") is not True
+-        or release.get("source_baseline_commit") != RC8_SOURCE_COMMIT
+-        or release.get("legacy_release") != RC8_PROTOCOL_VERSION
++        or release.get("source_baseline_commit") != RC9_SOURCE_COMMIT
++        or release.get("legacy_release") != RC9_PROTOCOL_VERSION
+     ):
+-        raise ValidationFailure("rc.9 metadata does not preserve historical rc.8 evidence")
++        raise ValidationFailure("rc.13 metadata does not preserve historical rc.9 evidence")
+     claim = release.get("claim_v5", {})
+     if (
+         not isinstance(claim, dict)
+-        or claim.get("claim_protocol_version") != PROTOCOL_VERSION
++        or claim.get("claim_protocol_version") != RC9_PROTOCOL_VERSION
+         or claim.get("schema") != "schemas/v1/conformance-claim-v5.schema.json"
+         or claim.get("claims_emitted") != []
+     ):
+-        raise ValidationFailure("rc.9 release metadata fabricates a platform claim")
++        raise ValidationFailure("rc.13 metadata fabricates a claim-v5 platform claim")
++    suite_pin = release.get("skillfile_sources_v1", {})
++    if (
++        not isinstance(suite_pin, dict)
++        or suite_pin.get("manifest_path")
++        != "conformance/skillfile-sources-v1/manifest.json"
++        or suite_pin.get("manifest_sha256") != skillfile_sources_manifest_sha256
++        or suite_pin.get("compatible_core")
++        != {
++            "tag": "v1.0.0-rc.10",
++            "manifest_sha256": RC10_CORE_MANIFEST_SHA256,
++        }
++    ):
++        raise ValidationFailure("rc.13 metadata does not pin the accepted source suite separately")
+     execution = release.get("assurance", {})
+     if (
+         not isinstance(execution, dict)
+@@ -920,10 +970,61 @@ def validate_manifest() -> None:
+         or execution.get("skill_vendored_provider_allowed") is not False
+     ):
+         raise ValidationFailure(
+-            "rc.9 release metadata does not honestly record assurance availability"
++            "rc.13 release metadata does not honestly record assurance availability"
+         )
+ 
+ 
++def validate_skillfile_sources_manifest() -> str:
++    manifest_path = ROOT / "conformance" / "skillfile-sources-v1" / "manifest.json"
++    manifest = load_json(manifest_path)
++    if (
++        not isinstance(manifest, dict)
++        or set(manifest) != {"suite", "files"}
++        or manifest.get("suite") != "skillfile-sources-v1"
++    ):
++        raise ValidationFailure("skillfile-sources-v1 manifest has the wrong identity")
++
++    expected_paths: set[str] = set()
++    roots = (
++        ROOT / "protocol" / "skillfile-sources.md",
++        ROOT / "protocol" / "repository-transport.md",
++        ROOT / "docs" / "skillfile-sources.md",
++        ROOT / "schemas" / "skillfile-sources-v1",
++        ROOT / "conformance" / "skillfile-sources-v1",
++    )
++    for path in roots:
++        if not path.exists():
++            raise ValidationFailure(f"skillfile-sources-v1 suite input is missing: {path}")
++        candidates = path.rglob("*") if path.is_dir() else (path,)
++        for candidate in candidates:
++            if candidate.is_file() and not candidate.is_symlink() and candidate != manifest_path:
++                expected_paths.add(candidate.relative_to(ROOT).as_posix())
++
++    entries = manifest.get("files")
++    if not isinstance(entries, list):
++        raise ValidationFailure("skillfile-sources-v1 manifest files must be a list")
++    paths: list[str] = []
++    for entry in entries:
++        if not isinstance(entry, dict) or set(entry) != {"path", "sha256"}:
++            raise ValidationFailure("skillfile-sources-v1 manifest entry is malformed")
++        path = entry["path"]
++        digest = entry["sha256"]
++        if not isinstance(path, str) or not isinstance(digest, str):
++            raise ValidationFailure("skillfile-sources-v1 manifest entry is malformed")
++        if path not in expected_paths:
++            raise ValidationFailure(f"skillfile-sources-v1 manifest lists an out-of-scope path: {path}")
++        paths.append(path)
++        target = ROOT / path
++        if not target.is_file():
++            raise ValidationFailure(f"skillfile-sources-v1 manifest path is missing: {path}")
++        actual_digest = "sha256:" + hashlib.sha256(target.read_bytes()).hexdigest()
++        if digest != actual_digest:
++            raise ValidationFailure(f"skillfile-sources-v1 manifest digest mismatch: {path}")
++    if paths != sorted(paths) or len(paths) != len(set(paths)) or set(paths) != expected_paths:
++        raise ValidationFailure("skillfile-sources-v1 manifest inventory is incomplete or unsorted")
++    return "sha256:" + hashlib.sha256(manifest_path.read_bytes()).hexdigest()
++
++
+ def validate_review_evidence() -> None:
+     cases = {
+         "review-report.schema.json": (("v1-valid.json", True), ("v1-invalid.json", False)),

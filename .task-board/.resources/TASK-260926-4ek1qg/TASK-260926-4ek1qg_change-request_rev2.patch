@@ -1,0 +1,389 @@
+diff --git a/.github/ci/implementation-coverage.tsv b/.github/ci/implementation-coverage.tsv
+index 7b9ac0f..f486dde 100644
+--- a/.github/ci/implementation-coverage.tsv
++++ b/.github/ci/implementation-coverage.tsv
+@@ -7,13 +7,21 @@
+ # family's PRESENCE in the conformance root was never evidence that anything
+ # opened it.
+ #
+-# This table is the specification's own statement of the other half. It names,
+-# per pinned implementation, the cases that must be OBSERVED PASSING against
+-# this repository's in-tree suite, and the root artefacts each of them reads:
++# This table is the specification's own statement of the other half. The
++# implementation-specific claims below record each client's corpus boundary:
+ #
+-#   * `tools/implementation_coverage.py families` fails when this repository
+-#     stops publishing an artefact a row declares, so a family cannot be
+-#     deleted from the suite while the ledger still claims it is consumed;
++#   * curator 0a628621 (`go`) consumes this candidate's full `conformance/v1`;
++#   * cocoaskills 4a88aa0e (`manager`) consumes core `conformance/v1` from
++#     v1.0.0-rc.10. Its accepted `skillfile-sources-v1` corpus and schemas come
++#     from this candidate and are exercised in the workflow's separate draft
++#     conformance step. It does not claim support for later core revisions.
++#
++# The rows below name the cases that must be OBSERVED PASSING for those
++# implementations, and the root artefacts each case reads:
++#
++#   * `tools/implementation_coverage.py families --implementation <name>` fails
++#     when that implementation's declared core root stops publishing an
++#     artefact its rows name, so one client's corpus cannot hide another's gap;
+ #   * `tools/implementation_coverage.py go` fails when a `go` row is not
+ #     observed passing in that runner's real `go test -json` stream. A rename,
+ #     a deletion, a package dropped from the invocation, a `-run` filter
+@@ -25,8 +33,10 @@
+ #
+ # The ledger is deliberately owned HERE rather than deferred to each
+ # implementation's own consumption ledger: an implementation that renames or
+-# drops a schema-8 consumer must fail this repository's landing gate, not
+-# merely its own.
++# drops a declared consumer must fail this repository's landing gate, not
++# merely its own. The workflow selects the implementation's corpus root when
++# checking families, so one client's supported boundary cannot be widened by
++# another client's candidate suite.
+ #
+ # Columns are TAB separated:
+ #   implementation  identity  artefacts  behaviour
+@@ -43,9 +53,10 @@ go	internal/skillspec.TestReleasedSchemaCases	schema-cases/index.json,schema-cas
+ go	internal/marker.TestReadAuthoritativeMarkerV4SchemaCases	schema-cases/index.json,schema-cases/install-marker-v4	every published install-marker-v4 case is read back through the marker reader
+ go	internal/moduleroots.TestModuleRootVectors	vectors/module-roots.json	every published module-roots case drives declaration, containment and the declared/effective replace bijection to its own failure boundary
+ go	internal/scriptpolicy.TestScriptHostExecutionPolicySectionsAreAllClassified	vectors/script-host-execution-policy.json	every top-level section of the published script-worker family is classified, so a section this specification adds cannot be ignored
++go	internal/scriptpolicy.TestScriptHostExecutionPolicyProductionConsumersCoverAllCases	vectors/script-host-execution-policy.json	every published behavioral case, including executable identity, maps to a production row and the hard-link substitution definition is present
+ go	internal/scriptpolicy.TestScriptExecutionPolicyIdentityMatchesTheSuite	vectors/script-host-execution-policy.json	the closed policy identity and interpreter set the implementation hard-codes are read back from the suite's own bytes
+ go	internal/scriptpolicy.TestScriptExecutionOptInCases	vectors/script-host-execution-policy.json	every published opt-in case decides manifest acceptance and the enforced/declared-only classification
+-go	internal/scriptpolicy.TestARefusalPrecedesEveryWorkerSurface	vectors/script-host-execution-policy.json	every enforced shape the suite declares is refused before any worker surface
++go	internal/scriptpolicy.TestPreflightRefusalCases	vectors/script-host-execution-policy.json	the mandatory-control-unavailable install and invocation shapes refuse before starting a worker, while the three non-refusal shapes succeed
+ manager	tests/test_schema8_candidate_conformance.py::test_every_declared_schema8_artefact_is_published	schema-cases/index.json	the presence ledger is decided against this suite's manifest inside the run that consumes it
+ manager	tests/test_schema8_candidate_conformance.py::test_both_manifest_families_are_consumed_in_full	schema-cases/agent-skill-v8,schema-cases/csk-skill-v8	every published agent-skill-v8 and csk-skill-v8 case is collected, and neither family is empty
+ manager	tests/test_schema8_candidate_conformance.py::test_schema8_manifest_case	schema-cases/agent-skill-v8,schema-cases/csk-skill-v8	every published schema-8 manifest case decides acceptance through the real skill-spec loader
+diff --git a/.github/workflows/implementations.yml b/.github/workflows/implementations.yml
+index e3ee69a..b7dffa2 100644
+--- a/.github/workflows/implementations.yml
++++ b/.github/workflows/implementations.yml
+@@ -31,26 +31,39 @@ jobs:
+         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+         with:
+           repository: relux-works/curator
+-          # relux-works/curator main at PR 37, the commit that stopped treating
+-          # a family's presence in the conformance root as evidence that
+-          # anything read it. It declares the schema-8 artefacts its packages
+-          # consume and adds `internal/scriptpolicy`; qualified against this
+-          # suite by candidate dispatch 32689488293.
+-          ref: a3abcf3468b4854904313295672eef6f7d8826fd
++          # Curator 0a628621 classifies executable_identity_cases and the
++          # hard_link_substitution_definition added by PR #88. Keep this pin
++          # in lockstep with that suite erratum and its production consumer.
++          ref: 0a62862130fd6cbd9db8b246da63fdb5aecdfaaf
+           path: implementations/go
+           submodules: true
++          # The Go suite does not use the board state. Excluding its deep paths
++          # avoids Windows checkout path-length failures while retaining all
++          # implementation sources and declared submodules.
++          sparse-checkout: |
++            /*
++            !/.task-board/
++          sparse-checkout-cone-mode: false
+ 
+       - name: Checkout Python manager
+         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+         with:
+           repository: ivanopcode/cocoaskills
+-          # ivanopcode/cocoaskills main at PR 43, the mirror of curator PR 37
+-          # on the Python side. Its schema-8 consumer is root-derived, so it
+-          # decides real behaviour against whatever suite this job publishes;
+-          # qualified against this suite by candidate run 32756144649.
+-          ref: 3ecca1dba9f8831e1617b7466c17ecc8a2957d3f
++          # cocoaskills 4a88aa0e is pinned to the accepted skillfile-sources-v1
++          # corpus. Its declared scope is core v1.0.0-rc.10 plus that draft
++          # corpus and schemas from this candidate; it does not claim rc.11-rc.12.
++          ref: 4a88aa0e47ab2b34ded16162cec7f97d0c7cf6f1
+           path: implementations/manager
+ 
++      - name: Checkout Python manager core v1.0.0-rc.10
++        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
++        with:
++          repository: relux-works/curator-spec
++          # The Python client declares support through rc.10. Keep its core
++          # checks on that released corpus while Go checks the full candidate.
++          ref: v1.0.0-rc.10
++          path: implementations/manager-core
++
+       - name: Checkout registry service
+         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+         with:
+@@ -72,12 +85,18 @@ jobs:
+           python -m pip install --upgrade pip
+           python -m pip install -e "./implementations/manager[dev]" -e "./implementations/registry[dev]"
+ 
+-      # The presence half of the coverage contract. Every artefact
+-      # `.github/ci/implementation-coverage.tsv` claims a pinned implementation
+-      # reads must still be published by this suite, so a family cannot be
+-      # deleted while the ledger keeps claiming it is consumed.
+-      - name: Require this suite to publish every declared artefact
+-        run: python tools/implementation_coverage.py families --root conformance/v1
++      # Each client's declared artefacts are checked against its own core
++      # root: curator gets the full candidate, cocoaskills gets released rc.10.
++      - name: Require curator's candidate core artefacts
++        run: >-
++          python tools/implementation_coverage.py families
++          --implementation go --root conformance/v1
++
++      - name: Require cocoaskills rc.10 core artefacts
++        run: >-
++          python tools/implementation_coverage.py families
++          --implementation manager
++          --root implementations/manager-core/conformance/v1
+ 
+       # The stream is captured rather than piped so the gate below reads the
+       # run it is gating, and this step still reports `go test`'s own status.
+@@ -103,17 +122,17 @@ jobs:
+           python tools/implementation_coverage.py go
+           --stream implementations/go/go-test.json
+ 
+-      # The Python manager's own presence ledger, run against this suite. It
+-      # fails when this root serves the schema-8 consumer only partly, so a
+-      # half-published surface cannot run quieter instead of failing.
+-      - name: Require the Python manager's declared artefacts
++      # The Python manager's own presence ledger is also checked against its
++      # declared rc.10 core corpus, not the newer candidate core.
++      - name: Require the Python manager's rc.10 core artefacts
+         run: >-
+           python implementations/manager/.github/scripts/candidate_consumption.py
+-          require --root conformance/v1
++          require --root implementations/manager-core/conformance/v1
+ 
+-      - name: Python manager schema-8 consumption
++      - name: Python manager rc.10 schema-8 consumption
+         working-directory: implementations/manager
+         env:
++          CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/implementations/manager-core/conformance/v1
+           CSK_REQUIRE_FULL_CANDIDATE_ROOT: "1"
+         run: >-
+           python -m pytest -q tests/test_schema8_candidate_conformance.py
+@@ -124,19 +143,25 @@ jobs:
+           python tools/implementation_coverage.py pytest
+           --results implementations/manager/manager-schema8-results.xml
+ 
++      # The draft test reads CSK_DRAFT_SOURCES_SUITE_ROOT and resolves
++      # schemas/v1 plus schemas/skillfile-sources-v1 from the candidate checkout
++      # two levels above that suite path. This feeds both corpus and schemas
++      # from this candidate. cocoaskills declares this POSIX-only draft lane;
++      # its own workflow excludes Windows for this suite.
++      - name: Python manager candidate skillfile-sources-v1 consumption
++        if: runner.os != 'Windows'
++        working-directory: implementations/manager
++        env:
++          CSK_DRAFT_SOURCES_SUITE_ROOT: ${{ github.workspace }}/conformance/skillfile-sources-v1
++        run: >-
++          python -m pytest -q tests/test_draft_sources_conformance.py
++          --junitxml=manager-skillfile-sources-results.xml
++
+       # NOTE ON THE PYTHON MANAGER'S RELEASED-SUITE MODULE.
+-      # `tests/test_protocol_conformance.py` used to run here against this
+-      # repository's own root. At this pin it authenticates ONE immutable
+-      # suite -- protocol `1.0.0-rc.6`, manifest `sha256:12e58b82...` -- and
+-      # refuses every other root by design; it could be pointed at this
+-      # repository's moving root only while the previous pin performed no
+-      # authentication at all, which is the same false-green the schema-8
+-      # coverage contract above exists to remove. That module keeps running
+-      # against the suite it names in that implementation's own CI, and it
+-      # returns to this job when its released suite pin advances to rc.9 --
+-      # the step the landing order schedules after rc.9 is published. Until
+-      # then the schema-8 consumption steps above, plus the root-independent
+-      # lifecycle selection below, are what this job asserts about that pin.
++      # `tests/test_protocol_conformance.py` authenticates its own immutable
++      # rc.6 suite and rejects arbitrary roots. It is not the cross-implementation
++      # qualification here: the schema-8 cases above use the manager's declared
++      # rc.10 core, and the draft-source cases use the candidate corpus and schemas.
+       - name: Python manager lifecycle behavior
+         run: >-
+           python -m pytest -q
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 543d3fb..36135a8 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -595,6 +595,13 @@ Versioning for the complete specification set.
+ 
+ ### Changed
+ 
++- Updated the Implementations workflow to pin curator 0a628621 in lockstep
++  with PR #88's executable identity and hard-link erratum, require curator's
++  production consumer-map case, and sparse-checkout curator without
++  `.task-board/` for Windows. Qualified cocoaskills 4a88aa0e against its
++  declared core v1.0.0-rc.10 plus the candidate skillfile-sources-v1 corpus
++  and schemas, while keeping the draft suite on its supported POSIX lanes.
++
+ - Clarified Skillfile-source security requirements: positive registry evidence
+   requires the exact name/repository/commit/raw package-tree hash tuple while
+   verified matching revocations remain deny-wins under advisory policy;
+diff --git a/tools/implementation_coverage.py b/tools/implementation_coverage.py
+index 8994600..e160577 100644
+--- a/tools/implementation_coverage.py
++++ b/tools/implementation_coverage.py
+@@ -10,8 +10,8 @@ schema-8 surface while opening none of it.
+ `.github/ci/implementation-coverage.tsv` is this repository's own answer to the
+ second question, and this module enforces it in three parts:
+ 
+-    families  every artefact the ledger declares is still published by
+-              `conformance/v1/manifest.json`;
++    families  every core artefact the selected implementation declares is
++              still published by its declared core suite's `manifest.json`;
+     go        every `go` row was observed PASSING in a real `go test -json`
+               stream, with no skip of the case or any of its subtests;
+     pytest    every `manager` row was observed PASSING in a real pytest
+@@ -162,12 +162,16 @@ def missing_artifacts(
+     return tuple(missing)
+ 
+ 
+-def check_families(rows: Sequence[Row], suite: Path) -> list[str]:
+-    """Fail when this suite stopped publishing what the ledger claims is read."""
++def check_families(
++    rows: Sequence[Row], suite: Path, implementation: str | None = None
++) -> list[str]:
++    """Fail when this suite stopped publishing what the selected rows read."""
+     paths = published_paths(suite)
+     report: list[str] = []
+     failures: list[str] = []
+     for row in rows:
++        if implementation is not None and row.implementation != implementation:
++            continue
+         missing = missing_artifacts(row.artifacts, paths)
+         if missing:
+             failures.append(
+@@ -178,6 +182,9 @@ def check_families(rows: Sequence[Row], suite: Path) -> list[str]:
+             report.append(f"served  {row.implementation}\t{row.identity}")
+     if failures:
+         raise CoverageError("\n".join(failures))
++    if not report:
++        selected = f" for {implementation}" if implementation else ""
++        raise CoverageError(f"the coverage ledger declares no served rows{selected}")
+     return report
+ 
+ 
+@@ -312,9 +319,15 @@ def main(argv: Sequence[str] | None = None) -> int:
+     subparsers = parser.add_subparsers(dest="command", required=True)
+ 
+     families = subparsers.add_parser(
+-        "families", help="assert this suite still publishes every declared artefact"
++        "families",
++        help="assert the selected implementation's core artefacts are published",
+     )
+     families.add_argument("--root", type=Path, default=DEFAULT_SUITE)
++    families.add_argument(
++        "--implementation",
++        choices=IMPLEMENTATIONS,
++        help="check only this implementation's declared artefacts",
++    )
+ 
+     go = subparsers.add_parser(
+         "go", help="assert every declared Go case was observed passing"
+@@ -330,7 +343,10 @@ def main(argv: Sequence[str] | None = None) -> int:
+     try:
+         rows = load_ledger(args.ledger)
+         if args.command == "families":
+-            report = check_families(rows, args.root)
++            # The per-implementation roots can intentionally differ: curator
++            # consumes the candidate core while cocoaskills is qualified
++            # against the released core it declares support for.
++            report = check_families(rows, args.root, args.implementation)
+         elif args.command == "go":
+             report = check_go(rows, args.stream)
+         else:
+diff --git a/tools/test_implementation_coverage.py b/tools/test_implementation_coverage.py
+index 5eb55bf..4df49a6 100644
+--- a/tools/test_implementation_coverage.py
++++ b/tools/test_implementation_coverage.py
+@@ -11,6 +11,7 @@ import implementation_coverage as coverage
+ 
+ 
+ SOURCE_ROOT = Path(__file__).resolve().parents[1]
++WORKFLOW = SOURCE_ROOT / ".github" / "workflows" / "implementations.yml"
+ 
+ GO_ROW = (
+     "go\tinternal/scriptpolicy.TestScriptExecutionOptInCases\t"
+@@ -56,6 +57,45 @@ class LedgerShapeTests(unittest.TestCase):
+         self.assertTrue(rows)
+         self.assertEqual({row.implementation for row in rows}, {"go", "manager"})
+ 
++    def test_shipped_ledger_tracks_curator_main_script_policy_consumers(self) -> None:
++        identities = {
++            row.identity
++            for row in coverage.load_ledger()
++            if row.implementation == "go"
++        }
++        self.assertIn(
++            "internal/scriptpolicy.TestScriptHostExecutionPolicyProductionConsumersCoverAllCases",
++            identities,
++        )
++        self.assertIn("internal/scriptpolicy.TestPreflightRefusalCases", identities)
++        self.assertNotIn(
++            "internal/scriptpolicy.TestARefusalPrecedesEveryWorkerSurface",
++            identities,
++        )
++
++    def test_cocoaskills_partial_client_lane_uses_rc10_and_candidate_draft_sources(self) -> None:
++        workflow = WORKFLOW.read_text(encoding="utf-8")
++        ledger = coverage.DEFAULT_LEDGER.read_text(encoding="utf-8")
++        self.assertIn("ref: 4a88aa0e47ab2b34ded16162cec7f97d0c7cf6f1", workflow)
++        self.assertIn("ref: v1.0.0-rc.10", workflow)
++        self.assertIn("path: implementations/manager-core", workflow)
++        self.assertIn(
++            r"CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/implementations/manager-core/conformance/v1",
++            workflow,
++        )
++        self.assertIn(
++            r"CSK_DRAFT_SOURCES_SUITE_ROOT: ${{ github.workspace }}/conformance/skillfile-sources-v1",
++            workflow,
++        )
++        self.assertIn("python tools/implementation_coverage.py families", workflow)
++        self.assertIn("--implementation manager", workflow)
++        self.assertIn("schemas/v1 plus schemas/skillfile-sources-v1", workflow)
++        self.assertIn("python -m pytest -q tests/test_draft_sources_conformance.py", workflow)
++        self.assertIn("if: runner.os != 'Windows'", workflow)
++        self.assertIn("cocoaskills 4a88aa0e", ledger)
++        self.assertIn("v1.0.0-rc.10", ledger)
++        self.assertIn("skillfile-sources-v1", ledger)
++
+     def test_comments_and_blank_lines_are_not_rows(self) -> None:
+         rows = coverage.load_ledger(self.write(LEDGER + "\n#  trailing note\n"))
+         self.assertEqual(len(rows), 2)
+@@ -139,10 +179,23 @@ class FamilyTests(unittest.TestCase):
+             coverage.check_families(coverage.load_ledger(self.ledger), self.suite)
+ 
+     def test_the_shipped_ledger_is_served_by_the_shipped_suite(self) -> None:
++        go_rows = tuple(row for row in coverage.load_ledger() if row.implementation == "go")
+         report = coverage.check_families(
+-            coverage.load_ledger(), SOURCE_ROOT / "conformance" / "v1"
++            coverage.load_ledger(), SOURCE_ROOT / "conformance" / "v1", "go"
+         )
+-        self.assertEqual(len(report), len(coverage.load_ledger()))
++        self.assertEqual(len(report), len(go_rows))
++
++    def test_implementation_filter_does_not_require_another_clients_corpus(self) -> None:
++        self.publish("vectors/module-roots.json")
++        report = coverage.check_families(
++            coverage.load_ledger(self.ledger), self.suite, "manager"
++        )
++        self.assertEqual(report, [
++            "served  manager\ttests/test_schema8_candidate_conformance.py::test_module_root_case"
++        ])
++        with self.assertRaises(coverage.CoverageError) as caught:
++            coverage.check_families(coverage.load_ledger(self.ledger), self.suite, "go")
++        self.assertIn("vectors/script-host-execution-policy.json", str(caught.exception))
+ 
+ 
+ class GoStreamTests(unittest.TestCase):
+@@ -310,7 +363,13 @@ class CommandLineTests(unittest.TestCase):
+     def test_families_returns_zero_for_the_shipped_suite(self) -> None:
+         self.assertEqual(
+             self.run_quietly(
+-                ["families", "--root", str(SOURCE_ROOT / "conformance" / "v1")]
++                [
++                    "families",
++                    "--implementation",
++                    "go",
++                    "--root",
++                    str(SOURCE_ROOT / "conformance" / "v1"),
++                ]
+             ),
+             0,
+         )
