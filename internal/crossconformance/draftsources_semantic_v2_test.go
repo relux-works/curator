@@ -11,8 +11,10 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/buildrepo"
+	"github.com/relux-works/curator/internal/closure"
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/install"
+	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/sourcelock"
 	"github.com/relux-works/curator/internal/testcli"
 )
@@ -46,7 +48,11 @@ func v2Endpoint(url, auth, extra string) string {
 }
 
 func v2PolicyDoc(entry, aliases string) string {
-	doc := `{"schema_version":2,"repositories":{"` + v2Identity + `":` + entry + `}`
+	return v2PolicyDocFor(v2Identity, entry, aliases)
+}
+
+func v2PolicyDocFor(identity, entry, aliases string) string {
+	doc := `{"schema_version":2,"repositories":{"` + identity + `":` + entry + `}`
 	if aliases != "" {
 		doc += `,"aliases":` + aliases
 	}
@@ -64,6 +70,9 @@ func v2Entry(endpoints, fallback, extra string) string {
 func init() {
 	registerDraftSemantic("v2-port-endpoint", driveV2PortEndpoint)
 	registerDraftSemantic("v2-declared-mirror", driveV2DeclaredMirror)
+	registerDraftSemantic("v2-refresh-current-endpoint-existing-checkout", driveV2RefreshCurrentEndpoint)
+	registerDraftSemantic("v2-scp-alias-port-refused", driveV2SCPAliasPortRefused)
+	registerDraftSemantic("v2-ssh-uri-alias-port", driveV2SSHAliasPort)
 	registerDraftSemantic("v2-mirror-first", driveV2MirrorFirst)
 	registerDraftSemantic("v2-alias-resolution", driveV2AliasResolution)
 	registerDraftSemantic("v2-reader-accepts-v1-policy", driveV2ReaderAcceptsV1)
@@ -95,8 +104,12 @@ func v2Parse(t *testing.T, doc string) *config.SourcePolicy {
 }
 
 func v2Resolve(t *testing.T, policy *config.SourcePolicy) config.Resolution {
+	return v2ResolveFor(t, policy, v2Identity)
+}
+
+func v2ResolveFor(t *testing.T, policy *config.SourcePolicy, identity string) config.Resolution {
 	t.Helper()
-	resolved, err := config.ResolveRepositoryEndpoints(policy, "", v2Identity)
+	resolved, err := config.ResolveRepositoryEndpoints(policy, "", identity)
 	if err != nil {
 		t.Fatalf("ResolveRepositoryEndpoints: %v", err)
 	}
@@ -121,6 +134,14 @@ func v2ResolveRefused(t *testing.T, doc, wantClass string) {
 // v2CLIResolve runs one CLI resolve with the given policy doc and
 // fixture arms, returning the exit code, stderr, and clone log.
 func v2CLIResolve(t *testing.T, policyDoc string, failURL, failStderr, rewriteURL string) (int, string, []string, string) {
+	return v2CLIResolveWithTag(t, policyDoc, failURL, failStderr, rewriteURL, "v1")
+}
+
+func v2CLIResolveWithTag(t *testing.T, policyDoc string, failURL, failStderr, rewriteURL, tag string) (int, string, []string, string) {
+	return v2CLIResolveIdentityWithTag(t, v2Identity, policyDoc, failURL, failStderr, rewriteURL, tag)
+}
+
+func v2CLIResolveIdentityWithTag(t *testing.T, identity, policyDoc string, failURL, failStderr, rewriteURL, tag string) (int, string, []string, string) {
 	t.Helper()
 	realGit := requireGit(t)
 	root := t.TempDir()
@@ -133,7 +154,7 @@ func v2CLIResolve(t *testing.T, policyDoc string, failURL, failStderr, rewriteUR
 			t.Fatal(err)
 		}
 	}
-	payload := `{"schema_version":2,"sources":{"kit":{"repository":"` + v2Identity + `","tag":"v1"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
+	payload := `{"schema_version":2,"sources":{"kit":{"repository":"` + identity + `","tag":"` + tag + `"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -142,6 +163,10 @@ func v2CLIResolve(t *testing.T, policyDoc string, failURL, failStderr, rewriteUR
 }
 
 func v2LockIdentity(t *testing.T, project, wantCommit string) {
+	v2LockIdentityFor(t, project, wantCommit, v2Identity)
+}
+
+func v2LockIdentityFor(t *testing.T, project, wantCommit, identity string) {
 	t.Helper()
 	lock, err := sourcelock.Read(filepath.Join(project, "Skillfile.lock.json"))
 	if err != nil {
@@ -151,8 +176,8 @@ func v2LockIdentity(t *testing.T, project, wantCommit string) {
 	if !ok {
 		t.Fatal("lock misses review")
 	}
-	if member.Package.Repository != v2Identity {
-		t.Fatalf("lock identity = %q, want the canonical key", member.Package.Repository)
+	if member.Package.Repository != identity {
+		t.Fatalf("lock identity = %q, want canonical key %q", member.Package.Repository, identity)
 	}
 	if member.Package.Commit.Hex != wantCommit {
 		t.Fatalf("lock commit = %s, want %s", member.Package.Commit.Hex, wantCommit)
@@ -182,21 +207,50 @@ func driveV2PortEndpoint(t *testing.T, _ draftSemanticCase) {
 	v2LockIdentity(t, parts[1], parts[0])
 }
 
-func driveV2DeclaredMirror(t *testing.T, _ draftSemanticCase) {
-	doc := v2PolicyDoc(v2Entry(v2Endpoint(v2Mirror, "mirror-https", `"mirror_of":"`+v2Identity+`"`), "none", ""), "")
-	resolved := v2Resolve(t, v2Parse(t, doc))
-	if len(resolved.Attempts) != 1 || resolved.Attempts[0].URL != v2Mirror || resolved.Attempts[0].MirrorOf != v2Identity {
+func driveV2DeclaredMirror(t *testing.T, c draftSemanticCase) {
+	identityValue, identityOK := c.Input["repository"].(string)
+	endpoint, endpointOK := c.Input["endpoint"].(string)
+	mirrorOf, mirrorOK := c.Input["mirror_of"].(string)
+	declaredTag, ok := c.Input["declared_tag"].(string)
+	if !identityOK || !endpointOK || !mirrorOK || !ok || c.Input["operation"] != "source-resolution" {
+		t.Fatalf("case input = %+v, want a source-resolution tag case", c.Input)
+	}
+	doc := v2PolicyDocFor(identityValue, v2Entry(v2Endpoint(endpoint, "mirror-https", `"mirror_of":"`+mirrorOf+`"`), "none", ""), "")
+	resolved := v2ResolveFor(t, v2Parse(t, doc), identityValue)
+	if len(resolved.Attempts) != 1 || resolved.Attempts[0].URL != endpoint || resolved.Attempts[0].MirrorOf != mirrorOf {
 		t.Fatalf("resolved = %+v, want the declared mirror once", resolved.Attempts)
 	}
-	code, stderr, clones, rest := v2CLIResolve(t, doc, "https://never.invalid/x.git", "fatal: unexpected", v2Mirror)
+	code, stderr, clones, rest := v2CLIResolveIdentityWithTag(t, identityValue, doc, "https://never.invalid/x.git", "fatal: unexpected", endpoint, declaredTag)
 	parts := strings.SplitN(rest, "|", 2)
 	if code != 0 {
 		t.Fatalf("resolve = %d, want success:\n%s", code, stderr)
 	}
-	if len(clones) != 1 || clones[0] != v2Mirror {
-		t.Fatalf("clones = %v, want the listed mirror once", clones)
+	if len(clones) != 1 || clones[0] != endpoint {
+		t.Fatalf("clones = %v, want the listed mirror %q once", clones, endpoint)
 	}
-	v2LockIdentity(t, parts[1], parts[0])
+	v2LockIdentityFor(t, parts[1], parts[0], identityValue)
+	lock, err := sourcelock.Read(sourcelock.PathIn(parts[1]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	member, ok := lock.Find("review")
+	if !ok || member.Package.Commit.Hex != parts[0] {
+		t.Fatalf("resolved lock member = %+v, want resolved commit %q", member, parts[0])
+	}
+	parsed, err := manifest.Load(parts[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed.Sources["kit"].Ref.Kind != "tag" || parsed.Sources["kit"].Ref.Value != declaredTag {
+		t.Fatalf("resolved selection = %+v, want declared tag %q", parsed.Sources["kit"].Ref, declaredTag)
+	}
+	got := strings.Join([]string{
+		"attempt-listed-mirror-once",
+		"verify-resolved-commit-and-declared-tag-objects-on-resolution",
+	}, ";")
+	if got != c.Expected {
+		t.Fatalf("observed outcome %q differs from corpus expectation %q", got, c.Expected)
+	}
 }
 
 func driveV2MirrorFirst(t *testing.T, _ draftSemanticCase) {
@@ -429,10 +483,8 @@ func driveV2UserInsteadOf(t *testing.T, _ draftSemanticCase) {
 // TestDraftLiteralRefreshIgnoresUserConfig pins the fetch half of the
 // draft literal-URL isolation (BUG-260920-3ukdk4) at the production
 // entry: after a clean resolve, a hostile user git configuration must
-// not redirect the refresh fetch to another repository. It is
-// intentionally NOT a corpus row (no registerDraftSemantic call): the
-// semantic ratio stays 94 and TestDraftSourcesSemanticCoverage is
-// unaffected.
+// not redirect the refresh fetch to another repository. It is a standalone
+// regression test outside the pinned semantic corpus.
 func TestDraftLiteralRefreshIgnoresUserConfig(t *testing.T) {
 	realGit := requireGit(t)
 	root := t.TempDir()
@@ -453,9 +505,12 @@ func TestDraftLiteralRefreshIgnoresUserConfig(t *testing.T) {
 	if evilMain == commit {
 		t.Fatal("declared and evil fixtures collide")
 	}
-	fakeDir, logPath := installDraftTransportShim(t, "https://never.invalid/x.git", "fatal: unexpected", v2Primary, bare, realGit)
-	pathEnv := draftTransportPATH(t, fakeDir)
 	configPath, project, home := setupCLIProject(t, root)
+	policy := v2PolicyDoc(v2Entry(v2Endpoint(v2Primary, "team-https", ""), "none", ""), "")
+	if err := os.WriteFile(filepath.Join(filepath.Dir(configPath), "source-policy.json"), []byte(policy), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	pathEnv, logPath := draftEndpointGitShim(t, v2Primary, bare, false)
 	payload := `{"schema_version":2,"sources":{"kit":{"git":"` + v2Primary + `","branch":"main"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
 		t.Fatal(err)
@@ -474,6 +529,10 @@ func TestDraftLiteralRefreshIgnoresUserConfig(t *testing.T) {
 	if member.Package.Commit.Hex != commit {
 		t.Fatalf("initial lock = %s, want %s", member.Package.Commit.Hex, commit)
 	}
+	storedOrigin := draftGitOutput(t, draftRepoDirForTest(home, project, "kit"), "remote", "get-url", "origin")
+	if storedOrigin == v2Primary {
+		t.Fatalf("stored remote.origin.url %q selected the endpoint; refresh must use the current machine plan", storedOrigin)
+	}
 	// Advance the declared repository's main past the resolved commit.
 	if err := os.WriteFile(filepath.Join(work, "skills", "review", "references", "info.md"), []byte("advanced"), 0o644); err != nil {
 		t.Fatal(err)
@@ -485,9 +544,10 @@ func TestDraftLiteralRefreshIgnoresUserConfig(t *testing.T) {
 	if advanced == commit || advanced == evilMain {
 		t.Fatal("fixture advance collided")
 	}
-	hostileBody := "[url \"file://" + evilBare + "\"]\n" +
-		"\tinsteadOf = file://" + bare + "\n" +
-		"\tpushInsteadOf = file://" + bare + "\n"
+	bareURL, evilURL := draftGitFileURL(bare), draftGitFileURL(evilBare)
+	hostileBody := "[url \"" + evilURL + "\"]\n" +
+		"\tinsteadOf = " + bareURL + "\n" +
+		"\tpushInsteadOf = " + bareURL + "\n"
 	hostile := filepath.Join(root, "hostile.gitconfig")
 	if err := os.WriteFile(hostile, []byte(hostileBody), 0o644); err != nil {
 		t.Fatal(err)
@@ -500,7 +560,7 @@ func TestDraftLiteralRefreshIgnoresUserConfig(t *testing.T) {
 	// under the hostile selectors lands on evil's main, proving the
 	// payload redirects fetches when it is consulted.
 	control := filepath.Join(t.TempDir(), "control")
-	if code, _, stderr := testcli.Run(t, "", nil, "", realGit, "clone", "--quiet", "--", "file://"+bare, control); code != 0 {
+	if code, _, stderr := testcli.Run(t, "", nil, "", realGit, "clone", "--quiet", "--", bareURL, control); code != 0 {
 		t.Fatalf("control clone: %s", stderr)
 	}
 	if code, _, stderr := testcli.Run(t, control, hostileEnv, "", realGit, "fetch", "--quiet", "--all"); code != 0 {
@@ -514,8 +574,10 @@ func TestDraftLiteralRefreshIgnoresUserConfig(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("refresh = %d:\n%s\n%s", code, stdout, stderr)
 	}
-	if clones := draftCloneLog(t, logPath); len(clones) != 1 {
-		t.Fatalf("clones = %v, want exactly the initial clone (refresh must fetch, not reclone)", clones)
+	operations := strings.Split(strings.TrimSpace(readDraftFetchLog(t, logPath)), "\n")
+	if len(operations) != 2 || !strings.Contains(operations[0], "clone") || !strings.Contains(operations[1], "fetch") ||
+		!strings.Contains(operations[1], v2Primary) {
+		t.Fatalf("Git operations = %q, want one initial clone and one fetch through current endpoint %q", operations, v2Primary)
 	}
 	lock, err = sourcelock.Read(filepath.Join(project, "Skillfile.lock.json"))
 	if err != nil {
@@ -894,4 +956,221 @@ func driveV2ExternalAliasRefused(t *testing.T, _ draftSemanticCase) {
 	policyDoc := `{"schema_version":2,"repositories":{"` + toolsIdentity + `":{"endpoints":[{"url":"https://git.example.com/skills/tools.git","authentication":"team-https","alias":"corp-mirror","mirror_of":"` + toolsIdentity + `"}],"fallback":"none"}},"aliases":{"corp-mirror":{"host":"mirror.corp.example","authentication":"team-https"}}}`
 	driveV2ExternalRefused(t, "https://git.example.com/skills/tools.git", policyDoc,
 		`{"schema_version":1,"providers":{"team-https":{"https":{"anonymous":true}}}}`)
+}
+
+func driveV2SCPAliasPortRefused(t *testing.T, c draftSemanticCase) {
+	identityValue, _ := c.Input["repository"].(string)
+	endpoint, _ := c.Input["endpoint"].(string)
+	alias, _ := c.Input["alias"].(string)
+	aliases, _ := c.Input["aliases"].(map[string]any)
+	aliasEntry, _ := aliases[alias].(map[string]any)
+	host, _ := aliasEntry["host"].(string)
+	port, _ := aliasEntry["port"].(float64)
+	portInt := int(port)
+	endpointJSON := `"alias":"` + alias + `","mirror_of":"` + identityValue + `"`
+	aliasJSON := `{"` + alias + `":{"host":"` + host + `","port":` + fmt.Sprint(portInt) + `,"authentication":"team-ssh"}}`
+	doc := v2PolicyDocFor(identityValue, v2Entry(v2Endpoint(endpoint, "team-ssh", endpointJSON), "none", ""), aliasJSON)
+	guessedSSH := fmt.Sprintf("ssh://git@%s:%d/~/kit.git", host, portInt)
+	root := t.TempDir()
+	configPath, project, home := setupCLIProject(t, root)
+	if err := os.WriteFile(filepath.Join(filepath.Dir(configPath), "source-policy.json"), []byte(doc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	payload := `{"schema_version":2,"sources":{"kit":{"repository":"` + identityValue + `","tag":"v1"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
+	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pathEnv, logPath := draftEndpointGitShim(t, "", "", true)
+	code, _, stderr := runCurator(t, home, configPath, pathEnv, "project", "resolve", "app")
+	if code == 0 || !strings.Contains(stderr, config.CodeRepositoryPolicyInvalid) {
+		t.Fatalf("resolve = %d, stderr %q; want repository_policy_invalid", code, stderr)
+	}
+	if attempts := readDraftFetchLog(t, logPath); attempts != "" {
+		t.Fatalf("network attempts = %q, want zero before I/O", attempts)
+	}
+	if strings.Contains(stderr, "ssh://") || strings.Contains(stderr, guessedSSH) {
+		t.Fatalf("refusal guessed an SSH URI: %q", stderr)
+	}
+	got := strings.Join([]string{"repository_policy_invalid", "zero-network-attempts", "no-ssh-uri-guess"}, ";")
+	if got != c.Expected {
+		t.Fatalf("observed outcome %q differs from corpus expectation %q", got, c.Expected)
+	}
+}
+
+func driveV2SSHAliasPort(t *testing.T, c draftSemanticCase) {
+	identityValue, _ := c.Input["repository"].(string)
+	endpoint, _ := c.Input["endpoint"].(string)
+	alias, _ := c.Input["alias"].(string)
+	aliases, _ := c.Input["aliases"].(map[string]any)
+	aliasEntry, _ := aliases[alias].(map[string]any)
+	host, _ := aliasEntry["host"].(string)
+	port, _ := aliasEntry["port"].(float64)
+	portInt := int(port)
+	endpointJSON := `"alias":"` + alias + `","mirror_of":"` + identityValue + `"`
+	aliasJSON := `{"` + alias + `":{"host":"` + host + `","port":` + fmt.Sprint(portInt) + `,"authentication":"team-ssh"}}`
+	doc := v2PolicyDocFor(identityValue, v2Entry(v2Endpoint(endpoint, "team-ssh", endpointJSON), "none", ""), aliasJSON)
+	connectionURL := fmt.Sprintf("ssh://git@%s:%d/kit.git", host, portInt)
+	resolved := v2ResolveFor(t, v2Parse(t, doc), identityValue)
+	if len(resolved.Attempts) != 1 {
+		t.Fatalf("resolved attempts = %+v, want one", resolved.Attempts)
+	}
+	plannedURL, ok := resolved.Attempts[0].ConnectionURL()
+	if !ok || plannedURL != connectionURL {
+		t.Fatalf("connection target = %q/%v, want %q", plannedURL, ok, connectionURL)
+	}
+	root := t.TempDir()
+	bare, _ := draftCLIKitBare(t, root)
+	configPath, project, home := setupCLIProject(t, root)
+	if err := os.WriteFile(filepath.Join(filepath.Dir(configPath), "source-policy.json"), []byte(doc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	payload := `{"schema_version":2,"sources":{"kit":{"repository":"` + identityValue + `","tag":"v1"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
+	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pathEnv, logPath := draftEndpointGitShim(t, connectionURL, bare, false)
+	code, stdout, stderr := runCurator(t, home, configPath, pathEnv, "project", "resolve", "app")
+	if code != 0 {
+		t.Fatalf("resolve = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+	logText := readDraftFetchLog(t, logPath)
+	if strings.Count(logText, connectionURL) != 1 {
+		t.Fatalf("Git operations = %q, want one clone through %q", logText, connectionURL)
+	}
+	lock, err := sourcelock.Read(sourcelock.PathIn(project))
+	if err != nil {
+		t.Fatal(err)
+	}
+	member, ok := lock.Find("review")
+	if !ok || member.Package.Repository != identityValue {
+		t.Fatalf("lock member = %+v, want canonical identity %q", member, identityValue)
+	}
+	got := strings.Join([]string{"connect-" + connectionURL, "identity-stays-" + member.Package.Repository, "attempt-once"}, ";")
+	if got != c.Expected {
+		t.Fatalf("observed outcome %q differs from corpus expectation %q", got, c.Expected)
+	}
+}
+
+func driveV2RefreshCurrentEndpoint(t *testing.T, c draftSemanticCase) {
+	identityValue, _ := c.Input["repository"].(string)
+	storedOrigin, _ := c.Input["stored_origin"].(string)
+	currentEndpoint, _ := c.Input["current_endpoint"].(string)
+	currentAlias, _ := c.Input["current_alias"].(map[string]any)
+	currentHost, _ := currentAlias["host"].(string)
+	currentPort := int(currentAlias["port"].(float64))
+	root := t.TempDir()
+	configPath, project, home := setupCLIProject(t, root)
+	payload := `{"schema_version":2,"sources":{"kit":{"repository":"` + identityValue + `","tag":"v1.0.0"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
+	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	oldWork, oldBare, oldCommit := v2BareSkill(t, filepath.Join(root, "old"), "old bytes", "v1.0.0")
+	currentWork, currentBare, currentCommit := v2BareSkill(t, filepath.Join(root, "current"), "current bytes", "v1.0.0")
+	_ = currentWork
+	repoDir := draftRepoDirForTest(home, project, "kit")
+	if err := os.MkdirAll(filepath.Dir(repoDir), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runDraftGit(t, "", "clone", "--quiet", "--", oldBare, repoDir)
+	runDraftGit(t, repoDir, "remote", "set-url", "origin", storedOrigin)
+	m, err := manifest.ParseBytes([]byte(payload), filepath.Join(project, "Skillfile.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := closure.ResolveDraft(closure.DraftResolveConfig{
+		ProjectRoot: project, Home: home, Manifest: m, ManifestPayload: []byte(payload),
+		Expansion: manifest.ExpansionOptions{GitRoots: map[string]string{"kit": oldWork}},
+	})
+	if err != nil {
+		t.Fatalf("initial resolve: %v", err)
+	}
+	lockPath := sourcelock.PathIn(project)
+	if err := sourcelock.Write(lockPath, plan.Lock); err != nil {
+		t.Fatal(err)
+	}
+	oldMember, ok := plan.Lock.Find("review")
+	if !ok || oldMember.Package.Commit.Hex != oldCommit {
+		t.Fatalf("initial member = %+v, want locked commit %s", oldMember, oldCommit)
+	}
+	bindings, err := sourcelock.NewBindings(plan.Lock.LockSHA256, map[string]sourcelock.SourceBinding{"kit": {Location: repoDir}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sourcelock.WriteBindings(install.DraftBindingsPath(home, project), bindings); err != nil {
+		t.Fatal(err)
+	}
+	beforeLock, err := os.ReadFile(lockPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	endpointJSON := `"alias":"current","mirror_of":"` + identityValue + `"`
+	aliasJSON := `{"current":{"host":"` + currentHost + `","port":` + fmt.Sprint(currentPort) + `,"authentication":"team-https"}}`
+	policyDoc := v2PolicyDocFor(identityValue, v2Entry(v2Endpoint(currentEndpoint, "team-https", endpointJSON), "none", ""), aliasJSON)
+	policy := v2Parse(t, policyDoc)
+	resolution := v2ResolveFor(t, policy, identityValue)
+	if len(resolution.Attempts) != 1 {
+		t.Fatalf("current resolution attempts = %+v", resolution.Attempts)
+	}
+	currentTarget, ok := resolution.Attempts[0].ConnectionURL()
+	if !ok || resolution.Attempts[0].ResolvedHost != currentHost || resolution.Attempts[0].ResolvedPort != currentPort {
+		t.Fatalf("current endpoint plan = %+v, want %s:%d", resolution.Attempts[0], currentHost, currentPort)
+	}
+	if err := os.WriteFile(filepath.Join(filepath.Dir(configPath), "source-policy.json"), []byte(policyDoc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	extraEnv, fetchLog := draftEndpointGitShim(t, currentTarget, currentBare, false)
+	code, stdout, stderr := runCurator(t, home, configPath, extraEnv, "project", "refresh", "app")
+	if code != 0 {
+		t.Fatalf("project refresh = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+	logText := readDraftFetchLog(t, fetchLog)
+	if !strings.Contains(logText, currentTarget) || strings.Contains(logText, storedOrigin) || strings.Contains(logText, "fetch\t--all") {
+		t.Fatalf("fetches = %q; want the current resolved endpoint only", logText)
+	}
+	afterLock, err := os.ReadFile(lockPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, err := sourcelock.Read(lockPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	updatedMember, ok := updated.Find("review")
+	if !ok || updatedMember.Package.Commit.Hex != currentCommit || updatedMember.ContentSHA256 == oldMember.ContentSHA256 {
+		t.Fatalf("updated member = %+v, want refreshed commit/content %s", updatedMember, currentCommit)
+	}
+	if string(beforeLock) == string(afterLock) || updated.LockSHA256 == plan.Lock.LockSHA256 {
+		t.Fatal("successful refresh did not replace the lock generation")
+	}
+	got := strings.Join([]string{
+		"fetch-current-resolved-endpoint-" + fmt.Sprintf("%s:%d", currentHost, currentPort),
+		"never-fetch-stored-origin",
+		"verify-locked-content",
+		"replace-lock-atomically-on-success",
+	}, ";")
+	if got != c.Expected {
+		t.Fatalf("observed outcome %q differs from corpus expectation %q", got, c.Expected)
+	}
+}
+
+func v2BareSkill(t *testing.T, root, description, tag string) (work, bare, commit string) {
+	t.Helper()
+	work = filepath.Join(root, "work")
+	bare = filepath.Join(root, "source.git")
+	if err := os.MkdirAll(work, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	skillDir := filepath.Join(work, "skills", "review")
+	writeDraftSkill(t, skillDir, "review")
+	content := "---\nname: review\ndescription: " + description + "\n---\n# review\n"
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runDraftGit(t, work, "init", "-q", "-b", "main")
+	runDraftGit(t, work, "add", ".")
+	runDraftGit(t, work, "commit", "-qm", "fixture")
+	runDraftGit(t, work, "tag", tag)
+	commit = draftGitOutput(t, work, "rev-parse", "HEAD")
+	runDraftGit(t, "", "clone", "--quiet", "--bare", "--", work, bare)
+	return work, bare, commit
 }

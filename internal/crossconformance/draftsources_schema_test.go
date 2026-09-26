@@ -39,22 +39,20 @@ var draftSchemaDrivers = map[string]func(t *testing.T, dir string, entry draftSc
 // set exactly: a fixed gap must convert its row to a drive, never
 // silently pass.
 var draftSchemaBounds = map[string]string{
-	// No production entry consumes local-snapshot inventory documents
-	// as bytes: Capture/BuildInventory derive inventories from live
-	// trees and OpenLocal re-derives from the store tree, so the wire
-	// shape is proven by the snapshot vectors through Capture, not by
-	// parsing these documents.
-	"schema-cases/local-snapshot-v1/valid.json":                     "no byte-reader production entry for inventory documents; shape proven by Capture vectors",
-	"schema-cases/local-snapshot-v1/invalid-algorithm.json":         "no byte-reader production entry for inventory documents; shape proven by Capture vectors",
-	"schema-cases/local-snapshot-v1/invalid-unknown-top-level.json": "no byte-reader production entry for inventory documents; shape proven by Capture vectors",
+	// Curator never reads serialized inventory JSON; Capture/OpenLocal
+	// recompute inventory from the stored tree. The snapshot vectors
+	// drive those production entries.
+	"schema-cases/local-snapshot-v1/valid.json":                     "Curator never reads serialized inventory JSON; inventory is recomputed from the stored tree (internal/snapshot Capture/OpenLocal)",
+	"schema-cases/local-snapshot-v1/invalid-algorithm.json":         "Curator never reads serialized inventory JSON; inventory is recomputed from the stored tree (internal/snapshot Capture/OpenLocal)",
+	"schema-cases/local-snapshot-v1/invalid-unknown-top-level.json": "Curator never reads serialized inventory JSON; inventory is recomputed from the stored tree (internal/snapshot Capture/OpenLocal)",
 }
 
-// TestDraftSourcesSchemaCases drives all 116 pinned schema cases.
+// TestDraftSourcesSchemaCases drives all 121 released schema cases.
 func TestDraftSourcesSchemaCases(t *testing.T) {
 	dir := draftCorpusDir(t)
 	entries := loadDraftIndex(t)
 	seenBounds := map[string]bool{}
-	conformancecoverage.RunOutcomes(t, "draft-sources-v1/schema-cases", entries,
+	conformancecoverage.RunOutcomes(t, "skillfile-sources-v1/schema-cases", entries,
 		func(entry draftSchemaEntry) string { return entry.Instance }, func(t *testing.T, entry draftSchemaEntry) conformancecoverage.Observation {
 			driver, ok := draftSchemaDrivers[entry.Schema]
 			if !ok {

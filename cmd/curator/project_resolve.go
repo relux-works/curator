@@ -187,20 +187,6 @@ func acquireDraftGitRoots(home, projectRoot string, projectManifest *manifest.Ma
 // vocabulary, never URLs, stderr, or secrets, and nothing here enters
 // portable state.
 func fetchDraftRepoAllowingFallback(repoDir string, resolution config.Resolution, alias string, stderr io.Writer) error {
-	if _, err := os.Stat(filepath.Join(repoDir, ".git")); err == nil {
-		if err := gitops.FetchIsolated(repoDir); err != nil {
-			class := buildrepo.ClassifyFetchOutput(gitFailureDetail(err))
-			if buildrepo.AllowSecondAttempt(resolution.Fallback, class) && len(resolution.Attempts) > 1 {
-				_, _ = fmt.Fprintf(stderr, "warning: %s: fetch failed (%s: %s); recloning from the alternate endpoint\n", alias, class, class.Reason())
-				_ = os.RemoveAll(repoDir)
-			} else {
-				_, _ = fmt.Fprintf(stderr, "warning: %s: fetch of the existing checkout failed (%s: %s)\n", alias, class, class.Reason())
-				return fmt.Errorf("%s: %s: %s", config.CodeRepositoryEndpointUnavailable, alias, fetchExhaustion(resolution, class))
-			}
-		} else {
-			return nil
-		}
-	}
 	attempts := resolution.Attempts
 	// Alias-substituted endpoints connect to the resolved host:port,
 	// not the listed URL (repository-transport §5). Every connection
@@ -213,6 +199,23 @@ func fetchDraftRepoAllowingFallback(repoDir string, resolution config.Resolution
 			return fmt.Errorf("%s: %s: endpoint %d connection target is malformed", config.CodeRepositoryPolicyInvalid, alias, index+1)
 		}
 		targets[index] = target
+	}
+	if _, err := os.Stat(filepath.Join(repoDir, ".git")); err == nil {
+		classes := make([]buildrepo.FailureClass, 0, len(attempts))
+		for index, target := range targets {
+			err := gitops.FetchURLIsolated(repoDir, target)
+			if err == nil {
+				return nil
+			}
+			class := buildrepo.ClassifyFetchOutput(gitFailureDetail(err))
+			classes = append(classes, class)
+			_, _ = fmt.Fprintf(stderr, "warning: %s: %s\n", alias, draftAttemptClause(index+1, attempts[index], class))
+			if index+1 < len(attempts) && buildrepo.AllowSecondAttempt(resolution.Fallback, class) {
+				continue
+			}
+			break
+		}
+		return fmt.Errorf("%s: %s: %s", config.CodeRepositoryEndpointUnavailable, alias, endpointExhaustion(resolution, classes))
 	}
 	classes := make([]buildrepo.FailureClass, 0, len(attempts))
 	for index, attempt := range attempts {

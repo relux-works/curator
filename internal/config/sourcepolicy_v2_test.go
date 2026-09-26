@@ -311,6 +311,12 @@ func TestParseSourcePolicyV2Refusals(t *testing.T) {
 			CodeRepositoryPolicyInvalid,
 		},
 		{
+			"SCP-like endpoint with alias port",
+			v2doc(v2entry(v2endpoint("git@example.org:kit.git", "team-ssh", `"alias":"corp-mirror","mirror_of":"example.org/kit"`), ""),
+				`{"corp-mirror":{"host":"mirror.corp.example","port":2222,"authentication":"team-ssh"}}`),
+			CodeRepositoryPolicyInvalid,
+		},
+		{
 			"pin differs only by port",
 			v2doc(v2entry(v2endpoint("https://example.org/kit.git", "team-https", ""), `"pin":"https://example.org:8443/kit.git"`), ""),
 			CodeRepositoryPolicyInvalid,
@@ -528,11 +534,6 @@ func TestAttemptConnectionURL(t *testing.T) {
 			want:    "git@mirror.corp.example:kit.git",
 		},
 		{
-			name:    "scp alias with port renders ssh with a home-relative path",
-			attempt: Attempt{URL: "git@example.org:teams/kit.git", Alias: "corp-mirror", ResolvedHost: "mirror.corp.example", ResolvedPort: 2222, HasExplicitPort: true},
-			want:    "ssh://git@mirror.corp.example:2222/~/teams/kit.git",
-		},
-		{
 			name:    "nested https path survives substitution",
 			attempt: Attempt{URL: "https://example.org/teams/kit.git", Alias: "corp-mirror", ResolvedHost: "mirror.corp.example", ResolvedPort: 8443, HasExplicitPort: true},
 			want:    "https://mirror.corp.example:8443/teams/kit.git",
@@ -576,6 +577,7 @@ func TestAttemptConnectionURLRefusesMistranslations(t *testing.T) {
 		{"https with query", Attempt{URL: "https://example.org/kit.git?x=1", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost}},
 		{"ssh URI with empty user", Attempt{URL: "ssh://@example.org/kit.git", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost}},
 		{"scp without path", Attempt{URL: "git@example.org:", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost}},
+		{"scp alias with explicit port", Attempt{URL: "git@example.org:kit.git", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost, ResolvedPort: 2222, HasExplicitPort: true}},
 		{"scp with absolute path", Attempt{URL: "git@example.org:/kit.git", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost}},
 		{"scp with second colon", Attempt{URL: "git@example.org:kit:evil.git", Alias: valid.Alias, ResolvedHost: valid.ResolvedHost}},
 	}
@@ -593,9 +595,8 @@ func TestAttemptConnectionURLRefusesMistranslations(t *testing.T) {
 // when present, else the transport default.
 func TestAttemptConnectionURLFollowsLoaderPlans(t *testing.T) {
 	docs := map[string]string{
-		"https://mirror.corp.example:8443/kit.git":     `{"schema_version":2,"repositories":{"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https","alias":"m","mirror_of":"example.org/kit"}],"fallback":"none"}},"aliases":{"m":{"host":"mirror.corp.example","port":8443,"authentication":"team-https"}}}`,
-		"git@mirror.corp.example:kit.git":              `{"schema_version":2,"repositories":{"example.org/kit":{"endpoints":[{"url":"git@example.org:kit.git","authentication":"team-ssh","alias":"m","mirror_of":"example.org/kit"}],"fallback":"none"}},"aliases":{"m":{"host":"mirror.corp.example","authentication":"team-ssh"}}}`,
-		"ssh://git@mirror.corp.example:2222/~/kit.git": `{"schema_version":2,"repositories":{"example.org/kit":{"endpoints":[{"url":"git@example.org:kit.git","authentication":"team-ssh","alias":"m","mirror_of":"example.org/kit"}],"fallback":"none"}},"aliases":{"m":{"host":"mirror.corp.example","port":2222,"authentication":"team-ssh"}}}`,
+		"https://mirror.corp.example:8443/kit.git": `{"schema_version":2,"repositories":{"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https","alias":"m","mirror_of":"example.org/kit"}],"fallback":"none"}},"aliases":{"m":{"host":"mirror.corp.example","port":8443,"authentication":"team-https"}}}`,
+		"git@mirror.corp.example:kit.git":          `{"schema_version":2,"repositories":{"example.org/kit":{"endpoints":[{"url":"git@example.org:kit.git","authentication":"team-ssh","alias":"m","mirror_of":"example.org/kit"}],"fallback":"none"}},"aliases":{"m":{"host":"mirror.corp.example","authentication":"team-ssh"}}}`,
 	}
 	for want, doc := range docs {
 		policy, err := ParseSourcePolicy([]byte(doc), "source-policy.json")

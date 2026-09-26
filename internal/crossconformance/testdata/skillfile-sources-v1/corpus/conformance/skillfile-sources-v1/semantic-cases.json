@@ -176,11 +176,84 @@
     "expected": "reject"
   },
   {
-    "id": "missing-snapshot",
+    "id": "path-missing-snapshot-identical-bytes",
     "input": {
-      "locked": "A",
+      "operation": "install-with-existing-lock",
+      "source_kind": "path",
       "snapshot_store": "absent",
-      "live": "B"
+      "locked_bytes": "A",
+      "current_bytes": "A",
+      "locked_package_identity": "local-snapshot-A",
+      "replayed_package_identity": "local-snapshot-A",
+      "locked_content_sha256": "context-A",
+      "replayed_content_sha256": "context-A",
+      "lock_before": "bytes-L",
+      "lock_after": "bytes-L"
+    },
+    "expected": "install;lock-byte-identical"
+  },
+  {
+    "id": "path-missing-snapshot-drifted-bytes",
+    "input": {
+      "operation": "install-with-existing-lock",
+      "source_kind": "path",
+      "snapshot_store": "absent",
+      "locked_bytes": "A",
+      "current_bytes": "B",
+      "locked_package_identity": "local-snapshot-A",
+      "replayed_package_identity": "local-snapshot-B",
+      "locked_content_sha256": "context-A",
+      "replayed_content_sha256": "context-B"
+    },
+    "expected": "source_snapshot_changed"
+  },
+  {
+    "id": "git-missing-snapshot-fetches-locked-commit",
+    "input": {
+      "operation": "install-with-existing-lock",
+      "source_kind": "git",
+      "snapshot_store": "absent",
+      "locked_commit": "commit-A",
+      "fetched_commit": "commit-A",
+      "locked_package_identity": "network-git-A",
+      "fetched_package_identity": "network-git-A",
+      "locked_content_sha256": "context-A",
+      "fetched_content_sha256": "context-A",
+      "lock_before": "bytes-L",
+      "lock_after": "bytes-L"
+    },
+    "expected": "fetch-locked-commit;install;lock-byte-identical"
+  },
+  {
+    "id": "git-moved-tag-replays-locked-commit",
+    "input": {
+      "operation": "install-with-existing-lock",
+      "source_kind": "git",
+      "snapshot_store": "absent",
+      "manifest": "unchanged",
+      "locked_commit": "commit-A",
+      "locked_object_format": "sha1",
+      "declared_tag": "v1.0.0",
+      "tag_after_lock": "commit-B",
+      "fetched_commit": "commit-A",
+      "fetched_object_format": "sha1",
+      "locked_package_identity": "network-git-A",
+      "fetched_package_identity": "network-git-A",
+      "locked_content_sha256": "sha256-A",
+      "fetched_content_sha256": "sha256-A",
+      "ref_resolution": "not-performed",
+      "lock_before": "bytes-L",
+      "lock_after": "bytes-L"
+    },
+    "expected": "fetch-commit-A-by-object-id;verify-object-format-and-commit;verify-package-identity-and-content-sha256;install;no-tag-resolution;lock-byte-identical"
+  },
+  {
+    "id": "missing-snapshot-unreachable-source",
+    "input": {
+      "source_kind": "git",
+      "snapshot_store": "absent",
+      "source_reachable": false,
+      "locked_commit": "commit-A"
     },
     "expected": "source_snapshot_unavailable"
   },
@@ -336,7 +409,15 @@
     "id": "attested-network-current",
     "input": {
       "package": "network-git",
-      "signed_record": "valid-fresh-exact-name-repository-commit-context",
+      "registry_policy": "strict",
+      "signed_record": "valid-fresh-exact-name-repository-commit-raw-package-tree-hash",
+      "exact_match_fields": [
+        "name",
+        "source_identity",
+        "commit",
+        "raw_package_tree_content_sha256"
+      ],
+      "lock_projected_context_hash": "differs-from-raw-package-tree-hash",
       "marker_attestation": "matches-registry-status-key",
       "operation": "status"
     },
@@ -458,6 +539,24 @@
     "id": "attestation-evidence-revoked",
     "input": {
       "required_registry_evidence": "revoked",
+      "registry_policy": "advisory",
+      "revocation_match": "raw-content-hash-only;repository-and-commit-differ",
+      "marker_summary": "apparently-valid",
+      "operations": [
+        "install",
+        "status",
+        "repair",
+        "refresh"
+      ]
+    },
+    "expected": "install-repair-refresh-refuse-preserve-prior-state;status-noncurrent-or-unknown-nonzero-no-mutation"
+  },
+  {
+    "id": "attestation-evidence-revoked-identity-commit-advisory",
+    "input": {
+      "required_registry_evidence": "revoked",
+      "registry_policy": "advisory",
+      "revocation_match": "canonical-repository-and-commit-only;name-and-content-hash-differ",
       "marker_summary": "apparently-valid",
       "operations": [
         "install",
@@ -472,6 +571,9 @@
     "id": "attestation-evidence-wrong-name",
     "input": {
       "required_registry_evidence": "wrong-name",
+      "registry_policy": "strict",
+      "only_mismatching_grant_field": "name",
+      "all_other_grant_fields": "match",
       "marker_summary": "apparently-valid",
       "operations": [
         "install",
@@ -486,6 +588,9 @@
     "id": "attestation-evidence-wrong-repository",
     "input": {
       "required_registry_evidence": "wrong-repository",
+      "registry_policy": "strict",
+      "only_mismatching_grant_field": "canonical-repository-identity",
+      "all_other_grant_fields": "match",
       "marker_summary": "apparently-valid",
       "operations": [
         "install",
@@ -500,6 +605,9 @@
     "id": "attestation-evidence-wrong-commit",
     "input": {
       "required_registry_evidence": "wrong-commit",
+      "registry_policy": "strict",
+      "only_mismatching_grant_field": "locked-commit",
+      "all_other_grant_fields": "match",
       "marker_summary": "apparently-valid",
       "operations": [
         "install",
@@ -514,6 +622,10 @@
     "id": "attestation-evidence-wrong-context",
     "input": {
       "required_registry_evidence": "wrong-context",
+      "registry_policy": "strict",
+      "only_mismatching_grant_field": "raw-package-tree-content_sha256",
+      "all_other_grant_fields": "match",
+      "record_hash_matches": "lock-projected-context-hash-only",
       "marker_summary": "apparently-valid",
       "operations": [
         "install",
@@ -826,12 +938,15 @@
   {
     "id": "v2-declared-mirror",
     "input": {
+      "operation": "source-resolution",
       "transport_revision": 2,
       "repository": "example.org/kit",
+      "declared_tag": "v1.0.0",
+      "resolved_commit": "commit-A",
       "endpoint": "https://mirror.example.net/kit.git",
       "mirror_of": "example.org/kit"
     },
-    "expected": "attempt-listed-mirror-once;verify-locked-commit-tag-objects-identically-to-revision-1"
+    "expected": "attempt-listed-mirror-once;verify-resolved-commit-and-declared-tag-objects-on-resolution"
   },
   {
     "id": "v2-mirror-first",
@@ -865,6 +980,60 @@
       "mirror_of": "example.org/kit"
     },
     "expected": "substitute-alias-once;connect-to-mirror.corp.example:8443;identity-stays-example.org/kit"
+  },
+  {
+    "id": "v2-refresh-current-endpoint-existing-checkout",
+    "input": {
+      "operation": "explicit-refresh",
+      "transport_revision": 2,
+      "repository": "example.org/kit",
+      "existing_checkout": true,
+      "stored_origin": "https://old-mirror.example.net/kit.git",
+      "current_endpoint": "https://example.org/kit.git",
+      "current_alias": {
+        "host": "current-mirror.example.net",
+        "port": 8443,
+        "authentication": "team-https"
+      },
+      "current_mirror_of": "example.org/kit"
+    },
+    "expected": "fetch-current-resolved-endpoint-current-mirror.example.net:8443;never-fetch-stored-origin;verify-locked-content;replace-lock-atomically-on-success"
+  },
+  {
+    "id": "v2-scp-alias-port-refused",
+    "input": {
+      "transport_revision": 2,
+      "repository": "example.org/kit",
+      "endpoint": "git@example.org:kit.git",
+      "alias": "ssh-mirror",
+      "aliases": {
+        "ssh-mirror": {
+          "host": "mirror.example.net",
+          "port": 2222,
+          "authentication": "team-ssh"
+        }
+      },
+      "mirror_of": "example.org/kit"
+    },
+    "expected": "repository_policy_invalid;zero-network-attempts;no-ssh-uri-guess"
+  },
+  {
+    "id": "v2-ssh-uri-alias-port",
+    "input": {
+      "transport_revision": 2,
+      "repository": "example.org/kit",
+      "endpoint": "ssh://git@example.org/kit.git",
+      "alias": "ssh-mirror",
+      "aliases": {
+        "ssh-mirror": {
+          "host": "mirror.example.net",
+          "port": 2222,
+          "authentication": "team-ssh"
+        }
+      },
+      "mirror_of": "example.org/kit"
+    },
+    "expected": "connect-ssh://git@mirror.example.net:2222/kit.git;identity-stays-example.org/kit;attempt-once"
   },
   {
     "id": "v2-reader-accepts-v1-policy",
@@ -1082,5 +1251,60 @@
       "mirror_of": "example.org/kit"
     },
     "expected": "build_repository_identity_invalid;alias-rewriting-has-no-resolved-host-input-in-strict-lane;zero-attempts"
+  },
+  {
+    "id": "git-moved-tag-replays-locked-commit-through-mirror",
+    "input": {
+      "operation": "install-with-existing-lock",
+      "source_kind": "git",
+      "snapshot_store": "absent",
+      "manifest": "unchanged",
+      "transport_revision": 2,
+      "repository": "example.org/kit",
+      "endpoint": "https://mirror.example.net/kit.git",
+      "mirror_of": "example.org/kit",
+      "locked_commit": "commit-A",
+      "locked_object_format": "sha1",
+      "declared_tag": "v1.0.0",
+      "tag_after_lock": "commit-B",
+      "fetched_commit": "commit-A",
+      "fetched_object_format": "sha1",
+      "locked_package_identity": "network-git-A",
+      "fetched_package_identity": "network-git-A",
+      "locked_content_sha256": "sha256-A",
+      "fetched_content_sha256": "sha256-A",
+      "ref_resolution": "not-performed",
+      "lock_before": "bytes-L",
+      "lock_after": "bytes-L"
+    },
+    "expected": "fetch-commit-A-by-object-id-from-listed-mirror;verify-object-format-and-commit;verify-package-identity-and-content-sha256;install;no-tag-resolution;lock-byte-identical"
+  },
+  {
+    "id": "global-schema2-without-profile-lock-refused",
+    "input": {
+      "operation": "load-skillfile",
+      "manager_capabilities": {
+        "skillfile_sources_v1": true,
+        "profile_locks": false
+      },
+      "scope": "machine-global",
+      "stored_scope_schema_version": 1,
+      "skillfile_schema_version": 2
+    },
+    "expected": "upgrade-error;machine-global-scope-remains-schema-1"
+  },
+  {
+    "id": "project-schema2-without-profile-lock-accepted",
+    "input": {
+      "operation": "load-skillfile",
+      "manager_capabilities": {
+        "skillfile_sources_v1": true,
+        "profile_locks": false
+      },
+      "scope": "project",
+      "stored_scope_schema_version": 1,
+      "skillfile_schema_version": 2
+    },
+    "expected": "accept-schema-2"
   }
 ]

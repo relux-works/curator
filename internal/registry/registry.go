@@ -365,7 +365,11 @@ func resolveMatched(registries []Registry, sourceIdentity, commit, contentSHA256
 				warnings = append(warnings, fmt.Sprintf("registry %s returned a malformed record: %v", reg.Name, err))
 				continue
 			}
-			if !match(record) {
+			// Positive schema-2 evidence has an exact four-field grant.
+			// Revocation retains registry §3's broader artifact match, so a
+			// repository+commit denial cannot be narrowed by name or content.
+			revocationMatch := record.Status == StatusRevoked && Matches(record, sourceIdentity, commit, contentSHA256)
+			if !match(record) && !revocationMatch {
 				continue
 			}
 			if !VerifySigned(payload, reg.PublicKeys) {

@@ -106,6 +106,7 @@ func draftCLIKitBare(t *testing.T, root string) (bare, commit string) {
 	runDraftGit(t, work, "add", ".")
 	runDraftGit(t, work, "commit", "-qm", "fixture")
 	runDraftGit(t, work, "tag", "v1")
+	runDraftGit(t, work, "tag", "v1.0.0")
 	runDraftGit(t, "", "clone", "--quiet", "--bare", "--", work, bare)
 	return bare, draftGitOutput(t, "", "--git-dir", bare, "rev-parse", "v1^{commit}")
 }
@@ -130,7 +131,7 @@ func installDraftTransportShim(t *testing.T, failURL, failStderr, rewriteURL, ba
 	}
 	script.WriteString("done\n")
 	script.WriteString("is_clone=0; for arg in \"$@\"; do if [ \"$arg\" = \"clone\" ]; then is_clone=1; fi; done\n")
-	script.WriteString("if [ \"$is_clone\" = \"1\" ]; then printf '%s\\n' \"$url\" >>\"$log\"\n")
+	script.WriteString("if [ \"$is_clone\" = \"1\" ]; then clone_url=''; previous=''; for arg in \"$@\"; do clone_url=\"$previous\"; previous=\"$arg\"; done; printf '%s\\n' \"$clone_url\" >>\"$log\"\n")
 	script.WriteString("dest=''; for arg in \"$@\"; do dest=\"$arg\"; done\n")
 	script.WriteString("if [ \"$fail\" = \"1\" ]; then printf \"Cloning into '%s'...\\n\" \"$dest\" >&2\n")
 	script.WriteString("printf '%s\\n' \"" + failStderr + "\" >&2\n")

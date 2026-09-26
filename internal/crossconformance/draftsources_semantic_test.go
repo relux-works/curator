@@ -1,7 +1,8 @@
 package crossconformance
 
 import (
-	"sync"
+	"hash/crc32"
+	"strconv"
 	"testing"
 
 	"github.com/relux-works/curator/internal/conformancecoverage"
@@ -22,11 +23,32 @@ func registerDraftSemantic(id string, drive func(t *testing.T, _ draftSemanticCa
 	draftSemanticDrivers[id] = drive
 }
 
-// TestDraftSourcesSemanticCases drives every pinned semantic case.
-func TestDraftSourcesSemanticCases(t *testing.T) {
+// The released semantic matrix is divided into five stable batches so each
+// bounded go test invocation stays below the local runner budget. CRC32 keeps
+// the assignment deterministic and spreads unrelated production paths across
+// batches.
+const skillfileSourcesSemanticBatchCount = 5
+
+func TestDraftSourcesSemanticCasesBatch0(t *testing.T) { runDraftSourcesSemanticBatch(t, 0) }
+func TestDraftSourcesSemanticCasesBatch1(t *testing.T) { runDraftSourcesSemanticBatch(t, 1) }
+func TestDraftSourcesSemanticCasesBatch2(t *testing.T) { runDraftSourcesSemanticBatch(t, 2) }
+func TestDraftSourcesSemanticCasesBatch3(t *testing.T) { runDraftSourcesSemanticBatch(t, 3) }
+func TestDraftSourcesSemanticCasesBatch4(t *testing.T) { runDraftSourcesSemanticBatch(t, 4) }
+
+func draftSemanticBatch(id string) int {
+	return int(crc32.ChecksumIEEE([]byte(id)) % skillfileSourcesSemanticBatchCount)
+}
+
+func runDraftSourcesSemanticBatch(t *testing.T, batch int) {
 	cases := loadDraftSemantic(t)
-	resetSemanticOutcomes()
-	conformancecoverage.RunOutcomesParallel(t, "draft-sources-v1/semantic-cases", cases,
+	selected := make([]draftSemanticCase, 0, len(cases)/skillfileSourcesSemanticBatchCount+1)
+	for _, c := range cases {
+		if draftSemanticBatch(c.ID) == batch {
+			selected = append(selected, c)
+		}
+	}
+	family := "skillfile-sources-v1/semantic-cases/" + strconv.Itoa(batch)
+	conformancecoverage.RunOutcomesParallel(t, family, selected,
 		func(c draftSemanticCase) string { return c.ID }, func(t *testing.T, c draftSemanticCase) conformancecoverage.Observation {
 			drive, ok := draftSemanticDrivers[c.ID]
 			if !ok {
@@ -36,7 +58,7 @@ func TestDraftSourcesSemanticCases(t *testing.T) {
 				t.Fatalf("case %q carries no expected outcome", c.ID)
 			}
 			drive(t, c)
-			return semanticObservation(c.ID)
+			return conformancecoverage.Observation{}
 		})
 }
 
@@ -49,6 +71,9 @@ func TestDraftSourcesSemanticCoverage(t *testing.T) {
 		ids[c.ID] = true
 	}
 	for _, c := range cases {
+		if batch := draftSemanticBatch(c.ID); batch < 0 || batch >= skillfileSourcesSemanticBatchCount {
+			t.Errorf("semantic case %q has invalid batch %d", c.ID, batch)
+		}
 		if _, ok := draftSemanticDrivers[c.ID]; !ok {
 			t.Errorf("semantic case %q has no production-entry row", c.ID)
 		}
@@ -58,41 +83,4 @@ func TestDraftSourcesSemanticCoverage(t *testing.T) {
 			t.Errorf("driver %q has no corpus case", id)
 		}
 	}
-}
-
-// semanticBound records an explicit bound: the case cannot be driven at
-// a production entry for the stated reason, and is reported as a bound,
-// never as passing.
-func semanticBound(t *testing.T, c draftSemanticCase, reason string) {
-	t.Helper()
-	recordSemanticBound(c.ID, reason)
-	t.Logf("BOUND %s: expected %q: %s", c.ID, c.Expected, reason)
-}
-
-// draftSemanticBounds carries only explicit bounds. Known gaps are read from
-// the committed ledger by conformancecoverage.Run; no driver may declare one.
-var draftSemanticOutcomes = struct {
-	sync.Mutex
-	byID map[string]conformancecoverage.Observation
-}{byID: map[string]conformancecoverage.Observation{}}
-
-func resetSemanticOutcomes() {
-	draftSemanticOutcomes.Lock()
-	defer draftSemanticOutcomes.Unlock()
-	draftSemanticOutcomes.byID = map[string]conformancecoverage.Observation{}
-}
-
-func recordSemanticBound(id, reason string) {
-	draftSemanticOutcomes.Lock()
-	defer draftSemanticOutcomes.Unlock()
-	if prev, ok := draftSemanticOutcomes.byID[id]; ok && prev.BoundReason != reason {
-		panic("semantic case " + id + " classified twice: " + prev.BoundReason + " then " + reason)
-	}
-	draftSemanticOutcomes.byID[id] = conformancecoverage.Observation{BoundReason: reason}
-}
-
-func semanticObservation(id string) conformancecoverage.Observation {
-	draftSemanticOutcomes.Lock()
-	defer draftSemanticOutcomes.Unlock()
-	return draftSemanticOutcomes.byID[id]
 }

@@ -1,0 +1,79 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"strings"
+)
+
+const endpoint = __DRAFT_ENDPOINT__
+const mappedRepository = __DRAFT_REPOSITORY__
+const realGit = __DRAFT_REAL_GIT__
+const logPath = __DRAFT_LOG_PATH__
+const envLogPath = __DRAFT_ENV_LOG_PATH__
+const failFetch = __DRAFT_FAIL_FETCH__
+
+func appendLog(path, line string) {
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(128)
+	}
+	_, _ = fmt.Fprintln(file, line)
+	_ = file.Close()
+}
+
+func main() {
+	args := append([]string(nil), os.Args[1:]...)
+	isFetch, isClone, hasEndpoint := false, false, false
+	for _, arg := range args {
+		if arg == "fetch" {
+			isFetch = true
+		}
+		if arg == "clone" {
+			isClone = true
+		}
+		if arg == endpoint {
+			hasEndpoint = true
+		}
+	}
+	if isFetch {
+		appendLog(logPath, strings.Join(args, "\t"))
+		if !hasEndpoint {
+			fmt.Fprintln(os.Stderr, "fatal: test shim refused fetch through a stored remote")
+			os.Exit(128)
+		}
+		if failFetch {
+			fmt.Fprintf(os.Stderr, "fatal: unable to access '%s': Could not resolve host: unreachable.fixture.test\n", endpoint)
+			os.Exit(128)
+		}
+	}
+	if isClone {
+		appendLog(logPath, strings.Join(args, "\t"))
+		appendLog(envLogPath, strings.Join([]string{
+			"SSH_AUTH_SOCK=" + os.Getenv("SSH_AUTH_SOCK"),
+			"GIT_ASKPASS=" + os.Getenv("GIT_ASKPASS"),
+		}, "\n"))
+		if endpoint == "" {
+			fmt.Fprintln(os.Stderr, "fatal: test shim refused an unexpected clone")
+			os.Exit(128)
+		}
+	}
+	if (isFetch || isClone) && hasEndpoint {
+		for i, arg := range args {
+			if arg == endpoint {
+				args[i] = mappedRepository
+			}
+		}
+	}
+	cmd := exec.Command(realGit, args...)
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	if err := cmd.Run(); err != nil {
+		if exit, ok := err.(*exec.ExitError); ok {
+			os.Exit(exit.ExitCode())
+		}
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(128)
+	}
+}

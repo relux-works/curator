@@ -19,7 +19,7 @@ func TestDraftSourcesSnapshotVectors(t *testing.T) {
 	vectors := loadDraftSnapshots(t)
 	seenSkill := ""
 	seenSnapshots := map[string]string{}
-	conformancecoverage.Run(t, "draft-sources-v1/snapshot-cases", vectors,
+	conformancecoverage.Run(t, "skillfile-sources-v1/snapshot-cases", vectors,
 		func(vector draftSnapshotVector) string { return vector.ID }, func(t *testing.T, vector draftSnapshotVector) {
 			base := t.TempDir()
 			pkg := filepath.Join(base, "pkg")

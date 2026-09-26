@@ -157,10 +157,9 @@ type Attempt struct {
 // there. An attempt naming an alias connects to the resolved address:
 // the alias host with the alias port when present, else the URL port
 // when present, else the transport default. The listed URL keeps its
-// scheme, userinfo, and path; only the host (and port) change, except
-// an scp-like URL combined with an explicit port, which has no
-// port-bearing spelling and is rendered as the equivalent ssh:// URL
-// with a home-relative path.
+// scheme, userinfo, and path; only the host (and port) change. An
+// scp-like URL cannot use an alias port because converting it would
+// require guessing a home-relative path convention.
 //
 // ok is false when no connection target can be formed from the carried
 // values; the caller fails the acquisition closed before any network
@@ -201,7 +200,10 @@ func (a Attempt) ConnectionURL() (target string, ok bool) {
 		}
 		return "ssh://" + userinfo + a.ResolvedHost + port + path, true
 	}
-	return scpConnectionURL(a.URL, a.ResolvedHost, port)
+	if a.HasExplicitPort {
+		return "", false
+	}
+	return scpConnectionURL(a.URL, a.ResolvedHost, "")
 }
 
 // splitConnectionAuthority splits the post-scheme remainder of a
@@ -522,7 +524,8 @@ func planAttempt(key string, endpoint Endpoint, aliases map[string]AliasEntry) (
 		return Attempt{}, verr.New("", "%s: endpoint %q is outside the endpoint grammar", CodeRepositoryPolicyInvalid, endpoint.URL)
 	}
 	_, epPath, _ := strings.Cut(epIdentity, "/")
-	resolvedHost, resolvedPort, hasExplicitPort, err := checkEndpointSemantics("", key, keyHost, keyPath, urlHost, epPath, hasURLPort, urlPort, endpoint.MirrorOf, endpoint.Alias, endpoint.Authentication, aliases)
+	_, _, uriEndpoint := cutRevision2Scheme(endpoint.URL)
+	resolvedHost, resolvedPort, hasExplicitPort, err := checkEndpointSemantics("", key, keyHost, keyPath, urlHost, epPath, !uriEndpoint, hasURLPort, urlPort, endpoint.MirrorOf, endpoint.Alias, endpoint.Authentication, aliases)
 	if err != nil {
 		return Attempt{}, err
 	}
@@ -750,7 +753,8 @@ func parsePolicyEndpointV2(label string, index int, key string, raw any, aliases
 	}
 	keyHost, keyPath, _ := strings.Cut(key, "/")
 	_, epPath, _ := strings.Cut(epIdentity, "/")
-	if _, _, _, err := checkEndpointSemantics(field, key, keyHost, keyPath, urlHost, epPath, hasURLPort, urlPort, mirrorOf, aliasName, provider, aliases); err != nil {
+	_, _, uriEndpoint := cutRevision2Scheme(urlValue)
+	if _, _, _, err := checkEndpointSemantics(field, key, keyHost, keyPath, urlHost, epPath, !uriEndpoint, hasURLPort, urlPort, mirrorOf, aliasName, provider, aliases); err != nil {
 		return Endpoint{}, err
 	}
 	return Endpoint{URL: urlValue, Authentication: provider, MirrorOf: mirrorOf, Alias: aliasName}, nil
@@ -765,7 +769,7 @@ func parsePolicyEndpointV2(label string, index int, key string, raw any, aliases
 // (lowercased), the resolved port (0 for the transport default), and
 // whether an explicit port was present. field prefixes diagnostics and
 // is empty at the planning entry.
-func checkEndpointSemantics(field, key, keyHost, keyPath, urlHost, epPath string, hasURLPort bool, urlPort int, mirrorOf, aliasName, endpointAuth string, aliases map[string]AliasEntry) (string, int, bool, error) {
+func checkEndpointSemantics(field, key, keyHost, keyPath, urlHost, epPath string, scpLike, hasURLPort bool, urlPort int, mirrorOf, aliasName, endpointAuth string, aliases map[string]AliasEntry) (string, int, bool, error) {
 	label := field
 	if label == "" {
 		label = "repositories." + key
@@ -796,6 +800,9 @@ func checkEndpointSemantics(field, key, keyHost, keyPath, urlHost, epPath string
 		}
 		if target.Authentication != endpointAuth {
 			return "", 0, false, verr.New(label, "%s: alias authentication must equal the endpoint authentication", CodeRepositoryPolicyInvalid)
+		}
+		if scpLike && target.HasPort {
+			return "", 0, false, verr.New(label, "%s: an SCP-like endpoint cannot use an alias port", CodeRepositoryPolicyInvalid)
 		}
 		resolvedHost = target.Host
 		if target.HasPort {

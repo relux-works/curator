@@ -34,6 +34,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/stateread"
@@ -189,7 +190,24 @@ func BuildInventory(packageRoot string, files []string) (Inventory, error) {
 // captureAfterCopyHook is a test-only deterministic scheduling seam: when
 // non-nil it runs once after the copy loop so a test can race the live
 // tree inside one Capture. Production code leaves it nil.
-var captureAfterCopyHook func()
+var captureAfterCopyHookMu sync.RWMutex
+var captureAfterCopyHook func(*LocalAcquisition)
+
+// SetCaptureAfterCopyHookForTesting installs a deterministic after-copy hook
+// and returns a function that restores the prior hook. The acquisition
+// argument lets external-package tests scope mutations to one production
+// install even when other conformance rows capture snapshots concurrently.
+func SetCaptureAfterCopyHookForTesting(hook func(*LocalAcquisition)) (restore func()) {
+	captureAfterCopyHookMu.Lock()
+	previous := captureAfterCopyHook
+	captureAfterCopyHook = hook
+	captureAfterCopyHookMu.Unlock()
+	return func() {
+		captureAfterCopyHookMu.Lock()
+		captureAfterCopyHook = previous
+		captureAfterCopyHookMu.Unlock()
+	}
+}
 
 // publishAfterAuditHook is the same seam for publication: when non-nil it
 // runs after the pre-publication staging audit so a test can mutate the
@@ -254,8 +272,11 @@ func Capture(acquisition *LocalAcquisition) (Inventory, error) {
 			return Inventory{}, fmt.Errorf("capture staging for %s: %w", posix, err)
 		}
 	}
-	if captureAfterCopyHook != nil {
-		captureAfterCopyHook()
+	captureAfterCopyHookMu.RLock()
+	hook := captureAfterCopyHook
+	captureAfterCopyHookMu.RUnlock()
+	if hook != nil {
+		hook(acquisition)
 	}
 	reenumerated, err := EnumerateInputs(acquisition.Physical, acquisition.Outputs, acquisition.RootEntries)
 	if err != nil {

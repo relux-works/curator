@@ -370,6 +370,33 @@ func FetchIsolated(repo string) error {
 	})
 }
 
+// FetchURLIsolated refreshes one repository from an explicitly resolved
+// endpoint. It never consults the checkout's configured remotes, so an
+// explicit draft refresh follows the current machine endpoint plan rather
+// than a possibly stale origin URL. Heads and tags are mapped into the same
+// local refs used by Resolve.
+func FetchURLIsolated(repo, remoteURL string) error {
+	trimmed := strings.TrimSpace(remoteURL)
+	if trimmed == "" || strings.HasPrefix(trimmed, "-") {
+		return fmt.Errorf("refusing to fetch from suspicious git URL")
+	}
+	if err := EnsureRepo(repo); err != nil {
+		return err
+	}
+	env, cleanup, err := isolatedGitEnv()
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+	args := []string{
+		"fetch", "--force", "--prune", "--no-write-fetch-head", trimmed,
+		"+refs/heads/*:refs/remotes/origin/*",
+		"+refs/tags/*:refs/tags/*",
+	}
+	_, err = runWithEnv(repo, env, withIsolatedConfigArgs(args)...)
+	return err
+}
+
 // FetchCommitIsolated requests one locked object ID from the repository's
 // origin. It does not fetch tags or branches, so callers cannot accidentally
 // advance a symbolic reference while replaying a lock.
@@ -387,6 +414,24 @@ func FetchCommitIsolated(repo, commit string) error {
 	}
 	_, err = runWithEnv(repo, env, withIsolatedConfigArgs([]string{"fetch", "--no-tags", "--no-write-fetch-head", "origin", commit})...)
 	return err
+}
+
+// RepositoryObjectFormat returns the storage object format declared by a
+// Git repository. Locked replay uses it to bind object IDs to the repository
+// that supplied them; checking hex width alone does not establish that bind.
+func RepositoryObjectFormat(repo string) (string, error) {
+	if err := EnsureRepo(repo); err != nil {
+		return "", err
+	}
+	output, err := run(repo, "rev-parse", "--show-object-format")
+	if err != nil {
+		return "", err
+	}
+	format := strings.TrimSpace(output)
+	if format != "sha1" && format != "sha256" {
+		return "", fmt.Errorf("unsupported Git object format %q", format)
+	}
+	return format, nil
 }
 
 // FetchCommitFromURLIsolated initializes a private object database when

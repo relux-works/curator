@@ -246,6 +246,14 @@ func TestResolveExact(t *testing.T) {
 	if revoked.Result != ResultRevoked {
 		t.Fatalf("exact revocation must deny: %+v", revoked)
 	}
+	broadRevocation, _ := resolve(mint(func(body map[string]any) {
+		body["name"] = "other"
+		body["content_sha256"] = "sha256:" + strings.Repeat("e", 64)
+		body["status"] = StatusRevoked
+	}))
+	if broadRevocation.Result != ResultRevoked {
+		t.Fatalf("repository+commit revocation must deny despite name/content mismatch: %+v", broadRevocation)
+	}
 	// Frozen legacy entry: wrong-name and wrong-context still resolve
 	// audited under §13.3 OR-matching.
 	if legacy := func() Resolution {

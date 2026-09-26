@@ -9,9 +9,12 @@ import (
 
 	"github.com/relux-works/curator/internal/audit"
 	"github.com/relux-works/curator/internal/capabilities"
+	"github.com/relux-works/curator/internal/closure"
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/snapshot"
+	"github.com/relux-works/curator/internal/sourcelock"
+	"github.com/relux-works/curator/internal/staging"
 )
 
 // Capture and audit-state semantic rows (§3–§4): mutation detection,
@@ -19,23 +22,58 @@ import (
 // binding, and the local attestation gate.
 
 func init() {
-	registerDraftSemantic("capture-mutation", driveCaptureMutationBound)
+	registerDraftSemantic("capture-mutation", driveCaptureMutation)
 	registerDraftSemantic("frozen-copy-mutation", driveFrozenCopyMutation)
 	registerDraftSemantic("local-git-dirty", driveLocalGitDirty)
-	registerDraftSemantic("missing-snapshot", driveMissingSnapshot)
 	registerDraftSemantic("runtime-only-refresh", driveRuntimeOnlyRefresh)
 	registerDraftSemantic("build-only-refresh", driveBuildOnlyRefresh)
 	registerDraftSemantic("missing-audit-report", driveMissingAuditReport)
 	registerDraftSemantic("strict-network-attestation-local", driveStrictNetworkAttestationLocal)
 }
 
-// driveCaptureMutationBound: the live-mutation-during-capture race window
-// is inside snapshot.Capture and is proven in-package by
-// TestReviewIdentityReplacementDuringCapture through the capture hook;
-// no external interleaving seam exists, so this row is an explicit
-// bound, never a pass.
-func driveCaptureMutationBound(t *testing.T, c draftSemanticCase) {
-	semanticBound(t, c, "live-mutation-during-capture window is inside Capture; proven in-package via the capture hook (TestReviewIdentityReplacementDuringCapture)")
+// driveCaptureMutation exercises the live mutation window through the
+// production closure resolver. The acquisition-aware test hook scopes the
+// mutation to this source while semantic rows execute concurrently.
+func driveCaptureMutation(t *testing.T, c draftSemanticCase) {
+	payload := `{"schema_version":2,"sources":{"s":{"path":"src"}},"skills":[{"name":"review","from":"s","directory":"skills/review"}]}`
+	project, home := draftProject(t, payload, map[string]string{"src/skills/review": "review"})
+	packageRoot := filepath.Join(project, "src", "skills", "review")
+	if err := os.WriteFile(filepath.Join(packageRoot, "SKILL.md"), []byte("---\nname: review\ndescription: captured A\n---\n# review\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	canonicalPackageRoot, err := staging.Canonicalize(packageRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var matched bool
+	var hookErr error
+	restoreHook := snapshot.SetCaptureAfterCopyHookForTesting(func(acquisition *snapshot.LocalAcquisition) {
+		if acquisition.Physical != canonicalPackageRoot {
+			return
+		}
+		matched = true
+		hookErr = os.WriteFile(filepath.Join(packageRoot, "SKILL.md"), []byte("---\nname: review\ndescription: captured B\n---\n# review\n"), 0o644)
+	})
+	defer restoreHook()
+
+	_, resolveErr := closure.ResolveDraft(closure.DraftResolveConfig{
+		ProjectRoot:     project,
+		Home:            home,
+		Manifest:        draftManifest(t, project, payload),
+		ManifestPayload: []byte(payload),
+	})
+	if !matched {
+		t.Fatal("capture hook did not observe this production acquisition")
+	}
+	if hookErr != nil {
+		t.Fatalf("capture hook mutation: %v", hookErr)
+	}
+	if resolveErr == nil || !strings.Contains(resolveErr.Error(), c.Expected) {
+		t.Fatalf("ResolveDraft err = %v, want %q", resolveErr, c.Expected)
+	}
+	if _, statErr := os.Stat(sourcelock.PathIn(project)); !os.IsNotExist(statErr) {
+		t.Fatalf("failed capture wrote a lock: stat err = %v", statErr)
+	}
 }
 
 // driveFrozenCopyMutation mutates the staged frozen copy between audit
@@ -113,25 +151,6 @@ func driveLocalGitDirty(t *testing.T, _ draftSemanticCase) {
 		if byPath[rel] != want {
 			t.Fatalf("%s sha = %s, want %s (snapshot-B-and-C)", rel, byPath[rel], want)
 		}
-	}
-}
-
-// driveMissingSnapshot proves a locked digest absent from the store
-// fails with source_snapshot_unavailable without consulting live bytes.
-func driveMissingSnapshot(t *testing.T, _ draftSemanticCase) {
-	home := t.TempDir()
-	live := t.TempDir()
-	writeDraftSkill(t, filepath.Join(live, "pkg"), "review")
-	liveBefore := treeDigest(t, live)
-	locked := "sha256:" + strings.Repeat("aa", 32)
-	if _, err := snapshot.OpenLocal(home, locked); err == nil || !strings.Contains(err.Error(), "source_snapshot_unavailable") {
-		t.Fatalf("OpenLocal err = %v, want source_snapshot_unavailable", err)
-	}
-	if _, statErr := os.Lstat(snapshot.LocalStoreDir(home)); !os.IsNotExist(statErr) {
-		t.Fatalf("missing snapshot created store state")
-	}
-	if after := treeDigest(t, live); after != liveBefore {
-		t.Fatal("missing snapshot touched live bytes")
 	}
 }
 

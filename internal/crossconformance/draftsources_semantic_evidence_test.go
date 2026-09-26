@@ -53,6 +53,7 @@ const (
 	attestMalformed
 	attestStale
 	attestRevoked
+	attestRevokedIdentityCommit
 	attestWrongRepository
 	attestWrongCommit
 	attestWrongKey
@@ -175,6 +176,12 @@ func (s *attestStub) serveRecords(w http.ResponseWriter, r *http.Request) {
 		records = append(records, map[string]any{"name": "review", "status": "bogus"})
 	case attestRevoked:
 		mint(func(body map[string]any) { body["status"] = registry.StatusRevoked }, s.good)
+	case attestRevokedIdentityCommit:
+		mint(func(body map[string]any) {
+			body["name"] = "other"
+			body["content_sha256"] = "sha256:" + strings.Repeat("e", 64)
+			body["status"] = registry.StatusRevoked
+		}, s.good)
 	case attestWrongRepository:
 		mint(func(body map[string]any) {
 			body["source_identity"] = "unrelated.test/kit"
@@ -279,6 +286,9 @@ func init() {
 		id, condition := id, condition
 		registerDraftSemantic(id, func(t *testing.T, c draftSemanticCase) { driveAttestationEvidence(t, c, condition) })
 	}
+	registerDraftSemantic("attestation-evidence-revoked-identity-commit-advisory", func(t *testing.T, c draftSemanticCase) {
+		driveAttestationEvidence(t, c, attestRevokedIdentityCommit)
+	})
 }
 
 func driveAttestationEvidence(t *testing.T, c draftSemanticCase, condition attestCondition) {
@@ -319,6 +329,12 @@ func driveAttestationEvidence(t *testing.T, c draftSemanticCase, condition attes
 		resolution = registry.Resolve(regs, identity, commit, content, static([]map[string]any{mintStatic(func(body map[string]any) {
 			body["status"] = registry.StatusRevoked
 		}, stub.good)}, nil))
+	case attestRevokedIdentityCommit:
+		resolution = registry.ResolveExact(regs, "review", identity, commit, content, static([]map[string]any{mintStatic(func(body map[string]any) {
+			body["name"] = "other"
+			body["content_sha256"] = "sha256:" + strings.Repeat("e", 64)
+			body["status"] = registry.StatusRevoked
+		}, stub.good)}, nil))
 	case attestWrongRepository:
 		resolution = registry.Resolve(regs, identity, commit, content, static([]map[string]any{mintStatic(func(body map[string]any) {
 			body["source_identity"] = "unrelated.test/kit"
@@ -348,7 +364,7 @@ func driveAttestationEvidence(t *testing.T, c draftSemanticCase, condition attes
 		resolution = registry.ResolveExact(regs, "review", identity, commit, content, static(payloads, nil))
 	}
 	wantResult := registry.ResultUnknown
-	if condition == attestRevoked {
+	if condition == attestRevoked || condition == attestRevokedIdentityCommit {
 		wantResult = registry.ResultRevoked
 	}
 	if resolution.Result != wantResult {
@@ -360,12 +376,15 @@ func driveAttestationEvidence(t *testing.T, c draftSemanticCase, condition attes
 	stub.set(condition)
 	freshBefore := draftInstallStateDigest(t, project, home)
 	cfg := draftStrictRegistryConfig(home, stub)
+	if condition == attestRevokedIdentityCommit {
+		cfg.Audit.RegistryPolicy = "advisory"
+	}
 	fresh := install.Project(cfg, project, "test", install.Options{Platform: draftPlatform()})
 	if fresh.Status != "failed" {
 		t.Fatalf("fresh install = %+v, want refusal", fresh)
 	}
 	wantErr := "is not audited by any trusted registry"
-	if condition == attestRevoked {
+	if condition == attestRevoked || condition == attestRevokedIdentityCommit {
 		wantErr = "is revoked by"
 	}
 	if condition == attestStale {
@@ -382,6 +401,9 @@ func driveAttestationEvidence(t *testing.T, c draftSemanticCase, condition attes
 	stub.set(attestGood)
 	repairProject, repairHome, repairRepo := draftGitProject(t, "https://example.org/kit.git")
 	repairCfg := draftStrictRegistryConfig(repairHome, stub)
+	if condition == attestRevokedIdentityCommit {
+		repairCfg.Audit.RegistryPolicy = "advisory"
+	}
 	if result := install.Project(repairCfg, repairProject, "test", install.Options{Platform: draftPlatform()}); result.Status != "ok" {
 		t.Fatalf("baseline install = %+v", result)
 	}
@@ -415,9 +437,11 @@ func driveAttestationEvidence(t *testing.T, c draftSemanticCase, condition attes
 	if again.Status != "failed" || !strings.Contains(strings.Join(again.Errors, ";"), wantErr) {
 		t.Fatalf("install after refresh = %+v, want the %q refusal", again, wantErr)
 	}
-
 	// Layer 3: compiled-CLI status is nonzero and read-only.
 	driveEvidenceCLIStatus(t, c, stub, condition, wantErr)
+	if condition == attestRevokedIdentityCommit && c.Expected != "install-repair-refresh-refuse-preserve-prior-state;status-noncurrent-or-unknown-nonzero-no-mutation" {
+		t.Fatalf("corpus expectation = %q, want deny-wins advisory outcome", c.Expected)
+	}
 }
 
 // draftInstallStateDigest hashes installed state excluding read-through
@@ -449,10 +473,17 @@ func draftRefreshPreservedDigest(t *testing.T, project, home string) string {
 // condition flips status nonzero without any mutation.
 func driveEvidenceCLIStatus(t *testing.T, c draftSemanticCase, stub *attestStub, condition attestCondition, wantErr string) {
 	t.Helper()
+	if condition == attestRevokedIdentityCommit {
+		driveRevokedIdentityCommitCLIStatus(t, c, stub)
+		return
+	}
 	if runtime.GOOS == "windows" {
 		t.Skip("test transport wrapper is POSIX-only")
 	}
 	configPath, project, home, pathEnv := driveAttestedCLIInstall(t, stub)
+	if c.ID == "attestation-evidence-revoked-identity-commit-advisory" {
+		setCLIRegistryPolicy(t, configPath, "advisory")
+	}
 	stub.set(condition)
 	before := draftInstallStateDigest(t, project, home)
 	code, stdout, stderr := runCurator(t, home, configPath, pathEnv, "status", "app")
@@ -463,6 +494,64 @@ func driveEvidenceCLIStatus(t *testing.T, c draftSemanticCase, stub *attestStub,
 		t.Fatal("status mutated state")
 	}
 	_ = wantErr
+}
+
+func driveRevokedIdentityCommitCLIStatus(t *testing.T, c draftSemanticCase, stub *attestStub) {
+	t.Helper()
+	root := t.TempDir()
+	bare, _ := draftCLIKitBare(t, root)
+	configPath, project, home := setupCLIProject(t, root)
+	mergeRegistryConfig(t, configPath, stub)
+	setCLIRegistryPolicy(t, configPath, "advisory")
+	const declared = "https://fixture.test/kit.git"
+	payload := `{"schema_version":2,"sources":{"kit":{"git":"` + declared + `","tag":"v1"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
+	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pathEnv, _ := draftEndpointGitShim(t, declared, bare, false)
+	stub.set(attestGood)
+	for _, args := range [][]string{{"project", "resolve", "app"}, {"install", "app"}, {"status", "app"}} {
+		if code, stdout, stderr := runCurator(t, home, configPath, pathEnv, args...); code != 0 {
+			t.Fatalf("baseline %v = %d\nstdout:\n%s\nstderr:\n%s", args, code, stdout, stderr)
+		}
+	}
+	if c.Expected != "install-repair-refresh-refuse-preserve-prior-state;status-noncurrent-or-unknown-nonzero-no-mutation" {
+		t.Fatalf("corpus expectation = %q, want deny-wins advisory outcome", c.Expected)
+	}
+	stub.set(attestRevokedIdentityCommit)
+	before := draftInstallStateDigest(t, project, home)
+	code, stdout, stderr := runCurator(t, home, configPath, pathEnv, "status", "app")
+	if code == 0 || !strings.Contains(stderr, "is revoked by") {
+		t.Fatalf("status = %d\nstdout:\n%s\nstderr:\n%s; want revoked noncurrent result", code, stdout, stderr)
+	}
+	if after := draftInstallStateDigest(t, project, home); after != before {
+		t.Fatal("status under revoked identity+commit evidence mutated state")
+	}
+}
+
+func setCLIRegistryPolicy(t *testing.T, configPath, policy string) {
+	t.Helper()
+	payload, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(payload, &doc); err != nil {
+		t.Fatal(err)
+	}
+	audit, _ := doc["audit"].(map[string]any)
+	if audit == nil {
+		audit = map[string]any{}
+		doc["audit"] = audit
+	}
+	audit["registry_policy"] = policy
+	merged, err := json.MarshalIndent(doc, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, merged, 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // mergeRegistryConfig adds the stub registry and a strict no-cache

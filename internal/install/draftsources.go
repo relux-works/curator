@@ -648,6 +648,13 @@ func replayGitDraftSnapshot(cfg *config.Config, projectRoot string, member sourc
 }
 
 func verifyLockedGitMember(repo string, member sourcelock.Member) error {
+	objectFormat, err := gitops.RepositoryObjectFormat(repo)
+	if err != nil {
+		return fmt.Errorf("source_snapshot_unavailable: declared Git source for %s cannot verify its object format", member.Name)
+	}
+	if objectFormat != member.Package.Commit.ObjectFormat {
+		return fmt.Errorf("source_snapshot_changed: locked Git object format for %s is %q, repository uses %q", member.Name, member.Package.Commit.ObjectFormat, objectFormat)
+	}
 	staging, err := os.MkdirTemp("", "curator-locked-git-replay-")
 	if err != nil {
 		return err

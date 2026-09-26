@@ -17,10 +17,8 @@ import (
 
 // Draft literal-lane environment and ssh isolation (TASK-260920-3ccq6b).
 //
-// These rows are intentionally NOT corpus rows (no registerDraftSemantic
-// calls): the v2 semantic matrix stays 94 and
-// TestDraftSourcesSemanticCoverage is unaffected. The spec's
-// v2-user-ssh-alias-ignored case covers only the logical declaration
+// These rows are standalone security regressions, not corpus rows. The
+// spec's v2-user-ssh-alias-ignored case covers only the logical declaration
 // (planning refusal before any fetch); the literal ssh:// fetch isolation
 // below has no v2 semantic case, so local rows carry it.
 //
@@ -582,15 +580,14 @@ func TestDraftLiteralIgnoresProxyEnvironment(t *testing.T) {
 // git observes both values. Dropping either (narrowing the allow-list)
 // fails the env assertions.
 func TestDraftLiteralKeepsAgentAndAskpass(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("test transport wrapper is POSIX-only")
-	}
-	realGit := requireGit(t)
 	root := t.TempDir()
 	bare, commit := draftCLIKitBare(t, root)
-	fakeDir, cloneLog, envLog := literalIsolationGitShim(t, literalIsolationHTTPS, bare, realGit)
-	pathEnv := draftTransportPATH(t, fakeDir)
 	configPath, project, home := setupCLIProject(t, root)
+	policy := v2PolicyDoc(v2Entry(v2Endpoint(literalIsolationHTTPS, "team-https", ""), "none", ""), "")
+	if err := os.WriteFile(filepath.Join(filepath.Dir(configPath), "source-policy.json"), []byte(policy), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	pathEnv, operationLog := draftEndpointGitShim(t, literalIsolationHTTPS, bare, false)
 	payload := `{"schema_version":2,"sources":{"kit":{"git":"` + literalIsolationHTTPS + `","tag":"v1"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
 		t.Fatal(err)
@@ -605,15 +602,20 @@ func TestDraftLiteralKeepsAgentAndAskpass(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("resolve = %d, want success with agent/askpass set:\n%s\n%s", code, stdout, stderr)
 	}
-	if clones := draftCloneLog(t, cloneLog); len(clones) != 1 || clones[0] != literalIsolationHTTPS {
-		t.Fatalf("clones = %v, want the declared literal endpoint once", clones)
+	operations := readDraftFetchLog(t, operationLog)
+	if !strings.Contains(operations, "clone") || strings.Count(operations, literalIsolationHTTPS) != 1 {
+		t.Fatalf("Git operations = %q, want one clone through current endpoint %q", operations, literalIsolationHTTPS)
 	}
-	envSeen := literalIsolationEnvLog(t, envLog)
+	envSeen := readDraftGitEnvironment(t, operationLog)
 	if !strings.Contains(envSeen, "SSH_AUTH_SOCK="+agentSock) {
 		t.Fatalf("git missed SSH_AUTH_SOCK:\n%s", envSeen)
 	}
 	if !strings.Contains(envSeen, "GIT_ASKPASS="+askpass) {
 		t.Fatalf("git missed GIT_ASKPASS:\n%s", envSeen)
+	}
+	storedOrigin := draftGitOutput(t, draftRepoDirForTest(home, project, "kit"), "remote", "get-url", "origin")
+	if storedOrigin == literalIsolationHTTPS {
+		t.Fatalf("stored remote.origin.url %q selected the endpoint; refresh must use the current machine plan", storedOrigin)
 	}
 	lock, err := sourcelock.Read(filepath.Join(project, "Skillfile.lock.json"))
 	if err != nil {
@@ -627,5 +629,9 @@ func TestDraftLiteralKeepsAgentAndAskpass(t *testing.T) {
 	code, stdout, stderr = runCurator(t, home, configPath, env, "project", "refresh", "app")
 	if code != 0 {
 		t.Fatalf("refresh = %d, want success with agent/askpass set:\n%s\n%s", code, stdout, stderr)
+	}
+	operations = readDraftFetchLog(t, operationLog)
+	if strings.Count(operations, "\tfetch\t") != 1 || !strings.Contains(operations, literalIsolationHTTPS) {
+		t.Fatalf("Git operations = %q, want one refresh fetch through current endpoint %q", operations, literalIsolationHTTPS)
 	}
 }

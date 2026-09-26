@@ -372,10 +372,10 @@ func TestCaptureDetectsRemovedMember(t *testing.T) {
 func TestCaptureDetectsLiveContentChange(t *testing.T) {
 	_, pkg, acquisition := captureFixture(t, map[string]string{"a.md": "before\n"})
 	var hookErr error
-	captureAfterCopyHook = func() {
+	restoreHook := SetCaptureAfterCopyHookForTesting(func(_ *LocalAcquisition) {
 		hookErr = os.WriteFile(filepath.Join(pkg, "a.md"), []byte("after\n"), 0o644)
-	}
-	defer func() { captureAfterCopyHook = nil }()
+	})
+	defer restoreHook()
 	_, err := Capture(acquisition)
 	if hookErr != nil {
 		t.Fatalf("race hook: %v", hookErr)
@@ -392,15 +392,15 @@ func TestCaptureDetectsLiveContentChange(t *testing.T) {
 func TestReviewIdentityReplacementDuringCapture(t *testing.T) {
 	_, pkg, acquisition := captureFixture(t, map[string]string{"a.md": "same\n"})
 	var hookErr error
-	captureAfterCopyHook = func() {
+	restoreHook := SetCaptureAfterCopyHookForTesting(func(_ *LocalAcquisition) {
 		path := filepath.Join(pkg, "a.md")
 		if err := os.WriteFile(path+".new", []byte("same\n"), 0o644); err != nil {
 			hookErr = err
 			return
 		}
 		hookErr = os.Rename(path+".new", path)
-	}
-	defer func() { captureAfterCopyHook = nil }()
+	})
+	defer restoreHook()
 	_, err := Capture(acquisition)
 	if hookErr != nil {
 		t.Fatalf("race hook: %v", hookErr)
