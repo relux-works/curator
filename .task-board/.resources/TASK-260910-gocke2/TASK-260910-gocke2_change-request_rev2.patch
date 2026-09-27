@@ -1,0 +1,98 @@
+diff --git a/internal/envprofile/surfacing_test.go b/internal/envprofile/surfacing_test.go
+index 556a4b48..70c83212 100644
+--- a/internal/envprofile/surfacing_test.go
++++ b/internal/envprofile/surfacing_test.go
+@@ -147,8 +147,14 @@ func TestAllowlistWarningOperations(t *testing.T) {
+ 	pinHomes(t)
+ 	root := t.TempDir()
+ 	writePackage(t, root, "acme", "1.0.0", "hello\n")
++	empty := Policy{}
+ 	nonEmpty := Policy{MCPAllowlist: []string{"https://example.com/m"}}
+-	info, _, _, err := Install(home, InstallOptions{Operand: root, Policy: nonEmpty})
++	info, _, _, err := Install(home, InstallOptions{Operand: root, Policy: empty})
++	if err != nil {
++		t.Fatal(err)
++	}
++	assertWarningPresent(t, info.Warnings, DiagAllowlistEmpty)
++	info, _, _, err = Install(home, InstallOptions{Operand: root, Policy: nonEmpty})
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -161,6 +167,14 @@ func TestAllowlistWarningOperations(t *testing.T) {
+ 		t.Fatal("a path root with no overlays must not move on update")
+ 	}
+ 	assertWarningAbsent(t, updated.Warnings, DiagAllowlistEmpty)
++	updated, moved, err = UpdateWithPolicy(home, "acme", empty)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if moved {
++		t.Fatal("a path root with no overlays must not move on update")
++	}
++	assertWarningPresent(t, updated.Warnings, DiagAllowlistEmpty)
+ 	fx := writeManagedFixture(t, "acme")
+ 	req := statusRequest(fx)
+ 	req.Policy = nonEmpty
+@@ -169,6 +183,62 @@ func TestAllowlistWarningOperations(t *testing.T) {
+ 		t.Fatal(err)
+ 	}
+ 	assertWarningAbsent(t, status.Warnings, DiagAllowlistEmpty)
++	req.Policy = empty
++	status, err = StatusOf(req)
++	if err != nil {
++		t.Fatal(err)
++	}
++	assertWarningPresent(t, status.Warnings, DiagAllowlistEmpty)
++}
++
++// TestEmptyAllowlistWarningLeavesCurrentStatusCurrent proves the
++// mcp_package_allowlist_empty warning does not make an otherwise-current
++// environment status non-current.
++func TestEmptyAllowlistWarningLeavesCurrentStatusCurrent(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	seedLiveNativeCredentials(t, fx)
++	if err := EnsureDefault(fx.home); err != nil {
++		t.Fatal(err)
++	}
++	for _, profile := range []string{"acme", DefaultProfile} {
++		for _, environment := range []string{"claude_code", "codex_cli", "opencode", "pi"} {
++			req := fx.request(environment)
++			req.Profile = profile
++			req.Repair = true
++			if _, err := Resolve(req); err != nil {
++				t.Fatalf("provision %s/%s: %v", profile, environment, err)
++			}
++		}
++	}
++
++	req := statusRequest(fx)
++	req.Policy = Policy{MCPAllowlist: []string{"https://example.com/m"}}
++	quiet, err := StatusOf(req)
++	if err != nil {
++		t.Fatal(err)
++	}
++	nonCurrentHomes := func(status *Status) []string {
++		var rows []string
++		for _, home := range status.Homes {
++			if !home.Current {
++				rows = append(rows, home.Profile+"/"+home.Environment)
++			}
++		}
++		return rows
++	}
++	if quiet.NonCurrent {
++		t.Fatalf("control fixture is not current: homes=%v scopes=%+v diagnostics=%v", nonCurrentHomes(quiet), quiet.Scopes, quiet.Diagnostics)
++	}
++
++	req.Policy = Policy{}
++	warned, err := StatusOf(req)
++	if err != nil {
++		t.Fatal(err)
++	}
++	assertWarningPresent(t, warned.Warnings, DiagAllowlistEmpty)
++	if warned.NonCurrent {
++		t.Fatalf("empty-allowlist warning made an otherwise-current status non-current: homes=%v scopes=%+v diagnostics=%v", nonCurrentHomes(warned), warned.Scopes, warned.Diagnostics)
++	}
+ }
+ 
+ func assertWarningAbsent(t *testing.T, warnings []string, diagnostic string) {
