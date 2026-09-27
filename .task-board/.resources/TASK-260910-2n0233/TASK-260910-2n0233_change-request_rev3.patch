@@ -1,0 +1,1990 @@
+diff --git a/cmd/curator/env.go b/cmd/curator/env.go
+index 8d2aa6b7..b90afb32 100644
+--- a/cmd/curator/env.go
++++ b/cmd/curator/env.go
+@@ -124,6 +124,7 @@ func (c cli) cmdEnvStatus(cfg *config.Config, args []string) int {
+ 		return exitFail
+ 	}
+ 	attachProviderPosture(cfg, status)
++	attachRegistryPosture(cfg, status)
+ 	if *asJSON {
+ 		payload, err := json.MarshalIndent(status, "", "  ")
+ 		if err != nil {
+diff --git a/cmd/curator/env_test.go b/cmd/curator/env_test.go
+index 5c8e2317..1a042844 100644
+--- a/cmd/curator/env_test.go
++++ b/cmd/curator/env_test.go
+@@ -1,6 +1,8 @@
+ package main
+ 
+ import (
++	"crypto/sha256"
++	"encoding/hex"
+ 	"encoding/json"
+ 	"os"
+ 	"path/filepath"
+@@ -327,6 +329,115 @@ func TestEnvStatusMatrix(t *testing.T) {
+ 	}
+ }
+ 
++func TestEnvStatusRegistryBoundaryPostureAndCheck(t *testing.T) {
++	source, home := profileHome(t)
++	writeNativeCredentials(t)
++	pkg := t.TempDir()
++	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
++	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
++		t.Fatalf("profile install stderr:\n%s", stderr)
++	}
++	for _, profile := range []string{"acme", "default"} {
++		for _, environment := range []string{"claude_code", "codex_cli", "opencode", "pi"} {
++			if code, _, stderr := runProfile(t, source, "env", "resolve", environment, "--profile", profile, "--repair"); code != exitOK {
++				t.Fatalf("repair %s %s stderr:\n%s", profile, environment, stderr)
++			}
++		}
++	}
++	const registryURL = "https://registry.example.test"
++	source.cfg.DisableBuiltinRegistries = true
++	source.cfg.AuditRegistries = []config.Registry{{Name: "trusted", URL: registryURL, PublicKeys: []string{"ed25519:test"}, Enabled: true}}
++	bin := t.TempDir()
++	for _, name := range []string{"curator-run", "curator-session"} {
++		if runtime.GOOS == "windows" {
++			name += ".exe"
++		}
++		if err := os.WriteFile(filepath.Join(bin, name), []byte("stub"), 0o755); err != nil {
++			t.Fatal(err)
++		}
++	}
++	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
++
++	code, stdout, stderr := runProfile(t, source, "env", "status", "--check", "--json")
++	if code != exitOK {
++		t.Fatalf("first-use registry status --check = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	var report struct {
++		NonCurrent      bool `json:"non_current"`
++		RegistryPosture []struct {
++			Name                 string `json:"name"`
++			URL                  string `json:"url"`
++			HighWaterVersion     *int   `json:"high_water_version"`
++			HighWaterLogSize     *int   `json:"high_water_log_size"`
++			LastBoundaryVerified bool   `json:"last_boundary_verified"`
++			Diagnostic           string `json:"diagnostic"`
++		} `json:"registry_posture"`
++	}
++	if err := json.Unmarshal([]byte(stdout), &report); err != nil {
++		t.Fatalf("status JSON: %v\n%s", err, stdout)
++	}
++	if len(report.RegistryPosture) != 1 {
++		t.Fatalf("registry posture rows = %+v, want one configured trusted registry", report.RegistryPosture)
++	}
++	row := report.RegistryPosture[0]
++	if row.Name != "trusted" || row.URL != registryURL || row.HighWaterVersion != nil || row.HighWaterLogSize != nil || row.LastBoundaryVerified || row.Diagnostic != "" || report.NonCurrent {
++		t.Fatalf("first-use posture = %+v non_current=%v", row, report.NonCurrent)
++	}
++
++	stateDir := filepath.Join(home, "state", "registry")
++	if err := os.MkdirAll(stateDir, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	sum := sha256.Sum256([]byte(registryURL))
++	stateName := "snapshot-" + hex.EncodeToString(sum[:])[:16] + ".json"
++	statePath := filepath.Join(stateDir, stateName)
++	statePayload, err := json.Marshal(map[string]any{
++		"highest_version":   17,
++		"head":              strings.Repeat("b", 64),
++		"merkle_root":       strings.Repeat("a", 64),
++		"log_size":          12,
++		"boundary_verified": true,
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(statePath, statePayload, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	catalog := `{"schema_version":1,"states":["` + stateName + `"]}`
++	if err := os.WriteFile(filepath.Join(stateDir, "known-registries.json"), []byte(catalog), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	code, stdout, stderr = runProfile(t, source, "env", "status", "--check", "--json")
++	if code != exitOK {
++		t.Fatalf("persisted registry status --check = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	if err := json.Unmarshal([]byte(stdout), &report); err != nil {
++		t.Fatalf("status JSON with persisted high-water: %v\n%s", err, stdout)
++	}
++	row = report.RegistryPosture[0]
++	if row.HighWaterVersion == nil || *row.HighWaterVersion != 17 || row.HighWaterLogSize == nil || *row.HighWaterLogSize != 12 || !row.LastBoundaryVerified || row.Diagnostic != "" {
++		t.Fatalf("persisted registry posture = %+v", row)
++	}
++	if err := os.WriteFile(statePath, []byte("{broken"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	code, stdout, stderr = runProfile(t, source, "env", "status", "--check", "--json")
++	if code != exitFail {
++		t.Fatalf("unreadable registry rollback state --check = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitFail, stdout, stderr)
++	}
++	if err := json.Unmarshal([]byte(stdout), &report); err != nil {
++		t.Fatalf("status JSON with unreadable state: %v\n%s", err, stdout)
++	}
++	if !report.NonCurrent || len(report.RegistryPosture) != 1 || !strings.Contains(report.RegistryPosture[0].Diagnostic, "unreadable") {
++		t.Fatalf("unreadable registry state posture = %+v non_current=%v", report.RegistryPosture, report.NonCurrent)
++	}
++	entries, err := os.ReadDir(stateDir)
++	if err != nil || len(entries) != 2 {
++		t.Fatalf("read-only status changed rollback state directory: entries=%v error=%v", entries, err)
++	}
++}
++
+ // TestUmbrellaMissingProvider narrows the discovery gate: an unknown
+ // subcommand with no curator-<name> on PATH names the executable and the
+ // installation guidance, and downloads nothing.
+diff --git a/cmd/curator/envstatus.go b/cmd/curator/envstatus.go
+index d0642012..b5bd638e 100644
+--- a/cmd/curator/envstatus.go
++++ b/cmd/curator/envstatus.go
+@@ -8,6 +8,7 @@ import (
+ 
+ 	"github.com/relux-works/curator/internal/config"
+ 	"github.com/relux-works/curator/internal/envprofile"
++	"github.com/relux-works/curator/internal/registry"
+ )
+ 
+ // printEnvStatus renders the profile × environment × surface matrix as
+@@ -44,6 +45,11 @@ func printEnvStatus(stdout io.Writer, status *envprofile.Status) {
+ 			_, _ = fmt.Fprintln(stdout, row)
+ 		}
+ 	}
++	// Registry page-boundary posture follows the S6 shell-hook block and
++	// the §12 posture block, in the closed status-row order.
++	for _, row := range status.RegistryPosture {
++		_, _ = fmt.Fprintln(stdout, formatRegistryPosture(row))
++	}
+ 	for _, home := range status.Homes {
+ 		state := "current"
+ 		if !home.Current {
+@@ -179,6 +185,45 @@ func attachProviderPosture(cfg *config.Config, status *envprofile.Status) {
+ 	}
+ }
+ 
++// attachRegistryPosture reads each enabled registry's existing §5 high-water
++// and page-boundary posture. An absent first-use state is informational;
++// unreadable or missing-after-use state is an error row and makes --check
++// fail, because registry operations cannot safely treat it as first use.
++func attachRegistryPosture(cfg *config.Config, status *envprofile.Status) {
++	status.RegistryPosture = readRegistryPosture(cfg)
++	for _, row := range status.RegistryPosture {
++		if row.Diagnostic != "" {
++			status.NonCurrent = true
++		}
++	}
++}
++
++func readRegistryPosture(cfg *config.Config) []registry.BoundaryPosture {
++	trusted := cfg.TrustedRegistries()
++	registries := make([]registry.Registry, 0, len(trusted))
++	for _, entry := range trusted {
++		registries = append(registries, registry.Registry{Name: entry.Name, URL: entry.URL, PublicKeys: entry.PublicKeys})
++	}
++	cacheDir := filepath.Join(cfg.Home(), "cache", "registry")
++	stateDir := registry.ReadOnlyStateDir(filepath.Join(cfg.Home(), "state", "registry"), cacheDir)
++	return registry.ReadBoundaryPosture(stateDir, registries)
++}
++
++func formatRegistryPosture(row registry.BoundaryPosture) string {
++	if row.Diagnostic != "" {
++		return fmt.Sprintf("registry %s %s: rollback state unavailable: %s", row.Name, row.URL, row.Diagnostic)
++	}
++	verified := "no"
++	if row.LastBoundaryVerified {
++		verified = "yes"
++	}
++	if row.HighWaterVersion == nil || row.HighWaterLogSize == nil {
++		return fmt.Sprintf("registry %s %s: no persisted high-water, last page boundary verified: %s", row.Name, row.URL, verified)
++	}
++	return fmt.Sprintf("registry %s %s: high-water version %d, log_size %d, last page boundary verified: %s",
++		row.Name, row.URL, *row.HighWaterVersion, *row.HighWaterLogSize, verified)
++}
++
+ // formatPassable renders the effective passable_env_names: unbounded for
+ // a nil list, otherwise the compact JSON array.
+ func formatPassable(names []string) string {
+diff --git a/cmd/curator/main.go b/cmd/curator/main.go
+index 01e337e9..610b7143 100644
+--- a/cmd/curator/main.go
++++ b/cmd/curator/main.go
+@@ -827,6 +827,13 @@ func (c cli) cmdStatus(args []string) int {
+ 		targetRoots = append(targetRoots, target.Root)
+ 	}
+ 	trustRows, trustWarnings, trustStateUnreadable := hookTrustPosture(cfg.Home(), targetRoots)
++	registryRows := readRegistryPosture(cfg)
++	registryStateUnreadable := false
++	for _, row := range registryRows {
++		if row.Diagnostic != "" {
++			registryStateUnreadable = true
++		}
++	}
+ 
+ 	exitCode := exitOK
+ 	jsonResults := make([]map[string]any, 0, len(targets))
+@@ -891,6 +898,9 @@ func (c cli) cmdStatus(args []string) int {
+ 		// JSON consumer sees the same read failures the human output
+ 		// prints.
+ 		payload := map[string]any{"alias": target.Alias, "path": target.Root, "skills": drift, "shell_hook_trust": trustRows}
++		if len(registryRows) > 0 {
++			payload["registry_posture"] = registryRows
++		}
+ 		if len(trustWarnings) > 0 {
+ 			payload["shell_hook_trust_warnings"] = trustWarnings
+ 		}
+@@ -924,6 +934,9 @@ func (c cli) cmdStatus(args []string) int {
+ 		for _, row := range trustRows {
+ 			_, _ = fmt.Fprintln(c.stdout, formatTrustRow(row))
+ 		}
++		for _, row := range registryRows {
++			_, _ = fmt.Fprintln(c.stdout, formatRegistryPosture(row))
++		}
+ 	}
+ 	// A changed file, a recorded file whose bytes are missing or
+ 	// unreadable, or an unreadable approval state is non-current; an
+@@ -932,6 +945,9 @@ func (c cli) cmdStatus(args []string) int {
+ 	if *check && hookTrustCheckFailed(trustRows, trustStateUnreadable) {
+ 		exitCode = exitFail
+ 	}
++	if *check && registryStateUnreadable {
++		exitCode = exitFail
++	}
+ 	if *jsonOut {
+ 		var output any = jsonResults
+ 		if len(jsonResults) == 1 {
+@@ -1194,8 +1210,12 @@ func (c cli) cmdStatusAttest(cfg *config.Config, projectRoot, alias string, json
+ 	for _, entry := range trusted {
+ 		registries = append(registries, registry.Registry{Name: entry.Name, URL: entry.URL, PublicKeys: entry.PublicKeys})
+ 	}
+-	fetch := registry.NewHTTPFetchWithPolicy(
+-		filepath.Join(cfg.Home(), "cache", "registry"),
++	cacheDir := filepath.Join(cfg.Home(), "cache", "registry")
++	stateDir := registry.ReadOnlyStateDir(filepath.Join(cfg.Home(), "state", "registry"), cacheDir)
++	fetch := registry.NewHTTPFetchWithPolicyReadOnly(
++		cacheDir,
++		stateDir,
++		registries,
+ 		time.Duration(cfg.Audit.CacheTTLSeconds)*time.Second,
+ 		time.Duration(cfg.Audit.OfflineGraceSeconds)*time.Second,
+ 		nil,
+diff --git a/cmd/curator/main_test.go b/cmd/curator/main_test.go
+index 41ca3fce..e1828272 100644
+--- a/cmd/curator/main_test.go
++++ b/cmd/curator/main_test.go
+@@ -794,6 +794,62 @@ func TestCLIEndToEndInstallStatusAndTamperCheck(t *testing.T) {
+ 	if code := runCode(t, configPath, []string{"status", "app", "--check"}); code != exitOK {
+ 		t.Fatalf("clean status = %d", code)
+ 	}
++	// Registry posture is read-only: absent first-use state is current, while
++	// an unreadable persisted state is visible and fails --check.
++	configBytes, err := os.ReadFile(configPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var configDocument map[string]any
++	if err := json.Unmarshal(configBytes, &configDocument); err != nil {
++		t.Fatal(err)
++	}
++	const registryURL = "https://registry.example.test"
++	configDocument["disable_builtin_registries"] = true
++	configDocument["audit_registries"] = []any{map[string]any{
++		"name": "test-registry", "url": registryURL, "enabled": true,
++		"public_keys": []any{"ed25519:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},
++	}}
++	configBytes, err = json.Marshal(configDocument)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(configPath, configBytes, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	code, stdout, stderr := capture(t, configPath, "status", "app", "--json", "--check")
++	if code != exitOK {
++		t.Fatalf("first-use registry status --check = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	var statusDocument map[string]any
++	if err := json.Unmarshal([]byte(stdout), &statusDocument); err != nil {
++		t.Fatalf("status output: %v\n%s", err, stdout)
++	}
++	postureRows, ok := statusDocument["registry_posture"].([]any)
++	if !ok || len(postureRows) != 1 {
++		t.Fatalf("registry_posture = %v, want one configured registry row", statusDocument["registry_posture"])
++	}
++
++	stateDir := filepath.Join(filepath.Dir(configPath), "state", "registry")
++	if err := os.MkdirAll(stateDir, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	registryDigest := sha256.Sum256([]byte(registryURL))
++	stateName := "snapshot-" + hex.EncodeToString(registryDigest[:])[:16] + ".json"
++	if err := os.WriteFile(filepath.Join(stateDir, stateName), []byte("{broken"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	catalog := `{"schema_version":1,"states":["` + stateName + `"]}`
++	if err := os.WriteFile(filepath.Join(stateDir, "known-registries.json"), []byte(catalog), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	code, stdout, stderr = capture(t, configPath, "status", "app", "--json", "--check")
++	if code != exitFail {
++		t.Fatalf("unreadable registry rollback state --check = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitFail, stdout, stderr)
++	}
++	if !strings.Contains(stdout, "rollback state is unreadable") {
++		t.Fatalf("status did not report unreadable registry state:\n%s", stdout)
++	}
+ 	if err := os.WriteFile(installedSkill, []byte("tampered\n"), 0o644); err != nil {
+ 		t.Fatal(err)
+ 	}
+diff --git a/docs/cli.md b/docs/cli.md
+index ebbbcea6..912647ec 100644
+--- a/docs/cli.md
++++ b/docs/cli.md
+@@ -246,6 +246,25 @@ check. The `--json` document carries the same rows under `shell_hook_trust`
+ (malformed lines, unreadable state) under `shell_hook_trust_warnings`.
+ `curator env status` reports the same posture rows with the same `--check`
+ semantics.
++
++Both `curator status` and `curator env status` also report one registry page
++boundary row per enabled registry with pinned keys. Each row names the
++registry URL, the persisted high-water version and `log_size` when present,
++and whether the stored page-boundary posture is verified. The rows appear
++after the shell-hook and §12 posture rows; JSON uses `registry_posture`.
++First use with no high-water is informational and passes `--check`. An
++unreadable or missing-after-use rollback state is reported as unavailable and
++fails `--check`; status reads do not create or repair that state.
++
++`curator status --attest` validates the signed `boundary` on every fetched
++records page before using its records. A rejected page leaves that registry
++unknown for the attestation and prints the `registry_page_boundary_*`
++diagnostic with the registry URL in the result detail. The read-only command
++does not advance high-water state or write the record cache. A pre-existing
++cache entry remains on disk after a rejected chain but is not served for that
++operation; it is eligible for a later outage fallback only when its signed
++boundary matches the persisted high-water.
++
+ For managed-home provisioning, an unreadable marker is reported as unknown,
+ not unprovisioned: the scope row carries `provisioned_known: false` and an
+ `environment_marker_unreadable` diagnostic, and `--check` returns non-zero.
+diff --git a/docs/troubleshooting.md b/docs/troubleshooting.md
+index 327463b5..1cbc87bb 100644
+--- a/docs/troubleshooting.md
++++ b/docs/troubleshooting.md
+@@ -705,6 +705,52 @@ Remedy: restore access to the native target out of band — fix the
+ permissions or parent, or restore the file — then re-run with
+ `--repair`: repair converges and the link reads through once the
+ target stats again.
++
++## Registry page-boundary diagnostics
++
++Curator requires every successful records page to carry the registry's signed
++snapshot boundary. Each rejected page contributes no records; the diagnostic
++names the registry URL. There is no legacy-accept setting.
++
++### registry_page_boundary_missing
++
++Symptom: install or `curator status --attest` reports
++`registry_page_boundary_missing` for a registry URL.
++
++Cause: the records page omitted `boundary`, the value was not a complete
++`registry-snapshot-v1` object, or its signature did not verify against that
++registry's pinned keys. The registry is excluded for the operation.
++
++Remedy: update the registry service so every `/v1/records` success response
++uses `records-response-v2` and carries the complete signed boundary. Verify
++the configured key pin matches the signing key. Retry after the service is
++corrected; do not bypass the boundary check.
++
++### registry_page_boundary_mismatch
++
++Symptom: a later cursor page reports `registry_page_boundary_mismatch`.
++
++Cause: the later page's verified boundary bytes differ from the first page's
++boundary. The client refuses the whole chain and does not advance high-water
++state from the later page.
++
++Remedy: fix the service pagination so every cursor page is evaluated at the
++captured first-page snapshot and emits the same boundary bytes. Retry the
++query after the service is healthy.
++
++### registry_page_boundary_stale
++
++Symptom: the first records page reports `registry_page_boundary_stale`.
++
++Cause: its signed boundary is below the registry URL's persisted high-water,
++or has the same version with a different `head`, `merkle_root`, or `log_size`.
++The client excludes the registry and leaves rollback state unchanged.
++
++Remedy: check that the configured URL reaches the intended registry and that
++its service is serving the current committed snapshot. Preserve the local
++rollback state and retry after the registry has recovered; deleting that state
++would remove rollback protection.
++
+ ## Enforced script execution diagnostics
+ 
+ Enforced script commands (`execution_policy: "script-worker-v1"`) launch
+diff --git a/internal/crossconformance/draftsources_semantic_evidence_test.go b/internal/crossconformance/draftsources_semantic_evidence_test.go
+index 55819a5d..54f6bb31 100644
+--- a/internal/crossconformance/draftsources_semantic_evidence_test.go
++++ b/internal/crossconformance/draftsources_semantic_evidence_test.go
+@@ -204,7 +204,15 @@ func (s *attestStub) serveRecords(w http.ResponseWriter, r *http.Request) {
+ 	default:
+ 		mint(nil, s.good)
+ 	}
+-	writeStubJSON(w, map[string]any{"records": records, "next_cursor": nil})
++	boundary := s.good.sign(map[string]any{
++		"schema_version": 1,
++		"version":        1,
++		"log_size":       0,
++		"head":           strings.Repeat("ab", 32),
++		"merkle_root":    strings.Repeat("cd", 32),
++		"created_at":     time.Now().UTC().Truncate(time.Second).Format("2006-01-02T15:04:05Z"),
++	})
++	writeStubJSON(w, map[string]any{"records": records, "next_cursor": nil, "boundary": boundary})
+ }
+ 
+ func writeStubJSON(w http.ResponseWriter, value any) {
+diff --git a/internal/envprofile/status.go b/internal/envprofile/status.go
+index 98d467cc..c5424e5d 100644
+--- a/internal/envprofile/status.go
++++ b/internal/envprofile/status.go
+@@ -26,6 +26,7 @@ import (
+ 	"github.com/relux-works/curator/internal/envregistry"
+ 	"github.com/relux-works/curator/internal/hookapproval"
+ 	"github.com/relux-works/curator/internal/manifest"
++	"github.com/relux-works/curator/internal/registry"
+ 	"github.com/relux-works/curator/internal/stateread"
+ )
+ 
+@@ -225,6 +226,10 @@ type Status struct {
+ 	RequireCurrentProfile *string `json:"require_current_profile,omitempty"`
+ 	// RequireCurrentLocked reports whether the requirement is locked.
+ 	RequireCurrentLocked bool `json:"require_current_profile_locked,omitempty"`
++	// RegistryPosture reports the persisted registry page-boundary high-water
++	// and the verified-boundary posture. It is attached by the CLI because the
++	// CLI owns configured registry trust anchors.
++	RegistryPosture []registry.BoundaryPosture `json:"registry_posture"`
+ }
+ 
+ // StatusRequest scopes one status computation. The seams mirror
+diff --git a/internal/install/draftevidence_test.go b/internal/install/draftevidence_test.go
+index 0793828a..bd01c5fc 100644
+--- a/internal/install/draftevidence_test.go
++++ b/internal/install/draftevidence_test.go
+@@ -23,11 +23,12 @@ import (
+ // install-package counterpart of the crossconformance attest stub,
+ // narrowed to the draft §4 exact-matching bound.
+ type draftEvidenceStub struct {
+-	t       *testing.T
+-	server  *httptest.Server
+-	pinned  string
+-	private ed25519.PrivateKey
+-	mutate  func(body map[string]any)
++	t        *testing.T
++	server   *httptest.Server
++	pinned   string
++	private  ed25519.PrivateKey
++	mutate   func(body map[string]any)
++	boundary map[string]any
+ }
+ 
+ func newDraftEvidenceStub(t *testing.T, mutate func(body map[string]any)) *draftEvidenceStub {
+@@ -42,6 +43,11 @@ func newDraftEvidenceStub(t *testing.T, mutate func(body map[string]any)) *draft
+ 		private: private,
+ 		mutate:  mutate,
+ 	}
++	stub.boundary = stub.sign(map[string]any{
++		"schema_version": 1, "version": 1, "log_size": 0,
++		"head": strings.Repeat("ab", 32), "merkle_root": strings.Repeat("cd", 32),
++		"created_at": time.Now().UTC().Truncate(time.Second).Format("2006-01-02T15:04:05Z"),
++	})
+ 	mux := http.NewServeMux()
+ 	mux.HandleFunc("/v1/snapshot", stub.serveSnapshot)
+ 	mux.HandleFunc("/v1/records", stub.serveRecords)
+@@ -72,11 +78,7 @@ func (s *draftEvidenceStub) sign(body map[string]any) map[string]any {
+ 
+ func (s *draftEvidenceStub) serveSnapshot(w http.ResponseWriter, _ *http.Request) {
+ 	w.Header().Set("Content-Type", "application/json")
+-	_ = json.NewEncoder(w).Encode(s.sign(map[string]any{
+-		"schema_version": 1, "version": 1, "log_size": 0,
+-		"head": strings.Repeat("ab", 32), "merkle_root": strings.Repeat("cd", 32),
+-		"created_at": time.Now().UTC().Truncate(time.Second).Format("2006-01-02T15:04:05Z"),
+-	}))
++	_ = json.NewEncoder(w).Encode(s.boundary)
+ }
+ 
+ func (s *draftEvidenceStub) serveRecords(w http.ResponseWriter, r *http.Request) {
+@@ -90,7 +92,7 @@ func (s *draftEvidenceStub) serveRecords(w http.ResponseWriter, r *http.Request)
+ 	if s.mutate != nil {
+ 		s.mutate(body)
+ 	}
+-	_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(body)}, "next_cursor": nil})
++	_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(body)}, "next_cursor": nil, "boundary": s.boundary})
+ }
+ 
+ // TestDraftEvidenceExactMatch is the production-entry bound for draft §4
+diff --git a/internal/install/dryrun_conformance_test.go b/internal/install/dryrun_conformance_test.go
+index fa029bfa..b9660063 100644
+--- a/internal/install/dryrun_conformance_test.go
++++ b/internal/install/dryrun_conformance_test.go
+@@ -214,18 +214,18 @@ func loopbackRegistry(t *testing.T, calls *int) (*httptest.Server, string) {
+ 		}
+ 		return body
+ 	}
++	boundary := sign(map[string]any{
++		"schema_version": 1, "merkle_root": strings.Repeat("a", 64), "log_size": 1,
++		"head": strings.Repeat("b", 64), "version": 1, "created_at": createdAt,
++	})
+ 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+ 		*calls++
+ 		w.Header().Set("Content-Type", "application/json")
+ 		switch {
+ 		case strings.HasSuffix(r.URL.Path, "/v1/snapshot"):
+-			_ = json.NewEncoder(w).Encode(sign(map[string]any{
+-				"schema_version": 1, "merkle_root": strings.Repeat("a", 64), "log_size": 1,
+-				"head": strings.Repeat("b", 64), "version": 1,
+-				"created_at": createdAt,
+-			}))
++			_ = json.NewEncoder(w).Encode(boundary)
+ 		case strings.HasSuffix(r.URL.Path, "/v1/records"):
+-			_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{}, "next_cursor": nil})
++			_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{}, "next_cursor": nil, "boundary": boundary})
+ 		default:
+ 			http.NotFound(w, r)
+ 		}
+diff --git a/internal/install/install.go b/internal/install/install.go
+index 021edf7e..424e997a 100644
+--- a/internal/install/install.go
++++ b/internal/install/install.go
+@@ -1388,13 +1388,18 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string,
+ 	if persist {
+ 		fetch = registry.NewHTTPFetchWithPolicy(
+ 			cacheDir,
++			snapshotStateDir,
++			usable,
+ 			time.Duration(cfg.Audit.CacheTTLSeconds)*time.Second,
+ 			time.Duration(cfg.Audit.OfflineGraceSeconds)*time.Second,
+ 			nil,
++			registry.FetchPolicy{PersistCache: true, PersistState: true},
+ 		)
+ 	} else {
+ 		fetch = registry.NewHTTPFetchWithPolicyReadOnly(
+ 			cacheDir,
++			snapshotStateDir,
++			usable,
+ 			time.Duration(cfg.Audit.CacheTTLSeconds)*time.Second,
+ 			time.Duration(cfg.Audit.OfflineGraceSeconds)*time.Second,
+ 			nil,
+diff --git a/internal/install/registry_e2e_test.go b/internal/install/registry_e2e_test.go
+index ce5980a7..08e4ec0d 100644
+--- a/internal/install/registry_e2e_test.go
++++ b/internal/install/registry_e2e_test.go
+@@ -94,6 +94,7 @@ func fakeRegistry(t *testing.T, status, sourceIdentity, commit, contentHash stri
+ 	}
+ 	createdAt := fixture.createdAt.Format(time.RFC3339)
+ 	pinned := "ed25519:" + base64.StdEncoding.EncodeToString(public)
++	var pageBoundary map[string]any
+ 	sign := func(body map[string]any) map[string]any {
+ 		signature := ed25519.Sign(private, registry.CanonicalBytes(body))
+ 		body["sig"] = map[string]any{
+@@ -102,6 +103,16 @@ func fakeRegistry(t *testing.T, status, sourceIdentity, commit, contentHash stri
+ 		}
+ 		return body
+ 	}
++	snapshot := func() map[string]any {
++		stamped := createdAt
++		if fixture.serveTimeMint {
++			stamped = time.Now().UTC().Add(fixture.futureOffset).Truncate(time.Second).Format(time.RFC3339)
++		}
++		return sign(map[string]any{
++			"schema_version": 1, "merkle_root": strings.Repeat("a", 64), "log_size": 1, "head": strings.Repeat("b", 64),
++			"version": 1, "created_at": stamped,
++		})
++	}
+ 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+ 		w.Header().Set("Content-Type", "application/json")
+ 		switch {
+@@ -109,20 +120,17 @@ func fakeRegistry(t *testing.T, status, sourceIdentity, commit, contentHash stri
+ 			if fixture.beforeSnapshot != nil {
+ 				fixture.beforeSnapshot()
+ 			}
+-			stamped := createdAt
+-			if fixture.serveTimeMint {
+-				stamped = time.Now().UTC().Add(fixture.futureOffset).Truncate(time.Second).Format(time.RFC3339)
+-			}
+-			_ = json.NewEncoder(w).Encode(sign(map[string]any{
+-				"schema_version": 1, "merkle_root": strings.Repeat("a", 64), "log_size": 1, "head": strings.Repeat("b", 64),
+-				"version": 1, "created_at": stamped,
+-			}))
++			pageBoundary = snapshot()
++			_ = json.NewEncoder(w).Encode(pageBoundary)
+ 		case strings.HasSuffix(r.URL.Path, "/v1/records"):
++			if pageBoundary == nil {
++				pageBoundary = snapshot()
++			}
+ 			record := sign(map[string]any{
+ 				"name": "skill-a", "source_identity": sourceIdentity,
+ 				"commit": commit, "content_sha256": contentHash, "status": status,
+ 			})
+-			_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{record}, "next_cursor": nil})
++			_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{record}, "next_cursor": nil, "boundary": pageBoundary})
+ 		default:
+ 			http.NotFound(w, r)
+ 		}
+diff --git a/internal/registry/attest.go b/internal/registry/attest.go
+index 377a3252..c828b17e 100644
+--- a/internal/registry/attest.go
++++ b/internal/registry/attest.go
+@@ -2,6 +2,7 @@ package registry
+ 
+ import (
+ 	"path/filepath"
++	"strings"
+ 
+ 	"github.com/relux-works/curator/internal/identity"
+ 	"github.com/relux-works/curator/internal/marker"
+@@ -63,7 +64,10 @@ func AttestRoot(scope, skillsRoot string, registries []Registry, fetch FetchFn)
+ 			if resolution.Attestation != nil {
+ 				registryName = resolution.Attestation.Registry
+ 			}
+-			results = append(results, AttestResult{Scope: scope, Skill: recorded.Name, Result: resolution.Result, Registry: registryName})
++			results = append(results, AttestResult{
++				Scope: scope, Skill: recorded.Name, Result: resolution.Result, Registry: registryName,
++				Detail: strings.Join(resolution.Warnings, "; "),
++			})
+ 			continue
+ 		}
+ 		if recorded.Commit == "" || recorded.ContentSHA256 == "" {
+@@ -80,7 +84,10 @@ func AttestRoot(scope, skillsRoot string, registries []Registry, fetch FetchFn)
+ 		if resolution.Attestation != nil {
+ 			registryName = resolution.Attestation.Registry
+ 		}
+-		results = append(results, AttestResult{Scope: scope, Skill: recorded.Name, Result: resolution.Result, Registry: registryName})
++		results = append(results, AttestResult{
++			Scope: scope, Skill: recorded.Name, Result: resolution.Result, Registry: registryName,
++			Detail: strings.Join(resolution.Warnings, "; "),
++		})
+ 	}
+ 	return results
+ }
+diff --git a/internal/registry/boundary.go b/internal/registry/boundary.go
+new file mode 100644
+index 00000000..f9ba8282
+--- /dev/null
++++ b/internal/registry/boundary.go
+@@ -0,0 +1,228 @@
++package registry
++
++import (
++	"bytes"
++	"fmt"
++	"os"
++	"path/filepath"
++
++	"github.com/relux-works/curator/internal/stateread"
++)
++
++// Page-boundary diagnostics are closed by registry protocol §9.3.
++const (
++	PageBoundaryMissing  = "registry_page_boundary_missing"
++	PageBoundaryMismatch = "registry_page_boundary_mismatch"
++	PageBoundaryStale    = "registry_page_boundary_stale"
++)
++
++// PageBoundaryError reports a rejected records page and names its registry.
++// The FetchFn returns no records for a rejected chain and does not use or
++// replace a cache entry for that operation.
++type PageBoundaryError struct {
++	Diagnostic string
++	URL        string
++	Detail     string
++}
++
++func (e *PageBoundaryError) Error() string {
++	return fmt.Sprintf("%s: registry %s %s", e.Diagnostic, e.URL, e.Detail)
++}
++
++// pageStateError reports a failure to read or persist protected rollback
++// state. It fails closed like a boundary rejection, without inventing a
++// page-boundary diagnostic.
++type pageStateError struct{ msg string }
++
++func (e *pageStateError) Error() string { return e.msg }
++
++// pageChain applies §9.3 to one cursor chain. The first page's boundary is
++// the chain boundary; later pages verify their own signature, then compare
++// their exact JSON bytes before anything else. Only the first page checks or
++// advances the persisted high-water.
++type pageChain struct {
++	name      string
++	url       string
++	keys      []string
++	stateDir  string
++	stateName string
++	stateFile string
++	persist   bool
++	known     map[string]bool
++	state     snapshotState
++	chain     []byte
++	pages     int
++}
++
++// openPageChain reads the existing high-water without creating or repairing
++// state. A missing state file listed in the catalog, an unreadable state, or
++// an invalid catalog is unavailable, never first use.
++func openPageChain(name, registryURL string, keys []string, stateDir string, persist bool) (*pageChain, error) {
++	known, err := loadSnapshotStateCatalogReadOnly(stateDir)
++	if err != nil {
++		return nil, &pageStateError{fmt.Sprintf("registry %s rollback state catalog is unavailable: %v", name, err)}
++	}
++	stateName := "snapshot-" + urlDigest(registryURL) + ".json"
++	stateFile := filepath.Join(stateDir, stateName)
++	state, exists, err := readSnapshotState(stateFile)
++	if err != nil {
++		return nil, &pageStateError{fmt.Sprintf("registry %s rollback state is unreadable: %v", name, err)}
++	}
++	if !exists && known[stateName] {
++		return nil, &pageStateError{fmt.Sprintf("registry %s rollback state is missing after prior use", name)}
++	}
++	return &pageChain{
++		name: name, url: registryURL, keys: keys,
++		stateDir: stateDir, stateName: stateName, stateFile: stateFile,
++		persist: persist, known: known, state: state,
++	}, nil
++}
++
++func (c *pageChain) verifiedBoundary(boundary map[string]any) (parsedSnapshot, error) {
++	parsed, err := parseSnapshot(boundary)
++	if err != nil || !VerifySigned(boundary, c.keys) {
++		return parsedSnapshot{}, &PageBoundaryError{
++			Diagnostic: PageBoundaryMissing,
++			URL:        c.url,
++			Detail:     "served a records page whose boundary failed verification",
++		}
++	}
++	return parsed, nil
++}
++
++// acceptPage processes one page boundary in §9.3 order. Call it before the
++// page's records are added to the chain's result. A later page never checks or
++// advances high-water state.
++func (c *pageChain) acceptPage(boundary map[string]any, raw []byte) error {
++	parsed, err := c.verifiedBoundary(boundary)
++	if err != nil {
++		return err
++	}
++	if c.pages > 0 {
++		if !bytes.Equal(raw, c.chain) {
++			return &PageBoundaryError{
++				Diagnostic: PageBoundaryMismatch,
++				URL:        c.url,
++				Detail:     "served a records page whose boundary differs from the chain boundary",
++			}
++		}
++		c.pages++
++		return nil
++	}
++	if parsed.Version < c.state.HighestVersion {
++		return &PageBoundaryError{
++			Diagnostic: PageBoundaryStale,
++			URL:        c.url,
++			Detail:     "served a records page boundary below the persisted high-water",
++		}
++	}
++	if parsed.Version == c.state.HighestVersion && c.state.Head != "" {
++		if c.state.Head != parsed.Head || c.state.MerkleRoot != parsed.MerkleRoot || c.state.LogSize != parsed.LogSize {
++			return &PageBoundaryError{
++				Diagnostic: PageBoundaryStale,
++				URL:        c.url,
++				Detail:     "served a records page boundary that conflicts with the persisted high-water",
++			}
++		}
++		c.chain = append([]byte(nil), raw...)
++		c.pages = 1
++		return nil
++	}
++	if c.persist {
++		if err := os.MkdirAll(c.stateDir, 0o700); err != nil {
++			return &pageStateError{fmt.Sprintf("registry %s rollback state directory is unavailable: %v", c.name, err)}
++		}
++		_ = os.Chmod(c.stateDir, 0o700) // #nosec G302 -- protected state directory needs traversal bits
++		// The shared snapshot-state writer atomically publishes the higher
++		// high-water and boundary posture before this page contributes.
++		next := snapshotState{
++			HighestVersion:   parsed.Version,
++			Head:             parsed.Head,
++			MerkleRoot:       parsed.MerkleRoot,
++			LogSize:          parsed.LogSize,
++			BoundaryVerified: true,
++		}
++		if err := writeSnapshotState(c.stateFile, next); err != nil {
++			return &pageStateError{fmt.Sprintf("registry %s rollback state could not be persisted: %v", c.name, err)}
++		}
++		c.state = next
++		if !c.known[c.stateName] {
++			c.known[c.stateName] = true
++			if err := writeSnapshotStateCatalog(c.stateDir, c.known); err != nil {
++				return &pageStateError{fmt.Sprintf("registry %s rollback state catalog could not be persisted: %v", c.name, err)}
++			}
++		}
++	}
++	c.chain = append([]byte(nil), raw...)
++	c.pages = 1
++	return nil
++}
++
++// cacheBoundaryCurrent accepts a cached response only when its signed
++// boundary matches the already-persisted high-water. A cache entry can never
++// establish first-use state or advance a high-water.
++func (c *pageChain) cacheBoundaryCurrent(boundary map[string]any, raw []byte) bool {
++	parsed, err := c.verifiedBoundary(boundary)
++	if err != nil || c.state.Head == "" || parsed.Version != c.state.HighestVersion {
++		return false
++	}
++	return c.state.Head == parsed.Head && c.state.MerkleRoot == parsed.MerkleRoot && c.state.LogSize == parsed.LogSize && len(raw) > 0
++}
++
++// BoundaryPosture is one trusted registry's read-only §9.3 status row.
++type BoundaryPosture struct {
++	Name                 string `json:"name"`
++	URL                  string `json:"url"`
++	HighWaterVersion     *int   `json:"high_water_version"`
++	HighWaterLogSize     *int   `json:"high_water_log_size"`
++	LastBoundaryVerified bool   `json:"last_boundary_verified"`
++	Diagnostic           string `json:"diagnostic,omitempty"`
++}
++
++// ReadBoundaryPosture reports persisted state in trusted registry order and
++// never creates, repairs, or mutates protected state. An unreadable or
++// missing-after-use state is reported as a diagnostic rather than absence.
++func ReadBoundaryPosture(stateDir string, registries []Registry) []BoundaryPosture {
++	known, catalogErr := loadSnapshotStateCatalogReadOnly(stateDir)
++	rows := make([]BoundaryPosture, 0, len(registries))
++	for _, reg := range registries {
++		if len(reg.PublicKeys) == 0 {
++			continue
++		}
++		row := BoundaryPosture{Name: reg.Name, URL: reg.URL}
++		if catalogErr != nil {
++			row.Diagnostic = fmt.Sprintf("rollback state catalog is unavailable: %v", catalogErr)
++			rows = append(rows, row)
++			continue
++		}
++		stateName := "snapshot-" + urlDigest(reg.URL) + ".json"
++		state, exists, err := readSnapshotState(filepath.Join(stateDir, stateName))
++		switch {
++		case err != nil:
++			row.Diagnostic = fmt.Sprintf("rollback state is unreadable: %v", err)
++		case !exists && known[stateName]:
++			row.Diagnostic = "rollback state is missing after prior use"
++		case !exists:
++			// First use has no persisted high-water yet.
++		default:
++			version, logSize := state.HighestVersion, state.LogSize
++			row.HighWaterVersion = &version
++			row.HighWaterLogSize = &logSize
++			row.LastBoundaryVerified = state.BoundaryVerified
++		}
++		rows = append(rows, row)
++	}
++	return rows
++}
++
++// ReadOnlyStateDir preserves access to pre-migration rollback state. Only a
++// proven absence selects the legacy directory; unreadable state keeps the
++// protected path selected so its later read fails closed instead of falling
++// back to legacy state.
++func ReadOnlyStateDir(stateDir, legacyDir string) string {
++	metadata, err := stateread.Stat(stateDir)
++	if err == nil && metadata.Kind == stateread.KindAbsent {
++		return legacyDir
++	}
++	return stateDir
++}
+diff --git a/internal/registry/boundary_conformance_test.go b/internal/registry/boundary_conformance_test.go
+new file mode 100644
+index 00000000..a31e6a44
+--- /dev/null
++++ b/internal/registry/boundary_conformance_test.go
+@@ -0,0 +1,145 @@
++package registry
++
++import (
++	"encoding/json"
++	"errors"
++	"os"
++	"path/filepath"
++	"sort"
++	"strings"
++	"testing"
++)
++
++type pageBoundaryVector struct {
++	Name               string  `json:"name"`
++	Accepted           bool    `json:"accepted"`
++	BoundaryPresent    bool    `json:"boundary_present"`
++	BoundaryVersion    int     `json:"boundary_version"`
++	ChainBoundaryEqual bool    `json:"chain_boundary_equal"`
++	Diagnostic         *string `json:"diagnostic"`
++	HighWaterAdvanced  bool    `json:"high_water_advanced"`
++	RegistryExcluded   bool    `json:"registry_excluded"`
++	SameBody           bool    `json:"same_body"`
++	SignatureValid     bool    `json:"signature_valid"`
++	StoredVersion      int     `json:"stored_version"`
++}
++
++// TestPageBoundaryConformanceVectors drives every pinned registry-client
++// page_boundary_cases vector through the production HTTP fetch entry point.
++// It skips only when CURATOR_CONFORMANCE_ROOT is unset; a root without the
++// family or with a different case set is a failure.
++func TestPageBoundaryConformanceVectors(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	payload, err := os.ReadFile(filepath.Join(root, "vectors", "registry-client.json")) // #nosec G304 -- pinned conformance root
++	if err != nil {
++		t.Fatal(err)
++	}
++	var document struct {
++		Cases []pageBoundaryVector `json:"page_boundary_cases"`
++	}
++	if err := json.Unmarshal(payload, &document); err != nil {
++		t.Fatal(err)
++	}
++	want := []string{
++		"fresh-boundary-advances-high-water",
++		"equal-version-same-body-accepted",
++		"equal-version-different-body-rejected",
++		"below-high-water-rejected",
++		"chain-boundary-mismatch-rejected",
++		"missing-boundary-excluded",
++		"bad-signature-rejected",
++		"stale-and-mismatch-reports-mismatch",
++		"higher-and-mismatch-never-advances",
++	}
++	got := make([]string, 0, len(document.Cases))
++	for _, testCase := range document.Cases {
++		got = append(got, testCase.Name)
++	}
++	sort.Strings(got)
++	sort.Strings(want)
++	if strings.Join(got, "\n") != strings.Join(want, "\n") {
++		t.Fatalf("page_boundary_cases names = %v, want %v", got, want)
++	}
++	for _, testCase := range document.Cases {
++		t.Run(testCase.Name, func(t *testing.T) { runPageBoundaryVector(t, testCase) })
++	}
++}
++
++func runPageBoundaryVector(t *testing.T, testCase pageBoundaryVector) {
++	t.Helper()
++	w := newBoundaryWorld(t)
++	cacheDir, stateDir := t.TempDir(), t.TempDir()
++	stored := w.storedBody(testCase.StoredVersion)
++	subject := w.otherBody(testCase.BoundaryVersion)
++	if testCase.SameBody {
++		subject = w.storedBody(testCase.BoundaryVersion)
++	}
++	signedBy := w.signer
++	if !testCase.SignatureValid {
++		signedBy = w.rogue
++	}
++	var pages []string
++	if testCase.ChainBoundaryEqual {
++		var boundary map[string]any
++		if testCase.BoundaryPresent {
++			boundary = signedBy.sign(subject)
++		}
++		pages = []string{boundaryPage(t, boundary, []any{signedBoundaryRecord(t, w, StatusAudited)}, nil)}
++	} else {
++		next := "page-2"
++		pages = []string{
++			boundaryPage(t, w.signer.sign(stored), []any{signedBoundaryRecord(t, w, StatusAudited)}, next),
++			boundaryPage(t, signedBy.sign(subject), []any{signedBoundaryRecord(t, w, StatusDeprecated)}, nil),
++		}
++	}
++	server, _ := boundaryServer(t, pages...)
++	regs := w.registries(server.URL)
++	w.seed(t, stateDir, regs[0], stored)
++	statePath := boundaryStateFile(stateDir, server.URL)
++	before := readBoundaryState(t, statePath)
++	fetch := fetchBoundary(t, cacheDir, stateDir, regs, FetchPolicy{PersistCache: true, PersistState: true})
++	records, fetchErr := fetch(server.URL, "vector", testCommit, testContentSHA256)
++	if testCase.Accepted {
++		if fetchErr != nil || len(records) == 0 {
++			t.Fatalf("vector accepted=%v but fetch returned %d records and %v", testCase.Accepted, len(records), fetchErr)
++		}
++	} else {
++		if fetchErr == nil || len(records) != 0 {
++			t.Fatalf("rejected vector returned %d records and error %v", len(records), fetchErr)
++		}
++		if testCase.Diagnostic != nil {
++			var boundaryErr *PageBoundaryError
++			if !errors.As(fetchErr, &boundaryErr) || boundaryErr.Diagnostic != *testCase.Diagnostic {
++				t.Fatalf("error = %v, want diagnostic %s", fetchErr, *testCase.Diagnostic)
++			}
++			if !strings.Contains(fetchErr.Error(), server.URL) {
++				t.Fatalf("error does not name registry URL %s: %v", server.URL, fetchErr)
++			}
++		}
++	}
++	if testCase.RegistryExcluded != (fetchErr != nil) {
++		t.Fatalf("registry_excluded=%v, fetch error=%v", testCase.RegistryExcluded, fetchErr)
++	}
++	after := readBoundaryState(t, statePath)
++	if testCase.HighWaterAdvanced {
++		var state snapshotState
++		if err := json.Unmarshal(after, &state); err != nil {
++			t.Fatal(err)
++		}
++		if state.HighestVersion != testCase.BoundaryVersion || !state.BoundaryVerified {
++			t.Fatalf("vector high-water = %+v", state)
++		}
++	} else if string(before) != string(after) {
++		t.Fatalf("vector changed high-water unexpectedly:\nbefore %s\nafter %s", before, after)
++	}
++	cache := boundaryCacheEntries(t, cacheDir)
++	if testCase.Accepted && len(cache) != 1 {
++		t.Fatalf("accepted vector cache entries = %v, want one", cache)
++	}
++	if !testCase.Accepted && len(cache) != 0 {
++		t.Fatalf("rejected vector wrote cache entries: %v", cache)
++	}
++}
+diff --git a/internal/registry/boundary_test.go b/internal/registry/boundary_test.go
+new file mode 100644
+index 00000000..e84bb380
+--- /dev/null
++++ b/internal/registry/boundary_test.go
+@@ -0,0 +1,568 @@
++package registry
++
++import (
++	"crypto/sha256"
++	"encoding/hex"
++	"encoding/json"
++	"errors"
++	"net/http"
++	"net/http/httptest"
++	"os"
++	"path/filepath"
++	"strings"
++	"sync/atomic"
++	"testing"
++	"time"
++
++	"github.com/relux-works/curator/internal/stateread"
++)
++
++type boundaryWorld struct {
++	signer *signer
++	rogue  *signer
++	now    time.Time
++}
++
++func newBoundaryWorld(t *testing.T) *boundaryWorld {
++	t.Helper()
++	return &boundaryWorld{signer: newSigner(t), rogue: newSigner(t), now: time.Now().UTC().Truncate(time.Second)}
++}
++
++func (w *boundaryWorld) registries(url string) []Registry {
++	return []Registry{{Name: "one", URL: url, PublicKeys: []string{w.signer.pinned}}}
++}
++
++func (w *boundaryWorld) storedBody(version int) map[string]any {
++	body := snapshotBody(version, w.now)
++	body["head"] = strings.Repeat("b", 64)
++	body["merkle_root"] = strings.Repeat("a", 64)
++	body["log_size"] = version
++	return body
++}
++
++func (w *boundaryWorld) otherBody(version int) map[string]any {
++	body := snapshotBody(version, w.now)
++	body["head"] = strings.Repeat("c", 64)
++	body["merkle_root"] = strings.Repeat("d", 64)
++	body["log_size"] = version
++	return body
++}
++
++func (w *boundaryWorld) seed(t *testing.T, stateDir string, reg Registry, body map[string]any) {
++	t.Helper()
++	fetch := func(string) (map[string]any, error) { return w.signer.sign(body), nil }
++	tampered, warnings := CheckSnapshotsWithPolicy(
++		[]Registry{reg}, stateDir, fetch, w.now, DefaultSnapshotMaxAge, DefaultSnapshotClockSkew,
++	)
++	if len(tampered) != 0 || len(warnings) != 0 {
++		t.Fatalf("seed snapshot state: tampered=%v warnings=%v", tampered, warnings)
++	}
++}
++
++func boundaryStateFile(stateDir, registryURL string) string {
++	sum := sha256.Sum256([]byte(registryURL))
++	return filepath.Join(stateDir, "snapshot-"+hex.EncodeToString(sum[:])[:16]+".json")
++}
++
++func readBoundaryState(t *testing.T, path string) []byte {
++	t.Helper()
++	data, err := os.ReadFile(path) // #nosec G304 -- test-owned state path
++	if err != nil {
++		t.Fatal(err)
++	}
++	return data
++}
++
++func boundaryCacheEntries(t *testing.T, cacheDir string) []string {
++	t.Helper()
++	files, err := filepath.Glob(filepath.Join(cacheDir, "records-*.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	return files
++}
++
++func boundaryPage(t *testing.T, boundary map[string]any, records []any, next any) string {
++	t.Helper()
++	page := map[string]any{"records": records, "next_cursor": next}
++	if boundary != nil {
++		page["boundary"] = boundary
++	}
++	payload, err := json.Marshal(page)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return string(payload)
++}
++
++func boundaryServer(t *testing.T, pages ...string) (*httptest.Server, *int) {
++	t.Helper()
++	calls := 0
++	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
++		calls++
++		page := pages[len(pages)-1]
++		if calls <= len(pages) {
++			page = pages[calls-1]
++		}
++		w.Header().Set("Content-Type", "application/json")
++		_, _ = w.Write([]byte(page))
++	}))
++	t.Cleanup(server.Close)
++	return server, &calls
++}
++
++func signedBoundaryRecord(t *testing.T, w *boundaryWorld, status string) map[string]any {
++	t.Helper()
++	return w.signer.sign(record(status))
++}
++
++func fetchBoundary(t *testing.T, cacheDir, stateDir string, regs []Registry, policy FetchPolicy) FetchFn {
++	t.Helper()
++	return NewHTTPFetchWithPolicy(cacheDir, stateDir, regs, time.Minute, time.Hour, time.Now, policy)
++}
++
++func TestReadOnlyStateDirFallsBackOnlyForProvenAbsence(t *testing.T) {
++	legacyDir := t.TempDir()
++	presentDir := t.TempDir()
++	blockedParent := filepath.Join(t.TempDir(), "not-a-directory")
++	if err := os.WriteFile(blockedParent, []byte("file blocks child inspection"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	tests := []struct {
++		name       string
++		stateDir   string
++		wantKind   stateread.Kind
++		wantDir    string
++		wantReport bool
++	}{
++		{
++			name:     "absent state uses legacy directory",
++			stateDir: filepath.Join(t.TempDir(), "state"),
++			wantKind: stateread.KindAbsent,
++			wantDir:  legacyDir,
++		},
++		{
++			name:     "present state uses protected directory",
++			stateDir: presentDir,
++			wantKind: stateread.KindPresent,
++			wantDir:  presentDir,
++		},
++		{
++			name:       "unreadable state does not fall back",
++			stateDir:   filepath.Join(blockedParent, "state"),
++			wantKind:   stateread.KindUnreadable,
++			wantDir:    filepath.Join(blockedParent, "state"),
++			wantReport: true,
++		},
++	}
++	for _, test := range tests {
++		t.Run(test.name, func(t *testing.T) {
++			metadata, err := stateread.Stat(test.stateDir)
++			if metadata.Kind != test.wantKind || (test.wantKind == stateread.KindUnreadable) != (err != nil) {
++				t.Fatalf("stateread.Stat(%q) = (%+v, %v), want kind %q", test.stateDir, metadata, err, test.wantKind)
++			}
++			selected := ReadOnlyStateDir(test.stateDir, legacyDir)
++			if selected != test.wantDir {
++				t.Fatalf("ReadOnlyStateDir(%q) = %q, want %q", test.stateDir, selected, test.wantDir)
++			}
++			if test.wantReport {
++				rows := ReadBoundaryPosture(selected, []Registry{{Name: "one", URL: "https://one.example.test", PublicKeys: []string{"pinned"}}})
++				if len(rows) != 1 || !strings.Contains(rows[0].Diagnostic, stateread.DiagUnreadable) {
++					t.Fatalf("unreadable selected state posture = %+v, want a fail-closed %s diagnostic", rows, stateread.DiagUnreadable)
++				}
++			}
++		})
++	}
++}
++
++func requireBoundaryError(t *testing.T, records []map[string]any, err error, code, registryURL string) {
++	t.Helper()
++	if err == nil {
++		t.Fatalf("wanted %s, received %d records", code, len(records))
++	}
++	var boundaryErr *PageBoundaryError
++	if !errors.As(err, &boundaryErr) || boundaryErr.Diagnostic != code {
++		t.Fatalf("error = %v, want page diagnostic %s", err, code)
++	}
++	if !strings.HasPrefix(err.Error(), code) || !strings.Contains(err.Error(), registryURL) {
++		t.Fatalf("error %q must start with %s and name %s", err, code, registryURL)
++	}
++	if len(records) != 0 {
++		t.Fatalf("rejected page contributed %d records", len(records))
++	}
++}
++
++func TestRecordsPageBoundaryCases(t *testing.T) {
++	tests := []struct {
++		name          string
++		storedVersion int
++		first         func(*boundaryWorld) map[string]any
++		second        func(*boundaryWorld) map[string]any
++		missingFirst  bool
++		accepted      bool
++		wantError     string
++		wantAdvanced  int
++	}{
++		{name: "fresh boundary advances", storedVersion: 7, first: func(w *boundaryWorld) map[string]any { return w.signer.sign(w.otherBody(8)) }, accepted: true, wantAdvanced: 8},
++		{name: "equal version same body", storedVersion: 8, first: func(w *boundaryWorld) map[string]any { return w.signer.sign(w.storedBody(8)) }, accepted: true, wantAdvanced: 8},
++		{name: "equal version different body", storedVersion: 8, first: func(w *boundaryWorld) map[string]any { return w.signer.sign(w.otherBody(8)) }, wantError: PageBoundaryStale, wantAdvanced: 8},
++		{name: "below high-water", storedVersion: 8, first: func(w *boundaryWorld) map[string]any { return w.signer.sign(w.otherBody(7)) }, wantError: PageBoundaryStale, wantAdvanced: 8},
++		{name: "later mismatch", storedVersion: 7, first: func(w *boundaryWorld) map[string]any { return w.signer.sign(w.storedBody(7)) }, second: func(w *boundaryWorld) map[string]any { return w.signer.sign(w.otherBody(8)) }, wantError: PageBoundaryMismatch, wantAdvanced: 7},
++		{name: "missing boundary", storedVersion: 7, missingFirst: true, wantError: PageBoundaryMissing, wantAdvanced: 7},
++		{name: "bad signature", storedVersion: 7, first: func(w *boundaryWorld) map[string]any { return w.rogue.sign(w.otherBody(8)) }, wantError: PageBoundaryMissing, wantAdvanced: 7},
++		{name: "stale and mismatch reports mismatch", storedVersion: 8, first: func(w *boundaryWorld) map[string]any { return w.signer.sign(w.storedBody(8)) }, second: func(w *boundaryWorld) map[string]any { return w.signer.sign(w.otherBody(7)) }, wantError: PageBoundaryMismatch, wantAdvanced: 8},
++		{name: "higher and mismatch never advances", storedVersion: 7, first: func(w *boundaryWorld) map[string]any { return w.signer.sign(w.storedBody(7)) }, second: func(w *boundaryWorld) map[string]any { return w.signer.sign(w.otherBody(9)) }, wantError: PageBoundaryMismatch, wantAdvanced: 7},
++		{name: "missing wins over later mismatch", storedVersion: 7, first: func(w *boundaryWorld) map[string]any { return w.signer.sign(w.storedBody(7)) }, second: func(*boundaryWorld) map[string]any { return nil }, wantError: PageBoundaryMissing, wantAdvanced: 7},
++		{name: "bad signature wins over later mismatch", storedVersion: 7, first: func(w *boundaryWorld) map[string]any { return w.signer.sign(w.storedBody(7)) }, second: func(w *boundaryWorld) map[string]any { return w.rogue.sign(w.otherBody(8)) }, wantError: PageBoundaryMissing, wantAdvanced: 7},
++		{name: "bad signature wins over stale", storedVersion: 8, first: func(w *boundaryWorld) map[string]any { return w.rogue.sign(w.otherBody(7)) }, wantError: PageBoundaryMissing, wantAdvanced: 8},
++	}
++	for _, test := range tests {
++		t.Run(test.name, func(t *testing.T) {
++			w := newBoundaryWorld(t)
++			cacheDir, stateDir := t.TempDir(), t.TempDir()
++			var pages []string
++			if test.second != nil {
++				next := "page-2"
++				pages = []string{
++					boundaryPage(t, test.first(w), []any{signedBoundaryRecord(t, w, StatusAudited)}, next),
++					boundaryPage(t, test.second(w), []any{signedBoundaryRecord(t, w, StatusDeprecated)}, nil),
++				}
++			} else {
++				var first map[string]any
++				if !test.missingFirst {
++					first = test.first(w)
++				}
++				pages = []string{boundaryPage(t, first, []any{signedBoundaryRecord(t, w, StatusAudited)}, nil)}
++			}
++			server, calls := boundaryServer(t, pages...)
++			regs := w.registries(server.URL)
++			w.seed(t, stateDir, regs[0], w.storedBody(test.storedVersion))
++			before := readBoundaryState(t, boundaryStateFile(stateDir, server.URL))
++
++			fetch := fetchBoundary(t, cacheDir, stateDir, regs, FetchPolicy{PersistCache: true, PersistState: true})
++			records, err := fetch(server.URL, "id", testCommit, testContentSHA256)
++			if test.accepted {
++				if err != nil || len(records) == 0 {
++					t.Fatalf("accepted case: records=%v error=%v", records, err)
++				}
++			} else {
++				requireBoundaryError(t, records, err, test.wantError, server.URL)
++			}
++			if test.second != nil && *calls != 2 {
++				t.Fatalf("later-page case made %d requests, want 2", *calls)
++			}
++			stateBytes := readBoundaryState(t, boundaryStateFile(stateDir, server.URL))
++			if test.accepted && test.wantAdvanced > test.storedVersion {
++				var state snapshotState
++				if err := json.Unmarshal(stateBytes, &state); err != nil {
++					t.Fatal(err)
++				}
++				if state.HighestVersion != test.wantAdvanced || !state.BoundaryVerified {
++					t.Fatalf("higher boundary did not persist with posture: %+v", state)
++				}
++			} else if string(stateBytes) != string(before) {
++				t.Fatalf("accepted equal or rejected chain changed rollback state:\nbefore %s\nafter %s", before, stateBytes)
++			}
++			entries := boundaryCacheEntries(t, cacheDir)
++			if test.accepted && len(entries) != 1 {
++				t.Fatalf("accepted chain cache entries = %v, want one", entries)
++			}
++			if !test.accepted && len(entries) != 0 {
++				t.Fatalf("rejected chain wrote record cache: %v", entries)
++			}
++		})
++	}
++}
++
++func TestRecordsPageBoundaryEqualVersionRejectsEachChangedBodyField(t *testing.T) {
++	changes := []struct {
++		name   string
++		change func(map[string]any)
++	}{
++		{name: "head", change: func(body map[string]any) { body["head"] = strings.Repeat("c", 64) }},
++		{name: "merkle_root", change: func(body map[string]any) { body["merkle_root"] = strings.Repeat("d", 64) }},
++		{name: "log_size", change: func(body map[string]any) { body["log_size"] = 7 }},
++	}
++	for _, test := range changes {
++		t.Run(test.name, func(t *testing.T) {
++			w := newBoundaryWorld(t)
++			cacheDir, stateDir := t.TempDir(), t.TempDir()
++			body := w.storedBody(8)
++			test.change(body)
++			boundary := w.signer.sign(body)
++			server, _ := boundaryServer(t, boundaryPage(t, boundary, []any{signedBoundaryRecord(t, w, StatusAudited)}, nil))
++			reg := w.registries(server.URL)[0]
++			w.seed(t, stateDir, reg, w.storedBody(8))
++			statePath := boundaryStateFile(stateDir, server.URL)
++			before := readBoundaryState(t, statePath)
++			fetch := fetchBoundary(t, cacheDir, stateDir, []Registry{reg}, FetchPolicy{PersistCache: true, PersistState: true})
++			records, err := fetch(server.URL, "id", testCommit, testContentSHA256)
++			requireBoundaryError(t, records, err, PageBoundaryStale, server.URL)
++			if after := readBoundaryState(t, statePath); string(after) != string(before) {
++				t.Fatalf("equal-version %s conflict changed rollback state:\nbefore %s\nafter %s", test.name, before, after)
++			}
++			if entries := boundaryCacheEntries(t, cacheDir); len(entries) != 0 {
++				t.Fatalf("equal-version %s conflict wrote cache: %v", test.name, entries)
++			}
++		})
++	}
++}
++
++func TestRecordsPageBoundaryRejectsNonV2EnvelopeBeforeStateAdvance(t *testing.T) {
++	tests := []struct {
++		name string
++		page func(*testing.T, *boundaryWorld, map[string]any) map[string]any
++	}{
++		{
++			name: "unknown top-level member",
++			page: func(t *testing.T, w *boundaryWorld, boundary map[string]any) map[string]any {
++				return map[string]any{
++					"records": []any{signedBoundaryRecord(t, w, StatusAudited)}, "next_cursor": nil,
++					"boundary": boundary, "extension": true,
++				}
++			},
++		},
++		{
++			name: "missing records member",
++			page: func(_ *testing.T, _ *boundaryWorld, boundary map[string]any) map[string]any {
++				return map[string]any{"next_cursor": nil, "boundary": boundary}
++			},
++		},
++		{
++			name: "missing next_cursor member",
++			page: func(t *testing.T, w *boundaryWorld, boundary map[string]any) map[string]any {
++				return map[string]any{"records": []any{signedBoundaryRecord(t, w, StatusAudited)}, "boundary": boundary}
++			},
++		},
++	}
++	for _, test := range tests {
++		t.Run(test.name, func(t *testing.T) {
++			w := newBoundaryWorld(t)
++			cacheDir, stateDir := t.TempDir(), t.TempDir()
++			body := w.otherBody(8)
++			boundary := w.signer.sign(body)
++			page, err := json.Marshal(test.page(t, w, boundary))
++			if err != nil {
++				t.Fatal(err)
++			}
++			server, _ := boundaryServer(t, string(page))
++			regs := w.registries(server.URL)
++			w.seed(t, stateDir, regs[0], w.storedBody(7))
++			statePath := boundaryStateFile(stateDir, server.URL)
++			before := readBoundaryState(t, statePath)
++			fetch := fetchBoundary(t, cacheDir, stateDir, regs, FetchPolicy{PersistCache: true, PersistState: true})
++			records, fetchErr := fetch(server.URL, "id", testCommit, testContentSHA256)
++			if fetchErr == nil || !strings.Contains(fetchErr.Error(), "unknown or missing fields") || len(records) != 0 {
++				t.Fatalf("non-v2 page returned records=%v error=%v", records, fetchErr)
++			}
++			if after := readBoundaryState(t, statePath); string(after) != string(before) {
++				t.Fatalf("non-v2 page advanced rollback state:\nbefore %s\nafter %s", before, after)
++			}
++			if entries := boundaryCacheEntries(t, cacheDir); len(entries) != 0 {
++				t.Fatalf("non-v2 page wrote cache: %v", entries)
++			}
++		})
++	}
++}
++
++func TestRecordsPageBoundaryRequiresByteIdenticalChain(t *testing.T) {
++	w := newBoundaryWorld(t)
++	cacheDir, stateDir := t.TempDir(), t.TempDir()
++	boundary := w.signer.sign(w.storedBody(7))
++	first, err := json.Marshal(map[string]any{
++		"records": []any{signedBoundaryRecord(t, w, StatusAudited)}, "next_cursor": "page-2", "boundary": boundary,
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	second, err := json.MarshalIndent(map[string]any{
++		"records": []any{signedBoundaryRecord(t, w, StatusDeprecated)}, "next_cursor": nil, "boundary": boundary,
++	}, "", " ")
++	if err != nil {
++		t.Fatal(err)
++	}
++	server, _ := boundaryServer(t, string(first), string(second))
++	regs := w.registries(server.URL)
++	w.seed(t, stateDir, regs[0], w.storedBody(7))
++	fetch := fetchBoundary(t, cacheDir, stateDir, regs, FetchPolicy{PersistCache: true, PersistState: true})
++	records, fetchErr := fetch(server.URL, "id", testCommit, testContentSHA256)
++	requireBoundaryError(t, records, fetchErr, PageBoundaryMismatch, server.URL)
++}
++
++func TestRecordsPageBoundaryReadOnlyNeverPersists(t *testing.T) {
++	w := newBoundaryWorld(t)
++	t.Run("first use creates no state or cache", func(t *testing.T) {
++		root := t.TempDir()
++		stateDir := filepath.Join(root, "missing-state")
++		cacheDir := filepath.Join(root, "missing-cache")
++		boundary := w.signer.sign(w.otherBody(8))
++		server, _ := boundaryServer(t, boundaryPage(t, boundary, []any{signedBoundaryRecord(t, w, StatusAudited)}, nil))
++		regs := w.registries(server.URL)
++		fetch := fetchBoundary(t, cacheDir, stateDir, regs, FetchPolicy{})
++		if records, err := fetch(server.URL, "id", testCommit, testContentSHA256); err != nil || len(records) != 1 {
++			t.Fatalf("read-only page failed: records=%v error=%v", records, err)
++		}
++		if _, err := os.Stat(stateDir); !os.IsNotExist(err) {
++			t.Fatalf("read-only fetch created high-water state: %v", err)
++		}
++		if _, err := os.Stat(cacheDir); !os.IsNotExist(err) {
++			t.Fatalf("read-only fetch created a record cache: %v", err)
++		}
++	})
++
++	t.Run("higher boundary is verified without advancing", func(t *testing.T) {
++		cacheDir, stateDir := t.TempDir(), t.TempDir()
++		boundary := w.signer.sign(w.otherBody(8))
++		server, _ := boundaryServer(t, boundaryPage(t, boundary, []any{signedBoundaryRecord(t, w, StatusAudited)}, nil))
++		regs := w.registries(server.URL)
++		w.seed(t, stateDir, regs[0], w.storedBody(7))
++		before := readBoundaryState(t, boundaryStateFile(stateDir, server.URL))
++		fetch := fetchBoundary(t, cacheDir, stateDir, regs, FetchPolicy{})
++		if records, err := fetch(server.URL, "id", testCommit, testContentSHA256); err != nil || len(records) != 1 {
++			t.Fatalf("read-only higher boundary failed: records=%v error=%v", records, err)
++		}
++		if after := readBoundaryState(t, boundaryStateFile(stateDir, server.URL)); string(after) != string(before) {
++			t.Fatalf("read-only fetch changed rollback state:\nbefore %s\nafter %s", before, after)
++		}
++	})
++}
++
++func TestReadBoundaryPostureReportsPersistedHighWaterWithoutWrites(t *testing.T) {
++	w := newBoundaryWorld(t)
++	stateDir := t.TempDir()
++	reg := w.registries("https://registry.example.test")[0]
++	w.seed(t, stateDir, reg, w.storedBody(7))
++	statePath := boundaryStateFile(stateDir, reg.URL)
++	state, exists, err := readSnapshotState(statePath)
++	if err != nil || !exists {
++		t.Fatalf("seeded snapshot state exists=%v error=%v", exists, err)
++	}
++	state.BoundaryVerified = true
++	if err := writeSnapshotState(statePath, state); err != nil {
++		t.Fatal(err)
++	}
++	before := readBoundaryState(t, statePath)
++	entriesBefore, err := os.ReadDir(stateDir)
++	if err != nil {
++		t.Fatal(err)
++	}
++
++	rows := ReadBoundaryPosture(stateDir, []Registry{reg})
++	if len(rows) != 1 || rows[0].Diagnostic != "" || rows[0].Name != reg.Name || rows[0].URL != reg.URL ||
++		rows[0].HighWaterVersion == nil || *rows[0].HighWaterVersion != 7 ||
++		rows[0].HighWaterLogSize == nil || *rows[0].HighWaterLogSize != 7 || !rows[0].LastBoundaryVerified {
++		t.Fatalf("persisted boundary posture = %+v", rows)
++	}
++	if after := readBoundaryState(t, statePath); string(after) != string(before) {
++		t.Fatalf("read-only posture changed state:\nbefore %s\nafter %s", before, after)
++	}
++	entriesAfter, err := os.ReadDir(stateDir)
++	if err != nil || len(entriesAfter) != len(entriesBefore) {
++		t.Fatalf("read-only posture changed state files: before=%v after=%v error=%v", entriesBefore, entriesAfter, err)
++	}
++}
++
++func TestReadBoundaryPostureOnlyListsRegistriesWithPinnedKeys(t *testing.T) {
++	w := newBoundaryWorld(t)
++	registries := []Registry{
++		{Name: "untrusted", URL: "https://untrusted.example.test"},
++		w.registries("https://trusted.example.test")[0],
++	}
++	rows := ReadBoundaryPosture(t.TempDir(), registries)
++	if len(rows) != 1 || rows[0].Name != "one" || rows[0].URL != "https://trusted.example.test" {
++		t.Fatalf("registry posture rows = %+v, want only the pinned trusted registry", rows)
++	}
++}
++
++func TestRecordsPageBoundaryPersistsBeforeContribution(t *testing.T) {
++	w := newBoundaryWorld(t)
++	cacheDir, stateDir := t.TempDir(), t.TempDir()
++	firstBoundary := w.signer.sign(w.otherBody(8))
++	var calls int
++	var serverURL string
++	server := httptest.NewServer(http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
++		calls++
++		resp.Header().Set("Content-Type", "application/json")
++		if req.URL.Query().Get("cursor") == "" {
++			next := "page-2"
++			_, _ = resp.Write([]byte(boundaryPage(t, firstBoundary, []any{signedBoundaryRecord(t, w, StatusAudited)}, next)))
++			return
++		}
++		var persisted snapshotState
++		stateBytes, err := os.ReadFile(boundaryStateFile(stateDir, serverURL))
++		if err != nil || json.Unmarshal(stateBytes, &persisted) != nil || persisted.HighestVersion != 8 || !persisted.BoundaryVerified {
++			resp.WriteHeader(http.StatusInternalServerError)
++			_, _ = resp.Write([]byte(`{"error":"boundary was not persisted before page contribution"}`))
++			return
++		}
++		_, _ = resp.Write([]byte(boundaryPage(t, firstBoundary, []any{signedBoundaryRecord(t, w, StatusDeprecated)}, nil)))
++	}))
++	serverURL = server.URL
++	t.Cleanup(server.Close)
++	regs := w.registries(serverURL)
++	w.seed(t, stateDir, regs[0], w.storedBody(7))
++	fetch := fetchBoundary(t, cacheDir, stateDir, regs, FetchPolicy{PersistCache: true, PersistState: true})
++	records, err := fetch(serverURL, "id", testCommit, testContentSHA256)
++	if err != nil || len(records) != 2 || calls != 2 {
++		t.Fatalf("page chain = %d records, %d calls, error %v; want persisted page-1 state before page 2", len(records), calls, err)
++	}
++}
++
++func TestRecordsPageBoundaryRejectsRefreshWithoutServingOrReplacingCache(t *testing.T) {
++	w := newBoundaryWorld(t)
++	cacheDir, stateDir := t.TempDir(), t.TempDir()
++	currentBoundary := w.signer.sign(w.otherBody(8))
++	var stale atomic.Bool
++	server := httptest.NewServer(http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
++		resp.Header().Set("Content-Type", "application/json")
++		boundary := currentBoundary
++		if stale.Load() {
++			boundary = w.signer.sign(w.storedBody(7))
++		}
++		_, _ = resp.Write([]byte(boundaryPage(t, boundary, []any{signedBoundaryRecord(t, w, StatusAudited)}, nil)))
++	}))
++	t.Cleanup(server.Close)
++	regs := w.registries(server.URL)
++	w.seed(t, stateDir, regs[0], w.storedBody(7))
++	fetch := NewHTTPFetchWithPolicy(cacheDir, stateDir, regs, 0, time.Hour, time.Now,
++		FetchPolicy{PersistCache: true, PersistState: true})
++	if records, err := fetch(server.URL, "id", testCommit, testContentSHA256); err != nil || len(records) != 1 {
++		t.Fatalf("initial current page failed: records=%v error=%v", records, err)
++	}
++	entries := boundaryCacheEntries(t, cacheDir)
++	if len(entries) != 1 {
++		t.Fatalf("initial accepted page cache entries = %v, want one", entries)
++	}
++	cacheBefore := readBoundaryState(t, entries[0])
++	stale.Store(true)
++	if records, err := fetch(server.URL, "id", testCommit, testContentSHA256); err == nil || len(records) != 0 {
++		t.Fatalf("stale refresh returned %d cached/current records with error %v", len(records), err)
++	} else {
++		var boundaryErr *PageBoundaryError
++		if !errors.As(err, &boundaryErr) || boundaryErr.Diagnostic != PageBoundaryStale || !strings.Contains(err.Error(), server.URL) {
++			t.Fatalf("stale refresh error = %v, want URL-scoped %s", err, PageBoundaryStale)
++		}
++	}
++	if after := readBoundaryState(t, entries[0]); string(after) != string(cacheBefore) {
++		t.Fatalf("rejected refresh replaced the accepted cache:\nbefore %s\nafter %s", cacheBefore, after)
++	}
++}
++
++func TestAttestRootKeepsRejectedBoundaryUnknownAndExplainsWhy(t *testing.T) {
++	w := newBoundaryWorld(t)
++	cacheDir, stateDir := t.TempDir(), t.TempDir()
++	server, _ := boundaryServer(t, boundaryPage(t, w.signer.sign(w.otherBody(7)), []any{signedBoundaryRecord(t, w, StatusAudited)}, nil))
++	regs := w.registries(server.URL)
++	w.seed(t, stateDir, regs[0], w.storedBody(8))
++	fetch := fetchBoundary(t, cacheDir, stateDir, regs, FetchPolicy{})
++	root := t.TempDir()
++	writeAttestMarker(t, root, "net", v5AttestNetworkMarker())
++	results := attestResultsBySkill(AttestRoot("test", root, regs, fetch))
++	got := results["net"]
++	if got.Result != ResultUnknown || got.Registry != "" {
++		t.Fatalf("stale boundary attestation = %+v, want unknown without an authorizing registry", got)
++	}
++	if !strings.Contains(got.Detail, PageBoundaryStale) || !strings.Contains(got.Detail, server.URL) {
++		t.Fatalf("attestation detail %q must name diagnostic and registry URL", got.Detail)
++	}
++}
+diff --git a/internal/registry/http.go b/internal/registry/http.go
+index 0a5db20a..37bfb4e2 100644
+--- a/internal/registry/http.go
++++ b/internal/registry/http.go
+@@ -95,39 +95,59 @@ func HTTPGetSnapshot(baseURL string) (map[string]any, error) {
+ 	return data, nil
+ }
+ 
+-// NewHTTPFetch builds a FetchFn over GET /v1/records with an on-disk cache:
+-// a fresh entry is served without a network call; on refresh failure a stale
+-// entry stays usable within the offline grace window (Spec §13.5).
+-func NewHTTPFetch(cacheDir string, ttl, grace time.Duration, now func() time.Time) FetchFn {
++// FetchPolicy controls persistence independently for the response cache and
++// the protected registry high-water state.
++type FetchPolicy struct {
++	PersistCache bool
++	PersistState bool
++}
++
++// NewHTTPFetch builds a persistent records fetcher. Every network page must
++// carry a verified v2 boundary before its records contribute; the boundary
++// is checked against the shared snapshot high-water state (protocol §9.3).
++func NewHTTPFetch(cacheDir, stateDir string, registries []Registry, ttl, grace time.Duration, now func() time.Time) FetchFn {
+ 	if ttl == 0 {
+ 		ttl = DefaultCacheTTL
+ 	}
+ 	if grace == 0 {
+ 		grace = DefaultOfflineGrace
+ 	}
+-	return newHTTPFetch(cacheDir, ttl, grace, now, true)
++	return newHTTPFetch(cacheDir, stateDir, registries, ttl, grace, now, FetchPolicy{PersistCache: true, PersistState: true})
+ }
+ 
+-// NewHTTPFetchWithPolicy is the manager-config form. Unlike NewHTTPFetch,
+-// zero is literal and disables fresh-cache or stale-fallback use respectively.
+-func NewHTTPFetchWithPolicy(cacheDir string, ttl, grace time.Duration, now func() time.Time) FetchFn {
+-	return newHTTPFetch(cacheDir, ttl, grace, now, true)
++// NewHTTPFetchWithPolicy is the manager-config form. Zero TTL and grace are
++// literal and disable fresh-cache or stale-fallback use respectively.
++func NewHTTPFetchWithPolicy(cacheDir, stateDir string, registries []Registry, ttl, grace time.Duration, now func() time.Time, policy FetchPolicy) FetchFn {
++	return newHTTPFetch(cacheDir, stateDir, registries, ttl, grace, now, policy)
+ }
+ 
+-// NewHTTPFetchWithPolicyReadOnly reads existing cache entries and may use the
+-// network, but never creates or updates the persistent response cache.
+-func NewHTTPFetchWithPolicyReadOnly(cacheDir string, ttl, grace time.Duration, now func() time.Time) FetchFn {
+-	return newHTTPFetch(cacheDir, ttl, grace, now, false)
++// NewHTTPFetchWithPolicyReadOnly verifies network and cached boundaries
++// against existing state, but never creates or updates either persistent
++// cache or rollback state.
++func NewHTTPFetchWithPolicyReadOnly(cacheDir, stateDir string, registries []Registry, ttl, grace time.Duration, now func() time.Time) FetchFn {
++	return newHTTPFetch(cacheDir, stateDir, registries, ttl, grace, now, FetchPolicy{})
+ }
+ 
+-func newHTTPFetch(cacheDir string, ttl, grace time.Duration, now func() time.Time, persist bool) FetchFn {
++func newHTTPFetch(cacheDir, stateDir string, registries []Registry, ttl, grace time.Duration, now func() time.Time, policy FetchPolicy) FetchFn {
+ 	if now == nil {
+ 		now = time.Now
+ 	}
+-	if persist {
++	if policy.PersistCache {
+ 		_ = os.MkdirAll(cacheDir, 0o755)
+ 	}
++	byURL := make(map[string]Registry, len(registries))
++	for _, reg := range registries {
++		byURL[strings.TrimRight(reg.URL, "/")] = reg
++	}
+ 	return func(baseURL, sourceIdentity, commit, contentSHA256 string) ([]map[string]any, error) {
++		reg, trusted := byURL[strings.TrimRight(baseURL, "/")]
++		if !trusted || len(reg.PublicKeys) == 0 {
++			return nil, fmt.Errorf("registry %s is not trusted: no pinned keys to verify its page boundary", baseURL)
++		}
++		chain, err := openPageChain(reg.Name, baseURL, reg.PublicKeys, stateDir, policy.PersistState)
++		if err != nil {
++			return nil, err
++		}
+ 		query := url.Values{}
+ 		query.Set("source_identity", sourceIdentity)
+ 		query.Set("commit", commit)
+@@ -137,25 +157,35 @@ func newHTTPFetch(cacheDir string, ttl, grace time.Duration, now func() time.Tim
+ 		sum := sha256.Sum256([]byte(endpoint))
+ 		cacheFile := filepath.Join(cacheDir, "records-"+hex.EncodeToString(sum[:])[:16]+".json")
+ 
+-		if fetchedAt, records, ok := readRecordCache(cacheFile); ok && now().Sub(fetchedAt) < ttl {
++		if fetchedAt, records, boundary, rawBoundary, ok := readRecordCache(cacheFile); ok && now().Sub(fetchedAt) >= 0 && now().Sub(fetchedAt) < ttl &&
++			chain.cacheBoundaryCurrent(boundary, rawBoundary) {
+ 			return records, nil
+ 		}
+-		records, err := httpGetAllRecords(endpoint)
++		records, err := httpGetAllRecords(chain, endpoint)
+ 		if err != nil {
+-			if fetchedAt, cached, ok := readRecordCache(cacheFile); ok && now().Sub(fetchedAt) < grace {
++			var boundaryErr *PageBoundaryError
++			var stateErr *pageStateError
++			if errors.As(err, &boundaryErr) || errors.As(err, &stateErr) {
++				// A rejected chain contributes nothing. Keep any pre-existing
++				// cache entry on disk for a later genuine outage, but do not
++				// overwrite it or serve it for this rejected operation.
++				return nil, err
++			}
++			if fetchedAt, cached, boundary, rawBoundary, ok := readRecordCache(cacheFile); ok && now().Sub(fetchedAt) >= 0 && now().Sub(fetchedAt) < grace &&
++				chain.cacheBoundaryCurrent(boundary, rawBoundary) {
+ 				return cached, nil
+ 			}
+ 			return nil, err
+ 		}
+-		if persist {
+-			writeRecordCache(cacheFile, now(), records)
++		if policy.PersistCache {
++			writeRecordCache(cacheFile, now(), records, chain.chain)
+ 		}
+ 		return records, nil
+ 	}
+ }
+ 
+-func httpGetAllRecords(endpoint string) ([]map[string]any, error) {
+-	var records []map[string]any
++func httpGetAllRecords(chain *pageChain, endpoint string) ([]map[string]any, error) {
++	records := make([]map[string]any, 0)
+ 	seenCursors := map[string]bool{}
+ 	cursor := ""
+ 	for {
+@@ -170,7 +200,7 @@ func httpGetAllRecords(endpoint string) ([]map[string]any, error) {
+ 			query.Set("cursor", cursor)
+ 		}
+ 		pageURL.RawQuery = query.Encode()
+-		page, next, err := httpGetRecordsPage(pageURL.String())
++		page, next, err := httpGetRecordsPage(chain, pageURL.String())
+ 		if err != nil {
+ 			return nil, err
+ 		}
+@@ -189,7 +219,7 @@ func httpGetAllRecords(endpoint string) ([]map[string]any, error) {
+ 	}
+ }
+ 
+-func httpGetRecordsPage(endpoint string) ([]map[string]any, string, error) {
++func httpGetRecordsPage(chain *pageChain, endpoint string) ([]map[string]any, string, error) {
+ 	request, err := http.NewRequest(http.MethodGet, endpoint, nil)
+ 	if err != nil {
+ 		return nil, "", err
+@@ -205,13 +235,33 @@ func httpGetRecordsPage(endpoint string) ([]map[string]any, string, error) {
+ 	if !isJSONResponse(result.header.Get("Content-Type")) {
+ 		return nil, "", fmt.Errorf("registry records response has unsupported content type %q", result.header.Get("Content-Type"))
+ 	}
+-	var data map[string]any
+-	if err := decodeJSON(result.body, &data); err != nil {
++	var rawEnvelope map[string]json.RawMessage
++	if err := decodeJSON(result.body, &rawEnvelope); err != nil {
+ 		return nil, "", fmt.Errorf("registry returned invalid JSON: %v", err)
+ 	}
+-	if unknown := unknownKeys(data, "records", "next_cursor"); len(unknown) > 0 || len(data) != 2 {
++	rawBoundary, present := rawEnvelope["boundary"]
++	if !present {
++		return nil, "", &PageBoundaryError{Diagnostic: PageBoundaryMissing, URL: chain.url, Detail: "served a records page with no boundary"}
++	}
++	if len(rawEnvelope) != 3 {
+ 		return nil, "", fmt.Errorf("registry records response has unknown or missing fields")
+ 	}
++	for key := range rawEnvelope {
++		if key != "records" && key != "next_cursor" && key != "boundary" {
++			return nil, "", fmt.Errorf("registry records response has unknown or missing fields")
++		}
++	}
++	var boundary map[string]any
++	if err := decodeJSON(rawBoundary, &boundary); err != nil || boundary == nil {
++		return nil, "", &PageBoundaryError{Diagnostic: PageBoundaryMissing, URL: chain.url, Detail: "served a records page whose boundary failed verification"}
++	}
++	if err := chain.acceptPage(boundary, rawBoundary); err != nil {
++		return nil, "", err
++	}
++	var data map[string]any
++	if err := decodeJSON(result.body, &data); err != nil {
++		return nil, "", fmt.Errorf("registry returned invalid JSON: %v", err)
++	}
+ 	rawRecords, ok := data["records"].([]any)
+ 	if !ok {
+ 		return nil, "", fmt.Errorf("registry records response field 'records' must be an array")
+@@ -242,27 +292,36 @@ func httpGetRecordsPage(endpoint string) ([]map[string]any, string, error) {
+ 	return records, next, nil
+ }
+ 
+-func readRecordCache(path string) (time.Time, []map[string]any, bool) {
++func readRecordCache(path string) (time.Time, []map[string]any, map[string]any, []byte, bool) {
+ 	payload, err := os.ReadFile(path) // #nosec G304 -- cache under the machine home
+ 	if err != nil {
+-		return time.Time{}, nil, false
++		return time.Time{}, nil, nil, nil, false
+ 	}
+ 	var data struct {
+ 		FetchedAt float64          `json:"fetched_at"`
+ 		Records   []map[string]any `json:"records"`
++		Boundary  json.RawMessage  `json:"boundary"`
+ 	}
+-	if err := decodeJSON(payload, &data); err != nil {
+-		return time.Time{}, nil, false
++	if err := decodeJSON(payload, &data); err != nil || data.Records == nil || len(data.Boundary) == 0 {
++		return time.Time{}, nil, nil, nil, false
++	}
++	var boundary map[string]any
++	if err := decodeJSON(data.Boundary, &boundary); err != nil || boundary == nil {
++		return time.Time{}, nil, nil, nil, false
+ 	}
+ 	seconds := int64(data.FetchedAt)
+ 	nanos := int64((data.FetchedAt - float64(seconds)) * 1e9)
+-	return time.Unix(seconds, nanos), data.Records, true
++	return time.Unix(seconds, nanos), data.Records, boundary, data.Boundary, true
+ }
+ 
+-func writeRecordCache(path string, fetchedAt time.Time, records []map[string]any) {
++func writeRecordCache(path string, fetchedAt time.Time, records []map[string]any, boundary []byte) {
++	if len(boundary) == 0 {
++		return
++	}
+ 	payload, err := json.Marshal(map[string]any{
+ 		"fetched_at": float64(fetchedAt.UnixNano()) / 1e9,
+ 		"records":    records,
++		"boundary":   json.RawMessage(boundary),
+ 	})
+ 	if err != nil {
+ 		return
+diff --git a/internal/registry/registry_test.go b/internal/registry/registry_test.go
+index 3a0f6e5c..24dfb087 100644
+--- a/internal/registry/registry_test.go
++++ b/internal/registry/registry_test.go
+@@ -519,6 +519,8 @@ func TestProtectedRollbackStateDistinguishesAbsentAndUnreadable(t *testing.T) {
+ func TestHTTPFetchCacheAndOfflineGrace(t *testing.T) {
+ 	s := newSigner(t)
+ 	calls := 0
++	current := time.Now().UTC().Truncate(time.Second)
++	boundary := s.sign(snapshotBody(1, current))
+ 	var server *httptest.Server
+ 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+ 		calls++
+@@ -528,13 +530,14 @@ func TestHTTPFetchCacheAndOfflineGrace(t *testing.T) {
+ 			return
+ 		}
+ 		w.Header().Set("Content-Type", "application/json")
+-		_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(record(StatusAudited))}, "next_cursor": nil})
++		_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(record(StatusAudited))}, "next_cursor": nil, "boundary": boundary})
+ 	}))
+ 	defer server.Close()
+ 
+-	current := time.Now()
+ 	now := func() time.Time { return current }
+-	fetch := NewHTTPFetch(t.TempDir(), time.Minute, time.Hour, now)
++	cacheDir, stateDir := t.TempDir(), t.TempDir()
++	registries := []Registry{{Name: "one", URL: server.URL, PublicKeys: []string{s.pinned}}}
++	fetch := NewHTTPFetch(cacheDir, stateDir, registries, time.Minute, time.Hour, now)
+ 
+ 	first, err := fetch(server.URL, "id", "c", "h")
+ 	if err != nil || len(first) != 1 {
+@@ -559,15 +562,18 @@ func TestHTTPFetchCacheAndOfflineGrace(t *testing.T) {
+ }
+ 
+ func TestReadOnlyHTTPFetchDoesNotCreateCache(t *testing.T) {
++	s := newSigner(t)
+ 	root := t.TempDir()
+ 	cacheDir := filepath.Join(root, "missing-cache")
+ 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+ 		w.Header().Set("Content-Type", "application/json")
+-		_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{}, "next_cursor": nil})
++		boundary := s.sign(snapshotBody(1, time.Now().UTC().Truncate(time.Second)))
++		_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{}, "next_cursor": nil, "boundary": boundary})
+ 	}))
+ 	defer server.Close()
+ 
+-	fetch := NewHTTPFetchWithPolicyReadOnly(cacheDir, 0, 0, time.Now)
++	registries := []Registry{{Name: "one", URL: server.URL, PublicKeys: []string{s.pinned}}}
++	fetch := NewHTTPFetchWithPolicyReadOnly(cacheDir, filepath.Join(root, "missing-state"), registries, 0, 0, time.Now)
+ 	if _, err := fetch(server.URL, "identity", testCommit, testContentSHA256); err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -625,6 +631,7 @@ func TestReadOnlySnapshotCheckDoesNotCreateOrAdvanceState(t *testing.T) {
+ func TestHTTPFailuresUseOfflineCacheAndRejectSnapshots(t *testing.T) {
+ 	s := newSigner(t)
+ 	failed := false
++	boundary := s.sign(snapshotBody(1, time.Now().UTC().Truncate(time.Second)))
+ 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+ 		w.Header().Set("Content-Type", "application/json")
+ 		if failed {
+@@ -636,12 +643,13 @@ func TestHTTPFailuresUseOfflineCacheAndRejectSnapshots(t *testing.T) {
+ 			_ = json.NewEncoder(w).Encode(s.sign(snapshotBody(1, time.Now())))
+ 			return
+ 		}
+-		_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(record(StatusAudited))}, "next_cursor": nil})
++		_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(record(StatusAudited))}, "next_cursor": nil, "boundary": boundary})
+ 	}))
+ 	defer server.Close()
+ 
+ 	current := time.Now()
+-	fetch := NewHTTPFetch(t.TempDir(), time.Minute, time.Hour, func() time.Time { return current })
++	registries := []Registry{{Name: "one", URL: server.URL, PublicKeys: []string{s.pinned}}}
++	fetch := NewHTTPFetch(t.TempDir(), t.TempDir(), registries, time.Minute, time.Hour, func() time.Time { return current })
+ 	first, err := fetch(server.URL, "id", "commit", "hash")
+ 	if err != nil || len(first) != 1 {
+ 		t.Fatalf("initial records fetch: records=%v err=%v", first, err)
+@@ -660,6 +668,7 @@ func TestHTTPFailuresUseOfflineCacheAndRejectSnapshots(t *testing.T) {
+ func TestHTTPFetchFollowsBoundedPagination(t *testing.T) {
+ 	s := newSigner(t)
+ 	calls := 0
++	boundary := s.sign(snapshotBody(1, time.Now().UTC().Truncate(time.Second)))
+ 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+ 		calls++
+ 		w.Header().Set("Content-Type", "application/json")
+@@ -667,16 +676,17 @@ func TestHTTPFetchFollowsBoundedPagination(t *testing.T) {
+ 			t.Errorf("limit = %q", r.URL.Query().Get("limit"))
+ 		}
+ 		if r.URL.Query().Get("cursor") == "" {
+-			_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(record(StatusAudited))}, "next_cursor": "page-2"})
++			_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(record(StatusAudited))}, "next_cursor": "page-2", "boundary": boundary})
+ 			return
+ 		}
+ 		if r.URL.Query().Get("cursor") != "page-2" {
+ 			t.Errorf("cursor = %q", r.URL.Query().Get("cursor"))
+ 		}
+-		_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(record(StatusDeprecated))}, "next_cursor": nil})
++		_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(record(StatusDeprecated))}, "next_cursor": nil, "boundary": boundary})
+ 	}))
+ 	defer server.Close()
+-	fetch := NewHTTPFetch(t.TempDir(), time.Minute, time.Hour, time.Now)
++	registries := []Registry{{Name: "one", URL: server.URL, PublicKeys: []string{s.pinned}}}
++	fetch := NewHTTPFetch(t.TempDir(), t.TempDir(), registries, time.Minute, time.Hour, time.Now)
+ 	records, err := fetch(server.URL, "id", "commit", "hash")
+ 	if err != nil || len(records) != 2 || calls != 2 {
+ 		t.Fatalf("records=%d calls=%d err=%v", len(records), calls, err)
+diff --git a/internal/registry/snapshot.go b/internal/registry/snapshot.go
+index d8df715c..f4325ca9 100644
+--- a/internal/registry/snapshot.go
++++ b/internal/registry/snapshot.go
+@@ -30,10 +30,11 @@ var snapshotStateNameRE = regexp.MustCompile(`^snapshot-[0-9a-f]{16}\.json$`)
+ const snapshotStateCatalogName = "known-registries.json"
+ 
+ type snapshotState struct {
+-	HighestVersion int    `json:"highest_version"`
+-	Head           string `json:"head,omitempty"`
+-	MerkleRoot     string `json:"merkle_root,omitempty"`
+-	LogSize        int    `json:"log_size,omitempty"`
++	HighestVersion   int    `json:"highest_version"`
++	Head             string `json:"head,omitempty"`
++	MerkleRoot       string `json:"merkle_root,omitempty"`
++	LogSize          int    `json:"log_size,omitempty"`
++	BoundaryVerified bool   `json:"boundary_verified,omitempty"`
+ }
+ 
+ type snapshotStateCatalog struct {
+@@ -183,7 +184,12 @@ func checkSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch Snap
+ 			continue
+ 		}
+ 		if persist {
+-			if err := writeSnapshotState(stateFile, snapshotState{HighestVersion: parsed.Version, Head: parsed.Head, MerkleRoot: parsed.MerkleRoot, LogSize: parsed.LogSize}); err != nil {
++			// Snapshot checks do not receive a page boundary. Preserve the
++			// last page-boundary posture while advancing the shared high-water.
++			if err := writeSnapshotState(stateFile, snapshotState{
++				HighestVersion: parsed.Version, Head: parsed.Head, MerkleRoot: parsed.MerkleRoot,
++				LogSize: parsed.LogSize, BoundaryVerified: state.BoundaryVerified,
++			}); err != nil {
+ 				warnings = append(warnings, fmt.Sprintf("registry %s rollback state could not be persisted: %v", reg.Name, err))
+ 				tampered[reg.URL] = true
+ 				continue
