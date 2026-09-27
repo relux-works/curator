@@ -1,0 +1,16 @@
+refused: exit=1
+stdout:
+lock-delta moved context mcp-root 1.0.0 → 1.1.0 commit:<old-root-commit> → commit:<new-root-commit>
+lock-delta added mcp tool 1.0.0 commit:<tool-commit>
+mcp-declaration tool 1.0.0 stdio command=npx args=["tool"] env_names=[]
+stderr:
+mcp-root: warning: mcp_package_allowlist_empty: the MCP package allowlist is empty; every declaration package in the closure is admitted
+mcp-root: profile_update_confirmation_required: members tool require --confirm-system-delta; revision B refuses with profile_update_confirmation_required unless --confirm-system-delta is given
+confirmed: exit=0
+stdout:
+lock-delta moved context mcp-root 1.0.0 → 1.1.0 commit:<old-root-commit> → commit:<new-root-commit>
+lock-delta added mcp tool 1.0.0 commit:<tool-commit>
+mcp-declaration tool 1.0.0 stdio command=npx args=["tool"] env_names=[]
+mcp-root: updated (lock sha256:<lock-hash>)
+stderr:
+mcp-root: warning: mcp_package_allowlist_empty: the MCP package allowlist is empty; every declaration package in the closure is admitted

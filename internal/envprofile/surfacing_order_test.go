@@ -151,7 +151,7 @@ func observeLiveUpdateEmission(t *testing.T) {
 	gitRun(t, root, "commit", "-m", "two")
 	gitRun(t, root, "tag", "v1.0.1")
 	sink := &lockObservingSink{lock: lockPath(home, "grows")}
-	info, moved, err := UpdateWithOptions(home, "grows", UpdateOptions{SurfacingSink: sink})
+	info, moved, err := UpdateWithOptions(home, "grows", UpdateOptions{ConfirmSystemDelta: true, SurfacingSink: sink})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +169,7 @@ func observeLiveUpdateEmission(t *testing.T) {
 	// An unchanged update publishes nothing but still surfaces the
 	// candidate set exactly once.
 	restill := &lockObservingSink{lock: lockPath(home, "grows")}
-	restillInfo, moved, err := UpdateWithOptions(home, "grows", UpdateOptions{SurfacingSink: restill})
+	restillInfo, moved, err := UpdateWithOptions(home, "grows", UpdateOptions{ConfirmSystemDelta: true, SurfacingSink: restill})
 	if err != nil {
 		t.Fatal(err)
 	}

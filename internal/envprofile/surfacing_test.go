@@ -123,7 +123,7 @@ func TestUpdateSurfacesCandidateMCPSet(t *testing.T) {
 	gitRun(t, root, "add", ".")
 	gitRun(t, root, "commit", "-m", "two")
 	gitRun(t, root, "tag", "v1.0.1")
-	info, moved, err := UpdateWithPolicy(home, "grows", Policy{})
+	info, moved, err := UpdateWithOptions(home, "grows", UpdateOptions{ConfirmSystemDelta: true})
 	if err != nil {
 		t.Fatal(err)
 	}

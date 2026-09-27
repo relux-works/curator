@@ -40,6 +40,61 @@ func loadWithSystem(t *testing.T, user, system string) (*Config, []string, error
 	return cfg, warnings, err
 }
 
+func TestSourceSignerOpenSSHKeyMaterialGrammar(t *testing.T) {
+	const source = "github.com/example/context"
+	tests := []struct {
+		name    string
+		key     string
+		wantErr bool
+	}{
+		{name: "unpadded base64 material", key: "ssh-ed25519 QUJDREVGRw"},
+		{name: "padded base64 material", key: "ssh-ed25519 QUJDREVGRw=="},
+		{name: "non-base64 character", key: "ssh-ed25519 QUJDREVGRw$", wantErr: true},
+		{name: "unknown key type", key: "ssh-unknown QUJDREVGRw", wantErr: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			data := map[string]any{
+				"schema_version": 2,
+				"skills_root":    "/tmp/skills",
+				"projects":       map[string]any{},
+				"environments": map[string]any{
+					"source_signers": map[string]any{
+						source: []any{map[string]any{"type": "ssh", "key": tc.key}},
+					},
+				},
+			}
+			_, err := Parse(data, "signers.json")
+			if tc.wantErr && err == nil {
+				t.Fatal("Parse accepted signer material outside the §12.1 grammar")
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("Parse rejected §12.1 signer material: %v", err)
+			}
+		})
+	}
+}
+
+func TestSourceSignerSSHIdentityTreatsPaddingAsEquivalent(t *testing.T) {
+	const source = "github.com/example/context"
+	data := map[string]any{
+		"schema_version": 2,
+		"skills_root":    "/tmp/skills",
+		"projects":       map[string]any{},
+		"environments": map[string]any{
+			"source_signers": map[string]any{
+				source: []any{
+					map[string]any{"type": "ssh", "key": "ssh-ed25519 QUJDREVGRw"},
+					map[string]any{"type": "ssh", "key": "ssh-ed25519 QUJDREVGRw=="},
+				},
+			},
+		},
+	}
+	if _, err := Parse(data, "signers.json"); err == nil || !strings.Contains(err.Error(), "duplicate signer") {
+		t.Fatalf("Parse error = %v, want duplicate signer after padding normalization", err)
+	}
+}
+
 func TestSchema2Defaults(t *testing.T) {
 	cfg := loadText(t, `{"schema_version": 2, "skills_root": "/tmp/skills", "projects": {}}`)
 	if cfg.Schema != 2 {
@@ -530,15 +585,15 @@ func TestSystemV2LockableSubsetIsClassWide(t *testing.T) {
 		"in_place_mode":             `{"in_place_mode": {"codex_cli": "linked"}}`,
 		"provider_directories":      `{"provider_directories": ["/opt/curator/providers"]}`,
 		"permissions":               `{"permissions": {"acme": "native"}}`,
+		"source_signers":            `{"source_signers": {"github.com/example/context": []}}`,
+		"require_source_signers":    `{"require_source_signers": true}`,
 	}
 	if len(payloads) != len(EnvKnobNames) {
 		t.Fatalf("payloads cover %d knobs, EnvKnobNames carries %d: keep the two in step", len(payloads), len(EnvKnobNames))
 	}
-	// The §12.2 transcription: exactly the nine keys the specification
-	// states ("overlays_allowed, precedence, mcp_package_allowlist,
-	// passable_env_names, require_current_profile, transitive_system_modules,
-	// isolation, provider_directories, and permissions" — provider_directories
-	// is carried by the §11 trust-root rule. This literal is the spec sentence; LockableEnvKeys
+	// The §12.2 transcription: exactly the eleven keys in the original set,
+	// plus permissions, source_signers, and require_source_signers. This literal
+	// is the spec sentence; LockableEnvKeys is the implementation.
 	// is the implementation. Either drifting — a widening that would reach
 	// §9.1 secret material or §12.1 waivers, or a narrowing that would drop
 	// a fleet-policy knob — fails below.
@@ -552,6 +607,8 @@ func TestSystemV2LockableSubsetIsClassWide(t *testing.T) {
 		"environments.isolation":                 true,
 		"environments.provider_directories":      true,
 		"environments.permissions":               true,
+		"environments.source_signers":            true,
+		"environments.require_source_signers":    true,
 	}
 	if len(LockableEnvKeys) != len(transcribed) {
 		t.Fatalf("LockableEnvKeys carries %d keys, §12.2 transcribes %d: a widening or narrowing without spec standing fails here", len(LockableEnvKeys), len(transcribed))
@@ -688,17 +745,17 @@ func TestSystemModuleWaiversNullRejected(t *testing.T) {
 }
 
 // TestUnsupportedEnvironmentFieldFailureIsDeterministic drives Load with
-// several unsupported fields so schema-gap attribution does not depend on
-// Go's randomized map iteration order. Permissions is supported here; the
-// lexically first unsupported signer field is the stable production blocker.
+// multiple unknown fields so schema-gap attribution does not depend on Go's
+// randomized map iteration order. The signer and permission fields are
+// supported; the lexically first unknown field is the stable blocker.
 func TestUnsupportedEnvironmentFieldFailureIsDeterministic(t *testing.T) {
 	body := `{"schema_version": 2, "skills_root": "x", "projects": {},` +
-		`"environments": {"source_signers": {}, "permissions": {}, "require_source_signers": true}}`
+		`"environments": {"source_signers": {}, "permissions": {}, "require_source_signers": true, "z_unknown": true, "a_unknown": true}}`
 	for attempt := 0; attempt < 24; attempt++ {
 		path := writeConfig(t, t.TempDir(), "config.json", body)
 		_, err := Load(path, nil)
-		if err == nil || !strings.Contains(err.Error(), `unsupported field "require_source_signers"`) {
-			t.Fatalf("attempt %d: Load err = %v, want stable first blocker environments.require_source_signers", attempt, err)
+		if err == nil || !strings.Contains(err.Error(), `unsupported field "a_unknown"`) {
+			t.Fatalf("attempt %d: Load err = %v, want stable first blocker environments.a_unknown", attempt, err)
 		}
 	}
 }

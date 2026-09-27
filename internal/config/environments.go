@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"fmt"
 	"regexp"
 	"sort"
@@ -42,8 +43,16 @@ type Environments struct {
 	// ProviderDirectories is the §11 trust-root list after the install
 	// directory, in listed order; the §12.1 default is the empty list.
 	ProviderDirectories []string
-	ShadowAcknowledged  []ShadowAcknowledgement
-	SecretWaivers       []SecretMaterialWaiver
+	// SourceSigners is the per-canonical-source signer allowlist
+	// (environments §12.1). A present source with an empty list admits no
+	// signer; an absent source is unconfigured.
+	SourceSigners map[string][]SourceSigner
+	// RequireSourceSigners requires every Git source to have a source-level
+	// allowlist. Set distinguishes the default from an explicit false value.
+	RequireSourceSigners    bool
+	RequireSourceSignersSet bool
+	ShadowAcknowledged      []ShadowAcknowledgement
+	SecretWaivers           []SecretMaterialWaiver
 	// TransitiveSystemModules is the §3/§5.5 admission policy: drop
 	// (default) skips transitive system modules at materialization with a
 	// warning, error refuses them at resolution.
@@ -111,6 +120,14 @@ type SystemModuleWaiver struct {
 	Reason  string
 }
 
+// SourceSigner is one SSH public key or OpenPGP fingerprint in a source
+// allowlist (environments §12.1).
+type SourceSigner struct {
+	Type        string
+	Key         string
+	Fingerprint string
+}
+
 // Defaults from the environments §12.1 table.
 const (
 	DefaultOverlayWeight   = 1000
@@ -130,6 +147,8 @@ var LockableEnvKeys = map[string]bool{
 	"environments.transitive_system_modules": true,
 	"environments.provider_directories":      true,
 	"environments.permissions":               true,
+	"environments.source_signers":            true,
+	"environments.require_source_signers":    true,
 }
 
 // systemEnvKnobs are the environments keys a system file may carry at all:
@@ -165,6 +184,7 @@ func defaultEnvironments() Environments {
 		XDGSeedAllowlist:        []string{"git", "gh", "ssh"},
 		MCPPackageAllowlist:     []string{},
 		ProviderDirectories:     []string{},
+		SourceSigners:           map[string][]SourceSigner{},
 		ShadowAcknowledged:      []ShadowAcknowledgement{},
 		SecretWaivers:           []SecretMaterialWaiver{},
 		TransitiveSystemModules: "drop",
@@ -342,6 +362,21 @@ func parseEnvironments(raw any) (Environments, error) {
 		}
 		env.ProviderDirectories = dirs
 	}
+	if rawSigners, present := obj["source_signers"]; present {
+		signers, err := parseSourceSigners(rawSigners)
+		if err != nil {
+			return Environments{}, err
+		}
+		env.SourceSigners = signers
+	}
+	if rawRequired, present := obj["require_source_signers"]; present {
+		required, ok := rawRequired.(bool)
+		if !ok {
+			return Environments{}, verr.New("environments.require_source_signers", "must be a boolean")
+		}
+		env.RequireSourceSigners = required
+		env.RequireSourceSignersSet = true
+	}
 	return env, nil
 }
 
@@ -356,7 +391,115 @@ var EnvKnobNames = []string{
 	"mcp_package_allowlist", "shadow_acknowledged", "secret_material_waivers",
 	"transitive_system_modules", "system_module_waivers",
 	"backup_retention", "require_current_profile", "in_place_mode",
-	"provider_directories", "permissions",
+	"provider_directories", "permissions", "source_signers", "require_source_signers",
+}
+
+var gpgFingerprintRE = regexp.MustCompile(`^[A-F0-9]{40}$`)
+
+var sshKeyTypes = map[string]bool{
+	"ssh-ed25519":                        true,
+	"ssh-rsa":                            true,
+	"ecdsa-sha2-nistp256":                true,
+	"ecdsa-sha2-nistp384":                true,
+	"ecdsa-sha2-nistp521":                true,
+	"sk-ssh-ed25519@openssh.com":         true,
+	"sk-ecdsa-sha2-nistp256@openssh.com": true,
+}
+
+func parseSourceSigners(raw any) (map[string][]SourceSigner, error) {
+	entries, ok := raw.(map[string]any)
+	if !ok {
+		return nil, verr.New("environments.source_signers", "must be an object")
+	}
+	out := make(map[string][]SourceSigner, len(entries))
+	sources := make([]string, 0, len(entries))
+	for source := range entries {
+		sources = append(sources, source)
+	}
+	sort.Strings(sources)
+	for _, source := range sources {
+		if !identity.ValidCanonical(source) {
+			return nil, verr.New("environments.source_signers", "source %q must be a canonical source identity", source)
+		}
+		items, ok := entries[source].([]any)
+		if !ok {
+			return nil, verr.New("environments.source_signers."+source, "must be an array")
+		}
+		seen := map[string]bool{}
+		parsed := make([]SourceSigner, 0, len(items))
+		for index, item := range items {
+			object, ok := item.(map[string]any)
+			if !ok {
+				return nil, verr.New("environments.source_signers."+source, "entry %d must be an object", index)
+			}
+			kind, ok := object["type"].(string)
+			if !ok {
+				return nil, verr.New("environments.source_signers."+source, "entry %d type must be ssh or gpg", index)
+			}
+			signer := SourceSigner{Type: kind}
+			switch kind {
+			case "ssh":
+				if len(object) != 2 {
+					return nil, verr.New("environments.source_signers."+source, "ssh entry %d must contain only type and key", index)
+				}
+				key, ok := object["key"].(string)
+				if !ok {
+					return nil, verr.New("environments.source_signers."+source, "ssh entry %d key must be an OpenSSH public key line", index)
+				}
+				keyType, material, err := parseOpenSSHPublicKey(key)
+				if err != nil {
+					return nil, verr.New("environments.source_signers."+source, "ssh entry %d: %v", index, err)
+				}
+				signer.Key = strings.TrimSpace(key)
+				identity := keyType + " " + normalizeOpenSSHKeyMaterial(material)
+				if seen[identity] {
+					return nil, verr.New("environments.source_signers."+source, "contains duplicate signer %q", identity)
+				}
+				seen[identity] = true
+			case "gpg":
+				if len(object) != 2 {
+					return nil, verr.New("environments.source_signers."+source, "gpg entry %d must contain only type and fingerprint", index)
+				}
+				fingerprint, ok := object["fingerprint"].(string)
+				if !ok || !gpgFingerprintRE.MatchString(fingerprint) {
+					return nil, verr.New("environments.source_signers."+source, "gpg entry %d fingerprint must be 40 uppercase hexadecimal characters", index)
+				}
+				signer.Fingerprint = fingerprint
+				if seen["gpg "+fingerprint] {
+					return nil, verr.New("environments.source_signers."+source, "contains duplicate signer %q", fingerprint)
+				}
+				seen["gpg "+fingerprint] = true
+			default:
+				return nil, verr.New("environments.source_signers."+source, "entry %d type must be ssh or gpg", index)
+			}
+			parsed = append(parsed, signer)
+		}
+		out[source] = parsed
+	}
+	return out, nil
+}
+
+func parseOpenSSHPublicKey(line string) (string, string, error) {
+	fields := strings.Fields(line)
+	if len(fields) < 2 || !sshKeyTypes[fields[0]] {
+		return "", "", fmt.Errorf("key must use a supported OpenSSH key type and base64 material")
+	}
+	// Environments §12.1 defines the SSH key as an OpenSSH public-key line
+	// with base64 key material. Validate that grammar with or without padding;
+	// cryptographic verification later decides whether the blob is a real key.
+	if _, err := base64.StdEncoding.DecodeString(fields[1]); err != nil {
+		if _, rawErr := base64.RawStdEncoding.DecodeString(fields[1]); rawErr != nil {
+			return "", "", fmt.Errorf("key material is not valid base64")
+		}
+	}
+	return fields[0], fields[1], nil
+}
+
+// Environments §12.1 defines SSH identity as key type plus base64 material.
+// Padding is optional in the public-key line, so remove trailing '=' on
+// both identities before comparing them.
+func normalizeOpenSSHKeyMaterial(material string) string {
+	return strings.TrimRight(material, "=")
 }
 
 // envKnob reports whether key is a §12.1 knob name.
@@ -1077,6 +1220,20 @@ func (e Environments) render() map[string]any {
 	for _, dir := range e.ProviderDirectories {
 		providerDirs = append(providerDirs, dir)
 	}
+	sourceSigners := map[string]any{}
+	for source, signers := range e.SourceSigners {
+		entries := make([]any, 0, len(signers))
+		for _, signer := range signers {
+			entry := map[string]any{"type": signer.Type}
+			if signer.Type == "ssh" {
+				entry["key"] = signer.Key
+			} else {
+				entry["fingerprint"] = signer.Fingerprint
+			}
+			entries = append(entries, entry)
+		}
+		sourceSigners[source] = entries
+	}
 	// The §12.1 schema default is []: an absent knob renders the empty
 	// list, an explicit null renders null (unbounded), a configured
 	// list renders itself. The S4 runtime default for an absent knob —
@@ -1118,6 +1275,8 @@ func (e Environments) render() map[string]any {
 		"backup_retention":        e.BackupRetention,
 		"require_current_profile": require, "in_place_mode": inPlace,
 		"provider_directories": providerDirs, "permissions": permissions,
+		"source_signers":         sourceSigners,
+		"require_source_signers": e.RequireSourceSigners,
 	}
 }
 
@@ -1135,7 +1294,7 @@ func EnvLockKey(knob string) string {
 		return "environments.precedence"
 	case "isolation":
 		return "environments.isolation"
-	case "overlays_allowed", "mcp_package_allowlist", "passable_env_names", "require_current_profile", "transitive_system_modules", "provider_directories", "permissions":
+	case "overlays_allowed", "mcp_package_allowlist", "passable_env_names", "require_current_profile", "transitive_system_modules", "provider_directories", "permissions", "source_signers", "require_source_signers":
 		return "environments." + head
 	}
 	return ""

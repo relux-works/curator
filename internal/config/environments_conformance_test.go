@@ -125,6 +125,132 @@ func TestManagerConfigV2SchemaCases(t *testing.T) {
 		})
 }
 
+type sourceSignerMergeVectorFile struct {
+	MergeCases []struct {
+		Name     string                         `json:"name"`
+		Locked   bool                           `json:"locked"`
+		System   map[string][]sourceSignerWire  `json:"system"`
+		Machine  *map[string][]sourceSignerWire `json:"machine"`
+		Expected struct {
+			Effective map[string][]sourceSignerWire `json:"effective"`
+			Warnings  []string                      `json:"warnings"`
+		} `json:"expected"`
+	} `json:"merge_cases"`
+}
+
+type sourceSignerWire struct {
+	Type        string `json:"type"`
+	Key         string `json:"key,omitempty"`
+	Fingerprint string `json:"fingerprint,omitempty"`
+}
+
+// TestSourceSignerMergeVectorsAtLoad drives every rc.13 source_signers
+// precedence vector through Load, including per-source system locks and
+// unlocked whole-knob defaults (manager §1, environments §12.1).
+func TestSourceSignerMergeVectorsAtLoad(t *testing.T) {
+	root := conformanceRoot(t)
+	payload, err := os.ReadFile(filepath.Join(root, "vectors", "environments-source-signers.json")) // #nosec G304 -- explicit conformance input
+	if err != nil {
+		t.Fatal(err)
+	}
+	var vectors sourceSignerMergeVectorFile
+	if err := json.Unmarshal(payload, &vectors); err != nil {
+		t.Fatal(err)
+	}
+	if len(vectors.MergeCases) != 6 {
+		t.Fatalf("pinned rc.13 merge case count = %d, want 6", len(vectors.MergeCases))
+	}
+	for _, tc := range vectors.MergeCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			normalizeMergeVectorKeys(tc.System)
+			if tc.Machine != nil {
+				normalizeMergeVectorKeys(*tc.Machine)
+			}
+			normalizeMergeVectorKeys(tc.Expected.Effective)
+			userEnv := map[string]any{}
+			if tc.Machine != nil {
+				userEnv["source_signers"] = *tc.Machine
+			}
+			userPayload, err := json.Marshal(map[string]any{
+				"schema_version": 2, "skills_root": "/tmp/skills", "projects": map[string]any{}, "environments": userEnv,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			systemEnv := map[string]any{"source_signers": tc.System}
+			systemData := map[string]any{"schema_version": 2, "environments": systemEnv}
+			if tc.Locked {
+				systemData["locked"] = []string{"environments.source_signers"}
+			}
+			systemPayload, err := json.Marshal(systemData)
+			if err != nil {
+				t.Fatal(err)
+			}
+			dir := t.TempDir()
+			userPath := writeConfig(t, dir, "config.json", string(userPayload))
+			systemPath := writeConfig(t, dir, "system.json", string(systemPayload))
+			t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
+			var warnings []string
+			cfg, err := Load(userPath, func(message string) { warnings = append(warnings, message) })
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			got := cfg.Env.SourceSigners
+			if got == nil {
+				got = map[string][]SourceSigner{}
+			}
+			want := decodeSourceSignerWire(tc.Expected.Effective)
+			if want == nil {
+				want = map[string][]SourceSigner{}
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("effective source_signers = %#v, want %#v", got, want)
+			}
+			if len(warnings) != len(tc.Expected.Warnings) {
+				t.Fatalf("Load warnings = %v, want source suffixes %v", warnings, tc.Expected.Warnings)
+			}
+			for i, suffix := range tc.Expected.Warnings {
+				if !strings.Contains(warnings[i], suffix) {
+					t.Errorf("warning %q does not name expected source %q", warnings[i], suffix)
+				}
+			}
+		})
+	}
+}
+
+func decodeSourceSignerWire(wire map[string][]sourceSignerWire) map[string][]SourceSigner {
+	if wire == nil {
+		return nil
+	}
+	decoded := make(map[string][]SourceSigner, len(wire))
+	for source, signers := range wire {
+		for _, signer := range signers {
+			decoded[source] = append(decoded[source], SourceSigner(signer))
+		}
+	}
+	return decoded
+}
+
+func normalizeMergeVectorKeys(signers map[string][]sourceSignerWire) {
+	const (
+		operatorKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIM2viPc9tcg5ax615zmMJHL/WEOIxD87zH2o+/Znd0Ga operator@example"
+		intruderKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINZFvyk44Hs0dZ8KKN5icz5Hv56DJuhxW6/eRroAMHVG intruder@example"
+	)
+	for source, list := range signers {
+		for i := range list {
+			if list[i].Type != "ssh" {
+				continue
+			}
+			if strings.HasSuffix(list[i].Key, "intruder@example") {
+				list[i].Key = intruderKey
+			} else {
+				list[i].Key = operatorKey
+			}
+		}
+		signers[source] = list
+	}
+}
+
 // TestSystemConfigV2SchemaCases runs the published system-config-v2 family
 // through Load as the system file over a fixed minimal schema-2 machine
 // file: every indexed valid case merges and every indexed invalid case
@@ -278,7 +404,7 @@ func TestManagerConfigV2Vectors(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !exactManagerEffectiveJSON(got, tc.Expected) {
+			if !managerEffectiveJSONMatchesVector(got, tc.Expected) {
 				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("effective config got %s, want %s", rendered, wantJSON)}
 			}
 			return conformancecoverage.Observation{}
@@ -304,6 +430,45 @@ func TestManagerEffectiveJSONComparisonRejectsExtraKnobs(t *testing.T) {
 	}
 }
 
+// managerEffectiveJSONMatchesVector handles the published vectors that
+// project the normalized object to their declared top-level keys. Each
+// projected value still compares as canonical JSON, so nested knobs remain
+// strict; full-object vectors retain exactManagerEffectiveJSON's strict rule.
+func managerEffectiveJSONMatchesVector(actual, expected map[string]any) bool {
+	if len(expected) == len(actual) {
+		return exactManagerEffectiveJSON(actual, expected)
+	}
+	if len(expected) > len(actual) {
+		return false
+	}
+	for key, expectedValue := range expected {
+		actualValue, ok := actual[key]
+		if !ok {
+			return false
+		}
+		actualJSON, actualErr := json.Marshal(actualValue)
+		expectedJSON, expectedErr := json.Marshal(expectedValue)
+		if actualErr != nil || expectedErr != nil || !bytes.Equal(actualJSON, expectedJSON) {
+			return false
+		}
+	}
+	return true
+}
+
+func TestProjectedManagerEffectiveJSONRejectsExtraEnvironmentKnob(t *testing.T) {
+	actual := map[string]any{
+		"environments": map[string]any{
+			"existing":                  true,
+			"transitive_system_modules": "drop",
+		},
+		"adapter_mode": "auto",
+	}
+	expected := map[string]any{"environments": map[string]any{"existing": true}}
+	if managerEffectiveJSONMatchesVector(actual, expected) {
+		t.Fatal("projected vector matched despite an unexpected environments knob")
+	}
+}
+
 // systemModuleSchemaFailure keeps the E2 schema cases' stronger diagnostic
 // assertion in the counted family driver. This avoids running the same
 // published case a second time in TestSystemModuleSchemaSubset and ensures a
@@ -318,12 +483,11 @@ func systemModuleSchemaFailure(family, file string, err error) string {
 	return ""
 }
 
-// TestOverlayGapOwnersMatchFirstProductionBlocker keeps the 28 legacy
-// path-kind overlay rows attributed to the source_signers fields that still
-// block them at the pinned root. Permissions are now parsed. Schema cases are
-// driven through Load; vectors are driven through Parse and compared with
-// their published EffectiveJSON.
-func TestOverlayGapOwnersMatchFirstProductionBlocker(t *testing.T) {
+// TestOverlayConformancePassesWithPermissionsAndSourceSigners drives the
+// published overlay schema cases through Load and their vectors through Parse.
+// With both the permissions and source signer knobs implemented, these cases
+// must match their published behavior and have no remaining gap rows.
+func TestOverlayConformancePassesWithPermissionsAndSourceSigners(t *testing.T) {
 	root := conformanceRoot(t)
 	_, gaps, err := conformancecoverage.Load()
 	if err != nil {
@@ -333,13 +497,11 @@ func TestOverlayGapOwnersMatchFirstProductionBlocker(t *testing.T) {
 	for _, gap := range gaps {
 		gapByCase[gap.Family+"\x00"+gap.CaseID] = gap
 	}
-	lookup := func(family, caseID string) conformancecoverage.Gap {
+	assertNoGap := func(family, caseID string) {
 		t.Helper()
-		gap, ok := gapByCase[family+"\x00"+caseID]
-		if !ok {
-			t.Fatalf("missing owner row for %s/%s", family, caseID)
+		if gap, ok := gapByCase[family+"\x00"+caseID]; ok {
+			t.Errorf("passing conformance case %s/%s still has gap row owned by %s: %s", family, caseID, gap.Owner, gap.Reason)
 		}
-		return gap
 	}
 
 	const managerSchema = "manager-config-v2/schema-cases"
@@ -368,37 +530,14 @@ func TestOverlayGapOwnersMatchFirstProductionBlocker(t *testing.T) {
 		}
 		for _, field := range []string{"permissions", "source_signers", "require_source_signers"} {
 			if _, exists := environments[field]; !exists {
-				t.Errorf("%s does not carry the new %q blocker whose owner is being verified", tc.Name, field)
+				t.Errorf("%s does not carry the published %q field", tc.Name, field)
 			}
 		}
-		_, loadErr := Load(writeConfig(t, t.TempDir(), "config.json", string(payload)), nil)
-		if loadErr == nil {
-			t.Errorf("Load now accepts published overlay case %s; remove its gap row", tc.Name)
+		if _, err := Load(writeConfig(t, t.TempDir(), "config.json", string(payload)), nil); err != nil {
+			t.Errorf("Load rejects published valid overlay case %s: %v", tc.Name, err)
 			continue
 		}
-		owner, field := overlaySchemaFailureOwner(loadErr)
-		if owner == "" {
-			t.Errorf("Load's first blocker for %s is not a known new field: %v", tc.Name, loadErr)
-			continue
-		}
-		gap := lookup(managerSchema, tc.Name)
-		if gap.Owner != owner {
-			t.Errorf("%s owner = %q, first unsupported field %s belongs to %q", tc.Name, gap.Owner, field, owner)
-		}
-		if field != "require_source_signers" || !strings.Contains(loadErr.Error(), field) {
-			t.Errorf("%s first Load blocker = %q, want unsupported require_source_signers: %v", tc.Name, field, loadErr)
-		}
-		for _, requiredField := range []string{"source_signers", "require_source_signers"} {
-			if !strings.Contains(gap.Reason, requiredField) {
-				t.Errorf("%s reason %q omits unsupported field %q", tc.Name, gap.Reason, requiredField)
-			}
-		}
-		if strings.Contains(gap.Reason, "permissions") {
-			t.Errorf("%s reason %q still attributes the now-supported permissions field", tc.Name, gap.Reason)
-		}
-		if strings.Contains(gap.Reason, "path-kind") {
-			t.Errorf("%s reason %q misattributes the Load failure to path-kind", tc.Name, gap.Reason)
-		}
+		assertNoGap(managerSchema, tc.Name)
 	}
 	if schemaCases != 14 {
 		t.Fatalf("published valid overlay schema cases = %d, want 14", schemaCases)
@@ -413,11 +552,21 @@ func TestOverlayGapOwnersMatchFirstProductionBlocker(t *testing.T) {
 	if err := json.Unmarshal(payload, &vectors); err != nil {
 		t.Fatal(err)
 	}
-	selectedVectors := map[string]bool{}
-	for _, gap := range gaps {
-		if gap.Family == managerVectors && strings.HasPrefix(gap.CaseID, "schema2-overlay-") {
-			selectedVectors[gap.CaseID] = true
-		}
+	selectedVectors := map[string]bool{
+		"schema2-overlay-git-git-uppercase":            true,
+		"schema2-overlay-git-http-uppercase":           true,
+		"schema2-overlay-git-https-uppercase":          true,
+		"schema2-overlay-git-scp":                      true,
+		"schema2-overlay-git-scp-no-user":              true,
+		"schema2-overlay-git-single-letter-host":       true,
+		"schema2-overlay-git-ssh-uppercase":            true,
+		"schema2-overlay-path-colon-later-segment":     true,
+		"schema2-overlay-path-relative":                true,
+		"schema2-overlay-path-source":                  true,
+		"schema2-overlay-path-windows-backslash":       true,
+		"schema2-overlay-path-windows-double-slash":    true,
+		"schema2-overlay-path-windows-lowercase-drive": true,
+		"schema2-overlay-path-windows-slash":           true,
 	}
 	vectorCases := 0
 	for _, tc := range vectors {
@@ -435,7 +584,7 @@ func TestOverlayGapOwnersMatchFirstProductionBlocker(t *testing.T) {
 		}
 		cfg, parseErr := Parse(object, "vector.json")
 		if parseErr != nil {
-			t.Errorf("Parse's first blocker for %s is %v; expected the published output comparison to identify its owners", tc.Name, parseErr)
+			t.Errorf("Parse rejects published valid overlay vector %s: %v", tc.Name, parseErr)
 			continue
 		}
 		rendered, err := json.Marshal(cfg.EffectiveJSON())
@@ -454,38 +603,16 @@ func TestOverlayGapOwnersMatchFirstProductionBlocker(t *testing.T) {
 		}
 		for _, field := range []string{"permissions", "source_signers", "require_source_signers"} {
 			if _, exists := wantEnv[field]; !exists {
-				t.Errorf("%s expected EffectiveJSON omits the published new %q field whose owner is being verified", tc.Name, field)
+				t.Errorf("%s expected EffectiveJSON omits the published %q field", tc.Name, field)
 			}
 		}
-		differences := jsonDifferencePaths("environments", gotEnv, wantEnv)
-		wantDifferences := []string{"environments.require_source_signers", "environments.source_signers"}
-		if !reflect.DeepEqual(differences, wantDifferences) {
-			t.Errorf("%s differences = %v, want only %v", tc.Name, differences, wantDifferences)
-			continue
+		if differences := jsonDifferencePaths("environments", gotEnv, wantEnv); len(differences) != 0 {
+			t.Errorf("%s EffectiveJSON differences = %v, want none", tc.Name, differences)
 		}
-		gap := lookup(managerVectors, tc.Name)
-		const wantOwners = "STORY-260916-ioemse"
-		if gap.Owner != wantOwners {
-			t.Errorf("%s owner = %q, changed source_signers fields are owned by %q", tc.Name, gap.Owner, wantOwners)
-		}
-		if strings.Contains(gap.Reason, "permissions") || !strings.Contains(gap.Reason, "source_signers") || !strings.Contains(gap.Reason, "require_source_signers") || strings.Contains(gap.Reason, "path-kind") {
-			t.Errorf("%s reason %q does not describe only the changed source_signers fields", tc.Name, gap.Reason)
-		}
+		assertNoGap(managerVectors, tc.Name)
 	}
 	if vectorCases != 14 {
 		t.Fatalf("published valid overlay vectors = %d, want 14", vectorCases)
-	}
-}
-
-func overlaySchemaFailureOwner(err error) (owner, field string) {
-	message := err.Error()
-	switch {
-	case strings.Contains(message, `unsupported field "source_signers"`):
-		return "STORY-260916-ioemse", "source_signers"
-	case strings.Contains(message, `unsupported field "require_source_signers"`):
-		return "STORY-260916-ioemse", "require_source_signers"
-	default:
-		return "", ""
 	}
 }
 

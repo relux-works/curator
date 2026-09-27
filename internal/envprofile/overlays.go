@@ -99,6 +99,8 @@ func resolveOverlay(home string, manager *gitManager, decl OverlaySpec) (context
 // resolution input.
 func overlayInputDefaults(input *contextresolve.Input, policy Policy) {
 	input.OverlayDefaultWeight = policy.OverlayDefaultWeight
+	input.SourceSigners = policy.SourceSigners
+	input.RequireSourceSigners = policy.RequireSourceSigners
 }
 
 // resolutionWarnings renders successful-resolution findings — the rule-3

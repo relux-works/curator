@@ -12,6 +12,8 @@
 package contextresolve
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"sort"
 	"strings"
@@ -32,6 +34,9 @@ const (
 	DiagCompositionInvalid   = "environment_composition_invalid"
 	DiagMCPPackageNotAllowed = "mcp_package_not_allowed"
 	DiagSourceMismatch       = "context_source_mismatch"
+	DiagSourceUnsigned       = "context_source_unsigned"
+	DiagSourceSignerRejected = "context_source_signer_rejected"
+	DiagSourceSignersMissing = "context_source_signers_missing"
 )
 
 // MachineRequirer names the machine as the requirer of the install
@@ -81,6 +86,36 @@ type Candidate struct {
 	Tag     string
 	Version pkgversion.Version
 	Commit  string
+}
+
+// Signer identifies an SSH public key or OpenPGP signer. SSH comments are
+// retained for status display but are not part of signer identity.
+type Signer struct {
+	Type        string
+	Key         string
+	Fingerprint string
+}
+
+// SignatureEvidence reports signature presence and cryptographic validity
+// for one selected ref. Signer is the key or fingerprint carried by the
+// signature, not an authorization decision.
+type SignatureEvidence struct {
+	Present bool
+	Valid   bool
+	Signer  Signer
+}
+
+// CandidateSignatures carries evidence for the selected tag and peeled
+// commit. Either signature may satisfy the source allowlist.
+type CandidateSignatures struct {
+	Tag    SignatureEvidence
+	Commit SignatureEvidence
+}
+
+// CandidateVerifier is implemented by network sources that can verify a
+// candidate's tag and commit signature before resolution admits it.
+type CandidateVerifier interface {
+	VerifyCandidate(kind, name, source, tag, commit string, allowed []Signer) (CandidateSignatures, error)
 }
 
 // Source supplies candidates and manifests. Every method receives the
@@ -133,6 +168,11 @@ type Input struct {
 	Direct []Requirement
 	// MCPAllowlist bounds MCP declaration packages; empty permits every identity.
 	MCPAllowlist []string
+	// SourceSigners is keyed by canonical Git source identity. Map presence
+	// distinguishes an empty allowlist, which admits no signer, from no
+	// allowlist, which is unconfigured unless RequireSourceSigners is true.
+	SourceSigners        map[string][]Signer
+	RequireSourceSigners bool
 }
 
 // RequirerConstraint is one requirer's constraint in a conflict detail.
@@ -508,12 +548,21 @@ func (r *resolver) selectName(name string) error {
 	}
 	if exactCommit != "" {
 		chosen = &selection{kind: kind, name: name, source: source, directory: directory, commit: exactCommit, overlay: r.overlays[name]}
+		for _, c := range constraints {
+			if c.requirement.Tag != "" {
+				chosen.tag = c.requirement.Tag
+				break
+			}
+		}
 		// The version a fixed candidate carries: the highest version tag
 		// peeling to the commit for a skill; the manifest version otherwise.
 		for _, candidate := range candidates {
 			if candidate.Commit == exactCommit {
-				chosen.version, chosen.hasVer, chosen.tag = candidate.Version, true, candidate.Tag
+				chosen.version, chosen.hasVer = candidate.Version, true
 			}
+		}
+		if err := r.verifyCandidate(chosen); err != nil {
+			return err
 		}
 		pkg, err := r.source.Manifest(kind, name, source, directory, exactCommit)
 		if err != nil {
@@ -585,15 +634,18 @@ func (r *resolver) selectName(name string) error {
 		return r.conflict(name, considered)
 	}
 	if current != nil && current.commit == best.Commit {
-		return nil
+		return r.verifyCandidate(current)
 	}
 	if current != nil && pkgversion.Compare(best.Version, current.version) > 0 {
 		// Rule 3: a selection never increases; keep the current one while it
 		// still satisfies every constraint.
-		return nil
+		return r.verifyCandidate(current)
 	}
 	chosen = &selection{kind: kind, name: name, source: source, directory: directory, commit: best.Commit,
 		version: best.Version, hasVer: true, tag: best.Tag, overlay: r.overlays[name]}
+	if err := r.verifyCandidate(chosen); err != nil {
+		return err
+	}
 	pkg, err := r.source.Manifest(kind, name, source, directory, best.Commit)
 	if err != nil {
 		return err
@@ -609,6 +661,112 @@ func (r *resolver) selectName(name string) error {
 		}
 	}
 	return r.install(name, chosen)
+}
+
+func (r *resolver) verifyCandidate(candidate *selection) error {
+	if candidate == nil || candidate.source == "" {
+		return nil // path and synthesized local roots have no signature material.
+	}
+	allowed, configured := r.input.SourceSigners[candidate.source]
+	if !configured {
+		if !r.input.RequireSourceSigners {
+			return nil
+		}
+		return &Error{Diagnostic: DiagSourceSignersMissing, Name: candidate.name,
+			Detail: fmt.Sprintf("source %s has no signer allowlist", candidate.source)}
+	}
+	verifier, ok := r.source.(CandidateVerifier)
+	if !ok {
+		return &Error{Diagnostic: DiagSourceSignerRejected, Name: candidate.name,
+			Detail: fmt.Sprintf("source %s %s signer unknown: signature verification is unavailable", candidate.source, candidateReference(candidate))}
+	}
+	evidence, err := verifier.VerifyCandidate(candidate.kind, candidate.name, candidate.source, candidate.tag, candidate.commit, allowed)
+	for _, signature := range []SignatureEvidence{evidence.Tag, evidence.Commit} {
+		if signature.Present && signature.Valid && allowedSigner(signature.Signer, allowed) {
+			return nil
+		}
+	}
+	seen := evidence.Tag.Signer
+	if !evidence.Tag.Present || signerName(seen) == "unknown" {
+		seen = evidence.Commit.Signer
+	}
+	if err != nil {
+		return &Error{Diagnostic: DiagSourceSignerRejected, Name: candidate.name,
+			Detail: fmt.Sprintf("source %s %s signer %s: verification failed: %v", candidate.source, candidateReference(candidate), signerName(seen), err)}
+	}
+	if !evidence.Tag.Present && !evidence.Commit.Present {
+		return &Error{Diagnostic: DiagSourceUnsigned, Name: candidate.name,
+			Detail: fmt.Sprintf("source %s %s carries no tag or commit signature", candidate.source, candidateReference(candidate))}
+	}
+	return &Error{Diagnostic: DiagSourceSignerRejected, Name: candidate.name,
+		Detail: fmt.Sprintf("source %s %s signer %s is not accepted or did not verify", candidate.source, candidateReference(candidate), signerName(seen))}
+}
+
+func candidateReference(candidate *selection) string {
+	if candidate.tag != "" {
+		return "tag " + candidate.tag
+	}
+	return "commit " + candidate.commit
+}
+
+func signerName(signer Signer) string {
+	return FormatSigner(signer)
+}
+
+// IsAllowedSigner compares one verified signer to a source allowlist. SSH
+// comments are ignored; OpenPGP fingerprints compare case-insensitively.
+func IsAllowedSigner(seen Signer, allowed []Signer) bool { return allowedSigner(seen, allowed) }
+
+// FormatSigner renders a verified or claimed signer without exposing SSH
+// public-key material in status output or diagnostics.
+func FormatSigner(signer Signer) string {
+	switch signer.Type {
+	case "ssh":
+		fields := strings.Fields(signer.Key)
+		if len(fields) >= 2 {
+			decoded, err := base64.StdEncoding.DecodeString(fields[1])
+			if err != nil {
+				decoded, err = base64.RawStdEncoding.DecodeString(fields[1])
+			}
+			if err == nil {
+				digest := sha256.Sum256(decoded)
+				return fields[0] + " SHA256:" + base64.RawStdEncoding.EncodeToString(digest[:])
+			}
+			return fields[0] + " " + fields[1]
+		}
+	case "gpg":
+		if signer.Fingerprint != "" {
+			return "gpg " + strings.ToUpper(signer.Fingerprint)
+		}
+	}
+	return "unknown"
+}
+
+func allowedSigner(seen Signer, allowed []Signer) bool {
+	for _, signer := range allowed {
+		if signer.Type != seen.Type {
+			continue
+		}
+		switch seen.Type {
+		case "ssh":
+			seenFields, allowedFields := strings.Fields(seen.Key), strings.Fields(signer.Key)
+			if len(seenFields) >= 2 && len(allowedFields) >= 2 && seenFields[0] == allowedFields[0] && normalizeSSHKeyMaterial(seenFields[1]) == normalizeSSHKeyMaterial(allowedFields[1]) {
+				return true
+			}
+		case "gpg":
+			if strings.EqualFold(seen.Fingerprint, signer.Fingerprint) && seen.Fingerprint != "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// Environments §12.1 defines SSH identity as key type plus base64 material.
+// Padding is optional in the public-key line, so remove trailing '=' from
+// both verified and configured material before comparing their identities.
+func normalizeSSHKeyMaterial(material string) string {
+	return strings.TrimRight(material, "=")
 }
 
 // exactVersionTagPinned reports whether some exact constraint names the

@@ -1,9 +1,12 @@
 package envprofile
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/relux-works/curator/internal/contextlock"
@@ -373,12 +376,18 @@ func TestUnreadablePathRootLeadsUnreadable(t *testing.T) {
 // path profile whose lock carries no state pin for its root: the root member
 // is rewritten to a commit pin (the only validated lock shape without a
 // state hash), so readLock still validates and updateLocked must refuse with
-// profile_source_invalid naming the missing pin. Production entry point:
-// UpdateWithPolicy. A mutant dropping the empty-pin refusal admits the lock
-// and must fail this test.
+// profile_source_invalid naming the missing pin before making any source
+// request. Production entry point: UpdateWithPolicy. A mutant dropping the
+// empty-pin refusal or moving it after source refresh must fail this test.
 func TestUpdatePathWithoutStatePinIsSourceInvalid(t *testing.T) {
 	home := t.TempDir()
 	pinHomes(t)
+	var requests atomic.Int64
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
 	source := filepath.Join(t.TempDir(), "source")
 	writeManifestPackage(t, source,
 		`{"schema_version": 1, "name": "pk", "version": "1.0.0",`+
@@ -395,7 +404,7 @@ func TestUpdatePathWithoutStatePinIsSourceInvalid(t *testing.T) {
 		if member.Kind == contextlock.KindContext && member.Name == "pk" {
 			lock.Members[i].StateHash = ""
 			lock.Members[i].Commit = strings.Repeat("ab", 20)
-			lock.Members[i].Source = "https://example.com/pk"
+			lock.Members[i].Source = server.URL + "/pk"
 		}
 	}
 	canonical, err := lock.Canonical()
@@ -408,6 +417,9 @@ func TestUpdatePathWithoutStatePinIsSourceInvalid(t *testing.T) {
 	_, _, err = UpdateWithPolicy(home, "pk", Policy{})
 	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) || !strings.Contains(err.Error(), "carries no state pin") {
 		t.Fatalf("err = %v, want %s naming the missing state pin", err, DiagSourceInvalid)
+	}
+	if got := requests.Load(); got != 0 {
+		t.Fatalf("missing-pin update made %d source requests before refusing", got)
 	}
 }
 

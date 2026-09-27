@@ -55,15 +55,16 @@ import (
 
 // Diagnostics (environments §1.1, §2.1, §9.7, manager profile §12.3).
 const (
-	DiagNameTaken       = "profile_name_taken"
-	DiagRefConflict     = "profile_install_ref_conflict"
-	DiagSourceInvalid   = "profile_source_invalid"
-	DiagPathMissing     = "profile_source_path_missing"
-	DiagPathUnreadable  = "profile_source_path_unreadable"
-	DiagUpdateBlocked   = "profile_update_blocked"
-	DiagInUse           = "profile_in_use"
-	DiagNotFound        = "profile_not_found"
-	DiagImportNameTaken = "profile_import_name_taken"
+	DiagNameTaken                       = "profile_name_taken"
+	DiagRefConflict                     = "profile_install_ref_conflict"
+	DiagSourceInvalid                   = "profile_source_invalid"
+	DiagPathMissing                     = "profile_source_path_missing"
+	DiagPathUnreadable                  = "profile_source_path_unreadable"
+	DiagUpdateBlocked                   = "profile_update_blocked"
+	DiagSystemDeltaConfirmationRequired = "profile_update_confirmation_required"
+	DiagInUse                           = "profile_in_use"
+	DiagNotFound                        = "profile_not_found"
+	DiagImportNameTaken                 = "profile_import_name_taken"
 	// DiagLockUnavailable reports that the manager-home mutation lock
 	// could not be acquired within the bounded wait (manager §2.5).
 	DiagLockUnavailable = "environment_lock_unavailable"
@@ -174,6 +175,7 @@ type Info struct {
 	Current    bool
 	ScopedFor  []string
 	Warnings   []string
+	Delta      []string
 	Surfacing  []string
 	Activation []EntryResult
 }
@@ -426,9 +428,11 @@ func InUseByAnyScope(home, name string) (bool, error) {
 // regardless of any enabled flag — an advisory profile install does not
 // exist.
 type Policy struct {
-	AllowedSources []string
-	MCPAllowlist   []string
-	Revocations    []string
+	AllowedSources       []string
+	MCPAllowlist         []string
+	SourceSigners        map[string][]contextresolve.Signer
+	RequireSourceSigners bool
+	Revocations          []string
 	// OverlaysAllowed is the effective §12.1 composition policy: false
 	// empties every overlay list at resolution (environments §12.2).
 	OverlaysAllowed bool
@@ -561,6 +565,8 @@ func PolicyFromConfig(cfg *config.Config) Policy {
 	policy := Policy{
 		AllowedSources:          cfg.AllowedSources,
 		MCPAllowlist:            cfg.Env.MCPPackageAllowlist,
+		SourceSigners:           make(map[string][]contextresolve.Signer, len(cfg.Env.SourceSigners)),
+		RequireSourceSigners:    cfg.Env.RequireSourceSigners,
 		Revocations:             cfg.Audit.Revocations,
 		OverlaysAllowed:         cfg.Env.OverlaysAllowed,
 		OverlayDefaultWeight:    int64(cfg.Env.OverlayDefaultWeight),
@@ -569,6 +575,14 @@ func PolicyFromConfig(cfg *config.Config) Policy {
 		RequireCurrent:          cfg.Env.RequireCurrent,
 		RequireCurrentLocked:    cfg.Locked["environments.require_current_profile"],
 		TransitiveSystemModules: cfg.Env.TransitiveSystemModules,
+	}
+	for source, signers := range cfg.Env.SourceSigners {
+		policy.SourceSigners[source] = make([]contextresolve.Signer, 0, len(signers))
+		for _, signer := range signers {
+			policy.SourceSigners[source] = append(policy.SourceSigners[source], contextresolve.Signer{
+				Type: signer.Type, Key: signer.Key, Fingerprint: signer.Fingerprint,
+			})
+		}
 	}
 	for _, waiver := range cfg.Env.SystemModuleWaivers {
 		policy.SystemModuleWaivers = append(policy.SystemModuleWaivers,
@@ -605,6 +619,12 @@ type InstallOptions struct {
 	As        string
 	Use       bool
 	Policy    Policy
+	// ConfirmSystemDelta acknowledges a trigger during reinstall of an
+	// existing profile (§9.2).
+	ConfirmSystemDelta bool
+	// WarningSink receives operation warnings before a confirmation gate or
+	// lock publication, preserving §9.2 output order.
+	WarningSink io.Writer
 	// Imported marks an installation reassembled by the section 9.6
 	// onboarding import: the install record and the environment markers
 	// carry imported_from_native. Only the import sets it.
@@ -729,7 +749,7 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 			if isPath {
 				return reinstallPathLocked(op, home, name, source, input, options)
 			}
-			info, _, err := updateLocked(op, home, name, options.Policy, options.SurfacingSink, nil)
+			info, _, err := updateLocked(op, home, name, options.Policy, options.SurfacingSink, options.WarningSink, options.ConfirmSystemDelta, nil)
 			if err != nil {
 				return Info{}, false, false, err
 			}
@@ -784,6 +804,7 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 	// published or any surface is (re-)materialized below — even when
 	// publication or activation later fails.
 	surfacing = carrySurfacing(options.SurfacingSink, surfacing)
+	writeUpdateWarnings(options.WarningSink, "", warnings)
 	sourcePayload, err := marshalSource(source)
 	if err != nil {
 		return Info{}, false, false, err
@@ -848,6 +869,9 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input 
 	if err != nil {
 		return Info{}, false, false, err
 	}
+	if err := fetchLockedSources(manager, oldLock); err != nil {
+		return Info{}, false, false, err
+	}
 	overlays, err := resolveOverlays(home, manager, name, policy)
 	if err != nil {
 		return Info{}, false, false, err
@@ -867,19 +891,8 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input 
 		if oldMembers[key] {
 			continue
 		}
-		entry, err := manager.ensureEntry(home, resolved)
-		if err != nil {
+		if err := auditNewUpdateMember(home, manager, key, resolved, policy); err != nil {
 			return Info{}, false, false, err
-		}
-		report, err := contextaudit.Detect(packageRoot(entry, resolved.Directory), pinOf(resolved), nil)
-		if err != nil {
-			return Info{}, false, false, err
-		}
-		if report.Blocking() {
-			return Info{}, false, false, fmt.Errorf("%s: new member %s carries a blocking finding; the old lock stands", DiagUpdateBlocked, key)
-		}
-		if _, err := strictAuditMember(home, manager, resolved, entry, policy); err != nil {
-			return Info{}, false, false, fmt.Errorf("%s: new member %s %v; the old lock stands", DiagUpdateBlocked, key, err)
 		}
 	}
 	if err := checkAdmissionPrePublish(home, manager, result, policy); err != nil {
@@ -901,6 +914,7 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input 
 		// The §2.3 emission point: the rows print before the
 		// activation below (re-)materializes any surface.
 		surfacing = carrySurfacing(options.SurfacingSink, surfacing)
+		writeUpdateWarnings(options.WarningSink, "", warnings)
 		if activate, err := reinstallActivation(home, name, options.Use); err != nil {
 			return Info{}, false, false, err
 		} else if activate {
@@ -914,11 +928,20 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input 
 		return info, false, true, nil
 	}
 	warnings := resolutionWarnings(result)
-	auditWarnings, err := auditAndStore(home, manager, result, policy)
+	auditWarnings, err := auditCandidates(home, manager, result, policy)
 	if err != nil {
 		return Info{}, false, false, err
 	}
 	warnings = append(warnings, auditWarnings...)
+	deltaLines, triggered, deltaErr := resolvedDelta(home, manager, oldLock, result.Lock)
+	for _, line := range deltaLines {
+		if options.SurfacingSink != nil {
+			_, _ = fmt.Fprintln(options.SurfacingSink, line)
+		}
+	}
+	if deltaErr != nil {
+		return Info{Name: name, Source: source, Lock: result.Lock, LockHash: oldHash, Delta: deltaLines}, false, false, deltaErr
+	}
 	// Environments §9.1: after the audit gate passes and before the lock
 	// is published, surface the resolved MCP set (§2.3) and warn when
 	// the MCP package allowlist is empty. Neither fails the install.
@@ -930,6 +953,14 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input 
 	// The §2.3 emission point: the rows print before the lock is
 	// published or any scope is resynced below.
 	surfacing = carrySurfacing(options.SurfacingSink, surfacing)
+	writeUpdateWarnings(options.WarningSink, "", warnings)
+	if len(triggered) > 0 && !options.ConfirmSystemDelta {
+		return Info{Name: name, Source: source, Lock: result.Lock, LockHash: oldHash, Warnings: warnings, Delta: deltaLines}, false, false,
+			fmt.Errorf("%s: members %s require --confirm-system-delta; %s", DiagSystemDeltaConfirmationRequired, strings.Join(triggered, ", "), systemDeltaHint)
+	}
+	if err := ensureResolvedEntries(home, manager, result); err != nil {
+		return Info{}, false, false, err
+	}
 	canonical, err := result.Lock.Canonical()
 	if err != nil {
 		return Info{}, false, false, err
@@ -954,7 +985,7 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input 
 	if err != nil {
 		return Info{}, false, false, err
 	}
-	return Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: machine == name, Warnings: warnings, Surfacing: surfacing}, false, true, nil
+	return Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: machine == name, Warnings: warnings, Delta: deltaLines, Surfacing: surfacing}, false, true, nil
 }
 
 // reinstallActivation reports whether a same-source path reinstall must run
@@ -1006,8 +1037,8 @@ func activateReinstall(op *operation, home, name string, source Source, lock *co
 // Update re-resolves the root (and overlays, when the machine declares any)
 // from the declared requirement, fetching new candidates. A blocking
 // finding on a member new to the lock leaves the old lock in place with
-// profile_update_blocked. A root pinned by tag or revision is reported as
-// pinned and does not move. A path root resolves from the immutable
+// profile_update_blocked. A root pinned by tag or revision stays pinned,
+// but its signature is still reverified. A path root resolves from the immutable
 // snapshot the store already holds under the old lock's state pin and never
 // reads the source directory again (environments §1); overlays still
 // re-resolve below, so a path root with git overlays is a legitimate
@@ -1026,6 +1057,12 @@ func Update(home, name string) (Info, bool, error) {
 type UpdateOptions struct {
 	// Policy carries the machine gates (§9.1).
 	Policy Policy
+	// ConfirmSystemDelta is the per-run §9.2 acknowledgement for a delta
+	// that introduces or changes system modules or an MCP declaration.
+	ConfirmSystemDelta bool
+	// WarningSink receives operation warnings before the confirmation gate
+	// or lock publication.
+	WarningSink io.Writer
 	// SurfacingSink receives the §2.3 declaration rows at the required
 	// emission point: after the audit gate passes and before the lock
 	// is published or any surface is re-materialized. A nil sink keeps
@@ -1054,11 +1091,11 @@ func UpdateWithOptions(home, name string, options UpdateOptions) (Info, bool, er
 		return Info{}, false, err
 	}
 	defer func() { _ = op.close() }()
-	return updateLocked(op, home, name, options.Policy, options.SurfacingSink, options.readRegularFile)
+	return updateLocked(op, home, name, options.Policy, options.SurfacingSink, options.WarningSink, options.ConfirmSystemDelta, options.readRegularFile)
 }
 
 // updateLocked re-resolves under the held operation lock.
-func updateLocked(op *operation, home, name string, policy Policy, sink io.Writer, readRegularFile func(string) (stateread.File, error)) (Info, bool, error) {
+func updateLocked(op *operation, home, name string, policy Policy, sink, warningSink io.Writer, confirmSystemDelta bool, readRegularFile func(string) (stateread.File, error)) (Info, bool, error) {
 	if readRegularFile == nil {
 		readRegularFile = stateread.ReadRegularFile
 	}
@@ -1082,24 +1119,17 @@ func updateLocked(op *operation, home, name string, policy Policy, sink io.Write
 	if err := ensureDefault(op, home, policy); err != nil {
 		return Info{}, false, err
 	}
+	rootMember, hasRootMember := oldLock.RootMember()
+	if source.Kind == KindPath && (!hasRootMember || rootMember.StateHash == "") {
+		return Info{}, false, fmt.Errorf("%s: profile %q lock carries no state pin for its path root", DiagSourceInvalid, name)
+	}
 	manager := newGitManager(home).withPolicy(policy)
+	if err := fetchLockedSources(manager, oldLock); err != nil {
+		return Info{}, false, err
+	}
 	var input contextresolve.Input
 	switch source.Kind {
 	case KindGit:
-		if source.Req.Tag != "" || source.Req.Revision != "" {
-			machine, err := Current(home)
-			if err != nil {
-				return Info{}, false, err
-			}
-			info := Info{Name: name, Source: source, Lock: oldLock, Current: machine == name}
-			if _, hash, err := readLockWith(home, name, readRegularFile); err == nil {
-				info.LockHash = hash
-			}
-			return info, false, nil
-		}
-		if err := manager.fetch(source.Git); err != nil {
-			return Info{}, false, fmt.Errorf("%s: %v", DiagSourceInvalid, err)
-		}
 		input, err = manager.inputFor(source)
 		if err != nil {
 			return Info{}, false, err
@@ -1114,10 +1144,6 @@ func updateLocked(op *operation, home, name string, policy Policy, sink io.Write
 		// directory, so every imported profile's source.Path names no
 		// existing entry). Overlays re-resolve below the switch, so a
 		// path root with git overlays still moves on update.
-		rootMember, ok := oldLock.RootMember()
-		if !ok || rootMember.StateHash == "" {
-			return Info{}, false, fmt.Errorf("%s: profile %q lock carries no state pin for its path root", DiagSourceInvalid, name)
-		}
 		entry := contextstore.EntryDir(home, contextlock.KindContext, oldLock.Root, rootMember.StateHash)
 		manifest, err := contextpkg.LoadManifest(entry)
 		if err != nil {
@@ -1152,19 +1178,8 @@ func updateLocked(op *operation, home, name string, policy Policy, sink io.Write
 		if oldMembers[key] {
 			continue
 		}
-		entry, err := manager.ensureEntry(home, resolved)
-		if err != nil {
+		if err := auditNewUpdateMember(home, manager, key, resolved, policy); err != nil {
 			return Info{}, false, err
-		}
-		report, err := contextaudit.Detect(packageRoot(entry, resolved.Directory), pinOf(resolved), nil)
-		if err != nil {
-			return Info{}, false, err
-		}
-		if report.Blocking() {
-			return Info{}, false, fmt.Errorf("%s: new member %s carries a blocking finding; the old lock stands", DiagUpdateBlocked, key)
-		}
-		if _, err := strictAuditMember(home, manager, resolved, entry, policy); err != nil {
-			return Info{}, false, fmt.Errorf("%s: new member %s %v; the old lock stands", DiagUpdateBlocked, key, err)
 		}
 	}
 	if err := checkAdmissionPrePublish(home, manager, result, policy); err != nil {
@@ -1186,14 +1201,24 @@ func updateLocked(op *operation, home, name string, policy Policy, sink io.Write
 		// The §2.3 emission point: nothing is published on this path, but
 		// the rows still print exactly once.
 		surfacing = carrySurfacing(sink, surfacing)
+		writeUpdateWarnings(warningSink, name, warnings)
 		return Info{Name: name, Source: source, Lock: result.Lock, LockHash: oldHash, Current: machine == name, Warnings: warnings, Surfacing: surfacing}, false, nil
 	}
 	warnings := resolutionWarnings(result)
-	auditWarnings, err := auditAndStore(home, manager, result, policy)
+	auditWarnings, err := auditCandidates(home, manager, result, policy)
 	if err != nil {
 		return Info{}, false, err
 	}
 	warnings = append(warnings, auditWarnings...)
+	deltaLines, triggered, deltaErr := resolvedDelta(home, manager, oldLock, result.Lock)
+	for _, line := range deltaLines {
+		if sink != nil {
+			_, _ = fmt.Fprintln(sink, line)
+		}
+	}
+	if deltaErr != nil {
+		return Info{Name: name, Source: source, Lock: result.Lock, LockHash: oldHash, Delta: deltaLines}, false, deltaErr
+	}
 	// Environments §9.2: after the audit gate passes and before the lock
 	// is published or any surface is re-materialized, surface the
 	// candidate lock's MCP set (§2.3) and warn when the MCP package
@@ -1207,6 +1232,14 @@ func updateLocked(op *operation, home, name string, policy Policy, sink io.Write
 	// published or any scope is resynced below — even when publication
 	// or the resync later fails.
 	surfacing = carrySurfacing(sink, surfacing)
+	writeUpdateWarnings(warningSink, name, warnings)
+	if len(triggered) > 0 && !confirmSystemDelta {
+		return Info{Name: name, Source: source, Lock: result.Lock, LockHash: oldHash, Warnings: warnings, Delta: deltaLines}, false,
+			fmt.Errorf("%s: members %s require --confirm-system-delta; %s", DiagSystemDeltaConfirmationRequired, strings.Join(triggered, ", "), systemDeltaHint)
+	}
+	if err := ensureResolvedEntries(home, manager, result); err != nil {
+		return Info{}, false, err
+	}
 	canonical, err := result.Lock.Canonical()
 	if err != nil {
 		return Info{}, false, err
@@ -1229,7 +1262,32 @@ func updateLocked(op *operation, home, name string, policy Policy, sink io.Write
 	if err != nil {
 		return Info{}, false, err
 	}
-	return Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: machine == name, Warnings: warnings, Surfacing: surfacing}, true, nil
+	return Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: machine == name, Warnings: warnings, Delta: deltaLines, Surfacing: surfacing}, true, nil
+}
+
+// fetchLockedSources refreshes every Git identity in the current closure
+// before resolving an update. A profile's root manifest can remain pinned
+// while one of its existing context, skill, or MCP dependencies publishes a
+// newer candidate; fetching only the root would silently miss that resolved
+// version delta (§9.2).
+func fetchLockedSources(manager *gitManager, lock *contextlock.Lock) error {
+	sources := map[string]bool{}
+	for _, member := range lock.Members {
+		if member.Source != "" {
+			sources[member.Source] = true
+		}
+	}
+	ordered := make([]string, 0, len(sources))
+	for source := range sources {
+		ordered = append(ordered, source)
+	}
+	sort.Strings(ordered)
+	for _, source := range ordered {
+		if err := manager.fetch(source); err != nil {
+			return fmt.Errorf("%s: %v", DiagSourceInvalid, err)
+		}
+	}
+	return nil
 }
 
 // Remove deletes a profile that is current in no scope and an overlay of
@@ -1335,6 +1393,17 @@ func overlayOwner(home, name string) (string, bool, error) {
 // blocking), revocation, and the deterministic detectors — regardless of any
 // enabled flag. An advisory profile install does not exist.
 func auditAndStore(home string, manager *gitManager, result *contextresolve.Result, policy Policy) ([]string, error) {
+	return auditMembers(home, manager, result, policy, true)
+}
+
+// auditCandidates performs the same strict audit without installing candidate
+// entries under the manager home. Updates use it before confirmation and
+// install the entries only after the gate accepts the invocation.
+func auditCandidates(home string, manager *gitManager, result *contextresolve.Result, policy Policy) ([]string, error) {
+	return auditMembers(home, manager, result, policy, false)
+}
+
+func auditMembers(home string, manager *gitManager, result *contextresolve.Result, policy Policy, store bool) ([]string, error) {
 	var warnings []string
 	keys := make([]string, 0, len(result.Members))
 	for key := range result.Members {
@@ -1342,43 +1411,92 @@ func auditAndStore(home string, manager *gitManager, result *contextresolve.Resu
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
-		resolved := result.Members[key]
-		entry, err := manager.ensureEntry(home, resolved)
+		memberWarnings, err := auditMember(home, manager, key, result.Members[key], policy, store)
 		if err != nil {
 			return nil, err
 		}
-		report, err := contextaudit.Detect(packageRoot(entry, resolved.Directory), pinOf(resolved), nil)
-		if err != nil {
-			return nil, err
+		warnings = append(warnings, memberWarnings...)
+	}
+	return warnings, nil
+}
+
+func auditMember(home string, manager *gitManager, key string, resolved contextresolve.Resolved, policy Policy, store bool) ([]string, error) {
+	var entry string
+	cleanup := func() {}
+	var err error
+	if store {
+		entry, err = manager.ensureEntry(home, resolved)
+	} else {
+		entry, cleanup, err = manager.inspectEntry(home, resolved)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer cleanup()
+	root := packageRoot(entry, resolved.Directory)
+	report, err := contextaudit.Detect(root, pinOf(resolved), nil)
+	if err != nil {
+		return nil, err
+	}
+	if report.Blocking() {
+		return nil, fmt.Errorf("%s: member %s carries a blocking %s finding", DiagSourceInvalid, key, contextaudit.ClassSecretMaterial)
+	}
+	gateWarnings, err := strictAuditMember(home, manager, resolved, entry, policy)
+	if err != nil {
+		return nil, fmt.Errorf("%s: member %s %v", DiagSourceInvalid, key, err)
+	}
+	warnings := gateWarnings
+	for _, unmatched := range report.Waivers {
+		if unmatched.Diagnostic == contextaudit.DiagWaiverUnmatched {
+			warnings = append(warnings, unmatched.Diagnostic)
 		}
-		if report.Blocking() {
-			return nil, fmt.Errorf("%s: member %s carries a blocking %s finding", DiagSourceInvalid, key, contextaudit.ClassSecretMaterial)
-		}
-		gateWarnings, err := strictAuditMember(home, manager, resolved, entry, policy)
-		if err != nil {
-			return nil, fmt.Errorf("%s: member %s %v", DiagSourceInvalid, key, err)
-		}
-		warnings = append(warnings, gateWarnings...)
-		for _, unmatched := range report.Waivers {
-			if unmatched.Diagnostic == contextaudit.DiagWaiverUnmatched {
-				warnings = append(warnings, unmatched.Diagnostic)
-			}
-		}
-		if resolved.Kind == contextlock.KindContext {
-			root := packageRoot(entry, resolved.Directory)
-			if manifest, err := contextpkg.LoadManifest(root); err == nil {
-				for _, system := range contextaudit.SystemModules(resolved.Name, manifest) {
-					warnings = append(warnings, contextaudit.ClassSystemModulePresent+": "+system.Package+"/"+system.Path)
-				}
-			}
-		}
-		if resolved.Kind == contextlock.KindMCP {
-			if warning, ok := checkMCPCommand(packageRoot(entry, resolved.Directory)); ok {
-				warnings = append(warnings, warning)
+	}
+	if resolved.Kind == contextlock.KindContext {
+		if manifest, err := contextpkg.LoadManifest(root); err == nil {
+			for _, system := range contextaudit.SystemModules(resolved.Name, manifest) {
+				warnings = append(warnings, contextaudit.ClassSystemModulePresent+": "+system.Package+"/"+system.Path)
 			}
 		}
 	}
+	if resolved.Kind == contextlock.KindMCP {
+		if warning, ok := checkMCPCommand(root); ok {
+			warnings = append(warnings, warning)
+		}
+	}
 	return warnings, nil
+}
+
+func auditNewUpdateMember(home string, manager *gitManager, key string, resolved contextresolve.Resolved, policy Policy) error {
+	entry, cleanup, err := manager.inspectEntry(home, resolved)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+	report, err := contextaudit.Detect(packageRoot(entry, resolved.Directory), pinOf(resolved), nil)
+	if err != nil {
+		return err
+	}
+	if report.Blocking() {
+		return fmt.Errorf("%s: new member %s carries a blocking finding; the old lock stands", DiagUpdateBlocked, key)
+	}
+	if _, err := strictAuditMember(home, manager, resolved, entry, policy); err != nil {
+		return fmt.Errorf("%s: new member %s %v; the old lock stands", DiagUpdateBlocked, key, err)
+	}
+	return nil
+}
+
+func ensureResolvedEntries(home string, manager *gitManager, result *contextresolve.Result) error {
+	keys := make([]string, 0, len(result.Members))
+	for key := range result.Members {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		if _, err := manager.ensureEntry(home, result.Members[key]); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // checkAdmissionPrePublish enforces the §3 error policy before a lock is
@@ -1405,11 +1523,12 @@ func checkAdmissionPrePublish(home string, manager *gitManager, result *contextr
 		if resolved.Kind != contextlock.KindContext {
 			continue
 		}
-		entry, err := manager.ensureEntry(home, resolved)
+		entry, cleanup, err := manager.inspectEntry(home, resolved)
 		if err != nil {
 			return err
 		}
 		manifest, err := contextpkg.LoadManifest(packageRoot(entry, resolved.Directory))
+		cleanup()
 		if err != nil {
 			return fmt.Errorf("%s: member %s manifest cannot be read; system-module admission cannot be decided: %v", DiagSourceInvalid, key, err)
 		}

@@ -1,13 +1,16 @@
 package envprofile
 
 import (
+	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/relux-works/curator/internal/contextlock"
+	"github.com/relux-works/curator/internal/contextresolve"
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
@@ -40,6 +43,262 @@ func provision(t *testing.T, fx *managedFixture, envID string, machine envregist
 	req.Repair = true
 	if _, err := Resolve(req); err != nil {
 		t.Fatalf("provision %s: %v", envID, err)
+	}
+}
+
+func TestStatusSignerPostureUnknownWithoutCachedSource(t *testing.T) {
+	home := t.TempDir()
+	const source = "github.com/example/signed"
+	rows := sourceSignerPosture(StatusRequest{
+		Home: home,
+		Policy: Policy{SourceSigners: map[string][]contextresolve.Signer{
+			source: {{Type: "ssh", Key: "ssh-ed25519 allowed"}},
+		}},
+	}, []Info{{
+		Name: "signed",
+		Lock: &contextlock.Lock{Members: []contextlock.Member{{
+			Kind: contextlock.KindContext, Name: "signed", Source: source, Commit: strings.Repeat("a", 40), Version: "1.0.0",
+		}}},
+	}})
+	if len(rows) != 1 || rows[0].State != "enforced" || rows[0].Signer != "unknown" || !rows[0].Current {
+		t.Fatalf("uncached signer posture = %+v, want enforced/unknown/current", rows)
+	}
+}
+
+func TestStatusSignerPostureReadFailureIsNonCurrent(t *testing.T) {
+	home := t.TempDir()
+	const source = "github.com/example/signed"
+	manager := newGitManager(home)
+	if err := os.MkdirAll(manager.reposDir(), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(manager.repoDir(source), []byte("not a repository directory"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rows := sourceSignerPosture(StatusRequest{
+		Home: home,
+		Policy: Policy{SourceSigners: map[string][]contextresolve.Signer{
+			source: {{Type: "ssh", Key: "ssh-ed25519 allowed"}},
+		}},
+	}, []Info{{
+		Name: "signed",
+		Lock: &contextlock.Lock{Members: []contextlock.Member{{
+			Kind: contextlock.KindContext, Name: "signed", Source: source, Commit: strings.Repeat("a", 40), Version: "1.0.0",
+		}}},
+	}})
+	if len(rows) != 1 || rows[0].State != "enforced" || rows[0].Signer != "unknown" || rows[0].Current {
+		t.Fatalf("unreadable signer posture = %+v, want enforced/unknown/non-current", rows)
+	}
+}
+
+type signerStatusVectorFile struct {
+	PostureCases []struct {
+		Name                 string                             `json:"name"`
+		Allowlists           map[string][]contextresolve.Signer `json:"allowlists"`
+		RequireSourceSigners bool                               `json:"require_source_signers"`
+		Local                map[string]struct {
+			Verdict string `json:"verdict"`
+		} `json:"local"`
+		Expected struct {
+			RequireSourceSigners bool `json:"require_source_signers"`
+			Rows                 []struct {
+				Current bool            `json:"current"`
+				Signer  json.RawMessage `json:"signer"`
+				Source  string          `json:"source"`
+				State   string          `json:"state"`
+			} `json:"rows"`
+		} `json:"expected"`
+	} `json:"posture_cases"`
+}
+
+type confirmationPostureVectorFile struct {
+	Cases []struct {
+		Name     string `json:"name"`
+		Revision string `json:"update_confirmation_revision"`
+		Expected struct {
+			Row struct {
+				Behavior string `json:"behavior"`
+				Revision string `json:"revision"`
+			} `json:"row"`
+		} `json:"expected"`
+	} `json:"confirmation_posture_cases"`
+}
+
+// TestUpdateConfirmationPostureVectorAtStatus binds the shipped revision-B
+// posture to StatusOf; the pinned revision-A row is retained as historical
+// protocol context and the manager reports the current B-flip refusal rule.
+func TestUpdateConfirmationPostureVectorAtStatus(t *testing.T) {
+	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+	if root == "" {
+		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
+	}
+	payload, err := os.ReadFile(filepath.Join(root, "vectors", "environments-source-signers.json")) // #nosec G304 -- explicit conformance root
+	if err != nil {
+		t.Fatal(err)
+	}
+	var vectors confirmationPostureVectorFile
+	if err := json.Unmarshal(payload, &vectors); err != nil {
+		t.Fatal(err)
+	}
+	if len(vectors.Cases) != 2 {
+		t.Fatalf("pinned confirmation-posture case count = %d, want 2", len(vectors.Cases))
+	}
+	var current *confirmationPostureVectorFile
+	for i := range vectors.Cases {
+		if vectors.Cases[i].Revision == "B-flip" {
+			current = &vectors
+		}
+	}
+	if current == nil {
+		t.Fatal("pinned confirmation-posture vectors omit B-flip")
+	}
+	var expected string
+	for _, vector := range current.Cases {
+		if vector.Revision == "B-flip" {
+			expected = vector.Expected.Row.Behavior
+		}
+	}
+	if expected == "" {
+		t.Fatal("pinned B-flip posture has no behavior description")
+	}
+	status, err := StatusOf(StatusRequest{Home: t.TempDir(), Machine: envregistry.DefaultMachineConfig()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.UpdateConfirmationRevision != "B-flip" || status.UpdateConfirmationBehavior != expected {
+		t.Fatalf("update confirmation posture = %s (%s), want B-flip (%s)", status.UpdateConfirmationRevision, status.UpdateConfirmationBehavior, expected)
+	}
+}
+
+// TestSignerPostureVectorsAtStatus drives every rc.13 posture row through
+// StatusOf after installing a real Git profile. It covers verified, absent,
+// failing, unconfigured, and required-missing local signer material.
+func TestSignerPostureVectorsAtStatus(t *testing.T) {
+	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+	if root == "" {
+		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
+	}
+	payload, err := os.ReadFile(filepath.Join(root, "vectors", "environments-source-signers.json")) // #nosec G304 -- explicit conformance root
+	if err != nil {
+		t.Fatal(err)
+	}
+	var vectors signerStatusVectorFile
+	if err := json.Unmarshal(payload, &vectors); err != nil {
+		t.Fatal(err)
+	}
+	if len(vectors.PostureCases) != 5 {
+		t.Fatalf("pinned rc.13 posture case count = %d, want 5", len(vectors.PostureCases))
+	}
+	for _, vector := range vectors.PostureCases {
+		t.Run(vector.Name, func(t *testing.T) {
+			pinHomes(t)
+			home := t.TempDir()
+			privateKey := ""
+			sourceSigners := make(map[string][]contextresolve.Signer, len(vector.Allowlists))
+			for source, signers := range vector.Allowlists {
+				if source != "github.com/example/context" {
+					t.Fatalf("unexpected pinned source %q", source)
+				}
+				sourceSigners[source] = signers
+			}
+			if local := vector.Local["github.com/example/context"]; local.Verdict == "verified" {
+				var allowedKey string
+				privateKey, allowedKey = statusSignerKey(t)
+				sourceSigners["github.com/example/context"] = []contextresolve.Signer{{Type: "ssh", Key: allowedKey + " operator@example"}}
+			}
+			const rawSource = "https://github.com/example/context"
+			repo := statusSignerRepo(t, privateKey)
+			ids := newGitIdentities(t)
+			operand := ids.serve(repo, rawSource)
+			if _, _, _, err := Install(home, InstallOptions{Operand: operand}); err != nil {
+				t.Fatalf("install status fixture: %v", err)
+			}
+			if vector.Local["github.com/example/context"].Verdict == "unknown" {
+				if err := os.RemoveAll(profileReposDir(home)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			status, err := StatusOf(StatusRequest{
+				Home: home, Machine: envregistry.DefaultMachineConfig(),
+				Detect: func(envregistry.Adapter) string { return "unknown" },
+				Policy: Policy{SourceSigners: sourceSigners, RequireSourceSigners: vector.RequireSourceSigners},
+			})
+			if err != nil {
+				t.Fatalf("StatusOf: %v", err)
+			}
+			if status.RequireSourceSigners != vector.Expected.RequireSourceSigners {
+				t.Errorf("require_source_signers = %t, want %t", status.RequireSourceSigners, vector.Expected.RequireSourceSigners)
+			}
+			if len(status.SourceSignerPosture) != len(vector.Expected.Rows) {
+				t.Fatalf("status signer rows = %+v, want %d rows", status.SourceSignerPosture, len(vector.Expected.Rows))
+			}
+			for i, want := range vector.Expected.Rows {
+				got := status.SourceSignerPosture[i]
+				if got.State != want.State || got.Current != want.Current || got.Source != want.Source {
+					t.Errorf("status signer row = %+v, want state=%s current=%t source=%s", got, want.State, want.Current, want.Source)
+				}
+				var wantSigner any
+				if len(want.Signer) > 0 {
+					if err := json.Unmarshal(want.Signer, &wantSigner); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if wantSigner == "unknown" && got.Signer != "unknown" {
+					t.Errorf("signer = %q, want unknown", got.Signer)
+				}
+				if _, ok := wantSigner.(map[string]any); ok && (got.Signer == "" || got.Signer == "unknown") {
+					t.Errorf("signer = %q, want verified signer", got.Signer)
+				}
+			}
+		})
+	}
+}
+
+func statusSignerKey(t *testing.T) (string, string) {
+	t.Helper()
+	private := filepath.Join(t.TempDir(), "signer")
+	if output, err := exec.Command("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", private).CombinedOutput(); err != nil {
+		t.Fatalf("ssh-keygen: %v\n%s", err, output)
+	}
+	output, err := exec.Command("ssh-keygen", "-y", "-f", private).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return private, strings.TrimSpace(string(output))
+}
+
+func statusSignerRepo(t *testing.T, privateKey string) string {
+	t.Helper()
+	repo := t.TempDir()
+	writePackage(t, repo, "signed", "1.0.0", "status\n")
+	gitStatusCommand(t, repo, "init")
+	gitStatusCommand(t, repo, "add", ".")
+	commit := []string{"-c", "user.name=Curator Test", "-c", "user.email=curator@example.test"}
+	tag := []string{"-c", "user.name=Curator Test", "-c", "user.email=curator@example.test"}
+	if privateKey != "" {
+		commit = append(commit, "-c", "gpg.format=ssh", "-c", "user.signingkey="+privateKey)
+		tag = append(tag, "-c", "gpg.format=ssh", "-c", "user.signingkey="+privateKey)
+	}
+	commit = append(commit, "commit")
+	if privateKey != "" {
+		commit = append(commit, "-S")
+	}
+	commit = append(commit, "-m", "release")
+	gitStatusCommand(t, repo, commit...)
+	tag = append(tag, "tag")
+	if privateKey != "" {
+		tag = append(tag, "-s", "-m", "release")
+	}
+	tag = append(tag, "v1.0.0")
+	gitStatusCommand(t, repo, tag...)
+	return repo
+}
+
+func gitStatusCommand(t *testing.T, repo string, args ...string) {
+	t.Helper()
+	command := exec.Command("git", append([]string{"-C", repo}, args...)...)
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, output)
 	}
 }
 

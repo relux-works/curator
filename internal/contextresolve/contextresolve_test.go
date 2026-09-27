@@ -1,6 +1,7 @@
 package contextresolve
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -13,6 +14,16 @@ import (
 type stubSource struct {
 	commits   map[string]string
 	manifests map[string]*Package
+}
+
+type signerStubSource struct {
+	*stubSource
+	evidence  CandidateSignatures
+	verifyErr error
+}
+
+func (s *signerStubSource) VerifyCandidate(_, _, _, _, _ string, _ []Signer) (CandidateSignatures, error) {
+	return s.evidence, s.verifyErr
 }
 
 func (s *stubSource) Identity(_ string, name, declared string) (string, error) {
@@ -91,6 +102,85 @@ func TestMinimalResolution(t *testing.T) {
 	}
 	if len(result.Members) != 2 {
 		t.Fatalf("members %+v", result.Members)
+	}
+}
+
+// TestResolveRejectsValidSignatureFromUnlistedSigner narrows the resolver's
+// authorization check: valid cryptographic evidence is insufficient unless
+// the signer's identity appears in the source allowlist.
+func TestResolveRejectsValidSignatureFromUnlistedSigner(t *testing.T) {
+	commit := strings.Repeat("1", 40)
+	source := &signerStubSource{
+		stubSource: &stubSource{
+			commits:   map[string]string{"root@v1.0.0": commit},
+			manifests: map[string]*Package{commit: {Version: "1.0.0"}},
+		},
+		evidence: CandidateSignatures{Tag: SignatureEvidence{
+			Present: true, Valid: true, Signer: Signer{Type: "ssh", Key: "ssh-ed25519 unlisted"},
+		}},
+	}
+	_, err := Resolve(source, Input{
+		Root: Requirement{Name: "root", Source: "https://example.com/root", Tag: "v1.0.0"},
+		SourceSigners: map[string][]Signer{
+			"https://example.com/root": {{Type: "ssh", Key: "ssh-ed25519 allowed"}},
+		},
+	})
+	resolutionErr := resolveError(t, err)
+	if resolutionErr.Diagnostic != DiagSourceSignerRejected {
+		t.Fatalf("diagnostic = %q, want %q", resolutionErr.Diagnostic, DiagSourceSignerRejected)
+	}
+	if !strings.Contains(resolutionErr.Detail, "ssh-ed25519 SHA256:") {
+		t.Fatalf("rejection does not identify claimed signer: %q", resolutionErr.Detail)
+	}
+}
+
+func TestResolveAcceptsAllowedSignatureWhenOtherVerificationErrors(t *testing.T) {
+	commit := strings.Repeat("1", 40)
+	allowed := Signer{Type: "ssh", Key: "ssh-ed25519 second-allowed"}
+	firstAllowed := Signer{Type: "ssh", Key: "ssh-ed25519 first-allowed"}
+	source := &signerStubSource{
+		stubSource: &stubSource{
+			commits:   map[string]string{"root@v1.0.0": commit},
+			manifests: map[string]*Package{commit: {Version: "1.0.0"}},
+		},
+		evidence:  CandidateSignatures{Commit: SignatureEvidence{Present: true, Valid: true, Signer: allowed}},
+		verifyErr: errors.New("tag signature verification unavailable"),
+	}
+	result, err := Resolve(source, Input{
+		Root:          Requirement{Name: "root", Source: "https://example.com/root", Tag: "v1.0.0"},
+		SourceSigners: map[string][]Signer{"https://example.com/root": {firstAllowed, allowed}},
+	})
+	if err != nil {
+		t.Fatalf("Resolve rejected an allowed commit signature after tag verification failed: %v", err)
+	}
+	if result == nil || result.Lock == nil {
+		t.Fatal("accepted signature did not produce a resolved lock")
+	}
+}
+
+func TestResolveMatchesUnpaddedAllowlistToPaddedVerifiedSSHKey(t *testing.T) {
+	const material = "AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2A5GK"
+	commit := strings.Repeat("1", 40)
+	source := &signerStubSource{
+		stubSource: &stubSource{
+			commits:   map[string]string{"root@v1.0.0": commit},
+			manifests: map[string]*Package{commit: {Version: "1.0.0"}},
+		},
+		evidence: CandidateSignatures{Tag: SignatureEvidence{
+			Present: true, Valid: true, Signer: Signer{Type: "ssh", Key: "ssh-ed25519 " + material + "== verified-comment"},
+		}},
+	}
+	result, err := Resolve(source, Input{
+		Root: Requirement{Name: "root", Source: "https://example.com/root", Tag: "v1.0.0"},
+		SourceSigners: map[string][]Signer{
+			"https://example.com/root": {{Type: "ssh", Key: "ssh-ed25519 " + material + " configured-comment"}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Resolve rejected equal SSH key material with different padding/comments: %v", err)
+	}
+	if result == nil || result.Lock == nil {
+		t.Fatal("accepted signature did not produce a resolved lock")
 	}
 }
 

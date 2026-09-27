@@ -8,6 +8,30 @@ import (
 // Production entry points under test: Validate, Sort, Canonical, Hash,
 // HashBytes, Parse, Read, Write.
 
+func TestResolvedDeltaUsesProtocolOrderAndGrammar(t *testing.T) {
+	oldLock := &Lock{Members: []Member{
+		{Kind: KindSkill, Name: "removed", Commit: strings.Repeat("c", 40)},
+		{Kind: KindContext, Name: "root", Version: "1.0.0", Commit: strings.Repeat("a", 40)},
+	}}
+	newLock := &Lock{Members: []Member{
+		{Kind: KindMCP, Name: "tool", Version: "1.2.0", Commit: strings.Repeat("d", 40)},
+		{Kind: KindContext, Name: "root", Version: "1.1.0", Commit: strings.Repeat("b", 40)},
+	}}
+	deltas := ResolvedDelta(oldLock, newLock)
+	var lines []string
+	for _, delta := range deltas {
+		lines = append(lines, delta.Line())
+	}
+	want := []string{
+		"lock-delta moved context root 1.0.0 → 1.1.0 commit:" + strings.Repeat("a", 40) + " → commit:" + strings.Repeat("b", 40),
+		"lock-delta added mcp tool 1.2.0 commit:" + strings.Repeat("d", 40),
+		"lock-delta removed skill removed - commit:" + strings.Repeat("c", 40),
+	}
+	if strings.Join(lines, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("delta lines = %#v, want %#v", lines, want)
+	}
+}
+
 func testLock() *Lock {
 	return &Lock{Root: "root", Members: []Member{
 		{Kind: KindSkill, Name: "s", Commit: strings.Repeat("a", 40), Source: "https://example.com/s", Weight: 1, RequiredBy: []string{"root"}},

@@ -23,6 +23,19 @@ func printEnvStatus(stdout io.Writer, status *envprofile.Status) {
 		}
 		_, _ = fmt.Fprintf(stdout, "require_current_profile: %s (%s)\n", *status.RequireCurrentProfile, locked)
 	}
+	_, _ = fmt.Fprintf(stdout, "require_source_signers: %t\n", status.RequireSourceSigners)
+	_, _ = fmt.Fprintf(stdout, "update_confirmation: %s (%s)\n", status.UpdateConfirmationRevision, status.UpdateConfirmationBehavior)
+	for _, row := range status.SourceSignerPosture {
+		state := row.State
+		if row.State == "enforced" {
+			state += " (" + row.Signer + ")"
+		}
+		current := "current"
+		if !row.Current {
+			current = "non-current"
+		}
+		_, _ = fmt.Fprintf(stdout, "source_signers profile %s %s %s %s: %s, %s\n", row.Profile, row.Kind, row.Name, row.Source, state, current)
+	}
 	for _, warning := range status.ShellHookTrustWarnings {
 		_, _ = fmt.Fprintf(stdout, "shell-hook-trust: warning: %s\n", warning)
 	}

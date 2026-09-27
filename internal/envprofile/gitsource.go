@@ -1,6 +1,9 @@
 package envprofile
 
 import (
+	"encoding/base64"
+	"encoding/binary"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,6 +18,7 @@ import (
 	"github.com/relux-works/curator/internal/gitops"
 	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/pkgversion"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // gitManager is the contextresolve.Source over the profile git cache and
@@ -269,6 +273,234 @@ func (m *gitManager) Manifest(kind, name, source, directory, commit string) (*co
 	}
 }
 
+// VerifyCandidate verifies the selected tag signature and peeled commit
+// signature against the configured source signer list. The resolver makes
+// the authorization decision from the returned signer identity; Git's
+// verification result alone never admits a candidate.
+func (m *gitManager) VerifyCandidate(_, _, source, tag, commit string, allowed []contextresolve.Signer) (contextresolve.CandidateSignatures, error) {
+	dir, err := m.ensureRepo(source)
+	if err != nil {
+		return contextresolve.CandidateSignatures{}, err
+	}
+	return m.verifyCandidateInRepo(dir, tag, commit, allowed)
+}
+
+// VerifyCandidateLocal verifies a locked candidate only when its source is
+// already cached. It never clones or fetches, so status remains read-only.
+func (m *gitManager) VerifyCandidateLocal(source, tag, commit string, allowed []contextresolve.Signer) (contextresolve.CandidateSignatures, bool, error) {
+	dir := m.repoDir(source)
+	metadata, err := stateread.Stat(dir)
+	if err != nil {
+		return contextresolve.CandidateSignatures{}, false, err
+	}
+	switch metadata.Kind {
+	case stateread.KindAbsent:
+		return contextresolve.CandidateSignatures{}, false, nil
+	case stateread.KindPresent:
+		if metadata.Info == nil {
+			return contextresolve.CandidateSignatures{}, false, stateread.UnusableError(dir, fmt.Errorf("cached source has no metadata"))
+		}
+		if !metadata.Info.IsDir() {
+			return contextresolve.CandidateSignatures{}, false, stateread.UnusableError(dir, fmt.Errorf("cached source is not a directory"))
+		}
+	default:
+		return contextresolve.CandidateSignatures{}, false, stateread.UnusableError(dir, fmt.Errorf("unknown cached source state %q", metadata.Kind))
+	}
+	evidence, err := m.verifyCandidateInRepo(dir, tag, commit, allowed)
+	return evidence, true, err
+}
+
+func (m *gitManager) verifyCandidateInRepo(dir, tag, commit string, allowed []contextresolve.Signer) (contextresolve.CandidateSignatures, error) {
+	var result contextresolve.CandidateSignatures
+	var tagErr, commitErr error
+	if tag != "" {
+		result.Tag, tagErr = m.verifyObjectSignature(dir, "tag", tag, allowed)
+	}
+	result.Commit, commitErr = m.verifyObjectSignature(dir, "commit", commit, allowed)
+	return result, errors.Join(tagErr, commitErr)
+}
+
+func (m *gitManager) verifyObjectSignature(dir, objectType, object string, allowed []contextresolve.Signer) (contextresolve.SignatureEvidence, error) {
+	show := exec.Command("git", "-C", dir, "cat-file", "-p", object) // #nosec G204 -- object comes from the verified local object database
+	payload, err := show.Output()
+	if err != nil {
+		return contextresolve.SignatureEvidence{}, fmt.Errorf("read %s signature: %w", objectType, err)
+	}
+	if !hasGitSignature(objectType, payload) {
+		return contextresolve.SignatureEvidence{}, nil
+	}
+	evidence := contextresolve.SignatureEvidence{Present: true}
+	signatureType := ""
+	switch {
+	case strings.Contains(string(payload), "-----BEGIN SSH SIGNATURE-----"):
+		signatureType = "ssh"
+	case strings.Contains(string(payload), "-----BEGIN PGP SIGNATURE-----"):
+		signatureType = "gpg"
+	default:
+		return evidence, nil
+	}
+	if signatureType == "ssh" {
+		if key, err := sshPublicKeyFromSignature(payload); err == nil {
+			evidence.Signer = contextresolve.Signer{Type: "ssh", Key: key}
+		}
+		if _, err := exec.LookPath("ssh-keygen"); err != nil {
+			return evidence, fmt.Errorf("SSH signature verification is unavailable: %w", err)
+		}
+		for _, signer := range allowed {
+			if signer.Type != "ssh" {
+				continue
+			}
+			fields := strings.Fields(signer.Key)
+			if len(fields) < 2 {
+				continue
+			}
+			tempDir, err := os.MkdirTemp("", "curator-allowed-signers-*")
+			if err != nil {
+				return evidence, err
+			}
+			allowedFile := filepath.Join(tempDir, "allowed_signers")
+			principal := gitSignaturePrincipal(objectType, payload)
+			if principal == "" {
+				principal = "curator"
+			}
+			writeErr := os.WriteFile(allowedFile, []byte(principal+" "+fields[0]+" "+fields[1]+"\n"), 0o600)
+			if writeErr != nil {
+				_ = os.RemoveAll(tempDir)
+				return evidence, writeErr
+			}
+			args := []string{"-C", dir, "-c", "gpg.format=ssh", "-c", "gpg.ssh.allowedSignersFile=" + allowedFile}
+			command := "verify-commit"
+			if objectType == "tag" {
+				command = "verify-tag"
+			}
+			args = append(args, command, "--raw", object)
+			verify := exec.Command("git", args...) // #nosec G204 -- object is a selected tag or peeled commit from the local repository
+			verifyOutput, verifyErr := verify.CombinedOutput()
+			_ = os.RemoveAll(tempDir)
+			if verifyErr == nil {
+				evidence.Valid = true
+				evidence.Signer = signer
+				return evidence, nil
+			}
+			_ = verifyOutput
+		}
+		return evidence, nil
+	}
+	if _, err := exec.LookPath("gpg"); err != nil {
+		return evidence, fmt.Errorf("OpenPGP signature verification is unavailable: %w", err)
+	}
+	args := []string{"-C", dir, "-c", "gpg.format=openpgp"}
+	command := "verify-commit"
+	if objectType == "tag" {
+		command = "verify-tag"
+	}
+	args = append(args, command, "--raw", object)
+	verify := exec.Command("git", args...) // #nosec G204 -- object is a selected tag or peeled commit from the local repository
+	verifyOutput, verifyErr := verify.CombinedOutput()
+	for _, line := range strings.Split(string(verifyOutput), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 3 || fields[0] != "[GNUPG:]" {
+			continue
+		}
+		switch fields[1] {
+		case "VALIDSIG":
+			evidence.Valid = verifyErr == nil
+			evidence.Signer = contextresolve.Signer{Type: "gpg", Fingerprint: fields[2]}
+			return evidence, nil
+		case "BADSIG", "ERRSIG":
+			evidence.Signer = contextresolve.Signer{Type: "gpg", Fingerprint: fields[2]}
+		}
+	}
+	return evidence, nil
+}
+
+func sshPublicKeyFromSignature(payload []byte) (string, error) {
+	const begin = "-----BEGIN SSH SIGNATURE-----"
+	const end = "-----END SSH SIGNATURE-----"
+	text := string(payload)
+	start := strings.Index(text, begin)
+	if start < 0 {
+		return "", fmt.Errorf("SSH signature armor is absent")
+	}
+	start += len(begin)
+	endAt := strings.Index(text[start:], end)
+	if endAt < 0 {
+		return "", fmt.Errorf("SSH signature armor is incomplete")
+	}
+	encoded := strings.Join(strings.Fields(text[start:start+endAt]), "")
+	decoded, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return "", err
+	}
+	if len(decoded) < 6 || string(decoded[:6]) != "SSHSIG" {
+		return "", fmt.Errorf("SSH signature payload has no SSHSIG header")
+	}
+	offset := 6
+	readString := func() ([]byte, error) {
+		if offset+4 > len(decoded) {
+			return nil, fmt.Errorf("SSH signature string header is truncated")
+		}
+		length := int(binary.BigEndian.Uint32(decoded[offset : offset+4]))
+		offset += 4
+		if length < 0 || offset+length > len(decoded) {
+			return nil, fmt.Errorf("SSH signature string length is invalid")
+		}
+		value := decoded[offset : offset+length]
+		offset += length
+		return value, nil
+	}
+	version, err := readString()
+	if err != nil || string(version) != "1" {
+		return "", fmt.Errorf("SSH signature version is unsupported")
+	}
+	keyBlob, err := readString()
+	if err != nil {
+		return "", err
+	}
+	if len(keyBlob) < 4 {
+		return "", fmt.Errorf("SSH signature public key is truncated")
+	}
+	keyTypeLength := int(binary.BigEndian.Uint32(keyBlob[:4]))
+	if keyTypeLength == 0 || 4+keyTypeLength > len(keyBlob) {
+		return "", fmt.Errorf("SSH signature public key type is invalid")
+	}
+	keyType := string(keyBlob[4 : 4+keyTypeLength])
+	return keyType + " " + base64.StdEncoding.EncodeToString(keyBlob), nil
+}
+
+func hasGitSignature(objectType string, payload []byte) bool {
+	text := string(payload)
+	if objectType == "commit" {
+		header, _, _ := strings.Cut(text, "\n\n")
+		for _, line := range strings.Split(header, "\n") {
+			if strings.HasPrefix(line, "gpgsig ") || strings.HasPrefix(line, "gpgsig-sha256 ") {
+				return true
+			}
+		}
+		return false
+	}
+	return strings.Contains(text, "-----BEGIN SSH SIGNATURE-----") || strings.Contains(text, "-----BEGIN PGP SIGNATURE-----")
+}
+
+func gitSignaturePrincipal(objectType string, payload []byte) string {
+	header, _, _ := strings.Cut(string(payload), "\n\n")
+	prefix := "committer "
+	if objectType == "tag" {
+		prefix = "tagger "
+	}
+	for _, line := range strings.Split(header, "\n") {
+		if !strings.HasPrefix(line, prefix) {
+			continue
+		}
+		open := strings.LastIndexByte(line, '<')
+		closeIndex := strings.LastIndexByte(line, '>')
+		if open >= 0 && closeIndex > open+1 {
+			return line[open+1 : closeIndex]
+		}
+	}
+	return ""
+}
+
 // rootInput builds the resolution input for a fresh git install: it fetches
 // the source, reads the root manifest at the required ref, and declares the
 // root requirement under its canonical source identity. A malformed network
@@ -422,6 +654,61 @@ func (m *gitManager) ensureEntry(home string, resolved contextresolve.Resolved) 
 		return contextstore.EnsureGit(home, resolved.Kind, resolved.Name, m.repoDir(resolved.Source), resolved.Commit)
 	}
 	return contextstore.EntryDir(home, resolved.Kind, resolved.Name, resolved.StateHash), nil
+}
+
+// inspectEntry returns an existing store entry or extracts a Git candidate to
+// a temporary directory. It never creates manager-home state, so a refused
+// update can audit and surface a candidate without installing its snapshot.
+func (m *gitManager) inspectEntry(home string, resolved contextresolve.Resolved) (string, func(), error) {
+	entry := m.entryPath(home, resolved)
+	metadata, err := stateread.Stat(entry)
+	if err != nil {
+		return "", func() {}, err
+	}
+	switch metadata.Kind {
+	case stateread.KindPresent:
+		if metadata.Info == nil {
+			return "", func() {}, stateread.UnusableError(entry, fmt.Errorf("context store entry has no metadata"))
+		}
+		if !metadata.Info.IsDir() {
+			return "", func() {}, stateread.UnusableError(entry, fmt.Errorf("context store entry is not a directory"))
+		}
+		return entry, func() {}, nil
+	case stateread.KindAbsent:
+		// Only proven absence permits an immutable Git snapshot fallback.
+	default:
+		return "", func() {}, stateread.UnusableError(entry, fmt.Errorf("unknown context store state %q", metadata.Kind))
+	}
+	if resolved.Commit == "" {
+		return entry, func() {}, nil
+	}
+	repo := m.repoDir(resolved.Source)
+	repoMetadata, err := stateread.Stat(repo)
+	if err != nil {
+		return "", func() {}, fmt.Errorf("cached source for %s is unavailable: %w", resolved.Name, err)
+	}
+	switch repoMetadata.Kind {
+	case stateread.KindAbsent:
+		return "", func() {}, fmt.Errorf("cached source for %s is unavailable: %w", resolved.Name, stateread.AbsentError(repo))
+	case stateread.KindPresent:
+		if repoMetadata.Info == nil {
+			return "", func() {}, stateread.UnusableError(repo, fmt.Errorf("cached source has no metadata"))
+		}
+		if !repoMetadata.Info.IsDir() {
+			return "", func() {}, stateread.UnusableError(repo, fmt.Errorf("cached source is not a directory"))
+		}
+	default:
+		return "", func() {}, stateread.UnusableError(repo, fmt.Errorf("unknown cached source state %q", repoMetadata.Kind))
+	}
+	snapshot, err := os.MkdirTemp("", "curator-profile-inspect-*")
+	if err != nil {
+		return "", func() {}, err
+	}
+	if err := gitops.Extract(repo, resolved.Commit, snapshot); err != nil {
+		_ = os.RemoveAll(snapshot)
+		return "", func() {}, err
+	}
+	return snapshot, func() { _ = os.RemoveAll(snapshot) }, nil
 }
 
 // packageOf maps a validated context manifest onto the resolution package.

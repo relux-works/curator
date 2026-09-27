@@ -18,6 +18,8 @@ func TestPolicyFromConfigCarriesEnvGates(t *testing.T) {
 		"schema_version": float64(2), "skills_root": "x", "projects": map[string]any{},
 		"environments": map[string]any{
 			"mcp_package_allowlist":   []any{"https://example.com/m"},
+			"source_signers":          map[string]any{"example.com/empty": []any{}},
+			"require_source_signers":  true,
 			"overlays_allowed":        false,
 			"overlay_default_weight":  float64(500),
 			"precedence":              map[string]any{"winner": "lower-weight", "placement": "winner-first"},
@@ -34,6 +36,9 @@ func TestPolicyFromConfigCarriesEnvGates(t *testing.T) {
 	policy := PolicyFromConfig(cfg)
 	if len(policy.MCPAllowlist) != 1 || policy.MCPAllowlist[0] != "https://example.com/m" {
 		t.Fatalf("MCP allowlist = %v", policy.MCPAllowlist)
+	}
+	if allowed, configured := policy.SourceSigners["example.com/empty"]; !configured || allowed == nil || len(allowed) != 0 || !policy.RequireSourceSigners {
+		t.Fatalf("empty signer allowlist/require posture = present:%t allow:%v required:%t", configured, allowed, policy.RequireSourceSigners)
 	}
 	if !policy.ForbidsOverlays() {
 		t.Fatalf("overlays_allowed=false must forbid overlays")

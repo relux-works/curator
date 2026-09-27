@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -21,6 +22,7 @@ import (
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextmaterialize"
 	"github.com/relux-works/curator/internal/contextpkg"
+	"github.com/relux-works/curator/internal/contextresolve"
 	"github.com/relux-works/curator/internal/envfragment"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
@@ -177,6 +179,18 @@ type ProviderState struct {
 	UnreadableDirectory *string  `json:"unreadable_directory,omitempty"`
 }
 
+// SourceSignerPosture reports the verification state for one locked Git
+// member's source (environments §12).
+type SourceSignerPosture struct {
+	Profile string `json:"profile"`
+	Kind    string `json:"kind"`
+	Name    string `json:"name"`
+	Source  string `json:"source"`
+	State   string `json:"state"`
+	Signer  string `json:"signer"`
+	Current bool   `json:"current"`
+}
+
 // DeclarationScope repeats the §2.3 surfacing rows for the current
 // profile of one reported scope, in row order without the LF.
 type DeclarationScope struct {
@@ -243,6 +257,14 @@ type Status struct {
 	// and the verified-boundary posture. It is attached by the CLI because the
 	// CLI owns configured registry trust anchors.
 	RegistryPosture []registry.BoundaryPosture `json:"registry_posture"`
+	// RequireSourceSigners reports the effective machine value (§12.1).
+	RequireSourceSigners bool `json:"require_source_signers"`
+	// SourceSignerPosture re-verifies locked Git pins from local source state
+	// without fetching (§12).
+	SourceSignerPosture []SourceSignerPosture `json:"source_signers"`
+	// UpdateConfirmation reports the shipped section 9.2 behavior.
+	UpdateConfirmationRevision string `json:"update_confirmation_revision"`
+	UpdateConfirmationBehavior string `json:"update_confirmation_behavior"`
 }
 
 // StatusRequest scopes one status computation. The seams mirror
@@ -301,6 +323,9 @@ func StatusOf(req StatusRequest) (*Status, error) {
 		status.RequireCurrentProfile = &value
 		status.RequireCurrentLocked = req.Policy.RequireCurrentLocked
 	}
+	status.RequireSourceSigners = req.Policy.RequireSourceSigners
+	status.UpdateConfirmationRevision = "B-flip"
+	status.UpdateConfirmationBehavior = "a triggered update delta refuses profile_update_confirmation_required unless --confirm-system-delta is given"
 	infos, err := statusProfiles(req.Home)
 	if err != nil {
 		return nil, err
@@ -331,6 +356,12 @@ func StatusOf(req StatusRequest) (*Status, error) {
 		return nil, err
 	}
 	status.Diagnostics = append(status.Diagnostics, profileDiagnostics...)
+	status.SourceSignerPosture = sourceSignerPosture(req, infos)
+	for _, row := range status.SourceSignerPosture {
+		if row.State == "enforced" && !row.Current {
+			status.NonCurrent = true
+		}
+	}
 	status.UnregisteredEnvironments = unregisteredEnvironments(req.Machine)
 	var orphanDiagnostics []StateDiagnostic
 	status.Orphans, orphanDiagnostics = orphanHomes(req.Home, installed)
@@ -415,10 +446,91 @@ func statusProfiles(home string) ([]Info, error) {
 		if err == nil {
 			info.Source = source
 		}
+		if lock, _, lockErr := readLock(home, entry.Name()); lockErr == nil {
+			info.Lock = lock
+		}
 		infos = append(infos, info)
 	}
 	sort.Slice(infos, func(i, j int) bool { return infos[i].Name < infos[j].Name })
 	return infos, nil
+}
+
+func sourceSignerPosture(req StatusRequest, infos []Info) []SourceSignerPosture {
+	manager := newGitManager(req.Home).withPolicy(req.Policy)
+	var rows []SourceSignerPosture
+	for _, info := range infos {
+		if info.Lock == nil {
+			continue
+		}
+		for _, member := range info.Lock.Members {
+			if member.Source == "" {
+				continue
+			}
+			row := SourceSignerPosture{
+				Profile: info.Name, Kind: member.Kind, Name: member.Name,
+				Source: member.Source, Signer: "unknown", Current: true,
+			}
+			allowed, configured := req.Policy.SourceSigners[member.Source]
+			if !configured {
+				if req.Policy.RequireSourceSigners {
+					row.State = "required-missing"
+				} else {
+					row.State = "unconfigured"
+				}
+				rows = append(rows, row)
+				continue
+			}
+			row.State = "enforced"
+			tag := lockedMemberTag(manager.repoDir(member.Source), member)
+			evidence, available, verifyErr := manager.VerifyCandidateLocal(member.Source, tag, member.Commit, allowed)
+			if signer, ok := verifiedAllowedSigner(evidence, allowed); ok {
+				row.Signer = contextresolve.FormatSigner(signer)
+				rows = append(rows, row)
+				continue
+			}
+			if !available && verifyErr == nil {
+				// §12 distinguishes a pin that cannot be reverified because
+				// local material is absent from a pin that fails verification.
+				// Unknown signer material is not evidence of drift; expose the
+				// unknown posture while keeping the recorded pin current.
+				rows = append(rows, row)
+				continue
+			}
+			row.Current = false
+			rows = append(rows, row)
+		}
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].Profile != rows[j].Profile {
+			return rows[i].Profile < rows[j].Profile
+		}
+		if rows[i].Kind != rows[j].Kind {
+			return rows[i].Kind < rows[j].Kind
+		}
+		return rows[i].Name < rows[j].Name
+	})
+	return rows
+}
+
+func lockedMemberTag(repo string, member contextlock.Member) string {
+	if member.Version == "" {
+		return ""
+	}
+	tag := "v" + member.Version
+	output, err := exec.Command("git", "-C", repo, "rev-parse", "--verify", "refs/tags/"+tag+"^{commit}").Output() // #nosec G204 -- version is validated in the lock schema
+	if err != nil || strings.TrimSpace(string(output)) != member.Commit {
+		return ""
+	}
+	return tag
+}
+
+func verifiedAllowedSigner(evidence contextresolve.CandidateSignatures, allowed []contextresolve.Signer) (contextresolve.Signer, bool) {
+	for _, signature := range []contextresolve.SignatureEvidence{evidence.Tag, evidence.Commit} {
+		if signature.Present && signature.Valid && contextresolve.IsAllowedSigner(signature.Signer, allowed) {
+			return signature.Signer, true
+		}
+	}
+	return contextresolve.Signer{}, false
 }
 
 // trustProjectCandidates returns the two hook-sourced env files of the

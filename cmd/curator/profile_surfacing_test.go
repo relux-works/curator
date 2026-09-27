@@ -139,7 +139,7 @@ func TestProfileUpdateListsNewDeclaration(t *testing.T) {
 	writeGitRepoFile(t, root, "agent-context.json", `{"schema_version": 1, "name": "grows", "version": "1.0.1",`+
 		`"requires": {"mcp": {"tool": {"git": "https://example.com/mcp-tool", "range": "*"}}}}`+"\n")
 	commitGitRepo(t, root, "v1.0.1")
-	code, stdout, stderr := runProfile(t, source, "profile", "update", "grows")
+	code, stdout, stderr := runProfile(t, source, "profile", "update", "grows", "--confirm-system-delta")
 	if code != exitOK {
 		t.Fatalf("update = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 	}
@@ -284,7 +284,7 @@ func TestProfileUpdateSurfacesBeforePublication(t *testing.T) {
 	commitGitRepo(t, root, "v1.0.1")
 	writer := &updatePublicationWriter{lock: lock, old: oldBytes}
 	var stderr strings.Builder
-	code := run([]string{"profile", "update", "grows"}, source, writer, &stderr)
+	code := run([]string{"profile", "update", "grows", "--confirm-system-delta"}, source, writer, &stderr)
 	stdout := writer.buffer.String()
 	if !writer.observed {
 		t.Fatal("no mcp-declaration row reached stdout")

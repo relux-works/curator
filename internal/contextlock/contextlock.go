@@ -71,6 +71,101 @@ type Lock struct {
 	Members []Member
 }
 
+// Delta is one resolved-version change between two locks. Exactly one of
+// Old or New is nil for an addition or removal; both are set for a move.
+type Delta struct {
+	Old *Member
+	New *Member
+}
+
+// ResolvedDelta compares locks by (kind, name), reporting additions,
+// removals, and members whose resolved version or pin changed, in the
+// protocol's bytewise member order (§9.2).
+func ResolvedDelta(oldLock, newLock *Lock) []Delta {
+	oldMembers := make(map[string]Member, len(oldLock.Members))
+	newMembers := make(map[string]Member, len(newLock.Members))
+	for _, member := range oldLock.Members {
+		oldMembers[memberKey(member)] = member
+	}
+	for _, member := range newLock.Members {
+		newMembers[memberKey(member)] = member
+	}
+	keys := make([]string, 0, len(oldMembers)+len(newMembers))
+	for key := range oldMembers {
+		keys = append(keys, key)
+	}
+	for key := range newMembers {
+		if _, exists := oldMembers[key]; !exists {
+			keys = append(keys, key)
+		}
+	}
+	memberForKey := func(key string) Member {
+		if member, exists := oldMembers[key]; exists {
+			return member
+		}
+		return newMembers[key]
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		a, b := memberForKey(keys[i]), memberForKey(keys[j])
+		if a.Kind != b.Kind {
+			return a.Kind < b.Kind
+		}
+		return a.Name < b.Name
+	})
+	deltas := make([]Delta, 0, len(keys))
+	for _, key := range keys {
+		oldMember, hadOld := oldMembers[key]
+		newMember, hasNew := newMembers[key]
+		switch {
+		case !hadOld:
+			copyMember := newMember
+			deltas = append(deltas, Delta{New: &copyMember})
+		case !hasNew:
+			copyMember := oldMember
+			deltas = append(deltas, Delta{Old: &copyMember})
+		case oldMember.Version != newMember.Version || deltaMemberPin(oldMember) != deltaMemberPin(newMember):
+			oldCopy, newCopy := oldMember, newMember
+			deltas = append(deltas, Delta{Old: &oldCopy, New: &newCopy})
+		}
+	}
+	return deltas
+}
+
+// Line renders one resolved-version delta in the closed environments §9.2
+// grammar.
+func (delta Delta) Line() string {
+	if delta.Old == nil && delta.New == nil {
+		return ""
+	}
+	if delta.Old == nil {
+		member := *delta.New
+		return fmt.Sprintf("lock-delta added %s %s %s %s", member.Kind, member.Name, deltaMemberVersion(member), deltaMemberPin(member))
+	}
+	if delta.New == nil {
+		member := *delta.Old
+		return fmt.Sprintf("lock-delta removed %s %s %s %s", member.Kind, member.Name, deltaMemberVersion(member), deltaMemberPin(member))
+	}
+	oldMember, newMember := *delta.Old, *delta.New
+	return fmt.Sprintf("lock-delta moved %s %s %s → %s %s → %s", newMember.Kind, newMember.Name,
+		deltaMemberVersion(oldMember), deltaMemberVersion(newMember), deltaMemberPin(oldMember), deltaMemberPin(newMember))
+}
+
+func memberKey(member Member) string { return member.Kind + "\x00" + member.Name }
+
+func deltaMemberVersion(member Member) string {
+	if member.Version == "" {
+		return "-"
+	}
+	return member.Version
+}
+
+func deltaMemberPin(member Member) string {
+	if member.Commit != "" {
+		return "commit:" + member.Commit
+	}
+	return "state:" + member.StateHash
+}
+
 // Find returns the member of the given kind and name.
 func (lock *Lock) Find(kind, name string) (Member, bool) {
 	for _, member := range lock.Members {

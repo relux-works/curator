@@ -65,6 +65,8 @@ var LockableKeys = map[string]bool{
 	"environments.transitive_system_modules": true,
 	"environments.provider_directories":      true,
 	"environments.permissions":               true,
+	"environments.source_signers":            true,
+	"environments.require_source_signers":    true,
 }
 
 var (
@@ -381,6 +383,13 @@ func applySystem(systemData, userData map[string]any, systemPath string, warn fu
 		if _, err := parseSystemEnvironments(rawEnv); err != nil {
 			return nil, nil, fmt.Errorf("%v (system config %s)", err, systemPath)
 		}
+		if locked["environments.require_source_signers"] {
+			systemEnv, _ := rawEnv.(map[string]any)
+			required, ok := systemEnv["require_source_signers"].(bool)
+			if !ok || !required {
+				return nil, nil, verr.New("environments.require_source_signers", "a system file locks require_source_signers only toward true")
+			}
+		}
 	}
 	merged := map[string]any{}
 	for key, value := range userData {
@@ -447,6 +456,29 @@ func mergeSystemEnvironments(systemData, userData map[string]any, locked map[str
 	for knob, value := range systemEnv {
 		full := "environments." + knob
 		if locked[full] {
+			if knob == "source_signers" {
+				systemSigners, _ := value.(map[string]any)
+				userRaw, userPresent := userEnv[knob]
+				userSigners, userMap := userRaw.(map[string]any)
+				if userPresent && !userMap {
+					// Keep a malformed machine value visible to the effective
+					// parser. Per-source policy cannot safely merge it.
+					merged[knob] = userRaw
+					continue
+				}
+				mergedSigners := map[string]any{}
+				for source, allowlist := range userSigners {
+					mergedSigners[source] = allowlist
+				}
+				for source, allowlist := range systemSigners {
+					if userAllowlist, present := userSigners[source]; present && !jsonEqual(userAllowlist, allowlist) && warn != nil {
+						warn(fmt.Sprintf("config key %q is locked by %s; the user override is ignored", full+"."+source, systemPath))
+					}
+					mergedSigners[source] = allowlist
+				}
+				merged[knob] = mergedSigners
+				continue
+			}
 			if userValue, present := userEnv[knob]; present && !jsonEqual(userValue, value) && warn != nil {
 				warn(fmt.Sprintf("config key %q is locked by %s; the user override is ignored", full, systemPath))
 			}

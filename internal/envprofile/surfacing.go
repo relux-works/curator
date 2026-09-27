@@ -36,8 +36,13 @@ func surfacingRows(home string, manager *gitManager, lock *contextlock.Lock) (ro
 		if member.Kind != contextlock.KindMCP {
 			continue
 		}
-		entry := manager.entryPath(home, resolvedOf(member))
+		entry, cleanup, err := manager.inspectEntry(home, resolvedOf(member))
+		if err != nil {
+			unreadable = append(unreadable, "mcp declaration "+member.Name+" cannot be read for surfacing: "+err.Error())
+			continue
+		}
 		manifest, err := contextpkg.LoadMCP(packageRoot(entry, member.Directory))
+		cleanup()
 		if err != nil {
 			unreadable = append(unreadable, "mcp declaration "+member.Name+" cannot be read for surfacing: "+err.Error())
 			continue

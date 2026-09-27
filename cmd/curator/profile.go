@@ -108,9 +108,10 @@ func (c cli) cmdProfileInstall(cfg *config.Config, args []string) int {
 	as := flags.String("as", "", "profile name (default: the root package name)")
 	use := flags.Bool("use", false, "activate the installed profile")
 	takeover := flags.Bool("takeover", false, "take over the unmanaged files the install would write")
+	confirmSystemDelta := flags.Bool("confirm-system-delta", false, "confirm system-module or MCP declaration changes on reinstall")
 	positional, err := parseInterspersed(flags, args)
 	if err != nil || len(positional) != 1 {
-		_, _ = fmt.Fprintln(c.stderr, "curator: profile install <git-url|path> [--directory <dir>] [--range <range>|--tag <tag>|--revision <commit>] [--as <name>] [--use] [--takeover]")
+		_, _ = fmt.Fprintln(c.stderr, "curator: profile install <git-url|path> [--directory <dir>] [--range <range>|--tag <tag>|--revision <commit>] [--as <name>] [--use] [--takeover] [--confirm-system-delta]")
 		return exitUsage
 	}
 	policy := envprofile.PolicyFromConfig(cfg)
@@ -122,11 +123,8 @@ func (c cli) cmdProfileInstall(cfg *config.Config, args []string) int {
 	info, activated, updated, err := envprofile.Install(cfg.Home(), envprofile.InstallOptions{
 		Operand: positional[0], Directory: *directory,
 		Range: *rng, Tag: *tag, Revision: *revision, As: *as, Use: *use,
-		Policy: policy, SurfacingSink: c.stdout,
+		Policy: policy, SurfacingSink: c.stdout, WarningSink: c.stderr, ConfirmSystemDelta: *confirmSystemDelta,
 	})
-	for _, warning := range info.Warnings {
-		_, _ = fmt.Fprintln(c.stderr, "warning:", warning)
-	}
 	for _, result := range info.Activation {
 		printEntryResult(c, result)
 	}
@@ -277,9 +275,10 @@ func (c cli) cmdProfileUpdate(cfg *config.Config, args []string) int {
 	flags := c.newFlagSet("profile update")
 	all := flags.Bool("all", false, "update every installed profile")
 	takeover := flags.Bool("takeover", false, "take over the unmanaged files the update would write")
+	confirmSystemDelta := flags.Bool("confirm-system-delta", false, "confirm system-module or MCP declaration changes")
 	positional, err := parseInterspersed(flags, args)
 	if err != nil || (*all && len(positional) != 0) || (!*all && len(positional) > 1) {
-		_, _ = fmt.Fprintln(c.stderr, "curator: profile update [<name>|--all] [--takeover]")
+		_, _ = fmt.Fprintln(c.stderr, "curator: profile update [<name>|--all] [--takeover] [--confirm-system-delta]")
 		return exitUsage
 	}
 	policy := envprofile.PolicyFromConfig(cfg)
@@ -319,15 +318,15 @@ func (c cli) cmdProfileUpdate(cfg *config.Config, args []string) int {
 		// nothing prints twice. The closed columns carry no per-profile
 		// prefix.
 		info, moved, err := envprofile.UpdateWithOptions(cfg.Home(), name, envprofile.UpdateOptions{
-			Policy: policy, SurfacingSink: c.stdout,
+			Policy: policy, SurfacingSink: c.stdout, WarningSink: c.stderr, ConfirmSystemDelta: *confirmSystemDelta,
 		})
 		if err != nil {
 			_, _ = fmt.Fprintf(c.stderr, "%s: %v\n", name, err)
 			failed = true
+			if strings.Contains(err.Error(), envprofile.DiagSystemDeltaConfirmationRequired) {
+				break
+			}
 			continue
-		}
-		for _, warning := range info.Warnings {
-			_, _ = fmt.Fprintf(c.stderr, "%s: warning: %s\n", name, warning)
 		}
 		if moved {
 			_, _ = fmt.Fprintf(c.stdout, "%s: updated (lock %s)\n", info.Name, info.LockHash)

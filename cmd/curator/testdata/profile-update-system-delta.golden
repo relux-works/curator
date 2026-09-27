@@ -1,0 +1,14 @@
+refused: exit=1
+stdout:
+lock-delta moved context delta 1.0.0 → 1.0.1 commit:<old-commit> → commit:<new-commit>
+stderr:
+delta: warning: context-system-module-present: delta/system.md
+delta: warning: mcp_package_allowlist_empty: the MCP package allowlist is empty; every declaration package in the closure is admitted
+delta: profile_update_confirmation_required: members delta require --confirm-system-delta; revision B refuses with profile_update_confirmation_required unless --confirm-system-delta is given
+confirmed: exit=0
+stdout:
+lock-delta moved context delta 1.0.0 → 1.0.1 commit:<old-commit> → commit:<new-commit>
+delta: updated (lock sha256:<lock-hash>)
+stderr:
+delta: warning: context-system-module-present: delta/system.md
+delta: warning: mcp_package_allowlist_empty: the MCP package allowlist is empty; every declaration package in the closure is admitted
