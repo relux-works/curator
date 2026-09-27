@@ -4,10 +4,10 @@
 family	case_id	owner	reason
 agent-environment-marker-v1/schema-cases	valid-codex-seed-record-empty-snapshot.json	STORY-260916-1i1gfo	Parse rejects the valid Codex seed record forms added by E3.
 agent-environment-marker-v1/schema-cases	valid-codex-seed-record.json	STORY-260916-1i1gfo	Parse rejects the valid Codex seed record forms added by E3.
-manager-config-v2/schema-cases	invalid-system-module-waiver-missing-reason.json	STORY-260922-1cenbr	Load rejects before the E2 diagnostic because the updated case carries the unsupported 0017/0018 manager configuration field.
-manager-config-v2/schema-cases	invalid-system-module-waiver-package-grammar.json	STORY-260922-1cenbr	Load rejects before the E2 diagnostic because the updated case carries the unsupported 0017/0018 manager configuration field.
-manager-config-v2/schema-cases	invalid-system-module-waiver-unknown-field.json	STORY-260922-1cenbr	Load rejects before the E2 diagnostic because the updated case carries the unsupported 0017/0018 manager configuration field.
-manager-config-v2/schema-cases	invalid-transitive-system-modules-value.json	STORY-260922-1cenbr	Load rejects before the E2 diagnostic because the updated case carries the unsupported 0017/0018 manager configuration field.
+manager-config-v2/schema-cases	invalid-system-module-waiver-missing-reason.json	STORY-260916-ioemse	Load rejects before E2 validation at the unsupported E1 require_source_signers field; permissions are supported on trunk.
+manager-config-v2/schema-cases	invalid-system-module-waiver-package-grammar.json	STORY-260916-ioemse	Load rejects before E2 validation at the unsupported E1 require_source_signers field; permissions are supported on trunk.
+manager-config-v2/schema-cases	invalid-system-module-waiver-unknown-field.json	STORY-260916-ioemse	Load rejects before E2 validation at the unsupported E1 require_source_signers field; permissions are supported on trunk.
+manager-config-v2/schema-cases	invalid-transitive-system-modules-value.json	STORY-260916-ioemse	Load rejects before E2 validation at the unsupported E1 require_source_signers field; permissions are supported on trunk.
 manager-config-v2/schema-cases	valid-overlay-git-git-uppercase.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
 manager-config-v2/schema-cases	valid-overlay-git-http-uppercase.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
 manager-config-v2/schema-cases	valid-overlay-git-https-uppercase.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
@@ -31,7 +31,7 @@ manager-config-v2/schema-cases	valid-security-posture-permissive.json	STORY-2609
 manager-config-v2/schema-cases	valid-source-signers-empty-list.json	STORY-260916-ioemse	Load rejects the valid source_signers or require_source_signers case published by E1.
 manager-config-v2/schema-cases	valid-source-signers-gpg.json	STORY-260916-ioemse	Load rejects the valid source_signers or require_source_signers case published by E1.
 manager-config-v2/schema-cases	valid-source-signers.json	STORY-260916-ioemse	Load rejects the valid source_signers or require_source_signers case published by E1.
-manager-config-v2/schema-cases	valid-system-module-waiver.json	STORY-260922-1cenbr	Load rejects a valid manager-config case containing the adopted 0017/0018 configuration model.
+manager-config-v2/schema-cases	valid-system-module-waiver.json	STORY-260916-ioemse	Load rejects this published-valid case at the unsupported E1 require_source_signers field; permissions are supported on trunk.
 manager-config-v2/schema-cases	valid.json	STORY-260922-1cenbr	Load rejects a valid manager-config case containing the adopted 0017/0018 configuration model.
 manager-config-v2/vectors	schema2-empty-environments-defaults	STORY-260922-1cenbr	EffectiveJSON differs from the updated manager-config defaults and permission interface adopted by 0017/0018.
 manager-config-v2/vectors	schema2-every-knob	STORY-260916-ioemse	Parse rejects the source signer fields introduced by E1.

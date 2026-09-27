@@ -10,6 +10,7 @@ import (
 
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/contextmaterialize"
+	"github.com/relux-works/curator/internal/contextpkg"
 	"github.com/relux-works/curator/internal/envregistry"
 )
 
@@ -360,6 +361,75 @@ func TestStatusErrorReportsPolicyWithoutDropped(t *testing.T) {
 			t.Fatalf("dropped %+v under error, want empty", profile.DroppedSystemModules)
 		}
 	}
+}
+
+// TestStatusUnreadableTransitiveManifestDoesNotBecomeNoDrops ensures a
+// manifest read failure cannot masquerade as an empty dropped-module set.
+func TestStatusUnreadableTransitiveManifestDoesNotBecomeNoDrops(t *testing.T) {
+	home := t.TempDir()
+	pinHomes(t)
+	ids := newGitIdentities(t)
+	operand := admissionRepos(t, ids, true, true)
+	if _, _, _, err := Install(home, InstallOptions{Operand: operand, Policy: admissionPolicy()}); err != nil {
+		t.Fatal(err)
+	}
+	_, lock, _, err := loadResolveInputs(home, "sysroot")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifestPath string
+	manager := newGitManager(home)
+	for _, member := range lock.Members {
+		if member.Name != "sysleaf" {
+			continue
+		}
+		root := packageRoot(manager.entryPath(home, resolvedOf(member)), member.Directory)
+		manifestPath = filepath.Join(root, contextpkg.ManifestName)
+		break
+	}
+	if manifestPath == "" {
+		t.Fatal("lock has no sysleaf member")
+	}
+	if err := os.Remove(manifestPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(manifestPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	nativeHomeOf := admissionNative(t)
+	status, err := StatusOf(StatusRequest{
+		Home:         home,
+		Machine:      envregistry.DefaultMachineConfig(),
+		Detect:       func(envregistry.Adapter) string { return "unknown" },
+		NativeHomeOf: nativeHomeOf,
+		OperatorXDG:  t.TempDir(),
+		LaunchDir:    t.TempDir(),
+		Policy:       admissionPolicy(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var profile *ProfileState
+	for i := range status.Profiles {
+		if status.Profiles[i].Profile == "sysroot" {
+			profile = &status.Profiles[i]
+			break
+		}
+	}
+	if profile == nil || profile.DroppedSystemModules != nil {
+		t.Fatalf("dropped-module posture = %+v, want unknown (nil) after a manifest read failure", profile)
+	}
+	if !status.NonCurrent {
+		t.Fatal("a failed transitive manifest read must make env status non-current")
+	}
+	for _, diagnostic := range status.Diagnostics {
+		if diagnostic.Code == contextpkg.DiagManifestInvalid && diagnostic.Path == manifestPath &&
+			strings.Contains(diagnostic.Detail, "dropped system modules are unknown") {
+			return
+		}
+	}
+	t.Fatalf("status diagnostics %+v omit the unreadable-manifest posture", status.Diagnostics)
 }
 
 // TestPolicyFromConfigCarriesAdmission proves the machine knobs reach the

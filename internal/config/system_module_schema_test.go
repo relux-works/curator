@@ -11,10 +11,12 @@
 // none, since the committed pin serves the family and a root-content
 // skip would hide a regression.
 //
-// An invalid E2 case must be rejected for its E2 reason, not merely
-// rejected: a sibling knob the published bytes also carry (E4's
-// provider_directories at the current root) must not turn the case into
-// a false green. The rejection has to name the E2 knob.
+// The E2 invalid cases must reject for their E2 reason, not merely reject.
+// At rc.13 the manager cases also carry permissions and signer fields.
+// Permissions is supported on this trunk, so require_source_signers is the
+// deterministic first unsupported field; the gap ledger attributes these
+// cases to E1 until that surface lands. System-config E2 cases first
+// encounter the locked source_signers field.
 package config
 
 import (
@@ -45,7 +47,8 @@ var systemModuleSchemaCases = []struct {
 
 // TestSystemModuleSchemaSubset requires all seven E2 cases to remain
 // published. The counted manager/system family tests drive their exact bytes
-// through Load and assert both rejection and the E2 diagnostic.
+// through Load; the E2 diagnostic is driven, while an earlier external
+// blocker stays classified in the gap ledger.
 func TestSystemModuleSchemaSubset(t *testing.T) {
 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
 	if root == "" {

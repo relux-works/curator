@@ -668,9 +668,13 @@ func TestTransitiveSystemModulesValues(t *testing.T) {
 // (§12.1), so Load refuses it with the closed grammar's wrong-type error.
 // Absence and the empty list still load with no waivers.
 func TestSystemModuleWaiversNullRejected(t *testing.T) {
-	loadFails(t, `{"schema_version": 2, "skills_root": "x", "projects": {},`+
-		`"environments": {"system_module_waivers": null}}`,
-		"environments.system_module_waivers")
+	path := writeConfig(t, t.TempDir(), "config.json", `{"schema_version": 2, "skills_root": "x", "projects": {},`+
+		`"environments": {"system_module_waivers": null}}`)
+	_, err := Load(path, nil)
+	if err == nil || !strings.Contains(err.Error(), "environments.system_module_waivers") ||
+		!strings.Contains(err.Error(), "must be a list") {
+		t.Fatalf("Load err = %v, want the system_module_waivers wrong-type error", err)
+	}
 	for name, body := range map[string]string{
 		"absent": `{"schema_version": 2, "skills_root": "x", "projects": {}}`,
 		"empty": `{"schema_version": 2, "skills_root": "x", "projects": {},` +
@@ -679,6 +683,22 @@ func TestSystemModuleWaiversNullRejected(t *testing.T) {
 		cfg := loadText(t, body)
 		if len(cfg.Env.SystemModuleWaivers) != 0 {
 			t.Fatalf("%s: system_module_waivers = %+v, want empty", name, cfg.Env.SystemModuleWaivers)
+		}
+	}
+}
+
+// TestUnsupportedEnvironmentFieldFailureIsDeterministic drives Load with
+// several unsupported fields so schema-gap attribution does not depend on
+// Go's randomized map iteration order. Permissions is supported here; the
+// lexically first unsupported signer field is the stable production blocker.
+func TestUnsupportedEnvironmentFieldFailureIsDeterministic(t *testing.T) {
+	body := `{"schema_version": 2, "skills_root": "x", "projects": {},` +
+		`"environments": {"source_signers": {}, "permissions": {}, "require_source_signers": true}}`
+	for attempt := 0; attempt < 24; attempt++ {
+		path := writeConfig(t, t.TempDir(), "config.json", body)
+		_, err := Load(path, nil)
+		if err == nil || !strings.Contains(err.Error(), `unsupported field "require_source_signers"`) {
+			t.Fatalf("attempt %d: Load err = %v, want stable first blocker environments.require_source_signers", attempt, err)
 		}
 	}
 }

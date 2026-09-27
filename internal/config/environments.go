@@ -185,7 +185,12 @@ func parseEnvironments(raw any) (Environments, error) {
 	if !ok {
 		return Environments{}, verr.New("environments", "must be an object")
 	}
+	keys := make([]string, 0, len(obj))
 	for key := range obj {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
 		if !envKnob(key) {
 			return Environments{}, verr.New("environments", "has unsupported field %q", key)
 		}

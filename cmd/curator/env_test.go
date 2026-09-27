@@ -327,6 +327,59 @@ func TestEnvStatusMatrix(t *testing.T) {
 	}
 }
 
+// TestEnvStatusReportsDroppedSystemModuleThroughCLI proves env status prints
+// the effective admission policy and each dropped system module's package
+// and path through the production command entry point.
+func TestEnvStatusReportsDroppedSystemModuleThroughCLI(t *testing.T) {
+	requireGit(t)
+	source, _ := profileHome(t)
+	writeNativeCredentials(t)
+	leaf := t.TempDir()
+	writeGitRepoFile(t, leaf, "agent-context.json", `{"schema_version": 1, "name": "sysleaf", "version": "1.0.0",`+
+		`"context": {"modules": [{"path": "90-system.md", "class": "system"}]}}`+"\n")
+	writeGitRepoFile(t, leaf, "context/90-system.md", "Leaf system prompt.\n")
+	runGitRepo(t, leaf, "init")
+	commitGitRepo(t, leaf, "v1.0.0")
+	mid := t.TempDir()
+	writeGitRepoFile(t, mid, "agent-context.json", `{"schema_version": 1, "name": "sysmid", "version": "1.0.0",`+
+		`"requires": {"contexts": {"sysleaf": {"git": "https://example.com/sysleaf", "range": "*"}}},`+
+		`"context": {"modules": [{"path": "00-mid.md"}]}}`+"\n")
+	writeGitRepoFile(t, mid, "context/00-mid.md", "Mid context.\n")
+	runGitRepo(t, mid, "init")
+	commitGitRepo(t, mid, "v1.0.0")
+	root := t.TempDir()
+	writeGitRepoFile(t, root, "agent-context.json", `{"schema_version": 1, "name": "sysroot", "version": "1.0.0",`+
+		`"requires": {"contexts": {"sysmid": {"git": "https://example.com/sysmid", "range": "*"}}},`+
+		`"context": {"modules": [{"path": "00-root.md"}]}}`+"\n")
+	writeGitRepoFile(t, root, "context/00-root.md", "Root context.\n")
+	runGitRepo(t, root, "init")
+	commitGitRepo(t, root, "v1.0.0")
+	serveGitRepos(t, map[string]string{
+		"https://example.com/sysleaf": leaf,
+		"https://example.com/sysmid":  mid,
+		"https://example.com/sysroot": root,
+	})
+	if code, _, stderr := runProfile(t, source, "profile", "install", "https://example.com/sysroot"); code != exitOK {
+		t.Fatalf("profile install = %d\nstderr:\n%s", code, stderr)
+	}
+	if code, _, stderr := runProfile(t, source, "env", "resolve", "claude_code", "--profile", "sysroot", "--repair"); code != exitOK {
+		t.Fatalf("env resolve --repair = %d\nstderr:\n%s", code, stderr)
+	}
+	code, stdout, stderr := runProfile(t, source, "env", "status")
+	if code != exitOK {
+		t.Fatalf("env status = %d\nstderr:\n%s", code, stderr)
+	}
+	for _, want := range []string{
+		"profile sysroot:",
+		"transitive_system_modules=drop",
+		"dropped system module sysleaf 90-system.md",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("env status omits %q:\n%s", want, stdout)
+		}
+	}
+}
+
 // TestUmbrellaMissingProvider narrows the discovery gate: an unknown
 // subcommand with no curator-<name> on PATH names the executable and the
 // installation guidance, and downloads nothing.

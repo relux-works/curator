@@ -293,7 +293,12 @@ func StatusOf(req StatusRequest) (*Status, error) {
 	}
 	status.Adapters = adapterStates(req)
 	status.Targets = targetStates(req)
-	status.Profiles = profileStates(req, infos)
+	var profileDiagnostics []StateDiagnostic
+	status.Profiles, profileDiagnostics, err = profileStates(req, infos)
+	if err != nil {
+		return nil, err
+	}
+	status.Diagnostics = append(status.Diagnostics, profileDiagnostics...)
 	status.UnregisteredEnvironments = unregisteredEnvironments(req.Machine)
 	var orphanDiagnostics []StateDiagnostic
 	status.Orphans, orphanDiagnostics = orphanHomes(req.Home, installed)
@@ -543,8 +548,9 @@ func ageString(duration time.Duration) string {
 // profileStates reports the lock's context members with weights and the
 // precedence primitives per activation (§12): one row per installed
 // profile. Precedence is the effective machine policy.
-func profileStates(req StatusRequest, infos []Info) []ProfileState {
+func profileStates(req StatusRequest, infos []Info) ([]ProfileState, []StateDiagnostic, error) {
 	var out []ProfileState
+	var diagnostics []StateDiagnostic
 	for _, info := range infos {
 		_, lock, hash, err := loadResolveInputs(req.Home, info.Name)
 		if err != nil || lock == nil {
@@ -561,6 +567,17 @@ func profileStates(req StatusRequest, infos []Info) []ProfileState {
 			return members[i].Name < members[j].Name
 		})
 		precedence := req.Policy.Precedence()
+		transitive, err := effectiveTransitivePolicy(req.Policy)
+		if err != nil {
+			return nil, nil, err
+		}
+		dropped, diagnostic, err := droppedSystemModulesOf(req.Home, lock, req.Policy)
+		if err != nil {
+			return nil, nil, err
+		}
+		if diagnostic != nil {
+			diagnostics = append(diagnostics, *diagnostic)
+		}
 		out = append(out, ProfileState{
 			Profile:  info.Name,
 			LockHash: hash,
@@ -569,40 +586,40 @@ func profileStates(req StatusRequest, infos []Info) []ProfileState {
 				Winner:    precedence.Winner,
 				Placement: precedence.Placement,
 			},
-			TransitiveSystemModules: effectiveTransitivePolicy(req.Policy),
-			DroppedSystemModules:    droppedSystemModulesOf(req.Home, lock, req.Policy),
+			TransitiveSystemModules: transitive,
+			DroppedSystemModules:    dropped,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Profile < out[j].Profile })
-	return out
+	return out, diagnostics, nil
 }
 
 // effectiveTransitivePolicy reports the policy value status prints: the
 // configured knob, defaulting to drop exactly as resolution and
 // materialization do.
-func effectiveTransitivePolicy(policy Policy) string {
-	if effective, err := policy.Admission().Policy(); err == nil {
-		return effective
-	}
-	return contextmaterialize.TransitiveDrop
+func effectiveTransitivePolicy(policy Policy) (string, error) {
+	return policy.Admission().Policy()
 }
 
 // droppedSystemModulesOf recomputes, read-only, the system modules the
 // drop policy skips for the profile: every non-admitted system module in
 // emitted order that applies to at least one registered adapter. Under
-// the error policy nothing is skipped and the list is empty. A member
-// whose manifest cannot be read contributes nothing here; the profile's
-// home rows already report that same failure as non-current through the
-// resolve verifier, so the gap is never silent.
-func droppedSystemModulesOf(home string, lock *contextlock.Lock, policy Policy) []DroppedSystemModule {
+// the error policy nothing is skipped and the list is empty. When a
+// transitive manifest cannot be read, the dropped set is unknown; the
+// caller reports a diagnostic instead of treating that failure as absence.
+func droppedSystemModulesOf(home string, lock *contextlock.Lock, policy Policy) ([]DroppedSystemModule, *StateDiagnostic, error) {
 	dropped := []DroppedSystemModule{}
 	admission := policy.Admission()
-	if effective, err := admission.Policy(); err != nil || effective != contextmaterialize.TransitiveDrop {
-		return dropped
+	effective, err := admission.Policy()
+	if err != nil {
+		return nil, nil, err
+	}
+	if effective != contextmaterialize.TransitiveDrop {
+		return dropped, nil, nil
 	}
 	order, err := contextmaterialize.EmittedOrder(lock, policy.Precedence())
 	if err != nil {
-		return dropped
+		return nil, nil, err
 	}
 	direct := contextmaterialize.DirectSet(lock)
 	envIDs := registryEnvIDs()
@@ -611,9 +628,15 @@ func droppedSystemModulesOf(home string, lock *contextlock.Lock, policy Policy) 
 		if direct[member.Name] || admission.Waived(member.Name) {
 			continue
 		}
-		manifest, err := contextpkg.LoadManifest(packageRoot(manager.entryPath(home, resolvedOf(member)), member.Directory))
+		root := packageRoot(manager.entryPath(home, resolvedOf(member)), member.Directory)
+		manifestPath := filepath.Join(root, contextpkg.ManifestName)
+		manifest, err := contextpkg.LoadManifest(root)
 		if err != nil {
-			continue
+			return nil, &StateDiagnostic{
+				Code:   contextpkg.DiagManifestInvalid,
+				Path:   manifestPath,
+				Detail: fmt.Sprintf("dropped system modules are unknown for package %q: %v", member.Name, err),
+			}, nil
 		}
 		for _, module := range manifest.Modules {
 			class := module.Class
@@ -636,7 +659,7 @@ func droppedSystemModulesOf(home string, lock *contextlock.Lock, policy Policy) 
 			dropped = append(dropped, DroppedSystemModule{Package: member.Name, Path: module.Path})
 		}
 	}
-	return dropped
+	return dropped, nil, nil
 }
 
 // unregisteredEnvironments reports env-ids named in machine configuration

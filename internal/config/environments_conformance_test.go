@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -230,8 +231,8 @@ func TestSystemConfigV2IsolationDirectionsFromPinnedCases(t *testing.T) {
 }
 
 // TestManagerConfigV2Vectors runs the published manager-config-v2 vector
-// family through Parse: every valid case renders the expected effective
-// configuration and every invalid case is rejected.
+// family through Parse: every valid case renders the exact expected
+// effective configuration and every invalid case is rejected.
 func TestManagerConfigV2Vectors(t *testing.T) {
 	root := conformanceRoot(t)
 	payload, err := os.ReadFile(filepath.Join(root, "vectors", "manager-config-v2.json")) // #nosec G304 -- explicit conformance input
@@ -273,16 +274,34 @@ func TestManagerConfigV2Vectors(t *testing.T) {
 			if err := json.Unmarshal(rendered, &got); err != nil {
 				t.Fatal(err)
 			}
-			for key, want := range tc.Expected {
-				gotValue := got[key]
-				if !reflect.DeepEqual(gotValue, want) {
-					wantJSON, _ := json.Marshal(want)
-					gotJSON, _ := json.Marshal(gotValue)
-					return conformancecoverage.Observation{FailureReason: fmt.Sprintf("effective member %q got %s, want %s", key, gotJSON, wantJSON)}
-				}
+			wantJSON, err := json.Marshal(tc.Expected)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !exactManagerEffectiveJSON(got, tc.Expected) {
+				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("effective config got %s, want %s", rendered, wantJSON)}
 			}
 			return conformancecoverage.Observation{}
 		})
+}
+
+// exactManagerEffectiveJSON compares canonical JSON bytes for the full
+// normalized object. In particular, extra actual keys are a mismatch too.
+func exactManagerEffectiveJSON(actual, expected map[string]any) bool {
+	actualJSON, actualErr := json.Marshal(actual)
+	expectedJSON, expectedErr := json.Marshal(expected)
+	return actualErr == nil && expectedErr == nil && bytes.Equal(actualJSON, expectedJSON)
+}
+
+func TestManagerEffectiveJSONComparisonRejectsExtraKnobs(t *testing.T) {
+	actual := map[string]any{
+		"existing":                  true,
+		"transitive_system_modules": "drop",
+	}
+	expected := map[string]any{"existing": true}
+	if exactManagerEffectiveJSON(actual, expected) {
+		t.Fatal("normalized output with an unexpected manager knob matched the expected vector")
+	}
 }
 
 // systemModuleSchemaFailure keeps the E2 schema cases' stronger diagnostic
@@ -363,12 +382,11 @@ func TestOverlayGapOwnersMatchFirstProductionBlocker(t *testing.T) {
 			continue
 		}
 		gap := lookup(managerSchema, tc.Name)
-		const wantOwners = "STORY-260916-ioemse"
-		if gap.Owner != wantOwners {
-			t.Errorf("%s owner = %q, the first unsupported signer field is owned by E1; want %q", tc.Name, gap.Owner, wantOwners)
+		if gap.Owner != owner {
+			t.Errorf("%s owner = %q, first unsupported field %s belongs to %q", tc.Name, gap.Owner, field, owner)
 		}
-		if !strings.Contains(loadErr.Error(), field) {
-			t.Errorf("%s first Load blocker %q is not present in observed error %v", tc.Name, field, loadErr)
+		if field != "require_source_signers" || !strings.Contains(loadErr.Error(), field) {
+			t.Errorf("%s first Load blocker = %q, want unsupported require_source_signers: %v", tc.Name, field, loadErr)
 		}
 		for _, requiredField := range []string{"source_signers", "require_source_signers"} {
 			if !strings.Contains(gap.Reason, requiredField) {
