@@ -24,6 +24,11 @@ const (
 	Pi         = "pi"
 )
 
+// CodexSeedRevisionB is the immutable manager behavior recorded in
+// codex_seed_record (environments §7.4, §8.2). Revision B removes native
+// MCP servers from config.toml before the managed home is published.
+const CodexSeedRevisionB = "B"
+
 // EnvAliases maps the CLI-only short spellings to their canonical
 // registry ids (manager profile §12.1). The aliases exist only at the
 // command-line boundary: the CLI normalizes them before any validation
@@ -48,23 +53,26 @@ func NormalizeEnvID(id string) string {
 
 // Diagnostics (environments §7.7, §10.4, §11.1).
 const (
-	DiagUnknown                = "environment_unknown"
-	DiagFormUnsupported        = "environment_form_unsupported"
-	DiagIsolatedUnsupported    = "environment_isolated_unsupported"
-	DiagSharedUnsupported      = "environment_shared_unsupported"
-	DiagIsolationLockConflict  = "environment_isolation_lock_conflict"
-	DiagTargetUnknown          = "environment_target_unknown"
-	DiagTargetConsent          = "environment_target_consent_required"
-	DiagShadowingPresent       = "environment_shadowing_path_present"
-	DiagPassthroughDetached    = "environment_passthrough_detached"
-	DiagCredentialConflict     = "environment_credential_conflict"
-	DiagCredentialUnsupported  = "environment_credential_unsupported"
-	DiagSeedUnreadable         = "environment_seed_unreadable"
-	DiagBackupRecordUnreadable = "environment_backup_record_unreadable"
-	DiagSeedShadowed           = "environment_seed_shadowed"
-	DiagToolVersionUnverifed   = "environment_tool_version_unverified"
-	DiagSizeExceeded           = "environment_context_size_exceeded"
-	DiagReservedCommand        = "environment_reserved_command_name"
+	DiagUnknown                      = "environment_unknown"
+	DiagFormUnsupported              = "environment_form_unsupported"
+	DiagIsolatedUnsupported          = "environment_isolated_unsupported"
+	DiagSharedUnsupported            = "environment_shared_unsupported"
+	DiagIsolationLockConflict        = "environment_isolation_lock_conflict"
+	DiagTargetUnknown                = "environment_target_unknown"
+	DiagTargetConsent                = "environment_target_consent_required"
+	DiagShadowingPresent             = "environment_shadowing_path_present"
+	DiagPassthroughDetached          = "environment_passthrough_detached"
+	DiagCredentialConflict           = "environment_credential_conflict"
+	DiagCredentialUnsupported        = "environment_credential_unsupported"
+	DiagSeedUnreadable               = "environment_seed_unreadable"
+	DiagBackupRecordUnreadable       = "environment_backup_record_unreadable"
+	DiagSeedShadowed                 = "environment_seed_shadowed"
+	DiagMCPNativeServersUngoverned   = "mcp_native_servers_ungoverned"
+	DiagMCPNativeServersNotInherited = "mcp_native_servers_not_inherited"
+	DiagMCPSeedUnstripped            = "mcp_seed_unstripped"
+	DiagToolVersionUnverifed         = "environment_tool_version_unverified"
+	DiagSizeExceeded                 = "environment_context_size_exceeded"
+	DiagReservedCommand              = "environment_reserved_command_name"
 )
 
 // Forms (environments §7.2).
@@ -180,6 +188,9 @@ type Adapter struct {
 	Passthrough map[string][]Passthrough
 	// Seeds holds the per-adapter provisioning seed class (§7.4).
 	Seeds []string
+	// CodexSeedRevision is set only on codex_cli and names the immutable
+	// native config.toml seed rule the manager ships (§7.4, §8.2).
+	CodexSeedRevision string
 	// SeedWritten marks seeds the manager writes rather than copies
 	// (claude_code .claude.json).
 	SeedWritten map[string]bool
@@ -243,6 +254,7 @@ var Registry = []Adapter{
 			"default": {{Path: "auth.json", Strategy: StrategyKeyringPreferred, FileLinkTarget: "auth.json"}},
 		},
 		Seeds:             []string{"config.toml"},
+		CodexSeedRevision: CodexSeedRevisionB,
 		SeedWritten:       map[string]bool{},
 		VerifiedRelease:   "0.153.2",
 		Probe:             []string{"codex", "--version"},

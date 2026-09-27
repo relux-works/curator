@@ -36,6 +36,7 @@ func printEnvStatus(stdout io.Writer, status *envprofile.Status) {
 	// passable_env_names, the machine-level warnings, and the §2.3
 	// surfacing rows for the current profile of each reported scope.
 	_, _ = fmt.Fprintf(stdout, "s4_profile: %s, passable_env_names: %s\n", status.S4Profile, formatPassable(status.PassableEnvNames))
+	_, _ = fmt.Fprintf(stdout, "codex-seed: revision %s (%s)\n", status.CodexSeedRule.Revision, status.CodexSeedRule.Provenance)
 	for _, warning := range status.Warnings {
 		_, _ = fmt.Fprintf(stdout, "warning: %s\n", warning)
 	}
@@ -74,6 +75,15 @@ func printEnvStatus(stdout io.Writer, status *envprofile.Status) {
 		}
 		if len(home.Seeds) > 0 {
 			_, _ = fmt.Fprintf(stdout, "  seeds: %s\n", joinComma(home.Seeds))
+		}
+		if home.CodexSeedRecord != nil {
+			names := "none"
+			if len(home.NativeMCPServers) > 0 {
+				names = joinComma(home.NativeMCPServers)
+			}
+			_, _ = fmt.Fprintf(stdout, "  codex-seed-record: revision %s; native MCP servers %s (%s)\n", home.CodexSeedRecord.Revision, names, home.NativeMCPServersDisposition)
+		} else if home.NativeMCPServersDisposition == "unknown" {
+			_, _ = fmt.Fprintln(stdout, "  codex-seed-record: absent; native MCP servers unknown")
 		}
 		if len(home.SeedLinks) > 0 {
 			_, _ = fmt.Fprintf(stdout, "  seed-links: %s\n", joinComma(home.SeedLinks))

@@ -41,26 +41,29 @@ type SurfaceState struct {
 
 // HomeState is one profile × environment row.
 type HomeState struct {
-	Profile        string         `json:"profile"`
-	Environment    string         `json:"environment"`
-	Mode           string         `json:"mode"`
-	Form           string         `json:"form"`
-	Home           string         `json:"home"`
-	Provisioned    bool           `json:"provisioned"`
-	Current        bool           `json:"current"`
-	LockHash       string         `json:"lock_hash"`
-	MarkerHash     string         `json:"marker_hash"`
-	Surfaces       []SurfaceState `json:"surfaces"`
-	Passthrough    []string       `json:"passthrough"`
-	Seeds          []string       `json:"seeds"`
-	SeedLinks      []string       `json:"seed_links"`
-	SeededProjects []string       `json:"seeded_projects"`
-	BackupsKnown   bool           `json:"backups_known"`
-	Backups        int            `json:"backups"`
-	BackupsOldest  string         `json:"backups_oldest"`
-	BackupsNewest  string         `json:"backups_newest"`
-	Findings       []string       `json:"findings"`
-	Warnings       []string       `json:"warnings"`
+	Profile                     string                     `json:"profile"`
+	Environment                 string                     `json:"environment"`
+	Mode                        string                     `json:"mode"`
+	Form                        string                     `json:"form"`
+	Home                        string                     `json:"home"`
+	Provisioned                 bool                       `json:"provisioned"`
+	Current                     bool                       `json:"current"`
+	LockHash                    string                     `json:"lock_hash"`
+	MarkerHash                  string                     `json:"marker_hash"`
+	Surfaces                    []SurfaceState             `json:"surfaces"`
+	Passthrough                 []string                   `json:"passthrough"`
+	Seeds                       []string                   `json:"seeds"`
+	SeedLinks                   []string                   `json:"seed_links"`
+	SeededProjects              []string                   `json:"seeded_projects"`
+	CodexSeedRecord             *envmarker.CodexSeedRecord `json:"codex_seed_record,omitempty"`
+	NativeMCPServers            []string                   `json:"native_mcp_servers,omitempty"`
+	NativeMCPServersDisposition string                     `json:"native_mcp_servers_disposition,omitempty"`
+	BackupsKnown                bool                       `json:"backups_known"`
+	Backups                     int                        `json:"backups"`
+	BackupsOldest               string                     `json:"backups_oldest"`
+	BackupsNewest               string                     `json:"backups_newest"`
+	Findings                    []string                   `json:"findings"`
+	Warnings                    []string                   `json:"warnings"`
 }
 
 // ScopeHome carries both doors of a current profile (§8.1): the native
@@ -181,6 +184,13 @@ type DeclarationScope struct {
 	Rows    []string `json:"rows"`
 }
 
+// CodexSeedRuleState reports the manager-shipped seed behavior and its
+// provenance (§12). It is informational and never changes row currency.
+type CodexSeedRuleState struct {
+	Revision   string `json:"revision"`
+	Provenance string `json:"provenance"`
+}
+
 // Status is the whole matrix.
 type Status struct {
 	Homes                    []HomeState       `json:"homes"`
@@ -216,6 +226,8 @@ type Status struct {
 	// empty, and unreadable-declaration notices. Warnings never make a
 	// row non-current (§12).
 	Warnings []string `json:"warnings"`
+	// CodexSeedRule is the manager-wide §12 codex-seed posture row.
+	CodexSeedRule CodexSeedRuleState `json:"codex_seed_rule"`
 	// MCPDeclarations repeats the §2.3 surfacing rows for the current
 	// profile of each scope reported.
 	MCPDeclarations []DeclarationScope `json:"mcp_declarations"`
@@ -264,7 +276,10 @@ func (req *StatusRequest) resolve() ResolveRequest {
 
 // StatusOf recomputes the profile × environment × surface matrix.
 func StatusOf(req StatusRequest) (*Status, error) {
-	status := &Status{}
+	status := &Status{CodexSeedRule: CodexSeedRuleState{
+		Revision:   envregistry.CodexSeedRevisionB,
+		Provenance: "shipped",
+	}}
 	status.Notes = append(status.Notes, "opencode skills come from the machine-current profile, split-brain by construction (§7.1)")
 	// §12.2: env status reports the locked require_current_profile
 	// requirement. The policy already carries the effective knob and its
@@ -423,6 +438,9 @@ func homeState(req StatusRequest, profile string, adapter envregistry.Adapter) H
 		Mode:        envmarker.ModeManagedHome,
 		Home:        ManagedHomeDir(req.Home, profile, adapter.ID),
 	}
+	if adapter.ID != envregistry.CodexCLI {
+		state.NativeMCPServersDisposition = "none"
+	}
 	source, lock, hash, err := loadResolveInputs(req.Home, profile)
 	if err != nil {
 		state.Findings = append(state.Findings, DiagProfileUnknown+": "+err.Error())
@@ -472,6 +490,10 @@ func homeState(req StatusRequest, profile string, adapter envregistry.Adapter) H
 	}
 	state.SeedLinks = append([]string{}, marker.SeedLinks...)
 	state.SeededProjects = append([]string{}, marker.SeededProjects...)
+	if adapter.ID == envregistry.CodexCLI {
+		state.CodexSeedRecord = cloneCodexSeedRecord(marker.CodexSeedRecord)
+		state.Warnings = append(state.Warnings, codexSeedStatusWarnings(marker, &state)...)
+	}
 	for _, reason := range verdict.reasons {
 		diagnostic := reason
 		if strings.HasPrefix(reason, "passthrough entry") && strings.Contains(reason, "is detached") {
@@ -495,6 +517,48 @@ func homeState(req StatusRequest, profile string, adapter envregistry.Adapter) H
 	}
 	state.Current = len(state.Findings) == 0
 	return state
+}
+
+func cloneCodexSeedRecord(record *envmarker.CodexSeedRecord) *envmarker.CodexSeedRecord {
+	if record == nil {
+		return nil
+	}
+	cloned := *record
+	cloned.NativeMCPServers = append([]string{}, record.NativeMCPServers...)
+	return &cloned
+}
+
+// codexSeedStatusWarnings reports the recorded seed snapshot for one managed
+// Codex home. Revision-A and pre-rule homes retain their inherited base and
+// stay current with warnings; revision-B names were stripped and are not
+// inherited (§7.4, §7.7, §7.8, §8.2, §12).
+func codexSeedStatusWarnings(marker *envmarker.Marker, state *HomeState) []string {
+	record := marker.CodexSeedRecord
+	if record == nil {
+		state.NativeMCPServersDisposition = "unknown"
+		return []string{fmt.Sprintf("%s: this managed Codex home predates the seed record; re-provision it to apply seed revision %s", envregistry.DiagMCPSeedUnstripped, envregistry.CodexSeedRevisionB)}
+	}
+	state.NativeMCPServers = append([]string{}, record.NativeMCPServers...)
+	if len(record.NativeMCPServers) == 0 {
+		state.NativeMCPServersDisposition = "none"
+		return nil
+	}
+	switch record.Revision {
+	case "A":
+		state.NativeMCPServersDisposition = "ungoverned"
+		warnings := []string{fmt.Sprintf("%s: native Codex MCP servers %s remain in this managed home outside the profile lock and MCP allowlist", envregistry.DiagMCPNativeServersUngoverned, strings.Join(record.NativeMCPServers, ", "))}
+		if record.Revision != envregistry.CodexSeedRevisionB {
+			warnings = append(warnings, fmt.Sprintf("%s: this home retains revision-A native MCP servers; re-provision it to apply seed revision B", envregistry.DiagMCPSeedUnstripped))
+		}
+		return warnings
+	case envregistry.CodexSeedRevisionB:
+		state.NativeMCPServersDisposition = "not-inherited"
+		return []string{fmt.Sprintf("%s: native Codex MCP servers %s were stripped from config.toml and are not inherited", envregistry.DiagMCPNativeServersNotInherited, strings.Join(record.NativeMCPServers, ", "))}
+	default:
+		// Marker validation closes the revision set to A and B.
+		state.NativeMCPServersDisposition = "unknown"
+		return []string{fmt.Sprintf("%s: this managed Codex home records unsupported seed revision %q", envregistry.DiagMCPSeedUnstripped, record.Revision)}
+	}
 }
 
 func markerForm(marker *envmarker.Marker) string {

@@ -5,9 +5,11 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/relux-works/curator/internal/envmarker"
+	"github.com/relux-works/curator/internal/envregistry"
 )
 
 func installCLIEnvProfile(t *testing.T, source stubConfigSource) {
@@ -166,8 +168,12 @@ func TestEnvResolveKeepsSchema1BytesForMetadataOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	legacyBytes = append(legacyBytes, '\n')
-	if _, err := envmarker.Parse(legacyBytes); err != nil {
+	legacyMarker, err := envmarker.Parse(legacyBytes)
+	if err != nil {
 		t.Fatalf("schema-1 fixture must parse: %v", err)
+	}
+	if record := legacyMarker.CodexSeedRecord; record == nil || record.Revision != envregistry.CodexSeedRevisionB || record.NativeMCPServers == nil || len(record.NativeMCPServers) != 0 {
+		t.Fatalf("schema-1 fixture lost the required empty revision-B seed record: %+v", record)
 	}
 	if err := os.WriteFile(markerPath, legacyBytes, 0o644); err != nil {
 		t.Fatal(err)
@@ -184,5 +190,79 @@ func TestEnvResolveKeepsSchema1BytesForMetadataOnly(t *testing.T) {
 	}
 	if string(after) != string(legacyBytes) {
 		t.Fatalf("metadata-only upgrade changed schema-1 marker bytes:\n%s", after)
+	}
+}
+
+func TestEnvResolvePreservesPreRuleCodexSeedAndReportsUnstrippedHome(t *testing.T) {
+	source, _ := profileHome(t)
+	installCLIEnvProfile(t, source)
+	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
+		t.Fatalf("resolve --repair provision = %d\nstderr:\n%s", code, stderr)
+	}
+	markerPath, payload, _ := cliEnvMarker(t, source, "codex_cli")
+	var object map[string]any
+	if err := json.Unmarshal(payload, &object); err != nil {
+		t.Fatal(err)
+	}
+	object["version"] = float64(envmarker.VersionV1)
+	delete(object, "codex_seed_record")
+	modern, _ := object["passthrough"].([]any)
+	legacy := make([]any, 0, len(modern))
+	for _, value := range modern {
+		fields, _ := value.(map[string]any)
+		path, _ := fields["path"].(string)
+		strategy, _ := fields["strategy"].(string)
+		if strategy == "keyring-preferred" && fields["backend"] == "file" {
+			strategy = "file-link"
+		}
+		legacy = append(legacy, map[string]any{"path": path, "strategy": strategy})
+	}
+	object["passthrough"] = legacy
+	legacyBytes, err := json.MarshalIndent(object, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacyBytes = append(legacyBytes, '\n')
+	legacyMarker, err := envmarker.Parse(legacyBytes)
+	if err != nil {
+		t.Fatalf("pre-rule schema-1 fixture must parse: %v", err)
+	}
+	if legacyMarker.CodexSeedRecord != nil {
+		t.Fatalf("pre-rule schema-1 fixture unexpectedly has a Codex seed record: %+v", legacyMarker.CodexSeedRecord)
+	}
+	if err := os.WriteFile(markerPath, legacyBytes, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	managedConfig := filepath.Join(filepath.Dir(markerPath), "config.toml")
+	legacyConfig := "model = \"gpt-5-codex\"\n\n[mcp_servers.legacy]\ncommand = \"server\"\nargs = []\n"
+	if err := os.WriteFile(managedConfig, []byte(legacyConfig), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(filepath.Dir(markerPath), "AGENTS.md")); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
+		t.Fatalf("pre-rule schema-1 repair = %d\nstderr:\n%s", code, stderr)
+	}
+	after, err := os.ReadFile(markerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) != string(legacyBytes) {
+		t.Fatalf("metadata-only repair changed the pre-rule schema-1 marker:\n%s", after)
+	}
+	afterConfig, err := os.ReadFile(managedConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(afterConfig) != legacyConfig {
+		t.Fatalf("metadata-only repair changed the pre-rule Codex seed:\n%s", afterConfig)
+	}
+	code, stdout, stderr := runProfile(t, source, "env", "status")
+	if code != exitOK {
+		t.Fatalf("env status = %d\nstderr:\n%s", code, stderr)
+	}
+	if !strings.Contains(stdout, "mcp_seed_unstripped: this managed Codex home predates the seed record; re-provision it to apply seed revision B") {
+		t.Fatalf("env status did not report the pre-rule Codex home:\n%s", stdout)
 	}
 }

@@ -708,6 +708,42 @@ type seedBundle struct {
 	xdg map[string]string
 	// claudeInit marks the written (not copied) .claude.json seed.
 	claudeInit bool
+	// codexSeedRecord is captured only when a codex_cli home is first
+	// provisioned. Repair preserves the marker's existing record and seed.
+	codexSeedRecord *envmarker.CodexSeedRecord
+	warnings        []string
+}
+
+// stripCodexSeedMCPServers applies the shipped rc.13 §7.4 revision-B rule:
+// remove the whole top-level mcp_servers table (including every subtable),
+// retain every other TOML member, and return only the sorted server names.
+func stripCodexSeedMCPServers(payload []byte) ([]byte, []string, error) {
+	var document map[string]any
+	if err := toml.Unmarshal(payload, &document); err != nil {
+		return nil, nil, fmt.Errorf("config.toml is not valid TOML: %w", err)
+	}
+	serversValue, exists := document["mcp_servers"]
+	if !exists {
+		return payload, []string{}, nil
+	}
+	servers, ok := serversValue.(map[string]any)
+	if !ok {
+		return nil, nil, fmt.Errorf("config.toml mcp_servers is not a TOML table")
+	}
+	names := make([]string, 0, len(servers))
+	for name := range servers {
+		if name == "" {
+			return nil, nil, fmt.Errorf("config.toml mcp_servers contains an empty server name")
+		}
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	delete(document, "mcp_servers")
+	var stripped bytes.Buffer
+	if err := toml.NewEncoder(&stripped).Encode(document); err != nil {
+		return nil, nil, fmt.Errorf("strip config.toml mcp_servers: %w", err)
+	}
+	return stripped.Bytes(), names, nil
 }
 
 // gatherSeeds reads every seed upfront so that an unreadable seed stops
@@ -723,17 +759,43 @@ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bo
 		return nil, err
 	}
 	if provision {
+		if adapter.ID == envregistry.CodexCLI {
+			if adapter.CodexSeedRevision != envregistry.CodexSeedRevisionB {
+				return nil, fmt.Errorf("%s: unsupported codex_cli seed revision %q", envregistry.DiagSeedUnreadable, adapter.CodexSeedRevision)
+			}
+			bundle.codexSeedRecord = &envmarker.CodexSeedRecord{
+				Revision:         adapter.CodexSeedRevision,
+				NativeMCPServers: []string{},
+			}
+		}
 		for _, seed := range adapter.Seeds {
 			if adapter.SeedWritten[seed] {
 				bundle.claudeInit = true
 				continue
 			}
-			payload, err := os.ReadFile(filepath.Join(native, filepath.FromSlash(seed))) // #nosec G304 -- seed names are registry data
+			seedPath := filepath.Join(native, filepath.FromSlash(seed))
+			state, err := stateread.ReadFile(seedPath) // #nosec G304 -- seed names are registry data
 			if err != nil {
-				if os.IsNotExist(err) {
-					continue
-				}
 				return nil, fmt.Errorf("%s: seed %s: %v", envregistry.DiagSeedUnreadable, seed, err)
+			}
+			switch state.Kind {
+			case stateread.KindAbsent:
+				continue
+			case stateread.KindPresent:
+			default:
+				return nil, fmt.Errorf("%s: seed %s has unusable read state %q", envregistry.DiagSeedUnreadable, seed, state.Kind)
+			}
+			payload := state.Bytes
+			if adapter.ID == envregistry.CodexCLI && seed == "config.toml" {
+				stripped, names, err := stripCodexSeedMCPServers(payload)
+				if err != nil {
+					return nil, fmt.Errorf("%s: seed %s: %v", envregistry.DiagSeedUnreadable, seed, err)
+				}
+				payload = stripped
+				bundle.codexSeedRecord.NativeMCPServers = names
+				if len(names) > 0 {
+					bundle.warnings = append(bundle.warnings, fmt.Sprintf("%s: native Codex MCP servers %s were stripped from config.toml and are not inherited", envregistry.DiagMCPNativeServersNotInherited, strings.Join(names, ", ")))
+				}
 			}
 			bundle.files[seed] = payload
 		}
@@ -1089,6 +1151,16 @@ func isSeedPath(plan *homePlan, path string) bool {
 func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prior *envmarker.Marker, provenance string) (*envmarker.Marker, error) {
 	marker := plan.marker
 	marker.Version = envmarker.VersionV2
+	if prior != nil && prior.CodexSeedRecord != nil {
+		record := *prior.CodexSeedRecord
+		record.NativeMCPServers = append([]string{}, prior.CodexSeedRecord.NativeMCPServers...)
+		marker.CodexSeedRecord = &record
+	}
+	if seeds.codexSeedRecord != nil {
+		record := *seeds.codexSeedRecord
+		record.NativeMCPServers = append([]string{}, seeds.codexSeedRecord.NativeMCPServers...)
+		marker.CodexSeedRecord = &record
+	}
 	links, _, err := req.effectivePassthrough(plan.adapter, plan.isolation)
 	if err != nil {
 		return nil, err
@@ -1195,7 +1267,9 @@ func legacyMarkerProjectionMatches(prior, candidate *envmarker.Marker) bool {
 	projected := *candidate
 	projected.Version = envmarker.VersionV1
 	projected.Passthrough = &legacyEntries
-	projected.CodexSeedRecord = nil
+	// codex_seed_record is valid in schema 1 as well as schema 2. Preserve it
+	// in the legacy projection so metadata-only repair does not rewrite a
+	// schema-1 marker that already carries the rc.13 seed snapshot.
 	priorPayload, err := prior.Marshal()
 	if err != nil {
 		return false
@@ -2183,7 +2257,9 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 	if err != nil {
 		return nil, err
 	}
-	result := &ResolveResult{Document: document, Warnings: after.warnings, Provisioned: provisioned}
+	warnings := append([]string{}, after.warnings...)
+	warnings = append(warnings, seeds.warnings...)
+	result := &ResolveResult{Document: document, Warnings: warnings, Provisioned: provisioned}
 	if provisioned {
 		result.Notice = firstResolveNotice(adapter, plan)
 	}

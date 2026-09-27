@@ -150,8 +150,9 @@ type Passthrough struct {
 	pathSet        bool
 }
 
-// CodexSeedRecord is the schema-v2 snapshot of native MCP server names
-// preserved by a managed Codex home.
+// CodexSeedRecord is the native MCP server-name snapshot preserved by a
+// managed Codex home. It is valid in both marker versions: the seed-rule
+// record is independent of the versioned credential record (§8.2).
 type CodexSeedRecord struct {
 	Revision         string   `json:"revision"`
 	NativeMCPServers []string `json:"native_mcp_servers"`
@@ -272,9 +273,6 @@ func (m *Marker) Validate() error {
 			}
 		}
 		if m.CodexSeedRecord != nil {
-			if m.Version != VersionV2 {
-				return fmt.Errorf("codex_seed_record requires schema 2")
-			}
 			if m.CodexSeedRecord.Revision != "A" && m.CodexSeedRecord.Revision != "B" {
 				return fmt.Errorf("codex_seed_record revision is not A or B")
 			}
