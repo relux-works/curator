@@ -800,6 +800,14 @@ func TestSnapshotFutureBoundIsExactAtEveryConfiguredSkew(t *testing.T) {
 // before the run are unaffected (BUG-260906-1bdotx).
 func TestSnapshotZeroClockSkewIsLiteral(t *testing.T) {
 	s := newSigner(t)
+	strictCache, defaultCache := t.TempDir(), t.TempDir()
+	// Prepare persistent-cache state before sampling `now`: its creation and
+	// sync are checker work and must not widen this injected-now boundary.
+	for _, cache := range []string{strictCache, defaultCache} {
+		if err := writeSnapshotStateCatalog(cache, map[string]bool{}); err != nil {
+			t.Fatal(err)
+		}
+	}
 	now := time.Now().UTC().Truncate(time.Second).Add(500 * time.Millisecond)
 	// The next whole second is 500ms ahead of `now` — the shape a snapshot
 	// minted during the fetch takes after RFC3339 truncation.
@@ -807,11 +815,11 @@ func TestSnapshotZeroClockSkewIsLiteral(t *testing.T) {
 	fetch := func(string) (map[string]any, error) { return s.sign(body), nil }
 	reg := Registry{Name: "one", URL: "https://one", PublicKeys: []string{s.pinned}}
 
-	tampered, warnings := CheckSnapshotsWithPolicy([]Registry{reg}, t.TempDir(), fetch, now, 0, 0)
+	tampered, warnings := CheckSnapshotsWithPolicy([]Registry{reg}, strictCache, fetch, now, 0, 0)
 	if !tampered[reg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "too far in the future") {
 		t.Fatalf("a zero skew must refuse a sub-second future timestamp: %v %v", tampered, warnings)
 	}
-	tampered, warnings = CheckSnapshotsWithPolicy([]Registry{reg}, t.TempDir(), fetch, now, 0, DefaultSnapshotClockSkew)
+	tampered, warnings = CheckSnapshotsWithPolicy([]Registry{reg}, defaultCache, fetch, now, 0, DefaultSnapshotClockSkew)
 	if tampered[reg.URL] || len(warnings) != 0 {
 		t.Fatalf("the shipped default must absorb sub-second drift: %v %v", tampered, warnings)
 	}
