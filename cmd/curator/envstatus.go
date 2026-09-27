@@ -167,13 +167,8 @@ func derefProvider(value *string) string {
 // matrix: a refused, missing, or unreadable provider row is
 // non-current, so env status --check fails while one stands.
 func attachProviderPosture(cfg *config.Config, status *envprofile.Status) {
-	var projectBins []string
-	for _, project := range cfg.Projects {
-		projectBins = append(projectBins, filepath.Join(project.Path, ".agents", "bin"))
-	}
-	sort.Strings(projectBins)
 	var diagnostic *envprofile.StateDiagnostic
-	status.Providers, diagnostic = providerPosture(cfg.Home(), cfg.Env.ProviderDirectories, projectBins)
+	status.Providers, diagnostic = providerPostureForConfig(cfg, nil)
 	if diagnostic != nil {
 		status.Diagnostics = append(status.Diagnostics, *diagnostic)
 		status.NonCurrent = true
@@ -222,6 +217,15 @@ func formatRegistryPosture(row registry.BoundaryPosture) string {
 	}
 	return fmt.Sprintf("registry %s %s: high-water version %d, log_size %d, last page boundary verified: %s",
 		row.Name, row.URL, *row.HighWaterVersion, *row.HighWaterLogSize, verified)
+}
+
+func providerPostureForConfig(cfg *config.Config, pathOverride *string) ([]envprofile.ProviderState, *envprofile.StateDiagnostic) {
+	var projectBins []string
+	for _, project := range cfg.Projects {
+		projectBins = append(projectBins, filepath.Join(project.Path, ".agents", "bin"))
+	}
+	sort.Strings(projectBins)
+	return providerPostureWithPath(cfg.Home(), cfg.Env.ProviderDirectories, projectBins, pathOverride)
 }
 
 // formatPassable renders the effective passable_env_names: unbounded for

@@ -149,7 +149,7 @@ func resolveRevisionA(exe string, in providerInputs, roots []string) providerOut
 	if insideTrustRoots(canonical, roots) {
 		return providerOutcome{resolved: absolute, roots: roots, revision: providerRevisionA}
 	}
-	return providerOutcome{resolved: absolute, warned: true, diagnostic: providerDiagnosticOutsideRoots, roots: roots, revision: providerRevisionA, hintDir: filepath.Dir(absolute)}
+	return providerOutcome{resolved: absolute, warned: true, diagnostic: providerDiagnosticOutsideRoots, roots: roots, revision: providerRevisionA, hintDir: filepath.Dir(canonical)}
 }
 
 // resolveRevisionB searches the trust roots in order for the first
@@ -172,6 +172,13 @@ func resolveRevisionB(exe string, in providerInputs, roots []string) providerOut
 		canonical := canonicalPath(absolute)
 		if refused, label := refuseDir(canonical, in.publishedDirs, in.managedRoots); refused {
 			return providerOutcome{diagnostic: providerDiagnosticUntrusted, roots: roots, revision: providerRevisionB, untrustedPath: absolute, refusedLabel: label}
+		}
+		// A directory entry inside a trust root is not enough: a symlink
+		// can point at executable bytes the configured roots do not trust.
+		// Refuse that candidate instead of dispatching it or falling through
+		// to another root.
+		if !insideTrustRoots(canonical, roots) {
+			return providerOutcome{diagnostic: providerDiagnosticUntrusted, roots: roots, revision: providerRevisionB, untrustedPath: absolute}
 		}
 		return providerOutcome{resolved: absolute, roots: roots, revision: providerRevisionB}
 	}
@@ -382,6 +389,13 @@ func findProvider(name string, in providerInputs) (path, warning string, err err
 // (the user-bin shim directory, the managed skill bin directories, and
 // the environments root), and the ambient PATH.
 func providerInputsForHost(home string, providerDirs, projectBinDirs []string, revision providerRevision) (providerInputs, error) {
+	return providerInputsForHostWithPath(home, providerDirs, projectBinDirs, revision, nil)
+}
+
+// providerInputsForHostWithPath is the host builder with an optional PATH
+// override. Production leaves the override nil; CLI tests inject a private
+// search path without mutating the process environment.
+func providerInputsForHostWithPath(home string, providerDirs, projectBinDirs []string, revision providerRevision, pathOverride *string) (providerInputs, error) {
 	executable, err := os.Executable()
 	if err != nil {
 		return providerInputs{}, fmt.Errorf("cannot determine the manager install directory: %v", err)
@@ -391,7 +405,11 @@ func providerInputsForHost(home string, providerDirs, projectBinDirs []string, r
 	}
 	published := []labeledDir{}
 	userHome, _ := os.UserHomeDir()
-	selection := globalbins.Select(home, runtime.GOOS, pathEnvironment(), userHome)
+	environment := pathEnvironment()
+	if pathOverride != nil {
+		environment["PATH"] = *pathOverride
+	}
+	selection := globalbins.Select(home, runtime.GOOS, environment, userHome)
 	if selection.Path != "" {
 		refused, err := userBinShimRefused(selection)
 		if err != nil {
@@ -410,7 +428,7 @@ func providerInputsForHost(home string, providerDirs, projectBinDirs []string, r
 		providerDirs:  providerDirs,
 		publishedDirs: published,
 		managedRoots:  []labeledDir{{path: filepath.Join(home, "environments"), label: "the environments root"}},
-		pathEntries:   filepath.SplitList(os.Getenv("PATH")),
+		pathEntries:   filepath.SplitList(environment["PATH"]),
 		platform:      runtime.GOOS,
 		pathExt:       windowsPathExt(),
 		revision:      revision,
@@ -584,7 +602,11 @@ func discoverProviderNames(in providerInputs) []string {
 // refusal, missing, or an unreadable trust root. A refused or failed
 // provider row is non-current; the warning row stays current.
 func providerPosture(home string, providerDirs, projectBinDirs []string) ([]envprofile.ProviderState, *envprofile.StateDiagnostic) {
-	in, err := providerInputsForHost(home, providerDirs, projectBinDirs, activeProviderRevision)
+	return providerPostureWithPath(home, providerDirs, projectBinDirs, nil)
+}
+
+func providerPostureWithPath(home string, providerDirs, projectBinDirs []string, pathOverride *string) ([]envprofile.ProviderState, *envprofile.StateDiagnostic) {
+	in, err := providerInputsForHostWithPath(home, providerDirs, projectBinDirs, activeProviderRevision, pathOverride)
 	if err != nil {
 		var stateErr *stateread.Error
 		if errors.As(err, &stateErr) {
@@ -684,7 +706,7 @@ func (c cli) cmdUmbrella(cfg *config.Config, home string, args []string) int {
 		}
 		sort.Strings(projectBins)
 	}
-	in, err := providerInputsForHost(home, providerDirs, projectBins, activeProviderRevision)
+	in, err := providerInputsForHostWithPath(home, providerDirs, projectBins, activeProviderRevision, c.providerPathOverride)
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail

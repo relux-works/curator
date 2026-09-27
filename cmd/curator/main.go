@@ -186,6 +186,10 @@ type cli struct {
 	stdout   io.Writer
 	stderr   io.Writer
 	userHome func() (string, error)
+	// providerPathOverride is used by in-process CLI tests to make the
+	// status and umbrella paths hermetic without changing process PATH.
+	// Production callers leave it nil and use the host environment.
+	providerPathOverride *string
 	// unmanageBackupLstat and unmanageBackupReadDir are backup-inventory test
 	// seams; production commands leave them nil and envprofile uses stateread.
 	unmanageBackupLstat   func(string) (stateread.Metadata, error)
@@ -838,6 +842,13 @@ func (c cli) cmdStatus(args []string) int {
 			registryStateUnreadable = true
 		}
 	}
+	providers, providerDiagnostic := providerPostureForConfig(cfg, c.providerPathOverride)
+	providersCurrent := providerDiagnostic == nil
+	for _, provider := range providers {
+		if !provider.Current {
+			providersCurrent = false
+		}
+	}
 
 	exitCode := exitOK
 	jsonResults := make([]map[string]any, 0, len(targets))
@@ -901,9 +912,15 @@ func (c cli) cmdStatus(args []string) int {
 		// travel under their own key, present only when non-empty, so a
 		// JSON consumer sees the same read failures the human output
 		// prints.
-		payload := map[string]any{"alias": target.Alias, "path": target.Root, "skills": drift, "shell_hook_trust": trustRows}
+		payload := map[string]any{
+			"alias": target.Alias, "path": target.Root, "skills": drift,
+			"shell_hook_trust": trustRows, "providers": providers,
+		}
 		if len(registryRows) > 0 {
 			payload["registry_posture"] = registryRows
+		}
+		if providerDiagnostic != nil {
+			payload["provider_diagnostic"] = providerDiagnostic
 		}
 		if len(trustWarnings) > 0 {
 			payload["shell_hook_trust_warnings"] = trustWarnings
@@ -941,6 +958,12 @@ func (c cli) cmdStatus(args []string) int {
 		for _, row := range registryRows {
 			_, _ = fmt.Fprintln(c.stdout, formatRegistryPosture(row))
 		}
+		if providerDiagnostic != nil {
+			_, _ = fmt.Fprintf(c.stdout, "provider diagnostic %s: %s: %s\n", providerDiagnostic.Code, providerDiagnostic.Path, providerDiagnostic.Detail)
+		}
+		for _, provider := range providers {
+			_, _ = fmt.Fprintf(c.stdout, "provider %s: %s\n", provider.Name, describeProvider(provider))
+		}
 	}
 	// A changed file, a recorded file whose bytes are missing or
 	// unreadable, or an unreadable approval state is non-current; an
@@ -950,6 +973,9 @@ func (c cli) cmdStatus(args []string) int {
 		exitCode = exitFail
 	}
 	if *check && registryStateUnreadable {
+		exitCode = exitFail
+	}
+	if *check && !providersCurrent {
 		exitCode = exitFail
 	}
 	if *jsonOut {

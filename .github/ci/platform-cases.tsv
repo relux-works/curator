@@ -499,6 +499,9 @@ cmd/curator	TestEnvStatusMatrix	linux,darwin,windows	-	-	env status reports the 
 cmd/curator	TestUmbrellaMissingProvider	linux,darwin,windows	-	-	an unknown subcommand with no provider names the executable and the installation guidance
 cmd/curator	TestUmbrellaDispatchesToProvider	linux,darwin	windows	host-capability	the provider receives the remaining arguments verbatim over a POSIX launcher fixture
 cmd/curator	TestUmbrellaPropagatesExitCode	linux,darwin	windows	host-capability	the provider exit code is the command exit code over a POSIX launcher fixture
+cmd/curator	TestUmbrellaTrustedRootSymlinkEscape	linux,darwin,windows	linux,darwin,windows	host-capability	a provider symlink in a trust root cannot escape it under either rollout revision
+cmd/curator	TestUmbrellaProviderResolutionVectors	linux,darwin,windows	linux,darwin,windows	root-unset	the pinned provider-resolution vector cases reach the production resolver under both rollout revisions
+cmd/curator	TestCuratorStatusProviderPostureAndCheck	linux,darwin,windows	-	-	curator status reports provider paths and trust verdicts, and --check fails for missing provider rows
 
 # Opt-in developer probe -- never required, always tolerated.
 # ===========================================================================

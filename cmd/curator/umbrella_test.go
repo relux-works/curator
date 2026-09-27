@@ -131,6 +131,51 @@ func TestUmbrellaHostilePathPlantRefusedUnderB(t *testing.T) {
 	}
 }
 
+func TestUmbrellaTrustedRootSymlinkEscape(t *testing.T) {
+	tmp := t.TempDir()
+	install := filepath.Join(tmp, "install")
+	later := filepath.Join(tmp, "later")
+	outside := filepath.Join(tmp, "outside")
+	for _, dir := range []string{install, later, outside} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	target := writeProviderFile(t, outside, "curator-run", true)
+	link := filepath.Join(install, "curator-run")
+	if runtime.GOOS == "windows" {
+		link += ".exe"
+	}
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("host cannot create the provider symlink fixture: %v", err)
+	}
+	fallback := writeProviderFile(t, later, "curator-run", true)
+
+	for _, revision := range []providerRevision{providerRevisionA, providerRevisionB} {
+		in := umbrellaInputs(install, []string{later}, []string{install}, revision)
+		outcome := resolveProvider("run", in)
+		switch revision {
+		case providerRevisionA:
+			if outcome.resolved != link || !outcome.warned || outcome.diagnostic != providerDiagnosticOutsideRoots {
+				t.Fatalf("revision A symlink outcome = %+v, want PATH selection with the outside-roots warning", outcome)
+			}
+			if outcome.hintDir != canonicalPath(outside) {
+				t.Fatalf("revision A hint = %q, want the resolved target directory %q", outcome.hintDir, canonicalPath(outside))
+			}
+		case providerRevisionB:
+			if outcome.resolved != "" || outcome.diagnostic != providerDiagnosticUntrusted || outcome.untrustedPath != link {
+				t.Fatalf("revision B symlink outcome = %+v, want a refusal of %q before considering later candidate %q", outcome, link, fallback)
+			}
+			message := outcome.failure("run")
+			for _, want := range []string{providerDiagnosticUntrusted, link, install, later} {
+				if !strings.Contains(message, want) {
+					t.Fatalf("revision B refusal misses %q: %s", want, message)
+				}
+			}
+		}
+	}
+}
+
 // TestUmbrellaTrustRootSelectionBothRevisions pins the selection
 // matrix: install dir first, listed order, non-executables skipped,
 // never descending, and the revision-A PATH-only semantics.

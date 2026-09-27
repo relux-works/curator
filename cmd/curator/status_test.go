@@ -22,6 +22,7 @@ import (
 	"github.com/relux-works/curator/internal/buildmeta"
 	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/config"
+	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/hookapproval"
 	"github.com/relux-works/curator/internal/install"
@@ -87,21 +88,53 @@ func TestCLIHelperProcess(t *testing.T) {
 func capture(t *testing.T, configPath string, args ...string) (int, string, string) {
 	t.Helper()
 	userHome := filepath.Join(filepath.Dir(filepath.Dir(configPath)), "user")
+	if len(args) > 0 && args[0] == "status" {
+		path := statusProviderPath(t, os.Getenv("PATH"))
+		return captureWithUserHomeAndProviderPath(t, configPath, func() (string, error) { return userHome, nil }, &path, args...)
+	}
 	return captureWithUserHome(t, configPath, func() (string, error) { return userHome, nil }, args...)
 }
 
 func captureWithUserHome(t *testing.T, configPath string, userHome func() (string, error), args ...string) (int, string, string) {
+	return captureWithUserHomeAndProviderPath(t, configPath, userHome, nil, args...)
+}
+
+func captureWithUserHomeAndProviderPath(t *testing.T, configPath string, userHome func() (string, error), providerPath *string, args ...string) (int, string, string) {
 	t.Helper()
 	var stdout, stderr strings.Builder
-	command := cli{config: fileConfigSource(configPath), stdout: &stdout, stderr: &stderr, userHome: userHome}
+	command := cli{config: fileConfigSource(configPath), stdout: &stdout, stderr: &stderr, userHome: userHome, providerPathOverride: providerPath}
 	code := command.run(args)
 	return code, stdout.String(), stderr.String()
+}
+
+func statusProviderPath(t *testing.T, inherited string) string {
+	t.Helper()
+	dir := t.TempDir()
+	extension := ""
+	if runtime.GOOS == "windows" {
+		extension = ".exe"
+	}
+	for _, name := range []string{"curator-run", "curator-session"} {
+		if err := os.WriteFile(filepath.Join(dir, name+extension), []byte("status provider fixture\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if inherited == "" {
+		return dir
+	}
+	return dir + string(os.PathListSeparator) + inherited
 }
 
 // captureWithEnv drives the real CLI core in an isolated helper process for
 // cases whose contract is specifically about process environment selection.
 func captureWithEnv(t *testing.T, configPath string, environment map[string]string, args ...string) (int, string, string) {
 	t.Helper()
+	environment = cloneEnvironment(environment)
+	if len(args) > 0 && args[0] == "status" {
+		if _, explicit := environment["PATH"]; !explicit {
+			environment["PATH"] = statusProviderPath(t, os.Getenv("PATH"))
+		}
+	}
 	commandArgs := []string{"-test.run=^TestCLIHelperProcess$", "--"}
 	commandArgs = append(commandArgs, args...)
 	command := exec.Command(os.Args[0], commandArgs...)
@@ -132,12 +165,21 @@ func captureWithEnv(t *testing.T, configPath string, environment map[string]stri
 	return code, stdout.String(), stderr.String()
 }
 
+func cloneEnvironment(environment map[string]string) map[string]string {
+	clone := make(map[string]string, len(environment))
+	for key, value := range environment {
+		clone[key] = value
+	}
+	return clone
+}
+
 // statusPayload is the machine-readable status document one project produces.
 type statusPayload struct {
-	Alias  string            `json:"alias"`
-	Path   string            `json:"path"`
-	Skills map[string]string `json:"skills"`
-	Builds []buildReport     `json:"builds"`
+	Alias     string                     `json:"alias"`
+	Path      string                     `json:"path"`
+	Skills    map[string]string          `json:"skills"`
+	Builds    []buildReport              `json:"builds"`
+	Providers []envprofile.ProviderState `json:"providers"`
 }
 
 func decodeStatus(t *testing.T, payload string) statusPayload {
@@ -1738,15 +1780,16 @@ func TestStatusJSONKeepsTheLegacyShapeWithoutCompiledCommands(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &object); err != nil {
 		t.Fatalf("status --json is not one JSON object: %v\n%s", err, stdout)
 	}
-	// The §8.6 posture extends the historical document additively: the
-	// three legacy keys keep their shape, and the trust rows arrive under
-	// exactly one new key. A closure without compiled commands still
-	// carries no build key at all.
-	if len(object) != 4 || object["alias"] == nil || object["path"] == nil || object["skills"] == nil {
+	// The §8.6 and §11 postures extend the document additively. A closure
+	// without compiled commands still carries no build key at all.
+	if len(object) != 5 || object["alias"] == nil || object["path"] == nil || object["skills"] == nil {
 		t.Fatalf("status --json changed the historical document shape:\n%s", stdout)
 	}
 	if object["builds"] != nil {
 		t.Fatalf("status --json without compiled commands carries a builds key:\n%s", stdout)
+	}
+	if len(decodeStatus(t, stdout).Providers) != 2 {
+		t.Fatalf("status providers = %+v, want the always-reported run and session rows", decodeStatus(t, stdout).Providers)
 	}
 	rows, ok := object["shell_hook_trust"].([]any)
 	if !ok || len(rows) != 2 {
@@ -1778,6 +1821,132 @@ func TestStatusJSONKeepsTheLegacyShapeWithoutCompiledCommands(t *testing.T) {
 	if !ok || skills["skill-a"] != stateUpToDate {
 		t.Fatalf("skills = %v", object["skills"])
 	}
+}
+
+func TestCuratorStatusProviderPostureAndCheck(t *testing.T) {
+	_, home := legacyProject(t)
+	configPath := filepath.Join(home, "config.json")
+	if code, _, stderr := capture(t, configPath, "install", "app"); code != exitOK {
+		t.Fatalf("install = %d\n%s", code, stderr)
+	}
+
+	withoutProviders := pathWithoutUmbrellaProviders(t, os.Getenv("PATH"))
+	providerPath := statusProviderPath(t, withoutProviders)
+	providerDir := filepath.SplitList(providerPath)[0]
+	code, stdout, stderr := captureWithEnv(t, configPath, map[string]string{"PATH": providerPath}, "status", "app", "--json")
+	if code != exitOK {
+		t.Fatalf("status = %d\nstderr:\n%s", code, stderr)
+	}
+	report := decodeStatus(t, stdout)
+	byName := make(map[string]envprofile.ProviderState, len(report.Providers))
+	for _, row := range report.Providers {
+		byName[row.Name] = row
+	}
+	for _, name := range []string{"run", "session"} {
+		row, ok := byName[name]
+		if !ok {
+			t.Fatalf("status omitted always-reported curator-%s row: %+v", name, report.Providers)
+		}
+		wantPath := filepath.Join(providerDir, "curator-"+name)
+		if runtime.GOOS == "windows" {
+			wantPath += ".exe"
+		}
+		if row.Resolved == nil || *row.Resolved != wantPath || row.Verdict != envprofile.ProviderOutsideTrustRoots || !row.Current {
+			t.Fatalf("status row %s = %+v, want resolved warning row for %s", name, row, wantPath)
+		}
+		if len(row.TrustRoots) == 0 {
+			t.Fatalf("status row %s names no trust roots: %+v", name, row)
+		}
+	}
+	if code, _, stderr := captureWithEnv(t, configPath, map[string]string{"PATH": providerPath}, "status", "app", "--check"); code != exitOK {
+		t.Fatalf("current warning rows made status --check fail: %d\n%s", code, stderr)
+	}
+
+	code, stdout, stderr = captureWithEnv(t, configPath, map[string]string{"PATH": withoutProviders}, "status", "app", "--json", "--check")
+	if code != exitFail {
+		t.Fatalf("missing provider rows made status --check = %d, want %d\n%s", code, exitFail, stderr)
+	}
+	report = decodeStatus(t, stdout)
+	for _, name := range []string{"run", "session"} {
+		row := findProviderState(t, report.Providers, name)
+		if row.Verdict != envprofile.ProviderMissing || row.Current || row.Diagnostic == nil || *row.Diagnostic != providerDiagnosticMissing {
+			t.Fatalf("missing row %s = %+v", name, row)
+		}
+	}
+	code, human, stderr := captureWithEnv(t, configPath, map[string]string{"PATH": providerPath}, "status", "app")
+	if code != exitOK || !strings.Contains(human, "provider run:") || !strings.Contains(human, providerDir) || !strings.Contains(human, providerDiagnosticOutsideRoots) {
+		t.Fatalf("human provider posture = %d\n%s\nstderr:\n%s", code, human, stderr)
+	}
+
+	// A configured trust root that cannot be read is reported as unreadable,
+	// and it outranks the PATH provider just as it does during dispatch.
+	unreadableRoot := filepath.Join(t.TempDir(), "missing-provider-root")
+	configBytes, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var configDocument map[string]any
+	if err := json.Unmarshal(configBytes, &configDocument); err != nil {
+		t.Fatal(err)
+	}
+	configDocument["schema_version"] = 2
+	environments, _ := configDocument["environments"].(map[string]any)
+	if environments == nil {
+		environments = map[string]any{}
+	}
+	environments["provider_directories"] = []any{unreadableRoot}
+	configDocument["environments"] = environments
+	configBytes, err = json.Marshal(configDocument)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, configBytes, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, stdout, stderr = captureWithEnv(t, configPath, map[string]string{"PATH": providerPath}, "status", "app", "--json", "--check")
+	if code != exitFail {
+		t.Fatalf("unreadable provider root made status --check = %d, want %d\n%s", code, exitFail, stderr)
+	}
+	report = decodeStatus(t, stdout)
+	for _, name := range []string{"run", "session"} {
+		row := findProviderState(t, report.Providers, name)
+		if row.Verdict != envprofile.ProviderUnreadable || row.Current || row.Diagnostic == nil || *row.Diagnostic != providerDiagnosticRootUnreadable || row.UnreadableDirectory == nil || *row.UnreadableDirectory != unreadableRoot {
+			t.Fatalf("unreadable row %s = %+v, want the first unreadable root %q", name, row, unreadableRoot)
+		}
+	}
+}
+
+func pathWithoutUmbrellaProviders(t *testing.T, path string) string {
+	t.Helper()
+	var kept []string
+	for _, dir := range filepath.SplitList(path) {
+		containsProvider := false
+		for _, name := range []string{"curator-run", "curator-session"} {
+			candidate := filepath.Join(dir, name)
+			if runtime.GOOS == "windows" {
+				candidate += ".exe"
+			}
+			if info, err := os.Stat(candidate); err == nil && info.Mode().IsRegular() {
+				containsProvider = true
+				break
+			}
+		}
+		if !containsProvider {
+			kept = append(kept, dir)
+		}
+	}
+	return strings.Join(kept, string(os.PathListSeparator))
+}
+
+func findProviderState(t *testing.T, rows []envprofile.ProviderState, name string) envprofile.ProviderState {
+	t.Helper()
+	for _, row := range rows {
+		if row.Name == name {
+			return row
+		}
+	}
+	t.Fatalf("provider row %q is missing from %+v", name, rows)
+	return envprofile.ProviderState{}
 }
 
 // TestStatusAcceptsAnUnchangedLegacyMarkerSchema pins the legacy contract: a
