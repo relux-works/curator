@@ -1,0 +1,4355 @@
+diff --git a/.github/ci/conformance-gaps.tsv b/.github/ci/conformance-gaps.tsv
+index 008af583..dcde103d 100644
+--- a/.github/ci/conformance-gaps.tsv
++++ b/.github/ci/conformance-gaps.tsv
+@@ -2,60 +2,10 @@
+ # after the named published case passes its production-entry consumer.
+ # Case IDs and owners are verified against v1.0.0-rc.13 tag commit 23435129ebc4c29e5b7f75ec72a0aa0cd3f16065.
+ family	case_id	owner	reason
+-manager-config-v2/schema-cases	invalid-system-module-waiver-missing-reason.json	STORY-260916-ioemse	Load rejects before E2 validation at the unsupported E1 require_source_signers field; permissions are supported on trunk.
+-manager-config-v2/schema-cases	invalid-system-module-waiver-package-grammar.json	STORY-260916-ioemse	Load rejects before E2 validation at the unsupported E1 require_source_signers field; permissions are supported on trunk.
+-manager-config-v2/schema-cases	invalid-system-module-waiver-unknown-field.json	STORY-260916-ioemse	Load rejects before E2 validation at the unsupported E1 require_source_signers field; permissions are supported on trunk.
+-manager-config-v2/schema-cases	invalid-transitive-system-modules-value.json	STORY-260916-ioemse	Load rejects before E2 validation at the unsupported E1 require_source_signers field; permissions are supported on trunk.
+-manager-config-v2/schema-cases	valid-overlay-git-git-uppercase.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-git-http-uppercase.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-git-https-uppercase.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-git-scp-no-user.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-git-scp.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-git-single-letter-host.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-git-ssh-uppercase.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-path-colon-later-segment.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-path-relative.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-path-source.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-path-windows-backslash.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-path-windows-double-slash.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-path-windows-lowercase-drive.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-path-windows-slash.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-provider-directories-windows-drive.json	STORY-260922-1cenbr	Load rejects a valid manager-config case containing the adopted 0017/0018 configuration model.
+-manager-config-v2/schema-cases	valid-provider-directories.json	STORY-260922-1cenbr	Load rejects a valid manager-config case containing the adopted 0017/0018 configuration model.
+ manager-config-v2/schema-cases	valid-registry-bootstrap-members.json	STORY-260910-6bo7ej	Load rejects the valid registry bootstrap members case published by S2.
+-manager-config-v2/schema-cases	valid-require-source-signers.json	STORY-260916-ioemse	Load rejects the valid source_signers or require_source_signers case published by E1.
+ manager-config-v2/schema-cases	valid-security-posture-hardened.json	STORY-260910-2qmrb8	Load rejects the valid security_posture case published by S1/S3.
+ manager-config-v2/schema-cases	valid-security-posture-permissive.json	STORY-260910-2qmrb8	Load rejects the valid security_posture case published by S1/S3.
+-manager-config-v2/schema-cases	valid-source-signers-empty-list.json	STORY-260916-ioemse	Load rejects the valid source_signers or require_source_signers case published by E1.
+-manager-config-v2/schema-cases	valid-source-signers-gpg.json	STORY-260916-ioemse	Load rejects the valid source_signers or require_source_signers case published by E1.
+-manager-config-v2/schema-cases	valid-source-signers.json	STORY-260916-ioemse	Load rejects the valid source_signers or require_source_signers case published by E1.
+-manager-config-v2/schema-cases	valid-system-module-waiver.json	STORY-260916-ioemse	Load rejects this published-valid case at the unsupported E1 require_source_signers field; permissions are supported on trunk.
+-manager-config-v2/schema-cases	valid.json	STORY-260922-1cenbr	Load rejects a valid manager-config case containing the adopted 0017/0018 configuration model.
+-manager-config-v2/vectors	schema2-empty-environments-defaults	STORY-260922-1cenbr	EffectiveJSON differs from the updated manager-config defaults and permission interface adopted by 0017/0018.
+-manager-config-v2/vectors	schema2-every-knob	STORY-260916-ioemse	Parse rejects the source signer fields introduced by E1.
+-manager-config-v2/vectors	schema2-minimal-defaults	STORY-260922-1cenbr	EffectiveJSON differs from the updated manager-config defaults and permission interface adopted by 0017/0018.
+-manager-config-v2/vectors	schema2-overlay-git-git-uppercase	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-git-http-uppercase	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-git-https-uppercase	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-git-scp	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-git-scp-no-user	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-git-single-letter-host	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-git-ssh-uppercase	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-path-colon-later-segment	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-path-relative	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-path-source	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-path-windows-backslash	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-path-windows-double-slash	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-path-windows-lowercase-drive	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-path-windows-slash	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-partial-knobs-fill-defaults	STORY-260922-1cenbr	EffectiveJSON differs from the updated manager-config defaults and permission interface adopted by 0017/0018.
+-manager-config-v2/vectors	schema2-passable-env-absent-empty	STORY-260922-1cenbr	EffectiveJSON differs from the updated manager-config defaults and permission interface adopted by 0017/0018.
+-manager-config-v2/vectors	schema2-passable-env-explicit-empty	STORY-260922-1cenbr	EffectiveJSON differs from the updated manager-config defaults and permission interface adopted by 0017/0018.
+-manager-config-v2/vectors	schema2-passable-env-explicit-null-unbounded	STORY-260922-1cenbr	EffectiveJSON differs from the updated manager-config defaults and permission interface adopted by 0017/0018.
+-manager-config-v2/vectors	schema2-permissions	STORY-260922-1cenbr	EffectiveJSON differs from the updated manager-config defaults and permission interface adopted by 0017/0018.
+-manager-config-v2/vectors	schema2-provider-directories	STORY-260922-1cenbr	EffectiveJSON differs from the updated manager-config defaults and permission interface adopted by 0017/0018.
+ manager-config-v2/vectors	schema2-registry-bootstrap-members	STORY-260910-6bo7ej	Parse rejects the S2 bootstrap_checkpoint/mirror_group registry members.
+-manager-config-v2/vectors	schema2-source-signers	STORY-260916-ioemse	Parse rejects the source signer fields introduced by E1.
+ marker/install-marker-v4/schema-cases	invalid-external-declared-effective-mismatch.json	BUG-260923-2afgyq	marker.Read admits unequal declared and effective external repository identities
+ marker/install-marker-v4/schema-cases	invalid-marker-local-identity-kind-mismatch.json	BUG-260923-2afgyq	marker.Read admits a local marker identity with the wrong repository identity kind
+ marker/install-marker-v4/schema-cases	invalid-marker-network-identity-kind-mismatch.json	BUG-260923-2afgyq	marker.Read admits a network marker identity with the wrong repository identity kind
+@@ -63,9 +13,4 @@ marker/install-marker-v4/schema-cases	invalid-marker-sha1-effective-revision-wid
+ marker/install-marker-v4/schema-cases	invalid-marker-sha256-effective-revision-width.json	BUG-260923-2afgyq	marker.Read admits a SHA-256 external revision with the wrong effective width
+ script-host-execution-policy/executable-identity-cases	windows-exec-noncomponent-store-hardlinks	STORY-260925-1v7pvn	The production resolver accepts multiply-linked System32 targets without proving every additional link belongs to the component store.
+ script-host-execution-policy/executable-identity-cases	windows-exec-unowned-file-hardlinks	STORY-260925-1v7pvn	The production resolver accepts a multiply-linked file below captured SystemRoot\System32 without proving the target is platform-owned.
+-system-config-v2/schema-cases	invalid-transitive-system-modules-drop-direction.json	STORY-260916-ioemse	Load rejects before the E2 diagnostic because the updated system case locks source_signers from E1.
+-system-config-v2/schema-cases	invalid-transitive-system-modules-value.json	STORY-260916-ioemse	Load rejects before the E2 diagnostic because the updated system case locks source_signers from E1.
+-system-config-v2/schema-cases	valid-isolation-isolated-direction.json	STORY-260916-ioemse	Load rejects the system lock cases because source_signers locks from E1 are not supported.
+-system-config-v2/schema-cases	valid-isolation-shared-direction.json	STORY-260916-ioemse	Load rejects the system lock cases because source_signers locks from E1 are not supported.
+ system-config-v2/schema-cases	valid-security-posture-hardened-locked.json	STORY-260910-2qmrb8	Load rejects the locked hardened security_posture case published by S1/S3.
+-system-config-v2/schema-cases	valid.json	STORY-260916-ioemse	Load rejects the system lock cases because source_signers locks from E1 are not supported.
+diff --git a/.github/ci/root-artifacts.tsv b/.github/ci/root-artifacts.tsv
+index 2f1d5e0f..47a2354f 100644
+--- a/.github/ci/root-artifacts.tsv
++++ b/.github/ci/root-artifacts.tsv
+@@ -55,7 +55,7 @@
+ #   package  artefact[,artefact...]  note
+ #
+ # package	artefacts	note
+-cmd/curator	vectors/umbrella-provider-resolution.json,vectors/manager-lifecycle.json,vectors/environments-read-failure.json	TestUmbrellaProviderResolutionVectors, both lifecycle consumers, and TestEnvUnmanageBackupRecordVectors execute their complete published case families
++cmd/curator	vectors/umbrella-provider-resolution.json,vectors/manager-lifecycle.json,vectors/environments-read-failure.json,vectors/environments-source-signers.json	TestUmbrellaProviderResolutionVectors, both lifecycle consumers, TestEnvUnmanageBackupRecordVectors, and signer/update-confirmation production-entry tests bind their published case families
+ internal/buildsource	vectors/build-drivers.json	TestBuildSourceConformanceVectors reads the vector directly
+ internal/buildrepo	schema-cases/skill-build-v1,fixtures/external-repository/raw-objects.json,fixtures/external-repository/lfs-pointers.json,fixtures/external-repository/pack-index.json,fixtures/external-repository/local-config-and-refs.json,vectors/source-identities.json	complete skill-build-v1 and external-repository case consumers plus every published source identity
+ internal/devsub	schema-cases/skillfile-dev-v2	TestSkillfileDevV2PublishedCasesUseCoverageRatchet drives every published developer Skillfile schema case
+@@ -65,12 +65,13 @@ internal/scopes	vectors/external-repository-lifecycle.json	TestAuthoritativeGarb
+ internal/closure	vectors/closures.json,vectors/manager-lifecycle.json	TestClosureOrderingConformanceVector and TestBuildCommandOrderingConformanceVector read every case group they bind
+ internal/runtimestore	vectors/manager-lifecycle.json	launcher contract consumers bind the complete launcher_cases family
+ internal/contextmaterialize	vectors/environments.json	TestSystemModuleAdmissionVectors binds the published materialization family
++internal/contextresolve	vectors/environments-source-signers.json	TestSourceSignerVectorsAtResolve drives every signer vector through the resolver production entry
+ internal/marker	schema-cases/install-marker-v2,schema-cases/install-marker-v4,expected/build-driver/marker.json	the marker v2 and v4 schema cases and the authoritative compiled marker
+ internal/whitelist	fixtures/go-build-skill,expected/build-driver/context_files.json	the build-root context exclusion fixture and its expected file list
+ internal/moduleroots	vectors/module-roots.json	TestModuleRootVectors reads the vector directly
+ internal/scriptworker	vectors/script-host-execution-policy.json	TestExecutableIdentityCasesAtProductionEntry drives the published executable identity cases through the manager resolver
+ internal/scriptpolicy	vectors/script-host-execution-policy.json	the schema-8 script execution-policy family is read directly by every case in conformance_test.go
+-internal/envprofile	vectors/environments-codex-seed.json,vectors/environments-env-passthrough.json	TestEnvironmentsCodexSeedVectors and TestEnvironmentsEnvPassthroughVectors consume their published case groups
++internal/envprofile	vectors/environments-codex-seed.json,vectors/environments-env-passthrough.json,vectors/environments-source-signers.json	TestEnvironmentsCodexSeedVectors, TestEnvironmentsEnvPassthroughVectors, and every pinned system-delta vector are consumed
+ internal/envprofile	vectors/environments-read-failure.json	TestEnvironmentsReadFailureVectors drives the 37 marker, lock, seed, passthrough, and backup status cases through production entries; the two restore cases use the curator CLI consumer
+ internal/shell	vectors/shell-hook-trust.json	TestShellHookTrustVectors consumes every published trust case
+ internal/skillspec	schema-cases/agent-skill-v6,schema-cases/agent-skill-v7,schema-cases/csk-skill-v7,schema-cases/agent-skill-v8,schema-cases/csk-skill-v8,vectors/portable-paths.json,fixtures/go-build-skill	the schema v6 and v7 cases, BOTH schema-8 manifest families, portable-path vectors and the go-build skill fixture
+diff --git a/cmd/curator/envstatus.go b/cmd/curator/envstatus.go
+index e157c62c..86284a9f 100644
+--- a/cmd/curator/envstatus.go
++++ b/cmd/curator/envstatus.go
+@@ -23,6 +23,19 @@ func printEnvStatus(stdout io.Writer, status *envprofile.Status) {
+ 		}
+ 		_, _ = fmt.Fprintf(stdout, "require_current_profile: %s (%s)\n", *status.RequireCurrentProfile, locked)
+ 	}
++	_, _ = fmt.Fprintf(stdout, "require_source_signers: %t\n", status.RequireSourceSigners)
++	_, _ = fmt.Fprintf(stdout, "update_confirmation: %s (%s)\n", status.UpdateConfirmationRevision, status.UpdateConfirmationBehavior)
++	for _, row := range status.SourceSignerPosture {
++		state := row.State
++		if row.State == "enforced" {
++			state += " (" + row.Signer + ")"
++		}
++		current := "current"
++		if !row.Current {
++			current = "non-current"
++		}
++		_, _ = fmt.Fprintf(stdout, "source_signers profile %s %s %s %s: %s, %s\n", row.Profile, row.Kind, row.Name, row.Source, state, current)
++	}
+ 	for _, warning := range status.ShellHookTrustWarnings {
+ 		_, _ = fmt.Fprintf(stdout, "shell-hook-trust: warning: %s\n", warning)
+ 	}
+diff --git a/cmd/curator/profile.go b/cmd/curator/profile.go
+index 17e54928..5d8fc6f3 100644
+--- a/cmd/curator/profile.go
++++ b/cmd/curator/profile.go
+@@ -108,9 +108,10 @@ func (c cli) cmdProfileInstall(cfg *config.Config, args []string) int {
+ 	as := flags.String("as", "", "profile name (default: the root package name)")
+ 	use := flags.Bool("use", false, "activate the installed profile")
+ 	takeover := flags.Bool("takeover", false, "take over the unmanaged files the install would write")
++	confirmSystemDelta := flags.Bool("confirm-system-delta", false, "confirm system-module or MCP declaration changes on reinstall")
+ 	positional, err := parseInterspersed(flags, args)
+ 	if err != nil || len(positional) != 1 {
+-		_, _ = fmt.Fprintln(c.stderr, "curator: profile install <git-url|path> [--directory <dir>] [--range <range>|--tag <tag>|--revision <commit>] [--as <name>] [--use] [--takeover]")
++		_, _ = fmt.Fprintln(c.stderr, "curator: profile install <git-url|path> [--directory <dir>] [--range <range>|--tag <tag>|--revision <commit>] [--as <name>] [--use] [--takeover] [--confirm-system-delta]")
+ 		return exitUsage
+ 	}
+ 	policy := envprofile.PolicyFromConfig(cfg)
+@@ -122,11 +123,8 @@ func (c cli) cmdProfileInstall(cfg *config.Config, args []string) int {
+ 	info, activated, updated, err := envprofile.Install(cfg.Home(), envprofile.InstallOptions{
+ 		Operand: positional[0], Directory: *directory,
+ 		Range: *rng, Tag: *tag, Revision: *revision, As: *as, Use: *use,
+-		Policy: policy, SurfacingSink: c.stdout,
++		Policy: policy, SurfacingSink: c.stdout, WarningSink: c.stderr, ConfirmSystemDelta: *confirmSystemDelta,
+ 	})
+-	for _, warning := range info.Warnings {
+-		_, _ = fmt.Fprintln(c.stderr, "warning:", warning)
+-	}
+ 	for _, result := range info.Activation {
+ 		printEntryResult(c, result)
+ 	}
+@@ -277,9 +275,10 @@ func (c cli) cmdProfileUpdate(cfg *config.Config, args []string) int {
+ 	flags := c.newFlagSet("profile update")
+ 	all := flags.Bool("all", false, "update every installed profile")
+ 	takeover := flags.Bool("takeover", false, "take over the unmanaged files the update would write")
++	confirmSystemDelta := flags.Bool("confirm-system-delta", false, "confirm system-module or MCP declaration changes")
+ 	positional, err := parseInterspersed(flags, args)
+ 	if err != nil || (*all && len(positional) != 0) || (!*all && len(positional) > 1) {
+-		_, _ = fmt.Fprintln(c.stderr, "curator: profile update [<name>|--all] [--takeover]")
++		_, _ = fmt.Fprintln(c.stderr, "curator: profile update [<name>|--all] [--takeover] [--confirm-system-delta]")
+ 		return exitUsage
+ 	}
+ 	policy := envprofile.PolicyFromConfig(cfg)
+@@ -319,16 +318,16 @@ func (c cli) cmdProfileUpdate(cfg *config.Config, args []string) int {
+ 		// nothing prints twice. The closed columns carry no per-profile
+ 		// prefix.
+ 		info, moved, err := envprofile.UpdateWithOptions(cfg.Home(), name, envprofile.UpdateOptions{
+-			Policy: policy, SurfacingSink: c.stdout,
++			Policy: policy, SurfacingSink: c.stdout, WarningSink: c.stderr, ConfirmSystemDelta: *confirmSystemDelta,
+ 		})
+ 		if err != nil {
+ 			_, _ = fmt.Fprintf(c.stderr, "%s: %v\n", name, err)
+ 			failed = true
++			if strings.Contains(err.Error(), envprofile.DiagSystemDeltaConfirmationRequired) {
++				break
++			}
+ 			continue
+ 		}
+-		for _, warning := range info.Warnings {
+-			_, _ = fmt.Fprintf(c.stderr, "%s: warning: %s\n", name, warning)
+-		}
+ 		if moved {
+ 			_, _ = fmt.Fprintf(c.stdout, "%s: updated (lock %s)\n", info.Name, info.LockHash)
+ 		} else {
+diff --git a/cmd/curator/profile_delta_confirmation_test.go b/cmd/curator/profile_delta_confirmation_test.go
+new file mode 100644
+index 00000000..4fd8eee6
+--- /dev/null
++++ b/cmd/curator/profile_delta_confirmation_test.go
+@@ -0,0 +1,447 @@
++package main
++
++import (
++	"encoding/json"
++	"fmt"
++	"os"
++	"path/filepath"
++	"regexp"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/contextstore"
++	"github.com/relux-works/curator/internal/envprofile"
++)
++
++func TestProfileUpdateSystemDeltaConfirmationGolden(t *testing.T) {
++	requireGit(t)
++	source, home := profileHome(t)
++	const rawSource = "https://example.com/delta"
++	repo := t.TempDir()
++	writeGitRepoFile(t, repo, "agent-context.json", `{"schema_version":1,"name":"delta","version":"1.0.0"}`+"\n")
++	runGitRepo(t, repo, "init")
++	commitGitRepo(t, repo, "v1.0.0")
++	oldCommit := strings.TrimSpace(string(mustGitOutput(t, repo, "rev-parse", "HEAD")))
++	serveGitRepos(t, map[string]string{rawSource: repo})
++	code, _, stderr := runProfile(t, source, "profile", "install", rawSource)
++	if code != exitOK {
++		t.Fatalf("initial install = %d: %s", code, stderr)
++	}
++	lockPath := filepath.Join(envprofile.ProfileDir(home, "delta"), "lock.json")
++	oldLock, err := os.ReadFile(lockPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	writeGitRepoFile(t, repo, "agent-context.json", `{"schema_version":1,"name":"delta","version":"1.0.1","context":{"modules":[{"path":"system.md","class":"system","environments":["claude_code"]}]}}`+"\n")
++	writeGitRepoFile(t, repo, "context/system.md", "system prompt v1\n")
++	commitGitRepo(t, repo, "v1.0.1")
++	newCommit := strings.TrimSpace(string(mustGitOutput(t, repo, "rev-parse", "HEAD")))
++	refusedCode, refusedOut, refusedErr := runProfile(t, source, "profile", "update", "delta")
++	if refusedCode != exitFail {
++		t.Fatalf("unconfirmed update = %d\nstdout:\n%s\nstderr:\n%s", refusedCode, refusedOut, refusedErr)
++	}
++	afterRefusal, err := os.ReadFile(lockPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if string(afterRefusal) != string(oldLock) {
++		t.Fatal("confirmation refusal changed the installed lock")
++	}
++	candidateEntry := contextstore.EntryDir(home, contextlock.KindContext, "delta", newCommit)
++	if _, err := os.Lstat(candidateEntry); !os.IsNotExist(err) {
++		t.Fatalf("confirmation refusal installed a candidate store entry: %v", err)
++	}
++	confirmedCode, confirmedOut, confirmedErr := runProfile(t, source, "profile", "update", "delta", "--confirm-system-delta")
++	if confirmedCode != exitOK {
++		t.Fatalf("confirmed update = %d\nstdout:\n%s\nstderr:\n%s", confirmedCode, confirmedOut, confirmedErr)
++	}
++	if bytesEqual, err := os.ReadFile(lockPath); err != nil || string(bytesEqual) == string(oldLock) {
++		t.Fatalf("confirmed update did not publish the new lock: err=%v", err)
++	}
++	if _, err := os.Stat(candidateEntry); err != nil {
++		t.Fatalf("confirmed update did not install the candidate store entry: %v", err)
++	}
++	transcript := "refused: exit=1\nstdout:\n" + refusedOut + "stderr:\n" + refusedErr +
++		"confirmed: exit=0\nstdout:\n" + confirmedOut + "stderr:\n" + confirmedErr
++	transcript = normalizeDeltaTranscript(transcript, oldCommit, newCommit)
++	want, err := os.ReadFile(filepath.Join("testdata", "profile-update-system-delta.golden"))
++	if err != nil {
++		t.Fatalf("missing golden: %v\nactual transcript:\n%s", err, transcript)
++	}
++	if transcript != string(want) {
++		t.Fatalf("system-delta output differs from the pinned golden:\n%s", transcript)
++	}
++}
++
++func TestProfileUpdateMCPDeltaConfirmationGolden(t *testing.T) {
++	requireGit(t)
++	source, home := profileHome(t)
++	const rootSource = "https://example.com/mcp-root"
++	const toolSource = "https://example.com/mcp-tool"
++	rootRepo := t.TempDir()
++	writeGitRepoFile(t, rootRepo, "agent-context.json", `{"schema_version":1,"name":"mcp-root","version":"1.0.0"}`+"\n")
++	runGitRepo(t, rootRepo, "init")
++	commitGitRepo(t, rootRepo, "v1.0.0")
++	oldRootCommit := strings.TrimSpace(string(mustGitOutput(t, rootRepo, "rev-parse", "HEAD")))
++	toolRepo := t.TempDir()
++	writeGitRepoFile(t, toolRepo, "agent-mcp.json", `{"schema_version":1,"name":"tool","version":"1.0.0","server":{"transport":"stdio","command":"npx","args":["tool"],"env_names":[]}}`+"\n")
++	runGitRepo(t, toolRepo, "init")
++	commitGitRepo(t, toolRepo, "v1.0.0")
++	toolCommit := strings.TrimSpace(string(mustGitOutput(t, toolRepo, "rev-parse", "HEAD")))
++	serveGitRepos(t, map[string]string{rootSource: rootRepo, toolSource: toolRepo})
++	code, _, stderr := runProfile(t, source, "profile", "install", rootSource)
++	if code != exitOK {
++		t.Fatalf("initial install = %d: %s", code, stderr)
++	}
++	lockPath := filepath.Join(envprofile.ProfileDir(home, "mcp-root"), "lock.json")
++	oldLock, err := os.ReadFile(lockPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	writeGitRepoFile(t, rootRepo, "agent-context.json", `{"schema_version":1,"name":"mcp-root","version":"1.1.0","requires":{"mcp":{"tool":{"git":"`+toolSource+`","range":"*"}}}}`+"\n")
++	commitGitRepo(t, rootRepo, "v1.1.0")
++	newRootCommit := strings.TrimSpace(string(mustGitOutput(t, rootRepo, "rev-parse", "HEAD")))
++	refusedCode, refusedOut, refusedErr := runProfile(t, source, "profile", "update", "mcp-root")
++	if refusedCode != exitFail {
++		t.Fatalf("unconfirmed update = %d\nstdout:\n%s\nstderr:\n%s", refusedCode, refusedOut, refusedErr)
++	}
++	afterRefusal, err := os.ReadFile(lockPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if string(afterRefusal) != string(oldLock) {
++		t.Fatal("confirmation refusal changed the installed lock")
++	}
++	candidateEntries := []string{
++		contextstore.EntryDir(home, contextlock.KindContext, "mcp-root", newRootCommit),
++		contextstore.EntryDir(home, contextlock.KindMCP, "tool", toolCommit),
++	}
++	for _, entry := range candidateEntries {
++		if _, err := os.Lstat(entry); !os.IsNotExist(err) {
++			t.Fatalf("confirmation refusal installed candidate store entry %s: %v", entry, err)
++		}
++	}
++	confirmedCode, confirmedOut, confirmedErr := runProfile(t, source, "profile", "update", "mcp-root", "--confirm-system-delta")
++	if confirmedCode != exitOK {
++		t.Fatalf("confirmed update = %d\nstdout:\n%s\nstderr:\n%s", confirmedCode, confirmedOut, confirmedErr)
++	}
++	if bytesEqual, err := os.ReadFile(lockPath); err != nil || string(bytesEqual) == string(oldLock) {
++		t.Fatalf("confirmed update did not publish the new lock: err=%v", err)
++	}
++	for _, entry := range candidateEntries {
++		if _, err := os.Stat(entry); err != nil {
++			t.Fatalf("confirmed update did not install candidate store entry %s: %v", entry, err)
++		}
++	}
++	transcript := "refused: exit=1\nstdout:\n" + refusedOut + "stderr:\n" + refusedErr +
++		"confirmed: exit=0\nstdout:\n" + confirmedOut + "stderr:\n" + confirmedErr
++	transcript = strings.ReplaceAll(transcript, oldRootCommit, "<old-root-commit>")
++	transcript = strings.ReplaceAll(transcript, newRootCommit, "<new-root-commit>")
++	transcript = strings.ReplaceAll(transcript, toolCommit, "<tool-commit>")
++	transcript = regexp.MustCompile(`sha256:[0-9a-f]{64}`).ReplaceAllString(transcript, "sha256:<lock-hash>")
++	want, err := os.ReadFile(filepath.Join("testdata", "profile-update-mcp-delta.golden"))
++	if err != nil {
++		t.Fatalf("missing golden: %v\nactual transcript:\n%s", err, transcript)
++	}
++	if transcript != string(want) {
++		t.Fatalf("MCP-delta output differs from the pinned golden:\n%s", transcript)
++	}
++}
++
++type confirmationVectors struct {
++	AllCases []struct {
++		Name     string `json:"name"`
++		Flag     bool   `json:"flag"`
++		Expected struct {
++			Profiles []struct {
++				Profile   string              `json:"profile"`
++				Trigger   []string            `json:"trigger"`
++				RevisionB profileDeltaOutcome `json:"revision_b"`
++			} `json:"profiles"`
++			Stopped struct {
++				RevisionB *string `json:"revision_b"`
++			} `json:"stopped"`
++		} `json:"expected"`
++	} `json:"all_cases"`
++	ReinstallCases []struct {
++		Name     string `json:"name"`
++		Flag     bool   `json:"flag"`
++		Expected struct {
++			RevisionB profileDeltaOutcome `json:"revision_b"`
++		} `json:"expected"`
++	} `json:"reinstall_cases"`
++}
++
++type profileDeltaOutcome struct {
++	Diagnostic string
++	Proceeds   bool
++	Untouched  bool
++}
++
++func (outcome *profileDeltaOutcome) UnmarshalJSON(payload []byte) error {
++	var untouched string
++	if err := json.Unmarshal(payload, &untouched); err == nil {
++		outcome.Untouched = untouched == "untouched"
++		return nil
++	}
++	var value struct {
++		Diagnostic string `json:"diagnostic"`
++		Proceeds   bool   `json:"proceeds"`
++	}
++	if err := json.Unmarshal(payload, &value); err != nil {
++		return err
++	}
++	outcome.Diagnostic, outcome.Proceeds = value.Diagnostic, value.Proceeds
++	return nil
++}
++
++func loadConfirmationVectors(t *testing.T) confirmationVectors {
++	t.Helper()
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	payload, err := os.ReadFile(filepath.Join(root, "vectors", "environments-source-signers.json")) // #nosec G304 -- explicit conformance root
++	if err != nil {
++		t.Fatal(err)
++	}
++	var vectors confirmationVectors
++	if err := json.Unmarshal(payload, &vectors); err != nil {
++		t.Fatal(err)
++	}
++	if len(vectors.AllCases) != 2 || len(vectors.ReinstallCases) != 2 {
++		t.Fatalf("pinned all/reinstall case counts = %d/%d, want 2/2", len(vectors.AllCases), len(vectors.ReinstallCases))
++	}
++	return vectors
++}
++
++func TestProfileUpdateAllDeltaVectorsAtCLI(t *testing.T) {
++	requireGit(t)
++	vectors := loadConfirmationVectors(t)
++	for _, vector := range vectors.AllCases {
++		t.Run(vector.Name, func(t *testing.T) {
++			source, home := profileHome(t)
++			var repos map[string]string
++			var profiles []string
++			if vector.Flag {
++				const contextSource = "https://example.com/sysleaf"
++				const toolSource = "https://example.com/figma"
++				companyRepo := newContextRepo(t, "companyA", "1.0.0", "")
++				sysRepo := newContextRepo(t, "sysleaf", "1.0.0", "")
++				personalRepo := newContextRepo(t, "personal", "1.0.0", `{"mcp":{"figma-devmode":{"git":"`+toolSource+`","range":"*"}}}`)
++				toolRepo := newMCPRepo(t, "figma-devmode", "1.2.0", `["figma"]`)
++				repos = map[string]string{contextSource: sysRepo, toolSource: toolRepo, "https://example.com/companyA": companyRepo, "https://example.com/personal": personalRepo}
++				profiles = []string{"companyA", "personal"}
++				serveGitRepos(t, repos)
++				for _, profile := range profiles {
++					code, _, stderr := runProfile(t, source, "profile", "install", "https://example.com/"+profile)
++					if code != exitOK {
++						t.Fatalf("install %s = %d: %s", profile, code, stderr)
++					}
++				}
++				oldLocks := profileLocks(t, home, profiles)
++				writeGitRepoFile(t, sysRepo, "agent-context.json", `{"schema_version":1,"name":"sysleaf","version":"2.0.0","context":{"modules":[{"path":"90-system.md","class":"system","environments":["claude_code"]}]}}`+"\n")
++				writeGitRepoFile(t, sysRepo, "context/90-system.md", "system prompt v1\n")
++				commitGitRepo(t, sysRepo, "v2.0.0")
++				writeGitRepoFile(t, companyRepo, "agent-context.json", `{"schema_version":1,"name":"companyA","version":"1.1.0","context":{"modules":[{"path":"a.md"}]},"requires":{"contexts":{"sysleaf":{"git":"`+contextSource+`","range":"*"}}}}`+"\n")
++				commitGitRepo(t, companyRepo, "v1.1.0")
++				writeGitRepoFile(t, toolRepo, "agent-mcp.json", `{"schema_version":1,"name":"figma-devmode","version":"1.3.0","server":{"transport":"stdio","command":"npx","args":["figma","--new"],"env_names":[]}}`+"\n")
++				commitGitRepo(t, toolRepo, "v1.3.0")
++				code, stdout, stderr := runProfile(t, source, "profile", "update", "--all", "--confirm-system-delta")
++				if code != exitOK {
++					t.Fatalf("profile update --all --confirm-system-delta = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++				}
++				for _, profile := range profiles {
++					if string(readProfileLock(t, home, profile)) == string(oldLocks[profile]) {
++						t.Errorf("--all did not publish updated lock for %s", profile)
++					}
++				}
++				if !strings.Contains(stdout, "lock-delta added context sysleaf") || !strings.Contains(stdout, "lock-delta moved mcp figma-devmode") {
++					t.Errorf("--all output omitted a pinned trigger delta:\n%s", stdout)
++				}
++				if len(vector.Expected.Profiles) != 2 || !vector.Expected.Profiles[0].RevisionB.Proceeds || !vector.Expected.Profiles[1].RevisionB.Proceeds {
++					t.Fatalf("pinned confirmed all vector %q no longer describes two proceeding profiles", vector.Name)
++				}
++				if !vector.Flag {
++					t.Fatal("pinned all vector requires --confirm-system-delta")
++				}
++			}
++		})
++	}
++}
++
++func TestProfileUpdateAllStopsAtFirstUnconfirmedDelta(t *testing.T) {
++	requireGit(t)
++	vectors := loadConfirmationVectors(t)
++	var vector *confirmationVectorsEntry
++	for i := range vectors.AllCases {
++		if vectors.AllCases[i].Name == "all-without-flag-stops-at-first-refusal" {
++			vector = &confirmationVectorsEntry{Flag: vectors.AllCases[i].Flag, Names: []string{}}
++			for _, profile := range vectors.AllCases[i].Expected.Profiles {
++				vector.Names = append(vector.Names, profile.Profile)
++			}
++		}
++	}
++	if vector == nil || vector.Flag || strings.Join(vector.Names, ",") != "first,second,third" {
++		t.Fatalf("pinned stopping vector = %+v", vector)
++	}
++	source, home := profileHome(t)
++	const toolSource = "https://example.com/stop-tool"
++	firstRepo := newContextRepo(t, "first", "1.0.0", "")
++	secondRepo := newContextRepo(t, "second", "1.0.0", `{"mcp":{"tool":{"git":"`+toolSource+`","range":"*"}}}`)
++	thirdRepo := newContextRepo(t, "third", "1.0.0", "")
++	toolRepo := newMCPRepo(t, "tool", "1.0.0", `["tool"]`)
++	serveGitRepos(t, map[string]string{
++		"https://example.com/first": firstRepo, "https://example.com/second": secondRepo,
++		"https://example.com/third": thirdRepo, toolSource: toolRepo,
++	})
++	for _, profile := range vector.Names {
++		code, _, stderr := runProfile(t, source, "profile", "install", "https://example.com/"+profile)
++		if code != exitOK {
++			t.Fatalf("install %s = %d: %s", profile, code, stderr)
++		}
++	}
++	oldLocks := profileLocks(t, home, vector.Names)
++	advanceContextRepo(t, firstRepo, "first", "1.1.0")
++	writeGitRepoFile(t, toolRepo, "agent-mcp.json", `{"schema_version":1,"name":"tool","version":"1.1.0","server":{"transport":"stdio","command":"npx","args":["tool","--new"],"env_names":[]}}`+"\n")
++	commitGitRepo(t, toolRepo, "v1.1.0")
++	advanceContextRepo(t, thirdRepo, "third", "1.1.0")
++	code, stdout, stderr := runProfile(t, source, "profile", "update", "--all")
++	if code != exitFail || !strings.Contains(stderr, envprofile.DiagSystemDeltaConfirmationRequired) {
++		t.Fatalf("profile update --all = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	if string(readProfileLock(t, home, "first")) == string(oldLocks["first"]) {
++		t.Fatal("safe first profile was not updated before the refusal")
++	}
++	if string(readProfileLock(t, home, "second")) != string(oldLocks["second"]) {
++		t.Fatal("second profile lock changed despite the refusal")
++	}
++	if string(readProfileLock(t, home, "third")) != string(oldLocks["third"]) {
++		t.Fatal("--all did not stop after the first confirmation refusal")
++	}
++}
++
++type confirmationVectorsEntry = struct {
++	Flag  bool
++	Names []string
++}
++
++func TestProfileInstallReinstallDeltaVectorsAtCLI(t *testing.T) {
++	requireGit(t)
++	vectors := loadConfirmationVectors(t)
++	for _, vector := range vectors.ReinstallCases {
++		t.Run(vector.Name, func(t *testing.T) {
++			source, home := profileHome(t)
++			const systemSource = "https://example.com/reinstall-sysleaf"
++			const toolSource = "https://example.com/reinstall-tool"
++			rootName := "companyA"
++			var rootRepo, systemRepo, toolRepo string
++			var rootSource string
++			if strings.Contains(vector.Name, "with-flag") {
++				systemRepo = newContextRepo(t, "sysleaf", "1.0.0", "")
++				rootRepo = newContextRepo(t, rootName, "1.0.0", `{"contexts":{"sysleaf":{"git":"`+systemSource+`","range":"*"}}}`)
++				rootSource = "https://example.com/reinstall-company"
++				serveGitRepos(t, map[string]string{systemSource: systemRepo, rootSource: rootRepo})
++			} else {
++				rootName = "mcp-root"
++				rootRepo = newContextRepo(t, rootName, "1.0.0", `{"mcp":{"figma-devmode":{"git":"`+toolSource+`","range":"*"}}}`)
++				toolRepo = newMCPRepo(t, "figma-devmode", "1.2.0", `["figma"]`)
++				rootSource = "https://example.com/reinstall-mcp-root"
++				serveGitRepos(t, map[string]string{toolSource: toolRepo, rootSource: rootRepo})
++			}
++			code, _, stderr := runProfile(t, source, "profile", "install", rootSource)
++			if code != exitOK {
++				t.Fatalf("initial install = %d: %s", code, stderr)
++			}
++			oldLock := readProfileLock(t, home, rootName)
++			args := []string{"profile", "install", rootSource}
++			if vector.Flag {
++				args = append(args, "--confirm-system-delta")
++			}
++			if vector.Flag {
++				writeGitRepoFile(t, systemRepo, "agent-context.json", `{"schema_version":1,"name":"sysleaf","version":"2.0.0","context":{"modules":[{"path":"90-system.md","class":"system","environments":["claude_code"]}]}}`+"\n")
++				writeGitRepoFile(t, systemRepo, "context/90-system.md", "system prompt v1\n")
++				commitGitRepo(t, systemRepo, "v2.0.0")
++			} else {
++				writeGitRepoFile(t, toolRepo, "agent-mcp.json", `{"schema_version":1,"name":"figma-devmode","version":"1.3.0","server":{"transport":"stdio","command":"npx","args":["figma","--new"],"env_names":[]}}`+"\n")
++				commitGitRepo(t, toolRepo, "v1.3.0")
++			}
++			if vector.Flag {
++				code, stdout, stderr := runProfile(t, source, args...)
++				if code != exitOK {
++					t.Fatalf("confirmed reinstall = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++				}
++				if string(readProfileLock(t, home, rootName)) == string(oldLock) {
++					t.Fatal("confirmed reinstall did not publish the resolved update")
++				}
++			} else {
++				code, stdout, stderr := runProfile(t, source, args...)
++				if code != exitFail || !strings.Contains(stderr, envprofile.DiagSystemDeltaConfirmationRequired) {
++					t.Fatalf("unconfirmed reinstall = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++				}
++				if string(readProfileLock(t, home, rootName)) != string(oldLock) {
++					t.Fatal("refused reinstall changed the installed lock")
++				}
++			}
++			if vector.Expected.RevisionB.Proceeds != vector.Flag {
++				t.Fatalf("pinned reinstall vector %q has unexpected proceed=%t for flag=%t", vector.Name, vector.Expected.RevisionB.Proceeds, vector.Flag)
++			}
++		})
++	}
++}
++
++func newContextRepo(t *testing.T, name, version, requires string) string {
++	t.Helper()
++	repo := t.TempDir()
++	manifest := fmt.Sprintf(`{"schema_version":1,"name":%q,"version":%q,"context":{"modules":[{"path":"a.md"}]}`, name, version)
++	if requires != "" {
++		manifest += `,"requires":` + requires
++	}
++	manifest += "}\n"
++	writeGitRepoFile(t, repo, "agent-context.json", manifest)
++	writeGitRepoFile(t, repo, "context/a.md", "context\n")
++	runGitRepo(t, repo, "init")
++	commitGitRepo(t, repo, "v"+version)
++	return repo
++}
++
++func newMCPRepo(t *testing.T, name, version, args string) string {
++	t.Helper()
++	repo := t.TempDir()
++	manifest := fmt.Sprintf(`{"schema_version":1,"name":%q,"version":%q,"server":{"transport":"stdio","command":"npx","args":%s,"env_names":[]}}`, name, version, args)
++	writeGitRepoFile(t, repo, "agent-mcp.json", manifest+"\n")
++	runGitRepo(t, repo, "init")
++	commitGitRepo(t, repo, "v"+version)
++	return repo
++}
++
++func advanceContextRepo(t *testing.T, repo, name, version string) {
++	t.Helper()
++	writeGitRepoFile(t, repo, "agent-context.json", fmt.Sprintf(`{"schema_version":1,"name":%q,"version":%q,"context":{"modules":[{"path":"a.md"}]}}`+"\n", name, version))
++	commitGitRepo(t, repo, "v"+version)
++}
++
++func profileLocks(t *testing.T, home string, names []string) map[string][]byte {
++	t.Helper()
++	locks := make(map[string][]byte, len(names))
++	for _, name := range names {
++		locks[name] = readProfileLock(t, home, name)
++	}
++	return locks
++}
++
++func readProfileLock(t *testing.T, home, name string) []byte {
++	t.Helper()
++	payload, err := os.ReadFile(filepath.Join(envprofile.ProfileDir(home, name), "lock.json"))
++	if err != nil {
++		t.Fatalf("read %s lock: %v", name, err)
++	}
++	return payload
++}
++
++func normalizeDeltaTranscript(transcript, oldCommit, newCommit string) string {
++	transcript = strings.ReplaceAll(transcript, oldCommit, "<old-commit>")
++	transcript = strings.ReplaceAll(transcript, newCommit, "<new-commit>")
++	return regexp.MustCompile(`sha256:[0-9a-f]{64}`).ReplaceAllString(transcript, "sha256:<lock-hash>")
++}
+diff --git a/cmd/curator/profile_signers_test.go b/cmd/curator/profile_signers_test.go
+new file mode 100644
+index 00000000..4721da40
+--- /dev/null
++++ b/cmd/curator/profile_signers_test.go
+@@ -0,0 +1,209 @@
++package main
++
++import (
++	"encoding/json"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/envprofile"
++)
++
++type sourceSignerVectorFile struct {
++	VerificationCases []struct {
++		Name     string `json:"name"`
++		Expected struct {
++			Verdict    string `json:"verdict"`
++			Diagnostic string `json:"diagnostic"`
++		} `json:"expected"`
++	} `json:"verification_cases"`
++}
++
++func loadSourceSignerVector(t *testing.T, name string) (string, string) {
++	t.Helper()
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	payload, err := os.ReadFile(filepath.Join(root, "vectors", "environments-source-signers.json")) // #nosec G304 -- explicit conformance root
++	if err != nil {
++		t.Fatal(err)
++	}
++	var vectors sourceSignerVectorFile
++	if err := json.Unmarshal(payload, &vectors); err != nil {
++		t.Fatal(err)
++	}
++	for _, vector := range vectors.VerificationCases {
++		if vector.Name == name {
++			return vector.Expected.Verdict, vector.Expected.Diagnostic
++		}
++	}
++	t.Fatalf("pinned rc.13 signer vector %q is absent", name)
++	return "", ""
++}
++
++func generateSSHKey(t *testing.T) (string, string) {
++	t.Helper()
++	if _, err := exec.LookPath("ssh-keygen"); err != nil {
++		t.Skip("ssh-keygen is unavailable")
++	}
++	private := filepath.Join(t.TempDir(), "signer")
++	if output, err := exec.Command("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", private).CombinedOutput(); err != nil {
++		t.Fatalf("ssh-keygen: %v\n%s", err, output)
++	}
++	output, err := exec.Command("ssh-keygen", "-y", "-f", private).Output()
++	if err != nil {
++		t.Fatal(err)
++	}
++	return private, strings.TrimSpace(string(output))
++}
++
++func signerContextRepo(t *testing.T, signingKey string, signCommit, signTag bool) (string, string) {
++	t.Helper()
++	repo := t.TempDir()
++	writeGitRepoFile(t, repo, "agent-context.json", `{"schema_version":1,"name":"signed","version":"1.0.0"}`+"\n")
++	runGitRepo(t, repo, "init")
++	runGitRepo(t, repo, "add", ".")
++	commitArgs := []string{}
++	if signCommit {
++		commitArgs = append(commitArgs, "-c", "gpg.format=ssh", "-c", "user.signingkey="+signingKey)
++	}
++	commitArgs = append(commitArgs, "commit")
++	if signCommit {
++		commitArgs = append(commitArgs, "-S")
++	}
++	commitArgs = append(commitArgs, "-m", "release")
++	runGitRepo(t, repo, commitArgs...)
++	commit := strings.TrimSpace(string(mustGitOutput(t, repo, "rev-parse", "HEAD")))
++	tagArgs := []string{}
++	if signTag {
++		tagArgs = append(tagArgs, "-c", "gpg.format=ssh", "-c", "user.signingkey="+signingKey)
++	}
++	tagArgs = append(tagArgs, "tag")
++	if signTag {
++		tagArgs = append(tagArgs, "-s", "-m", "release")
++	}
++	tagArgs = append(tagArgs, "v1.0.0")
++	runGitRepo(t, repo, tagArgs...)
++	return repo, commit
++}
++
++func mustGitOutput(t *testing.T, repo string, args ...string) []byte {
++	t.Helper()
++	command := exec.Command("git", args...)
++	command.Dir = repo
++	output, err := command.Output()
++	if err != nil {
++		t.Fatal(err)
++	}
++	return output
++}
++
++func configureSignerPolicy(source stubConfigSource, canonical, publicKey string, required bool) stubConfigSource {
++	source.cfg.Env.SourceSigners = map[string][]config.SourceSigner{
++		canonical: {{Type: "ssh", Key: publicKey + " operator@example"}},
++	}
++	source.cfg.Env.RequireSourceSigners = required
++	return source
++}
++
++// TestSourceSignerVectorsAtProfileInstall binds the pinned unsigned, wrong
++// signer, accepted SSH tag, and empty-allowlist vectors to the production
++// profile install entry point and real Git signature verification.
++func TestSourceSignerVectorsAtProfileInstall(t *testing.T) {
++	requireGit(t)
++	if _, err := exec.LookPath("ssh-keygen"); err != nil {
++		t.Skip("ssh-keygen is unavailable")
++	}
++	allowedPrivate, allowedPublic := generateSSHKey(t)
++	wrongPrivate, _ := generateSSHKey(t)
++	tests := []struct {
++		name       string
++		vector     string
++		signCommit bool
++		signTag    bool
++		wrong      bool
++		empty      bool
++	}{
++		{name: "unsigned-refused", vector: "unsigned-refused"},
++		{name: "wrong-signer-refused", vector: "wrong-signer-refused", signTag: true, wrong: true},
++		{name: "ssh-tag-signature-accepted", vector: "ssh-tag-signature-accepted", signTag: true},
++		{name: "empty-allowlist-signed-refused", vector: "empty-allowlist-signed-refused", signTag: true, empty: true},
++	}
++	for _, tc := range tests {
++		t.Run(tc.name, func(t *testing.T) {
++			verdict, diagnostic := loadSourceSignerVector(t, tc.vector)
++			source, home := profileHome(t)
++			signingKey := allowedPrivate
++			if tc.wrong {
++				signingKey = wrongPrivate
++			}
++			repo, _ := signerContextRepo(t, signingKey, tc.signCommit, tc.signTag)
++			const rawSource = "https://example.com/signed"
++			serveGitRepos(t, map[string]string{rawSource: repo})
++			if tc.empty {
++				source.cfg.Env.SourceSigners = map[string][]config.SourceSigner{"example.com/signed": {}}
++			} else {
++				source = configureSignerPolicy(source, "example.com/signed", allowedPublic, false)
++			}
++			args := []string{"profile", "install", rawSource}
++			code, stdout, stderr := runProfile(t, source, args...)
++			if verdict == "accepted" {
++				if code != exitOK {
++					t.Fatalf("install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++				}
++				if _, err := os.Stat(filepath.Join(envprofile.ProfileDir(home, "signed"), "lock.json")); err != nil {
++					t.Fatalf("accepted install did not publish its lock: %v", err)
++				}
++				if tc.name == "ssh-tag-signature-accepted" {
++					statusCode, statusJSON, statusErr := runProfile(t, source, "env", "status", "--json")
++					if statusCode != exitOK {
++						t.Fatalf("status = %d: %s\n%s", statusCode, statusJSON, statusErr)
++					}
++					var status envprofile.Status
++					if err := json.Unmarshal([]byte(statusJSON), &status); err != nil {
++						t.Fatal(err)
++					}
++					if len(status.SourceSignerPosture) == 0 || status.SourceSignerPosture[0].State != "enforced" || !status.SourceSignerPosture[0].Current || !strings.HasPrefix(status.SourceSignerPosture[0].Signer, "ssh-ed25519 SHA256:") {
++						t.Fatalf("status signer posture = %+v", status.SourceSignerPosture)
++					}
++					humanCode, humanStatus, humanErr := runProfile(t, source, "env", "status")
++					if humanCode != exitOK || !strings.Contains(humanStatus, "require_source_signers: false") ||
++						!strings.Contains(humanStatus, "update_confirmation: B-flip") ||
++						!strings.Contains(humanStatus, "source_signers profile signed context signed example.com/signed: enforced (ssh-ed25519 SHA256:") {
++						t.Fatalf("human status = %d\n%s\n%s\n%s", humanCode, humanStatus, humanErr, statusErr)
++					}
++				}
++				return
++			}
++			if code != exitFail || !strings.Contains(stderr, diagnostic) {
++				t.Fatalf("install = %d, diagnostic %q missing\nstdout:\n%s\nstderr:\n%s", code, diagnostic, stdout, stderr)
++			}
++			if _, err := os.Stat(filepath.Join(envprofile.ProfileDir(home, "signed"), "lock.json")); !os.IsNotExist(err) {
++				t.Fatalf("refused signer candidate left a lock: err=%v", err)
++			}
++		})
++	}
++}
++
++// TestRevisionDoesNotBorrowTagSignature narrows the exact-revision rule: a
++// signed tag cannot authorize an unsigned peeled commit selected by revision.
++func TestRevisionDoesNotBorrowTagSignature(t *testing.T) {
++	requireGit(t)
++	allowedPrivate, allowedPublic := generateSSHKey(t)
++	repo, commit := signerContextRepo(t, allowedPrivate, false, true)
++	source, home := profileHome(t)
++	const rawSource = "https://example.com/signed"
++	serveGitRepos(t, map[string]string{rawSource: repo})
++	source = configureSignerPolicy(source, "example.com/signed", allowedPublic, false)
++	code, stdout, stderr := runProfile(t, source, "profile", "install", rawSource, "--revision", commit)
++	if code != exitFail || !strings.Contains(stderr, "context_source_unsigned") {
++		t.Fatalf("revision install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	if _, err := os.Stat(filepath.Join(envprofile.ProfileDir(home, "signed"), "lock.json")); !os.IsNotExist(err) {
++		t.Fatalf("unsigned revision unexpectedly published a lock: %v", err)
++	}
++}
+diff --git a/cmd/curator/profile_surfacing_test.go b/cmd/curator/profile_surfacing_test.go
+index 398c6780..a8e22549 100644
+--- a/cmd/curator/profile_surfacing_test.go
++++ b/cmd/curator/profile_surfacing_test.go
+@@ -139,7 +139,7 @@ func TestProfileUpdateListsNewDeclaration(t *testing.T) {
+ 	writeGitRepoFile(t, root, "agent-context.json", `{"schema_version": 1, "name": "grows", "version": "1.0.1",`+
+ 		`"requires": {"mcp": {"tool": {"git": "https://example.com/mcp-tool", "range": "*"}}}}`+"\n")
+ 	commitGitRepo(t, root, "v1.0.1")
+-	code, stdout, stderr := runProfile(t, source, "profile", "update", "grows")
++	code, stdout, stderr := runProfile(t, source, "profile", "update", "grows", "--confirm-system-delta")
+ 	if code != exitOK {
+ 		t.Fatalf("update = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+ 	}
+@@ -284,7 +284,7 @@ func TestProfileUpdateSurfacesBeforePublication(t *testing.T) {
+ 	commitGitRepo(t, root, "v1.0.1")
+ 	writer := &updatePublicationWriter{lock: lock, old: oldBytes}
+ 	var stderr strings.Builder
+-	code := run([]string{"profile", "update", "grows"}, source, writer, &stderr)
++	code := run([]string{"profile", "update", "grows", "--confirm-system-delta"}, source, writer, &stderr)
+ 	stdout := writer.buffer.String()
+ 	if !writer.observed {
+ 		t.Fatal("no mcp-declaration row reached stdout")
+diff --git a/cmd/curator/testdata/profile-update-mcp-delta.golden b/cmd/curator/testdata/profile-update-mcp-delta.golden
+new file mode 100644
+index 00000000..16e7816b
+--- /dev/null
++++ b/cmd/curator/testdata/profile-update-mcp-delta.golden
+@@ -0,0 +1,16 @@
++refused: exit=1
++stdout:
++lock-delta moved context mcp-root 1.0.0 → 1.1.0 commit:<old-root-commit> → commit:<new-root-commit>
++lock-delta added mcp tool 1.0.0 commit:<tool-commit>
++mcp-declaration tool 1.0.0 stdio command=npx args=["tool"] env_names=[]
++stderr:
++mcp-root: warning: mcp_package_allowlist_empty: the MCP package allowlist is empty; every declaration package in the closure is admitted
++mcp-root: profile_update_confirmation_required: members tool require --confirm-system-delta; revision B refuses with profile_update_confirmation_required unless --confirm-system-delta is given
++confirmed: exit=0
++stdout:
++lock-delta moved context mcp-root 1.0.0 → 1.1.0 commit:<old-root-commit> → commit:<new-root-commit>
++lock-delta added mcp tool 1.0.0 commit:<tool-commit>
++mcp-declaration tool 1.0.0 stdio command=npx args=["tool"] env_names=[]
++mcp-root: updated (lock sha256:<lock-hash>)
++stderr:
++mcp-root: warning: mcp_package_allowlist_empty: the MCP package allowlist is empty; every declaration package in the closure is admitted
+diff --git a/cmd/curator/testdata/profile-update-system-delta.golden b/cmd/curator/testdata/profile-update-system-delta.golden
+new file mode 100644
+index 00000000..59c655a4
+--- /dev/null
++++ b/cmd/curator/testdata/profile-update-system-delta.golden
+@@ -0,0 +1,14 @@
++refused: exit=1
++stdout:
++lock-delta moved context delta 1.0.0 → 1.0.1 commit:<old-commit> → commit:<new-commit>
++stderr:
++delta: warning: context-system-module-present: delta/system.md
++delta: warning: mcp_package_allowlist_empty: the MCP package allowlist is empty; every declaration package in the closure is admitted
++delta: profile_update_confirmation_required: members delta require --confirm-system-delta; revision B refuses with profile_update_confirmation_required unless --confirm-system-delta is given
++confirmed: exit=0
++stdout:
++lock-delta moved context delta 1.0.0 → 1.0.1 commit:<old-commit> → commit:<new-commit>
++delta: updated (lock sha256:<lock-hash>)
++stderr:
++delta: warning: context-system-module-present: delta/system.md
++delta: warning: mcp_package_allowlist_empty: the MCP package allowlist is empty; every declaration package in the closure is admitted
+diff --git a/internal/config/config.go b/internal/config/config.go
+index 96a2d6a1..40beb841 100644
+--- a/internal/config/config.go
++++ b/internal/config/config.go
+@@ -65,6 +65,8 @@ var LockableKeys = map[string]bool{
+ 	"environments.transitive_system_modules": true,
+ 	"environments.provider_directories":      true,
+ 	"environments.permissions":               true,
++	"environments.source_signers":            true,
++	"environments.require_source_signers":    true,
+ }
+ 
+ var (
+@@ -381,6 +383,13 @@ func applySystem(systemData, userData map[string]any, systemPath string, warn fu
+ 		if _, err := parseSystemEnvironments(rawEnv); err != nil {
+ 			return nil, nil, fmt.Errorf("%v (system config %s)", err, systemPath)
+ 		}
++		if locked["environments.require_source_signers"] {
++			systemEnv, _ := rawEnv.(map[string]any)
++			required, ok := systemEnv["require_source_signers"].(bool)
++			if !ok || !required {
++				return nil, nil, verr.New("environments.require_source_signers", "a system file locks require_source_signers only toward true")
++			}
++		}
+ 	}
+ 	merged := map[string]any{}
+ 	for key, value := range userData {
+@@ -447,6 +456,29 @@ func mergeSystemEnvironments(systemData, userData map[string]any, locked map[str
+ 	for knob, value := range systemEnv {
+ 		full := "environments." + knob
+ 		if locked[full] {
++			if knob == "source_signers" {
++				systemSigners, _ := value.(map[string]any)
++				userRaw, userPresent := userEnv[knob]
++				userSigners, userMap := userRaw.(map[string]any)
++				if userPresent && !userMap {
++					// Keep a malformed machine value visible to the effective
++					// parser. Per-source policy cannot safely merge it.
++					merged[knob] = userRaw
++					continue
++				}
++				mergedSigners := map[string]any{}
++				for source, allowlist := range userSigners {
++					mergedSigners[source] = allowlist
++				}
++				for source, allowlist := range systemSigners {
++					if userAllowlist, present := userSigners[source]; present && !jsonEqual(userAllowlist, allowlist) && warn != nil {
++						warn(fmt.Sprintf("config key %q is locked by %s; the user override is ignored", full+"."+source, systemPath))
++					}
++					mergedSigners[source] = allowlist
++				}
++				merged[knob] = mergedSigners
++				continue
++			}
+ 			if userValue, present := userEnv[knob]; present && !jsonEqual(userValue, value) && warn != nil {
+ 				warn(fmt.Sprintf("config key %q is locked by %s; the user override is ignored", full, systemPath))
+ 			}
+diff --git a/internal/config/environments.go b/internal/config/environments.go
+index ecafb13d..103cf3f8 100644
+--- a/internal/config/environments.go
++++ b/internal/config/environments.go
+@@ -1,6 +1,7 @@
+ package config
+ 
+ import (
++	"encoding/base64"
+ 	"fmt"
+ 	"regexp"
+ 	"sort"
+@@ -42,8 +43,16 @@ type Environments struct {
+ 	// ProviderDirectories is the §11 trust-root list after the install
+ 	// directory, in listed order; the §12.1 default is the empty list.
+ 	ProviderDirectories []string
+-	ShadowAcknowledged  []ShadowAcknowledgement
+-	SecretWaivers       []SecretMaterialWaiver
++	// SourceSigners is the per-canonical-source signer allowlist
++	// (environments §12.1). A present source with an empty list admits no
++	// signer; an absent source is unconfigured.
++	SourceSigners map[string][]SourceSigner
++	// RequireSourceSigners requires every Git source to have a source-level
++	// allowlist. Set distinguishes the default from an explicit false value.
++	RequireSourceSigners    bool
++	RequireSourceSignersSet bool
++	ShadowAcknowledged      []ShadowAcknowledgement
++	SecretWaivers           []SecretMaterialWaiver
+ 	// TransitiveSystemModules is the §3/§5.5 admission policy: drop
+ 	// (default) skips transitive system modules at materialization with a
+ 	// warning, error refuses them at resolution.
+@@ -111,6 +120,14 @@ type SystemModuleWaiver struct {
+ 	Reason  string
+ }
+ 
++// SourceSigner is one SSH public key or OpenPGP fingerprint in a source
++// allowlist (environments §12.1).
++type SourceSigner struct {
++	Type        string
++	Key         string
++	Fingerprint string
++}
++
+ // Defaults from the environments §12.1 table.
+ const (
+ 	DefaultOverlayWeight   = 1000
+@@ -130,6 +147,8 @@ var LockableEnvKeys = map[string]bool{
+ 	"environments.transitive_system_modules": true,
+ 	"environments.provider_directories":      true,
+ 	"environments.permissions":               true,
++	"environments.source_signers":            true,
++	"environments.require_source_signers":    true,
+ }
+ 
+ // systemEnvKnobs are the environments keys a system file may carry at all:
+@@ -165,6 +184,7 @@ func defaultEnvironments() Environments {
+ 		XDGSeedAllowlist:        []string{"git", "gh", "ssh"},
+ 		MCPPackageAllowlist:     []string{},
+ 		ProviderDirectories:     []string{},
++		SourceSigners:           map[string][]SourceSigner{},
+ 		ShadowAcknowledged:      []ShadowAcknowledgement{},
+ 		SecretWaivers:           []SecretMaterialWaiver{},
+ 		TransitiveSystemModules: "drop",
+@@ -342,6 +362,21 @@ func parseEnvironments(raw any) (Environments, error) {
+ 		}
+ 		env.ProviderDirectories = dirs
+ 	}
++	if rawSigners, present := obj["source_signers"]; present {
++		signers, err := parseSourceSigners(rawSigners)
++		if err != nil {
++			return Environments{}, err
++		}
++		env.SourceSigners = signers
++	}
++	if rawRequired, present := obj["require_source_signers"]; present {
++		required, ok := rawRequired.(bool)
++		if !ok {
++			return Environments{}, verr.New("environments.require_source_signers", "must be a boolean")
++		}
++		env.RequireSourceSigners = required
++		env.RequireSourceSignersSet = true
++	}
+ 	return env, nil
+ }
+ 
+@@ -356,7 +391,115 @@ var EnvKnobNames = []string{
+ 	"mcp_package_allowlist", "shadow_acknowledged", "secret_material_waivers",
+ 	"transitive_system_modules", "system_module_waivers",
+ 	"backup_retention", "require_current_profile", "in_place_mode",
+-	"provider_directories", "permissions",
++	"provider_directories", "permissions", "source_signers", "require_source_signers",
++}
++
++var gpgFingerprintRE = regexp.MustCompile(`^[A-F0-9]{40}$`)
++
++var sshKeyTypes = map[string]bool{
++	"ssh-ed25519":                        true,
++	"ssh-rsa":                            true,
++	"ecdsa-sha2-nistp256":                true,
++	"ecdsa-sha2-nistp384":                true,
++	"ecdsa-sha2-nistp521":                true,
++	"sk-ssh-ed25519@openssh.com":         true,
++	"sk-ecdsa-sha2-nistp256@openssh.com": true,
++}
++
++func parseSourceSigners(raw any) (map[string][]SourceSigner, error) {
++	entries, ok := raw.(map[string]any)
++	if !ok {
++		return nil, verr.New("environments.source_signers", "must be an object")
++	}
++	out := make(map[string][]SourceSigner, len(entries))
++	sources := make([]string, 0, len(entries))
++	for source := range entries {
++		sources = append(sources, source)
++	}
++	sort.Strings(sources)
++	for _, source := range sources {
++		if !identity.ValidCanonical(source) {
++			return nil, verr.New("environments.source_signers", "source %q must be a canonical source identity", source)
++		}
++		items, ok := entries[source].([]any)
++		if !ok {
++			return nil, verr.New("environments.source_signers."+source, "must be an array")
++		}
++		seen := map[string]bool{}
++		parsed := make([]SourceSigner, 0, len(items))
++		for index, item := range items {
++			object, ok := item.(map[string]any)
++			if !ok {
++				return nil, verr.New("environments.source_signers."+source, "entry %d must be an object", index)
++			}
++			kind, ok := object["type"].(string)
++			if !ok {
++				return nil, verr.New("environments.source_signers."+source, "entry %d type must be ssh or gpg", index)
++			}
++			signer := SourceSigner{Type: kind}
++			switch kind {
++			case "ssh":
++				if len(object) != 2 {
++					return nil, verr.New("environments.source_signers."+source, "ssh entry %d must contain only type and key", index)
++				}
++				key, ok := object["key"].(string)
++				if !ok {
++					return nil, verr.New("environments.source_signers."+source, "ssh entry %d key must be an OpenSSH public key line", index)
++				}
++				keyType, material, err := parseOpenSSHPublicKey(key)
++				if err != nil {
++					return nil, verr.New("environments.source_signers."+source, "ssh entry %d: %v", index, err)
++				}
++				signer.Key = strings.TrimSpace(key)
++				identity := keyType + " " + normalizeOpenSSHKeyMaterial(material)
++				if seen[identity] {
++					return nil, verr.New("environments.source_signers."+source, "contains duplicate signer %q", identity)
++				}
++				seen[identity] = true
++			case "gpg":
++				if len(object) != 2 {
++					return nil, verr.New("environments.source_signers."+source, "gpg entry %d must contain only type and fingerprint", index)
++				}
++				fingerprint, ok := object["fingerprint"].(string)
++				if !ok || !gpgFingerprintRE.MatchString(fingerprint) {
++					return nil, verr.New("environments.source_signers."+source, "gpg entry %d fingerprint must be 40 uppercase hexadecimal characters", index)
++				}
++				signer.Fingerprint = fingerprint
++				if seen["gpg "+fingerprint] {
++					return nil, verr.New("environments.source_signers."+source, "contains duplicate signer %q", fingerprint)
++				}
++				seen["gpg "+fingerprint] = true
++			default:
++				return nil, verr.New("environments.source_signers."+source, "entry %d type must be ssh or gpg", index)
++			}
++			parsed = append(parsed, signer)
++		}
++		out[source] = parsed
++	}
++	return out, nil
++}
++
++func parseOpenSSHPublicKey(line string) (string, string, error) {
++	fields := strings.Fields(line)
++	if len(fields) < 2 || !sshKeyTypes[fields[0]] {
++		return "", "", fmt.Errorf("key must use a supported OpenSSH key type and base64 material")
++	}
++	// Environments §12.1 defines the SSH key as an OpenSSH public-key line
++	// with base64 key material. Validate that grammar with or without padding;
++	// cryptographic verification later decides whether the blob is a real key.
++	if _, err := base64.StdEncoding.DecodeString(fields[1]); err != nil {
++		if _, rawErr := base64.RawStdEncoding.DecodeString(fields[1]); rawErr != nil {
++			return "", "", fmt.Errorf("key material is not valid base64")
++		}
++	}
++	return fields[0], fields[1], nil
++}
++
++// Environments §12.1 defines SSH identity as key type plus base64 material.
++// Padding is optional in the public-key line, so remove trailing '=' on
++// both identities before comparing them.
++func normalizeOpenSSHKeyMaterial(material string) string {
++	return strings.TrimRight(material, "=")
+ }
+ 
+ // envKnob reports whether key is a §12.1 knob name.
+@@ -1077,6 +1220,20 @@ func (e Environments) render() map[string]any {
+ 	for _, dir := range e.ProviderDirectories {
+ 		providerDirs = append(providerDirs, dir)
+ 	}
++	sourceSigners := map[string]any{}
++	for source, signers := range e.SourceSigners {
++		entries := make([]any, 0, len(signers))
++		for _, signer := range signers {
++			entry := map[string]any{"type": signer.Type}
++			if signer.Type == "ssh" {
++				entry["key"] = signer.Key
++			} else {
++				entry["fingerprint"] = signer.Fingerprint
++			}
++			entries = append(entries, entry)
++		}
++		sourceSigners[source] = entries
++	}
+ 	// The §12.1 schema default is []: an absent knob renders the empty
+ 	// list, an explicit null renders null (unbounded), a configured
+ 	// list renders itself. The S4 runtime default for an absent knob —
+@@ -1118,6 +1275,8 @@ func (e Environments) render() map[string]any {
+ 		"backup_retention":        e.BackupRetention,
+ 		"require_current_profile": require, "in_place_mode": inPlace,
+ 		"provider_directories": providerDirs, "permissions": permissions,
++		"source_signers":         sourceSigners,
++		"require_source_signers": e.RequireSourceSigners,
+ 	}
+ }
+ 
+@@ -1135,7 +1294,7 @@ func EnvLockKey(knob string) string {
+ 		return "environments.precedence"
+ 	case "isolation":
+ 		return "environments.isolation"
+-	case "overlays_allowed", "mcp_package_allowlist", "passable_env_names", "require_current_profile", "transitive_system_modules", "provider_directories", "permissions":
++	case "overlays_allowed", "mcp_package_allowlist", "passable_env_names", "require_current_profile", "transitive_system_modules", "provider_directories", "permissions", "source_signers", "require_source_signers":
+ 		return "environments." + head
+ 	}
+ 	return ""
+diff --git a/internal/config/environments_conformance_test.go b/internal/config/environments_conformance_test.go
+index 9859cbb8..53fc4a41 100644
+--- a/internal/config/environments_conformance_test.go
++++ b/internal/config/environments_conformance_test.go
+@@ -125,6 +125,132 @@ func TestManagerConfigV2SchemaCases(t *testing.T) {
+ 		})
+ }
+ 
++type sourceSignerMergeVectorFile struct {
++	MergeCases []struct {
++		Name     string                         `json:"name"`
++		Locked   bool                           `json:"locked"`
++		System   map[string][]sourceSignerWire  `json:"system"`
++		Machine  *map[string][]sourceSignerWire `json:"machine"`
++		Expected struct {
++			Effective map[string][]sourceSignerWire `json:"effective"`
++			Warnings  []string                      `json:"warnings"`
++		} `json:"expected"`
++	} `json:"merge_cases"`
++}
++
++type sourceSignerWire struct {
++	Type        string `json:"type"`
++	Key         string `json:"key,omitempty"`
++	Fingerprint string `json:"fingerprint,omitempty"`
++}
++
++// TestSourceSignerMergeVectorsAtLoad drives every rc.13 source_signers
++// precedence vector through Load, including per-source system locks and
++// unlocked whole-knob defaults (manager §1, environments §12.1).
++func TestSourceSignerMergeVectorsAtLoad(t *testing.T) {
++	root := conformanceRoot(t)
++	payload, err := os.ReadFile(filepath.Join(root, "vectors", "environments-source-signers.json")) // #nosec G304 -- explicit conformance input
++	if err != nil {
++		t.Fatal(err)
++	}
++	var vectors sourceSignerMergeVectorFile
++	if err := json.Unmarshal(payload, &vectors); err != nil {
++		t.Fatal(err)
++	}
++	if len(vectors.MergeCases) != 6 {
++		t.Fatalf("pinned rc.13 merge case count = %d, want 6", len(vectors.MergeCases))
++	}
++	for _, tc := range vectors.MergeCases {
++		t.Run(tc.Name, func(t *testing.T) {
++			normalizeMergeVectorKeys(tc.System)
++			if tc.Machine != nil {
++				normalizeMergeVectorKeys(*tc.Machine)
++			}
++			normalizeMergeVectorKeys(tc.Expected.Effective)
++			userEnv := map[string]any{}
++			if tc.Machine != nil {
++				userEnv["source_signers"] = *tc.Machine
++			}
++			userPayload, err := json.Marshal(map[string]any{
++				"schema_version": 2, "skills_root": "/tmp/skills", "projects": map[string]any{}, "environments": userEnv,
++			})
++			if err != nil {
++				t.Fatal(err)
++			}
++			systemEnv := map[string]any{"source_signers": tc.System}
++			systemData := map[string]any{"schema_version": 2, "environments": systemEnv}
++			if tc.Locked {
++				systemData["locked"] = []string{"environments.source_signers"}
++			}
++			systemPayload, err := json.Marshal(systemData)
++			if err != nil {
++				t.Fatal(err)
++			}
++			dir := t.TempDir()
++			userPath := writeConfig(t, dir, "config.json", string(userPayload))
++			systemPath := writeConfig(t, dir, "system.json", string(systemPayload))
++			t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
++			var warnings []string
++			cfg, err := Load(userPath, func(message string) { warnings = append(warnings, message) })
++			if err != nil {
++				t.Fatalf("Load: %v", err)
++			}
++			got := cfg.Env.SourceSigners
++			if got == nil {
++				got = map[string][]SourceSigner{}
++			}
++			want := decodeSourceSignerWire(tc.Expected.Effective)
++			if want == nil {
++				want = map[string][]SourceSigner{}
++			}
++			if !reflect.DeepEqual(got, want) {
++				t.Errorf("effective source_signers = %#v, want %#v", got, want)
++			}
++			if len(warnings) != len(tc.Expected.Warnings) {
++				t.Fatalf("Load warnings = %v, want source suffixes %v", warnings, tc.Expected.Warnings)
++			}
++			for i, suffix := range tc.Expected.Warnings {
++				if !strings.Contains(warnings[i], suffix) {
++					t.Errorf("warning %q does not name expected source %q", warnings[i], suffix)
++				}
++			}
++		})
++	}
++}
++
++func decodeSourceSignerWire(wire map[string][]sourceSignerWire) map[string][]SourceSigner {
++	if wire == nil {
++		return nil
++	}
++	decoded := make(map[string][]SourceSigner, len(wire))
++	for source, signers := range wire {
++		for _, signer := range signers {
++			decoded[source] = append(decoded[source], SourceSigner(signer))
++		}
++	}
++	return decoded
++}
++
++func normalizeMergeVectorKeys(signers map[string][]sourceSignerWire) {
++	const (
++		operatorKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIM2viPc9tcg5ax615zmMJHL/WEOIxD87zH2o+/Znd0Ga operator@example"
++		intruderKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINZFvyk44Hs0dZ8KKN5icz5Hv56DJuhxW6/eRroAMHVG intruder@example"
++	)
++	for source, list := range signers {
++		for i := range list {
++			if list[i].Type != "ssh" {
++				continue
++			}
++			if strings.HasSuffix(list[i].Key, "intruder@example") {
++				list[i].Key = intruderKey
++			} else {
++				list[i].Key = operatorKey
++			}
++		}
++		signers[source] = list
++	}
++}
++
+ // TestSystemConfigV2SchemaCases runs the published system-config-v2 family
+ // through Load as the system file over a fixed minimal schema-2 machine
+ // file: every indexed valid case merges and every indexed invalid case
+@@ -278,7 +404,7 @@ func TestManagerConfigV2Vectors(t *testing.T) {
+ 			if err != nil {
+ 				t.Fatal(err)
+ 			}
+-			if !exactManagerEffectiveJSON(got, tc.Expected) {
++			if !managerEffectiveJSONMatchesVector(got, tc.Expected) {
+ 				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("effective config got %s, want %s", rendered, wantJSON)}
+ 			}
+ 			return conformancecoverage.Observation{}
+@@ -304,6 +430,45 @@ func TestManagerEffectiveJSONComparisonRejectsExtraKnobs(t *testing.T) {
+ 	}
+ }
+ 
++// managerEffectiveJSONMatchesVector handles the published vectors that
++// project the normalized object to their declared top-level keys. Each
++// projected value still compares as canonical JSON, so nested knobs remain
++// strict; full-object vectors retain exactManagerEffectiveJSON's strict rule.
++func managerEffectiveJSONMatchesVector(actual, expected map[string]any) bool {
++	if len(expected) == len(actual) {
++		return exactManagerEffectiveJSON(actual, expected)
++	}
++	if len(expected) > len(actual) {
++		return false
++	}
++	for key, expectedValue := range expected {
++		actualValue, ok := actual[key]
++		if !ok {
++			return false
++		}
++		actualJSON, actualErr := json.Marshal(actualValue)
++		expectedJSON, expectedErr := json.Marshal(expectedValue)
++		if actualErr != nil || expectedErr != nil || !bytes.Equal(actualJSON, expectedJSON) {
++			return false
++		}
++	}
++	return true
++}
++
++func TestProjectedManagerEffectiveJSONRejectsExtraEnvironmentKnob(t *testing.T) {
++	actual := map[string]any{
++		"environments": map[string]any{
++			"existing":                  true,
++			"transitive_system_modules": "drop",
++		},
++		"adapter_mode": "auto",
++	}
++	expected := map[string]any{"environments": map[string]any{"existing": true}}
++	if managerEffectiveJSONMatchesVector(actual, expected) {
++		t.Fatal("projected vector matched despite an unexpected environments knob")
++	}
++}
++
+ // systemModuleSchemaFailure keeps the E2 schema cases' stronger diagnostic
+ // assertion in the counted family driver. This avoids running the same
+ // published case a second time in TestSystemModuleSchemaSubset and ensures a
+@@ -318,12 +483,11 @@ func systemModuleSchemaFailure(family, file string, err error) string {
+ 	return ""
+ }
+ 
+-// TestOverlayGapOwnersMatchFirstProductionBlocker keeps the 28 legacy
+-// path-kind overlay rows attributed to the source_signers fields that still
+-// block them at the pinned root. Permissions are now parsed. Schema cases are
+-// driven through Load; vectors are driven through Parse and compared with
+-// their published EffectiveJSON.
+-func TestOverlayGapOwnersMatchFirstProductionBlocker(t *testing.T) {
++// TestOverlayConformancePassesWithPermissionsAndSourceSigners drives the
++// published overlay schema cases through Load and their vectors through Parse.
++// With both the permissions and source signer knobs implemented, these cases
++// must match their published behavior and have no remaining gap rows.
++func TestOverlayConformancePassesWithPermissionsAndSourceSigners(t *testing.T) {
+ 	root := conformanceRoot(t)
+ 	_, gaps, err := conformancecoverage.Load()
+ 	if err != nil {
+@@ -333,13 +497,11 @@ func TestOverlayGapOwnersMatchFirstProductionBlocker(t *testing.T) {
+ 	for _, gap := range gaps {
+ 		gapByCase[gap.Family+"\x00"+gap.CaseID] = gap
+ 	}
+-	lookup := func(family, caseID string) conformancecoverage.Gap {
++	assertNoGap := func(family, caseID string) {
+ 		t.Helper()
+-		gap, ok := gapByCase[family+"\x00"+caseID]
+-		if !ok {
+-			t.Fatalf("missing owner row for %s/%s", family, caseID)
++		if gap, ok := gapByCase[family+"\x00"+caseID]; ok {
++			t.Errorf("passing conformance case %s/%s still has gap row owned by %s: %s", family, caseID, gap.Owner, gap.Reason)
+ 		}
+-		return gap
+ 	}
+ 
+ 	const managerSchema = "manager-config-v2/schema-cases"
+@@ -368,37 +530,14 @@ func TestOverlayGapOwnersMatchFirstProductionBlocker(t *testing.T) {
+ 		}
+ 		for _, field := range []string{"permissions", "source_signers", "require_source_signers"} {
+ 			if _, exists := environments[field]; !exists {
+-				t.Errorf("%s does not carry the new %q blocker whose owner is being verified", tc.Name, field)
++				t.Errorf("%s does not carry the published %q field", tc.Name, field)
+ 			}
+ 		}
+-		_, loadErr := Load(writeConfig(t, t.TempDir(), "config.json", string(payload)), nil)
+-		if loadErr == nil {
+-			t.Errorf("Load now accepts published overlay case %s; remove its gap row", tc.Name)
+-			continue
+-		}
+-		owner, field := overlaySchemaFailureOwner(loadErr)
+-		if owner == "" {
+-			t.Errorf("Load's first blocker for %s is not a known new field: %v", tc.Name, loadErr)
++		if _, err := Load(writeConfig(t, t.TempDir(), "config.json", string(payload)), nil); err != nil {
++			t.Errorf("Load rejects published valid overlay case %s: %v", tc.Name, err)
+ 			continue
+ 		}
+-		gap := lookup(managerSchema, tc.Name)
+-		if gap.Owner != owner {
+-			t.Errorf("%s owner = %q, first unsupported field %s belongs to %q", tc.Name, gap.Owner, field, owner)
+-		}
+-		if field != "require_source_signers" || !strings.Contains(loadErr.Error(), field) {
+-			t.Errorf("%s first Load blocker = %q, want unsupported require_source_signers: %v", tc.Name, field, loadErr)
+-		}
+-		for _, requiredField := range []string{"source_signers", "require_source_signers"} {
+-			if !strings.Contains(gap.Reason, requiredField) {
+-				t.Errorf("%s reason %q omits unsupported field %q", tc.Name, gap.Reason, requiredField)
+-			}
+-		}
+-		if strings.Contains(gap.Reason, "permissions") {
+-			t.Errorf("%s reason %q still attributes the now-supported permissions field", tc.Name, gap.Reason)
+-		}
+-		if strings.Contains(gap.Reason, "path-kind") {
+-			t.Errorf("%s reason %q misattributes the Load failure to path-kind", tc.Name, gap.Reason)
+-		}
++		assertNoGap(managerSchema, tc.Name)
+ 	}
+ 	if schemaCases != 14 {
+ 		t.Fatalf("published valid overlay schema cases = %d, want 14", schemaCases)
+@@ -413,11 +552,21 @@ func TestOverlayGapOwnersMatchFirstProductionBlocker(t *testing.T) {
+ 	if err := json.Unmarshal(payload, &vectors); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	selectedVectors := map[string]bool{}
+-	for _, gap := range gaps {
+-		if gap.Family == managerVectors && strings.HasPrefix(gap.CaseID, "schema2-overlay-") {
+-			selectedVectors[gap.CaseID] = true
+-		}
++	selectedVectors := map[string]bool{
++		"schema2-overlay-git-git-uppercase":            true,
++		"schema2-overlay-git-http-uppercase":           true,
++		"schema2-overlay-git-https-uppercase":          true,
++		"schema2-overlay-git-scp":                      true,
++		"schema2-overlay-git-scp-no-user":              true,
++		"schema2-overlay-git-single-letter-host":       true,
++		"schema2-overlay-git-ssh-uppercase":            true,
++		"schema2-overlay-path-colon-later-segment":     true,
++		"schema2-overlay-path-relative":                true,
++		"schema2-overlay-path-source":                  true,
++		"schema2-overlay-path-windows-backslash":       true,
++		"schema2-overlay-path-windows-double-slash":    true,
++		"schema2-overlay-path-windows-lowercase-drive": true,
++		"schema2-overlay-path-windows-slash":           true,
+ 	}
+ 	vectorCases := 0
+ 	for _, tc := range vectors {
+@@ -435,7 +584,7 @@ func TestOverlayGapOwnersMatchFirstProductionBlocker(t *testing.T) {
+ 		}
+ 		cfg, parseErr := Parse(object, "vector.json")
+ 		if parseErr != nil {
+-			t.Errorf("Parse's first blocker for %s is %v; expected the published output comparison to identify its owners", tc.Name, parseErr)
++			t.Errorf("Parse rejects published valid overlay vector %s: %v", tc.Name, parseErr)
+ 			continue
+ 		}
+ 		rendered, err := json.Marshal(cfg.EffectiveJSON())
+@@ -454,41 +603,19 @@ func TestOverlayGapOwnersMatchFirstProductionBlocker(t *testing.T) {
+ 		}
+ 		for _, field := range []string{"permissions", "source_signers", "require_source_signers"} {
+ 			if _, exists := wantEnv[field]; !exists {
+-				t.Errorf("%s expected EffectiveJSON omits the published new %q field whose owner is being verified", tc.Name, field)
++				t.Errorf("%s expected EffectiveJSON omits the published %q field", tc.Name, field)
+ 			}
+ 		}
+-		differences := jsonDifferencePaths("environments", gotEnv, wantEnv)
+-		wantDifferences := []string{"environments.require_source_signers", "environments.source_signers"}
+-		if !reflect.DeepEqual(differences, wantDifferences) {
+-			t.Errorf("%s differences = %v, want only %v", tc.Name, differences, wantDifferences)
+-			continue
+-		}
+-		gap := lookup(managerVectors, tc.Name)
+-		const wantOwners = "STORY-260916-ioemse"
+-		if gap.Owner != wantOwners {
+-			t.Errorf("%s owner = %q, changed source_signers fields are owned by %q", tc.Name, gap.Owner, wantOwners)
+-		}
+-		if strings.Contains(gap.Reason, "permissions") || !strings.Contains(gap.Reason, "source_signers") || !strings.Contains(gap.Reason, "require_source_signers") || strings.Contains(gap.Reason, "path-kind") {
+-			t.Errorf("%s reason %q does not describe only the changed source_signers fields", tc.Name, gap.Reason)
++		if differences := jsonDifferencePaths("environments", gotEnv, wantEnv); len(differences) != 0 {
++			t.Errorf("%s EffectiveJSON differences = %v, want none", tc.Name, differences)
+ 		}
++		assertNoGap(managerVectors, tc.Name)
+ 	}
+ 	if vectorCases != 14 {
+ 		t.Fatalf("published valid overlay vectors = %d, want 14", vectorCases)
+ 	}
+ }
+ 
+-func overlaySchemaFailureOwner(err error) (owner, field string) {
+-	message := err.Error()
+-	switch {
+-	case strings.Contains(message, `unsupported field "source_signers"`):
+-		return "STORY-260916-ioemse", "source_signers"
+-	case strings.Contains(message, `unsupported field "require_source_signers"`):
+-		return "STORY-260916-ioemse", "require_source_signers"
+-	default:
+-		return "", ""
+-	}
+-}
+-
+ func jsonDifferencePaths(prefix string, got, want any) []string {
+ 	gotObject, gotMap := got.(map[string]any)
+ 	wantObject, wantMap := want.(map[string]any)
+diff --git a/internal/config/environments_test.go b/internal/config/environments_test.go
+index c8e629fb..16548c26 100644
+--- a/internal/config/environments_test.go
++++ b/internal/config/environments_test.go
+@@ -40,6 +40,61 @@ func loadWithSystem(t *testing.T, user, system string) (*Config, []string, error
+ 	return cfg, warnings, err
+ }
+ 
++func TestSourceSignerOpenSSHKeyMaterialGrammar(t *testing.T) {
++	const source = "github.com/example/context"
++	tests := []struct {
++		name    string
++		key     string
++		wantErr bool
++	}{
++		{name: "unpadded base64 material", key: "ssh-ed25519 QUJDREVGRw"},
++		{name: "padded base64 material", key: "ssh-ed25519 QUJDREVGRw=="},
++		{name: "non-base64 character", key: "ssh-ed25519 QUJDREVGRw$", wantErr: true},
++		{name: "unknown key type", key: "ssh-unknown QUJDREVGRw", wantErr: true},
++	}
++	for _, tc := range tests {
++		t.Run(tc.name, func(t *testing.T) {
++			data := map[string]any{
++				"schema_version": 2,
++				"skills_root":    "/tmp/skills",
++				"projects":       map[string]any{},
++				"environments": map[string]any{
++					"source_signers": map[string]any{
++						source: []any{map[string]any{"type": "ssh", "key": tc.key}},
++					},
++				},
++			}
++			_, err := Parse(data, "signers.json")
++			if tc.wantErr && err == nil {
++				t.Fatal("Parse accepted signer material outside the §12.1 grammar")
++			}
++			if !tc.wantErr && err != nil {
++				t.Fatalf("Parse rejected §12.1 signer material: %v", err)
++			}
++		})
++	}
++}
++
++func TestSourceSignerSSHIdentityTreatsPaddingAsEquivalent(t *testing.T) {
++	const source = "github.com/example/context"
++	data := map[string]any{
++		"schema_version": 2,
++		"skills_root":    "/tmp/skills",
++		"projects":       map[string]any{},
++		"environments": map[string]any{
++			"source_signers": map[string]any{
++				source: []any{
++					map[string]any{"type": "ssh", "key": "ssh-ed25519 QUJDREVGRw"},
++					map[string]any{"type": "ssh", "key": "ssh-ed25519 QUJDREVGRw=="},
++				},
++			},
++		},
++	}
++	if _, err := Parse(data, "signers.json"); err == nil || !strings.Contains(err.Error(), "duplicate signer") {
++		t.Fatalf("Parse error = %v, want duplicate signer after padding normalization", err)
++	}
++}
++
+ func TestSchema2Defaults(t *testing.T) {
+ 	cfg := loadText(t, `{"schema_version": 2, "skills_root": "/tmp/skills", "projects": {}}`)
+ 	if cfg.Schema != 2 {
+@@ -530,15 +585,15 @@ func TestSystemV2LockableSubsetIsClassWide(t *testing.T) {
+ 		"in_place_mode":             `{"in_place_mode": {"codex_cli": "linked"}}`,
+ 		"provider_directories":      `{"provider_directories": ["/opt/curator/providers"]}`,
+ 		"permissions":               `{"permissions": {"acme": "native"}}`,
++		"source_signers":            `{"source_signers": {"github.com/example/context": []}}`,
++		"require_source_signers":    `{"require_source_signers": true}`,
+ 	}
+ 	if len(payloads) != len(EnvKnobNames) {
+ 		t.Fatalf("payloads cover %d knobs, EnvKnobNames carries %d: keep the two in step", len(payloads), len(EnvKnobNames))
+ 	}
+-	// The §12.2 transcription: exactly the nine keys the specification
+-	// states ("overlays_allowed, precedence, mcp_package_allowlist,
+-	// passable_env_names, require_current_profile, transitive_system_modules,
+-	// isolation, provider_directories, and permissions" — provider_directories
+-	// is carried by the §11 trust-root rule. This literal is the spec sentence; LockableEnvKeys
++	// The §12.2 transcription: exactly the eleven keys in the original set,
++	// plus permissions, source_signers, and require_source_signers. This literal
++	// is the spec sentence; LockableEnvKeys is the implementation.
+ 	// is the implementation. Either drifting — a widening that would reach
+ 	// §9.1 secret material or §12.1 waivers, or a narrowing that would drop
+ 	// a fleet-policy knob — fails below.
+@@ -552,6 +607,8 @@ func TestSystemV2LockableSubsetIsClassWide(t *testing.T) {
+ 		"environments.isolation":                 true,
+ 		"environments.provider_directories":      true,
+ 		"environments.permissions":               true,
++		"environments.source_signers":            true,
++		"environments.require_source_signers":    true,
+ 	}
+ 	if len(LockableEnvKeys) != len(transcribed) {
+ 		t.Fatalf("LockableEnvKeys carries %d keys, §12.2 transcribes %d: a widening or narrowing without spec standing fails here", len(LockableEnvKeys), len(transcribed))
+@@ -688,17 +745,17 @@ func TestSystemModuleWaiversNullRejected(t *testing.T) {
+ }
+ 
+ // TestUnsupportedEnvironmentFieldFailureIsDeterministic drives Load with
+-// several unsupported fields so schema-gap attribution does not depend on
+-// Go's randomized map iteration order. Permissions is supported here; the
+-// lexically first unsupported signer field is the stable production blocker.
++// multiple unknown fields so schema-gap attribution does not depend on Go's
++// randomized map iteration order. The signer and permission fields are
++// supported; the lexically first unknown field is the stable blocker.
+ func TestUnsupportedEnvironmentFieldFailureIsDeterministic(t *testing.T) {
+ 	body := `{"schema_version": 2, "skills_root": "x", "projects": {},` +
+-		`"environments": {"source_signers": {}, "permissions": {}, "require_source_signers": true}}`
++		`"environments": {"source_signers": {}, "permissions": {}, "require_source_signers": true, "z_unknown": true, "a_unknown": true}}`
+ 	for attempt := 0; attempt < 24; attempt++ {
+ 		path := writeConfig(t, t.TempDir(), "config.json", body)
+ 		_, err := Load(path, nil)
+-		if err == nil || !strings.Contains(err.Error(), `unsupported field "require_source_signers"`) {
+-			t.Fatalf("attempt %d: Load err = %v, want stable first blocker environments.require_source_signers", attempt, err)
++		if err == nil || !strings.Contains(err.Error(), `unsupported field "a_unknown"`) {
++			t.Fatalf("attempt %d: Load err = %v, want stable first blocker environments.a_unknown", attempt, err)
+ 		}
+ 	}
+ }
+diff --git a/internal/contextlock/contextlock.go b/internal/contextlock/contextlock.go
+index 71c42b80..9c986766 100644
+--- a/internal/contextlock/contextlock.go
++++ b/internal/contextlock/contextlock.go
+@@ -71,6 +71,101 @@ type Lock struct {
+ 	Members []Member
+ }
+ 
++// Delta is one resolved-version change between two locks. Exactly one of
++// Old or New is nil for an addition or removal; both are set for a move.
++type Delta struct {
++	Old *Member
++	New *Member
++}
++
++// ResolvedDelta compares locks by (kind, name), reporting additions,
++// removals, and members whose resolved version or pin changed, in the
++// protocol's bytewise member order (§9.2).
++func ResolvedDelta(oldLock, newLock *Lock) []Delta {
++	oldMembers := make(map[string]Member, len(oldLock.Members))
++	newMembers := make(map[string]Member, len(newLock.Members))
++	for _, member := range oldLock.Members {
++		oldMembers[memberKey(member)] = member
++	}
++	for _, member := range newLock.Members {
++		newMembers[memberKey(member)] = member
++	}
++	keys := make([]string, 0, len(oldMembers)+len(newMembers))
++	for key := range oldMembers {
++		keys = append(keys, key)
++	}
++	for key := range newMembers {
++		if _, exists := oldMembers[key]; !exists {
++			keys = append(keys, key)
++		}
++	}
++	memberForKey := func(key string) Member {
++		if member, exists := oldMembers[key]; exists {
++			return member
++		}
++		return newMembers[key]
++	}
++	sort.Slice(keys, func(i, j int) bool {
++		a, b := memberForKey(keys[i]), memberForKey(keys[j])
++		if a.Kind != b.Kind {
++			return a.Kind < b.Kind
++		}
++		return a.Name < b.Name
++	})
++	deltas := make([]Delta, 0, len(keys))
++	for _, key := range keys {
++		oldMember, hadOld := oldMembers[key]
++		newMember, hasNew := newMembers[key]
++		switch {
++		case !hadOld:
++			copyMember := newMember
++			deltas = append(deltas, Delta{New: &copyMember})
++		case !hasNew:
++			copyMember := oldMember
++			deltas = append(deltas, Delta{Old: &copyMember})
++		case oldMember.Version != newMember.Version || deltaMemberPin(oldMember) != deltaMemberPin(newMember):
++			oldCopy, newCopy := oldMember, newMember
++			deltas = append(deltas, Delta{Old: &oldCopy, New: &newCopy})
++		}
++	}
++	return deltas
++}
++
++// Line renders one resolved-version delta in the closed environments §9.2
++// grammar.
++func (delta Delta) Line() string {
++	if delta.Old == nil && delta.New == nil {
++		return ""
++	}
++	if delta.Old == nil {
++		member := *delta.New
++		return fmt.Sprintf("lock-delta added %s %s %s %s", member.Kind, member.Name, deltaMemberVersion(member), deltaMemberPin(member))
++	}
++	if delta.New == nil {
++		member := *delta.Old
++		return fmt.Sprintf("lock-delta removed %s %s %s %s", member.Kind, member.Name, deltaMemberVersion(member), deltaMemberPin(member))
++	}
++	oldMember, newMember := *delta.Old, *delta.New
++	return fmt.Sprintf("lock-delta moved %s %s %s → %s %s → %s", newMember.Kind, newMember.Name,
++		deltaMemberVersion(oldMember), deltaMemberVersion(newMember), deltaMemberPin(oldMember), deltaMemberPin(newMember))
++}
++
++func memberKey(member Member) string { return member.Kind + "\x00" + member.Name }
++
++func deltaMemberVersion(member Member) string {
++	if member.Version == "" {
++		return "-"
++	}
++	return member.Version
++}
++
++func deltaMemberPin(member Member) string {
++	if member.Commit != "" {
++		return "commit:" + member.Commit
++	}
++	return "state:" + member.StateHash
++}
++
+ // Find returns the member of the given kind and name.
+ func (lock *Lock) Find(kind, name string) (Member, bool) {
+ 	for _, member := range lock.Members {
+diff --git a/internal/contextlock/contextlock_test.go b/internal/contextlock/contextlock_test.go
+index 9132c96f..16a86857 100644
+--- a/internal/contextlock/contextlock_test.go
++++ b/internal/contextlock/contextlock_test.go
+@@ -8,6 +8,30 @@ import (
+ // Production entry points under test: Validate, Sort, Canonical, Hash,
+ // HashBytes, Parse, Read, Write.
+ 
++func TestResolvedDeltaUsesProtocolOrderAndGrammar(t *testing.T) {
++	oldLock := &Lock{Members: []Member{
++		{Kind: KindSkill, Name: "removed", Commit: strings.Repeat("c", 40)},
++		{Kind: KindContext, Name: "root", Version: "1.0.0", Commit: strings.Repeat("a", 40)},
++	}}
++	newLock := &Lock{Members: []Member{
++		{Kind: KindMCP, Name: "tool", Version: "1.2.0", Commit: strings.Repeat("d", 40)},
++		{Kind: KindContext, Name: "root", Version: "1.1.0", Commit: strings.Repeat("b", 40)},
++	}}
++	deltas := ResolvedDelta(oldLock, newLock)
++	var lines []string
++	for _, delta := range deltas {
++		lines = append(lines, delta.Line())
++	}
++	want := []string{
++		"lock-delta moved context root 1.0.0 → 1.1.0 commit:" + strings.Repeat("a", 40) + " → commit:" + strings.Repeat("b", 40),
++		"lock-delta added mcp tool 1.2.0 commit:" + strings.Repeat("d", 40),
++		"lock-delta removed skill removed - commit:" + strings.Repeat("c", 40),
++	}
++	if strings.Join(lines, "\n") != strings.Join(want, "\n") {
++		t.Fatalf("delta lines = %#v, want %#v", lines, want)
++	}
++}
++
+ func testLock() *Lock {
+ 	return &Lock{Root: "root", Members: []Member{
+ 		{Kind: KindSkill, Name: "s", Commit: strings.Repeat("a", 40), Source: "https://example.com/s", Weight: 1, RequiredBy: []string{"root"}},
+diff --git a/internal/contextresolve/contextresolve.go b/internal/contextresolve/contextresolve.go
+index a8d9a2f0..6465589a 100644
+--- a/internal/contextresolve/contextresolve.go
++++ b/internal/contextresolve/contextresolve.go
+@@ -12,6 +12,8 @@
+ package contextresolve
+ 
+ import (
++	"crypto/sha256"
++	"encoding/base64"
+ 	"fmt"
+ 	"sort"
+ 	"strings"
+@@ -32,6 +34,9 @@ const (
+ 	DiagCompositionInvalid   = "environment_composition_invalid"
+ 	DiagMCPPackageNotAllowed = "mcp_package_not_allowed"
+ 	DiagSourceMismatch       = "context_source_mismatch"
++	DiagSourceUnsigned       = "context_source_unsigned"
++	DiagSourceSignerRejected = "context_source_signer_rejected"
++	DiagSourceSignersMissing = "context_source_signers_missing"
+ )
+ 
+ // MachineRequirer names the machine as the requirer of the install
+@@ -83,6 +88,36 @@ type Candidate struct {
+ 	Commit  string
+ }
+ 
++// Signer identifies an SSH public key or OpenPGP signer. SSH comments are
++// retained for status display but are not part of signer identity.
++type Signer struct {
++	Type        string
++	Key         string
++	Fingerprint string
++}
++
++// SignatureEvidence reports signature presence and cryptographic validity
++// for one selected ref. Signer is the key or fingerprint carried by the
++// signature, not an authorization decision.
++type SignatureEvidence struct {
++	Present bool
++	Valid   bool
++	Signer  Signer
++}
++
++// CandidateSignatures carries evidence for the selected tag and peeled
++// commit. Either signature may satisfy the source allowlist.
++type CandidateSignatures struct {
++	Tag    SignatureEvidence
++	Commit SignatureEvidence
++}
++
++// CandidateVerifier is implemented by network sources that can verify a
++// candidate's tag and commit signature before resolution admits it.
++type CandidateVerifier interface {
++	VerifyCandidate(kind, name, source, tag, commit string, allowed []Signer) (CandidateSignatures, error)
++}
++
+ // Source supplies candidates and manifests. Every method receives the
+ // canonical identity the requirement declared ("" when the requirement gave
+ // none) and returns the identity resolution records.
+@@ -133,6 +168,11 @@ type Input struct {
+ 	Direct []Requirement
+ 	// MCPAllowlist bounds MCP declaration packages; empty permits every identity.
+ 	MCPAllowlist []string
++	// SourceSigners is keyed by canonical Git source identity. Map presence
++	// distinguishes an empty allowlist, which admits no signer, from no
++	// allowlist, which is unconfigured unless RequireSourceSigners is true.
++	SourceSigners        map[string][]Signer
++	RequireSourceSigners bool
+ }
+ 
+ // RequirerConstraint is one requirer's constraint in a conflict detail.
+@@ -508,13 +548,22 @@ func (r *resolver) selectName(name string) error {
+ 	}
+ 	if exactCommit != "" {
+ 		chosen = &selection{kind: kind, name: name, source: source, directory: directory, commit: exactCommit, overlay: r.overlays[name]}
++		for _, c := range constraints {
++			if c.requirement.Tag != "" {
++				chosen.tag = c.requirement.Tag
++				break
++			}
++		}
+ 		// The version a fixed candidate carries: the highest version tag
+ 		// peeling to the commit for a skill; the manifest version otherwise.
+ 		for _, candidate := range candidates {
+ 			if candidate.Commit == exactCommit {
+-				chosen.version, chosen.hasVer, chosen.tag = candidate.Version, true, candidate.Tag
++				chosen.version, chosen.hasVer = candidate.Version, true
+ 			}
+ 		}
++		if err := r.verifyCandidate(chosen); err != nil {
++			return err
++		}
+ 		pkg, err := r.source.Manifest(kind, name, source, directory, exactCommit)
+ 		if err != nil {
+ 			return err
+@@ -585,15 +634,18 @@ func (r *resolver) selectName(name string) error {
+ 		return r.conflict(name, considered)
+ 	}
+ 	if current != nil && current.commit == best.Commit {
+-		return nil
++		return r.verifyCandidate(current)
+ 	}
+ 	if current != nil && pkgversion.Compare(best.Version, current.version) > 0 {
+ 		// Rule 3: a selection never increases; keep the current one while it
+ 		// still satisfies every constraint.
+-		return nil
++		return r.verifyCandidate(current)
+ 	}
+ 	chosen = &selection{kind: kind, name: name, source: source, directory: directory, commit: best.Commit,
+ 		version: best.Version, hasVer: true, tag: best.Tag, overlay: r.overlays[name]}
++	if err := r.verifyCandidate(chosen); err != nil {
++		return err
++	}
+ 	pkg, err := r.source.Manifest(kind, name, source, directory, best.Commit)
+ 	if err != nil {
+ 		return err
+@@ -611,6 +663,112 @@ func (r *resolver) selectName(name string) error {
+ 	return r.install(name, chosen)
+ }
+ 
++func (r *resolver) verifyCandidate(candidate *selection) error {
++	if candidate == nil || candidate.source == "" {
++		return nil // path and synthesized local roots have no signature material.
++	}
++	allowed, configured := r.input.SourceSigners[candidate.source]
++	if !configured {
++		if !r.input.RequireSourceSigners {
++			return nil
++		}
++		return &Error{Diagnostic: DiagSourceSignersMissing, Name: candidate.name,
++			Detail: fmt.Sprintf("source %s has no signer allowlist", candidate.source)}
++	}
++	verifier, ok := r.source.(CandidateVerifier)
++	if !ok {
++		return &Error{Diagnostic: DiagSourceSignerRejected, Name: candidate.name,
++			Detail: fmt.Sprintf("source %s %s signer unknown: signature verification is unavailable", candidate.source, candidateReference(candidate))}
++	}
++	evidence, err := verifier.VerifyCandidate(candidate.kind, candidate.name, candidate.source, candidate.tag, candidate.commit, allowed)
++	for _, signature := range []SignatureEvidence{evidence.Tag, evidence.Commit} {
++		if signature.Present && signature.Valid && allowedSigner(signature.Signer, allowed) {
++			return nil
++		}
++	}
++	seen := evidence.Tag.Signer
++	if !evidence.Tag.Present || signerName(seen) == "unknown" {
++		seen = evidence.Commit.Signer
++	}
++	if err != nil {
++		return &Error{Diagnostic: DiagSourceSignerRejected, Name: candidate.name,
++			Detail: fmt.Sprintf("source %s %s signer %s: verification failed: %v", candidate.source, candidateReference(candidate), signerName(seen), err)}
++	}
++	if !evidence.Tag.Present && !evidence.Commit.Present {
++		return &Error{Diagnostic: DiagSourceUnsigned, Name: candidate.name,
++			Detail: fmt.Sprintf("source %s %s carries no tag or commit signature", candidate.source, candidateReference(candidate))}
++	}
++	return &Error{Diagnostic: DiagSourceSignerRejected, Name: candidate.name,
++		Detail: fmt.Sprintf("source %s %s signer %s is not accepted or did not verify", candidate.source, candidateReference(candidate), signerName(seen))}
++}
++
++func candidateReference(candidate *selection) string {
++	if candidate.tag != "" {
++		return "tag " + candidate.tag
++	}
++	return "commit " + candidate.commit
++}
++
++func signerName(signer Signer) string {
++	return FormatSigner(signer)
++}
++
++// IsAllowedSigner compares one verified signer to a source allowlist. SSH
++// comments are ignored; OpenPGP fingerprints compare case-insensitively.
++func IsAllowedSigner(seen Signer, allowed []Signer) bool { return allowedSigner(seen, allowed) }
++
++// FormatSigner renders a verified or claimed signer without exposing SSH
++// public-key material in status output or diagnostics.
++func FormatSigner(signer Signer) string {
++	switch signer.Type {
++	case "ssh":
++		fields := strings.Fields(signer.Key)
++		if len(fields) >= 2 {
++			decoded, err := base64.StdEncoding.DecodeString(fields[1])
++			if err != nil {
++				decoded, err = base64.RawStdEncoding.DecodeString(fields[1])
++			}
++			if err == nil {
++				digest := sha256.Sum256(decoded)
++				return fields[0] + " SHA256:" + base64.RawStdEncoding.EncodeToString(digest[:])
++			}
++			return fields[0] + " " + fields[1]
++		}
++	case "gpg":
++		if signer.Fingerprint != "" {
++			return "gpg " + strings.ToUpper(signer.Fingerprint)
++		}
++	}
++	return "unknown"
++}
++
++func allowedSigner(seen Signer, allowed []Signer) bool {
++	for _, signer := range allowed {
++		if signer.Type != seen.Type {
++			continue
++		}
++		switch seen.Type {
++		case "ssh":
++			seenFields, allowedFields := strings.Fields(seen.Key), strings.Fields(signer.Key)
++			if len(seenFields) >= 2 && len(allowedFields) >= 2 && seenFields[0] == allowedFields[0] && normalizeSSHKeyMaterial(seenFields[1]) == normalizeSSHKeyMaterial(allowedFields[1]) {
++				return true
++			}
++		case "gpg":
++			if strings.EqualFold(seen.Fingerprint, signer.Fingerprint) && seen.Fingerprint != "" {
++				return true
++			}
++		}
++	}
++	return false
++}
++
++// Environments §12.1 defines SSH identity as key type plus base64 material.
++// Padding is optional in the public-key line, so remove trailing '=' from
++// both verified and configured material before comparing their identities.
++func normalizeSSHKeyMaterial(material string) string {
++	return strings.TrimRight(material, "=")
++}
++
+ // exactVersionTagPinned reports whether some exact constraint names the
+ // version tag the selection came from, so the manifest version must match it.
+ func (r *resolver) exactVersionTagPinned(constraints []constraint, tag string) bool {
+diff --git a/internal/contextresolve/contextresolve_test.go b/internal/contextresolve/contextresolve_test.go
+index e2cad53f..dcbf1359 100644
+--- a/internal/contextresolve/contextresolve_test.go
++++ b/internal/contextresolve/contextresolve_test.go
+@@ -1,6 +1,7 @@
+ package contextresolve
+ 
+ import (
++	"errors"
+ 	"strings"
+ 	"testing"
+ 
+@@ -15,6 +16,16 @@ type stubSource struct {
+ 	manifests map[string]*Package
+ }
+ 
++type signerStubSource struct {
++	*stubSource
++	evidence  CandidateSignatures
++	verifyErr error
++}
++
++func (s *signerStubSource) VerifyCandidate(_, _, _, _, _ string, _ []Signer) (CandidateSignatures, error) {
++	return s.evidence, s.verifyErr
++}
++
+ func (s *stubSource) Identity(_ string, name, declared string) (string, error) {
+ 	if declared != "" {
+ 		return declared, nil
+@@ -94,6 +105,85 @@ func TestMinimalResolution(t *testing.T) {
+ 	}
+ }
+ 
++// TestResolveRejectsValidSignatureFromUnlistedSigner narrows the resolver's
++// authorization check: valid cryptographic evidence is insufficient unless
++// the signer's identity appears in the source allowlist.
++func TestResolveRejectsValidSignatureFromUnlistedSigner(t *testing.T) {
++	commit := strings.Repeat("1", 40)
++	source := &signerStubSource{
++		stubSource: &stubSource{
++			commits:   map[string]string{"root@v1.0.0": commit},
++			manifests: map[string]*Package{commit: {Version: "1.0.0"}},
++		},
++		evidence: CandidateSignatures{Tag: SignatureEvidence{
++			Present: true, Valid: true, Signer: Signer{Type: "ssh", Key: "ssh-ed25519 unlisted"},
++		}},
++	}
++	_, err := Resolve(source, Input{
++		Root: Requirement{Name: "root", Source: "https://example.com/root", Tag: "v1.0.0"},
++		SourceSigners: map[string][]Signer{
++			"https://example.com/root": {{Type: "ssh", Key: "ssh-ed25519 allowed"}},
++		},
++	})
++	resolutionErr := resolveError(t, err)
++	if resolutionErr.Diagnostic != DiagSourceSignerRejected {
++		t.Fatalf("diagnostic = %q, want %q", resolutionErr.Diagnostic, DiagSourceSignerRejected)
++	}
++	if !strings.Contains(resolutionErr.Detail, "ssh-ed25519 SHA256:") {
++		t.Fatalf("rejection does not identify claimed signer: %q", resolutionErr.Detail)
++	}
++}
++
++func TestResolveAcceptsAllowedSignatureWhenOtherVerificationErrors(t *testing.T) {
++	commit := strings.Repeat("1", 40)
++	allowed := Signer{Type: "ssh", Key: "ssh-ed25519 second-allowed"}
++	firstAllowed := Signer{Type: "ssh", Key: "ssh-ed25519 first-allowed"}
++	source := &signerStubSource{
++		stubSource: &stubSource{
++			commits:   map[string]string{"root@v1.0.0": commit},
++			manifests: map[string]*Package{commit: {Version: "1.0.0"}},
++		},
++		evidence:  CandidateSignatures{Commit: SignatureEvidence{Present: true, Valid: true, Signer: allowed}},
++		verifyErr: errors.New("tag signature verification unavailable"),
++	}
++	result, err := Resolve(source, Input{
++		Root:          Requirement{Name: "root", Source: "https://example.com/root", Tag: "v1.0.0"},
++		SourceSigners: map[string][]Signer{"https://example.com/root": {firstAllowed, allowed}},
++	})
++	if err != nil {
++		t.Fatalf("Resolve rejected an allowed commit signature after tag verification failed: %v", err)
++	}
++	if result == nil || result.Lock == nil {
++		t.Fatal("accepted signature did not produce a resolved lock")
++	}
++}
++
++func TestResolveMatchesUnpaddedAllowlistToPaddedVerifiedSSHKey(t *testing.T) {
++	const material = "AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2A5GK"
++	commit := strings.Repeat("1", 40)
++	source := &signerStubSource{
++		stubSource: &stubSource{
++			commits:   map[string]string{"root@v1.0.0": commit},
++			manifests: map[string]*Package{commit: {Version: "1.0.0"}},
++		},
++		evidence: CandidateSignatures{Tag: SignatureEvidence{
++			Present: true, Valid: true, Signer: Signer{Type: "ssh", Key: "ssh-ed25519 " + material + "== verified-comment"},
++		}},
++	}
++	result, err := Resolve(source, Input{
++		Root: Requirement{Name: "root", Source: "https://example.com/root", Tag: "v1.0.0"},
++		SourceSigners: map[string][]Signer{
++			"https://example.com/root": {{Type: "ssh", Key: "ssh-ed25519 " + material + " configured-comment"}},
++		},
++	})
++	if err != nil {
++		t.Fatalf("Resolve rejected equal SSH key material with different padding/comments: %v", err)
++	}
++	if result == nil || result.Lock == nil {
++		t.Fatal("accepted signature did not produce a resolved lock")
++	}
++}
++
+ // TestRangeConflict narrows the conflict gate: disjoint ranges on one name
+ // must fail with context_range_conflict. A mutant that picks the higher
+ // candidate despite the conflict must fail this test.
+diff --git a/internal/contextresolve/source_signers_conformance_test.go b/internal/contextresolve/source_signers_conformance_test.go
+new file mode 100644
+index 00000000..e2ff9d6d
+--- /dev/null
++++ b/internal/contextresolve/source_signers_conformance_test.go
+@@ -0,0 +1,207 @@
++package contextresolve
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/contextlock"
++)
++
++type sourceSignerVectorFile struct {
++	VerificationCases []sourceSignerVector `json:"verification_cases"`
++}
++
++type sourceSignerVector struct {
++	Name                 string                         `json:"name"`
++	Conforming           *bool                          `json:"conforming"`
++	SourceKind           string                         `json:"source_kind"`
++	Source               *string                        `json:"source"`
++	Allowlist            []sourceSignerVectorSigner     `json:"allowlist"`
++	RequireSourceSigners bool                           `json:"require_source_signers"`
++	Candidates           []sourceSignerVectorCandidate  `json:"candidates"`
++	Expected             *sourceSignerVectorExpected    `json:"expected"`
++	Observed             *sourceSignerVectorObservation `json:"observed"`
++}
++
++type sourceSignerVectorSigner struct {
++	Type        string `json:"type"`
++	Key         string `json:"key"`
++	Fingerprint string `json:"fingerprint"`
++}
++
++type sourceSignerVectorCandidate struct {
++	Version         string                      `json:"version"`
++	Tag             string                      `json:"tag"`
++	Commit          string                      `json:"commit"`
++	Form            string                      `json:"form"`
++	TagSignature    *sourceSignerVectorEvidence `json:"tag_signature"`
++	CommitSignature *sourceSignerVectorEvidence `json:"commit_signature"`
++}
++
++type sourceSignerVectorEvidence struct {
++	Signer sourceSignerVectorSigner `json:"signer"`
++	Valid  bool                     `json:"valid"`
++}
++
++type sourceSignerVectorExpected struct {
++	Verdict     string  `json:"verdict"`
++	Diagnostic  string  `json:"diagnostic"`
++	Selected    *string `json:"selected"`
++	LockWritten bool    `json:"lock_written"`
++}
++
++type sourceSignerVectorObservation struct {
++	Verdict  string  `json:"verdict"`
++	Selected *string `json:"selected"`
++}
++
++type vectorVerifierSource struct {
++	*stubSource
++	evidenceByCommit map[string]CandidateSignatures
++	verifiedCommits  []string
++}
++
++func (s *vectorVerifierSource) VerifyCandidate(_, _, _, _, commit string, _ []Signer) (CandidateSignatures, error) {
++	s.verifiedCommits = append(s.verifiedCommits, commit)
++	return s.evidenceByCommit[commit], nil
++}
++
++// TestSourceSignerVectorsAtResolve drives every rc.13 signer verification
++// case through Resolve, including the adversarial observations that the
++// protocol requires the manager to reject.
++func TestSourceSignerVectorsAtResolve(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	payload, err := os.ReadFile(filepath.Join(root, "vectors", "environments-source-signers.json")) // #nosec G304 -- explicit conformance root
++	if err != nil {
++		t.Fatal(err)
++	}
++	var vectors sourceSignerVectorFile
++	if err := json.Unmarshal(payload, &vectors); err != nil {
++		t.Fatal(err)
++	}
++	if len(vectors.VerificationCases) == 0 {
++		t.Fatal("pinned rc.13 source signer vector publishes no verification cases")
++	}
++	for _, vector := range vectors.VerificationCases {
++		t.Run(vector.Name, func(t *testing.T) {
++			verifySourceSignerVector(t, vector)
++		})
++	}
++}
++
++func verifySourceSignerVector(t *testing.T, vector sourceSignerVector) {
++	t.Helper()
++	base := &stubSource{commits: map[string]string{}, manifests: map[string]*Package{}}
++	verifier := &vectorVerifierSource{stubSource: base, evidenceByCommit: map[string]CandidateSignatures{}}
++	input := Input{
++		Root:                 Requirement{Kind: contextlock.KindContext, Name: "root"},
++		RequireSourceSigners: vector.RequireSourceSigners,
++	}
++	if vector.SourceKind == "path" {
++		if len(vector.Candidates) != 1 || vector.Candidates[0].Version == "" {
++			t.Fatalf("path vector has no single versioned candidate: %+v", vector.Candidates)
++		}
++		input.RootState = &StatePackage{
++			StateHash: strings.Repeat("f", 64),
++			Manifest:  &Package{Version: vector.Candidates[0].Version},
++		}
++	} else {
++		if vector.Source == nil || *vector.Source == "" {
++			t.Fatal("git signer vector has no source identity")
++		}
++		input.Root.Source = *vector.Source
++		for _, candidate := range vector.Candidates {
++			commit := candidate.Commit
++			if commit == "" {
++				commit = strings.Repeat("1", 40)
++			}
++			base.manifests[commit] = &Package{Version: candidate.Version}
++			if candidate.Tag != "" {
++				base.commits["root@"+candidate.Tag] = commit
++			}
++			verifier.evidenceByCommit[commit] = CandidateSignatures{
++				Tag:    vectorSignature(candidate.TagSignature),
++				Commit: vectorSignature(candidate.CommitSignature),
++			}
++		}
++		if vector.Allowlist != nil {
++			allowed := make([]Signer, 0, len(vector.Allowlist))
++			for _, signer := range vector.Allowlist {
++				allowed = append(allowed, Signer(signer))
++			}
++			input.SourceSigners = map[string][]Signer{*vector.Source: allowed}
++		}
++		if len(vector.Candidates) == 0 {
++			t.Fatal("git signer vector publishes no candidates")
++		}
++		switch vector.Candidates[0].Form {
++		case "tag":
++			input.Root.Tag = vector.Candidates[0].Tag
++		case "revision":
++			input.Root.Revision = vector.Candidates[0].Commit
++		default:
++			input.Root.Range = "*"
++		}
++	}
++
++	result, resolveErr := Resolve(verifier, input)
++	if vector.Conforming != nil && !*vector.Conforming {
++		if resolveErr == nil {
++			t.Fatalf("resolver accepted adversarial claim %q (observed %s)", vector.Name, vector.Observed.Verdict)
++		}
++		resolutionErr := resolveError(t, resolveErr)
++		if resolutionErr.Diagnostic != DiagSourceUnsigned {
++			t.Fatalf("diagnostic = %q, want %q", resolutionErr.Diagnostic, DiagSourceUnsigned)
++		}
++		if vector.Name == "fallback-selection" && (len(verifier.verifiedCommits) != 1 || verifier.verifiedCommits[0] != vector.Candidates[0].Commit) {
++			t.Fatalf("verification commits = %v, want only highest candidate %s", verifier.verifiedCommits, vector.Candidates[0].Commit)
++		}
++		return
++	}
++	if vector.Expected == nil {
++		t.Fatal("conforming vector has no expected result")
++	}
++	accepted := vector.Expected.Verdict == "accepted"
++	if accepted != (resolveErr == nil) {
++		t.Fatalf("Resolve error = %v, want accepted=%t", resolveErr, accepted)
++	}
++	if accepted {
++		if result == nil || vector.Expected.LockWritten != (result.Lock != nil) {
++			t.Fatalf("lock result = %+v, want lock_written=%t", result, vector.Expected.LockWritten)
++		}
++		member, ok := result.Members[Key(contextlock.KindContext, "root")]
++		if !ok || vector.Expected.Selected != nil && member.Version != *vector.Expected.Selected {
++			t.Fatalf("selected root = %+v, want %v", member, vector.Expected.Selected)
++		}
++	} else {
++		resolutionErr := resolveError(t, resolveErr)
++		if resolutionErr.Diagnostic != vector.Expected.Diagnostic {
++			t.Fatalf("diagnostic = %q, want %q", resolutionErr.Diagnostic, vector.Expected.Diagnostic)
++		}
++		if result != nil {
++			t.Fatalf("refused vector produced result %+v", result)
++		}
++	}
++	if (vector.SourceKind == "path" || vector.Allowlist == nil && !vector.RequireSourceSigners) && len(verifier.verifiedCommits) != 0 {
++		t.Fatalf("unconfigured or path source was verified: %v", verifier.verifiedCommits)
++	}
++}
++
++func vectorSignature(vector *sourceSignerVectorEvidence) SignatureEvidence {
++	if vector == nil {
++		return SignatureEvidence{}
++	}
++	return SignatureEvidence{
++		Present: true,
++		Valid:   vector.Valid,
++		Signer: Signer{
++			Type: vector.Signer.Type, Key: vector.Signer.Key, Fingerprint: vector.Signer.Fingerprint,
++		},
++	}
++}
+diff --git a/internal/envprofile/delta_confirmation_test.go b/internal/envprofile/delta_confirmation_test.go
+new file mode 100644
+index 00000000..d0e83d0e
+--- /dev/null
++++ b/internal/envprofile/delta_confirmation_test.go
+@@ -0,0 +1,66 @@
++package envprofile
++
++import (
++	"os"
++	"os/exec"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/contextstore"
++)
++
++// TestUpdateSystemDeltaRefusesBeforePublication drives UpdateWithOptions,
++// the profile update production entry, through revision-B refusal. The
++// resolved delta is reported, but neither the old lock nor the candidate
++// store entry is changed without the per-run confirmation flag.
++func TestUpdateSystemDeltaRefusesBeforePublication(t *testing.T) {
++	if _, err := gitLookPath(); err != nil {
++		t.Skip("no git on PATH")
++	}
++	home := t.TempDir()
++	pinHomes(t)
++	ids := newGitIdentities(t)
++	manifest := `{"schema_version":1,"name":"delta","version":"1.0.0"}` + "\n"
++	repo := gitRepo(t, map[string]string{"agent-context.json": manifest}, "v1.0.0")
++	operand := ids.serve(repo, "https://example.com/delta")
++	if _, _, _, err := Install(home, InstallOptions{Operand: operand}); err != nil {
++		t.Fatalf("initial install: %v", err)
++	}
++	lockPath := lockPath(home, "delta")
++	oldLock, err := os.ReadFile(lockPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	writeGitFile(t, repo, "agent-context.json", `{"schema_version":1,"name":"delta","version":"1.0.1","context":{"modules":[{"path":"system.md","class":"system","environments":["claude_code"]}]}}`+"\n")
++	writeGitFile(t, repo, "context/system.md", "system prompt\n")
++	gitRun(t, repo, "add", ".")
++	gitRun(t, repo, "commit", "-m", "system module")
++	gitRun(t, repo, "tag", "v1.0.1")
++	output, err := exec.Command("git", "-C", repo, "rev-parse", "HEAD").Output()
++	if err != nil {
++		t.Fatal(err)
++	}
++	newCommit := strings.TrimSpace(string(output))
++	info, moved, err := UpdateWithOptions(home, "delta", UpdateOptions{})
++	if err == nil || !strings.Contains(err.Error(), DiagSystemDeltaConfirmationRequired) {
++		t.Fatalf("unconfirmed UpdateWithOptions = moved:%t err:%v", moved, err)
++	}
++	if moved {
++		t.Fatal("a refused resolved delta must not report a moved profile")
++	}
++	if len(info.Delta) != 1 || !strings.Contains(info.Delta[0], "lock-delta moved context delta") {
++		t.Fatalf("refusal delta lines = %v", info.Delta)
++	}
++	currentLock, err := os.ReadFile(lockPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if string(currentLock) != string(oldLock) {
++		t.Fatal("confirmation refusal changed lock.json")
++	}
++	candidateEntry := contextstore.EntryDir(home, contextlock.KindContext, "delta", newCommit)
++	if _, err := os.Lstat(candidateEntry); !os.IsNotExist(err) {
++		t.Fatalf("confirmation refusal installed the candidate store entry: %v", err)
++	}
++}
+diff --git a/internal/envprofile/envprofile.go b/internal/envprofile/envprofile.go
+index 5db5758e..d1af95b5 100644
+--- a/internal/envprofile/envprofile.go
++++ b/internal/envprofile/envprofile.go
+@@ -55,15 +55,16 @@ import (
+ 
+ // Diagnostics (environments §1.1, §2.1, §9.7, manager profile §12.3).
+ const (
+-	DiagNameTaken       = "profile_name_taken"
+-	DiagRefConflict     = "profile_install_ref_conflict"
+-	DiagSourceInvalid   = "profile_source_invalid"
+-	DiagPathMissing     = "profile_source_path_missing"
+-	DiagPathUnreadable  = "profile_source_path_unreadable"
+-	DiagUpdateBlocked   = "profile_update_blocked"
+-	DiagInUse           = "profile_in_use"
+-	DiagNotFound        = "profile_not_found"
+-	DiagImportNameTaken = "profile_import_name_taken"
++	DiagNameTaken                       = "profile_name_taken"
++	DiagRefConflict                     = "profile_install_ref_conflict"
++	DiagSourceInvalid                   = "profile_source_invalid"
++	DiagPathMissing                     = "profile_source_path_missing"
++	DiagPathUnreadable                  = "profile_source_path_unreadable"
++	DiagUpdateBlocked                   = "profile_update_blocked"
++	DiagSystemDeltaConfirmationRequired = "profile_update_confirmation_required"
++	DiagInUse                           = "profile_in_use"
++	DiagNotFound                        = "profile_not_found"
++	DiagImportNameTaken                 = "profile_import_name_taken"
+ 	// DiagLockUnavailable reports that the manager-home mutation lock
+ 	// could not be acquired within the bounded wait (manager §2.5).
+ 	DiagLockUnavailable = "environment_lock_unavailable"
+@@ -174,6 +175,7 @@ type Info struct {
+ 	Current    bool
+ 	ScopedFor  []string
+ 	Warnings   []string
++	Delta      []string
+ 	Surfacing  []string
+ 	Activation []EntryResult
+ }
+@@ -426,9 +428,11 @@ func InUseByAnyScope(home, name string) (bool, error) {
+ // regardless of any enabled flag — an advisory profile install does not
+ // exist.
+ type Policy struct {
+-	AllowedSources []string
+-	MCPAllowlist   []string
+-	Revocations    []string
++	AllowedSources       []string
++	MCPAllowlist         []string
++	SourceSigners        map[string][]contextresolve.Signer
++	RequireSourceSigners bool
++	Revocations          []string
+ 	// OverlaysAllowed is the effective §12.1 composition policy: false
+ 	// empties every overlay list at resolution (environments §12.2).
+ 	OverlaysAllowed bool
+@@ -561,6 +565,8 @@ func PolicyFromConfig(cfg *config.Config) Policy {
+ 	policy := Policy{
+ 		AllowedSources:          cfg.AllowedSources,
+ 		MCPAllowlist:            cfg.Env.MCPPackageAllowlist,
++		SourceSigners:           make(map[string][]contextresolve.Signer, len(cfg.Env.SourceSigners)),
++		RequireSourceSigners:    cfg.Env.RequireSourceSigners,
+ 		Revocations:             cfg.Audit.Revocations,
+ 		OverlaysAllowed:         cfg.Env.OverlaysAllowed,
+ 		OverlayDefaultWeight:    int64(cfg.Env.OverlayDefaultWeight),
+@@ -570,6 +576,14 @@ func PolicyFromConfig(cfg *config.Config) Policy {
+ 		RequireCurrentLocked:    cfg.Locked["environments.require_current_profile"],
+ 		TransitiveSystemModules: cfg.Env.TransitiveSystemModules,
+ 	}
++	for source, signers := range cfg.Env.SourceSigners {
++		policy.SourceSigners[source] = make([]contextresolve.Signer, 0, len(signers))
++		for _, signer := range signers {
++			policy.SourceSigners[source] = append(policy.SourceSigners[source], contextresolve.Signer{
++				Type: signer.Type, Key: signer.Key, Fingerprint: signer.Fingerprint,
++			})
++		}
++	}
+ 	for _, waiver := range cfg.Env.SystemModuleWaivers {
+ 		policy.SystemModuleWaivers = append(policy.SystemModuleWaivers,
+ 			SystemModuleWaiver{Package: waiver.Package, Reason: waiver.Reason})
+@@ -605,6 +619,12 @@ type InstallOptions struct {
+ 	As        string
+ 	Use       bool
+ 	Policy    Policy
++	// ConfirmSystemDelta acknowledges a trigger during reinstall of an
++	// existing profile (§9.2).
++	ConfirmSystemDelta bool
++	// WarningSink receives operation warnings before a confirmation gate or
++	// lock publication, preserving §9.2 output order.
++	WarningSink io.Writer
+ 	// Imported marks an installation reassembled by the section 9.6
+ 	// onboarding import: the install record and the environment markers
+ 	// carry imported_from_native. Only the import sets it.
+@@ -729,7 +749,7 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
+ 			if isPath {
+ 				return reinstallPathLocked(op, home, name, source, input, options)
+ 			}
+-			info, _, err := updateLocked(op, home, name, options.Policy, options.SurfacingSink, nil)
++			info, _, err := updateLocked(op, home, name, options.Policy, options.SurfacingSink, options.WarningSink, options.ConfirmSystemDelta, nil)
+ 			if err != nil {
+ 				return Info{}, false, false, err
+ 			}
+@@ -784,6 +804,7 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
+ 	// published or any surface is (re-)materialized below — even when
+ 	// publication or activation later fails.
+ 	surfacing = carrySurfacing(options.SurfacingSink, surfacing)
++	writeUpdateWarnings(options.WarningSink, "", warnings)
+ 	sourcePayload, err := marshalSource(source)
+ 	if err != nil {
+ 		return Info{}, false, false, err
+@@ -848,6 +869,9 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input
+ 	if err != nil {
+ 		return Info{}, false, false, err
+ 	}
++	if err := fetchLockedSources(manager, oldLock); err != nil {
++		return Info{}, false, false, err
++	}
+ 	overlays, err := resolveOverlays(home, manager, name, policy)
+ 	if err != nil {
+ 		return Info{}, false, false, err
+@@ -867,20 +891,9 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input
+ 		if oldMembers[key] {
+ 			continue
+ 		}
+-		entry, err := manager.ensureEntry(home, resolved)
+-		if err != nil {
++		if err := auditNewUpdateMember(home, manager, key, resolved, policy); err != nil {
+ 			return Info{}, false, false, err
+ 		}
+-		report, err := contextaudit.Detect(packageRoot(entry, resolved.Directory), pinOf(resolved), nil)
+-		if err != nil {
+-			return Info{}, false, false, err
+-		}
+-		if report.Blocking() {
+-			return Info{}, false, false, fmt.Errorf("%s: new member %s carries a blocking finding; the old lock stands", DiagUpdateBlocked, key)
+-		}
+-		if _, err := strictAuditMember(home, manager, resolved, entry, policy); err != nil {
+-			return Info{}, false, false, fmt.Errorf("%s: new member %s %v; the old lock stands", DiagUpdateBlocked, key, err)
+-		}
+ 	}
+ 	if err := checkAdmissionPrePublish(home, manager, result, policy); err != nil {
+ 		return Info{}, false, false, err
+@@ -901,6 +914,7 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input
+ 		// The §2.3 emission point: the rows print before the
+ 		// activation below (re-)materializes any surface.
+ 		surfacing = carrySurfacing(options.SurfacingSink, surfacing)
++		writeUpdateWarnings(options.WarningSink, "", warnings)
+ 		if activate, err := reinstallActivation(home, name, options.Use); err != nil {
+ 			return Info{}, false, false, err
+ 		} else if activate {
+@@ -914,11 +928,20 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input
+ 		return info, false, true, nil
+ 	}
+ 	warnings := resolutionWarnings(result)
+-	auditWarnings, err := auditAndStore(home, manager, result, policy)
++	auditWarnings, err := auditCandidates(home, manager, result, policy)
+ 	if err != nil {
+ 		return Info{}, false, false, err
+ 	}
+ 	warnings = append(warnings, auditWarnings...)
++	deltaLines, triggered, deltaErr := resolvedDelta(home, manager, oldLock, result.Lock)
++	for _, line := range deltaLines {
++		if options.SurfacingSink != nil {
++			_, _ = fmt.Fprintln(options.SurfacingSink, line)
++		}
++	}
++	if deltaErr != nil {
++		return Info{Name: name, Source: source, Lock: result.Lock, LockHash: oldHash, Delta: deltaLines}, false, false, deltaErr
++	}
+ 	// Environments §9.1: after the audit gate passes and before the lock
+ 	// is published, surface the resolved MCP set (§2.3) and warn when
+ 	// the MCP package allowlist is empty. Neither fails the install.
+@@ -930,6 +953,14 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input
+ 	// The §2.3 emission point: the rows print before the lock is
+ 	// published or any scope is resynced below.
+ 	surfacing = carrySurfacing(options.SurfacingSink, surfacing)
++	writeUpdateWarnings(options.WarningSink, "", warnings)
++	if len(triggered) > 0 && !options.ConfirmSystemDelta {
++		return Info{Name: name, Source: source, Lock: result.Lock, LockHash: oldHash, Warnings: warnings, Delta: deltaLines}, false, false,
++			fmt.Errorf("%s: members %s require --confirm-system-delta; %s", DiagSystemDeltaConfirmationRequired, strings.Join(triggered, ", "), systemDeltaHint)
++	}
++	if err := ensureResolvedEntries(home, manager, result); err != nil {
++		return Info{}, false, false, err
++	}
+ 	canonical, err := result.Lock.Canonical()
+ 	if err != nil {
+ 		return Info{}, false, false, err
+@@ -954,7 +985,7 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input
+ 	if err != nil {
+ 		return Info{}, false, false, err
+ 	}
+-	return Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: machine == name, Warnings: warnings, Surfacing: surfacing}, false, true, nil
++	return Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: machine == name, Warnings: warnings, Delta: deltaLines, Surfacing: surfacing}, false, true, nil
+ }
+ 
+ // reinstallActivation reports whether a same-source path reinstall must run
+@@ -1006,8 +1037,8 @@ func activateReinstall(op *operation, home, name string, source Source, lock *co
+ // Update re-resolves the root (and overlays, when the machine declares any)
+ // from the declared requirement, fetching new candidates. A blocking
+ // finding on a member new to the lock leaves the old lock in place with
+-// profile_update_blocked. A root pinned by tag or revision is reported as
+-// pinned and does not move. A path root resolves from the immutable
++// profile_update_blocked. A root pinned by tag or revision stays pinned,
++// but its signature is still reverified. A path root resolves from the immutable
+ // snapshot the store already holds under the old lock's state pin and never
+ // reads the source directory again (environments §1); overlays still
+ // re-resolve below, so a path root with git overlays is a legitimate
+@@ -1026,6 +1057,12 @@ func Update(home, name string) (Info, bool, error) {
+ type UpdateOptions struct {
+ 	// Policy carries the machine gates (§9.1).
+ 	Policy Policy
++	// ConfirmSystemDelta is the per-run §9.2 acknowledgement for a delta
++	// that introduces or changes system modules or an MCP declaration.
++	ConfirmSystemDelta bool
++	// WarningSink receives operation warnings before the confirmation gate
++	// or lock publication.
++	WarningSink io.Writer
+ 	// SurfacingSink receives the §2.3 declaration rows at the required
+ 	// emission point: after the audit gate passes and before the lock
+ 	// is published or any surface is re-materialized. A nil sink keeps
+@@ -1054,11 +1091,11 @@ func UpdateWithOptions(home, name string, options UpdateOptions) (Info, bool, er
+ 		return Info{}, false, err
+ 	}
+ 	defer func() { _ = op.close() }()
+-	return updateLocked(op, home, name, options.Policy, options.SurfacingSink, options.readRegularFile)
++	return updateLocked(op, home, name, options.Policy, options.SurfacingSink, options.WarningSink, options.ConfirmSystemDelta, options.readRegularFile)
+ }
+ 
+ // updateLocked re-resolves under the held operation lock.
+-func updateLocked(op *operation, home, name string, policy Policy, sink io.Writer, readRegularFile func(string) (stateread.File, error)) (Info, bool, error) {
++func updateLocked(op *operation, home, name string, policy Policy, sink, warningSink io.Writer, confirmSystemDelta bool, readRegularFile func(string) (stateread.File, error)) (Info, bool, error) {
+ 	if readRegularFile == nil {
+ 		readRegularFile = stateread.ReadRegularFile
+ 	}
+@@ -1082,24 +1119,17 @@ func updateLocked(op *operation, home, name string, policy Policy, sink io.Write
+ 	if err := ensureDefault(op, home, policy); err != nil {
+ 		return Info{}, false, err
+ 	}
++	rootMember, hasRootMember := oldLock.RootMember()
++	if source.Kind == KindPath && (!hasRootMember || rootMember.StateHash == "") {
++		return Info{}, false, fmt.Errorf("%s: profile %q lock carries no state pin for its path root", DiagSourceInvalid, name)
++	}
+ 	manager := newGitManager(home).withPolicy(policy)
++	if err := fetchLockedSources(manager, oldLock); err != nil {
++		return Info{}, false, err
++	}
+ 	var input contextresolve.Input
+ 	switch source.Kind {
+ 	case KindGit:
+-		if source.Req.Tag != "" || source.Req.Revision != "" {
+-			machine, err := Current(home)
+-			if err != nil {
+-				return Info{}, false, err
+-			}
+-			info := Info{Name: name, Source: source, Lock: oldLock, Current: machine == name}
+-			if _, hash, err := readLockWith(home, name, readRegularFile); err == nil {
+-				info.LockHash = hash
+-			}
+-			return info, false, nil
+-		}
+-		if err := manager.fetch(source.Git); err != nil {
+-			return Info{}, false, fmt.Errorf("%s: %v", DiagSourceInvalid, err)
+-		}
+ 		input, err = manager.inputFor(source)
+ 		if err != nil {
+ 			return Info{}, false, err
+@@ -1114,10 +1144,6 @@ func updateLocked(op *operation, home, name string, policy Policy, sink io.Write
+ 		// directory, so every imported profile's source.Path names no
+ 		// existing entry). Overlays re-resolve below the switch, so a
+ 		// path root with git overlays still moves on update.
+-		rootMember, ok := oldLock.RootMember()
+-		if !ok || rootMember.StateHash == "" {
+-			return Info{}, false, fmt.Errorf("%s: profile %q lock carries no state pin for its path root", DiagSourceInvalid, name)
+-		}
+ 		entry := contextstore.EntryDir(home, contextlock.KindContext, oldLock.Root, rootMember.StateHash)
+ 		manifest, err := contextpkg.LoadManifest(entry)
+ 		if err != nil {
+@@ -1152,20 +1178,9 @@ func updateLocked(op *operation, home, name string, policy Policy, sink io.Write
+ 		if oldMembers[key] {
+ 			continue
+ 		}
+-		entry, err := manager.ensureEntry(home, resolved)
+-		if err != nil {
++		if err := auditNewUpdateMember(home, manager, key, resolved, policy); err != nil {
+ 			return Info{}, false, err
+ 		}
+-		report, err := contextaudit.Detect(packageRoot(entry, resolved.Directory), pinOf(resolved), nil)
+-		if err != nil {
+-			return Info{}, false, err
+-		}
+-		if report.Blocking() {
+-			return Info{}, false, fmt.Errorf("%s: new member %s carries a blocking finding; the old lock stands", DiagUpdateBlocked, key)
+-		}
+-		if _, err := strictAuditMember(home, manager, resolved, entry, policy); err != nil {
+-			return Info{}, false, fmt.Errorf("%s: new member %s %v; the old lock stands", DiagUpdateBlocked, key, err)
+-		}
+ 	}
+ 	if err := checkAdmissionPrePublish(home, manager, result, policy); err != nil {
+ 		return Info{}, false, err
+@@ -1186,14 +1201,24 @@ func updateLocked(op *operation, home, name string, policy Policy, sink io.Write
+ 		// The §2.3 emission point: nothing is published on this path, but
+ 		// the rows still print exactly once.
+ 		surfacing = carrySurfacing(sink, surfacing)
++		writeUpdateWarnings(warningSink, name, warnings)
+ 		return Info{Name: name, Source: source, Lock: result.Lock, LockHash: oldHash, Current: machine == name, Warnings: warnings, Surfacing: surfacing}, false, nil
+ 	}
+ 	warnings := resolutionWarnings(result)
+-	auditWarnings, err := auditAndStore(home, manager, result, policy)
++	auditWarnings, err := auditCandidates(home, manager, result, policy)
+ 	if err != nil {
+ 		return Info{}, false, err
+ 	}
+ 	warnings = append(warnings, auditWarnings...)
++	deltaLines, triggered, deltaErr := resolvedDelta(home, manager, oldLock, result.Lock)
++	for _, line := range deltaLines {
++		if sink != nil {
++			_, _ = fmt.Fprintln(sink, line)
++		}
++	}
++	if deltaErr != nil {
++		return Info{Name: name, Source: source, Lock: result.Lock, LockHash: oldHash, Delta: deltaLines}, false, deltaErr
++	}
+ 	// Environments §9.2: after the audit gate passes and before the lock
+ 	// is published or any surface is re-materialized, surface the
+ 	// candidate lock's MCP set (§2.3) and warn when the MCP package
+@@ -1207,6 +1232,14 @@ func updateLocked(op *operation, home, name string, policy Policy, sink io.Write
+ 	// published or any scope is resynced below — even when publication
+ 	// or the resync later fails.
+ 	surfacing = carrySurfacing(sink, surfacing)
++	writeUpdateWarnings(warningSink, name, warnings)
++	if len(triggered) > 0 && !confirmSystemDelta {
++		return Info{Name: name, Source: source, Lock: result.Lock, LockHash: oldHash, Warnings: warnings, Delta: deltaLines}, false,
++			fmt.Errorf("%s: members %s require --confirm-system-delta; %s", DiagSystemDeltaConfirmationRequired, strings.Join(triggered, ", "), systemDeltaHint)
++	}
++	if err := ensureResolvedEntries(home, manager, result); err != nil {
++		return Info{}, false, err
++	}
+ 	canonical, err := result.Lock.Canonical()
+ 	if err != nil {
+ 		return Info{}, false, err
+@@ -1229,7 +1262,32 @@ func updateLocked(op *operation, home, name string, policy Policy, sink io.Write
+ 	if err != nil {
+ 		return Info{}, false, err
+ 	}
+-	return Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: machine == name, Warnings: warnings, Surfacing: surfacing}, true, nil
++	return Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: machine == name, Warnings: warnings, Delta: deltaLines, Surfacing: surfacing}, true, nil
++}
++
++// fetchLockedSources refreshes every Git identity in the current closure
++// before resolving an update. A profile's root manifest can remain pinned
++// while one of its existing context, skill, or MCP dependencies publishes a
++// newer candidate; fetching only the root would silently miss that resolved
++// version delta (§9.2).
++func fetchLockedSources(manager *gitManager, lock *contextlock.Lock) error {
++	sources := map[string]bool{}
++	for _, member := range lock.Members {
++		if member.Source != "" {
++			sources[member.Source] = true
++		}
++	}
++	ordered := make([]string, 0, len(sources))
++	for source := range sources {
++		ordered = append(ordered, source)
++	}
++	sort.Strings(ordered)
++	for _, source := range ordered {
++		if err := manager.fetch(source); err != nil {
++			return fmt.Errorf("%s: %v", DiagSourceInvalid, err)
++		}
++	}
++	return nil
+ }
+ 
+ // Remove deletes a profile that is current in no scope and an overlay of
+@@ -1335,6 +1393,17 @@ func overlayOwner(home, name string) (string, bool, error) {
+ // blocking), revocation, and the deterministic detectors — regardless of any
+ // enabled flag. An advisory profile install does not exist.
+ func auditAndStore(home string, manager *gitManager, result *contextresolve.Result, policy Policy) ([]string, error) {
++	return auditMembers(home, manager, result, policy, true)
++}
++
++// auditCandidates performs the same strict audit without installing candidate
++// entries under the manager home. Updates use it before confirmation and
++// install the entries only after the gate accepts the invocation.
++func auditCandidates(home string, manager *gitManager, result *contextresolve.Result, policy Policy) ([]string, error) {
++	return auditMembers(home, manager, result, policy, false)
++}
++
++func auditMembers(home string, manager *gitManager, result *contextresolve.Result, policy Policy, store bool) ([]string, error) {
+ 	var warnings []string
+ 	keys := make([]string, 0, len(result.Members))
+ 	for key := range result.Members {
+@@ -1342,45 +1411,94 @@ func auditAndStore(home string, manager *gitManager, result *contextresolve.Resu
+ 	}
+ 	sort.Strings(keys)
+ 	for _, key := range keys {
+-		resolved := result.Members[key]
+-		entry, err := manager.ensureEntry(home, resolved)
++		memberWarnings, err := auditMember(home, manager, key, result.Members[key], policy, store)
+ 		if err != nil {
+ 			return nil, err
+ 		}
+-		report, err := contextaudit.Detect(packageRoot(entry, resolved.Directory), pinOf(resolved), nil)
+-		if err != nil {
+-			return nil, err
+-		}
+-		if report.Blocking() {
+-			return nil, fmt.Errorf("%s: member %s carries a blocking %s finding", DiagSourceInvalid, key, contextaudit.ClassSecretMaterial)
+-		}
+-		gateWarnings, err := strictAuditMember(home, manager, resolved, entry, policy)
+-		if err != nil {
+-			return nil, fmt.Errorf("%s: member %s %v", DiagSourceInvalid, key, err)
+-		}
+-		warnings = append(warnings, gateWarnings...)
+-		for _, unmatched := range report.Waivers {
+-			if unmatched.Diagnostic == contextaudit.DiagWaiverUnmatched {
+-				warnings = append(warnings, unmatched.Diagnostic)
+-			}
++		warnings = append(warnings, memberWarnings...)
++	}
++	return warnings, nil
++}
++
++func auditMember(home string, manager *gitManager, key string, resolved contextresolve.Resolved, policy Policy, store bool) ([]string, error) {
++	var entry string
++	cleanup := func() {}
++	var err error
++	if store {
++		entry, err = manager.ensureEntry(home, resolved)
++	} else {
++		entry, cleanup, err = manager.inspectEntry(home, resolved)
++	}
++	if err != nil {
++		return nil, err
++	}
++	defer cleanup()
++	root := packageRoot(entry, resolved.Directory)
++	report, err := contextaudit.Detect(root, pinOf(resolved), nil)
++	if err != nil {
++		return nil, err
++	}
++	if report.Blocking() {
++		return nil, fmt.Errorf("%s: member %s carries a blocking %s finding", DiagSourceInvalid, key, contextaudit.ClassSecretMaterial)
++	}
++	gateWarnings, err := strictAuditMember(home, manager, resolved, entry, policy)
++	if err != nil {
++		return nil, fmt.Errorf("%s: member %s %v", DiagSourceInvalid, key, err)
++	}
++	warnings := gateWarnings
++	for _, unmatched := range report.Waivers {
++		if unmatched.Diagnostic == contextaudit.DiagWaiverUnmatched {
++			warnings = append(warnings, unmatched.Diagnostic)
+ 		}
+-		if resolved.Kind == contextlock.KindContext {
+-			root := packageRoot(entry, resolved.Directory)
+-			if manifest, err := contextpkg.LoadManifest(root); err == nil {
+-				for _, system := range contextaudit.SystemModules(resolved.Name, manifest) {
+-					warnings = append(warnings, contextaudit.ClassSystemModulePresent+": "+system.Package+"/"+system.Path)
+-				}
++	}
++	if resolved.Kind == contextlock.KindContext {
++		if manifest, err := contextpkg.LoadManifest(root); err == nil {
++			for _, system := range contextaudit.SystemModules(resolved.Name, manifest) {
++				warnings = append(warnings, contextaudit.ClassSystemModulePresent+": "+system.Package+"/"+system.Path)
+ 			}
+ 		}
+-		if resolved.Kind == contextlock.KindMCP {
+-			if warning, ok := checkMCPCommand(packageRoot(entry, resolved.Directory)); ok {
+-				warnings = append(warnings, warning)
+-			}
++	}
++	if resolved.Kind == contextlock.KindMCP {
++		if warning, ok := checkMCPCommand(root); ok {
++			warnings = append(warnings, warning)
+ 		}
+ 	}
+ 	return warnings, nil
+ }
+ 
++func auditNewUpdateMember(home string, manager *gitManager, key string, resolved contextresolve.Resolved, policy Policy) error {
++	entry, cleanup, err := manager.inspectEntry(home, resolved)
++	if err != nil {
++		return err
++	}
++	defer cleanup()
++	report, err := contextaudit.Detect(packageRoot(entry, resolved.Directory), pinOf(resolved), nil)
++	if err != nil {
++		return err
++	}
++	if report.Blocking() {
++		return fmt.Errorf("%s: new member %s carries a blocking finding; the old lock stands", DiagUpdateBlocked, key)
++	}
++	if _, err := strictAuditMember(home, manager, resolved, entry, policy); err != nil {
++		return fmt.Errorf("%s: new member %s %v; the old lock stands", DiagUpdateBlocked, key, err)
++	}
++	return nil
++}
++
++func ensureResolvedEntries(home string, manager *gitManager, result *contextresolve.Result) error {
++	keys := make([]string, 0, len(result.Members))
++	for key := range result.Members {
++		keys = append(keys, key)
++	}
++	sort.Strings(keys)
++	for _, key := range keys {
++		if _, err := manager.ensureEntry(home, result.Members[key]); err != nil {
++			return err
++		}
++	}
++	return nil
++}
++
+ // checkAdmissionPrePublish enforces the §3 error policy before a lock is
+ // published: the first non-admitted system module in emitted order fails
+ // the operation with context_system_module_transitive, so a refused
+@@ -1405,11 +1523,12 @@ func checkAdmissionPrePublish(home string, manager *gitManager, result *contextr
+ 		if resolved.Kind != contextlock.KindContext {
+ 			continue
+ 		}
+-		entry, err := manager.ensureEntry(home, resolved)
++		entry, cleanup, err := manager.inspectEntry(home, resolved)
+ 		if err != nil {
+ 			return err
+ 		}
+ 		manifest, err := contextpkg.LoadManifest(packageRoot(entry, resolved.Directory))
++		cleanup()
+ 		if err != nil {
+ 			return fmt.Errorf("%s: member %s manifest cannot be read; system-module admission cannot be decided: %v", DiagSourceInvalid, key, err)
+ 		}
+diff --git a/internal/envprofile/envprofile_policy_test.go b/internal/envprofile/envprofile_policy_test.go
+index 93d3e0c1..90a4d8dd 100644
+--- a/internal/envprofile/envprofile_policy_test.go
++++ b/internal/envprofile/envprofile_policy_test.go
+@@ -18,6 +18,8 @@ func TestPolicyFromConfigCarriesEnvGates(t *testing.T) {
+ 		"schema_version": float64(2), "skills_root": "x", "projects": map[string]any{},
+ 		"environments": map[string]any{
+ 			"mcp_package_allowlist":   []any{"https://example.com/m"},
++			"source_signers":          map[string]any{"example.com/empty": []any{}},
++			"require_source_signers":  true,
+ 			"overlays_allowed":        false,
+ 			"overlay_default_weight":  float64(500),
+ 			"precedence":              map[string]any{"winner": "lower-weight", "placement": "winner-first"},
+@@ -35,6 +37,9 @@ func TestPolicyFromConfigCarriesEnvGates(t *testing.T) {
+ 	if len(policy.MCPAllowlist) != 1 || policy.MCPAllowlist[0] != "https://example.com/m" {
+ 		t.Fatalf("MCP allowlist = %v", policy.MCPAllowlist)
+ 	}
++	if allowed, configured := policy.SourceSigners["example.com/empty"]; !configured || allowed == nil || len(allowed) != 0 || !policy.RequireSourceSigners {
++		t.Fatalf("empty signer allowlist/require posture = present:%t allow:%v required:%t", configured, allowed, policy.RequireSourceSigners)
++	}
+ 	if !policy.ForbidsOverlays() {
+ 		t.Fatalf("overlays_allowed=false must forbid overlays")
+ 	}
+diff --git a/internal/envprofile/gitsource.go b/internal/envprofile/gitsource.go
+index f8525aea..e7c63fae 100644
+--- a/internal/envprofile/gitsource.go
++++ b/internal/envprofile/gitsource.go
+@@ -1,6 +1,9 @@
+ package envprofile
+ 
+ import (
++	"encoding/base64"
++	"encoding/binary"
++	"errors"
+ 	"fmt"
+ 	"os"
+ 	"os/exec"
+@@ -15,6 +18,7 @@ import (
+ 	"github.com/relux-works/curator/internal/gitops"
+ 	"github.com/relux-works/curator/internal/identity"
+ 	"github.com/relux-works/curator/internal/pkgversion"
++	"github.com/relux-works/curator/internal/stateread"
+ )
+ 
+ // gitManager is the contextresolve.Source over the profile git cache and
+@@ -269,6 +273,234 @@ func (m *gitManager) Manifest(kind, name, source, directory, commit string) (*co
+ 	}
+ }
+ 
++// VerifyCandidate verifies the selected tag signature and peeled commit
++// signature against the configured source signer list. The resolver makes
++// the authorization decision from the returned signer identity; Git's
++// verification result alone never admits a candidate.
++func (m *gitManager) VerifyCandidate(_, _, source, tag, commit string, allowed []contextresolve.Signer) (contextresolve.CandidateSignatures, error) {
++	dir, err := m.ensureRepo(source)
++	if err != nil {
++		return contextresolve.CandidateSignatures{}, err
++	}
++	return m.verifyCandidateInRepo(dir, tag, commit, allowed)
++}
++
++// VerifyCandidateLocal verifies a locked candidate only when its source is
++// already cached. It never clones or fetches, so status remains read-only.
++func (m *gitManager) VerifyCandidateLocal(source, tag, commit string, allowed []contextresolve.Signer) (contextresolve.CandidateSignatures, bool, error) {
++	dir := m.repoDir(source)
++	metadata, err := stateread.Stat(dir)
++	if err != nil {
++		return contextresolve.CandidateSignatures{}, false, err
++	}
++	switch metadata.Kind {
++	case stateread.KindAbsent:
++		return contextresolve.CandidateSignatures{}, false, nil
++	case stateread.KindPresent:
++		if metadata.Info == nil {
++			return contextresolve.CandidateSignatures{}, false, stateread.UnusableError(dir, fmt.Errorf("cached source has no metadata"))
++		}
++		if !metadata.Info.IsDir() {
++			return contextresolve.CandidateSignatures{}, false, stateread.UnusableError(dir, fmt.Errorf("cached source is not a directory"))
++		}
++	default:
++		return contextresolve.CandidateSignatures{}, false, stateread.UnusableError(dir, fmt.Errorf("unknown cached source state %q", metadata.Kind))
++	}
++	evidence, err := m.verifyCandidateInRepo(dir, tag, commit, allowed)
++	return evidence, true, err
++}
++
++func (m *gitManager) verifyCandidateInRepo(dir, tag, commit string, allowed []contextresolve.Signer) (contextresolve.CandidateSignatures, error) {
++	var result contextresolve.CandidateSignatures
++	var tagErr, commitErr error
++	if tag != "" {
++		result.Tag, tagErr = m.verifyObjectSignature(dir, "tag", tag, allowed)
++	}
++	result.Commit, commitErr = m.verifyObjectSignature(dir, "commit", commit, allowed)
++	return result, errors.Join(tagErr, commitErr)
++}
++
++func (m *gitManager) verifyObjectSignature(dir, objectType, object string, allowed []contextresolve.Signer) (contextresolve.SignatureEvidence, error) {
++	show := exec.Command("git", "-C", dir, "cat-file", "-p", object) // #nosec G204 -- object comes from the verified local object database
++	payload, err := show.Output()
++	if err != nil {
++		return contextresolve.SignatureEvidence{}, fmt.Errorf("read %s signature: %w", objectType, err)
++	}
++	if !hasGitSignature(objectType, payload) {
++		return contextresolve.SignatureEvidence{}, nil
++	}
++	evidence := contextresolve.SignatureEvidence{Present: true}
++	signatureType := ""
++	switch {
++	case strings.Contains(string(payload), "-----BEGIN SSH SIGNATURE-----"):
++		signatureType = "ssh"
++	case strings.Contains(string(payload), "-----BEGIN PGP SIGNATURE-----"):
++		signatureType = "gpg"
++	default:
++		return evidence, nil
++	}
++	if signatureType == "ssh" {
++		if key, err := sshPublicKeyFromSignature(payload); err == nil {
++			evidence.Signer = contextresolve.Signer{Type: "ssh", Key: key}
++		}
++		if _, err := exec.LookPath("ssh-keygen"); err != nil {
++			return evidence, fmt.Errorf("SSH signature verification is unavailable: %w", err)
++		}
++		for _, signer := range allowed {
++			if signer.Type != "ssh" {
++				continue
++			}
++			fields := strings.Fields(signer.Key)
++			if len(fields) < 2 {
++				continue
++			}
++			tempDir, err := os.MkdirTemp("", "curator-allowed-signers-*")
++			if err != nil {
++				return evidence, err
++			}
++			allowedFile := filepath.Join(tempDir, "allowed_signers")
++			principal := gitSignaturePrincipal(objectType, payload)
++			if principal == "" {
++				principal = "curator"
++			}
++			writeErr := os.WriteFile(allowedFile, []byte(principal+" "+fields[0]+" "+fields[1]+"\n"), 0o600)
++			if writeErr != nil {
++				_ = os.RemoveAll(tempDir)
++				return evidence, writeErr
++			}
++			args := []string{"-C", dir, "-c", "gpg.format=ssh", "-c", "gpg.ssh.allowedSignersFile=" + allowedFile}
++			command := "verify-commit"
++			if objectType == "tag" {
++				command = "verify-tag"
++			}
++			args = append(args, command, "--raw", object)
++			verify := exec.Command("git", args...) // #nosec G204 -- object is a selected tag or peeled commit from the local repository
++			verifyOutput, verifyErr := verify.CombinedOutput()
++			_ = os.RemoveAll(tempDir)
++			if verifyErr == nil {
++				evidence.Valid = true
++				evidence.Signer = signer
++				return evidence, nil
++			}
++			_ = verifyOutput
++		}
++		return evidence, nil
++	}
++	if _, err := exec.LookPath("gpg"); err != nil {
++		return evidence, fmt.Errorf("OpenPGP signature verification is unavailable: %w", err)
++	}
++	args := []string{"-C", dir, "-c", "gpg.format=openpgp"}
++	command := "verify-commit"
++	if objectType == "tag" {
++		command = "verify-tag"
++	}
++	args = append(args, command, "--raw", object)
++	verify := exec.Command("git", args...) // #nosec G204 -- object is a selected tag or peeled commit from the local repository
++	verifyOutput, verifyErr := verify.CombinedOutput()
++	for _, line := range strings.Split(string(verifyOutput), "\n") {
++		fields := strings.Fields(line)
++		if len(fields) < 3 || fields[0] != "[GNUPG:]" {
++			continue
++		}
++		switch fields[1] {
++		case "VALIDSIG":
++			evidence.Valid = verifyErr == nil
++			evidence.Signer = contextresolve.Signer{Type: "gpg", Fingerprint: fields[2]}
++			return evidence, nil
++		case "BADSIG", "ERRSIG":
++			evidence.Signer = contextresolve.Signer{Type: "gpg", Fingerprint: fields[2]}
++		}
++	}
++	return evidence, nil
++}
++
++func sshPublicKeyFromSignature(payload []byte) (string, error) {
++	const begin = "-----BEGIN SSH SIGNATURE-----"
++	const end = "-----END SSH SIGNATURE-----"
++	text := string(payload)
++	start := strings.Index(text, begin)
++	if start < 0 {
++		return "", fmt.Errorf("SSH signature armor is absent")
++	}
++	start += len(begin)
++	endAt := strings.Index(text[start:], end)
++	if endAt < 0 {
++		return "", fmt.Errorf("SSH signature armor is incomplete")
++	}
++	encoded := strings.Join(strings.Fields(text[start:start+endAt]), "")
++	decoded, err := base64.StdEncoding.DecodeString(encoded)
++	if err != nil {
++		return "", err
++	}
++	if len(decoded) < 6 || string(decoded[:6]) != "SSHSIG" {
++		return "", fmt.Errorf("SSH signature payload has no SSHSIG header")
++	}
++	offset := 6
++	readString := func() ([]byte, error) {
++		if offset+4 > len(decoded) {
++			return nil, fmt.Errorf("SSH signature string header is truncated")
++		}
++		length := int(binary.BigEndian.Uint32(decoded[offset : offset+4]))
++		offset += 4
++		if length < 0 || offset+length > len(decoded) {
++			return nil, fmt.Errorf("SSH signature string length is invalid")
++		}
++		value := decoded[offset : offset+length]
++		offset += length
++		return value, nil
++	}
++	version, err := readString()
++	if err != nil || string(version) != "1" {
++		return "", fmt.Errorf("SSH signature version is unsupported")
++	}
++	keyBlob, err := readString()
++	if err != nil {
++		return "", err
++	}
++	if len(keyBlob) < 4 {
++		return "", fmt.Errorf("SSH signature public key is truncated")
++	}
++	keyTypeLength := int(binary.BigEndian.Uint32(keyBlob[:4]))
++	if keyTypeLength == 0 || 4+keyTypeLength > len(keyBlob) {
++		return "", fmt.Errorf("SSH signature public key type is invalid")
++	}
++	keyType := string(keyBlob[4 : 4+keyTypeLength])
++	return keyType + " " + base64.StdEncoding.EncodeToString(keyBlob), nil
++}
++
++func hasGitSignature(objectType string, payload []byte) bool {
++	text := string(payload)
++	if objectType == "commit" {
++		header, _, _ := strings.Cut(text, "\n\n")
++		for _, line := range strings.Split(header, "\n") {
++			if strings.HasPrefix(line, "gpgsig ") || strings.HasPrefix(line, "gpgsig-sha256 ") {
++				return true
++			}
++		}
++		return false
++	}
++	return strings.Contains(text, "-----BEGIN SSH SIGNATURE-----") || strings.Contains(text, "-----BEGIN PGP SIGNATURE-----")
++}
++
++func gitSignaturePrincipal(objectType string, payload []byte) string {
++	header, _, _ := strings.Cut(string(payload), "\n\n")
++	prefix := "committer "
++	if objectType == "tag" {
++		prefix = "tagger "
++	}
++	for _, line := range strings.Split(header, "\n") {
++		if !strings.HasPrefix(line, prefix) {
++			continue
++		}
++		open := strings.LastIndexByte(line, '<')
++		closeIndex := strings.LastIndexByte(line, '>')
++		if open >= 0 && closeIndex > open+1 {
++			return line[open+1 : closeIndex]
++		}
++	}
++	return ""
++}
++
+ // rootInput builds the resolution input for a fresh git install: it fetches
+ // the source, reads the root manifest at the required ref, and declares the
+ // root requirement under its canonical source identity. A malformed network
+@@ -424,6 +656,61 @@ func (m *gitManager) ensureEntry(home string, resolved contextresolve.Resolved)
+ 	return contextstore.EntryDir(home, resolved.Kind, resolved.Name, resolved.StateHash), nil
+ }
+ 
++// inspectEntry returns an existing store entry or extracts a Git candidate to
++// a temporary directory. It never creates manager-home state, so a refused
++// update can audit and surface a candidate without installing its snapshot.
++func (m *gitManager) inspectEntry(home string, resolved contextresolve.Resolved) (string, func(), error) {
++	entry := m.entryPath(home, resolved)
++	metadata, err := stateread.Stat(entry)
++	if err != nil {
++		return "", func() {}, err
++	}
++	switch metadata.Kind {
++	case stateread.KindPresent:
++		if metadata.Info == nil {
++			return "", func() {}, stateread.UnusableError(entry, fmt.Errorf("context store entry has no metadata"))
++		}
++		if !metadata.Info.IsDir() {
++			return "", func() {}, stateread.UnusableError(entry, fmt.Errorf("context store entry is not a directory"))
++		}
++		return entry, func() {}, nil
++	case stateread.KindAbsent:
++		// Only proven absence permits an immutable Git snapshot fallback.
++	default:
++		return "", func() {}, stateread.UnusableError(entry, fmt.Errorf("unknown context store state %q", metadata.Kind))
++	}
++	if resolved.Commit == "" {
++		return entry, func() {}, nil
++	}
++	repo := m.repoDir(resolved.Source)
++	repoMetadata, err := stateread.Stat(repo)
++	if err != nil {
++		return "", func() {}, fmt.Errorf("cached source for %s is unavailable: %w", resolved.Name, err)
++	}
++	switch repoMetadata.Kind {
++	case stateread.KindAbsent:
++		return "", func() {}, fmt.Errorf("cached source for %s is unavailable: %w", resolved.Name, stateread.AbsentError(repo))
++	case stateread.KindPresent:
++		if repoMetadata.Info == nil {
++			return "", func() {}, stateread.UnusableError(repo, fmt.Errorf("cached source has no metadata"))
++		}
++		if !repoMetadata.Info.IsDir() {
++			return "", func() {}, stateread.UnusableError(repo, fmt.Errorf("cached source is not a directory"))
++		}
++	default:
++		return "", func() {}, stateread.UnusableError(repo, fmt.Errorf("unknown cached source state %q", repoMetadata.Kind))
++	}
++	snapshot, err := os.MkdirTemp("", "curator-profile-inspect-*")
++	if err != nil {
++		return "", func() {}, err
++	}
++	if err := gitops.Extract(repo, resolved.Commit, snapshot); err != nil {
++		_ = os.RemoveAll(snapshot)
++		return "", func() {}, err
++	}
++	return snapshot, func() { _ = os.RemoveAll(snapshot) }, nil
++}
++
+ // packageOf maps a validated context manifest onto the resolution package.
+ // Every requirement source is canonicalized through identity.Parse at this
+ // boundary (environments §1): two spellings of one repository enter
+diff --git a/internal/envprofile/overlays.go b/internal/envprofile/overlays.go
+index 73942cbe..8ef97499 100644
+--- a/internal/envprofile/overlays.go
++++ b/internal/envprofile/overlays.go
+@@ -99,6 +99,8 @@ func resolveOverlay(home string, manager *gitManager, decl OverlaySpec) (context
+ // resolution input.
+ func overlayInputDefaults(input *contextresolve.Input, policy Policy) {
+ 	input.OverlayDefaultWeight = policy.OverlayDefaultWeight
++	input.SourceSigners = policy.SourceSigners
++	input.RequireSourceSigners = policy.RequireSourceSigners
+ }
+ 
+ // resolutionWarnings renders successful-resolution findings — the rule-3
+diff --git a/internal/envprofile/pathkind_test.go b/internal/envprofile/pathkind_test.go
+index 39ec4f4a..e10d08f1 100644
+--- a/internal/envprofile/pathkind_test.go
++++ b/internal/envprofile/pathkind_test.go
+@@ -1,9 +1,12 @@
+ package envprofile
+ 
+ import (
++	"net/http"
++	"net/http/httptest"
+ 	"os"
+ 	"path/filepath"
+ 	"strings"
++	"sync/atomic"
+ 	"testing"
+ 
+ 	"github.com/relux-works/curator/internal/contextlock"
+@@ -373,12 +376,18 @@ func TestUnreadablePathRootLeadsUnreadable(t *testing.T) {
+ // path profile whose lock carries no state pin for its root: the root member
+ // is rewritten to a commit pin (the only validated lock shape without a
+ // state hash), so readLock still validates and updateLocked must refuse with
+-// profile_source_invalid naming the missing pin. Production entry point:
+-// UpdateWithPolicy. A mutant dropping the empty-pin refusal admits the lock
+-// and must fail this test.
++// profile_source_invalid naming the missing pin before making any source
++// request. Production entry point: UpdateWithPolicy. A mutant dropping the
++// empty-pin refusal or moving it after source refresh must fail this test.
+ func TestUpdatePathWithoutStatePinIsSourceInvalid(t *testing.T) {
+ 	home := t.TempDir()
+ 	pinHomes(t)
++	var requests atomic.Int64
++	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		requests.Add(1)
++		http.NotFound(w, r)
++	}))
++	defer server.Close()
+ 	source := filepath.Join(t.TempDir(), "source")
+ 	writeManifestPackage(t, source,
+ 		`{"schema_version": 1, "name": "pk", "version": "1.0.0",`+
+@@ -395,7 +404,7 @@ func TestUpdatePathWithoutStatePinIsSourceInvalid(t *testing.T) {
+ 		if member.Kind == contextlock.KindContext && member.Name == "pk" {
+ 			lock.Members[i].StateHash = ""
+ 			lock.Members[i].Commit = strings.Repeat("ab", 20)
+-			lock.Members[i].Source = "https://example.com/pk"
++			lock.Members[i].Source = server.URL + "/pk"
+ 		}
+ 	}
+ 	canonical, err := lock.Canonical()
+@@ -409,6 +418,9 @@ func TestUpdatePathWithoutStatePinIsSourceInvalid(t *testing.T) {
+ 	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) || !strings.Contains(err.Error(), "carries no state pin") {
+ 		t.Fatalf("err = %v, want %s naming the missing state pin", err, DiagSourceInvalid)
+ 	}
++	if got := requests.Load(); got != 0 {
++		t.Fatalf("missing-pin update made %d source requests before refusing", got)
++	}
+ }
+ 
+ // TestUpdatePathMissingSnapshotIsSourceInvalid drives UpdateWithPolicy on a
+diff --git a/internal/envprofile/profiledelta.go b/internal/envprofile/profiledelta.go
+new file mode 100644
+index 00000000..d2edaf40
+--- /dev/null
++++ b/internal/envprofile/profiledelta.go
+@@ -0,0 +1,253 @@
++package envprofile
++
++import (
++	"bytes"
++	"encoding/json"
++	"fmt"
++	"io"
++	"os"
++	"path/filepath"
++	"sort"
++
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/contextpkg"
++	"github.com/relux-works/curator/internal/contextresolve"
++	"github.com/relux-works/curator/internal/contextstore"
++	"github.com/relux-works/curator/internal/gitops"
++	"github.com/relux-works/curator/internal/protocoljson"
++	"github.com/relux-works/curator/internal/stateread"
++)
++
++const systemDeltaHint = "revision B refuses with profile_update_confirmation_required unless --confirm-system-delta is given"
++
++type deltaMemberChange struct {
++	old *contextlock.Member
++	new *contextlock.Member
++}
++
++type systemModuleRecord struct {
++	path         string
++	environments []string
++	content      []byte
++}
++
++// resolvedDelta renders §9.2 lock-delta rows and identifies member names
++// whose system-module inventory or MCP declaration changed.
++func resolvedDelta(home string, manager *gitManager, oldLock, newLock *contextlock.Lock) ([]string, []string, error) {
++	changes := make(map[string]deltaMemberChange)
++	deltas := contextlock.ResolvedDelta(oldLock, newLock)
++	lines := make([]string, 0, len(deltas))
++	for _, delta := range deltas {
++		lines = append(lines, delta.Line())
++		member := delta.New
++		if member == nil {
++			member = delta.Old
++		}
++		key := contextresolve.Key(member.Kind, member.Name)
++		changes[key] = deltaMemberChange{old: delta.Old, new: delta.New}
++	}
++	triggerNames := map[string]bool{}
++	for key, change := range changes {
++		var member contextlock.Member
++		if change.new != nil {
++			member = *change.new
++		} else if change.old != nil {
++			member = *change.old
++		}
++		switch member.Kind {
++		case contextlock.KindContext:
++			if change.new == nil {
++				continue
++			}
++			newInventory, err := systemModuleInventory(home, manager, *change.new, true)
++			if err != nil {
++				return lines, nil, fmt.Errorf("%s: cannot inspect system modules for %s: %w", DiagUpdateBlocked, key, err)
++			}
++			if change.old == nil {
++				if len(newInventory) > 0 {
++					triggerNames[member.Name] = true
++				}
++				continue
++			}
++			oldInventory, err := systemModuleInventory(home, manager, *change.old, false)
++			if err != nil {
++				return lines, nil, fmt.Errorf("%s: cannot inspect prior system modules for %s: %w", DiagUpdateBlocked, key, err)
++			}
++			if !equalSystemInventory(oldInventory, newInventory) {
++				triggerNames[member.Name] = true
++			}
++		case contextlock.KindMCP:
++			if change.new == nil {
++				continue
++			}
++			newDeclaration, err := mcpDeclaration(home, manager, *change.new, true)
++			if err != nil {
++				return lines, nil, fmt.Errorf("%s: cannot inspect MCP declaration for %s: %w", DiagUpdateBlocked, key, err)
++			}
++			if change.old == nil {
++				triggerNames[member.Name] = true
++				continue
++			}
++			oldDeclaration, err := mcpDeclaration(home, manager, *change.old, false)
++			if err != nil {
++				return lines, nil, fmt.Errorf("%s: cannot inspect prior MCP declaration for %s: %w", DiagUpdateBlocked, key, err)
++			}
++			if !bytes.Equal(oldDeclaration, newDeclaration) {
++				triggerNames[member.Name] = true
++			}
++		}
++	}
++	triggers := make([]string, 0, len(triggerNames))
++	for name := range triggerNames {
++		triggers = append(triggers, name)
++	}
++	sort.Strings(triggers)
++	return lines, triggers, nil
++}
++
++func systemModuleInventory(home string, manager *gitManager, member contextlock.Member, allowExtract bool) ([]systemModuleRecord, error) {
++	root, cleanup, err := deltaMemberRoot(home, manager, member, allowExtract)
++	if err != nil {
++		return nil, err
++	}
++	defer cleanup()
++	manifest, err := contextpkg.LoadManifest(packageRoot(root, member.Directory))
++	if err != nil {
++		return nil, err
++	}
++	records := make([]systemModuleRecord, 0)
++	for _, module := range manifest.Modules {
++		if module.Class != "system" {
++			continue
++		}
++		path := filepath.Join(packageRoot(root, member.Directory), contextpkg.ContextDir, filepath.FromSlash(module.Path))
++		content, err := os.ReadFile(path) // #nosec G304 -- declared module under immutable package snapshot
++		if err != nil {
++			return nil, err
++		}
++		var environments []string
++		if module.Environments != nil {
++			environments = make([]string, len(module.Environments))
++			copy(environments, module.Environments)
++		}
++		records = append(records, systemModuleRecord{path: module.Path, environments: environments, content: content})
++	}
++	sort.Slice(records, func(i, j int) bool {
++		if records[i].path != records[j].path {
++			return records[i].path < records[j].path
++		}
++		if environmentsKey(records[i].environments) != environmentsKey(records[j].environments) {
++			return environmentsKey(records[i].environments) < environmentsKey(records[j].environments)
++		}
++		return bytes.Compare(records[i].content, records[j].content) < 0
++	})
++	return records, nil
++}
++
++func environmentsKey(environments []string) string {
++	if environments == nil {
++		return "null"
++	}
++	payload, _ := protocoljson.MarshalCanonical(environments)
++	return string(payload)
++}
++
++func equalSystemInventory(left, right []systemModuleRecord) bool {
++	if len(left) != len(right) {
++		return false
++	}
++	for index := range left {
++		if left[index].path != right[index].path || environmentsKey(left[index].environments) != environmentsKey(right[index].environments) || !bytes.Equal(left[index].content, right[index].content) {
++			return false
++		}
++	}
++	return true
++}
++
++func mcpDeclaration(home string, manager *gitManager, member contextlock.Member, allowExtract bool) ([]byte, error) {
++	root, cleanup, err := deltaMemberRoot(home, manager, member, allowExtract)
++	if err != nil {
++		return nil, err
++	}
++	defer cleanup()
++	payload, err := os.ReadFile(filepath.Join(packageRoot(root, member.Directory), contextpkg.MCPManifestName)) // #nosec G304 -- member snapshot is immutable
++	if err != nil {
++		return nil, err
++	}
++	decoder := json.NewDecoder(bytes.NewReader(payload))
++	decoder.UseNumber()
++	var manifest map[string]any
++	if err := decoder.Decode(&manifest); err != nil {
++		return nil, err
++	}
++	server, ok := manifest["server"].(map[string]any)
++	if !ok {
++		return nil, fmt.Errorf("server declaration is absent or malformed")
++	}
++	return protocoljson.MarshalCanonical(server)
++}
++
++func deltaMemberRoot(home string, manager *gitManager, member contextlock.Member, allowExtract bool) (string, func(), error) {
++	entry := contextstore.EntryDir(home, member.Kind, member.Name, member.PinKey())
++	metadata, err := stateread.Stat(entry)
++	if err != nil {
++		return "", func() {}, err
++	}
++	switch metadata.Kind {
++	case stateread.KindPresent:
++		if metadata.Info == nil {
++			return "", func() {}, stateread.UnusableError(entry, fmt.Errorf("present snapshot has no metadata"))
++		}
++		if !metadata.Info.IsDir() {
++			return "", func() {}, stateread.UnusableError(entry, fmt.Errorf("locked package snapshot is not a directory"))
++		}
++		return entry, func() {}, nil
++	case stateread.KindAbsent:
++		// Only proven absence permits the immutable Git snapshot fallback.
++	default:
++		return "", func() {}, stateread.UnusableError(entry, fmt.Errorf("unknown snapshot state %q", metadata.Kind))
++	}
++	if !allowExtract || member.Commit == "" || member.Source == "" {
++		return "", func() {}, fmt.Errorf("locked package snapshot is unavailable")
++	}
++	repo := manager.repoDir(member.Source)
++	repoMetadata, err := stateread.Stat(repo)
++	if err != nil {
++		return "", func() {}, fmt.Errorf("cached source for %s is unavailable: %w", member.Name, err)
++	}
++	switch repoMetadata.Kind {
++	case stateread.KindAbsent:
++		return "", func() {}, fmt.Errorf("cached source for %s is unavailable: %w", member.Name, stateread.AbsentError(repo))
++	case stateread.KindPresent:
++		if repoMetadata.Info == nil {
++			return "", func() {}, stateread.UnusableError(repo, fmt.Errorf("cached source has no metadata"))
++		}
++		if !repoMetadata.Info.IsDir() {
++			return "", func() {}, stateread.UnusableError(repo, fmt.Errorf("cached source is not a directory"))
++		}
++	default:
++		return "", func() {}, stateread.UnusableError(repo, fmt.Errorf("unknown cached source state %q", repoMetadata.Kind))
++	}
++	snapshot, err := os.MkdirTemp("", "curator-profile-delta-*")
++	if err != nil {
++		return "", func() {}, err
++	}
++	if err := gitops.Extract(repo, member.Commit, snapshot); err != nil {
++		_ = os.RemoveAll(snapshot)
++		return "", func() {}, err
++	}
++	return snapshot, func() { _ = os.RemoveAll(snapshot) }, nil
++}
++
++func writeUpdateWarnings(sink io.Writer, profile string, warnings []string) {
++	if sink == nil {
++		return
++	}
++	for _, warning := range warnings {
++		if profile == "" {
++			_, _ = fmt.Fprintln(sink, "warning:", warning)
++		} else {
++			_, _ = fmt.Fprintf(sink, "%s: warning: %s\n", profile, warning)
++		}
++	}
++}
+diff --git a/internal/envprofile/profiledelta_conformance_test.go b/internal/envprofile/profiledelta_conformance_test.go
+new file mode 100644
+index 00000000..85fbdda9
+--- /dev/null
++++ b/internal/envprofile/profiledelta_conformance_test.go
+@@ -0,0 +1,181 @@
++package envprofile
++
++import (
++	"encoding/json"
++	"fmt"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/contextstore"
++)
++
++type sourceSignerDeltaVectorFile struct {
++	DeltaCases []sourceSignerDeltaVector `json:"delta_cases"`
++}
++
++type sourceSignerDeltaVector struct {
++	Name       string                          `json:"name"`
++	Conforming *bool                           `json:"conforming"`
++	Flag       bool                            `json:"flag"`
++	OldMembers []sourceSignerVectorMember      `json:"old_members"`
++	NewMembers []sourceSignerVectorMember      `json:"new_members"`
++	Snapshots  map[string]sourceSignerSnapshot `json:"snapshots"`
++	Expected   struct {
++		Lines     []string `json:"lines"`
++		Trigger   []string `json:"trigger"`
++		RevisionB struct {
++			Diagnostic string `json:"diagnostic"`
++			Proceeds   bool   `json:"proceeds"`
++		} `json:"revision_b"`
++	} `json:"expected"`
++	Claimed struct {
++		Proceeds bool `json:"proceeds"`
++	} `json:"claimed"`
++}
++
++type sourceSignerVectorMember struct {
++	Kind    string `json:"kind"`
++	Name    string `json:"name"`
++	Version string `json:"version"`
++	Commit  string `json:"commit"`
++}
++
++type sourceSignerSnapshot struct {
++	SystemModules []struct {
++		Path         string   `json:"path"`
++		Environments []string `json:"environments"`
++		Bytes        string   `json:"bytes"`
++	} `json:"system_modules"`
++	MCP json.RawMessage `json:"mcp"`
++}
++
++// TestSystemDeltaVectors binds every pinned rc.13 delta case to the
++// context-lock diff and snapshot comparison used by profile update. The CLI
++// confirmation and publication path is separately driven by its golden.
++func TestSystemDeltaVectors(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	payload, err := os.ReadFile(filepath.Join(root, "vectors", "environments-source-signers.json")) // #nosec G304 -- explicit conformance root
++	if err != nil {
++		t.Fatal(err)
++	}
++	var vectors sourceSignerDeltaVectorFile
++	if err := json.Unmarshal(payload, &vectors); err != nil {
++		t.Fatal(err)
++	}
++	if len(vectors.DeltaCases) == 0 {
++		t.Fatal("pinned source signer vector publishes no delta cases")
++	}
++	for _, tc := range vectors.DeltaCases {
++		t.Run(tc.Name, func(t *testing.T) {
++			home := t.TempDir()
++			oldLock := &contextlock.Lock{Root: "root", Members: vectorLockMembers(tc.OldMembers)}
++			newLock := &contextlock.Lock{Root: "root", Members: vectorLockMembers(tc.NewMembers)}
++			for _, member := range append(append([]contextlock.Member{}, oldLock.Members...), newLock.Members...) {
++				if member.Commit == "" {
++					continue
++				}
++				snapshot, ok := tc.Snapshots[member.Commit]
++				if !ok {
++					t.Fatalf("vector snapshot for %s %s commit %s is absent", member.Kind, member.Name, member.Commit)
++				}
++				writeVectorSnapshot(t, home, member, snapshot)
++			}
++			lines, triggers, err := resolvedDelta(home, newGitManager(home), oldLock, newLock)
++			if err != nil {
++				t.Fatal(err)
++			}
++			proceeds := len(triggers) == 0 || tc.Flag
++			if tc.Conforming != nil && !*tc.Conforming {
++				if len(lines) == 0 || len(triggers) == 0 {
++					t.Fatalf("non-conforming claim fixture produced no actual system delta: lines=%v triggers=%v", lines, triggers)
++				}
++				if proceeds || !tc.Claimed.Proceeds {
++					t.Fatalf("revision-B gate proceeds=%t, claimed adversarially=%t; want refusal against the claim", proceeds, tc.Claimed.Proceeds)
++				}
++				return
++			}
++			if strings.Join(lines, "\n") != strings.Join(tc.Expected.Lines, "\n") {
++				t.Errorf("delta lines = %#v, want %#v", lines, tc.Expected.Lines)
++			}
++			if strings.Join(triggers, "\n") != strings.Join(tc.Expected.Trigger, "\n") {
++				t.Errorf("system-delta triggers = %#v, want %#v", triggers, tc.Expected.Trigger)
++			}
++			if proceeds != tc.Expected.RevisionB.Proceeds {
++				t.Errorf("revision-B proceeds = %t, want %t", proceeds, tc.Expected.RevisionB.Proceeds)
++			}
++			if !proceeds && tc.Expected.RevisionB.Diagnostic != DiagSystemDeltaConfirmationRequired {
++				t.Errorf("revision-B diagnostic = %q, want %q", tc.Expected.RevisionB.Diagnostic, DiagSystemDeltaConfirmationRequired)
++			}
++		})
++	}
++}
++
++func vectorLockMembers(vector []sourceSignerVectorMember) []contextlock.Member {
++	members := make([]contextlock.Member, 0, len(vector))
++	for _, member := range vector {
++		members = append(members, contextlock.Member{
++			Kind: member.Kind, Name: member.Name, Version: member.Version,
++			Commit: member.Commit, Source: "github.com/example/" + member.Name,
++		})
++	}
++	return members
++}
++
++func writeVectorSnapshot(t *testing.T, home string, member contextlock.Member, snapshot sourceSignerSnapshot) {
++	t.Helper()
++	root := contextstore.EntryDir(home, member.Kind, member.Name, member.Commit)
++	if err := os.MkdirAll(root, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	switch member.Kind {
++	case contextlock.KindContext:
++		manifest := map[string]any{"schema_version": 1, "name": member.Name, "version": member.Version}
++		modules := make([]any, 0, len(snapshot.SystemModules))
++		for _, module := range snapshot.SystemModules {
++			entry := map[string]any{"path": module.Path, "class": "system"}
++			if module.Environments != nil {
++				entry["environments"] = module.Environments
++			}
++			modules = append(modules, entry)
++			path := filepath.Join(root, "context", filepath.FromSlash(module.Path))
++			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(path, []byte(module.Bytes), 0o644); err != nil {
++				t.Fatal(err)
++			}
++		}
++		if len(modules) > 0 {
++			manifest["context"] = map[string]any{"modules": modules}
++		}
++		writeJSONFixture(t, filepath.Join(root, "agent-context.json"), manifest)
++	case contextlock.KindMCP:
++		var server map[string]any
++		if err := json.Unmarshal(snapshot.MCP, &server); err != nil {
++			t.Fatalf("decode MCP snapshot for %s: %v", member.Name, err)
++		}
++		if server == nil {
++			t.Fatalf("MCP snapshot for %s has no declaration", member.Name)
++		}
++		writeJSONFixture(t, filepath.Join(root, "agent-mcp.json"), map[string]any{
++			"schema_version": 1, "name": member.Name, "version": member.Version, "server": server,
++		})
++	}
++}
++
++func writeJSONFixture(t *testing.T, path string, value any) {
++	t.Helper()
++	payload, err := json.Marshal(value)
++	if err != nil {
++		t.Fatal(fmt.Errorf("marshal fixture: %w", err))
++	}
++	if err := os.WriteFile(path, append(payload, '\n'), 0o644); err != nil {
++		t.Fatal(err)
++	}
++}
+diff --git a/internal/envprofile/status.go b/internal/envprofile/status.go
+index a9585ba0..aa3fd10a 100644
+--- a/internal/envprofile/status.go
++++ b/internal/envprofile/status.go
+@@ -13,6 +13,7 @@ import (
+ 	"errors"
+ 	"fmt"
+ 	"os"
++	"os/exec"
+ 	"path/filepath"
+ 	"sort"
+ 	"strings"
+@@ -21,6 +22,7 @@ import (
+ 	"github.com/relux-works/curator/internal/contextlock"
+ 	"github.com/relux-works/curator/internal/contextmaterialize"
+ 	"github.com/relux-works/curator/internal/contextpkg"
++	"github.com/relux-works/curator/internal/contextresolve"
+ 	"github.com/relux-works/curator/internal/envfragment"
+ 	"github.com/relux-works/curator/internal/envmarker"
+ 	"github.com/relux-works/curator/internal/envregistry"
+@@ -177,6 +179,18 @@ type ProviderState struct {
+ 	UnreadableDirectory *string  `json:"unreadable_directory,omitempty"`
+ }
+ 
++// SourceSignerPosture reports the verification state for one locked Git
++// member's source (environments §12).
++type SourceSignerPosture struct {
++	Profile string `json:"profile"`
++	Kind    string `json:"kind"`
++	Name    string `json:"name"`
++	Source  string `json:"source"`
++	State   string `json:"state"`
++	Signer  string `json:"signer"`
++	Current bool   `json:"current"`
++}
++
+ // DeclarationScope repeats the §2.3 surfacing rows for the current
+ // profile of one reported scope, in row order without the LF.
+ type DeclarationScope struct {
+@@ -243,6 +257,14 @@ type Status struct {
+ 	// and the verified-boundary posture. It is attached by the CLI because the
+ 	// CLI owns configured registry trust anchors.
+ 	RegistryPosture []registry.BoundaryPosture `json:"registry_posture"`
++	// RequireSourceSigners reports the effective machine value (§12.1).
++	RequireSourceSigners bool `json:"require_source_signers"`
++	// SourceSignerPosture re-verifies locked Git pins from local source state
++	// without fetching (§12).
++	SourceSignerPosture []SourceSignerPosture `json:"source_signers"`
++	// UpdateConfirmation reports the shipped section 9.2 behavior.
++	UpdateConfirmationRevision string `json:"update_confirmation_revision"`
++	UpdateConfirmationBehavior string `json:"update_confirmation_behavior"`
+ }
+ 
+ // StatusRequest scopes one status computation. The seams mirror
+@@ -301,6 +323,9 @@ func StatusOf(req StatusRequest) (*Status, error) {
+ 		status.RequireCurrentProfile = &value
+ 		status.RequireCurrentLocked = req.Policy.RequireCurrentLocked
+ 	}
++	status.RequireSourceSigners = req.Policy.RequireSourceSigners
++	status.UpdateConfirmationRevision = "B-flip"
++	status.UpdateConfirmationBehavior = "a triggered update delta refuses profile_update_confirmation_required unless --confirm-system-delta is given"
+ 	infos, err := statusProfiles(req.Home)
+ 	if err != nil {
+ 		return nil, err
+@@ -331,6 +356,12 @@ func StatusOf(req StatusRequest) (*Status, error) {
+ 		return nil, err
+ 	}
+ 	status.Diagnostics = append(status.Diagnostics, profileDiagnostics...)
++	status.SourceSignerPosture = sourceSignerPosture(req, infos)
++	for _, row := range status.SourceSignerPosture {
++		if row.State == "enforced" && !row.Current {
++			status.NonCurrent = true
++		}
++	}
+ 	status.UnregisteredEnvironments = unregisteredEnvironments(req.Machine)
+ 	var orphanDiagnostics []StateDiagnostic
+ 	status.Orphans, orphanDiagnostics = orphanHomes(req.Home, installed)
+@@ -415,12 +446,93 @@ func statusProfiles(home string) ([]Info, error) {
+ 		if err == nil {
+ 			info.Source = source
+ 		}
++		if lock, _, lockErr := readLock(home, entry.Name()); lockErr == nil {
++			info.Lock = lock
++		}
+ 		infos = append(infos, info)
+ 	}
+ 	sort.Slice(infos, func(i, j int) bool { return infos[i].Name < infos[j].Name })
+ 	return infos, nil
+ }
+ 
++func sourceSignerPosture(req StatusRequest, infos []Info) []SourceSignerPosture {
++	manager := newGitManager(req.Home).withPolicy(req.Policy)
++	var rows []SourceSignerPosture
++	for _, info := range infos {
++		if info.Lock == nil {
++			continue
++		}
++		for _, member := range info.Lock.Members {
++			if member.Source == "" {
++				continue
++			}
++			row := SourceSignerPosture{
++				Profile: info.Name, Kind: member.Kind, Name: member.Name,
++				Source: member.Source, Signer: "unknown", Current: true,
++			}
++			allowed, configured := req.Policy.SourceSigners[member.Source]
++			if !configured {
++				if req.Policy.RequireSourceSigners {
++					row.State = "required-missing"
++				} else {
++					row.State = "unconfigured"
++				}
++				rows = append(rows, row)
++				continue
++			}
++			row.State = "enforced"
++			tag := lockedMemberTag(manager.repoDir(member.Source), member)
++			evidence, available, verifyErr := manager.VerifyCandidateLocal(member.Source, tag, member.Commit, allowed)
++			if signer, ok := verifiedAllowedSigner(evidence, allowed); ok {
++				row.Signer = contextresolve.FormatSigner(signer)
++				rows = append(rows, row)
++				continue
++			}
++			if !available && verifyErr == nil {
++				// §12 distinguishes a pin that cannot be reverified because
++				// local material is absent from a pin that fails verification.
++				// Unknown signer material is not evidence of drift; expose the
++				// unknown posture while keeping the recorded pin current.
++				rows = append(rows, row)
++				continue
++			}
++			row.Current = false
++			rows = append(rows, row)
++		}
++	}
++	sort.Slice(rows, func(i, j int) bool {
++		if rows[i].Profile != rows[j].Profile {
++			return rows[i].Profile < rows[j].Profile
++		}
++		if rows[i].Kind != rows[j].Kind {
++			return rows[i].Kind < rows[j].Kind
++		}
++		return rows[i].Name < rows[j].Name
++	})
++	return rows
++}
++
++func lockedMemberTag(repo string, member contextlock.Member) string {
++	if member.Version == "" {
++		return ""
++	}
++	tag := "v" + member.Version
++	output, err := exec.Command("git", "-C", repo, "rev-parse", "--verify", "refs/tags/"+tag+"^{commit}").Output() // #nosec G204 -- version is validated in the lock schema
++	if err != nil || strings.TrimSpace(string(output)) != member.Commit {
++		return ""
++	}
++	return tag
++}
++
++func verifiedAllowedSigner(evidence contextresolve.CandidateSignatures, allowed []contextresolve.Signer) (contextresolve.Signer, bool) {
++	for _, signature := range []contextresolve.SignatureEvidence{evidence.Tag, evidence.Commit} {
++		if signature.Present && signature.Valid && contextresolve.IsAllowedSigner(signature.Signer, allowed) {
++			return signature.Signer, true
++		}
++	}
++	return contextresolve.Signer{}, false
++}
++
+ // trustProjectCandidates returns the two hook-sourced env files of the
+ // project the launch directory is inside, or nothing when it is inside no
+ // project. An empty launch directory means the process working directory,
+diff --git a/internal/envprofile/status_test.go b/internal/envprofile/status_test.go
+index 833f0221..3a506276 100644
+--- a/internal/envprofile/status_test.go
++++ b/internal/envprofile/status_test.go
+@@ -1,13 +1,16 @@
+ package envprofile
+ 
+ import (
++	"encoding/json"
+ 	"os"
++	"os/exec"
+ 	"path/filepath"
+ 	"strings"
+ 	"testing"
+ 	"time"
+ 
+ 	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/contextresolve"
+ 	"github.com/relux-works/curator/internal/contextstore"
+ 	"github.com/relux-works/curator/internal/envmarker"
+ 	"github.com/relux-works/curator/internal/envregistry"
+@@ -43,6 +46,262 @@ func provision(t *testing.T, fx *managedFixture, envID string, machine envregist
+ 	}
+ }
+ 
++func TestStatusSignerPostureUnknownWithoutCachedSource(t *testing.T) {
++	home := t.TempDir()
++	const source = "github.com/example/signed"
++	rows := sourceSignerPosture(StatusRequest{
++		Home: home,
++		Policy: Policy{SourceSigners: map[string][]contextresolve.Signer{
++			source: {{Type: "ssh", Key: "ssh-ed25519 allowed"}},
++		}},
++	}, []Info{{
++		Name: "signed",
++		Lock: &contextlock.Lock{Members: []contextlock.Member{{
++			Kind: contextlock.KindContext, Name: "signed", Source: source, Commit: strings.Repeat("a", 40), Version: "1.0.0",
++		}}},
++	}})
++	if len(rows) != 1 || rows[0].State != "enforced" || rows[0].Signer != "unknown" || !rows[0].Current {
++		t.Fatalf("uncached signer posture = %+v, want enforced/unknown/current", rows)
++	}
++}
++
++func TestStatusSignerPostureReadFailureIsNonCurrent(t *testing.T) {
++	home := t.TempDir()
++	const source = "github.com/example/signed"
++	manager := newGitManager(home)
++	if err := os.MkdirAll(manager.reposDir(), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(manager.repoDir(source), []byte("not a repository directory"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	rows := sourceSignerPosture(StatusRequest{
++		Home: home,
++		Policy: Policy{SourceSigners: map[string][]contextresolve.Signer{
++			source: {{Type: "ssh", Key: "ssh-ed25519 allowed"}},
++		}},
++	}, []Info{{
++		Name: "signed",
++		Lock: &contextlock.Lock{Members: []contextlock.Member{{
++			Kind: contextlock.KindContext, Name: "signed", Source: source, Commit: strings.Repeat("a", 40), Version: "1.0.0",
++		}}},
++	}})
++	if len(rows) != 1 || rows[0].State != "enforced" || rows[0].Signer != "unknown" || rows[0].Current {
++		t.Fatalf("unreadable signer posture = %+v, want enforced/unknown/non-current", rows)
++	}
++}
++
++type signerStatusVectorFile struct {
++	PostureCases []struct {
++		Name                 string                             `json:"name"`
++		Allowlists           map[string][]contextresolve.Signer `json:"allowlists"`
++		RequireSourceSigners bool                               `json:"require_source_signers"`
++		Local                map[string]struct {
++			Verdict string `json:"verdict"`
++		} `json:"local"`
++		Expected struct {
++			RequireSourceSigners bool `json:"require_source_signers"`
++			Rows                 []struct {
++				Current bool            `json:"current"`
++				Signer  json.RawMessage `json:"signer"`
++				Source  string          `json:"source"`
++				State   string          `json:"state"`
++			} `json:"rows"`
++		} `json:"expected"`
++	} `json:"posture_cases"`
++}
++
++type confirmationPostureVectorFile struct {
++	Cases []struct {
++		Name     string `json:"name"`
++		Revision string `json:"update_confirmation_revision"`
++		Expected struct {
++			Row struct {
++				Behavior string `json:"behavior"`
++				Revision string `json:"revision"`
++			} `json:"row"`
++		} `json:"expected"`
++	} `json:"confirmation_posture_cases"`
++}
++
++// TestUpdateConfirmationPostureVectorAtStatus binds the shipped revision-B
++// posture to StatusOf; the pinned revision-A row is retained as historical
++// protocol context and the manager reports the current B-flip refusal rule.
++func TestUpdateConfirmationPostureVectorAtStatus(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	payload, err := os.ReadFile(filepath.Join(root, "vectors", "environments-source-signers.json")) // #nosec G304 -- explicit conformance root
++	if err != nil {
++		t.Fatal(err)
++	}
++	var vectors confirmationPostureVectorFile
++	if err := json.Unmarshal(payload, &vectors); err != nil {
++		t.Fatal(err)
++	}
++	if len(vectors.Cases) != 2 {
++		t.Fatalf("pinned confirmation-posture case count = %d, want 2", len(vectors.Cases))
++	}
++	var current *confirmationPostureVectorFile
++	for i := range vectors.Cases {
++		if vectors.Cases[i].Revision == "B-flip" {
++			current = &vectors
++		}
++	}
++	if current == nil {
++		t.Fatal("pinned confirmation-posture vectors omit B-flip")
++	}
++	var expected string
++	for _, vector := range current.Cases {
++		if vector.Revision == "B-flip" {
++			expected = vector.Expected.Row.Behavior
++		}
++	}
++	if expected == "" {
++		t.Fatal("pinned B-flip posture has no behavior description")
++	}
++	status, err := StatusOf(StatusRequest{Home: t.TempDir(), Machine: envregistry.DefaultMachineConfig()})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if status.UpdateConfirmationRevision != "B-flip" || status.UpdateConfirmationBehavior != expected {
++		t.Fatalf("update confirmation posture = %s (%s), want B-flip (%s)", status.UpdateConfirmationRevision, status.UpdateConfirmationBehavior, expected)
++	}
++}
++
++// TestSignerPostureVectorsAtStatus drives every rc.13 posture row through
++// StatusOf after installing a real Git profile. It covers verified, absent,
++// failing, unconfigured, and required-missing local signer material.
++func TestSignerPostureVectorsAtStatus(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	payload, err := os.ReadFile(filepath.Join(root, "vectors", "environments-source-signers.json")) // #nosec G304 -- explicit conformance root
++	if err != nil {
++		t.Fatal(err)
++	}
++	var vectors signerStatusVectorFile
++	if err := json.Unmarshal(payload, &vectors); err != nil {
++		t.Fatal(err)
++	}
++	if len(vectors.PostureCases) != 5 {
++		t.Fatalf("pinned rc.13 posture case count = %d, want 5", len(vectors.PostureCases))
++	}
++	for _, vector := range vectors.PostureCases {
++		t.Run(vector.Name, func(t *testing.T) {
++			pinHomes(t)
++			home := t.TempDir()
++			privateKey := ""
++			sourceSigners := make(map[string][]contextresolve.Signer, len(vector.Allowlists))
++			for source, signers := range vector.Allowlists {
++				if source != "github.com/example/context" {
++					t.Fatalf("unexpected pinned source %q", source)
++				}
++				sourceSigners[source] = signers
++			}
++			if local := vector.Local["github.com/example/context"]; local.Verdict == "verified" {
++				var allowedKey string
++				privateKey, allowedKey = statusSignerKey(t)
++				sourceSigners["github.com/example/context"] = []contextresolve.Signer{{Type: "ssh", Key: allowedKey + " operator@example"}}
++			}
++			const rawSource = "https://github.com/example/context"
++			repo := statusSignerRepo(t, privateKey)
++			ids := newGitIdentities(t)
++			operand := ids.serve(repo, rawSource)
++			if _, _, _, err := Install(home, InstallOptions{Operand: operand}); err != nil {
++				t.Fatalf("install status fixture: %v", err)
++			}
++			if vector.Local["github.com/example/context"].Verdict == "unknown" {
++				if err := os.RemoveAll(profileReposDir(home)); err != nil {
++					t.Fatal(err)
++				}
++			}
++			status, err := StatusOf(StatusRequest{
++				Home: home, Machine: envregistry.DefaultMachineConfig(),
++				Detect: func(envregistry.Adapter) string { return "unknown" },
++				Policy: Policy{SourceSigners: sourceSigners, RequireSourceSigners: vector.RequireSourceSigners},
++			})
++			if err != nil {
++				t.Fatalf("StatusOf: %v", err)
++			}
++			if status.RequireSourceSigners != vector.Expected.RequireSourceSigners {
++				t.Errorf("require_source_signers = %t, want %t", status.RequireSourceSigners, vector.Expected.RequireSourceSigners)
++			}
++			if len(status.SourceSignerPosture) != len(vector.Expected.Rows) {
++				t.Fatalf("status signer rows = %+v, want %d rows", status.SourceSignerPosture, len(vector.Expected.Rows))
++			}
++			for i, want := range vector.Expected.Rows {
++				got := status.SourceSignerPosture[i]
++				if got.State != want.State || got.Current != want.Current || got.Source != want.Source {
++					t.Errorf("status signer row = %+v, want state=%s current=%t source=%s", got, want.State, want.Current, want.Source)
++				}
++				var wantSigner any
++				if len(want.Signer) > 0 {
++					if err := json.Unmarshal(want.Signer, &wantSigner); err != nil {
++						t.Fatal(err)
++					}
++				}
++				if wantSigner == "unknown" && got.Signer != "unknown" {
++					t.Errorf("signer = %q, want unknown", got.Signer)
++				}
++				if _, ok := wantSigner.(map[string]any); ok && (got.Signer == "" || got.Signer == "unknown") {
++					t.Errorf("signer = %q, want verified signer", got.Signer)
++				}
++			}
++		})
++	}
++}
++
++func statusSignerKey(t *testing.T) (string, string) {
++	t.Helper()
++	private := filepath.Join(t.TempDir(), "signer")
++	if output, err := exec.Command("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", private).CombinedOutput(); err != nil {
++		t.Fatalf("ssh-keygen: %v\n%s", err, output)
++	}
++	output, err := exec.Command("ssh-keygen", "-y", "-f", private).Output()
++	if err != nil {
++		t.Fatal(err)
++	}
++	return private, strings.TrimSpace(string(output))
++}
++
++func statusSignerRepo(t *testing.T, privateKey string) string {
++	t.Helper()
++	repo := t.TempDir()
++	writePackage(t, repo, "signed", "1.0.0", "status\n")
++	gitStatusCommand(t, repo, "init")
++	gitStatusCommand(t, repo, "add", ".")
++	commit := []string{"-c", "user.name=Curator Test", "-c", "user.email=curator@example.test"}
++	tag := []string{"-c", "user.name=Curator Test", "-c", "user.email=curator@example.test"}
++	if privateKey != "" {
++		commit = append(commit, "-c", "gpg.format=ssh", "-c", "user.signingkey="+privateKey)
++		tag = append(tag, "-c", "gpg.format=ssh", "-c", "user.signingkey="+privateKey)
++	}
++	commit = append(commit, "commit")
++	if privateKey != "" {
++		commit = append(commit, "-S")
++	}
++	commit = append(commit, "-m", "release")
++	gitStatusCommand(t, repo, commit...)
++	tag = append(tag, "tag")
++	if privateKey != "" {
++		tag = append(tag, "-s", "-m", "release")
++	}
++	tag = append(tag, "v1.0.0")
++	gitStatusCommand(t, repo, tag...)
++	return repo
++}
++
++func gitStatusCommand(t *testing.T, repo string, args ...string) {
++	t.Helper()
++	command := exec.Command("git", append([]string{"-C", repo}, args...)...)
++	if output, err := command.CombinedOutput(); err != nil {
++		t.Fatalf("git %v: %v\n%s", args, err, output)
++	}
++}
++
+ // TestStatusOrphanRetention proves removal without purge retains the
+ // managed homes and status reports each orphan by path.
+ func TestStatusOrphanRetention(t *testing.T) {
+diff --git a/internal/envprofile/surfacing.go b/internal/envprofile/surfacing.go
+index 425f44cb..3d491006 100644
+--- a/internal/envprofile/surfacing.go
++++ b/internal/envprofile/surfacing.go
+@@ -36,8 +36,13 @@ func surfacingRows(home string, manager *gitManager, lock *contextlock.Lock) (ro
+ 		if member.Kind != contextlock.KindMCP {
+ 			continue
+ 		}
+-		entry := manager.entryPath(home, resolvedOf(member))
++		entry, cleanup, err := manager.inspectEntry(home, resolvedOf(member))
++		if err != nil {
++			unreadable = append(unreadable, "mcp declaration "+member.Name+" cannot be read for surfacing: "+err.Error())
++			continue
++		}
+ 		manifest, err := contextpkg.LoadMCP(packageRoot(entry, member.Directory))
++		cleanup()
+ 		if err != nil {
+ 			unreadable = append(unreadable, "mcp declaration "+member.Name+" cannot be read for surfacing: "+err.Error())
+ 			continue
+diff --git a/internal/envprofile/surfacing_order_test.go b/internal/envprofile/surfacing_order_test.go
+index 6ac1661f..daa34cb8 100644
+--- a/internal/envprofile/surfacing_order_test.go
++++ b/internal/envprofile/surfacing_order_test.go
+@@ -151,7 +151,7 @@ func observeLiveUpdateEmission(t *testing.T) {
+ 	gitRun(t, root, "commit", "-m", "two")
+ 	gitRun(t, root, "tag", "v1.0.1")
+ 	sink := &lockObservingSink{lock: lockPath(home, "grows")}
+-	info, moved, err := UpdateWithOptions(home, "grows", UpdateOptions{SurfacingSink: sink})
++	info, moved, err := UpdateWithOptions(home, "grows", UpdateOptions{ConfirmSystemDelta: true, SurfacingSink: sink})
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -169,7 +169,7 @@ func observeLiveUpdateEmission(t *testing.T) {
+ 	// An unchanged update publishes nothing but still surfaces the
+ 	// candidate set exactly once.
+ 	restill := &lockObservingSink{lock: lockPath(home, "grows")}
+-	restillInfo, moved, err := UpdateWithOptions(home, "grows", UpdateOptions{SurfacingSink: restill})
++	restillInfo, moved, err := UpdateWithOptions(home, "grows", UpdateOptions{ConfirmSystemDelta: true, SurfacingSink: restill})
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+diff --git a/internal/envprofile/surfacing_test.go b/internal/envprofile/surfacing_test.go
+index 70c83212..e30d6ef6 100644
+--- a/internal/envprofile/surfacing_test.go
++++ b/internal/envprofile/surfacing_test.go
+@@ -123,7 +123,7 @@ func TestUpdateSurfacesCandidateMCPSet(t *testing.T) {
+ 	gitRun(t, root, "add", ".")
+ 	gitRun(t, root, "commit", "-m", "two")
+ 	gitRun(t, root, "tag", "v1.0.1")
+-	info, moved, err := UpdateWithPolicy(home, "grows", Policy{})
++	info, moved, err := UpdateWithOptions(home, "grows", UpdateOptions{ConfirmSystemDelta: true})
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
