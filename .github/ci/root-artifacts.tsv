@@ -55,7 +55,7 @@
 #   package  artefact[,artefact...]  note
 #
 # package	artefacts	note
-cmd/curator	vectors/umbrella-provider-resolution.json,vectors/manager-lifecycle.json	TestUmbrellaProviderResolutionVectors and both authoritative lifecycle consumers execute complete published case families
+cmd/curator	vectors/umbrella-provider-resolution.json,vectors/manager-lifecycle.json,vectors/environments-read-failure.json	TestUmbrellaProviderResolutionVectors, both lifecycle consumers, and TestEnvUnmanageBackupRecordVectors execute their complete published case families
 internal/buildsource	vectors/build-drivers.json	TestBuildSourceConformanceVectors reads the vector directly
 internal/buildrepo	schema-cases/skill-build-v1,fixtures/external-repository/raw-objects.json,fixtures/external-repository/lfs-pointers.json,fixtures/external-repository/pack-index.json,fixtures/external-repository/local-config-and-refs.json,vectors/source-identities.json	complete skill-build-v1 and external-repository case consumers plus every published source identity
 internal/devsub	schema-cases/skillfile-dev-v2	TestSkillfileDevV2PublishedCasesUseCoverageRatchet drives every published developer Skillfile schema case
@@ -71,6 +71,7 @@ internal/moduleroots	vectors/module-roots.json	TestModuleRootVectors reads the v
 internal/scriptworker	vectors/script-host-execution-policy.json	TestExecutableIdentityCasesAtProductionEntry drives the published executable identity cases through the manager resolver
 internal/scriptpolicy	vectors/script-host-execution-policy.json	the schema-8 script execution-policy family is read directly by every case in conformance_test.go
 internal/envprofile	vectors/environments-codex-seed.json,vectors/environments-env-passthrough.json	TestEnvironmentsCodexSeedVectors and TestEnvironmentsEnvPassthroughVectors consume their published case groups
+internal/envprofile	vectors/environments-read-failure.json	TestEnvironmentsReadFailureVectors drives the 37 marker, lock, seed, passthrough, and backup status cases through production entries; the two restore cases use the curator CLI consumer
 internal/shell	vectors/shell-hook-trust.json	TestShellHookTrustVectors consumes every published trust case
 internal/skillspec	schema-cases/agent-skill-v6,schema-cases/agent-skill-v7,schema-cases/csk-skill-v7,schema-cases/agent-skill-v8,schema-cases/csk-skill-v8,vectors/portable-paths.json,fixtures/go-build-skill	the schema v6 and v7 cases, BOTH schema-8 manifest families, portable-path vectors and the go-build skill fixture
 internal/install	vectors/build-drivers.json,vectors/manager-lifecycle.json	TestAuthoritativeCacheOutcomesDriveInstallation and the dry-run bindings read the vectors directly

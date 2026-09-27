@@ -21,6 +21,7 @@ import (
 
 type managerReadFunction struct {
 	file           string
+	line           int
 	name           string
 	key            string
 	directory      string
@@ -41,6 +42,7 @@ type managerReadAudit struct {
 	seamGuarded  []string
 	allowlisted  []string
 	violations   []string
+	readSites    []string
 }
 
 // Exceptions are deliberately keyed by file and function and explain why the
@@ -121,14 +123,6 @@ func reviewedManagerReadExceptions() map[string]string {
 	)
 	allow("Inspects a caller-owned native environment surface or seed; an absent external file is skipped or reported as missing, and other read errors are preserved.",
 		"internal/adapters/stage.go:*Mirror.stageStale",
-		"internal/envprofile/managed.go:*ResolveRequest.gatherSeeds",
-		"internal/envprofile/managed.go:*verification.checkCopy",
-		"internal/envprofile/managed.go:*verification.checkSurfaces",
-		"internal/envprofile/managed.go:checkProfileCollision",
-		"internal/envprofile/managed.go:claudeProjects",
-		"internal/envprofile/managed.go:claudeSeed",
-		"internal/envprofile/managed.go:inventoryUnmanaged",
-		"internal/envprofile/managed.go:referencedBlocked",
 	)
 	allow("Checks an external destination or target namespace before a write or removal; ENOENT describes path topology, while other metadata failures abort the operation.",
 		"internal/adapters/adapters.go:unmanagedConflict",
@@ -220,6 +214,11 @@ func TestManagerOwnedAbsenceReadsAreGuarded(t *testing.T) {
 	for _, violation := range audit.violations {
 		t.Error(violation)
 	}
+	if os.Getenv("CURATOR_MANAGER_READ_INVENTORY") == "1" {
+		for _, site := range audit.readSites {
+			t.Log(site)
+		}
+	}
 }
 
 func TestManagerReadScannerFindsAliasedNotExistCollapse(t *testing.T) {
@@ -240,9 +239,20 @@ import (
 	hostfs "os"
 )
 
-func readNewManagerState() string {
+func readNewManagerStateWithErrorsIs() string {
 	data, err := hostfs.ReadFile("manager-state")
 	if errorcheck.Is(err, iofs.ErrNotExist) {
+		return "default"
+	}
+	if err != nil {
+		return "default"
+	}
+	return string(data)
+}
+
+func readNewManagerStateWithOSIsNotExist() string {
+	data, err := hostfs.ReadFile("other-manager-state")
+	if hostfs.IsNotExist(err) {
 		return "default"
 	}
 	if err != nil {
@@ -258,8 +268,10 @@ func readNewManagerState() string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(audit.violations) != 1 || !strings.Contains(audit.violations[0], "internal/envprofile/mutant.go:readNewManagerState") {
-		t.Fatalf("AST scan of errors.Is(fs.ErrNotExist) mutant = %v, want its one unreviewed reader", audit.violations)
+	if len(audit.violations) != 2 ||
+		!strings.Contains(strings.Join(audit.violations, "\n"), "internal/envprofile/mutant.go:readNewManagerStateWithErrorsIs") ||
+		!strings.Contains(strings.Join(audit.violations, "\n"), "internal/envprofile/mutant.go:readNewManagerStateWithOSIsNotExist") {
+		t.Fatalf("AST scan did not reject both aliased absence-collapse mutants: %v", audit.violations)
 	}
 }
 
@@ -302,6 +314,7 @@ func scanManagerReadSourcesWithAllowlist(root string, allowlist map[string]strin
 			key := directory + "::" + name
 			info := &managerReadFunction{
 				file:         filepath.ToSlash(rel),
+				line:         fset.Position(function.Pos()).Line,
 				name:         name,
 				key:          key,
 				directory:    directory,
@@ -357,11 +370,13 @@ func scanManagerReadSourcesWithAllowlist(root string, allowlist map[string]strin
 			}
 			usedAllowlist[entry] = true
 			audit.allowlisted = append(audit.allowlisted, entry+" — "+reason)
+			audit.readSites = append(audit.readSites, fmt.Sprintf("%s:%d %s — reviewed allowlist: %s", function.file, function.line, function.name, reason))
 			continue
 		}
 		if function.throughSeam {
 			audit.sitesScanned++
 			audit.seamGuarded = append(audit.seamGuarded, entry)
+			audit.readSites = append(audit.readSites, fmt.Sprintf("%s:%d %s — shared stateread seam", function.file, function.line, function.name))
 		}
 	}
 	for entry := range allowlist {
@@ -371,6 +386,7 @@ func scanManagerReadSourcesWithAllowlist(root string, allowlist map[string]strin
 	}
 	sort.Strings(audit.seamGuarded)
 	sort.Strings(audit.allowlisted)
+	sort.Strings(audit.readSites)
 	sort.Strings(audit.violations)
 	return audit, nil
 }
@@ -428,7 +444,7 @@ func collectFunctionReads(info *managerReadFunction, function *ast.FuncDecl, mod
 }
 
 func filesystemReadCall(call *ast.CallExpr, imports map[string]string, dotImports map[string]bool, selections map[*ast.SelectorExpr]*types.Selection) (string, bool) {
-	readMethods := map[string]bool{"ReadFile": true, "ReadDir": true, "Stat": true, "Lstat": true, "Open": true}
+	readMethods := map[string]bool{"ReadFile": true, "ReadDir": true, "Stat": true, "Lstat": true, "Readlink": true, "Open": true}
 	fsFunctions := map[string]bool{"ReadFile": true, "ReadDir": true, "Stat": true, "WalkDir": true, "Glob": true}
 	switch function := call.Fun.(type) {
 	case *ast.SelectorExpr:
@@ -442,7 +458,7 @@ func filesystemReadCall(call *ast.CallExpr, imports map[string]string, dotImport
 }
 
 func filesystemReadSelector(function *ast.SelectorExpr, imports map[string]string, selections map[*ast.SelectorExpr]*types.Selection) (string, bool) {
-	readMethods := map[string]bool{"ReadFile": true, "ReadDir": true, "Stat": true, "Lstat": true, "Open": true}
+	readMethods := map[string]bool{"ReadFile": true, "ReadDir": true, "Stat": true, "Lstat": true, "Readlink": true, "Open": true}
 	fsFunctions := map[string]bool{"ReadFile": true, "ReadDir": true, "Stat": true, "WalkDir": true, "Glob": true}
 	if !readMethods[function.Sel.Name] && !fsFunctions[function.Sel.Name] {
 		return "", false
@@ -622,7 +638,7 @@ func calledFunction(call *ast.CallExpr, function *managerReadFunction, modulePat
 
 func isStateReadSeamFunction(name string) bool {
 	switch name {
-	case "ReadFile", "ReadDir", "Stat", "Lstat":
+	case "ReadFile", "ReadRegularFile", "ReadDir", "Stat", "Lstat", "Readlink":
 		return true
 	default:
 		return false

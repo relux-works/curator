@@ -221,7 +221,15 @@ func marshalSource(source Source) ([]byte, error) {
 
 // readLock loads a profile's lock and hash.
 func readLock(home, name string) (*contextlock.Lock, string, error) {
-	return contextlock.Read(lockPath(home, name))
+	return readLockWith(home, name, stateread.ReadRegularFile)
+}
+
+func readLockWith(home, name string, readRegularFile func(string) (stateread.File, error)) (*contextlock.Lock, string, error) {
+	lock, hash, err := contextlock.ReadWith(lockPath(home, name), readRegularFile)
+	if err != nil && !isStateAbsent(err) {
+		return nil, "", fmt.Errorf("%s: profile %q lock cannot be trusted: %w", envregistry.DiagStoreUntrusted, name, err)
+	}
+	return lock, hash, err
 }
 
 // List returns every installed profile with its lock and currency. The
@@ -721,7 +729,7 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 			if isPath {
 				return reinstallPathLocked(op, home, name, source, input, options)
 			}
-			info, _, err := updateLocked(op, home, name, options.Policy, options.SurfacingSink)
+			info, _, err := updateLocked(op, home, name, options.Policy, options.SurfacingSink, nil)
 			if err != nil {
 				return Info{}, false, false, err
 			}
@@ -1025,6 +1033,9 @@ type UpdateOptions struct {
 	// operation and Info.Surfacing stays empty, so the rows print
 	// exactly once. Emission never fails the operation.
 	SurfacingSink io.Writer
+	// readRegularFile is a production-entry fault seam; callers outside this
+	// package leave it nil and use stateread.ReadRegularFile.
+	readRegularFile func(string) (stateread.File, error)
 }
 
 // UpdateWithPolicy re-resolves under the machine gates of policy
@@ -1043,20 +1054,32 @@ func UpdateWithOptions(home, name string, options UpdateOptions) (Info, bool, er
 		return Info{}, false, err
 	}
 	defer func() { _ = op.close() }()
-	return updateLocked(op, home, name, options.Policy, options.SurfacingSink)
+	return updateLocked(op, home, name, options.Policy, options.SurfacingSink, options.readRegularFile)
 }
 
 // updateLocked re-resolves under the held operation lock.
-func updateLocked(op *operation, home, name string, policy Policy, sink io.Writer) (Info, bool, error) {
-	if err := ensureDefault(op, home, policy); err != nil {
-		return Info{}, false, err
+func updateLocked(op *operation, home, name string, policy Policy, sink io.Writer, readRegularFile func(string) (stateread.File, error)) (Info, bool, error) {
+	if readRegularFile == nil {
+		readRegularFile = stateread.ReadRegularFile
 	}
 	source, err := readSource(home, name)
 	if err != nil {
+		if name == DefaultProfile && isStateAbsent(err) {
+			if err := ensureDefault(op, home, policy); err != nil {
+				return Info{}, false, err
+			}
+			return Info{}, false, fmt.Errorf("%s: profile %q is the builtin local profile and does not move", DiagUpdateBlocked, name)
+		}
 		return Info{}, false, err
 	}
-	oldLock, oldHash, err := readLock(home, name)
+	oldLock, oldHash, err := readLockWith(home, name, readRegularFile)
 	if err != nil {
+		return Info{}, false, err
+	}
+	// Establish that the named profile's recorded evidence is readable before
+	// ensureDefault can publish any state. An unreadable lock makes update
+	// read-only: no other profile or generation is created as a side effect.
+	if err := ensureDefault(op, home, policy); err != nil {
 		return Info{}, false, err
 	}
 	manager := newGitManager(home).withPolicy(policy)
@@ -1069,7 +1092,7 @@ func updateLocked(op *operation, home, name string, policy Policy, sink io.Write
 				return Info{}, false, err
 			}
 			info := Info{Name: name, Source: source, Lock: oldLock, Current: machine == name}
-			if _, hash, err := readLock(home, name); err == nil {
+			if _, hash, err := readLockWith(home, name, readRegularFile); err == nil {
 				info.LockHash = hash
 			}
 			return info, false, nil

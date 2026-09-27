@@ -271,6 +271,13 @@ not unprovisioned: the scope row carries `provisioned_known: false` and an
 Unreadable backup inventories show `backups: unknown` with
 `environment_backup_record_unreadable`; unreadable orphan inventory is
 reported in the JSON `diagnostics` list instead of appearing empty.
+An unreadable profile lock is reported as `environment_store_untrusted` with
+unknown currency. Resolve, repair, and update refuse it without rebuilding or
+replacing state from that lock. A passthrough entry that cannot be inspected
+or whose link target cannot be read is reported as
+`environment_passthrough_unreadable`; resolve emits no fragment and repair
+leaves the entry untouched. A proven absent or replaced passthrough entry
+remains `environment_passthrough_detached`.
 
 ### curator list
 

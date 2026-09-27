@@ -63,6 +63,21 @@ func TestUnsupportedVersionIsRejected(t *testing.T) {
 	}
 }
 
+func TestReadKeepsUnsupportedVersionDiagnostic(t *testing.T) {
+	home := t.TempDir()
+	payload, err := testMarker().Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	future := strings.Replace(string(payload), `"version": 1`, `"version": 3`, 1)
+	if err := os.WriteFile(filepath.Join(home, Name), []byte(future), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Read(home); err == nil || !strings.Contains(err.Error(), DiagMarkerInvalid) || strings.Contains(err.Error(), DiagMarkerUnreadable) {
+		t.Fatalf("Read unsupported version error = %v; want %s without %s", err, DiagMarkerInvalid, DiagMarkerUnreadable)
+	}
+}
+
 func TestSchema2PathlessCredentialRecordOmitsPath(t *testing.T) {
 	marker := testMarker()
 	marker.Version = VersionV2
@@ -118,7 +133,7 @@ func TestUnknownFieldsAreRejected(t *testing.T) {
 }
 
 // TestReadDistinguishesAbsence checks Read reports absence as (nil, nil)
-// and an invalid marker as a fail-closed environment_marker_invalid error.
+// and an invalid marker as a fail-closed environment_marker_unreadable error.
 func TestReadDistinguishesAbsence(t *testing.T) {
 	home := t.TempDir()
 	marker, err := Read(home)
@@ -128,8 +143,8 @@ func TestReadDistinguishesAbsence(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(home, Name), []byte("{nope"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Read(home); err == nil || !strings.Contains(err.Error(), DiagMarkerInvalid) {
-		t.Fatalf("invalid marker must fail as %s, got %v", DiagMarkerInvalid, err)
+	if _, err := Read(home); err == nil || !strings.Contains(err.Error(), DiagMarkerUnreadable) {
+		t.Fatalf("invalid marker must fail as %s, got %v", DiagMarkerUnreadable, err)
 	}
 }
 

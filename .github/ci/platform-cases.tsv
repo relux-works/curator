@@ -356,6 +356,7 @@ internal/envprofile	TestStatusScopeMarkerAbsenceAndUnreadabilityDiffer/unreadabl
 internal/envprofile	TestStatusOrphanMarkerAbsenceAndUnreadabilityDiffer/unreadable_marker_is_reported,_not_treated_as_absence	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves orphan marker read failures
 internal/envprofile	TestStatusUnreadableOrphanInventoryIsNotEmpty	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves orphan inventory read failures
 internal/envprofile	TestStatusBackupInventoryAbsenceAndUnreadabilityDiffer/unreadable_backup_inventory_is_unknown_and_non-current	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves backup inventory read failures
+internal/envprofile	TestEnvironmentsReadFailureVectors	linux,darwin,windows	-	-	the 37 rc.13 profile cases drive manager status, resolve, provision, repair and update paths; the two backup-record restore cases run through the curator CLI consumer
 internal/envprofile	TestRemovePurgeMarkerAbsenceAndUnreadabilityDiffer/unreadable_marker_refuses_before_purge_writes	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves purge marker preflight failures
 internal/globalbins	TestRefreshAndStageRefuseAnUnreadableOwnershipLedger	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves refresh and staging preserve ledger read failures
 internal/scopes	TestConsumerRegistryAbsenceAndUnreadabilityDiffer	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves consumer registry failures

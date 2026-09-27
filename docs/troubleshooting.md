@@ -464,6 +464,23 @@ Remedy: restore the expected file and directory structure and access to the
 state path, then retry the command. Do not remove or recreate the state until
 you have confirmed which manager record is unreadable.
 
+### environment_store_untrusted
+
+Symptom: `environment_store_untrusted` names a profile whose source or lock
+record could not be read as a trusted regular file. `env status` keeps the
+profile row non-current with unknown currency. Resolve, repair, and update
+stop without emitting a fragment or rebuilding the managed home from that
+record.
+
+Cause: the profile lock is absent only when no lock entry exists under a
+traversable profile directory (`profile_unknown`). A present lock that is
+malformed, unreadable, a symlink, a directory, or below a non-directory
+parent is untrusted. The manager cannot establish which store generation the
+profile names.
+
+Remedy: restore or inspect the profile record out of band, then retry. Do not
+delete or regenerate the lock as a way to make resolve or update proceed.
+
 ### source_lock_stale
 
 Symptom: `source_lock_stale`.
@@ -570,6 +587,21 @@ strict external-build lane admits no explicit port and no host alias,
 then retry the explicit attempt.
 
 ## Environment credential links
+
+### environment_passthrough_unreadable
+
+Symptom: `env status` reports `environment_passthrough_unreadable` for a
+managed credential link, or resolve refuses with that diagnostic and emits
+no fragment. Repair leaves the entry untouched.
+
+Cause: the manager could not inspect the link path or read its target. This
+does not establish that the entry is absent or detached, so repair cannot
+replace it safely.
+
+Remedy: restore access to the entry and its parent directories, then retry
+status or resolve. If the path is present and readable but no longer has the
+recorded link shape or target, follow the `environment_passthrough_detached`
+or `environment_credential_conflict` guidance below.
 
 ### environment_credential_conflict
 

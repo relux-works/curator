@@ -25,6 +25,7 @@ import (
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/hookapproval"
+	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/registry"
 	"github.com/relux-works/curator/internal/stateread"
@@ -260,17 +261,28 @@ type StatusRequest struct {
 	ProbeTarget func(envregistry.Target) bool
 	// LaunchDir is the directory project entries are reported against.
 	LaunchDir string
+	// passthrough inspection seams mirror ResolveRequest for deterministic
+	// production-entry tests of failed lstat/readlink operations.
+	passthroughLstat    func(string) (os.FileInfo, error)
+	passthroughReadlink func(string) (string, error)
+	readStateFile       func(string) (stateread.File, error)
+	readRegularFile     func(string) (stateread.File, error)
+	readStateDirectory  func(string) (stateread.Directory, error)
 }
 
 func (req *StatusRequest) resolve() ResolveRequest {
 	return ResolveRequest{
-		Home:         req.Home,
-		Machine:      req.Machine,
-		Detect:       req.Detect,
-		NativeHomeOf: req.NativeHomeOf,
-		OperatorXDG:  req.OperatorXDG,
-		LaunchDir:    req.LaunchDir,
-		Policy:       req.Policy,
+		Home:                req.Home,
+		Machine:             req.Machine,
+		Detect:              req.Detect,
+		NativeHomeOf:        req.NativeHomeOf,
+		OperatorXDG:         req.OperatorXDG,
+		LaunchDir:           req.LaunchDir,
+		Policy:              req.Policy,
+		passthroughLstat:    req.passthroughLstat,
+		passthroughReadlink: req.passthroughReadlink,
+		readStateFile:       req.readStateFile,
+		readRegularFile:     req.readRegularFile,
 	}
 }
 
@@ -289,7 +301,7 @@ func StatusOf(req StatusRequest) (*Status, error) {
 		status.RequireCurrentProfile = &value
 		status.RequireCurrentLocked = req.Policy.RequireCurrentLocked
 	}
-	infos, err := List(req.Home)
+	infos, err := statusProfiles(req.Home)
 	if err != nil {
 		return nil, err
 	}
@@ -379,6 +391,36 @@ func StatusOf(req StatusRequest) (*Status, error) {
 	return status, nil
 }
 
+// statusProfiles enumerates profile source records without requiring their
+// locks to be readable. The status row then reports environment_store_untrusted
+// and unknown currency instead of dropping a profile from status entirely.
+func statusProfiles(home string) ([]Info, error) {
+	listing, err := stateread.ReadDir(ProfilesDir(home))
+	if err != nil {
+		return nil, err
+	}
+	if listing.Kind == stateread.KindAbsent {
+		return nil, nil
+	}
+	var infos []Info
+	for _, entry := range listing.Entries {
+		if !entry.IsDir() || !identifiers.Valid(entry.Name()) {
+			continue
+		}
+		source, err := readSource(home, entry.Name())
+		if err != nil && isStateAbsent(err) {
+			continue
+		}
+		info := Info{Name: entry.Name()}
+		if err == nil {
+			info.Source = source
+		}
+		infos = append(infos, info)
+	}
+	sort.Slice(infos, func(i, j int) bool { return infos[i].Name < infos[j].Name })
+	return infos, nil
+}
+
 // trustProjectCandidates returns the two hook-sourced env files of the
 // project the launch directory is inside, or nothing when it is inside no
 // project. An empty launch directory means the process working directory,
@@ -441,13 +483,17 @@ func homeState(req StatusRequest, profile string, adapter envregistry.Adapter) H
 	if adapter.ID != envregistry.CodexCLI {
 		state.NativeMCPServersDisposition = "none"
 	}
-	source, lock, hash, err := loadResolveInputs(req.Home, profile)
+	source, lock, hash, err := loadResolveInputsWith(req.Home, profile, req.readRegularFile)
 	if err != nil {
-		state.Findings = append(state.Findings, DiagProfileUnknown+": "+err.Error())
+		state.Findings = append(state.Findings, err.Error())
 		return state
 	}
 	state.LockHash = hash
-	state.Backups, state.BackupsOldest, state.BackupsNewest, err = backupAges(state.Home)
+	if req.readStateDirectory == nil {
+		state.Backups, state.BackupsOldest, state.BackupsNewest, err = backupAges(state.Home)
+	} else {
+		state.Backups, state.BackupsOldest, state.BackupsNewest, err = backupAgesWith(state.Home, req.readStateDirectory)
+	}
 	if err != nil {
 		state.Findings = append(state.Findings, envregistry.DiagBackupRecordUnreadable+": "+err.Error())
 	} else {
@@ -569,10 +615,14 @@ func markerForm(marker *envmarker.Marker) string {
 }
 
 // backupAges counts the versioned backup generations beside the marker
-// and reports the oldest and newest ages (§8.3, §12).
+// and reports the oldest and newest ages (§8.3, §8.4.1, §12).
 func backupAges(homeDir string) (int, string, string, error) {
+	return backupAgesWith(homeDir, stateread.ReadDir)
+}
+
+func backupAgesWith(homeDir string, readDirectory func(string) (stateread.Directory, error)) (int, string, string, error) {
 	root := filepath.Join(homeDir, ".agent-environment-backup")
-	listing, err := stateread.ReadDir(root)
+	listing, err := readDirectory(root)
 	if err != nil {
 		return 0, "-", "-", err
 	}

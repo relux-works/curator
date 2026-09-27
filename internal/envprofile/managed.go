@@ -97,6 +97,12 @@ type ResolveRequest struct {
 	// transactionOptions is a fault-injection seam for recovery tests. CLI
 	// requests leave it nil and use the production transaction engine.
 	transactionOptions []transaction.Option
+	// passthroughLstat and passthroughReadlink inject entry inspection errors
+	// in tests. Production requests leave them nil and use the shared reader.
+	passthroughLstat    func(string) (os.FileInfo, error)
+	passthroughReadlink func(string) (string, error)
+	readStateFile       func(string) (stateread.File, error)
+	readRegularFile     func(string) (stateread.File, error)
 }
 
 // ResolveResult is the outcome: exactly one of Document and StaleErr is
@@ -358,14 +364,18 @@ func referencedBlocked(homeDir string, prior *envmarker.Marker) (bool, error) {
 	if recorded {
 		return false, nil
 	}
-	_, err := os.Lstat(filepath.Join(homeDir, "opencode.json"))
-	if err == nil {
-		return true, nil
+	path := filepath.Join(homeDir, "opencode.json")
+	metadata, err := stateread.Lstat(path)
+	if err != nil {
+		return false, err
 	}
-	if os.IsNotExist(err) {
+	if metadata.Kind == stateread.KindAbsent {
 		return false, nil
 	}
-	return false, err
+	if metadata.Kind != stateread.KindPresent {
+		return false, stateread.UnusableError(path, fmt.Errorf("path metadata is unreadable"))
+	}
+	return true, nil
 }
 
 // rootContext assembles the root-context surface: monolithic bytes or the
@@ -503,7 +513,7 @@ func (p *homePlan) publishDocs() error {
 // liveness row. The native config.toml read is read-only: an absent file
 // or an absent key means the default file store, while an unreadable file
 // fails instead of defaulting — absence and a failed read are different
-// facts (§8.4) — and a selector outside the verified file/keyring/auto
+// facts (§8.4.1) — and a selector outside the verified file/keyring/auto
 // set fails closed with environment_credential_unsupported.
 func (req *ResolveRequest) effectivePassthrough(adapter envregistry.Adapter, isolation string) (map[string]string, map[string]string, error) {
 	links := map[string]string{}
@@ -520,7 +530,7 @@ func (req *ResolveRequest) effectivePassthrough(adapter envregistry.Adapter, iso
 		case envregistry.StrategyPerHomeKeychain, envregistry.StrategyAmbient:
 			continue
 		case envregistry.StrategyKeyringPreferred:
-			store, err := codexCredentialStore(native)
+			store, err := req.codexCredentialStore(native)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -572,7 +582,7 @@ func (req *ResolveRequest) credentialRecords(adapter envregistry.Adapter, isolat
 	var codexStore string
 	for _, entry := range entries {
 		if entry.Strategy == envregistry.StrategyKeyringPreferred {
-			codexStore, err = codexCredentialStore(native)
+			codexStore, err = req.codexCredentialStore(native)
 			if err != nil {
 				return nil, err
 			}
@@ -633,11 +643,19 @@ func (req *ResolveRequest) credentialRecords(adapter envregistry.Adapter, isolat
 // with environment_credential_unsupported. Sharing is defined by the
 // native effective storage only: a diverged managed config.toml changes
 // nothing and is never realigned.
-func codexCredentialStore(native string) (string, error) {
+func (req *ResolveRequest) codexCredentialStore(native string) (string, error) {
+	readRegularFile := req.readRegularFile
+	if readRegularFile == nil {
+		readRegularFile = stateread.ReadRegularFile
+	}
+	return codexCredentialStoreWith(native, readRegularFile)
+}
+
+func codexCredentialStoreWith(native string, readRegularFile func(string) (stateread.File, error)) (string, error) {
 	path := filepath.Join(native, "config.toml")
-	state, err := stateread.ReadFile(path)
+	state, err := readRegularFile(path)
 	if err != nil {
-		return "", fmt.Errorf("codex native config.toml is unreadable: %v", err)
+		return "", fmt.Errorf("%s: codex native config.toml: %w", envregistry.DiagSeedUnreadable, err)
 	}
 	if state.Kind == stateread.KindAbsent {
 		return "file", nil
@@ -648,7 +666,7 @@ func codexCredentialStore(native string) (string, error) {
 	payload := state.Bytes
 	var doc map[string]any
 	if err := toml.Unmarshal(payload, &doc); err != nil {
-		return "", fmt.Errorf("codex native config.toml is not valid TOML: %v", err)
+		return "", fmt.Errorf("%s: %w", envregistry.DiagSeedUnreadable, stateread.UnusableError(path, fmt.Errorf("codex native config.toml is not valid TOML: %w", err)))
 	}
 	raw, ok := doc["cli_auth_credentials_store"]
 	if !ok {
@@ -683,7 +701,7 @@ func (req *ResolveRequest) checkIsolatedCredentialStore(adapter envregistry.Adap
 	if err != nil {
 		return err
 	}
-	store, err := codexCredentialStore(native)
+	store, err := req.codexCredentialStore(native)
 	if err != nil {
 		return err
 	}
@@ -749,7 +767,7 @@ func stripCodexSeedMCPServers(payload []byte) ([]byte, []string, error) {
 // gatherSeeds reads every seed upfront so that an unreadable seed stops
 // provisioning before the first write. A seed absent in the native home
 // is simply not seeded; absence and unreadability stay different facts
-// (§8.4). Copy seeds are gathered at provisioning only: repair never
+// (§8.4.1). Copy seeds are gathered at provisioning only: repair never
 // refreshes them, so an unreadable native copy must not fail a repair
 // that would never read it.
 func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bool) (*seedBundle, error) {
@@ -773,19 +791,23 @@ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bo
 				bundle.claudeInit = true
 				continue
 			}
-			seedPath := filepath.Join(native, filepath.FromSlash(seed))
-			state, err := stateread.ReadFile(seedPath) // #nosec G304 -- seed names are registry data
+			path := filepath.Join(native, filepath.FromSlash(seed))
+			readRegularFile := req.readRegularFile
+			if readRegularFile == nil {
+				readRegularFile = stateread.ReadRegularFile
+			}
+			file, err := readRegularFile(path) // #nosec G304 -- seed names are registry data
 			if err != nil {
 				return nil, fmt.Errorf("%s: seed %s: %v", envregistry.DiagSeedUnreadable, seed, err)
 			}
-			switch state.Kind {
+			switch file.Kind {
 			case stateread.KindAbsent:
 				continue
 			case stateread.KindPresent:
 			default:
-				return nil, fmt.Errorf("%s: seed %s has unusable read state %q", envregistry.DiagSeedUnreadable, seed, state.Kind)
+				return nil, fmt.Errorf("%s: seed %s has unusable read state %q", envregistry.DiagSeedUnreadable, seed, file.Kind)
 			}
-			payload := state.Bytes
+			payload := file.Bytes
 			if adapter.ID == envregistry.CodexCLI && seed == "config.toml" {
 				stripped, names, err := stripCodexSeedMCPServers(payload)
 				if err != nil {
@@ -812,11 +834,12 @@ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bo
 				continue
 			}
 			target := filepath.Join(xdg, name)
-			if _, err := os.Stat(target); err != nil {
-				if os.IsNotExist(err) {
-					continue
-				}
+			metadata, err := stateread.Stat(target)
+			if err != nil {
 				return nil, fmt.Errorf("%s: xdg seed %s: %v", envregistry.DiagSeedUnreadable, name, err)
+			}
+			if metadata.Kind == stateread.KindAbsent {
+				continue
 			}
 			bundle.xdg[name] = target
 		}
@@ -841,8 +864,13 @@ func writeStoreDoc(path string, document []byte) error {
 func claudeSeed(homeDir, launchDir, form string) (seeded []string, err error) {
 	path := filepath.Join(homeDir, ".claude.json")
 	object := map[string]any{"hasCompletedOnboarding": true, "projects": map[string]any{}}
-	if payload, err := os.ReadFile(path); err == nil { // #nosec G304 -- managed .claude.json below the resolved home
-		parsed, ok := decodeJSONObject(payload)
+	state, err := stateread.ReadRegularFile(path) // #nosec G304 -- managed .claude.json below the resolved home
+	if err != nil {
+		return nil, fmt.Errorf("%s: managed .claude.json: %w", envregistry.DiagSeedUnreadable, err)
+	}
+	switch state.Kind {
+	case stateread.KindPresent:
+		parsed, ok := decodeJSONObject(state.Bytes)
 		if !ok {
 			return nil, fmt.Errorf("%s: managed .claude.json is not an object", envregistry.DiagSeedUnreadable)
 		}
@@ -850,8 +878,11 @@ func claudeSeed(homeDir, launchDir, form string) (seeded []string, err error) {
 		if _, ok := object["projects"].(map[string]any); !ok {
 			object["projects"] = map[string]any{}
 		}
-	} else if !os.IsNotExist(err) {
-		return nil, fmt.Errorf("%s: managed .claude.json: %v", envregistry.DiagSeedUnreadable, err)
+	case stateread.KindAbsent:
+	case stateread.KindUnreadable:
+		return nil, fmt.Errorf("%s: managed .claude.json is unreadable", envregistry.DiagSeedUnreadable)
+	default:
+		return nil, fmt.Errorf("%s: managed .claude.json has unknown read state %q", envregistry.DiagSeedUnreadable, state.Kind)
 	}
 	projects := object["projects"].(map[string]any)
 	for name := range projects {
@@ -913,16 +944,23 @@ func protocoljsonMarshal(object map[string]any) ([]byte, error) {
 // an unreadable or invalid file is reported, never treated as absence
 // (§8.4).
 func claudeProjects(homeDir string) (map[string]bool, error) {
-	payload, err := os.ReadFile(filepath.Join(homeDir, ".claude.json")) // #nosec G304 -- managed .claude.json below the resolved home
+	path := filepath.Join(homeDir, ".claude.json")
+	state, err := stateread.ReadRegularFile(path) // #nosec G304 -- managed .claude.json below the resolved home
 	if err != nil {
-		if os.IsNotExist(err) {
-			return map[string]bool{}, nil
-		}
-		return nil, err
+		return nil, fmt.Errorf("%s: managed .claude.json: %w", envregistry.DiagSeedUnreadable, err)
 	}
-	parsed, ok := decodeJSONObject(payload)
+	switch state.Kind {
+	case stateread.KindAbsent:
+		return map[string]bool{}, nil
+	case stateread.KindUnreadable:
+		return nil, fmt.Errorf("%s: managed .claude.json is unreadable", envregistry.DiagSeedUnreadable)
+	case stateread.KindPresent:
+	default:
+		return nil, fmt.Errorf("%s: managed .claude.json has unknown read state %q", envregistry.DiagSeedUnreadable, state.Kind)
+	}
+	parsed, ok := decodeJSONObject(state.Bytes)
 	if !ok {
-		return nil, fmt.Errorf("managed .claude.json is not an object")
+		return nil, fmt.Errorf("%s: managed .claude.json is not an object", envregistry.DiagSeedUnreadable)
 	}
 	entries := map[string]bool{}
 	if projects, ok := parsed["projects"].(map[string]any); ok {
@@ -981,16 +1019,23 @@ func inventoryUnmanaged(homeDir string, want map[string]bool, storeRoot string) 
 	sort.Strings(paths)
 	for _, path := range paths {
 		full := filepath.Join(homeDir, filepath.FromSlash(path))
-		info, err := os.Lstat(full)
+		metadata, err := stateread.Lstat(full)
 		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
 			return fmt.Errorf("%s: inventory of %s: %v", DiagUnmanagedConflict, path, err)
 		}
+		if metadata.Kind == stateread.KindAbsent {
+			continue
+		}
+		if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
+			return fmt.Errorf("%s: inventory of %s: path metadata is unreadable", DiagUnmanagedConflict, path)
+		}
+		info := metadata.Info
 		if info.Mode()&os.ModeSymlink != 0 {
-			target, err := os.Readlink(full)
-			if err == nil && !sameStoreTree(target, storeRoot) {
+			link, err := stateread.Readlink(full)
+			if err != nil || link.Kind != stateread.KindPresent {
+				return fmt.Errorf("%s: inventory of %s: symbolic link target is unreadable: %v", DiagUnmanagedConflict, path, err)
+			}
+			if !sameStoreTree(link.Target, storeRoot) {
 				return fmt.Errorf("%s: %s is a symlink outside the manager store; abort, or take over with backup", DiagForeignManager, path)
 			}
 		}
@@ -1493,9 +1538,11 @@ func sortedKeysBytes(values map[string][]byte) []string {
 // verification is the lock-free currency verdict over exactly the surfaces
 // the marker records (§10.1).
 type verification struct {
-	current  bool
-	reasons  []string
-	warnings []string
+	current               bool
+	reasons               []string
+	warnings              []string
+	passthroughReadFailed bool
+	markerReadFailed      bool
 	// surfaceState carries the per-surface outcome for status rows: ""
 	// (current), environment_surface_drift, environment_surface_missing,
 	// or environment_surface_unreadable.
@@ -1530,9 +1577,16 @@ func verifyHome(req *ResolveRequest, adapter envregistry.Adapter, source Source,
 		return verdict
 	}
 	verdict.order = order
-	marker, err := envmarker.Read(ManagedHomeDir(req.Home, req.Profile, adapter.ID))
+	readStateFile := req.readStateFile
+	if readStateFile == nil {
+		readStateFile = stateread.ReadFile
+	}
+	marker, err := envmarker.ReadWith(ManagedHomeDir(req.Home, req.Profile, adapter.ID), readStateFile)
 	if err != nil {
 		verdict.reasons = append(verdict.reasons, fmt.Sprintf("marker invalid: %v", err))
+		if strings.Contains(err.Error(), envmarker.DiagMarkerUnreadable) {
+			verdict.markerReadFailed = true
+		}
 		return verdict
 	}
 	if marker == nil {
@@ -1622,15 +1676,21 @@ func (v *verification) checkSurfaces(req *ResolveRequest, plan *homePlan, marker
 			full := filepath.Join(plan.homeDir, filepath.FromSlash(path))
 			target, linked := plan.links[path]
 			if linked && !copiedPaths[path] {
-				info, err := os.Lstat(full)
-				if err != nil {
-					if os.IsNotExist(err) {
-						v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is missing", path))
-						v.mark(key, DiagSurfaceMissing)
-					} else {
-						v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is unreadable: %v", path, err))
-						v.mark(key, DiagSurfaceUnreadable)
-					}
+				metadata, err := stateread.Lstat(full)
+				if err != nil || metadata.Kind == stateread.KindUnreadable {
+					v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is unreadable: %v", path, err))
+					v.mark(key, DiagSurfaceUnreadable)
+					continue
+				}
+				if metadata.Kind == stateread.KindAbsent {
+					v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is missing", path))
+					v.mark(key, DiagSurfaceMissing)
+					continue
+				}
+				info := metadata.Info
+				if info == nil {
+					v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is unreadable: metadata is unavailable", path))
+					v.mark(key, DiagSurfaceUnreadable)
 					continue
 				}
 				if info.Mode()&os.ModeSymlink == 0 {
@@ -1638,8 +1698,18 @@ func (v *verification) checkSurfaces(req *ResolveRequest, plan *homePlan, marker
 					v.mark(key, DiagSurfaceDrift)
 					continue
 				}
-				got, err := os.Readlink(full)
-				if err != nil || got != target {
+				link, err := stateread.Readlink(full)
+				if err != nil || link.Kind == stateread.KindUnreadable {
+					v.reasons = append(v.reasons, fmt.Sprintf("surface file %s link target is unreadable: %v", path, err))
+					v.mark(key, DiagSurfaceUnreadable)
+					continue
+				}
+				if link.Kind == stateread.KindAbsent {
+					v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is missing", path))
+					v.mark(key, DiagSurfaceMissing)
+					continue
+				}
+				if link.Target != target {
 					v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is drifted: link target changed", path))
 					v.mark(key, DiagSurfaceDrift)
 					continue
@@ -1663,18 +1733,18 @@ func (v *verification) checkSurfaces(req *ResolveRequest, plan *homePlan, marker
 					v.mark(key, DiagSurfaceDrift)
 					continue
 				}
-				payload, err := os.ReadFile(target) // #nosec G304 -- link target recomputed from the verified plan
-				if err != nil {
-					if os.IsNotExist(err) {
-						v.reasons = append(v.reasons, fmt.Sprintf("surface file %s link target is missing", path))
-						v.mark(key, DiagSurfaceMissing)
-					} else {
-						v.reasons = append(v.reasons, fmt.Sprintf("surface file %s link target is unreadable: %v", path, err))
-						v.mark(key, DiagSurfaceUnreadable)
-					}
+				state, err := stateread.ReadFile(target) // #nosec G304 -- link target recomputed from the verified plan
+				if err != nil || state.Kind == stateread.KindUnreadable {
+					v.reasons = append(v.reasons, fmt.Sprintf("surface file %s link target is unreadable: %v", path, err))
+					v.mark(key, DiagSurfaceUnreadable)
 					continue
 				}
-				if contextmaterialize.FileHash(payload) != contextmaterialize.FileHash(expected) {
+				if state.Kind == stateread.KindAbsent {
+					v.reasons = append(v.reasons, fmt.Sprintf("surface file %s link target is missing", path))
+					v.mark(key, DiagSurfaceMissing)
+					continue
+				}
+				if contextmaterialize.FileHash(state.Bytes) != contextmaterialize.FileHash(expected) {
 					v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is drifted: link target bytes differ", path))
 					v.mark(key, DiagSurfaceDrift)
 				}
@@ -1708,16 +1778,16 @@ func (v *verification) checkSurfaces(req *ResolveRequest, plan *homePlan, marker
 // missing file and an unreadable file are different facts (§8.4). It
 // returns the surface state for the status row.
 func (v *verification) checkCopy(path, full string, document []byte) string {
-	payload, err := os.ReadFile(full) // #nosec G304 -- home path from the verified plan
-	if err != nil {
-		if os.IsNotExist(err) {
-			v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is missing", path))
-			return DiagSurfaceMissing
-		}
+	state, err := stateread.ReadFile(full) // #nosec G304 -- home path from the verified plan
+	if err != nil || state.Kind == stateread.KindUnreadable {
 		v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is unreadable: %v", path, err))
 		return DiagSurfaceUnreadable
 	}
-	if contextmaterialize.FileHash(payload) != contextmaterialize.FileHash(document) {
+	if state.Kind == stateread.KindAbsent {
+		v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is missing", path))
+		return DiagSurfaceMissing
+	}
+	if contextmaterialize.FileHash(state.Bytes) != contextmaterialize.FileHash(document) {
 		v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is drifted: content hash differs", path))
 		return DiagSurfaceDrift
 	}
@@ -1727,11 +1797,12 @@ func (v *verification) checkCopy(path, full string, document []byte) string {
 // checkFallbackCopy verifies a recorded symlink-fallback copy against its
 // store source: file bytes for files, the store content hash for trees.
 func (v *verification) checkFallbackCopy(path, full, source string) string {
-	info, err := os.Stat(source)
-	if err != nil {
+	metadata, err := stateread.Stat(source)
+	if err != nil || metadata.Kind != stateread.KindPresent || metadata.Info == nil {
 		v.reasons = append(v.reasons, fmt.Sprintf("surface file %s store source is unreadable: %v", path, err))
 		return DiagSurfaceUnreadable
 	}
+	info := metadata.Info
 	if info.IsDir() {
 		want, err := contextstore.ContentHash(source)
 		if err != nil {
@@ -1834,9 +1905,28 @@ func (v *verification) checkPassthrough(req *ResolveRequest, plan *homePlan, mar
 			continue
 		}
 		full := filepath.Join(plan.homeDir, filepath.FromSlash(path))
-		info, err := os.Lstat(full)
-		if err != nil {
+		var metadata stateread.Metadata
+		if req.passthroughLstat == nil {
+			metadata, err = stateread.Lstat(full)
+		} else {
+			metadata, err = stateread.LstatWith(full, req.passthroughLstat)
+		}
+		if err != nil || metadata.Kind == stateread.KindUnreadable {
+			v.passthroughReadFailed = true
+			if err == nil {
+				err = stateread.UnusableError(full, fmt.Errorf("entry inspection returned unreadable without an error"))
+			}
+			v.reasons = append(v.reasons, fmt.Sprintf("%s: passthrough entry %s cannot be inspected: %v", envregistry.DiagPassthroughUnreadable, path, err))
+			continue
+		}
+		if metadata.Kind == stateread.KindAbsent {
 			v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s is detached", path))
+			continue
+		}
+		info := metadata.Info
+		if info == nil {
+			v.passthroughReadFailed = true
+			v.reasons = append(v.reasons, fmt.Sprintf("%s: passthrough entry %s has no readable metadata", envregistry.DiagPassthroughUnreadable, path))
 			continue
 		}
 		if info.Mode()&os.ModeSymlink == 0 {
@@ -1847,11 +1937,25 @@ func (v *verification) checkPassthrough(req *ResolveRequest, plan *homePlan, mar
 			v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s is detached", path))
 			continue
 		}
-		got, err := os.Readlink(full)
-		if err != nil {
+		var link stateread.Link
+		if req.passthroughReadlink == nil {
+			link, err = stateread.Readlink(full)
+		} else {
+			link, err = stateread.ReadlinkWith(full, req.passthroughReadlink)
+		}
+		if err != nil || link.Kind == stateread.KindUnreadable {
+			v.passthroughReadFailed = true
+			if err == nil {
+				err = stateread.UnusableError(full, fmt.Errorf("link inspection returned unreadable without an error"))
+			}
+			v.reasons = append(v.reasons, fmt.Sprintf("%s: passthrough entry %s target cannot be read: %v", envregistry.DiagPassthroughUnreadable, path, err))
+			continue
+		}
+		if link.Kind == stateread.KindAbsent {
 			v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s is detached", path))
 			continue
 		}
+		got := link.Target
 		if got != target {
 			v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s is detached: link targets %s, expected %s (%s)", path, got, target, envregistry.DiagCredentialConflict))
 			continue
@@ -2072,13 +2176,26 @@ func firstResolveNotice(adapter envregistry.Adapter, plan *homePlan) string {
 // loadResolveInputs reads the profile source and lock for resolution. A
 // missing profile is profile_unknown (§10.4).
 func loadResolveInputs(home, profile string) (Source, *contextlock.Lock, string, error) {
+	return loadResolveInputsWith(home, profile, nil)
+}
+
+func loadResolveInputsWith(home, profile string, readRegularFile func(string) (stateread.File, error)) (Source, *contextlock.Lock, string, error) {
+	if readRegularFile == nil {
+		readRegularFile = stateread.ReadRegularFile
+	}
 	source, err := readSource(home, profile)
 	if err != nil {
-		return Source{}, nil, "", fmt.Errorf("%s: profile %q is not installed", DiagProfileUnknown, profile)
+		if isStateAbsent(err) {
+			return Source{}, nil, "", fmt.Errorf("%s: profile %q is not installed", DiagProfileUnknown, profile)
+		}
+		return Source{}, nil, "", fmt.Errorf("%s: profile %q source cannot be trusted: %w", envregistry.DiagStoreUntrusted, profile, err)
 	}
-	lock, hash, err := readLock(home, profile)
+	lock, hash, err := readLockWith(home, profile, readRegularFile)
 	if err != nil {
-		return Source{}, nil, "", fmt.Errorf("%s: profile %q is not installed", DiagProfileUnknown, profile)
+		if isStateAbsent(err) {
+			return Source{}, nil, "", fmt.Errorf("%s: profile %q is not installed", DiagProfileUnknown, profile)
+		}
+		return Source{}, nil, "", err
 	}
 	return source, lock, hash, nil
 }
@@ -2125,11 +2242,17 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
 	if !identifiers.Valid(profile) {
 		return nil, fmt.Errorf("%s: profile %q is not installed", DiagProfileUnknown, profile)
 	}
-	source, lock, hash, err := loadResolveInputs(req.Home, profile)
+	source, lock, hash, err := loadResolveInputsWith(req.Home, profile, req.readRegularFile)
 	if err != nil {
 		return nil, err
 	}
 	verdict := verifyHome(&req, adapter, source, lock, hash)
+	if verdict.markerReadFailed {
+		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envmarker.DiagMarkerUnreadable, strings.Join(verdict.reasons, "; "))
+	}
+	if verdict.passthroughReadFailed {
+		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envregistry.DiagPassthroughUnreadable, strings.Join(verdict.reasons, "; "))
+	}
 	if verdict.current {
 		fragment, err := buildFragment(&req, adapter, verdict)
 		if err != nil {
@@ -2160,6 +2283,12 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 	}
 	defer func() { _ = op.close() }()
 	verdict := verifyHome(req, adapter, source, lock, hash)
+	if verdict.markerReadFailed {
+		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envmarker.DiagMarkerUnreadable, strings.Join(verdict.reasons, "; "))
+	}
+	if verdict.passthroughReadFailed {
+		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envregistry.DiagPassthroughUnreadable, strings.Join(verdict.reasons, "; "))
+	}
 	if verdict.current {
 		fragment, err := buildFragment(req, adapter, verdict)
 		if err != nil {
@@ -2278,14 +2407,17 @@ func isCredentialRefusal(err error) bool {
 // when two profile names map to one platform path below the environments
 // root (§5).
 func checkProfileCollision(home, profile string) error {
-	entries, err := os.ReadDir(EnvRoot(home))
+	listing, err := stateread.ReadDir(EnvRoot(home))
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
 		return err
 	}
-	for _, entry := range entries {
+	if listing.Kind == stateread.KindAbsent {
+		return nil
+	}
+	if listing.Kind != stateread.KindPresent {
+		return stateread.UnusableError(EnvRoot(home), fmt.Errorf("directory listing is unreadable"))
+	}
+	for _, entry := range listing.Entries {
 		if entry.Name() != profile && strings.EqualFold(entry.Name(), profile) {
 			return fmt.Errorf("%s: profile names %q and %q map to one platform path", contextmaterialize.DiagPathCollision, entry.Name(), profile)
 		}

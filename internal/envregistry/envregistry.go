@@ -51,7 +51,7 @@ func NormalizeEnvID(id string) string {
 	return id
 }
 
-// Diagnostics (environments §7.7, §10.4, §11.1).
+// Diagnostics (environments §7.7, §8.4.1, §10.4, §11.1).
 const (
 	DiagUnknown                      = "environment_unknown"
 	DiagFormUnsupported              = "environment_form_unsupported"
@@ -62,14 +62,16 @@ const (
 	DiagTargetConsent                = "environment_target_consent_required"
 	DiagShadowingPresent             = "environment_shadowing_path_present"
 	DiagPassthroughDetached          = "environment_passthrough_detached"
+	DiagPassthroughUnreadable        = "environment_passthrough_unreadable"
+	DiagStoreUntrusted               = "environment_store_untrusted"
 	DiagCredentialConflict           = "environment_credential_conflict"
 	DiagCredentialUnsupported        = "environment_credential_unsupported"
 	DiagSeedUnreadable               = "environment_seed_unreadable"
 	DiagBackupRecordUnreadable       = "environment_backup_record_unreadable"
-	DiagSeedShadowed                 = "environment_seed_shadowed"
 	DiagMCPNativeServersUngoverned   = "mcp_native_servers_ungoverned"
 	DiagMCPNativeServersNotInherited = "mcp_native_servers_not_inherited"
 	DiagMCPSeedUnstripped            = "mcp_seed_unstripped"
+	DiagSeedShadowed                 = "environment_seed_shadowed"
 	DiagToolVersionUnverifed         = "environment_tool_version_unverified"
 	DiagSizeExceeded                 = "environment_context_size_exceeded"
 	DiagReservedCommand              = "environment_reserved_command_name"

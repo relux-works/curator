@@ -2,13 +2,15 @@
 // §8.2, agent-environment-marker-v1 and agent-environment-marker-v2: the
 // per-home ledger of record for environment surfaces
 // (.agent-environment.json). Readers reject an unsupported version and
-// unknown fields; an unreadable or invalid marker fails closed and is
-// reported as environment_marker_invalid.
+// unknown fields; failed reads and malformed content fail closed as
+// environment_marker_unreadable, while unsupported versions remain
+// environment_marker_invalid.
 package envmarker
 
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -54,12 +56,13 @@ const (
 	ReasonClaudeCodeRootContext = "claude-code-root-context"
 )
 
-// DiagMarkerInvalid is the fail-closed diagnostic for an unreadable,
-// malformed, or unsupported marker.
+// DiagMarkerInvalid identifies a marker version that this reader does not
+// support. Parse also uses it for schema errors; Read classifies malformed
+// content as DiagMarkerUnreadable under environments §8.4.1.
 const DiagMarkerInvalid = "environment_marker_invalid"
 
-// DiagMarkerUnreadable is the fail-closed diagnostic for a marker path that
-// exists but cannot be read. Absence remains a separate outcome.
+// DiagMarkerUnreadable is the fail-closed diagnostic for marker content or a
+// path that exists but cannot be read. Absence remains a separate outcome.
 const DiagMarkerUnreadable = "environment_marker_unreadable"
 
 // Requirement is the declared requirement of a git root, as written.
@@ -167,7 +170,7 @@ var (
 // Validate applies the schema rules.
 func (m *Marker) Validate() error {
 	if m.Version != VersionV1 && m.Version != VersionV2 {
-		return fmt.Errorf("unsupported marker version %d", m.Version)
+		return &unsupportedMarkerVersionError{version: m.Version}
 	}
 	if !identifiers.Valid(m.Profile.Name) || !identifiers.Valid(m.Profile.Root) {
 		return fmt.Errorf("profile name or root is not a portable identifier")
@@ -339,6 +342,14 @@ func (m *Marker) Validate() error {
 		}
 	}
 	return nil
+}
+
+type unsupportedMarkerVersionError struct {
+	version int
+}
+
+func (e *unsupportedMarkerVersionError) Error() string {
+	return fmt.Sprintf("unsupported marker version %d", e.version)
 }
 
 // validateCredentialRecord implements the schema-v2 passthrough record
@@ -653,18 +664,35 @@ func (s *keyScanner) skipValue() error {
 }
 
 // Read loads the marker of a home. It distinguishes absence (nil, nil) from a
-// failed filesystem read (nil, error carrying DiagMarkerUnreadable) and an
-// invalid marker document (nil, error carrying DiagMarkerInvalid).
+// failed filesystem read or malformed marker document (nil, error carrying
+// DiagMarkerUnreadable). Unsupported versions retain DiagMarkerInvalid.
 func Read(home string) (*Marker, error) {
+	return ReadWith(home, stateread.ReadFile)
+}
+
+// ReadWith reads a marker through the supplied shared state-file reader.
+// The callback seam is used by the manager's production-entry fault tests;
+// normal callers use Read and the stateread filesystem boundary.
+func ReadWith(home string, readStateFile func(string) (stateread.File, error)) (*Marker, error) {
 	path := filepath.Join(home, Name)
-	result, err := stateread.ReadFile(path) // #nosec G304 -- home chosen by the caller
+	result, err := readStateFile(path) // #nosec G304 -- home chosen by the caller
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", DiagMarkerUnreadable, err)
 	}
 	if result.Kind == stateread.KindAbsent {
 		return nil, nil
 	}
-	return Parse(result.Bytes)
+	marker, err := Parse(result.Bytes)
+	if err != nil {
+		var unsupported *unsupportedMarkerVersionError
+		if errors.As(err, &unsupported) {
+			// §8.5 keeps a valid but unsupported marker version distinct from
+			// malformed or unreadable marker content (§8.4.1).
+			return nil, err
+		}
+		return nil, fmt.Errorf("%s: %w", DiagMarkerUnreadable, stateread.UnusableError(path, err))
+	}
+	return marker, nil
 }
 
 // SortedSurfaceKeys returns the surface keys in bytewise order.

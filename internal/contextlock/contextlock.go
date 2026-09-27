@@ -320,7 +320,14 @@ func Parse(payload []byte) (*Lock, error) {
 // Read loads a lock file. The file holds exactly the CCJ-1 bytes, so the
 // bytes on disk hash to the lock hash.
 func Read(path string) (*Lock, string, error) {
-	result, err := stateread.ReadFile(path) // #nosec G304 -- manager-home path
+	return ReadWith(path, stateread.ReadRegularFile)
+}
+
+// ReadWith reads a lock through the supplied shared regular-file reader.
+// The callback seam is used by the manager's production-entry fault tests;
+// normal callers use Read and the stateread filesystem boundary.
+func ReadWith(path string, readRegularFile func(string) (stateread.File, error)) (*Lock, string, error) {
+	result, err := readRegularFile(path) // #nosec G304 -- manager-home path
 	if err != nil {
 		return nil, "", err
 	}

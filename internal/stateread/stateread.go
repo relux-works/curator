@@ -51,6 +51,13 @@ type Metadata struct {
 	Info os.FileInfo
 }
 
+// Link is the result of reading a symbolic link's target text. Target is
+// populated only when the link was present and readable.
+type Link struct {
+	Kind   Kind
+	Target string
+}
+
 // Error preserves the path and failed-read class for callers that need to
 // attach an operation-specific diagnostic.
 type Error struct {
@@ -108,6 +115,23 @@ func ReadFile(path string) (File, error) {
 	return File{Kind: KindUnreadable}, &Error{Kind: KindUnreadable, Path: path, Cause: err}
 }
 
+// ReadRegularFile reads a present regular file (environments §8.4.1). A missing leaf remains
+// absent; inspection, type, and read failures are unreadable. This is used
+// for manager records and seed files whose boundary requires regular bytes.
+func ReadRegularFile(path string) (File, error) {
+	metadata, err := Lstat(path)
+	if err != nil {
+		return File{Kind: KindUnreadable}, err
+	}
+	if metadata.Kind == KindAbsent {
+		return File{Kind: KindAbsent}, nil
+	}
+	if metadata.Kind != KindPresent || metadata.Info == nil || !metadata.Info.Mode().IsRegular() {
+		return File{Kind: KindUnreadable}, UnusableError(path, fmt.Errorf("path must be a regular file"))
+	}
+	return ReadFile(path)
+}
+
 // ReadDir lists state or surface inventory and keeps absence separate from
 // all other listing failures.
 func ReadDir(path string) (Directory, error) {
@@ -136,7 +160,14 @@ func Stat(path string) (Metadata, error) {
 
 // Lstat inspects the exact state path without following a symbolic link.
 func Lstat(path string) (Metadata, error) {
-	info, err := os.Lstat(path)
+	return LstatWith(path, os.Lstat)
+}
+
+// LstatWith classifies an lstat result using the same absent-versus-unreadable
+// rule as the other state readers. readPath is an injectable syscall boundary
+// for tests that need to exercise errors unavailable on the host filesystem.
+func LstatWith(path string, readPath func(string) (os.FileInfo, error)) (Metadata, error) {
+	info, err := readPath(path)
 	if err == nil {
 		return Metadata{Kind: KindPresent, Info: info}, nil
 	}
@@ -146,19 +177,54 @@ func Lstat(path string) (Metadata, error) {
 	return Metadata{Kind: KindUnreadable}, &Error{Kind: KindUnreadable, Path: path, Cause: err}
 }
 
+// Readlink reads a symbolic link's target text and keeps absence separate
+// from all other inspection failures.
+func Readlink(path string) (Link, error) {
+	return ReadlinkWith(path, os.Readlink)
+}
+
+// ReadlinkWith classifies a readlink result using the shared absent-versus-
+// unreadable rule. readPath is an injectable syscall boundary for tests that
+// need to exercise read errors unavailable on the host filesystem.
+func ReadlinkWith(path string, readPath func(string) (string, error)) (Link, error) {
+	target, err := readPath(path)
+	if err == nil {
+		return Link{Kind: KindPresent, Target: target}, nil
+	}
+	if missingPath(path, err) {
+		return Link{Kind: KindAbsent}, nil
+	}
+	return Link{Kind: KindUnreadable}, &Error{Kind: KindUnreadable, Path: path, Cause: err}
+}
+
 // missingPath recognizes a missing leaf only when no existing ancestor makes
 // the path unaddressable. Windows can report a child beneath a regular file as
 // ERROR_PATH_NOT_FOUND; treating that as absence would let callers take an
 // absence fallback after a failed read.
 func missingPath(path string, cause error) bool {
-	if !os.IsNotExist(cause) {
+	return missingPathWith(path, cause, os.IsNotExist)
+}
+
+// missingPathWith accepts the platform absence predicate so tests can model
+// platform mappings such as Windows ENOTDIR also satisfying IsNotExist.
+func missingPathWith(path string, cause error, isNotExist func(error) bool) bool {
+	if !isNotExist(cause) {
 		return false
 	}
 	parent := filepath.Dir(path)
 	for {
-		info, err := os.Stat(parent)
+		info, err := os.Lstat(parent)
 		if err == nil {
-			return info.IsDir()
+			if info.IsDir() {
+				return true
+			}
+			if info.Mode()&os.ModeSymlink == 0 {
+				return false
+			}
+			// A symlink ancestor is traversable only when it resolves to a
+			// directory. Broken links, loops, and links to files stay unreadable.
+			target, err := os.Stat(parent)
+			return err == nil && target.IsDir()
 		}
 		if !os.IsNotExist(err) {
 			return false
