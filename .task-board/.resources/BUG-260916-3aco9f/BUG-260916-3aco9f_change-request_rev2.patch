@@ -1,0 +1,402 @@
+diff --git a/cmd/curator/profile_install_matrix_test.go b/cmd/curator/profile_install_matrix_test.go
+new file mode 100644
+index 00000000..08b0fb83
+--- /dev/null
++++ b/cmd/curator/profile_install_matrix_test.go
+@@ -0,0 +1,363 @@
++package main
++
++import (
++	"fmt"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++type profileInstallFixture struct {
++	operand string
++	args    []string
++	edit    func(*testing.T)
++}
++
++type profileInstallFlagCase struct {
++	name     string
++	args     []string
++	use      bool
++	takeover bool
++}
++
++var profileInstallFlagCases = []profileInstallFlagCase{
++	{name: "neither"},
++	{name: "use", args: []string{"--use"}, use: true},
++	{name: "takeover", args: []string{"--takeover"}, takeover: true},
++	{name: "use-takeover", args: []string{"--use", "--takeover"}, use: true, takeover: true},
++}
++
++var profileInstallShapes = []string{"path-root", "git-root", "git-collection"}
++
++// TestProfileInstallActivationMatrix drives each profile install source
++// shape through run(): a local path root, a Git repository root, and a
++// directory-selected package in a Git collection. Each shape is exercised as
++// a first install, an unchanged-lock same-source reinstall, and a changed-lock
++// same-source reinstall, with every --use/--takeover combination. A new
++// unmanaged Claude file makes --use alone prove that activation was attempted,
++// while the combined flags prove notice, backup, and activation.
++func TestProfileInstallActivationMatrix(t *testing.T) {
++	if _, err := exec.LookPath("git"); err != nil {
++		t.Skip("no git on PATH")
++	}
++
++	kinds := []string{"first-install", "same-source-unchanged-lock", "same-source-changed-lock"}
++	for _, shape := range profileInstallShapes {
++		for _, kind := range kinds {
++			for _, flagCase := range profileInstallFlagCases {
++				name := strings.Join([]string{shape, kind, flagCase.name}, "/")
++				t.Run(name, func(t *testing.T) {
++					source, _ := profileHome(t)
++					pinOperatorHome(t)
++
++					other := t.TempDir()
++					writeContextPackage(t, other, "other", "1.0.0", "other profile\n")
++					if code, _, stderr := runProfile(t, source, "profile", "install", other, "--use"); code != exitOK {
++						t.Fatalf("install other --use = %d\nstderr:\n%s", code, stderr)
++					}
++					blocker := setProfileInstallUnmanagedClaudeFile(t)
++
++					fixture := newProfileInstallFixture(t, shape)
++					if kind != "first-install" {
++						if code, _, stderr := runProfile(t, source, profileInstallArgs(fixture)...); code != exitOK {
++							t.Fatalf("seed same source = %d\nstderr:\n%s", code, stderr)
++						}
++					}
++					if kind == "same-source-changed-lock" {
++						fixture.edit(t)
++					}
++					var previousHash string
++					if kind != "first-install" {
++						previousHash = profileInstallLockHash(t, source)
++					}
++
++					args := append(profileInstallArgs(fixture), flagCase.args...)
++					code, stdout, stderr := runProfile(t, source, args...)
++					currentHash := profileInstallLockHash(t, source)
++					switch kind {
++					case "same-source-unchanged-lock":
++						if currentHash != previousHash {
++							t.Fatalf("same-source reinstall changed lock hash %s -> %s", previousHash, currentHash)
++						}
++					case "same-source-changed-lock":
++						if currentHash == previousHash {
++							t.Fatalf("changed source reinstall kept lock hash %s", currentHash)
++						}
++					}
++					if flagCase.use && !flagCase.takeover {
++						if code != exitFail {
++							t.Fatalf("install --use = %d, want unmanaged-surface refusal\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++						}
++						if !strings.Contains(stderr, "environment_surface_unmanaged_conflict") || !strings.Contains(stderr, "profile_use_partial") {
++							t.Fatalf("--use must attempt activation and report the blocked switch:\n%s", stderr)
++						}
++						if got := profileInstallCurrent(t, source); got != "other" {
++							t.Fatalf("current=%q after refused activation, want other", got)
++						}
++						assertProfileInstallNoTakeover(t, blocker)
++						return
++					}
++
++					if code != exitOK {
++						t.Fatalf("install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++					}
++					if flagCase.use {
++						if got := profileInstallCurrent(t, source); got != "tk" {
++							t.Fatalf("current=%q after --use, want tk", got)
++						}
++						if !strings.Contains(stdout, "claude_code: switched") {
++							t.Fatalf("--use did not report the machine-scope switch:\n%s", stdout)
++						}
++						assertProfileInstallTakeover(t, blocker, stderr)
++						return
++					}
++
++					if got := profileInstallCurrent(t, source); got != "other" {
++						t.Fatalf("current=%q without --use, want other", got)
++					}
++					assertProfileInstallNoTakeover(t, blocker)
++				})
++			}
++		}
++	}
++}
++
++// TestProfileInstallStopThenRetryConformanceVector captures the issue #73
++// state sequence at the CLI boundary: a same-source install first publishes
++// the lock and stops on unmanaged state, then the unchanged-lock retry with
++// --use --takeover activates, prints the replacement notice, and backs up the
++// unmanaged bytes before replacing them.
++func TestProfileInstallStopThenRetryConformanceVector(t *testing.T) {
++	if _, err := exec.LookPath("git"); err != nil {
++		t.Skip("no git on PATH")
++	}
++
++	for _, shape := range profileInstallShapes {
++		t.Run(shape, func(t *testing.T) {
++			source, _ := profileHome(t)
++			pinOperatorHome(t)
++			other := t.TempDir()
++			writeContextPackage(t, other, "other", "1.0.0", "other profile\n")
++			if code, _, stderr := runProfile(t, source, "profile", "install", other, "--use"); code != exitOK {
++				t.Fatalf("install other --use = %d\nstderr:\n%s", code, stderr)
++			}
++			blocker := setProfileInstallUnmanagedClaudeFile(t)
++			fixture := newProfileInstallFixture(t, shape)
++			install := profileInstallArgs(fixture)
++
++			code, stdout, stderr := runProfile(t, source, append(install, "--use")...)
++			if code != exitFail || !strings.Contains(stderr, "environment_surface_unmanaged_conflict") {
++				t.Fatalf("first attempt = %d, want unmanaged-surface stop\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++			}
++			if got := profileInstallCurrent(t, source); got != "other" {
++				t.Fatalf("current=%q after first stop, want other", got)
++			}
++			assertProfileInstallNoTakeover(t, blocker)
++			lockAtStop := profileInstallLockHash(t, source)
++
++			code, stdout, stderr = runProfile(t, source, append(install, "--use", "--takeover")...)
++			if code != exitOK {
++				t.Fatalf("retry = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++			}
++			if got := profileInstallCurrent(t, source); got != "tk" {
++				t.Fatalf("current=%q after retry, want tk", got)
++			}
++			if got := profileInstallLockHash(t, source); got != lockAtStop {
++				t.Fatalf("unchanged-lock retry changed lock hash %s -> %s", lockAtStop, got)
++			}
++			if !strings.Contains(stderr, "notice:") || !strings.Contains(stderr, ".agent-environment-backup") {
++				t.Fatalf("retry must print the takeover notice and backup path:\n%s", stderr)
++			}
++			assertProfileInstallTakeover(t, blocker, stderr)
++		})
++	}
++}
++
++// TestProfileInstallReinstallUsePreservesProjectScope drives a same-source
++// reinstall through run() with a divergent environment scope. --use switches
++// the machine-global current profile, while the independently selected
++// codex_cli project scope continues to use its own profile and bytes.
++func TestProfileInstallReinstallUsePreservesProjectScope(t *testing.T) {
++	for _, shape := range profileInstallShapes {
++		t.Run(shape, func(t *testing.T) {
++			source, _ := profileHome(t)
++			pinOperatorHome(t)
++			project := t.TempDir()
++			other := t.TempDir()
++			writeContextPackage(t, project, "project", "1.0.0", "project scope\n")
++			writeContextPackage(t, other, "other", "1.0.0", "other machine profile\n")
++			fixture := newProfileInstallFixture(t, shape)
++			if code, _, stderr := runProfile(t, source, profileInstallArgs(fixture)...); code != exitOK {
++				t.Fatalf("install target = %d\nstderr:\n%s", code, stderr)
++			}
++			if code, _, stderr := runProfile(t, source, "profile", "install", project); code != exitOK {
++				t.Fatalf("install project profile = %d\nstderr:\n%s", code, stderr)
++			}
++			if code, _, stderr := runProfile(t, source, "profile", "use", "project", "--env", "codex_cli"); code != exitOK {
++				t.Fatalf("project scope use = %d\nstderr:\n%s", code, stderr)
++			}
++			if code, _, stderr := runProfile(t, source, "profile", "install", other, "--use"); code != exitOK {
++				t.Fatalf("install other --use = %d\nstderr:\n%s", code, stderr)
++			}
++			if got := profileInstallCurrent(t, source); got != "other" {
++				t.Fatalf("machine current=%q before reinstall, want other", got)
++			}
++
++			lockBefore := profileInstallLockHash(t, source)
++			args := append(profileInstallArgs(fixture), "--use")
++			code, stdout, stderr := runProfile(t, source, args...)
++			if code != exitOK {
++				t.Fatalf("same-source install --use = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++			}
++			if got := profileInstallLockHash(t, source); got != lockBefore {
++				t.Fatalf("unchanged-lock reinstall changed hash %s -> %s", lockBefore, got)
++			}
++			if got := profileInstallCurrent(t, source); got != "tk" {
++				t.Fatalf("machine current=%q after reinstall, want tk", got)
++			}
++			if strings.Contains(stdout, "codex_cli") {
++				t.Fatalf("machine-scope reinstall must not rewrite the divergent project scope:\n%s", stdout)
++			}
++			listCode, list, listErr := runProfile(t, source, "profile", "list")
++			if listCode != exitOK || !strings.Contains(list, "env:codex_cli=project") {
++				t.Fatalf("profile list = %d; want the project-scoped current\nstdout:\n%s\nstderr:\n%s", listCode, list, listErr)
++			}
++			codexDoc, err := os.ReadFile(filepath.Join(os.Getenv("CODEX_HOME"), "AGENTS.md")) // #nosec G304 -- test home
++			if err != nil || !strings.Contains(string(codexDoc), "## Context: project 1.0.0") {
++				t.Fatalf("codex project scope err=%v, content:\n%s", err, codexDoc)
++			}
++		})
++	}
++}
++
++func newProfileInstallFixture(t *testing.T, shape string) profileInstallFixture {
++	t.Helper()
++	if shape == "path-root" {
++		root := t.TempDir()
++		writeContextPackage(t, root, "tk", "1.0.0", "original source\n")
++		return profileInstallFixture{
++			operand: root,
++			edit: func(t *testing.T) {
++				writeContextPackage(t, root, "tk", "1.0.0", "changed source\n")
++			},
++		}
++	}
++
++	repo := t.TempDir()
++	packageRoot := repo
++	args := []string{}
++	if shape == "git-collection" {
++		packageRoot = filepath.Join(repo, "contexts", "tk")
++		args = []string{"--directory", "contexts/tk"}
++	}
++	writeContextPackage(t, packageRoot, "tk", "1.0.0", "original source\n")
++	profileInstallGit(t, repo, "init", "-q")
++	profileInstallGit(t, repo, "add", ".")
++	profileInstallGit(t, repo, "commit", "-m", "v1")
++	profileInstallGit(t, repo, "tag", "v1.0.0")
++
++	operand := "https://example.com/profile-install/" + strings.ReplaceAll(shape, "-", "/")
++	gitConfig := filepath.Join(t.TempDir(), "gitconfig")
++	rewrite := fmt.Sprintf("[url %q]\n\tinsteadOf = %s\n", gitFileURL(repo), operand)
++	if err := os.WriteFile(gitConfig, []byte(rewrite), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	t.Setenv("GIT_CONFIG_GLOBAL", gitConfig)
++	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
++	return profileInstallFixture{
++		operand: operand,
++		args:    args,
++		edit: func(t *testing.T) {
++			writeContextPackage(t, packageRoot, "tk", "2.0.0", "changed source\n")
++			profileInstallGit(t, repo, "add", ".")
++			profileInstallGit(t, repo, "commit", "-m", "v2")
++			profileInstallGit(t, repo, "tag", "v2.0.0")
++		},
++	}
++}
++
++func profileInstallGit(t *testing.T, repo string, args ...string) {
++	t.Helper()
++	cmd := exec.Command("git", args...)
++	cmd.Dir = repo
++	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com",
++		"GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@example.com")
++	if output, err := cmd.CombinedOutput(); err != nil {
++		t.Fatalf("git %v: %v\n%s", args, err, output)
++	}
++}
++
++func profileInstallArgs(fixture profileInstallFixture) []string {
++	args := []string{"profile", "install", fixture.operand}
++	args = append(args, fixture.args...)
++	return append(args, "--as", "tk")
++}
++
++func setProfileInstallUnmanagedClaudeFile(t *testing.T) string {
++	t.Helper()
++	fresh := t.TempDir()
++	t.Setenv("CLAUDE_CONFIG_DIR", fresh)
++	if err := os.WriteFile(filepath.Join(fresh, "CLAUDE.md"), []byte("operator-owned context\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	return filepath.Join(fresh, "CLAUDE.md")
++}
++
++func profileInstallCurrent(t *testing.T, source stubConfigSource) string {
++	t.Helper()
++	code, stdout, stderr := runProfile(t, source, "profile", "list")
++	if code != exitOK {
++		t.Fatalf("profile list = %d\nstderr:\n%s", code, stderr)
++	}
++	for _, line := range strings.Split(stdout, "\n") {
++		fields := strings.Split(line, "\t")
++		if len(fields) > 0 && strings.Contains(line, "current") {
++			return fields[0]
++		}
++	}
++	return "<none>"
++}
++
++func profileInstallLockHash(t *testing.T, source stubConfigSource) string {
++	t.Helper()
++	code, stdout, stderr := runProfile(t, source, "profile", "list")
++	if code != exitOK {
++		t.Fatalf("profile list = %d\nstderr:\n%s", code, stderr)
++	}
++	for _, line := range strings.Split(stdout, "\n") {
++		fields := strings.Split(line, "\t")
++		if len(fields) > 6 && fields[0] == "tk" {
++			return fields[6]
++		}
++	}
++	t.Fatalf("profile list has no tk lock hash:\n%s", stdout)
++	return ""
++}
++
++func assertProfileInstallNoTakeover(t *testing.T, blocker string) {
++	t.Helper()
++	bytes, err := os.ReadFile(blocker) // #nosec G304 -- test fixture path
++	if err != nil || string(bytes) != "operator-owned context\n" {
++		t.Fatalf("unmanaged bytes = %q, err = %v; no activation must leave them untouched", bytes, err)
++	}
++	if _, err := os.Stat(filepath.Join(filepath.Dir(blocker), ".agent-environment-backup")); !os.IsNotExist(err) {
++		t.Fatalf("an operation without an activation must write no backup; stat err = %v", err)
++	}
++}
++
++func assertProfileInstallTakeover(t *testing.T, blocker, stderr string) {
++	t.Helper()
++	backup, err := os.ReadFile(filepath.Join(filepath.Dir(blocker), ".agent-environment-backup", "1", "CLAUDE.md")) // #nosec G304 -- test fixture path
++	if err != nil || string(backup) != "operator-owned context\n" {
++		t.Fatalf("backup = %q, err = %v", backup, err)
++	}
++	installed, err := os.ReadFile(blocker) // #nosec G304 -- test fixture path
++	if err != nil || !strings.Contains(string(installed), "curator-root-context-v2") {
++		t.Fatalf("installed Claude context = %q, err = %v", installed, err)
++	}
++	if !strings.Contains(stderr, "notice:") || !strings.Contains(stderr, ".agent-environment-backup") {
++		t.Fatalf("takeover must print its notice and backup path:\n%s", stderr)
++	}
++}
+diff --git a/internal/registry/registry_test.go b/internal/registry/registry_test.go
+index 3a0f6e5c..9788e6b1 100644
+--- a/internal/registry/registry_test.go
++++ b/internal/registry/registry_test.go
+@@ -800,6 +800,14 @@ func TestSnapshotFutureBoundIsExactAtEveryConfiguredSkew(t *testing.T) {
+ // before the run are unaffected (BUG-260906-1bdotx).
+ func TestSnapshotZeroClockSkewIsLiteral(t *testing.T) {
+ 	s := newSigner(t)
++	strictCache, defaultCache := t.TempDir(), t.TempDir()
++	// Prepare persistent-cache state before sampling `now`: its creation and
++	// sync are checker work and must not widen this injected-now boundary.
++	for _, cache := range []string{strictCache, defaultCache} {
++		if err := writeSnapshotStateCatalog(cache, map[string]bool{}); err != nil {
++			t.Fatal(err)
++		}
++	}
+ 	now := time.Now().UTC().Truncate(time.Second).Add(500 * time.Millisecond)
+ 	// The next whole second is 500ms ahead of `now` — the shape a snapshot
+ 	// minted during the fetch takes after RFC3339 truncation.
+@@ -807,11 +815,11 @@ func TestSnapshotZeroClockSkewIsLiteral(t *testing.T) {
+ 	fetch := func(string) (map[string]any, error) { return s.sign(body), nil }
+ 	reg := Registry{Name: "one", URL: "https://one", PublicKeys: []string{s.pinned}}
+ 
+-	tampered, warnings := CheckSnapshotsWithPolicy([]Registry{reg}, t.TempDir(), fetch, now, 0, 0)
++	tampered, warnings := CheckSnapshotsWithPolicy([]Registry{reg}, strictCache, fetch, now, 0, 0)
+ 	if !tampered[reg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "too far in the future") {
+ 		t.Fatalf("a zero skew must refuse a sub-second future timestamp: %v %v", tampered, warnings)
+ 	}
+-	tampered, warnings = CheckSnapshotsWithPolicy([]Registry{reg}, t.TempDir(), fetch, now, 0, DefaultSnapshotClockSkew)
++	tampered, warnings = CheckSnapshotsWithPolicy([]Registry{reg}, defaultCache, fetch, now, 0, DefaultSnapshotClockSkew)
+ 	if tampered[reg.URL] || len(warnings) != 0 {
+ 		t.Fatalf("the shipped default must absorb sub-second drift: %v %v", tampered, warnings)
+ 	}
