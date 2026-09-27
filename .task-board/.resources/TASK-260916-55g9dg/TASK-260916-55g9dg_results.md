@@ -1,512 +1,171 @@
-# TASK-260916-55g9dg results — direct-only `class: system` modules (E2, manager)
+# TASK-260916-55g9dg results — E2 direct-only system modules
 
-Story STORY-260916-2d9coh, wave 1. Spec: curator-spec `0da4020`,
-`protocol/environments.md` §3/§5.5/§12 (+ `profiles/manager.md` §1 lock set).
-Worktree branch `task-board/story/STORY-260916-2d9coh`, uncommitted.
+## Candidate and scope
 
-Outcome: implemented and verified. The E2 admission rule is enforced at
-resolution (error policy, pre-publish, lock untouched) and at
-materialization (drop policy, admitted bytes only), with the two §12.1
-knobs, the §12.2 lock direction, status posture, vectors, and CHANGELOG.
-Revision 2 (§7) repairs the one Linux-only gate failure with a
-test-only fixture fix; no production file changed in revision 2.
-Revision 3 (§8) answers the rev2 review verdict: the
-vector-comparison workaround is gone (exact comparison restored),
-explicit null waivers are rejected with a Load regression test, and
-two explicit root-content subset drivers (admission + schema) with
-ledger rows pin the new-family coverage.
+- Story worktree: `STORY-260916-2d9coh`, branch `task-board/story/STORY-260916-2d9coh`.
+- Candidate base: current trunk, `bd3c0f436226ec831c13b3a307c30acd035c73c2`; the task scope's E2 production implementation is present on current trunk. This revision adds the rc.13 first-blocker accounting, explicit E2 subset accounting, deterministic config diagnostics, and the null/status/CLI regression coverage described below.
+- Curator `SPEC_PIN` remains rc.13 commit `23435129ebc4c29e5b7f75ec72a0aa0cd3f16065` (`.github/workflows/ci.yml:43`). No spec bytes were vendored and no pin was changed.
+- Normative contract checked: curator-spec `protocol/environments.md` §3, §5.5, §5.7, §12.1, §12.2, §12 posture, §13; `profiles/manager.md` §1. The rc.13 source was checked out in a temporary clone at the exact pin. It is outside the worktree.
 
-## 1. Per-file changes
+## Changes in this revision
 
-Production:
+- `internal/config/environments.go:182-190,290-305,940-946,1082-1093`: deterministic ordering for unsupported environment fields; explicit `null` for `system_module_waivers` is a wrong-type error while omission defaults to `[]`; config serialization and the system-file lock direction remain explicit.
+- `internal/config/environments_test.go:635-669,671-722`: `Load`-entry regressions for explicit null, omitted/empty defaults, stable first unsupported-field diagnostics, and the `drop` lock-direction / waiver-not-lockable rules.
+- `internal/config/system_module_schema_test.go:1-85`: explicit accounting for the seven E2 schema cases from the pinned schema index. The existing manager/system family consumers feed published exact case bytes through `Load`. Current rc.13 publishes all seven; tests fail loudly if the pinned family disappears. No `root-content` skip is used because this committed pin serves the family and the gate forbids a skip that can never legitimately occur.
+- `internal/config/environments_conformance_test.go:233-304,306-350` and `.github/ci/conformance-gaps.tsv`: restore full canonical-JSON equality for manager vectors, with a regression rejecting extra normalized keys; establish each schema/vector row's first production blocker and attribute it to that surface. For manager cases the deterministic first blocker is `environments.permissions` (STORY-260922-1cenbr); for system cases it is locked `environments.source_signers` (STORY-260916-ioemse). E2 is not credited for those still-blocked cases.
+- `internal/envprofile/status.go:296-307,551-663`: propagate admission-policy/materialization errors; an unreadable transitive manifest reports `context_manifest_invalid` and an unknown dropped set instead of treating the failed read as absence. Status still reports the effective policy and each dropped module's package/path.
+- `internal/envprofile/admission_test.go:368-430`: portable unreadable-manifest regression; the test asserts unknown dropped modules, a path-bearing diagnostic, and non-current status.
+- `cmd/curator/env_test.go:330-381`: production `env status` command regression for the effective `drop` policy and the `sysleaf 90-system.md` dropped-module entry.
 
-- `internal/config/environments.go` — `Environments` gains
-  `TransitiveSystemModules` (closed enum `drop`|`error`, default `drop`)
-  and `SystemModuleWaivers` (`[{package, reason}]`, default empty);
-  `parseSystemModuleWaivers` enforces the package identifier grammar,
-  non-empty reason, and no unknown fields; `parseSystemEnvironments`
-  refuses a system file carrying `drop` (locks to `error` only);
-  `LockableEnvKeys` + `EnvLockKey` admit `transitive_system_modules`
-  only (waivers not lockable); `render` writes both knobs.
-- `internal/config/config.go` — `LockableKeys` gains
-  `environments.transitive_system_modules` (waivers deliberately absent).
-- `internal/contextmaterialize/admission.go` (new) — admission core:
-  diagnostics `context_system_module_dropped` /
-  `context_system_module_transitive`, `Admission` policy, `DirectSet`
-  (root + active overlays + `required_by`-named-by-root-or-overlay),
-  `ClassifySystemModules` (emitted × manifest order),
-  `FirstTransitiveSystemModule` (resolution scan, applies-to-≥1-adapter),
-  `TransitiveSystemModuleError` naming package + module.
-- `internal/contextmaterialize/contextmaterialize.go` — `SystemPrompt`
-  takes `Admission` and returns `(document, written, dropped, err)`:
-  under drop the document is exactly the admitted modules' bytes;
-  under error the first dropped module refuses with
-  `context_system_module_transitive` and no document.
-- `internal/envprofile/envprofile.go` — `Policy` gains
-  `TransitiveSystemModules` (+ `SystemModuleWaiver`, `Policy.Admission()`,
-  `PolicyFromConfig` mapping); `checkAdmissionPrePublish` gates install,
-  reinstall, and update before any lock publish and before the
-  identical-lock fast path (a violating lock fails the update even when
-  nothing moved); unreadable manifest fails closed (`§8.4`).
-- `internal/envprofile/managed.go` — `systemPrompt` passes the policy
-  and appends one `context_system_module_dropped` warning naming package
-  + path per dropped module (flows to `ResolveResult.Warnings` through
-  re-verification; under error the repair fails with the refusal).
-- `internal/envprofile/status.go` — `ProfileState` gains
-  `transitive_system_modules` (effective value) and
-  `dropped_system_modules` (package+path, emitted order, drop only;
-  empty under error); read-only recompute from lock + store manifests.
-- `cmd/curator/envstatus.go` — profile row prints the policy value and
-  one `dropped system module <package> <path>` line per drop.
-- `CHANGELOG.md` — Unreleased E2 entry (default `drop`, `error` opt-in).
+## E2 behavior and acceptance mapping
 
-Tests:
+| Requirement | Evidence |
+|---|---|
+| Defaults, grammar, writing, and lock direction | Defaults are `drop` and empty waivers (`internal/config/environments.go:150-168`); parsing/closed validation at `:290-305,825-850`; effective output at `:1082-1093`; lockable key at `internal/config/config.go:54-67`; `drop` is rejected in a system lock at `internal/config/environments.go:940-946`. New null and deterministic-diagnostic tests are listed above. |
+| Direct, transitive, and waiver admission | `internal/contextmaterialize/admission.go:66-102,129-150` defines direct packages as the root, active overlays, and contexts-required packages; waived packages are admitted. |
+| Drop warning/output and error refusal | `internal/contextmaterialize/admission.go:117-127,153-198` reports `context_system_module_transitive` with package and module under `error`; `internal/contextmaterialize/contextmaterialize.go:257-285` assembles admitted bytes only and returns dropped modules. Resolution checks before publish at `internal/envprofile/envprofile.go:764-766,877-879,1361-1398`; the warning/fragment admitted-set path is `internal/envprofile/managed.go:2270-2312,1905-1925`. Existing E2 integration tests cover install/update refusal without replacing the lock, drop warning, waiver and admitted fragment semantics (`internal/envprofile/admission_test.go:65-245`). |
+| Always-warn finding preserved | Existing `context-system-module-present` audit behavior remains in `internal/contextaudit`; E2 admission tests do not replace that finding with the admission warning. |
+| Status posture | Effective policy and all dropped package/path pairs are exposed at `internal/envprofile/status.go:581-591,604-662` and printed by `cmd/curator/envstatus.go:107-115`. Drop warnings do not themselves mark a provisioned row non-current (`internal/envprofile/admission_test.go:266-325`). Failed manifest reads are unknown plus diagnostic, never absence (`status.go:604-639`, regression above). |
+| Vectors | `internal/contextmaterialize/system_module_admission_test.go:34-43,100-141,143-240` selects and byte-compares the five rc.13 system-module admission cases through `SystemPrompt`/`ClassifySystemModules`: direct, transitive-drop, transitive-error, waived, and overlay-direct. `internal/config/environments_conformance_test.go:268-304` compares the full manager effective JSON and rejects unexpected normalized keys. Both drivers require every named case from the pinned root. |
+| Schema cases | `internal/config/system_module_schema_test.go:30-85` accounts for all seven E2 cases; the manager/system schema tests run their exact published bytes through production `Load`. The cases blocked earlier by other surfaces remain in the ledger under those owners. |
 
-- `internal/config/environments_test.go` — lockable-subset transcription
-  + payloads for both knobs, `EffectiveJSONShape` knob list, new
-  `TestTransitiveSystemModulesDefaults/Values`,
-  `TestSystemTransitiveDirection` (error locks, drop refused locked and
-  unlocked, waivers refused carried/not-lockable).
-- `internal/config/environments_conformance_test.go` —
-  `prunePostRevisionKnobs`: a vector revision predating a knob cannot
-  expect it, so exactly the closed `postPinKnobs` list is pruned from
-  the rendered object when the case's own expectation lacks it. Full
-  exact comparison at the new root; old keys still exact at the pin.
-- `internal/contextmaterialize/admission_test.go` (new) — direct-set
-  partition (root/overlay/requires, overlay-required, root-shared),
-  drop bytes + dropped, per-module drops, error refusal naming the
-  first module with no document, waiver admission under both policies,
-  selector exclusion, all-dropped unwritten, policy-enum rejection,
-  resolution-scan order + unregistered-selector exclusion.
-- `internal/envprofile/admission_test.go` (new) — production entry
-  points over a git root→mid→leaf closure: error-policy install
-  refuses with the typed diagnostic and writes no lock; waiver
-  admits; error-policy update fails and the old lock bytes are
-  identical; drop repair warns, writes exactly the admitted bytes,
-  and the fragment carries `system_prompt`; all-dropped writes no
-  file and no fragment section; status reports policy + drops with
-  the home row current; error status reports policy with empty
-  drops; `PolicyFromConfig` mapping + zero-policy drop default.
-- `internal/interop/environments/context_materialization_test.go` —
-  vector struct gains `machine_policy`/`admitted`/`dropped`/`warnings`/
-  `error*`; system-prompt cases drive `SystemPrompt` with the case
-  policy and assert bytes + admitted + dropped + warnings, or the
-  refusal naming diagnostic + package + module.
+## Previous verdict closure (revision 2)
 
-## 2. AC mapping (acceptance criteria → code)
+1. Removed `postPinKnobs` / `prunePostRevisionKnobs`; `TestManagerConfigV2Vectors` now compares canonical JSON for the complete normalized object (`internal/config/environments_conformance_test.go:268-304`). The rc.13 exact manager vector family is green (31 driven, 25 separately attributed known gaps). `TestManagerEffectiveJSONComparisonRejectsExtraKnobs` names the regression and the matching narrowing mutant below proves expected-key-only comparison fails it. No SPEC_PIN change.
+2. `TestSystemModuleWaiversNullRejected` calls production `Load`, rejects explicit `null`, and keeps absence/empty accepted (`internal/config/environments_test.go:635-651`).
+3. The five-vector admission subset is explicitly selected from the current pinned root and fails if any case is missing (`internal/contextmaterialize/system_module_admission_test.go:34-43,100-141`); the seven schema cases have the same fail-closed presence accounting (`internal/config/system_module_schema_test.go:30-85`) and their family consumers run through `Load`. The rc.13 pin publishes these families. I did not add an impossible `root-content` skip/ledger row: current-pin gate policy rejects that skip when the pin serves the content. This follows the current rc.13 rework brief and keeps the pinned suite fail-closed.
 
-- Knobs parsed, validated, written; schema cases from the root:
-  `internal/config/environments.go:40,43,99,769,912,1027`,
-  `internal/config/config.go:65`. Schema-case tests consume the root
-  index dynamically (`environments_conformance_test.go`), so the new
-  cases execute at `0da4020` and are absent (not failed) at the pin.
-- Direct = root / active overlay / requires-named; waived admitted:
-  `internal/contextmaterialize/admission.go:72` (`DirectSet`),
-  `:62` (`Waived`), `:135` (`ClassifySystemModules`).
-- Drop skips with `context_system_module_dropped` naming package +
-  module; bytes = admitted only:
-  `internal/contextmaterialize/contextmaterialize.go:257`,
-  `internal/envprofile/managed.go:1787`.
-- Error fails resolution with `context_system_module_transitive`,
-  lock unchanged: `internal/envprofile/envprofile.go:1209`
-  (`checkAdmissionPrePublish`, called pre-publish at install,
-  reinstall, and update — including before the identical-lock fast
-  path — plus `FirstTransitiveSystemModule` at
-  `internal/contextmaterialize/admission.go:160`).
-- `context-system-module-present` stays always-warn:
-  `internal/envprofile/envprofile.go` audit warnings untouched
-  (proven by `TestDropRepairWarnsAndFragmentFollowsAdmitted`).
-- Fragment follows the admitted set:
-  `internal/envfragment/envfragment.go` `buildFragment` keys
-  `system_prompt` off the marker surface, which the admitted-only
-  materialization writes; `works.relux.curator.system-modules` is
-  the launcher-owned ax key reflecting that presence (no manager
-  field of that name exists; manager contract §10.2 presence is
-  pinned by the fragment tests).
-- Status reports policy + every dropped module; drop never
-  non-current: `internal/envprofile/status.go:110,114,390,404`,
-  `cmd/curator/envstatus.go:72`; currency is findings-only
-  (`status.go` `homeState`), proven by
-  `TestStatusReportsPolicyAndDropped`.
-- Vectors + unit tests + CHANGELOG + transcripts: §4, §5.
+## Conformance and gap ledger
 
-## 3. Profile shipped
+Conformance root used for pinned runs:
 
-`drop` default (non-breaking), `error` opt-in — exactly as §12.1
-states. No warn-first split applies (brief: direct, non-breaking).
+`/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/curator-spec-rc13-checkout-9am5ezqk/spec/conformance/v1`
 
-## 4. Validation transcripts (real exit codes, shell `bash`)
+The repository's normal `curator-spec` checkout was newer than the curator pin. I used a temporary shared Git clone checked out at the exact rc.13 commit so its fixture bytes retain literal `$Format` placeholders. An earlier `git archive` extraction substituted those placeholders; the full interop test failed on the altered fixture (exit 1). I discarded that extracted root and reran against the exact clone, where the interop package passed (exit 0).
 
-Conformance root for the new-revision runs:
-`CURATOR_CONFORMANCE_ROOT=…/curator-spec/conformance/v1` (`0da4020`).
-Pin root: `/tmp/pinroot-87a0d00/conformance/v1`, extracted read-only
-via `git archive`/`git show` from `87a0d00` (the committed SPEC_PIN).
+| Driver | Result on exact rc.13 root |
+|---|---|
+| `TestSystemModuleAdmissionVectors` | 5/5 E2 vectors driven through production `SystemPrompt`; byte-exact expectations pass; 19 other cases reported bounded; 0 skipped. |
+| `TestManagerConfigV2Vectors` | 31 driven, 25 known gaps, 0 bound/skipped (56 total). |
+| `TestManagerConfigV2SchemaCases` | 78 driven, 29 known gaps (107 total). |
+| `TestSystemConfigV2SchemaCases` | 36 driven, 6 known gaps (42 total). |
+| E2 schema subset | All 7 pinned E2 cases are explicitly selected/accounted, and the schema-family consumers feed their exact inputs through `Load`. They remain known gaps where another earlier blocker stops processing: five manager cases first-block at unsupported `permissions`; two system cases first-block at locked `source_signers`. |
+| E2-owned materialization gap rows | 0 before and 0 after; all five E2 admission vectors pass. |
 
-- `go build ./...` → exit 0.
-- `go vet` on `internal/config internal/contextresolve
-  internal/contextmaterialize internal/contextaudit
-  internal/envfragment internal/envprofile cmd/curator
-  internal/interop/environments` → exit 0.
-- `gofmt -l internal/ cmd/` → empty (clean). (`gofmt -l .` lists
-  only pre-existing `.task-board/.resources` probe files, untouched.)
-- `golangci-lint run` (v2.12.2, repo `.golangci.yml`) on all eight
-  narrow packages → `0 issues.`
+`.github/ci/conformance-gaps.tsv` remains at 69 rows. Owner histogram before → after:
 
-New-root (`0da4020`) suites, each run directly (no `tee`; exit code
-via `PIPESTATUS`):
+| Owner | Before | After |
+|---|---:|---:|
+| BUG-260923-2afgyq | 5 | 5 |
+| STORY-260910-2qmrb8 | 3 | 3 |
+| STORY-260910-6bo7ej | 2 | 2 |
+| STORY-260916-1i1gfo | 2 | 2 |
+| STORY-260916-ioemse | 11 | 10 |
+| STORY-260916-ioemse + STORY-260922-1cenbr | 28 | 0 |
+| STORY-260922-1cenbr | 16 | 45 |
+| STORY-260925-1v7pvn | 2 | 2 |
 
-- `go test ./internal/interop/environments/` → exit 0 (`ok`, 2.0s):
-  all materialization cases byte-exact, including the five
-  admission cases `system-module-direct`,
-  `system-module-transitive-drop`, `system-module-transitive-error`
-  (refusal naming diagnostic + package + module, `file_written`
-  false), `system-module-transitive-waived`,
-  `system-module-overlay-direct`.
-- `go test ./internal/contextmaterialize/ -count=1` → exit 0.
-- `go test ./internal/contextresolve/ ./internal/contextaudit/
-  ./internal/envfragment/` → exit 0 each.
-- `go test ./internal/envprofile/` in three `-run` shards + one
-  leftover (partition verified to cover all 154 tests; the full
-  package exceeds the single-call time bound, so sharding is the
-  documented split, not a narrowing): shard A (install/update/
-  reinstall/drop/status/policy/…) → exit 0, 504.6s; shard B
-  (import/resolve/repair/managed/…) → exit 0, 180.8s; shard C
-  (path/overlay/weight/git/…) → exit 0, 198.5s;
-  `TestNonDirectoryPathIsSourceInvalid` → PASS.
-- `go test ./cmd/curator/` in four `-run` shards (partition
-  verified to cover all 163 tests): env/profile/import →
-  exit 0, 267.3s; build/status/classify → exit 0, 75.7s; gc/
-  global/cli/misc → exit 0, 194.6s; compiled/toolchain/creds
-  leftover → exit 0, 342.6s.
-- `go test ./internal/config/ -count=1` → exit 1 (expected-red:
-  41 subtests fail, and every one carries E4's
-  `provider_directories` knob — verified programmatically: zero
-  failing subtests without it. All E2-invalid schema cases pass,
-  all new unit tests pass; see §6). Failing set: every
-  `valid*` schema case and every valid manager vector
-  (`valid vector rejected: … unsupported field
-  "provider_directories"` or the expected member carrying it).
+The 28 combined overlay rows and the manager `schema2-every-knob` first-blocker row now belong to STORY-260922-1cenbr because `permissions` is the first unsupported/differing field; the E1 count falls by one. This records the first actual blocker rather than claiming E2 or E1 code was reached. No remaining E2 row passed unnoticed or was removed from the ledger.
 
-Pin-root (`87a0d00`, the committed SPEC_PIN lane) suites:
+## Validation transcripts
 
-- `go test ./internal/interop/environments/` → exit 0 (old cases
-  byte-exact under default drop; admission cases absent, nothing
-  skipped-or-failed).
-- `go test ./internal/config/` → exit 0 (old schema cases +
-  pruned vectors + new unit tests). The pin lane stays green.
+Commands below were run directly as standalone processes in `zsh`; no pipeline was used. Exit codes are the real process exits.
 
-Negative evidence (narrowing mutants, each restored after):
+Green:
 
-- `DirectSet` without the overlay-requirer rule → unit
-  `TestDirectSet` FAILs and vector
-  `system-module-overlay-direct` FAILs (admitted list short).
-- `Admission.Waived` forced false → unit
-  `TestSystemPromptWaiverAdmits` FAILs and vector
-  `system-module-transitive-waived` FAILs.
-- The error-policy install/update tests assert the typed
-  `TransitiveSystemModuleError` (`errors.As`) plus lock
-  absence/byte-identity; the drop tests assert exact file bytes.
-
-Manual CLI proof (built binary, temp config): `env config show
-transitive_system_modules` → `"drop"` default; `set … '"error"'`
-→ persists; `set … '"quarantine"'` → exit 1
-(`environments.transitive_system_modules: must be drop or
-error`); waiver list round-trips.
-
-## 5. Deliberately out of scope
-
-- E4 `provider_directories` (knob, trust, dispatch): a sibling
-  task owns it. Parsing it here without E4 semantics would be a
-  hollow stub, so the new-root `valid*` config cases stay red
-  until E4 lands (§4/§6 evidence).
-- E1 signer rules; pi `SYSTEM.md` channel changes; SPEC_PIN bump;
-  ax integration; proposals 0014–0018; tags/releases.
-- `internal/contextresolve.Resolve` itself is untouched: module
-  manifests are not resolver inputs, so the §3 error refusal is
-  enforced pre-publish in `envprofile` over the identical closure
-  + `required_by` edges (equivalent directness: one name, one
-  kind), and at materialization for stale locks. Observable
-  behavior is exactly "resolution fails, lock unchanged".
-- No `platform-cases.tsv` / `root-artifacts.tsv` change: no new
-  vector file or schema family was consumed — only new cases
-  inside already-declared families, which the dynamic tests pick
-  up automatically (no new skip class needed).
-
-## 6. Spec gaps and findings (reported, not patched)
-
-- F1 (resolution-time "applicable" has no environment): §3 says
-  "resolution of the same module MUST fail" where "the same
-  module" is a non-admitted *applicable* system module, but
-  applicability is environment-relative. Implemented: a module
-  refusing resolution iff it applies to ≥1 registered adapter
-  environment; a module selecting only unregistered environments
-  selects nothing (§3) and never refuses. Unit-pinned
-  (`TestFirstTransitiveSystemModuleOrder`).
-- F2 (materialization under error for a stale violating lock,
-  e.g. after a drop→error flip): §3 only defines resolution
-  failure. Implemented fail-closed: `SystemPrompt` returns
-  `context_system_module_transitive` (the error vector pins
-  `file_written: false` at the materialization layer), which
-  also preserves "MUST contain only admitted system modules".
-  The fix is machine-config-only (add a waiver), no
-  re-resolution needed.
-- F3 (E2 schema/vector cases bundle E4's knob): every E2 schema
-  case and every valid manager vector also carries
-  `provider_directories`, so the invalid E2 cases currently
-  reject on the E4 field before reaching the E2 checks (the
-  dedicated unit tests pin the E2 checks directly), and the
-  valid E2 cases cannot go green until E4 lands. Pre-existing
-  overlap, no spec change proposed.
-- F4 (update identical-lock fast path vs refusal): §9.2 says an
-  identical-lock update "changes nothing and says so"; under
-  error with a violating lock this would hide the violation
-  forever. Implemented: the refusal runs before the fast path,
-  so the update fails and the old lock stands. Documented in
-  `checkAdmissionPrePublish`.
-
-## 7. Revision 2 — Linux-only gate repair (this run)
-
-CR rev1 reached the hosted gate (run 35176838317): macOS and
-Windows lanes green, both Linux lanes red on exactly one test:
-
-```
-internal/envprofile TestStatusReportsPolicyAndDropped
-admission_test.go:300: drop warnings made the row non-current:
-  [environment_passthrough_detached: passthrough entry .credentials.json is detached]
+```text
+0  go build ./...
+0  go vet ./...
+0  gofmt -l internal/ cmd/                  (no output)
+0  git diff --check
+0  golangci-lint run ./internal/config/... ./internal/contextresolve/... ./internal/contextmaterialize/... ./internal/contextaudit/... ./internal/envfragment/... ./internal/envprofile/... ./cmd/curator/... ./internal/interop/environments/...  (0 issues)
+0  env CURATOR_CONFORMANCE_ROOT=<exact rc.13 root> go test -count=1 ./internal/config/...
+0  env CURATOR_CONFORMANCE_ROOT=<exact rc.13 root> go test -count=1 -run '^TestManagerConfigV2Vectors$' -v ./internal/config (31 driven, 25 known-gap, 0 bound/skipped)
+0  go vet ./internal/config/...
+0  golangci-lint run ./internal/config/... (0 issues)
+0  env CURATOR_CONFORMANCE_ROOT=<exact rc.13 root> go test -count=1 -run '^TestSystemModuleAdmissionVectors$' -v ./internal/contextmaterialize
+0  env CURATOR_CONFORMANCE_ROOT=<exact rc.13 root> go test -count=1 -run '^(TestManagerConfigV2SchemaCases|TestSystemConfigV2SchemaCases|TestSystemModuleSchemaSubset|TestManagerConfigV2Vectors|TestOverlayGapOwnersMatchFirstProductionBlocker)$' ./internal/config
+0  env CURATOR_CONFORMANCE_ROOT=<exact rc.13 root> go test -count=1 ./internal/interop/environments/...
+0  env CURATOR_CONFORMANCE_ROOT=<exact rc.13 root> go test -count=1 ./internal/envprofile/... -run '^Test(InstallError|UpdateError|DropRepair|DropAllDropped|StatusReportsPolicyAndDropped|StatusErrorReportsPolicyWithoutDropped|StatusUnreadableTransitiveManifestDoesNotBecomeNoDrops|PolicyFromConfigCarriesAdmission)$'
+0  go test -count=1 ./internal/contextresolve/...
+0  go test -count=1 ./internal/contextmaterialize/...
+0  go test -count=1 ./internal/contextaudit/...
+0  env CURATOR_CONFORMANCE_ROOT=<configured conformance root> go test -count=1 ./internal/envfragment/...
+0  go test -count=1 ./cmd/curator/... -run '^TestEnvStatusReportsDroppedSystemModuleThroughCLI$' -v
 ```
 
-Root cause (fixture-only; production code is correct): the test
-repaired with `NativeHomeOf` rooted at temp dir N1
-(`admissionResolve`) but ran `StatusOf` with a DIFFERENT temp
-dir N2. The §7.4 liveness row records the symlink target at
-repair (`os.Symlink(links[path], …)`,
-`internal/envprofile/managed.go:937`) and requires byte-identity
-at verify (`got != target → detached`,
-`internal/envprofile/managed.go:1352-1356`). With N1 ≠ N2 the
-detached finding is deterministic — but only on Linux, because
-`claude_code` carries the `.credentials.json` file-link entry
-on `linux` only (`internal/envregistry/envregistry.go:215-218`;
-`darwin` links nothing, other platforms fall through to an
-absent `default`). A genuinely moved native home SHOULD report
-detached (pinned by `TestResolvePassthroughLiveness`), so the
-fix is the fixture, not the gate.
+Expected/red run, reported as such:
 
-Fix (`internal/envprofile/admission_test.go`, test-only):
-`admissionNative` (line 150) makes one native-home base and
-`admissionResolve` (line 164) takes it as a parameter;
-`TestStatusReportsPolicyAndDropped` (line 277) shares the one
-base between repair and status — the established
-`managedFixture` pattern (single `fx.native` for both
-`fx.request` and `statusRequest`). With the identical string on
-both sides (`nativeHome` returns the closure value verbatim,
-`managed.go:128-131`; `os.Readlink` returns the recorded bytes
-verbatim), `got == target` holds deterministically on every
-platform. The strong assertion is kept: home row current AND
-carrying the drop warning. No production file changed in
-revision 2; SPEC_PIN untouched; no test weakened.
+```text
+1  env CURATOR_CONFORMANCE_ROOT=<exact rc.13 root> go test -count=1 ./internal/envprofile/...
+   Go's 10-minute test timeout fired in TestWeightRulesApplyInOrder while gitops.Clone/ensureRepo was running. The focused E2 envprofile selection above passed. A standalone retry of `go test -count=1 -timeout 45s ./internal/envprofile/... -run '^TestWeightRulesApplyInOrder$' -v` exited 0 in 12.6s (three subtests); the broad package run remains non-green and the cause was not established.
+```
 
-Revision-2 validation transcripts (real exit codes, shell
-`bash`, `CURATOR_CONFORMANCE_ROOT=…/curator-spec/conformance/v1`):
+The hosted `scripts/remote-gate.sh` was not run manually; handoff runtime owns that one full gate. This host is macOS, so local validation does not independently establish Linux/Windows behavior.
 
-- `go build ./...` → exit 0.
-- `go vet` on `internal/config internal/contextresolve
-  internal/contextmaterialize internal/contextaudit
-  internal/envfragment internal/envprofile cmd/curator
-  internal/interop/environments` → exit 0.
-- `gofmt -l internal/ cmd/` → empty (clean).
-- `golangci-lint run ./internal/envprofile/...` (v2.12.2,
-  repo `.golangci.yml`) → `0 issues.`
-- `go test ./internal/envprofile/ -run '<8 admission tests>'
-  -count=1` → exit 0 (`ok`, 36.7s): all 8 pass, including
-  `TestStatusReportsPolicyAndDropped`.
-- `go test ./internal/envprofile/ -run '<5 status/resolve
-  neighbors>' -count=1` → exit 0 (`ok`, 3.9s): no
-  cross-test interference.
-- `go test ./internal/interop/environments/ -count=1` →
-  exit 0 (`ok`, 1.4s): vectors still byte-exact.
-- `go test ./internal/contextmaterialize/ -count=1` →
-  exit 0 (`ok`, 0.7s).
+## Narrowing mutants
 
-Reran myself (this run): everything above. Accepted from the
-rev1 evidence (§4) without rerun: the sharded full-package
-`envprofile`/`cmd/curator` suites and the pin-root lane —
-justified because revision 2 touches one `_test.go` file whose
-symbols are used only by its own package's tests, and the
-rev1 macOS/Windows full gate was green on the identical
-production tree. Not run: Linux execution locally (no Linux
-runner on this host; the docker daemon is unresponsive) —
-the hosted gate at handoff is the authoritative Linux check.
+Each mutant was installed using Go's `-overlay` from `/tmp/e2-mutants`, outside the worktree. Every mutant test command exited 1 because its committed regression caught the narrowed behavior; survivors: 0/8.
 
+| Mutant | Catching regression | Exit |
+|---|---|---:|
+| Treat explicit null waivers as absence | `TestSystemModuleWaiversNullRejected` (`Load`) | 1 |
+| Exclude active overlays from `DirectSet` | overlay-direct admission vector / direct-set unit coverage | 1 |
+| Apply error refusal only when a transitive package has at least two modules | `TestInstallErrorRefusesTransitiveSystemModule` | 1 |
+| Suppress drop warning for a single dropped module | `TestDropRepairWarnsAndFragmentFollowsAdmitted` | 1 |
+| Treat unreadable transitive manifest as an empty dropped set | `TestStatusUnreadableTransitiveManifestDoesNotBecomeNoDrops` | 1 |
+| Ignore waiver map during classification | `TestSystemPromptWaiverAdmits` | 1 |
+| Permit system-file lock toward `drop` | `TestSystemTransitiveDirection` | 1 |
+| Compare only expected manager-vector keys, allowing extra normalized knobs | `TestManagerEffectiveJSONComparisonRejectsExtraKnobs` | 1 |
 
-## 8. Revision 3 — rework after review verdict rev2 (this run)
+Bounds: mutants establish that these committed tests reject the listed narrowing changes. They do not prove all possible malformed manifests, filesystem races, or platform-specific path behavior. The exact rc.13 vectors and cross-platform hosted gate cover additional cases; hosted CI remains pending handoff.
 
-Answers `TASK-260916-55g9dg_review-verdict-rev2.md` (changes
-requested, items 1–3). Everything the verdict marks as
-implemented/passing is untouched except the one-line production fix
-in item 2. The spec checkout now reports `23dafa7` (a later landed
-revision than the brief's `0da4020`; all cited vectors/cases
-verified present there).
+## Checklist mapping and remaining bounds
 
-### 8.1 Item 1 (high) — vector-comparison workaround removed
+- Config grammar/defaults/writing and lock rule: implemented and tested. The older rc.11 `root-content` requirement was superseded by the current rc.13 pin contract; current-pin tests require the cases and fail if absent.
+- Admission, drop/error diagnostics, unchanged lock on resolution refusal, waiver, admitted-set fragment, status policy/path posture, and five vectors: implemented and covered as cited.
+- Lint and build/vet/format validation: green. The config package, five admission vectors, focused E2 envprofile regressions, CLI posture test, and standalone weight-rule retry are green. Full `internal/envprofile/...` is the one validation command that timed out red, recorded above; no claim is made that this broad package command passed.
+- CHANGELOG and LOGBOOK files were not edited per current campaign rules. Findings and release text are in this task outcome resource.
+- No SPEC_PIN update, no vendored conformance files, and no ax integration or proposal work.
 
-- Deleted `postPinKnobs` / `prunePostRevisionKnobs` from
-  `internal/config/environments_conformance_test.go` (was :33-66
-  and the :224 call site); `TestManagerConfigV2Vectors` compares
-  every expected member exactly again (:187-196). No other file
-  referenced the mechanism (verified by grep; the only other
-  mention is the reviewer's ignored probe copy under
-  `.temp/review-55g9dg/`, left alone).
-- SPEC_PIN untouched (`87a0d00`, still at
-  `.github/workflows/ci.yml:52`).
-- Expected pinned-root failure (orchestrator-owned pin-lag,
-  `spec-pin-lag-hold.md`): at rc.11 `go test
-  ./internal/config/` exits 1 with ONLY
-  `TestManagerConfigV2Vectors` failing (18 subtests); all 18
-  diffs verified programmatically to be purely `only-got:
-  {system_module_waivers, transitive_system_modules}` with zero
-  value diffs — the implementation renders the spec'd knobs and
-  the pinned vector predates them. Resolved by promoting
-  SPEC_PIN, never in this test.
-- At the new root the exact comparison adds ZERO E2 failures:
-  the 20 vector member-mismatches are all `only-want:
-  {provider_directories}` (E4) plus the sibling-owned
-  `passable_env_names` default change (want `[]`, a wave-1
-  landing outside E2 scope); the new root expects
-  `transitive_system_modules: "drop"` /
-  `system_module_waivers: []` and our rendering matches.
+## CHANGELOG entry (for release prep)
 
-### 8.2 Item 2 (medium) — explicit null waivers rejected
+E2: restrict system-class context modules to direct packages and explicitly waived packages. The default `transitive_system_modules=drop` is non-breaking and warns with `context_system_module_dropped`; `error` is opt-in and refuses resolution with `context_system_module_transitive`. Add `system_module_waivers` for reviewed package exceptions.
 
-- `internal/config/environments.go:281-290`: the knob arm no
-  longer bypasses nil, so a present `null` reaches
-  `parseSystemModuleWaivers` and fails with the closed
-  grammar's wrong-type error
-  `environments.system_module_waivers: must be a list`. Absence
-  still defaults to `[]`. (Mirrors the existing schema-2
-  explicit-null-environments rejection in `config.go`.)
-- Committed regression at the production entry point:
-  `TestSystemModuleWaiversNullRejected`
-  (`internal/config/environments_test.go:602`) drives `Load`
-  with `{"system_module_waivers": null}` (the reviewer's probe
-  shape) and asserts rejection naming
-  `environments.system_module_waivers`; absent and `[]` still
-  load empty. PASS.
+## Revision 6 — re-apply on 97ca3370
 
-### 8.3 Item 3 (medium) — explicit root-content subset drivers
+This revision re-applies the accepted E2 delta from `refs/campaign/55g9dg-rev4-full-20260927` onto clean trunk `97ca3370`. It remains uncommitted on `task-board/story/STORY-260916-2d9coh`.
 
-- Admission driver: `TestSystemModuleAdmissionVectors`
-  (`internal/contextmaterialize/system_module_admission_test.go:102`,
-  new, 298 lines). Selects the five `system-module-*` cases by
-  name; each runs byte-exact through production `SystemPrompt`
-  + `ClassifySystemModules` (lock hash, emitted order,
-  admitted/dropped sets, drop warnings, the error refusal
-  naming diagnostic + package + module, expected-file bytes +
-  sha, surface hash). Partial publication fails loud naming
-  the missing cases; a root publishing none takes
-  `t.Skipf("%s publishes no system-module admission cases",
-  root)` (:131).
-- Placement (deliberate, documented): the driver lives in the
-  production package `internal/contextmaterialize`, NOT in
-  `internal/interop/environments`. That package's committed
-  contract (`TestNoCaseHereSkipsForAnythingButTheDeferredRoot`,
-  `TestNoLedgerRowForThisPackageToleratesASkip` — both green,
-  see transcripts) forbids any additional skip and any
-  tolerating ledger row; placing the required root-content
-  driver there would force weakening those gates, which
-  campaign rules forbid. The godriver-precedent shape (direct
-  root read + root-content skip + ledger row) in the
-  production package satisfies the brief without touching the
-  interop gate. The existing interop test keeps iterating all
-  published cases (5/5 at the new root).
-- Schema driver: `TestSystemModuleSchemaSubset`
-  (`internal/config/system_module_schema_test.go:49`, new, 119
-  lines). Runs the seven E2 schema cases (5 manager + 2
-  system) with exact published bytes through `Load` (system
-  cases as the system file over the minimal machine file, the
-  same recipe as the existing tests); validity comes from the
-  root index; an invalid case must be rejected NAMING the E2
-  knob, so a sibling-field rejection is a loud failure, never
-  a false green. No E2 case in the index →
-  `t.Skipf("%s publishes no system-module schema cases",
-  root)` (:80).
-- Ledger: two `.github/ci/platform-cases.tsv` rows, class
-  `root-content`, must + skip on all three platforms (:321
-  config, :330 contextmaterialize), the
-  `TestModuleRootVectorsDriveTheWholeBuild` shape.
-  `ledger-consistency.sh` → exit 0 (241 rows; both new rows ok
-  on linux/darwin/windows). No `root-artifacts.tsv` change
-  (godriver precedent: subset-level absence inside a served
-  family needs no family row). This supersedes the §5 "no
-  ledger change" note, which predates the rework brief's
-  explicit ledger requirement.
+### Conflict resolutions and boundary
 
-### 8.4 Revision-3 validation transcripts (real exit codes, shell `bash`)
+- `.github/ci/conformance-gaps.tsv`: the rev4 ledger described `permissions` as an unsupported blocker, but trunk now parses and writes that knob. Kept trunk's permissions and fragment-v2 ledger state, then updated the five affected E2 manager-schema rows to the actual first remaining blocker, E1's `require_source_signers`. The current gap rows are at lines 7–10 and 33.
+- `internal/config/environments_conformance_test.go`: kept the accepted rev4 exact full-object JSON comparison and extra-key regression. For the overlapping gap attribution, kept the current first-blocker logic for signer fields and expected `require_source_signers` as the deterministic first unsupported field after trunk's supported `permissions` knob.
+- The other six paths applied cleanly: `cmd/curator/env_test.go`, `internal/config/environments.go`, `internal/config/environments_test.go`, `internal/config/system_module_schema_test.go`, `internal/envprofile/admission_test.go`, and `internal/envprofile/status.go`.
+- Trunk features remain present: the permissions parser/serializer is still in `internal/config/environments.go:28-31,242-247,1106-1120`; `cmd/curator/env_test.go:61` still asserts `launch-env-fragment-v2`. `git diff --name-only HEAD -- . ':!.task-board'` lists exactly the eight paths above, `git diff --cached --name-only` is empty, and `git diff --check` is clean. No commit was created.
 
-New root `23dafa7` unless noted; every command run directly
-with the exit captured via `echo EXIT=$?` (file redirects,
-never pipes):
+### Regression and narrowing mutant
 
-- `go build ./...` → exit 0. `go vet ./...` → exit 0.
-  `gofmt -l internal/ cmd/` → empty, exit 0.
-  `golangci-lint run` (v2.12.2, repo `.golangci.yml`) on
-  `./internal/config/... ./internal/contextmaterialize/...
-  ./internal/envprofile/...
-  ./internal/interop/environments/... ./cmd/curator/...` →
-  `0 issues.`, exit 0.
-- `go test -count=1 ./internal/contextmaterialize/...` →
-  exit 0 (incl. the new driver, 5/5 PASS).
-- `go test -count=1 ./internal/envprofile/...` → exit 0
-  (full suite, 378.7s).
-- `go test -count=1 ./internal/interop/environments/...` →
-  exit 0 (incl. the no-skip/no-tolerance contract tests).
-- `go test -count=1 ./internal/config/...` → exit 1
-  (expected-red, sibling-owned): 48 failing subtests = the
-  rev2 set of 41 (every one `provider_directories` /
-  `passable_env_names`-caused, verified programmatically
-  case by case: 18 valid schema cases rejected on the E4
-  field, 1 system ditto, 2 valid vectors ditto, 20 vector
-  member diffs all `only-want: {provider_directories}`) +
-  the 7 new subset subtests (same E4 cause, now explicit).
-  Zero E2-caused failures. Anomaly: the first full-config
-  attempt hit the 11m go-test timeout with no output; the
-  immediate verbose rerun completed in 69s. Cause not
-  isolated (transient; the hosted gate runs this suite
-  routinely).
-- `go test -count=1 ./cmd/curator/...` → exit 1: seven
-  `*Compiled*` tests fail with `go-v1
-  build_execution_worker_protocol_invalid: cannot read the
-  ready message` (~130s each; host Go is 1.26.0, the tested
-  family is 1.25) and the 10m suite timeout fires. Proven
-  PRE-EXISTING and environmental: the same test on the
-  pristine tree (rev3 changes stashed) also fails with exit
-  1. `go test -count=1 -timeout 9m -skip 'Compiled'
-  ./cmd/curator/...` → exit 0 (ok, 375.4s): everything else
-  in the CLI suite is green.
-- rc.11 root (`/tmp/rc11root` via `git archive 87a0d00`,
-  test input only, nothing vendored): the new admission
-  driver → SKIP `… publishes no system-module admission
-  cases`, exit 0; the new schema driver → SKIP `…
-  publishes no system-module schema cases`, exit 0; full
-  `./internal/config/` → exit 1 with ONLY
-  `TestManagerConfigV2Vectors` failing (18 subtests, all
-  purely the two E2 knobs — the expected pin-lag failure
-  from item 1).
-- Reran myself (this run): everything above. The rev1
-  sharded-suite evidence and §4 mutant evidence stand
-  unchanged (no production behavior touched except the
-  null-waiver rejection, which carries its own regression
-  test).
+- Named regression: `TestStatusUnreadableTransitiveManifestDoesNotBecomeNoDrops`, `internal/envprofile/admission_test.go:366-433`. It drives `StatusOf` with an unreadable transitive package manifest and requires the dropped-module set to remain unknown, the row to be non-current, and a manifest diagnostic with the package/path context.
+- Narrowing mutant: replaced the unreadable-manifest diagnostic return in `internal/envprofile/status.go:633-640` with `continue`, which treats the unreadable transitive manifest as absent. With the mutant kept buildable, the named regression failed at `admission_test.go:420`: it observed `DroppedSystemModules: []` where nil/unknown was required (mutant command exit 1). The candidate source was restored, and the focused status tests passed afterwards.
+- A first, broader mutant attempt also exited 1 at compilation because deleting the diagnostic left `manifestPath` unused. That attempt was not counted as a killed mutant; the compile-safe mutant above is the evidence.
 
-### 8.5 Out of scope / not done
+### Validation transcripts
 
-- E4 `provider_directories` + the `passable_env_names`
-  default change stay sibling-owned; the schema-subset
-  driver is written to go green unmodified once the sibling
-  lands (the rejection-reason assertions match post-E4
-  behavior).
-- SPEC_PIN promotion stays orchestrator-owned
-  (`spec-pin-lag-hold.md`); the hosted gate fails
-  `TestManagerConfigV2Vectors` at rc.11 until promotion —
-  stated here, not worked around.
-- No Linux/Windows/race lanes run locally; the hosted gate
-  is authoritative.
+All validation commands were run directly as standalone processes; exit codes below are the actual process exits.
+
+```text
+0  go test ./internal/contextmaterialize ./internal/contextresolve -count=1
+0  CURATOR_CONFORMANCE_ROOT=/Users/administrator/Developer/ReluxWorks/curator/curator-spec/conformance/v1 go test ./internal/contextmaterialize ./internal/config -run 'SystemModuleAdmissionVectors|ManagerConfigV2|SystemConfigV2|SystemModuleSchemaSubset|SystemModuleWaivers' -count=1
+0  go test ./internal/envprofile -run '^TestStatusUnreadableTransitiveManifestDoesNotBecomeNoDrops$' -count=1
+1  go test ./internal/envprofile -run '^TestStatusUnreadableTransitiveManifestDoesNotBecomeNoDrops$' -count=1  (compile failure on the first, overly broad mutant attempt; not counted as a kill)
+1  go test ./internal/envprofile -run '^TestStatusUnreadableTransitiveManifestDoesNotBecomeNoDrops$' -count=1  (compile-safe narrowing mutant; expected regression failure at the unknown-set assertion)
+0  CURATOR_CONFORMANCE_ROOT=/Users/administrator/Developer/ReluxWorks/curator/curator-spec/conformance/v1 go test ./internal/config -count=1
+0  go test ./cmd/curator -run '^TestEnvStatusReportsDroppedSystemModuleThroughCLI$' -count=1
+0  go test ./internal/envprofile -run 'TestStatus(UnreadableTransitiveManifestDoesNotBecomeNoDrops|ReportsPolicyAndDropped|ErrorReportsPolicyWithoutDropped)$' -count=1
+0  go build ./...
+0  go vet ./...
+0  gofmt -l cmd/curator/env_test.go internal/config/environments.go internal/config/environments_conformance_test.go internal/config/environments_test.go internal/config/system_module_schema_test.go internal/envprofile/admission_test.go internal/envprofile/status.go  (no output)
+0  git diff --check
+```
+
+The full hosted `scripts/remote-gate.sh` was not run in this bounded re-apply; handoff runtime owns that gate. The old rev4 verdict resource (`TASK-260916-55g9dg_review-verdict-rev4.md`) records acceptance, although the appended Review Round Brief calls rev4 a rejection. The re-apply followed `55g9dg-reapply-6.md` and also supplies the requested named regression plus a killed narrowing mutant; no new review verdict was issued in this developer run.

@@ -1,0 +1,487 @@
+diff --git a/.github/ci/conformance-gaps.tsv b/.github/ci/conformance-gaps.tsv
+index 7a806bac..b23b0080 100644
+--- a/.github/ci/conformance-gaps.tsv
++++ b/.github/ci/conformance-gaps.tsv
+@@ -4,10 +4,10 @@
+ family	case_id	owner	reason
+ agent-environment-marker-v1/schema-cases	valid-codex-seed-record-empty-snapshot.json	STORY-260916-1i1gfo	Parse rejects the valid Codex seed record forms added by E3.
+ agent-environment-marker-v1/schema-cases	valid-codex-seed-record.json	STORY-260916-1i1gfo	Parse rejects the valid Codex seed record forms added by E3.
+-manager-config-v2/schema-cases	invalid-system-module-waiver-missing-reason.json	STORY-260922-1cenbr	Load rejects before the E2 diagnostic because the updated case carries the unsupported 0017/0018 manager configuration field.
+-manager-config-v2/schema-cases	invalid-system-module-waiver-package-grammar.json	STORY-260922-1cenbr	Load rejects before the E2 diagnostic because the updated case carries the unsupported 0017/0018 manager configuration field.
+-manager-config-v2/schema-cases	invalid-system-module-waiver-unknown-field.json	STORY-260922-1cenbr	Load rejects before the E2 diagnostic because the updated case carries the unsupported 0017/0018 manager configuration field.
+-manager-config-v2/schema-cases	invalid-transitive-system-modules-value.json	STORY-260922-1cenbr	Load rejects before the E2 diagnostic because the updated case carries the unsupported 0017/0018 manager configuration field.
++manager-config-v2/schema-cases	invalid-system-module-waiver-missing-reason.json	STORY-260916-ioemse	Load rejects before E2 validation at the unsupported E1 require_source_signers field; permissions are supported on trunk.
++manager-config-v2/schema-cases	invalid-system-module-waiver-package-grammar.json	STORY-260916-ioemse	Load rejects before E2 validation at the unsupported E1 require_source_signers field; permissions are supported on trunk.
++manager-config-v2/schema-cases	invalid-system-module-waiver-unknown-field.json	STORY-260916-ioemse	Load rejects before E2 validation at the unsupported E1 require_source_signers field; permissions are supported on trunk.
++manager-config-v2/schema-cases	invalid-transitive-system-modules-value.json	STORY-260916-ioemse	Load rejects before E2 validation at the unsupported E1 require_source_signers field; permissions are supported on trunk.
+ manager-config-v2/schema-cases	valid-overlay-git-git-uppercase.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+ manager-config-v2/schema-cases	valid-overlay-git-http-uppercase.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+ manager-config-v2/schema-cases	valid-overlay-git-https-uppercase.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+@@ -31,7 +31,7 @@ manager-config-v2/schema-cases	valid-security-posture-permissive.json	STORY-2609
+ manager-config-v2/schema-cases	valid-source-signers-empty-list.json	STORY-260916-ioemse	Load rejects the valid source_signers or require_source_signers case published by E1.
+ manager-config-v2/schema-cases	valid-source-signers-gpg.json	STORY-260916-ioemse	Load rejects the valid source_signers or require_source_signers case published by E1.
+ manager-config-v2/schema-cases	valid-source-signers.json	STORY-260916-ioemse	Load rejects the valid source_signers or require_source_signers case published by E1.
+-manager-config-v2/schema-cases	valid-system-module-waiver.json	STORY-260922-1cenbr	Load rejects a valid manager-config case containing the adopted 0017/0018 configuration model.
++manager-config-v2/schema-cases	valid-system-module-waiver.json	STORY-260916-ioemse	Load rejects this published-valid case at the unsupported E1 require_source_signers field; permissions are supported on trunk.
+ manager-config-v2/schema-cases	valid.json	STORY-260922-1cenbr	Load rejects a valid manager-config case containing the adopted 0017/0018 configuration model.
+ manager-config-v2/vectors	schema2-empty-environments-defaults	STORY-260922-1cenbr	EffectiveJSON differs from the updated manager-config defaults and permission interface adopted by 0017/0018.
+ manager-config-v2/vectors	schema2-every-knob	STORY-260916-ioemse	Parse rejects the source signer fields introduced by E1.
+diff --git a/cmd/curator/env_test.go b/cmd/curator/env_test.go
+index 5c8e2317..ba6141c6 100644
+--- a/cmd/curator/env_test.go
++++ b/cmd/curator/env_test.go
+@@ -327,6 +327,59 @@ func TestEnvStatusMatrix(t *testing.T) {
+ 	}
+ }
+ 
++// TestEnvStatusReportsDroppedSystemModuleThroughCLI proves env status prints
++// the effective admission policy and each dropped system module's package
++// and path through the production command entry point.
++func TestEnvStatusReportsDroppedSystemModuleThroughCLI(t *testing.T) {
++	requireGit(t)
++	source, _ := profileHome(t)
++	writeNativeCredentials(t)
++	leaf := t.TempDir()
++	writeGitRepoFile(t, leaf, "agent-context.json", `{"schema_version": 1, "name": "sysleaf", "version": "1.0.0",`+
++		`"context": {"modules": [{"path": "90-system.md", "class": "system"}]}}`+"\n")
++	writeGitRepoFile(t, leaf, "context/90-system.md", "Leaf system prompt.\n")
++	runGitRepo(t, leaf, "init")
++	commitGitRepo(t, leaf, "v1.0.0")
++	mid := t.TempDir()
++	writeGitRepoFile(t, mid, "agent-context.json", `{"schema_version": 1, "name": "sysmid", "version": "1.0.0",`+
++		`"requires": {"contexts": {"sysleaf": {"git": "https://example.com/sysleaf", "range": "*"}}},`+
++		`"context": {"modules": [{"path": "00-mid.md"}]}}`+"\n")
++	writeGitRepoFile(t, mid, "context/00-mid.md", "Mid context.\n")
++	runGitRepo(t, mid, "init")
++	commitGitRepo(t, mid, "v1.0.0")
++	root := t.TempDir()
++	writeGitRepoFile(t, root, "agent-context.json", `{"schema_version": 1, "name": "sysroot", "version": "1.0.0",`+
++		`"requires": {"contexts": {"sysmid": {"git": "https://example.com/sysmid", "range": "*"}}},`+
++		`"context": {"modules": [{"path": "00-root.md"}]}}`+"\n")
++	writeGitRepoFile(t, root, "context/00-root.md", "Root context.\n")
++	runGitRepo(t, root, "init")
++	commitGitRepo(t, root, "v1.0.0")
++	serveGitRepos(t, map[string]string{
++		"https://example.com/sysleaf": leaf,
++		"https://example.com/sysmid":  mid,
++		"https://example.com/sysroot": root,
++	})
++	if code, _, stderr := runProfile(t, source, "profile", "install", "https://example.com/sysroot"); code != exitOK {
++		t.Fatalf("profile install = %d\nstderr:\n%s", code, stderr)
++	}
++	if code, _, stderr := runProfile(t, source, "env", "resolve", "claude_code", "--profile", "sysroot", "--repair"); code != exitOK {
++		t.Fatalf("env resolve --repair = %d\nstderr:\n%s", code, stderr)
++	}
++	code, stdout, stderr := runProfile(t, source, "env", "status")
++	if code != exitOK {
++		t.Fatalf("env status = %d\nstderr:\n%s", code, stderr)
++	}
++	for _, want := range []string{
++		"profile sysroot:",
++		"transitive_system_modules=drop",
++		"dropped system module sysleaf 90-system.md",
++	} {
++		if !strings.Contains(stdout, want) {
++			t.Fatalf("env status omits %q:\n%s", want, stdout)
++		}
++	}
++}
++
+ // TestUmbrellaMissingProvider narrows the discovery gate: an unknown
+ // subcommand with no curator-<name> on PATH names the executable and the
+ // installation guidance, and downloads nothing.
+diff --git a/internal/config/environments.go b/internal/config/environments.go
+index f655a2e7..ecafb13d 100644
+--- a/internal/config/environments.go
++++ b/internal/config/environments.go
+@@ -185,7 +185,12 @@ func parseEnvironments(raw any) (Environments, error) {
+ 	if !ok {
+ 		return Environments{}, verr.New("environments", "must be an object")
+ 	}
++	keys := make([]string, 0, len(obj))
+ 	for key := range obj {
++		keys = append(keys, key)
++	}
++	sort.Strings(keys)
++	for _, key := range keys {
+ 		if !envKnob(key) {
+ 			return Environments{}, verr.New("environments", "has unsupported field %q", key)
+ 		}
+diff --git a/internal/config/environments_conformance_test.go b/internal/config/environments_conformance_test.go
+index 640e43ba..9859cbb8 100644
+--- a/internal/config/environments_conformance_test.go
++++ b/internal/config/environments_conformance_test.go
+@@ -1,6 +1,7 @@
+ package config
+ 
+ import (
++	"bytes"
+ 	"encoding/json"
+ 	"fmt"
+ 	"os"
+@@ -230,8 +231,8 @@ func TestSystemConfigV2IsolationDirectionsFromPinnedCases(t *testing.T) {
+ }
+ 
+ // TestManagerConfigV2Vectors runs the published manager-config-v2 vector
+-// family through Parse: every valid case renders the expected effective
+-// configuration and every invalid case is rejected.
++// family through Parse: every valid case renders the exact expected
++// effective configuration and every invalid case is rejected.
+ func TestManagerConfigV2Vectors(t *testing.T) {
+ 	root := conformanceRoot(t)
+ 	payload, err := os.ReadFile(filepath.Join(root, "vectors", "manager-config-v2.json")) // #nosec G304 -- explicit conformance input
+@@ -273,18 +274,36 @@ func TestManagerConfigV2Vectors(t *testing.T) {
+ 			if err := json.Unmarshal(rendered, &got); err != nil {
+ 				t.Fatal(err)
+ 			}
+-			for key, want := range tc.Expected {
+-				gotValue := got[key]
+-				if !reflect.DeepEqual(gotValue, want) {
+-					wantJSON, _ := json.Marshal(want)
+-					gotJSON, _ := json.Marshal(gotValue)
+-					return conformancecoverage.Observation{FailureReason: fmt.Sprintf("effective member %q got %s, want %s", key, gotJSON, wantJSON)}
+-				}
++			wantJSON, err := json.Marshal(tc.Expected)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if !exactManagerEffectiveJSON(got, tc.Expected) {
++				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("effective config got %s, want %s", rendered, wantJSON)}
+ 			}
+ 			return conformancecoverage.Observation{}
+ 		})
+ }
+ 
++// exactManagerEffectiveJSON compares canonical JSON bytes for the full
++// normalized object. In particular, extra actual keys are a mismatch too.
++func exactManagerEffectiveJSON(actual, expected map[string]any) bool {
++	actualJSON, actualErr := json.Marshal(actual)
++	expectedJSON, expectedErr := json.Marshal(expected)
++	return actualErr == nil && expectedErr == nil && bytes.Equal(actualJSON, expectedJSON)
++}
++
++func TestManagerEffectiveJSONComparisonRejectsExtraKnobs(t *testing.T) {
++	actual := map[string]any{
++		"existing":                  true,
++		"transitive_system_modules": "drop",
++	}
++	expected := map[string]any{"existing": true}
++	if exactManagerEffectiveJSON(actual, expected) {
++		t.Fatal("normalized output with an unexpected manager knob matched the expected vector")
++	}
++}
++
+ // systemModuleSchemaFailure keeps the E2 schema cases' stronger diagnostic
+ // assertion in the counted family driver. This avoids running the same
+ // published case a second time in TestSystemModuleSchemaSubset and ensures a
+@@ -363,12 +382,11 @@ func TestOverlayGapOwnersMatchFirstProductionBlocker(t *testing.T) {
+ 			continue
+ 		}
+ 		gap := lookup(managerSchema, tc.Name)
+-		const wantOwners = "STORY-260916-ioemse"
+-		if gap.Owner != wantOwners {
+-			t.Errorf("%s owner = %q, the first unsupported signer field is owned by E1; want %q", tc.Name, gap.Owner, wantOwners)
++		if gap.Owner != owner {
++			t.Errorf("%s owner = %q, first unsupported field %s belongs to %q", tc.Name, gap.Owner, field, owner)
+ 		}
+-		if !strings.Contains(loadErr.Error(), field) {
+-			t.Errorf("%s first Load blocker %q is not present in observed error %v", tc.Name, field, loadErr)
++		if field != "require_source_signers" || !strings.Contains(loadErr.Error(), field) {
++			t.Errorf("%s first Load blocker = %q, want unsupported require_source_signers: %v", tc.Name, field, loadErr)
+ 		}
+ 		for _, requiredField := range []string{"source_signers", "require_source_signers"} {
+ 			if !strings.Contains(gap.Reason, requiredField) {
+diff --git a/internal/config/environments_test.go b/internal/config/environments_test.go
+index f6d75e0b..c8e629fb 100644
+--- a/internal/config/environments_test.go
++++ b/internal/config/environments_test.go
+@@ -668,9 +668,13 @@ func TestTransitiveSystemModulesValues(t *testing.T) {
+ // (§12.1), so Load refuses it with the closed grammar's wrong-type error.
+ // Absence and the empty list still load with no waivers.
+ func TestSystemModuleWaiversNullRejected(t *testing.T) {
+-	loadFails(t, `{"schema_version": 2, "skills_root": "x", "projects": {},`+
+-		`"environments": {"system_module_waivers": null}}`,
+-		"environments.system_module_waivers")
++	path := writeConfig(t, t.TempDir(), "config.json", `{"schema_version": 2, "skills_root": "x", "projects": {},`+
++		`"environments": {"system_module_waivers": null}}`)
++	_, err := Load(path, nil)
++	if err == nil || !strings.Contains(err.Error(), "environments.system_module_waivers") ||
++		!strings.Contains(err.Error(), "must be a list") {
++		t.Fatalf("Load err = %v, want the system_module_waivers wrong-type error", err)
++	}
+ 	for name, body := range map[string]string{
+ 		"absent": `{"schema_version": 2, "skills_root": "x", "projects": {}}`,
+ 		"empty": `{"schema_version": 2, "skills_root": "x", "projects": {},` +
+@@ -683,6 +687,22 @@ func TestSystemModuleWaiversNullRejected(t *testing.T) {
+ 	}
+ }
+ 
++// TestUnsupportedEnvironmentFieldFailureIsDeterministic drives Load with
++// several unsupported fields so schema-gap attribution does not depend on
++// Go's randomized map iteration order. Permissions is supported here; the
++// lexically first unsupported signer field is the stable production blocker.
++func TestUnsupportedEnvironmentFieldFailureIsDeterministic(t *testing.T) {
++	body := `{"schema_version": 2, "skills_root": "x", "projects": {},` +
++		`"environments": {"source_signers": {}, "permissions": {}, "require_source_signers": true}}`
++	for attempt := 0; attempt < 24; attempt++ {
++		path := writeConfig(t, t.TempDir(), "config.json", body)
++		_, err := Load(path, nil)
++		if err == nil || !strings.Contains(err.Error(), `unsupported field "require_source_signers"`) {
++			t.Fatalf("attempt %d: Load err = %v, want stable first blocker environments.require_source_signers", attempt, err)
++		}
++	}
++}
++
+ // TestSystemTransitiveDirection proves the §12.2 lock direction: a system
+ // file locks transitive_system_modules only to error, and waivers are not
+ // lockable at all.
+diff --git a/internal/config/system_module_schema_test.go b/internal/config/system_module_schema_test.go
+index 048ffaae..2bce12dc 100644
+--- a/internal/config/system_module_schema_test.go
++++ b/internal/config/system_module_schema_test.go
+@@ -11,10 +11,12 @@
+ // none, since the committed pin serves the family and a root-content
+ // skip would hide a regression.
+ //
+-// An invalid E2 case must be rejected for its E2 reason, not merely
+-// rejected: a sibling knob the published bytes also carry (E4's
+-// provider_directories at the current root) must not turn the case into
+-// a false green. The rejection has to name the E2 knob.
++// The E2 invalid cases must reject for their E2 reason, not merely reject.
++// At rc.13 the manager cases also carry permissions and signer fields.
++// Permissions is supported on this trunk, so require_source_signers is the
++// deterministic first unsupported field; the gap ledger attributes these
++// cases to E1 until that surface lands. System-config E2 cases first
++// encounter the locked source_signers field.
+ package config
+ 
+ import (
+@@ -45,7 +47,8 @@ var systemModuleSchemaCases = []struct {
+ 
+ // TestSystemModuleSchemaSubset requires all seven E2 cases to remain
+ // published. The counted manager/system family tests drive their exact bytes
+-// through Load and assert both rejection and the E2 diagnostic.
++// through Load; the E2 diagnostic is driven, while an earlier external
++// blocker stays classified in the gap ledger.
+ func TestSystemModuleSchemaSubset(t *testing.T) {
+ 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+ 	if root == "" {
+diff --git a/internal/envprofile/admission_test.go b/internal/envprofile/admission_test.go
+index b4ec807b..8b77e87e 100644
+--- a/internal/envprofile/admission_test.go
++++ b/internal/envprofile/admission_test.go
+@@ -10,6 +10,7 @@ import (
+ 
+ 	"github.com/relux-works/curator/internal/config"
+ 	"github.com/relux-works/curator/internal/contextmaterialize"
++	"github.com/relux-works/curator/internal/contextpkg"
+ 	"github.com/relux-works/curator/internal/envregistry"
+ )
+ 
+@@ -362,6 +363,75 @@ func TestStatusErrorReportsPolicyWithoutDropped(t *testing.T) {
+ 	}
+ }
+ 
++// TestStatusUnreadableTransitiveManifestDoesNotBecomeNoDrops ensures a
++// manifest read failure cannot masquerade as an empty dropped-module set.
++func TestStatusUnreadableTransitiveManifestDoesNotBecomeNoDrops(t *testing.T) {
++	home := t.TempDir()
++	pinHomes(t)
++	ids := newGitIdentities(t)
++	operand := admissionRepos(t, ids, true, true)
++	if _, _, _, err := Install(home, InstallOptions{Operand: operand, Policy: admissionPolicy()}); err != nil {
++		t.Fatal(err)
++	}
++	_, lock, _, err := loadResolveInputs(home, "sysroot")
++	if err != nil {
++		t.Fatal(err)
++	}
++	var manifestPath string
++	manager := newGitManager(home)
++	for _, member := range lock.Members {
++		if member.Name != "sysleaf" {
++			continue
++		}
++		root := packageRoot(manager.entryPath(home, resolvedOf(member)), member.Directory)
++		manifestPath = filepath.Join(root, contextpkg.ManifestName)
++		break
++	}
++	if manifestPath == "" {
++		t.Fatal("lock has no sysleaf member")
++	}
++	if err := os.Remove(manifestPath); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Mkdir(manifestPath, 0o755); err != nil {
++		t.Fatal(err)
++	}
++
++	nativeHomeOf := admissionNative(t)
++	status, err := StatusOf(StatusRequest{
++		Home:         home,
++		Machine:      envregistry.DefaultMachineConfig(),
++		Detect:       func(envregistry.Adapter) string { return "unknown" },
++		NativeHomeOf: nativeHomeOf,
++		OperatorXDG:  t.TempDir(),
++		LaunchDir:    t.TempDir(),
++		Policy:       admissionPolicy(),
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	var profile *ProfileState
++	for i := range status.Profiles {
++		if status.Profiles[i].Profile == "sysroot" {
++			profile = &status.Profiles[i]
++			break
++		}
++	}
++	if profile == nil || profile.DroppedSystemModules != nil {
++		t.Fatalf("dropped-module posture = %+v, want unknown (nil) after a manifest read failure", profile)
++	}
++	if !status.NonCurrent {
++		t.Fatal("a failed transitive manifest read must make env status non-current")
++	}
++	for _, diagnostic := range status.Diagnostics {
++		if diagnostic.Code == contextpkg.DiagManifestInvalid && diagnostic.Path == manifestPath &&
++			strings.Contains(diagnostic.Detail, "dropped system modules are unknown") {
++			return
++		}
++	}
++	t.Fatalf("status diagnostics %+v omit the unreadable-manifest posture", status.Diagnostics)
++}
++
+ // TestPolicyFromConfigCarriesAdmission proves the machine knobs reach the
+ // profile policy: the error value and the waiver list.
+ func TestPolicyFromConfigCarriesAdmission(t *testing.T) {
+diff --git a/internal/envprofile/status.go b/internal/envprofile/status.go
+index 98d467cc..bde3a31c 100644
+--- a/internal/envprofile/status.go
++++ b/internal/envprofile/status.go
+@@ -293,7 +293,12 @@ func StatusOf(req StatusRequest) (*Status, error) {
+ 	}
+ 	status.Adapters = adapterStates(req)
+ 	status.Targets = targetStates(req)
+-	status.Profiles = profileStates(req, infos)
++	var profileDiagnostics []StateDiagnostic
++	status.Profiles, profileDiagnostics, err = profileStates(req, infos)
++	if err != nil {
++		return nil, err
++	}
++	status.Diagnostics = append(status.Diagnostics, profileDiagnostics...)
+ 	status.UnregisteredEnvironments = unregisteredEnvironments(req.Machine)
+ 	var orphanDiagnostics []StateDiagnostic
+ 	status.Orphans, orphanDiagnostics = orphanHomes(req.Home, installed)
+@@ -543,8 +548,9 @@ func ageString(duration time.Duration) string {
+ // profileStates reports the lock's context members with weights and the
+ // precedence primitives per activation (§12): one row per installed
+ // profile. Precedence is the effective machine policy.
+-func profileStates(req StatusRequest, infos []Info) []ProfileState {
++func profileStates(req StatusRequest, infos []Info) ([]ProfileState, []StateDiagnostic, error) {
+ 	var out []ProfileState
++	var diagnostics []StateDiagnostic
+ 	for _, info := range infos {
+ 		_, lock, hash, err := loadResolveInputs(req.Home, info.Name)
+ 		if err != nil || lock == nil {
+@@ -561,6 +567,17 @@ func profileStates(req StatusRequest, infos []Info) []ProfileState {
+ 			return members[i].Name < members[j].Name
+ 		})
+ 		precedence := req.Policy.Precedence()
++		transitive, err := effectiveTransitivePolicy(req.Policy)
++		if err != nil {
++			return nil, nil, err
++		}
++		dropped, diagnostic, err := droppedSystemModulesOf(req.Home, lock, req.Policy)
++		if err != nil {
++			return nil, nil, err
++		}
++		if diagnostic != nil {
++			diagnostics = append(diagnostics, *diagnostic)
++		}
+ 		out = append(out, ProfileState{
+ 			Profile:  info.Name,
+ 			LockHash: hash,
+@@ -569,40 +586,40 @@ func profileStates(req StatusRequest, infos []Info) []ProfileState {
+ 				Winner:    precedence.Winner,
+ 				Placement: precedence.Placement,
+ 			},
+-			TransitiveSystemModules: effectiveTransitivePolicy(req.Policy),
+-			DroppedSystemModules:    droppedSystemModulesOf(req.Home, lock, req.Policy),
++			TransitiveSystemModules: transitive,
++			DroppedSystemModules:    dropped,
+ 		})
+ 	}
+ 	sort.Slice(out, func(i, j int) bool { return out[i].Profile < out[j].Profile })
+-	return out
++	return out, diagnostics, nil
+ }
+ 
+ // effectiveTransitivePolicy reports the policy value status prints: the
+ // configured knob, defaulting to drop exactly as resolution and
+ // materialization do.
+-func effectiveTransitivePolicy(policy Policy) string {
+-	if effective, err := policy.Admission().Policy(); err == nil {
+-		return effective
+-	}
+-	return contextmaterialize.TransitiveDrop
++func effectiveTransitivePolicy(policy Policy) (string, error) {
++	return policy.Admission().Policy()
+ }
+ 
+ // droppedSystemModulesOf recomputes, read-only, the system modules the
+ // drop policy skips for the profile: every non-admitted system module in
+ // emitted order that applies to at least one registered adapter. Under
+-// the error policy nothing is skipped and the list is empty. A member
+-// whose manifest cannot be read contributes nothing here; the profile's
+-// home rows already report that same failure as non-current through the
+-// resolve verifier, so the gap is never silent.
+-func droppedSystemModulesOf(home string, lock *contextlock.Lock, policy Policy) []DroppedSystemModule {
++// the error policy nothing is skipped and the list is empty. When a
++// transitive manifest cannot be read, the dropped set is unknown; the
++// caller reports a diagnostic instead of treating that failure as absence.
++func droppedSystemModulesOf(home string, lock *contextlock.Lock, policy Policy) ([]DroppedSystemModule, *StateDiagnostic, error) {
+ 	dropped := []DroppedSystemModule{}
+ 	admission := policy.Admission()
+-	if effective, err := admission.Policy(); err != nil || effective != contextmaterialize.TransitiveDrop {
+-		return dropped
++	effective, err := admission.Policy()
++	if err != nil {
++		return nil, nil, err
++	}
++	if effective != contextmaterialize.TransitiveDrop {
++		return dropped, nil, nil
+ 	}
+ 	order, err := contextmaterialize.EmittedOrder(lock, policy.Precedence())
+ 	if err != nil {
+-		return dropped
++		return nil, nil, err
+ 	}
+ 	direct := contextmaterialize.DirectSet(lock)
+ 	envIDs := registryEnvIDs()
+@@ -611,9 +628,15 @@ func droppedSystemModulesOf(home string, lock *contextlock.Lock, policy Policy)
+ 		if direct[member.Name] || admission.Waived(member.Name) {
+ 			continue
+ 		}
+-		manifest, err := contextpkg.LoadManifest(packageRoot(manager.entryPath(home, resolvedOf(member)), member.Directory))
++		root := packageRoot(manager.entryPath(home, resolvedOf(member)), member.Directory)
++		manifestPath := filepath.Join(root, contextpkg.ManifestName)
++		manifest, err := contextpkg.LoadManifest(root)
+ 		if err != nil {
+-			continue
++			return nil, &StateDiagnostic{
++				Code:   contextpkg.DiagManifestInvalid,
++				Path:   manifestPath,
++				Detail: fmt.Sprintf("dropped system modules are unknown for package %q: %v", member.Name, err),
++			}, nil
+ 		}
+ 		for _, module := range manifest.Modules {
+ 			class := module.Class
+@@ -636,7 +659,7 @@ func droppedSystemModulesOf(home string, lock *contextlock.Lock, policy Policy)
+ 			dropped = append(dropped, DroppedSystemModule{Package: member.Name, Path: module.Path})
+ 		}
+ 	}
+-	return dropped
++	return dropped, nil, nil
+ }
+ 
+ // unregisteredEnvironments reports env-ids named in machine configuration
