@@ -94,6 +94,7 @@ func fakeRegistry(t *testing.T, status, sourceIdentity, commit, contentHash stri
 	}
 	createdAt := fixture.createdAt.Format(time.RFC3339)
 	pinned := "ed25519:" + base64.StdEncoding.EncodeToString(public)
+	var pageBoundary map[string]any
 	sign := func(body map[string]any) map[string]any {
 		signature := ed25519.Sign(private, registry.CanonicalBytes(body))
 		body["sig"] = map[string]any{
@@ -102,6 +103,16 @@ func fakeRegistry(t *testing.T, status, sourceIdentity, commit, contentHash stri
 		}
 		return body
 	}
+	snapshot := func() map[string]any {
+		stamped := createdAt
+		if fixture.serveTimeMint {
+			stamped = time.Now().UTC().Add(fixture.futureOffset).Truncate(time.Second).Format(time.RFC3339)
+		}
+		return sign(map[string]any{
+			"schema_version": 1, "merkle_root": strings.Repeat("a", 64), "log_size": 1, "head": strings.Repeat("b", 64),
+			"version": 1, "created_at": stamped,
+		})
+	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
@@ -109,20 +120,17 @@ func fakeRegistry(t *testing.T, status, sourceIdentity, commit, contentHash stri
 			if fixture.beforeSnapshot != nil {
 				fixture.beforeSnapshot()
 			}
-			stamped := createdAt
-			if fixture.serveTimeMint {
-				stamped = time.Now().UTC().Add(fixture.futureOffset).Truncate(time.Second).Format(time.RFC3339)
-			}
-			_ = json.NewEncoder(w).Encode(sign(map[string]any{
-				"schema_version": 1, "merkle_root": strings.Repeat("a", 64), "log_size": 1, "head": strings.Repeat("b", 64),
-				"version": 1, "created_at": stamped,
-			}))
+			pageBoundary = snapshot()
+			_ = json.NewEncoder(w).Encode(pageBoundary)
 		case strings.HasSuffix(r.URL.Path, "/v1/records"):
+			if pageBoundary == nil {
+				pageBoundary = snapshot()
+			}
 			record := sign(map[string]any{
 				"name": "skill-a", "source_identity": sourceIdentity,
 				"commit": commit, "content_sha256": contentHash, "status": status,
 			})
-			_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{record}, "next_cursor": nil})
+			_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{record}, "next_cursor": nil, "boundary": pageBoundary})
 		default:
 			http.NotFound(w, r)
 		}

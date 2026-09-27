@@ -8,6 +8,7 @@ import (
 
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/envprofile"
+	"github.com/relux-works/curator/internal/registry"
 )
 
 // printEnvStatus renders the profile × environment × surface matrix as
@@ -43,6 +44,11 @@ func printEnvStatus(stdout io.Writer, status *envprofile.Status) {
 		for _, row := range scope.Rows {
 			_, _ = fmt.Fprintln(stdout, row)
 		}
+	}
+	// Registry page-boundary posture follows the S6 shell-hook block and
+	// the §12 posture block, in the closed status-row order.
+	for _, row := range status.RegistryPosture {
+		_, _ = fmt.Fprintln(stdout, formatRegistryPosture(row))
 	}
 	for _, home := range status.Homes {
 		state := "current"
@@ -177,6 +183,45 @@ func attachProviderPosture(cfg *config.Config, status *envprofile.Status) {
 			status.NonCurrent = true
 		}
 	}
+}
+
+// attachRegistryPosture reads each enabled registry's existing §5 high-water
+// and page-boundary posture. An absent first-use state is informational;
+// unreadable or missing-after-use state is an error row and makes --check
+// fail, because registry operations cannot safely treat it as first use.
+func attachRegistryPosture(cfg *config.Config, status *envprofile.Status) {
+	status.RegistryPosture = readRegistryPosture(cfg)
+	for _, row := range status.RegistryPosture {
+		if row.Diagnostic != "" {
+			status.NonCurrent = true
+		}
+	}
+}
+
+func readRegistryPosture(cfg *config.Config) []registry.BoundaryPosture {
+	trusted := cfg.TrustedRegistries()
+	registries := make([]registry.Registry, 0, len(trusted))
+	for _, entry := range trusted {
+		registries = append(registries, registry.Registry{Name: entry.Name, URL: entry.URL, PublicKeys: entry.PublicKeys})
+	}
+	cacheDir := filepath.Join(cfg.Home(), "cache", "registry")
+	stateDir := registry.ReadOnlyStateDir(filepath.Join(cfg.Home(), "state", "registry"), cacheDir)
+	return registry.ReadBoundaryPosture(stateDir, registries)
+}
+
+func formatRegistryPosture(row registry.BoundaryPosture) string {
+	if row.Diagnostic != "" {
+		return fmt.Sprintf("registry %s %s: rollback state unavailable: %s", row.Name, row.URL, row.Diagnostic)
+	}
+	verified := "no"
+	if row.LastBoundaryVerified {
+		verified = "yes"
+	}
+	if row.HighWaterVersion == nil || row.HighWaterLogSize == nil {
+		return fmt.Sprintf("registry %s %s: no persisted high-water, last page boundary verified: %s", row.Name, row.URL, verified)
+	}
+	return fmt.Sprintf("registry %s %s: high-water version %d, log_size %d, last page boundary verified: %s",
+		row.Name, row.URL, *row.HighWaterVersion, *row.HighWaterLogSize, verified)
 }
 
 // formatPassable renders the effective passable_env_names: unbounded for

@@ -794,6 +794,62 @@ func TestCLIEndToEndInstallStatusAndTamperCheck(t *testing.T) {
 	if code := runCode(t, configPath, []string{"status", "app", "--check"}); code != exitOK {
 		t.Fatalf("clean status = %d", code)
 	}
+	// Registry posture is read-only: absent first-use state is current, while
+	// an unreadable persisted state is visible and fails --check.
+	configBytes, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var configDocument map[string]any
+	if err := json.Unmarshal(configBytes, &configDocument); err != nil {
+		t.Fatal(err)
+	}
+	const registryURL = "https://registry.example.test"
+	configDocument["disable_builtin_registries"] = true
+	configDocument["audit_registries"] = []any{map[string]any{
+		"name": "test-registry", "url": registryURL, "enabled": true,
+		"public_keys": []any{"ed25519:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},
+	}}
+	configBytes, err = json.Marshal(configDocument)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, configBytes, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	code, stdout, stderr := capture(t, configPath, "status", "app", "--json", "--check")
+	if code != exitOK {
+		t.Fatalf("first-use registry status --check = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+	var statusDocument map[string]any
+	if err := json.Unmarshal([]byte(stdout), &statusDocument); err != nil {
+		t.Fatalf("status output: %v\n%s", err, stdout)
+	}
+	postureRows, ok := statusDocument["registry_posture"].([]any)
+	if !ok || len(postureRows) != 1 {
+		t.Fatalf("registry_posture = %v, want one configured registry row", statusDocument["registry_posture"])
+	}
+
+	stateDir := filepath.Join(filepath.Dir(configPath), "state", "registry")
+	if err := os.MkdirAll(stateDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	registryDigest := sha256.Sum256([]byte(registryURL))
+	stateName := "snapshot-" + hex.EncodeToString(registryDigest[:])[:16] + ".json"
+	if err := os.WriteFile(filepath.Join(stateDir, stateName), []byte("{broken"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	catalog := `{"schema_version":1,"states":["` + stateName + `"]}`
+	if err := os.WriteFile(filepath.Join(stateDir, "known-registries.json"), []byte(catalog), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	code, stdout, stderr = capture(t, configPath, "status", "app", "--json", "--check")
+	if code != exitFail {
+		t.Fatalf("unreadable registry rollback state --check = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitFail, stdout, stderr)
+	}
+	if !strings.Contains(stdout, "rollback state is unreadable") {
+		t.Fatalf("status did not report unreadable registry state:\n%s", stdout)
+	}
 	if err := os.WriteFile(installedSkill, []byte("tampered\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

@@ -26,6 +26,7 @@ import (
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/hookapproval"
 	"github.com/relux-works/curator/internal/manifest"
+	"github.com/relux-works/curator/internal/registry"
 	"github.com/relux-works/curator/internal/stateread"
 )
 
@@ -225,6 +226,10 @@ type Status struct {
 	RequireCurrentProfile *string `json:"require_current_profile,omitempty"`
 	// RequireCurrentLocked reports whether the requirement is locked.
 	RequireCurrentLocked bool `json:"require_current_profile_locked,omitempty"`
+	// RegistryPosture reports the persisted registry page-boundary high-water
+	// and the verified-boundary posture. It is attached by the CLI because the
+	// CLI owns configured registry trust anchors.
+	RegistryPosture []registry.BoundaryPosture `json:"registry_posture"`
 }
 
 // StatusRequest scopes one status computation. The seams mirror

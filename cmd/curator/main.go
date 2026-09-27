@@ -831,6 +831,13 @@ func (c cli) cmdStatus(args []string) int {
 		targetRoots = append(targetRoots, target.Root)
 	}
 	trustRows, trustWarnings, trustStateUnreadable := hookTrustPosture(cfg.Home(), targetRoots)
+	registryRows := readRegistryPosture(cfg)
+	registryStateUnreadable := false
+	for _, row := range registryRows {
+		if row.Diagnostic != "" {
+			registryStateUnreadable = true
+		}
+	}
 
 	exitCode := exitOK
 	jsonResults := make([]map[string]any, 0, len(targets))
@@ -895,6 +902,9 @@ func (c cli) cmdStatus(args []string) int {
 		// JSON consumer sees the same read failures the human output
 		// prints.
 		payload := map[string]any{"alias": target.Alias, "path": target.Root, "skills": drift, "shell_hook_trust": trustRows}
+		if len(registryRows) > 0 {
+			payload["registry_posture"] = registryRows
+		}
 		if len(trustWarnings) > 0 {
 			payload["shell_hook_trust_warnings"] = trustWarnings
 		}
@@ -928,12 +938,18 @@ func (c cli) cmdStatus(args []string) int {
 		for _, row := range trustRows {
 			_, _ = fmt.Fprintln(c.stdout, formatTrustRow(row))
 		}
+		for _, row := range registryRows {
+			_, _ = fmt.Fprintln(c.stdout, formatRegistryPosture(row))
+		}
 	}
 	// A changed file, a recorded file whose bytes are missing or
 	// unreadable, or an unreadable approval state is non-current; an
 	// unapproved file whose bytes read stays a warning row and never fails
 	// the check (Spec §8.6).
 	if *check && hookTrustCheckFailed(trustRows, trustStateUnreadable) {
+		exitCode = exitFail
+	}
+	if *check && registryStateUnreadable {
 		exitCode = exitFail
 	}
 	if *jsonOut {
@@ -1198,8 +1214,12 @@ func (c cli) cmdStatusAttest(cfg *config.Config, projectRoot, alias string, json
 	for _, entry := range trusted {
 		registries = append(registries, registry.Registry{Name: entry.Name, URL: entry.URL, PublicKeys: entry.PublicKeys})
 	}
-	fetch := registry.NewHTTPFetchWithPolicy(
-		filepath.Join(cfg.Home(), "cache", "registry"),
+	cacheDir := filepath.Join(cfg.Home(), "cache", "registry")
+	stateDir := registry.ReadOnlyStateDir(filepath.Join(cfg.Home(), "state", "registry"), cacheDir)
+	fetch := registry.NewHTTPFetchWithPolicyReadOnly(
+		cacheDir,
+		stateDir,
+		registries,
 		time.Duration(cfg.Audit.CacheTTLSeconds)*time.Second,
 		time.Duration(cfg.Audit.OfflineGraceSeconds)*time.Second,
 		nil,

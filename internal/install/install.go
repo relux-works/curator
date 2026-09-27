@@ -1388,13 +1388,18 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string, 
 	if persist {
 		fetch = registry.NewHTTPFetchWithPolicy(
 			cacheDir,
+			snapshotStateDir,
+			usable,
 			time.Duration(cfg.Audit.CacheTTLSeconds)*time.Second,
 			time.Duration(cfg.Audit.OfflineGraceSeconds)*time.Second,
 			nil,
+			registry.FetchPolicy{PersistCache: true, PersistState: true},
 		)
 	} else {
 		fetch = registry.NewHTTPFetchWithPolicyReadOnly(
 			cacheDir,
+			snapshotStateDir,
+			usable,
 			time.Duration(cfg.Audit.CacheTTLSeconds)*time.Second,
 			time.Duration(cfg.Audit.OfflineGraceSeconds)*time.Second,
 			nil,

@@ -95,39 +95,59 @@ func HTTPGetSnapshot(baseURL string) (map[string]any, error) {
 	return data, nil
 }
 
-// NewHTTPFetch builds a FetchFn over GET /v1/records with an on-disk cache:
-// a fresh entry is served without a network call; on refresh failure a stale
-// entry stays usable within the offline grace window (Spec §13.5).
-func NewHTTPFetch(cacheDir string, ttl, grace time.Duration, now func() time.Time) FetchFn {
+// FetchPolicy controls persistence independently for the response cache and
+// the protected registry high-water state.
+type FetchPolicy struct {
+	PersistCache bool
+	PersistState bool
+}
+
+// NewHTTPFetch builds a persistent records fetcher. Every network page must
+// carry a verified v2 boundary before its records contribute; the boundary
+// is checked against the shared snapshot high-water state (protocol §9.3).
+func NewHTTPFetch(cacheDir, stateDir string, registries []Registry, ttl, grace time.Duration, now func() time.Time) FetchFn {
 	if ttl == 0 {
 		ttl = DefaultCacheTTL
 	}
 	if grace == 0 {
 		grace = DefaultOfflineGrace
 	}
-	return newHTTPFetch(cacheDir, ttl, grace, now, true)
+	return newHTTPFetch(cacheDir, stateDir, registries, ttl, grace, now, FetchPolicy{PersistCache: true, PersistState: true})
 }
 
-// NewHTTPFetchWithPolicy is the manager-config form. Unlike NewHTTPFetch,
-// zero is literal and disables fresh-cache or stale-fallback use respectively.
-func NewHTTPFetchWithPolicy(cacheDir string, ttl, grace time.Duration, now func() time.Time) FetchFn {
-	return newHTTPFetch(cacheDir, ttl, grace, now, true)
+// NewHTTPFetchWithPolicy is the manager-config form. Zero TTL and grace are
+// literal and disable fresh-cache or stale-fallback use respectively.
+func NewHTTPFetchWithPolicy(cacheDir, stateDir string, registries []Registry, ttl, grace time.Duration, now func() time.Time, policy FetchPolicy) FetchFn {
+	return newHTTPFetch(cacheDir, stateDir, registries, ttl, grace, now, policy)
 }
 
-// NewHTTPFetchWithPolicyReadOnly reads existing cache entries and may use the
-// network, but never creates or updates the persistent response cache.
-func NewHTTPFetchWithPolicyReadOnly(cacheDir string, ttl, grace time.Duration, now func() time.Time) FetchFn {
-	return newHTTPFetch(cacheDir, ttl, grace, now, false)
+// NewHTTPFetchWithPolicyReadOnly verifies network and cached boundaries
+// against existing state, but never creates or updates either persistent
+// cache or rollback state.
+func NewHTTPFetchWithPolicyReadOnly(cacheDir, stateDir string, registries []Registry, ttl, grace time.Duration, now func() time.Time) FetchFn {
+	return newHTTPFetch(cacheDir, stateDir, registries, ttl, grace, now, FetchPolicy{})
 }
 
-func newHTTPFetch(cacheDir string, ttl, grace time.Duration, now func() time.Time, persist bool) FetchFn {
+func newHTTPFetch(cacheDir, stateDir string, registries []Registry, ttl, grace time.Duration, now func() time.Time, policy FetchPolicy) FetchFn {
 	if now == nil {
 		now = time.Now
 	}
-	if persist {
+	if policy.PersistCache {
 		_ = os.MkdirAll(cacheDir, 0o755)
 	}
+	byURL := make(map[string]Registry, len(registries))
+	for _, reg := range registries {
+		byURL[strings.TrimRight(reg.URL, "/")] = reg
+	}
 	return func(baseURL, sourceIdentity, commit, contentSHA256 string) ([]map[string]any, error) {
+		reg, trusted := byURL[strings.TrimRight(baseURL, "/")]
+		if !trusted || len(reg.PublicKeys) == 0 {
+			return nil, fmt.Errorf("registry %s is not trusted: no pinned keys to verify its page boundary", baseURL)
+		}
+		chain, err := openPageChain(reg.Name, baseURL, reg.PublicKeys, stateDir, policy.PersistState)
+		if err != nil {
+			return nil, err
+		}
 		query := url.Values{}
 		query.Set("source_identity", sourceIdentity)
 		query.Set("commit", commit)
@@ -137,25 +157,35 @@ func newHTTPFetch(cacheDir string, ttl, grace time.Duration, now func() time.Tim
 		sum := sha256.Sum256([]byte(endpoint))
 		cacheFile := filepath.Join(cacheDir, "records-"+hex.EncodeToString(sum[:])[:16]+".json")
 
-		if fetchedAt, records, ok := readRecordCache(cacheFile); ok && now().Sub(fetchedAt) < ttl {
+		if fetchedAt, records, boundary, rawBoundary, ok := readRecordCache(cacheFile); ok && now().Sub(fetchedAt) >= 0 && now().Sub(fetchedAt) < ttl &&
+			chain.cacheBoundaryCurrent(boundary, rawBoundary) {
 			return records, nil
 		}
-		records, err := httpGetAllRecords(endpoint)
+		records, err := httpGetAllRecords(chain, endpoint)
 		if err != nil {
-			if fetchedAt, cached, ok := readRecordCache(cacheFile); ok && now().Sub(fetchedAt) < grace {
+			var boundaryErr *PageBoundaryError
+			var stateErr *pageStateError
+			if errors.As(err, &boundaryErr) || errors.As(err, &stateErr) {
+				// A rejected chain contributes nothing. Keep any pre-existing
+				// cache entry on disk for a later genuine outage, but do not
+				// overwrite it or serve it for this rejected operation.
+				return nil, err
+			}
+			if fetchedAt, cached, boundary, rawBoundary, ok := readRecordCache(cacheFile); ok && now().Sub(fetchedAt) >= 0 && now().Sub(fetchedAt) < grace &&
+				chain.cacheBoundaryCurrent(boundary, rawBoundary) {
 				return cached, nil
 			}
 			return nil, err
 		}
-		if persist {
-			writeRecordCache(cacheFile, now(), records)
+		if policy.PersistCache {
+			writeRecordCache(cacheFile, now(), records, chain.chain)
 		}
 		return records, nil
 	}
 }
 
-func httpGetAllRecords(endpoint string) ([]map[string]any, error) {
-	var records []map[string]any
+func httpGetAllRecords(chain *pageChain, endpoint string) ([]map[string]any, error) {
+	records := make([]map[string]any, 0)
 	seenCursors := map[string]bool{}
 	cursor := ""
 	for {
@@ -170,7 +200,7 @@ func httpGetAllRecords(endpoint string) ([]map[string]any, error) {
 			query.Set("cursor", cursor)
 		}
 		pageURL.RawQuery = query.Encode()
-		page, next, err := httpGetRecordsPage(pageURL.String())
+		page, next, err := httpGetRecordsPage(chain, pageURL.String())
 		if err != nil {
 			return nil, err
 		}
@@ -189,7 +219,7 @@ func httpGetAllRecords(endpoint string) ([]map[string]any, error) {
 	}
 }
 
-func httpGetRecordsPage(endpoint string) ([]map[string]any, string, error) {
+func httpGetRecordsPage(chain *pageChain, endpoint string) ([]map[string]any, string, error) {
 	request, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, "", err
@@ -205,12 +235,32 @@ func httpGetRecordsPage(endpoint string) ([]map[string]any, string, error) {
 	if !isJSONResponse(result.header.Get("Content-Type")) {
 		return nil, "", fmt.Errorf("registry records response has unsupported content type %q", result.header.Get("Content-Type"))
 	}
+	var rawEnvelope map[string]json.RawMessage
+	if err := decodeJSON(result.body, &rawEnvelope); err != nil {
+		return nil, "", fmt.Errorf("registry returned invalid JSON: %v", err)
+	}
+	rawBoundary, present := rawEnvelope["boundary"]
+	if !present {
+		return nil, "", &PageBoundaryError{Diagnostic: PageBoundaryMissing, URL: chain.url, Detail: "served a records page with no boundary"}
+	}
+	if len(rawEnvelope) != 3 {
+		return nil, "", fmt.Errorf("registry records response has unknown or missing fields")
+	}
+	for key := range rawEnvelope {
+		if key != "records" && key != "next_cursor" && key != "boundary" {
+			return nil, "", fmt.Errorf("registry records response has unknown or missing fields")
+		}
+	}
+	var boundary map[string]any
+	if err := decodeJSON(rawBoundary, &boundary); err != nil || boundary == nil {
+		return nil, "", &PageBoundaryError{Diagnostic: PageBoundaryMissing, URL: chain.url, Detail: "served a records page whose boundary failed verification"}
+	}
+	if err := chain.acceptPage(boundary, rawBoundary); err != nil {
+		return nil, "", err
+	}
 	var data map[string]any
 	if err := decodeJSON(result.body, &data); err != nil {
 		return nil, "", fmt.Errorf("registry returned invalid JSON: %v", err)
-	}
-	if unknown := unknownKeys(data, "records", "next_cursor"); len(unknown) > 0 || len(data) != 2 {
-		return nil, "", fmt.Errorf("registry records response has unknown or missing fields")
 	}
 	rawRecords, ok := data["records"].([]any)
 	if !ok {
@@ -242,27 +292,36 @@ func httpGetRecordsPage(endpoint string) ([]map[string]any, string, error) {
 	return records, next, nil
 }
 
-func readRecordCache(path string) (time.Time, []map[string]any, bool) {
+func readRecordCache(path string) (time.Time, []map[string]any, map[string]any, []byte, bool) {
 	payload, err := os.ReadFile(path) // #nosec G304 -- cache under the machine home
 	if err != nil {
-		return time.Time{}, nil, false
+		return time.Time{}, nil, nil, nil, false
 	}
 	var data struct {
 		FetchedAt float64          `json:"fetched_at"`
 		Records   []map[string]any `json:"records"`
+		Boundary  json.RawMessage  `json:"boundary"`
 	}
-	if err := decodeJSON(payload, &data); err != nil {
-		return time.Time{}, nil, false
+	if err := decodeJSON(payload, &data); err != nil || data.Records == nil || len(data.Boundary) == 0 {
+		return time.Time{}, nil, nil, nil, false
+	}
+	var boundary map[string]any
+	if err := decodeJSON(data.Boundary, &boundary); err != nil || boundary == nil {
+		return time.Time{}, nil, nil, nil, false
 	}
 	seconds := int64(data.FetchedAt)
 	nanos := int64((data.FetchedAt - float64(seconds)) * 1e9)
-	return time.Unix(seconds, nanos), data.Records, true
+	return time.Unix(seconds, nanos), data.Records, boundary, data.Boundary, true
 }
 
-func writeRecordCache(path string, fetchedAt time.Time, records []map[string]any) {
+func writeRecordCache(path string, fetchedAt time.Time, records []map[string]any, boundary []byte) {
+	if len(boundary) == 0 {
+		return
+	}
 	payload, err := json.Marshal(map[string]any{
 		"fetched_at": float64(fetchedAt.UnixNano()) / 1e9,
 		"records":    records,
+		"boundary":   json.RawMessage(boundary),
 	})
 	if err != nil {
 		return

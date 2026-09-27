@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -324,6 +326,115 @@ func TestEnvStatusMatrix(t *testing.T) {
 	}
 	if !names["run"] || !names["session"] {
 		t.Fatalf("providers miss the always-reported rows: %v", names)
+	}
+}
+
+func TestEnvStatusRegistryBoundaryPostureAndCheck(t *testing.T) {
+	source, home := profileHome(t)
+	writeNativeCredentials(t)
+	pkg := t.TempDir()
+	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
+	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
+		t.Fatalf("profile install stderr:\n%s", stderr)
+	}
+	for _, profile := range []string{"acme", "default"} {
+		for _, environment := range []string{"claude_code", "codex_cli", "opencode", "pi"} {
+			if code, _, stderr := runProfile(t, source, "env", "resolve", environment, "--profile", profile, "--repair"); code != exitOK {
+				t.Fatalf("repair %s %s stderr:\n%s", profile, environment, stderr)
+			}
+		}
+	}
+	const registryURL = "https://registry.example.test"
+	source.cfg.DisableBuiltinRegistries = true
+	source.cfg.AuditRegistries = []config.Registry{{Name: "trusted", URL: registryURL, PublicKeys: []string{"ed25519:test"}, Enabled: true}}
+	bin := t.TempDir()
+	for _, name := range []string{"curator-run", "curator-session"} {
+		if runtime.GOOS == "windows" {
+			name += ".exe"
+		}
+		if err := os.WriteFile(filepath.Join(bin, name), []byte("stub"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	code, stdout, stderr := runProfile(t, source, "env", "status", "--check", "--json")
+	if code != exitOK {
+		t.Fatalf("first-use registry status --check = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+	var report struct {
+		NonCurrent      bool `json:"non_current"`
+		RegistryPosture []struct {
+			Name                 string `json:"name"`
+			URL                  string `json:"url"`
+			HighWaterVersion     *int   `json:"high_water_version"`
+			HighWaterLogSize     *int   `json:"high_water_log_size"`
+			LastBoundaryVerified bool   `json:"last_boundary_verified"`
+			Diagnostic           string `json:"diagnostic"`
+		} `json:"registry_posture"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &report); err != nil {
+		t.Fatalf("status JSON: %v\n%s", err, stdout)
+	}
+	if len(report.RegistryPosture) != 1 {
+		t.Fatalf("registry posture rows = %+v, want one configured trusted registry", report.RegistryPosture)
+	}
+	row := report.RegistryPosture[0]
+	if row.Name != "trusted" || row.URL != registryURL || row.HighWaterVersion != nil || row.HighWaterLogSize != nil || row.LastBoundaryVerified || row.Diagnostic != "" || report.NonCurrent {
+		t.Fatalf("first-use posture = %+v non_current=%v", row, report.NonCurrent)
+	}
+
+	stateDir := filepath.Join(home, "state", "registry")
+	if err := os.MkdirAll(stateDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256([]byte(registryURL))
+	stateName := "snapshot-" + hex.EncodeToString(sum[:])[:16] + ".json"
+	statePath := filepath.Join(stateDir, stateName)
+	statePayload, err := json.Marshal(map[string]any{
+		"highest_version":   17,
+		"head":              strings.Repeat("b", 64),
+		"merkle_root":       strings.Repeat("a", 64),
+		"log_size":          12,
+		"boundary_verified": true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(statePath, statePayload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	catalog := `{"schema_version":1,"states":["` + stateName + `"]}`
+	if err := os.WriteFile(filepath.Join(stateDir, "known-registries.json"), []byte(catalog), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	code, stdout, stderr = runProfile(t, source, "env", "status", "--check", "--json")
+	if code != exitOK {
+		t.Fatalf("persisted registry status --check = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+	if err := json.Unmarshal([]byte(stdout), &report); err != nil {
+		t.Fatalf("status JSON with persisted high-water: %v\n%s", err, stdout)
+	}
+	row = report.RegistryPosture[0]
+	if row.HighWaterVersion == nil || *row.HighWaterVersion != 17 || row.HighWaterLogSize == nil || *row.HighWaterLogSize != 12 || !row.LastBoundaryVerified || row.Diagnostic != "" {
+		t.Fatalf("persisted registry posture = %+v", row)
+	}
+	if err := os.WriteFile(statePath, []byte("{broken"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	code, stdout, stderr = runProfile(t, source, "env", "status", "--check", "--json")
+	if code != exitFail {
+		t.Fatalf("unreadable registry rollback state --check = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitFail, stdout, stderr)
+	}
+	if err := json.Unmarshal([]byte(stdout), &report); err != nil {
+		t.Fatalf("status JSON with unreadable state: %v\n%s", err, stdout)
+	}
+	if !report.NonCurrent || len(report.RegistryPosture) != 1 || !strings.Contains(report.RegistryPosture[0].Diagnostic, "unreadable") {
+		t.Fatalf("unreadable registry state posture = %+v non_current=%v", report.RegistryPosture, report.NonCurrent)
+	}
+	entries, err := os.ReadDir(stateDir)
+	if err != nil || len(entries) != 2 {
+		t.Fatalf("read-only status changed rollback state directory: entries=%v error=%v", entries, err)
 	}
 }
 

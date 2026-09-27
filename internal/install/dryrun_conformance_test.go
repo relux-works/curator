@@ -214,18 +214,18 @@ func loopbackRegistry(t *testing.T, calls *int) (*httptest.Server, string) {
 		}
 		return body
 	}
+	boundary := sign(map[string]any{
+		"schema_version": 1, "merkle_root": strings.Repeat("a", 64), "log_size": 1,
+		"head": strings.Repeat("b", 64), "version": 1, "created_at": createdAt,
+	})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		*calls++
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/v1/snapshot"):
-			_ = json.NewEncoder(w).Encode(sign(map[string]any{
-				"schema_version": 1, "merkle_root": strings.Repeat("a", 64), "log_size": 1,
-				"head": strings.Repeat("b", 64), "version": 1,
-				"created_at": createdAt,
-			}))
+			_ = json.NewEncoder(w).Encode(boundary)
 		case strings.HasSuffix(r.URL.Path, "/v1/records"):
-			_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{}, "next_cursor": nil})
+			_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{}, "next_cursor": nil, "boundary": boundary})
 		default:
 			http.NotFound(w, r)
 		}

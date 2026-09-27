@@ -246,6 +246,25 @@ check. The `--json` document carries the same rows under `shell_hook_trust`
 (malformed lines, unreadable state) under `shell_hook_trust_warnings`.
 `curator env status` reports the same posture rows with the same `--check`
 semantics.
+
+Both `curator status` and `curator env status` also report one registry page
+boundary row per enabled registry with pinned keys. Each row names the
+registry URL, the persisted high-water version and `log_size` when present,
+and whether the stored page-boundary posture is verified. The rows appear
+after the shell-hook and §12 posture rows; JSON uses `registry_posture`.
+First use with no high-water is informational and passes `--check`. An
+unreadable or missing-after-use rollback state is reported as unavailable and
+fails `--check`; status reads do not create or repair that state.
+
+`curator status --attest` validates the signed `boundary` on every fetched
+records page before using its records. A rejected page leaves that registry
+unknown for the attestation and prints the `registry_page_boundary_*`
+diagnostic with the registry URL in the result detail. The read-only command
+does not advance high-water state or write the record cache. A pre-existing
+cache entry remains on disk after a rejected chain but is not served for that
+operation; it is eligible for a later outage fallback only when its signed
+boundary matches the persisted high-water.
+
 For managed-home provisioning, an unreadable marker is reported as unknown,
 not unprovisioned: the scope row carries `provisioned_known: false` and an
 `environment_marker_unreadable` diagnostic, and `--check` returns non-zero.

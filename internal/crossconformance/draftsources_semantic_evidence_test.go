@@ -204,7 +204,15 @@ func (s *attestStub) serveRecords(w http.ResponseWriter, r *http.Request) {
 	default:
 		mint(nil, s.good)
 	}
-	writeStubJSON(w, map[string]any{"records": records, "next_cursor": nil})
+	boundary := s.good.sign(map[string]any{
+		"schema_version": 1,
+		"version":        1,
+		"log_size":       0,
+		"head":           strings.Repeat("ab", 32),
+		"merkle_root":    strings.Repeat("cd", 32),
+		"created_at":     time.Now().UTC().Truncate(time.Second).Format("2006-01-02T15:04:05Z"),
+	})
+	writeStubJSON(w, map[string]any{"records": records, "next_cursor": nil, "boundary": boundary})
 }
 
 func writeStubJSON(w http.ResponseWriter, value any) {

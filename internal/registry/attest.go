@@ -2,6 +2,7 @@ package registry
 
 import (
 	"path/filepath"
+	"strings"
 
 	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/marker"
@@ -63,7 +64,10 @@ func AttestRoot(scope, skillsRoot string, registries []Registry, fetch FetchFn) 
 			if resolution.Attestation != nil {
 				registryName = resolution.Attestation.Registry
 			}
-			results = append(results, AttestResult{Scope: scope, Skill: recorded.Name, Result: resolution.Result, Registry: registryName})
+			results = append(results, AttestResult{
+				Scope: scope, Skill: recorded.Name, Result: resolution.Result, Registry: registryName,
+				Detail: strings.Join(resolution.Warnings, "; "),
+			})
 			continue
 		}
 		if recorded.Commit == "" || recorded.ContentSHA256 == "" {
@@ -80,7 +84,10 @@ func AttestRoot(scope, skillsRoot string, registries []Registry, fetch FetchFn) 
 		if resolution.Attestation != nil {
 			registryName = resolution.Attestation.Registry
 		}
-		results = append(results, AttestResult{Scope: scope, Skill: recorded.Name, Result: resolution.Result, Registry: registryName})
+		results = append(results, AttestResult{
+			Scope: scope, Skill: recorded.Name, Result: resolution.Result, Registry: registryName,
+			Detail: strings.Join(resolution.Warnings, "; "),
+		})
 	}
 	return results
 }

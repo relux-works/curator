@@ -519,6 +519,8 @@ func TestProtectedRollbackStateDistinguishesAbsentAndUnreadable(t *testing.T) {
 func TestHTTPFetchCacheAndOfflineGrace(t *testing.T) {
 	s := newSigner(t)
 	calls := 0
+	current := time.Now().UTC().Truncate(time.Second)
+	boundary := s.sign(snapshotBody(1, current))
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		calls++
@@ -528,13 +530,14 @@ func TestHTTPFetchCacheAndOfflineGrace(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(record(StatusAudited))}, "next_cursor": nil})
+		_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(record(StatusAudited))}, "next_cursor": nil, "boundary": boundary})
 	}))
 	defer server.Close()
 
-	current := time.Now()
 	now := func() time.Time { return current }
-	fetch := NewHTTPFetch(t.TempDir(), time.Minute, time.Hour, now)
+	cacheDir, stateDir := t.TempDir(), t.TempDir()
+	registries := []Registry{{Name: "one", URL: server.URL, PublicKeys: []string{s.pinned}}}
+	fetch := NewHTTPFetch(cacheDir, stateDir, registries, time.Minute, time.Hour, now)
 
 	first, err := fetch(server.URL, "id", "c", "h")
 	if err != nil || len(first) != 1 {
@@ -559,15 +562,18 @@ func TestHTTPFetchCacheAndOfflineGrace(t *testing.T) {
 }
 
 func TestReadOnlyHTTPFetchDoesNotCreateCache(t *testing.T) {
+	s := newSigner(t)
 	root := t.TempDir()
 	cacheDir := filepath.Join(root, "missing-cache")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{}, "next_cursor": nil})
+		boundary := s.sign(snapshotBody(1, time.Now().UTC().Truncate(time.Second)))
+		_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{}, "next_cursor": nil, "boundary": boundary})
 	}))
 	defer server.Close()
 
-	fetch := NewHTTPFetchWithPolicyReadOnly(cacheDir, 0, 0, time.Now)
+	registries := []Registry{{Name: "one", URL: server.URL, PublicKeys: []string{s.pinned}}}
+	fetch := NewHTTPFetchWithPolicyReadOnly(cacheDir, filepath.Join(root, "missing-state"), registries, 0, 0, time.Now)
 	if _, err := fetch(server.URL, "identity", testCommit, testContentSHA256); err != nil {
 		t.Fatal(err)
 	}
@@ -625,6 +631,7 @@ func TestReadOnlySnapshotCheckDoesNotCreateOrAdvanceState(t *testing.T) {
 func TestHTTPFailuresUseOfflineCacheAndRejectSnapshots(t *testing.T) {
 	s := newSigner(t)
 	failed := false
+	boundary := s.sign(snapshotBody(1, time.Now().UTC().Truncate(time.Second)))
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if failed {
@@ -636,12 +643,13 @@ func TestHTTPFailuresUseOfflineCacheAndRejectSnapshots(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(s.sign(snapshotBody(1, time.Now())))
 			return
 		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(record(StatusAudited))}, "next_cursor": nil})
+		_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(record(StatusAudited))}, "next_cursor": nil, "boundary": boundary})
 	}))
 	defer server.Close()
 
 	current := time.Now()
-	fetch := NewHTTPFetch(t.TempDir(), time.Minute, time.Hour, func() time.Time { return current })
+	registries := []Registry{{Name: "one", URL: server.URL, PublicKeys: []string{s.pinned}}}
+	fetch := NewHTTPFetch(t.TempDir(), t.TempDir(), registries, time.Minute, time.Hour, func() time.Time { return current })
 	first, err := fetch(server.URL, "id", "commit", "hash")
 	if err != nil || len(first) != 1 {
 		t.Fatalf("initial records fetch: records=%v err=%v", first, err)
@@ -660,6 +668,7 @@ func TestHTTPFailuresUseOfflineCacheAndRejectSnapshots(t *testing.T) {
 func TestHTTPFetchFollowsBoundedPagination(t *testing.T) {
 	s := newSigner(t)
 	calls := 0
+	boundary := s.sign(snapshotBody(1, time.Now().UTC().Truncate(time.Second)))
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
 		w.Header().Set("Content-Type", "application/json")
@@ -667,16 +676,17 @@ func TestHTTPFetchFollowsBoundedPagination(t *testing.T) {
 			t.Errorf("limit = %q", r.URL.Query().Get("limit"))
 		}
 		if r.URL.Query().Get("cursor") == "" {
-			_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(record(StatusAudited))}, "next_cursor": "page-2"})
+			_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(record(StatusAudited))}, "next_cursor": "page-2", "boundary": boundary})
 			return
 		}
 		if r.URL.Query().Get("cursor") != "page-2" {
 			t.Errorf("cursor = %q", r.URL.Query().Get("cursor"))
 		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(record(StatusDeprecated))}, "next_cursor": nil})
+		_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(record(StatusDeprecated))}, "next_cursor": nil, "boundary": boundary})
 	}))
 	defer server.Close()
-	fetch := NewHTTPFetch(t.TempDir(), time.Minute, time.Hour, time.Now)
+	registries := []Registry{{Name: "one", URL: server.URL, PublicKeys: []string{s.pinned}}}
+	fetch := NewHTTPFetch(t.TempDir(), t.TempDir(), registries, time.Minute, time.Hour, time.Now)
 	records, err := fetch(server.URL, "id", "commit", "hash")
 	if err != nil || len(records) != 2 || calls != 2 {
 		t.Fatalf("records=%d calls=%d err=%v", len(records), calls, err)

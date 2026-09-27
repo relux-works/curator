@@ -158,6 +158,7 @@ func (c cli) cmdEnvStatus(cfg *config.Config, args []string) int {
 		return exitFail
 	}
 	attachProviderPosture(cfg, status)
+	attachRegistryPosture(cfg, status)
 	if *asJSON {
 		payload, err := json.MarshalIndent(status, "", "  ")
 		if err != nil {

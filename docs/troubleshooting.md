@@ -705,6 +705,52 @@ Remedy: restore access to the native target out of band — fix the
 permissions or parent, or restore the file — then re-run with
 `--repair`: repair converges and the link reads through once the
 target stats again.
+
+## Registry page-boundary diagnostics
+
+Curator requires every successful records page to carry the registry's signed
+snapshot boundary. Each rejected page contributes no records; the diagnostic
+names the registry URL. There is no legacy-accept setting.
+
+### registry_page_boundary_missing
+
+Symptom: install or `curator status --attest` reports
+`registry_page_boundary_missing` for a registry URL.
+
+Cause: the records page omitted `boundary`, the value was not a complete
+`registry-snapshot-v1` object, or its signature did not verify against that
+registry's pinned keys. The registry is excluded for the operation.
+
+Remedy: update the registry service so every `/v1/records` success response
+uses `records-response-v2` and carries the complete signed boundary. Verify
+the configured key pin matches the signing key. Retry after the service is
+corrected; do not bypass the boundary check.
+
+### registry_page_boundary_mismatch
+
+Symptom: a later cursor page reports `registry_page_boundary_mismatch`.
+
+Cause: the later page's verified boundary bytes differ from the first page's
+boundary. The client refuses the whole chain and does not advance high-water
+state from the later page.
+
+Remedy: fix the service pagination so every cursor page is evaluated at the
+captured first-page snapshot and emits the same boundary bytes. Retry the
+query after the service is healthy.
+
+### registry_page_boundary_stale
+
+Symptom: the first records page reports `registry_page_boundary_stale`.
+
+Cause: its signed boundary is below the registry URL's persisted high-water,
+or has the same version with a different `head`, `merkle_root`, or `log_size`.
+The client excludes the registry and leaves rollback state unchanged.
+
+Remedy: check that the configured URL reaches the intended registry and that
+its service is serving the current committed snapshot. Preserve the local
+rollback state and retry after the registry has recovered; deleting that state
+would remove rollback protection.
+
 ## Enforced script execution diagnostics
 
 Enforced script commands (`execution_policy: "script-worker-v1"`) launch

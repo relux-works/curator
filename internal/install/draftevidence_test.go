@@ -23,11 +23,12 @@ import (
 // install-package counterpart of the crossconformance attest stub,
 // narrowed to the draft §4 exact-matching bound.
 type draftEvidenceStub struct {
-	t       *testing.T
-	server  *httptest.Server
-	pinned  string
-	private ed25519.PrivateKey
-	mutate  func(body map[string]any)
+	t        *testing.T
+	server   *httptest.Server
+	pinned   string
+	private  ed25519.PrivateKey
+	mutate   func(body map[string]any)
+	boundary map[string]any
 }
 
 func newDraftEvidenceStub(t *testing.T, mutate func(body map[string]any)) *draftEvidenceStub {
@@ -42,6 +43,11 @@ func newDraftEvidenceStub(t *testing.T, mutate func(body map[string]any)) *draft
 		private: private,
 		mutate:  mutate,
 	}
+	stub.boundary = stub.sign(map[string]any{
+		"schema_version": 1, "version": 1, "log_size": 0,
+		"head": strings.Repeat("ab", 32), "merkle_root": strings.Repeat("cd", 32),
+		"created_at": time.Now().UTC().Truncate(time.Second).Format("2006-01-02T15:04:05Z"),
+	})
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/snapshot", stub.serveSnapshot)
 	mux.HandleFunc("/v1/records", stub.serveRecords)
@@ -72,11 +78,7 @@ func (s *draftEvidenceStub) sign(body map[string]any) map[string]any {
 
 func (s *draftEvidenceStub) serveSnapshot(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(s.sign(map[string]any{
-		"schema_version": 1, "version": 1, "log_size": 0,
-		"head": strings.Repeat("ab", 32), "merkle_root": strings.Repeat("cd", 32),
-		"created_at": time.Now().UTC().Truncate(time.Second).Format("2006-01-02T15:04:05Z"),
-	}))
+	_ = json.NewEncoder(w).Encode(s.boundary)
 }
 
 func (s *draftEvidenceStub) serveRecords(w http.ResponseWriter, r *http.Request) {
@@ -90,7 +92,7 @@ func (s *draftEvidenceStub) serveRecords(w http.ResponseWriter, r *http.Request)
 	if s.mutate != nil {
 		s.mutate(body)
 	}
-	_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(body)}, "next_cursor": nil})
+	_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(body)}, "next_cursor": nil, "boundary": s.boundary})
 }
 
 // TestDraftEvidenceExactMatch is the production-entry bound for draft §4

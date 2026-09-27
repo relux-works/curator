@@ -30,10 +30,11 @@ var snapshotStateNameRE = regexp.MustCompile(`^snapshot-[0-9a-f]{16}\.json$`)
 const snapshotStateCatalogName = "known-registries.json"
 
 type snapshotState struct {
-	HighestVersion int    `json:"highest_version"`
-	Head           string `json:"head,omitempty"`
-	MerkleRoot     string `json:"merkle_root,omitempty"`
-	LogSize        int    `json:"log_size,omitempty"`
+	HighestVersion   int    `json:"highest_version"`
+	Head             string `json:"head,omitempty"`
+	MerkleRoot       string `json:"merkle_root,omitempty"`
+	LogSize          int    `json:"log_size,omitempty"`
+	BoundaryVerified bool   `json:"boundary_verified,omitempty"`
 }
 
 type snapshotStateCatalog struct {
@@ -183,7 +184,12 @@ func checkSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch Snap
 			continue
 		}
 		if persist {
-			if err := writeSnapshotState(stateFile, snapshotState{HighestVersion: parsed.Version, Head: parsed.Head, MerkleRoot: parsed.MerkleRoot, LogSize: parsed.LogSize}); err != nil {
+			// Snapshot checks do not receive a page boundary. Preserve the
+			// last page-boundary posture while advancing the shared high-water.
+			if err := writeSnapshotState(stateFile, snapshotState{
+				HighestVersion: parsed.Version, Head: parsed.Head, MerkleRoot: parsed.MerkleRoot,
+				LogSize: parsed.LogSize, BoundaryVerified: state.BoundaryVerified,
+			}); err != nil {
 				warnings = append(warnings, fmt.Sprintf("registry %s rollback state could not be persisted: %v", reg.Name, err))
 				tampered[reg.URL] = true
 				continue
