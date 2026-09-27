@@ -999,6 +999,36 @@ regular file at a link path, two live Pi credentials — refuse with
 resolve them and re-run. The v1 marker still records path and strategy
 only.
 
+### curator env unmanage
+
+`curator env unmanage` returns marker-recorded in-place surfaces to native
+ownership (Spec environments §8.3, §8.4.1, and §9.2). By default it visits
+every registered environment; `--env` limits the operation to one. It
+removes only surfaces recorded by each environment marker, clears the
+recorded current profile for the selected scope, and removes the marker.
+
+Synopsis:
+
+```bash
+curator env unmanage [--restore-backups] [--env <env-id>] [--target <target-id>]
+```
+
+With `--restore-backups`, the newest readable takeover generation is copied
+back to its home-relative paths before the marker is removed. A missing
+backup inventory restores nothing. An inventory that cannot be established
+stops before native-home mutation with
+`environment_backup_record_unreadable`. Without the flag, generations are
+left in place and their path is printed as a notice. Credential files and
+unrecorded files are never touched. `--target` is accepted by the command
+syntax, but secondary fixed-home writes remain deferred until their home
+resolution and surface-write path are implemented.
+
+Unmanage one environment and restore its newest takeover generation:
+
+```bash
+curator env unmanage --restore-backups --env claude_code
+```
+
 ### curator ui
 
 `curator ui` opens an interactive terminal view over installed environment state.

@@ -74,7 +74,7 @@ Commands:
   skill check <dir>        validate one skill package (--locale, --json)
   global <subcommand>      init | add | remove | list | status (--check, --json) | install | update | upgrade
   profile <subcommand>     install | list | use | update | remove | sync | compose (see profile install -h)
-  env <subcommand>         resolve | status | config (see env resolve -h)
+  env <subcommand>         resolve | status | config | migrate | unmanage (see env resolve -h)
   run <env-id> ...         umbrella dispatch to curator-run (see §11)
   hybrid <subcommand>      add | remove | list | status
   audit [target] [flags]   run audit, pin trust, or publish a signed record
@@ -186,6 +186,10 @@ type cli struct {
 	stdout   io.Writer
 	stderr   io.Writer
 	userHome func() (string, error)
+	// unmanageBackupLstat and unmanageBackupReadDir are backup-inventory test
+	// seams; production commands leave them nil and envprofile uses stateread.
+	unmanageBackupLstat   func(string) (stateread.Metadata, error)
+	unmanageBackupReadDir func(string) (stateread.Directory, error)
 }
 
 func (c cli) newFlagSet(name string) *flag.FlagSet {

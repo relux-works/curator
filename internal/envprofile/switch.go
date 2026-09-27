@@ -54,10 +54,11 @@ import (
 
 // Diagnostics for switching (environments §8.5, §9.7).
 const (
-	DiagUsePartial         = "profile_use_partial"
-	DiagUnmanagedConflict  = "environment_surface_unmanaged_conflict"
-	DiagBackupExists       = "environment_backup_exists"
-	DiagUnknownEnvironment = "environment_unknown"
+	DiagUsePartial           = "profile_use_partial"
+	DiagUnmanagedConflict    = "environment_surface_unmanaged_conflict"
+	DiagBackupExists         = "environment_backup_exists"
+	DiagUnknownEnvironment   = "environment_unknown"
+	DiagWriteWouldFollowLink = "environment_write_would_follow_link"
 )
 
 // BackupRetention is the number of backup generations kept (environments

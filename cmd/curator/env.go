@@ -31,7 +31,7 @@ func machineFromConfig(cfg *config.Config) envregistry.MachineConfig {
 
 func (c cli) cmdEnv(args []string) int {
 	if len(args) == 0 {
-		_, _ = fmt.Fprintln(c.stderr, "curator: env needs a subcommand: resolve | status | config | migrate")
+		_, _ = fmt.Fprintln(c.stderr, "curator: env needs a subcommand: resolve | status | config | migrate | unmanage")
 		return exitUsage
 	}
 	cfg, code := c.loadConfig()
@@ -47,9 +47,43 @@ func (c cli) cmdEnv(args []string) int {
 		return c.cmdEnvConfig(cfg, args[1:])
 	case "migrate":
 		return c.cmdEnvMigrate(cfg, args[1:])
+	case "unmanage":
+		return c.cmdEnvUnmanage(cfg, args[1:])
 	}
 	_, _ = fmt.Fprintf(c.stderr, "curator: unknown env subcommand %q\n", args[0])
 	return exitUsage
+}
+
+func (c cli) cmdEnvUnmanage(cfg *config.Config, args []string) int {
+	flags := c.newFlagSet("env unmanage")
+	restore := flags.Bool("restore-backups", false, "restore the newest takeover backup generation")
+	environment := flags.String("env", "", "unmanage one environment (default: every environment)")
+	target := flags.String("target", "", "unmanage one secondary fixed-home target")
+	positional, err := parseInterspersed(flags, args)
+	if err != nil || len(positional) != 0 {
+		_, _ = fmt.Fprintln(c.stderr, "curator: env unmanage [--restore-backups] [--env <env-id>] [--target <target-id>]")
+		return exitUsage
+	}
+	result, err := envprofile.Unmanage(envprofile.UnmanageRequest{
+		Home:           cfg.Home(),
+		EnvID:          *environment,
+		TargetID:       *target,
+		RestoreBackups: *restore,
+		BackupLstat:    c.unmanageBackupLstat,
+		BackupReadDir:  c.unmanageBackupReadDir,
+	})
+	if err != nil {
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+		return exitFail
+	}
+	for _, home := range result.Homes {
+		_, _ = fmt.Fprintf(c.stdout, "unmanaged %s: removed %d surface(s), restored %d backup file(s)\n",
+			home.Environment, len(home.Removed), len(home.Restored))
+		if !*restore {
+			_, _ = fmt.Fprintf(c.stderr, "notice: any backup generations remain at %s\n", home.BackupPath)
+		}
+	}
+	return exitOK
 }
 
 func (c cli) cmdEnvResolve(cfg *config.Config, args []string) int {
