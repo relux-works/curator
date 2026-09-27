@@ -1,193 +1,102 @@
-# TASK-260916-3oh0u8 results — provider lookup from trust roots (E4, manager)
+# TASK-260916-3oh0u8 results
 
-Story STORY-260916-2otjbn, wave 1. Spec: curator-spec `0da4020`
-(`protocol/environments.md` §11/§11.1/§12/§12.1/§12.2,
-`profiles/manager.md` §1, `cli/curator.md`), vectors
-`conformance/v1/vectors/umbrella-provider-resolution.json`.
-Shipped profile: **revision A (warning release)**; revision B is
-implemented behind the same switch and covered by vectors, but not
-shipped. The flip is a later release.
+Role: developer
+Candidate: Story worktree on trunk, base d41da0f; no commit made.
+Spec pin: curator-spec 23435129ebc4c29e5b7f75ec72a0aa0cd3f16065 (rc.13), matching SPEC_PIN at .github/workflows/ci.yml:43.
+Normative clauses: environments.md sections 11, 11.1, 12, 12.1, 12.2; profiles/manager.md section 1.
 
-## Per-file changes
+## Changes in this candidate
 
-- `internal/config/environments.go` — new `Environments.ProviderDirectories`
-  knob: closed list of absolute paths (POSIX-absolute or Windows
-  drive-absolute with either separator, 1–4096 chars, unique),
-  default `[]`, rendered as `[]` (never null); added to
-  `EnvKnobNames` (so `env config show/set/unset` and `SplitEnvKnob`
-  accept it), `LockableEnvKeys`, and `EnvLockKey`.
-- `internal/config/config.go` — `environments.provider_directories`
-  added to the manager §1 `LockableKeys` set (system-file carry +
-  lock allowed; locked-but-unset fails closed via the existing gate).
-- `cmd/curator/umbrella.go` — trust-root resolution. One rollout
-  constant (`activeProviderRevision = providerRevisionA`); both
-  revisions implemented in `resolveProvider`:
-  - trust roots = install dir (running executable resolved through
-    symlinks) then `provider_directories` in order; first executable
-    regular file directly inside a root wins, non-executables
-    skipped, never descending; Windows searches `name+PATHEXT` in
-    order (bare name never matches, as the platform lookup does).
-  - revision A: PATH selects (own ordered search matching LookPath
-    semantics incl. empty-entry and PATHEXT handling); unreadable
-    root fails first (`subcommand_provider_root_unreadable`, first
-    root in order, never absence/fallback); managed/published
-    candidate refused (`subcommand_provider_untrusted`, path +
-    roots); inside-roots resolves silently; outside resolves with
-    `subcommand_provider_outside_trust_roots` (path, roots, hint);
-    no PATH match is `subcommand_provider_missing` (roots named)
-    even when a root holds it.
-  - revision B: roots scanned in order (unreadable fails at
-    encounter, earlier match wins); managed/published match
-    refused; diagnostic-only PATH probe refused; else missing.
-    Five outcomes disjoint.
-  - refused set = user-bin shim dir (directly inside), managed
-    skill bin dirs (global `bin` + every configured project's
-    `.agents/bin`, directly inside), environments root (at or
-    below); symlink-aware on both sides.
-  - discovery (`discoverProviderNames`) + posture rows
-    (`providerPosture`) for §12.
-- `cmd/curator/main.go` — umbrella branch threads the loaded config
-  (nil when unloadable → install dir alone) into `cmdUmbrella`.
-- `cmd/curator/env.go` — `env status` attaches provider posture after
-  `StatusOf`.
-- `cmd/curator/envstatus.go` — `provider <name>:` rows (path +
-  verdict + current/non-current) and `attachProviderPosture`
-  (refused/missing/unreadable rows set `NonCurrent`, so `--check`
-  fails; the warning row stays current).
-- `internal/envprofile/status.go` — data-only `ProviderState` +
-  verdict constants and `Status.Providers` (`providers` in JSON);
-  no §11 logic there (resolution stays in `cmd/curator` per scope).
-- `cmd/curator/umbrella_conformance_test.go` (new) — executes every
-  vector case for both revisions through `resolveProvider`.
-- `cmd/curator/umbrella_test.go` (new) — hostile plant (warned
-  end-to-end under A, refused under B), selection matrix, refused
-  dirs incl. symlink, unreadable-never-absence, missing/warning
-  text, posture rows, name/candidate parsing, shipped-revision pin.
-- `cmd/curator/envconfig_test.go`, `cmd/curator/env_test.go` —
-  knob CLI round-trip + lock tests; status matrix plants stub
-  providers (warned-current under A) and asserts the new rows and
-  the `providers` JSON member (see contract note below).
-- `internal/config/environments_test.go` — knob grammar/default/
-  render/lock/write tests; §12.2 transcription extended to seven
-  keys per the landed spec.
-- `.github/ci/platform-cases.tsv` — ledger row for
-  `TestUmbrellaProviderResolutionVectors` (all platforms,
-  `root-content`, mirroring the godriver row).
-- `CHANGELOG.md` — Unreleased E4 warning-release entry (revision B
-  later, 0016 dependency).
+- cmd/curator/umbrella.go: revision B now refuses a candidate whose symlink target resolves outside all trust roots; refusal does not fall through to a later root. Revision A's provider_directories hint uses the canonical target directory. The optional PATH override is a CLI test seam; production uses host PATH.
+- cmd/curator/main.go and cmd/curator/envstatus.go: curator status now reports provider rows in text and JSON, and --check fails for missing, refused, unreadable, or otherwise failed rows. Shared config-to-posture construction keeps env status and curator status aligned.
+- cmd/curator/umbrella_test.go and cmd/curator/status_test.go: added symlink-escape coverage and top-level status coverage for warning, missing, unreadable, and --check behavior.
+- .github/ci/platform-cases.tsv: registered the new resolver, symlink, and status tests.
+- internal/config already contains the knob implementation on trunk; no config files were changed here. The implementation is at internal/config/environments.go:338, 731-761, 1120, 1138 and internal/config/config.go:66. It parses unique absolute POSIX or Windows-drive paths, writes the default empty list, and includes the system-lockable key.
 
-## How each AC line is met (file:line)
+## Rules, vectors, and production entries
 
-- "Conformance subset green" — `TestUmbrellaProviderResolutionVectors`
-  (`cmd/curator/umbrella_conformance_test.go:58`): all 14 cases ×
-  both revisions pass against `0da4020` (exit 0). Provider schema
-  cases: all four `invalid-provider-directories-*` schema cases
-  (manager + system families) pass through `Load`, and the minimal
-  invalid vector `schema2-provider-directories-relative` passes
-  through `Parse`; the full-file *valid* provider cases reject
-  only for the sibling story's `transitive_system_modules` /
-  `system_module_waivers` knobs (verified: zero failures mention
-  `provider_directories`).
-- "a curator-run planted through a PATH entry outside the trust
-  roots is refused" — refused under B:
-  `TestUmbrellaHostilePathPlantRefusedUnderB`
-  (`cmd/curator/umbrella_test.go`), plus the vector case
-  `s6-planted-path-provider-warns-then-refuses` (B expects
-  `subcommand_provider_untrusted`, null resolved); warned under
-  the shipped A: `TestUmbrellaHostilePathPlantWarnsUnderAEndToEnd`
-  (end-to-end through `run()`: dispatches + warns).
+| Rule | Production entry and evidence |
+| --- | --- |
+| Revision A keeps PATH selection and warns with the resolved path, roots, and provider_directories hint. | resolveRevisionA and warningText in cmd/curator/umbrella.go:136-152, 367-369. Pinned vector suite includes the S6 planted PATH case; end-to-end A warning test passed. |
+| Revision B selects install directory then provider_directories and never dispatches a PATH-only candidate. | resolveRevisionB in cmd/curator/umbrella.go:162-194. All 14 published cases ran against both revisions (28 resolver comparisons); S6 PATH plant was refused under B and warned under A. |
+| Published/managed candidates are refused; unreadable roots are not absence or fallback; missing and refusal outcomes stay distinct. | cmd/curator/umbrella.go:137-147, 162-194. Published, managed, missing, and unreadable vector cases passed; unreadable and refused provider posture rows are non-current. |
+| A symlink inside a trust root cannot escape it under B. | New containment check at cmd/curator/umbrella.go:176-183 and regression at cmd/curator/umbrella_test.go:134-177. A still selects and warns; B refuses before trying a later root. |
+| Status reports every discovered provider and always run/session, including missing and unreadable outcomes. | env status uses providerPostureForConfig at cmd/curator/envstatus.go:163-183. curator status emits rows and checks currency at cmd/curator/main.go:838-844, 908-914, 948-963. CLI test at cmd/curator/status_test.go:1826-1914 covers warning, missing, unreadable, and --check. |
+| Config schema is consumed from the pinned root. | TestManagerConfigV2SchemaCases and TestSystemConfigV2SchemaCases at internal/config/environments_conformance_test.go:102-132 index and execute all cases. The root includes valid-provider-directories, valid-provider-directories-windows-drive, invalid-provider-directories-relative, and invalid-provider-directories-duplicate manager cases, plus the corresponding system negative cases. |
 
-## Validation transcripts (real exit codes, `sh`, unpiped gates)
+The rc.13 root publishes the provider vectors, so this candidate does not use a root-content skip for that family. TestUmbrellaProviderResolutionVectors skips only when CURATOR_CONFORMANCE_ROOT is unset; with the pinned root it fails if the vector file or cases are absent. The ledger already records 14 cases at .github/ci/conformance-case-counts.tsv:61.
 
-Conformance root exported unless noted:
-`CURATOR_CONFORMANCE_ROOT=…/curator-spec/conformance/v1` (`0da4020`).
+## Conformance-gap ledger
 
-- `go build ./...` → exit 0.
-- `go vet ./...` → exit 0.
-- `gofmt -l .` → clean (no output).
-- `golangci-lint run ./cmd/curator/... ./internal/config/...
-  ./internal/envprofile/...` → exit 0, 0 issues (one
-  `ineffassign` in a new test found and fixed first).
-- `go test ./cmd/curator/ -run '<22-test mask: all umbrella,
-  vector, env-status, envconfig-knob, TestRunUnknownCommand>'`
-  → exit 0, 22/22 PASS, 14/14 vector subtests PASS.
-- `go test ./cmd/curator/ -run 'TestEnv|TestUmbrella|TestRun|
-  TestConfig|TestGlobal|TestProfile'` → exit 0, `ok` (454 s;
-  96 tests matched, zero FAIL/panic lines in the log).
-- `go test ./internal/config/ -run '<knob mask>'` → exit 0.
-- `go test ./internal/config/` (full) → exit 1: 44 subtests fail,
-  ALL solely for out-of-scope knobs (`transitive_system_modules`,
-  `system_module_waivers`, and the S4 `passable_env_names`
-  default change). Proven same-root causes, none mine:
-  `unsupported field` counts are 11× system_module_waivers, 8×
-  transitive_system_modules, 1× lock refusal for transitive; and
-  `schema2-passable-env-absent-empty` fails identically on the
-  pristine baseline (verified via stash + rerun + pop, exit 1
-  both ways). On the CI pin (`87a0d00`) these cases do not exist
-  and the package is green.
-- `go test ./internal/envprofile/ -run 'TestStatus|TestProvider|
-  StatusOf'` → exit 0. Full package: NOT green in this session —
-  `TestSCPOverlayResolvesAsGit` (git-subprocess overlay test in
-  an untouched file) hung past the 10 m `go test` timeout under
-  concurrent-agent load on this host; unrelated to this change
-  (my envprofile diff adds only a struct field/type/constants).
-- Skip paths: unset root → exit 0, `SKIP
-  (CURATOR_CONFORMANCE_ROOT is not set)`; root without the vector
-  → exit 0, `SKIP (… publishes no umbrella-provider-resolution
-  vector)` — the `publishes no ` root-content pattern.
-- Narrowing mutants (each reverted after; revert verified by
-  grep): B-probe-refusal→missing → exit 1 (4 vector subtests +
-  hostile test fail; trust-root refusal still passes, proving
-  narrowness); A-warn→silent → exit 1 (4 vector subtests + 3
-  warn tests fail); grammar accepts relative → exit 1
-  (`schema2-provider-directories-relative` vector + 3 unit
-  subtests fail).
-- Full `go test ./cmd/curator/` (incl. compiled-build lanes) was
-  NOT run here: the package TestMain serializes on the host
-  GOROOT lock, which concurrent agents on this host hold for
-  minutes at a time (one attempt failed to acquire it within
-  TestMain's 5 min budget without running a single test). The
-  runtime's `scripts/remote-gate.sh` runs the full suite at
-  handoff. Relevant-blast-radius subsets above are green.
+Baseline d41da0f: 69 data rows, 0 owned by STORY-260916-2otjbn or TASK-260916-3oh0u8.
+Candidate: 69 data rows, 0 owned by this Story/task.
+No owned row passed and therefore none required removal. Other owners' rows were left unchanged.
 
-## Profile shipped
+## Narrowing mutants
 
-Revision A (warning release): `activeProviderRevision =
-providerRevisionA` (`cmd/curator/umbrella.go`), pinned by
-`TestActiveRevisionIsWarningRelease`. PATH still selects; the
-trust verdict warns. Revision B ships in a later release.
+All overlays were temporary files under TMPDIR; no mutants were written into the worktree.
 
-## Deliberately out of scope
+| Mutant | Before/new gate evidence |
+| --- | --- |
+| Remove the B canonical-target containment check. | Existing vector/selection/refusal mask survived: exit 0. The new TestUmbrellaTrustedRootSymlinkEscape then failed on B dispatching the escaped symlink: exit 1. This demonstrates the old coverage gap and the new regression kill. |
+| Weaken the revision-A outside-roots warning to silent resolution. | TestUmbrellaProviderResolutionVectors failed on warning cases: exit 1. |
+| Dispatch the revision-B PATH probe result. | TestUmbrellaProviderResolutionVectors failed on the S6 plant and other PATH-only/refused cases: exit 1. |
+| Treat unreadable trust roots as absence. | TestUmbrellaUnreadableRootNeverAbsence failed because revision A warned from PATH: exit 1. |
+| Remove manager-published/managed directory refusal. | TestUmbrellaRefusedDirectoriesBothRevisions and TestUmbrellaSymlinkIntoManagedRefused failed: exit 1. |
+| Keep status rows but suppress --check failure for non-current providers. | TestCuratorStatusProviderPostureAndCheck failed because missing rows returned exit 0 instead of exit 1; mutant test command exited 1. |
 
-- Launcher side (`TASK-260916-16ys92`), proposal 0016 itself,
-  SPEC_PIN, spec edits.
-- Sibling knobs in the same root families
-  (`transitive_system_modules`, `system_module_waivers`, S4
-  `passable_env_names` default): not implemented; their red
-  cases are reported, not patched around.
-- `curator status` (project-skills surface) carries no provider
-  rows: the spec defines provider posture under `env status`
-  (§12) only, and the brief names `envstatus.go`. Adding rows to
-  `curator status` would invent spec surface.
+Overlay setup attempts that did not represent behavioral mutants also exited 1 (unused local variables in two initial overlays and one incorrect overlay filename); the overlays were corrected before the kills above and those setup failures are not counted as gate evidence.
 
-## Spec gaps / decisions (reported, not patched)
+## Local validation transcripts
 
-- §11 does not order the revision-A unreadable check against the
-  managed-dir refusal. Implemented: readability first (the
-  general "MUST NOT fall through … to PATH" bullet forbids
-  consulting PATH selection while a root is unreadable).
-- §11 does not say whether a revision-B earlier match outranks a
-  later unreadable root. Implemented encounter order (earlier
-  match wins; "no LATER root … fires"), with a committed test.
-- "Ownership/writability check" (task description): no MUST-level
-  writability enforcement exists in §11 (operator-administered
-  roots are SHOULD-level and unvectorized); implemented as the
-  manager-owned-directory refusal, extended to skill bin dirs.
-- The root's invalid `provider-directories` schema cases are
-  full every-knob files: they reject for the sibling knobs first
-  and cannot isolate this grammar until that story lands. The
-  minimal invalid vector + unit tests isolate it (proven by M3).
-- Existing `TestEnvStatusMatrix` asserted post-repair `--check`
-  exit 0 under the pre-E4 contract; the landed spec makes
-  missing provider rows non-current, so the test now plants stub
-  providers (warned-current under A) with that standing noted.
+Passing commands:
+
+- CURATOR_CONFORMANCE_ROOT=/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T//TASK-260916-3oh0u8-rc13.tVXCPS/root/conformance/v1 go test ./cmd/curator -run '^(TestUmbrellaTrustedRootSymlinkEscape|TestUmbrellaProviderResolutionVectors|TestCuratorStatusProviderPostureAndCheck|TestStatusJSONKeepsTheLegacyShapeWithoutCompiledCommands|TestUmbrellaHostilePathPlantWarnsUnderAEndToEnd|TestUmbrellaHostilePathPlantRefusedUnderB|TestUmbrellaRefusedDirectoriesBothRevisions|TestUmbrellaUnreadableRootNeverAbsence|TestProviderPostureRows)$' -count=1 — exit 0.
+- CURATOR_CONFORMANCE_ROOT=/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T//TASK-260916-3oh0u8-rc13.tVXCPS/root/conformance/v1 go test ./cmd/curator -run '^TestUmbrellaProviderResolutionVectors$' -count=1 -v — exit 0; 14 driven, 0 known-gap, 0 bound, 0 skipped, 14 total; each case compared A and B.
+- CURATOR_CONFORMANCE_ROOT=/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T//TASK-260916-3oh0u8-rc13.tVXCPS/root/conformance/v1 go test ./internal/config -run 'TestManagerConfigV2SchemaCases|TestSystemConfigV2SchemaCases|TestManagerConfigV2Vectors' -count=1 — exit 0.
+- CURATOR_CONFORMANCE_ROOT=/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T//TASK-260916-3oh0u8-rc13.tVXCPS/root/conformance/v1 go test ./internal/config -run '^(TestManagerConfigV2SchemaCases|TestSystemConfigV2SchemaCases)$' -count=1 -v — exit 0; manager schema 78 driven / 29 known-gap / 0 skipped of 107; system schema 36 driven / 6 known-gap / 0 skipped of 42. Provider-directory cases passed; remaining known gaps belong to other findings.
+- go test ./internal/config/... — exit 0.
+- go test ./internal/config -run '^TestProviderDirectories' -count=1 — exit 0.
+- go test ./internal/envprofile -run '^TestManagerOwnedAbsenceReadsAreGuarded$' -count=1 — exit 0.
+- go build ./... — exit 0.
+- go vet ./... — exit 0.
+- gofmt -l cmd internal — exit 0, no output.
+- golangci-lint run — exit 0, 0 issues.
+- git diff --check — exit 0.
+
+Additional commands and limits:
+
+- CURATOR_CONFORMANCE_ROOT=/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T//TASK-260916-3oh0u8-rc13.tVXCPS/root/conformance/v1 go test ./cmd/curator/... — exit 1: package test timed out at 10 minutes in unrelated TestDraftTransportIdentityInvalidSurfacesThroughCLI while fingerprintToolchain/digestToolchainRecords read the host Go toolchain. No provider assertion failure was reported. The focused provider/status suite above passed afterward; the full package suite remains locally unverified.
+- The updated status test first waited on the package host-GOROOT lock held by another concurrent run and exited 1 after 301.623 seconds. After that run exited, the focused suite passed. No lock was bypassed.
+- gofmt -l . — exit 0, but listed 24 archived Go files under .task-board/.resources. None were candidate source files; gofmt -l cmd internal was clean.
+- Early focused iterations exited 1 for a Darwin /var versus /private/var expected-path spelling and two status-test fixture-order/config-version mistakes. The assertions/fixture were corrected; final focused command exits 0 as recorded above.
+
+## Handoff notes and release preparation
+
+The archived refs/campaign/2otjbn-full-20260927 patch was inspected as reference and not applied. The current task resources contain no standalone revision-1 review-verdict artifact; the attached hold and revision-1 validation history explain the old rc.11 pin lag. Current SPEC_PIN is rc.13.
+
+No CHANGELOG.md or LOGBOOK.md edit was made, per the newer campaign rules. Findings, decisions, and anomalies are recorded here.
+
+## CHANGELOG entry (for release prep)
+
+E4: ship the warning release (revision A), keeping PATH selection while warning with subcommand_provider_outside_trust_roots, the resolved provider path, consulted trust roots, and a provider_directories migration hint. Revision B will refuse PATH-only providers in a later release. This is the warn-first step for the proposal 0016 path_prepend dependency.
+
+The hosted gate for this new candidate has not run yet; the task-board handoff/runtime gate is the arbiter.
+
+## Revision 3 — re-apply on eca2bf27
+
+Re-applied the accepted rev2 patch from `refs/campaign/2otjbn-rev2-20260927` onto the fresh trunk base `eca2bf27`. The two expected conflicts were resolved by retaining both sides: trunk's registry boundary posture and rev2's provider posture in `cmd/curator/envstatus.go` and `cmd/curator/main.go`. No code outside those two conflict resolutions was introduced. The other four changed paths (`.github/ci/platform-cases.tsv`, `cmd/curator/status_test.go`, `cmd/curator/umbrella.go`, `cmd/curator/umbrella_test.go`) compare byte-for-byte with rev2 (`git diff --quiet refs/campaign/2otjbn-rev2-20260927 -- <four paths>`: exit 0). The worktree delta is exactly the six rev2 paths; no commit was made.
+
+The attached `TASK-260916-3oh0u8_review-verdict-rev2.md` currently says **ACCEPTED** and names `TestUmbrellaTrustedRootSymlinkEscape`; the review-round note says rev2 was rejected. I found no rejection rationale in the attached verdict. To answer the requested regression/mutant evidence, I reran that named test and performed a temporary narrowing mutant against its canonical-target check. The mutant changed the containment input from the resolved canonical provider path to the lexical symlink path; the test then failed because revision B dispatched the escaped provider (mutant command exit 1). I restored the source byte-for-byte, reran the regression green, and verified `cmd/curator/umbrella.go` still matches rev2.
+
+### Revision 3 validation transcripts
+
+- `go build ./...` — exit 0 (after restoring the mutant).
+- `env CURATOR_CONFORMANCE_ROOT=/Users/administrator/Developer/ReluxWorks/curator/curator-spec/conformance/v1 go test ./cmd/curator -run '^TestUmbrellaProviderResolutionVectors$' -count=1 -v` — exit 0; 14 driven, 0 known-gap, 0 bound, 0 skipped; all 14 cases compared both revisions.
+- `go test ./cmd/curator -run '^TestUmbrella(HostilePathPlantWarnsUnderAEndToEnd|HostilePathPlantRefusedUnderB|TrustedRootSymlinkEscape)$' -count=1` — exit 0.
+- `go test ./cmd/curator -run '^TestCuratorStatusProviderPostureAndCheck$' -count=1` — exit 0.
+- `go test ./cmd/curator -run '^TestUmbrellaTrustedRootSymlinkEscape$' -count=1` — exit 1 while the temporary lexical-path mutant was present (expected kill); exit 0 after restoring the accepted implementation.
+- The requested broad mask `env CURATOR_CONFORMANCE_ROOT=/Users/administrator/Developer/ReluxWorks/curator/curator-spec/conformance/v1 go test ./cmd/curator -run 'Umbrella|Provider|EnvStatus|Status|Boundary|Attest'` — exit 1 after Go's 10-minute test timeout in `TestEnvStatusMissingAndUnreadableKeepRecord`, inside envprofile/contextlock canonical JSON processing. No provider assertion failed before timeout. The provider vector, hostile PATH, symlink, and status-provider tests were rerun in the bounded masks above and passed.
+- `git diff --check HEAD -- . ':!.task-board'` — exit 0. The four non-conflicting paths compare byte-for-byte with rev2 (exit 0). Final changed-path listing: `.github/ci/platform-cases.tsv`, `cmd/curator/envstatus.go`, `cmd/curator/main.go`, `cmd/curator/status_test.go`, `cmd/curator/umbrella.go`, `cmd/curator/umbrella_test.go`.
+
+This re-apply changed no `CHANGELOG.md`, `LOGBOOK.md`, configuration, spec pin, or conformance ledger. The hosted gate for this re-applied candidate has not yet run; handoff will publish it for the configured gate.
