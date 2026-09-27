@@ -1,0 +1,976 @@
+diff --git a/.github/ci/conformance-case-counts.tsv b/.github/ci/conformance-case-counts.tsv
+index 2ff76862..d9edd023 100644
+--- a/.github/ci/conformance-case-counts.tsv
++++ b/.github/ci/conformance-case-counts.tsv
+@@ -70,3 +70,4 @@ environments-env-passthrough/allowlist-empty-cases	6
+ environments-env-passthrough/schema-cases	4
+ environments-env-passthrough/surfacing-cases	6
+ environments-env-passthrough/surfacing-order-cases	2
++environments-read-failure/restore	2
+diff --git a/.github/ci/platform-cases.tsv b/.github/ci/platform-cases.tsv
+index fc2a919b..e7dacd87 100644
+--- a/.github/ci/platform-cases.tsv
++++ b/.github/ci/platform-cases.tsv
+@@ -679,6 +679,7 @@ cmd/curator	TestCLIAuditEmitsScriptLabels	linux,darwin,windows	-	-	curator audit
+ cmd/curator	TestCLIAuditMixedSkillRecordsBothPolicies	linux,darwin,windows	-	-	curator audit records enforced identity and explicit absence for a mixed skill
+ cmd/curator	TestCLIAuditJSONCarriesScriptLabels	linux,darwin,windows	-	-	curator audit JSON carries warning labels and per-command policy identities
+ cmd/curator	TestCLIAuditJSONRecordsExplicitAbsence	linux,darwin,windows	-	-	curator audit JSON records declared-only policy absence explicitly
++cmd/curator	TestEnvUnmanageBackupRecordVectors	linux,darwin,windows	linux,darwin,windows	root-unset	rc.13 backup-record restore vectors drive curator env unmanage through the CLI; unreadable inventory refuses before mutation and absent inventory restores nothing
+ 
+ # ===========================================================================
+ # Decision 0017 credential-link repairs and explicit migration (F-C1/F-C2/F-C3).
+diff --git a/README.md b/README.md
+index f0fd74ba..f4f567b4 100644
+--- a/README.md
++++ b/README.md
+@@ -177,6 +177,7 @@ curator profile remove <name> [--purge]  # refuse while current in any scope
+ curator profile sync    # re-materialize current profiles across adapters
+ curator env resolve <env-id> [--profile <name>] [--repair] [--format json|env|shell]
+ curator env status [--check] [--json]  # profile x environment x surface matrix
++curator env unmanage [--restore-backups] [--env <env-id>]
+ curator env config show|set|unset [<knob> [<value>]]  # section 12.1 knobs
+ # <env-id> accepts claude and codex as aliases of claude_code and codex_cli;
+ # outputs, markers, fragments, and config keep the canonical id.
+diff --git a/cmd/curator/env.go b/cmd/curator/env.go
+index 8d2aa6b7..0f6853f4 100644
+--- a/cmd/curator/env.go
++++ b/cmd/curator/env.go
+@@ -31,7 +31,7 @@ func machineFromConfig(cfg *config.Config) envregistry.MachineConfig {
+ 
+ func (c cli) cmdEnv(args []string) int {
+ 	if len(args) == 0 {
+-		_, _ = fmt.Fprintln(c.stderr, "curator: env needs a subcommand: resolve | status | config | migrate")
++		_, _ = fmt.Fprintln(c.stderr, "curator: env needs a subcommand: resolve | status | config | migrate | unmanage")
+ 		return exitUsage
+ 	}
+ 	cfg, code := c.loadConfig()
+@@ -47,11 +47,45 @@ func (c cli) cmdEnv(args []string) int {
+ 		return c.cmdEnvConfig(cfg, args[1:])
+ 	case "migrate":
+ 		return c.cmdEnvMigrate(cfg, args[1:])
++	case "unmanage":
++		return c.cmdEnvUnmanage(cfg, args[1:])
+ 	}
+ 	_, _ = fmt.Fprintf(c.stderr, "curator: unknown env subcommand %q\n", args[0])
+ 	return exitUsage
+ }
+ 
++func (c cli) cmdEnvUnmanage(cfg *config.Config, args []string) int {
++	flags := c.newFlagSet("env unmanage")
++	restore := flags.Bool("restore-backups", false, "restore the newest takeover backup generation")
++	environment := flags.String("env", "", "unmanage one environment (default: every environment)")
++	target := flags.String("target", "", "unmanage one secondary fixed-home target")
++	positional, err := parseInterspersed(flags, args)
++	if err != nil || len(positional) != 0 {
++		_, _ = fmt.Fprintln(c.stderr, "curator: env unmanage [--restore-backups] [--env <env-id>] [--target <target-id>]")
++		return exitUsage
++	}
++	result, err := envprofile.Unmanage(envprofile.UnmanageRequest{
++		Home:           cfg.Home(),
++		EnvID:          *environment,
++		TargetID:       *target,
++		RestoreBackups: *restore,
++		BackupLstat:    c.unmanageBackupLstat,
++		BackupReadDir:  c.unmanageBackupReadDir,
++	})
++	if err != nil {
++		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
++		return exitFail
++	}
++	for _, home := range result.Homes {
++		_, _ = fmt.Fprintf(c.stdout, "unmanaged %s: removed %d surface(s), restored %d backup file(s)\n",
++			home.Environment, len(home.Removed), len(home.Restored))
++		if !*restore {
++			_, _ = fmt.Fprintf(c.stderr, "notice: any backup generations remain at %s\n", home.BackupPath)
++		}
++	}
++	return exitOK
++}
++
+ func (c cli) cmdEnvResolve(cfg *config.Config, args []string) int {
+ 	flags := c.newFlagSet("env resolve")
+ 	profile := flags.String("profile", "", "profile name (default: the current profile)")
+diff --git a/cmd/curator/env_unmanage_test.go b/cmd/curator/env_unmanage_test.go
+new file mode 100644
+index 00000000..e4f81ecc
+--- /dev/null
++++ b/cmd/curator/env_unmanage_test.go
+@@ -0,0 +1,326 @@
++package main
++
++import (
++	"encoding/json"
++	"errors"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/conformancecoverage"
++	"github.com/relux-works/curator/internal/envprofile"
++	"github.com/relux-works/curator/internal/envregistry"
++	"github.com/relux-works/curator/internal/stateread"
++)
++
++type readFailureVectorDocument struct {
++	Cases []readFailureVector `json:"cases"`
++}
++
++type readFailureVector struct {
++	Name         string                    `json:"name"`
++	Operation    string                    `json:"operation"`
++	FileClass    string                    `json:"file_class"`
++	Presence     string                    `json:"presence"`
++	EntryKind    string                    `json:"entry_kind"`
++	FailureClass string                    `json:"failure_class"`
++	Expected     readFailureVectorExpected `json:"expected"`
++}
++
++type readFailureVectorExpected struct {
++	Diagnostic *string `json:"diagnostic"`
++	Written    *bool   `json:"written"`
++}
++
++type unmanageFixture struct {
++	source      stubConfigSource
++	managerHome string
++	nativeHome  string
++	backupRoot  string
++	backupFile  string
++	markerPath  string
++	surfacePath string
++}
++
++func TestEnvUnmanageBackupRecordVectors(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	payload, err := os.ReadFile(filepath.Join(root, "vectors", "environments-read-failure.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var document readFailureVectorDocument
++	if err := json.Unmarshal(payload, &document); err != nil {
++		t.Fatalf("decode environments-read-failure.json: %v", err)
++	}
++	var cases []readFailureVector
++	for _, published := range document.Cases {
++		if published.Operation == "restore" && published.FileClass == "backup-record" {
++			cases = append(cases, published)
++		}
++	}
++	want := []string{
++		"backup-record-unreadable-restore-stops",
++		"backup-record-absent-restore-nothing",
++	}
++	if len(cases) != len(want) {
++		t.Fatalf("rc.13 publishes %d backup-record restore vectors, want %d", len(cases), len(want))
++	}
++	got := map[string]bool{}
++	for _, item := range cases {
++		got[item.Name] = true
++	}
++	for _, name := range want {
++		if !got[name] {
++			t.Fatalf("rc.13 backup-record restore vector %q is missing", name)
++		}
++	}
++
++	conformancecoverage.Run(t, "environments-read-failure/restore", cases,
++		func(item readFailureVector) string { return item.Name },
++		func(caseT *testing.T, item readFailureVector) {
++			runBackupRecordRestoreVector(caseT, item)
++		})
++}
++
++func runBackupRecordRestoreVector(t *testing.T, item readFailureVector) {
++	t.Helper()
++	withBackup := item.Presence == "present" && item.EntryKind == "directory"
++	fixture := newUnmanageFixture(t, withBackup)
++	if item.Expected.Written == nil || *item.Expected.Written {
++		t.Fatalf("vector %s expected.written = %v; this consumer requires the rc.13 no-write assertion", item.Name, item.Expected.Written)
++	}
++	if item.Presence == "absent" {
++		if _, err := os.Lstat(fixture.backupRoot); !os.IsNotExist(err) {
++			t.Fatalf("absent backup-record fixture has inventory %s (%v)", fixture.backupRoot, err)
++		}
++	}
++
++	var readDir func(string) (stateread.Directory, error)
++	if item.FailureClass == "io-error" && item.Presence == "present" {
++		readDir = func(directory string) (stateread.Directory, error) {
++			if filepath.Clean(directory) == filepath.Clean(fixture.backupRoot) {
++				return stateread.Directory{Kind: stateread.KindUnreadable}, &stateread.Error{
++					Kind: stateread.KindUnreadable, Path: directory, Cause: errors.New("injected I/O error"),
++				}
++			}
++			return stateread.ReadDir(directory)
++		}
++	}
++
++	beforeSurface := readFileForUnmanageTest(t, fixture.surfacePath)
++	beforeMarker := readFileForUnmanageTest(t, fixture.markerPath)
++	beforeBackup := []byte(nil)
++	if withBackup {
++		beforeBackup = readFileForUnmanageTest(t, fixture.backupFile)
++	}
++	beforeCurrent, err := envprofile.Current(fixture.managerHome)
++	if err != nil {
++		t.Fatal(err)
++	}
++
++	code, stdout, stderr := runEnvUnmanageWithReadDir(t, fixture.source, readDir, "--restore-backups")
++	if item.Expected.Diagnostic != nil {
++		if code != exitFail || !strings.Contains(stderr, *item.Expected.Diagnostic) || !strings.Contains(stderr, stateread.DiagUnreadable) {
++			t.Fatalf("%s CLI result = %d\nstdout:\n%s\nstderr:\n%s; want typed %s refusal", item.Name, code, stdout, stderr, *item.Expected.Diagnostic)
++		}
++		if got := readFileForUnmanageTest(t, fixture.surfacePath); string(got) != string(beforeSurface) {
++			t.Fatal("unreadable backup inventory changed the managed surface before refusing")
++		}
++		if got := readFileForUnmanageTest(t, fixture.markerPath); string(got) != string(beforeMarker) {
++			t.Fatal("unreadable backup inventory removed or replaced the marker")
++		}
++		if got := readFileForUnmanageTest(t, fixture.backupFile); string(got) != string(beforeBackup) {
++			t.Fatal("unreadable backup inventory changed the recorded backup")
++		}
++		if got, err := envprofile.Current(fixture.managerHome); err != nil || got != beforeCurrent {
++			t.Fatalf("unreadable backup inventory changed the current profile: %q (%v), want %q", got, err, beforeCurrent)
++		}
++		return
++	}
++
++	if code != exitOK {
++		t.Fatalf("%s CLI result = %d\nstdout:\n%s\nstderr:\n%s", item.Name, code, stdout, stderr)
++	}
++	if strings.Contains(stderr, envregistry.DiagBackupRecordUnreadable) {
++		t.Fatalf("absent inventory was treated as unreadable:\n%s", stderr)
++	}
++	if _, err := os.Lstat(fixture.surfacePath); !os.IsNotExist(err) {
++		t.Fatalf("unmanage did not remove the recorded managed surface: %s (%v)", fixture.surfacePath, err)
++	}
++	if _, err := os.Lstat(fixture.markerPath); !os.IsNotExist(err) {
++		t.Fatalf("unmanage did not remove the marker: %s (%v)", fixture.markerPath, err)
++	}
++	if _, err := os.Lstat(fixture.backupRoot); !os.IsNotExist(err) {
++		t.Fatalf("unmanage created or changed the absent backup inventory: %s (%v)", fixture.backupRoot, err)
++	}
++	if got, err := envprofile.Current(fixture.managerHome); err != nil || got != "" {
++		t.Fatalf("successful default unmanage left current profile %q (%v)", got, err)
++	}
++}
++
++func newUnmanageFixture(t *testing.T, withTakeoverBackup bool) unmanageFixture {
++	t.Helper()
++	source, managerHome := profileHome(t)
++	native := os.Getenv("CLAUDE_CONFIG_DIR")
++	if err := os.MkdirAll(native, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	surface := filepath.Join(native, "CLAUDE.md")
++	if withTakeoverBackup {
++		if err := os.WriteFile(surface, []byte("operator-owned context\n"), 0o644); err != nil {
++			t.Fatal(err)
++		}
++	}
++	// A first install activates automatically when there is no current
++	// profile. Seed a distinct current so the explicit scoped profile use
++	// below is the operation that records any takeover backup.
++	if err := envprofile.SetCurrent(managerHome, "prior-profile"); err != nil {
++		t.Fatal(err)
++	}
++	pkg := t.TempDir()
++	writeContextPackage(t, pkg, "acme", "1.0.0", "managed context\n")
++	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
++		t.Fatalf("profile install = %d\nstderr:\n%s", code, stderr)
++	}
++	arguments := []string{"profile", "use", "acme", "--env", "claude_code"}
++	if withTakeoverBackup {
++		arguments = append(arguments, "--takeover")
++	}
++	if code, _, stderr := runProfile(t, source, arguments...); code != exitOK {
++		t.Fatalf("profile use = %d\nstderr:\n%s", code, stderr)
++	}
++	if err := envprofile.SetCurrent(managerHome, "acme"); err != nil {
++		t.Fatal(err)
++	}
++	fixture := unmanageFixture{
++		source: source, managerHome: managerHome, nativeHome: native,
++		backupRoot:  filepath.Join(native, ".agent-environment-backup"),
++		markerPath:  filepath.Join(native, ".agent-environment.json"),
++		surfacePath: surface,
++	}
++	if withTakeoverBackup {
++		fixture.backupFile = filepath.Join(fixture.backupRoot, "1", "CLAUDE.md")
++		if got := readFileForUnmanageTest(t, fixture.backupFile); string(got) != "operator-owned context\n" {
++			t.Fatalf("takeover backup = %q, want original operator bytes", got)
++		}
++	}
++	return fixture
++}
++
++func runEnvUnmanageWithReadDir(t *testing.T, source stubConfigSource, readDir func(string) (stateread.Directory, error), args ...string) (int, string, string) {
++	return runEnvUnmanageWithReaders(t, source, nil, readDir, args...)
++}
++
++func runEnvUnmanageWithReaders(t *testing.T, source stubConfigSource, lstat func(string) (stateread.Metadata, error), readDir func(string) (stateread.Directory, error), args ...string) (int, string, string) {
++	t.Helper()
++	var stdout, stderr strings.Builder
++	command := cli{
++		config: source, stdout: &stdout, stderr: &stderr, userHome: os.UserHomeDir,
++		unmanageBackupLstat: lstat, unmanageBackupReadDir: readDir,
++	}
++	code := command.run(append([]string{"env", "unmanage"}, args...))
++	return code, stdout.String(), stderr.String()
++}
++
++func readFileForUnmanageTest(t *testing.T, path string) []byte {
++	t.Helper()
++	payload, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatalf("read fixture %s: %v", path, err)
++	}
++	return payload
++}
++
++func TestEnvUnmanageDoesNotRestoreWithoutAnObservedRecord(t *testing.T) {
++	fixture := newUnmanageFixture(t, true)
++	lstat := func(path string) (stateread.Metadata, error) {
++		if filepath.Clean(path) == filepath.Clean(fixture.backupRoot) {
++			return stateread.Metadata{Kind: stateread.KindAbsent}, nil
++		}
++		return stateread.Lstat(path)
++	}
++	code, stdout, stderr := runEnvUnmanageWithReaders(t, fixture.source, lstat, nil, "--restore-backups", "--env", "claude_code")
++	if code != exitOK {
++		t.Fatalf("unmanage with absent backup-record view = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	if payload, err := os.ReadFile(fixture.surfacePath); !os.IsNotExist(err) {
++		t.Fatalf("a physical generation was restored without an observed backup record: %q (%v)", payload, err)
++	}
++	if got := readFileForUnmanageTest(t, fixture.backupFile); string(got) != "operator-owned context\n" {
++		t.Fatalf("the backup record itself changed: %q", got)
++	}
++}
++
++func TestEnvUnmanageRestoresNewestBackupGeneration(t *testing.T) {
++	fixture := newUnmanageFixture(t, true)
++	newest := filepath.Join(fixture.backupRoot, "2", "CLAUDE.md")
++	if err := os.MkdirAll(filepath.Dir(newest), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(newest, []byte("newest operator context\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++
++	code, stdout, stderr := runEnvUnmanageWithReadDir(t, fixture.source, nil, "--restore-backups", "--env", "claude_code")
++	if code != exitOK {
++		t.Fatalf("env unmanage --restore-backups = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	if got := readFileForUnmanageTest(t, fixture.surfacePath); string(got) != "newest operator context\n" {
++		t.Fatalf("restored surface = %q, want newest generation bytes", got)
++	}
++	if _, err := os.Lstat(fixture.markerPath); !os.IsNotExist(err) {
++		t.Fatalf("unmanage did not remove the marker: %s (%v)", fixture.markerPath, err)
++	}
++	if got := readFileForUnmanageTest(t, fixture.backupFile); string(got) != "operator-owned context\n" {
++		t.Fatalf("restore changed the prior backup generation: %q", got)
++	}
++	if got := readFileForUnmanageTest(t, newest); string(got) != "newest operator context\n" {
++		t.Fatalf("restore changed the newest backup generation: %q", got)
++	}
++	if got, err := envprofile.Current(fixture.managerHome); err != nil || got != "acme" {
++		t.Fatalf("scoped unmanage changed machine current profile: %q (%v), want acme", got, err)
++	}
++	if got, err := envprofile.ScopedCurrents(fixture.managerHome); err != nil {
++		t.Fatal(err)
++	} else if _, exists := got["env:claude_code"]; exists {
++		t.Fatalf("scoped unmanage retained its current profile record: %v", got)
++	}
++}
++
++func TestEnvUnmanageRestoresRecordedTakeoverBackup(t *testing.T) {
++	fixture := newUnmanageFixture(t, true)
++	code, stdout, stderr := runEnvUnmanageWithReadDir(t, fixture.source, nil, "--restore-backups", "--env", "claude_code")
++	if code != exitOK {
++		t.Fatalf("env unmanage --restore-backups = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	if got := readFileForUnmanageTest(t, fixture.surfacePath); string(got) != "operator-owned context\n" {
++		t.Fatalf("restored surface = %q, want the original takeover bytes", got)
++	}
++	if _, err := os.Lstat(fixture.markerPath); !os.IsNotExist(err) {
++		t.Fatalf("unmanage did not remove the marker: %s (%v)", fixture.markerPath, err)
++	}
++	if got := readFileForUnmanageTest(t, fixture.backupFile); string(got) != "operator-owned context\n" {
++		t.Fatalf("restore modified its source generation: %q", got)
++	}
++}
++
++func TestEnvUnmanageLeavesBackupsWithoutRestoreFlag(t *testing.T) {
++	fixture := newUnmanageFixture(t, true)
++	code, stdout, stderr := runEnvUnmanageWithReadDir(t, fixture.source, nil)
++	if code != exitOK {
++		t.Fatalf("env unmanage = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	if _, err := os.Lstat(fixture.surfacePath); !os.IsNotExist(err) {
++		t.Fatalf("managed surface remains after unmanage: %s (%v)", fixture.surfacePath, err)
++	}
++	if got := readFileForUnmanageTest(t, fixture.backupFile); string(got) != "operator-owned context\n" {
++		t.Fatalf("unmanage without restore changed the retained backup: %q", got)
++	}
++	if !strings.Contains(stderr, fixture.backupRoot) {
++		t.Fatalf("unmanage did not tell the operator where backups remain:\n%s", stderr)
++	}
++}
+diff --git a/cmd/curator/main.go b/cmd/curator/main.go
+index 01e337e9..b8d04baa 100644
+--- a/cmd/curator/main.go
++++ b/cmd/curator/main.go
+@@ -74,7 +74,7 @@ Commands:
+   skill check <dir>        validate one skill package (--locale, --json)
+   global <subcommand>      init | add | remove | list | status (--check, --json) | install | update | upgrade
+   profile <subcommand>     install | list | use | update | remove | sync | compose (see profile install -h)
+-  env <subcommand>         resolve | status | config (see env resolve -h)
++  env <subcommand>         resolve | status | config | migrate | unmanage (see env resolve -h)
+   run <env-id> ...         umbrella dispatch to curator-run (see §11)
+   hybrid <subcommand>      add | remove | list | status
+   audit [target] [flags]   run audit, pin trust, or publish a signed record
+@@ -186,6 +186,10 @@ type cli struct {
+ 	stdout   io.Writer
+ 	stderr   io.Writer
+ 	userHome func() (string, error)
++	// unmanageBackupLstat and unmanageBackupReadDir are backup-inventory test
++	// seams; production commands leave them nil and envprofile uses stateread.
++	unmanageBackupLstat   func(string) (stateread.Metadata, error)
++	unmanageBackupReadDir func(string) (stateread.Directory, error)
+ }
+ 
+ func (c cli) newFlagSet(name string) *flag.FlagSet {
+diff --git a/docs/cli.md b/docs/cli.md
+index ebbbcea6..306113be 100644
+--- a/docs/cli.md
++++ b/docs/cli.md
+@@ -999,6 +999,36 @@ regular file at a link path, two live Pi credentials — refuse with
+ resolve them and re-run. The v1 marker still records path and strategy
+ only.
+ 
++### curator env unmanage
++
++`curator env unmanage` returns marker-recorded in-place surfaces to native
++ownership (Spec environments §8.3, §8.4.1, and §9.2). By default it visits
++every registered environment; `--env` limits the operation to one. It
++removes only surfaces recorded by each environment marker, clears the
++recorded current profile for the selected scope, and removes the marker.
++
++Synopsis:
++
++```bash
++curator env unmanage [--restore-backups] [--env <env-id>] [--target <target-id>]
++```
++
++With `--restore-backups`, the newest readable takeover generation is copied
++back to its home-relative paths before the marker is removed. A missing
++backup inventory restores nothing. An inventory that cannot be established
++stops before native-home mutation with
++`environment_backup_record_unreadable`. Without the flag, generations are
++left in place and their path is printed as a notice. Credential files and
++unrecorded files are never touched. `--target` is accepted by the command
++syntax, but secondary fixed-home writes remain deferred until their home
++resolution and surface-write path are implemented.
++
++Unmanage one environment and restore its newest takeover generation:
++
++```bash
++curator env unmanage --restore-backups --env claude_code
++```
++
+ ### curator ui
+ 
+ `curator ui` opens an interactive terminal view over installed environment state.
+diff --git a/internal/envprofile/switch.go b/internal/envprofile/switch.go
+index 4dfaa5ee..658d638d 100644
+--- a/internal/envprofile/switch.go
++++ b/internal/envprofile/switch.go
+@@ -54,10 +54,11 @@ import (
+ 
+ // Diagnostics for switching (environments §8.5, §9.7).
+ const (
+-	DiagUsePartial         = "profile_use_partial"
+-	DiagUnmanagedConflict  = "environment_surface_unmanaged_conflict"
+-	DiagBackupExists       = "environment_backup_exists"
+-	DiagUnknownEnvironment = "environment_unknown"
++	DiagUsePartial           = "profile_use_partial"
++	DiagUnmanagedConflict    = "environment_surface_unmanaged_conflict"
++	DiagBackupExists         = "environment_backup_exists"
++	DiagUnknownEnvironment   = "environment_unknown"
++	DiagWriteWouldFollowLink = "environment_write_would_follow_link"
+ )
+ 
+ // BackupRetention is the number of backup generations kept (environments
+diff --git a/internal/envprofile/unmanage.go b/internal/envprofile/unmanage.go
+new file mode 100644
+index 00000000..9e73c760
+--- /dev/null
++++ b/internal/envprofile/unmanage.go
+@@ -0,0 +1,461 @@
++package envprofile
++
++import (
++	"fmt"
++	"io/fs"
++	"os"
++	"path"
++	"path/filepath"
++	"runtime"
++	"sort"
++	"strconv"
++	"strings"
++
++	"github.com/relux-works/curator/internal/envmarker"
++	"github.com/relux-works/curator/internal/envregistry"
++	"github.com/relux-works/curator/internal/stateread"
++)
++
++// UnmanageRequest selects native in-place environment surfaces to return to
++// operator ownership (environments §9.2).
++type UnmanageRequest struct {
++	Home           string
++	EnvID          string
++	TargetID       string
++	RestoreBackups bool
++	NativeHomeOf   func(string) (string, error)
++	// BackupLstat and BackupReadDir are narrow seams for deterministic
++	// backup-inventory failures. Production leaves them nil and uses stateread.
++	BackupLstat   func(string) (stateread.Metadata, error)
++	BackupReadDir func(string) (stateread.Directory, error)
++}
++
++// UnmanageHome reports the in-place work for one native adapter home.
++type UnmanageHome struct {
++	Environment   string
++	Home          string
++	Removed       []string
++	Restored      []string
++	BackupPath    string
++	MarkerRemoved bool
++}
++
++// UnmanageResult is the report for one unmanage operation.
++type UnmanageResult struct {
++	Homes []UnmanageHome
++}
++
++type unmanagePlan struct {
++	environment string
++	home        string
++	marker      *envmarker.Marker
++	markerPath  string
++	backupPath  string
++	removals    map[string]bool
++	restores    map[string][]byte
++}
++
++// Unmanage removes only native surfaces recorded by their environment marker
++// and can restore the newest §8.3 backup generation before deleting that
++// marker. It holds the manager-home mutation lock throughout, preflights all
++// selected markers and backup records before its first native-home write, and
++// clears the selected current-profile records last.
++func Unmanage(req UnmanageRequest) (*UnmanageResult, error) {
++	if req.Home == "" {
++		return nil, fmt.Errorf("manager home is empty")
++	}
++	environment := envregistry.NormalizeEnvID(req.EnvID)
++	if environment != "" {
++		if _, ok := adapterByID(environment); !ok {
++			return nil, fmt.Errorf("%s: explicit operand names the unregistered environment %q", DiagUnknownEnvironment, environment)
++		}
++	}
++	if req.TargetID != "" {
++		if environment != "" {
++			if _, err := envregistry.TargetFor(environment, req.TargetID); err != nil {
++				return nil, err
++			}
++		} else if _, err := envregistry.TargetByID(req.TargetID); err != nil {
++			return nil, err
++		}
++		return nil, fmt.Errorf("secondary fixed-home target %q writes are deferred: unmanage does not touch target homes until surface writes are implemented", req.TargetID)
++	}
++
++	op, err := beginOperation(req.Home)
++	if err != nil {
++		return nil, err
++	}
++	defer func() { _ = op.close() }()
++
++	currentRemovals, err := unmanageCurrentRemovals(req.Home, environment)
++	if err != nil {
++		return nil, err
++	}
++	plans, err := planUnmanageHomes(req)
++	if err != nil {
++		return nil, err
++	}
++	for _, plan := range plans {
++		if err := preflightUnmanagePlan(plan); err != nil {
++			return nil, err
++		}
++	}
++
++	result := &UnmanageResult{Homes: make([]UnmanageHome, 0, len(plans))}
++	for _, plan := range plans {
++		outcome, err := applyUnmanagePlan(plan)
++		if err != nil {
++			return result, fmt.Errorf("unmanage %s: %w", plan.environment, err)
++		}
++		result.Homes = append(result.Homes, outcome)
++	}
++	if len(currentRemovals) > 0 {
++		if err := op.publish(nil, currentRemovals...); err != nil {
++			return result, fmt.Errorf("native environment surfaces were unmanaged but the current-profile record could not be cleared: %w", err)
++		}
++	}
++	return result, nil
++}
++
++func planUnmanageHomes(req UnmanageRequest) ([]unmanagePlan, error) {
++	var selected []Adapter
++	if req.EnvID != "" {
++		adapter, _ := adapterByID(envregistry.NormalizeEnvID(req.EnvID))
++		selected = []Adapter{adapter}
++	} else {
++		selected = append(selected, Adapters...)
++	}
++
++	plans := make([]unmanagePlan, 0, len(selected))
++	for _, adapter := range selected {
++		native := ""
++		var err error
++		if req.NativeHomeOf != nil {
++			native, err = req.NativeHomeOf(adapter.ID)
++		} else {
++			native, err = NativeHome(adapter)
++		}
++		if err != nil {
++			return nil, err
++		}
++		if native == "" {
++			return nil, fmt.Errorf("native home for %s is empty", adapter.ID)
++		}
++		marker, err := envmarker.Read(native)
++		if err != nil {
++			return nil, err
++		}
++		plan := unmanagePlan{
++			environment: adapter.ID,
++			home:        native,
++			marker:      marker,
++			markerPath:  filepath.Join(native, envmarker.Name),
++			backupPath:  filepath.Join(native, ".agent-environment-backup"),
++			removals:    map[string]bool{},
++			restores:    map[string][]byte{},
++		}
++		if marker != nil {
++			for _, key := range marker.SortedSurfaceKeys() {
++				for _, surfacePath := range marker.Surfaces[key].Paths {
++					if credentialPath(adapter.ID, surfacePath) {
++						continue
++					}
++					plan.removals[surfacePath] = true
++				}
++			}
++		}
++		if req.RestoreBackups {
++			files, err := newestBackupFiles(req, adapter.ID, plan.backupPath)
++			if err != nil {
++				return nil, err
++			}
++			plan.restores = files
++		}
++		plans = append(plans, plan)
++	}
++	return plans, nil
++}
++
++func newestBackupFiles(req UnmanageRequest, environment, backupRoot string) (map[string][]byte, error) {
++	metadata, err := readBackupLstat(req, backupRoot)
++	if err != nil {
++		return nil, backupRecordUnreadable(backupRoot, err)
++	}
++	if metadata.Kind == stateread.KindAbsent {
++		return map[string][]byte{}, nil
++	}
++	if metadata.Kind != stateread.KindPresent || metadata.Info == nil || !metadata.Info.IsDir() || metadata.Info.Mode()&os.ModeSymlink != 0 {
++		return nil, backupRecordUnreadable(backupRoot, stateread.UnusableError(backupRoot, fmt.Errorf("backup inventory is not a directory")))
++	}
++	listing, err := readBackupDir(req, backupRoot)
++	if err != nil {
++		return nil, backupRecordUnreadable(backupRoot, err)
++	}
++	if listing.Kind != stateread.KindPresent {
++		return nil, backupRecordUnreadable(backupRoot, stateread.UnusableError(backupRoot, fmt.Errorf("unknown directory read state %q", listing.Kind)))
++	}
++
++	newest := 0
++	for _, entry := range listing.Entries {
++		generation, err := strconv.Atoi(entry.Name())
++		if err != nil || generation <= 0 || strconv.Itoa(generation) != entry.Name() {
++			continue
++		}
++		if generation > newest {
++			newest = generation
++		}
++	}
++	if newest == 0 {
++		return map[string][]byte{}, nil
++	}
++
++	generationRoot := filepath.Join(backupRoot, strconv.Itoa(newest))
++	generationMetadata, err := stateread.Lstat(generationRoot)
++	if err != nil {
++		return nil, backupRecordUnreadable(generationRoot, err)
++	}
++	if generationMetadata.Kind != stateread.KindPresent || generationMetadata.Info == nil || !generationMetadata.Info.IsDir() || generationMetadata.Info.Mode()&os.ModeSymlink != 0 {
++		return nil, backupRecordUnreadable(generationRoot, stateread.UnusableError(generationRoot, fmt.Errorf("newest backup generation is not a directory")))
++	}
++	files, err := readBackupTree(req, environment, generationRoot, "")
++	if err != nil {
++		return nil, err
++	}
++	return files, nil
++}
++
++func readBackupTree(req UnmanageRequest, environment, directory, prefix string) (map[string][]byte, error) {
++	listing, err := readBackupDir(req, directory)
++	if err != nil {
++		return nil, backupRecordUnreadable(directory, err)
++	}
++	if listing.Kind != stateread.KindPresent {
++		return nil, backupRecordUnreadable(directory, stateread.UnusableError(directory, fmt.Errorf("backup generation directory is absent or unusable")))
++	}
++	files := map[string][]byte{}
++	for _, entry := range listing.Entries {
++		name := entry.Name()
++		rel := path.Join(prefix, name)
++		if !safeBackupPath(rel) || reservedRestorePath(rel) {
++			return nil, backupRecordUnreadable(filepath.Join(directory, name), stateread.UnusableError(filepath.Join(directory, name), fmt.Errorf("invalid backup path %q", rel)))
++		}
++		full := filepath.Join(directory, name)
++		metadata, err := stateread.Lstat(full)
++		if err != nil {
++			return nil, backupRecordUnreadable(full, err)
++		}
++		if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
++			return nil, backupRecordUnreadable(full, stateread.UnusableError(full, fmt.Errorf("backup entry cannot be established")))
++		}
++		if metadata.Info.IsDir() {
++			nested, err := readBackupTree(req, environment, full, rel)
++			if err != nil {
++				return nil, err
++			}
++			for nestedPath, payload := range nested {
++				files[nestedPath] = payload
++			}
++			continue
++		}
++		if !metadata.Info.Mode().IsRegular() {
++			return nil, backupRecordUnreadable(full, stateread.UnusableError(full, fmt.Errorf("backup entry is not a regular file")))
++		}
++		if credentialPath(environment, rel) {
++			return nil, backupRecordUnreadable(full, stateread.UnusableError(full, fmt.Errorf("backup record names a credential path")))
++		}
++		state, err := stateread.ReadFile(full)
++		if err != nil {
++			return nil, backupRecordUnreadable(full, err)
++		}
++		if state.Kind != stateread.KindPresent {
++			return nil, backupRecordUnreadable(full, stateread.UnusableError(full, fmt.Errorf("backup file is absent")))
++		}
++		files[rel] = append([]byte(nil), state.Bytes...)
++	}
++	return files, nil
++}
++
++func readBackupDir(req UnmanageRequest, directory string) (stateread.Directory, error) {
++	if req.BackupReadDir != nil {
++		return req.BackupReadDir(directory)
++	}
++	return stateread.ReadDir(directory)
++}
++
++func readBackupLstat(req UnmanageRequest, path string) (stateread.Metadata, error) {
++	if req.BackupLstat != nil {
++		return req.BackupLstat(path)
++	}
++	return stateread.Lstat(path)
++}
++
++func backupRecordUnreadable(path string, err error) error {
++	if err == nil {
++		err = stateread.UnusableError(path, fmt.Errorf("backup inventory cannot be established"))
++	}
++	return fmt.Errorf("%s: %w", envregistry.DiagBackupRecordUnreadable, err)
++}
++
++func preflightUnmanagePlan(plan unmanagePlan) error {
++	paths := make(map[string]bool, len(plan.removals)+len(plan.restores))
++	for rel := range plan.removals {
++		paths[rel] = true
++	}
++	for rel := range plan.restores {
++		if !safeBackupPath(rel) || reservedRestorePath(rel) {
++			return backupRecordUnreadable(filepath.Join(plan.backupPath, rel), stateread.UnusableError(filepath.Join(plan.backupPath, rel), fmt.Errorf("invalid backup path %q", rel)))
++		}
++		paths[rel] = true
++	}
++	for rel := range paths {
++		if err := inspectUnmanagePath(plan.home, rel); err != nil {
++			return fmt.Errorf("%s: %w", plan.environment, err)
++		}
++	}
++	return nil
++}
++
++func inspectUnmanagePath(home, rel string) error {
++	if !safeBackupPath(rel) {
++		return fmt.Errorf("%s: invalid home-relative path %q", DiagSurfaceUnreadable, rel)
++	}
++	parts := strings.Split(rel, "/")
++	current := home
++	for index, part := range parts {
++		current = filepath.Join(current, filepath.FromSlash(part))
++		metadata, err := stateread.Lstat(current)
++		if err != nil {
++			return err
++		}
++		if metadata.Kind == stateread.KindAbsent {
++			return nil
++		}
++		if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
++			return stateread.UnusableError(current, fmt.Errorf("unknown entry state %q", metadata.Kind))
++		}
++		last := index == len(parts)-1
++		if !last && metadata.Info.Mode()&os.ModeSymlink != 0 {
++			return fmt.Errorf("%s: refusing to traverse link at %s", DiagWriteWouldFollowLink, current)
++		}
++		if !last && !metadata.Info.IsDir() {
++			return stateread.UnusableError(current, fmt.Errorf("parent path component is not a directory"))
++		}
++		if last && !metadata.Info.Mode().IsRegular() && metadata.Info.Mode()&os.ModeSymlink == 0 {
++			return fmt.Errorf("%s: recorded surface is not a regular file or link: %s", DiagSurfaceUnreadable, current)
++		}
++	}
++	return nil
++}
++
++func applyUnmanagePlan(plan unmanagePlan) (UnmanageHome, error) {
++	outcome := UnmanageHome{
++		Environment: plan.environment,
++		Home:        plan.home,
++		BackupPath:  plan.backupPath,
++	}
++	paths := make([]string, 0, len(plan.removals)+len(plan.restores))
++	seen := map[string]bool{}
++	for rel := range plan.removals {
++		seen[rel] = true
++	}
++	for rel := range plan.restores {
++		seen[rel] = true
++	}
++	for rel := range seen {
++		paths = append(paths, rel)
++	}
++	sort.Strings(paths)
++	for _, rel := range paths {
++		full := filepath.Join(plan.home, filepath.FromSlash(rel))
++		payload, restore := plan.restores[rel]
++		if restore {
++			if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
++				return outcome, err
++			}
++			if err := os.Remove(full); err != nil && !os.IsNotExist(err) {
++				return outcome, err
++			}
++			if err := os.WriteFile(full, payload, 0o644); err != nil {
++				return outcome, err
++			}
++			outcome.Restored = append(outcome.Restored, rel)
++			continue
++		}
++		if !plan.removals[rel] {
++			continue
++		}
++		if err := os.Remove(full); err != nil && !os.IsNotExist(err) {
++			return outcome, err
++		}
++		outcome.Removed = append(outcome.Removed, rel)
++	}
++	if plan.marker != nil {
++		if err := os.Remove(plan.markerPath); err != nil && !os.IsNotExist(err) {
++			return outcome, err
++		}
++		outcome.MarkerRemoved = true
++	}
++	return outcome, nil
++}
++
++func safeBackupPath(rel string) bool {
++	if rel == "" || path.IsAbs(rel) || !fs.ValidPath(rel) {
++		return false
++	}
++	clean := path.Clean(rel)
++	return clean == rel && clean != "." && !strings.HasPrefix(clean, "../")
++}
++
++func reservedRestorePath(rel string) bool {
++	return rel == envmarker.Name || rel == ".agent-environment-backup" || strings.HasPrefix(rel, ".agent-environment-backup/")
++}
++
++func credentialPath(environment, rel string) bool {
++	adapter, err := envregistry.ByID(environment)
++	if err != nil {
++		return false
++	}
++	for _, passthrough := range adapter.PassthroughFor(runtime.GOOS) {
++		if filepath.ToSlash(filepath.Clean(passthrough.Path)) == rel {
++			return true
++		}
++	}
++	return false
++}
++
++func unmanageCurrentRemovals(home, environment string) ([]string, error) {
++	current, err := Current(home)
++	if err != nil {
++		return nil, err
++	}
++	scoped, err := ScopedCurrents(home)
++	if err != nil {
++		return nil, err
++	}
++	var scopes []string
++	removeMachine := environment == ""
++	if environment == "" {
++		for scope := range scoped {
++			scopes = append(scopes, scope)
++		}
++	} else {
++		scope := "env:" + environment
++		if _, exists := scoped[scope]; exists {
++			scopes = append(scopes, scope)
++		}
++	}
++	sort.Strings(scopes)
++	var removals []string
++	if removeMachine && current != "" {
++		removals = append(removals, CurrentFile(home))
++	}
++	for _, scope := range scopes {
++		paths, err := scopeRecordPaths(home, scope)
++		if err != nil {
++			return nil, err
++		}
++		removals = append(removals, paths...)
++	}
++	sort.Strings(removals)
++	return removals, nil
++}
