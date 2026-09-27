@@ -1,0 +1,2121 @@
+diff --git a/.github/ci/conformance-case-counts.tsv b/.github/ci/conformance-case-counts.tsv
+index 2ff76862..fdba0113 100644
+--- a/.github/ci/conformance-case-counts.tsv
++++ b/.github/ci/conformance-case-counts.tsv
+@@ -70,3 +70,4 @@ environments-env-passthrough/allowlist-empty-cases	6
+ environments-env-passthrough/schema-cases	4
+ environments-env-passthrough/surfacing-cases	6
+ environments-env-passthrough/surfacing-order-cases	2
++environments-read-failure/cases	39
+diff --git a/.github/ci/conformance-gaps.tsv b/.github/ci/conformance-gaps.tsv
+index 7a806bac..4007f920 100644
+--- a/.github/ci/conformance-gaps.tsv
++++ b/.github/ci/conformance-gaps.tsv
+@@ -4,6 +4,8 @@
+ family	case_id	owner	reason
+ agent-environment-marker-v1/schema-cases	valid-codex-seed-record-empty-snapshot.json	STORY-260916-1i1gfo	Parse rejects the valid Codex seed record forms added by E3.
+ agent-environment-marker-v1/schema-cases	valid-codex-seed-record.json	STORY-260916-1i1gfo	Parse rejects the valid Codex seed record forms added by E3.
++environments-read-failure/cases	backup-record-absent-restore-nothing	TASK-260927-1wc76r	no env unmanage --restore-backups production entry
++environments-read-failure/cases	backup-record-unreadable-restore-stops	TASK-260927-1wc76r	no env unmanage --restore-backups production entry
+ manager-config-v2/schema-cases	invalid-system-module-waiver-missing-reason.json	STORY-260922-1cenbr	Load rejects before the E2 diagnostic because the updated case carries the unsupported 0017/0018 manager configuration field.
+ manager-config-v2/schema-cases	invalid-system-module-waiver-package-grammar.json	STORY-260922-1cenbr	Load rejects before the E2 diagnostic because the updated case carries the unsupported 0017/0018 manager configuration field.
+ manager-config-v2/schema-cases	invalid-system-module-waiver-unknown-field.json	STORY-260922-1cenbr	Load rejects before the E2 diagnostic because the updated case carries the unsupported 0017/0018 manager configuration field.
+diff --git a/.github/ci/platform-cases.tsv b/.github/ci/platform-cases.tsv
+index fc2a919b..c94e4d04 100644
+--- a/.github/ci/platform-cases.tsv
++++ b/.github/ci/platform-cases.tsv
+@@ -356,6 +356,7 @@ internal/envprofile	TestStatusScopeMarkerAbsenceAndUnreadabilityDiffer/unreadabl
+ internal/envprofile	TestStatusOrphanMarkerAbsenceAndUnreadabilityDiffer/unreadable_marker_is_reported,_not_treated_as_absence	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves orphan marker read failures
+ internal/envprofile	TestStatusUnreadableOrphanInventoryIsNotEmpty	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves orphan inventory read failures
+ internal/envprofile	TestStatusBackupInventoryAbsenceAndUnreadabilityDiffer/unreadable_backup_inventory_is_unknown_and_non-current	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves backup inventory read failures
++internal/envprofile	TestEnvironmentsReadFailureVectors	linux,darwin,windows	-	-	the rc.13 read-failure family drives manager status, resolve, provision, repair and update paths; its two restore vectors remain gap-owned by TASK-260927-1wc76r
+ internal/envprofile	TestRemovePurgeMarkerAbsenceAndUnreadabilityDiffer/unreadable_marker_refuses_before_purge_writes	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves purge marker preflight failures
+ internal/globalbins	TestRefreshAndStageRefuseAnUnreadableOwnershipLedger	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves refresh and staging preserve ledger read failures
+ internal/scopes	TestConsumerRegistryAbsenceAndUnreadabilityDiffer	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves consumer registry failures
+diff --git a/.github/ci/root-artifacts.tsv b/.github/ci/root-artifacts.tsv
+index 243e24ad..d05a0fab 100644
+--- a/.github/ci/root-artifacts.tsv
++++ b/.github/ci/root-artifacts.tsv
+@@ -71,6 +71,7 @@ internal/moduleroots	vectors/module-roots.json	TestModuleRootVectors reads the v
+ internal/scriptworker	vectors/script-host-execution-policy.json	TestExecutableIdentityCasesAtProductionEntry drives the published executable identity cases through the manager resolver
+ internal/scriptpolicy	vectors/script-host-execution-policy.json	the schema-8 script execution-policy family is read directly by every case in conformance_test.go
+ internal/envprofile	vectors/environments-env-passthrough.json	TestEnvironmentsEnvPassthroughVectors consumes every published case group
++internal/envprofile	vectors/environments-read-failure.json	TestEnvironmentsReadFailureVectors drives marker, lock, seed, passthrough and backup status cases through production entries; restore vectors remain gap-owned by TASK-260927-1wc76r
+ internal/shell	vectors/shell-hook-trust.json	TestShellHookTrustVectors consumes every published trust case
+ internal/skillspec	schema-cases/agent-skill-v6,schema-cases/agent-skill-v7,schema-cases/csk-skill-v7,schema-cases/agent-skill-v8,schema-cases/csk-skill-v8,vectors/portable-paths.json,fixtures/go-build-skill	the schema v6 and v7 cases, BOTH schema-8 manifest families, portable-path vectors and the go-build skill fixture
+ internal/install	vectors/build-drivers.json,vectors/manager-lifecycle.json	TestAuthoritativeCacheOutcomesDriveInstallation and the dry-run bindings read the vectors directly
+diff --git a/docs/cli.md b/docs/cli.md
+index ebbbcea6..42f00399 100644
+--- a/docs/cli.md
++++ b/docs/cli.md
+@@ -252,6 +252,13 @@ not unprovisioned: the scope row carries `provisioned_known: false` and an
+ Unreadable backup inventories show `backups: unknown` with
+ `environment_backup_record_unreadable`; unreadable orphan inventory is
+ reported in the JSON `diagnostics` list instead of appearing empty.
++An unreadable profile lock is reported as `environment_store_untrusted` with
++unknown currency. Resolve, repair, and update refuse it without rebuilding or
++replacing state from that lock. A passthrough entry that cannot be inspected
++or whose link target cannot be read is reported as
++`environment_passthrough_unreadable`; resolve emits no fragment and repair
++leaves the entry untouched. A proven absent or replaced passthrough entry
++remains `environment_passthrough_detached`.
+ 
+ ### curator list
+ 
+diff --git a/docs/troubleshooting.md b/docs/troubleshooting.md
+index 327463b5..a1035cf3 100644
+--- a/docs/troubleshooting.md
++++ b/docs/troubleshooting.md
+@@ -464,6 +464,23 @@ Remedy: restore the expected file and directory structure and access to the
+ state path, then retry the command. Do not remove or recreate the state until
+ you have confirmed which manager record is unreadable.
+ 
++### environment_store_untrusted
++
++Symptom: `environment_store_untrusted` names a profile whose source or lock
++record could not be read as a trusted regular file. `env status` keeps the
++profile row non-current with unknown currency. Resolve, repair, and update
++stop without emitting a fragment or rebuilding the managed home from that
++record.
++
++Cause: the profile lock is absent only when no lock entry exists under a
++traversable profile directory (`profile_unknown`). A present lock that is
++malformed, unreadable, a symlink, a directory, or below a non-directory
++parent is untrusted. The manager cannot establish which store generation the
++profile names.
++
++Remedy: restore or inspect the profile record out of band, then retry. Do not
++delete or regenerate the lock as a way to make resolve or update proceed.
++
+ ### source_lock_stale
+ 
+ Symptom: `source_lock_stale`.
+@@ -571,6 +588,21 @@ then retry the explicit attempt.
+ 
+ ## Environment credential links
+ 
++### environment_passthrough_unreadable
++
++Symptom: `env status` reports `environment_passthrough_unreadable` for a
++managed credential link, or resolve refuses with that diagnostic and emits
++no fragment. Repair leaves the entry untouched.
++
++Cause: the manager could not inspect the link path or read its target. This
++does not establish that the entry is absent or detached, so repair cannot
++replace it safely.
++
++Remedy: restore access to the entry and its parent directories, then retry
++status or resolve. If the path is present and readable but no longer has the
++recorded link shape or target, follow the `environment_passthrough_detached`
++or `environment_credential_conflict` guidance below.
++
+ ### environment_credential_conflict
+ 
+ Symptom: `env resolve --repair` stops with
+diff --git a/internal/contextlock/contextlock.go b/internal/contextlock/contextlock.go
+index ff329579..71c42b80 100644
+--- a/internal/contextlock/contextlock.go
++++ b/internal/contextlock/contextlock.go
+@@ -320,7 +320,14 @@ func Parse(payload []byte) (*Lock, error) {
+ // Read loads a lock file. The file holds exactly the CCJ-1 bytes, so the
+ // bytes on disk hash to the lock hash.
+ func Read(path string) (*Lock, string, error) {
+-	result, err := stateread.ReadFile(path) // #nosec G304 -- manager-home path
++	return ReadWith(path, stateread.ReadRegularFile)
++}
++
++// ReadWith reads a lock through the supplied shared regular-file reader.
++// The callback seam is used by the manager's production-entry fault tests;
++// normal callers use Read and the stateread filesystem boundary.
++func ReadWith(path string, readRegularFile func(string) (stateread.File, error)) (*Lock, string, error) {
++	result, err := readRegularFile(path) // #nosec G304 -- manager-home path
+ 	if err != nil {
+ 		return nil, "", err
+ 	}
+diff --git a/internal/envmarker/envmarker.go b/internal/envmarker/envmarker.go
+index 3d92a7ee..9b30dd36 100644
+--- a/internal/envmarker/envmarker.go
++++ b/internal/envmarker/envmarker.go
+@@ -2,13 +2,15 @@
+ // §8.2, agent-environment-marker-v1 and agent-environment-marker-v2: the
+ // per-home ledger of record for environment surfaces
+ // (.agent-environment.json). Readers reject an unsupported version and
+-// unknown fields; an unreadable or invalid marker fails closed and is
+-// reported as environment_marker_invalid.
++// unknown fields; failed reads and malformed content fail closed as
++// environment_marker_unreadable, while unsupported versions remain
++// environment_marker_invalid.
+ package envmarker
+ 
+ import (
+ 	"bytes"
+ 	"encoding/json"
++	"errors"
+ 	"fmt"
+ 	"path/filepath"
+ 	"regexp"
+@@ -54,12 +56,13 @@ const (
+ 	ReasonClaudeCodeRootContext = "claude-code-root-context"
+ )
+ 
+-// DiagMarkerInvalid is the fail-closed diagnostic for an unreadable,
+-// malformed, or unsupported marker.
++// DiagMarkerInvalid identifies a marker version that this reader does not
++// support. Parse also uses it for schema errors; Read classifies malformed
++// content as DiagMarkerUnreadable under environments §8.4.1.
+ const DiagMarkerInvalid = "environment_marker_invalid"
+ 
+-// DiagMarkerUnreadable is the fail-closed diagnostic for a marker path that
+-// exists but cannot be read. Absence remains a separate outcome.
++// DiagMarkerUnreadable is the fail-closed diagnostic for marker content or a
++// path that exists but cannot be read. Absence remains a separate outcome.
+ const DiagMarkerUnreadable = "environment_marker_unreadable"
+ 
+ // Requirement is the declared requirement of a git root, as written.
+@@ -166,7 +169,7 @@ var (
+ // Validate applies the schema rules.
+ func (m *Marker) Validate() error {
+ 	if m.Version != VersionV1 && m.Version != VersionV2 {
+-		return fmt.Errorf("unsupported marker version %d", m.Version)
++		return &unsupportedMarkerVersionError{version: m.Version}
+ 	}
+ 	if !identifiers.Valid(m.Profile.Name) || !identifiers.Valid(m.Profile.Root) {
+ 		return fmt.Errorf("profile name or root is not a portable identifier")
+@@ -343,6 +346,14 @@ func (m *Marker) Validate() error {
+ 	return nil
+ }
+ 
++type unsupportedMarkerVersionError struct {
++	version int
++}
++
++func (e *unsupportedMarkerVersionError) Error() string {
++	return fmt.Sprintf("unsupported marker version %d", e.version)
++}
++
+ // validateCredentialRecord implements the schema-v2 passthrough record
+ // contract. Ambient records and an isolated per-home keychain have no home
+ // path; every other strategy records its portable home-relative path.
+@@ -655,18 +666,35 @@ func (s *keyScanner) skipValue() error {
+ }
+ 
+ // Read loads the marker of a home. It distinguishes absence (nil, nil) from a
+-// failed filesystem read (nil, error carrying DiagMarkerUnreadable) and an
+-// invalid marker document (nil, error carrying DiagMarkerInvalid).
++// failed filesystem read or malformed marker document (nil, error carrying
++// DiagMarkerUnreadable). Unsupported versions retain DiagMarkerInvalid.
+ func Read(home string) (*Marker, error) {
++	return ReadWith(home, stateread.ReadFile)
++}
++
++// ReadWith reads a marker through the supplied shared state-file reader.
++// The callback seam is used by the manager's production-entry fault tests;
++// normal callers use Read and the stateread filesystem boundary.
++func ReadWith(home string, readStateFile func(string) (stateread.File, error)) (*Marker, error) {
+ 	path := filepath.Join(home, Name)
+-	result, err := stateread.ReadFile(path) // #nosec G304 -- home chosen by the caller
++	result, err := readStateFile(path) // #nosec G304 -- home chosen by the caller
+ 	if err != nil {
+ 		return nil, fmt.Errorf("%s: %w", DiagMarkerUnreadable, err)
+ 	}
+ 	if result.Kind == stateread.KindAbsent {
+ 		return nil, nil
+ 	}
+-	return Parse(result.Bytes)
++	marker, err := Parse(result.Bytes)
++	if err != nil {
++		var unsupported *unsupportedMarkerVersionError
++		if errors.As(err, &unsupported) {
++			// §8.5 keeps a valid but unsupported marker version distinct from
++			// malformed or unreadable marker content (§8.4.1).
++			return nil, err
++		}
++		return nil, fmt.Errorf("%s: %w", DiagMarkerUnreadable, stateread.UnusableError(path, err))
++	}
++	return marker, nil
+ }
+ 
+ // SortedSurfaceKeys returns the surface keys in bytewise order.
+diff --git a/internal/envmarker/envmarker_test.go b/internal/envmarker/envmarker_test.go
+index 11e43ece..5ef0859c 100644
+--- a/internal/envmarker/envmarker_test.go
++++ b/internal/envmarker/envmarker_test.go
+@@ -63,6 +63,21 @@ func TestUnsupportedVersionIsRejected(t *testing.T) {
+ 	}
+ }
+ 
++func TestReadKeepsUnsupportedVersionDiagnostic(t *testing.T) {
++	home := t.TempDir()
++	payload, err := testMarker().Marshal()
++	if err != nil {
++		t.Fatal(err)
++	}
++	future := strings.Replace(string(payload), `"version": 1`, `"version": 3`, 1)
++	if err := os.WriteFile(filepath.Join(home, Name), []byte(future), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := Read(home); err == nil || !strings.Contains(err.Error(), DiagMarkerInvalid) || strings.Contains(err.Error(), DiagMarkerUnreadable) {
++		t.Fatalf("Read unsupported version error = %v; want %s without %s", err, DiagMarkerInvalid, DiagMarkerUnreadable)
++	}
++}
++
+ func TestSchema2PathlessCredentialRecordOmitsPath(t *testing.T) {
+ 	marker := testMarker()
+ 	marker.Version = VersionV2
+@@ -118,7 +133,7 @@ func TestUnknownFieldsAreRejected(t *testing.T) {
+ }
+ 
+ // TestReadDistinguishesAbsence checks Read reports absence as (nil, nil)
+-// and an invalid marker as a fail-closed environment_marker_invalid error.
++// and an invalid marker as a fail-closed environment_marker_unreadable error.
+ func TestReadDistinguishesAbsence(t *testing.T) {
+ 	home := t.TempDir()
+ 	marker, err := Read(home)
+@@ -128,8 +143,8 @@ func TestReadDistinguishesAbsence(t *testing.T) {
+ 	if err := os.WriteFile(filepath.Join(home, Name), []byte("{nope"), 0o644); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if _, err := Read(home); err == nil || !strings.Contains(err.Error(), DiagMarkerInvalid) {
+-		t.Fatalf("invalid marker must fail as %s, got %v", DiagMarkerInvalid, err)
++	if _, err := Read(home); err == nil || !strings.Contains(err.Error(), DiagMarkerUnreadable) {
++		t.Fatalf("invalid marker must fail as %s, got %v", DiagMarkerUnreadable, err)
+ 	}
+ }
+ 
+diff --git a/internal/envprofile/envprofile.go b/internal/envprofile/envprofile.go
+index 1d4044fb..5db5758e 100644
+--- a/internal/envprofile/envprofile.go
++++ b/internal/envprofile/envprofile.go
+@@ -221,7 +221,15 @@ func marshalSource(source Source) ([]byte, error) {
+ 
+ // readLock loads a profile's lock and hash.
+ func readLock(home, name string) (*contextlock.Lock, string, error) {
+-	return contextlock.Read(lockPath(home, name))
++	return readLockWith(home, name, stateread.ReadRegularFile)
++}
++
++func readLockWith(home, name string, readRegularFile func(string) (stateread.File, error)) (*contextlock.Lock, string, error) {
++	lock, hash, err := contextlock.ReadWith(lockPath(home, name), readRegularFile)
++	if err != nil && !isStateAbsent(err) {
++		return nil, "", fmt.Errorf("%s: profile %q lock cannot be trusted: %w", envregistry.DiagStoreUntrusted, name, err)
++	}
++	return lock, hash, err
+ }
+ 
+ // List returns every installed profile with its lock and currency. The
+@@ -721,7 +729,7 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
+ 			if isPath {
+ 				return reinstallPathLocked(op, home, name, source, input, options)
+ 			}
+-			info, _, err := updateLocked(op, home, name, options.Policy, options.SurfacingSink)
++			info, _, err := updateLocked(op, home, name, options.Policy, options.SurfacingSink, nil)
+ 			if err != nil {
+ 				return Info{}, false, false, err
+ 			}
+@@ -1025,6 +1033,9 @@ type UpdateOptions struct {
+ 	// operation and Info.Surfacing stays empty, so the rows print
+ 	// exactly once. Emission never fails the operation.
+ 	SurfacingSink io.Writer
++	// readRegularFile is a production-entry fault seam; callers outside this
++	// package leave it nil and use stateread.ReadRegularFile.
++	readRegularFile func(string) (stateread.File, error)
+ }
+ 
+ // UpdateWithPolicy re-resolves under the machine gates of policy
+@@ -1043,22 +1054,34 @@ func UpdateWithOptions(home, name string, options UpdateOptions) (Info, bool, er
+ 		return Info{}, false, err
+ 	}
+ 	defer func() { _ = op.close() }()
+-	return updateLocked(op, home, name, options.Policy, options.SurfacingSink)
++	return updateLocked(op, home, name, options.Policy, options.SurfacingSink, options.readRegularFile)
+ }
+ 
+ // updateLocked re-resolves under the held operation lock.
+-func updateLocked(op *operation, home, name string, policy Policy, sink io.Writer) (Info, bool, error) {
+-	if err := ensureDefault(op, home, policy); err != nil {
+-		return Info{}, false, err
++func updateLocked(op *operation, home, name string, policy Policy, sink io.Writer, readRegularFile func(string) (stateread.File, error)) (Info, bool, error) {
++	if readRegularFile == nil {
++		readRegularFile = stateread.ReadRegularFile
+ 	}
+ 	source, err := readSource(home, name)
+ 	if err != nil {
++		if name == DefaultProfile && isStateAbsent(err) {
++			if err := ensureDefault(op, home, policy); err != nil {
++				return Info{}, false, err
++			}
++			return Info{}, false, fmt.Errorf("%s: profile %q is the builtin local profile and does not move", DiagUpdateBlocked, name)
++		}
+ 		return Info{}, false, err
+ 	}
+-	oldLock, oldHash, err := readLock(home, name)
++	oldLock, oldHash, err := readLockWith(home, name, readRegularFile)
+ 	if err != nil {
+ 		return Info{}, false, err
+ 	}
++	// Establish that the named profile's recorded evidence is readable before
++	// ensureDefault can publish any state. An unreadable lock makes update
++	// read-only: no other profile or generation is created as a side effect.
++	if err := ensureDefault(op, home, policy); err != nil {
++		return Info{}, false, err
++	}
+ 	manager := newGitManager(home).withPolicy(policy)
+ 	var input contextresolve.Input
+ 	switch source.Kind {
+@@ -1069,7 +1092,7 @@ func updateLocked(op *operation, home, name string, policy Policy, sink io.Write
+ 				return Info{}, false, err
+ 			}
+ 			info := Info{Name: name, Source: source, Lock: oldLock, Current: machine == name}
+-			if _, hash, err := readLock(home, name); err == nil {
++			if _, hash, err := readLockWith(home, name, readRegularFile); err == nil {
+ 				info.LockHash = hash
+ 			}
+ 			return info, false, nil
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index 42c0dc15..5b8da4b7 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -97,6 +97,12 @@ type ResolveRequest struct {
+ 	// transactionOptions is a fault-injection seam for recovery tests. CLI
+ 	// requests leave it nil and use the production transaction engine.
+ 	transactionOptions []transaction.Option
++	// passthroughLstat and passthroughReadlink inject entry inspection errors
++	// in tests. Production requests leave them nil and use the shared reader.
++	passthroughLstat    func(string) (os.FileInfo, error)
++	passthroughReadlink func(string) (string, error)
++	readStateFile       func(string) (stateread.File, error)
++	readRegularFile     func(string) (stateread.File, error)
+ }
+ 
+ // ResolveResult is the outcome: exactly one of Document and StaleErr is
+@@ -358,14 +364,18 @@ func referencedBlocked(homeDir string, prior *envmarker.Marker) (bool, error) {
+ 	if recorded {
+ 		return false, nil
+ 	}
+-	_, err := os.Lstat(filepath.Join(homeDir, "opencode.json"))
+-	if err == nil {
+-		return true, nil
++	path := filepath.Join(homeDir, "opencode.json")
++	metadata, err := stateread.Lstat(path)
++	if err != nil {
++		return false, err
+ 	}
+-	if os.IsNotExist(err) {
++	if metadata.Kind == stateread.KindAbsent {
+ 		return false, nil
+ 	}
+-	return false, err
++	if metadata.Kind != stateread.KindPresent {
++		return false, stateread.UnusableError(path, fmt.Errorf("path metadata is unreadable"))
++	}
++	return true, nil
+ }
+ 
+ // rootContext assembles the root-context surface: monolithic bytes or the
+@@ -503,7 +513,7 @@ func (p *homePlan) publishDocs() error {
+ // liveness row. The native config.toml read is read-only: an absent file
+ // or an absent key means the default file store, while an unreadable file
+ // fails instead of defaulting — absence and a failed read are different
+-// facts (§8.4) — and a selector outside the verified file/keyring/auto
++// facts (§8.4.1) — and a selector outside the verified file/keyring/auto
+ // set fails closed with environment_credential_unsupported.
+ func (req *ResolveRequest) effectivePassthrough(adapter envregistry.Adapter, isolation string) (map[string]string, map[string]string, error) {
+ 	links := map[string]string{}
+@@ -520,7 +530,7 @@ func (req *ResolveRequest) effectivePassthrough(adapter envregistry.Adapter, iso
+ 		case envregistry.StrategyPerHomeKeychain, envregistry.StrategyAmbient:
+ 			continue
+ 		case envregistry.StrategyKeyringPreferred:
+-			store, err := codexCredentialStore(native)
++			store, err := req.codexCredentialStore(native)
+ 			if err != nil {
+ 				return nil, nil, err
+ 			}
+@@ -572,7 +582,7 @@ func (req *ResolveRequest) credentialRecords(adapter envregistry.Adapter, isolat
+ 	var codexStore string
+ 	for _, entry := range entries {
+ 		if entry.Strategy == envregistry.StrategyKeyringPreferred {
+-			codexStore, err = codexCredentialStore(native)
++			codexStore, err = req.codexCredentialStore(native)
+ 			if err != nil {
+ 				return nil, err
+ 			}
+@@ -633,11 +643,19 @@ func (req *ResolveRequest) credentialRecords(adapter envregistry.Adapter, isolat
+ // with environment_credential_unsupported. Sharing is defined by the
+ // native effective storage only: a diverged managed config.toml changes
+ // nothing and is never realigned.
+-func codexCredentialStore(native string) (string, error) {
++func (req *ResolveRequest) codexCredentialStore(native string) (string, error) {
++	readRegularFile := req.readRegularFile
++	if readRegularFile == nil {
++		readRegularFile = stateread.ReadRegularFile
++	}
++	return codexCredentialStoreWith(native, readRegularFile)
++}
++
++func codexCredentialStoreWith(native string, readRegularFile func(string) (stateread.File, error)) (string, error) {
+ 	path := filepath.Join(native, "config.toml")
+-	state, err := stateread.ReadFile(path)
++	state, err := readRegularFile(path)
+ 	if err != nil {
+-		return "", fmt.Errorf("codex native config.toml is unreadable: %v", err)
++		return "", fmt.Errorf("%s: codex native config.toml: %w", envregistry.DiagSeedUnreadable, err)
+ 	}
+ 	if state.Kind == stateread.KindAbsent {
+ 		return "file", nil
+@@ -648,7 +666,7 @@ func codexCredentialStore(native string) (string, error) {
+ 	payload := state.Bytes
+ 	var doc map[string]any
+ 	if err := toml.Unmarshal(payload, &doc); err != nil {
+-		return "", fmt.Errorf("codex native config.toml is not valid TOML: %v", err)
++		return "", fmt.Errorf("%s: %w", envregistry.DiagSeedUnreadable, stateread.UnusableError(path, fmt.Errorf("codex native config.toml is not valid TOML: %w", err)))
+ 	}
+ 	raw, ok := doc["cli_auth_credentials_store"]
+ 	if !ok {
+@@ -683,7 +701,7 @@ func (req *ResolveRequest) checkIsolatedCredentialStore(adapter envregistry.Adap
+ 	if err != nil {
+ 		return err
+ 	}
+-	store, err := codexCredentialStore(native)
++	store, err := req.codexCredentialStore(native)
+ 	if err != nil {
+ 		return err
+ 	}
+@@ -713,7 +731,7 @@ type seedBundle struct {
+ // gatherSeeds reads every seed upfront so that an unreadable seed stops
+ // provisioning before the first write. A seed absent in the native home
+ // is simply not seeded; absence and unreadability stay different facts
+-// (§8.4). Copy seeds are gathered at provisioning only: repair never
++// (§8.4.1). Copy seeds are gathered at provisioning only: repair never
+ // refreshes them, so an unreadable native copy must not fail a repair
+ // that would never read it.
+ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bool) (*seedBundle, error) {
+@@ -728,14 +746,19 @@ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bo
+ 				bundle.claudeInit = true
+ 				continue
+ 			}
+-			payload, err := os.ReadFile(filepath.Join(native, filepath.FromSlash(seed))) // #nosec G304 -- seed names are registry data
++			path := filepath.Join(native, filepath.FromSlash(seed))
++			readRegularFile := req.readRegularFile
++			if readRegularFile == nil {
++				readRegularFile = stateread.ReadRegularFile
++			}
++			file, err := readRegularFile(path) // #nosec G304 -- seed names are registry data
+ 			if err != nil {
+-				if os.IsNotExist(err) {
+-					continue
+-				}
+ 				return nil, fmt.Errorf("%s: seed %s: %v", envregistry.DiagSeedUnreadable, seed, err)
+ 			}
+-			bundle.files[seed] = payload
++			if file.Kind == stateread.KindAbsent {
++				continue
++			}
++			bundle.files[seed] = file.Bytes
+ 		}
+ 	} else if adapter.ID == envregistry.ClaudeCode {
+ 		bundle.claudeInit = true
+@@ -750,12 +773,13 @@ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bo
+ 				continue
+ 			}
+ 			target := filepath.Join(xdg, name)
+-			if _, err := os.Stat(target); err != nil {
+-				if os.IsNotExist(err) {
+-					continue
+-				}
++			metadata, err := stateread.Stat(target)
++			if err != nil {
+ 				return nil, fmt.Errorf("%s: xdg seed %s: %v", envregistry.DiagSeedUnreadable, name, err)
+ 			}
++			if metadata.Kind == stateread.KindAbsent {
++				continue
++			}
+ 			bundle.xdg[name] = target
+ 		}
+ 	}
+@@ -779,8 +803,13 @@ func writeStoreDoc(path string, document []byte) error {
+ func claudeSeed(homeDir, launchDir, form string) (seeded []string, err error) {
+ 	path := filepath.Join(homeDir, ".claude.json")
+ 	object := map[string]any{"hasCompletedOnboarding": true, "projects": map[string]any{}}
+-	if payload, err := os.ReadFile(path); err == nil { // #nosec G304 -- managed .claude.json below the resolved home
+-		parsed, ok := decodeJSONObject(payload)
++	state, err := stateread.ReadRegularFile(path) // #nosec G304 -- managed .claude.json below the resolved home
++	if err != nil {
++		return nil, fmt.Errorf("%s: managed .claude.json: %w", envregistry.DiagSeedUnreadable, err)
++	}
++	switch state.Kind {
++	case stateread.KindPresent:
++		parsed, ok := decodeJSONObject(state.Bytes)
+ 		if !ok {
+ 			return nil, fmt.Errorf("%s: managed .claude.json is not an object", envregistry.DiagSeedUnreadable)
+ 		}
+@@ -788,8 +817,11 @@ func claudeSeed(homeDir, launchDir, form string) (seeded []string, err error) {
+ 		if _, ok := object["projects"].(map[string]any); !ok {
+ 			object["projects"] = map[string]any{}
+ 		}
+-	} else if !os.IsNotExist(err) {
+-		return nil, fmt.Errorf("%s: managed .claude.json: %v", envregistry.DiagSeedUnreadable, err)
++	case stateread.KindAbsent:
++	case stateread.KindUnreadable:
++		return nil, fmt.Errorf("%s: managed .claude.json is unreadable", envregistry.DiagSeedUnreadable)
++	default:
++		return nil, fmt.Errorf("%s: managed .claude.json has unknown read state %q", envregistry.DiagSeedUnreadable, state.Kind)
+ 	}
+ 	projects := object["projects"].(map[string]any)
+ 	for name := range projects {
+@@ -851,16 +883,23 @@ func protocoljsonMarshal(object map[string]any) ([]byte, error) {
+ // an unreadable or invalid file is reported, never treated as absence
+ // (§8.4).
+ func claudeProjects(homeDir string) (map[string]bool, error) {
+-	payload, err := os.ReadFile(filepath.Join(homeDir, ".claude.json")) // #nosec G304 -- managed .claude.json below the resolved home
++	path := filepath.Join(homeDir, ".claude.json")
++	state, err := stateread.ReadRegularFile(path) // #nosec G304 -- managed .claude.json below the resolved home
+ 	if err != nil {
+-		if os.IsNotExist(err) {
+-			return map[string]bool{}, nil
+-		}
+-		return nil, err
++		return nil, fmt.Errorf("%s: managed .claude.json: %w", envregistry.DiagSeedUnreadable, err)
++	}
++	switch state.Kind {
++	case stateread.KindAbsent:
++		return map[string]bool{}, nil
++	case stateread.KindUnreadable:
++		return nil, fmt.Errorf("%s: managed .claude.json is unreadable", envregistry.DiagSeedUnreadable)
++	case stateread.KindPresent:
++	default:
++		return nil, fmt.Errorf("%s: managed .claude.json has unknown read state %q", envregistry.DiagSeedUnreadable, state.Kind)
+ 	}
+-	parsed, ok := decodeJSONObject(payload)
++	parsed, ok := decodeJSONObject(state.Bytes)
+ 	if !ok {
+-		return nil, fmt.Errorf("managed .claude.json is not an object")
++		return nil, fmt.Errorf("%s: managed .claude.json is not an object", envregistry.DiagSeedUnreadable)
+ 	}
+ 	entries := map[string]bool{}
+ 	if projects, ok := parsed["projects"].(map[string]any); ok {
+@@ -919,16 +958,23 @@ func inventoryUnmanaged(homeDir string, want map[string]bool, storeRoot string)
+ 	sort.Strings(paths)
+ 	for _, path := range paths {
+ 		full := filepath.Join(homeDir, filepath.FromSlash(path))
+-		info, err := os.Lstat(full)
++		metadata, err := stateread.Lstat(full)
+ 		if err != nil {
+-			if os.IsNotExist(err) {
+-				continue
+-			}
+ 			return fmt.Errorf("%s: inventory of %s: %v", DiagUnmanagedConflict, path, err)
+ 		}
++		if metadata.Kind == stateread.KindAbsent {
++			continue
++		}
++		if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
++			return fmt.Errorf("%s: inventory of %s: path metadata is unreadable", DiagUnmanagedConflict, path)
++		}
++		info := metadata.Info
+ 		if info.Mode()&os.ModeSymlink != 0 {
+-			target, err := os.Readlink(full)
+-			if err == nil && !sameStoreTree(target, storeRoot) {
++			link, err := stateread.Readlink(full)
++			if err != nil || link.Kind != stateread.KindPresent {
++				return fmt.Errorf("%s: inventory of %s: symbolic link target is unreadable: %v", DiagUnmanagedConflict, path, err)
++			}
++			if !sameStoreTree(link.Target, storeRoot) {
+ 				return fmt.Errorf("%s: %s is a symlink outside the manager store; abort, or take over with backup", DiagForeignManager, path)
+ 			}
+ 		}
+@@ -1419,9 +1465,11 @@ func sortedKeysBytes(values map[string][]byte) []string {
+ // verification is the lock-free currency verdict over exactly the surfaces
+ // the marker records (§10.1).
+ type verification struct {
+-	current  bool
+-	reasons  []string
+-	warnings []string
++	current               bool
++	reasons               []string
++	warnings              []string
++	passthroughReadFailed bool
++	markerReadFailed      bool
+ 	// surfaceState carries the per-surface outcome for status rows: ""
+ 	// (current), environment_surface_drift, environment_surface_missing,
+ 	// or environment_surface_unreadable.
+@@ -1456,9 +1504,16 @@ func verifyHome(req *ResolveRequest, adapter envregistry.Adapter, source Source,
+ 		return verdict
+ 	}
+ 	verdict.order = order
+-	marker, err := envmarker.Read(ManagedHomeDir(req.Home, req.Profile, adapter.ID))
++	readStateFile := req.readStateFile
++	if readStateFile == nil {
++		readStateFile = stateread.ReadFile
++	}
++	marker, err := envmarker.ReadWith(ManagedHomeDir(req.Home, req.Profile, adapter.ID), readStateFile)
+ 	if err != nil {
+ 		verdict.reasons = append(verdict.reasons, fmt.Sprintf("marker invalid: %v", err))
++		if strings.Contains(err.Error(), envmarker.DiagMarkerUnreadable) {
++			verdict.markerReadFailed = true
++		}
+ 		return verdict
+ 	}
+ 	if marker == nil {
+@@ -1548,15 +1603,21 @@ func (v *verification) checkSurfaces(req *ResolveRequest, plan *homePlan, marker
+ 			full := filepath.Join(plan.homeDir, filepath.FromSlash(path))
+ 			target, linked := plan.links[path]
+ 			if linked && !copiedPaths[path] {
+-				info, err := os.Lstat(full)
+-				if err != nil {
+-					if os.IsNotExist(err) {
+-						v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is missing", path))
+-						v.mark(key, DiagSurfaceMissing)
+-					} else {
+-						v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is unreadable: %v", path, err))
+-						v.mark(key, DiagSurfaceUnreadable)
+-					}
++				metadata, err := stateread.Lstat(full)
++				if err != nil || metadata.Kind == stateread.KindUnreadable {
++					v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is unreadable: %v", path, err))
++					v.mark(key, DiagSurfaceUnreadable)
++					continue
++				}
++				if metadata.Kind == stateread.KindAbsent {
++					v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is missing", path))
++					v.mark(key, DiagSurfaceMissing)
++					continue
++				}
++				info := metadata.Info
++				if info == nil {
++					v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is unreadable: metadata is unavailable", path))
++					v.mark(key, DiagSurfaceUnreadable)
+ 					continue
+ 				}
+ 				if info.Mode()&os.ModeSymlink == 0 {
+@@ -1564,8 +1625,18 @@ func (v *verification) checkSurfaces(req *ResolveRequest, plan *homePlan, marker
+ 					v.mark(key, DiagSurfaceDrift)
+ 					continue
+ 				}
+-				got, err := os.Readlink(full)
+-				if err != nil || got != target {
++				link, err := stateread.Readlink(full)
++				if err != nil || link.Kind == stateread.KindUnreadable {
++					v.reasons = append(v.reasons, fmt.Sprintf("surface file %s link target is unreadable: %v", path, err))
++					v.mark(key, DiagSurfaceUnreadable)
++					continue
++				}
++				if link.Kind == stateread.KindAbsent {
++					v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is missing", path))
++					v.mark(key, DiagSurfaceMissing)
++					continue
++				}
++				if link.Target != target {
+ 					v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is drifted: link target changed", path))
+ 					v.mark(key, DiagSurfaceDrift)
+ 					continue
+@@ -1589,18 +1660,18 @@ func (v *verification) checkSurfaces(req *ResolveRequest, plan *homePlan, marker
+ 					v.mark(key, DiagSurfaceDrift)
+ 					continue
+ 				}
+-				payload, err := os.ReadFile(target) // #nosec G304 -- link target recomputed from the verified plan
+-				if err != nil {
+-					if os.IsNotExist(err) {
+-						v.reasons = append(v.reasons, fmt.Sprintf("surface file %s link target is missing", path))
+-						v.mark(key, DiagSurfaceMissing)
+-					} else {
+-						v.reasons = append(v.reasons, fmt.Sprintf("surface file %s link target is unreadable: %v", path, err))
+-						v.mark(key, DiagSurfaceUnreadable)
+-					}
++				state, err := stateread.ReadFile(target) // #nosec G304 -- link target recomputed from the verified plan
++				if err != nil || state.Kind == stateread.KindUnreadable {
++					v.reasons = append(v.reasons, fmt.Sprintf("surface file %s link target is unreadable: %v", path, err))
++					v.mark(key, DiagSurfaceUnreadable)
++					continue
++				}
++				if state.Kind == stateread.KindAbsent {
++					v.reasons = append(v.reasons, fmt.Sprintf("surface file %s link target is missing", path))
++					v.mark(key, DiagSurfaceMissing)
+ 					continue
+ 				}
+-				if contextmaterialize.FileHash(payload) != contextmaterialize.FileHash(expected) {
++				if contextmaterialize.FileHash(state.Bytes) != contextmaterialize.FileHash(expected) {
+ 					v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is drifted: link target bytes differ", path))
+ 					v.mark(key, DiagSurfaceDrift)
+ 				}
+@@ -1634,16 +1705,16 @@ func (v *verification) checkSurfaces(req *ResolveRequest, plan *homePlan, marker
+ // missing file and an unreadable file are different facts (§8.4). It
+ // returns the surface state for the status row.
+ func (v *verification) checkCopy(path, full string, document []byte) string {
+-	payload, err := os.ReadFile(full) // #nosec G304 -- home path from the verified plan
+-	if err != nil {
+-		if os.IsNotExist(err) {
+-			v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is missing", path))
+-			return DiagSurfaceMissing
+-		}
++	state, err := stateread.ReadFile(full) // #nosec G304 -- home path from the verified plan
++	if err != nil || state.Kind == stateread.KindUnreadable {
+ 		v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is unreadable: %v", path, err))
+ 		return DiagSurfaceUnreadable
+ 	}
+-	if contextmaterialize.FileHash(payload) != contextmaterialize.FileHash(document) {
++	if state.Kind == stateread.KindAbsent {
++		v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is missing", path))
++		return DiagSurfaceMissing
++	}
++	if contextmaterialize.FileHash(state.Bytes) != contextmaterialize.FileHash(document) {
+ 		v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is drifted: content hash differs", path))
+ 		return DiagSurfaceDrift
+ 	}
+@@ -1653,11 +1724,12 @@ func (v *verification) checkCopy(path, full string, document []byte) string {
+ // checkFallbackCopy verifies a recorded symlink-fallback copy against its
+ // store source: file bytes for files, the store content hash for trees.
+ func (v *verification) checkFallbackCopy(path, full, source string) string {
+-	info, err := os.Stat(source)
+-	if err != nil {
++	metadata, err := stateread.Stat(source)
++	if err != nil || metadata.Kind != stateread.KindPresent || metadata.Info == nil {
+ 		v.reasons = append(v.reasons, fmt.Sprintf("surface file %s store source is unreadable: %v", path, err))
+ 		return DiagSurfaceUnreadable
+ 	}
++	info := metadata.Info
+ 	if info.IsDir() {
+ 		want, err := contextstore.ContentHash(source)
+ 		if err != nil {
+@@ -1760,11 +1832,30 @@ func (v *verification) checkPassthrough(req *ResolveRequest, plan *homePlan, mar
+ 			continue
+ 		}
+ 		full := filepath.Join(plan.homeDir, filepath.FromSlash(path))
+-		info, err := os.Lstat(full)
+-		if err != nil {
++		var metadata stateread.Metadata
++		if req.passthroughLstat == nil {
++			metadata, err = stateread.Lstat(full)
++		} else {
++			metadata, err = stateread.LstatWith(full, req.passthroughLstat)
++		}
++		if err != nil || metadata.Kind == stateread.KindUnreadable {
++			v.passthroughReadFailed = true
++			if err == nil {
++				err = stateread.UnusableError(full, fmt.Errorf("entry inspection returned unreadable without an error"))
++			}
++			v.reasons = append(v.reasons, fmt.Sprintf("%s: passthrough entry %s cannot be inspected: %v", envregistry.DiagPassthroughUnreadable, path, err))
++			continue
++		}
++		if metadata.Kind == stateread.KindAbsent {
+ 			v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s is detached", path))
+ 			continue
+ 		}
++		info := metadata.Info
++		if info == nil {
++			v.passthroughReadFailed = true
++			v.reasons = append(v.reasons, fmt.Sprintf("%s: passthrough entry %s has no readable metadata", envregistry.DiagPassthroughUnreadable, path))
++			continue
++		}
+ 		if info.Mode()&os.ModeSymlink == 0 {
+ 			if !info.IsDir() {
+ 				v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s is detached: link path holds a regular file, expected a link to %s (%s)", path, target, envregistry.DiagCredentialConflict))
+@@ -1773,11 +1864,25 @@ func (v *verification) checkPassthrough(req *ResolveRequest, plan *homePlan, mar
+ 			v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s is detached", path))
+ 			continue
+ 		}
+-		got, err := os.Readlink(full)
+-		if err != nil {
++		var link stateread.Link
++		if req.passthroughReadlink == nil {
++			link, err = stateread.Readlink(full)
++		} else {
++			link, err = stateread.ReadlinkWith(full, req.passthroughReadlink)
++		}
++		if err != nil || link.Kind == stateread.KindUnreadable {
++			v.passthroughReadFailed = true
++			if err == nil {
++				err = stateread.UnusableError(full, fmt.Errorf("link inspection returned unreadable without an error"))
++			}
++			v.reasons = append(v.reasons, fmt.Sprintf("%s: passthrough entry %s target cannot be read: %v", envregistry.DiagPassthroughUnreadable, path, err))
++			continue
++		}
++		if link.Kind == stateread.KindAbsent {
+ 			v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s is detached", path))
+ 			continue
+ 		}
++		got := link.Target
+ 		if got != target {
+ 			v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s is detached: link targets %s, expected %s (%s)", path, got, target, envregistry.DiagCredentialConflict))
+ 			continue
+@@ -1998,13 +2103,26 @@ func firstResolveNotice(adapter envregistry.Adapter, plan *homePlan) string {
+ // loadResolveInputs reads the profile source and lock for resolution. A
+ // missing profile is profile_unknown (§10.4).
+ func loadResolveInputs(home, profile string) (Source, *contextlock.Lock, string, error) {
++	return loadResolveInputsWith(home, profile, nil)
++}
++
++func loadResolveInputsWith(home, profile string, readRegularFile func(string) (stateread.File, error)) (Source, *contextlock.Lock, string, error) {
++	if readRegularFile == nil {
++		readRegularFile = stateread.ReadRegularFile
++	}
+ 	source, err := readSource(home, profile)
+ 	if err != nil {
+-		return Source{}, nil, "", fmt.Errorf("%s: profile %q is not installed", DiagProfileUnknown, profile)
++		if isStateAbsent(err) {
++			return Source{}, nil, "", fmt.Errorf("%s: profile %q is not installed", DiagProfileUnknown, profile)
++		}
++		return Source{}, nil, "", fmt.Errorf("%s: profile %q source cannot be trusted: %w", envregistry.DiagStoreUntrusted, profile, err)
+ 	}
+-	lock, hash, err := readLock(home, profile)
++	lock, hash, err := readLockWith(home, profile, readRegularFile)
+ 	if err != nil {
+-		return Source{}, nil, "", fmt.Errorf("%s: profile %q is not installed", DiagProfileUnknown, profile)
++		if isStateAbsent(err) {
++			return Source{}, nil, "", fmt.Errorf("%s: profile %q is not installed", DiagProfileUnknown, profile)
++		}
++		return Source{}, nil, "", err
+ 	}
+ 	return source, lock, hash, nil
+ }
+@@ -2051,11 +2169,17 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
+ 	if !identifiers.Valid(profile) {
+ 		return nil, fmt.Errorf("%s: profile %q is not installed", DiagProfileUnknown, profile)
+ 	}
+-	source, lock, hash, err := loadResolveInputs(req.Home, profile)
++	source, lock, hash, err := loadResolveInputsWith(req.Home, profile, req.readRegularFile)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+ 	verdict := verifyHome(&req, adapter, source, lock, hash)
++	if verdict.markerReadFailed {
++		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envmarker.DiagMarkerUnreadable, strings.Join(verdict.reasons, "; "))
++	}
++	if verdict.passthroughReadFailed {
++		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envregistry.DiagPassthroughUnreadable, strings.Join(verdict.reasons, "; "))
++	}
+ 	if verdict.current {
+ 		fragment, err := buildFragment(&req, adapter, verdict)
+ 		if err != nil {
+@@ -2086,6 +2210,12 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
+ 	}
+ 	defer func() { _ = op.close() }()
+ 	verdict := verifyHome(req, adapter, source, lock, hash)
++	if verdict.markerReadFailed {
++		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envmarker.DiagMarkerUnreadable, strings.Join(verdict.reasons, "; "))
++	}
++	if verdict.passthroughReadFailed {
++		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envregistry.DiagPassthroughUnreadable, strings.Join(verdict.reasons, "; "))
++	}
+ 	if verdict.current {
+ 		fragment, err := buildFragment(req, adapter, verdict)
+ 		if err != nil {
+@@ -2202,14 +2332,17 @@ func isCredentialRefusal(err error) bool {
+ // when two profile names map to one platform path below the environments
+ // root (§5).
+ func checkProfileCollision(home, profile string) error {
+-	entries, err := os.ReadDir(EnvRoot(home))
++	listing, err := stateread.ReadDir(EnvRoot(home))
+ 	if err != nil {
+-		if os.IsNotExist(err) {
+-			return nil
+-		}
+ 		return err
+ 	}
+-	for _, entry := range entries {
++	if listing.Kind == stateread.KindAbsent {
++		return nil
++	}
++	if listing.Kind != stateread.KindPresent {
++		return stateread.UnusableError(EnvRoot(home), fmt.Errorf("directory listing is unreadable"))
++	}
++	for _, entry := range listing.Entries {
+ 		if entry.Name() != profile && strings.EqualFold(entry.Name(), profile) {
+ 			return fmt.Errorf("%s: profile names %q and %q map to one platform path", contextmaterialize.DiagPathCollision, entry.Name(), profile)
+ 		}
+diff --git a/internal/envprofile/read_failure_conformance_test.go b/internal/envprofile/read_failure_conformance_test.go
+new file mode 100644
+index 00000000..f26446e5
+--- /dev/null
++++ b/internal/envprofile/read_failure_conformance_test.go
+@@ -0,0 +1,491 @@
++package envprofile
++
++import (
++	"encoding/json"
++	"errors"
++	"os"
++	"path/filepath"
++	"strings"
++	"syscall"
++	"testing"
++
++	"github.com/relux-works/curator/internal/conformancecoverage"
++	"github.com/relux-works/curator/internal/envmarker"
++	"github.com/relux-works/curator/internal/envregistry"
++	"github.com/relux-works/curator/internal/stateread"
++)
++
++type readFailureVectorCase struct {
++	Name         string `json:"name"`
++	Operation    string `json:"operation"`
++	FileClass    string `json:"file_class"`
++	EntryKind    string `json:"entry_kind"`
++	FailureClass string `json:"failure_class"`
++	Conforming   *bool  `json:"conforming"`
++	Expected     struct {
++		Currency              string  `json:"currency"`
++		Diagnostic            *string `json:"diagnostic"`
++		FragmentEmitted       *bool   `json:"fragment_emitted"`
++		RowCurrent            *bool   `json:"row_current"`
++		Rebuilt               *bool   `json:"rebuilt"`
++		Written               *bool   `json:"written"`
++		ProvisioningContinues *bool   `json:"provisioning_continues"`
++		RepairRelinks         *bool   `json:"repair_relinks"`
++	} `json:"expected"`
++}
++
++func TestEnvironmentsReadFailureVectors(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	path := filepath.Join(root, "vectors", "environments-read-failure.json")
++	payload, err := os.ReadFile(path) // #nosec G304 -- explicit conformance input
++	if err != nil {
++		t.Fatal(err)
++	}
++	var vectors struct {
++		ProtocolVersion string                  `json:"protocol_version"`
++		Cases           []readFailureVectorCase `json:"cases"`
++	}
++	if err := json.Unmarshal(payload, &vectors); err != nil {
++		t.Fatal(err)
++	}
++	if vectors.ProtocolVersion != "1.0.0-rc.13" || len(vectors.Cases) != 39 {
++		t.Fatalf("pinned read-failure vectors = protocol %q, %d cases; want rc.13 and 39 cases", vectors.ProtocolVersion, len(vectors.Cases))
++	}
++	conformancecoverage.RunOutcomes(t, "environments-read-failure/cases", vectors.Cases,
++		func(tc readFailureVectorCase) string { return tc.Name }, func(t *testing.T, tc readFailureVectorCase) conformancecoverage.Observation {
++			if tc.Name == "backup-record-unreadable-restore-stops" || tc.Name == "backup-record-absent-restore-nothing" {
++				return conformancecoverage.Observation{FailureReason: "no env unmanage --restore-backups production entry"}
++			}
++			if tc.Operation == "restore" {
++				t.Fatalf("unattributed backup restore vector %q", tc.Name)
++			}
++			switch tc.FileClass {
++			case "marker":
++				runMarkerReadFailureVector(t, tc)
++			case "lock":
++				runLockReadFailureVector(t, tc)
++			case "seed":
++				runSeedReadFailureVector(t, tc)
++			case "passthrough":
++				runPassthroughReadFailureVector(t, tc)
++			case "backup-record":
++				runBackupReadFailureVector(t, tc)
++			default:
++				t.Fatalf("unknown read-failure file class %q", tc.FileClass)
++			}
++			return conformancecoverage.Observation{}
++		})
++}
++
++func vectorFailure(class string) error {
++	switch class {
++	case "permission-denied":
++		return syscall.EACCES
++	case "io-error":
++		return syscall.EIO
++	case "parent-not-directory":
++		return syscall.ENOTDIR
++	default:
++		return errors.New("injected unreadable failure")
++	}
++}
++
++func unreadableFile(path string, cause error) (stateread.File, error) {
++	return stateread.File{Kind: stateread.KindUnreadable}, stateread.UnusableError(path, cause)
++}
++
++func vectorRegularFileReader(target string, failure error) func(string) (stateread.File, error) {
++	return func(path string) (stateread.File, error) {
++		if path == target {
++			return unreadableFile(path, failure)
++		}
++		return stateread.ReadRegularFile(path)
++	}
++}
++
++func vectorStateFileReader(target string, failure error) func(string) (stateread.File, error) {
++	return func(path string) (stateread.File, error) {
++		if path == target {
++			return unreadableFile(path, failure)
++		}
++		return stateread.ReadFile(path)
++	}
++}
++
++func runMarkerReadFailureVector(t *testing.T, tc readFailureVectorCase) {
++	t.Helper()
++	fx := writeManagedFixture(t, "acme")
++	seedLiveNativeCredentials(t, fx)
++	provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
++	marker := filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), envmarker.Name)
++	var readStateFile func(string) (stateread.File, error)
++	switch tc.FailureClass {
++	case "permission-denied", "io-error":
++		readStateFile = vectorStateFileReader(marker, vectorFailure(tc.FailureClass))
++	case "unparseable-content":
++		if err := os.WriteFile(marker, []byte("{\n"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++	case "schema-invalid-content":
++		if err := os.WriteFile(marker, []byte("{}\n"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++	case "": // marker absence is known stale state
++		if err := os.Remove(marker); err != nil {
++			t.Fatal(err)
++		}
++	default:
++		t.Fatalf("unsupported marker failure class %q", tc.FailureClass)
++	}
++	req := fx.request("codex_cli")
++	req.readStateFile = readStateFile
++	result, err := Resolve(req)
++	want := envmarker.DiagMarkerUnreadable
++	if tc.FailureClass == "" {
++		want = DiagHomeStale
++	}
++	if err == nil || !strings.Contains(err.Error(), want) {
++		t.Fatalf("Resolve marker case error = %v; want %s", err, want)
++	}
++	if tc.FailureClass != "" && !strings.HasPrefix(err.Error(), envmarker.DiagMarkerUnreadable) {
++		t.Fatalf("Resolve collapsed unreadable marker into stale: %v", err)
++	}
++	if tc.Conforming != nil && !*tc.Conforming && strings.HasPrefix(err.Error(), DiagHomeStale) {
++		t.Fatalf("unreadable marker was reported as absence: %v", err)
++	}
++	if result != nil && len(result.Document) != 0 {
++		t.Fatal("Resolve emitted a fragment after an unreadable marker")
++	}
++	statusReq := statusRequest(fx)
++	statusReq.readStateFile = readStateFile
++	status, err := StatusOf(statusReq)
++	if err != nil {
++		t.Fatal(err)
++	}
++	row := findHome(status, "acme", "codex_cli")
++	if row == nil || row.Current {
++		t.Fatalf("unreadable marker status row = %+v; want non-current currency unknown", row)
++	}
++}
++
++func runLockReadFailureVector(t *testing.T, tc readFailureVectorCase) {
++	t.Helper()
++	fx := writeManagedFixture(t, "acme")
++	lock := lockPath(fx.home, "acme")
++	var readRegularFile func(string) (stateread.File, error)
++	switch tc.FailureClass {
++	case "permission-denied", "io-error", "parent-not-directory":
++		readRegularFile = vectorRegularFileReader(lock, vectorFailure(tc.FailureClass))
++	case "unparseable-content":
++		if err := os.WriteFile(lock, []byte("{\n"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++	case "schema-invalid-content":
++		if err := os.WriteFile(lock, []byte("{\"schema_version\":1}\n"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++	case "symlink-where-regular-required":
++		outside := filepath.Join(t.TempDir(), "lock.json")
++		if err := os.WriteFile(outside, []byte("{}\n"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Remove(lock); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Symlink(outside, lock); err != nil {
++			t.Fatal(err)
++		}
++	case "directory-where-file-expected":
++		if err := os.Remove(lock); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Mkdir(lock, 0o700); err != nil {
++			t.Fatal(err)
++		}
++	case "": // the known-absent lock vector
++		if err := os.Remove(lock); err != nil {
++			t.Fatal(err)
++		}
++	default:
++		t.Fatalf("unsupported lock failure class %q", tc.FailureClass)
++	}
++	if tc.Operation == "update" {
++		broken, err := os.ReadFile(lock)
++		if err != nil {
++			t.Fatal(err)
++		}
++		_, _, err = UpdateWithOptions(fx.home, "acme", UpdateOptions{Policy: Policy{}, readRegularFile: readRegularFile})
++		if err == nil || !strings.Contains(err.Error(), envregistry.DiagStoreUntrusted) {
++			t.Fatalf("Update error = %v; want %s", err, envregistry.DiagStoreUntrusted)
++		}
++		after, err := os.ReadFile(lock)
++		if err != nil || string(after) != string(broken) {
++			t.Fatalf("update changed unreadable lock: %v", err)
++		}
++		if _, err := os.Lstat(ProfileDir(fx.home, DefaultProfile)); !os.IsNotExist(err) {
++			t.Fatalf("update wrote default profile before refusing unreadable lock: %v", err)
++		}
++		return
++	}
++	if tc.Operation == "env-status" {
++		statusReq := statusRequest(fx)
++		statusReq.readRegularFile = readRegularFile
++		status, err := StatusOf(statusReq)
++		if err != nil {
++			t.Fatal(err)
++		}
++		row := findHome(status, "acme", "codex_cli")
++		if row == nil || row.Current || !containsText(row.Findings, envregistry.DiagStoreUntrusted) {
++			t.Fatalf("unreadable lock status row = %+v; want non-current currency unknown %s", row, envregistry.DiagStoreUntrusted)
++		}
++		return
++	}
++	req := fx.request("codex_cli")
++	req.Repair = tc.Operation == "repair"
++	req.readRegularFile = readRegularFile
++	result, err := Resolve(req)
++	if tc.FailureClass == "" {
++		if err == nil || !strings.Contains(err.Error(), DiagProfileUnknown) {
++			t.Fatalf("absent lock error = %v; want %s", err, DiagProfileUnknown)
++		}
++		return
++	}
++	if err == nil || !strings.HasPrefix(err.Error(), envregistry.DiagStoreUntrusted) {
++		t.Fatalf("Resolve(%s) error = %v; want %s", tc.Operation, err, envregistry.DiagStoreUntrusted)
++	}
++	if tc.Conforming != nil && !*tc.Conforming && strings.Contains(err.Error(), DiagProfileUnknown) {
++		t.Fatalf("unreadable lock was reported as profile unknown: %v", err)
++	}
++	if result != nil && len(result.Document) != 0 {
++		t.Fatal("Resolve emitted a fragment from an unreadable lock")
++	}
++	if tc.Operation == "repair" {
++		if _, err := os.Lstat(filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), envmarker.Name)); !os.IsNotExist(err) {
++			t.Fatalf("repair rebuilt from unreadable lock: %v", err)
++		}
++	}
++}
++
++func runSeedReadFailureVector(t *testing.T, tc readFailureVectorCase) {
++	t.Helper()
++	fx := writeManagedFixture(t, "acme")
++	seed := filepath.Join(fx.native["codex_cli"], "config.toml")
++	var readRegularFile func(string) (stateread.File, error)
++	switch tc.FailureClass {
++	case "permission-denied", "io-error", "parent-not-directory":
++		readRegularFile = vectorRegularFileReader(seed, vectorFailure(tc.FailureClass))
++	case "unparseable-content":
++		if err := os.WriteFile(seed, []byte("not = [toml\n"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++	case "symlink-where-regular-required":
++		target := filepath.Join(t.TempDir(), "config.toml")
++		if err := os.WriteFile(target, []byte("cli_auth_credentials_store = \"file\"\n"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Symlink(target, seed); err != nil {
++			t.Fatal(err)
++		}
++	case "directory-where-file-expected":
++		if err := os.Mkdir(seed, 0o700); err != nil {
++			t.Fatal(err)
++		}
++	case "": // absent native seed is allowed
++	default:
++		t.Fatalf("unsupported seed failure class %q", tc.FailureClass)
++	}
++	req := fx.request("codex_cli")
++	req.Repair = true
++	req.readRegularFile = readRegularFile
++	_, err := Resolve(req)
++	if tc.FailureClass == "" {
++		if err != nil {
++			t.Fatalf("absent seed should not block provisioning: %v", err)
++		}
++		return
++	}
++	if err == nil || !strings.Contains(err.Error(), envregistry.DiagSeedUnreadable) {
++		t.Fatalf("Resolve with unreadable seed error = %v; want %s", err, envregistry.DiagSeedUnreadable)
++	}
++	if _, err := os.Lstat(filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), envmarker.Name)); !os.IsNotExist(err) {
++		t.Fatalf("provisioning continued after unreadable seed: %v", err)
++	}
++}
++
++func runPassthroughReadFailureVector(t *testing.T, tc readFailureVectorCase) {
++	t.Helper()
++	path := "auth.json"
++	if tc.FailureClass == "parent-not-directory" {
++		// The stock Codex passthrough is a root-level file, whose parent is
++		// also required to contain the marker. Give this production-entry
++		// case a valid nested registry path so the failure is a real
++		// non-directory ancestor on every platform, including Windows where
++		// ERROR_PATH_NOT_FOUND also satisfies os.IsNotExist.
++		path = "nested/auth.json"
++		originalRegistry := envregistry.Registry
++		registry := append([]envregistry.Adapter(nil), originalRegistry...)
++		found := false
++		for index := range registry {
++			if registry[index].ID != envregistry.CodexCLI {
++				continue
++			}
++			passthrough := make(map[string][]envregistry.Passthrough, len(registry[index].Passthrough))
++			for goos, entries := range registry[index].Passthrough {
++				passthrough[goos] = append([]envregistry.Passthrough(nil), entries...)
++			}
++			entries := passthrough["default"]
++			if len(entries) != 1 {
++				t.Fatalf("Codex default passthrough entries = %d; want one", len(entries))
++			}
++			entries[0].Path = path
++			passthrough["default"] = entries
++			registry[index].Passthrough = passthrough
++			found = true
++			break
++		}
++		if !found {
++			t.Fatal("Codex adapter is missing from the environment registry")
++		}
++		envregistry.Registry = registry
++		t.Cleanup(func() { envregistry.Registry = originalRegistry })
++	}
++	fx := writeManagedFixture(t, "acme")
++	seedLiveNativeCredentials(t, fx)
++	provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
++	link := filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), filepath.FromSlash(path))
++	var lstat func(string) (os.FileInfo, error)
++	var readlink func(string) (string, error)
++	if tc.FailureClass != "" && tc.FailureClass != "parent-not-directory" {
++		failure := vectorFailure(tc.FailureClass)
++		lstat = func(path string) (os.FileInfo, error) {
++			if path == link {
++				return nil, &os.PathError{Op: "lstat", Path: path, Err: failure}
++			}
++			return os.Lstat(path)
++		}
++		if tc.Name == "passthrough-readlink-io-error-unreadable" {
++			lstat = func(path string) (os.FileInfo, error) { return os.Lstat(path) }
++			readlink = func(path string) (string, error) {
++				if path == link {
++					return "", failure
++				}
++				return os.Readlink(path)
++			}
++		}
++	} else if tc.FailureClass == "" && tc.EntryKind == "missing" {
++		if err := os.Remove(link); err != nil {
++			t.Fatal(err)
++		}
++	} else if tc.FailureClass == "" && tc.EntryKind == "directory" {
++		if err := os.Remove(link); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Mkdir(link, 0o700); err != nil {
++			t.Fatal(err)
++		}
++	} else if tc.FailureClass == "parent-not-directory" {
++		parent := filepath.Dir(link)
++		if err := os.Remove(link); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Remove(parent); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(parent, []byte("blocking parent"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++	}
++
++	if tc.Operation == "env-resolve" {
++		req := fx.request("codex_cli")
++		req.passthroughLstat = lstat
++		req.passthroughReadlink = readlink
++		result, err := Resolve(req)
++		want := DiagHomeStale
++		if tc.FailureClass != "" {
++			want = envregistry.DiagPassthroughUnreadable
++		}
++		if err == nil || !strings.Contains(err.Error(), want) {
++			t.Fatalf("Resolve error = %v; want %s", err, want)
++		}
++		if tc.FailureClass != "" && !strings.HasPrefix(err.Error(), envregistry.DiagPassthroughUnreadable) {
++			t.Fatalf("Resolve collapsed unreadable passthrough into stale: %v", err)
++		}
++		if result != nil && len(result.Document) != 0 {
++			t.Fatal("Resolve emitted a fragment for stale or unreadable passthrough")
++		}
++		return
++	}
++	statusReq := statusRequest(fx)
++	statusReq.passthroughLstat = lstat
++	statusReq.passthroughReadlink = readlink
++	status, err := StatusOf(statusReq)
++	if err != nil {
++		t.Fatal(err)
++	}
++	row := findHome(status, "acme", "codex_cli")
++	if row == nil || row.Current {
++		t.Fatalf("passthrough status row = %+v; want non-current", row)
++	}
++	if tc.FailureClass != "" {
++		if !containsText(row.Findings, envregistry.DiagPassthroughUnreadable) || containsText(row.Findings, envregistry.DiagPassthroughDetached) {
++			t.Fatalf("unreadable status findings = %v", row.Findings)
++		}
++	} else if !containsText(row.Findings, envregistry.DiagPassthroughDetached) {
++		t.Fatalf("detached status findings = %v", row.Findings)
++	}
++	if tc.Expected.RepairRelinks != nil && *tc.Expected.RepairRelinks {
++		req := fx.request("codex_cli")
++		req.Repair = true
++		if _, err := Resolve(req); err != nil {
++			t.Fatalf("repair detached entry: %v", err)
++		}
++		if _, err := os.Lstat(link); err != nil {
++			t.Fatalf("repair did not restore detached link: %v", err)
++		}
++	}
++}
++
++func runBackupReadFailureVector(t *testing.T, tc readFailureVectorCase) {
++	t.Helper()
++	fx := writeManagedFixture(t, "acme")
++	seedLiveNativeCredentials(t, fx)
++	provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
++	managed := ManagedHomeDir(fx.home, "acme", "codex_cli")
++	backupRoot := filepath.Join(managed, ".agent-environment-backup")
++	if tc.FailureClass != "" {
++		if err := os.Mkdir(backupRoot, 0o700); err != nil {
++			t.Fatal(err)
++		}
++	}
++	statusReq := statusRequest(fx)
++	if tc.FailureClass != "" {
++		statusReq.readStateDirectory = func(path string) (stateread.Directory, error) {
++			if path == backupRoot {
++				return stateread.Directory{Kind: stateread.KindUnreadable}, stateread.UnusableError(path, vectorFailure(tc.FailureClass))
++			}
++			return stateread.ReadDir(path)
++		}
++	}
++	status, err := StatusOf(statusReq)
++	if err != nil {
++		t.Fatal(err)
++	}
++	row := findHome(status, "acme", "codex_cli")
++	if row == nil {
++		t.Fatal("backup status omitted the profile row")
++	}
++	if tc.FailureClass != "" {
++		if row.BackupsKnown || row.Current || !containsText(row.Findings, envregistry.DiagBackupRecordUnreadable) {
++			t.Fatalf("unreadable backup inventory row = %+v", row)
++		}
++		if tc.Conforming != nil && !*tc.Conforming && !strings.Contains(strings.Join(row.Findings, " "), envregistry.DiagBackupRecordUnreadable) {
++			t.Fatal("unreadable backup inventory was reported as empty/current")
++		}
++	} else if !row.BackupsKnown || row.Backups != 0 {
++		t.Fatalf("absent backup inventory row = %+v; want known zero", row)
++	}
++}
+diff --git a/internal/envprofile/read_failure_test.go b/internal/envprofile/read_failure_test.go
+new file mode 100644
+index 00000000..c0343cd7
+--- /dev/null
++++ b/internal/envprofile/read_failure_test.go
+@@ -0,0 +1,209 @@
++package envprofile
++
++import (
++	"errors"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/envmarker"
++	"github.com/relux-works/curator/internal/envregistry"
++	"github.com/relux-works/curator/internal/stateread"
++)
++
++func TestPassthroughReadFailuresAreUnknownAndNeverRepaired(t *testing.T) {
++	for _, failure := range []string{"lstat", "readlink"} {
++		t.Run(failure, func(t *testing.T) {
++			fx := writeManagedFixture(t, "acme")
++			auth := filepath.Join(fx.native["codex_cli"], "auth.json")
++			if err := os.WriteFile(auth, []byte("{\"openai_api_key\":null}\n"), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
++			managed := ManagedHomeDir(fx.home, "acme", "codex_cli")
++			link := filepath.Join(managed, "auth.json")
++			wantTarget, err := os.Readlink(link)
++			if err != nil {
++				t.Fatal(err)
++			}
++			markerPath := filepath.Join(managed, envmarker.Name)
++			markerBefore, err := os.ReadFile(markerPath)
++			if err != nil {
++				t.Fatal(err)
++			}
++
++			lstat := func(path string) (os.FileInfo, error) { return os.Lstat(path) }
++			readlink := func(path string) (string, error) { return os.Readlink(path) }
++			if failure == "lstat" {
++				lstat = func(path string) (os.FileInfo, error) {
++					if path == link {
++						return nil, &os.PathError{Op: "lstat", Path: path, Err: os.ErrPermission}
++					}
++					return os.Lstat(path)
++				}
++			} else {
++				readlink = func(path string) (string, error) {
++					if path == link {
++						return "", errors.New("injected readlink I/O error")
++					}
++					return os.Readlink(path)
++				}
++			}
++
++			statusReq := statusRequest(fx)
++			statusReq.passthroughLstat = lstat
++			statusReq.passthroughReadlink = readlink
++			status, err := StatusOf(statusReq)
++			if err != nil {
++				t.Fatal(err)
++			}
++			row := findHome(status, "acme", "codex_cli")
++			if row == nil || row.Current || !containsText(row.Findings, envregistry.DiagPassthroughUnreadable) {
++				t.Fatalf("status row = %+v; want unknown, non-current %s", row, envregistry.DiagPassthroughUnreadable)
++			}
++
++			for _, repair := range []bool{false, true} {
++				req := fx.request("codex_cli")
++				req.Repair = repair
++				req.passthroughLstat = lstat
++				req.passthroughReadlink = readlink
++				result, resolveErr := Resolve(req)
++				if resolveErr == nil || !strings.Contains(resolveErr.Error(), envregistry.DiagPassthroughUnreadable) {
++					t.Fatalf("Resolve(repair=%v) error = %v; want %s", repair, resolveErr, envregistry.DiagPassthroughUnreadable)
++				}
++				if !strings.HasPrefix(resolveErr.Error(), envregistry.DiagPassthroughUnreadable) {
++					t.Fatalf("Resolve(repair=%v) collapsed unreadable passthrough into stale/detached: %v", repair, resolveErr)
++				}
++				if result != nil && len(result.Document) != 0 {
++					t.Fatalf("Resolve(repair=%v) emitted a fragment after an unreadable passthrough", repair)
++				}
++			}
++			if got, err := os.Readlink(link); err != nil || got != wantTarget {
++				t.Fatalf("repair changed passthrough link to %q (%v), want %q", got, err, wantTarget)
++			}
++			markerAfter, err := os.ReadFile(markerPath)
++			if err != nil || string(markerAfter) != string(markerBefore) {
++				t.Fatalf("repair changed marker after read failure: %v", err)
++			}
++		})
++	}
++}
++
++func TestUnreadableLockIsUntrustedAcrossStatusResolveRepairAndUpdate(t *testing.T) {
++	for _, kind := range []string{"malformed", "directory", "symlink"} {
++		t.Run(kind, func(t *testing.T) {
++			fx := writeManagedFixture(t, "acme")
++			lock := lockPath(fx.home, "acme")
++			switch kind {
++			case "malformed":
++				if err := os.WriteFile(lock, []byte("{\n"), 0o600); err != nil {
++					t.Fatal(err)
++				}
++			case "directory":
++				if err := os.Remove(lock); err != nil {
++					t.Fatal(err)
++				}
++				if err := os.Mkdir(lock, 0o700); err != nil {
++					t.Fatal(err)
++				}
++			case "symlink":
++				outside := filepath.Join(t.TempDir(), "lock.json")
++				if err := os.WriteFile(outside, []byte("{}\n"), 0o600); err != nil {
++					t.Fatal(err)
++				}
++				if err := os.Remove(lock); err != nil {
++					t.Fatal(err)
++				}
++				if err := os.Symlink(outside, lock); err != nil {
++					t.Fatal(err)
++				}
++			}
++
++			before, err := os.Lstat(lock)
++			if err != nil {
++				t.Fatal(err)
++			}
++			request := fx.request("codex_cli")
++			if _, err := Resolve(request); err == nil || !strings.Contains(err.Error(), envregistry.DiagStoreUntrusted) {
++				t.Fatalf("Resolve error = %v; want %s", err, envregistry.DiagStoreUntrusted)
++			}
++			request.Repair = true
++			if _, err := Resolve(request); err == nil || !strings.Contains(err.Error(), envregistry.DiagStoreUntrusted) {
++				t.Fatalf("Resolve --repair error = %v; want %s", err, envregistry.DiagStoreUntrusted)
++			}
++			status, err := StatusOf(statusRequest(fx))
++			if err != nil {
++				t.Fatal(err)
++			}
++			row := findHome(status, "acme", "codex_cli")
++			if row == nil || row.Current || !containsText(row.Findings, envregistry.DiagStoreUntrusted) {
++				t.Fatalf("status row = %+v; want non-current %s", row, envregistry.DiagStoreUntrusted)
++			}
++			if _, err := os.Lstat(filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), envmarker.Name)); !os.IsNotExist(err) {
++				t.Fatalf("repair rebuilt managed home from unreadable lock: marker lstat error = %v", err)
++			}
++			after, err := os.Lstat(lock)
++			if err != nil || before.Mode().Type() != after.Mode().Type() {
++				t.Fatalf("lock entry changed after refused repair: before=%v after=%v err=%v", before.Mode(), after, err)
++			}
++		})
++	}
++}
++
++func TestUnreadableLockRefusesUpdateWithoutRewriting(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	policy := Policy{}
++	lock := lockPath(fx.home, "acme")
++	broken := []byte("{\n")
++	if err := os.WriteFile(lock, broken, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if _, _, err := UpdateWithOptions(fx.home, "acme", UpdateOptions{Policy: policy}); err == nil || !strings.Contains(err.Error(), envregistry.DiagStoreUntrusted) {
++		t.Fatalf("Update error = %v; want %s", err, envregistry.DiagStoreUntrusted)
++	}
++	after, err := os.ReadFile(lock)
++	if err != nil || string(after) != string(broken) {
++		t.Fatalf("update rewrote unreadable lock: %q (%v)", after, err)
++	}
++	if _, err := os.Lstat(ProfileDir(fx.home, DefaultProfile)); !os.IsNotExist(err) {
++		t.Fatalf("update wrote default profile before refusing unreadable lock: %v", err)
++	}
++}
++
++func TestAbsentLockRemainsProfileUnknown(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	if err := os.Remove(lockPath(fx.home, "acme")); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := Resolve(fx.request("codex_cli")); err == nil || !strings.Contains(err.Error(), DiagProfileUnknown) {
++		t.Fatalf("Resolve with absent lock error = %v; want %s", err, DiagProfileUnknown)
++	}
++}
++
++func TestUnreadableCodexSeedDoesNotSelectAbsentDefault(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	seed := filepath.Join(fx.native["codex_cli"], "config.toml")
++	reads := 0
++	req := fx.request("codex_cli")
++	req.Repair = true
++	req.readRegularFile = func(path string) (stateread.File, error) {
++		if path == seed {
++			reads++
++			if reads == 1 {
++				return stateread.File{Kind: stateread.KindUnreadable}, stateread.UnusableError(path, os.ErrPermission)
++			}
++			return stateread.File{Kind: stateread.KindAbsent}, nil
++		}
++		return stateread.ReadRegularFile(path)
++	}
++	if _, err := Resolve(req); err == nil || !strings.Contains(err.Error(), envregistry.DiagSeedUnreadable) {
++		t.Fatalf("Resolve with unreadable Codex seed = %v; want %s", err, envregistry.DiagSeedUnreadable)
++	}
++	if reads != 1 {
++		t.Fatalf("unreadable seed was retried and could take absence fallback: %d reads", reads)
++	}
++	if _, err := os.Lstat(filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), envmarker.Name)); !os.IsNotExist(err) {
++		t.Fatalf("provisioning continued after unreadable seed: %v", err)
++	}
++}
+diff --git a/internal/envprofile/state_read_guard_test.go b/internal/envprofile/state_read_guard_test.go
+index 0993bacf..098fba20 100644
+--- a/internal/envprofile/state_read_guard_test.go
++++ b/internal/envprofile/state_read_guard_test.go
+@@ -21,6 +21,7 @@ import (
+ 
+ type managerReadFunction struct {
+ 	file           string
++	line           int
+ 	name           string
+ 	key            string
+ 	directory      string
+@@ -41,6 +42,7 @@ type managerReadAudit struct {
+ 	seamGuarded  []string
+ 	allowlisted  []string
+ 	violations   []string
++	readSites    []string
+ }
+ 
+ // Exceptions are deliberately keyed by file and function and explain why the
+@@ -121,14 +123,6 @@ func reviewedManagerReadExceptions() map[string]string {
+ 	)
+ 	allow("Inspects a caller-owned native environment surface or seed; an absent external file is skipped or reported as missing, and other read errors are preserved.",
+ 		"internal/adapters/stage.go:*Mirror.stageStale",
+-		"internal/envprofile/managed.go:*ResolveRequest.gatherSeeds",
+-		"internal/envprofile/managed.go:*verification.checkCopy",
+-		"internal/envprofile/managed.go:*verification.checkSurfaces",
+-		"internal/envprofile/managed.go:checkProfileCollision",
+-		"internal/envprofile/managed.go:claudeProjects",
+-		"internal/envprofile/managed.go:claudeSeed",
+-		"internal/envprofile/managed.go:inventoryUnmanaged",
+-		"internal/envprofile/managed.go:referencedBlocked",
+ 	)
+ 	allow("Checks an external destination or target namespace before a write or removal; ENOENT describes path topology, while other metadata failures abort the operation.",
+ 		"internal/adapters/adapters.go:unmanagedConflict",
+@@ -220,6 +214,11 @@ func TestManagerOwnedAbsenceReadsAreGuarded(t *testing.T) {
+ 	for _, violation := range audit.violations {
+ 		t.Error(violation)
+ 	}
++	if os.Getenv("CURATOR_MANAGER_READ_INVENTORY") == "1" {
++		for _, site := range audit.readSites {
++			t.Log(site)
++		}
++	}
+ }
+ 
+ func TestManagerReadScannerFindsAliasedNotExistCollapse(t *testing.T) {
+@@ -240,7 +239,7 @@ import (
+ 	hostfs "os"
+ )
+ 
+-func readNewManagerState() string {
++func readNewManagerStateWithErrorsIs() string {
+ 	data, err := hostfs.ReadFile("manager-state")
+ 	if errorcheck.Is(err, iofs.ErrNotExist) {
+ 		return "default"
+@@ -250,6 +249,17 @@ func readNewManagerState() string {
+ 	}
+ 	return string(data)
+ }
++
++func readNewManagerStateWithOSIsNotExist() string {
++	data, err := hostfs.ReadFile("other-manager-state")
++	if hostfs.IsNotExist(err) {
++		return "default"
++	}
++	if err != nil {
++		return "default"
++	}
++	return string(data)
++}
+ `
+ 	if err := os.WriteFile(filepath.Join(root, "internal/envprofile/mutant.go"), []byte(mutant), 0o644); err != nil {
+ 		t.Fatal(err)
+@@ -258,8 +268,10 @@ func readNewManagerState() string {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if len(audit.violations) != 1 || !strings.Contains(audit.violations[0], "internal/envprofile/mutant.go:readNewManagerState") {
+-		t.Fatalf("AST scan of errors.Is(fs.ErrNotExist) mutant = %v, want its one unreviewed reader", audit.violations)
++	if len(audit.violations) != 2 ||
++		!strings.Contains(strings.Join(audit.violations, "\n"), "internal/envprofile/mutant.go:readNewManagerStateWithErrorsIs") ||
++		!strings.Contains(strings.Join(audit.violations, "\n"), "internal/envprofile/mutant.go:readNewManagerStateWithOSIsNotExist") {
++		t.Fatalf("AST scan did not reject both aliased absence-collapse mutants: %v", audit.violations)
+ 	}
+ }
+ 
+@@ -302,6 +314,7 @@ func scanManagerReadSourcesWithAllowlist(root string, allowlist map[string]strin
+ 			key := directory + "::" + name
+ 			info := &managerReadFunction{
+ 				file:         filepath.ToSlash(rel),
++				line:         fset.Position(function.Pos()).Line,
+ 				name:         name,
+ 				key:          key,
+ 				directory:    directory,
+@@ -357,11 +370,13 @@ func scanManagerReadSourcesWithAllowlist(root string, allowlist map[string]strin
+ 			}
+ 			usedAllowlist[entry] = true
+ 			audit.allowlisted = append(audit.allowlisted, entry+" — "+reason)
++			audit.readSites = append(audit.readSites, fmt.Sprintf("%s:%d %s — reviewed allowlist: %s", function.file, function.line, function.name, reason))
+ 			continue
+ 		}
+ 		if function.throughSeam {
+ 			audit.sitesScanned++
+ 			audit.seamGuarded = append(audit.seamGuarded, entry)
++			audit.readSites = append(audit.readSites, fmt.Sprintf("%s:%d %s — shared stateread seam", function.file, function.line, function.name))
+ 		}
+ 	}
+ 	for entry := range allowlist {
+@@ -371,6 +386,7 @@ func scanManagerReadSourcesWithAllowlist(root string, allowlist map[string]strin
+ 	}
+ 	sort.Strings(audit.seamGuarded)
+ 	sort.Strings(audit.allowlisted)
++	sort.Strings(audit.readSites)
+ 	sort.Strings(audit.violations)
+ 	return audit, nil
+ }
+@@ -428,7 +444,7 @@ func collectFunctionReads(info *managerReadFunction, function *ast.FuncDecl, mod
+ }
+ 
+ func filesystemReadCall(call *ast.CallExpr, imports map[string]string, dotImports map[string]bool, selections map[*ast.SelectorExpr]*types.Selection) (string, bool) {
+-	readMethods := map[string]bool{"ReadFile": true, "ReadDir": true, "Stat": true, "Lstat": true, "Open": true}
++	readMethods := map[string]bool{"ReadFile": true, "ReadDir": true, "Stat": true, "Lstat": true, "Readlink": true, "Open": true}
+ 	fsFunctions := map[string]bool{"ReadFile": true, "ReadDir": true, "Stat": true, "WalkDir": true, "Glob": true}
+ 	switch function := call.Fun.(type) {
+ 	case *ast.SelectorExpr:
+@@ -442,7 +458,7 @@ func filesystemReadCall(call *ast.CallExpr, imports map[string]string, dotImport
+ }
+ 
+ func filesystemReadSelector(function *ast.SelectorExpr, imports map[string]string, selections map[*ast.SelectorExpr]*types.Selection) (string, bool) {
+-	readMethods := map[string]bool{"ReadFile": true, "ReadDir": true, "Stat": true, "Lstat": true, "Open": true}
++	readMethods := map[string]bool{"ReadFile": true, "ReadDir": true, "Stat": true, "Lstat": true, "Readlink": true, "Open": true}
+ 	fsFunctions := map[string]bool{"ReadFile": true, "ReadDir": true, "Stat": true, "WalkDir": true, "Glob": true}
+ 	if !readMethods[function.Sel.Name] && !fsFunctions[function.Sel.Name] {
+ 		return "", false
+@@ -622,7 +638,7 @@ func calledFunction(call *ast.CallExpr, function *managerReadFunction, modulePat
+ 
+ func isStateReadSeamFunction(name string) bool {
+ 	switch name {
+-	case "ReadFile", "ReadDir", "Stat", "Lstat":
++	case "ReadFile", "ReadRegularFile", "ReadDir", "Stat", "Lstat", "Readlink":
+ 		return true
+ 	default:
+ 		return false
+diff --git a/internal/envprofile/status.go b/internal/envprofile/status.go
+index 98d467cc..9323a77a 100644
+--- a/internal/envprofile/status.go
++++ b/internal/envprofile/status.go
+@@ -25,6 +25,7 @@ import (
+ 	"github.com/relux-works/curator/internal/envmarker"
+ 	"github.com/relux-works/curator/internal/envregistry"
+ 	"github.com/relux-works/curator/internal/hookapproval"
++	"github.com/relux-works/curator/internal/identifiers"
+ 	"github.com/relux-works/curator/internal/manifest"
+ 	"github.com/relux-works/curator/internal/stateread"
+ )
+@@ -243,17 +244,28 @@ type StatusRequest struct {
+ 	ProbeTarget func(envregistry.Target) bool
+ 	// LaunchDir is the directory project entries are reported against.
+ 	LaunchDir string
++	// passthrough inspection seams mirror ResolveRequest for deterministic
++	// production-entry tests of failed lstat/readlink operations.
++	passthroughLstat    func(string) (os.FileInfo, error)
++	passthroughReadlink func(string) (string, error)
++	readStateFile       func(string) (stateread.File, error)
++	readRegularFile     func(string) (stateread.File, error)
++	readStateDirectory  func(string) (stateread.Directory, error)
+ }
+ 
+ func (req *StatusRequest) resolve() ResolveRequest {
+ 	return ResolveRequest{
+-		Home:         req.Home,
+-		Machine:      req.Machine,
+-		Detect:       req.Detect,
+-		NativeHomeOf: req.NativeHomeOf,
+-		OperatorXDG:  req.OperatorXDG,
+-		LaunchDir:    req.LaunchDir,
+-		Policy:       req.Policy,
++		Home:                req.Home,
++		Machine:             req.Machine,
++		Detect:              req.Detect,
++		NativeHomeOf:        req.NativeHomeOf,
++		OperatorXDG:         req.OperatorXDG,
++		LaunchDir:           req.LaunchDir,
++		Policy:              req.Policy,
++		passthroughLstat:    req.passthroughLstat,
++		passthroughReadlink: req.passthroughReadlink,
++		readStateFile:       req.readStateFile,
++		readRegularFile:     req.readRegularFile,
+ 	}
+ }
+ 
+@@ -269,7 +281,7 @@ func StatusOf(req StatusRequest) (*Status, error) {
+ 		status.RequireCurrentProfile = &value
+ 		status.RequireCurrentLocked = req.Policy.RequireCurrentLocked
+ 	}
+-	infos, err := List(req.Home)
++	infos, err := statusProfiles(req.Home)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+@@ -354,6 +366,36 @@ func StatusOf(req StatusRequest) (*Status, error) {
+ 	return status, nil
+ }
+ 
++// statusProfiles enumerates profile source records without requiring their
++// locks to be readable. The status row then reports environment_store_untrusted
++// and unknown currency instead of dropping a profile from status entirely.
++func statusProfiles(home string) ([]Info, error) {
++	listing, err := stateread.ReadDir(ProfilesDir(home))
++	if err != nil {
++		return nil, err
++	}
++	if listing.Kind == stateread.KindAbsent {
++		return nil, nil
++	}
++	var infos []Info
++	for _, entry := range listing.Entries {
++		if !entry.IsDir() || !identifiers.Valid(entry.Name()) {
++			continue
++		}
++		source, err := readSource(home, entry.Name())
++		if err != nil && isStateAbsent(err) {
++			continue
++		}
++		info := Info{Name: entry.Name()}
++		if err == nil {
++			info.Source = source
++		}
++		infos = append(infos, info)
++	}
++	sort.Slice(infos, func(i, j int) bool { return infos[i].Name < infos[j].Name })
++	return infos, nil
++}
++
+ // trustProjectCandidates returns the two hook-sourced env files of the
+ // project the launch directory is inside, or nothing when it is inside no
+ // project. An empty launch directory means the process working directory,
+@@ -413,13 +455,17 @@ func homeState(req StatusRequest, profile string, adapter envregistry.Adapter) H
+ 		Mode:        envmarker.ModeManagedHome,
+ 		Home:        ManagedHomeDir(req.Home, profile, adapter.ID),
+ 	}
+-	source, lock, hash, err := loadResolveInputs(req.Home, profile)
++	source, lock, hash, err := loadResolveInputsWith(req.Home, profile, req.readRegularFile)
+ 	if err != nil {
+-		state.Findings = append(state.Findings, DiagProfileUnknown+": "+err.Error())
++		state.Findings = append(state.Findings, err.Error())
+ 		return state
+ 	}
+ 	state.LockHash = hash
+-	state.Backups, state.BackupsOldest, state.BackupsNewest, err = backupAges(state.Home)
++	if req.readStateDirectory == nil {
++		state.Backups, state.BackupsOldest, state.BackupsNewest, err = backupAges(state.Home)
++	} else {
++		state.Backups, state.BackupsOldest, state.BackupsNewest, err = backupAgesWith(state.Home, req.readStateDirectory)
++	}
+ 	if err != nil {
+ 		state.Findings = append(state.Findings, envregistry.DiagBackupRecordUnreadable+": "+err.Error())
+ 	} else {
+@@ -495,10 +541,14 @@ func markerForm(marker *envmarker.Marker) string {
+ }
+ 
+ // backupAges counts the versioned backup generations beside the marker
+-// and reports the oldest and newest ages (§8.3, §12).
++// and reports the oldest and newest ages (§8.3, §8.4.1, §12).
+ func backupAges(homeDir string) (int, string, string, error) {
++	return backupAgesWith(homeDir, stateread.ReadDir)
++}
++
++func backupAgesWith(homeDir string, readDirectory func(string) (stateread.Directory, error)) (int, string, string, error) {
+ 	root := filepath.Join(homeDir, ".agent-environment-backup")
+-	listing, err := stateread.ReadDir(root)
++	listing, err := readDirectory(root)
+ 	if err != nil {
+ 		return 0, "-", "-", err
+ 	}
+diff --git a/internal/envregistry/envregistry.go b/internal/envregistry/envregistry.go
+index d146834f..0cdc7fbf 100644
+--- a/internal/envregistry/envregistry.go
++++ b/internal/envregistry/envregistry.go
+@@ -46,7 +46,7 @@ func NormalizeEnvID(id string) string {
+ 	return id
+ }
+ 
+-// Diagnostics (environments §7.7, §10.4, §11.1).
++// Diagnostics (environments §7.7, §8.4.1, §10.4, §11.1).
+ const (
+ 	DiagUnknown                = "environment_unknown"
+ 	DiagFormUnsupported        = "environment_form_unsupported"
+@@ -57,6 +57,8 @@ const (
+ 	DiagTargetConsent          = "environment_target_consent_required"
+ 	DiagShadowingPresent       = "environment_shadowing_path_present"
+ 	DiagPassthroughDetached    = "environment_passthrough_detached"
++	DiagPassthroughUnreadable  = "environment_passthrough_unreadable"
++	DiagStoreUntrusted         = "environment_store_untrusted"
+ 	DiagCredentialConflict     = "environment_credential_conflict"
+ 	DiagCredentialUnsupported  = "environment_credential_unsupported"
+ 	DiagSeedUnreadable         = "environment_seed_unreadable"
+diff --git a/internal/stateread/stateread.go b/internal/stateread/stateread.go
+index a7d4fd5b..47e998bc 100644
+--- a/internal/stateread/stateread.go
++++ b/internal/stateread/stateread.go
+@@ -51,6 +51,13 @@ type Metadata struct {
+ 	Info os.FileInfo
+ }
+ 
++// Link is the result of reading a symbolic link's target text. Target is
++// populated only when the link was present and readable.
++type Link struct {
++	Kind   Kind
++	Target string
++}
++
+ // Error preserves the path and failed-read class for callers that need to
+ // attach an operation-specific diagnostic.
+ type Error struct {
+@@ -108,6 +115,23 @@ func ReadFile(path string) (File, error) {
+ 	return File{Kind: KindUnreadable}, &Error{Kind: KindUnreadable, Path: path, Cause: err}
+ }
+ 
++// ReadRegularFile reads a present regular file (environments §8.4.1). A missing leaf remains
++// absent; inspection, type, and read failures are unreadable. This is used
++// for manager records and seed files whose boundary requires regular bytes.
++func ReadRegularFile(path string) (File, error) {
++	metadata, err := Lstat(path)
++	if err != nil {
++		return File{Kind: KindUnreadable}, err
++	}
++	if metadata.Kind == KindAbsent {
++		return File{Kind: KindAbsent}, nil
++	}
++	if metadata.Kind != KindPresent || metadata.Info == nil || !metadata.Info.Mode().IsRegular() {
++		return File{Kind: KindUnreadable}, UnusableError(path, fmt.Errorf("path must be a regular file"))
++	}
++	return ReadFile(path)
++}
++
+ // ReadDir lists state or surface inventory and keeps absence separate from
+ // all other listing failures.
+ func ReadDir(path string) (Directory, error) {
+@@ -136,7 +160,14 @@ func Stat(path string) (Metadata, error) {
+ 
+ // Lstat inspects the exact state path without following a symbolic link.
+ func Lstat(path string) (Metadata, error) {
+-	info, err := os.Lstat(path)
++	return LstatWith(path, os.Lstat)
++}
++
++// LstatWith classifies an lstat result using the same absent-versus-unreadable
++// rule as the other state readers. readPath is an injectable syscall boundary
++// for tests that need to exercise errors unavailable on the host filesystem.
++func LstatWith(path string, readPath func(string) (os.FileInfo, error)) (Metadata, error) {
++	info, err := readPath(path)
+ 	if err == nil {
+ 		return Metadata{Kind: KindPresent, Info: info}, nil
+ 	}
+@@ -146,12 +177,38 @@ func Lstat(path string) (Metadata, error) {
+ 	return Metadata{Kind: KindUnreadable}, &Error{Kind: KindUnreadable, Path: path, Cause: err}
+ }
+ 
++// Readlink reads a symbolic link's target text and keeps absence separate
++// from all other inspection failures.
++func Readlink(path string) (Link, error) {
++	return ReadlinkWith(path, os.Readlink)
++}
++
++// ReadlinkWith classifies a readlink result using the shared absent-versus-
++// unreadable rule. readPath is an injectable syscall boundary for tests that
++// need to exercise read errors unavailable on the host filesystem.
++func ReadlinkWith(path string, readPath func(string) (string, error)) (Link, error) {
++	target, err := readPath(path)
++	if err == nil {
++		return Link{Kind: KindPresent, Target: target}, nil
++	}
++	if missingPath(path, err) {
++		return Link{Kind: KindAbsent}, nil
++	}
++	return Link{Kind: KindUnreadable}, &Error{Kind: KindUnreadable, Path: path, Cause: err}
++}
++
+ // missingPath recognizes a missing leaf only when no existing ancestor makes
+ // the path unaddressable. Windows can report a child beneath a regular file as
+ // ERROR_PATH_NOT_FOUND; treating that as absence would let callers take an
+ // absence fallback after a failed read.
+ func missingPath(path string, cause error) bool {
+-	if !os.IsNotExist(cause) {
++	return missingPathWith(path, cause, os.IsNotExist)
++}
++
++// missingPathWith accepts the platform absence predicate so tests can model
++// platform mappings such as Windows ENOTDIR also satisfying IsNotExist.
++func missingPathWith(path string, cause error, isNotExist func(error) bool) bool {
++	if !isNotExist(cause) {
+ 		return false
+ 	}
+ 	parent := filepath.Dir(path)
+diff --git a/internal/stateread/stateread_test.go b/internal/stateread/stateread_test.go
+index 2e077c87..3adea19c 100644
+--- a/internal/stateread/stateread_test.go
++++ b/internal/stateread/stateread_test.go
+@@ -4,9 +4,49 @@ import (
+ 	"errors"
+ 	"os"
+ 	"path/filepath"
++	"syscall"
+ 	"testing"
+ )
+ 
++func TestRegularFileAndLinkReadersKeepFailureClasses(t *testing.T) {
++	root := t.TempDir()
++	file := filepath.Join(root, "state.json")
++	if err := os.WriteFile(file, []byte("state\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if got, err := ReadRegularFile(file); err != nil || got.Kind != KindPresent || string(got.Bytes) != "state\n" {
++		t.Fatalf("ReadRegularFile(file) = (%+v, %v), want present bytes", got, err)
++	}
++	if got, err := ReadRegularFile(filepath.Join(root, "missing")); err != nil || got.Kind != KindAbsent {
++		t.Fatalf("ReadRegularFile(missing) = (%+v, %v), want absent", got, err)
++	}
++	if got, err := ReadRegularFile(root); err == nil || got.Kind != KindUnreadable {
++		t.Fatalf("ReadRegularFile(directory) = (%+v, %v), want unreadable", got, err)
++	}
++
++	linkPath := filepath.Join(root, "link")
++	if err := os.Symlink(file, linkPath); err != nil {
++		t.Fatal(err)
++	}
++	if got, err := ReadRegularFile(linkPath); err == nil || got.Kind != KindUnreadable {
++		t.Fatalf("ReadRegularFile(symlink) = (%+v, %v), want unreadable", got, err)
++	}
++	if got, err := Readlink(linkPath); err != nil || got.Kind != KindPresent || got.Target != file {
++		t.Fatalf("Readlink(link) = (%+v, %v), want target %q", got, err, file)
++	}
++	if got, err := Readlink(filepath.Join(root, "missing-link")); err != nil || got.Kind != KindAbsent {
++		t.Fatalf("Readlink(missing) = (%+v, %v), want absent", got, err)
++	}
++	failedLstat := func(string) (os.FileInfo, error) { return nil, errors.New("injected inspection failure") }
++	if got, err := LstatWith(file, failedLstat); err == nil || got.Kind != KindUnreadable {
++		t.Fatalf("LstatWith(failed) = (%+v, %v), want unreadable", got, err)
++	}
++	failedReadlink := func(string) (string, error) { return "", errors.New("injected link read failure") }
++	if got, err := ReadlinkWith(linkPath, failedReadlink); err == nil || got.Kind != KindUnreadable {
++		t.Fatalf("ReadlinkWith(failed) = (%+v, %v), want unreadable", got, err)
++	}
++}
++
+ // TestReadsDistinguishAbsentFromBlockedParent proves that a missing leaf in
+ // a traversable directory is absence, while read/stat failures beneath a
+ // regular-file ancestor remain unreadable on every platform.
+@@ -34,9 +74,26 @@ func TestReadsDistinguishAbsentFromBlockedParent(t *testing.T) {
+ 	if missingPath(blocked, os.ErrNotExist) {
+ 		t.Fatalf("missingPath(%q, os.ErrNotExist) = true below an existing file", blocked)
+ 	}
++	if missingPath(blocked, syscall.ENOTDIR) {
++		t.Fatalf("missingPath(%q, ENOTDIR) = true; ENOTDIR is always unreadable", blocked)
++	}
++	windowsAbsence := func(err error) bool {
++		return os.IsNotExist(err) || errors.Is(err, syscall.ENOTDIR)
++	}
++	if missingPathWith(blocked, syscall.ENOTDIR, windowsAbsence) {
++		t.Fatalf("missingPathWith(%q, ENOTDIR, Windows IsNotExist) = true below a regular-file parent", blocked)
++	}
+ 	if !missingPath(absent, os.ErrNotExist) {
+ 		t.Fatal("missingPath for a missing leaf under a traversable directory = false, want true")
+ 	}
++	if missingPath(absent, syscall.EACCES) {
++		t.Fatal("missingPath treated permission denied as absence")
++	}
++	if got, err := ReadlinkWith(filepath.Join(blocker, "child-link"), func(string) (string, error) {
++		return "", os.ErrNotExist
++	}); err == nil || got.Kind != KindUnreadable {
++		t.Fatalf("ReadlinkWith(ENOENT below non-directory parent) = (%+v, %v), want unreadable", got, err)
++	}
+ 	checks := []struct {
+ 		name string
+ 		read func() (Kind, error)
+@@ -45,6 +102,7 @@ func TestReadsDistinguishAbsentFromBlockedParent(t *testing.T) {
+ 		{"read-dir", func() (Kind, error) { result, err := ReadDir(blocked); return result.Kind, err }},
+ 		{"stat", func() (Kind, error) { result, err := Stat(blocked); return result.Kind, err }},
+ 		{"lstat", func() (Kind, error) { result, err := Lstat(blocked); return result.Kind, err }},
++		{"read-regular-file", func() (Kind, error) { result, err := ReadRegularFile(blocked); return result.Kind, err }},
+ 	}
+ 	for _, check := range checks {
+ 		t.Run(check.name, func(t *testing.T) {
