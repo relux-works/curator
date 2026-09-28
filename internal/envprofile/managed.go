@@ -95,6 +95,9 @@ type ResolveRequest struct {
 	// OperatorXDG is the operator's effective XDG config home; empty
 	// means resolve it from the process environment.
 	OperatorXDG string
+	// codexSeedRevisionForTest exercises a retained, non-shipped seed
+	// revision through Resolve without mutating the registry singleton.
+	codexSeedRevisionForTest string
 	// transactionOptions is a fault-injection seam for recovery tests. CLI
 	// requests leave it nil and use the production transaction engine.
 	transactionOptions []transaction.Option
@@ -155,6 +158,17 @@ func (req *ResolveRequest) detected(adapter envregistry.Adapter) string {
 		return req.Detect(adapter)
 	}
 	return detectRelease(adapter.Probe)
+}
+
+func applyCodexSeedRevisionTestOverride(adapter envregistry.Adapter, revision string) (envregistry.Adapter, error) {
+	if revision == "" {
+		return adapter, nil
+	}
+	if adapter.ID != envregistry.CodexCLI || (revision != envregistry.CodexSeedRevisionA && revision != envregistry.CodexSeedRevisionB) {
+		return envregistry.Adapter{}, fmt.Errorf("invalid Codex seed revision test override %q for %s", revision, adapter.ID)
+	}
+	adapter.CodexSeedRevision = revision
+	return adapter, nil
 }
 
 // operatorXDG resolves the operator's effective XDG config home.
@@ -738,30 +752,41 @@ type seedBundle struct {
 	warnings        []string
 }
 
-// stripCodexSeedMCPServers applies the shipped rc.13 §7.4 revision-B rule:
-// remove the whole top-level mcp_servers table (including every subtable),
-// retain every other TOML member, and return only the sorted server names.
-func stripCodexSeedMCPServers(payload []byte) ([]byte, []string, error) {
+func parseCodexSeedConfig(payload []byte) (map[string]any, []string, bool, error) {
 	var document map[string]any
 	if err := toml.Unmarshal(payload, &document); err != nil {
-		return nil, nil, fmt.Errorf("config.toml is not valid TOML: %w", err)
+		return nil, nil, false, fmt.Errorf("config.toml is not valid TOML: %w", err)
 	}
 	serversValue, exists := document["mcp_servers"]
 	if !exists {
-		return payload, []string{}, nil
+		return document, []string{}, false, nil
 	}
 	servers, ok := serversValue.(map[string]any)
 	if !ok {
-		return nil, nil, fmt.Errorf("config.toml mcp_servers is not a TOML table")
+		return nil, nil, false, fmt.Errorf("config.toml mcp_servers is not a TOML table")
 	}
 	names := make([]string, 0, len(servers))
 	for name := range servers {
 		if name == "" {
-			return nil, nil, fmt.Errorf("config.toml mcp_servers contains an empty server name")
+			return nil, nil, false, fmt.Errorf("config.toml mcp_servers contains an empty server name")
 		}
 		names = append(names, name)
 	}
 	sort.Strings(names)
+	return document, names, true, nil
+}
+
+// stripCodexSeedMCPServers applies the rc.13 §7.4 revision-B rule: remove
+// the whole top-level mcp_servers table (including every subtable), retain
+// every other TOML member, and return only the sorted server names.
+func stripCodexSeedMCPServers(payload []byte) ([]byte, []string, error) {
+	document, names, exists, err := parseCodexSeedConfig(payload)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !exists {
+		return payload, names, nil
+	}
 	delete(document, "mcp_servers")
 	var stripped bytes.Buffer
 	if err := toml.NewEncoder(&stripped).Encode(document); err != nil {
@@ -784,7 +809,7 @@ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bo
 	}
 	if provision {
 		if adapter.ID == envregistry.CodexCLI {
-			if adapter.CodexSeedRevision != envregistry.CodexSeedRevisionB {
+			if adapter.CodexSeedRevision != envregistry.CodexSeedRevisionA && adapter.CodexSeedRevision != envregistry.CodexSeedRevisionB {
 				return nil, fmt.Errorf("%s: unsupported codex_cli seed revision %q", envregistry.DiagSeedUnreadable, adapter.CodexSeedRevision)
 			}
 			bundle.codexSeedRecord = &envmarker.CodexSeedRecord{
@@ -815,14 +840,24 @@ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bo
 			}
 			payload := file.Bytes
 			if adapter.ID == envregistry.CodexCLI && seed == "config.toml" {
-				stripped, names, err := stripCodexSeedMCPServers(payload)
+				var names []string
+				switch adapter.CodexSeedRevision {
+				case envregistry.CodexSeedRevisionA:
+					_, names, _, err = parseCodexSeedConfig(payload)
+				case envregistry.CodexSeedRevisionB:
+					payload, names, err = stripCodexSeedMCPServers(payload)
+				}
 				if err != nil {
 					return nil, fmt.Errorf("%s: seed %s: %v", envregistry.DiagSeedUnreadable, seed, err)
 				}
-				payload = stripped
 				bundle.codexSeedRecord.NativeMCPServers = names
 				if len(names) > 0 {
-					bundle.warnings = append(bundle.warnings, fmt.Sprintf("%s: native Codex MCP servers %s were stripped from config.toml and are not inherited", envregistry.DiagMCPNativeServersNotInherited, strings.Join(names, ", ")))
+					switch adapter.CodexSeedRevision {
+					case envregistry.CodexSeedRevisionA:
+						bundle.warnings = append(bundle.warnings, fmt.Sprintf("%s: native Codex MCP servers %s were inherited into this managed home outside the profile lock and MCP allowlist; the next seed revision stops inheriting them. Declare each server in the profile's MCP set, or accept the loss.", envregistry.DiagMCPNativeServersUngoverned, strings.Join(names, ", ")))
+					case envregistry.CodexSeedRevisionB:
+						bundle.warnings = append(bundle.warnings, fmt.Sprintf("%s: native Codex MCP servers %s were stripped from config.toml and are not inherited", envregistry.DiagMCPNativeServersNotInherited, strings.Join(names, ", ")))
+					}
 				}
 			}
 			bundle.files[seed] = payload
@@ -2298,6 +2333,10 @@ func currentProfileFor(home, envID, named string) (string, error) {
 // store under the mutation lock and the fragment is emitted.
 func Resolve(req ResolveRequest) (*ResolveResult, error) {
 	adapter, err := envregistry.ByID(req.EnvID)
+	if err != nil {
+		return nil, err
+	}
+	adapter, err = applyCodexSeedRevisionTestOverride(adapter, req.codexSeedRevisionForTest)
 	if err != nil {
 		return nil, err
 	}

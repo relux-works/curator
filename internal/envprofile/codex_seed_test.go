@@ -54,10 +54,10 @@ type codexSeedVectorSet struct {
 	Posture      []codexSeedPostureVector      `json:"posture_cases"`
 }
 
-// TestCodexSeedProvisioningAndStatus exercises Resolve and StatusOf, the
-// production entry points for revision-B Codex seed handling. It also pins
-// malformed native config to a fail-closed provisioning result.
-func TestCodexSeedProvisioningAndStatus(t *testing.T) {
+// TestCodexSeedProvisioningAndStatus exercises the shipped revision-A rule
+// through Resolve and StatusOf, including the whole-file copy and migration
+// warning.
+func TestCodexSeedRevisionAWholeCopyWarningAndPostureRegression(t *testing.T) {
 	fx := writeManagedFixture(t, "acme")
 	seedLiveNativeCredentials(t, fx)
 	native := "model = \"gpt-5-codex\"\n\n[projects.\"/Users/operator/work\"]\ntrust_level = \"trusted\"\n\n[tui]\ntheme = \"dark\"\n\n[mcp_servers.gh]\ncommand = \"gh\"\nargs = [\"mcp\"]\n\n[mcp_servers.figma]\ncommand = \"npx\"\nargs = [\"-y\", \"figma-developer-mcp\", \"--stdio\"]\n"
@@ -74,11 +74,13 @@ func TestCodexSeedProvisioningAndStatus(t *testing.T) {
 	if !result.Provisioned {
 		t.Fatal("Resolve did not report first provisioning")
 	}
-	if got := countWarnings(result.Warnings, envregistry.DiagMCPNativeServersNotInherited); got != 1 {
-		t.Fatalf("provision warnings = %v; mcp_native_servers_not_inherited count = %d, want 1", result.Warnings, got)
+	if got := countWarnings(result.Warnings, envregistry.DiagMCPNativeServersUngoverned); got != 1 {
+		t.Fatalf("provision warnings = %v; mcp_native_servers_ungoverned count = %d, want 1", result.Warnings, got)
 	}
-	if warning := warningWithPrefix(result.Warnings, envregistry.DiagMCPNativeServersNotInherited); !strings.Contains(warning, "figma, gh") {
-		t.Fatalf("provision warning %q does not name the sorted native servers", warning)
+	warning := warningWithPrefix(result.Warnings, envregistry.DiagMCPNativeServersUngoverned)
+	lowerWarning := strings.ToLower(warning)
+	if !strings.Contains(warning, "figma, gh") || !strings.Contains(lowerWarning, "next seed revision stops inheriting them") || !strings.Contains(lowerWarning, "declare each server in the profile's mcp set, or accept the loss") {
+		t.Fatalf("revision-A provisioning warning lacks names or migration hint: %q", warning)
 	}
 
 	managedHome := ManagedHomeDir(fx.home, fx.profile, envregistry.CodexCLI)
@@ -90,20 +92,22 @@ func TestCodexSeedProvisioningAndStatus(t *testing.T) {
 	if err := toml.Unmarshal(seededPayload, &seeded); err != nil {
 		t.Fatalf("managed config.toml is not valid TOML: %v", err)
 	}
-	if _, exists := seeded["mcp_servers"]; exists {
-		t.Fatalf("managed config.toml retained mcp_servers: %s", seededPayload)
+	if _, exists := seeded["mcp_servers"]; !exists {
+		t.Fatalf("revision-A managed config.toml omitted inherited mcp_servers: %s", seededPayload)
 	}
 	var original map[string]any
 	if err := toml.Unmarshal([]byte(native), &original); err != nil {
 		t.Fatal(err)
 	}
-	delete(original, "mcp_servers")
 	if !reflect.DeepEqual(seeded, original) {
-		t.Fatalf("managed config.toml members = %#v, want all native members except mcp_servers %#v", seeded, original)
+		t.Fatalf("managed config.toml members = %#v, want every native member %#v", seeded, original)
+	}
+	if !bytes.Equal(seededPayload, []byte(native)) {
+		t.Fatalf("revision-A seed changed native config.toml bytes:\n got %q\nwant %q", seededPayload, native)
 	}
 
 	marker := readManagedMarker(t, fx, envregistry.CodexCLI)
-	wantRecord := &envmarker.CodexSeedRecord{Revision: envregistry.CodexSeedRevisionB, NativeMCPServers: []string{"figma", "gh"}}
+	wantRecord := &envmarker.CodexSeedRecord{Revision: envregistry.CodexSeedRevisionA, NativeMCPServers: []string{"figma", "gh"}}
 	if !reflect.DeepEqual(marker.CodexSeedRecord, wantRecord) {
 		t.Fatalf("codex_seed_record = %+v, want %+v", marker.CodexSeedRecord, wantRecord)
 	}
@@ -112,7 +116,7 @@ func TestCodexSeedProvisioningAndStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status.CodexSeedRule.Revision != envregistry.CodexSeedRevisionB || status.CodexSeedRule.Provenance != "shipped" {
+	if status.CodexSeedRule.Revision != envregistry.CodexSeedRevisionA || status.CodexSeedRule.Provenance != "shipped" {
 		t.Fatalf("codex-seed status row = %+v", status.CodexSeedRule)
 	}
 	home := findHome(status, fx.profile, envregistry.CodexCLI)
@@ -122,11 +126,11 @@ func TestCodexSeedProvisioningAndStatus(t *testing.T) {
 	if !home.Current {
 		t.Fatalf("Codex seed warnings made the home non-current: %+v", home)
 	}
-	if !reflect.DeepEqual(home.NativeMCPServers, wantRecord.NativeMCPServers) || home.NativeMCPServersDisposition != "not-inherited" {
+	if !reflect.DeepEqual(home.NativeMCPServers, wantRecord.NativeMCPServers) || home.NativeMCPServersDisposition != "ungoverned" {
 		t.Fatalf("env status Codex seed row = %+v", home)
 	}
-	if got := countWarnings(home.Warnings, envregistry.DiagMCPNativeServersNotInherited); got != 1 {
-		t.Fatalf("env status warnings = %v; not-inherited count = %d, want 1", home.Warnings, got)
+	if got := countWarnings(home.Warnings, envregistry.DiagMCPNativeServersUngoverned); got != 1 {
+		t.Fatalf("env status warnings = %v; ungoverned count = %d, want 1", home.Warnings, got)
 	}
 }
 
@@ -139,6 +143,7 @@ func TestCodexSeedStripsInlineMCPTable(t *testing.T) {
 	}
 	req := fx.request(envregistry.CodexCLI)
 	req.Repair = true
+	req.codexSeedRevisionForTest = envregistry.CodexSeedRevisionB
 	result, err := Resolve(req)
 	if err != nil {
 		t.Fatalf("Resolve provisioning: %v", err)
@@ -172,6 +177,7 @@ func TestCodexSeedRejectsInvalidTOMLBeforePublishingHome(t *testing.T) {
 	}
 	req := fx.request(envregistry.CodexCLI)
 	req.Repair = true
+	req.codexSeedRevisionForTest = envregistry.CodexSeedRevisionB
 	if _, err := Resolve(req); err == nil || !strings.Contains(err.Error(), envregistry.DiagSeedUnreadable) {
 		t.Fatalf("Resolve error = %v, want %s refusal", err, envregistry.DiagSeedUnreadable)
 	}
@@ -189,6 +195,7 @@ func TestCodexSeedSnapshotAndBytesDoNotRefreshOnRepair(t *testing.T) {
 	}
 	req := fx.request(envregistry.CodexCLI)
 	req.Repair = true
+	req.codexSeedRevisionForTest = envregistry.CodexSeedRevisionB
 	if _, err := Resolve(req); err != nil {
 		t.Fatal(err)
 	}
@@ -224,12 +231,14 @@ func TestCodexSeedSnapshotAndBytesDoNotRefreshOnRepair(t *testing.T) {
 	}
 }
 
-// TestEnvironmentsCodexSeedVectors drives the published rc.13 revision-B
-// provisioning vectors and every revision-B status vector through Resolve and
-// StatusOf. Revision-A producer/status postures are prior-manager behavior;
-// they are explicitly reported as bounded while A-record homes under the
-// shipped B manager remain production-driven.
+// TestEnvironmentsCodexSeedVectors drives the shipped revision-A rc.13
+// vectors through Resolve and StatusOf. Revision-B cases remain exercised
+// through the internal revision seam, while the gap ledger assigns their
+// shipped-production coverage to the revision flip leaf.
 func TestEnvironmentsCodexSeedVectors(t *testing.T) {
+	if envregistry.CodexSeedRevision != envregistry.CodexSeedRevisionA {
+		t.Fatalf("trunk must ship Codex seed revision A, got %q", envregistry.CodexSeedRevision)
+	}
 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
 	if root == "" {
 		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
@@ -246,25 +255,34 @@ func TestEnvironmentsCodexSeedVectors(t *testing.T) {
 	if len(vectors.Provisioning) == 0 || len(vectors.Posture) == 0 {
 		t.Fatalf("%s is missing provisioning or posture cases", codexSeedVectorFile)
 	}
+	const revisionBGap = "revision B remains behind the test seam until TASK-260927-1e5qqm ships it through the registry"
 	conformancecoverage.RunOutcomes(t, "environments-codex-seed/provisioning-cases", vectors.Provisioning,
 		func(tc codexSeedProvisioningVector) string { return tc.Name }, func(t *testing.T, tc codexSeedProvisioningVector) conformancecoverage.Observation {
-			if tc.Revision != envregistry.CodexSeedRevisionB {
-				return conformancecoverage.Observation{BoundReason: "revision A is prior-manager provisioning behavior; this manager ships revision B"}
+			if tc.Revision == envregistry.CodexSeedRevisionA {
+				runCodexSeedProvisioningVector(t, tc, "")
+				return conformancecoverage.Observation{}
 			}
-			runCodexSeedProvisioningVector(t, tc)
-			return conformancecoverage.Observation{}
+			if tc.Revision != envregistry.CodexSeedRevisionB {
+				t.Fatalf("unknown Codex seed vector revision %q", tc.Revision)
+			}
+			runCodexSeedProvisioningVector(t, tc, envregistry.CodexSeedRevisionB)
+			return conformancecoverage.Observation{FailureReason: revisionBGap}
 		})
 	conformancecoverage.RunOutcomes(t, "environments-codex-seed/posture-cases", vectors.Posture,
 		func(tc codexSeedPostureVector) string { return tc.Name }, func(t *testing.T, tc codexSeedPostureVector) conformancecoverage.Observation {
-			if tc.RevisionShipped != envregistry.CodexSeedRevisionB {
-				return conformancecoverage.Observation{BoundReason: "revision A is prior-manager status behavior; this manager ships revision B"}
+			if tc.RevisionShipped == envregistry.CodexSeedRevisionA {
+				runCodexSeedPostureVector(t, tc, "")
+				return conformancecoverage.Observation{}
 			}
-			runCodexSeedPostureVector(t, tc)
-			return conformancecoverage.Observation{}
+			if tc.RevisionShipped != envregistry.CodexSeedRevisionB {
+				t.Fatalf("unknown Codex seed posture revision %q", tc.RevisionShipped)
+			}
+			runCodexSeedPostureVector(t, tc, envregistry.CodexSeedRevisionB)
+			return conformancecoverage.Observation{FailureReason: revisionBGap}
 		})
 }
 
-func runCodexSeedProvisioningVector(t *testing.T, tc codexSeedProvisioningVector) {
+func runCodexSeedProvisioningVector(t *testing.T, tc codexSeedProvisioningVector, revisionOverride string) {
 	t.Helper()
 	fx := writeManagedFixture(t, "acme")
 	seedLiveNativeCredentials(t, fx)
@@ -273,6 +291,7 @@ func runCodexSeedProvisioningVector(t *testing.T, tc codexSeedProvisioningVector
 	}
 	req := fx.request(envregistry.CodexCLI)
 	req.Repair = true
+	req.codexSeedRevisionForTest = revisionOverride
 	result, err := Resolve(req)
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
@@ -303,6 +322,9 @@ func runCodexSeedProvisioningVector(t *testing.T, tc codexSeedProvisioningVector
 	if !reflect.DeepEqual(seeded, tc.Expected.SeededMembers) {
 		t.Fatalf("seeded members = %#v, want %#v", seeded, tc.Expected.SeededMembers)
 	}
+	if tc.Revision == envregistry.CodexSeedRevisionA && !bytes.Equal(seedBytes, []byte(tc.NativeConfig)) {
+		t.Fatalf("revision-A seed changed native config.toml bytes:\n got %q\nwant %q", seedBytes, tc.NativeConfig)
+	}
 	marker := readManagedMarker(t, fx, envregistry.CodexCLI)
 	if !reflect.DeepEqual(marker.CodexSeedRecord, tc.Expected.CodexSeedRecord) {
 		t.Fatalf("codex_seed_record = %+v, want %+v", marker.CodexSeedRecord, tc.Expected.CodexSeedRecord)
@@ -311,12 +333,18 @@ func runCodexSeedProvisioningVector(t *testing.T, tc codexSeedProvisioningVector
 		t.Fatalf("recorded native server names = %v, want %v", marker.CodexSeedRecord.NativeMCPServers, tc.Expected.Names)
 	}
 	if tc.Expected.Diagnostic == nil {
-		if got := countWarnings(result.Warnings, envregistry.DiagMCPNativeServersNotInherited); got != 0 {
-			t.Fatalf("provision warnings = %v; no stripped-server warning expected", result.Warnings)
+		for _, code := range []string{envregistry.DiagMCPNativeServersUngoverned, envregistry.DiagMCPNativeServersNotInherited} {
+			if got := countWarnings(result.Warnings, code); got != 0 {
+				t.Fatalf("provision warnings = %v; no %s warning expected", result.Warnings, code)
+			}
 		}
 	} else {
-		if *tc.Expected.Diagnostic != envregistry.DiagMCPNativeServersNotInherited {
-			t.Fatalf("unexpected revision-B diagnostic %q", *tc.Expected.Diagnostic)
+		wantDiagnostic := envregistry.DiagMCPNativeServersUngoverned
+		if tc.Revision == envregistry.CodexSeedRevisionB {
+			wantDiagnostic = envregistry.DiagMCPNativeServersNotInherited
+		}
+		if *tc.Expected.Diagnostic != wantDiagnostic {
+			t.Fatalf("revision-%s diagnostic = %q, want %q", tc.Revision, *tc.Expected.Diagnostic, wantDiagnostic)
 		}
 		if got := countWarnings(result.Warnings, *tc.Expected.Diagnostic); got != 1 {
 			t.Fatalf("provision warnings = %v; %s count = %d, want 1", result.Warnings, *tc.Expected.Diagnostic, got)
@@ -327,13 +355,18 @@ func runCodexSeedProvisioningVector(t *testing.T, tc codexSeedProvisioningVector
 				t.Fatalf("provision warning %q omits native server %q", warning, name)
 			}
 		}
-	}
-	if tc.Expected.MigrationHint {
-		t.Fatalf("revision-B warning unexpectedly requires a migration hint: %v", result.Warnings)
+		if tc.Expected.MigrationHint {
+			lowerWarning := strings.ToLower(warning)
+			if !strings.Contains(lowerWarning, "next seed revision stops inheriting them") || !strings.Contains(lowerWarning, "declare each server in the profile's mcp set, or accept the loss") {
+				t.Fatalf("revision-A warning omits the migration hint: %q", warning)
+			}
+		} else if strings.Contains(warning, "next seed revision") || strings.Contains(warning, "accept the loss") {
+			t.Fatalf("revision-B warning unexpectedly has a migration hint: %q", warning)
+		}
 	}
 }
 
-func runCodexSeedPostureVector(t *testing.T, tc codexSeedPostureVector) {
+func runCodexSeedPostureVector(t *testing.T, tc codexSeedPostureVector, revisionOverride string) {
 	t.Helper()
 	fx := writeManagedFixture(t, "acme")
 	seedLiveNativeCredentials(t, fx)
@@ -357,7 +390,9 @@ func runCodexSeedPostureVector(t *testing.T, tc codexSeedPostureVector) {
 	if err := os.WriteFile(markerPath, markerBytes, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	status, err := StatusOf(statusRequest(fx))
+	request := statusRequest(fx)
+	request.codexSeedRevisionForTest = revisionOverride
+	status, err := StatusOf(request)
 	if err != nil {
 		t.Fatal(err)
 	}

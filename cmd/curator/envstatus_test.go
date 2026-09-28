@@ -15,23 +15,23 @@ import (
 func TestPrintEnvStatusShowsCodexSeedPostureAndNames(t *testing.T) {
 	var output bytes.Buffer
 	printEnvStatus(&output, &envprofile.Status{
-		CodexSeedRule: envprofile.CodexSeedRuleState{Revision: envregistry.CodexSeedRevisionB, Provenance: "shipped"},
+		CodexSeedRule: envprofile.CodexSeedRuleState{Revision: envregistry.CodexSeedRevisionA, Provenance: "shipped"},
 		Homes: []envprofile.HomeState{{
 			Profile:                     "acme",
 			Environment:                 envregistry.CodexCLI,
 			Provisioned:                 true,
 			Current:                     true,
-			CodexSeedRecord:             &envmarker.CodexSeedRecord{Revision: envregistry.CodexSeedRevisionB, NativeMCPServers: []string{"figma"}},
+			CodexSeedRecord:             &envmarker.CodexSeedRecord{Revision: envregistry.CodexSeedRevisionA, NativeMCPServers: []string{"figma"}},
 			NativeMCPServers:            []string{"figma"},
-			NativeMCPServersDisposition: "not-inherited",
-			Warnings:                    []string{envregistry.DiagMCPNativeServersNotInherited + ": figma"},
+			NativeMCPServersDisposition: "ungoverned",
+			Warnings:                    []string{envregistry.DiagMCPNativeServersUngoverned + ": figma"},
 		}},
 	})
 	text := output.String()
 	for _, want := range []string{
-		"codex-seed: revision B (shipped)",
-		"codex-seed-record: revision B; native MCP servers figma (not-inherited)",
-		"warning: mcp_native_servers_not_inherited: figma",
+		"codex-seed: revision A (shipped)",
+		"codex-seed-record: revision A; native MCP servers figma (ungoverned)",
+		"warning: mcp_native_servers_ungoverned: figma",
 	} {
 		if !strings.Contains(text, want) {
 			t.Errorf("env status output omitted %q:\n%s", want, text)
@@ -39,7 +39,7 @@ func TestPrintEnvStatusShowsCodexSeedPostureAndNames(t *testing.T) {
 	}
 }
 
-func TestEnvStatusReportsStrippedNativeCodexServers(t *testing.T) {
+func TestEnvStatusReportsUngovernedNativeCodexServers(t *testing.T) {
 	source, _ := profileHome(t)
 	installCLIEnvProfile(t, source)
 	configPath := filepath.Join(os.Getenv("CODEX_HOME"), "config.toml")
@@ -49,17 +49,25 @@ func TestEnvStatusReportsStrippedNativeCodexServers(t *testing.T) {
 	}
 	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
 		t.Fatalf("env resolve codex_cli --repair = %d\nstderr:\n%s", code, stderr)
-	} else if !strings.Contains(stderr, "mcp_native_servers_not_inherited: native Codex MCP servers figma") {
-		t.Fatalf("env resolve omitted the stripped-server warning:\n%s", stderr)
+	} else if !strings.Contains(stderr, "mcp_native_servers_ungoverned: native Codex MCP servers figma") || !strings.Contains(strings.ToLower(stderr), "declare each server in the profile's mcp set, or accept the loss") {
+		t.Fatalf("env resolve omitted the revision-A warning or migration hint:\n%s", stderr)
+	}
+	managedConfig := filepath.Join(envprofile.ManagedHomeDir(source.cfg.Home(), "acme", envregistry.CodexCLI), "config.toml")
+	seeded, err := os.ReadFile(managedConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(seeded) != nativeConfig {
+		t.Fatalf("revision-A CLI seed changed config.toml:\n got %q\nwant %q", seeded, nativeConfig)
 	}
 	code, stdout, stderr := runProfile(t, source, "env", "status")
 	if code != exitOK {
 		t.Fatalf("env status = %d\nstderr:\n%s", code, stderr)
 	}
 	for _, want := range []string{
-		"codex-seed: revision B (shipped)",
-		"codex-seed-record: revision B; native MCP servers figma (not-inherited)",
-		"warning: mcp_native_servers_not_inherited: native Codex MCP servers figma were stripped from config.toml and are not inherited",
+		"codex-seed: revision A (shipped)",
+		"codex-seed-record: revision A; native MCP servers figma (ungoverned)",
+		"warning: mcp_native_servers_ungoverned: native Codex MCP servers figma remain in this managed home outside the profile lock and MCP allowlist",
 	} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("env status omitted %q:\n%s", want, stdout)
@@ -67,7 +75,7 @@ func TestEnvStatusReportsStrippedNativeCodexServers(t *testing.T) {
 	}
 }
 
-func TestEnvResolveStripsAndReportsInlineNativeCodexMCPTable(t *testing.T) {
+func TestEnvResolveCopiesAndReportsInlineNativeCodexMCPTable(t *testing.T) {
 	source, _ := profileHome(t)
 	installCLIEnvProfile(t, source)
 	configPath := filepath.Join(os.Getenv("CODEX_HOME"), "config.toml")
@@ -79,8 +87,8 @@ mcp_servers = { local = { command = "server", args = [] } }
 	}
 	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
 		t.Fatalf("env resolve codex_cli --repair = %d\nstderr:\n%s", code, stderr)
-	} else if !strings.Contains(stderr, "mcp_native_servers_not_inherited: native Codex MCP servers local") {
-		t.Fatalf("env resolve omitted the inline-table warning:\n%s", stderr)
+	} else if !strings.Contains(stderr, "mcp_native_servers_ungoverned: native Codex MCP servers local") || !strings.Contains(strings.ToLower(stderr), "accept the loss") {
+		t.Fatalf("env resolve omitted the inline-table warning or migration hint:\n%s", stderr)
 	}
 
 	seededPath := filepath.Join(envprofile.ManagedHomeDir(source.cfg.Home(), "acme", envregistry.CodexCLI), "config.toml")
@@ -88,18 +96,15 @@ mcp_servers = { local = { command = "server", args = [] } }
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(seeded), "mcp_servers") || strings.Contains(string(seeded), `command = "server"`) {
-		t.Fatalf("inline native MCP table reached the managed config.toml: %s", seeded)
-	}
-	if !strings.Contains(string(seeded), `model = "gpt-5-codex"`) {
-		t.Fatalf("stripping inline native MCP table lost other Codex config: %s", seeded)
+	if string(seeded) != nativeConfig {
+		t.Fatalf("revision-A seed changed inline native Codex config:\n got %q\nwant %q", seeded, nativeConfig)
 	}
 
 	code, stdout, stderr := runProfile(t, source, "env", "status")
 	if code != exitOK {
 		t.Fatalf("env status = %d\nstderr:\n%s", code, stderr)
 	}
-	if !strings.Contains(stdout, "native MCP servers local (not-inherited)") {
+	if !strings.Contains(stdout, "native MCP servers local (ungoverned)") {
 		t.Fatalf("env status omitted inline-table server name:\n%s", stdout)
 	}
 	if strings.Contains(stdout, `command = "server"`) {

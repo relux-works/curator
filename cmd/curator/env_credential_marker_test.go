@@ -172,8 +172,8 @@ func TestEnvResolveKeepsSchema1BytesForMetadataOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("schema-1 fixture must parse: %v", err)
 	}
-	if record := legacyMarker.CodexSeedRecord; record == nil || record.Revision != envregistry.CodexSeedRevisionB || record.NativeMCPServers == nil || len(record.NativeMCPServers) != 0 {
-		t.Fatalf("schema-1 fixture lost the required empty revision-B seed record: %+v", record)
+	if record := legacyMarker.CodexSeedRecord; record == nil || record.Revision != envregistry.CodexSeedRevisionA || record.NativeMCPServers == nil || len(record.NativeMCPServers) != 0 {
+		t.Fatalf("schema-1 fixture lost the required empty revision-A seed record: %+v", record)
 	}
 	if err := os.WriteFile(markerPath, legacyBytes, 0o644); err != nil {
 		t.Fatal(err)
@@ -262,7 +262,7 @@ func TestEnvResolvePreservesPreRuleCodexSeedAndReportsUnstrippedHome(t *testing.
 	if code != exitOK {
 		t.Fatalf("env status = %d\nstderr:\n%s", code, stderr)
 	}
-	if !strings.Contains(stdout, "mcp_seed_unstripped: this managed Codex home predates the seed record; re-provision it to apply seed revision B") {
+	if !strings.Contains(stdout, "mcp_seed_unstripped: this managed Codex home predates the seed record; re-provision it to apply seed revision A") {
 		t.Fatalf("env status did not report the pre-rule Codex home:\n%s", stdout)
 	}
 }

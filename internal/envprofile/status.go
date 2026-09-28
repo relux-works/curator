@@ -290,28 +290,39 @@ type StatusRequest struct {
 	readStateFile       func(string) (stateread.File, error)
 	readRegularFile     func(string) (stateread.File, error)
 	readStateDirectory  func(string) (stateread.Directory, error)
+	// codexSeedRevisionForTest exercises retained, non-shipped posture rows
+	// without mutating the registry singleton.
+	codexSeedRevisionForTest string
 }
 
 func (req *StatusRequest) resolve() ResolveRequest {
 	return ResolveRequest{
-		Home:                req.Home,
-		Machine:             req.Machine,
-		Detect:              req.Detect,
-		NativeHomeOf:        req.NativeHomeOf,
-		OperatorXDG:         req.OperatorXDG,
-		LaunchDir:           req.LaunchDir,
-		Policy:              req.Policy,
-		passthroughLstat:    req.passthroughLstat,
-		passthroughReadlink: req.passthroughReadlink,
-		readStateFile:       req.readStateFile,
-		readRegularFile:     req.readRegularFile,
+		Home:                     req.Home,
+		Machine:                  req.Machine,
+		Detect:                   req.Detect,
+		NativeHomeOf:             req.NativeHomeOf,
+		OperatorXDG:              req.OperatorXDG,
+		LaunchDir:                req.LaunchDir,
+		Policy:                   req.Policy,
+		codexSeedRevisionForTest: req.codexSeedRevisionForTest,
+		passthroughLstat:         req.passthroughLstat,
+		passthroughReadlink:      req.passthroughReadlink,
+		readStateFile:            req.readStateFile,
+		readRegularFile:          req.readRegularFile,
 	}
 }
 
 // StatusOf recomputes the profile × environment × surface matrix.
 func StatusOf(req StatusRequest) (*Status, error) {
+	shippedCodexSeedRevision := envregistry.CodexSeedRevision
+	if req.codexSeedRevisionForTest != "" {
+		if req.codexSeedRevisionForTest != envregistry.CodexSeedRevisionA && req.codexSeedRevisionForTest != envregistry.CodexSeedRevisionB {
+			return nil, fmt.Errorf("invalid Codex seed revision test override %q", req.codexSeedRevisionForTest)
+		}
+		shippedCodexSeedRevision = req.codexSeedRevisionForTest
+	}
 	status := &Status{CodexSeedRule: CodexSeedRuleState{
-		Revision:   envregistry.CodexSeedRevisionB,
+		Revision:   shippedCodexSeedRevision,
 		Provenance: "shipped",
 	}}
 	status.Notes = append(status.Notes, "opencode skills come from the machine-current profile, split-brain by construction (§7.1)")
@@ -334,6 +345,9 @@ func StatusOf(req StatusRequest) (*Status, error) {
 	for _, info := range infos {
 		installed[info.Name] = true
 		for _, adapter := range envregistry.Registry {
+			if adapter.ID == envregistry.CodexCLI {
+				adapter.CodexSeedRevision = shippedCodexSeedRevision
+			}
 			status.Homes = append(status.Homes, homeState(req, info.Name, adapter))
 		}
 	}
@@ -654,7 +668,7 @@ func homeState(req StatusRequest, profile string, adapter envregistry.Adapter) H
 	state.SeededProjects = append([]string{}, marker.SeededProjects...)
 	if adapter.ID == envregistry.CodexCLI {
 		state.CodexSeedRecord = cloneCodexSeedRecord(marker.CodexSeedRecord)
-		state.Warnings = append(state.Warnings, codexSeedStatusWarnings(marker, &state)...)
+		state.Warnings = append(state.Warnings, codexSeedStatusWarnings(marker, &state, adapter.CodexSeedRevision)...)
 	}
 	for _, reason := range verdict.reasons {
 		diagnostic := reason
@@ -691,14 +705,14 @@ func cloneCodexSeedRecord(record *envmarker.CodexSeedRecord) *envmarker.CodexSee
 }
 
 // codexSeedStatusWarnings reports the recorded seed snapshot for one managed
-// Codex home. Revision-A and pre-rule homes retain their inherited base and
-// stay current with warnings; revision-B names were stripped and are not
-// inherited (§7.4, §7.7, §7.8, §8.2, §12).
-func codexSeedStatusWarnings(marker *envmarker.Marker, state *HomeState) []string {
+// Codex home. Revision-A homes retain their inherited base and stay current
+// with warnings; revision-B names were stripped and are not inherited
+// (§7.4, §7.7, §7.8, §8.2, §12).
+func codexSeedStatusWarnings(marker *envmarker.Marker, state *HomeState, shippedRevision string) []string {
 	record := marker.CodexSeedRecord
 	if record == nil {
 		state.NativeMCPServersDisposition = "unknown"
-		return []string{fmt.Sprintf("%s: this managed Codex home predates the seed record; re-provision it to apply seed revision %s", envregistry.DiagMCPSeedUnstripped, envregistry.CodexSeedRevisionB)}
+		return []string{fmt.Sprintf("%s: this managed Codex home predates the seed record; re-provision it to apply seed revision %s", envregistry.DiagMCPSeedUnstripped, shippedRevision)}
 	}
 	state.NativeMCPServers = append([]string{}, record.NativeMCPServers...)
 	if len(record.NativeMCPServers) == 0 {
@@ -706,11 +720,11 @@ func codexSeedStatusWarnings(marker *envmarker.Marker, state *HomeState) []strin
 		return nil
 	}
 	switch record.Revision {
-	case "A":
+	case envregistry.CodexSeedRevisionA:
 		state.NativeMCPServersDisposition = "ungoverned"
 		warnings := []string{fmt.Sprintf("%s: native Codex MCP servers %s remain in this managed home outside the profile lock and MCP allowlist", envregistry.DiagMCPNativeServersUngoverned, strings.Join(record.NativeMCPServers, ", "))}
-		if record.Revision != envregistry.CodexSeedRevisionB {
-			warnings = append(warnings, fmt.Sprintf("%s: this home retains revision-A native MCP servers; re-provision it to apply seed revision B", envregistry.DiagMCPSeedUnstripped))
+		if record.Revision == envregistry.CodexSeedRevisionA && shippedRevision == envregistry.CodexSeedRevisionB {
+			warnings = append(warnings, fmt.Sprintf("%s: this home retains revision-A native MCP servers; re-provision it to apply seed revision %s", envregistry.DiagMCPSeedUnstripped, shippedRevision))
 		}
 		return warnings
 	case envregistry.CodexSeedRevisionB:

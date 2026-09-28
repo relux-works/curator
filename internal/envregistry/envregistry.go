@@ -24,10 +24,17 @@ const (
 	Pi         = "pi"
 )
 
-// CodexSeedRevisionB is the immutable manager behavior recorded in
-// codex_seed_record (environments §7.4, §8.2). Revision B removes native
-// MCP servers from config.toml before the managed home is published.
-const CodexSeedRevisionB = "B"
+// Codex seed behavior recorded in codex_seed_record (environments §7.4,
+// §8.2). Revision A copies config.toml whole and warns about inherited MCP
+// servers. Revision B removes them before the managed home is published.
+const (
+	CodexSeedRevisionA = "A"
+	CodexSeedRevisionB = "B"
+
+	// CodexSeedRevision selects the manager behavior shipped on trunk. Move
+	// this single registry switch to B only after revision A has shipped.
+	CodexSeedRevision = CodexSeedRevisionA
+)
 
 // EnvAliases maps the CLI-only short spellings to their canonical
 // registry ids (manager profile §12.1). The aliases exist only at the
@@ -256,7 +263,7 @@ var Registry = []Adapter{
 			"default": {{Path: "auth.json", Strategy: StrategyKeyringPreferred, FileLinkTarget: "auth.json"}},
 		},
 		Seeds:             []string{"config.toml"},
-		CodexSeedRevision: CodexSeedRevisionB,
+		CodexSeedRevision: CodexSeedRevision,
 		SeedWritten:       map[string]bool{},
 		VerifiedRelease:   "0.153.2",
 		Probe:             []string{"codex", "--version"},
