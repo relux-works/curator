@@ -120,6 +120,18 @@ spawn run child final message (run=RUN-260924-f4e6d3, tools=29 patches=1 failed=
 Confirmed: worktree holds exactly the candidate (1 modified + 2 new test files), board still `integrating`. Nothing further to do — evidence is attached and the bound landing is with the runner.
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260924-f4e6d3, pid=86510, exit=0)
+spawn run RUN-260924-f4e6d3 failed; operator action required; failure: board_publication_pending: runner integrate refused: board_publication_pending: STORY-260924-2tyzhh is landed and its board state is committed as c278af4fd6f865af4800d2ec30414a890ba68919 on the local trunk, but the publication push did not land (board_publish_local_trunk_unproven); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: c278af4fd6f865af4800d2ec30414a890ba68919
+  cause_code: board_publish_local_trunk_unproven
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: 002273e94cc6684504b6d356c91d7ed28d687f35
+  story_id: STORY-260924-2tyzhh
+  cause: board_publish_local_trunk_unproven: the local trunk holds an unpublished link c278af4fd6f865af4800d2ec30414a890ba68919 that is not this repository's own board-state record (the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key); a stable content digest is never ownership proof — nothing was projected and nothing was pushed
+  link_oid: c278af4fd6f865af4800d2ec30414a890ba68919
+  reason: the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key
+  remedy: land the unproven commits through integrate/reconcile-trunk, not through this command
+run write-boundary clearance for RUN-260924-f4e6d3: Operator review 2026-09-23: every flagged path is board state under .task-board/ (activity streams, journals and element files of other elements) or inside OTHER Stories' managed worktrees under .temp/STORY-*/worktree, written concurrently by the orchestrator's own board mutations and by other tracked runs during this run's lifetime; no source path outside the Story worktree was written.
 
 ## Precondition Resources
 - [campaign-producer-rules.md](file://BUG-260924-5p8b0z/campaign-producer-rules.md)
@@ -146,7 +158,7 @@ spawn run completed: muse (run=RUN-260924-f4e6d3, pid=86510, exit=0)
 2026-09-24T09:30:11Z
 
 ## Last Update
-2026-09-24T13:37:32Z
+2026-09-25T02:14:30Z
 
 ## Assigned To
 [implementer] developer (muse)
