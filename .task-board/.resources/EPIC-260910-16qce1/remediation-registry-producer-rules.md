@@ -74,7 +74,7 @@ carries the product scope; this file carries where and how.
   `done`.
 
 ## Models and review
-- Producers: Muse `muse-spark-1.3-contributor` at `max`; reviewers: Claude `claude-opus-5` at `max` (from 2026-09-18; codex `gpt-6-astra:low` before). Reviewers verify the exact worktree tree, re-run
+- Producers: Muse `muse-spark-1.3-contributor` at `max`; reviewers: Codex `gpt-6-astra` at `low` (restored 2026-09-22; claude-opus-5:max was used 18–21.09). Reviewers verify the exact worktree tree, re-run
   pytest + mypy independently, attack the change with narrowing mutants, and
   record exactly one verdict resource `<TASK-ID>_review-verdict-rev<N>.md`
   before routing (`accept_cr` or `set_status(to-dev)`), and leave no files in
