@@ -1,0 +1,1574 @@
+diff --git a/.github/ci/conformance-case-counts.tsv b/.github/ci/conformance-case-counts.tsv
+index 2ff76862..a156abef 100644
+--- a/.github/ci/conformance-case-counts.tsv
++++ b/.github/ci/conformance-case-counts.tsv
+@@ -70,3 +70,4 @@ environments-env-passthrough/allowlist-empty-cases	6
+ environments-env-passthrough/schema-cases	4
+ environments-env-passthrough/surfacing-cases	6
+ environments-env-passthrough/surfacing-order-cases	2
++environments-write-nofollow/cases	11
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index 42c0dc15..60e0745c 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -41,12 +41,13 @@ import (
+ // Diagnostics for managed homes and resolution (environments §7.7, §8.5,
+ // §9.7, §10.4).
+ const (
+-	DiagHomeStale       = "environment_home_stale"
+-	DiagRepairFailed    = "environment_repair_failed"
+-	DiagForeignManager  = "environment_foreign_manager_detected"
+-	DiagForeignSuspect  = "environment_foreign_manager_suspected"
+-	DiagProfileUnknown  = "profile_unknown"
+-	DiagReservedCommand = "environment_reserved_command_name"
++	DiagHomeStale            = "environment_home_stale"
++	DiagRepairFailed         = "environment_repair_failed"
++	DiagForeignManager       = "environment_foreign_manager_detected"
++	DiagWriteWouldFollowLink = "environment_write_would_follow_link"
++	DiagForeignSuspect       = "environment_foreign_manager_suspected"
++	DiagProfileUnknown       = "profile_unknown"
++	DiagReservedCommand      = "environment_reserved_command_name"
+ )
+ 
+ // EnvRootName is the manager-owned environments root below the manager
+@@ -238,6 +239,7 @@ type homePlan struct {
+ 	adapter    envregistry.Adapter
+ 	parent     string
+ 	homeDir    string
++	storeRoot  string
+ 	form       string
+ 	isolation  string
+ 	copies     map[string][]byte
+@@ -287,6 +289,7 @@ func assembleHome(req *ResolveRequest, source Source, lock *contextlock.Lock, ha
+ 		adapter:    adapter,
+ 		parent:     ManagedParent(req.Home, req.Profile, adapter.ID),
+ 		homeDir:    ManagedHomeDir(req.Home, req.Profile, adapter.ID),
++		storeRoot:  ProfilesDir(req.Home),
+ 		form:       form,
+ 		isolation:  isolation,
+ 		copies:     map[string][]byte{},
+@@ -489,7 +492,7 @@ func (p *homePlan) publishDocs() error {
+ 	}
+ 	sort.Strings(paths)
+ 	for _, path := range paths {
+-		if err := writeStoreDoc(path, p.docs[path]); err != nil {
++		if err := writeStoreDoc(p.storeRoot, path, p.docs[path]); err != nil {
+ 			return err
+ 		}
+ 	}
+@@ -763,11 +766,12 @@ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bo
+ }
+ 
+ // writeStoreDoc publishes manager-authored bytes as a store document.
+-func writeStoreDoc(path string, document []byte) error {
+-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
++func writeStoreDoc(root, path string, document []byte) error {
++	rel, err := managedRelative(root, path)
++	if err != nil {
+ 		return err
+ 	}
+-	return os.WriteFile(path, document, 0o644)
++	return atomicManagedFile(root, rel, document, 0o644)
+ }
+ 
+ // claudeSeed merges the .claude.json provisioning seed: the exact object
+@@ -776,10 +780,14 @@ func writeStoreDoc(path string, document []byte) error {
+ // under the referenced form — hasClaudeMdExternalIncludesApproved (§7.4).
+ // Later tool writes are its own state: repair only adds the launch
+ // directory's entry and never rewrites anything else.
+-func claudeSeed(homeDir, launchDir, form string) (seeded []string, err error) {
+-	path := filepath.Join(homeDir, ".claude.json")
++func claudeSeed(root, homeRel, launchDir, form string) (seeded []string, err error) {
++	path := managedJoin(homeRel, ".claude.json")
+ 	object := map[string]any{"hasCompletedOnboarding": true, "projects": map[string]any{}}
+-	if payload, err := os.ReadFile(path); err == nil { // #nosec G304 -- managed .claude.json below the resolved home
++	payload, present, err := readManagedRegular(root, path)
++	if err != nil {
++		return nil, fmt.Errorf("%s: managed .claude.json: %v", envregistry.DiagSeedUnreadable, err)
++	}
++	if present {
+ 		parsed, ok := decodeJSONObject(payload)
+ 		if !ok {
+ 			return nil, fmt.Errorf("%s: managed .claude.json is not an object", envregistry.DiagSeedUnreadable)
+@@ -788,8 +796,12 @@ func claudeSeed(homeDir, launchDir, form string) (seeded []string, err error) {
+ 		if _, ok := object["projects"].(map[string]any); !ok {
+ 			object["projects"] = map[string]any{}
+ 		}
+-	} else if !os.IsNotExist(err) {
+-		return nil, fmt.Errorf("%s: managed .claude.json: %v", envregistry.DiagSeedUnreadable, err)
++	} else if full, pathErr := managedPath(root, path, false); pathErr != nil {
++		return nil, fmt.Errorf("%s: managed .claude.json: %v", envregistry.DiagSeedUnreadable, pathErr)
++	} else if info, statErr := os.Lstat(full); statErr == nil && !info.Mode().IsRegular() {
++		return nil, fmt.Errorf("%s: managed .claude.json is not a regular file", envregistry.DiagSeedUnreadable)
++	} else if statErr != nil && !os.IsNotExist(statErr) {
++		return nil, fmt.Errorf("%s: managed .claude.json: %v", envregistry.DiagSeedUnreadable, statErr)
+ 	}
+ 	projects := object["projects"].(map[string]any)
+ 	for name := range projects {
+@@ -814,11 +826,11 @@ func claudeSeed(homeDir, launchDir, form string) (seeded []string, err error) {
+ 		seeded = append(seeded, launchDir)
+ 	}
+ 	sort.Strings(seeded)
+-	payload, err := protocoljsonMarshal(object)
++	payload, err = protocoljsonMarshal(object)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	if err := os.WriteFile(path, payload, 0o644); err != nil {
++	if err := atomicManagedFile(root, path, payload, 0o644); err != nil {
+ 		return nil, err
+ 	}
+ 	return seeded, nil
+@@ -937,6 +949,21 @@ func inventoryUnmanaged(homeDir string, want map[string]bool, storeRoot string)
+ 	return nil
+ }
+ 
++// preflightManagedWriteTargets checks every managed-surface parent and the
++// private marker destination before an operation writes store documents,
++// backups, surfaces, or the marker.
++func preflightManagedWriteTargets(root, homeRel string, want map[string]bool) error {
++	if err := os.MkdirAll(root, 0o755); err != nil {
++		return err
++	}
++	for path := range want {
++		if _, err := managedPath(root, managedJoin(homeRel, path), false); err != nil {
++			return err
++		}
++	}
++	return checkManagedPrivateTarget(root, managedJoin(homeRel, envmarker.Name))
++}
++
+ // sameStoreTree reports whether the link target lives below the store.
+ func sameStoreTree(target, storeRoot string) bool {
+ 	if !filepath.IsAbs(target) {
+@@ -951,15 +978,9 @@ func sameStoreTree(target, storeRoot string) bool {
+ // files, and the marker. Managed paths the plan no longer wants are
+ // removed; files the marker does not record are never touched.
+ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded map[string]bool, prior *envmarker.Marker, provisioned bool) error {
+-	if err := os.MkdirAll(plan.homeDir, 0o755); err != nil {
+-		return err
+-	}
+-	if plan.adapter.ID == envregistry.OpenCode {
+-		if err := os.MkdirAll(plan.parent, 0o755); err != nil {
+-			return err
+-		}
+-	}
+-	if err := plan.publishDocs(); err != nil {
++	root := EnvRoot(req.Home)
++	homeRel, err := managedRelative(root, plan.homeDir)
++	if err != nil {
+ 		return err
+ 	}
+ 	want := map[string]bool{}
+@@ -975,74 +996,77 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
+ 	for seed := range seeds.files {
+ 		want[seed] = true
+ 	}
+-	// Versioned generations preserve replaced file bytes (§8.3, §9.5):
+-	// every file the operation replaces is copied into the next backup
+-	// generation before the first write — on provisioning as on repair,
+-	// whether or not any import was requested. Symlinks are skipped: they
+-	// are manager-derived and re-derive from the lock and the immutable
+-	// store, while openBackup follows links and fails on directory links
+-	// (skills trees). A next generation that already exists fails with
++	if err := preflightManagedWriteTargets(root, homeRel, want); err != nil {
++		return err
++	}
++	if _, err := managedDirectory(root, homeRel); err != nil {
++		return err
++	}
++	if err := plan.publishDocs(); err != nil {
++		return err
++	}
++	// Versioned generations preserve replaced regular-file bytes (§8.3,
++	// §9.5) before the first write. An authorized takeover also backs up a
++	// replaced unmanaged symlink as a symlink, preserving its link text;
++	// manager-recorded links are re-derived from the lock and are not backed
++	// up. A next generation that already exists fails with
+ 	// environment_backup_exists.
+ 	replacing := map[string]bool{}
+ 	for path := range want {
+-		info, err := os.Lstat(filepath.Join(plan.homeDir, filepath.FromSlash(path)))
++		full, err := managedPath(root, managedJoin(homeRel, path), false)
++		if err != nil {
++			return err
++		}
++		info, err := os.Lstat(full)
+ 		if err != nil || info.Mode()&os.ModeSymlink != 0 {
++			if err == nil && provisioned && req.Policy.Takeover && !recorded[path] && info.Mode()&os.ModeSymlink != 0 {
++				replacing[path] = true
++			}
+ 			continue
+ 		}
+-		replacing[path] = true
++		if info.Mode().IsRegular() {
++			replacing[path] = true
++		}
+ 	}
+ 	if len(replacing) > 0 {
+-		if _, err := openBackup(plan.homeDir, replacing); err != nil {
++		if _, err := openBackup(root, homeRel, replacing); err != nil {
+ 			return err
+ 		}
+ 	}
+ 	// Remove recorded files the plan no longer wants.
+ 	for path := range recorded {
+ 		if !want[path] && !isSeedPath(plan, path) {
+-			_ = os.Remove(filepath.Join(plan.homeDir, filepath.FromSlash(path)))
++			if err := removeManagedEntry(root, managedJoin(homeRel, path)); err != nil {
++				return err
++			}
+ 		}
+ 	}
+ 	// Writes run in sorted path order: the fresh-home provisioning order
+-	// (§8.1) is deterministic even though the plan accumulates maps.
+-	// Copied surfaces never follow a link: remove first, as the switch
+-	// path does, so a stray symlink in a managed home cannot redirect a
+-	// write outside the manager's tree.
++	// (§8.1) is deterministic even though the plan accumulates maps. Each
++	// destination is replaced from a private same-directory entry, so the
++	// existing surface path is never opened through a symlink.
+ 	for _, path := range sortedKeysBytes(plan.copies) {
+ 		document := plan.copies[path]
+-		if err := os.MkdirAll(filepath.Dir(filepath.Join(plan.homeDir, filepath.FromSlash(path))), 0o755); err != nil {
+-			return err
+-		}
+-		_ = os.Remove(filepath.Join(plan.homeDir, filepath.FromSlash(path)))
+-		if err := os.WriteFile(filepath.Join(plan.homeDir, filepath.FromSlash(path)), document, 0o644); err != nil {
++		if err := atomicManagedFile(root, managedJoin(homeRel, path), document, 0o644); err != nil {
+ 			return err
+ 		}
+ 	}
+ 	for _, path := range sortedKeys(plan.links) {
+ 		target := plan.links[path]
+-		full := filepath.Join(plan.homeDir, filepath.FromSlash(path))
+-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+-			return err
+-		}
+-		_ = os.Remove(full)
+-		if err := os.Symlink(target, full); err != nil {
++		rel := managedJoin(homeRel, path)
++		if err := atomicManagedLink(root, rel, target); err != nil {
+ 			// Copy fallback where the platform takes no symlink: record
+ 			// the copy with its reason so hash drift applies to it.
+-			if err := copyLinkFallback(full, target, path, plan); err != nil {
++			if err := copyLinkFallback(root, rel, target, path, plan); err != nil {
+ 				return err
+ 			}
+ 		}
+ 	}
+ 	// Copy seeds are written at provisioning only: after that the tool
+-	// owns them, so repair never refreshes them (§7.4). Like the copied
+-	// surfaces above, the seed and marker writes remove first so a stray
+-	// symlink in a managed home cannot redirect them; both targets stay
+-	// under the manager's own tree. (claudeSeed is deliberately excluded:
+-	// it reads the existing .claude.json and merges, so removing first
+-	// would destroy the tool-owned state it must preserve.)
++	// owns them, so repair never refreshes them (§7.4).
+ 	if provisioned {
+ 		for seed, payload := range seeds.files {
+-			_ = os.Remove(filepath.Join(plan.homeDir, filepath.FromSlash(seed)))
+-			if err := os.WriteFile(filepath.Join(plan.homeDir, filepath.FromSlash(seed)), payload, 0o644); err != nil {
++			if err := atomicManagedFile(root, managedJoin(homeRel, seed), payload, 0o644); err != nil {
+ 				return err
+ 			}
+ 		}
+@@ -1087,6 +1111,11 @@ func isSeedPath(plan *homePlan, path string) bool {
+ // removed, and unrecorded entries shadowing allowlisted operator entries
+ // warn environment_seed_shadowed and are never touched (§7.1, §7.4).
+ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prior *envmarker.Marker, provenance string) (*envmarker.Marker, error) {
++	root := EnvRoot(req.Home)
++	homeRel, err := managedRelative(root, plan.homeDir)
++	if err != nil {
++		return nil, err
++	}
+ 	marker := plan.marker
+ 	marker.Version = envmarker.VersionV2
+ 	links, _, err := req.effectivePassthrough(plan.adapter, plan.isolation)
+@@ -1107,7 +1136,7 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
+ 	}
+ 	migrateCmd := fmt.Sprintf("curator env migrate --plan --profile %s --env %s, then curator env migrate --apply --expect <plan-hash> --profile %s --env %s", req.Profile, plan.adapter.ID, req.Profile, plan.adapter.ID)
+ 	for _, path := range sortedKeys(links) {
+-		if err := ensureCredentialLink(plan.homeDir, path, links[path], recordedLinks[path], migrateCmd); err != nil {
++		if err := ensureCredentialLink(root, homeRel, path, links[path], recordedLinks[path], migrateCmd); err != nil {
+ 			return nil, err
+ 		}
+ 	}
+@@ -1138,7 +1167,7 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
+ 		}
+ 	}
+ 	if seeds.claudeInit || plan.adapter.ID == envregistry.ClaudeCode {
+-		seeded, err := claudeSeed(plan.homeDir, req.LaunchDir, plan.form)
++		seeded, err := claudeSeed(root, homeRel, req.LaunchDir, plan.form)
+ 		if err != nil {
+ 			return nil, err
+ 		}
+@@ -1151,8 +1180,11 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
+ 	if plan.adapter.ID == envregistry.OpenCode {
+ 		for _, name := range sortedKeys(seeds.xdg) {
+ 			full := filepath.Join(plan.parent, name)
+-			_ = os.Remove(full)
+-			if err := os.Symlink(seeds.xdg[name], full); err != nil {
++			rel, err := managedRelative(root, full)
++			if err != nil {
++				return nil, err
++			}
++			if err := atomicManagedLink(root, rel, seeds.xdg[name]); err != nil {
+ 				return nil, fmt.Errorf("xdg seed %s: %v", name, err)
+ 			}
+ 			seedLinks = append(seedLinks, name)
+@@ -1161,7 +1193,14 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
+ 		if prior != nil {
+ 			for _, name := range prior.SeedLinks {
+ 				if _, ok := seeds.xdg[name]; !ok {
+-					_ = os.Remove(filepath.Join(plan.parent, name))
++					full := filepath.Join(plan.parent, name)
++					rel, err := managedRelative(root, full)
++					if err != nil {
++						return nil, err
++					}
++					if err := removeManagedEntry(root, rel); err != nil {
++						return nil, err
++					}
+ 				}
+ 			}
+ 		}
+@@ -1246,17 +1285,18 @@ func sameCredentialRecordSet(left, right []envmarker.Passthrough) bool {
+ // file, an unrecorded symlink to an unexpected target, a non-empty
+ // directory, or a link whose state cannot be established refuses the
+ // same way, removing nothing. Native bytes are never touched.
+-func ensureCredentialLink(homeDir, path, target string, recorded bool, migrateCmd string) error {
+-	full := filepath.Join(homeDir, filepath.FromSlash(path))
++func ensureCredentialLink(root, homeRel, path, target string, recorded bool, migrateCmd string) error {
++	rel := managedJoin(homeRel, path)
++	full, err := managedPath(root, rel, false)
++	if err != nil {
++		return err
++	}
+ 	metadata, err := stateread.Lstat(full)
+ 	if err != nil {
+ 		return fmt.Errorf("%s: %s cannot be inspected: %v: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full, err)
+ 	}
+ 	if metadata.Kind == stateread.KindAbsent {
+-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+-			return err
+-		}
+-		if err := os.Symlink(target, full); err != nil {
++		if err := atomicManagedLink(root, rel, target); err != nil {
+ 			return fmt.Errorf("passthrough %s: %v", path, err)
+ 		}
+ 		return nil
+@@ -1286,8 +1326,10 @@ func ensureCredentialLink(homeDir, path, target string, recorded bool, migrateCm
+ 		if len(entries) != 0 {
+ 			return fmt.Errorf("%s: %s holds a non-empty directory, expected a link to %s: refusing to remove it; clear the directory out of band and re-run", envregistry.DiagCredentialConflict, full, target)
+ 		}
+-		_ = os.Remove(full)
+-		if err := os.Symlink(target, full); err != nil {
++		if err := removeManagedEntry(root, rel); err != nil {
++			return err
++		}
++		if err := atomicManagedLink(root, rel, target); err != nil {
+ 			return fmt.Errorf("passthrough %s: %v", path, err)
+ 		}
+ 		return nil
+@@ -2051,6 +2093,14 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
+ 	if !identifiers.Valid(profile) {
+ 		return nil, fmt.Errorf("%s: profile %q is not installed", DiagProfileUnknown, profile)
+ 	}
++	managedRoot := EnvRoot(req.Home)
++	homeRel, err := managedRelative(managedRoot, ManagedHomeDir(req.Home, profile, req.EnvID))
++	if err != nil {
++		return nil, err
++	}
++	if err := checkManagedPrivateTarget(managedRoot, managedJoin(homeRel, envmarker.Name)); err != nil {
++		return nil, err
++	}
+ 	source, lock, hash, err := loadResolveInputs(req.Home, profile)
+ 	if err != nil {
+ 		return nil, err
+@@ -2116,16 +2166,57 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	// The credential store must be established before the first write: an
+-	// unknown native selector fails here, not halfway through applyPlan
+-	// leaving a markerless partial home behind that the §9.5 inventory
+-	// would then refuse to provision over.
+-	if _, _, err := req.effectivePassthrough(adapter, plan.isolation); err != nil {
++	root := EnvRoot(req.Home)
++	homeRel, err := managedRelative(root, plan.homeDir)
++	if err != nil {
++		return nil, err
++	}
++	writePaths := map[string]bool{}
++	for path := range plan.copies {
++		writePaths[path] = true
++	}
++	for path := range plan.links {
++		writePaths[path] = true
++	}
++	for path := range seeds.files {
++		writePaths[path] = true
++	}
++	if seeds.claudeInit {
++		writePaths[".claude.json"] = true
++	}
++	if seeds.claudeInit {
++		if err := checkManagedPrivateTarget(root, managedJoin(homeRel, ".claude.json")); err != nil {
++			return nil, err
++		}
++	}
++	passthroughLinks, _, err := req.effectivePassthrough(adapter, plan.isolation)
++	if err != nil {
+ 		if provisioned || isCredentialRefusal(err) {
+ 			return nil, err
+ 		}
+ 		return nil, fmt.Errorf("%s: %v", DiagRepairFailed, err)
+ 	}
++	for path := range passthroughLinks {
++		writePaths[path] = true
++	}
++	if err := preflightManagedWriteTargets(root, homeRel, writePaths); err != nil {
++		return nil, err
++	}
++	if adapter.ID == envregistry.OpenCode {
++		for name := range seeds.xdg {
++			rel, err := managedRelative(root, filepath.Join(plan.parent, name))
++			if err != nil {
++				return nil, err
++			}
++			if _, err := managedPath(root, rel, false); err != nil {
++				return nil, err
++			}
++		}
++	}
++	// The credential store must be established before the first write: an
++	// unknown native selector fails here, not halfway through applyPlan
++	// leaving a markerless partial home behind that the §9.5 inventory
++	// would then refuse to provision over.
+ 	if provisioned {
+ 		want := map[string]bool{}
+ 		for path := range plan.copies {
+@@ -2219,13 +2310,13 @@ func checkProfileCollision(home, profile string) error {
+ 
+ // copyLinkFallback materializes a file link as a copy when the platform
+ // takes no symlink, recording the manager §5 fallback reason.
+-func copyLinkFallback(full, target, path string, plan *homePlan) error {
++func copyLinkFallback(root, fullRel, target, path string, plan *homePlan) error {
+ 	info, err := os.Stat(target)
+ 	if err != nil {
+ 		return fmt.Errorf("link %s: %v", path, err)
+ 	}
+ 	if info.IsDir() {
+-		if err := copyTree(target, full); err != nil {
++		if err := copyTree(target, root, fullRel); err != nil {
+ 			return fmt.Errorf("link %s: %v", path, err)
+ 		}
+ 	} else {
+@@ -2233,7 +2324,7 @@ func copyLinkFallback(full, target, path string, plan *homePlan) error {
+ 		if err != nil {
+ 			return fmt.Errorf("link %s: %v", path, err)
+ 		}
+-		if err := os.WriteFile(full, payload, 0o644); err != nil {
++		if err := atomicManagedFile(root, fullRel, payload, 0o644); err != nil {
+ 			return err
+ 		}
+ 	}
+@@ -2252,7 +2343,7 @@ func copyLinkFallback(full, target, path string, plan *homePlan) error {
+ }
+ 
+ // copyTree copies a directory tree for symlink-fallback copies.
+-func copyTree(source, destination string) error {
++func copyTree(source, root, destination string) error {
+ 	return filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
+ 		if err != nil {
+ 			return err
+@@ -2261,15 +2352,22 @@ func copyTree(source, destination string) error {
+ 		if err != nil {
+ 			return err
+ 		}
+-		out := filepath.Join(destination, rel)
++		outRel := destination
++		if rel != "." {
++			outRel = managedJoin(destination, filepath.ToSlash(rel))
++		}
+ 		if info.IsDir() {
+-			return os.MkdirAll(out, 0o755)
++			_, err := managedDirectory(root, outRel)
++			return err
++		}
++		if info.Mode()&os.ModeSymlink != 0 {
++			return fmt.Errorf("store tree contains a symlink at %s", path)
+ 		}
+ 		payload, err := os.ReadFile(path) // #nosec G304 -- store tree walked from the plan
+ 		if err != nil {
+ 			return err
+ 		}
+-		return os.WriteFile(out, payload, info.Mode().Perm())
++		return atomicManagedFile(root, outRel, payload, info.Mode().Perm())
+ 	})
+ }
+ 
+diff --git a/internal/envprofile/nofollow.go b/internal/envprofile/nofollow.go
+new file mode 100644
+index 00000000..b3cb03ca
+--- /dev/null
++++ b/internal/envprofile/nofollow.go
+@@ -0,0 +1,273 @@
++package envprofile
++
++import (
++	"crypto/rand"
++	"encoding/hex"
++	"fmt"
++	"io"
++	"io/fs"
++	"os"
++	"path/filepath"
++	"strings"
++)
++
++// managedPath joins a path below root after checking each existing parent
++// component with lstat semantics. Components at or above root are allowed to
++// resolve normally; components below it may not be symlinks.
++func managedPath(root, rel string, createParents bool) (string, error) {
++	parts, err := managedPathParts(rel)
++	if err != nil {
++		return "", err
++	}
++	root = filepath.Clean(root)
++	if createParents {
++		if err := os.MkdirAll(root, 0o755); err != nil {
++			return "", err
++		}
++	}
++	rootInfo, err := os.Stat(root)
++	if err != nil {
++		return "", err
++	}
++	if !rootInfo.IsDir() {
++		return "", fmt.Errorf("managed root %s is not a directory", root)
++	}
++	current := root
++	for _, component := range parts[:len(parts)-1] {
++		current = filepath.Join(current, component)
++		info, statErr := os.Lstat(current)
++		if os.IsNotExist(statErr) && createParents {
++			if mkdirErr := os.Mkdir(current, 0o755); mkdirErr != nil && !os.IsExist(mkdirErr) {
++				return "", mkdirErr
++			}
++			info, statErr = os.Lstat(current)
++		}
++		if os.IsNotExist(statErr) {
++			return filepath.Join(append([]string{root}, parts...)...), nil
++		}
++		if statErr != nil {
++			return "", statErr
++		}
++		if info.Mode()&os.ModeSymlink != 0 {
++			return "", fmt.Errorf("%s: %s", DiagWriteWouldFollowLink, current)
++		}
++		if !info.IsDir() {
++			return "", fmt.Errorf("managed path component %s is not a directory", current)
++		}
++	}
++	return filepath.Join(append([]string{root}, parts...)...), nil
++}
++
++// managedDirectory creates each component below root separately and refuses
++// any pre-existing symbolic link on the route.
++func managedDirectory(root, rel string) (string, error) {
++	parts, err := managedPathParts(rel)
++	if err != nil {
++		return "", err
++	}
++	root = filepath.Clean(root)
++	if err := os.MkdirAll(root, 0o755); err != nil {
++		return "", err
++	}
++	info, err := os.Stat(root)
++	if err != nil {
++		return "", err
++	}
++	if !info.IsDir() {
++		return "", fmt.Errorf("managed root %s is not a directory", root)
++	}
++	current := root
++	for _, component := range parts {
++		current = filepath.Join(current, component)
++		info, err := os.Lstat(current)
++		if os.IsNotExist(err) {
++			if err := os.Mkdir(current, 0o755); err != nil && !os.IsExist(err) {
++				return "", err
++			}
++			info, err = os.Lstat(current)
++		}
++		if err != nil {
++			return "", err
++		}
++		if info.Mode()&os.ModeSymlink != 0 {
++			return "", fmt.Errorf("%s: %s", DiagWriteWouldFollowLink, current)
++		}
++		if !info.IsDir() {
++			return "", fmt.Errorf("managed path component %s is not a directory", current)
++		}
++	}
++	return current, nil
++}
++
++func managedPathParts(rel string) ([]string, error) {
++	slash := filepath.ToSlash(rel)
++	if strings.Contains(rel, "\\") || !fs.ValidPath(slash) || slash == "." {
++		return nil, fmt.Errorf("invalid managed relative path %q", rel)
++	}
++	return strings.Split(slash, "/"), nil
++}
++
++func managedJoin(base, rel string) string {
++	if base == "" {
++		return filepath.ToSlash(filepath.FromSlash(rel))
++	}
++	return filepath.ToSlash(filepath.Join(filepath.FromSlash(base), filepath.FromSlash(rel)))
++}
++
++func managedRelative(root, full string) (string, error) {
++	rootAbs, err := filepath.Abs(root)
++	if err != nil {
++		return "", err
++	}
++	fullAbs, err := filepath.Abs(full)
++	if err != nil {
++		return "", err
++	}
++	rel, err := filepath.Rel(rootAbs, fullAbs)
++	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
++		return "", fmt.Errorf("managed path %s is not below root %s", full, root)
++	}
++	rel = filepath.ToSlash(rel)
++	if _, err := managedPathParts(rel); err != nil {
++		return "", err
++	}
++	return rel, nil
++}
++
++func checkManagedPrivateTarget(root, rel string) error {
++	if _, err := os.Stat(root); os.IsNotExist(err) {
++		return nil
++	} else if err != nil {
++		return err
++	}
++	full, err := managedPath(root, rel, false)
++	if err != nil {
++		return err
++	}
++	info, err := os.Lstat(full)
++	if os.IsNotExist(err) {
++		return nil
++	}
++	if err != nil {
++		return err
++	}
++	if info.Mode()&os.ModeSymlink != 0 {
++		return fmt.Errorf("%s: %s", DiagWriteWouldFollowLink, full)
++	}
++	return nil
++}
++
++// atomicManagedFile replaces a file entry with bytes staged under a private
++// name in the same directory. Rename replaces a target symlink itself rather
++// than opening the path through it.
++func atomicManagedFile(root, rel string, payload []byte, mode fs.FileMode) error {
++	full, err := managedPath(root, rel, true)
++	if err != nil {
++		return err
++	}
++	file, err := os.CreateTemp(filepath.Dir(full), ".curator-write-*.tmp")
++	if err != nil {
++		return err
++	}
++	temp := file.Name()
++	defer func() { _ = os.Remove(temp) }()
++	if err := file.Chmod(mode); err != nil {
++		_ = file.Close()
++		return err
++	}
++	if _, err := file.Write(payload); err != nil {
++		_ = file.Close()
++		return err
++	}
++	if err := file.Sync(); err != nil {
++		_ = file.Close()
++		return err
++	}
++	if err := file.Close(); err != nil {
++		return err
++	}
++	return os.Rename(temp, full)
++}
++
++// atomicManagedLink creates a private symlink beside the target and renames
++// that entry into place. The target text is never opened by this operation.
++func atomicManagedLink(root, rel, linkTarget string) error {
++	full, err := managedPath(root, rel, true)
++	if err != nil {
++		return err
++	}
++	dir := filepath.Dir(full)
++	for range 8 {
++		var nonce [16]byte
++		if _, err := rand.Read(nonce[:]); err != nil {
++			return err
++		}
++		temp := filepath.Join(dir, ".curator-link-"+hex.EncodeToString(nonce[:]))
++		if err := os.Symlink(linkTarget, temp); err != nil {
++			if os.IsExist(err) {
++				continue
++			}
++			return err
++		}
++		if err := os.Rename(temp, full); err != nil {
++			_ = os.Remove(temp)
++			return err
++		}
++		return nil
++	}
++	return fmt.Errorf("could not allocate a private symlink name beside %s", full)
++}
++
++// removeManagedEntry removes a target entry without resolving its final
++// component and refuses traversal through any parent link.
++func removeManagedEntry(root, rel string) error {
++	full, err := managedPath(root, rel, false)
++	if err != nil {
++		return err
++	}
++	if err := os.Remove(full); err != nil && !os.IsNotExist(err) {
++		return err
++	}
++	return nil
++}
++
++// readManagedRegular opens a regular file without following a final symlink.
++// It is used for backup input; links are handled with Readlink and preserved
++// as links instead.
++func readManagedRegular(root, rel string) (payload []byte, present bool, err error) {
++	full, err := managedPath(root, rel, false)
++	if err != nil {
++		return nil, false, err
++	}
++	info, err := os.Lstat(full)
++	if os.IsNotExist(err) {
++		return nil, false, nil
++	}
++	if err != nil {
++		return nil, false, err
++	}
++	if info.Mode()&os.ModeSymlink != 0 {
++		return nil, false, fmt.Errorf("%s: %s", DiagWriteWouldFollowLink, full)
++	}
++	if !info.Mode().IsRegular() {
++		return nil, false, nil
++	}
++	file, err := openReadNoFollow(full)
++	if err != nil {
++		return nil, false, err
++	}
++	defer func() {
++		if closeErr := file.Close(); err == nil {
++			err = closeErr
++		}
++	}()
++	opened, err := file.Stat()
++	if err != nil {
++		return nil, false, err
++	}
++	if !opened.Mode().IsRegular() || !os.SameFile(info, opened) {
++		return nil, false, fmt.Errorf("%s: %s changed while being backed up", DiagWriteWouldFollowLink, full)
++	}
++	payload, err = io.ReadAll(file)
++	return payload, true, err
++}
+diff --git a/internal/envprofile/nofollow_open_unix.go b/internal/envprofile/nofollow_open_unix.go
+new file mode 100644
+index 00000000..63dd25f4
+--- /dev/null
++++ b/internal/envprofile/nofollow_open_unix.go
+@@ -0,0 +1,17 @@
++//go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd || solaris
++
++package envprofile
++
++import (
++	"os"
++
++	"golang.org/x/sys/unix"
++)
++
++func openReadNoFollow(path string) (*os.File, error) {
++	fd, err := unix.Open(path, unix.O_RDONLY|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0)
++	if err != nil {
++		return nil, err
++	}
++	return os.NewFile(uintptr(fd), path), nil
++}
+diff --git a/internal/envprofile/nofollow_open_windows.go b/internal/envprofile/nofollow_open_windows.go
+new file mode 100644
+index 00000000..f7440382
+--- /dev/null
++++ b/internal/envprofile/nofollow_open_windows.go
+@@ -0,0 +1,33 @@
++//go:build windows
++
++package envprofile
++
++import (
++	"fmt"
++	"os"
++
++	"golang.org/x/sys/windows"
++)
++
++func openReadNoFollow(path string) (*os.File, error) {
++	name, err := windows.UTF16PtrFromString(path)
++	if err != nil {
++		return nil, err
++	}
++	handle, err := windows.CreateFile(name, windows.GENERIC_READ,
++		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
++		nil, windows.OPEN_EXISTING, windows.FILE_FLAG_OPEN_REPARSE_POINT, 0)
++	if err != nil {
++		return nil, err
++	}
++	var info windows.ByHandleFileInformation
++	if err := windows.GetFileInformationByHandle(handle, &info); err != nil {
++		_ = windows.CloseHandle(handle)
++		return nil, err
++	}
++	if info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 {
++		_ = windows.CloseHandle(handle)
++		return nil, fmt.Errorf("%s: %s", DiagWriteWouldFollowLink, path)
++	}
++	return os.NewFile(uintptr(handle), path), nil
++}
+diff --git a/internal/envprofile/switch.go b/internal/envprofile/switch.go
+index 4dfaa5ee..7a1e17f1 100644
+--- a/internal/envprofile/switch.go
++++ b/internal/envprofile/switch.go
+@@ -49,7 +49,6 @@ import (
+ 	"github.com/relux-works/curator/internal/envmarker"
+ 	"github.com/relux-works/curator/internal/envregistry"
+ 	"github.com/relux-works/curator/internal/identifiers"
+-	"github.com/relux-works/curator/internal/stateread"
+ )
+ 
+ // Diagnostics for switching (environments §8.5, §9.7).
+@@ -488,6 +487,9 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
+ 	if err := os.MkdirAll(native, 0o755); err != nil {
+ 		return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
+ 	}
++	if err := checkManagedPrivateTarget(native, envmarker.Name); err != nil {
++		return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
++	}
+ 	prior, err := envmarker.Read(native)
+ 	if err != nil {
+ 		return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
+@@ -500,11 +502,15 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
+ 			}
+ 		}
+ 	}
+-	target := filepath.Join(native, adapter.Target)
+ 	want := map[string]bool{}
+ 	if written {
+ 		want[adapter.Target] = true
+ 	}
++	for path := range want {
++		if _, err := managedPath(native, path, false); err != nil {
++			return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
++		}
++	}
+ 	// Section 9.5 onboarding inventory for this entry: a managed-surface
+ 	// path that is already a symlink pointing outside the manager's store
+ 	// is evidence of another manager and stops the entry with
+@@ -554,14 +560,25 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
+ 	}
+ 	generation := 0
+ 	if len(want) > 0 {
+-		needsBackup := false
++		backupWant := map[string]bool{}
+ 		for path := range want {
+-			if _, err := os.Lstat(filepath.Join(native, path)); err == nil {
+-				needsBackup = true
++			full, err := managedPath(native, path, false)
++			if err != nil {
++				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
++			}
++			info, err := os.Lstat(full)
++			if err != nil {
++				if !os.IsNotExist(err) {
++					return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
++				}
++				continue
++			}
++			if info.Mode().IsRegular() || (takeover && !recorded[path] && info.Mode()&os.ModeSymlink != 0) {
++				backupWant[path] = true
+ 			}
+ 		}
+-		if needsBackup {
+-			generation, err = openBackup(native, want)
++		if len(backupWant) > 0 {
++			generation, err = openBackup(native, "", backupWant)
+ 			if err != nil {
+ 				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
+ 			}
+@@ -571,7 +588,7 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
+ 	if prior != nil {
+ 		for path := range recorded {
+ 			if !want[path] {
+-				_ = os.Remove(filepath.Join(native, path))
++				_ = removeManagedEntry(native, path)
+ 			}
+ 		}
+ 	}
+@@ -579,14 +596,7 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
+ 	copies := []envmarker.Copy{}
+ 	if written {
+ 		if adapter.ID == "claude_code" {
+-			// A copied surface never follows a link: remove first,
+-			// exactly as replaceLink does for the linked adapters.
+-			// os.WriteFile follows a symlink, so without this a
+-			// --takeover of a foreign-manager symlink would write
+-			// through the link into a file outside every managed
+-			// home (§9.5 never absorbs in the wrong direction).
+-			_ = os.Remove(target)
+-			if err := os.WriteFile(target, document, 0o644); err != nil {
++			if err := atomicManagedFile(native, adapter.Target, document, 0o644); err != nil {
+ 				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
+ 			}
+ 			copies = append(copies, envmarker.Copy{Path: adapter.Target, Reason: envmarker.ReasonClaudeCodeRootContext})
+@@ -595,13 +605,10 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
+ 			if err != nil {
+ 				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
+ 			}
+-			if err := replaceLink(target, storeFile); err != nil {
+-				// Copy fallback (manager §5): the link is already
+-				// removed by replaceLink, so this write cannot
+-				// follow it; remove again defensively before the
+-				// copy and record the reason.
+-				_ = os.Remove(target)
+-				if writeErr := os.WriteFile(target, document, 0o644); writeErr != nil {
++			if err := replaceLink(native, adapter.Target, storeFile); err != nil {
++				// Copy fallback uses the same atomic replacement
++				// discipline as a linked surface.
++				if writeErr := atomicManagedFile(native, adapter.Target, document, 0o644); writeErr != nil {
+ 					return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: writeErr.Error()}
+ 				}
+ 				copies = append(copies, envmarker.Copy{Path: adapter.Target, Reason: envmarker.ReasonSymlinkFallback})
+@@ -641,8 +648,7 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
+ 		return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
+ 	}
+ 	// The marker is curator-owned state: never follow a link to it either.
+-	_ = os.Remove(filepath.Join(native, envmarker.Name))
+-	if err := os.WriteFile(filepath.Join(native, envmarker.Name), payload, 0o644); err != nil {
++	if err := atomicManagedFile(native, envmarker.Name, payload, 0o644); err != nil {
+ 		return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
+ 	}
+ 	_ = generation
+@@ -657,27 +663,34 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
+ // openBackup copies every file the operation will replace into the next
+ // versioned generation and prunes beyond the retention count. A next
+ // generation that already exists fails with environment_backup_exists.
+-func openBackup(native string, want map[string]bool) (int, error) {
+-	base := filepath.Join(native, ".agent-environment-backup")
+-	listing, err := stateread.ReadDir(base)
++func openBackup(root, homeRel string, want map[string]bool) (int, error) {
++	baseRel := managedJoin(homeRel, ".agent-environment-backup")
++	base, err := managedDirectory(root, baseRel)
++	if err != nil {
++		return 0, err
++	}
++	listing, err := os.ReadDir(base)
+ 	highest := 0
+ 	if err != nil {
+ 		return 0, err
+ 	}
+-	if listing.Kind == stateread.KindPresent {
+-		for _, entry := range listing.Entries {
+-			var n int
+-			if _, err := fmt.Sscanf(entry.Name(), "%d", &n); err == nil && n > highest {
+-				highest = n
+-			}
++	for _, entry := range listing {
++		var n int
++		if _, err := fmt.Sscanf(entry.Name(), "%d", &n); err == nil && n > highest {
++			highest = n
+ 		}
+ 	}
+ 	next := highest + 1
++	generationRel := managedJoin(baseRel, fmt.Sprintf("%d", next))
+ 	generation := filepath.Join(base, fmt.Sprintf("%d", next))
+-	if _, err := os.Lstat(generation); err == nil {
++	if info, err := os.Lstat(generation); err == nil && info.Mode()&os.ModeSymlink != 0 {
++		return 0, fmt.Errorf("%s: %s", DiagWriteWouldFollowLink, generation)
++	} else if err == nil {
+ 		return 0, fmt.Errorf("%s: generation %d exists", DiagBackupExists, next)
++	} else if !os.IsNotExist(err) {
++		return 0, err
+ 	}
+-	if err := os.MkdirAll(generation, 0o755); err != nil {
++	if _, err := managedDirectory(root, generationRel); err != nil {
+ 		return 0, err
+ 	}
+ 	paths := make([]string, 0, len(want))
+@@ -686,25 +699,36 @@ func openBackup(native string, want map[string]bool) (int, error) {
+ 	}
+ 	sort.Strings(paths)
+ 	for _, path := range paths {
+-		full := filepath.Join(native, path)
++		sourceRel := managedJoin(homeRel, path)
++		full, err := managedPath(root, sourceRel, false)
++		if err != nil {
++			_ = os.RemoveAll(generation)
++			return 0, err
++		}
+ 		info, err := os.Lstat(full)
+ 		if err != nil {
+ 			continue
+ 		}
+-		if !info.Mode().IsRegular() && info.Mode()&os.ModeSymlink == 0 {
++		targetRel := managedJoin(generationRel, path)
++		if info.Mode()&os.ModeSymlink != 0 {
++			linkText, err := os.Readlink(full)
++			if err == nil {
++				err = atomicManagedLink(root, targetRel, linkText)
++			}
++			if err != nil {
++				_ = os.RemoveAll(generation)
++				return 0, err
++			}
+ 			continue
+ 		}
+-		payload, err := os.ReadFile(full) // #nosec G304 -- recorded file of the home
+-		if err != nil {
+-			_ = os.RemoveAll(generation)
+-			return 0, err
++		if !info.Mode().IsRegular() {
++			continue
+ 		}
+-		target := filepath.Join(generation, path)
+-		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+-			_ = os.RemoveAll(generation)
+-			return 0, err
++		payload, present, err := readManagedRegular(root, sourceRel)
++		if err == nil && present {
++			err = atomicManagedFile(root, targetRel, payload, 0o644)
+ 		}
+-		if err := os.WriteFile(target, payload, 0o644); err != nil {
++		if err != nil {
+ 			_ = os.RemoveAll(generation)
+ 			return 0, err
+ 		}
+@@ -738,22 +762,18 @@ func pruneBackups(base string, newest int) {
+ 
+ // writeStoreDocument stores the rendered document for link targets.
+ func writeStoreDocument(home, profile string, adapter Adapter, document []byte) (string, error) {
+-	dir := filepath.Join(ProfilesDir(home), profile, "rendered", adapter.ID)
+-	if err := os.MkdirAll(dir, 0o755); err != nil {
+-		return "", err
+-	}
+-	path := filepath.Join(dir, adapter.Target)
+-	if err := os.WriteFile(path, document, 0o644); err != nil {
++	root := ProfilesDir(home)
++	rel := filepath.ToSlash(filepath.Join(profile, "rendered", adapter.ID, filepath.FromSlash(adapter.Target)))
++	path := filepath.Join(root, filepath.FromSlash(rel))
++	if err := atomicManagedFile(root, rel, document, 0o644); err != nil {
+ 		return "", err
+ 	}
+ 	return path, nil
+ }
+ 
+-// replaceLink swaps target to a symlink of storeFile, removing whatever the
+-// marker recorded there before.
+-func replaceLink(target, storeFile string) error {
+-	_ = os.Remove(target)
+-	return os.Symlink(storeFile, target)
++// replaceLink atomically replaces a managed surface entry with its store link.
++func replaceLink(native, rel, storeFile string) error {
++	return atomicManagedLink(native, rel, storeFile)
+ }
+ 
+ // purgeHomes removes the in-place surfaces, markers, and backup generations
+diff --git a/internal/envprofile/write_nofollow_conformance_test.go b/internal/envprofile/write_nofollow_conformance_test.go
+new file mode 100644
+index 00000000..03a722c4
+--- /dev/null
++++ b/internal/envprofile/write_nofollow_conformance_test.go
+@@ -0,0 +1,469 @@
++package envprofile
++
++import (
++	"crypto/sha256"
++	"encoding/base64"
++	"encoding/hex"
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/conformancecoverage"
++	"github.com/relux-works/curator/internal/contextstore"
++	"github.com/relux-works/curator/internal/envmarker"
++)
++
++type writeNofollowVector struct {
++	Cases    []writeNofollowCase             `json:"cases"`
++	Fixtures map[string]writeNofollowFixture `json:"fixtures"`
++}
++
++type writeNofollowFixture struct {
++	BytesBase64 string `json:"bytes_base64"`
++	SHA256      string `json:"sha256"`
++}
++
++type writeNofollowCase struct {
++	Name                string `json:"name"`
++	Operation           string `json:"operation"`
++	Mode                string `json:"mode"`
++	TakeoverAuthorized  bool   `json:"takeover_authorized"`
++	MarkerRecordsTarget bool   `json:"marker_records_target"`
++	ParentLink          *struct {
++		LinkPoints string `json:"link_points"`
++	} `json:"parent_link"`
++	Target struct {
++		Kind       string  `json:"kind"`
++		LinkOwner  *string `json:"link_owner"`
++		LinkPoints *string `json:"link_points"`
++	} `json:"target"`
++	Expected struct {
++		Outcome                  string  `json:"outcome"`
++		Diagnostic               *string `json:"diagnostic"`
++		EntryAfter               string  `json:"entry_after"`
++		BackupHoldsLink          bool    `json:"backup_holds_link"`
++		ForeignTargetSHA256After *string `json:"foreign_target_sha256_after"`
++	} `json:"expected"`
++}
++
++// TestEnvironmentWriteNofollowVectors drives rc.13 materialize, takeover,
++// and repair cases through UseWithPolicy and Resolve. The backup-source
++// vector for an unauthorized, unowned symlink is classified separately:
++// no production operation requests that backup. Ordinary takeover refuses
++// the path during foreign-manager inventory; authorized takeover preserves
++// the link itself in the backup. Those production paths remain driven by
++// the adjacent takeover vectors.
++func TestEnvironmentWriteNofollowVectors(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	payload, err := os.ReadFile(filepath.Join(root, "vectors", "environments-write-nofollow.json")) // #nosec G304 -- explicit conformance input
++	if err != nil {
++		t.Fatal(err)
++	}
++	var vectors writeNofollowVector
++	if err := json.Unmarshal(payload, &vectors); err != nil {
++		t.Fatal(err)
++	}
++	if len(vectors.Cases) != 11 {
++		t.Fatalf("rc.13 write-nofollow vector has %d cases, want 11", len(vectors.Cases))
++	}
++	if len(vectors.Fixtures) == 0 {
++		t.Fatal("rc.13 write-nofollow vector has no fixtures")
++	}
++	conformancecoverage.RunOutcomes(t, "environments-write-nofollow/cases", vectors.Cases,
++		func(tc writeNofollowCase) string { return tc.Name }, func(caseT *testing.T, tc writeNofollowCase) conformancecoverage.Observation {
++			if tc.Operation == "backup" && tc.Name == "backup-symlinked-target-refused" {
++				return conformancecoverage.Observation{BoundReason: "no production entry requests backup of an unauthorized, unowned link: ordinary takeover refuses it in the foreign-manager inventory, and authorized takeover preserves the link itself; both production paths are driven by the adjacent takeover vectors"}
++			}
++			runWriteNofollowVectorCase(caseT, tc, vectors.Fixtures)
++			return conformancecoverage.Observation{}
++		})
++}
++
++func TestResolveRenderedDocumentReplacesStoreSymlinkWithoutFollowing(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	seedLiveNativeCredentials(t, fx)
++	request := fx.request("codex_cli")
++	request.Repair = true
++	storeDocument := storeDocPath(fx.home, fx.profile, "codex_cli", ".agent-context/system-prompt.md")
++	foreign := filepath.Join(t.TempDir(), "foreign.md")
++	if err := os.WriteFile(foreign, []byte("foreign store target\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.MkdirAll(filepath.Dir(storeDocument), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Symlink(foreign, storeDocument); err != nil {
++		t.Skipf("symlink fixture unavailable: %v", err)
++	}
++
++	if _, err := Resolve(request); err != nil {
++		t.Fatalf("resolve with planted rendered-document link: %v", err)
++	}
++	assertManagedEntry(t, storeDocument, "managed-file", ProfilesDir(fx.home))
++	if got, err := os.ReadFile(foreign); err != nil || string(got) != "foreign store target\n" {
++		t.Fatalf("foreign rendered-document target changed to %q (%v)", got, err)
++	}
++}
++
++func runWriteNofollowVectorCase(t *testing.T, tc writeNofollowCase, fixtures map[string]writeNofollowFixture) {
++	t.Helper()
++	switch tc.Name {
++	case "takeover-symlinked-target-authorized-replaced", "takeover-symlinked-target-unauthorized-stopped":
++		runSwitchSymlinkTakeoverCase(t, tc, fixtures)
++	case "materialize-symlinked-parent-refused", "takeover-symlinked-parent-authorized-still-refused":
++		runResolveSymlinkParentCase(t, tc, fixtures)
++	case "repair-planted-link-replaced":
++		runResolvePlantedLinkRepairCase(t, tc, fixtures)
++	case "repair-manager-owned-link-replaced":
++		runResolveOwnedLinkRepairCase(t, tc)
++	case "backup-symlinked-destination-refused":
++		runSwitchBackupParentCase(t, tc, fixtures)
++	case "materialize-clean-path-written":
++		runResolveCleanMaterializeCase(t, tc)
++	case "takeover-inside-link-unauthorized-unmanaged-conflict":
++		runSwitchInsideStoreLinkCase(t, tc, fixtures)
++	case "materialize-recorded-file-replaced":
++		runResolveRecordedFileRepairCase(t, tc)
++	default:
++		t.Fatalf("unhandled rc.13 write-nofollow case %q", tc.Name)
++	}
++}
++
++func fixtureBytes(t *testing.T, fixtures map[string]writeNofollowFixture, name string) []byte {
++	t.Helper()
++	fixture, ok := fixtures[name]
++	if !ok {
++		t.Fatalf("vector fixture %q is absent", name)
++	}
++	payload, err := base64.StdEncoding.DecodeString(fixture.BytesBase64)
++	if err != nil {
++		t.Fatalf("decode fixture %q: %v", name, err)
++	}
++	hash := sha256.Sum256(payload)
++	if got := hex.EncodeToString(hash[:]); got != fixture.SHA256 {
++		t.Fatalf("fixture %q hash = %s, want %s", name, got, fixture.SHA256)
++	}
++	return payload
++}
++
++func writeExternalTarget(t *testing.T, fixtures map[string]writeNofollowFixture) string {
++	t.Helper()
++	path := filepath.Join(t.TempDir(), "foreign-notes.md")
++	if err := os.WriteFile(path, fixtureBytes(t, fixtures, "foreign-notes"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	return path
++}
++
++func assertForeignHash(t *testing.T, path string, want *string) {
++	t.Helper()
++	if want == nil {
++		return
++	}
++	payload, err := os.ReadFile(path) // #nosec G304 -- vector-owned fixture path
++	if err != nil {
++		t.Fatalf("read foreign target: %v", err)
++	}
++	hash := sha256.Sum256(payload)
++	got := hex.EncodeToString(hash[:])
++	if got != *want {
++		t.Fatalf("foreign target sha256 = %s, want %s", got, *want)
++	}
++}
++
++func assertExpectedDiagnostic(t *testing.T, err error, want *string) {
++	t.Helper()
++	if want == nil {
++		if err != nil {
++			t.Fatalf("unexpected operation error: %v", err)
++		}
++		return
++	}
++	if err == nil || !strings.Contains(err.Error(), *want) {
++		t.Fatalf("operation error = %v, want diagnostic %s", err, *want)
++	}
++}
++
++func assertSwitchDiagnostic(t *testing.T, err error, results []EntryResult, want *string) {
++	t.Helper()
++	if want == nil {
++		if err != nil {
++			t.Fatalf("unexpected switch error: %v", err)
++		}
++		return
++	}
++	if err == nil {
++		t.Fatalf("switch error = nil, want diagnostic %s", *want)
++	}
++	for _, result := range results {
++		if strings.Contains(result.Detail, *want) {
++			return
++		}
++	}
++	t.Fatalf("switch results %+v do not report %s (aggregate error %v)", results, *want, err)
++}
++
++func assertManagedEntry(t *testing.T, path, want string, storeRoot string) {
++	t.Helper()
++	info, err := os.Lstat(path)
++	if want == "unchanged" && os.IsNotExist(err) {
++		return
++	}
++	if err != nil {
++		t.Fatalf("lstat managed entry %s: %v", path, err)
++	}
++	switch want {
++	case "managed-file":
++		if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
++			t.Fatalf("entry %s mode = %s, want a regular managed file", path, info.Mode())
++		}
++	case "managed-link":
++		if info.Mode()&os.ModeSymlink == 0 {
++			t.Fatalf("entry %s mode = %s, want a managed link", path, info.Mode())
++		}
++		linkText, err := os.Readlink(path)
++		if err != nil || !sameStoreTree(linkText, storeRoot) {
++			t.Fatalf("entry %s link = %q (%v), not into store %s", path, linkText, err, storeRoot)
++		}
++	case "unchanged":
++		// The operation-specific assertions below also verify the target
++		// link text or bytes for each unchanged row.
++	default:
++		t.Fatalf("unknown vector entry_after value %q", want)
++	}
++}
++
++func setupVectorSwitch(t *testing.T, fixtures map[string]writeNofollowFixture) (home, native string) {
++	t.Helper()
++	home = t.TempDir()
++	pinHomes(t)
++	source := t.TempDir()
++	writePackage(t, source, "acme", "1.0.0", string(fixtureBytes(t, fixtures, "managed-root-context")))
++	if _, _, _, err := Install(home, InstallOptions{Operand: source}); err != nil {
++		t.Fatalf("install vector profile: %v", err)
++	}
++	native = claudeHome(t)
++	return home, native
++}
++
++func runSwitchSymlinkTakeoverCase(t *testing.T, tc writeNofollowCase, fixtures map[string]writeNofollowFixture) {
++	home, native := setupVectorSwitch(t, fixtures)
++	foreign := writeExternalTarget(t, fixtures)
++	target := filepath.Join(native, "CLAUDE.md")
++	if err := os.MkdirAll(native, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Symlink(foreign, target); err != nil {
++		t.Skipf("symlink fixture unavailable: %v", err)
++	}
++	results, err := UseWithPolicy(home, "acme", "claude_code", "", false, Policy{Takeover: tc.TakeoverAuthorized})
++	assertSwitchDiagnostic(t, err, results, tc.Expected.Diagnostic)
++	if tc.Expected.Outcome == "replaced" {
++		assertManagedEntry(t, target, tc.Expected.EntryAfter, contextstore.Root(home))
++		backup := filepath.Join(native, ".agent-environment-backup", "1", "CLAUDE.md")
++		info, err := os.Lstat(backup)
++		if err != nil || info.Mode()&os.ModeSymlink == 0 {
++			t.Fatalf("takeover backup is not the original symlink: mode=%v err=%v", info, err)
++		}
++		if got, err := os.Readlink(backup); err != nil || got != foreign {
++			t.Fatalf("takeover backup link = %q, %v; want %q", got, err, foreign)
++		}
++	} else {
++		if info, err := os.Lstat(target); err != nil || info.Mode()&os.ModeSymlink == 0 {
++			t.Fatalf("refused takeover changed target entry: mode=%v err=%v", info, err)
++		}
++		if _, err := os.Lstat(filepath.Join(native, ".agent-environment-backup")); !os.IsNotExist(err) {
++			t.Fatalf("refused takeover created a backup: %v", err)
++		}
++	}
++	assertForeignHash(t, foreign, tc.Expected.ForeignTargetSHA256After)
++}
++
++func runResolveSymlinkParentCase(t *testing.T, tc writeNofollowCase, fixtures map[string]writeNofollowFixture) {
++	fx := writeManagedFixture(t, "acme")
++	seedLiveNativeCredentials(t, fx)
++	request := fx.request("codex_cli")
++	request.Repair = true
++	request.Policy.Takeover = tc.TakeoverAuthorized
++	homeDir := ManagedHomeDir(fx.home, "acme", "codex_cli")
++	parent := filepath.Join(homeDir, ".agent-context")
++	outside := t.TempDir()
++	foreign := writeExternalTarget(t, fixtures)
++	if tc.Target.Kind == "symlink" {
++		if err := os.Symlink(foreign, filepath.Join(outside, "system-prompt.md")); err != nil {
++			t.Skipf("symlink fixture unavailable: %v", err)
++		}
++	}
++	if err := os.MkdirAll(filepath.Dir(parent), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.MkdirAll(homeDir, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Symlink(outside, parent); err != nil {
++		t.Skipf("symlink fixture unavailable: %v", err)
++	}
++	_, err := Resolve(request)
++	assertExpectedDiagnostic(t, err, tc.Expected.Diagnostic)
++	if got, err := os.Readlink(parent); err != nil || got != outside {
++		t.Fatalf("managed parent entry = %q (%v), want original symlink to %q", got, err, outside)
++	}
++	assertForeignHash(t, foreign, tc.Expected.ForeignTargetSHA256After)
++	if tc.Expected.BackupHoldsLink {
++		t.Fatal("parent-link refusal unexpectedly backed up the target")
++	}
++	if _, err := os.Lstat(filepath.Join(homeDir, ".agent-environment-backup")); !os.IsNotExist(err) {
++		t.Fatalf("parent-link refusal created a backup: %v", err)
++	}
++}
++
++func runResolvePlantedLinkRepairCase(t *testing.T, tc writeNofollowCase, fixtures map[string]writeNofollowFixture) {
++	fx := writeManagedFixture(t, "acme")
++	seedLiveNativeCredentials(t, fx)
++	request := fx.request("claude_code")
++	request.Repair = true
++	if _, err := Resolve(request); err != nil {
++		t.Fatalf("initial materialization: %v", err)
++	}
++	marker := readManagedMarker(t, fx, "claude_code")
++	path := marker.Surfaces[envmarker.SurfaceRootContext].Paths[0]
++	target := filepath.Join(ManagedHomeDir(fx.home, "acme", "claude_code"), filepath.FromSlash(path))
++	foreign := writeExternalTarget(t, fixtures)
++	if err := os.Remove(target); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Symlink(foreign, target); err != nil {
++		t.Skipf("symlink fixture unavailable: %v", err)
++	}
++	_, err := Resolve(request)
++	assertExpectedDiagnostic(t, err, tc.Expected.Diagnostic)
++	assertManagedEntry(t, target, tc.Expected.EntryAfter, contextstore.Root(fx.home))
++	assertForeignHash(t, foreign, tc.Expected.ForeignTargetSHA256After)
++	if tc.Expected.BackupHoldsLink {
++		t.Fatal("repair unexpectedly backed up the planted link")
++	}
++}
++
++func runResolveOwnedLinkRepairCase(t *testing.T, tc writeNofollowCase) {
++	fx := writeManagedFixture(t, "acme")
++	seedLiveNativeCredentials(t, fx)
++	request := fx.request("codex_cli")
++	request.Repair = true
++	if _, err := Resolve(request); err != nil {
++		t.Fatalf("initial materialization: %v", err)
++	}
++	homeDir := ManagedHomeDir(fx.home, "acme", "codex_cli")
++	link := filepath.Join(homeDir, ".agent-context", "system-prompt.md")
++	linkText, err := os.Readlink(link)
++	if err != nil {
++		t.Fatalf("system prompt surface is not linked: %v", err)
++	}
++	rootContext := filepath.Join(homeDir, "AGENTS.md")
++	if err := os.Remove(rootContext); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(rootContext, []byte("drift\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	_, err = Resolve(request)
++	assertExpectedDiagnostic(t, err, tc.Expected.Diagnostic)
++	assertManagedEntry(t, link, tc.Expected.EntryAfter, ProfilesDir(fx.home))
++	if got, err := os.Readlink(link); err != nil || got != linkText {
++		t.Fatalf("repaired link = %q, %v; want %q", got, err, linkText)
++	}
++	if tc.Expected.BackupHoldsLink {
++		t.Fatal("manager-owned link repair unexpectedly backed up the link")
++	}
++}
++
++func runSwitchBackupParentCase(t *testing.T, tc writeNofollowCase, fixtures map[string]writeNofollowFixture) {
++	home, native := setupVectorSwitch(t, fixtures)
++	target := filepath.Join(native, "CLAUDE.md")
++	original := fixtureBytes(t, fixtures, "foreign-notes")
++	if err := os.MkdirAll(native, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(target, original, 0o644); err != nil {
++		t.Fatal(err)
++	}
++	outside := t.TempDir()
++	backupRoot := filepath.Join(native, ".agent-environment-backup")
++	if err := os.Symlink(outside, backupRoot); err != nil {
++		t.Skipf("symlink fixture unavailable: %v", err)
++	}
++	results, err := UseWithPolicy(home, "acme", "claude_code", "", false, Policy{Takeover: true})
++	assertSwitchDiagnostic(t, err, results, tc.Expected.Diagnostic)
++	if got, err := os.ReadFile(target); err != nil || string(got) != string(original) {
++		t.Fatalf("backup refusal changed the takeover target: %q (%v)", got, err)
++	}
++	entries, err := os.ReadDir(outside)
++	if err != nil || len(entries) != 0 {
++		t.Fatalf("backup path symlink received writes: entries=%v err=%v", entries, err)
++	}
++	assertForeignHash(t, target, tc.Expected.ForeignTargetSHA256After)
++}
++
++func runResolveCleanMaterializeCase(t *testing.T, tc writeNofollowCase) {
++	fx := writeManagedFixture(t, "acme")
++	seedLiveNativeCredentials(t, fx)
++	request := fx.request("claude_code")
++	request.Repair = true
++	_, err := Resolve(request)
++	assertExpectedDiagnostic(t, err, tc.Expected.Diagnostic)
++	marker := readManagedMarker(t, fx, "claude_code")
++	path := marker.Surfaces[envmarker.SurfaceRootContext].Paths[0]
++	target := filepath.Join(ManagedHomeDir(fx.home, "acme", "claude_code"), filepath.FromSlash(path))
++	assertManagedEntry(t, target, tc.Expected.EntryAfter, contextstore.Root(fx.home))
++}
++
++func runSwitchInsideStoreLinkCase(t *testing.T, tc writeNofollowCase, fixtures map[string]writeNofollowFixture) {
++	home, native := setupVectorSwitch(t, fixtures)
++	storeTarget := filepath.Join(contextstore.Root(home), "vector", "target.md")
++	if err := os.MkdirAll(filepath.Dir(storeTarget), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	foreign := fixtureBytes(t, fixtures, "foreign-notes")
++	if err := os.WriteFile(storeTarget, foreign, 0o644); err != nil {
++		t.Fatal(err)
++	}
++	target := filepath.Join(native, "CLAUDE.md")
++	if err := os.MkdirAll(native, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Symlink(storeTarget, target); err != nil {
++		t.Skipf("symlink fixture unavailable: %v", err)
++	}
++	results, err := UseWithPolicy(home, "acme", "claude_code", "", false, Policy{})
++	assertSwitchDiagnostic(t, err, results, tc.Expected.Diagnostic)
++	if got, err := os.Readlink(target); err != nil || got != storeTarget {
++		t.Fatalf("refused inside-store link changed to %q (%v)", got, err)
++	}
++	assertForeignHash(t, storeTarget, tc.Expected.ForeignTargetSHA256After)
++}
++
++func runResolveRecordedFileRepairCase(t *testing.T, tc writeNofollowCase) {
++	fx := writeManagedFixture(t, "acme")
++	seedLiveNativeCredentials(t, fx)
++	request := fx.request("claude_code")
++	request.Repair = true
++	if _, err := Resolve(request); err != nil {
++		t.Fatalf("initial materialization: %v", err)
++	}
++	marker := readManagedMarker(t, fx, "claude_code")
++	path := marker.Surfaces[envmarker.SurfaceRootContext].Paths[0]
++	target := filepath.Join(ManagedHomeDir(fx.home, "acme", "claude_code"), filepath.FromSlash(path))
++	if err := os.WriteFile(target, []byte("operator drift\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	_, err := Resolve(request)
++	assertExpectedDiagnostic(t, err, tc.Expected.Diagnostic)
++	assertManagedEntry(t, target, tc.Expected.EntryAfter, contextstore.Root(fx.home))
++	if tc.Expected.BackupHoldsLink {
++		t.Fatal("regular-file repair unexpectedly backed up a symlink")
++	}
++}

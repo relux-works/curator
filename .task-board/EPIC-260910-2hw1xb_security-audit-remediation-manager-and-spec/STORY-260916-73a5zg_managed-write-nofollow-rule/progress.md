@@ -1,5 +1,5 @@
 ## Status
-backlog
+done
 
 ## Review
 required
@@ -29,4 +29,4 @@ Takeover closed-set gap (two operations that can hit unmanaged files) is already
 2026-09-16T10:49:10Z
 
 ## Last Update
-2026-09-17T19:38:41Z
+2026-09-28T02:52:10Z
