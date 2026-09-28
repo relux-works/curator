@@ -98,6 +98,16 @@ spawn selection rationale for muse-spark-1.3-contributor/xhigh: bound 2v4v2m-lan
 spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
 spawn queued: [implementer] developer (muse) (run=RUN-260925-41399e, max_parallel=20)
 spawn run started: [implementer] developer (muse) (run=RUN-260925-41399e)
+spawn run child final message (run=RUN-260925-41399e, tools=23 patches=0 failed=0):
+Integration run for CR-TASK-260924-2v4v2m revision 2 finished:
+
+- Remote CI gate on the gate branch passed; the story landed as `f03da5bc` with board state committed locally as `58669b1d`.
+- Publication push did not land (`board_publish_local_trunk_unproven` — signing-key identity not bound); the landing itself stands and the orchestrator delivers via `task-board board publish` / reconcile-trunk.
+- Full integrate output attached as outcome `TASK-260924-2v4v2m_integration-land.md` (exit 0 on attach).
+- No source files changed; worktree left as found. Stopping here per the integration instruction — no handoff, no status change.
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260925-41399e, pid=30706, exit=0)
+spawn run RUN-260925-41399e failed; operator action required; failure: integration_binding_state_invalid: Change Request CR-TASK-260924-2v4v2m-2 revision 2 is integrated, want accepted or checkpointed
 
 ## Precondition Resources
 - [carry-delta-review-note-2.md](file://TASK-260924-2v4v2m/carry-delta-review-note-2.md)
@@ -121,12 +131,13 @@ spawn run started: [implementer] developer (muse) (run=RUN-260925-41399e)
 - [TASK-260924-2v4v2m_spawn-log_-reviewer--reviewer--claude-_RUN-260925-d785d0.log](file://TASK-260924-2v4v2m/TASK-260924-2v4v2m_spawn-log_-reviewer--reviewer--claude-_RUN-260925-d785d0.log) — System spawn log captured by task-board
 - [TASK-260924-2v4v2m_review-verdict-rev2.md](file://TASK-260924-2v4v2m/TASK-260924-2v4v2m_review-verdict-rev2.md) — Review verdict CR rev2: ACCEPTED (carry-delta)
 - [TASK-260924-2v4v2m_spawn-log_-implementer--developer--muse-_RUN-260925-41399e.log](file://TASK-260924-2v4v2m/TASK-260924-2v4v2m_spawn-log_-implementer--developer--muse-_RUN-260925-41399e.log) — System spawn log captured by task-board
+- [TASK-260924-2v4v2m_integration-land.md](file://TASK-260924-2v4v2m/TASK-260924-2v4v2m_integration-land.md) — Integrate output for CR-TASK-260924-2v4v2m revision 2 (STORY-260924-txgta4 land; board publication pending)
 
 ## Created
 2026-09-24T03:50:04Z
 
 ## Last Update
-2026-09-25T14:30:51Z
+2026-09-25T15:09:18Z
 
 ## Assigned To
 [implementer] developer (muse)
