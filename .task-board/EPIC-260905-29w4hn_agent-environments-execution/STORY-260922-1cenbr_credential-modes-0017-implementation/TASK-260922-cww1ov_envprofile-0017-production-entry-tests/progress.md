@@ -327,6 +327,17 @@ Integration preconditions confirmed and recorded, with no files changed:
 - Outcome artifact `TASK-260922-cww1ov_integration-land.md` attached. Per the bound-landing assignment, `worktree integrate` was not executed here and no status or handoff was issued — landing is left to the runner's synchronous transaction.
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260926-2f51e2, pid=14444, exit=0)
+spawn run RUN-260926-2f51e2 failed; operator action required; failure: board_publication_pending: runner integrate refused: board_publication_pending: STORY-260922-1cenbr is landed and its board state is committed as aa093918aa78436245bf27f0697b2d4aa1a1fcb3 on the local trunk, but the publication push did not land (board_publish_local_trunk_unproven); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: aa093918aa78436245bf27f0697b2d4aa1a1fcb3
+  cause_code: board_publish_local_trunk_unproven
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: 774ed74ac69ff501c79a1586a7b3cf5503904ba5
+  story_id: STORY-260922-1cenbr
+  cause: board_publish_local_trunk_unproven: the local trunk holds an unpublished link aa093918aa78436245bf27f0697b2d4aa1a1fcb3 that is not this repository's own board-state record (the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key); a stable content digest is never ownership proof — nothing was projected and nothing was pushed
+  link_oid: aa093918aa78436245bf27f0697b2d4aa1a1fcb3
+  reason: the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key
+  remedy: land the unproven commits through integrate/reconcile-trunk, not through this command
 
 ## Precondition Resources
 - [cww1ov-review-rev12-note.md](file://TASK-260922-cww1ov/cww1ov-review-rev12-note.md)
@@ -444,7 +455,7 @@ spawn run completed: muse (run=RUN-260926-2f51e2, pid=14444, exit=0)
 2026-09-22T01:39:32Z
 
 ## Last Update
-2026-09-26T06:21:50Z
+2026-09-26T06:58:12Z
 
 ## Assigned To
 [implementer] developer (muse)
