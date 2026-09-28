@@ -1,0 +1,1148 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index de10191..8907a43 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -2,6 +2,14 @@
+ 
+ ## Unreleased
+ 
++- Add a public release-versioned native-argument classifier for interactive
++  launchers. It identifies Claude and Pi print forms and Codex `exec` through
++  the plugin-owned grammar, returns that grammar version, stops at `--`, and
++  fails closed for unknown systems or unverified releases. Add the
++  pre-admission `Registry.PermissionMapping` API so launchers can obtain the
++  plugin-owned mapping and grammar for a verified system, release and
++  permission mode. Expected release v0.5.22; the orchestrator cuts the tag.
++
+ - Carry interactive permission mode, verified tool release and caller native
+   arguments through vendor admission into the launch plan; add best-effort
+   Claude and Codex stored-policy inspection with explicit inspected and
+diff --git a/README.md b/README.md
+index 002ce79..467c69c 100644
+--- a/README.md
++++ b/README.md
+@@ -147,8 +147,64 @@ The agentic-system plugin contract and its registry.
+   Prompt text is never parsed as a flag (`internal/nativeargs` owns the
+   rule): `--` ends flag parsing, a lone `-` and anything never dash-leading
+   are positional, and `=`-forms read as their flag. Known non-conflicting
+-  policy selectors are still forwarded. Launcher headless detection over the
+-  same arguments remains F-L1.
++  policy selectors are still forwarded.
++
++#### Permission-mode: non-interactive form classification
++
++`agentic.Registry.ClassifyNonInteractiveArgs(system, toolRelease, suffix)` is
++the launcher's versioned headless-argument classifier. It returns
++`NativeArgsClassification{Form, Grammar}`; `IsNonInteractive` is false when
++`Form` is empty. Every plugin verifies the exact release with its own
++`ReleaseCapability` rows and returns the same permission-grammar version used
++by the native-policy scanner. Unknown systems return `ErrUnknownSystem`, an
++unsupported system classifier returns `ErrNativeArgsClassifierUnsupported`,
++and an absent or unverified release returns
++`ErrPermissionModeUnverifiedRelease`. If a plugin cannot establish an option's
++arity under its pinned grammar, it returns
++`ErrNativeArgsClassificationIndeterminate`; callers must not treat that as an
++interactive result.
++
++| Launcher env-id | System | Verified release | Form | Tested placement |
++|---|---|---|---|---|
++| `claude_code` | `claude-code` | `2.1.261` | print | short flag `-p` |
++| `claude_code` | `claude-code` | `2.1.261` | print | equals value `--print=true` |
++| `claude_code` | `claude-code` | `2.1.261` | print | flag followed by a separate prompt |
++| `codex_cli` | `codex` | `0.153.2` | exec (`exec` or `e`) | first command token |
++| `codex_cli` | `codex` | `0.153.2` | exec (`exec` or `e`) | after an equals-form root option |
++| `codex_cli` | `codex` | `0.153.2` | exec (`exec` or `e`) | after a separate-value root option |
++| `pi` | `pi-native` | `0.84.2` | print | short flag `-p` |
++| `pi` | `pi-native` | `0.84.2` | print | equals value `--print=true` |
++| `pi` | `pi-native` | `0.84.2` | print | flag followed by a separate prompt |
++
++For print forms, the classifier accepts flag, `=` and separate-prompt
++placements. Codex recognizes `exec` (and its `e` alias) after the root options
++whose arity is declared in the pinned plugin grammar. A root flag whose arity
++the classifier does not model returns an indeterminate-classification error
++because its next token could be a value rather than a command. All three stop
++at `--`, so a prompt that looks like a flag or command is not classified. The
++`pi` system is the local-runtime wrapper, not the native Pi CLI, and does not
++declare this classifier; the launcher maps Pi to `pi-native`.
++
++#### Permission-mode: release mapping
++
++`agentic.Registry.PermissionMapping(system, toolRelease, mode)` returns
++`PermissionMapping{Flag, Grammar}` before launch-plan admission. The plugin
++owns the flag spelling and uses the same verified release row as its
++permission-policy grammar. `native` returns an empty `Flag`; `yolo` returns
++the plugin mapping when the verified release supports it. Unknown systems,
++unknown modes, systems without this capability, unsupported yolo mappings,
++and absent or unverified releases return typed errors. In particular, a
++verified `pi-native` release has no yolo mapping, and an unverified release
++fails closed even for this reporting API.
++
++| System | Verified release | Mode | Result | Grammar |
++|---|---|---|---|---|
++| `claude-code` | `2.1.261` | `native` | no module-owned flag | `permission-grammar-v2` |
++| `claude-code` | `2.1.261` | `yolo` | plugin-owned mapping | `permission-grammar-v2` |
++| `codex` | `0.153.2` | `native` | no module-owned flag | `permission-grammar-v2` |
++| `codex` | `0.153.2` | `yolo` | plugin-owned mapping | `permission-grammar-v2` |
++| `pi-native` | `0.84.2` | `native` | no module-owned flag | `permission-grammar-v1` |
++| `pi-native` | `0.84.2` | `yolo` | `ErrPermissionModeUnsupported` | — |
+ 
+ #### Permission-mode: stored-policy inspection
+ 
+diff --git a/TASK-260924-1nh93t_results.md b/TASK-260924-1nh93t_results.md
+new file mode 100644
+index 0000000..c838d95
+--- /dev/null
++++ b/TASK-260924-1nh93t_results.md
+@@ -0,0 +1,218 @@
++# TASK-260924-1nh93t results
++
++## Audit basis and Story base
++
++Read launcher SPEC `0.5.0-draft` §4 from the assigned launcher Story worktree and curator-spec Decision 0018. Revision 2 identified the public native-argument classifier as missing and added it using the verified release rows and `internal/nativeargs`. The revision 2 review then found a separate missing §4.3 `mapped=` reporting API; this revision adds that capability and its audit row.
++
++The task start reminder required verifying the Story base before trusting it. After `git fetch origin main`, the worktree `HEAD`, fresh `origin/main`, and task-board `selected_base_oid` all matched `850ac393250606d57188540ef569103c413bd539` (`main`). No rebase or merge was needed.
++
++## Launcher capability audit
++
++The table covers every §4 behavior that the launcher must obtain from agents-management. The environment-ID aliases, closed mapping to `ax` provider IDs, Curator fragment parsing, launcher defaults and configuration files, channel application, file probes, process handoff, and launcher diagnostics are launcher-owned by SPEC §4.1–§4.7; they do not need duplicate module APIs.
++
++| SPEC clause | Behavior the launcher obtains from the module | Public module API | Status |
++|---|---|---|---|
++| §4.1 | Identify the adapter-declared home variable, environment contract, modes, and system identity after the launcher maps its env-id. | `agentic.Registry.Lookup`; `agentic.System.ID`, `Capabilities`, `ResolveBinary`, `ChildEnv`. | Satisfied before this task. Curator fragment parsing, repair, digesting, aliases, and env-id/system-id/`ax`-provider mapping remain launcher-owned. |
++| §4.2 | Resolve the system's declared runtime/vendor compatibility and model rows. | `vendorplugin.Registry.ResolveRuntime`, `RuntimeModels`, system/runtime declarations and model rows. | Satisfied before this task. The closed env-id and provider-id maps are launcher-owned. |
++| §4.3 | Rank the module's admitted lineup, get each model's declared effort support/recommendation, and bind Pi fallback to one runtime's rows. | `vendorplugin.Lineup`, `LineupOf`, runtime model declarations and model metadata. | Satisfied before this task. Ordered Pi runtime preference and launcher config precedence are launcher-owned. |
++| §4.3–§4.5 | Carry resolved `native`/`yolo`, exact tool release, and opaque native suffix into the interactive request; map mode and reject unsupported modes, duplicate bypass, unknown/conflicting native policy, and release drift. | `agentic.LaunchRequest.PermissionMode`, `ToolRelease`, `NativeArgs`; `agentic.LookupReleaseCapability`; plugin-owned release rows and argv builders; typed permission errors; `vendorplugin.BuildLaunch`. | The launch-plan path was satisfied before this task. The separate pre-admission `mapped=` reporting value was not publicly available before Revision 3; see the next row. Native mode forwards the suffix without policy inspection. |
++| §4.3 | Print the permission provenance line before admission, including the module-supplied `mapped=<flag or none>` value. | **Added:** `agentic.Registry.PermissionMapping(systemID, toolRelease, mode)`; optional `PermissionMappingCapability`; `PermissionMapping{Flag, Grammar}` from the selected system plugin. | **MISSING before Revision 3; added.** It can be called before `BuildLaunch`; it returns no flag for verified native mode, the plugin mapping for supported verified yolo, and typed errors for unknown systems, unknown modes, unsupported mappings, or unverified releases. |
++| §4.3–§4.4 | Establish the running release from the launch environment. | `agentic.ProbeToolRelease`, optional `ToolReleaseProber`, `ErrToolReleaseUndetected`. | Satisfied before this task. The local Pi wrapper has no native Pi release probe; an absent result cannot establish a permission mapping. |
++| §4.4 | Admit the resolved runtime/model/effort through the vendor and system boundary, then return an interactive value plan. | `vendorplugin.BuildLaunch` / `BuildLaunchWithEnvironment`, `SpawnRequest`, `agentic.BuildPlan`, `agentic.Plan`; typed admission and launch errors. | Satisfied before this task. Launcher code must not bypass vendor admission with a bare model id. |
++| §4.4 | Interpret provider-limit evidence for the same runtime/model/managed-home tuple and preserve read failures. | `providerlimits.Store.AvailabilityFor`, `VerdictQuery`, `Availability.Serviceable`, state and failure evidence. | Satisfied before this task. The check is a separate launcher-invoked read; `BuildLaunch` does not perform it. |
++| §4.4–§4.5 | Obtain complete argv, filtered child environment, stdin, workdir, binary, plus the module-owned environment literals for a tracked document. | `agentic.Plan` fields; `System.ChildEnv(nil, req)`; `BuildPlanWithEnvironment`; `vendorplugin.BuildLaunchWithEnvironment`. | Satisfied before this task. The launcher composes fragment channels and must not re-overlay inherited names beneath `Plan.Env`. |
++| §4.5–§4.6 | Inspect known stored-policy relaxations and distinguish inspected, unavailable, unsupported, and failed sources. | `agentic.InspectStoredPolicy(system, plan)`, `StoredPolicyInspection`, typed source/support results. | Satisfied before this task for declared inspectors. An unsupported or unreadable source is not a clean scan. |
++| §4.6 | Determine whether the verified native suffix selects a non-interactive form for the headless default; return the form and grammar version, and keep prompt text after `--` opaque. | **Added in Revision 2:** `agentic.Registry.ClassifyNonInteractiveArgs`; `NonInteractiveArgumentClassifier`; `NativeArgsClassification{Form, Grammar}`; plugin classifiers reusing `internal/nativeargs` and each plugin's `ReleaseCapability` rows. | **MISSING before Revision 2; added and kept by review.** Unknown systems, absent/unverified releases, unsupported plugins, and indeterminate suffix grammar return typed errors. |
++| §4.1, §4.5–§4.7 | Parse/repair fragments, own defaults and `ax.json`, compose channels and environment, run file probes, select tracked handoff vs exec, and emit launcher diagnostics. | No module API is required beyond the systems, declarations, value plans, and typed failures above. | Launcher-owned by SPEC. No duplicate launcher API was added. |
++
++## Public classifier
++
++`agentic.Registry.ClassifyNonInteractiveArgs(systemID, toolRelease, suffix)` resolves the system through the existing registry, then dispatches through the optional `NonInteractiveArgumentClassifier` plugin capability. It copies the suffix before dispatch. The result carries `Form` and the same `permission-grammar-v1` or `permission-grammar-v2` token verified for that tool release; `IsNonInteractive()` is false for an empty form.
++
++| Launcher env-id | Module system | Verified release | Grammar | Non-interactive form and tested placements |
++|---|---|---:|---|---|
++| `claude_code` | `claude-code` | `2.1.261` | `permission-grammar-v2` | print (`-p`, `--print`): short flag, `--print=true`, and flag followed by a separate prompt |
++| `codex_cli` | `codex` | `0.153.2` | `permission-grammar-v2` | `exec` and `e`: first command, after an equals-form root option, and after separate-value root options |
++| `pi` | `pi-native` | `0.84.2` | `permission-grammar-v1` | print (`-p`, `--print`): short flag, `--print=true`, and flag followed by a separate prompt |
++
++The plugin packages own their tool-specific spellings. All classifiers stop at the shared `--` boundary. Codex skips root option values whose arity is declared in the pinned plugin grammar before identifying its first command token, so a value equal to `exec` is not treated as a subcommand. A root flag whose arity the classifier does not model returns `ErrNativeArgsClassificationIndeterminate` because its following token could be a value; callers must not treat the error as interactive. The `pi` system is a local-runtime wrapper rather than the native Pi CLI and returns `ErrNativeArgsClassifierUnsupported`; the launcher's Pi mapping uses `pi-native`.
++
++Typed refusals are `ErrUnknownSystem` for an unregistered system, `ErrNativeArgsClassifierUnsupported` for a registered system without the optional capability, `ErrPermissionModeUnverifiedRelease` for an absent or unverified tool release, and `ErrNativeArgsClassificationIndeterminate` when the plugin cannot establish the suffix grammar.
++
++## Tests, mutation evidence, and validation
++
++The public registry entry point is driven with fake argument suffixes; no provider or `ax` process was run. Positive rows cover each mapped environment/form and `=`/separate placement, including Codex's `e` alias and an exec command after `--local-provider`. Negative rows cover each print/exec spelling after `--`, a print-looking token after a prior flag and separator, `exec` as a Codex model value, an unmodeled Codex root flag before `exec` returning `ErrNativeArgsClassificationIndeterminate`, unknown systems, an unsupported wrapper system, and empty/unverified releases tested with otherwise classifiable suffixes (`exec` for Codex, print for Claude and Pi).
++
++Six narrowing mutants were applied one at a time in a disposable copy, then the copy was removed. Each attack used a standalone `go test ./pkg/agentic -run '^<test-name>$' -count=1` command; all six expected-red commands exited 1, so the measured kill ratio was 6/6:
++
++| Mutant | Standalone attack command | Exit | Observed failure |
++|---|---|---:|---|
++| Narrow print classification to exact flag elements, losing `=` recognition. | `go test ./pkg/agentic -run '^TestRegistryClassifiesVersionedNonInteractiveFormsByEnvironmentAndPlacement$' -count=1` | 1 | Claude `--print=true` became interactive. |
++| Remove the separator stop from shared flag parsing. | `go test ./pkg/agentic -run '^TestRegistryClassifierStopsBeforePromptText$' -count=1` | 1 | `--print` after `--verbose --` was classified. |
++| Remove `--model` from Codex's pinned value-taking root options. | `go test ./pkg/agentic -run '^TestCodexClassifierDoesNotTreatAnOptionValueAsTheExecCommand$' -count=1` | 1 | The valid `--model exec` suffix became indeterminate. |
++| Treat every unmodeled Codex root flag as boolean. | `go test ./pkg/agentic -run '^TestCodexClassifierFailsClosedForAnUnmodeledRootFlag$' -count=1` | 1 | The unmodeled flag before `exec` stopped returning the indeterminate error. |
++| Reject Codex's pinned release row. | `go test ./pkg/agentic -run '^TestRegistryClassifiesVersionedNonInteractiveFormsByEnvironmentAndPlacement$' -count=1` | 1 | All Codex positive release rows refused. |
++| Substitute Codex's pinned release for caller input. | `go test ./pkg/agentic -run '^TestNonInteractiveClassifierFailsClosedForUnknownOrUnverifiedInputs$' -count=1` | 1 | The unverified Codex release with valid suffix `exec` returned an exec classification. |
++
++`--yolo` is a Codex-native root boolean needed to reach a later `exec`; the spelling lives in Codex's plugin. Codex's argv guard narrowly allowlists the parser-only root-option helpers, and Muse's cross-plugin guard allowlists only that Codex alias constant and parser read. The full lint command reports 20 findings in untouched files; `--new` reports no findings in this task diff.
++
++Validation commands and real exit codes:
++
++| Command | Exit |
++|---|---:|
++| `go test ./pkg/agentic ./pkg/agentic/systems/claude ./pkg/agentic/systems/codex ./pkg/agentic/systems/muse ./pkg/agentic/systems/pinative` | 0 |
++| `go test ./...` | 0 |
++| `go vet ./...` | 0 |
++| `go build ./...` | 0 |
++| `gofmt -d pkg/agentic/noninteractive_test.go pkg/agentic/noninteractive.go pkg/agentic/systems/claude/policy.go pkg/agentic/systems/codex/policy.go pkg/agentic/systems/pinative/policy.go pkg/agentic/systems/codex/args.go` | 0 |
++| `golangci-lint run --new ./...` | 0 — 0 new issues |
++| `golangci-lint run ./...` | 1 — 20 findings in untouched files; none in this task's changed lines |
++| `git diff --check` | 0 |
++
++The release note is under `## Unreleased` and identifies expected v0.5.22. Per the campaign rules, the orchestrator cuts the release tag after landing; this producer did not tag. Repository-wide lint cleanup is outside this task; the new diff is lint-clean. Campaign rules prohibit editing `LOGBOOK.md`; this task-scoped outcome records the relevant findings for the handoff.
++
++## Revision 3 — F-M1e rework
++
++### Revision 2 review finding and response
++
++The revision 2 verdict (`TASK-260924-1nh93t_review-verdict-rev2.md`) was
++CHANGES_REQUESTED because the audit omitted the §4.3 `mapped=` value printed
++before admission. The SPEC says agents-management supplies it and does not name
++a provider flag. `ReleaseCapability`, `Plan`, and `LaunchProvenance` did not
++expose that mapping. The audit table above now has a separate §4.3 row, and the
++new `agentic.Registry.PermissionMapping(systemID, toolRelease, mode)` API
++returns `PermissionMapping{Flag, Grammar}` through an optional
++`PermissionMappingCapability`, before any plan is built or admitted.
++
++The capability implementations in Claude, Codex, and native Pi use the same
++plugin-owned `verifiedReleases` rows as the permission grammar. `native`
++returns an empty flag, supported verified `yolo` returns the same plugin
++constant used by interactive argv construction, and the verified Pi row
++returns `ErrPermissionModeUnsupported` for `yolo`. Unknown systems return
++`ErrUnknownSystem`, an unimplemented system capability returns
++`ErrPermissionModeUnsupported`, unknown modes return `ErrPermissionModeUnknown`,
++and missing or unverified releases return `ErrPermissionModeUnverifiedRelease`.
++The API is independently callable before `BuildLaunch`; native plan argv
++continues to forward its suffix without requiring a release pin.
++
++### Final §4 audit sweep
++
++Re-read all of launcher Story `STORY-260922-39hxog`'s `SPEC.md` §4 from its
++assigned worktree. The separate row above covers the only additional phrase
++requiring a module-supplied value: the `mapped=` field in §4.3. **No further
++§4 phrase says that agents-management supplies a value or that the module
++returns a capability missing from the audit table.** The remaining module
++dependencies are represented in the table: system declarations and home/env
++contracts (§4.1), runtime and model compatibility plus lineup (§4.2–§4.3),
++release probing, permission request and policy handling, `BuildLaunch` and
++`BuildPlan`, provider-limit verdicts, the complete plan and owned environment
++values (§4.4–§4.5), stored-policy inspection, and the non-interactive native
++argument classifier (§4.6). Fragment handling, defaults and configuration,
++channel composition, file probes, handoff/exec, and launcher diagnostics stay
++launcher-owned.
++
++### Permission-mapping matrix and regression evidence
++
++`TestRegistryPermissionMappingMatrixByEnvironmentModeAndRelease` drives the
++public registry API for all 12 system × mode × release-verification rows:
++
++| System | Mode | Release status | Result |
++|---|---|---|---|
++| `claude-code` | `native` | verified `2.1.261` | empty flag; `permission-grammar-v2` |
++| `claude-code` | `native` | unverified `2.1.262` | `ErrPermissionModeUnverifiedRelease` |
++| `claude-code` | `yolo` | verified `2.1.261` | Claude plugin mapping; `permission-grammar-v2` |
++| `claude-code` | `yolo` | unverified `2.1.262` | `ErrPermissionModeUnverifiedRelease` |
++| `codex` | `native` | verified `0.153.2` | empty flag; `permission-grammar-v2` |
++| `codex` | `native` | unverified `0.153.3` | `ErrPermissionModeUnverifiedRelease` |
++| `codex` | `yolo` | verified `0.153.2` | Codex plugin mapping; `permission-grammar-v2` |
++| `codex` | `yolo` | unverified `0.153.3` | `ErrPermissionModeUnverifiedRelease` |
++| `pi-native` | `native` | verified `0.84.2` | empty flag; `permission-grammar-v1` |
++| `pi-native` | `native` | unverified `0.84.3` | `ErrPermissionModeUnverifiedRelease` |
++| `pi-native` | `yolo` | verified `0.84.2` | `ErrPermissionModeUnsupported` |
++| `pi-native` | `yolo` | unverified `0.84.3` | `ErrPermissionModeUnverifiedRelease` |
++
++`TestRegistryPermissionMappingRefusesUnknownSystemAndMode` covers unknown
++system, registered `pi` (the local-runtime wrapper without the optional
++capability), and an unsupported mode. Plugin tests
++`TestPermissionMappingUsesTheClaudeArgvFlagOnlyForVerifiedYolo`,
++`TestPermissionMappingUsesTheCodexArgvFlagOnlyForVerifiedYolo`, and
++`TestPermissionMappingKeepsVerifiedPiNativeEmptyAndYoloUnsupported` verify
++each plugin's mapping against its own argv constant or unsupported release
++fact. The provider flag spellings remain in their owning plugin packages; the
++Codex argv guard allows only the read-only pre-admission mapping method in
++addition to its existing parser helpers.
++
++Two narrowing mutants were applied separately and each was killed by the
++named public matrix test (both attack commands were standalone, expected-red
++`go test` runs):
++
++| Mutant | Command | Exit | Observed failure |
++|---|---|---:|---|
++| Return Claude's provider flag for `native`. | `go test ./pkg/agentic -run '^TestRegistryPermissionMappingMatrixByEnvironmentModeAndRelease$' -count=1` | 1 | The `claude-code/native/verified` row observed a non-empty flag. |
++| Substitute Claude's pinned row after release lookup fails. | `go test ./pkg/agentic -run '^TestRegistryPermissionMappingMatrixByEnvironmentModeAndRelease$' -count=1` | 1 | Both `claude-code/native/unverified` and `claude-code/yolo/unverified` returned nil errors. |
++
++The classifier matrix and six classifier mutants recorded above were retained
++from revision 2; the revision 2 reviewer independently verified that
++classifier surface and its release-substitution mutant.
++
++### Revision 3 verification
++
++| Command | Exit |
++|---|---:|
++| `go test ./pkg/agentic -run '^(TestRegistryPermissionMappingMatrixByEnvironmentModeAndRelease|TestRegistryPermissionMappingRefusesUnknownSystemAndMode)$' -count=1` | 0 |
++| `go test ./pkg/agentic ./pkg/agentic/systems/claude ./pkg/agentic/systems/codex ./pkg/agentic/systems/pinative` | 0 |
++| `go test ./...` | 0 |
++| `go vet ./...` | 0 |
++| `go build ./...` | 0 |
++| `golangci-lint run --new ./...` | 0 — 0 new issues |
++| `golangci-lint run ./...` | 1 — 20 findings in untouched files; no findings in this task's changed lines |
++| `git diff --check` | 0 |
++
++The full lint findings are pre-existing in unrelated tests, CLI output,
++provider-limit helpers, and vendor-plugin files. The task diff passes the
++repository's `--new` lint check. No cross-platform claim was made from these
++local checks. Expected release remains v0.5.22; the orchestrator cuts the tag
++after landing. No `LOGBOOK.md` edit was made; this outcome records the review
++finding and decision for the task.
++
++Checklist item 13's rejection branch was triggered by the revision 2
++CHANGES_REQUESTED verdict. Its evidence is attached as
++`TASK-260924-1nh93t_review-verdict-rev2.md`, and the task was routed back to
++development for this rework. That evidence and routing satisfy the conditional
++item for the prior rejection; revision 3 is now awaiting review.
++
++### Revision 3 rework — fresh verification
++
++Re-read all of launcher Story `STORY-260922-39hxog`'s SPEC §4 (lines 194–911)
++from its assigned worktree. The only additional value explicitly supplied by
++agents-management is §4.3's pre-admission `mapped=` permission provenance;
++the table above now binds it to `Registry.PermissionMapping`. **No further §4
++phrase says that agents-management supplies a value or that the module returns
++a capability missing from the audit table.**
++
++I reran the named revision 3 regression against two narrowing mutants. Both
++mutant runs were standalone `go test` processes with `-count=1`; each returned
++exit 1 as expected, for a 2/2 kill ratio:
++
++| Mutant | Regression command | Exit | Observed failure |
++|---|---|---:|---|
++| Return a non-empty Codex mapping for verified `native`. | `go test ./pkg/agentic -run '^TestRegistryPermissionMappingMatrixByEnvironmentModeAndRelease$' -count=1` | 1 | `codex/native/verified` got a flag instead of an empty mapping. |
++| Substitute Codex's verified release when an unverified release is requested. | `go test ./pkg/agentic -run '^TestRegistryPermissionMappingMatrixByEnvironmentModeAndRelease$' -count=1` | 1 | `codex/native/unverified` and `codex/yolo/unverified` returned nil errors. |
++
++For each mutant I restored `pkg/agentic/systems/codex/policy.go` from a saved
++copy in the worktree and verified the restoration with `diff -u` (exit 0)
++before running the clean-candidate gates.
++
++Fresh clean-candidate verification (all commands were run directly, without
++pipes):
++
++| Command | Exit | Result |
++|---|---:|---|
++| `go test ./...` | 0 | All packages passed. |
++| `go vet ./...` | 0 | No findings. |
++| `go build ./...` | 0 | All packages built. |
++| `golangci-lint run --new ./...` | 0 | 0 new issues. |
++| `gofmt -d` on all changed Go files | 0 | No formatting diff. |
++| `git diff --check` | 0 | No whitespace errors. |
++
++These checks were run on the current host; no cross-platform result is claimed.
+diff --git a/pkg/agentic/noninteractive.go b/pkg/agentic/noninteractive.go
+new file mode 100644
+index 0000000..1ada30e
+--- /dev/null
++++ b/pkg/agentic/noninteractive.go
+@@ -0,0 +1,64 @@
++package agentic
++
++import (
++	"errors"
++	"fmt"
++)
++
++// NonInteractiveForm identifies a closed command form that runs without an
++// interactive terminal session. An empty form means the native suffix does
++// not select a known non-interactive form for the verified release.
++type NonInteractiveForm string
++
++const (
++	NonInteractiveFormNone  NonInteractiveForm = ""
++	NonInteractiveFormPrint NonInteractiveForm = "print"
++	NonInteractiveFormExec  NonInteractiveForm = "exec"
++)
++
++// NativeArgsClassification is the release-bound result of classifying one
++// caller-owned native-argument suffix. Grammar is the same permission-grammar
++// version verified for the system and tool release.
++type NativeArgsClassification struct {
++	Form    NonInteractiveForm
++	Grammar PermissionGrammarVersion
++}
++
++// IsNonInteractive reports whether Form names a recognized non-interactive
++// command form.
++func (c NativeArgsClassification) IsNonInteractive() bool {
++	return c.Form != NonInteractiveFormNone
++}
++
++// NonInteractiveArgumentClassifier is an optional system capability. A
++// classifier must verify the exact tool release using its plugin-owned
++// ReleaseCapability rows before examining native arguments.
++type NonInteractiveArgumentClassifier interface {
++	ClassifyNonInteractiveArgs(toolRelease string, suffix []string) (NativeArgsClassification, error)
++}
++
++var (
++	ErrNativeArgsClassifierUnsupported       = errors.New("agentic: system has no verified native-argument non-interactive classifier")
++	ErrNativeArgsClassificationIndeterminate = errors.New("agentic: native-argument form cannot be determined under the verified grammar")
++)
++
++// ClassifyNonInteractiveArgs resolves systemID through this registry and asks
++// that system's release-bound classifier whether suffix selects a known
++// non-interactive form. Unknown systems return ErrUnknownSystem; a release
++// that is absent or unverified returns ErrPermissionModeUnverifiedRelease.
++// A plugin may return ErrNativeArgsClassificationIndeterminate when the
++// suffix contains syntax whose meaning is not established by the verified
++// grammar; callers must not treat that as an interactive classification.
++// The suffix is copied at the registry boundary so a plugin cannot mutate the
++// caller's argv storage.
++func (r *Registry) ClassifyNonInteractiveArgs(systemID SystemID, toolRelease string, suffix []string) (NativeArgsClassification, error) {
++	system, ok := r.Lookup(systemID)
++	if !ok {
++		return NativeArgsClassification{}, fmt.Errorf("%w: %s", ErrUnknownSystem, systemID)
++	}
++	classifier, ok := system.(NonInteractiveArgumentClassifier)
++	if !ok {
++		return NativeArgsClassification{}, fmt.Errorf("%w: %s", ErrNativeArgsClassifierUnsupported, system.ID())
++	}
++	return classifier.ClassifyNonInteractiveArgs(toolRelease, append([]string(nil), suffix...))
++}
+diff --git a/pkg/agentic/noninteractive_test.go b/pkg/agentic/noninteractive_test.go
+new file mode 100644
+index 0000000..5dc66cb
+--- /dev/null
++++ b/pkg/agentic/noninteractive_test.go
+@@ -0,0 +1,140 @@
++package agentic_test
++
++import (
++	"errors"
++	"testing"
++
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/claude"
++	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/codex"
++	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/pi"
++	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/pinative"
++)
++
++func TestRegistryClassifiesVersionedNonInteractiveFormsByEnvironmentAndPlacement(t *testing.T) {
++	tests := []struct {
++		name    string
++		system  agentic.SystemID
++		release string
++		suffix  []string
++		form    agentic.NonInteractiveForm
++		grammar agentic.PermissionGrammarVersion
++	}{
++		{"claude print short flag", "claude-code", "2.1.261", []string{"-p"}, agentic.NonInteractiveFormPrint, agentic.PermissionGrammarV2},
++		{"claude print equals placement", "claude-code", "2.1.261", []string{"--print=true"}, agentic.NonInteractiveFormPrint, agentic.PermissionGrammarV2},
++		{"claude print with separate prompt", "claude-code", "2.1.261", []string{"--print", "summarize this"}, agentic.NonInteractiveFormPrint, agentic.PermissionGrammarV2},
++		{"codex exec command", "codex", "0.153.2", []string{"exec", "summarize this"}, agentic.NonInteractiveFormExec, agentic.PermissionGrammarV2},
++		{"codex exec alias", "codex", "0.153.2", []string{"e", "summarize this"}, agentic.NonInteractiveFormExec, agentic.PermissionGrammarV2},
++		{"codex exec after equals option", "codex", "0.153.2", []string{"--model=gpt-test", "exec", "summarize this"}, agentic.NonInteractiveFormExec, agentic.PermissionGrammarV2},
++		{"codex exec after separate option", "codex", "0.153.2", []string{"--model", "gpt-test", "exec", "summarize this"}, agentic.NonInteractiveFormExec, agentic.PermissionGrammarV2},
++		{"codex exec after other separate option", "codex", "0.153.2", []string{"--local-provider", "ollama", "exec", "summarize this"}, agentic.NonInteractiveFormExec, agentic.PermissionGrammarV2},
++		{"pi print short flag", "pi-native", "0.84.2", []string{"-p"}, agentic.NonInteractiveFormPrint, agentic.PermissionGrammarV1},
++		{"pi print equals placement", "pi-native", "0.84.2", []string{"--print=true"}, agentic.NonInteractiveFormPrint, agentic.PermissionGrammarV1},
++		{"pi print with separate prompt", "pi-native", "0.84.2", []string{"--print", "summarize this"}, agentic.NonInteractiveFormPrint, agentic.PermissionGrammarV1},
++	}
++
++	for _, tt := range tests {
++		t.Run(tt.name, func(t *testing.T) {
++			got, err := agentic.Default.ClassifyNonInteractiveArgs(tt.system, tt.release, tt.suffix)
++			if err != nil {
++				t.Fatalf("ClassifyNonInteractiveArgs: %v", err)
++			}
++			if !got.IsNonInteractive() || got.Form != tt.form || got.Grammar != tt.grammar {
++				t.Fatalf("classification = %#v, want form %q under %q", got, tt.form, tt.grammar)
++			}
++		})
++	}
++}
++
++func TestRegistryClassifierStopsBeforePromptText(t *testing.T) {
++	tests := []struct {
++		name    string
++		system  agentic.SystemID
++		release string
++		suffix  []string
++		grammar agentic.PermissionGrammarVersion
++	}{
++		{"claude print-looking prompt", "claude-code", "2.1.261", []string{"--", "--print"}, agentic.PermissionGrammarV2},
++		{"claude short print-looking prompt", "claude-code", "2.1.261", []string{"--", "-p"}, agentic.PermissionGrammarV2},
++		{"claude print-looking prompt after a flag", "claude-code", "2.1.261", []string{"--verbose", "--", "--print"}, agentic.PermissionGrammarV2},
++		{"codex exec-looking prompt", "codex", "0.153.2", []string{"--", "exec"}, agentic.PermissionGrammarV2},
++		{"pi print-looking prompt", "pi-native", "0.84.2", []string{"--", "--print"}, agentic.PermissionGrammarV1},
++		{"pi short print-looking prompt", "pi-native", "0.84.2", []string{"--", "-p"}, agentic.PermissionGrammarV1},
++	}
++
++	for _, tt := range tests {
++		t.Run(tt.name, func(t *testing.T) {
++			got, err := agentic.Default.ClassifyNonInteractiveArgs(tt.system, tt.release, tt.suffix)
++			if err != nil {
++				t.Fatalf("ClassifyNonInteractiveArgs: %v", err)
++			}
++			if got.IsNonInteractive() || got.Form != agentic.NonInteractiveFormNone || got.Grammar != tt.grammar {
++				t.Fatalf("classification = %#v, want interactive under %q", got, tt.grammar)
++			}
++		})
++	}
++}
++
++func TestCodexClassifierDoesNotTreatAnOptionValueAsTheExecCommand(t *testing.T) {
++	got, err := agentic.Default.ClassifyNonInteractiveArgs("codex", "0.153.2", []string{"--model", "exec"})
++	if err != nil {
++		t.Fatalf("ClassifyNonInteractiveArgs: %v", err)
++	}
++	if got.IsNonInteractive() || got.Form != agentic.NonInteractiveFormNone {
++		t.Fatalf("classification = %#v, want interactive because exec is the model option value", got)
++	}
++}
++
++func TestCodexClassifierFailsClosedForAnUnmodeledRootFlag(t *testing.T) {
++	tests := []struct {
++		name   string
++		suffix []string
++	}{
++		{"unknown option", []string{"--unknown-root-option", "exec"}},
++		{"variadic image option", []string{"--image", "one.png", "two.png", "exec"}},
++	}
++	for _, tt := range tests {
++		t.Run(tt.name, func(t *testing.T) {
++			_, err := agentic.Default.ClassifyNonInteractiveArgs("codex", "0.153.2", tt.suffix)
++			if !errors.Is(err, agentic.ErrNativeArgsClassificationIndeterminate) {
++				t.Fatalf("error = %v, want ErrNativeArgsClassificationIndeterminate", err)
++			}
++		})
++	}
++}
++
++func TestNonInteractiveClassifierFailsClosedForUnknownOrUnverifiedInputs(t *testing.T) {
++	t.Run("unknown system", func(t *testing.T) {
++		_, err := agentic.Default.ClassifyNonInteractiveArgs("opencode", "1.0.0", []string{"--print"})
++		if !errors.Is(err, agentic.ErrUnknownSystem) {
++			t.Fatalf("error = %v, want ErrUnknownSystem", err)
++		}
++	})
++
++	t.Run("registered system without this capability", func(t *testing.T) {
++		_, err := agentic.Default.ClassifyNonInteractiveArgs("pi", "0.84.2", []string{"spawn"})
++		if !errors.Is(err, agentic.ErrNativeArgsClassifierUnsupported) {
++			t.Fatalf("error = %v, want ErrNativeArgsClassifierUnsupported", err)
++		}
++	})
++
++	for _, system := range []struct {
++		id      agentic.SystemID
++		release string
++		suffix  []string
++	}{
++		{"claude-code", "2.1.262", []string{"--print"}},
++		{"codex", "0.153.3", []string{"exec"}},
++		{"pi-native", "0.84.3", []string{"--print"}},
++		{"claude-code", "", []string{"--print"}},
++		{"codex", "", []string{"exec"}},
++		{"pi-native", "", []string{"--print"}},
++	} {
++		t.Run(string(system.id)+"/"+system.release, func(t *testing.T) {
++			_, err := agentic.Default.ClassifyNonInteractiveArgs(system.id, system.release, system.suffix)
++			if !errors.Is(err, agentic.ErrPermissionModeUnverifiedRelease) {
++				t.Fatalf("error = %v, want ErrPermissionModeUnverifiedRelease", err)
++			}
++		})
++	}
++}
+diff --git a/pkg/agentic/permission_mapping.go b/pkg/agentic/permission_mapping.go
+new file mode 100644
+index 0000000..152ea7d
+--- /dev/null
++++ b/pkg/agentic/permission_mapping.go
+@@ -0,0 +1,41 @@
++package agentic
++
++import "fmt"
++
++// PermissionMapping is the provider mapping for one verified system release
++// and interactive permission mode. An empty Flag means the module contributes
++// no native argument, as for PermissionModeNative.
++type PermissionMapping struct {
++	Flag    string
++	Grammar PermissionGrammarVersion
++}
++
++// PermissionMappingCapability is an optional system capability for resolving
++// the module-owned native argument used by an interactive permission mode.
++// Implementations must use the same release rows as their permission-policy
++// grammar and return no mapping for an unverified release.
++type PermissionMappingCapability interface {
++	PermissionMapping(toolRelease string, mode PermissionMode) (PermissionMapping, error)
++}
++
++// PermissionMapping resolves the registered system's module-owned permission
++// mapping without constructing or admitting a launch plan. The plugin verifies
++// the exact tool release and supplies its permission grammar alongside the
++// mapping. Unknown systems return ErrUnknownSystem; systems without this
++// capability return ErrPermissionModeUnsupported; unverified releases and
++// unknown modes return their existing typed errors.
++func (r *Registry) PermissionMapping(systemID SystemID, toolRelease string, mode PermissionMode) (PermissionMapping, error) {
++	system, ok := r.Lookup(systemID)
++	if !ok {
++		return PermissionMapping{}, fmt.Errorf("%w: %s", ErrUnknownSystem, systemID)
++	}
++	mapper, ok := system.(PermissionMappingCapability)
++	if !ok {
++		return PermissionMapping{}, fmt.Errorf("%w: %s has no release-pinned permission mapping", ErrPermissionModeUnsupported, system.ID())
++	}
++	mapping, err := mapper.PermissionMapping(toolRelease, mode)
++	if err != nil {
++		return PermissionMapping{}, err
++	}
++	return mapping, nil
++}
+diff --git a/pkg/agentic/permission_mapping_test.go b/pkg/agentic/permission_mapping_test.go
+new file mode 100644
+index 0000000..9f7b3ba
+--- /dev/null
++++ b/pkg/agentic/permission_mapping_test.go
+@@ -0,0 +1,87 @@
++package agentic_test
++
++import (
++	"errors"
++	"testing"
++
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/claude"
++	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/codex"
++	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/pi"
++	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/pinative"
++)
++
++func TestRegistryPermissionMappingMatrixByEnvironmentModeAndRelease(t *testing.T) {
++	systems := []struct {
++		id                 agentic.SystemID
++		verifiedRelease    string
++		unverifiedRelease  string
++		grammar            agentic.PermissionGrammarVersion
++		yoloMappingSupport bool
++	}{
++		{"claude-code", "2.1.261", "2.1.262", agentic.PermissionGrammarV2, true},
++		{"codex", "0.153.2", "0.153.3", agentic.PermissionGrammarV2, true},
++		{"pi-native", "0.84.2", "0.84.3", agentic.PermissionGrammarV1, false},
++	}
++	modes := []agentic.PermissionMode{agentic.PermissionModeNative, agentic.PermissionModeYolo}
++
++	for _, system := range systems {
++		for _, mode := range modes {
++			for _, release := range []struct {
++				name     string
++				value    string
++				verified bool
++			}{
++				{"verified", system.verifiedRelease, true},
++				{"unverified", system.unverifiedRelease, false},
++			} {
++				name := string(system.id) + "/" + string(mode) + "/" + release.name
++				t.Run(name, func(t *testing.T) {
++					got, err := agentic.Default.PermissionMapping(system.id, release.value, mode)
++					if !release.verified {
++						if !errors.Is(err, agentic.ErrPermissionModeUnverifiedRelease) {
++							t.Fatalf("PermissionMapping error = %v, want ErrPermissionModeUnverifiedRelease", err)
++						}
++						return
++					}
++					if mode == agentic.PermissionModeYolo && !system.yoloMappingSupport {
++						if !errors.Is(err, agentic.ErrPermissionModeUnsupported) {
++							t.Fatalf("PermissionMapping error = %v, want ErrPermissionModeUnsupported", err)
++						}
++						return
++					}
++					if err != nil {
++						t.Fatalf("PermissionMapping: %v", err)
++					}
++					if got.Grammar != system.grammar {
++						t.Errorf("Grammar = %q, want %q", got.Grammar, system.grammar)
++					}
++					if mode == agentic.PermissionModeNative && got.Flag != "" {
++						t.Errorf("native mapping Flag = %q, want no module-owned flag", got.Flag)
++					}
++					if mode == agentic.PermissionModeYolo && got.Flag == "" {
++						t.Error("verified yolo mapping has no flag")
++					}
++				})
++			}
++		}
++	}
++}
++
++func TestRegistryPermissionMappingRefusesUnknownSystemAndMode(t *testing.T) {
++	t.Run("unknown system", func(t *testing.T) {
++		if _, err := agentic.Default.PermissionMapping("opencode", "1.0.0", agentic.PermissionModeNative); !errors.Is(err, agentic.ErrUnknownSystem) {
++			t.Fatalf("PermissionMapping error = %v, want ErrUnknownSystem", err)
++		}
++	})
++	t.Run("registered system without mapping capability", func(t *testing.T) {
++		if _, err := agentic.Default.PermissionMapping("pi", "0.84.2", agentic.PermissionModeNative); !errors.Is(err, agentic.ErrPermissionModeUnsupported) {
++			t.Fatalf("PermissionMapping error = %v, want ErrPermissionModeUnsupported", err)
++		}
++	})
++	t.Run("unknown mode", func(t *testing.T) {
++		if _, err := agentic.Default.PermissionMapping("claude-code", "2.1.261", "automatic"); !errors.Is(err, agentic.ErrPermissionModeUnknown) {
++			t.Fatalf("PermissionMapping error = %v, want ErrPermissionModeUnknown", err)
++		}
++	})
++}
+diff --git a/pkg/agentic/systems/claude/args.go b/pkg/agentic/systems/claude/args.go
+index 0ea9144..44c1dd8 100644
+--- a/pkg/agentic/systems/claude/args.go
++++ b/pkg/agentic/systems/claude/args.go
+@@ -170,18 +170,14 @@ func interactiveArgs(req agentic.LaunchRequest, effective agentic.PermissionMode
+ 	// scan classifies against it: an unpinned or newer release, and an
+ 	// empty one, fail closed here, and the scan below never reasons
+ 	// under a grammar no release verified.
+-	row, err := agentic.LookupReleaseCapability(verifiedReleases, req.ToolRelease)
++	mapping, err := permissionMapping(req.ToolRelease, effective)
+ 	if err != nil {
+-		return nil, fmt.Errorf("claude: %w", err)
+-	}
+-	if !row.YoloSupported {
+-		return nil, fmt.Errorf("claude: refusing yolo: %w: tool release %q documents no bypass flag",
+-			agentic.ErrPermissionModeUnsupported, row.Release)
++		return nil, err
+ 	}
+ 	if err := scanNativePolicy(req.NativeArgs); err != nil {
+ 		return nil, fmt.Errorf("claude: %w", err)
+ 	}
+-	return append(append(args, bypassPermissionsFlag), nativeArgsSuffix(req)...), nil
++	return append(append(args, mapping.Flag), nativeArgsSuffix(req)...), nil
+ }
+ 
+ // appendEffort appends the effort transport when an effort was requested. Both
+diff --git a/pkg/agentic/systems/claude/policy.go b/pkg/agentic/systems/claude/policy.go
+index 53d5b2c..3983a07 100644
+--- a/pkg/agentic/systems/claude/policy.go
++++ b/pkg/agentic/systems/claude/policy.go
+@@ -30,8 +30,56 @@ const permissionModeFlag = "--permission-mode"
+ const (
+ 	allowDangerouslySkipPermissionsFlag = "--allow-dangerously-skip-permissions"
+ 	restrictedFlag                      = "--restricted"
++	printShortFlag                      = "-p"
++	printLongFlag                       = "--print"
+ )
+ 
++// ClassifyNonInteractiveArgs reports whether the caller suffix selects
++// Claude's print form. It uses the same exact release row and permission
++// grammar as the yolo conflict scanner; prompt text after `--` is excluded by
++// the shared nativeargs flag-position parser.
++func (*System) ClassifyNonInteractiveArgs(toolRelease string, suffix []string) (agentic.NativeArgsClassification, error) {
++	capability, err := agentic.LookupReleaseCapability(verifiedReleases, toolRelease)
++	if err != nil {
++		return agentic.NativeArgsClassification{}, fmt.Errorf("claude: %w", err)
++	}
++	for _, index := range nativeargs.FlagIndexes(suffix) {
++		name, _, _ := nativeargs.SplitFlagValue(suffix[index])
++		if name == printShortFlag || name == printLongFlag {
++			return agentic.NativeArgsClassification{Form: agentic.NonInteractiveFormPrint, Grammar: capability.Grammar}, nil
++		}
++	}
++	return agentic.NativeArgsClassification{Grammar: capability.Grammar}, nil
++}
++
++// PermissionMapping exposes Claude's provider mapping before launch-plan
++// admission. Native maps to no module-owned argument; yolo returns the same
++// spelling used by Args, under the grammar verified for this exact release.
++func (*System) PermissionMapping(toolRelease string, mode agentic.PermissionMode) (agentic.PermissionMapping, error) {
++	return permissionMapping(toolRelease, mode)
++}
++
++func permissionMapping(toolRelease string, mode agentic.PermissionMode) (agentic.PermissionMapping, error) {
++	effective, err := mode.Resolve()
++	if err != nil {
++		return agentic.PermissionMapping{}, fmt.Errorf("claude: %w", err)
++	}
++	capability, err := agentic.LookupReleaseCapability(verifiedReleases, toolRelease)
++	if err != nil {
++		return agentic.PermissionMapping{}, fmt.Errorf("claude: %w", err)
++	}
++	mapping := agentic.PermissionMapping{Grammar: capability.Grammar}
++	if effective == agentic.PermissionModeNative {
++		return mapping, nil
++	}
++	if !capability.YoloSupported {
++		return agentic.PermissionMapping{}, fmt.Errorf("claude: refusing yolo: %w: tool release %q documents no bypass flag",
++			agentic.ErrPermissionModeUnsupported, capability.Release)
++	}
++	mapping.Flag = bypassPermissionsFlag
++	return mapping, nil
++}
++
+ // knownPermissionModes is the closed `--permission-mode` value set at
+ // the pinned release: the six choices `claude --help` lists
+ // ("acceptEdits", "auto", "bypassPermissions", "manual", "dontAsk",
+diff --git a/pkg/agentic/systems/claude/policy_test.go b/pkg/agentic/systems/claude/policy_test.go
+index bb1104b..ec2840b 100644
+--- a/pkg/agentic/systems/claude/policy_test.go
++++ b/pkg/agentic/systems/claude/policy_test.go
+@@ -9,6 +9,25 @@ import (
+ 	"github.com/relux-works/skill-agents-management/pkg/agentic"
+ )
+ 
++func TestPermissionMappingUsesTheClaudeArgvFlagOnlyForVerifiedYolo(t *testing.T) {
++	system := New()
++	got, err := system.PermissionMapping("2.1.261", agentic.PermissionModeYolo)
++	if err != nil {
++		t.Fatalf("PermissionMapping(yolo): %v", err)
++	}
++	if got.Flag != bypassPermissionsFlag || got.Grammar != agentic.PermissionGrammarV2 {
++		t.Fatalf("yolo mapping = %#v, want plugin argv flag under %q", got, agentic.PermissionGrammarV2)
++	}
++
++	got, err = system.PermissionMapping("2.1.261", agentic.PermissionModeNative)
++	if err != nil {
++		t.Fatalf("PermissionMapping(native): %v", err)
++	}
++	if got.Flag != "" || got.Grammar != agentic.PermissionGrammarV2 {
++		t.Fatalf("native mapping = %#v, want no flag under %q", got, agentic.PermissionGrammarV2)
++	}
++}
++
+ // This file is the claude half of the versioned provider-capability
+ // table (curator-spec Decision 0018 choices 3 and 6): the verified
+ // release the yolo mapping holds for, the drift it fails closed on, the
+diff --git a/pkg/agentic/systems/codex/args.go b/pkg/agentic/systems/codex/args.go
+index 45f42c0..1ff9cd7 100644
+--- a/pkg/agentic/systems/codex/args.go
++++ b/pkg/agentic/systems/codex/args.go
+@@ -64,6 +64,11 @@ import (
+ // proof — whose signature carries this flag — holds it.
+ const bypassApprovalsAndSandboxFlag = "--dangerously-bypass-approvals-and-sandbox"
+ 
++// yoloAliasFlag is a provider-owned alias accepted by Codex for the same
++// native option. It is recognized when classifying caller args but is never
++// emitted by this module.
++const yoloAliasFlag = "--yolo"
++
+ // Args builds the codex argv for one launch mode, excluding the binary.
+ //
+ // It is the single construction site. Every surface of this plugin that needs
+@@ -158,18 +163,14 @@ func Args(req agentic.LaunchRequest, mode agentic.LaunchMode) ([]string, error)
+ 		// scan classifies against it: an unpinned or newer release, and an
+ 		// empty one, fail closed here, and the scan below never reasons
+ 		// under a grammar no release verified.
+-		row, err := agentic.LookupReleaseCapability(verifiedReleases, req.ToolRelease)
++		mapping, err := permissionMapping(req.ToolRelease, effective)
+ 		if err != nil {
+-			return nil, fmt.Errorf("codex: %w", err)
+-		}
+-		if !row.YoloSupported {
+-			return nil, fmt.Errorf("codex: refusing yolo: %w: tool release %q documents no bypass flag",
+-				agentic.ErrPermissionModeUnsupported, row.Release)
++			return nil, err
+ 		}
+ 		if err := scanNativePolicy(req.NativeArgs); err != nil {
+ 			return nil, fmt.Errorf("codex: %w", err)
+ 		}
+-		return append(append(args, bypassApprovalsAndSandboxFlag), nativeArgsSuffix(req)...), nil
++		return append(append(args, mapping.Flag), nativeArgsSuffix(req)...), nil
+ 	default:
+ 		return nil, fmt.Errorf("codex: unsupported launch mode %s", mode)
+ 	}
+diff --git a/pkg/agentic/systems/codex/argvguard_test.go b/pkg/agentic/systems/codex/argvguard_test.go
+index fd69f92..2be6468 100644
+--- a/pkg/agentic/systems/codex/argvguard_test.go
++++ b/pkg/agentic/systems/codex/argvguard_test.go
+@@ -91,8 +91,11 @@ var codexArgvConstructionAllowlist = map[string]string{
+ 	// appends no flag of its own, so a second construction hiding behind
+ 	// this exemption would have to spell a signature literal this
+ 	// function never emits.
+-	argvguard.AllowlistKey(codexPolicyFile, "scanNativePolicy"):    "classifies caller native args against the closed key set under yolo; it references the table and the bypass const to compare, and constructs no argv",
+-	argvguard.AllowlistKey(codexPolicyFile, "checkConfigOverride"): "the one-override half of the scan, split out so the separate, `=`, and attached-short forms share one classifier",
++	argvguard.AllowlistKey(codexPolicyFile, "scanNativePolicy"):          "classifies caller native args against the closed key set under yolo; it references the table and the bypass const to compare, and constructs no argv",
++	argvguard.AllowlistKey(codexPolicyFile, "checkConfigOverride"):       "the one-override half of the scan, split out so the separate, `=`, and attached-short forms share one classifier",
++	argvguard.AllowlistKey(codexPolicyFile, "codexRootOptionTakesValue"): "classifies caller-owned suffix positions so the registered command classifier does not mistake an option value for the exec subcommand; emits no argv",
++	argvguard.AllowlistKey(codexPolicyFile, "codexRootOptionIsBoolean"):  "recognizes pinned root flags while classifying caller-owned suffix positions; emits no argv",
++	argvguard.AllowlistKey(codexPolicyFile, "permissionMapping"):         "returns the verified plugin-owned mapping for pre-admission reporting; reads the centralized flag constant and constructs no argv",
+ }
+ 
+ // moduleGoSources reads every non-test Go file this module's build compiles.
+diff --git a/pkg/agentic/systems/codex/policy.go b/pkg/agentic/systems/codex/policy.go
+index fb34bd4..9dcdc47 100644
+--- a/pkg/agentic/systems/codex/policy.go
++++ b/pkg/agentic/systems/codex/policy.go
+@@ -66,6 +66,103 @@ const approveForMeFlag = "--approve-for-me"
+ // verbatim with no claim, like every other known key.
+ const mcpServersKeyPrefix = "mcp_servers."
+ 
++// ClassifyNonInteractiveArgs reports the Codex exec subcommand (or its `e`
++// alias) when it is the first positional command in the caller suffix. Known
++// root options are parsed using this release's command grammar; an unknown
++// or unmodeled root flag returns ErrNativeArgsClassificationIndeterminate
++// because its value arity is not established by this classifier. The scan
++// also stops at `--`, so prompt text can never become a subcommand.
++func (*System) ClassifyNonInteractiveArgs(toolRelease string, suffix []string) (agentic.NativeArgsClassification, error) {
++	capability, err := agentic.LookupReleaseCapability(verifiedReleases, toolRelease)
++	if err != nil {
++		return agentic.NativeArgsClassification{}, fmt.Errorf("codex: %w", err)
++	}
++	form, err := classifyCodexNonInteractiveForm(suffix)
++	if err != nil {
++		return agentic.NativeArgsClassification{}, fmt.Errorf("codex: %w", err)
++	}
++	return agentic.NativeArgsClassification{Form: form, Grammar: capability.Grammar}, nil
++}
++
++// PermissionMapping exposes Codex's provider mapping before launch-plan
++// admission. Native maps to no module-owned argument; yolo returns the same
++// spelling used by Args, under the grammar verified for this exact release.
++func (*System) PermissionMapping(toolRelease string, mode agentic.PermissionMode) (agentic.PermissionMapping, error) {
++	return permissionMapping(toolRelease, mode)
++}
++
++func permissionMapping(toolRelease string, mode agentic.PermissionMode) (agentic.PermissionMapping, error) {
++	effective, err := mode.Resolve()
++	if err != nil {
++		return agentic.PermissionMapping{}, fmt.Errorf("codex: %w", err)
++	}
++	capability, err := agentic.LookupReleaseCapability(verifiedReleases, toolRelease)
++	if err != nil {
++		return agentic.PermissionMapping{}, fmt.Errorf("codex: %w", err)
++	}
++	mapping := agentic.PermissionMapping{Grammar: capability.Grammar}
++	if effective == agentic.PermissionModeNative {
++		return mapping, nil
++	}
++	if !capability.YoloSupported {
++		return agentic.PermissionMapping{}, fmt.Errorf("codex: refusing yolo: %w: tool release %q documents no bypass flag",
++			agentic.ErrPermissionModeUnsupported, capability.Release)
++	}
++	mapping.Flag = bypassApprovalsAndSandboxFlag
++	return mapping, nil
++}
++
++func classifyCodexNonInteractiveForm(suffix []string) (agentic.NonInteractiveForm, error) {
++	for i := 0; i < len(suffix); i++ {
++		el := suffix[i]
++		if nativeargs.IsSeparator(el) {
++			return agentic.NonInteractiveFormNone, nil
++		}
++		if !nativeargs.IsFlagElement(el) {
++			if el == "exec" || el == "e" {
++				return agentic.NonInteractiveFormExec, nil
++			}
++			return agentic.NonInteractiveFormNone, nil
++		}
++		name, _, hasValue := nativeargs.SplitFlagValue(el)
++		if codexRootOptionTakesValue(name) {
++			if !hasValue {
++				if i+1 >= len(suffix) || nativeargs.IsSeparator(suffix[i+1]) {
++					return agentic.NonInteractiveFormNone, nil
++				}
++				i++
++			}
++			continue
++		}
++		if !codexRootOptionIsBoolean(name) {
++			// An unknown or unmodeled root flag may take a value. Without its
++			// release-pinned arity, a following "exec" could be an option value
++			// rather than a subcommand, so this suffix does not establish a known
++			// form.
++			return agentic.NonInteractiveFormNone, fmt.Errorf("%w: codex root flag %q", agentic.ErrNativeArgsClassificationIndeterminate, name)
++		}
++	}
++	return agentic.NonInteractiveFormNone, nil
++}
++
++func codexRootOptionTakesValue(name string) bool {
++	switch name {
++	case "-C", "--cd", "--add-dir", "-m", "--model", "--local-provider", "-p", "--profile", "-c", "--config", "-a", "--ask-for-approval", "-s", "--sandbox", "--enable", "--disable", "--remote", "--remote-auth-token":
++		return true
++	default:
++		return false
++	}
++}
++
++func codexRootOptionIsBoolean(name string) bool {
++	switch name {
++	case "--oss", "--approve-for-me", "--not-so-yolo", bypassApprovalsAndSandboxFlag, yoloAliasFlag, "--dangerously-bypass-hook-trust", "--strict-config", "--search", "--no-alt-screen":
++		return true
++	default:
++		return false
++	}
++}
++
+ // scanNativePolicy classifies the flag positions of the caller's native
+ // arguments under yolo, against the pinned release's closed grammar.
+ // nativeargs.FlagIndexes is the only positions reader: prompt text —
+diff --git a/pkg/agentic/systems/codex/policy_test.go b/pkg/agentic/systems/codex/policy_test.go
+index 2bbe177..0df60cf 100644
+--- a/pkg/agentic/systems/codex/policy_test.go
++++ b/pkg/agentic/systems/codex/policy_test.go
+@@ -9,6 +9,25 @@ import (
+ 	"github.com/relux-works/skill-agents-management/pkg/agentic"
+ )
+ 
++func TestPermissionMappingUsesTheCodexArgvFlagOnlyForVerifiedYolo(t *testing.T) {
++	system := New()
++	got, err := system.PermissionMapping("0.153.2", agentic.PermissionModeYolo)
++	if err != nil {
++		t.Fatalf("PermissionMapping(yolo): %v", err)
++	}
++	if got.Flag != bypassApprovalsAndSandboxFlag || got.Grammar != agentic.PermissionGrammarV2 {
++		t.Fatalf("yolo mapping = %#v, want plugin argv flag under %q", got, agentic.PermissionGrammarV2)
++	}
++
++	got, err = system.PermissionMapping("0.153.2", agentic.PermissionModeNative)
++	if err != nil {
++		t.Fatalf("PermissionMapping(native): %v", err)
++	}
++	if got.Flag != "" || got.Grammar != agentic.PermissionGrammarV2 {
++		t.Fatalf("native mapping = %#v, want no flag under %q", got, agentic.PermissionGrammarV2)
++	}
++}
++
+ // This file is the codex half of the versioned provider-capability table
+ // (curator-spec Decision 0018 choices 3 and 6): the verified release the
+ // yolo mapping holds for, the drift it fails closed on, the closed `-c`
+diff --git a/pkg/agentic/systems/muse/argvguard_test.go b/pkg/agentic/systems/muse/argvguard_test.go
+index 501af52..e19aed7 100644
+--- a/pkg/agentic/systems/muse/argvguard_test.go
++++ b/pkg/agentic/systems/muse/argvguard_test.go
+@@ -30,9 +30,10 @@ import (
+ //     code by accident, and a guard with false positives is a guard somebody
+ //     deletes.
+ //
+-// "--yolo" is muse's alone: qwen spells the VALUE "yolo" as the argument to
+-// --approval-mode, which is a different literal, and exact matching keeps the
+-// two apart.
++// "--yolo" is Muse's approval flag. Codex also accepts that spelling as an
++// alias for its bypass flag; its only occurrences are the centralized Codex
++// grammar constant and the read-only native-argument classifier. Those two
++// exact sites are allowlisted below and remain covered by Codex's argv guard.
+ //
+ // "--reasoning-effort" passes the same test and is muse's alone for the same
+ // reason exact matching gives: codex carries effort as the config override
+@@ -46,6 +47,8 @@ var museArgvSignature = []string{
+ }
+ 
+ const museArgsFile = "pkg/agentic/systems/muse/args.go"
++const codexArgsFile = "pkg/agentic/systems/codex/args.go"
++const codexPolicyFile = "pkg/agentic/systems/codex/policy.go"
+ 
+ // museArgvConstructionAllowlist names the only sites permitted to spell a
+ // signature literal, each with the reason it is not a second construction.
+@@ -54,7 +57,9 @@ const museArgsFile = "pkg/agentic/systems/muse/args.go"
+ // this module name their construction site Args, so a bare-name allowlist would
+ // exempt every Args in the module from every plugin's guard.
+ var museArgvConstructionAllowlist = map[string]string{
+-	argvguard.AllowlistKey(museArgsFile, "Args"): "the single construction site",
++	argvguard.AllowlistKey(museArgsFile, "Args"):                        "the single construction site",
++	argvguard.AllowlistKey(codexArgsFile, "yoloAliasFlag"):              "Codex's native alias has the same spelling as Muse's flag; this constant is read by the Codex classifier and is never emitted",
++	argvguard.AllowlistKey(codexPolicyFile, "codexRootOptionIsBoolean"): "the Codex classifier recognizes the overlapping native alias while reading caller args; it emits no argv",
+ }
+ 
+ // moduleGoSources reads every non-test Go file this module's build compiles,
+@@ -135,9 +140,10 @@ func TestTheMuseArgvGuardFiresOnTheRealConstructionSite(t *testing.T) {
+ // TestTheMuseGuardDoesNotFireOnTheOtherPlugins is the cross-plugin
+ // false-positive bound, measured against real neighbouring code.
+ //
+-// qwen is the interesting one: it spells the VALUE "yolo" where this signature
+-// spells the FLAG "--yolo". Exact matching is what keeps the two apart, and
+-// this is where that claim is measured rather than asserted.
++// Codex is the intentional overlap: its native CLI alias has the same spelling
++// as Muse's flag, so only the two exact, parser-only sites listed in the
++// allowlist above are accepted. Other plugins still have to avoid the
++// signature, including qwen's separate "yolo" value spelling.
+ func TestTheMuseGuardDoesNotFireOnTheOtherPlugins(t *testing.T) {
+ 	sources := moduleGoSources(t)
+ 	for _, plugin := range []string{"codex", "claude", "qwen", "gemini", "agy"} {
+diff --git a/pkg/agentic/systems/pinative/args.go b/pkg/agentic/systems/pinative/args.go
+index b8cbcec..f241cf2 100644
+--- a/pkg/agentic/systems/pinative/args.go
++++ b/pkg/agentic/systems/pinative/args.go
+@@ -73,15 +73,11 @@ func Args(req agentic.LaunchRequest, mode agentic.LaunchMode) ([]string, error)
+ 		return nil, fmt.Errorf("pinative: unsupported launch mode %s", mode)
+ 	}
+ 	if mode == agentic.LaunchModeInteractive && effective == agentic.PermissionModeYolo {
+-		// Drift fails closed before support is even asked: an unpinned
+-		// or newer release, and an empty one, refuse as unverified,
+-		// and only the verified release reaches the unsupported
+-		// refusal below.
+-		if _, err := agentic.LookupReleaseCapability(verifiedReleases, req.ToolRelease); err != nil {
+-			return nil, fmt.Errorf("pinative: %w", err)
++		// The same public mapping capability establishes the release row
++		// and reports Pi's verified lack of a bypass flag.
++		if _, err := permissionMapping(req.ToolRelease, effective); err != nil {
++			return nil, err
+ 		}
+-		return nil, fmt.Errorf("pinative: refusing yolo: %w: pi 0.84.2 documents no interactive permission-bypass flag; --approve trusts project-local files for this run and is not equivalent",
+-			agentic.ErrPermissionModeUnsupported)
+ 	}
+ 	vendor := strings.TrimSpace(req.Vendor)
+ 	if vendor == "" {
+diff --git a/pkg/agentic/systems/pinative/policy.go b/pkg/agentic/systems/pinative/policy.go
+index 3b15c5e..ab191a4 100644
+--- a/pkg/agentic/systems/pinative/policy.go
++++ b/pkg/agentic/systems/pinative/policy.go
+@@ -1,6 +1,11 @@
+ package pinative
+ 
+-import "github.com/relux-works/skill-agents-management/pkg/agentic"
++import (
++	"fmt"
++
++	"github.com/relux-works/skill-agents-management/internal/nativeargs"
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
+ 
+ // verifiedReleases is this environment's rows of the versioned
+ // provider-capability table (curator-spec Decision 0018 choice 6).
+@@ -15,3 +20,48 @@ import "github.com/relux-works/skill-agents-management/pkg/agentic"
+ var verifiedReleases = []agentic.ReleaseCapability{
+ 	{Release: "0.84.2", Grammar: agentic.PermissionGrammarV1, YoloSupported: false},
+ }
++
++const (
++	printShortFlag = "-p"
++	printLongFlag  = "--print"
++)
++
++// ClassifyNonInteractiveArgs reports whether the caller suffix selects Pi's
++// one-shot print form. It verifies the same release row as permission policy
++// handling and delegates flag positions to the shared native-argument grammar.
++func (*System) ClassifyNonInteractiveArgs(toolRelease string, suffix []string) (agentic.NativeArgsClassification, error) {
++	capability, err := agentic.LookupReleaseCapability(verifiedReleases, toolRelease)
++	if err != nil {
++		return agentic.NativeArgsClassification{}, fmt.Errorf("pinative: %w", err)
++	}
++	for _, index := range nativeargs.FlagIndexes(suffix) {
++		name, _, _ := nativeargs.SplitFlagValue(suffix[index])
++		if name == printShortFlag || name == printLongFlag {
++			return agentic.NativeArgsClassification{Form: agentic.NonInteractiveFormPrint, Grammar: capability.Grammar}, nil
++		}
++	}
++	return agentic.NativeArgsClassification{Grammar: capability.Grammar}, nil
++}
++
++// PermissionMapping exposes Pi's verified native mapping before launch-plan
++// admission. Native maps to no module-owned argument. Pi 0.84.2 documents no
++// yolo bypass flag, so that mode keeps the existing typed refusal.
++func (*System) PermissionMapping(toolRelease string, mode agentic.PermissionMode) (agentic.PermissionMapping, error) {
++	return permissionMapping(toolRelease, mode)
++}
++
++func permissionMapping(toolRelease string, mode agentic.PermissionMode) (agentic.PermissionMapping, error) {
++	effective, err := mode.Resolve()
++	if err != nil {
++		return agentic.PermissionMapping{}, fmt.Errorf("pinative: %w", err)
++	}
++	capability, err := agentic.LookupReleaseCapability(verifiedReleases, toolRelease)
++	if err != nil {
++		return agentic.PermissionMapping{}, fmt.Errorf("pinative: %w", err)
++	}
++	if effective == agentic.PermissionModeYolo {
++		return agentic.PermissionMapping{}, fmt.Errorf("pinative: refusing yolo: %w: pi 0.84.2 documents no interactive permission-bypass flag; --approve trusts project-local files for this run and is not equivalent",
++			agentic.ErrPermissionModeUnsupported)
++	}
++	return agentic.PermissionMapping{Grammar: capability.Grammar}, nil
++}
+diff --git a/pkg/agentic/systems/pinative/policy_test.go b/pkg/agentic/systems/pinative/policy_test.go
+index b1c42ff..0f665aa 100644
+--- a/pkg/agentic/systems/pinative/policy_test.go
++++ b/pkg/agentic/systems/pinative/policy_test.go
+@@ -10,6 +10,20 @@ import (
+ 	"github.com/relux-works/skill-agents-management/pkg/agentic/systems/pinative"
+ )
+ 
++func TestPermissionMappingKeepsVerifiedPiNativeEmptyAndYoloUnsupported(t *testing.T) {
++	system := pinative.New()
++	got, err := system.PermissionMapping("0.84.2", agentic.PermissionModeNative)
++	if err != nil {
++		t.Fatalf("PermissionMapping(native): %v", err)
++	}
++	if got.Flag != "" || got.Grammar != agentic.PermissionGrammarV1 {
++		t.Fatalf("native mapping = %#v, want no flag under %q", got, agentic.PermissionGrammarV1)
++	}
++	if _, err := system.PermissionMapping("0.84.2", agentic.PermissionModeYolo); !errors.Is(err, agentic.ErrPermissionModeUnsupported) {
++		t.Fatalf("PermissionMapping(yolo) error = %v, want ErrPermissionModeUnsupported", err)
++	}
++}
++
+ // This file is the pi-native half of the versioned
+ // provider-capability table (curator-spec Decision 0018 choice 6):
+ // drift fails closed before support is even asked, the verified

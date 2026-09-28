@@ -1,0 +1,592 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index de10191..cb7d04f 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -2,6 +2,12 @@
+ 
+ ## Unreleased
+ 
++- Add a public release-versioned native-argument classifier for interactive
++  launchers. It identifies Claude and Pi print forms and Codex `exec` through
++  the plugin-owned grammar, returns that grammar version, stops at `--`, and
++  fails closed for unknown systems or unverified releases. Expected release
++  v0.5.22; the orchestrator cuts the tag.
++
+ - Carry interactive permission mode, verified tool release and caller native
+   arguments through vendor admission into the launch plan; add best-effort
+   Claude and Codex stored-policy inspection with explicit inspected and
+diff --git a/README.md b/README.md
+index 002ce79..3da91e0 100644
+--- a/README.md
++++ b/README.md
+@@ -147,8 +147,37 @@ The agentic-system plugin contract and its registry.
+   Prompt text is never parsed as a flag (`internal/nativeargs` owns the
+   rule): `--` ends flag parsing, a lone `-` and anything never dash-leading
+   are positional, and `=`-forms read as their flag. Known non-conflicting
+-  policy selectors are still forwarded. Launcher headless detection over the
+-  same arguments remains F-L1.
++  policy selectors are still forwarded.
++
++#### Permission-mode: non-interactive form classification
++
++`agentic.Registry.ClassifyNonInteractiveArgs(system, toolRelease, suffix)` is
++the launcher's versioned headless-argument classifier. It returns
++`NativeArgsClassification{Form, Grammar}`; `IsNonInteractive` is false when
++`Form` is empty. Every plugin verifies the exact release with its own
++`ReleaseCapability` rows and returns the same permission-grammar version used
++by the native-policy scanner. Unknown systems return `ErrUnknownSystem`, an
++unsupported system classifier returns `ErrNativeArgsClassifierUnsupported`,
++and an absent or unverified release returns
++`ErrPermissionModeUnverifiedRelease`. If a plugin cannot establish an option's
++arity under its pinned grammar, it returns
++`ErrNativeArgsClassificationIndeterminate`; callers must not treat that as an
++interactive result.
++
++| System | Verified release | Grammar | Recognized non-interactive form |
++|---|---|---|---|
++| `claude-code` | `2.1.261` | `permission-grammar-v2` | print (`-p`, `--print`) |
++| `codex` | `0.153.2` | `permission-grammar-v2` | `exec` / `e` subcommand |
++| `pi-native` | `0.84.2` | `permission-grammar-v1` | print (`-p`, `--print`) |
++
++For print forms, the classifier accepts flag, `=` and separate-prompt
++placements. Codex recognizes `exec` (and its `e` alias) after the root options
++whose arity is declared in the pinned plugin grammar. A root flag whose arity
++the classifier does not model returns an indeterminate-classification error
++because its next token could be a value rather than a command. All three stop
++at `--`, so a prompt that looks like a flag or command is not classified. The
++`pi` system is the local-runtime wrapper, not the native Pi CLI, and does not
++declare this classifier; the launcher maps Pi to `pi-native`.
+ 
+ #### Permission-mode: stored-policy inspection
+ 
+diff --git a/TASK-260924-1nh93t_results.md b/TASK-260924-1nh93t_results.md
+new file mode 100644
+index 0000000..214552f
+--- /dev/null
++++ b/TASK-260924-1nh93t_results.md
+@@ -0,0 +1,69 @@
++# TASK-260924-1nh93t results
++
++## Audit basis and Story base
++
++Read launcher SPEC `0.5.0-draft` §4 from the assigned launcher Story worktree and curator-spec Decision 0018. The module already exposed model/vendor admission, release-pinned permission mapping and conflict inspection, stored-policy inspection, provider-limit verdicts, and plan construction. The sole missing module capability for this launcher contract was a public native-argument classifier that reused those release rows and `internal/nativeargs`.
++
++The task start reminder required verifying the Story base before trusting it. After `git fetch origin main`, the worktree `HEAD`, fresh `origin/main`, and task-board `selected_base_oid` all matched `850ac393250606d57188540ef569103c413bd539` (`main`). No rebase or merge was needed.
++
++## Launcher capability audit
++
++The table covers every §4 behavior that the launcher must obtain from agents-management. The environment-ID aliases, closed mapping to `ax` provider IDs, Curator fragment parsing, launcher defaults and configuration files, channel application, file probes, process handoff, and launcher diagnostics are launcher-owned by SPEC §4.1–§4.7; they do not need duplicate module APIs.
++
++| SPEC clause | Module capability the launcher needs | Public module API | Status |
++|---|---|---|---|
++| §4.1–§4.2 | Resolve the canonical agentic system and its home variable, modes, binary, environment contract, and launch identity. | `agentic.Registry.Lookup`; `agentic.System.ID`, `Capabilities`, `ResolveBinary`, `ChildEnv`; `agentic.Plan` (`Binary`, `Env`, `Home`, `WorkDir`). | Satisfied before this task. The launcher owns Curator env-ID aliases and the env-ID / system-ID / `ax`-provider map. |
++| §4.2–§4.3 | Resolve a runtime/vendor and choose an admitted model and declared effort, including runtime-scoped Pi fallback. | `vendorplugin.Registry.ResolveRuntime`, `RuntimeModels`, `Lineup` / `LineupOf`, runtime declarations and model rows. | Satisfied before this task. The ordered Pi runtime preference is launcher convention; the module supplies each runtime's declared rows. |
++| §4.3–§4.4 | Admit the resolved model/effort pair through the vendor and system boundary; build an interactive plan without bypassing vendor admission. | `vendorplugin.BuildLaunch` / `BuildLaunchWithEnvironment`, `SpawnRequest`, `agentic.LaunchRequest`, `agentic.BuildPlan`; typed admission and launch errors. | Satisfied before this task. |
++| §4.3–§4.4, §4.6 | Map `native` / `yolo`, reject duplicate or conflicting native policy selectors, and bind that grammar to an exact verified tool release. | `LaunchRequest.PermissionMode`, `ToolRelease`, `NativeArgs`; `agentic.LookupReleaseCapability`; plugin-owned release rows and argv builders; `ErrPermissionModeUnsupported`, `ErrPermissionModeDuplicate`, `ErrNativePolicyConflict`, `ErrNativePolicyUnknown`, `ErrPermissionModeUnverifiedRelease`. `BuildLaunch` reaches the production gates. | Satisfied before this task. Unknown/unverified releases fail closed; native mode keeps its verbatim forwarding contract. |
++| §4.3–§4.4 | Establish the running release from the launch environment instead of synthesizing it. | `agentic.ProbeToolRelease`, optional `ToolReleaseProber`, `ErrToolReleaseUndetected`. The local Pi wrapper intentionally has no Pi release probe. | Satisfied before this task. The caller passes an empty release after a failed probe; release-bound yolo/classification refuses. |
++| §4.3, §4.4, §4.6 | Inspect known stored-policy relaxations and distinguish inspected, unavailable, and unsupported sources. | `agentic.InspectStoredPolicy(system, plan)`, `StoredPolicyInspection`, typed support/source results. | Satisfied before this task for declared inspectors. Unsupported is distinct from a clean scan. |
++| §4.4 | Check the same resolved runtime/model/managed-home tuple for provider-limit serviceability; preserve read errors as errors. | `providerlimits.Store.AvailabilityFor`, `VerdictQuery`, `Availability.Serviceable`, state and read-failure evidence. | Satisfied before this task. This is a separate launcher-invoked read; `BuildLaunch` does not do it. |
++| §4.4–§4.5 | Return a value-only plan with argv, child environment, stdin, workdir, and binary; refuse unsupported interactive parameters/composition. | `agentic.Plan`, `BuildPlanWithEnvironment`, `System.ChildEnv`, `ErrCompositionNotInteractive`, `ErrParameterNotInteractive`; `vendorplugin.BuildLaunchWithEnvironment` returns owned environment literals. | Satisfied before this task. The launcher applies fragment channels and does not overlay inherited names under `Plan.Env`. |
++| §4.5–§4.6 | Classify whether the native suffix selects a known non-interactive form so the launcher can resolve silent headless permission defaults. The shared flag parser must keep prompt text after `--` opaque. | **Added:** `agentic.Registry.ClassifyNonInteractiveArgs`; `NonInteractiveArgumentClassifier`; `NativeArgsClassification{Form, Grammar}`; plugin classifiers backed by `internal/nativeargs` and each plugin's `ReleaseCapability` rows. | **MISSING before this task; added and covered below.** Unknown systems and unverified releases fail closed with typed errors. |
++| §4.5–§4.7 | Decode Curator fragments, own `defaults.json` / `ax.json`, compose system-prompt/MCP channels, stat launcher-owned files, select `ax` vs exec, and emit launcher diagnostics. | Launcher-owned per the SPEC; module APIs above provide plans, declarations, and typed plugin failures. | No module capability is required. No duplicate launcher API was added. |
++
++## Public classifier
++
++`agentic.Registry.ClassifyNonInteractiveArgs(systemID, toolRelease, suffix)` resolves the system through the existing registry, then dispatches through the optional `NonInteractiveArgumentClassifier` plugin capability. It copies the suffix before dispatch. The result carries `Form` and the same `permission-grammar-v1` or `permission-grammar-v2` token verified for that tool release; `IsNonInteractive()` is false for an empty form.
++
++| Environment/system | Verified release | Grammar | Form and tested placement rows |
++|---|---:|---|---|
++| `claude-code` | `2.1.261` | `permission-grammar-v2` | print: short flag, long flag with `=`, long flag with a separate prompt token |
++| `codex` | `0.153.2` | `permission-grammar-v2` | `exec` and its `e` alias: command at the start, after an equals-form root option, and after separate-value root options |
++| `pi-native` | `0.84.2` | `permission-grammar-v1` | print: short flag, long flag with `=`, long flag with a separate prompt token |
++
++The plugin packages own their tool-specific spellings. All classifiers stop at the shared `--` boundary. Codex skips root option values whose arity is declared in the pinned plugin grammar before identifying its first command token, so a value equal to `exec` is not treated as a subcommand. A root flag whose arity the classifier does not model returns `ErrNativeArgsClassificationIndeterminate` because its following token could be a value; callers must not treat the error as interactive. The `pi` system is a local-runtime wrapper rather than the native Pi CLI and returns `ErrNativeArgsClassifierUnsupported`; the launcher's Pi mapping uses `pi-native`.
++
++Typed refusals are `ErrUnknownSystem` for an unregistered system, `ErrNativeArgsClassifierUnsupported` for a registered system without the optional capability, `ErrPermissionModeUnverifiedRelease` for an absent or unverified tool release, and `ErrNativeArgsClassificationIndeterminate` when the plugin cannot establish the suffix grammar.
++
++## Tests, mutation evidence, and validation
++
++The public registry entry point is driven with fake argument suffixes; no provider or `ax` process was run. Positive rows cover each mapped environment/form and `=`/separate placement, including Codex's `e` alias and an exec command after `--local-provider`. Negative rows cover each print/exec spelling after `--`, a print-looking token after a prior flag and separator, `exec` as a Codex model value, an unmodeled Codex root flag before `exec` returning `ErrNativeArgsClassificationIndeterminate`, unknown systems, an unsupported wrapper system, empty releases, and unverified releases.
++
++Six one-change mutants were applied and tested in disposable copies, then the copies were removed. All six were killed (the mutant test command exited 1 on the named assertion):
++
++| Mutant | Test that failed | Result |
++|---|---|---|
++| Narrow print classification to exact flag elements, losing `=` recognition. | `TestRegistryClassifiesVersionedNonInteractiveFormsByEnvironmentAndPlacement` | Killed; Claude `--print=true` became interactive. |
++| Narrow the separator stop to work only before any prior flag. | `TestRegistryClassifierStopsBeforePromptText` | Killed; `--print` after `--verbose --` was classified. |
++| Narrow Codex root-option value skipping to `--config` only. | `TestCodexClassifierDoesNotTreatAnOptionValueAsTheExecCommand` | Killed; the `--model` value `exec` became a subcommand. |
++| Narrow unknown-root-flag handling so an unmodeled option is treated as a no-value flag. | `TestCodexClassifierFailsClosedForAnUnmodeledRootFlag` | Killed; the following `exec` was misclassified as a subcommand instead of returning the indeterminate error. |
++| Narrow verified-release admission by rejecting Codex's pinned release. | `TestRegistryClassifiesVersionedNonInteractiveFormsByEnvironmentAndPlacement` | Killed; all Codex positive release rows refused. |
++| Widen release lookup by substituting the pinned Codex release for caller input. | `TestNonInteractiveClassifierFailsClosedForUnknownOrUnverifiedInputs` | Killed; empty and unverified Codex releases were admitted. |
++
++The first probe for the new root-arity mutant used the Codex system package with a test name that lives in `pkg/agentic`; it exited 0 with `[no tests to run]` and is not counted. The corrected public-registry probe in `pkg/agentic` exited 1 as expected and killed the mutant; it was rerun after the indeterminate-error change and again exited 1 as expected. During implementation, focused package runs exited 1 because the Codex argvguard treated the parser helper as a construction site and found a duplicated bypass spelling; the parser now references the existing bypass constant, and both read-only parser helpers have justified allowlist entries. Two full-suite runs also exited 1 because Muse's cross-plugin argv guard interpreted Codex's legitimate `--yolo` native alias as a second Muse construction site. Muse's guard now allows only the Codex alias constant and read-only classifier, with the overlap documented; the focused suite including both plugin guards and the final full suite exited 0. A parallel `golangci-lint run --new ./...` attempt exited 3 because golangci-lint was already running concurrently; its standalone rerun exited 0. The full lint command exited 1 on 20 pre-existing findings in untouched files, while the task diff had 0 new lint issues.
++
++Validation commands and real exit codes:
++
++| Command | Exit |
++|---|---:|
++| `go test ./pkg/agentic ./pkg/agentic/systems/claude ./pkg/agentic/systems/codex ./pkg/agentic/systems/muse ./pkg/agentic/systems/pinative` | 0 |
++| `go test ./...` | 0 |
++| `go vet ./...` | 0 |
++| `go build ./...` | 0 |
++| `golangci-lint run --new ./...` | 0 — 0 new issues |
++| `golangci-lint run ./...` | 1 — 20 pre-existing issues in untouched files; none in this task's changed lines |
++| `git diff --check` | 0 |
++
++The release note is under `## Unreleased` and identifies expected v0.5.22. Per the campaign rules, the orchestrator cuts the release tag after landing; this producer did not tag. Repository-wide lint cleanup is outside this task; the new diff is lint-clean. Campaign rules prohibit editing `LOGBOOK.md`; this task-scoped outcome records the relevant findings for the handoff.
+diff --git a/pkg/agentic/noninteractive.go b/pkg/agentic/noninteractive.go
+new file mode 100644
+index 0000000..1ada30e
+--- /dev/null
++++ b/pkg/agentic/noninteractive.go
+@@ -0,0 +1,64 @@
++package agentic
++
++import (
++	"errors"
++	"fmt"
++)
++
++// NonInteractiveForm identifies a closed command form that runs without an
++// interactive terminal session. An empty form means the native suffix does
++// not select a known non-interactive form for the verified release.
++type NonInteractiveForm string
++
++const (
++	NonInteractiveFormNone  NonInteractiveForm = ""
++	NonInteractiveFormPrint NonInteractiveForm = "print"
++	NonInteractiveFormExec  NonInteractiveForm = "exec"
++)
++
++// NativeArgsClassification is the release-bound result of classifying one
++// caller-owned native-argument suffix. Grammar is the same permission-grammar
++// version verified for the system and tool release.
++type NativeArgsClassification struct {
++	Form    NonInteractiveForm
++	Grammar PermissionGrammarVersion
++}
++
++// IsNonInteractive reports whether Form names a recognized non-interactive
++// command form.
++func (c NativeArgsClassification) IsNonInteractive() bool {
++	return c.Form != NonInteractiveFormNone
++}
++
++// NonInteractiveArgumentClassifier is an optional system capability. A
++// classifier must verify the exact tool release using its plugin-owned
++// ReleaseCapability rows before examining native arguments.
++type NonInteractiveArgumentClassifier interface {
++	ClassifyNonInteractiveArgs(toolRelease string, suffix []string) (NativeArgsClassification, error)
++}
++
++var (
++	ErrNativeArgsClassifierUnsupported       = errors.New("agentic: system has no verified native-argument non-interactive classifier")
++	ErrNativeArgsClassificationIndeterminate = errors.New("agentic: native-argument form cannot be determined under the verified grammar")
++)
++
++// ClassifyNonInteractiveArgs resolves systemID through this registry and asks
++// that system's release-bound classifier whether suffix selects a known
++// non-interactive form. Unknown systems return ErrUnknownSystem; a release
++// that is absent or unverified returns ErrPermissionModeUnverifiedRelease.
++// A plugin may return ErrNativeArgsClassificationIndeterminate when the
++// suffix contains syntax whose meaning is not established by the verified
++// grammar; callers must not treat that as an interactive classification.
++// The suffix is copied at the registry boundary so a plugin cannot mutate the
++// caller's argv storage.
++func (r *Registry) ClassifyNonInteractiveArgs(systemID SystemID, toolRelease string, suffix []string) (NativeArgsClassification, error) {
++	system, ok := r.Lookup(systemID)
++	if !ok {
++		return NativeArgsClassification{}, fmt.Errorf("%w: %s", ErrUnknownSystem, systemID)
++	}
++	classifier, ok := system.(NonInteractiveArgumentClassifier)
++	if !ok {
++		return NativeArgsClassification{}, fmt.Errorf("%w: %s", ErrNativeArgsClassifierUnsupported, system.ID())
++	}
++	return classifier.ClassifyNonInteractiveArgs(toolRelease, append([]string(nil), suffix...))
++}
+diff --git a/pkg/agentic/noninteractive_test.go b/pkg/agentic/noninteractive_test.go
+new file mode 100644
+index 0000000..d31ae01
+--- /dev/null
++++ b/pkg/agentic/noninteractive_test.go
+@@ -0,0 +1,139 @@
++package agentic_test
++
++import (
++	"errors"
++	"testing"
++
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/claude"
++	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/codex"
++	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/pi"
++	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/pinative"
++)
++
++func TestRegistryClassifiesVersionedNonInteractiveFormsByEnvironmentAndPlacement(t *testing.T) {
++	tests := []struct {
++		name    string
++		system  agentic.SystemID
++		release string
++		suffix  []string
++		form    agentic.NonInteractiveForm
++		grammar agentic.PermissionGrammarVersion
++	}{
++		{"claude print short flag", "claude-code", "2.1.261", []string{"-p"}, agentic.NonInteractiveFormPrint, agentic.PermissionGrammarV2},
++		{"claude print equals placement", "claude-code", "2.1.261", []string{"--print=true"}, agentic.NonInteractiveFormPrint, agentic.PermissionGrammarV2},
++		{"claude print with separate prompt", "claude-code", "2.1.261", []string{"--print", "summarize this"}, agentic.NonInteractiveFormPrint, agentic.PermissionGrammarV2},
++		{"codex exec command", "codex", "0.153.2", []string{"exec", "summarize this"}, agentic.NonInteractiveFormExec, agentic.PermissionGrammarV2},
++		{"codex exec alias", "codex", "0.153.2", []string{"e", "summarize this"}, agentic.NonInteractiveFormExec, agentic.PermissionGrammarV2},
++		{"codex exec after equals option", "codex", "0.153.2", []string{"--model=gpt-test", "exec", "summarize this"}, agentic.NonInteractiveFormExec, agentic.PermissionGrammarV2},
++		{"codex exec after separate option", "codex", "0.153.2", []string{"--model", "gpt-test", "exec", "summarize this"}, agentic.NonInteractiveFormExec, agentic.PermissionGrammarV2},
++		{"codex exec after other separate option", "codex", "0.153.2", []string{"--local-provider", "ollama", "exec", "summarize this"}, agentic.NonInteractiveFormExec, agentic.PermissionGrammarV2},
++		{"pi print short flag", "pi-native", "0.84.2", []string{"-p"}, agentic.NonInteractiveFormPrint, agentic.PermissionGrammarV1},
++		{"pi print equals placement", "pi-native", "0.84.2", []string{"--print=true"}, agentic.NonInteractiveFormPrint, agentic.PermissionGrammarV1},
++		{"pi print with separate prompt", "pi-native", "0.84.2", []string{"--print", "summarize this"}, agentic.NonInteractiveFormPrint, agentic.PermissionGrammarV1},
++	}
++
++	for _, tt := range tests {
++		t.Run(tt.name, func(t *testing.T) {
++			got, err := agentic.Default.ClassifyNonInteractiveArgs(tt.system, tt.release, tt.suffix)
++			if err != nil {
++				t.Fatalf("ClassifyNonInteractiveArgs: %v", err)
++			}
++			if !got.IsNonInteractive() || got.Form != tt.form || got.Grammar != tt.grammar {
++				t.Fatalf("classification = %#v, want form %q under %q", got, tt.form, tt.grammar)
++			}
++		})
++	}
++}
++
++func TestRegistryClassifierStopsBeforePromptText(t *testing.T) {
++	tests := []struct {
++		name    string
++		system  agentic.SystemID
++		release string
++		suffix  []string
++		grammar agentic.PermissionGrammarVersion
++	}{
++		{"claude print-looking prompt", "claude-code", "2.1.261", []string{"--", "--print"}, agentic.PermissionGrammarV2},
++		{"claude short print-looking prompt", "claude-code", "2.1.261", []string{"--", "-p"}, agentic.PermissionGrammarV2},
++		{"claude print-looking prompt after a flag", "claude-code", "2.1.261", []string{"--verbose", "--", "--print"}, agentic.PermissionGrammarV2},
++		{"codex exec-looking prompt", "codex", "0.153.2", []string{"--", "exec"}, agentic.PermissionGrammarV2},
++		{"pi print-looking prompt", "pi-native", "0.84.2", []string{"--", "--print"}, agentic.PermissionGrammarV1},
++		{"pi short print-looking prompt", "pi-native", "0.84.2", []string{"--", "-p"}, agentic.PermissionGrammarV1},
++	}
++
++	for _, tt := range tests {
++		t.Run(tt.name, func(t *testing.T) {
++			got, err := agentic.Default.ClassifyNonInteractiveArgs(tt.system, tt.release, tt.suffix)
++			if err != nil {
++				t.Fatalf("ClassifyNonInteractiveArgs: %v", err)
++			}
++			if got.IsNonInteractive() || got.Form != agentic.NonInteractiveFormNone || got.Grammar != tt.grammar {
++				t.Fatalf("classification = %#v, want interactive under %q", got, tt.grammar)
++			}
++		})
++	}
++}
++
++func TestCodexClassifierDoesNotTreatAnOptionValueAsTheExecCommand(t *testing.T) {
++	got, err := agentic.Default.ClassifyNonInteractiveArgs("codex", "0.153.2", []string{"--model", "exec"})
++	if err != nil {
++		t.Fatalf("ClassifyNonInteractiveArgs: %v", err)
++	}
++	if got.IsNonInteractive() || got.Form != agentic.NonInteractiveFormNone {
++		t.Fatalf("classification = %#v, want interactive because exec is the model option value", got)
++	}
++}
++
++func TestCodexClassifierFailsClosedForAnUnmodeledRootFlag(t *testing.T) {
++	tests := []struct {
++		name   string
++		suffix []string
++	}{
++		{"unknown option", []string{"--unknown-root-option", "exec"}},
++		{"variadic image option", []string{"--image", "one.png", "two.png", "exec"}},
++	}
++	for _, tt := range tests {
++		t.Run(tt.name, func(t *testing.T) {
++			_, err := agentic.Default.ClassifyNonInteractiveArgs("codex", "0.153.2", tt.suffix)
++			if !errors.Is(err, agentic.ErrNativeArgsClassificationIndeterminate) {
++				t.Fatalf("error = %v, want ErrNativeArgsClassificationIndeterminate", err)
++			}
++		})
++	}
++}
++
++func TestNonInteractiveClassifierFailsClosedForUnknownOrUnverifiedInputs(t *testing.T) {
++	t.Run("unknown system", func(t *testing.T) {
++		_, err := agentic.Default.ClassifyNonInteractiveArgs("opencode", "1.0.0", []string{"--print"})
++		if !errors.Is(err, agentic.ErrUnknownSystem) {
++			t.Fatalf("error = %v, want ErrUnknownSystem", err)
++		}
++	})
++
++	t.Run("registered system without this capability", func(t *testing.T) {
++		_, err := agentic.Default.ClassifyNonInteractiveArgs("pi", "0.84.2", []string{"spawn"})
++		if !errors.Is(err, agentic.ErrNativeArgsClassifierUnsupported) {
++			t.Fatalf("error = %v, want ErrNativeArgsClassifierUnsupported", err)
++		}
++	})
++
++	for _, system := range []struct {
++		id      agentic.SystemID
++		release string
++	}{
++		{"claude-code", "2.1.262"},
++		{"codex", "0.153.3"},
++		{"pi-native", "0.84.3"},
++		{"claude-code", ""},
++		{"codex", ""},
++		{"pi-native", ""},
++	} {
++		t.Run(string(system.id)+"/"+system.release, func(t *testing.T) {
++			_, err := agentic.Default.ClassifyNonInteractiveArgs(system.id, system.release, []string{"--print"})
++			if !errors.Is(err, agentic.ErrPermissionModeUnverifiedRelease) {
++				t.Fatalf("error = %v, want ErrPermissionModeUnverifiedRelease", err)
++			}
++		})
++	}
++}
+diff --git a/pkg/agentic/systems/claude/policy.go b/pkg/agentic/systems/claude/policy.go
+index 53d5b2c..565173e 100644
+--- a/pkg/agentic/systems/claude/policy.go
++++ b/pkg/agentic/systems/claude/policy.go
+@@ -30,8 +30,28 @@ const permissionModeFlag = "--permission-mode"
+ const (
+ 	allowDangerouslySkipPermissionsFlag = "--allow-dangerously-skip-permissions"
+ 	restrictedFlag                      = "--restricted"
++	printShortFlag                      = "-p"
++	printLongFlag                       = "--print"
+ )
+ 
++// ClassifyNonInteractiveArgs reports whether the caller suffix selects
++// Claude's print form. It uses the same exact release row and permission
++// grammar as the yolo conflict scanner; prompt text after `--` is excluded by
++// the shared nativeargs flag-position parser.
++func (*System) ClassifyNonInteractiveArgs(toolRelease string, suffix []string) (agentic.NativeArgsClassification, error) {
++	capability, err := agentic.LookupReleaseCapability(verifiedReleases, toolRelease)
++	if err != nil {
++		return agentic.NativeArgsClassification{}, fmt.Errorf("claude: %w", err)
++	}
++	for _, index := range nativeargs.FlagIndexes(suffix) {
++		name, _, _ := nativeargs.SplitFlagValue(suffix[index])
++		if name == printShortFlag || name == printLongFlag {
++			return agentic.NativeArgsClassification{Form: agentic.NonInteractiveFormPrint, Grammar: capability.Grammar}, nil
++		}
++	}
++	return agentic.NativeArgsClassification{Grammar: capability.Grammar}, nil
++}
++
+ // knownPermissionModes is the closed `--permission-mode` value set at
+ // the pinned release: the six choices `claude --help` lists
+ // ("acceptEdits", "auto", "bypassPermissions", "manual", "dontAsk",
+diff --git a/pkg/agentic/systems/codex/args.go b/pkg/agentic/systems/codex/args.go
+index 45f42c0..9f0e1ae 100644
+--- a/pkg/agentic/systems/codex/args.go
++++ b/pkg/agentic/systems/codex/args.go
+@@ -64,6 +64,11 @@ import (
+ // proof — whose signature carries this flag — holds it.
+ const bypassApprovalsAndSandboxFlag = "--dangerously-bypass-approvals-and-sandbox"
+ 
++// yoloAliasFlag is a provider-owned alias accepted by Codex for the same
++// native option. It is recognized when classifying caller args but is never
++// emitted by this module.
++const yoloAliasFlag = "--yolo"
++
+ // Args builds the codex argv for one launch mode, excluding the binary.
+ //
+ // It is the single construction site. Every surface of this plugin that needs
+diff --git a/pkg/agentic/systems/codex/argvguard_test.go b/pkg/agentic/systems/codex/argvguard_test.go
+index fd69f92..b5bef21 100644
+--- a/pkg/agentic/systems/codex/argvguard_test.go
++++ b/pkg/agentic/systems/codex/argvguard_test.go
+@@ -91,8 +91,10 @@ var codexArgvConstructionAllowlist = map[string]string{
+ 	// appends no flag of its own, so a second construction hiding behind
+ 	// this exemption would have to spell a signature literal this
+ 	// function never emits.
+-	argvguard.AllowlistKey(codexPolicyFile, "scanNativePolicy"):    "classifies caller native args against the closed key set under yolo; it references the table and the bypass const to compare, and constructs no argv",
+-	argvguard.AllowlistKey(codexPolicyFile, "checkConfigOverride"): "the one-override half of the scan, split out so the separate, `=`, and attached-short forms share one classifier",
++	argvguard.AllowlistKey(codexPolicyFile, "scanNativePolicy"):          "classifies caller native args against the closed key set under yolo; it references the table and the bypass const to compare, and constructs no argv",
++	argvguard.AllowlistKey(codexPolicyFile, "checkConfigOverride"):       "the one-override half of the scan, split out so the separate, `=`, and attached-short forms share one classifier",
++	argvguard.AllowlistKey(codexPolicyFile, "codexRootOptionTakesValue"): "classifies caller-owned suffix positions so the registered command classifier does not mistake an option value for the exec subcommand; emits no argv",
++	argvguard.AllowlistKey(codexPolicyFile, "codexRootOptionIsBoolean"):  "recognizes pinned root flags while classifying caller-owned suffix positions; emits no argv",
+ }
+ 
+ // moduleGoSources reads every non-test Go file this module's build compiles.
+diff --git a/pkg/agentic/systems/codex/policy.go b/pkg/agentic/systems/codex/policy.go
+index fb34bd4..f9ffb04 100644
+--- a/pkg/agentic/systems/codex/policy.go
++++ b/pkg/agentic/systems/codex/policy.go
+@@ -66,6 +66,75 @@ const approveForMeFlag = "--approve-for-me"
+ // verbatim with no claim, like every other known key.
+ const mcpServersKeyPrefix = "mcp_servers."
+ 
++// ClassifyNonInteractiveArgs reports the Codex exec subcommand (or its `e`
++// alias) when it is the first positional command in the caller suffix. Known
++// root options are parsed using this release's command grammar; an unknown
++// or unmodeled root flag returns ErrNativeArgsClassificationIndeterminate
++// because its value arity is not established by this classifier. The scan
++// also stops at `--`, so prompt text can never become a subcommand.
++func (*System) ClassifyNonInteractiveArgs(toolRelease string, suffix []string) (agentic.NativeArgsClassification, error) {
++	capability, err := agentic.LookupReleaseCapability(verifiedReleases, toolRelease)
++	if err != nil {
++		return agentic.NativeArgsClassification{}, fmt.Errorf("codex: %w", err)
++	}
++	form, err := classifyCodexNonInteractiveForm(suffix)
++	if err != nil {
++		return agentic.NativeArgsClassification{}, fmt.Errorf("codex: %w", err)
++	}
++	return agentic.NativeArgsClassification{Form: form, Grammar: capability.Grammar}, nil
++}
++
++func classifyCodexNonInteractiveForm(suffix []string) (agentic.NonInteractiveForm, error) {
++	for i := 0; i < len(suffix); i++ {
++		el := suffix[i]
++		if nativeargs.IsSeparator(el) {
++			return agentic.NonInteractiveFormNone, nil
++		}
++		if !nativeargs.IsFlagElement(el) {
++			if el == "exec" || el == "e" {
++				return agentic.NonInteractiveFormExec, nil
++			}
++			return agentic.NonInteractiveFormNone, nil
++		}
++		name, _, hasValue := nativeargs.SplitFlagValue(el)
++		if codexRootOptionTakesValue(name) {
++			if !hasValue {
++				if i+1 >= len(suffix) || nativeargs.IsSeparator(suffix[i+1]) {
++					return agentic.NonInteractiveFormNone, nil
++				}
++				i++
++			}
++			continue
++		}
++		if !codexRootOptionIsBoolean(name) {
++			// An unknown or unmodeled root flag may take a value. Without its
++			// release-pinned arity, a following "exec" could be an option value
++			// rather than a subcommand, so this suffix does not establish a known
++			// form.
++			return agentic.NonInteractiveFormNone, fmt.Errorf("%w: codex root flag %q", agentic.ErrNativeArgsClassificationIndeterminate, name)
++		}
++	}
++	return agentic.NonInteractiveFormNone, nil
++}
++
++func codexRootOptionTakesValue(name string) bool {
++	switch name {
++	case "-C", "--cd", "--add-dir", "-m", "--model", "--local-provider", "-p", "--profile", "-c", "--config", "-a", "--ask-for-approval", "-s", "--sandbox", "--enable", "--disable", "--remote", "--remote-auth-token":
++		return true
++	default:
++		return false
++	}
++}
++
++func codexRootOptionIsBoolean(name string) bool {
++	switch name {
++	case "--oss", "--approve-for-me", "--not-so-yolo", bypassApprovalsAndSandboxFlag, yoloAliasFlag, "--dangerously-bypass-hook-trust", "--strict-config", "--search", "--no-alt-screen":
++		return true
++	default:
++		return false
++	}
++}
++
+ // scanNativePolicy classifies the flag positions of the caller's native
+ // arguments under yolo, against the pinned release's closed grammar.
+ // nativeargs.FlagIndexes is the only positions reader: prompt text —
+diff --git a/pkg/agentic/systems/muse/argvguard_test.go b/pkg/agentic/systems/muse/argvguard_test.go
+index 501af52..e19aed7 100644
+--- a/pkg/agentic/systems/muse/argvguard_test.go
++++ b/pkg/agentic/systems/muse/argvguard_test.go
+@@ -30,9 +30,10 @@ import (
+ //     code by accident, and a guard with false positives is a guard somebody
+ //     deletes.
+ //
+-// "--yolo" is muse's alone: qwen spells the VALUE "yolo" as the argument to
+-// --approval-mode, which is a different literal, and exact matching keeps the
+-// two apart.
++// "--yolo" is Muse's approval flag. Codex also accepts that spelling as an
++// alias for its bypass flag; its only occurrences are the centralized Codex
++// grammar constant and the read-only native-argument classifier. Those two
++// exact sites are allowlisted below and remain covered by Codex's argv guard.
+ //
+ // "--reasoning-effort" passes the same test and is muse's alone for the same
+ // reason exact matching gives: codex carries effort as the config override
+@@ -46,6 +47,8 @@ var museArgvSignature = []string{
+ }
+ 
+ const museArgsFile = "pkg/agentic/systems/muse/args.go"
++const codexArgsFile = "pkg/agentic/systems/codex/args.go"
++const codexPolicyFile = "pkg/agentic/systems/codex/policy.go"
+ 
+ // museArgvConstructionAllowlist names the only sites permitted to spell a
+ // signature literal, each with the reason it is not a second construction.
+@@ -54,7 +57,9 @@ const museArgsFile = "pkg/agentic/systems/muse/args.go"
+ // this module name their construction site Args, so a bare-name allowlist would
+ // exempt every Args in the module from every plugin's guard.
+ var museArgvConstructionAllowlist = map[string]string{
+-	argvguard.AllowlistKey(museArgsFile, "Args"): "the single construction site",
++	argvguard.AllowlistKey(museArgsFile, "Args"):                        "the single construction site",
++	argvguard.AllowlistKey(codexArgsFile, "yoloAliasFlag"):              "Codex's native alias has the same spelling as Muse's flag; this constant is read by the Codex classifier and is never emitted",
++	argvguard.AllowlistKey(codexPolicyFile, "codexRootOptionIsBoolean"): "the Codex classifier recognizes the overlapping native alias while reading caller args; it emits no argv",
+ }
+ 
+ // moduleGoSources reads every non-test Go file this module's build compiles,
+@@ -135,9 +140,10 @@ func TestTheMuseArgvGuardFiresOnTheRealConstructionSite(t *testing.T) {
+ // TestTheMuseGuardDoesNotFireOnTheOtherPlugins is the cross-plugin
+ // false-positive bound, measured against real neighbouring code.
+ //
+-// qwen is the interesting one: it spells the VALUE "yolo" where this signature
+-// spells the FLAG "--yolo". Exact matching is what keeps the two apart, and
+-// this is where that claim is measured rather than asserted.
++// Codex is the intentional overlap: its native CLI alias has the same spelling
++// as Muse's flag, so only the two exact, parser-only sites listed in the
++// allowlist above are accepted. Other plugins still have to avoid the
++// signature, including qwen's separate "yolo" value spelling.
+ func TestTheMuseGuardDoesNotFireOnTheOtherPlugins(t *testing.T) {
+ 	sources := moduleGoSources(t)
+ 	for _, plugin := range []string{"codex", "claude", "qwen", "gemini", "agy"} {
+diff --git a/pkg/agentic/systems/pinative/policy.go b/pkg/agentic/systems/pinative/policy.go
+index 3b15c5e..4394630 100644
+--- a/pkg/agentic/systems/pinative/policy.go
++++ b/pkg/agentic/systems/pinative/policy.go
+@@ -1,6 +1,11 @@
+ package pinative
+ 
+-import "github.com/relux-works/skill-agents-management/pkg/agentic"
++import (
++	"fmt"
++
++	"github.com/relux-works/skill-agents-management/internal/nativeargs"
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
+ 
+ // verifiedReleases is this environment's rows of the versioned
+ // provider-capability table (curator-spec Decision 0018 choice 6).
+@@ -15,3 +20,25 @@ import "github.com/relux-works/skill-agents-management/pkg/agentic"
+ var verifiedReleases = []agentic.ReleaseCapability{
+ 	{Release: "0.84.2", Grammar: agentic.PermissionGrammarV1, YoloSupported: false},
+ }
++
++const (
++	printShortFlag = "-p"
++	printLongFlag  = "--print"
++)
++
++// ClassifyNonInteractiveArgs reports whether the caller suffix selects Pi's
++// one-shot print form. It verifies the same release row as permission policy
++// handling and delegates flag positions to the shared native-argument grammar.
++func (*System) ClassifyNonInteractiveArgs(toolRelease string, suffix []string) (agentic.NativeArgsClassification, error) {
++	capability, err := agentic.LookupReleaseCapability(verifiedReleases, toolRelease)
++	if err != nil {
++		return agentic.NativeArgsClassification{}, fmt.Errorf("pinative: %w", err)
++	}
++	for _, index := range nativeargs.FlagIndexes(suffix) {
++		name, _, _ := nativeargs.SplitFlagValue(suffix[index])
++		if name == printShortFlag || name == printLongFlag {
++			return agentic.NativeArgsClassification{Form: agentic.NonInteractiveFormPrint, Grammar: capability.Grammar}, nil
++		}
++	}
++	return agentic.NativeArgsClassification{Grammar: capability.Grammar}, nil
++}
