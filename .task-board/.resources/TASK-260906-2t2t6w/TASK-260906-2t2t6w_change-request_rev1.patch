@@ -1,0 +1,362 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 01dee93..c1b015c 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -3,7 +3,7 @@
+ ## 0.1.0 — unreleased
+ 
+ Release-readiness candidate; source builds report `0.1.0-dev`, against
+-SPEC `0.4.0-draft`. No tag or release is created by this work.
++SPEC `0.4.1-draft`. No tag or release is created by this work.
+ 
+ ### Added
+ 
+@@ -37,6 +37,13 @@ SPEC `0.4.0-draft`. No tag or release is created by this work.
+ 
+ - Plan/environment value-contract errata (PR #7) and Pi prompt precedence
+   errata (PR #8). Pi has no MCP channel.
++- SPEC `0.4.1-draft`: fold the four 0.2.1-review minors
++  (TASK-260906-2t2t6w) — the resolve pass-through clause for unmapped
++  `--repair` diagnostics (§4.1/§6), the ordered pre-launch checks with
++  the binary check first (§4.6; the implementation now runs
++  binary → layer stat → §5 probe and reports the first failure), the
++  silent-MCP-absence residual for `claude_code`/`opencode` (§9), and a
++  version-pin test that reads SPEC.md and README.md.
+ 
+ ### Dependencies
+ 
+diff --git a/README.md b/README.md
+index e27a651..5a82830 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ `curator-run` composes Curator's managed environment, agents-management's
+ admitted interactive plan, and optional ax tracking. The contract is
+-[SPEC 0.4.0-draft](SPEC.md).
++[SPEC 0.4.1-draft](SPEC.md).
+ 
+ ## Production pipeline
+ 
+@@ -92,7 +92,7 @@ sudo install -m 0755 curator-run /usr/local/bin/curator-run
+ curator-run --version
+ ```
+ 
+-This development build reports `0.1.0-dev` (specification `0.4.0-draft`).
++This development build reports `0.1.0-dev` (specification `0.4.1-draft`).
+ Ensure `/usr/local/bin` is on `PATH`, or install into a dedicated trusted
+ operator-owned directory on `PATH`. Do **not** install into Curator's user-bin
+ shim directory (`~/.local/bin`), a managed skill bin directory, or beneath the
+diff --git a/SPEC.md b/SPEC.md
+index d65b889..e8b6f28 100644
+--- a/SPEC.md
++++ b/SPEC.md
+@@ -1,6 +1,6 @@
+ # Curator Agent Launcher — Specification
+ 
+-**Specification version:** `0.4.0-draft`
++**Specification version:** `0.4.1-draft`
+ **Status:** in-repository draft (see [Versioning](#8-versioning))
+ 
+ The launcher is the **execution plane** of the four-plane composition fixed
+@@ -275,6 +275,18 @@ launch:
+   repair could not take Curator's mutation lock within its bounded wait —
+   a retry later is the remedy, and the launcher does not retry on its
+   own); any other non-zero exit is `resolve_invocation_failed`.
++  Making `--repair` unconditional widens the resolve failure surface
++  beyond the mapped four: a journaled mutation transaction can fail
++  with diagnostics environments.md §10.4 does not list and this
++  document therefore does not map (`environment_marker_invalid`,
++  `environment_surface_unmanaged_conflict`, `environment_backup_exists`
++  per §8.5, `environment_seed_unreadable` per §7.7). Every such exit
++  collapses into `resolve_invocation_failed`, and Curator's own
++  diagnostic code and message are printed verbatim with the launcher's
++  code line — streamed before it, the resolve transport's form of the
++  pass-through `ax_handoff_failed` gives `ax`'s Structured Error after
++  its line. The launcher's line names only the family; the operator
++  reads Curator's line for the remedy.
+   `environment_home_stale` cannot arise from a `--repair` invocation; a
+   Curator that nevertheless reports it is not the Curator this document
+   is written against, and the exit falls under `resolve_invocation_failed`
+@@ -728,9 +740,10 @@ is `exec_provider_missing`, reported with the exact executable name and
+ installation guidance; in tracked mode the launcher checks this before
+ the handoff so that `ax` is never asked to record a session for a binary
+ that is not there. The three pre-launch checks — this binary check, the
+-§4.5 codex layer stat, and the §5.1 file-kind probe — all run immediately
+-before the handoff or exec, in both modes, so that `ax` is never asked to
+-record a session the launcher already knows is wrong.
++§4.5 codex layer stat, and the §5.1 file-kind probe — run in this order,
++immediately before the handoff or exec, in both modes, and the first
++failure is the one reported, so that `ax` is never asked to record a
++session the launcher already knows is wrong.
+ 
+ ### 4.7 The launcher's configuration file family
+ 
+@@ -929,7 +942,7 @@ contract. Usage errors exit 2; every operational failure exits 1.
+ | Family | Codes | Condition |
+ |---|---|---|
+ | usage | `usage` | unknown flag, missing `<env-id>`, stray operand before `--`, repeated flag, invalid `--system-prompt` or `--ax-profile` value, `--name` outside the `ax` §2.1 grammar or over 64 characters, `--ax-profile` on an untracked machine, a flag overriding a locked default — exit 2, nothing resolved, nothing launched |
+-| resolve | `resolve_invocation_failed`, `resolve_environment_unknown`, `resolve_profile_unknown`, `resolve_repair_failed`, `resolve_lock_unavailable`, `resolve_fragment_invalid` | §4.1: the context plane could not produce a usable fragment — `curator` not startable or an unexpected non-zero exit; unregistered environment; uninstalled profile; the store cannot restore the stale home; the repair could not take Curator's mutation lock within its bounded wait; or the output is not a valid closed fragment |
++| resolve | `resolve_invocation_failed`, `resolve_environment_unknown`, `resolve_profile_unknown`, `resolve_repair_failed`, `resolve_lock_unavailable`, `resolve_fragment_invalid` | §4.1: the context plane could not produce a usable fragment — `curator` not startable, or a non-zero exit with an unmapped diagnostic, Curator's own code and message passed through verbatim; unregistered environment; uninstalled profile; the store cannot restore the stale home; the repair could not take Curator's mutation lock within its bounded wait; or the output is not a valid closed fragment |
+ | defaults | `defaults_config_invalid`, `defaults_unresolvable` | §4.3 and §4.6: a launcher-owned configuration file — `defaults.json` or `ax.json` (§4.7) — exists but cannot be read or parsed, or names an unknown env-id or member — a read failure, never an absence; the lineup admits no model for the mapped system after the flag and configuration levels left it unset |
+ | plan | `plan_refused`, `plan_provider_limited` | §4.4: the spawn plane refused the request (unknown system/runtime or model, model not driven by the system, mode not declared by the system, invalid or missing required effort, unresolved vendor, or failure to produce a provider-limits verdict), or the explicit provider-limits verdict was not serviceable (`AvailabilityHealthy`) — the verdict's structure and evidence are surfaced verbatim |
+ | environment | `env_unsupported` | §4.2: the environment has no spawn-plane or `ax` provider mapping in this revision |
+@@ -972,7 +985,7 @@ reordered.
+ ## 8. Versioning
+ 
+ - This specification is versioned semantically; the current version is
+-  **`0.4.0-draft`**. Draft versions may change incompatibly between
++  **`0.4.1-draft`**. Draft versions may change incompatibly between
+   commits; the `-draft` suffix is the signal that nothing downstream may
+   pin them.
+ - The `curator-run` binary reports both its build version and the
+@@ -988,6 +1001,7 @@ reordered.
+ 
+ | Version | Change |
+ |---|---|
++| `0.4.1-draft` | Four 0.2.1-review minors (TASK-260906-2t2t6w). §4.1/§6: the resolve pass-through clause — unmapped `--repair` diagnostics (`environment_marker_invalid`, `environment_surface_unmanaged_conflict`, `environment_backup_exists`, `environment_seed_unreadable`) collapse into `resolve_invocation_failed` with Curator's own code and message passed through verbatim, and the §6 gloss no longer leads with "`curator` not startable" for that class. §4.6: the three pre-launch checks run in the listed order — binary check first — and the first failure is the one reported. §9: the silent-MCP-absence residual for `claude_code` and `opencode` recorded. `TestSpecVersionPinned` now reads SPEC.md and README.md. |
+ | `0.3.0-draft` | §4.2: correct the Pi system to `pi-native` using accepted A0 E1/E2 and landed native-Pi support (PR23, `a2a6e9f`). Other API/environment errata remain separately tracked. |
+ | `0.4.0-draft` | E4 provider path (TASK-260916-16ys92). §2: the launcher is dispatched through the environments.md §11 trust-root resolution (curator-spec `0da4020`, PR #62) and reports its resolved executable path. §4.3: the stderr line-group grows to two lines — `curator-run: provider: path=<absolute path>` (own executable via `os.Executable` + `filepath.EvalSymlinks`, fallback `path=unavailable`, never fails the launch, folded with the existing framing rule) printed before the `defaults:` line at every launch; path-only in this revision because the umbrella passes no distinguishing marker, with the closed origin set deferred to a future revision. |
+ | `0.2.1-draft` | Follow-ups against environments.md 1.1 and the cycle-2 review. §4.1: the resolve invocation always passes `--repair`, with the read-only/fail-closed semantics of environments.md §10.1 stated, `resolve_repair_failed` kept, `resolve_lock_unavailable` added for `environment_lock_unavailable`, and `environment_home_stale` declared unreachable. §4.5: the codex layer file `<home>/curator-mcp.config.toml` MUST be stat-ed immediately before handoff or exec whenever the argv carries `-p curator-mcp` (a missing layer is silently ignored by codex, under `--strict-config` too), with `mcp_layer_missing` / `mcp_layer_unreadable`; `-p` takes exactly one value, so an operator `-p` after `--` fails the launch (Decision 0012 open question 3 closed). §4.6: `ax.json` `enabled: false` is not configured; the machine-over-operator precedence explained; the configuration read fires before a usage error. New §4.7 names the `defaults.json`/`ax.json` file family as launcher-owned knobs against the environments.md §12.1 manager knob table. §6: `defaults` row names §4.6/`ax.json`, `mcp` family added, invariant 1 extended. §9: docs-confidence item covers both files; codex `-p` item closed; residual-window item added. |
+@@ -1066,9 +1080,20 @@ reordered.
+   resolve time and not re-verified before exec; the launcher MAY re-verify
+   the marker-recorded hashes under a later revision, as §10.1 permits,
+   and this revision does not.
++- **Silent MCP absence beyond codex is unverified.** The §4.5 stat rule
++  exists because codex demonstrably swallows a missing `-p` layer —
++  exit 0, under `--strict-config` too. Whether `claude_code`
++  (`--mcp-config <missing path> --strict-mcp-config`) and `opencode`
++  (`OPENCODE_CONFIG` naming a missing file) also proceed silently when
++  their MCP configuration file is absent is **unverified** at the
++  pinned releases; if either does, the §4.5 stat rule generalizes to
++  it. The per-adapter rows of environments.md §7.8 are where such
++  facts belong upstream.
+ 
+ ## Specification changelog
+ 
++- 2026-09-22, 0.4.1-draft §§4.1/4.6/6/9 (TASK-260906-2t2t6w): fold the four 0.2.1-review minors. §4.1 gains the resolve pass-through clause — the widened `--repair` surface (`environment_marker_invalid`, `environment_surface_unmanaged_conflict`, `environment_backup_exists`, `environment_seed_unreadable`) collapses into `resolve_invocation_failed` with Curator's own code and message passed through verbatim — and the §6 gloss is fixed to match. §4.6 states the pre-launch check order (binary check first, first failure reported). §9 records the silent-MCP-absence residual for `claude_code` and `opencode`.
++
+ - 2026-09-17, 0.4.0-draft §2/§4.3 (E4, TASK-260916-16ys92): the launcher is dispatched through the environments.md §11 trust-root resolution and reports its own resolved executable path. §4.3 line-group grows to two lines: `curator-run: provider: path=<absolute path>` (os.Executable + filepath.EvalSymlinks; fallback `path=unavailable`, never fails the launch, folded with the existing framing rule) printed before the `defaults:` line at every launch. Path-only in this revision: the umbrella passes no distinguishing argv/env marker, so no closed origin set is defined yet.
+ 
+ - 2026-09-16, 0.3.0-draft §4.5 erratum: the owned environment literals are supplied by the admitted plan's snapshot (`BuildLaunchWithEnvironment`, agents-management v0.5.13). No second build or reconstruction of the effective request is required.
+diff --git a/cmd/curator-run/main.go b/cmd/curator-run/main.go
+index ee2dad7..199e3d4 100644
+--- a/cmd/curator-run/main.go
++++ b/cmd/curator-run/main.go
+@@ -27,7 +27,7 @@ import (
+ 
+ const (
+ 	name        = cli.Name
+-	specVersion = "0.4.0-draft"
++	specVersion = "0.4.1-draft"
+ 	// buildVersion is the launcher's own version; the specification
+ 	// version is reported beside it (SPEC §8).
+ 	buildVersion = "0.1.0-dev"
+diff --git a/cmd/curator-run/main_test.go b/cmd/curator-run/main_test.go
+index aaed27b..240c897 100644
+--- a/cmd/curator-run/main_test.go
++++ b/cmd/curator-run/main_test.go
+@@ -306,16 +306,26 @@ func TestRunResolveFailuresExit1(t *testing.T) {
+ 		name, stdout, stderr string
+ 		exit                 int
+ 		wantCode             string
++		// wantInDetail pins the remedy pointer for the widened --repair
++		// surface: the unmapped Curator code the launcher's own line names.
++		wantInDetail string
+ 	}{
+-		{"environment_unknown", "", "curator: environment_unknown: unregistered environment \"pi\"\n", 1, "resolve_environment_unknown"},
+-		{"profile_unknown", "", "curator: profile_unknown: no profile is current\n", 1, "resolve_profile_unknown"},
+-		{"repair_failed", "", "curator: environment_repair_failed: x\n", 1, "resolve_repair_failed"},
+-		{"lock_unavailable", "", "curator: environment_lock_unavailable: x\n", 1, "resolve_lock_unavailable"},
+-		{"home_stale is unexpected", "", "curator: environment_home_stale: x\n", 1, "resolve_invocation_failed"},
+-		{"no diagnostic", "", "boom\n", 3, "resolve_invocation_failed"},
+-		{"invalid fragment", "{\"fragment\":\"launch-env-fragment-v1\"}\n", "", 0, "resolve_fragment_invalid"},
+-		{"empty stdout is not absence", "", "", 0, "resolve_fragment_invalid"},
+-		{"other environment's fragment", strings.Replace(strings.Replace(piFragmentLine, `"environment":"pi"`, `"environment":"codex_cli"`, 1), "PI_CODING_AGENT_DIR", "CODEX_HOME", 1), "", 0, "resolve_fragment_invalid"},
++		{"environment_unknown", "", "curator: environment_unknown: unregistered environment \"pi\"\n", 1, "resolve_environment_unknown", ""},
++		{"profile_unknown", "", "curator: profile_unknown: no profile is current\n", 1, "resolve_profile_unknown", ""},
++		{"repair_failed", "", "curator: environment_repair_failed: x\n", 1, "resolve_repair_failed", ""},
++		{"lock_unavailable", "", "curator: environment_lock_unavailable: x\n", 1, "resolve_lock_unavailable", ""},
++		{"home_stale is unexpected", "", "curator: environment_home_stale: x\n", 1, "resolve_invocation_failed", ""},
++		{"no diagnostic", "", "boom\n", 3, "resolve_invocation_failed", ""},
++		// The widened --repair surface of SPEC §4.1: unmapped Curator
++		// diagnostics collapse into resolve_invocation_failed with
++		// Curator's own line forwarded verbatim ahead of the launcher's.
++		{"repair marker invalid", "", "curator: environment_marker_invalid: marker unreadable\n", 1, "resolve_invocation_failed", "environment_marker_invalid"},
++		{"repair unmanaged conflict", "", "curator: environment_surface_unmanaged_conflict: unmanaged file blocks repair\n", 1, "resolve_invocation_failed", "environment_surface_unmanaged_conflict"},
++		{"repair backup exists", "", "curator: environment_backup_exists: stale backup blocks repair\n", 1, "resolve_invocation_failed", "environment_backup_exists"},
++		{"repair seed unreadable", "", "curator: environment_seed_unreadable: seed unreadable\n", 1, "resolve_invocation_failed", "environment_seed_unreadable"},
++		{"invalid fragment", "{\"fragment\":\"launch-env-fragment-v1\"}\n", "", 0, "resolve_fragment_invalid", ""},
++		{"empty stdout is not absence", "", "", 0, "resolve_fragment_invalid", ""},
++		{"other environment's fragment", strings.Replace(strings.Replace(piFragmentLine, `"environment":"pi"`, `"environment":"codex_cli"`, 1), "PI_CODING_AGENT_DIR", "CODEX_HOME", 1), "", 0, "resolve_fragment_invalid", ""},
+ 	}
+ 	for _, c := range cases {
+ 		sr := &scriptedRunner{stdout: c.stdout, stderr: c.stderr, exit: c.exit}
+@@ -330,6 +340,9 @@ func TestRunResolveFailuresExit1(t *testing.T) {
+ 		if !strings.HasPrefix(errOut.String(), want) {
+ 			t.Errorf("%s: stderr %q, want prefix %q", c.name, errOut.String(), want)
+ 		}
++		if c.wantInDetail != "" && !strings.Contains(errOut.String(), c.wantInDetail) {
++			t.Errorf("%s: stderr %q does not name the unmapped diagnostic %q", c.name, errOut.String(), c.wantInDetail)
++		}
+ 		if strings.Contains(errOut.String(), "plan_refused") || out.Len() != 0 {
+ 			t.Errorf("%s: a failed resolve must not reach the refusal or stdout: %q %q", c.name, errOut.String(), out.String())
+ 		}
+@@ -381,10 +394,19 @@ func TestRunProductionResolverAgainstFakeCurator(t *testing.T) {
+ // TestSpecVersionPinned fails when the reported specification version
+ // drifts from the version SPEC.md and README.md state; the three are one fact.
+ func TestSpecVersionPinned(t *testing.T) {
+-	const want = "0.4.0-draft"
++	const want = "0.4.1-draft"
+ 	if specVersion != want {
+ 		t.Fatalf("specVersion = %q, want %q", specVersion, want)
+ 	}
++	for _, doc := range []string{"../../SPEC.md", "../../README.md"} {
++		data, err := os.ReadFile(doc)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if !strings.Contains(string(data), specVersion) {
++			t.Fatalf("%s does not state specVersion %q", doc, specVersion)
++		}
++	}
+ 	var out, errOut strings.Builder
+ 	if got := runNoResolve(t, []string{"--version"}, &out, &errOut); got != 0 {
+ 		t.Fatalf("run(--version) = %d, want 0", got)
+@@ -555,6 +577,7 @@ func TestRunDiagnosticsContract(t *testing.T) {
+ 		{"resolve repair failed", []string{"pi"}, "", "curator: environment_repair_failed: store\n", 1, "", "", "resolve_repair_failed", 1, false},
+ 		{"resolve lock unavailable", []string{"pi"}, "", "curator: environment_lock_unavailable: busy\n", 1, "", "", "resolve_lock_unavailable", 1, false},
+ 		{"resolve invocation failed", []string{"pi"}, "", "boom\n", 3, "", "", "resolve_invocation_failed", 1, false},
++		{"resolve invocation failed unmapped", []string{"pi"}, "", "curator: environment_marker_invalid: marker unreadable\n", 1, "", "", "resolve_invocation_failed", 1, false},
+ 		{"resolve fragment invalid", []string{"pi"}, "{}\n", "", 0, "", "", "resolve_fragment_invalid", 1, false},
+ 		{"env unsupported", []string{"opencode"}, opencodeLine, "", 0, "", "", "env_unsupported", 1, false},
+ 		{"defaults config invalid", []string{"pi"}, piFragmentLine, "", 0, "", "{", "defaults_config_invalid", 1, false},
+diff --git a/cmd/curator-run/testdata/help.golden b/cmd/curator-run/testdata/help.golden
+index 253e318..b712453 100644
+--- a/cmd/curator-run/testdata/help.golden
++++ b/cmd/curator-run/testdata/help.golden
+@@ -1,4 +1,4 @@
+-curator-run 0.1.0-dev (specification 0.4.0-draft)
++curator-run 0.1.0-dev (specification 0.4.1-draft)
+ 
+ usage: curator-run <env-id> [--profile <name>] [--system-prompt <append|replace>]
+                    [--model <model>] [--effort <effort>]
+diff --git a/internal/composition/probe.go b/internal/composition/probe.go
+index 9423c8d..e524539 100644
+--- a/internal/composition/probe.go
++++ b/internal/composition/probe.go
+@@ -23,7 +23,8 @@ func (e *LayerError) Unwrap() error { return e.Err }
+ 
+ // CheckLaunchBoundary probes the codex MCP layer afresh on every invocation.
+ // The execution Story MUST call this immediately before BOTH direct process
+-// creation and ax handoff, alongside binary and §5 file-kind checks. Compose
++// creation and ax handoff, after the binary check and before the §5
++// boundary (SPEC §4.6 order). Compose
+ // deliberately never calls it: a successful early check is stale evidence.
+ // This read-only check never removes flags, repairs files, or falls back.
+ // As with any pathname probe, a replacement after this check remains a TOCTOU
+diff --git a/internal/execution/execution.go b/internal/execution/execution.go
+index accf5dc..c44e687 100644
+--- a/internal/execution/execution.go
++++ b/internal/execution/execution.go
+@@ -143,9 +143,9 @@ func (l Launch) Run(opts Options) int {
+ 	}
+ 	cmd.Dir = l.value.WorkDir
+ 	cmd.Stdout = streams.Stdout
+-	if err := opts.Boundary(); err != nil {
+-		return fail(err)
+-	}
++	// SPEC §4.6 order: the binary check first, then the §4.5 codex layer
++	// stat, then the §5 boundary (the §5.1 file-kind probe); the first
++	// failure is the one reported.
+ 	binary, err := executable(l.value.Binary, l.value.WorkDir, l.value.Env)
+ 	if err != nil {
+ 		return fail(fmt.Errorf("exec_provider_missing: %s: install the provider executable and make it available on the launch PATH: %w", l.value.Binary, err))
+@@ -153,6 +153,9 @@ func (l Launch) Run(opts Options) int {
+ 	if err := l.value.CheckLaunchBoundary(); err != nil {
+ 		return fail(err)
+ 	}
++	if err := opts.Boundary(); err != nil {
++		return fail(err)
++	}
+ 	if !l.tracked {
+ 		cmd.Path = binary
+ 	}
+diff --git a/internal/execution/execution_test.go b/internal/execution/execution_test.go
+index 000a159..dd06541 100644
+--- a/internal/execution/execution_test.go
++++ b/internal/execution/execution_test.go
+@@ -20,6 +20,7 @@ import (
+ 
+ 	"github.com/relux-works/curator-agent-launcher/internal/cli"
+ 	"github.com/relux-works/curator-agent-launcher/internal/composition"
++	"github.com/relux-works/curator-agent-launcher/internal/diagnostics"
+ 	"github.com/relux-works/curator-agent-launcher/internal/execution"
+ 	"github.com/relux-works/curator-agent-launcher/internal/fragment"
+ 	"github.com/relux-works/curator-agent-launcher/internal/mapping"
+@@ -337,6 +338,65 @@ func TestLateChecksBothModes(t *testing.T) {
+ 		}
+ 	}
+ }
++
++// TestPrelaunchCheckOrder pins SPEC §4.6: the binary check runs first,
++// then the §4.5 codex layer stat, then the §5 boundary (the §5.1
++// file-kind probe), and the first failure is the one reported — exactly
++// one diagnostic code line on stderr. All three failures provoked at
++// once report the binary check.
++func TestPrelaunchCheckOrder(t *testing.T) {
++	for _, tracked := range []bool{false, true} {
++		for _, tc := range []struct {
++			name                    string
++			breakBinary, breakLayer bool
++			breakBoundary           bool
++			want                    string
++		}{
++			{"all three fail", true, true, true, "exec_provider_missing"},
++			{"stat before probe", false, true, true, "mcp_layer_missing"},
++			{"probe last", false, false, true, "sysprompt_file_unreadable"},
++		} {
++			t.Run(fmt.Sprintf("tracked=%v/%s", tracked, tc.name), func(t *testing.T) {
++				f, dir := fixture(t, "codex_cli", false)
++				v := compose(t, f, dir, agentic.StdinPayload{})
++				copyPath := filepath.Join(dir, "provider")
++				data, err := os.ReadFile(helper)
++				if err != nil {
++					t.Fatal(err)
++				}
++				write(t, copyPath, data)
++				os.Chmod(copyPath, 0700)
++				v.Binary = copyPath
++				if tc.breakBinary {
++					os.Remove(copyPath)
++				}
++				if tc.breakLayer {
++					os.Remove(f.MCP.Path)
++				}
++				boundary := execution.Boundary(func() error { return nil })
++				if tc.breakBoundary {
++					boundary = func() error { return errors.New("sysprompt_file_unreadable: \"SYSTEM.md\": probe refused") }
++				}
++				code, c, stderr := run(t, prepare(t, v, f, tracked, false), boundary)
++				equal(t, code, 1)
++				equal(t, c, capture{})
++				lines := strings.Split(strings.TrimSuffix(stderr, "\n"), "\n")
++				found := 0
++				for _, line := range lines {
++					if diagnostics.IsDiagnosticLine(line) {
++						found++
++						if !strings.HasPrefix(line, "curator-run: "+tc.want+": ") {
++							t.Fatalf("diagnostic line %q does not carry code %q", line, tc.want)
++						}
++					}
++				}
++				if found != 1 {
++					t.Fatalf("stderr has %d diagnostic lines, want exactly 1: %q", found, stderr)
++				}
++			})
++		}
++	}
++}
+ func TestAxFailureNoFallback(t *testing.T) {
+ 	for _, kind := range []string{"nonzero", "missing", "nonexec", "bad_format"} {
+ 		t.Run(kind, func(t *testing.T) {
