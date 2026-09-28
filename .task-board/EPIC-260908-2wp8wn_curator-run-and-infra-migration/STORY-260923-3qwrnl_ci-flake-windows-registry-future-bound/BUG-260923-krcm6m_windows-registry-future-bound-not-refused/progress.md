@@ -211,6 +211,13 @@ spawn selection rationale for muse-spark-1.3-contributor/xhigh: bound krcm6m-lan
 spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
 spawn queued: [implementer] developer (muse) (run=RUN-260925-9eccef, max_parallel=20)
 spawn run started: [implementer] developer (muse) (run=RUN-260925-9eccef)
+spawn run child final message (run=RUN-260925-9eccef, tools=29 patches=0 failed=0):
+Integration transaction for accepted revision 5 landed. Log attached as `BUG-260923-krcm6m_integration-land.md` on BUG-260923-krcm6m.
+
+Result: story landed as `16eec15e`, board state committed as `ab34556e` on local trunk. The publication push did not land (`board_publish_local_trunk_unproven` — signing key not bound to repository identity); the landing stands and publication is left to the orchestrator per the land instruction. No source file changed, no status change, no handoff issued.
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260925-9eccef, pid=49499, exit=0)
+spawn run RUN-260925-9eccef failed; operator action required; failure: integration_binding_state_invalid: Change Request CR-BUG-260923-krcm6m-5 revision 5 is integrated, want accepted or checkpointed
 
 ## Precondition Resources
 - [carry-delta-review-note-2.md](file://BUG-260923-krcm6m/carry-delta-review-note-2.md)
@@ -255,12 +262,13 @@ spawn run started: [implementer] developer (muse) (run=RUN-260925-9eccef)
 - [BUG-260923-krcm6m_spawn-log_-reviewer--reviewer--claude-_RUN-260925-e62b20.log](file://BUG-260923-krcm6m/BUG-260923-krcm6m_spawn-log_-reviewer--reviewer--claude-_RUN-260925-e62b20.log) — System spawn log captured by task-board
 - [BUG-260923-krcm6m_review-verdict-rev5.md](file://BUG-260923-krcm6m/BUG-260923-krcm6m_review-verdict-rev5.md) — Review verdict rev5 accepted
 - [BUG-260923-krcm6m_spawn-log_-implementer--developer--muse-_RUN-260925-9eccef.log](file://BUG-260923-krcm6m/BUG-260923-krcm6m_spawn-log_-implementer--developer--muse-_RUN-260925-9eccef.log) — System spawn log captured by task-board
+- [BUG-260923-krcm6m_integration-land.md](file://BUG-260923-krcm6m/BUG-260923-krcm6m_integration-land.md) — Integration landing log for accepted revision 5
 
 ## Created
 2026-09-23T19:12:26Z
 
 ## Last Update
-2026-09-25T15:57:16Z
+2026-09-25T16:39:05Z
 
 ## Assigned To
 [implementer] developer (muse)
