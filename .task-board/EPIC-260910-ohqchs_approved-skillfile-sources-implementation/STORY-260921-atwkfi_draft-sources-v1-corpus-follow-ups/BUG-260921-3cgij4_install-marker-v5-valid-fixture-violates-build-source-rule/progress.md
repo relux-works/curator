@@ -86,6 +86,8 @@ spawn agent resolution: Agent selection: muse via explicit_override (preferred_a
 spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=muse; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
 spawn queued: [implementer] developer (muse) (run=RUN-260921-7a22b9, max_parallel=8)
 spawn run started: [implementer] developer (muse) (run=RUN-260921-7a22b9)
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260921-7a22b9, pid=21608, exit=0)
 
 ## Precondition Resources
 - [3cgij4-brief.md](file://BUG-260921-3cgij4/3cgij4-brief.md)
@@ -111,12 +113,13 @@ spawn run started: [implementer] developer (muse) (run=RUN-260921-7a22b9)
 - [BUG-260921-3cgij4_spawn-log_-implementer--developer--muse-_RUN-260921-97850b.log](file://BUG-260921-3cgij4/BUG-260921-3cgij4_spawn-log_-implementer--developer--muse-_RUN-260921-97850b.log) — System spawn log captured by task-board
 - [BUG-260921-3cgij4_integration-results.md](file://BUG-260921-3cgij4/BUG-260921-3cgij4_integration-results.md) — Integration refusal evidence for revision 2
 - [BUG-260921-3cgij4_spawn-log_-implementer--developer--muse-_RUN-260921-7a22b9.log](file://BUG-260921-3cgij4/BUG-260921-3cgij4_spawn-log_-implementer--developer--muse-_RUN-260921-7a22b9.log) — System spawn log captured by task-board
+- [BUG-260921-3cgij4_completion-results.md](file://BUG-260921-3cgij4/BUG-260921-3cgij4_completion-results.md) — worktree complete log for revision 2
 
 ## Created
 2026-09-21T10:21:51Z
 
 ## Last Update
-2026-09-21T13:45:21Z
+2026-09-21T13:47:09Z
 
 ## Assigned To
 [implementer] developer (muse)
