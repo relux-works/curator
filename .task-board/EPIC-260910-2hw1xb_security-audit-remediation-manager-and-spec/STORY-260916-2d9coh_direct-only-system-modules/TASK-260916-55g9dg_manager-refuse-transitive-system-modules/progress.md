@@ -163,6 +163,17 @@ Landing preconditions confirmed for accepted CR rev5; evidence attached as `TASK
 Runner to perform the bound landing synchronously.
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260927-198dc1, pid=12824, exit=0)
+spawn run RUN-260927-198dc1 failed; operator action required; failure: board_publication_pending: runner integrate refused: board_publication_pending: STORY-260916-2d9coh is landed and its board state is committed as d41da0fbf210f6bc0ea1a5cef3d81a12af9eb439 on the local trunk, but the publication push did not land (board_publish_local_trunk_unproven); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: d41da0fbf210f6bc0ea1a5cef3d81a12af9eb439
+  cause_code: board_publish_local_trunk_unproven
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: 3ec26d9643ee4227f16a7906ca38cae103006c37
+  story_id: STORY-260916-2d9coh
+  cause: board_publish_local_trunk_unproven: the local trunk holds an unpublished link d41da0fbf210f6bc0ea1a5cef3d81a12af9eb439 that is not this repository's own board-state record (the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key); a stable content digest is never ownership proof — nothing was projected and nothing was pushed
+  link_oid: d41da0fbf210f6bc0ea1a5cef3d81a12af9eb439
+  reason: the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key
+  remedy: land the unproven commits through integrate/reconcile-trunk, not through this command
 
 ## Precondition Resources
 - [remediation-manager-producer-rules.md](file://TASK-260916-55g9dg/remediation-manager-producer-rules.md) — Campaign rules for curator manager producers/reviewers: worktree, spec source at curator-spec 0da4020, conformance root and root-content skips, warn-first, posture, validation, handoff
@@ -217,7 +228,7 @@ spawn run completed: muse (run=RUN-260927-198dc1, pid=12824, exit=0)
 2026-09-16T10:50:06Z
 
 ## Last Update
-2026-09-27T05:22:00Z
+2026-09-27T06:04:56Z
 
 ## Assigned To
 [implementer] developer (muse)
