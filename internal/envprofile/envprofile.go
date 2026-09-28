@@ -433,6 +433,9 @@ type Policy struct {
 	SourceSigners        map[string][]contextresolve.Signer
 	RequireSourceSigners bool
 	Revocations          []string
+	SecurityPosture      string
+	PassableEnvNames     []string
+	PassableEnvNamesSet  bool
 	// OverlaysAllowed is the effective §12.1 composition policy: false
 	// empties every overlay list at resolution (environments §12.2).
 	OverlaysAllowed bool
@@ -468,6 +471,32 @@ type Policy struct {
 	// the operation fails rather than overwrite. It is operation-scoped
 	// and never set from machine configuration.
 	Takeover bool
+}
+
+// checkHardenedProfileMutation enforces the hardened install/update
+// refusals before an operation takes its mutation lock or resolves sources.
+func (p Policy) checkHardenedProfileMutation() error {
+	if err := config.CheckSecurityPostureSourceAllowlist(p.SecurityPosture, p.AllowedSources); err != nil {
+		return err
+	}
+	return p.checkHardenedPassthrough()
+}
+
+// checkHardenedPassthrough refuses only the explicit unbounded choice. An
+// absent knob continues to follow the shipped S4 profile.
+func (p Policy) checkHardenedPassthrough() error {
+	return config.CheckSecurityPosturePassableEnv(p.SecurityPosture, p.PassableEnvNames, p.PassableEnvNamesSet)
+}
+
+func (p Policy) checkHardenedMCP(lock *contextlock.Lock) error {
+	declarationsPresent := false
+	for _, member := range lock.Members {
+		if member.Kind == contextlock.KindMCP {
+			declarationsPresent = true
+			break
+		}
+	}
+	return config.CheckSecurityPostureMCPAllowlist(p.SecurityPosture, p.MCPAllowlist, declarationsPresent)
 }
 
 // OverlaySpec is one machine overlay declaration for a profile
@@ -568,6 +597,9 @@ func PolicyFromConfig(cfg *config.Config) Policy {
 		SourceSigners:           make(map[string][]contextresolve.Signer, len(cfg.Env.SourceSigners)),
 		RequireSourceSigners:    cfg.Env.RequireSourceSigners,
 		Revocations:             cfg.Audit.Revocations,
+		SecurityPosture:         cfg.EffectiveSecurityPosture(),
+		PassableEnvNames:        cfg.Env.PassableEnvNames,
+		PassableEnvNamesSet:     cfg.Env.PassableEnvNamesSet,
 		OverlaysAllowed:         cfg.Env.OverlaysAllowed,
 		OverlayDefaultWeight:    int64(cfg.Env.OverlayDefaultWeight),
 		PrecedenceWinner:        cfg.Env.Precedence.Winner,
@@ -653,6 +685,9 @@ type InstallOptions struct {
 // Install holds the manager-home mutation lock and publishes its records
 // through the operation journal (see lock.go).
 func Install(home string, options InstallOptions) (Info, bool, bool, error) {
+	if err := options.Policy.checkHardenedProfileMutation(); err != nil {
+		return Info{}, false, false, err
+	}
 	op, err := beginOperation(home)
 	if err != nil {
 		return Info{}, false, false, err
@@ -817,6 +852,9 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 	if err != nil {
 		return Info{}, false, false, err
 	}
+	if err := options.Policy.checkHardenedMCP(result.Lock); err != nil {
+		return Info{}, false, false, err
+	}
 	warnings := resolutionWarnings(result)
 	auditWarnings, err := auditAndStore(home, manager, result, options.Policy)
 	if err != nil {
@@ -915,6 +953,9 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input 
 	overlayInputDefaults(&input, policy)
 	result, err := contextresolve.Resolve(manager, input)
 	if err != nil {
+		return Info{}, false, false, err
+	}
+	if err := policy.checkHardenedMCP(result.Lock); err != nil {
 		return Info{}, false, false, err
 	}
 	oldMembers := map[string]bool{}
@@ -1120,6 +1161,9 @@ func UpdateWithPolicy(home, name string, policy Policy) (Info, bool, error) {
 // UpdateWithOptions re-resolves like UpdateWithPolicy and prints the §2.3
 // declaration rows to the options' sink at the required emission point.
 func UpdateWithOptions(home, name string, options UpdateOptions) (Info, bool, error) {
+	if err := options.Policy.checkHardenedProfileMutation(); err != nil {
+		return Info{}, false, err
+	}
 	op, err := beginOperation(home)
 	if err != nil {
 		return Info{}, false, err
@@ -1218,6 +1262,9 @@ func updateLocked(op *operation, home, name string, policy Policy, sink, warning
 	overlayInputDefaults(&input, policy)
 	result, err := contextresolve.Resolve(manager, input)
 	if err != nil {
+		return Info{}, false, err
+	}
+	if err := policy.checkHardenedMCP(result.Lock); err != nil {
 		return Info{}, false, err
 	}
 	oldMembers := map[string]bool{}

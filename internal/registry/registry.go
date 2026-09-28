@@ -86,6 +86,10 @@ type Resolution struct {
 	Result      string
 	Attestation *Attestation
 	Warnings    []string
+	// Unreachable contains the URLs whose record query failed because the
+	// registry could not be reached. Callers may aggregate this per-query
+	// signal into an operation-level diagnostic without parsing Warnings.
+	Unreachable []string
 }
 
 // FetchFn returns raw record payloads for an artifact query.
@@ -348,6 +352,7 @@ func ResolveExact(registries []Registry, name, sourceIdentity, commit, contentSH
 // ResolveExact: only the record-admission predicate differs.
 func resolveMatched(registries []Registry, sourceIdentity, commit, contentSHA256 string, fetch FetchFn, match func(Record) bool) Resolution {
 	var warnings []string
+	var unreachable []string
 	var audited, deprecated *Attestation
 	for _, reg := range registries {
 		if len(reg.PublicKeys) == 0 {
@@ -357,6 +362,9 @@ func resolveMatched(registries []Registry, sourceIdentity, commit, contentSHA256
 		payloads, err := fetch(reg.URL, sourceIdentity, commit, contentSHA256)
 		if err != nil {
 			warnings = append(warnings, fmt.Sprintf("registry %s unavailable: %v", reg.Name, err))
+			if isRegistryUnavailable(err) {
+				unreachable = append(unreachable, reg.URL)
+			}
 			continue
 		}
 		for _, payload := range payloads {
@@ -379,7 +387,7 @@ func resolveMatched(registries []Registry, sourceIdentity, commit, contentSHA256
 			attestation := &Attestation{Registry: reg.Name, Status: record.Status, KeyID: record.KeyID(), Record: payload}
 			switch record.Status {
 			case StatusRevoked:
-				return Resolution{Result: ResultRevoked, Attestation: attestation, Warnings: warnings}
+				return Resolution{Result: ResultRevoked, Attestation: attestation, Warnings: warnings, Unreachable: unreachable}
 			case StatusAudited:
 				if audited == nil {
 					audited = attestation
@@ -392,12 +400,12 @@ func resolveMatched(registries []Registry, sourceIdentity, commit, contentSHA256
 		}
 	}
 	if audited != nil {
-		return Resolution{Result: ResultAudited, Attestation: audited, Warnings: warnings}
+		return Resolution{Result: ResultAudited, Attestation: audited, Warnings: warnings, Unreachable: unreachable}
 	}
 	if deprecated != nil {
-		return Resolution{Result: ResultDeprecated, Attestation: deprecated, Warnings: warnings}
+		return Resolution{Result: ResultDeprecated, Attestation: deprecated, Warnings: warnings, Unreachable: unreachable}
 	}
-	return Resolution{Result: ResultUnknown, Warnings: warnings}
+	return Resolution{Result: ResultUnknown, Warnings: warnings, Unreachable: unreachable}
 }
 
 // parseISO8601 accepts RFC 3339 with a Z or offset suffix.

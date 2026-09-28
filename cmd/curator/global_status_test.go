@@ -638,9 +638,7 @@ func TestGlobalStatusKeepsTheDeclaredSkillSurfaceWithoutCompiledCommands(t *test
 	if stdout != "global: skill-a "+stateUpToDate+"\n" {
 		t.Fatalf("global status changed the pre-existing declared-skill output:\n%q", stdout)
 	}
-	if stderr != "" {
-		t.Fatalf("a clean global status wrote to standard error:\n%s", stderr)
-	}
+	requirePermissivePostureWarning(t, stderr)
 	if code, _, _ := capture(t, filepath.Join(home, "config.json"), "global", "status", "--check"); code != exitOK {
 		t.Fatalf("clean global status --check = %d, want %d", code, exitOK)
 	}

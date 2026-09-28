@@ -206,9 +206,10 @@ func TestDraftProjectResolveHelp(t *testing.T) {
 			}
 		}
 		code, stdout, stderr := capture(t, configPath, "project", verb, "help")
-		if code != exitOK || stdout != wantReport || stderr != "" {
+		if code != exitOK || stdout != wantReport {
 			t.Fatalf("project %s help = code %d, stdout %q, stderr %q; want the v1 report for alias help", verb, code, stdout, stderr)
 		}
+		requirePermissivePostureWarning(t, stderr)
 	}
 	for _, marker := range []string{
 		"Skillfile schema 2 project sources",

@@ -501,9 +501,7 @@ func TestDraftTransportLegacyGolden(t *testing.T) {
 	if code != exitOK {
 		t.Fatalf("switch off = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 	}
-	if stderr != "" {
-		t.Fatalf("switch-off stderr:\n%s", stderr)
-	}
+	requirePermissivePostureWarning(t, stderr)
 	if len(fetches) != 2 {
 		t.Fatalf("%d fetches, want 2:\n%s", len(fetches), strings.Join(fetches, "\n"))
 	}
@@ -525,16 +523,18 @@ func TestDraftTransportLegacyGolden(t *testing.T) {
 	// Switch on without a policy, and switch off without one, must produce
 	// the same bytes on the same fixture.
 	code2, stdout2, stderr2, fetches2 := run(true, nil)
-	if code2 != exitOK || stderr2 != "" {
+	if code2 != exitOK {
 		t.Fatalf("switch on without policy = %d\nstdout:\n%s\nstderr:\n%s", code2, stdout2, stderr2)
 	}
+	requirePermissivePostureWarning(t, stderr2)
 	if other := draftCLILegacyRun(t, fixture.root, code2, stdout2, fetches2); other != golden {
 		t.Fatalf("switch on without policy differs from the legacy golden:\n%s", other)
 	}
 	code3, stdout3, stderr3, fetches3 := run(false, nil)
-	if code3 != exitOK || stderr3 != "" {
+	if code3 != exitOK {
 		t.Fatalf("switch off without policy = %d\nstdout:\n%s\nstderr:\n%s", code3, stdout3, stderr3)
 	}
+	requirePermissivePostureWarning(t, stderr3)
 	if other := draftCLILegacyRun(t, fixture.root, code3, stdout3, fetches3); other != golden {
 		t.Fatalf("switch off without policy differs from the legacy golden:\n%s", other)
 	}

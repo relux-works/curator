@@ -14,6 +14,13 @@ import (
 	"github.com/relux-works/curator/internal/envprofile"
 )
 
+func requireOnePermissivePostureWarning(t *testing.T, stderr string) {
+	t.Helper()
+	if got := strings.Count(stderr, "security_posture_permissive"); got != 1 {
+		t.Fatalf("permissive security-posture warnings = %d, want exactly one in stderr:\n%s", got, stderr)
+	}
+}
+
 func TestProfileUpdateSystemDeltaConfirmationGolden(t *testing.T) {
 	requireGit(t)
 	source, home := profileHome(t)
@@ -41,6 +48,7 @@ func TestProfileUpdateSystemDeltaConfirmationGolden(t *testing.T) {
 	if refusedCode != exitFail {
 		t.Fatalf("unconfirmed update = %d\nstdout:\n%s\nstderr:\n%s", refusedCode, refusedOut, refusedErr)
 	}
+	requireOnePermissivePostureWarning(t, refusedErr)
 	afterRefusal, err := os.ReadFile(lockPath)
 	if err != nil {
 		t.Fatal(err)
@@ -56,6 +64,7 @@ func TestProfileUpdateSystemDeltaConfirmationGolden(t *testing.T) {
 	if confirmedCode != exitOK {
 		t.Fatalf("confirmed update = %d\nstdout:\n%s\nstderr:\n%s", confirmedCode, confirmedOut, confirmedErr)
 	}
+	requireOnePermissivePostureWarning(t, confirmedErr)
 	if bytesEqual, err := os.ReadFile(lockPath); err != nil || string(bytesEqual) == string(oldLock) {
 		t.Fatalf("confirmed update did not publish the new lock: err=%v", err)
 	}
@@ -106,6 +115,7 @@ func TestProfileUpdateMCPDeltaConfirmationGolden(t *testing.T) {
 	if refusedCode != exitFail {
 		t.Fatalf("unconfirmed update = %d\nstdout:\n%s\nstderr:\n%s", refusedCode, refusedOut, refusedErr)
 	}
+	requireOnePermissivePostureWarning(t, refusedErr)
 	afterRefusal, err := os.ReadFile(lockPath)
 	if err != nil {
 		t.Fatal(err)
@@ -126,6 +136,7 @@ func TestProfileUpdateMCPDeltaConfirmationGolden(t *testing.T) {
 	if confirmedCode != exitOK {
 		t.Fatalf("confirmed update = %d\nstdout:\n%s\nstderr:\n%s", confirmedCode, confirmedOut, confirmedErr)
 	}
+	requireOnePermissivePostureWarning(t, confirmedErr)
 	if bytesEqual, err := os.ReadFile(lockPath); err != nil || string(bytesEqual) == string(oldLock) {
 		t.Fatalf("confirmed update did not publish the new lock: err=%v", err)
 	}

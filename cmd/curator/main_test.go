@@ -35,9 +35,10 @@ import (
 )
 
 type stubConfigSource struct {
-	path string
-	cfg  *config.Config
-	err  error
+	path       string
+	cfg        *config.Config
+	err        error
+	signingKey string
 }
 
 func (source stubConfigSource) Path() string { return source.path }
@@ -84,9 +85,7 @@ func TestRunUsesInjectedConfigSourceAndWriters(t *testing.T) {
 			if got, want := stdout.String(), alias+"\t"+project+"\n"; got != want {
 				t.Fatalf("stdout = %q, want %q", got, want)
 			}
-			if stderr.Len() != 0 {
-				t.Fatalf("list wrote stderr: %q", stderr.String())
-			}
+			requirePermissivePostureWarning(t, stderr.String())
 		})
 	}
 }

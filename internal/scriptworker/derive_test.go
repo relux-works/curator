@@ -1,6 +1,7 @@
 package scriptworker
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/scriptpolicy"
 	"github.com/relux-works/curator/internal/skillspec"
@@ -26,6 +28,22 @@ func runDerivedSession(t *testing.T, fixture *launchFixture) (Result, stubReport
 		t.Fatalf("runSession refused: %v", err)
 	}
 	return result, decodeStubReport(t, result.Stdout)
+}
+
+func postureTestEnv(configPath, home string) []string {
+	env := make([]string, 0, len(os.Environ())+3)
+	for _, item := range os.Environ() {
+		if strings.HasPrefix(item, "HOME=") || strings.HasPrefix(item, "CURATOR_CONFIG=") ||
+			strings.HasPrefix(item, "CURATOR_SYSTEM_CONFIG=") {
+			continue
+		}
+		env = append(env, item)
+	}
+	return append(env,
+		"HOME="+home,
+		"CURATOR_CONFIG="+configPath,
+		"CURATOR_SYSTEM_CONFIG=",
+	)
 }
 
 // TestCapabilityDerivationAllFieldsAbsentDenyByDefault drives vector case
@@ -1088,15 +1106,12 @@ func TestNativeLauncherWorkerModeWinsOverShimDispatch(t *testing.T) {
 	worker.send(workerMessage{Kind: kindShutdown, Nonce: fixture.nonce})
 }
 
-// TestProductionBinaryLaunchesWhenHostProvides proves admission honesty on
-// the production image: a fresh production process admits an enforced
-// command through `skill check`, an executed native launcher with an
-// operator-bound interpreter runs the script end to end, and a launcher
-// with no binding refuses `script_execution_control_unavailable` because
-// the interpreter cannot be resolved on this host.
-func TestProductionBinaryLaunchesWhenHostProvides(t *testing.T) {
-	curator := mustPhysical(t, builtCuratorBinary(t))
-	stub := mustPhysical(t, stubInterpreterBinary(t))
+// productionEnforcedLauncherFixture builds the production launcher used by
+// subprocess tests that exercise the enforced shim entry point.
+func productionEnforcedLauncherFixture(t *testing.T) (curator, stub, launcher string) {
+	t.Helper()
+	curator = mustPhysical(t, builtCuratorBinary(t))
+	stub = mustPhysical(t, stubInterpreterBinary(t))
 
 	skillDir := t.TempDir()
 	writeTestFile(t, filepath.Join(skillDir, "SKILL.md"), []byte("---\nname: s\ndescription: d\n---\n# s\n"), 0o644)
@@ -1111,15 +1126,13 @@ func TestProductionBinaryLaunchesWhenHostProvides(t *testing.T) {
 	// The `skill check` surface admits the enforced command: the control
 	// table is complete.
 	check := exec.Command(curator, "skill", "check", skillDir)
-	check.Env = append(os.Environ(),
-		"HOME="+t.TempDir(),
-		"CURATOR_CONFIG="+filepath.Join(t.TempDir(), "config.json"))
+	check.Env = postureTestEnv(filepath.Join(t.TempDir(), "config.json"), t.TempDir())
 	if output, err := check.CombinedOutput(); err != nil {
 		t.Fatalf("skill check refused an enforced command: %v: %s", err, output)
 	}
 
 	binDir := mustPhysical(t, t.TempDir())
-	launcher := filepath.Join(binDir, "tool"+exeSuffix())
+	launcher = filepath.Join(binDir, "tool"+exeSuffix())
 	copyTestFile(t, curator, launcher)
 	sidecar, err := NewShimSidecar("skill", "tool", "python3-v1",
 		filepath.Join(skillDir, "scripts", "tool"), skillDir, "", 8, json.RawMessage(`{}`))
@@ -1131,11 +1144,23 @@ func TestProductionBinaryLaunchesWhenHostProvides(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeTestFile(t, launcher+ShimSidecarSuffix, payload, 0o644)
+	return curator, stub, launcher
+}
+
+// TestProductionBinaryLaunchesWhenHostProvides proves admission honesty on
+// the production image: a fresh production process admits an enforced
+// command through `skill check`, an executed native launcher with an
+// operator-bound interpreter runs the script end to end, and a launcher
+// with no binding refuses `script_execution_control_unavailable` because
+// the interpreter cannot be resolved on this host.
+func TestProductionBinaryLaunchesWhenHostProvides(t *testing.T) {
+	_, stub, launcher := productionEnforcedLauncherFixture(t)
 
 	// With an operator-bound interpreter the executed launcher runs the
 	// script: shim dispatch works and the worker session completes.
 	boundConfig, err := json.Marshal(map[string]any{
-		"schema_version": 1, "skills_root": t.TempDir(), "projects": map[string]any{},
+		"schema_version": 1,
+		"skills_root":    t.TempDir(), "projects": map[string]any{},
 		"script_interpreters": map[string]string{"python3-v1": stub},
 	})
 	if err != nil {
@@ -1144,14 +1169,21 @@ func TestProductionBinaryLaunchesWhenHostProvides(t *testing.T) {
 	bound := filepath.Join(t.TempDir(), "config.json")
 	writeTestFile(t, bound, boundConfig, 0o644)
 	launched := exec.Command(launcher, "--help")
-	launched.Env = append(os.Environ(), "CURATOR_CONFIG="+bound)
+	launched.Env = postureTestEnv(bound, t.TempDir())
 	launched.Dir = t.TempDir()
 	launched.Stdin = strings.NewReader("")
-	shimOutput, shimErr := launched.CombinedOutput()
+	var stdout, stderr bytes.Buffer
+	launched.Stdout = &stdout
+	launched.Stderr = &stderr
+	shimErr := launched.Run()
 	if shimErr != nil {
-		t.Fatalf("the native launcher refused with a bound interpreter: %v: %s", shimErr, shimOutput)
+		t.Fatalf("the native launcher refused with a bound interpreter: %v: stdout=%s stderr=%s", shimErr, stdout.String(), stderr.String())
 	}
-	report := decodeStubReport(t, shimOutput)
+	if bytes.Contains(stdout.Bytes(), []byte(config.DiagSecurityPosturePermissive)) ||
+		bytes.Contains(stderr.Bytes(), []byte(config.DiagSecurityPosturePermissive)) {
+		t.Fatalf("schema-1 launcher leaked the permissive warning: stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+	report := decodeStubReport(t, stdout.Bytes())
 	if len(report.Argv) == 0 || report.Argv[len(report.Argv)-1] != "--help" {
 		t.Fatalf("stub argv = %q, want the forwarded argument", report.Argv)
 	}
@@ -1160,7 +1192,7 @@ func TestProductionBinaryLaunchesWhenHostProvides(t *testing.T) {
 	// interpreter cannot be resolved on this host, so the
 	// interpreter-resolution control is unavailable here.
 	unbound := exec.Command(launcher, "--help")
-	unbound.Env = append(os.Environ(), "CURATOR_CONFIG="+filepath.Join(t.TempDir(), "config.json"))
+	unbound.Env = postureTestEnv(filepath.Join(t.TempDir(), "config.json"), t.TempDir())
 	unbound.Dir = t.TempDir()
 	unbound.Stdin = strings.NewReader("")
 	deniedOutput, deniedErr := unbound.CombinedOutput()
@@ -1172,5 +1204,62 @@ func TestProductionBinaryLaunchesWhenHostProvides(t *testing.T) {
 	}
 	if exitErr, ok := deniedErr.(*exec.ExitError); !ok || exitErr.ExitCode() != 1 {
 		t.Fatalf("launcher error = %v, want exit 1", deniedErr)
+	}
+}
+
+func TestProductionEnforcedShimDoesNotLeakPermissiveWarning(t *testing.T) {
+	_, stub, launcher := productionEnforcedLauncherFixture(t)
+	for _, testCase := range []struct {
+		name   string
+		config map[string]any
+	}{
+		{
+			name: "explicit-permissive",
+			config: map[string]any{
+				"schema_version": 2, "security_posture": "permissive",
+				"skills_root": t.TempDir(), "projects": map[string]any{},
+				"script_interpreters": map[string]string{"python3-v1": stub},
+			},
+		},
+		{
+			name: "schema-1-default-permissive",
+			config: map[string]any{
+				"schema_version": 1,
+				"skills_root":    t.TempDir(), "projects": map[string]any{},
+				"script_interpreters": map[string]string{"python3-v1": stub},
+			},
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			configJSON, err := json.Marshal(testCase.config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			configPath := filepath.Join(t.TempDir(), "config.json")
+			writeTestFile(t, configPath, configJSON, 0o644)
+
+			launched := exec.Command(launcher, "hello")
+			launched.Env = postureTestEnv(configPath, t.TempDir())
+			launched.Dir = t.TempDir()
+			launched.Stdin = strings.NewReader("")
+			var stdout, stderr bytes.Buffer
+			launched.Stdout = &stdout
+			launched.Stderr = &stderr
+			if err := launched.Run(); err != nil {
+				t.Fatalf("the enforced launcher refused: %v: stdout=%s stderr=%s", err, stdout.String(), stderr.String())
+			}
+			for _, stream := range []struct {
+				name string
+				data []byte
+			}{{"stdout", stdout.Bytes()}, {"stderr", stderr.Bytes()}} {
+				if bytes.Contains(stream.data, []byte(config.DiagSecurityPosturePermissive)) {
+					t.Errorf("permissive warning leaked to launched command %s: %q", stream.name, stream.data)
+				}
+			}
+			report := decodeStubReport(t, stdout.Bytes())
+			if len(report.Argv) == 0 || report.Argv[len(report.Argv)-1] != "hello" {
+				t.Fatalf("stub argv = %q, want the forwarded argument", report.Argv)
+			}
+		})
 	}
 }

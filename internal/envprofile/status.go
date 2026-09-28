@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextmaterialize"
 	"github.com/relux-works/curator/internal/contextpkg"
@@ -265,6 +266,10 @@ type Status struct {
 	// UpdateConfirmation reports the shipped section 9.2 behavior.
 	UpdateConfirmationRevision string `json:"update_confirmation_revision"`
 	UpdateConfirmationBehavior string `json:"update_confirmation_behavior"`
+	// SecurityPostureRows is the manager §10 inventory. Schema 1 reports
+	// no env-status posture inventory; schema 2 carries the same closed
+	// rows as curator status.
+	SecurityPostureRows []config.SecurityPostureRow `json:"security_posture_rows"`
 }
 
 // StatusRequest scopes one status computation. The seams mirror
@@ -326,6 +331,12 @@ func StatusOf(req StatusRequest) (*Status, error) {
 		Provenance: "shipped",
 	}}
 	status.Notes = append(status.Notes, "opencode skills come from the machine-current profile, split-brain by construction (§7.1)")
+	if req.Policy.SecurityPosture == config.SecurityPostureHardened && len(req.Policy.AllowedSources) == 0 {
+		status.NonCurrent = true
+	}
+	if req.Policy.SecurityPosture == config.SecurityPostureHardened && req.Machine.PassableEnvNamesSet && req.Machine.PassableEnvNames == nil {
+		status.NonCurrent = true
+	}
 	// §12.2: env status reports the locked require_current_profile
 	// requirement. The policy already carries the effective knob and its
 	// locked bit from the loaded configuration.
@@ -397,6 +408,14 @@ func StatusOf(req StatusRequest) (*Status, error) {
 	declarations, declarationWarnings := declarationScopes(req, installed)
 	status.MCPDeclarations = declarations
 	status.Warnings = append(status.Warnings, declarationWarnings...)
+	if req.Policy.SecurityPosture == config.SecurityPostureHardened && len(req.Policy.MCPAllowlist) == 0 {
+		for _, declaration := range declarations {
+			if len(declaration.Rows) > 0 {
+				status.NonCurrent = true
+				break
+			}
+		}
+	}
 	if len(status.Orphans) > 0 {
 		status.NonCurrent = true
 	}

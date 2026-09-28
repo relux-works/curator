@@ -170,9 +170,10 @@ func TestProjectResolveSchema1KeepsReadOnlyMeaning(t *testing.T) {
 	}
 	code, stdout, stderr := capture(t, configPath, "project", "resolve", "app")
 	want := "alias: app\npath: " + project + "\nskillfile: " + filepath.Join(project, "Skillfile.json") + "\nskills: " + filepath.Join(project, ".agents", "skills") + "\nbin: " + filepath.Join(project, ".agents", "bin") + "\n"
-	if code != exitOK || stdout != want || stderr != "" {
-		t.Fatalf("schema-1 resolve = (%d, %q, %q), want (%d, %q, empty)", code, stdout, stderr, exitOK, want)
+	if code != exitOK || stdout != want {
+		t.Fatalf("schema-1 resolve = (%d, %q, %q), want (%d, %q)", code, stdout, stderr, exitOK, want)
 	}
+	requirePermissivePostureWarning(t, stderr)
 	if _, err := os.Stat(filepath.Join(project, "Skillfile.lock.json")); !os.IsNotExist(err) {
 		t.Fatalf("schema-1 resolve wrote a lock: %v", err)
 	}
@@ -188,9 +189,10 @@ func TestProjectResolveIgnoresRemovedSwitch(t *testing.T) {
 	}
 	writeCLISkill(t, filepath.Join(project, "skills", "review"), "review")
 	code, stdout, stderr := capture(t, configPath, "project", "resolve", "app")
-	if code != exitOK || !strings.Contains(stdout, "resolve app: 1 skills") || stderr != "" {
+	if code != exitOK || !strings.Contains(stdout, "resolve app: 1 skills") {
 		t.Fatalf("schema-2 resolve with the removed variable set = (%d, %q, %q), want successful default resolution", code, stdout, stderr)
 	}
+	requirePermissivePostureWarning(t, stderr)
 	if _, err := sourcelock.Read(filepath.Join(project, "Skillfile.lock.json")); err != nil {
 		t.Fatalf("schema-2 resolve with the removed variable set wrote no lock: %v", err)
 	}

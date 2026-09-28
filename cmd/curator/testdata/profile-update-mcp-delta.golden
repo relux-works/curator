@@ -4,6 +4,7 @@ lock-delta moved context mcp-root 1.0.0 → 1.1.0 commit:<old-root-commit> → c
 lock-delta added mcp tool 1.0.0 commit:<tool-commit>
 mcp-declaration tool 1.0.0 stdio command=npx args=["tool"] env_names=[]
 stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default
 mcp-root: warning: mcp_package_allowlist_empty: the MCP package allowlist is empty; every declaration package in the closure is admitted
 mcp-root: profile_update_confirmation_required: members tool require --confirm-system-delta; revision B refuses with profile_update_confirmation_required unless --confirm-system-delta is given
 confirmed: exit=0
@@ -13,4 +14,5 @@ lock-delta added mcp tool 1.0.0 commit:<tool-commit>
 mcp-declaration tool 1.0.0 stdio command=npx args=["tool"] env_names=[]
 mcp-root: updated (lock sha256:<lock-hash>)
 stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default
 mcp-root: warning: mcp_package_allowlist_empty: the MCP package allowlist is empty; every declaration package in the closure is admitted

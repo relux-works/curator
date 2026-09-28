@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -42,6 +43,37 @@ var httpClient = &http.Client{
 }
 
 var errRegistryResponseLimit = errors.New("registry response limit exceeded")
+
+type registryUnavailableError struct {
+	cause error
+}
+
+func (e *registryUnavailableError) Error() string { return e.cause.Error() }
+
+func (e *registryUnavailableError) Unwrap() error { return e.cause }
+
+func markRegistryUnavailable(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &registryUnavailableError{cause: err}
+}
+
+func isRegistryUnavailable(err error) bool {
+	var unavailable *registryUnavailableError
+	return errors.As(err, &unavailable)
+}
+
+func isRegistryTransportFailure(err error) bool {
+	if err == nil || errors.Is(err, context.Canceled) {
+		return false
+	}
+	var networkError net.Error
+	return errors.As(err, &networkError) ||
+		errors.Is(err, context.DeadlineExceeded) ||
+		errors.Is(err, io.EOF) ||
+		errors.Is(err, io.ErrUnexpectedEOF)
+}
 
 type registryHTTPResult struct {
 	status int
@@ -410,6 +442,9 @@ func doRegistryRequest(client *http.Client, request *http.Request, responseLimit
 		}
 		response, err := client.Do(attemptRequest) // #nosec G107 -- registry URL comes from pinned machine config
 		if err != nil {
+			if isRegistryTransportFailure(err) {
+				err = markRegistryUnavailable(err)
+			}
 			lastErr = err
 			if attempt == RegistryMaxAttempts || !RetryPermitted(request.Method, "network_error", hasIdempotencyKey) ||
 				!waitRegistryRetry(ctx, retryDelay(nil, attempt)) {
@@ -420,6 +455,9 @@ func doRegistryRequest(client *http.Client, request *http.Request, responseLimit
 		body, readErr := readBounded(response.Body, responseLimit)
 		_ = response.Body.Close()
 		if readErr != nil {
+			if isRegistryTransportFailure(readErr) {
+				readErr = markRegistryUnavailable(readErr)
+			}
 			if !errors.Is(readErr, errRegistryResponseLimit) && attempt < RegistryMaxAttempts &&
 				RetryPermitted(request.Method, "network_error", hasIdempotencyKey) &&
 				waitRegistryRetry(ctx, retryDelay(nil, attempt)) {
@@ -480,10 +518,16 @@ func registryStatusError(label string, result registryHTTPResult) error {
 			}
 		}
 	}
+	var err error
 	if code != "" {
-		return fmt.Errorf("registry %s failed (%d, %s)", label, result.status, code)
+		err = fmt.Errorf("registry %s failed (%d, %s)", label, result.status, code)
+	} else {
+		err = fmt.Errorf("registry %s failed (%d)", label, result.status)
 	}
-	return fmt.Errorf("registry %s failed (%d)", label, result.status)
+	if result.status >= http.StatusInternalServerError {
+		return markRegistryUnavailable(err)
+	}
+	return err
 }
 
 func stableErrorCode(value string) bool {

@@ -2332,6 +2332,12 @@ func currentProfileFor(home, envID, named string) (string, error) {
 // reasons); under repair the home is provisioned or repaired from the
 // store under the mutation lock and the fragment is emitted.
 func Resolve(req ResolveRequest) (*ResolveResult, error) {
+	policy := req.Policy
+	policy.PassableEnvNames = req.Machine.PassableEnvNames
+	policy.PassableEnvNamesSet = req.Machine.PassableEnvNamesSet
+	if err := policy.checkHardenedPassthrough(); err != nil {
+		return nil, err
+	}
 	adapter, err := envregistry.ByID(req.EnvID)
 	if err != nil {
 		return nil, err
@@ -2361,6 +2367,9 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
 		return nil, err
 	}
 	if err := validateProfilePathSources(profile, source, req.Policy); err != nil {
+		return nil, err
+	}
+	if err := policy.checkHardenedMCP(lock); err != nil {
 		return nil, err
 	}
 	verdict := verifyHome(&req, adapter, source, lock, hash)

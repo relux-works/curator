@@ -71,9 +71,10 @@ func TestGlobalAdoptCLIAdoptsAndIsIdempotent(t *testing.T) {
 	}
 
 	code, stdout, stderr := fixture.invoke(t, "global", "adopt", "tool", "--dry-run")
-	if code != exitOK || !strings.Contains(stdout, "would adopt command") || stderr != "" {
+	if code != exitOK || !strings.Contains(stdout, "would adopt command") {
 		t.Fatalf("global adopt --dry-run = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 	}
+	requireOnePermissivePostureWarning(t, stderr)
 	if _, err := os.Lstat(filepath.Join(fixture.userBin, ".curator-managed.json")); !os.IsNotExist(err) {
 		t.Fatalf("CLI dry-run wrote ownership marker: %v", err)
 	}
@@ -85,13 +86,15 @@ func TestGlobalAdoptCLIAdoptsAndIsIdempotent(t *testing.T) {
 	}
 
 	code, stdout, stderr = fixture.invoke(t, "global", "adopt", "tool")
-	if code != exitOK || !strings.Contains(stdout, "adopted command") || !strings.Contains(stdout, "backup:") || stderr != "" {
+	if code != exitOK || !strings.Contains(stdout, "adopted command") || !strings.Contains(stdout, "backup:") {
 		t.Fatalf("global adopt = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 	}
+	requireOnePermissivePostureWarning(t, stderr)
 	code, stdout, stderr = fixture.invoke(t, "global", "adopt", "tool")
-	if code != exitOK || !strings.Contains(stdout, "already managed") || stderr != "" {
+	if code != exitOK || !strings.Contains(stdout, "already managed") {
 		t.Fatalf("second global adopt = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 	}
+	requireOnePermissivePostureWarning(t, stderr)
 	backups, err := os.ReadDir(filepath.Join(fixture.home, "backups", "global-bins"))
 	if err != nil || len(backups) != 1 {
 		t.Fatalf("CLI backup count = (%d, %v), want 1", len(backups), err)

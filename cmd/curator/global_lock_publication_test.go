@@ -128,9 +128,7 @@ func requireGlobalCommand(t *testing.T, fixture globalLockCLIFixture, want int, 
 func TestGlobalAddPublishesProfileLockBeforeNativeMaterialization(t *testing.T) {
 	fixture := newGlobalLockCLIFixture(t)
 	_, stderr := requireGlobalCommand(t, fixture, exitOK, "global", "add", "new-skill", "--git", fixture.gitURL, "--tag", "v1")
-	if stderr != "" {
-		t.Fatalf("global add stderr = %q", stderr)
-	}
+	requireOnePermissivePostureWarning(t, stderr)
 	fixture.requireSkillLockAndStore(t)
 	fixture.requireNativeSkill(t)
 	if _, err := os.Lstat(fixture.managed); err != nil {

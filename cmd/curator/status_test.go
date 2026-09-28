@@ -1782,8 +1782,12 @@ func TestStatusJSONKeepsTheLegacyShapeWithoutCompiledCommands(t *testing.T) {
 	}
 	// The §8.6 and §11 postures extend the document additively. A closure
 	// without compiled commands still carries no build key at all.
-	if len(object) != 5 || object["alias"] == nil || object["path"] == nil || object["skills"] == nil {
+	if len(object) != 6 || object["alias"] == nil || object["path"] == nil || object["skills"] == nil {
 		t.Fatalf("status --json changed the historical document shape:\n%s", stdout)
+	}
+	postureRows, ok := object["security_posture_rows"].([]any)
+	if !ok || len(postureRows) != 5 {
+		t.Fatalf("schema-1 security_posture_rows = %v, want the header and four legacy gates", object["security_posture_rows"])
 	}
 	if object["builds"] != nil {
 		t.Fatalf("status --json without compiled commands carries a builds key:\n%s", stdout)

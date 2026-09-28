@@ -40,6 +40,9 @@ import (
 
 // Options control one installation run.
 type Options struct {
+	// Operation identifies the user-visible manager operation. The zero value
+	// is an install for existing programmatic callers.
+	Operation    Operation
 	DryRun       bool
 	Fetch        bool
 	FixGitignore bool
@@ -75,6 +78,20 @@ type Options struct {
 	ResolveAttest func(nodes []*closure.Node) (map[string]*marker.Attestation, []string, error)
 }
 
+// Operation is the install surface for which registry availability is being
+// checked. Status may derive a read-only install plan without representing an
+// install or update operation.
+type Operation string
+
+const (
+	// OperationInstall identifies a regular install operation.
+	OperationInstall Operation = "install"
+	// OperationUpdate identifies an install operation that fetches source updates.
+	OperationUpdate Operation = "update"
+	// OperationStatus identifies a read-only plan derived for status reporting.
+	OperationStatus Operation = "status"
+)
+
 func (o Options) context() context.Context {
 	if o.Context == nil {
 		return context.Background()
@@ -84,11 +101,12 @@ func (o Options) context() context.Context {
 
 // Result reports one project installation.
 type Result struct {
-	Alias    string
-	Path     string
-	Status   string // ok | skipped | failed
-	Messages []string
-	Errors   []string
+	Alias       string
+	Path        string
+	Status      string // ok | skipped | failed
+	Messages    []string
+	Errors      []string
+	Diagnostics []Diagnostic
 	// Builds is the immutable build plan derived before any mutation.
 	Builds []PlannedBuild
 	// BuildsComplete reports whether Builds describes every compiled command the
@@ -122,6 +140,66 @@ type Result struct {
 	// or key is non-current); it never authorizes. Nil when resolution
 	// never ran or failed.
 	Attestations map[string]*marker.Attestation
+}
+
+// Diagnostic is a structured operation-level notice surfaced by the CLI.
+// Registry-unreachable notices are deliberately kept apart from the routine
+// per-query messages in Result.Messages.
+type Diagnostic struct {
+	Code       string
+	Severity   string
+	Registries []string
+	Artifacts  []string
+}
+
+type registryResolution struct {
+	Attestations             map[string]*marker.Attestation
+	Warnings                 []string
+	Unreachable              []string
+	ArtifactsWithoutEvidence []string
+}
+
+func (r registryResolution) diagnostic(cfg *config.Config) *Diagnostic {
+	if len(r.Unreachable) == 0 {
+		return nil
+	}
+	severity := "warning"
+	if cfg != nil && cfg.SecurityPostureHardened() {
+		severity = "error"
+	}
+	return &Diagnostic{
+		Code:       "registry_unreachable_during_install",
+		Severity:   severity,
+		Registries: sortedUnique(r.Unreachable),
+		Artifacts:  sortedUnique(r.ArtifactsWithoutEvidence),
+	}
+}
+
+func sortedUnique(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	sort.Strings(values)
+	unique := values[:0]
+	for _, value := range values {
+		if len(unique) == 0 || unique[len(unique)-1] != value {
+			unique = append(unique, value)
+		}
+	}
+	return unique
+}
+
+func addRegistryDiagnostic(result *Result, cfg *config.Config, resolution registryResolution) bool {
+	diagnostic := resolution.diagnostic(cfg)
+	if diagnostic == nil {
+		return false
+	}
+	result.Diagnostics = append(result.Diagnostics, *diagnostic)
+	if diagnostic.Severity == "error" {
+		result.Status = "failed"
+		return true
+	}
+	return false
 }
 
 func (r *Result) failf(format string, args ...any) {
@@ -517,20 +595,25 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 		return result, nil
 	}
 
-	// 14. Registry resolution (Spec §13); Options.ResolveAttest overrides.
-	resolveAttest := opts.ResolveAttest
-	if resolveAttest == nil {
-		resolveAttest = func(nodes []*closure.Node) (map[string]*marker.Attestation, []string, error) {
-			return resolveRegistries(cfg, nodes, alias, !opts.DryRun, draftLock != nil)
-		}
+	// 14. Registry resolution (Spec §13) and the operation-level
+	// unreachable-registry gate (registry §4, manager §7.1).
+	registryResult, regErr := resolveRegistryEvidence(cfg, nodes, alias, !opts.DryRun, draftLock != nil, opts)
+	result.Messages = append(result.Messages, registryResult.Warnings...)
+	result.Attestations = registryResult.Attestations
+	registryRefused := false
+	if opts.Operation != OperationStatus {
+		registryRefused = addRegistryDiagnostic(&result, cfg, registryResult)
 	}
-	attestations, regWarnings, regErr := resolveAttest(nodes)
-	result.Messages = append(result.Messages, regWarnings...)
+	if registryRefused {
+		if regErr != nil {
+			result.Errors = append(result.Errors, regErr.Error())
+		}
+		return result, nil
+	}
 	if regErr != nil {
 		result.failf("%v", regErr)
 		return result, nil
 	}
-	result.Attestations = attestations
 
 	// 15. Narrow boundaries for the remaining read-only gates. Operation-private
 	// toolchain state must never land in the checkout, the runtime store, or a
@@ -697,7 +780,7 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 			return stageProjectTargets(projectTargetRequest{
 				cfg: cfg, alias: alias, projectRoot: projectRoot, platform: platform,
 				nodes: nodes, hybridNames: hybridNames, agents: agents,
-				effectiveLocale: effectiveLocale, mcpFound: mcpFound, attestations: attestations,
+				effectiveLocale: effectiveLocale, mcpFound: mcpFound, attestations: registryResult.Attestations,
 				skillsDir: skillsDir, binDir: binDir, hybridStore: hybridStore,
 				plan: plan, deps: deps, scoped: scoped, verbose: opts.Verbose,
 				external: externalStaged, externalStoreRoot: externalPlan.deps.StoreRoot,
@@ -1333,10 +1416,18 @@ func mcpVerifier(env mcp.Env, agents []string, scope string) func([]*closure.Nod
 // a record authorizes only on exact name, canonical repository, commit,
 // and context hash matching. The frozen v1 lane keeps §13.3 OR-matching
 // byte-identically.
-func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string, persist bool, draft bool) (map[string]*marker.Attestation, []string, error) {
+func resolveRegistryEvidence(cfg *config.Config, nodes []*closure.Node, alias string, persist bool, draft bool, opts Options) (registryResolution, error) {
+	if opts.ResolveAttest != nil {
+		attestations, warnings, err := opts.ResolveAttest(nodes)
+		return registryResolution{Attestations: attestations, Warnings: warnings}, err
+	}
+	return resolveRegistries(cfg, nodes, alias, persist, draft)
+}
+
+func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string, persist bool, draft bool) (registryResolution, error) {
 	trusted := cfg.TrustedRegistries()
 	if len(trusted) == 0 {
-		return map[string]*marker.Attestation{}, nil, nil
+		return registryResolution{Attestations: map[string]*marker.Attestation{}}, nil
 	}
 	registries := make([]registry.Registry, 0, len(trusted))
 	for _, entry := range trusted {
@@ -1347,7 +1438,7 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string, 
 	snapshotStateDir := stateDir
 	if persist {
 		if err := registry.MigrateSnapshotStates(cacheDir, stateDir); err != nil {
-			return nil, nil, fmt.Errorf("audit registry rollback state migration failed: %w", err)
+			return registryResolution{}, fmt.Errorf("audit registry rollback state migration failed: %w", err)
 		}
 	} else if _, err := os.Stat(stateDir); os.IsNotExist(err) {
 		// A pre-migration installation may still hold protected snapshot state in
@@ -1356,33 +1447,35 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string, 
 		// incomplete.
 		snapshotStateDir = cacheDir
 	}
-	var warnings []string
-	var tampered map[string]bool
-	var snapshotWarnings []string
+	var snapshotCheck registry.SnapshotCheck
 	if persist {
-		tampered, snapshotWarnings = registry.CheckSnapshotsWithPolicy(
+		snapshotCheck = registry.CheckSnapshotsWithPolicyDetailed(
 			registries, snapshotStateDir, registry.HTTPGetSnapshot, time.Now(),
 			time.Duration(cfg.Audit.SnapshotMaxAgeSeconds)*time.Second,
 			time.Duration(cfg.Audit.SnapshotClockSkewSeconds)*time.Second,
 		)
 	} else {
-		tampered, snapshotWarnings = registry.CheckSnapshotsWithPolicyReadOnly(
+		snapshotCheck = registry.CheckSnapshotsWithPolicyReadOnlyDetailed(
 			registries, snapshotStateDir, registry.HTTPGetSnapshot, time.Now(),
 			time.Duration(cfg.Audit.SnapshotMaxAgeSeconds)*time.Second,
 			time.Duration(cfg.Audit.SnapshotClockSkewSeconds)*time.Second,
 		)
 	}
-	for _, warning := range snapshotWarnings {
-		warnings = append(warnings, alias+": registry: "+warning)
+	result := registryResolution{
+		Attestations: map[string]*marker.Attestation{},
+		Unreachable:  append([]string(nil), snapshotCheck.Unreachable...),
+	}
+	for _, warning := range snapshotCheck.Warnings {
+		result.Warnings = append(result.Warnings, alias+": registry: "+warning)
 	}
 	var usable []registry.Registry
 	for _, reg := range registries {
-		if !tampered[reg.URL] {
+		if !snapshotCheck.Tampered[reg.URL] {
 			usable = append(usable, reg)
 		}
 	}
 	if len(usable) == 0 {
-		return nil, warnings, fmt.Errorf("every trusted audit registry served a tampered snapshot")
+		return result, fmt.Errorf("every trusted audit registry served a tampered snapshot")
 	}
 	var fetch registry.FetchFn
 	if persist {
@@ -1406,7 +1499,6 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string, 
 		)
 	}
 	strict := cfg.Audit.RegistryPolicy == "strict"
-	attestations := map[string]*marker.Attestation{}
 	var problems []string
 	for _, node := range nodes {
 		if node.Identity == "" {
@@ -1414,7 +1506,7 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string, 
 		}
 		contentHash, err := hashing.ContentSHA256(node.Snapshot, nil)
 		if err != nil {
-			return nil, warnings, err
+			return result, err
 		}
 		var resolution registry.Resolution
 		if draft {
@@ -1423,7 +1515,12 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string, 
 			resolution = registry.Resolve(usable, node.Identity, node.Resolved.Commit, contentHash, fetch)
 		}
 		for _, warning := range resolution.Warnings {
-			warnings = append(warnings, alias+": registry: "+warning)
+			result.Warnings = append(result.Warnings, alias+": registry: "+warning)
+		}
+		result.Unreachable = append(result.Unreachable, resolution.Unreachable...)
+		if resolution.Attestation == nil {
+			result.ArtifactsWithoutEvidence = append(result.ArtifactsWithoutEvidence,
+				fmt.Sprintf("%s@%s", node.Name, node.Resolved.Commit))
 		}
 		switch resolution.Result {
 		case registry.ResultRevoked:
@@ -1433,7 +1530,7 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string, 
 			}
 			problems = append(problems, fmt.Sprintf("%s is revoked by %s", node.Name, name))
 		case registry.ResultDeprecated:
-			warnings = append(warnings, fmt.Sprintf("%s: registry: %s is marked deprecated", alias, node.Name))
+			result.Warnings = append(result.Warnings, fmt.Sprintf("%s: registry: %s is marked deprecated", alias, node.Name))
 		case registry.ResultUnknown:
 			if strict {
 				problems = append(problems, fmt.Sprintf(
@@ -1441,7 +1538,7 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string, 
 			}
 		}
 		if resolution.Attestation != nil && resolution.Result != registry.ResultRevoked {
-			attestations[node.Name] = &marker.Attestation{
+			result.Attestations[node.Name] = &marker.Attestation{
 				Registry: resolution.Attestation.Registry,
 				Status:   resolution.Attestation.Status,
 				KeyID:    resolution.Attestation.KeyID,
@@ -1449,7 +1546,7 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string, 
 		}
 	}
 	if len(problems) > 0 {
-		return nil, warnings, fmt.Errorf("%s", strings.Join(problems, "; "))
+		return result, fmt.Errorf("%s", strings.Join(problems, "; "))
 	}
-	return attestations, warnings, nil
+	return result, nil
 }

@@ -208,8 +208,7 @@ func (c cli) newFlagSet(name string) *flag.FlagSet {
 // the operator-trusted interpreter bindings and hand the invocation to
 // the script worker session. A configuration that cannot load leaves the
 // bindings empty, so interpreter resolution refuses closed rather than
-// guessing; configuration warnings stay silent here because the
-// launcher's streams belong to the caller's pipeline.
+// guessing. The launched command owns this process's output streams.
 func runEnforcedShim(executable string, args []string) int {
 	var interpreters map[string]string
 	var diagnosticsDir string
@@ -325,6 +324,9 @@ func (c cli) loadConfig() (*config.Config, int) {
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return nil, exitFail
+	}
+	if warning := cfg.SecurityPostureWarning(); warning != "" {
+		_, _ = fmt.Fprintln(c.stderr, "warning:", warning)
 	}
 	return cfg, exitOK
 }
@@ -690,6 +692,14 @@ func (c cli) cmdInstallMode(args []string, fetch bool) int {
 	if code != exitOK {
 		return code
 	}
+	postureOperation := "install"
+	if fetch {
+		postureOperation = "update"
+	}
+	if err := cfg.CheckSecurityPosture(postureOperation, false); err != nil {
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+		return exitFail
+	}
 	if auditMode != "" {
 		cfgCopy := *cfg
 		cfgCopy.Audit = cfg.Audit
@@ -709,6 +719,10 @@ func (c cli) cmdInstallMode(args []string, fetch bool) int {
 		return exitUsage
 	}
 	opts.Fetch = fetch && !opts.DryRun
+	opts.Operation = install.OperationInstall
+	if fetch {
+		opts.Operation = install.OperationUpdate
+	}
 	opts.FetchedRepos = map[string]bool{}
 	opts.External = productionExternalDeps(cfg, opts.DryRun)
 	opts.External.BuildSSH = install.CaptureBuildSSHSelection(cfg, opts.BuildSSH, os.Getenv)
@@ -731,6 +745,23 @@ func (c cli) cmdInstallMode(args []string, fetch bool) int {
 func (c cli) printResult(result install.Result) {
 	for _, message := range result.Messages {
 		_, _ = fmt.Fprintln(c.stdout, message)
+	}
+	for _, diagnostic := range result.Diagnostics {
+		severity := "warning"
+		if diagnostic.Severity == "error" {
+			severity = "error"
+		}
+		registries := strings.Join(diagnostic.Registries, ", ")
+		if registries == "" {
+			registries = "(none)"
+		}
+		artifacts := strings.Join(diagnostic.Artifacts, ", ")
+		if artifacts == "" {
+			artifacts = "(none)"
+		}
+		_, _ = fmt.Fprintf(c.stderr,
+			"curator: %s: GATE NOTICE %s: unreachable trusted registries: %s; artifacts resolved without registry evidence: %s\n",
+			severity, diagnostic.Code, registries, artifacts)
 	}
 	c.printResultErrors(result)
 }
@@ -765,6 +796,10 @@ func (c cli) cmdUpdate() int {
 	cfg, code := c.loadConfig()
 	if code != exitOK {
 		return code
+	}
+	if err := cfg.CheckSecurityPosture("update", false); err != nil {
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+		return exitFail
 	}
 	entries, err := os.ReadDir(cfg.SkillsRoot)
 	if err != nil {
@@ -808,6 +843,7 @@ func (c cli) cmdStatus(args []string) int {
 	if code != exitOK {
 		return code
 	}
+	securityPostureRows := curatorSecurityPostureRows(cfg)
 	authority, err := preflightCLIExecution(context.Background(), cfg)
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
@@ -861,7 +897,7 @@ func (c cli) cmdStatus(args []string) int {
 		// verdict from a plan that was already stale.
 		scope := projectStatusScope(cfg, target.Root, target.Alias)
 		before := markerDigests(scope.stores...)
-		result := install.Project(cfg, target.Root, target.Alias, install.Options{DryRun: true, Build: install.BuildDeps{Assurance: authority}, External: productionExternalDeps(cfg, true)})
+		result := install.Project(cfg, target.Root, target.Alias, install.Options{Operation: install.OperationStatus, DryRun: true, Build: install.BuildDeps{Assurance: authority}, External: productionExternalDeps(cfg, true)})
 		if result.Status == "failed" {
 			// A read-only plan that refused, yet still described every compiled
 			// command it was asked about, has produced a currentness verdict — and
@@ -917,6 +953,7 @@ func (c cli) cmdStatus(args []string) int {
 		payload := map[string]any{
 			"alias": target.Alias, "path": target.Root, "skills": drift,
 			"shell_hook_trust": trustRows, "providers": providers,
+			"security_posture_rows": securityPostureRows,
 		}
 		if len(registryRows) > 0 {
 			payload["registry_posture"] = registryRows
@@ -951,6 +988,7 @@ func (c cli) cmdStatus(args []string) int {
 		}
 	}
 	if !*jsonOut {
+		printSecurityPostureRows(c.stdout, securityPostureRows)
 		for _, warning := range trustWarnings {
 			_, _ = fmt.Fprintln(c.stdout, "shell-hook-trust: warning: "+warning)
 		}
@@ -1690,7 +1728,7 @@ func (c cli) globalStatusPlanWithAuthority(cfg *config.Config, authority *instal
 			"could not resolve the user home the machine-wide scope mirrors into: %v", err))
 		return result, true
 	}
-	result := install.Global(cfg, userHome, install.Options{DryRun: true, Build: install.BuildDeps{Assurance: authority}, External: productionExternalDeps(cfg, true)})
+	result := install.Global(cfg, userHome, install.Options{Operation: install.OperationStatus, DryRun: true, Build: install.BuildDeps{Assurance: authority}, External: productionExternalDeps(cfg, true)})
 	return result, result.Status == "failed" && !result.BuildsComplete
 }
 
@@ -1733,6 +1771,10 @@ func (c cli) runGlobalInstallModeWithProfile(cfg *config.Config, args []string, 
 	}
 	opts.Build.Assurance = authority
 	opts.Fetch = fetch && !opts.DryRun
+	opts.Operation = install.OperationInstall
+	if fetch {
+		opts.Operation = install.OperationUpdate
+	}
 	opts.FetchedRepos = map[string]bool{}
 	opts.External = productionExternalDeps(cfg, opts.DryRun)
 	opts.External.BuildSSH = install.CaptureBuildSSHSelection(cfg, opts.BuildSSH, os.Getenv)

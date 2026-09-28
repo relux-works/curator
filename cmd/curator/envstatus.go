@@ -14,6 +14,7 @@ import (
 // printEnvStatus renders the profile × environment × surface matrix as
 // human-readable rows. Machine-readable consumers use --json.
 func printEnvStatus(stdout io.Writer, status *envprofile.Status) {
+	printSecurityPostureRows(stdout, status.SecurityPostureRows)
 	// §12.2: env status reports the locked require_current_profile
 	// requirement.
 	if status.RequireCurrentProfile != nil {
@@ -151,6 +152,16 @@ func printEnvStatus(stdout io.Writer, status *envprofile.Status) {
 	}
 	for _, note := range status.Notes {
 		_, _ = fmt.Fprintf(stdout, "note: %s\n", note)
+	}
+}
+
+func printSecurityPostureRows(stdout io.Writer, rows []config.SecurityPostureRow) {
+	for index, row := range rows {
+		if index == 0 && row.Gate == "security_posture" {
+			_, _ = fmt.Fprintf(stdout, "security_posture: %v (%s)\n", row.Value, row.Source)
+			continue
+		}
+		_, _ = fmt.Fprintf(stdout, "%s: %v (%s)\n", row.Gate, row.Value, row.Source)
 	}
 }
 

@@ -48,7 +48,8 @@ type Environments struct {
 	// signer; an absent source is unconfigured.
 	SourceSigners map[string][]SourceSigner
 	// RequireSourceSigners requires every Git source to have a source-level
-	// allowlist. Set distinguishes the default from an explicit false value.
+	// allowlist. The security posture selects true only when this knob is absent;
+	// Set distinguishes the default from an explicit false value.
 	RequireSourceSigners    bool
 	RequireSourceSignersSet bool
 	ShadowAcknowledged      []ShadowAcknowledgement

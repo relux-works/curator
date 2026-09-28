@@ -185,6 +185,7 @@ func (c cli) cmdEnvStatus(cfg *config.Config, args []string) int {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
+	status.SecurityPostureRows = envSecurityPostureRows(cfg)
 	attachProviderPosture(cfg, status)
 	attachRegistryPosture(cfg, status)
 	if *asJSON {

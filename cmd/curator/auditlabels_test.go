@@ -187,9 +187,7 @@ func TestCLIAuditEmitsScriptLabels(t *testing.T) {
 			if code != exitOK {
 				t.Fatalf("audit = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitOK, stdout, stderr)
 			}
-			if stderr != "" {
-				t.Fatalf("audit wrote errors for a labelled skill:\n%s", stderr)
-			}
+			requirePermissivePostureWarning(t, stderr)
 			wantRecord := "app: audit info: label-skill: command 'tool' execution_policy=" + testCase.wantPolicy
 			if !strings.Contains(stdout, wantRecord) {
 				t.Fatalf("audit output does not carry the record entry %q:\n%s", wantRecord, stdout)
@@ -230,9 +228,7 @@ func TestCLIAuditMixedSkillRecordsBothPolicies(t *testing.T) {
 	if code != exitOK {
 		t.Fatalf("audit = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitOK, stdout, stderr)
 	}
-	if stderr != "" {
-		t.Fatalf("audit wrote errors:\n%s", stderr)
-	}
+	requirePermissivePostureWarning(t, stderr)
 	for _, want := range []string{
 		"app: audit info: label-skill: command 'guarded' execution_policy=script-worker-v1",
 		"app: audit info: label-skill: command 'tool' execution_policy=(none)",
@@ -261,9 +257,7 @@ func TestCLIAuditJSONCarriesScriptLabels(t *testing.T) {
 	if code != exitOK {
 		t.Fatalf("audit = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitOK, stdout, stderr)
 	}
-	if stderr != "" {
-		t.Fatalf("audit wrote errors:\n%s", stderr)
-	}
+	requirePermissivePostureWarning(t, stderr)
 	var outputs []struct {
 		Scope    string   `json:"scope"`
 		Warnings []string `json:"warnings"`
@@ -305,9 +299,7 @@ func TestCLIAuditJSONRecordsExplicitAbsence(t *testing.T) {
 	if code != exitOK {
 		t.Fatalf("audit = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitOK, stdout, stderr)
 	}
-	if stderr != "" {
-		t.Fatalf("audit wrote errors:\n%s", stderr)
-	}
+	requirePermissivePostureWarning(t, stderr)
 	var outputs []struct {
 		Scope    string   `json:"scope"`
 		Warnings []string `json:"warnings"`

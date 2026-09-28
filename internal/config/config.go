@@ -56,6 +56,7 @@ var LockableKeys = map[string]bool{
 	"disable_builtin_registries":             true,
 	"allowed_sources":                        true,
 	"audit":                                  true,
+	"security_posture":                       true,
 	"environments.overlays_allowed":          true,
 	"environments.precedence":                true,
 	"environments.mcp_package_allowlist":     true,
@@ -63,10 +64,10 @@ var LockableKeys = map[string]bool{
 	"environments.require_current_profile":   true,
 	"environments.isolation":                 true,
 	"environments.transitive_system_modules": true,
+	"environments.require_source_signers":    true,
 	"environments.provider_directories":      true,
 	"environments.permissions":               true,
 	"environments.source_signers":            true,
-	"environments.require_source_signers":    true,
 }
 
 var (
@@ -81,6 +82,7 @@ var managerKeys = map[string]bool{
 	"schema_version": true, "skills_root": true, "default_agents": true,
 	"preferred_locale": true, "adapter_mode": true, "worktree_alias_pattern": true,
 	"projects": true, "allowed_sources": true, "audit": true,
+	"security_posture": true,
 	"audit_registries": true, "disable_builtin_registries": true,
 	"execution": true,
 	"build_ssh": true, "build_https": true,
@@ -169,14 +171,20 @@ type Config struct {
 	Locked map[string]bool
 	// SystemConfigPath is the enforced system file the effective
 	// configuration merged, or "" when none was present.
-	SystemConfigPath         string
-	SkillsRoot               string
-	PreferredLocale          string
-	DefaultAgents            []string
-	AdapterMode              string // auto | symlink | copy
-	WorktreeAliasPattern     string
-	Projects                 map[string]Project
-	Audit                    Audit
+	SystemConfigPath     string
+	SkillsRoot           string
+	PreferredLocale      string
+	DefaultAgents        []string
+	AdapterMode          string // auto | symlink | copy
+	WorktreeAliasPattern string
+	Projects             map[string]Project
+	Audit                Audit
+	// SecurityPosture is the effective machine profile. Schema-1 machines
+	// always resolve to permissive; schema-2 machines use the shipped
+	// revision default unless the machine or an enforced system config sets it.
+	SecurityPosture          string
+	SecurityPostureSource    string
+	postureSources           map[string]string
 	Execution                Execution
 	AllowedSources           []string
 	AuditRegistries          []Registry
@@ -286,26 +294,28 @@ func Load(path string, warn func(string)) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	machineData := userData
 	userIsolation := userIsolationFromConfig(userData)
 	locked := map[string]bool{}
 	systemPath := ""
+	var systemDataForSources map[string]any
 	if resolved := SystemPath(); resolved != "" {
 		systemPath = resolved
 		systemData, err := readObject(systemPath)
 		if err != nil {
 			return nil, err
 		}
+		systemDataForSources = systemData
 		merged, mergedLocked, err := applySystem(systemData, userData, systemPath, warn)
 		if err != nil {
 			return nil, err
 		}
 		userData, locked = merged, mergedLocked
 	}
-	cfg, err := Parse(userData, path)
+	cfg, err := parseConfig(userData, path, locked, machineData, systemDataForSources)
 	if err != nil {
 		return nil, err
 	}
-	cfg.Locked = locked
 	cfg.SystemConfigPath = systemPath
 	cfg.UserIsolation = userIsolation
 	return cfg, nil
@@ -349,6 +359,14 @@ func applySystem(systemData, userData map[string]any, systemPath string, warn fu
 			return nil, nil, verr.New(key, "system config %s has unsupported field", systemPath)
 		}
 	}
+	if rawPosture, present := systemData["security_posture"]; present {
+		if systemSchema != SchemaVersion2 {
+			return nil, nil, verr.New("security_posture", "system config %s requires schema_version 2 for security_posture", systemPath)
+		}
+		if posture, ok := rawPosture.(string); !ok || posture != SecurityPostureHardened {
+			return nil, nil, verr.New("security_posture", "system config %s may set security_posture only to hardened", systemPath)
+		}
+	}
 	rawLocked, _ := systemData["locked"].([]any)
 	if systemData["locked"] != nil && rawLocked == nil {
 		return nil, nil, verr.New("locked", "system config %s field 'locked' must be a list of strings", systemPath)
@@ -366,6 +384,9 @@ func applySystem(systemData, userData map[string]any, systemPath string, warn fu
 		} else if strings.HasPrefix(key, "environments") {
 			return nil, nil, verr.New("locked", "system config %s cannot lock %q: lock the environments.<key> knob", systemPath, key)
 		}
+		if key == "security_posture" && systemSchema != SchemaVersion2 {
+			return nil, nil, verr.New("locked", "system config %s cannot lock security_posture under schema_version 1", systemPath)
+		}
 		if !LockableKeys[key] {
 			return nil, nil, verr.New("locked", "system config %s cannot lock %q", systemPath, key)
 		}
@@ -373,6 +394,9 @@ func applySystem(systemData, userData map[string]any, systemPath string, warn fu
 			return nil, nil, verr.New("locked", "system config %s lists %q more than once", systemPath, key)
 		}
 		locked[key] = true
+	}
+	if hasConfigKey(systemData, "security_posture") && !locked["security_posture"] {
+		return nil, nil, verr.New("security_posture", "system config %s must lock security_posture", systemPath)
 	}
 	// A system file carries only the lockable environments subset with the
 	// §12.1 value grammars; isolation is lockable in either direction (§12.2).
@@ -511,6 +535,10 @@ func checkLockedEnvSet(systemData map[string]any, locked map[string]bool, system
 
 // Parse validates a raw config object (Spec §7.1).
 func Parse(data map[string]any, path string) (*Config, error) {
+	return parseConfig(data, path, nil, data, nil)
+}
+
+func parseConfig(data map[string]any, path string, locked map[string]bool, machineData, systemData map[string]any) (*Config, error) {
 	for key := range data {
 		if !managerKeys[key] {
 			return nil, verr.New(key, "unsupported top-level configuration field")
@@ -522,6 +550,19 @@ func Parse(data map[string]any, path string) (*Config, error) {
 	}
 	if schema != SchemaVersion && schema != SchemaVersion2 {
 		return nil, verr.New("schema_version", "unsupported config schema_version %d; this config requires a newer tool", schema)
+	}
+	if schema == SchemaVersion && hasConfigKey(machineData, "security_posture") {
+		return nil, verr.New("security_posture", "requires schema_version 2; manager-config-v1 is frozen without this field")
+	}
+	posture := defaultSecurityPosture(schema)
+	if schema == SchemaVersion2 {
+		if rawPosture, present := data["security_posture"]; present {
+			value, ok := rawPosture.(string)
+			if !ok || (value != SecurityPosturePermissive && value != SecurityPostureHardened) {
+				return nil, verr.New("security_posture", "must be permissive or hardened")
+			}
+			posture = value
+		}
 	}
 	// A schema-1 file declares no environments object (manager §12); one
 	// that carries it is rejected rather than read with its knobs ignored
@@ -695,12 +736,15 @@ func Parse(data map[string]any, path string) (*Config, error) {
 		}
 	}
 
-	return &Config{
+	if locked == nil {
+		locked = map[string]bool{}
+	}
+	cfg := &Config{
 		Path:                     path,
 		Schema:                   schema,
 		Env:                      env,
 		UserIsolation:            env.Isolation,
-		Locked:                   map[string]bool{},
+		Locked:                   locked,
 		SkillsRoot:               expandHome(skillsRoot),
 		PreferredLocale:          preferredLocale,
 		DefaultAgents:            defaultAgents,
@@ -716,7 +760,12 @@ func Parse(data map[string]any, path string) (*Config, error) {
 		BuildHTTPS:               buildHTTPS,
 		ScriptInterpreters:       scriptInterpreters,
 		ScriptDiagnosticsDir:     diagnosticsDir,
-	}, nil
+		SecurityPosture:          posture,
+	}
+	cfg.SecurityPostureSource = securityPostureSource(data, machineData, systemData, locked, schema)
+	cfg.postureSources = securityPostureSources(data, machineData, systemData, locked)
+	applyHardenedDefaults(cfg, data)
+	return cfg, nil
 }
 
 func parseExecution(raw any) (Execution, error) {

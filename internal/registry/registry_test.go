@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,6 +16,51 @@ import (
 
 	"github.com/relux-works/curator/internal/stateread"
 )
+
+func TestRegistryOutageClassificationExcludesOtherFailures(t *testing.T) {
+	if !isRegistryUnavailable(registryStatusError("snapshot request", registryHTTPResult{status: http.StatusServiceUnavailable})) {
+		t.Fatal("HTTP 503 must classify as registry unavailable")
+	}
+	if isRegistryUnavailable(registryStatusError("snapshot request", registryHTTPResult{status: http.StatusBadRequest})) {
+		t.Fatal("HTTP 400 must not classify as registry unavailable")
+	}
+
+	s := newSigner(t)
+	reg := Registry{Name: "trusted", URL: "https://registry.example", PublicKeys: []string{s.pinned}}
+	fetchFailure := errors.New("registry response is malformed")
+	resolve := func(fetch FetchFn) Resolution {
+		return Resolve([]Registry{reg}, "git.example/skill", testCommit, testContentSHA256, fetch)
+	}
+	malformed := resolve(func(string, string, string, string) ([]map[string]any, error) {
+		return nil, fetchFailure
+	})
+	if len(malformed.Unreachable) != 0 {
+		t.Fatalf("malformed response was marked unreachable: %v", malformed.Unreachable)
+	}
+	outage := resolve(func(string, string, string, string) ([]map[string]any, error) {
+		return nil, markRegistryUnavailable(errors.New("dial tcp: connection refused"))
+	})
+	if len(outage.Unreachable) != 1 || outage.Unreachable[0] != reg.URL {
+		t.Fatalf("transport outage was not marked unreachable: %v", outage.Unreachable)
+	}
+
+	stateDir := t.TempDir()
+	check := func(fetch SnapshotFetchFn) SnapshotCheck {
+		return CheckSnapshotsWithPolicyReadOnlyDetailed(
+			[]Registry{reg}, stateDir, fetch, time.Now(), DefaultSnapshotMaxAge, DefaultSnapshotClockSkew,
+		)
+	}
+	malformedSnapshot := check(func(string) (map[string]any, error) { return nil, fetchFailure })
+	if len(malformedSnapshot.Unreachable) != 0 {
+		t.Fatalf("malformed snapshot was marked unreachable: %v", malformedSnapshot.Unreachable)
+	}
+	outageSnapshot := check(func(string) (map[string]any, error) {
+		return nil, markRegistryUnavailable(errors.New("dial tcp: connection refused"))
+	})
+	if len(outageSnapshot.Unreachable) != 1 || outageSnapshot.Unreachable[0] != reg.URL {
+		t.Fatalf("snapshot transport outage was not marked unreachable: %v", outageSnapshot.Unreachable)
+	}
+}
 
 // signer builds signed registry objects for tests.
 type signer struct {

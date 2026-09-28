@@ -212,22 +212,26 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 		return result, nil
 	}
 
-	// Registry resolution (Spec §13); Options.ResolveAttest overrides. A
-	// revoked or unaudited artifact fails the global scope here, before any
+	// Registry resolution (Spec §13) and the operation-level
+	// unreachable-registry gate (registry §4, manager §7.1) both run before any
 	// toolchain, cache, or compiler work.
-	resolveAttest := opts.ResolveAttest
-	if resolveAttest == nil {
-		resolveAttest = func(nodes []*closure.Node) (map[string]*marker.Attestation, []string, error) {
-			return resolveRegistries(cfg, nodes, "global", !opts.DryRun, false)
-		}
+	registryResult, regErr := resolveRegistryEvidence(cfg, nodes, "global", !opts.DryRun, false, opts)
+	result.Messages = append(result.Messages, registryResult.Warnings...)
+	result.Attestations = registryResult.Attestations
+	registryRefused := false
+	if opts.Operation != OperationStatus {
+		registryRefused = addRegistryDiagnostic(&result, cfg, registryResult)
 	}
-	attestations, regWarnings, regErr := resolveAttest(nodes)
-	result.Messages = append(result.Messages, regWarnings...)
+	if registryRefused {
+		if regErr != nil {
+			result.Errors = append(result.Errors, regErr.Error())
+		}
+		return result, nil
+	}
 	if regErr != nil {
 		result.failf("%v", regErr)
 		return result, nil
 	}
-	result.Attestations = attestations
 
 	// Narrow boundaries for the remaining read-only gates. Operation-private
 	// toolchain state must never land in the global scope, the runtime store,
@@ -350,7 +354,7 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 			return stageGlobalTargets(globalTargetRequest{
 				cfg: cfg, home: home, userHome: userHome, platform: platform,
 				nodes: nodes, agents: agents, effectiveLocale: effectiveLocale,
-				mcpFound: mcpFound, attestations: attestations,
+				mcpFound: mcpFound, attestations: registryResult.Attestations,
 				skillsDir: skillsDir, binDir: binDir,
 				plan: plan, deps: deps, scoped: scoped,
 				external: externalStaged, externalStoreRoot: externalPlan.deps.StoreRoot,

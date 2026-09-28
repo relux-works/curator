@@ -53,13 +53,24 @@ type parsedSnapshot struct {
 // SnapshotFetchFn returns the signed snapshot object of a registry.
 type SnapshotFetchFn func(url string) (map[string]any, error)
 
+// SnapshotCheck carries the verified registry state plus the trusted
+// registries whose snapshots could not be reached. Unreachable is separate
+// from Warnings so callers do not have to infer outage state from display
+// text.
+type SnapshotCheck struct {
+	Tampered    map[string]bool
+	Warnings    []string
+	Unreachable []string
+}
+
 // CheckSnapshots verifies each registry snapshot and returns the URLs to
 // treat as tampered plus warnings (Spec §13.4). A registry is excluded when
 // its snapshot signature fails, its version moved backward relative to the
 // persisted highest accepted version, or it is stale. An unreachable
 // snapshot warns but does not exclude.
 func CheckSnapshots(registries []Registry, cacheDir string, fetch SnapshotFetchFn, now time.Time, maxAge time.Duration) (map[string]bool, []string) {
-	return checkSnapshotsWithPolicy(registries, cacheDir, fetch, now, maxAge, DefaultSnapshotClockSkew, true)
+	result := checkSnapshotsWithPolicy(registries, cacheDir, fetch, now, maxAge, DefaultSnapshotClockSkew, true)
+	return result.Tampered, result.Warnings
 }
 
 // CheckSnapshotsWithPolicy applies explicit manager-config age and clock-skew
@@ -72,16 +83,30 @@ func CheckSnapshots(registries []Registry, cacheDir string, fetch SnapshotFetchF
 // the post-fetch wall clock plus the configured skew, while callers that
 // inject a fixed `now` with an instant fetch observe a ~zero tolerance.
 func CheckSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch SnapshotFetchFn, now time.Time, maxAge, clockSkew time.Duration) (map[string]bool, []string) {
+	result := CheckSnapshotsWithPolicyDetailed(registries, cacheDir, fetch, now, maxAge, clockSkew)
+	return result.Tampered, result.Warnings
+}
+
+// CheckSnapshotsWithPolicyDetailed returns the same snapshot verdict as
+// CheckSnapshotsWithPolicy and also reports URLs whose snapshot fetch failed.
+func CheckSnapshotsWithPolicyDetailed(registries []Registry, cacheDir string, fetch SnapshotFetchFn, now time.Time, maxAge, clockSkew time.Duration) SnapshotCheck {
 	return checkSnapshotsWithPolicy(registries, cacheDir, fetch, now, maxAge, clockSkew, true)
 }
 
 // CheckSnapshotsWithPolicyReadOnly verifies candidates against existing
 // rollback state without creating or advancing protected state.
 func CheckSnapshotsWithPolicyReadOnly(registries []Registry, stateDir string, fetch SnapshotFetchFn, now time.Time, maxAge, clockSkew time.Duration) (map[string]bool, []string) {
+	result := CheckSnapshotsWithPolicyReadOnlyDetailed(registries, stateDir, fetch, now, maxAge, clockSkew)
+	return result.Tampered, result.Warnings
+}
+
+// CheckSnapshotsWithPolicyReadOnlyDetailed is the read-only form of
+// CheckSnapshotsWithPolicyDetailed.
+func CheckSnapshotsWithPolicyReadOnlyDetailed(registries []Registry, stateDir string, fetch SnapshotFetchFn, now time.Time, maxAge, clockSkew time.Duration) SnapshotCheck {
 	return checkSnapshotsWithPolicy(registries, stateDir, fetch, now, maxAge, clockSkew, false)
 }
 
-func checkSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch SnapshotFetchFn, now time.Time, maxAge, clockSkew time.Duration, persist bool) (map[string]bool, []string) {
+func checkSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch SnapshotFetchFn, now time.Time, maxAge, clockSkew time.Duration, persist bool) SnapshotCheck {
 	// The future-timestamp bound below tolerates the checker's own latency
 	// since it sampled its clock. The start is taken once at function entry
 	// — not per registry — so the bound is the post-fetch wall clock plus
@@ -95,6 +120,7 @@ func checkSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch Snap
 	}
 	tampered := map[string]bool{}
 	var warnings []string
+	var unreachable []string
 	if persist {
 		if err := os.MkdirAll(cacheDir, 0o700); err != nil {
 			for _, reg := range registries {
@@ -103,7 +129,7 @@ func checkSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch Snap
 					warnings = append(warnings, fmt.Sprintf("registry %s rollback state directory is unavailable: %v", reg.Name, err))
 				}
 			}
-			return tampered, warnings
+			return SnapshotCheck{Tampered: tampered, Warnings: warnings, Unreachable: unreachable}
 		}
 		_ = os.Chmod(cacheDir, 0o700) // #nosec G302 -- owner-only directory access requires traversal bits
 	}
@@ -121,7 +147,7 @@ func checkSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch Snap
 				warnings = append(warnings, fmt.Sprintf("registry %s rollback state catalog is unavailable: %v", reg.Name, err))
 			}
 		}
-		return tampered, warnings
+		return SnapshotCheck{Tampered: tampered, Warnings: warnings, Unreachable: unreachable}
 	}
 	for _, reg := range registries {
 		if len(reg.PublicKeys) == 0 {
@@ -143,6 +169,9 @@ func checkSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch Snap
 		snapshot, err := fetch(reg.URL)
 		if err != nil {
 			warnings = append(warnings, fmt.Sprintf("registry %s snapshot unavailable: %v", reg.Name, err))
+			if isRegistryUnavailable(err) {
+				unreachable = append(unreachable, reg.URL)
+			}
 			continue
 		}
 		parsed, err := parseSnapshot(snapshot)
@@ -203,7 +232,7 @@ func checkSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch Snap
 			}
 		}
 	}
-	return tampered, warnings
+	return SnapshotCheck{Tampered: tampered, Warnings: warnings, Unreachable: unreachable}
 }
 
 // MigrateSnapshotStates moves legacy rollback state out of the disposable
