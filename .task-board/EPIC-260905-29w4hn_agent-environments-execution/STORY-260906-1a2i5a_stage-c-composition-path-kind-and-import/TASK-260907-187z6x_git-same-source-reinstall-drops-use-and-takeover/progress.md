@@ -14,7 +14,7 @@ estimated(fibonacci(3))
 - (none)
 
 ## Blocks
-- BUG-260916-3aco9f
+- (none)
 
 ## Checklist
 - [x] profile install <git-url> --use --takeover after the 9.5 stop no longer exits 0 with updated profile: the stop is surfaced with its diagnostic and non-zero exit, and neither flag takes effect
@@ -171,7 +171,7 @@ run write-boundary clearance for RUN-260923-f7e76b: Operator review 2026-09-23: 
 2026-09-06T22:08:08Z
 
 ## Last Update
-2026-09-26T16:01:17Z
+2026-09-26T19:21:19Z
 
 ## Assigned To
 [implementer] developer (muse)
