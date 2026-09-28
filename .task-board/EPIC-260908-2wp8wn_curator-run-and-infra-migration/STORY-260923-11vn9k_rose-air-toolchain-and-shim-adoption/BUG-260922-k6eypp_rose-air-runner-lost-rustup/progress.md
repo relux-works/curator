@@ -103,6 +103,9 @@ spawn selection rationale for claude-opus-5-5/low: muse would not execute the st
 spawn agent resolution: Agent selection: claude via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
 spawn queued: [implementer] developer (claude) (run=RUN-260928-b1cf47, max_parallel=20)
 spawn run started: [implementer] developer (claude) (run=RUN-260928-b1cf47)
+agent completed: [implementer] developer (claude) (exit=0)
+spawn run completed: claude (run=RUN-260928-b1cf47, pid=73911, exit=0)
+spawn run RUN-260928-b1cf47 failed; operator action required; failure: integration_binding_state_invalid: Change Request CR-BUG-260922-k6eypp-3 revision 3 is integrated, want accepted or checkpointed
 
 ## Precondition Resources
 - [k6eypp-fix-1.md](file://BUG-260922-k6eypp/k6eypp-fix-1.md) — k6eypp-fix-1.md
@@ -134,12 +137,13 @@ spawn run started: [implementer] developer (claude) (run=RUN-260928-b1cf47)
 - [BUG-260922-k6eypp_spawn-log_-implementer--developer--muse-_RUN-260928-d81929.log](file://BUG-260922-k6eypp/BUG-260922-k6eypp_spawn-log_-implementer--developer--muse-_RUN-260928-d81929.log) — System spawn log captured by task-board
 - [BUG-260922-k6eypp_story-integrate.md](file://BUG-260922-k6eypp/BUG-260922-k6eypp_story-integrate.md) — Story integrate preconditions for rev 3 landing
 - [BUG-260922-k6eypp_spawn-log_-implementer--developer--claude-_RUN-260928-b1cf47.log](file://BUG-260922-k6eypp/BUG-260922-k6eypp_spawn-log_-implementer--developer--claude-_RUN-260928-b1cf47.log) — System spawn log captured by task-board
+- [BUG-260922-k6eypp_story-integrate-2.md](file://BUG-260922-k6eypp/BUG-260922-k6eypp_story-integrate-2.md) — Story integrate run 2 output (exit 1: landed locally, board publish unproven)
 
 ## Created
 2026-09-22T12:50:39Z
 
 ## Last Update
-2026-09-28T05:50:32Z
+2026-09-28T06:37:28Z
 
 ## Assigned To
 [implementer] developer (claude)
