@@ -1,0 +1,3364 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 4db6cc5..46b1ed3 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -7,6 +7,23 @@ Versioning for the complete specification set.
+ 
+ ### Added
+ 
++- STORY-260922-188t6n (TASK-260922-1nf6o6, F-S1): add
++  `agent-environment-marker-v2.schema.json` with the six-field
++  credential record (`isolation`, `strategy`, `source_role`,
++  `backend`, `backend_version`, `provenance`) and conditional
++  linkless paths. Schema 1 remains valid and unchanged; existing schema-1
++  markers upgrade only when a successful mutation already requires marker
++  publication, and rollback restores the preceding marker. Normative
++  publication, backup `lstat`, and no-credential-archive rules are in
++  environments §§7.4/8.4.1 and manager §§12.4/12.5. Adds schema cases;
++  frozen v1 protocol schemas remain unchanged. The spec validator caches
++  successful schema meta-checks by canonical content and rechecks changed
++  schemas. Curator follow-up leaf:
++  **Publish schema-2 credential records in the environment manager**
++  (manager-side publication, schema id
++  `agent-environment-marker-v2.schema.json`, six exact fields above,
++  path omitted for linkless records, and the upgrade rule above).
++
+ - STORY-260922-188t6n (TASK-260922-1hla8q, F-S2): fix the Decision
+   0018 choice-7 transport left open at adoption. The minimum transport
+   version token is `launch-env-fragment-v2` — a launcher establishes
+diff --git a/conformance/v1/manifest.json b/conformance/v1/manifest.json
+index dcffead..ac37742 100644
+--- a/conformance/v1/manifest.json
++++ b/conformance/v1/manifest.json
+@@ -644,6 +644,10 @@
+       "path": "schema-cases/agent-environment-marker-v1/invalid-mode.json",
+       "sha256": "sha256:89dfbe49ca1b3ef81d664b5141c454c1fcca51a2d20c8c011ca55d56cb9206f5"
+     },
++    {
++      "path": "schema-cases/agent-environment-marker-v1/invalid-passthrough-credential-record.json",
++      "sha256": "sha256:6ca158719b182dac34e2530ad53d1d2fb2e8360caeb1538dc73231b656720219"
++    },
+     {
+       "path": "schema-cases/agent-environment-marker-v1/invalid-passthrough-unknown-strategy.json",
+       "sha256": "sha256:5307222f1a7f55bced62b88fc3a3184b48b78e380d8b9795deba5e325de4f7ff"
+@@ -796,6 +800,110 @@
+       "path": "schema-cases/agent-environment-marker-v1/valid.json",
+       "sha256": "sha256:bbd4e9b9b9d2a30ae516f6c699603bafbc2e26edb2e1173b9d733bbda0b06c49"
+     },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/invalid-empty-backend-version.json",
++      "sha256": "sha256:138cb9b95e1622d9583b55af3c8db8e2ef5d08efcc48bf62e0865252998b0578"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/invalid-missing-backend-version.json",
++      "sha256": "sha256:d6a310c910c55db030484c3ca98bcc3c870a7623a4ae5df77a1c121915f0d1ca"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/invalid-missing-backend.json",
++      "sha256": "sha256:a3d57f3af2c539ab9a40b14a34ae7ba71f8ecb99ed3bf7b1f05abe4582cb5c17"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/invalid-missing-isolation.json",
++      "sha256": "sha256:a74cb6d36dc38c9c3711e755ead521f0243f79cb17a5b7bdd826040784f02a0f"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/invalid-missing-path-on-file-link.json",
++      "sha256": "sha256:463e0446aee7ce001a5c2c34170cbe220951c4138e30341f5cedff71e672bd64"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/invalid-missing-path-on-keyring-preferred-file.json",
++      "sha256": "sha256:1460f18aba8bcf7acef3eef3adb9c2a9cfdaf4faa8e72dce18075fcc4d645c31"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/invalid-missing-provenance.json",
++      "sha256": "sha256:1947668d0dfd0808dbfd8c400cffc8c5377612ad0ddd1d8fe584657be6bdb14f"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/invalid-missing-source-role.json",
++      "sha256": "sha256:0ea58ee8e8b787045048efed1ea86b4eda526dd5b15db007148d6da0e9473bc6"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/invalid-missing-strategy.json",
++      "sha256": "sha256:c94e91dd0ada59fb89f33531c7cda682b5dfdfe05e404b589cfac0e7a6fb1207"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/invalid-path-on-ambient-backend.json",
++      "sha256": "sha256:bf5bd6fbe3a804aa501c7fd034a7122d0df85ede3597663028e7ad19e74cf373"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/invalid-path-on-ambient-strategy.json",
++      "sha256": "sha256:5059139872afa12615678262e141a56ab4875aedc21889f4545b98804920b342"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/invalid-path-on-isolated-per-home-keychain.json",
++      "sha256": "sha256:0d8391aad5e09527d8c72d16f6b232f0f74c3e43267b0d2151f82daa4ba9b342"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/invalid-unknown-backend.json",
++      "sha256": "sha256:b3b7aaf57f9355d9853a798baa112ca20f4a19aa95352a874d95d5b4e68cd1dd"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/invalid-unknown-field.json",
++      "sha256": "sha256:8c5c580be615663ba0203ee76f543efd76f44364834c7abf53a3c1313a6a2436"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/invalid-unknown-isolation.json",
++      "sha256": "sha256:88070b95ed57a1a3d41dca02684bd19f1499b2af60ce5baab6ec48365a7d80b9"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/invalid-unknown-provenance.json",
++      "sha256": "sha256:37a8da0fb00d81d5fc8bbc41c59130774af4416080880ab7c9858d59fd1b1124"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/invalid-unknown-source-role.json",
++      "sha256": "sha256:7075328290c8281dea43a7ad926e8c6693380f6bb521b715e6096204b4c6b9da"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/invalid-unknown-strategy.json",
++      "sha256": "sha256:bfa0ca9c04e7632e6d0d0303c9386b30df3d8d07a6e5874c4e1cf22b171ea25e"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/invalid.json",
++      "sha256": "sha256:496dc070b0688426fd9562e7fca5d0e6a3836f23d04ddd65ba5b74c2468485f5"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/valid-ambient.json",
++      "sha256": "sha256:27b463d83c06179f3d4c8ae64627d7a70707a410a94e1066e300c7d807e64035"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/valid-file-link.json",
++      "sha256": "sha256:3e30e6004ff7bd0f9a7cc68af08512a93ad4785db845bc36f4ca6518b783b234"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/valid-in-place.json",
++      "sha256": "sha256:40fb2f758dd8490c43bac3875de7b4c0c8daf9529724160c259395a4b78d5806"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/valid-keyring-preferred-ambient.json",
++      "sha256": "sha256:297f33ec5612e1f908cd940de3182c0c866661947670c74de8659d30586ab32b"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/valid-keyring-preferred-file.json",
++      "sha256": "sha256:cc0ef8ecd220a63a5b7948865d48d740b5264cb81ff5a661bcacaa208bcda510"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/valid-per-home-keychain-isolated.json",
++      "sha256": "sha256:b195234e805a7515239670043063e4318c1bfab304c693272e26f96e14672130"
++    },
++    {
++      "path": "schema-cases/agent-environment-marker-v2/valid.json",
++      "sha256": "sha256:037a297fe69976d6a1956e785b23ff07592c8908e7edb025885b6e1e2857f4a7"
++    },
+     {
+       "path": "schema-cases/agent-mcp-v1/invalid-command-absolute-path.json",
+       "sha256": "sha256:0afe161f7f56aae373fbc3e61f3e2d2f3dc6631e6c378d718e5f5f809d86b5e1"
+@@ -2982,7 +3090,7 @@
+     },
+     {
+       "path": "schema-cases/index.json",
+-      "sha256": "sha256:464af01ccb873bc1c219dda4f2a3f28e5e9a236ecd97166f959b9e49bfd96241"
++      "sha256": "sha256:bff81eb96ea8aece6487d6e375d4dad7f178ea4966f61aff0fad219a0db47148"
+     },
+     {
+       "path": "schema-cases/install-marker-v1/invalid.json",
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v1/invalid-passthrough-credential-record.json b/conformance/v1/schema-cases/agent-environment-marker-v1/invalid-passthrough-credential-record.json
+new file mode 100644
+index 0000000..5590ce5
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v1/invalid-passthrough-credential-record.json
+@@ -0,0 +1,86 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [
++    {
++      "backend": "file",
++      "backend_version": "0.153.2",
++      "isolation": "shared",
++      "path": "auth.json",
++      "provenance": "provisioned",
++      "source_role": "native",
++      "strategy": "file-link"
++    }
++  ],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 1
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-empty-backend-version.json b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-empty-backend-version.json
+new file mode 100644
+index 0000000..88973cc
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-empty-backend-version.json
+@@ -0,0 +1,86 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [
++    {
++      "backend": "file",
++      "backend_version": "",
++      "isolation": "shared",
++      "path": "auth.json",
++      "provenance": "provisioned",
++      "source_role": "native",
++      "strategy": "file-link"
++    }
++  ],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-missing-backend-version.json b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-missing-backend-version.json
+new file mode 100644
+index 0000000..f6c70eb
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-missing-backend-version.json
+@@ -0,0 +1,85 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [
++    {
++      "backend": "file",
++      "isolation": "shared",
++      "path": "auth.json",
++      "provenance": "provisioned",
++      "source_role": "native",
++      "strategy": "file-link"
++    }
++  ],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-missing-backend.json b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-missing-backend.json
+new file mode 100644
+index 0000000..1dc2a2d
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-missing-backend.json
+@@ -0,0 +1,85 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [
++    {
++      "backend_version": "0.153.2",
++      "isolation": "shared",
++      "path": "auth.json",
++      "provenance": "provisioned",
++      "source_role": "native",
++      "strategy": "file-link"
++    }
++  ],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-missing-isolation.json b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-missing-isolation.json
+new file mode 100644
+index 0000000..f801a88
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-missing-isolation.json
+@@ -0,0 +1,85 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [
++    {
++      "backend": "file",
++      "backend_version": "0.153.2",
++      "path": "auth.json",
++      "provenance": "provisioned",
++      "source_role": "native",
++      "strategy": "file-link"
++    }
++  ],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-missing-path-on-file-link.json b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-missing-path-on-file-link.json
+new file mode 100644
+index 0000000..94c99b0
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-missing-path-on-file-link.json
+@@ -0,0 +1,85 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [
++    {
++      "backend": "file",
++      "backend_version": "0.153.2",
++      "isolation": "shared",
++      "provenance": "provisioned",
++      "source_role": "native",
++      "strategy": "file-link"
++    }
++  ],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-missing-path-on-keyring-preferred-file.json b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-missing-path-on-keyring-preferred-file.json
+new file mode 100644
+index 0000000..f7aeaf7
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-missing-path-on-keyring-preferred-file.json
+@@ -0,0 +1,85 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [
++    {
++      "backend": "file",
++      "backend_version": "0.153.2",
++      "isolation": "shared",
++      "provenance": "provisioned",
++      "source_role": "native",
++      "strategy": "keyring-preferred"
++    }
++  ],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-missing-provenance.json b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-missing-provenance.json
+new file mode 100644
+index 0000000..3fe9f4a
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-missing-provenance.json
+@@ -0,0 +1,85 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [
++    {
++      "backend": "file",
++      "backend_version": "0.153.2",
++      "isolation": "shared",
++      "path": "auth.json",
++      "source_role": "native",
++      "strategy": "file-link"
++    }
++  ],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-missing-source-role.json b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-missing-source-role.json
+new file mode 100644
+index 0000000..79851aa
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-missing-source-role.json
+@@ -0,0 +1,85 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [
++    {
++      "backend": "file",
++      "backend_version": "0.153.2",
++      "isolation": "shared",
++      "path": "auth.json",
++      "provenance": "provisioned",
++      "strategy": "file-link"
++    }
++  ],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-missing-strategy.json b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-missing-strategy.json
+new file mode 100644
+index 0000000..67543ae
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-missing-strategy.json
+@@ -0,0 +1,85 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [
++    {
++      "backend": "file",
++      "backend_version": "0.153.2",
++      "isolation": "shared",
++      "path": "auth.json",
++      "provenance": "provisioned",
++      "source_role": "native"
++    }
++  ],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-path-on-ambient-backend.json b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-path-on-ambient-backend.json
+new file mode 100644
+index 0000000..71a60bc
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-path-on-ambient-backend.json
+@@ -0,0 +1,86 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [
++    {
++      "backend": "ambient",
++      "backend_version": "0.153.2",
++      "isolation": "shared",
++      "path": "auth.json",
++      "provenance": "provisioned",
++      "source_role": "native",
++      "strategy": "keyring-preferred"
++    }
++  ],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-path-on-ambient-strategy.json b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-path-on-ambient-strategy.json
+new file mode 100644
+index 0000000..e865590
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-path-on-ambient-strategy.json
+@@ -0,0 +1,86 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [
++    {
++      "backend": "file",
++      "backend_version": "2.1.261",
++      "isolation": "shared",
++      "path": "auth.json",
++      "provenance": "provisioned",
++      "source_role": "native",
++      "strategy": "ambient"
++    }
++  ],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-path-on-isolated-per-home-keychain.json b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-path-on-isolated-per-home-keychain.json
+new file mode 100644
+index 0000000..c6bc1ab
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-path-on-isolated-per-home-keychain.json
+@@ -0,0 +1,86 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [
++    {
++      "backend": "keychain",
++      "backend_version": "2.1.261",
++      "isolation": "isolated",
++      "path": "auth.json",
++      "provenance": "provisioned",
++      "source_role": "managed",
++      "strategy": "per-home-keychain"
++    }
++  ],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-unknown-backend.json b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-unknown-backend.json
+new file mode 100644
+index 0000000..353c706
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-unknown-backend.json
+@@ -0,0 +1,86 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [
++    {
++      "backend": "unknown",
++      "backend_version": "0.153.2",
++      "isolation": "shared",
++      "path": "auth.json",
++      "provenance": "provisioned",
++      "source_role": "native",
++      "strategy": "file-link"
++    }
++  ],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-unknown-field.json b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-unknown-field.json
+new file mode 100644
+index 0000000..41ca8a7
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-unknown-field.json
+@@ -0,0 +1,87 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [
++    {
++      "backend": "file",
++      "backend_version": "0.153.2",
++      "isolation": "shared",
++      "owner": "unexpected",
++      "path": "auth.json",
++      "provenance": "provisioned",
++      "source_role": "native",
++      "strategy": "file-link"
++    }
++  ],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-unknown-isolation.json b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-unknown-isolation.json
+new file mode 100644
+index 0000000..7adf46a
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-unknown-isolation.json
+@@ -0,0 +1,86 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [
++    {
++      "backend": "file",
++      "backend_version": "0.153.2",
++      "isolation": "machine",
++      "path": "auth.json",
++      "provenance": "provisioned",
++      "source_role": "native",
++      "strategy": "file-link"
++    }
++  ],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-unknown-provenance.json b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-unknown-provenance.json
+new file mode 100644
+index 0000000..3a92acb
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-unknown-provenance.json
+@@ -0,0 +1,86 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [
++    {
++      "backend": "file",
++      "backend_version": "0.153.2",
++      "isolation": "shared",
++      "path": "auth.json",
++      "provenance": "copied",
++      "source_role": "native",
++      "strategy": "file-link"
++    }
++  ],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-unknown-source-role.json b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-unknown-source-role.json
+new file mode 100644
+index 0000000..c3f7301
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-unknown-source-role.json
+@@ -0,0 +1,86 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [
++    {
++      "backend": "file",
++      "backend_version": "0.153.2",
++      "isolation": "shared",
++      "path": "auth.json",
++      "provenance": "provisioned",
++      "source_role": "system",
++      "strategy": "file-link"
++    }
++  ],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-unknown-strategy.json b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-unknown-strategy.json
+new file mode 100644
+index 0000000..58b623e
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid-unknown-strategy.json
+@@ -0,0 +1,86 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [
++    {
++      "backend": "file",
++      "backend_version": "0.153.2",
++      "isolation": "shared",
++      "path": "auth.json",
++      "provenance": "provisioned",
++      "source_role": "native",
++      "strategy": "hardlink"
++    }
++  ],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/invalid.json b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid.json
+new file mode 100644
+index 0000000..2fa767a
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/invalid.json
+@@ -0,0 +1,42 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/valid-ambient.json b/conformance/v1/schema-cases/agent-environment-marker-v2/valid-ambient.json
+new file mode 100644
+index 0000000..7bd8cd6
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/valid-ambient.json
+@@ -0,0 +1,85 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [
++    {
++      "backend": "ambient",
++      "backend_version": "2.1.261",
++      "isolation": "shared",
++      "provenance": "provisioned",
++      "source_role": "native",
++      "strategy": "ambient"
++    }
++  ],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/valid-file-link.json b/conformance/v1/schema-cases/agent-environment-marker-v2/valid-file-link.json
+new file mode 100644
+index 0000000..2859075
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/valid-file-link.json
+@@ -0,0 +1,86 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [
++    {
++      "backend": "file",
++      "backend_version": "0.153.2",
++      "isolation": "shared",
++      "path": "auth.json",
++      "provenance": "provisioned",
++      "source_role": "native",
++      "strategy": "file-link"
++    }
++  ],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/valid-in-place.json b/conformance/v1/schema-cases/agent-environment-marker-v2/valid-in-place.json
+new file mode 100644
+index 0000000..8679a40
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/valid-in-place.json
+@@ -0,0 +1,86 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [
++    {
++      "backend": "file",
++      "backend_version": "0.153.2",
++      "isolation": "shared",
++      "path": "auth.json",
++      "provenance": "repaired",
++      "source_role": "native",
++      "strategy": "in-place"
++    }
++  ],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/valid-keyring-preferred-ambient.json b/conformance/v1/schema-cases/agent-environment-marker-v2/valid-keyring-preferred-ambient.json
+new file mode 100644
+index 0000000..5153ffc
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/valid-keyring-preferred-ambient.json
+@@ -0,0 +1,85 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [
++    {
++      "backend": "ambient",
++      "backend_version": "0.153.2",
++      "isolation": "shared",
++      "provenance": "provisioned",
++      "source_role": "native",
++      "strategy": "keyring-preferred"
++    }
++  ],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/valid-keyring-preferred-file.json b/conformance/v1/schema-cases/agent-environment-marker-v2/valid-keyring-preferred-file.json
+new file mode 100644
+index 0000000..32a563b
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/valid-keyring-preferred-file.json
+@@ -0,0 +1,86 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [
++    {
++      "backend": "file",
++      "backend_version": "0.153.2",
++      "isolation": "shared",
++      "path": "auth.json",
++      "provenance": "provisioned",
++      "source_role": "native",
++      "strategy": "keyring-preferred"
++    }
++  ],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/valid-per-home-keychain-isolated.json b/conformance/v1/schema-cases/agent-environment-marker-v2/valid-per-home-keychain-isolated.json
+new file mode 100644
+index 0000000..1ec2cdc
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/valid-per-home-keychain-isolated.json
+@@ -0,0 +1,85 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [
++    {
++      "backend": "keychain",
++      "backend_version": "2.1.261",
++      "isolation": "isolated",
++      "provenance": "provisioned",
++      "source_role": "managed",
++      "strategy": "per-home-keychain"
++    }
++  ],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/agent-environment-marker-v2/valid.json b/conformance/v1/schema-cases/agent-environment-marker-v2/valid.json
+new file mode 100644
+index 0000000..71b93ed
+--- /dev/null
++++ b/conformance/v1/schema-cases/agent-environment-marker-v2/valid.json
+@@ -0,0 +1,76 @@
++{
++  "members": [
++    {
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "name": "companyA",
++      "overlay": false,
++      "version": "2.3.0",
++      "weight": 100
++    },
++    {
++      "name": "personal",
++      "overlay": true,
++      "source_path": "/Users/operator/personal-context",
++      "state_sha256": "abababababababababababababababababababababababababababababababab",
++      "version": "0.3.0",
++      "weight": 1000
++    }
++  ],
++  "mode": "managed-home",
++  "passthrough": [],
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "kind": "git",
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA",
++    "requirement": {
++      "range": "^2"
++    },
++    "root": "companyA",
++    "source": "github.com/example/companyA"
++  },
++  "seeded_projects": [
++    "/Users/operator/projects/app"
++  ],
++  "seeds": [
++    ".claude.json"
++  ],
++  "surfaces": {
++    "mcp": {
++      "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
++      "copies": [],
++      "paths": [
++        ".agent-context/mcp/claude_code.json"
++      ]
++    },
++    "root-context": {
++      "content_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
++      "copies": [
++        {
++          "path": "CLAUDE.md",
++          "reason": "claude-code-root-context"
++        }
++      ],
++      "form": "monolithic",
++      "paths": [
++        "CLAUDE.md"
++      ]
++    },
++    "skills": {
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "copies": [],
++      "paths": []
++    },
++    "system-prompt": {
++      "content_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
++      "copies": [],
++      "paths": [
++        ".agent-context/system-prompt.md"
++      ]
++    }
++  },
++  "version": 2
++}
+diff --git a/conformance/v1/schema-cases/index.json b/conformance/v1/schema-cases/index.json
+index f75b0c9..920e31d 100644
+--- a/conformance/v1/schema-cases/index.json
++++ b/conformance/v1/schema-cases/index.json
+@@ -499,6 +499,141 @@
+     "schema": "agent-environment-marker-v1.schema.json",
+     "valid": false
+   },
++  {
++    "instance": "agent-environment-marker-v1/invalid-passthrough-credential-record.json",
++    "schema": "agent-environment-marker-v1.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "agent-environment-marker-v2/valid.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": true
++  },
++  {
++    "instance": "agent-environment-marker-v2/invalid.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "agent-environment-marker-v2/valid-file-link.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": true
++  },
++  {
++    "instance": "agent-environment-marker-v2/valid-keyring-preferred-file.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": true
++  },
++  {
++    "instance": "agent-environment-marker-v2/valid-keyring-preferred-ambient.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": true
++  },
++  {
++    "instance": "agent-environment-marker-v2/valid-per-home-keychain-isolated.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": true
++  },
++  {
++    "instance": "agent-environment-marker-v2/valid-ambient.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": true
++  },
++  {
++    "instance": "agent-environment-marker-v2/valid-in-place.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": true
++  },
++  {
++    "instance": "agent-environment-marker-v2/invalid-missing-isolation.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "agent-environment-marker-v2/invalid-missing-strategy.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "agent-environment-marker-v2/invalid-missing-source-role.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "agent-environment-marker-v2/invalid-missing-backend.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "agent-environment-marker-v2/invalid-missing-backend-version.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "agent-environment-marker-v2/invalid-missing-provenance.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "agent-environment-marker-v2/invalid-unknown-backend.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "agent-environment-marker-v2/invalid-unknown-provenance.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "agent-environment-marker-v2/invalid-unknown-isolation.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "agent-environment-marker-v2/invalid-unknown-source-role.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "agent-environment-marker-v2/invalid-empty-backend-version.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "agent-environment-marker-v2/invalid-unknown-strategy.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "agent-environment-marker-v2/invalid-path-on-ambient-strategy.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "agent-environment-marker-v2/invalid-path-on-ambient-backend.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "agent-environment-marker-v2/invalid-path-on-isolated-per-home-keychain.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "agent-environment-marker-v2/invalid-missing-path-on-file-link.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "agent-environment-marker-v2/invalid-missing-path-on-keyring-preferred-file.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "agent-environment-marker-v2/invalid-unknown-field.json",
++    "schema": "agent-environment-marker-v2.schema.json",
++    "valid": false
++  },
+   {
+     "instance": "agent-mcp-v1/valid.json",
+     "schema": "agent-mcp-v1.schema.json",
+diff --git a/profiles/manager.md b/profiles/manager.md
+index 944cce1..dd35f7c 100644
+--- a/profiles/manager.md
++++ b/profiles/manager.md
+@@ -2762,7 +2762,14 @@ environments §7.4 under the manager lock, never silent inside `--repair`.
+ Materialization, refresh, switch, and garbage collection MUST
+ NOT create, rewrite, or delete a credential file beyond maintaining the
+ declared passthrough links themselves: the operator-owned credential
+-boundary of section 1, applied to environment homes.
++boundary of section 1, applied to environment homes. Credential-record
++publication follows environments §7.4 and uses
++`agent-environment-marker-v2.schema.json`. A schema-1 marker is not
++upgraded solely to add the record; when an otherwise-required successful
++mutation publishes a replacement marker, it MUST publish schema 2 with
++the complete record. Rollback restores the preceding marker exactly.
++Backup discovery and backups use the environments §8.4.1 no-follow and
++no-archive rules.
+ 
+ | Condition | Diagnostic (environments §7.7) |
+ |---|---|
+@@ -2817,7 +2824,12 @@ provisions or repairs the home from the store entries the lock names as one
+ journaled transaction — re-materializing managed surfaces, re-linking
+ absent passthrough links, reconciling XDG seeds, adding the launch
+ directory's project entry — never touching environment-owned mutable
+-state, unmanaged files, seeds, or backups. A link path that holds a
++state, unmanaged files, seeds, or backups. A schema-1 marker remains
++schema 1 during reads and operations that do not otherwise publish a
++replacement marker. When this repair already requires marker publication,
++the successful transaction MUST publish schema 2 and its complete
++credential records (environments §7.4); rollback restores the preceding
++marker, including its version and bytes. A link path that holds a
+ regular file or an unexpected symlink target is
+ `environment_credential_conflict`: the repair stops with the diagnostic
+ and emits no fragment (environments §10.1). Repair restores managed
+diff --git a/protocol/environments.md b/protocol/environments.md
+index 3a85887..3715914 100644
+--- a/protocol/environments.md
++++ b/protocol/environments.md
+@@ -1492,21 +1492,37 @@ reported, never silent: `env status` (and `resolve`) report it with
+ `environment_credential_conflict`-class wording (curator follow-up
+ F-C1). On the operator Mac, ~/.curator/environments/default/pi/auth.json points to ~/.pi/auth.json; that target does not exist, the real credential is ~/.pi/agent/auth.json, and env status does not show the dangling passthrough as detached. env status and resolve report dangling or mis-targeted credential links as detached, with environment_credential_conflict-class wording instead of silence.
+ 
+-**Credential record.** From the marker revision Decision 0017 choice
+-5 defines (follow-up), every passthrough record carries the effective
+-`isolation` mode it was linked under, its strategy, its `source_role`
+-(`native` when the bytes live in the native home, `managed` when they
+-live in the managed home), its `backend` (`file`, `keychain`, or
+-`ambient`), the `backend_version` tool release the write behavior was
+-verified on, and its `provenance` (`provisioned`, `repaired`, or
+-`migrated`). Strategies with no linkable entry — macOS
+-per-home-keychain under `isolated`, `ambient` — record without a
+-path. A schema-1 marker records `path` and `strategy` only and is
+-never rewritten to add the record. Records publish under the
+-manager-home mutation lock through a same-directory temporary file and
+-atomic rename with journal protection; rollback restores the preceding
+-marker. Backup discovery and general backups MUST NOT follow auth
+-symlinks and MUST NOT archive credential bytes.
++**Credential record.** Decision 0017 choice 5 defines the schema-2
++credential record in `agent-environment-marker-v2.schema.json`
++(`schemas/v1/agent-environment-marker-v2.schema.json`). Every schema-2
++passthrough record MUST carry `isolation` (the effective `shared` or
++`isolated` mode), `strategy`, `source_role` (`native` when the
++bytes are owned by the native home, `managed` when they are owned by
++the managed home), `backend` (`file`, `keychain`, or `ambient`),
++`backend_version` (the non-empty verified tool release), and
++`provenance` (`provisioned`, `repaired`, or `migrated`). A
++linkless record MUST omit `path`: this applies to the `ambient`
++strategy or backend and to `per-home-keychain` when `isolation` is
++`isolated`. Every other passthrough record MUST carry its home-relative
++`path`. Schema 2 encodes these requirements and rejects additional
++record members.
++
++A schema-1 marker retains passthrough entries with `path` and
++`strategy` only; the manager MUST NOT rewrite it solely to add the
++schema-2 credential record. If a successful manager-home mutation
++already requires publishing a replacement marker for another state
++change, that publication MUST use schema 2 and include the complete
++credential records. There is no standalone marker-upgrade write. If the
++mutation rolls back, journal recovery MUST restore the exact preceding
++marker bytes, including its schema version.
++
++Marker publication MUST occur under the manager-home mutation lock in
++the same journal-protected transaction as the mutation. The manager
++MUST write the complete marker to a temporary file in the marker's
++directory and atomically rename it into place; rollback MUST restore the
++preceding marker. Backup discovery MUST inspect auth paths with
++`lstat` and MUST NOT follow auth symlinks. Backups MUST NOT archive
++credential bytes or traverse a symlink to credential bytes.
+ 
+ Passthrough entries are excluded from surface content hashes and drift
+ detection, are never copied into the profile store, and are never audited
+@@ -1865,13 +1881,18 @@ the current profile of each scope, both homes and whether each has been
+ provisioned. An operator picks one door per environment for daily work; a
+ `--isolated-home` flag that would change the answer is not in revision 1.
+ 
+-### 8.2 Environment marker, schema 1
++### 8.2 Environment marker, schemas 1 and 2
+ 
+ Every in-place surface set and every managed home carries a per-home
+-**environment marker**, `.agent-environment.json`, a strict schema-1 object
+-beside the managed surfaces. The marker records:
+-
+-- `version` — exactly `1`;
++**environment marker**, `.agent-environment.json`, beside the managed
++surfaces. Its supported wire formats are the strict schema-1 object
++(`agent-environment-marker-v1.schema.json`) and the strict schema-2
++object (`agent-environment-marker-v2.schema.json`). Newly created
++markers MUST use schema 2. Existing schema-1 markers remain supported;
++the only upgrade rule is the otherwise-required marker publication
++stated in section 7.4. The marker records:
++
++- `version` — exactly `1` for schema 1 or `2` for schema 2;
+ - `profile` — the profile `name`, the `root` package name, its source
+   `kind` (exactly `git`, `local`, or `path`), and `lock_sha256`, the lock
+   hash of section 1.3. A `git` root additionally records its canonical
+@@ -1899,8 +1920,10 @@ beside the managed surfaces. The marker records:
+   section 5.8 MCP file keyed `mcp`; only `root-context` carries a `form`.
+   Surface keys are sorted;
+   required arrays are present even when empty;
+-- for a managed home, the recorded `passthrough` entries with their section
+-  7.4 strategy, and the recorded provisioning `seeds` by home-relative path;
++- for a managed home, the recorded `passthrough` entries and
++  provisioning `seeds` by home-relative path: schema 1 entries carry
++  `path` and `strategy`, while schema 2 entries carry the complete
++  section 7.4 credential record and carry `path` only when linkable;
+ - for a managed `claude_code` home, `seeded_projects`: the sorted list of
+   literal launch-directory paths whose project entry section 7.4 has
+   written into the managed `.claude.json`, so that resolve can tell a
+@@ -2100,6 +2123,13 @@ row's diagnostic, never a local restatement:
+ | recorded surface | `environment_surface_missing` | `environment_surface_unreadable` — non-current, currency unknown | 8.4 |
+ | inventory candidate | not detected — never in the loss list | a loss with reason; a lossy import stops with `environment_import_lossy` unless consented; onboarding stops before its first write while the inventory is incomplete | 9.5, 9.6 |
+ 
++Auth-path discovery is no-follow: backup discovery MUST use
++`lstat` on each auth path and MUST NOT follow an auth symlink. If a link
++target must be identified for the section 7.4 liveness check, the manager
++MAY read the link text but MUST NOT open or traverse the target for
++discovery or backup. Credential paths and bytes MUST NOT be archived.
++An `lstat` or required `readlink` failure is unreadable, never absence.
++
+ Boundary verification precedes readability classification: on the section
+ 10.1 verification order (enclosing boundary, then entries, then pin hashes,
+ then home currency), a failure that violates the section 4 contract — a
+@@ -3600,8 +3630,9 @@ The following surfaces of this document are conformance-vector surfaces,
+ with schemas and vectors delivered separately (`schemas/v1/`, positive and
+ negative vectors, and byte-exact determinism vectors). Schemas:
+ `agent-context-v1` (section 2), `agent-mcp-v1` (section 2.2),
+-`context-lock-v1` (section 1.3), the rewritten `agent-environment-marker-v1`
+-(section 8.2), the rewritten `launch-env-fragment-v1` (section 10.2)
++`context-lock-v1` (section 1.3), `agent-environment-marker-v1` and
++`agent-environment-marker-v2` (section 8.2), the rewritten
++`launch-env-fragment-v1` (section 10.2)
+ — which requires `argument` on every `flag` descriptor and `name` exactly
+ when `argument` is `name`; the Decision 0012 §9 worked example, which omits
+ `argument` on its system-prompt descriptors, is read as pre-revision —
+diff --git a/release/1.0.0-rc.9.json b/release/1.0.0-rc.9.json
+index 8d797c8..1a53f12 100644
+--- a/release/1.0.0-rc.9.json
++++ b/release/1.0.0-rc.9.json
+@@ -12,7 +12,7 @@
+     "verified_provider_contract": "host-execution-provider-v1"
+   },
+   "candidate_protocol_pin": {
+-    "manifest_sha256": "sha256:30b858155181a111d7556a84df1f5d62b188c276cf8e4e34c4dcf60b67fc6764",
++    "manifest_sha256": "sha256:c7f6abd63e59005d9404a2bc87c3f321e2278a231c74726ef4d45cfb0cf483e2",
+     "suite_root": "conformance/v1"
+   },
+   "claim_v5": {
+@@ -24,7 +24,7 @@
+   "downstream_consumption": {
+     "committed_release_pin_advanced": false,
+     "environment": "CURATOR_CONFORMANCE_ROOT",
+-    "required_manifest_sha256": "sha256:30b858155181a111d7556a84df1f5d62b188c276cf8e4e34c4dcf60b67fc6764"
++    "required_manifest_sha256": "sha256:c7f6abd63e59005d9404a2bc87c3f321e2278a231c74726ef4d45cfb0cf483e2"
+   },
+   "historical_release": {
+     "immutable": true,
+diff --git a/schemas/v1/agent-environment-marker-v2.schema.json b/schemas/v1/agent-environment-marker-v2.schema.json
+new file mode 100644
+index 0000000..a7937df
+--- /dev/null
++++ b/schemas/v1/agent-environment-marker-v2.schema.json
+@@ -0,0 +1,227 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://relux-works.github.io/curator-spec/schemas/v1/agent-environment-marker-v2.schema.json",
++  "title": ".agent-environment.json schema 2",
++  "type": "object",
++  "required": ["version", "profile", "members", "precedence", "mode", "surfaces"],
++  "properties": {
++    "version": {"const": 2},
++    "profile": {
++      "oneOf": [
++        {
++          "type": "object",
++          "required": ["name", "root", "kind", "lock_sha256", "source", "requirement"],
++          "properties": {
++            "name": {"$ref": "common.schema.json#/$defs/identifier"},
++            "root": {"$ref": "common.schema.json#/$defs/identifier"},
++            "kind": {"const": "git"},
++            "lock_sha256": {"$ref": "common.schema.json#/$defs/hex256"},
++            "source": {"$ref": "context-lock-v1.schema.json#/$defs/sourceIdentity"},
++            "requirement": {"$ref": "#/$defs/requirement"},
++            "directory": {"$ref": "common.schema.json#/$defs/portablePath"}
++          },
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": ["name", "root", "kind", "lock_sha256"],
++          "properties": {
++            "name": {"$ref": "common.schema.json#/$defs/identifier"},
++            "root": {"$ref": "common.schema.json#/$defs/identifier"},
++            "kind": {"const": "local"},
++            "lock_sha256": {"$ref": "common.schema.json#/$defs/hex256"}
++          },
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": ["name", "root", "kind", "lock_sha256", "source_path"],
++          "properties": {
++            "name": {"$ref": "common.schema.json#/$defs/identifier"},
++            "root": {"$ref": "common.schema.json#/$defs/identifier"},
++            "kind": {"const": "path"},
++            "lock_sha256": {"$ref": "common.schema.json#/$defs/hex256"},
++            "source_path": {"$ref": "common.schema.json#/$defs/nonEmptyString"},
++            "imported_from_native": {"const": true}
++          },
++          "additionalProperties": false
++        }
++      ]
++    },
++    "members": {
++      "type": "array",
++      "minItems": 1,
++      "items": {"$ref": "#/$defs/member"}
++    },
++    "precedence": {"$ref": "#/$defs/precedence"},
++    "mode": {"enum": ["managed-home", "linked", "copied"]},
++    "surfaces": {
++      "type": "object",
++      "properties": {
++        "mcp": {"$ref": "#/$defs/surfaceEntry"},
++        "root-context": {"$ref": "#/$defs/rootContextSurfaceEntry"},
++        "skills": {"$ref": "#/$defs/surfaceEntry"},
++        "system-prompt": {"$ref": "#/$defs/surfaceEntry"}
++      },
++      "additionalProperties": false
++    },
++    "passthrough": {
++      "type": "array",
++      "items": {
++        "type": "object",
++        "required": ["isolation", "strategy", "source_role", "backend", "backend_version", "provenance"],
++        "properties": {
++          "path": {"$ref": "common.schema.json#/$defs/portablePath"},
++          "isolation": {"enum": ["shared", "isolated"]},
++          "strategy": {"enum": ["per-home-keychain", "file-link", "keyring-preferred", "ambient", "in-place"]},
++          "source_role": {"enum": ["native", "managed"]},
++          "backend": {"enum": ["file", "keychain", "ambient"]},
++          "backend_version": {"$ref": "common.schema.json#/$defs/nonEmptyString"},
++          "provenance": {"enum": ["provisioned", "repaired", "migrated"]}
++        },
++        "allOf": [
++          {
++            "if": {
++              "anyOf": [
++                {"properties": {"strategy": {"const": "ambient"}}, "required": ["strategy"]},
++                {"properties": {"backend": {"const": "ambient"}}, "required": ["backend"]},
++                {
++                  "properties": {
++                    "strategy": {"const": "per-home-keychain"},
++                    "isolation": {"const": "isolated"}
++                  },
++                  "required": ["strategy", "isolation"]
++                }
++              ]
++            },
++            "then": {"not": {"required": ["path"]}},
++            "else": {"required": ["path"]}
++          }
++        ],
++        "additionalProperties": false
++      }
++    },
++    "seeds": {"$ref": "common.schema.json#/$defs/pathSet"},
++    "seeded_projects": {
++      "type": "array",
++      "uniqueItems": true,
++      "items": {"$ref": "common.schema.json#/$defs/nonEmptyString"}
++    },
++    "seed_links": {"$ref": "common.schema.json#/$defs/pathSet"},
++    "codex_seed_record": {
++      "type": "object",
++      "required": ["revision", "native_mcp_servers"],
++      "properties": {
++        "revision": {"enum": ["A", "B"]},
++        "native_mcp_servers": {
++          "type": "array",
++          "uniqueItems": true,
++          "items": {"$ref": "common.schema.json#/$defs/nonEmptyString"}
++        }
++      },
++      "additionalProperties": false
++    }
++  },
++  "allOf": [
++    {
++      "if": {"properties": {"mode": {"const": "copied"}}, "required": ["mode"]},
++      "then": {
++        "properties": {
++          "surfaces": {"additionalProperties": {"not": {"required": ["copies"]}}}
++        }
++      },
++      "else": {
++        "properties": {
++          "surfaces": {"additionalProperties": {"required": ["copies"]}}
++        }
++      }
++    },
++    {
++      "if": {"properties": {"mode": {"const": "managed-home"}}, "required": ["mode"]},
++      "then": {"required": ["passthrough", "seeds"]},
++      "else": {
++        "properties": {
++          "passthrough": false,
++          "seeds": false,
++          "seeded_projects": false,
++          "seed_links": false,
++          "codex_seed_record": false
++        }
++      }
++    }
++  ],
++  "additionalProperties": false,
++  "$defs": {
++    "requirement": {
++      "type": "object",
++      "properties": {
++        "range": {"$ref": "agent-context-v1.schema.json#/$defs/range"},
++        "tag": {"$ref": "common.schema.json#/$defs/gitRefName"},
++        "revision": {"$ref": "common.schema.json#/$defs/commit"}
++      },
++      "additionalProperties": false,
++      "minProperties": 1,
++      "maxProperties": 1
++    },
++    "precedence": {
++      "type": "object",
++      "required": ["winner", "placement"],
++      "properties": {
++        "winner": {"enum": ["higher-weight", "lower-weight"]},
++        "placement": {"enum": ["winner-last", "winner-first"]}
++      },
++      "additionalProperties": false
++    },
++    "member": {
++      "type": "object",
++      "required": ["name", "version", "weight", "overlay"],
++      "properties": {
++        "name": {"$ref": "common.schema.json#/$defs/identifier"},
++        "version": {"$ref": "agent-context-v1.schema.json#/$defs/packageVersion"},
++        "commit": {"$ref": "common.schema.json#/$defs/commit"},
++        "state_sha256": {"$ref": "common.schema.json#/$defs/hex256"},
++        "weight": {"$ref": "agent-context-v1.schema.json#/$defs/weight"},
++        "overlay": {"type": "boolean"},
++        "source_path": {"$ref": "common.schema.json#/$defs/nonEmptyString"}
++      },
++      "additionalProperties": false,
++      "oneOf": [
++        {"required": ["commit"], "not": {"anyOf": [{"required": ["state_sha256"]}, {"required": ["source_path"]}]}},
++        {"required": ["state_sha256"], "not": {"required": ["commit"]}}
++      ]
++    },
++    "rootContextSurfaceEntry": {
++      "type": "object",
++      "required": ["paths", "form", "content_sha256"],
++      "properties": {
++        "paths": {"$ref": "common.schema.json#/$defs/pathSet"},
++        "form": {"enum": ["monolithic", "referenced"]},
++        "content_sha256": {"$ref": "common.schema.json#/$defs/sha256"},
++        "copies": {"$ref": "#/$defs/copies"}
++      },
++      "additionalProperties": false
++    },
++    "surfaceEntry": {
++      "type": "object",
++      "required": ["paths", "content_sha256"],
++      "properties": {
++        "paths": {"$ref": "common.schema.json#/$defs/pathSet"},
++        "content_sha256": {"$ref": "common.schema.json#/$defs/sha256"},
++        "copies": {"$ref": "#/$defs/copies"}
++      },
++      "additionalProperties": false
++    },
++    "copies": {
++      "type": "array",
++      "items": {
++        "type": "object",
++        "required": ["path", "reason"],
++        "properties": {
++          "path": {"$ref": "common.schema.json#/$defs/portablePath"},
++          "reason": {"enum": ["symlink-fallback", "claude-code-root-context"]}
++        },
++        "additionalProperties": false
++      }
++    }
++  }
++}
+diff --git a/tools/generate-vectors/environments.go b/tools/generate-vectors/environments.go
+index e013bb2..288682f 100644
+--- a/tools/generate-vectors/environments.go
++++ b/tools/generate-vectors/environments.go
+@@ -1213,6 +1213,14 @@ func validEnvironmentMarkerV1() map[string]any {
+ 	}
+ }
+ 
++// validEnvironmentMarkerV2 is the schema-2 form of the positive environment
++// marker example. The unchanged marker members are inherited from schema 1.
++func validEnvironmentMarkerV2() map[string]any {
++	marker := deepCloneMap(validEnvironmentMarkerV1())
++	marker["version"] = 2
++	return marker
++}
++
+ func withProfile(valid map[string]any, profile map[string]any) map[string]any {
+ 	out := cloneMap(valid)
+ 	out["profile"] = profile
+@@ -1261,6 +1269,13 @@ func environmentMarkerSchemaExamples(valid map[string]any) []schemaExample {
+ 	codexSeed["codex_seed_record"] = map[string]any{"revision": "B", "native_mcp_servers": []any{"figma", "gh"}}
+ 	codexSeedEmpty := cloneMap(valid)
+ 	codexSeedEmpty["codex_seed_record"] = map[string]any{"revision": "A", "native_mcp_servers": []any{}}
++	v2Credential := map[string]any{
++		"path": "auth.json", "isolation": "shared", "strategy": "file-link",
++		"source_role": "native", "backend": "file", "backend_version": "0.153.2",
++		"provenance": "provisioned",
++	}
++	credentialOnV1 := deepCloneMap(valid)
++	credentialOnV1["passthrough"] = []any{deepCloneMap(v2Credential)}
+ 
+ 	return []schemaExample{
+ 		{name: "valid-local-profile", valid: true, instance: localProfile},
+@@ -1321,6 +1336,76 @@ func environmentMarkerSchemaExamples(valid map[string]any) []schemaExample {
+ 		{name: "invalid-codex-seed-record-names-member", valid: false, instance: withField(valid, "codex_seed_record", map[string]any{"revision": "B", "native_mcp_servers": []any{"figma", ""}})},
+ 		{name: "invalid-codex-seed-record-names-not-array", valid: false, instance: withField(valid, "codex_seed_record", map[string]any{"revision": "B", "native_mcp_servers": "figma"})},
+ 		{name: "invalid-codex-seed-record-on-linked-home", valid: false, instance: withField(linked, "codex_seed_record", map[string]any{"revision": "B", "native_mcp_servers": []any{"figma"}})},
++		{name: "invalid-passthrough-credential-record", valid: false, instance: credentialOnV1},
++	}
++}
++
++// environmentMarkerV2SchemaExamples covers each strategy, both keyring-
++// preferred path branches, every required record member, and linkless path
++// rejection for ambient and isolated per-home-keychain records.
++func environmentMarkerV2SchemaExamples(valid map[string]any) []schemaExample {
++	record := func(strategy, isolation, sourceRole, backend, backendVersion, provenance, path string) map[string]any {
++		entry := map[string]any{
++			"isolation": isolation, "strategy": strategy, "source_role": sourceRole,
++			"backend": backend, "backend_version": backendVersion, "provenance": provenance,
++		}
++		if path != "" {
++			entry["path"] = path
++		}
++		return entry
++	}
++	withRecord := func(entry map[string]any) map[string]any {
++		marker := deepCloneMap(valid)
++		marker["passthrough"] = []any{entry}
++		return marker
++	}
++	fileLink := record("file-link", "shared", "native", "file", "0.153.2", "provisioned", "auth.json")
++	keyringFile := record("keyring-preferred", "shared", "native", "file", "0.153.2", "provisioned", "auth.json")
++	keyringAmbient := record("keyring-preferred", "shared", "native", "ambient", "0.153.2", "provisioned", "")
++	perHomeKeychain := record("per-home-keychain", "isolated", "managed", "keychain", "2.1.261", "provisioned", "")
++	ambient := record("ambient", "shared", "native", "ambient", "2.1.261", "provisioned", "")
++	inPlace := record("in-place", "shared", "native", "file", "0.153.2", "repaired", "auth.json")
++
++	missing := func(member string) map[string]any {
++		entry := deepCloneMap(fileLink)
++		delete(entry, member)
++		return entry
++	}
++	withField := func(entry map[string]any, field string, value any) map[string]any {
++		out := deepCloneMap(entry)
++		out[field] = value
++		return out
++	}
++	withoutPath := func(entry map[string]any) map[string]any {
++		out := deepCloneMap(entry)
++		delete(out, "path")
++		return out
++	}
++	return []schemaExample{
++		{name: "valid-file-link", valid: true, instance: withRecord(fileLink)},
++		{name: "valid-keyring-preferred-file", valid: true, instance: withRecord(keyringFile)},
++		{name: "valid-keyring-preferred-ambient", valid: true, instance: withRecord(keyringAmbient)},
++		{name: "valid-per-home-keychain-isolated", valid: true, instance: withRecord(perHomeKeychain)},
++		{name: "valid-ambient", valid: true, instance: withRecord(ambient)},
++		{name: "valid-in-place", valid: true, instance: withRecord(inPlace)},
++		{name: "invalid-missing-isolation", valid: false, instance: withRecord(missing("isolation"))},
++		{name: "invalid-missing-strategy", valid: false, instance: withRecord(missing("strategy"))},
++		{name: "invalid-missing-source-role", valid: false, instance: withRecord(missing("source_role"))},
++		{name: "invalid-missing-backend", valid: false, instance: withRecord(missing("backend"))},
++		{name: "invalid-missing-backend-version", valid: false, instance: withRecord(missing("backend_version"))},
++		{name: "invalid-missing-provenance", valid: false, instance: withRecord(missing("provenance"))},
++		{name: "invalid-unknown-backend", valid: false, instance: withRecord(withField(fileLink, "backend", "unknown"))},
++		{name: "invalid-unknown-provenance", valid: false, instance: withRecord(withField(fileLink, "provenance", "copied"))},
++		{name: "invalid-unknown-isolation", valid: false, instance: withRecord(withField(fileLink, "isolation", "machine"))},
++		{name: "invalid-unknown-source-role", valid: false, instance: withRecord(withField(fileLink, "source_role", "system"))},
++		{name: "invalid-empty-backend-version", valid: false, instance: withRecord(withField(fileLink, "backend_version", ""))},
++		{name: "invalid-unknown-strategy", valid: false, instance: withRecord(withField(fileLink, "strategy", "hardlink"))},
++		{name: "invalid-path-on-ambient-strategy", valid: false, instance: withRecord(record("ambient", "shared", "native", "file", "2.1.261", "provisioned", "auth.json"))},
++		{name: "invalid-path-on-ambient-backend", valid: false, instance: withRecord(withField(keyringAmbient, "path", "auth.json"))},
++		{name: "invalid-path-on-isolated-per-home-keychain", valid: false, instance: withRecord(withField(perHomeKeychain, "path", "auth.json"))},
++		{name: "invalid-missing-path-on-file-link", valid: false, instance: withRecord(withoutPath(fileLink))},
++		{name: "invalid-missing-path-on-keyring-preferred-file", valid: false, instance: withRecord(withoutPath(keyringFile))},
++		{name: "invalid-unknown-field", valid: false, instance: withRecord(withField(fileLink, "owner", "unexpected"))},
+ 	}
+ }
+ 
+diff --git a/tools/generate-vectors/environments_test.go b/tools/generate-vectors/environments_test.go
+index dd7f216..bf6662f 100644
+--- a/tools/generate-vectors/environments_test.go
++++ b/tools/generate-vectors/environments_test.go
+@@ -417,6 +417,7 @@ func TestEnvironmentSchemaCasesCoverTheClosedSurfaces(t *testing.T) {
+ 		"agent-mcp-v1.schema.json":                agentMCPSchemaExamples(validAgentMCPV1()),
+ 		"context-lock-v1.schema.json":             contextLockSchemaExamples(validContextLockV1()),
+ 		"agent-environment-marker-v1.schema.json": environmentMarkerSchemaExamples(validEnvironmentMarkerV1()),
++		"agent-environment-marker-v2.schema.json": environmentMarkerV2SchemaExamples(validEnvironmentMarkerV2()),
+ 		"launch-env-fragment-v1.schema.json":      launchEnvFragmentSchemaExamples(validLaunchEnvFragmentV1()),
+ 		"launch-env-fragment-v2.schema.json":      launchEnvFragmentV2SchemaExamples(validLaunchEnvFragmentV2()),
+ 	} {
+diff --git a/tools/generate-vectors/main.go b/tools/generate-vectors/main.go
+index ac91ea7..864926f 100644
+--- a/tools/generate-vectors/main.go
++++ b/tools/generate-vectors/main.go
+@@ -2635,6 +2635,9 @@ func writeSchemaCases(suite string, marker, ledger, audited, snapshot, logEntry,
+ 	environmentMarker := validEnvironmentMarkerV1()
+ 	cases["agent-environment-marker-v1.schema.json"] = schemaCase{environmentMarker, without(environmentMarker, "surfaces")}
+ 	additionalCases["agent-environment-marker-v1.schema.json"] = environmentMarkerSchemaExamples(environmentMarker)
++	environmentMarkerV2 := validEnvironmentMarkerV2()
++	cases["agent-environment-marker-v2.schema.json"] = schemaCase{environmentMarkerV2, without(environmentMarkerV2, "surfaces")}
++	additionalCases["agent-environment-marker-v2.schema.json"] = environmentMarkerV2SchemaExamples(environmentMarkerV2)
+ 	launchFragment := validLaunchEnvFragmentV1()
+ 	cases["launch-env-fragment-v1.schema.json"] = schemaCase{launchFragment, without(launchFragment, "env")}
+ 	additionalCases["launch-env-fragment-v1.schema.json"] = launchEnvFragmentSchemaExamples(launchFragment)
+diff --git a/tools/test_validate.py b/tools/test_validate.py
+index 3e5e6a0..bd228d3 100644
+--- a/tools/test_validate.py
++++ b/tools/test_validate.py
+@@ -10,6 +10,7 @@ import shlex
+ import tempfile
+ import unittest
+ from pathlib import Path
++from unittest.mock import patch
+ 
+ 
+ MODULE_PATH = Path(__file__).with_name("validate.py")
+@@ -25,6 +26,35 @@ def swapped(values: list, first: int, second: int) -> list:
+     return result
+ 
+ 
++class SchemaRegistryCacheTests(unittest.TestCase):
++    def test_schema_documents_are_cached_by_content_and_changes_are_rechecked(self) -> None:
++        with tempfile.TemporaryDirectory() as directory:
++            schema_dir = Path(directory)
++            schema_path = schema_dir / "cache-test.schema.json"
++            schema = {
++                "$schema": "https://json-schema.org/draft/2020-12/schema",
++                "$id": f"urn:cache-test:{schema_dir.name}",
++                "type": "object",
++            }
++            schema_path.write_text(json.dumps(schema), encoding="utf-8")
++            check_schema = validate.Draft202012Validator.check_schema
++
++            with patch.object(validate, "SCHEMAS", schema_dir), patch.object(
++                validate.Draft202012Validator,
++                "check_schema",
++                wraps=check_schema,
++            ) as checked:
++                validate.schema_registry()
++                validate.schema_registry()
++                self.assertEqual(checked.call_count, 1)
++
++                schema["type"] = "unknown-json-schema-type"
++                schema_path.write_text(json.dumps(schema), encoding="utf-8")
++                with self.assertRaises(validate.ValidationFailure):
++                    validate.schema_registry()
++                self.assertEqual(checked.call_count, 2)
++
++
+ class WireSemanticValidationTests(unittest.TestCase):
+     def test_manifest_requires_exact_declared_repository_selection(self) -> None:
+         valid = {
+diff --git a/tools/validate.py b/tools/validate.py
+index afc8d07..6d6def7 100644
+--- a/tools/validate.py
++++ b/tools/validate.py
+@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
+ SCHEMAS = ROOT / "schemas" / "v1"
+ SUITE = ROOT / "conformance" / "v1"
+ REVIEWS = ROOT / "reviews"
++_VALID_SCHEMA_DOCUMENTS: set[bytes] = set()
+ SAFE_INTEGER = 9_007_199_254_740_991
+ PROTOCOL_VERSION = "1.0.0-rc.9"
+ RC8_PROTOCOL_VERSION = "1.0.0-rc.8"
+@@ -167,10 +168,13 @@ def schema_registry() -> tuple[Registry, dict[str, Path]]:
+     paths: dict[str, Path] = {}
+     for path in sorted(SCHEMAS.glob("*.json")):
+         document = load_json(path)
+-        try:
+-            Draft202012Validator.check_schema(document)
+-        except SchemaError as exc:
+-            raise ValidationFailure(f"{path}: invalid Draft 2020-12 schema: {exc.message}") from exc
++        schema_content = ccj1_bytes(document)
++        if schema_content not in _VALID_SCHEMA_DOCUMENTS:
++            try:
++                Draft202012Validator.check_schema(document)
++            except SchemaError as exc:
++                raise ValidationFailure(f"{path}: invalid Draft 2020-12 schema: {exc.message}") from exc
++            _VALID_SCHEMA_DOCUMENTS.add(schema_content)
+         schema_id = document.get("$id")
+         if not isinstance(schema_id, str) or not schema_id:
+             raise ValidationFailure(f"{path}: schema has no $id")
+@@ -751,7 +755,10 @@ def validate_wire_semantics(schema_name: str, instance: Any) -> str | None:
+                         return "required_by names a package outside the lock"
+                     if member.get("name") in required_by:
+                         return "required_by names the member itself"
+-    elif schema_name == "agent-environment-marker-v1.schema.json":
++    elif schema_name in (
++        "agent-environment-marker-v1.schema.json",
++        "agent-environment-marker-v2.schema.json",
++    ):
+         surfaces = instance.get("surfaces")
+         if isinstance(surfaces, dict):
+             keys = list(surfaces)

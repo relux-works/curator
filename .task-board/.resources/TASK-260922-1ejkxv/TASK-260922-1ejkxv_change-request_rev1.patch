@@ -1,0 +1,643 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index c0969e9..1e2de65 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -45,6 +45,19 @@ Versioning for the complete specification set.
+   mode resolution, transport, provenance) and the curator emission
+   follow-up (manager-side v2 emission). Frozen v1 protocol schemas
+   untouched; the v1 fragment file is untouched and stays valid.
++- STORY-260922-188t6n (TASK-260922-1ejkxv, F-S3): extend the
++  `system-config-v2` `environments.isolation` lock to both `shared` and
++  `isolated`, retaining manager §1 whole-map locked-list semantics.
++  An explicit `shared` profile request under an isolated lock is refused
++  with `environment_isolation_lock_conflict`; silence resolves to the
++  locked direction. An existing shared passthrough refuses with
++  `environment_credential_conflict` and points to the explicit F-C2
++  inspect → plan → apply migration (`TASK-260922-1t2w1q`); the manager
++  never silently unlinks or migrates it. Adds focused positive and
++  negative schema cases and exact-direction generator checks. Frozen v1
++  protocol schemas remain unchanged. Curator enforcement follow-up:
++  **Enforce the isolated environment lock in the environment manager**
++  (`environments.isolation`, `environment_isolation_lock_conflict`).
+ - STORY-260921-3z0fgr: adopt decisions 0017 (environment credential
+   modes) and 0018 (`curator run` permission interface), both proposed
+   2026-09-16 and adopted 2026-09-21 with every open question resolved
+diff --git a/conformance/README.md b/conformance/README.md
+index 9445236..c23ec19 100644
+--- a/conformance/README.md
++++ b/conformance/README.md
+@@ -150,9 +150,11 @@ The suite contains:
+ - the `system-config` schema-2 surface: `schema-cases/system-config-v2` with
+   every environments section 12.2 lockable key present and named in
+   `locked`, the minimal, empty-`environments`, and schema-1-`locked`
+-  positives, one negative per closed-object rule (an unknown or unlockable
++  positives, positive `shared` and `isolated` direction cases for the
++  `isolation` lock, and negative unknown-direction and both-directions values;
++  one negative per closed-object rule (an unknown or unlockable
+   `environments` knob), per section 12.1 value grammar including the
+-  `isolated` and `yolo` directions section 12.2 does not lock, per `locked` entry
++  `yolo` direction section 12.2 does not lock, per `locked` entry
+   outside the section 12.2 set (an unknown, unlockable, bare, or unprefixed
+   key and a duplicate), and a schema-1 rejection.
+   `schema-cases/system-config-v1` is byte-frozen;
+diff --git a/conformance/v1/manifest.json b/conformance/v1/manifest.json
+index ac37742..1a8fa1e 100644
+--- a/conformance/v1/manifest.json
++++ b/conformance/v1/manifest.json
+@@ -3090,7 +3090,7 @@
+     },
+     {
+       "path": "schema-cases/index.json",
+-      "sha256": "sha256:bff81eb96ea8aece6487d6e375d4dad7f178ea4966f61aff0fad219a0db47148"
++      "sha256": "sha256:87f9a7641cf0e1511f91d4033f6366c669649442c4c356e49315e63493f917ff"
+     },
+     {
+       "path": "schema-cases/install-marker-v1/invalid.json",
+@@ -4349,13 +4349,17 @@
+       "sha256": "sha256:7449d84c9c3a3473e08211b59fea16f139205223e054a6ac428a3089fdb95ed4"
+     },
+     {
+-      "path": "schema-cases/system-config-v2/invalid-isolation-isolated-direction.json",
+-      "sha256": "sha256:c6f4c4f3f7c86ae4bbe07c807ab9ba000dcbd2d535a00f99457b49b2015b33d7"
++      "path": "schema-cases/system-config-v2/invalid-isolation-both-directions.json",
++      "sha256": "sha256:84b10e2b18fed4ccfdc33568dc4c9296b2537ba77124bf87b2e6de109c8ec3f0"
+     },
+     {
+       "path": "schema-cases/system-config-v2/invalid-isolation-profile-grammar.json",
+       "sha256": "sha256:ff8581b56032135439424510f1ffcd7e779366af1a1e9c8d85ed10c3f2e61419"
+     },
++    {
++      "path": "schema-cases/system-config-v2/invalid-isolation-unknown-direction.json",
++      "sha256": "sha256:358a14160353f8b4cb449454c793a2c897137951ebf729b190bc0176f3f3ce9b"
++    },
+     {
+       "path": "schema-cases/system-config-v2/invalid-isolation-value.json",
+       "sha256": "sha256:f32f8d1fb71668402e7f74b200d7ae7ccee82ce5e0a5289d5f0c2c344a13c46a"
+@@ -4488,6 +4492,14 @@
+       "path": "schema-cases/system-config-v2/valid-empty-environments.json",
+       "sha256": "sha256:291d41a946ada058ae118082c113cff83e54e70a0dd294c1dd3f70996aacf578"
+     },
++    {
++      "path": "schema-cases/system-config-v2/valid-isolation-isolated-direction.json",
++      "sha256": "sha256:c6f4c4f3f7c86ae4bbe07c807ab9ba000dcbd2d535a00f99457b49b2015b33d7"
++    },
++    {
++      "path": "schema-cases/system-config-v2/valid-isolation-shared-direction.json",
++      "sha256": "sha256:e6389b2328085137a88d1ddde6869cd2299d05183cb6897e1dd85193ec5b6abc"
++    },
+     {
+       "path": "schema-cases/system-config-v2/valid-minimal.json",
+       "sha256": "sha256:45424871e24c9c98586f913bbb5949692a5a92b4c4123b64d4f273ad45c6deac"
+diff --git a/conformance/v1/schema-cases/index.json b/conformance/v1/schema-cases/index.json
+index 920e31d..fd842e7 100644
+--- a/conformance/v1/schema-cases/index.json
++++ b/conformance/v1/schema-cases/index.json
+@@ -4985,7 +4985,22 @@
+     "valid": false
+   },
+   {
+-    "instance": "system-config-v2/invalid-isolation-isolated-direction.json",
++    "instance": "system-config-v2/valid-isolation-shared-direction.json",
++    "schema": "system-config-v2.schema.json",
++    "valid": true
++  },
++  {
++    "instance": "system-config-v2/valid-isolation-isolated-direction.json",
++    "schema": "system-config-v2.schema.json",
++    "valid": true
++  },
++  {
++    "instance": "system-config-v2/invalid-isolation-unknown-direction.json",
++    "schema": "system-config-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "system-config-v2/invalid-isolation-both-directions.json",
+     "schema": "system-config-v2.schema.json",
+     "valid": false
+   },
+diff --git a/conformance/v1/schema-cases/system-config-v2/invalid-isolation-both-directions.json b/conformance/v1/schema-cases/system-config-v2/invalid-isolation-both-directions.json
+new file mode 100644
+index 0000000..3e33356
+--- /dev/null
++++ b/conformance/v1/schema-cases/system-config-v2/invalid-isolation-both-directions.json
+@@ -0,0 +1,62 @@
++{
++  "allowed_sources": [
++    "https://github.com/example/"
++  ],
++  "audit": {},
++  "environments": {
++    "isolation": {
++      "companyA": {
++        "claude_code": [
++          "shared",
++          "isolated"
++        ]
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "permissions": {
++      "companyA": "native"
++    },
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "provider_directories": [
++      "/usr/local/lib/curator/providers"
++    ],
++    "require_current_profile": "companyA",
++    "require_source_signers": true,
++    "source_signers": {
++      "github.com/example/context": [
++        {
++          "key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2A5GK operator@example",
++          "type": "ssh"
++        }
++      ]
++    },
++    "transitive_system_modules": "error"
++  },
++  "locked": [
++    "audit",
++    "allowed_sources",
++    "environments.overlays_allowed",
++    "environments.precedence",
++    "environments.mcp_package_allowlist",
++    "environments.passable_env_names",
++    "environments.require_current_profile",
++    "environments.transitive_system_modules",
++    "environments.isolation",
++    "environments.provider_directories",
++    "environments.source_signers",
++    "environments.require_source_signers",
++    "environments.permissions"
++  ],
++  "preferred_locale": "en",
++  "schema_version": 2
++}
+diff --git a/conformance/v1/schema-cases/system-config-v2/invalid-isolation-unknown-direction.json b/conformance/v1/schema-cases/system-config-v2/invalid-isolation-unknown-direction.json
+new file mode 100644
+index 0000000..593dd9d
+--- /dev/null
++++ b/conformance/v1/schema-cases/system-config-v2/invalid-isolation-unknown-direction.json
+@@ -0,0 +1,59 @@
++{
++  "allowed_sources": [
++    "https://github.com/example/"
++  ],
++  "audit": {},
++  "environments": {
++    "isolation": {
++      "companyA": {
++        "claude_code": "automatic"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "permissions": {
++      "companyA": "native"
++    },
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "provider_directories": [
++      "/usr/local/lib/curator/providers"
++    ],
++    "require_current_profile": "companyA",
++    "require_source_signers": true,
++    "source_signers": {
++      "github.com/example/context": [
++        {
++          "key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2A5GK operator@example",
++          "type": "ssh"
++        }
++      ]
++    },
++    "transitive_system_modules": "error"
++  },
++  "locked": [
++    "audit",
++    "allowed_sources",
++    "environments.overlays_allowed",
++    "environments.precedence",
++    "environments.mcp_package_allowlist",
++    "environments.passable_env_names",
++    "environments.require_current_profile",
++    "environments.transitive_system_modules",
++    "environments.isolation",
++    "environments.provider_directories",
++    "environments.source_signers",
++    "environments.require_source_signers",
++    "environments.permissions"
++  ],
++  "preferred_locale": "en",
++  "schema_version": 2
++}
+diff --git a/conformance/v1/schema-cases/system-config-v2/invalid-isolation-isolated-direction.json b/conformance/v1/schema-cases/system-config-v2/valid-isolation-isolated-direction.json
+similarity index 100%
+rename from conformance/v1/schema-cases/system-config-v2/invalid-isolation-isolated-direction.json
+rename to conformance/v1/schema-cases/system-config-v2/valid-isolation-isolated-direction.json
+diff --git a/conformance/v1/schema-cases/system-config-v2/valid-isolation-shared-direction.json b/conformance/v1/schema-cases/system-config-v2/valid-isolation-shared-direction.json
+new file mode 100644
+index 0000000..64176c7
+--- /dev/null
++++ b/conformance/v1/schema-cases/system-config-v2/valid-isolation-shared-direction.json
+@@ -0,0 +1,59 @@
++{
++  "allowed_sources": [
++    "https://github.com/example/"
++  ],
++  "audit": {},
++  "environments": {
++    "isolation": {
++      "companyA": {
++        "claude_code": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "permissions": {
++      "companyA": "native"
++    },
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "provider_directories": [
++      "/usr/local/lib/curator/providers"
++    ],
++    "require_current_profile": "companyA",
++    "require_source_signers": true,
++    "source_signers": {
++      "github.com/example/context": [
++        {
++          "key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2A5GK operator@example",
++          "type": "ssh"
++        }
++      ]
++    },
++    "transitive_system_modules": "error"
++  },
++  "locked": [
++    "audit",
++    "allowed_sources",
++    "environments.overlays_allowed",
++    "environments.precedence",
++    "environments.mcp_package_allowlist",
++    "environments.passable_env_names",
++    "environments.require_current_profile",
++    "environments.transitive_system_modules",
++    "environments.isolation",
++    "environments.provider_directories",
++    "environments.source_signers",
++    "environments.require_source_signers",
++    "environments.permissions"
++  ],
++  "preferred_locale": "en",
++  "schema_version": 2
++}
+diff --git a/profiles/manager.md b/profiles/manager.md
+index f674fe3..dbaf5d3 100644
+--- a/profiles/manager.md
++++ b/profiles/manager.md
+@@ -94,8 +94,12 @@ user configuration:
+    Operator credential selections — the `build_ssh` scopes among them — are
+    never lockable: section 12.2 makes credential material operator-owned, and
+    a system file MUST NOT select or constrain it; `environments.isolation`
+-   is lockable only in the direction of `shared`, and schema 2 admits no
+-   other value there; `environments.transitive_system_modules` is lockable
++   is lockable in either direction, `shared` or `isolated`, and schema 2
++   admits exactly those values. The full profile-by-environment map keeps
++   the manager §1 replacement semantics in rule 2. Under an isolated lock,
++   an explicit profile request for `shared` is refused as specified in
++   environments §12.2; silence resolves to the locked value.
++   `environments.transitive_system_modules` is lockable
+    only in the direction of `error`, and schema 2 admits no other value
+    there; `environments.require_source_signers` is lockable only in the
+    direction of `true`, and schema 2 admits no other value there;
+@@ -2767,6 +2771,12 @@ removing nothing — when the link path holds a regular file or a symlink
+ to an unexpected target (environments §7.4). A mode change of a
+ provisioned home is the explicit inspect → plan → apply migration of
+ environments §7.4 under the manager lock, never silent inside `--repair`.
++An isolated system lock does not migrate an already-provisioned shared
++passthrough: the manager refuses use with `environment_credential_conflict`
++and points the operator to that explicit migration. A profile that explicitly
++requests `shared` under the isolated lock is refused with
++`environment_isolation_lock_conflict`; silence resolves to `isolated`
++(environments §12.2).
+ Materialization, refresh, switch, and garbage collection MUST
+ NOT create, rewrite, or delete a credential file beyond maintaining the
+ declared passthrough links themselves: the operator-owned credential
+@@ -2783,8 +2793,9 @@ no-archive rules.
+ |---|---|
+ | `isolated` configured for `opencode`, for `claude_code` on macOS below the pinned release, or for `codex_cli` under native `keyring` or `auto` storage | `environment_isolated_unsupported` |
+ | `shared` configured for `claude_code` on macOS at or above the pinned release | `environment_shared_unsupported` |
++| profile explicitly requests `shared` for a profile × environment whose system lock requires `isolated` (refusal; no fragment) | `environment_isolation_lock_conflict` |
+ | recorded passthrough entry is no longer a symlink to the native entry (non-current) | `environment_passthrough_detached` |
+-| recorded passthrough link path holds a regular file or an unexpected symlink target at repair (refusal, no fragment) | `environment_credential_conflict` |
++| recorded passthrough link path holds a regular file or an unexpected symlink target at repair, or an isolated system lock engages while a provisioned home still has a recorded shared passthrough (refusal; no fragment; directs to explicit migration) | `environment_credential_conflict` |
+ | native credential storage selector outside the verified set (refusal, no fragment) | `environment_credential_unsupported` |
+ 
+ ### 12.5 `env resolve`
+@@ -2889,7 +2900,8 @@ in this profile launches.
+ | recorded surface file unreadable at resolve (no fragment; non-current, currency unknown) | `environment_surface_unreadable` |
+ | lock file unreadable or malformed at resolve (no fragment; non-current, currency unknown; never rebuilt from) | `environment_store_untrusted` |
+ | recorded passthrough entry unreadable at resolve (no fragment; non-current, currency unknown) | `environment_passthrough_unreadable` |
+-| recorded passthrough link path holds a regular file or an unexpected symlink target under `--repair` (no fragment) | `environment_credential_conflict` |
++| profile explicitly requests `shared` for a profile × environment whose system lock requires `isolated` (refusal; no fragment) | `environment_isolation_lock_conflict` |
++| recorded passthrough link path holds a regular file or an unexpected symlink target under `--repair`, or an isolated system lock engages while a provisioned home still has a recorded shared passthrough (no fragment; the latter directs to explicit migration and never unlinks silently) | `environment_credential_conflict` |
+ | store entry, lock, or marker file fails the environments §4 protected-boundary contract or its pin hash at resolve (no fragment; non-current) | `environment_store_untrusted` |
+ | enclosing boundary cannot be proven at resolve (no fragment; non-current; nothing rebuilt) | `environment_store_untrusted` |
+ | repair could not acquire the mutation lock within the bounded wait | `environment_lock_unavailable` |
+diff --git a/protocol/environments.md b/protocol/environments.md
+index 86f60c8..0acb9e7 100644
+--- a/protocol/environments.md
++++ b/protocol/environments.md
+@@ -1723,9 +1723,10 @@ identifier not declared by the registry is `environment_target_unknown`.
+ | declared shadowing path exists (non-current; current warning under `shadow_acknowledged`) | `environment_shadowing_path_present` |
+ | `isolated` configured for `opencode`, or for `claude_code` on macOS below the pinned release | `environment_isolated_unsupported` |
+ | `shared` configured for `claude_code` on macOS at or above the pinned release | `environment_shared_unsupported` |
++| profile explicitly requests `shared` for a profile × environment whose system lock requires `isolated` (refusal; names the profile, environment, and system policy source) | `environment_isolation_lock_conflict` |
+ | recorded passthrough entry is no longer a symlink to the native entry (non-current) | `environment_passthrough_detached` |
+ | recorded passthrough entry whose link state cannot be established — `lstat` or `readlink` fails with permission, I/O, or path errors (non-current, currency unknown; never "detached") | `environment_passthrough_unreadable` |
+-| recorded passthrough link path holds a regular file or a symlink to an unexpected target at repair (refusal, no fragment; never removed or re-pointed) | `environment_credential_conflict` |
++| recorded passthrough link path holds a regular file or a symlink to an unexpected target at repair, or an isolated system lock engages while a provisioned home still has a recorded shared passthrough (refusal, no fragment; the latter directs to explicit migration and never unlinks silently) | `environment_credential_conflict` |
+ | credential strategy cannot be established — native storage selector outside the verified set (refusal, no fragment) | `environment_credential_unsupported` |
+ | provisioning seed exists but cannot be read — a native-home file or a named XDG entry | `environment_seed_unreadable` |
+ | unrecorded entry in a managed `opencode` parent shadows an allowlisted operator entry (warning) | `environment_seed_shadowed` |
+@@ -3208,7 +3209,8 @@ that no reader mistakes the surfacing rows for an execution sandbox.
+ | recorded surface file unreadable at resolve (no fragment; non-current, currency unknown; never "missing", never a stale-home reason; `--repair` does not re-materialize it) | `environment_surface_unreadable` |
+ | lock file unreadable or malformed at resolve (no fragment; non-current, currency unknown; never `profile_unknown`; never rebuilt from — section 8.4.1, lock row) | `environment_store_untrusted` |
+ | recorded passthrough entry unreadable at resolve (no fragment; non-current, currency unknown; never "detached", never a stale-home reason; `--repair` does not re-link it) | `environment_passthrough_unreadable` |
+-| recorded passthrough link path holds a regular file or an unexpected symlink target under `--repair` (no fragment; without `--repair` the same state is the stale-home reason above) | `environment_credential_conflict` |
++| profile explicitly requests `shared` for a profile × environment whose system lock requires `isolated` (refusal; no fragment) | `environment_isolation_lock_conflict` |
++| recorded passthrough link path holds a regular file or an unexpected symlink target under `--repair`, or an isolated system lock engages while a provisioned home still has a recorded shared passthrough (no fragment; the latter directs to explicit migration and never unlinks silently) | `environment_credential_conflict` |
+ | native credential storage selector outside the verified set at provisioning or repair (no fragment) | `environment_credential_unsupported` |
+ | store entry, lock, or marker file fails the §4 protected-boundary contract or its pin hash, or a `path` source directory fails its §4 boundary checks, at resolve (no fragment; non-current) | `environment_store_untrusted` |
+ | enclosing boundary (environments root or store root) cannot be proven at resolve (no fragment; non-current; nothing rebuilt) | `environment_store_untrusted` |
+@@ -3611,8 +3613,23 @@ use` of any other profile in the machine scope a configuration error under
+ the manager §1 locked-key rules, and `env status` reports the requirement;
+ a locked `overlays_allowed: false` empties every overlay list with the
+ manager §1 warning. The manager §1 credential rule stands: no key that
+-selects or constrains credential material is lockable, and `isolation` is
+-lockable only in the direction of `shared`. `transitive_system_modules`
++selects or constrains credential material is lockable. `isolation` remains
++the credential-store-sharing knob from §12.1 and is lockable in either
++direction, `shared` or `isolated`; `system-config-v2` admits exactly those
++two values. A locked `environments.isolation` replaces the full
++profile-by-environment map under manager §1 rule 2. Each profile ×
++environment entry in that system map forces its declared direction: `shared`
++forces shared credential-store mode, and `isolated` forces isolated
++credential-store mode. A silent profile value resolves to the locked
++direction. For a profile and environment locked to `isolated`, an explicit
++profile request for `shared` is refused with
++`environment_isolation_lock_conflict`, naming the profile, environment, and
++system policy source. If that lock engages for an already-provisioned home
++whose marker still records a shared passthrough, the manager refuses use
++with `environment_credential_conflict`, leaves the link and credential bytes
++untouched, and directs the operator to the explicit inspect → plan → apply
++migration in manager §12.4 (Curator follow-up F-C2). The manager MUST NOT
++silently unlink or migrate the passthrough. `transitive_system_modules`
+ is lockable only in the direction of `error`: a system file MUST lock
+ `transitive_system_modules` only to `error`, and `system_module_waivers`
+ MUST NOT be lockable — a lock MUST NOT admit a transitive package's system
+@@ -3692,8 +3709,11 @@ S6-planted `curator-run`, the manager-published and managed directory
+ refusals under both revisions, the unreadable-root failures under both
+ revisions, and the missing case — with the
+ `provider_directories` grammar pinned by the `manager-config-v2` and
+-`system-config-v2` schema cases; the section 12.1 `permissions`
+-per-profile mode grammar with the `native`-alone system direction case
++`system-config-v2` schema cases; the section 12.1 `isolation`
++profile-by-environment grammar with positive `shared` and `isolated`
++system-lock cases and negative unknown and both-direction values, plus the
++section 12.1 `permissions` per-profile mode grammar with the `native`-alone
++system direction case
+ (`vectors/manager-config-v2.json` and the `manager-config-v2` /
+ `system-config-v2` schema cases); the section 1.4 signer-verification cases
+ (`vectors/environments-source-signers.json`) — an allowlisted ssh tag
+diff --git a/release/1.0.0-rc.9.json b/release/1.0.0-rc.9.json
+index 1a53f12..bf36576 100644
+--- a/release/1.0.0-rc.9.json
++++ b/release/1.0.0-rc.9.json
+@@ -12,7 +12,7 @@
+     "verified_provider_contract": "host-execution-provider-v1"
+   },
+   "candidate_protocol_pin": {
+-    "manifest_sha256": "sha256:c7f6abd63e59005d9404a2bc87c3f321e2278a231c74726ef4d45cfb0cf483e2",
++    "manifest_sha256": "sha256:f1a078a84c44864a63c96a062bf1dc75816d8905288652125a8aa84cd788377f",
+     "suite_root": "conformance/v1"
+   },
+   "claim_v5": {
+@@ -24,7 +24,7 @@
+   "downstream_consumption": {
+     "committed_release_pin_advanced": false,
+     "environment": "CURATOR_CONFORMANCE_ROOT",
+-    "required_manifest_sha256": "sha256:c7f6abd63e59005d9404a2bc87c3f321e2278a231c74726ef4d45cfb0cf483e2"
++    "required_manifest_sha256": "sha256:f1a078a84c44864a63c96a062bf1dc75816d8905288652125a8aa84cd788377f"
+   },
+   "historical_release": {
+     "immutable": true,
+diff --git a/schemas/v1/README.md b/schemas/v1/README.md
+index 162d2c9..e776e3c 100644
+--- a/schemas/v1/README.md
++++ b/schemas/v1/README.md
+@@ -8,7 +8,9 @@ The unreleased environments 1.1 batch carries `manager-config-v2`: schema 1
+ plus one closed `environments` object of the environments section 12.1 knobs;
+ and `system-config-v2`: `system-config-v1` plus one closed `environments`
+ object of exactly the section 12.2 lockable keys, which `locked` may name as
+-`environments.<key>`. Both schema-1 files are byte-frozen and stay valid.
++`environments.<key>`. Its `isolation.<profile>.<env-id>` entries admit both
++`shared` and `isolated` lock directions with the manager §1 whole-map
++replacement semantics. Both schema-1 files are byte-frozen and stay valid.
+ 
+ Rc.9 carries `agent-skill-v8`, `csk-skill-v8`, `install-marker-v4`, and
+ conformance claim v5. Rc.8 carries `assurance-policy-v1`,
+diff --git a/schemas/v1/system-config-v2.schema.json b/schemas/v1/system-config-v2.schema.json
+index 003e9ac..f8fadb0 100644
+--- a/schemas/v1/system-config-v2.schema.json
++++ b/schemas/v1/system-config-v2.schema.json
+@@ -2,7 +2,7 @@
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "$id": "https://relux-works.github.io/curator-spec/schemas/v1/system-config-v2.schema.json",
+   "title": "Curator enforced system configuration schema 2",
+-  "description": "Schema 1 plus one closed `environments` object carrying exactly the environments protocol section 12.2 lockable knobs with their section 12.1 value grammars, a `locked` set that may name each of them as `environments.<key>`, and the top-level `security_posture` member of manager profile section 1. Every schema-1 member keeps its schema-1 shape by reference; `isolation` admits only `shared`, `transitive_system_modules` admits only `error`, `require_source_signers` admits only `true`, and `permissions` admits only `native`, the one direction section 12.2 makes lockable in each case; `security_posture` admits only `hardened`, the one direction manager section 1 makes lockable.",
++  "description": "Schema 1 plus one closed `environments` object carrying exactly the environments protocol section 12.2 lockable knobs with their section 12.1 value grammars, a `locked` set that may name each of them as `environments.<key>`, and the top-level `security_posture` member of manager profile section 1. Every schema-1 member keeps its schema-1 shape by reference; `isolation` admits `shared` and `isolated`, the two directions section 12.2 makes lockable; `transitive_system_modules` admits only `error`, `require_source_signers` admits only `true`, and `permissions` admits only `native`, the one direction section 12.2 makes lockable in each case; `security_posture` admits only `hardened`, the one direction manager section 1 makes lockable.",
+   "type": "object",
+   "required": ["schema_version"],
+   "properties": {
+@@ -70,7 +70,7 @@
+           "additionalProperties": {
+             "type": "object",
+             "propertyNames": {"$ref": "common.schema.json#/$defs/identifier"},
+-            "additionalProperties": {"enum": ["shared"]}
++            "additionalProperties": {"enum": ["shared", "isolated"]}
+           }
+         },
+         "permissions": {
+diff --git a/tools/generate-vectors/main_test.go b/tools/generate-vectors/main_test.go
+index e2cbd98..7d5714e 100644
+--- a/tools/generate-vectors/main_test.go
++++ b/tools/generate-vectors/main_test.go
+@@ -2486,6 +2486,12 @@ func TestSystemConfigV2IsSchemaOnePlusTheLockableEnvironmentsKeys(t *testing.T)
+ 	if environments["additionalProperties"] != false {
+ 		t.Fatal("system config v2 environments object is not closed")
+ 	}
++	isolation := environments["properties"].(map[string]any)["isolation"].(map[string]any)
++	profileValues := isolation["additionalProperties"].(map[string]any)
++	modeValues := profileValues["additionalProperties"].(map[string]any)
++	if got := modeValues["enum"]; !reflect.DeepEqual(got, []any{"shared", "isolated"}) {
++		t.Fatalf("system config v2 isolation directions = %#v, want shared and isolated", got)
++	}
+ 	locked := system["properties"].(map[string]any)["locked"].(map[string]any)["items"].(map[string]any)["enum"].([]any)
+ 	want := []any{"audit_registries", "disable_builtin_registries", "allowed_sources", "audit", "security_posture"}
+ 	for _, key := range systemConfigV2LockableKeys {
+@@ -2526,6 +2532,40 @@ func TestSystemConfigV2IsSchemaOnePlusTheLockableEnvironmentsKeys(t *testing.T)
+ 			t.Fatalf("the positive system-config-v2 case omits lockable key %s", key)
+ 		}
+ 	}
++	validIsolation := valid["environments"].(map[string]any)["isolation"].(map[string]any)["companyA"].(map[string]any)
++	if validIsolation["claude_code"] != "shared" || validIsolation["codex_cli"] != "shared" {
++		t.Fatalf("baseline valid system-config-v2 isolation must retain the shared direction: %#v", validIsolation)
++	}
++	examples := systemConfigV2SchemaExamples(valid)
++	wantDirectionCases := map[string]bool{
++		"valid-isolation-shared-direction":    true,
++		"valid-isolation-isolated-direction":  true,
++		"invalid-isolation-unknown-direction": false,
++		"invalid-isolation-both-directions":   false,
++		"invalid-isolation-value":             false,
++	}
++	caseIsolation := map[string]string{
++		"valid-isolation-shared-direction":   "shared",
++		"valid-isolation-isolated-direction": "isolated",
++	}
++	for _, example := range examples {
++		if wantValid, ok := wantDirectionCases[example.name]; ok {
++			if example.valid != wantValid {
++				t.Fatalf("system-config-v2 case %s valid = %t, want %t", example.name, example.valid, wantValid)
++			}
++			if wantMode, positive := caseIsolation[example.name]; positive {
++				instance := example.instance.(map[string]any)
++				mode := instance["environments"].(map[string]any)["isolation"].(map[string]any)["companyA"].(map[string]any)["claude_code"]
++				if mode != wantMode {
++					t.Fatalf("system-config-v2 case %s isolation mode = %#v, want %q", example.name, mode, wantMode)
++				}
++			}
++			delete(wantDirectionCases, example.name)
++		}
++	}
++	if len(wantDirectionCases) > 0 {
++		t.Fatalf("system-config-v2 direction cases missing: %#v", wantDirectionCases)
++	}
+ }
+ 
+ func TestRegistryAndAuditSchemasRemainSourceEvidenceOnly(t *testing.T) {
+diff --git a/tools/generate-vectors/system_config.go b/tools/generate-vectors/system_config.go
+index 96d19b4..50625a9 100644
+--- a/tools/generate-vectors/system_config.go
++++ b/tools/generate-vectors/system_config.go
+@@ -11,9 +11,9 @@ var systemConfigV2LockableKeys = []string{
+ 
+ // systemConfigV2EveryKey sets every §12.2 lockable knob to a non-default value
+ // so that the positive case exercises every grammar the schema encodes.
+-// `isolation` is `shared` only, `transitive_system_modules` is `error`
+-// only, `require_source_signers` is `true` only, and `permissions` is
+-// `native` only: §12.2 makes each lockable in that direction alone.
++// `isolation` admits `shared` and `isolated`; `transitive_system_modules` is
++// `error` only, `require_source_signers` is `true` only, and `permissions` is
++// `native` only: §12.2 limits each of those locks to the stated directions.
+ func systemConfigV2EveryKey() map[string]any {
+ 	return map[string]any{
+ 		"overlays_allowed":          false,
+@@ -100,7 +100,10 @@ func systemConfigV2SchemaExamples(valid map[string]any) []schemaExample {
+ 		{name: "invalid-require-current-profile-grammar", instance: withKnob("require_current_profile", "")},
+ 		{name: "invalid-transitive-system-modules-drop-direction", instance: withKnob("transitive_system_modules", "drop")},
+ 		{name: "invalid-transitive-system-modules-value", instance: withKnob("transitive_system_modules", "quarantine")},
+-		{name: "invalid-isolation-isolated-direction", instance: withKnob("isolation", map[string]any{"companyA": map[string]any{"claude_code": "isolated"}})},
++		{name: "valid-isolation-shared-direction", valid: true, instance: withKnob("isolation", map[string]any{"companyA": map[string]any{"claude_code": "shared"}})},
++		{name: "valid-isolation-isolated-direction", valid: true, instance: withKnob("isolation", map[string]any{"companyA": map[string]any{"claude_code": "isolated"}})},
++		{name: "invalid-isolation-unknown-direction", instance: withKnob("isolation", map[string]any{"companyA": map[string]any{"claude_code": "automatic"}})},
++		{name: "invalid-isolation-both-directions", instance: withKnob("isolation", map[string]any{"companyA": map[string]any{"claude_code": []any{"shared", "isolated"}}})},
+ 		{name: "invalid-isolation-value", instance: withKnob("isolation", map[string]any{"companyA": map[string]any{"codex_cli": "private"}})},
+ 		{name: "invalid-isolation-profile-grammar", instance: withKnob("isolation", map[string]any{"Company A": map[string]any{"codex_cli": "shared"}})},
+ 		{name: "invalid-permissions-yolo-direction", instance: withKnob("permissions", map[string]any{"companyA": "yolo"})},
+diff --git a/tools/test_validate.py b/tools/test_validate.py
+index 79789e3..c8c5f5a 100644
+--- a/tools/test_validate.py
++++ b/tools/test_validate.py
+@@ -5270,15 +5270,24 @@ class SystemConfigV2SchemaTests(unittest.TestCase):
+         with self.assertRaisesRegex(validate.ValidationFailure, "overlays_allowed does not take its grammar"):
+             self.run_gate(schema=self.mutated(inline))
+ 
+-    def test_isolation_admitting_isolated_fails(self) -> None:
++    def test_isolation_admitting_an_unknown_direction_fails(self) -> None:
+         def widen(s):
+             node = s
+             for segment in self.ISOLATION_ENUM[:-1]:
+                 node = node[segment]
+-            node["enum"] = ["shared", "isolated"]
+-        with self.assertRaisesRegex(validate.ValidationFailure, "permits shared alone"):
++            node["enum"] = ["shared", "isolated", "automatic"]
++        with self.assertRaisesRegex(validate.ValidationFailure, "permits exactly shared and isolated"):
+             self.run_gate(schema=self.mutated(widen))
+ 
++    def test_isolation_must_admit_both_directions(self) -> None:
++        def narrow(s):
++            node = s
++            for segment in self.ISOLATION_ENUM[:-1]:
++                node = node[segment]
++            node["enum"] = ["shared"]
++        with self.assertRaisesRegex(validate.ValidationFailure, "permits exactly shared and isolated"):
++            self.run_gate(schema=self.mutated(narrow))
++
+     def test_transitive_system_modules_admitting_drop_fails(self) -> None:
+         def widen(s):
+             node = s
+diff --git a/tools/validate.py b/tools/validate.py
+index 4cd617f..44fe870 100644
+--- a/tools/validate.py
++++ b/tools/validate.py
+@@ -4101,7 +4101,7 @@ def validate_system_config_v2_schema(
+     knob other than `isolation`, `transitive_system_modules`,
+     `require_source_signers`, and `permissions` takes its grammar from the
+     `manager-config-v2` environments object by reference, so the two
+-    schemas cannot drift; `isolation` admits `shared` alone,
++    schemas cannot drift; `isolation` admits `shared` and `isolated`,
+     `transitive_system_modules` admits `error` alone,
+     `require_source_signers` admits `true` alone, and `permissions`
+     admits `native` alone (section 12.2: each lockable only in that
+@@ -4159,8 +4159,10 @@ def validate_system_config_v2_schema(
+         if not isinstance(node, dict) or segment not in node:
+             raise ValidationFailure("system-config-v2 states no closed isolation value set")
+         node = node[segment]
+-    if node != ["shared"]:
+-        raise ValidationFailure(f"system-config-v2 isolation admits {node!r}; section 12.2 permits shared alone")
++    if node != ["shared", "isolated"]:
++        raise ValidationFailure(
++            f"system-config-v2 isolation admits {node!r}; section 12.2 permits exactly shared and isolated"
++        )
+     node = schema
+     for segment in SYSTEM_CONFIG_TRANSITIVE_ENUM_PATH:
+         if not isinstance(node, dict) or segment not in node:
