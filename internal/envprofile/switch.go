@@ -489,6 +489,9 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 	if err := os.MkdirAll(native, 0o755); err != nil {
 		return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
 	}
+	if err := checkManagedPrivateTarget(native, envmarker.Name); err != nil {
+		return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
+	}
 	prior, err := envmarker.Read(native)
 	if err != nil {
 		return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
@@ -501,33 +504,52 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 			}
 		}
 	}
-	target := filepath.Join(native, adapter.Target)
 	want := map[string]bool{}
 	if written {
 		want[adapter.Target] = true
 	}
-	// Section 9.5 onboarding inventory for this entry: a managed-surface
-	// path that is already a symlink pointing outside the manager's store
-	// is evidence of another manager and stops the entry with
-	// environment_foreign_manager_detected and the explicit abort-or-take-
-	// over choice, never a silent absorption. Any other unmanaged file the
-	// entry would write fails with environment_surface_unmanaged_conflict
-	// — unless the carrying operation passes --takeover, which backs the
-	// file up before the first write (below) and reports the replace
-	// notice. The flag covers only the files this entry writes.
+	for path := range want {
+		if _, err := managedPath(native, path, false); err != nil {
+			return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
+		}
+	}
+	// Section 9.5 inventory: an unrecorded surface symlink pointing outside
+	// the profile store is evidence of another manager and stops with
+	// environment_foreign_manager_detected unless this operation explicitly
+	// authorizes takeover. Takeover backs up the exact link entry (including
+	// its link text) before replacement; §8.3.1 requires that backup and each
+	// managed write to avoid following the link. Other unrecorded targets
+	// fail with environment_surface_unmanaged_conflict without takeover.
 	result := EntryResult{Adapter: adapter.ID, Home: native}
 	var taken []string
 	for path := range want {
 		if recorded[path] {
 			continue
 		}
-		full := filepath.Join(native, path)
-		info, err := os.Lstat(full)
+		full, err := managedPath(native, path, false)
 		if err != nil {
+			result.OK = false
+			result.Detail = err.Error()
+			return result
+		}
+		state, err := stateread.Lstat(full)
+		if err != nil {
+			result.OK = false
+			result.Detail = err.Error()
+			return result
+		}
+		if state.Kind == stateread.KindAbsent {
 			continue
 		}
+		info := state.Info
 		if info.Mode()&os.ModeSymlink != 0 {
-			if linkTarget, readErr := os.Readlink(full); readErr == nil && !sameStoreTree(linkTarget, contextstore.Root(home)) {
+			linkTarget, readErr := os.Readlink(full)
+			if readErr != nil {
+				result.OK = false
+				result.Detail = DiagForeignManager + ": " + path + " is a symlink that cannot be inspected; refusing takeover"
+				return result
+			}
+			if !sameStoreTree(linkTarget, contextstore.Root(home)) {
 				if !takeover {
 					result.OK = false
 					result.Detail = DiagForeignManager + ": " + path + " is a symlink outside the manager store; abort, or take over with backup"
@@ -555,14 +577,26 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 	}
 	generation := 0
 	if len(want) > 0 {
-		needsBackup := false
+		backupWant := map[string]bool{}
 		for path := range want {
-			if _, err := os.Lstat(filepath.Join(native, path)); err == nil {
-				needsBackup = true
+			full, err := managedPath(native, path, false)
+			if err != nil {
+				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
+			}
+			state, err := stateread.Lstat(full)
+			if err != nil {
+				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
+			}
+			if state.Kind == stateread.KindAbsent {
+				continue
+			}
+			info := state.Info
+			if info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+				backupWant[path] = true
 			}
 		}
-		if needsBackup {
-			generation, err = openBackup(native, want)
+		if len(backupWant) > 0 {
+			generation, err = openBackup(native, "", backupWant)
 			if err != nil {
 				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
 			}
@@ -572,7 +606,7 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 	if prior != nil {
 		for path := range recorded {
 			if !want[path] {
-				_ = os.Remove(filepath.Join(native, path))
+				_ = removeManagedEntry(native, path)
 			}
 		}
 	}
@@ -580,14 +614,7 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 	copies := []envmarker.Copy{}
 	if written {
 		if adapter.ID == "claude_code" {
-			// A copied surface never follows a link: remove first,
-			// exactly as replaceLink does for the linked adapters.
-			// os.WriteFile follows a symlink, so without this a
-			// --takeover of a foreign-manager symlink would write
-			// through the link into a file outside every managed
-			// home (§9.5 never absorbs in the wrong direction).
-			_ = os.Remove(target)
-			if err := os.WriteFile(target, document, 0o644); err != nil {
+			if err := atomicManagedFile(native, adapter.Target, document, 0o644); err != nil {
 				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
 			}
 			copies = append(copies, envmarker.Copy{Path: adapter.Target, Reason: envmarker.ReasonClaudeCodeRootContext})
@@ -596,13 +623,10 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 			if err != nil {
 				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
 			}
-			if err := replaceLink(target, storeFile); err != nil {
-				// Copy fallback (manager §5): the link is already
-				// removed by replaceLink, so this write cannot
-				// follow it; remove again defensively before the
-				// copy and record the reason.
-				_ = os.Remove(target)
-				if writeErr := os.WriteFile(target, document, 0o644); writeErr != nil {
+			if err := replaceLink(native, adapter.Target, storeFile); err != nil {
+				// Copy fallback uses the same atomic replacement
+				// discipline as a linked surface.
+				if writeErr := atomicManagedFile(native, adapter.Target, document, 0o644); writeErr != nil {
 					return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: writeErr.Error()}
 				}
 				copies = append(copies, envmarker.Copy{Path: adapter.Target, Reason: envmarker.ReasonSymlinkFallback})
@@ -642,8 +666,7 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 		return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
 	}
 	// The marker is curator-owned state: never follow a link to it either.
-	_ = os.Remove(filepath.Join(native, envmarker.Name))
-	if err := os.WriteFile(filepath.Join(native, envmarker.Name), payload, 0o644); err != nil {
+	if err := atomicManagedFile(native, envmarker.Name, payload, 0o644); err != nil {
 		return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
 	}
 	_ = generation
@@ -658,27 +681,39 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 // openBackup copies every file the operation will replace into the next
 // versioned generation and prunes beyond the retention count. A next
 // generation that already exists fails with environment_backup_exists.
-func openBackup(native string, want map[string]bool) (int, error) {
-	base := filepath.Join(native, ".agent-environment-backup")
+func openBackup(root, homeRel string, want map[string]bool) (int, error) {
+	baseRel := managedJoin(homeRel, ".agent-environment-backup")
+	base, err := managedDirectory(root, baseRel)
+	if err != nil {
+		return 0, err
+	}
 	listing, err := stateread.ReadDir(base)
 	highest := 0
 	if err != nil {
 		return 0, err
 	}
-	if listing.Kind == stateread.KindPresent {
-		for _, entry := range listing.Entries {
-			var n int
-			if _, err := fmt.Sscanf(entry.Name(), "%d", &n); err == nil && n > highest {
-				highest = n
-			}
+	if listing.Kind == stateread.KindAbsent {
+		return 0, stateread.AbsentError(base)
+	}
+	for _, entry := range listing.Entries {
+		var n int
+		if _, err := fmt.Sscanf(entry.Name(), "%d", &n); err == nil && n > highest {
+			highest = n
 		}
 	}
 	next := highest + 1
+	generationRel := managedJoin(baseRel, fmt.Sprintf("%d", next))
 	generation := filepath.Join(base, fmt.Sprintf("%d", next))
-	if _, err := os.Lstat(generation); err == nil {
+	generationState, err := stateread.Lstat(generation)
+	if err != nil {
+		return 0, err
+	}
+	if generationState.Kind == stateread.KindPresent && generationState.Info.Mode()&os.ModeSymlink != 0 {
+		return 0, fmt.Errorf("%s: %s", DiagWriteWouldFollowLink, generation)
+	} else if generationState.Kind == stateread.KindPresent {
 		return 0, fmt.Errorf("%s: generation %d exists", DiagBackupExists, next)
 	}
-	if err := os.MkdirAll(generation, 0o755); err != nil {
+	if _, err := managedDirectory(root, generationRel); err != nil {
 		return 0, err
 	}
 	paths := make([]string, 0, len(want))
@@ -687,25 +722,44 @@ func openBackup(native string, want map[string]bool) (int, error) {
 	}
 	sort.Strings(paths)
 	for _, path := range paths {
-		full := filepath.Join(native, path)
-		info, err := os.Lstat(full)
-		if err != nil {
-			continue
-		}
-		if !info.Mode().IsRegular() && info.Mode()&os.ModeSymlink == 0 {
-			continue
-		}
-		payload, err := os.ReadFile(full) // #nosec G304 -- recorded file of the home
+		sourceRel := managedJoin(homeRel, path)
+		full, err := managedPath(root, sourceRel, false)
 		if err != nil {
 			_ = os.RemoveAll(generation)
 			return 0, err
 		}
-		target := filepath.Join(generation, path)
-		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		state, err := stateread.Lstat(full)
+		if err != nil {
 			_ = os.RemoveAll(generation)
 			return 0, err
 		}
-		if err := os.WriteFile(target, payload, 0o644); err != nil {
+		if state.Kind == stateread.KindAbsent {
+			continue
+		}
+		info := state.Info
+		targetRel := managedJoin(generationRel, path)
+		if info.Mode()&os.ModeSymlink != 0 {
+			linkText, err := os.Readlink(full)
+			if err == nil {
+				err = atomicManagedLink(root, targetRel, linkText)
+			}
+			if err != nil {
+				_ = os.RemoveAll(generation)
+				return 0, err
+			}
+			continue
+		}
+		if !info.Mode().IsRegular() {
+			continue
+		}
+		payload, present, err := readManagedRegular(root, sourceRel)
+		if err == nil && !present {
+			err = stateread.AbsentError(full)
+		}
+		if err == nil {
+			err = atomicManagedFile(root, targetRel, payload, 0o644)
+		}
+		if err != nil {
 			_ = os.RemoveAll(generation)
 			return 0, err
 		}
@@ -739,22 +793,18 @@ func pruneBackups(base string, newest int) {
 
 // writeStoreDocument stores the rendered document for link targets.
 func writeStoreDocument(home, profile string, adapter Adapter, document []byte) (string, error) {
-	dir := filepath.Join(ProfilesDir(home), profile, "rendered", adapter.ID)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", err
-	}
-	path := filepath.Join(dir, adapter.Target)
-	if err := os.WriteFile(path, document, 0o644); err != nil {
+	root := ProfilesDir(home)
+	rel := filepath.ToSlash(filepath.Join(profile, "rendered", adapter.ID, filepath.FromSlash(adapter.Target)))
+	path := filepath.Join(root, filepath.FromSlash(rel))
+	if err := atomicManagedFile(root, rel, document, 0o644); err != nil {
 		return "", err
 	}
 	return path, nil
 }
 
-// replaceLink swaps target to a symlink of storeFile, removing whatever the
-// marker recorded there before.
-func replaceLink(target, storeFile string) error {
-	_ = os.Remove(target)
-	return os.Symlink(storeFile, target)
+// replaceLink atomically replaces a managed surface entry with its store link.
+func replaceLink(native, rel, storeFile string) error {
+	return atomicManagedLink(native, rel, storeFile)
 }
 
 // purgeHomes removes the in-place surfaces, markers, and backup generations

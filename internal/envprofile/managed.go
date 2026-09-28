@@ -14,6 +14,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -244,6 +245,7 @@ type homePlan struct {
 	adapter    envregistry.Adapter
 	parent     string
 	homeDir    string
+	storeRoot  string
 	form       string
 	isolation  string
 	copies     map[string][]byte
@@ -293,6 +295,7 @@ func assembleHome(req *ResolveRequest, source Source, lock *contextlock.Lock, ha
 		adapter:    adapter,
 		parent:     ManagedParent(req.Home, req.Profile, adapter.ID),
 		homeDir:    ManagedHomeDir(req.Home, req.Profile, adapter.ID),
+		storeRoot:  ProfilesDir(req.Home),
 		form:       form,
 		isolation:  isolation,
 		copies:     map[string][]byte{},
@@ -499,7 +502,7 @@ func (p *homePlan) publishDocs() error {
 	}
 	sort.Strings(paths)
 	for _, path := range paths {
-		if err := writeStoreDoc(path, p.docs[path]); err != nil {
+		if err := writeStoreDoc(p.storeRoot, path, p.docs[path]); err != nil {
 			return err
 		}
 	}
@@ -848,11 +851,12 @@ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bo
 }
 
 // writeStoreDoc publishes manager-authored bytes as a store document.
-func writeStoreDoc(path string, document []byte) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+func writeStoreDoc(root, path string, document []byte) error {
+	rel, err := managedRelative(root, path)
+	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, document, 0o644)
+	return atomicManagedFile(root, rel, document, 0o644)
 }
 
 // claudeSeed merges the .claude.json provisioning seed: the exact object
@@ -861,16 +865,18 @@ func writeStoreDoc(path string, document []byte) error {
 // under the referenced form — hasClaudeMdExternalIncludesApproved (§7.4).
 // Later tool writes are its own state: repair only adds the launch
 // directory's entry and never rewrites anything else.
-func claudeSeed(homeDir, launchDir, form string) (seeded []string, err error) {
-	path := filepath.Join(homeDir, ".claude.json")
+func claudeSeed(root, homeRel, launchDir, form string) (seeded []string, err error) {
+	path := managedJoin(homeRel, ".claude.json")
 	object := map[string]any{"hasCompletedOnboarding": true, "projects": map[string]any{}}
-	state, err := stateread.ReadRegularFile(path) // #nosec G304 -- managed .claude.json below the resolved home
+	payload, present, err := readManagedRegular(root, path)
 	if err != nil {
-		return nil, fmt.Errorf("%s: managed .claude.json: %w", envregistry.DiagSeedUnreadable, err)
+		if strings.Contains(err.Error(), DiagWriteWouldFollowLink) {
+			return nil, err
+		}
+		return nil, fmt.Errorf("%s: managed .claude.json: %v", envregistry.DiagSeedUnreadable, err)
 	}
-	switch state.Kind {
-	case stateread.KindPresent:
-		parsed, ok := decodeJSONObject(state.Bytes)
+	if present {
+		parsed, ok := decodeJSONObject(payload)
 		if !ok {
 			return nil, fmt.Errorf("%s: managed .claude.json is not an object", envregistry.DiagSeedUnreadable)
 		}
@@ -878,11 +884,12 @@ func claudeSeed(homeDir, launchDir, form string) (seeded []string, err error) {
 		if _, ok := object["projects"].(map[string]any); !ok {
 			object["projects"] = map[string]any{}
 		}
-	case stateread.KindAbsent:
-	case stateread.KindUnreadable:
-		return nil, fmt.Errorf("%s: managed .claude.json is unreadable", envregistry.DiagSeedUnreadable)
-	default:
-		return nil, fmt.Errorf("%s: managed .claude.json has unknown read state %q", envregistry.DiagSeedUnreadable, state.Kind)
+	} else if full, pathErr := managedPath(root, path, false); pathErr != nil {
+		return nil, fmt.Errorf("%s: managed .claude.json: %v", envregistry.DiagSeedUnreadable, pathErr)
+	} else if state, statErr := stateread.Lstat(full); statErr != nil {
+		return nil, fmt.Errorf("%s: managed .claude.json: %v", envregistry.DiagSeedUnreadable, statErr)
+	} else if state.Kind == stateread.KindPresent && !state.Info.Mode().IsRegular() {
+		return nil, fmt.Errorf("%s: managed .claude.json is not a regular file", envregistry.DiagSeedUnreadable)
 	}
 	projects := object["projects"].(map[string]any)
 	for name := range projects {
@@ -907,11 +914,11 @@ func claudeSeed(homeDir, launchDir, form string) (seeded []string, err error) {
 		seeded = append(seeded, launchDir)
 	}
 	sort.Strings(seeded)
-	payload, err := protocoljsonMarshal(object)
+	payload, err = protocoljsonMarshal(object)
 	if err != nil {
 		return nil, err
 	}
-	if err := os.WriteFile(path, payload, 0o644); err != nil {
+	if err := atomicManagedFile(root, path, payload, 0o644); err != nil {
 		return nil, err
 	}
 	return seeded, nil
@@ -1044,6 +1051,21 @@ func inventoryUnmanaged(homeDir string, want map[string]bool, storeRoot string) 
 	return nil
 }
 
+// preflightManagedWriteTargets checks every managed-surface parent and the
+// private marker destination before an operation writes store documents,
+// backups, surfaces, or the marker.
+func preflightManagedWriteTargets(root, homeRel string, want map[string]bool) error {
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		return err
+	}
+	for path := range want {
+		if _, err := managedPath(root, managedJoin(homeRel, path), false); err != nil {
+			return err
+		}
+	}
+	return checkManagedPrivateTarget(root, managedJoin(homeRel, envmarker.Name))
+}
+
 // sameStoreTree reports whether the link target lives below the store.
 func sameStoreTree(target, storeRoot string) bool {
 	if !filepath.IsAbs(target) {
@@ -1058,15 +1080,9 @@ func sameStoreTree(target, storeRoot string) bool {
 // files, and the marker. Managed paths the plan no longer wants are
 // removed; files the marker does not record are never touched.
 func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded map[string]bool, prior *envmarker.Marker, provisioned bool) error {
-	if err := os.MkdirAll(plan.homeDir, 0o755); err != nil {
-		return err
-	}
-	if plan.adapter.ID == envregistry.OpenCode {
-		if err := os.MkdirAll(plan.parent, 0o755); err != nil {
-			return err
-		}
-	}
-	if err := plan.publishDocs(); err != nil {
+	root := EnvRoot(req.Home)
+	homeRel, err := managedRelative(root, plan.homeDir)
+	if err != nil {
 		return err
 	}
 	want := map[string]bool{}
@@ -1082,74 +1098,88 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
 	for seed := range seeds.files {
 		want[seed] = true
 	}
-	// Versioned generations preserve replaced file bytes (§8.3, §9.5):
-	// every file the operation replaces is copied into the next backup
-	// generation before the first write — on provisioning as on repair,
-	// whether or not any import was requested. Symlinks are skipped: they
-	// are manager-derived and re-derive from the lock and the immutable
-	// store, while openBackup follows links and fails on directory links
-	// (skills trees). A next generation that already exists fails with
+	if err := preflightManagedWriteTargets(root, homeRel, want); err != nil {
+		return err
+	}
+	if _, err := managedDirectory(root, homeRel); err != nil {
+		return err
+	}
+	if err := plan.publishDocs(); err != nil {
+		return err
+	}
+	// Versioned generations preserve replaced regular-file bytes (§8.3,
+	// §9.5) before the first write. An authorized takeover also backs up a
+	// replaced unmanaged symlink as a symlink, preserving its link text;
+	// manager-recorded links are re-derived from the lock and are not backed
+	// up. A next generation that already exists fails with
 	// environment_backup_exists.
 	replacing := map[string]bool{}
 	for path := range want {
-		info, err := os.Lstat(filepath.Join(plan.homeDir, filepath.FromSlash(path)))
-		if err != nil || info.Mode()&os.ModeSymlink != 0 {
+		full, err := managedPath(root, managedJoin(homeRel, path), false)
+		if err != nil {
+			return err
+		}
+		state, err := stateread.Lstat(full)
+		if err != nil {
+			return err
+		}
+		if state.Kind == stateread.KindAbsent {
 			continue
 		}
-		replacing[path] = true
+		info := state.Info
+		if info.Mode()&os.ModeSymlink != 0 {
+			if provisioned && req.Policy.Takeover && !recorded[path] {
+				replacing[path] = true
+			}
+			continue
+		}
+		if info.Mode().IsRegular() {
+			replacing[path] = true
+		}
 	}
 	if len(replacing) > 0 {
-		if _, err := openBackup(plan.homeDir, replacing); err != nil {
+		if _, err := openBackup(root, homeRel, replacing); err != nil {
 			return err
 		}
 	}
 	// Remove recorded files the plan no longer wants.
 	for path := range recorded {
 		if !want[path] && !isSeedPath(plan, path) {
-			_ = os.Remove(filepath.Join(plan.homeDir, filepath.FromSlash(path)))
+			if err := removeManagedEntry(root, managedJoin(homeRel, path)); err != nil {
+				return err
+			}
 		}
 	}
 	// Writes run in sorted path order: the fresh-home provisioning order
-	// (§8.1) is deterministic even though the plan accumulates maps.
-	// Copied surfaces never follow a link: remove first, as the switch
-	// path does, so a stray symlink in a managed home cannot redirect a
-	// write outside the manager's tree.
+	// (§8.1) is deterministic even though the plan accumulates maps. Each
+	// destination is replaced from a private same-directory entry, so the
+	// existing surface path is never opened through a symlink.
 	for _, path := range sortedKeysBytes(plan.copies) {
 		document := plan.copies[path]
-		if err := os.MkdirAll(filepath.Dir(filepath.Join(plan.homeDir, filepath.FromSlash(path))), 0o755); err != nil {
-			return err
-		}
-		_ = os.Remove(filepath.Join(plan.homeDir, filepath.FromSlash(path)))
-		if err := os.WriteFile(filepath.Join(plan.homeDir, filepath.FromSlash(path)), document, 0o644); err != nil {
+		if err := atomicManagedFile(root, managedJoin(homeRel, path), document, 0o644); err != nil {
 			return err
 		}
 	}
 	for _, path := range sortedKeys(plan.links) {
 		target := plan.links[path]
-		full := filepath.Join(plan.homeDir, filepath.FromSlash(path))
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			return err
-		}
-		_ = os.Remove(full)
-		if err := os.Symlink(target, full); err != nil {
+		rel := managedJoin(homeRel, path)
+		if err := atomicManagedLink(root, rel, target); err != nil {
+			var unavailable *errSymlinkUnavailable
+			if !errors.As(err, &unavailable) {
+				return fmt.Errorf("link %s: %v", path, err)
+			}
 			// Copy fallback where the platform takes no symlink: record
 			// the copy with its reason so hash drift applies to it.
-			if err := copyLinkFallback(full, target, path, plan); err != nil {
+			if err := copyLinkFallback(root, rel, target, path, plan); err != nil {
 				return err
 			}
 		}
 	}
 	// Copy seeds are written at provisioning only: after that the tool
-	// owns them, so repair never refreshes them (§7.4). Like the copied
-	// surfaces above, the seed and marker writes remove first so a stray
-	// symlink in a managed home cannot redirect them; both targets stay
-	// under the manager's own tree. (claudeSeed is deliberately excluded:
-	// it reads the existing .claude.json and merges, so removing first
-	// would destroy the tool-owned state it must preserve.)
+	// owns them, so repair never refreshes them (§7.4).
 	if provisioned {
 		for seed, payload := range seeds.files {
-			_ = os.Remove(filepath.Join(plan.homeDir, filepath.FromSlash(seed)))
-			if err := os.WriteFile(filepath.Join(plan.homeDir, filepath.FromSlash(seed)), payload, 0o644); err != nil {
+			if err := atomicManagedFile(root, managedJoin(homeRel, seed), payload, 0o644); err != nil {
 				return err
 			}
 		}
@@ -1194,6 +1224,11 @@ func isSeedPath(plan *homePlan, path string) bool {
 // removed, and unrecorded entries shadowing allowlisted operator entries
 // warn environment_seed_shadowed and are never touched (§7.1, §7.4).
 func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prior *envmarker.Marker, provenance string) (*envmarker.Marker, error) {
+	root := EnvRoot(req.Home)
+	homeRel, err := managedRelative(root, plan.homeDir)
+	if err != nil {
+		return nil, err
+	}
 	marker := plan.marker
 	marker.Version = envmarker.VersionV2
 	if prior != nil && prior.CodexSeedRecord != nil {
@@ -1224,7 +1259,7 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
 	}
 	migrateCmd := fmt.Sprintf("curator env migrate --plan --profile %s --env %s, then curator env migrate --apply --expect <plan-hash> --profile %s --env %s", req.Profile, plan.adapter.ID, req.Profile, plan.adapter.ID)
 	for _, path := range sortedKeys(links) {
-		if err := ensureCredentialLink(plan.homeDir, path, links[path], recordedLinks[path], migrateCmd); err != nil {
+		if err := ensureCredentialLink(root, homeRel, path, links[path], recordedLinks[path], migrateCmd); err != nil {
 			return nil, err
 		}
 	}
@@ -1255,7 +1290,7 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
 		}
 	}
 	if seeds.claudeInit || plan.adapter.ID == envregistry.ClaudeCode {
-		seeded, err := claudeSeed(plan.homeDir, req.LaunchDir, plan.form)
+		seeded, err := claudeSeed(root, homeRel, req.LaunchDir, plan.form)
 		if err != nil {
 			return nil, err
 		}
@@ -1268,8 +1303,11 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
 	if plan.adapter.ID == envregistry.OpenCode {
 		for _, name := range sortedKeys(seeds.xdg) {
 			full := filepath.Join(plan.parent, name)
-			_ = os.Remove(full)
-			if err := os.Symlink(seeds.xdg[name], full); err != nil {
+			rel, err := managedRelative(root, full)
+			if err != nil {
+				return nil, err
+			}
+			if err := atomicManagedLink(root, rel, seeds.xdg[name]); err != nil {
 				return nil, fmt.Errorf("xdg seed %s: %v", name, err)
 			}
 			seedLinks = append(seedLinks, name)
@@ -1278,7 +1316,14 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
 		if prior != nil {
 			for _, name := range prior.SeedLinks {
 				if _, ok := seeds.xdg[name]; !ok {
-					_ = os.Remove(filepath.Join(plan.parent, name))
+					full := filepath.Join(plan.parent, name)
+					rel, err := managedRelative(root, full)
+					if err != nil {
+						return nil, err
+					}
+					if err := removeManagedEntry(root, rel); err != nil {
+						return nil, err
+					}
 				}
 			}
 		}
@@ -1365,17 +1410,18 @@ func sameCredentialRecordSet(left, right []envmarker.Passthrough) bool {
 // file, an unrecorded symlink to an unexpected target, a non-empty
 // directory, or a link whose state cannot be established refuses the
 // same way, removing nothing. Native bytes are never touched.
-func ensureCredentialLink(homeDir, path, target string, recorded bool, migrateCmd string) error {
-	full := filepath.Join(homeDir, filepath.FromSlash(path))
+func ensureCredentialLink(root, homeRel, path, target string, recorded bool, migrateCmd string) error {
+	rel := managedJoin(homeRel, path)
+	full, err := managedPath(root, rel, false)
+	if err != nil {
+		return err
+	}
 	metadata, err := stateread.Lstat(full)
 	if err != nil {
 		return fmt.Errorf("%s: %s cannot be inspected: %v: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full, err)
 	}
 	if metadata.Kind == stateread.KindAbsent {
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			return err
-		}
-		if err := os.Symlink(target, full); err != nil {
+		if err := atomicManagedLink(root, rel, target); err != nil {
 			return fmt.Errorf("passthrough %s: %v", path, err)
 		}
 		return nil
@@ -1405,8 +1451,10 @@ func ensureCredentialLink(homeDir, path, target string, recorded bool, migrateCm
 		if len(entries) != 0 {
 			return fmt.Errorf("%s: %s holds a non-empty directory, expected a link to %s: refusing to remove it; clear the directory out of band and re-run", envregistry.DiagCredentialConflict, full, target)
 		}
-		_ = os.Remove(full)
-		if err := os.Symlink(target, full); err != nil {
+		if err := removeManagedEntry(root, rel); err != nil {
+			return err
+		}
+		if err := atomicManagedLink(root, rel, target); err != nil {
 			return fmt.Errorf("passthrough %s: %v", path, err)
 		}
 		return nil
@@ -2242,6 +2290,14 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
 	if !identifiers.Valid(profile) {
 		return nil, fmt.Errorf("%s: profile %q is not installed", DiagProfileUnknown, profile)
 	}
+	managedRoot := EnvRoot(req.Home)
+	homeRel, err := managedRelative(managedRoot, ManagedHomeDir(req.Home, profile, req.EnvID))
+	if err != nil {
+		return nil, err
+	}
+	if err := checkManagedPrivateTarget(managedRoot, managedJoin(homeRel, envmarker.Name)); err != nil {
+		return nil, err
+	}
 	source, lock, hash, err := loadResolveInputsWith(req.Home, profile, req.readRegularFile)
 	if err != nil {
 		return nil, err
@@ -2319,16 +2375,57 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 	if err != nil {
 		return nil, err
 	}
-	// The credential store must be established before the first write: an
-	// unknown native selector fails here, not halfway through applyPlan
-	// leaving a markerless partial home behind that the §9.5 inventory
-	// would then refuse to provision over.
-	if _, _, err := req.effectivePassthrough(adapter, plan.isolation); err != nil {
+	root := EnvRoot(req.Home)
+	homeRel, err := managedRelative(root, plan.homeDir)
+	if err != nil {
+		return nil, err
+	}
+	writePaths := map[string]bool{}
+	for path := range plan.copies {
+		writePaths[path] = true
+	}
+	for path := range plan.links {
+		writePaths[path] = true
+	}
+	for path := range seeds.files {
+		writePaths[path] = true
+	}
+	if seeds.claudeInit {
+		writePaths[".claude.json"] = true
+	}
+	if seeds.claudeInit {
+		if err := checkManagedPrivateTarget(root, managedJoin(homeRel, ".claude.json")); err != nil {
+			return nil, err
+		}
+	}
+	passthroughLinks, _, err := req.effectivePassthrough(adapter, plan.isolation)
+	if err != nil {
 		if provisioned || isCredentialRefusal(err) {
 			return nil, err
 		}
 		return nil, fmt.Errorf("%s: %v", DiagRepairFailed, err)
 	}
+	for path := range passthroughLinks {
+		writePaths[path] = true
+	}
+	if err := preflightManagedWriteTargets(root, homeRel, writePaths); err != nil {
+		return nil, err
+	}
+	if adapter.ID == envregistry.OpenCode {
+		for name := range seeds.xdg {
+			rel, err := managedRelative(root, filepath.Join(plan.parent, name))
+			if err != nil {
+				return nil, err
+			}
+			if _, err := managedPath(root, rel, false); err != nil {
+				return nil, err
+			}
+		}
+	}
+	// The credential store must be established before the first write: an
+	// unknown native selector fails here, not halfway through applyPlan
+	// leaving a markerless partial home behind that the §9.5 inventory
+	// would then refuse to provision over.
 	if provisioned {
 		want := map[string]bool{}
 		for path := range plan.copies {
@@ -2427,13 +2524,13 @@ func checkProfileCollision(home, profile string) error {
 
 // copyLinkFallback materializes a file link as a copy when the platform
 // takes no symlink, recording the manager §5 fallback reason.
-func copyLinkFallback(full, target, path string, plan *homePlan) error {
+func copyLinkFallback(root, fullRel, target, path string, plan *homePlan) error {
 	info, err := os.Stat(target)
 	if err != nil {
 		return fmt.Errorf("link %s: %v", path, err)
 	}
 	if info.IsDir() {
-		if err := copyTree(target, full); err != nil {
+		if err := copyTree(target, root, fullRel); err != nil {
 			return fmt.Errorf("link %s: %v", path, err)
 		}
 	} else {
@@ -2441,7 +2538,7 @@ func copyLinkFallback(full, target, path string, plan *homePlan) error {
 		if err != nil {
 			return fmt.Errorf("link %s: %v", path, err)
 		}
-		if err := os.WriteFile(full, payload, 0o644); err != nil {
+		if err := atomicManagedFile(root, fullRel, payload, 0o644); err != nil {
 			return err
 		}
 	}
@@ -2460,7 +2557,7 @@ func copyLinkFallback(full, target, path string, plan *homePlan) error {
 }
 
 // copyTree copies a directory tree for symlink-fallback copies.
-func copyTree(source, destination string) error {
+func copyTree(source, root, destination string) error {
 	return filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -2469,15 +2566,22 @@ func copyTree(source, destination string) error {
 		if err != nil {
 			return err
 		}
-		out := filepath.Join(destination, rel)
+		outRel := destination
+		if rel != "." {
+			outRel = managedJoin(destination, filepath.ToSlash(rel))
+		}
 		if info.IsDir() {
-			return os.MkdirAll(out, 0o755)
+			_, err := managedDirectory(root, outRel)
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("store tree contains a symlink at %s", path)
 		}
 		payload, err := os.ReadFile(path) // #nosec G304 -- store tree walked from the plan
 		if err != nil {
 			return err
 		}
-		return os.WriteFile(out, payload, info.Mode().Perm())
+		return atomicManagedFile(root, outRel, payload, info.Mode().Perm())
 	})
 }
 
