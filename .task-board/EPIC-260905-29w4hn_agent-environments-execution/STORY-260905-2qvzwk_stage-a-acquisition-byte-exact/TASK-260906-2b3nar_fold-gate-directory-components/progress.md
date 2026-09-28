@@ -134,6 +134,51 @@ Integration preconditions confirmed for accepted CR-TASK-260906-2b3nar revision 
 - Attached `TASK-260906-2b3nar_integration-precheck.md` as outcome. Per the integration binding, `worktree integrate` was not executed and no `handoff`/`set_status` was issued; the runner performs the bound landing from here.
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260923-c9e0ce, pid=17930, exit=0)
+spawn run RUN-260923-c9e0ce failed; operator action required; failure: run_write_boundary_uncleared: runner integrate refused: run_write_boundary_uncleared: delivery of element STORY-260905-2qvzwk is gated on 2 run(s) under warn policy
+  [BLOCKED] run RUN-260923-506d2e verdict=violated terminal=violated: the terminal assessment is violated
+  [BLOCKED] run RUN-260923-ca2c9e verdict=violated terminal=violated: the terminal assessment is violated
+clear a violating run with: task-board spawn write-boundary-clear <RUN-ID> --reason "..."
+board_publication_pending: STORY-260905-2qvzwk is landed and its board state is committed as 6c19e5ee0f8e1fd05d18257b34f3455fe93ab409 on the local trunk, but the publication push did not land (board_publish_local_trunk_unproven); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: 6c19e5ee0f8e1fd05d18257b34f3455fe93ab409
+  cause_code: board_publish_local_trunk_unproven
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: f9e0e7104aafd707d143d18e117406274424d933
+  story_id: STORY-260905-2qvzwk
+  cause: board_publish_local_trunk_unproven: the local trunk holds an unpublished link 6c19e5ee0f8e1fd05d18257b34f3455fe93ab409 that is not this repository's own board-state record (the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key); a stable content digest is never ownership proof — nothing was projected and nothing was pushed
+  link_oid: 6c19e5ee0f8e1fd05d18257b34f3455fe93ab409
+  reason: the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key
+  remedy: land the unproven commits through integrate/reconcile-trunk, not through this command
+run write-boundary clearance for RUN-260922-7c2bdf: Operator review 2026-09-23: every flagged path is board state under .task-board/ (activity streams, journals and element files of other elements) or inside OTHER Stories' managed worktrees under .temp/STORY-*/worktree, written concurrently by the orchestrator's own board mutations and by other tracked runs during this run's lifetime; no source path outside the Story worktree was written.
+run write-boundary clearance for RUN-260923-506d2e: Operator review 2026-09-23: every flagged path is board state under .task-board/ (activity streams, journals and element files of other elements) or inside OTHER Stories' managed worktrees under .temp/STORY-*/worktree, written concurrently by the orchestrator's own board mutations and by other tracked runs during this run's lifetime; no source path outside the Story worktree was written.
+run write-boundary clearance for RUN-260923-c9e0ce: Operator review 2026-09-23: every flagged path is board state under .task-board/ (activity streams, journals and element files of other elements) or inside OTHER Stories' managed worktrees under .temp/STORY-*/worktree, written concurrently by the orchestrator's own board mutations and by other tracked runs during this run's lifetime; no source path outside the Story worktree was written.
+run write-boundary clearance for RUN-260923-ca2c9e: Operator review 2026-09-23: every flagged path is board state under .task-board/ (activity streams, journals and element files of other elements) or inside OTHER Stories' managed worktrees under .temp/STORY-*/worktree, written concurrently by the orchestrator's own board mutations and by other tracked runs during this run's lifetime; no source path outside the Story worktree was written.
+spawn selection rationale tuple: {"role":"developer","pair":"muse-spark-1.3-contributor/xhigh","text":"bound resume of a cleanup_pending integration after write-boundary clearance; muse xhigh full"}
+spawn selection rationale for muse-spark-1.3-contributor/xhigh: bound resume of a cleanup_pending integration after write-boundary clearance; muse xhigh full
+spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn queued: [implementer] developer (muse) (run=RUN-260923-0f5f1d, max_parallel=20)
+spawn run started: [implementer] developer (muse) (run=RUN-260923-0f5f1d)
+spawn run child final message (run=RUN-260923-0f5f1d, tools=4 patches=0 failed=0):
+Integration resume refused — no retry, no handoff, no file changed.
+
+Command (from `/Users/administrator/Developer/ReluxWorks/curator/curator`):
+`task-board worktree integrate STORY-260905-2qvzwk --cr TASK-260906-2b3nar --revision 5 --commit-time "2026-09-23T13:19:51Z"`
+
+Result: refusal, recorded in `.temp/integrate-2b3nar-resume.log`:
+`wrong integration owner for TASK-260906-2b3nar revision 5: run RUN-260923-0f5f1d is developer (implementer) bound to revision 0; required developer (implementer) bound to CR-TASK-260906-2b3nar-5 revision 5`
+
+Local main still holds the prior transaction commits `f9e0e710` (story) and `6c19e5ee` (board state).
+
+Log attached as outcome resource `TASK-260906-2b3nar_integration-resume.md` on TASK-260906-2b3nar.
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260923-0f5f1d, pid=67553, exit=0)
+No Change Request revision was published for TASK-260906-2b3nar (handoff_unsatisfied): the board is not at to-review
+spawn autonomous recovery: run RUN-260923-0f5f1d queued successor RUN-260923-a191d8 (attempt 1/1, model=muse-spark-1.3-contributor): producer run RUN-260923-0f5f1d remains unsatisfied: producer run RUN-260923-0f5f1d published no Change Request and reached no handoff branch while TASK-260906-2b3nar is done: the board is not at to-review
+spawn run started: [implementer] developer (muse) (run=RUN-260923-a191d8)
+spawn run RUN-260923-a191d8 cancelled by operator; operator action required; reason: no operator reason supplied
+spawn run child final message (run=RUN-260923-a191d8): unavailable (no_terminal_record)
+agent completed: [implementer] developer (muse) (exit=143)
+spawn run completed: muse (run=RUN-260923-a191d8, pid=79211, exit=143)
 
 ## Precondition Resources
 - [campaign-producer-rules.md](file://TASK-260906-2b3nar/campaign-producer-rules.md) — Campaign producer/reviewer rules for host e11-1
@@ -145,6 +190,7 @@ spawn run completed: muse (run=RUN-260923-c9e0ce, pid=17930, exit=0)
 - [republish-tree-bound-evidence.md](file://TASK-260906-2b3nar/republish-tree-bound-evidence.md)
 - [identity-review-note.md](file://TASK-260906-2b3nar/identity-review-note.md)
 - [2b3nar-integrate-instruction-5.md](file://TASK-260906-2b3nar/2b3nar-integrate-instruction-5.md)
+- [2b3nar-integrate-resume.md](file://TASK-260906-2b3nar/2b3nar-integrate-resume.md)
 
 ## Outcome Resources
 - [TASK-260906-2b3nar_spawn-log_-implementer--developer--muse-_RUN-260922-5ae498.log](file://TASK-260906-2b3nar/TASK-260906-2b3nar_spawn-log_-implementer--developer--muse-_RUN-260922-5ae498.log) — System spawn log captured by task-board
@@ -175,12 +221,15 @@ spawn run completed: muse (run=RUN-260923-c9e0ce, pid=17930, exit=0)
 - [TASK-260906-2b3nar_review-verdict-rev5.md](file://TASK-260906-2b3nar/TASK-260906-2b3nar_review-verdict-rev5.md) — Rev5 identity review verdict: ACCEPT
 - [TASK-260906-2b3nar_spawn-log_-implementer--developer--muse-_RUN-260923-c9e0ce.log](file://TASK-260906-2b3nar/TASK-260906-2b3nar_spawn-log_-implementer--developer--muse-_RUN-260923-c9e0ce.log) — System spawn log captured by task-board
 - [TASK-260906-2b3nar_integration-precheck.md](file://TASK-260906-2b3nar/TASK-260906-2b3nar_integration-precheck.md) — Integration preconditions + fresh narrow evidence for accepted rev5; integrate not executed per binding
+- [TASK-260906-2b3nar_spawn-log_-implementer--developer--muse-_RUN-260923-0f5f1d.log](file://TASK-260906-2b3nar/TASK-260906-2b3nar_spawn-log_-implementer--developer--muse-_RUN-260923-0f5f1d.log) — System spawn log captured by task-board
+- [TASK-260906-2b3nar_integration-resume.md](file://TASK-260906-2b3nar/TASK-260906-2b3nar_integration-resume.md) — Resume integrate rev5 refusal log
+- [TASK-260906-2b3nar_spawn-log_-implementer--developer--muse-_RUN-260923-a191d8.log](file://TASK-260906-2b3nar/TASK-260906-2b3nar_spawn-log_-implementer--developer--muse-_RUN-260923-a191d8.log) — System spawn log captured by task-board
 
 ## Created
 2026-09-05T23:12:15Z
 
 ## Last Update
-2026-09-23T13:19:51Z
+2026-09-23T14:01:45Z
 
 ## Assigned To
 [implementer] developer (muse)
