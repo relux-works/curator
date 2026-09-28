@@ -9,6 +9,7 @@ import (
 
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextresolve"
+	"github.com/relux-works/curator/internal/pathboundary"
 )
 
 func itoa(n int) string { return strconv.Itoa(n) }
@@ -173,6 +174,9 @@ func writeManifestPackage(t *testing.T, root, manifest string, modules map[strin
 		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
 			t.Fatal(err)
 		}
+	}
+	if err := pathboundary.ProtectTree(root); err != nil {
+		t.Fatalf("protect path package fixture: %v", err)
 	}
 }
 

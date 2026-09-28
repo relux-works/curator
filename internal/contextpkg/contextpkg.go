@@ -433,6 +433,25 @@ func LoadMCP(root string) (*MCPManifest, error) {
 	return ParseMCP(payload)
 }
 
+// LoadMCPIfPresent reads an optional declaration from a path-kind context
+// package. Absence means the context package carries no MCP declaration;
+// unreadable or malformed bytes remain errors.
+func LoadMCPIfPresent(root string) (*MCPManifest, bool, error) {
+	path := filepath.Join(root, MCPManifestName)
+	file, err := stateread.ReadFile(path) // #nosec G304 -- operator-selected package root
+	if err != nil {
+		return nil, false, err
+	}
+	if file.Kind == stateread.KindAbsent {
+		return nil, false, nil
+	}
+	manifest, err := ParseMCP(file.Bytes)
+	if err != nil {
+		return nil, true, err
+	}
+	return manifest, true, nil
+}
+
 // ParseMCP validates agent-mcp.json bytes.
 func ParseMCP(payload []byte) (*MCPManifest, error) {
 	object, err := decodeObject(payload, DiagMCPInvalid, MCPManifestName)

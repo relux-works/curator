@@ -260,6 +260,9 @@ type homePlan struct {
 // store entries it names, and machine configuration: no read of the home
 // itself beyond the fallback and merge inputs the caller supplies.
 func assembleHome(req *ResolveRequest, source Source, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, order []contextlock.Member, adapter envregistry.Adapter, prior *envmarker.Marker) (*homePlan, error) {
+	if err := validateProfilePathSources(req.Profile, source, req.Policy); err != nil {
+		return nil, err
+	}
 	manager := newGitManager(req.Home)
 	packages, err := loadMaterial(req.Home, manager, lock)
 	if err != nil {
@@ -2302,6 +2305,9 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := validateProfilePathSources(profile, source, req.Policy); err != nil {
+		return nil, err
+	}
 	verdict := verifyHome(&req, adapter, source, lock, hash)
 	if verdict.markerReadFailed {
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envmarker.DiagMarkerUnreadable, strings.Join(verdict.reasons, "; "))
@@ -2338,6 +2344,9 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 		return nil, err
 	}
 	defer func() { _ = op.close() }()
+	if err := validateProfilePathSources(req.Profile, source, req.Policy); err != nil {
+		return nil, err
+	}
 	verdict := verifyHome(req, adapter, source, lock, hash)
 	if verdict.markerReadFailed {
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envmarker.DiagMarkerUnreadable, strings.Join(verdict.reasons, "; "))

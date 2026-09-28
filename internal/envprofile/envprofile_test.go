@@ -14,6 +14,7 @@ import (
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/managerlock"
+	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/transaction"
 )
 
@@ -32,6 +33,9 @@ func writePackage(t *testing.T, root, name, version, module string) {
 	}
 	if err := os.WriteFile(filepath.Join(root, "context", "a.md"), []byte(module), 0o644); err != nil {
 		t.Fatal(err)
+	}
+	if err := pathboundary.ProtectTree(root); err != nil {
+		t.Fatalf("protect path package fixture: %v", err)
 	}
 }
 
@@ -406,6 +410,9 @@ func TestInstallSurfacesSystemModuleWarning(t *testing.T) {
 	}
 	if err := os.WriteFile(filepath.Join(source, "context", "s.md"), []byte("system\n"), 0o644); err != nil {
 		t.Fatal(err)
+	}
+	if err := pathboundary.ProtectTree(source); err != nil {
+		t.Fatalf("protect path package fixture: %v", err)
 	}
 	info, _, _, err := Install(home, InstallOptions{Operand: source})
 	if err != nil {

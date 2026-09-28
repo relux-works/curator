@@ -10,6 +10,7 @@ import (
 
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/envmarker"
+	"github.com/relux-works/curator/internal/pathboundary"
 )
 
 // These tests drive the production run() entry point for the profile rows.
@@ -41,6 +42,9 @@ func writeContextPackage(t *testing.T, root, name, version, module string) {
 	}
 	if err := os.WriteFile(filepath.Join(root, "context", "a.md"), []byte(module), 0o644); err != nil {
 		t.Fatal(err)
+	}
+	if err := pathboundary.ProtectTree(root); err != nil {
+		t.Fatalf("protect path package fixture: %v", err)
 	}
 }
 
@@ -237,6 +241,23 @@ func TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable(t *testing
 	}
 }
 
+// TestProfileInstallRefusesPathMCPDeclarationThroughCLI drives the rc.13
+// path-kind MCP refusal through the production profile install command.
+func TestProfileInstallRefusesPathMCPDeclarationThroughCLI(t *testing.T) {
+	source, _ := profileHome(t)
+	root := t.TempDir()
+	writeContextPackage(t, root, "acme", "1.0.0", "hello\n")
+	mcp := `{"schema_version":1,"name":"figma-devmode","version":"1.2.0","server":{"transport":"stdio","command":"npx","args":["-y","figma-developer-mcp","--stdio"],"env_names":[]}}` + "\n"
+	if err := os.WriteFile(filepath.Join(root, "agent-mcp.json"), []byte(mcp), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, _, stderr := runProfile(t, source, "profile", "install", root)
+	if code != exitFail || !strings.Contains(stderr, "mcp_declaration_path_source_refused") ||
+		!strings.Contains(stderr, `package "acme"`) || !strings.Contains(stderr, `declaration "figma-devmode"`) {
+		t.Fatalf("profile install = %d, stderr %q; want the rc.13 refusal naming the package and declaration", code, stderr)
+	}
+}
+
 // TestProfileUseUnknownIsAFailure narrows the lookup gate: switching to a
 // profile that is not installed fails with exit 1, never success.
 func TestProfileUseUnknownIsAFailure(t *testing.T) {
@@ -399,6 +420,9 @@ func TestProfileInstallWarnsOnSystemModule(t *testing.T) {
 	}
 	if err := os.WriteFile(filepath.Join(pkg, "context", "s.md"), []byte("system\n"), 0o644); err != nil {
 		t.Fatal(err)
+	}
+	if err := pathboundary.ProtectTree(pkg); err != nil {
+		t.Fatalf("protect path package fixture: %v", err)
 	}
 	code, _, stderr := runProfile(t, source, "profile", "install", pkg)
 	if code != exitOK {

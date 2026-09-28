@@ -58,9 +58,15 @@ func resolveOverlay(home string, manager *gitManager, decl OverlaySpec) (context
 		if decl.Range != "" || decl.Tag != "" || decl.Revision != "" || decl.Directory != "" {
 			return contextresolve.Overlay{}, fmt.Errorf("%s: a path overlay carries no range, tag, revision, or directory", DiagSourceInvalid)
 		}
+		if err := validatePathPackageDirectory(decl.Source); err != nil {
+			return contextresolve.Overlay{}, err
+		}
 		manifest, err := contextpkg.LoadManifest(decl.Source)
 		if err != nil {
 			return contextresolve.Overlay{}, pathManifestDiag(decl.Source, err)
+		}
+		if err := refusePathMCPDeclaration(decl.Source, manifest.Name); err != nil {
+			return contextresolve.Overlay{}, err
 		}
 		state, err := stateForPath(home, manifest.Name, decl.Source)
 		if err != nil {

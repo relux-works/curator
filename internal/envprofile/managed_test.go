@@ -14,6 +14,7 @@ import (
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/managerlock"
+	"github.com/relux-works/curator/internal/pathboundary"
 )
 
 // managedFixture installs a hand-built profile: a context root with a
@@ -64,11 +65,22 @@ func writeManagedFixture(t *testing.T, profile string) *managedFixture {
 		t.Fatal(err)
 	}
 	fx.lockHash = hash
-	source := `{"kind": "path", "path": "/tmp/` + profile + "-source" + "\"}\n"
+	sourceDir := filepath.Join(t.TempDir(), profile+"-source")
+	if err := os.Mkdir(sourceDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := pathboundary.ProtectTree(sourceDir); err != nil {
+		t.Fatalf("protect path source fixture: %v", err)
+	}
+	source, err := json.Marshal(Source{Kind: KindPath, Path: sourceDir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	source = append(source, '\n')
 	if err := os.MkdirAll(ProfileDir(home, profile), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(sourcePath(home, profile), []byte(source), 0o644); err != nil {
+	if err := os.WriteFile(sourcePath(home, profile), source, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := SetCurrent(home, profile); err != nil {

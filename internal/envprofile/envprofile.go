@@ -663,9 +663,6 @@ func Install(home string, options InstallOptions) (Info, bool, bool, error) {
 
 // installLocked installs under the held operation lock.
 func installLocked(op *operation, home string, options InstallOptions) (Info, bool, bool, error) {
-	if err := ensureDefault(op, home, options.Policy); err != nil {
-		return Info{}, false, false, err
-	}
 	kind := installOperandKind(options.Operand)
 	if kind == identity.SourceInvalid {
 		return Info{}, false, false, sourceKindRefusal("operand", options.Operand)
@@ -683,6 +680,37 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 	if !isPath && forms > 1 {
 		return Info{}, false, false, fmt.Errorf("%s: at most one of --range, --tag, --revision", DiagRefConflict)
 	}
+	pathProfile := ""
+	if isPath {
+		if err := validatePathPackageDirectory(options.Operand); err != nil {
+			return Info{}, false, false, err
+		}
+		manifest, err := contextpkg.LoadManifest(options.Operand)
+		if err != nil {
+			return Info{}, false, false, pathManifestDiag(options.Operand, err)
+		}
+		if err := refusePathMCPDeclaration(options.Operand, manifest.Name); err != nil {
+			return Info{}, false, false, err
+		}
+		pathProfile = options.As
+		if pathProfile == "" {
+			pathProfile = manifest.Name
+		}
+		if !validProfileName(pathProfile) {
+			return Info{}, false, false, fmt.Errorf("%s: profile name %q is not a portable identifier", DiagSourceInvalid, pathProfile)
+		}
+		if err := preflightPathOverlayDeclarations(pathProfile, options.Policy); err != nil {
+			return Info{}, false, false, err
+		}
+	}
+	if pathProfile != DefaultProfile {
+		if err := preflightPathOverlayDeclarations(DefaultProfile, options.Policy); err != nil {
+			return Info{}, false, false, err
+		}
+	}
+	if err := ensureDefault(op, home, options.Policy); err != nil {
+		return Info{}, false, false, err
+	}
 	var (
 		source  Source
 		input   contextresolve.Input
@@ -690,9 +718,15 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 		name    string
 	)
 	if isPath {
+		if err := validatePathPackageDirectory(options.Operand); err != nil {
+			return Info{}, false, false, err
+		}
 		manifest, err := contextpkg.LoadManifest(options.Operand)
 		if err != nil {
 			return Info{}, false, false, pathManifestDiag(options.Operand, err)
+		}
+		if err := refusePathMCPDeclaration(options.Operand, manifest.Name); err != nil {
+			return Info{}, false, false, err
 		}
 		name = options.As
 		if name == "" {
@@ -1099,6 +1133,16 @@ func updateLocked(op *operation, home, name string, policy Policy, sink, warning
 	if readRegularFile == nil {
 		readRegularFile = stateread.ReadRegularFile
 	}
+	defaultProfile := name == DefaultProfile
+	if defaultProfile {
+		// Preserve the builtin profile's established refusal ordering. The
+		// default profile is local and has no source record until created;
+		// ensure it before reading source.json so update reports
+		// profile_update_blocked rather than profile_not_found.
+		if err := ensureDefault(op, home, policy); err != nil {
+			return Info{}, false, err
+		}
+	}
 	source, err := readSource(home, name)
 	if err != nil {
 		if name == DefaultProfile && isStateAbsent(err) {
@@ -1109,6 +1153,11 @@ func updateLocked(op *operation, home, name string, policy Policy, sink, warning
 		}
 		return Info{}, false, err
 	}
+	if !defaultProfile {
+		if err := validateProfilePathSources(name, source, policy); err != nil {
+			return Info{}, false, err
+		}
+	}
 	oldLock, oldHash, err := readLockWith(home, name, readRegularFile)
 	if err != nil {
 		return Info{}, false, err
@@ -1116,8 +1165,10 @@ func updateLocked(op *operation, home, name string, policy Policy, sink, warning
 	// Establish that the named profile's recorded evidence is readable before
 	// ensureDefault can publish any state. An unreadable lock makes update
 	// read-only: no other profile or generation is created as a side effect.
-	if err := ensureDefault(op, home, policy); err != nil {
-		return Info{}, false, err
+	if !defaultProfile {
+		if err := ensureDefault(op, home, policy); err != nil {
+			return Info{}, false, err
+		}
 	}
 	rootMember, hasRootMember := oldLock.RootMember()
 	if source.Kind == KindPath && (!hasRootMember || rootMember.StateHash == "") {
@@ -1137,13 +1188,12 @@ func updateLocked(op *operation, home, name string, policy Policy, sink, warning
 	case KindPath:
 		// Environments §1: installation copies the directory tree into
 		// the profile store as an immutable snapshot and never reads
-		// the source directory again. Update resolves the root from
+		// its bytes from the source directory again. The §4 boundary
+		// check above inspects metadata only. Update resolves the root from
 		// the snapshot the store already holds under the old lock's
-		// state_sha256 pin — never from source.Path, which may have
-		// been edited or deleted (the §9.6 import deletes its staging
-		// directory, so every imported profile's source.Path names no
-		// existing entry). Overlays re-resolve below the switch, so a
-		// path root with git overlays still moves on update.
+		// state_sha256 pin — never from source.Path; the path is inspected
+		// only for its protected boundary. Overlays re-resolve below the
+		// switch, so a path root with Git overlays still moves on update.
 		entry := contextstore.EntryDir(home, contextlock.KindContext, oldLock.Root, rootMember.StateHash)
 		manifest, err := contextpkg.LoadManifest(entry)
 		if err != nil {

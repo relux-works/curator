@@ -6,8 +6,10 @@ package envprofile
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,6 +22,7 @@ import (
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/stateread"
 )
 
@@ -160,7 +163,15 @@ func importLocked(op *operation, home string, options ImportOptions) (Info, bool
 	if err != nil {
 		return Info{}, false, false, err
 	}
-	defer func() { _ = os.RemoveAll(stage) }()
+	defer func() {
+		// The imported path root remains the source named by the profile.
+		// Remove an unreferenced reassembly after a failed install, but do
+		// not leave a persisted source pointing at deleted bytes.
+		source, sourceErr := readSource(home, name)
+		if sourceErr != nil || source.Path != stage {
+			_ = os.RemoveAll(stage)
+		}
+	}()
 	installOptions := InstallOptions{
 		Operand: stage, As: name, Use: options.Use,
 		Policy: options.Policy, Imported: true,
@@ -499,17 +510,31 @@ func normalizeImportText(data []byte) []byte {
 	return []byte(strings.TrimRight(text, "\n") + "\n")
 }
 
-// reassembleImport assembles the context-package-shaped directory inside
-// the machine home: agent-context.json (schema_version 1, version 1.0.0,
+// reassembleImport assembles the context-package-shaped directory below
+// the protected imports directory: agent-context.json (schema_version 1, version 1.0.0,
 // weight 0, no weights), one normalized module per detected root-context
 // file in ascending environment-identifier order, and one requires.skills
 // entry per mapping entry pinned by revision. An import with no detected
-// root-context file emits no context member.
+// root-context file emits no context member. The directory is durable because
+// an imported path root is verified at every resolve (§§4, 9.6).
 func reassembleImport(home, name string, roots []detectedRoot, skills []detectedSkill) (string, error) {
-	stage, err := os.MkdirTemp(home, ".import-*")
+	importsDir := filepath.Join(home, "imports")
+	if err := ensureImportSourceRoot(importsDir); err != nil {
+		return "", err
+	}
+	final := filepath.Join(importsDir, name)
+	metadata, err := stateread.Lstat(final)
+	if err != nil {
+		return "", fmt.Errorf("%s: inspect import source %q: %w", DiagPathSourceUntrusted, final, err)
+	}
+	if metadata.Kind != stateread.KindAbsent {
+		return "", fmt.Errorf("%s: import source path %q already exists", DiagPathSourceUntrusted, final)
+	}
+	stage, err := os.MkdirTemp(importsDir, ".import-*")
 	if err != nil {
 		return "", err
 	}
+	defer func() { _ = os.RemoveAll(stage) }()
 	manifest := map[string]any{
 		"schema_version": 1,
 		"name":           name,
@@ -536,25 +561,62 @@ func reassembleImport(home, name string, roots []detectedRoot, skills []detected
 	}
 	payload, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
-		_ = os.RemoveAll(stage)
 		return "", err
 	}
 	if err := os.WriteFile(filepath.Join(stage, "agent-context.json"), append(payload, '\n'), 0o644); err != nil {
-		_ = os.RemoveAll(stage)
 		return "", err
 	}
 	if len(roots) > 0 {
 		contextDir := filepath.Join(stage, "context")
 		if err := os.MkdirAll(contextDir, 0o755); err != nil {
-			_ = os.RemoveAll(stage)
 			return "", err
 		}
 		for _, root := range roots {
 			if err := os.WriteFile(filepath.Join(contextDir, root.envID+".md"), normalizeImportText(root.data), 0o644); err != nil {
-				_ = os.RemoveAll(stage)
 				return "", err
 			}
 		}
 	}
-	return stage, nil
+	if err := pathboundary.ProtectTree(stage); err != nil {
+		return "", fmt.Errorf("%s: cannot protect imported source %q: %w", DiagPathSourceUntrusted, stage, err)
+	}
+	if err := os.Rename(stage, final); err != nil {
+		return "", err
+	}
+	if err := pathboundary.Validate(final); err != nil {
+		_ = os.RemoveAll(final)
+		return "", fmt.Errorf("%s: imported source %q failed its boundary check: %w", DiagPathSourceUntrusted, final, err)
+	}
+	return final, nil
+}
+
+func ensureImportSourceRoot(path string) error {
+	metadata, err := stateread.Lstat(path)
+	if err != nil {
+		return fmt.Errorf("%s: inspect imports directory %q: %w", DiagPathSourceUntrusted, path, err)
+	}
+	if metadata.Kind == stateread.KindAbsent {
+		created := false
+		if err := os.Mkdir(path, 0o700); err == nil {
+			created = true
+		} else if !errors.Is(err, fs.ErrExist) {
+			return fmt.Errorf("create imports directory %q: %w", path, err)
+		}
+		if created {
+			if err := pathboundary.ProtectTree(path); err != nil {
+				return fmt.Errorf("%s: cannot protect imports directory %q: %w", DiagPathSourceUntrusted, path, err)
+			}
+		}
+		metadata, err = stateread.Lstat(path)
+		if err != nil {
+			return fmt.Errorf("%s: inspect imports directory %q: %w", DiagPathSourceUntrusted, path, err)
+		}
+	}
+	if metadata.Kind != stateread.KindPresent {
+		return fmt.Errorf("%s: imports directory %q is not present", DiagPathSourceUntrusted, path)
+	}
+	if err := pathboundary.ValidateRoot(path); err != nil {
+		return fmt.Errorf("%s: imports directory %q failed its boundary check: %w", DiagPathSourceUntrusted, path, err)
+	}
+	return nil
 }

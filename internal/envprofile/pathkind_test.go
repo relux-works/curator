@@ -94,9 +94,9 @@ func TestNestedGitIsSourceInvalid(t *testing.T) {
 	}
 }
 
-// TestSymlinkInPathIsSourceInvalid drives Install with a symbolic link in
-// the source tree: the snapshot discipline is profile_source_invalid.
-func TestSymlinkInPathIsSourceInvalid(t *testing.T) {
+// TestSymlinkInPathIsUntrusted drives Install with a symbolic link in the
+// source tree: the section 4 source-boundary refusal is environment_store_untrusted.
+func TestSymlinkInPathIsUntrusted(t *testing.T) {
 	home := t.TempDir()
 	pinHomes(t)
 	source := filepath.Join(t.TempDir(), "source")
@@ -109,8 +109,8 @@ func TestSymlinkInPathIsSourceInvalid(t *testing.T) {
 		t.Skipf("this host cannot create symlinks: %v", err)
 	}
 	_, _, _, err := Install(home, InstallOptions{Operand: source})
-	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) {
-		t.Fatalf("err = %v, want %s", err, DiagSourceInvalid)
+	if err == nil || !strings.Contains(err.Error(), DiagPathSourceUntrusted) || !strings.Contains(err.Error(), "link_safety") {
+		t.Fatalf("err = %v, want %s with link_safety", err, DiagPathSourceUntrusted)
 	}
 }
 
@@ -310,13 +310,12 @@ func TestPathSnapshotImmutableAcrossUpdateSyncUse(t *testing.T) {
 	}
 }
 
-// TestPathUpdateAllSucceedsWithImportedProfile drives Import (which deletes
-// its §9.6 staging directory, so the recorded source.Path names no existing
-// entry) followed by the per-profile update loop the `profile update --all`
-// row runs: ListWithPolicy skipping default, UpdateWithPolicy each.
-// Production entry points: Import, ListWithPolicy, UpdateWithPolicy. Before
-// the §1 fix, the update re-read source.Path and failed the whole machine
-// with profile_source_path_missing.
+// TestPathUpdateAllSucceedsWithImportedProfile drives Import followed by the
+// per-profile update loop the `profile update --all` row runs:
+// ListWithPolicy skipping default, UpdateWithPolicy each. The imported path
+// source remains in the manager's imports directory so its §4 boundary can be
+// checked on every resolve and mutating profile operation.
+// Production entry points: Import, ListWithPolicy, UpdateWithPolicy.
 func TestPathUpdateAllSucceedsWithImportedProfile(t *testing.T) {
 	home := t.TempDir()
 	pinHomes(t)
@@ -331,8 +330,12 @@ func TestPathUpdateAllSucceedsWithImportedProfile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(source.Path); !os.IsNotExist(err) {
-		t.Fatalf("import staging %q still exists: the test does not exercise the deleted-source shape", source.Path)
+	wantSource := filepath.Join(home, "imports", info.Name)
+	if source.Path != wantSource {
+		t.Fatalf("import source %q, want durable path %q", source.Path, wantSource)
+	}
+	if info, err := os.Stat(source.Path); err != nil || !info.IsDir() {
+		t.Fatalf("durable imported source %q is unavailable: info=%v err=%v", source.Path, info, err)
 	}
 	profiles, err := ListWithPolicy(home, Policy{})
 	if err != nil {

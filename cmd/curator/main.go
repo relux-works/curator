@@ -26,6 +26,7 @@ import (
 	"github.com/relux-works/curator/internal/closure"
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/devsub"
+	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/gitcred"
 	"github.com/relux-works/curator/internal/gitignore"
 	"github.com/relux-works/curator/internal/gitops"
@@ -2144,7 +2145,7 @@ func (c cli) cmdGC() int {
 		_, _ = fmt.Fprintln(c.stderr, "curator: acquire the manager-home lock:", err)
 		return exitFail
 	}
-	result, err := collectUnderLock(home, lock)
+	result, err := collectUnderLock(home, lock, envprofile.PolicyFromConfig(cfg))
 	if closeErr := lock.Close(); closeErr != nil && err == nil {
 		err = fmt.Errorf("release the manager-home lock: %w", closeErr)
 	}
@@ -2167,7 +2168,10 @@ func (c cli) cmdGC() int {
 	return exitOK
 }
 
-func collectUnderLock(home string, lock *managerlock.HomeLock) (scopes.MaintenanceResult, error) {
+func collectUnderLock(home string, lock *managerlock.HomeLock, policy envprofile.Policy) (scopes.MaintenanceResult, error) {
+	if err := envprofile.PreflightCurrentPathSources(home, policy); err != nil {
+		return scopes.MaintenanceResult{}, err
+	}
 	engine, err := transaction.New(home)
 	if err != nil {
 		return scopes.MaintenanceResult{}, fmt.Errorf("open the install transaction journal: %w", err)

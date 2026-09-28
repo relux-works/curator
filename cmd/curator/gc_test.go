@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/marker"
@@ -87,6 +88,33 @@ func TestGCPrunesDeadConsumersUnderTheHomeLock(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(home, "runtime", "skill-x")); err == nil {
 		t.Fatal("unreferenced runtime entry survived gc")
+	}
+}
+
+func TestGCFailsClosedForUntrustedCurrentPathSource(t *testing.T) {
+	source, home := profileHome(t)
+	packageRoot := t.TempDir()
+	writeContextPackage(t, packageRoot, "gc-path-source", "1.0.0", "context\n")
+	if code, _, stderr := runProfile(t, source, "profile", "install", packageRoot); code != exitOK {
+		t.Fatalf("path profile install = %d\nstderr:\n%s", code, stderr)
+	}
+	if code, _, stderr := runProfile(t, source, "profile", "use", "gc-path-source"); code != exitOK {
+		t.Fatalf("use path profile = %d\nstderr:\n%s", code, stderr)
+	}
+	if err := os.RemoveAll(packageRoot); err != nil {
+		t.Fatal(err)
+	}
+	dead := filepath.Join(t.TempDir(), "gone")
+	if err := scopes.RecordConsumer(home, dead); err != nil {
+		t.Fatal(err)
+	}
+
+	code, _, stderr := runProfile(t, source, "gc")
+	if code != exitFail || !strings.Contains(stderr, "environment_store_untrusted") || !strings.Contains(stderr, "regular_types") {
+		t.Fatalf("gc = %d\nstderr:\n%s\nwanted environment_store_untrusted naming regular_types", code, stderr)
+	}
+	if consumers := mustLoadConsumers(t, home); len(consumers) != 1 || consumers[0] != dead {
+		t.Fatalf("gc pruned consumers before refusing the untrusted path source: %v", consumers)
 	}
 }
 
@@ -196,7 +224,7 @@ func runGC(t *testing.T, home string) int {
 		t.Error(err)
 		return exitFail
 	}
-	_, collectErr := collectUnderLock(home, lock)
+	_, collectErr := collectUnderLock(home, lock, envprofile.Policy{})
 	closeErr := lock.Close()
 	if collectErr != nil || closeErr != nil {
 		t.Errorf("collect = %v, close = %v", collectErr, closeErr)

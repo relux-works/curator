@@ -166,6 +166,22 @@ func UseWithPolicy(home, name, environment, target string, clearScope bool, poli
 
 // useLocked switches under the held operation lock.
 func useLocked(op *operation, home, name, environment, target string, clearScope bool, policy Policy) ([]EntryResult, error) {
+	profileToValidate := name
+	if clearScope {
+		current, err := Current(home)
+		if err != nil {
+			return nil, err
+		}
+		profileToValidate = current
+		if profileToValidate == "" {
+			profileToValidate = DefaultProfile
+		}
+	}
+	if profileToValidate != "" {
+		if err := preflightProfilePathSources(home, profileToValidate, policy); err != nil {
+			return nil, err
+		}
+	}
 	if err := ensureDefault(op, home, policy); err != nil {
 		return nil, err
 	}
@@ -353,6 +369,9 @@ func SyncWithPolicy(home string, policy Policy) ([]EntryResult, error) {
 		return nil, err
 	}
 	defer func() { _ = op.close() }()
+	if err := preflightCurrentPathSources(home, policy); err != nil {
+		return nil, err
+	}
 	if err := ensureDefault(op, home, policy); err != nil {
 		return nil, err
 	}
@@ -405,6 +424,9 @@ func materializeScope(home, profile, environment string, policy Policy) ([]Entry
 	}
 	source, err := readSource(home, profile)
 	if err != nil {
+		return nil, err
+	}
+	if err := validateProfilePathSources(profile, source, policy); err != nil {
 		return nil, err
 	}
 	var adapters []Adapter

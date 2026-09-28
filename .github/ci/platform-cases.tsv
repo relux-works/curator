@@ -512,6 +512,7 @@ internal/hashing	TestCrossCheckTree	-	linux,darwin,windows	opt-in	cross-implemen
 # Stage (c): composition, the path kind, onboarding takeover, and import rows.
 # Hermetic fixtures only: every row is required on all three runners.
 internal/config	TestPathOverlayDeclarationParses	linux,darwin,windows	-	-	a path overlay parses with no requirement form at all, in every path spelling the landed discriminator admits (absolute, relative, colon-in-a-later-segment, and all four Windows drive spellings)
+internal/envprofile	TestResolveRejectsGroupWritableOnlyPathOverlay	linux,darwin	windows	platform-control	resolve refuses a path overlay with only the group-write permission bit set
 internal/envprofile	TestPathOverlayJoinsClosure	linux,darwin,windows	-	-	a form-free path overlay joins the closure flagged overlay at the machine default weight and survives update
 internal/envprofile	TestPathOverlayFormIsSourceInvalid	linux,darwin,windows	-	-	a range, tag, revision, or directory on a path overlay is profile_source_invalid at resolution
 internal/config	TestGitOverlayDeclarationParses	linux,darwin,windows	-	-	a git overlay parses with exactly one requirement form in every git spelling the landed discriminator admits, and is refused with none
@@ -542,7 +543,7 @@ internal/envprofile	TestMissingPathOperandIsPathMissing	linux,darwin,windows	-	-
 internal/envprofile	TestMissingOverlayPathIsPathMissing	linux,darwin,windows	-	-	an absent overlay source fails with the absence diagnostic
 internal/envprofile	TestNonDirectoryPathIsSourceInvalid	linux,darwin,windows	-	-	a path operand naming a non-directory is profile_source_invalid
 internal/envprofile	TestNestedGitIsSourceInvalid	linux,darwin,windows	-	-	a .git entry below the source root is profile_source_invalid
-internal/envprofile	TestSymlinkInPathIsSourceInvalid	linux,darwin	windows	host-capability	a link in the source tree is profile_source_invalid
+internal/envprofile	TestSymlinkInPathIsUntrusted	linux,darwin	windows	host-capability	a link in the source tree is environment_store_untrusted naming link_safety
 internal/envprofile	TestFoldedPathsAreSourceInvalid	linux	darwin,windows	host-capability	two entries folding to one platform path are profile_source_invalid; case-folding hosts skip under the classified host-capability reason
 internal/envprofile	TestRootGitExcluded	linux,darwin,windows	-	-	a root-level .git entry is excluded from the immutable snapshot
 internal/envprofile	TestUnreadablePathIsUnreadable	linux,darwin	windows	host-capability	an unreadable source reports profile_source_path_unreadable leading, never absence and never wrapped invalid
@@ -762,4 +763,10 @@ internal/stateread	TestReadsDistinguishAbsentFromBlockedParent	linux,darwin,wind
 internal/scriptworker	TestLoadShimSidecarRefusesUnreadablePath	linux,darwin,windows	-	-	loading an enforced sidecar below a regular-file ancestor refuses with manager_state_unreadable
 cmd/curator	TestEnforcedShimDispatchRefusesUnreadableSidecar	linux,darwin,windows	-	-	main executable dispatch refuses unreadable sidecar state instead of falling through to ordinary CLI dispatch
 internal/runtimestore	TestManagedEnforcedShimsInRefusesUnreadableInventory	linux,darwin,windows	-	-	shim inventory listing below a regular-file ancestor is a typed read failure rather than an absent bin
+internal/envprofile	TestPathKindMCPVectorsDriveInstallEntry	linux,darwin,windows	-	-	all five rc.13 MCP path-kind vectors reach Install, refusing root, overlay, onboarding-import, and the admitted mutant while preserving Git admission
+internal/envprofile	TestPathKindBoundaryVectorsDriveProductionEntries	linux,darwin,windows	-	-	all fourteen rc.13 path-boundary vectors reach Install, Import, Resolve, Update, or Status; any host-bound row is named in the tally
+internal/envprofile	TestPathKindDryRunVectorsDriveReadOnlyResolve	linux,darwin,windows	-	-	all three rc.13 path-overlay read-only resolve vectors prove no fragment, no rebuild and byte-identical source and manager state
+internal/envprofile	TestPathOverlayBoundaryRejectsEscapingAndInternalLinks	linux,darwin,windows	linux,darwin,windows	host-capability	Install refuses an escaping symbolic link as containment and an in-tree symbolic link as link_safety when the host can create links
+internal/envprofile	TestPathOverlayFailureBlocksResolveAndMakesStatusNonCurrent	linux,darwin,windows	-	-	Resolve emits no fragment and Status reports non-current after a real world-writable mode or DACL mutation of the path directory
+cmd/curator	TestGCFailsClosedForUntrustedCurrentPathSource	linux,darwin,windows	-	-	GC validates the current path source before transaction recovery or consumer pruning
 internal/install	TestLockedNetworkRepositoryDistinguishesAbsentAndUnreadableCheckouts	linux,darwin,windows	-	-	proven checkout absence falls back while blocked or present-unusable locked repositories fail closed

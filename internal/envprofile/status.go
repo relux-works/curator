@@ -600,6 +600,10 @@ func homeState(req StatusRequest, profile string, adapter envregistry.Adapter) H
 		state.Findings = append(state.Findings, err.Error())
 		return state
 	}
+	if err := validateProfilePathSources(profile, source, req.Policy); err != nil {
+		state.Findings = append(state.Findings, err.Error())
+		return state
+	}
 	state.LockHash = hash
 	if req.readStateDirectory == nil {
 		state.Backups, state.BackupsOldest, state.BackupsNewest, err = backupAges(state.Home)
