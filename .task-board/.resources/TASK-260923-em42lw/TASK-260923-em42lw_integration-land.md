@@ -1,25 +1,11 @@
-# TASK-260923-em42lw bound integration run (RUN-260926-6db7c3) - landing preconditions
-
-Date (UTC): 2026-09-26
-Role binding: developer (implementer). Board left at integrating; no status change, no handoff, no file change this run.
-
-## Preconditions confirmed (read-only)
-- Task status: integrating (verified via get query, exit 0).
-- CR-TASK-260923-em42lw-10: accepted (activity event seq 193, ready to accepted, recorded 2026-09-26T18:26:22Z).
-- Worktree branch: task-board/story/STORY-260923-1lu2o3.
-- Worktree HEAD: f02ba39e (trunk convergence base from rev10 note).
-- Working tree: uncommitted producer delta present (19 dirty entries: 17 modified + 2 untracked per git status porcelain); no commit made this run.
-- Instruction files present on board: em42lw-review-rev10-note.md (carry-forward) and em42lw-integrate-land.md (precondition type).
-
-## Integrate command NOT executed
-- The attached em42lw-integrate-land.md instructs running: task-board worktree integrate STORY-260923-1lu2o3 --cr TASK-260923-em42lw --revision 10.
-- The bound Integration Assignment for this run explicitly prohibits executing or detaching worktree checkpoint / worktree integrate and states the runner performs the bound landing synchronously after this run. It also supersedes generic FIRST/LAST status and handoff instructions.
-- Therefore no integrate log exists to attach. No refusal from the integrate command was observed because it was not invoked. The orchestrator/runner delivers the landing.
-- No board writes were made before or during verification; this add_resource outcome is the single fresh task-scoped artifact from this run.
-
-## Verification performed vs accepted
-- Reran myself (read-only, exit 0 each): git status porcelain, git rev-parse HEAD/BRANCH, git diff stat, board get/activity queries.
-- Accepted from already-attached evidence (not rerun): rev10 focused gates and patch-identity verification recorded in TASK-260923-em42lw_results.md and review-verdict-rev10.md. No test or build command was run this turn in order to honor Change no file and bounded headless-run constraints.
-
-## Handoff
-- Ready for review handoff by the runner via the bound landing transaction. Work left uncommitted in the story worktree as required.
+board_publication_pending: STORY-260923-1lu2o3 is landed and its board state is committed as 0be1c20e41bb3d9aec268aeea358a53eed7ff79c on the local trunk, but the publication push did not land (board_publish_local_trunk_unproven); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: 0be1c20e41bb3d9aec268aeea358a53eed7ff79c
+  cause_code: board_publish_local_trunk_unproven
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: 1a57c71cb5545ff2561c8f2e8956e0387191a369
+  story_id: STORY-260923-1lu2o3
+  cause: board_publish_local_trunk_unproven: the local trunk holds an unpublished link 0be1c20e41bb3d9aec268aeea358a53eed7ff79c that is not this repository's own board-state record (the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key); a stable content digest is never ownership proof — nothing was projected and nothing was pushed
+  link_oid: 0be1c20e41bb3d9aec268aeea358a53eed7ff79c
+  reason: the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key
+  remedy: land the unproven commits through integrate/reconcile-trunk, not through this command

@@ -209,6 +209,15 @@ spawn selection rationale for muse-spark-1.3-contributor/xhigh: bound em42lw-lan
 spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
 spawn queued: [implementer] developer (muse) (run=RUN-260926-443a01, max_parallel=20)
 spawn run started: [implementer] developer (muse) (run=RUN-260926-443a01)
+spawn run child final message (run=RUN-260926-443a01, tools=5 patches=0 failed=1):
+Integration landed and evidence attached — stopping per instruction.
+
+- `task-board worktree integrate STORY-260923-1lu2o3 --cr TASK-260923-em42lw --revision 11` exited 0; story commit `1a57c71c`, board commit `0be1c20e`. Publication push did not land (`board_publish_local_trunk_unproven`, signer not bound to repo identity) — landing stands, publishing is the orchestrator's step.
+- Updated outcome resource `TASK-260923-em42lw_integration-land.md` (exit 0). Initial `resource add` exited 1 (resource already exists), so used `resource update`.
+- No files changed, no status writes, no handoff per the bound integration assignment.
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260926-443a01, pid=51505, exit=0)
+spawn run RUN-260926-443a01 failed; operator action required; failure: integration_binding_state_invalid: Change Request CR-TASK-260923-em42lw-11 revision 11 is integrated, want accepted or checkpointed
 
 ## Precondition Resources
 - [carry-delta-review-note-2.md](file://TASK-260923-em42lw/carry-delta-review-note-2.md)
@@ -269,7 +278,7 @@ spawn run started: [implementer] developer (muse) (run=RUN-260926-443a01)
 - [TASK-260923-em42lw_spawn-log_-reviewer--reviewer--claude-_RUN-260926-f9dfea.log](file://TASK-260923-em42lw/TASK-260923-em42lw_spawn-log_-reviewer--reviewer--claude-_RUN-260926-f9dfea.log) — System spawn log captured by task-board
 - [TASK-260923-em42lw_review-verdict-rev10.md](file://TASK-260923-em42lw/TASK-260923-em42lw_review-verdict-rev10.md) — rev10 review verdict
 - [TASK-260923-em42lw_spawn-log_-implementer--developer--muse-_RUN-260926-6db7c3.log](file://TASK-260923-em42lw/TASK-260923-em42lw_spawn-log_-implementer--developer--muse-_RUN-260926-6db7c3.log) — System spawn log captured by task-board
-- [TASK-260923-em42lw_integration-land.md](file://TASK-260923-em42lw/TASK-260923-em42lw_integration-land.md) — Bound integration run: landing preconditions, integrate not executed per binding
+- [TASK-260923-em42lw_integration-land.md](file://TASK-260923-em42lw/TASK-260923-em42lw_integration-land.md) — Integration landing log for accepted CR revision 11 (STORY-260923-1lu2o3 via TASK-260923-em42lw)
 - [em42lw-review-rev10-note.md](file://TASK-260923-em42lw/em42lw-review-rev10-note.md)
 - [TASK-260923-em42lw_spawn-log_-implementer--developer--muse-_RUN-260926-835757.log](file://TASK-260923-em42lw/TASK-260923-em42lw_spawn-log_-implementer--developer--muse-_RUN-260926-835757.log) — System spawn log captured by task-board
 - [TASK-260923-em42lw_change-request_rev11.patch](file://TASK-260923-em42lw/TASK-260923-em42lw_change-request_rev11.patch) — Change Request CR-TASK-260923-em42lw-11 revision 11 candidate patch (repository_delta=present, 39 changed paths)
@@ -284,7 +293,7 @@ spawn run started: [implementer] developer (muse) (run=RUN-260926-443a01)
 2026-09-23T11:49:43Z
 
 ## Last Update
-2026-09-26T21:37:00Z
+2026-09-26T21:48:54Z
 
 ## Assigned To
 [implementer] developer (muse)
