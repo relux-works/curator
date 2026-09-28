@@ -1,0 +1,276 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index f95475c..86aa781 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -31,6 +31,22 @@ Versioning for the complete specification set.
+   follow-up leaves. Normative text, `manager-config-v2`,
+   `system-config-v2`, vectors, schema cases, and gates extended in
+   the same revision; frozen v1 protocol schemas untouched.
++- STORY-260921-3z0fgr (TASK-260922-23ahj2): operator corrections to
++  the landed 0017/0018 adoption (text only; no schema, vector, or
++  generator change). C1: the provider flag spelling (`yolo` →
++  `--dangerously-skip-permissions` / `--dangerously-bypass-approvals-and-sandbox`),
++  the per-tool-release mapping, the argv grammar, and the
++  (environment, tool release) capability table are owned by
++  agents-management as a `LaunchRequest` permission-mode member for
++  `LaunchModeInteractive` with goldens — the launcher only resolves
++  and passes the mode (Decision 0013 D5); follow-up F-M1 added, F-L1
++  narrowed to mode resolution, transport, and provenance. C2: the Pi
++  dangling-link operator evidence (managed home links to a missing
++  `~/.pi/auth.json` while the credential is `~/.pi/agent/auth.json`,
++  `env status` silent) is recorded, and `env status`/`resolve` must
++  report dangling or mis-targeted credential links (F-C1). C3: an
++  absent `cli_auth_credentials_store` key resolves to effective
++  `file` storage, so `isolated` is admitted for `codex_cli`.
+ - STORY-260916-12lbww: one closed per-manager, per-platform
+   dotfile-manager state table for the section 9.5 onboarding heuristic
+   (environments §9.5/§13), replacing the by-example POSIX-only list: one
+diff --git a/cli/curator.md b/cli/curator.md
+index 336538b..d69c3c4 100644
+--- a/cli/curator.md
++++ b/cli/curator.md
+@@ -159,13 +159,17 @@ alias), resolved per launch as flag, then the `permissions.<profile>`
+ machine knob, then the launcher-global `defaults.json` default, then
+ the built-in default — `yolo` for interactive untracked launches,
+ `native` for headless, CI, and tracked silence. A fleet-wide
+-force-`native` lock overrides the whole precedence. The launcher maps
+-`yolo` to the verified native bypass flag per environment, refuses
+-conflicts and unsupported environments, and records the effective mode
+-and its provenance; raw bypass text after `--` stays available
+-untracked and unvalidated. The flag spelling, mapping, refusals, and
+-provenance are owned by the launcher SPEC; environments §10.1 states
+-the Curator-side resolution, lock, and transport rules.
++force-`native` lock overrides the whole precedence. The launcher
++resolves the mode and passes it to agents-management, which maps
++`yolo` to the verified native bypass flag per environment; the
++launcher refuses conflicts and unsupported environments, and records
++the effective mode and its provenance; raw bypass text after `--`
++stays available untracked and unvalidated. The provider flag
++spelling, the per-tool-release mapping with its goldens, and the argv
++grammar are owned by agents-management as a `LaunchRequest`
++permission-mode member — the launcher never spells a provider flag
++(Decision 0013 D5); environments §10.1 states the Curator-side
++resolution, lock, and transport rules.
+ 
+ ```bash
+ # Install one root context package as a profile; profile audit is always
+diff --git a/decisions/0017-environment-credential-modes.md b/decisions/0017-environment-credential-modes.md
+index eaff273..fe14b84 100644
+--- a/decisions/0017-environment-credential-modes.md
++++ b/decisions/0017-environment-credential-modes.md
+@@ -16,6 +16,12 @@ choices. The normative amendments land in the same revision
+ the manager implementation work are named follow-ups (Compatibility
+ and security impact).
+ 
++Corrected 2026-09-22 under TASK-260922-23ahj2
++(STORY-260921-3z0fgr): the Pi dangling-link operator evidence
++(Context, choice 3) and the absent-`cli_auth_credentials_store`-key
++resolves to effective `file` rule (choice 4); normative text amended
++in the same revision.
++
+ Numbering: the existing decision series ends at 0016; 0011 remains
+ reserved as recorded in Decision 0013. This filing uses the next two
+ unused numbers, 0017–0018.
+@@ -76,6 +82,13 @@ suffixed Keychain item. The cause is unknown. The string
+ `CLAUDE_SECURESTORAGE_CONFIG_DIR` in the installed Claude binary proves
+ string presence only, not semantics or support.
+ 
++Operator evidence 2026-09-21 (correction revision): on the operator
++Mac the managed Pi home links to `~/.pi/auth.json`, which does not
++exist — the real credential is `~/.pi/agent/auth.json` — so the link
++is dangling, and `env status` does not report it. A dangling or
++mis-targeted credential link is evidence, not a hypothesis, and must
++be reported instead of silence (choice 3). On the operator Mac, ~/.curator/environments/default/pi/auth.json points to ~/.pi/auth.json; that target does not exist, the real credential is ~/.pi/agent/auth.json, and env status does not show the dangling passthrough as detached. env status and resolve report dangling or mis-targeted credential links as detached, with environment_credential_conflict-class wording instead of silence.
++
+ ## Gap statement
+ 
+ The knob exists but the design around it is incomplete: the macOS
+@@ -150,8 +163,8 @@ choice where the Compatibility section says so.
+ |---|---|---|
+ | 1 | What is the supported macOS `claude_code` shared store, if any? | **Unsupported until the experiment is recorded.** No shared store is supported: `environment_shared_unsupported` stands, and the §7.4 residual is answered negatively (a 2.1.273 managed-home login wrote a file under `CLAUDE_CONFIG_DIR`, not a suffixed Keychain item). Gate for reconsideration: an authorized disposable-account experiment proving (a) which store Claude reads first when file and Keychain both exist, (b) whether the file is rewritten in place on refresh, (c) under which conditions, if any, a suffixed Keychain item is written. The manager never exports Keychain secrets to JSON. |
+ | 2 | Is `isolated` bounded store separation or strict account separation? | **Bounded store separation.** `isolated` means the managed home does not share the declared credential stores with the native home. It is not account separation (ambient auth — helpers, cloud credentials, auth variables, native selectors — is unchanged) and never filesystem isolation. Normative §7.4 and manager §12.4 say so. |
+-| 3 | Which Pi root wins when both `~/.pi/auth.json` and `~/.pi/agent/auth.json` exist? | **Native root `~/.pi/agent` (option 2).** Migration inventories both roots; on conflict the operator chooses and the bytes are preserved. The existing 2 B `~/.pi/auth.json` is a manager-created artefact of the wrong target: migration unlinks the recorded link, never deletes the native file. |
+-| 4 | Does Codex keyring identity depend on `CODEX_HOME`, and what do `auto`/`ephemeral` and a diverged `config.toml` mean for sharing? | **Keyring identity assumed operator-global; probe defined.** The manager assumes Codex keyring identity is independent of `CODEX_HOME` until the probe proves otherwise. Probe: a disposable-account launch with a scratch `CODEX_HOME` observing login state (logged-in ⇒ global; not-logged-in ⇒ per-home); secrets are never exported. Consequences (normative §7.4): under native `keyring` or `auto` storage `isolated` is `environment_isolated_unsupported` — `isolated` for `codex_cli` is available under `file` storage only, because under `auto` the file-link is inert on a keyring host and the home would authenticate through the operator-global keyring; a future revision may admit `auto` only where the manager proves the effective store is `file`, probe-gated. Sharing is defined by the native effective storage only — a diverged managed `config.toml` changes nothing and the manager never realigns configs; any selector outside the verified `file`/`keyring`/`auto` set (including `ephemeral`) fails closed with `environment_credential_unsupported`. |
++| 3 | Which Pi root wins when both `~/.pi/auth.json` and `~/.pi/agent/auth.json` exist? | **Native root `~/.pi/agent` (option 2).** Migration inventories both roots; on conflict the operator chooses and the bytes are preserved. The existing 2 B `~/.pi/auth.json` is a manager-created artefact of the wrong target: migration unlinks the recorded link, never deletes the native file. Operator evidence 2026-09-21: on the operator Mac the managed home links to `~/.pi/auth.json`, which does not exist — the real credential is `~/.pi/agent/auth.json` — the link is dangling and `env status` is silent. `env status` (and `resolve`) report a dangling or mis-targeted credential link with `environment_credential_conflict`-class wording instead of silence (curator follow-up F-C1). On the operator Mac, ~/.curator/environments/default/pi/auth.json points to ~/.pi/auth.json; that target does not exist, the real credential is ~/.pi/agent/auth.json, and env status does not show the dangling passthrough as detached. env status and resolve report dangling or mis-targeted credential links as detached, with environment_credential_conflict-class wording instead of silence. |
++| 4 | Does Codex keyring identity depend on `CODEX_HOME`, and what do `auto`/`ephemeral` and a diverged `config.toml` mean for sharing? | **Keyring identity assumed operator-global; probe defined.** The manager assumes Codex keyring identity is independent of `CODEX_HOME` until the probe proves otherwise. Probe: a disposable-account launch with a scratch `CODEX_HOME` observing login state (logged-in ⇒ global; not-logged-in ⇒ per-home); secrets are never exported. Consequences (normative §7.4): under native `keyring` or `auto` storage `isolated` is `environment_isolated_unsupported` — `isolated` for `codex_cli` is available under `file` storage only — including an absent `cli_auth_credentials_store` key, which resolves to effective `file`, so `isolated` is admitted — because under `auto` the file-link is inert on a keyring host and the home would authenticate through the operator-global keyring; a future revision may admit `auto` only where the manager proves the effective store is `file`, probe-gated. Sharing is defined by the native effective storage only — a diverged managed `config.toml` changes nothing and the manager never realigns configs; any selector outside the verified `file`/`keyring`/`auto` set (including `ephemeral`) fails closed with `environment_credential_unsupported`. The operator's machines have no cli_auth_credentials_store key in config.toml, so the platform default file applies and isolated is admitted; the operator's profile design relies on that platform default and on nothing more from 0017. |
+ | 5 | What marker and config fields carry mode, strategy, source role, backend/version, and provenance, and how are they published? | **Fields named; schema enactment is a follow-up.** Config: `isolation.<profile>.<env-id>` stays the only config field. Marker: each passthrough record carries `isolation` (effective mode), `strategy`, `source_role` (`native` = bytes owned by the native home, `managed` = bytes owned by the managed home), `backend` (`file`/`keychain`/`ambient`), `backend_version` (verified tool release), and `provenance` (`provisioned`/`repaired`/`migrated`); linkless strategies (macOS per-home-keychain under isolated, ambient) record without a path. A schema-1 marker records `path` and `strategy` only and is never rewritten to add the record. Publication is under the manager-home mutation lock via same-directory temp plus atomic rename with journal protection; rollback restores the preceding marker. Backups and discovery never follow auth symlinks (`lstat` semantics) and never archive credential bytes. The marker-schema extension is a named follow-up spec revision. |
+ | 6 | Can a fleet enforce `isolated`? | **Not in this adoption — follow-up.** The system schema still locks only toward `shared`; enforcing `isolated` fleet-wide needs a reviewed policy revision, not a knob reinterpretation. Named follow-up. |
+ | 7 | What consent shape, if any, authorizes a future credential copy? | **No consent shape authorized — copy stays refused.** No copy consent exists in this revision; `secret_material_waivers` waives an audited finding, never extraction. Any future copy needs operator-owned profile/env, source/destination roles, purpose, reason, and expiry, plus an explicit revision of the no-copy boundary. |
+diff --git a/decisions/0018-curator-run-permission-interface.md b/decisions/0018-curator-run-permission-interface.md
+index 8a1e336..c49d789 100644
+--- a/decisions/0018-curator-run-permission-interface.md
++++ b/decisions/0018-curator-run-permission-interface.md
+@@ -26,6 +26,15 @@ amendments land in the same revision (environments §10.1, §10.2, §12.1,
+ the fragment transport members and token, and the `ax` capability are
+ named follow-ups (Compatibility and security impact).
+ 
++Corrected 2026-09-22 under TASK-260922-23ahj2
++(STORY-260921-3z0fgr): the provider flag spelling, per-tool-release
++mapping, argv grammar, and capability table are owned by
++agents-management as a `LaunchRequest` permission-mode member for
++`LaunchModeInteractive` with goldens (item 1, choices 3–6,
++Compatibility) — the launcher only resolves and passes the mode, per
++Decision 0013 D5; follow-up F-M1 added, F-L1 narrowed. Normative text
++amended in the same revision.
++
+ Numbering: the existing decision series ends at 0016; 0011 remains
+ reserved as recorded in Decision 0013. This filing uses the next two
+ unused numbers, 0017–0018.
+@@ -143,7 +152,9 @@ All six options are adopted as amended (2026-09-21).
+    silence resolves `yolo` only for interactive untracked launches —
+    headless, CI, and tracked silence resolves `native` per item 5. The
+    per-environment mapping is unchanged (one reviewed
+-   provider-mapping owner; a reviewed capability table, never runtime
++   provider-mapping owner — agents-management, as a `LaunchRequest`
++   permission-mode member for `LaunchModeInteractive` with goldens per
++   tool release; a reviewed capability table, never runtime
+    help parsing):
+ 
+    | env | yolo maps to | placement |
+@@ -304,10 +315,10 @@ the question and the recorded choice.
+ |---|---|---|
+ | 1 | Should `--yolo` ship in the same increment as `--permissions` or follow after the mapping settles? | **Same increment, as an exact alias of the yolo mode** (review recommendation, for legacy-wrapper parity). `-d`/`--danger` stay rejected. Launcher follow-up implements both together. |
+ | 2 | What is the exact `ax` admission precondition for tracked yolo, and which version carries it? | **Both, carried by a versioned `ax` capability — until then, refused.** Tracked yolo is admitted only by an ax-owned permission representation **and** validated natively-mapped admission, carried by a versioned `ax` capability (the carrying version is fixed by the implementing revision — follow-up). Normative now: tracked plus effective `yolo` from any level is refused (`permission_mode_tracked_unsupported`) with no fallback to untracked, and no bypass spelling enters the composed `ax` document (D5/D3.6). |
+-| 3 | How are unknown future native policy forms detected without false resolved-policy claims? | **Refused (fail closed) with a versioned-capability token.** The provider grammar is closed per pinned tool release; unknown future native policy forms (new Codex `-c` keys, new Claude modes) are refused (`usage`, exit 2), never resolved into a policy claim. The grammar distinguishes prompt text from flags (the launcher SPEC owns the parsing rule); the capability table is versioned per choice 6. |
+-| 4 | What does the launcher print, and where is it recorded, when native stored settings relax the posture beneath a `native` request? | **Print the effective-native-policy line; record it in the launch record.** The launcher prints an stderr warning line naming the detected relaxation and its source (best-effort detection over known selectors; the launcher never claims beyond what it inspected) and records it in the launch record — the tracked `ax` launch document (launcher-SPEC-owned extension key) when tracked, the stderr provenance stream when untracked (no persistent record in untracked mode). Exact spelling and key: launcher SPEC revision (follow-up). |
+-| 5 | Which negative tests drive the real `curator run` entry, and what narrowing mutants prove each bound? | **Real `curator run` entry with a fake tool; rows named.** The implementation MUST add negative rows driving the real entry: per-environment mapping rows; per-conflict refusal rows (`=` and separate forms, aliases, `exec` placement); precedence rows (flag/profile/global/default-interactive/default-headless); v1-file-with-member and unknown-value rejection rows; lock-engaged refusal rows from every level (visible `yolo` ⇒ `usage`, silence ⇒ `native`); tracked-refusal rows from every level; headless/CI-silence ⇒ `native` rows (`source=default-headless`); legacy-fragment would-be-`yolo` refusal rows from every level including the flag; and one narrowing mutant per refusal bound. Launcher follow-up implements; no new spec vectors in this revision. |
+-| 6 | What versioned-capability rule re-verifies each mapping, and what fails closed first? | **Draft's proposal adopted; encoding is a follow-up.** Each mapping is re-verified per tool release; the capability table keys (environment, tool release) to a grammar version. On version drift the `yolo` mapping fails closed first (refuse `yolo` for unverified releases; `native` still forwards verbatim with no claims). The exact token/member encoding is to be fixed by the implementing revision (follow-up). |
++| 3 | How are unknown future native policy forms detected without false resolved-policy claims? | **Refused (fail closed) with a versioned-capability token.** The provider grammar is closed per pinned tool release; unknown future native policy forms (new Codex `-c` keys, new Claude modes) are refused (`usage`, exit 2), never resolved into a policy claim. The grammar distinguishes prompt text from flags (agents-management owns the parsing rule as part of its argv grammar); the capability table is versioned per choice 6. |
++| 4 | What does the launcher print, and where is it recorded, when native stored settings relax the posture beneath a `native` request? | **Print the effective-native-policy line; record it in the launch record.** The launcher prints an stderr warning line naming the detected relaxation and its source (best-effort detection over known selectors; the launcher never claims beyond what it inspected) and records it in the launch record — the tracked `ax` launch document (launcher-SPEC-owned extension key) when tracked, the stderr provenance stream when untracked (no persistent record in untracked mode). Exact spelling of the launcher's own line and key: launcher SPEC revision (follow-up). |
++| 5 | Which negative tests drive the real `curator run` entry, and what narrowing mutants prove each bound? | **Real `curator run` entry with a fake tool; rows named.** The implementation MUST add negative rows driving the real entry: per-environment mapping rows; per-conflict refusal rows (`=` and separate forms, aliases, `exec` placement); precedence rows (flag/profile/global/default-interactive/default-headless); v1-file-with-member and unknown-value rejection rows; lock-engaged refusal rows from every level (visible `yolo` ⇒ `usage`, silence ⇒ `native`); tracked-refusal rows from every level; headless/CI-silence ⇒ `native` rows (`source=default-headless`); legacy-fragment would-be-`yolo` refusal rows from every level including the flag; and one narrowing mutant per refusal bound. Launcher follow-up implements (it drives the resolved mode through the real entry; the per-tool-release mapping goldens live in agents-management per choice 6); no new spec vectors in this revision. |
++| 6 | What versioned-capability rule re-verifies each mapping, and what fails closed first? | **Draft's proposal adopted; encoding is an agents-management follow-up (F-M1).** Each mapping is re-verified per tool release; the capability table keys (environment, tool release) to a grammar version and is owned by agents-management as part of the `LaunchRequest` permission-mode member for `LaunchModeInteractive`, with goldens per tool release. On version drift the `yolo` mapping fails closed first (refuse `yolo` for unverified releases; `native` still forwards verbatim with no claims). The exact token/member encoding is to be fixed by the agents-management revision (follow-up F-M1). |
+ | 7 | What minimum Curator/fragment version token carries the profile level and the lock engagement, which markers complete the headless detector, and where is that list versioned? | **Fail-closed rule normative now; token value, member names, and marker list fixed as stated.** The item-5 rule is specified, not deferred: unestablished transport support ⇒ would-be `yolo` refused (`permission_policy_unsupported`); `native` (explicit, or headless/CI/tracked silence) proceeds. The minimum token value and the exact fragment member names are to be fixed by the implementing revision (follow-up — the token names the revision that defines it). Non-interactive markers: the closed set {`CI`, `GITHUB_ACTIONS`} fixed by this adoption; additions by later spec revision only, never ad-hoc; the list is versioned in the launcher SPEC §4.6 and mirrored in environments §10.1. |
+ 
+ ## Compatibility and security impact
+@@ -321,20 +332,32 @@ transport fail-closed rule), §10.2 (transport requirement), §12.1 (new
+ shaping), with `manager-config-v2`, `system-config-v2`, vectors,
+ schema cases, and gates extended in the same revision. The launcher
+ SPEC §3 (flag table), §4.1 (fragment members and the transport
+-version precondition), §4.2 (mapping table), §4.3 (defaults v2 and
+-item-2 precedence), §4.5 (composition placement and conflicts), §4.6
++version precondition), §4.3 (defaults v2 and
++item-2 precedence), §4.5 (composition placement of the resolved
++mode), §4.6
+ (tracked refusal from every level, the item-5 headless detector,
+ headless/CI/tracked default `native`), §4.7 (file family note), §6
+ (diagnostics, including `permission_policy_unsupported`), the README
+-options table, and `internal/cli` parse, `internal/mapping` capability
+-table, `internal/composition` placement, and `internal/execution`
++options table, and `internal/cli` parse,
++`internal/composition` placement, and `internal/execution`
+ refusal plus provenance — with Decision 0013 D3.6/D5/D6.4 satisfied
+-before any tracked bypass — are a launcher follow-up leaf, as are the
+-choice-5 negative rows. The launch-env fragment member names and the
++before any tracked bypass — are a launcher follow-up leaf (F-L1:
++mode resolution, transport of the resolved mode, and provenance
++only — no argv grammar), as are the
++choice-5 negative rows. The provider flag spelling, the
++per-tool-release mapping, the argv grammar with its parsing rule
++(choices 3, 6), and the versioned provider-capability table keyed by
++(environment, tool release) are owned by agents-management as a
++`LaunchRequest` permission-mode member for `LaunchModeInteractive`,
++with goldens per tool release (follow-up F-M1,
++skill-agents-management); on drift `yolo` is refused first. agents-management owns the LaunchRequest permission-mode member for LaunchModeInteractive with positive and negative interactive goldens per tool release; the module's argvguard forbids spelling argv grammar in two places, which is why F-M1 owns the mapping and F-L1 carries no argv grammar. The
++launch-env fragment member names and the
+ minimum transport token (choice 7) and the `ax` permission capability
+-(choice 2) are follow-up spec revisions; the versioned
+-provider-capability encoding (choice 6) is owned by the launcher SPEC
+-revision (launcher follow-up F-L1). No launcher flag, mapping,
++(choice 2) are follow-up spec revisions. This decision neither
++violates Decision 0013 D5 — the launcher never spells a provider
++flag, it resolves and passes the mode only — nor duplicates argv
++grammar: the launcher SPEC declares no native flag spelling. 0017/0018 block nothing in task-board: tracked children spell bypass in the module's exec plugins themselves; 0018 serves curator run now and tracked sessions later through ax (F-A1). No
++launcher flag, mapping,
+ default, composition, `ax` document, or `defaults.json` changes in
+ this revision. Raw bypass after `--` stays available untracked by
+ design; the typed flag adds validated UX, not a perimeter.
+diff --git a/profiles/manager.md b/profiles/manager.md
+index b9f0b42..6e14e05 100644
+--- a/profiles/manager.md
++++ b/profiles/manager.md
+@@ -2742,7 +2742,10 @@ where a value is a configuration error rather than a choice: `isolated` for
+ `codex_cli` under native `keyring` or `auto` storage, is
+ `environment_isolated_unsupported` (under `auto` the file-link is
+ inert on a keyring host, so admission would authenticate through the
+-operator-global keyring — environments §7.4); `shared` for `claude_code` on macOS at
++operator-global keyring — environments §7.4). An absent
++`cli_auth_credentials_store` key resolves to effective `file`
++storage, so `isolated` is admitted for `codex_cli` (environments
++§7.4). The operator's machines have no cli_auth_credentials_store key in config.toml, so the platform default file applies and isolated is admitted; the operator's profile design relies on that platform default and on nothing more from 0017. `shared` for `claude_code` on macOS at
+ or above the pinned release is `environment_shared_unsupported`, because
+ that adapter is isolated by construction there and the knob's default
+ follows. Passthrough entries are excluded from surface content hashes and
+diff --git a/protocol/environments.md b/protocol/environments.md
+index 2f39541..04c5909 100644
+--- a/protocol/environments.md
++++ b/protocol/environments.md
+@@ -1380,7 +1380,7 @@ pinned release that the strategy answers to:
+ | Environment | Passthrough entries | Strategy | Write behavior |
+ |---|---|---|---|
+ | `claude_code` | macOS: none — Claude Code stores OAuth credentials in the login Keychain as service `Claude Code-credentials`, account `$USER`; with `CLAUDE_CONFIG_DIR` set the service name is suffixed with `-` plus the first 8 hex characters of the SHA-256 of the config-dir path, so each managed home owns a separate Keychain item that the native item never serves (**verified** from the 2.1.261 bundle strings and the Keychain items present); Linux: `.credentials.json`; Windows: none in revision 1 (reserved pending platform verification) | macOS: `per-home-keychain` — nothing is linked, and every managed home logs in on its own; Linux: `file-link` — the managed home's `.credentials.json` is a symlink to the native file, re-checked by the liveness row | Linux write behavior **unverified** (docs-confidence: rename-over assumed until verified, so the Linux `file-link` is the expected-to-detach case below) |
+-| `codex_cli` | `auth.json` | `keyring-preferred`: where the operator's `config.toml` sets `cli_auth_credentials_store` to `keyring` the credential is ambient and no entry is linked; under `file` (the default) or `auto` the managed `auth.json` is a `file-link` — a symlink to the native file, re-checked by the liveness row. The manager assumes the keyring identity is operator-global (independent of `CODEX_HOME`) until a disposable-account scratch-`CODEX_HOME` probe proves per-home scoping, so under `keyring` or `auto` storage `isolated` is `environment_isolated_unsupported`; a storage selector outside the verified `file`/`keyring`/`auto` set fails closed with `environment_credential_unsupported` | **verified** in-place: codex 0.153.2 rewrites `auth.json` by truncate-and-write on the same inode, mode 0600, never temp-and-rename (upstream `login/src/auth/storage.rs` for the path the binary names); `cli_auth_credentials_store = file|keyring|auto` **verified** in the embedded configuration docs |
++| `codex_cli` | `auth.json` | `keyring-preferred`: where the operator's `config.toml` sets `cli_auth_credentials_store` to `keyring` the credential is ambient and no entry is linked; under `file` (the default) or `auto` the managed `auth.json` is a `file-link` — a symlink to the native file, re-checked by the liveness row. The manager assumes the keyring identity is operator-global (independent of `CODEX_HOME`) until a disposable-account scratch-`CODEX_HOME` probe proves per-home scoping, so under `keyring` or `auto` storage `isolated` is `environment_isolated_unsupported`. An absent `cli_auth_credentials_store` key means effective `file` storage, so `isolated` is admitted; a storage selector outside the verified `file`/`keyring`/`auto` set fails closed with `environment_credential_unsupported` | **verified** in-place: codex 0.153.2 rewrites `auth.json` by truncate-and-write on the same inode, mode 0600, never temp-and-rename (upstream `login/src/auth/storage.rs` for the path the binary names); `cli_auth_credentials_store = file|keyring|auto` **verified** in the embedded configuration docs |
+ | `opencode` | none — auth lives in `XDG_DATA_HOME`, which the config swap never touches (section 7.1) | ambient | — |
+ | `pi` | `auth.json` | `file-link` — the managed `auth.json` is a symlink to the native `~/.pi/agent/auth.json` (native root `~/.pi/agent`, not `~/.pi`), re-checked by the liveness row | **verified** in-place: pi 0.84.2 rewrites its agent-root `auth.json` with a single in-place write, mode 0600, under its own lockfile, never temp-and-rename (installed `core/auth-storage.js`) |
+ 
+@@ -1464,11 +1464,13 @@ authorized disposable-account experiment proves which store Claude
+ reads first, whether the file is rewritten in place on refresh, and
+ under which conditions, if any, a suffixed item is written; the
+ verified selection scheme stands regardless. `isolated` remains
+-available for `codex_cli` under `file` storage only, for `pi`,
++available for `codex_cli` under `file` storage only — including an
++absent `cli_auth_credentials_store` key, which resolves to effective
++`file` — for `pi`,
+ and for `claude_code` on Linux. Sharing is defined by the native
+ home's effective storage alone: a managed `config.toml` that diverges
+ from the native selection changes nothing, and the manager never
+-rewrites either file to realign them.
++rewrites either file to realign them. The operator's machines have no cli_auth_credentials_store key in config.toml, so the platform default file applies and isolated is admitted; the operator's profile design relies on that platform default and on nothing more from 0017.
+ 
+ **Migration.** A mode change is never applied by repair: changing the
+ effective mode of a provisioned home runs an explicit inspect → plan
+@@ -1481,7 +1483,14 @@ shared conflict — the managed home holds credential bytes a link
+ would displace — the migration reports both sides and stops: the
+ operator resolves the conflict out of band and re-runs. The recorded
+ 2 B `~/.pi/auth.json` is unlinked as a recorded link of the wrong
+-target, never deleted as a native file.
++target, never deleted as a native file. Operator evidence
++2026-09-21: on the operator Mac the managed Pi home links to
++`~/.pi/auth.json`, which does not exist — the real credential is
++`~/.pi/agent/auth.json` — so the link is dangling, and `env status`
++is silent about it. A dangling or mis-targeted credential link is
++reported, never silent: `env status` (and `resolve`) report it with
++`environment_credential_conflict`-class wording (curator follow-up
++F-C1). On the operator Mac, ~/.curator/environments/default/pi/auth.json points to ~/.pi/auth.json; that target does not exist, the real credential is ~/.pi/agent/auth.json, and env status does not show the dangling passthrough as detached. env status and resolve report dangling or mis-targeted credential links as detached, with environment_credential_conflict-class wording instead of silence.
+ 
+ **Credential record.** From the marker revision Decision 0017 choice
+ 5 defines (follow-up), every passthrough record carries the effective
+@@ -2915,7 +2924,7 @@ launcher-global `defaults.json` default, over the built-in default —
+ `yolo` for interactive untracked launches, `native` for headless, CI,
+ and tracked silence. `native` means no launcher override (argv
+ forwarded verbatim), not a guaranteed prompting posture; `yolo`
+-requests the launcher-SPEC-declared native bypass, never an
++requests the agents-management-declared native bypass, never an
+ outside-policy bypass. A launch is headless when stdin or stdout is
+ not a TTY, when the native arguments select a non-interactive form,
+ when a non-interactive marker (`CI` or `GITHUB_ACTIONS`, the closed
+@@ -2928,9 +2937,16 @@ engagement and delivers them through the fragment (section 10.2);
+ verified transport support is a precondition for admitting `yolo` —
+ when the launcher cannot establish it, any launch that would otherwise
+ resolve `yolo` is refused (`permission_policy_unsupported`), while a
+-launch that resolves `native` proceeds. The flag spelling, mapping
+-table, refusal rules, and provenance line are owned by the launcher
+-SPEC, not this document.
++launch that resolves `native` proceeds. The provider flag spelling,
++the per-tool-release mapping with its goldens, and the argv grammar
++are owned by agents-management as a `LaunchRequest` permission-mode
++member for `LaunchModeInteractive` (Decision 0018, choices 3 and 6),
++not this document and not the launcher SPEC: the launcher never
++spells a provider flag (Decision 0013 D5) — it resolves and passes
++the mode only. The launcher owns mode resolution (flag over profile
++over global over built-in default, including conflict refusal), the
++headless detector, transport of the resolved mode, the stderr
++provenance line, and the launch-record extension key.
+ 
+ **Tracked residual.** Decision 0013's document has no destination
+ environment-unset or `PATH`-transform member. Its own-literals-only
