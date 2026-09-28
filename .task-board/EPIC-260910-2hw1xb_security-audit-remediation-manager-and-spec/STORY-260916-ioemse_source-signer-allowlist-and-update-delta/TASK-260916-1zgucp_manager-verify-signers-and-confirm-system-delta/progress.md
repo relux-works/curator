@@ -166,6 +166,17 @@ Preconditions confirmed and evidence attached; stopping per the binding assignme
 - Outcome `TASK-260916-1zgucp_integration-land.md` updated (exit 0). It records that the `worktree integrate` command was deliberately not executed — the Integration Assignment supersedes that step and leaves the bound landing to the runner.
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260927-c04c91, pid=51632, exit=0)
+spawn run RUN-260927-c04c91 failed; operator action required; failure: board_publication_pending: runner integrate refused: board_publication_pending: STORY-260916-ioemse is landed and its board state is committed as 97e856425b1aeafe533e86e33e7f9dfd873d9b50 on the local trunk, but the publication push did not land (board_publish_local_trunk_unproven); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: 97e856425b1aeafe533e86e33e7f9dfd873d9b50
+  cause_code: board_publish_local_trunk_unproven
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: c0400b1a78ee7ea9738f3fd52a5fe26de75f2570
+  story_id: STORY-260916-ioemse
+  cause: board_publish_local_trunk_unproven: the local trunk holds an unpublished link 97e856425b1aeafe533e86e33e7f9dfd873d9b50 that is not this repository's own board-state record (the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key); a stable content digest is never ownership proof — nothing was projected and nothing was pushed
+  link_oid: 97e856425b1aeafe533e86e33e7f9dfd873d9b50
+  reason: the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key
+  remedy: land the unproven commits through integrate/reconcile-trunk, not through this command
 
 ## Precondition Resources
 - [1zgucp-carry-4.md](file://TASK-260916-1zgucp/1zgucp-carry-4.md)
@@ -221,7 +232,7 @@ spawn run completed: muse (run=RUN-260927-c04c91, pid=51632, exit=0)
 2026-09-16T10:50:06Z
 
 ## Last Update
-2026-09-27T23:24:40Z
+2026-09-27T23:29:32Z
 
 ## Assigned To
 [implementer] developer (muse)
