@@ -135,6 +135,21 @@ Integration preconditions confirmed for accepted rev 1 (one-file comment-only ch
 Fresh outcome `TASK-260908-1bfk8y_integration-4.md` attached. No converge/integrate run, no status writes; worktree left with only the TSV modification. Board remains `integrating` for the runner's bound landing.
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260923-b89626, pid=89077, exit=0)
+spawn run RUN-260923-b89626 failed; operator action required; failure: run_write_boundary_uncleared: runner integrate refused: run_write_boundary_uncleared: delivery of element STORY-260907-2bddfc is gated on 2 run(s) under warn policy
+  [BLOCKED] run RUN-260922-bd79a5 verdict= terminal=terminal-missing: no boundary assessment was recorded
+  [BLOCKED] run RUN-260922-c82052 verdict= terminal=terminal-missing: no boundary assessment was recorded
+clear a violating run with: task-board spawn write-boundary-clear <RUN-ID> --reason "..."
+board_publication_pending: STORY-260907-2bddfc is landed and its board state is committed as fad881368b632f43a18b01681a8fc7def110cbae on the local trunk, but the publication push did not land (board_publish_local_trunk_unproven); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: fad881368b632f43a18b01681a8fc7def110cbae
+  cause_code: board_publish_local_trunk_unproven
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: 2e5b368b4dff7b1bf78b67f74351f6941e5ba636
+  story_id: STORY-260907-2bddfc
+  cause: board_publish_local_trunk_unproven: the local trunk holds an unpublished link fad881368b632f43a18b01681a8fc7def110cbae that is not this repository's own board-state record (the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key); a stable content digest is never ownership proof — nothing was projected and nothing was pushed
+  link_oid: fad881368b632f43a18b01681a8fc7def110cbae
+  reason: the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key
+  remedy: land the unproven commits through integrate/reconcile-trunk, not through this command
 
 ## Precondition Resources
 - [campaign-producer-rules.md](file://TASK-260908-1bfk8y/campaign-producer-rules.md) — Campaign producer/reviewer rules for host e11-1
@@ -167,7 +182,7 @@ spawn run completed: muse (run=RUN-260923-b89626, pid=89077, exit=0)
 2026-09-07T22:40:48Z
 
 ## Last Update
-2026-09-23T14:31:19Z
+2026-09-23T15:53:30Z
 
 ## Assigned To
 [implementer] developer (muse)
