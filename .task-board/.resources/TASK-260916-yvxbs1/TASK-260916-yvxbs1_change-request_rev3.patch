@@ -1,0 +1,4132 @@
+diff --git a/.github/ci/conformance-case-counts.tsv b/.github/ci/conformance-case-counts.tsv
+index d9edd023..8efed811 100644
+--- a/.github/ci/conformance-case-counts.tsv
++++ b/.github/ci/conformance-case-counts.tsv
+@@ -23,6 +23,9 @@ module-roots/vectors	10
+ script-host-execution-policy/opt-in-cases	6
+ script-host-execution-policy/executable-identity-cases	8
+ shell-hook-trust/vectors	14
++environments-path-kind-admission/mcp_kind_cases	5
++environments-path-kind-admission/path_boundary_cases	14
++environments-path-kind-admission/dry_run_cases	3
+ build-source/build-source-cases	10
+ build-drivers/positive-cases	8
+ build-drivers/rejection-cases	77
+@@ -65,6 +68,8 @@ context-detectors/cases	12
+ snapshot-acquisition/cases	1
+ environments/header-cases	4
+ environments/materialization-cases	24
++environments-codex-seed/provisioning-cases	7
++environments-codex-seed/posture-cases	8
+ environments-env-passthrough/default-resolution-cases	7
+ environments-env-passthrough/allowlist-empty-cases	6
+ environments-env-passthrough/schema-cases	4
+diff --git a/.github/ci/conformance-gaps.tsv b/.github/ci/conformance-gaps.tsv
+index b23b0080..008af583 100644
+--- a/.github/ci/conformance-gaps.tsv
++++ b/.github/ci/conformance-gaps.tsv
+@@ -2,8 +2,6 @@
+ # after the named published case passes its production-entry consumer.
+ # Case IDs and owners are verified against v1.0.0-rc.13 tag commit 23435129ebc4c29e5b7f75ec72a0aa0cd3f16065.
+ family	case_id	owner	reason
+-agent-environment-marker-v1/schema-cases	valid-codex-seed-record-empty-snapshot.json	STORY-260916-1i1gfo	Parse rejects the valid Codex seed record forms added by E3.
+-agent-environment-marker-v1/schema-cases	valid-codex-seed-record.json	STORY-260916-1i1gfo	Parse rejects the valid Codex seed record forms added by E3.
+ manager-config-v2/schema-cases	invalid-system-module-waiver-missing-reason.json	STORY-260916-ioemse	Load rejects before E2 validation at the unsupported E1 require_source_signers field; permissions are supported on trunk.
+ manager-config-v2/schema-cases	invalid-system-module-waiver-package-grammar.json	STORY-260916-ioemse	Load rejects before E2 validation at the unsupported E1 require_source_signers field; permissions are supported on trunk.
+ manager-config-v2/schema-cases	invalid-system-module-waiver-unknown-field.json	STORY-260916-ioemse	Load rejects before E2 validation at the unsupported E1 require_source_signers field; permissions are supported on trunk.
+diff --git a/.github/ci/platform-cases.tsv b/.github/ci/platform-cases.tsv
+index e7dacd87..5051dd09 100644
+--- a/.github/ci/platform-cases.tsv
++++ b/.github/ci/platform-cases.tsv
+@@ -499,6 +499,9 @@ cmd/curator	TestEnvStatusMatrix	linux,darwin,windows	-	-	env status reports the
+ cmd/curator	TestUmbrellaMissingProvider	linux,darwin,windows	-	-	an unknown subcommand with no provider names the executable and the installation guidance
+ cmd/curator	TestUmbrellaDispatchesToProvider	linux,darwin	windows	host-capability	the provider receives the remaining arguments verbatim over a POSIX launcher fixture
+ cmd/curator	TestUmbrellaPropagatesExitCode	linux,darwin	windows	host-capability	the provider exit code is the command exit code over a POSIX launcher fixture
++cmd/curator	TestUmbrellaTrustedRootSymlinkEscape	linux,darwin,windows	linux,darwin,windows	host-capability	a provider symlink in a trust root cannot escape it under either rollout revision
++cmd/curator	TestUmbrellaProviderResolutionVectors	linux,darwin,windows	linux,darwin,windows	root-unset	the pinned provider-resolution vector cases reach the production resolver under both rollout revisions
++cmd/curator	TestCuratorStatusProviderPostureAndCheck	linux,darwin,windows	-	-	curator status reports provider paths and trust verdicts, and --check fails for missing provider rows
+ 
+ # Opt-in developer probe -- never required, always tolerated.
+ # ===========================================================================
+@@ -538,7 +541,7 @@ internal/envprofile	TestMissingPathOperandIsPathMissing	linux,darwin,windows	-	-
+ internal/envprofile	TestMissingOverlayPathIsPathMissing	linux,darwin,windows	-	-	an absent overlay source fails with the absence diagnostic
+ internal/envprofile	TestNonDirectoryPathIsSourceInvalid	linux,darwin,windows	-	-	a path operand naming a non-directory is profile_source_invalid
+ internal/envprofile	TestNestedGitIsSourceInvalid	linux,darwin,windows	-	-	a .git entry below the source root is profile_source_invalid
+-internal/envprofile	TestSymlinkInPathIsSourceInvalid	linux,darwin	windows	host-capability	a link in the source tree is profile_source_invalid
++internal/envprofile	TestSymlinkInPathIsUntrusted	linux,darwin	windows	host-capability	a link in the source tree is environment_store_untrusted naming link_safety
+ internal/envprofile	TestFoldedPathsAreSourceInvalid	linux	darwin,windows	host-capability	two entries folding to one platform path are profile_source_invalid; case-folding hosts skip under the classified host-capability reason
+ internal/envprofile	TestRootGitExcluded	linux,darwin,windows	-	-	a root-level .git entry is excluded from the immutable snapshot
+ internal/envprofile	TestUnreadablePathIsUnreadable	linux,darwin	windows	host-capability	an unreadable source reports profile_source_path_unreadable leading, never absence and never wrapped invalid
+@@ -758,4 +761,9 @@ internal/stateread	TestReadsDistinguishAbsentFromBlockedParent	linux,darwin,wind
+ internal/scriptworker	TestLoadShimSidecarRefusesUnreadablePath	linux,darwin,windows	-	-	loading an enforced sidecar below a regular-file ancestor refuses with manager_state_unreadable
+ cmd/curator	TestEnforcedShimDispatchRefusesUnreadableSidecar	linux,darwin,windows	-	-	main executable dispatch refuses unreadable sidecar state instead of falling through to ordinary CLI dispatch
+ internal/runtimestore	TestManagedEnforcedShimsInRefusesUnreadableInventory	linux,darwin,windows	-	-	shim inventory listing below a regular-file ancestor is a typed read failure rather than an absent bin
++internal/envprofile	TestPathKindMCPVectorsDriveInstallEntry	linux,darwin,windows	-	-	all five rc.13 MCP path-kind vectors reach Install, refusing root, overlay, onboarding-import, and the admitted mutant while preserving Git admission
++internal/envprofile	TestPathKindBoundaryVectorsDriveProductionEntries	linux,darwin,windows	-	-	all fourteen rc.13 path-boundary vectors reach Install, Import, Resolve, Update, or Status; any host-bound row is named in the tally
++internal/envprofile	TestPathKindDryRunVectorsDriveReadOnlyResolve	linux,darwin,windows	-	-	all three rc.13 path-overlay read-only resolve vectors prove no fragment, no rebuild and byte-identical source and manager state
++internal/envprofile	TestPathOverlayBoundaryRejectsEscapingAndInternalLinks	linux,darwin,windows	linux,darwin,windows	host-capability	Install refuses an escaping symbolic link as containment and an in-tree symbolic link as link_safety when the host can create links
++internal/envprofile	TestPathOverlayFailureBlocksResolveAndMakesStatusNonCurrent	linux,darwin,windows	-	-	Resolve emits no fragment and Status reports non-current after a real world-writable mode or DACL mutation of the path directory
+ internal/install	TestLockedNetworkRepositoryDistinguishesAbsentAndUnreadableCheckouts	linux,darwin,windows	-	-	proven checkout absence falls back while blocked or present-unusable locked repositories fail closed
+diff --git a/.github/ci/root-artifacts.tsv b/.github/ci/root-artifacts.tsv
+index 243e24ad..706542cd 100644
+--- a/.github/ci/root-artifacts.tsv
++++ b/.github/ci/root-artifacts.tsv
+@@ -70,7 +70,7 @@ internal/whitelist	fixtures/go-build-skill,expected/build-driver/context_files.j
+ internal/moduleroots	vectors/module-roots.json	TestModuleRootVectors reads the vector directly
+ internal/scriptworker	vectors/script-host-execution-policy.json	TestExecutableIdentityCasesAtProductionEntry drives the published executable identity cases through the manager resolver
+ internal/scriptpolicy	vectors/script-host-execution-policy.json	the schema-8 script execution-policy family is read directly by every case in conformance_test.go
+-internal/envprofile	vectors/environments-env-passthrough.json	TestEnvironmentsEnvPassthroughVectors consumes every published case group
++internal/envprofile	vectors/environments-codex-seed.json,vectors/environments-env-passthrough.json,vectors/environments-path-kind-admission.json	TestEnvironmentsCodexSeedVectors and TestEnvironmentsEnvPassthroughVectors consume their published case groups; path-kind MCP, source-boundary, and read-only resolve consumers drive published path-source cases through production entries
+ internal/shell	vectors/shell-hook-trust.json	TestShellHookTrustVectors consumes every published trust case
+ internal/skillspec	schema-cases/agent-skill-v6,schema-cases/agent-skill-v7,schema-cases/csk-skill-v7,schema-cases/agent-skill-v8,schema-cases/csk-skill-v8,vectors/portable-paths.json,fixtures/go-build-skill	the schema v6 and v7 cases, BOTH schema-8 manifest families, portable-path vectors and the go-build skill fixture
+ internal/install	vectors/build-drivers.json,vectors/manager-lifecycle.json	TestAuthoritativeCacheOutcomesDriveInstallation and the dry-run bindings read the vectors directly
+diff --git a/cmd/curator/env_credential_marker_test.go b/cmd/curator/env_credential_marker_test.go
+index 3fc216eb..33cf1451 100644
+--- a/cmd/curator/env_credential_marker_test.go
++++ b/cmd/curator/env_credential_marker_test.go
+@@ -5,9 +5,11 @@ import (
+ 	"os"
+ 	"path/filepath"
+ 	"runtime"
++	"strings"
+ 	"testing"
+ 
+ 	"github.com/relux-works/curator/internal/envmarker"
++	"github.com/relux-works/curator/internal/envregistry"
+ )
+ 
+ func installCLIEnvProfile(t *testing.T, source stubConfigSource) {
+@@ -166,9 +168,13 @@ func TestEnvResolveKeepsSchema1BytesForMetadataOnly(t *testing.T) {
+ 		t.Fatal(err)
+ 	}
+ 	legacyBytes = append(legacyBytes, '\n')
+-	if _, err := envmarker.Parse(legacyBytes); err != nil {
++	legacyMarker, err := envmarker.Parse(legacyBytes)
++	if err != nil {
+ 		t.Fatalf("schema-1 fixture must parse: %v", err)
+ 	}
++	if record := legacyMarker.CodexSeedRecord; record == nil || record.Revision != envregistry.CodexSeedRevisionB || record.NativeMCPServers == nil || len(record.NativeMCPServers) != 0 {
++		t.Fatalf("schema-1 fixture lost the required empty revision-B seed record: %+v", record)
++	}
+ 	if err := os.WriteFile(markerPath, legacyBytes, 0o644); err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -186,3 +192,77 @@ func TestEnvResolveKeepsSchema1BytesForMetadataOnly(t *testing.T) {
+ 		t.Fatalf("metadata-only upgrade changed schema-1 marker bytes:\n%s", after)
+ 	}
+ }
++
++func TestEnvResolvePreservesPreRuleCodexSeedAndReportsUnstrippedHome(t *testing.T) {
++	source, _ := profileHome(t)
++	installCLIEnvProfile(t, source)
++	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
++		t.Fatalf("resolve --repair provision = %d\nstderr:\n%s", code, stderr)
++	}
++	markerPath, payload, _ := cliEnvMarker(t, source, "codex_cli")
++	var object map[string]any
++	if err := json.Unmarshal(payload, &object); err != nil {
++		t.Fatal(err)
++	}
++	object["version"] = float64(envmarker.VersionV1)
++	delete(object, "codex_seed_record")
++	modern, _ := object["passthrough"].([]any)
++	legacy := make([]any, 0, len(modern))
++	for _, value := range modern {
++		fields, _ := value.(map[string]any)
++		path, _ := fields["path"].(string)
++		strategy, _ := fields["strategy"].(string)
++		if strategy == "keyring-preferred" && fields["backend"] == "file" {
++			strategy = "file-link"
++		}
++		legacy = append(legacy, map[string]any{"path": path, "strategy": strategy})
++	}
++	object["passthrough"] = legacy
++	legacyBytes, err := json.MarshalIndent(object, "", "  ")
++	if err != nil {
++		t.Fatal(err)
++	}
++	legacyBytes = append(legacyBytes, '\n')
++	legacyMarker, err := envmarker.Parse(legacyBytes)
++	if err != nil {
++		t.Fatalf("pre-rule schema-1 fixture must parse: %v", err)
++	}
++	if legacyMarker.CodexSeedRecord != nil {
++		t.Fatalf("pre-rule schema-1 fixture unexpectedly has a Codex seed record: %+v", legacyMarker.CodexSeedRecord)
++	}
++	if err := os.WriteFile(markerPath, legacyBytes, 0o644); err != nil {
++		t.Fatal(err)
++	}
++	managedConfig := filepath.Join(filepath.Dir(markerPath), "config.toml")
++	legacyConfig := "model = \"gpt-5-codex\"\n\n[mcp_servers.legacy]\ncommand = \"server\"\nargs = []\n"
++	if err := os.WriteFile(managedConfig, []byte(legacyConfig), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Remove(filepath.Join(filepath.Dir(markerPath), "AGENTS.md")); err != nil {
++		t.Fatal(err)
++	}
++	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
++		t.Fatalf("pre-rule schema-1 repair = %d\nstderr:\n%s", code, stderr)
++	}
++	after, err := os.ReadFile(markerPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if string(after) != string(legacyBytes) {
++		t.Fatalf("metadata-only repair changed the pre-rule schema-1 marker:\n%s", after)
++	}
++	afterConfig, err := os.ReadFile(managedConfig)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if string(afterConfig) != legacyConfig {
++		t.Fatalf("metadata-only repair changed the pre-rule Codex seed:\n%s", afterConfig)
++	}
++	code, stdout, stderr := runProfile(t, source, "env", "status")
++	if code != exitOK {
++		t.Fatalf("env status = %d\nstderr:\n%s", code, stderr)
++	}
++	if !strings.Contains(stdout, "mcp_seed_unstripped: this managed Codex home predates the seed record; re-provision it to apply seed revision B") {
++		t.Fatalf("env status did not report the pre-rule Codex home:\n%s", stdout)
++	}
++}
+diff --git a/cmd/curator/envstatus.go b/cmd/curator/envstatus.go
+index b5bd638e..e157c62c 100644
+--- a/cmd/curator/envstatus.go
++++ b/cmd/curator/envstatus.go
+@@ -36,6 +36,7 @@ func printEnvStatus(stdout io.Writer, status *envprofile.Status) {
+ 	// passable_env_names, the machine-level warnings, and the §2.3
+ 	// surfacing rows for the current profile of each reported scope.
+ 	_, _ = fmt.Fprintf(stdout, "s4_profile: %s, passable_env_names: %s\n", status.S4Profile, formatPassable(status.PassableEnvNames))
++	_, _ = fmt.Fprintf(stdout, "codex-seed: revision %s (%s)\n", status.CodexSeedRule.Revision, status.CodexSeedRule.Provenance)
+ 	for _, warning := range status.Warnings {
+ 		_, _ = fmt.Fprintf(stdout, "warning: %s\n", warning)
+ 	}
+@@ -75,6 +76,15 @@ func printEnvStatus(stdout io.Writer, status *envprofile.Status) {
+ 		if len(home.Seeds) > 0 {
+ 			_, _ = fmt.Fprintf(stdout, "  seeds: %s\n", joinComma(home.Seeds))
+ 		}
++		if home.CodexSeedRecord != nil {
++			names := "none"
++			if len(home.NativeMCPServers) > 0 {
++				names = joinComma(home.NativeMCPServers)
++			}
++			_, _ = fmt.Fprintf(stdout, "  codex-seed-record: revision %s; native MCP servers %s (%s)\n", home.CodexSeedRecord.Revision, names, home.NativeMCPServersDisposition)
++		} else if home.NativeMCPServersDisposition == "unknown" {
++			_, _ = fmt.Fprintln(stdout, "  codex-seed-record: absent; native MCP servers unknown")
++		}
+ 		if len(home.SeedLinks) > 0 {
+ 			_, _ = fmt.Fprintf(stdout, "  seed-links: %s\n", joinComma(home.SeedLinks))
+ 		}
+@@ -167,13 +177,8 @@ func derefProvider(value *string) string {
+ // matrix: a refused, missing, or unreadable provider row is
+ // non-current, so env status --check fails while one stands.
+ func attachProviderPosture(cfg *config.Config, status *envprofile.Status) {
+-	var projectBins []string
+-	for _, project := range cfg.Projects {
+-		projectBins = append(projectBins, filepath.Join(project.Path, ".agents", "bin"))
+-	}
+-	sort.Strings(projectBins)
+ 	var diagnostic *envprofile.StateDiagnostic
+-	status.Providers, diagnostic = providerPosture(cfg.Home(), cfg.Env.ProviderDirectories, projectBins)
++	status.Providers, diagnostic = providerPostureForConfig(cfg, nil)
+ 	if diagnostic != nil {
+ 		status.Diagnostics = append(status.Diagnostics, *diagnostic)
+ 		status.NonCurrent = true
+@@ -224,6 +229,15 @@ func formatRegistryPosture(row registry.BoundaryPosture) string {
+ 		row.Name, row.URL, *row.HighWaterVersion, *row.HighWaterLogSize, verified)
+ }
+ 
++func providerPostureForConfig(cfg *config.Config, pathOverride *string) ([]envprofile.ProviderState, *envprofile.StateDiagnostic) {
++	var projectBins []string
++	for _, project := range cfg.Projects {
++		projectBins = append(projectBins, filepath.Join(project.Path, ".agents", "bin"))
++	}
++	sort.Strings(projectBins)
++	return providerPostureWithPath(cfg.Home(), cfg.Env.ProviderDirectories, projectBins, pathOverride)
++}
++
+ // formatPassable renders the effective passable_env_names: unbounded for
+ // a nil list, otherwise the compact JSON array.
+ func formatPassable(names []string) string {
+diff --git a/cmd/curator/envstatus_test.go b/cmd/curator/envstatus_test.go
+new file mode 100644
+index 00000000..0e9f70df
+--- /dev/null
++++ b/cmd/curator/envstatus_test.go
+@@ -0,0 +1,108 @@
++package main
++
++import (
++	"bytes"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/envmarker"
++	"github.com/relux-works/curator/internal/envprofile"
++	"github.com/relux-works/curator/internal/envregistry"
++)
++
++func TestPrintEnvStatusShowsCodexSeedPostureAndNames(t *testing.T) {
++	var output bytes.Buffer
++	printEnvStatus(&output, &envprofile.Status{
++		CodexSeedRule: envprofile.CodexSeedRuleState{Revision: envregistry.CodexSeedRevisionB, Provenance: "shipped"},
++		Homes: []envprofile.HomeState{{
++			Profile:                     "acme",
++			Environment:                 envregistry.CodexCLI,
++			Provisioned:                 true,
++			Current:                     true,
++			CodexSeedRecord:             &envmarker.CodexSeedRecord{Revision: envregistry.CodexSeedRevisionB, NativeMCPServers: []string{"figma"}},
++			NativeMCPServers:            []string{"figma"},
++			NativeMCPServersDisposition: "not-inherited",
++			Warnings:                    []string{envregistry.DiagMCPNativeServersNotInherited + ": figma"},
++		}},
++	})
++	text := output.String()
++	for _, want := range []string{
++		"codex-seed: revision B (shipped)",
++		"codex-seed-record: revision B; native MCP servers figma (not-inherited)",
++		"warning: mcp_native_servers_not_inherited: figma",
++	} {
++		if !strings.Contains(text, want) {
++			t.Errorf("env status output omitted %q:\n%s", want, text)
++		}
++	}
++}
++
++func TestEnvStatusReportsStrippedNativeCodexServers(t *testing.T) {
++	source, _ := profileHome(t)
++	installCLIEnvProfile(t, source)
++	configPath := filepath.Join(os.Getenv("CODEX_HOME"), "config.toml")
++	nativeConfig := "model = \"gpt-5-codex\"\n\n[mcp_servers.figma]\ncommand = \"server\"\nargs = []\n"
++	if err := os.WriteFile(configPath, []byte(nativeConfig), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
++		t.Fatalf("env resolve codex_cli --repair = %d\nstderr:\n%s", code, stderr)
++	} else if !strings.Contains(stderr, "mcp_native_servers_not_inherited: native Codex MCP servers figma") {
++		t.Fatalf("env resolve omitted the stripped-server warning:\n%s", stderr)
++	}
++	code, stdout, stderr := runProfile(t, source, "env", "status")
++	if code != exitOK {
++		t.Fatalf("env status = %d\nstderr:\n%s", code, stderr)
++	}
++	for _, want := range []string{
++		"codex-seed: revision B (shipped)",
++		"codex-seed-record: revision B; native MCP servers figma (not-inherited)",
++		"warning: mcp_native_servers_not_inherited: native Codex MCP servers figma were stripped from config.toml and are not inherited",
++	} {
++		if !strings.Contains(stdout, want) {
++			t.Errorf("env status omitted %q:\n%s", want, stdout)
++		}
++	}
++}
++
++func TestEnvResolveStripsAndReportsInlineNativeCodexMCPTable(t *testing.T) {
++	source, _ := profileHome(t)
++	installCLIEnvProfile(t, source)
++	configPath := filepath.Join(os.Getenv("CODEX_HOME"), "config.toml")
++	nativeConfig := `model = "gpt-5-codex"
++mcp_servers = { local = { command = "server", args = [] } }
++`
++	if err := os.WriteFile(configPath, []byte(nativeConfig), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
++		t.Fatalf("env resolve codex_cli --repair = %d\nstderr:\n%s", code, stderr)
++	} else if !strings.Contains(stderr, "mcp_native_servers_not_inherited: native Codex MCP servers local") {
++		t.Fatalf("env resolve omitted the inline-table warning:\n%s", stderr)
++	}
++
++	seededPath := filepath.Join(envprofile.ManagedHomeDir(source.cfg.Home(), "acme", envregistry.CodexCLI), "config.toml")
++	seeded, err := os.ReadFile(seededPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if strings.Contains(string(seeded), "mcp_servers") || strings.Contains(string(seeded), `command = "server"`) {
++		t.Fatalf("inline native MCP table reached the managed config.toml: %s", seeded)
++	}
++	if !strings.Contains(string(seeded), `model = "gpt-5-codex"`) {
++		t.Fatalf("stripping inline native MCP table lost other Codex config: %s", seeded)
++	}
++
++	code, stdout, stderr := runProfile(t, source, "env", "status")
++	if code != exitOK {
++		t.Fatalf("env status = %d\nstderr:\n%s", code, stderr)
++	}
++	if !strings.Contains(stdout, "native MCP servers local (not-inherited)") {
++		t.Fatalf("env status omitted inline-table server name:\n%s", stdout)
++	}
++	if strings.Contains(stdout, `command = "server"`) {
++		t.Fatalf("env status exposed the native MCP server command:\n%s", stdout)
++	}
++}
+diff --git a/cmd/curator/main.go b/cmd/curator/main.go
+index f20d9738..845e728e 100644
+--- a/cmd/curator/main.go
++++ b/cmd/curator/main.go
+@@ -186,6 +186,10 @@ type cli struct {
+ 	stdout   io.Writer
+ 	stderr   io.Writer
+ 	userHome func() (string, error)
++	// providerPathOverride is used by in-process CLI tests to make the
++	// status and umbrella paths hermetic without changing process PATH.
++	// Production callers leave it nil and use the host environment.
++	providerPathOverride *string
+ 	// unmanageBackupLstat and unmanageBackupReadDir are backup-inventory test
+ 	// seams; production commands leave them nil and envprofile uses stateread.
+ 	unmanageBackupLstat   func(string) (stateread.Metadata, error)
+@@ -838,6 +842,13 @@ func (c cli) cmdStatus(args []string) int {
+ 			registryStateUnreadable = true
+ 		}
+ 	}
++	providers, providerDiagnostic := providerPostureForConfig(cfg, c.providerPathOverride)
++	providersCurrent := providerDiagnostic == nil
++	for _, provider := range providers {
++		if !provider.Current {
++			providersCurrent = false
++		}
++	}
+ 
+ 	exitCode := exitOK
+ 	jsonResults := make([]map[string]any, 0, len(targets))
+@@ -901,10 +912,16 @@ func (c cli) cmdStatus(args []string) int {
+ 		// travel under their own key, present only when non-empty, so a
+ 		// JSON consumer sees the same read failures the human output
+ 		// prints.
+-		payload := map[string]any{"alias": target.Alias, "path": target.Root, "skills": drift, "shell_hook_trust": trustRows}
++		payload := map[string]any{
++			"alias": target.Alias, "path": target.Root, "skills": drift,
++			"shell_hook_trust": trustRows, "providers": providers,
++		}
+ 		if len(registryRows) > 0 {
+ 			payload["registry_posture"] = registryRows
+ 		}
++		if providerDiagnostic != nil {
++			payload["provider_diagnostic"] = providerDiagnostic
++		}
+ 		if len(trustWarnings) > 0 {
+ 			payload["shell_hook_trust_warnings"] = trustWarnings
+ 		}
+@@ -941,6 +958,12 @@ func (c cli) cmdStatus(args []string) int {
+ 		for _, row := range registryRows {
+ 			_, _ = fmt.Fprintln(c.stdout, formatRegistryPosture(row))
+ 		}
++		if providerDiagnostic != nil {
++			_, _ = fmt.Fprintf(c.stdout, "provider diagnostic %s: %s: %s\n", providerDiagnostic.Code, providerDiagnostic.Path, providerDiagnostic.Detail)
++		}
++		for _, provider := range providers {
++			_, _ = fmt.Fprintf(c.stdout, "provider %s: %s\n", provider.Name, describeProvider(provider))
++		}
+ 	}
+ 	// A changed file, a recorded file whose bytes are missing or
+ 	// unreadable, or an unreadable approval state is non-current; an
+@@ -952,6 +975,9 @@ func (c cli) cmdStatus(args []string) int {
+ 	if *check && registryStateUnreadable {
+ 		exitCode = exitFail
+ 	}
++	if *check && !providersCurrent {
++		exitCode = exitFail
++	}
+ 	if *jsonOut {
+ 		var output any = jsonResults
+ 		if len(jsonResults) == 1 {
+diff --git a/cmd/curator/profile_test.go b/cmd/curator/profile_test.go
+index c9c50bd0..723aad19 100644
+--- a/cmd/curator/profile_test.go
++++ b/cmd/curator/profile_test.go
+@@ -10,6 +10,7 @@ import (
+ 
+ 	"github.com/relux-works/curator/internal/config"
+ 	"github.com/relux-works/curator/internal/envmarker"
++	"github.com/relux-works/curator/internal/pathboundary"
+ )
+ 
+ // These tests drive the production run() entry point for the profile rows.
+@@ -42,6 +43,9 @@ func writeContextPackage(t *testing.T, root, name, version, module string) {
+ 	if err := os.WriteFile(filepath.Join(root, "context", "a.md"), []byte(module), 0o644); err != nil {
+ 		t.Fatal(err)
+ 	}
++	if err := pathboundary.ProtectTree(root); err != nil {
++		t.Fatalf("protect path package fixture: %v", err)
++	}
+ }
+ 
+ func runProfile(t *testing.T, source stubConfigSource, args ...string) (int, string, string) {
+@@ -237,6 +241,23 @@ func TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable(t *testing
+ 	}
+ }
+ 
++// TestProfileInstallRefusesPathMCPDeclarationThroughCLI drives the rc.13
++// path-kind MCP refusal through the production profile install command.
++func TestProfileInstallRefusesPathMCPDeclarationThroughCLI(t *testing.T) {
++	source, _ := profileHome(t)
++	root := t.TempDir()
++	writeContextPackage(t, root, "acme", "1.0.0", "hello\n")
++	mcp := `{"schema_version":1,"name":"figma-devmode","version":"1.2.0","server":{"transport":"stdio","command":"npx","args":["-y","figma-developer-mcp","--stdio"],"env_names":[]}}` + "\n"
++	if err := os.WriteFile(filepath.Join(root, "agent-mcp.json"), []byte(mcp), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	code, _, stderr := runProfile(t, source, "profile", "install", root)
++	if code != exitFail || !strings.Contains(stderr, "mcp_declaration_path_source_refused") ||
++		!strings.Contains(stderr, `package "acme"`) || !strings.Contains(stderr, `declaration "figma-devmode"`) {
++		t.Fatalf("profile install = %d, stderr %q; want the rc.13 refusal naming the package and declaration", code, stderr)
++	}
++}
++
+ // TestProfileUseUnknownIsAFailure narrows the lookup gate: switching to a
+ // profile that is not installed fails with exit 1, never success.
+ func TestProfileUseUnknownIsAFailure(t *testing.T) {
+diff --git a/cmd/curator/status_test.go b/cmd/curator/status_test.go
+index 6db625fd..a5885c4b 100644
+--- a/cmd/curator/status_test.go
++++ b/cmd/curator/status_test.go
+@@ -22,6 +22,7 @@ import (
+ 	"github.com/relux-works/curator/internal/buildmeta"
+ 	"github.com/relux-works/curator/internal/closureexec"
+ 	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/envprofile"
+ 	"github.com/relux-works/curator/internal/godriver"
+ 	"github.com/relux-works/curator/internal/hookapproval"
+ 	"github.com/relux-works/curator/internal/install"
+@@ -87,21 +88,53 @@ func TestCLIHelperProcess(t *testing.T) {
+ func capture(t *testing.T, configPath string, args ...string) (int, string, string) {
+ 	t.Helper()
+ 	userHome := filepath.Join(filepath.Dir(filepath.Dir(configPath)), "user")
++	if len(args) > 0 && args[0] == "status" {
++		path := statusProviderPath(t, os.Getenv("PATH"))
++		return captureWithUserHomeAndProviderPath(t, configPath, func() (string, error) { return userHome, nil }, &path, args...)
++	}
+ 	return captureWithUserHome(t, configPath, func() (string, error) { return userHome, nil }, args...)
+ }
+ 
+ func captureWithUserHome(t *testing.T, configPath string, userHome func() (string, error), args ...string) (int, string, string) {
++	return captureWithUserHomeAndProviderPath(t, configPath, userHome, nil, args...)
++}
++
++func captureWithUserHomeAndProviderPath(t *testing.T, configPath string, userHome func() (string, error), providerPath *string, args ...string) (int, string, string) {
+ 	t.Helper()
+ 	var stdout, stderr strings.Builder
+-	command := cli{config: fileConfigSource(configPath), stdout: &stdout, stderr: &stderr, userHome: userHome}
++	command := cli{config: fileConfigSource(configPath), stdout: &stdout, stderr: &stderr, userHome: userHome, providerPathOverride: providerPath}
+ 	code := command.run(args)
+ 	return code, stdout.String(), stderr.String()
+ }
+ 
++func statusProviderPath(t *testing.T, inherited string) string {
++	t.Helper()
++	dir := t.TempDir()
++	extension := ""
++	if runtime.GOOS == "windows" {
++		extension = ".exe"
++	}
++	for _, name := range []string{"curator-run", "curator-session"} {
++		if err := os.WriteFile(filepath.Join(dir, name+extension), []byte("status provider fixture\n"), 0o755); err != nil {
++			t.Fatal(err)
++		}
++	}
++	if inherited == "" {
++		return dir
++	}
++	return dir + string(os.PathListSeparator) + inherited
++}
++
+ // captureWithEnv drives the real CLI core in an isolated helper process for
+ // cases whose contract is specifically about process environment selection.
+ func captureWithEnv(t *testing.T, configPath string, environment map[string]string, args ...string) (int, string, string) {
+ 	t.Helper()
++	environment = cloneEnvironment(environment)
++	if len(args) > 0 && args[0] == "status" {
++		if _, explicit := environment["PATH"]; !explicit {
++			environment["PATH"] = statusProviderPath(t, os.Getenv("PATH"))
++		}
++	}
+ 	commandArgs := []string{"-test.run=^TestCLIHelperProcess$", "--"}
+ 	commandArgs = append(commandArgs, args...)
+ 	command := exec.Command(os.Args[0], commandArgs...)
+@@ -132,12 +165,21 @@ func captureWithEnv(t *testing.T, configPath string, environment map[string]stri
+ 	return code, stdout.String(), stderr.String()
+ }
+ 
++func cloneEnvironment(environment map[string]string) map[string]string {
++	clone := make(map[string]string, len(environment))
++	for key, value := range environment {
++		clone[key] = value
++	}
++	return clone
++}
++
+ // statusPayload is the machine-readable status document one project produces.
+ type statusPayload struct {
+-	Alias  string            `json:"alias"`
+-	Path   string            `json:"path"`
+-	Skills map[string]string `json:"skills"`
+-	Builds []buildReport     `json:"builds"`
++	Alias     string                     `json:"alias"`
++	Path      string                     `json:"path"`
++	Skills    map[string]string          `json:"skills"`
++	Builds    []buildReport              `json:"builds"`
++	Providers []envprofile.ProviderState `json:"providers"`
+ }
+ 
+ func decodeStatus(t *testing.T, payload string) statusPayload {
+@@ -1738,16 +1780,17 @@ func TestStatusJSONKeepsTheLegacyShapeWithoutCompiledCommands(t *testing.T) {
+ 	if err := json.Unmarshal([]byte(stdout), &object); err != nil {
+ 		t.Fatalf("status --json is not one JSON object: %v\n%s", err, stdout)
+ 	}
+-	// The §8.6 posture extends the historical document additively: the
+-	// three legacy keys keep their shape, and the trust rows arrive under
+-	// exactly one new key. A closure without compiled commands still
+-	// carries no build key at all.
+-	if len(object) != 4 || object["alias"] == nil || object["path"] == nil || object["skills"] == nil {
++	// The §8.6 and §11 postures extend the document additively. A closure
++	// without compiled commands still carries no build key at all.
++	if len(object) != 5 || object["alias"] == nil || object["path"] == nil || object["skills"] == nil {
+ 		t.Fatalf("status --json changed the historical document shape:\n%s", stdout)
+ 	}
+ 	if object["builds"] != nil {
+ 		t.Fatalf("status --json without compiled commands carries a builds key:\n%s", stdout)
+ 	}
++	if len(decodeStatus(t, stdout).Providers) != 2 {
++		t.Fatalf("status providers = %+v, want the always-reported run and session rows", decodeStatus(t, stdout).Providers)
++	}
+ 	rows, ok := object["shell_hook_trust"].([]any)
+ 	if !ok || len(rows) != 2 {
+ 		t.Fatalf("shell_hook_trust = %v, want the two install-recorded files", object["shell_hook_trust"])
+@@ -1780,6 +1823,132 @@ func TestStatusJSONKeepsTheLegacyShapeWithoutCompiledCommands(t *testing.T) {
+ 	}
+ }
+ 
++func TestCuratorStatusProviderPostureAndCheck(t *testing.T) {
++	_, home := legacyProject(t)
++	configPath := filepath.Join(home, "config.json")
++	if code, _, stderr := capture(t, configPath, "install", "app"); code != exitOK {
++		t.Fatalf("install = %d\n%s", code, stderr)
++	}
++
++	withoutProviders := pathWithoutUmbrellaProviders(t, os.Getenv("PATH"))
++	providerPath := statusProviderPath(t, withoutProviders)
++	providerDir := filepath.SplitList(providerPath)[0]
++	code, stdout, stderr := captureWithEnv(t, configPath, map[string]string{"PATH": providerPath}, "status", "app", "--json")
++	if code != exitOK {
++		t.Fatalf("status = %d\nstderr:\n%s", code, stderr)
++	}
++	report := decodeStatus(t, stdout)
++	byName := make(map[string]envprofile.ProviderState, len(report.Providers))
++	for _, row := range report.Providers {
++		byName[row.Name] = row
++	}
++	for _, name := range []string{"run", "session"} {
++		row, ok := byName[name]
++		if !ok {
++			t.Fatalf("status omitted always-reported curator-%s row: %+v", name, report.Providers)
++		}
++		wantPath := filepath.Join(providerDir, "curator-"+name)
++		if runtime.GOOS == "windows" {
++			wantPath += ".exe"
++		}
++		if row.Resolved == nil || *row.Resolved != wantPath || row.Verdict != envprofile.ProviderOutsideTrustRoots || !row.Current {
++			t.Fatalf("status row %s = %+v, want resolved warning row for %s", name, row, wantPath)
++		}
++		if len(row.TrustRoots) == 0 {
++			t.Fatalf("status row %s names no trust roots: %+v", name, row)
++		}
++	}
++	if code, _, stderr := captureWithEnv(t, configPath, map[string]string{"PATH": providerPath}, "status", "app", "--check"); code != exitOK {
++		t.Fatalf("current warning rows made status --check fail: %d\n%s", code, stderr)
++	}
++
++	code, stdout, stderr = captureWithEnv(t, configPath, map[string]string{"PATH": withoutProviders}, "status", "app", "--json", "--check")
++	if code != exitFail {
++		t.Fatalf("missing provider rows made status --check = %d, want %d\n%s", code, exitFail, stderr)
++	}
++	report = decodeStatus(t, stdout)
++	for _, name := range []string{"run", "session"} {
++		row := findProviderState(t, report.Providers, name)
++		if row.Verdict != envprofile.ProviderMissing || row.Current || row.Diagnostic == nil || *row.Diagnostic != providerDiagnosticMissing {
++			t.Fatalf("missing row %s = %+v", name, row)
++		}
++	}
++	code, human, stderr := captureWithEnv(t, configPath, map[string]string{"PATH": providerPath}, "status", "app")
++	if code != exitOK || !strings.Contains(human, "provider run:") || !strings.Contains(human, providerDir) || !strings.Contains(human, providerDiagnosticOutsideRoots) {
++		t.Fatalf("human provider posture = %d\n%s\nstderr:\n%s", code, human, stderr)
++	}
++
++	// A configured trust root that cannot be read is reported as unreadable,
++	// and it outranks the PATH provider just as it does during dispatch.
++	unreadableRoot := filepath.Join(t.TempDir(), "missing-provider-root")
++	configBytes, err := os.ReadFile(configPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var configDocument map[string]any
++	if err := json.Unmarshal(configBytes, &configDocument); err != nil {
++		t.Fatal(err)
++	}
++	configDocument["schema_version"] = 2
++	environments, _ := configDocument["environments"].(map[string]any)
++	if environments == nil {
++		environments = map[string]any{}
++	}
++	environments["provider_directories"] = []any{unreadableRoot}
++	configDocument["environments"] = environments
++	configBytes, err = json.Marshal(configDocument)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(configPath, configBytes, 0o644); err != nil {
++		t.Fatal(err)
++	}
++	code, stdout, stderr = captureWithEnv(t, configPath, map[string]string{"PATH": providerPath}, "status", "app", "--json", "--check")
++	if code != exitFail {
++		t.Fatalf("unreadable provider root made status --check = %d, want %d\n%s", code, exitFail, stderr)
++	}
++	report = decodeStatus(t, stdout)
++	for _, name := range []string{"run", "session"} {
++		row := findProviderState(t, report.Providers, name)
++		if row.Verdict != envprofile.ProviderUnreadable || row.Current || row.Diagnostic == nil || *row.Diagnostic != providerDiagnosticRootUnreadable || row.UnreadableDirectory == nil || *row.UnreadableDirectory != unreadableRoot {
++			t.Fatalf("unreadable row %s = %+v, want the first unreadable root %q", name, row, unreadableRoot)
++		}
++	}
++}
++
++func pathWithoutUmbrellaProviders(t *testing.T, path string) string {
++	t.Helper()
++	var kept []string
++	for _, dir := range filepath.SplitList(path) {
++		containsProvider := false
++		for _, name := range []string{"curator-run", "curator-session"} {
++			candidate := filepath.Join(dir, name)
++			if runtime.GOOS == "windows" {
++				candidate += ".exe"
++			}
++			if info, err := os.Stat(candidate); err == nil && info.Mode().IsRegular() {
++				containsProvider = true
++				break
++			}
++		}
++		if !containsProvider {
++			kept = append(kept, dir)
++		}
++	}
++	return strings.Join(kept, string(os.PathListSeparator))
++}
++
++func findProviderState(t *testing.T, rows []envprofile.ProviderState, name string) envprofile.ProviderState {
++	t.Helper()
++	for _, row := range rows {
++		if row.Name == name {
++			return row
++		}
++	}
++	t.Fatalf("provider row %q is missing from %+v", name, rows)
++	return envprofile.ProviderState{}
++}
++
+ // TestStatusAcceptsAnUnchangedLegacyMarkerSchema pins the legacy contract: a
+ // marker below the current schema still describes a current schema 1 through 5
+ // installation and must not be reported as unsupported.
+diff --git a/cmd/curator/umbrella.go b/cmd/curator/umbrella.go
+index a25b2153..ff64c21e 100644
+--- a/cmd/curator/umbrella.go
++++ b/cmd/curator/umbrella.go
+@@ -149,7 +149,7 @@ func resolveRevisionA(exe string, in providerInputs, roots []string) providerOut
+ 	if insideTrustRoots(canonical, roots) {
+ 		return providerOutcome{resolved: absolute, roots: roots, revision: providerRevisionA}
+ 	}
+-	return providerOutcome{resolved: absolute, warned: true, diagnostic: providerDiagnosticOutsideRoots, roots: roots, revision: providerRevisionA, hintDir: filepath.Dir(absolute)}
++	return providerOutcome{resolved: absolute, warned: true, diagnostic: providerDiagnosticOutsideRoots, roots: roots, revision: providerRevisionA, hintDir: filepath.Dir(canonical)}
+ }
+ 
+ // resolveRevisionB searches the trust roots in order for the first
+@@ -173,6 +173,13 @@ func resolveRevisionB(exe string, in providerInputs, roots []string) providerOut
+ 		if refused, label := refuseDir(canonical, in.publishedDirs, in.managedRoots); refused {
+ 			return providerOutcome{diagnostic: providerDiagnosticUntrusted, roots: roots, revision: providerRevisionB, untrustedPath: absolute, refusedLabel: label}
+ 		}
++		// A directory entry inside a trust root is not enough: a symlink
++		// can point at executable bytes the configured roots do not trust.
++		// Refuse that candidate instead of dispatching it or falling through
++		// to another root.
++		if !insideTrustRoots(canonical, roots) {
++			return providerOutcome{diagnostic: providerDiagnosticUntrusted, roots: roots, revision: providerRevisionB, untrustedPath: absolute}
++		}
+ 		return providerOutcome{resolved: absolute, roots: roots, revision: providerRevisionB}
+ 	}
+ 	if match, found := searchOrderedDirs(exe, in.pathEntries, in); found {
+@@ -382,6 +389,13 @@ func findProvider(name string, in providerInputs) (path, warning string, err err
+ // (the user-bin shim directory, the managed skill bin directories, and
+ // the environments root), and the ambient PATH.
+ func providerInputsForHost(home string, providerDirs, projectBinDirs []string, revision providerRevision) (providerInputs, error) {
++	return providerInputsForHostWithPath(home, providerDirs, projectBinDirs, revision, nil)
++}
++
++// providerInputsForHostWithPath is the host builder with an optional PATH
++// override. Production leaves the override nil; CLI tests inject a private
++// search path without mutating the process environment.
++func providerInputsForHostWithPath(home string, providerDirs, projectBinDirs []string, revision providerRevision, pathOverride *string) (providerInputs, error) {
+ 	executable, err := os.Executable()
+ 	if err != nil {
+ 		return providerInputs{}, fmt.Errorf("cannot determine the manager install directory: %v", err)
+@@ -391,7 +405,11 @@ func providerInputsForHost(home string, providerDirs, projectBinDirs []string, r
+ 	}
+ 	published := []labeledDir{}
+ 	userHome, _ := os.UserHomeDir()
+-	selection := globalbins.Select(home, runtime.GOOS, pathEnvironment(), userHome)
++	environment := pathEnvironment()
++	if pathOverride != nil {
++		environment["PATH"] = *pathOverride
++	}
++	selection := globalbins.Select(home, runtime.GOOS, environment, userHome)
+ 	if selection.Path != "" {
+ 		refused, err := userBinShimRefused(selection)
+ 		if err != nil {
+@@ -410,7 +428,7 @@ func providerInputsForHost(home string, providerDirs, projectBinDirs []string, r
+ 		providerDirs:  providerDirs,
+ 		publishedDirs: published,
+ 		managedRoots:  []labeledDir{{path: filepath.Join(home, "environments"), label: "the environments root"}},
+-		pathEntries:   filepath.SplitList(os.Getenv("PATH")),
++		pathEntries:   filepath.SplitList(environment["PATH"]),
+ 		platform:      runtime.GOOS,
+ 		pathExt:       windowsPathExt(),
+ 		revision:      revision,
+@@ -584,7 +602,11 @@ func discoverProviderNames(in providerInputs) []string {
+ // refusal, missing, or an unreadable trust root. A refused or failed
+ // provider row is non-current; the warning row stays current.
+ func providerPosture(home string, providerDirs, projectBinDirs []string) ([]envprofile.ProviderState, *envprofile.StateDiagnostic) {
+-	in, err := providerInputsForHost(home, providerDirs, projectBinDirs, activeProviderRevision)
++	return providerPostureWithPath(home, providerDirs, projectBinDirs, nil)
++}
++
++func providerPostureWithPath(home string, providerDirs, projectBinDirs []string, pathOverride *string) ([]envprofile.ProviderState, *envprofile.StateDiagnostic) {
++	in, err := providerInputsForHostWithPath(home, providerDirs, projectBinDirs, activeProviderRevision, pathOverride)
+ 	if err != nil {
+ 		var stateErr *stateread.Error
+ 		if errors.As(err, &stateErr) {
+@@ -684,7 +706,7 @@ func (c cli) cmdUmbrella(cfg *config.Config, home string, args []string) int {
+ 		}
+ 		sort.Strings(projectBins)
+ 	}
+-	in, err := providerInputsForHost(home, providerDirs, projectBins, activeProviderRevision)
++	in, err := providerInputsForHostWithPath(home, providerDirs, projectBins, activeProviderRevision, c.providerPathOverride)
+ 	if err != nil {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitFail
+diff --git a/cmd/curator/umbrella_test.go b/cmd/curator/umbrella_test.go
+index 579b50ba..223ad2d3 100644
+--- a/cmd/curator/umbrella_test.go
++++ b/cmd/curator/umbrella_test.go
+@@ -131,6 +131,51 @@ func TestUmbrellaHostilePathPlantRefusedUnderB(t *testing.T) {
+ 	}
+ }
+ 
++func TestUmbrellaTrustedRootSymlinkEscape(t *testing.T) {
++	tmp := t.TempDir()
++	install := filepath.Join(tmp, "install")
++	later := filepath.Join(tmp, "later")
++	outside := filepath.Join(tmp, "outside")
++	for _, dir := range []string{install, later, outside} {
++		if err := os.MkdirAll(dir, 0o755); err != nil {
++			t.Fatal(err)
++		}
++	}
++	target := writeProviderFile(t, outside, "curator-run", true)
++	link := filepath.Join(install, "curator-run")
++	if runtime.GOOS == "windows" {
++		link += ".exe"
++	}
++	if err := os.Symlink(target, link); err != nil {
++		t.Skipf("host cannot create the provider symlink fixture: %v", err)
++	}
++	fallback := writeProviderFile(t, later, "curator-run", true)
++
++	for _, revision := range []providerRevision{providerRevisionA, providerRevisionB} {
++		in := umbrellaInputs(install, []string{later}, []string{install}, revision)
++		outcome := resolveProvider("run", in)
++		switch revision {
++		case providerRevisionA:
++			if outcome.resolved != link || !outcome.warned || outcome.diagnostic != providerDiagnosticOutsideRoots {
++				t.Fatalf("revision A symlink outcome = %+v, want PATH selection with the outside-roots warning", outcome)
++			}
++			if outcome.hintDir != canonicalPath(outside) {
++				t.Fatalf("revision A hint = %q, want the resolved target directory %q", outcome.hintDir, canonicalPath(outside))
++			}
++		case providerRevisionB:
++			if outcome.resolved != "" || outcome.diagnostic != providerDiagnosticUntrusted || outcome.untrustedPath != link {
++				t.Fatalf("revision B symlink outcome = %+v, want a refusal of %q before considering later candidate %q", outcome, link, fallback)
++			}
++			message := outcome.failure("run")
++			for _, want := range []string{providerDiagnosticUntrusted, link, install, later} {
++				if !strings.Contains(message, want) {
++					t.Fatalf("revision B refusal misses %q: %s", want, message)
++				}
++			}
++		}
++	}
++}
++
+ // TestUmbrellaTrustRootSelectionBothRevisions pins the selection
+ // matrix: install dir first, listed order, non-executables skipped,
+ // never descending, and the revision-A PATH-only semantics.
+diff --git a/internal/contextpkg/contextpkg.go b/internal/contextpkg/contextpkg.go
+index 62009ce1..66148228 100644
+--- a/internal/contextpkg/contextpkg.go
++++ b/internal/contextpkg/contextpkg.go
+@@ -433,6 +433,25 @@ func LoadMCP(root string) (*MCPManifest, error) {
+ 	return ParseMCP(payload)
+ }
+ 
++// LoadMCPIfPresent reads an optional declaration from a path-kind context
++// package. Absence means the context package carries no MCP declaration;
++// unreadable or malformed bytes remain errors.
++func LoadMCPIfPresent(root string) (*MCPManifest, bool, error) {
++	path := filepath.Join(root, MCPManifestName)
++	file, err := stateread.ReadFile(path) // #nosec G304 -- operator-selected package root
++	if err != nil {
++		return nil, false, err
++	}
++	if file.Kind == stateread.KindAbsent {
++		return nil, false, nil
++	}
++	manifest, err := ParseMCP(file.Bytes)
++	if err != nil {
++		return nil, true, err
++	}
++	return manifest, true, nil
++}
++
+ // ParseMCP validates agent-mcp.json bytes.
+ func ParseMCP(payload []byte) (*MCPManifest, error) {
+ 	object, err := decodeObject(payload, DiagMCPInvalid, MCPManifestName)
+diff --git a/internal/envmarker/envmarker.go b/internal/envmarker/envmarker.go
+index 3d92a7ee..c9395ef0 100644
+--- a/internal/envmarker/envmarker.go
++++ b/internal/envmarker/envmarker.go
+@@ -150,8 +150,9 @@ type Passthrough struct {
+ 	pathSet        bool
+ }
+ 
+-// CodexSeedRecord is the schema-v2 snapshot of native MCP server names
+-// preserved by a managed Codex home.
++// CodexSeedRecord is the native MCP server-name snapshot preserved by a
++// managed Codex home. It is valid in both marker versions: the seed-rule
++// record is independent of the versioned credential record (§8.2).
+ type CodexSeedRecord struct {
+ 	Revision         string   `json:"revision"`
+ 	NativeMCPServers []string `json:"native_mcp_servers"`
+@@ -272,9 +273,6 @@ func (m *Marker) Validate() error {
+ 			}
+ 		}
+ 		if m.CodexSeedRecord != nil {
+-			if m.Version != VersionV2 {
+-				return fmt.Errorf("codex_seed_record requires schema 2")
+-			}
+ 			if m.CodexSeedRecord.Revision != "A" && m.CodexSeedRecord.Revision != "B" {
+ 				return fmt.Errorf("codex_seed_record revision is not A or B")
+ 			}
+diff --git a/internal/envprofile/codex_seed_test.go b/internal/envprofile/codex_seed_test.go
+new file mode 100644
+index 00000000..9c87de88
+--- /dev/null
++++ b/internal/envprofile/codex_seed_test.go
+@@ -0,0 +1,417 @@
++package envprofile
++
++import (
++	"bytes"
++	"encoding/json"
++	"fmt"
++	"os"
++	"path/filepath"
++	"reflect"
++	"sort"
++	"strings"
++	"testing"
++
++	"github.com/BurntSushi/toml"
++	"github.com/relux-works/curator/internal/conformancecoverage"
++	"github.com/relux-works/curator/internal/envmarker"
++	"github.com/relux-works/curator/internal/envregistry"
++)
++
++const codexSeedVectorFile = "environments-codex-seed.json"
++
++type codexSeedProvisioningVector struct {
++	Name         string `json:"name"`
++	Revision     string `json:"revision"`
++	NativeConfig string `json:"native_config_toml"`
++	Expected     struct {
++		SeededHasMCP    bool                       `json:"seeded_has_mcp_servers"`
++		SeededTopLevel  []string                   `json:"seeded_top_level_members"`
++		SeededMembers   map[string]any             `json:"seeded_members"`
++		Names           []string                   `json:"names"`
++		Diagnostic      *string                    `json:"diagnostic"`
++		MigrationHint   bool                       `json:"migration_hint"`
++		CodexSeedRecord *envmarker.CodexSeedRecord `json:"codex_seed_record"`
++	} `json:"expected"`
++}
++
++type codexSeedPostureVector struct {
++	Name            string                     `json:"name"`
++	RevisionShipped string                     `json:"revision_shipped"`
++	Environment     string                     `json:"environment"`
++	Record          *envmarker.CodexSeedRecord `json:"codex_seed_record"`
++	Expected        struct {
++		CodexSeedRow string   `json:"codex_seed_row"`
++		Diagnostics  []string `json:"status_diagnostics"`
++		NamesListed  []string `json:"names_listed"`
++		ListedAs     string   `json:"listed_as"`
++		RepairHint   bool     `json:"repair_hint"`
++		RowCurrent   bool     `json:"row_current"`
++	} `json:"expected"`
++}
++
++type codexSeedVectorSet struct {
++	Provisioning []codexSeedProvisioningVector `json:"provisioning_cases"`
++	Posture      []codexSeedPostureVector      `json:"posture_cases"`
++}
++
++// TestCodexSeedProvisioningAndStatus exercises Resolve and StatusOf, the
++// production entry points for revision-B Codex seed handling. It also pins
++// malformed native config to a fail-closed provisioning result.
++func TestCodexSeedProvisioningAndStatus(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	seedLiveNativeCredentials(t, fx)
++	native := "model = \"gpt-5-codex\"\n\n[projects.\"/Users/operator/work\"]\ntrust_level = \"trusted\"\n\n[tui]\ntheme = \"dark\"\n\n[mcp_servers.gh]\ncommand = \"gh\"\nargs = [\"mcp\"]\n\n[mcp_servers.figma]\ncommand = \"npx\"\nargs = [\"-y\", \"figma-developer-mcp\", \"--stdio\"]\n"
++	if err := os.WriteFile(filepath.Join(fx.native[envregistry.CodexCLI], "config.toml"), []byte(native), 0o600); err != nil {
++		t.Fatal(err)
++	}
++
++	req := fx.request(envregistry.CodexCLI)
++	req.Repair = true
++	result, err := Resolve(req)
++	if err != nil {
++		t.Fatalf("Resolve provisioning: %v", err)
++	}
++	if !result.Provisioned {
++		t.Fatal("Resolve did not report first provisioning")
++	}
++	if got := countWarnings(result.Warnings, envregistry.DiagMCPNativeServersNotInherited); got != 1 {
++		t.Fatalf("provision warnings = %v; mcp_native_servers_not_inherited count = %d, want 1", result.Warnings, got)
++	}
++	if warning := warningWithPrefix(result.Warnings, envregistry.DiagMCPNativeServersNotInherited); !strings.Contains(warning, "figma, gh") {
++		t.Fatalf("provision warning %q does not name the sorted native servers", warning)
++	}
++
++	managedHome := ManagedHomeDir(fx.home, fx.profile, envregistry.CodexCLI)
++	seededPayload, err := os.ReadFile(filepath.Join(managedHome, "config.toml"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var seeded map[string]any
++	if err := toml.Unmarshal(seededPayload, &seeded); err != nil {
++		t.Fatalf("managed config.toml is not valid TOML: %v", err)
++	}
++	if _, exists := seeded["mcp_servers"]; exists {
++		t.Fatalf("managed config.toml retained mcp_servers: %s", seededPayload)
++	}
++	var original map[string]any
++	if err := toml.Unmarshal([]byte(native), &original); err != nil {
++		t.Fatal(err)
++	}
++	delete(original, "mcp_servers")
++	if !reflect.DeepEqual(seeded, original) {
++		t.Fatalf("managed config.toml members = %#v, want all native members except mcp_servers %#v", seeded, original)
++	}
++
++	marker := readManagedMarker(t, fx, envregistry.CodexCLI)
++	wantRecord := &envmarker.CodexSeedRecord{Revision: envregistry.CodexSeedRevisionB, NativeMCPServers: []string{"figma", "gh"}}
++	if !reflect.DeepEqual(marker.CodexSeedRecord, wantRecord) {
++		t.Fatalf("codex_seed_record = %+v, want %+v", marker.CodexSeedRecord, wantRecord)
++	}
++
++	status, err := StatusOf(statusRequest(fx))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if status.CodexSeedRule.Revision != envregistry.CodexSeedRevisionB || status.CodexSeedRule.Provenance != "shipped" {
++		t.Fatalf("codex-seed status row = %+v", status.CodexSeedRule)
++	}
++	home := findHome(status, fx.profile, envregistry.CodexCLI)
++	if home == nil {
++		t.Fatal("env status omitted the managed codex_cli home")
++	}
++	if !home.Current {
++		t.Fatalf("Codex seed warnings made the home non-current: %+v", home)
++	}
++	if !reflect.DeepEqual(home.NativeMCPServers, wantRecord.NativeMCPServers) || home.NativeMCPServersDisposition != "not-inherited" {
++		t.Fatalf("env status Codex seed row = %+v", home)
++	}
++	if got := countWarnings(home.Warnings, envregistry.DiagMCPNativeServersNotInherited); got != 1 {
++		t.Fatalf("env status warnings = %v; not-inherited count = %d, want 1", home.Warnings, got)
++	}
++}
++
++func TestCodexSeedStripsInlineMCPTable(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	seedLiveNativeCredentials(t, fx)
++	native := "model = \"gpt-5-codex\"\nmcp_servers = { local = { command = \"server\", args = [] } }\n"
++	if err := os.WriteFile(filepath.Join(fx.native[envregistry.CodexCLI], "config.toml"), []byte(native), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	req := fx.request(envregistry.CodexCLI)
++	req.Repair = true
++	result, err := Resolve(req)
++	if err != nil {
++		t.Fatalf("Resolve provisioning: %v", err)
++	}
++	if got := countWarnings(result.Warnings, envregistry.DiagMCPNativeServersNotInherited); got != 1 {
++		t.Fatalf("provision warnings = %v; not-inherited count = %d, want 1", result.Warnings, got)
++	}
++	managedHome := ManagedHomeDir(fx.home, fx.profile, envregistry.CodexCLI)
++	seededPayload, err := os.ReadFile(filepath.Join(managedHome, "config.toml"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var seeded map[string]any
++	if err := toml.Unmarshal(seededPayload, &seeded); err != nil {
++		t.Fatalf("managed config.toml is not valid TOML: %v", err)
++	}
++	if _, exists := seeded["mcp_servers"]; exists {
++		t.Fatalf("managed config.toml retained inline mcp_servers: %s", seededPayload)
++	}
++	want := &envmarker.CodexSeedRecord{Revision: envregistry.CodexSeedRevisionB, NativeMCPServers: []string{"local"}}
++	if got := readManagedMarker(t, fx, envregistry.CodexCLI).CodexSeedRecord; !reflect.DeepEqual(got, want) {
++		t.Fatalf("codex_seed_record = %+v, want %+v", got, want)
++	}
++}
++
++func TestCodexSeedRejectsInvalidTOMLBeforePublishingHome(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	seedLiveNativeCredentials(t, fx)
++	if err := os.WriteFile(filepath.Join(fx.native[envregistry.CodexCLI], "config.toml"), []byte("[mcp_servers.figma\ncommand = \"npx\"\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	req := fx.request(envregistry.CodexCLI)
++	req.Repair = true
++	if _, err := Resolve(req); err == nil || !strings.Contains(err.Error(), envregistry.DiagSeedUnreadable) {
++		t.Fatalf("Resolve error = %v, want %s refusal", err, envregistry.DiagSeedUnreadable)
++	}
++	if _, err := os.Lstat(ManagedHomeDir(fx.home, fx.profile, envregistry.CodexCLI)); !os.IsNotExist(err) {
++		t.Fatalf("invalid native config published managed home: lstat error = %v", err)
++	}
++}
++
++func TestCodexSeedSnapshotAndBytesDoNotRefreshOnRepair(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	seedLiveNativeCredentials(t, fx)
++	native := "model = \"gpt-5-codex\"\n\n[mcp_servers.original]\ncommand = \"server\"\nargs = []\n"
++	if err := os.WriteFile(filepath.Join(fx.native[envregistry.CodexCLI], "config.toml"), []byte(native), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	req := fx.request(envregistry.CodexCLI)
++	req.Repair = true
++	if _, err := Resolve(req); err != nil {
++		t.Fatal(err)
++	}
++	managedHome := ManagedHomeDir(fx.home, fx.profile, envregistry.CodexCLI)
++	seedPath := filepath.Join(managedHome, "config.toml")
++	before, err := os.ReadFile(seedPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	beforeRecord := readManagedMarker(t, fx, envregistry.CodexCLI).CodexSeedRecord
++	if err := os.WriteFile(filepath.Join(fx.native[envregistry.CodexCLI], "config.toml"), []byte("model = \"changed\"\n\n[mcp_servers.later]\ncommand = \"server\"\nargs = []\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Remove(filepath.Join(managedHome, "AGENTS.md")); err != nil {
++		t.Fatal(err)
++	}
++	result, err := Resolve(req)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if got := countWarnings(result.Warnings, envregistry.DiagMCPNativeServersNotInherited); got != 0 {
++		t.Fatalf("repair repeated the provisioning warning: %v", result.Warnings)
++	}
++	after, err := os.ReadFile(seedPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !reflect.DeepEqual(after, before) {
++		t.Fatalf("repair refreshed the Codex seed: before %q, after %q", before, after)
++	}
++	if got := readManagedMarker(t, fx, envregistry.CodexCLI).CodexSeedRecord; !reflect.DeepEqual(got, beforeRecord) {
++		t.Fatalf("repair refreshed codex_seed_record: before %+v, after %+v", beforeRecord, got)
++	}
++}
++
++// TestEnvironmentsCodexSeedVectors drives the published rc.13 revision-B
++// provisioning vectors and every revision-B status vector through Resolve and
++// StatusOf. Revision-A producer/status postures are prior-manager behavior;
++// they are explicitly reported as bounded while A-record homes under the
++// shipped B manager remain production-driven.
++func TestEnvironmentsCodexSeedVectors(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	path := filepath.Join(root, "vectors", codexSeedVectorFile)
++	payload, err := os.ReadFile(path) // #nosec G304 -- explicit conformance input
++	if err != nil {
++		t.Fatal(err)
++	}
++	var vectors codexSeedVectorSet
++	if err := json.Unmarshal(payload, &vectors); err != nil {
++		t.Fatal(err)
++	}
++	if len(vectors.Provisioning) == 0 || len(vectors.Posture) == 0 {
++		t.Fatalf("%s is missing provisioning or posture cases", codexSeedVectorFile)
++	}
++	conformancecoverage.RunOutcomes(t, "environments-codex-seed/provisioning-cases", vectors.Provisioning,
++		func(tc codexSeedProvisioningVector) string { return tc.Name }, func(t *testing.T, tc codexSeedProvisioningVector) conformancecoverage.Observation {
++			if tc.Revision != envregistry.CodexSeedRevisionB {
++				return conformancecoverage.Observation{BoundReason: "revision A is prior-manager provisioning behavior; this manager ships revision B"}
++			}
++			runCodexSeedProvisioningVector(t, tc)
++			return conformancecoverage.Observation{}
++		})
++	conformancecoverage.RunOutcomes(t, "environments-codex-seed/posture-cases", vectors.Posture,
++		func(tc codexSeedPostureVector) string { return tc.Name }, func(t *testing.T, tc codexSeedPostureVector) conformancecoverage.Observation {
++			if tc.RevisionShipped != envregistry.CodexSeedRevisionB {
++				return conformancecoverage.Observation{BoundReason: "revision A is prior-manager status behavior; this manager ships revision B"}
++			}
++			runCodexSeedPostureVector(t, tc)
++			return conformancecoverage.Observation{}
++		})
++}
++
++func runCodexSeedProvisioningVector(t *testing.T, tc codexSeedProvisioningVector) {
++	t.Helper()
++	fx := writeManagedFixture(t, "acme")
++	seedLiveNativeCredentials(t, fx)
++	if err := os.WriteFile(filepath.Join(fx.native[envregistry.CodexCLI], "config.toml"), []byte(tc.NativeConfig), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	req := fx.request(envregistry.CodexCLI)
++	req.Repair = true
++	result, err := Resolve(req)
++	if err != nil {
++		t.Fatalf("Resolve: %v", err)
++	}
++	if !result.Provisioned {
++		t.Fatal("Resolve did not provision the Codex home")
++	}
++	seedPath := filepath.Join(ManagedHomeDir(fx.home, fx.profile, envregistry.CodexCLI), "config.toml")
++	seedBytes, err := os.ReadFile(seedPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var seeded map[string]any
++	if err := toml.Unmarshal(seedBytes, &seeded); err != nil {
++		t.Fatalf("seeded config.toml is not valid TOML: %v", err)
++	}
++	if _, exists := seeded["mcp_servers"]; exists != tc.Expected.SeededHasMCP {
++		t.Fatalf("seeded_has_mcp_servers = %v, want %v", exists, tc.Expected.SeededHasMCP)
++	}
++	topLevel := make([]string, 0, len(seeded))
++	for key := range seeded {
++		topLevel = append(topLevel, key)
++	}
++	sort.Strings(topLevel)
++	if !reflect.DeepEqual(topLevel, tc.Expected.SeededTopLevel) {
++		t.Fatalf("seeded top-level members = %v, want %v", topLevel, tc.Expected.SeededTopLevel)
++	}
++	if !reflect.DeepEqual(seeded, tc.Expected.SeededMembers) {
++		t.Fatalf("seeded members = %#v, want %#v", seeded, tc.Expected.SeededMembers)
++	}
++	marker := readManagedMarker(t, fx, envregistry.CodexCLI)
++	if !reflect.DeepEqual(marker.CodexSeedRecord, tc.Expected.CodexSeedRecord) {
++		t.Fatalf("codex_seed_record = %+v, want %+v", marker.CodexSeedRecord, tc.Expected.CodexSeedRecord)
++	}
++	if !reflect.DeepEqual(marker.CodexSeedRecord.NativeMCPServers, tc.Expected.Names) {
++		t.Fatalf("recorded native server names = %v, want %v", marker.CodexSeedRecord.NativeMCPServers, tc.Expected.Names)
++	}
++	if tc.Expected.Diagnostic == nil {
++		if got := countWarnings(result.Warnings, envregistry.DiagMCPNativeServersNotInherited); got != 0 {
++			t.Fatalf("provision warnings = %v; no stripped-server warning expected", result.Warnings)
++		}
++	} else {
++		if *tc.Expected.Diagnostic != envregistry.DiagMCPNativeServersNotInherited {
++			t.Fatalf("unexpected revision-B diagnostic %q", *tc.Expected.Diagnostic)
++		}
++		if got := countWarnings(result.Warnings, *tc.Expected.Diagnostic); got != 1 {
++			t.Fatalf("provision warnings = %v; %s count = %d, want 1", result.Warnings, *tc.Expected.Diagnostic, got)
++		}
++		warning := warningWithPrefix(result.Warnings, *tc.Expected.Diagnostic)
++		for _, name := range tc.Expected.Names {
++			if !strings.Contains(warning, name) {
++				t.Fatalf("provision warning %q omits native server %q", warning, name)
++			}
++		}
++	}
++	if tc.Expected.MigrationHint {
++		t.Fatalf("revision-B warning unexpectedly requires a migration hint: %v", result.Warnings)
++	}
++}
++
++func runCodexSeedPostureVector(t *testing.T, tc codexSeedPostureVector) {
++	t.Helper()
++	fx := writeManagedFixture(t, "acme")
++	seedLiveNativeCredentials(t, fx)
++	provision(t, fx, tc.Environment, envregistry.DefaultMachineConfig())
++	marker := readManagedMarker(t, fx, tc.Environment)
++	marker.CodexSeedRecord = cloneCodexSeedRecord(tc.Record)
++	if tc.Record != nil && tc.Record.Revision == "A" && len(tc.Record.NativeMCPServers) > 0 {
++		var config bytes.Buffer
++		for _, name := range tc.Record.NativeMCPServers {
++			fmt.Fprintf(&config, "\n[mcp_servers.%q]\ncommand = \"server\"\nargs = []\n", name)
++		}
++		if err := os.WriteFile(filepath.Join(ManagedHomeDir(fx.home, fx.profile, tc.Environment), "config.toml"), config.Bytes(), 0o600); err != nil {
++			t.Fatal(err)
++		}
++	}
++	markerBytes, err := marker.Marshal()
++	if err != nil {
++		t.Fatal(err)
++	}
++	markerPath := filepath.Join(ManagedHomeDir(fx.home, fx.profile, tc.Environment), envmarker.Name)
++	if err := os.WriteFile(markerPath, markerBytes, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	status, err := StatusOf(statusRequest(fx))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if status.CodexSeedRule.Revision != tc.Expected.CodexSeedRow {
++		t.Fatalf("codex-seed row revision = %q, want %q", status.CodexSeedRule.Revision, tc.Expected.CodexSeedRow)
++	}
++	home := findHome(status, fx.profile, tc.Environment)
++	if home == nil {
++		t.Fatal("env status omitted the expected home")
++	}
++	if home.Current != tc.Expected.RowCurrent {
++		t.Fatalf("home current = %v, want %v; findings=%v", home.Current, tc.Expected.RowCurrent, home.Findings)
++	}
++	if !equalOrdered(home.NativeMCPServers, tc.Expected.NamesListed) {
++		t.Fatalf("listed native servers = %v, want %v", home.NativeMCPServers, tc.Expected.NamesListed)
++	}
++	if home.NativeMCPServersDisposition != tc.Expected.ListedAs {
++		t.Fatalf("listed-as disposition = %q, want %q", home.NativeMCPServersDisposition, tc.Expected.ListedAs)
++	}
++	var diagnostics []string
++	repairHint := false
++	for _, warning := range home.Warnings {
++		for _, code := range []string{envregistry.DiagMCPNativeServersUngoverned, envregistry.DiagMCPNativeServersNotInherited, envregistry.DiagMCPSeedUnstripped} {
++			if strings.HasPrefix(warning, code+":") {
++				diagnostics = append(diagnostics, code)
++				if code == envregistry.DiagMCPSeedUnstripped && strings.Contains(warning, "re-provision") {
++					repairHint = true
++				}
++			}
++		}
++	}
++	if !equalOrdered(diagnostics, tc.Expected.Diagnostics) {
++		t.Fatalf("status diagnostics = %v, want %v; warnings=%v", diagnostics, tc.Expected.Diagnostics, home.Warnings)
++	}
++	if repairHint != tc.Expected.RepairHint {
++		t.Fatalf("repair hint = %v, want %v; warnings=%v", repairHint, tc.Expected.RepairHint, home.Warnings)
++	}
++}
++
++func countWarnings(warnings []string, code string) int {
++	count := 0
++	for _, warning := range warnings {
++		if strings.HasPrefix(warning, code+":") {
++			count++
++		}
++	}
++	return count
++}
++
++func warningWithPrefix(warnings []string, code string) string {
++	for _, warning := range warnings {
++		if strings.HasPrefix(warning, code+":") {
++			return warning
++		}
++	}
++	return ""
++}
+diff --git a/internal/envprofile/envprofile.go b/internal/envprofile/envprofile.go
+index 1d4044fb..53fb8fe4 100644
+--- a/internal/envprofile/envprofile.go
++++ b/internal/envprofile/envprofile.go
+@@ -635,9 +635,6 @@ func Install(home string, options InstallOptions) (Info, bool, bool, error) {
+ 
+ // installLocked installs under the held operation lock.
+ func installLocked(op *operation, home string, options InstallOptions) (Info, bool, bool, error) {
+-	if err := ensureDefault(op, home, options.Policy); err != nil {
+-		return Info{}, false, false, err
+-	}
+ 	kind := installOperandKind(options.Operand)
+ 	if kind == identity.SourceInvalid {
+ 		return Info{}, false, false, sourceKindRefusal("operand", options.Operand)
+@@ -655,6 +652,37 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
+ 	if !isPath && forms > 1 {
+ 		return Info{}, false, false, fmt.Errorf("%s: at most one of --range, --tag, --revision", DiagRefConflict)
+ 	}
++	pathProfile := ""
++	if isPath {
++		if err := validatePathPackageDirectory(options.Operand); err != nil {
++			return Info{}, false, false, err
++		}
++		manifest, err := contextpkg.LoadManifest(options.Operand)
++		if err != nil {
++			return Info{}, false, false, pathManifestDiag(options.Operand, err)
++		}
++		if err := refusePathMCPDeclaration(options.Operand, manifest.Name); err != nil {
++			return Info{}, false, false, err
++		}
++		pathProfile = options.As
++		if pathProfile == "" {
++			pathProfile = manifest.Name
++		}
++		if !validProfileName(pathProfile) {
++			return Info{}, false, false, fmt.Errorf("%s: profile name %q is not a portable identifier", DiagSourceInvalid, pathProfile)
++		}
++		if err := preflightPathOverlayDeclarations(pathProfile, options.Policy); err != nil {
++			return Info{}, false, false, err
++		}
++	}
++	if pathProfile != DefaultProfile {
++		if err := preflightPathOverlayDeclarations(DefaultProfile, options.Policy); err != nil {
++			return Info{}, false, false, err
++		}
++	}
++	if err := ensureDefault(op, home, options.Policy); err != nil {
++		return Info{}, false, false, err
++	}
+ 	var (
+ 		source  Source
+ 		input   contextresolve.Input
+@@ -662,10 +690,16 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
+ 		name    string
+ 	)
+ 	if isPath {
++		if err := validatePathPackageDirectory(options.Operand); err != nil {
++			return Info{}, false, false, err
++		}
+ 		manifest, err := contextpkg.LoadManifest(options.Operand)
+ 		if err != nil {
+ 			return Info{}, false, false, pathManifestDiag(options.Operand, err)
+ 		}
++		if err := refusePathMCPDeclaration(options.Operand, manifest.Name); err != nil {
++			return Info{}, false, false, err
++		}
+ 		name = options.As
+ 		if name == "" {
+ 			name = manifest.Name
+@@ -1048,17 +1082,34 @@ func UpdateWithOptions(home, name string, options UpdateOptions) (Info, bool, er
+ 
+ // updateLocked re-resolves under the held operation lock.
+ func updateLocked(op *operation, home, name string, policy Policy, sink io.Writer) (Info, bool, error) {
+-	if err := ensureDefault(op, home, policy); err != nil {
+-		return Info{}, false, err
++	defaultProfile := name == DefaultProfile
++	if defaultProfile {
++		// Preserve the builtin profile's established refusal ordering. The
++		// default profile is local and has no source record until created;
++		// ensure it before reading source.json so update reports
++		// profile_update_blocked rather than profile_not_found.
++		if err := ensureDefault(op, home, policy); err != nil {
++			return Info{}, false, err
++		}
+ 	}
+ 	source, err := readSource(home, name)
+ 	if err != nil {
+ 		return Info{}, false, err
+ 	}
++	if !defaultProfile {
++		if err := validateProfilePathSources(name, source, policy); err != nil {
++			return Info{}, false, err
++		}
++	}
+ 	oldLock, oldHash, err := readLock(home, name)
+ 	if err != nil {
+ 		return Info{}, false, err
+ 	}
++	if !defaultProfile {
++		if err := ensureDefault(op, home, policy); err != nil {
++			return Info{}, false, err
++		}
++	}
+ 	manager := newGitManager(home).withPolicy(policy)
+ 	var input contextresolve.Input
+ 	switch source.Kind {
+@@ -1084,13 +1135,12 @@ func updateLocked(op *operation, home, name string, policy Policy, sink io.Write
+ 	case KindPath:
+ 		// Environments §1: installation copies the directory tree into
+ 		// the profile store as an immutable snapshot and never reads
+-		// the source directory again. Update resolves the root from
++		// its bytes from the source directory again. The §4 boundary
++		// check above inspects metadata only. Update resolves the root from
+ 		// the snapshot the store already holds under the old lock's
+-		// state_sha256 pin — never from source.Path, which may have
+-		// been edited or deleted (the §9.6 import deletes its staging
+-		// directory, so every imported profile's source.Path names no
+-		// existing entry). Overlays re-resolve below the switch, so a
+-		// path root with git overlays still moves on update.
++		// state_sha256 pin — never from source.Path. The path is inspected
++		// only for its protected boundary. Overlays re-resolve below the
++		// switch, so a path root with Git overlays still moves on update.
+ 		rootMember, ok := oldLock.RootMember()
+ 		if !ok || rootMember.StateHash == "" {
+ 			return Info{}, false, fmt.Errorf("%s: profile %q lock carries no state pin for its path root", DiagSourceInvalid, name)
+diff --git a/internal/envprofile/envprofile_test.go b/internal/envprofile/envprofile_test.go
+index 11894533..523187b5 100644
+--- a/internal/envprofile/envprofile_test.go
++++ b/internal/envprofile/envprofile_test.go
+@@ -14,6 +14,7 @@ import (
+ 	"github.com/relux-works/curator/internal/contextstore"
+ 	"github.com/relux-works/curator/internal/envmarker"
+ 	"github.com/relux-works/curator/internal/managerlock"
++	"github.com/relux-works/curator/internal/pathboundary"
+ 	"github.com/relux-works/curator/internal/transaction"
+ )
+ 
+@@ -33,6 +34,9 @@ func writePackage(t *testing.T, root, name, version, module string) {
+ 	if err := os.WriteFile(filepath.Join(root, "context", "a.md"), []byte(module), 0o644); err != nil {
+ 		t.Fatal(err)
+ 	}
++	if err := pathboundary.ProtectTree(root); err != nil {
++		t.Fatalf("protect path package fixture: %v", err)
++	}
+ }
+ 
+ func pinHomes(t *testing.T) map[string]string {
+diff --git a/internal/envprofile/import.go b/internal/envprofile/import.go
+index 55a50b7b..d3a113fb 100644
+--- a/internal/envprofile/import.go
++++ b/internal/envprofile/import.go
+@@ -6,8 +6,10 @@ package envprofile
+ 
+ import (
+ 	"encoding/json"
++	"errors"
+ 	"fmt"
+ 	"io"
++	"io/fs"
+ 	"os"
+ 	"os/exec"
+ 	"path/filepath"
+@@ -20,6 +22,7 @@ import (
+ 	"github.com/relux-works/curator/internal/envregistry"
+ 	"github.com/relux-works/curator/internal/identifiers"
+ 	"github.com/relux-works/curator/internal/marker"
++	"github.com/relux-works/curator/internal/pathboundary"
+ 	"github.com/relux-works/curator/internal/stateread"
+ )
+ 
+@@ -160,7 +163,15 @@ func importLocked(op *operation, home string, options ImportOptions) (Info, bool
+ 	if err != nil {
+ 		return Info{}, false, false, err
+ 	}
+-	defer func() { _ = os.RemoveAll(stage) }()
++	defer func() {
++		// The imported path root remains the source named by the profile.
++		// Remove an unreferenced reassembly after a failed install, but do
++		// not leave a persisted source pointing at deleted bytes.
++		source, sourceErr := readSource(home, name)
++		if sourceErr != nil || source.Path != stage {
++			_ = os.RemoveAll(stage)
++		}
++	}()
+ 	installOptions := InstallOptions{
+ 		Operand: stage, As: name, Use: options.Use,
+ 		Policy: options.Policy, Imported: true,
+@@ -499,17 +510,31 @@ func normalizeImportText(data []byte) []byte {
+ 	return []byte(strings.TrimRight(text, "\n") + "\n")
+ }
+ 
+-// reassembleImport assembles the context-package-shaped directory inside
+-// the machine home: agent-context.json (schema_version 1, version 1.0.0,
++// reassembleImport assembles the context-package-shaped directory below
++// the protected imports directory: agent-context.json (schema_version 1, version 1.0.0,
+ // weight 0, no weights), one normalized module per detected root-context
+ // file in ascending environment-identifier order, and one requires.skills
+ // entry per mapping entry pinned by revision. An import with no detected
+-// root-context file emits no context member.
++// root-context file emits no context member. The directory is durable because
++// an imported path root is verified at every resolve (§§4, 9.6).
+ func reassembleImport(home, name string, roots []detectedRoot, skills []detectedSkill) (string, error) {
+-	stage, err := os.MkdirTemp(home, ".import-*")
++	importsDir := filepath.Join(home, "imports")
++	if err := ensureImportSourceRoot(importsDir); err != nil {
++		return "", err
++	}
++	final := filepath.Join(importsDir, name)
++	metadata, err := stateread.Lstat(final)
++	if err != nil {
++		return "", fmt.Errorf("%s: inspect import source %q: %w", DiagPathSourceUntrusted, final, err)
++	}
++	if metadata.Kind != stateread.KindAbsent {
++		return "", fmt.Errorf("%s: import source path %q already exists", DiagPathSourceUntrusted, final)
++	}
++	stage, err := os.MkdirTemp(importsDir, ".import-*")
+ 	if err != nil {
+ 		return "", err
+ 	}
++	defer func() { _ = os.RemoveAll(stage) }()
+ 	manifest := map[string]any{
+ 		"schema_version": 1,
+ 		"name":           name,
+@@ -536,25 +561,62 @@ func reassembleImport(home, name string, roots []detectedRoot, skills []detected
+ 	}
+ 	payload, err := json.MarshalIndent(manifest, "", "  ")
+ 	if err != nil {
+-		_ = os.RemoveAll(stage)
+ 		return "", err
+ 	}
+ 	if err := os.WriteFile(filepath.Join(stage, "agent-context.json"), append(payload, '\n'), 0o644); err != nil {
+-		_ = os.RemoveAll(stage)
+ 		return "", err
+ 	}
+ 	if len(roots) > 0 {
+ 		contextDir := filepath.Join(stage, "context")
+ 		if err := os.MkdirAll(contextDir, 0o755); err != nil {
+-			_ = os.RemoveAll(stage)
+ 			return "", err
+ 		}
+ 		for _, root := range roots {
+ 			if err := os.WriteFile(filepath.Join(contextDir, root.envID+".md"), normalizeImportText(root.data), 0o644); err != nil {
+-				_ = os.RemoveAll(stage)
+ 				return "", err
+ 			}
+ 		}
+ 	}
+-	return stage, nil
++	if err := pathboundary.ProtectTree(stage); err != nil {
++		return "", fmt.Errorf("%s: cannot protect imported source %q: %w", DiagPathSourceUntrusted, stage, err)
++	}
++	if err := os.Rename(stage, final); err != nil {
++		return "", err
++	}
++	if err := pathboundary.Validate(final); err != nil {
++		_ = os.RemoveAll(final)
++		return "", fmt.Errorf("%s: imported source %q failed its boundary check: %w", DiagPathSourceUntrusted, final, err)
++	}
++	return final, nil
++}
++
++func ensureImportSourceRoot(path string) error {
++	metadata, err := stateread.Lstat(path)
++	if err != nil {
++		return fmt.Errorf("%s: inspect imports directory %q: %w", DiagPathSourceUntrusted, path, err)
++	}
++	if metadata.Kind == stateread.KindAbsent {
++		created := false
++		if err := os.Mkdir(path, 0o700); err == nil {
++			created = true
++		} else if !errors.Is(err, fs.ErrExist) {
++			return fmt.Errorf("create imports directory %q: %w", path, err)
++		}
++		if created {
++			if err := pathboundary.ProtectTree(path); err != nil {
++				return fmt.Errorf("%s: cannot protect imports directory %q: %w", DiagPathSourceUntrusted, path, err)
++			}
++		}
++		metadata, err = stateread.Lstat(path)
++		if err != nil {
++			return fmt.Errorf("%s: inspect imports directory %q: %w", DiagPathSourceUntrusted, path, err)
++		}
++	}
++	if metadata.Kind != stateread.KindPresent {
++		return fmt.Errorf("%s: imports directory %q is not present", DiagPathSourceUntrusted, path)
++	}
++	if err := pathboundary.ValidateRoot(path); err != nil {
++		return fmt.Errorf("%s: imports directory %q failed its boundary check: %w", DiagPathSourceUntrusted, path, err)
++	}
++	return nil
+ }
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index 42c0dc15..f249a8ef 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -252,6 +252,9 @@ type homePlan struct {
+ // store entries it names, and machine configuration: no read of the home
+ // itself beyond the fallback and merge inputs the caller supplies.
+ func assembleHome(req *ResolveRequest, source Source, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, order []contextlock.Member, adapter envregistry.Adapter, prior *envmarker.Marker) (*homePlan, error) {
++	if err := validateProfilePathSources(req.Profile, source, req.Policy); err != nil {
++		return nil, err
++	}
+ 	manager := newGitManager(req.Home)
+ 	packages, err := loadMaterial(req.Home, manager, lock)
+ 	if err != nil {
+@@ -708,6 +711,42 @@ type seedBundle struct {
+ 	xdg map[string]string
+ 	// claudeInit marks the written (not copied) .claude.json seed.
+ 	claudeInit bool
++	// codexSeedRecord is captured only when a codex_cli home is first
++	// provisioned. Repair preserves the marker's existing record and seed.
++	codexSeedRecord *envmarker.CodexSeedRecord
++	warnings        []string
++}
++
++// stripCodexSeedMCPServers applies the shipped rc.13 §7.4 revision-B rule:
++// remove the whole top-level mcp_servers table (including every subtable),
++// retain every other TOML member, and return only the sorted server names.
++func stripCodexSeedMCPServers(payload []byte) ([]byte, []string, error) {
++	var document map[string]any
++	if err := toml.Unmarshal(payload, &document); err != nil {
++		return nil, nil, fmt.Errorf("config.toml is not valid TOML: %w", err)
++	}
++	serversValue, exists := document["mcp_servers"]
++	if !exists {
++		return payload, []string{}, nil
++	}
++	servers, ok := serversValue.(map[string]any)
++	if !ok {
++		return nil, nil, fmt.Errorf("config.toml mcp_servers is not a TOML table")
++	}
++	names := make([]string, 0, len(servers))
++	for name := range servers {
++		if name == "" {
++			return nil, nil, fmt.Errorf("config.toml mcp_servers contains an empty server name")
++		}
++		names = append(names, name)
++	}
++	sort.Strings(names)
++	delete(document, "mcp_servers")
++	var stripped bytes.Buffer
++	if err := toml.NewEncoder(&stripped).Encode(document); err != nil {
++		return nil, nil, fmt.Errorf("strip config.toml mcp_servers: %w", err)
++	}
++	return stripped.Bytes(), names, nil
+ }
+ 
+ // gatherSeeds reads every seed upfront so that an unreadable seed stops
+@@ -723,18 +762,44 @@ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bo
+ 		return nil, err
+ 	}
+ 	if provision {
++		if adapter.ID == envregistry.CodexCLI {
++			if adapter.CodexSeedRevision != envregistry.CodexSeedRevisionB {
++				return nil, fmt.Errorf("%s: unsupported codex_cli seed revision %q", envregistry.DiagSeedUnreadable, adapter.CodexSeedRevision)
++			}
++			bundle.codexSeedRecord = &envmarker.CodexSeedRecord{
++				Revision:         adapter.CodexSeedRevision,
++				NativeMCPServers: []string{},
++			}
++		}
+ 		for _, seed := range adapter.Seeds {
+ 			if adapter.SeedWritten[seed] {
+ 				bundle.claudeInit = true
+ 				continue
+ 			}
+-			payload, err := os.ReadFile(filepath.Join(native, filepath.FromSlash(seed))) // #nosec G304 -- seed names are registry data
++			seedPath := filepath.Join(native, filepath.FromSlash(seed))
++			state, err := stateread.ReadFile(seedPath) // #nosec G304 -- seed names are registry data
+ 			if err != nil {
+-				if os.IsNotExist(err) {
+-					continue
+-				}
+ 				return nil, fmt.Errorf("%s: seed %s: %v", envregistry.DiagSeedUnreadable, seed, err)
+ 			}
++			switch state.Kind {
++			case stateread.KindAbsent:
++				continue
++			case stateread.KindPresent:
++			default:
++				return nil, fmt.Errorf("%s: seed %s has unusable read state %q", envregistry.DiagSeedUnreadable, seed, state.Kind)
++			}
++			payload := state.Bytes
++			if adapter.ID == envregistry.CodexCLI && seed == "config.toml" {
++				stripped, names, err := stripCodexSeedMCPServers(payload)
++				if err != nil {
++					return nil, fmt.Errorf("%s: seed %s: %v", envregistry.DiagSeedUnreadable, seed, err)
++				}
++				payload = stripped
++				bundle.codexSeedRecord.NativeMCPServers = names
++				if len(names) > 0 {
++					bundle.warnings = append(bundle.warnings, fmt.Sprintf("%s: native Codex MCP servers %s were stripped from config.toml and are not inherited", envregistry.DiagMCPNativeServersNotInherited, strings.Join(names, ", ")))
++				}
++			}
+ 			bundle.files[seed] = payload
+ 		}
+ 	} else if adapter.ID == envregistry.ClaudeCode {
+@@ -1089,6 +1154,16 @@ func isSeedPath(plan *homePlan, path string) bool {
+ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prior *envmarker.Marker, provenance string) (*envmarker.Marker, error) {
+ 	marker := plan.marker
+ 	marker.Version = envmarker.VersionV2
++	if prior != nil && prior.CodexSeedRecord != nil {
++		record := *prior.CodexSeedRecord
++		record.NativeMCPServers = append([]string{}, prior.CodexSeedRecord.NativeMCPServers...)
++		marker.CodexSeedRecord = &record
++	}
++	if seeds.codexSeedRecord != nil {
++		record := *seeds.codexSeedRecord
++		record.NativeMCPServers = append([]string{}, seeds.codexSeedRecord.NativeMCPServers...)
++		marker.CodexSeedRecord = &record
++	}
+ 	links, _, err := req.effectivePassthrough(plan.adapter, plan.isolation)
+ 	if err != nil {
+ 		return nil, err
+@@ -1195,7 +1270,9 @@ func legacyMarkerProjectionMatches(prior, candidate *envmarker.Marker) bool {
+ 	projected := *candidate
+ 	projected.Version = envmarker.VersionV1
+ 	projected.Passthrough = &legacyEntries
+-	projected.CodexSeedRecord = nil
++	// codex_seed_record is valid in schema 1 as well as schema 2. Preserve it
++	// in the legacy projection so metadata-only repair does not rewrite a
++	// schema-1 marker that already carries the rc.13 seed snapshot.
+ 	priorPayload, err := prior.Marshal()
+ 	if err != nil {
+ 		return false
+@@ -2055,6 +2132,9 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
+ 	if err != nil {
+ 		return nil, err
+ 	}
++	if err := validateProfilePathSources(profile, source, req.Policy); err != nil {
++		return nil, err
++	}
+ 	verdict := verifyHome(&req, adapter, source, lock, hash)
+ 	if verdict.current {
+ 		fragment, err := buildFragment(&req, adapter, verdict)
+@@ -2085,6 +2165,9 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
+ 		return nil, err
+ 	}
+ 	defer func() { _ = op.close() }()
++	if err := validateProfilePathSources(req.Profile, source, req.Policy); err != nil {
++		return nil, err
++	}
+ 	verdict := verifyHome(req, adapter, source, lock, hash)
+ 	if verdict.current {
+ 		fragment, err := buildFragment(req, adapter, verdict)
+@@ -2183,7 +2266,9 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	result := &ResolveResult{Document: document, Warnings: after.warnings, Provisioned: provisioned}
++	warnings := append([]string{}, after.warnings...)
++	warnings = append(warnings, seeds.warnings...)
++	result := &ResolveResult{Document: document, Warnings: warnings, Provisioned: provisioned}
+ 	if provisioned {
+ 		result.Notice = firstResolveNotice(adapter, plan)
+ 	}
+diff --git a/internal/envprofile/managed_test.go b/internal/envprofile/managed_test.go
+index 15b6ab42..d9aa9a4e 100644
+--- a/internal/envprofile/managed_test.go
++++ b/internal/envprofile/managed_test.go
+@@ -14,6 +14,7 @@ import (
+ 	"github.com/relux-works/curator/internal/envmarker"
+ 	"github.com/relux-works/curator/internal/envregistry"
+ 	"github.com/relux-works/curator/internal/managerlock"
++	"github.com/relux-works/curator/internal/pathboundary"
+ )
+ 
+ // managedFixture installs a hand-built profile: a context root with a
+@@ -64,11 +65,22 @@ func writeManagedFixture(t *testing.T, profile string) *managedFixture {
+ 		t.Fatal(err)
+ 	}
+ 	fx.lockHash = hash
+-	source := `{"kind": "path", "path": "/tmp/` + profile + "-source" + "\"}\n"
++	sourceDir := filepath.Join(t.TempDir(), profile+"-source")
++	if err := os.Mkdir(sourceDir, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	if err := pathboundary.ProtectTree(sourceDir); err != nil {
++		t.Fatalf("protect path source fixture: %v", err)
++	}
++	source, err := json.Marshal(Source{Kind: KindPath, Path: sourceDir})
++	if err != nil {
++		t.Fatal(err)
++	}
++	source = append(source, '\n')
+ 	if err := os.MkdirAll(ProfileDir(home, profile), 0o755); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if err := os.WriteFile(sourcePath(home, profile), []byte(source), 0o644); err != nil {
++	if err := os.WriteFile(sourcePath(home, profile), source, 0o644); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	if err := SetCurrent(home, profile); err != nil {
+diff --git a/internal/envprofile/overlays.go b/internal/envprofile/overlays.go
+index 73942cbe..c8a34d38 100644
+--- a/internal/envprofile/overlays.go
++++ b/internal/envprofile/overlays.go
+@@ -58,10 +58,16 @@ func resolveOverlay(home string, manager *gitManager, decl OverlaySpec) (context
+ 		if decl.Range != "" || decl.Tag != "" || decl.Revision != "" || decl.Directory != "" {
+ 			return contextresolve.Overlay{}, fmt.Errorf("%s: a path overlay carries no range, tag, revision, or directory", DiagSourceInvalid)
+ 		}
++		if err := validatePathPackageDirectory(decl.Source); err != nil {
++			return contextresolve.Overlay{}, err
++		}
+ 		manifest, err := contextpkg.LoadManifest(decl.Source)
+ 		if err != nil {
+ 			return contextresolve.Overlay{}, pathManifestDiag(decl.Source, err)
+ 		}
++		if err := refusePathMCPDeclaration(decl.Source, manifest.Name); err != nil {
++			return contextresolve.Overlay{}, err
++		}
+ 		state, err := stateForPath(home, manifest.Name, decl.Source)
+ 		if err != nil {
+ 			return contextresolve.Overlay{}, err
+diff --git a/internal/envprofile/overlays_test.go b/internal/envprofile/overlays_test.go
+index bdd8f05d..7df31287 100644
+--- a/internal/envprofile/overlays_test.go
++++ b/internal/envprofile/overlays_test.go
+@@ -9,6 +9,7 @@ import (
+ 
+ 	"github.com/relux-works/curator/internal/contextlock"
+ 	"github.com/relux-works/curator/internal/contextresolve"
++	"github.com/relux-works/curator/internal/pathboundary"
+ )
+ 
+ func itoa(n int) string { return strconv.Itoa(n) }
+@@ -174,6 +175,9 @@ func writeManifestPackage(t *testing.T, root, manifest string, modules map[strin
+ 			t.Fatal(err)
+ 		}
+ 	}
++	if err := pathboundary.ProtectTree(root); err != nil {
++		t.Fatalf("protect path package fixture: %v", err)
++	}
+ }
+ 
+ func lockMember(lock *contextlock.Lock, name string) (contextlock.Member, bool) {
+diff --git a/internal/envprofile/path_kind_conformance_test.go b/internal/envprofile/path_kind_conformance_test.go
+new file mode 100644
+index 00000000..f8c06b20
+--- /dev/null
++++ b/internal/envprofile/path_kind_conformance_test.go
+@@ -0,0 +1,593 @@
++package envprofile
++
++import (
++	"crypto/sha256"
++	"encoding/hex"
++	"encoding/json"
++	"fmt"
++	"os"
++	"path/filepath"
++	"sort"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/conformancecoverage"
++	"github.com/relux-works/curator/internal/contextmaterialize"
++	"github.com/relux-works/curator/internal/envregistry"
++	"github.com/relux-works/curator/internal/pathboundary"
++)
++
++const pathKindAdmissionVector = "environments-path-kind-admission.json"
++
++type pathKindAdmissionVectors struct {
++	MCPKindCases []pathMCPKindVector  `json:"mcp_kind_cases"`
++	PathBoundary []pathBoundaryVector `json:"path_boundary_cases"`
++	DryRun       []pathBoundaryVector `json:"dry_run_cases"`
++}
++
++type pathMCPKindVector struct {
++	Name             string `json:"name"`
++	Admitted         bool   `json:"admitted"`
++	Conforming       *bool  `json:"conforming"`
++	Diagnostic       string `json:"diagnostic"`
++	Declaration      string `json:"declaration"`
++	NamesDeclaration string `json:"names_declaration"`
++	NamesPackage     string `json:"names_package"`
++	Origin           string `json:"origin"`
++	Package          string `json:"package"`
++	SourceKind       string `json:"source_kind"`
++}
++
++type pathBoundaryVector struct {
++	Conforming    *bool  `json:"conforming"`
++	Name          string `json:"name"`
++	Diagnostic    string `json:"diagnostic"`
++	FailingCheck  string `json:"failing_check"`
++	NamesCheck    string `json:"names_check"`
++	Module        string `json:"module"`
++	NamesModule   string `json:"names_module"`
++	NamesPackage  string `json:"names_package"`
++	Origin        string `json:"origin"`
++	Package       string `json:"package"`
++	Role          string `json:"role"`
++	CarriesSystem bool   `json:"carries_system_modules"`
++	Direct        bool   `json:"direct"`
++	Rebuild       bool   `json:"rebuild_planned"`
++	Current       bool   `json:"row_current"`
++	Fragment      bool   `json:"fragment_emitted"`
++	Outcome       string `json:"outcome"`
++}
++
++func readPathKindAdmissionVectors(t *testing.T) pathKindAdmissionVectors {
++	t.Helper()
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	payload, err := os.ReadFile(filepath.Join(root, "vectors", pathKindAdmissionVector)) // #nosec G304 -- explicit pinned conformance input
++	if err != nil {
++		t.Fatal(err)
++	}
++	var vectors pathKindAdmissionVectors
++	if err := json.Unmarshal(payload, &vectors); err != nil {
++		t.Fatal(err)
++	}
++	return vectors
++}
++
++// TestPathKindMCPVectorsDriveInstallEntry executes the complete pinned MCP
++// family through Install. The one git-positive row keeps the existing Git
++// MCP admission path, while every path row, including the published bad
++// admission shape, must refuse and name both package and declaration.
++func TestPathKindMCPVectorsDriveInstallEntry(t *testing.T) {
++	vectors := readPathKindAdmissionVectors(t)
++	conformancecoverage.RunOutcomes(t, "environments-path-kind-admission/mcp_kind_cases", vectors.MCPKindCases,
++		func(tc pathMCPKindVector) string { return tc.Name },
++		func(caseT *testing.T, tc pathMCPKindVector) conformancecoverage.Observation {
++			if tc.SourceKind == "git" {
++				if !tc.Admitted || tc.Diagnostic != "" {
++					caseT.Fatalf("Git MCP vector %q does not describe admission: %+v", tc.Name, tc)
++				}
++				driveGitMCPAdmission(caseT)
++				return conformancecoverage.Observation{}
++			}
++			nonconformingAdmission := tc.Conforming != nil && !*tc.Conforming && tc.Admitted
++			if tc.SourceKind != "path" ||
++				(tc.Diagnostic != "mcp_declaration_path_source_refused" && !nonconformingAdmission) {
++				caseT.Fatalf("unclassified MCP vector %q: %+v", tc.Name, tc)
++			}
++			drivePathMCPRefusal(caseT, tc)
++			return conformancecoverage.Observation{}
++		})
++}
++
++func driveGitMCPAdmission(t *testing.T) {
++	t.Helper()
++	home := t.TempDir()
++	pinHomes(t)
++	ids := newGitIdentities(t)
++	tool := gitRepo(t, map[string]string{
++		"agent-mcp.json": pathMCPManifest,
++	}, "v1.2.0")
++	toolURL := ids.serve(tool, "https://example.com/mcp-figma-devmode")
++	root := gitRepo(t, map[string]string{
++		"agent-context.json": `{"schema_version":1,"name":"figma-root","version":"1.0.0","requires":{"mcp":{"figma-devmode":{"git":"` + toolURL + `","range":"*"}}}}` + "\n",
++	}, "v1.0.0")
++	operand := ids.serve(root, "https://example.com/figma-root")
++	if _, _, _, err := Install(home, InstallOptions{Operand: operand}); err != nil {
++		t.Fatalf("Git MCP package should remain admissible: %v", err)
++	}
++}
++
++func drivePathMCPRefusal(t *testing.T, tc pathMCPKindVector) {
++	t.Helper()
++	home := t.TempDir()
++	pinHomes(t)
++	pathPackage := filepath.Join(t.TempDir(), "path-package")
++	pathMCPPackage(t, pathPackage)
++	var err error
++	switch tc.Origin {
++	case "root", "onboarding-import":
++		_, _, _, err = Install(home, InstallOptions{Operand: pathPackage, Imported: tc.Origin == "onboarding-import"})
++	case "overlay":
++		root := filepath.Join(t.TempDir(), "root")
++		writeManifestPackage(t, root,
++			`{"schema_version":1,"name":"team-context","version":"1.0.0"}`+"\n", nil)
++		policy := Policy{OverlaysAllowed: true, OverlayDefaultWeight: 1000,
++			Overlays: map[string][]OverlaySpec{"team-context": {{Source: pathPackage}}}}
++		_, _, _, err = Install(home, InstallOptions{Operand: root, Policy: policy})
++	default:
++		t.Fatalf("MCP vector %q has unknown path origin %q", tc.Name, tc.Origin)
++	}
++	wantDiagnostic := tc.Diagnostic
++	if tc.Conforming != nil && !*tc.Conforming && tc.Admitted {
++		wantDiagnostic = DiagMCPPathSourceRefused
++	}
++	wantPackage, wantDeclaration := tc.NamesPackage, tc.NamesDeclaration
++	if wantPackage == "" {
++		wantPackage = tc.Package
++	}
++	if wantDeclaration == "" {
++		wantDeclaration = tc.Declaration
++	}
++	if err == nil || !strings.Contains(err.Error(), wantDiagnostic) ||
++		!strings.Contains(err.Error(), wantPackage) || !strings.Contains(err.Error(), wantDeclaration) {
++		t.Fatalf("Install err = %v, want %s naming package %q and declaration %q", err, wantDiagnostic, wantPackage, wantDeclaration)
++	}
++}
++
++// TestPathKindBoundaryVectorsDriveProductionEntries executes every §4
++// path-boundary vector through Install, Import, Resolve, Update or Status.
++// Foreign-owner rows use the boundary validator's injected owner lookup;
++// only a host that cannot create a required special file records a bound.
++func TestPathKindBoundaryVectorsDriveProductionEntries(t *testing.T) {
++	vectors := readPathKindAdmissionVectors(t)
++	conformancecoverage.RunOutcomes(t, "environments-path-kind-admission/path_boundary_cases", vectors.PathBoundary,
++		func(tc pathBoundaryVector) string { return tc.Name },
++		func(caseT *testing.T, tc pathBoundaryVector) conformancecoverage.Observation {
++			if reason := drivePathBoundaryVector(caseT, tc); reason != "" {
++				caseT.Logf("bounded: %s", reason)
++				return conformancecoverage.Observation{BoundReason: reason}
++			}
++			return conformancecoverage.Observation{}
++		})
++}
++
++func drivePathBoundaryVector(t *testing.T, tc pathBoundaryVector) string {
++	t.Helper()
++	switch tc.Name {
++	case "path-overlay-system-module-admitted":
++		home, root, overlay, policy := newVectorPathOverlay(t, true)
++		installVectorPathOverlay(t, home, root, policy)
++		result := assertPathResolveCurrent(t, home, "team-context", policy, tc)
++		var fragment struct {
++			SystemPrompt *struct {
++				Path string `json:"path"`
++			} `json:"system_prompt"`
++		}
++		if err := json.Unmarshal(result.Document, &fragment); err != nil {
++			t.Fatalf("decode emitted fragment: %v", err)
++		}
++		if fragment.SystemPrompt == nil || fragment.SystemPrompt.Path == "" {
++			t.Fatalf("trusted direct system overlay emitted no system_prompt section: %s", result.Document)
++		}
++		payload, err := os.ReadFile(fragment.SystemPrompt.Path)
++		if err != nil || string(payload) != "personal context\n" {
++			t.Fatalf("system prompt at %q = %q, err=%v; want admitted module bytes", fragment.SystemPrompt.Path, payload, err)
++		}
++		if overlay == "" || !tc.Fragment || !tc.Current || tc.Diagnostic != "" || tc.Module != "90-system.md" {
++			t.Fatalf("trusted direct system overlay did not reach its admitted resolve row: vector=%+v result=%s", tc, result.Document)
++		}
++		return ""
++	case "path-root-no-system-modules-admitted":
++		home := t.TempDir()
++		pinHomes(t)
++		root := filepath.Join(t.TempDir(), "root")
++		writeManifestPackage(t, root, `{"schema_version":1,"name":"team-context","version":"1.0.0"}`+"\n", nil)
++		if _, _, _, err := Install(home, InstallOptions{Operand: root}); err != nil {
++			t.Fatalf("Install path root: %v", err)
++		}
++		assertPathResolveCurrent(t, home, "team-context", Policy{}, tc)
++		return ""
++	case "path-import-no-system-modules-admitted":
++		home := t.TempDir()
++		pinHomes(t)
++		seams := pinImportSeams(t)
++		seedCurrentDefault(t, home)
++		if _, _, _, err := Import(home, seams.options(Policy{})); err != nil {
++			t.Fatalf("Import path root: %v", err)
++		}
++		source, err := readSource(home, "imported")
++		if err != nil || source.Path != filepath.Join(home, "imports", "imported") {
++			t.Fatalf("Import source=%+v err=%v, want durable imports path", source, err)
++		}
++		assertPathResolveCurrent(t, home, "imported", Policy{}, tc)
++		return ""
++	case "path-overlay-no-system-modules-admitted":
++		home, root, _, policy := newVectorPathOverlay(t, false)
++		installVectorPathOverlay(t, home, root, policy)
++		assertPathResolveCurrent(t, home, "team-context", policy, tc)
++		return ""
++	case "path-overlay-world-writable-untrusted", "path-overlay-no-system-world-writable-untrusted":
++		return driveUntrustedOverlayInstall(t, tc, false)
++	case "path-overlay-symlinked-component-untrusted":
++		home, root, overlay, policy := newVectorPathOverlay(t, tc.CarriesSystem)
++		if err := os.Symlink(filepath.Join(overlay, "context", "personal.md"), filepath.Join(overlay, "context", "alias.md")); err != nil {
++			return "host cannot create the symlink needed by the link_safety vector: " + err.Error()
++		}
++		return assertOverlayInstallDiagnostic(t, home, root, policy, tc)
++	case "path-overlay-containment-escape-untrusted":
++		home, root, overlay, policy := newVectorPathOverlay(t, tc.CarriesSystem)
++		outside := filepath.Join(t.TempDir(), "outside.md")
++		if err := os.WriteFile(outside, []byte("outside\n"), 0o644); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Symlink(outside, filepath.Join(overlay, "context", "alias.md")); err != nil {
++			return "host cannot create the symlink needed by the containment vector: " + err.Error()
++		}
++		return assertOverlayInstallDiagnostic(t, home, root, policy, tc)
++	case "path-overlay-wrong-ownership-untrusted", "path-import-no-system-wrong-ownership-untrusted":
++		return driveWrongOwnerVector(t, tc)
++	case "path-overlay-untrusted-rebuilds":
++		return drivePathOverlayUntrustedRepair(t, tc)
++	case "path-overlay-non-regular-component-untrusted":
++		return driveNonRegularVector(t, tc)
++	case "path-transitive-system-module-refused":
++		drivePathRootTransitiveSystemRefusal(t, tc)
++		return ""
++	case "path-overlay-untrusted-reported-current":
++		return driveUntrustedOverlayInstall(t, tc, true)
++	default:
++		t.Fatalf("unclassified path-boundary vector %q", tc.Name)
++		return ""
++	}
++}
++
++func newVectorPathOverlay(t *testing.T, system bool) (string, string, string, Policy) {
++	t.Helper()
++	home := t.TempDir()
++	pinHomes(t)
++	root := filepath.Join(t.TempDir(), "root")
++	writeManifestPackage(t, root, `{"schema_version":1,"name":"team-context","version":"1.0.0"}`+"\n", nil)
++	class := ""
++	if system {
++		class = "system"
++	}
++	overlay := filepath.Join(t.TempDir(), "personal")
++	module := `{"path":"personal.md"}`
++	if class != "" {
++		module = `{"path":"personal.md","class":"` + class + `"}`
++	}
++	writeManifestPackage(t, overlay,
++		`{"schema_version":1,"name":"personal","version":"1.0.0","context":{"modules":[`+module+`]}}`+"\n",
++		map[string]string{"personal.md": "personal context\n"})
++	policy := Policy{OverlaysAllowed: true, OverlayDefaultWeight: 1000,
++		Overlays: map[string][]OverlaySpec{"team-context": {{Source: overlay}}}}
++	return home, root, overlay, policy
++}
++
++func installVectorPathOverlay(t *testing.T, home, root string, policy Policy) {
++	t.Helper()
++	if _, _, _, err := Install(home, InstallOptions{Operand: root, Policy: policy}); err != nil {
++		t.Fatalf("Install trusted path overlay: %v", err)
++	}
++}
++
++func resolveVectorPath(t *testing.T, home, profile string, policy Policy) *ResolveResult {
++	t.Helper()
++	result, err := Resolve(ResolveRequest{
++		Home: home, Profile: profile, EnvID: "claude_code", Machine: envregistry.DefaultMachineConfig(),
++		Policy: policy, LaunchDir: t.TempDir(), Repair: true, Format: "json",
++		Detect:       func(envregistry.Adapter) string { return "unknown" },
++		NativeHomeOf: func(id string) (string, error) { return filepath.Join(home, "native", id), nil },
++		OperatorXDG:  t.TempDir(),
++	})
++	if err != nil {
++		t.Fatalf("Resolve path source: %v", err)
++	}
++	return result
++}
++
++func assertPathResolveCurrent(t *testing.T, home, profile string, policy Policy, tc pathBoundaryVector) *ResolveResult {
++	t.Helper()
++	result := resolveVectorPath(t, home, profile, policy)
++	if len(result.Document) == 0 || !tc.Fragment || !tc.Current || tc.Diagnostic != "" {
++		t.Fatalf("trusted path source did not emit a current fragment: vector=%+v result=%s", tc, result.Document)
++	}
++	status, err := StatusOf(StatusRequest{
++		Home: home, Machine: envregistry.DefaultMachineConfig(), Policy: policy, LaunchDir: t.TempDir(),
++		Detect:       func(envregistry.Adapter) string { return "unknown" },
++		NativeHomeOf: func(id string) (string, error) { return filepath.Join(home, "native", id), nil },
++		OperatorXDG:  filepath.Join(home, "xdg"),
++	})
++	if err != nil {
++		t.Fatalf("StatusOf trusted path source: %v", err)
++	}
++	for _, row := range status.Homes {
++		if row.Profile == profile && row.Environment == "claude_code" {
++			if !row.Current {
++				t.Fatalf("StatusOf reports %s/claude_code non-current: %v", profile, row.Findings)
++			}
++			return result
++		}
++	}
++	t.Fatalf("StatusOf has no %s/claude_code row", profile)
++	return nil
++}
++
++func assertOverlayInstallDiagnostic(t *testing.T, home, root string, policy Policy, tc pathBoundaryVector) string {
++	t.Helper()
++	_, _, _, err := Install(home, InstallOptions{Operand: root, Policy: policy})
++	if err == nil || !strings.Contains(err.Error(), tc.Diagnostic) || !strings.Contains(err.Error(), tc.NamesCheck) {
++		t.Fatalf("Install err = %v, want %s naming %s", err, tc.Diagnostic, tc.NamesCheck)
++	}
++	return ""
++}
++
++func driveUntrustedOverlayInstall(t *testing.T, tc pathBoundaryVector, checkStatus bool) string {
++	t.Helper()
++	home, root, overlay, policy := newVectorPathOverlay(t, tc.CarriesSystem)
++	if !checkStatus {
++		restore, err := makeWorldWritableDirectoryForTest(overlay)
++		if err != nil {
++			t.Fatalf("create world-writable path boundary: %v", err)
++			return ""
++		}
++		defer func() {
++			if err := restore(); err != nil {
++				t.Errorf("restore path boundary fixture: %v", err)
++			}
++		}()
++		if err := validatePathDirectory(overlay); err == nil || !strings.Contains(err.Error(), "permissions") {
++			t.Fatalf("world-writable path source validation = %v, want permissions refusal", err)
++		}
++		return assertOverlayInstallDiagnostic(t, home, root, policy, tc)
++	}
++	installVectorPathOverlay(t, home, root, policy)
++	restore, err := makeWorldWritableDirectoryForTest(overlay)
++	if err != nil {
++		t.Fatalf("create world-writable path boundary: %v", err)
++		return ""
++	}
++	defer func() {
++		if err := restore(); err != nil {
++			t.Errorf("restore path boundary fixture: %v", err)
++		}
++	}()
++	if err := validatePathDirectory(overlay); err == nil || !strings.Contains(err.Error(), "permissions") {
++		t.Fatalf("world-writable path source validation = %v, want permissions refusal", err)
++	}
++	request := ResolveRequest{Home: home, Profile: "team-context", EnvID: "claude_code", LaunchDir: t.TempDir(),
++		Machine: envregistry.DefaultMachineConfig(), Policy: policy}
++	result, err := Resolve(request)
++	if err == nil || result != nil || !strings.Contains(err.Error(), tc.Diagnostic) || !strings.Contains(err.Error(), tc.NamesCheck) {
++		t.Fatalf("Resolve = (%v, %v), want no fragment and %s naming %s", result, err, tc.Diagnostic, tc.NamesCheck)
++	}
++	status, err := StatusOf(StatusRequest{Home: home, Machine: envregistry.DefaultMachineConfig(), Policy: policy})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !status.NonCurrent {
++		t.Fatal("Status reports a boundary-invalid overlay current")
++	}
++	for _, row := range status.Homes {
++		if row.Profile == "team-context" && !row.Current && strings.Join(row.Findings, " ") != "" &&
++			strings.Contains(strings.Join(row.Findings, " "), tc.Diagnostic) && strings.Contains(strings.Join(row.Findings, " "), tc.NamesCheck) {
++			return ""
++		}
++	}
++	t.Fatal("Status row did not report the path boundary failure")
++	return ""
++}
++
++func driveWrongOwnerVector(t *testing.T, tc pathBoundaryVector) string {
++	t.Helper()
++	if tc.Origin == "onboarding-import" {
++		home := t.TempDir()
++		pinHomes(t)
++		seams := pinImportSeams(t)
++		seedCurrentDefault(t, home)
++		info, _, _, err := Import(home, seams.options(Policy{}))
++		if err != nil {
++			t.Fatalf("Import: %v", err)
++		}
++		undo, reason := forceWrongOwnerForTest(info.Source.Path)
++		if reason != "" {
++			return reason
++		}
++		defer undo()
++		return assertResolveUntrusted(t, home, info.Name, Policy{}, tc)
++	}
++	home, root, overlay, policy := newVectorPathOverlay(t, tc.CarriesSystem)
++	undo, reason := forceWrongOwnerForTest(overlay)
++	if reason != "" {
++		return reason
++	}
++	defer undo()
++	return assertOverlayInstallDiagnostic(t, home, root, policy, tc)
++}
++
++func drivePathOverlayUntrustedRepair(t *testing.T, tc pathBoundaryVector) string {
++	t.Helper()
++	if tc.Conforming == nil || *tc.Conforming || !tc.Rebuild || tc.FailingCheck != pathboundary.CheckOwnership {
++		t.Fatalf("vector %q is not the pinned non-conforming rebuild probe: %+v", tc.Name, tc)
++	}
++	home, root, overlay, policy := newVectorPathOverlay(t, tc.CarriesSystem)
++	installVectorPathOverlay(t, home, root, policy)
++	undo, reason := forceWrongOwnerForTest(overlay)
++	if reason != "" {
++		return reason
++	}
++	defer undo()
++	before := hashTreeForTest(t, home)
++	result, err := Resolve(ResolveRequest{
++		Home: home, Profile: "team-context", EnvID: "claude_code", Machine: envregistry.DefaultMachineConfig(),
++		Policy: policy, LaunchDir: t.TempDir(), Repair: true,
++		Detect:       func(envregistry.Adapter) string { return "unknown" },
++		NativeHomeOf: func(id string) (string, error) { return filepath.Join(home, "native", id), nil },
++		OperatorXDG:  filepath.Join(home, "xdg"),
++	})
++	if err == nil || result != nil || !strings.Contains(err.Error(), tc.Diagnostic) ||
++		!strings.Contains(err.Error(), tc.NamesCheck) || strings.Contains(err.Error(), "would-rebuild-untrusted-store") {
++		t.Fatalf("repair Resolve = (%v, %v), want no fragment, no rebuild plan, and %s naming %s", result, err, tc.Diagnostic, tc.NamesCheck)
++	}
++	if after := hashTreeForTest(t, home); after != before {
++		t.Fatal("repair Resolve mutated manager state before refusing the untrusted path source")
++	}
++	return ""
++}
++
++func assertResolveUntrusted(t *testing.T, home, profile string, policy Policy, tc pathBoundaryVector) string {
++	t.Helper()
++	result, err := Resolve(ResolveRequest{Home: home, Profile: profile, EnvID: "claude_code", LaunchDir: t.TempDir(),
++		Machine: envregistry.DefaultMachineConfig(), Policy: policy})
++	if err == nil || result != nil || !strings.Contains(err.Error(), tc.Diagnostic) || !strings.Contains(err.Error(), tc.NamesCheck) {
++		t.Fatalf("Resolve = (%v, %v), want %s naming %s", result, err, tc.Diagnostic, tc.NamesCheck)
++	}
++	return ""
++}
++
++func driveNonRegularVector(t *testing.T, tc pathBoundaryVector) string {
++	t.Helper()
++	home, root, overlay, policy := newVectorPathOverlay(t, tc.CarriesSystem)
++	if err := makeFIFOVectorForTest(filepath.Join(overlay, "context", "pipe")); err != nil {
++		return "host cannot create the non-regular-file vector: " + err.Error()
++	}
++	return assertOverlayInstallDiagnostic(t, home, root, policy, tc)
++}
++
++func drivePathRootTransitiveSystemRefusal(t *testing.T, tc pathBoundaryVector) {
++	t.Helper()
++	home := t.TempDir()
++	pinHomes(t)
++	ids := newGitIdentities(t)
++	leaf := gitRepo(t, map[string]string{
++		"agent-context.json":   `{"schema_version":1,"name":"leaf","version":"1.0.0","context":{"modules":[{"path":"90-system.md","class":"system"}]}}` + "\n",
++		"context/90-system.md": "leaf system prompt\n",
++	}, "v1.0.0")
++	leafURL := ids.serve(leaf, "https://example.com/path-leaf")
++	mid := gitRepo(t, map[string]string{
++		"agent-context.json": `{"schema_version":1,"name":"mid","version":"1.0.0","requires":{"contexts":{"leaf":{"git":"` + leafURL + `","range":"*"}}}}` + "\n",
++	}, "v1.0.0")
++	midURL := ids.serve(mid, "https://example.com/path-mid")
++	root := filepath.Join(t.TempDir(), "root")
++	writeManifestPackage(t, root,
++		`{"schema_version":1,"name":"team-context","version":"1.0.0","requires":{"contexts":{"mid":{"git":"`+midURL+`","range":"*"}}}}`+"\n", nil)
++	policy := Policy{TransitiveSystemModules: contextmaterialize.TransitiveError}
++	_, _, _, err := Install(home, InstallOptions{Operand: root, Policy: policy})
++	if err == nil || !strings.Contains(err.Error(), tc.Diagnostic) || !strings.Contains(err.Error(), tc.NamesPackage) || !strings.Contains(err.Error(), tc.NamesModule) {
++		t.Fatalf("Install err = %v, want %s naming package %s and module %s", err, tc.Diagnostic, tc.NamesPackage, tc.NamesModule)
++	}
++}
++
++// TestPathKindDryRunVectorsDriveReadOnlyResolve verifies dry-run-equivalent
++// lock-free Resolve behaviour for intact and untrusted path overlays: it
++// never emits a fragment for an untrusted source, plans no rebuild, and
++// leaves manager and source trees byte-identical.
++func TestPathKindDryRunVectorsDriveReadOnlyResolve(t *testing.T) {
++	vectors := readPathKindAdmissionVectors(t)
++	conformancecoverage.RunOutcomes(t, "environments-path-kind-admission/dry_run_cases", vectors.DryRun,
++		func(tc pathBoundaryVector) string { return tc.Name },
++		func(caseT *testing.T, tc pathBoundaryVector) conformancecoverage.Observation {
++			if reason := drivePathDryRunVector(caseT, tc); reason != "" {
++				return conformancecoverage.Observation{BoundReason: reason}
++			}
++			return conformancecoverage.Observation{}
++		})
++}
++
++func drivePathDryRunVector(t *testing.T, tc pathBoundaryVector) string {
++	t.Helper()
++	home, root, overlay, policy := newVectorPathOverlay(t, tc.CarriesSystem)
++	installVectorPathOverlay(t, home, root, policy)
++	var restore func() error
++	if tc.FailingCheck != "" {
++		var err error
++		restore, err = makeWorldWritableDirectoryForTest(overlay)
++		if err != nil {
++			t.Fatalf("create world-writable path boundary: %v", err)
++		}
++		if err := validatePathDirectory(overlay); err == nil || !strings.Contains(err.Error(), "permissions") {
++			t.Fatalf("world-writable path source validation = %v, want permissions refusal", err)
++		}
++		defer func() {
++			if err := restore(); err != nil {
++				t.Errorf("restore path boundary fixture: %v", err)
++			}
++		}()
++	}
++	beforeHome := hashTreeForTest(t, home)
++	beforeSource := hashTreeForTest(t, overlay)
++	result, err := Resolve(ResolveRequest{Home: home, Profile: "team-context", EnvID: "claude_code", LaunchDir: t.TempDir(),
++		Machine: envregistry.DefaultMachineConfig(), Policy: policy, Repair: false})
++	if tc.Diagnostic != "" {
++		if err == nil || result != nil || !strings.Contains(err.Error(), tc.Diagnostic) || !strings.Contains(err.Error(), tc.FailingCheck) ||
++			strings.Contains(err.Error(), "would-rebuild-untrusted-store") {
++			t.Fatalf("Resolve=(%v,%v), want no fragment, %s/%s and no rebuild plan", result, err, tc.Diagnostic, tc.FailingCheck)
++		}
++	} else if err != nil && !strings.Contains(err.Error(), DiagHomeStale) {
++		t.Fatalf("intact read-only Resolve: %v", err)
++	}
++	if after := hashTreeForTest(t, home); beforeHome != after {
++		t.Fatal("read-only Resolve mutated manager state")
++	}
++	if after := hashTreeForTest(t, overlay); beforeSource != after {
++		t.Fatal("read-only Resolve mutated the path source")
++	}
++	return ""
++}
++
++func hashTreeForTest(t *testing.T, root string) string {
++	t.Helper()
++	var paths []string
++	if err := filepath.WalkDir(root, func(path string, _ os.DirEntry, err error) error {
++		if err != nil {
++			return err
++		}
++		paths = append(paths, path)
++		return nil
++	}); err != nil {
++		t.Fatal(err)
++	}
++	sort.Strings(paths)
++	h := sha256.New()
++	for _, path := range paths {
++		info, err := os.Lstat(path)
++		if err != nil {
++			t.Fatal(err)
++		}
++		relative, err := filepath.Rel(root, path)
++		if err != nil {
++			t.Fatal(err)
++		}
++		_, _ = fmt.Fprint(h, relative, "\x00", info.Mode().String(), "\x00")
++		if info.Mode().IsRegular() {
++			payload, err := os.ReadFile(path)
++			if err != nil {
++				t.Fatal(err)
++			}
++			_, _ = h.Write(payload)
++		}
++	}
++	return hex.EncodeToString(h.Sum(nil))
++}
+diff --git a/internal/envprofile/path_kind_owner_test_helper_test.go b/internal/envprofile/path_kind_owner_test_helper_test.go
+new file mode 100644
+index 00000000..0b7a394e
+--- /dev/null
++++ b/internal/envprofile/path_kind_owner_test_helper_test.go
+@@ -0,0 +1,24 @@
++package envprofile
++
++import (
++	"os"
++	"path/filepath"
++
++	"github.com/relux-works/curator/internal/pathboundary"
++)
++
++// forceWrongOwnerForTest injects a foreign owner identity for one path while
++// leaving the production owner lookup in place for every other component.
++// This drives the boundary through Install/Resolve without chown privileges.
++func forceWrongOwnerForTest(path string) (func(), string) {
++	previous := pathSourceOwnerLookup
++	lookup := pathSourceOwnerLookup
++	target := filepath.Clean(path)
++	pathSourceOwnerLookup = func(candidate string, info os.FileInfo) (pathboundary.OwnerIdentity, error) {
++		if filepath.Clean(candidate) == target {
++			return pathboundary.OwnerIdentity("injected:foreign-owner"), nil
++		}
++		return lookup(candidate, info)
++	}
++	return func() { pathSourceOwnerLookup = previous }, ""
++}
+diff --git a/internal/envprofile/path_kind_test_helpers_other_test.go b/internal/envprofile/path_kind_test_helpers_other_test.go
+new file mode 100644
+index 00000000..d5a34832
+--- /dev/null
++++ b/internal/envprofile/path_kind_test_helpers_other_test.go
+@@ -0,0 +1,15 @@
++//go:build !unix && !windows
++
++package envprofile
++
++import (
++	"errors"
++)
++
++func makeFIFOVectorForTest(string) error {
++	return errors.New("host platform does not expose POSIX named pipes")
++}
++
++func makeWorldWritableDirectoryForTest(string) (func() error, error) {
++	return nil, errors.New("host platform does not expose a writable-boundary test helper")
++}
+diff --git a/internal/envprofile/path_kind_test_helpers_unix_test.go b/internal/envprofile/path_kind_test_helpers_unix_test.go
+new file mode 100644
+index 00000000..da7be3ba
+--- /dev/null
++++ b/internal/envprofile/path_kind_test_helpers_unix_test.go
+@@ -0,0 +1,27 @@
++//go:build unix
++
++package envprofile
++
++import (
++	"fmt"
++	"os"
++	"syscall"
++)
++
++func makeFIFOVectorForTest(path string) error {
++	if err := syscall.Mkfifo(path, 0o600); err != nil {
++		return fmt.Errorf("mkfifo: %w", err)
++	}
++	return nil
++}
++
++func makeWorldWritableDirectoryForTest(path string) (func() error, error) {
++	info, err := os.Lstat(path)
++	if err != nil {
++		return nil, err
++	}
++	if err := os.Chmod(path, 0o777); err != nil {
++		return nil, err
++	}
++	return func() error { return os.Chmod(path, info.Mode().Perm()) }, nil
++}
+diff --git a/internal/envprofile/path_kind_test_helpers_windows_test.go b/internal/envprofile/path_kind_test_helpers_windows_test.go
+new file mode 100644
+index 00000000..970e7b33
+--- /dev/null
++++ b/internal/envprofile/path_kind_test_helpers_windows_test.go
+@@ -0,0 +1,67 @@
++//go:build windows
++
++package envprofile
++
++import (
++	"fmt"
++
++	"github.com/relux-works/curator/internal/pathboundary"
++	"golang.org/x/sys/windows"
++)
++
++func makeFIFOVectorForTest(string) error {
++	return fmt.Errorf("Windows does not expose POSIX named pipes")
++}
++
++func makeWorldWritableDirectoryForTest(path string) (func() error, error) {
++	path16, err := windows.UTF16PtrFromString(path)
++	if err != nil {
++		return nil, err
++	}
++	handle, err := windows.CreateFile(
++		path16,
++		uint32(windows.READ_CONTROL|windows.WRITE_DAC),
++		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
++		nil,
++		windows.OPEN_EXISTING,
++		windows.FILE_FLAG_OPEN_REPARSE_POINT|windows.FILE_FLAG_BACKUP_SEMANTICS,
++		0,
++	)
++	if err != nil {
++		return nil, err
++	}
++	defer func() { _ = windows.CloseHandle(handle) }()
++	descriptor, err := windows.GetSecurityInfo(
++		handle,
++		windows.SE_FILE_OBJECT,
++		windows.DACL_SECURITY_INFORMATION,
++	)
++	if err != nil {
++		return nil, err
++	}
++	dacl, _, err := descriptor.DACL()
++	if err != nil {
++		return nil, err
++	}
++	everyone, err := windows.StringToSid("S-1-1-0")
++	if err != nil {
++		return nil, err
++	}
++	worldWrite, err := windows.ACLFromEntries([]windows.EXPLICIT_ACCESS{{
++		AccessPermissions: windows.GENERIC_WRITE,
++		AccessMode:        windows.GRANT_ACCESS,
++		Inheritance:       windows.NO_INHERITANCE,
++		Trustee: windows.TRUSTEE{
++			TrusteeForm:  windows.TRUSTEE_IS_SID,
++			TrusteeType:  windows.TRUSTEE_IS_WELL_KNOWN_GROUP,
++			TrusteeValue: windows.TrusteeValueFromSID(everyone),
++		},
++	}}, dacl)
++	if err != nil {
++		return nil, err
++	}
++	if err := windows.SetSecurityInfo(handle, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION, nil, nil, worldWrite, nil); err != nil {
++		return nil, err
++	}
++	return func() error { return pathboundary.ProtectTree(path) }, nil
++}
+diff --git a/internal/envprofile/path_source_boundary_test.go b/internal/envprofile/path_source_boundary_test.go
+new file mode 100644
+index 00000000..35169ad2
+--- /dev/null
++++ b/internal/envprofile/path_source_boundary_test.go
+@@ -0,0 +1,229 @@
++package envprofile
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/envregistry"
++)
++
++const pathMCPManifest = `{"schema_version":1,"name":"figma-devmode","version":"1.2.0","server":{"transport":"stdio","command":"npx","args":["-y","figma-developer-mcp","--stdio"],"env_names":["FIGMA_API_KEY"],"environments":["claude_code","codex_cli","opencode"]}}` + "\n"
++
++func pathMCPPackage(t *testing.T, root string) {
++	t.Helper()
++	writeManifestPackage(t, root,
++		`{"schema_version":1,"name":"figma-devmode","version":"1.2.0"}`+"\n", nil)
++	if err := os.WriteFile(filepath.Join(root, "agent-mcp.json"), []byte(pathMCPManifest), 0o644); err != nil {
++		t.Fatal(err)
++	}
++}
++
++func assertPathMCPRefusal(t *testing.T, err error) {
++	t.Helper()
++	if err == nil || !strings.Contains(err.Error(), DiagMCPPathSourceRefused) ||
++		strings.Count(err.Error(), "figma-devmode") < 2 {
++		t.Fatalf("err = %v, want %s naming package and declaration figma-devmode", err, DiagMCPPathSourceRefused)
++	}
++}
++
++// TestPathRootAndImportedMCPDeclarationsRefused drives the installed path
++// source admission used by both an ordinary path root and Import's
++// ImportedFromNative path. The refusal names the package and declaration.
++// Production entry point: Install, the entry Import delegates to.
++func TestPathRootAndImportedMCPDeclarationsRefused(t *testing.T) {
++	for _, imported := range []bool{false, true} {
++		t.Run(map[bool]string{false: "root", true: "onboarding-import"}[imported], func(t *testing.T) {
++			home := t.TempDir()
++			pinHomes(t)
++			source := filepath.Join(t.TempDir(), "path-mcp")
++			pathMCPPackage(t, source)
++			_, _, _, err := Install(home, InstallOptions{Operand: source, Imported: imported})
++			assertPathMCPRefusal(t, err)
++			if _, err := readSource(home, "figma-devmode"); err == nil {
++				t.Fatal("refused path package left an installed profile source")
++			}
++		})
++	}
++}
++
++// TestPathOverlayMCPDeclarationRefused drives a path overlay through the
++// ordinary install pipeline and refuses its MCP declaration before the
++// overlay can join the profile closure.
++func TestPathOverlayMCPDeclarationRefused(t *testing.T) {
++	home := t.TempDir()
++	pinHomes(t)
++	root := filepath.Join(t.TempDir(), "root")
++	writeManifestPackage(t, root,
++		`{"schema_version":1,"name":"team-context","version":"1.0.0"}`+"\n", nil)
++	overlay := filepath.Join(t.TempDir(), "path-mcp")
++	pathMCPPackage(t, overlay)
++	policy := Policy{
++		OverlaysAllowed:      true,
++		OverlayDefaultWeight: 1000,
++		Overlays:             map[string][]OverlaySpec{"team-context": {{Source: overlay}}},
++	}
++	_, _, _, err := Install(home, InstallOptions{Operand: root, Policy: policy})
++	assertPathMCPRefusal(t, err)
++}
++
++func pathOverlayFixture(t *testing.T, moduleClass string) (string, string, Policy) {
++	t.Helper()
++	root := filepath.Join(t.TempDir(), "root")
++	writeManifestPackage(t, root,
++		`{"schema_version":1,"name":"team-context","version":"1.0.0"}`+"\n", nil)
++	overlay := filepath.Join(t.TempDir(), "personal")
++	module := `{"path":"personal.md"}`
++	if moduleClass != "" {
++		module = `{"path":"personal.md","class":"` + moduleClass + `"}`
++	}
++	writeManifestPackage(t, overlay,
++		`{"schema_version":1,"name":"personal","version":"1.0.0","context":{"modules":[`+module+`]}}`+"\n",
++		map[string]string{"personal.md": "personal context\n"})
++	policy := Policy{
++		OverlaysAllowed:      true,
++		OverlayDefaultWeight: 1000,
++		Overlays:             map[string][]OverlaySpec{"team-context": {{Source: overlay}}},
++	}
++	return root, overlay, policy
++}
++
++// TestPathOverlayBoundaryRejectsEscapingAndInternalLinks proves both
++// containment and link_safety at Install's production path-overlay entry.
++func TestPathOverlayBoundaryRejectsEscapingAndInternalLinks(t *testing.T) {
++	for _, tc := range []struct {
++		name   string
++		target func(root, overlay string) string
++		check  string
++	}{
++		{name: "escape", target: func(_, _ string) string { return filepath.Join(t.TempDir(), "outside.md") }, check: "containment"},
++		{name: "within-tree", target: func(_ string, overlay string) string { return filepath.Join(overlay, "context", "personal.md") }, check: "link_safety"},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			home := t.TempDir()
++			pinHomes(t)
++			root, overlay, policy := pathOverlayFixture(t, "")
++			link := filepath.Join(overlay, "context", "alias.md")
++			if err := os.Symlink(tc.target(root, overlay), link); err != nil {
++				t.Skipf("host cannot create the symlink vector: %v", err)
++			}
++			_, _, _, err := Install(home, InstallOptions{Operand: root, Policy: policy})
++			if err == nil || !strings.Contains(err.Error(), DiagPathSourceUntrusted) || !strings.Contains(err.Error(), tc.check) {
++				t.Fatalf("err = %v, want %s with %s", err, DiagPathSourceUntrusted, tc.check)
++			}
++		})
++	}
++}
++
++// TestPathOverlayTrustedSystemModuleRemainsAdmitted follows rc.13 §3 and
++// the pinned path-overlay-system-module-admitted vector: direct trusted
++// path overlays share the existing system-module admission rule.
++func TestPathOverlayTrustedSystemModuleRemainsAdmitted(t *testing.T) {
++	home := t.TempDir()
++	pinHomes(t)
++	root, _, policy := pathOverlayFixture(t, "system")
++	info, _, _, err := Install(home, InstallOptions{Operand: root, Policy: policy})
++	if err != nil {
++		t.Fatalf("trusted direct system overlay was refused: %v", err)
++	}
++	found := false
++	for _, warning := range info.Warnings {
++		if strings.Contains(warning, "context-system-module-present") {
++			found = true
++		}
++	}
++	if !found {
++		t.Fatalf("direct system overlay produced no system-module finding: warnings=%v", info.Warnings)
++	}
++}
++
++// TestPathOverlayFailureBlocksResolveAndMakesStatusNonCurrent drives the
++// path directory contract after install. The path is inspected again by
++// Resolve and Status, no fragment is emitted, and no rebuild is planned.
++func TestPathOverlayFailureBlocksResolveAndMakesStatusNonCurrent(t *testing.T) {
++	home := t.TempDir()
++	pinHomes(t)
++	root, overlay, policy := pathOverlayFixture(t, "")
++	if _, _, _, err := Install(home, InstallOptions{Operand: root, Policy: policy}); err != nil {
++		t.Fatal(err)
++	}
++	restore, err := makeWorldWritableDirectoryForTest(overlay)
++	if err != nil {
++		t.Fatalf("create world-writable permission vector: %v", err)
++	}
++	defer func() {
++		if err := restore(); err != nil {
++			t.Errorf("restore path boundary fixture: %v", err)
++		}
++	}()
++	if err := validatePathDirectory(overlay); err == nil || !strings.Contains(err.Error(), "permissions") {
++		t.Fatalf("world-writable path source validation = %v, want permissions refusal", err)
++	}
++	req := ResolveRequest{
++		Home: home, Profile: "team-context", EnvID: "claude_code", LaunchDir: t.TempDir(),
++		Machine: envregistry.DefaultMachineConfig(), Policy: policy,
++		Detect: func(envregistry.Adapter) string { return "unknown" },
++	}
++	if result, err := Resolve(req); err == nil || result != nil || !strings.Contains(err.Error(), DiagPathSourceUntrusted) || !strings.Contains(err.Error(), "permissions") {
++		t.Fatalf("Resolve = (%v, %v), want no fragment and %s/permissions", result, err, DiagPathSourceUntrusted)
++	}
++	status, err := StatusOf(StatusRequest{Home: home, Machine: envregistry.DefaultMachineConfig(), Policy: policy})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !status.NonCurrent {
++		t.Fatal("StatusOf reports a profile current while its path overlay is untrusted")
++	}
++	for _, row := range status.Homes {
++		if row.Profile != "team-context" || row.Current {
++			continue
++		}
++		for _, finding := range row.Findings {
++			if strings.Contains(finding, DiagPathSourceUntrusted) && strings.Contains(finding, "permissions") {
++				return
++			}
++		}
++	}
++	t.Fatal("StatusOf did not report environment_store_untrusted naming the permissions check")
++}
++
++func TestPathSourceMutationsRejectUntrustedOverlayBeforeDefaultWrites(t *testing.T) {
++	for _, operation := range []string{"update", "use", "sync"} {
++		t.Run(operation, func(t *testing.T) {
++			home := t.TempDir()
++			pinHomes(t)
++			root, overlay, policy := pathOverlayFixture(t, "")
++			if _, _, _, err := Install(home, InstallOptions{Operand: root, Policy: policy}); err != nil {
++				t.Fatal(err)
++			}
++			if err := os.RemoveAll(ProfileDir(home, DefaultProfile)); err != nil {
++				t.Fatal(err)
++			}
++			if err := SetCurrent(home, "team-context"); err != nil {
++				t.Fatal(err)
++			}
++			undo, reason := forceWrongOwnerForTest(overlay)
++			if reason != "" {
++				t.Skip(reason)
++			}
++			defer undo()
++
++			var err error
++			switch operation {
++			case "update":
++				_, _, err = UpdateWithPolicy(home, "team-context", policy)
++			case "use":
++				_, err = UseWithPolicy(home, "team-context", "", "", false, policy)
++			case "sync":
++				_, err = SyncWithPolicy(home, policy)
++			}
++			if err == nil || !strings.Contains(err.Error(), DiagPathSourceUntrusted) || !strings.Contains(err.Error(), "ownership") {
++				t.Fatalf("%s error = %v, want %s naming ownership", operation, err, DiagPathSourceUntrusted)
++			}
++			if _, err := os.Stat(ProfileDir(home, DefaultProfile)); !os.IsNotExist(err) {
++				t.Fatalf("%s created the default profile before refusing the untrusted path: stat err=%v", operation, err)
++			}
++		})
++	}
++}
+diff --git a/internal/envprofile/pathkind_test.go b/internal/envprofile/pathkind_test.go
+index 39ec4f4a..24c1e3ea 100644
+--- a/internal/envprofile/pathkind_test.go
++++ b/internal/envprofile/pathkind_test.go
+@@ -91,9 +91,9 @@ func TestNestedGitIsSourceInvalid(t *testing.T) {
+ 	}
+ }
+ 
+-// TestSymlinkInPathIsSourceInvalid drives Install with a symbolic link in
+-// the source tree: the snapshot discipline is profile_source_invalid.
+-func TestSymlinkInPathIsSourceInvalid(t *testing.T) {
++// TestSymlinkInPathIsUntrusted drives Install with a symbolic link in the
++// source tree: the section 4 source-boundary refusal is environment_store_untrusted.
++func TestSymlinkInPathIsUntrusted(t *testing.T) {
+ 	home := t.TempDir()
+ 	pinHomes(t)
+ 	source := filepath.Join(t.TempDir(), "source")
+@@ -106,8 +106,8 @@ func TestSymlinkInPathIsSourceInvalid(t *testing.T) {
+ 		t.Skipf("this host cannot create symlinks: %v", err)
+ 	}
+ 	_, _, _, err := Install(home, InstallOptions{Operand: source})
+-	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) {
+-		t.Fatalf("err = %v, want %s", err, DiagSourceInvalid)
++	if err == nil || !strings.Contains(err.Error(), DiagPathSourceUntrusted) || !strings.Contains(err.Error(), "link_safety") {
++		t.Fatalf("err = %v, want %s with link_safety", err, DiagPathSourceUntrusted)
+ 	}
+ }
+ 
+@@ -307,13 +307,12 @@ func TestPathSnapshotImmutableAcrossUpdateSyncUse(t *testing.T) {
+ 	}
+ }
+ 
+-// TestPathUpdateAllSucceedsWithImportedProfile drives Import (which deletes
+-// its §9.6 staging directory, so the recorded source.Path names no existing
+-// entry) followed by the per-profile update loop the `profile update --all`
+-// row runs: ListWithPolicy skipping default, UpdateWithPolicy each.
+-// Production entry points: Import, ListWithPolicy, UpdateWithPolicy. Before
+-// the §1 fix, the update re-read source.Path and failed the whole machine
+-// with profile_source_path_missing.
++// TestPathUpdateAllSucceedsWithImportedProfile drives Import followed by the
++// per-profile update loop the `profile update --all` row runs:
++// ListWithPolicy skipping default, UpdateWithPolicy each. The imported path
++// source remains in the manager's imports directory so its §4 boundary can be
++// checked on every resolve and mutating profile operation.
++// Production entry points: Import, ListWithPolicy, UpdateWithPolicy.
+ func TestPathUpdateAllSucceedsWithImportedProfile(t *testing.T) {
+ 	home := t.TempDir()
+ 	pinHomes(t)
+@@ -328,8 +327,12 @@ func TestPathUpdateAllSucceedsWithImportedProfile(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if _, err := os.Stat(source.Path); !os.IsNotExist(err) {
+-		t.Fatalf("import staging %q still exists: the test does not exercise the deleted-source shape", source.Path)
++	wantSource := filepath.Join(home, "imports", info.Name)
++	if source.Path != wantSource {
++		t.Fatalf("import source %q, want durable path %q", source.Path, wantSource)
++	}
++	if info, err := os.Stat(source.Path); err != nil || !info.IsDir() {
++		t.Fatalf("durable imported source %q is unavailable: info=%v err=%v", source.Path, info, err)
+ 	}
+ 	profiles, err := ListWithPolicy(home, Policy{})
+ 	if err != nil {
+diff --git a/internal/envprofile/pathsource.go b/internal/envprofile/pathsource.go
+new file mode 100644
+index 00000000..d062b66d
+--- /dev/null
++++ b/internal/envprofile/pathsource.go
+@@ -0,0 +1,157 @@
++package envprofile
++
++import (
++	"errors"
++	"fmt"
++	"io/fs"
++
++	"github.com/relux-works/curator/internal/contextpkg"
++	"github.com/relux-works/curator/internal/identity"
++	"github.com/relux-works/curator/internal/pathboundary"
++)
++
++const (
++	// DiagPathSourceUntrusted reports an untrusted protected-boundary source.
++	DiagPathSourceUntrusted = "environment_store_untrusted"
++	// DiagMCPPathSourceRefused reports an MCP declaration carried by a path source.
++	DiagMCPPathSourceRefused = "mcp_declaration_path_source_refused"
++)
++
++var pathSourceOwnerLookup = pathboundary.DefaultOwnerLookup()
++
++// validateProfilePathSources verifies only directories named as path
++// sources. It does not reread their content as package state or recompute a
++// state pin from the live directory.
++func validateProfilePathSources(profile string, source Source, policy Policy) error {
++	if source.Kind == KindPath && source.Path != "" {
++		if err := validatePathDirectory(source.Path); err != nil {
++			return err
++		}
++	}
++	for _, overlay := range policy.EffectiveOverlays(profile) {
++		if identity.ClassifySource(overlay.Source) != identity.SourcePath {
++			continue
++		}
++		if err := validatePathDirectory(overlay.Source); err != nil {
++			return err
++		}
++	}
++	return nil
++}
++
++// preflightProfilePathSources reads one installed source record and proves
++// its path directories before a mutating caller can establish defaults or
++// write a materialized home. A proven absence leaves profile-existence and
++// policy diagnostics to the operation that consumes the profile; unreadable
++// and malformed records remain errors.
++func preflightProfilePathSources(home, profile string, policy Policy) error {
++	source, err := readSource(home, profile)
++	if err != nil {
++		if isStateAbsent(err) {
++			return nil
++		}
++		return err
++	}
++	return validateProfilePathSources(profile, source, policy)
++}
++
++// preflightCurrentPathSources covers all profiles a sync will materialize
++// before ensureDefault or the first native-home write.
++func preflightCurrentPathSources(home string, policy Policy) error {
++	current, err := Current(home)
++	if err != nil {
++		return err
++	}
++	if current == "" {
++		current = DefaultProfile
++	}
++	if err := preflightProfilePathSources(home, current, policy); err != nil {
++		return err
++	}
++	scoped, err := ScopedCurrents(home)
++	if err != nil {
++		return err
++	}
++	for _, profile := range scoped {
++		if err := preflightProfilePathSources(home, profile, policy); err != nil {
++			return err
++		}
++	}
++	return nil
++}
++
++func validatePathDirectory(path string) error {
++	if err := pathboundary.ValidateWithOwner(path, pathSourceOwnerLookup); err != nil {
++		return pathBoundaryDiagnostic(path, err)
++	}
++	return nil
++}
++
++// validatePathPackageDirectory proves the source boundary before parsing any
++// package bytes. Missing and non-directory operands retain the established
++// path-source diagnostics; an unsafe directory is environment_store_untrusted.
++func validatePathPackageDirectory(path string) error {
++	err := pathboundary.ValidateWithOwner(path, pathSourceOwnerLookup)
++	if err == nil {
++		return nil
++	}
++	var failure *pathboundary.Failure
++	if errors.As(err, &failure) && failure.Check == pathboundary.CheckRegular &&
++		(pathboundary.IsAbsent(err) || errors.Is(err, fs.ErrPermission) || failure.Reason == "declared path is not a directory") {
++		return pathManifestDiag(path, err)
++	}
++	return pathBoundaryDiagnostic(path, err)
++}
++
++func pathBoundaryDiagnostic(path string, err error) error {
++	var failure *pathboundary.Failure
++	if errors.As(err, &failure) {
++		return fmt.Errorf("%s: path %q fails %s boundary check at %q: %s",
++			DiagPathSourceUntrusted, failure.Root, failure.Check, failure.Path, boundaryReason(failure))
++	}
++	return fmt.Errorf("%s: path %q boundary could not be proven: %v", DiagPathSourceUntrusted, path, err)
++}
++
++func preflightPathOverlayDeclarations(profile string, policy Policy) error {
++	for _, overlay := range policy.EffectiveOverlays(profile) {
++		if identity.ClassifySource(overlay.Source) != identity.SourcePath {
++			continue
++		}
++		if overlay.Range != "" || overlay.Tag != "" || overlay.Revision != "" || overlay.Directory != "" {
++			return fmt.Errorf("%s: a path overlay carries no range, tag, revision, or directory", DiagSourceInvalid)
++		}
++		if err := validatePathPackageDirectory(overlay.Source); err != nil {
++			return err
++		}
++		manifest, err := contextpkg.LoadManifest(overlay.Source)
++		if err != nil {
++			return pathManifestDiag(overlay.Source, err)
++		}
++		if err := refusePathMCPDeclaration(overlay.Source, manifest.Name); err != nil {
++			return err
++		}
++	}
++	return nil
++}
++
++func boundaryReason(failure *pathboundary.Failure) string {
++	if failure.Reason != "" {
++		return failure.Reason
++	}
++	if failure.Cause != nil {
++		return failure.Cause.Error()
++	}
++	return "check could not be proven"
++}
++
++func refusePathMCPDeclaration(root, packageName string) error {
++	manifest, present, err := contextpkg.LoadMCPIfPresent(root)
++	if err != nil {
++		return fmt.Errorf("%s: path package at %q has an invalid MCP declaration: %w", contextpkg.DiagMCPInvalid, root, err)
++	}
++	if !present {
++		return nil
++	}
++	return fmt.Errorf("%s: package %q carries MCP declaration %q from a path source",
++		DiagMCPPathSourceRefused, packageName, manifest.Name)
++}
+diff --git a/internal/envprofile/status.go b/internal/envprofile/status.go
+index efd9dee3..6a7f808b 100644
+--- a/internal/envprofile/status.go
++++ b/internal/envprofile/status.go
+@@ -41,26 +41,29 @@ type SurfaceState struct {
+ 
+ // HomeState is one profile × environment row.
+ type HomeState struct {
+-	Profile        string         `json:"profile"`
+-	Environment    string         `json:"environment"`
+-	Mode           string         `json:"mode"`
+-	Form           string         `json:"form"`
+-	Home           string         `json:"home"`
+-	Provisioned    bool           `json:"provisioned"`
+-	Current        bool           `json:"current"`
+-	LockHash       string         `json:"lock_hash"`
+-	MarkerHash     string         `json:"marker_hash"`
+-	Surfaces       []SurfaceState `json:"surfaces"`
+-	Passthrough    []string       `json:"passthrough"`
+-	Seeds          []string       `json:"seeds"`
+-	SeedLinks      []string       `json:"seed_links"`
+-	SeededProjects []string       `json:"seeded_projects"`
+-	BackupsKnown   bool           `json:"backups_known"`
+-	Backups        int            `json:"backups"`
+-	BackupsOldest  string         `json:"backups_oldest"`
+-	BackupsNewest  string         `json:"backups_newest"`
+-	Findings       []string       `json:"findings"`
+-	Warnings       []string       `json:"warnings"`
++	Profile                     string                     `json:"profile"`
++	Environment                 string                     `json:"environment"`
++	Mode                        string                     `json:"mode"`
++	Form                        string                     `json:"form"`
++	Home                        string                     `json:"home"`
++	Provisioned                 bool                       `json:"provisioned"`
++	Current                     bool                       `json:"current"`
++	LockHash                    string                     `json:"lock_hash"`
++	MarkerHash                  string                     `json:"marker_hash"`
++	Surfaces                    []SurfaceState             `json:"surfaces"`
++	Passthrough                 []string                   `json:"passthrough"`
++	Seeds                       []string                   `json:"seeds"`
++	SeedLinks                   []string                   `json:"seed_links"`
++	SeededProjects              []string                   `json:"seeded_projects"`
++	CodexSeedRecord             *envmarker.CodexSeedRecord `json:"codex_seed_record,omitempty"`
++	NativeMCPServers            []string                   `json:"native_mcp_servers,omitempty"`
++	NativeMCPServersDisposition string                     `json:"native_mcp_servers_disposition,omitempty"`
++	BackupsKnown                bool                       `json:"backups_known"`
++	Backups                     int                        `json:"backups"`
++	BackupsOldest               string                     `json:"backups_oldest"`
++	BackupsNewest               string                     `json:"backups_newest"`
++	Findings                    []string                   `json:"findings"`
++	Warnings                    []string                   `json:"warnings"`
+ }
+ 
+ // ScopeHome carries both doors of a current profile (§8.1): the native
+@@ -181,6 +184,13 @@ type DeclarationScope struct {
+ 	Rows    []string `json:"rows"`
+ }
+ 
++// CodexSeedRuleState reports the manager-shipped seed behavior and its
++// provenance (§12). It is informational and never changes row currency.
++type CodexSeedRuleState struct {
++	Revision   string `json:"revision"`
++	Provenance string `json:"provenance"`
++}
++
+ // Status is the whole matrix.
+ type Status struct {
+ 	Homes                    []HomeState       `json:"homes"`
+@@ -216,6 +226,8 @@ type Status struct {
+ 	// empty, and unreadable-declaration notices. Warnings never make a
+ 	// row non-current (§12).
+ 	Warnings []string `json:"warnings"`
++	// CodexSeedRule is the manager-wide §12 codex-seed posture row.
++	CodexSeedRule CodexSeedRuleState `json:"codex_seed_rule"`
+ 	// MCPDeclarations repeats the §2.3 surfacing rows for the current
+ 	// profile of each scope reported.
+ 	MCPDeclarations []DeclarationScope `json:"mcp_declarations"`
+@@ -264,7 +276,10 @@ func (req *StatusRequest) resolve() ResolveRequest {
+ 
+ // StatusOf recomputes the profile × environment × surface matrix.
+ func StatusOf(req StatusRequest) (*Status, error) {
+-	status := &Status{}
++	status := &Status{CodexSeedRule: CodexSeedRuleState{
++		Revision:   envregistry.CodexSeedRevisionB,
++		Provenance: "shipped",
++	}}
+ 	status.Notes = append(status.Notes, "opencode skills come from the machine-current profile, split-brain by construction (§7.1)")
+ 	// §12.2: env status reports the locked require_current_profile
+ 	// requirement. The policy already carries the effective knob and its
+@@ -423,11 +438,18 @@ func homeState(req StatusRequest, profile string, adapter envregistry.Adapter) H
+ 		Mode:        envmarker.ModeManagedHome,
+ 		Home:        ManagedHomeDir(req.Home, profile, adapter.ID),
+ 	}
++	if adapter.ID != envregistry.CodexCLI {
++		state.NativeMCPServersDisposition = "none"
++	}
+ 	source, lock, hash, err := loadResolveInputs(req.Home, profile)
+ 	if err != nil {
+ 		state.Findings = append(state.Findings, DiagProfileUnknown+": "+err.Error())
+ 		return state
+ 	}
++	if err := validateProfilePathSources(profile, source, req.Policy); err != nil {
++		state.Findings = append(state.Findings, err.Error())
++		return state
++	}
+ 	state.LockHash = hash
+ 	state.Backups, state.BackupsOldest, state.BackupsNewest, err = backupAges(state.Home)
+ 	if err != nil {
+@@ -472,6 +494,10 @@ func homeState(req StatusRequest, profile string, adapter envregistry.Adapter) H
+ 	}
+ 	state.SeedLinks = append([]string{}, marker.SeedLinks...)
+ 	state.SeededProjects = append([]string{}, marker.SeededProjects...)
++	if adapter.ID == envregistry.CodexCLI {
++		state.CodexSeedRecord = cloneCodexSeedRecord(marker.CodexSeedRecord)
++		state.Warnings = append(state.Warnings, codexSeedStatusWarnings(marker, &state)...)
++	}
+ 	for _, reason := range verdict.reasons {
+ 		diagnostic := reason
+ 		if strings.HasPrefix(reason, "passthrough entry") && strings.Contains(reason, "is detached") {
+@@ -497,6 +523,48 @@ func homeState(req StatusRequest, profile string, adapter envregistry.Adapter) H
+ 	return state
+ }
+ 
++func cloneCodexSeedRecord(record *envmarker.CodexSeedRecord) *envmarker.CodexSeedRecord {
++	if record == nil {
++		return nil
++	}
++	cloned := *record
++	cloned.NativeMCPServers = append([]string{}, record.NativeMCPServers...)
++	return &cloned
++}
++
++// codexSeedStatusWarnings reports the recorded seed snapshot for one managed
++// Codex home. Revision-A and pre-rule homes retain their inherited base and
++// stay current with warnings; revision-B names were stripped and are not
++// inherited (§7.4, §7.7, §7.8, §8.2, §12).
++func codexSeedStatusWarnings(marker *envmarker.Marker, state *HomeState) []string {
++	record := marker.CodexSeedRecord
++	if record == nil {
++		state.NativeMCPServersDisposition = "unknown"
++		return []string{fmt.Sprintf("%s: this managed Codex home predates the seed record; re-provision it to apply seed revision %s", envregistry.DiagMCPSeedUnstripped, envregistry.CodexSeedRevisionB)}
++	}
++	state.NativeMCPServers = append([]string{}, record.NativeMCPServers...)
++	if len(record.NativeMCPServers) == 0 {
++		state.NativeMCPServersDisposition = "none"
++		return nil
++	}
++	switch record.Revision {
++	case "A":
++		state.NativeMCPServersDisposition = "ungoverned"
++		warnings := []string{fmt.Sprintf("%s: native Codex MCP servers %s remain in this managed home outside the profile lock and MCP allowlist", envregistry.DiagMCPNativeServersUngoverned, strings.Join(record.NativeMCPServers, ", "))}
++		if record.Revision != envregistry.CodexSeedRevisionB {
++			warnings = append(warnings, fmt.Sprintf("%s: this home retains revision-A native MCP servers; re-provision it to apply seed revision B", envregistry.DiagMCPSeedUnstripped))
++		}
++		return warnings
++	case envregistry.CodexSeedRevisionB:
++		state.NativeMCPServersDisposition = "not-inherited"
++		return []string{fmt.Sprintf("%s: native Codex MCP servers %s were stripped from config.toml and are not inherited", envregistry.DiagMCPNativeServersNotInherited, strings.Join(record.NativeMCPServers, ", "))}
++	default:
++		// Marker validation closes the revision set to A and B.
++		state.NativeMCPServersDisposition = "unknown"
++		return []string{fmt.Sprintf("%s: this managed Codex home records unsupported seed revision %q", envregistry.DiagMCPSeedUnstripped, record.Revision)}
++	}
++}
++
+ func markerForm(marker *envmarker.Marker) string {
+ 	if surface, ok := marker.Surfaces[envmarker.SurfaceRootContext]; ok {
+ 		return surface.Form
+diff --git a/internal/envprofile/switch.go b/internal/envprofile/switch.go
+index 658d638d..bf7430ce 100644
+--- a/internal/envprofile/switch.go
++++ b/internal/envprofile/switch.go
+@@ -166,6 +166,22 @@ func UseWithPolicy(home, name, environment, target string, clearScope bool, poli
+ 
+ // useLocked switches under the held operation lock.
+ func useLocked(op *operation, home, name, environment, target string, clearScope bool, policy Policy) ([]EntryResult, error) {
++	profileToValidate := name
++	if clearScope {
++		current, err := Current(home)
++		if err != nil {
++			return nil, err
++		}
++		profileToValidate = current
++		if profileToValidate == "" {
++			profileToValidate = DefaultProfile
++		}
++	}
++	if profileToValidate != "" {
++		if err := preflightProfilePathSources(home, profileToValidate, policy); err != nil {
++			return nil, err
++		}
++	}
+ 	if err := ensureDefault(op, home, policy); err != nil {
+ 		return nil, err
+ 	}
+@@ -353,6 +369,9 @@ func SyncWithPolicy(home string, policy Policy) ([]EntryResult, error) {
+ 		return nil, err
+ 	}
+ 	defer func() { _ = op.close() }()
++	if err := preflightCurrentPathSources(home, policy); err != nil {
++		return nil, err
++	}
+ 	if err := ensureDefault(op, home, policy); err != nil {
+ 		return nil, err
+ 	}
+@@ -407,6 +426,9 @@ func materializeScope(home, profile, environment string, policy Policy) ([]Entry
+ 	if err != nil {
+ 		return nil, err
+ 	}
++	if err := validateProfilePathSources(profile, source, policy); err != nil {
++		return nil, err
++	}
+ 	var adapters []Adapter
+ 	if environment != "" {
+ 		adapter, _ := adapterByID(environment)
+diff --git a/internal/envregistry/envregistry.go b/internal/envregistry/envregistry.go
+index d146834f..03f98cba 100644
+--- a/internal/envregistry/envregistry.go
++++ b/internal/envregistry/envregistry.go
+@@ -24,6 +24,11 @@ const (
+ 	Pi         = "pi"
+ )
+ 
++// CodexSeedRevisionB is the immutable manager behavior recorded in
++// codex_seed_record (environments §7.4, §8.2). Revision B removes native
++// MCP servers from config.toml before the managed home is published.
++const CodexSeedRevisionB = "B"
++
+ // EnvAliases maps the CLI-only short spellings to their canonical
+ // registry ids (manager profile §12.1). The aliases exist only at the
+ // command-line boundary: the CLI normalizes them before any validation
+@@ -48,23 +53,26 @@ func NormalizeEnvID(id string) string {
+ 
+ // Diagnostics (environments §7.7, §10.4, §11.1).
+ const (
+-	DiagUnknown                = "environment_unknown"
+-	DiagFormUnsupported        = "environment_form_unsupported"
+-	DiagIsolatedUnsupported    = "environment_isolated_unsupported"
+-	DiagSharedUnsupported      = "environment_shared_unsupported"
+-	DiagIsolationLockConflict  = "environment_isolation_lock_conflict"
+-	DiagTargetUnknown          = "environment_target_unknown"
+-	DiagTargetConsent          = "environment_target_consent_required"
+-	DiagShadowingPresent       = "environment_shadowing_path_present"
+-	DiagPassthroughDetached    = "environment_passthrough_detached"
+-	DiagCredentialConflict     = "environment_credential_conflict"
+-	DiagCredentialUnsupported  = "environment_credential_unsupported"
+-	DiagSeedUnreadable         = "environment_seed_unreadable"
+-	DiagBackupRecordUnreadable = "environment_backup_record_unreadable"
+-	DiagSeedShadowed           = "environment_seed_shadowed"
+-	DiagToolVersionUnverifed   = "environment_tool_version_unverified"
+-	DiagSizeExceeded           = "environment_context_size_exceeded"
+-	DiagReservedCommand        = "environment_reserved_command_name"
++	DiagUnknown                      = "environment_unknown"
++	DiagFormUnsupported              = "environment_form_unsupported"
++	DiagIsolatedUnsupported          = "environment_isolated_unsupported"
++	DiagSharedUnsupported            = "environment_shared_unsupported"
++	DiagIsolationLockConflict        = "environment_isolation_lock_conflict"
++	DiagTargetUnknown                = "environment_target_unknown"
++	DiagTargetConsent                = "environment_target_consent_required"
++	DiagShadowingPresent             = "environment_shadowing_path_present"
++	DiagPassthroughDetached          = "environment_passthrough_detached"
++	DiagCredentialConflict           = "environment_credential_conflict"
++	DiagCredentialUnsupported        = "environment_credential_unsupported"
++	DiagSeedUnreadable               = "environment_seed_unreadable"
++	DiagBackupRecordUnreadable       = "environment_backup_record_unreadable"
++	DiagSeedShadowed                 = "environment_seed_shadowed"
++	DiagMCPNativeServersUngoverned   = "mcp_native_servers_ungoverned"
++	DiagMCPNativeServersNotInherited = "mcp_native_servers_not_inherited"
++	DiagMCPSeedUnstripped            = "mcp_seed_unstripped"
++	DiagToolVersionUnverifed         = "environment_tool_version_unverified"
++	DiagSizeExceeded                 = "environment_context_size_exceeded"
++	DiagReservedCommand              = "environment_reserved_command_name"
+ )
+ 
+ // Forms (environments §7.2).
+@@ -180,6 +188,9 @@ type Adapter struct {
+ 	Passthrough map[string][]Passthrough
+ 	// Seeds holds the per-adapter provisioning seed class (§7.4).
+ 	Seeds []string
++	// CodexSeedRevision is set only on codex_cli and names the immutable
++	// native config.toml seed rule the manager ships (§7.4, §8.2).
++	CodexSeedRevision string
+ 	// SeedWritten marks seeds the manager writes rather than copies
+ 	// (claude_code .claude.json).
+ 	SeedWritten map[string]bool
+@@ -243,6 +254,7 @@ var Registry = []Adapter{
+ 			"default": {{Path: "auth.json", Strategy: StrategyKeyringPreferred, FileLinkTarget: "auth.json"}},
+ 		},
+ 		Seeds:             []string{"config.toml"},
++		CodexSeedRevision: CodexSeedRevisionB,
+ 		SeedWritten:       map[string]bool{},
+ 		VerifiedRelease:   "0.153.2",
+ 		Probe:             []string{"codex", "--version"},
+diff --git a/internal/pathboundary/owner_unix.go b/internal/pathboundary/owner_unix.go
+new file mode 100644
+index 00000000..2cb6e4ab
+--- /dev/null
++++ b/internal/pathboundary/owner_unix.go
+@@ -0,0 +1,35 @@
++//go:build unix
++
++package pathboundary
++
++import (
++	"fmt"
++	"io/fs"
++	"os"
++	"syscall"
++)
++
++func protectTree(string) error { return nil }
++
++func isLink(_ string, info os.FileInfo) (bool, error) {
++	return info.Mode()&fs.ModeSymlink != 0, nil
++}
++
++func effectiveOwner() (OwnerIdentity, error) {
++	return OwnerIdentity(fmt.Sprintf("uid:%d", os.Geteuid())), nil
++}
++
++func lookupOwner(path string, info os.FileInfo) (OwnerIdentity, error) {
++	stat, ok := info.Sys().(*syscall.Stat_t)
++	if !ok {
++		return "", fmt.Errorf("cannot prove owner of %s", path)
++	}
++	return OwnerIdentity(fmt.Sprintf("uid:%d", stat.Uid)), nil
++}
++
++func checkMutationPermissions(path string, info os.FileInfo) error {
++	if info.Mode().Perm()&0o022 != 0 {
++		return fmt.Errorf("%s grants group or other identities mutation permission", path)
++	}
++	return nil
++}
+diff --git a/internal/pathboundary/owner_unsupported.go b/internal/pathboundary/owner_unsupported.go
+new file mode 100644
+index 00000000..1ac1ffae
+--- /dev/null
++++ b/internal/pathboundary/owner_unsupported.go
+@@ -0,0 +1,29 @@
++//go:build !unix && !windows
++
++package pathboundary
++
++import (
++	"fmt"
++	"io/fs"
++	"os"
++)
++
++func protectTree(string) error {
++	return fmt.Errorf("cannot establish private mutation permissions on this platform")
++}
++
++func isLink(_ string, info os.FileInfo) (bool, error) {
++	return info.Mode()&fs.ModeSymlink != 0, nil
++}
++
++func effectiveOwner() (OwnerIdentity, error) {
++	return "", fmt.Errorf("cannot prove operator ownership on this platform")
++}
++
++func lookupOwner(path string, _ os.FileInfo) (OwnerIdentity, error) {
++	return "", fmt.Errorf("cannot prove operator ownership for %s on this platform", path)
++}
++
++func checkMutationPermissions(path string, _ os.FileInfo) error {
++	return fmt.Errorf("cannot prove private mutation permissions for %s on this platform", path)
++}
+diff --git a/internal/pathboundary/owner_windows.go b/internal/pathboundary/owner_windows.go
+new file mode 100644
+index 00000000..80978474
+--- /dev/null
++++ b/internal/pathboundary/owner_windows.go
+@@ -0,0 +1,197 @@
++//go:build windows
++
++package pathboundary
++
++import (
++	"fmt"
++	"os"
++	"path/filepath"
++	"runtime"
++	"syscall"
++	"unsafe"
++
++	"golang.org/x/sys/windows"
++)
++
++const mutationRights windows.ACCESS_MASK = windows.GENERIC_WRITE | windows.GENERIC_ALL |
++	windows.FILE_WRITE_DATA | windows.FILE_APPEND_DATA | windows.FILE_WRITE_EA |
++	windows.FILE_WRITE_ATTRIBUTES | windowsFileDeleteChild | windows.DELETE |
++	windows.WRITE_DAC | windows.WRITE_OWNER
++
++const windowsFileDeleteChild windows.ACCESS_MASK = 0x00000040
++
++func protectTree(root string) error {
++	owner, err := windows.GetCurrentProcessToken().GetTokenUser()
++	if err != nil {
++		return fmt.Errorf("resolve effective Windows user: %w", err)
++	}
++	trustee := windows.TRUSTEE{
++		TrusteeForm:  windows.TRUSTEE_IS_SID,
++		TrusteeType:  windows.TRUSTEE_IS_USER,
++		TrusteeValue: windows.TrusteeValueFromSID(owner.User.Sid),
++	}
++	acl, err := windows.ACLFromEntries([]windows.EXPLICIT_ACCESS{{
++		AccessPermissions: windows.ACCESS_MASK(0x001F01FF), // FILE_ALL_ACCESS
++		AccessMode:        windows.SET_ACCESS,
++		Inheritance:       windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT,
++		Trustee:           trustee,
++	}}, nil)
++	if err != nil {
++		return fmt.Errorf("build owner-only mutation DACL: %w", err)
++	}
++	return filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
++		if walkErr != nil {
++			return walkErr
++		}
++		info, err := os.Lstat(path)
++		if err != nil {
++			return err
++		}
++		link, err := isLink(path, info)
++		if err != nil {
++			return err
++		}
++		if link {
++			return fmt.Errorf("cannot protect a tree containing a symbolic link: %s", path)
++		}
++		if !info.IsDir() && !info.Mode().IsRegular() {
++			return fmt.Errorf("cannot protect a tree containing a non-regular component: %s", path)
++		}
++		if err := setPrivateMutationDACL(path, acl); err != nil {
++			return err
++		}
++		return nil
++	})
++}
++
++func setPrivateMutationDACL(path string, dacl *windows.ACL) error {
++	handle, err := openNoFollowAccess(path, windows.READ_CONTROL|windows.WRITE_DAC)
++	if err != nil {
++		return err
++	}
++	defer func() { _ = windows.CloseHandle(handle) }()
++	api := windows.NewLazySystemDLL("advapi32.dll")
++	setSecurityInfo := api.NewProc("SetSecurityInfo")
++	if err := setSecurityInfo.Find(); err != nil {
++		return err
++	}
++	status, _, _ := setSecurityInfo.Call(
++		uintptr(handle),
++		uintptr(windows.SE_FILE_OBJECT),
++		uintptr(windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION),
++		0, 0, uintptr(unsafe.Pointer(dacl)), 0,
++	)
++	if status != 0 {
++		return fmt.Errorf("set owner-only mutation DACL on %s: %w", path, syscall.Errno(status))
++	}
++	runtime.KeepAlive(dacl)
++	return nil
++}
++
++func isLink(path string, info os.FileInfo) (bool, error) {
++	if info.Mode()&os.ModeSymlink != 0 {
++		return true, nil
++	}
++	handle, err := openNoFollow(path)
++	if err != nil {
++		return false, err
++	}
++	defer func() { _ = windows.CloseHandle(handle) }()
++	var attributes windows.ByHandleFileInformation
++	if err := windows.GetFileInformationByHandle(handle, &attributes); err != nil {
++		return false, err
++	}
++	return attributes.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0, nil
++}
++
++func effectiveOwner() (OwnerIdentity, error) {
++	user, err := windows.GetCurrentProcessToken().GetTokenUser()
++	if err != nil {
++		return "", fmt.Errorf("resolve effective Windows user: %w", err)
++	}
++	return OwnerIdentity("sid:" + user.User.Sid.String()), nil
++}
++
++func lookupOwner(path string, _ os.FileInfo) (OwnerIdentity, error) {
++	owner, _, err := securityOwnerAndDACL(path)
++	if err != nil {
++		return "", err
++	}
++	return OwnerIdentity("sid:" + owner.String()), nil
++}
++
++func checkMutationPermissions(path string, _ os.FileInfo) error {
++	owner, dacl, err := securityOwnerAndDACL(path)
++	if err != nil {
++		return err
++	}
++	if owner == nil || dacl == nil {
++		return fmt.Errorf("%s has no owner-only mutation DACL", path)
++	}
++	for index := uint32(0); index < uint32(dacl.AceCount); index++ {
++		var ace *windows.ACCESS_ALLOWED_ACE
++		if err := windows.GetAce(dacl, index, &ace); err != nil || ace == nil {
++			return fmt.Errorf("read %s DACL entry: %w", path, err)
++		}
++		switch ace.Header.AceType {
++		case windows.ACCESS_ALLOWED_ACE_TYPE:
++			sid := (*windows.SID)(unsafe.Pointer(&ace.SidStart)) // #nosec G103 -- fixed ACCESS_ALLOWED_ACE layout.
++			if sid == nil || !sid.IsValid() {
++				return fmt.Errorf("%s DACL contains an invalid SID", path)
++			}
++			if !owner.Equals(sid) && ace.Mask&mutationRights != 0 {
++				return fmt.Errorf("%s DACL grants mutation rights to another identity", path)
++			}
++		case windows.ACCESS_DENIED_ACE_TYPE:
++			// Denials cannot grant mutation rights.
++		default:
++			return fmt.Errorf("%s DACL contains an unsupported entry", path)
++		}
++	}
++	return nil
++}
++
++func securityOwnerAndDACL(path string) (*windows.SID, *windows.ACL, error) {
++	handle, err := openNoFollow(path)
++	if err != nil {
++		return nil, nil, err
++	}
++	defer func() { _ = windows.CloseHandle(handle) }()
++	descriptor, err := windows.GetSecurityInfo(
++		handle,
++		windows.SE_FILE_OBJECT,
++		windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION,
++	)
++	if err != nil {
++		return nil, nil, err
++	}
++	owner, _, err := descriptor.Owner()
++	if err != nil || owner == nil || !owner.IsValid() {
++		return nil, nil, fmt.Errorf("%s has no valid owner", path)
++	}
++	dacl, _, err := descriptor.DACL()
++	if err != nil {
++		return nil, nil, err
++	}
++	return owner, dacl, nil
++}
++
++func openNoFollow(path string) (windows.Handle, error) {
++	return openNoFollowAccess(path, windows.READ_CONTROL)
++}
++
++func openNoFollowAccess(path string, access windows.ACCESS_MASK) (windows.Handle, error) {
++	path16, err := windows.UTF16PtrFromString(path)
++	if err != nil {
++		return 0, err
++	}
++	return windows.CreateFile(
++		path16,
++		uint32(access),
++		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
++		nil,
++		windows.OPEN_EXISTING,
++		windows.FILE_FLAG_OPEN_REPARSE_POINT|windows.FILE_FLAG_BACKUP_SEMANTICS,
++		0,
++	)
++}
+diff --git a/internal/pathboundary/pathboundary.go b/internal/pathboundary/pathboundary.go
+new file mode 100644
+index 00000000..6a79b20a
+--- /dev/null
++++ b/internal/pathboundary/pathboundary.go
+@@ -0,0 +1,209 @@
++// Package pathboundary verifies operator-owned source directories without
++// changing or adopting their contents. It is shared by path-source admission
++// and the profile-store boundary work described by environments §4.
++package pathboundary
++
++import (
++	"errors"
++	"fmt"
++	"io/fs"
++	"os"
++	"path/filepath"
++	"strings"
++)
++
++const (
++	// CheckOwnership names the owner-identity boundary check.
++	CheckOwnership = "ownership"
++	// CheckPermissions names the private-mutation boundary check.
++	CheckPermissions = "permissions"
++	// CheckContainment names the source-root containment boundary check.
++	CheckContainment = "containment"
++	// CheckRegular names the regular-file-type boundary check.
++	CheckRegular = "regular_types"
++	// CheckLinkSafety names the no-symlink boundary check.
++	CheckLinkSafety = "link_safety"
++)
++
++// Failure identifies the first boundary check that could not be proven.
++// Root is the operator-declared directory; Path is the component that failed.
++type Failure struct {
++	Root   string
++	Path   string
++	Check  string
++	Reason string
++	Cause  error
++}
++
++func (f *Failure) Error() string {
++	if f.Cause != nil {
++		return fmt.Sprintf("%s: %s boundary check failed at %s: %v", f.Check, f.Root, f.Path, f.Cause)
++	}
++	return fmt.Sprintf("%s: %s boundary check failed at %s: %s", f.Check, f.Root, f.Path, f.Reason)
++}
++
++func (f *Failure) Unwrap() error { return f.Cause }
++
++// OwnerIdentity is the platform-specific identity used to compare a path's
++// owner with the effective operator.
++type OwnerIdentity string
++
++// OwnerLookup reads the identity that owns a path without following a link.
++// Tests may inject an identity for a selected path while production uses
++// DefaultOwnerLookup.
++type OwnerLookup func(path string, info os.FileInfo) (OwnerIdentity, error)
++
++// DefaultOwnerLookup returns the platform implementation that reads owner
++// identity without following a symbolic link.
++func DefaultOwnerLookup() OwnerLookup { return lookupOwner }
++
++// Validate proves the protected-boundary contract for a path source
++// directory (environments §4). It never follows links, repairs permissions,
++// changes ownership, or copies source bytes.
++func Validate(root string) error {
++	return ValidateWithOwner(root, DefaultOwnerLookup())
++}
++
++// ValidateWithOwner proves the same contract as Validate while allowing the
++// caller to supply owner identities. Production supplies DefaultOwnerLookup;
++// the seam lets production-entry tests cover foreign-owner paths without
++// requiring a second host user or chown privilege.
++func ValidateWithOwner(root string, ownerLookup OwnerLookup) error {
++	if ownerLookup == nil {
++		return &Failure{Root: root, Path: root, Check: CheckOwnership, Reason: "owner lookup is unavailable"}
++	}
++	operator, err := effectiveOwner()
++	if err != nil {
++		return &Failure{Root: root, Path: root, Check: CheckOwnership, Cause: err}
++	}
++	absolute, rootInfo, err := inspectRoot(root)
++	if err != nil {
++		return err
++	}
++	if err := checkNode(absolute, absolute, rootInfo, operator, ownerLookup); err != nil {
++		return err
++	}
++
++	return filepath.WalkDir(absolute, func(path string, entry fs.DirEntry, walkErr error) error {
++		if walkErr != nil {
++			return &Failure{Root: absolute, Path: path, Check: CheckRegular, Cause: walkErr}
++		}
++		if path == absolute {
++			return nil
++		}
++		relative, err := filepath.Rel(absolute, path)
++		if err != nil || escapes(relative) {
++			return &Failure{Root: absolute, Path: path, Check: CheckContainment, Reason: "component does not resolve below the declared directory", Cause: err}
++		}
++		info, err := entry.Info()
++		if err != nil {
++			return &Failure{Root: absolute, Path: path, Check: CheckRegular, Cause: err}
++		}
++		link, err := isLink(path, info)
++		if err != nil {
++			return &Failure{Root: absolute, Path: path, Check: CheckLinkSafety, Cause: err}
++		}
++		if link {
++			if escapes, readErr := symlinkEscapes(absolute, path); readErr != nil {
++				return &Failure{Root: absolute, Path: path, Check: CheckLinkSafety, Cause: readErr}
++			} else if escapes {
++				return &Failure{Root: absolute, Path: path, Check: CheckContainment, Reason: "symbolic-link target escapes the declared directory"}
++			}
++			return &Failure{Root: absolute, Path: path, Check: CheckLinkSafety, Reason: "symbolic link below the declared directory"}
++		}
++		if err := checkNode(absolute, path, info, operator, ownerLookup); err != nil {
++			return err
++		}
++		if !info.IsDir() && !info.Mode().IsRegular() {
++			return &Failure{Root: absolute, Path: path, Check: CheckRegular, Reason: "component is neither a directory nor a regular file"}
++		}
++		return nil
++	})
++}
++
++// ValidateRoot checks only the exact directory node. It is useful for a
++// protected parent whose children are independent declared source roots.
++func ValidateRoot(root string) error {
++	absolute, info, err := inspectRoot(root)
++	if err != nil {
++		return err
++	}
++	operator, err := effectiveOwner()
++	if err != nil {
++		return &Failure{Root: absolute, Path: absolute, Check: CheckOwnership, Cause: err}
++	}
++	return checkNode(absolute, absolute, info, operator, DefaultOwnerLookup())
++}
++
++func inspectRoot(root string) (string, os.FileInfo, error) {
++	absolute, err := filepath.Abs(root)
++	if err != nil {
++		return "", nil, &Failure{Root: root, Path: root, Check: CheckContainment, Cause: err}
++	}
++	absolute = filepath.Clean(absolute)
++	rootInfo, err := os.Lstat(absolute)
++	if err != nil {
++		return "", nil, &Failure{Root: absolute, Path: absolute, Check: CheckRegular, Cause: err}
++	}
++	rootLink, err := isLink(absolute, rootInfo)
++	if err != nil {
++		return "", nil, &Failure{Root: absolute, Path: absolute, Check: CheckLinkSafety, Cause: err}
++	}
++	if rootLink {
++		return "", nil, &Failure{Root: absolute, Path: absolute, Check: CheckLinkSafety, Reason: "declared directory is a symbolic link"}
++	}
++	if !rootInfo.IsDir() {
++		return "", nil, &Failure{Root: absolute, Path: absolute, Check: CheckRegular, Reason: "declared path is not a directory"}
++	}
++	return absolute, rootInfo, nil
++}
++
++// ProtectTree establishes private mutation permissions for a tree the
++// manager just created. It is only for manager-created staging such as an
++// onboarding import; an existing operator path is never repaired this way.
++func ProtectTree(root string) error { return protectTree(root) }
++
++func checkNode(root, path string, info os.FileInfo, operator OwnerIdentity, ownerLookup OwnerLookup) error {
++	owner, err := ownerLookup(path, info)
++	if err != nil {
++		return &Failure{Root: root, Path: path, Check: CheckOwnership, Cause: err}
++	}
++	if owner != operator {
++		return &Failure{Root: root, Path: path, Check: CheckOwnership, Reason: fmt.Sprintf("%s is not owned by the effective operator", path)}
++	}
++	if err := checkMutationPermissions(path, info); err != nil {
++		return &Failure{Root: root, Path: path, Check: CheckPermissions, Cause: err}
++	}
++	return nil
++}
++
++func escapes(relative string) bool {
++	return relative == ".." || filepath.IsAbs(relative) || strings.HasPrefix(relative, ".."+string(os.PathSeparator))
++}
++
++// symlinkEscapes resolves only the target spelling. It reads the link
++// metadata and target bytes, but never follows the link. This lets the
++// boundary diagnostic distinguish an escaping link from a link wholly
++// within the declared tree; both are then refused.
++func symlinkEscapes(root, path string) (bool, error) {
++	target, err := os.Readlink(path)
++	if err != nil {
++		return false, err
++	}
++	if !filepath.IsAbs(target) {
++		target = filepath.Join(filepath.Dir(path), target)
++	}
++	target, err = filepath.Abs(target)
++	if err != nil {
++		return true, err
++	}
++	relative, err := filepath.Rel(root, filepath.Clean(target))
++	if err != nil {
++		return true, err
++	}
++	return escapes(relative), nil
++}
++
++// IsAbsent reports a missing declared path without conflating other read
++// failures with absence.
++func IsAbsent(err error) bool { return errors.Is(err, fs.ErrNotExist) }
+diff --git a/internal/pathboundary/pathboundary_test.go b/internal/pathboundary/pathboundary_test.go
+new file mode 100644
+index 00000000..71da097a
+--- /dev/null
++++ b/internal/pathboundary/pathboundary_test.go
+@@ -0,0 +1,136 @@
++package pathboundary
++
++import (
++	"os"
++	"path/filepath"
++	"testing"
++)
++
++func TestValidateTrustedDirectoryTree(t *testing.T) {
++	root := filepath.Join(t.TempDir(), "source")
++	if err := os.MkdirAll(filepath.Join(root, "context"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(root, "context", "a.md"), []byte("module\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := ProtectTree(root); err != nil {
++		t.Fatal(err)
++	}
++	if err := Validate(root); err != nil {
++		t.Fatalf("trusted directory rejected: %v", err)
++	}
++}
++
++func TestValidateRootIgnoresIndependentChildRoots(t *testing.T) {
++	root := filepath.Join(t.TempDir(), "imports")
++	if err := os.Mkdir(root, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	if err := ProtectTree(root); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Mkdir(filepath.Join(root, "untrusted-sibling"), 0o777); err != nil {
++		t.Fatal(err)
++	}
++	if err := ValidateRoot(root); err != nil {
++		t.Fatalf("trusted parent rejected because of an independent child: %v", err)
++	}
++}
++
++func TestValidateRejectsGroupOrWorldWritableComponents(t *testing.T) {
++	root := filepath.Join(t.TempDir(), "source")
++	if err := os.MkdirAll(root, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := ProtectTree(root); err != nil {
++		t.Fatal(err)
++	}
++	restore, err := makeWorldWritableDirectoryForTest(root)
++	if err != nil {
++		t.Fatalf("create world-writable mutation boundary: %v", err)
++	}
++	defer func() {
++		if err := restore(); err != nil {
++			t.Errorf("restore permission fixture: %v", err)
++		}
++	}()
++	err = Validate(root)
++	if err == nil {
++		t.Fatal("Validate admitted a world-writable mutation boundary")
++	}
++	failure, ok := err.(*Failure)
++	if !ok || failure.Check != CheckPermissions {
++		t.Fatalf("Validate error = %v, want permissions failure", err)
++	}
++}
++
++func TestValidateRejectsInternalSymlink(t *testing.T) {
++	root := filepath.Join(t.TempDir(), "source")
++	if err := os.MkdirAll(filepath.Join(root, "context"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(root, "inside.md"), []byte("module\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := ProtectTree(root); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Symlink(filepath.Join(root, "inside.md"), filepath.Join(root, "context", "link.md")); err != nil {
++		t.Skipf("host cannot create symbolic links: %v", err)
++	}
++	err := Validate(root)
++	failure, ok := err.(*Failure)
++	if !ok || failure.Check != CheckLinkSafety {
++		t.Fatalf("Validate error = %v, want link-safety failure", err)
++	}
++}
++
++func TestValidateRejectsEscapingSymlinkAsContainmentFailure(t *testing.T) {
++	root := filepath.Join(t.TempDir(), "source")
++	outside := filepath.Join(t.TempDir(), "outside.md")
++	if err := os.MkdirAll(root, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(outside, []byte("outside\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := ProtectTree(root); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Symlink(outside, filepath.Join(root, "escape.md")); err != nil {
++		t.Skipf("host cannot create symbolic links: %v", err)
++	}
++	err := Validate(root)
++	failure, ok := err.(*Failure)
++	if !ok || failure.Check != CheckContainment {
++		t.Fatalf("Validate error = %v, want containment failure", err)
++	}
++}
++
++func TestValidateRejectsMissingDirectory(t *testing.T) {
++	root := filepath.Join(t.TempDir(), "absent")
++	err := Validate(root)
++	if !IsAbsent(err) {
++		t.Fatalf("Validate error = %v, want an absent path failure", err)
++	}
++}
++
++func TestValidateRejectsInjectedForeignOwner(t *testing.T) {
++	root := filepath.Join(t.TempDir(), "foreign-owner")
++	if err := os.Mkdir(root, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	lookup := DefaultOwnerLookup()
++	injected := func(path string, info os.FileInfo) (OwnerIdentity, error) {
++		if filepath.Clean(path) == filepath.Clean(root) {
++			return "injected:foreign-owner", nil
++		}
++		return lookup(path, info)
++	}
++	err := ValidateWithOwner(root, injected)
++	failure, ok := err.(*Failure)
++	if !ok || failure.Check != CheckOwnership {
++		t.Fatalf("ValidateWithOwner error = %v, want ownership failure", err)
++	}
++}
+diff --git a/internal/pathboundary/pathboundary_test_helpers_other_test.go b/internal/pathboundary/pathboundary_test_helpers_other_test.go
+new file mode 100644
+index 00000000..39d23bcc
+--- /dev/null
++++ b/internal/pathboundary/pathboundary_test_helpers_other_test.go
+@@ -0,0 +1,9 @@
++//go:build !unix && !windows
++
++package pathboundary
++
++import "fmt"
++
++func makeWorldWritableDirectoryForTest(string) (func() error, error) {
++	return nil, fmt.Errorf("platform has no protected-boundary mutation helper")
++}
+diff --git a/internal/pathboundary/pathboundary_test_helpers_unix_test.go b/internal/pathboundary/pathboundary_test_helpers_unix_test.go
+new file mode 100644
+index 00000000..e9e2697c
+--- /dev/null
++++ b/internal/pathboundary/pathboundary_test_helpers_unix_test.go
+@@ -0,0 +1,16 @@
++//go:build unix
++
++package pathboundary
++
++import "os"
++
++func makeWorldWritableDirectoryForTest(path string) (func() error, error) {
++	info, err := os.Lstat(path)
++	if err != nil {
++		return nil, err
++	}
++	if err := os.Chmod(path, 0o777); err != nil {
++		return nil, err
++	}
++	return func() error { return os.Chmod(path, info.Mode().Perm()) }, nil
++}
+diff --git a/internal/pathboundary/pathboundary_test_helpers_windows_test.go b/internal/pathboundary/pathboundary_test_helpers_windows_test.go
+new file mode 100644
+index 00000000..11524930
+--- /dev/null
++++ b/internal/pathboundary/pathboundary_test_helpers_windows_test.go
+@@ -0,0 +1,58 @@
++//go:build windows
++
++package pathboundary
++
++import "golang.org/x/sys/windows"
++
++func makeWorldWritableDirectoryForTest(path string) (func() error, error) {
++	path16, err := windows.UTF16PtrFromString(path)
++	if err != nil {
++		return nil, err
++	}
++	handle, err := windows.CreateFile(
++		path16,
++		uint32(windows.READ_CONTROL|windows.WRITE_DAC),
++		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
++		nil,
++		windows.OPEN_EXISTING,
++		windows.FILE_FLAG_OPEN_REPARSE_POINT|windows.FILE_FLAG_BACKUP_SEMANTICS,
++		0,
++	)
++	if err != nil {
++		return nil, err
++	}
++	defer func() { _ = windows.CloseHandle(handle) }()
++	descriptor, err := windows.GetSecurityInfo(
++		handle,
++		windows.SE_FILE_OBJECT,
++		windows.DACL_SECURITY_INFORMATION,
++	)
++	if err != nil {
++		return nil, err
++	}
++	dacl, _, err := descriptor.DACL()
++	if err != nil {
++		return nil, err
++	}
++	everyone, err := windows.StringToSid("S-1-1-0")
++	if err != nil {
++		return nil, err
++	}
++	worldWrite, err := windows.ACLFromEntries([]windows.EXPLICIT_ACCESS{{
++		AccessPermissions: windows.GENERIC_WRITE,
++		AccessMode:        windows.GRANT_ACCESS,
++		Inheritance:       windows.NO_INHERITANCE,
++		Trustee: windows.TRUSTEE{
++			TrusteeForm:  windows.TRUSTEE_IS_SID,
++			TrusteeType:  windows.TRUSTEE_IS_WELL_KNOWN_GROUP,
++			TrusteeValue: windows.TrusteeValueFromSID(everyone),
++		},
++	}}, dacl)
++	if err != nil {
++		return nil, err
++	}
++	if err := windows.SetSecurityInfo(handle, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION, nil, nil, worldWrite, nil); err != nil {
++		return nil, err
++	}
++	return func() error { return ProtectTree(path) }, nil
++}
