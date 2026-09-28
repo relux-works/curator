@@ -1,0 +1,1223 @@
+diff --git a/cmd/curator/env.go b/cmd/curator/env.go
+index 9a537ea3..a612bf8b 100644
+--- a/cmd/curator/env.go
++++ b/cmd/curator/env.go
+@@ -4,6 +4,7 @@ import (
+ 	"encoding/json"
+ 	"fmt"
+ 	"os"
++	"path/filepath"
+ 
+ 	"github.com/relux-works/curator/internal/config"
+ 	"github.com/relux-works/curator/internal/envprofile"
+@@ -29,6 +30,33 @@ func machineFromConfig(cfg *config.Config) envregistry.MachineConfig {
+ 	return machine
+ }
+ 
++// profileNativeHomeResolver keeps injected CLI homes consistent across the
++// profile and legacy global materializers. Production commands leave the
++// resolver nil and honor the adapter environment variables directly.
++func (c cli) profileNativeHomeResolver() func(string) (string, error) {
++	if c.userHome == nil {
++		return nil
++	}
++	userHome, err := c.userHome()
++	if err != nil {
++		return func(string) (string, error) { return "", err }
++	}
++	return func(id string) (string, error) {
++		switch id {
++		case envregistry.ClaudeCode:
++			return filepath.Join(userHome, ".claude"), nil
++		case envregistry.CodexCLI:
++			return filepath.Join(userHome, ".codex"), nil
++		case envregistry.OpenCode:
++			return filepath.Join(userHome, ".config", "opencode"), nil
++		case envregistry.Pi:
++			return filepath.Join(userHome, ".pi"), nil
++		default:
++			return "", fmt.Errorf("%s: unregistered environment %q", envregistry.DiagUnknown, id)
++		}
++	}
++}
++
+ func (c cli) cmdEnv(args []string) int {
+ 	if len(args) == 0 {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator: env needs a subcommand: resolve | status | config | migrate | unmanage")
+diff --git a/cmd/curator/global_lock_publication_test.go b/cmd/curator/global_lock_publication_test.go
+new file mode 100644
+index 00000000..5bfbbcf8
+--- /dev/null
++++ b/cmd/curator/global_lock_publication_test.go
+@@ -0,0 +1,236 @@
++package main
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/contextstore"
++	"github.com/relux-works/curator/internal/envmarker"
++	"github.com/relux-works/curator/internal/envprofile"
++)
++
++type globalLockCLIFixture struct {
++	source  stubConfigSource
++	home    string
++	gitURL  string
++	codex   string
++	managed string
++}
++
++func newGlobalLockCLIFixture(t *testing.T) globalLockCLIFixture {
++	t.Helper()
++	source, home := profileHome(t)
++	source.cfg.SkillsRoot = filepath.Join(home, "skills-root")
++	userHome := t.TempDir()
++	t.Setenv("HOME", userHome)
++	t.Setenv("USERPROFILE", userHome)
++	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(userHome, ".claude"))
++	codex := filepath.Join(userHome, ".codex")
++	t.Setenv("CODEX_HOME", codex)
++	t.Setenv("XDG_CONFIG_HOME", filepath.Join(userHome, ".config"))
++	t.Setenv("PI_CODING_AGENT_DIR", filepath.Join(userHome, ".pi"))
++	writeNativeCredentials(t)
++
++	repo := t.TempDir()
++	writeCLISkill(t, repo, "new-skill")
++	runGit(t, repo, "init", "-q", "-b", "main")
++	runGit(t, repo, "add", ".")
++	runGit(t, repo, "commit", "-qm", "publish new-skill")
++	runGit(t, repo, "tag", "v1")
++	gitConfig := filepath.Join(t.TempDir(), "gitconfig")
++	rewrite := "[url \"" + gitFileURL(repo) + "\"]\n\tinsteadOf = https://example.com/new-skill\n"
++	if err := os.WriteFile(gitConfig, []byte(rewrite), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	t.Setenv("GIT_CONFIG_GLOBAL", gitConfig)
++	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
++	fixture := globalLockCLIFixture{
++		source: source, home: home, gitURL: "https://example.com/new-skill", codex: codex,
++		managed: filepath.Join(envprofile.ManagedHomeDir(home, "default", "codex_cli"), "skills", "new-skill"),
++	}
++	requireGlobalCommand(t, fixture, exitOK, "global", "init")
++	return fixture
++}
++
++func (fixture globalLockCLIFixture) run(t *testing.T, args ...string) (int, string, string) {
++	t.Helper()
++	return runProfile(t, fixture.source, args...)
++}
++
++func (fixture globalLockCLIFixture) writeLegacyGlobalDeclaration(t *testing.T) {
++	t.Helper()
++	writeFile(t, filepath.Join(fixture.home, "global", "Skillfile.json"),
++		`{"schema_version":1,"skills":[{"name":"new-skill","git":"`+fixture.gitURL+`","tag":"v1"}]}`)
++}
++
++func (fixture globalLockCLIFixture) lock(t *testing.T) (*contextlock.Lock, string) {
++	t.Helper()
++	lock, hash, err := contextlock.Read(filepath.Join(fixture.home, "profiles", "default", "lock.json"))
++	if err != nil {
++		t.Fatalf("read default profile lock: %v", err)
++	}
++	return lock, hash
++}
++
++func (fixture globalLockCLIFixture) requireSkillLockAndStore(t *testing.T) (*contextlock.Lock, string) {
++	t.Helper()
++	lock, hash := fixture.lock(t)
++	for _, member := range lock.Members {
++		if member.Kind == contextlock.KindSkill && member.Name == "new-skill" {
++			if member.Commit == "" || member.Source != "example.com/new-skill" {
++				t.Fatalf("new-skill lock member = %+v, want exact Git pin", member)
++			}
++			entry := contextstore.EntryDir(fixture.home, contextlock.KindSkill, member.Name, member.Commit)
++			if info, err := os.Stat(entry); err != nil || !info.IsDir() {
++				t.Fatalf("referenced store entry %s is unavailable: %v", entry, err)
++			}
++			return lock, hash
++		}
++	}
++	t.Fatalf("default lock has no new-skill member: %+v", lock.Members)
++	return nil, ""
++}
++
++func (fixture globalLockCLIFixture) requireNativeSkill(t *testing.T) {
++	t.Helper()
++	payload, err := os.ReadFile(filepath.Join(fixture.codex, ".agent-context", "skills", "new-skill", "SKILL.md"))
++	if err != nil {
++		t.Fatalf("read materialized native skill: %v", err)
++	}
++	if !strings.Contains(string(payload), "# new-skill") {
++		t.Fatalf("native skill bytes = %q", payload)
++	}
++	marker, err := envmarker.Read(fixture.codex)
++	if err != nil {
++		t.Fatalf("read native environment marker: %v", err)
++	}
++	if marker == nil || marker.Profile.Name != "default" || marker.Surfaces[envmarker.SurfaceSkills].Paths == nil {
++		t.Fatalf("native marker does not record the profile skill surface: %+v", marker)
++	}
++	_, lockHash := fixture.lock(t)
++	if marker.Profile.LockSHA256 != strings.TrimPrefix(lockHash, "sha256:") {
++		t.Fatalf("native marker lock = %s, profile lock = %s", marker.Profile.LockSHA256, lockHash)
++	}
++}
++
++func requireGlobalCommand(t *testing.T, fixture globalLockCLIFixture, want int, args ...string) (string, string) {
++	t.Helper()
++	code, stdout, stderr := fixture.run(t, args...)
++	if code != want {
++		t.Fatalf("curator %v = %d, want %d\nstdout:\n%s\nstderr:\n%s", args, code, want, stdout, stderr)
++	}
++	return stdout, stderr
++}
++
++func TestGlobalAddPublishesProfileLockBeforeNativeMaterialization(t *testing.T) {
++	fixture := newGlobalLockCLIFixture(t)
++	_, stderr := requireGlobalCommand(t, fixture, exitOK, "global", "add", "new-skill", "--git", fixture.gitURL, "--tag", "v1")
++	if stderr != "" {
++		t.Fatalf("global add stderr = %q", stderr)
++	}
++	fixture.requireSkillLockAndStore(t)
++	fixture.requireNativeSkill(t)
++	if _, err := os.Lstat(fixture.managed); err != nil {
++		t.Fatalf("managed-home skill was not materialized: %v", err)
++	}
++}
++
++func TestGlobalAddConflictRetainsLockAndProfileSyncTakeoverRecovers(t *testing.T) {
++	fixture := newGlobalLockCLIFixture(t)
++	requireGlobalCommand(t, fixture, exitOK, "profile", "sync")
++	_, beforeHash := fixture.lock(t)
++	conflictDir := filepath.Join(fixture.codex, ".agent-context", "skills", "new-skill")
++	conflictFile := filepath.Join(conflictDir, "SKILL.md")
++	writeFile(t, conflictFile, "operator-owned preimage\n")
++	manifestPath := filepath.Join(fixture.home, "global", "Skillfile.json")
++	manifestBefore, err := os.ReadFile(manifestPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	markerPath := filepath.Join(fixture.codex, envmarker.Name)
++	markerBefore, err := os.ReadFile(markerPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++
++	_, stderr := requireGlobalCommand(t, fixture, exitFail, "global", "add", "new-skill", "--git", fixture.gitURL, "--tag", "v1")
++	if !strings.Contains(stderr, envprofile.DiagUnmanagedConflict) || !strings.Contains(stderr, ".agent-context/skills/new-skill/SKILL.md") {
++		t.Fatalf("global add conflict stderr = %q", stderr)
++	}
++	_, afterHash := fixture.requireSkillLockAndStore(t)
++	if afterHash == beforeHash {
++		t.Fatalf("profile lock hash stayed %s after the blocked add", afterHash)
++	}
++	preimage, err := os.ReadFile(conflictFile)
++	if err != nil || string(preimage) != "operator-owned preimage\n" {
++		t.Fatalf("conflicting surface changed: %q, %v", preimage, err)
++	}
++	markerAfter, err := os.ReadFile(markerPath)
++	if err != nil || string(markerAfter) != string(markerBefore) {
++		t.Fatalf("native marker changed on conflict: err=%v", err)
++	}
++	manifestAfter, err := os.ReadFile(manifestPath)
++	if err != nil || string(manifestAfter) != string(manifestBefore) {
++		t.Fatalf("legacy declaration changed on conflict: err=%v", err)
++	}
++	if _, err := os.Lstat(fixture.managed); !os.IsNotExist(err) {
++		t.Fatalf("managed surface changed before native conflict was reported: %v", err)
++	}
++
++	requireGlobalCommand(t, fixture, exitOK, "profile", "sync", "--takeover")
++	backup := filepath.Join(fixture.codex, ".agent-environment-backup", "1", ".agent-context", "skills", "new-skill", "SKILL.md")
++	backupBytes, err := os.ReadFile(backup)
++	if err != nil || string(backupBytes) != "operator-owned preimage\n" {
++		t.Fatalf("takeover backup = %q, %v", backupBytes, err)
++	}
++	fixture.requireNativeSkill(t)
++	requireGlobalCommand(t, fixture, exitOK, "global", "add", "new-skill", "--git", fixture.gitURL, "--tag", "v1")
++	fixture.requireNativeSkill(t)
++}
++
++func TestGlobalInstallPublishesMigratedLockBeforeNativeMaterialization(t *testing.T) {
++	fixture := newGlobalLockCLIFixture(t)
++	fixture.writeLegacyGlobalDeclaration(t)
++	requireGlobalCommand(t, fixture, exitOK, "global", "install")
++	fixture.requireSkillLockAndStore(t)
++	fixture.requireNativeSkill(t)
++}
++
++func TestGlobalInstallConflictRetainsMigratedLockAndTakeoverRecovers(t *testing.T) {
++	fixture := newGlobalLockCLIFixture(t)
++	fixture.writeLegacyGlobalDeclaration(t)
++	conflictDir := filepath.Join(fixture.codex, ".agent-context", "skills", "new-skill")
++	conflictFile := filepath.Join(conflictDir, "SKILL.md")
++	writeFile(t, conflictFile, "operator-owned preimage\n")
++	manifestPath := filepath.Join(fixture.home, "global", "Skillfile.json")
++	manifestBefore, err := os.ReadFile(manifestPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	_, stderr := requireGlobalCommand(t, fixture, exitFail, "global", "install")
++	if !strings.Contains(stderr, envprofile.DiagUnmanagedConflict) || !strings.Contains(stderr, ".agent-context/skills/new-skill/SKILL.md") {
++		t.Fatalf("global install conflict stderr = %q", stderr)
++	}
++	fixture.requireSkillLockAndStore(t)
++	preimage, err := os.ReadFile(conflictFile)
++	if err != nil || string(preimage) != "operator-owned preimage\n" {
++		t.Fatalf("conflicting surface changed: %q, %v", preimage, err)
++	}
++	manifestAfter, err := os.ReadFile(manifestPath)
++	if err != nil || string(manifestAfter) != string(manifestBefore) {
++		t.Fatalf("global install changed its declaration source on conflict: err=%v", err)
++	}
++
++	requireGlobalCommand(t, fixture, exitOK, "profile", "sync", "--takeover")
++	backup := filepath.Join(fixture.codex, ".agent-environment-backup", "1", ".agent-context", "skills", "new-skill", "SKILL.md")
++	backupBytes, err := os.ReadFile(backup)
++	if err != nil || string(backupBytes) != "operator-owned preimage\n" {
++		t.Fatalf("takeover backup = %q, %v", backupBytes, err)
++	}
++	fixture.requireNativeSkill(t)
++	requireGlobalCommand(t, fixture, exitOK, "global", "install")
++	fixture.requireNativeSkill(t)
++}
+diff --git a/cmd/curator/main.go b/cmd/curator/main.go
+index e6e9ae3e..8dc309a5 100644
+--- a/cmd/curator/main.go
++++ b/cmd/curator/main.go
+@@ -1433,11 +1433,32 @@ func (c cli) cmdGlobal(args []string) int {
+ 			_, _ = fmt.Fprintln(c.stderr, "curator: specify exactly one of --tag, --branch, --revision")
+ 			return exitUsage
+ 		}
+-		if err := manifest.AddDecl(install.GlobalRoot(cfg.Home()), positional[0], refKind, refValue, *git, *source); err != nil {
++		if *git == "" || *source != "" || refKind == "branch" {
++			_, _ = fmt.Fprintln(c.stderr, "curator: profile-scoped global add requires --git and exactly one of --tag or --revision")
++			return exitUsage
++		}
++		globalManifest, err := manifest.Load(install.GlobalRoot(cfg.Home()))
++		if err != nil {
++			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
++			return exitFail
++		}
++		if globalManifest == nil {
++			_, _ = fmt.Fprintf(c.stderr, "curator: %s not found at %s; run 'curator global init' first\n", manifest.Name, manifest.PathIn(install.GlobalRoot(cfg.Home())))
++			return exitFail
++		}
++		info, err := envprofile.GlobalAdd(cfg.Home(), envprofile.DirectSkill{
++			Name: positional[0], Git: *git, Tag: *tag, Revision: *revision,
++		}, envprofile.PolicyFromConfig(cfg), machineFromConfig(cfg), c.profileNativeHomeResolver())
++		if err != nil {
+ 			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 			return exitFail
+ 		}
+-		return c.runGlobalInstall(cfg, nil)
++		_, _ = fmt.Fprintf(c.stdout, "installed global skill %s in profile %s (lock %s)\n", positional[0], info.Name, info.LockHash)
++		if err := manifest.AddDecl(install.GlobalRoot(cfg.Home()), positional[0], refKind, refValue, *git, ""); err != nil {
++			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
++			return exitFail
++		}
++		return c.runGlobalInstallModeWithProfile(cfg, nil, false, true)
+ 	case "install":
+ 		return c.runGlobalInstall(cfg, args[1:])
+ 	case "adopt":
+@@ -1678,6 +1699,10 @@ func (c cli) runGlobalInstall(cfg *config.Config, args []string) int {
+ }
+ 
+ func (c cli) runGlobalInstallMode(cfg *config.Config, args []string, fetch bool) int {
++	return c.runGlobalInstallModeWithProfile(cfg, args, fetch, false)
++}
++
++func (c cli) runGlobalInstallModeWithProfile(cfg *config.Config, args []string, fetch, profileAlreadyMaterialized bool) int {
+ 	opts, positional, all, auditMode, err := c.installFlags(args)
+ 	if err != nil || len(positional) != 0 || all {
+ 		if err == nil {
+@@ -1693,6 +1718,14 @@ func (c cli) runGlobalInstallMode(cfg *config.Config, args []string, fetch bool)
+ 		cfgCopy.Audit.Mode = auditMode
+ 		cfg = &cfgCopy
+ 	}
++	if len(args) == 0 && !opts.DryRun && !fetch && !profileAlreadyMaterialized {
++		info, err := envprofile.GlobalInstall(cfg.Home(), envprofile.PolicyFromConfig(cfg), machineFromConfig(cfg), c.profileNativeHomeResolver())
++		if err != nil {
++			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
++			return exitFail
++		}
++		_, _ = fmt.Fprintf(c.stdout, "installed global skills from profile %s (lock %s)\n", info.Name, info.LockHash)
++	}
+ 	authority, err := preflightCLIExecution(context.Background(), cfg)
+ 	if err != nil {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+diff --git a/cmd/curator/profile.go b/cmd/curator/profile.go
+index 5d8fc6f3..bfda9b88 100644
+--- a/cmd/curator/profile.go
++++ b/cmd/curator/profile.go
+@@ -366,6 +366,18 @@ func (c cli) cmdProfileSync(cfg *config.Config, args []string) int {
+ 	}
+ 	policy := envprofile.PolicyFromConfig(cfg)
+ 	policy.Takeover = *takeover
++	managed, managedErr := envprofile.SyncManagedHomesWithPolicy(cfg.Home(), policy, machineFromConfig(cfg))
++	for _, result := range managed {
++		if result.OK {
++			_, _ = fmt.Fprintf(c.stdout, "%s: synced (%s)\n", result.Adapter, result.Home)
++		} else {
++			_, _ = fmt.Fprintf(c.stderr, "%s: %s\n", result.Adapter, result.Detail)
++		}
++	}
++	if managedErr != nil {
++		_, _ = fmt.Fprintln(c.stderr, "curator:", managedErr)
++		return exitFail
++	}
+ 	results, err := envprofile.SyncWithPolicy(cfg.Home(), policy)
+ 	for _, result := range results {
+ 		if result.OK {
+diff --git a/internal/envprofile/global.go b/internal/envprofile/global.go
+new file mode 100644
+index 00000000..ca42daf1
+--- /dev/null
++++ b/internal/envprofile/global.go
+@@ -0,0 +1,323 @@
++package envprofile
++
++import (
++	"fmt"
++	"sort"
++	"strings"
++
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/contextmaterialize"
++	"github.com/relux-works/curator/internal/contextpkg"
++	"github.com/relux-works/curator/internal/contextresolve"
++	"github.com/relux-works/curator/internal/contextstore"
++	"github.com/relux-works/curator/internal/envmarker"
++	"github.com/relux-works/curator/internal/envregistry"
++)
++
++// DirectSkill is one machine-level direct skill declaration accepted by the
++// global skill commands. The lock stores the resolved commit; its source and
++// revision are sufficient to replay that exact declaration later.
++type DirectSkill struct {
++	Name     string
++	Git      string
++	Tag      string
++	Revision string
++}
++
++// GlobalAdd extends the current profile lock with one direct skill and then
++// materializes the resulting profile. The lock and immutable entries publish
++// before any managed or in-place surface is touched. A surface conflict
++// therefore leaves the lock available to profile sync --takeover.
++func GlobalAdd(home string, skill DirectSkill, policy Policy, machine envregistry.MachineConfig, nativeHomeOf func(string) (string, error)) (Info, error) {
++	if skill.Name == "" || skill.Git == "" || (skill.Tag == "") == (skill.Revision == "") {
++		return Info{}, fmt.Errorf("%s: global add requires a skill name, Git source, and exactly one of tag or revision", DiagRefConflict)
++	}
++	return globalSkillOperation(home, policy, machine, &skill, nativeHomeOf)
++}
++
++// GlobalInstall replays the current profile lock's resolved skill members and
++// materializes them. It is also the retry path after a sync takeover.
++func GlobalInstall(home string, policy Policy, machine envregistry.MachineConfig, nativeHomeOf func(string) (string, error)) (Info, error) {
++	return globalSkillOperation(home, policy, machine, nil, nativeHomeOf)
++}
++
++func globalSkillOperation(home string, policy Policy, machine envregistry.MachineConfig, addition *DirectSkill, nativeHomeOf func(string) (string, error)) (Info, error) {
++	op, err := beginOperation(home)
++	if err != nil {
++		return Info{}, err
++	}
++	closed := false
++	closeOperation := func() {
++		if !closed {
++			_ = op.close()
++			closed = true
++		}
++	}
++	defer closeOperation()
++	if err := ensureDefault(op, home, policy); err != nil {
++		return Info{}, err
++	}
++	profile, err := currentOrDefault(home)
++	if err != nil {
++		return Info{}, err
++	}
++	source, err := readSource(home, profile)
++	if err != nil {
++		return Info{}, err
++	}
++	oldLock, oldHash, err := readLock(home, profile)
++	if err != nil {
++		return Info{}, err
++	}
++	manager := newGitManager(home).withPolicy(policy)
++	if err := fetchLockedSources(manager, oldLock); err != nil {
++		return Info{}, err
++	}
++	input, err := globalSkillInput(home, profile, source, oldLock, manager, policy, addition)
++	if err != nil {
++		return Info{}, err
++	}
++	result, err := contextresolve.Resolve(manager, input)
++	if err != nil {
++		return Info{}, err
++	}
++	if err := checkAdmissionPrePublish(home, manager, result, policy); err != nil {
++		return Info{}, err
++	}
++	warnings, err := auditAndStore(home, manager, result, policy)
++	if err != nil {
++		return Info{}, err
++	}
++	if err := ensureResolvedEntries(home, manager, result); err != nil {
++		return Info{}, err
++	}
++	canonical, err := result.Lock.Canonical()
++	if err != nil {
++		return Info{}, err
++	}
++	newHash := contextlock.HashBytes(canonical)
++	if newHash != oldHash {
++		if err := op.publish(map[string][]byte{lockPath(home, profile): canonical}); err != nil {
++			return Info{}, err
++		}
++	}
++	info := Info{Name: profile, Source: source, Lock: result.Lock, LockHash: newHash, Current: true, Warnings: warnings}
++	// Preflight both managed and in-place homes while the manager lock is held.
++	// A static unmanaged conflict is found before any surface is written, while
++	// the extended lock and immutable entries are already published.
++	if err := preflightManagedProfile(home, profile, policy, machine, nativeHomeOf); err != nil {
++		return info, err
++	}
++	if err := preflightInPlaceScope(home, profile, "", policy, nativeHomeOf); err != nil {
++		return info, err
++	}
++	nativeResults, err := materializeScopeWithNativeHome(home, profile, "", policy, nativeHomeOf)
++	if err != nil {
++		return info, err
++	}
++	for _, result := range nativeResults {
++		if !result.OK {
++			return info, fmt.Errorf("%s", result.Detail)
++		}
++	}
++	closeOperation()
++	if _, err := syncManagedProfile(home, profile, policy, machine, nativeHomeOf); err != nil {
++		return info, err
++	}
++	return info, nil
++}
++
++func currentOrDefault(home string) (string, error) {
++	current, err := Current(home)
++	if err != nil {
++		return "", err
++	}
++	if current == "" {
++		return DefaultProfile, nil
++	}
++	return current, nil
++}
++
++func globalSkillInput(home, profile string, source Source, oldLock *contextlock.Lock, manager *gitManager, policy Policy, addition *DirectSkill) (contextresolve.Input, error) {
++	root, ok := oldLock.RootMember()
++	if !ok {
++		return contextresolve.Input{}, fmt.Errorf("%s: profile %q lock has no root member", DiagSourceInvalid, profile)
++	}
++	var input contextresolve.Input
++	switch source.Kind {
++	case KindGit:
++		resolved, err := manager.inputFor(source)
++		if err != nil {
++			return contextresolve.Input{}, err
++		}
++		input = resolved
++		if root.Commit == "" {
++			return contextresolve.Input{}, fmt.Errorf("%s: profile %q lock has no Git root commit", DiagSourceInvalid, profile)
++		}
++		input.Root.Range, input.Root.Tag = "", ""
++		input.Root.Revision = root.Commit
++	case KindPath, KindLocal:
++		if root.StateHash == "" {
++			return contextresolve.Input{}, fmt.Errorf("%s: profile %q lock has no state pin for its local root", DiagSourceInvalid, profile)
++		}
++		entry := contextstore.EntryDir(home, contextlock.KindContext, oldLock.Root, root.StateHash)
++		manifest, err := contextpkg.LoadManifest(packageRoot(entry, root.Directory))
++		if err != nil {
++			return contextresolve.Input{}, fmt.Errorf("%s: profile %q root snapshot cannot be read: %v", DiagSourceInvalid, profile, err)
++		}
++		if manifest.Name != oldLock.Root {
++			return contextresolve.Input{}, fmt.Errorf("%s: profile %q root snapshot names %q, want %q", DiagSourceInvalid, profile, manifest.Name, oldLock.Root)
++		}
++		input = contextresolve.Input{
++			Root:      contextresolve.Requirement{Kind: contextlock.KindContext, Name: oldLock.Root},
++			RootState: &contextresolve.StatePackage{StateHash: root.StateHash, Manifest: packageOf(manifest)},
++		}
++	default:
++		return contextresolve.Input{}, fmt.Errorf("%s: profile %q has unsupported source kind %q", DiagSourceInvalid, profile, source.Kind)
++	}
++	overlays, err := resolveOverlays(home, manager, profile, policy)
++	if err != nil {
++		return contextresolve.Input{}, err
++	}
++	input.Overlays = overlays
++	input.MCPAllowlist = policy.MCPAllowlist
++	for _, member := range oldLock.Members {
++		if member.Kind != contextlock.KindSkill {
++			continue
++		}
++		if addition != nil && member.Name == addition.Name {
++			continue
++		}
++		if member.Source == "" || member.Commit == "" {
++			return contextresolve.Input{}, fmt.Errorf("%s: skill %q in profile %q lock has no replayable Git pin", DiagSourceInvalid, member.Name, profile)
++		}
++		input.Direct = append(input.Direct, contextresolve.Requirement{
++			Kind: contextlock.KindSkill, Name: member.Name, Source: member.Source, Revision: member.Commit,
++		})
++	}
++	if addition != nil {
++		identity, err := canonicalGit(addition.Git)
++		if err != nil {
++			return contextresolve.Input{}, fmt.Errorf("%s: %v", DiagSourceInvalid, err)
++		}
++		manager.recordRaw(identity, addition.Git)
++		input.Direct = append(input.Direct, contextresolve.Requirement{
++			Kind: contextlock.KindSkill, Name: addition.Name, Source: identity,
++			Tag: addition.Tag, Revision: addition.Revision,
++		})
++	}
++	sort.Slice(input.Direct, func(i, j int) bool { return input.Direct[i].Name < input.Direct[j].Name })
++	overlayInputDefaults(&input, policy)
++	return input, nil
++}
++
++// SyncManagedHomesWithPolicy re-materializes every installed profile's
++// managed homes from its lock. It complements the native in-place pass in
++// SyncWithPolicy; both source the skill set from the same profile lock.
++func SyncManagedHomesWithPolicy(home string, policy Policy, machine envregistry.MachineConfig) ([]EntryResult, error) {
++	if err := EnsureDefaultWithPolicy(home, policy); err != nil {
++		return nil, err
++	}
++	profiles, err := ListWithPolicy(home, policy)
++	if err != nil {
++		return nil, err
++	}
++	for _, profile := range profiles {
++		if err := preflightManagedProfile(home, profile.Name, policy, machine, nil); err != nil {
++			return nil, err
++		}
++	}
++	var results []EntryResult
++	var failures []string
++	for _, profile := range profiles {
++		profileResults, syncErr := syncManagedProfile(home, profile.Name, policy, machine, nil)
++		results = append(results, profileResults...)
++		if syncErr != nil {
++			failures = append(failures, syncErr.Error())
++		}
++	}
++	if len(failures) > 0 {
++		return results, fmt.Errorf("%s", strings.Join(failures, "; "))
++	}
++	return results, nil
++}
++
++func preflightManagedProfile(home, profile string, policy Policy, machine envregistry.MachineConfig, nativeHomeOf func(string) (string, error)) error {
++	source, lock, hash, err := loadResolveInputs(home, profile)
++	if err != nil {
++		return err
++	}
++	precedence := policy.Precedence()
++	for _, adapter := range envregistry.Registry {
++		req := ResolveRequest{Home: home, Profile: profile, EnvID: adapter.ID, Machine: machine, Repair: true, Policy: policy, NativeHomeOf: nativeHomeOf}
++		verdict := verifyHome(&req, adapter, source, lock, hash)
++		if verdict.markerReadFailed {
++			return fmt.Errorf("%s: %s", envmarker.DiagMarkerUnreadable, strings.Join(verdict.reasons, "; "))
++		}
++		if verdict.passthroughReadFailed {
++			return fmt.Errorf("%s: %s", envregistry.DiagPassthroughUnreadable, strings.Join(verdict.reasons, "; "))
++		}
++		if verdict.current {
++			continue
++		}
++		order, err := contextmaterialize.EmittedOrder(lock, precedence)
++		if err != nil {
++			return fmt.Errorf("%s: %v", DiagRepairFailed, err)
++		}
++		plan, err := assembleHome(&req, source, lock, hash, precedence, order, adapter, verdict.marker)
++		if err != nil {
++			return err
++		}
++		recorded := map[string]bool{}
++		if verdict.marker != nil {
++			for _, surface := range verdict.marker.Surfaces {
++				for _, path := range surface.Paths {
++					recorded[path] = true
++				}
++			}
++		}
++		want := unmanagedPlanTargets(plan, recorded)
++		if len(want) > 0 && !policy.Takeover {
++			if err := inventoryUnmanaged(plan.homeDir, want, contextstore.Root(home)); err != nil {
++				return err
++			}
++		}
++	}
++	return nil
++}
++
++func syncManagedProfile(home, profile string, policy Policy, machine envregistry.MachineConfig, nativeHomeOf func(string) (string, error)) ([]EntryResult, error) {
++	var results []EntryResult
++	var failures []string
++	for _, adapter := range envregistry.Registry {
++		_, err := Resolve(ResolveRequest{
++			Home: home, Profile: profile, EnvID: adapter.ID, Machine: machine,
++			Repair: true, Policy: policy, NativeHomeOf: nativeHomeOf,
++		})
++		result := EntryResult{Adapter: adapter.ID, Home: ManagedHomeDir(home, profile, adapter.ID), OK: err == nil}
++		if err != nil {
++			result.Detail = err.Error()
++			failures = append(failures, err.Error())
++		}
++		results = append(results, result)
++	}
++	if len(failures) > 0 {
++		return results, fmt.Errorf("%s", strings.Join(failures, "; "))
++	}
++	return results, nil
++}
++
++func unmanagedPlanTargets(plan *homePlan, recorded map[string]bool) map[string]bool {
++	want := map[string]bool{}
++	for path := range plan.copies {
++		if !recorded[path] {
++			want[path] = true
++		}
++	}
++	for path := range plan.links {
++		if !recorded[path] {
++			want[path] = true
++		}
++	}
++	return want
++}
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index adccecf1..a9e33963 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -1101,6 +1101,22 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
+ 	for seed := range seeds.files {
+ 		want[seed] = true
+ 	}
++	// A new member can add a managed path beneath an already-provisioned
++	// home. Until the marker records that path it remains unmanaged, including
++	// during a repair of an otherwise managed home.
++	unmanaged := unmanagedPlanTargets(plan, recorded)
++	if len(unmanaged) > 0 {
++		if err := inventoryUnmanaged(plan.homeDir, unmanaged, contextstore.Root(req.Home)); err != nil {
++			if !req.Policy.Takeover {
++				return err
++			}
++			if prior != nil {
++				plan.warnings = append(plan.warnings, "taking over unmanaged files for "+plan.adapter.ID+
++					": native global context files are being replaced by managed ones; backups land in "+
++					filepath.Join(plan.homeDir, ".agent-environment-backup")+"/")
++			}
++		}
++	}
+ 	if err := preflightManagedWriteTargets(root, homeRel, want); err != nil {
+ 		return err
+ 	}
+diff --git a/internal/envprofile/switch.go b/internal/envprofile/switch.go
+index 69af33cb..c0006722 100644
+--- a/internal/envprofile/switch.go
++++ b/internal/envprofile/switch.go
+@@ -30,11 +30,12 @@
+ //
+ // Managed homes, seeds, passthrough, and secondary fixed-home targets are
+ // stage (b): this file materializes the four registered adapters' native
+-// in-place homes only. The skills tree and MCP files are likewise stage
+-// (b): the recorded surfaces are the root-context file every adapter owns.
++// in-place homes only. Root context and profile skill directories are
++// recorded as separate surfaces; MCP files remain managed-home surfaces.
+ package envprofile
+ 
+ import (
++	"errors"
+ 	"fmt"
+ 	"os"
+ 	"path/filepath"
+@@ -59,6 +60,7 @@ const (
+ 	DiagBackupExists         = "environment_backup_exists"
+ 	DiagUnknownEnvironment   = "environment_unknown"
+ 	DiagWriteWouldFollowLink = "environment_write_would_follow_link"
++	profileSkillsSurfaceDir  = ".agent-context/skills"
+ )
+ 
+ // BackupRetention is the number of backup generations kept (environments
+@@ -119,6 +121,13 @@ func NativeHome(adapter Adapter) (string, error) {
+ 	return filepath.Join(home, adapter.DefaultDir), nil
+ }
+ 
++func resolveNativeHome(adapter Adapter, resolver func(string) (string, error)) (string, error) {
++	if resolver != nil {
++		return resolver(adapter.ID)
++	}
++	return NativeHome(adapter)
++}
++
+ // EntryResult is the per-adapter outcome of a switch. Notice carries the
+ // section 9.5 takeover notice for the entry; Warnings carries the
+ // non-blocking onboarding findings (the dotfile-manager heuristic).
+@@ -418,6 +427,10 @@ func SyncWithPolicy(home string, policy Policy) ([]EntryResult, error) {
+ // its own pass, so every home is written exactly once and the recorded state
+ // and the bytes always agree when the command returns.
+ func materializeScope(home, profile, environment string, policy Policy) ([]EntryResult, error) {
++	return materializeScopeWithNativeHome(home, profile, environment, policy, nil)
++}
++
++func materializeScopeWithNativeHome(home, profile, environment string, policy Policy, nativeHomeOf func(string) (string, error)) ([]EntryResult, error) {
+ 	lock, hash, err := readLock(home, profile)
+ 	if err != nil {
+ 		return nil, err
+@@ -450,6 +463,10 @@ func materializeScope(home, profile, environment string, policy Policy) ([]Entry
+ 	if err != nil {
+ 		return nil, err
+ 	}
++	skills, err := skillsOf(home, manager, lock)
++	if err != nil {
++		return nil, err
++	}
+ 	precedence := policy.Precedence()
+ 	order, err := contextmaterialize.EmittedOrder(lock, precedence)
+ 	if err != nil {
+@@ -457,11 +474,138 @@ func materializeScope(home, profile, environment string, policy Policy) ([]Entry
+ 	}
+ 	var results []EntryResult
+ 	for _, adapter := range adapters {
+-		results = append(results, materializeOne(home, source, profile, lock, hash, precedence, order, packages, adapter, policy.Takeover))
++		results = append(results, materializeOne(home, source, profile, lock, hash, precedence, order, packages, skills, adapter, policy.Takeover, nativeHomeOf))
+ 	}
+ 	return results, nil
+ }
+ 
++// preflightInPlaceScope checks every native target a scope will materialize
++// before the caller starts writing any surface. Global lock publication uses
++// this while holding the manager-home lock so a static unmanaged conflict
++// cannot leave earlier adapter surfaces partially updated.
++func preflightInPlaceScope(home, profile, environment string, policy Policy, nativeHomeOf func(string) (string, error)) error {
++	lock, hash, err := readLock(home, profile)
++	if err != nil {
++		return err
++	}
++	source, err := readSource(home, profile)
++	if err != nil {
++		return err
++	}
++	if err := validateProfilePathSources(profile, source, policy); err != nil {
++		return err
++	}
++	manager := newGitManager(home)
++	packages, err := loadMaterial(home, manager, lock)
++	if err != nil {
++		return err
++	}
++	skills, err := skillsOf(home, manager, lock)
++	if err != nil {
++		return err
++	}
++	precedence := policy.Precedence()
++	scoped, err := ScopedCurrents(home)
++	if err != nil {
++		return err
++	}
++	var adapters []Adapter
++	if environment != "" {
++		adapter, ok := adapterByID(environment)
++		if !ok {
++			return fmt.Errorf("%s: explicit operand names the unregistered environment %q", DiagUnknownEnvironment, environment)
++		}
++		adapters = []Adapter{adapter}
++	} else {
++		for _, adapter := range Adapters {
++			if _, hasScope := scoped["env:"+adapter.ID]; !hasScope {
++				adapters = append(adapters, adapter)
++			}
++		}
++	}
++	for _, adapter := range adapters {
++		native, err := resolveNativeHome(adapter, nativeHomeOf)
++		if err != nil {
++			return err
++		}
++		rootState, err := stateread.Stat(native)
++		if err != nil {
++			return err
++		}
++		if rootState.Kind == stateread.KindAbsent {
++			continue
++		}
++		if rootState.Info == nil || !rootState.Info.IsDir() {
++			return fmt.Errorf("managed root %s is not a directory", native)
++		}
++		if err := checkManagedPrivateTarget(native, envmarker.Name); err != nil {
++			return err
++		}
++		prior, err := envmarker.Read(native)
++		if err != nil {
++			return err
++		}
++		recorded := map[string]bool{}
++		if prior != nil {
++			for _, surface := range prior.Surfaces {
++				for _, path := range surface.Paths {
++					recorded[path] = true
++				}
++			}
++		}
++		want := map[string]bool{}
++		_, written, err := contextmaterialize.Monolithic(lock, hash, precedence, adapter.ID, packages)
++		if err != nil {
++			return err
++		}
++		if written {
++			want[adapter.Target] = true
++		}
++		for _, skill := range skills {
++			want[filepath.ToSlash(filepath.Join(profileSkillsSurfaceDir, skill.name))] = true
++		}
++		for path := range want {
++			if recorded[path] {
++				continue
++			}
++			full, err := managedPath(native, path, false)
++			if err != nil {
++				return err
++			}
++			metadata, err := stateread.Lstat(full)
++			if err != nil {
++				return fmt.Errorf("%s: inspect %s: %w", DiagUnmanagedConflict, inPlaceConflictPath(path), err)
++			}
++			if metadata.Kind == stateread.KindAbsent {
++				continue
++			}
++			if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
++				return fmt.Errorf("%s: inspect %s: path state is unreadable", DiagUnmanagedConflict, inPlaceConflictPath(path))
++			}
++			if metadata.Info.Mode()&os.ModeSymlink != 0 {
++				link, err := stateread.Readlink(full)
++				if err != nil || link.Kind != stateread.KindPresent {
++					return fmt.Errorf("%s: inspect symlink %s: %v", DiagUnmanagedConflict, inPlaceConflictPath(path), err)
++				}
++				if !sameStoreTree(link.Target, contextstore.Root(home)) && !policy.Takeover {
++					return fmt.Errorf("%s: %s is a symlink outside the manager store; abort or take over with backup", DiagForeignManager, inPlaceConflictPath(path))
++				}
++			}
++			if !policy.Takeover {
++				return fmt.Errorf("%s: %s exists and no marker records it", DiagUnmanagedConflict, inPlaceConflictPath(path))
++			}
++		}
++	}
++	return nil
++}
++
++func inPlaceConflictPath(path string) string {
++	if strings.HasPrefix(path, profileSkillsSurfaceDir+"/") {
++		return filepath.ToSlash(filepath.Join(path, "SKILL.md"))
++	}
++	return path
++}
++
+ // loadMaterial loads the module bytes of every context member from its
+ // store entry, below the member directory when the lock records one.
+ func loadMaterial(home string, manager *gitManager, lock *contextlock.Lock) (map[string]contextmaterialize.Package, error) {
+@@ -499,8 +643,8 @@ func loadMaterial(home string, manager *gitManager, lock *contextlock.Lock) (map
+ // environment_surface_unmanaged_conflict (or
+ // environment_foreign_manager_detected for a foreign-manager symlink)
+ // rather than overwrite.
+-func materializeOne(home string, source Source, profile string, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, order []contextlock.Member, packages map[string]contextmaterialize.Package, adapter Adapter, takeover bool) EntryResult {
+-	native, err := NativeHome(adapter)
++func materializeOne(home string, source Source, profile string, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, order []contextlock.Member, packages map[string]contextmaterialize.Package, skills []skillOf, adapter Adapter, takeover bool, nativeHomeOf func(string) (string, error)) EntryResult {
++	native, err := resolveNativeHome(adapter, nativeHomeOf)
+ 	if err != nil {
+ 		return EntryResult{Adapter: adapter.ID, OK: false, Detail: err.Error()}
+ 	}
+@@ -530,6 +674,16 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
+ 	if written {
+ 		want[adapter.Target] = true
+ 	}
++	skillLinks := map[string]string{}
++	skillHashes := map[string][]byte{}
++	skillPaths := make([]string, 0, len(skills))
++	for _, skill := range skills {
++		path := filepath.ToSlash(filepath.Join(profileSkillsSurfaceDir, skill.name))
++		skillLinks[path] = skill.root
++		skillHashes[path] = []byte(skill.hash)
++		skillPaths = append(skillPaths, path)
++		want[path] = true
++	}
+ 	for path := range want {
+ 		if _, err := managedPath(native, path, false); err != nil {
+ 			return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
+@@ -557,24 +711,29 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
+ 		state, err := stateread.Lstat(full)
+ 		if err != nil {
+ 			result.OK = false
+-			result.Detail = err.Error()
++			result.Detail = fmt.Sprintf("%s: inspect %s: %v", DiagUnmanagedConflict, inPlaceConflictPath(path), err)
+ 			return result
+ 		}
+ 		if state.Kind == stateread.KindAbsent {
+ 			continue
+ 		}
++		if state.Kind != stateread.KindPresent || state.Info == nil {
++			result.OK = false
++			result.Detail = fmt.Sprintf("%s: inspect %s: path state is unreadable", DiagUnmanagedConflict, inPlaceConflictPath(path))
++			return result
++		}
+ 		info := state.Info
+ 		if info.Mode()&os.ModeSymlink != 0 {
+-			linkTarget, readErr := os.Readlink(full)
+-			if readErr != nil {
++			link, readErr := stateread.Readlink(full)
++			if readErr != nil || link.Kind != stateread.KindPresent {
+ 				result.OK = false
+-				result.Detail = DiagForeignManager + ": " + path + " is a symlink that cannot be inspected; refusing takeover"
++				result.Detail = fmt.Sprintf("%s: inspect symlink %s: %v", DiagUnmanagedConflict, inPlaceConflictPath(path), readErr)
+ 				return result
+ 			}
+-			if !sameStoreTree(linkTarget, contextstore.Root(home)) {
++			if !sameStoreTree(link.Target, contextstore.Root(home)) {
+ 				if !takeover {
+ 					result.OK = false
+-					result.Detail = DiagForeignManager + ": " + path + " is a symlink outside the manager store; abort, or take over with backup"
++					result.Detail = DiagForeignManager + ": " + inPlaceConflictPath(path) + " is a symlink outside the manager store; abort, or take over with backup"
+ 					return result
+ 				}
+ 				taken = append(taken, path+" (foreign-manager symlink)")
+@@ -583,7 +742,7 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
+ 		}
+ 		if !takeover {
+ 			result.OK = false
+-			result.Detail = DiagUnmanagedConflict + ": " + path + " exists and no marker records it"
++			result.Detail = DiagUnmanagedConflict + ": " + inPlaceConflictPath(path) + " exists and no marker records it"
+ 			return result
+ 		}
+ 		taken = append(taken, path)
+@@ -613,7 +772,7 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
+ 				continue
+ 			}
+ 			info := state.Info
+-			if info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
++			if info.Mode().IsRegular() || info.Mode().IsDir() || info.Mode()&os.ModeSymlink != 0 {
+ 				backupWant[path] = true
+ 			}
+ 		}
+@@ -628,7 +787,7 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
+ 	if prior != nil {
+ 		for path := range recorded {
+ 			if !want[path] {
+-				_ = removeManagedEntry(native, path)
++				_ = removeManagedTree(native, path)
+ 			}
+ 		}
+ 	}
+@@ -683,6 +842,41 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
+ 	if written {
+ 		marker.Surfaces[envmarker.SurfaceRootContext] = surface
+ 	}
++	sort.Strings(skillPaths)
++	skillCopies := []envmarker.Copy{}
++	for _, path := range skillPaths {
++		full, err := managedPath(native, path, false)
++		if err != nil {
++			return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
++		}
++		state, err := stateread.Lstat(full)
++		if err != nil {
++			return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
++		}
++		if state.Kind == stateread.KindPresent && state.Info != nil && state.Info.IsDir() && state.Info.Mode()&os.ModeSymlink == 0 {
++			if err := removeManagedTree(native, path); err != nil {
++				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
++			}
++		}
++		if err := replaceLink(native, path, skillLinks[path]); err != nil {
++			var unavailable *errSymlinkUnavailable
++			if !errors.As(err, &unavailable) {
++				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: fmt.Sprintf("link %s: %v", path, err)}
++			}
++			if err := removeManagedTree(native, path); err != nil {
++				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
++			}
++			if err := copyTree(skillLinks[path], native, path); err != nil {
++				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: fmt.Sprintf("link %s: %v; copy fallback: %v", path, unavailable, err)}
++			}
++			skillCopies = append(skillCopies, envmarker.Copy{Path: path, Reason: envmarker.ReasonSymlinkFallback})
++		}
++	}
++	if len(skillPaths) > 0 {
++		marker.Surfaces[envmarker.SurfaceSkills] = envmarker.Surface{
++			Paths: skillPaths, ContentSHA256: contextmaterialize.SurfaceHash(skillHashes), Copies: &skillCopies,
++		}
++	}
+ 	payload, err := marker.Marshal()
+ 	if err != nil {
+ 		return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
+@@ -700,6 +894,41 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
+ 	return result
+ }
+ 
++// removeManagedTree removes a managed surface path without following a
++// symlink at the target or in any descendant. Directories are removed only
++// after their entries have each passed the same managed-path checks.
++func removeManagedTree(root, rel string) error {
++	full, err := managedPath(root, rel, false)
++	if err != nil {
++		return err
++	}
++	state, err := stateread.Lstat(full)
++	if err != nil {
++		return err
++	}
++	if state.Kind == stateread.KindAbsent {
++		return nil
++	}
++	if state.Kind != stateread.KindPresent || state.Info == nil {
++		return fmt.Errorf("%s: inspect %s: path state is unreadable", DiagUnmanagedConflict, rel)
++	}
++	if state.Info.IsDir() && state.Info.Mode()&os.ModeSymlink == 0 {
++		listing, err := stateread.ReadDir(full)
++		if err != nil || listing.Kind != stateread.KindPresent {
++			return fmt.Errorf("%s: inspect directory %s: %v", DiagUnmanagedConflict, rel, err)
++		}
++		for _, entry := range listing.Entries {
++			if err := removeManagedTree(root, managedJoin(rel, entry.Name())); err != nil {
++				return err
++			}
++		}
++	}
++	if err := os.Remove(full); err != nil && !os.IsNotExist(err) {
++		return err
++	}
++	return nil
++}
++
+ // openBackup copies every file the operation will replace into the next
+ // versioned generation and prunes beyond the retention count. A next
+ // generation that already exists fails with environment_backup_exists.
+@@ -747,42 +976,28 @@ func openBackup(root, homeRel string, want map[string]bool) (int, error) {
+ 		sourceRel := managedJoin(homeRel, path)
+ 		full, err := managedPath(root, sourceRel, false)
+ 		if err != nil {
+-			_ = os.RemoveAll(generation)
++			_ = removeManagedTree(root, generationRel)
+ 			return 0, err
+ 		}
+ 		state, err := stateread.Lstat(full)
+ 		if err != nil {
+-			_ = os.RemoveAll(generation)
++			_ = removeManagedTree(root, generationRel)
+ 			return 0, err
+ 		}
+ 		if state.Kind == stateread.KindAbsent {
+ 			continue
+ 		}
+-		info := state.Info
+ 		targetRel := managedJoin(generationRel, path)
+-		if info.Mode()&os.ModeSymlink != 0 {
+-			linkText, err := os.Readlink(full)
+-			if err == nil {
+-				err = atomicManagedLink(root, targetRel, linkText)
+-			}
+-			if err != nil {
+-				_ = os.RemoveAll(generation)
+-				return 0, err
+-			}
+-			continue
++		if state.Kind != stateread.KindPresent || state.Info == nil {
++			_ = removeManagedTree(root, generationRel)
++			return 0, fmt.Errorf("%s: backup source %s is unreadable", DiagUnmanagedConflict, path)
+ 		}
+-		if !info.Mode().IsRegular() {
++		info := state.Info
++		if !info.Mode().IsRegular() && !info.IsDir() && info.Mode()&os.ModeSymlink == 0 {
+ 			continue
+ 		}
+-		payload, present, err := readManagedRegular(root, sourceRel)
+-		if err == nil && !present {
+-			err = stateread.AbsentError(full)
+-		}
+-		if err == nil {
+-			err = atomicManagedFile(root, targetRel, payload, 0o644)
+-		}
+-		if err != nil {
+-			_ = os.RemoveAll(generation)
++		if err := copyManagedEntry(root, sourceRel, targetRel); err != nil {
++			_ = removeManagedTree(root, generationRel)
+ 			return 0, err
+ 		}
+ 	}
+@@ -790,6 +1005,60 @@ func openBackup(root, homeRel string, want map[string]bool) (int, error) {
+ 	return next, nil
+ }
+ 
++// copyManagedEntry backs up a surface without following links. Each source
++// read and destination write is confined by managedPath; files and links are
++// published through the atomic managed writers.
++func copyManagedEntry(root, sourceRel, targetRel string) error {
++	source, err := managedPath(root, sourceRel, false)
++	if err != nil {
++		return err
++	}
++	state, err := stateread.Lstat(source)
++	if err != nil {
++		return err
++	}
++	if state.Kind == stateread.KindAbsent {
++		return nil
++	}
++	if state.Kind != stateread.KindPresent || state.Info == nil {
++		return fmt.Errorf("%s: backup source %s is unreadable", DiagUnmanagedConflict, sourceRel)
++	}
++	info := state.Info
++	if info.Mode()&os.ModeSymlink != 0 {
++		link, err := stateread.Readlink(source)
++		if err != nil || link.Kind != stateread.KindPresent {
++			return fmt.Errorf("%s: backup symlink %s cannot be read: %v", DiagUnmanagedConflict, sourceRel, err)
++		}
++		return atomicManagedLink(root, targetRel, link.Target)
++	}
++	if info.IsDir() {
++		if _, err := managedDirectory(root, targetRel); err != nil {
++			return err
++		}
++		listing, err := stateread.ReadDir(source)
++		if err != nil || listing.Kind != stateread.KindPresent {
++			return fmt.Errorf("%s: backup directory %s cannot be read: %v", DiagUnmanagedConflict, sourceRel, err)
++		}
++		for _, entry := range listing.Entries {
++			if err := copyManagedEntry(root, managedJoin(sourceRel, entry.Name()), managedJoin(targetRel, entry.Name())); err != nil {
++				return err
++			}
++		}
++		return nil
++	}
++	if !info.Mode().IsRegular() {
++		return nil
++	}
++	payload, present, err := readManagedRegular(root, sourceRel)
++	if err == nil && !present {
++		err = stateread.AbsentError(source)
++	}
++	if err != nil {
++		return err
++	}
++	return atomicManagedFile(root, targetRel, payload, info.Mode().Perm())
++}
++
+ // pruneBackups removes the oldest generations beyond the retention count.
+ // Backups are otherwise never removed: never modified, never collected.
+ func pruneBackups(base string, newest int) {

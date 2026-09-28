@@ -1,0 +1,569 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index a0dba52..307683d 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -7,6 +7,11 @@ Versioning for the complete specification set.
+ 
+ ### Added
+ 
++- Specify that global add/install publish the extended profile lock before
++  in-place materialization and retain it on
++  `environment_surface_unmanaged_conflict`, with transactional surface
++  rollback and sync takeover recovery. Add ordering, lock-preservation,
++  and `profile sync --takeover` recovery vectors.
+ - Gate `skillfile-sources-v1` schema references and protocol citations against
+   the `v1.0.0-rc.10` core baseline, preserving partial-client independence in
+   Specification CI. Its sole conditional-citation exception is the exact
+diff --git a/conformance/README.md b/conformance/README.md
+index 0035197..20fcb7a 100644
+--- a/conformance/README.md
++++ b/conformance/README.md
+@@ -137,7 +137,11 @@ The suite contains:
+   (`vectors/context-detectors.json`: positive and negative cases per closed
+   pattern class, MCP `args` and `url` in scope, the scoped waiver that clears
+   only its own span at its pin, the unpinnable case, and the
+-  `context-system-module-present` warning);
++  `context-system-module-present` warning); and the section 9.4 global
++  lock-publication vector family (`vectors/environments-global-lock-publication.json`):
++  both global operations publish before surface materialization, each retains
++  its extended lock on an unmanaged conflict, and `profile sync --takeover`
++  materializes the preserved skill set with the existing closed carrier set;
+ - the `manager-config` schema-2 surface: `schema-cases/manager-config-v2`
+   with every environments section 12.1 knob present, one negative per
+   closed-object rule and per value grammar, and a schema-1 rejection, plus
+diff --git a/conformance/v1/manifest.json b/conformance/v1/manifest.json
+index c6a7d2d..ff3d996 100644
+--- a/conformance/v1/manifest.json
++++ b/conformance/v1/manifest.json
+@@ -4568,6 +4568,10 @@
+       "path": "vectors/environments-env-passthrough.json",
+       "sha256": "sha256:14af7a2647807280522ffc6d51d6607418c32408861932a59dc0f42d36381155"
+     },
++    {
++      "path": "vectors/environments-global-lock-publication.json",
++      "sha256": "sha256:ad82da00fb9c70919e85c2022c1d36028219101601702ef131b6439181d14165"
++    },
+     {
+       "path": "vectors/environments-path-kind-admission.json",
+       "sha256": "sha256:708476ab6d581d71baea986b1bf6cb581b38ea6f530fe8a721c4a2cbbdf6f110"
+diff --git a/conformance/v1/vectors/environments-global-lock-publication.json b/conformance/v1/vectors/environments-global-lock-publication.json
+new file mode 100644
+index 0000000..f5d4d04
+--- /dev/null
++++ b/conformance/v1/vectors/environments-global-lock-publication.json
+@@ -0,0 +1,125 @@
++{
++  "capability": "agent-environments",
++  "capability_revision": 1,
++  "cases": [
++    {
++      "events": [
++        "resolve-and-audit-candidate",
++        "publish-referenced-store-entries",
++        "publish-extended-profile-lock",
++        "materialize-in-place-surfaces"
++      ],
++      "expected": {
++        "diagnostic": null,
++        "in_place_surfaces_after": "extended-skill-set",
++        "outcome": "materialized",
++        "profile_lock_after": "extended"
++      },
++      "name": "global-add-publishes-lock-before-materialization",
++      "operation": "global add",
++      "profile_lock_before": "old",
++      "takeover_flag": false
++    },
++    {
++      "events": [
++        "resolve-and-audit-candidate",
++        "publish-referenced-store-entries",
++        "publish-extended-profile-lock",
++        "materialize-in-place-surfaces"
++      ],
++      "expected": {
++        "diagnostic": null,
++        "in_place_surfaces_after": "extended-skill-set",
++        "outcome": "materialized",
++        "profile_lock_after": "extended"
++      },
++      "name": "global-install-publishes-lock-before-materialization",
++      "operation": "global install",
++      "profile_lock_before": "old",
++      "takeover_flag": false
++    },
++    {
++      "conflict_surface": "codex_cli/.agent-context/skills/new-skill/SKILL.md",
++      "events": [
++        "resolve-and-audit-candidate",
++        "publish-referenced-store-entries",
++        "publish-extended-profile-lock",
++        "materialize-in-place-surfaces"
++      ],
++      "expected": {
++        "conflict_surface_after": "unmanaged-preimage",
++        "diagnostic": "environment_surface_unmanaged_conflict",
++        "diagnostic_surface": "codex_cli/.agent-context/skills/new-skill/SKILL.md",
++        "in_place_surfaces_after": "pre-operation",
++        "journal_disposition": "retain-lock-rollback-surfaces",
++        "other_mutable_state_after": "pre-operation",
++        "outcome": "conflict",
++        "profile_lock_after": "extended",
++        "referenced_store_entries_after": "retained"
++      },
++      "name": "global-add-conflict-retains-extended-lock",
++      "operation": "global add",
++      "profile_lock_before": "old",
++      "takeover_flag": false
++    },
++    {
++      "conflict_surface": "codex_cli/.agent-context/skills/new-skill/SKILL.md",
++      "events": [
++        "resolve-and-audit-candidate",
++        "publish-referenced-store-entries",
++        "publish-extended-profile-lock",
++        "materialize-in-place-surfaces"
++      ],
++      "expected": {
++        "conflict_surface_after": "unmanaged-preimage",
++        "diagnostic": "environment_surface_unmanaged_conflict",
++        "diagnostic_surface": "codex_cli/.agent-context/skills/new-skill/SKILL.md",
++        "in_place_surfaces_after": "pre-operation",
++        "journal_disposition": "retain-lock-rollback-surfaces",
++        "other_mutable_state_after": "pre-operation",
++        "outcome": "conflict",
++        "profile_lock_after": "extended",
++        "referenced_store_entries_after": "retained"
++      },
++      "name": "global-install-conflict-retains-extended-lock",
++      "operation": "global install",
++      "profile_lock_before": "old",
++      "takeover_flag": false
++    },
++    {
++      "depends_on_case": "global-install-conflict-retains-extended-lock",
++      "events": [
++        "read-extended-profile-lock",
++        "back-up-conflicting-unmanaged-surface",
++        "materialize-all-in-place-surfaces-from-lock"
++      ],
++      "expected": {
++        "backup_before_replacement": true,
++        "conflict_surface_after": "managed-from-extended-lock",
++        "diagnostic": null,
++        "in_place_surfaces_after": "extended-skill-set",
++        "materialized_from": "extended-profile-lock",
++        "outcome": "materialized",
++        "profile_lock_after": "extended"
++      },
++      "name": "profile-sync-takeover-recovers-global-conflict",
++      "operation": "profile sync --takeover",
++      "profile_lock_before": "extended",
++      "takeover_flag": true
++    }
++  ],
++  "global_operations": [
++    "global add",
++    "global install"
++  ],
++  "protocol_version": "1.0.0-rc.13",
++  "rule": "protocol/environments.md section 9.4 and profiles/manager.md sections 2.5, 2.6, and 12.3",
++  "schema_version": 1,
++  "takeover_carriers": [
++    "profile install",
++    "profile use",
++    "profile sync",
++    "profile update",
++    "env resolve --repair"
++  ]
++}
+diff --git a/profiles/manager.md b/profiles/manager.md
+index dd763b3..df9664b 100644
+--- a/profiles/manager.md
++++ b/profiles/manager.md
+@@ -565,7 +565,8 @@ remain until all target swaps and the consumer ledger are durable. Recording
+ the consumer last prevents a failed installation from advertising state that
+ was not installed and prevents concurrent projects from losing ledger updates.
+ 
+-If cache publication or any target swap fails, the manager keeps the home lock
++Except for the handled profile-global conflict outcome below, if cache
++publication or any target swap fails, the manager keeps the home lock
+ and restores journaled targets in exact reverse commit order. Before restoring
+ a target it requires the current digest to equal the journal's desired digest;
+ a mismatch is implementation corruption and MUST NOT overwrite unknown state.
+@@ -575,6 +576,21 @@ Retaining an unreferenced immutable entry is always safe. Existing valid cache
+ entries are never modified during rollback, and the built artifact is never a
+ rollback program or verifier.
+ 
++For environments `global add` and `global install` (section 12.3), the
++candidate profile lock and its referenced immutable store entries publish
++before the first in-place surface swap. If a surface write meets
++`environment_surface_unmanaged_conflict`, the manager MUST durably record
++that handled disposition in the journal before reporting it, restore every
++in-place surface already swapped by the invocation in reverse commit order,
++leave the conflicting unmanaged surface untouched, retain the published
++profile lock and its referenced entries, and restore every other mutable
++target to its pre-operation value. It then completes the journal under the
++same home lock and reports the diagnostic with the conflicting surface
++identified. This outcome changes no surface or other mutable state; the
++published lock and referenced immutable entries are the only retained
++operation state. Every other failure uses the ordinary all-target rollback
++above, including restoring the previous profile lock.
++
+ After a successful commit the manager durably removes backups and marks or
+ removes the journal, then runs runtime, snapshot, and compiled-artifact cache GC
+ while still holding the home lock. GC failure is reported as a maintenance
+@@ -603,6 +619,13 @@ succeeds. No transaction releases the home lock between its first target swap
+ and durable success or reverse rollback, so recovery cannot overwrite a later
+ project's successful commit or lose a consumer-ledger update.
+ 
++If an incomplete journal records the handled environments profile-global
++`environment_surface_unmanaged_conflict` disposition from section 2.5,
++recovery MUST finish rolling back the in-place surface targets and other
++mutable targets while retaining the published profile lock and its referenced
++immutable entries, then complete the journal. It MUST NOT restore the previous
++profile lock for this recorded disposition.
++
+ Repair uses the same immutable-source validation, context exclusion,
+ build-source digest, closure, audit and registry gates, fixed toolchain and
+ process graph, private build, cache publication, and journaled commit sequence
+@@ -2689,6 +2712,20 @@ The machine-global skill scope is profile-scoped (environments §9.4): a
+ profile's skill set is the `skill` members of its lock, and the global skill
+ commands write direct declarations into the current profile's lock through
+ the same resolution, accepting `--profile <name>` and `--all-profiles`.
++
++For every profile selected by `global add` or `global install`, the manager
++MUST publish the resolved extended profile lock, together with any immutable
++store entries it names, before materializing in-place surfaces from that
++lock. If an in-place write meets
++`environment_surface_unmanaged_conflict`, it MUST apply the lock-retaining
++journal outcome in section 2.5: restore any surfaces already written,
++preserve the extended lock and its referenced entries, leave the unmanaged
++surface and all other mutable state unchanged, and report the diagnostic
++naming the surface. The conflict outcome leaves the extended lock available
++to `profile sync --takeover` or `profile use --takeover` before the operator
++retries the global operation. Other failures use the ordinary all-target
++rollback in section 2.5.
++
+ `profile sync` re-materializes every installed profile across every
+ registered adapter and participating target from the locks it finds — the
+ actualization path when a new adapter or target is registered. The
+diff --git a/protocol/environments.md b/protocol/environments.md
+index 0acb9e7..61c08a7 100644
+--- a/protocol/environments.md
++++ b/protocol/environments.md
+@@ -2457,12 +2457,29 @@ install` operations carry no takeover flag: they are outside the section
+ 9.5 closed set and fail closed on
+ `environment_surface_unmanaged_conflict` exactly as section 8.3 states;
+ recover by running `profile sync --takeover` or `profile use --takeover`,
+-then retry the blocked global operation. `profile sync` re-materializes
+-every installed profile across every registered adapter and participating
+-target from the locks it finds; it is the actualization path when a new
+-adapter or target is registered on the machine. A lock it cannot read is
+-not "not found" (section 8.4.1, lock row): the profile is reported as
+-`environment_store_untrusted` and left unmaterialized.
++then retry the blocked global operation.
++
++For each selected profile, `global add` and `global install` MUST install
++the immutable store entries named by the resolved closure and publish the
++extended profile lock before attempting any in-place surface materialization.
++This is the global-operation order in manager sections 2.5 and 12.3, matching
++the publish-before-rematerialize order for `profile update` in section 9.2,
++steps 4–5. If an in-place write meets
++`environment_surface_unmanaged_conflict`, the manager MUST keep the
++published extended lock and its referenced store entries, restore any
++in-place surfaces already written by that invocation to their pre-operation
++state, leave every other mutable manager state at its pre-operation value,
++and report the diagnostic naming the conflicting surface. The unmanaged
++surface itself remains untouched. This handled conflict does not roll back
++the extended lock; other failures follow the ordinary transaction rollback
++rule in manager section 2.5.
++
++`profile sync` re-materializes every installed profile across every
++registered adapter and participating target from the locks it finds; it is
++the actualization path when a new adapter or target is registered on the
++machine. A lock it cannot read is not "not found" (section 8.4.1, lock
++row): the profile is reported as `environment_store_untrusted` and left
++unmaterialized.
+ 
+ **Commands.** Skill commands reach a shell through the manager's forwarding
+ shims in one user-bin directory (manager §12.1; core §12.1). That directory
+diff --git a/release/1.0.0-rc.13.json b/release/1.0.0-rc.13.json
+index e70f929..f37c157 100644
+--- a/release/1.0.0-rc.13.json
++++ b/release/1.0.0-rc.13.json
+@@ -12,7 +12,7 @@
+     "verified_provider_contract": "host-execution-provider-v1"
+   },
+   "candidate_protocol_pin": {
+-    "manifest_sha256": "sha256:be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca",
++    "manifest_sha256": "sha256:46967d7a4445f6ef3bc32228e71e8b65822b1d471401e7f7f86c2ff24ec7a77e",
+     "suite_root": "conformance/v1"
+   },
+   "claim_v5": {
+@@ -24,7 +24,7 @@
+   "downstream_consumption": {
+     "committed_release_pin_advanced": false,
+     "environment": "CURATOR_CONFORMANCE_ROOT",
+-    "required_manifest_sha256": "sha256:be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca"
++    "required_manifest_sha256": "sha256:46967d7a4445f6ef3bc32228e71e8b65822b1d471401e7f7f86c2ff24ec7a77e"
+   },
+   "historical_release": {
+     "immutable": true,
+diff --git a/tools/test_validate.py b/tools/test_validate.py
+index 2c3c9df..09b6540 100644
+--- a/tools/test_validate.py
++++ b/tools/test_validate.py
+@@ -4830,6 +4830,89 @@ class ReadFailureVectorTests(unittest.TestCase):
+             validate.validate_environments_read_failure_vectors(changed)
+ 
+ 
++class GlobalLockPublicationVectorTests(unittest.TestCase):
++    """Global profile locks publish before materialization and survive conflicts."""
++
++    def setUp(self) -> None:
++        self.vector = validate.load_json(
++            validate.SUITE / "vectors" / "environments-global-lock-publication.json"
++        )
++
++    def case(self, name: str, vector=None) -> dict:
++        for item in (vector or self.vector)["cases"]:
++            if item["name"] == name:
++                return item
++        raise AssertionError(f"global-lock-publication case {name} is missing")
++
++    def test_published_vector_passes(self) -> None:
++        validate.validate_environments_global_lock_publication_vectors(self.vector)
++
++    def test_materialization_before_lock_publication_fails(self) -> None:
++        for name in (
++            "global-add-publishes-lock-before-materialization",
++            "global-install-publishes-lock-before-materialization",
++            "global-add-conflict-retains-extended-lock",
++            "global-install-conflict-retains-extended-lock",
++        ):
++            with self.subTest(case=name):
++                changed = copy.deepcopy(self.vector)
++                case = self.case(name, changed)
++                case["events"] = list(reversed(case["events"]))
++                with self.assertRaises(validate.ValidationFailure):
++                    validate.validate_environments_global_lock_publication_vectors(changed)
++
++    def test_unmanaged_conflict_cannot_roll_back_lock_or_keep_partial_surfaces(self) -> None:
++        for member, value in (
++            ("profile_lock_after", "old"),
++            ("in_place_surfaces_after", "partially-materialized"),
++            ("other_mutable_state_after", "changed"),
++            ("conflict_surface_after", "overwritten"),
++        ):
++            with self.subTest(member=member):
++                changed = copy.deepcopy(self.vector)
++                case = self.case("global-add-conflict-retains-extended-lock", changed)
++                case["expected"][member] = value
++                with self.assertRaises(validate.ValidationFailure):
++                    validate.validate_environments_global_lock_publication_vectors(changed)
++
++    def test_conflict_must_name_the_surface_and_use_the_stable_diagnostic(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = self.case("global-install-conflict-retains-extended-lock", changed)
++        case["expected"]["diagnostic_surface"] = "codex_cli/.agent-context/skills/other/SKILL.md"
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_global_lock_publication_vectors(changed)
++
++    def test_sync_takeover_must_read_and_materialize_the_preserved_lock(self) -> None:
++        for member, value in (
++            ("operation", "profile sync"),
++            ("profile_lock_before", "old"),
++            ("takeover_flag", False),
++            ("depends_on_case", "global-add-publishes-lock-before-materialization"),
++            ("events", ["materialize-all-in-place-surfaces-from-lock"]),
++        ):
++            with self.subTest(member=member):
++                changed = copy.deepcopy(self.vector)
++                case = self.case("profile-sync-takeover-recovers-global-conflict", changed)
++                case[member] = value
++                with self.assertRaises(validate.ValidationFailure):
++                    validate.validate_environments_global_lock_publication_vectors(changed)
++
++    def test_each_global_operation_has_a_conflict_case(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        changed["cases"] = [
++            item for item in changed["cases"]
++            if item["name"] != "global-install-conflict-retains-extended-lock"
++        ]
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_global_lock_publication_vectors(changed)
++
++    def test_global_operations_do_not_join_the_takeover_carrier_set(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        changed["takeover_carriers"].append("global add")
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_environments_global_lock_publication_vectors(changed)
++
++
+ class UmbrellaProviderVectorTests(unittest.TestCase):
+     """The environments §11 trust-root gate must fail closed.
+ 
+@@ -6435,12 +6518,10 @@ class TakeoverClosedSetTextTests(unittest.TestCase):
+ 
+     def test_section_95_sentence_moved_to_section_94_fails(self) -> None:
+         without_sentence = self.replace_sentence(self.environments, validate.TAKEOVER_EXCLUSION_95, "")
+-        moved = self.mutated(
++        moved = self.replace_sentence(
+             without_sentence,
+-            "then retry the blocked global operation. `profile sync`",
+-            "then retry the blocked global operation. "
+-            + validate.TAKEOVER_EXCLUSION_95
+-            + " `profile sync`",
++            validate.TAKEOVER_EXCLUSION_94,
++            validate.TAKEOVER_EXCLUSION_94 + " " + validate.TAKEOVER_EXCLUSION_95,
+         )
+         with self.assertRaisesRegex(validate.ValidationFailure, "section 9.5.*pinned takeover sentence"):
+             self.run_gate(environments=moved)
+diff --git a/tools/validate.py b/tools/validate.py
+index 6dab77e..f738442 100644
+--- a/tools/validate.py
++++ b/tools/validate.py
+@@ -9829,6 +9829,134 @@ def validate_environments_read_failure_vectors(vector: Any = None) -> None:
+         _validate_read_failure_case(name, case)
+ 
+ 
++GLOBAL_LOCK_PUBLICATION_OPERATIONS = ("global add", "global install")
++GLOBAL_LOCK_PUBLICATION_CARRIERS = (
++    "profile install",
++    "profile use",
++    "profile sync",
++    "profile update",
++    "env resolve --repair",
++)
++GLOBAL_LOCK_PUBLICATION_SURFACE = "codex_cli/.agent-context/skills/new-skill/SKILL.md"
++GLOBAL_LOCK_PUBLICATION_ORDER = [
++    "resolve-and-audit-candidate",
++    "publish-referenced-store-entries",
++    "publish-extended-profile-lock",
++    "materialize-in-place-surfaces",
++]
++
++
++def validate_environments_global_lock_publication_vectors(vector: Any = None) -> None:
++    """The environments §9.4 global lock-publication and takeover-recovery vectors."""
++    if vector is None:
++        vector = load_json(SUITE / "vectors" / "environments-global-lock-publication.json")
++    if not isinstance(vector, dict) or set(vector) != {
++        "schema_version", "protocol_version", "capability", "capability_revision",
++        "rule", "global_operations", "takeover_carriers", "cases",
++    }:
++        raise ValidationFailure("environments-global-lock-publication vector has an open or incomplete shape")
++    if (
++        vector.get("schema_version") != 1
++        or vector.get("protocol_version") != PROTOCOL_VERSION
++        or vector.get("capability") != "agent-environments"
++        or vector.get("capability_revision") != 1
++    ):
++        raise ValidationFailure("environments-global-lock-publication vector has the wrong capability identity")
++    if vector.get("rule") != (
++        "protocol/environments.md section 9.4 and profiles/manager.md sections 2.5, 2.6, and 12.3"
++    ):
++        raise ValidationFailure("environments-global-lock-publication vector cites the wrong normative rules")
++    if vector.get("global_operations") != list(GLOBAL_LOCK_PUBLICATION_OPERATIONS):
++        raise ValidationFailure("environments-global-lock-publication operations are not the closed global pair")
++    if vector.get("takeover_carriers") != list(GLOBAL_LOCK_PUBLICATION_CARRIERS):
++        raise ValidationFailure("environments-global-lock-publication widens the takeover carrier set")
++
++    success_cases = [
++        {
++            "name": "global-add-publishes-lock-before-materialization",
++            "operation": "global add",
++            "profile_lock_before": "old",
++            "takeover_flag": False,
++            "events": GLOBAL_LOCK_PUBLICATION_ORDER,
++            "expected": {
++                "diagnostic": None,
++                "in_place_surfaces_after": "extended-skill-set",
++                "outcome": "materialized",
++                "profile_lock_after": "extended",
++            },
++        },
++        {
++            "name": "global-install-publishes-lock-before-materialization",
++            "operation": "global install",
++            "profile_lock_before": "old",
++            "takeover_flag": False,
++            "events": GLOBAL_LOCK_PUBLICATION_ORDER,
++            "expected": {
++                "diagnostic": None,
++                "in_place_surfaces_after": "extended-skill-set",
++                "outcome": "materialized",
++                "profile_lock_after": "extended",
++            },
++        },
++    ]
++    conflict_cases = []
++    for name, operation in (
++        ("global-add-conflict-retains-extended-lock", "global add"),
++        ("global-install-conflict-retains-extended-lock", "global install"),
++    ):
++        conflict_cases.append({
++            "name": name,
++            "operation": operation,
++            "profile_lock_before": "old",
++            "takeover_flag": False,
++            "conflict_surface": GLOBAL_LOCK_PUBLICATION_SURFACE,
++            "events": GLOBAL_LOCK_PUBLICATION_ORDER,
++            "expected": {
++                "outcome": "conflict",
++                "diagnostic": "environment_surface_unmanaged_conflict",
++                "diagnostic_surface": GLOBAL_LOCK_PUBLICATION_SURFACE,
++                "profile_lock_after": "extended",
++                "referenced_store_entries_after": "retained",
++                "in_place_surfaces_after": "pre-operation",
++                "conflict_surface_after": "unmanaged-preimage",
++                "other_mutable_state_after": "pre-operation",
++                "journal_disposition": "retain-lock-rollback-surfaces",
++            },
++        })
++    recovery_case = {
++        "name": "profile-sync-takeover-recovers-global-conflict",
++        "operation": "profile sync --takeover",
++        "depends_on_case": "global-install-conflict-retains-extended-lock",
++        "profile_lock_before": "extended",
++        "takeover_flag": True,
++        "events": [
++            "read-extended-profile-lock",
++            "back-up-conflicting-unmanaged-surface",
++            "materialize-all-in-place-surfaces-from-lock",
++        ],
++        "expected": {
++            "outcome": "materialized",
++            "diagnostic": None,
++            "profile_lock_after": "extended",
++            "materialized_from": "extended-profile-lock",
++            "in_place_surfaces_after": "extended-skill-set",
++            "conflict_surface_after": "managed-from-extended-lock",
++            "backup_before_replacement": True,
++        },
++    }
++    expected_cases = {
++        case["name"]: case for case in (*success_cases, *conflict_cases, recovery_case)
++    }
++    cases = named_cases(vector.get("cases"), "environments global lock-publication")
++    if set(cases) != set(expected_cases):
++        raise ValidationFailure("environments-global-lock-publication case inventory is not exact")
++    for name, expected in expected_cases.items():
++        if cases[name] != expected:
++            raise ValidationFailure(
++                f"environments-global-lock-publication case {name} does not match the ordering and recovery rule"
++            )
++
++
+ UMBRELLA_PROVIDER_DIAGNOSTICS = {
+     "subcommand_provider_missing",
+     "subcommand_provider_untrusted",
+@@ -11115,6 +11243,7 @@ def main() -> int:
+         validate_environments_write_nofollow_vectors,
+         validate_environments_dotfile_managers_vectors,
+         validate_environments_read_failure_vectors,
++        validate_environments_global_lock_publication_vectors,
+         validate_registry_page_boundary_vectors,
+         validate_registry_checkpoint_vectors,
+         validate_registry_bootstrap_vectors,
