@@ -124,6 +124,17 @@ spawn run child final message (run=RUN-260925-2c6388, tools=5 patches=0 failed=0
 Integration preconditions confirmed and attached as `TASK-260924-m28s6b_integration-land.md`: board is `integrating`, candidate rev 4 present as uncommitted working-tree changes only (12 files, HEAD `66bc92aa`), no repo files changed or committed by this run. `worktree integrate` deliberately not executed — the runner performs the landing synchronously.
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260925-2c6388, pid=10241, exit=0)
+spawn run RUN-260925-2c6388 failed; operator action required; failure: board_publication_pending: runner integrate refused: board_publication_pending: STORY-260924-3eywt2 is landed and its board state is committed as 094f8ad7c89ecfd620d503ddade62104f70098db on the local trunk, but the publication push did not land (board_publish_local_trunk_unproven); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: 094f8ad7c89ecfd620d503ddade62104f70098db
+  cause_code: board_publish_local_trunk_unproven
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: 5dddbb572a0cd0cb68ea3b9d75d51181d24d4405
+  story_id: STORY-260924-3eywt2
+  cause: board_publish_local_trunk_unproven: the local trunk holds an unpublished link 094f8ad7c89ecfd620d503ddade62104f70098db that is not this repository's own board-state record (the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key); a stable content digest is never ownership proof — nothing was projected and nothing was pushed
+  link_oid: 094f8ad7c89ecfd620d503ddade62104f70098db
+  reason: the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key
+  remedy: land the unproven commits through integrate/reconcile-trunk, not through this command
 
 ## Precondition Resources
 - [skillfile-lock-replay-addendum-20260924.md](file://TASK-260924-m28s6b/skillfile-lock-replay-addendum-20260924.md)
@@ -166,7 +177,7 @@ spawn run completed: muse (run=RUN-260925-2c6388, pid=10241, exit=0)
 2026-09-24T03:15:32Z
 
 ## Last Update
-2026-09-25T13:39:49Z
+2026-09-25T14:14:59Z
 
 ## Assigned To
 [implementer] developer (muse)
