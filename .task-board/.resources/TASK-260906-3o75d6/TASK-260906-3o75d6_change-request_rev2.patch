@@ -1,0 +1,311 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index c0969e9..157912b 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -563,6 +563,13 @@ Versioning for the complete specification set.
+ 
+ ### Changed
+ 
++- Editorial: the CLI guide now states the complete §9.5 takeover carrier
++  clause once below its command table, including the §9.5 notice, backup, and
++  no-flag failure wording, with each carrier row pointing to it; the
++  `env resolve` scope is stated with the note, and the example is grouped with
++  `profile use`. The validator pins the note to environments §9.5. No
++  protocol rule changed.
++
+ - Closed the environments §9.5 takeover closed-set question for `profile
+   import` activation and the §9.4 global operations by text, keeping the
+   five-member carrier set (orchestrator decision 2026-09-22,
+diff --git a/cli/curator.md b/cli/curator.md
+index d69c3c4..439f5bd 100644
+--- a/cli/curator.md
++++ b/cli/curator.md
+@@ -27,17 +27,17 @@ identifiers.
+ | `curator skill check <dir> [--locale <code>] [--json]` | Validate one package |
+ | `curator global init\|add\|remove\|list\|status\|install\|update\|upgrade [--profile <name>\|--all-profiles]` | Manage global scope; under the environments capability skill operations act on the current profile unless `--profile` or `--all-profiles` selects otherwise |
+ | `curator hybrid add\|remove\|list\|status` | Manage hybrid scope |
+-| `curator profile install <git-url\|path> [--directory <dir>] [--range <range>\|--tag <tag>\|--revision <commit>] [--as <name>] [--use] [--confirm-system-delta] [--takeover]` | Install one root context package as a profile — resolve its closure, audit every member always-strict, write the lock; a reinstall that re-resolves as `profile update` (section 9.1) prints the resolved-version delta and runs the same confirmation gate, confirmed per-run by `--confirm-system-delta`; `--range latest` when no requirement is given; `--use` takes no name and activates the installed root; first install activates and says so; `[--takeover]` takes over the unmanaged files the install would write (section 9.5 notice, section 8.3 backup); without it the write fails with `environment_surface_unmanaged_conflict` |
++| `curator profile install <git-url\|path> [--directory <dir>] [--range <range>\|--tag <tag>\|--revision <commit>] [--as <name>] [--use] [--confirm-system-delta] [--takeover]` | Install one root context package as a profile — resolve its closure, audit every member always-strict, write the lock; a reinstall that re-resolves as `profile update` (section 9.1) prints the resolved-version delta and runs the same confirmation gate, confirmed per-run by `--confirm-system-delta`; `--range latest` when no requirement is given; `--use` takes no name and activates the installed root; first install activates and says so; see the takeover note below. |
+ | `curator profile import [--as <name>] [--allow-lossy] [--use]` | Reassemble the section 9.5 inventory into a context-package-shaped directory and install it through the ordinary `path` pipeline; the profile is named `imported` unless `--as` supplies a name; a lossy import stops with `environment_import_lossy` and the loss list unless the per-operation consent flag re-reports the list as warnings, and machine configuration never pre-records consent; activation follows the section 9.1 rules — `--use` takes no name, and a first install activates and says so |
+ | `curator profile list` | List installed profiles: name, root package, source identity, declared requirement (`range`, `tag`, or `revision` as written), root version, lock hash, and per-scope current markers |
+-| `curator profile use <name> [--env <env-id>] [--target <target-id>] [--takeover]` | Switch the machine or scoped current profile, re-materialize in-place surfaces, and re-point the command shims on a machine-scope switch; a partial scope is reported, never recorded; `[--takeover]` takes over the unmanaged files the switch would write (section 9.5 notice, section 8.3 backup); without it the write fails with `environment_surface_unmanaged_conflict` |
+-| `curator profile use --clear --env <env-id>\|--target <target-id> [--takeover]` | Drop a scoped current profile and re-materialize the scope from the machine default; `[--takeover]` takes over the unmanaged files the re-materialization would write (section 9.5 notice, section 8.3 backup); without it the write fails with `environment_surface_unmanaged_conflict` |
+-| `curator profile update [<name>\|--all] [--confirm-system-delta] [--takeover]` | Re-resolve the root and overlays from their declared requirements; print the resolved-version delta before the lock is published; a blocking finding on a new member leaves the old lock in place; a delta that introduces or changes a `class: system` module or MCP declaration warns with `profile_update_system_delta` under revision A and refuses with `profile_update_confirmation_required` under revision B unless the per-run `--confirm-system-delta` is given, and no configuration knob pre-confirms it; managed homes become stale for explicit repair; `[--takeover]` takes over the unmanaged files the update would write (section 9.5 notice, section 8.3 backup); without it the write fails with `environment_surface_unmanaged_conflict` |
++| `curator profile use <name> [--env <env-id>] [--target <target-id>] [--takeover]` | Switch the machine or scoped current profile, re-materialize in-place surfaces, and re-point the command shims on a machine-scope switch; a partial scope is reported, never recorded; see the takeover note below. |
++| `curator profile use --clear --env <env-id>\|--target <target-id> [--takeover]` | Drop a scoped current profile and re-materialize the scope from the machine default; see the takeover note below. |
++| `curator profile update [<name>\|--all] [--confirm-system-delta] [--takeover]` | Re-resolve the root and overlays from their declared requirements; print the resolved-version delta before the lock is published; a blocking finding on a new member leaves the old lock in place; a delta that introduces or changes a `class: system` module or MCP declaration warns with `profile_update_system_delta` under revision A and refuses with `profile_update_confirmation_required` under revision B unless the per-run `--confirm-system-delta` is given, and no configuration knob pre-confirms it; managed homes become stale for explicit repair; see the takeover note below. |
+ | `curator profile remove <name> [--purge]` | Remove a profile that is current in no scope and an overlay of none; managed homes are retained as orphans unless `--purge` removes them with markers and backups |
+-| `curator profile sync [--takeover]` | Re-materialize every installed profile across every registered adapter and participating target from its lock; `[--takeover]` takes over the unmanaged files the sync would write (section 9.5 notice, section 8.3 backup); without it the write fails with `environment_surface_unmanaged_conflict` |
++| `curator profile sync [--takeover]` | Re-materialize every installed profile across every registered adapter and participating target from its lock; see the takeover note below. |
+ | `curator profile compose <profile> add\|remove\|list [<source> --range\|--tag\|--revision <ref>] [--weight <n>]` | Informative: edit the machine `overlays.<profile>` list of `manager-config` schema 2; the lock moves only on `profile update` |
+ | `curator env config show\|set\|unset [<knob> [<value>]]` | Informative: read or edit one environments section 12.1 knob of `manager-config` schema 2 by its table name; a locked knob refuses with the system-file warning |
+-| `curator env resolve <env-id> [--profile <name>] [--repair] [--takeover] [--format json\|env\|shell]` | Verify the managed home lock-free and print a `launch-env-fragment-v1`; a stale home emits no fragment without `--repair`, which repairs from the store under the mutation lock; `[--takeover]` applies only with `--repair`, taking over the unmanaged files the repair would write (section 9.5 notice, section 8.3 backup); without it the write fails with `environment_surface_unmanaged_conflict` |
++| `curator env resolve <env-id> [--profile <name>] [--repair] [--takeover] [--format json\|env\|shell]` | Verify the managed home lock-free and print a `launch-env-fragment-v1`; a stale home emits no fragment without `--repair`, which repairs from the store under the mutation lock; see the takeover note below. |
+ | `curator env status [--check] [--json]` | Report the profile × environment × surface matrix read-only, with the passthrough liveness, seed, shadowing, target consent, tool release, backup, and orphan rows |
+ | `curator env unmanage [--restore-backups] [--env <env-id>] [--target <target-id>]` | Return in-place surfaces to native ownership: recorded surfaces removed, the newest backup generation restored under `--restore-backups`, the scope's current profile cleared |
+ | `curator env backups scrub [--older-than <days>]` | Remove backup generations on explicit request; nothing else removes a backup |
+@@ -51,6 +51,17 @@ identifiers.
+ | `curator hook approvals` | List every shell-hook approval record read-only (path, digest, approver, time) |
+ | `curator hook revoke <path>` | Remove the shell-hook approval record for one absolute path |
+ 
++**Takeover note:** Takeover is not an operation of its own: the explicit takeover
++flag is carried by a mutating operation and covers only the specific unmanaged
++files that carrying operation would write — it never selects a scope of its own.
++The flag is accepted on exactly the mutating operations named above as onboarding
++triggers — `profile install`, `profile use`, `profile sync`, `profile update`, and
++`env resolve --repair` — and on no other operation. A carrying operation that
++meets unmanaged files outside onboarding performs the same notice and backup as
++onboarding when the flag is given; without the flag, section 8.3 applies and the
++operation fails with `environment_surface_unmanaged_conflict` rather than
++overwrite. For `env resolve`, `--takeover` applies only with `--repair`.
++
+ Exit code 0 is success, including a syntax-only check that emitted only
+ warnings. Exit code 1 is an operation failure, security-policy block, partial
+ multi-target failure, or `status --check` result containing any non-current or
+@@ -194,6 +205,9 @@ curator profile use personal
+ curator profile use companyA --env claude_code
+ curator profile use --clear --env claude_code
+ 
++# Retry a profile switch after an unmanaged-file conflict.
++curator profile use companyA --env claude_code --takeover
++
+ # Move the lock; remove a profile and its managed homes.
+ curator profile update
+ curator profile remove personal --purge
+@@ -216,10 +230,6 @@ curator run codex_cli --permissions native -- exec "run tests"
+ # Hand in-place surfaces back to native ownership, restoring the newest backup.
+ curator env unmanage --restore-backups --env pi
+ 
+-# Where unmanaged files block the switch, --takeover takes over the files
+-# the operation would write, with the onboarding notice and backup;
+-# without it the write fails.
+-curator profile use companyA --env claude_code --takeover
+ ```
+ 
+ ## External repository lifecycle
+diff --git a/tools/test_validate.py b/tools/test_validate.py
+index 79789e3..9beb66f 100644
+--- a/tools/test_validate.py
++++ b/tools/test_validate.py
+@@ -6395,6 +6395,65 @@ class TakeoverClosedSetTextTests(unittest.TestCase):
+         with self.assertRaisesRegex(validate.ValidationFailure, "section 12.3.*pinned takeover sentence"):
+             self.run_gate(manager=text)
+ 
++    def test_cli_note_matches_the_complete_section_95_clause(self) -> None:
++        section95 = validate.markdown_h3_section(self.environments, "### 9.5 Onboarding", label="environments.md")
++        clause = validate.takeover_cli_clause(section95)
++        expected_note = f"{clause} {validate.CLI_TAKEOVER_ENV_RESOLVE_SCOPE}"
++        self.assertEqual(validate.squash_prose(self.cli).count(validate.squash_prose(expected_note)), 1)
++        self.run_gate()
++
++    def test_cli_note_without_closed_set_fails(self) -> None:
++        text = self.mutated(self.cli, "and on no other operation.", "and on other operations.")
++        with self.assertRaisesRegex(validate.ValidationFailure, "takeover note does not match"):
++            self.run_gate(cli=text)
++
++    def test_cli_note_missing_write_coverage_and_conflict_rule_fails(self) -> None:
++        text = self.replace_sentence(
++            self.cli,
++            "A carrying operation that meets unmanaged files outside onboarding performs the same notice and backup as onboarding when the flag is given; without the flag, section 8.3 applies and the operation fails with `environment_surface_unmanaged_conflict` rather than overwrite.",
++            "",
++        )
++        with self.assertRaisesRegex(validate.ValidationFailure, "takeover note does not match"):
++            self.run_gate(cli=text)
++
++    def test_cli_note_drop_of_carrier_fails(self) -> None:
++        text = self.mutated(self.cli, ", `profile sync`", "")
++        with self.assertRaisesRegex(validate.ValidationFailure, "takeover note does not match"):
++            self.run_gate(cli=text)
++
++    def test_cli_note_requires_env_resolve_repair_scope(self) -> None:
++        text = self.mutated(
++            self.cli,
++            f" {validate.CLI_TAKEOVER_ENV_RESOLVE_SCOPE}",
++            "",
++        )
++        with self.assertRaisesRegex(validate.ValidationFailure, "takeover note does not match"):
++            self.run_gate(cli=text)
++
++    def test_cli_carrier_row_without_flag_fails(self) -> None:
++        line = next(line for line in self.cli.splitlines() if line.startswith("| `curator profile sync "))
++        changed = line.replace(" [--takeover]`", "`")
++        text = self.mutated(self.cli, line, changed)
++        with self.assertRaisesRegex(validate.ValidationFailure, "row carriers/counts"):
++            self.run_gate(cli=text)
++
++    def test_cli_env_resolve_takeover_row_requires_repair(self) -> None:
++        line = next(line for line in self.cli.splitlines() if line.startswith("| `curator env resolve "))
++        changed = line.replace("[--repair] ", "", 1)
++        text = self.mutated(self.cli, line, changed)
++        with self.assertRaisesRegex(validate.ValidationFailure, "not scoped to --repair"):
++            self.run_gate(cli=text)
++
++    def test_cli_carrier_row_cannot_repeat_takeover_clause(self) -> None:
++        line = next(line for line in self.cli.splitlines() if line.startswith("| `curator profile sync "))
++        changed = line.replace(
++            "; see the takeover note below.",
++            "; the flag takes over unmanaged files; see the takeover note below.",
++        )
++        text = self.mutated(self.cli, line, changed)
++        with self.assertRaisesRegex(validate.ValidationFailure, "repeats the clause"):
++            self.run_gate(cli=text)
++
+     def test_import_row_gaining_takeover_fails(self) -> None:
+         text = self.mutated(
+             self.cli,
+diff --git a/tools/validate.py b/tools/validate.py
+index 4cd617f..825f300 100644
+--- a/tools/validate.py
++++ b/tools/validate.py
+@@ -4209,6 +4209,26 @@ TAKEOVER_CARRYING_OPERATIONS = (
+     "env resolve --repair",
+ )
+ 
++CLI_TAKEOVER_ROW_COUNTS = {
++    "profile install": 1,
++    "profile use <name>": 1,
++    "profile use --clear": 1,
++    "profile update": 1,
++    "profile sync": 1,
++    "env resolve --repair": 1,
++}
++CLI_TAKEOVER_ROW_CARRIERS = {
++    "profile install": "profile install",
++    "profile use <name>": "profile use",
++    "profile use --clear": "profile use",
++    "profile update": "profile update",
++    "profile sync": "profile sync",
++    "env resolve --repair": "env resolve --repair",
++}
++CLI_TAKEOVER_ROW_POINTER = "see the takeover note below."
++CLI_TAKEOVER_NOTE_LABEL = "**Takeover note:**"
++CLI_TAKEOVER_ENV_RESOLVE_SCOPE = "For `env resolve`, `--takeover` applies only with `--repair`."
++
+ # These full sentences are pinned in their owning sections. Whitespace
+ # normalization permits Markdown wrapping without making the predicates,
+ # subjects, recovery meaning, or section placement token-presence checks.
+@@ -4289,6 +4309,21 @@ def takeover_trigger_operations(section95: str) -> list[str]:
+     return BACKTICKED.findall(match.group(1))
+ 
+ 
++def takeover_cli_clause(section95: str) -> str:
++    """The CLI guide's informative copy of the carrier and write-coverage clause in §9.5."""
++    normalized = squash_prose(section95)
++    match = re.search(
++        r"Takeover is not an operation of its own:.*?and on no other operation\. "
++        r"A carrying operation that meets unmanaged files outside onboarding performs the same notice "
++        r"and backup as onboarding when the flag is given; without the flag, section 8\.3 applies and "
++        r"the operation fails with `environment_surface_unmanaged_conflict` rather than overwrite\.",
++        normalized,
++    )
++    if match is None:
++        raise ValidationFailure("environments.md section 9.5 states no complete CLI takeover and write-coverage clause")
++    return match.group(0)
++
++
+ def require_exact_takeover_sentence(section: str, expected: str, *, label: str) -> None:
+     """Require one whitespace-normalized exact sentence in its owning section."""
+     normalized = squash_prose(section)
+@@ -4297,8 +4332,8 @@ def require_exact_takeover_sentence(section: str, expected: str, *, label: str)
+         raise ValidationFailure(f"{label} does not contain exactly one pinned takeover sentence")
+ 
+ 
+-def validate_cli_takeover_rows(cli_text: str) -> None:
+-    """The import and global CLI rows carry no takeover flag."""
++def validate_cli_takeover_rows(cli_text: str, carrying: list[str], clause: str) -> None:
++    """Pin the CLI carrier rows and note while excluding import/global rows."""
+     import_rows = [line for line in cli_text.splitlines() if "curator profile import" in line]
+     if not import_rows:
+         raise ValidationFailure("cli/curator.md names no profile import command")
+@@ -4309,6 +4344,82 @@ def validate_cli_takeover_rows(cli_text: str) -> None:
+         if "--takeover" in line:
+             raise ValidationFailure(f"cli/curator.md row carries a takeover flag it must not: {line.strip()[:80]}")
+ 
++    lines = cli_text.splitlines()
++    try:
++        commands_heading = lines.index("## Commands")
++    except ValueError as error:
++        raise ValidationFailure("cli/curator.md has no Commands table for the takeover note") from error
++    table_lines: list[int] = []
++    command_rows: list[tuple[str, str]] = []
++    for index in range(commands_heading + 1, len(lines)):
++        line = lines[index]
++        if not line.startswith("|"):
++            if table_lines:
++                break
++            if line.strip():
++                break
++            continue
++        table_lines.append(index)
++        row = re.match(r"^\|\s*`([^`]*)`\s*\|\s*(.*?)\s*\|\s*$", line)
++        if row is not None:
++            command_rows.append((row.group(1), row.group(2).strip()))
++    if not table_lines or not command_rows:
++        raise ValidationFailure("cli/curator.md has no parseable Commands table for takeover carriers")
++
++    # The complete clause must appear once, immediately under the table, and
++    # match the carrier, notice, backup, and refusal rules in environments §9.5.
++    cursor = table_lines[-1] + 1
++    while cursor < len(lines) and not lines[cursor].strip():
++        cursor += 1
++    note_lines: list[str] = []
++    while cursor < len(lines) and lines[cursor].strip():
++        note_lines.append(lines[cursor].strip())
++        cursor += 1
++    note_paragraph = " ".join(note_lines)
++    if not note_paragraph.startswith(CLI_TAKEOVER_NOTE_LABEL):
++        raise ValidationFailure("cli/curator.md does not place the takeover note immediately below the Commands table")
++    note_clause = note_paragraph[len(CLI_TAKEOVER_NOTE_LABEL) :].strip()
++    expected_note = f"{clause} {CLI_TAKEOVER_ENV_RESOLVE_SCOPE}"
++    if squash_prose(note_clause) != squash_prose(expected_note):
++        raise ValidationFailure("cli/curator.md takeover note does not match the complete environments §9.5 clause and env resolve repair scope")
++    if squash_prose(cli_text).count(clause) != 1:
++        raise ValidationFailure("cli/curator.md must state the §9.5 takeover clause exactly once")
++
++    if set(CLI_TAKEOVER_ROW_CARRIERS.values()) != set(carrying):
++        raise ValidationFailure("CLI takeover rows do not map to the §9.5 carrier set")
++    actual_counts: dict[str, int] = {}
++    for command, behavior in command_rows:
++        if "--takeover" not in command:
++            continue
++        if "[--takeover]" not in command:
++            raise ValidationFailure(f"CLI takeover carrier is not shown as an optional flag: {command}")
++        if command.startswith("curator profile install "):
++            row_key = "profile install"
++        elif command.startswith("curator profile use <name>"):
++            row_key = "profile use <name>"
++        elif command.startswith("curator profile use --clear"):
++            row_key = "profile use --clear"
++        elif command.startswith("curator profile update "):
++            row_key = "profile update"
++        elif command.startswith("curator profile sync "):
++            row_key = "profile sync"
++        elif command.startswith("curator env resolve "):
++            if "[--repair]" not in command:
++                raise ValidationFailure("CLI env resolve takeover carrier is not scoped to --repair")
++            row_key = "env resolve --repair"
++        else:
++            raise ValidationFailure(f"CLI command row adds --takeover outside the §9.5 carrier set: {command}")
++        actual_counts[row_key] = actual_counts.get(row_key, 0) + 1
++        if not behavior.lower().endswith(CLI_TAKEOVER_ROW_POINTER):
++            raise ValidationFailure(f"CLI takeover row does not point to the note: {command}")
++        before_pointer = behavior[: -len(CLI_TAKEOVER_ROW_POINTER)].lower()
++        if re.search(r"\btakeover\b|\btakes over\b", before_pointer):
++            raise ValidationFailure(f"CLI takeover row repeats the clause instead of using only a pointer: {command}")
++    if actual_counts != CLI_TAKEOVER_ROW_COUNTS:
++        raise ValidationFailure(
++            f"CLI takeover row carriers/counts are {actual_counts!r}; want {CLI_TAKEOVER_ROW_COUNTS!r}"
++        )
++
+ 
+ def validate_takeover_closed_set_text(
+     environments_text: str | None = None,
+@@ -4340,7 +4451,7 @@ def validate_takeover_closed_set_text(
+     require_exact_takeover_sentence(section96, TAKEOVER_EXCLUSION_96, label="environments.md section 9.6")
+     section123 = markdown_h3_section(manager_text, "### 12.3 Profile lifecycle", label="profiles/manager.md")
+     require_exact_takeover_sentence(section123, TAKEOVER_EXCLUSION_MANAGER, label="profiles/manager.md section 12.3")
+-    validate_cli_takeover_rows(cli_text)
++    validate_cli_takeover_rows(cli_text, carrying, takeover_cli_clause(section95))
+ 
+ 
+ def validate_local_links() -> None:

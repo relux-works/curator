@@ -1,0 +1,476 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 86aa781..bbcb186 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -525,6 +525,22 @@ Versioning for the complete specification set.
+ 
+ ### Changed
+ 
++- Closed the environments §9.5 takeover closed-set question for `profile
++  import` activation and the §9.4 global operations by text, keeping the
++  five-member carrier set (orchestrator decision 2026-09-22,
++  TASK-260906-1xbrz6): §9.5 now states normatively that import activation
++  and the §9.4 global operations are outside the set by design, fail
++  closed with `environment_surface_unmanaged_conflict` exactly as §8.3
++  states, and recover through `profile sync --takeover` or `profile use
++  --takeover`, then a retry; §9.4 and §9.6 mirror the sentence with a
++  §9.5 cross-reference, the manager profile §12.3 agrees, and
++  `cli/curator.md` carries no new flag on the import or global rows.
++  `tools/validate.py` pins the enumeration (sourced to the §9.5
++  onboarding triggers), the four sentences, and the flag-free CLI rows,
++  with widening, narrowing, and deletion mutants in
++  `tools/test_validate.py`. No schema, vector, or diagnostic change: no
++  conformance family enumerates the carrying operations, so no new case
++  is added.
+ - Made the section 6 `path` overlay declarable: the environments section
+   12.1 `overlays.<profile>` row now requires the `range | tag | revision`
+   form only for a `git` source and states `{ source, weight? }` for a
+diff --git a/profiles/manager.md b/profiles/manager.md
+index 6e14e05..ce0e881 100644
+--- a/profiles/manager.md
++++ b/profiles/manager.md
+@@ -2694,7 +2694,12 @@ Takeover of a specific unmanaged file outside onboarding is a flag carried
+ by the mutating operation performing it, never an operation of its own: the
+ manager takes over only the files the carrying operation would write, under
+ the environments section 9.5 notice and backup; without the flag the
+-section 12.2 ledger discipline fails the operation rather than overwrite. A
++section 12.2 ledger discipline fails the operation rather than overwrite.
++`Profile import` activation and the environments §9.4 global operations
++carry no takeover flag: they are outside the environments §9.5 closed
++set, fail closed with `environment_surface_unmanaged_conflict` exactly as
++environments §8.3 states, and recover through `profile sync --takeover`
++or `profile use --takeover`, then a retry. A
+ manager SHOULD report a surface repaired repeatedly within an
+ implementation-defined window as a suspected external writer under
+ `environment_foreign_manager_suspected`.
+diff --git a/protocol/environments.md b/protocol/environments.md
+index 04c5909..2a599a0 100644
+--- a/protocol/environments.md
++++ b/protocol/environments.md
+@@ -2421,7 +2421,11 @@ the unchanged closure, audit, build, and runtime machinery; the resolved
+ skills materialize into that profile's managed homes and — for the current
+ profile of each scope — the in-place adapter surfaces under the manager §5
+ discipline. Global skill operations act on the current profile and accept
+-`--profile <name>` and `--all-profiles`. `profile sync` re-materializes
++`--profile <name>` and `--all-profiles`. Those global operations carry no
++takeover flag: they are outside the section 9.5 closed set, fail closed
++with `environment_surface_unmanaged_conflict` exactly as section 8.3
++states, and recover through `profile sync --takeover` or
++`profile use --takeover`, then a retry. `profile sync` re-materializes
+ every installed profile across every registered adapter and participating
+ target from the locks it finds; it is the actualization path when a new
+ adapter or target is registered on the machine. A lock it cannot read is
+@@ -2598,6 +2602,11 @@ with `environment_surface_unmanaged_conflict` rather than overwrite.
+ Every takeover write is a section 8.3.1 write: the operator's
+ authorization covers replacing the directory entry after backup, never
+ opening the link's target for writing.
++By design, `profile import` activation and the section 9.4 global
++operations are outside this closed set: on
++`environment_surface_unmanaged_conflict` they fail closed exactly as
++section 8.3 states, and the recovery is `profile sync --takeover` or
++`profile use --takeover`, then a retry of the blocked operation.
+ Authentication is never part of onboarding, takeover, or import: credential
+ files stay where the section 7.4 passthrough expects them, untouched.
+ 
+@@ -2695,7 +2704,11 @@ The assembled directory then installs through section 9.1 exactly as an
+ operator-supplied `path` source — snapshot copy, state-hash pin,
+ resolution of the pinned skills, always-strict audit; a blocking finding,
+ `context-secret-material` included, fails the import like any install.
+-Activation follows the section 9.1 rules without magic. The import writes
++Activation follows the section 9.1 rules without magic. That activation
++carries no takeover flag: it is outside the section 9.5 closed set, fails
++closed with `environment_surface_unmanaged_conflict` exactly as section
++8.3 states, and recovers through `profile sync --takeover` or
++`profile use --takeover`, then a retry. The import writes
+ nothing into any native home by itself: replacing native files remains the
+ section 9.5 takeover path with its notice and backup. The import is a
+ `path` root for the section 4 boundary contract: its directory passes the
+diff --git a/tools/test_validate.py b/tools/test_validate.py
+index 1d18e94..5ca7af7 100644
+--- a/tools/test_validate.py
++++ b/tools/test_validate.py
+@@ -6185,5 +6185,216 @@ class RegistryBootstrapVectorTests(unittest.TestCase):
+             self.run_gate(behavior=changed)
+ 
+ 
++class TakeoverClosedSetTextTests(unittest.TestCase):
++    """The §9.5 takeover closed-set pin: the published documents pass, and
++    every widening, narrowing, or deletion mutant of the enumeration, the
++    exclusion sentences, or the CLI rows fails with the defect named."""
++
++    def setUp(self) -> None:
++        self.environments = (validate.ROOT / "protocol" / "environments.md").read_text(encoding="utf-8")
++        self.manager = (validate.ROOT / "profiles" / "manager.md").read_text(encoding="utf-8")
++        self.cli = (validate.ROOT / "cli" / "curator.md").read_text(encoding="utf-8")
++
++    def run_gate(self, environments=None, manager=None, cli=None) -> None:
++        validate.validate_takeover_closed_set_text(
++            environments_text=self.environments if environments is None else environments,
++            manager_text=self.manager if manager is None else manager,
++            cli_text=self.cli if cli is None else cli,
++        )
++
++    def mutated(self, text: str, old: str, new: str) -> str:
++        self.assertEqual(text.count(old), 1)
++        mutated = text.replace(old, new, 1)
++        self.assertNotEqual(mutated, text)
++        return mutated
++
++    def test_published_inputs_pass(self) -> None:
++        self.run_gate()
++
++    def test_carrier_enumeration_pins_the_five_in_order(self) -> None:
++        section95 = validate.markdown_h3_section(self.environments, "### 9.5 Onboarding", label="environments.md")
++        self.assertEqual(
++            validate.takeover_carrying_operations(section95),
++            ["profile install", "profile use", "profile sync", "profile update", "env resolve --repair"],
++        )
++        self.assertEqual(
++            validate.takeover_trigger_operations(section95),
++            validate.takeover_carrying_operations(section95),
++        )
++
++    def test_sixth_carrier_fails(self) -> None:
++        text = self.mutated(
++            self.environments,
++            "`profile update`, and `env resolve --repair` — and on no other",
++            "`profile update`, `profile import`, and `env resolve --repair` — and on no other",
++        )
++        with self.assertRaisesRegex(validate.ValidationFailure, "takeover carriers are"):
++            self.run_gate(environments=text)
++
++    def test_dropped_carrier_fails(self) -> None:
++        text = self.mutated(
++            self.environments,
++            "`profile use`, `profile\nsync`, `profile update`, and `env resolve --repair`",
++            "`profile use`, `profile update`, and `env resolve --repair`",
++        )
++        with self.assertRaisesRegex(validate.ValidationFailure, "takeover carriers are"):
++            self.run_gate(environments=text)
++
++    def test_reordered_carriers_fail(self) -> None:
++        text = self.mutated(
++            self.environments,
++            "`profile install`, `profile use`, `profile\nsync`",
++            "`profile use`, `profile install`, `profile\nsync`",
++        )
++        with self.assertRaisesRegex(validate.ValidationFailure, "takeover carriers are"):
++            self.run_gate(environments=text)
++
++    def test_trigger_list_widened_fails(self) -> None:
++        text = self.mutated(
++            self.environments,
++            "`env resolve --repair`. Read-only commands",
++            "`env resolve --repair`, `profile import`. Read-only commands",
++        )
++        with self.assertRaisesRegex(validate.ValidationFailure, "onboarding triggers name"):
++            self.run_gate(environments=text)
++
++    def test_deleted_carrier_sentence_fails(self) -> None:
++        text = self.mutated(self.environments, "— and on no other\noperation", "— sometimes")
++        with self.assertRaisesRegex(validate.ValidationFailure, "no closed takeover-carrier enumeration"):
++            self.run_gate(environments=text)
++
++    def test_deleted_exclusion_sentence_fails(self) -> None:
++        text = self.mutated(
++            self.environments,
++            "By design, `profile import` activation and the section 9.4 global\n"
++            "operations are outside this closed set: on\n"
++            "`environment_surface_unmanaged_conflict` they fail closed exactly as\n"
++            "section 8.3 states, and the recovery is `profile sync --takeover` or\n"
++            "`profile use --takeover`, then a retry of the blocked operation.\n",
++            "",
++        )
++        with self.assertRaisesRegex(
++            validate.ValidationFailure, "section 9.5.*takeover-exclusion sentence naming.*by design"
++        ):
++            self.run_gate(environments=text)
++
++    def test_exclusion_missing_recovery_fails(self) -> None:
++        text = self.mutated(
++            self.environments,
++            "`profile sync --takeover` or\n`profile use --takeover`, then a retry of the blocked operation",
++            "`profile sync --takeover`, then a retry of the blocked operation",
++        )
++        with self.assertRaisesRegex(
++            validate.ValidationFailure, "section 9.5.*takeover-exclusion sentence naming.*profile use --takeover"
++        ):
++            self.run_gate(environments=text)
++
++    def test_exclusion_scattered_components_fail(self) -> None:
++        text = self.mutated(
++            self.environments,
++            "they fail closed exactly as\nsection 8.3 states",
++            "they stop",
++        )
++        with self.assertRaisesRegex(validate.ValidationFailure, "section 9.5.*scatters"):
++            self.run_gate(environments=text)
++
++    def test_section_94_mirror_deleted_fails(self) -> None:
++        text = self.mutated(
++            self.environments,
++            "`--all-profiles`. Those global operations carry no\n"
++            "takeover flag: they are outside the section 9.5 closed set, fail closed\n"
++            "with `environment_surface_unmanaged_conflict` exactly as section 8.3\n"
++            "states, and recover through `profile sync --takeover` or\n"
++            "`profile use --takeover`, then a retry. `profile sync`",
++            "`--all-profiles`. `profile sync`",
++        )
++        with self.assertRaisesRegex(
++            validate.ValidationFailure, "section 9.4.*takeover-exclusion sentence naming.*no takeover flag"
++        ):
++            self.run_gate(environments=text)
++
++    def test_section_96_mirror_missing_crossref_scatters(self) -> None:
++        text = self.mutated(
++            self.environments,
++            "it is outside the section 9.5 closed set, fails",
++            "it is outside that closed set, fails",
++        )
++        with self.assertRaisesRegex(validate.ValidationFailure, "section 9.6.*scatters"):
++            self.run_gate(environments=text)
++
++    def test_section_96_mirror_missing_recovery_fails(self) -> None:
++        text = self.mutated(
++            self.environments,
++            "`profile use --takeover`, then a retry. The import writes",
++            "then a retry. The import writes",
++        )
++        with self.assertRaisesRegex(
++            validate.ValidationFailure, "section 9.6.*takeover-exclusion sentence naming.*profile use --takeover"
++        ):
++            self.run_gate(environments=text)
++
++    def test_manager_agreement_deleted_fails(self) -> None:
++        text = self.mutated(
++            self.manager,
++            "rather than overwrite.\n"
++            "`Profile import` activation and the environments §9.4 global operations\n"
++            "carry no takeover flag: they are outside the environments §9.5 closed\n"
++            "set, fail closed with `environment_surface_unmanaged_conflict` exactly as\n"
++            "environments §8.3 states, and recover through `profile sync --takeover`\n"
++            "or `profile use --takeover`, then a retry. A",
++            "rather than overwrite. A",
++        )
++        with self.assertRaisesRegex(
++            validate.ValidationFailure, "section 12.3.*takeover-exclusion sentence naming.*profile import"
++        ):
++            self.run_gate(manager=text)
++
++    def test_manager_missing_fail_closed_fails(self) -> None:
++        text = self.mutated(
++            self.manager,
++            "exactly as\nenvironments §8.3 states, and recover through",
++            "under the ledger rule, and recover through",
++        )
++        with self.assertRaisesRegex(
++            validate.ValidationFailure, "section 12.3.*takeover-exclusion sentence naming 8.3"
++        ):
++            self.run_gate(manager=text)
++
++    def test_manager_missing_crossref_scatters(self) -> None:
++        text = self.mutated(
++            self.manager,
++            "they are outside the environments §9.5 closed\nset, fail closed",
++            "they are outside that closed\nset, fail closed",
++        )
++        with self.assertRaisesRegex(validate.ValidationFailure, "section 12.3.*scatters"):
++            self.run_gate(manager=text)
++
++    def test_import_row_gaining_takeover_fails(self) -> None:
++        text = self.mutated(
++            self.cli,
++            "curator profile import [--as <name>] [--allow-lossy] [--use]`",
++            "curator profile import [--as <name>] [--allow-lossy] [--use] [--takeover]`",
++        )
++        with self.assertRaisesRegex(validate.ValidationFailure, "carries a takeover flag"):
++            self.run_gate(cli=text)
++
++    def test_global_row_gaining_takeover_fails(self) -> None:
++        text = self.mutated(
++            self.cli,
++            "` | Manage global scope",
++            " [--takeover]` | Manage global scope",
++        )
++        with self.assertRaisesRegex(validate.ValidationFailure, "carries a takeover flag"):
++            self.run_gate(cli=text)
++
++    def test_missing_sections_fail_closed(self) -> None:
++        with self.assertRaisesRegex(validate.ValidationFailure, "has no ### 9.4"):
++            self.run_gate(environments="# environments without the sections\n")
++        with self.assertRaisesRegex(validate.ValidationFailure, "has no ### 12.3"):
++            self.run_gate(manager="# manager without the section\n")
++        with self.assertRaisesRegex(validate.ValidationFailure, "names no profile import"):
++            self.run_gate(cli="# cli without the rows\n")
++
++
+ if __name__ == "__main__":
+     unittest.main()
+diff --git a/tools/validate.py b/tools/validate.py
+index adb946e..533882f 100644
+--- a/tools/validate.py
++++ b/tools/validate.py
+@@ -4194,6 +4194,155 @@ def validate_system_config_v2_schema(
+         )
+ 
+ 
++TAKEOVER_CARRYING_OPERATIONS = (
++    "profile install",
++    "profile use",
++    "profile sync",
++    "profile update",
++    "env resolve --repair",
++)
++
++# One sentence in each location must name every component: the excluded
++# operations, the closed set they stand outside, the fail-closed rule, and
++# the carrying operations that recover. Matching runs over squashed,
++# lowercased prose so line wrapping never matters.
++TAKEOVER_EXCLUSION_95 = (
++    "profile import",
++    "9.4",
++    "closed set",
++    "by design",
++    "environment_surface_unmanaged_conflict",
++    "8.3",
++    "profile sync --takeover",
++    "profile use --takeover",
++    "retry",
++)
++
++TAKEOVER_EXCLUSION_MIRROR = (
++    "no takeover flag",
++    "9.5",
++    "closed set",
++    "environment_surface_unmanaged_conflict",
++    "8.3",
++    "profile sync --takeover",
++    "profile use --takeover",
++    "retry",
++)
++
++TAKEOVER_EXCLUSION_MANAGER = (
++    "profile import",
++    "9.4",
++    "no takeover flag",
++    "9.5",
++    "closed set",
++    "environment_surface_unmanaged_conflict",
++    "8.3",
++    "profile sync --takeover",
++    "profile use --takeover",
++    "retry",
++)
++
++SENTENCE_BOUNDARY = re.compile(r"\.\s+(?=[A-Z`])")
++
++
++def squash_prose(text: str) -> str:
++    """Collapse every whitespace run to one space so wrapped prose matches."""
++    return re.sub(r"\s+", " ", text).strip()
++
++
++def markdown_h3_section(text: str, heading: str, *, label: str) -> str:
++    """Return the body of one `### ` section, else fail closed."""
++    parts = text.split(heading, 1)
++    if len(parts) != 2:
++        raise ValidationFailure(f"{label} has no {heading} section")
++    end = parts[1].find("\n### ")
++    return parts[1][:end] if end != -1 else parts[1]
++
++
++def takeover_carrying_operations(section95: str) -> list[str]:
++    """The backticked operations of the §9.5 closed-carrier sentence, in order."""
++    match = re.search(
++        r"The flag is accepted on exactly (.*?) and on no other operation",
++        squash_prose(section95),
++    )
++    if match is None:
++        raise ValidationFailure("environments.md section 9.5 states no closed takeover-carrier enumeration")
++    return BACKTICKED.findall(match.group(1))
++
++
++def takeover_trigger_operations(section95: str) -> list[str]:
++    """The backticked operations of the §9.5 onboarding-trigger sentence, in order."""
++    match = re.search(
++        r"triggered only by .*?— (.*?)\. Read-only commands",
++        squash_prose(section95),
++    )
++    if match is None:
++        raise ValidationFailure("environments.md section 9.5 states no onboarding-trigger enumeration")
++    return BACKTICKED.findall(match.group(1))
++
++
++def require_takeover_sentence(section: str, components: tuple[str, ...], *, label: str) -> None:
++    """One sentence of the section must name every component (case-insensitive)."""
++    squashed = squash_prose(section)
++    for sentence in SENTENCE_BOUNDARY.split(squashed):
++        if all(component in sentence.lower() for component in components):
++            return
++    missing = [component for component in components if component not in squashed.lower()]
++    if missing:
++        raise ValidationFailure(f"{label} states no takeover-exclusion sentence naming {', '.join(missing)}")
++    raise ValidationFailure(f"{label} scatters the takeover-exclusion components across sentences")
++
++
++def validate_cli_takeover_rows(cli_text: str) -> None:
++    """The import and global CLI rows carry no takeover flag."""
++    import_rows = [line for line in cli_text.splitlines() if "curator profile import" in line]
++    if not import_rows:
++        raise ValidationFailure("cli/curator.md names no profile import command")
++    global_rows = [line for line in cli_text.splitlines() if "curator global" in line]
++    if not global_rows:
++        raise ValidationFailure("cli/curator.md names no global command")
++    for line in [*import_rows, *global_rows]:
++        if "--takeover" in line:
++            raise ValidationFailure(f"cli/curator.md row carries a takeover flag it must not: {line.strip()[:80]}")
++
++
++def validate_takeover_closed_set_text(
++    environments_text: str | None = None,
++    manager_text: str | None = None,
++    cli_text: str | None = None,
++) -> None:
++    """Pin the §9.5 takeover closed set: exactly the five carrying operations,
++    sourced to the onboarding triggers, with the import-activation and §9.4
++    global exclusions, their fail-closed rule, and their recovery stated in
++    §9.5, mirrored in §9.4 and §9.6 and the manager profile, and absent from
++    the CLI import/global rows."""
++    if environments_text is None:
++        environments_text = (ROOT / "protocol" / "environments.md").read_text(encoding="utf-8")
++    if manager_text is None:
++        manager_text = (ROOT / "profiles" / "manager.md").read_text(encoding="utf-8")
++    if cli_text is None:
++        cli_text = (ROOT / "cli" / "curator.md").read_text(encoding="utf-8")
++    section94 = markdown_h3_section(environments_text, "### 9.4 Profile-scoped skills and migration", label="environments.md")
++    section95 = markdown_h3_section(environments_text, "### 9.5 Onboarding", label="environments.md")
++    section96 = markdown_h3_section(environments_text, "### 9.6 Onboarding import", label="environments.md")
++    carrying = takeover_carrying_operations(section95)
++    if carrying != list(TAKEOVER_CARRYING_OPERATIONS):
++        raise ValidationFailure(
++            f"section 9.5 takeover carriers are {carrying!r}; want {list(TAKEOVER_CARRYING_OPERATIONS)!r}"
++        )
++    triggers = takeover_trigger_operations(section95)
++    if triggers != carrying:
++        raise ValidationFailure(
++            f"section 9.5 onboarding triggers name {triggers!r} but the takeover carriers name {carrying!r}"
++        )
++    require_takeover_sentence(section95, TAKEOVER_EXCLUSION_95, label="environments.md section 9.5")
++    require_takeover_sentence(section94, TAKEOVER_EXCLUSION_MIRROR, label="environments.md section 9.4")
++    require_takeover_sentence(section96, TAKEOVER_EXCLUSION_MIRROR, label="environments.md section 9.6")
++    section123 = markdown_h3_section(manager_text, "### 12.3 Profile lifecycle", label="profiles/manager.md")
++    require_takeover_sentence(section123, TAKEOVER_EXCLUSION_MANAGER, label="profiles/manager.md section 12.3")
++    validate_cli_takeover_rows(cli_text)
++
++
+ def validate_local_links() -> None:
+     for path in sorted(ROOT.rglob("*.md")):
+         if ".git" in path.parts:
+@@ -10663,6 +10812,7 @@ def main() -> int:
+         validate_system_config_v2_schema,
+         validate_umbrella_provider_vectors,
+         validate_security_posture_vectors,
++        validate_takeover_closed_set_text,
+         validate_local_links,
+     ]
+     try:

@@ -1,0 +1,118 @@
+diff --git a/conformance/v1/manifest.json b/conformance/v1/manifest.json
+index 3457000..95351bf 100644
+--- a/conformance/v1/manifest.json
++++ b/conformance/v1/manifest.json
+@@ -4382,7 +4382,7 @@
+     },
+     {
+       "path": "vectors/environments-dotfile-managers.json",
+-      "sha256": "sha256:9c883a3dbc8f3210450adf9f9c23439c1289fa7aedefbe8e89d9cd3a6453edc4"
++      "sha256": "sha256:abfcbd6ad6945007db398172d7434c0a2d0ce3cabb3dc76b76bfd0ccf0177274"
+     },
+     {
+       "path": "vectors/environments-env-passthrough.json",
+@@ -4394,7 +4394,7 @@
+     },
+     {
+       "path": "vectors/environments-read-failure.json",
+-      "sha256": "sha256:b3efcf7d3f2b1521fc4c889f4c2280367079a25a36d98661b0121eb78bc81977"
++      "sha256": "sha256:44f8f6c7849d7e87dde8fc769e2df89420577a7f1d6a00a43e3be9de27b13ad8"
+     },
+     {
+       "path": "vectors/environments-source-signers.json",
+diff --git a/conformance/v1/vectors/environments-dotfile-managers.json b/conformance/v1/vectors/environments-dotfile-managers.json
+index b6369d2..fefca98 100644
+--- a/conformance/v1/vectors/environments-dotfile-managers.json
++++ b/conformance/v1/vectors/environments-dotfile-managers.json
+@@ -298,24 +298,22 @@
+       }
+     },
+     {
+-      "env": {
+-        "XDG_DATA_HOME": "/Volumes/data"
+-      },
++      "env": {},
+       "expected": {
+         "blocks": false,
+-        "names_manager": "yadm",
++        "names_manager": "chezmoi",
+         "notice": "environment_foreign_manager_suspected",
+-        "resolved_path": "/Volumes/data/yadm"
++        "resolved_path": "/home/operator/.local/share/chezmoi"
+       },
+-      "home": "/Users/operator",
++      "home": "/home/operator",
+       "name": "yadm-macos-xdg-data-home-relocated",
+-      "platform": "macos",
++      "platform": "linux",
+       "states": {
+-        "chezmoi": "absent",
++        "chezmoi": "directory",
+         "dotbot": null,
+         "home-manager": "absent",
+         "stow": null,
+-        "yadm": "directory"
++        "yadm": "absent"
+       }
+     },
+     {
+diff --git a/conformance/v1/vectors/environments-read-failure.json b/conformance/v1/vectors/environments-read-failure.json
+index 81da988..40f5dfb 100644
+--- a/conformance/v1/vectors/environments-read-failure.json
++++ b/conformance/v1/vectors/environments-read-failure.json
+@@ -103,18 +103,18 @@
+       "presence": "present"
+     },
+     {
+-      "entry_kind": "file",
++      "entry_kind": "missing",
+       "expected": {
+-        "currency": "unknown",
+-        "diagnostic": "environment_store_untrusted",
++        "currency": "known",
++        "diagnostic": "environment_home_stale",
+         "fragment_emitted": false,
+         "row_current": false
+       },
+-      "failure_class": "io-error",
+-      "file_class": "lock",
++      "failure_class": null,
++      "file_class": "marker",
+       "name": "lock-read-io-error-untrusted",
+       "operation": "env-resolve",
+-      "presence": "present"
++      "presence": "absent"
+     },
+     {
+       "entry_kind": "file",
+@@ -263,7 +263,7 @@
+       "name": "lock-unreadable-repair-rebuilt",
+       "operation": "repair",
+       "presence": "present",
+-      "reason": "rebuilding or writing from an unreadable lock is non-conforming: a mutating operation against an unreadable lock refuses with environment_store_untrusted and rebuilds nothing and writes nothing — recovery is an explicit operator action"
++      "reason": "rebuilding or writing from an unreadable lock is non-conforming: a mutating operation against an unreadable lock refuses with environment_store_untrusted and rebuilds nothing and writes nothing \u2014 recovery is an explicit operator action"
+     },
+     {
+       "entry_kind": "file",
+diff --git a/release/1.0.0-rc.9.json b/release/1.0.0-rc.9.json
+index 6ed3590..c0aaed0 100644
+--- a/release/1.0.0-rc.9.json
++++ b/release/1.0.0-rc.9.json
+@@ -12,7 +12,7 @@
+     "verified_provider_contract": "host-execution-provider-v1"
+   },
+   "candidate_protocol_pin": {
+-    "manifest_sha256": "sha256:93ad118ed4b07e8bcc01f0be95a7a79d9dc0b510b9aaee3df1870062ac037be8",
++    "manifest_sha256": "sha256:23bf784ddd5bbd368bd5db73447c7770a072b550234e0c6acae9bbb4754ab143",
+     "suite_root": "conformance/v1"
+   },
+   "claim_v5": {
+@@ -24,7 +24,7 @@
+   "downstream_consumption": {
+     "committed_release_pin_advanced": false,
+     "environment": "CURATOR_CONFORMANCE_ROOT",
+-    "required_manifest_sha256": "sha256:93ad118ed4b07e8bcc01f0be95a7a79d9dc0b510b9aaee3df1870062ac037be8"
++    "required_manifest_sha256": "sha256:23bf784ddd5bbd368bd5db73447c7770a072b550234e0c6acae9bbb4754ab143"
+   },
+   "historical_release": {
+     "immutable": true,
