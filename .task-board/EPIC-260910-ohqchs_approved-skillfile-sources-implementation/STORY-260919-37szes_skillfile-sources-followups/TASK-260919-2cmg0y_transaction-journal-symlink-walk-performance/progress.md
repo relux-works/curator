@@ -97,6 +97,8 @@ spawn agent resolution: Agent selection: muse via explicit_override (preferred_a
 spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=muse; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
 spawn queued: [implementer] developer (muse) (run=RUN-260921-f1c67b, max_parallel=20)
 spawn run started: [implementer] developer (muse) (run=RUN-260921-f1c67b)
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260921-f1c67b, pid=96598, exit=0)
 
 ## Precondition Resources
 - [2cmg0y-brief.md](file://TASK-260919-2cmg0y/2cmg0y-brief.md)
@@ -127,12 +129,13 @@ spawn run started: [implementer] developer (muse) (run=RUN-260921-f1c67b)
 - [TASK-260919-2cmg0y_review-verdict-rev1.md](file://TASK-260919-2cmg0y/TASK-260919-2cmg0y_review-verdict-rev1.md) — Reviewer verdict rev1 (ACCEPT): provenance, R1 seam + rows + 7 mutants (M7 survivor as residual), R2/R3 checks, R4 gate measurement reproduced, bounds
 - [TASK-260919-2cmg0y_review-rev1-evidence.tar.gz](file://TASK-260919-2cmg0y/TASK-260919-2cmg0y_review-rev1-evidence.tar.gz) — Reviewer rev1 evidence: probe tests, mutant scripts, run logs (transaction full, sweep base/candidate, lint, mutants), gate go-test.json extractions and proxy scripts
 - [TASK-260919-2cmg0y_spawn-log_-implementer--developer--muse-_RUN-260921-f1c67b.log](file://TASK-260919-2cmg0y/TASK-260919-2cmg0y_spawn-log_-implementer--developer--muse-_RUN-260921-f1c67b.log) — System spawn log captured by task-board
+- [TASK-260919-2cmg0y_integration-results.md](file://TASK-260919-2cmg0y/TASK-260919-2cmg0y_integration-results.md) — Integration run log for accepted rev 1 (story_final)
 
 ## Created
 2026-09-19T07:14:38Z
 
 ## Last Update
-2026-09-21T06:07:23Z
+2026-09-21T06:10:22Z
 
 ## Assigned To
 [implementer] developer (muse)
