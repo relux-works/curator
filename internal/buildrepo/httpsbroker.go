@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -18,9 +19,10 @@ const (
 	HTTPSBrokerName = "curator-build-https-askpass"
 	// EnvHTTPSBrokerState names the manager-owned, secret-free state file.
 	EnvHTTPSBrokerState = "CURATOR_BUILD_HTTPS_ASKPASS_STATE"
-	// EnvHTTPSBrokerSecret carries the resolved secret only to the fetch
-	// process tree. It is never written to broker state.
-	EnvHTTPSBrokerSecret = "CURATOR_BUILD_HTTPS_ASKPASS_SECRET" // #nosec G101 -- environment variable name, not a credential.
+	// EnvHTTPSBrokerHandle identifies the inherited pipe handle that carries
+	// the resolved secret. Its value is a descriptor/handle number, not secret
+	// material.
+	EnvHTTPSBrokerHandle = "CURATOR_BUILD_HTTPS_ASKPASS_HANDLE"
 )
 
 type httpsCredentialState struct {
@@ -68,8 +70,9 @@ func RunHTTPSCredentialBroker(args []string, getenv func(string) string, out io.
 	if len(args) != 1 || getenv == nil || out == nil {
 		return 1
 	}
-	statePath, secret := getenv(EnvHTTPSBrokerState), getenv(EnvHTTPSBrokerSecret)
-	if statePath == "" || secret == "" {
+	statePath := getenv(EnvHTTPSBrokerState)
+	handle, ok := parseHTTPSBrokerHandle(getenv(EnvHTTPSBrokerHandle))
+	if statePath == "" || !ok {
 		return 1
 	}
 	state, ok := readHTTPSCredentialState(statePath)
@@ -81,7 +84,18 @@ func RunHTTPSCredentialBroker(args []string, getenv func(string) string, out io.
 	case "Username for 'https://" + state.Host + "': ":
 		answer = state.Username
 	case "Password for 'https://" + state.Username + "@" + state.Host + "': ":
-		answer = secret
+		secret, ok := readHTTPSBrokerSecret(handle)
+		if !ok {
+			return 1
+		}
+		defer clear(secret)
+		if _, err := out.Write(secret); err != nil {
+			return 1
+		}
+		if _, err := io.WriteString(out, "\n"); err != nil {
+			return 1
+		}
+		return 0
 	default:
 		return 1
 	}
@@ -89,6 +103,28 @@ func RunHTTPSCredentialBroker(args []string, getenv func(string) string, out io.
 		return 1
 	}
 	return 0
+}
+
+func parseHTTPSBrokerHandle(value string) (uintptr, bool) {
+	parsed, err := strconv.ParseUint(value, 10, 64)
+	if err != nil || parsed <= 2 || uint64(uintptr(parsed)) != parsed {
+		return 0, false
+	}
+	return uintptr(parsed), true
+}
+
+func readHTTPSBrokerSecret(handle uintptr) ([]byte, bool) {
+	pipe := os.NewFile(handle, "https-askpass-secret")
+	if pipe == nil {
+		return nil, false
+	}
+	secret, readErr := io.ReadAll(pipe)
+	closeErr := pipe.Close()
+	if readErr != nil || closeErr != nil || len(secret) == 0 {
+		clear(secret)
+		return nil, false
+	}
+	return secret, true
 }
 
 func readHTTPSCredentialState(path string) (httpsCredentialState, bool) {

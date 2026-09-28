@@ -6,20 +6,75 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 )
 
+const (
+	legacyHTTPSBrokerSecretEnv = "CURATOR_BUILD_HTTPS_ASKPASS_SECRET"
+	httpsBrokerHandleEnv       = "CURATOR_BUILD_HTTPS_ASKPASS_HANDLE"
+	testBrokerSpawnGrandchild  = "CURATOR_TEST_HTTPS_BROKER_SPAWN_GRANDCHILD"
+	testBrokerReportPath       = "CURATOR_TEST_HTTPS_BROKER_REPORT"
+	testBrokerGrandchild       = "CURATOR_TEST_HTTPS_BROKER_GRANDCHILD"
+	testBrokerFetchChild       = "CURATOR_TEST_HTTPS_BROKER_FETCH_CHILD"
+	testExpectedBrokerSecret   = "fetch-only-secret"
+)
+
 func TestMain(m *testing.M) {
+	if os.Getenv(testBrokerGrandchild) == "1" {
+		code := 0
+		presence := "absent"
+		if _, ok := os.LookupEnv(legacyHTTPSBrokerSecretEnv); ok {
+			presence = "present"
+		}
+		if err := os.WriteFile(os.Getenv(testBrokerReportPath), []byte(presence), 0o600); err != nil {
+			code = 2
+		}
+		os.Exit(code)
+	}
+	if os.Getenv(testBrokerFetchChild) == "1" {
+		os.Exit(runHTTPSBrokerFetchChild())
+	}
 	if IsHTTPSBrokerInvocation(os.Args[0]) {
-		os.Exit(RunHTTPSCredentialBroker(os.Args[1:], os.Getenv, os.Stdout))
+		var output bytes.Buffer
+		code := RunHTTPSCredentialBroker(os.Args[1:], os.Getenv, &output)
+		if reportPath := os.Getenv(testBrokerReportPath); reportPath != "" {
+			presence := "absent"
+			if _, ok := os.LookupEnv(legacyHTTPSBrokerSecretEnv); ok {
+				presence = "present"
+			}
+			answer := "wrong"
+			if output.String() == testExpectedBrokerSecret+"\n" {
+				answer = "received"
+			}
+			if err := os.WriteFile(reportPath+".helper", []byte(presence), 0o600); err != nil {
+				code = 1
+			}
+			if err := os.WriteFile(reportPath+".answer", []byte(answer), 0o600); err != nil {
+				code = 1
+			}
+			if os.Getenv(testBrokerSpawnGrandchild) == "1" {
+				command := exec.Command(os.Args[0])
+				command.Env = append(os.Environ(),
+					testBrokerGrandchild+"=1",
+					testBrokerReportPath+"="+reportPath+".grandchild",
+				)
+				if err := command.Run(); err != nil {
+					code = 1
+				}
+			}
+		}
+		_, _ = os.Stdout.Write(output.Bytes())
+		os.Exit(code)
 	}
 	if IsSSHWrapperInvocation(os.Args[0]) {
 		os.Exit(RunSSHWrapper(os.Args[1:], os.Getenv, os.Stdin, os.Stdout, os.Stderr))
@@ -28,6 +83,47 @@ func TestMain(m *testing.M) {
 		os.Exit(testFakeSSHMain(os.Args))
 	}
 	os.Exit(m.Run())
+}
+
+func runHTTPSBrokerFetchChild() int {
+	reportPath := os.Getenv(testBrokerReportPath)
+	presence := "absent"
+	if _, ok := os.LookupEnv(legacyHTTPSBrokerSecretEnv); ok {
+		presence = "present"
+	}
+	if reportPath == "" || os.WriteFile(reportPath+".fetch", []byte(presence), 0o600) != nil {
+		return 1
+	}
+	handle, ok := parseHTTPSBrokerHandle(os.Getenv(EnvHTTPSBrokerHandle))
+	if !ok {
+		return 1
+	}
+	reader := os.NewFile(handle, "https-askpass-test-reader")
+	if reader == nil {
+		return 1
+	}
+	command := exec.Command(os.Getenv("GIT_ASKPASS"), "Password for 'https://oauth2@fixture.test': ")
+	childHandle, err := inheritHTTPSBrokerReader(command, reader)
+	if err != nil {
+		_ = reader.Close()
+		return 1
+	}
+	childEnv := make([]string, 0, len(os.Environ()))
+	for _, entry := range os.Environ() {
+		if strings.HasPrefix(entry, testBrokerFetchChild+"=") {
+			continue
+		}
+		childEnv = append(childEnv, entry)
+	}
+	command.Env = setEnvironmentValue(childEnv, EnvHTTPSBrokerHandle, childHandle)
+	command.Stdout = io.Discard
+	command.Stderr = io.Discard
+	err = command.Run()
+	_ = reader.Close()
+	if err != nil {
+		return 1
+	}
+	return 0
 }
 
 func TestHTTPSCredentialBrokerAnswersOnlyPinnedGitPrompts(t *testing.T) {
@@ -41,16 +137,10 @@ func TestHTTPSCredentialBrokerAnswersOnlyPinnedGitPrompts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	environment := map[string]string{
-		EnvHTTPSBrokerState:  statePath,
-		EnvHTTPSBrokerSecret: "broker-secret",
-	}
-	getenv := func(name string) string { return environment[name] }
-
 	for _, testCase := range []struct {
 		name   string
 		args   []string
-		mutate func()
+		mutate func(map[string]string)
 		want   string
 		code   int
 	}{
@@ -59,16 +149,31 @@ func TestHTTPSCredentialBrokerAnswersOnlyPinnedGitPrompts(t *testing.T) {
 		{name: "foreign host", args: []string{"Username for 'https://other.example.test': "}, code: 1},
 		{name: "foreign prompt", args: []string{"Token for 'https://git.example.test': "}, code: 1},
 		{name: "extra argument", args: []string{"Username for 'https://git.example.test': ", "extra"}, code: 1},
-		{name: "absent secret", args: []string{"Username for 'https://git.example.test': "}, mutate: func() { environment[EnvHTTPSBrokerSecret] = "" }, code: 1},
-		{name: "absent state", args: []string{"Username for 'https://git.example.test': "}, mutate: func() { environment[EnvHTTPSBrokerState] = filepath.Join(root, "absent") }, code: 1},
-		{name: "unreadable state shape", args: []string{"Username for 'https://git.example.test': "}, mutate: func() { environment[EnvHTTPSBrokerState] = root }, code: 1},
+		{name: "absent pipe handle", args: []string{"Username for 'https://git.example.test': "}, mutate: func(environment map[string]string) { delete(environment, httpsBrokerHandleEnv) }, code: 1},
+		{name: "malformed pipe handle", args: []string{"Username for 'https://git.example.test': "}, mutate: func(environment map[string]string) { environment[httpsBrokerHandleEnv] = "not-a-handle" }, code: 1},
+		{name: "absent state", args: []string{"Username for 'https://git.example.test': "}, mutate: func(environment map[string]string) { environment[EnvHTTPSBrokerState] = filepath.Join(root, "absent") }, code: 1},
+		{name: "unreadable state shape", args: []string{"Username for 'https://git.example.test': "}, mutate: func(environment map[string]string) { environment[EnvHTTPSBrokerState] = root }, code: 1},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			environment[EnvHTTPSBrokerState] = statePath
-			environment[EnvHTTPSBrokerSecret] = "broker-secret"
-			if testCase.mutate != nil {
-				testCase.mutate()
+			reader, writer, err := os.Pipe()
+			if err != nil {
+				t.Fatal(err)
 			}
+			if _, err := writer.Write([]byte("broker-secret")); err != nil {
+				t.Fatal(err)
+			}
+			if err := writer.Close(); err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = reader.Close() }()
+			environment := map[string]string{
+				EnvHTTPSBrokerState:  statePath,
+				httpsBrokerHandleEnv: strconv.FormatUint(uint64(reader.Fd()), 10),
+			}
+			if testCase.mutate != nil {
+				testCase.mutate(environment)
+			}
+			getenv := func(name string) string { return environment[name] }
 			var output bytes.Buffer
 			code := RunHTTPSCredentialBroker(testCase.args, getenv, &output)
 			if code != testCase.code || output.String() != testCase.want {
@@ -98,7 +203,7 @@ func TestHTTPSBrokerStateContainsHostAndUsernameOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	if strings.Contains(string(payload), secret) || string(payload) != "{\"host\":\"git.example.test\",\"username\":\"oauth2\"}\n" {
-		t.Fatalf("state = %q", payload)
+		t.Fatal("HTTPS broker state does not contain only host and username")
 	}
 	for _, diagnostic := range []string{
 		fmt.Sprintf("%v", NewHTTPSCredentials("git.example.test", "oauth2", secret)),
@@ -107,6 +212,46 @@ func TestHTTPSBrokerStateContainsHostAndUsernameOnly(t *testing.T) {
 	} {
 		if strings.Contains(diagnostic, secret) || !strings.Contains(diagnostic, "<redacted>") {
 			t.Fatalf("credential diagnostic = %q", diagnostic)
+		}
+	}
+	assertBrokerExecutableReleased(t, wrapper)
+}
+
+func TestHTTPSBrokerPipeSurvivesFetchAndAskpassExecOnEveryPlatform(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "askpass-report")
+	wrapper, statePath, err := materializeHTTPSCredentialBroker(root, executable,
+		NewHTTPSCredentials("fixture.test", "oauth2", testExpectedBrokerSecret))
+	if err != nil {
+		t.Fatal(err)
+	}
+	command := exec.Command(executable)
+	command.Env = append(cleanDiscoveryEnvironment(),
+		testBrokerFetchChild+"=1",
+		testBrokerReportPath+"="+reportPath,
+		testBrokerSpawnGrandchild+"=1",
+		"GIT_ASKPASS="+wrapper,
+		EnvHTTPSBrokerState+"="+statePath,
+	)
+	if err := runCommandWithHTTPSSecret(command, testExpectedBrokerSecret); err != nil {
+		t.Fatalf("fetch and askpass pipe flow: %v", err)
+	}
+	for _, report := range []struct{ suffix, want string }{
+		{suffix: ".fetch", want: "absent"},
+		{suffix: ".answer", want: "received"},
+		{suffix: ".helper", want: "absent"},
+		{suffix: ".grandchild", want: "absent"},
+	} {
+		contents, err := os.ReadFile(reportPath + report.suffix)
+		if err != nil {
+			t.Fatalf("read askpass %s report: %v", report.suffix, err)
+		}
+		if string(contents) != report.want {
+			t.Fatalf("askpass %s report = %q, want %q", report.suffix, contents, report.want)
 		}
 	}
 	assertBrokerExecutableReleased(t, wrapper)
@@ -171,23 +316,32 @@ func TestPrivateHTTPSBrokerAuthenticatesRealGitRepository(t *testing.T) {
 	cmd.Env = append(os.Environ(),
 		"GIT_TERMINAL_PROMPT=0",
 		"GIT_ASKPASS="+wrapper,
-		EnvHTTPSBrokerState+"="+statePath,
-		EnvHTTPSBrokerSecret+"="+secret)
-	output, err := cmd.CombinedOutput()
+		EnvHTTPSBrokerState+"="+statePath)
+	var output bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &output, &output
+	err = runCommandWithHTTPSSecret(cmd, secret)
 	if err != nil {
-		t.Fatalf("private HTTPS ls-remote: %v\n%s", err, output)
+		t.Fatalf("private HTTPS ls-remote: %v\n%s", err, output.String())
 	}
-	if authenticated == 0 || !strings.Contains(string(output), fixture.commit) {
-		t.Fatalf("authenticated requests=%d output=%s", authenticated, output)
+	if authenticated == 0 || !strings.Contains(output.String(), fixture.commit) {
+		t.Fatalf("authenticated requests=%d output=%s", authenticated, output.String())
 	}
 }
 
-func TestSelectedHTTPSFetchEnvironmentIsScopedAndOverridesBothAskPassSurfaces(t *testing.T) {
+func TestSelectedHTTPSFetchSecretUsesPipeAndNeverEntersTheProcessEnvironment(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the HTTPS test transport wrapper is POSIX-only")
 	}
 	fixture := makeGitFixture(t, "sha1", false)
-	tool, logPath := fakeHTTPGitTool(t, fixture.bare)
+	reportPath := filepath.Join(t.TempDir(), "https-askpass-report")
+	fetchHook := fmt.Sprintf(`fetch_command=0
+for arg in "$@"; do [ "$arg" = "fetch" ] && fetch_command=1; done
+if [ "$fetch_command" = "1" ]; then
+  export %s=1
+  export %s=%s
+  "$GIT_ASKPASS" "Password for 'https://oauth2@fixture.test': " >/dev/null || exit 93
+fi`, testBrokerSpawnGrandchild, testBrokerReportPath, shellQuote(reportPath))
+	tool, logPath := fakeHTTPGitToolWithFetchHook(t, fixture.bare, fetchHook)
 	executable, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
@@ -198,16 +352,17 @@ func TestSelectedHTTPSFetchEnvironmentIsScopedAndOverridesBothAskPassSurfaces(t 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := AcquireNetwork(context.Background(), NetworkRequest{
+	_, acquireErr := AcquireNetwork(context.Background(), NetworkRequest{
 		Source: source,
 		Lock:   LockedCommit{ObjectFormat: "sha1", Hex: fixture.commit},
 		Tool:   tool,
-	}); err != nil {
-		t.Fatal(err)
-	}
+	})
 	log, err := os.ReadFile(logPath)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if acquireErr != nil {
+		t.Errorf("authenticated production fetch failed: %v", acquireErr)
 	}
 	var fetchLine string
 	for _, line := range strings.Split(string(log), "\n") {
@@ -217,17 +372,17 @@ func TestSelectedHTTPSFetchEnvironmentIsScopedAndOverridesBothAskPassSurfaces(t 
 		}
 	}
 	if fetchLine == "" || !strings.Contains(fetchLine, "core.askPass=") {
-		t.Fatalf("fetch argv did not set core.askPass: %s", log)
+		t.Errorf("fetch argv did not set core.askPass: %s", log)
 	}
 	for _, required := range []string{
 		"http.sslVerify=true", "http.followRedirects=false", "https://fixture.test/repository.git",
 	} {
 		if !strings.Contains(fetchLine, required) {
-			t.Fatalf("fetch lost hardened argument %q: %s", required, fetchLine)
+			t.Errorf("fetch lost hardened argument %q: %s", required, fetchLine)
 		}
 	}
-	if !strings.Contains(fetchLine, "secret=1 state=1") || !strings.Contains(fetchLine, "askpass=") || !strings.Contains(fetchLine, HTTPSBrokerName) {
-		t.Fatalf("fetch environment did not point GIT_ASKPASS at the materialized wrapper: %s", fetchLine)
+	if !strings.Contains(fetchLine, "secret=0 state=1 handle=1") || !strings.Contains(fetchLine, "askpass=") || !strings.Contains(fetchLine, HTTPSBrokerName) {
+		t.Errorf("fetch environment must carry metadata and a pipe handle, never the secret: %s", fetchLine)
 	}
 	var environmentAskPass, configuredAskPass string
 	for _, field := range strings.Fields(fetchLine) {
@@ -239,18 +394,32 @@ func TestSelectedHTTPSFetchEnvironmentIsScopedAndOverridesBothAskPassSurfaces(t 
 		}
 	}
 	if environmentAskPass == "" || configuredAskPass != environmentAskPass {
-		t.Fatalf("GIT_ASKPASS=%q core.askPass=%q, want the same wrapper", environmentAskPass, configuredAskPass)
+		t.Errorf("GIT_ASKPASS=%q core.askPass=%q, want the same wrapper", environmentAskPass, configuredAskPass)
 	}
 	for _, line := range strings.Split(string(log), "\n") {
 		if line == "" || strings.Contains(line, " fetch ") {
 			continue
 		}
-		if strings.Contains(line, "secret=1") || strings.Contains(line, "state=1") {
-			t.Fatalf("non-fetch Git child received broker material: %s", line)
+		if strings.Contains(line, "secret=1") || strings.Contains(line, "state=1") || strings.Contains(line, "handle=1") {
+			t.Errorf("non-fetch Git child received broker material: %s", line)
 		}
 	}
 	if strings.Contains(string(log), "fetch-only-secret") {
-		t.Fatalf("diagnostic log disclosed the secret: %s", log)
+		t.Error("fetch diagnostics contain the HTTPS secret")
+	}
+	for _, report := range []struct{ suffix, want string }{
+		{suffix: ".answer", want: "received"},
+		{suffix: ".helper", want: "absent"},
+		{suffix: ".grandchild", want: "absent"},
+	} {
+		contents, err := os.ReadFile(reportPath + report.suffix)
+		if err != nil {
+			t.Errorf("read askpass %s report: %v", report.suffix, err)
+			continue
+		}
+		if string(contents) != report.want {
+			t.Errorf("askpass %s report = %q, want %q", report.suffix, contents, report.want)
+		}
 	}
 }
 
@@ -268,7 +437,7 @@ func TestAnonymousHTTPSArgumentsAndEnvironmentRemainUnchanged(t *testing.T) {
 		t.Fatal("anonymous HTTPS argv or environment changed")
 	}
 	for _, entry := range afterEnv {
-		if strings.HasPrefix(entry, EnvHTTPSBrokerState+"=") || strings.HasPrefix(entry, EnvHTTPSBrokerSecret+"=") {
+		if strings.HasPrefix(entry, EnvHTTPSBrokerState+"=") || strings.HasPrefix(entry, legacyHTTPSBrokerSecretEnv+"=") || strings.HasPrefix(entry, httpsBrokerHandleEnv+"=") {
 			t.Fatalf("anonymous environment contains broker material: %q", entry)
 		}
 	}

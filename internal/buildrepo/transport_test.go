@@ -627,7 +627,7 @@ func fakeTransportGitTool(t *testing.T, routes map[string]transportBehavior) (Gi
 			}
 		}
 		if route.leakSecret {
-			failArms.WriteString("printf 'leaked-secret: %s\\n' \"${" + EnvHTTPSBrokerSecret + "-}\" >&2\n")
+			fmt.Fprintf(&failArms, "handle=\"${%s-}\"\nif [ -n \"$handle\" ]; then eval \"read -r leaked_secret <&$handle\"; printf 'leaked-secret: %%s\\n' \"$leaked_secret\" >&2; fi\n", EnvHTTPSBrokerHandle)
 		}
 		fmt.Fprintf(&failArms, "printf '%%s' %s >&2; exit 128\nfi\n", shellQuote(route.stderr))
 	}
@@ -638,9 +638,11 @@ for arg in "$@"; do printf ' <%%s>' "$arg"; done
 printf ' | env: HOME=%%s CFGGLOBAL=%%s CFGSYSTEM=%%s GIT_SSH=%%s askpass=%%s' "${HOME-}" "${GIT_CONFIG_GLOBAL-}" "${GIT_CONFIG_SYSTEM-}" "${GIT_SSH-}" "${GIT_ASKPASS-}"
 secret_present=0
 state_present=0
-[ -n "${%s-}" ] && secret_present=1
+handle_present=0
+[ "${CURATOR_BUILD_HTTPS_ASKPASS_SECRET+x}" = "x" ] && secret_present=1
 [ -n "${%s-}" ] && state_present=1
-printf ' secret=%%s state=%%s\n' "$secret_present" "$state_present"
+[ -n "${%s-}" ] && handle_present=1
+printf ' secret=%%s state=%%s handle=%%s\n' "$secret_present" "$state_present" "$handle_present"
 if [ "$state_present" = 1 ] && [ -f "${%s-}" ]; then
 broker_state=""
 read -r broker_state < "${%s-}"
@@ -672,7 +674,7 @@ IFS='
 set -- $args
 IFS=$oldifs
 exec %s "$@"
-`, EnvHTTPSBrokerSecret, EnvHTTPSBrokerState, EnvHTTPSBrokerState, EnvHTTPSBrokerState,
+`, EnvHTTPSBrokerState, EnvHTTPSBrokerHandle, EnvHTTPSBrokerState, EnvHTTPSBrokerState,
 		shellQuote(logPath), failArms.String(), rewrites.String(), shellQuote(realTool.Executable))
 	if err := os.WriteFile(wrapper, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
