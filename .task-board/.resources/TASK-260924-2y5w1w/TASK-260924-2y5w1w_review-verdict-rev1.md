@@ -1,0 +1,9 @@
+# Review verdict — TASK-260924-2y5w1w CR rev1: ACCEPTED
+Reviewer: claude-opus-5-5 (low). Worktree == candidate tree 02f6a9e (git diff incl. intent-to-add: empty).
+Independent reruns (zsh, pipefail): `go vet ./...` exit 0; `go test ./...` exit 0 (all packages ok).
+1. Vendor admission: SpawnRequest.PermissionMode/ToolRelease/NativeArgs carried by passthroughLaunchRequest and Vendor.Spawn (defensive copy), enforced by checkLaunchFidelity (spawn.go:473-481) → no vendor bypass. Driven through BuildLaunchWithEnvironment (claude/vendor_admission_test.go:117): native, yolo mapping, ErrNativePolicyConflict (v0.5.20), ErrPermissionModeUnverifiedRelease (v0.5.18); mutation refusal test :191; snapshot test :238.
+2. Inspector: Claude (CLAUDE_CONFIG_DIR|Home|HOME/.claude settings.json, <workdir>/.claude/settings{,.local}.json), Codex (CODEX_HOME config.toml, project .codex/config.toml, selected profile). Absent/unreadable/unparseable/root-unavailable/unknown-selection all land in SourcesNotInspected; managed policy always listed as not-provided. No os.Getenv/UserHomeDir/Getwd in new code (grep empty). Pi → unsupported (pi/storedpolicy_test.go).
+   Selector judgement: permissions.allow / additionalDirectories are genuine stored relaxations beneath native (they pre-approve tools / widen reach) — not misleading; advisory only: an operator stderr line may be long with many allow rules; consider summarising counts in the consumer.
+3. Provider spellings in plugins only (codex classifyStoredSandboxMode reuses knownSandboxValues; argvguard green). CHANGELOG: one new bullet under `## Unreleased`, released entries untouched.
+4. Own mutant: Claude unreadable (non-ENOENT) source reported as inspected/clean → KILLED by TestStoredPolicyInspectorReportsUnreadableMode000Source. Restored; tree clean.
+Verdict: accept_cr revision 1.

@@ -1,0 +1,1493 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index ca87b3d..de10191 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -2,6 +2,12 @@
+ 
+ ## Unreleased
+ 
++- Carry interactive permission mode, verified tool release and caller native
++  arguments through vendor admission into the launch plan; add best-effort
++  Claude and Codex stored-policy inspection with explicit inspected and
++  not-inspected sources. Expected release v0.5.21; the orchestrator cuts the
++  tag.
++
+ - Retire the `ultra` effort word everywhere. No row declares it any more
+   (gpt-6-astra/astra, gpt-6-sol/sol, gpt-5.6-sol, gpt-5.6-terra and
+   qwen3.7-plus-via-codex now stop at `max`), and the admission scale
+diff --git a/README.md b/README.md
+index 70caf2b..002ce79 100644
+--- a/README.md
++++ b/README.md
+@@ -149,6 +149,41 @@ The agentic-system plugin contract and its registry.
+   are positional, and `=`-forms read as their flag. Known non-conflicting
+   policy selectors are still forwarded. Launcher headless detection over the
+   same arguments remains F-L1.
++
++#### Permission-mode: stored-policy inspection
++
++`agentic.InspectStoredPolicy(system, plan)` returns known relaxations with
++their selector and source path, every source it fully inspected, and every
++candidate source it could not inspect. It uses only `plan.Env`, `plan.Home`
++and `plan.WorkDir`; relative config roots resolve against `plan.WorkDir`. It
++does not read ambient environment or the current directory. A reported
++relaxation is a stored value, not a claim that precedence made it active. The
++result does not resolve precedence between files or include policy the process
++did not expose.
++
++- **Claude Code** reads `$CLAUDE_CONFIG_DIR/settings.json` when
++  `CLAUDE_CONFIG_DIR` is present; otherwise it reads `plan.Home/settings.json`,
++  falling back to `$HOME/.claude/settings.json`. It also reads
++  `plan.WorkDir/.claude/settings.json` and
++  `plan.WorkDir/.claude/settings.local.json`. It reports
++  `permissions.defaultMode` values `acceptEdits`, `auto` and
++  `bypassPermissions`, each non-empty `permissions.allow` rule, and each
++  non-empty `permissions.additionalDirectories` entry. System, MDM, server and
++  embedding-host managed settings have no source path in the launch plan, so
++  the result marks them not provided.
++- **Codex** reads `$CODEX_HOME/config.toml` when `CODEX_HOME` is present;
++  otherwise it reads `plan.Home/config.toml`, falling back to
++  `$HOME/.codex/config.toml`. It also reads
++  `plan.WorkDir/.codex/config.toml`. When the user config selects a `profile`,
++  it reads `<profile>.config.toml` under the Codex config root. It reports
++  `approval_policy = "never"`, `sandbox_mode = "workspace-write"` or
++  `"danger-full-access"`, and non-empty `sandbox_permissions`.
++  System-managed settings and requirements are not provided through the plan
++  and remain visible as not inspected.
++- **Pi** reports stored-policy inspection as unsupported.
++
++An absent file, unreadable file, malformed file, unavailable root or unavailable selected profile is listed under `sources_not_inspected` with its reason. Such a source never counts as clean; callers must read the result as bounded to the sources listed under `sources_inspected`.
++
+ - `Registry` is the only place a system binding may live. `Register` is the
+   only way one comes to exist, and it refuses a duplicate id, an id that does
+   not normalize, an id that normalizes to a spelling other than itself, an id
+diff --git a/pkg/agentic/storedpolicy.go b/pkg/agentic/storedpolicy.go
+new file mode 100644
+index 0000000..08dda06
+--- /dev/null
++++ b/pkg/agentic/storedpolicy.go
+@@ -0,0 +1,78 @@
++package agentic
++
++// StoredPolicySupport says whether an agentic system exposes stored-policy
++// inspection. Unsupported systems make no statement about local settings.
++type StoredPolicySupport string
++
++const (
++	StoredPolicySupported   StoredPolicySupport = "supported"
++	StoredPolicyUnsupported StoredPolicySupport = "unsupported"
++)
++
++// StoredPolicySourceReason records why a candidate settings source was not
++// inspected. None of these states means the source was clean.
++type StoredPolicySourceReason string
++
++const (
++	StoredPolicySourceAbsent           StoredPolicySourceReason = "absent"
++	StoredPolicySourceUnreadable       StoredPolicySourceReason = "unreadable"
++	StoredPolicySourceUnparseable      StoredPolicySourceReason = "unparseable"
++	StoredPolicySourceRootUnavailable  StoredPolicySourceReason = "root-unavailable"
++	StoredPolicySourceNotProvided      StoredPolicySourceReason = "not-provided"
++	StoredPolicySourceUnknownSelection StoredPolicySourceReason = "unknown-selection"
++)
++
++// StoredPolicySourceIssue is one source the inspector could not inspect.
++type StoredPolicySourceIssue struct {
++	SourcePath string                   `json:"source_path"`
++	Reason     StoredPolicySourceReason `json:"reason"`
++}
++
++// StoredPolicyRelaxation is one known setting whose value can reduce
++// permission prompts or broaden access. Value is preserved as text from the
++// source; the inspector does not resolve precedence or claim that the setting
++// took effect.
++type StoredPolicyRelaxation struct {
++	Selector   string `json:"selector"`
++	Value      string `json:"value"`
++	SourcePath string `json:"source_path"`
++}
++
++// StoredPolicyInspection reports findings only from sources it fully read and
++// parsed. SourcesNotInspected distinguishes absence from read and parse
++// failures so callers cannot treat an incomplete scan as clean.
++type StoredPolicyInspection struct {
++	Support             StoredPolicySupport       `json:"support"`
++	Relaxations         []StoredPolicyRelaxation  `json:"relaxations,omitempty"`
++	SourcesInspected    []string                  `json:"sources_inspected,omitempty"`
++	SourcesNotInspected []StoredPolicySourceIssue `json:"sources_not_inspected,omitempty"`
++}
++
++// StoredPolicyContext contains only launch-owned inputs needed to locate
++// settings. Inspectors must not read ambient process environment or working
++// directory state.
++type StoredPolicyContext struct {
++	Environment []string
++	Home        string
++	WorkDir     string
++}
++
++// StoredPolicyInspector is an optional system capability. The system plugin
++// owns its provider-specific settings paths, selectors and value grammar.
++type StoredPolicyInspector interface {
++	InspectStoredPolicy(StoredPolicyContext) StoredPolicyInspection
++}
++
++// InspectStoredPolicy dispatches inspection through the selected system
++// plugin, using the environment and roots captured by the launch plan.
++func InspectStoredPolicy(system System, plan Plan) StoredPolicyInspection {
++	inspector, ok := system.(StoredPolicyInspector)
++	if !ok {
++		return StoredPolicyInspection{Support: StoredPolicyUnsupported}
++	}
++	return inspector.InspectStoredPolicy(StoredPolicyContext{
++		Environment: append([]string(nil), plan.Env...),
++		Home:        plan.Home,
++		WorkDir:     plan.WorkDir,
++	})
++}
+diff --git a/pkg/agentic/systems/claude/storedpolicy.go b/pkg/agentic/systems/claude/storedpolicy.go
+new file mode 100644
+index 0000000..69d81ab
+--- /dev/null
++++ b/pkg/agentic/systems/claude/storedpolicy.go
+@@ -0,0 +1,177 @@
++package claude
++
++import (
++	"encoding/json"
++	"errors"
++	"fmt"
++	"os"
++	"path/filepath"
++	"strings"
++
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
++
++const claudeManagedPolicySource = "managed settings (system, MDM, server, or embedding-host policy)"
++
++// InspectStoredPolicy reads only settings paths derived from the supplied
++// launch environment, home and working directory. It reports raw known
++// relaxations per file and does not resolve precedence or managed policy.
++func (*System) InspectStoredPolicy(ctx agentic.StoredPolicyContext) agentic.StoredPolicyInspection {
++	result := agentic.StoredPolicyInspection{Support: agentic.StoredPolicySupported}
++	home := storedPolicyEnvValue(ctx.Environment, "HOME")
++	configRoot := storedPolicyEnvValue(ctx.Environment, "CLAUDE_CONFIG_DIR")
++	if strings.TrimSpace(configRoot) == "" {
++		configRoot = ctx.Home
++	}
++	if strings.TrimSpace(configRoot) == "" && home != "" {
++		configRoot = filepath.Join(home, ".claude")
++	}
++
++	if root, ok := resolveStoredPolicyRoot(configRoot, home, ctx.WorkDir); ok {
++		inspectClaudeSettingsFile(&result, filepath.Join(root, "settings.json"))
++	} else {
++		result.SourcesNotInspected = append(result.SourcesNotInspected, agentic.StoredPolicySourceIssue{
++			SourcePath: "${CLAUDE_CONFIG_DIR}/settings.json or ${HOME}/.claude/settings.json",
++			Reason:     agentic.StoredPolicySourceRootUnavailable,
++		})
++	}
++
++	if projectRoot, ok := resolveProjectRoot(ctx.WorkDir); ok {
++		inspectClaudeSettingsFile(&result, filepath.Join(projectRoot, ".claude", "settings.json"))
++		inspectClaudeSettingsFile(&result, filepath.Join(projectRoot, ".claude", "settings.local.json"))
++	} else {
++		for _, name := range []string{"settings.json", "settings.local.json"} {
++			result.SourcesNotInspected = append(result.SourcesNotInspected, agentic.StoredPolicySourceIssue{
++				SourcePath: filepath.Join("<workdir>", ".claude", name),
++				Reason:     agentic.StoredPolicySourceRootUnavailable,
++			})
++		}
++	}
++
++	// These sources do not have a path carried by the launch environment and
++	// may be delivered outside the local file system. Keep that blind spot
++	// visible rather than treating the local file results as the full policy.
++	result.SourcesNotInspected = append(result.SourcesNotInspected, agentic.StoredPolicySourceIssue{
++		SourcePath: claudeManagedPolicySource,
++		Reason:     agentic.StoredPolicySourceNotProvided,
++	})
++	return result
++}
++
++func inspectClaudeSettingsFile(result *agentic.StoredPolicyInspection, path string) {
++	data, err := os.ReadFile(path)
++	if err != nil {
++		result.SourcesNotInspected = append(result.SourcesNotInspected, agentic.StoredPolicySourceIssue{
++			SourcePath: path,
++			Reason:     storedPolicyReadFailure(err),
++		})
++		return
++	}
++
++	relaxations, err := parseClaudeStoredPolicy(data, path)
++	if err != nil {
++		result.SourcesNotInspected = append(result.SourcesNotInspected, agentic.StoredPolicySourceIssue{
++			SourcePath: path,
++			Reason:     agentic.StoredPolicySourceUnparseable,
++		})
++		return
++	}
++	result.SourcesInspected = append(result.SourcesInspected, path)
++	result.Relaxations = append(result.Relaxations, relaxations...)
++}
++
++func parseClaudeStoredPolicy(data []byte, sourcePath string) ([]agentic.StoredPolicyRelaxation, error) {
++	var root map[string]json.RawMessage
++	if err := json.Unmarshal(data, &root); err != nil {
++		return nil, err
++	}
++	if root == nil {
++		return nil, errors.New("claude settings root is not an object")
++	}
++
++	rawPermissions, found := root["permissions"]
++	if !found {
++		return nil, nil
++	}
++	var permissions map[string]json.RawMessage
++	if err := json.Unmarshal(rawPermissions, &permissions); err != nil || permissions == nil {
++		return nil, errors.New("claude permissions setting is not an object")
++	}
++
++	var relaxations []agentic.StoredPolicyRelaxation
++	if rawMode, found := permissions["defaultMode"]; found {
++		var mode string
++		if err := json.Unmarshal(rawMode, &mode); err != nil || !knownPermissionModes[mode] {
++			return nil, errors.New("claude default permission mode is not a known string")
++		}
++		if mode == "acceptEdits" || mode == "auto" || mode == "bypassPermissions" {
++			relaxations = append(relaxations, agentic.StoredPolicyRelaxation{
++				Selector: "permissions.defaultMode", Value: mode, SourcePath: sourcePath,
++			})
++		}
++	}
++	for _, selector := range []string{"allow", "additionalDirectories"} {
++		rawValues, found := permissions[selector]
++		if !found {
++			continue
++		}
++		var values []string
++		if err := json.Unmarshal(rawValues, &values); err != nil || values == nil {
++			return nil, fmt.Errorf("claude permissions.%s is not a string array", selector)
++		}
++		for _, value := range values {
++			if strings.TrimSpace(value) == "" {
++				continue
++			}
++			relaxations = append(relaxations, agentic.StoredPolicyRelaxation{
++				Selector: "permissions." + selector, Value: value, SourcePath: sourcePath,
++			})
++		}
++	}
++	return relaxations, nil
++}
++
++func storedPolicyReadFailure(err error) agentic.StoredPolicySourceReason {
++	if errors.Is(err, os.ErrNotExist) {
++		return agentic.StoredPolicySourceAbsent
++	}
++	return agentic.StoredPolicySourceUnreadable
++}
++
++func storedPolicyEnvValue(env []string, name string) string {
++	value := ""
++	for _, entry := range env {
++		key, candidate, found := strings.Cut(entry, "=")
++		if found && key == name {
++			value = candidate
++		}
++	}
++	return value
++}
++
++func resolveStoredPolicyRoot(raw, home, workDir string) (string, bool) {
++	raw = strings.TrimSpace(raw)
++	if raw == "" {
++		return "", false
++	}
++	if raw == "~" || strings.HasPrefix(raw, "~/") || strings.HasPrefix(raw, "~\\") {
++		if home == "" {
++			return "", false
++		}
++		raw = filepath.Join(home, strings.TrimLeft(raw[1:], "/\\"))
++	}
++	if !filepath.IsAbs(raw) {
++		if !filepath.IsAbs(workDir) {
++			return "", false
++		}
++		raw = filepath.Join(workDir, raw)
++	}
++	return filepath.Clean(raw), true
++}
++
++func resolveProjectRoot(workDir string) (string, bool) {
++	if !filepath.IsAbs(workDir) {
++		return "", false
++	}
++	return filepath.Clean(workDir), true
++}
+diff --git a/pkg/agentic/systems/claude/storedpolicy_test.go b/pkg/agentic/systems/claude/storedpolicy_test.go
+new file mode 100644
+index 0000000..5a0dc2b
+--- /dev/null
++++ b/pkg/agentic/systems/claude/storedpolicy_test.go
+@@ -0,0 +1,173 @@
++package claude
++
++import (
++	"os"
++	"path/filepath"
++	"runtime"
++	"testing"
++
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
++
++func TestStoredPolicyInspectorReportsEveryKnownSelectorAtEveryLocalSource(t *testing.T) {
++	sources := []struct {
++		name string
++		path func(home, workDir string) string
++	}{
++		{"user", func(home, _ string) string { return filepath.Join(home, "settings.json") }},
++		{"project-shared", func(_, workDir string) string { return filepath.Join(workDir, ".claude", "settings.json") }},
++		{"project-local", func(_, workDir string) string { return filepath.Join(workDir, ".claude", "settings.local.json") }},
++	}
++	selectors := []struct {
++		name     string
++		selector string
++		value    string
++		setting  string
++	}{
++		{"default-mode-bypass", "permissions.defaultMode", "bypassPermissions", `"permissions":{"defaultMode":"bypassPermissions"}`},
++		{"allow-rule", "permissions.allow", "Bash(git *)", `"permissions":{"allow":["Bash(git *)"]}`},
++		{"additional-directory", "permissions.additionalDirectories", "/shared", `"permissions":{"additionalDirectories":["/shared"]}`},
++	}
++
++	for _, source := range sources {
++		for _, selector := range selectors {
++			t.Run(source.name+"/"+selector.name, func(t *testing.T) {
++				root := t.TempDir()
++				home := filepath.Join(root, "home")
++				configRoot := filepath.Join(home, ".claude")
++				workDir := filepath.Join(root, "project")
++				path := source.path(configRoot, workDir)
++				if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
++					t.Fatal(err)
++				}
++				if err := os.WriteFile(path, []byte("{"+selector.setting+"}"), 0o600); err != nil {
++					t.Fatal(err)
++				}
++
++				report := agentic.InspectStoredPolicy(New(), agentic.Plan{
++					Env:     []string{"HOME=" + home, "CLAUDE_CONFIG_DIR=" + configRoot},
++					Home:    filepath.Join(root, "decoy", ".claude"),
++					WorkDir: workDir,
++				})
++				if report.Support != agentic.StoredPolicySupported {
++					t.Fatalf("Support = %q, want supported", report.Support)
++				}
++				if !containsString(report.SourcesInspected, path) {
++					t.Fatalf("sources inspected = %v, want %q", report.SourcesInspected, path)
++				}
++				if len(report.Relaxations) != 1 {
++					t.Fatalf("relaxations = %#v, want exactly one row", report.Relaxations)
++				}
++				got := report.Relaxations[0]
++				if got.Selector != selector.selector || got.Value != selector.value || got.SourcePath != path {
++					t.Fatalf("relaxation = %#v, want selector=%q value=%q source=%q", got, selector.selector, selector.value, path)
++				}
++			})
++		}
++	}
++}
++
++func TestStoredPolicyInspectorReportsRelaxedDefaultModes(t *testing.T) {
++	for _, mode := range []string{"acceptEdits", "auto", "bypassPermissions"} {
++		t.Run(mode, func(t *testing.T) {
++			root := t.TempDir()
++			home := filepath.Join(root, "home")
++			configRoot := filepath.Join(home, ".claude")
++			path := filepath.Join(configRoot, "settings.json")
++			if err := os.MkdirAll(configRoot, 0o700); err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(path, []byte(`{"permissions":{"defaultMode":"`+mode+`"}}`), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			report := New().InspectStoredPolicy(agentic.StoredPolicyContext{
++				Environment: []string{"HOME=" + home}, Home: "~/.claude", WorkDir: root,
++			})
++			if len(report.Relaxations) != 1 || report.Relaxations[0].Value != mode {
++				t.Fatalf("relaxations = %#v, want defaultMode %q", report.Relaxations, mode)
++			}
++		})
++	}
++}
++
++func TestStoredPolicyInspectorDoesNotCallMalformedOrAbsentSettingsClean(t *testing.T) {
++	root := t.TempDir()
++	home := filepath.Join(root, "home")
++	configRoot := filepath.Join(home, ".claude")
++	workDir := filepath.Join(root, "project")
++	path := filepath.Join(configRoot, "settings.json")
++	if err := os.MkdirAll(configRoot, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(path, []byte(`{"permissions":`), 0o600); err != nil {
++		t.Fatal(err)
++	}
++
++	report := New().InspectStoredPolicy(agentic.StoredPolicyContext{
++		Environment: []string{"HOME=" + home}, Home: "~/.claude", WorkDir: workDir,
++	})
++	if containsString(report.SourcesInspected, path) {
++		t.Fatalf("malformed source %q was marked inspected: %#v", path, report)
++	}
++	if !hasSourceIssue(report, path, agentic.StoredPolicySourceUnparseable) {
++		t.Fatalf("malformed source issue missing: %#v", report.SourcesNotInspected)
++	}
++	if !hasSourceIssue(report, filepath.Join(workDir, ".claude", "settings.json"), agentic.StoredPolicySourceAbsent) {
++		t.Fatalf("absent shared project source missing from not-inspected list: %#v", report.SourcesNotInspected)
++	}
++}
++
++func TestStoredPolicyInspectorReportsUnreadableMode000Source(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("POSIX mode bits are unavailable on Windows")
++	}
++	root := t.TempDir()
++	home := filepath.Join(root, "home")
++	configRoot := filepath.Join(home, ".claude")
++	path := filepath.Join(configRoot, "settings.json")
++	if err := os.MkdirAll(configRoot, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(path, []byte(`{"permissions":{"defaultMode":"bypassPermissions"}}`), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Chmod(path, 0); err != nil {
++		t.Fatal(err)
++	}
++	defer func() {
++		if err := os.Chmod(path, 0o600); err != nil {
++			t.Errorf("restore readable mode: %v", err)
++		}
++	}()
++	if _, err := os.ReadFile(path); err == nil {
++		t.Skip("the test process can read a mode-000 file, so this host cannot reproduce unreadability")
++	}
++
++	report := New().InspectStoredPolicy(agentic.StoredPolicyContext{
++		Environment: []string{"HOME=" + home}, Home: "~/.claude", WorkDir: root,
++	})
++	if containsString(report.SourcesInspected, path) || len(report.Relaxations) != 0 {
++		t.Fatalf("unreadable source was treated as clean or inspected: %#v", report)
++	}
++	if !hasSourceIssue(report, path, agentic.StoredPolicySourceUnreadable) {
++		t.Fatalf("unreadable source issue missing: %#v", report.SourcesNotInspected)
++	}
++}
++
++func containsString(values []string, want string) bool {
++	for _, value := range values {
++		if value == want {
++			return true
++		}
++	}
++	return false
++}
++
++func hasSourceIssue(report agentic.StoredPolicyInspection, path string, reason agentic.StoredPolicySourceReason) bool {
++	for _, issue := range report.SourcesNotInspected {
++		if issue.SourcePath == path && issue.Reason == reason {
++			return true
++		}
++	}
++	return false
++}
+diff --git a/pkg/agentic/systems/claude/vendor_admission_test.go b/pkg/agentic/systems/claude/vendor_admission_test.go
+new file mode 100644
+index 0000000..6f633cc
+--- /dev/null
++++ b/pkg/agentic/systems/claude/vendor_admission_test.go
+@@ -0,0 +1,258 @@
++package claude
++
++import (
++	"context"
++	"errors"
++	"os"
++	"path/filepath"
++	"reflect"
++	"testing"
++
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++	"github.com/relux-works/skill-agents-management/pkg/vendorplugin"
++)
++
++const (
++	permissionAdmissionRuntime  vendorplugin.RuntimeID = "permission-admission-fixture"
++	permissionAdmissionVendorID vendorplugin.VendorID  = "permission-admission-vendor"
++	permissionAdmissionModel    vendorplugin.ModelID   = "permission-admission-model"
++)
++
++type permissionAdmissionVendor struct {
++	spawnCalls    int
++	request       vendorplugin.SpawnRequest
++	mutateRequest func(*vendorplugin.SpawnRequest)
++	mutate        func(*agentic.LaunchRequest)
++}
++
++func (*permissionAdmissionVendor) ID() vendorplugin.VendorID { return permissionAdmissionVendorID }
++
++func (*permissionAdmissionVendor) Models() []vendorplugin.Model {
++	return vendorplugin.CloneModels([]vendorplugin.Model{{
++		ID:          permissionAdmissionModel,
++		Description: "a fixture model for vendor admission tests",
++		Lifecycle:   vendorplugin.LifecycleCurrent,
++		Rank: vendorplugin.CapabilityRank{Score: 1, Basis: []vendorplugin.RankEvidence{{
++			Source: "test fixture", Observation: "one model row exercises the real vendor admission path",
++		}}},
++		Effort: vendorplugin.EffortDeclaration{
++			Support:     agentic.EffortSupportRequired,
++			Vocabulary:  []string{"high"},
++			Recommended: "high",
++		},
++		Systems: []agentic.SystemID{New().ID()},
++	}})
++}
++
++func (*permissionAdmissionVendor) Availability(vendorplugin.AvailabilityQuery) (vendorplugin.Availability, error) {
++	return vendorplugin.Unchecked(), nil
++}
++
++func (v *permissionAdmissionVendor) Spawn(sc vendorplugin.SpawnContext) (agentic.LaunchRequest, error) {
++	v.spawnCalls++
++	v.request = sc.Request
++	v.request.NativeArgs = append([]string(nil), sc.Request.NativeArgs...)
++	if v.mutateRequest != nil {
++		v.mutateRequest(&sc.Request)
++	}
++	launch := vendorplugin.PassthroughLaunch(sc)
++	if v.mutate != nil {
++		v.mutate(&launch)
++	}
++	return launch, nil
++}
++
++func newPermissionAdmissionFixture(t *testing.T, mutate func(*agentic.LaunchRequest)) (*vendorplugin.Registry, *permissionAdmissionVendor, string) {
++	t.Helper()
++
++	systems := agentic.NewRegistry()
++	if err := systems.Register(New()); err != nil {
++		t.Fatalf("register Claude system: %v", err)
++	}
++	registry := vendorplugin.NewRegistry(systems)
++	vendor := &permissionAdmissionVendor{mutate: mutate}
++	if err := registry.Register(vendor); err != nil {
++		t.Fatalf("register fixture vendor: %v", err)
++	}
++	if err := registry.DeclareRuntime(vendorplugin.RuntimeDeclaration{
++		ID:     permissionAdmissionRuntime,
++		System: New().ID(),
++		Vendor: permissionAdmissionVendorID,
++		Broker: vendorplugin.BrokerProvenance{
++			Checked: []string{"test fixture"},
++			Found:   "registered fixture vendor",
++		},
++	}); err != nil {
++		t.Fatalf("declare fixture runtime: %v", err)
++	}
++
++	root := t.TempDir()
++	workDir := filepath.Join(root, "work")
++	binDir := filepath.Join(root, "bin")
++	if err := os.MkdirAll(workDir, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.MkdirAll(binDir, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	binary := filepath.Join(binDir, "claude")
++	if err := os.WriteFile(binary, []byte("#!/bin/sh\nexit 0\n"), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	return registry, vendor, workDir
++}
++
++func permissionAdmissionRequest(workDir string) vendorplugin.SpawnRequest {
++	return vendorplugin.SpawnRequest{
++		Runtime:     permissionAdmissionRuntime,
++		Model:       permissionAdmissionModel,
++		Effort:      "high",
++		WorkDir:     workDir,
++		Home:        filepath.Join(workDir, ".claude-home"),
++		Env:         []string{"PATH=" + filepath.Join(filepath.Dir(workDir), "bin"), "HOME=" + workDir},
++		ToolRelease: "2.1.261",
++	}
++}
++
++func TestBuildLaunchWithEnvironmentCarriesPermissionRequestThroughVendorAdmission(t *testing.T) {
++	tests := []struct {
++		name      string
++		configure func(*vendorplugin.SpawnRequest)
++		wantArgv  []string
++		wantErr   error
++	}{
++		{
++			name: "native preserves release and caller arguments",
++			configure: func(req *vendorplugin.SpawnRequest) {
++				req.PermissionMode = agentic.PermissionModeNative
++				req.ToolRelease = "native-unpinned-release"
++				req.NativeArgs = []string{"--permission-mode", "default", "literal task"}
++			},
++			wantArgv: []string{"--model", string(permissionAdmissionModel), "--effort", "high", "--permission-mode", "default", "literal task"},
++		},
++		{
++			name: "yolo maps the verified release before caller arguments",
++			configure: func(req *vendorplugin.SpawnRequest) {
++				req.PermissionMode = agentic.PermissionModeYolo
++				req.NativeArgs = []string{"--verbose", "literal task"}
++			},
++			wantArgv: []string{"--model", string(permissionAdmissionModel), "--effort", "high", bypassPermissionsFlag, "--verbose", "literal task"},
++		},
++		{
++			name: "yolo refuses a conflicting native selector",
++			configure: func(req *vendorplugin.SpawnRequest) {
++				req.PermissionMode = agentic.PermissionModeYolo
++				req.NativeArgs = []string{"--permission-mode", "plan"}
++			},
++			wantErr: agentic.ErrNativePolicyConflict,
++		},
++		{
++			name: "yolo refuses an unverified release",
++			configure: func(req *vendorplugin.SpawnRequest) {
++				req.PermissionMode = agentic.PermissionModeYolo
++				req.ToolRelease = "2.1.274"
++			},
++			wantErr: agentic.ErrPermissionModeUnverifiedRelease,
++		},
++	}
++
++	for _, tc := range tests {
++		t.Run(tc.name, func(t *testing.T) {
++			registry, vendor, workDir := newPermissionAdmissionFixture(t, nil)
++			req := permissionAdmissionRequest(workDir)
++			tc.configure(&req)
++
++			result, err := vendorplugin.BuildLaunchWithEnvironment(context.Background(), registry, req, agentic.LaunchModeInteractive)
++			if tc.wantErr != nil {
++				if !errors.Is(err, tc.wantErr) {
++					t.Fatalf("BuildLaunchWithEnvironment err = %v, want %v", err, tc.wantErr)
++				}
++			} else {
++				if err != nil {
++					t.Fatalf("BuildLaunchWithEnvironment: %v", err)
++				}
++				if !reflect.DeepEqual(result.Plan.Argv, tc.wantArgv) {
++					t.Fatalf("Plan.Argv = %#v, want %#v", result.Plan.Argv, tc.wantArgv)
++				}
++			}
++
++			if vendor.spawnCalls != 1 {
++				t.Fatalf("vendor Spawn calls = %d, want one admission call", vendor.spawnCalls)
++			}
++			if vendor.request.PermissionMode != req.PermissionMode || vendor.request.ToolRelease != req.ToolRelease || !reflect.DeepEqual(vendor.request.NativeArgs, req.NativeArgs) {
++				t.Fatalf("permission request at Vendor.Spawn = mode %q, release %q, args %#v; want mode %q, release %q, args %#v",
++					vendor.request.PermissionMode, vendor.request.ToolRelease, vendor.request.NativeArgs,
++					req.PermissionMode, req.ToolRelease, req.NativeArgs)
++			}
++		})
++	}
++}
++
++func TestBuildLaunchWithEnvironmentRefusesVendorPermissionRequestMutation(t *testing.T) {
++	tests := []struct {
++		name      string
++		configure func(*vendorplugin.SpawnRequest)
++		mutate    func(*agentic.LaunchRequest)
++	}{
++		{
++			name: "permission mode cannot be downgraded",
++			configure: func(req *vendorplugin.SpawnRequest) {
++				req.PermissionMode = agentic.PermissionModeYolo
++			},
++			mutate: func(launch *agentic.LaunchRequest) { launch.PermissionMode = agentic.PermissionModeNative },
++		},
++		{
++			name: "unverified release cannot be rewritten to a pin",
++			configure: func(req *vendorplugin.SpawnRequest) {
++				req.PermissionMode = agentic.PermissionModeYolo
++				req.ToolRelease = "2.1.274"
++			},
++			mutate: func(launch *agentic.LaunchRequest) { launch.ToolRelease = "2.1.261" },
++		},
++		{
++			name: "conflicting native arguments cannot be dropped",
++			configure: func(req *vendorplugin.SpawnRequest) {
++				req.PermissionMode = agentic.PermissionModeYolo
++				req.NativeArgs = []string{"--permission-mode", "plan"}
++			},
++			mutate: func(launch *agentic.LaunchRequest) { launch.NativeArgs = nil },
++		},
++	}
++
++	for _, tc := range tests {
++		t.Run(tc.name, func(t *testing.T) {
++			registry, vendor, workDir := newPermissionAdmissionFixture(t, tc.mutate)
++			req := permissionAdmissionRequest(workDir)
++			tc.configure(&req)
++			_, err := vendorplugin.BuildLaunchWithEnvironment(context.Background(), registry, req, agentic.LaunchModeInteractive)
++			if !errors.Is(err, vendorplugin.ErrVendorContract) {
++				t.Fatalf("BuildLaunchWithEnvironment err = %v, want ErrVendorContract", err)
++			}
++			if vendor.spawnCalls != 1 {
++				t.Fatalf("vendor Spawn calls = %d, want one admission call", vendor.spawnCalls)
++			}
++		})
++	}
++}
++
++func TestBuildLaunchWithEnvironmentKeepsNativeArgsSnapshotOutsideVendorOwnership(t *testing.T) {
++	mutateRequest := func(req *vendorplugin.SpawnRequest) {
++		req.NativeArgs[0] = "--dangerously-skip-permissions"
++	}
++	registry, vendor, workDir := newPermissionAdmissionFixture(t, nil)
++	vendor.mutateRequest = mutateRequest
++	req := permissionAdmissionRequest(workDir)
++	req.PermissionMode = agentic.PermissionModeNative
++	req.NativeArgs = []string{"--verbose"}
++
++	_, err := vendorplugin.BuildLaunchWithEnvironment(context.Background(), registry, req, agentic.LaunchModeInteractive)
++	if !errors.Is(err, vendorplugin.ErrVendorContract) {
++		t.Fatalf("BuildLaunchWithEnvironment err = %v, want ErrVendorContract after Vendor.Spawn changed its owned request copy", err)
++	}
++	if !reflect.DeepEqual(req.NativeArgs, []string{"--verbose"}) {
++		t.Fatalf("the caller's NativeArgs changed to %#v", req.NativeArgs)
++	}
++	if vendor.spawnCalls != 1 {
++		t.Fatalf("vendor Spawn calls = %d, want one admission call", vendor.spawnCalls)
++	}
++}
+diff --git a/pkg/agentic/systems/codex/argvguard_test.go b/pkg/agentic/systems/codex/argvguard_test.go
+index ae31959..fd69f92 100644
+--- a/pkg/agentic/systems/codex/argvguard_test.go
++++ b/pkg/agentic/systems/codex/argvguard_test.go
+@@ -83,8 +83,9 @@ var codexArgvConstructionAllowlist = map[string]string{
+ 	// against, never argv this plugin emits. It names the two keys Args
+ 	// itself spells because the closed set must recognize the module's
+ 	// own transports as known.
+-	argvguard.AllowlistKey(codexPolicyFile, "knownConfigKeys"):    "the closed -c/--config key set the yolo scan classifies against; classification data, not a construction",
+-	argvguard.AllowlistKey(codexPolicyFile, "knownSandboxValues"): "the pinned -s/--sandbox value set the yolo scan classifies against; classification data, not a construction",
++	argvguard.AllowlistKey(codexPolicyFile, "knownConfigKeys"):           "the closed -c/--config key set the yolo scan classifies against; classification data, not a construction",
++	argvguard.AllowlistKey(codexPolicyFile, "knownSandboxValues"):        "the pinned -s/--sandbox value set the yolo scan classifies against; classification data, not a construction",
++	argvguard.AllowlistKey(codexPolicyFile, "classifyStoredSandboxMode"): "classifies the already-known sandbox values read from stored config; it emits no argv",
+ 	// The yolo scan over caller native arguments: it reads the key set
+ 	// and the bypass const to COMPARE, and refuses or forwards — it
+ 	// appends no flag of its own, so a second construction hiding behind
+diff --git a/pkg/agentic/systems/codex/policy.go b/pkg/agentic/systems/codex/policy.go
+index 5cecad5..fb34bd4 100644
+--- a/pkg/agentic/systems/codex/policy.go
++++ b/pkg/agentic/systems/codex/policy.go
+@@ -50,6 +50,14 @@ var knownConfigKeys = map[string]bool{
+ var knownApprovalValues = map[string]bool{"on-request": true, "never": true}
+ var knownSandboxValues = map[string]bool{"read-only": true, "workspace-write": true, "danger-full-access": true}
+ 
++// classifyStoredSandboxMode separates the recognized stored values from the
++// ones that relax the sandbox. Keeping the provider's closed value set here
++// avoids a second spelling in the settings inspector.
++func classifyStoredSandboxMode(mode string) (known, relaxing bool) {
++	known = knownSandboxValues[mode]
++	return known, known && mode != "read-only"
++}
++
+ const approveForMeFlag = "--approve-for-me"
+ 
+ // mcpServersKeyPrefix admits the composition-evidenced config shape:
+diff --git a/pkg/agentic/systems/codex/storedpolicy.go b/pkg/agentic/systems/codex/storedpolicy.go
+new file mode 100644
+index 0000000..ca9071b
+--- /dev/null
++++ b/pkg/agentic/systems/codex/storedpolicy.go
+@@ -0,0 +1,323 @@
++package codex
++
++import (
++	"encoding/json"
++	"errors"
++	"fmt"
++	"os"
++	"path/filepath"
++	"strings"
++
++	"github.com/pelletier/go-toml/v2"
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
++
++const codexManagedPolicySource = "system or cloud-managed configuration and requirements"
++
++// InspectStoredPolicy reads the user configuration, the configuration file
++// in the supplied working directory, and a user-selected profile file. It
++// never reads the process environment or resolves provider precedence.
++func (*System) InspectStoredPolicy(ctx agentic.StoredPolicyContext) agentic.StoredPolicyInspection {
++	result := agentic.StoredPolicyInspection{Support: agentic.StoredPolicySupported}
++	home := codexPolicyEnvValue(ctx.Environment, "HOME")
++	configRoot := codexPolicyEnvValue(ctx.Environment, "CODEX_HOME")
++	if strings.TrimSpace(configRoot) == "" {
++		configRoot = ctx.Home
++	}
++	if strings.TrimSpace(configRoot) == "" && home != "" {
++		configRoot = filepath.Join(home, ".codex")
++	}
++
++	var root string
++	rootOK := false
++	if root, rootOK = resolveCodexConfigRoot(configRoot, home, ctx.WorkDir); rootOK {
++		userPath := filepath.Join(root, "config.toml")
++		userConfig, userReadErr := readCodexConfig(userPath)
++		var profileName string
++		var userProfileErr error
++		if userReadErr != nil {
++			result.SourcesNotInspected = append(result.SourcesNotInspected, agentic.StoredPolicySourceIssue{
++				SourcePath: userPath,
++				Reason:     codexReadFailure(userReadErr),
++			})
++			if !errors.Is(userReadErr, os.ErrNotExist) {
++				result.SourcesNotInspected = append(result.SourcesNotInspected, agentic.StoredPolicySourceIssue{
++					SourcePath: filepath.Join(root, "<selected-profile>.config.toml"),
++					Reason:     agentic.StoredPolicySourceUnknownSelection,
++				})
++			}
++		} else {
++			profileName, userProfileErr = codexSelectedProfile(userConfig)
++			if userProfileErr != nil {
++				result.SourcesNotInspected = append(result.SourcesNotInspected, agentic.StoredPolicySourceIssue{
++					SourcePath: userPath,
++					Reason:     agentic.StoredPolicySourceUnparseable,
++				})
++			} else {
++				inspectCodexConfig(&result, userPath, userConfig)
++			}
++		}
++
++		if projectRoot, ok := resolveCodexProjectRoot(ctx.WorkDir); ok {
++			projectPath := filepath.Join(projectRoot, ".codex", "config.toml")
++			projectConfig, err := readCodexConfig(projectPath)
++			if err != nil {
++				result.SourcesNotInspected = append(result.SourcesNotInspected, agentic.StoredPolicySourceIssue{
++					SourcePath: projectPath,
++					Reason:     codexReadFailure(err),
++				})
++			} else {
++				inspectCodexConfig(&result, projectPath, projectConfig)
++			}
++		} else {
++			result.SourcesNotInspected = append(result.SourcesNotInspected, agentic.StoredPolicySourceIssue{
++				SourcePath: filepath.Join("<workdir>", ".codex", "config.toml"),
++				Reason:     agentic.StoredPolicySourceRootUnavailable,
++			})
++		}
++
++		if userReadErr == nil {
++			if userProfileErr != nil {
++				result.SourcesNotInspected = append(result.SourcesNotInspected, agentic.StoredPolicySourceIssue{
++					SourcePath: filepath.Join(root, "<selected-profile>.config.toml"),
++					Reason:     agentic.StoredPolicySourceUnknownSelection,
++				})
++			} else if profileName != "" {
++				if profilePath, ok := codexProfilePath(root, profileName); ok {
++					profileConfig, err := readCodexConfig(profilePath)
++					if err != nil {
++						result.SourcesNotInspected = append(result.SourcesNotInspected, agentic.StoredPolicySourceIssue{
++							SourcePath: profilePath,
++							Reason:     codexReadFailure(err),
++						})
++					} else {
++						inspectCodexConfig(&result, profilePath, profileConfig)
++					}
++				} else {
++					result.SourcesNotInspected = append(result.SourcesNotInspected, agentic.StoredPolicySourceIssue{
++						SourcePath: filepath.Join(root, "<selected-profile>.config.toml"),
++						Reason:     agentic.StoredPolicySourceUnknownSelection,
++					})
++				}
++			}
++		}
++	} else {
++		result.SourcesNotInspected = append(result.SourcesNotInspected, agentic.StoredPolicySourceIssue{
++			SourcePath: "${CODEX_HOME}/config.toml or ${HOME}/.codex/config.toml",
++			Reason:     agentic.StoredPolicySourceRootUnavailable,
++		})
++		if _, ok := resolveCodexProjectRoot(ctx.WorkDir); !ok {
++			result.SourcesNotInspected = append(result.SourcesNotInspected, agentic.StoredPolicySourceIssue{
++				SourcePath: filepath.Join("<workdir>", ".codex", "config.toml"),
++				Reason:     agentic.StoredPolicySourceRootUnavailable,
++			})
++		} else {
++			projectPath := filepath.Join(filepath.Clean(ctx.WorkDir), ".codex", "config.toml")
++			projectConfig, err := readCodexConfig(projectPath)
++			if err != nil {
++				result.SourcesNotInspected = append(result.SourcesNotInspected, agentic.StoredPolicySourceIssue{
++					SourcePath: projectPath,
++					Reason:     codexReadFailure(err),
++				})
++			} else {
++				inspectCodexConfig(&result, projectPath, projectConfig)
++			}
++		}
++	}
++
++	result.SourcesNotInspected = append(result.SourcesNotInspected, agentic.StoredPolicySourceIssue{
++		SourcePath: codexManagedPolicySource,
++		Reason:     agentic.StoredPolicySourceNotProvided,
++	})
++	return result
++}
++
++var (
++	errCodexConfigRoot        = errors.New("codex configuration root is not a TOML table")
++	errCodexConfigUnparseable = errors.New("codex configuration is not parseable TOML")
++)
++
++func readCodexConfig(path string) (map[string]any, error) {
++	data, err := os.ReadFile(path)
++	if err != nil {
++		return nil, err
++	}
++	var config map[string]any
++	if err := toml.Unmarshal(data, &config); err != nil {
++		return nil, errors.Join(errCodexConfigUnparseable, err)
++	}
++	if config == nil {
++		return nil, errCodexConfigRoot
++	}
++	return config, nil
++}
++
++func inspectCodexConfig(result *agentic.StoredPolicyInspection, path string, config map[string]any) {
++	relaxations, err := codexPolicyRelaxations(config, path)
++	if err != nil {
++		result.SourcesNotInspected = append(result.SourcesNotInspected, agentic.StoredPolicySourceIssue{
++			SourcePath: path,
++			Reason:     agentic.StoredPolicySourceUnparseable,
++		})
++		return
++	}
++	result.SourcesInspected = append(result.SourcesInspected, path)
++	result.Relaxations = append(result.Relaxations, relaxations...)
++}
++
++func codexPolicyRelaxations(config map[string]any, sourcePath string) ([]agentic.StoredPolicyRelaxation, error) {
++	var relaxations []agentic.StoredPolicyRelaxation
++	if value, found := config["approval_policy"]; found {
++		if mode, ok := value.(string); ok {
++			switch mode {
++			case "never":
++				relaxations = append(relaxations, codexRelaxation("approval_policy", mode, sourcePath))
++			case "on-request", "on-failure", "untrusted":
++			default:
++				return nil, fmt.Errorf("unrecognized approval_policy value %q", mode)
++			}
++		} else if !validGranularApprovalPolicy(value) {
++			return nil, errors.New("unrecognized approval_policy value")
++		}
++	}
++	if value, found := config["sandbox_mode"]; found {
++		mode, ok := value.(string)
++		if !ok {
++			return nil, errors.New("sandbox_mode is not a string")
++		}
++		known, relaxing := classifyStoredSandboxMode(mode)
++		if !known {
++			return nil, fmt.Errorf("unrecognized sandbox_mode value %q", mode)
++		}
++		if relaxing {
++			relaxations = append(relaxations, codexRelaxation("sandbox_mode", mode, sourcePath))
++		}
++	}
++	if value, found := config["sandbox_permissions"]; found && codexPermissionValueIsRelaxing(value) {
++		encoded, err := json.Marshal(value)
++		if err != nil {
++			return nil, fmt.Errorf("sandbox_permissions cannot be rendered: %w", err)
++		}
++		relaxations = append(relaxations, codexRelaxation("sandbox_permissions", string(encoded), sourcePath))
++	}
++	return relaxations, nil
++}
++
++func validGranularApprovalPolicy(value any) bool {
++	policy, ok := value.(map[string]any)
++	if !ok || len(policy) != 1 {
++		return false
++	}
++	granular, ok := policy["granular"].(map[string]any)
++	if !ok {
++		return false
++	}
++	for key, value := range granular {
++		switch key {
++		case "sandbox_approval", "rules", "mcp_elicitations", "request_permissions", "skill_approval":
++			if _, ok := value.(bool); !ok {
++				return false
++			}
++		default:
++			return false
++		}
++	}
++	return true
++}
++
++func codexPermissionValueIsRelaxing(value any) bool {
++	switch value := value.(type) {
++	case bool:
++		return value
++	case string:
++		return strings.TrimSpace(value) != ""
++	case []any:
++		for _, item := range value {
++			if codexPermissionValueIsRelaxing(item) {
++				return true
++			}
++		}
++	case map[string]any:
++		for _, item := range value {
++			if codexPermissionValueIsRelaxing(item) {
++				return true
++			}
++		}
++	case int64:
++		return value > 0
++	case float64:
++		return value > 0
++	}
++	return false
++}
++
++func codexRelaxation(selector, value, sourcePath string) agentic.StoredPolicyRelaxation {
++	return agentic.StoredPolicyRelaxation{Selector: selector, Value: value, SourcePath: sourcePath}
++}
++
++func codexSelectedProfile(config map[string]any) (string, error) {
++	value, found := config["profile"]
++	if !found {
++		return "", nil
++	}
++	name, ok := value.(string)
++	if !ok || strings.TrimSpace(name) != name {
++		return "", errors.New("codex profile selector is not a string")
++	}
++	return name, nil
++}
++
++func codexProfilePath(root, name string) (string, bool) {
++	if name == "" || name == "." || name == ".." || filepath.Base(name) != name || strings.ContainsAny(name, "/\\\x00") {
++		return "", false
++	}
++	return filepath.Join(root, name+".config.toml"), true
++}
++
++func codexReadFailure(err error) agentic.StoredPolicySourceReason {
++	if errors.Is(err, os.ErrNotExist) {
++		return agentic.StoredPolicySourceAbsent
++	}
++	if errors.Is(err, errCodexConfigRoot) || errors.Is(err, errCodexConfigUnparseable) {
++		return agentic.StoredPolicySourceUnparseable
++	}
++	return agentic.StoredPolicySourceUnreadable
++}
++
++func codexPolicyEnvValue(env []string, name string) string {
++	value := ""
++	for _, entry := range env {
++		key, candidate, found := strings.Cut(entry, "=")
++		if found && key == name {
++			value = candidate
++		}
++	}
++	return value
++}
++
++func resolveCodexConfigRoot(raw, home, workDir string) (string, bool) {
++	raw = strings.TrimSpace(raw)
++	if raw == "" {
++		return "", false
++	}
++	if raw == "~" || strings.HasPrefix(raw, "~/") || strings.HasPrefix(raw, "~\\") {
++		if home == "" {
++			return "", false
++		}
++		raw = filepath.Join(home, strings.TrimLeft(raw[1:], "/\\"))
++	}
++	if !filepath.IsAbs(raw) {
++		if !filepath.IsAbs(workDir) {
++			return "", false
++		}
++		raw = filepath.Join(workDir, raw)
++	}
++	return filepath.Clean(raw), true
++}
++
++func resolveCodexProjectRoot(workDir string) (string, bool) {
++	if !filepath.IsAbs(workDir) {
++		return "", false
++	}
++	return filepath.Clean(workDir), true
++}
+diff --git a/pkg/agentic/systems/codex/storedpolicy_test.go b/pkg/agentic/systems/codex/storedpolicy_test.go
+new file mode 100644
+index 0000000..594c533
+--- /dev/null
++++ b/pkg/agentic/systems/codex/storedpolicy_test.go
+@@ -0,0 +1,220 @@
++package codex
++
++import (
++	"os"
++	"path/filepath"
++	"runtime"
++	"testing"
++
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
++
++func TestStoredPolicyInspectorReportsEveryKnownSelectorAtEveryLocalSource(t *testing.T) {
++	sources := []struct {
++		name string
++		path func(root, workDir string) string
++	}{
++		{"user", func(root, _ string) string { return filepath.Join(root, "config.toml") }},
++		{"project", func(_, workDir string) string { return filepath.Join(workDir, ".codex", "config.toml") }},
++		{"selected-profile", func(root, _ string) string { return filepath.Join(root, "fast.config.toml") }},
++	}
++	selectors := []struct {
++		name     string
++		selector string
++		value    string
++		setting  string
++	}{
++		{"approval-policy", "approval_policy", "never", `approval_policy = "never"`},
++		{"sandbox-mode", "sandbox_mode", "danger-full-access", `sandbox_mode = "danger-full-access"`},
++		{"sandbox-permissions", "sandbox_permissions", `["disk-write-access"]`, `sandbox_permissions = ["disk-write-access"]`},
++	}
++
++	for _, source := range sources {
++		for _, selector := range selectors {
++			t.Run(source.name+"/"+selector.name, func(t *testing.T) {
++				root := t.TempDir()
++				home := filepath.Join(root, "home")
++				configRoot := filepath.Join(home, ".codex")
++				workDir := filepath.Join(root, "project")
++				path := source.path(configRoot, workDir)
++				if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
++					t.Fatal(err)
++				}
++				if source.name != "user" {
++					if err := os.MkdirAll(configRoot, 0o700); err != nil {
++						t.Fatal(err)
++					}
++					if err := os.WriteFile(filepath.Join(configRoot, "config.toml"), []byte("profile = \"fast\"\n"), 0o600); err != nil {
++						t.Fatal(err)
++					}
++				}
++				content := selector.setting + "\n"
++				if source.name == "user" {
++					content = "profile = \"fast\"\n" + content
++				}
++				if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
++					t.Fatal(err)
++				}
++
++				report := agentic.InspectStoredPolicy(New(), agentic.Plan{
++					Env:     []string{"HOME=" + home, "CODEX_HOME=" + configRoot},
++					Home:    filepath.Join(root, "decoy", ".codex"),
++					WorkDir: workDir,
++				})
++				if report.Support != agentic.StoredPolicySupported {
++					t.Fatalf("Support = %q, want supported", report.Support)
++				}
++				if !codexStoredPolicyContains(report.SourcesInspected, path) {
++					t.Fatalf("sources inspected = %v, want %q", report.SourcesInspected, path)
++				}
++				if len(report.Relaxations) != 1 {
++					t.Fatalf("relaxations = %#v, want exactly one row", report.Relaxations)
++				}
++				got := report.Relaxations[0]
++				if got.Selector != selector.selector || got.Value != selector.value || got.SourcePath != path {
++					t.Fatalf("relaxation = %#v, want selector=%q value=%q source=%q", got, selector.selector, selector.value, path)
++				}
++			})
++		}
++	}
++}
++
++func TestStoredPolicyInspectorDoesNotCallMalformedOrAbsentConfigClean(t *testing.T) {
++	root := t.TempDir()
++	home := filepath.Join(root, "home")
++	configRoot := filepath.Join(home, ".codex")
++	workDir := filepath.Join(root, "project")
++	userPath := filepath.Join(configRoot, "config.toml")
++	if err := os.MkdirAll(configRoot, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(userPath, []byte("approval_policy = \"never\"\n[broken\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++
++	report := New().InspectStoredPolicy(agentic.StoredPolicyContext{
++		Environment: []string{"HOME=" + home, "CODEX_HOME=" + configRoot},
++		Home:        "~/.codex",
++		WorkDir:     workDir,
++	})
++	if codexStoredPolicyContains(report.SourcesInspected, userPath) {
++		t.Fatalf("malformed source %q was marked inspected: %#v", userPath, report)
++	}
++	if !codexHasSourceIssue(report, userPath, agentic.StoredPolicySourceUnparseable) {
++		t.Fatalf("malformed source issue missing: %#v", report.SourcesNotInspected)
++	}
++	if !codexHasSourceIssue(report, filepath.Join(workDir, ".codex", "config.toml"), agentic.StoredPolicySourceAbsent) {
++		t.Fatalf("absent project source missing: %#v", report.SourcesNotInspected)
++	}
++	if len(report.Relaxations) != 0 {
++		t.Fatalf("relaxation from malformed source was retained: %#v", report.Relaxations)
++	}
++}
++
++func TestStoredPolicyInspectorReportsUnreadableMode000Config(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("POSIX mode bits are unavailable on Windows")
++	}
++	root := t.TempDir()
++	home := filepath.Join(root, "home")
++	configRoot := filepath.Join(home, ".codex")
++	path := filepath.Join(configRoot, "config.toml")
++	if err := os.MkdirAll(configRoot, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(path, []byte("approval_policy = \"never\"\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Chmod(path, 0); err != nil {
++		t.Fatal(err)
++	}
++	defer func() {
++		if err := os.Chmod(path, 0o600); err != nil {
++			t.Errorf("restore readable mode: %v", err)
++		}
++	}()
++	if _, err := os.ReadFile(path); err == nil {
++		t.Skip("the test process can read a mode-000 file, so this host cannot reproduce unreadability")
++	}
++
++	report := New().InspectStoredPolicy(agentic.StoredPolicyContext{
++		Environment: []string{"HOME=" + home, "CODEX_HOME=" + configRoot},
++		Home:        "~/.codex",
++		WorkDir:     root,
++	})
++	if codexStoredPolicyContains(report.SourcesInspected, path) || len(report.Relaxations) != 0 {
++		t.Fatalf("unreadable source was treated as clean or inspected: %#v", report)
++	}
++	if !codexHasSourceIssue(report, path, agentic.StoredPolicySourceUnreadable) {
++		t.Fatalf("unreadable source issue missing: %#v", report.SourcesNotInspected)
++	}
++}
++
++func TestStoredPolicyInspectorRefusesProfilePathTraversal(t *testing.T) {
++	root := t.TempDir()
++	home := filepath.Join(root, "home")
++	configRoot := filepath.Join(home, ".codex")
++	workDir := filepath.Join(root, "project")
++	if err := os.MkdirAll(configRoot, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(configRoot, "config.toml"), []byte("profile = \"../outside\"\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	outsideProfile := filepath.Join(home, "outside.config.toml")
++	if err := os.WriteFile(outsideProfile, []byte("approval_policy = \"never\"\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++
++	report := New().InspectStoredPolicy(agentic.StoredPolicyContext{
++		Environment: []string{"HOME=" + home, "CODEX_HOME=" + configRoot},
++		Home:        "~/.codex",
++		WorkDir:     workDir,
++	})
++	if len(report.Relaxations) != 0 {
++		t.Fatalf("traversal profile was read: %#v", report.Relaxations)
++	}
++	if !codexHasSourceIssue(report, filepath.Join(configRoot, "<selected-profile>.config.toml"), agentic.StoredPolicySourceUnknownSelection) {
++		t.Fatalf("invalid selected-profile source was not reported: %#v", report.SourcesNotInspected)
++	}
++}
++
++func TestStoredPolicyInspectorIgnoresKnownRestrictiveValues(t *testing.T) {
++	root := t.TempDir()
++	home := filepath.Join(root, "home")
++	configRoot := filepath.Join(home, ".codex")
++	path := filepath.Join(configRoot, "config.toml")
++	if err := os.MkdirAll(configRoot, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(path, []byte("approval_policy = \"on-request\"\nsandbox_mode = \"read-only\"\nsandbox_permissions = []\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	report := New().InspectStoredPolicy(agentic.StoredPolicyContext{
++		Environment: []string{"HOME=" + home}, Home: "~/.codex", WorkDir: root,
++	})
++	if len(report.Relaxations) != 0 {
++		t.Fatalf("restrictive values reported as relaxations: %#v", report.Relaxations)
++	}
++	if !codexStoredPolicyContains(report.SourcesInspected, path) {
++		t.Fatalf("valid restrictive config was not inspected: %#v", report)
++	}
++}
++
++func codexStoredPolicyContains(values []string, want string) bool {
++	for _, value := range values {
++		if value == want {
++			return true
++		}
++	}
++	return false
++}
++
++func codexHasSourceIssue(report agentic.StoredPolicyInspection, path string, reason agentic.StoredPolicySourceReason) bool {
++	for _, issue := range report.SourcesNotInspected {
++		if issue.SourcePath == path && issue.Reason == reason {
++			return true
++		}
++	}
++	return false
++}
+diff --git a/pkg/agentic/systems/pi/storedpolicy_test.go b/pkg/agentic/systems/pi/storedpolicy_test.go
+new file mode 100644
+index 0000000..9f7a6ac
+--- /dev/null
++++ b/pkg/agentic/systems/pi/storedpolicy_test.go
+@@ -0,0 +1,17 @@
++package pi
++
++import (
++	"testing"
++
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
++
++func TestStoredPolicyInspectorReportsUnsupported(t *testing.T) {
++	got := agentic.InspectStoredPolicy(New(&fakeStatusReader{}), agentic.Plan{})
++	if got.Support != agentic.StoredPolicyUnsupported {
++		t.Fatalf("Support = %q, want unsupported", got.Support)
++	}
++	if len(got.Relaxations) != 0 || len(got.SourcesInspected) != 0 || len(got.SourcesNotInspected) != 0 {
++		t.Fatalf("unsupported inspection made claims about settings: %#v", got)
++	}
++}
+diff --git a/pkg/vendorplugin/plugin.go b/pkg/vendorplugin/plugin.go
+index f4efaf9..ca98ba6 100644
+--- a/pkg/vendorplugin/plugin.go
++++ b/pkg/vendorplugin/plugin.go
+@@ -71,20 +71,23 @@ func PassthroughLaunch(sc SpawnContext) agentic.LaunchRequest {
+ // records as unresolved.
+ func passthroughLaunchRequest(system agentic.SystemID, model Model, effort string, req SpawnRequest) agentic.LaunchRequest {
+ 	return agentic.LaunchRequest{
+-		System:      system,
+-		Model:       model.Launchable(),
+-		Effort:      effort,
+-		PromptPath:  req.PromptPath,
+-		Prompt:      req.Prompt,
+-		WorkDir:     req.WorkDir,
+-		Home:        req.Home,
+-		Env:         req.Env,
+-		Run:         req.Run,
+-		Profile:     req.Profile,
+-		Goal:        req.Goal,
+-		Budget:      req.Budget,
+-		ServiceTier: req.ServiceTier,
+-		Composition: req.Composition,
+-		Deadline:    req.Deadline,
++		System:         system,
++		Model:          model.Launchable(),
++		Effort:         effort,
++		PromptPath:     req.PromptPath,
++		Prompt:         req.Prompt,
++		WorkDir:        req.WorkDir,
++		Home:           req.Home,
++		Env:            req.Env,
++		Run:            req.Run,
++		Profile:        req.Profile,
++		Goal:           req.Goal,
++		Budget:         req.Budget,
++		ServiceTier:    req.ServiceTier,
++		Composition:    req.Composition,
++		Deadline:       req.Deadline,
++		PermissionMode: req.PermissionMode,
++		ToolRelease:    req.ToolRelease,
++		NativeArgs:     append([]string(nil), req.NativeArgs...),
+ 	}
+ }
+diff --git a/pkg/vendorplugin/spawn.go b/pkg/vendorplugin/spawn.go
+index d7a9a89..1372883 100644
+--- a/pkg/vendorplugin/spawn.go
++++ b/pkg/vendorplugin/spawn.go
+@@ -111,6 +111,17 @@ type SpawnRequest struct {
+ 	ServiceTier string
+ 	Composition agentic.Composition
+ 
++	// PermissionMode is the interactive permission posture admitted by the
++	// agentic system plugin. The vendor layer carries it without interpreting
++	// provider policy.
++	PermissionMode agentic.PermissionMode
++	// ToolRelease is the running harness release established by the caller.
++	// The agentic plugin uses it to select its verified permission grammar.
++	ToolRelease string
++	// NativeArgs are caller-supplied harness arguments, forwarded unchanged to
++	// the agentic plugin for interactive planning.
++	NativeArgs []string
++
+ 	// Deadline is the hard fence the caller enforces on the child process,
+ 	// projected verbatim onto LaunchRequest.Deadline so a harness that fences
+ 	// its own turn (pi --deadline) fences at the caller's budget. Zero means
+@@ -168,6 +179,10 @@ func buildLaunch(ctx context.Context, r *Registry, req SpawnRequest, mode agenti
+ 	if r == nil {
+ 		return agentic.Plan{}, errors.New("vendorplugin: cannot build a launch without a registry")
+ 	}
++	// Keep an admission-owned snapshot. Vendor.Spawn receives its own copy so
++	// it cannot mutate the caller's permission arguments before fidelity checks
++	// and the agentic plugin see them.
++	req.NativeArgs = append([]string(nil), req.NativeArgs...)
+ 	binding, err := resolveLaunchBinding(r, req.Runtime)
+ 	if err != nil {
+ 		return agentic.Plan{}, err
+@@ -214,11 +229,13 @@ func buildLaunch(ctx context.Context, r *Registry, req SpawnRequest, mode agenti
+ 		launch = passthroughLaunchRequest(binding.SystemID, model, effort, req)
+ 	} else {
+ 		runtime := binding.Runtime()
++		vendorRequest := req
++		vendorRequest.NativeArgs = append([]string(nil), req.NativeArgs...)
+ 		launch, err = binding.Vendor.Spawn(SpawnContext{
+ 			Runtime: runtime,
+ 			Model:   model,
+ 			Effort:  effort,
+-			Request: req,
++			Request: vendorRequest,
+ 		})
+ 		if err != nil {
+ 			return agentic.Plan{}, fmt.Errorf("vendorplugin: vendor %s could not build the launch request for model %q: %w", binding.VendorID, model.ID, err)
+@@ -453,6 +470,15 @@ func checkLaunchFidelity(runtime Runtime, model Model, effort string, req SpawnR
+ 	if !reflect.DeepEqual(launch.Composition, req.Composition) {
+ 		return fmt.Errorf("%w: vendor %s changed the launch composition; the MCP servers a child can reach are the caller's decision", ErrVendorContract, runtime.VendorID)
+ 	}
++	if launch.PermissionMode != req.PermissionMode {
++		return fmt.Errorf("%w: vendor %s changed the caller's permission mode", ErrVendorContract, runtime.VendorID)
++	}
++	if launch.ToolRelease != req.ToolRelease {
++		return fmt.Errorf("%w: vendor %s changed the caller's verified tool release", ErrVendorContract, runtime.VendorID)
++	}
++	if !reflect.DeepEqual(launch.NativeArgs, req.NativeArgs) {
++		return fmt.Errorf("%w: vendor %s changed the caller's native arguments", ErrVendorContract, runtime.VendorID)
++	}
+ 	return nil
+ }
+ 
