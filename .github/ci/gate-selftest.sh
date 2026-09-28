@@ -1087,11 +1087,18 @@ cat >"$FAKEBIN/rustup" <<'EOF'
 echo "rustup $*" >>"$FAKE_RUSTUP_LOG"
 if [ "$1" = "show" ]; then
 	echo "1.92.0-test (overridden by fake rust-toolchain.toml)"
+elif [ "$1" = "which" ]; then
+	if [ -n "${FAKE_PINNED_RUSTC:-}" ]; then
+		echo "$FAKE_PINNED_RUSTC"
+	else
+		echo "rustup which fallback is unavailable in this fixture" >&2
+		exit 1
+	fi
 fi
 EOF
 chmod +x "$FAKEBIN/rustup"
-printf '#!/usr/bin/env bash\necho "rustc fake"\n' >"$FAKEBIN/rustc"
-printf '#!/usr/bin/env bash\necho "cargo fake"\n' >"$FAKEBIN/cargo"
+printf '#!/usr/bin/env bash\necho "rustc fake: $0"\n' >"$FAKEBIN/rustc"
+printf '#!/usr/bin/env bash\necho "cargo fake: $0"\n' >"$FAKEBIN/cargo"
 chmod +x "$FAKEBIN/rustc" "$FAKEBIN/cargo"
 
 printf '[toolchain]\nchannel = "1.92.0"\nprofile = "minimal"\n' >"$WORK/rust-install-channel.toml"
@@ -1125,6 +1132,26 @@ for _entry in $PATH; do
 done
 IFS="$OLDIFS"
 
+# For the Homebrew-keg fixture, also remove any preinstalled rustc/cargo
+# directories so only its explicit keg proxies can satisfy the PATH checks.
+NO_RUST_TOOLS_PATH=""
+OLDIFS="$IFS"; IFS=':'
+# shellcheck disable=SC2086
+for _entry in $PATH; do
+	[ -n "$_entry" ] || _entry='.'
+	if [ -x "$_entry/rustup" ] || [ -x "$_entry/rustup.exe" ] || \
+	   [ -x "$_entry/rustc" ] || [ -x "$_entry/rustc.exe" ] || \
+	   [ -x "$_entry/cargo" ] || [ -x "$_entry/cargo.exe" ]; then
+		continue
+	fi
+	if [ -z "$NO_RUST_TOOLS_PATH" ]; then
+		NO_RUST_TOOLS_PATH="$_entry"
+	else
+		NO_RUST_TOOLS_PATH="$NO_RUST_TOOLS_PATH:$_entry"
+	fi
+done
+IFS="$OLDIFS"
+
 # rustup present ONLY under CARGO_HOME/bin: the self-hosted runner service
 # starts from launchd with a minimal PATH and the lane shell reads no
 # profiles, so a per-user rustup (~/.cargo/bin, --no-modify-path) is
@@ -1153,36 +1180,106 @@ else
 	ok 'the CARGO_HOME-only success prints no diagnostics block'
 fi
 
-# rustup present ONLY under a Homebrew prefix: the Homebrew formula keeps
-# the rustup binary at $HOMEBREW_PREFIX/bin and puts only the toolchain
-# proxies under ~/.cargo/bin, so a launchd-started runner (PATH without
-# /opt/homebrew/bin) sees no rustup on PATH or in CARGO_HOME/bin (rose-air
-# run 35306933411). HOMEBREW_PREFIX points at a fake prefix so the row
-# drives the probe without depending on a real /opt/homebrew on this host.
+# Simulate the Homebrew rustup formula: `rustup` is linked into the prefix's
+# bin directory, but its rustc/cargo proxies exist only beside the real
+# executable in the versioned keg. Git Bash on Windows does not guarantee
+# real symlink support, and Homebrew's layout is POSIX-only.
+case "$(uname -s)" in
+	MINGW*|MSYS*|CYGWIN*)
+		skip 'Homebrew rustup keg fixture and mutant' 'Homebrew layout is POSIX-only; Windows Git Bash does not guarantee real symlinks'
+		;;
+	*)
 BREWBIN="$WORK/fake-brew/bin"
+BREWKEGBIN="$WORK/fake-brew/Cellar/rustup/1.28.2/bin"
 BREWCARGO="$WORK/fake-cargo-brew/bin"
-mkdir -p "$BREWBIN" "$BREWCARGO"
-cp "$FAKEBIN/rustup" "$BREWBIN/"
-cp "$FAKEBIN/rustc" "$FAKEBIN/cargo" "$BREWCARGO/"
+mkdir -p "$BREWBIN" "$BREWKEGBIN" "$BREWCARGO"
+cp "$FAKEBIN/rustup" "$BREWKEGBIN/rustup"
+cp "$FAKEBIN/rustc" "$FAKEBIN/cargo" "$BREWKEGBIN/"
+ln -s ../Cellar/rustup/1.28.2/bin/rustup "$BREWBIN/rustup"
+BREWKEG_REALBIN="$(cd -P "$BREWKEGBIN" && pwd)"
 : >"$WORK/rustup-log-brew.txt"; : >"$WORK/github-path-brew.txt"
-assert 'the installer finds rustup under the Homebrew prefix without PATH help' 0 \
-	env PATH="$NORUSTPATH" FAKE_RUSTUP_LOG="$WORK/rustup-log-brew.txt" GITHUB_PATH="$WORK/github-path-brew.txt" \
+assert 'the Homebrew fixture links rustup from bin into its versioned keg' 0 \
+	bash -c 'test -L "$1/rustup" && test "$(readlink "$1/rustup")" = ../Cellar/rustup/1.28.2/bin/rustup' _ "$BREWBIN"
+assert 'the Homebrew fixture keeps compiler proxies only in the keg' 0 \
+	bash -c 'test -x "$1/rustc" && test -x "$1/cargo" && test ! -e "$2/rustc" && test ! -e "$2/cargo" && test ! -e "$3/rustc" && test ! -e "$3/cargo"' _ "$BREWKEGBIN" "$BREWBIN" "$BREWCARGO"
+assert 'the installer finds rustc and cargo from a Homebrew rustup keg' 0 \
+	env PATH="$NO_RUST_TOOLS_PATH" FAKE_RUSTUP_LOG="$WORK/rustup-log-brew.txt" GITHUB_PATH="$WORK/github-path-brew.txt" \
 	    CARGO_HOME="$WORK/fake-cargo-brew" HOMEBREW_PREFIX="$WORK/fake-brew" RUSTUP_HOME="$WORK/empty-rustup-home" \
 	    CI_RUST_TOOLCHAIN_FILE="$WORK/rust-install-channel.toml" "$BASH_ABS" "$IRS"
 assert_contains 'the Homebrew-prefix install names the filed channel' 'toolchain install 1.92.0 --profile minimal' "$WORK/rustup-log-brew.txt"
+assert_contains 'the rustc invocation resolves to the keg proxy' "rustc fake: $BREWKEG_REALBIN/rustc" "$WORK/out.txt"
+assert_contains 'the cargo invocation resolves to the keg proxy' "cargo fake: $BREWKEG_REALBIN/cargo" "$WORK/out.txt"
 assert_contains 'the Homebrew bin dir is recorded for the rest of the lane' "$WORK/fake-brew/bin" "$WORK/github-path-brew.txt"
 assert_contains 'the CARGO_HOME bin dir (proxies) is still recorded alongside it' "$WORK/fake-cargo-brew/bin" "$WORK/github-path-brew.txt"
-_brew_want="$(printf '%s\n%s' "$WORK/fake-cargo-brew/bin" "$WORK/fake-brew/bin")"
+assert_contains 'the Homebrew keg proxy dir is recorded for the rest of the lane' "$BREWKEG_REALBIN" "$WORK/github-path-brew.txt"
+_brew_want="$(printf '%s\n%s\n%s' "$WORK/fake-cargo-brew/bin" "$WORK/fake-brew/bin" "$BREWKEG_REALBIN")"
 if [ "$(cat "$WORK/github-path-brew.txt")" = "$_brew_want" ]; then
-	ok 'the Homebrew-prefix GITHUB_PATH writes are the shim dirs in order'
+	ok 'the Homebrew GITHUB_PATH writes are CARGO_HOME, prefix, then keg proxies'
 else
-	bad 'the Homebrew-prefix GITHUB_PATH writes are the shim dirs in order' \
+	bad 'the Homebrew GITHUB_PATH writes are CARGO_HOME, prefix, then keg proxies' \
 		"got: $(tr '\n' ' ' <"$WORK/github-path-brew.txt" | cut -c1-200)"
 fi
 if grep -q 'runner diagnostics:' "$WORK/out.txt"; then
-	bad 'the Homebrew-prefix success prints no diagnostics block' "$(tr '\n' ' ' <"$WORK/out.txt" | cut -c1-200)"
+	bad 'the Homebrew-keg success prints no diagnostics block' "$(tr '\n' ' ' <"$WORK/out.txt" | cut -c1-200)"
 else
-	ok 'the Homebrew-prefix success prints no diagnostics block'
+	ok 'the Homebrew-keg success prints no diagnostics block'
+fi
+
+# Narrowing mutant: remove the single production step that adds the resolved
+# Homebrew proxy directory to PATH/GITHUB_PATH. The same fixture must reject
+# it at the compiler check; its rustup-which fallback is unavailable by
+# design, so this specifically proves the keg-proxy row drives that step.
+_keg_step_count="$(grep -cF 'prepend_lane_path "$rustup_proxy_dir"' "$IRS")"
+_keg_mutant="$WORK/install-rust-without-keg-proxies.sh"
+awk 'index($0, "prepend_lane_path \"$rustup_proxy_dir\"") { next } { print }' "$IRS" >"$_keg_mutant"
+_keg_mutant_count="$(grep -cF 'prepend_lane_path "$rustup_proxy_dir"' "$_keg_mutant" || true)"
+if [ "$_keg_step_count" -eq 1 ] && [ "$_keg_mutant_count" -eq 0 ]; then
+	ok 'the Homebrew keg mutant removes exactly the keg PATH step'
+else
+	bad 'the Homebrew keg mutant removes exactly the keg PATH step' \
+		"production occurrences: $_keg_step_count (want 1), mutant: $_keg_mutant_count (want 0)"
+fi
+if "$BASH_ABS" -n "$_keg_mutant"; then
+	ok 'the Homebrew keg mutant is syntactically valid'
+else
+	bad 'the Homebrew keg mutant is syntactically valid' 'bash -n failed; the kill below would prove nothing'
+fi
+assert 'the Homebrew keg self-test rejects a missing keg PATH step' 1 \
+	env PATH="$NO_RUST_TOOLS_PATH" FAKE_RUSTUP_LOG="$WORK/rustup-log-brew-mutant.txt" GITHUB_PATH="$WORK/github-path-brew-mutant.txt" \
+	    CARGO_HOME="$WORK/fake-cargo-brew" HOMEBREW_PREFIX="$WORK/fake-brew" RUSTUP_HOME="$WORK/empty-rustup-home" \
+	    CI_RUST_TOOLCHAIN_FILE="$WORK/rust-install-channel.toml" "$BASH_ABS" "$_keg_mutant"
+assert_contains 'the Homebrew keg mutant fails at the pinned rustc check' \
+	'rust-pin: rustc is not on PATH after installing Rust 1.92.0' "$WORK/out.txt"
+;;
+esac
+
+# If the resolved rustup directory does not contain proxies, rustup's exact
+# pinned `which` result supplies the toolchain bin directory instead.
+FALLBACKBREW="$WORK/fake-brew-fallback"
+FALLBACKKEGBIN="$FALLBACKBREW/Cellar/rustup/1.28.2/bin"
+FALLBACKBIN="$WORK/fake-pinned-toolchain/bin"
+mkdir -p "$FALLBACKBREW/bin" "$FALLBACKKEGBIN" "$FALLBACKBIN"
+cp "$FAKEBIN/rustup" "$FALLBACKKEGBIN/rustup"
+cp "$FAKEBIN/rustc" "$FAKEBIN/cargo" "$FALLBACKBIN/"
+ln -s ../Cellar/rustup/1.28.2/bin/rustup "$FALLBACKBREW/bin/rustup"
+: >"$WORK/rustup-log-fallback.txt"; : >"$WORK/github-path-fallback.txt"
+assert 'the pinned rustup-which fallback finds rustc and cargo' 0 \
+	env PATH="$NO_RUST_TOOLS_PATH" FAKE_PINNED_RUSTC="$FALLBACKBIN/rustc" \
+	    FAKE_RUSTUP_LOG="$WORK/rustup-log-fallback.txt" GITHUB_PATH="$WORK/github-path-fallback.txt" \
+	    CARGO_HOME="$WORK/fake-cargo-brew" HOMEBREW_PREFIX="$FALLBACKBREW" RUSTUP_HOME="$WORK/empty-rustup-home" \
+	    CI_RUST_TOOLCHAIN_FILE="$WORK/rust-install-channel.toml" "$BASH_ABS" "$IRS"
+assert_contains 'the fallback asks rustup for the filed channel compiler' \
+	'which --toolchain 1.92.0 rustc' "$WORK/rustup-log-fallback.txt"
+assert_contains 'the fallback compiler resolves from its pinned toolchain bin' \
+	"rustc fake: $FALLBACKBIN/rustc" "$WORK/out.txt"
+assert_contains 'the fallback cargo resolves from its pinned toolchain bin' \
+	"cargo fake: $FALLBACKBIN/cargo" "$WORK/out.txt"
+_fallback_want="$(printf '%s\n%s\n%s' "$WORK/fake-cargo-brew/bin" "$FALLBACKBREW/bin" "$FALLBACKBIN")"
+if [ "$(cat "$WORK/github-path-fallback.txt")" = "$_fallback_want" ]; then
+	ok 'the pinned fallback GITHUB_PATH writes CARGO_HOME, prefix, then toolchain bin'
+else
+	bad 'the pinned fallback GITHUB_PATH writes CARGO_HOME, prefix, then toolchain bin' \
+		"got: $(tr '\n' ' ' <"$WORK/github-path-fallback.txt" | cut -c1-200)"
 fi
 
 # Absent from PATH, CARGO_HOME/bin and the Homebrew prefix: CARGO_HOME and

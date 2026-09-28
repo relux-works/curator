@@ -13,15 +13,17 @@
 # bootstraps: the hosted images ship it on PATH, and the self-hosted runner
 # gets it once per docs/self-hosted-runner-setup.md -- either under
 # ~/.cargo/bin (or $CARGO_HOME/bin) via rustup.rs, or as the Homebrew
-# formula, which keeps the rustup binary under the Homebrew prefix
-# (/opt/homebrew/bin on Apple silicon) and only the toolchain proxies under
-# ~/.cargo/bin. The runner service starts from launchd with a minimal PATH
+# formula, which links rustup under the Homebrew prefix (/opt/homebrew/bin
+# on Apple silicon) and can keep rustc/cargo proxies in the formula keg. The
+# runner service starts from launchd with a minimal PATH
 # (no /opt/homebrew/bin) and the lane shell reads no profiles, so this
 # script resolves rustup itself, in order: PATH, $CARGO_HOME/bin,
 # $HOMEBREW_PREFIX/bin (if set), /opt/homebrew/bin, /usr/local/bin. The
 # directory that holds rustup is prepended to PATH and GITHUB_PATH before
-# any rustup call; $CARGO_HOME/bin stays on both too because the proxies
-# live there. Resolution never uses RUSTUP_HOME. A runner without rustup in
+# any rustup call; $CARGO_HOME/bin stays on both too because rustup.rs
+# proxies live there. After installation, if rustc/cargo are still absent,
+# the Homebrew keg that holds the rustup executable is added as well.
+# Resolution never uses RUSTUP_HOME. A runner without rustup in
 # any of those places fails here with that note named (rose-air run
 # 35306933411), not with a generic rustc-not-found later; the failure
 # prints the runner diagnostics (runner name, searched PATH, per-candidate
@@ -143,6 +145,63 @@ fi
 echo "rust-pin: using rustup at $rustup_bin"
 
 rustup toolchain install "$channel" --profile minimal
+
+# rustup.rs exposes its proxies in CARGO_HOME/bin, which was added above.
+# Homebrew can link only rustup into its prefix/bin while keeping the rustc
+# and cargo proxies beside the real rustup executable in the versioned keg.
+# Resolve symlinks without relying on GNU-only readlink flags; if that does
+# not locate the proxies, use the installed pinned compiler's directory.
+lane_has_rust_tools() {
+	command -v rustc >/dev/null 2>&1 && command -v cargo >/dev/null 2>&1
+}
+
+prepend_lane_path() {
+	_lane_dir="$1"
+	[ -n "$_lane_dir" ] || return 0
+	printf '%s\n' "$_lane_dir" >>"$GITHUB_PATH"
+	export PATH="$_lane_dir:$PATH"
+}
+
+real_binary_dir() {
+	_real_path="$1"
+	command -v readlink >/dev/null 2>&1 || return 1
+	case "$_real_path" in
+		/*) ;;
+		*) _real_path="$PWD/$_real_path" ;;
+	esac
+	_link_hops=0
+	while [ -L "$_real_path" ]; do
+		_link_hops=$((_link_hops + 1))
+		[ "$_link_hops" -le 40 ] || return 1
+		_link_dir="$(cd -P "$(dirname "$_real_path")" 2>/dev/null && pwd)" || return 1
+		_link_target="$(readlink "$_real_path")" || return 1
+		case "$_link_target" in
+			/*) _real_path="$_link_target" ;;
+			*) _real_path="$_link_dir/$_link_target" ;;
+		esac
+	done
+	cd -P "$(dirname "$_real_path")" 2>/dev/null && pwd
+}
+
+if ! lane_has_rust_tools; then
+	rustup_proxy_dir="$(real_binary_dir "$rustup_bin" 2>/dev/null || true)"
+	if [ -n "$rustup_proxy_dir" ] && {
+		[ -x "$rustup_proxy_dir/rustc" ] || [ -x "$rustup_proxy_dir/cargo" ];
+	}; then
+		echo "rust-pin: adding rustup proxy directory $rustup_proxy_dir"
+		prepend_lane_path "$rustup_proxy_dir"
+	fi
+fi
+
+if ! lane_has_rust_tools; then
+	if pinned_rustc="$(rustup which --toolchain "$channel" rustc 2>/dev/null)"; then
+		pinned_rustc_dir="$(dirname "$pinned_rustc")"
+		if [ -n "$pinned_rustc_dir" ]; then
+			echo "rust-pin: adding pinned toolchain directory $pinned_rustc_dir"
+			prepend_lane_path "$pinned_rustc_dir"
+		fi
+	fi
+fi
 
 command -v rustc >/dev/null 2>&1 || fail "rustc is not on PATH after installing Rust $channel"
 command -v cargo >/dev/null 2>&1 || fail "cargo is not on PATH after installing Rust $channel"
