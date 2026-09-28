@@ -29,6 +29,7 @@ import (
 	"github.com/relux-works/curator/internal/gitcred"
 	"github.com/relux-works/curator/internal/gitignore"
 	"github.com/relux-works/curator/internal/gitops"
+	"github.com/relux-works/curator/internal/globalbins"
 	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
@@ -72,7 +73,7 @@ Commands:
   list                     configured projects and declared skills
   project <subcommand>     add | resolve | refresh
   skill check <dir>        validate one skill package (--locale, --json)
-  global <subcommand>      init | add | remove | list | status (--check, --json) | install | update | upgrade
+  global <subcommand>      init | add | remove | list | status (--check, --json) | install | adopt <command> [--dry-run] | update | upgrade
   profile <subcommand>     install | list | use | update | remove | sync | compose (see profile install -h)
   env <subcommand>         resolve | status | config | migrate | unmanage (see env resolve -h)
   run <env-id> ...         umbrella dispatch to curator-run (see §11)
@@ -1392,7 +1393,7 @@ func (c cli) cmdSkillCheck(args []string) int {
 
 func (c cli) cmdGlobal(args []string) int {
 	if len(args) == 0 {
-		_, _ = fmt.Fprintln(c.stderr, "curator: global requires a subcommand: init, add, remove, list, status, install, update, upgrade")
+		_, _ = fmt.Fprintln(c.stderr, "curator: global requires a subcommand: init, add, remove, list, status, install, adopt, update, upgrade")
 		return exitUsage
 	}
 	cfg, code := c.loadConfig()
@@ -1438,6 +1439,8 @@ func (c cli) cmdGlobal(args []string) int {
 		return c.runGlobalInstall(cfg, nil)
 	case "install":
 		return c.runGlobalInstall(cfg, args[1:])
+	case "adopt":
+		return c.cmdGlobalAdopt(cfg, args[1:])
 	case "remove":
 		if len(args) < 2 {
 			return exitUsage
@@ -1466,6 +1469,65 @@ func (c cli) cmdGlobal(args []string) int {
 	}
 	_, _ = fmt.Fprintf(c.stderr, "curator: unknown global subcommand %q\n", args[0])
 	return exitUsage
+}
+
+func (c cli) cmdGlobalAdopt(cfg *config.Config, args []string) int {
+	flags := c.newFlagSet("global adopt")
+	dryRun := flags.Bool("dry-run", false, "verify the forwarding shim without changing files")
+	positional, err := parseInterspersed(flags, args)
+	if err != nil || len(positional) != 1 {
+		if err == nil {
+			_, _ = fmt.Fprintln(c.stderr, "curator: global adopt requires exactly one command")
+		}
+		return exitUsage
+	}
+	userHome, err := c.userHome()
+	if err != nil {
+		_, _ = fmt.Fprintln(c.stderr, "curator: cannot resolve the user home:", err)
+		return exitFail
+	}
+	var result globalbins.Adoption
+	if *dryRun {
+		result, err = globalbins.Adopt(cfg.Home(), positional[0], "", nil, userHome, true)
+	} else {
+		// Refuse invalid requests before creating lock state. Once the read-only
+		// preflight succeeds, serialize the marker update with global install and
+		// repeat every check while holding the manager-home lock.
+		preview, previewErr := globalbins.Adopt(cfg.Home(), positional[0], "", nil, userHome, true)
+		if previewErr != nil {
+			err = previewErr
+		} else if preview.AlreadyManaged {
+			result = preview
+		} else {
+			manager, lockErr := managerlock.New(cfg.Home())
+			if lockErr != nil {
+				err = fmt.Errorf("open manager locks: %w", lockErr)
+			} else {
+				var lock *managerlock.HomeLock
+				lock, err = manager.AcquireHomeOnly(context.Background(), false)
+				if err == nil {
+					result, err = globalbins.Adopt(cfg.Home(), positional[0], "", nil, userHome, false)
+					if closeErr := lock.Close(); closeErr != nil && err == nil {
+						err = fmt.Errorf("release the manager-home lock: %w", closeErr)
+					}
+				}
+			}
+		}
+	}
+	if err != nil {
+		_, _ = fmt.Fprintln(c.stderr, err)
+		return exitFail
+	}
+	if result.AlreadyManaged {
+		_, _ = fmt.Fprintf(c.stdout, "global: command %q is already managed at %s\n", positional[0], result.Path)
+		return exitOK
+	}
+	if result.DryRun {
+		_, _ = fmt.Fprintf(c.stdout, "global: would adopt command %q at %s\n", positional[0], result.Path)
+		return exitOK
+	}
+	_, _ = fmt.Fprintf(c.stdout, "global: adopted command %q at %s (backup: %s)\n", positional[0], result.Path, result.Backup)
+	return exitOK
 }
 
 // cmdGlobalStatus is the read-only currentness surface of the machine-wide

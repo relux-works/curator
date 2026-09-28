@@ -1080,3 +1080,29 @@ Remedy: no action is required. An enforced command with no declared
 `network` hosts audits clean and still records its identity; a
 declared-only entry that should be enforced calls for the same remedy as
 `script-command-declared-only` above.
+
+## Global command forwarding conflicts
+
+### global command was not published because the target is unmanaged
+
+Symptom: `curator global install` reports that a command was not published to
+the user-bin directory because the target exists and is not managed by Curator.
+
+Cause: Curator will not replace a user-bin entry unless its ownership marker
+already records the command. This protects manually created or changed files.
+
+Remedy: if the existing entry is already the canonical Curator forwarding shim,
+preview and adopt it. Adoption verifies the exact bytes, creates a backup under
+the Curator backups directory, and records the command in
+`.curator-managed.json`:
+
+```bash
+curator global adopt <command> --dry-run
+curator global adopt <command>
+curator global install
+```
+
+Adoption refuses a missing command, a symlink or special file, or different
+bytes. If the bytes differ, inspect and preserve that entry yourself; choose a
+different PATH-visible user-bin directory with `CURATOR_GLOBAL_USER_BIN` if
+Curator should publish alongside it.

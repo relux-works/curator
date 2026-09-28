@@ -720,6 +720,31 @@ curator global install
 
 The command materializes global skills into the machine home store.
 
+### curator global adopt
+
+Synopsis:
+
+```bash
+curator global adopt <command> [--dry-run]
+```
+
+Take an existing user-bin forwarding shim under Curator management when it is
+a regular file whose bytes exactly match the canonical shim for an installed
+global command. A successful adoption copies the original with its mode and
+modification time preserved into the Curator backups directory, then records
+the command in `.curator-managed.json`. The source entry is never rewritten.
+Symlinks, special files, missing commands, and different bytes are refused.
+
+Preview and adopt a command:
+
+```bash
+curator global adopt task-board --dry-run
+curator global adopt task-board
+```
+
+`--dry-run` performs the same checks without creating a backup or changing the
+ownership marker.
+
 ### curator global update
 
 Synopsis:

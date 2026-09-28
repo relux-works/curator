@@ -342,9 +342,9 @@ func unmanagedConflict(path, name string, managed map[string]bool, canonical, pl
 	if managed[name] && ownedTarget(path, canonical, platform) {
 		return false
 	}
-	// A ledger entry is necessary but not sufficient. This avoids adopting a
-	// matching shim that a user created, and detects replacement of a formerly
-	// managed path.
+	// A ledger entry is necessary but not sufficient. A matching shim is only
+	// managed after the explicit adopt command records ownership, and changed
+	// paths remain conflicts.
 	return true
 }
 
@@ -416,7 +416,7 @@ func PublishedShims(binDir string) (bool, error) {
 
 func readLedger(binDir string) (map[string]bool, error) {
 	path := filepath.Join(binDir, managedFile)
-	state, err := stateread.ReadFile(path) // #nosec G304 -- binDir is selected from trusted manager state
+	state, err := stateread.ReadRegularFile(path) // #nosec G304 -- binDir is selected from trusted manager state
 	if err != nil {
 		return nil, err
 	}
@@ -464,13 +464,7 @@ func writeLedger(binDir string, entries map[string]bool) error {
 		return err
 	}
 	target := filepath.Join(binDir, managedFile)
-	if err := os.Rename(temporaryPath, target); err != nil {
-		if removeErr := os.Remove(target); removeErr != nil && !os.IsNotExist(removeErr) {
-			return err
-		}
-		return os.Rename(temporaryPath, target)
-	}
-	return nil
+	return replaceLedgerFile(temporaryPath, target)
 }
 
 func expectedNames(expected map[string]bool) []string {

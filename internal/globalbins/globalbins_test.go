@@ -1,6 +1,7 @@
 package globalbins
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/relux-works/curator/internal/runtimestore"
 	"github.com/relux-works/curator/internal/skillspec"
@@ -58,6 +60,250 @@ func TestRefreshPublishesAndRemovesManagedUnixShims(t *testing.T) {
 	Refresh(managerHome, map[string]bool{}, "unix", map[string]string{"PATH": userBin}, userHome)
 	if _, err := os.Lstat(published); !os.IsNotExist(err) {
 		t.Fatalf("stale managed shim survived: %v", err)
+	}
+}
+
+type adoptionFixture struct {
+	managerHome string
+	userHome    string
+	userBin     string
+	canonical   string
+	published   string
+	platform    string
+	environment map[string]string
+}
+
+func newAdoptionFixture(t *testing.T, platform string, published []byte) adoptionFixture {
+	t.Helper()
+	root := t.TempDir()
+	managerHome := filepath.Join(root, "manager")
+	userHome := filepath.Join(root, "user")
+	userBin := filepath.Join(userHome, ".local", "bin")
+	canonicalBin := filepath.Join(managerHome, "global", "bin")
+	if err := os.MkdirAll(canonicalBin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(userBin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	canonical := shimPath(canonicalBin, "tool", platform)
+	if err := os.WriteFile(canonical, []byte("canonical Curator target\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	publishedPath := shimPath(userBin, "tool", platform)
+	if published != nil {
+		if err := os.WriteFile(publishedPath, published, 0o751); err != nil {
+			t.Fatal(err)
+		}
+		fixed := time.Date(2021, 4, 5, 6, 7, 8, 0, time.UTC)
+		if err := os.Chtimes(publishedPath, fixed, fixed); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return adoptionFixture{
+		managerHome: managerHome,
+		userHome:    userHome,
+		userBin:     userBin,
+		canonical:   canonical,
+		published:   publishedPath,
+		platform:    platform,
+		environment: map[string]string{"PATH": userBin, UserBinEnv: userBin},
+	}
+}
+
+func canonicalForwardingBytes(fixture adoptionFixture) []byte {
+	if fixture.platform == "windows" {
+		return []byte(runtimestore.WindowsShimContent(fixture.canonical, nil))
+	}
+	return []byte(runtimestore.UnixShimContent(fixture.canonical, nil))
+}
+
+func TestAdoptCanonicalShimBacksUpAndGlobalInstallStagesItAsManaged(t *testing.T) {
+	for _, platform := range []string{"unix", "windows"} {
+		t.Run(platform, func(t *testing.T) {
+			fixture := newAdoptionFixture(t, platform, nil)
+			if err := writeLedger(fixture.userBin, map[string]bool{"other": true}); err != nil {
+				t.Fatal(err)
+			}
+			want := canonicalForwardingBytes(fixture)
+			if err := os.WriteFile(fixture.published, want, 0o751); err != nil {
+				t.Fatal(err)
+			}
+			fixed := time.Date(2021, 4, 5, 6, 7, 8, 0, time.UTC)
+			if err := os.Chtimes(fixture.published, fixed, fixed); err != nil {
+				t.Fatal(err)
+			}
+			before, err := os.Stat(fixture.published)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			adopted, err := Adopt(fixture.managerHome, "tool", platform, fixture.environment, fixture.userHome, false)
+			if err != nil {
+				t.Fatalf("Adopt() = %v", err)
+			}
+			if adopted.Path != fixture.published || adopted.Backup == "" || adopted.AlreadyManaged || adopted.DryRun {
+				t.Fatalf("Adopt() = %+v, want a new backed-up adoption", adopted)
+			}
+			if filepath.Dir(adopted.Backup) != filepath.Join(fixture.managerHome, "backups", "global-bins") {
+				t.Fatalf("backup path = %s, want Curator backup root", adopted.Backup)
+			}
+			backup, err := os.ReadFile(adopted.Backup)
+			if err != nil || !bytes.Equal(backup, want) {
+				t.Fatalf("backup bytes = %q, %v; want canonical shim %q", backup, err, want)
+			}
+			backupInfo, err := os.Stat(adopted.Backup)
+			if err != nil || backupInfo.Mode().Perm() != before.Mode().Perm() || !backupInfo.ModTime().Equal(before.ModTime()) {
+				t.Fatalf("backup metadata = (%v, %v); want mode %v and mtime %v", backupInfo, err, before.Mode().Perm(), before.ModTime())
+			}
+			managed, err := readLedger(fixture.userBin)
+			if err != nil || !managed["tool"] || !managed["other"] {
+				t.Fatalf("adoption ledger = %v, %v; want tool added without losing other", managed, err)
+			}
+
+			// install.stageGlobalScope calls StageForwarding. It must recognize
+			// the adopted bytes and ledger entry as its own, without an unmanaged
+			// conflict.
+			forwarding, err := StageForwarding(t.TempDir(), fixture.managerHome, map[string]bool{"tool": true}, platform, fixture.environment, fixture.userHome)
+			if err != nil || forwarding.Published != 1 || containsMessage(forwarding.Messages, "not managed by Curator") {
+				t.Fatalf("StageForwarding() = (%+v, %v); want one managed command and no conflict", forwarding, err)
+			}
+
+			second, err := Adopt(fixture.managerHome, "tool", platform, fixture.environment, fixture.userHome, false)
+			if err != nil || !second.AlreadyManaged || second.Backup != "" {
+				t.Fatalf("second Adopt() = (%+v, %v); want idempotent no-op", second, err)
+			}
+			backups, err := os.ReadDir(filepath.Join(fixture.managerHome, "backups", "global-bins"))
+			if err != nil || len(backups) != 1 {
+				t.Fatalf("backup count after idempotent adoption = (%d, %v), want 1", len(backups), err)
+			}
+		})
+	}
+}
+
+func TestAdoptDryRunWritesNothingForUnixAndWindowsShims(t *testing.T) {
+	for _, platform := range []string{"unix", "windows"} {
+		t.Run(platform, func(t *testing.T) {
+			fixture := newAdoptionFixture(t, platform, nil)
+			want := canonicalForwardingBytes(fixture)
+			if err := os.WriteFile(fixture.published, want, 0o751); err != nil {
+				t.Fatal(err)
+			}
+
+			result, err := Adopt(fixture.managerHome, "tool", platform, fixture.environment, fixture.userHome, true)
+			if err != nil || !result.DryRun || result.AlreadyManaged || result.Backup != "" {
+				t.Fatalf("dry-run Adopt() = (%+v, %v)", result, err)
+			}
+			if _, err := os.Lstat(filepath.Join(fixture.userBin, managedFile)); !os.IsNotExist(err) {
+				t.Fatalf("dry-run wrote ownership marker: %v", err)
+			}
+			if _, err := os.Lstat(filepath.Join(fixture.managerHome, "backups")); !os.IsNotExist(err) {
+				t.Fatalf("dry-run wrote backup root: %v", err)
+			}
+			got, err := os.ReadFile(fixture.published)
+			if err != nil || !bytes.Equal(got, want) {
+				t.Fatalf("dry-run changed source entry: %q, %v", got, err)
+			}
+		})
+	}
+}
+
+func TestAdoptRefusalsDoNotWrite(t *testing.T) {
+	cases := []struct {
+		name       string
+		prepare    func(*testing.T, adoptionFixture)
+		wantReason string
+	}{
+		{
+			name: "different bytes",
+			prepare: func(t *testing.T, fixture adoptionFixture) {
+				if err := os.WriteFile(fixture.published, []byte("manual replacement\n"), 0o755); err != nil {
+					t.Fatal(err)
+				}
+			},
+			wantReason: "bytes differ",
+		},
+		{
+			name: "symbolic link",
+			prepare: func(t *testing.T, fixture adoptionFixture) {
+				if err := os.Remove(fixture.published); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(fixture.canonical, fixture.published); err != nil {
+					t.Skipf("host cannot create symbolic links: %v", err)
+				}
+			},
+			wantReason: "symbolic link",
+		},
+		{
+			name: "special entry",
+			prepare: func(t *testing.T, fixture adoptionFixture) {
+				if err := os.Remove(fixture.published); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Mkdir(fixture.published, 0o755); err != nil {
+					t.Fatal(err)
+				}
+			},
+			wantReason: "not a regular file",
+		},
+		{
+			name: "missing entry",
+			prepare: func(t *testing.T, fixture adoptionFixture) {
+				if err := os.Remove(fixture.published); err != nil {
+					t.Fatal(err)
+				}
+			},
+			wantReason: "entry does not exist",
+		},
+		{
+			name: "unknown command",
+			prepare: func(t *testing.T, fixture adoptionFixture) {
+				if err := os.Remove(fixture.canonical); err != nil {
+					t.Fatal(err)
+				}
+			},
+			wantReason: "no Curator global command has a canonical target",
+		},
+	}
+
+	for _, platform := range []string{"unix", "windows"} {
+		for _, tc := range cases {
+			t.Run(platform+"/"+tc.name, func(t *testing.T) {
+				fixture := newAdoptionFixture(t, platform, nil)
+				if err := os.WriteFile(fixture.published, canonicalForwardingBytes(fixture), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				original, err := os.ReadFile(fixture.published)
+				if err != nil {
+					t.Fatal(err)
+				}
+				tc.prepare(t, fixture)
+
+				_, err = Adopt(fixture.managerHome, "tool", platform, fixture.environment, fixture.userHome, false)
+				if err == nil || !strings.Contains(err.Error(), fixture.published) || !strings.Contains(err.Error(), tc.wantReason) {
+					t.Fatalf("Adopt() error = %v; want path %s and reason %q", err, fixture.published, tc.wantReason)
+				}
+				if _, err := os.Lstat(filepath.Join(fixture.userBin, managedFile)); !os.IsNotExist(err) {
+					t.Fatalf("refusal wrote ownership marker: %v", err)
+				}
+				if _, err := os.Lstat(filepath.Join(fixture.managerHome, "backups")); !os.IsNotExist(err) {
+					t.Fatalf("refusal wrote backup root: %v", err)
+				}
+				if tc.name == "different bytes" {
+					got, err := os.ReadFile(fixture.published)
+					if err != nil || string(got) != "manual replacement\n" {
+						t.Fatalf("mismatch entry changed: %q, %v", got, err)
+					}
+				}
+				if tc.name == "unknown command" {
+					got, err := os.ReadFile(fixture.published)
+					if err != nil || !bytes.Equal(got, original) {
+						t.Fatalf("unknown-command entry changed: %q, %v", got, err)
+					}
+				}
+			})
+		}
 	}
 }
 
