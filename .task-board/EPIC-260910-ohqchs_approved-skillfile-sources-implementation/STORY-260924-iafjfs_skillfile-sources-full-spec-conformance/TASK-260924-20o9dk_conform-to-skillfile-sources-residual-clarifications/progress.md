@@ -149,6 +149,20 @@ spawn selection rationale for muse-spark-1.3-contributor/xhigh: bound 20o9dk-lan
 spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
 spawn queued: [implementer] developer (muse) (run=RUN-260926-fe6669, max_parallel=20)
 spawn run started: [implementer] developer (muse) (run=RUN-260926-fe6669)
+spawn run child final message (run=RUN-260926-fe6669, tools=28 patches=0 failed=0):
+Integration transaction executed and evidence attached; stopping per the integration instruction.
+
+What happened:
+- Ran the single authorized command `task-board worktree integrate STORY-260924-iafjfs --cr TASK-260924-20o9dk --revision 5` with `pipefail`; real exit code **1**.
+- The remote CI gate (run 36237810909 on `gate/STORY-260924-iafjfs/260926-110640-74404-1`) completed with conclusion **success** — Lint, Test (ubuntu/macos/windows), Race, Interop conformance, and Naming gates all green.
+- The story **landed locally** (`story_commit_oid: 5328d488…`, board state committed as `e8620502…`), but publication to the protected trunk did not push: `board_publication_pending` / `board_publish_local_trunk_unproven` (signer not bound to repository identity). The landing stands; the PR/publish/reconcile-trunk delivery steps are the orchestrator's.
+- Attached the exact log by updating the existing outcome resource `TASK-260924-20o9dk_integration-land.md` on TASK-260924-20o9dk.
+- Changed no source file; made no status/handoff writes; board remains at `integrating`.
+
+The refusal-adjacent outcome (`board_publication_pending` with exit 1) is attached verbatim — the orchestrator delivers from here.
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260926-fe6669, pid=62599, exit=0)
+spawn run RUN-260926-fe6669 failed; operator action required; failure: integration_binding_state_invalid: Change Request CR-TASK-260924-20o9dk-5 revision 5 is integrated, want accepted or checkpointed
 
 ## Precondition Resources
 - [20o9dk-review-rev5-note.md](file://TASK-260924-20o9dk/20o9dk-review-rev5-note.md)
@@ -186,7 +200,7 @@ spawn run started: [implementer] developer (muse) (run=RUN-260926-fe6669)
 - [TASK-260924-20o9dk_spawn-log_-reviewer--reviewer--claude-_RUN-260926-b6e2b5.log](file://TASK-260924-20o9dk/TASK-260924-20o9dk_spawn-log_-reviewer--reviewer--claude-_RUN-260926-b6e2b5.log) — System spawn log captured by task-board
 - [TASK-260924-20o9dk_review-verdict-rev5.md](file://TASK-260924-20o9dk/TASK-260924-20o9dk_review-verdict-rev5.md) — Rev5 review verdict: accepted
 - [TASK-260924-20o9dk_spawn-log_-implementer--developer--muse-_RUN-260926-5592c9.log](file://TASK-260924-20o9dk/TASK-260924-20o9dk_spawn-log_-implementer--developer--muse-_RUN-260926-5592c9.log) — System spawn log captured by task-board
-- [TASK-260924-20o9dk_integration-land.md](file://TASK-260924-20o9dk/TASK-260924-20o9dk_integration-land.md) — Bound integration landing attempt log for CR-TASK-260924-20o9dk-5 (refused; orchestrator delivers)
+- [TASK-260924-20o9dk_integration-land.md](file://TASK-260924-20o9dk/TASK-260924-20o9dk_integration-land.md) — Integration landing log for accepted CR revision 5 (board_publication_pending; landing stands locally)
 - [TASK-260924-20o9dk_spawn-log_-implementer--developer--muse-_RUN-260926-b930ad.log](file://TASK-260924-20o9dk/TASK-260924-20o9dk_spawn-log_-implementer--developer--muse-_RUN-260926-b930ad.log) — System spawn log captured by task-board
 - [TASK-260924-20o9dk_spawn-log_-implementer--developer--muse-_RUN-260926-fe6669.log](file://TASK-260924-20o9dk/TASK-260924-20o9dk_spawn-log_-implementer--developer--muse-_RUN-260926-fe6669.log) — System spawn log captured by task-board
 
@@ -194,7 +208,7 @@ spawn run started: [implementer] developer (muse) (run=RUN-260926-fe6669)
 2026-09-24T11:35:43Z
 
 ## Last Update
-2026-09-26T11:03:11Z
+2026-09-26T11:48:04Z
 
 ## Assigned To
 [implementer] developer (muse)
