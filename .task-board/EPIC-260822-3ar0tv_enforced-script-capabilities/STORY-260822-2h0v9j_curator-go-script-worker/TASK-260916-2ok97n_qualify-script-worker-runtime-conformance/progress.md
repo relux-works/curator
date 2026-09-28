@@ -17,7 +17,7 @@ estimated(fibonacci(5))
 - TASK-260916-1xib1x
 
 ## Blocks
-- TASK-260924-5c0747
+- (none)
 
 ## Checklist
 - [x] Code written per task description and AC
@@ -217,6 +217,17 @@ Preconditions confirmed and evidence attached; ending the run without further bo
 - The attached instruction's `worktree integrate` command was deliberately not executed: the task-level Integration Assignment supersedes it and reserves the landing transaction for the runner. Outcome artifact `TASK-260916-2ok97n_integration-results.md` is attached documenting the preconditions and this deferral. No test/build gates were run in this turn; none claimed.
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260924-75eac0, pid=19976, exit=0)
+spawn run RUN-260924-75eac0 failed; operator action required; failure: board_publication_pending: runner integrate refused: board_publication_pending: STORY-260822-2h0v9j is landed and its board state is committed as 948ae7c9e4a71a4026968913e1ff646aa21e0d52 on the local trunk, but the publication push did not land (board_publish_local_trunk_unproven); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: 948ae7c9e4a71a4026968913e1ff646aa21e0d52
+  cause_code: board_publish_local_trunk_unproven
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: 9a59d568117c525937b24427448f1227fe020554
+  story_id: STORY-260822-2h0v9j
+  cause: board_publish_local_trunk_unproven: the local trunk holds an unpublished link 948ae7c9e4a71a4026968913e1ff646aa21e0d52 that is not this repository's own board-state record (the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key); a stable content digest is never ownership proof — nothing was projected and nothing was pushed
+  link_oid: 948ae7c9e4a71a4026968913e1ff646aa21e0d52
+  reason: the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key
+  remedy: land the unproven commits through integrate/reconcile-trunk, not through this command
 
 ## Precondition Resources
 - [TASK-260916-3gcc00_reconciliation.md](file://TASK-260916-2ok97n/TASK-260916-3gcc00_reconciliation.md) — Reconciliation table naming the exact gaps (R1-R5)
@@ -289,7 +300,7 @@ spawn run completed: muse (run=RUN-260924-75eac0, pid=19976, exit=0)
 2026-09-15T20:40:15Z
 
 ## Last Update
-2026-09-24T05:55:48Z
+2026-09-26T12:01:45Z
 
 ## Assigned To
 [implementer] developer (muse)
