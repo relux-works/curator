@@ -309,17 +309,32 @@ func runResolveSymlinkParentCase(t *testing.T, tc writeNofollowCase, fixtures ma
 		t.Skipf("symlink fixture unavailable: %v", err)
 	}
 	_, err := Resolve(request)
-	assertExpectedDiagnostic(t, err, tc.Expected.Diagnostic)
 	if got, err := os.Readlink(parent); err != nil || got != outside {
 		t.Fatalf("managed parent entry = %q (%v), want original symlink to %q", got, err, outside)
 	}
 	assertForeignHash(t, foreign, tc.Expected.ForeignTargetSHA256After)
+	// Environments §8.3.1 requires this parent link to stop the write before
+	// any operation-private atomic writer can publish through it. Check the
+	// exact vector target entry, not only its foreign link target's bytes.
+	outsideTarget := filepath.Join(outside, "system-prompt.md")
+	if tc.Target.Kind == "symlink" {
+		info, err := os.Lstat(outsideTarget)
+		if err != nil || info.Mode()&os.ModeSymlink == 0 {
+			t.Fatalf("parent-link target entry changed: mode=%v err=%v", info, err)
+		}
+		if got, err := os.Readlink(outsideTarget); err != nil || got != foreign {
+			t.Fatalf("parent-link target now points to %q (%v), want original %q", got, err, foreign)
+		}
+	} else if _, err := os.Lstat(outsideTarget); !os.IsNotExist(err) {
+		t.Fatalf("parent-link target was created outside the managed root: %v", err)
+	}
 	if tc.Expected.BackupHoldsLink {
 		t.Fatal("parent-link refusal unexpectedly backed up the target")
 	}
 	if _, err := os.Lstat(filepath.Join(homeDir, ".agent-environment-backup")); !os.IsNotExist(err) {
 		t.Fatalf("parent-link refusal created a backup: %v", err)
 	}
+	assertExpectedDiagnostic(t, err, tc.Expected.Diagnostic)
 }
 
 func runResolvePlantedLinkRepairCase(t *testing.T, tc writeNofollowCase, fixtures map[string]writeNofollowFixture) {
@@ -396,8 +411,10 @@ func runSwitchBackupParentCase(t *testing.T, tc writeNofollowCase, fixtures map[
 	if err := os.Symlink(outside, backupRoot); err != nil {
 		t.Skipf("symlink fixture unavailable: %v", err)
 	}
-	results, err := UseWithPolicy(home, "acme", "claude_code", "", false, Policy{Takeover: true})
-	assertSwitchDiagnostic(t, err, results, tc.Expected.Diagnostic)
+	results, switchErr := UseWithPolicy(home, "acme", "claude_code", "", false, Policy{Takeover: true})
+	if got, err := os.Readlink(backupRoot); err != nil || got != outside {
+		t.Fatalf("backup destination parent = %q (%v), want original symlink to %q", got, err, outside)
+	}
 	if got, err := os.ReadFile(target); err != nil || string(got) != string(original) {
 		t.Fatalf("backup refusal changed the takeover target: %q (%v)", got, err)
 	}
@@ -406,6 +423,7 @@ func runSwitchBackupParentCase(t *testing.T, tc writeNofollowCase, fixtures map[
 		t.Fatalf("backup path symlink received writes: entries=%v err=%v", entries, err)
 	}
 	assertForeignHash(t, target, tc.Expected.ForeignTargetSHA256After)
+	assertSwitchDiagnostic(t, switchErr, results, tc.Expected.Diagnostic)
 }
 
 func runResolveCleanMaterializeCase(t *testing.T, tc writeNofollowCase) {
