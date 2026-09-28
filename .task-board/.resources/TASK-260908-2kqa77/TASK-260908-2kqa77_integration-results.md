@@ -1,19 +1,15 @@
-# TASK-260908-2kqa77 integration preconditions — confirmation (bound developer run)
-
-No file changed in this run. No `worktree integrate`, no status write, no handoff call per the binding Integration Assignment (runner performs the bound landing synchronously).
-
-## 1. Path set matches accepted revision 5
-`git status --short` in the Story worktree shows exactly the 10 paths in `TASK-260908-2kqa77_change-request_rev5.patch` (3 modified: `.github/ci/gate-selftest.sh`, `.github/workflows/ci.yml`, `CHANGELOG.md`; 7 added under `tools/goreleaserconfig/`). All changes uncommitted — no commit past checkpoint.
-
-## 2. Tree identity re-derived this run
-Temp-index `write-tree` over HEAD + worktree = `4c24e01de711d512ce1acd2d71390e723a60089f`, equal to the rev4/rev5 candidate tree recorded in `TASK-260908-2kqa77_review-verdict-rev5.md` (rev4 and rev5 patches byte-identical per that verdict).
-
-## 3. Acceptance + tree-bound green validation (accepted evidence, not rerun)
-- `TASK-260908-2kqa77_review-verdict-rev5.md`: ACCEPTED (identity review, content judgement carried by rev4 verdict).
-- `TASK-260908-2kqa77_change-request_rev5-validation.log`: remote gate run 35858447222 finished `success`, exit 0 — Lint, Naming, Interop, Race x2, Gate self-test x3, Test x3 all green.
-- Board status confirmed `integrating` via query (no write made).
-
-## 4. Fresh narrow test executed this run
-`go test -count=1 ./tools/goreleaserconfig/` — exit code 0 (`ok ... 1.190s`). Full landing suite NOT rerun (runtime runs it once at landing).
-
-Ready for the runner to perform the bound landing of CR-TASK-260908-2kqa77 revision 5.
+run_write_boundary_uncleared: delivery of element STORY-260908-g7o5zw is gated on 2 run(s) under warn policy
+  [BLOCKED] run RUN-260923-cbc7df verdict=violated terminal=violated: the terminal assessment is violated
+  [ok] run RUN-260923-30160c verdict=violated terminal=violated: assessed
+clear a violating run with: task-board spawn write-boundary-clear <RUN-ID> --reason "..."
+board_publication_pending: STORY-260908-g7o5zw is landed and its board state is committed as 1511b345c143acfd78b5db0ab4f3176f5ce6ce94 on the local trunk, but the publication push did not land (board_publish_local_trunk_unproven); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: 1511b345c143acfd78b5db0ab4f3176f5ce6ce94
+  cause_code: board_publish_local_trunk_unproven
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: b1e296ef1b7e09da61683e4a5e3e691cf9b1449e
+  story_id: STORY-260908-g7o5zw
+  cause: board_publish_local_trunk_unproven: the local trunk holds an unpublished link 1511b345c143acfd78b5db0ab4f3176f5ce6ce94 that is not this repository's own board-state record (the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key); a stable content digest is never ownership proof — nothing was projected and nothing was pushed
+  link_oid: 1511b345c143acfd78b5db0ab4f3176f5ce6ce94
+  reason: the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key
+  remedy: land the unproven commits through integrate/reconcile-trunk, not through this command
