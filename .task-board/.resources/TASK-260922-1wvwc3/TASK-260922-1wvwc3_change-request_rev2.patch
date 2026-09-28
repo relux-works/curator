@@ -1,0 +1,3162 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index ee53edb..673e7ab 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -2,6 +2,32 @@
+ 
+ ## Unreleased
+ 
++- Add the versioned provider-capability table keyed (environment, tool
++  release) to a permission-grammar version (curator-spec Decision 0018
++  choices 3 and 6; expected release v0.5.17, tag cut by the orchestrator).
++  Each plugin holds its own environment's rows — `claude-code` 2.1.261,
++  `codex` 0.153.2, `pi`/`pi-native` 0.84.2 (unsupported) — and
++  `LookupReleaseCapability` is the single reader. The grammar version in
++  force is `permission-grammar-v1`, the token the launcher must cite; a
++  row naming a grammar this module does not implement selects no mapping.
++  The caller establishes the running release with `ProbeToolRelease`
++  (`<binary> --version` against the launch environment; `pi` has no
++  probe because its binary is the wrapper) and passes it on the new
++  `LaunchRequest.ToolRelease`. On drift — an unpinned or newer release,
++  or none established — yolo fails closed first with the named
++  `ErrPermissionModeUnverifiedRelease`, while native still forwards
++  verbatim with no claims. The new `LaunchRequest.NativeArgs` (refused
++  outside interactive launches with `ErrNativeArgsNotInteractive`) are
++  forwarded verbatim after the module-spelled argv, so the yolo bypass
++  flag lands before them; under yolo the plugin scans flag positions
++  against the looked-up release's closed grammar and refuses an unknown
++  codex `-c` key or an unknown claude `--permission-mode` value as usage
++  (`ErrNativePolicyUnknown`, which the caller maps to exit 2), never
++  resolved into a policy claim, while native performs no inspection at
++  all. Prompt text is never parsed as a flag (`internal/nativeargs` owns
++  the rule: `--` ends flag parsing, `=`-forms read as their flag).
++  Known policy selectors under yolo are forwarded verbatim — Decision
++  0018 item 4's conflict table is a later leaf.
+ - Add `LaunchRequest.PermissionMode` (curator-spec Decision 0018): the
+   interactive permission posture, `native` (zero value: pass nothing, the
+   provider's stored settings decide) or `yolo` (the single provider bypass
+diff --git a/README.md b/README.md
+index 9b73886..d6aa536 100644
+--- a/README.md
++++ b/README.md
+@@ -75,9 +75,11 @@ The agentic-system plugin contract and its registry.
+   `ResolveBinary`, `Argv`, `ChildEnv`, `Stdin`, `ValidateComposition`.
+ - Four launch modes: `exec`, `dry-run`, `managed-session`, and `interactive`
+   (curator-spec Decision 0013 §5) — the complete argv a launcher hands to a
+-  human's terminal, holding model selection, effort transport, and the
+-  optional typed permission-mode member only (`LaunchRequest.PermissionMode`,
+-  curator-spec Decision 0018 — the next item).
++  human's terminal, holding model selection, effort transport, the
++  optional typed permission-mode member (`LaunchRequest.PermissionMode`,
++  curator-spec Decision 0018 — the next item), and the caller's native
++  arguments forwarded verbatim after everything the module spells
++  (`LaunchRequest.NativeArgs` — the item after that).
+   `BuildPlan` refuses an interactive request carrying a composition
+   (`ErrCompositionNotInteractive`) or a goal, budget, service tier or prompt
+   (`ErrParameterNotInteractive`), and holds every plugin to a detached stdin
+@@ -98,6 +100,41 @@ The agentic-system plugin contract and its registry.
+   composition is refused first (`ErrCompositionNotInteractive`) — so
+   `ErrPermissionModeDuplicate` is the direct plugin `Argv` path's refusal for
+   a composition prefix that already carries the flag, never de-duplicated.
++- The versioned provider-capability table (curator-spec Decision 0018
++  choices 3 and 6) keys (environment, tool release) to a permission-grammar
++  version. Each plugin holds its own environment's rows and
++  `LookupReleaseCapability` is the single reader; there is no central map
++  keyed by system id (the single-source guard forbids a second binding
++  table). The grammar version in force is `permission-grammar-v1`, the
++  token the launcher cites:
++
++  | environment | verified tool release | grammar | yolo |
++  |---|---|---|---|
++  | `claude-code` | 2.1.261 | `permission-grammar-v1` | `--dangerously-skip-permissions` |
++  | `codex` | 0.153.2 | `permission-grammar-v1` | `--dangerously-bypass-approvals-and-sandbox` |
++  | `pi` | 0.84.2 | `permission-grammar-v1` | unsupported (`ErrPermissionModeUnsupported`) |
++  | `pi-native` | 0.84.2 | `permission-grammar-v1` | unsupported (`ErrPermissionModeUnsupported`) |
++
++  The caller establishes the running release by probing the resolved binary
++  (`ProbeToolRelease`: `<binary> --version` against the launch environment —
++  fake binaries in tests, never a real provider) and passes it on
++  `LaunchRequest.ToolRelease`. On drift — an unpinned or newer release, or
++  none established at all — yolo fails closed first with
++  `ErrPermissionModeUnverifiedRelease`, while native still forwards verbatim
++  with no claims. `pi` has no probe (its binary is the agents-infra wrapper,
++  whose version is not pi's release), so yolo there without an explicitly
++  passed release refuses as unverified. Under yolo the plugin scans the
++  caller's `NativeArgs` against the looked-up release's closed grammar: an
++  unknown codex `-c` key or an unknown claude `--permission-mode` value is
++  refused as usage (`ErrNativePolicyUnknown`, which the caller maps to exit
++  2), never resolved into a policy claim; the mapped bypass flag in flag
++  position is refused as a duplicate. Native performs no inspection at all.
++  Prompt text is never parsed as a flag (`internal/nativeargs` owns the
++  rule): `--` ends flag parsing, a lone `-` and anything never dash-leading
++  are positional, and `=`-forms read as their flag. Known policy selectors
++  under yolo are classified but forwarded verbatim — Decision 0018 item 4's
++  conflict table is a later leaf, as is the launcher's headless detection
++  over the same arguments (F-L1).
+ - `Registry` is the only place a system binding may live. `Register` is the
+   only way one comes to exist, and it refuses a duplicate id, an id that does
+   not normalize, an id that normalizes to a spelling other than itself, an id
+@@ -162,7 +199,8 @@ proven against all four codex launch-surface goldens through the real
+   dry-run mirror), the managed-session provider-args fragment, and the
+   interactive session (`-m <model>` plus the effort override, plus
+   `--dangerously-bypass-approvals-and-sandbox` exactly when the request carries
+-  `yolo`). `argvguard_test.go` scans every non-test Go file in the module and
++  `yolo` at a verified tool release, plus the caller's verbatim native
++  suffix). `argvguard_test.go` scans every non-test Go file in the module and
+   fails if a second site appears; it narrows itself onto the real `Args` to
+   prove it can fire, holds nine mutant spellings, demonstrates its three
+   declared-open residuals staying open, and counts the bypass flag's literal at
+@@ -226,7 +264,8 @@ frozen RUNTIME id `claude`; `parity_test.go` maps between them in one place.
+   silently drops a zero ceiling.
+ - **One argv construction site**, guarded the same way codex's is and by the same
+   scanner. The interactive session is `--model <id>` plus the effort flag, plus
+-  `--dangerously-skip-permissions` exactly when the request carries `yolo`; the
++  `--dangerously-skip-permissions` exactly when the request carries `yolo` at a
++  verified tool release, plus the caller's verbatim native suffix; the
+   flag literal occurs once in the plugin (the const both branches reference);
+   the guard counts it module-wide at exactly two sites — this const and agy's
+   pre-existing exec spelling — since the AST signature must keep excluding
+@@ -326,10 +365,11 @@ Plugin id `pi-native`; the frozen runtimes that bind it are `pi-anthropic`,
+ 
+ - **Interactive and dry-run only.** No exec grammar: headless Pi is the
+   wrapper's, and a native `-p` run would be an unsupervised child. Exec is
+-  refused with `ErrUnsupportedLaunchMode`. `yolo` is refused with
+-  `ErrPermissionModeUnsupported`: pi 0.84.2 documents no permission-bypass
+-  flag, and `--approve` trusts project-local files rather than bypassing
+-  permissions.
++  refused with `ErrUnsupportedLaunchMode`. `yolo` at the verified pi 0.84.2 is
++  refused with `ErrPermissionModeUnsupported` — that release documents no
++  permission-bypass flag, and `--approve` trusts project-local files rather
++  than bypassing permissions — and yolo at any other release fails closed
++  earlier, as drift (`ErrPermissionModeUnverifiedRelease`).
+ - **The model identity is always `<vendor>/<launch identity>`.** Pi 0.84.2
+   resolves a bare id across every provider file and exits "ambiguous"; a
+   wrong prefix falls to its custom-model path with a warning. The vendor is
+diff --git a/internal/nativeargs/nativeargs.go b/internal/nativeargs/nativeargs.go
+new file mode 100644
+index 0000000..5656686
+--- /dev/null
++++ b/internal/nativeargs/nativeargs.go
+@@ -0,0 +1,60 @@
++// Package nativeargs owns the prompt-text-versus-flag parsing rule for
++// caller native arguments, curator-spec Decision 0018 choice 3.
++//
++// The rule is three lines: the element `--` ends flag parsing, and
++// everything from it on is prompt text; an element before it is a flag
++// when it is flag-shaped (more than one byte, dash-leading); anything
++// else — positionals, a lone `-`, the empty string — is prompt text.
++// Prompt text is NEVER parsed as a flag, in either direction the rule is
++// read: flag-looking prompt after `--` is forwarded without
++// classification, and the same text in flag position is classified.
++//
++// Scans must use FlagIndexes, not the predicates directly. The break at
++// `--` is the load-bearing half of the rule, and a scan written as
++// "classify every flag-shaped element" without it parses prompt text as
++// flags the moment a caller separates them — which is the defect this
++// package exists to prevent. FlagIndexes is the single choke point, so
++// narrowing it the one way (dropping the break) is killed by every
++// plugin's prompt-passthrough row.
++package nativeargs
++
++import "strings"
++
++// IsSeparator reports whether el ends flag parsing: the argv `--`, and
++// only it. A provider honors the same separator (codex's own usage tip
++// says to pass a value as one with `--`), so what this rule calls prompt
++// text the tool reads as prompt text too.
++func IsSeparator(el string) bool { return el == "--" }
++
++// IsFlagElement reports whether el is flag-shaped: more than one byte
++// and dash-leading. The separator itself is flag-shaped on purpose: a
++// caller must end the scan at it (FlagIndexes does), never classify it.
++// A lone `-` is positional — the stdin-marker shape — never a flag, and
++// so is anything not dash-leading at all.
++func IsFlagElement(el string) bool { return len(el) > 1 && el[0] == '-' }
++
++// FlagIndexes returns the indexes of the elements that are flags under
++// the rule: flag-shaped elements before the first `--`. Everything else
++// is prompt text and is never returned, however flag-like it reads.
++func FlagIndexes(args []string) []int {
++	var out []int
++	for i, el := range args {
++		if IsSeparator(el) {
++			return out
++		}
++		if IsFlagElement(el) {
++			out = append(out, i)
++		}
++	}
++	return out
++}
++
++// SplitFlagValue splits one flag element into its name and its `=`-form
++// value: `--permission-mode=auto` is the same flag as a separate
++// `--permission-mode auto`, and a scan that only matched exact elements
++// would read the `=` form as prompt text. The cut is at the FIRST `=`:
++// a `-c` value may itself carry `=` (`key="a=b"`), and only the flag's
++// own separator divides the name from the value.
++func SplitFlagValue(el string) (name, value string, hasValue bool) {
++	return strings.Cut(el, "=")
++}
+diff --git a/internal/nativeargs/nativeargs_test.go b/internal/nativeargs/nativeargs_test.go
+new file mode 100644
+index 0000000..c62e6ed
+--- /dev/null
++++ b/internal/nativeargs/nativeargs_test.go
+@@ -0,0 +1,106 @@
++package nativeargs
++
++import (
++	"reflect"
++	"testing"
++)
++
++// The parsing rule's atoms, pinned as a truth table: the separator ends
++// flag parsing, flag-shaped means longer than one byte and dash-leading,
++// and a lone "-" is positional.
++func TestThePredicatesNameTheRule(t *testing.T) {
++	t.Parallel()
++	for el, wantSeparator := range map[string]bool{
++		"--":   true,
++		"---":  false,
++		"--x":  false,
++		"-":    false,
++		"":     false,
++		"x":    false,
++		" -- ": false,
++		"--=x": false,
++	} {
++		if got := IsSeparator(el); got != wantSeparator {
++			t.Errorf("IsSeparator(%q) = %v, want %v", el, got, wantSeparator)
++		}
++	}
++	for el, wantFlag := range map[string]bool{
++		"--":     true, // flag-shaped AND the separator: callers end the scan, never classify it
++		"--x":    true,
++		"-c":     true,
++		"-":      false, // the stdin-marker shape: positional
++		"":       false,
++		"x":      false,
++		"-c=x":   true,
++		" -c":    false,
++		"prompt": false,
++	} {
++		if got := IsFlagElement(el); got != wantFlag {
++			t.Errorf("IsFlagElement(%q) = %v, want %v", el, got, wantFlag)
++		}
++	}
++}
++
++// FlagIndexes is the composed rule: flag-shaped elements before the
++// first "--", and nothing else — however flag-like the prompt text
++// reads. Each row is one scan shape the plugins rely on.
++func TestFlagIndexesReturnsFlagPositionsOnly(t *testing.T) {
++	t.Parallel()
++	for _, c := range []struct {
++		name string
++		args []string
++		want []int
++	}{
++		{"empty", nil, nil},
++		{"flags only", []string{"-c", "k=v", "--long"}, []int{0, 2}},
++		{"positionals are prompt", []string{"deploy", "prod"}, nil},
++		{"a lone dash is positional", []string{"-"}, nil},
++		{"the separator ends the scan", []string{"-c", "k=v", "--", "-c", "evil=x"}, []int{0}},
++		{"a leading separator parses nothing", []string{"--", "--dangerously-skip-permissions"}, nil},
++		{"a trailing separator changes nothing", []string{"-c", "--"}, []int{0}},
++		{"an empty element is positional", []string{"", "-c"}, []int{1}},
++		{"prompt that looks like a flag is never returned", []string{"--", "--permission-mode", "ultrastrict"}, nil},
++	} {
++		t.Run(c.name, func(t *testing.T) {
++			t.Parallel()
++			if got := FlagIndexes(c.args); !reflect.DeepEqual(got, c.want) {
++				t.Errorf("FlagIndexes(%q) = %v, want %v", c.args, got, c.want)
++			}
++		})
++	}
++}
++
++// The narrowing the choke point buys: dropping the separator break
++// parses prompt text as flags. This row plants flag-shaped prompt and
++// requires silence; a FlagIndexes narrowed to "every flag-shaped
++// element" returns [1 2] here and fails it.
++// The `=`-form rule: the cut is at the first `=`, so a value carrying
++// its own `=` stays whole after the flag's separator.
++func TestSplitFlagValueCutsAtTheFirstEquals(t *testing.T) {
++	t.Parallel()
++	for _, c := range []struct {
++		el          string
++		name, value string
++		hasValue    bool
++	}{
++		{"--permission-mode=auto", "--permission-mode", "auto", true},
++		{"--config=k=\"a=b\"", "--config", "k=\"a=b\"", true},
++		{"-c=", "-c", "", true},
++		{"--flag", "--flag", "", false},
++		{"prompt", "prompt", "", false},
++		{"", "", "", false},
++	} {
++		name, value, hasValue := SplitFlagValue(c.el)
++		if name != c.name || value != c.value || hasValue != c.hasValue {
++			t.Errorf("SplitFlagValue(%q) = (%q, %q, %v), want (%q, %q, %v)", c.el, name, value, hasValue, c.name, c.value, c.hasValue)
++		}
++	}
++}
++
++func TestFlagIndexesStopsAtTheSeparator(t *testing.T) {
++	t.Parallel()
++	got := FlagIndexes([]string{"prompt", "--sandbox", "--", "--sandbox"})
++	if len(got) != 1 || got[0] != 1 {
++		t.Fatalf("FlagIndexes = %v, want [1]: the pre-separator flag is parsed and the post-separator twin is prompt", got)
++	}
++}
+diff --git a/internal/regress/interactive_test.go b/internal/regress/interactive_test.go
+index 8c94fdd..d568672 100644
+--- a/internal/regress/interactive_test.go
++++ b/internal/regress/interactive_test.go
+@@ -27,6 +27,11 @@ import (
+ // registry refuses them with ErrUnsupportedLaunchMode, and that refusal is
+ // asserted below so a declaration added without a construction is noticed.
+ //
++// The sweep covers module-spelled argv only: no row here sets NativeArgs,
++// and the caller's verbatim suffix may carry caller-chosen markers —
++// that is the caller's spelling under Decision 0018 item 4 (raw bypass
++// stays available untracked), not a marker this module emitted.
++//
+ // pi is the third mapped system and is NOT here, for a reason this package
+ // already enforces: importing its plugin registers it into the default
+ // registry, and TestEveryLayerOneSystemHasASmokeCase then demands a golden pi
+@@ -78,12 +83,17 @@ type interactiveCase struct {
+ 	// to (curator-spec Decision 0018), empty when the system refuses yolo
+ 	// outright (pi-native: pi 0.84.2 documents no such flag).
+ 	yoloFlag string
++	// toolRelease is the pinned release the yolo mapping was verified
++	// against (Decision 0018 choice 6). The yolo sweep below carries it;
++	// the drift test carries anything but.
++	toolRelease string
+ }
+ 
+ var interactiveCases = map[string]interactiveCase{
+ 	"claude-code": {
+ 		system: claude.New(), stub: "claude",
+-		yoloFlag: "--dangerously-skip-permissions",
++		yoloFlag:    "--dangerously-skip-permissions",
++		toolRelease: "2.1.261",
+ 		exec: func(t *testing.T, req agentic.LaunchRequest, workDir string) agentic.LaunchRequest {
+ 			req.PromptPath = paritycase.WritePromptFile(t, workDir, "body")
+ 			return req
+@@ -91,7 +101,8 @@ var interactiveCases = map[string]interactiveCase{
+ 	},
+ 	"codex": {
+ 		system: codex.New(), stub: "codex",
+-		yoloFlag: "--dangerously-bypass-approvals-and-sandbox",
++		yoloFlag:    "--dangerously-bypass-approvals-and-sandbox",
++		toolRelease: "0.153.2",
+ 		exec: func(_ *testing.T, req agentic.LaunchRequest, workDir string) agentic.LaunchRequest {
+ 			req.Prompt = []byte("body")
+ 			return req
+@@ -99,6 +110,7 @@ var interactiveCases = map[string]interactiveCase{
+ 	},
+ 	"pi-native": {
+ 		system: pinative.New(), stub: "pi", vendor: "anthropic",
++		toolRelease: "0.84.2",
+ 	},
+ }
+ 
+@@ -168,6 +180,7 @@ func TestAYoloPlanCarriesItsOneBypassFlagAndNoOtherMarker(t *testing.T) {
+ 			workDir, binDir := paritycase.TempSlot(t), paritycase.TempSlot(t)
+ 			req := interactiveRequest(t, c, workDir, binDir)
+ 			req.PermissionMode = agentic.PermissionModeYolo
++			req.ToolRelease = c.toolRelease
+ 
+ 			if c.yoloFlag == "" {
+ 				if _, err := paritycase.TryBuildPlan(c.system, req, agentic.LaunchModeInteractive); !errors.Is(err, agentic.ErrPermissionModeUnsupported) {
+@@ -198,6 +211,44 @@ func TestAYoloPlanCarriesItsOneBypassFlagAndNoOtherMarker(t *testing.T) {
+ 	}
+ }
+ 
++// TestAYoloPlanRefusesDriftForEveryMappedSystem is the Decision 0018
++// choice-6 half of the sweep above: yolo at an unverified release — a
++// newer one, or none established at all — fails closed with the drift
++// sentinel for every mapped system, while the same request at native
++// builds. Pi-native's verified release stays unsupported (the sweep
++// above); drift there refuses as unverified like everywhere else.
++func TestAYoloPlanRefusesDriftForEveryMappedSystem(t *testing.T) {
++	for name, c := range interactiveCases {
++		for _, release := range []string{"9.9.9", ""} {
++			t.Run(name+"/release-"+driftName(release), func(t *testing.T) {
++				workDir, binDir := paritycase.TempSlot(t), paritycase.TempSlot(t)
++				req := interactiveRequest(t, c, workDir, binDir)
++				req.PermissionMode = agentic.PermissionModeYolo
++				req.ToolRelease = release
++				if _, err := paritycase.TryBuildPlan(c.system, req, agentic.LaunchModeInteractive); !errors.Is(err, agentic.ErrPermissionModeUnverifiedRelease) {
++					t.Fatalf("%s: err = %v, want ErrPermissionModeUnverifiedRelease", name, err)
++				}
++			})
++		}
++		t.Run(name+"/native-builds-unverified", func(t *testing.T) {
++			workDir, binDir := paritycase.TempSlot(t), paritycase.TempSlot(t)
++			req := interactiveRequest(t, c, workDir, binDir)
++			req.PermissionMode = agentic.PermissionModeNative
++			req.ToolRelease = "9.9.9"
++			if _, err := paritycase.TryBuildPlan(c.system, req, agentic.LaunchModeInteractive); err != nil {
++				t.Fatalf("%s: native at an unverified release was refused: %v", name, err)
++			}
++		})
++	}
++}
++
++func driftName(release string) string {
++	if release == "" {
++		return "unestablished"
++	}
++	return release
++}
++
+ // TestAnInteractivePlanRefusesACompositionForEveryMappedSystem is the
+ // decision's sentinel, once per system, through the real registry: whatever
+ // grammar the system declares, the composer's prefix does not reach a terminal.
+diff --git a/internal/toolprobe/toolprobe.go b/internal/toolprobe/toolprobe.go
+new file mode 100644
+index 0000000..8bc6ad1
+--- /dev/null
++++ b/internal/toolprobe/toolprobe.go
+@@ -0,0 +1,100 @@
++// Package toolprobe runs one tool's `--version` probe: the `<binary>
++// --version` subprocess a ToolReleaseProber resolves and parses.
++//
++// It performs NO caching and NO parsing: every call is a fresh subprocess
++// read, and the release grammar is each tool's own (a plugin's probe.go).
++// What is shared here is the part every probe must get identically right:
++// the argv (exactly `--version`, never a flag that could start a session),
++// the bounded wait (the caller's context, plus this package's own
++// timeout — whichever fires first), the byte cap (a version answer is
++// one line; anything past the cap is a refusal, not a truncation), and
++// the environment discipline (the child sees the handed launch
++// environment, or an empty one — never the ambient process environment,
++// which the System contract forbids a plugin from reading).
++package toolprobe
++
++import (
++	"bytes"
++	"context"
++	"fmt"
++	"os/exec"
++	"strings"
++	"time"
++)
++
++// versionArg is the probe's whole argv after the binary. It is a const
++// rather than a parameter so no caller can probe with anything else: a
++// probe that could spell an arbitrary argv is a launcher wearing a
++// probe's name.
++const versionArg = "--version"
++
++// versionTimeout is this package's own bound on a `--version`
++// subprocess call. It composes with whatever deadline the caller's ctx
++// already carries: context.WithTimeout always fires at the EARLIER of
++// the two, so a caller with a tighter budget keeps it. The exact value
++// is not a behavior contract — any bound in seconds serves — which is
++// why no test pins it; the honoring of a fired context is what the
++// tests prove, with a short caller ctx and a sleeping stub.
++const versionTimeout = 10 * time.Second
++
++// maxVersionBytes caps a `--version` answer. A version is one line;
++// 64 KiB is orders of magnitude past that and still cheap to hold while
++// the answer is checked. Past the cap the probe refuses rather than
++// truncating: a truncated answer could parse as a release it is not.
++const maxVersionBytes = 64 << 10
++
++// VersionOutput runs binary with argv `--version` in env and returns its
++// stdout. Stderr is discarded: all three probed tools print their
++// release on stdout (claude `2.1.274 (Claude Code)`, codex `codex-cli
++// 0.153.4`, pi `0.84.2`, each exit 0), and a diagnostic there must not
++// become part of the parsed answer.
++//
++// A nil env runs the child with an EMPTY environment, not the process's
++// own: exec would otherwise inherit ambient state the System contract
++// forbids.
++func VersionOutput(ctx context.Context, binary string, env []string) ([]byte, error) {
++	if strings.TrimSpace(binary) == "" {
++		return nil, fmt.Errorf("toolprobe: no binary to probe")
++	}
++	bounded, cancel := context.WithTimeout(ctx, versionTimeout)
++	defer cancel()
++	cmd := exec.CommandContext(bounded, binary, versionArg)
++	cmd.Env = env
++	if cmd.Env == nil {
++		cmd.Env = []string{}
++	}
++	var stdout bytes.Buffer
++	cmd.Stdout = &stdout
++	if err := cmd.Run(); err != nil {
++		return nil, fmt.Errorf("toolprobe: %s --version: %w", binary, err)
++	}
++	if stdout.Len() > maxVersionBytes {
++		return nil, fmt.Errorf("toolprobe: %s --version answered %d bytes, past the %d byte cap", binary, stdout.Len(), maxVersionBytes)
++	}
++	return stdout.Bytes(), nil
++}
++
++// IsReleaseTriple reports whether s is a dotted release triple:
++// three dot-separated runs of ASCII digits, "2.1.261". There is no
++// leading-zero rule and no prerelease suffix: the pinned releases are
++// exact triples, and anything else fails closed at the probe (never
++// established) rather than matching a row it merely resembles. A future
++// verified release with a suffix re-verifies this rule with its grammar
++// version.
++func IsReleaseTriple(s string) bool {
++	parts := strings.Split(s, ".")
++	if len(parts) != 3 {
++		return false
++	}
++	for _, part := range parts {
++		if part == "" {
++			return false
++		}
++		for i := 0; i < len(part); i++ {
++			if part[i] < '0' || part[i] > '9' {
++				return false
++			}
++		}
++	}
++	return true
++}
+diff --git a/internal/toolprobe/toolprobe_test.go b/internal/toolprobe/toolprobe_test.go
+new file mode 100644
+index 0000000..9a82914
+--- /dev/null
++++ b/internal/toolprobe/toolprobe_test.go
+@@ -0,0 +1,130 @@
++package toolprobe
++
++import (
++	"context"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++	"time"
++)
++
++// The release-triple grammar, pinned both ways: exact triples admit,
++// and anything else — suffixes, missing parts, non-digits, surrounding
++// text — refuses.
++func TestIsReleaseTripleAdmitsExactTriplesOnly(t *testing.T) {
++	t.Parallel()
++	for _, s := range []string{"2.1.261", "0.153.2", "0.84.2", "10.20.30", "01.02.03"} {
++		if !IsReleaseTriple(s) {
++			t.Errorf("IsReleaseTriple(%q) = false, want true", s)
++		}
++	}
++	for _, s := range []string{"", " ", "2.1", "2.1.261.4", "2.1.x", "v2.1.261", "2.1.261-beta", "2. 1.261", "2..261", "codex-cli 0.153.4", "2.1.274 (Claude Code)"} {
++		if IsReleaseTriple(s) {
++			t.Errorf("IsReleaseTriple(%q) = true, want false", s)
++		}
++	}
++}
++
++func writeStub(t *testing.T, dir, name, body string) string {
++	t.Helper()
++	path := filepath.Join(dir, name)
++	if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
++		t.Fatalf("writing the stub %s: %v", name, err)
++	}
++	return path
++}
++
++// The probe runs `<binary> --version` and returns stdout. The stub logs
++// its argv, so the capture proves the probe's argv is exactly that —
++// never a flag that could start a session.
++func TestVersionOutputRunsVersionAndReturnsStdout(t *testing.T) {
++	t.Parallel()
++	dir := t.TempDir()
++	capture := filepath.Join(dir, "argv.log")
++	bin := writeStub(t, dir, "tool", "#!/bin/sh\necho \"$@\" > "+capture+"\necho 1.2.3\n")
++	got, err := VersionOutput(context.Background(), bin, []string{"PATH=" + dir})
++	if err != nil {
++		t.Fatalf("VersionOutput: %v", err)
++	}
++	if string(got) != "1.2.3\n" {
++		t.Errorf("stdout = %q, want %q", got, "1.2.3\n")
++	}
++	argv, err := os.ReadFile(capture)
++	if err != nil {
++		t.Fatalf("reading the argv capture: %v", err)
++	}
++	if strings.TrimSpace(string(argv)) != "--version" {
++		t.Errorf("the probe ran with argv %q, want exactly --version", strings.TrimSpace(string(argv)))
++	}
++}
++
++// Stderr is discarded: a diagnostic there must not become part of the
++// parsed answer.
++func TestVersionOutputDiscardsStderr(t *testing.T) {
++	t.Parallel()
++	dir := t.TempDir()
++	bin := writeStub(t, dir, "tool", "#!/bin/sh\necho noise >&2\necho 1.2.3\n")
++	got, err := VersionOutput(context.Background(), bin, []string{"PATH=" + dir})
++	if err != nil {
++		t.Fatalf("VersionOutput: %v", err)
++	}
++	if string(got) != "1.2.3\n" {
++		t.Errorf("stdout = %q, want %q (stderr discarded)", got, "1.2.3\n")
++	}
++}
++
++// A nil env runs the child with an EMPTY environment, never the
++// process's own: the stub reports whether it inherited anything.
++func TestVersionOutputNeverInheritsTheProcessEnvironment(t *testing.T) {
++	// Sequential on purpose: t.Setenv refuses t.Parallel, and the point is
++	// the process environment, which parallel tests share.
++	dir := t.TempDir()
++	bin := writeStub(t, dir, "tool", "#!/bin/sh\nif [ -z \"$TOOLPROBE_SENTINEL_XYZ\" ]; then echo clean; else echo dirty; fi\n")
++	t.Setenv("TOOLPROBE_SENTINEL_XYZ", "1")
++	got, err := VersionOutput(context.Background(), bin, nil)
++	if err != nil {
++		t.Fatalf("VersionOutput: %v", err)
++	}
++	if strings.TrimSpace(string(got)) != "clean" {
++		t.Errorf("the child saw the process environment: %q", got)
++	}
++}
++
++func TestVersionOutputRefusesWhatItCannotUse(t *testing.T) {
++	t.Parallel()
++	dir := t.TempDir()
++	if _, err := VersionOutput(context.Background(), "", []string{"PATH=" + dir}); err == nil {
++		t.Error("an empty binary was admitted")
++	}
++	if _, err := VersionOutput(context.Background(), filepath.Join(dir, "missing"), []string{"PATH=" + dir}); err == nil {
++		t.Error("a missing binary was admitted")
++	}
++	t.Run("a non-zero exit", func(t *testing.T) {
++		t.Parallel()
++		bin := writeStub(t, dir, "failing", "#!/bin/sh\necho 1.2.3\nexit 3\n")
++		if _, err := VersionOutput(context.Background(), bin, []string{"PATH=" + dir}); err == nil {
++			t.Error("a non-zero exit was admitted with its stdout")
++		}
++	})
++	t.Run("an answer past the byte cap", func(t *testing.T) {
++		t.Parallel()
++		bin := writeStub(t, dir, "chatty", "#!/bin/sh\nhead -c 100000 /dev/zero | tr '\\0' '7'\n")
++		if _, err := VersionOutput(context.Background(), bin, []string{"PATH=" + dir}); err == nil {
++			t.Error("a 100KB answer was admitted")
++		}
++	})
++	t.Run("a fired context", func(t *testing.T) {
++		t.Parallel()
++		bin := writeStub(t, dir, "sleeper", "#!/bin/sh\nsleep 30\n")
++		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
++		defer cancel()
++		start := time.Now()
++		if _, err := VersionOutput(ctx, bin, []string{"PATH=" + dir}); err == nil {
++			t.Error("a hung subprocess was admitted")
++		}
++		if elapsed := time.Since(start); elapsed > 20*time.Second {
++			t.Errorf("the probe waited %s for a hung subprocess; the caller ctx must bound it", elapsed)
++		}
++	})
++}
+diff --git a/pkg/agentic/capability_test.go b/pkg/agentic/capability_test.go
+new file mode 100644
+index 0000000..6984ed5
+--- /dev/null
++++ b/pkg/agentic/capability_test.go
+@@ -0,0 +1,209 @@
++package agentic
++
++import (
++	"context"
++	"errors"
++	"strings"
++	"testing"
++)
++
++// This file is the core half of the versioned provider-capability table
++// (curator-spec Decision 0018 choices 3 and 6): the NativeArgs scope the
++// core owns, the release lookup every plugin reads, and the probe
++// dispatcher the launcher calls. The per-release rows, the closed
++// grammars, and the yolo/native argv are each plugin's to hold and each
++// plugin's policy_test.go to prove.
++
++// Native arguments outside LaunchModeInteractive are refused — in every
++// non-interactive mode, before any plugin surface runs. Only the
++// interactive grammar has a verbatim suffix to forward them through.
++func TestBuildPlanRefusesNativeArgsOutsideInteractiveLaunches(t *testing.T) {
++	modes := map[string]LaunchMode{
++		"exec":            LaunchModeExec,
++		"dry-run":         LaunchModeDryRun,
++		"managed-session": LaunchModeManagedSession,
++	}
++	for name, mode := range modes {
++		t.Run(name, func(t *testing.T) {
++			sys := interactivePangolin()
++			registry := registerPangolin(t, sys)
++			req := pangolinRequest()
++			req.NativeArgs = []string{"--native", "x"}
++
++			_, err := BuildPlan(registry, req, mode)
++			if !errors.Is(err, ErrNativeArgsNotInteractive) {
++				t.Fatalf("err = %v, want ErrNativeArgsNotInteractive", err)
++			}
++			if sys.calls["Argv"] != 0 {
++				t.Error("Argv was dispatched for a non-interactive request carrying native arguments")
++			}
++		})
++	}
++
++	t.Run("and no native arguments in those modes is admitted", func(t *testing.T) {
++		// The narrowing: the refusal is the MEMBER's, not a new rule
++		// against the modes. Every request written before the member
++		// existed carries none and must keep building.
++		for name, mode := range modes {
++			sys := interactivePangolin()
++			registry := registerPangolin(t, sys)
++			if _, err := BuildPlan(registry, pangolinRequest(), mode); err != nil {
++				t.Errorf("%s: the request without native arguments was refused: %v", name, err)
++			}
++		}
++	})
++}
++
++// The tool release is an observation, not launch content: outside the
++// interactive yolo path it is ignored, even when it names a release no
++// table verifies. Ignoring it cannot misdirect a launch — no argv
++// outside that path reads it — so there is no scope refusal for it,
++// and this test pins the leniency rather than leaving it implied.
++func TestBuildPlanIgnoresToolReleaseOutsideTheInteractiveYoloPath(t *testing.T) {
++	for name, mode := range map[string]LaunchMode{
++		"exec":            LaunchModeExec,
++		"dry-run":         LaunchModeDryRun,
++		"managed-session": LaunchModeManagedSession,
++	} {
++		t.Run(name, func(t *testing.T) {
++			registry := registerPangolin(t, interactivePangolin())
++			req := pangolinRequest()
++			req.ToolRelease = "9.9.9-unverified"
++			if _, err := BuildPlan(registry, req, mode); err != nil {
++				t.Errorf("%s: a request carrying an unverified tool release was refused: %v", name, err)
++			}
++		})
++	}
++	t.Run("and an interactive native launch ignores it too", func(t *testing.T) {
++		registry := registerPangolin(t, interactivePangolin())
++		req := interactiveRequest()
++		req.ToolRelease = "9.9.9-unverified"
++		if _, err := BuildPlan(registry, req, LaunchModeInteractive); err != nil {
++			t.Errorf("interactive native with an unverified tool release was refused: %v", err)
++		}
++	})
++}
++
++// The lookup is the single reader over the per-plugin rows: an exact
++// hit returns its row, and an empty release, an unpinned or newer one,
++// or a row naming an unimplemented grammar all refuse with the drift
++// sentinel. The refusal names the grammar in force, so the launcher
++// citing the token can see what would have to be re-verified.
++func TestLookupReleaseCapabilityReadsOneRowPerRelease(t *testing.T) {
++	rows := []ReleaseCapability{
++		{Release: "2.1.261", Grammar: PermissionGrammarV1, YoloSupported: true},
++		{Release: "0.84.2", Grammar: PermissionGrammarV1, YoloSupported: false},
++	}
++	t.Run("an exact hit returns its row", func(t *testing.T) {
++		row, err := LookupReleaseCapability(rows, "2.1.261")
++		if err != nil {
++			t.Fatalf("LookupReleaseCapability: %v", err)
++		}
++		if row.Release != "2.1.261" || row.Grammar != PermissionGrammarV1 || !row.YoloSupported {
++			t.Errorf("row = %+v, want the 2.1.261 row with grammar v1 and yolo supported", row)
++		}
++	})
++	t.Run("surrounding whitespace trims, near-misses refuse", func(t *testing.T) {
++		if _, err := LookupReleaseCapability(rows, "  2.1.261\t"); err != nil {
++			t.Errorf("a trimmable release was refused: %v", err)
++		}
++		for _, release := range []string{"v2.1.261", "2.1.2610", "2.1.26", "2.1.274", "9.9.9"} {
++			if _, err := LookupReleaseCapability(rows, release); !errors.Is(err, ErrPermissionModeUnverifiedRelease) {
++				t.Errorf("release %q: err = %v, want ErrPermissionModeUnverifiedRelease", release, err)
++			}
++		}
++	})
++	t.Run("an empty release refuses as undetected, not as unknown", func(t *testing.T) {
++		_, err := LookupReleaseCapability(rows, "  ")
++		if !errors.Is(err, ErrPermissionModeUnverifiedRelease) {
++			t.Fatalf("err = %v, want ErrPermissionModeUnverifiedRelease", err)
++		}
++		if !strings.Contains(err.Error(), "no tool release was established") {
++			t.Errorf("refusal %q does not say the release was never established", err)
++		}
++	})
++	t.Run("the refusal names the grammar and the verified releases", func(t *testing.T) {
++		_, err := LookupReleaseCapability(rows, "2.1.274")
++		if !errors.Is(err, ErrPermissionModeUnverifiedRelease) {
++			t.Fatalf("err = %v, want ErrPermissionModeUnverifiedRelease", err)
++		}
++		for _, want := range []string{string(PermissionGrammarV1), "2.1.261", "0.84.2"} {
++			if !strings.Contains(err.Error(), want) {
++				t.Errorf("refusal %q does not name %q", err, want)
++			}
++		}
++	})
++	t.Run("a row naming an unimplemented grammar selects no mapping", func(t *testing.T) {
++		// Helper-direct and disclosed as a bound: every production row
++		// names PermissionGrammarV1, so no BuildPlan input reaches this
++		// branch today. It is the fail-closed half of "rows naming a new
++		// grammar ship with the code that implements it" — a v2 row
++		// meeting v1 code refuses rather than classifying under a
++		// grammar the scan does not know.
++		future := []ReleaseCapability{{Release: "3.0.0", Grammar: "permission-grammar-v2", YoloSupported: true}}
++		_, err := LookupReleaseCapability(future, "3.0.0")
++		if !errors.Is(err, ErrPermissionModeUnverifiedRelease) {
++			t.Fatalf("err = %v, want ErrPermissionModeUnverifiedRelease", err)
++		}
++		if !strings.Contains(err.Error(), "does not implement") {
++			t.Errorf("refusal %q does not say the grammar is unimplemented", err)
++		}
++	})
++}
++
++// probingPangolin is the double with a release probe: the pangolin
++// contract plus one scriptable answer.
++type probingPangolin struct {
++	*pangolinSystem
++	release    string
++	probeErr   error
++	probeCalls int
++	probeEnv   []string
++}
++
++func (p *probingPangolin) ProbeToolRelease(_ context.Context, env []string) (string, error) {
++	p.probeCalls++
++	p.probeEnv = append([]string(nil), env...)
++	return p.release, p.probeErr
++}
++
++// The dispatcher calls the system's own probe with the handed
++// environment, and answers a system with no probe — or no system —
++// with the undetected sentinel. The probe's own error passes through
++// unwrapped: the plugin already joined the sentinel to its cause.
++func TestProbeToolReleaseDispatchesToTheSystem(t *testing.T) {
++	t.Run("a system with a probe is called once with the handed env", func(t *testing.T) {
++		sys := &probingPangolin{pangolinSystem: newPangolin(), release: "2.1.261"}
++		env := []string{"PATH=/bin"}
++		release, err := ProbeToolRelease(context.Background(), sys, env)
++		if err != nil {
++			t.Fatalf("ProbeToolRelease: %v", err)
++		}
++		if release != "2.1.261" {
++			t.Errorf("release = %q, want %q", release, "2.1.261")
++		}
++		if sys.probeCalls != 1 {
++			t.Errorf("the probe ran %d time(s), want exactly once", sys.probeCalls)
++		}
++		if len(sys.probeEnv) != 1 || sys.probeEnv[0] != "PATH=/bin" {
++			t.Errorf("the probe saw env %q, want the handed environment", sys.probeEnv)
++		}
++	})
++	t.Run("a probe failure passes through", func(t *testing.T) {
++		boom := errors.New("boom")
++		sys := &probingPangolin{pangolinSystem: newPangolin(), probeErr: boom}
++		if _, err := ProbeToolRelease(context.Background(), sys, nil); !errors.Is(err, boom) {
++			t.Errorf("err = %v, want the probe's own error", err)
++		}
++	})
++	t.Run("a system with no probe is undetected, never synthesized", func(t *testing.T) {
++		if _, err := ProbeToolRelease(context.Background(), newPangolin(), nil); !errors.Is(err, ErrToolReleaseUndetected) {
++			t.Errorf("err = %v, want ErrToolReleaseUndetected", err)
++		}
++	})
++	t.Run("a nil system is undetected, not a panic", func(t *testing.T) {
++		if _, err := ProbeToolRelease(context.Background(), nil, nil); !errors.Is(err, ErrToolReleaseUndetected) {
++			t.Errorf("err = %v, want ErrToolReleaseUndetected", err)
++		}
++	})
++}
+diff --git a/pkg/agentic/plan.go b/pkg/agentic/plan.go
+index 7e04ec1..25be56f 100644
+--- a/pkg/agentic/plan.go
++++ b/pkg/agentic/plan.go
+@@ -151,6 +151,35 @@ var (
+ 	// that should not have been set, or the reverse, and the plugin cannot
+ 	// tell which.
+ 	ErrPermissionModeDuplicate = errors.New("agentic: permission-mode bypass flag already present in the launch composition prefix")
++	// ErrPermissionModeUnverifiedRelease is returned, by the plugin, when
++	// an interactive launch requests yolo and the tool release on the
++	// request is not a verified row of that system's capability table:
++	// unpinned, newer than the verification, an empty value (detection
++	// failed or never ran), or a row naming a grammar this module does
++	// not implement. On version drift the yolo mapping fails closed
++	// first; native never reads the release and forwards verbatim.
++	ErrPermissionModeUnverifiedRelease = errors.New("agentic: tool release is not a verified permission-grammar row")
++	// ErrNativePolicyUnknown is returned, by the plugin, when an
++	// interactive yolo launch carries a native policy form the pinned
++	// release's closed grammar does not know: a new codex `-c` key, a new
++	// claude `--permission-mode` value, or a malformed value in one of
++	// those positions. It is refused as usage — the caller maps it to
++	// exit 2 — never resolved into a policy claim. Native performs no
++	// argv inspection at all, so the same arguments pass there verbatim.
++	ErrNativePolicyUnknown = errors.New("agentic: unknown native policy form")
++	// ErrNativeArgsNotInteractive is returned when a non-interactive
++	// launch carries native arguments. Only the interactive grammar has
++	// a verbatim suffix to forward them through; anywhere else they
++	// would be dropped silently, which is a launch that looks like the
++	// one that was asked for and is not.
++	ErrNativeArgsNotInteractive = errors.New("agentic: native arguments outside an interactive launch")
++	// ErrToolReleaseUndetected is returned when the running tool release
++	// cannot be established: no probe, an unresolvable binary, a
++	// non-zero exit, an unparsable answer, or a fired context. The
++	// caller answers it by passing ToolRelease "" and planning anyway —
++	// never by synthesizing a release — so yolo fails closed and native
++	// forwards verbatim.
++	ErrToolReleaseUndetected = errors.New("agentic: tool release could not be established")
+ 	// ErrPluginContract is returned when a plugin answers a dispatch surface
+ 	// with something the contract forbids — an empty binary reported as a
+ 	// success, or a stdin payload carrying bytes while claiming nothing is
+@@ -261,6 +290,10 @@ func buildPlan(r *Registry, req LaunchRequest, mode LaunchMode, owned *[]string)
+ 		return Plan{}, fmt.Errorf("%w: %s carries permission mode %q in %s mode; the member is valid only for interactive launches",
+ 			ErrPermissionModeNotInteractive, id, strings.TrimSpace(string(req.PermissionMode)), mode)
+ 	}
++	if mode != LaunchModeInteractive && len(req.NativeArgs) != 0 {
++		return Plan{}, fmt.Errorf("%w: %s carries %d native argument(s) in %s mode; only the interactive grammar forwards them",
++			ErrNativeArgsNotInteractive, id, len(req.NativeArgs), mode)
++	}
+ 	req, err = PrepareLaunchRequest(sys, req, mode)
+ 	if err != nil {
+ 		return Plan{}, fmt.Errorf("agentic: %s rejected the launch request before planning: %w", id, err)
+diff --git a/pkg/agentic/system.go b/pkg/agentic/system.go
+index 4451580..a0d9d68 100644
+--- a/pkg/agentic/system.go
++++ b/pkg/agentic/system.go
+@@ -24,6 +24,7 @@
+ package agentic
+ 
+ import (
++	"context"
+ 	"fmt"
+ 	"strings"
+ 	"time"
+@@ -107,15 +108,19 @@ const (
+ 	// CLOSED set of constraints rather than a spelling:
+ 	//
+ 	//   - The argv contains ONLY model selection, the system's declared
+-	//     effort transport for the requested effort, and — when the request
++	//     effort transport for the requested effort, — when the request
+ 	//     carries PermissionMode "yolo" — the ONE provider bypass flag that
+ 	//     system's plugin maps yolo to (curator-spec Decision 0018; the
+-	//     launcher only resolves and passes the mode, Decision 0013 D5).
+-	//     It carries no print or headless mode, no output-format flag, no
+-	//     OTHER permission-bypass or unrestricted-mode flag, no goal or
++	//     launcher only resolves and passes the mode, Decision 0013 D5),
++	//     and the caller's NativeArgs forwarded verbatim after everything
++	//     the module spells. It carries no print or headless mode, no
++	//     output-format flag, no OTHER permission-bypass or
++	//     unrestricted-mode flag of its own spelling, no goal or
+ 	//     assignment-prompt machinery, no budget flag and no service-tier
+-	//     flag. What it may not contain is the invariant; what it does
+-	//     contain is the system plugin's to spell.
++	//     flag. What the module may not SPELL is the invariant; the
++	//     verbatim suffix is the caller's spelling, not the module's — the
++	//     module classifies its flag positions under yolo and claims no
++	//     posture over it.
+ 	//   - Composition is NOT part of the interactive argv. The MCP composition
+ 	//     prefix is the composer's plane, and BuildPlan refuses a request
+ 	//     carrying one with ErrCompositionNotInteractive.
+@@ -426,6 +431,80 @@ func (m PermissionMode) Resolve() (PermissionMode, error) {
+ 	}
+ }
+ 
++// PermissionGrammarVersion names the provider-permission grammar a
++// capability row was verified against, curator-spec Decision 0018 choices
++// 3 and 6. Each mapping is re-verified per tool release, and the version
++// is what tells a re-verified release from a merely observed one: the
++// launcher cites the token (in provenance and diagnostics), and a row
++// naming a grammar this module does not implement selects no mapping.
++type PermissionGrammarVersion string
++
++// PermissionGrammarV1 is the grammar this module implements: the closed
++// policy set Decision 0018 verified (claude's six `--permission-mode`
++// values, codex's five `-c` keys plus the `mcp_servers.` shape) over the
++// pinned releases below. A re-verification that widens or renames that
++// set ships as a new token, and rows naming it ship with the code that
++// implements it — never ahead of it.
++const PermissionGrammarV1 PermissionGrammarVersion = "permission-grammar-v1"
++
++// ReleaseCapability is one row of the versioned provider-capability table:
++// what one tool release, verified under one grammar version, admits. The
++// table is keyed by (environment, tool release); each plugin holds its
++// own environment's rows (there is no central map keyed by system id —
++// pkg/agentic's single-source guard forbids a second binding table, and
++// the mapping is each plugin's by Decision 0013 D5), and
++// LookupReleaseCapability is the single reader over them.
++type ReleaseCapability struct {
++	// Release is the exact tool release this row verifies, "2.1.261" for
++	// one claude row. Matching is exact after trimming: a near-miss is
++	// not a neighbouring release, it is an unverified one.
++	Release string
++	// Grammar is the permission-grammar version the release was verified
++	// under. Only PermissionGrammarV1 exists today; a row naming any
++	// other version is refused as unverified, because a grammar this
++	// module does not implement cannot classify the caller's arguments.
++	Grammar PermissionGrammarVersion
++	// YoloSupported reports whether the release documents a
++	// permission-bypass flag for the plugin to map yolo to. False is a
++	// verified fact, not an absence: pi 0.84.2's row carries false
++	// because that release documents no such flag, and yolo there is
++	// refused as unsupported rather than as drift.
++	YoloSupported bool
++}
++
++// LookupReleaseCapability finds the capability row for one tool release.
++//
++// An empty release (detection failed or never ran) and a release with no
++// row (unpinned or newer than the verification) both refuse with
++// ErrPermissionModeUnverifiedRelease: on version drift the yolo mapping
++// fails closed first. So does a row naming a grammar version this module
++// does not implement. The refusal names the grammar in force and the
++// verified releases, so the operator — and the launcher citing the
++// token — can see what would have to be re-verified.
++func LookupReleaseCapability(rows []ReleaseCapability, release string) (ReleaseCapability, error) {
++	trimmed := strings.TrimSpace(release)
++	if trimmed == "" {
++		return ReleaseCapability{}, fmt.Errorf("%w: no tool release was established (detection failed or never ran); yolo requires a release verified under %s, while native forwards verbatim",
++			ErrPermissionModeUnverifiedRelease, PermissionGrammarV1)
++	}
++	for _, row := range rows {
++		if strings.TrimSpace(row.Release) != trimmed {
++			continue
++		}
++		if row.Grammar != PermissionGrammarV1 {
++			return ReleaseCapability{}, fmt.Errorf("%w: tool release %q names grammar %q, which this module does not implement (in force: %s); yolo selects no mapping under an unimplemented grammar",
++				ErrPermissionModeUnverifiedRelease, trimmed, row.Grammar, PermissionGrammarV1)
++		}
++		return row, nil
++	}
++	verified := make([]string, 0, len(rows))
++	for _, row := range rows {
++		verified = append(verified, strings.TrimSpace(row.Release))
++	}
++	return ReleaseCapability{}, fmt.Errorf("%w: tool release %q is not verified under %s (verified releases: %s); yolo fails closed on drift, while native forwards verbatim",
++		ErrPermissionModeUnverifiedRelease, trimmed, PermissionGrammarV1, strings.Join(verified, ", "))
++}
++
+ // LaunchRequest is everything a caller supplies for one launch. It is the
+ // input to every dispatch surface, so a plugin never reaches for ambient
+ // state: what is not here is not available to it.
+@@ -533,6 +612,45 @@ type LaunchRequest struct {
+ 	// mode carrying a non-zero value is refused, and so is an unknown value
+ 	// in any mode. The mapping — and only the mapping — is each plugin's.
+ 	PermissionMode PermissionMode
++
++	// ToolRelease is the running tool's release the yolo mapping was verified
++	// against, curator-spec Decision 0018 choice 6: "2.1.261" for claude,
++	// "0.153.2" for codex, "0.84.2" for pi. The caller establishes it by
++	// probing the resolved binary (ProbeToolRelease) before planning and
++	// passes the answer here; BuildPlan never starts a process, so a dry run
++	// reports the same plan whether the binary exists or not.
++	//
++	// It is read ONLY on the interactive yolo path, where the plugin looks
++	// the release up in its verified rows (ReleaseCapability): an unpinned
++	// or newer release, and an empty value (detection failed or never ran),
++	// refuse yolo with ErrPermissionModeUnverifiedRelease. Native never
++	// reads it — the raw contract is unchanged and no claim is made — and
++	// outside interactive launches it is ignored: it is an observation, not
++	// launch content, so ignoring it cannot misdirect a launch the way
++	// dropping a parameter would.
++	ToolRelease string
++
++	// NativeArgs are the caller's own native arguments, forwarded VERBATIM
++	// into the interactive argv after everything the module spells (so the
++	// yolo bypass flag lands before them, Decision 0018 item 1). They are
++	// the launcher's `--`-separated remainder, and this module is their
++	// only validator: Decision 0013 D5 forbids the launcher from spelling
++	// provider grammar, so no other layer may classify them.
++	//
++	// Under yolo the plugin scans flag positions (internal/nativeargs owns
++	// the prompt-text-versus-flag rule) against the closed grammar of the
++	// looked-up tool release: an unknown policy form — a new codex `-c`
++	// key, a new claude `--permission-mode` value — is refused with
++	// ErrNativePolicyUnknown, which the caller maps to usage (exit 2),
++	// never resolved into a policy claim (Decision 0018 choice 3). Under
++	// native they are forwarded with no inspection at all: raw bypass may
++	// remain available untracked, and the interface stays UX rather than a
++	// perimeter (Decision 0018 item 4). Any non-empty value outside
++	// LaunchModeInteractive is refused with ErrNativeArgsNotInteractive:
++	// no other grammar has a verbatim suffix to carry it, and dropping
++	// caller arguments silently is a launch that looks like the one that
++	// was asked for and is not.
++	NativeArgs []string
+ }
+ 
+ // RunContext is the caller's identity for one tracked run, carried to the
+@@ -669,6 +787,43 @@ type LaunchRequestPreparer interface {
+ 	PrepareLaunchRequest(LaunchRequest, LaunchMode) (LaunchRequestPreparation, error)
+ }
+ 
++// ToolReleaseProber is implemented by a system whose running tool release
++// can be established by probing the binary the system resolves: the plugin
++// runs `<binary> --version` against the launch environment and parses its
++// own release out of the output. It is a PRE-plan step — the launcher's
++// (follow-up F-L1) — never part of BuildPlan, which starts no process.
++//
++// A system whose binary cannot attest its tool release does not implement
++// it: pi's binary is the agents-infra wrapper, and the wrapper's version
++// is not pi's release, so pi has no probe and yolo there fails closed as
++// unverified unless the caller established the release another way.
++type ToolReleaseProber interface {
++	ProbeToolRelease(ctx context.Context, env []string) (string, error)
++}
++
++// ProbeToolRelease establishes the running tool release for one system,
++// for the caller to pass on LaunchRequest.ToolRelease.
++//
++// Every failure — no probe, an unresolvable binary, a non-zero exit, an
++// unparsable answer, a fired context — is ErrToolReleaseUndetected, and
++// the contract on it is total: the caller passes ToolRelease "" and
++// plans anyway. Yolo then fails closed in LookupReleaseCapability and
++// native forwards verbatim, so a detection failure is a refusal for the
++// posture that resolves policy and a pass for the one that claims
++// nothing. A probe error must never be answered by synthesizing the
++// release the table wants to see.
++func ProbeToolRelease(ctx context.Context, sys System, env []string) (string, error) {
++	if sys == nil {
++		return "", fmt.Errorf("%w: no system to probe; pass ToolRelease \"\" and plan anyway", ErrToolReleaseUndetected)
++	}
++	prober, ok := sys.(ToolReleaseProber)
++	if !ok {
++		return "", fmt.Errorf("%w: system %s establishes no tool release by probing; pass ToolRelease \"\" and plan anyway",
++			ErrToolReleaseUndetected, sys.ID())
++	}
++	return prober.ProbeToolRelease(ctx, env)
++}
++
+ // PrepareLaunchRequest applies a system's optional pure pre-plan gate. Systems
+ // without one preserve the request byte-for-byte.
+ func PrepareLaunchRequest(system System, req LaunchRequest, mode LaunchMode) (LaunchRequest, error) {
+diff --git a/pkg/agentic/systems/claude/args.go b/pkg/agentic/systems/claude/args.go
+index 53d8f8a..0ea9144 100644
+--- a/pkg/agentic/systems/claude/args.go
++++ b/pkg/agentic/systems/claude/args.go
+@@ -86,6 +86,10 @@ func Args(req agentic.LaunchRequest, mode agentic.LaunchMode) ([]string, error)
+ 		return nil, fmt.Errorf("claude: %w: permission mode %q is valid only for interactive launches",
+ 			agentic.ErrPermissionModeNotInteractive, strings.TrimSpace(string(req.PermissionMode)))
+ 	}
++	if mode != agentic.LaunchModeInteractive && len(req.NativeArgs) != 0 {
++		return nil, fmt.Errorf("claude: %w: %d native argument(s) reach no verbatim suffix outside an interactive launch",
++			agentic.ErrNativeArgsNotInteractive, len(req.NativeArgs))
++	}
+ 	switch mode {
+ 	case agentic.LaunchModeExec, agentic.LaunchModeDryRun:
+ 	case agentic.LaunchModeInteractive:
+@@ -142,21 +146,42 @@ func interactiveArgs(req agentic.LaunchRequest, effective agentic.PermissionMode
+ 	args := []string{"--model", strings.TrimSpace(req.Model.ID)}
+ 	args = appendEffort(args, req)
+ 	if effective != agentic.PermissionModeYolo {
+-		return args, nil
++		// Native forwards the caller's arguments with no inspection at
++		// all: the raw contract is unchanged and no claim is made over
++		// them (curator-spec Decision 0018 item 4).
++		return append(args, nativeArgsSuffix(req)...), nil
+ 	}
+ 	// Yolo appends the bypass flag AFTER model and effort, mirroring the exec
+-	// grammar's relative order (model, effort, bypass) and landing before any
+-	// prompt text — which this mode never carries. A composition prefix that
+-	// already holds the flag is refused, not de-duplicated: through BuildPlan
+-	// the composition is refused first anyway, so this fires for a caller
+-	// holding the plugin directly, where it is the only line.
++	// grammar's relative order (model, effort, bypass) and landing before the
++	// caller's verbatim suffix (curator-spec Decision 0018 item 1). A
++	// composition prefix that already holds the flag is refused, not
++	// de-duplicated: through BuildPlan the composition is refused first
++	// anyway, so this fires for a caller holding the plugin directly,
++	// where it is the only line. It stays the first yolo check — an exact,
++	// release-independent match — so the capability lookup below only ever
++	// classifies requests this one admitted.
+ 	for _, arg := range req.Composition.Prefix {
+ 		if arg == bypassPermissionsFlag {
+ 			return nil, fmt.Errorf("claude: %w: the composition prefix already carries %q; refusing rather than emitting it twice",
+ 				agentic.ErrPermissionModeDuplicate, bypassPermissionsFlag)
+ 		}
+ 	}
+-	return append(args, bypassPermissionsFlag), nil
++	// The capability lookup establishes the verified grammar before the
++	// scan classifies against it: an unpinned or newer release, and an
++	// empty one, fail closed here, and the scan below never reasons
++	// under a grammar no release verified.
++	row, err := agentic.LookupReleaseCapability(verifiedReleases, req.ToolRelease)
++	if err != nil {
++		return nil, fmt.Errorf("claude: %w", err)
++	}
++	if !row.YoloSupported {
++		return nil, fmt.Errorf("claude: refusing yolo: %w: tool release %q documents no bypass flag",
++			agentic.ErrPermissionModeUnsupported, row.Release)
++	}
++	if err := scanNativePolicy(req.NativeArgs); err != nil {
++		return nil, fmt.Errorf("claude: %w", err)
++	}
++	return append(append(args, bypassPermissionsFlag), nativeArgsSuffix(req)...), nil
+ }
+ 
+ // appendEffort appends the effort transport when an effort was requested. Both
+@@ -182,3 +207,10 @@ func appendEffort(args []string, req agentic.LaunchRequest) []string {
+ func compositionArgvPrefix(req agentic.LaunchRequest) []string {
+ 	return append([]string{}, req.Composition.Prefix...)
+ }
++
++// nativeArgsSuffix returns the caller's native arguments for the verbatim
++// interactive suffix, copied for the same reason: the plan's argv must not
++// alias the request's backing array.
++func nativeArgsSuffix(req agentic.LaunchRequest) []string {
++	return append([]string{}, req.NativeArgs...)
++}
+diff --git a/pkg/agentic/systems/claude/interactive_test.go b/pkg/agentic/systems/claude/interactive_test.go
+index 79f688a..d54d12a 100644
+--- a/pkg/agentic/systems/claude/interactive_test.go
++++ b/pkg/agentic/systems/claude/interactive_test.go
+@@ -230,6 +230,7 @@ func TestTheYoloArgvAppendsTheBypassFlagOnce(t *testing.T) {
+ 	workDir := tempSlot(t)
+ 	req := interactiveRequest(workDir)
+ 	req.PermissionMode = agentic.PermissionModeYolo
++	req.ToolRelease = "2.1.261"
+ 	binDir := tempSlot(t)
+ 	writeStubExecutable(t, binDir, executableName)
+ 	req.Env = append(req.Env, "PATH="+binDir)
+@@ -334,6 +335,7 @@ func TestTheYoloRefusalsAreNamedAndTotal(t *testing.T) {
+ 		// plugin's.
+ 		req := interactiveRequest(workDir)
+ 		req.PermissionMode = agentic.PermissionModeYolo
++		req.ToolRelease = "2.1.261"
+ 		req.Composition = agentic.Composition{Prefix: []string{mcpConfigFlag, "{}"}}
+ 		argv, err := New().Argv(req, agentic.LaunchModeInteractive)
+ 		if err != nil {
+diff --git a/pkg/agentic/systems/claude/policy.go b/pkg/agentic/systems/claude/policy.go
+new file mode 100644
+index 0000000..da76af3
+--- /dev/null
++++ b/pkg/agentic/systems/claude/policy.go
+@@ -0,0 +1,89 @@
++package claude
++
++import (
++	"fmt"
++	"strings"
++
++	"github.com/relux-works/skill-agents-management/internal/nativeargs"
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
++
++// verifiedReleases is this environment's rows of the versioned
++// provider-capability table (curator-spec Decision 0018 choice 6): the
++// tool releases whose yolo mapping this plugin verified, each under the
++// grammar version it was verified against.
++//
++// There is exactly one row: claude 2.1.261, the release this plugin's
++// grammar comments were checked against. The mapping it verifies is the
++// bypass const in args.go; the grammar it names closes the
++// `--permission-mode` values below. A newer release — installed 2.1.274
++// included — has no row until it is re-verified, and yolo there fails
++// closed while native forwards verbatim.
++var verifiedReleases = []agentic.ReleaseCapability{
++	{Release: "2.1.261", Grammar: agentic.PermissionGrammarV1, YoloSupported: true},
++}
++
++// permissionModeFlag is the session policy selector whose VALUES are
++// closed under the pinned grammar. The flag itself is spelled here once,
++// for the scan to recognize in either value form.
++const permissionModeFlag = "--permission-mode"
++
++// knownPermissionModes is the closed `--permission-mode` value set at
++// the pinned release: the six choices `claude --help` lists
++// ("acceptEdits", "auto", "bypassPermissions", "manual", "dontAsk",
++// "plan" — Decision 0018's verification at 2.1.273, unchanged at
++// installed 2.1.274). A seventh value is an unknown native policy form:
++// refused, never resolved into a claim about the session's posture.
++var knownPermissionModes = map[string]bool{
++	"acceptEdits":       true,
++	"auto":              true,
++	"bypassPermissions": true,
++	"manual":            true,
++	"dontAsk":           true,
++	"plan":              true,
++}
++
++// scanNativePolicy classifies the flag positions of the caller's native
++// arguments under yolo, against the pinned release's closed grammar.
++// nativeargs.FlagIndexes is the only positions reader: prompt text —
++// after `--`, or never dash-leading — is never classified, however
++// flag-like it reads.
++//
++// Two forms refuse. A `--permission-mode` value outside the known six,
++// in separate or `=` form, is an unknown policy form
++// (ErrNativePolicyUnknown, which the caller maps to usage exit 2): the
++// module cannot vouch for a bypass flag beside a mode it cannot name.
++// The mapped bypass flag in a flag position is a duplicate
++// (ErrPermissionModeDuplicate), in exact or `=` form: the plan would
++// otherwise emit it twice, once mapped and once forwarded.
++//
++// Everything else is forwarded verbatim with no claim: known modes
++// (whose conflicts with yolo are Decision 0018 item 4's table, a later
++// leaf — this scan classifies, it does not refuse them), and unknown
++// top-level flags, which the provider refuses or ignores itself and
++// which would break benign forward compatibility if this layer refused
++// them.
++func scanNativePolicy(args []string) error {
++	for _, i := range nativeargs.FlagIndexes(args) {
++		el := args[i]
++		name, value, hasValue := nativeargs.SplitFlagValue(el)
++		if name == permissionModeFlag {
++			mode := value
++			if !hasValue {
++				if i+1 >= len(args) {
++					return fmt.Errorf("%w: %s expects a mode value and the arguments end there", agentic.ErrNativePolicyUnknown, permissionModeFlag)
++				}
++				mode = args[i+1]
++			}
++			if !knownPermissionModes[mode] {
++				return fmt.Errorf("%w: %s mode %q is not one of the six verified under %s", agentic.ErrNativePolicyUnknown, permissionModeFlag, mode, agentic.PermissionGrammarV1)
++			}
++			continue
++		}
++		if el == bypassPermissionsFlag || strings.HasPrefix(el, bypassPermissionsFlag+"=") {
++			return fmt.Errorf("%w: the native arguments already carry %q; refusing rather than emitting it twice",
++				agentic.ErrPermissionModeDuplicate, bypassPermissionsFlag)
++		}
++	}
++	return nil
++}
+diff --git a/pkg/agentic/systems/claude/policy_test.go b/pkg/agentic/systems/claude/policy_test.go
+new file mode 100644
+index 0000000..62e6a0b
+--- /dev/null
++++ b/pkg/agentic/systems/claude/policy_test.go
+@@ -0,0 +1,292 @@
++package claude
++
++import (
++	"errors"
++	"reflect"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
++
++// This file is the claude half of the versioned provider-capability
++// table (curator-spec Decision 0018 choices 3 and 6): the verified
++// release the yolo mapping holds for, the drift it fails closed on, the
++// closed `--permission-mode` grammar the yolo scan classifies, and the
++// parsing rule that keeps prompt text out of the scan. Every row drives
++// the real registry and BuildPlan — argvFor for the plans that must
++// build, planErrorFor for the refusals — except where the plugin repeat
++// needs the direct path too.
++
++// The yolo positive with caller arguments: the bypass flag lands after
++// model and effort and BEFORE the verbatim suffix (Decision 0018 item
++// 1), and the suffix carries positionals, shorts, and prose untouched.
++func TestYoloForwardsNativeArgsVerbatimAfterTheBypassFlag(t *testing.T) {
++	t.Parallel()
++	workDir := tempSlot(t)
++	req := interactiveRequest(workDir)
++	req.PermissionMode = agentic.PermissionModeYolo
++	req.ToolRelease = "2.1.261"
++	req.NativeArgs = []string{"--verbose", "deploy the thing", "-d"}
++
++	got := argvFor(t, req, agentic.LaunchModeInteractive)
++	want := []string{"--model", parityModel, "--effort", parityEffort, bypassPermissionsFlag, "--verbose", "deploy the thing", "-d"}
++	if !reflect.DeepEqual(got, want) {
++		t.Fatalf("Argv = %#v, want %#v", got, want)
++	}
++}
++
++// Native performs no argv inspection at all: unknown policy forms, the
++// bypass flag itself, and an unverified or missing release all pass
++// through verbatim. The interface is UX, not a perimeter (Decision
++// 0018 item 4), and the raw contract is unchanged.
++func TestNativeForwardsEverythingVerbatimWithoutInspection(t *testing.T) {
++	t.Parallel()
++	workDir := tempSlot(t)
++	native := []string{"--permission-mode", "ultrastrict", "--verbose", bypassPermissionsFlag}
++	for _, c := range []struct {
++		name    string
++		mode    agentic.PermissionMode
++		release string
++	}{
++		{"zero value at the pinned release", "", "2.1.261"},
++		{"explicit native at the pinned release", agentic.PermissionModeNative, "2.1.261"},
++		{"explicit native past the pin", agentic.PermissionModeNative, "2.1.274"},
++		{"explicit native with no release established", agentic.PermissionModeNative, ""},
++		{"zero value with no release established", "", ""},
++	} {
++		t.Run(c.name, func(t *testing.T) {
++			req := interactiveRequest(workDir)
++			req.PermissionMode = c.mode
++			req.ToolRelease = c.release
++			req.NativeArgs = native
++			got := argvFor(t, req, agentic.LaunchModeInteractive)
++			want := append([]string{"--model", parityModel, "--effort", parityEffort}, native...)
++			if !reflect.DeepEqual(got, want) {
++				t.Fatalf("Argv = %#v, want %#v", got, want)
++			}
++		})
++	}
++}
++
++// Drift fails closed first: yolo at any release but the pinned one —
++// the installed newer release, an invented future one, or none at all —
++// is refused with the named diagnostic, through BuildPlan and through
++// the plugin held directly.
++func TestYoloRefusesDriftWithANamedDiagnostic(t *testing.T) {
++	t.Parallel()
++	workDir := tempSlot(t)
++	for _, release := range []string{"2.1.274", "9.9.9", ""} {
++		t.Run("release "+quoteRelease(release), func(t *testing.T) {
++			req := interactiveRequest(workDir)
++			req.PermissionMode = agentic.PermissionModeYolo
++			req.ToolRelease = release
++			if err := planErrorFor(t, req, agentic.LaunchModeInteractive); !errors.Is(err, agentic.ErrPermissionModeUnverifiedRelease) {
++				t.Fatalf("BuildPlan err = %v, want ErrPermissionModeUnverifiedRelease", err)
++			}
++			if _, err := New().Argv(req, agentic.LaunchModeInteractive); !errors.Is(err, agentic.ErrPermissionModeUnverifiedRelease) {
++				t.Fatalf("Argv err = %v, want ErrPermissionModeUnverifiedRelease", err)
++			}
++		})
++	}
++	t.Run("the diagnostic names the grammar token the launcher cites", func(t *testing.T) {
++		req := interactiveRequest(workDir)
++		req.PermissionMode = agentic.PermissionModeYolo
++		req.ToolRelease = "2.1.274"
++		err := planErrorFor(t, req, agentic.LaunchModeInteractive)
++		if !errors.Is(err, agentic.ErrPermissionModeUnverifiedRelease) {
++			t.Fatalf("err = %v, want ErrPermissionModeUnverifiedRelease", err)
++		}
++		for _, want := range []string{string(agentic.PermissionGrammarV1), "2.1.274", "2.1.261"} {
++			if !strings.Contains(err.Error(), want) {
++				t.Errorf("refusal %q does not name %q", err, want)
++			}
++		}
++	})
++}
++
++func quoteRelease(release string) string {
++	if release == "" {
++		return "unestablished"
++	}
++	return release
++}
++
++// An unknown `--permission-mode` value under yolo is refused as usage
++// (the caller maps it to exit 2), in separate form, `=` form, and when
++// the flag dangles with no value at all. Never resolved into a claim
++// about the session's posture.
++func TestYoloRefusesUnknownPermissionModes(t *testing.T) {
++	t.Parallel()
++	workDir := tempSlot(t)
++	for _, c := range []struct {
++		name string
++		args []string
++		want string
++	}{
++		{"separate form", []string{"--permission-mode", "ultrastrict"}, "ultrastrict"},
++		{"equals form", []string{"--permission-mode=ultrastrict"}, "ultrastrict"},
++		{"empty equals value", []string{"--permission-mode="}, ""},
++		{"a dangling flag", []string{"--permission-mode"}, "--permission-mode"},
++		{"case is exact", []string{"--permission-mode", "Auto"}, "Auto"},
++	} {
++		t.Run(c.name, func(t *testing.T) {
++			req := interactiveRequest(workDir)
++			req.PermissionMode = agentic.PermissionModeYolo
++			req.ToolRelease = "2.1.261"
++			req.NativeArgs = c.args
++			err := planErrorFor(t, req, agentic.LaunchModeInteractive)
++			if !errors.Is(err, agentic.ErrNativePolicyUnknown) {
++				t.Fatalf("BuildPlan err = %v, want ErrNativePolicyUnknown", err)
++			}
++			if c.want != "" && !strings.Contains(err.Error(), c.want) {
++				t.Errorf("refusal %q does not name %q", err, c.want)
++			}
++			if _, err := New().Argv(req, agentic.LaunchModeInteractive); !errors.Is(err, agentic.ErrNativePolicyUnknown) {
++				t.Fatalf("Argv err = %v, want ErrNativePolicyUnknown", err)
++			}
++		})
++	}
++}
++
++// The narrowing the closed set buys: every one of the six verified
++// values builds and forwards verbatim. The refusal above is the
++// UNKNOWN's, not a refusal of the flag.
++func TestYoloAdmitsTheSixVerifiedPermissionModes(t *testing.T) {
++	t.Parallel()
++	workDir := tempSlot(t)
++	for _, mode := range []string{"acceptEdits", "auto", "bypassPermissions", "manual", "dontAsk", "plan"} {
++		t.Run(mode, func(t *testing.T) {
++			req := interactiveRequest(workDir)
++			req.PermissionMode = agentic.PermissionModeYolo
++			req.ToolRelease = "2.1.261"
++			req.NativeArgs = []string{"--permission-mode", mode}
++			got := argvFor(t, req, agentic.LaunchModeInteractive)
++			want := []string{"--model", parityModel, "--effort", parityEffort, bypassPermissionsFlag, "--permission-mode", mode}
++			if !reflect.DeepEqual(got, want) {
++				t.Fatalf("Argv = %#v, want %#v", got, want)
++			}
++		})
++	}
++	t.Run("and in equals form", func(t *testing.T) {
++		req := interactiveRequest(workDir)
++		req.PermissionMode = agentic.PermissionModeYolo
++		req.ToolRelease = "2.1.261"
++		req.NativeArgs = []string{"--permission-mode=manual"}
++		got := argvFor(t, req, agentic.LaunchModeInteractive)
++		want := []string{"--model", parityModel, "--effort", parityEffort, bypassPermissionsFlag, "--permission-mode=manual"}
++		if !reflect.DeepEqual(got, want) {
++			t.Fatalf("Argv = %#v, want %#v", got, want)
++		}
++	})
++}
++
++// The parsing rule, both directions: the same flag-looking text is
++// refused in flag position and forwarded as prompt text after `--` —
++// and a positional that never led with a dash is prompt wherever it
++// sits.
++func TestPromptTextIsNeverParsedAsAFlag(t *testing.T) {
++	t.Parallel()
++	workDir := tempSlot(t)
++	yolo := func(args []string) agentic.LaunchRequest {
++		req := interactiveRequest(workDir)
++		req.PermissionMode = agentic.PermissionModeYolo
++		req.ToolRelease = "2.1.261"
++		req.NativeArgs = args
++		return req
++	}
++	t.Run("an unknown mode after the separator is prompt, not policy", func(t *testing.T) {
++		got := argvFor(t, yolo([]string{"--", "--permission-mode", "ultrastrict"}), agentic.LaunchModeInteractive)
++		want := []string{"--model", parityModel, "--effort", parityEffort, bypassPermissionsFlag, "--", "--permission-mode", "ultrastrict"}
++		if !reflect.DeepEqual(got, want) {
++			t.Fatalf("Argv = %#v, want %#v", got, want)
++		}
++		if err := planErrorFor(t, yolo([]string{"--permission-mode", "ultrastrict"}), agentic.LaunchModeInteractive); !errors.Is(err, agentic.ErrNativePolicyUnknown) {
++			t.Fatalf("the flag-position twin was not refused: %v", err)
++		}
++	})
++	t.Run("the bypass flag after the separator is prompt, not a duplicate", func(t *testing.T) {
++		got := argvFor(t, yolo([]string{"--", bypassPermissionsFlag}), agentic.LaunchModeInteractive)
++		want := []string{"--model", parityModel, "--effort", parityEffort, bypassPermissionsFlag, "--", bypassPermissionsFlag}
++		if !reflect.DeepEqual(got, want) {
++			t.Fatalf("Argv = %#v, want %#v", got, want)
++		}
++		if err := planErrorFor(t, yolo([]string{bypassPermissionsFlag}), agentic.LaunchModeInteractive); !errors.Is(err, agentic.ErrPermissionModeDuplicate) {
++			t.Fatalf("the flag-position twin was not refused as a duplicate: %v", err)
++		}
++	})
++	t.Run("a positional that never led with a dash is prompt", func(t *testing.T) {
++		got := argvFor(t, yolo([]string{"ultrastrict", "deploy"}), agentic.LaunchModeInteractive)
++		want := []string{"--model", parityModel, "--effort", parityEffort, bypassPermissionsFlag, "ultrastrict", "deploy"}
++		if !reflect.DeepEqual(got, want) {
++			t.Fatalf("Argv = %#v, want %#v", got, want)
++		}
++	})
++	t.Run("and a lone dash is positional too", func(t *testing.T) {
++		got := argvFor(t, yolo([]string{"-"}), agentic.LaunchModeInteractive)
++		want := []string{"--model", parityModel, "--effort", parityEffort, bypassPermissionsFlag, "-"}
++		if !reflect.DeepEqual(got, want) {
++			t.Fatalf("Argv = %#v, want %#v", got, want)
++		}
++	})
++}
++
++// The mapped bypass flag in the caller's flag positions is refused,
++// not emitted twice: at a non-zero index (so a scan narrowed to the
++// first element admits it), and in `=` form (so an exact-match scan
++// admits that).
++func TestYoloRefusesTheBypassFlagInNativeArgs(t *testing.T) {
++	t.Parallel()
++	workDir := tempSlot(t)
++	for _, c := range []struct {
++		name string
++		args []string
++	}{
++		{"at a non-zero index", []string{"--verbose", bypassPermissionsFlag}},
++		{"in equals form", []string{bypassPermissionsFlag + "=true"}},
++	} {
++		t.Run(c.name, func(t *testing.T) {
++			req := interactiveRequest(workDir)
++			req.PermissionMode = agentic.PermissionModeYolo
++			req.ToolRelease = "2.1.261"
++			req.NativeArgs = c.args
++			if err := planErrorFor(t, req, agentic.LaunchModeInteractive); !errors.Is(err, agentic.ErrPermissionModeDuplicate) {
++				t.Fatalf("BuildPlan err = %v, want ErrPermissionModeDuplicate", err)
++			}
++			if _, err := New().Argv(req, agentic.LaunchModeInteractive); !errors.Is(err, agentic.ErrPermissionModeDuplicate) {
++				t.Fatalf("Argv err = %v, want ErrPermissionModeDuplicate", err)
++			}
++		})
++	}
++}
++
++// The scan is placement-insensitive: a positional `exec` ahead of the
++// flag does not hide it. Only `--` ends flag parsing.
++func TestTheScanSeesExecPlacement(t *testing.T) {
++	t.Parallel()
++	workDir := tempSlot(t)
++	req := interactiveRequest(workDir)
++	req.PermissionMode = agentic.PermissionModeYolo
++	req.ToolRelease = "2.1.261"
++	req.NativeArgs = []string{"exec", "--permission-mode", "ultrastrict"}
++	if err := planErrorFor(t, req, agentic.LaunchModeInteractive); !errors.Is(err, agentic.ErrNativePolicyUnknown) {
++		t.Fatalf("err = %v, want ErrNativePolicyUnknown", err)
++	}
++}
++
++// Native arguments outside interactive mode are refused, through
++// BuildPlan and through the plugin held directly: no other grammar
++// forwards them.
++func TestNativeArgsOutsideInteractiveAreRefused(t *testing.T) {
++	t.Parallel()
++	workDir := tempSlot(t)
++	req := interactiveRequest(workDir)
++	req.NativeArgs = []string{"--verbose"}
++	req.PromptPath = writePromptFile(t, workDir, parityPromptBody)
++	if err := planErrorFor(t, req, agentic.LaunchModeExec); !errors.Is(err, agentic.ErrNativeArgsNotInteractive) {
++		t.Fatalf("BuildPlan err = %v, want ErrNativeArgsNotInteractive", err)
++	}
++	if _, err := New().Argv(req, agentic.LaunchModeExec); !errors.Is(err, agentic.ErrNativeArgsNotInteractive) {
++		t.Fatalf("Argv err = %v, want ErrNativeArgsNotInteractive", err)
++	}
++}
+diff --git a/pkg/agentic/systems/claude/probe.go b/pkg/agentic/systems/claude/probe.go
+new file mode 100644
+index 0000000..9c7a81c
+--- /dev/null
++++ b/pkg/agentic/systems/claude/probe.go
+@@ -0,0 +1,52 @@
++package claude
++
++import (
++	"context"
++	"errors"
++	"fmt"
++	"strings"
++
++	"github.com/relux-works/skill-agents-management/internal/toolprobe"
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
++
++// ProbeToolRelease implements agentic.ToolReleaseProber: it resolves the
++// binary through the same path every launch uses, runs `<binary>
++// --version` against the launch environment, and parses this tool's
++// release out of the answer.
++//
++// Every failure is ErrToolReleaseUndetected (joined with its cause), and
++// the caller answers it by passing ToolRelease "" and planning anyway —
++// never by synthesizing a release. Yolo then fails closed in the
++// capability lookup and native forwards verbatim.
++func (*System) ProbeToolRelease(ctx context.Context, env []string) (string, error) {
++	binary, err := resolveBinary(env)
++	if err != nil {
++		return "", errors.Join(agentic.ErrToolReleaseUndetected, fmt.Errorf("claude: resolving the binary: %v", err))
++	}
++	out, err := toolprobe.VersionOutput(ctx, binary, env)
++	if err != nil {
++		return "", errors.Join(agentic.ErrToolReleaseUndetected, fmt.Errorf("claude: probing the binary: %v", err))
++	}
++	release, err := parseToolRelease(out)
++	if err != nil {
++		return "", errors.Join(agentic.ErrToolReleaseUndetected, fmt.Errorf("claude: parsing the answer: %v", err))
++	}
++	return release, nil
++}
++
++// parseToolRelease reads the release out of `claude --version`: the
++// first field of the first line, `2.1.274 (Claude Code)` at installed
++// 2.1.274. Anything else — an empty answer, a first field that is not
++// an exact triple — is undetected, never guessed at.
++func parseToolRelease(out []byte) (string, error) {
++	line, _, _ := strings.Cut(string(out), "\n")
++	fields := strings.Fields(line)
++	if len(fields) == 0 {
++		return "", fmt.Errorf("the answer is empty")
++	}
++	if !toolprobe.IsReleaseTriple(fields[0]) {
++		return "", fmt.Errorf("the first field %q is not a release triple", fields[0])
++	}
++	return fields[0], nil
++}
+diff --git a/pkg/agentic/systems/claude/probe_test.go b/pkg/agentic/systems/claude/probe_test.go
+new file mode 100644
+index 0000000..2f4a73a
+--- /dev/null
++++ b/pkg/agentic/systems/claude/probe_test.go
+@@ -0,0 +1,110 @@
++package claude
++
++import (
++	"context"
++	"errors"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
++
++// The version grammar, pinned against the real capture first: `claude
++// --version` prints `<triple> (Claude Code)` on stdout, exit 0
++// (installed 2.1.274). Helper-direct and disclosed as a bound —
++// parseToolRelease is the probe's pure half; the rows below drive the
++// production prober through agentic.ProbeToolRelease against fake
++// binaries, and never execute a real provider.
++func TestParseToolReleaseReadsTheFirstField(t *testing.T) {
++	t.Parallel()
++	for out, want := range map[string]string{
++		"2.1.274 (Claude Code)\n": "2.1.274",
++		"2.1.261 (Claude Code)\n": "2.1.261",
++		"2.1.261\n":               "2.1.261",
++		"  2.1.261 (x)\nsecond\n": "2.1.261",
++	} {
++		if got, err := parseToolRelease([]byte(out)); err != nil || got != want {
++			t.Errorf("parseToolRelease(%q) = (%q, %v), want (%q, nil)", out, got, err, want)
++		}
++	}
++	for _, out := range []string{"", "\n", "claude\n", "(Claude Code) 2.1.274\n", "v2.1.261 (x)\n", "2.1 (x)\n"} {
++		if got, err := parseToolRelease([]byte(out)); err == nil {
++			t.Errorf("parseToolRelease(%q) = %q, want an error", out, got)
++		}
++	}
++}
++
++func writeScriptStub(t *testing.T, dir, name, body string) string {
++	t.Helper()
++	path := filepath.Join(dir, name)
++	if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
++		t.Fatalf("writing the stub %s: %v", name, err)
++	}
++	return path
++}
++
++func probeEnv(binDir string) []string {
++	return []string{"PATH=" + binDir}
++}
++
++// The probe resolves the binary through the launch PATH, runs it with
++// exactly `--version`, and returns the parsed release.
++func TestProbeToolReleaseEstablishesTheRelease(t *testing.T) {
++	t.Parallel()
++	binDir := tempSlot(t)
++	capture := filepath.Join(binDir, "argv.log")
++	writeScriptStub(t, binDir, executableName, "#!/bin/sh\necho \"$@\" > "+capture+"\necho '2.1.261 (Claude Code)'\n")
++
++	release, err := agentic.ProbeToolRelease(context.Background(), New(), probeEnv(binDir))
++	if err != nil {
++		t.Fatalf("ProbeToolRelease: %v", err)
++	}
++	if release != "2.1.261" {
++		t.Errorf("release = %q, want %q", release, "2.1.261")
++	}
++	argv, err := os.ReadFile(capture)
++	if err != nil {
++		t.Fatalf("reading the argv capture: %v", err)
++	}
++	if strings.TrimSpace(string(argv)) != "--version" {
++		t.Errorf("the probe ran with argv %q, want exactly --version", strings.TrimSpace(string(argv)))
++	}
++}
++
++// Every detection failure is the undetected sentinel: an unresolvable
++// binary, a missing PATH, a non-zero exit, an unparsable answer. The
++// caller answers it with ToolRelease "" — yolo fails closed, native
++// forwards — never by synthesizing a release.
++func TestProbeToolReleaseFailsClosed(t *testing.T) {
++	t.Parallel()
++	t.Run("an unresolvable binary", func(t *testing.T) {
++		t.Parallel()
++		if _, err := agentic.ProbeToolRelease(context.Background(), New(), probeEnv(tempSlot(t))); !errors.Is(err, agentic.ErrToolReleaseUndetected) {
++			t.Errorf("err = %v, want ErrToolReleaseUndetected", err)
++		}
++	})
++	t.Run("no PATH at all", func(t *testing.T) {
++		t.Parallel()
++		if _, err := agentic.ProbeToolRelease(context.Background(), New(), []string{"HOME=/home/agent"}); !errors.Is(err, agentic.ErrToolReleaseUndetected) {
++			t.Errorf("err = %v, want ErrToolReleaseUndetected", err)
++		}
++	})
++	t.Run("a non-zero exit", func(t *testing.T) {
++		t.Parallel()
++		binDir := tempSlot(t)
++		writeScriptStub(t, binDir, executableName, "#!/bin/sh\necho '2.1.261 (Claude Code)'\nexit 3\n")
++		if _, err := agentic.ProbeToolRelease(context.Background(), New(), probeEnv(binDir)); !errors.Is(err, agentic.ErrToolReleaseUndetected) {
++			t.Errorf("err = %v, want ErrToolReleaseUndetected", err)
++		}
++	})
++	t.Run("an unparsable answer", func(t *testing.T) {
++		t.Parallel()
++		binDir := tempSlot(t)
++		writeScriptStub(t, binDir, executableName, "#!/bin/sh\necho 'something else entirely'\n")
++		if _, err := agentic.ProbeToolRelease(context.Background(), New(), probeEnv(binDir)); !errors.Is(err, agentic.ErrToolReleaseUndetected) {
++			t.Errorf("err = %v, want ErrToolReleaseUndetected", err)
++		}
++	})
++}
+diff --git a/pkg/agentic/systems/codex/args.go b/pkg/agentic/systems/codex/args.go
+index d81200b..45f42c0 100644
+--- a/pkg/agentic/systems/codex/args.go
++++ b/pkg/agentic/systems/codex/args.go
+@@ -77,6 +77,10 @@ func Args(req agentic.LaunchRequest, mode agentic.LaunchMode) ([]string, error)
+ 		return nil, fmt.Errorf("codex: %w: permission mode %q is valid only for interactive launches",
+ 			agentic.ErrPermissionModeNotInteractive, strings.TrimSpace(string(req.PermissionMode)))
+ 	}
++	if mode != agentic.LaunchModeInteractive && len(req.NativeArgs) != 0 {
++		return nil, fmt.Errorf("codex: %w: %d native argument(s) reach no verbatim suffix outside an interactive launch",
++			agentic.ErrNativeArgsNotInteractive, len(req.NativeArgs))
++	}
+ 	model := strings.TrimSpace(req.Model.ID)
+ 	switch mode {
+ 	case agentic.LaunchModeExec, agentic.LaunchModeDryRun:
+@@ -129,22 +133,43 @@ func Args(req agentic.LaunchRequest, mode agentic.LaunchMode) ([]string, error)
+ 		// from the same fragment, so the three cannot drift.
+ 		args = appendReasoningAndTier(args, req)
+ 		if effective != agentic.PermissionModeYolo {
+-			return args, nil
++			// Native forwards the caller's arguments with no inspection
++			// at all: the raw contract is unchanged and no claim is made
++			// over them (curator-spec Decision 0018 item 4).
++			return append(args, nativeArgsSuffix(req)...), nil
+ 		}
+ 		// Yolo appends the bypass flag AFTER model and effort, mirroring the
+ 		// exec grammar's relative order (model, effort, bypass) and landing
+-		// before any prompt text — which this mode never carries. A
+-		// composition prefix that already holds the flag is refused, not
+-		// de-duplicated: through BuildPlan the composition is refused first
+-		// anyway, so this fires for a caller holding the plugin directly,
+-		// where it is the only line.
++		// before the caller's verbatim suffix (curator-spec Decision 0018
++		// item 1). A composition prefix that already holds the flag is
++		// refused, not de-duplicated: through BuildPlan the composition is
++		// refused first anyway, so this fires for a caller holding the
++		// plugin directly, where it is the only line. It stays the first
++		// yolo check — an exact, release-independent match — so the
++		// capability lookup below only ever classifies requests this one
++		// admitted.
+ 		for _, arg := range req.Composition.Prefix {
+ 			if arg == bypassApprovalsAndSandboxFlag {
+ 				return nil, fmt.Errorf("codex: %w: the composition prefix already carries %q; refusing rather than emitting it twice",
+ 					agentic.ErrPermissionModeDuplicate, bypassApprovalsAndSandboxFlag)
+ 			}
+ 		}
+-		return append(args, bypassApprovalsAndSandboxFlag), nil
++		// The capability lookup establishes the verified grammar before the
++		// scan classifies against it: an unpinned or newer release, and an
++		// empty one, fail closed here, and the scan below never reasons
++		// under a grammar no release verified.
++		row, err := agentic.LookupReleaseCapability(verifiedReleases, req.ToolRelease)
++		if err != nil {
++			return nil, fmt.Errorf("codex: %w", err)
++		}
++		if !row.YoloSupported {
++			return nil, fmt.Errorf("codex: refusing yolo: %w: tool release %q documents no bypass flag",
++				agentic.ErrPermissionModeUnsupported, row.Release)
++		}
++		if err := scanNativePolicy(req.NativeArgs); err != nil {
++			return nil, fmt.Errorf("codex: %w", err)
++		}
++		return append(append(args, bypassApprovalsAndSandboxFlag), nativeArgsSuffix(req)...), nil
+ 	default:
+ 		return nil, fmt.Errorf("codex: unsupported launch mode %s", mode)
+ 	}
+@@ -205,3 +230,10 @@ func NormalizeServiceTier(tier string) string {
+ func compositionArgvPrefix(req agentic.LaunchRequest) []string {
+ 	return append([]string{}, req.Composition.Prefix...)
+ }
++
++// nativeArgsSuffix returns the caller's native arguments for the verbatim
++// interactive suffix, copied for the same reason: the plan's argv must not
++// alias the request's backing array.
++func nativeArgsSuffix(req agentic.LaunchRequest) []string {
++	return append([]string{}, req.NativeArgs...)
++}
+diff --git a/pkg/agentic/systems/codex/argvguard_test.go b/pkg/agentic/systems/codex/argvguard_test.go
+index b283176..a8d64e1 100644
+--- a/pkg/agentic/systems/codex/argvguard_test.go
++++ b/pkg/agentic/systems/codex/argvguard_test.go
+@@ -46,8 +46,9 @@ var codexArgvSignature = []string{
+ }
+ 
+ const (
+-	codexArgsFile = "pkg/agentic/systems/codex/args.go"
+-	codexEnvFile  = "pkg/agentic/systems/codex/env.go"
++	codexArgsFile   = "pkg/agentic/systems/codex/args.go"
++	codexEnvFile    = "pkg/agentic/systems/codex/env.go"
++	codexPolicyFile = "pkg/agentic/systems/codex/policy.go"
+ )
+ 
+ // codexArgvConstructionAllowlist names the only sites permitted to spell a
+@@ -77,6 +78,19 @@ var codexArgvConstructionAllowlist = map[string]string{
+ 	// function the scanner may resolve it through, which is what the gate
+ 	// above holds: any other site spelling or referencing it is reported.
+ 	argvguard.AllowlistKey(codexArgsFile, "bypassApprovalsAndSandboxFlag"): "the single spelling of the bypass flag; the exec and interactive branches reference it rather than repeating the literal",
++	// The yolo scan's closed `-c` key set (curator-spec Decision 0018
++	// choice 3): data the scan classifies the caller's arguments
++	// against, never argv this plugin emits. It names the two keys Args
++	// itself spells because the closed set must recognize the module's
++	// own transports as known.
++	argvguard.AllowlistKey(codexPolicyFile, "knownConfigKeys"): "the closed -c/--config key set the yolo scan classifies against; classification data, not a construction",
++	// The yolo scan over caller native arguments: it reads the key set
++	// and the bypass const to COMPARE, and refuses or forwards — it
++	// appends no flag of its own, so a second construction hiding behind
++	// this exemption would have to spell a signature literal this
++	// function never emits.
++	argvguard.AllowlistKey(codexPolicyFile, "scanNativePolicy"):    "classifies caller native args against the closed key set under yolo; it references the table and the bypass const to compare, and constructs no argv",
++	argvguard.AllowlistKey(codexPolicyFile, "checkConfigOverride"): "the one-override half of the scan, split out so the separate, `=`, and attached-short forms share one classifier",
+ }
+ 
+ // moduleGoSources reads every non-test Go file this module's build compiles.
+diff --git a/pkg/agentic/systems/codex/interactive_test.go b/pkg/agentic/systems/codex/interactive_test.go
+index 4dc7852..5c26c3b 100644
+--- a/pkg/agentic/systems/codex/interactive_test.go
++++ b/pkg/agentic/systems/codex/interactive_test.go
+@@ -265,6 +265,7 @@ func TestTheYoloArgvAppendsTheBypassFlagOnce(t *testing.T) {
+ 	workDir := tempSlot(t)
+ 	req := interactiveRequest(workDir)
+ 	req.PermissionMode = agentic.PermissionModeYolo
++	req.ToolRelease = "0.153.2"
+ 	plan, _ := interactivePlan(t, req, agentic.LaunchModeInteractive)
+ 
+ 	if want := []string{"-m", parityModel, "-c", `model_reasoning_effort="high"`, bypassApprovalsAndSandboxFlag}; !reflect.DeepEqual(plan.Argv, want) {
+@@ -385,6 +386,7 @@ func TestTheYoloRefusalsAreNamedAndTotal(t *testing.T) {
+ 		// plugin's.
+ 		req := interactiveRequest(workDir)
+ 		req.PermissionMode = agentic.PermissionModeYolo
++		req.ToolRelease = "0.153.2"
+ 		req.Composition = agentic.Composition{Prefix: []string{"-c", `mcp_servers.board.url="http://127.0.0.1:9/mcp"`}}
+ 		argv, err := New().Argv(req, agentic.LaunchModeInteractive)
+ 		if err != nil {
+diff --git a/pkg/agentic/systems/codex/policy.go b/pkg/agentic/systems/codex/policy.go
+new file mode 100644
+index 0000000..51c0553
+--- /dev/null
++++ b/pkg/agentic/systems/codex/policy.go
+@@ -0,0 +1,134 @@
++package codex
++
++import (
++	"fmt"
++	"strings"
++
++	"github.com/relux-works/skill-agents-management/internal/nativeargs"
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
++
++// verifiedReleases is this environment's rows of the versioned
++// provider-capability table (curator-spec Decision 0018 choice 6): the
++// tool releases whose yolo mapping this plugin verified, each under the
++// grammar version it was verified against.
++//
++// There is exactly one row: codex 0.153.2, the release this plugin's
++// grammar comments were checked against. The mapping it verifies is the
++// bypass const in args.go; the grammar it names closes the `-c` keys
++// below. A newer release — installed 0.153.4 included — has no row
++// until it is re-verified, and yolo there fails closed while native
++// forwards verbatim.
++var verifiedReleases = []agentic.ReleaseCapability{
++	{Release: "0.153.2", Grammar: agentic.PermissionGrammarV1, YoloSupported: true},
++}
++
++// configFlag and configFlagLong are the two spellings of the config
++// override flag, `-c, --config <key=value>`. Both name the same key
++// grammar, so the scan recognizes both — and only both.
++const (
++	configFlag     = "-c"
++	configFlagLong = "--config"
++)
++
++// knownConfigKeys is the closed `-c`/`--config` key set at the pinned
++// release. Two keys are this module's own transports (args.go spells
++// both); three are Decision 0018 item 4's policy keys; the
++// `mcp_servers.` shape below is the composition grammar's
++// (composition.go), which a caller may also override directly. Any
++// other key is an unknown native policy form: a `-c` override reaches
++// the provider's config surface directly, so an unlisted key is refused
++// rather than resolved into a claim about the session's posture.
++var knownConfigKeys = map[string]bool{
++	"model_reasoning_effort": true,
++	"service_tier":           true,
++	"approval_policy":        true,
++	"sandbox_mode":           true,
++	"sandbox_permissions":    true,
++}
++
++// mcpServersKeyPrefix admits the composition-evidenced config shape:
++// `mcp_servers.<server>.<field>` overrides name MCP servers the same
++// way the composition prefix does, so they are known — and forwarded
++// verbatim with no claim, like every other known key.
++const mcpServersKeyPrefix = "mcp_servers."
++
++// scanNativePolicy classifies the flag positions of the caller's native
++// arguments under yolo, against the pinned release's closed grammar.
++// nativeargs.FlagIndexes is the only positions reader: prompt text —
++// after `--`, or never dash-leading — is never classified, however
++// flag-like it reads.
++//
++// A `-c`/`--config` key outside the known set, in separate, `=`, or
++// attached-short (`-ckey=value`) form, is an unknown policy form
++// (ErrNativePolicyUnknown, which the caller maps to usage exit 2): the
++// module cannot vouch for a bypass flag beside a config override it
++// cannot name. So is a malformed override — a missing value, or a value
++// without `key=`: unclassifiable fails closed. The mapped bypass flag
++// in a flag position is a duplicate (ErrPermissionModeDuplicate), in
++// exact or `=` form: the plan would otherwise emit it twice.
++//
++// Everything else is forwarded verbatim with no claim: known keys
++// (whose conflicts with yolo are Decision 0018 item 4's table, a later
++// leaf — this scan classifies, it does not refuse them), and unknown
++// top-level flags, which the provider refuses itself (`error:
++// unexpected argument`) and which would break benign forward
++// compatibility if this layer refused them.
++func scanNativePolicy(args []string) error {
++	for _, i := range nativeargs.FlagIndexes(args) {
++		el := args[i]
++		name, value, hasValue := nativeargs.SplitFlagValue(el)
++		if name == configFlagLong || name == configFlag {
++			override := value
++			if !hasValue {
++				if i+1 >= len(args) {
++					return fmt.Errorf("%w: %s expects a key=value override and the arguments end there", agentic.ErrNativePolicyUnknown, name)
++				}
++				override = args[i+1]
++			}
++			if err := checkConfigOverride(override); err != nil {
++				return err
++			}
++			continue
++		}
++		if isAttachedConfigValue(el) {
++			if err := checkConfigOverride(strings.TrimPrefix(el, configFlag)); err != nil {
++				return err
++			}
++			continue
++		}
++		if el == bypassApprovalsAndSandboxFlag || strings.HasPrefix(el, bypassApprovalsAndSandboxFlag+"=") {
++			return fmt.Errorf("%w: the native arguments already carry %q; refusing rather than emitting it twice",
++				agentic.ErrPermissionModeDuplicate, bypassApprovalsAndSandboxFlag)
++		}
++	}
++	return nil
++}
++
++// isAttachedConfigValue reports whether el is `-c` with its override
++// attached, `-ckey=value`: a short flag with a value-taking definition
++// parses its remainder as the value (observed against installed 0.153.4:
++// `-cmodel_reasoning_effort="high" --help` prints help, exit 0, where a
++// bogus flag errors). Long elements never take this path however they
++// start: `--configx` is an unknown long, not `--config` with an
++// attached value.
++func isAttachedConfigValue(el string) bool {
++	return len(el) > len(configFlag) && strings.HasPrefix(el, configFlag) && !strings.HasPrefix(el, "--")
++}
++
++// checkConfigOverride classifies one `-c` override value: `key=value`
++// with a known key passes, and everything else — no `=`, a key with
++// whitespace, an unlisted key — is refused as usage.
++func checkConfigOverride(override string) error {
++	key, _, ok := strings.Cut(override, "=")
++	if !ok {
++		return fmt.Errorf("%w: malformed codex -c override %q: want key=value", agentic.ErrNativePolicyUnknown, override)
++	}
++	if key == "" || strings.ContainsAny(key, " \t\r\n") {
++		return fmt.Errorf("%w: malformed codex -c key %q", agentic.ErrNativePolicyUnknown, key)
++	}
++	if !knownConfigKeys[key] && !strings.HasPrefix(key, mcpServersKeyPrefix) {
++		return fmt.Errorf("%w: codex -c key %q is not one of the keys verified under %s", agentic.ErrNativePolicyUnknown, key, agentic.PermissionGrammarV1)
++	}
++	return nil
++}
+diff --git a/pkg/agentic/systems/codex/policy_test.go b/pkg/agentic/systems/codex/policy_test.go
+new file mode 100644
+index 0000000..dad1aa0
+--- /dev/null
++++ b/pkg/agentic/systems/codex/policy_test.go
+@@ -0,0 +1,318 @@
++package codex
++
++import (
++	"errors"
++	"reflect"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
++
++// This file is the codex half of the versioned provider-capability table
++// (curator-spec Decision 0018 choices 3 and 6): the verified release the
++// yolo mapping holds for, the drift it fails closed on, the closed `-c`
++// key grammar the yolo scan classifies, and the parsing rule that keeps
++// prompt text out of the scan. Every row drives the real registry and
++// BuildPlan — interactivePlan for the plans that must build,
++// interactivePlanError/planErrorIn for the refusals — except where the
++// plugin repeat needs the direct path too.
++
++func yoloRequest(workDir string) agentic.LaunchRequest {
++	req := interactiveRequest(workDir)
++	req.PermissionMode = agentic.PermissionModeYolo
++	req.ToolRelease = "0.153.2"
++	return req
++}
++
++// The yolo positive with caller arguments: the bypass flag lands after
++// model and effort and BEFORE the verbatim suffix (Decision 0018 item
++// 1), and the suffix carries flags, positionals, and prose untouched.
++func TestYoloForwardsNativeArgsVerbatimAfterTheBypassFlag(t *testing.T) {
++	t.Parallel()
++	workDir := tempSlot(t)
++	req := yoloRequest(workDir)
++	req.NativeArgs = []string{"--search", "resume the session", "-a", "never"}
++
++	plan, _ := interactivePlan(t, req, agentic.LaunchModeInteractive)
++	want := []string{"-m", parityModel, "-c", `model_reasoning_effort="high"`, bypassApprovalsAndSandboxFlag, "--search", "resume the session", "-a", "never"}
++	if !reflect.DeepEqual(plan.Argv, want) {
++		t.Fatalf("Argv = %#v, want %#v", plan.Argv, want)
++	}
++}
++
++// Native performs no argv inspection at all: unknown `-c` keys, the
++// bypass flag itself, and an unverified or missing release all pass
++// through verbatim. The interface is UX, not a perimeter (Decision
++// 0018 item 4), and the raw contract is unchanged.
++func TestNativeForwardsEverythingVerbatimWithoutInspection(t *testing.T) {
++	t.Parallel()
++	workDir := tempSlot(t)
++	native := []string{"-c", "future_key=x", bypassApprovalsAndSandboxFlag}
++	for _, c := range []struct {
++		name    string
++		mode    agentic.PermissionMode
++		release string
++	}{
++		{"zero value at the pinned release", "", "0.153.2"},
++		{"explicit native at the pinned release", agentic.PermissionModeNative, "0.153.2"},
++		{"explicit native past the pin", agentic.PermissionModeNative, "0.153.4"},
++		{"explicit native with no release established", agentic.PermissionModeNative, ""},
++		{"zero value with no release established", "", ""},
++	} {
++		t.Run(c.name, func(t *testing.T) {
++			req := interactiveRequest(workDir)
++			req.PermissionMode = c.mode
++			req.ToolRelease = c.release
++			req.NativeArgs = native
++			plan, _ := interactivePlan(t, req, agentic.LaunchModeInteractive)
++			want := append([]string{"-m", parityModel, "-c", `model_reasoning_effort="high"`}, native...)
++			if !reflect.DeepEqual(plan.Argv, want) {
++				t.Fatalf("Argv = %#v, want %#v", plan.Argv, want)
++			}
++		})
++	}
++}
++
++// Drift fails closed first: yolo at any release but the pinned one —
++// the installed newer release, an invented future one, or none at all —
++// is refused with the named diagnostic, through BuildPlan and through
++// the plugin held directly.
++func TestYoloRefusesDriftWithANamedDiagnostic(t *testing.T) {
++	t.Parallel()
++	workDir := tempSlot(t)
++	for _, release := range []string{"0.153.4", "9.9.9", ""} {
++		t.Run("release "+quoteRelease(release), func(t *testing.T) {
++			req := interactiveRequest(workDir)
++			req.PermissionMode = agentic.PermissionModeYolo
++			req.ToolRelease = release
++			if err := interactivePlanError(t, req); !errors.Is(err, agentic.ErrPermissionModeUnverifiedRelease) {
++				t.Fatalf("BuildPlan err = %v, want ErrPermissionModeUnverifiedRelease", err)
++			}
++			if _, err := New().Argv(req, agentic.LaunchModeInteractive); !errors.Is(err, agentic.ErrPermissionModeUnverifiedRelease) {
++				t.Fatalf("Argv err = %v, want ErrPermissionModeUnverifiedRelease", err)
++			}
++		})
++	}
++	t.Run("the diagnostic names the grammar token the launcher cites", func(t *testing.T) {
++		req := interactiveRequest(workDir)
++		req.PermissionMode = agentic.PermissionModeYolo
++		req.ToolRelease = "0.153.4"
++		err := interactivePlanError(t, req)
++		if !errors.Is(err, agentic.ErrPermissionModeUnverifiedRelease) {
++			t.Fatalf("err = %v, want ErrPermissionModeUnverifiedRelease", err)
++		}
++		for _, want := range []string{string(agentic.PermissionGrammarV1), "0.153.4", "0.153.2"} {
++			if !strings.Contains(err.Error(), want) {
++				t.Errorf("refusal %q does not name %q", err, want)
++			}
++		}
++	})
++}
++
++func quoteRelease(release string) string {
++	if release == "" {
++		return "unestablished"
++	}
++	return release
++}
++
++// An unknown `-c` key under yolo is refused as usage (the caller maps
++// it to exit 2): separate `-c` and `--config`, `=` form, attached
++// short, and every malformed shape — a dangling flag, a value without
++// `key=`, a key with whitespace. Never resolved into a claim about the
++// session's posture.
++func TestYoloRefusesUnknownConfigKeys(t *testing.T) {
++	t.Parallel()
++	workDir := tempSlot(t)
++	for _, c := range []struct {
++		name string
++		args []string
++		want string
++	}{
++		{"separate -c", []string{"-c", "future_key=x"}, "future_key"},
++		{"separate --config", []string{"--config", "future_key=x"}, "future_key"},
++		{"equals form", []string{"--config=future_key=x"}, "future_key"},
++		{"attached short", []string{"-cfuture_key=x"}, "future_key"},
++		{"attached short with equals", []string{"-c=future_key=x"}, "future_key"},
++		{"a dangling -c", []string{"-c"}, "-c"},
++		{"a dangling --config", []string{"--config"}, "--config"},
++		{"a value without key=", []string{"-c", "noequals"}, "noequals"},
++		{"an empty key", []string{"-c", "=x"}, ""},
++		{"a key with whitespace", []string{"-c", "bad key=x"}, "bad key"},
++		{"case is exact", []string{"-c", "Approval_Policy=never"}, "Approval_Policy"},
++	} {
++		t.Run(c.name, func(t *testing.T) {
++			req := yoloRequest(workDir)
++			req.NativeArgs = c.args
++			err := interactivePlanError(t, req)
++			if !errors.Is(err, agentic.ErrNativePolicyUnknown) {
++				t.Fatalf("BuildPlan err = %v, want ErrNativePolicyUnknown", err)
++			}
++			if c.want != "" && !strings.Contains(err.Error(), c.want) {
++				t.Errorf("refusal %q does not name %q", err, c.want)
++			}
++			if _, err := New().Argv(req, agentic.LaunchModeInteractive); !errors.Is(err, agentic.ErrNativePolicyUnknown) {
++				t.Fatalf("Argv err = %v, want ErrNativePolicyUnknown", err)
++			}
++		})
++	}
++}
++
++// The narrowing the closed set buys: every verified key builds and
++// forwards verbatim — the module's own transports, the three policy
++// keys, and the composition-evidenced `mcp_servers.` shape. The refusal
++// above is the UNKNOWN's, not a refusal of the flag.
++func TestYoloAdmitsTheVerifiedConfigKeys(t *testing.T) {
++	t.Parallel()
++	workDir := tempSlot(t)
++	for _, key := range []string{"model_reasoning_effort", "service_tier", "approval_policy", "sandbox_mode", "sandbox_permissions", "mcp_servers.docs.url"} {
++		t.Run(key, func(t *testing.T) {
++			req := yoloRequest(workDir)
++			req.NativeArgs = []string{"-c", key + "=x"}
++			plan, _ := interactivePlan(t, req, agentic.LaunchModeInteractive)
++			want := []string{"-m", parityModel, "-c", `model_reasoning_effort="high"`, bypassApprovalsAndSandboxFlag, "-c", key + "=x"}
++			if !reflect.DeepEqual(plan.Argv, want) {
++				t.Fatalf("Argv = %#v, want %#v", plan.Argv, want)
++			}
++		})
++	}
++	t.Run("and in equals form", func(t *testing.T) {
++		req := yoloRequest(workDir)
++		req.NativeArgs = []string{"--config=sandbox_mode=read-only"}
++		plan, _ := interactivePlan(t, req, agentic.LaunchModeInteractive)
++		want := []string{"-m", parityModel, "-c", `model_reasoning_effort="high"`, bypassApprovalsAndSandboxFlag, "--config=sandbox_mode=read-only"}
++		if !reflect.DeepEqual(plan.Argv, want) {
++			t.Fatalf("Argv = %#v, want %#v", plan.Argv, want)
++		}
++	})
++}
++
++// Long flags are exact and shorts are case-sensitive: `--configx` is
++// an unknown long (not `--config` with an attached value) and `-C` is
++// the workdir flag (not `-c`), so both forward verbatim instead of
++// entering the override classifier.
++func TestLongFlagsAreExactAndShortsAreCaseSensitive(t *testing.T) {
++	t.Parallel()
++	workDir := tempSlot(t)
++	for _, c := range []struct {
++		name string
++		args []string
++	}{
++		{"a longer long", []string{"--configx", "k=v"}},
++		{"the capital short", []string{"-C", "/tmp/work"}},
++	} {
++		t.Run(c.name, func(t *testing.T) {
++			req := yoloRequest(workDir)
++			req.NativeArgs = c.args
++			plan, _ := interactivePlan(t, req, agentic.LaunchModeInteractive)
++			want := append([]string{"-m", parityModel, "-c", `model_reasoning_effort="high"`, bypassApprovalsAndSandboxFlag}, c.args...)
++			if !reflect.DeepEqual(plan.Argv, want) {
++				t.Fatalf("Argv = %#v, want %#v", plan.Argv, want)
++			}
++		})
++	}
++}
++
++// The parsing rule, both directions: the same flag-looking text is
++// refused in flag position and forwarded as prompt text after `--` —
++// and a positional that never led with a dash is prompt wherever it
++// sits.
++func TestPromptTextIsNeverParsedAsAFlag(t *testing.T) {
++	t.Parallel()
++	workDir := tempSlot(t)
++	yolo := func(args []string) agentic.LaunchRequest {
++		req := yoloRequest(workDir)
++		req.NativeArgs = args
++		return req
++	}
++	t.Run("an unknown key after the separator is prompt, not policy", func(t *testing.T) {
++		plan, _ := interactivePlan(t, yolo([]string{"--", "-c", "future_key=x"}), agentic.LaunchModeInteractive)
++		want := []string{"-m", parityModel, "-c", `model_reasoning_effort="high"`, bypassApprovalsAndSandboxFlag, "--", "-c", "future_key=x"}
++		if !reflect.DeepEqual(plan.Argv, want) {
++			t.Fatalf("Argv = %#v, want %#v", plan.Argv, want)
++		}
++		if err := interactivePlanError(t, yolo([]string{"-c", "future_key=x"})); !errors.Is(err, agentic.ErrNativePolicyUnknown) {
++			t.Fatalf("the flag-position twin was not refused: %v", err)
++		}
++	})
++	t.Run("the bypass flag after the separator is prompt, not a duplicate", func(t *testing.T) {
++		plan, _ := interactivePlan(t, yolo([]string{"--", bypassApprovalsAndSandboxFlag}), agentic.LaunchModeInteractive)
++		want := []string{"-m", parityModel, "-c", `model_reasoning_effort="high"`, bypassApprovalsAndSandboxFlag, "--", bypassApprovalsAndSandboxFlag}
++		if !reflect.DeepEqual(plan.Argv, want) {
++			t.Fatalf("Argv = %#v, want %#v", plan.Argv, want)
++		}
++		if err := interactivePlanError(t, yolo([]string{bypassApprovalsAndSandboxFlag})); !errors.Is(err, agentic.ErrPermissionModeDuplicate) {
++			t.Fatalf("the flag-position twin was not refused as a duplicate: %v", err)
++		}
++	})
++	t.Run("a positional that never led with a dash is prompt", func(t *testing.T) {
++		plan, _ := interactivePlan(t, yolo([]string{"future_key=x"}), agentic.LaunchModeInteractive)
++		want := []string{"-m", parityModel, "-c", `model_reasoning_effort="high"`, bypassApprovalsAndSandboxFlag, "future_key=x"}
++		if !reflect.DeepEqual(plan.Argv, want) {
++			t.Fatalf("Argv = %#v, want %#v", plan.Argv, want)
++		}
++	})
++	t.Run("and a lone dash is positional too", func(t *testing.T) {
++		plan, _ := interactivePlan(t, yolo([]string{"-"}), agentic.LaunchModeInteractive)
++		want := []string{"-m", parityModel, "-c", `model_reasoning_effort="high"`, bypassApprovalsAndSandboxFlag, "-"}
++		if !reflect.DeepEqual(plan.Argv, want) {
++			t.Fatalf("Argv = %#v, want %#v", plan.Argv, want)
++		}
++	})
++}
++
++// The mapped bypass flag in the caller's flag positions is refused,
++// not emitted twice: at a non-zero index (so a scan narrowed to the
++// first element admits it), and in `=` form (so an exact-match scan
++// admits that).
++func TestYoloRefusesTheBypassFlagInNativeArgs(t *testing.T) {
++	t.Parallel()
++	workDir := tempSlot(t)
++	for _, c := range []struct {
++		name string
++		args []string
++	}{
++		{"at a non-zero index", []string{"--search", bypassApprovalsAndSandboxFlag}},
++		{"in equals form", []string{bypassApprovalsAndSandboxFlag + "=true"}},
++	} {
++		t.Run(c.name, func(t *testing.T) {
++			req := yoloRequest(workDir)
++			req.NativeArgs = c.args
++			if err := interactivePlanError(t, req); !errors.Is(err, agentic.ErrPermissionModeDuplicate) {
++				t.Fatalf("BuildPlan err = %v, want ErrPermissionModeDuplicate", err)
++			}
++			if _, err := New().Argv(req, agentic.LaunchModeInteractive); !errors.Is(err, agentic.ErrPermissionModeDuplicate) {
++				t.Fatalf("Argv err = %v, want ErrPermissionModeDuplicate", err)
++			}
++		})
++	}
++}
++
++// The scan is placement-insensitive: a positional `exec` ahead of the
++// flag does not hide it. Only `--` ends flag parsing.
++func TestTheScanSeesExecPlacement(t *testing.T) {
++	t.Parallel()
++	workDir := tempSlot(t)
++	req := yoloRequest(workDir)
++	req.NativeArgs = []string{"exec", "-c", "future_key=x"}
++	if err := interactivePlanError(t, req); !errors.Is(err, agentic.ErrNativePolicyUnknown) {
++		t.Fatalf("err = %v, want ErrNativePolicyUnknown", err)
++	}
++}
++
++// Native arguments outside interactive mode are refused, through
++// BuildPlan and through the plugin held directly: no other grammar
++// forwards them.
++func TestNativeArgsOutsideInteractiveAreRefused(t *testing.T) {
++	t.Parallel()
++	workDir := tempSlot(t)
++	req := interactiveRequest(workDir)
++	req.NativeArgs = []string{"--search"}
++	if err := planErrorIn(t, req, agentic.LaunchModeExec); !errors.Is(err, agentic.ErrNativeArgsNotInteractive) {
++		t.Fatalf("BuildPlan err = %v, want ErrNativeArgsNotInteractive", err)
++	}
++	if _, err := New().Argv(req, agentic.LaunchModeExec); !errors.Is(err, agentic.ErrNativeArgsNotInteractive) {
++		t.Fatalf("Argv err = %v, want ErrNativeArgsNotInteractive", err)
++	}
++}
+diff --git a/pkg/agentic/systems/codex/probe.go b/pkg/agentic/systems/codex/probe.go
+new file mode 100644
+index 0000000..e845f84
+--- /dev/null
++++ b/pkg/agentic/systems/codex/probe.go
+@@ -0,0 +1,51 @@
++package codex
++
++import (
++	"context"
++	"errors"
++	"fmt"
++	"strings"
++
++	"github.com/relux-works/skill-agents-management/internal/toolprobe"
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
++
++// ProbeToolRelease implements agentic.ToolReleaseProber: it resolves the
++// binary through the same path every launch uses (the managed package,
++// the unwrapped shim, or PATH — binary.go), runs `<binary> --version`
++// against the launch environment, and parses this tool's release out of
++// the answer.
++//
++// Every failure is ErrToolReleaseUndetected (joined with its cause), and
++// the caller answers it by passing ToolRelease "" and planning anyway —
++// never by synthesizing a release. Yolo then fails closed in the
++// capability lookup and native forwards verbatim.
++func (*System) ProbeToolRelease(ctx context.Context, env []string) (string, error) {
++	binary, err := resolveBinary(env)
++	if err != nil {
++		return "", errors.Join(agentic.ErrToolReleaseUndetected, fmt.Errorf("codex: resolving the binary: %v", err))
++	}
++	out, err := toolprobe.VersionOutput(ctx, binary, env)
++	if err != nil {
++		return "", errors.Join(agentic.ErrToolReleaseUndetected, fmt.Errorf("codex: probing the binary: %v", err))
++	}
++	release, err := parseToolRelease(out)
++	if err != nil {
++		return "", errors.Join(agentic.ErrToolReleaseUndetected, fmt.Errorf("codex: parsing the answer: %v", err))
++	}
++	return release, nil
++}
++
++// parseToolRelease reads the release out of `codex --version`: exactly
++// `codex-cli <triple>` on the first line (`codex-cli 0.153.4` at
++// installed 0.153.4). Anything else — a missing tag, extra fields, a
++// second field that is not an exact triple — is undetected, never
++// guessed at.
++func parseToolRelease(out []byte) (string, error) {
++	line, _, _ := strings.Cut(string(out), "\n")
++	fields := strings.Fields(line)
++	if len(fields) != 2 || fields[0] != "codex-cli" || !toolprobe.IsReleaseTriple(fields[1]) {
++		return "", fmt.Errorf("the answer %q is not `codex-cli <release>`", line)
++	}
++	return fields[1], nil
++}
+diff --git a/pkg/agentic/systems/codex/probe_test.go b/pkg/agentic/systems/codex/probe_test.go
+new file mode 100644
+index 0000000..fb266e7
+--- /dev/null
++++ b/pkg/agentic/systems/codex/probe_test.go
+@@ -0,0 +1,108 @@
++package codex
++
++import (
++	"context"
++	"errors"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
++
++// The version grammar, pinned against the real capture first: `codex
++// --version` prints `codex-cli <triple>` on stdout, exit 0 (installed
++// 0.153.4). Helper-direct and disclosed as a bound — parseToolRelease
++// is the probe's pure half; the rows below drive the production prober
++// through agentic.ProbeToolRelease against fake binaries, and never
++// execute a real provider.
++func TestParseToolReleaseReadsTheTaggedTriple(t *testing.T) {
++	t.Parallel()
++	for out, want := range map[string]string{
++		"codex-cli 0.153.4\n": "0.153.4",
++		"codex-cli 0.153.2\n": "0.153.2",
++	} {
++		if got, err := parseToolRelease([]byte(out)); err != nil || got != want {
++			t.Errorf("parseToolRelease(%q) = (%q, %v), want (%q, nil)", out, got, err, want)
++		}
++	}
++	for _, out := range []string{"", "\n", "0.153.4\n", "codex-cli\n", "codex 0.153.4\n", "codex-cli 0.153.4 extra\n", "codex-cli v0.153.4\n"} {
++		if got, err := parseToolRelease([]byte(out)); err == nil {
++			t.Errorf("parseToolRelease(%q) = %q, want an error", out, got)
++		}
++	}
++}
++
++func writeScriptStub(t *testing.T, dir, name, body string) string {
++	t.Helper()
++	path := filepath.Join(dir, name)
++	if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
++		t.Fatalf("writing the stub %s: %v", name, err)
++	}
++	return path
++}
++
++func probeEnv(binDir string) []string {
++	return []string{"PATH=" + binDir}
++}
++
++// The probe resolves the binary through the launch PATH, runs it with
++// exactly `--version`, and returns the parsed release.
++func TestProbeToolReleaseEstablishesTheRelease(t *testing.T) {
++	t.Parallel()
++	binDir := tempSlot(t)
++	capture := filepath.Join(binDir, "argv.log")
++	writeScriptStub(t, binDir, executableName, "#!/bin/sh\necho \"$@\" > "+capture+"\necho 'codex-cli 0.153.2'\n")
++
++	release, err := agentic.ProbeToolRelease(context.Background(), New(), probeEnv(binDir))
++	if err != nil {
++		t.Fatalf("ProbeToolRelease: %v", err)
++	}
++	if release != "0.153.2" {
++		t.Errorf("release = %q, want %q", release, "0.153.2")
++	}
++	argv, err := os.ReadFile(capture)
++	if err != nil {
++		t.Fatalf("reading the argv capture: %v", err)
++	}
++	if strings.TrimSpace(string(argv)) != "--version" {
++		t.Errorf("the probe ran with argv %q, want exactly --version", strings.TrimSpace(string(argv)))
++	}
++}
++
++// Every detection failure is the undetected sentinel: an unresolvable
++// binary, a missing PATH, a non-zero exit, an unparsable answer. The
++// caller answers it with ToolRelease "" — yolo fails closed, native
++// forwards — never by synthesizing a release.
++func TestProbeToolReleaseFailsClosed(t *testing.T) {
++	t.Parallel()
++	t.Run("an unresolvable binary", func(t *testing.T) {
++		t.Parallel()
++		if _, err := agentic.ProbeToolRelease(context.Background(), New(), probeEnv(tempSlot(t))); !errors.Is(err, agentic.ErrToolReleaseUndetected) {
++			t.Errorf("err = %v, want ErrToolReleaseUndetected", err)
++		}
++	})
++	t.Run("no PATH at all", func(t *testing.T) {
++		t.Parallel()
++		if _, err := agentic.ProbeToolRelease(context.Background(), New(), []string{"HOME=/home/agent"}); !errors.Is(err, agentic.ErrToolReleaseUndetected) {
++			t.Errorf("err = %v, want ErrToolReleaseUndetected", err)
++		}
++	})
++	t.Run("a non-zero exit", func(t *testing.T) {
++		t.Parallel()
++		binDir := tempSlot(t)
++		writeScriptStub(t, binDir, executableName, "#!/bin/sh\necho 'codex-cli 0.153.2'\nexit 3\n")
++		if _, err := agentic.ProbeToolRelease(context.Background(), New(), probeEnv(binDir)); !errors.Is(err, agentic.ErrToolReleaseUndetected) {
++			t.Errorf("err = %v, want ErrToolReleaseUndetected", err)
++		}
++	})
++	t.Run("an unparsable answer", func(t *testing.T) {
++		t.Parallel()
++		binDir := tempSlot(t)
++		writeScriptStub(t, binDir, executableName, "#!/bin/sh\necho 'something else entirely'\n")
++		if _, err := agentic.ProbeToolRelease(context.Background(), New(), probeEnv(binDir)); !errors.Is(err, agentic.ErrToolReleaseUndetected) {
++			t.Errorf("err = %v, want ErrToolReleaseUndetected", err)
++		}
++	})
++}
+diff --git a/pkg/agentic/systems/pi/args.go b/pkg/agentic/systems/pi/args.go
+index a096eeb..1a06ce0 100644
+--- a/pkg/agentic/systems/pi/args.go
++++ b/pkg/agentic/systems/pi/args.go
+@@ -51,10 +51,17 @@ func interactiveArgs(req agentic.LaunchRequest, effective agentic.PermissionMode
+ 		return nil, fmt.Errorf("pi: an interactive launch requires a model id")
+ 	}
+ 	if effective == agentic.PermissionModeYolo {
++		// Drift fails closed before support is even asked: an unpinned
++		// or newer release, and an empty one, refuse as unverified,
++		// and only the verified release reaches the unsupported
++		// refusal below.
++		if _, err := agentic.LookupReleaseCapability(verifiedReleases, req.ToolRelease); err != nil {
++			return nil, fmt.Errorf("pi: %w", err)
++		}
+ 		return nil, fmt.Errorf("pi: refusing yolo: %w: pi 0.84.2 documents no interactive permission-bypass flag; --approve trusts project-local files for this run and is not equivalent",
+ 			agentic.ErrPermissionModeUnsupported)
+ 	}
+-	return []string{"pi", "--model", model}, nil
++	return append([]string{"pi", "--model", model}, nativeArgsSuffix(req)...), nil
+ }
+ 
+ func args(req agentic.LaunchRequest, mode agentic.LaunchMode) ([]string, error) {
+@@ -66,6 +73,10 @@ func args(req agentic.LaunchRequest, mode agentic.LaunchMode) ([]string, error)
+ 		return nil, fmt.Errorf("pi: %w: permission mode %q is valid only for interactive launches",
+ 			agentic.ErrPermissionModeNotInteractive, strings.TrimSpace(string(req.PermissionMode)))
+ 	}
++	if mode != agentic.LaunchModeInteractive && len(req.NativeArgs) != 0 {
++		return nil, fmt.Errorf("pi: %w: %d native argument(s) reach no verbatim suffix outside an interactive launch",
++			agentic.ErrNativeArgsNotInteractive, len(req.NativeArgs))
++	}
+ 	if mode == agentic.LaunchModeInteractive {
+ 		return interactiveArgs(req, effective)
+ 	}
+@@ -87,6 +98,13 @@ func args(req agentic.LaunchRequest, mode agentic.LaunchMode) ([]string, error)
+ 	}, nil
+ }
+ 
++// nativeArgsSuffix returns the caller's native arguments for the verbatim
++// interactive suffix, copied so the plan's argv never aliases the request's
++// backing array.
++func nativeArgsSuffix(req agentic.LaunchRequest) []string {
++	return append([]string{}, req.NativeArgs...)
++}
++
+ // defaultDeadline is the Process-A deadline spelled when the caller declared
+ // none. It is the historical constant, kept only as the zero-value fallback:
+ // a caller with a fence of its own (task-board's hard timeout) passes it on
+diff --git a/pkg/agentic/systems/pi/interactive_test.go b/pkg/agentic/systems/pi/interactive_test.go
+index a6e34c1..f028856 100644
+--- a/pkg/agentic/systems/pi/interactive_test.go
++++ b/pkg/agentic/systems/pi/interactive_test.go
+@@ -164,6 +164,7 @@ func TestAnInteractiveLaunchRefusesWhatItsGrammarCannotCarry(t *testing.T) {
+ func TestAnInteractiveYoloLaunchIsRefusedAsUnsupported(t *testing.T) {
+ 	req, _ := interactiveRequest(t)
+ 	req.PermissionMode = agentic.PermissionModeYolo
++	req.ToolRelease = "0.84.2"
+ 	if _, err := buildPlan(t, req, agentic.LaunchModeInteractive); !errors.Is(err, agentic.ErrPermissionModeUnsupported) {
+ 		t.Fatalf("BuildPlan err = %v, want ErrPermissionModeUnsupported", err)
+ 	}
+diff --git a/pkg/agentic/systems/pi/policy.go b/pkg/agentic/systems/pi/policy.go
+new file mode 100644
+index 0000000..fc29cd5
+--- /dev/null
++++ b/pkg/agentic/systems/pi/policy.go
+@@ -0,0 +1,23 @@
++package pi
++
++import "github.com/relux-works/skill-agents-management/pkg/agentic"
++
++// verifiedReleases is this environment's rows of the versioned
++// provider-capability table (curator-spec Decision 0018 choice 6).
++//
++// There is exactly one row: pi 0.84.2, the release this plugin's
++// `--model` grammar was checked against, carrying YoloSupported false —
++// that release documents no permission-bypass flag (`--approve` trusts
++// project-local files for the run; Decision 0018 records it as not
++// equivalent), so yolo at the verified release is refused as
++// unsupported. Any other release — and an empty one — fails closed
++// earlier, as drift.
++//
++// This plugin has no release probe to fill ToolRelease with: its binary
++// is the agents-infra wrapper, and the wrapper's version is not pi's
++// release. The caller passes the release when it established it another
++// way, and yolo without one is refused as unverified. Native never
++// reads the table either way.
++var verifiedReleases = []agentic.ReleaseCapability{
++	{Release: "0.84.2", Grammar: agentic.PermissionGrammarV1, YoloSupported: false},
++}
+diff --git a/pkg/agentic/systems/pi/policy_test.go b/pkg/agentic/systems/pi/policy_test.go
+new file mode 100644
+index 0000000..a7ee81a
+--- /dev/null
++++ b/pkg/agentic/systems/pi/policy_test.go
+@@ -0,0 +1,143 @@
++package pi
++
++import (
++	"context"
++	"errors"
++	"reflect"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
++
++// This file is the pi half of the versioned provider-capability table
++// (curator-spec Decision 0018 choice 6): drift fails closed before
++// support is even asked, the verified release stays unsupported, and
++// native forwards verbatim. Pi has no native-policy scan — yolo never
++// reaches classification — and no release probe: its binary is the
++// agents-infra wrapper, and the wrapper's version is not pi's release.
++
++// The verified release stays unsupported: yolo at pi 0.84.2 is refused
++// with the unchanged sentinel even carrying native arguments no
++// grammar knows — the refusal precedes classification, so the scan is
++// never reached here.
++func TestYoloAtTheVerifiedReleaseStaysUnsupported(t *testing.T) {
++	req, _ := interactiveRequest(t)
++	req.PermissionMode = agentic.PermissionModeYolo
++	req.ToolRelease = "0.84.2"
++	req.NativeArgs = []string{"--permission-mode", "ultrastrict", "-c", "future_key=x"}
++	if _, err := buildPlan(t, req, agentic.LaunchModeInteractive); !errors.Is(err, agentic.ErrPermissionModeUnsupported) {
++		t.Fatalf("BuildPlan err = %v, want ErrPermissionModeUnsupported", err)
++	}
++	if _, err := New(&fakeStatusReader{}).Argv(req, agentic.LaunchModeInteractive); !errors.Is(err, agentic.ErrPermissionModeUnsupported) {
++		t.Fatalf("Argv err = %v, want ErrPermissionModeUnsupported", err)
++	}
++}
++
++// Drift fails closed first: yolo at any release but the verified one —
++// a newer release, an invented future one, or none at all — is refused
++// as unverified, through BuildPlan and through the plugin held
++// directly.
++func TestYoloRefusesDriftWithANamedDiagnostic(t *testing.T) {
++	for _, release := range []string{"0.85.0", "9.9.9", ""} {
++		t.Run("release "+quoteRelease(release), func(t *testing.T) {
++			req, _ := interactiveRequest(t)
++			req.PermissionMode = agentic.PermissionModeYolo
++			req.ToolRelease = release
++			err := mustPlanError(t, req)
++			if !errors.Is(err, agentic.ErrPermissionModeUnverifiedRelease) {
++				t.Fatalf("BuildPlan err = %v, want ErrPermissionModeUnverifiedRelease", err)
++			}
++			if _, err := New(&fakeStatusReader{}).Argv(req, agentic.LaunchModeInteractive); !errors.Is(err, agentic.ErrPermissionModeUnverifiedRelease) {
++				t.Fatalf("Argv err = %v, want ErrPermissionModeUnverifiedRelease", err)
++			}
++		})
++	}
++	t.Run("the diagnostic names the grammar token the launcher cites", func(t *testing.T) {
++		req, _ := interactiveRequest(t)
++		req.PermissionMode = agentic.PermissionModeYolo
++		req.ToolRelease = "0.85.0"
++		err := mustPlanError(t, req)
++		if !errors.Is(err, agentic.ErrPermissionModeUnverifiedRelease) {
++			t.Fatalf("err = %v, want ErrPermissionModeUnverifiedRelease", err)
++		}
++		for _, want := range []string{string(agentic.PermissionGrammarV1), "0.85.0", "0.84.2"} {
++			if !strings.Contains(err.Error(), want) {
++				t.Errorf("refusal %q does not name %q", err, want)
++			}
++		}
++	})
++}
++
++func quoteRelease(release string) string {
++	if release == "" {
++		return "unestablished"
++	}
++	return release
++}
++
++func mustPlanError(t *testing.T, req agentic.LaunchRequest) error {
++	t.Helper()
++	_, err := buildPlan(t, req, agentic.LaunchModeInteractive)
++	if err == nil {
++		t.Fatal("BuildPlan built a plan that must be refused")
++	}
++	return err
++}
++
++// Native forwards the caller's arguments with no inspection at any
++// release — pinned, newer, or never established — because the raw
++// contract is unchanged and no claim is made (Decision 0018 item 4).
++func TestNativeForwardsVerbatimAtAnyRelease(t *testing.T) {
++	native := []string{"--approve", "resume the session"}
++	for _, c := range []struct {
++		name    string
++		mode    agentic.PermissionMode
++		release string
++	}{
++		{"zero value at the pinned release", "", "0.84.2"},
++		{"explicit native at the pinned release", agentic.PermissionModeNative, "0.84.2"},
++		{"explicit native past the pin", agentic.PermissionModeNative, "0.85.0"},
++		{"explicit native with no release established", agentic.PermissionModeNative, ""},
++	} {
++		t.Run(c.name, func(t *testing.T) {
++			req, _ := interactiveRequest(t)
++			req.PermissionMode = c.mode
++			req.ToolRelease = c.release
++			req.NativeArgs = native
++			plan, err := buildPlan(t, req, agentic.LaunchModeInteractive)
++			if err != nil {
++				t.Fatalf("BuildPlan: %v", err)
++			}
++			want := append([]string{"pi", "--model", "qwen-3.8-27b-mlx-8bit"}, native...)
++			if !reflect.DeepEqual(plan.Argv, want) {
++				t.Fatalf("Argv = %#v, want %#v", plan.Argv, want)
++			}
++		})
++	}
++}
++
++// The wrapper has no probe: resolving `agents-infra` and asking IT for
++// a version would attest the wrapper, not pi's release, so the system
++// establishes none and yolo without an explicitly passed release fails
++// closed as unverified.
++func TestTheWrapperEstablishesNoToolRelease(t *testing.T) {
++	_, binDir := interactiveRequest(t)
++	if _, err := agentic.ProbeToolRelease(context.Background(), New(&fakeStatusReader{}), []string{"PATH=" + binDir}); !errors.Is(err, agentic.ErrToolReleaseUndetected) {
++		t.Errorf("err = %v, want ErrToolReleaseUndetected", err)
++	}
++}
++
++// Native arguments outside interactive mode are refused, through
++// BuildPlan and through the plugin held directly: no other grammar
++// forwards them.
++func TestNativeArgsOutsideInteractiveAreRefused(t *testing.T) {
++	req, _ := interactiveRequest(t)
++	req.NativeArgs = []string{"--approve"}
++	if _, err := buildPlan(t, req, agentic.LaunchModeExec); !errors.Is(err, agentic.ErrNativeArgsNotInteractive) {
++		t.Fatalf("BuildPlan err = %v, want ErrNativeArgsNotInteractive", err)
++	}
++	if _, err := New(&fakeStatusReader{}).Argv(req, agentic.LaunchModeExec); !errors.Is(err, agentic.ErrNativeArgsNotInteractive) {
++		t.Fatalf("Argv err = %v, want ErrNativeArgsNotInteractive", err)
++	}
++}
+diff --git a/pkg/agentic/systems/pinative/args.go b/pkg/agentic/systems/pinative/args.go
+index 08ca895..b8cbcec 100644
+--- a/pkg/agentic/systems/pinative/args.go
++++ b/pkg/agentic/systems/pinative/args.go
+@@ -63,12 +63,23 @@ func Args(req agentic.LaunchRequest, mode agentic.LaunchMode) ([]string, error)
+ 		return nil, fmt.Errorf("pinative: %w: permission mode %q is valid only for interactive launches",
+ 			agentic.ErrPermissionModeNotInteractive, strings.TrimSpace(string(req.PermissionMode)))
+ 	}
++	if mode != agentic.LaunchModeInteractive && len(req.NativeArgs) != 0 {
++		return nil, fmt.Errorf("pinative: %w: %d native argument(s) reach no verbatim suffix outside an interactive launch",
++			agentic.ErrNativeArgsNotInteractive, len(req.NativeArgs))
++	}
+ 	switch mode {
+ 	case agentic.LaunchModeInteractive, agentic.LaunchModeDryRun:
+ 	default:
+ 		return nil, fmt.Errorf("pinative: unsupported launch mode %s", mode)
+ 	}
+ 	if mode == agentic.LaunchModeInteractive && effective == agentic.PermissionModeYolo {
++		// Drift fails closed before support is even asked: an unpinned
++		// or newer release, and an empty one, refuse as unverified,
++		// and only the verified release reaches the unsupported
++		// refusal below.
++		if _, err := agentic.LookupReleaseCapability(verifiedReleases, req.ToolRelease); err != nil {
++			return nil, fmt.Errorf("pinative: %w", err)
++		}
+ 		return nil, fmt.Errorf("pinative: refusing yolo: %w: pi 0.84.2 documents no interactive permission-bypass flag; --approve trusts project-local files for this run and is not equivalent",
+ 			agentic.ErrPermissionModeUnsupported)
+ 	}
+@@ -96,5 +107,15 @@ func Args(req agentic.LaunchRequest, mode agentic.LaunchMode) ([]string, error)
+ 		}
+ 		args = append(args, "--thinking", effort)
+ 	}
+-	return args, nil
++	// The verbatim suffix: native forwards the caller's arguments with no
++	// inspection (Decision 0018 item 4). Yolo never reaches here — refused
++	// above — and dry-run carries none (the scope gate refused them).
++	return append(args, nativeArgsSuffix(req)...), nil
++}
++
++// nativeArgsSuffix returns the caller's native arguments for the verbatim
++// interactive suffix, copied so the plan's argv never aliases the request's
++// backing array.
++func nativeArgsSuffix(req agentic.LaunchRequest) []string {
++	return append([]string{}, req.NativeArgs...)
+ }
+diff --git a/pkg/agentic/systems/pinative/pinative_test.go b/pkg/agentic/systems/pinative/pinative_test.go
+index b777167..6c0f444 100644
+--- a/pkg/agentic/systems/pinative/pinative_test.go
++++ b/pkg/agentic/systems/pinative/pinative_test.go
+@@ -109,6 +109,7 @@ func TestTheInteractiveArgvIsTheQualifiedModelAndThinking(t *testing.T) {
+ func TestAnInteractiveYoloLaunchIsRefusedAsUnsupported(t *testing.T) {
+ 	req, _ := request(t)
+ 	req.PermissionMode = agentic.PermissionModeYolo
++	req.ToolRelease = "0.84.2"
+ 	if _, err := buildPlan(t, req, agentic.LaunchModeInteractive); !errors.Is(err, agentic.ErrPermissionModeUnsupported) {
+ 		t.Fatalf("BuildPlan err = %v, want ErrPermissionModeUnsupported", err)
+ 	}
+diff --git a/pkg/agentic/systems/pinative/policy.go b/pkg/agentic/systems/pinative/policy.go
+new file mode 100644
+index 0000000..3b15c5e
+--- /dev/null
++++ b/pkg/agentic/systems/pinative/policy.go
+@@ -0,0 +1,17 @@
++package pinative
++
++import "github.com/relux-works/skill-agents-management/pkg/agentic"
++
++// verifiedReleases is this environment's rows of the versioned
++// provider-capability table (curator-spec Decision 0018 choice 6).
++//
++// There is exactly one row: pi 0.84.2, carrying YoloSupported false —
++// that release documents no permission-bypass flag, so yolo at the
++// verified release is refused as unsupported, and any other release (or
++// an empty one) fails closed earlier, as drift. The release string
++// matches pi's row because both environments run the same tool
++// release; the rows are still per-environment facts (the table keys
++// environment AND release), which is why each plugin holds its own.
++var verifiedReleases = []agentic.ReleaseCapability{
++	{Release: "0.84.2", Grammar: agentic.PermissionGrammarV1, YoloSupported: false},
++}
+diff --git a/pkg/agentic/systems/pinative/policy_test.go b/pkg/agentic/systems/pinative/policy_test.go
+new file mode 100644
+index 0000000..b1c42ff
+--- /dev/null
++++ b/pkg/agentic/systems/pinative/policy_test.go
+@@ -0,0 +1,121 @@
++package pinative_test
++
++import (
++	"errors"
++	"reflect"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++	"github.com/relux-works/skill-agents-management/pkg/agentic/systems/pinative"
++)
++
++// This file is the pi-native half of the versioned
++// provider-capability table (curator-spec Decision 0018 choice 6):
++// drift fails closed before support is even asked, the verified
++// release stays unsupported, and native forwards verbatim. Pi-native
++// has no native-policy scan — yolo never reaches classification — but
++// unlike the wrapper it does probe: its binary is raw `pi`, which
++// attests its own release (probe_test.go).
++
++// The verified release stays unsupported: yolo at pi 0.84.2 is refused
++// with the unchanged sentinel even carrying native arguments no
++// grammar knows — the refusal precedes classification, so the scan is
++// never reached here.
++func TestYoloAtTheVerifiedReleaseStaysUnsupported(t *testing.T) {
++	req, _ := request(t)
++	req.PermissionMode = agentic.PermissionModeYolo
++	req.ToolRelease = "0.84.2"
++	req.NativeArgs = []string{"--permission-mode", "ultrastrict", "-c", "future_key=x"}
++	if _, err := buildPlan(t, req, agentic.LaunchModeInteractive); !errors.Is(err, agentic.ErrPermissionModeUnsupported) {
++		t.Fatalf("BuildPlan err = %v, want ErrPermissionModeUnsupported", err)
++	}
++	if _, err := pinative.New().Argv(req, agentic.LaunchModeInteractive); !errors.Is(err, agentic.ErrPermissionModeUnsupported) {
++		t.Fatalf("Argv err = %v, want ErrPermissionModeUnsupported", err)
++	}
++}
++
++// Drift fails closed first: yolo at any release but the verified one —
++// a newer release, an invented future one, or none at all — is refused
++// as unverified, through BuildPlan and through the plugin held
++// directly.
++func TestYoloRefusesDriftWithANamedDiagnostic(t *testing.T) {
++	for _, release := range []string{"0.85.0", "9.9.9", ""} {
++		name := release
++		if name == "" {
++			name = "unestablished"
++		}
++		t.Run("release "+name, func(t *testing.T) {
++			req, _ := request(t)
++			req.PermissionMode = agentic.PermissionModeYolo
++			req.ToolRelease = release
++			if _, err := buildPlan(t, req, agentic.LaunchModeInteractive); !errors.Is(err, agentic.ErrPermissionModeUnverifiedRelease) {
++				t.Fatalf("BuildPlan err = %v, want ErrPermissionModeUnverifiedRelease", err)
++			}
++			if _, err := pinative.New().Argv(req, agentic.LaunchModeInteractive); !errors.Is(err, agentic.ErrPermissionModeUnverifiedRelease) {
++				t.Fatalf("Argv err = %v, want ErrPermissionModeUnverifiedRelease", err)
++			}
++		})
++	}
++	t.Run("the diagnostic names the grammar token the launcher cites", func(t *testing.T) {
++		req, _ := request(t)
++		req.PermissionMode = agentic.PermissionModeYolo
++		req.ToolRelease = "0.85.0"
++		_, err := buildPlan(t, req, agentic.LaunchModeInteractive)
++		if !errors.Is(err, agentic.ErrPermissionModeUnverifiedRelease) {
++			t.Fatalf("err = %v, want ErrPermissionModeUnverifiedRelease", err)
++		}
++		for _, want := range []string{string(agentic.PermissionGrammarV1), "0.85.0", "0.84.2"} {
++			if !strings.Contains(err.Error(), want) {
++				t.Errorf("refusal %q does not name %q", err, want)
++			}
++		}
++	})
++}
++
++// Native forwards the caller's arguments with no inspection at any
++// release — pinned, newer, or never established — because the raw
++// contract is unchanged and no claim is made (Decision 0018 item 4).
++func TestNativeForwardsVerbatimAtAnyRelease(t *testing.T) {
++	native := []string{"--no-approve", "resume the session"}
++	for _, c := range []struct {
++		name    string
++		mode    agentic.PermissionMode
++		release string
++	}{
++		{"zero value at the pinned release", "", "0.84.2"},
++		{"explicit native at the pinned release", agentic.PermissionModeNative, "0.84.2"},
++		{"explicit native past the pin", agentic.PermissionModeNative, "0.85.0"},
++		{"explicit native with no release established", agentic.PermissionModeNative, ""},
++	} {
++		t.Run(c.name, func(t *testing.T) {
++			req, _ := request(t)
++			req.PermissionMode = c.mode
++			req.ToolRelease = c.release
++			req.NativeArgs = native
++			plan, err := buildPlan(t, req, agentic.LaunchModeInteractive)
++			if err != nil {
++				t.Fatalf("BuildPlan: %v", err)
++			}
++			want := append([]string{"--model", "anthropic/claude-opus-5", "--thinking", "high"}, native...)
++			if !reflect.DeepEqual(plan.Argv, want) {
++				t.Fatalf("Argv = %#v, want %#v", plan.Argv, want)
++			}
++		})
++	}
++}
++
++// Native arguments outside interactive mode are refused, through
++// BuildPlan and through the plugin held directly. Pi-native declares
++// no exec mode, so the dry-run mirror — byte-identical argv, but no
++// verbatim suffix — carries the repeat.
++func TestNativeArgsOutsideInteractiveAreRefused(t *testing.T) {
++	req, _ := request(t)
++	req.NativeArgs = []string{"--no-approve"}
++	if _, err := buildPlan(t, req, agentic.LaunchModeDryRun); !errors.Is(err, agentic.ErrNativeArgsNotInteractive) {
++		t.Fatalf("BuildPlan err = %v, want ErrNativeArgsNotInteractive", err)
++	}
++	if _, err := pinative.New().Argv(req, agentic.LaunchModeDryRun); !errors.Is(err, agentic.ErrNativeArgsNotInteractive) {
++		t.Fatalf("Argv err = %v, want ErrNativeArgsNotInteractive", err)
++	}
++}
+diff --git a/pkg/agentic/systems/pinative/probe.go b/pkg/agentic/systems/pinative/probe.go
+new file mode 100644
+index 0000000..79258e3
+--- /dev/null
++++ b/pkg/agentic/systems/pinative/probe.go
+@@ -0,0 +1,47 @@
++package pinative
++
++import (
++	"context"
++	"errors"
++	"fmt"
++	"strings"
++
++	"github.com/relux-works/skill-agents-management/internal/toolprobe"
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
++
++// ProbeToolRelease implements agentic.ToolReleaseProber: it resolves the
++// raw `pi` binary through the same path every launch uses, runs `<binary>
++// --version` against the launch environment, and parses this tool's
++// release out of the answer.
++//
++// Every failure is ErrToolReleaseUndetected (joined with its cause), and
++// the caller answers it by passing ToolRelease "" and planning anyway —
++// never by synthesizing a release. Yolo then fails closed in the
++// capability lookup and native forwards verbatim.
++func (*System) ProbeToolRelease(ctx context.Context, env []string) (string, error) {
++	binary, err := resolveBinary(env)
++	if err != nil {
++		return "", errors.Join(agentic.ErrToolReleaseUndetected, fmt.Errorf("pinative: resolving the binary: %v", err))
++	}
++	out, err := toolprobe.VersionOutput(ctx, binary, env)
++	if err != nil {
++		return "", errors.Join(agentic.ErrToolReleaseUndetected, fmt.Errorf("pinative: probing the binary: %v", err))
++	}
++	release, err := parseToolRelease(out)
++	if err != nil {
++		return "", errors.Join(agentic.ErrToolReleaseUndetected, fmt.Errorf("pinative: parsing the answer: %v", err))
++	}
++	return release, nil
++}
++
++// parseToolRelease reads the release out of `pi --version`: the whole
++// trimmed answer, `0.84.2` at installed 0.84.2. Anything else — an
++// empty answer, anything but an exact triple — is undetected, never
++// guessed at.
++func parseToolRelease(out []byte) (string, error) {
++	if release := strings.TrimSpace(string(out)); toolprobe.IsReleaseTriple(release) {
++		return release, nil
++	}
++	return "", fmt.Errorf("the answer %q is not a release triple", strings.TrimSpace(string(out)))
++}
+diff --git a/pkg/agentic/systems/pinative/probe_test.go b/pkg/agentic/systems/pinative/probe_test.go
+new file mode 100644
+index 0000000..e914974
+--- /dev/null
++++ b/pkg/agentic/systems/pinative/probe_test.go
+@@ -0,0 +1,92 @@
++package pinative
++
++import (
++	"context"
++	"errors"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
++
++// The version grammar, pinned against the real capture first: `pi
++// --version` prints the bare triple on stdout, exit 0 (`0.84.2` at
++// installed 0.84.2). Helper-direct and disclosed as a bound —
++// parseToolRelease is the probe's pure half; the rows below drive the
++// production prober through agentic.ProbeToolRelease against fake
++// binaries, and never execute a real provider.
++func TestParseToolReleaseReadsTheBareTriple(t *testing.T) {
++	for out, want := range map[string]string{
++		"0.84.2\n":  "0.84.2",
++		"  0.84.2 ": "0.84.2",
++	} {
++		if got, err := parseToolRelease([]byte(out)); err != nil || got != want {
++			t.Errorf("parseToolRelease(%q) = (%q, %v), want (%q, nil)", out, got, err, want)
++		}
++	}
++	for _, out := range []string{"", "\n", "pi 0.84.2\n", "v0.84.2\n", "0.84\n"} {
++		if got, err := parseToolRelease([]byte(out)); err == nil {
++			t.Errorf("parseToolRelease(%q) = %q, want an error", out, got)
++		}
++	}
++}
++
++func writeScriptStub(t *testing.T, dir, name, body string) string {
++	t.Helper()
++	path := filepath.Join(dir, name)
++	if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
++		t.Fatalf("writing the stub %s: %v", name, err)
++	}
++	return path
++}
++
++// The probe resolves the raw `pi` binary through the launch PATH, runs
++// it with exactly `--version`, and returns the parsed release.
++func TestProbeToolReleaseEstablishesTheRelease(t *testing.T) {
++	binDir := t.TempDir()
++	capture := filepath.Join(binDir, "argv.log")
++	writeScriptStub(t, binDir, "pi", "#!/bin/sh\necho \"$@\" > "+capture+"\necho '0.84.2'\n")
++
++	release, err := agentic.ProbeToolRelease(context.Background(), New(), []string{"PATH=" + binDir})
++	if err != nil {
++		t.Fatalf("ProbeToolRelease: %v", err)
++	}
++	if release != "0.84.2" {
++		t.Errorf("release = %q, want %q", release, "0.84.2")
++	}
++	argv, err := os.ReadFile(capture)
++	if err != nil {
++		t.Fatalf("reading the argv capture: %v", err)
++	}
++	if strings.TrimSpace(string(argv)) != "--version" {
++		t.Errorf("the probe ran with argv %q, want exactly --version", strings.TrimSpace(string(argv)))
++	}
++}
++
++// Every detection failure is the undetected sentinel: an unresolvable
++// binary, a non-zero exit, an unparsable answer. The caller answers it
++// with ToolRelease "" — yolo fails closed, native forwards — never by
++// synthesizing a release.
++func TestProbeToolReleaseFailsClosed(t *testing.T) {
++	t.Run("an unresolvable binary", func(t *testing.T) {
++		if _, err := agentic.ProbeToolRelease(context.Background(), New(), []string{"PATH=" + t.TempDir()}); !errors.Is(err, agentic.ErrToolReleaseUndetected) {
++			t.Errorf("err = %v, want ErrToolReleaseUndetected", err)
++		}
++	})
++	t.Run("a non-zero exit", func(t *testing.T) {
++		binDir := t.TempDir()
++		writeScriptStub(t, binDir, "pi", "#!/bin/sh\necho '0.84.2'\nexit 3\n")
++		if _, err := agentic.ProbeToolRelease(context.Background(), New(), []string{"PATH=" + binDir}); !errors.Is(err, agentic.ErrToolReleaseUndetected) {
++			t.Errorf("err = %v, want ErrToolReleaseUndetected", err)
++		}
++	})
++	t.Run("an unparsable answer", func(t *testing.T) {
++		binDir := t.TempDir()
++		writeScriptStub(t, binDir, "pi", "#!/bin/sh\necho 'something else entirely'\n")
++		if _, err := agentic.ProbeToolRelease(context.Background(), New(), []string{"PATH=" + binDir}); !errors.Is(err, agentic.ErrToolReleaseUndetected) {
++			t.Errorf("err = %v, want ErrToolReleaseUndetected", err)
++		}
++	})
++}

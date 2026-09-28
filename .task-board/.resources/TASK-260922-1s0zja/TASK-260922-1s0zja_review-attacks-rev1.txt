@@ -1,0 +1,69 @@
+FILE: baseline.log
+ok  	github.com/relux-works/skill-agents-management/pkg/agentic	2.695s
+ok  	github.com/relux-works/skill-agents-management/pkg/agentic/systems/claude	3.506s
+ok  	github.com/relux-works/skill-agents-management/pkg/agentic/systems/codex	5.449s
+ok  	github.com/relux-works/skill-agents-management/pkg/agentic/systems/pi	2.928s
+ok  	github.com/relux-works/skill-agents-management/pkg/agentic/systems/pinative	4.011s
+ok  	github.com/relux-works/skill-agents-management/internal/argvguard	2.279s
+ok  	github.com/relux-works/skill-agents-management/internal/regress	4.305s
+
+
+FILE: unknown.log
+--- FAIL: TestBuildPlanRefusesAnUnknownPermissionModeInEveryMode (0.00s)
+    --- FAIL: TestBuildPlanRefusesAnUnknownPermissionModeInEveryMode/near-misses_are_refused,_not_guessed_at (0.00s)
+        interactive_test.go:318: value "auto": err = <nil>, want ErrPermissionModeUnknown
+FAIL
+FAIL	github.com/relux-works/skill-agents-management/pkg/agentic	0.528s
+FAIL
+
+
+FILE: duplicate.log
+--- FAIL: TestTheYoloRefusalsAreNamedAndTotal (0.05s)
+    --- FAIL: TestTheYoloRefusalsAreNamedAndTotal/yolo_with_the_bypass_flag_already_in_the_composition_prefix_is_refused,_not_de-duplicated (0.00s)
+        interactive_test.go:319: Argv err = <nil>, want ErrPermissionModeDuplicate
+FAIL
+FAIL	github.com/relux-works/skill-agents-management/pkg/agentic/systems/claude	0.561s
+FAIL
+
+
+FILE: double-emission.log
+--- FAIL: TestTheYoloArgvAppendsTheBypassFlagOnce (0.12s)
+    interactive_test.go:240: Argv = []string{"--model", "claude-opus-5", "--effort", "high", "--dangerously-skip-permissions", "--dangerously-skip-permissions"}, want []string{"--model", "claude-opus-5", "--effort", "high", "--dangerously-skip-permissions"}
+FAIL
+FAIL	github.com/relux-works/skill-agents-management/pkg/agentic/systems/claude	0.672s
+FAIL
+
+
+FILE: third-site.log
+ok  	github.com/relux-works/skill-agents-management/pkg/agentic/systems/agy	1.261s
+ok  	github.com/relux-works/skill-agents-management/pkg/agentic/systems/claude	2.044s
+ok  	github.com/relux-works/skill-agents-management/pkg/agentic/systems/codex	2.950s
+ok  	github.com/relux-works/skill-agents-management/pkg/agentic/systems/gemini	3.344s
+ok  	github.com/relux-works/skill-agents-management/pkg/agentic/systems/muse	4.275s
+ok  	github.com/relux-works/skill-agents-management/pkg/agentic/systems/pi	4.652s
+ok  	github.com/relux-works/skill-agents-management/pkg/agentic/systems/pinative	5.335s
+ok  	github.com/relux-works/skill-agents-management/pkg/agentic/systems/qwen	4.469s
+ok  	github.com/relux-works/skill-agents-management/internal/argvguard	3.279s
+
+
+FILE: mutate.py
+from pathlib import Path
+import subprocess
+root=Path(__file__).resolve().parent/'candidate'
+def run(name,path,old,new,args):
+ p=root/path; src=p.read_text(); assert old in src
+ p.write_text(src.replace(old,new,1))
+ try:
+  r=subprocess.run(['go','test',*args,'-count=1'],cwd=root,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+  (root.parent/(name+'.log')).write_text(r.stdout)
+  print(name,'exit',r.returncode,r.stdout[-2200:],flush=True)
+ finally:p.write_text(src)
+run('unknown','pkg/agentic/system.go','case "", string(PermissionModeNative):','case "", "auto", string(PermissionModeNative):',['./pkg/agentic','-run','TestBuildPlanRefusesAnUnknownPermissionModeInEveryMode'])
+run('duplicate','pkg/agentic/systems/claude/args.go','for _, arg := range req.Composition.Prefix {','for i, arg := range req.Composition.Prefix {\n if i > 0 { break }',['./pkg/agentic/systems/claude','-run','TestTheYoloRefusalsAreNamedAndTotal'])
+run('double-emission','pkg/agentic/systems/claude/args.go','return append(args, bypassPermissionsFlag), nil','return append(args, bypassPermissionsFlag, bypassPermissionsFlag), nil',['./pkg/agentic/systems/claude','-run','TestTheYoloArgvAppendsTheBypassFlagOnce'])
+p=root/'pkg/agentic/review_third_spelling.go'
+p.write_text('package agentic\nfunc reviewThirdSpelling() []string { return []string{"--dangerously-skip-permissions"} }\n')
+try:
+ r=subprocess.run(['go','test','./pkg/agentic/systems/...','./internal/argvguard','-run','Argv|Spelling|Sharing|Bypass','-count=1'],cwd=root,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+ (root.parent/'third-site.log').write_text(r.stdout);print('third-site exit',r.returncode,r.stdout,flush=True)
+finally:p.unlink()
