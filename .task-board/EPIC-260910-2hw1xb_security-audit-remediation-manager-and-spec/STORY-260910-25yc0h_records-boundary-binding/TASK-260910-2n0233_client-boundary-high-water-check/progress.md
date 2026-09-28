@@ -97,6 +97,13 @@ spawn selection rationale for muse-spark-1.3-contributor/xhigh: bound 2n0233-lan
 spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
 spawn queued: [implementer] developer (muse) (run=RUN-260927-254cf1, max_parallel=20)
 spawn run started: [implementer] developer (muse) (run=RUN-260927-254cf1)
+spawn run child final message (run=RUN-260927-254cf1, tools=5 patches=0 failed=0):
+Integration transaction run and evidence attached — stopping per the bound instruction.
+
+Result: the story landing stands — `STORY-260910-25yc0h` landed as story commit `890d598a76499b28bff41193a80dc316a669967f` with board state committed as `eca2bf27edaec03227ce8485953d96df9d7ef48c` on the local trunk. The command exited 1 only on the follow-on publication push (`board_publish_local_trunk_unproven`: signing key not bindable to repository identity, nothing pushed). Exact output attached as `TASK-260910-2n0233_integration-land.md` on the task. No files changed, no status or handoff writes made — the orchestrator delivers from here.
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260927-254cf1, pid=29916, exit=0)
+spawn run RUN-260927-254cf1 failed; operator action required; failure: integration_binding_state_invalid: Change Request CR-TASK-260910-2n0233-4 revision 4 is integrated, want accepted or checkpointed
 
 ## Precondition Resources
 - [remediation-manager-producer-rules.md](file://TASK-260910-2n0233/remediation-manager-producer-rules.md) — Campaign rules for curator manager tasks (rule 8; reviewer codex gpt-6-astra:low)
@@ -130,12 +137,13 @@ spawn run started: [implementer] developer (muse) (run=RUN-260927-254cf1)
 - [TASK-260910-2n0233_spawn-log_-reviewer--reviewer--claude-_RUN-260927-7280c9.log](file://TASK-260910-2n0233/TASK-260910-2n0233_spawn-log_-reviewer--reviewer--claude-_RUN-260927-7280c9.log) — System spawn log captured by task-board
 - [TASK-260910-2n0233_review-verdict-rev4.md](file://TASK-260910-2n0233/TASK-260910-2n0233_review-verdict-rev4.md) — rev4 review verdict: accepted
 - [TASK-260910-2n0233_spawn-log_-implementer--developer--muse-_RUN-260927-254cf1.log](file://TASK-260910-2n0233/TASK-260910-2n0233_spawn-log_-implementer--developer--muse-_RUN-260927-254cf1.log) — System spawn log captured by task-board
+- [TASK-260910-2n0233_integration-land.md](file://TASK-260910-2n0233/TASK-260910-2n0233_integration-land.md) — Bound integration landing log for CR-TASK-260910-2n0233 rev4 (STORY-260910-25yc0h)
 
 ## Created
 2026-09-10T14:44:04Z
 
 ## Last Update
-2026-09-27T08:31:49Z
+2026-09-27T08:41:02Z
 
 ## Assigned To
 [implementer] developer (muse)
