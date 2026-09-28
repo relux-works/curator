@@ -293,6 +293,16 @@ spawn selection rationale for muse-spark-1.3-contributor/xhigh: bound 306v4m-lan
 spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
 spawn queued: [implementer] developer (muse) (run=RUN-260926-e56bd2, max_parallel=20)
 spawn run started: [implementer] developer (muse) (run=RUN-260926-e56bd2)
+spawn run child final message (run=RUN-260926-e56bd2, tools=55 patches=0 failed=2):
+Integration landing executed and evidence attached; stopping per the integration instruction.
+
+- Ran the bound transaction: `task-board worktree integrate STORY-260915-3w11un --cr BUG-260922-306v4m --revision 8` from the control root. It ran the remote CI gate (gate run 36225749576 on `gate/STORY-260915-3w11un/260926-070558-37194-1`, completed `success`, gate branch cleaned up) and landed.
+- Result: landing stands — story commit `2d8ab4e3`, board-state commit `3bdcfe07` on local trunk, with `board_publication_pending` (`board_publish_local_trunk_unproven`, a signing-key/binding matter). Publication (`task-board board publish`, PR, reconcile-trunk) is the orchestrator's delivery step, not mine.
+- Attached the exact log by updating the existing task-scoped outcome `BUG-260922-306v4m_integration-land.md` (add refused as already-exists, exit 1; update exited 0).
+- Changed no repo file (only the instructed `.temp/integrate-306v4m-land.log`), made no board status writes, and called no handoff.
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260926-e56bd2, pid=36651, exit=0)
+spawn run RUN-260926-e56bd2 failed; operator action required; failure: integration_binding_state_invalid: Change Request CR-BUG-260922-306v4m-8 revision 8 is integrated, want accepted or checkpointed
 
 ## Precondition Resources
 - [carry-delta-review-note-2.md](file://BUG-260922-306v4m/carry-delta-review-note-2.md)
@@ -352,7 +362,7 @@ spawn run started: [implementer] developer (muse) (run=RUN-260926-e56bd2)
 - [BUG-260922-306v4m_spawn-log_-reviewer--reviewer--claude-_RUN-260925-547330.log](file://BUG-260922-306v4m/BUG-260922-306v4m_spawn-log_-reviewer--reviewer--claude-_RUN-260925-547330.log) — System spawn log captured by task-board
 - [BUG-260922-306v4m_review-verdict-rev7.md](file://BUG-260922-306v4m/BUG-260922-306v4m_review-verdict-rev7.md) — rev7 carry-forward review verdict: ACCEPTED
 - [BUG-260922-306v4m_spawn-log_-implementer--developer--muse-_RUN-260925-c5585b.log](file://BUG-260922-306v4m/BUG-260922-306v4m_spawn-log_-implementer--developer--muse-_RUN-260925-c5585b.log) — System spawn log captured by task-board
-- [BUG-260922-306v4m_integration-land.md](file://BUG-260922-306v4m/BUG-260922-306v4m_integration-land.md) — Integration landing attempt for CR revision 7 refused as stale; exact refusal log
+- [BUG-260922-306v4m_integration-land.md](file://BUG-260922-306v4m/BUG-260922-306v4m_integration-land.md) — Bound integration landing log: CR-BUG-260922-306v4m revision 8 integrate for STORY-260915-3w11un
 - [BUG-260922-306v4m_spawn-log_-implementer--developer--muse-_RUN-260925-e5c170.log](file://BUG-260922-306v4m/BUG-260922-306v4m_spawn-log_-implementer--developer--muse-_RUN-260925-e5c170.log) — System spawn log captured by task-board
 - [BUG-260922-306v4m_change-request_rev8.patch](file://BUG-260922-306v4m/BUG-260922-306v4m_change-request_rev8.patch) — Change Request CR-BUG-260922-306v4m-8 revision 8 candidate patch (repository_delta=present, 3 changed paths)
 - [BUG-260922-306v4m_change-request_rev8-validation.log](file://BUG-260922-306v4m/BUG-260922-306v4m_change-request_rev8-validation.log) — Change Request CR-BUG-260922-306v4m-8 revision 8 bounded validation log
@@ -365,7 +375,7 @@ spawn run started: [implementer] developer (muse) (run=RUN-260926-e56bd2)
 2026-09-22T16:51:33Z
 
 ## Last Update
-2026-09-26T07:05:02Z
+2026-09-26T07:51:21Z
 
 ## Assigned To
 [implementer] developer (muse)
