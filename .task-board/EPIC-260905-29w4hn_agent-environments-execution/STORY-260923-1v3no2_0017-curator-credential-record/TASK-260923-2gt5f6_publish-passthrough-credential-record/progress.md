@@ -111,6 +111,17 @@ Integration preconditions for accepted CR-TASK-260923-2gt5f6-3 rev3 confirmed an
 - Per the binding, no `worktree integrate`/`checkpoint`, status change, or handoff was executed here; the runner performs the landing synchronously. No `go test` run in this turn; acceptance rests on the attached rev3 validation log, re-validated at landing.
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260926-d3e2ef, pid=54152, exit=0)
+spawn run RUN-260926-d3e2ef failed; operator action required; failure: board_publication_pending: runner integrate refused: board_publication_pending: STORY-260923-1v3no2 is landed and its board state is committed as 316438cc3f830801c44adba75750a6b28a156933 on the local trunk, but the publication push did not land (board_publish_local_trunk_unproven); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: 316438cc3f830801c44adba75750a6b28a156933
+  cause_code: board_publish_local_trunk_unproven
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: 87db87ff9eb0937cbd502b5c316b933d0636d2c1
+  story_id: STORY-260923-1v3no2
+  cause: board_publish_local_trunk_unproven: the local trunk holds an unpublished link 316438cc3f830801c44adba75750a6b28a156933 that is not this repository's own board-state record (the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key); a stable content digest is never ownership proof — nothing was projected and nothing was pushed
+  link_oid: 316438cc3f830801c44adba75750a6b28a156933
+  reason: the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key
+  remedy: land the unproven commits through integrate/reconcile-trunk, not through this command
 
 ## Precondition Resources
 - [carry-delta-review-note-2.md](file://TASK-260923-2gt5f6/carry-delta-review-note-2.md)
@@ -144,7 +155,7 @@ spawn run completed: muse (run=RUN-260926-d3e2ef, pid=54152, exit=0)
 2026-09-23T11:50:05Z
 
 ## Last Update
-2026-09-26T13:58:04Z
+2026-09-26T13:59:29Z
 
 ## Assigned To
 [implementer] developer (muse)
