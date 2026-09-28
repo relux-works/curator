@@ -1,0 +1,1064 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 7acbbe7..5bda9d9 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,5 +1,14 @@
+ # Changelog
+ 
++## Unreleased
++
++### Security
++
++- Validate `defaults.json` and `ax.json` before use: reject symlinks, files
++  owned by a different identity than their configuration directory, and
++  group/world-writable POSIX files; inspect Windows DACL write grants
++  (TASK-260916-1ihonr).
++
+ ## 0.1.0
+ 
+ First tagged release. The binary reports `0.1.0`; the specification remains
+diff --git a/SPEC.md b/SPEC.md
+index 71c7a0b..5130a64 100644
+--- a/SPEC.md
++++ b/SPEC.md
+@@ -887,6 +887,23 @@ machine), each with its own closed schema:
+ | `defaults.json` (`curator-run-defaults-v2`, §4.3) | model and effort defaults plus the launcher-global permission default per env-id; the `locked` rule | operator over machine per member, unless the machine file is locked |
+ | `ax.json` (`curator-run-ax-v1`, §4.6) | whether the `ax` integration is configured | machine over operator; `enabled: false` is not configured |
+ 
++Before either file is parsed or used, the reader MUST open it without
++following a final-component symlink and validate the opened file. It MUST be
++a regular file owned by the same identity as its containing configuration
++directory. On POSIX systems, any group-write or other-write mode bit is a
++refusal. On Windows, a missing or null DACL is a refusal, as is an allow ACE
++that grants file-write, delete, or security-control rights to an identity
++other than the file owner (including its OWNER RIGHTS and CREATOR OWNER
++aliases), LocalSystem, or Builtin Administrators. The
++diagnostic detail names the refusal reason
++(`symlinked configuration file`, `configuration file owner`,
++`group/world-writable configuration file`, or `Windows DACL`). A failed open,
++metadata query, DACL query, or read is `defaults_config_invalid`; it MUST NOT
++be treated as an absent file. Only an absent file or a genuinely absent
++configuration directory keeps the absence behavior defined by §4.3 and §4.6.
++These checks apply independently to machine and operator files before their
++respective precedence rules.
++
+ These are **launcher-owned knobs, not manager knobs**. Curator's machine
+ configuration is the closed knob table of environments.md §12.1, carried
+ by `manager-config` schema 2 under one `environments` object, and none of
+@@ -1075,7 +1092,7 @@ contract. Usage errors exit 2; every operational failure exits 1.
+ |---|---|---|
+ | usage | `usage` | unknown flag, missing `<env-id>`, stray operand before `--`, repeated flag, invalid permission value, repeated or combined permission forms, rejected `-d`/`--danger`, invalid `--system-prompt` or `--ax-profile` value, `--name` outside the `ax` §2.1 grammar or over 64 characters, `--ax-profile` on an untracked machine, a flag overriding a member set by a locked machine `defaults.json`, or visible `yolo` under an established force-native lock — exit 2, nothing resolved, nothing launched |
+ | resolve | `resolve_invocation_failed`, `resolve_environment_unknown`, `resolve_profile_unknown`, `resolve_repair_failed`, `resolve_lock_unavailable`, `resolve_fragment_invalid` | §4.1: the context plane could not produce a usable fragment — `curator` not startable, or a non-zero exit with an unmapped diagnostic, Curator's own code and message passed through verbatim; unregistered environment; uninstalled profile; the store cannot restore the stale home; the repair could not take Curator's mutation lock within its bounded wait; or the output is not a valid closed fragment |
+-| defaults | `defaults_config_invalid`, `defaults_unresolvable` | §4.3 and §4.6: a launcher-owned configuration file — `defaults.json` or `ax.json` (§4.7) — exists but cannot be read or parsed, or names an unknown env-id or member; this includes a v1 file carrying the v2-only `permissions` member — a read failure is never absence; the lineup admits no model for the mapped system after earlier model levels are silent |
++| defaults | `defaults_config_invalid`, `defaults_unresolvable` | §4.3, §4.6, and §4.7: a launcher-owned configuration file — `defaults.json` or `ax.json` — is symlinked, non-regular, owned by a different identity than its configuration directory, group/world-writable on POSIX, grants a non-owner/non-owner-alias/non-system/non-administrators Windows DACL identity write/delete/security-control access, or cannot be read or parsed, or names an unknown env-id or member; this includes a v1 file carrying the v2-only `permissions` member — a read failure is never absence; the lineup admits no model for the mapped system after earlier model levels are silent |
+ | plan | `plan_refused`, `plan_provider_limited` | §4.4: the spawn plane refused the request (unknown system/runtime or model, model not driven by the system, mode not declared by the system, invalid or missing required effort, unresolved vendor, an unverified release-specific permission mapping, or failure to produce a provider-limits verdict), or the explicit provider-limits verdict was not serviceable (`AvailabilityHealthy`) — the verdict's structure and evidence are surfaced verbatim |
+ | environment | `env_unsupported` | §4.2: the environment has no spawn-plane or `ax` provider mapping in this revision |
+ | permission | `permission_policy_unsupported`, `permission_mode_tracked_unsupported`, `permission_mode_unsupported` | §4.1/§4.6: the fragment cannot establish v2 permission and lock transport for a would-be `yolo`; or a tracked launch resolves `yolo` from any level; or the environment has no declared `yolo` mapping — exit 1, terminal refusal with no fallback to untracked execution |
+diff --git a/cmd/curator-run/config_owner_unix_test.go b/cmd/curator-run/config_owner_unix_test.go
+new file mode 100644
+index 0000000..47a2de3
+--- /dev/null
++++ b/cmd/curator-run/config_owner_unix_test.go
+@@ -0,0 +1,56 @@
++//go:build aix || darwin || dragonfly || freebsd || linux || netbsd || openbsd || solaris
++
++package main
++
++import (
++	"os"
++	"syscall"
++	"testing"
++)
++
++func foreignOwnedConfigFile(t *testing.T, contents string) (string, bool) {
++	t.Helper()
++	const parent = "/tmp"
++	parentInfo, err := os.Stat(parent)
++	if err != nil {
++		return "", false
++	}
++	parentStat, ok := parentInfo.Sys().(*syscall.Stat_t)
++	if !ok {
++		return "", false
++	}
++	f, err := os.CreateTemp(parent, "curator-run-foreign-owner-")
++	if err != nil {
++		return "", false
++	}
++	path := f.Name()
++	if _, err := f.WriteString(contents); err != nil {
++		_ = f.Close()
++		_ = os.Remove(path)
++		return "", false
++	}
++	if err := f.Close(); err != nil {
++		_ = os.Remove(path)
++		return "", false
++	}
++	if os.Geteuid() == 0 && parentStat.Uid == 0 {
++		if err := os.Chown(path, 65534, -1); err != nil {
++			_ = os.Remove(path)
++			return "", false
++		}
++	}
++	fileInfo, err := os.Stat(path)
++	if err != nil {
++		_ = os.Remove(path)
++		return "", false
++	}
++	fileStat, ok := fileInfo.Sys().(*syscall.Stat_t)
++	if !ok || fileStat.Uid == parentStat.Uid {
++		_ = os.Remove(path)
++		return "", false
++	}
++	t.Cleanup(func() { _ = os.Remove(path) })
++	return path, true
++}
++
++func currentUserIsRoot() bool { return os.Geteuid() == 0 }
+diff --git a/cmd/curator-run/config_owner_windows_test.go b/cmd/curator-run/config_owner_windows_test.go
+new file mode 100644
+index 0000000..8593d79
+--- /dev/null
++++ b/cmd/curator-run/config_owner_windows_test.go
+@@ -0,0 +1,7 @@
++package main
++
++import "testing"
++
++func foreignOwnedConfigFile(*testing.T, string) (string, bool) { return "", false }
++
++func currentUserIsRoot() bool { return false }
+diff --git a/cmd/curator-run/config_security_test.go b/cmd/curator-run/config_security_test.go
+new file mode 100644
+index 0000000..9fb043d
+--- /dev/null
++++ b/cmd/curator-run/config_security_test.go
+@@ -0,0 +1,250 @@
++package main
++
++import (
++	"context"
++	"os"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator-agent-launcher/internal/defaults"
++	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++)
++
++const (
++	securityDefaultsJSON = `{"schema":"curator-run-defaults-v1","defaults":{"pi":{"model":"claude-fable-5"}}}`
++	securityAXJSON       = `{"schema":"curator-run-ax-v1","enabled":true}`
++)
++
++type securityFiles struct {
++	paths                   defaults.Paths
++	machineDir, operatorDir string
++}
++
++func securityFixture(t *testing.T) (launchDeps, *scriptedRunner, securityFiles) {
++	t.Helper()
++	root := t.TempDir()
++	machineDir := filepath.Join(root, "machine")
++	operatorDir := filepath.Join(root, "operator")
++	for _, dir := range []string{machineDir, operatorDir} {
++		if err := os.Mkdir(dir, 0700); err != nil {
++			t.Fatal(err)
++		}
++	}
++	files := securityFiles{
++		paths: defaults.Paths{
++			Machine:  filepath.Join(machineDir, "defaults.json"),
++			Operator: filepath.Join(operatorDir, "defaults.json"),
++		},
++		machineDir:  machineDir,
++		operatorDir: operatorDir,
++	}
++	runner := &scriptedRunner{stdout: fragmentLineFor("pi")}
++	deps := testDeps(t, fragment.NewWithRunner("curator", runner))
++	deps.defaults = files.paths
++	deps.configPaths = func() (defaults.Paths, error) { return files.paths, nil }
++	deps.axPaths = func() (defaults.Paths, error) { return files.paths, nil }
++	return deps, runner, files
++}
++
++func securityPath(files securityFiles, target string) string {
++	switch target {
++	case "machine-defaults":
++		return files.paths.Machine
++	case "operator-defaults":
++		return files.paths.Operator
++	case "machine-ax":
++		return filepath.Join(files.machineDir, "ax.json")
++	case "operator-ax":
++		return filepath.Join(files.operatorDir, "ax.json")
++	default:
++		panic("unknown security fixture target: " + target)
++	}
++}
++
++func securityContents(target string) string {
++	if strings.HasSuffix(target, "-ax") {
++		return securityAXJSON
++	}
++	return securityDefaultsJSON
++}
++
++func runSecurityInvocation(t *testing.T, deps launchDeps, runner *scriptedRunner, wantCalls int, wantReason string) {
++	t.Helper()
++	var stdout, stderr strings.Builder
++	code := run(context.Background(), []string{"pi"}, &stdout, &stderr, deps)
++	if code != 1 || stdout.Len() != 0 {
++		t.Fatalf("exit=%d stdout=%q stderr=%q; want a terminal configuration refusal", code, stdout.String(), stderr.String())
++	}
++	assertSingleDiagnostic(t, stderr.String(), defaults.CodeInvalid)
++	if !strings.Contains(stderr.String(), wantReason) {
++		t.Fatalf("stderr %q does not name %q", stderr.String(), wantReason)
++	}
++	if runner.calls != wantCalls {
++		t.Fatalf("fragment resolver calls=%d, want %d (stderr %q)", runner.calls, wantCalls, stderr.String())
++	}
++}
++
++func TestRunConfigSecurityGoldens(t *testing.T) {
++	for _, tc := range []struct {
++		name, target, kind, golden, reason string
++		mode                               os.FileMode
++		calls                              int
++	}{
++		{"symlinked-operator-defaults", "operator-defaults", "symlink", "config-symlink.golden", "symlinked configuration file", 0, 1},
++		{"group-writable-operator-defaults", "operator-defaults", "mode", "config-group-writable.golden", "group/world-writable configuration file", 0o620, 1},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			if tc.kind == "mode" && runtime.GOOS == "windows" {
++				t.Skip("POSIX group mode bits are not Windows DACLs")
++			}
++			deps, runner, files := securityFixture(t)
++			path := securityPath(files, tc.target)
++			switch tc.kind {
++			case "symlink":
++				targetPath := path + ".target"
++				if err := os.WriteFile(targetPath, []byte(securityContents(tc.target)), 0600); err != nil {
++					t.Fatal(err)
++				}
++				if err := os.Symlink(targetPath, path); err != nil {
++					t.Skipf("cannot create a symlink on this host: %v", err)
++				}
++			case "mode":
++				if err := os.WriteFile(path, []byte(securityContents(tc.target)), 0600); err != nil {
++					t.Fatal(err)
++				}
++				if err := os.Chmod(path, tc.mode); err != nil {
++					t.Fatal(err)
++				}
++			}
++
++			var stdout, stderr strings.Builder
++			code := run(context.Background(), []string{"pi"}, &stdout, &stderr, deps)
++			if code != 1 || stdout.Len() != 0 {
++				t.Fatalf("exit=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
++			}
++			assertSingleDiagnostic(t, stderr.String(), defaults.CodeInvalid)
++			if !strings.Contains(stderr.String(), tc.reason) || runner.calls != tc.calls {
++				t.Fatalf("resolver calls=%d stderr=%q", runner.calls, stderr.String())
++			}
++			golden, err := os.ReadFile(filepath.Join("testdata", tc.golden))
++			if err != nil {
++				t.Fatal(err)
++			}
++			want := strings.ReplaceAll(string(golden), "$CONFIG_PATH", path)
++			if stderr.String() != want {
++				t.Fatalf("stderr differs from %s\ngot:  %q\nwant: %q", tc.golden, stderr.String(), want)
++			}
++		})
++	}
++}
++
++func TestRunConfigSecurityRefusalRows(t *testing.T) {
++	cases := []struct {
++		target, kind string
++		wantCalls    int
++	}{
++		{"machine-defaults", "symlink", 1},
++		{"operator-defaults", "symlink", 1},
++		{"machine-ax", "symlink", 0},
++		{"operator-ax", "symlink", 0},
++		{"machine-defaults", "group-write", 1},
++		{"operator-defaults", "group-write", 1},
++		{"machine-ax", "group-write", 0},
++		{"operator-ax", "group-write", 0},
++		{"machine-defaults", "world-write", 1},
++		{"operator-defaults", "world-write", 1},
++		{"machine-ax", "world-write", 0},
++		{"operator-ax", "world-write", 0},
++		{"machine-defaults", "unreadable", 1},
++		{"operator-defaults", "unreadable", 1},
++		{"machine-ax", "unreadable", 0},
++		{"operator-ax", "unreadable", 0},
++	}
++	for _, tc := range cases {
++		t.Run(tc.target+"/"+tc.kind, func(t *testing.T) {
++			if (tc.kind == "group-write" || tc.kind == "world-write" || tc.kind == "unreadable") && runtime.GOOS == "windows" {
++				t.Skip("POSIX mode bits are not Windows DACLs")
++			}
++			if tc.kind == "unreadable" && currentUserIsRoot() {
++				t.Skip("root can read mode-000 files")
++			}
++			deps, runner, files := securityFixture(t)
++			path := securityPath(files, tc.target)
++			switch tc.kind {
++			case "symlink":
++				targetPath := path + ".target"
++				if err := os.WriteFile(targetPath, []byte(securityContents(tc.target)), 0600); err != nil {
++					t.Fatal(err)
++				}
++				if err := os.Symlink(targetPath, path); err != nil {
++					t.Skipf("cannot create a symlink on this host: %v", err)
++				}
++			case "group-write", "world-write":
++				if err := os.WriteFile(path, []byte(securityContents(tc.target)), 0600); err != nil {
++					t.Fatal(err)
++				}
++				mode := os.FileMode(0o620)
++				if tc.kind == "world-write" {
++					mode = 0o602
++				}
++				if err := os.Chmod(path, mode); err != nil {
++					t.Fatal(err)
++				}
++			case "unreadable":
++				if err := os.WriteFile(path, []byte(securityContents(tc.target)), 0600); err != nil {
++					t.Fatal(err)
++				}
++				if err := os.Chmod(path, 0); err != nil {
++					t.Fatal(err)
++				}
++				t.Cleanup(func() { _ = os.Chmod(path, 0600) })
++			}
++			reason := "configuration file"
++			if tc.kind == "symlink" {
++				reason = "symlinked configuration file"
++			} else if tc.kind == "group-write" || tc.kind == "world-write" {
++				reason = "group/world-writable configuration file"
++			} else if tc.kind == "unreadable" {
++				reason = "configuration file is unreadable"
++			}
++			runSecurityInvocation(t, deps, runner, tc.wantCalls, reason)
++		})
++	}
++}
++
++func TestRunConfigSecurityRejectsDifferentDirectoryOwner(t *testing.T) {
++	path, ok := foreignOwnedConfigFile(t, securityDefaultsJSON)
++	if !ok {
++		t.Skip("host cannot create a file owned by a different identity than /tmp")
++	}
++	for _, target := range []string{"machine", "operator"} {
++		t.Run(target, func(t *testing.T) {
++			deps, runner, files := securityFixture(t)
++			if target == "machine" {
++				files.paths.Machine = path
++			} else {
++				files.paths.Operator = path
++			}
++			deps.defaults = files.paths
++			deps.configPaths = func() (defaults.Paths, error) { return files.paths, nil }
++			runSecurityInvocation(t, deps, runner, 1, "configuration file is owned by a different identity")
++		})
++	}
++}
++
++func TestRunConfigSecurityHappyPath(t *testing.T) {
++	f := entryFixture(t, "pi", true)
++	f.writeDefaults(t, f.deps.defaults.Machine, `{"schema":"curator-run-defaults-v1","defaults":{"pi":{"model":"claude-opus-5","effort":"high"}}}`)
++	f.writeDefaults(t, f.deps.defaults.Operator, `{"schema":"curator-run-defaults-v1","defaults":{"pi":{"model":"claude-fable-5"}}}`)
++	f.writeDefaults(t, filepath.Join(filepath.Dir(f.deps.defaults.Machine), "ax.json"), securityAXJSON)
++	f.args = []string{"pi"}
++	code, out, stderr := f.run()
++	if code != 0 || len(out) == 0 || f.resolver.calls != 1 || f.builds != 1 {
++		t.Fatalf("exit=%d resolver=%d builds=%d stdout=%s stderr=%s", code, f.resolver.calls, f.builds, out, stderr)
++	}
++	if !strings.Contains(string(stderr), "model=claude-fable-5 (operator) effort=high (machine)") {
++		t.Fatalf("machine/operator defaults did not reach the production resolver: %s", stderr)
++	}
++}
+diff --git a/cmd/curator-run/testdata/config-group-writable.golden b/cmd/curator-run/testdata/config-group-writable.golden
+new file mode 100644
+index 0000000..f48d585
+--- /dev/null
++++ b/cmd/curator-run/testdata/config-group-writable.golden
+@@ -0,0 +1 @@
++curator-run: defaults_config_invalid: $CONFIG_PATH: group/world-writable configuration file (mode 0620)
+diff --git a/cmd/curator-run/testdata/config-symlink.golden b/cmd/curator-run/testdata/config-symlink.golden
+new file mode 100644
+index 0000000..8801e2d
+--- /dev/null
++++ b/cmd/curator-run/testdata/config-symlink.golden
+@@ -0,0 +1 @@
++curator-run: defaults_config_invalid: $CONFIG_PATH: symlinked configuration file
+diff --git a/go.mod b/go.mod
+index 0ddfbd4..2806749 100644
+--- a/go.mod
++++ b/go.mod
+@@ -2,6 +2,9 @@ module github.com/relux-works/curator-agent-launcher
+ 
+ go 1.25.5
+ 
+-require github.com/relux-works/skill-agents-management v0.5.22
++require (
++	github.com/relux-works/skill-agents-management v0.5.22
++	golang.org/x/sys v0.47.0
++)
+ 
+ require github.com/pelletier/go-toml/v2 v2.4.3 // indirect
+diff --git a/go.sum b/go.sum
+index 1603538..9ac4bca 100644
+--- a/go.sum
++++ b/go.sum
+@@ -2,3 +2,5 @@ github.com/pelletier/go-toml/v2 v2.4.3 h1:GTRvJQutkOSftxIFD5xw9aepkYNuPWmVJpffdD
+ github.com/pelletier/go-toml/v2 v2.4.3/go.mod h1:2gIqNv+qfxSVS7cM2xJQKtLSTLUE9V8t9Stt+h56mCY=
+ github.com/relux-works/skill-agents-management v0.5.22 h1:0DXd6usDJG15LGruDq4X0YXIUS/rneOorRaYijKbhII=
+ github.com/relux-works/skill-agents-management v0.5.22/go.mod h1:wi+oH6fVUBF0bBOPs2bU7iyUhJveSAFh369CQB91ryk=
++golang.org/x/sys v0.47.0 h1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=
++golang.org/x/sys v0.47.0/go.mod h1:4GL1E5IUh+htKOUEOaiffhrAeqysfVGipDYzABqnCmw=
+diff --git a/internal/axconfig/config.go b/internal/axconfig/config.go
+index 7b2ef90..4644689 100644
+--- a/internal/axconfig/config.go
++++ b/internal/axconfig/config.go
+@@ -3,9 +3,9 @@ package axconfig
+ 
+ import (
+ 	"fmt"
+-	"os"
+ 	"path/filepath"
+ 
++	"github.com/relux-works/curator-agent-launcher/internal/configfile"
+ 	"github.com/relux-works/curator-agent-launcher/internal/fragment"
+ )
+ 
+@@ -26,17 +26,13 @@ func (e *Error) Unwrap() error { return e.Err }
+ func Load(machineDir, operatorDir string) (bool, error) {
+ 	for _, dir := range []string{machineDir, operatorDir} {
+ 		path := filepath.Join(dir, "ax.json")
+-		present, err := exists(path)
++		data, present, err := configfile.Read(path)
+ 		if err != nil {
+ 			return false, &Error{path, err}
+ 		}
+ 		if !present {
+ 			continue
+ 		}
+-		data, err := os.ReadFile(path)
+-		if err != nil {
+-			return false, &Error{path, err}
+-		}
+ 		enabled, err := parse(data)
+ 		if err != nil {
+ 			return false, &Error{path, err}
+@@ -46,61 +42,6 @@ func Load(machineDir, operatorDir string) (bool, error) {
+ 	return false, nil
+ }
+ 
+-func exists(path string) (bool, error) {
+-	// Walk ancestors first so ENOENT through a dangling link cannot become absence.
+-	parent := filepath.Dir(path)
+-	if parent != path {
+-		present, err := directory(parent)
+-		if err != nil || !present {
+-			return false, err
+-		}
+-	}
+-	info, err := os.Lstat(path)
+-	if os.IsNotExist(err) {
+-		return false, nil
+-	}
+-	if err != nil {
+-		return false, err
+-	}
+-	if info.Mode()&os.ModeSymlink != 0 {
+-		info, err = os.Stat(path)
+-	}
+-	if err != nil {
+-		return false, err
+-	}
+-	if !info.Mode().IsRegular() {
+-		return false, fmt.Errorf("not a regular file")
+-	}
+-	return true, nil
+-}
+-
+-func directory(path string) (bool, error) {
+-	parent := filepath.Dir(path)
+-	if parent != path {
+-		present, err := directory(parent)
+-		if err != nil || !present {
+-			return false, err
+-		}
+-	}
+-	info, err := os.Lstat(path)
+-	if os.IsNotExist(err) {
+-		return false, nil
+-	}
+-	if err != nil {
+-		return false, err
+-	}
+-	if info.Mode()&os.ModeSymlink != 0 {
+-		info, err = os.Stat(path)
+-	}
+-	if err != nil {
+-		return false, err
+-	}
+-	if !info.IsDir() {
+-		return false, fmt.Errorf("ancestor %s is not a directory", path)
+-	}
+-	return true, nil
+-}
+-
+ func parse(data []byte) (bool, error) {
+ 	v, err := fragment.ParseJSON(data)
+ 	if err != nil {
+diff --git a/internal/configfile/configfile.go b/internal/configfile/configfile.go
+new file mode 100644
+index 0000000..7dc6781
+--- /dev/null
++++ b/internal/configfile/configfile.go
+@@ -0,0 +1,109 @@
++// Package configfile securely reads launcher-owned configuration files.
++package configfile
++
++import (
++	"errors"
++	"fmt"
++	"io"
++	"os"
++	"path/filepath"
++)
++
++var errSymlink = errors.New("symlinked configuration file")
++
++// Read returns a file's complete contents and whether it was present. Only a
++// genuinely absent file or directory is optional. Existing unreadable, linked,
++// non-regular, foreign-owned, or writable-by-others files are refusals.
++func Read(path string) ([]byte, bool, error) {
++	if path == "" {
++		return nil, false, fmt.Errorf("empty configuration path")
++	}
++
++	dirInfo, present, err := inspectDirectory(filepath.Dir(path))
++	if err != nil {
++		return nil, false, err
++	}
++	if !present {
++		return nil, false, nil
++	}
++
++	info, err := os.Lstat(path)
++	if err != nil {
++		if os.IsNotExist(err) {
++			return nil, false, nil
++		}
++		return nil, false, fmt.Errorf("cannot inspect configuration file: %w", err)
++	}
++	if info.Mode()&os.ModeSymlink != 0 {
++		return nil, true, errSymlink
++	}
++	if !info.Mode().IsRegular() {
++		return nil, true, fmt.Errorf("configuration file is not a regular file")
++	}
++
++	f, err := openFile(path)
++	if err != nil {
++		if errors.Is(err, errSymlink) {
++			return nil, true, errSymlink
++		}
++		return nil, true, fmt.Errorf("configuration file is unreadable: %w", err)
++	}
++	closed := false
++	defer func() {
++		if !closed {
++			_ = f.Close()
++		}
++	}()
++
++	info, err = f.Stat()
++	if err != nil {
++		return nil, true, fmt.Errorf("cannot inspect configuration file: %w", err)
++	}
++	if !info.Mode().IsRegular() {
++		return nil, true, fmt.Errorf("configuration file is not a regular file")
++	}
++	if err := validateFile(path, f, info, dirInfo); err != nil {
++		return nil, true, err
++	}
++
++	data, err := io.ReadAll(f)
++	if err != nil {
++		return nil, true, fmt.Errorf("configuration file is unreadable: %w", err)
++	}
++	closeErr := f.Close()
++	closed = true
++	if closeErr != nil {
++		return nil, true, fmt.Errorf("configuration file is unreadable: %w", closeErr)
++	}
++	return data, true, nil
++}
++
++// inspectDirectory permits a valid directory symlink (for example macOS
++// /etc), but a dangling link or a non-directory ancestor is never absence.
++func inspectDirectory(path string) (os.FileInfo, bool, error) {
++	parent := filepath.Dir(path)
++	if parent != path {
++		_, present, err := inspectDirectory(parent)
++		if err != nil || !present {
++			return nil, present, err
++		}
++	}
++
++	info, err := os.Lstat(path)
++	if err != nil {
++		if os.IsNotExist(err) {
++			return nil, false, nil
++		}
++		return nil, false, fmt.Errorf("cannot inspect configuration directory %q: %w", path, err)
++	}
++	if info.Mode()&os.ModeSymlink != 0 {
++		info, err = os.Stat(path)
++		if err != nil {
++			return nil, false, fmt.Errorf("unreadable symlink ancestor %q: %v", path, err)
++		}
++	}
++	if !info.IsDir() {
++		return nil, false, fmt.Errorf("configuration ancestor %q is not a directory", path)
++	}
++	return info, true, nil
++}
+diff --git a/internal/configfile/configfile_unix.go b/internal/configfile/configfile_unix.go
+new file mode 100644
+index 0000000..5d86512
+--- /dev/null
++++ b/internal/configfile/configfile_unix.go
+@@ -0,0 +1,38 @@
++//go:build aix || darwin || dragonfly || freebsd || linux || netbsd || openbsd || solaris
++
++package configfile
++
++import (
++	"fmt"
++	"os"
++	"syscall"
++)
++
++func openFile(path string) (*os.File, error) {
++	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_CLOEXEC|syscall.O_NONBLOCK, 0)
++	if err != nil {
++		if err == syscall.ELOOP {
++			return nil, errSymlink
++		}
++		return nil, err
++	}
++	return os.NewFile(uintptr(fd), path), nil
++}
++
++func validateFile(_ string, _ *os.File, info, dirInfo os.FileInfo) error {
++	fileStat, ok := info.Sys().(*syscall.Stat_t)
++	if !ok {
++		return fmt.Errorf("cannot establish configuration file owner")
++	}
++	dirStat, ok := dirInfo.Sys().(*syscall.Stat_t)
++	if !ok {
++		return fmt.Errorf("cannot establish configuration directory owner")
++	}
++	if fileStat.Uid != dirStat.Uid {
++		return fmt.Errorf("configuration file is owned by a different identity than its configuration directory")
++	}
++	if mode := info.Mode().Perm(); mode&0o022 != 0 {
++		return fmt.Errorf("group/world-writable configuration file (mode %04o)", mode)
++	}
++	return nil
++}
+diff --git a/internal/configfile/configfile_windows.go b/internal/configfile/configfile_windows.go
+new file mode 100644
+index 0000000..3e1a4b7
+--- /dev/null
++++ b/internal/configfile/configfile_windows.go
+@@ -0,0 +1,164 @@
++package configfile
++
++import (
++	"fmt"
++	"os"
++	"path/filepath"
++	"unsafe"
++
++	"golang.org/x/sys/windows"
++)
++
++const (
++	accessAllowedObjectACEType         = 5
++	accessAllowedCallbackACEType       = 9
++	accessAllowedCallbackObjectACEType = 11
++	aceObjectTypePresent               = 0x1
++	aceInheritedObjectTypePresent      = 0x2
++)
++
++func openFile(path string) (*os.File, error) {
++	p, err := windows.UTF16PtrFromString(path)
++	if err != nil {
++		return nil, err
++	}
++	h, err := windows.CreateFile(p,
++		windows.GENERIC_READ|windows.READ_CONTROL,
++		windows.FILE_SHARE_READ,
++		nil,
++		windows.OPEN_EXISTING,
++		windows.FILE_FLAG_OPEN_REPARSE_POINT|windows.FILE_FLAG_BACKUP_SEMANTICS,
++		0,
++	)
++	if err != nil {
++		return nil, err
++	}
++	var info windows.ByHandleFileInformation
++	if err := windows.GetFileInformationByHandle(h, &info); err != nil {
++		_ = windows.CloseHandle(h)
++		return nil, err
++	}
++	if info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 {
++		_ = windows.CloseHandle(h)
++		return nil, errSymlink
++	}
++	if info.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY != 0 {
++		_ = windows.CloseHandle(h)
++		return nil, fmt.Errorf("configuration file is not a regular file")
++	}
++	return os.NewFile(uintptr(h), path), nil
++}
++
++func validateFile(path string, file *os.File, _ os.FileInfo, _ os.FileInfo) error {
++	fileOwner, dacl, closeSecurity, err := securityForHandle(windows.Handle(file.Fd()))
++	if err != nil {
++		return err
++	}
++	defer closeSecurity()
++
++	dirPath, err := windows.UTF16PtrFromString(filepath.Dir(path))
++	if err != nil {
++		return fmt.Errorf("cannot inspect configuration directory owner: %w", err)
++	}
++	dirHandle, err := windows.CreateFile(dirPath,
++		windows.READ_CONTROL|windows.FILE_READ_ATTRIBUTES,
++		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
++		nil,
++		windows.OPEN_EXISTING,
++		windows.FILE_FLAG_BACKUP_SEMANTICS,
++		0,
++	)
++	if err != nil {
++		return fmt.Errorf("cannot inspect configuration directory owner: %w", err)
++	}
++	defer windows.CloseHandle(dirHandle)
++	dirOwner, _, closeDirectorySecurity, err := securityForHandle(dirHandle)
++	if err != nil {
++		return fmt.Errorf("cannot inspect configuration directory owner: %w", err)
++	}
++	defer closeDirectorySecurity()
++	if !fileOwner.Equals(dirOwner) {
++		return fmt.Errorf("configuration file is owned by a different identity than its configuration directory")
++	}
++	if err := rejectForeignWriteGrants(dacl, fileOwner); err != nil {
++		return err
++	}
++	return nil
++}
++
++func securityForHandle(handle windows.Handle) (*windows.SID, *windows.ACL, func(), error) {
++	sd, err := windows.GetSecurityInfo(handle, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION)
++	if err != nil {
++		return nil, nil, nil, fmt.Errorf("cannot inspect Windows configuration security descriptor: %w", err)
++	}
++	free := func() { _, _ = windows.LocalFree(windows.Handle(unsafe.Pointer(sd))) }
++	owner, _, err := sd.Owner()
++	if err != nil {
++		free()
++		return nil, nil, nil, fmt.Errorf("cannot inspect Windows configuration owner: %w", err)
++	}
++	dacl, _, err := sd.DACL()
++	if err != nil {
++		free()
++		return nil, nil, nil, fmt.Errorf("Windows DACL is absent: %w", err)
++	}
++	if dacl == nil {
++		free()
++		return nil, nil, nil, fmt.Errorf("Windows DACL is null and grants unrestricted access")
++	}
++	return owner, dacl, free, nil
++}
++
++func rejectForeignWriteGrants(dacl *windows.ACL, owner *windows.SID) error {
++	writeMask := windows.ACCESS_MASK(windows.GENERIC_WRITE | windows.GENERIC_ALL | windows.FILE_GENERIC_WRITE |
++		windows.DELETE | windows.WRITE_DAC | windows.WRITE_OWNER)
++	for i := uint32(0); i < uint32(dacl.AceCount); i++ {
++		var ace *windows.ACCESS_ALLOWED_ACE
++		if err := windows.GetAce(dacl, i, &ace); err != nil {
++			return fmt.Errorf("cannot inspect Windows DACL entry: %w", err)
++		}
++		typ := ace.Header.AceType
++		if typ == windows.ACCESS_DENIED_ACE_TYPE || isNonGrantingACE(typ) {
++			continue
++		}
++		var sidOffset uintptr
++		switch typ {
++		case windows.ACCESS_ALLOWED_ACE_TYPE, accessAllowedCallbackACEType:
++			sidOffset = 8
++		case accessAllowedObjectACEType, accessAllowedCallbackObjectACEType:
++			if ace.Header.AceSize < 12 {
++				return fmt.Errorf("malformed Windows object DACL entry")
++			}
++			flags := *(*uint32)(unsafe.Add(unsafe.Pointer(ace), 8))
++			sidOffset = 12
++			if flags&aceObjectTypePresent != 0 {
++				sidOffset += 16
++			}
++			if flags&aceInheritedObjectTypePresent != 0 {
++				sidOffset += 16
++			}
++		default:
++			return fmt.Errorf("Windows DACL contains an unsupported access entry (type %d)", typ)
++		}
++		if uint64(sidOffset)+8 > uint64(ace.Header.AceSize) {
++			return fmt.Errorf("malformed Windows DACL entry")
++		}
++		sid := (*windows.SID)(unsafe.Add(unsafe.Pointer(ace), sidOffset))
++		if !sid.IsValid() || sidOffset+uintptr(sid.Len()) > uintptr(ace.Header.AceSize) {
++			return fmt.Errorf("malformed Windows DACL identity")
++		}
++		if hasForeignWriteGrant(uint32(ace.Mask), uint32(writeMask), sid.String(), owner.String()) {
++			return fmt.Errorf("Windows DACL grants write access to another identity")
++		}
++	}
++	return nil
++}
++
++func isNonGrantingACE(typ uint8) bool {
++	switch typ {
++	case 2, 3, 6, 7, 8, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21:
++		return true
++	default:
++		return false
++	}
++}
+diff --git a/internal/configfile/configfile_windows_test.go b/internal/configfile/configfile_windows_test.go
+new file mode 100644
+index 0000000..4d47b33
+--- /dev/null
++++ b/internal/configfile/configfile_windows_test.go
+@@ -0,0 +1,46 @@
++package configfile
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++	"unsafe"
++
++	"golang.org/x/sys/windows"
++)
++
++func TestReadRejectsForeignDACLWriteGrant(t *testing.T) {
++	path := filepath.Join(t.TempDir(), "defaults.json")
++	if err := os.WriteFile(path, []byte(`{"schema":"curator-run-defaults-v1","defaults":{}}`), 0600); err != nil {
++		t.Fatal(err)
++	}
++	sd, err := windows.SecurityDescriptorFromString("D:(A;;GR;;;WD)(A;;GW;;;WD)")
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer windows.LocalFree(windows.Handle(unsafe.Pointer(sd)))
++	dacl, _, err := sd.DACL()
++	if err != nil {
++		t.Fatal(err)
++	}
++	pathUTF16, err := windows.UTF16PtrFromString(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	handle, err := windows.CreateFile(pathUTF16, windows.WRITE_DAC, windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE, nil, windows.OPEN_EXISTING, windows.FILE_ATTRIBUTE_NORMAL, 0)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := windows.SetSecurityInfo(handle, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION, nil, nil, dacl, nil); err != nil {
++		_ = windows.CloseHandle(handle)
++		t.Fatal(err)
++	}
++	if err := windows.CloseHandle(handle); err != nil {
++		t.Fatal(err)
++	}
++	_, present, err := Read(path)
++	if !present || err == nil || !strings.Contains(err.Error(), "Windows DACL grants write access to another identity") {
++		t.Fatalf("present=%v err=%v, want named DACL refusal", present, err)
++	}
++}
+diff --git a/internal/configfile/policy.go b/internal/configfile/policy.go
+new file mode 100644
+index 0000000..751fc12
+--- /dev/null
++++ b/internal/configfile/policy.go
+@@ -0,0 +1,20 @@
++package configfile
++
++const (
++	ownerRightsSID        = "S-1-3-4"
++	creatorOwnerSID       = "S-1-3-0"
++	localSystemSID        = "S-1-5-18"
++	builtinAdministrators = "S-1-5-32-544"
++)
++
++func hasForeignWriteGrant(mask, writeMask uint32, trusteeSID, ownerSID string) bool {
++	if mask&writeMask == 0 {
++		return false
++	}
++	switch trusteeSID {
++	case ownerSID, ownerRightsSID, creatorOwnerSID, localSystemSID, builtinAdministrators:
++		return false
++	default:
++		return true
++	}
++}
+diff --git a/internal/configfile/policy_test.go b/internal/configfile/policy_test.go
+new file mode 100644
+index 0000000..443355a
+--- /dev/null
++++ b/internal/configfile/policy_test.go
+@@ -0,0 +1,27 @@
++package configfile
++
++import "testing"
++
++func TestForeignDACLWriteGrantPolicy(t *testing.T) {
++	const writeMask = 0x40000000
++	for _, tc := range []struct {
++		name, trustee string
++		mask          uint32
++		want          bool
++	}{
++		{"owner-write", "S-1-5-21-1", writeMask, false},
++		{"owner-rights-write", ownerRightsSID, writeMask, false},
++		{"creator-owner-write", creatorOwnerSID, writeMask, false},
++		{"system-write", localSystemSID, writeMask, false},
++		{"administrators-write", builtinAdministrators, writeMask, false},
++		{"other-user-write", "S-1-5-21-2", writeMask, true},
++		{"everyone-write", "S-1-1-0", writeMask, true},
++		{"other-user-read-only", "S-1-5-21-2", 0x80000000, false},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			if got := hasForeignWriteGrant(tc.mask, writeMask, tc.trustee, "S-1-5-21-1"); got != tc.want {
++				t.Fatalf("hasForeignWriteGrant = %v, want %v", got, tc.want)
++			}
++		})
++	}
++}
+diff --git a/internal/defaults/defaults.go b/internal/defaults/defaults.go
+index 5dc8e39..53b8e12 100644
+--- a/internal/defaults/defaults.go
++++ b/internal/defaults/defaults.go
+@@ -5,9 +5,9 @@ package defaults
+ 
+ import (
+ 	"fmt"
+-	"os"
+ 	"path/filepath"
+ 
++	"github.com/relux-works/curator-agent-launcher/internal/configfile"
+ 	"github.com/relux-works/curator-agent-launcher/internal/fragment"
+ )
+ 
+@@ -70,27 +70,12 @@ func Load(paths Paths) (Files, error) {
+ }
+ 
+ func loadFile(path string) (file, error) {
+-	if path == "" {
+-		return file{}, invalid(fmt.Errorf("empty defaults path"))
+-	}
+-	// Inspect each component without following symlinks when classifying absence.
+-	// Lstat on only the final path would misclassify a dangling parent link.
+-	if err := inspect(path); err != nil {
+-		if os.IsNotExist(err) {
+-			return file{}, nil
+-		}
+-		return file{}, invalid(fmt.Errorf("%s: %w", path, err))
+-	}
+-	info, err := os.Stat(path)
++	data, present, err := configfile.Read(path)
+ 	if err != nil {
+ 		return file{}, invalid(fmt.Errorf("%s: %w", path, err))
+ 	}
+-	if !info.Mode().IsRegular() {
+-		return file{}, invalid(fmt.Errorf("%s: defaults must be a regular file", path))
+-	}
+-	data, err := os.ReadFile(path)
+-	if err != nil {
+-		return file{}, invalid(fmt.Errorf("%s: %w", path, err))
++	if !present {
++		return file{}, nil
+ 	}
+ 	f, err := parse(data)
+ 	if err != nil {
+@@ -99,26 +84,6 @@ func loadFile(path string) (file, error) {
+ 	return f, nil
+ }
+ 
+-func inspect(path string) error {
+-	parent := filepath.Dir(path)
+-	if parent != path && parent != "." {
+-		if err := inspect(parent); err != nil {
+-			return err
+-		}
+-	}
+-	info, err := os.Lstat(path)
+-	if err != nil {
+-		return err
+-	}
+-	if info.Mode()&os.ModeSymlink != 0 {
+-		if _, err := os.Stat(path); err != nil {
+-			// Deliberately do not wrap ENOENT: the link exists, so this is not absence.
+-			return fmt.Errorf("unreadable symlink %s: %v", path, err)
+-		}
+-	}
+-	return nil
+-}
+-
+ func parse(data []byte) (file, error) {
+ 	root, err := fragment.ParseJSON(data)
+ 	if err != nil {
+diff --git a/internal/defaults/defaults_test.go b/internal/defaults/defaults_test.go
+index c048197..79b6a84 100644
+--- a/internal/defaults/defaults_test.go
++++ b/internal/defaults/defaults_test.go
+@@ -334,19 +334,16 @@ func TestLoadFilesystem(t *testing.T) {
+ 			code(t, err, defaults.CodeInvalid)
+ 		})
+ 	}
+-	t.Run("valid-link", func(t *testing.T) {
++	t.Run("linked-file-is-refused", func(t *testing.T) {
+ 		p := paths(t)
+ 		write(t, p.Machine, doc(`{"pi":{"model":"m"}}`, false))
+ 		if err := os.Symlink(p.Machine, p.Operator); err != nil {
+ 			t.Fatal(err)
+ 		}
+-		f, err := defaults.Load(p)
+-		if err != nil {
+-			t.Fatal(err)
+-		}
+-		got, err := f.Resolve("pi", defaults.Pair{})
+-		if err != nil || got.Model != resolved("m", defaults.OriginOperator) {
+-			t.Fatalf("%+v %v", got, err)
++		_, err := defaults.Load(p)
++		code(t, err, defaults.CodeInvalid)
++		if !strings.Contains(err.Error(), "symlinked configuration file") {
++			t.Fatalf("linked file refusal has no named reason: %v", err)
+ 		}
+ 	})
+ 	t.Run("empty-path", func(t *testing.T) { _, err := defaults.Load(defaults.Paths{}); code(t, err, defaults.CodeInvalid) })
