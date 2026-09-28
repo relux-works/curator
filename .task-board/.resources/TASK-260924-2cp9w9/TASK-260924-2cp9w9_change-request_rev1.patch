@@ -1,0 +1,765 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 3c24b80..79f466f 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -598,6 +598,15 @@ Versioning for the complete specification set.
+ 
+ ### Changed
+ 
++- Clarified draft Skillfile-source residuals: positive registry evidence
++  requires the exact name/repository/commit/raw package-tree hash tuple while
++  verified matching revocations remain deny-wins under advisory policy;
++  marker-v5 local build records reject raw external-only members (including
++  null) and external `declared_tag` values outside Git ref-name grammar; and
++  explicit refresh uses current resolved endpoints. SCP-like endpoints with
++  alias ports fail closed. Added distinguishing registry, marker and transport
++  conformance vectors; frozen release artifacts remain unchanged.
++
+ - Editorial: the CLI guide now states the complete §9.5 takeover carrier
+   clause once below its command table, including the §9.5 notice, backup, and
+   no-flag failure wording, with each carrier row pointing to it; the
+diff --git a/conformance/draft-sources-v1/index.json b/conformance/draft-sources-v1/index.json
+index effd940..98a37aa 100644
+--- a/conformance/draft-sources-v1/index.json
++++ b/conformance/draft-sources-v1/index.json
+@@ -371,6 +371,36 @@
+     "instance": "schema-cases/install-marker-v5/invalid-local-substituted.json",
+     "valid": false
+   },
++  {
++    "schema": "install-marker-v5.schema.json",
++    "instance": "schema-cases/install-marker-v5/invalid-local-repository-null.json",
++    "valid": false,
++    "comment": "Local go-v1 raw JSON arm rejects the external-only repository member even when null"
++  },
++  {
++    "schema": "install-marker-v5.schema.json",
++    "instance": "schema-cases/install-marker-v5/invalid-local-substituted-null.json",
++    "valid": false,
++    "comment": "Local go-v1 raw JSON arm rejects the external-only substituted member even when null"
++  },
++  {
++    "schema": "install-marker-v5.schema.json",
++    "instance": "schema-cases/install-marker-v5/invalid-local-substitution-null.json",
++    "valid": false,
++    "comment": "Local go-v1 raw JSON arm rejects the external-only substitution member even when null"
++  },
++  {
++    "schema": "install-marker-v5.schema.json",
++    "instance": "schema-cases/install-marker-v5/invalid-external-declared-tag-empty.json",
++    "valid": false,
++    "comment": "A present external declared_tag must be a non-empty Git ref name"
++  },
++  {
++    "schema": "install-marker-v5.schema.json",
++    "instance": "schema-cases/install-marker-v5/invalid-external-declared-tag-invalid-refname.json",
++    "valid": false,
++    "comment": "A present external declared_tag must satisfy the Git ref-name grammar"
++  },
+   {
+     "schema": "install-marker-v5.schema.json",
+     "instance": "schema-cases/install-marker-v5/invalid-attestation-missing-status.json",
+diff --git a/conformance/draft-sources-v1/schema-cases/install-marker-v5/invalid-external-declared-tag-empty.json b/conformance/draft-sources-v1/schema-cases/install-marker-v5/invalid-external-declared-tag-empty.json
+new file mode 100644
+index 0000000..8528fe5
+--- /dev/null
++++ b/conformance/draft-sources-v1/schema-cases/install-marker-v5/invalid-external-declared-tag-empty.json
+@@ -0,0 +1,88 @@
++{
++  "activation": {
++    "commands": [
++      "golden-tool"
++    ],
++    "context": true
++  },
++  "agents": [
++    "codex_cli"
++  ],
++  "build_roots": [
++    "build"
++  ],
++  "build_source": {
++    "algorithm": "curator-build-source-v1",
++    "content_sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
++  },
++  "builds": {
++    "golden-tool": {
++      "artifact_path": "bin/golden-tool",
++      "artifact_sha256": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
++      "build_source": {
++        "algorithm": "curator-build-source-v1",
++        "content_sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
++      },
++      "cache_key": "sha256:4abc903bde7d8d9f65d32fd276f37dadccc88eb28bbaf693106dcebc4a19107a",
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "declared_identity": {
++        "kind": "network-git",
++        "value": "github.com/example/golden-tools"
++      },
++      "declared_locked_commit": {
++        "hex": "0123456789abcdef0123456789abcdef01234567",
++        "object_format": "sha1"
++      },
++      "declared_tag": "",
++      "descriptor_target": "golden-tool",
++      "driver": "go-repository-v1",
++      "effective_identity": {
++        "kind": "operator-local-git",
++        "value": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
++      },
++      "execution_policy": "manager-worker-v1",
++      "object_format": "sha1",
++      "receipt_schema_version": 3,
++      "receipt_sha256": "sha256:0f8f910a2b6ba9b35531bb232cb2890e11eb55a64ba01bcdd2d93d5ea421d0e0",
++      "repository": "golden-tools",
++      "substituted": true,
++      "substitution": {
++        "type": "local-path"
++      }
++    },
++    "local-helper": {
++      "artifact_path": "bin/local-helper",
++      "artifact_sha256": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
++      "cache_key": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "driver": "go-v1",
++      "execution_policy": "manager-worker-v1",
++      "receipt_schema_version": 3,
++      "receipt_sha256": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
++    }
++  },
++  "commands": [
++    "golden-tool",
++    "local-helper"
++  ],
++  "content_sha256": "sha256:e2bd2941476b164099dc773d7448c638ff99849f8dce76e7b105f215fcdf31be",
++  "dependencies": [],
++  "files": [
++    ".skill_triggers/en.md",
++    "SKILL.md",
++    "references/notes.md"
++  ],
++  "installed_at": "2000-01-01T00:00:00Z",
++  "locale": null,
++  "lock_sha256": "sha256:04c57a18c2e1ccae26695420aa586ded8d15d7aace16d198bc5fbe4fbb060d81",
++  "name": "golden-skill",
++  "package": {
++    "kind": "local-snapshot",
++    "snapshot": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
++  },
++  "requirers": [
++    "<project>"
++  ],
++  "runtime_roots": [],
++  "schema_version": 5,
++  "skill_schema_version": 8
++}
+diff --git a/conformance/draft-sources-v1/schema-cases/install-marker-v5/invalid-external-declared-tag-invalid-refname.json b/conformance/draft-sources-v1/schema-cases/install-marker-v5/invalid-external-declared-tag-invalid-refname.json
+new file mode 100644
+index 0000000..a37730a
+--- /dev/null
++++ b/conformance/draft-sources-v1/schema-cases/install-marker-v5/invalid-external-declared-tag-invalid-refname.json
+@@ -0,0 +1,88 @@
++{
++  "activation": {
++    "commands": [
++      "golden-tool"
++    ],
++    "context": true
++  },
++  "agents": [
++    "codex_cli"
++  ],
++  "build_roots": [
++    "build"
++  ],
++  "build_source": {
++    "algorithm": "curator-build-source-v1",
++    "content_sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
++  },
++  "builds": {
++    "golden-tool": {
++      "artifact_path": "bin/golden-tool",
++      "artifact_sha256": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
++      "build_source": {
++        "algorithm": "curator-build-source-v1",
++        "content_sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
++      },
++      "cache_key": "sha256:4abc903bde7d8d9f65d32fd276f37dadccc88eb28bbaf693106dcebc4a19107a",
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "declared_identity": {
++        "kind": "network-git",
++        "value": "github.com/example/golden-tools"
++      },
++      "declared_locked_commit": {
++        "hex": "0123456789abcdef0123456789abcdef01234567",
++        "object_format": "sha1"
++      },
++      "declared_tag": "release..candidate",
++      "descriptor_target": "golden-tool",
++      "driver": "go-repository-v1",
++      "effective_identity": {
++        "kind": "operator-local-git",
++        "value": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
++      },
++      "execution_policy": "manager-worker-v1",
++      "object_format": "sha1",
++      "receipt_schema_version": 3,
++      "receipt_sha256": "sha256:0f8f910a2b6ba9b35531bb232cb2890e11eb55a64ba01bcdd2d93d5ea421d0e0",
++      "repository": "golden-tools",
++      "substituted": true,
++      "substitution": {
++        "type": "local-path"
++      }
++    },
++    "local-helper": {
++      "artifact_path": "bin/local-helper",
++      "artifact_sha256": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
++      "cache_key": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "driver": "go-v1",
++      "execution_policy": "manager-worker-v1",
++      "receipt_schema_version": 3,
++      "receipt_sha256": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
++    }
++  },
++  "commands": [
++    "golden-tool",
++    "local-helper"
++  ],
++  "content_sha256": "sha256:e2bd2941476b164099dc773d7448c638ff99849f8dce76e7b105f215fcdf31be",
++  "dependencies": [],
++  "files": [
++    ".skill_triggers/en.md",
++    "SKILL.md",
++    "references/notes.md"
++  ],
++  "installed_at": "2000-01-01T00:00:00Z",
++  "locale": null,
++  "lock_sha256": "sha256:04c57a18c2e1ccae26695420aa586ded8d15d7aace16d198bc5fbe4fbb060d81",
++  "name": "golden-skill",
++  "package": {
++    "kind": "local-snapshot",
++    "snapshot": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
++  },
++  "requirers": [
++    "<project>"
++  ],
++  "runtime_roots": [],
++  "schema_version": 5,
++  "skill_schema_version": 8
++}
+diff --git a/conformance/draft-sources-v1/schema-cases/install-marker-v5/invalid-local-repository-null.json b/conformance/draft-sources-v1/schema-cases/install-marker-v5/invalid-local-repository-null.json
+new file mode 100644
+index 0000000..4eddf63
+--- /dev/null
++++ b/conformance/draft-sources-v1/schema-cases/install-marker-v5/invalid-local-repository-null.json
+@@ -0,0 +1,86 @@
++{
++  "activation": {
++    "commands": [
++      "golden-tool"
++    ],
++    "context": true
++  },
++  "agents": [
++    "codex_cli"
++  ],
++  "build_roots": [
++    "build"
++  ],
++  "build_source": {
++    "algorithm": "curator-build-source-v1",
++    "content_sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
++  },
++  "builds": {
++    "golden-tool": {
++      "artifact_path": "bin/golden-tool",
++      "artifact_sha256": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
++      "build_source": {
++        "algorithm": "curator-build-source-v1",
++        "content_sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
++      },
++      "cache_key": "sha256:4abc903bde7d8d9f65d32fd276f37dadccc88eb28bbaf693106dcebc4a19107a",
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "declared_identity": {
++        "kind": "network-git",
++        "value": "github.com/example/golden-tools"
++      },
++      "declared_locked_commit": {
++        "hex": "0123456789abcdef0123456789abcdef01234567",
++        "object_format": "sha1"
++      },
++      "declared_tag": "v1.4.0",
++      "descriptor_target": "golden-tool",
++      "driver": "go-repository-v1",
++      "effective_identity": {
++        "kind": "network-git",
++        "value": "github.com/example/golden-tools"
++      },
++      "execution_policy": "manager-worker-v1",
++      "object_format": "sha1",
++      "receipt_schema_version": 3,
++      "receipt_sha256": "sha256:0f8f910a2b6ba9b35531bb232cb2890e11eb55a64ba01bcdd2d93d5ea421d0e0",
++      "repository": "golden-tools",
++      "substituted": false
++    },
++    "local-helper": {
++      "artifact_path": "bin/local-helper",
++      "artifact_sha256": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
++      "cache_key": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "driver": "go-v1",
++      "execution_policy": "manager-worker-v1",
++      "receipt_schema_version": 3,
++      "receipt_sha256": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
++      "repository": null
++    }
++  },
++  "commands": [
++    "golden-tool",
++    "local-helper"
++  ],
++  "content_sha256": "sha256:e2bd2941476b164099dc773d7448c638ff99849f8dce76e7b105f215fcdf31be",
++  "dependencies": [],
++  "files": [
++    ".skill_triggers/en.md",
++    "SKILL.md",
++    "references/notes.md"
++  ],
++  "installed_at": "2000-01-01T00:00:00Z",
++  "locale": null,
++  "lock_sha256": "sha256:04c57a18c2e1ccae26695420aa586ded8d15d7aace16d198bc5fbe4fbb060d81",
++  "name": "golden-skill",
++  "package": {
++    "kind": "local-snapshot",
++    "snapshot": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
++  },
++  "requirers": [
++    "<project>"
++  ],
++  "runtime_roots": [],
++  "schema_version": 5,
++  "skill_schema_version": 8
++}
+diff --git a/conformance/draft-sources-v1/schema-cases/install-marker-v5/invalid-local-substituted-null.json b/conformance/draft-sources-v1/schema-cases/install-marker-v5/invalid-local-substituted-null.json
+new file mode 100644
+index 0000000..968b017
+--- /dev/null
++++ b/conformance/draft-sources-v1/schema-cases/install-marker-v5/invalid-local-substituted-null.json
+@@ -0,0 +1,86 @@
++{
++  "activation": {
++    "commands": [
++      "golden-tool"
++    ],
++    "context": true
++  },
++  "agents": [
++    "codex_cli"
++  ],
++  "build_roots": [
++    "build"
++  ],
++  "build_source": {
++    "algorithm": "curator-build-source-v1",
++    "content_sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
++  },
++  "builds": {
++    "golden-tool": {
++      "artifact_path": "bin/golden-tool",
++      "artifact_sha256": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
++      "build_source": {
++        "algorithm": "curator-build-source-v1",
++        "content_sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
++      },
++      "cache_key": "sha256:4abc903bde7d8d9f65d32fd276f37dadccc88eb28bbaf693106dcebc4a19107a",
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "declared_identity": {
++        "kind": "network-git",
++        "value": "github.com/example/golden-tools"
++      },
++      "declared_locked_commit": {
++        "hex": "0123456789abcdef0123456789abcdef01234567",
++        "object_format": "sha1"
++      },
++      "declared_tag": "v1.4.0",
++      "descriptor_target": "golden-tool",
++      "driver": "go-repository-v1",
++      "effective_identity": {
++        "kind": "network-git",
++        "value": "github.com/example/golden-tools"
++      },
++      "execution_policy": "manager-worker-v1",
++      "object_format": "sha1",
++      "receipt_schema_version": 3,
++      "receipt_sha256": "sha256:0f8f910a2b6ba9b35531bb232cb2890e11eb55a64ba01bcdd2d93d5ea421d0e0",
++      "repository": "golden-tools",
++      "substituted": false
++    },
++    "local-helper": {
++      "artifact_path": "bin/local-helper",
++      "artifact_sha256": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
++      "cache_key": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "driver": "go-v1",
++      "execution_policy": "manager-worker-v1",
++      "receipt_schema_version": 3,
++      "receipt_sha256": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
++      "substituted": null
++    }
++  },
++  "commands": [
++    "golden-tool",
++    "local-helper"
++  ],
++  "content_sha256": "sha256:e2bd2941476b164099dc773d7448c638ff99849f8dce76e7b105f215fcdf31be",
++  "dependencies": [],
++  "files": [
++    ".skill_triggers/en.md",
++    "SKILL.md",
++    "references/notes.md"
++  ],
++  "installed_at": "2000-01-01T00:00:00Z",
++  "locale": null,
++  "lock_sha256": "sha256:04c57a18c2e1ccae26695420aa586ded8d15d7aace16d198bc5fbe4fbb060d81",
++  "name": "golden-skill",
++  "package": {
++    "kind": "local-snapshot",
++    "snapshot": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
++  },
++  "requirers": [
++    "<project>"
++  ],
++  "runtime_roots": [],
++  "schema_version": 5,
++  "skill_schema_version": 8
++}
+diff --git a/conformance/draft-sources-v1/schema-cases/install-marker-v5/invalid-local-substitution-null.json b/conformance/draft-sources-v1/schema-cases/install-marker-v5/invalid-local-substitution-null.json
+new file mode 100644
+index 0000000..f94d57c
+--- /dev/null
++++ b/conformance/draft-sources-v1/schema-cases/install-marker-v5/invalid-local-substitution-null.json
+@@ -0,0 +1,86 @@
++{
++  "activation": {
++    "commands": [
++      "golden-tool"
++    ],
++    "context": true
++  },
++  "agents": [
++    "codex_cli"
++  ],
++  "build_roots": [
++    "build"
++  ],
++  "build_source": {
++    "algorithm": "curator-build-source-v1",
++    "content_sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
++  },
++  "builds": {
++    "golden-tool": {
++      "artifact_path": "bin/golden-tool",
++      "artifact_sha256": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
++      "build_source": {
++        "algorithm": "curator-build-source-v1",
++        "content_sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
++      },
++      "cache_key": "sha256:4abc903bde7d8d9f65d32fd276f37dadccc88eb28bbaf693106dcebc4a19107a",
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "declared_identity": {
++        "kind": "network-git",
++        "value": "github.com/example/golden-tools"
++      },
++      "declared_locked_commit": {
++        "hex": "0123456789abcdef0123456789abcdef01234567",
++        "object_format": "sha1"
++      },
++      "declared_tag": "v1.4.0",
++      "descriptor_target": "golden-tool",
++      "driver": "go-repository-v1",
++      "effective_identity": {
++        "kind": "network-git",
++        "value": "github.com/example/golden-tools"
++      },
++      "execution_policy": "manager-worker-v1",
++      "object_format": "sha1",
++      "receipt_schema_version": 3,
++      "receipt_sha256": "sha256:0f8f910a2b6ba9b35531bb232cb2890e11eb55a64ba01bcdd2d93d5ea421d0e0",
++      "repository": "golden-tools",
++      "substituted": false
++    },
++    "local-helper": {
++      "artifact_path": "bin/local-helper",
++      "artifact_sha256": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
++      "cache_key": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++      "driver": "go-v1",
++      "execution_policy": "manager-worker-v1",
++      "receipt_schema_version": 3,
++      "receipt_sha256": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
++      "substitution": null
++    }
++  },
++  "commands": [
++    "golden-tool",
++    "local-helper"
++  ],
++  "content_sha256": "sha256:e2bd2941476b164099dc773d7448c638ff99849f8dce76e7b105f215fcdf31be",
++  "dependencies": [],
++  "files": [
++    ".skill_triggers/en.md",
++    "SKILL.md",
++    "references/notes.md"
++  ],
++  "installed_at": "2000-01-01T00:00:00Z",
++  "locale": null,
++  "lock_sha256": "sha256:04c57a18c2e1ccae26695420aa586ded8d15d7aace16d198bc5fbe4fbb060d81",
++  "name": "golden-skill",
++  "package": {
++    "kind": "local-snapshot",
++    "snapshot": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
++  },
++  "requirers": [
++    "<project>"
++  ],
++  "runtime_roots": [],
++  "schema_version": 5,
++  "skill_schema_version": 8
++}
+diff --git a/conformance/draft-sources-v1/semantic-cases.json b/conformance/draft-sources-v1/semantic-cases.json
+index 7bdc0ba..59d75a1 100644
+--- a/conformance/draft-sources-v1/semantic-cases.json
++++ b/conformance/draft-sources-v1/semantic-cases.json
+@@ -336,7 +336,15 @@
+     "id": "attested-network-current",
+     "input": {
+       "package": "network-git",
+-      "signed_record": "valid-fresh-exact-name-repository-commit-context",
++      "registry_policy": "strict",
++      "signed_record": "valid-fresh-exact-name-repository-commit-raw-package-tree-hash",
++      "exact_match_fields": [
++        "name",
++        "source_identity",
++        "commit",
++        "raw_package_tree_content_sha256"
++      ],
++      "lock_projected_context_hash": "differs-from-raw-package-tree-hash",
+       "marker_attestation": "matches-registry-status-key",
+       "operation": "status"
+     },
+@@ -458,6 +466,24 @@
+     "id": "attestation-evidence-revoked",
+     "input": {
+       "required_registry_evidence": "revoked",
++      "registry_policy": "advisory",
++      "revocation_match": "raw-content-hash-only;repository-and-commit-differ",
++      "marker_summary": "apparently-valid",
++      "operations": [
++        "install",
++        "status",
++        "repair",
++        "refresh"
++      ]
++    },
++    "expected": "install-repair-refresh-refuse-preserve-prior-state;status-noncurrent-or-unknown-nonzero-no-mutation"
++  },
++  {
++    "id": "attestation-evidence-revoked-identity-commit-advisory",
++    "input": {
++      "required_registry_evidence": "revoked",
++      "registry_policy": "advisory",
++      "revocation_match": "canonical-repository-and-commit-only;name-and-content-hash-differ",
+       "marker_summary": "apparently-valid",
+       "operations": [
+         "install",
+@@ -472,6 +498,9 @@
+     "id": "attestation-evidence-wrong-name",
+     "input": {
+       "required_registry_evidence": "wrong-name",
++      "registry_policy": "strict",
++      "only_mismatching_grant_field": "name",
++      "all_other_grant_fields": "match",
+       "marker_summary": "apparently-valid",
+       "operations": [
+         "install",
+@@ -486,6 +515,9 @@
+     "id": "attestation-evidence-wrong-repository",
+     "input": {
+       "required_registry_evidence": "wrong-repository",
++      "registry_policy": "strict",
++      "only_mismatching_grant_field": "canonical-repository-identity",
++      "all_other_grant_fields": "match",
+       "marker_summary": "apparently-valid",
+       "operations": [
+         "install",
+@@ -500,6 +532,9 @@
+     "id": "attestation-evidence-wrong-commit",
+     "input": {
+       "required_registry_evidence": "wrong-commit",
++      "registry_policy": "strict",
++      "only_mismatching_grant_field": "locked-commit",
++      "all_other_grant_fields": "match",
+       "marker_summary": "apparently-valid",
+       "operations": [
+         "install",
+@@ -514,6 +549,10 @@
+     "id": "attestation-evidence-wrong-context",
+     "input": {
+       "required_registry_evidence": "wrong-context",
++      "registry_policy": "strict",
++      "only_mismatching_grant_field": "raw-package-tree-content_sha256",
++      "all_other_grant_fields": "match",
++      "record_hash_matches": "lock-projected-context-hash-only",
+       "marker_summary": "apparently-valid",
+       "operations": [
+         "install",
+@@ -866,6 +905,60 @@
+     },
+     "expected": "substitute-alias-once;connect-to-mirror.corp.example:8443;identity-stays-example.org/kit"
+   },
++  {
++    "id": "v2-refresh-current-endpoint-existing-checkout",
++    "input": {
++      "operation": "explicit-refresh",
++      "transport_revision": 2,
++      "repository": "example.org/kit",
++      "existing_checkout": true,
++      "stored_origin": "https://old-mirror.example.net/kit.git",
++      "current_endpoint": "https://example.org/kit.git",
++      "current_alias": {
++        "host": "current-mirror.example.net",
++        "port": 8443,
++        "authentication": "team-https"
++      },
++      "current_mirror_of": "example.org/kit"
++    },
++    "expected": "fetch-current-resolved-endpoint-current-mirror.example.net:8443;never-fetch-stored-origin;verify-locked-content;replace-lock-atomically-on-success"
++  },
++  {
++    "id": "v2-scp-alias-port-refused",
++    "input": {
++      "transport_revision": 2,
++      "repository": "example.org/kit",
++      "endpoint": "git@example.org:kit.git",
++      "alias": "ssh-mirror",
++      "aliases": {
++        "ssh-mirror": {
++          "host": "mirror.example.net",
++          "port": 2222,
++          "authentication": "team-ssh"
++        }
++      },
++      "mirror_of": "example.org/kit"
++    },
++    "expected": "repository_policy_invalid;zero-network-attempts;no-ssh-uri-guess"
++  },
++  {
++    "id": "v2-ssh-uri-alias-port",
++    "input": {
++      "transport_revision": 2,
++      "repository": "example.org/kit",
++      "endpoint": "ssh://git@example.org/kit.git",
++      "alias": "ssh-mirror",
++      "aliases": {
++        "ssh-mirror": {
++          "host": "mirror.example.net",
++          "port": 2222,
++          "authentication": "team-ssh"
++        }
++      },
++      "mirror_of": "example.org/kit"
++    },
++    "expected": "connect-ssh://git@mirror.example.net:2222/kit.git;identity-stays-example.org/kit;attempt-once"
++  },
+   {
+     "id": "v2-reader-accepts-v1-policy",
+     "input": {
+diff --git a/protocol/repository-transport.md b/protocol/repository-transport.md
+index 4123a46..e1fbd36 100644
+--- a/protocol/repository-transport.md
++++ b/protocol/repository-transport.md
+@@ -236,6 +236,15 @@ MUST NOT name aliases. User `~/.ssh/config` Host aliases, `insteadOf`,
+ `ProxyCommand`, `core.sshCommand`, helpers, include files and environment
+ overrides remain NOT imported.
+ 
++An endpoint written in SCP-like form (`[user@]host:path`) has no URI port
++position. If its named alias supplies a port, the manager MUST fail with
++`repository_policy_invalid` before network I/O. Converting it to an SSH URI
++would require a `~/` remote-path convention that some SSH front ends do not
++accept, so the manager MUST NOT guess that rendering or risk changing the
++target path. An SSH URI endpoint MAY use an alias port; its connection target
++is the SSH URI with the resolved alias host and port, while the repository
++identity remains the entry key.
++
+ ## 6. Revision 2 resolution, failure classes and attempt bounds
+ 
+ Resolution for a schema-2 entry runs in this order, with every structural
+@@ -264,7 +273,7 @@ these fail-closed rows (zero attempts, no fallback, no cache shortcut):
+ |---|---|
+ | Resolved connection host differs from the key host without `mirror_of` | `repository_mirror_undeclared`, forbidden |
+ | `alias` names no entry in the policy alias table | `repository_alias_unknown`, forbidden |
+-| `mirror_of` or alias misuse (`mirror_of` mismatch, spurious attestation, mirror URL combined with an alias, embedded alias host, chained alias, double port, authentication mismatch, pin mismatch) | `repository_policy_invalid`, forbidden |
++| `mirror_of` or alias misuse (`mirror_of` mismatch, spurious attestation, mirror URL combined with an alias, embedded alias host, chained alias, double port, authentication mismatch, pin mismatch, SCP-like endpoint with alias port) | `repository_policy_invalid`, forbidden |
+ 
+ Mirror, port and alias properties add no fallback-allowed class: a declared
+ mirror or aliased endpoint that fails with an availability/authentication
+diff --git a/protocol/skillfile-sources.md b/protocol/skillfile-sources.md
+index c01bde3..585a539 100644
+--- a/protocol/skillfile-sources.md
++++ b/protocol/skillfile-sources.md
+@@ -173,6 +173,17 @@ bytes on another machine preserves package identity. Shared manifests with
+ absolute paths remain intentionally machine-specific, but locks do not copy
+ those paths into identity fields.
+ 
++For an explicit refresh of an existing network-Git checkout, the manager MUST
++resolve the current source-policy endpoint plan before network I/O and MUST
++send every refresh fetch to an endpoint connection target resolved by that
++plan. A checkout's persisted `remote.origin.url` is machine-private state; it
++MUST NOT select, replace, or bypass the current endpoint plan, even when the
++checkout is reused. When no policy entry applies, use the declaration's
++endpoint once under repository-transport revision 1; a logical declaration
++without an entry fails with `repository_endpoint_unavailable`. An unreadable
++or invalid policy, or failure of all permitted current endpoint attempts,
++MUST fail without changing the prior lock or installed state.
++
+ ## 4. Runtime, builds, audit and persistent records
+ 
+ Local acquisition feeds the complete existing package pipeline. Context
+@@ -210,8 +221,24 @@ requiredness and canonical set ordering.
+ registry evidence and MUST equal its registry, status and key ID (including key
+ absence). Both `network-git` and legacy `configured-git` packages may record it
+ only when existing registry rules establish the exact canonical repository,
+-name, commit and context hash. A configured source path alone is not a registry
+-identity. This summary is not authorization: signed records and current trust,
++name, commit and content hash. For a schema-2 network-Git member, a
++non-revoked record MUST NOT provide positive evidence or an attestation unless
++all four values match: canonical package name, canonical repository identity,
++locked commit, and registry artifact content hash. This is a conjunctive
++grant; matching only content, or only repository and commit, does not grant
++positive evidence. The compared registry `content_sha256` is the SHA-256 of
++the raw frozen package tree under registry §3 hashing rules. It is not the
++lock member's projected context `content_sha256`.
++
++For schema-2 network-Git members, revocation retains registry §3's broader
++artifact match: a verified `revoked` record matches when either its artifact
++content hash equals the raw frozen package-tree hash, or its canonical
++repository identity and commit both match. Registry §4 is deny-wins, so such a
++matching revocation MUST block the member under advisory as well as strict
++registry policy, even when its name or other grant dimensions do not match.
++Exact positive matching MUST NOT narrow this revocation check. A configured
++source path alone is not a registry identity.
++The marker summary is not authorization: signed records and current trust,
+ revocation, freshness and assurance policy MUST still be checked when required.
+ A missing, unreadable, malformed, stale or mismatching required evidence record
+ MUST NOT become an unattested successful installation or current status.
+@@ -262,6 +289,13 @@ external build_source and descriptor_target, as well as the common fields.
+ Only receipt_schema_version changes to 3. External substitution shape, commit
+ length, exact-tag provenance and all cross-field equality rules remain intact.
+ An external record MUST NOT omit these fields in favor of a receipt hash alone.
++The local `go-v1` record is a closed raw JSON arm: no member defined only by
++the `go-repository-v1` arm may be present, including with JSON `null` (for
++example, `repository`, `declared_tag`, `substituted`, or `substitution`).
++Presence is invalid even when decoding would otherwise collapse `null` to an
++absent zero value. In a `go-repository-v1` record, `declared_tag` is optional;
++when present it MUST be a non-empty Git ref name, and null, empty, or
++ref-name-invalid values MUST be rejected.
+ Compare the record with receipt-3 `input.build` under the existing external
+ receipt-input rules; compare receipt-3 `input.package` with marker `package`.
+ Receipt/cache hashes are recomputed over the new wrapper, not copied from v4.
