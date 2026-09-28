@@ -366,6 +366,18 @@ func (c cli) cmdProfileSync(cfg *config.Config, args []string) int {
 	}
 	policy := envprofile.PolicyFromConfig(cfg)
 	policy.Takeover = *takeover
+	managed, managedErr := envprofile.SyncManagedHomesWithPolicy(cfg.Home(), policy, machineFromConfig(cfg))
+	for _, result := range managed {
+		if result.OK {
+			_, _ = fmt.Fprintf(c.stdout, "%s: synced (%s)\n", result.Adapter, result.Home)
+		} else {
+			_, _ = fmt.Fprintf(c.stderr, "%s: %s\n", result.Adapter, result.Detail)
+		}
+	}
+	if managedErr != nil {
+		_, _ = fmt.Fprintln(c.stderr, "curator:", managedErr)
+		return exitFail
+	}
 	results, err := envprofile.SyncWithPolicy(cfg.Home(), policy)
 	for _, result := range results {
 		if result.OK {

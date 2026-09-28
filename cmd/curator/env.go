@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/envprofile"
@@ -27,6 +28,33 @@ func machineFromConfig(cfg *config.Config) envregistry.MachineConfig {
 	machine.Permissions = cfg.Env.Permissions
 	machine.PermissionsLocked = cfg.Locked["environments.permissions"]
 	return machine
+}
+
+// profileNativeHomeResolver keeps injected CLI homes consistent across the
+// profile and legacy global materializers. Production commands leave the
+// resolver nil and honor the adapter environment variables directly.
+func (c cli) profileNativeHomeResolver() func(string) (string, error) {
+	if c.userHome == nil {
+		return nil
+	}
+	userHome, err := c.userHome()
+	if err != nil {
+		return func(string) (string, error) { return "", err }
+	}
+	return func(id string) (string, error) {
+		switch id {
+		case envregistry.ClaudeCode:
+			return filepath.Join(userHome, ".claude"), nil
+		case envregistry.CodexCLI:
+			return filepath.Join(userHome, ".codex"), nil
+		case envregistry.OpenCode:
+			return filepath.Join(userHome, ".config", "opencode"), nil
+		case envregistry.Pi:
+			return filepath.Join(userHome, ".pi"), nil
+		default:
+			return "", fmt.Errorf("%s: unregistered environment %q", envregistry.DiagUnknown, id)
+		}
+	}
 }
 
 func (c cli) cmdEnv(args []string) int {

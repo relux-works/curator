@@ -1101,6 +1101,22 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
 	for seed := range seeds.files {
 		want[seed] = true
 	}
+	// A new member can add a managed path beneath an already-provisioned
+	// home. Until the marker records that path it remains unmanaged, including
+	// during a repair of an otherwise managed home.
+	unmanaged := unmanagedPlanTargets(plan, recorded)
+	if len(unmanaged) > 0 {
+		if err := inventoryUnmanaged(plan.homeDir, unmanaged, contextstore.Root(req.Home)); err != nil {
+			if !req.Policy.Takeover {
+				return err
+			}
+			if prior != nil {
+				plan.warnings = append(plan.warnings, "taking over unmanaged files for "+plan.adapter.ID+
+					": native global context files are being replaced by managed ones; backups land in "+
+					filepath.Join(plan.homeDir, ".agent-environment-backup")+"/")
+			}
+		}
+	}
 	if err := preflightManagedWriteTargets(root, homeRel, want); err != nil {
 		return err
 	}

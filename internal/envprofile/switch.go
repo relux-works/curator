@@ -30,11 +30,12 @@
 //
 // Managed homes, seeds, passthrough, and secondary fixed-home targets are
 // stage (b): this file materializes the four registered adapters' native
-// in-place homes only. The skills tree and MCP files are likewise stage
-// (b): the recorded surfaces are the root-context file every adapter owns.
+// in-place homes only. Root context and profile skill directories are
+// recorded as separate surfaces; MCP files remain managed-home surfaces.
 package envprofile
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -59,6 +60,7 @@ const (
 	DiagBackupExists         = "environment_backup_exists"
 	DiagUnknownEnvironment   = "environment_unknown"
 	DiagWriteWouldFollowLink = "environment_write_would_follow_link"
+	profileSkillsSurfaceDir  = ".agent-context/skills"
 )
 
 // BackupRetention is the number of backup generations kept (environments
@@ -117,6 +119,13 @@ func NativeHome(adapter Adapter) (string, error) {
 		return "", fmt.Errorf("no home directory for %s: set %s", adapter.ID, adapter.EnvVar)
 	}
 	return filepath.Join(home, adapter.DefaultDir), nil
+}
+
+func resolveNativeHome(adapter Adapter, resolver func(string) (string, error)) (string, error) {
+	if resolver != nil {
+		return resolver(adapter.ID)
+	}
+	return NativeHome(adapter)
 }
 
 // EntryResult is the per-adapter outcome of a switch. Notice carries the
@@ -418,6 +427,10 @@ func SyncWithPolicy(home string, policy Policy) ([]EntryResult, error) {
 // its own pass, so every home is written exactly once and the recorded state
 // and the bytes always agree when the command returns.
 func materializeScope(home, profile, environment string, policy Policy) ([]EntryResult, error) {
+	return materializeScopeWithNativeHome(home, profile, environment, policy, nil)
+}
+
+func materializeScopeWithNativeHome(home, profile, environment string, policy Policy, nativeHomeOf func(string) (string, error)) ([]EntryResult, error) {
 	lock, hash, err := readLock(home, profile)
 	if err != nil {
 		return nil, err
@@ -450,6 +463,10 @@ func materializeScope(home, profile, environment string, policy Policy) ([]Entry
 	if err != nil {
 		return nil, err
 	}
+	skills, err := skillsOf(home, manager, lock)
+	if err != nil {
+		return nil, err
+	}
 	precedence := policy.Precedence()
 	order, err := contextmaterialize.EmittedOrder(lock, precedence)
 	if err != nil {
@@ -457,9 +474,136 @@ func materializeScope(home, profile, environment string, policy Policy) ([]Entry
 	}
 	var results []EntryResult
 	for _, adapter := range adapters {
-		results = append(results, materializeOne(home, source, profile, lock, hash, precedence, order, packages, adapter, policy.Takeover))
+		results = append(results, materializeOne(home, source, profile, lock, hash, precedence, order, packages, skills, adapter, policy.Takeover, nativeHomeOf))
 	}
 	return results, nil
+}
+
+// preflightInPlaceScope checks every native target a scope will materialize
+// before the caller starts writing any surface. Global lock publication uses
+// this while holding the manager-home lock so a static unmanaged conflict
+// cannot leave earlier adapter surfaces partially updated.
+func preflightInPlaceScope(home, profile, environment string, policy Policy, nativeHomeOf func(string) (string, error)) error {
+	lock, hash, err := readLock(home, profile)
+	if err != nil {
+		return err
+	}
+	source, err := readSource(home, profile)
+	if err != nil {
+		return err
+	}
+	if err := validateProfilePathSources(profile, source, policy); err != nil {
+		return err
+	}
+	manager := newGitManager(home)
+	packages, err := loadMaterial(home, manager, lock)
+	if err != nil {
+		return err
+	}
+	skills, err := skillsOf(home, manager, lock)
+	if err != nil {
+		return err
+	}
+	precedence := policy.Precedence()
+	scoped, err := ScopedCurrents(home)
+	if err != nil {
+		return err
+	}
+	var adapters []Adapter
+	if environment != "" {
+		adapter, ok := adapterByID(environment)
+		if !ok {
+			return fmt.Errorf("%s: explicit operand names the unregistered environment %q", DiagUnknownEnvironment, environment)
+		}
+		adapters = []Adapter{adapter}
+	} else {
+		for _, adapter := range Adapters {
+			if _, hasScope := scoped["env:"+adapter.ID]; !hasScope {
+				adapters = append(adapters, adapter)
+			}
+		}
+	}
+	for _, adapter := range adapters {
+		native, err := resolveNativeHome(adapter, nativeHomeOf)
+		if err != nil {
+			return err
+		}
+		rootState, err := stateread.Stat(native)
+		if err != nil {
+			return err
+		}
+		if rootState.Kind == stateread.KindAbsent {
+			continue
+		}
+		if rootState.Info == nil || !rootState.Info.IsDir() {
+			return fmt.Errorf("managed root %s is not a directory", native)
+		}
+		if err := checkManagedPrivateTarget(native, envmarker.Name); err != nil {
+			return err
+		}
+		prior, err := envmarker.Read(native)
+		if err != nil {
+			return err
+		}
+		recorded := map[string]bool{}
+		if prior != nil {
+			for _, surface := range prior.Surfaces {
+				for _, path := range surface.Paths {
+					recorded[path] = true
+				}
+			}
+		}
+		want := map[string]bool{}
+		_, written, err := contextmaterialize.Monolithic(lock, hash, precedence, adapter.ID, packages)
+		if err != nil {
+			return err
+		}
+		if written {
+			want[adapter.Target] = true
+		}
+		for _, skill := range skills {
+			want[filepath.ToSlash(filepath.Join(profileSkillsSurfaceDir, skill.name))] = true
+		}
+		for path := range want {
+			if recorded[path] {
+				continue
+			}
+			full, err := managedPath(native, path, false)
+			if err != nil {
+				return err
+			}
+			metadata, err := stateread.Lstat(full)
+			if err != nil {
+				return fmt.Errorf("%s: inspect %s: %w", DiagUnmanagedConflict, inPlaceConflictPath(path), err)
+			}
+			if metadata.Kind == stateread.KindAbsent {
+				continue
+			}
+			if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
+				return fmt.Errorf("%s: inspect %s: path state is unreadable", DiagUnmanagedConflict, inPlaceConflictPath(path))
+			}
+			if metadata.Info.Mode()&os.ModeSymlink != 0 {
+				link, err := stateread.Readlink(full)
+				if err != nil || link.Kind != stateread.KindPresent {
+					return fmt.Errorf("%s: inspect symlink %s: %v", DiagUnmanagedConflict, inPlaceConflictPath(path), err)
+				}
+				if !sameStoreTree(link.Target, contextstore.Root(home)) && !policy.Takeover {
+					return fmt.Errorf("%s: %s is a symlink outside the manager store; abort or take over with backup", DiagForeignManager, inPlaceConflictPath(path))
+				}
+			}
+			if !policy.Takeover {
+				return fmt.Errorf("%s: %s exists and no marker records it", DiagUnmanagedConflict, inPlaceConflictPath(path))
+			}
+		}
+	}
+	return nil
+}
+
+func inPlaceConflictPath(path string) string {
+	if strings.HasPrefix(path, profileSkillsSurfaceDir+"/") {
+		return filepath.ToSlash(filepath.Join(path, "SKILL.md"))
+	}
+	return path
 }
 
 // loadMaterial loads the module bytes of every context member from its
@@ -499,8 +643,8 @@ func loadMaterial(home string, manager *gitManager, lock *contextlock.Lock) (map
 // environment_surface_unmanaged_conflict (or
 // environment_foreign_manager_detected for a foreign-manager symlink)
 // rather than overwrite.
-func materializeOne(home string, source Source, profile string, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, order []contextlock.Member, packages map[string]contextmaterialize.Package, adapter Adapter, takeover bool) EntryResult {
-	native, err := NativeHome(adapter)
+func materializeOne(home string, source Source, profile string, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, order []contextlock.Member, packages map[string]contextmaterialize.Package, skills []skillOf, adapter Adapter, takeover bool, nativeHomeOf func(string) (string, error)) EntryResult {
+	native, err := resolveNativeHome(adapter, nativeHomeOf)
 	if err != nil {
 		return EntryResult{Adapter: adapter.ID, OK: false, Detail: err.Error()}
 	}
@@ -530,6 +674,16 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 	if written {
 		want[adapter.Target] = true
 	}
+	skillLinks := map[string]string{}
+	skillHashes := map[string][]byte{}
+	skillPaths := make([]string, 0, len(skills))
+	for _, skill := range skills {
+		path := filepath.ToSlash(filepath.Join(profileSkillsSurfaceDir, skill.name))
+		skillLinks[path] = skill.root
+		skillHashes[path] = []byte(skill.hash)
+		skillPaths = append(skillPaths, path)
+		want[path] = true
+	}
 	for path := range want {
 		if _, err := managedPath(native, path, false); err != nil {
 			return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
@@ -557,24 +711,29 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 		state, err := stateread.Lstat(full)
 		if err != nil {
 			result.OK = false
-			result.Detail = err.Error()
+			result.Detail = fmt.Sprintf("%s: inspect %s: %v", DiagUnmanagedConflict, inPlaceConflictPath(path), err)
 			return result
 		}
 		if state.Kind == stateread.KindAbsent {
 			continue
 		}
+		if state.Kind != stateread.KindPresent || state.Info == nil {
+			result.OK = false
+			result.Detail = fmt.Sprintf("%s: inspect %s: path state is unreadable", DiagUnmanagedConflict, inPlaceConflictPath(path))
+			return result
+		}
 		info := state.Info
 		if info.Mode()&os.ModeSymlink != 0 {
-			linkTarget, readErr := os.Readlink(full)
-			if readErr != nil {
+			link, readErr := stateread.Readlink(full)
+			if readErr != nil || link.Kind != stateread.KindPresent {
 				result.OK = false
-				result.Detail = DiagForeignManager + ": " + path + " is a symlink that cannot be inspected; refusing takeover"
+				result.Detail = fmt.Sprintf("%s: inspect symlink %s: %v", DiagUnmanagedConflict, inPlaceConflictPath(path), readErr)
 				return result
 			}
-			if !sameStoreTree(linkTarget, contextstore.Root(home)) {
+			if !sameStoreTree(link.Target, contextstore.Root(home)) {
 				if !takeover {
 					result.OK = false
-					result.Detail = DiagForeignManager + ": " + path + " is a symlink outside the manager store; abort, or take over with backup"
+					result.Detail = DiagForeignManager + ": " + inPlaceConflictPath(path) + " is a symlink outside the manager store; abort, or take over with backup"
 					return result
 				}
 				taken = append(taken, path+" (foreign-manager symlink)")
@@ -583,7 +742,7 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 		}
 		if !takeover {
 			result.OK = false
-			result.Detail = DiagUnmanagedConflict + ": " + path + " exists and no marker records it"
+			result.Detail = DiagUnmanagedConflict + ": " + inPlaceConflictPath(path) + " exists and no marker records it"
 			return result
 		}
 		taken = append(taken, path)
@@ -613,7 +772,7 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 				continue
 			}
 			info := state.Info
-			if info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+			if info.Mode().IsRegular() || info.Mode().IsDir() || info.Mode()&os.ModeSymlink != 0 {
 				backupWant[path] = true
 			}
 		}
@@ -628,7 +787,7 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 	if prior != nil {
 		for path := range recorded {
 			if !want[path] {
-				_ = removeManagedEntry(native, path)
+				_ = removeManagedTree(native, path)
 			}
 		}
 	}
@@ -683,6 +842,41 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 	if written {
 		marker.Surfaces[envmarker.SurfaceRootContext] = surface
 	}
+	sort.Strings(skillPaths)
+	skillCopies := []envmarker.Copy{}
+	for _, path := range skillPaths {
+		full, err := managedPath(native, path, false)
+		if err != nil {
+			return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
+		}
+		state, err := stateread.Lstat(full)
+		if err != nil {
+			return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
+		}
+		if state.Kind == stateread.KindPresent && state.Info != nil && state.Info.IsDir() && state.Info.Mode()&os.ModeSymlink == 0 {
+			if err := removeManagedTree(native, path); err != nil {
+				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
+			}
+		}
+		if err := replaceLink(native, path, skillLinks[path]); err != nil {
+			var unavailable *errSymlinkUnavailable
+			if !errors.As(err, &unavailable) {
+				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: fmt.Sprintf("link %s: %v", path, err)}
+			}
+			if err := removeManagedTree(native, path); err != nil {
+				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
+			}
+			if err := copyTree(skillLinks[path], native, path); err != nil {
+				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: fmt.Sprintf("link %s: %v; copy fallback: %v", path, unavailable, err)}
+			}
+			skillCopies = append(skillCopies, envmarker.Copy{Path: path, Reason: envmarker.ReasonSymlinkFallback})
+		}
+	}
+	if len(skillPaths) > 0 {
+		marker.Surfaces[envmarker.SurfaceSkills] = envmarker.Surface{
+			Paths: skillPaths, ContentSHA256: contextmaterialize.SurfaceHash(skillHashes), Copies: &skillCopies,
+		}
+	}
 	payload, err := marker.Marshal()
 	if err != nil {
 		return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
@@ -698,6 +892,41 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 	// a takeover that reaches this line always has its backup.
 	result.OK = true
 	return result
+}
+
+// removeManagedTree removes a managed surface path without following a
+// symlink at the target or in any descendant. Directories are removed only
+// after their entries have each passed the same managed-path checks.
+func removeManagedTree(root, rel string) error {
+	full, err := managedPath(root, rel, false)
+	if err != nil {
+		return err
+	}
+	state, err := stateread.Lstat(full)
+	if err != nil {
+		return err
+	}
+	if state.Kind == stateread.KindAbsent {
+		return nil
+	}
+	if state.Kind != stateread.KindPresent || state.Info == nil {
+		return fmt.Errorf("%s: inspect %s: path state is unreadable", DiagUnmanagedConflict, rel)
+	}
+	if state.Info.IsDir() && state.Info.Mode()&os.ModeSymlink == 0 {
+		listing, err := stateread.ReadDir(full)
+		if err != nil || listing.Kind != stateread.KindPresent {
+			return fmt.Errorf("%s: inspect directory %s: %v", DiagUnmanagedConflict, rel, err)
+		}
+		for _, entry := range listing.Entries {
+			if err := removeManagedTree(root, managedJoin(rel, entry.Name())); err != nil {
+				return err
+			}
+		}
+	}
+	if err := os.Remove(full); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }
 
 // openBackup copies every file the operation will replace into the next
@@ -747,47 +976,87 @@ func openBackup(root, homeRel string, want map[string]bool) (int, error) {
 		sourceRel := managedJoin(homeRel, path)
 		full, err := managedPath(root, sourceRel, false)
 		if err != nil {
-			_ = os.RemoveAll(generation)
+			_ = removeManagedTree(root, generationRel)
 			return 0, err
 		}
 		state, err := stateread.Lstat(full)
 		if err != nil {
-			_ = os.RemoveAll(generation)
+			_ = removeManagedTree(root, generationRel)
 			return 0, err
 		}
 		if state.Kind == stateread.KindAbsent {
 			continue
 		}
-		info := state.Info
 		targetRel := managedJoin(generationRel, path)
-		if info.Mode()&os.ModeSymlink != 0 {
-			linkText, err := os.Readlink(full)
-			if err == nil {
-				err = atomicManagedLink(root, targetRel, linkText)
-			}
-			if err != nil {
-				_ = os.RemoveAll(generation)
-				return 0, err
-			}
+		if state.Kind != stateread.KindPresent || state.Info == nil {
+			_ = removeManagedTree(root, generationRel)
+			return 0, fmt.Errorf("%s: backup source %s is unreadable", DiagUnmanagedConflict, path)
+		}
+		info := state.Info
+		if !info.Mode().IsRegular() && !info.IsDir() && info.Mode()&os.ModeSymlink == 0 {
 			continue
 		}
-		if !info.Mode().IsRegular() {
-			continue
-		}
-		payload, present, err := readManagedRegular(root, sourceRel)
-		if err == nil && !present {
-			err = stateread.AbsentError(full)
-		}
-		if err == nil {
-			err = atomicManagedFile(root, targetRel, payload, 0o644)
-		}
-		if err != nil {
-			_ = os.RemoveAll(generation)
+		if err := copyManagedEntry(root, sourceRel, targetRel); err != nil {
+			_ = removeManagedTree(root, generationRel)
 			return 0, err
 		}
 	}
 	pruneBackups(base, highest+1)
 	return next, nil
+}
+
+// copyManagedEntry backs up a surface without following links. Each source
+// read and destination write is confined by managedPath; files and links are
+// published through the atomic managed writers.
+func copyManagedEntry(root, sourceRel, targetRel string) error {
+	source, err := managedPath(root, sourceRel, false)
+	if err != nil {
+		return err
+	}
+	state, err := stateread.Lstat(source)
+	if err != nil {
+		return err
+	}
+	if state.Kind == stateread.KindAbsent {
+		return nil
+	}
+	if state.Kind != stateread.KindPresent || state.Info == nil {
+		return fmt.Errorf("%s: backup source %s is unreadable", DiagUnmanagedConflict, sourceRel)
+	}
+	info := state.Info
+	if info.Mode()&os.ModeSymlink != 0 {
+		link, err := stateread.Readlink(source)
+		if err != nil || link.Kind != stateread.KindPresent {
+			return fmt.Errorf("%s: backup symlink %s cannot be read: %v", DiagUnmanagedConflict, sourceRel, err)
+		}
+		return atomicManagedLink(root, targetRel, link.Target)
+	}
+	if info.IsDir() {
+		if _, err := managedDirectory(root, targetRel); err != nil {
+			return err
+		}
+		listing, err := stateread.ReadDir(source)
+		if err != nil || listing.Kind != stateread.KindPresent {
+			return fmt.Errorf("%s: backup directory %s cannot be read: %v", DiagUnmanagedConflict, sourceRel, err)
+		}
+		for _, entry := range listing.Entries {
+			if err := copyManagedEntry(root, managedJoin(sourceRel, entry.Name()), managedJoin(targetRel, entry.Name())); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	if !info.Mode().IsRegular() {
+		return nil
+	}
+	payload, present, err := readManagedRegular(root, sourceRel)
+	if err == nil && !present {
+		err = stateread.AbsentError(source)
+	}
+	if err != nil {
+		return err
+	}
+	return atomicManagedFile(root, targetRel, payload, info.Mode().Perm())
 }
 
 // pruneBackups removes the oldest generations beyond the retention count.
