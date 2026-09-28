@@ -99,6 +99,19 @@ spawn run started: [implementer] developer (muse) (run=RUN-260924-325fc4)
 run write-boundary clearance for RUN-260924-0e49e4: Operator review 2026-09-23: every flagged path is board state under .task-board/ (activity streams, journals and element files of other elements) or inside OTHER Stories' managed worktrees under .temp/STORY-*/worktree, written concurrently by the orchestrator's own board mutations and by other tracked runs during this run's lifetime; no source path outside the Story worktree was written.
 run write-boundary clearance for RUN-260924-b28bdd: Operator review 2026-09-23: every flagged path is board state under .task-board/ (activity streams, journals and element files of other elements) or inside OTHER Stories' managed worktrees under .temp/STORY-*/worktree, written concurrently by the orchestrator's own board mutations and by other tracked runs during this run's lifetime; no source path outside the Story worktree was written.
 run write-boundary clearance for RUN-260924-c349c4: Operator review 2026-09-23: every flagged path is board state under .task-board/ (activity streams, journals and element files of other elements) or inside OTHER Stories' managed worktrees under .temp/STORY-*/worktree, written concurrently by the orchestrator's own board mutations and by other tracked runs during this run's lifetime; no source path outside the Story worktree was written.
+spawn run child final message (run=RUN-260924-325fc4, tools=27 patches=0 failed=1):
+Integration transaction ran and the log is attached as `TASK-260924-1kpw4w_integration-final.md` on TASK-260924-1kpw4w.
+
+What the log shows (integrate exit code 1, landing intact — not a refusal):
+
+- Story STORY-260924-1ckno7 landed as `56522484c9f505995bdf8ac33e785cfea2134f67` on the local trunk; board state committed as `a48f584c28b8ff4d6f760fb15ec1a6057c259f85`.
+- Remote CI gate passed (run 35984022803 on the gate branch, all jobs success) before the landing.
+- Only the publication push did not land: `board_publication_pending` / `board_publish_local_trunk_unproven` — the configured signing key can't be bound to the repository identity. Remedy per the log is the orchestrator's step (`task-board board publish`, then hosted PR merge and `reconcile-trunk`).
+
+No files changed, no status writes, no handoff — stopping here for the orchestrator to deliver, per the integration instruction.
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260924-325fc4, pid=57007, exit=0)
+spawn run RUN-260924-325fc4 failed; operator action required; failure: integration_binding_state_invalid: Change Request CR-TASK-260924-1kpw4w-1 revision 1 is integrated, want accepted or checkpointed
 
 ## Precondition Resources
 - [1kpw4w-integrate-final.md](file://TASK-260924-1kpw4w/1kpw4w-integrate-final.md)
@@ -118,14 +131,14 @@ run write-boundary clearance for RUN-260924-c349c4: Operator review 2026-09-23: 
 - [1kpw4w-review-note.md](file://TASK-260924-1kpw4w/1kpw4w-review-note.md)
 - [skillfile-operator-memo-20260924.md](file://TASK-260924-1kpw4w/skillfile-operator-memo-20260924.md)
 - [TASK-260924-1kpw4w_spawn-log_-implementer--developer--muse-_RUN-260924-213860.log](file://TASK-260924-1kpw4w/TASK-260924-1kpw4w_spawn-log_-implementer--developer--muse-_RUN-260924-213860.log) — System spawn log captured by task-board
-- [TASK-260924-1kpw4w_integration-final.md](file://TASK-260924-1kpw4w/TASK-260924-1kpw4w_integration-final.md) — Integration transaction refusal log for CR-TASK-260924-1kpw4w-1 revision 1 (exit 1); orchestrator delivers
+- [TASK-260924-1kpw4w_integration-final.md](file://TASK-260924-1kpw4w/TASK-260924-1kpw4w_integration-final.md) — Final integrate log for accepted CR revision 1: landing intact, board publication pending (orchestrator step)
 - [TASK-260924-1kpw4w_spawn-log_-implementer--developer--muse-_RUN-260924-325fc4.log](file://TASK-260924-1kpw4w/TASK-260924-1kpw4w_spawn-log_-implementer--developer--muse-_RUN-260924-325fc4.log) — System spawn log captured by task-board
 
 ## Created
 2026-09-24T03:50:49Z
 
 ## Last Update
-2026-09-24T09:53:10Z
+2026-09-24T10:31:24Z
 
 ## Assigned To
 [implementer] developer (muse)
