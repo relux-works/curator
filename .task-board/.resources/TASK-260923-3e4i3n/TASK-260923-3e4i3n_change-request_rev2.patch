@@ -1,0 +1,1032 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 4809c7c..84602c6 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,6 +1,6 @@
+ # Changelog
+ 
+-## Unreleased
++## Unreleased — v0.5.20
+ 
+ - Retire the `ultra` effort word everywhere. No row declares it any more
+   (gpt-6-astra/astra, gpt-6-sol/sol, gpt-5.6-sol, gpt-5.6-terra and
+@@ -20,12 +20,14 @@
+ 
+ - Add the versioned provider-capability table keyed (environment, tool
+   release) to a permission-grammar version (curator-spec Decision 0018
+-  choices 3 and 6; expected release v0.5.18 (v0.5.17 carried the 2026-09-22 model declarations), tag cut by the orchestrator).
++  choices 3 and 6; expected release v0.5.20, tag cut by the orchestrator).
+   Each plugin holds its own environment's rows — `claude-code` 2.1.261,
+   `codex` 0.153.2, `pi`/`pi-native` 0.84.2 (unsupported) — and
+   `LookupReleaseCapability` is the single reader. The grammar version in
+-  force is `permission-grammar-v1`, the token the launcher must cite; a
+-  row naming a grammar this module does not implement selects no mapping.
++  force is `permission-grammar-v2` for Claude and Codex (it adds Decision
++  0018's known conflict selectors) and `permission-grammar-v1` for Pi, the
++  token the launcher must cite; a row naming an unsupported grammar selects
++  no mapping.
+   The caller establishes the running release with `ProbeToolRelease`
+   (`<binary> --version` against the launch environment; `pi` has no
+   probe because its binary is the wrapper) and passes it on the new
+@@ -36,14 +38,22 @@
+   outside interactive launches with `ErrNativeArgsNotInteractive`) are
+   forwarded verbatim after the module-spelled argv, so the yolo bypass
+   flag lands before them; under yolo the plugin scans flag positions
+-  against the looked-up release's closed grammar and refuses an unknown
+-  codex `-c` key or an unknown claude `--permission-mode` value as usage
+-  (`ErrNativePolicyUnknown`, which the caller maps to exit 2), never
+-  resolved into a policy claim, while native performs no inspection at
+-  all. Prompt text is never parsed as a flag (`internal/nativeargs` owns
+-  the rule: `--` ends flag parsing, `=`-forms read as their flag).
+-  Known policy selectors under yolo are forwarded verbatim — Decision
+-  0018 item 4's conflict table is a later leaf.
++  against the looked-up release's closed grammar and refuses unknown or
++  malformed policy forms with `ErrNativePolicyUnknown`. It refuses known
++  conflicting selectors with `ErrNativePolicyConflict` and an exported
++  `NativePolicyConflictError` carrying the selector and placement: Claude
++  `--permission-mode`, `--allow-dangerously-skip-permissions`,
++  `--restricted`; Codex
++  `-a`/`--ask-for-approval`, `-s`/`--sandbox`, `--approve-for-me`, every
++  `--dangerously-bypass-*` selector except the module-mapped bypass flag,
++  which retains `ErrPermissionModeDuplicate`, and `-c`/`--config` keys
++  `approval_policy`, `sandbox_mode`, and `sandbox_permissions`. The rows
++  test equals and separate-token forms for value-taking selectors and bare
++  and equals forms for boolean flags, plus Codex's `exec` placement.
++  Native performs no argv inspection, and known non-conflicting selectors
++  remain forwarded. Prompt text is never parsed as a flag
++  (`internal/nativeargs` owns the rule: `--` ends flag parsing, `=`-forms
++  read as their flag).
+ - Declare the 2026-09-22 heads and their floating short spellings:
+   `gpt-6-sol` (+ alias `sol`) and `gpt-6-luna` (+ alias `luna`) in `openai`,
+   `claude-opus-5-5` (+ alias `opus`) in `anthropic`. All six rows are declared
+diff --git a/README.md b/README.md
+index 12f4b70..70caf2b 100644
+--- a/README.md
++++ b/README.md
+@@ -77,7 +77,7 @@ The agentic-system plugin contract and its registry.
+   (curator-spec Decision 0013 §5) — the complete argv a launcher hands to a
+   human's terminal, holding model selection, effort transport, the
+   optional typed permission-mode member (`LaunchRequest.PermissionMode`,
+-  curator-spec Decision 0018 — the next item), and the caller's native
++  curator-spec Decision 0018), and the caller's native
+   arguments forwarded verbatim after everything the module spells
+   (`LaunchRequest.NativeArgs` — the item after that).
+   `BuildPlan` refuses an interactive request carrying a composition
+@@ -98,20 +98,32 @@ The agentic-system plugin contract and its registry.
+   launches (`ErrPermissionModeNotInteractive`). A yolo launch carrying any
+   composition never reaches the duplicate check through `BuildPlan` — the
+   composition is refused first (`ErrCompositionNotInteractive`) — so
+-  `ErrPermissionModeDuplicate` is the direct plugin `Argv` path's refusal for
+-  a composition prefix that already carries the flag, never de-duplicated.
++  `ErrPermissionModeDuplicate` catches a duplicated native bypass flag in
++  `BuildPlan` and a duplicated composition prefix through direct plugin
++  `Argv`, never de-duplicating either. Claude and Codex refuse known conflicting
++  native policy selectors under yolo with `ErrNativePolicyConflict`; callers
++  can use `errors.As` to read `NativePolicyConflictError.Selector` and
++  `.Placement`. This includes Claude `--permission-mode` (all six verified
++  values), `--allow-dangerously-skip-permissions`, and `--restricted`, plus
++  Codex `-a`/`--ask-for-approval`, `-s`/`--sandbox`, `--approve-for-me`, every
++  `--dangerously-bypass-*` flag, and `-c`/`--config` keys `approval_policy`,
++  `sandbox_mode`, and `sandbox_permissions`. Codex selectors are checked both
++  at top level and after `exec`. Native mode performs no argv inspection and
++  forwards the raw arguments unchanged; known non-conflicting selectors keep
++  forwarding under yolo.
+ - The versioned provider-capability table (curator-spec Decision 0018
+   choices 3 and 6) keys (environment, tool release) to a permission-grammar
+   version. Each plugin holds its own environment's rows and
+   `LookupReleaseCapability` is the single reader; there is no central map
+   keyed by system id (the single-source guard forbids a second binding
+-  table). The grammar version in force is `permission-grammar-v1`, the
+-  token the launcher cites:
++  table). Claude and Codex use `permission-grammar-v2`, which adds the known
++  conflict selectors above; Pi keeps `permission-grammar-v1`. The token is
++  passed through the capability row for the launcher to cite:
+ 
+   | environment | verified tool release | grammar | yolo |
+   |---|---|---|---|
+-  | `claude-code` | 2.1.261 | `permission-grammar-v1` | `--dangerously-skip-permissions` |
+-  | `codex` | 0.153.2 | `permission-grammar-v1` | `--dangerously-bypass-approvals-and-sandbox` |
++  | `claude-code` | 2.1.261 | `permission-grammar-v2` | `--dangerously-skip-permissions` |
++  | `codex` | 0.153.2 | `permission-grammar-v2` | `--dangerously-bypass-approvals-and-sandbox` |
+   | `pi` | 0.84.2 | `permission-grammar-v1` | unsupported (`ErrPermissionModeUnsupported`) |
+   | `pi-native` | 0.84.2 | `permission-grammar-v1` | unsupported (`ErrPermissionModeUnsupported`) |
+ 
+@@ -128,13 +140,15 @@ The agentic-system plugin contract and its registry.
+   unknown codex `-c` key or an unknown claude `--permission-mode` value is
+   refused as usage (`ErrNativePolicyUnknown`, which the caller maps to exit
+   2), never resolved into a policy claim; the mapped bypass flag in flag
+-  position is refused as a duplicate. Native performs no inspection at all.
++  position is refused as a duplicate. A known conflicting selector is refused
++  with `ErrNativePolicyConflict`; invalid values and unknown selectors remain
++  fail-closed through `ErrNativePolicyUnknown`. Native performs no inspection
++  at all.
+   Prompt text is never parsed as a flag (`internal/nativeargs` owns the
+   rule): `--` ends flag parsing, a lone `-` and anything never dash-leading
+-  are positional, and `=`-forms read as their flag. Known policy selectors
+-  under yolo are classified but forwarded verbatim — Decision 0018 item 4's
+-  conflict table is a later leaf, as is the launcher's headless detection
+-  over the same arguments (F-L1).
++  are positional, and `=`-forms read as their flag. Known non-conflicting
++  policy selectors are still forwarded. Launcher headless detection over the
++  same arguments remains F-L1.
+ - `Registry` is the only place a system binding may live. `Register` is the
+   only way one comes to exist, and it refuses a duplicate id, an id that does
+   not normalize, an id that normalizes to a spelling other than itself, an id
+diff --git a/TASK-260923-3e4i3n_results.md b/TASK-260923-3e4i3n_results.md
+new file mode 100644
+index 0000000..1cf1c97
+--- /dev/null
++++ b/TASK-260923-3e4i3n_results.md
+@@ -0,0 +1,77 @@
++# TASK-260923-3e4i3n — native-policy-conflict-refusal results
++
++## Implementation
++
++Decision 0018 item 4 is enforced in the existing Claude and Codex yolo native-argument scanners. The scanners run from the plugins' `Args` paths, reached through `BuildPlan`. They use `nativeargs.FlagIndexes` and `SplitFlagValue`; Codex also recognizes attached `-c` values and scans selectors after the `exec` subcommand.
++
++Native mode skips these policy scans and forwards the original native arguments. Known non-conflicting selectors remain forwarded under yolo. Malformed or invalid policy forms fail closed.
++
++The capability grammar is `permission-grammar-v2` for Claude and Codex because it adds the Decision 0018 conflict selectors, aliases, and Codex `exec` placement. Pi retains `permission-grammar-v1`. The module has no independent release-version constant; the changelog marks the next release as v0.5.20. Tagging remains the orchestrator's post-landing step.
++
++Exported errors for launcher mapping:
++
++- `agentic.ErrNativePolicyConflict`: stable `errors.Is` classification.
++- `*agentic.NativePolicyConflictError`: `errors.As` details in `Selector` and `Placement`.
++- `agentic.NativePolicyPlacementFlag`, `...Equals`, `...SeparateToken`, and `...AttachedShort`: stable placement values.
++- `agentic.ErrPermissionModeDuplicate`: existing sentinel for a repeated module-mapped bypass flag.
++- `agentic.ErrNativePolicyUnknown`: malformed or invalid values and unrecognized policy grammar.
++
++README Permission-mode docs now describe the refusal and exported errors; the “later leaf” wording is removed. CHANGELOG identifies v0.5.20.
++
++## Executed selector matrix
++
++Every row below drove the plugin through `BuildPlan`. Each yolo row refused; the native twin preserved its original argv. Codex rows ran both at top level and after `exec`.
++
++| Provider / selector family | Forms / placements | Yolo rows | Native rows |
++|---|---|---:|---:|
++| Claude `--permission-mode` | Six verified values × separate-token and `=` | 12 conflict | 12 forwarded |
++| Claude `--allow-dangerously-skip-permissions` | Bare and `=` | 2 conflict | 2 forwarded |
++| Claude `--restricted` | Bare and `=` | 2 conflict | 2 forwarded |
++| Claude mapped bypass duplicate | Bare and `=`; `ErrPermissionModeDuplicate` | 2 refused | 2 forwarded |
++| **Claude total** | 18 selector/form rows per mode | **18** | **18** |
++| Codex `-a` / `--ask-for-approval` | Two spellings × separate-token and `=` × top-level and `exec` | 8 conflict | 8 forwarded |
++| Codex `-s` / `--sandbox` | Two spellings × separate-token and `=` × top-level and `exec` | 8 conflict | 8 forwarded |
++| Codex `--approve-for-me` | Bare and `=` × top-level and `exec` | 4 conflict | 4 forwarded |
++| Codex `--dangerously-bypass-*` | Known hook selector, both forms, plus a family-prefix selector × top-level and `exec` | 6 conflict | 6 forwarded |
++| Codex mapped bypass duplicate | Bare and `=` × top-level and `exec`; `ErrPermissionModeDuplicate` | 4 refused | 4 forwarded |
++| Codex config keys `approval_policy`, `sandbox_mode`, `sandbox_permissions` | Five encodings (`-c` separate/`=`, `--config` separate/`=`, attached short) × top-level and `exec` | 30 conflict | 30 forwarded |
++| **Codex total** | 30 selector/form/command rows per mode | **60** | **60** |
++| **Combined total** | One BuildPlan subtest per selector/form/mode; Codex also includes command placement | **78** | **78** |
++
++Additional yolo tests forward Claude `--debug`, `--verbose`, and `-d`; Codex `model_reasoning_effort`, `service_tier`, `mcp_servers.*`, and `--search`. Six invalid Codex `-a` / `-s` inputs fail with `ErrNativePolicyUnknown`. Native-mode tests also forward unknown policy forms with missing and unverified releases.
++
++## Narrowing mutants
++
++Each source mutation ran in a disposable copy under the Story worktree, never against the candidate files. Each listed test exited 1 because the corresponding BuildPlan matrix assertion observed that the narrowed selector was admitted. All ten mutants were killed.
++
++| Refusal family narrowed | Targeted command in disposable copy | Exit | Result |
++|---|---|---:|---|
++| Claude known permission-mode values | `go test ./pkg/agentic/systems/claude -run '^TestPermissionModeConflictMatrix$'` | 1 | Killed; all 12 yolo forms admitted |
++| Claude `--allow-dangerously-skip-permissions` | `go test ./pkg/agentic/systems/claude -run '^TestOtherKnownClaudePolicyConflicts$'` | 1 | Killed; both yolo forms admitted |
++| Claude `--restricted` | `go test ./pkg/agentic/systems/claude -run '^TestOtherKnownClaudePolicyConflicts$'` | 1 | Killed; both yolo forms admitted |
++| Claude mapped bypass duplicate | `go test ./pkg/agentic/systems/claude -run '^TestOtherKnownClaudePolicyConflicts$'` | 1 | Killed; duplicate rows admitted |
++| Codex `-a` / `--ask-for-approval` | `go test ./pkg/agentic/systems/codex -run '^TestKnownCodexPolicyConflictMatrix$'` | 1 | Killed; short alias rows admitted |
++| Codex `-s` / `--sandbox` | `go test ./pkg/agentic/systems/codex -run '^TestKnownCodexPolicyConflictMatrix$'` | 1 | Killed; short alias rows admitted |
++| Codex `--approve-for-me` | `go test ./pkg/agentic/systems/codex -run '^TestKnownCodexPolicyConflictMatrix$'` | 1 | Killed; yolo rows admitted |
++| Codex `--dangerously-bypass-*` family | `go test ./pkg/agentic/systems/codex -run '^TestKnownCodexPolicyConflictMatrix$'` | 1 | Killed; the family-prefix row admitted |
++| Codex policy config keys | `go test ./pkg/agentic/systems/codex -run '^TestKnownCodexPolicyConflictMatrix$'` | 1 | Killed; `sandbox_permissions` rows admitted |
++| Codex mapped bypass duplicate | `go test ./pkg/agentic/systems/codex -run '^TestKnownCodexPolicyConflictMatrix$'` | 1 | Killed; duplicate rows admitted |
++
++One initial Claude permission-mode mutant failed at compile time because the mutation made a local variable unused; it is excluded from the ten results above. The corrected mutant preserved compilation and was killed by the matrix assertions as reported. The disposable copy was restored and removed afterward.
++
++## Validation
++
++Commands run against the candidate worktree after implementation:
++
++| Command | Exit | Result |
++|---|---:|---|
++| `go test ./pkg/agentic ./pkg/agentic/systems/claude ./pkg/agentic/systems/codex` | 0 | Focused packages passed |
++| `go test ./...` | 0 | All packages passed |
++| `go vet ./...` | 0 | Passed |
++| `go build ./...` | 0 | Passed |
++| `golangci-lint run --new` | 0 | 0 new issues |
++| `golangci-lint run` | 1 | 20 existing findings in unchanged files; full lint is not clean |
++| `gofmt -l` over all eight changed Go files | 0 | No files reported |
++| `git diff --check` | 0 | Passed |
++
++The full-lint findings are in unchanged provider-limit, vendor-plugin, CLI, and test files. No real provider CLI was invoked. No `LOGBOOK.md` was written, per task instructions.
+diff --git a/pkg/agentic/capability_test.go b/pkg/agentic/capability_test.go
+index 6984ed5..9ce9611 100644
+--- a/pkg/agentic/capability_test.go
++++ b/pkg/agentic/capability_test.go
+@@ -103,6 +103,16 @@ func TestLookupReleaseCapabilityReadsOneRowPerRelease(t *testing.T) {
+ 			t.Errorf("row = %+v, want the 2.1.261 row with grammar v1 and yolo supported", row)
+ 		}
+ 	})
++	t.Run("the expanded refusal grammar is implemented", func(t *testing.T) {
++		v2 := []ReleaseCapability{{Release: "2.1.273", Grammar: PermissionGrammarV2, YoloSupported: true}}
++		row, err := LookupReleaseCapability(v2, "2.1.273")
++		if err != nil {
++			t.Fatalf("LookupReleaseCapability: %v", err)
++		}
++		if row.Grammar != PermissionGrammarV2 || !row.YoloSupported {
++			t.Errorf("row = %+v, want grammar v2 with yolo supported", row)
++		}
++	})
+ 	t.Run("surrounding whitespace trims, near-misses refuse", func(t *testing.T) {
+ 		if _, err := LookupReleaseCapability(rows, "  2.1.261\t"); err != nil {
+ 			t.Errorf("a trimmable release was refused: %v", err)
+@@ -134,13 +144,9 @@ func TestLookupReleaseCapabilityReadsOneRowPerRelease(t *testing.T) {
+ 		}
+ 	})
+ 	t.Run("a row naming an unimplemented grammar selects no mapping", func(t *testing.T) {
+-		// Helper-direct and disclosed as a bound: every production row
+-		// names PermissionGrammarV1, so no BuildPlan input reaches this
+-		// branch today. It is the fail-closed half of "rows naming a new
+-		// grammar ship with the code that implements it" — a v2 row
+-		// meeting v1 code refuses rather than classifying under a
+-		// grammar the scan does not know.
+-		future := []ReleaseCapability{{Release: "3.0.0", Grammar: "permission-grammar-v2", YoloSupported: true}}
++		// Helper-direct and disclosed as a bound: this synthetic row names
++		// a future grammar that the current scanners do not implement.
++		future := []ReleaseCapability{{Release: "3.0.0", Grammar: "permission-grammar-v3", YoloSupported: true}}
+ 		_, err := LookupReleaseCapability(future, "3.0.0")
+ 		if !errors.Is(err, ErrPermissionModeUnverifiedRelease) {
+ 			t.Fatalf("err = %v, want ErrPermissionModeUnverifiedRelease", err)
+diff --git a/pkg/agentic/plan.go b/pkg/agentic/plan.go
+index 25be56f..cba08c8 100644
+--- a/pkg/agentic/plan.go
++++ b/pkg/agentic/plan.go
+@@ -146,11 +146,16 @@ var (
+ 	ErrPermissionModeUnsupported = errors.New("agentic: system maps no permission-mode bypass flag")
+ 	// ErrPermissionModeDuplicate is returned, by the plugin, when an
+ 	// interactive yolo launch already carries the mapped bypass flag in its
+-	// composition prefix. It is refused rather than de-duplicated: a second
++	// composition prefix or native arguments. It is refused rather than de-duplicated: a second
+ 	// spelling of one flag is either a caller that meant native and a yolo
+ 	// that should not have been set, or the reverse, and the plugin cannot
+ 	// tell which.
+-	ErrPermissionModeDuplicate = errors.New("agentic: permission-mode bypass flag already present in the launch composition prefix")
++	ErrPermissionModeDuplicate = errors.New("agentic: permission-mode bypass flag already present in launch arguments")
++	// ErrNativePolicyConflict is returned when yolo is paired with a native
++	// selector that changes or constrains the same permission posture. Callers
++	// can use errors.Is for stable classification and errors.As to recover the
++	// selector and argv placement from NativePolicyConflictError.
++	ErrNativePolicyConflict = errors.New("agentic: native policy selector conflicts with yolo permission mode")
+ 	// ErrPermissionModeUnverifiedRelease is returned, by the plugin, when
+ 	// an interactive launch requests yolo and the tool release on the
+ 	// request is not a verified row of that system's capability table:
+@@ -188,6 +193,35 @@ var (
+ 	ErrPluginContract = errors.New("agentic: system violated the plugin contract")
+ )
+ 
++// NativePolicyPlacement identifies how a native policy selector reached the
++// provider grammar. These values are stable so launchers can report the
++// offending spelling without parsing an error string.
++type NativePolicyPlacement string
++
++const (
++	NativePolicyPlacementFlag          NativePolicyPlacement = "flag"
++	NativePolicyPlacementEquals        NativePolicyPlacement = "equals"
++	NativePolicyPlacementSeparateToken NativePolicyPlacement = "separate-token"
++	NativePolicyPlacementAttachedShort NativePolicyPlacement = "attached-short"
++)
++
++// NativePolicyConflictError carries the native selector and the argv form
++// that conflicted with yolo. It unwraps to ErrNativePolicyConflict, so callers
++// may use errors.Is for stable classification and errors.As for details.
++type NativePolicyConflictError struct {
++	Selector  string
++	Placement NativePolicyPlacement
++}
++
++func (e *NativePolicyConflictError) Error() string {
++	if e == nil {
++		return ErrNativePolicyConflict.Error()
++	}
++	return fmt.Sprintf("%s: selector %q in %s form", ErrNativePolicyConflict, e.Selector, e.Placement)
++}
++
++func (e *NativePolicyConflictError) Unwrap() error { return ErrNativePolicyConflict }
++
+ // refuseNonInteractiveParameters is the interactive grammar's request-side
+ // half, applied once here so that no plugin has to carry its own copy of the
+ // rule and no plugin can forget one.
+diff --git a/pkg/agentic/system.go b/pkg/agentic/system.go
+index a0d9d68..e76e285 100644
+--- a/pkg/agentic/system.go
++++ b/pkg/agentic/system.go
+@@ -439,14 +439,18 @@ func (m PermissionMode) Resolve() (PermissionMode, error) {
+ // naming a grammar this module does not implement selects no mapping.
+ type PermissionGrammarVersion string
+ 
+-// PermissionGrammarV1 is the grammar this module implements: the closed
+-// policy set Decision 0018 verified (claude's six `--permission-mode`
+-// values, codex's five `-c` keys plus the `mcp_servers.` shape) over the
+-// pinned releases below. A re-verification that widens or renames that
+-// set ships as a new token, and rows naming it ship with the code that
+-// implements it — never ahead of it.
++// PermissionGrammarV1 is the original closed policy grammar: Claude's six
++// `--permission-mode` values and Codex's five `-c` keys plus the
++// `mcp_servers.` shape. It remains available for capability rows whose
++// grammar did not change, such as Pi's unsupported-yolo row.
+ const PermissionGrammarV1 PermissionGrammarVersion = "permission-grammar-v1"
+ 
++// PermissionGrammarV2 adds Decision 0018's known yolo-conflicting native
++// selectors for Claude and Codex, including aliases and Codex exec placement.
++// Capability rows select this token only for releases verified against the
++// expanded refusal grammar.
++const PermissionGrammarV2 PermissionGrammarVersion = "permission-grammar-v2"
++
+ // ReleaseCapability is one row of the versioned provider-capability table:
+ // what one tool release, verified under one grammar version, admits. The
+ // table is keyed by (environment, tool release); each plugin holds its
+@@ -460,9 +464,8 @@ type ReleaseCapability struct {
+ 	// not a neighbouring release, it is an unverified one.
+ 	Release string
+ 	// Grammar is the permission-grammar version the release was verified
+-	// under. Only PermissionGrammarV1 exists today; a row naming any
+-	// other version is refused as unverified, because a grammar this
+-	// module does not implement cannot classify the caller's arguments.
++	// under. A row naming a grammar this module does not implement is
++	// refused as unverified, because its selectors cannot be classified.
+ 	Grammar PermissionGrammarVersion
+ 	// YoloSupported reports whether the release documents a
+ 	// permission-bypass flag for the plugin to map yolo to. False is a
+@@ -484,16 +487,16 @@ type ReleaseCapability struct {
+ func LookupReleaseCapability(rows []ReleaseCapability, release string) (ReleaseCapability, error) {
+ 	trimmed := strings.TrimSpace(release)
+ 	if trimmed == "" {
+-		return ReleaseCapability{}, fmt.Errorf("%w: no tool release was established (detection failed or never ran); yolo requires a release verified under %s, while native forwards verbatim",
+-			ErrPermissionModeUnverifiedRelease, PermissionGrammarV1)
++		return ReleaseCapability{}, fmt.Errorf("%w: no tool release was established (detection failed or never ran); yolo requires a release verified under %s or %s, while native forwards verbatim",
++			ErrPermissionModeUnverifiedRelease, PermissionGrammarV1, PermissionGrammarV2)
+ 	}
+ 	for _, row := range rows {
+ 		if strings.TrimSpace(row.Release) != trimmed {
+ 			continue
+ 		}
+-		if row.Grammar != PermissionGrammarV1 {
+-			return ReleaseCapability{}, fmt.Errorf("%w: tool release %q names grammar %q, which this module does not implement (in force: %s); yolo selects no mapping under an unimplemented grammar",
+-				ErrPermissionModeUnverifiedRelease, trimmed, row.Grammar, PermissionGrammarV1)
++		if row.Grammar != PermissionGrammarV1 && row.Grammar != PermissionGrammarV2 {
++			return ReleaseCapability{}, fmt.Errorf("%w: tool release %q names grammar %q, which this module does not implement (implemented: %s, %s); yolo selects no mapping under an unimplemented grammar",
++				ErrPermissionModeUnverifiedRelease, trimmed, row.Grammar, PermissionGrammarV1, PermissionGrammarV2)
+ 		}
+ 		return row, nil
+ 	}
+@@ -501,8 +504,8 @@ func LookupReleaseCapability(rows []ReleaseCapability, release string) (ReleaseC
+ 	for _, row := range rows {
+ 		verified = append(verified, strings.TrimSpace(row.Release))
+ 	}
+-	return ReleaseCapability{}, fmt.Errorf("%w: tool release %q is not verified under %s (verified releases: %s); yolo fails closed on drift, while native forwards verbatim",
+-		ErrPermissionModeUnverifiedRelease, trimmed, PermissionGrammarV1, strings.Join(verified, ", "))
++	return ReleaseCapability{}, fmt.Errorf("%w: tool release %q is not verified under %s or %s (verified releases: %s); yolo fails closed on drift, while native forwards verbatim",
++		ErrPermissionModeUnverifiedRelease, trimmed, PermissionGrammarV1, PermissionGrammarV2, strings.Join(verified, ", "))
+ }
+ 
+ // LaunchRequest is everything a caller supplies for one launch. It is the
+diff --git a/pkg/agentic/systems/claude/policy.go b/pkg/agentic/systems/claude/policy.go
+index da76af3..53d5b2c 100644
+--- a/pkg/agentic/systems/claude/policy.go
++++ b/pkg/agentic/systems/claude/policy.go
+@@ -2,7 +2,6 @@ package claude
+ 
+ import (
+ 	"fmt"
+-	"strings"
+ 
+ 	"github.com/relux-works/skill-agents-management/internal/nativeargs"
+ 	"github.com/relux-works/skill-agents-management/pkg/agentic"
+@@ -20,7 +19,7 @@ import (
+ // included — has no row until it is re-verified, and yolo there fails
+ // closed while native forwards verbatim.
+ var verifiedReleases = []agentic.ReleaseCapability{
+-	{Release: "2.1.261", Grammar: agentic.PermissionGrammarV1, YoloSupported: true},
++	{Release: "2.1.261", Grammar: agentic.PermissionGrammarV2, YoloSupported: true},
+ }
+ 
+ // permissionModeFlag is the session policy selector whose VALUES are
+@@ -28,6 +27,11 @@ var verifiedReleases = []agentic.ReleaseCapability{
+ // for the scan to recognize in either value form.
+ const permissionModeFlag = "--permission-mode"
+ 
++const (
++	allowDangerouslySkipPermissionsFlag = "--allow-dangerously-skip-permissions"
++	restrictedFlag                      = "--restricted"
++)
++
+ // knownPermissionModes is the closed `--permission-mode` value set at
+ // the pinned release: the six choices `claude --help` lists
+ // ("acceptEdits", "auto", "bypassPermissions", "manual", "dontAsk",
+@@ -49,41 +53,46 @@ var knownPermissionModes = map[string]bool{
+ // after `--`, or never dash-leading — is never classified, however
+ // flag-like it reads.
+ //
+-// Two forms refuse. A `--permission-mode` value outside the known six,
+-// in separate or `=` form, is an unknown policy form
+-// (ErrNativePolicyUnknown, which the caller maps to usage exit 2): the
+-// module cannot vouch for a bypass flag beside a mode it cannot name.
+-// The mapped bypass flag in a flag position is a duplicate
+-// (ErrPermissionModeDuplicate), in exact or `=` form: the plan would
+-// otherwise emit it twice, once mapped and once forwarded.
++// Known `--permission-mode` values, `--allow-dangerously-skip-permissions`,
++// and `--restricted` conflict with yolo and are refused with a typed error.
++// A value outside the six known permission modes remains an unknown policy
++// form: the module cannot vouch for a bypass flag beside a mode it cannot
++// name. The mapped bypass flag remains the duplicate refusal, in exact or
++// `=` form, because the plan would otherwise emit it twice.
+ //
+-// Everything else is forwarded verbatim with no claim: known modes
+-// (whose conflicts with yolo are Decision 0018 item 4's table, a later
+-// leaf — this scan classifies, it does not refuse them), and unknown
+-// top-level flags, which the provider refuses or ignores itself and
+-// which would break benign forward compatibility if this layer refused
+-// them.
++// Everything else is forwarded verbatim with no claim, including unknown
++// top-level flags. Flag positions come only from nativeargs.FlagIndexes, so
++// prompt text after `--` is not inspected.
+ func scanNativePolicy(args []string) error {
+ 	for _, i := range nativeargs.FlagIndexes(args) {
+ 		el := args[i]
+ 		name, value, hasValue := nativeargs.SplitFlagValue(el)
+ 		if name == permissionModeFlag {
+ 			mode := value
++			placement := agentic.NativePolicyPlacementEquals
+ 			if !hasValue {
+-				if i+1 >= len(args) {
++				if i+1 >= len(args) || args[i+1] == "--" {
+ 					return fmt.Errorf("%w: %s expects a mode value and the arguments end there", agentic.ErrNativePolicyUnknown, permissionModeFlag)
+ 				}
+ 				mode = args[i+1]
++				placement = agentic.NativePolicyPlacementSeparateToken
+ 			}
+ 			if !knownPermissionModes[mode] {
+-				return fmt.Errorf("%w: %s mode %q is not one of the six verified under %s", agentic.ErrNativePolicyUnknown, permissionModeFlag, mode, agentic.PermissionGrammarV1)
++				return fmt.Errorf("%w: %s mode %q is not one of the six verified under %s", agentic.ErrNativePolicyUnknown, permissionModeFlag, mode, agentic.PermissionGrammarV2)
+ 			}
+-			continue
++			return &agentic.NativePolicyConflictError{Selector: name, Placement: placement}
+ 		}
+-		if el == bypassPermissionsFlag || strings.HasPrefix(el, bypassPermissionsFlag+"=") {
++		if name == bypassPermissionsFlag {
+ 			return fmt.Errorf("%w: the native arguments already carry %q; refusing rather than emitting it twice",
+ 				agentic.ErrPermissionModeDuplicate, bypassPermissionsFlag)
+ 		}
++		if name == allowDangerouslySkipPermissionsFlag || name == restrictedFlag {
++			placement := agentic.NativePolicyPlacementFlag
++			if hasValue {
++				placement = agentic.NativePolicyPlacementEquals
++			}
++			return &agentic.NativePolicyConflictError{Selector: name, Placement: placement}
++		}
+ 	}
+ 	return nil
+ }
+diff --git a/pkg/agentic/systems/claude/policy_test.go b/pkg/agentic/systems/claude/policy_test.go
+index 62e6a0b..bb1104b 100644
+--- a/pkg/agentic/systems/claude/policy_test.go
++++ b/pkg/agentic/systems/claude/policy_test.go
+@@ -97,7 +97,7 @@ func TestYoloRefusesDriftWithANamedDiagnostic(t *testing.T) {
+ 		if !errors.Is(err, agentic.ErrPermissionModeUnverifiedRelease) {
+ 			t.Fatalf("err = %v, want ErrPermissionModeUnverifiedRelease", err)
+ 		}
+-		for _, want := range []string{string(agentic.PermissionGrammarV1), "2.1.274", "2.1.261"} {
++		for _, want := range []string{string(agentic.PermissionGrammarV2), "2.1.274", "2.1.261"} {
+ 			if !strings.Contains(err.Error(), want) {
+ 				t.Errorf("refusal %q does not name %q", err, want)
+ 			}
+@@ -149,36 +149,116 @@ func TestYoloRefusesUnknownPermissionModes(t *testing.T) {
+ 	}
+ }
+ 
+-// The narrowing the closed set buys: every one of the six verified
+-// values builds and forwards verbatim. The refusal above is the
+-// UNKNOWN's, not a refusal of the flag.
+-func TestYoloAdmitsTheSixVerifiedPermissionModes(t *testing.T) {
++// Every known permission mode conflicts with yolo in both argv forms.
++// Each row drives BuildPlan, and its native twin proves inspection is
++// mode-gated rather than shared with the forwarding path.
++func TestPermissionModeConflictMatrix(t *testing.T) {
+ 	t.Parallel()
+ 	workDir := tempSlot(t)
+-	for _, mode := range []string{"acceptEdits", "auto", "bypassPermissions", "manual", "dontAsk", "plan"} {
+-		t.Run(mode, func(t *testing.T) {
++	for _, value := range []string{"acceptEdits", "auto", "bypassPermissions", "manual", "dontAsk", "plan"} {
++		for _, form := range []struct {
++			name      string
++			args      []string
++			placement agentic.NativePolicyPlacement
++		}{
++			{"separate-token", []string{"--permission-mode", value}, agentic.NativePolicyPlacementSeparateToken},
++			{"equals", []string{"--permission-mode=" + value}, agentic.NativePolicyPlacementEquals},
++		} {
++			t.Run(value+"/"+form.name, func(t *testing.T) {
++				req := interactiveRequest(workDir)
++				req.PermissionMode = agentic.PermissionModeYolo
++				req.ToolRelease = "2.1.261"
++				req.NativeArgs = form.args
++				err := planErrorFor(t, req, agentic.LaunchModeInteractive)
++				assertNativePolicyConflict(t, err, "--permission-mode", form.placement)
++			})
++			t.Run("native/"+value+"/"+form.name, func(t *testing.T) {
++				req := interactiveRequest(workDir)
++				req.PermissionMode = agentic.PermissionModeNative
++				req.ToolRelease = "2.1.261"
++				req.NativeArgs = form.args
++				got := argvFor(t, req, agentic.LaunchModeInteractive)
++				want := append([]string{"--model", parityModel, "--effort", parityEffort}, form.args...)
++				if !reflect.DeepEqual(got, want) {
++					t.Fatalf("Argv = %#v, want %#v", got, want)
++				}
++			})
++		}
++	}
++}
++
++func TestOtherKnownClaudePolicyConflicts(t *testing.T) {
++	t.Parallel()
++	workDir := tempSlot(t)
++	rows := []struct {
++		name      string
++		selector  string
++		placement agentic.NativePolicyPlacement
++		args      []string
++		duplicate bool
++	}{
++		{"allow-bypass flag", allowDangerouslySkipPermissionsFlag, agentic.NativePolicyPlacementFlag, []string{allowDangerouslySkipPermissionsFlag}, false},
++		{"allow-bypass equals", allowDangerouslySkipPermissionsFlag, agentic.NativePolicyPlacementEquals, []string{allowDangerouslySkipPermissionsFlag + "=true"}, false},
++		{"restricted flag", restrictedFlag, agentic.NativePolicyPlacementFlag, []string{restrictedFlag}, false},
++		{"restricted equals", restrictedFlag, agentic.NativePolicyPlacementEquals, []string{restrictedFlag + "=true"}, false},
++		{"mapped bypass flag", bypassPermissionsFlag, agentic.NativePolicyPlacementFlag, []string{bypassPermissionsFlag}, true},
++		{"mapped bypass equals", bypassPermissionsFlag, agentic.NativePolicyPlacementEquals, []string{bypassPermissionsFlag + "=true"}, true},
++	}
++	for _, row := range rows {
++		t.Run("yolo/"+row.name, func(t *testing.T) {
+ 			req := interactiveRequest(workDir)
+ 			req.PermissionMode = agentic.PermissionModeYolo
+ 			req.ToolRelease = "2.1.261"
+-			req.NativeArgs = []string{"--permission-mode", mode}
++			req.NativeArgs = row.args
++			err := planErrorFor(t, req, agentic.LaunchModeInteractive)
++			if row.duplicate {
++				if !errors.Is(err, agentic.ErrPermissionModeDuplicate) {
++					t.Fatalf("BuildPlan err = %v, want ErrPermissionModeDuplicate", err)
++				}
++				return
++			}
++			assertNativePolicyConflict(t, err, row.selector, row.placement)
++		})
++		t.Run("native/"+row.name, func(t *testing.T) {
++			req := interactiveRequest(workDir)
++			req.PermissionMode = agentic.PermissionModeNative
++			req.ToolRelease = "2.1.261"
++			req.NativeArgs = row.args
+ 			got := argvFor(t, req, agentic.LaunchModeInteractive)
+-			want := []string{"--model", parityModel, "--effort", parityEffort, bypassPermissionsFlag, "--permission-mode", mode}
++			want := append([]string{"--model", parityModel, "--effort", parityEffort}, row.args...)
+ 			if !reflect.DeepEqual(got, want) {
+ 				t.Fatalf("Argv = %#v, want %#v", got, want)
+ 			}
+ 		})
+ 	}
+-	t.Run("and in equals form", func(t *testing.T) {
+-		req := interactiveRequest(workDir)
+-		req.PermissionMode = agentic.PermissionModeYolo
+-		req.ToolRelease = "2.1.261"
+-		req.NativeArgs = []string{"--permission-mode=manual"}
+-		got := argvFor(t, req, agentic.LaunchModeInteractive)
+-		want := []string{"--model", parityModel, "--effort", parityEffort, bypassPermissionsFlag, "--permission-mode=manual"}
+-		if !reflect.DeepEqual(got, want) {
+-			t.Fatalf("Argv = %#v, want %#v", got, want)
+-		}
+-	})
++}
++
++func TestYoloForwardsKnownNonConflictingClaudeSelectors(t *testing.T) {
++	t.Parallel()
++	workDir := tempSlot(t)
++	req := interactiveRequest(workDir)
++	req.PermissionMode = agentic.PermissionModeYolo
++	req.ToolRelease = "2.1.261"
++	req.NativeArgs = []string{"--debug", "--verbose", "-d"}
++	got := argvFor(t, req, agentic.LaunchModeInteractive)
++	want := []string{"--model", parityModel, "--effort", parityEffort, bypassPermissionsFlag, "--debug", "--verbose", "-d"}
++	if !reflect.DeepEqual(got, want) {
++		t.Fatalf("Argv = %#v, want %#v", got, want)
++	}
++}
++
++func assertNativePolicyConflict(t *testing.T, err error, selector string, placement agentic.NativePolicyPlacement) {
++	t.Helper()
++	if !errors.Is(err, agentic.ErrNativePolicyConflict) {
++		t.Fatalf("BuildPlan err = %v, want ErrNativePolicyConflict", err)
++	}
++	var conflict *agentic.NativePolicyConflictError
++	if !errors.As(err, &conflict) {
++		t.Fatalf("BuildPlan err %T does not contain NativePolicyConflictError", err)
++	}
++	if conflict.Selector != selector || conflict.Placement != placement {
++		t.Fatalf("conflict = %+v, want selector %q placement %q", conflict, selector, placement)
++	}
+ }
+ 
+ // The parsing rule, both directions: the same flag-looking text is
+diff --git a/pkg/agentic/systems/codex/argvguard_test.go b/pkg/agentic/systems/codex/argvguard_test.go
+index a8d64e1..ae31959 100644
+--- a/pkg/agentic/systems/codex/argvguard_test.go
++++ b/pkg/agentic/systems/codex/argvguard_test.go
+@@ -83,7 +83,8 @@ var codexArgvConstructionAllowlist = map[string]string{
+ 	// against, never argv this plugin emits. It names the two keys Args
+ 	// itself spells because the closed set must recognize the module's
+ 	// own transports as known.
+-	argvguard.AllowlistKey(codexPolicyFile, "knownConfigKeys"): "the closed -c/--config key set the yolo scan classifies against; classification data, not a construction",
++	argvguard.AllowlistKey(codexPolicyFile, "knownConfigKeys"):    "the closed -c/--config key set the yolo scan classifies against; classification data, not a construction",
++	argvguard.AllowlistKey(codexPolicyFile, "knownSandboxValues"): "the pinned -s/--sandbox value set the yolo scan classifies against; classification data, not a construction",
+ 	// The yolo scan over caller native arguments: it reads the key set
+ 	// and the bypass const to COMPARE, and refuses or forwards — it
+ 	// appends no flag of its own, so a second construction hiding behind
+diff --git a/pkg/agentic/systems/codex/policy.go b/pkg/agentic/systems/codex/policy.go
+index 51c0553..5cecad5 100644
+--- a/pkg/agentic/systems/codex/policy.go
++++ b/pkg/agentic/systems/codex/policy.go
+@@ -20,7 +20,7 @@ import (
+ // until it is re-verified, and yolo there fails closed while native
+ // forwards verbatim.
+ var verifiedReleases = []agentic.ReleaseCapability{
+-	{Release: "0.153.2", Grammar: agentic.PermissionGrammarV1, YoloSupported: true},
++	{Release: "0.153.2", Grammar: agentic.PermissionGrammarV2, YoloSupported: true},
+ }
+ 
+ // configFlag and configFlagLong are the two spellings of the config
+@@ -33,7 +33,7 @@ const (
+ 
+ // knownConfigKeys is the closed `-c`/`--config` key set at the pinned
+ // release. Two keys are this module's own transports (args.go spells
+-// both); three are Decision 0018 item 4's policy keys; the
++// both); three are Decision 0018 item 4's conflicting policy keys; the
+ // `mcp_servers.` shape below is the composition grammar's
+ // (composition.go), which a caller may also override directly. Any
+ // other key is an unknown native policy form: a `-c` override reaches
+@@ -47,6 +47,11 @@ var knownConfigKeys = map[string]bool{
+ 	"sandbox_permissions":    true,
+ }
+ 
++var knownApprovalValues = map[string]bool{"on-request": true, "never": true}
++var knownSandboxValues = map[string]bool{"read-only": true, "workspace-write": true, "danger-full-access": true}
++
++const approveForMeFlag = "--approve-for-me"
++
+ // mcpServersKeyPrefix admits the composition-evidenced config shape:
+ // `mcp_servers.<server>.<field>` overrides name MCP servers the same
+ // way the composition prefix does, so they are known — and forwarded
+@@ -59,52 +64,115 @@ const mcpServersKeyPrefix = "mcp_servers."
+ // after `--`, or never dash-leading — is never classified, however
+ // flag-like it reads.
+ //
+-// A `-c`/`--config` key outside the known set, in separate, `=`, or
+-// attached-short (`-ckey=value`) form, is an unknown policy form
+-// (ErrNativePolicyUnknown, which the caller maps to usage exit 2): the
+-// module cannot vouch for a bypass flag beside a config override it
+-// cannot name. So is a malformed override — a missing value, or a value
+-// without `key=`: unclassifiable fails closed. The mapped bypass flag
+-// in a flag position is a duplicate (ErrPermissionModeDuplicate), in
+-// exact or `=` form: the plan would otherwise emit it twice.
++// Decision 0018 conflicts are refused with NativePolicyConflictError:
++// `-a`/`--ask-for-approval`, `-s`/`--sandbox`, `--approve-for-me`, every
++// `--dangerously-bypass-*` selector, and the three policy config keys.
++// Option values are checked against the pinned closed values before a
++// conflict is returned. Unknown values, malformed config overrides and
++// unknown config keys fail closed with ErrNativePolicyUnknown. The
++// module-mapped bypass flag retains ErrPermissionModeDuplicate.
+ //
+-// Everything else is forwarded verbatim with no claim: known keys
+-// (whose conflicts with yolo are Decision 0018 item 4's table, a later
+-// leaf — this scan classifies, it does not refuse them), and unknown
+-// top-level flags, which the provider refuses itself (`error:
+-// unexpected argument`) and which would break benign forward
+-// compatibility if this layer refused them.
++// Everything else is forwarded verbatim with no claim, including known
++// non-conflicting config keys and unknown top-level flags. The scan only
++// reads flag positions supplied by nativeargs.FlagIndexes, so `exec`
++// placement is visible while text after `--` remains prompt.
+ func scanNativePolicy(args []string) error {
+ 	for _, i := range nativeargs.FlagIndexes(args) {
+ 		el := args[i]
+ 		name, value, hasValue := nativeargs.SplitFlagValue(el)
+ 		if name == configFlagLong || name == configFlag {
+ 			override := value
++			placement := agentic.NativePolicyPlacementEquals
+ 			if !hasValue {
+-				if i+1 >= len(args) {
++				if i+1 >= len(args) || args[i+1] == "--" {
+ 					return fmt.Errorf("%w: %s expects a key=value override and the arguments end there", agentic.ErrNativePolicyUnknown, name)
+ 				}
+ 				override = args[i+1]
++				placement = agentic.NativePolicyPlacementSeparateToken
+ 			}
+ 			if err := checkConfigOverride(override); err != nil {
+ 				return err
+ 			}
++			key, _, _ := strings.Cut(override, "=")
++			if isConflictingConfigKey(key) {
++				return &agentic.NativePolicyConflictError{Selector: key, Placement: placement}
++			}
+ 			continue
+ 		}
+ 		if isAttachedConfigValue(el) {
+-			if err := checkConfigOverride(strings.TrimPrefix(el, configFlag)); err != nil {
++			override := strings.TrimPrefix(el, configFlag)
++			if err := checkConfigOverride(override); err != nil {
+ 				return err
+ 			}
++			key, _, _ := strings.Cut(override, "=")
++			if isConflictingConfigKey(key) {
++				return &agentic.NativePolicyConflictError{Selector: key, Placement: agentic.NativePolicyPlacementAttachedShort}
++			}
+ 			continue
+ 		}
+-		if el == bypassApprovalsAndSandboxFlag || strings.HasPrefix(el, bypassApprovalsAndSandboxFlag+"=") {
++		if name == "-a" || name == "--ask-for-approval" {
++			optionValue, placement, err := nativePolicyOptionValue(args, i, value, hasValue, name)
++			if err != nil {
++				return err
++			}
++			if !knownApprovalValues[optionValue] {
++				return fmt.Errorf("%w: %s value %q is not one of the values verified under %s", agentic.ErrNativePolicyUnknown, name, optionValue, agentic.PermissionGrammarV2)
++			}
++			return &agentic.NativePolicyConflictError{Selector: name, Placement: placement}
++		}
++		if name == "-s" || name == "--sandbox" {
++			optionValue, placement, err := nativePolicyOptionValue(args, i, value, hasValue, name)
++			if err != nil {
++				return err
++			}
++			if !knownSandboxValues[optionValue] {
++				return fmt.Errorf("%w: %s value %q is not one of the values verified under %s", agentic.ErrNativePolicyUnknown, name, optionValue, agentic.PermissionGrammarV2)
++			}
++			return &agentic.NativePolicyConflictError{Selector: name, Placement: placement}
++		}
++		if name == approveForMeFlag {
++			return &agentic.NativePolicyConflictError{Selector: name, Placement: nativePolicyFlagPlacement(hasValue)}
++		}
++		if name == bypassApprovalsAndSandboxFlag {
+ 			return fmt.Errorf("%w: the native arguments already carry %q; refusing rather than emitting it twice",
+ 				agentic.ErrPermissionModeDuplicate, bypassApprovalsAndSandboxFlag)
+ 		}
++		if strings.HasPrefix(name, "--dangerously-bypass-") {
++			return &agentic.NativePolicyConflictError{Selector: name, Placement: nativePolicyFlagPlacement(hasValue)}
++		}
+ 	}
+ 	return nil
+ }
+ 
++func nativePolicyOptionValue(args []string, index int, value string, hasValue bool, selector string) (string, agentic.NativePolicyPlacement, error) {
++	if hasValue {
++		if value == "" {
++			return "", "", fmt.Errorf("%w: %s requires a value", agentic.ErrNativePolicyUnknown, selector)
++		}
++		return value, agentic.NativePolicyPlacementEquals, nil
++	}
++	if index+1 >= len(args) || args[index+1] == "--" || nativeargs.IsFlagElement(args[index+1]) {
++		return "", "", fmt.Errorf("%w: %s expects a value and the arguments end there", agentic.ErrNativePolicyUnknown, selector)
++	}
++	return args[index+1], agentic.NativePolicyPlacementSeparateToken, nil
++}
++
++func nativePolicyFlagPlacement(hasValue bool) agentic.NativePolicyPlacement {
++	if hasValue {
++		return agentic.NativePolicyPlacementEquals
++	}
++	return agentic.NativePolicyPlacementFlag
++}
++
++func isConflictingConfigKey(key string) bool {
++	switch key {
++	case "approval_policy", "sandbox_mode", "sandbox_permissions":
++		return true
++	default:
++		return false
++	}
++}
++
+ // isAttachedConfigValue reports whether el is `-c` with its override
+ // attached, `-ckey=value`: a short flag with a value-taking definition
+ // parses its remainder as the value (observed against installed 0.153.4:
+@@ -128,7 +196,7 @@ func checkConfigOverride(override string) error {
+ 		return fmt.Errorf("%w: malformed codex -c key %q", agentic.ErrNativePolicyUnknown, key)
+ 	}
+ 	if !knownConfigKeys[key] && !strings.HasPrefix(key, mcpServersKeyPrefix) {
+-		return fmt.Errorf("%w: codex -c key %q is not one of the keys verified under %s", agentic.ErrNativePolicyUnknown, key, agentic.PermissionGrammarV1)
++		return fmt.Errorf("%w: codex -c key %q is not one of the keys verified under %s", agentic.ErrNativePolicyUnknown, key, agentic.PermissionGrammarV2)
+ 	}
+ 	return nil
+ }
+diff --git a/pkg/agentic/systems/codex/policy_test.go b/pkg/agentic/systems/codex/policy_test.go
+index dad1aa0..2bbe177 100644
+--- a/pkg/agentic/systems/codex/policy_test.go
++++ b/pkg/agentic/systems/codex/policy_test.go
+@@ -32,10 +32,10 @@ func TestYoloForwardsNativeArgsVerbatimAfterTheBypassFlag(t *testing.T) {
+ 	t.Parallel()
+ 	workDir := tempSlot(t)
+ 	req := yoloRequest(workDir)
+-	req.NativeArgs = []string{"--search", "resume the session", "-a", "never"}
++	req.NativeArgs = []string{"--search", "resume the session", "--profile", "project"}
+ 
+ 	plan, _ := interactivePlan(t, req, agentic.LaunchModeInteractive)
+-	want := []string{"-m", parityModel, "-c", `model_reasoning_effort="high"`, bypassApprovalsAndSandboxFlag, "--search", "resume the session", "-a", "never"}
++	want := []string{"-m", parityModel, "-c", `model_reasoning_effort="high"`, bypassApprovalsAndSandboxFlag, "--search", "resume the session", "--profile", "project"}
+ 	if !reflect.DeepEqual(plan.Argv, want) {
+ 		t.Fatalf("Argv = %#v, want %#v", plan.Argv, want)
+ 	}
+@@ -74,6 +74,149 @@ func TestNativeForwardsEverythingVerbatimWithoutInspection(t *testing.T) {
+ 	}
+ }
+ 
++type nativePolicyConflictCase struct {
++	name      string
++	selector  string
++	placement agentic.NativePolicyPlacement
++	args      []string
++	duplicate bool
++}
++
++func knownCodexPolicyConflicts() []nativePolicyConflictCase {
++	var rows []nativePolicyConflictCase
++	for _, flag := range []string{"-a", "--ask-for-approval"} {
++		rows = append(rows,
++			nativePolicyConflictCase{flag + "/separate", flag, agentic.NativePolicyPlacementSeparateToken, []string{flag, "never"}, false},
++			nativePolicyConflictCase{flag + "/equals", flag, agentic.NativePolicyPlacementEquals, []string{flag + "=never"}, false},
++		)
++	}
++	for _, flag := range []string{"-s", "--sandbox"} {
++		rows = append(rows,
++			nativePolicyConflictCase{flag + "/separate", flag, agentic.NativePolicyPlacementSeparateToken, []string{flag, "danger-full-access"}, false},
++			nativePolicyConflictCase{flag + "/equals", flag, agentic.NativePolicyPlacementEquals, []string{flag + "=danger-full-access"}, false},
++		)
++	}
++	rows = append(rows,
++		nativePolicyConflictCase{"approve-for-me/flag", approveForMeFlag, agentic.NativePolicyPlacementFlag, []string{approveForMeFlag}, false},
++		nativePolicyConflictCase{"approve-for-me/equals", approveForMeFlag, agentic.NativePolicyPlacementEquals, []string{approveForMeFlag + "=true"}, false},
++		nativePolicyConflictCase{"bypass-hook-trust/flag", "--dangerously-bypass-hook-trust", agentic.NativePolicyPlacementFlag, []string{"--dangerously-bypass-hook-trust"}, false},
++		nativePolicyConflictCase{"bypass-hook-trust/equals", "--dangerously-bypass-hook-trust", agentic.NativePolicyPlacementEquals, []string{"--dangerously-bypass-hook-trust=true"}, false},
++		nativePolicyConflictCase{"bypass-prefix-family", "--dangerously-bypass-future-selector", agentic.NativePolicyPlacementFlag, []string{"--dangerously-bypass-future-selector"}, false},
++		nativePolicyConflictCase{"mapped-bypass/flag", bypassApprovalsAndSandboxFlag, agentic.NativePolicyPlacementFlag, []string{bypassApprovalsAndSandboxFlag}, true},
++		nativePolicyConflictCase{"mapped-bypass/equals", bypassApprovalsAndSandboxFlag, agentic.NativePolicyPlacementEquals, []string{bypassApprovalsAndSandboxFlag + "=true"}, true},
++	)
++	for _, key := range []string{"approval_policy", "sandbox_mode", "sandbox_permissions"} {
++		rows = append(rows,
++			nativePolicyConflictCase{key + "/short-separate", key, agentic.NativePolicyPlacementSeparateToken, []string{"-c", key + "=never"}, false},
++			nativePolicyConflictCase{key + "/short-equals", key, agentic.NativePolicyPlacementEquals, []string{"-c=" + key + "=never"}, false},
++			nativePolicyConflictCase{key + "/long-separate", key, agentic.NativePolicyPlacementSeparateToken, []string{"--config", key + "=never"}, false},
++			nativePolicyConflictCase{key + "/long-equals", key, agentic.NativePolicyPlacementEquals, []string{"--config=" + key + "=never"}, false},
++			nativePolicyConflictCase{key + "/short-attached", key, agentic.NativePolicyPlacementAttachedShort, []string{"-c" + key + "=never"}, false},
++		)
++	}
++	return rows
++}
++
++// This is the selector × argv placement × mode matrix. Codex rows are
++// repeated after the `exec` subcommand because both help surfaces expose
++// these selectors. Every yolo row drives BuildPlan; each native twin proves
++// that the same argv is forwarded without inspection.
++func TestKnownCodexPolicyConflictMatrix(t *testing.T) {
++	t.Parallel()
++	workDir := tempSlot(t)
++	for _, row := range knownCodexPolicyConflicts() {
++		for _, command := range []struct {
++			name   string
++			prefix []string
++		}{
++			{"top-level", nil},
++			{"exec", []string{"exec"}},
++		} {
++			args := append(append([]string{}, command.prefix...), row.args...)
++			t.Run(command.name+"/yolo/"+row.name, func(t *testing.T) {
++				req := interactiveRequest(workDir)
++				req.PermissionMode = agentic.PermissionModeYolo
++				req.ToolRelease = "0.153.2"
++				req.NativeArgs = args
++				err := interactivePlanError(t, req)
++				if row.duplicate {
++					if !errors.Is(err, agentic.ErrPermissionModeDuplicate) {
++						t.Fatalf("BuildPlan err = %v, want ErrPermissionModeDuplicate", err)
++					}
++					return
++				}
++				assertCodexNativePolicyConflict(t, err, row.selector, row.placement)
++			})
++			t.Run(command.name+"/native/"+row.name, func(t *testing.T) {
++				req := interactiveRequest(workDir)
++				req.PermissionMode = agentic.PermissionModeNative
++				req.ToolRelease = "0.153.2"
++				req.NativeArgs = args
++				plan, _ := interactivePlan(t, req, agentic.LaunchModeInteractive)
++				want := append([]string{"-m", parityModel, "-c", `model_reasoning_effort="high"`}, args...)
++				if !reflect.DeepEqual(plan.Argv, want) {
++					t.Fatalf("Argv = %#v, want %#v", plan.Argv, want)
++				}
++			})
++		}
++	}
++}
++
++func assertCodexNativePolicyConflict(t *testing.T, err error, selector string, placement agentic.NativePolicyPlacement) {
++	t.Helper()
++	if !errors.Is(err, agentic.ErrNativePolicyConflict) {
++		t.Fatalf("BuildPlan err = %v, want ErrNativePolicyConflict", err)
++	}
++	var conflict *agentic.NativePolicyConflictError
++	if !errors.As(err, &conflict) {
++		t.Fatalf("BuildPlan err %T does not contain NativePolicyConflictError", err)
++	}
++	if conflict.Selector != selector || conflict.Placement != placement {
++		t.Fatalf("conflict = %+v, want selector %q placement %q", conflict, selector, placement)
++	}
++}
++
++func TestCodexYoloForwardsKnownNonConflictingPolicySelectors(t *testing.T) {
++	t.Parallel()
++	workDir := tempSlot(t)
++	for _, args := range [][]string{
++		{"-c", `model_reasoning_effort="high"`},
++		{"-c", `service_tier="priority"`},
++		{"-c", "mcp_servers.docs.url=https://example.invalid"},
++		{"--search"},
++	} {
++		req := yoloRequest(workDir)
++		req.NativeArgs = args
++		plan, _ := interactivePlan(t, req, agentic.LaunchModeInteractive)
++		want := append([]string{"-m", parityModel, "-c", `model_reasoning_effort="high"`, bypassApprovalsAndSandboxFlag}, args...)
++		if !reflect.DeepEqual(plan.Argv, want) {
++			t.Errorf("args %q: Argv = %#v, want %#v", args, plan.Argv, want)
++		}
++	}
++}
++
++func TestYoloRefusesInvalidCodexPolicyValues(t *testing.T) {
++	t.Parallel()
++	workDir := tempSlot(t)
++	for _, args := range [][]string{
++		{"-a", "sometimes"},
++		{"--ask-for-approval=sometimes"},
++		{"-s", "unrestricted"},
++		{"--sandbox="},
++		{"-a"},
++		{"--sandbox", "--search"},
++	} {
++		t.Run(strings.Join(args, "_"), func(t *testing.T) {
++			req := yoloRequest(workDir)
++			req.NativeArgs = args
++			err := interactivePlanError(t, req)
++			if !errors.Is(err, agentic.ErrNativePolicyUnknown) {
++				t.Fatalf("BuildPlan err = %v, want ErrNativePolicyUnknown", err)
++			}
++		})
++	}
++}
++
+ // Drift fails closed first: yolo at any release but the pinned one —
+ // the installed newer release, an invented future one, or none at all —
+ // is refused with the named diagnostic, through BuildPlan and through
+@@ -102,7 +245,7 @@ func TestYoloRefusesDriftWithANamedDiagnostic(t *testing.T) {
+ 		if !errors.Is(err, agentic.ErrPermissionModeUnverifiedRelease) {
+ 			t.Fatalf("err = %v, want ErrPermissionModeUnverifiedRelease", err)
+ 		}
+-		for _, want := range []string{string(agentic.PermissionGrammarV1), "0.153.4", "0.153.2"} {
++		for _, want := range []string{string(agentic.PermissionGrammarV2), "0.153.4", "0.153.2"} {
+ 			if !strings.Contains(err.Error(), want) {
+ 				t.Errorf("refusal %q does not name %q", err, want)
+ 			}
+@@ -159,14 +302,13 @@ func TestYoloRefusesUnknownConfigKeys(t *testing.T) {
+ 	}
+ }
+ 
+-// The narrowing the closed set buys: every verified key builds and
+-// forwards verbatim — the module's own transports, the three policy
+-// keys, and the composition-evidenced `mcp_servers.` shape. The refusal
+-// above is the UNKNOWN's, not a refusal of the flag.
+-func TestYoloAdmitsTheVerifiedConfigKeys(t *testing.T) {
++// The module's own config transports and composition-evidenced
++// `mcp_servers.` shape stay forwarded because they do not conflict with
++// yolo. Decision 0018's three policy keys are covered by the refusal matrix.
++func TestYoloForwardsKnownNonConflictingConfigKeys(t *testing.T) {
+ 	t.Parallel()
+ 	workDir := tempSlot(t)
+-	for _, key := range []string{"model_reasoning_effort", "service_tier", "approval_policy", "sandbox_mode", "sandbox_permissions", "mcp_servers.docs.url"} {
++	for _, key := range []string{"model_reasoning_effort", "service_tier", "mcp_servers.docs.url"} {
+ 		t.Run(key, func(t *testing.T) {
+ 			req := yoloRequest(workDir)
+ 			req.NativeArgs = []string{"-c", key + "=x"}
+@@ -179,9 +321,9 @@ func TestYoloAdmitsTheVerifiedConfigKeys(t *testing.T) {
+ 	}
+ 	t.Run("and in equals form", func(t *testing.T) {
+ 		req := yoloRequest(workDir)
+-		req.NativeArgs = []string{"--config=sandbox_mode=read-only"}
++		req.NativeArgs = []string{"--config=model_reasoning_effort=low"}
+ 		plan, _ := interactivePlan(t, req, agentic.LaunchModeInteractive)
+-		want := []string{"-m", parityModel, "-c", `model_reasoning_effort="high"`, bypassApprovalsAndSandboxFlag, "--config=sandbox_mode=read-only"}
++		want := []string{"-m", parityModel, "-c", `model_reasoning_effort="high"`, bypassApprovalsAndSandboxFlag, "--config=model_reasoning_effort=low"}
+ 		if !reflect.DeepEqual(plan.Argv, want) {
+ 			t.Fatalf("Argv = %#v, want %#v", plan.Argv, want)
+ 		}
