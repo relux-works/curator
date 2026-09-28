@@ -137,6 +137,21 @@ Integration preconditions confirmed and evidence attached; stopping here per the
 - No file changed, no commit, no status change, no handoff call.
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260924-d6df60, pid=19308, exit=0)
+spawn run RUN-260924-d6df60 failed; operator action required; failure: run_write_boundary_uncleared: runner integrate refused: run_write_boundary_uncleared: delivery of element STORY-260923-3vwgy4 is gated on 2 run(s) under warn policy
+  [ok] run RUN-260924-022824 verdict=violated terminal=violated: assessed
+  [BLOCKED] run RUN-260924-e5577a verdict=violated terminal=violated: the terminal assessment is violated
+clear a violating run with: task-board spawn write-boundary-clear <RUN-ID> --reason "..."
+board_publication_pending: STORY-260923-3vwgy4 is landed and its board state is committed as 5b326aa384d9e3f3a7c047e7b228107e84c90df9 on the local trunk, but the publication push did not land (board_publish_local_trunk_unproven); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: 5b326aa384d9e3f3a7c047e7b228107e84c90df9
+  cause_code: board_publish_local_trunk_unproven
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: be10c604d5466785fa7263a7b22fbde2edbc9c04
+  story_id: STORY-260923-3vwgy4
+  cause: board_publish_local_trunk_unproven: the local trunk holds an unpublished link 5b326aa384d9e3f3a7c047e7b228107e84c90df9 that is not this repository's own board-state record (the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key); a stable content digest is never ownership proof — nothing was projected and nothing was pushed
+  link_oid: 5b326aa384d9e3f3a7c047e7b228107e84c90df9
+  reason: the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key
+  remedy: land the unproven commits through integrate/reconcile-trunk, not through this command
 
 ## Precondition Resources
 - [3mazfw-integrate-final.md](file://BUG-260923-3mazfw/3mazfw-integrate-final.md)
@@ -183,7 +198,7 @@ spawn run completed: muse (run=RUN-260924-d6df60, pid=19308, exit=0)
 2026-09-23T12:07:49Z
 
 ## Last Update
-2026-09-24T08:43:17Z
+2026-09-24T09:18:17Z
 
 ## Assigned To
 [implementer] developer (muse)
