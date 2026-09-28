@@ -169,6 +169,17 @@ Integration preconditions for accepted CR-TASK-260916-33abdk-4 rev4 confirmed, f
 - Attached outcome `TASK-260916-33abdk_integration-preconditions-runb62ea3.md`. No `integrate`/`checkpoint`/`handoff`/status writes executed — the bound landing stays runner-owned.
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260927-b62ea3, pid=81184, exit=0)
+spawn run RUN-260927-b62ea3 failed; operator action required; failure: board_publication_pending: runner integrate refused: board_publication_pending: STORY-260916-1i1gfo is landed and its board state is committed as 6bd98d49e9aaa65db0937ef0112af0351eddbf08 on the local trunk, but the publication push did not land (board_publish_local_trunk_unproven); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: 6bd98d49e9aaa65db0937ef0112af0351eddbf08
+  cause_code: board_publish_local_trunk_unproven
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: 4b25b7951e8b243a2ce003bfaa8102d25965982b
+  story_id: STORY-260916-1i1gfo
+  cause: board_publish_local_trunk_unproven: the local trunk holds an unpublished link 6bd98d49e9aaa65db0937ef0112af0351eddbf08 that is not this repository's own board-state record (the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key); a stable content digest is never ownership proof — nothing was projected and nothing was pushed
+  link_oid: 6bd98d49e9aaa65db0937ef0112af0351eddbf08
+  reason: the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key
+  remedy: land the unproven commits through integrate/reconcile-trunk, not through this command
 
 ## Precondition Resources
 - [33abdk-carry-4.md](file://TASK-260916-33abdk/33abdk-carry-4.md)
@@ -212,7 +223,7 @@ spawn run completed: muse (run=RUN-260927-b62ea3, pid=81184, exit=0)
 2026-09-16T10:50:07Z
 
 ## Last Update
-2026-09-27T16:02:11Z
+2026-09-27T16:04:29Z
 
 ## Assigned To
 [implementer] developer (muse)
