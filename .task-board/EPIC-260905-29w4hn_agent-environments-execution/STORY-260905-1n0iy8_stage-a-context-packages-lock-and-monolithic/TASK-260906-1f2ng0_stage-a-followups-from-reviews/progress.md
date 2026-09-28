@@ -261,6 +261,17 @@ Integration preconditions for accepted revision 7 confirmed and fresh outcome ev
 Verified: CR-TASK-260906-1f2ng0-7 rev 7 accepted (ledger seq 204/205, 2026-09-26T01:52:14Z) with verdict `accepted`; task and story both `integrating`; integrate instruction present; no directives. Worktree untouched — no file changed, nothing committed, `CHANGELOG.md` clean, `git diff --check` exit 0, no stray root or `test/`/`ledger/` paths, revision content uncommitted (9 modified + 2 new files). No `go test` run per the memory-tight review constraint; no new gates claimed green. `worktree integrate` deliberately not executed — the land log is the runner's synchronous step.
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260926-955f2f, pid=79515, exit=0)
+spawn run RUN-260926-955f2f failed; operator action required; failure: board_publication_pending: runner integrate refused: board_publication_pending: STORY-260905-1n0iy8 is landed and its board state is committed as 60498052a1833f7511bd16086d953c8099fe7eed on the local trunk, but the publication push did not land (board_publish_local_trunk_unproven); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: 60498052a1833f7511bd16086d953c8099fe7eed
+  cause_code: board_publish_local_trunk_unproven
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: d35ace63536fb55442b84e631dfdd134c4ad1a23
+  story_id: STORY-260905-1n0iy8
+  cause: board_publish_local_trunk_unproven: the local trunk holds an unpublished link 60498052a1833f7511bd16086d953c8099fe7eed that is not this repository's own board-state record (the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key); a stable content digest is never ownership proof — nothing was projected and nothing was pushed
+  link_oid: 60498052a1833f7511bd16086d953c8099fe7eed
+  reason: the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key
+  remedy: land the unproven commits through integrate/reconcile-trunk, not through this command
 
 ## Precondition Resources
 - [carry-delta-review-note-2.md](file://TASK-260906-1f2ng0/carry-delta-review-note-2.md)
@@ -317,7 +328,7 @@ spawn run completed: muse (run=RUN-260926-955f2f, pid=79515, exit=0)
 2026-09-06T03:40:31Z
 
 ## Last Update
-2026-09-26T02:17:56Z
+2026-09-26T02:52:16Z
 
 ## Assigned To
 [implementer] developer (muse)
