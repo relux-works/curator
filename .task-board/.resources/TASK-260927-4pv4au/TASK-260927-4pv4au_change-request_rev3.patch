@@ -1,0 +1,2505 @@
+diff --git a/.github/ci/conformance-case-counts.tsv b/.github/ci/conformance-case-counts.tsv
+index abe4c703..128bff25 100644
+--- a/.github/ci/conformance-case-counts.tsv
++++ b/.github/ci/conformance-case-counts.tsv
+@@ -73,3 +73,4 @@ environments-env-passthrough/schema-cases	4
+ environments-env-passthrough/surfacing-cases	6
+ environments-env-passthrough/surfacing-order-cases	2
+ environments-read-failure/restore	2
++security-posture/vectors	17
+diff --git a/.github/ci/conformance-gaps.tsv b/.github/ci/conformance-gaps.tsv
+index 008af583..72629515 100644
+--- a/.github/ci/conformance-gaps.tsv
++++ b/.github/ci/conformance-gaps.tsv
+@@ -2,52 +2,52 @@
+ # after the named published case passes its production-entry consumer.
+ # Case IDs and owners are verified against v1.0.0-rc.13 tag commit 23435129ebc4c29e5b7f75ec72a0aa0cd3f16065.
+ family	case_id	owner	reason
+-manager-config-v2/schema-cases	invalid-system-module-waiver-missing-reason.json	STORY-260916-ioemse	Load rejects before E2 validation at the unsupported E1 require_source_signers field; permissions are supported on trunk.
+-manager-config-v2/schema-cases	invalid-system-module-waiver-package-grammar.json	STORY-260916-ioemse	Load rejects before E2 validation at the unsupported E1 require_source_signers field; permissions are supported on trunk.
+-manager-config-v2/schema-cases	invalid-system-module-waiver-unknown-field.json	STORY-260916-ioemse	Load rejects before E2 validation at the unsupported E1 require_source_signers field; permissions are supported on trunk.
+-manager-config-v2/schema-cases	invalid-transitive-system-modules-value.json	STORY-260916-ioemse	Load rejects before E2 validation at the unsupported E1 require_source_signers field; permissions are supported on trunk.
+-manager-config-v2/schema-cases	valid-overlay-git-git-uppercase.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-git-http-uppercase.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-git-https-uppercase.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-git-scp-no-user.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-git-scp.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-git-single-letter-host.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-git-ssh-uppercase.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-path-colon-later-segment.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-path-relative.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-path-source.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-path-windows-backslash.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-path-windows-double-slash.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-path-windows-lowercase-drive.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
+-manager-config-v2/schema-cases	valid-overlay-path-windows-slash.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers or require_source_signers field owned by E1, before evaluating the overlay path kind.
++manager-config-v2/schema-cases	invalid-system-module-waiver-missing-reason.json	STORY-260916-ioemse	Load reaches E2 validation after the supported require_source_signers and permissions fields; source_signers remains unsupported by E1.
++manager-config-v2/schema-cases	invalid-system-module-waiver-package-grammar.json	STORY-260916-ioemse	Load reaches E2 validation after the supported require_source_signers and permissions fields; source_signers remains unsupported by E1.
++manager-config-v2/schema-cases	invalid-system-module-waiver-unknown-field.json	STORY-260916-ioemse	Load reaches E2 validation after the supported require_source_signers and permissions fields; source_signers remains unsupported by E1.
++manager-config-v2/schema-cases	invalid-transitive-system-modules-value.json	STORY-260916-ioemse	Load reaches E2 validation after the supported require_source_signers and permissions fields; source_signers remains unsupported by E1.
++manager-config-v2/schema-cases	valid-overlay-git-git-uppercase.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers field owned by E1, before evaluating the overlay path kind.
++manager-config-v2/schema-cases	valid-overlay-git-http-uppercase.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers field owned by E1, before evaluating the overlay path kind.
++manager-config-v2/schema-cases	valid-overlay-git-https-uppercase.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers field owned by E1, before evaluating the overlay path kind.
++manager-config-v2/schema-cases	valid-overlay-git-scp-no-user.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers field owned by E1, before evaluating the overlay path kind.
++manager-config-v2/schema-cases	valid-overlay-git-scp.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers field owned by E1, before evaluating the overlay path kind.
++manager-config-v2/schema-cases	valid-overlay-git-single-letter-host.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers field owned by E1, before evaluating the overlay path kind.
++manager-config-v2/schema-cases	valid-overlay-git-ssh-uppercase.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers field owned by E1, before evaluating the overlay path kind.
++manager-config-v2/schema-cases	valid-overlay-path-colon-later-segment.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers field owned by E1, before evaluating the overlay path kind.
++manager-config-v2/schema-cases	valid-overlay-path-relative.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers field owned by E1, before evaluating the overlay path kind.
++manager-config-v2/schema-cases	valid-overlay-path-source.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers field owned by E1, before evaluating the overlay path kind.
++manager-config-v2/schema-cases	valid-overlay-path-windows-backslash.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers field owned by E1, before evaluating the overlay path kind.
++manager-config-v2/schema-cases	valid-overlay-path-windows-double-slash.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers field owned by E1, before evaluating the overlay path kind.
++manager-config-v2/schema-cases	valid-overlay-path-windows-lowercase-drive.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers field owned by E1, before evaluating the overlay path kind.
++manager-config-v2/schema-cases	valid-overlay-path-windows-slash.json	STORY-260916-ioemse	Load rejects on the unsupported source_signers field owned by E1, before evaluating the overlay path kind.
+ manager-config-v2/schema-cases	valid-provider-directories-windows-drive.json	STORY-260922-1cenbr	Load rejects a valid manager-config case containing the adopted 0017/0018 configuration model.
+ manager-config-v2/schema-cases	valid-provider-directories.json	STORY-260922-1cenbr	Load rejects a valid manager-config case containing the adopted 0017/0018 configuration model.
+ manager-config-v2/schema-cases	valid-registry-bootstrap-members.json	STORY-260910-6bo7ej	Load rejects the valid registry bootstrap members case published by S2.
+-manager-config-v2/schema-cases	valid-require-source-signers.json	STORY-260916-ioemse	Load rejects the valid source_signers or require_source_signers case published by E1.
+-manager-config-v2/schema-cases	valid-security-posture-hardened.json	STORY-260910-2qmrb8	Load rejects the valid security_posture case published by S1/S3.
+-manager-config-v2/schema-cases	valid-security-posture-permissive.json	STORY-260910-2qmrb8	Load rejects the valid security_posture case published by S1/S3.
+-manager-config-v2/schema-cases	valid-source-signers-empty-list.json	STORY-260916-ioemse	Load rejects the valid source_signers or require_source_signers case published by E1.
+-manager-config-v2/schema-cases	valid-source-signers-gpg.json	STORY-260916-ioemse	Load rejects the valid source_signers or require_source_signers case published by E1.
+-manager-config-v2/schema-cases	valid-source-signers.json	STORY-260916-ioemse	Load rejects the valid source_signers or require_source_signers case published by E1.
+-manager-config-v2/schema-cases	valid-system-module-waiver.json	STORY-260916-ioemse	Load rejects this published-valid case at the unsupported E1 require_source_signers field; permissions are supported on trunk.
++manager-config-v2/schema-cases	valid-require-source-signers.json	STORY-260916-ioemse	Load rejects the valid source_signers case published by E1; require_source_signers is supported.
++manager-config-v2/schema-cases	valid-security-posture-hardened.json	STORY-260916-ioemse	Load admits security_posture but this case also carries unsupported environments.source_signers from E1.
++manager-config-v2/schema-cases	valid-security-posture-permissive.json	STORY-260916-ioemse	Load admits security_posture but this case also carries unsupported environments.source_signers from E1.
++manager-config-v2/schema-cases	valid-source-signers-empty-list.json	STORY-260916-ioemse	Load rejects the valid source_signers case published by E1; require_source_signers is supported.
++manager-config-v2/schema-cases	valid-source-signers-gpg.json	STORY-260916-ioemse	Load rejects the valid source_signers case published by E1; require_source_signers is supported.
++manager-config-v2/schema-cases	valid-source-signers.json	STORY-260916-ioemse	Load rejects the valid source_signers case published by E1; require_source_signers is supported.
++manager-config-v2/schema-cases	valid-system-module-waiver.json	STORY-260916-ioemse	Load rejects this published-valid case at the unsupported E1 source_signers field; require_source_signers and permissions are supported.
+ manager-config-v2/schema-cases	valid.json	STORY-260922-1cenbr	Load rejects a valid manager-config case containing the adopted 0017/0018 configuration model.
+ manager-config-v2/vectors	schema2-empty-environments-defaults	STORY-260922-1cenbr	EffectiveJSON differs from the updated manager-config defaults and permission interface adopted by 0017/0018.
+ manager-config-v2/vectors	schema2-every-knob	STORY-260916-ioemse	Parse rejects the source signer fields introduced by E1.
+ manager-config-v2/vectors	schema2-minimal-defaults	STORY-260922-1cenbr	EffectiveJSON differs from the updated manager-config defaults and permission interface adopted by 0017/0018.
+-manager-config-v2/vectors	schema2-overlay-git-git-uppercase	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-git-http-uppercase	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-git-https-uppercase	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-git-scp	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-git-scp-no-user	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-git-single-letter-host	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-git-ssh-uppercase	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-path-colon-later-segment	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-path-relative	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-path-source	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-path-windows-backslash	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-path-windows-double-slash	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-path-windows-lowercase-drive	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
+-manager-config-v2/vectors	schema2-overlay-path-windows-slash	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers and require_source_signers values owned by E1.
++manager-config-v2/vectors	schema2-overlay-git-git-uppercase	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers value owned by E1.
++manager-config-v2/vectors	schema2-overlay-git-http-uppercase	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers value owned by E1.
++manager-config-v2/vectors	schema2-overlay-git-https-uppercase	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers value owned by E1.
++manager-config-v2/vectors	schema2-overlay-git-scp	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers value owned by E1.
++manager-config-v2/vectors	schema2-overlay-git-scp-no-user	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers value owned by E1.
++manager-config-v2/vectors	schema2-overlay-git-single-letter-host	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers value owned by E1.
++manager-config-v2/vectors	schema2-overlay-git-ssh-uppercase	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers value owned by E1.
++manager-config-v2/vectors	schema2-overlay-path-colon-later-segment	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers value owned by E1.
++manager-config-v2/vectors	schema2-overlay-path-relative	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers value owned by E1.
++manager-config-v2/vectors	schema2-overlay-path-source	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers value owned by E1.
++manager-config-v2/vectors	schema2-overlay-path-windows-backslash	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers value owned by E1.
++manager-config-v2/vectors	schema2-overlay-path-windows-double-slash	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers value owned by E1.
++manager-config-v2/vectors	schema2-overlay-path-windows-lowercase-drive	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers value owned by E1.
++manager-config-v2/vectors	schema2-overlay-path-windows-slash	STORY-260916-ioemse	Parse accepts the overlay declaration, but EffectiveJSON omits the source_signers value owned by E1.
+ manager-config-v2/vectors	schema2-partial-knobs-fill-defaults	STORY-260922-1cenbr	EffectiveJSON differs from the updated manager-config defaults and permission interface adopted by 0017/0018.
+ manager-config-v2/vectors	schema2-passable-env-absent-empty	STORY-260922-1cenbr	EffectiveJSON differs from the updated manager-config defaults and permission interface adopted by 0017/0018.
+ manager-config-v2/vectors	schema2-passable-env-explicit-empty	STORY-260922-1cenbr	EffectiveJSON differs from the updated manager-config defaults and permission interface adopted by 0017/0018.
+@@ -67,5 +67,5 @@ system-config-v2/schema-cases	invalid-transitive-system-modules-drop-direction.j
+ system-config-v2/schema-cases	invalid-transitive-system-modules-value.json	STORY-260916-ioemse	Load rejects before the E2 diagnostic because the updated system case locks source_signers from E1.
+ system-config-v2/schema-cases	valid-isolation-isolated-direction.json	STORY-260916-ioemse	Load rejects the system lock cases because source_signers locks from E1 are not supported.
+ system-config-v2/schema-cases	valid-isolation-shared-direction.json	STORY-260916-ioemse	Load rejects the system lock cases because source_signers locks from E1 are not supported.
+-system-config-v2/schema-cases	valid-security-posture-hardened-locked.json	STORY-260910-2qmrb8	Load rejects the locked hardened security_posture case published by S1/S3.
++system-config-v2/schema-cases	valid-security-posture-hardened-locked.json	STORY-260916-ioemse	Load admits security_posture but this case also carries an unsupported environments.source_signers lock from E1.
+ system-config-v2/schema-cases	valid.json	STORY-260916-ioemse	Load rejects the system lock cases because source_signers locks from E1 are not supported.
+diff --git a/cmd/curator/auditlabels_test.go b/cmd/curator/auditlabels_test.go
+index 5568b919..d824bd13 100644
+--- a/cmd/curator/auditlabels_test.go
++++ b/cmd/curator/auditlabels_test.go
+@@ -187,9 +187,7 @@ func TestCLIAuditEmitsScriptLabels(t *testing.T) {
+ 			if code != exitOK {
+ 				t.Fatalf("audit = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitOK, stdout, stderr)
+ 			}
+-			if stderr != "" {
+-				t.Fatalf("audit wrote errors for a labelled skill:\n%s", stderr)
+-			}
++			requirePermissivePostureWarning(t, stderr)
+ 			wantRecord := "app: audit info: label-skill: command 'tool' execution_policy=" + testCase.wantPolicy
+ 			if !strings.Contains(stdout, wantRecord) {
+ 				t.Fatalf("audit output does not carry the record entry %q:\n%s", wantRecord, stdout)
+@@ -230,9 +228,7 @@ func TestCLIAuditMixedSkillRecordsBothPolicies(t *testing.T) {
+ 	if code != exitOK {
+ 		t.Fatalf("audit = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitOK, stdout, stderr)
+ 	}
+-	if stderr != "" {
+-		t.Fatalf("audit wrote errors:\n%s", stderr)
+-	}
++	requirePermissivePostureWarning(t, stderr)
+ 	for _, want := range []string{
+ 		"app: audit info: label-skill: command 'guarded' execution_policy=script-worker-v1",
+ 		"app: audit info: label-skill: command 'tool' execution_policy=(none)",
+@@ -261,9 +257,7 @@ func TestCLIAuditJSONCarriesScriptLabels(t *testing.T) {
+ 	if code != exitOK {
+ 		t.Fatalf("audit = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitOK, stdout, stderr)
+ 	}
+-	if stderr != "" {
+-		t.Fatalf("audit wrote errors:\n%s", stderr)
+-	}
++	requirePermissivePostureWarning(t, stderr)
+ 	var outputs []struct {
+ 		Scope    string   `json:"scope"`
+ 		Warnings []string `json:"warnings"`
+@@ -305,9 +299,7 @@ func TestCLIAuditJSONRecordsExplicitAbsence(t *testing.T) {
+ 	if code != exitOK {
+ 		t.Fatalf("audit = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitOK, stdout, stderr)
+ 	}
+-	if stderr != "" {
+-		t.Fatalf("audit wrote errors:\n%s", stderr)
+-	}
++	requirePermissivePostureWarning(t, stderr)
+ 	var outputs []struct {
+ 		Scope    string   `json:"scope"`
+ 		Warnings []string `json:"warnings"`
+diff --git a/cmd/curator/draft_diagnostics_test.go b/cmd/curator/draft_diagnostics_test.go
+index 3e71d9b6..a69a4da8 100644
+--- a/cmd/curator/draft_diagnostics_test.go
++++ b/cmd/curator/draft_diagnostics_test.go
+@@ -206,9 +206,10 @@ func TestDraftProjectResolveHelp(t *testing.T) {
+ 			}
+ 		}
+ 		code, stdout, stderr := capture(t, configPath, "project", verb, "help")
+-		if code != exitOK || stdout != wantReport || stderr != "" {
++		if code != exitOK || stdout != wantReport {
+ 			t.Fatalf("project %s help = code %d, stdout %q, stderr %q; want the v1 report for alias help", verb, code, stdout, stderr)
+ 		}
++		requirePermissivePostureWarning(t, stderr)
+ 	}
+ 	for _, marker := range []string{
+ 		"Skillfile schema 2 project sources",
+diff --git a/cmd/curator/draft_sources_test.go b/cmd/curator/draft_sources_test.go
+index 1c863c92..fbca9fb9 100644
+--- a/cmd/curator/draft_sources_test.go
++++ b/cmd/curator/draft_sources_test.go
+@@ -170,9 +170,10 @@ func TestProjectResolveSchema1KeepsReadOnlyMeaning(t *testing.T) {
+ 	}
+ 	code, stdout, stderr := capture(t, configPath, "project", "resolve", "app")
+ 	want := "alias: app\npath: " + project + "\nskillfile: " + filepath.Join(project, "Skillfile.json") + "\nskills: " + filepath.Join(project, ".agents", "skills") + "\nbin: " + filepath.Join(project, ".agents", "bin") + "\n"
+-	if code != exitOK || stdout != want || stderr != "" {
+-		t.Fatalf("schema-1 resolve = (%d, %q, %q), want (%d, %q, empty)", code, stdout, stderr, exitOK, want)
++	if code != exitOK || stdout != want {
++		t.Fatalf("schema-1 resolve = (%d, %q, %q), want (%d, %q)", code, stdout, stderr, exitOK, want)
+ 	}
++	requirePermissivePostureWarning(t, stderr)
+ 	if _, err := os.Stat(filepath.Join(project, "Skillfile.lock.json")); !os.IsNotExist(err) {
+ 		t.Fatalf("schema-1 resolve wrote a lock: %v", err)
+ 	}
+@@ -188,9 +189,10 @@ func TestProjectResolveIgnoresRemovedSwitch(t *testing.T) {
+ 	}
+ 	writeCLISkill(t, filepath.Join(project, "skills", "review"), "review")
+ 	code, stdout, stderr := capture(t, configPath, "project", "resolve", "app")
+-	if code != exitOK || !strings.Contains(stdout, "resolve app: 1 skills") || stderr != "" {
++	if code != exitOK || !strings.Contains(stdout, "resolve app: 1 skills") {
+ 		t.Fatalf("schema-2 resolve with the removed variable set = (%d, %q, %q), want successful default resolution", code, stdout, stderr)
+ 	}
++	requirePermissivePostureWarning(t, stderr)
+ 	if _, err := sourcelock.Read(filepath.Join(project, "Skillfile.lock.json")); err != nil {
+ 		t.Fatalf("schema-2 resolve with the removed variable set wrote no lock: %v", err)
+ 	}
+diff --git a/cmd/curator/draft_transport_test.go b/cmd/curator/draft_transport_test.go
+index 074a01c3..2c99585c 100644
+--- a/cmd/curator/draft_transport_test.go
++++ b/cmd/curator/draft_transport_test.go
+@@ -501,9 +501,7 @@ func TestDraftTransportLegacyGolden(t *testing.T) {
+ 	if code != exitOK {
+ 		t.Fatalf("switch off = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+ 	}
+-	if stderr != "" {
+-		t.Fatalf("switch-off stderr:\n%s", stderr)
+-	}
++	requirePermissivePostureWarning(t, stderr)
+ 	if len(fetches) != 2 {
+ 		t.Fatalf("%d fetches, want 2:\n%s", len(fetches), strings.Join(fetches, "\n"))
+ 	}
+@@ -525,16 +523,18 @@ func TestDraftTransportLegacyGolden(t *testing.T) {
+ 	// Switch on without a policy, and switch off without one, must produce
+ 	// the same bytes on the same fixture.
+ 	code2, stdout2, stderr2, fetches2 := run(true, nil)
+-	if code2 != exitOK || stderr2 != "" {
++	if code2 != exitOK {
+ 		t.Fatalf("switch on without policy = %d\nstdout:\n%s\nstderr:\n%s", code2, stdout2, stderr2)
+ 	}
++	requirePermissivePostureWarning(t, stderr2)
+ 	if other := draftCLILegacyRun(t, fixture.root, code2, stdout2, fetches2); other != golden {
+ 		t.Fatalf("switch on without policy differs from the legacy golden:\n%s", other)
+ 	}
+ 	code3, stdout3, stderr3, fetches3 := run(false, nil)
+-	if code3 != exitOK || stderr3 != "" {
++	if code3 != exitOK {
+ 		t.Fatalf("switch off without policy = %d\nstdout:\n%s\nstderr:\n%s", code3, stdout3, stderr3)
+ 	}
++	requirePermissivePostureWarning(t, stderr3)
+ 	if other := draftCLILegacyRun(t, fixture.root, code3, stdout3, fetches3); other != golden {
+ 		t.Fatalf("switch off without policy differs from the legacy golden:\n%s", other)
+ 	}
+diff --git a/cmd/curator/env.go b/cmd/curator/env.go
+index 9a537ea3..b68ffae2 100644
+--- a/cmd/curator/env.go
++++ b/cmd/curator/env.go
+@@ -157,6 +157,7 @@ func (c cli) cmdEnvStatus(cfg *config.Config, args []string) int {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitFail
+ 	}
++	status.SecurityPostureRows = envSecurityPostureRows(cfg)
+ 	attachProviderPosture(cfg, status)
+ 	attachRegistryPosture(cfg, status)
+ 	if *asJSON {
+diff --git a/cmd/curator/envstatus.go b/cmd/curator/envstatus.go
+index e157c62c..9f931d2a 100644
+--- a/cmd/curator/envstatus.go
++++ b/cmd/curator/envstatus.go
+@@ -14,6 +14,7 @@ import (
+ // printEnvStatus renders the profile × environment × surface matrix as
+ // human-readable rows. Machine-readable consumers use --json.
+ func printEnvStatus(stdout io.Writer, status *envprofile.Status) {
++	printSecurityPostureRows(stdout, status.SecurityPostureRows)
+ 	// §12.2: env status reports the locked require_current_profile
+ 	// requirement.
+ 	if status.RequireCurrentProfile != nil {
+@@ -141,6 +142,16 @@ func printEnvStatus(stdout io.Writer, status *envprofile.Status) {
+ 	}
+ }
+ 
++func printSecurityPostureRows(stdout io.Writer, rows []config.SecurityPostureRow) {
++	for index, row := range rows {
++		if index == 0 && row.Gate == "security_posture" {
++			_, _ = fmt.Fprintf(stdout, "security_posture: %v (%s)\n", row.Value, row.Source)
++			continue
++		}
++		_, _ = fmt.Fprintf(stdout, "%s: %v (%s)\n", row.Gate, row.Value, row.Source)
++	}
++}
++
+ // describeProvider renders one §12 umbrella provider row: the resolved
+ // absolute provider path with its trust verdict. A refused or failed
+ // provider row is non-current; the revision-A outside-roots warning row
+diff --git a/cmd/curator/global_status_test.go b/cmd/curator/global_status_test.go
+index d1863e7b..ae6141b7 100644
+--- a/cmd/curator/global_status_test.go
++++ b/cmd/curator/global_status_test.go
+@@ -638,9 +638,7 @@ func TestGlobalStatusKeepsTheDeclaredSkillSurfaceWithoutCompiledCommands(t *test
+ 	if stdout != "global: skill-a "+stateUpToDate+"\n" {
+ 		t.Fatalf("global status changed the pre-existing declared-skill output:\n%q", stdout)
+ 	}
+-	if stderr != "" {
+-		t.Fatalf("a clean global status wrote to standard error:\n%s", stderr)
+-	}
++	requirePermissivePostureWarning(t, stderr)
+ 	if code, _, _ := capture(t, filepath.Join(home, "config.json"), "global", "status", "--check"); code != exitOK {
+ 		t.Fatalf("clean global status --check = %d, want %d", code, exitOK)
+ 	}
+diff --git a/cmd/curator/main.go b/cmd/curator/main.go
+index 845e728e..32993d2f 100644
+--- a/cmd/curator/main.go
++++ b/cmd/curator/main.go
+@@ -206,8 +206,7 @@ func (c cli) newFlagSet(name string) *flag.FlagSet {
+ // the operator-trusted interpreter bindings and hand the invocation to
+ // the script worker session. A configuration that cannot load leaves the
+ // bindings empty, so interpreter resolution refuses closed rather than
+-// guessing; configuration warnings stay silent here because the
+-// launcher's streams belong to the caller's pipeline.
++// guessing. The launched command owns this process's output streams.
+ func runEnforcedShim(executable string, args []string) int {
+ 	var interpreters map[string]string
+ 	var diagnosticsDir string
+@@ -324,6 +323,9 @@ func (c cli) loadConfig() (*config.Config, int) {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return nil, exitFail
+ 	}
++	if warning := cfg.SecurityPostureWarning(); warning != "" {
++		_, _ = fmt.Fprintln(c.stderr, "warning:", warning)
++	}
+ 	return cfg, exitOK
+ }
+ 
+@@ -688,6 +690,14 @@ func (c cli) cmdInstallMode(args []string, fetch bool) int {
+ 	if code != exitOK {
+ 		return code
+ 	}
++	postureOperation := "install"
++	if fetch {
++		postureOperation = "update"
++	}
++	if err := cfg.CheckSecurityPosture(postureOperation, false); err != nil {
++		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
++		return exitFail
++	}
+ 	if auditMode != "" {
+ 		cfgCopy := *cfg
+ 		cfgCopy.Audit = cfg.Audit
+@@ -764,6 +774,10 @@ func (c cli) cmdUpdate() int {
+ 	if code != exitOK {
+ 		return code
+ 	}
++	if err := cfg.CheckSecurityPosture("update", false); err != nil {
++		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
++		return exitFail
++	}
+ 	entries, err := os.ReadDir(cfg.SkillsRoot)
+ 	if err != nil {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+@@ -806,6 +820,7 @@ func (c cli) cmdStatus(args []string) int {
+ 	if code != exitOK {
+ 		return code
+ 	}
++	securityPostureRows := curatorSecurityPostureRows(cfg)
+ 	authority, err := preflightCLIExecution(context.Background(), cfg)
+ 	if err != nil {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+@@ -915,6 +930,7 @@ func (c cli) cmdStatus(args []string) int {
+ 		payload := map[string]any{
+ 			"alias": target.Alias, "path": target.Root, "skills": drift,
+ 			"shell_hook_trust": trustRows, "providers": providers,
++			"security_posture_rows": securityPostureRows,
+ 		}
+ 		if len(registryRows) > 0 {
+ 			payload["registry_posture"] = registryRows
+@@ -949,6 +965,7 @@ func (c cli) cmdStatus(args []string) int {
+ 		}
+ 	}
+ 	if !*jsonOut {
++		printSecurityPostureRows(c.stdout, securityPostureRows)
+ 		for _, warning := range trustWarnings {
+ 			_, _ = fmt.Fprintln(c.stdout, "shell-hook-trust: warning: "+warning)
+ 		}
+diff --git a/cmd/curator/main_test.go b/cmd/curator/main_test.go
+index e1828272..4078f47f 100644
+--- a/cmd/curator/main_test.go
++++ b/cmd/curator/main_test.go
+@@ -84,9 +84,7 @@ func TestRunUsesInjectedConfigSourceAndWriters(t *testing.T) {
+ 			if got, want := stdout.String(), alias+"\t"+project+"\n"; got != want {
+ 				t.Fatalf("stdout = %q, want %q", got, want)
+ 			}
+-			if stderr.Len() != 0 {
+-				t.Fatalf("list wrote stderr: %q", stderr.String())
+-			}
++			requirePermissivePostureWarning(t, stderr.String())
+ 		})
+ 	}
+ }
+diff --git a/cmd/curator/security_posture.go b/cmd/curator/security_posture.go
+new file mode 100644
+index 00000000..33c929a6
+--- /dev/null
++++ b/cmd/curator/security_posture.go
+@@ -0,0 +1,33 @@
++package main
++
++import (
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/envfragment"
++	"github.com/relux-works/curator/internal/envregistry"
++	"github.com/relux-works/curator/internal/shell"
++)
++
++func securityPostureRevisions() config.SecurityPostureRevisions {
++	providerTrustRoots := "revision-A"
++	if activeProviderRevision == providerRevisionB {
++		providerTrustRoots = "revision-B"
++	}
++	return config.SecurityPostureRevisions{
++		HookTrust:          string(shell.DefaultTrustProfile),
++		EnvPassthrough:     string(envfragment.ActiveS4Profile),
++		ProviderTrustRoots: providerTrustRoots,
++		UpdateConfirmation: "A-warning",
++		CodexSeed:          envregistry.CodexSeedRevisionB,
++	}
++}
++
++func curatorSecurityPostureRows(cfg *config.Config) []config.SecurityPostureRow {
++	return cfg.SecurityPostureStatusRows(securityPostureRevisions())
++}
++
++func envSecurityPostureRows(cfg *config.Config) []config.SecurityPostureRow {
++	if cfg == nil || cfg.Schema == config.SchemaVersion {
++		return nil
++	}
++	return cfg.SecurityPostureStatusRows(securityPostureRevisions())
++}
+diff --git a/cmd/curator/security_posture_conformance_test.go b/cmd/curator/security_posture_conformance_test.go
+new file mode 100644
+index 00000000..bbee0757
+--- /dev/null
++++ b/cmd/curator/security_posture_conformance_test.go
+@@ -0,0 +1,368 @@
++package main
++
++import (
++	"bytes"
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"reflect"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/conformancecoverage"
++	"github.com/relux-works/curator/internal/envfragment"
++	"github.com/relux-works/curator/internal/identity"
++)
++
++type cliSecurityPostureVector struct {
++	Name             string                          `json:"name"`
++	RolloutRevision  string                          `json:"rollout_revision"`
++	Machine          map[string]any                  `json:"machine"`
++	System           map[string]any                  `json:"system"`
++	ShippedRevisions config.SecurityPostureRevisions `json:"shipped_revisions"`
++	Operation        struct {
++		Kind                   string `json:"kind"`
++		MCPDeclarationsPresent bool   `json:"mcp_declarations_present"`
++	} `json:"operation"`
++	Expected struct {
++		Outcome           string                         `json:"outcome"`
++		Diagnostics       []cliSecurityPostureDiagnostic `json:"diagnostics"`
++		CuratorStatusRows []config.SecurityPostureRow    `json:"curator_status_rows"`
++		EnvStatusRows     json.RawMessage                `json:"env_status_rows"`
++		Effective         map[string]any                 `json:"effective"`
++	} `json:"expected"`
++}
++
++type cliSecurityPostureDiagnostic struct {
++	Code          string `json:"code"`
++	Severity      string `json:"severity"`
++	Count         *int   `json:"count,omitempty"`
++	NamesKnob     bool   `json:"names_knob,omitempty"`
++	MigrationHint bool   `json:"migration_hint,omitempty"`
++}
++
++// TestSecurityPostureVectorsThroughCLI drives every revision-A-owned vector
++// through run(), then checks the status commands and operation result that a
++// caller sees. The config package vector test separately pins the resolved
++// effective values and provenance. The two unreachable-registry vectors are
++// owned by 1sapuy; revision-B cases are owned by the posture flip leaf.
++func TestSecurityPostureVectorsThroughCLI(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	payload, err := os.ReadFile(filepath.Join(root, "vectors", "security-posture.json")) // #nosec G304 -- explicit pinned conformance input
++	if err != nil {
++		t.Fatal(err)
++	}
++	var corpus struct {
++		Cases []cliSecurityPostureVector `json:"cases"`
++	}
++	if err := json.Unmarshal(payload, &corpus); err != nil {
++		t.Fatal(err)
++	}
++	conformancecoverage.RunOutcomes(t, "security-posture/vectors", corpus.Cases,
++		func(tc cliSecurityPostureVector) string { return tc.Name },
++		func(caseT *testing.T, tc cliSecurityPostureVector) conformancecoverage.Observation {
++			if reason := cliSecurityPostureVectorBound(tc.Name); reason != "" {
++				return conformancecoverage.Observation{BoundReason: reason}
++			}
++			source := securityPostureCLIFixture(caseT, tc)
++
++			curatorCode, curatorOut, curatorErr := runProfile(caseT, source, "status", "app", "--json")
++			if curatorCode != exitOK {
++				caseT.Fatalf("curator status = %d\nstdout:\n%s\nstderr:\n%s", curatorCode, curatorOut, curatorErr)
++			}
++			var curatorStatus struct {
++				SecurityPostureRows []config.SecurityPostureRow `json:"security_posture_rows"`
++			}
++			if err := json.Unmarshal([]byte(curatorOut), &curatorStatus); err != nil {
++				caseT.Fatalf("decode curator status: %v\n%s", err, curatorOut)
++			}
++			assertPostureJSONEqual(caseT, "curator status rows", cliExpectedSecurityPostureRows(tc.Expected.CuratorStatusRows, source.cfg), curatorStatus.SecurityPostureRows)
++
++			envCode, envOut, envErr := runProfile(caseT, source, "env", "status", "--json")
++			if envCode != exitOK {
++				caseT.Fatalf("env status = %d\nstdout:\n%s\nstderr:\n%s", envCode, envOut, envErr)
++			}
++			var envStatus struct {
++				SecurityPostureRows []config.SecurityPostureRow `json:"security_posture_rows"`
++				PassableEnvNames    []string                    `json:"passable_env_names"`
++			}
++			if err := json.Unmarshal([]byte(envOut), &envStatus); err != nil {
++				caseT.Fatalf("decode env status: %v\n%s", err, envOut)
++			}
++			var wantEnvRows any
++			if err := json.Unmarshal(tc.Expected.EnvStatusRows, &wantEnvRows); err != nil {
++				caseT.Fatalf("decode expected env status rows: %v", err)
++			}
++			if rows, ok := wantEnvRows.([]any); ok {
++				wantEnvRows = cliExpectedSecurityPostureRows(decodeCLISecurityPostureRows(caseT, rows), source.cfg)
++			}
++			assertPostureJSONEqual(caseT, "env status rows", wantEnvRows, envStatus.SecurityPostureRows)
++			if want, ok := tc.Expected.Effective["passable_env_names"]; ok {
++				if !cliVectorSetsPassableEnvNames(tc.Machine) {
++					if securityPostureRevisions().EnvPassthrough == string(envfragment.S4Enforce) {
++						want = []string{}
++					} else {
++						want = nil
++					}
++				}
++				assertPostureJSONEqual(caseT, "effective passable_env_names", want, envStatus.PassableEnvNames)
++			}
++
++			operationCode, operationOut, operationErr := runSecurityPostureVectorOperation(caseT, source, tc)
++			if tc.Expected.Outcome == "refused" && operationCode != exitFail {
++				caseT.Fatalf("operation exit = %d, want refusal (%d)\nstdout:\n%s\nstderr:\n%s", operationCode, exitFail, operationOut, operationErr)
++			}
++			if tc.Expected.Outcome != "refused" && operationCode != exitOK {
++				caseT.Fatalf("operation exit = %d, want %q (%d)\nstdout:\n%s\nstderr:\n%s", operationCode, tc.Expected.Outcome, exitOK, operationOut, operationErr)
++			}
++			diagnosticOutput := operationOut + operationErr
++			for _, diagnostic := range tc.Expected.Diagnostics {
++				if got := strings.Count(diagnosticOutput, diagnostic.Code); got != 1 {
++					caseT.Fatalf("diagnostic %q occurred %d times, want once in production output:\n%s", diagnostic.Code, got, diagnosticOutput)
++				}
++			}
++			return conformancecoverage.Observation{}
++		})
++}
++
++func cliVectorSetsPassableEnvNames(machine map[string]any) bool {
++	environments, _ := machine["environments"].(map[string]any)
++	_, configured := environments["passable_env_names"]
++	return configured
++}
++
++// CLI status reports the revisions compiled into this manager. The config
++// vector driver separately verifies the revisions supplied by each vector;
++// here replace only those unrelated shipped rows so the production entry
++// assertion can focus on the posture policy under test.
++func cliExpectedSecurityPostureRows(rows []config.SecurityPostureRow, cfg *config.Config) []config.SecurityPostureRow {
++	actual := securityPostureRevisions()
++	shipped := map[string]any{
++		"hook-trust":           actual.HookTrust,
++		"env-passthrough":      actual.EnvPassthrough,
++		"provider-trust-roots": actual.ProviderTrustRoots,
++		"update-confirmation":  actual.UpdateConfirmation,
++		"codex-seed":           actual.CodexSeed,
++	}
++	expected := append([]config.SecurityPostureRow(nil), rows...)
++	for index := range expected {
++		if expected[index].Gate == "source-allowlist" && cfg != nil {
++			expected[index].Value = len(cfg.AllowedSources)
++		}
++		if expected[index].Source != "shipped" {
++			continue
++		}
++		if value, ok := shipped[expected[index].Gate]; ok {
++			expected[index].Value = value
++		}
++	}
++	return expected
++}
++
++func decodeCLISecurityPostureRows(t testing.TB, rows []any) []config.SecurityPostureRow {
++	t.Helper()
++	payload, err := json.Marshal(rows)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var decoded []config.SecurityPostureRow
++	if err := json.Unmarshal(payload, &decoded); err != nil {
++		t.Fatal(err)
++	}
++	return decoded
++}
++
++func cliSecurityPostureVectorBound(name string) string {
++	switch name {
++	case "unreachable-registry-permissive-warns", "unreachable-registry-hardened-refuses":
++		return "install-time unreachable-registry behavior is owned by TASK-260910-1sapuy"
++	case "revision-B-default-hardened-flip-install", "refusal-mcp-allowlist-empty-with-declarations", "hardened-contradiction-status-check-non-current", "posture-rows-flipped-revisions":
++		return "revision-B default or shipped-row flip is owned by TASK-260927-25hk87 (flip-security-posture-default-hardened)"
++	default:
++		return ""
++	}
++}
++
++func securityPostureCLIFixture(t *testing.T, tc cliSecurityPostureVector) stubConfigSource {
++	t.Helper()
++	configSource, _ := profileHome(t)
++	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
++	project, home := legacyProject(t)
++
++	machine := clonePostureVectorMap(tc.Machine)
++	machine["skills_root"] = filepath.Join(filepath.Dir(home), "skills")
++	machine["projects"] = map[string]any{"app": map[string]any{
++		"path": project, "agents": []any{"codex_cli"},
++	}}
++	if raw, ok := machine["allowed_sources"]; ok {
++		machine["allowed_sources"] = canonicalPostureSources(raw)
++	}
++	if raw, ok := machine["environments"].(map[string]any); ok {
++		environments := clonePostureVectorMap(raw)
++		if allowlist, ok := environments["mcp_package_allowlist"]; ok {
++			environments["mcp_package_allowlist"] = canonicalPostureSources(allowlist)
++		}
++		machine["environments"] = environments
++	}
++	if tc.Operation.Kind == "profile-install" && tc.Operation.MCPDeclarationsPresent && tc.Expected.Outcome == "proceeds" {
++		// The production resolver applies the broad source allowlist to every
++		// git member in the closure, then applies the MCP allowlist as an
++		// additional bound. Make this CLI fixture valid for both checks.
++		allowed := postureVectorStrings(machine["allowed_sources"])
++		seen := make(map[string]bool, len(allowed))
++		for _, source := range allowed {
++			seen[source] = true
++		}
++		environments, _ := machine["environments"].(map[string]any)
++		for _, source := range postureVectorStrings(environments["mcp_package_allowlist"]) {
++			if !seen[source] {
++				allowed = append(allowed, source)
++				seen[source] = true
++			}
++		}
++		machine["allowed_sources"] = allowed
++	}
++	system := clonePostureVectorMap(tc.System)
++	if _, ok := system["schema_version"]; !ok {
++		system["schema_version"] = 2
++	}
++	machinePath := writePostureVectorFile(t, home, "config.json", machine)
++	systemPath := writePostureVectorFile(t, t.TempDir(), "system.json", system)
++	t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
++	cfg, err := config.Load(machinePath, nil)
++	if err != nil {
++		t.Fatalf("load vector config: %v", err)
++	}
++	configSource.path = machinePath
++	configSource.cfg = cfg
++	return configSource
++}
++
++func runSecurityPostureVectorOperation(t *testing.T, source stubConfigSource, tc cliSecurityPostureVector) (int, string, string) {
++	t.Helper()
++	switch tc.Operation.Kind {
++	case "status":
++		return runProfile(t, source, "status", "app", "--json")
++	case "install":
++		return runProfile(t, source, "install", "app")
++	case "profile-install":
++		installSource := securityPostureVectorPackage(t, tc)
++		return runProfile(t, source, "profile", "install", installSource)
++	default:
++		t.Fatalf("unbounded vector has unsupported production operation %q", tc.Operation.Kind)
++		return exitFail, "", ""
++	}
++}
++
++func securityPostureVectorPackage(t *testing.T, tc cliSecurityPostureVector) string {
++	t.Helper()
++	if !tc.Operation.MCPDeclarationsPresent {
++		root := t.TempDir()
++		writeContextPackage(t, root, "posture", "1.0.0", "posture test module\n")
++		return root
++	}
++	requireGit(t)
++	allowed := postureVectorStrings(tc.Machine["allowed_sources"])
++	environment, _ := tc.Machine["environments"].(map[string]any)
++	mcpAllowed := postureVectorStrings(environment["mcp_package_allowlist"])
++	if len(allowed) == 0 || len(mcpAllowed) == 0 {
++		t.Fatalf("MCP vector fixture needs source and MCP allowlists: sources=%v mcp=%v", allowed, mcpAllowed)
++	}
++	rootIdentity, mcpIdentity := allowed[0], mcpAllowed[0]
++	tool := t.TempDir()
++	writeGitRepoFile(t, tool, "agent-mcp.json", surfacingToolManifest)
++	runGitRepo(t, tool, "init", "-q", "-b", "main")
++	commitGitRepo(t, tool, "v1.0.0")
++	root := t.TempDir()
++	manifest := `{"schema_version":1,"name":"posture-root","version":"1.0.0",` +
++		`"requires":{"mcp":{"tool":{"git":"` + mcpIdentity + `","range":"*"}}}}` + "\n"
++	writeGitRepoFile(t, root, "agent-context.json", manifest)
++	runGitRepo(t, root, "init", "-q", "-b", "main")
++	commitGitRepo(t, root, "v1.0.0")
++	serveGitRepos(t, map[string]string{rootIdentity: root, mcpIdentity: tool})
++	return rootIdentity
++}
++
++func postureVectorStrings(raw any) []string {
++	switch values := raw.(type) {
++	case []string:
++		return append([]string(nil), values...)
++	case []any:
++		result := make([]string, 0, len(values))
++		for _, value := range values {
++			if text, ok := value.(string); ok {
++				result = append(result, text)
++			}
++		}
++		return result
++	default:
++		return nil
++	}
++}
++
++// CLI policy consumes canonical host/path identities, while vector fixtures
++// use transport URLs for convenient source examples. Keep the tested source
++// identity the same while removing the transport used only for cloning.
++func canonicalPostureSources(raw any) []string {
++	sources := postureVectorStrings(raw)
++	canonical := make([]string, len(sources))
++	for index, source := range sources {
++		canonical[index] = identity.Canonical(source)
++		if canonical[index] == "" {
++			canonical[index] = source
++		}
++	}
++	return canonical
++}
++
++func clonePostureVectorMap(input map[string]any) map[string]any {
++	result := make(map[string]any, len(input)+2)
++	for key, value := range input {
++		result[key] = value
++	}
++	return result
++}
++
++func writePostureVectorFile(t *testing.T, dir, name string, value any) string {
++	t.Helper()
++	if err := os.MkdirAll(dir, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	payload, err := json.Marshal(value)
++	if err != nil {
++		t.Fatal(err)
++	}
++	path := filepath.Join(dir, name)
++	if err := os.WriteFile(path, payload, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	return path
++}
++
++func assertPostureJSONEqual(t testing.TB, label string, want, got any) {
++	t.Helper()
++	wantJSON, err := json.Marshal(want)
++	if err != nil {
++		t.Fatalf("marshal expected %s: %v", label, err)
++	}
++	gotJSON, err := json.Marshal(got)
++	if err != nil {
++		t.Fatalf("marshal actual %s: %v", label, err)
++	}
++	var wantValue, gotValue any
++	if err := json.Unmarshal(wantJSON, &wantValue); err != nil {
++		t.Fatal(err)
++	}
++	if err := json.Unmarshal(gotJSON, &gotValue); err != nil {
++		t.Fatal(err)
++	}
++	if !reflect.DeepEqual(wantValue, gotValue) {
++		var pretty bytes.Buffer
++		_ = json.Indent(&pretty, gotJSON, "", "  ")
++		t.Fatalf("%s mismatch:\n got: %s\nwant: %s", label, pretty.String(), wantJSON)
++	}
++}
+diff --git a/cmd/curator/security_posture_test.go b/cmd/curator/security_posture_test.go
+new file mode 100644
+index 00000000..616da9fa
+--- /dev/null
++++ b/cmd/curator/security_posture_test.go
+@@ -0,0 +1,306 @@
++package main
++
++import (
++	"encoding/json"
++	"io"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/envprofile"
++)
++
++func decodeSecurityPostureRows(t testing.TB, document string) []map[string]any {
++	t.Helper()
++	var payload map[string]any
++	if err := json.Unmarshal([]byte(document), &payload); err != nil {
++		t.Fatalf("status document is not a JSON object: %v\n%s", err, document)
++	}
++	values, ok := payload["security_posture_rows"].([]any)
++	if !ok {
++		t.Fatalf("security_posture_rows = %#v, want rows", payload["security_posture_rows"])
++	}
++	rows := make([]map[string]any, 0, len(values))
++	for _, value := range values {
++		row, ok := value.(map[string]any)
++		if !ok {
++			t.Fatalf("posture row = %#v, want object", value)
++		}
++		rows = append(rows, row)
++	}
++	return rows
++}
++
++func requirePermissivePostureWarning(t testing.TB, stderr string) {
++	t.Helper()
++	if got := strings.Count(stderr, config.DiagSecurityPosturePermissive); got != 1 {
++		t.Fatalf("permissive posture warning count = %d, want once per operation:\n%s", got, stderr)
++	}
++}
++
++func TestSecurityPostureWarningAndEnvStatusRows(t *testing.T) {
++	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
++	source := writeMachineConfig(t, `{"schema_version":2,"skills_root":"x","projects":{}}`)
++	code, stdout, stderr := runProfile(t, source, "env", "status", "--json")
++	if code != exitOK {
++		t.Fatalf("env status = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	requirePermissivePostureWarning(t, stderr)
++	for _, want := range []string{"security_posture", config.SecurityPostureMigrationHint} {
++		if !strings.Contains(stderr, want) {
++			t.Fatalf("permissive warning misses %q:\n%s", want, stderr)
++		}
++	}
++	rows := decodeSecurityPostureRows(t, stdout)
++	if len(rows) != 14 || rows[0]["gate"] != "security_posture" ||
++		rows[0]["value"] != config.SecurityPosturePermissive || rows[0]["source"] != "profile" {
++		t.Fatalf("env status posture rows = %#v", rows)
++	}
++}
++
++func TestSecurityPostureWarningIsNotEmittedByEnforcedShim(t *testing.T) {
++	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
++	source := writeMachineConfig(t, `{"schema_version":2,"skills_root":"x","projects":{}}`)
++	t.Setenv("CURATOR_CONFIG", source.path)
++	reader, writer, err := os.Pipe()
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer func() { _ = reader.Close() }()
++	previousStderr := os.Stderr
++	os.Stderr = writer
++	code := runEnforcedShim(filepath.Join(t.TempDir(), "curator"), nil)
++	_ = writer.Close()
++	os.Stderr = previousStderr
++	if code != exitFail {
++		t.Fatalf("enforced shim without a sidecar = %d, want %d", code, exitFail)
++	}
++	output, err := io.ReadAll(reader)
++	if err != nil {
++		t.Fatalf("read enforced shim stderr: %v", err)
++	}
++	if strings.Contains(string(output), config.DiagSecurityPosturePermissive) {
++		t.Fatalf("enforced shim leaked the permissive warning to its stderr: %s", output)
++	}
++}
++
++func TestSecurityPostureHardenedContradictionFailsEnvStatusCheck(t *testing.T) {
++	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
++	source := writeMachineConfig(t, `{"schema_version":2,"security_posture":"hardened","skills_root":"x","projects":{}}`)
++	code, stdout, stderr := runProfile(t, source, "env", "status", "--check", "--json")
++	if code != exitFail {
++		t.Fatalf("env status --check = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitFail, stdout, stderr)
++	}
++	var status struct {
++		NonCurrent          bool             `json:"non_current"`
++		SecurityPostureRows []map[string]any `json:"security_posture_rows"`
++	}
++	if err := json.Unmarshal([]byte(stdout), &status); err != nil {
++		t.Fatalf("env status --check JSON: %v\n%s", err, stdout)
++	}
++	if !status.NonCurrent {
++		t.Fatalf("hardened empty source allowlist reports current: %s", stdout)
++	}
++	if len(status.SecurityPostureRows) != 14 || status.SecurityPostureRows[0]["value"] != "hardened" {
++		t.Fatalf("hardened posture rows = %#v", status.SecurityPostureRows)
++	}
++}
++
++func TestSecurityPostureSchema1EnvStatusHasNoPostureInventory(t *testing.T) {
++	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
++	source := writeMachineConfig(t, `{"schema_version":1,"skills_root":"x","projects":{}}`)
++	code, stdout, stderr := runProfile(t, source, "env", "status", "--json")
++	if code != exitOK {
++		t.Fatalf("schema-1 env status = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	requirePermissivePostureWarning(t, stderr)
++	var status struct {
++		SecurityPostureRows []any `json:"security_posture_rows"`
++	}
++	if err := json.Unmarshal([]byte(stdout), &status); err != nil {
++		t.Fatalf("schema-1 env status JSON: %v\n%s", err, stdout)
++	}
++	if status.SecurityPostureRows != nil {
++		t.Fatalf("schema-1 env status posture rows = %#v, want null", status.SecurityPostureRows)
++	}
++}
++
++func TestSecurityPostureCuratorStatusRows(t *testing.T) {
++	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
++	project, home := legacyProject(t)
++	configPath := filepath.Join(home, "config.json")
++	data := map[string]any{
++		"schema_version": 2,
++		"skills_root":    filepath.Join(filepath.Dir(home), "skills"),
++		"projects": map[string]any{
++			"app": map[string]any{"path": project, "agents": []any{"codex_cli"}},
++		},
++	}
++	contents, err := json.Marshal(data)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(configPath, contents, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	cfg, err := config.Load(configPath, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	code, stdout, stderr := runProfile(t, stubConfigSource{path: configPath, cfg: cfg}, "status", "app", "--json")
++	if code != exitOK {
++		t.Fatalf("curator status = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	rows := decodeSecurityPostureRows(t, stdout)
++	if len(rows) != 14 || rows[0]["gate"] != "security_posture" || rows[0]["value"] != "permissive" {
++		t.Fatalf("curator status posture rows = %#v", rows)
++	}
++	requirePermissivePostureWarning(t, stderr)
++}
++
++func TestSecurityPostureProfileInstallRefusesEmptySourceAllowlistBeforeWriting(t *testing.T) {
++	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
++	source := writeMachineConfig(t, `{"schema_version":2,"security_posture":"hardened","allowed_sources":[],"skills_root":"x","projects":{}}`)
++	pkg := t.TempDir()
++	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
++	code, stdout, stderr := runProfile(t, source, "profile", "install", pkg)
++	if code != exitFail || !strings.Contains(stderr, config.DiagSourceAllowlistEmpty) {
++		t.Fatalf("hardened profile install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	if _, err := os.Lstat(envprofile.ProfileDir(source.cfg.Home(), "acme")); !os.IsNotExist(err) {
++		t.Fatalf("refused install published profile state: %v", err)
++	}
++}
++
++func TestSecurityPostureProfileInstallRefusesMCPDeclarations(t *testing.T) {
++	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
++	requireGit(t)
++	configSource := writeMachineConfig(t, `{"schema_version":2,"security_posture":"hardened",`+
++		`"allowed_sources":["example.com"],"skills_root":"x","projects":{},`+
++		`"environments":{"mcp_package_allowlist":[]}}`)
++	tool := t.TempDir()
++	writeGitRepoFile(t, tool, "agent-mcp.json", surfacingToolManifest)
++	runGitRepo(t, tool, "init")
++	commitGitRepo(t, tool, "v1.0.0")
++	root := t.TempDir()
++	writeGitRepoFile(t, root, "agent-context.json", `{"schema_version":1,"name":"withmcp","version":"1.0.0",`+
++		`"requires":{"mcp":{"tool":{"git":"https://example.com/mcp-tool","range":"*"}}}}`+"\n")
++	runGitRepo(t, root, "init")
++	commitGitRepo(t, root, "v1.0.0")
++	serveGitRepos(t, map[string]string{"https://example.com/mcp-tool": tool, "https://example.com/withmcp": root})
++	code, stdout, stderr := runProfile(t, configSource, "profile", "install", "https://example.com/withmcp")
++	if code != exitFail || !strings.Contains(stderr, config.DiagMCPAllowlistEmpty) {
++		t.Fatalf("hardened MCP profile install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	if _, err := os.Lstat(envprofile.ProfileDir(configSource.cfg.Home(), "withmcp")); !os.IsNotExist(err) {
++		t.Fatalf("refused MCP install published profile state: %v", err)
++	}
++}
++
++func TestSecurityPostureHardenedMCPContradictionFailsEnvStatusCheck(t *testing.T) {
++	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
++	requireGit(t)
++	vector := cliSecurityPostureVector{
++		Machine: map[string]any{
++			"allowed_sources": []any{"https://example.com/skills"},
++			"environments": map[string]any{
++				"mcp_package_allowlist": []any{"https://example.com/mcp"},
++			},
++		},
++	}
++	vector.Operation.MCPDeclarationsPresent = true
++	root := securityPostureVectorPackage(t, vector)
++	source := writeMachineConfig(t, `{"schema_version":2,"allowed_sources":["example.com/skills","example.com/mcp"],`+
++		`"skills_root":"x","projects":{},"environments":{"mcp_package_allowlist":["example.com/mcp"]}}`)
++	if code, stdout, stderr := runProfile(t, source, "profile", "install", root); code != exitOK {
++		t.Fatalf("permissive MCP profile install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	lockedConfig := map[string]any{
++		"schema_version":   2,
++		"security_posture": config.SecurityPostureHardened,
++		"allowed_sources":  []string{"example.com/skills", "example.com/mcp"},
++		"skills_root":      source.cfg.SkillsRoot,
++		"projects":         map[string]any{},
++		"environments": map[string]any{
++			"mcp_package_allowlist": []string{},
++		},
++	}
++	writePostureVectorFile(t, filepath.Dir(source.path), filepath.Base(source.path), lockedConfig)
++	source = reloadSource(t, source)
++	code, stdout, stderr := runProfile(t, source, "env", "status", "--check", "--json")
++	if code != exitFail {
++		t.Fatalf("hardened empty MCP allowlist status --check = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitFail, stdout, stderr)
++	}
++	var status struct {
++		NonCurrent      bool                          `json:"non_current"`
++		Warnings        []string                      `json:"warnings"`
++		MCPDeclarations []envprofile.DeclarationScope `json:"mcp_declarations"`
++	}
++	if err := json.Unmarshal([]byte(stdout), &status); err != nil {
++		t.Fatalf("env status --check JSON: %v\n%s", err, stdout)
++	}
++	if !status.NonCurrent {
++		t.Fatalf("hardened MCP contradiction reports current: %s", stdout)
++	}
++	declarations := false
++	for _, scope := range status.MCPDeclarations {
++		declarations = declarations || len(scope.Rows) > 0
++	}
++	if !declarations {
++		t.Fatalf("fixture status contains no MCP declaration rows: %s", stdout)
++	}
++	if !strings.Contains(strings.Join(status.Warnings, "\n"), config.DiagMCPAllowlistEmpty) {
++		t.Fatalf("hardened empty MCP allowlist status lacks its diagnostic: %+v", status.Warnings)
++	}
++}
++
++func TestSecurityPostureHardenedEmptyMCPWithoutDeclarationsWarnsAndInstalls(t *testing.T) {
++	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
++	source := writeMachineConfig(t, `{"schema_version":2,"security_posture":"hardened",`+
++		`"allowed_sources":["example.com"],"skills_root":"x","projects":{},`+
++		`"environments":{"mcp_package_allowlist":[]}}`)
++	pkg := t.TempDir()
++	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
++	code, stdout, stderr := runProfile(t, source, "profile", "install", pkg)
++	if code != exitOK {
++		t.Fatalf("hardened declaration-free install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	if !strings.Contains(stderr, config.DiagMCPAllowlistEmpty) {
++		t.Fatalf("hardened declaration-free install lacks the non-refusing empty-allowlist warning:\n%s", stderr)
++	}
++	if strings.Contains(stderr, config.DiagSecurityPosturePermissive) {
++		t.Fatalf("hardened install received the permissive warning:\n%s", stderr)
++	}
++}
++
++func TestSecurityPostureResolveRefusesExplicitUnboundedPassthrough(t *testing.T) {
++	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
++	source := writeMachineConfig(t, `{"schema_version":2,"security_posture":"hardened",`+
++		`"allowed_sources":["example.com"],"skills_root":"x","projects":{},`+
++		`"environments":{"mcp_package_allowlist":["https://example.com/mcp"],"passable_env_names":null}}`)
++	code, stdout, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair")
++	if code != exitFail || !strings.Contains(stderr, config.DiagPassableEnvUnbounded) {
++		t.Fatalf("hardened resolve = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	if stdout != "" {
++		t.Fatalf("refused resolve emitted a fragment: %q", stdout)
++	}
++	if _, err := os.Lstat(filepath.Join(source.cfg.Home(), "environments")); !os.IsNotExist(err) {
++		t.Fatalf("refused resolve wrote an environment home: %v", err)
++	}
++	code, stdout, stderr = runProfile(t, source, "env", "status", "--check", "--json")
++	if code != exitFail {
++		t.Fatalf("hardened env status --check = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitFail, stdout, stderr)
++	}
++	var status struct {
++		NonCurrent bool `json:"non_current"`
++	}
++	if err := json.Unmarshal([]byte(stdout), &status); err != nil {
++		t.Fatalf("hardened env status --check JSON: %v\n%s", err, stdout)
++	}
++	if !status.NonCurrent {
++		t.Fatalf("hardened explicit unbounded passthrough reports current: %s", stdout)
++	}
++}
+diff --git a/cmd/curator/status_test.go b/cmd/curator/status_test.go
+index a5885c4b..1f7df686 100644
+--- a/cmd/curator/status_test.go
++++ b/cmd/curator/status_test.go
+@@ -1782,9 +1782,13 @@ func TestStatusJSONKeepsTheLegacyShapeWithoutCompiledCommands(t *testing.T) {
+ 	}
+ 	// The §8.6 and §11 postures extend the document additively. A closure
+ 	// without compiled commands still carries no build key at all.
+-	if len(object) != 5 || object["alias"] == nil || object["path"] == nil || object["skills"] == nil {
++	if len(object) != 6 || object["alias"] == nil || object["path"] == nil || object["skills"] == nil {
+ 		t.Fatalf("status --json changed the historical document shape:\n%s", stdout)
+ 	}
++	postureRows, ok := object["security_posture_rows"].([]any)
++	if !ok || len(postureRows) != 5 {
++		t.Fatalf("schema-1 security_posture_rows = %v, want the header and four legacy gates", object["security_posture_rows"])
++	}
+ 	if object["builds"] != nil {
+ 		t.Fatalf("status --json without compiled commands carries a builds key:\n%s", stdout)
+ 	}
+diff --git a/internal/config/config.go b/internal/config/config.go
+index 96a2d6a1..af03658d 100644
+--- a/internal/config/config.go
++++ b/internal/config/config.go
+@@ -56,6 +56,7 @@ var LockableKeys = map[string]bool{
+ 	"disable_builtin_registries":             true,
+ 	"allowed_sources":                        true,
+ 	"audit":                                  true,
++	"security_posture":                       true,
+ 	"environments.overlays_allowed":          true,
+ 	"environments.precedence":                true,
+ 	"environments.mcp_package_allowlist":     true,
+@@ -63,6 +64,7 @@ var LockableKeys = map[string]bool{
+ 	"environments.require_current_profile":   true,
+ 	"environments.isolation":                 true,
+ 	"environments.transitive_system_modules": true,
++	"environments.require_source_signers":    true,
+ 	"environments.provider_directories":      true,
+ 	"environments.permissions":               true,
+ }
+@@ -79,6 +81,7 @@ var managerKeys = map[string]bool{
+ 	"schema_version": true, "skills_root": true, "default_agents": true,
+ 	"preferred_locale": true, "adapter_mode": true, "worktree_alias_pattern": true,
+ 	"projects": true, "allowed_sources": true, "audit": true,
++	"security_posture": true,
+ 	"audit_registries": true, "disable_builtin_registries": true,
+ 	"execution": true,
+ 	"build_ssh": true, "build_https": true,
+@@ -167,14 +170,20 @@ type Config struct {
+ 	Locked map[string]bool
+ 	// SystemConfigPath is the enforced system file the effective
+ 	// configuration merged, or "" when none was present.
+-	SystemConfigPath         string
+-	SkillsRoot               string
+-	PreferredLocale          string
+-	DefaultAgents            []string
+-	AdapterMode              string // auto | symlink | copy
+-	WorktreeAliasPattern     string
+-	Projects                 map[string]Project
+-	Audit                    Audit
++	SystemConfigPath     string
++	SkillsRoot           string
++	PreferredLocale      string
++	DefaultAgents        []string
++	AdapterMode          string // auto | symlink | copy
++	WorktreeAliasPattern string
++	Projects             map[string]Project
++	Audit                Audit
++	// SecurityPosture is the effective machine profile. Schema-1 machines
++	// always resolve to permissive; schema-2 machines use the shipped
++	// revision default unless the machine or an enforced system config sets it.
++	SecurityPosture          string
++	SecurityPostureSource    string
++	postureSources           map[string]string
+ 	Execution                Execution
+ 	AllowedSources           []string
+ 	AuditRegistries          []Registry
+@@ -284,26 +293,28 @@ func Load(path string, warn func(string)) (*Config, error) {
+ 	if err != nil {
+ 		return nil, err
+ 	}
++	machineData := userData
+ 	userIsolation := userIsolationFromConfig(userData)
+ 	locked := map[string]bool{}
+ 	systemPath := ""
++	var systemDataForSources map[string]any
+ 	if resolved := SystemPath(); resolved != "" {
+ 		systemPath = resolved
+ 		systemData, err := readObject(systemPath)
+ 		if err != nil {
+ 			return nil, err
+ 		}
++		systemDataForSources = systemData
+ 		merged, mergedLocked, err := applySystem(systemData, userData, systemPath, warn)
+ 		if err != nil {
+ 			return nil, err
+ 		}
+ 		userData, locked = merged, mergedLocked
+ 	}
+-	cfg, err := Parse(userData, path)
++	cfg, err := parseConfig(userData, path, locked, machineData, systemDataForSources)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	cfg.Locked = locked
+ 	cfg.SystemConfigPath = systemPath
+ 	cfg.UserIsolation = userIsolation
+ 	return cfg, nil
+@@ -347,6 +358,14 @@ func applySystem(systemData, userData map[string]any, systemPath string, warn fu
+ 			return nil, nil, verr.New(key, "system config %s has unsupported field", systemPath)
+ 		}
+ 	}
++	if rawPosture, present := systemData["security_posture"]; present {
++		if systemSchema != SchemaVersion2 {
++			return nil, nil, verr.New("security_posture", "system config %s requires schema_version 2 for security_posture", systemPath)
++		}
++		if posture, ok := rawPosture.(string); !ok || posture != SecurityPostureHardened {
++			return nil, nil, verr.New("security_posture", "system config %s may set security_posture only to hardened", systemPath)
++		}
++	}
+ 	rawLocked, _ := systemData["locked"].([]any)
+ 	if systemData["locked"] != nil && rawLocked == nil {
+ 		return nil, nil, verr.New("locked", "system config %s field 'locked' must be a list of strings", systemPath)
+@@ -364,6 +383,9 @@ func applySystem(systemData, userData map[string]any, systemPath string, warn fu
+ 		} else if strings.HasPrefix(key, "environments") {
+ 			return nil, nil, verr.New("locked", "system config %s cannot lock %q: lock the environments.<key> knob", systemPath, key)
+ 		}
++		if key == "security_posture" && systemSchema != SchemaVersion2 {
++			return nil, nil, verr.New("locked", "system config %s cannot lock security_posture under schema_version 1", systemPath)
++		}
+ 		if !LockableKeys[key] {
+ 			return nil, nil, verr.New("locked", "system config %s cannot lock %q", systemPath, key)
+ 		}
+@@ -372,6 +394,9 @@ func applySystem(systemData, userData map[string]any, systemPath string, warn fu
+ 		}
+ 		locked[key] = true
+ 	}
++	if hasConfigKey(systemData, "security_posture") && !locked["security_posture"] {
++		return nil, nil, verr.New("security_posture", "system config %s must lock security_posture", systemPath)
++	}
+ 	// A system file carries only the lockable environments subset with the
+ 	// §12.1 value grammars; isolation is lockable in either direction (§12.2).
+ 	if rawEnv, present := systemData["environments"]; present && rawEnv != nil {
+@@ -479,6 +504,10 @@ func checkLockedEnvSet(systemData map[string]any, locked map[string]bool, system
+ 
+ // Parse validates a raw config object (Spec §7.1).
+ func Parse(data map[string]any, path string) (*Config, error) {
++	return parseConfig(data, path, nil, data, nil)
++}
++
++func parseConfig(data map[string]any, path string, locked map[string]bool, machineData, systemData map[string]any) (*Config, error) {
+ 	for key := range data {
+ 		if !managerKeys[key] {
+ 			return nil, verr.New(key, "unsupported top-level configuration field")
+@@ -491,6 +520,19 @@ func Parse(data map[string]any, path string) (*Config, error) {
+ 	if schema != SchemaVersion && schema != SchemaVersion2 {
+ 		return nil, verr.New("schema_version", "unsupported config schema_version %d; this config requires a newer tool", schema)
+ 	}
++	if schema == SchemaVersion && hasConfigKey(machineData, "security_posture") {
++		return nil, verr.New("security_posture", "requires schema_version 2; manager-config-v1 is frozen without this field")
++	}
++	posture := defaultSecurityPosture(schema)
++	if schema == SchemaVersion2 {
++		if rawPosture, present := data["security_posture"]; present {
++			value, ok := rawPosture.(string)
++			if !ok || (value != SecurityPosturePermissive && value != SecurityPostureHardened) {
++				return nil, verr.New("security_posture", "must be permissive or hardened")
++			}
++			posture = value
++		}
++	}
+ 	// A schema-1 file declares no environments object (manager §12); one
+ 	// that carries it is rejected rather than read with its knobs ignored
+ 	// (manager §1 rule 4). Under schema 2 an explicit null is rejected the
+@@ -663,12 +705,15 @@ func Parse(data map[string]any, path string) (*Config, error) {
+ 		}
+ 	}
+ 
+-	return &Config{
++	if locked == nil {
++		locked = map[string]bool{}
++	}
++	cfg := &Config{
+ 		Path:                     path,
+ 		Schema:                   schema,
+ 		Env:                      env,
+ 		UserIsolation:            env.Isolation,
+-		Locked:                   map[string]bool{},
++		Locked:                   locked,
+ 		SkillsRoot:               expandHome(skillsRoot),
+ 		PreferredLocale:          preferredLocale,
+ 		DefaultAgents:            defaultAgents,
+@@ -684,7 +729,12 @@ func Parse(data map[string]any, path string) (*Config, error) {
+ 		BuildHTTPS:               buildHTTPS,
+ 		ScriptInterpreters:       scriptInterpreters,
+ 		ScriptDiagnosticsDir:     diagnosticsDir,
+-	}, nil
++		SecurityPosture:          posture,
++	}
++	cfg.SecurityPostureSource = securityPostureSource(data, machineData, systemData, locked, schema)
++	cfg.postureSources = securityPostureSources(data, machineData, systemData, locked)
++	applyHardenedDefaults(cfg, data)
++	return cfg, nil
+ }
+ 
+ func parseExecution(raw any) (Execution, error) {
+diff --git a/internal/config/environments.go b/internal/config/environments.go
+index ecafb13d..4ec6fb05 100644
+--- a/internal/config/environments.go
++++ b/internal/config/environments.go
+@@ -48,6 +48,10 @@ type Environments struct {
+ 	// (default) skips transitive system modules at materialization with a
+ 	// warning, error refuses them at resolution.
+ 	TransitiveSystemModules string
++	// RequireSourceSigners is the §12.1 source-signature requirement. The
++	// security posture selects true only when the machine knob is absent.
++	RequireSourceSigners    bool
++	RequireSourceSignersSet bool
+ 	// SystemModuleWaivers admits transitive packages' system modules by
+ 	// name; an entry naming no lock member has no effect.
+ 	SystemModuleWaivers []SystemModuleWaiver
+@@ -128,6 +132,7 @@ var LockableEnvKeys = map[string]bool{
+ 	"environments.require_current_profile":   true,
+ 	"environments.isolation":                 true,
+ 	"environments.transitive_system_modules": true,
++	"environments.require_source_signers":    true,
+ 	"environments.provider_directories":      true,
+ 	"environments.permissions":               true,
+ }
+@@ -308,6 +313,14 @@ func parseEnvironments(raw any) (Environments, error) {
+ 		}
+ 		env.TransitiveSystemModules = transitive
+ 	}
++	if rawSigners, present := obj["require_source_signers"]; present {
++		required, ok := rawSigners.(bool)
++		if !ok {
++			return Environments{}, verr.New("environments.require_source_signers", "must be a boolean")
++		}
++		env.RequireSourceSigners = required
++		env.RequireSourceSignersSet = true
++	}
+ 	// An explicit null is rejected like any other mistyped list: the
+ 	// schema type is array (§12.1), so null is malformed, never the
+ 	// empty default. Only absence takes the default.
+@@ -356,6 +369,7 @@ var EnvKnobNames = []string{
+ 	"mcp_package_allowlist", "shadow_acknowledged", "secret_material_waivers",
+ 	"transitive_system_modules", "system_module_waivers",
+ 	"backup_retention", "require_current_profile", "in_place_mode",
++	"require_source_signers",
+ 	"provider_directories", "permissions",
+ }
+ 
+@@ -960,6 +974,11 @@ func parseSystemEnvironments(raw any) (map[string]any, error) {
+ 			return nil, verr.New("environments.transitive_system_modules", "a system file locks transitive_system_modules only toward error")
+ 		}
+ 	}
++	if rawSigners, present := obj["require_source_signers"]; present {
++		if required, _ := rawSigners.(bool); !required {
++			return nil, verr.New("environments.require_source_signers", "a system file locks require_source_signers only toward true")
++		}
++	}
+ 	if _, present := obj["permissions"]; present {
+ 		if obj["permissions"] == nil {
+ 			return nil, verr.New("environments.permissions", "must be an object")
+@@ -1115,6 +1134,7 @@ func (e Environments) render() map[string]any {
+ 		"mcp_package_allowlist": mcp, "shadow_acknowledged": shadow,
+ 		"secret_material_waivers":   waivers,
+ 		"transitive_system_modules": e.TransitiveSystemModules, "system_module_waivers": systemWaivers,
++		"require_source_signers":  e.RequireSourceSigners,
+ 		"backup_retention":        e.BackupRetention,
+ 		"require_current_profile": require, "in_place_mode": inPlace,
+ 		"provider_directories": providerDirs, "permissions": permissions,
+@@ -1135,7 +1155,7 @@ func EnvLockKey(knob string) string {
+ 		return "environments.precedence"
+ 	case "isolation":
+ 		return "environments.isolation"
+-	case "overlays_allowed", "mcp_package_allowlist", "passable_env_names", "require_current_profile", "transitive_system_modules", "provider_directories", "permissions":
++	case "overlays_allowed", "mcp_package_allowlist", "passable_env_names", "require_current_profile", "transitive_system_modules", "require_source_signers", "provider_directories", "permissions":
+ 		return "environments." + head
+ 	}
+ 	return ""
+diff --git a/internal/config/environments_conformance_test.go b/internal/config/environments_conformance_test.go
+index 9859cbb8..8fe3f6c3 100644
+--- a/internal/config/environments_conformance_test.go
++++ b/internal/config/environments_conformance_test.go
+@@ -385,13 +385,11 @@ func TestOverlayGapOwnersMatchFirstProductionBlocker(t *testing.T) {
+ 		if gap.Owner != owner {
+ 			t.Errorf("%s owner = %q, first unsupported field %s belongs to %q", tc.Name, gap.Owner, field, owner)
+ 		}
+-		if field != "require_source_signers" || !strings.Contains(loadErr.Error(), field) {
+-			t.Errorf("%s first Load blocker = %q, want unsupported require_source_signers: %v", tc.Name, field, loadErr)
++		if field != "source_signers" || !strings.Contains(loadErr.Error(), field) {
++			t.Errorf("%s first Load blocker = %q, want unsupported source_signers: %v", tc.Name, field, loadErr)
+ 		}
+-		for _, requiredField := range []string{"source_signers", "require_source_signers"} {
+-			if !strings.Contains(gap.Reason, requiredField) {
+-				t.Errorf("%s reason %q omits unsupported field %q", tc.Name, gap.Reason, requiredField)
+-			}
++		if !strings.Contains(gap.Reason, "source_signers") || strings.Contains(gap.Reason, "require_source_signers") {
++			t.Errorf("%s reason %q does not isolate the remaining source_signers blocker", tc.Name, gap.Reason)
+ 		}
+ 		if strings.Contains(gap.Reason, "permissions") {
+ 			t.Errorf("%s reason %q still attributes the now-supported permissions field", tc.Name, gap.Reason)
+@@ -458,7 +456,7 @@ func TestOverlayGapOwnersMatchFirstProductionBlocker(t *testing.T) {
+ 			}
+ 		}
+ 		differences := jsonDifferencePaths("environments", gotEnv, wantEnv)
+-		wantDifferences := []string{"environments.require_source_signers", "environments.source_signers"}
++		wantDifferences := []string{"environments.source_signers"}
+ 		if !reflect.DeepEqual(differences, wantDifferences) {
+ 			t.Errorf("%s differences = %v, want only %v", tc.Name, differences, wantDifferences)
+ 			continue
+@@ -468,7 +466,7 @@ func TestOverlayGapOwnersMatchFirstProductionBlocker(t *testing.T) {
+ 		if gap.Owner != wantOwners {
+ 			t.Errorf("%s owner = %q, changed source_signers fields are owned by %q", tc.Name, gap.Owner, wantOwners)
+ 		}
+-		if strings.Contains(gap.Reason, "permissions") || !strings.Contains(gap.Reason, "source_signers") || !strings.Contains(gap.Reason, "require_source_signers") || strings.Contains(gap.Reason, "path-kind") {
++		if strings.Contains(gap.Reason, "permissions") || !strings.Contains(gap.Reason, "source_signers") || strings.Contains(gap.Reason, "require_source_signers") || strings.Contains(gap.Reason, "path-kind") {
+ 			t.Errorf("%s reason %q does not describe only the changed source_signers fields", tc.Name, gap.Reason)
+ 		}
+ 	}
+diff --git a/internal/config/environments_test.go b/internal/config/environments_test.go
+index c8e629fb..6edbe74c 100644
+--- a/internal/config/environments_test.go
++++ b/internal/config/environments_test.go
+@@ -524,6 +524,7 @@ func TestSystemV2LockableSubsetIsClassWide(t *testing.T) {
+ 		"shadow_acknowledged":       `{"shadow_acknowledged": [{"env": "codex_cli", "path": "some/path"}]}`,
+ 		"secret_material_waivers":   `{"secret_material_waivers": [{"pin": "0123456789abcdef0123456789abcdef01234567", "file": "context/a.md", "span": [1, 2], "reason": "org policy"}]}`,
+ 		"transitive_system_modules": `{"transitive_system_modules": "error"}`,
++		"require_source_signers":    `{"require_source_signers": true}`,
+ 		"system_module_waivers":     `{"system_module_waivers": [{"package": "sysleaf", "reason": "reviewed"}]}`,
+ 		"backup_retention":          `{"backup_retention": 1}`,
+ 		"require_current_profile":   `{"require_current_profile": "acme"}`,
+@@ -534,10 +535,10 @@ func TestSystemV2LockableSubsetIsClassWide(t *testing.T) {
+ 	if len(payloads) != len(EnvKnobNames) {
+ 		t.Fatalf("payloads cover %d knobs, EnvKnobNames carries %d: keep the two in step", len(payloads), len(EnvKnobNames))
+ 	}
+-	// The §12.2 transcription: exactly the nine keys the specification
++	// The §12.2 transcription: exactly the ten keys the specification
+ 	// states ("overlays_allowed, precedence, mcp_package_allowlist,
+ 	// passable_env_names, require_current_profile, transitive_system_modules,
+-	// isolation, provider_directories, and permissions" — provider_directories
++	// require_source_signers, isolation, provider_directories, and permissions" — provider_directories
+ 	// is carried by the §11 trust-root rule. This literal is the spec sentence; LockableEnvKeys
+ 	// is the implementation. Either drifting — a widening that would reach
+ 	// §9.1 secret material or §12.1 waivers, or a narrowing that would drop
+@@ -549,6 +550,7 @@ func TestSystemV2LockableSubsetIsClassWide(t *testing.T) {
+ 		"environments.passable_env_names":        true,
+ 		"environments.require_current_profile":   true,
+ 		"environments.transitive_system_modules": true,
++		"environments.require_source_signers":    true,
+ 		"environments.isolation":                 true,
+ 		"environments.provider_directories":      true,
+ 		"environments.permissions":               true,
+@@ -689,16 +691,16 @@ func TestSystemModuleWaiversNullRejected(t *testing.T) {
+ 
+ // TestUnsupportedEnvironmentFieldFailureIsDeterministic drives Load with
+ // several unsupported fields so schema-gap attribution does not depend on
+-// Go's randomized map iteration order. Permissions is supported here; the
+-// lexically first unsupported signer field is the stable production blocker.
++// Go's randomized map iteration order. Permissions and require_source_signers
++// are supported here; source_signers remains the stable production blocker.
+ func TestUnsupportedEnvironmentFieldFailureIsDeterministic(t *testing.T) {
+ 	body := `{"schema_version": 2, "skills_root": "x", "projects": {},` +
+ 		`"environments": {"source_signers": {}, "permissions": {}, "require_source_signers": true}}`
+ 	for attempt := 0; attempt < 24; attempt++ {
+ 		path := writeConfig(t, t.TempDir(), "config.json", body)
+ 		_, err := Load(path, nil)
+-		if err == nil || !strings.Contains(err.Error(), `unsupported field "require_source_signers"`) {
+-			t.Fatalf("attempt %d: Load err = %v, want stable first blocker environments.require_source_signers", attempt, err)
++		if err == nil || !strings.Contains(err.Error(), `unsupported field "source_signers"`) {
++			t.Fatalf("attempt %d: Load err = %v, want stable first blocker environments.source_signers", attempt, err)
+ 		}
+ 	}
+ }
+diff --git a/internal/config/security_posture.go b/internal/config/security_posture.go
+new file mode 100644
+index 00000000..f0af5fa7
+--- /dev/null
++++ b/internal/config/security_posture.go
+@@ -0,0 +1,340 @@
++package config
++
++import "fmt"
++
++// SecurityPostureRevision is the one release switch for the machine posture
++// default. Revision A ships first with the permissive warning; Revision B is
++// the later default flip owned by its bounded rollout task.
++const SecurityPostureRevision = "A"
++
++const (
++	// SecurityPosturePermissive selects today's default-open gate values.
++	SecurityPosturePermissive = "permissive"
++	// SecurityPostureHardened selects the strict end of each posture gate.
++	SecurityPostureHardened = "hardened"
++	// DiagSecurityPosturePermissive identifies the revision-A migration warning.
++	DiagSecurityPosturePermissive = "security_posture_permissive"
++	// DiagSourceAllowlistEmpty identifies the hardened install/update refusal.
++	DiagSourceAllowlistEmpty = "source_allowlist_empty"
++	// DiagMCPAllowlistEmpty identifies the hardened MCP-resolution refusal.
++	DiagMCPAllowlistEmpty = "mcp_package_allowlist_empty"
++	// DiagPassableEnvUnbounded identifies explicit-null passthrough refusal.
++	DiagPassableEnvUnbounded = "passable_env_names_unbounded_refused" // #nosec G101 -- diagnostic identifier, not a credential.
++	// SecurityPostureMigrationHint is shown while revision A defaults permissive.
++	SecurityPostureMigrationHint = "set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default"
++)
++
++// SecurityPostureDiagnostic is a posture operation finding. Optional fields
++// are emitted only when that diagnostic defines them in manager §7.1.
++type SecurityPostureDiagnostic struct {
++	Code          string `json:"code"`
++	Severity      string `json:"severity"`
++	Count         *int   `json:"count,omitempty"`
++	NamesKnob     bool   `json:"names_knob,omitempty"`
++	MigrationHint bool   `json:"migration_hint,omitempty"`
++}
++
++// SecurityPostureRow is one closed manager status row.
++type SecurityPostureRow struct {
++	Gate   string `json:"gate"`
++	Value  any    `json:"value"`
++	Source string `json:"source"`
++}
++
++// SecurityPostureRevisions are the independently shipped gate revisions
++// rendered beside the posture policy. Status callers supply their actual
++// compiled revisions; conformance vectors supply the revision tuple they pin.
++type SecurityPostureRevisions struct {
++	HookTrust          string `json:"hook_trust"`
++	EnvPassthrough     string `json:"env_passthrough"`
++	ProviderTrustRoots string `json:"provider_trust_roots"`
++	UpdateConfirmation string `json:"update_confirmation"`
++	CodexSeed          string `json:"codex_seed"`
++}
++
++func defaultSecurityPosture(schema int) string {
++	if schema == SchemaVersion {
++		return SecurityPosturePermissive
++	}
++	switch SecurityPostureRevision {
++	case "A":
++		return SecurityPosturePermissive
++	case "B":
++		return SecurityPostureHardened
++	default:
++		panic("unknown security posture revision " + SecurityPostureRevision)
++	}
++}
++
++// EffectiveSecurityPosture returns the effective profile. A zero Config is
++// treated like an older permissive caller so adding this field does not turn
++// existing programmatic callers into hardened operations accidentally.
++func (c *Config) EffectiveSecurityPosture() string {
++	if c == nil || c.SecurityPosture == "" {
++		return SecurityPosturePermissive
++	}
++	return c.SecurityPosture
++}
++
++// SecurityPostureHardened exposes the effective posture to downstream
++// resolvers without requiring them to reconstruct defaults or provenance.
++func (c *Config) SecurityPostureHardened() bool {
++	return c != nil && c.EffectiveSecurityPosture() == SecurityPostureHardened
++}
++
++// SecurityPostureWarning returns the revision-A migration warning once per
++// loaded manager operation when the effective posture is permissive.
++func (c *Config) SecurityPostureWarning() string {
++	if c == nil || c.SecurityPostureHardened() {
++		return ""
++	}
++	return fmt.Sprintf("%s: security_posture is permissive; %s", DiagSecurityPosturePermissive, SecurityPostureMigrationHint)
++}
++
++// SecurityPostureSources returns a copy of the per-knob provenance map.
++func (c *Config) SecurityPostureSources() map[string]string {
++	result := make(map[string]string, len(c.postureSources))
++	for knob, source := range c.postureSources {
++		result[knob] = source
++	}
++	return result
++}
++
++// SecurityPostureDiagnostics computes posture-specific diagnostics for one
++// manager operation. The permissive warning is operation-scoped. Empty MCP
++// allowlists retain their warning when no MCP declarations are present;
++// hardened contradictions refuse only the affected operation.
++func (c *Config) SecurityPostureDiagnostics(operation string, mcpDeclarationsPresent bool) []SecurityPostureDiagnostic {
++	if c == nil {
++		return nil
++	}
++	diagnostics := []SecurityPostureDiagnostic{}
++	if !c.SecurityPostureHardened() {
++		count := 1
++		diagnostics = append(diagnostics, SecurityPostureDiagnostic{
++			Code: DiagSecurityPosturePermissive, Severity: "warning", Count: &count,
++			NamesKnob: true, MigrationHint: true,
++		})
++		return diagnostics
++	}
++
++	switch operation {
++	case "install", "update":
++		if len(c.AllowedSources) == 0 {
++			diagnostics = append(diagnostics, SecurityPostureDiagnostic{Code: DiagSourceAllowlistEmpty, Severity: "error"})
++		}
++	case "profile-install", "profile-update", "launch-composition":
++		if mcpDeclarationsPresent && len(c.Env.MCPPackageAllowlist) == 0 {
++			diagnostics = append(diagnostics, SecurityPostureDiagnostic{Code: DiagMCPAllowlistEmpty, Severity: "error"})
++		} else if !mcpDeclarationsPresent && len(c.Env.MCPPackageAllowlist) == 0 {
++			diagnostics = append(diagnostics, SecurityPostureDiagnostic{Code: DiagMCPAllowlistEmpty, Severity: "warning"})
++		}
++		if c.Env.PassableEnvNamesSet && c.Env.PassableEnvNames == nil {
++			diagnostics = append(diagnostics, SecurityPostureDiagnostic{
++				Code: DiagPassableEnvUnbounded, Severity: "error", NamesKnob: true,
++			})
++		}
++	}
++	return diagnostics
++}
++
++// CheckSecurityPostureSourceAllowlist enforces the install/update source gate.
++func CheckSecurityPostureSourceAllowlist(posture string, allowedSources []string) error {
++	if posture == SecurityPostureHardened && len(allowedSources) == 0 {
++		return fmt.Errorf("%s: operation refused under the hardened security posture", DiagSourceAllowlistEmpty)
++	}
++	return nil
++}
++
++// CheckSecurityPostureMCPAllowlist enforces the closure-dependent MCP gate.
++func CheckSecurityPostureMCPAllowlist(posture string, allowlist []string, declarationsPresent bool) error {
++	if posture == SecurityPostureHardened && declarationsPresent && len(allowlist) == 0 {
++		return fmt.Errorf("%s: operation refused under the hardened security posture", DiagMCPAllowlistEmpty)
++	}
++	return nil
++}
++
++// CheckSecurityPosturePassableEnv refuses explicit unbounded passthrough
++// under hardened posture, while absent values remain governed by S4.
++func CheckSecurityPosturePassableEnv(posture string, names []string, set bool) error {
++	if posture == SecurityPostureHardened && set && names == nil {
++		return fmt.Errorf("%s: operation refused under the hardened security posture", DiagPassableEnvUnbounded)
++	}
++	return nil
++}
++
++// SecurityPostureContradiction reports an effective configuration that makes
++// an environment status check non-current. A profile status without --check
++// remains informational; source allowlist emptiness affects install/update,
++// while MCP declarations and explicit unbounded passthrough affect the
++// currently resolved environment state.
++func (c *Config) SecurityPostureContradiction(mcpDeclarationsPresent bool) bool {
++	if !c.SecurityPostureHardened() {
++		return false
++	}
++	return len(c.AllowedSources) == 0 ||
++		(mcpDeclarationsPresent && len(c.Env.MCPPackageAllowlist) == 0) ||
++		(c.Env.PassableEnvNamesSet && c.Env.PassableEnvNames == nil)
++}
++
++// CheckSecurityPosture returns the first operation refusal, if any.
++func (c *Config) CheckSecurityPosture(operation string, mcpDeclarationsPresent bool) error {
++	if c == nil {
++		return nil
++	}
++	posture := c.EffectiveSecurityPosture()
++	switch operation {
++	case "install", "update":
++		return CheckSecurityPostureSourceAllowlist(posture, c.AllowedSources)
++	case "profile-install", "profile-update", "launch-composition":
++		if err := CheckSecurityPostureMCPAllowlist(posture, c.Env.MCPPackageAllowlist, mcpDeclarationsPresent); err != nil {
++			return err
++		}
++		return CheckSecurityPosturePassableEnv(posture, c.Env.PassableEnvNames, c.Env.PassableEnvNamesSet)
++	}
++	return nil
++}
++
++// SecurityPostureStatusRows returns the ordered inventory shared by curator
++// status and env status. Schema 1 carries only its four legacy gates and no
++// env-status inventory.
++func (c *Config) SecurityPostureStatusRows(revisions SecurityPostureRevisions) []SecurityPostureRow {
++	if c == nil {
++		return nil
++	}
++	postureSource := c.SecurityPostureSource
++	if postureSource == "" {
++		postureSource = "profile"
++	}
++	rows := []SecurityPostureRow{
++		{Gate: "security_posture", Value: c.EffectiveSecurityPosture(), Source: postureSource},
++		{Gate: "hook-trust", Value: revisions.HookTrust, Source: "shipped"},
++		{Gate: "registry-policy", Value: c.Audit.RegistryPolicy, Source: c.PostureSourceFor("audit.registry_policy")},
++		{Gate: "audit-mode", Value: c.Audit.Mode, Source: c.PostureSourceFor("audit.mode")},
++		{Gate: "source-allowlist", Value: len(c.AllowedSources), Source: c.PostureSourceFor("allowed_sources")},
++	}
++	if c.Schema == SchemaVersion {
++		return rows
++	}
++	return append(rows,
++		SecurityPostureRow{Gate: "env-passthrough", Value: revisions.EnvPassthrough, Source: "shipped"},
++		SecurityPostureRow{Gate: "transitive-system-modules", Value: c.Env.TransitiveSystemModules, Source: c.PostureSourceFor("environments.transitive_system_modules")},
++		SecurityPostureRow{Gate: "provider-trust-roots", Value: revisions.ProviderTrustRoots, Source: "shipped"},
++		SecurityPostureRow{Gate: "source-signers", Value: fmt.Sprintf("%t", c.Env.RequireSourceSigners), Source: c.PostureSourceFor("environments.require_source_signers")},
++		SecurityPostureRow{Gate: "update-confirmation", Value: revisions.UpdateConfirmation, Source: "shipped"},
++		SecurityPostureRow{Gate: "codex-seed", Value: revisions.CodexSeed, Source: "shipped"},
++		SecurityPostureRow{Gate: "store-boundary", Value: "enforced", Source: "shipped"},
++		SecurityPostureRow{Gate: "write-discipline", Value: "enforced", Source: "shipped"},
++		SecurityPostureRow{Gate: "mcp-package-allowlist", Value: len(c.Env.MCPPackageAllowlist), Source: c.PostureSourceFor("environments.mcp_package_allowlist")},
++	)
++}
++
++// PostureSourceFor returns a gate's provenance, defaulting unknown or unset
++// fields to profile provenance.
++func (c *Config) PostureSourceFor(knob string) string {
++	if c == nil {
++		return "profile"
++	}
++	if source := c.postureSources[knob]; source != "" {
++		return source
++	}
++	return "profile"
++}
++
++func hasConfigKey(data map[string]any, key string) bool {
++	if data == nil {
++		return false
++	}
++	_, ok := data[key]
++	return ok
++}
++
++func hasNestedConfigKey(data map[string]any, object, key string) bool {
++	if data == nil {
++		return false
++	}
++	values, _ := data[object].(map[string]any)
++	if values == nil {
++		return false
++	}
++	_, ok := values[key]
++	return ok
++}
++
++func securityPostureSource(effective, machine, system map[string]any, locked map[string]bool, schema int) string {
++	if schema == SchemaVersion {
++		return "profile"
++	}
++	if locked["security_posture"] {
++		return "lock"
++	}
++	if hasConfigKey(machine, "security_posture") || hasConfigKey(system, "security_posture") || hasConfigKey(effective, "security_posture") {
++		return "explicit"
++	}
++	return "profile"
++}
++
++func securityPostureSources(effective, machine, system map[string]any, locked map[string]bool) map[string]string {
++	keys := []struct {
++		name      string
++		lock      string
++		top       string
++		topNested string
++		env       string
++	}{
++		{name: "security_posture", lock: "security_posture", top: "security_posture"},
++		{name: "audit.mode", lock: "audit", top: "audit", topNested: "mode"},
++		{name: "audit.registry_policy", lock: "audit", top: "audit", topNested: "registry_policy"},
++		{name: "allowed_sources", lock: "allowed_sources", top: "allowed_sources"},
++		{name: "environments.mcp_package_allowlist", lock: "environments.mcp_package_allowlist", env: "mcp_package_allowlist"},
++		{name: "environments.passable_env_names", lock: "environments.passable_env_names", env: "passable_env_names"},
++		{name: "environments.transitive_system_modules", lock: "environments.transitive_system_modules", env: "transitive_system_modules"},
++		{name: "environments.require_source_signers", lock: "environments.require_source_signers", env: "require_source_signers"},
++	}
++	result := make(map[string]string, len(keys))
++	for _, key := range keys {
++		switch {
++		case locked[key.lock]:
++			result[key.name] = "lock"
++		case key.env != "" && hasNestedConfigKey(machine, "environments", key.env):
++			result[key.name] = "explicit"
++		case key.env != "" && hasNestedConfigKey(system, "environments", key.env):
++			result[key.name] = "explicit"
++		case key.env != "" && hasNestedConfigKey(effective, "environments", key.env):
++			result[key.name] = "explicit"
++		case key.topNested != "" && hasNestedConfigKey(machine, key.top, key.topNested):
++			result[key.name] = "explicit"
++		case key.topNested != "" && hasNestedConfigKey(system, key.top, key.topNested):
++			result[key.name] = "explicit"
++		case key.topNested != "" && hasNestedConfigKey(effective, key.top, key.topNested):
++			result[key.name] = "explicit"
++		case key.top != "" && key.topNested == "" && hasConfigKey(machine, key.top):
++			result[key.name] = "explicit"
++		case key.top != "" && key.topNested == "" && hasConfigKey(system, key.top):
++			result[key.name] = "explicit"
++		case key.top != "" && key.topNested == "" && hasConfigKey(effective, key.top):
++			result[key.name] = "explicit"
++		default:
++			result[key.name] = "profile"
++		}
++	}
++	return result
++}
++
++func applyHardenedDefaults(cfg *Config, data map[string]any) {
++	if cfg == nil || !cfg.SecurityPostureHardened() {
++		return
++	}
++	if !hasNestedConfigKey(data, "audit", "mode") {
++		cfg.Audit.Mode = "strict"
++	}
++	if !hasNestedConfigKey(data, "audit", "registry_policy") {
++		cfg.Audit.RegistryPolicy = "strict"
++	}
++	if !hasNestedConfigKey(data, "environments", "transitive_system_modules") {
++		cfg.Env.TransitiveSystemModules = "error"
++	}
++	if !hasNestedConfigKey(data, "environments", "require_source_signers") {
++		cfg.Env.RequireSourceSigners = true
++	}
++}
+diff --git a/internal/config/security_posture_conformance_test.go b/internal/config/security_posture_conformance_test.go
+new file mode 100644
+index 00000000..175cb096
+--- /dev/null
++++ b/internal/config/security_posture_conformance_test.go
+@@ -0,0 +1,273 @@
++package config
++
++import (
++	"bytes"
++	"encoding/json"
++	"fmt"
++	"os"
++	"path/filepath"
++	"reflect"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/conformancecoverage"
++	"github.com/relux-works/curator/internal/envfragment"
++)
++
++type securityPostureVector struct {
++	Name             string                     `json:"name"`
++	RolloutRevision  string                     `json:"rollout_revision"`
++	Machine          map[string]any             `json:"machine"`
++	System           map[string]any             `json:"system"`
++	ShippedRevisions SecurityPostureRevisions   `json:"shipped_revisions"`
++	Operation        securityPostureOperation   `json:"operation"`
++	Expected         securityPostureExpectation `json:"expected"`
++}
++
++type securityPostureOperation struct {
++	Kind                   string `json:"kind"`
++	MCPDeclarationsPresent bool   `json:"mcp_declarations_present"`
++}
++
++type securityPostureExpectation struct {
++	Profile                 string                      `json:"profile"`
++	ProfileSource           string                      `json:"profile_source"`
++	Effective               map[string]any              `json:"effective"`
++	Sources                 map[string]string           `json:"sources"`
++	PassableEnvNullExplicit bool                        `json:"passable_env_null_explicit"`
++	Diagnostics             []SecurityPostureDiagnostic `json:"diagnostics"`
++	Outcome                 string                      `json:"outcome"`
++	CuratorStatusRows       []SecurityPostureRow        `json:"curator_status_rows"`
++	EnvStatusRows           json.RawMessage             `json:"env_status_rows"`
++}
++
++// TestSecurityPostureVectors drives every revision-A-owned vector through
++// config.Load and the same diagnostics, outcome, and status-row APIs consumed
++// by the manager. Registry reachability belongs to 1sapuy; revision-B default
++// and flipped shipped-row cases belong to the flip leaf.
++func TestSecurityPostureVectors(t *testing.T) {
++	root := conformanceRoot(t)
++	payload, err := os.ReadFile(filepath.Join(root, "vectors", "security-posture.json")) // #nosec G304 -- pinned conformance input
++	if err != nil {
++		t.Fatal(err)
++	}
++	var corpus struct {
++		Cases []securityPostureVector `json:"cases"`
++	}
++	if err := json.Unmarshal(payload, &corpus); err != nil {
++		t.Fatal(err)
++	}
++	cases := corpus.Cases
++	if len(cases) == 0 {
++		t.Fatal("security-posture vectors publish no cases")
++	}
++	conformancecoverage.RunOutcomes(t, "security-posture/vectors", cases,
++		func(tc securityPostureVector) string { return tc.Name }, func(caseT *testing.T, tc securityPostureVector) conformancecoverage.Observation {
++			if reason := securityPostureBound(tc.Name); reason != "" {
++				return conformancecoverage.Observation{BoundReason: reason}
++			}
++			cfg := loadSecurityPostureVector(t, tc)
++			checkJSONEqual(t, "effective posture", tc.Expected.Effective, securityPostureEffective(cfg, tc.ShippedRevisions.EnvPassthrough))
++			if got := cfg.EffectiveSecurityPosture(); got != tc.Expected.Profile {
++				caseT.Fatalf("profile = %q, want %q", got, tc.Expected.Profile)
++			}
++			if cfg.SecurityPostureSource != tc.Expected.ProfileSource {
++				caseT.Fatalf("profile source = %q, want %q", cfg.SecurityPostureSource, tc.Expected.ProfileSource)
++			}
++			checkJSONEqual(caseT, "posture sources", tc.Expected.Sources, securityPostureVectorSources(cfg))
++			gotNullExplicit := cfg.Env.PassableEnvNamesSet && cfg.Env.PassableEnvNames == nil
++			if gotNullExplicit != tc.Expected.PassableEnvNullExplicit {
++				caseT.Fatalf("passable_env_names null explicit = %v, want %v", gotNullExplicit, tc.Expected.PassableEnvNullExplicit)
++			}
++			checkJSONEqual(caseT, "diagnostics", tc.Expected.Diagnostics, cfg.SecurityPostureDiagnostics(tc.Operation.Kind, tc.Operation.MCPDeclarationsPresent))
++			if got := securityPostureVectorOutcome(cfg, tc.Operation); got != tc.Expected.Outcome {
++				caseT.Fatalf("outcome = %q, want %q", got, tc.Expected.Outcome)
++			}
++			checkJSONEqual(caseT, "curator status rows", tc.Expected.CuratorStatusRows, cfg.SecurityPostureStatusRows(tc.ShippedRevisions))
++			var wantEnvRows any
++			if err := json.Unmarshal(tc.Expected.EnvStatusRows, &wantEnvRows); err != nil {
++				caseT.Fatalf("decode expected env_status_rows: %v", err)
++			}
++			var gotEnvRows any
++			if cfg.Schema != SchemaVersion {
++				gotEnvRows = cfg.SecurityPostureStatusRows(tc.ShippedRevisions)
++			}
++			checkJSONEqual(caseT, "env status rows", wantEnvRows, gotEnvRows)
++			return conformancecoverage.Observation{}
++		})
++}
++
++func TestSecurityPostureSchema1MachineRemainsPermissiveWithSystemPosture(t *testing.T) {
++	dir := t.TempDir()
++	machine := map[string]any{
++		"schema_version": SchemaVersion,
++		"skills_root":    filepath.Join(dir, "skills"),
++		"projects":       map[string]any{},
++	}
++	system := map[string]any{
++		"schema_version":   SchemaVersion2,
++		"security_posture": SecurityPostureHardened,
++		"locked":           []any{"security_posture"},
++	}
++	machinePath := writeSecurityPostureJSON(t, dir, "machine.json", machine)
++	systemPath := writeSecurityPostureJSON(t, dir, "system.json", system)
++	t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
++	cfg, err := Load(machinePath, nil)
++	if err != nil {
++		t.Fatalf("Load schema-1 machine with a system posture: %v", err)
++	}
++	if cfg.EffectiveSecurityPosture() != SecurityPosturePermissive || cfg.SecurityPostureSource != "profile" {
++		t.Fatalf("schema-1 security posture = %q from %q, want permissive/profile", cfg.EffectiveSecurityPosture(), cfg.SecurityPostureSource)
++	}
++}
++
++func TestSecurityPostureSystemValueMustBeLocked(t *testing.T) {
++	dir := t.TempDir()
++	machine := map[string]any{
++		"schema_version":   SchemaVersion2,
++		"skills_root":      filepath.Join(dir, "skills"),
++		"projects":         map[string]any{},
++		"security_posture": SecurityPosturePermissive,
++	}
++	system := map[string]any{
++		"schema_version":   SchemaVersion2,
++		"security_posture": SecurityPostureHardened,
++	}
++	machinePath := writeSecurityPostureJSON(t, dir, "machine.json", machine)
++	systemPath := writeSecurityPostureJSON(t, dir, "system.json", system)
++	t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
++	if _, err := Load(machinePath, nil); err == nil || !strings.Contains(err.Error(), "must lock security_posture") {
++		t.Fatalf("Load system posture without its required lock error = %v", err)
++	}
++}
++
++func securityPostureBound(name string) string {
++	switch name {
++	case "unreachable-registry-permissive-warns", "unreachable-registry-hardened-refuses":
++		return "install-time unreachable-registry behavior is owned by TASK-260910-1sapuy"
++	case "revision-B-default-hardened-flip-install", "refusal-mcp-allowlist-empty-with-declarations", "hardened-contradiction-status-check-non-current", "posture-rows-flipped-revisions":
++		return "revision-B posture default or shipped-row flip is owned by TASK-260927-25hk87"
++	default:
++		return ""
++	}
++}
++
++func loadSecurityPostureVector(t *testing.T, tc securityPostureVector) *Config {
++	t.Helper()
++	dir := t.TempDir()
++	machine := cloneStringAnyMap(tc.Machine)
++	if _, ok := machine["skills_root"]; !ok {
++		machine["skills_root"] = filepath.Join(dir, "skills")
++	}
++	if _, ok := machine["projects"]; !ok {
++		machine["projects"] = map[string]any{}
++	}
++	system := cloneStringAnyMap(tc.System)
++	if _, ok := system["schema_version"]; !ok {
++		system["schema_version"] = SchemaVersion2
++	}
++	machinePath := writeSecurityPostureJSON(t, dir, "machine.json", machine)
++	systemPath := writeSecurityPostureJSON(t, dir, "system.json", system)
++	t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
++	cfg, err := Load(machinePath, nil)
++	if err != nil {
++		t.Fatalf("Load vector config: %v", err)
++	}
++	return cfg
++}
++
++func cloneStringAnyMap(input map[string]any) map[string]any {
++	cloned := make(map[string]any, len(input)+2)
++	for key, value := range input {
++		cloned[key] = value
++	}
++	return cloned
++}
++
++func writeSecurityPostureJSON(t *testing.T, dir, name string, value any) string {
++	t.Helper()
++	payload, err := json.Marshal(value)
++	if err != nil {
++		t.Fatal(err)
++	}
++	path := filepath.Join(dir, name)
++	if err := os.WriteFile(path, payload, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	return path
++}
++
++func securityPostureEffective(cfg *Config, s4 string) map[string]any {
++	effective := map[string]any{
++		"audit_mode":            cfg.Audit.Mode,
++		"audit_registry_policy": cfg.Audit.RegistryPolicy,
++		"allowed_sources":       append([]string{}, cfg.AllowedSources...),
++	}
++	if cfg.Schema == SchemaVersion {
++		return effective
++	}
++	profile := envfragment.S4Warn
++	if s4 == string(envfragment.S4Enforce) {
++		profile = envfragment.S4Enforce
++	}
++	effective["mcp_package_allowlist"] = append([]string{}, cfg.Env.MCPPackageAllowlist...)
++	effective["passable_env_names"] = envfragment.EffectivePassable(cfg.Env.PassableEnvNames, cfg.Env.PassableEnvNamesSet, profile)
++	effective["transitive_system_modules"] = cfg.Env.TransitiveSystemModules
++	effective["require_source_signers"] = cfg.Env.RequireSourceSigners
++	return effective
++}
++
++func securityPostureVectorSources(cfg *Config) map[string]string {
++	sources := map[string]string{
++		"audit_mode":            cfg.PostureSourceFor("audit.mode"),
++		"audit_registry_policy": cfg.PostureSourceFor("audit.registry_policy"),
++		"allowed_sources":       cfg.PostureSourceFor("allowed_sources"),
++	}
++	if cfg.Schema != SchemaVersion {
++		sources["mcp_package_allowlist"] = cfg.PostureSourceFor("environments.mcp_package_allowlist")
++		sources["passable_env_names"] = cfg.PostureSourceFor("environments.passable_env_names")
++		sources["transitive_system_modules"] = cfg.PostureSourceFor("environments.transitive_system_modules")
++		sources["require_source_signers"] = cfg.PostureSourceFor("environments.require_source_signers")
++	}
++	return sources
++}
++
++func securityPostureVectorOutcome(cfg *Config, operation securityPostureOperation) string {
++	switch operation.Kind {
++	case "status":
++		return "current"
++	case "status-check":
++		if cfg.SecurityPostureContradiction(operation.MCPDeclarationsPresent) {
++			return "non-current"
++		}
++		return "current"
++	case "install", "update", "profile-install", "profile-update", "launch-composition":
++		if err := cfg.CheckSecurityPosture(operation.Kind, operation.MCPDeclarationsPresent); err != nil {
++			return "refused"
++		}
++		return "proceeds"
++	default:
++		return fmt.Sprintf("unsupported operation %q", operation.Kind)
++	}
++}
++
++func checkJSONEqual(t testing.TB, label string, want, got any) {
++	t.Helper()
++	wantJSON, err := json.Marshal(want)
++	if err != nil {
++		t.Fatalf("marshal expected %s: %v", label, err)
++	}
++	gotJSON, err := json.Marshal(got)
++	if err != nil {
++		t.Fatalf("marshal actual %s: %v", label, err)
++	}
++	if !bytes.Equal(wantJSON, gotJSON) {
++		var wantPretty, gotPretty any
++		_ = json.Unmarshal(wantJSON, &wantPretty)
++		_ = json.Unmarshal(gotJSON, &gotPretty)
++		if reflect.DeepEqual(wantPretty, gotPretty) {
++			return
++		}
++		t.Fatalf("%s mismatch:\n got: %s\nwant: %s", label, gotJSON, wantJSON)
++	}
++}
+diff --git a/internal/envprofile/envprofile.go b/internal/envprofile/envprofile.go
+index 1d4044fb..86d60508 100644
+--- a/internal/envprofile/envprofile.go
++++ b/internal/envprofile/envprofile.go
+@@ -418,9 +418,12 @@ func InUseByAnyScope(home, name string) (bool, error) {
+ // regardless of any enabled flag — an advisory profile install does not
+ // exist.
+ type Policy struct {
+-	AllowedSources []string
+-	MCPAllowlist   []string
+-	Revocations    []string
++	AllowedSources      []string
++	MCPAllowlist        []string
++	Revocations         []string
++	SecurityPosture     string
++	PassableEnvNames    []string
++	PassableEnvNamesSet bool
+ 	// OverlaysAllowed is the effective §12.1 composition policy: false
+ 	// empties every overlay list at resolution (environments §12.2).
+ 	OverlaysAllowed bool
+@@ -458,6 +461,32 @@ type Policy struct {
+ 	Takeover bool
+ }
+ 
++// checkHardenedProfileMutation enforces the hardened install/update
++// refusals before an operation takes its mutation lock or resolves sources.
++func (p Policy) checkHardenedProfileMutation() error {
++	if err := config.CheckSecurityPostureSourceAllowlist(p.SecurityPosture, p.AllowedSources); err != nil {
++		return err
++	}
++	return p.checkHardenedPassthrough()
++}
++
++// checkHardenedPassthrough refuses only the explicit unbounded choice. An
++// absent knob continues to follow the shipped S4 profile.
++func (p Policy) checkHardenedPassthrough() error {
++	return config.CheckSecurityPosturePassableEnv(p.SecurityPosture, p.PassableEnvNames, p.PassableEnvNamesSet)
++}
++
++func (p Policy) checkHardenedMCP(lock *contextlock.Lock) error {
++	declarationsPresent := false
++	for _, member := range lock.Members {
++		if member.Kind == contextlock.KindMCP {
++			declarationsPresent = true
++			break
++		}
++	}
++	return config.CheckSecurityPostureMCPAllowlist(p.SecurityPosture, p.MCPAllowlist, declarationsPresent)
++}
++
+ // OverlaySpec is one machine overlay declaration for a profile
+ // (environments §6, §12.1): a git source with a range or exact form, or a
+ // path source with no form, an optional directory within a git snapshot,
+@@ -554,6 +583,9 @@ func PolicyFromConfig(cfg *config.Config) Policy {
+ 		AllowedSources:          cfg.AllowedSources,
+ 		MCPAllowlist:            cfg.Env.MCPPackageAllowlist,
+ 		Revocations:             cfg.Audit.Revocations,
++		SecurityPosture:         cfg.EffectiveSecurityPosture(),
++		PassableEnvNames:        cfg.Env.PassableEnvNames,
++		PassableEnvNamesSet:     cfg.Env.PassableEnvNamesSet,
+ 		OverlaysAllowed:         cfg.Env.OverlaysAllowed,
+ 		OverlayDefaultWeight:    int64(cfg.Env.OverlayDefaultWeight),
+ 		PrecedenceWinner:        cfg.Env.Precedence.Winner,
+@@ -625,6 +657,9 @@ type InstallOptions struct {
+ // Install holds the manager-home mutation lock and publishes its records
+ // through the operation journal (see lock.go).
+ func Install(home string, options InstallOptions) (Info, bool, bool, error) {
++	if err := options.Policy.checkHardenedProfileMutation(); err != nil {
++		return Info{}, false, false, err
++	}
+ 	op, err := beginOperation(home)
+ 	if err != nil {
+ 		return Info{}, false, false, err
+@@ -755,6 +790,9 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
+ 	if err != nil {
+ 		return Info{}, false, false, err
+ 	}
++	if err := options.Policy.checkHardenedMCP(result.Lock); err != nil {
++		return Info{}, false, false, err
++	}
+ 	warnings := resolutionWarnings(result)
+ 	auditWarnings, err := auditAndStore(home, manager, result, options.Policy)
+ 	if err != nil {
+@@ -851,6 +889,9 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input
+ 	if err != nil {
+ 		return Info{}, false, false, err
+ 	}
++	if err := policy.checkHardenedMCP(result.Lock); err != nil {
++		return Info{}, false, false, err
++	}
+ 	oldMembers := map[string]bool{}
+ 	for _, member := range oldLock.Members {
+ 		oldMembers[contextresolve.Key(member.Kind, member.Name)] = true
+@@ -1038,6 +1079,9 @@ func UpdateWithPolicy(home, name string, policy Policy) (Info, bool, error) {
+ // UpdateWithOptions re-resolves like UpdateWithPolicy and prints the §2.3
+ // declaration rows to the options' sink at the required emission point.
+ func UpdateWithOptions(home, name string, options UpdateOptions) (Info, bool, error) {
++	if err := options.Policy.checkHardenedProfileMutation(); err != nil {
++		return Info{}, false, err
++	}
+ 	op, err := beginOperation(home)
+ 	if err != nil {
+ 		return Info{}, false, err
+@@ -1121,6 +1165,9 @@ func updateLocked(op *operation, home, name string, policy Policy, sink io.Write
+ 	if err != nil {
+ 		return Info{}, false, err
+ 	}
++	if err := policy.checkHardenedMCP(result.Lock); err != nil {
++		return Info{}, false, err
++	}
+ 	oldMembers := map[string]bool{}
+ 	for _, member := range oldLock.Members {
+ 		oldMembers[contextresolve.Key(member.Kind, member.Name)] = true
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index 3e4d621f..53851777 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -2113,6 +2113,12 @@ func currentProfileFor(home, envID, named string) (string, error) {
+ // reasons); under repair the home is provisioned or repaired from the
+ // store under the mutation lock and the fragment is emitted.
+ func Resolve(req ResolveRequest) (*ResolveResult, error) {
++	policy := req.Policy
++	policy.PassableEnvNames = req.Machine.PassableEnvNames
++	policy.PassableEnvNamesSet = req.Machine.PassableEnvNamesSet
++	if err := policy.checkHardenedPassthrough(); err != nil {
++		return nil, err
++	}
+ 	adapter, err := envregistry.ByID(req.EnvID)
+ 	if err != nil {
+ 		return nil, err
+@@ -2129,6 +2135,9 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
+ 	if err != nil {
+ 		return nil, err
+ 	}
++	if err := policy.checkHardenedMCP(lock); err != nil {
++		return nil, err
++	}
+ 	verdict := verifyHome(&req, adapter, source, lock, hash)
+ 	if verdict.current {
+ 		fragment, err := buildFragment(&req, adapter, verdict)
+diff --git a/internal/envprofile/status.go b/internal/envprofile/status.go
+index 29886966..0a2ee342 100644
+--- a/internal/envprofile/status.go
++++ b/internal/envprofile/status.go
+@@ -18,6 +18,7 @@ import (
+ 	"strings"
+ 	"time"
+ 
++	"github.com/relux-works/curator/internal/config"
+ 	"github.com/relux-works/curator/internal/contextlock"
+ 	"github.com/relux-works/curator/internal/contextmaterialize"
+ 	"github.com/relux-works/curator/internal/contextpkg"
+@@ -242,6 +243,10 @@ type Status struct {
+ 	// and the verified-boundary posture. It is attached by the CLI because the
+ 	// CLI owns configured registry trust anchors.
+ 	RegistryPosture []registry.BoundaryPosture `json:"registry_posture"`
++	// SecurityPostureRows is the manager §10 inventory. Schema 1 reports
++	// no env-status posture inventory; schema 2 carries the same closed
++	// rows as curator status.
++	SecurityPostureRows []config.SecurityPostureRow `json:"security_posture_rows"`
+ }
+ 
+ // StatusRequest scopes one status computation. The seams mirror
+@@ -281,6 +286,12 @@ func StatusOf(req StatusRequest) (*Status, error) {
+ 		Provenance: "shipped",
+ 	}}
+ 	status.Notes = append(status.Notes, "opencode skills come from the machine-current profile, split-brain by construction (§7.1)")
++	if req.Policy.SecurityPosture == config.SecurityPostureHardened && len(req.Policy.AllowedSources) == 0 {
++		status.NonCurrent = true
++	}
++	if req.Policy.SecurityPosture == config.SecurityPostureHardened && req.Machine.PassableEnvNamesSet && req.Machine.PassableEnvNames == nil {
++		status.NonCurrent = true
++	}
+ 	// §12.2: env status reports the locked require_current_profile
+ 	// requirement. The policy already carries the effective knob and its
+ 	// locked bit from the loaded configuration.
+@@ -340,6 +351,14 @@ func StatusOf(req StatusRequest) (*Status, error) {
+ 	declarations, declarationWarnings := declarationScopes(req, installed)
+ 	status.MCPDeclarations = declarations
+ 	status.Warnings = append(status.Warnings, declarationWarnings...)
++	if req.Policy.SecurityPosture == config.SecurityPostureHardened && len(req.Policy.MCPAllowlist) == 0 {
++		for _, declaration := range declarations {
++			if len(declaration.Rows) > 0 {
++				status.NonCurrent = true
++				break
++			}
++		}
++	}
+ 	if len(status.Orphans) > 0 {
+ 		status.NonCurrent = true
+ 	}
+diff --git a/internal/scriptworker/derive_test.go b/internal/scriptworker/derive_test.go
+index 850fbd56..60108107 100644
+--- a/internal/scriptworker/derive_test.go
++++ b/internal/scriptworker/derive_test.go
+@@ -1,6 +1,7 @@
+ package scriptworker
+ 
+ import (
++	"bytes"
+ 	"context"
+ 	"encoding/json"
+ 	"os"
+@@ -12,6 +13,7 @@ import (
+ 	"testing"
+ 	"time"
+ 
++	"github.com/relux-works/curator/internal/config"
+ 	"github.com/relux-works/curator/internal/godriver"
+ 	"github.com/relux-works/curator/internal/scriptpolicy"
+ 	"github.com/relux-works/curator/internal/skillspec"
+@@ -28,6 +30,22 @@ func runDerivedSession(t *testing.T, fixture *launchFixture) (Result, stubReport
+ 	return result, decodeStubReport(t, result.Stdout)
+ }
+ 
++func postureTestEnv(configPath, home string) []string {
++	env := make([]string, 0, len(os.Environ())+3)
++	for _, item := range os.Environ() {
++		if strings.HasPrefix(item, "HOME=") || strings.HasPrefix(item, "CURATOR_CONFIG=") ||
++			strings.HasPrefix(item, "CURATOR_SYSTEM_CONFIG=") {
++			continue
++		}
++		env = append(env, item)
++	}
++	return append(env,
++		"HOME="+home,
++		"CURATOR_CONFIG="+configPath,
++		"CURATOR_SYSTEM_CONFIG=",
++	)
++}
++
+ // TestCapabilityDerivationAllFieldsAbsentDenyByDefault drives vector case
+ // `all-fields-absent-deny-by-default` at the production entry: an absent
+ // (or empty) declaration derives the offline environment, exactly the
+@@ -1088,15 +1106,12 @@ func TestNativeLauncherWorkerModeWinsOverShimDispatch(t *testing.T) {
+ 	worker.send(workerMessage{Kind: kindShutdown, Nonce: fixture.nonce})
+ }
+ 
+-// TestProductionBinaryLaunchesWhenHostProvides proves admission honesty on
+-// the production image: a fresh production process admits an enforced
+-// command through `skill check`, an executed native launcher with an
+-// operator-bound interpreter runs the script end to end, and a launcher
+-// with no binding refuses `script_execution_control_unavailable` because
+-// the interpreter cannot be resolved on this host.
+-func TestProductionBinaryLaunchesWhenHostProvides(t *testing.T) {
+-	curator := mustPhysical(t, builtCuratorBinary(t))
+-	stub := mustPhysical(t, stubInterpreterBinary(t))
++// productionEnforcedLauncherFixture builds the production launcher used by
++// subprocess tests that exercise the enforced shim entry point.
++func productionEnforcedLauncherFixture(t *testing.T) (curator, stub, launcher string) {
++	t.Helper()
++	curator = mustPhysical(t, builtCuratorBinary(t))
++	stub = mustPhysical(t, stubInterpreterBinary(t))
+ 
+ 	skillDir := t.TempDir()
+ 	writeTestFile(t, filepath.Join(skillDir, "SKILL.md"), []byte("---\nname: s\ndescription: d\n---\n# s\n"), 0o644)
+@@ -1111,15 +1126,13 @@ func TestProductionBinaryLaunchesWhenHostProvides(t *testing.T) {
+ 	// The `skill check` surface admits the enforced command: the control
+ 	// table is complete.
+ 	check := exec.Command(curator, "skill", "check", skillDir)
+-	check.Env = append(os.Environ(),
+-		"HOME="+t.TempDir(),
+-		"CURATOR_CONFIG="+filepath.Join(t.TempDir(), "config.json"))
++	check.Env = postureTestEnv(filepath.Join(t.TempDir(), "config.json"), t.TempDir())
+ 	if output, err := check.CombinedOutput(); err != nil {
+ 		t.Fatalf("skill check refused an enforced command: %v: %s", err, output)
+ 	}
+ 
+ 	binDir := mustPhysical(t, t.TempDir())
+-	launcher := filepath.Join(binDir, "tool"+exeSuffix())
++	launcher = filepath.Join(binDir, "tool"+exeSuffix())
+ 	copyTestFile(t, curator, launcher)
+ 	sidecar, err := NewShimSidecar("skill", "tool", "python3-v1",
+ 		filepath.Join(skillDir, "scripts", "tool"), skillDir, "", 8, json.RawMessage(`{}`))
+@@ -1131,11 +1144,23 @@ func TestProductionBinaryLaunchesWhenHostProvides(t *testing.T) {
+ 		t.Fatal(err)
+ 	}
+ 	writeTestFile(t, launcher+ShimSidecarSuffix, payload, 0o644)
++	return curator, stub, launcher
++}
++
++// TestProductionBinaryLaunchesWhenHostProvides proves admission honesty on
++// the production image: a fresh production process admits an enforced
++// command through `skill check`, an executed native launcher with an
++// operator-bound interpreter runs the script end to end, and a launcher
++// with no binding refuses `script_execution_control_unavailable` because
++// the interpreter cannot be resolved on this host.
++func TestProductionBinaryLaunchesWhenHostProvides(t *testing.T) {
++	_, stub, launcher := productionEnforcedLauncherFixture(t)
+ 
+ 	// With an operator-bound interpreter the executed launcher runs the
+ 	// script: shim dispatch works and the worker session completes.
+ 	boundConfig, err := json.Marshal(map[string]any{
+-		"schema_version": 1, "skills_root": t.TempDir(), "projects": map[string]any{},
++		"schema_version": 1,
++		"skills_root":    t.TempDir(), "projects": map[string]any{},
+ 		"script_interpreters": map[string]string{"python3-v1": stub},
+ 	})
+ 	if err != nil {
+@@ -1144,14 +1169,21 @@ func TestProductionBinaryLaunchesWhenHostProvides(t *testing.T) {
+ 	bound := filepath.Join(t.TempDir(), "config.json")
+ 	writeTestFile(t, bound, boundConfig, 0o644)
+ 	launched := exec.Command(launcher, "--help")
+-	launched.Env = append(os.Environ(), "CURATOR_CONFIG="+bound)
++	launched.Env = postureTestEnv(bound, t.TempDir())
+ 	launched.Dir = t.TempDir()
+ 	launched.Stdin = strings.NewReader("")
+-	shimOutput, shimErr := launched.CombinedOutput()
++	var stdout, stderr bytes.Buffer
++	launched.Stdout = &stdout
++	launched.Stderr = &stderr
++	shimErr := launched.Run()
+ 	if shimErr != nil {
+-		t.Fatalf("the native launcher refused with a bound interpreter: %v: %s", shimErr, shimOutput)
++		t.Fatalf("the native launcher refused with a bound interpreter: %v: stdout=%s stderr=%s", shimErr, stdout.String(), stderr.String())
+ 	}
+-	report := decodeStubReport(t, shimOutput)
++	if bytes.Contains(stdout.Bytes(), []byte(config.DiagSecurityPosturePermissive)) ||
++		bytes.Contains(stderr.Bytes(), []byte(config.DiagSecurityPosturePermissive)) {
++		t.Fatalf("schema-1 launcher leaked the permissive warning: stdout=%q stderr=%q", stdout.String(), stderr.String())
++	}
++	report := decodeStubReport(t, stdout.Bytes())
+ 	if len(report.Argv) == 0 || report.Argv[len(report.Argv)-1] != "--help" {
+ 		t.Fatalf("stub argv = %q, want the forwarded argument", report.Argv)
+ 	}
+@@ -1160,7 +1192,7 @@ func TestProductionBinaryLaunchesWhenHostProvides(t *testing.T) {
+ 	// interpreter cannot be resolved on this host, so the
+ 	// interpreter-resolution control is unavailable here.
+ 	unbound := exec.Command(launcher, "--help")
+-	unbound.Env = append(os.Environ(), "CURATOR_CONFIG="+filepath.Join(t.TempDir(), "config.json"))
++	unbound.Env = postureTestEnv(filepath.Join(t.TempDir(), "config.json"), t.TempDir())
+ 	unbound.Dir = t.TempDir()
+ 	unbound.Stdin = strings.NewReader("")
+ 	deniedOutput, deniedErr := unbound.CombinedOutput()
+@@ -1174,3 +1206,60 @@ func TestProductionBinaryLaunchesWhenHostProvides(t *testing.T) {
+ 		t.Fatalf("launcher error = %v, want exit 1", deniedErr)
+ 	}
+ }
++
++func TestProductionEnforcedShimDoesNotLeakPermissiveWarning(t *testing.T) {
++	_, stub, launcher := productionEnforcedLauncherFixture(t)
++	for _, testCase := range []struct {
++		name   string
++		config map[string]any
++	}{
++		{
++			name: "explicit-permissive",
++			config: map[string]any{
++				"schema_version": 2, "security_posture": "permissive",
++				"skills_root": t.TempDir(), "projects": map[string]any{},
++				"script_interpreters": map[string]string{"python3-v1": stub},
++			},
++		},
++		{
++			name: "schema-1-default-permissive",
++			config: map[string]any{
++				"schema_version": 1,
++				"skills_root":    t.TempDir(), "projects": map[string]any{},
++				"script_interpreters": map[string]string{"python3-v1": stub},
++			},
++		},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			configJSON, err := json.Marshal(testCase.config)
++			if err != nil {
++				t.Fatal(err)
++			}
++			configPath := filepath.Join(t.TempDir(), "config.json")
++			writeTestFile(t, configPath, configJSON, 0o644)
++
++			launched := exec.Command(launcher, "hello")
++			launched.Env = postureTestEnv(configPath, t.TempDir())
++			launched.Dir = t.TempDir()
++			launched.Stdin = strings.NewReader("")
++			var stdout, stderr bytes.Buffer
++			launched.Stdout = &stdout
++			launched.Stderr = &stderr
++			if err := launched.Run(); err != nil {
++				t.Fatalf("the enforced launcher refused: %v: stdout=%s stderr=%s", err, stdout.String(), stderr.String())
++			}
++			for _, stream := range []struct {
++				name string
++				data []byte
++			}{{"stdout", stdout.Bytes()}, {"stderr", stderr.Bytes()}} {
++				if bytes.Contains(stream.data, []byte(config.DiagSecurityPosturePermissive)) {
++					t.Errorf("permissive warning leaked to launched command %s: %q", stream.name, stream.data)
++				}
++			}
++			report := decodeStubReport(t, stdout.Bytes())
++			if len(report.Argv) == 0 || report.Argv[len(report.Argv)-1] != "hello" {
++				t.Fatalf("stub argv = %q, want the forwarded argument", report.Argv)
++			}
++		})
++	}
++}
