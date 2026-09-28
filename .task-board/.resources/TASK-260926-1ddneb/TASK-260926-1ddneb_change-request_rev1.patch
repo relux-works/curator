@@ -1,0 +1,114 @@
+diff --git a/GOVERNANCE.md b/GOVERNANCE.md
+index c7b16b4..db88086 100644
+--- a/GOVERNANCE.md
++++ b/GOVERNANCE.md
+@@ -29,7 +29,9 @@ become the standard.
+    archive with SHA-256 checksums.
+ 
+ Release CI verifies the tag against `maintainers.allowed_signers` before
+-packaging. Its exact target must be contained in the protected default branch
++packaging. The allowlist trusts `oparin@me.com` (maintainer) and
++`bot@relux.works` (automation signer authorized by the operator on
++2026-09-26). Its exact target must be contained in the protected default branch
+ and must either carry a signature from the same allowlist or be a
+ GitHub-verified merge commit created by that protected-branch workflow. The
+ maintainer-signed tag explicitly authorizes the exact target in both cases.
+diff --git a/RELEASE.md b/RELEASE.md
+index de802e7..9367573 100644
+--- a/RELEASE.md
++++ b/RELEASE.md
+@@ -71,7 +71,9 @@ approve changes; CI enforces the mechanically verifiable items.
+ - [ ] Neither report has an open critical or high finding.
+ - [ ] Only `reviews/` changed after each report's `reviewed_commit`.
+ - [ ] The release commit and annotated `v1.0.0` tag verify against
+-  `maintainers.allowed_signers`.
++  `maintainers.allowed_signers`. Trusted principals are `oparin@me.com`
++  (maintainer) and `bot@relux.works` (automation signer authorized by the
++  operator on 2026-09-26).
+ - [ ] Release archives, SHA-256 checksums, and build-provenance attestations are
+   present and immutable.
+ 
+diff --git a/maintainers.allowed_signers b/maintainers.allowed_signers
+index e54fd88..47f54d6 100644
+--- a/maintainers.allowed_signers
++++ b/maintainers.allowed_signers
+@@ -1 +1,2 @@
+ oparin@me.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBCUyTf/+Zsam+4ftpv2aNxP86CmTlsfxXxo6XySRIKx2LN+UDVM6ftmPQHBJuedkg4KSIcu9H107FRkUMqjOnso=
++bot@relux.works ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPG7xTX05HL1XaD4XLUk0/TTeqRNHbMj5HdnqNQdDTID
+diff --git a/tools/test_allowed_signers.py b/tools/test_allowed_signers.py
+new file mode 100644
+index 0000000..3ad66a6
+--- /dev/null
++++ b/tools/test_allowed_signers.py
+@@ -0,0 +1,71 @@
++from __future__ import annotations
++
++import unittest
++from pathlib import Path
++
++
++ROOT = Path(__file__).resolve().parents[1]
++ALLOWED_SIGNERS = ROOT / "maintainers.allowed_signers"
++
++MAINTAINER_LINE = (
++    "oparin@me.com ecdsa-sha2-nistp256 "
++    "AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBCUyTf/+Zsam+4ftpv2aNxP86CmTlsfxXxo6XySRIKx2LN+UDVM6ftmPQHBJuedkg4KSIcu9H107FRkUMqjOnso="
++)
++BOT_LINE = (
++    "bot@relux.works ssh-ed25519 "
++    "AAAAC3NzaC1lZDI1NTE5AAAAIPG7xTX05HL1XaD4XLUk0/TTeqRNHbMj5HdnqNQdDTID"
++)
++
++KNOWN_KEY_TYPES = {"ecdsa-sha2-nistp256", "ssh-ed25519"}
++
++
++class SignerLineError(ValueError):
++    pass
++
++
++def parse_allowed_signers_line(line: str) -> tuple[str, str, str]:
++    parts = line.split(" ")
++    if len(parts) != 3 or not all(parts):
++        raise SignerLineError(f"malformed allowed_signers line: {line!r}")
++    principal, key_type, key = parts
++    if "@" not in principal:
++        raise SignerLineError(f"principal is not an email: {principal!r}")
++    if key_type not in KNOWN_KEY_TYPES:
++        raise SignerLineError(f"unknown key type: {key_type!r}")
++    return principal, key_type, key
++
++
++class AllowedSignersFileTests(unittest.TestCase):
++    def test_file_is_expected_two_lines(self) -> None:
++        raw = ALLOWED_SIGNERS.read_bytes()
++        self.assertTrue(raw.endswith(b"\n"), "file must end with a trailing newline")
++        lines = raw.decode("utf-8").splitlines()
++        self.assertEqual(lines, [MAINTAINER_LINE, BOT_LINE])
++
++    def test_maintainer_line_byte_identical(self) -> None:
++        lines = ALLOWED_SIGNERS.read_text(encoding="utf-8").splitlines()
++        self.assertEqual(lines[0], MAINTAINER_LINE)
++
++    def test_bot_line_exact(self) -> None:
++        lines = ALLOWED_SIGNERS.read_text(encoding="utf-8").splitlines()
++        self.assertEqual(lines[1], BOT_LINE)
++
++    def test_principals_are_unique_and_known(self) -> None:
++        principals = [parse_allowed_signers_line(line)[0] for line in ALLOWED_SIGNERS.read_text(encoding="utf-8").splitlines()]
++        self.assertEqual(sorted(principals), ["bot@relux.works", "oparin@me.com"])
++
++    def test_rejects_malformed_line(self) -> None:
++        with self.assertRaises(SignerLineError):
++            parse_allowed_signers_line("bot@relux.works ssh-ed25519")
++
++    def test_rejects_unknown_key_type(self) -> None:
++        with self.assertRaises(SignerLineError):
++            parse_allowed_signers_line("bot@relux.works ssh-rsa AAAA")
++
++    def test_rejects_non_email_principal(self) -> None:
++        with self.assertRaises(SignerLineError):
++            parse_allowed_signers_line("bot ssh-ed25519 AAAA")
++
++
++if __name__ == "__main__":
++    unittest.main()
