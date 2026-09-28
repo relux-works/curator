@@ -128,6 +128,17 @@ spawn run child final message (run=RUN-260927-d98e1f, tools=6 patches=0 failed=0
 Worktree verified ready for the runner-owned landing of accepted revision 6: board at `integrating`, branch on `task-board/story/STORY-260916-1ll22r` at trunk `6bd98d49` with no producer commits, exactly the 17 expected rev5/rev6 paths changed, no stray files, no CHANGELOG/LOGBOOK edits. Preconditions attached as `TASK-260918-ryh3kw_integration-land.md`. No files changed, no status change, no integrate/handoff run — the landing transaction is left to the runner.
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260927-d98e1f, pid=20288, exit=0)
+spawn run RUN-260927-d98e1f failed; operator action required; failure: board_publication_pending: runner integrate refused: board_publication_pending: STORY-260916-1ll22r is landed and its board state is committed as 86552087f9a5ba27a9148ee84f579cc8b0b1fcbe on the local trunk, but the publication push did not land (board_publish_local_trunk_unproven); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: 86552087f9a5ba27a9148ee84f579cc8b0b1fcbe
+  cause_code: board_publish_local_trunk_unproven
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: ead882c8da784176cfd6e7d131f3359dc2d0733a
+  story_id: STORY-260916-1ll22r
+  cause: board_publish_local_trunk_unproven: the local trunk holds an unpublished link 86552087f9a5ba27a9148ee84f579cc8b0b1fcbe that is not this repository's own board-state record (the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key); a stable content digest is never ownership proof — nothing was projected and nothing was pushed
+  link_oid: 86552087f9a5ba27a9148ee84f579cc8b0b1fcbe
+  reason: the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key
+  remedy: land the unproven commits through integrate/reconcile-trunk, not through this command
 
 ## Precondition Resources
 - [campaign-producer-rules.md](file://TASK-260918-ryh3kw/campaign-producer-rules.md)
@@ -181,7 +192,7 @@ spawn run completed: muse (run=RUN-260927-d98e1f, pid=20288, exit=0)
 2026-09-18T17:27:15Z
 
 ## Last Update
-2026-09-27T19:51:12Z
+2026-09-27T19:54:09Z
 
 ## Assigned To
 [implementer] developer (muse)
