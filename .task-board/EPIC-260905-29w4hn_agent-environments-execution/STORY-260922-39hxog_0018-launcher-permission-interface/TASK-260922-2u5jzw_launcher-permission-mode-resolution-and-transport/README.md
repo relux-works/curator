@@ -1,0 +1,10 @@
+# TASK-260922-2u5jzw: launcher-permission-mode-resolution-and-transport
+
+## Description
+F-L1b: implement the 0018 permission interface in the launcher: internal/cli parses --permissions native|yolo and the --yolo alias (= and separate forms, aliases, exec placement conflicts refused), rejects -d/--danger; resolution precedence flag > profile > global > default-interactive > default-headless with provenance source recorded; internal/composition places the resolved mode into the agents-management LaunchRequest permission-mode member (pin bumped to the F-M1 release) and never spells a flag; internal/execution refuses tracked + effective yolo from any level (permission_mode_tracked_unsupported, no fallback), refuses would-be yolo when transport support is not established (permission_policy_unsupported, token from F-S2), prints the choice-4 effective-native-policy line and records it. Choice-5 negative rows drive the REAL curator run entry with a fake tool: per-environment mapping rows (via the member, asserting the argv the member yields), per-conflict refusal rows, precedence rows, v1-file-with-member and unknown-value rejection rows, lock-engaged refusal rows from every level, tracked-refusal rows from every level, headless/CI-silence => native rows, legacy-fragment would-be-yolo refusal rows from every level including the flag; one narrowing mutant per refusal bound executed and killed.
+
+## Scope
+curator-agent-launcher: internal/cli, internal/composition, internal/execution, internal/plan if the resolved mode is planned, cmd/curator-run tests, go.mod/go.sum pin, docs cross-check, CHANGELOG. No provider flag spelling in this module (argvguard-style test proves it).
+
+## Acceptance Criteria
+1) all choice-5 row families present and executed through the real entry with a fake tool (count per family reported); 2) narrowing mutants: one per refusal bound, executed, killed, table attached; 3) a module-level test proves no bypass flag spelling exists in the launcher sources; 4) go.mod pins the F-M1 release; 5) hosted gate green; 6) CHANGELOG entry.

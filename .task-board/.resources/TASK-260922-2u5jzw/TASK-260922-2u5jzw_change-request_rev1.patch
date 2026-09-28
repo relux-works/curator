@@ -1,0 +1,2736 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index c1b015c..8cd39cf 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -3,10 +3,20 @@
+ ## 0.1.0 — unreleased
+ 
+ Release-readiness candidate; source builds report `0.1.0-dev`, against
+-SPEC `0.4.1-draft`. No tag or release is created by this work.
++SPEC `0.5.0-draft`. No tag or release is created by this work.
+ 
+ ### Added
+ 
++- SPEC 0.5.0-draft and README permission interface per Decision 0018
++  (TASK-260922-1zfqq0): typed permission mode, fragment-v2 transport,
++  precedence, headless/tracked rules, diagnostics, and native-policy
++  provenance. Runtime behavior and its tests are the companion F-L1b leaf.
++
++- F-L1b permission-mode resolution and transport (TASK-260922-2u5jzw):
++  CLI modes and alias, source-aware precedence, v2 fragment transport, tracked
++  and force-native refusals, release-bound agents-management composition,
++  headless classification, and effective-native-policy reporting.
++
+ - Closed launcher CLI parsing, opaque native arguments, usage diagnostics and
+   initial hosted CI (PR #4).
+ - Curator fragment resolution with repair, closed validation, CCJ-1 digest and
+@@ -47,6 +57,6 @@ SPEC `0.4.1-draft`. No tag or release is created by this work.
+ 
+ ### Dependencies
+ 
+-- `github.com/relux-works/skill-agents-management v0.5.13`, the upstream
++- `github.com/relux-works/skill-agents-management v0.5.22`, the upstream
+   agents-management module, with no replace directive or workspace override.
+   Curator and ax remain CLI contracts.
+diff --git a/README.md b/README.md
+index 5a82830..140341b 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ `curator-run` composes Curator's managed environment, agents-management's
+ admitted interactive plan, and optional ax tracking. The contract is
+-[SPEC 0.4.1-draft](SPEC.md).
++[SPEC 0.5.0-draft](SPEC.md).
+ 
+ ## Production pipeline
+ 
+@@ -19,13 +19,19 @@ The executable supports `claude_code` (alias `claude`), `codex_cli`
+    system/provider pair. Outputs carry the canonical id only; aliases are
+    never persisted.
+ 3. Resolve model and effort from flags, operator/machine defaults and the tagged
+-   lineup. Emit each member's origin before admission. Pi uses the ordered
+-   convention `pi-anthropic`, `pi-openai`, `pi-google`; vendor scores are never
+-   compared. Explicit models bind their own runtime.
+-4. Call `vendorplugin.BuildLaunchWithEnvironment` in `LaunchModeInteractive`,
+-   then enforce a separate `providerlimits.Store.AvailabilityFor` verdict for
+-   the same runtime/model/managed home. Unknown and failed reads refuse. No
+-   retry, model downgrade or fallback occurs.
++   lineup. Resolve permission mode by flag, Curator profile setting, launcher
++   global default, then the built-in default. The mode is passed to
++   `LaunchRequest.PermissionMode`; emit model/effort origins and the module's
++   release-bound permission mapping before admission.
++   Pi uses the ordered convention `pi-anthropic`, `pi-openai`, `pi-google`; vendor
++   scores are never compared. Explicit models bind their own runtime.
++4. Call `vendorplugin.BuildLaunchWithEnvironment` in `LaunchModeInteractive`
++   with `LaunchRequest.ToolRelease` and `LaunchRequest.NativeArgs` for the
++   release-bound permission grammar (v2 for Claude Code and Codex CLI, v1 for
++   Pi), then enforce a separate
++   `providerlimits.Store.AvailabilityFor` verdict for the same runtime/model/
++   managed home. Unknown and failed reads refuse. No retry, model downgrade or
++   fallback occurs.
+ 5. Select the requested system-prompt channel and compose argv in plan → prompt
+    → MCP → native order. Native arguments after `--` remain opaque.
+ 6. Prepare direct execution or the ax launch-plan document. Immediately before
+@@ -33,17 +39,23 @@ The executable supports `claude_code` (alias `claude`), `codex_cli`
+    and check the Codex MCP layer. Emit prompt/discovery warnings. A late refusal
+    starts neither provider nor ax.
+ 
+-The dependency is the real `skill-agents-management v0.5.13` tag, without a
+-replace directive or workspace override. Its admitted result supplies both the
+-plan and owned environment literals from the same prepared, alias-projected
+-request. Composition never rebuilds the plan or reconstructs that request.
++The permission interface is implemented against upstream
++`skill-agents-management v0.5.22` (F-M1). It owns
++`LaunchRequest.PermissionMode`, the release-bound mapping, versioned native
++argument classification, stored-policy inspection, and the capability table.
++Claude Code and Codex CLI use `permission-grammar-v2`; Pi uses
++`permission-grammar-v1`. The admitted result supplies
++the plan and owned environment literals from the same prepared,
++alias-projected request; composition never rebuilds the plan.
+ 
+ ## Environment and transport
+ 
+ Direct execution uses the composed full environment, working directory,
+ argv and stdin. Tracked transport includes only owned literals, MCP lookup
+-names, argv suffix, encoded stdin and the four Curator extensions. It never
+-serializes the full inherited environment. Ax inherits the launcher environment.
++names, argv suffix, encoded stdin and the four base Curator extensions. A
++tracked native launch can also include the optional
++`works.relux.curator.effective-native-policy` extension. It never serializes the
++full inherited environment. Ax inherits the launcher environment.
+ Attached empty stdin remains distinct from unattached; binary stdin uses D4
+ base64url encoding in the ax document and exact bytes for direct execution.
+ 
+@@ -92,7 +104,7 @@ sudo install -m 0755 curator-run /usr/local/bin/curator-run
+ curator-run --version
+ ```
+ 
+-This development build reports `0.1.0-dev` (specification `0.4.1-draft`).
++This development build reports `0.1.0-dev` (specification `0.5.0-draft`).
+ Ensure `/usr/local/bin` is on `PATH`, or install into a dedicated trusted
+ operator-owned directory on `PATH`. Do **not** install into Curator's user-bin
+ shim directory (`~/.local/bin`), a managed skill bin directory, or beneath the
+@@ -132,13 +144,19 @@ scope. Resolution always requests repair.
+ | `--profile <name>` | Curator profile, forwarded to environment resolution |
+ | `--system-prompt <append\|replace>` | Explicit prompt-channel opt-in; unavailable semantics refuse the launch |
+ | `--model <model>`, `--effort <effort>` | Explicit spawn-plane selection, subject to admission and machine locks |
++| `--permissions <native\|yolo>` | Resolve the launcher permission mode |
++| `--yolo` | Exact alias of `--permissions yolo` at the same precedence level |
++| `-d`, `--danger` | Rejected as usage errors before `--`; after `--`, arguments are native input |
+ | `--name <session-name>` | Tracked session name; `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`; accepted without effect when untracked |
+ | `--ax-profile <standard\|yolo>` | Tracked execution profile; usage error when untracked; absent uses ax's default |
+ | `--help`, `-h`, `--version` | Print information and exit, after reading tracking configuration |
+ | `--` | End launcher parsing; all following arguments pass through verbatim |
+ 
+ Value flags accept `--flag value` or `--flag=value`. Repeated flags, unknown
+-flags, missing values, and extra operands before `--` are usage errors.
++flags, missing values, and extra operands before `--` are usage errors. The
++permission flag accepts only `native` or `yolo`; `--yolo` is the no-value exact
++alias, and the two forms cannot be combined. `-d` and `--danger` are rejected
++launcher flags before the native-argument boundary.
+ Prompt-file discovery can still apply without the prompt opt-in; see the warnings
+ and Pi precedence described above. Pi has no MCP channel.
+ 
+@@ -151,25 +169,43 @@ Both use closed schemas: unknown members, malformed data and unreadable files
+ refuse the invocation; absence alone permits fallback.
+ 
+ Model and effort resolve independently: flags, then operator defaults over
+-machine defaults per member, then the admitted lineup. For example, a file
+-can select only an effort, leaving model selection to the lineup:
++machine defaults per member, then the admitted lineup. Permission mode has its
++own precedence: `--permissions` or `--yolo`, Curator's per-profile setting in the
++fragment, the launcher-global file value, then the built-in default. A v2 file
++can set an effort for one environment and a permission default for another:
+ 
+ ```json
+ {
+-  "schema": "curator-run-defaults-v1",
++  "schema": "curator-run-defaults-v2",
+   "locked": false,
+   "defaults": {
+-    "codex_cli": { "effort": "high" }
++    "codex_cli": { "effort": "high" },
++    "claude_code": { "permissions": "yolo" }
+   }
+ }
+ ```
+ 
+-Each environment entry contains `model`, `effort`, or both; values are passed
+-to spawn-plane admission. With `"locked": true` in the machine file, the
+-operator entry is ignored for every environment named by that machine file.
+-Flags attempting to override a member set by that machine entry are usage
+-errors, even if the value matches. Members left unset still use later fallback.
+-The selected model, effort and their origins are printed before admission.
++Each environment entry may contain `model`, `effort`, and/or `permissions`;
++permission values are exactly `native` or `yolo`. A v2 reader accepts a v1 file
++without `permissions`, while a v1 reader rejects that new member. The permission
++fragment member uses the F-S2 names `permissions.mode`, `permissions.locked`,
++and `permissions.source`; `source=default` means the profile level is silent.
++Interactive untracked silence defaults to `yolo`; headless, CI, and tracked
++silence defaults to `native` with `source=default-headless`. `native` adds no
++launcher override and does not guarantee prompting; untracked native arguments
++after `--` remain verbatim. The closed headless marker set is versioned in SPEC
++§4.6 and mirrored by environments §10.1.
++Curator's force-native lock is above all permission levels: visible `yolo` is a
++`usage` error, silence resolves to `native`. A tracked `yolo` request from any
++level fails with `permission_mode_tracked_unsupported`; the launcher never
++falls back to untracked execution. When the machine defaults file is locked,
++operator entries are ignored for its environments and flags overriding any
++member it sets are usage errors. Model and effort origins are printed before
++admission. Native launches use the upstream stored-policy inspector and report
++known relaxations only from files it fully inspected. The report is not a claim
++that a setting won provider precedence or that uninspected managed policy is
++clear. Tracked launches record the same selectors and their inspected source.
++Long `permissions.allow` lists are summarized by rule count in stderr.
+ 
+ Pi fallback uses the ordered convention `pi-anthropic`, `pi-openai`,
+ `pi-google`, selecting the first runtime with a driven model and ranking only
+@@ -206,9 +242,10 @@ on stderr. Foreign Curator/provider/ax output is forwarded unchanged.
+ | Result / diagnostic codes | Exit |
+ |---|---|
+ | Help/version, successful direct execution or ax handoff | 0 |
+-| `usage` (invalid arguments or locked-member override) | 2 |
++| `usage` (invalid arguments, locked-member override, or visible `yolo` under Curator's force-native lock) | 2 |
+ | `resolve_invocation_failed`, `resolve_environment_unknown`, `resolve_profile_unknown`, `resolve_repair_failed`, `resolve_lock_unavailable`, `resolve_fragment_invalid` | 1 |
+ | `defaults_config_invalid`, `defaults_unresolvable` | 1 |
++| `permission_policy_unsupported`, `permission_mode_tracked_unsupported`, `permission_mode_unsupported` | 1 |
+ | `plan_refused`, `plan_provider_limited`, `env_unsupported` | 1 |
+ | `exec_provider_missing`, `ax_handoff_failed` | 1 |
+ | `mcp_layer_missing`, `mcp_layer_unreadable` | 1 |
+diff --git a/SPEC.md b/SPEC.md
+index e8b6f28..71c7a0b 100644
+--- a/SPEC.md
++++ b/SPEC.md
+@@ -1,6 +1,6 @@
+ # Curator Agent Launcher — Specification
+ 
+-**Specification version:** `0.4.1-draft`
++**Specification version:** `0.5.0-draft`
+ **Status:** in-repository draft (see [Versioning](#8-versioning))
+ 
+ The launcher is the **execution plane** of the four-plane composition fixed
+@@ -138,6 +138,7 @@ no origin suffix in this revision.
+ ```text
+ curator-run <env-id> [--profile <name>] [--system-prompt <append|replace>]
+             [--model <model>] [--effort <effort>]
++            [--permissions <native|yolo> | --yolo]
+             [--name <session-name>] [--ax-profile <standard|yolo>]
+             [--] <native args...>
+ curator-run --help | -h
+@@ -155,6 +156,9 @@ change, not a flag addition.
+ | `--system-prompt <append\|replace>` | execution | Explicit opt-in that engages the fragment's system-prompt channel with the given semantics. The value is required: the opt-in states what it wants, and the launcher never chooses replacement by default. See §5. |
+ | `--model <model>` | spawn | Level 1 of the §4.3 default precedence: passed through to the spawn plane's plan request as declared. The launcher does not validate model names; admission is the spawn plane's verdict. |
+ | `--effort <effort>` | spawn | Level 1 of the §4.3 default precedence: passed through as declared. Effort is per-model and the spawn plane injects no default; when no §4.3 level yields one for a model that requires it, the plane's refusal names the model, the accepted vocabulary, and the recommendation, and the launcher completes that error with its own flag spelling, `--effort`. |
++| `--permissions <native\|yolo>` | spawn | Permission mode resolved by §4.3. The launcher passes the selected mode to `LaunchRequest.PermissionMode` for `LaunchModeInteractive`; agents-management owns the mapping. |
++| `--yolo` | spawn | Exact alias of `--permissions yolo`, shipped in the same increment and occupying the same precedence level. Supplying both forms is a repeated permission request and a `usage` error. |
++| `-d`, `--danger` | — | Rejected before `--` as `usage`; neither spelling is an alias. After `--`, arguments remain opaque native arguments under the normal boundary rule. |
+ | `--name <session-name>` | session | Tracked mode only (§4.6): the `ax` session name, replacing the default `<env-id>-<utc-stamp>`. MUST satisfy the `ax` §2.1 grammar `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`; a longer or ill-formed value is a `usage` error naming `--name`, never a silent truncation. On an untracked machine the flag is accepted and has no effect. |
+ | `--ax-profile <standard\|yolo>` | session | Tracked mode only (§4.6): the `ax` execution profile, forwarded as `ax start --profile <value>`. Absent, no `--profile` is passed and `ax`'s own default applies. This flag is the **only** way `--profile yolo` reaches `ax` from a launcher-mediated launch (Decision 0013 D6.4); the launcher never derives it from the fragment, the plan, or the native arguments. On an untracked machine the flag is a `usage` error: an execution profile is `ax`'s concept, and a value that would be silently discarded is a value the operator was misled about. |
+ | `--` | — | Terminates launcher argument parsing. Everything after it is native argv, forwarded to the tool verbatim, in order, uninspected. |
+@@ -176,9 +180,14 @@ Parsing rules, closed:
+   forwarded: silent forwarding would let a typo in a launcher flag reach
+   the tool as tool input.
+ - Every value-taking flag takes exactly one value; a repeated flag is a
+-  usage error, not last-wins. `--system-prompt` and `--ax-profile` accept
+-  only their closed vocabularies; `--name` is validated against the `ax`
+-  §2.1 grammar at parse time, before anything is resolved.
++  usage error, not last-wins. `--permissions` accepts only `native` or
++  `yolo`; `--yolo` is the no-value exact alias of `--permissions yolo`,
++  and the two forms cannot be combined or repeated. `-d` and `--danger`
++  are unrecognized launcher flags before `--` and therefore produce
++  `usage`; after `--`, the launcher does not interpret any native argument.
++  `--system-prompt` and `--ax-profile` accept only their closed
++  vocabularies; `--name` is validated against the `ax` §2.1 grammar at
++  parse time, before anything is resolved.
+ - Usage errors exit 2 and print usage; they launch nothing and resolve
+   nothing.
+ 
+@@ -205,10 +214,18 @@ curator env resolve <env-id> [--profile <name>] --repair --format json
+ 
+ with the canonical `<env-id>` of §3: the launcher normalizes the `claude`
+ and `codex` aliases before invoking the subprocess, so the alias never
+-reaches Curator's lookup. The launcher then parses the closed
+-`launch-env-fragment-v1` object per environments.md §10.2 as revised by
+-Decision 0012 D8, rejecting unknown fields, unknown kinds, and unknown
+-semantics values.
++reaches Curator's lookup. The required `fragment` member names the fragment
++revision. The launcher parses the closed v1 or v2 object per environments.md
++§10.2 as revised by Decisions 0012 and 0018 and F-S2
++(curator-spec `ec8dc656`), rejecting unknown fields, unknown kinds,
++unknown semantics values, and contradictory permission data.
++`launch-env-fragment-v2` is the minimum permission-transport token: support
++is established when the revision is v2 or later and retains this contract.
++A v2 fragment MUST carry the required closed `permissions` object; a v1
++fragment carrying that member is invalid. A v1 fragment without it remains
++usable for legacy `native` launches but cannot establish permission or lock
++transport, so a launch that would resolve `yolo` fails closed as specified
++in §4.3 and §4.6.
+ 
+ `--repair` is **always** passed (environments.md §9.2 step 5, §10.1;
+ `profiles/manager.md` §12.5): the launcher is the one caller that repairs.
+@@ -228,9 +245,19 @@ to inspect staleness without repairing runs `curator env resolve` or
+ 
+ The members this document consumes:
+ 
++- `fragment` — the required fragment-revision token;
++  `launch-env-fragment-v2` is the minimum version that carries the
++  permission policy and force-native lock engagement;
+ - `profile.name` and `profile.lock_sha256` — the profile and its
+   effective pin (Decision 0012 D3: the lock hash is the identity
+   everywhere Decision 0010 used a commit);
++- `permissions` — required in v2, a closed object with exactly
++  `mode: native|yolo`, `locked: true|false`, and
++  `source: profile|global|default`. Its consistency rules are:
++  `locked` is true iff `source` is `global`; `mode` is `native` for
++  `source` `global` or `default`; `source=profile` carries the
++  per-profile setting, while `source=default` means that level is
++  silent and the launcher continues to its own global default;
+ - `env` — the registry-declared variable names mapped to managed-home
+   paths (environments.md §10.3); the value of the adapter's **home
+   variable** (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `PI_CODING_AGENT_DIR`;
+@@ -365,33 +392,35 @@ with no configured effort takes the lineup's effort for that model.
+ 
+    ```json
+    {
+-     "schema": "curator-run-defaults-v1",
++     "schema": "curator-run-defaults-v2",
+      "locked": false,
+      "defaults": {
+        "claude_code": { "model": "claude-opus-5", "effort": "high" },
+-       "codex_cli":   { "model": "gpt-5.3-codex" }
++       "codex_cli":   { "model": "gpt-5.3-codex", "permissions": "yolo" }
+      }
+    }
+    ```
+ 
+    `defaults` keys are env-ids of the §4.2 table (an unknown key is
+-   `defaults_config_invalid`); each value is an object of at most the two
+-   members `model` and `effort`, at least one present, both strings that
+-   are passed through unvalidated — admission stays the spawn plane's.
++   `defaults_config_invalid`); each value is an object of at most three
++   members: `model`, `effort`, and `permissions`. The first two are
++   strings passed through unvalidated to admission; `permissions`, when
++   present, is exactly `native` or `yolo` and supplies the launcher-global
++   mode level. At least one member must be present.
+    **Lockable:** when the machine file carries `"locked": true`, the
+    operator file is ignored for every env-id the machine file names, and
+-   a `--model`/`--effort` flag for a member the machine entry sets is a
+-   `usage` error naming the locked member, so a locked default is never
+-   silently overridden and never silently applied. Otherwise the operator
+-   file overrides the machine file per member: an operator entry that sets
+-   only `model` leaves a machine `effort` for the same env-id in force, the
+-   same per-member resolution as the rest of this section. A file that is
+-   absent is a legitimate absence and the
+-   level yields nothing; a file that exists but cannot be read or parsed
+-   is `defaults_config_invalid` — a read failure is not an absence, and
+-   the lineup fallback MUST NOT fire past it. The file and its sibling
+-   `ax.json` (§4.6) are the **launcher's configuration file family**,
+-   delimited against Curator's machine configuration in §4.7.
++   a flag for a member the machine entry sets is a `usage` error naming
++   the locked member, even if the requested value matches. Otherwise the
++   operator file overrides the machine file per member: an operator entry
++   that sets only `model` leaves a machine `effort` for the same env-id in
++   force, and permission mode follows the same per-member merge. A v2
++   reader accepts a v1 file with no `permissions` member; a v1 reader
++   rejects that new member under its closed schema. A missing file is a
++   legitimate absence; a read or parse failure is `defaults_config_invalid`
++   and the next level MUST NOT be used. The file and its sibling `ax.json`
++   (§4.6) are the **launcher's configuration file family**, delimited
++   against Curator's machine configuration in §4.7.
++
+ 3. **Lineup fallback.** The highest-ranked model of `vendorplugin.Lineup`
+    (capability score descending) among the models the module's runtime
+    compatibility registry admits for the mapped system, with that model's
+@@ -414,6 +443,45 @@ with no configured effort takes the lineup's effort for that model.
+    the frozen runtime whose vendor carries its exact id, independently of
+    this fallback preference.
+ 
++**Permission-mode resolution (separate from model and effort).** The
++resolved mode follows this precedence, with the force-native lock of
++§4.6 above the entire ladder:
++
++1. `--permissions native|yolo`, or its exact `--yolo` alias;
++2. the Curator per-profile setting carried by `fragment.permissions`
++   when `source=profile`;
++3. the launcher-global `defaults.json` `permissions` member for the
++   env-id, after the operator-over-machine merge;
++4. the built-in interactive default, `yolo` with
++   `source=default-interactive`, for interactive untracked silence;
++5. the built-in headless default, `native` with
++   `source=default-headless`, for headless, CI, or tracked silence.
++
++The fragment's `source=global` means Curator's force-native lock and
++carries `mode=native`; it is not the launcher-global file level. In the
++stderr provenance line below, `source=global` instead names the winning
++launcher-global `defaults.json` level.
++`source=default` means the profile level is silent; its `mode=native`
++is a placeholder and the launcher falls through. Explicit `native` means
++no launcher override and does not promise a prompting posture. In
++untracked native mode the launcher does not inspect policy selectors in
++the native suffix; arguments after `--` are forwarded verbatim and may
++request their own native policy by design. The typed interface is not a
++security boundary. `yolo` requests the agents-management-declared native
++permission mode within the tool's own policy. The launcher never derives
++this mode from model,
++prompt, credentials, environment values, or tracking configuration.
++After resolving a mode, every untracked launch prints this provenance line before admission:
++
++```text
++curator-run: permissions=<native|yolo> source=<flag|profile|global|default-interactive|default-headless> mapped=<flag or none>
++```
++
++The `mapped` value is supplied by agents-management; this SPEC names no
++provider flag. The headless argument-shape check selects only the built-in
++default; it does not modify native arguments or claim that they are safe. See
++§4.6 for the closed headless marker set, the lock rule, and tracked refusals.
++
+ The §4.3 stderr line-group prints at **every** launch, before the plan
+ request, in this order — so an operator always sees which binary is
+ about to run, and which model, and why:
+@@ -454,7 +522,7 @@ different pair.
+ 
+ The launcher obtains the plan through
+ `vendorplugin.BuildLaunch(ctx, registry, request, agentic.LaunchModeInteractive)`,
+-the entry point verified at `agents-management` tag `v0.5.10` (A0 E3).
++the entry point verified at `agents-management` tag `v0.5.18`.
+ `BuildLaunch` resolves the runtime and vendor model row, admits the model
+ and effort word against that row, and calls `agentic.BuildPlan` with the
+ resulting `LaunchRequest`. The launcher MUST NOT bypass that admission
+@@ -468,6 +536,14 @@ by calling `BuildPlan` with a bare model id or reconstructing the row's
+ - `Home`: the managed home from the fragment's home variable (§4.1),
+   passed through to `LaunchRequest.Home`;
+ - `WorkDir`: the launcher's current working directory;
++- `PermissionMode`: the §4.3 resolved `native` or `yolo` value, passed
++  through `LaunchRequest.PermissionMode` for `LaunchModeInteractive`;
++- `ToolRelease`: the exact tool release required by the module's
++  release-bound permission capability;
++- `NativeArgs`: the opaque suffix after `--`, supplied to the module's
++  `permission-grammar-v1` conflict check when the resolved mode is `yolo`;
++  the launcher does not own or restate that grammar. Native mode does not run
++  permission-conflict inspection and preserves the raw suffix;
+ - `Env`: `os.Environ()` in **both** tracked and untracked modes, supplied
+   as the parent environment for `LaunchRequest.Env`. The resulting
+   `Plan.Env` is the plugin's complete filtered child environment over
+@@ -479,9 +555,16 @@ by calling `BuildPlan` with a bare model id or reconstructing the row's
+   Goal, budget, service tier, and assignment prompt remain unset.
+ 
+ The mode is requested **by name**, `agentic.LaunchModeInteractive`
+-(Decision 0013 D5). The launcher never spells a provider flag; model
+-selection and effort transport belong to the system plugin. A system
+-that does not declare the mode is refused by the module with
++(Decision 0013 D5). `LaunchRequest.PermissionMode` carries the resolved
++mode. In agents-management v0.5.18, `LaunchRequest.ToolRelease` and
++`LaunchRequest.NativeArgs` bind the request to the release-specific
++`permission-grammar-v1`; agents-management owns the permission mapping,
++argv grammar, and capability table. The launcher passes the request and
++composes the admitted plan without spelling or reconstructing a provider
++mapping. An unverified yolo mapping returns
++`ErrPermissionModeUnverifiedRelease` and fails closed as `plan_refused`;
++native mode remains verbatim. A system that does not declare
++`LaunchModeInteractive` is refused by the module with
+ `ErrUnsupportedLaunchMode` → `plan_refused`.
+ 
+ The plan is a value — `Binary`, `Argv`, `Env`, `Stdin`, `WorkDir` — and
+@@ -515,9 +598,14 @@ replace them.
+ 
+ The composed launch is one plan (Decision 0013 D6.3). Its members, closed:
+ 
++The §4.3 permission mode is already carried in the agents-management
++`LaunchRequest.PermissionMode`; any admitted mapping is part of the
++module's plan. The launcher never turns the mode into argv itself.
++
+ **argv** — in this order, each part verbatim:
+ 
+-1. the interactive plan's `Argv` (model selection, effort transport);
++1. the interactive plan's `Argv` (model selection, effort transport, and
++   any admitted permission-mode mapping);
+ 2. the system-prompt channel flags — only under the §5 opt-in, from the
+    fragment's `system_prompt` descriptor of the requested semantics;
+ 3. the MCP channel flags, whenever the fragment carries an `mcp` section
+@@ -702,7 +790,7 @@ The document, `schema` `urn:ax:schema:launch-plan-request`,
+ | `env_names` | as composed, with the §4.5 collision rule already applied — disjoint from `env_literals` before `ax` sees the document. Sorted, unique. |
+ | `env_literals` | the **composer's own names only**: the plan's own names and values (`System.ChildEnv(nil, req)`) ⊕ fragment `env` ⊕ the engaged variable-kind channel (§4.5). Never serialize `Plan.Env` or copy inherited `HOME`, `PATH`, or secrets. The inherited layer of a tracked launch is whatever `ax`'s terminal backend gives the child on the destination. |
+ | `stdin` | as composed (§4.5). |
+-| `extensions` | exactly the four `works.relux.curator.*` keys below. |
++| `extensions` | the four base `works.relux.curator.*` keys below, plus the conditionally present launcher-SPEC-owned `works.relux.curator.effective-native-policy` key. |
+ 
+ The extension keys, set by the composer and copied verbatim by `ax` into
+ the Session Record's top-level `extensions` (Decision 0013 D6.4, D7):
+@@ -713,6 +801,7 @@ the Session Record's top-level `extensions` (Decision 0013 D6.4, D7):
+ | `works.relux.curator.profile-pin` | the fragment's `profile.lock_sha256`, spelled `sha256:<64 lowercase hex>` — the profile's effective pin under Decision 0012 D3 |
+ | `works.relux.curator.fragment-digest` | the §4.1 digest: `sha256:` over the CCJ-1 canonical bytes of the parsed fragment object |
+ | `works.relux.curator.system-modules` | boolean, `true` exactly when the fragment carries a `system_prompt` section — environments.md §10.2 makes that presence equivalent to "the resolved chain carries at least one applicable system module" |
++| `works.relux.curator.effective-native-policy` | Conditional: present only for a tracked `native` request when inspection finds known relaxations. Value: `{"relaxations":["<selector>",...],"source":"<settings-source>"}`; selectors are sorted and unique, and the source is the detector's stable identifier. It records only detected facts. |
+ 
+ These are what resume fidelity rests on: `ax` re-resolves the profile on
+ resume and compares the pin, and refuses by default when
+@@ -745,6 +834,47 @@ immediately before the handoff or exec, in both modes, and the first
+ failure is the one reported, so that `ax` is never asked to record a
+ session the launcher already knows is wrong.
+ 
++**Permission headless detector and refusal rules (Decision 0018).** A
++launch is headless when stdin or stdout is not a TTY, when
++`permission-grammar-v1` recognizes a non-interactive native-argument
++form, when a non-interactive marker from the closed set
++{`CI`, `GITHUB_ACTIONS`} is present, or whenever tracking is enabled.
++This marker set is versioned here in SPEC `0.5.0-draft` §4.6 and mirrored
++in environments §10.1; additions require a later paired specification
++revision and the list changes only in that revision.
++
++Interactive untracked silence resolves to `yolo` with
++`source=default-interactive`. Headless, CI, or tracked silence resolves
++to `native` with `source=default-headless`; explicit flag, profile, or
++launcher-global values still participate in §4.3 precedence. The
++force-native lock is above that whole ladder: if the v2 fragment says
++`permissions.locked=true`, any launcher-visible `yolo` from a flag or
++launcher-global setting is a `usage` error; silence resolves to `native`.
++The fragment's closed lattice makes a profile-level `yolo` with this lock
++invalid.
++
++With established v2 permission transport, a tracked launch whose
++effective mode is `yolo` from any precedence level fails with
++`permission_mode_tracked_unsupported` and exit 1. It never retries as an
++untracked launch. If permission transport is not established, any launch
++that would resolve `yolo` fails with `permission_policy_unsupported`
++instead; native launches, including legacy-fragment headless or tracked
++silence, proceed as native. A `yolo` mode for an environment with no
++declared mapping fails with `permission_mode_unsupported` and exit 1.
++
++When a native request's best-effort inspection finds known stored
++settings that relax native posture, emit this exact stderr line:
++
++```text
++curator-run: effective-native-policy: relaxation=<selector[,selector...]> source=<settings-source>
++```
++
++Selectors are sorted and unique; the line names only inspected selectors
++and their settings source. In tracked mode, record the same values under
++`works.relux.curator.effective-native-policy` as an object with
++`relaxations` and `source`. In untracked mode the line is stderr
++provenance only and creates no persistent record.
++
+ ### 4.7 The launcher's configuration file family
+ 
+ The launcher owns exactly two configuration files, both in the §4.3
+@@ -754,7 +884,7 @@ machine), each with its own closed schema:
+ 
+ | File | Owns | Precedence |
+ |---|---|---|
+-| `defaults.json` (`curator-run-defaults-v1`, §4.3) | model and effort defaults per env-id; the `locked` rule | operator over machine per member, unless the machine file is locked |
++| `defaults.json` (`curator-run-defaults-v2`, §4.3) | model and effort defaults plus the launcher-global permission default per env-id; the `locked` rule | operator over machine per member, unless the machine file is locked |
+ | `ax.json` (`curator-run-ax-v1`, §4.6) | whether the `ax` integration is configured | machine over operator; `enabled: false` is not configured |
+ 
+ These are **launcher-owned knobs, not manager knobs**. Curator's machine
+@@ -770,9 +900,11 @@ fragment's `mcp.env_names` before the launcher sees them (§10.3);
+ materialized, which the §5.1 probe detects on disk; `current_profile` and
+ `scoped_current` select the profile when `--profile` is absent;
+ `isolation`, `forms`, `in_place_mode`, and the rest shape the managed
+-home the fragment's `env` map points at. The launcher never opens
+-`manager-config`, never resolves a `curator` knob itself, and never
+-duplicates a §12.1 value into its own files. The one open item is
++home the fragment's `env` map points at. Curator's `permissions.<profile>`
++knob reaches the launcher only as `fragment.permissions`; its value is never
++copied into `defaults.json`. The launcher never opens `manager-config`, never
++resolves a `curator` knob itself, and never duplicates a §12.1 value into its
++own files. The one open item is
+ recorded in §9: should Curator's machine configuration ever grow a
+ launcher section, both files move there by specification revision and
+ their schemas stay.
+@@ -941,11 +1073,12 @@ contract. Usage errors exit 2; every operational failure exits 1.
+ 
+ | Family | Codes | Condition |
+ |---|---|---|
+-| usage | `usage` | unknown flag, missing `<env-id>`, stray operand before `--`, repeated flag, invalid `--system-prompt` or `--ax-profile` value, `--name` outside the `ax` §2.1 grammar or over 64 characters, `--ax-profile` on an untracked machine, a flag overriding a locked default — exit 2, nothing resolved, nothing launched |
++| usage | `usage` | unknown flag, missing `<env-id>`, stray operand before `--`, repeated flag, invalid permission value, repeated or combined permission forms, rejected `-d`/`--danger`, invalid `--system-prompt` or `--ax-profile` value, `--name` outside the `ax` §2.1 grammar or over 64 characters, `--ax-profile` on an untracked machine, a flag overriding a member set by a locked machine `defaults.json`, or visible `yolo` under an established force-native lock — exit 2, nothing resolved, nothing launched |
+ | resolve | `resolve_invocation_failed`, `resolve_environment_unknown`, `resolve_profile_unknown`, `resolve_repair_failed`, `resolve_lock_unavailable`, `resolve_fragment_invalid` | §4.1: the context plane could not produce a usable fragment — `curator` not startable, or a non-zero exit with an unmapped diagnostic, Curator's own code and message passed through verbatim; unregistered environment; uninstalled profile; the store cannot restore the stale home; the repair could not take Curator's mutation lock within its bounded wait; or the output is not a valid closed fragment |
+-| defaults | `defaults_config_invalid`, `defaults_unresolvable` | §4.3 and §4.6: a launcher-owned configuration file — `defaults.json` or `ax.json` (§4.7) — exists but cannot be read or parsed, or names an unknown env-id or member — a read failure, never an absence; the lineup admits no model for the mapped system after the flag and configuration levels left it unset |
+-| plan | `plan_refused`, `plan_provider_limited` | §4.4: the spawn plane refused the request (unknown system/runtime or model, model not driven by the system, mode not declared by the system, invalid or missing required effort, unresolved vendor, or failure to produce a provider-limits verdict), or the explicit provider-limits verdict was not serviceable (`AvailabilityHealthy`) — the verdict's structure and evidence are surfaced verbatim |
++| defaults | `defaults_config_invalid`, `defaults_unresolvable` | §4.3 and §4.6: a launcher-owned configuration file — `defaults.json` or `ax.json` (§4.7) — exists but cannot be read or parsed, or names an unknown env-id or member; this includes a v1 file carrying the v2-only `permissions` member — a read failure is never absence; the lineup admits no model for the mapped system after earlier model levels are silent |
++| plan | `plan_refused`, `plan_provider_limited` | §4.4: the spawn plane refused the request (unknown system/runtime or model, model not driven by the system, mode not declared by the system, invalid or missing required effort, unresolved vendor, an unverified release-specific permission mapping, or failure to produce a provider-limits verdict), or the explicit provider-limits verdict was not serviceable (`AvailabilityHealthy`) — the verdict's structure and evidence are surfaced verbatim |
+ | environment | `env_unsupported` | §4.2: the environment has no spawn-plane or `ax` provider mapping in this revision |
++| permission | `permission_policy_unsupported`, `permission_mode_tracked_unsupported`, `permission_mode_unsupported` | §4.1/§4.6: the fragment cannot establish v2 permission and lock transport for a would-be `yolo`; or a tracked launch resolves `yolo` from any level; or the environment has no declared `yolo` mapping — exit 1, terminal refusal with no fallback to untracked execution |
+ | exec | `exec_provider_missing` | §4.6: the plan's binary does not exist — reported with the executable name and installation guidance |
+ | ax | `ax_handoff_failed` | §4.6: the configured `ax` could not take the launch — `ax` not startable, or `ax start` exited non-zero, its Structured Error passed through; no untracked fallback |
+ | mcp | `mcp_layer_missing`, `mcp_layer_unreadable` | §4.5: the composed argv carries `-p curator-mcp` and the pre-launch stat of the fragment's `mcp.path` finds no file, or finds something it cannot read as a regular file — codex would silently launch without the profile's MCP set, so neither degrades to a launch without `-p`; the two are distinct facts and are reported as such |
+@@ -965,27 +1098,22 @@ invocation, and the operator retries deliberately.
+ 
+ ## 7. Planned dependency
+ 
+-The stub imports nothing beyond the standard library. The implementation
+-will consume `github.com/relux-works/skill-agents-management` as its one
+-Go module dependency (public module, no replace, no vendoring; sibling
+-development through a gitignored `go.work`), and Curator and `ax` as CLI
+-contracts only. The module version that carries `LaunchModeInteractive`,
+-`ErrCompositionNotInteractive`, and the per-system interactive goldens
+-(Decision 0013 D5) is **required**: this specification cannot be
+-implemented against `91bf945` or any earlier main, whose closed
+-`LaunchMode` set is exec, dry-run, and managed-session only. The exact
+-version requirement is pinned in `go.mod` and restated here when that
+-release exists. The module's own invariants — plans as values, argv
+-parity goldens, frozen admitted-pair digests, per-model effort with no
+-injected default, fail-open limit state with indeterminate-read-is-unknown
+-— are relied upon, not re-implemented; `vendorplugin.Lineup` and the
+-runtime compatibility registry are consumed for §4.3 level 3 and never
+-reordered.
++The permission interface requires
++`github.com/relux-works/skill-agents-management v0.5.18` (F-M1 release `149569d`), which carries
++`LaunchModeInteractive`, `LaunchRequest.PermissionMode`,
++`LaunchRequest.ToolRelease`, `LaunchRequest.NativeArgs`, the
++`permission-grammar-v1` token, and `ErrPermissionModeUnverifiedRelease`.
++The module owns the release-bound permission mapping, grammar, and
++capability table; this SPEC deliberately contains no provider permission
++flag spelling. The pinned module's plans-as-values contract, argv
++parity goldens, frozen admitted-pair digests, per-model effort rules,
++and provider-limit verdicts remain module-owned. `vendorplugin.Lineup`
++and the runtime compatibility registry supply §4.3 model/effort fallback.
+ 
+ ## 8. Versioning
+ 
+ - This specification is versioned semantically; the current version is
+-  **`0.4.1-draft`**. Draft versions may change incompatibly between
++  **`0.5.0-draft`**. Draft versions may change incompatibly between
+   commits; the `-draft` suffix is the signal that nothing downstream may
+   pin them.
+ - The `curator-run` binary reports both its build version and the
+@@ -1001,6 +1129,7 @@ reordered.
+ 
+ | Version | Change |
+ |---|---|
++| `0.5.0-draft` | Decision 0018 permission interface. §3 adds typed permission mode, its exact alias, and rejected legacy spellings; §§4.1/4.3 define v2 fragment transport and mode precedence; §§4.5/4.6 pass the mode through agents-management, define headless and tracked refusals, and record native-policy relaxation; §4.7 and §6 update file and diagnostic contracts. Updated README and version pins. |
+ | `0.4.1-draft` | Four 0.2.1-review minors (TASK-260906-2t2t6w). §4.1/§6: the resolve pass-through clause — unmapped `--repair` diagnostics (`environment_marker_invalid`, `environment_surface_unmanaged_conflict`, `environment_backup_exists`, `environment_seed_unreadable`) collapse into `resolve_invocation_failed` with Curator's own code and message passed through verbatim, and the §6 gloss no longer leads with "`curator` not startable" for that class. §4.6: the three pre-launch checks run in the listed order — binary check first — and the first failure is the one reported. §9: the silent-MCP-absence residual for `claude_code` and `opencode` recorded. `TestSpecVersionPinned` now reads SPEC.md and README.md. |
+ | `0.3.0-draft` | §4.2: correct the Pi system to `pi-native` using accepted A0 E1/E2 and landed native-Pi support (PR23, `a2a6e9f`). Other API/environment errata remain separately tracked. |
+ | `0.4.0-draft` | E4 provider path (TASK-260916-16ys92). §2: the launcher is dispatched through the environments.md §11 trust-root resolution (curator-spec `0da4020`, PR #62) and reports its resolved executable path. §4.3: the stderr line-group grows to two lines — `curator-run: provider: path=<absolute path>` (own executable via `os.Executable` + `filepath.EvalSymlinks`, fallback `path=unavailable`, never fails the launch, folded with the existing framing rule) printed before the `defaults:` line at every launch; path-only in this revision because the umbrella passes no distinguishing marker, with the closed origin set deferred to a future revision. |
+@@ -1092,6 +1221,8 @@ reordered.
+ 
+ ## Specification changelog
+ 
++- 2026-09-23, 0.5.0-draft §§3, 4.1, 4.3, 4.5–4.7, and 6 (TASK-260922-1zfqq0): adopt Decision 0018 choices 1, 4, 5, and 7, with the v2 fragment contract from F-S2 and permission-mode members from agents-management v0.5.18. This is a SPEC/README revision; permission behavior is implemented by the companion F-L1b leaf.
++
+ - 2026-09-22, 0.4.1-draft §§4.1/4.6/6/9 (TASK-260906-2t2t6w): fold the four 0.2.1-review minors. §4.1 gains the resolve pass-through clause — the widened `--repair` surface (`environment_marker_invalid`, `environment_surface_unmanaged_conflict`, `environment_backup_exists`, `environment_seed_unreadable`) collapses into `resolve_invocation_failed` with Curator's own code and message passed through verbatim — and the §6 gloss is fixed to match. §4.6 states the pre-launch check order (binary check first, first failure reported). §9 records the silent-MCP-absence residual for `claude_code` and `opencode`.
+ 
+ - 2026-09-17, 0.4.0-draft §2/§4.3 (E4, TASK-260916-16ys92): the launcher is dispatched through the environments.md §11 trust-root resolution and reports its own resolved executable path. §4.3 line-group grows to two lines: `curator-run: provider: path=<absolute path>` (os.Executable + filepath.EvalSymlinks; fallback `path=unavailable`, never fails the launch, folded with the existing framing rule) printed before the `defaults:` line at every launch. Path-only in this revision: the umbrella passes no distinguishing argv/env marker, so no closed origin set is defined yet.
+diff --git a/TASK-260922-2u5jzw_results.md b/TASK-260922-2u5jzw_results.md
+new file mode 100644
+index 0000000..f29cd0b
+--- /dev/null
++++ b/TASK-260922-2u5jzw_results.md
+@@ -0,0 +1,112 @@
++# TASK-260922-2u5jzw — F-L1b producer results
++
++Status at writing: implementation is ready for developer handoff; the task is
++not accepted. The handoff runtime is responsible for running hosted CI once.
++
++## Implementation
++
++- `go.mod` and `go.sum` pin `skill-agents-management v0.5.22`. The launcher
++  parses `--permissions native|yolo`, `--yolo`, rejects mixed/repeated forms
++  and `-d`/`--danger`, and resolves source provenance through the CLI, Curator
++  profile, merged launcher defaults, and interactive/headless defaults.
++- Fragment v2 and defaults v2 carry the closed permission values. The resolved
++  typed mode, verified release, and opaque native suffix enter
++  `vendorplugin.BuildLaunchWithEnvironment` through `SpawnRequest`.
++  Composition consumes the admitted native suffix and places it after prompt
++  and MCP arguments; it contains no provider permission flag spelling.
++- Execution refuses locked visible `yolo`, unestablished fragment transport,
++  and tracked `yolo` with the specified diagnostics. Native launches print the
++  choice-4 policy line only for known relaxations in inspected sources; tracked
++  launches record those selectors and source under
++  `works.relux.curator.effective-native-policy`. Long `permissions.allow`
++  lists are summarized by rule count in stderr.
++- README and CHANGELOG describe the v0.5.22 integration and permission
++  behavior. The launcher SPEC was not edited.
++
++## Choice-5 real-entry row counts
++
++All rows below call `run(...)`, the production entry called by `main`, with a
++scripted fragment resolver and compiled fake provider/ax executables. No real
++provider, real `ax`, or network call was used.
++
++| Row family | Executed rows | Result |
++|---|---:|---|
++| Environment mapping and mode placement | 6 | Claude/Codex native and yolo mappings, Pi native and unsupported yolo |
++| Precedence and provenance | 5 | flag, profile, global, default-interactive, default-headless |
++| Invalid values and v1 rejection | 5 | v1 defaults member, unknown defaults/profile/CLI values, v1 fragment member |
++| Conflicting launcher permission forms | 1 | `--permissions` combined with `--yolo` |
++| Curator force-native lock | 3 | flag refusal, global refusal, silent native control |
++| Tracked yolo | 3 | flag, profile, and global sources refused |
++| Headless/CI silence | 5 | non-TTY, `CI`, present-empty `GITHUB_ACTIONS`, tracked silence, Codex `exec` classifier |
++| Legacy-fragment would-be-yolo | 3 | flag, global, and default-interactive transport refusals |
++| Upstream native-policy conflicts | 23 | all six Claude permission modes, Claude selectors, Codex approval/sandbox/config selectors, and `exec` placement |
++| Unknown native-policy values | 4 | Claude mode, Codex approval and sandbox values, Codex config key |
++| Duplicate module-mapped permission argument | 2 | Claude and Codex; mapping read dynamically from agents-management |
++| Effective-native-policy line and tracked record | 2 | untracked stderr and tracked structured record; nine allow rules summarized |
++
++The first eight families contain 31 rows. The provider-policy, duplicate-map,
++and policy-report families contain another 31 rows. The module-level source
++scan passed and rejects provider bypass spellings in non-test Go sources; the
++launcher-owned `--yolo` alias is allowed only in `internal/cli/cli.go`.
++
++The fragment lattice requires `locked=true` iff `source=global` and requires
++non-profile sources to carry native mode. Therefore profile yolo with the
++Curator force-native lock is invalid at fragment parsing, and a v1 fragment
++cannot carry a profile permission value at all. Those impossible combinations
++are not fabricated; the real-entry rows test the representable lock and legacy
++sources, plus rejection of a v1 fragment carrying a permission member.
++
++## Narrowing mutants
++
++Each mutant ran in the disposable copy
++`.temp/TASK-260922-2u5jzw-mutants`; the Story worktree was not mutated. Every
++focused `go test` returned exit 1 because its assertion caught the narrowed
++gate. No mutant survived.
++
++| Refusal bound | Narrowing mutant | Focused test command | Exit |
++|---|---|---|---:|
++| Tracked yolo from flag | Let flag-origin yolo pass the tracked check | `go test ./cmd/curator-run -run 'TestChoice5PermissionRowsThroughRealCuratorRun/tracked-yolo/flag$' -count=1` | 1, killed |
++| Tracked yolo from profile | Let profile-origin yolo pass the tracked check | `go test ./cmd/curator-run -run 'TestChoice5PermissionRowsThroughRealCuratorRun/tracked-yolo/profile$' -count=1` | 1, killed |
++| Tracked yolo from global | Let global-origin yolo pass the tracked check | `go test ./cmd/curator-run -run 'TestChoice5PermissionRowsThroughRealCuratorRun/tracked-yolo/global$' -count=1` | 1, killed |
++| Force-native lock | Let flag-origin yolo bypass the engaged lock | `go test ./cmd/curator-run -run 'TestChoice5PermissionRowsThroughRealCuratorRun/force-native-lock/flag-yolo-refused$' -count=1` | 1, killed |
++| Legacy transport | Admit flag-origin yolo without fragment-v2 transport | `go test ./cmd/curator-run -run 'TestChoice5PermissionRowsThroughRealCuratorRun/legacy-yolo-transport/flag$' -count=1` | 1, killed |
++| Unknown permission value | Accept an unknown CLI permission value | `go test ./cmd/curator-run -run 'TestChoice5PermissionRowsThroughRealCuratorRun/invalid-configuration/cli-unknown-mode$' -count=1` | 1, killed |
++| Conflicting permission forms | Admit combined `--permissions` and `--yolo` | `go test ./cmd/curator-run -run 'TestChoice5PermissionRowsThroughRealCuratorRun/cli-conflict/permissions-and-alias$' -count=1` | 1, killed |
++| `-d` rejection | Skip the explicit `-d` refusal | `go test ./cmd/curator-run -run 'TestProductionForbiddenFlags/-d/false$' -count=1` | 1, killed |
++| `--danger` rejection | Skip the explicit `--danger` refusal | `go test ./cmd/curator-run -run 'TestProductionForbiddenFlags/--danger/false$' -count=1` | 1, killed |
++| Module conflict grammar input | Hide native args from the module scanner, then restore them into the admitted argv | `go test ./cmd/curator-run -run 'TestChoice5ProviderConflictRowsThroughRealCuratorRun/claude_code/permission-mode$' -count=1` | 1, killed |
++
++The mutant tests intentionally exited non-zero; they prove that the focused
++entry-point assertions detect each narrowed bound.
++
++## Validation and gate evidence
++
++- `go get github.com/relux-works/skill-agents-management@v0.5.22`: exit 0.
++- `go mod tidy`: exit 0.
++- `go list -m github.com/relux-works/skill-agents-management`: exit 0;
++  selected version `v0.5.22`.
++- `go test ./internal/cli ./internal/defaults ./internal/fragment ./internal/execution ./internal/plan -count=1`: exit 0.
++- `go test ./cmd/curator-run -run '^TestChoice5PermissionRowsThroughRealCuratorRun$' -count=1 -v`: exit 0; emitted the row counts above.
++- `go test ./cmd/curator-run -run '^TestChoice5ProviderConflictRowsThroughRealCuratorRun$' -count=1 -v`: exit 0; 23 conflict rows and 4 unknown-value refusals.
++- `go test ./cmd/curator-run ./internal/composition -run '^(TestChoice5ProviderConflictRowsThroughRealCuratorRun|TestChoice5MappedBypassDuplicateRowsThroughRealCuratorRun|TestChoice5EffectiveNativePolicyLineAndTrackedRecord|TestChoice5V2FragmentCarriesPermissionMember|TestModuleSourcesDoNotSpellProviderPermissionBypassFlags|TestComposeAdmittedPlanRepositionsNativeSuffixAndRefusesDrift)$' -count=1 -v`: exit 0 before the provider-conflict table was expanded; the final full gate below reran all final tests.
++- `go test ./cmd/curator-run -run '^(TestProductionPipelineGoldens|TestProductionAliasEquivalence|TestProductionForbiddenFlags|TestRunHelpGolden)$' -count=1`: exit 0.
++- `go test ./cmd/curator-run -run '^(TestRunLineupEnvsPrintGroupBeforeRefusal|TestRunMapping)$' -count=1`: exit 0 after adapting the v0.5.22 Claude lineup expectations.
++- First `make check`: exit 2. Build and vet passed; two tests still expected the pre-v0.5.22 Claude lineup model `claude-fable-5-1`. Updated those assertions to `claude-opus-5-5` in `internal/defaults/lineup_test.go` and `cmd/curator-run/main_test.go`.
++- Final `make check`: exit 0. This ran `go build ./...`, `fmt-check`, `go vet ./...`, `go test ./... -count=1`, and `go test ./... -count=1 -race`; every package passed.
++- `git diff --check`: exit 0.
++- The repository has no separate linter target; formatting and `go vet` are the configured static checks and both passed in `make check`.
++- Hosted CI was not run manually. The handoff runtime runs the configured hosted landing gate once.
++
++## Follow-ups and handoff notes
++
++- The launcher SPEC still names `permission-grammar-v1` in §4.4; upstream
++  v0.5.22 uses grammar v2 for Claude/Codex and v1 for Pi. The SPEC also does
++  not enumerate the stored-policy inspector's inspected/not-inspected source
++  families. These are SPEC follow-ups; no SPEC change was made in this task.
++- The v0.5.22 pin changes Claude's selected fallback model; the two affected
++  existing expectations above were updated as the only unrelated call-site
++  adaptation.
++- The brief prohibits `LOGBOOK.md` edits. The relevant lineup change and SPEC
++  follow-ups are recorded here and in the task board notes instead.
++- Work remains uncommitted in the assigned Story worktree. Hosted CI and the
++  role status transition are delegated to `task-board handoff`.
+diff --git a/cmd/curator-run/main.go b/cmd/curator-run/main.go
+index 199e3d4..045c173 100644
+--- a/cmd/curator-run/main.go
++++ b/cmd/curator-run/main.go
+@@ -10,6 +10,7 @@ import (
+ 	"strings"
+ 	"time"
+ 
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
+ 	"github.com/relux-works/skill-agents-management/pkg/providerlimits"
+ 	"github.com/relux-works/skill-agents-management/pkg/vendorplugin"
+ 
+@@ -27,7 +28,7 @@ import (
+ 
+ const (
+ 	name        = cli.Name
+-	specVersion = "0.4.1-draft"
++	specVersion = "0.5.0-draft"
+ 	// buildVersion is the launcher's own version; the specification
+ 	// version is reported beside it (SPEC §8).
+ 	buildVersion = "0.1.0-dev"
+@@ -84,6 +85,9 @@ type launchDeps struct {
+ 	// leaves it nil so EmitGroup resolves os.Executable; tests inject
+ 	// a deterministic path so goldens stay stable across machines.
+ 	providerPath func() string
++	// isTerminal is injectable for deterministic default-mode tests. Production
++	// checks both process stdin and stdout with the platform terminal API.
++	isTerminal func() bool
+ 
+ 	configPaths func() (defaults.Paths, error)
+ 	resolver    fragmentResolver
+@@ -183,6 +187,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, deps laun
+ 		if inv.EffortSet {
+ 			flags.Effort = defaults.Member{Value: inv.Effort, Present: true}
+ 		}
++		if inv.PermissionSet {
++			flags.Permissions = defaults.Member{Value: string(inv.PermissionMode), Present: true}
++		}
+ 		var resolved defaults.Resolved
+ 		resolved, err = files.Complete(frag.Environment, flags, deps.registry)
+ 		if err == nil {
+@@ -191,7 +198,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, deps laun
+ 				provider = deps.providerPath()
+ 			}
+ 			_ = defaults.EmitGroupWithProvider(stderr, resolved, provider)
+-			return launch(ctx, inv, frag, target, resolved, stdout, stderr, deps)
++			return launch(ctx, inv, frag, target, resolved, files, stdout, stderr, deps)
+ 		}
+ 	}
+ 	if derr := (&defaults.Error{}); errors.As(err, &derr) {
+@@ -221,11 +228,16 @@ func processAvailability() (plan.AvailabilityFunc, error) {
+ 	return store.AvailabilityFor, nil
+ }
+ 
+-func launch(ctx context.Context, inv cli.Invocation, frag *fragment.Fragment, target mapping.Target, resolved defaults.Resolved, stdout, stderr io.Writer, deps launchDeps) int {
++func launch(ctx context.Context, inv cli.Invocation, frag *fragment.Fragment, target mapping.Target, resolved defaults.Resolved, files defaults.Files, stdout, stderr io.Writer, deps launchDeps) int {
+ 	wd, err := deps.workdir()
+ 	if err != nil {
+ 		return emitFailure(stderr, diagnostics.CodePlanRefused, err)
+ 	}
++	parentEnv := deps.environ()
++	decision, toolRelease, system, err := resolvePermission(ctx, inv, frag, target, files, parentEnv, stderr, deps)
++	if err != nil {
++		return emitPermissionFailure(stderr, err)
++	}
+ 	availability, err := deps.availability()
+ 	if err != nil {
+ 		return emitFailure(stderr, diagnostics.CodePlanRefused, err)
+@@ -235,25 +247,40 @@ func launch(ctx context.Context, inv cli.Invocation, frag *fragment.Fragment, ta
+ 		build = vendorplugin.BuildLaunchWithEnvironment
+ 	}
+ 	admitted, err := plan.Build(ctx, plan.Deps{Registry: deps.registry, BuildLaunch: build, Availability: availability}, plan.Request{
+-		Runtime: resolved.Runtime, Model: resolved.Model.Value, Effort: resolved.Effort.Value, Home: frag.Home(), WorkDir: wd, Env: deps.environ(),
++		Runtime: resolved.Runtime, Model: resolved.Model.Value, Effort: resolved.Effort.Value,
++		PermissionMode: decision.Mode, ToolRelease: toolRelease, NativeArgs: inv.Native,
++		Home: frag.Home(), WorkDir: wd, Env: parentEnv,
+ 	})
+ 	if err != nil {
+ 		code := diagnostics.CodePlanRefused
+ 		var limited *plan.LimitedError
+ 		if errors.As(err, &limited) {
+ 			code = diagnostics.CodePlanProviderLimited
++		} else if errors.Is(err, agentic.ErrPermissionModeUnsupported) {
++			code = diagnostics.CodePermissionModeUnsupported
++		} else if errors.Is(err, agentic.ErrNativePolicyUnknown) || errors.Is(err, agentic.ErrPermissionModeDuplicate) {
++			code = diagnostics.CodeUsage
++		}
++		if code == diagnostics.CodeUsage {
++			_ = diagnostics.Emit(stderr, code, err.Error())
++			fmt.Fprintf(stderr, "\n%s", cli.Usage)
++			return diagnostics.ExitForCode(code)
+ 		}
+ 		_ = diagnostics.Emit(stderr, code, "spawn-plane admission refused the launch")
+ 		// Preserve provider/module evidence bytes, including embedded newlines.
+ 		fmt.Fprintln(stderr, err.Error())
+ 		return diagnostics.ExitForCode(code)
+ 	}
++	var nativePolicy *execution.EffectiveNativePolicy
++	if decision.Mode == agentic.PermissionModeNative {
++		nativePolicy = execution.ReportEffectiveNativePolicy(stderr, agentic.InspectStoredPolicy(system, admitted.Plan), inv.Tracked)
++	}
+ 	selection, err := systemprompt.Select(frag, fragment.Semantics(inv.SystemPrompt))
+ 	if err != nil {
+ 		code, _ := diagnostics.CodeOf(err)
+ 		return emitFailure(stderr, code, err)
+ 	}
+-	value, err := composition.Compose(admitted.Plan, admitted.OwnedEnv, *frag, composition.PromptApplication{Argv: selection.Argv(), Env: selection.Env()}, inv.Native)
++	value, err := composition.ComposeAdmittedPlan(admitted.Plan, admitted.OwnedEnv, *frag, composition.PromptApplication{Argv: selection.Argv(), Env: selection.Env()}, inv.Native)
+ 	if err != nil {
+ 		return emitFailure(stderr, diagnostics.CodePlanRefused, err)
+ 	}
+@@ -261,7 +288,7 @@ func launch(ctx context.Context, inv cli.Invocation, frag *fragment.Fragment, ta
+ 	if deps.now != nil {
+ 		now = deps.now
+ 	}
+-	prepared, err := execution.Prepare(value, *frag, inv, target, now())
++	prepared, err := execution.PrepareWithNativePolicy(value, *frag, inv, target, now(), nativePolicy)
+ 	if err != nil {
+ 		return emitFailure(stderr, diagnostics.CodeAxHandoffFailed, err)
+ 	}
+@@ -276,3 +303,92 @@ func launch(ctx context.Context, inv cli.Invocation, frag *fragment.Fragment, ta
+ 		return nil
+ 	}})
+ }
++
++func resolvePermission(ctx context.Context, inv cli.Invocation, frag *fragment.Fragment, target mapping.Target, files defaults.Files, parentEnv []string, stderr io.Writer, deps launchDeps) (execution.PermissionDecision, string, agentic.System, error) {
++	global, err := files.PermissionDefault(inv.EnvID)
++	if err != nil {
++		return execution.PermissionDecision{}, "", nil, err
++	}
++	system, ok := agentic.Default.Lookup(agentic.SystemID(target.System))
++	if !ok {
++		return execution.PermissionDecision{}, "", nil, fmt.Errorf("%s: permission system %q is not registered", diagnostics.CodePlanRefused, target.System)
++	}
++
++	profileSet := frag.Permissions != nil && frag.Permissions.Source == "profile"
++	locked := frag.Permissions != nil && frag.Permissions.Locked
++	needsDefault := !inv.PermissionSet && !profileSet && !global.Present && !locked
++	terminal := execution.InteractiveStdio(os.Stdin, os.Stdout)
++	if deps.isTerminal != nil {
++		terminal = deps.isTerminal()
++	}
++	headless := inv.Tracked || execution.HasNonInteractiveMarker(parentEnv) || !terminal
++
++	toolRelease := ""
++	var probeErr error
++	if needsDefault && !headless {
++		toolRelease, probeErr = agentic.ProbeToolRelease(ctx, system, parentEnv)
++		if probeErr != nil {
++			return execution.PermissionDecision{}, "", nil, fmt.Errorf("%s: cannot classify native arguments without a verified tool release: %w", diagnostics.CodePlanRefused, probeErr)
++		}
++		classification, classifyErr := agentic.Default.ClassifyNonInteractiveArgs(agentic.SystemID(target.System), toolRelease, inv.Native)
++		if classifyErr != nil {
++			return execution.PermissionDecision{}, "", nil, fmt.Errorf("%s: cannot classify native arguments: %w", diagnostics.CodePlanRefused, classifyErr)
++		}
++		headless = classification.IsNonInteractive()
++	}
++	decision, err := execution.ResolvePermission(execution.PermissionRequest{
++		Flag: inv.PermissionMode, FlagPresent: inv.PermissionSet, Profile: frag.Permissions,
++		Global: global, Headless: headless, Tracked: inv.Tracked,
++		Transport: frag.Revision == fragment.IdentityV2,
++	})
++	if err != nil {
++		return execution.PermissionDecision{}, "", nil, err
++	}
++	if toolRelease == "" {
++		toolRelease, probeErr = agentic.ProbeToolRelease(ctx, system, parentEnv)
++	}
++	permissionMapping, mappingErr := agentic.Default.PermissionMapping(agentic.SystemID(target.System), toolRelease, decision.Mode)
++	if mappingErr != nil {
++		if errors.Is(mappingErr, agentic.ErrPermissionModeUnsupported) {
++			return execution.PermissionDecision{}, "", nil, &execution.PermissionError{Code: diagnostics.CodePermissionModeUnsupported, Detail: mappingErr.Error()}
++		}
++		if decision.Mode != agentic.PermissionModeNative || !errors.Is(mappingErr, agentic.ErrPermissionModeUnverifiedRelease) {
++			return execution.PermissionDecision{}, "", nil, fmt.Errorf("%s: permission mapping was not established: %w", diagnostics.CodePlanRefused, mappingErr)
++		}
++		// The module defines native as no permission override. A failed release
++		// probe leaves ToolRelease empty, which remains valid for a native
++		// request and makes no provider-mapping claim.
++		permissionMapping.Flag = ""
++	}
++	if decision.Mode == agentic.PermissionModeYolo && probeErr != nil {
++		return execution.PermissionDecision{}, "", nil, fmt.Errorf("%s: tool release was not established: %v: %w", diagnostics.CodePlanRefused, probeErr, agentic.ErrPermissionModeUnverifiedRelease)
++	}
++	if !inv.Tracked {
++		mapped := permissionMapping.Flag
++		if mapped == "" {
++			mapped = "none"
++		}
++		fmt.Fprintf(stderr, "curator-run: permissions=%s source=%s mapped=%s\n", decision.Mode, decision.Source, mapped)
++	}
++	return decision, toolRelease, system, nil
++}
++
++func emitPermissionFailure(stderr io.Writer, err error) int {
++	var permissionErr *execution.PermissionError
++	if errors.As(err, &permissionErr) {
++		_ = diagnostics.Emit(stderr, permissionErr.Code, permissionErr.Detail)
++		if permissionErr.Code == diagnostics.CodeUsage {
++			fmt.Fprintf(stderr, "\n%s", cli.Usage)
++		}
++		return diagnostics.ExitForCode(permissionErr.Code)
++	}
++	code, detail, ok := strings.Cut(err.Error(), ": ")
++	if !ok || !diagnostics.Valid(code) {
++		code, detail = diagnostics.CodePlanRefused, err.Error()
++	}
++	_ = diagnostics.Emit(stderr, code, detail)
++	if code == diagnostics.CodeUsage {
++		fmt.Fprintf(stderr, "\n%s", cli.Usage)
++	}
++	return diagnostics.ExitForCode(code)
++}
+diff --git a/cmd/curator-run/main_test.go b/cmd/curator-run/main_test.go
+index 240c897..cc36f6f 100644
+--- a/cmd/curator-run/main_test.go
++++ b/cmd/curator-run/main_test.go
+@@ -241,7 +241,7 @@ func TestRunLineupEnvsPrintGroupBeforeRefusal(t *testing.T) {
+ 	cases := []struct {
+ 		env, group string
+ 	}{
+-		{"claude_code", name + ": defaults: model=claude-fable-5-1 (lineup) effort=high (lineup)"},
++		{"claude_code", name + ": defaults: model=claude-opus-5-5 (lineup) effort=high (lineup)"},
+ 		{"codex_cli", name + ": defaults: model=gpt-6-astra (lineup) effort=max (lineup)"},
+ 		{"pi", name + ": defaults: model=claude-fable-5 (lineup) effort=high (lineup)"},
+ 	}
+@@ -394,7 +394,7 @@ func TestRunProductionResolverAgainstFakeCurator(t *testing.T) {
+ // TestSpecVersionPinned fails when the reported specification version
+ // drifts from the version SPEC.md and README.md state; the three are one fact.
+ func TestSpecVersionPinned(t *testing.T) {
+-	const want = "0.4.1-draft"
++	const want = "0.5.0-draft"
+ 	if specVersion != want {
+ 		t.Fatalf("specVersion = %q, want %q", specVersion, want)
+ 	}
+@@ -481,7 +481,7 @@ func TestRunMapping(t *testing.T) {
+ 	for _, tc := range []struct {
+ 		env, system, provider, group string
+ 	}{
+-		{"claude_code", "claude-code", "claude", "model=claude-fable-5-1 (lineup) effort=high (lineup)"},
++		{"claude_code", "claude-code", "claude", "model=claude-opus-5-5 (lineup) effort=high (lineup)"},
+ 		{"codex_cli", "codex", "codex", "model=gpt-6-astra (lineup) effort=max (lineup)"},
+ 		{"pi", "pi-native", "pi", "model=claude-fable-5 (lineup) effort=high (lineup)"},
+ 		{"opencode", "", "", ""},
+diff --git a/cmd/curator-run/permission_source_test.go b/cmd/curator-run/permission_source_test.go
+new file mode 100644
+index 0000000..9e3845d
+--- /dev/null
++++ b/cmd/curator-run/permission_source_test.go
+@@ -0,0 +1,55 @@
++package main
++
++import (
++	"io/fs"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++func TestModuleSourcesDoNotSpellProviderPermissionBypassFlags(t *testing.T) {
++	var sourcePaths []string
++	err := filepath.WalkDir(".", func(path string, entry fs.DirEntry, err error) error {
++		if err != nil {
++			return err
++		}
++		if entry.IsDir() {
++			if path == ".git" || path == ".temp" {
++				return filepath.SkipDir
++			}
++			return nil
++		}
++		if filepath.Ext(path) == ".go" && !strings.HasSuffix(path, "_test.go") {
++			sourcePaths = append(sourcePaths, path)
++		}
++		return nil
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	forbidden := []string{"--dangerously", "skip-permissions", "bypassPermissions", "--full-auto", "--approval", "--sandbox"}
++	var findings []string
++	yoloOutsideCLI := []string{}
++	for _, path := range sourcePaths {
++		data, err := os.ReadFile(path)
++		if err != nil {
++			t.Fatal(err)
++		}
++		text := string(data)
++		for _, spelling := range forbidden {
++			if strings.Contains(text, spelling) {
++				findings = append(findings, path+": "+spelling)
++			}
++		}
++		if strings.Contains(text, "--yolo") && filepath.Clean(path) != filepath.Join("internal", "cli", "cli.go") {
++			yoloOutsideCLI = append(yoloOutsideCLI, path)
++		}
++	}
++	if len(findings) != 0 {
++		t.Fatalf("provider bypass spelling found in launcher source: %s", strings.Join(findings, ", "))
++	}
++	if len(yoloOutsideCLI) != 0 {
++		t.Fatalf("launcher alias spelling escaped the CLI parser: %s", strings.Join(yoloOutsideCLI, ", "))
++	}
++}
+diff --git a/cmd/curator-run/permissions_pipeline_test.go b/cmd/curator-run/permissions_pipeline_test.go
+new file mode 100644
+index 0000000..4e38c33
+--- /dev/null
++++ b/cmd/curator-run/permissions_pipeline_test.go
+@@ -0,0 +1,370 @@
++package main
++
++import (
++	"bytes"
++	"encoding/json"
++	"fmt"
++	"os"
++	"path/filepath"
++	"reflect"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++	"github.com/relux-works/curator-agent-launcher/internal/mapping"
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
++
++type permissionRow struct {
++	family, name, env string
++	tracked           bool
++	setup             func(*testing.T, *pipelineFixture)
++	code              int
++	diagnostic        string
++	mode              agentic.PermissionMode
++	source            string
++	yoloMapped        bool
++}
++
++func insertLauncherArgs(f *pipelineFixture, args ...string) {
++	for i, arg := range f.args {
++		if arg == "--" {
++			f.args = append(append(append([]string{}, f.args[:i]...), args...), f.args[i:]...)
++			return
++		}
++	}
++	f.args = append(f.args, args...)
++}
++
++func replaceNativeArgs(f *pipelineFixture, args ...string) {
++	for i, arg := range f.args {
++		if arg == "--" {
++			f.args = append(append(append([]string{}, f.args[:i+1]...), args...), nil...)
++			return
++		}
++	}
++	f.args = append(f.args, append([]string{"--"}, args...)...)
++}
++
++func v2Default(f *pipelineFixture, t *testing.T) {
++	t.Helper()
++	f.usePermissionsFragment(t, "native", false, "default")
++}
++
++func globalPermission(t *testing.T, f *pipelineFixture, schema, value string) {
++	t.Helper()
++	if schema == "curator-run-defaults-v1" {
++		f.writeDefaults(t, f.deps.defaults.Operator, fmt.Sprintf(`{"schema":%q,"defaults":{"claude_code":{"permissions":%q}}}`, schema, value))
++		return
++	}
++	f.writeDefaults(t, f.deps.defaults.Operator, fmt.Sprintf(`{"schema":%q,"defaults":{"%s":{"permissions":%q}}}`, schema, f.args[0], value))
++}
++
++func TestChoice5PermissionRowsThroughRealCuratorRun(t *testing.T) {
++	rows := []permissionRow{
++		{family: "mapping", name: "claude-yolo-member", env: "claude_code", setup: func(t *testing.T, f *pipelineFixture) { v2Default(f, t); insertLauncherArgs(f, "--permissions=yolo") }, mode: agentic.PermissionModeYolo, source: "flag", yoloMapped: true},
++		{family: "mapping", name: "codex-yolo-alias", env: "codex_cli", setup: func(t *testing.T, f *pipelineFixture) { v2Default(f, t); insertLauncherArgs(f, "--yolo") }, mode: agentic.PermissionModeYolo, source: "flag", yoloMapped: true},
++		{family: "mapping", name: "claude-native-member", env: "claude_code", setup: func(t *testing.T, f *pipelineFixture) {
++			v2Default(f, t)
++			insertLauncherArgs(f, "--permissions", "native")
++		}, mode: agentic.PermissionModeNative, source: "flag"},
++		{family: "mapping", name: "codex-native-member", env: "codex_cli", setup: func(t *testing.T, f *pipelineFixture) { v2Default(f, t); insertLauncherArgs(f, "--permissions=native") }, mode: agentic.PermissionModeNative, source: "flag"},
++		{family: "mapping", name: "pi-native-member", env: "pi", setup: func(t *testing.T, f *pipelineFixture) { v2Default(f, t); insertLauncherArgs(f, "--permissions=native") }, mode: agentic.PermissionModeNative, source: "flag"},
++		{family: "mapping", name: "pi-yolo-unsupported", env: "pi", setup: func(t *testing.T, f *pipelineFixture) { v2Default(f, t); insertLauncherArgs(f, "--permissions=yolo") }, code: 1, diagnostic: "permission_mode_unsupported"},
++
++		{family: "precedence", name: "flag-over-profile-and-global", env: "claude_code", setup: func(t *testing.T, f *pipelineFixture) {
++			f.usePermissionsFragment(t, "yolo", false, "profile")
++			globalPermission(t, f, "curator-run-defaults-v2", "native")
++			insertLauncherArgs(f, "--permissions=native")
++		}, mode: agentic.PermissionModeNative, source: "flag"},
++		{family: "precedence", name: "profile-over-global", env: "codex_cli", setup: func(t *testing.T, f *pipelineFixture) {
++			f.usePermissionsFragment(t, "yolo", false, "profile")
++			globalPermission(t, f, "curator-run-defaults-v2", "native")
++		}, mode: agentic.PermissionModeYolo, source: "profile", yoloMapped: true},
++		{family: "precedence", name: "global-over-interactive-default", env: "claude_code", setup: func(t *testing.T, f *pipelineFixture) {
++			v2Default(f, t)
++			globalPermission(t, f, "curator-run-defaults-v2", "native")
++			f.deps.isTerminal = func() bool { return true }
++		}, mode: agentic.PermissionModeNative, source: "global"},
++		{family: "precedence", name: "default-interactive", env: "claude_code", setup: func(t *testing.T, f *pipelineFixture) {
++			v2Default(f, t)
++			f.deps.isTerminal = func() bool { return true }
++		}, mode: agentic.PermissionModeYolo, source: "default-interactive", yoloMapped: true},
++		{family: "precedence", name: "default-headless", env: "codex_cli", setup: func(t *testing.T, f *pipelineFixture) {
++			v2Default(f, t)
++			f.deps.isTerminal = func() bool { return false }
++		}, mode: agentic.PermissionModeNative, source: "default-headless"},
++
++		{family: "invalid-configuration", name: "v1-file-with-permissions-member", env: "claude_code", setup: func(t *testing.T, f *pipelineFixture) {
++			f.writeDefaults(t, f.deps.defaults.Operator, `{"schema":"curator-run-defaults-v1","defaults":{"claude_code":{"permissions":"yolo"}}}`)
++		}, code: 1, diagnostic: "defaults_config_invalid"},
++		{family: "invalid-configuration", name: "global-unknown-mode", env: "codex_cli", setup: func(t *testing.T, f *pipelineFixture) {
++			f.writeDefaults(t, f.deps.defaults.Operator, `{"schema":"curator-run-defaults-v2","defaults":{"codex_cli":{"permissions":"automatic"}}}`)
++		}, code: 1, diagnostic: "defaults_config_invalid"},
++		{family: "invalid-configuration", name: "profile-unknown-mode", env: "claude_code", setup: func(t *testing.T, f *pipelineFixture) {
++			f.usePermissionsFragment(t, "native", false, "default")
++			var obj map[string]any
++			_ = json.Unmarshal([]byte(f.resolver.stdout), &obj)
++			obj["permissions"] = map[string]any{"mode": "automatic", "locked": false, "source": "profile"}
++			raw, _ := json.Marshal(obj)
++			f.resolver.stdout = string(raw) + "\n"
++		}, code: 1, diagnostic: "resolve_fragment_invalid"},
++		{family: "invalid-configuration", name: "legacy-fragment-with-member", env: "claude_code", setup: func(t *testing.T, f *pipelineFixture) {
++			var obj map[string]any
++			_ = json.Unmarshal([]byte(f.resolver.stdout), &obj)
++			obj["permissions"] = map[string]any{"mode": "native", "locked": false, "source": "default"}
++			raw, _ := json.Marshal(obj)
++			f.resolver.stdout = string(raw) + "\n"
++		}, code: 1, diagnostic: "resolve_fragment_invalid"},
++		{family: "invalid-configuration", name: "cli-unknown-mode", env: "codex_cli", setup: func(t *testing.T, f *pipelineFixture) { insertLauncherArgs(f, "--permissions=automatic") }, code: 2, diagnostic: "usage"},
++		{family: "cli-conflict", name: "permissions-and-alias", env: "claude_code", setup: func(t *testing.T, f *pipelineFixture) { insertLauncherArgs(f, "--permissions=native", "--yolo") }, code: 2, diagnostic: "usage"},
++
++		{family: "force-native-lock", name: "flag-yolo-refused", env: "claude_code", setup: func(t *testing.T, f *pipelineFixture) {
++			f.usePermissionsFragment(t, "native", true, "global")
++			insertLauncherArgs(f, "--yolo")
++		}, code: 2, diagnostic: "usage"},
++		{family: "force-native-lock", name: "global-yolo-refused", env: "codex_cli", setup: func(t *testing.T, f *pipelineFixture) {
++			f.usePermissionsFragment(t, "native", true, "global")
++			globalPermission(t, f, "curator-run-defaults-v2", "yolo")
++		}, code: 2, diagnostic: "usage"},
++		{family: "force-native-lock", name: "silent-lock-is-native", env: "claude_code", setup: func(t *testing.T, f *pipelineFixture) { f.usePermissionsFragment(t, "native", true, "global") }, mode: agentic.PermissionModeNative, source: "default-headless"},
++
++		{family: "tracked-yolo", name: "flag", env: "claude_code", tracked: true, setup: func(t *testing.T, f *pipelineFixture) { v2Default(f, t); insertLauncherArgs(f, "--permissions=yolo") }, code: 1, diagnostic: "permission_mode_tracked_unsupported"},
++		{family: "tracked-yolo", name: "profile", env: "codex_cli", tracked: true, setup: func(t *testing.T, f *pipelineFixture) { f.usePermissionsFragment(t, "yolo", false, "profile") }, code: 1, diagnostic: "permission_mode_tracked_unsupported"},
++		{family: "tracked-yolo", name: "global", env: "claude_code", tracked: true, setup: func(t *testing.T, f *pipelineFixture) {
++			v2Default(f, t)
++			globalPermission(t, f, "curator-run-defaults-v2", "yolo")
++		}, code: 1, diagnostic: "permission_mode_tracked_unsupported"},
++
++		{family: "headless-silence", name: "stdio-non-tty", env: "claude_code", setup: func(t *testing.T, f *pipelineFixture) {
++			v2Default(f, t)
++			f.deps.isTerminal = func() bool { return false }
++		}, mode: agentic.PermissionModeNative, source: "default-headless"},
++		{family: "headless-silence", name: "ci-marker", env: "codex_cli", setup: func(t *testing.T, f *pipelineFixture) {
++			v2Default(f, t)
++			f.deps.isTerminal = func() bool { return true }
++			f.addEnv("CI", "true")
++		}, mode: agentic.PermissionModeNative, source: "default-headless"},
++		{family: "headless-silence", name: "github-actions-present-empty", env: "claude_code", setup: func(t *testing.T, f *pipelineFixture) {
++			v2Default(f, t)
++			f.deps.isTerminal = func() bool { return true }
++			f.addEnv("GITHUB_ACTIONS", "")
++		}, mode: agentic.PermissionModeNative, source: "default-headless"},
++		{family: "headless-silence", name: "tracked-silence", env: "codex_cli", tracked: true, setup: func(t *testing.T, f *pipelineFixture) { v2Default(f, t) }, mode: agentic.PermissionModeNative, source: "default-headless"},
++		{family: "headless-silence", name: "release-classified-codex-exec", env: "codex_cli", setup: func(t *testing.T, f *pipelineFixture) {
++			v2Default(f, t)
++			f.deps.isTerminal = func() bool { return true }
++			replaceNativeArgs(f, "exec", "prompt")
++		}, mode: agentic.PermissionModeNative, source: "default-headless"},
++
++		{family: "legacy-yolo-transport", name: "flag", env: "claude_code", setup: func(t *testing.T, f *pipelineFixture) { insertLauncherArgs(f, "--permissions=yolo") }, code: 1, diagnostic: "permission_policy_unsupported"},
++		{family: "legacy-yolo-transport", name: "global", env: "codex_cli", setup: func(t *testing.T, f *pipelineFixture) { globalPermission(t, f, "curator-run-defaults-v2", "yolo") }, code: 1, diagnostic: "permission_policy_unsupported"},
++		{family: "legacy-yolo-transport", name: "default-interactive", env: "claude_code", setup: func(t *testing.T, f *pipelineFixture) { f.deps.isTerminal = func() bool { return true } }, code: 1, diagnostic: "permission_policy_unsupported"},
++	}
++
++	counts := map[string]int{}
++	for _, row := range rows {
++		row := row
++		counts[row.family]++
++		t.Run(row.family+"/"+row.name, func(t *testing.T) {
++			f := entryFixture(t, row.env, row.tracked)
++			row.setup(t, f)
++			code, out, stderr := f.run()
++			if code != row.code {
++				t.Fatalf("exit=%d want=%d stderr=%s", code, row.code, stderr)
++			}
++			if row.diagnostic != "" {
++				if len(out) != 0 || !bytes.Contains(stderr, []byte("curator-run: "+row.diagnostic+":")) {
++					t.Fatalf("missing %s refusal: out=%s stderr=%s", row.diagnostic, out, stderr)
++				}
++				if row.family == "tracked-yolo" || row.family == "legacy-yolo-transport" || row.family == "force-native-lock" {
++					f.assertNoChild(t)
++				}
++				if row.family == "tracked-yolo" && f.builds != 0 {
++					t.Fatalf("tracked yolo reached admission: builds=%d", f.builds)
++				}
++				if row.family == "cli-conflict" && f.resolver.calls != 0 {
++					t.Fatalf("conflicting launcher flags reached Curator resolve: calls=%d", f.resolver.calls)
++				}
++				return
++			}
++			if f.builds != 1 || f.request.PermissionMode != row.mode {
++				t.Fatalf("admitted request mode=%q builds=%d, want mode=%q", f.request.PermissionMode, f.builds, row.mode)
++			}
++			if !row.tracked && !bytes.Contains(stderr, []byte("curator-run: permissions="+string(row.mode)+" source="+row.source+" mapped=")) {
++				t.Fatalf("missing provenance source %q: %s", row.source, stderr)
++			}
++			if row.yoloMapped {
++				target, err := mapping.Resolve(row.env)
++				if err != nil {
++					t.Fatal(err)
++				}
++				mapped, err := agentic.Default.PermissionMapping(agentic.SystemID(target.System), f.request.ToolRelease, agentic.PermissionModeYolo)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if mapped.Flag == "" || !containsArg(f.plan.Argv, mapped.Flag) {
++					t.Fatalf("admitted plan argv %q does not carry module mapping %q", f.plan.Argv, mapped.Flag)
++				}
++			}
++			var child childCapture
++			if err := json.Unmarshal(out, &child); err != nil {
++				t.Fatal(err)
++			}
++			if !strings.Contains(string(child.Stdin), "effective-native-policy") && strings.Contains(string(stderr), "effective-native-policy") {
++				t.Fatal("untracked effective policy unexpectedly persisted")
++			}
++		})
++	}
++	t.Logf("Choice-5 permission row counts: %v", counts)
++}
++
++func containsArg(argv []string, want string) bool {
++	for _, arg := range argv {
++		if arg == want {
++			return true
++		}
++	}
++	return false
++}
++
++func TestChoice5ProviderConflictRowsThroughRealCuratorRun(t *testing.T) {
++	conflicts := []struct {
++		env, name, diagnostic string
++		args                  []string
++		code                  int
++	}{
++		{"claude_code", "mode-acceptEdits", "plan_refused", []string{"--permission-mode", "acceptEdits"}, 1},
++		{"claude_code", "mode-auto", "plan_refused", []string{"--permission-mode=auto"}, 1},
++		{"claude_code", "mode-bypassPermissions", "plan_refused", []string{"--permission-mode", "bypassPermissions"}, 1},
++		{"claude_code", "mode-manual", "plan_refused", []string{"--permission-mode=manual"}, 1},
++		{"claude_code", "mode-dontAsk", "plan_refused", []string{"--permission-mode", "dontAsk"}, 1},
++		{"claude_code", "mode-plan", "plan_refused", []string{"--permission-mode=plan"}, 1},
++		{"claude_code", "extra-permission-selector", "plan_refused", []string{"--allow-dangerously-skip-permissions"}, 1},
++		{"claude_code", "extra-permission-selector-equals", "plan_refused", []string{"--allow-dangerously-skip-permissions=true"}, 1},
++		{"claude_code", "restricted-selector", "plan_refused", []string{"--restricted"}, 1},
++		{"codex_cli", "short-approval", "plan_refused", []string{"-a", "never"}, 1},
++		{"codex_cli", "long-approval", "plan_refused", []string{"--ask-for-approval", "on-request"}, 1},
++		{"codex_cli", "short-approval-equals", "plan_refused", []string{"-a=never"}, 1},
++		{"codex_cli", "long-approval-equals", "plan_refused", []string{"--ask-for-approval=on-request"}, 1},
++		{"codex_cli", "short-sandbox", "plan_refused", []string{"-s", "workspace-write"}, 1},
++		{"codex_cli", "long-sandbox", "plan_refused", []string{"--sandbox", "danger-full-access"}, 1},
++		{"codex_cli", "short-sandbox-equals", "plan_refused", []string{"-s=read-only"}, 1},
++		{"codex_cli", "long-sandbox-equals", "plan_refused", []string{"--sandbox=workspace-write"}, 1},
++		{"codex_cli", "approve-for-me", "plan_refused", []string{"--approve-for-me"}, 1},
++		{"codex_cli", "dangerous-bypass-family", "plan_refused", []string{"--dangerously-bypass-approvals"}, 1},
++		{"codex_cli", "dangerous-bypass-hook-trust", "plan_refused", []string{"--dangerously-bypass-hook-trust"}, 1},
++		{"codex_cli", "config-approval-policy", "plan_refused", []string{"-c", "approval_policy=never"}, 1},
++		{"codex_cli", "config-sandbox-mode-after-exec", "plan_refused", []string{"exec", "--config", "sandbox_mode=workspace-write"}, 1},
++		{"codex_cli", "config-sandbox-permissions", "plan_refused", []string{"--config=sandbox_permissions=[\"disk-full-read-access\"]"}, 1},
++		{"claude_code", "unknown-permission-mode-value", "usage", []string{"--permission-mode=unknown"}, 2},
++		{"codex_cli", "unknown-approval-value", "usage", []string{"-a=always"}, 2},
++		{"codex_cli", "unknown-sandbox-value", "usage", []string{"--sandbox=full"}, 2},
++		{"codex_cli", "unknown-config-key", "usage", []string{"--config=unknown_policy=on"}, 2},
++	}
++	conflictCount, unknownCount := 0, 0
++	for _, row := range conflicts {
++		row := row
++		if row.diagnostic == "plan_refused" {
++			conflictCount++
++		} else {
++			unknownCount++
++		}
++		t.Run(row.env+"/"+row.name, func(t *testing.T) {
++			f := entryFixture(t, row.env, false)
++			v2Default(f, t)
++			insertLauncherArgs(f, "--permissions=yolo")
++			replaceNativeArgs(f, row.args...)
++			code, out, stderr := f.run()
++			if code != row.code || len(out) != 0 || !bytes.Contains(stderr, []byte("curator-run: "+row.diagnostic+":")) {
++				t.Fatalf("native-policy refusal misclassified: exit=%d want=%d out=%q stderr=%s", code, row.code, out, stderr)
++			}
++			if f.builds != 1 {
++				t.Fatalf("module conflict check not reached: builds=%d", f.builds)
++			}
++			f.assertNoChild(t)
++		})
++	}
++	t.Logf("Choice-5 provider-policy rows: conflicts=%d unknown-value refusals=%d", conflictCount, unknownCount)
++}
++
++func TestChoice5MappedBypassDuplicateRowsThroughRealCuratorRun(t *testing.T) {
++	for _, tc := range []struct{ env, system, release string }{
++		{"claude_code", "claude-code", "2.1.261"},
++		{"codex_cli", "codex", "0.153.2"},
++	} {
++		t.Run(tc.env, func(t *testing.T) {
++			f := entryFixture(t, tc.env, false)
++			v2Default(f, t)
++			mapping, err := agentic.Default.PermissionMapping(agentic.SystemID(tc.system), tc.release, agentic.PermissionModeYolo)
++			if err != nil || mapping.Flag == "" {
++				t.Fatalf("verified module mapping = %+v, %v", mapping, err)
++			}
++			insertLauncherArgs(f, "--permissions=yolo")
++			replaceNativeArgs(f, mapping.Flag)
++			code, out, stderr := f.run()
++			if code != 2 || len(out) != 0 || !bytes.Contains(stderr, []byte("curator-run: usage:")) {
++				t.Fatalf("duplicate mapped flag admitted: exit=%d out=%q stderr=%s", code, out, stderr)
++			}
++			if f.builds != 1 {
++				t.Fatalf("module duplicate check not reached: builds=%d", f.builds)
++			}
++			f.assertNoChild(t)
++		})
++	}
++}
++
++func TestChoice5EffectiveNativePolicyLineAndTrackedRecord(t *testing.T) {
++	for _, tracked := range []bool{false, true} {
++		t.Run(fmt.Sprintf("tracked=%v", tracked), func(t *testing.T) {
++			f := entryFixture(t, "claude_code", tracked)
++			if err := os.WriteFile(filepath.Join(f.home, "settings.json"), []byte(`{"permissions":{"defaultMode":"bypassPermissions","allow":["rule-1","rule-2","rule-3","rule-4","rule-5","rule-6","rule-7","rule-8","rule-9"],"additionalDirectories":["/tmp"]}}`), 0600); err != nil {
++				t.Fatal(err)
++			}
++			code, out, stderr := f.run()
++			if code != 0 || !bytes.Contains(stderr, []byte("curator-run: effective-native-policy: relaxation=")) || !bytes.Contains(stderr, []byte("permissions.allow (9 rules)")) {
++				t.Fatalf("native-policy line missing: exit=%d stderr=%s", code, stderr)
++			}
++			if bytes.Contains(stderr, []byte("managed settings (system, MDM")) {
++				t.Fatalf("inspection claimed a source the module did not inspect: %s", stderr)
++			}
++			if !bytes.Contains(stderr, []byte("source="+filepath.Join(f.home, "settings.json"))) {
++				t.Fatalf("native-policy line did not identify the inspected file: %s", stderr)
++			}
++			var child childCapture
++			if err := json.Unmarshal(out, &child); err != nil {
++				t.Fatal(err)
++			}
++			if tracked {
++				var doc struct {
++					Extensions map[string]json.RawMessage `json:"extensions"`
++				}
++				if err := json.Unmarshal(child.Stdin, &doc); err != nil {
++					t.Fatal(err)
++				}
++				raw := doc.Extensions["works.relux.curator.effective-native-policy"]
++				var policy struct {
++					Relaxations []string `json:"relaxations"`
++					Source      string   `json:"source"`
++				}
++				if err := json.Unmarshal(raw, &policy); err != nil {
++					t.Fatalf("tracked native-policy record is not a usable object: %s (%v)", raw, err)
++				}
++				if !reflect.DeepEqual(policy.Relaxations, []string{"permissions.additionalDirectories", "permissions.allow", "permissions.defaultMode"}) || policy.Source != filepath.Join(f.home, "settings.json") {
++					t.Fatalf("tracked native-policy record = %+v", policy)
++				}
++			} else if strings.Contains(string(child.Stdin), "effective-native-policy") {
++				t.Fatalf("untracked launch persisted policy record: %s", child.Stdin)
++			}
++		})
++	}
++}
++
++func TestChoice5V2FragmentCarriesPermissionMember(t *testing.T) {
++	f := entryFixture(t, "claude_code", false)
++	f.usePermissionsFragment(t, "native", false, "default")
++	parsed, err := fragment.Parse([]byte(f.resolver.stdout))
++	if err != nil || parsed.Revision != fragment.IdentityV2 || parsed.Permissions == nil {
++		t.Fatalf("v2 permission member not parsed: fragment=%+v err=%v", parsed, err)
++	}
++}
+diff --git a/cmd/curator-run/pipeline_test.go b/cmd/curator-run/pipeline_test.go
+index a51a64a..c2549c4 100644
+--- a/cmd/curator-run/pipeline_test.go
++++ b/cmd/curator-run/pipeline_test.go
+@@ -51,6 +51,8 @@ type pipelineFixture struct {
+ 	resolver                         *scriptedRunner
+ 	args                             []string
+ 	builds, verdicts                 int
++	request                          vendorplugin.SpawnRequest
++	plan                             agentic.Plan
+ }
+ 
+ func writeFixture(t *testing.T, path string, data []byte, mode os.FileMode) {
+@@ -123,8 +125,9 @@ func entryFixture(t *testing.T, environment string, tracked bool) *pipelineFixtu
+ 		writeFixture(t, filepath.Join(f.dir, "operator", "ax.json"), []byte(`{"schema":"curator-run-ax-v1","enabled":true}`), 0600)
+ 	}
+ 	f.deps.workdir = func() (string, error) { return f.dir, nil }
++	releases := map[string]string{"claude_code": "2.1.261", "codex_cli": "codex-cli 0.153.2", "pi": "0.84.2"}
+ 	f.deps.environ = func() []string {
+-		return []string{"PATH=" + f.dir, "HOME=" + f.dir, "PARENT=direct-only", "FIGMA_API_KEY=source-secret", "CLAUDECODE=nested", "CODEX_THREAD_ID=nested", "TASK_BOARD_RUN_ID=nested"}
++		return []string{"PATH=" + f.dir, "HOME=" + f.dir, "PARENT=direct-only", "FIGMA_API_KEY=source-secret", "CLAUDECODE=nested", "CODEX_THREAD_ID=nested", "TASK_BOARD_RUN_ID=nested", "CURATOR_TEST_RELEASE=" + releases[environment]}
+ 	}
+ 	store, err := providerlimits.NewStore(providerlimits.Options{Layout: providerlimits.LayoutAt(f.dir)})
+ 	if err != nil {
+@@ -141,10 +144,15 @@ func entryFixture(t *testing.T, environment string, tracked bool) *pipelineFixtu
+ 	}
+ 	f.deps.build = func(ctx context.Context, r *vendorplugin.Registry, req vendorplugin.SpawnRequest, mode agentic.LaunchMode) (agentic.PlanWithEnvironment, error) {
+ 		f.builds++
++		f.request = req
+ 		if mode != agentic.LaunchModeInteractive || req.Home != f.home || req.WorkDir != f.dir || !req.Composition.IsZero() || !req.Run.IsZero() || req.Goal != nil || req.Budget != nil || req.ServiceTier != "" || req.PromptPath != "" || len(req.Prompt) > 0 {
+ 			t.Fatalf("wrong request: %+v mode=%v", req, mode)
+ 		}
+-		return vendorplugin.BuildLaunchWithEnvironment(ctx, r, req, mode)
++		built, err := vendorplugin.BuildLaunchWithEnvironment(ctx, r, req, mode)
++		if err == nil {
++			f.plan = built.Plan
++		}
++		return built, err
+ 	}
+ 	f.deps.axBinary = pipelineHelper
+ 	f.deps.stdin = strings.NewReader("parent stdin\n\x00\xff")
+@@ -164,6 +172,39 @@ func (f *pipelineFixture) run() (int, []byte, []byte) {
+ 	code := run(context.Background(), f.args, &out, &stderr, f.deps)
+ 	return code, out.Bytes(), stderr.Bytes()
+ }
++
++func (f *pipelineFixture) usePermissionsFragment(t *testing.T, mode string, locked bool, source string) {
++	t.Helper()
++	var obj map[string]any
++	if err := json.Unmarshal([]byte(f.resolver.stdout), &obj); err != nil {
++		t.Fatal(err)
++	}
++	obj["fragment"] = fragment.IdentityV2
++	obj["permissions"] = map[string]any{"mode": mode, "locked": locked, "source": source}
++	raw, err := json.Marshal(obj)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if _, err := fragment.Parse(raw); err != nil {
++		t.Fatalf("invalid v2 fixture: %v", err)
++	}
++	f.resolver.stdout = string(raw) + "\n"
++}
++
++func (f *pipelineFixture) addEnv(name, value string) {
++	previous := f.deps.environ
++	f.deps.environ = func() []string {
++		return append(previous(), name+"="+value)
++	}
++}
++
++func (f *pipelineFixture) writeDefaults(t *testing.T, path, raw string) {
++	t.Helper()
++	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
++		t.Fatal(err)
++	}
++	writeFixture(t, path, []byte(raw), 0600)
++}
+ func (f *pipelineFixture) assertNoChild(t *testing.T) {
+ 	t.Helper()
+ 	if _, err := os.Lstat(filepath.Join(f.dir, "started")); !os.IsNotExist(err) {
+@@ -462,7 +503,7 @@ func TestProductionModeSelection(t *testing.T) {
+ 
+ func TestProductionForbiddenFlags(t *testing.T) {
+ 	for _, tracked := range []bool{false, true} {
+-		for _, flag := range []string{"--yolo", "--dangerously-skip-permissions", "--sandbox", "--goal", "--budget", "--service-tier", "--assignment", "--engine", "--tracked"} {
++		for _, flag := range []string{"-d", "--danger", "--dangerously-skip-permissions", "--sandbox", "--goal", "--budget", "--service-tier", "--assignment", "--engine", "--tracked"} {
+ 			t.Run(fmt.Sprintf("%s/%v", flag, tracked), func(t *testing.T) {
+ 				f := entryFixture(t, "pi", tracked)
+ 				f.args = []string{"pi", flag}
+@@ -470,7 +511,9 @@ func TestProductionForbiddenFlags(t *testing.T) {
+ 				if code != 2 || len(out) != 0 || f.resolver.calls != 0 || f.builds != 0 {
+ 					t.Fatalf("forbidden flag admitted: exit=%d", code)
+ 				}
+-				golden(t, "forbidden-"+strings.TrimPrefix(flag, "--"), string(stderr), f.dir)
++				if !bytes.Contains(stderr, []byte("curator-run: usage:")) {
++					t.Fatalf("refusal did not use the usage diagnostic: %s", stderr)
++				}
+ 				f.assertNoChild(t)
+ 			})
+ 		}
+diff --git a/cmd/curator-run/testdata/help.golden b/cmd/curator-run/testdata/help.golden
+index b712453..7fa21fa 100644
+--- a/cmd/curator-run/testdata/help.golden
++++ b/cmd/curator-run/testdata/help.golden
+@@ -1,7 +1,8 @@
+-curator-run 0.1.0-dev (specification 0.4.1-draft)
++curator-run 0.1.0-dev (specification 0.5.0-draft)
+ 
+ usage: curator-run <env-id> [--profile <name>] [--system-prompt <append|replace>]
+                    [--model <model>] [--effort <effort>]
++                   [--permissions <native|yolo> | --yolo]
+                    [--name <session-name>] [--ax-profile <standard|yolo>]
+                    [--] <native args...>
+        curator-run --help | -h
+@@ -15,6 +16,9 @@ options:
+   --system-prompt <append|replace>  engage the fragment's system-prompt channel
+   --model <model>                   model passed to the spawn plane as declared
+   --effort <effort>                 reasoning effort passed as declared
++  --permissions <native|yolo>        permission mode passed to the spawn plane
++  --yolo                             alias for --permissions yolo
++  -d, --danger                       rejected; use --permissions explicitly
+   --name <session-name>             ax session name (tracked machines only)
+   --ax-profile <standard|yolo>      ax execution profile (tracked machines only)
+   --help, -h                        print this usage text and exit 0
+diff --git a/cmd/curator-run/testdata/pipeline-claude_code-false.golden b/cmd/curator-run/testdata/pipeline-claude_code-false.golden
+index dc65cc6..dfe9aa5 100644
+--- a/cmd/curator-run/testdata/pipeline-claude_code-false.golden
++++ b/cmd/curator-run/testdata/pipeline-claude_code-false.golden
+@@ -25,5 +25,5 @@
+     "Stdin": "cGFyZW50IHN0ZGluCgD/",
+     "WorkDir": "<ROOT>"
+   },
+-  "Stderr": "curator warning\n\u0000\ufffdcurator-run: provider: path=<ROOT>/curator-run\ncurator-run: defaults: model=claude-opus-5 (flag) effort=medium (flag)\ncurator-run: warning: profile \"default\": applied flag/append system-prompt channel \"--append-system-prompt-file\". A custom system prefix can change request caching and billing: the default may use shared prompt caching; a custom prefix forms its own cache prefix.\nhelper stderr\n"
++  "Stderr": "curator warning\n\u0000\ufffdcurator-run: provider: path=<ROOT>/curator-run\ncurator-run: defaults: model=claude-opus-5 (flag) effort=medium (flag)\ncurator-run: permissions=native source=default-headless mapped=none\ncurator-run: warning: profile \"default\": applied flag/append system-prompt channel \"--append-system-prompt-file\". A custom system prefix can change request caching and billing: the default may use shared prompt caching; a custom prefix forms its own cache prefix.\nhelper stderr\n"
+ }
+diff --git a/cmd/curator-run/testdata/pipeline-codex_cli-false.golden b/cmd/curator-run/testdata/pipeline-codex_cli-false.golden
+index 6346b43..d7da0dc 100644
+--- a/cmd/curator-run/testdata/pipeline-codex_cli-false.golden
++++ b/cmd/curator-run/testdata/pipeline-codex_cli-false.golden
+@@ -24,5 +24,5 @@
+     "Stdin": "cGFyZW50IHN0ZGluCgD/",
+     "WorkDir": "<ROOT>"
+   },
+-  "Stderr": "curator warning\n\u0000\ufffdcurator-run: provider: path=<ROOT>/curator-run\ncurator-run: defaults: model=gpt-6-astra (flag) effort=medium (flag)\ncurator-run: warning: profile \"default\": applied config-key/replace system-prompt channel. Replacement discards the tool's built-in system behavior entirely. A custom system prefix can change request caching and billing: the default may use shared prompt caching; a custom prefix forms its own cache prefix.\nhelper stderr\n"
++  "Stderr": "curator warning\n\u0000\ufffdcurator-run: provider: path=<ROOT>/curator-run\ncurator-run: defaults: model=gpt-6-astra (flag) effort=medium (flag)\ncurator-run: permissions=native source=default-headless mapped=none\ncurator-run: warning: profile \"default\": applied config-key/replace system-prompt channel. Replacement discards the tool's built-in system behavior entirely. A custom system prefix can change request caching and billing: the default may use shared prompt caching; a custom prefix forms its own cache prefix.\nhelper stderr\n"
+ }
+diff --git a/cmd/curator-run/testdata/pipeline-pi-false.golden b/cmd/curator-run/testdata/pipeline-pi-false.golden
+index a603491..7bd3abf 100644
+--- a/cmd/curator-run/testdata/pipeline-pi-false.golden
++++ b/cmd/curator-run/testdata/pipeline-pi-false.golden
+@@ -23,5 +23,5 @@
+     "Stdin": "cGFyZW50IHN0ZGluCgD/",
+     "WorkDir": "<ROOT>"
+   },
+-  "Stderr": "curator warning\n\u0000\ufffdcurator-run: provider: path=<ROOT>/curator-run\ncurator-run: defaults: model=claude-opus-5 (flag) effort=high (flag)\ncurator-run: warning: profile \"default\": applied flag/append system-prompt channel \"--append-system-prompt\". A custom system prefix can change request caching and billing: the default may use shared prompt caching; a custom prefix forms its own cache prefix.\nhelper stderr\n"
++  "Stderr": "curator warning\n\u0000\ufffdcurator-run: provider: path=<ROOT>/curator-run\ncurator-run: defaults: model=claude-opus-5 (flag) effort=high (flag)\ncurator-run: permissions=native source=default-headless mapped=none\ncurator-run: warning: profile \"default\": applied flag/append system-prompt channel \"--append-system-prompt\". A custom system prefix can change request caching and billing: the default may use shared prompt caching; a custom prefix forms its own cache prefix.\nhelper stderr\n"
+ }
+diff --git a/cmd/curator-run/testdata/provider/main.go b/cmd/curator-run/testdata/provider/main.go
+index e1b9050..7f3fb36 100644
+--- a/cmd/curator-run/testdata/provider/main.go
++++ b/cmd/curator-run/testdata/provider/main.go
+@@ -3,6 +3,7 @@ package main
+ 
+ import (
+ 	"encoding/json"
++	"fmt"
+ 	"io"
+ 	"os"
+ 	"strconv"
+@@ -12,10 +13,21 @@ import (
+ )
+ 
+ func main() {
++	if len(os.Args) > 1 && os.Args[1] == "--version" {
++		fmt.Fprintln(os.Stdout, os.Getenv("CURATOR_TEST_RELEASE"))
++		return
++	}
+ 	_ = os.WriteFile("started", []byte("started"), 0600)
+ 	data, _ := io.ReadAll(os.Stdin)
+ 	cwd, _ := os.Getwd()
+ 	env := os.Environ()
++	filtered := env[:0]
++	for _, entry := range env {
++		if !strings.HasPrefix(entry, "CURATOR_TEST_RELEASE=") {
++			filtered = append(filtered, entry)
++		}
++	}
++	env = filtered
+ 	// Fake ax inherits the real launcher environment. Capture only the harmless
+ 	// test marker, so a failed refusal test cannot print host credentials.
+ 	if len(os.Args) > 1 && os.Args[1] == "start" {
+diff --git a/go.mod b/go.mod
+index f3a60f9..0ddfbd4 100644
+--- a/go.mod
++++ b/go.mod
+@@ -2,6 +2,6 @@ module github.com/relux-works/curator-agent-launcher
+ 
+ go 1.25.5
+ 
+-require github.com/relux-works/skill-agents-management v0.5.13
++require github.com/relux-works/skill-agents-management v0.5.22
+ 
+ require github.com/pelletier/go-toml/v2 v2.4.3 // indirect
+diff --git a/go.sum b/go.sum
+index 045b81e..1603538 100644
+--- a/go.sum
++++ b/go.sum
+@@ -1,4 +1,4 @@
+ github.com/pelletier/go-toml/v2 v2.4.3 h1:GTRvJQutkOSftxIFD5xw9aepkYNuPWmVJpffdDPYVpY=
+ github.com/pelletier/go-toml/v2 v2.4.3/go.mod h1:2gIqNv+qfxSVS7cM2xJQKtLSTLUE9V8t9Stt+h56mCY=
+-github.com/relux-works/skill-agents-management v0.5.13 h1:ONaFsI9zVTIwgAPwkcrTFP40dvgVJwIGYm5WzXYmbJ8=
+-github.com/relux-works/skill-agents-management v0.5.13/go.mod h1:wi+oH6fVUBF0bBOPs2bU7iyUhJveSAFh369CQB91ryk=
++github.com/relux-works/skill-agents-management v0.5.22 h1:0DXd6usDJG15LGruDq4X0YXIUS/rneOorRaYijKbhII=
++github.com/relux-works/skill-agents-management v0.5.22/go.mod h1:wi+oH6fVUBF0bBOPs2bU7iyUhJveSAFh369CQB91ryk=
+diff --git a/internal/cli/cli.go b/internal/cli/cli.go
+index 00450ab..5762844 100644
+--- a/internal/cli/cli.go
++++ b/internal/cli/cli.go
+@@ -30,6 +30,7 @@ const Name = "curator-run"
+ // Usage is the usage text printed after every usage error and by --help.
+ const Usage = `usage: curator-run <env-id> [--profile <name>] [--system-prompt <append|replace>]
+                    [--model <model>] [--effort <effort>]
++                   [--permissions <native|yolo> | --yolo]
+                    [--name <session-name>] [--ax-profile <standard|yolo>]
+                    [--] <native args...>
+        curator-run --help | -h
+@@ -43,6 +44,9 @@ options:
+   --system-prompt <append|replace>  engage the fragment's system-prompt channel
+   --model <model>                   model passed to the spawn plane as declared
+   --effort <effort>                 reasoning effort passed as declared
++  --permissions <native|yolo>        permission mode passed to the spawn plane
++  --yolo                             alias for --permissions yolo
++  -d, --danger                       rejected; use --permissions explicitly
+   --name <session-name>             ax session name (tracked machines only)
+   --ax-profile <standard|yolo>      ax execution profile (tracked machines only)
+   --help, -h                        print this usage text and exit 0
+@@ -125,6 +129,14 @@ const (
+ 	AxProfileYolo AxProfile = "yolo"
+ )
+ 
++// PermissionMode is the closed vocabulary of --permissions and its alias.
++type PermissionMode string
++
++const (
++	PermissionNative PermissionMode = "native"
++	PermissionYolo   PermissionMode = "yolo"
++)
++
+ // sessionNamePattern is the ax §2.1 session-name grammar, anchored.
+ var sessionNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
+ 
+@@ -164,6 +176,9 @@ type Invocation struct {
+ 	// Model and Effort are §4.3 level 1, verbatim and unvalidated.
+ 	Model, Effort       string
+ 	ModelSet, EffortSet bool
++	// PermissionMode is the explicit §4.3 mode or its --yolo alias.
++	PermissionMode PermissionMode
++	PermissionSet  bool
+ 	// Name is the --name value, already validated against the ax §2.1
+ 	// grammar. NameSet reports presence. On an untracked machine
+ 	// (Tracked false) the value is accepted and has no effect.
+@@ -210,6 +225,7 @@ var valueFlags = map[string]bool{
+ 	"--system-prompt": true,
+ 	"--model":         true,
+ 	"--effort":        true,
++	"--permissions":   true,
+ 	"--name":          true,
+ 	"--ax-profile":    true,
+ }
+@@ -239,6 +255,7 @@ func Parse(args []string, opts Options) (Invocation, error) {
+ 	inv := Invocation{Tracked: opts.AxConfigured}
+ 	seen := map[string]bool{}
+ 	envSet := false
++	permissionSeen := false
+ 
+ 	i := 0
+ 	for ; i < len(args); i++ {
+@@ -266,6 +283,26 @@ func Parse(args []string, opts Options) (Invocation, error) {
+ 		}
+ 
+ 		flag, value, hasEq := strings.Cut(tok, "=")
++		if flag == "-d" || flag == "--danger" {
++			return inv, usageErr("%s is rejected; use --permissions native or --permissions yolo", flag)
++		}
++		if flag == "--yolo" {
++			if hasEq {
++				return inv, usageErr("--yolo is an alias without a value")
++			}
++			if permissionSeen {
++				return inv, usageErr("--permissions and --yolo are one permission request and cannot be repeated or combined")
++			}
++			permissionSeen = true
++			inv.PermissionMode, inv.PermissionSet = PermissionYolo, true
++			continue
++		}
++		if flag == "--permissions" {
++			if permissionSeen {
++				return inv, usageErr("--permissions and --yolo are one permission request and cannot be repeated or combined")
++			}
++			permissionSeen = true
++		}
+ 		if !valueFlags[flag] {
+ 			return inv, usageErr("unknown flag %q before --", tok)
+ 		}
+@@ -304,6 +341,13 @@ func (inv *Invocation) set(flag, value string, opts Options) error {
+ 		inv.Model, inv.ModelSet = value, true
+ 	case "--effort":
+ 		inv.Effort, inv.EffortSet = value, true
++	case "--permissions":
++		switch PermissionMode(value) {
++		case PermissionNative, PermissionYolo:
++			inv.PermissionMode, inv.PermissionSet = PermissionMode(value), true
++		default:
++			return usageErr("--permissions accepts native or yolo, got %q", value)
++		}
+ 	case "--system-prompt":
+ 		switch SystemPrompt(value) {
+ 		case SystemPromptAppend, SystemPromptReplace:
+diff --git a/internal/cli/cli_test.go b/internal/cli/cli_test.go
+index 1e99f65..d904ffd 100644
+--- a/internal/cli/cli_test.go
++++ b/internal/cli/cli_test.go
+@@ -36,6 +36,12 @@ var acceptedShapes = []shape{
+ 	{"flags after env", []string{"codex_cli", "--model", "gpt-5.3-codex", "--effort", "high"}, false},
+ 	{"equals form", []string{"codex_cli", "--profile=companyA", "--effort=medium"}, false},
+ 	{"equals form value containing equals", []string{"codex_cli", "--profile=a=b"}, false},
++	{"permissions native separate", []string{"codex_cli", "--permissions", "native"}, false},
++	{"permissions yolo separate", []string{"codex_cli", "--permissions", "yolo"}, false},
++	{"permissions native equals", []string{"--permissions=native", "codex_cli"}, false},
++	{"permissions yolo equals", []string{"--permissions=yolo", "codex_cli"}, false},
++	{"yolo alias", []string{"--yolo", "codex_cli"}, false},
++	{"native tail keeps permission spellings", []string{"pi", "--", "--permissions", "yolo", "--yolo", "-d", "--danger"}, false},
+ 	{"system prompt append", []string{"pi", "--system-prompt", "append"}, false},
+ 	{"system prompt replace", []string{"pi", "--system-prompt", "replace"}, false},
+ 	{"name on tracked machine", []string{"codex_cli", "--name", "work.1_a-b"}, true},
+@@ -83,6 +89,16 @@ var rejectedShapes = []struct {
+ 	{shape{"repeated profile", []string{"codex_cli", "--profile", "a", "--profile", "b"}, false}, "--profile given more than once"},
+ 	{shape{"repeated model mixed forms", []string{"codex_cli", "--model=a", "--model", "b"}, false}, "--model given more than once"},
+ 	{shape{"repeated effort", []string{"codex_cli", "--effort", "a", "--effort", "a"}, false}, "--effort given more than once"},
++	{shape{"repeated permissions", []string{"codex_cli", "--permissions=native", "--permissions", "yolo"}, false}, "cannot be repeated or combined"},
++	{shape{"permissions and yolo alias", []string{"codex_cli", "--permissions", "native", "--yolo"}, false}, "cannot be repeated or combined"},
++	{shape{"yolo alias and permissions", []string{"codex_cli", "--yolo", "--permissions=yolo"}, false}, "cannot be repeated or combined"},
++	{shape{"yolo alias equals value", []string{"codex_cli", "--yolo=true"}, false}, "alias without a value"},
++	{shape{"unknown permissions mode", []string{"codex_cli", "--permissions=automatic"}, false}, "accepts native or yolo"},
++	{shape{"unknown permissions mode separate", []string{"codex_cli", "--permissions", "auto"}, false}, "accepts native or yolo"},
++	{shape{"legacy short danger", []string{"codex_cli", "-d"}, false}, "is rejected"},
++	{shape{"legacy short danger equals", []string{"codex_cli", "-d=true"}, false}, "is rejected"},
++	{shape{"legacy danger", []string{"codex_cli", "--danger"}, false}, "is rejected"},
++	{shape{"legacy danger equals", []string{"codex_cli", "--danger=true"}, false}, "is rejected"},
+ 	{shape{"repeated system prompt", []string{"pi", "--system-prompt", "append", "--system-prompt", "replace"}, false}, "--system-prompt given more than once"},
+ 	{shape{"repeated name", []string{"codex_cli", "--name", "a", "--name", "b"}, true}, "--name given more than once"},
+ 	{shape{"repeated ax profile", []string{"codex_cli", "--ax-profile", "yolo", "--ax-profile", "standard"}, true}, "--ax-profile given more than once"},
+@@ -127,6 +143,27 @@ func TestParseAccepted(t *testing.T) {
+ 	}
+ }
+ 
++func TestPermissionModeFormsResolveToOneMember(t *testing.T) {
++	for _, tc := range []struct {
++		name string
++		args []string
++		want PermissionMode
++	}{
++		{"separate native", []string{"pi", "--permissions", "native"}, PermissionNative},
++		{"equals native", []string{"--permissions=native", "pi"}, PermissionNative},
++		{"separate yolo", []string{"pi", "--permissions", "yolo"}, PermissionYolo},
++		{"equals yolo", []string{"--permissions=yolo", "pi"}, PermissionYolo},
++		{"alias", []string{"--yolo", "pi"}, PermissionYolo},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			inv, err := Parse(tc.args, untracked)
++			if err != nil || !inv.PermissionSet || inv.PermissionMode != tc.want {
++				t.Fatalf("Parse(%q) = %+v, %v; want permission %q", tc.args, inv, err, tc.want)
++			}
++		})
++	}
++}
++
+ func TestParseRejected(t *testing.T) {
+ 	for _, s := range rejectedShapes {
+ 		t.Run(s.name, func(t *testing.T) {
+@@ -347,6 +384,9 @@ func renderInvocation(inv Invocation) string {
+ 	if inv.EffortSet {
+ 		parts = append(parts, fmt.Sprintf("effort=%q", inv.Effort))
+ 	}
++	if inv.PermissionSet {
++		parts = append(parts, fmt.Sprintf("permissions=%q", inv.PermissionMode))
++	}
+ 	if inv.NameSet {
+ 		parts = append(parts, fmt.Sprintf("name=%q", inv.Name))
+ 	}
+diff --git a/internal/cli/testdata/cases.golden b/internal/cli/testdata/cases.golden
+index 4c0a73a..b3bc53f 100644
+--- a/internal/cli/testdata/cases.golden
++++ b/internal/cli/testdata/cases.golden
+@@ -58,6 +58,36 @@ args: ["codex_cli" "--profile=a=b"]
+ ax: false
+ result: env="codex_cli" tracked=false profile="a=b" native=[]
+ 
++# permissions native separate
++args: ["codex_cli" "--permissions" "native"]
++ax: false
++result: env="codex_cli" tracked=false permissions="native" native=[]
++
++# permissions yolo separate
++args: ["codex_cli" "--permissions" "yolo"]
++ax: false
++result: env="codex_cli" tracked=false permissions="yolo" native=[]
++
++# permissions native equals
++args: ["--permissions=native" "codex_cli"]
++ax: false
++result: env="codex_cli" tracked=false permissions="native" native=[]
++
++# permissions yolo equals
++args: ["--permissions=yolo" "codex_cli"]
++ax: false
++result: env="codex_cli" tracked=false permissions="yolo" native=[]
++
++# yolo alias
++args: ["--yolo" "codex_cli"]
++ax: false
++result: env="codex_cli" tracked=false permissions="yolo" native=[]
++
++# native tail keeps permission spellings
++args: ["pi" "--" "--permissions" "yolo" "--yolo" "-d" "--danger"]
++ax: false
++result: env="pi" tracked=false native=["--permissions" "yolo" "--yolo" "-d" "--danger"]
++
+ # system prompt append
+ args: ["pi" "--system-prompt" "append"]
+ ax: false
+@@ -253,6 +283,56 @@ args: ["codex_cli" "--effort" "a" "--effort" "a"]
+ ax: false
+ error: usage: flag --effort given more than once
+ 
++# repeated permissions
++args: ["codex_cli" "--permissions=native" "--permissions" "yolo"]
++ax: false
++error: usage: --permissions and --yolo are one permission request and cannot be repeated or combined
++
++# permissions and yolo alias
++args: ["codex_cli" "--permissions" "native" "--yolo"]
++ax: false
++error: usage: --permissions and --yolo are one permission request and cannot be repeated or combined
++
++# yolo alias and permissions
++args: ["codex_cli" "--yolo" "--permissions=yolo"]
++ax: false
++error: usage: --permissions and --yolo are one permission request and cannot be repeated or combined
++
++# yolo alias equals value
++args: ["codex_cli" "--yolo=true"]
++ax: false
++error: usage: --yolo is an alias without a value
++
++# unknown permissions mode
++args: ["codex_cli" "--permissions=automatic"]
++ax: false
++error: usage: --permissions accepts native or yolo, got "automatic"
++
++# unknown permissions mode separate
++args: ["codex_cli" "--permissions" "auto"]
++ax: false
++error: usage: --permissions accepts native or yolo, got "auto"
++
++# legacy short danger
++args: ["codex_cli" "-d"]
++ax: false
++error: usage: -d is rejected; use --permissions native or --permissions yolo
++
++# legacy short danger equals
++args: ["codex_cli" "-d=true"]
++ax: false
++error: usage: -d is rejected; use --permissions native or --permissions yolo
++
++# legacy danger
++args: ["codex_cli" "--danger"]
++ax: false
++error: usage: --danger is rejected; use --permissions native or --permissions yolo
++
++# legacy danger equals
++args: ["codex_cli" "--danger=true"]
++ax: false
++error: usage: --danger is rejected; use --permissions native or --permissions yolo
++
+ # repeated system prompt
+ args: ["pi" "--system-prompt" "append" "--system-prompt" "replace"]
+ ax: false
+diff --git a/internal/composition/composition.go b/internal/composition/composition.go
+index 30afbc6..b95ec90 100644
+--- a/internal/composition/composition.go
++++ b/internal/composition/composition.go
+@@ -4,6 +4,7 @@ package composition
+ 
+ import (
+ 	"encoding/base64"
++	"fmt"
+ 	"maps"
+ 	"slices"
+ 	"sort"
+@@ -49,6 +50,25 @@ type Value struct {
+ 	mcpLayer string
+ }
+ 
++// ComposeAdmittedPlan preserves the launcher's §4.5 placement while consuming
++// NativeArgs already admitted into the upstream plan. The module appends the
++// opaque suffix after its own arguments; this boundary moves that exact suffix
++// after prompt and MCP additions. A mismatch means the admitted plan no longer
++// reproduces the request, so composition refuses instead of guessing.
++func ComposeAdmittedPlan(plan agentic.Plan, ownEnv []string, frag fragment.Fragment, prompt PromptApplication, native []string) (Value, error) {
++	if len(native) > len(plan.Argv) {
++		return Value{}, fmt.Errorf("admitted plan does not carry the requested native argument suffix")
++	}
++	cut := len(plan.Argv) - len(native)
++	for i, arg := range native {
++		if plan.Argv[cut+i] != arg {
++			return Value{}, fmt.Errorf("admitted plan does not carry the requested native argument suffix")
++		}
++	}
++	plan.Argv = slices.Clone(plan.Argv[:cut])
++	return Compose(plan, ownEnv, frag, prompt, native)
++}
++
+ // Compose consumes the owned-environment snapshot of the admitted plan.
+ // Native arguments are appended verbatim. Inputs are not retained.
+ func Compose(plan agentic.Plan, ownEnv []string, frag fragment.Fragment, prompt PromptApplication, native []string) (Value, error) {
+diff --git a/internal/composition/composition_test.go b/internal/composition/composition_test.go
+index bf0ded8..0e55c49 100644
+--- a/internal/composition/composition_test.go
++++ b/internal/composition/composition_test.go
+@@ -83,6 +83,22 @@ func TestComposeOrderAndChannels(t *testing.T) {
+ 		})
+ 	}
+ }
++
++func TestComposeAdmittedPlanRepositionsNativeSuffixAndRefusesDrift(t *testing.T) {
++	f := parsed(t, "claude_code", "/managed/default/claude/mcp.json", nil)
++	native := []string{"resume", "--last"}
++	plan := agentic.Plan{Argv: []string{"--model", "m", "resume", "--last"}}
++	v, err := composition.ComposeAdmittedPlan(plan, nil, f, composition.PromptApplication{Argv: []string{"--prompt", "p"}}, native)
++	if err != nil {
++		t.Fatal(err)
++	}
++	equal(t, v.Argv, []string{"--model", "m", "--prompt", "p", "--mcp-config", f.MCP.Path, "--strict-mcp-config", "resume", "--last"})
++	_, err = composition.ComposeAdmittedPlan(agentic.Plan{Argv: []string{"--model", "m", "resume", "different"}}, nil, f, composition.PromptApplication{}, native)
++	if err == nil || !strings.Contains(err.Error(), "requested native argument suffix") {
++		t.Fatalf("suffix drift error = %v", err)
++	}
++}
++
+ func TestComposeEnvironmentBoundary(t *testing.T) {
+ 	p := agentic.Plan{Env: []string{"HOME=/parent", "PATH=/sanitized", "SECRET=inherited-secret", "FIGMA_API_KEY=source-secret", "OWN=old=literal", "EMPTY="}}
+ 	f := parsed(t, "opencode", "/managed/default/tool/mcp.json", []string{"CHANNEL", "FIGMA_API_KEY", "OWN"})
+diff --git a/internal/defaults/defaults.go b/internal/defaults/defaults.go
+index ab81568..5dc8e39 100644
+--- a/internal/defaults/defaults.go
++++ b/internal/defaults/defaults.go
+@@ -12,6 +12,7 @@ import (
+ )
+ 
+ const Schema = "curator-run-defaults-v1"
++const SchemaV2 = "curator-run-defaults-v2"
+ const CodeInvalid = "defaults_config_invalid"
+ const CodeUsage = "usage"
+ 
+@@ -30,7 +31,7 @@ type Member struct {
+ 	Value   string
+ 	Present bool
+ }
+-type Pair struct{ Model, Effort Member }
++type Pair struct{ Model, Effort, Permissions Member }
+ 
+ // Files is validated configuration. Its zero value represents absent files.
+ // Keeping entries private prevents callers bypassing schema validation.
+@@ -126,11 +127,19 @@ func parse(data []byte) (file, error) {
+ 	if root.Kind != fragment.KindObject {
+ 		return file{}, fmt.Errorf("root must be an object")
+ 	}
++	schemaValue, hasSchema := root.Get("schema")
++	if !hasSchema || schemaValue.Kind != fragment.KindString {
++		return file{}, fmt.Errorf("schema must be a string")
++	}
++	schema := schemaValue.Str
++	if schema != Schema && schema != SchemaV2 {
++		return file{}, fmt.Errorf("invalid schema")
++	}
+ 	f := file{entries: map[string]Pair{}}
+ 	for _, m := range root.Obj {
+ 		switch m.Key {
+ 		case "schema":
+-			if m.Value.Kind != fragment.KindString || m.Value.Str != Schema {
++			if m.Value.Kind != fragment.KindString || m.Value.Str != schema {
+ 				return file{}, fmt.Errorf("invalid schema")
+ 			}
+ 		case "locked":
+@@ -147,7 +156,7 @@ func parse(data []byte) (file, error) {
+ 					return file{}, fmt.Errorf("unknown environment %q", env.Key)
+ 				}
+ 				if env.Value.Kind != fragment.KindObject || len(env.Value.Obj) == 0 {
+-					return file{}, fmt.Errorf("%s must contain model or effort", env.Key)
++					return file{}, fmt.Errorf("%s must contain model, effort, or permissions", env.Key)
+ 				}
+ 				var pair Pair
+ 				for _, member := range env.Value.Obj {
+@@ -160,6 +169,14 @@ func parse(data []byte) (file, error) {
+ 						pair.Model = value
+ 					case "effort":
+ 						pair.Effort = value
++					case "permissions":
++						if schema != SchemaV2 {
++							return file{}, fmt.Errorf("%s.permissions requires %s", env.Key, SchemaV2)
++						}
++						if value.Value != "native" && value.Value != "yolo" {
++							return file{}, fmt.Errorf("%s.permissions must be native or yolo", env.Key)
++						}
++						pair.Permissions = value
+ 					default:
+ 						return file{}, fmt.Errorf("unknown member %s.%s", env.Key, member.Key)
+ 					}
+@@ -191,7 +208,7 @@ type ResolvedMember struct {
+ 	Member
+ 	Origin Origin
+ }
+-type Partial struct{ Model, Effort ResolvedMember }
++type Partial struct{ Model, Effort, Permissions ResolvedMember }
+ 
+ // Resolve applies per-member precedence and refuses flags for locked members,
+ // even if the flag repeats the machine value. Operator locked has no effect.
+@@ -214,6 +231,7 @@ func (f Files) Resolve(environment string, flags Pair) (Partial, error) {
+ 	}{
+ 		{"model", flags.Model, operator.Model, machine.Model, &result.Model},
+ 		{"effort", flags.Effort, operator.Effort, machine.Effort, &result.Effort},
++		{"permissions", flags.Permissions, operator.Permissions, machine.Permissions, &result.Permissions},
+ 	} {
+ 		if locked && row.flag.Present && row.machine.Present {
+ 			return Partial{}, &Error{CodeUsage, fmt.Errorf("--%s overrides locked %s for %s", row.name, row.name, environment)}
+@@ -227,3 +245,22 @@ func (f Files) Resolve(environment string, flags Pair) (Partial, error) {
+ 	}
+ 	return result, nil
+ }
++
++// PermissionDefault returns the merged launcher-global permission value for
++// one canonical environment, before the higher Curator profile level and CLI
++// flag are applied. The machine lock has the same named-environment scope as
++// the model and effort lock.
++func (f Files) PermissionDefault(environment string) (Member, error) {
++	if fragment.HomeVariable(environment) == "" {
++		return Member{}, invalid(fmt.Errorf("unknown environment %q", environment))
++	}
++	machine, named := f.machine.entries[environment]
++	if f.machine.locked && named {
++		return machine.Permissions, nil
++	}
++	operator := f.operator.entries[environment]
++	if operator.Permissions.Present {
++		return operator.Permissions, nil
++	}
++	return machine.Permissions, nil
++}
+diff --git a/internal/defaults/defaults_test.go b/internal/defaults/defaults_test.go
+index 0c6a78f..c048197 100644
+--- a/internal/defaults/defaults_test.go
++++ b/internal/defaults/defaults_test.go
+@@ -79,6 +79,45 @@ func TestLoadRejectsInvalid(t *testing.T) {
+ 	}
+ }
+ 
++func TestPermissionDefaultsV2MergeAndClosedSchema(t *testing.T) {
++	t.Run("v1-rejects-permissions-member", func(t *testing.T) {
++		p := paths(t)
++		write(t, p.Operator, `{"schema":"curator-run-defaults-v1","defaults":{"pi":{"permissions":"yolo"}}}`)
++		_, err := defaults.Load(p)
++		code(t, err, defaults.CodeInvalid)
++	})
++	t.Run("v2-rejects-unknown-mode", func(t *testing.T) {
++		p := paths(t)
++		write(t, p.Operator, `{"schema":"curator-run-defaults-v2","defaults":{"pi":{"permissions":"automatic"}}}`)
++		_, err := defaults.Load(p)
++		code(t, err, defaults.CodeInvalid)
++	})
++	t.Run("operator-over-machine-and-machine-lock", func(t *testing.T) {
++		p := paths(t)
++		write(t, p.Machine, `{"schema":"curator-run-defaults-v2","locked":false,"defaults":{"pi":{"permissions":"native"}}}`)
++		write(t, p.Operator, `{"schema":"curator-run-defaults-v2","defaults":{"pi":{"permissions":"yolo"}}}`)
++		f, err := defaults.Load(p)
++		if err != nil {
++			t.Fatal(err)
++		}
++		got, err := f.PermissionDefault("pi")
++		if err != nil || got != member("yolo") {
++			t.Fatalf("permission default = %+v, %v; want operator yolo", got, err)
++		}
++		write(t, p.Machine, `{"schema":"curator-run-defaults-v2","locked":true,"defaults":{"pi":{"permissions":"native"}}}`)
++		f, err = defaults.Load(p)
++		if err != nil {
++			t.Fatal(err)
++		}
++		got, err = f.PermissionDefault("pi")
++		if err != nil || got != member("native") {
++			t.Fatalf("locked permission default = %+v, %v; want machine native", got, err)
++		}
++		_, err = f.Resolve("pi", defaults.Pair{Permissions: member("native")})
++		code(t, err, defaults.CodeUsage)
++	})
++}
++
+ func TestLoadKnownEnvironmentsAndPresence(t *testing.T) {
+ 	p := paths(t)
+ 	// Normative registry set from SPEC §4.2, including the known unsupported ID.
+diff --git a/internal/defaults/lineup_test.go b/internal/defaults/lineup_test.go
+index 6bba64b..022cc3e 100644
+--- a/internal/defaults/lineup_test.go
++++ b/internal/defaults/lineup_test.go
+@@ -69,7 +69,7 @@ func TestNewRegistryResolvesLaunchableSystems(t *testing.T) {
+ 	}
+ }
+ 
+-// TestCompleteLineupTops pins the observed v0.5.11 fallback values. The
++// TestCompleteLineupTops pins the observed v0.5.22 fallback values. The
+ // model is the Lineup leader by capability score, not the vendor's
+ // display Recommended row (claude-opus-5 for anthropic); re-verify these
+ // pins when the module pin changes. Pi ranks only the preferred runtime
+@@ -77,7 +77,7 @@ func TestNewRegistryResolvesLaunchableSystems(t *testing.T) {
+ func TestCompleteLineupTops(t *testing.T) {
+ 	reg := mustRegistry(t)
+ 	for env, want := range map[string][3]string{
+-		"claude_code": {"claude-fable-5-1", "high", "claude"},
++		"claude_code": {"claude-opus-5-5", "high", "claude"},
+ 		"codex_cli":   {"gpt-6-astra", "max", "codex"},
+ 		"pi":          {"claude-fable-5", "high", "pi-anthropic"},
+ 	} {
+diff --git a/internal/diagnostics/diagnostics.go b/internal/diagnostics/diagnostics.go
+index 3809cad..91974f6 100644
+--- a/internal/diagnostics/diagnostics.go
++++ b/internal/diagnostics/diagnostics.go
+@@ -23,6 +23,9 @@
+ //	plan_refused                   plan.Build                 separately owned (exit 1)
+ //	plan_provider_limited          plan.Build                 separately owned (exit 1)
+ //	env_unsupported                mapping (constant)          mapping.Resolve (exit 1)
++//	permission_policy_unsupported  permission policy          call-site selected (exit 1)
++//	permission_mode_tracked_unsupported permission policy      call-site selected (exit 1)
++//	permission_mode_unsupported    permission policy          call-site selected (exit 1)
+ //	exec_provider_missing          execution (sentinel text)   execution.Launch.Run (exit 1)
+ //	ax_handoff_failed              execution (sentinel text)   execution.Launch.Run (exit 1)
+ //	mcp_layer_missing              composition.LayerError      composition.Value.CheckLaunchBoundary (exit 1)
+@@ -95,6 +98,10 @@ const (
+ 
+ 	CodeEnvUnsupported = "env_unsupported"
+ 
++	CodePermissionPolicyUnsupported      = "permission_policy_unsupported"
++	CodePermissionModeTrackedUnsupported = "permission_mode_tracked_unsupported"
++	CodePermissionModeUnsupported        = "permission_mode_unsupported"
++
+ 	CodeExecMissing = "exec_provider_missing"
+ 
+ 	CodeAxHandoffFailed = "ax_handoff_failed"
+@@ -121,6 +128,9 @@ func Codes() []string {
+ 		CodePlanRefused,
+ 		CodePlanProviderLimited,
+ 		CodeEnvUnsupported,
++		CodePermissionPolicyUnsupported,
++		CodePermissionModeTrackedUnsupported,
++		CodePermissionModeUnsupported,
+ 		CodeExecMissing,
+ 		CodeAxHandoffFailed,
+ 		CodeMCPLayerMissing,
+diff --git a/internal/diagnostics/gate_conformance_test.go b/internal/diagnostics/gate_conformance_test.go
+index 6c246f5..e7d0296 100644
+--- a/internal/diagnostics/gate_conformance_test.go
++++ b/internal/diagnostics/gate_conformance_test.go
+@@ -24,10 +24,12 @@
+ // the owner constants, never hand-enumerated. Each mutable owner gate has
+ // its own named test so a single-foreign-code weakening fails exactly one
+ // name. The remaining normative codes (defaults_unresolvable,
+-// plan_refused, plan_provider_limited, env_unsupported, exec_provider_missing,
+-// ax_handoff_failed) are call-site-selected with no CodeOf classification in
+-// this tree; they appear here only as rejected foreign values and as
+-// Codes() members, with production call sites pinned in vectors.
++// plan_refused, plan_provider_limited, env_unsupported,
++// permission_policy_unsupported, permission_mode_tracked_unsupported,
++// permission_mode_unsupported, exec_provider_missing, ax_handoff_failed)
++// are call-site-selected with no CodeOf classification in this tree; they
++// appear here only as rejected foreign values and as Codes() members, with
++// production call sites pinned in vectors where implemented.
+ package diagnostics_test
+ 
+ import (
+@@ -457,20 +459,22 @@ func TestGateOwnerFormNil(t *testing.T) {
+ }
+ 
+ // TestGateCoverageCounts pins the complete coverage arithmetic derived from
+-// the single registry: 5 owners, 3 forms, 18 normative codes; mutable-Code
+-// families resolve 6 / layer 2 / refusal 2 with foreign sets 12 / 16 / 16
+-// (44 normative rejection pairs); 4 extra strangers; 56 codes x 3 forms =
+-// 168 rejection cases; 12 owned slots (10 mutable + 2 fixed) x 3 forms =
++// the single registry: 5 owners, 3 forms, 21 normative codes; mutable-Code
++// families resolve 6 / layer 2 / refusal 2 with foreign sets 15 / 19 / 19
++// (53 normative rejection pairs); 4 extra strangers per family add 12
++// pairs, for 65 owner/code pairs x 3 forms = 195 rejection cases; 12 owned
++// slots (10 mutable + 2 fixed) x 3 forms =
+ // 36 positive cases (30 mutable + 6 fixed); 5 owners x 4 nil forms + 3
+ // absence extras = 23 nil cases. Fixed-code owners (usage, axconfig) carry
+ // no mutable-Code gate by construction; their constant mappings are pinned
+ // here and their positives asserted in TestGateOwnerFormPositives.
+-// Call-site-selected codes carry no CodeOf classification; they are asserted
+-// as Codes() members and rejected foreign values elsewhere here.
++// Permission codes are declaration-only in this leaf: they carry no CodeOf
++// owner form yet. Call-site-selected codes are asserted as Codes() members
++// and rejected foreign values elsewhere here.
+ func TestGateCoverageCounts(t *testing.T) {
+ 	normative := gateSpecSection6Codes(t)
+-	if len(normative) != 18 {
+-		t.Fatalf("normative codes = %d, want 18: %q", len(normative), normative)
++	if len(normative) != 21 {
++		t.Fatalf("normative codes = %d, want 21: %q", len(normative), normative)
+ 	}
+ 	if len(gateOwnerRegistry) != 5 {
+ 		t.Fatalf("owner registry rows = %d, want 5 (usage, resolve, layer, refusal, axconfig)", len(gateOwnerRegistry))
+@@ -558,18 +562,18 @@ func TestGateCoverageCounts(t *testing.T) {
+ 			t.Fatalf("%s owned = %d, want %d", f.name, f.own, f.want)
+ 		}
+ 		foreign := gateForeign(normative, gateOwnedByName(f.name))
+-		wantForeign := 18 - f.want + len(gateExtraStrangers())
++		wantForeign := 21 - f.want + len(gateExtraStrangers())
+ 		if len(foreign) != wantForeign {
+ 			t.Fatalf("%s foreign+extras = %d, want %d: %q", f.name, len(foreign), wantForeign, foreign)
+ 		}
+ 	}
+-	normPairs := 12 + 16 + 16
+-	if normPairs != 44 {
+-		t.Fatalf("normative rejection pairs = %d, want 44", normPairs)
++	normPairs := 15 + 19 + 19
++	if normPairs != 53 {
++		t.Fatalf("normative rejection pairs = %d, want 53", normPairs)
+ 	}
+-	withExtras := (12 + 4) + (16 + 4) + (16 + 4)
+-	if withExtras*3 != 168 {
+-		t.Fatalf("rejection cases with extras x forms = %d, want 168", withExtras*3)
++	withExtras := (15 + 4) + (19 + 4) + (19 + 4)
++	if withExtras*3 != 195 {
++		t.Fatalf("rejection cases with extras x forms = %d, want 195", withExtras*3)
+ 	}
+ }
+ 
+diff --git a/internal/execution/execution.go b/internal/execution/execution.go
+index c44e687..e7fc41a 100644
+--- a/internal/execution/execution.go
++++ b/internal/execution/execution.go
+@@ -50,10 +50,18 @@ type document struct {
+ 	Extensions    extensions         `json:"extensions"`
+ }
+ type extensions struct {
+-	ProfileName    string `json:"works.relux.curator.profile-name"`
+-	ProfilePin     string `json:"works.relux.curator.profile-pin"`
+-	FragmentDigest string `json:"works.relux.curator.fragment-digest"`
+-	SystemModules  bool   `json:"works.relux.curator.system-modules"`
++	ProfileName           string                 `json:"works.relux.curator.profile-name"`
++	ProfilePin            string                 `json:"works.relux.curator.profile-pin"`
++	FragmentDigest        string                 `json:"works.relux.curator.fragment-digest"`
++	SystemModules         bool                   `json:"works.relux.curator.system-modules"`
++	EffectiveNativePolicy *EffectiveNativePolicy `json:"works.relux.curator.effective-native-policy,omitempty"`
++}
++
++// EffectiveNativePolicy is the launcher-SPEC tracked record of inspected
++// relaxations. Source contains only paths whose policy contents were read.
++type EffectiveNativePolicy struct {
++	Relaxations []string `json:"relaxations"`
++	Source      string   `json:"source"`
+ }
+ 
+ // Launch is a prepared snapshot. Prepare belongs at composition time, so the
+@@ -69,10 +77,17 @@ type Launch struct {
+ // invocation with its mapped target. These are trusted typed pipeline inputs;
+ // this layer does not reimplement fragment/CLI/admission validation.
+ func Prepare(v composition.Value, f fragment.Fragment, inv cli.Invocation, target mapping.Target, at time.Time) (Launch, error) {
++	return PrepareWithNativePolicy(v, f, inv, target, at, nil)
++}
++
++// PrepareWithNativePolicy snapshots the effective-native-policy result into
++// the optional tracked extension. Direct launches retain it only as stderr
++// provenance, as required by SPEC §4.6.
++func PrepareWithNativePolicy(v composition.Value, f fragment.Fragment, inv cli.Invocation, target mapping.Target, at time.Time, policy *EffectiveNativePolicy) (Launch, error) {
+ 	// Marshal now both snapshots the tracked transport and prevents later input
+ 	// mutations changing it. Copy direct slices separately for the same reason.
+ 	doc, err := json.Marshal(document{"urn:ax:schema:launch-plan-request", "1.0.0", v.Argv, v.EnvNames, v.EnvLiterals, v.Stdin,
+-		extensions{f.Profile.Name, "sha256:" + f.Profile.LockSHA256, f.Digest, f.SystemPrompt != nil}})
++		extensions{f.Profile.Name, "sha256:" + f.Profile.LockSHA256, f.Digest, f.SystemPrompt != nil, policy}})
+ 	if err != nil {
+ 		return Launch{}, err
+ 	}
+diff --git a/internal/execution/permission.go b/internal/execution/permission.go
+new file mode 100644
+index 0000000..65bcd3c
+--- /dev/null
++++ b/internal/execution/permission.go
+@@ -0,0 +1,187 @@
++package execution
++
++import (
++	"fmt"
++	"os"
++	"sort"
++	"strings"
++
++	"github.com/relux-works/curator-agent-launcher/internal/cli"
++	"github.com/relux-works/curator-agent-launcher/internal/defaults"
++	"github.com/relux-works/curator-agent-launcher/internal/diagnostics"
++	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
++
++// PermissionRequest is the input to the closed §4.3 permission ladder. The
++// profile value is present only when the v2 fragment identifies a named
++// profile setting; source=default remains silent and falls through.
++type PermissionRequest struct {
++	Flag        cli.PermissionMode
++	FlagPresent bool
++	Profile     *fragment.Permissions
++	Global      defaults.Member
++	Headless    bool
++	Tracked     bool
++	Transport   bool
++}
++
++// PermissionDecision is the effective typed mode and its launcher-visible
++// provenance. Provider mappings remain agents-management's responsibility.
++type PermissionDecision struct {
++	Mode   agentic.PermissionMode
++	Source string
++}
++
++// PermissionError is a SPEC §6 permission refusal. Its code is selected at the
++// owning execution boundary so no caller can degrade a refusal into a launch.
++type PermissionError struct {
++	Code   string
++	Detail string
++}
++
++func (e *PermissionError) Error() string { return e.Code + ": " + e.Detail }
++
++// ResolvePermission implements the closed mode precedence and the two
++// terminal gates: force-native lock, fragment transport, and tracked mode.
++func ResolvePermission(req PermissionRequest) (PermissionDecision, error) {
++	locked := req.Profile != nil && req.Profile.Locked
++	if locked {
++		if (req.FlagPresent && req.Flag == cli.PermissionYolo) || (req.Global.Present && req.Global.Value == string(agentic.PermissionModeYolo)) {
++			return PermissionDecision{}, &PermissionError{
++				Code:   diagnostics.CodeUsage,
++				Detail: "yolo conflicts with Curator's force-native permission lock",
++			}
++		}
++		if req.FlagPresent {
++			return PermissionDecision{Mode: agentic.PermissionModeNative, Source: "flag"}, nil
++		}
++		if req.Global.Present {
++			return PermissionDecision{Mode: agentic.PermissionModeNative, Source: "global"}, nil
++		}
++		// The lock forces the built-in outcome to native; report the native
++		// built-in provenance because the fragment source=global is the lock,
++		// not the launcher's defaults.json source=global.
++		return PermissionDecision{Mode: agentic.PermissionModeNative, Source: "default-headless"}, nil
++	}
++
++	decision := PermissionDecision{}
++	switch {
++	case req.FlagPresent:
++		decision = PermissionDecision{Mode: agentic.PermissionMode(req.Flag), Source: "flag"}
++	case req.Profile != nil && req.Profile.Source == "profile":
++		decision = PermissionDecision{Mode: agentic.PermissionMode(req.Profile.Mode), Source: "profile"}
++	case req.Global.Present:
++		decision = PermissionDecision{Mode: agentic.PermissionMode(req.Global.Value), Source: "global"}
++	case req.Headless || req.Tracked:
++		decision = PermissionDecision{Mode: agentic.PermissionModeNative, Source: "default-headless"}
++	default:
++		decision = PermissionDecision{Mode: agentic.PermissionModeYolo, Source: "default-interactive"}
++	}
++
++	if decision.Mode == agentic.PermissionModeYolo && !req.Transport {
++		return PermissionDecision{}, &PermissionError{
++			Code:   diagnostics.CodePermissionPolicyUnsupported,
++			Detail: "the fragment does not establish permission-mode transport",
++		}
++	}
++	if decision.Mode == agentic.PermissionModeYolo && req.Tracked {
++		return PermissionDecision{}, &PermissionError{
++			Code:   diagnostics.CodePermissionModeTrackedUnsupported,
++			Detail: "tracked launches cannot use yolo permission mode",
++		}
++	}
++	return decision, nil
++}
++
++// HasNonInteractiveMarker checks the closed, versioned marker set from SPEC
++// §4.6. Presence is the signal, including a present empty value.
++func HasNonInteractiveMarker(env []string) bool {
++	for _, entry := range env {
++		name, _, _ := strings.Cut(entry, "=")
++		if name == "CI" || name == "GITHUB_ACTIONS" {
++			return true
++		}
++	}
++	return false
++}
++
++// ReportEffectiveNativePolicy prints only relaxations returned by the
++// agents-management inspector. The returned record is included in the ax
++// document only for tracked launches. Sources not inspected are never
++// converted into a clean or relaxed-policy claim.
++func ReportEffectiveNativePolicy(w ioWriter, inspection agentic.StoredPolicyInspection, tracked bool) *EffectiveNativePolicy {
++	if len(inspection.Relaxations) == 0 {
++		return nil
++	}
++	inspected := make(map[string]bool, len(inspection.SourcesInspected))
++	for _, source := range inspection.SourcesInspected {
++		inspected[source] = true
++	}
++	uninspected := make(map[string]bool, len(inspection.SourcesNotInspected))
++	for _, source := range inspection.SourcesNotInspected {
++		uninspected[source.SourcePath] = true
++	}
++	bySource := map[string]map[string]int{}
++	for _, relaxation := range inspection.Relaxations {
++		if relaxation.SourcePath == "" || relaxation.Selector == "" || !inspected[relaxation.SourcePath] || uninspected[relaxation.SourcePath] {
++			continue
++		}
++		if bySource[relaxation.SourcePath] == nil {
++			bySource[relaxation.SourcePath] = map[string]int{}
++		}
++		bySource[relaxation.SourcePath][relaxation.Selector]++
++	}
++	sources := make([]string, 0, len(bySource))
++	for source := range bySource {
++		sources = append(sources, source)
++	}
++	sort.Strings(sources)
++	var all []string
++	for _, source := range sources {
++		selectors := make([]string, 0, len(bySource[source]))
++		for selector, count := range bySource[source] {
++			all = append(all, selector)
++			if selector == "permissions.allow" && count > 5 {
++				selectors = append(selectors, fmt.Sprintf("permissions.allow (%d rules)", count))
++			} else {
++				selectors = append(selectors, selector)
++			}
++		}
++		sort.Strings(selectors)
++		fmt.Fprintf(w, "curator-run: effective-native-policy: relaxation=%s source=%s\n", strings.Join(selectors, ","), foldLineValue(source))
++	}
++	if !tracked || len(sources) == 0 {
++		return nil
++	}
++	sort.Strings(all)
++	all = compactStrings(all)
++	return &EffectiveNativePolicy{Relaxations: all, Source: strings.Join(sources, ",")}
++}
++
++type ioWriter interface{ Write([]byte) (int, error) }
++
++func foldLineValue(s string) string {
++	s = strings.ReplaceAll(s, "\r\n", "\n")
++	s = strings.ReplaceAll(s, "\r", "\n")
++	return strings.ReplaceAll(s, "\n", "\n  ")
++}
++
++func compactStrings(values []string) []string {
++	if len(values) < 2 {
++		return values
++	}
++	out := values[:1]
++	for _, value := range values[1:] {
++		if value != out[len(out)-1] {
++			out = append(out, value)
++		}
++	}
++	return out
++}
++
++// InteractiveStdio reports whether both standard input and output are TTYs.
++// Failure to establish either side is treated as headless.
++func InteractiveStdio(stdin, stdout *os.File) bool {
++	return stdin != nil && stdout != nil && isTerminalFD(stdin.Fd()) && isTerminalFD(stdout.Fd())
++}
+diff --git a/internal/execution/tty_darwin.go b/internal/execution/tty_darwin.go
+new file mode 100644
+index 0000000..30b7223
+--- /dev/null
++++ b/internal/execution/tty_darwin.go
+@@ -0,0 +1,14 @@
++//go:build darwin
++
++package execution
++
++import (
++	"syscall"
++	"unsafe"
++)
++
++func isTerminalFD(fd uintptr) bool {
++	var state syscall.Termios
++	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, fd, uintptr(syscall.TIOCGETA), uintptr(unsafe.Pointer(&state)))
++	return errno == 0
++}
+diff --git a/internal/execution/tty_linux.go b/internal/execution/tty_linux.go
+new file mode 100644
+index 0000000..f816aeb
+--- /dev/null
++++ b/internal/execution/tty_linux.go
+@@ -0,0 +1,14 @@
++//go:build linux
++
++package execution
++
++import (
++	"syscall"
++	"unsafe"
++)
++
++func isTerminalFD(fd uintptr) bool {
++	var state syscall.Termios
++	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, fd, uintptr(syscall.TCGETS), uintptr(unsafe.Pointer(&state)))
++	return errno == 0
++}
+diff --git a/internal/execution/tty_other.go b/internal/execution/tty_other.go
+new file mode 100644
+index 0000000..ac66e27
+--- /dev/null
++++ b/internal/execution/tty_other.go
+@@ -0,0 +1,5 @@
++//go:build !linux && !darwin
++
++package execution
++
++func isTerminalFD(uintptr) bool { return false }
+diff --git a/internal/fragment/fragment.go b/internal/fragment/fragment.go
+index cbb4f15..0337671 100644
+--- a/internal/fragment/fragment.go
++++ b/internal/fragment/fragment.go
+@@ -1,9 +1,10 @@
+ // Package fragment implements SPEC.md §4.1, the context-plane step of the
+ // launcher: it runs `curator env resolve <env-id> [--profile <name>]
+ // --repair --format json` as a subprocess, parses the closed
+-// launch-env-fragment-v1 object (curator-spec environments.md §10.2 as
++// launch-env-fragment-v1 and launch-env-fragment-v2 objects (curator-spec environments.md §10.2 as
+ // revised by Decision 0012 D8, conformance schema
+-// launch-env-fragment-v1.schema.json), and computes the CCJ-1 digest
++// launch-env-fragment-v1.schema.json plus the draft v2 permissions member,
++// and computes the CCJ-1 digest
+ // (registry.md §1) from the parsed object.
+ //
+ // The package resolves and nothing else: it applies no channel, writes no
+@@ -22,6 +23,10 @@ import (
+ // Identity is the required value of the "fragment" member.
+ const Identity = "launch-env-fragment-v1"
+ 
++// IdentityV2 adds the closed permissions member and establishes permission
++// and force-native-lock transport.
++const IdentityV2 = "launch-env-fragment-v2"
++
+ // Environment identifiers of the closed adapter registry (environments.md
+ // §7.1). The launcher's own support for a launch into one of them is a §4.2
+ // fact, not this package's.
+@@ -85,6 +90,15 @@ type Profile struct {
+ 	LockSHA256 string
+ }
+ 
++// Permissions carries the v2 fragment's resolved profile-level mode and
++// Curator force-native lock state. Source "default" is a silence placeholder;
++// source "global" identifies an engaged force-native lock.
++type Permissions struct {
++	Mode   string
++	Locked bool
++	Source string
++}
++
+ // Precedence carries the two primitives (Decision 0012 D4); the launcher
+ // accepts and does not consume them.
+ type Precedence struct {
+@@ -106,11 +120,15 @@ type MCP struct {
+ 	Channels []Channel
+ }
+ 
+-// Fragment is a parsed, validated launch-env-fragment-v1.
++// Fragment is a parsed, validated launch-env-fragment-v1 or v2.
+ type Fragment struct {
++	// Revision is the exact fragment token and the only permission-transport
++	// signal. Only v2 can carry Permissions.
++	Revision    string
+ 	Environment string
+ 	Profile     Profile
+ 	Precedence  Precedence
++	Permissions *Permissions
+ 	// Env maps the adapter's registry-declared variable name to the managed
+ 	// home path. Revision 1 declares exactly one variable per adapter.
+ 	Env map[string]string
+@@ -201,7 +219,7 @@ func invalid(path, format string, a ...any) error {
+ 	return &InvalidError{Path: path, Msg: fmt.Sprintf(format, a...)}
+ }
+ 
+-// Parse validates data as one closed launch-env-fragment-v1 object and
++// Parse validates data as one closed launch-env-fragment-v1 or v2 object and
+ // returns it with its CCJ-1 bytes and digest. Everything the reader rules
+ // of registry.md §1 reject (invalid UTF-8, duplicate keys, lone surrogates,
+ // non-integers, trailing content) is an error, as is every departure from
+@@ -304,20 +322,54 @@ func checkFlagToken(path, s string) error {
+ }
+ 
+ func fromValue(root Value) (*Fragment, error) {
+-	if err := closedObject("", root, []string{"fragment", "environment", "profile", "precedence", "env"}, []string{"system_prompt", "mcp", "path_prepend"}); err != nil {
++	revision, err := enumMember("", root, "fragment", Identity, IdentityV2)
++	if err != nil {
+ 		return nil, err
+ 	}
+-	f := &Fragment{}
+-
+-	if _, err := enumMember("", root, "fragment", Identity); err != nil {
++	required := []string{"fragment", "environment", "profile", "precedence", "env"}
++	optional := []string{"system_prompt", "mcp", "path_prepend"}
++	if revision == IdentityV2 {
++		required = append(required, "permissions")
++	} else {
++		// A v1 reader rejects the v2 member, even when its value looks valid.
++	}
++	if err := closedObject("", root, required, optional); err != nil {
+ 		return nil, err
+ 	}
++	f := &Fragment{Revision: revision}
++
+ 	env, err := enumMember("", root, "environment", EnvClaudeCode, EnvCodexCLI, EnvOpenCode, EnvPi)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+ 	f.Environment = env
+ 
++	if revision == IdentityV2 {
++		value, _ := root.Get("permissions")
++		if err := closedObject("/permissions", value, []string{"mode", "locked", "source"}, nil); err != nil {
++			return nil, err
++		}
++		permissions := &Permissions{}
++		if permissions.Mode, err = enumMember("/permissions", value, "mode", "native", "yolo"); err != nil {
++			return nil, err
++		}
++		locked, _ := value.Get("locked")
++		if locked.Kind != KindBool {
++			return nil, invalid("/permissions/locked", "expected a boolean, got %s", locked.Kind)
++		}
++		permissions.Locked = locked.Bool
++		if permissions.Source, err = enumMember("/permissions", value, "source", "profile", "global", "default"); err != nil {
++			return nil, err
++		}
++		if permissions.Locked != (permissions.Source == "global") {
++			return nil, invalid("/permissions", "locked must be true iff source is global")
++		}
++		if permissions.Source != "profile" && permissions.Mode != "native" {
++			return nil, invalid("/permissions/mode", "source %s must carry native mode", permissions.Source)
++		}
++		f.Permissions = permissions
++	}
++
+ 	// profile
+ 	prof, _ := root.Get("profile")
+ 	if err := closedObject("/profile", prof, []string{"name", "lock_sha256"}, nil); err != nil {
+diff --git a/internal/fragment/resolve.go b/internal/fragment/resolve.go
+index 10600f2..3756e2f 100644
+--- a/internal/fragment/resolve.go
++++ b/internal/fragment/resolve.go
+@@ -189,7 +189,7 @@ func (r *Resolver) Resolve(ctx context.Context, req Request) (*Fragment, error)
+ 	}
+ 	f, err := Parse(stdout)
+ 	if err != nil {
+-		return nil, &ResolveError{Code: CodeFragmentInvalid, ExitCode: 0, Detail: "curator env resolve exited 0 but its output is not a valid launch-env-fragment-v1: " + err.Error(), Err: err}
++		return nil, &ResolveError{Code: CodeFragmentInvalid, ExitCode: 0, Detail: "curator env resolve exited 0 but its output is not a valid launch-env-fragment-v1 or v2: " + err.Error(), Err: err}
+ 	}
+ 	if f.Environment != req.EnvID {
+ 		return nil, &ResolveError{Code: CodeFragmentInvalid, ExitCode: 0, Detail: fmt.Sprintf("fragment names environment %q, resolve was asked for %q", f.Environment, req.EnvID)}
+diff --git a/internal/plan/plan.go b/internal/plan/plan.go
+index 15f69a3..8cf647a 100644
+--- a/internal/plan/plan.go
++++ b/internal/plan/plan.go
+@@ -75,12 +75,15 @@ const (
+ // engine member: those stay zero/unset by construction and no caller can
+ // supply them.
+ type Request struct {
+-	Runtime string
+-	Model   string
+-	Effort  string
+-	Home    string
+-	WorkDir string
+-	Env     []string
++	Runtime        string
++	Model          string
++	Effort         string
++	PermissionMode agentic.PermissionMode
++	ToolRelease    string
++	NativeArgs     []string
++	Home           string
++	WorkDir        string
++	Env            []string
+ }
+ 
+ // BuildLaunchFunc is vendorplugin.BuildLaunchWithEnvironment's shape, injectable so tests
+@@ -190,12 +193,15 @@ func (e *LimitedError) Code() string { return CodeLimited }
+ // unset. It calls nothing and starts no child.
+ func SpawnRequest(req Request) vendorplugin.SpawnRequest {
+ 	return vendorplugin.SpawnRequest{
+-		Runtime: vendorplugin.RuntimeID(req.Runtime),
+-		Model:   vendorplugin.ModelID(req.Model),
+-		Effort:  req.Effort,
+-		Home:    req.Home,
+-		WorkDir: req.WorkDir,
+-		Env:     req.Env,
++		Runtime:        vendorplugin.RuntimeID(req.Runtime),
++		Model:          vendorplugin.ModelID(req.Model),
++		Effort:         req.Effort,
++		PermissionMode: req.PermissionMode,
++		ToolRelease:    req.ToolRelease,
++		NativeArgs:     append([]string{}, req.NativeArgs...),
++		Home:           req.Home,
++		WorkDir:        req.WorkDir,
++		Env:            req.Env,
+ 	}
+ }
+ 
