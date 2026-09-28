@@ -1,0 +1,159 @@
+diff --git a/internal/scriptworker/worker_test.go b/internal/scriptworker/worker_test.go
+index c21b368a..f4a324c4 100644
+--- a/internal/scriptworker/worker_test.go
++++ b/internal/scriptworker/worker_test.go
+@@ -1,9 +1,11 @@
+ package scriptworker
+ 
+ import (
++	"bytes"
+ 	"crypto/sha256"
+ 	"encoding/hex"
+ 	"encoding/json"
++	"fmt"
+ 	"io"
+ 	"os"
+ 	"os/exec"
+@@ -11,6 +13,7 @@ import (
+ 	"runtime"
+ 	"strings"
+ 	"testing"
++	"time"
+ 
+ 	"github.com/relux-works/curator/internal/godriver"
+ )
+@@ -23,6 +26,7 @@ type rawWorker struct {
+ 	command *exec.Cmd
+ 	stdin   io.WriteCloser
+ 	stdout  io.ReadCloser
++	stderr  *bytes.Buffer
+ }
+ 
+ func startRawWorker(t *testing.T, launchPath string) *rawWorker {
+@@ -38,11 +42,12 @@ func startRawWorker(t *testing.T, launchPath string) *rawWorker {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	command.Stderr = os.Stderr
++	stderr := &bytes.Buffer{}
++	command.Stderr = stderr
+ 	if err := command.Start(); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	worker := &rawWorker{t: t, command: command, stdin: stdin, stdout: stdout}
++	worker := &rawWorker{t: t, command: command, stdin: stdin, stdout: stdout, stderr: stderr}
+ 	t.Cleanup(worker.close)
+ 	return worker
+ }
+@@ -50,7 +55,7 @@ func startRawWorker(t *testing.T, launchPath string) *rawWorker {
+ func (worker *rawWorker) send(message workerMessage) {
+ 	worker.t.Helper()
+ 	if err := writeMessage(worker.stdin, message); err != nil {
+-		worker.t.Fatalf("cannot send %s: %v", message.Kind, err)
++		worker.t.Fatalf("cannot send %s: %v; %s", message.Kind, err, worker.exitReport())
+ 	}
+ }
+ 
+@@ -58,11 +63,28 @@ func (worker *rawWorker) receive() workerMessage {
+ 	worker.t.Helper()
+ 	message, err := readMessage(worker.stdout)
+ 	if err != nil {
+-		worker.t.Fatalf("cannot read a worker message: %v", err)
++		worker.t.Fatalf("cannot read a worker message: %v; %s", err, worker.exitReport())
+ 	}
+ 	return message
+ }
+ 
++// exitReport names how the worker process ended and what it wrote to
++// stderr, so a closed channel is attributable (for example a kernel kill
++// at exec rather than a protocol refusal).
++func (worker *rawWorker) exitReport() string {
++	_ = worker.stdin.Close()
++	done := make(chan error, 1)
++	go func() { done <- worker.command.Wait() }()
++	var status string
++	select {
++	case err := <-done:
++		status = fmt.Sprintf("worker exit: %v (state %v)", err, worker.command.ProcessState)
++	case <-time.After(10 * time.Second):
++		status = "worker still running 10s after the channel closed"
++	}
++	return fmt.Sprintf("%s; worker stderr: %q", status, worker.stderr.String())
++}
++
+ // permit sends the parent's permit frame: the worker starts the
+ // interpreter only after it arrives.
+ func (worker *rawWorker) permit(nonce string) {
+@@ -530,14 +552,7 @@ func TestScriptWorkerRejectsForgedWorkerIdentity(t *testing.T) {
+ 	// the recorded identity.
+ 	modified := filepath.Join(mustPhysical(t, t.TempDir()), executableFixtureName("curator-modified"))
+ 	copyTestFile(t, original, modified)
+-	payload, err := os.ReadFile(modified) // #nosec G304 -- test-owned copy
+-	if err != nil {
+-		t.Fatal(err)
+-	}
+-	payload[len(payload)-1] ^= 0xff
+-	if err := os.WriteFile(modified, payload, 0o755); err != nil {
+-		t.Fatal(err)
+-	}
++	tamperExecutableFixture(t, modified)
+ 	second := startRawWorker(t, modified)
+ 	other := newWorkerFixture(t, original)
+ 	otherWire := other.request()
+@@ -549,6 +564,40 @@ func TestScriptWorkerRejectsForgedWorkerIdentity(t *testing.T) {
+ 	}
+ }
+ 
++// tamperExecutableFixture changes the bytes of an executable copy while
++// keeping it launchable. On darwin the kernel kills an arm64 image whose
++// code signature no longer matches its bytes before main runs, so a raw
++// byte flip proves only SIGKILL, never the identity refusal; there the
++// copy is re-signed ad hoc under a different identifier, which is what an
++// attacker producing a runnable substitute does. Elsewhere the last byte
++// is flipped. Either way the result must differ from the source bytes.
++func tamperExecutableFixture(t *testing.T, path string) {
++	t.Helper()
++	before, err := os.ReadFile(path) // #nosec G304 -- test-owned copy
++	if err != nil {
++		t.Fatal(err)
++	}
++	if runtime.GOOS == "darwin" {
++		output, err := exec.Command("/usr/bin/codesign", "--force", "--sign", "-", "--identifier", "curator.test.tampered", path).CombinedOutput() // #nosec G204 -- fixed tool on a test-owned copy
++		if err != nil {
++			t.Fatalf("cannot re-sign the tampered fixture: %v: %s", err, output)
++		}
++	} else {
++		payload := append([]byte(nil), before...)
++		payload[len(payload)-1] ^= 0xff
++		if err := os.WriteFile(path, payload, 0o755); err != nil { // #nosec G306 -- executable test fixture
++			t.Fatal(err)
++		}
++	}
++	after, err := os.ReadFile(path) // #nosec G304 -- test-owned copy
++	if err != nil {
++		t.Fatal(err)
++	}
++	if bytes.Equal(before, after) {
++		t.Fatal("the tampered fixture still has the original bytes")
++	}
++}
++
+ // TestScriptWorkerRejectsSubstitutedManager proves a worker started through
+ // a launcher link still proves the installed identity, and a retargeted
+ // link cannot move it.
+@@ -558,14 +607,7 @@ func TestScriptWorkerRejectsSubstitutedManager(t *testing.T) {
+ 	copyTestFile(t, mustPhysical(t, os.Args[0]), installed)
+ 	other := filepath.Join(directory, executableFixtureName("curator-other"))
+ 	copyTestFile(t, installed, other)
+-	payload, err := os.ReadFile(other) // #nosec G304 -- test-owned copy
+-	if err != nil {
+-		t.Fatal(err)
+-	}
+-	payload[len(payload)-1] ^= 0xff
+-	if err := os.WriteFile(other, payload, 0o755); err != nil {
+-		t.Fatal(err)
+-	}
++	tamperExecutableFixture(t, other)
+ 	link := filepath.Join(directory, executableFixtureName("curator"))
+ 	if err := os.Symlink(installed, link); err != nil {
+ 		t.Skipf("this host forbids symlink creation: %v", err)
