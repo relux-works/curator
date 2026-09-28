@@ -157,6 +157,11 @@ spawn selection rationale for muse-spark-1.3-contributor/xhigh: bound 6chzf9-int
 spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
 spawn queued: [implementer] developer (muse) (run=RUN-260924-92f669, max_parallel=20)
 spawn run started: [implementer] developer (muse) (run=RUN-260924-92f669)
+spawn run child final message (run=RUN-260924-92f669, tools=5 patches=0 failed=0):
+Attachment verified: `BUG-260922-6chzf9_integration-final.md` attached on BUG-260922-6chzf9, exit 0. No further action; orchestrator delivers.
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260924-92f669, pid=5788, exit=0)
+spawn run RUN-260924-92f669 failed; operator action required; failure: integration_binding_state_invalid: Change Request CR-BUG-260922-6chzf9-4 revision 4 is integrated, want accepted or checkpointed
 
 ## Precondition Resources
 - [6chzf9-integrate-final.md](file://BUG-260922-6chzf9/6chzf9-integrate-final.md)
@@ -198,12 +203,13 @@ spawn run started: [implementer] developer (muse) (run=RUN-260924-92f669)
 - [BUG-260922-6chzf9_review-verdict-rev4.md](file://BUG-260922-6chzf9/BUG-260922-6chzf9_review-verdict-rev4.md) — rev4 review verdict
 - [nochangelog-delta-review-note.md](file://BUG-260922-6chzf9/nochangelog-delta-review-note.md)
 - [BUG-260922-6chzf9_spawn-log_-implementer--developer--muse-_RUN-260924-92f669.log](file://BUG-260922-6chzf9/BUG-260922-6chzf9_spawn-log_-implementer--developer--muse-_RUN-260924-92f669.log) — System spawn log captured by task-board
+- [BUG-260922-6chzf9_integration-final.md](file://BUG-260922-6chzf9/BUG-260922-6chzf9_integration-final.md) — Bound integration transaction output for CR-BUG-260922-6chzf9-4 revision 4 (exit 1, board_publication_pending; landing stands per log)
 
 ## Created
 2026-09-22T09:53:57Z
 
 ## Last Update
-2026-09-24T08:19:07Z
+2026-09-24T08:28:36Z
 
 ## Assigned To
 [implementer] developer (muse)
