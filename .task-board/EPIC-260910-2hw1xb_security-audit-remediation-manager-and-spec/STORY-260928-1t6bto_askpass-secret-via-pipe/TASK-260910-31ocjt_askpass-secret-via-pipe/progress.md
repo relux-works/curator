@@ -152,6 +152,18 @@ Integration preconditions for accepted rev6 (CR-TASK-260910-31ocjt-6) reconfirme
 No repo files changed; no status writes, no `handoff`, and no `worktree integrate` executed per the bound-producer assignment — the runner performs the synchronous landing after this run exits.
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260929-aac3be, pid=73768, exit=0)
+spawn run RUN-260929-aac3be failed; operator action required; failure: board_publication_pending: runner integrate refused: board_publication_pending: STORY-260928-1t6bto is landed and its board state is committed as 85a7133ab7c6b079ec976260f361d65de20df7ef on the local trunk, but the publication push did not land (board_publish_foreign_lane_overlap); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: 85a7133ab7c6b079ec976260f361d65de20df7ef
+  cause_code: board_publish_foreign_lane_overlap
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: 29ebed123f535d89704ff06e4cde0a5ed0e3813b
+  story_id: STORY-260928-1t6bto
+  cause: board_publish_foreign_lane_overlap: the unpublished 85a7133ab7c6b079ec976260f361d65de20df7ef reaches outside board_paths(STORY-260928-1t6bto) on 2 path(s) — starting with .task-board/EPIC-260910-2hw1xb_security-audit-remediation-manager-and-spec/STORY-260910-234vmx_supply-chain-and-credential-hardening/TASK-260910-31ocjt_askpass-secret-via-pipe/README.md; a Story record carries its own lane only, and a delta spanning lanes needs an Epic Record subject covering them — nothing was projected and nothing was pushed
+  element_id: STORY-260928-1t6bto
+  link_oid: 85a7133ab7c6b079ec976260f361d65de20df7ef
+  paths: .task-board/EPIC-260910-2hw1xb_security-audit-remediation-manager-and-spec/STORY-260910-234vmx_supply-chain-and-credential-hardening/TASK-260910-31ocjt_askpass-secret-via-pipe/README.md,.task-board/EPIC-260910-2hw1xb_security-audit-remediation-manager-and-spec/STORY-260910-234vmx_supply-chain-and-credential-hardening/TASK-260910-31ocjt_askpass-secret-via-pipe/progress.md
+  remedy: re-record the bytes at the owning scope, or land the chain through integrate/reconcile-trunk
 
 ## Precondition Resources
 - [31ocjt-brief.md](file://TASK-260910-31ocjt/31ocjt-brief.md) — 31ocjt-brief.md
@@ -201,7 +213,7 @@ spawn run completed: muse (run=RUN-260929-aac3be, pid=73768, exit=0)
 2026-09-10T14:45:39Z
 
 ## Last Update
-2026-09-29T12:24:31Z
+2026-09-29T13:27:53Z
 
 ## Assigned To
 [implementer] developer (muse)
