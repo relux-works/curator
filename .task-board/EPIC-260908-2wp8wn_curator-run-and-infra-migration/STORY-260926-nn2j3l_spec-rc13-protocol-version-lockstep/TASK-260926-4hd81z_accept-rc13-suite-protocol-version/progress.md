@@ -61,6 +61,22 @@ Integration preconditions confirmed for accepted rev1; landing evidence attached
 - Attached `TASK-260926-4hd81z_integration-land.md` as a task-scoped outcome resource. No `worktree integrate`, handoff, or status write performed — the landing step is the runner's.
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260926-e328d8, pid=95128, exit=0)
+spawn run RUN-260926-e328d8 failed; operator action required; failure: board_publication_pending: runner integrate refused: board_publication_pending: STORY-260926-nn2j3l is landed and its board state is committed as 80fd617fe6cc08ae7c9d5ee615431f1fb7a9b0e7 on the local trunk, but the publication push did not land (board_publish_local_trunk_unproven); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: 80fd617fe6cc08ae7c9d5ee615431f1fb7a9b0e7
+  cause_code: board_publish_local_trunk_unproven
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: b8fcc58080e7e9804f0f55c44de6b33a96d28b96
+  story_id: STORY-260926-nn2j3l
+  cause: board_publish_local_trunk_unproven: the local trunk holds an unpublished link 80fd617fe6cc08ae7c9d5ee615431f1fb7a9b0e7 that is not this repository's own board-state record (the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key); a stable content digest is never ownership proof — nothing was projected and nothing was pushed
+  link_oid: 80fd617fe6cc08ae7c9d5ee615431f1fb7a9b0e7
+  reason: the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key
+  remedy: land the unproven commits through integrate/reconcile-trunk, not through this command
+spawn selection rationale tuple: {"role":"developer","pair":"claude-opus-5-5/low","text":"exact-head release PR review; opus low full"}
+spawn selection rationale for claude-opus-5-5/low: exact-head release PR review; opus low full
+spawn agent resolution: Agent selection: claude via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn queued: [implementer] developer (claude) (run=RUN-260926-740dd9, max_parallel=8)
+spawn run RUN-260926-740dd9 cancelled by operator; operator action required; reason: no operator reason supplied
 
 ## Precondition Resources
 - [campaign-producer-rules.md](file://TASK-260926-4hd81z/campaign-producer-rules.md)
@@ -77,12 +93,13 @@ spawn run completed: muse (run=RUN-260926-e328d8, pid=95128, exit=0)
 - [TASK-260926-4hd81z_review-verdict-rev1.md](file://TASK-260926-4hd81z/TASK-260926-4hd81z_review-verdict-rev1.md) — Reviewer verdict rev1: accepted
 - [TASK-260926-4hd81z_spawn-log_-implementer--developer--muse-_RUN-260926-e328d8.log](file://TASK-260926-4hd81z/TASK-260926-4hd81z_spawn-log_-implementer--developer--muse-_RUN-260926-e328d8.log) — System spawn log captured by task-board
 - [TASK-260926-4hd81z_integration-land.md](file://TASK-260926-4hd81z/TASK-260926-4hd81z_integration-land.md) — Bound integration run: landing preconditions and rerun evidence for accepted rev1
+- [TASK-260926-4hd81z_spawn-log_-implementer--developer--claude-_RUN-260926-740dd9.log](file://TASK-260926-4hd81z/TASK-260926-4hd81z_spawn-log_-implementer--developer--claude-_RUN-260926-740dd9.log) — System spawn log captured by task-board
 
 ## Created
 2026-09-26T03:59:31Z
 
 ## Last Update
-2026-09-26T05:51:09Z
+2026-09-26T06:02:30Z
 
 ## Assigned To
-[implementer] developer (muse)
+[implementer] developer (claude)
