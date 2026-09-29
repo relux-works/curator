@@ -69,6 +69,17 @@ func Validate(root string) error {
 // the seam lets production-entry tests cover foreign-owner paths without
 // requiring a second host user or chown privilege.
 func ValidateWithOwner(root string, ownerLookup OwnerLookup) error {
+	return validateWithOwnerAndEntryInfo(root, ownerLookup, func(_ string, entry fs.DirEntry) (os.FileInfo, error) {
+		return entry.Info()
+	})
+}
+
+// entryInfoLookup is the metadata read performed after a parent directory
+// has been listed. validateWithOwnerAndEntryInfo keeps that boundary explicit
+// so tests can reproduce a replacement or removal in the readdir/lstat window.
+type entryInfoLookup func(path string, entry fs.DirEntry) (os.FileInfo, error)
+
+func validateWithOwnerAndEntryInfo(root string, ownerLookup OwnerLookup, entryInfo entryInfoLookup) error {
 	if ownerLookup == nil {
 		return &Failure{Root: root, Path: root, Check: CheckOwnership, Reason: "owner lookup is unavailable"}
 	}
@@ -85,7 +96,24 @@ func ValidateWithOwner(root string, ownerLookup OwnerLookup) error {
 	}
 
 	return filepath.WalkDir(absolute, func(path string, entry fs.DirEntry, walkErr error) error {
+		// vanished applies environments §4 to every per-entry probe (lstat,
+		// link, ownership/DACL, and the directory open for recursion): an
+		// entry that no longer exists when examined was not part of the
+		// directory at examination time. Any other probe error fails closed.
+		vanished := func(err error) (error, bool) {
+			if path == absolute || !IsAbsent(err) {
+				return nil, false
+			}
+			if entry != nil && entry.IsDir() {
+				// Keep WalkDir from descending into the vanished path.
+				return filepath.SkipDir, true
+			}
+			return nil, true
+		}
 		if walkErr != nil {
+			if result, gone := vanished(walkErr); gone {
+				return result
+			}
 			return &Failure{Root: absolute, Path: path, Check: CheckRegular, Cause: walkErr}
 		}
 		if path == absolute {
@@ -95,15 +123,23 @@ func ValidateWithOwner(root string, ownerLookup OwnerLookup) error {
 		if err != nil || escapes(relative) {
 			return &Failure{Root: absolute, Path: path, Check: CheckContainment, Reason: "component does not resolve below the declared directory", Cause: err}
 		}
-		info, err := entry.Info()
+		info, err := entryInfo(path, entry)
 		if err != nil {
+			if result, gone := vanished(err); gone {
+				return result
+			}
 			return &Failure{Root: absolute, Path: path, Check: CheckRegular, Cause: err}
 		}
 		link, err := isLink(path, info)
 		if err != nil {
+			if result, gone := vanished(err); gone {
+				return result
+			}
 			return &Failure{Root: absolute, Path: path, Check: CheckLinkSafety, Cause: err}
 		}
 		if link {
+			// A link is refused whether or not it still exists when its
+			// target is read: lstat already observed it inside the tree.
 			if escapes, readErr := symlinkEscapes(absolute, path); readErr != nil {
 				return &Failure{Root: absolute, Path: path, Check: CheckLinkSafety, Cause: readErr}
 			} else if escapes {
@@ -112,6 +148,12 @@ func ValidateWithOwner(root string, ownerLookup OwnerLookup) error {
 			return &Failure{Root: absolute, Path: path, Check: CheckLinkSafety, Reason: "symbolic link below the declared directory"}
 		}
 		if err := checkNode(absolute, path, info, operator, ownerLookup); err != nil {
+			var failure *Failure
+			if errors.As(err, &failure) && failure.Cause != nil {
+				if result, gone := vanished(failure.Cause); gone {
+					return result
+				}
+			}
 			return err
 		}
 		if !info.IsDir() && !info.Mode().IsRegular() {

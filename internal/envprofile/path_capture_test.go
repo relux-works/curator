@@ -37,6 +37,8 @@ func TestPathInstallCapturesDirtyUntrackedInsideGit(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "root")
 	writeSeedPackage(t, root, "acme")
 	pathSourceGit(t, root, "init", "-q", "-b", "main")
+	pathSourceGit(t, root, "config", "gc.auto", "0")
+	pathSourceGit(t, root, "config", "maintenance.auto", "false")
 	pathSourceGit(t, root, "add", ".")
 	pathSourceGit(t, root, "commit", "-qm", "one")
 	if err := os.WriteFile(filepath.Join(root, "context", "a.md"), []byte("dirty\n"), 0o644); err != nil {
