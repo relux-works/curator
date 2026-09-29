@@ -1761,6 +1761,33 @@ else
 	skip 'the lint wiring pin needs python3' 'python3 not on PATH (the lint lane still asserts its own wiring via TestCommittedWiring)'
 fi
 
+echo '=== naming-gate.sh: real mentions fail, binary-patch base85 noise does not ==='
+NG="$HERE/naming-gate.sh"
+if command -v python3 >/dev/null 2>&1; then
+	# Names assembled at runtime so this file never spells either one.
+	ng_full="$(printf '%s%s' wild berries)"
+	ng_short="$(printf '%s%s' w b)"
+	ng_tree() { rm -rf "$WORK/ng"; mkdir -p "$WORK/ng/docs"; printf 'clean text\n' >"$WORK/ng/docs/readme.md"; }
+	ng_binary_patch() { # $1 = one line placed inside the binary block
+		printf 'diff --git a/x.bin b/x.bin\nindex 1..2 100644\nGIT binary patch\nliteral 12\n%s\nzcmZ?wbhEHbWMp7uXkcIfVnzmrf\n\nliteral 0\nHcmV?d00001\n\ndiff --git a/y.txt b/y.txt\n+clean\n' "$1" >"$WORK/ng/change.patch"
+	}
+	ng_tree; ng_binary_patch "zq*>K|@dcWsQ;${ng_short};M7nsyfzNC>Fby"
+	assert 'naming (a): short word on a base85 line in a binary block passes' 0 bash "$NG" "$WORK/ng"
+	ng_tree; printf 'diff --git a/n.md b/n.md\n+ask %s about it\n' "$ng_short" >"$WORK/ng/change.patch"
+	assert 'naming (b): short word on a text line of a .patch fails' 1 bash "$NG" "$WORK/ng"
+	assert_contains 'naming (b) fails for the short-name reason' "the employer's short name must not appear" "$WORK/out.txt"
+	ng_tree; ng_binary_patch "zq*>K|@dc ${ng_short} M7nsyf"
+	assert 'naming (c): non-base85 line inside a binary block fails' 1 bash "$NG" "$WORK/ng"
+	assert_contains 'naming (c) fails for the short-name reason' "the employer's short name must not appear" "$WORK/out.txt"
+	ng_tree; printf 'Written at %s.\n' "$(printf '%s' "$ng_full" | tr a-z A-Z)" >"$WORK/ng/docs/history.md"
+	assert 'naming (d): full name in markdown fails' 1 bash "$NG" "$WORK/ng"
+	assert_contains 'naming (d) fails for the full-name reason' 'the employer name must not appear' "$WORK/out.txt"
+	ng_tree
+	assert 'naming (e): a clean tree passes' 0 bash "$NG" "$WORK/ng"
+else
+	skip 'the naming gate rows need python3' 'python3 not on PATH'
+fi
+
 echo ''
 printf 'gate-selftest: %d passed, %d failed' "$PASS" "$FAIL"
 [ "$SKIPPED" -gt 0 ] && printf ', %d skipped (reported above, not hidden)' "$SKIPPED"

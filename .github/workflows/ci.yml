@@ -539,28 +539,9 @@ jobs:
           submodules: true
 
       - name: Employer name gate
-        run: |
-          # Curator is an open protocol implementation. The employer under
-          # whose roof some of it was written is not part of that protocol and
-          # must not appear anywhere in the repository -- not in source, docs,
-          # task records or commit messages. Historical records that named a
-          # local checkout path or an internal remote were masked to
-          # `intranet` rather than deleted.
-          #
-          # Both patterns are assembled from parts so this file does not trip
-          # the gate it defines.
-          full="$(printf '%s%s' wild berries)"
-          short="$(printf '%s%s' w b)"
-          status=0
-          if grep -riIn --exclude-dir=.git "$full" .; then
-            echo "naming gate: the employer name must not appear in this repository"
-            status=1
-          fi
-          if grep -riIEn --exclude-dir=.git "\\b$short\\b" .; then
-            echo "naming gate: the employer's short name must not appear in this repository"
-            status=1
-          fi
-          exit "$status"
+        # Rules, the binary-patch exemption and the assembled-from-parts
+        # patterns live in the script; gate-selftest.sh drives its rows.
+        run: bash .github/ci/naming-gate.sh
   candidate-conformance:
     name: Candidate suite (${{ matrix.os }})
     if: >-
