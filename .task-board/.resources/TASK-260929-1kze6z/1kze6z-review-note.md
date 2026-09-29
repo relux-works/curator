@@ -6,7 +6,7 @@ against `1kze6z-brief.md`. Verify:
 2. The only exemption is literal/delta/blank/base85-shaped lines inside a `GIT binary patch` block, which ends at the next `diff --git` or
    EOF. Everything else is still scanned. Try to find a bypass:
    - a markdown file containing a line "GIT binary patch" followed by a base85-shaped line that contains the short name (for example the
-     short name alone, or a token like `wb` glued to base85 characters). Decide whether that is an acceptable residual: base85-shaped
+     short name alone, or the short token glued to base85 characters). Decide whether that is an acceptable residual: base85-shaped
      lines cannot contain spaces or dots, so a real sentence cannot hide there. Say so explicitly;
    - a file whose name does not end in .patch — say whether the exemption applies and whether it should;
    - CRLF line endings.
