@@ -1,0 +1,72 @@
+diff --git a/.github/ci/gate-selftest.sh b/.github/ci/gate-selftest.sh
+index ae058ea5..c86fd476 100644
+--- a/.github/ci/gate-selftest.sh
++++ b/.github/ci/gate-selftest.sh
+@@ -1784,6 +1784,25 @@ if command -v python3 >/dev/null 2>&1; then
+ 	assert_contains 'naming (d) fails for the full-name reason' 'the employer name must not appear' "$WORK/out.txt"
+ 	ng_tree
+ 	assert 'naming (e): a clean tree passes' 0 bash "$NG" "$WORK/ng"
++	ng_sig='Employer name gate'
++	ng_tree; printf -- '- CI: %s\t2026-09-28T10:11:12.3456789Z ./docs/x.md:3:ask %s\n' "$ng_sig" "$ng_short" >"$WORK/ng/progress.md"
++	assert 'naming (f): a historical CI echo with the step signature passes' 0 bash "$NG" "$WORK/ng"
++	ng_tree; printf '{"log":"%s\\t2026-09-28T10:11:12.3456789Z ./docs/x.md:3:ask %s"}\n' "$ng_sig" "$ng_short" >"$WORK/ng/events.ndjson"
++	assert 'naming (g): a JSON-escaped CI echo with the step signature passes' 0 bash "$NG" "$WORK/ng"
++	ng_tree; printf '%s: ask %s about ./docs\n' "$ng_sig" "$ng_short" >"$WORK/ng/docs/notes.md"
++	assert 'naming (h): the step name without timestamp and ./ is still scanned' 1 bash "$NG" "$WORK/ng"
++	ng_tree; printf '  log: \342\200\246-29T01:51:52.8528587Z ./docs/x.patch:9:zq*>K|@dc %s M7\n' "$ng_short" >"$WORK/ng/progress.md"
++	assert 'naming (j): a prefix-truncated CI echo (ellipsis + timestamp tail + ./) passes' 0 bash "$NG" "$WORK/ng"
++	ng_tree; printf 'as said \342\200\246 ask %s about ./docs\n' "$ng_short" >"$WORK/ng/docs/notes.md"
++	assert 'naming (k): prose with an ellipsis but no timestamp tail is still scanned' 1 bash "$NG" "$WORK/ng"
++	ng_tree; printf 'ask %s\nand %s\n' "$ng_short" "$ng_full" >"$WORK/ng/docs/notes.md"
++	assert 'naming (i): a planted mention fails' 1 bash "$NG" "$WORK/ng"
++	if grep -qiF "$ng_short" "$WORK/out.txt" || grep -qiF "$ng_full" "$WORK/out.txt"; then
++		bad 'naming (i): the failure report carries no line content' "planted word echoed in gate output"
++	else
++		ok 'naming (i): the failure report carries no line content'
++	fi
++	assert_contains 'naming (i) reports path:line' './docs/notes.md:1' "$WORK/out.txt"
+ else
+ 	skip 'the naming gate rows need python3' 'python3 not on PATH'
+ fi
+diff --git a/.github/ci/naming-gate.sh b/.github/ci/naming-gate.sh
+index 5b175649..004b1bfb 100755
+--- a/.github/ci/naming-gate.sh
++++ b/.github/ci/naming-gate.sh
+@@ -16,6 +16,17 @@
+ # mentions. Every other line, including any other line inside a block, is
+ # scanned.
+ #
++# Reports carry `path:line` only, never the line content: CI job logs are
++# excerpted into immutable board records, so a report that echoed the line
++# would plant fresh hits in the next run. A second narrow exemption covers the
++# echoes the old content-printing format already left behind: a line carrying
++# the GitHub Actions log prefix of this step -- the step name, a TAB (literal,
++# or `\t` inside a JSON string), an RFC3339 UTC timestamp and ` ./` -- is a
++# machine echo and is skipped. Excerpts the runner truncated inside the
++# prefix keep only its tail: the `…` truncation marker directly followed by
++# the rest of the timestamp and ` ./` is the same echo. Stated bound: a line forged with that exact
++# signature is exempt too; prose without it never is.
++#
+ # Usage:
+ #   naming-gate.sh [root]    (default: the current directory)
+ 
+@@ -45,6 +56,8 @@ import re, sys
+ pat = re.compile(sys.argv[1].encode(), re.I)
+ B85 = re.compile(rb'^[A-Za-z][0-9A-Za-z!#$%&()*+;<=>?@^_`{|}~-]+$')
+ LIT = re.compile(rb'^(literal|delta) [0-9]+$')
++ECHO = re.compile(rb'Employer name gate(\t|\\t)[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z \./'
++                  rb'|\xe2\x80\xa6[0-9-]*T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?Z \./')
+ out = sys.stdout.buffer
+ for f in open(sys.argv[2], 'rb').read().split(b'\n'):
+     if not f:
+@@ -59,8 +72,8 @@ for f in open(sys.argv[2], 'rb').read().split(b'\n'):
+                 inblock = True
+             elif inblock and (line == b'' or LIT.match(line) or B85.match(line)):
+                 continue
+-            if pat.search(line):
+-                out.write(f + b':' + str(n).encode() + b':' + line + b'\n')
++            if pat.search(line) and not ECHO.search(line):
++                out.write(f + b':' + str(n).encode() + b'\n')
+ PY
+ 	rm -f "$hits.g"
+ }
