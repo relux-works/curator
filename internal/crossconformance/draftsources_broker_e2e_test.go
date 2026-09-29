@@ -50,6 +50,24 @@ func runBrokerBinary(t *testing.T, bin string, env []string, stdin []string, arg
 	return testcli.Run(t, "", env, strings.Join(stdin, ""), bin, args...)
 }
 
+// legacyBrokerSecretEnv is the removed environment hand-off; the
+// broker must ignore it so a secret placed there is never answered.
+const legacyBrokerSecretEnv = "CURATOR_BUILD_HTTPS_ASKPASS_SECRET"
+
+// runBrokerWithSecret delivers secret to the broker copy through an
+// inherited pipe handle, the production hand-off, and asserts the
+// child environment carries neither the secret nor the legacy name.
+func runBrokerWithSecret(t *testing.T, bin string, env []string, secret string, args ...string) (int, string) {
+	t.Helper()
+	code, stdout, childEnv := testcli.RunWithHTTPSBrokerSecret(t, env, buildrepo.EnvHTTPSBrokerTransport, secret, bin, args...)
+	for _, entry := range childEnv {
+		if strings.Contains(entry, secret) || strings.HasPrefix(entry, legacyBrokerSecretEnv+"=") {
+			t.Fatalf("child environment carries the secret hand-off: %q", strings.SplitN(entry, "=", 2)[0])
+		}
+	}
+	return code, stdout
+}
+
 func writeAskpassState(t *testing.T, host, username string) string {
 	t.Helper()
 	payload, err := json.Marshal(map[string]string{"Host": host, "Username": username})
@@ -67,29 +85,41 @@ func TestDraftSourcesBrokerAskpassDispatch(t *testing.T) {
 	askpass := copyBrokerBinary(t, buildrepo.HTTPSBrokerName)
 	const host, username, secret = "git.example.test", "oauth2", "broker-secret"
 	state := writeAskpassState(t, host, username)
-	env := []string{
-		buildrepo.EnvHTTPSBrokerState + "=" + state,
-		buildrepo.EnvHTTPSBrokerSecret + "=" + secret,
-	}
+	env := []string{buildrepo.EnvHTTPSBrokerState + "=" + state}
 	usernamePrompt := "Username for 'https://" + host + "': "
 	passwordPrompt := "Password for 'https://" + username + "@" + host + "': "
 
 	t.Run("username prompt", func(t *testing.T) {
-		code, stdout, _ := runBrokerBinary(t, askpass, env, nil, usernamePrompt)
+		code, stdout := runBrokerWithSecret(t, askpass, env, secret, usernamePrompt)
 		if code != 0 || stdout != username+"\n" {
 			t.Fatalf("code = %d, stdout = %q, want %q", code, stdout, username+"\n")
 		}
 	})
 	t.Run("password prompt", func(t *testing.T) {
-		code, stdout, _ := runBrokerBinary(t, askpass, env, nil, passwordPrompt)
+		code, stdout := runBrokerWithSecret(t, askpass, env, secret, passwordPrompt)
 		if code != 0 || stdout != secret+"\n" {
 			t.Fatalf("code = %d, stdout redacted, want the secret once", code)
+		}
+	})
+	t.Run("missing secret handle", func(t *testing.T) {
+		code, stdout, _ := runBrokerBinary(t, askpass, env, nil, passwordPrompt)
+		if code != 1 || stdout != "" {
+			t.Fatalf("code = %d, stdout = %q, want silent refusal", code, stdout)
+		}
+	})
+	t.Run("legacy env secret is not answered", func(t *testing.T) {
+		// Mutant control: a broker that still reads the removed
+		// environment variable would answer here.
+		legacy := append([]string{legacyBrokerSecretEnv + "=" + secret}, env...)
+		code, stdout, _ := runBrokerBinary(t, askpass, legacy, nil, passwordPrompt)
+		if code != 1 || strings.Contains(stdout, secret) {
+			t.Fatalf("code = %d, stdout redacted, want silent refusal", code)
 		}
 	})
 	t.Run("plain binary answers no prompt", func(t *testing.T) {
 		// Mutant control: the dispatch is basename-gated, so the
 		// ordinary CLI entry must never answer a credential prompt.
-		code, stdout, _ := runBrokerBinary(t, curatorBinary(t), env, nil, passwordPrompt)
+		code, stdout := runBrokerWithSecret(t, curatorBinary(t), env, secret, passwordPrompt)
 		if code == 0 || strings.Contains(stdout, secret) {
 			t.Fatalf("code = %d, stdout redacted, want no answer", code)
 		}
@@ -104,12 +134,11 @@ func TestDraftSourcesBrokerAskpassDispatch(t *testing.T) {
 		{"bare prompt", []string{"Password: "}, env},
 		{"no arguments", nil, env},
 		{"extra argument", []string{usernamePrompt, "extra"}, env},
-		{"missing secret", []string{passwordPrompt}, []string{buildrepo.EnvHTTPSBrokerState + "=" + state}},
-		{"missing state", []string{passwordPrompt}, []string{buildrepo.EnvHTTPSBrokerSecret + "=" + secret}},
-		{"relative state", []string{passwordPrompt}, []string{buildrepo.EnvHTTPSBrokerState + "=relative.json", buildrepo.EnvHTTPSBrokerSecret + "=" + secret}},
+		{"missing state", []string{passwordPrompt}, nil},
+		{"relative state", []string{passwordPrompt}, []string{buildrepo.EnvHTTPSBrokerState + "=relative.json"}},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			code, stdout, _ := runBrokerBinary(t, askpass, testCase.env, nil, testCase.args...)
+			code, stdout := runBrokerWithSecret(t, askpass, testCase.env, secret, testCase.args...)
 			if code == 1 && stdout == "" {
 				return
 			}
@@ -121,9 +150,8 @@ func TestDraftSourcesBrokerAskpassDispatch(t *testing.T) {
 		if err := os.WriteFile(bad, []byte(`{"Host":"x","Username":"y","secret":"leak"}`), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		code, stdout, _ := runBrokerBinary(t, askpass,
-			[]string{buildrepo.EnvHTTPSBrokerState + "=" + bad, buildrepo.EnvHTTPSBrokerSecret + "=" + secret},
-			nil, passwordPrompt)
+		code, stdout := runBrokerWithSecret(t, askpass,
+			[]string{buildrepo.EnvHTTPSBrokerState + "=" + bad}, secret, passwordPrompt)
 		if code == 1 && stdout == "" {
 			return
 		}

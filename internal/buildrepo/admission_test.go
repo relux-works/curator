@@ -667,6 +667,10 @@ func realGitTool(t *testing.T) GitTool {
 }
 
 func fakeHTTPGitTool(t *testing.T, repository string) (GitTool, string) {
+	return fakeHTTPGitToolWithFetchHook(t, repository, "")
+}
+
+func fakeHTTPGitToolWithFetchHook(t *testing.T, repository, fetchHook string) (GitTool, string) {
 	t.Helper()
 	realTool := realGitTool(t)
 	root := t.TempDir()
@@ -676,9 +680,11 @@ func fakeHTTPGitTool(t *testing.T, repository string) (GitTool, string) {
 {
 	secret_present=0
 	state_present=0
-	[ -n "${%s-}" ] && secret_present=1
+	handle_present=0
+	[ "${CURATOR_BUILD_HTTPS_ASKPASS_SECRET+x}" = "x" ] && secret_present=1
 	[ -n "${%s-}" ] && state_present=1
-	printf ' secret=%%s state=%%s askpass=%%s' "$secret_present" "$state_present" "${GIT_ASKPASS-}"
+	[ -n "${%s-}" ] && handle_present=1
+	printf ' secret=%%s state=%%s handle=%%s askpass=%%s' "$secret_present" "$state_present" "$handle_present" "${GIT_ASKPASS-}"
   for arg in "$@"; do printf ' %%s' "$arg"; done
   printf '\n'
 } >> %s
@@ -697,8 +703,10 @@ IFS='
 '
 set -- $args
 IFS=$oldifs
+# FETCH_HOOK
 exec %s "$@"
-`, EnvHTTPSBrokerSecret, EnvHTTPSBrokerState, shellQuote(logPath), shellQuote("file://"+repository), shellQuote(realTool.Executable))
+`, EnvHTTPSBrokerState, EnvHTTPSBrokerTransport, shellQuote(logPath), shellQuote("file://"+repository), shellQuote(realTool.Executable))
+	script = strings.Replace(script, "# FETCH_HOOK", fetchHook, 1)
 	if err := os.WriteFile(wrapper, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}

@@ -380,6 +380,7 @@ func acquireNetworkFormat(ctx context.Context, request NetworkRequest, limits Li
 	refspec := sourceRef + ":" + destination
 	askPass := request.Tool.AskPass
 	fetchEnv := env
+	fetchSecret := ""
 	if request.Source.Transport == "https" && request.Tool.HTTPSCredentials.Selected() {
 		host := strings.SplitN(request.Source.Identity, "/", 2)[0]
 		if request.Tool.HTTPSCredentials.Host != host {
@@ -392,9 +393,8 @@ func acquireNetworkFormat(ctx context.Context, request NetworkRequest, limits Li
 		}
 		fetchEnv = append([]string{}, env...)
 		fetchEnv = setEnvironmentValue(fetchEnv, "GIT_ASKPASS", askPass)
-		fetchEnv = append(fetchEnv,
-			EnvHTTPSBrokerState+"="+state,
-			EnvHTTPSBrokerSecret+"="+request.Tool.HTTPSCredentials.secret)
+		fetchEnv = append(fetchEnv, EnvHTTPSBrokerState+"="+state)
+		fetchSecret = request.Tool.HTTPSCredentials.secret
 	}
 	if request.Source.Transport == "ssh" && request.sshPolicy != nil {
 		wrapper, state, err := materializeSSHWrapper(root, request.Tool.SSHWrapper, *request.sshPolicy)
@@ -405,7 +405,15 @@ func acquireNetworkFormat(ctx context.Context, request NetworkRequest, limits Li
 		fetchEnv = append(fetchEnv, EnvSSHWrapperState+"="+state)
 	}
 	fetchArgs := strictFetchArgs(paths.repo, paths.hooks, askPass, request.Source.Transport, request.Source.Git, refspec)
-	if stderr, truncated, err := runGitCapture(ctx, request.Tool.Executable, paths.work, fetchEnv, fetchArgs...); err != nil {
+	var stderr string
+	var truncated bool
+	var fetchErr error
+	if fetchSecret != "" {
+		stderr, truncated, fetchErr = runGitCaptureWithHTTPSSecret(ctx, request.Tool.Executable, paths.work, fetchEnv, fetchSecret, fetchArgs...)
+	} else {
+		stderr, truncated, fetchErr = runGitCapture(ctx, request.Tool.Executable, paths.work, fetchEnv, fetchArgs...)
+	}
+	if fetchErr != nil {
 		return nil, &fetchError{stderr: stderr, truncated: truncated}
 	}
 	if err := validatePrivateRepository(paths.repo, request.Lock.ObjectFormat); err != nil {
@@ -529,15 +537,51 @@ func newBoundedGitCommand(ctx context.Context, executable string, args ...string
 // returns no output: only a failed fetch needs classification, and only
 // the classifier reads the field.
 func runGitCapture(ctx context.Context, executable, dir string, env []string, args ...string) (string, bool, error) {
+	return runGitCaptureSecret(ctx, executable, dir, env, "", args...)
+}
+
+func runGitCaptureWithHTTPSSecret(ctx context.Context, executable, dir string, env []string, secret string, args ...string) (string, bool, error) {
+	return runGitCaptureSecret(ctx, executable, dir, env, secret, args...)
+}
+
+func runGitCaptureSecret(ctx context.Context, executable, dir string, env []string, secret string, args ...string) (string, bool, error) {
 	cmd := newBoundedGitCommand(ctx, executable, args...)
 	cmd.Dir, cmd.Env, cmd.Stdin = dir, env, bytes.NewReader(nil)
 	var stderr bytes.Buffer
 	capture := &boundedWriter{writer: &stderr, remaining: 64 << 10}
 	cmd.Stdout, cmd.Stderr = io.Discard, capture
-	if err := cmd.Run(); err != nil {
+	var err error
+	if secret != "" {
+		err = runCommandWithHTTPSSecret(cmd, secret)
+	} else {
+		err = cmd.Run()
+	}
+	if err != nil {
 		return stderr.String(), capture.truncated, err
 	}
 	return "", false, nil
+}
+
+func runCommandWithHTTPSSecret(cmd *exec.Cmd, secret string) error {
+	transport, err := NewHTTPSBrokerSecretTransport(cmd, secret)
+	if err != nil {
+		return err
+	}
+	cmd.Env = setEnvironmentValue(cmd.Env, EnvHTTPSBrokerTransport, transport.EnvironmentValue())
+	if err := cmd.Start(); err != nil {
+		return errors.Join(err, transport.Close())
+	}
+	transport.ChildStarted()
+	serveCtx, cancelServe := context.WithCancel(context.Background())
+	serveDone := make(chan error, 1)
+	go func() {
+		serveDone <- transport.Serve(serveCtx)
+	}()
+	waitErr := cmd.Wait()
+	cancelServe()
+	serveErr := <-serveDone
+	closeErr := transport.Close()
+	return errors.Join(waitErr, serveErr, closeErr)
 }
 
 type boundedWriter struct {

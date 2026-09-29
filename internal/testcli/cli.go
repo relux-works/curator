@@ -11,6 +11,7 @@ package testcli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -20,6 +21,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/relux-works/curator/internal/buildrepo"
 )
 
 var binaryOnce struct {
@@ -183,4 +186,54 @@ func GoBuild(t *testing.T, dir, output string, extraEnv []string) {
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("go build: %v\n%s", err, out)
 	}
+}
+
+// RunWithHTTPSBrokerSecret starts one child through the same fetch-scoped
+// secret transport used by production. The secret never enters argv or env;
+// the returned env is the exact child environment for assertions.
+func RunWithHTTPSBrokerSecret(t *testing.T, env []string, transportEnv, secret, name string, args ...string) (int, string, []string) {
+	t.Helper()
+	cmd := exec.Command(name, args...) // #nosec G204 -- test-only seam; callers pass the built manager binary.
+	transport, err := buildrepo.NewHTTPSBrokerSecretTransport(cmd, secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd.Env = withEnvironmentValue(append(os.Environ(), env...), transportEnv, transport.EnvironmentValue())
+	var stdout strings.Builder
+	cmd.Stdout = &stdout
+	if err := cmd.Start(); err != nil {
+		_ = transport.Close()
+		t.Fatalf("run %s %v: %v", name, args, err)
+	}
+	transport.ChildStarted()
+	serveCtx, cancelServe := context.WithCancel(context.Background())
+	serveDone := make(chan error, 1)
+	go func() { serveDone <- transport.Serve(serveCtx) }()
+	code := 0
+	waitErr := cmd.Wait()
+	cancelServe()
+	serveErr := <-serveDone
+	closeErr := transport.Close()
+	if serveErr != nil || closeErr != nil {
+		t.Fatalf("HTTPS broker secret transport: %v", errors.Join(serveErr, closeErr))
+	}
+	if waitErr != nil {
+		exit, ok := waitErr.(*exec.ExitError)
+		if !ok {
+			t.Fatalf("run %s %v: %v", name, args, waitErr)
+		}
+		code = exit.ExitCode()
+	}
+	return code, stdout.String(), cmd.Env
+}
+
+func withEnvironmentValue(environment []string, name, value string) []string {
+	prefix := name + "="
+	result := make([]string, 0, len(environment)+1)
+	for _, entry := range environment {
+		if !strings.HasPrefix(entry, prefix) {
+			result = append(result, entry)
+		}
+	}
+	return append(result, prefix+value)
 }

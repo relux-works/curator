@@ -1,6 +1,7 @@
 package buildrepo
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,14 +19,21 @@ const (
 	HTTPSBrokerName = "curator-build-https-askpass"
 	// EnvHTTPSBrokerState names the manager-owned, secret-free state file.
 	EnvHTTPSBrokerState = "CURATOR_BUILD_HTTPS_ASKPASS_STATE"
-	// EnvHTTPSBrokerSecret carries the resolved secret only to the fetch
-	// process tree. It is never written to broker state.
-	EnvHTTPSBrokerSecret = "CURATOR_BUILD_HTTPS_ASKPASS_SECRET" // #nosec G101 -- environment variable name, not a credential.
 )
 
 type httpsCredentialState struct {
 	Host     string `json:"host"`
 	Username string `json:"username"`
+}
+
+// HTTPSBrokerSecretTransport owns one fetch-scoped channel for the resolved
+// password. EnvironmentValue is a descriptor number on Unix and an unguessable
+// named-pipe name on Windows; neither form contains secret material.
+type HTTPSBrokerSecretTransport interface {
+	EnvironmentValue() string
+	ChildStarted()
+	Serve(context.Context) error
+	Close() error
 }
 
 // HTTPSCredentials is one resolved credential bound to one HTTPS host. The
@@ -68,8 +76,8 @@ func RunHTTPSCredentialBroker(args []string, getenv func(string) string, out io.
 	if len(args) != 1 || getenv == nil || out == nil {
 		return 1
 	}
-	statePath, secret := getenv(EnvHTTPSBrokerState), getenv(EnvHTTPSBrokerSecret)
-	if statePath == "" || secret == "" {
+	statePath := getenv(EnvHTTPSBrokerState)
+	if statePath == "" || !httpsBrokerSecretTransportPresent(getenv) {
 		return 1
 	}
 	state, ok := readHTTPSCredentialState(statePath)
@@ -81,7 +89,19 @@ func RunHTTPSCredentialBroker(args []string, getenv func(string) string, out io.
 	case "Username for 'https://" + state.Host + "': ":
 		answer = state.Username
 	case "Password for 'https://" + state.Username + "@" + state.Host + "': ":
-		answer = secret
+		secret, ok := readHTTPSBrokerSecret(getenv)
+		if !ok || len(secret) == 0 {
+			clear(secret)
+			return 1
+		}
+		defer clear(secret)
+		if _, err := out.Write(secret); err != nil {
+			return 1
+		}
+		if _, err := io.WriteString(out, "\n"); err != nil {
+			return 1
+		}
+		return 0
 	default:
 		return 1
 	}

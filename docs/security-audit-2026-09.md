@@ -197,6 +197,7 @@ cross-registry Merkle-root comparison warning. Tracked as
 broker design is strong (host-pinned, exact prompts, 0600 state), but the
 secret is visible to every descendant of the fetch child. Deliver it through a
 pipe or inherited fd. Tracked as `TASK-260910-31ocjt`.
+Remediated by TASK-260910-31ocjt.
 
 ### I3. `install.sh` verifies only same-origin checksums (Medium, supply chain)
 
