@@ -1,0 +1,334 @@
+=== candidate-suite.sh verify-ref: only a full immutable revision is a candidate ===
+ok    candidate inputs reject revision plus root
+ok    candidate inputs accept revision only
+ok    candidate inputs accept root only
+
+=== release-source-gate.sh: versioned Go installs stay publishable ===
+ok    a release module without local interpretation directives passes
+ok    a replace directive that breaks versioned go install is rejected
+ok    an exclude directive that changes versioned resolution is rejected
+ok    a missing module file is a read failure, not a clean module
+ok    the repository module passes the release-source gate
+ok    a candidate commit contained in main is accepted
+ok    an unmerged branch candidate is rejected
+ok    missing ancestry evidence is rejected, not treated as absent
+ok    a half-specified ancestry check is rejected
+ok    production workflows invoke the source gates before every publisher
+ok    workflow checker rejects a missing normal-CI source gate
+ok    workflow checker rejects a missing release ancestry gate
+ok    workflow checker rejects an additional publisher before the gate
+ok    workflow rejects ambiguous inputs before candidate checkout or recording
+ok    the committed SPEC_PIN is itself a full immutable revision
+ok    verify-ref rejects a branch
+ok    verify-ref rejects a tag
+ok    verify-ref rejects HEAD
+ok    verify-ref rejects a short hash
+ok    verify-ref rejects uppercase hex
+ok    verify-ref rejects a placeholder
+ok    verify-ref rejects the empty string
+ok    verify-ref rejects the null commit
+ok    verify-ref rejects a revision equal to the pin
+ok    verify-ref accepts a full 40-hex revision
+
+=== candidate-suite.sh record: identity, anti-confusion, evidence wording ===
+ok    record rejects a nonexistent root
+ok    record rejects a root with no manifest.json
+ok    record rejects a manifest digest mismatch
+ok    record rejects a candidate identical to the pin
+ok    record accepts a distinct candidate
+ok    record avoids Git for Windows shasum filename escaping
+ok    record rejects a backslash-prefixed digest
+ok    prefixed digest rejection names non-canonical output
+ok    evidence states it is NOT A RELEASE
+ok    evidence claims no release
+ok    evidence claims no conformance
+ok    evidence is stamped candidate-only
+ok    evidence records the manifest digest
+ok    evidence records a tree digest
+ok    evidence records the file count
+ok    evidence records the protocol version
+ok    evidence records the committed pin
+
+=== platform-case-gate.sh: the ledger is enforced, not decorated ===
+ok    a complete windows run passes
+ok    a required DACL case that skips fails
+ok    a required case that never runs fails
+ok    a required case that fails, fails the gate
+ok    a declared subtest skip is tolerated
+ok    a declared subtest skip for the WRONG class fails
+ok    a skip with an unrecognised reason fails
+ok    a host-capability skip is recorded and allowed
+ok    a root-unset skip in a SERVED package fails
+ok    a root-unset skip in a DEFERRED package passes
+ok    a LEDGER-TOLERATED root-unset skip in a SERVED package fails
+ok    the same ledger-tolerated skip passes once the package is deferred
+ok    an allow-policy tolerated skip survives beside a deferred package
+ok    a tolerated platform-control skip passes
+ok    an excluded package is not demanded
+ok    output text mimicking a result event is not counted
+
+=== platform-case-gate.sh: the SHIPPED ledger is satisfiable on each runner ===
+ok    the shipped ledger is satisfiable on linux
+ok    the shipped ledger is satisfiable on darwin
+ok    the shipped ledger is satisfiable on windows
+
+=== platform-cases.tsv: the packages this pin promoted tolerate no skip ===
+ok    internal/config tolerates no skip in the shipped ledger (7 rows)
+ok    internal/envfragment tolerates no skip in the shipped ledger (5 rows)
+ok    internal/envmarker tolerates no skip in the shipped ledger (1 rows)
+ok    internal/interop/environments tolerates no skip in the shipped ledger (12 rows)
+ok    a root-unset skip of TestConformanceContextVersions fails an otherwise-passing linux stream, even deferred
+ok    the linux verdict is the ledger refusing it, not a class policy
+ok    a root-unset skip of TestConformanceContextVersions fails an otherwise-passing darwin stream, even deferred
+ok    the darwin verdict is the ledger refusing it, not a class policy
+ok    a root-unset skip of TestConformanceContextVersions fails an otherwise-passing windows stream, even deferred
+ok    the windows verdict is the ledger refusing it, not a class policy
+
+=== suite-plan.sh: the plan comes from the root, not from the lane ===
+ok    suite-plan rejects a nonexistent root
+ok    a fully serving root defers nothing, even under CI_REQUIRE_FULL_ROOT
+ok    a partial root defers, and that is fatal under CI_REQUIRE_FULL_ROOT
+ok    a partial root defers and is tolerated without it
+ok    the partial root defers internal/marker
+ok    root-artifacts.tsv declares vectors/context-detectors.json for internal/interop/environments
+ok    root-artifacts.tsv declares vectors/context-versions.json for internal/interop/environments
+ok    root-artifacts.tsv declares vectors/environments.json for internal/interop/environments
+ok    root-artifacts.tsv declares vectors/snapshot-acquisition.json for internal/interop/environments
+ok    a candidate root missing vectors/environments.json fails the lane
+ok    the failure names internal/interop/environments
+ok    the failure names vectors/environments.json
+ok    internal/interop itself is still served for vectors/environments.json
+ok    a candidate root missing vectors/context-versions.json fails the lane
+ok    the failure names internal/interop/environments
+ok    the failure names vectors/context-versions.json
+ok    internal/interop itself is still served for vectors/context-versions.json
+ok    a candidate root missing vectors/context-detectors.json fails the lane
+ok    the failure names internal/interop/environments
+ok    the failure names vectors/context-detectors.json
+ok    internal/interop itself is still served for vectors/context-detectors.json
+ok    a candidate root missing vectors/snapshot-acquisition.json fails the lane
+ok    the failure names internal/interop/environments
+ok    the failure names vectors/snapshot-acquisition.json
+ok    internal/interop itself is still served for vectors/snapshot-acquisition.json
+ok    a candidate root missing expected/environments fails the lane
+ok    the failure names internal/interop/environments
+ok    the failure names expected/environments
+ok    internal/interop itself is still served for expected/environments
+ok    a candidate root missing expected/byte-exact-snapshot_sha256.txt fails the lane
+ok    the failure names internal/interop/environments
+ok    the failure names expected/byte-exact-snapshot_sha256.txt
+ok    internal/interop itself is still served for expected/byte-exact-snapshot_sha256.txt
+ok    a candidate root missing fixtures/byte-exact fails the lane
+ok    the failure names internal/interop/environments
+ok    the failure names fixtures/byte-exact
+ok    internal/interop itself is still served for fixtures/byte-exact
+ok    internal/interop is never deferred by a partial root
+ok    a root excluding linux excludes godriver there
+ok    godriver is excluded on linux
+ok    the exclusion is asserted by a case
+ok    the same root does NOT exclude godriver on darwin
+ok    darwin excludes nothing under a linux-only exclusion
+ok    a pre-vector root still excludes godriver on linux
+ok    the fallback exclusion is recorded as such
+
+=== ledger-consistency.sh: a ledger claim is checked against the real builds ===
+ok    a ledger row naming a nonexistent case fails
+ok    a ledger row naming a nonexistent package fails
+ok    the shipped ledger is consistent with every build
+
+=== no-broad-suppression.sh: narrow and named, or not at all ===
+ok    a clean tree passes
+ok    a bare //nolint is rejected
+ok    a //nolint:all is rejected
+ok    a named //nolint with a reason is accepted
+ok    a bare //#nosec is rejected
+ok    a production-path lint exclusion is rejected
+ok    wholesale linter disabling is rejected
+ok    an unrecorded gosec exclusion is rejected
+ok    a recorded gosec exclusion is accepted
+ok    the shipped .golangci.yml passes the gate
+
+=== toolchain-identity.sh: the toolchain is read back, never assumed ===
+ok    a healthy toolchain passes
+ok    a toolchain that is not go.mod's version is rejected
+ok    GOTOOLCHAIN=auto is rejected
+ok    go 1.25's empty GOENV spelling passes
+ok    a per-user go env file is rejected
+
+=== ci.yml: every test-gate lane pins its per-package timeout ===
+ok    the workflow has four explicitly budgeted test-gate lanes
+ok    the self-test enforces all four workflow lane timeout pins
+ok    test timeout is pinned to ${{ runner.os == 'Windows' && '120m' || '60m' }}
+ok    test-self-hosted timeout is pinned to 60m
+ok    race timeout is pinned to 60m
+ok    candidate-conformance timeout is pinned to ${{ runner.os == 'Windows' && '120m' || '60m' }}
+ok    the self-test rejects Test timeout drift
+ok    the self-test rejects self-hosted Test timeout drift
+ok    the self-test rejects Race timeout drift
+ok    the self-test rejects candidate timeout drift
+ok    the self-test rejects Windows candidate budget drift
+ok    test-gate.sh defaults to the 60m per-package budget
+ok    Makefile CI gate targets default to the 60m per-package budget
+
+=== test-gate.sh: a synthetic hanging package still fails at its deadline ===
+ok    synthetic package hang fails test-gate (exit=1)
+ok    test-gate forwards the configured 2s package deadline to go test
+ok    the synthetic Go test fails because its package deadline expires
+ok    synthetic gate failure elapsed 8s including compilation
+
+=== pnpm-pin-guard.sh: the workflow copy of the pin cannot drift ===
+ok    the workflow PNPM_PIN agrees with SupportedPNPMVersion
+ok    a drifted workflow pin is rejected
+ok    an unset pin fails closed
+ok    an unreadable Go source fails closed
+ok    a Go source with no declaration fails closed
+
+=== ci.yml: every suite lane verifies and installs the pinned pnpm first ===
+ok    every test-gate.sh lane verifies the pin, then installs it via npm first on PATH
+ok    no lane hardcodes a pnpm release; every install reads PNPM_PIN
+
+=== platform-cases.tsv: the real-pnpm cases are required on windows with no deferral ===
+ok    the Go suite carries no Windows pnpm deferral
+ok    the class table carries no bug-naming deferral row
+ok    the ledger requires TestRealPinnedPNPMLockSupersetSnapshotDependencies on every runner and tolerates no skip
+ok    the ledger requires TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization on every runner and tolerates no skip
+ok    a pnpm-absent skip of an install case fails on windows
+ok    windows records TestRealPinnedPNPMLockSupersetSnapshotDependencies as ledger-refused, not tolerated
+ok    windows records TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization as ledger-refused, not tolerated
+ok    the same skip fails on linux too
+
+=== rust-pin-guard.sh: the committed toolchain file cannot drift ===
+ok    the committed rust-toolchain.toml agrees with SupportedRustToolchainVersion
+ok    a bumped toolchain file is rejected
+ok    a changed supported value is rejected
+ok    a missing toolchain file fails closed
+ok    a toolchain file with no channel fails closed
+ok    a floating channel is rejected
+ok    a non-minimal profile is rejected
+ok    an unreadable Go source fails closed
+ok    a Go source with no declaration fails closed
+
+=== install-rust-toolchain.sh: rustup installs the filed channel, shims lead PATH ===
+ok    the installer installs exactly the filed channel
+ok    the install invocation names the filed channel
+ok    the shim directory is prepended for the rest of the lane
+ok    the installer finds rustup under CARGO_HOME/bin without PATH help
+ok    the CARGO_HOME-only install names the filed channel
+ok    the CARGO_HOME bin dir is recorded for the rest of the lane
+ok    the CARGO_HOME-only success still names its rustup
+ok    the CARGO_HOME-only GITHUB_PATH write is exactly the shim dir
+ok    the CARGO_HOME-only success prints no diagnostics block
+ok    row (b): rustup in CARGO_HOME/bin installs with go on PATH
+ok    row (b): the GITHUB_PATH write is exactly CARGO_HOME/bin
+ok    row (c): a Rust directory holding a different go is refused
+ok    row (c): the refusal names the shadowing directory
+ok    row (c): the refusal records nothing on GITHUB_PATH
+ok    the Homebrew fixture links rustup from bin into its versioned keg
+ok    the Homebrew fixture keeps compiler proxies only in the keg
+ok    the installer finds rustc and cargo from a Homebrew rustup keg
+ok    the Homebrew-prefix install names the filed channel
+ok    the rustc invocation resolves to the keg proxy
+ok    the cargo invocation resolves to the keg proxy
+ok    the CARGO_HOME bin dir (proxies) is still recorded alongside it
+ok    the Homebrew keg proxy dir is recorded for the rest of the lane
+ok    the Homebrew GITHUB_PATH writes are CARGO_HOME then keg proxies, never the prefix bin
+ok    the Homebrew-keg success prints no diagnostics block
+ok    the Homebrew keg mutant removes exactly the keg PATH step
+ok    the Homebrew keg mutant is syntactically valid
+ok    the Homebrew keg self-test rejects a missing keg PATH step
+ok    the Homebrew keg mutant fails at the pinned rustc check
+ok    row (a): a rustup symlinked from a shared prefix with go installs
+ok    row (a): later steps still resolve the original go
+ok    row (a): GITHUB_PATH never records the shared prefix bin
+ok    row (a): the keg proxy dir is recorded instead
+ok    the old-prepend mutant restores exactly the dirname(rustup) prepend
+ok    row (a) kills the old dirname(rustup) prepend mutant
+ok    the old-prepend mutant is caught by the resolution invariant
+ok    the pinned rustup-which fallback finds rustc and cargo
+ok    the fallback asks rustup for the filed channel compiler
+ok    the fallback compiler resolves from its pinned toolchain bin
+ok    the fallback cargo resolves from its pinned toolchain bin
+ok    the pinned fallback GITHUB_PATH writes CARGO_HOME, keg, then toolchain bin
+ok    a runner without rustup fails
+ok    the failure names the runner-setup note
+ok    the failure prints the runner diagnostics block
+ok    the failure names RUNNER_NAME
+ok    the failure names RUNNER_OS
+ok    the failure names hostname
+ok    the failure names whoami
+ok    the failure names HOME
+ok    the failure names a set CARGO_HOME
+ok    the failure names HOMEBREW_PREFIX
+ok    the failure names the searched PATH
+ok    the failure lists the CARGO_HOME candidate as absent
+ok    the failure lists the Homebrew-prefix candidate as not executable
+ok    the failure lists the Apple-silicon Homebrew candidate
+ok    the failure lists the Intel Homebrew candidate
+ok    the failure lists the empty CARGO_HOME bin dir
+ok    the failure lists the Apple-silicon Homebrew bin dir
+ok    the failure lists the Intel Homebrew bin dir
+ok    the failure reports command -v rustup
+ok    the failure reports type -a rustup
+ok    the remedy sentence is still the last line of the failure
+ok    a runner without rustup and without CARGO_HOME fails
+ok    the failure names a defaulted CARGO_HOME
+ok    the failure names an unset RUNNER_NAME
+ok    the failure names an unset HOMEBREW_PREFIX
+ok    the failure lists the defaulted candidate as absent
+ok    the failure lists exactly the three probed candidates when HOMEBREW_PREFIX is unset
+ok    a runner with many rust-named files still fails
+ok    the failure lists the seeded CARGO_HOME bin dir
+ok    the bounded listing shows exactly 20 of the 25 rust-named entries
+ok    the remedy sentence is still the last line after the bounded listing
+ok    the narrowing mutant drops exactly the diagnostic Apple-silicon candidate
+ok    the narrowing mutant is syntactically valid
+ok    the narrowed mutant still exits 1
+ok    the named Apple-silicon-candidate row kills the narrowing mutant
+ok    the narrowed mutant keeps its other candidate lines
+ok    the installer names no release; it reads the channel from the file
+ok    the installer reads its channel from rust-toolchain.toml
+
+=== ci.yml: every suite lane verifies and installs the pinned Rust toolchain first ===
+ok    every test-gate.sh lane verifies the rust pin, then installs it via rustup before go test
+ok    no lane spells its own rustup install; every lane uses install-rust-toolchain.sh
+
+=== platform-cases.tsv: the production rust cases run on darwin, tolerate host absence elsewhere ===
+ok    TestProductionManagerCapturesRegistryFromRawPaths is required on darwin and tolerates host-capability absence on linux,windows
+ok    TestProductionManagerCapturesGitWithoutCallerProjection is required on darwin and tolerates host-capability absence on linux,windows
+ok    a toolchain-absent skip of a production rust case fails on darwin
+ok    the same absence skip of a production rust case passes on linux
+ok    a non-absence skip of a production rust case fails on linux
+
+=== goreleaser rc channel values: the lint lane runs the Go gate ===
+ok    the awk config gate stays deleted (values are enforced by tools/goreleaserconfig)
+ok    the lint job carries exactly one live gate step
+ok    the pin reports the live step
+ok    a commented-out run line is not a live invocation
+ok    the pin names the miss
+ok    an if:false gate step is not live
+ok    a deleted gate step fails the pin
+ok    a changed gate path fails the pin
+ok    a quoted run value is the same invocation
+ok    a single-quoted run value is the same invocation
+ok    a trailing comment on the run line still counts
+ok    duplicate run keys disqualify the step
+ok    an unreadable workflow fails the pin closed
+=== naming-gate.sh: real mentions fail, binary-patch base85 noise does not ===
+ok    naming (a): short word on a base85 line in a binary block passes
+ok    naming (b): short word on a text line of a .patch fails
+ok    naming (b) fails for the short-name reason
+ok    naming (c): non-base85 line inside a binary block fails
+ok    naming (c) fails for the short-name reason
+ok    naming (d): full name in markdown fails
+ok    naming (d) fails for the full-name reason
+ok    naming (e): a clean tree passes
+ok    naming (f): a historical CI echo with the step signature passes
+ok    naming (g): a JSON-escaped CI echo with the step signature passes
+ok    naming (h): the step name without timestamp and ./ is still scanned
+ok    naming (j): a prefix-truncated CI echo (ellipsis + timestamp tail + ./) passes
+ok    naming (k): prose with an ellipsis but no timestamp tail is still scanned
+ok    naming (i): a planted mention fails
+ok    naming (i): the failure report carries no line content
+ok    naming (i) reports path:line
+
+gate-selftest: 292 passed, 0 failed
