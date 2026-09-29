@@ -1,0 +1,761 @@
+diff --git a/.github/ci/platform-cases.tsv b/.github/ci/platform-cases.tsv
+index e1760373..cce26025 100644
+--- a/.github/ci/platform-cases.tsv
++++ b/.github/ci/platform-cases.tsv
+@@ -770,3 +770,4 @@ internal/envprofile	TestPathOverlayBoundaryRejectsEscapingAndInternalLinks	linux
+ internal/envprofile	TestPathOverlayFailureBlocksResolveAndMakesStatusNonCurrent	linux,darwin,windows	-	-	Resolve emits no fragment and Status reports non-current after a real world-writable mode or DACL mutation of the path directory
+ cmd/curator	TestGCFailsClosedForUntrustedCurrentPathSource	linux,darwin,windows	-	-	GC validates the current path source before transaction recovery or consumer pruning
+ internal/install	TestLockedNetworkRepositoryDistinguishesAbsentAndUnreadableCheckouts	linux,darwin,windows	-	-	proven checkout absence falls back while blocked or present-unusable locked repositories fail closed
++internal/install	TestInstallScriptSecurityRows	linux,darwin	windows	platform-control	install.sh verification rows (POSIX installer)
+diff --git a/.github/ci/skip-classes.tsv b/.github/ci/skip-classes.tsv
+index 8c5cf0b8..6eb1df9f 100644
+--- a/.github/ci/skip-classes.tsv
++++ b/.github/ci/skip-classes.tsv
+@@ -117,3 +117,4 @@ opt-in	hashes the whole host GOROOT	allow	a whole-GOROOT probe, not part of the
+ # --- go test plumbing -------------------------------------------------------
+ helper-process	helper process	allow	the go test helper-process re-exec pattern
+ helper-process	is not reachable from this test binary	allow	the go test helper-process re-exec pattern
++platform-control	install\.sh supports macOS and Linux	allow	install.sh is a POSIX shell installer; Windows installs use the release archive directly
+diff --git a/README.md b/README.md
+index f4f567b4..8032551b 100644
+--- a/README.md
++++ b/README.md
+@@ -26,6 +26,14 @@ brew install relux-works/tap/curator
+ curl -fsSL https://raw.githubusercontent.com/relux-works/curator/main/install.sh | sh
+ ```
+ 
++The installer verifies the release's `checksums.txt` with GitHub artifact attestation when `gh attestation verify` is available, or with the release's keyless cosign signature when it is not. Both checks pin the Curator release workflow identity and GitHub Actions OIDC issuer. It then checks the downloaded archive's SHA-256 against the verified checksum file. Install the [GitHub CLI](https://cli.github.com/) or [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) before using the script; it refuses to install when neither verifier is available or verification fails.
++
++For an emergency only, `CURATOR_INSTALL_INSECURE_SKIP_VERIFY=1` bypasses attestation, signature, and checksum verification. The installer prints a warning and installs the downloaded executable without integrity verification:
++
++```bash
++curl -fsSL https://raw.githubusercontent.com/relux-works/curator/main/install.sh | env CURATOR_INSTALL_INSECURE_SKIP_VERIFY=1 sh
++```
++
+ </details>
+ 
+ <details>
+diff --git a/SECURITY.md b/SECURITY.md
+new file mode 100644
+index 00000000..86641d3b
+--- /dev/null
++++ b/SECURITY.md
+@@ -0,0 +1,24 @@
++# Security
++
++## Release installer verification
++
++The macOS and Linux `install.sh` installer verifies `checksums.txt` before
++installing Curator. It prefers GitHub artifact attestation through
++`gh attestation verify`; when that command is unavailable, it verifies the
++release's `checksums.txt.sig` and `checksums.txt.pem` with cosign. Both paths
++pin the signer to
++`^https://github.com/relux-works/curator/\.github/workflows/release\.yml@refs/tags/v`
++and the issuer to `https://token.actions.githubusercontent.com`. The GitHub
++CLI path also pins the signer workflow when the installed CLI supports that
++option. After the attestation or signature succeeds, the installer checks the
++archive's SHA-256 against `checksums.txt` before extracting or installing it.
++
++Missing verification tools, invalid attestations or signatures, identity or
++issuer mismatches, and archive checksum failures all refuse installation. Use
++the [GitHub CLI](https://cli.github.com/) or
++[cosign](https://docs.sigstore.dev/cosign/system_config/installation/).
++
++`CURATOR_INSTALL_INSECURE_SKIP_VERIFY=1` is an emergency bypass. It skips all
++attestation, signature, and checksum verification and installs the downloaded
++executable without integrity verification. The installer prints a warning
++when this variable is set.
+diff --git a/install.sh b/install.sh
+index 4a8c7740..85c0aa4d 100755
+--- a/install.sh
++++ b/install.sh
+@@ -7,9 +7,14 @@
+ # Environment:
+ #   CURATOR_VERSION   install a specific version (default: latest)
+ #   CURATOR_BIN_DIR   install directory (default: /usr/local/bin, falls back to ~/.local/bin)
++#   CURATOR_INSTALL_INSECURE_SKIP_VERIFY=1
++#                     bypass release attestation, signature, and checksum verification
+ set -eu
+ 
+ REPO="relux-works/curator"
++SIGNER_IDENTITY_REGEX='^https://github.com/relux-works/curator/\.github/workflows/release\.yml@refs/tags/v'
++SIGNER_WORKFLOW="$REPO/.github/workflows/release.yml"
++OIDC_ISSUER="https://token.actions.githubusercontent.com"
+ 
+ os=$(uname -s | tr '[:upper:]' '[:lower:]')
+ case "$os" in
+@@ -39,19 +44,82 @@ tmp=$(mktemp -d)
+ trap 'rm -rf "$tmp"' EXIT
+ 
+ echo "downloading curator $version ($os/$arch)..."
+-curl -fsSL -o "$tmp/$archive" "$base/$archive"
+-curl -fsSL -o "$tmp/checksums.txt" "$base/checksums.txt"
++if ! curl -fsSL -o "$tmp/$archive" "$base/$archive"; then
++  echo "curator installer: failed to download $archive; refusing to install" >&2
++  exit 1
++fi
++
++if [ "${CURATOR_INSTALL_INSECURE_SKIP_VERIFY:-}" = "1" ]; then
++  echo "curator installer: WARNING: CURATOR_INSTALL_INSECURE_SKIP_VERIFY=1 bypasses all release attestation, signature, and archive checksum verification. The downloaded executable will be installed without integrity verification." >&2
++else
++  if ! curl -fsSL -o "$tmp/checksums.txt" "$base/checksums.txt"; then
++    echo "curator installer: failed to download checksums.txt; refusing to install" >&2
++    exit 1
++  fi
++
++  gh_help=""
++  use_gh=0
++  if command -v gh >/dev/null 2>&1 && gh_help=$(gh attestation verify --help 2>&1); then
++    use_gh=1
++  fi
+ 
+-echo "verifying checksum..."
+-(
+-  cd "$tmp"
+-  grep " $archive\$" checksums.txt > wanted.txt
+-  if command -v sha256sum >/dev/null 2>&1; then
+-    sha256sum -c wanted.txt >/dev/null
++  if [ "$use_gh" -eq 1 ]; then
++    echo "verifying GitHub build attestation..."
++    if printf '%s\n' "$gh_help" | grep -q -- '--signer-workflow'; then
++      if ! gh attestation verify "$tmp/checksums.txt" \
++        --repo "$REPO" \
++        --signer-workflow "$SIGNER_WORKFLOW" \
++        --cert-identity-regex "$SIGNER_IDENTITY_REGEX" \
++        --cert-oidc-issuer "$OIDC_ISSUER"; then
++        echo "curator installer: GitHub attestation verification failed for checksums.txt; refusing to install" >&2
++        exit 1
++      fi
++    else
++      if ! gh attestation verify "$tmp/checksums.txt" \
++        --repo "$REPO" \
++        --cert-identity-regex "$SIGNER_IDENTITY_REGEX" \
++        --cert-oidc-issuer "$OIDC_ISSUER"; then
++        echo "curator installer: GitHub attestation verification failed for checksums.txt; refusing to install" >&2
++        exit 1
++      fi
++    fi
++  elif command -v cosign >/dev/null 2>&1; then
++    echo "verifying checksums.txt signature with cosign..."
++    if ! curl -fsSL -o "$tmp/checksums.txt.sig" "$base/checksums.txt.sig" ||
++      ! curl -fsSL -o "$tmp/checksums.txt.pem" "$base/checksums.txt.pem"; then
++      echo "curator installer: failed to download the checksums.txt signature or certificate; refusing to install" >&2
++      exit 1
++    fi
++    if ! cosign verify-blob "$tmp/checksums.txt" \
++      --signature "$tmp/checksums.txt.sig" \
++      --certificate "$tmp/checksums.txt.pem" \
++      --certificate-identity-regexp "$SIGNER_IDENTITY_REGEX" \
++      --certificate-oidc-issuer "$OIDC_ISSUER"; then
++      echo "curator installer: cosign signature verification failed for checksums.txt; refusing to install" >&2
++      exit 1
++    fi
+   else
+-    shasum -a 256 -c wanted.txt >/dev/null
++    echo "curator installer: release verification requires 'gh attestation verify' or cosign; install GitHub CLI (https://cli.github.com/) or cosign (https://docs.sigstore.dev/cosign/system_config/installation/), then retry; refusing to install without verification" >&2
++    exit 1
++  fi
++
++  echo "verifying archive checksum..."
++  if ! (
++    cd "$tmp"
++    awk -v archive="$archive" '
++      $2 == archive { print; matches++ }
++      END { if (matches != 1) exit 1 }
++    ' checksums.txt > wanted.txt || exit 1
++    if command -v sha256sum >/dev/null 2>&1; then
++      sha256sum -c wanted.txt >/dev/null
++    else
++      shasum -a 256 -c wanted.txt >/dev/null
++    fi
++  ); then
++    echo "curator installer: SHA-256 verification failed for $archive against checksums.txt; refusing to install" >&2
++    exit 1
+   fi
+-)
++fi
+ 
+ tar -xzf "$tmp/$archive" -C "$tmp" curator
+ 
+diff --git a/internal/install/installer_script_test.go b/internal/install/installer_script_test.go
+new file mode 100644
+index 00000000..a54e9642
+--- /dev/null
++++ b/internal/install/installer_script_test.go
+@@ -0,0 +1,576 @@
++package install
++
++import (
++	"archive/tar"
++	"compress/gzip"
++	"crypto/sha256"
++	"encoding/hex"
++	"errors"
++	"fmt"
++	"io"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++)
++
++const (
++	fixtureVersion      = "v1.2.3"
++	fixtureArchive      = "curator_1.2.3_darwin_amd64.tar.gz"
++	fixtureSignerPrefix = "https://github.com/relux-works/curator/.github/workflows/release.yml@refs/tags/v"
++	fixtureIdentityRE   = `^https://github.com/relux-works/curator/\.github/workflows/release\.yml@refs/tags/v`
++	fixtureOIDCIssuer   = "https://token.actions.githubusercontent.com"
++	fixtureWorkflow     = "relux-works/curator/.github/workflows/release.yml"
++)
++
++type installScriptFixture struct {
++	ghAvailable              bool
++	ghAttestationCommand     bool
++	ghSupportsSignerWorkflow bool
++	ghAttestationValid       bool
++	cosignAvailable          bool
++	cosignSignatureValid     bool
++	signerIdentity           string
++	tamperArchive            bool
++	omitChecksumEntry        bool
++	duplicateChecksumEntry   bool
++	forceShasum              bool
++	skipVerification         bool
++}
++
++type installScriptResult struct {
++	output       string
++	exitCode     int
++	installed    bool
++	ghCalls      string
++	cosignCalls  string
++	curlRequests string
++}
++
++func TestInstallScriptSecurityRows(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("install.sh supports macOS and Linux")
++	}
++
++	type row struct {
++		name                 string
++		acceptance           bool
++		fixture              installScriptFixture
++		install              bool
++		refusalMessage       string
++		warning              bool
++		expectCosignPolicy   bool
++		expectNoGH           bool
++		expectNoCosign       bool
++		expectedGHArgs       []string
++		expectedCurlRequests []string
++	}
++	rows := []row{
++		{
++			name:       "valid_attestation_installs",
++			acceptance: true,
++			fixture: installScriptFixture{
++				ghAvailable:              true,
++				ghAttestationCommand:     true,
++				ghSupportsSignerWorkflow: true,
++				ghAttestationValid:       true,
++			},
++			install: true,
++			expectedGHArgs: []string{
++				"attestation verify",
++				"--repo relux-works/curator",
++				"checksums.txt",
++				"--signer-workflow " + fixtureWorkflow,
++				"--cert-identity-regex " + fixtureIdentityRE,
++				"--cert-oidc-issuer " + fixtureOIDCIssuer,
++			},
++			expectNoCosign: true,
++		},
++		{
++			name:       "tampered_archive_refused",
++			acceptance: true,
++			fixture: installScriptFixture{
++				ghAvailable:              true,
++				ghAttestationCommand:     true,
++				ghSupportsSignerWorkflow: true,
++				ghAttestationValid:       true,
++				tamperArchive:            true,
++			},
++			refusalMessage: "SHA-256 verification failed",
++			expectedGHArgs: []string{"attestation verify", "--repo relux-works/curator"},
++			expectNoCosign: true,
++		},
++		{
++			name:       "missing_archive_checksum_refused",
++			acceptance: true,
++			fixture: installScriptFixture{
++				ghAvailable:              true,
++				ghAttestationCommand:     true,
++				ghSupportsSignerWorkflow: true,
++				ghAttestationValid:       true,
++				omitChecksumEntry:        true,
++			},
++			refusalMessage: "SHA-256 verification failed",
++			expectedGHArgs: []string{"attestation verify", "--repo relux-works/curator"},
++			expectNoCosign: true,
++		},
++		{
++			name: "duplicate_archive_checksum_refused",
++			fixture: installScriptFixture{
++				ghAvailable:              true,
++				ghAttestationCommand:     true,
++				ghSupportsSignerWorkflow: true,
++				ghAttestationValid:       true,
++				duplicateChecksumEntry:   true,
++			},
++			refusalMessage: "SHA-256 verification failed",
++			expectedGHArgs: []string{"attestation verify", "--repo relux-works/curator"},
++			expectNoCosign: true,
++		},
++		{
++			name:       "unattested_checksums_refused",
++			acceptance: true,
++			fixture: installScriptFixture{
++				ghAvailable:              true,
++				ghAttestationCommand:     true,
++				ghSupportsSignerWorkflow: true,
++				ghAttestationValid:       false,
++			},
++			refusalMessage: "GitHub attestation verification failed",
++			expectedGHArgs: []string{
++				"attestation verify",
++				"--repo relux-works/curator",
++				"--cert-identity-regex " + fixtureIdentityRE,
++				"--cert-oidc-issuer " + fixtureOIDCIssuer,
++			},
++			expectNoCosign: true,
++		},
++		{
++			name:       "bad_cosign_signature_refused",
++			acceptance: true,
++			fixture: installScriptFixture{
++				cosignAvailable:      true,
++				cosignSignatureValid: false,
++			},
++			refusalMessage:     "cosign signature verification failed",
++			expectCosignPolicy: true,
++			expectNoGH:         true,
++		},
++		{
++			name:       "wrong_cosign_identity_refused",
++			acceptance: true,
++			fixture: installScriptFixture{
++				cosignAvailable:      true,
++				cosignSignatureValid: true,
++				signerIdentity:       "https://github.com/untrusted/repository/.github/workflows/release.yml@refs/tags/v1.2.3",
++			},
++			refusalMessage:     "cosign signature verification failed",
++			expectCosignPolicy: true,
++			expectNoGH:         true,
++		},
++		{
++			name:           "missing_verifier_refused",
++			acceptance:     true,
++			fixture:        installScriptFixture{},
++			refusalMessage: "install GitHub CLI",
++		},
++		{
++			name:           "explicit_optout_warns_and_installs",
++			acceptance:     true,
++			fixture:        installScriptFixture{skipVerification: true},
++			install:        true,
++			warning:        true,
++			expectNoGH:     true,
++			expectNoCosign: true,
++		},
++		{
++			name: "cosign_fallback_installs",
++			fixture: installScriptFixture{
++				ghAvailable:          true,
++				ghAttestationCommand: false,
++				cosignAvailable:      true,
++				cosignSignatureValid: true,
++				forceShasum:          runtime.GOOS == "darwin",
++			},
++			install:              true,
++			expectCosignPolicy:   true,
++			expectNoGH:           true,
++			expectedCurlRequests: []string{"checksums.txt.sig", "checksums.txt.pem"},
++		},
++		{
++			name: "failed_attestation_does_not_downgrade",
++			fixture: installScriptFixture{
++				ghAvailable:              true,
++				ghAttestationCommand:     true,
++				ghSupportsSignerWorkflow: true,
++				ghAttestationValid:       false,
++				cosignAvailable:          true,
++				cosignSignatureValid:     true,
++			},
++			refusalMessage: "GitHub attestation verification failed",
++			expectedGHArgs: []string{"attestation verify", "--repo relux-works/curator"},
++			expectNoCosign: true,
++		},
++		{
++			name: "older_gh_pins_identity_without_signer_workflow_flag",
++			fixture: installScriptFixture{
++				ghAvailable:          true,
++				ghAttestationCommand: true,
++				ghAttestationValid:   true,
++			},
++			install: true,
++			expectedGHArgs: []string{
++				"attestation verify",
++				"--repo relux-works/curator",
++				"--cert-identity-regex " + fixtureIdentityRE,
++				"--cert-oidc-issuer " + fixtureOIDCIssuer,
++			},
++			expectNoCosign: true,
++		},
++	}
++
++	const expectedAcceptanceRows = 8
++	const expectedTotalRows = 12
++	acceptanceRows := 0
++	for _, testRow := range rows {
++		if testRow.acceptance {
++			acceptanceRows++
++		}
++	}
++	if acceptanceRows != expectedAcceptanceRows || len(rows) != expectedTotalRows {
++		t.Fatalf("production-entry row coverage = %d/%d acceptance rows and %d/%d total rows",
++			acceptanceRows, expectedAcceptanceRows, len(rows), expectedTotalRows)
++	}
++
++	passed := 0
++	for _, testRow := range rows {
++		testRow := testRow
++		if t.Run(testRow.name, func(t *testing.T) {
++			result := runInstallScriptFixture(t, testRow.fixture)
++			if testRow.install {
++				if result.exitCode != 0 || !result.installed {
++					t.Fatalf("expected install: exit=%d installed=%t\n%s", result.exitCode, result.installed, result.output)
++				}
++			} else {
++				assertInstallRefused(t, result, testRow.refusalMessage)
++			}
++			if testRow.warning && (!strings.Contains(result.output, "WARNING: CURATOR_INSTALL_INSECURE_SKIP_VERIFY=1") ||
++				!strings.Contains(result.output, "without integrity verification")) {
++				t.Errorf("opt-out warning was not loud and explicit:\n%s", result.output)
++			}
++			if testRow.expectCosignPolicy {
++				assertCosignPolicyArgs(t, result.cosignCalls)
++			}
++			if testRow.expectNoGH && result.ghCalls != "" {
++				t.Errorf("unexpected gh call: %s", result.ghCalls)
++			}
++			if testRow.expectNoCosign && result.cosignCalls != "" {
++				t.Errorf("unexpected cosign call: %s", result.cosignCalls)
++			}
++			for _, expected := range testRow.expectedGHArgs {
++				if !strings.Contains(result.ghCalls, expected) {
++					t.Errorf("gh invocation does not contain %q:\n%s", expected, result.ghCalls)
++				}
++			}
++			for _, expected := range testRow.expectedCurlRequests {
++				if !strings.Contains(result.curlRequests, expected) {
++					t.Errorf("release request list does not contain %q:\n%s", expected, result.curlRequests)
++				}
++			}
++		}) {
++			passed++
++		}
++	}
++	t.Logf("install.sh production-entry coverage: %d/%d rows passed; %d/%d task acceptance rows", passed, expectedTotalRows, acceptanceRows, expectedAcceptanceRows)
++	if passed != expectedTotalRows {
++		t.Errorf("production-entry rows passed = %d/%d", passed, expectedTotalRows)
++	}
++}
++
++func assertCosignPolicyArgs(t *testing.T, calls string) {
++	t.Helper()
++	for _, expected := range []string{
++		"verify-blob",
++		"--signature ",
++		"--certificate ",
++		"--certificate-identity-regexp " + fixtureIdentityRE,
++		"--certificate-oidc-issuer " + fixtureOIDCIssuer,
++	} {
++		if !strings.Contains(calls, expected) {
++			t.Errorf("cosign invocation does not contain %q:\n%s", expected, calls)
++		}
++	}
++}
++
++func assertInstallRefused(t *testing.T, result installScriptResult, message string) {
++	t.Helper()
++	if result.exitCode == 0 || result.installed {
++		t.Fatalf("installer accepted a release that must be refused: exit=%d installed=%t\n%s", result.exitCode, result.installed, result.output)
++	}
++	if !strings.Contains(result.output, message) || !strings.Contains(result.output, "refusing to install") {
++		t.Fatalf("refusal lacks a clear reason (%q):\n%s", message, result.output)
++	}
++}
++
++func runInstallScriptFixture(t *testing.T, fixture installScriptFixture) installScriptResult {
++	t.Helper()
++	if runtime.GOOS == "windows" {
++		t.Skip("install.sh supports macOS and Linux")
++	}
++
++	root := t.TempDir()
++	releaseDir := filepath.Join(root, "release")
++	toolDir := filepath.Join(root, "tools")
++	installDir := filepath.Join(root, "installed")
++	for _, dir := range []string{releaseDir, toolDir, installDir} {
++		if err := os.MkdirAll(dir, 0o755); err != nil {
++			t.Fatal(err)
++		}
++	}
++
++	archivePath := filepath.Join(releaseDir, fixtureArchive)
++	writeFixtureArchive(t, archivePath, false)
++	archiveBytes, err := os.ReadFile(archivePath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	digest := sha256.Sum256(archiveBytes)
++	checksums := fmt.Sprintf("%s  %s\n", hex.EncodeToString(digest[:]), fixtureArchive)
++	if fixture.omitChecksumEntry {
++		checksums = "# checksums file has no row for this archive\n"
++	} else if fixture.duplicateChecksumEntry {
++		checksums += checksums
++	}
++	if err := os.WriteFile(filepath.Join(releaseDir, "checksums.txt"), []byte(checksums), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if fixture.tamperArchive {
++		writeFixtureArchive(t, archivePath, true)
++	}
++	for name, content := range map[string]string{
++		"checksums.txt.sig": "fixture signature",
++		"checksums.txt.pem": "fixture certificate",
++	} {
++		if err := os.WriteFile(filepath.Join(releaseDir, name), []byte(content), 0o644); err != nil {
++			t.Fatal(err)
++		}
++	}
++
++	for _, name := range []string{"awk", "cp", "cut", "grep", "gzip", "head", "install", "mkdir", "mktemp", "rm", "sha256sum", "shasum", "tar", "tr"} {
++		if name == "sha256sum" && fixture.forceShasum {
++			continue
++		}
++		path, err := exec.LookPath(name)
++		if err != nil {
++			if name == "sha256sum" || name == "shasum" {
++				continue
++			}
++			t.Fatalf("required test utility %q is unavailable: %v", name, err)
++		}
++		if err := os.Symlink(path, filepath.Join(toolDir, name)); err != nil {
++			t.Fatal(err)
++		}
++	}
++	if fixture.forceShasum {
++		if _, err := exec.LookPath("shasum"); err != nil {
++			t.Fatalf("shasum is required for the macOS checksum fallback row: %v", err)
++		}
++	}
++	writeInstallerExecutable(t, filepath.Join(toolDir, "uname"), `#!/bin/sh
++case "${1:-}" in
++  -s) echo Darwin ;;
++  -m) echo x86_64 ;;
++  *) exit 2 ;;
++esac
++`)
++
++	curlLog := filepath.Join(root, "curl.log")
++	writeInstallerExecutable(t, filepath.Join(toolDir, "curl"), `#!/bin/sh
++out=
++url=
++while [ "$#" -gt 0 ]; do
++  case "$1" in
++    -o) out=$2; shift 2 ;;
++    -*) shift ;;
++    *) url=$1; shift ;;
++  esac
++done
++name=${url##*/}
++printf '%s\n' "$name" >> "$CURL_LOG"
++if [ -z "$out" ] || [ ! -f "$FIXTURE_RELEASE_DIR/$name" ]; then
++  echo "fixture release asset not found: $name" >&2
++  exit 22
++fi
++cp "$FIXTURE_RELEASE_DIR/$name" "$out"
++`)
++
++	ghLog := filepath.Join(root, "gh.log")
++	if fixture.ghAvailable {
++		writeInstallerExecutable(t, filepath.Join(toolDir, "gh"), `#!/bin/sh
++if [ "${1:-}" = attestation ] && [ "${2:-}" = verify ] && [ "${3:-}" = --help ]; then
++  if [ "$GH_ATTESTATION_COMMAND" != 1 ]; then
++    echo "unknown command: attestation verify" >&2
++    exit 127
++  fi
++  if [ "$GH_SUPPORTS_SIGNER_WORKFLOW" = 1 ]; then echo --signer-workflow; fi
++  exit 0
++fi
++printf '%s\n' "$*" >> "$GH_LOG"
++if [ "$GH_ATTESTATION_VALID" != 1 ]; then
++  echo "fixture attestation rejected" >&2
++  exit 1
++fi
++exit 0
++`)
++	}
++
++	cosignLog := filepath.Join(root, "cosign.log")
++	if fixture.cosignAvailable {
++		writeInstallerExecutable(t, filepath.Join(toolDir, "cosign"), `#!/bin/sh
++printf '%s\n' "$*" >> "$COSIGN_LOG"
++if [ "${1:-}" != verify-blob ]; then exit 2; fi
++shift
++file=$1
++shift
++signature=
++certificate=
++identity=
++issuer=
++while [ "$#" -gt 0 ]; do
++  case "$1" in
++    --signature) signature=$2; shift 2 ;;
++    --certificate) certificate=$2; shift 2 ;;
++    --certificate-identity-regexp) identity=$2; shift 2 ;;
++    --certificate-oidc-issuer) issuer=$2; shift 2 ;;
++    *) shift ;;
++  esac
++done
++if [ ! -s "$file" ] || [ ! -s "$signature" ] || [ ! -s "$certificate" ]; then
++  echo "fixture signature inputs missing" >&2
++  exit 1
++fi
++if [ "$identity" != "$EXPECTED_COSIGN_IDENTITY_REGEX" ] || [ "$issuer" != "$EXPECTED_COSIGN_ISSUER" ]; then
++  echo "fixture verifier policy mismatch" >&2
++  exit 1
++fi
++if ! printf '%s\n' "$FIXTURE_SIGNER_IDENTITY" | grep -Eq "$identity"; then
++  echo "fixture certificate identity mismatch" >&2
++  exit 1
++fi
++if [ "$COSIGN_SIGNATURE_VALID" != 1 ]; then
++  echo "fixture signature invalid" >&2
++  exit 1
++fi
++exit 0
++`)
++	}
++
++	signerIdentity := fixture.signerIdentity
++	if signerIdentity == "" {
++		signerIdentity = fixtureSignerPrefix + "1.2.3"
++	}
++	installerPath, err := filepath.Abs(filepath.Join("..", "..", "install.sh"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	cmd := exec.Command("/bin/sh", installerPath)
++	cmd.Env = []string{
++		"PATH=" + toolDir,
++		"HOME=" + filepath.Join(root, "home"),
++		"TMPDIR=" + root,
++		"CURATOR_VERSION=" + fixtureVersion,
++		"CURATOR_BIN_DIR=" + installDir,
++		"FIXTURE_RELEASE_DIR=" + releaseDir,
++		"CURL_LOG=" + curlLog,
++		"GH_LOG=" + ghLog,
++		"GH_ATTESTATION_COMMAND=" + boolEnv(fixture.ghAttestationCommand),
++		"GH_SUPPORTS_SIGNER_WORKFLOW=" + boolEnv(fixture.ghSupportsSignerWorkflow),
++		"GH_ATTESTATION_VALID=" + boolEnv(fixture.ghAttestationValid),
++		"COSIGN_LOG=" + cosignLog,
++		"COSIGN_SIGNATURE_VALID=" + boolEnv(fixture.cosignSignatureValid),
++		"EXPECTED_COSIGN_IDENTITY_REGEX=" + fixtureIdentityRE,
++		"EXPECTED_COSIGN_ISSUER=" + fixtureOIDCIssuer,
++		"FIXTURE_SIGNER_IDENTITY=" + signerIdentity,
++	}
++	if fixture.skipVerification {
++		cmd.Env = append(cmd.Env, "CURATOR_INSTALL_INSECURE_SKIP_VERIFY=1")
++	}
++
++	output, runErr := cmd.CombinedOutput()
++	result := installScriptResult{output: string(output)}
++	if runErr != nil {
++		var exitErr *exec.ExitError
++		if !errors.As(runErr, &exitErr) {
++			t.Fatalf("running install.sh: %v\n%s", runErr, output)
++		}
++		result.exitCode = exitErr.ExitCode()
++	}
++	if _, err := os.Stat(filepath.Join(installDir, "curator")); err == nil {
++		result.installed = true
++	} else if !errors.Is(err, os.ErrNotExist) {
++		t.Fatalf("checking installed binary: %v", err)
++	}
++	result.ghCalls = readOptionalFixtureLog(t, ghLog)
++	result.cosignCalls = readOptionalFixtureLog(t, cosignLog)
++	result.curlRequests = readOptionalFixtureLog(t, curlLog)
++	return result
++}
++
++func writeFixtureArchive(t *testing.T, path string, includeExtraFile bool) {
++	t.Helper()
++	file, err := os.Create(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	gz := gzip.NewWriter(file)
++	tarWriter := tar.NewWriter(gz)
++	binary := []byte("#!/bin/sh\nif [ \"${1:-}\" = --version ]; then echo 'curator v1.2.3'; exit 0; fi\nexit 0\n")
++	if err := tarWriter.WriteHeader(&tar.Header{Name: "curator", Mode: 0o755, Size: int64(len(binary)), Typeflag: tar.TypeReg}); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := tarWriter.Write(binary); err != nil {
++		t.Fatal(err)
++	}
++	if includeExtraFile {
++		note := []byte("valid archive with a changed digest\n")
++		if err := tarWriter.WriteHeader(&tar.Header{Name: "README.txt", Mode: 0o644, Size: int64(len(note)), Typeflag: tar.TypeReg}); err != nil {
++			t.Fatal(err)
++		}
++		if _, err := tarWriter.Write(note); err != nil {
++			t.Fatal(err)
++		}
++	}
++	for _, closer := range []io.Closer{tarWriter, gz, file} {
++		if err := closer.Close(); err != nil {
++			t.Fatal(err)
++		}
++	}
++}
++
++func writeInstallerExecutable(t *testing.T, path, content string) {
++	t.Helper()
++	if err := os.WriteFile(path, []byte(content), 0o755); err != nil {
++		t.Fatal(err)
++	}
++}
++
++func readOptionalFixtureLog(t *testing.T, path string) string {
++	t.Helper()
++	data, err := os.ReadFile(path)
++	if errors.Is(err, os.ErrNotExist) {
++		return ""
++	}
++	if err != nil {
++		t.Fatal(err)
++	}
++	return string(data)
++}
++
++func boolEnv(value bool) string {
++	if value {
++		return "1"
++	}
++	return "0"
++}
