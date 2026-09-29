@@ -117,3 +117,4 @@ opt-in	hashes the whole host GOROOT	allow	a whole-GOROOT probe, not part of the 
 # --- go test plumbing -------------------------------------------------------
 helper-process	helper process	allow	the go test helper-process re-exec pattern
 helper-process	is not reachable from this test binary	allow	the go test helper-process re-exec pattern
+platform-control	install\.sh supports macOS and Linux	allow	install.sh is a POSIX shell installer; Windows installs use the release archive directly

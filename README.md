@@ -26,6 +26,14 @@ brew install relux-works/tap/curator
 curl -fsSL https://raw.githubusercontent.com/relux-works/curator/main/install.sh | sh
 ```
 
+The installer verifies the release's `checksums.txt` with GitHub artifact attestation when `gh attestation verify` is available, or with the release's keyless cosign signature when it is not. Both checks pin the Curator release workflow identity and GitHub Actions OIDC issuer. It then checks the downloaded archive's SHA-256 against the verified checksum file. Install the [GitHub CLI](https://cli.github.com/) or [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) before using the script; it refuses to install when neither verifier is available or verification fails.
+
+For an emergency only, `CURATOR_INSTALL_INSECURE_SKIP_VERIFY=1` bypasses attestation, signature, and checksum verification. The installer prints a warning and installs the downloaded executable without integrity verification:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/relux-works/curator/main/install.sh | env CURATOR_INSTALL_INSECURE_SKIP_VERIFY=1 sh
+```
+
 </details>
 
 <details>

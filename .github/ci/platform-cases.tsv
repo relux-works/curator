@@ -770,3 +770,4 @@ internal/envprofile	TestPathOverlayBoundaryRejectsEscapingAndInternalLinks	linux
 internal/envprofile	TestPathOverlayFailureBlocksResolveAndMakesStatusNonCurrent	linux,darwin,windows	-	-	Resolve emits no fragment and Status reports non-current after a real world-writable mode or DACL mutation of the path directory
 cmd/curator	TestGCFailsClosedForUntrustedCurrentPathSource	linux,darwin,windows	-	-	GC validates the current path source before transaction recovery or consumer pruning
 internal/install	TestLockedNetworkRepositoryDistinguishesAbsentAndUnreadableCheckouts	linux,darwin,windows	-	-	proven checkout absence falls back while blocked or present-unusable locked repositories fail closed
+internal/install	TestInstallScriptSecurityRows	linux,darwin	windows	platform-control	install.sh verification rows (POSIX installer)
