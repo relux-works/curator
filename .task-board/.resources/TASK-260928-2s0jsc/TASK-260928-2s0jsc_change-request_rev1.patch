@@ -1,0 +1,1012 @@
+diff --git a/cmd/curator/global_adopt_test.go b/cmd/curator/global_adopt_test.go
+new file mode 100644
+index 00000000..7da79144
+--- /dev/null
++++ b/cmd/curator/global_adopt_test.go
+@@ -0,0 +1,180 @@
++package main
++
++import (
++	"bytes"
++	"os"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/globalbins"
++	"github.com/relux-works/curator/internal/runtimestore"
++)
++
++type globalAdoptCLIFixture struct {
++	home       string
++	configPath string
++	userHome   string
++	userBin    string
++	canonical  string
++	published  string
++}
++
++func newGlobalAdoptCLIFixture(t *testing.T) globalAdoptCLIFixture {
++	t.Helper()
++	home := globalScopeDeclaring(t, "")
++	configPath := filepath.Join(home, "config.json")
++	userHome := filepath.Join(filepath.Dir(home), "user")
++	userBin := filepath.Join(userHome, ".local", "bin")
++	if err := os.MkdirAll(userBin, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	canonicalName, publishedName := "tool", "tool"
++	if runtime.GOOS == "windows" {
++		canonicalName += ".cmd"
++		publishedName += ".cmd"
++	}
++	canonical := filepath.Join(home, "global", "bin", canonicalName)
++	published := filepath.Join(userBin, publishedName)
++	if err := os.MkdirAll(filepath.Dir(canonical), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	t.Setenv(globalbins.UserBinEnv, userBin)
++	t.Setenv("PATH", userBin)
++	return globalAdoptCLIFixture{
++		home: home, configPath: configPath, userHome: userHome, userBin: userBin,
++		canonical: canonical, published: published,
++	}
++}
++
++func (fixture globalAdoptCLIFixture) invoke(t *testing.T, args ...string) (int, string, string) {
++	t.Helper()
++	return captureWithUserHome(t, fixture.configPath, func() (string, error) { return fixture.userHome, nil }, args...)
++}
++
++func (fixture globalAdoptCLIFixture) canonicalShim() []byte {
++	if runtime.GOOS == "windows" {
++		return []byte(runtimestore.WindowsShimContent(fixture.canonical, nil))
++	}
++	return []byte(runtimestore.UnixShimContent(fixture.canonical, nil))
++}
++
++func TestGlobalAdoptCLIAdoptsAndIsIdempotent(t *testing.T) {
++	fixture := newGlobalAdoptCLIFixture(t)
++	if err := os.WriteFile(fixture.canonical, []byte("canonical target\n"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	want := fixture.canonicalShim()
++	if err := os.WriteFile(fixture.published, want, 0o755); err != nil {
++		t.Fatal(err)
++	}
++
++	code, stdout, stderr := fixture.invoke(t, "global", "adopt", "tool", "--dry-run")
++	if code != exitOK || !strings.Contains(stdout, "would adopt command") || stderr != "" {
++		t.Fatalf("global adopt --dry-run = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	if _, err := os.Lstat(filepath.Join(fixture.userBin, ".curator-managed.json")); !os.IsNotExist(err) {
++		t.Fatalf("CLI dry-run wrote ownership marker: %v", err)
++	}
++	if _, err := os.Lstat(filepath.Join(fixture.home, "backups")); !os.IsNotExist(err) {
++		t.Fatalf("CLI dry-run wrote backup root: %v", err)
++	}
++	if _, err := os.Lstat(filepath.Join(fixture.home, "state")); !os.IsNotExist(err) {
++		t.Fatalf("CLI dry-run created manager lock state: %v", err)
++	}
++
++	code, stdout, stderr = fixture.invoke(t, "global", "adopt", "tool")
++	if code != exitOK || !strings.Contains(stdout, "adopted command") || !strings.Contains(stdout, "backup:") || stderr != "" {
++		t.Fatalf("global adopt = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	code, stdout, stderr = fixture.invoke(t, "global", "adopt", "tool")
++	if code != exitOK || !strings.Contains(stdout, "already managed") || stderr != "" {
++		t.Fatalf("second global adopt = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	backups, err := os.ReadDir(filepath.Join(fixture.home, "backups", "global-bins"))
++	if err != nil || len(backups) != 1 {
++		t.Fatalf("CLI backup count = (%d, %v), want 1", len(backups), err)
++	}
++}
++
++func TestGlobalAdoptCLIRefusesByteMismatch(t *testing.T) {
++	fixture := newGlobalAdoptCLIFixture(t)
++	if err := os.WriteFile(fixture.canonical, []byte("canonical target\n"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(fixture.published, []byte("manually edited shim\n"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	original, err := os.ReadFile(fixture.published)
++	if err != nil {
++		t.Fatal(err)
++	}
++
++	code, _, stderr := fixture.invoke(t, "global", "adopt", "tool")
++	if code != exitFail || !strings.Contains(stderr, fixture.published) || !strings.Contains(stderr, "bytes differ") {
++		t.Fatalf("global adopt mismatch = %d\nstderr:\n%s; want non-zero with path and byte-mismatch reason", code, stderr)
++	}
++	if _, err := os.Lstat(filepath.Join(fixture.userBin, ".curator-managed.json")); !os.IsNotExist(err) {
++		t.Fatalf("mismatch refusal wrote ownership marker: %v", err)
++	}
++	if _, err := os.Lstat(filepath.Join(fixture.home, "backups")); !os.IsNotExist(err) {
++		t.Fatalf("mismatch refusal wrote backup root: %v", err)
++	}
++	if _, err := os.Lstat(filepath.Join(fixture.home, "state")); !os.IsNotExist(err) {
++		t.Fatalf("mismatch refusal created manager lock state: %v", err)
++	}
++	got, err := os.ReadFile(fixture.published)
++	if err != nil || !bytes.Equal(got, original) {
++		t.Fatalf("mismatch refusal changed user entry: %q, %v", got, err)
++	}
++}
++
++func TestGlobalAdoptCLIRefusesUnknownAndMissingCommandsWithoutWrites(t *testing.T) {
++	for _, testCase := range []struct {
++		name       string
++		command    string
++		wantReason string
++	}{
++		{name: "unknown", command: "unknown-tool", wantReason: "no Curator global command has a canonical target"},
++		{name: "missing entry", command: "tool", wantReason: "entry does not exist"},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			fixture := newGlobalAdoptCLIFixture(t)
++			if err := os.WriteFile(fixture.canonical, []byte("canonical target\n"), 0o755); err != nil {
++				t.Fatal(err)
++			}
++			path := filepath.Join(fixture.userBin, testCase.command)
++			if runtime.GOOS == "windows" {
++				path += ".cmd"
++			}
++			var original []byte
++			if testCase.name == "unknown" {
++				original = []byte("unrelated command\n")
++				if err := os.WriteFile(path, original, 0o755); err != nil {
++					t.Fatal(err)
++				}
++			}
++
++			code, _, stderr := fixture.invoke(t, "global", "adopt", testCase.command)
++			if code != exitFail || !strings.Contains(stderr, path) || !strings.Contains(stderr, testCase.wantReason) {
++				t.Fatalf("global adopt %s = %d\nstderr:\n%s; want path %s and reason %q", testCase.command, code, stderr, path, testCase.wantReason)
++			}
++			if _, err := os.Lstat(filepath.Join(fixture.userBin, ".curator-managed.json")); !os.IsNotExist(err) {
++				t.Fatalf("refusal wrote ownership marker: %v", err)
++			}
++			if _, err := os.Lstat(filepath.Join(fixture.home, "backups")); !os.IsNotExist(err) {
++				t.Fatalf("refusal wrote backup root: %v", err)
++			}
++			if _, err := os.Lstat(filepath.Join(fixture.home, "state")); !os.IsNotExist(err) {
++				t.Fatalf("refusal created manager lock state: %v", err)
++			}
++			if testCase.name == "unknown" {
++				got, err := os.ReadFile(path)
++				if err != nil || !bytes.Equal(got, original) {
++					t.Fatalf("unknown-command refusal changed user entry: %q, %v", got, err)
++				}
++			}
++		})
++	}
++}
+diff --git a/cmd/curator/main.go b/cmd/curator/main.go
+index 845e728e..f3c9920f 100644
+--- a/cmd/curator/main.go
++++ b/cmd/curator/main.go
+@@ -29,6 +29,7 @@ import (
+ 	"github.com/relux-works/curator/internal/gitcred"
+ 	"github.com/relux-works/curator/internal/gitignore"
+ 	"github.com/relux-works/curator/internal/gitops"
++	"github.com/relux-works/curator/internal/globalbins"
+ 	"github.com/relux-works/curator/internal/godriver"
+ 	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/identifiers"
+@@ -72,7 +73,7 @@ Commands:
+   list                     configured projects and declared skills
+   project <subcommand>     add | resolve | refresh
+   skill check <dir>        validate one skill package (--locale, --json)
+-  global <subcommand>      init | add | remove | list | status (--check, --json) | install | update | upgrade
++  global <subcommand>      init | add | remove | list | status (--check, --json) | install | adopt <command> [--dry-run] | update | upgrade
+   profile <subcommand>     install | list | use | update | remove | sync | compose (see profile install -h)
+   env <subcommand>         resolve | status | config | migrate | unmanage (see env resolve -h)
+   run <env-id> ...         umbrella dispatch to curator-run (see §11)
+@@ -1392,7 +1393,7 @@ func (c cli) cmdSkillCheck(args []string) int {
+ 
+ func (c cli) cmdGlobal(args []string) int {
+ 	if len(args) == 0 {
+-		_, _ = fmt.Fprintln(c.stderr, "curator: global requires a subcommand: init, add, remove, list, status, install, update, upgrade")
++		_, _ = fmt.Fprintln(c.stderr, "curator: global requires a subcommand: init, add, remove, list, status, install, adopt, update, upgrade")
+ 		return exitUsage
+ 	}
+ 	cfg, code := c.loadConfig()
+@@ -1438,6 +1439,8 @@ func (c cli) cmdGlobal(args []string) int {
+ 		return c.runGlobalInstall(cfg, nil)
+ 	case "install":
+ 		return c.runGlobalInstall(cfg, args[1:])
++	case "adopt":
++		return c.cmdGlobalAdopt(cfg, args[1:])
+ 	case "remove":
+ 		if len(args) < 2 {
+ 			return exitUsage
+@@ -1468,6 +1471,65 @@ func (c cli) cmdGlobal(args []string) int {
+ 	return exitUsage
+ }
+ 
++func (c cli) cmdGlobalAdopt(cfg *config.Config, args []string) int {
++	flags := c.newFlagSet("global adopt")
++	dryRun := flags.Bool("dry-run", false, "verify the forwarding shim without changing files")
++	positional, err := parseInterspersed(flags, args)
++	if err != nil || len(positional) != 1 {
++		if err == nil {
++			_, _ = fmt.Fprintln(c.stderr, "curator: global adopt requires exactly one command")
++		}
++		return exitUsage
++	}
++	userHome, err := c.userHome()
++	if err != nil {
++		_, _ = fmt.Fprintln(c.stderr, "curator: cannot resolve the user home:", err)
++		return exitFail
++	}
++	var result globalbins.Adoption
++	if *dryRun {
++		result, err = globalbins.Adopt(cfg.Home(), positional[0], "", nil, userHome, true)
++	} else {
++		// Refuse invalid requests before creating lock state. Once the read-only
++		// preflight succeeds, serialize the marker update with global install and
++		// repeat every check while holding the manager-home lock.
++		preview, previewErr := globalbins.Adopt(cfg.Home(), positional[0], "", nil, userHome, true)
++		if previewErr != nil {
++			err = previewErr
++		} else if preview.AlreadyManaged {
++			result = preview
++		} else {
++			manager, lockErr := managerlock.New(cfg.Home())
++			if lockErr != nil {
++				err = fmt.Errorf("open manager locks: %w", lockErr)
++			} else {
++				var lock *managerlock.HomeLock
++				lock, err = manager.AcquireHomeOnly(context.Background(), false)
++				if err == nil {
++					result, err = globalbins.Adopt(cfg.Home(), positional[0], "", nil, userHome, false)
++					if closeErr := lock.Close(); closeErr != nil && err == nil {
++						err = fmt.Errorf("release the manager-home lock: %w", closeErr)
++					}
++				}
++			}
++		}
++	}
++	if err != nil {
++		_, _ = fmt.Fprintln(c.stderr, err)
++		return exitFail
++	}
++	if result.AlreadyManaged {
++		_, _ = fmt.Fprintf(c.stdout, "global: command %q is already managed at %s\n", positional[0], result.Path)
++		return exitOK
++	}
++	if result.DryRun {
++		_, _ = fmt.Fprintf(c.stdout, "global: would adopt command %q at %s\n", positional[0], result.Path)
++		return exitOK
++	}
++	_, _ = fmt.Fprintf(c.stdout, "global: adopted command %q at %s (backup: %s)\n", positional[0], result.Path, result.Backup)
++	return exitOK
++}
++
+ // cmdGlobalStatus is the read-only currentness surface of the machine-wide
+ // scope. It carries the same contract as `curator status`: the same stable
+ // codes, the same optional machine-readable document, and the same fail-closed
+diff --git a/docs/cli.md b/docs/cli.md
+index c987f214..c9d5b948 100644
+--- a/docs/cli.md
++++ b/docs/cli.md
+@@ -720,6 +720,31 @@ curator global install
+ 
+ The command materializes global skills into the machine home store.
+ 
++### curator global adopt
++
++Synopsis:
++
++```bash
++curator global adopt <command> [--dry-run]
++```
++
++Take an existing user-bin forwarding shim under Curator management when it is
++a regular file whose bytes exactly match the canonical shim for an installed
++global command. A successful adoption copies the original with its mode and
++modification time preserved into the Curator backups directory, then records
++the command in `.curator-managed.json`. The source entry is never rewritten.
++Symlinks, special files, missing commands, and different bytes are refused.
++
++Preview and adopt a command:
++
++```bash
++curator global adopt task-board --dry-run
++curator global adopt task-board
++```
++
++`--dry-run` performs the same checks without creating a backup or changing the
++ownership marker.
++
+ ### curator global update
+ 
+ Synopsis:
+diff --git a/docs/troubleshooting.md b/docs/troubleshooting.md
+index 9ba90f04..22987ac9 100644
+--- a/docs/troubleshooting.md
++++ b/docs/troubleshooting.md
+@@ -1080,3 +1080,29 @@ Remedy: no action is required. An enforced command with no declared
+ `network` hosts audits clean and still records its identity; a
+ declared-only entry that should be enforced calls for the same remedy as
+ `script-command-declared-only` above.
++
++## Global command forwarding conflicts
++
++### global command was not published because the target is unmanaged
++
++Symptom: `curator global install` reports that a command was not published to
++the user-bin directory because the target exists and is not managed by Curator.
++
++Cause: Curator will not replace a user-bin entry unless its ownership marker
++already records the command. This protects manually created or changed files.
++
++Remedy: if the existing entry is already the canonical Curator forwarding shim,
++preview and adopt it. Adoption verifies the exact bytes, creates a backup under
++the Curator backups directory, and records the command in
++`.curator-managed.json`:
++
++```bash
++curator global adopt <command> --dry-run
++curator global adopt <command>
++curator global install
++```
++
++Adoption refuses a missing command, a symlink or special file, or different
++bytes. If the bytes differ, inspect and preserve that entry yourself; choose a
++different PATH-visible user-bin directory with `CURATOR_GLOBAL_USER_BIN` if
++Curator should publish alongside it.
+diff --git a/internal/globalbins/adopt.go b/internal/globalbins/adopt.go
+new file mode 100644
+index 00000000..9aaeb455
+--- /dev/null
++++ b/internal/globalbins/adopt.go
+@@ -0,0 +1,212 @@
++package globalbins
++
++import (
++	"bytes"
++	"fmt"
++	"os"
++	"path/filepath"
++
++	"github.com/relux-works/curator/internal/identifiers"
++	"github.com/relux-works/curator/internal/runtimestore"
++	"github.com/relux-works/curator/internal/stateread"
++)
++
++// Adoption describes a verified forwarding shim that was added to the
++// user-bin ownership ledger.
++type Adoption struct {
++	Path           string
++	Backup         string
++	AlreadyManaged bool
++	DryRun         bool
++}
++
++// Adopt takes an existing user-bin forwarding shim under Curator management
++// only when its bytes equal the canonical forwarding shim for an installed
++// global command. The source entry is never replaced. A caller performing a
++// real adoption must hold the manager-home mutation lock; dry runs are read-only.
++func Adopt(home, name, platform string, environment map[string]string, userHome string, dryRun bool) (Adoption, error) {
++	if platform == "" {
++		platform = runtimestore.Platform()
++	}
++	if userHome == "" {
++		userHome, _ = os.UserHomeDir()
++	}
++	selection := Select(home, platform, environment, userHome)
++	if selection.Path == "" {
++		return Adoption{}, fmt.Errorf("global: cannot adopt command %q: %s", name, selection.Warning)
++	}
++
++	path := filepath.Join(selection.Path, name)
++	if identifiers.Valid(name) {
++		path = shimPath(selection.Path, name, platform)
++	}
++	if !identifiers.Valid(name) {
++		return Adoption{}, adoptionRefusal(path, "command name is not a valid Curator global command")
++	}
++
++	canonical := shimPath(filepath.Join(home, "global", "bin"), name, platform)
++	canonicalState, err := stateread.Lstat(canonical)
++	if err != nil {
++		return Adoption{}, adoptionRefusal(path, fmt.Sprintf("canonical target %s cannot be inspected: %v", canonical, err))
++	}
++	if canonicalState.Kind == stateread.KindAbsent {
++		return Adoption{}, adoptionRefusal(path, fmt.Sprintf("no Curator global command has a canonical target at %s", canonical))
++	}
++	if canonicalState.Info == nil || !canonicalState.Info.Mode().IsRegular() {
++		return Adoption{}, adoptionRefusal(path, fmt.Sprintf("canonical target %s is not a regular file", canonical))
++	}
++
++	entryState, err := stateread.Lstat(path)
++	if err != nil {
++		return Adoption{}, adoptionRefusal(path, fmt.Sprintf("entry cannot be inspected: %v", err))
++	}
++	if entryState.Kind == stateread.KindAbsent {
++		return Adoption{}, adoptionRefusal(path, "entry does not exist")
++	}
++	if entryState.Info == nil {
++		return Adoption{}, adoptionRefusal(path, "entry metadata is unavailable")
++	}
++	if entryState.Info.Mode()&os.ModeSymlink != 0 {
++		return Adoption{}, adoptionRefusal(path, "entry is a symbolic link")
++	}
++	if !entryState.Info.Mode().IsRegular() {
++		return Adoption{}, adoptionRefusal(path, "entry is not a regular file")
++	}
++	entry, err := stateread.ReadRegularFile(path)
++	if err != nil {
++		return Adoption{}, adoptionRefusal(path, fmt.Sprintf("entry cannot be read as a regular file: %v", err))
++	}
++
++	want := runtimestore.UnixShimContent(canonical, nil)
++	if platform == "windows" {
++		want = runtimestore.WindowsShimContent(canonical, nil)
++	}
++	if !bytes.Equal(entry.Bytes, []byte(want)) {
++		return Adoption{}, adoptionRefusal(path, fmt.Sprintf("bytes differ from the canonical Curator shim for %s", canonical))
++	}
++
++	managed, err := readLedger(selection.Path)
++	if err != nil {
++		return Adoption{}, adoptionRefusal(path, fmt.Sprintf("ownership marker %s cannot be read: %v", filepath.Join(selection.Path, managedFile), err))
++	}
++	if managed[name] {
++		return Adoption{Path: path, AlreadyManaged: true}, nil
++	}
++	if dryRun {
++		return Adoption{Path: path, DryRun: true}, nil
++	}
++
++	if err := confirmAdoptionEntry(path, entryState.Info, entry.Bytes); err != nil {
++		return Adoption{}, adoptionRefusal(path, fmt.Sprintf("entry changed while it was being adopted: %v", err))
++	}
++	backup, err := copyAdoptionBackup(home, path, entry.Bytes, entryState.Info)
++	if err != nil {
++		return Adoption{}, adoptionRefusal(path, fmt.Sprintf("backup could not be created under %s: %v", filepath.Join(home, "backups", "global-bins"), err))
++	}
++	if err := confirmAdoptionEntry(path, entryState.Info, entry.Bytes); err != nil {
++		_ = os.Remove(backup)
++		return Adoption{}, adoptionRefusal(path, fmt.Sprintf("entry changed while it was being adopted: %v", err))
++	}
++
++	managed[name] = true
++	if err := writeLedger(selection.Path, managed); err != nil {
++		_ = os.Remove(backup)
++		return Adoption{}, adoptionRefusal(path, fmt.Sprintf("ownership marker %s could not be written: %v", filepath.Join(selection.Path, managedFile), err))
++	}
++	return Adoption{Path: path, Backup: backup}, nil
++}
++
++func adoptionRefusal(path, reason string) error {
++	return fmt.Errorf("global: cannot adopt %s: %s", path, reason)
++}
++
++func confirmAdoptionEntry(path string, original os.FileInfo, originalBytes []byte) error {
++	state, err := stateread.Lstat(path)
++	if err != nil {
++		return err
++	}
++	if state.Kind != stateread.KindPresent || state.Info == nil || !state.Info.Mode().IsRegular() {
++		return fmt.Errorf("entry is no longer a regular file")
++	}
++	if !os.SameFile(original, state.Info) {
++		return fmt.Errorf("entry identity changed")
++	}
++	if original.Mode() != state.Info.Mode() || !original.ModTime().Equal(state.Info.ModTime()) {
++		return fmt.Errorf("entry metadata changed")
++	}
++	current, err := stateread.ReadRegularFile(path)
++	if err != nil {
++		return err
++	}
++	if !bytes.Equal(current.Bytes, originalBytes) {
++		return fmt.Errorf("entry bytes changed")
++	}
++	return nil
++}
++
++func copyAdoptionBackup(home, source string, payload []byte, sourceInfo os.FileInfo) (string, error) {
++	backupBase := filepath.Join(home, "backups")
++	if state, err := stateread.Lstat(backupBase); err != nil {
++		return "", err
++	} else if state.Kind == stateread.KindPresent && (state.Info == nil || !state.Info.IsDir() || state.Info.Mode()&os.ModeSymlink != 0) {
++		return "", fmt.Errorf("backup root is not a real directory")
++	}
++	if err := os.MkdirAll(backupBase, 0o700); err != nil {
++		return "", err
++	}
++	baseState, err := stateread.Lstat(backupBase)
++	if err != nil {
++		return "", err
++	}
++	if baseState.Kind != stateread.KindPresent || baseState.Info == nil || !baseState.Info.IsDir() || baseState.Info.Mode()&os.ModeSymlink != 0 {
++		return "", fmt.Errorf("backup root is not a real directory")
++	}
++
++	backupRoot := filepath.Join(home, "backups", "global-bins")
++	if state, err := stateread.Lstat(backupRoot); err != nil {
++		return "", err
++	} else if state.Kind == stateread.KindPresent && (state.Info == nil || !state.Info.IsDir() || state.Info.Mode()&os.ModeSymlink != 0) {
++		return "", fmt.Errorf("backup directory is not a real directory")
++	}
++	if err := os.MkdirAll(backupRoot, 0o700); err != nil {
++		return "", err
++	}
++	rootState, err := stateread.Lstat(backupRoot)
++	if err != nil {
++		return "", err
++	}
++	if rootState.Kind != stateread.KindPresent || rootState.Info == nil || !rootState.Info.IsDir() || rootState.Info.Mode()&os.ModeSymlink != 0 {
++		return "", fmt.Errorf("backup directory is not a real directory")
++	}
++
++	pattern := filepath.Base(source) + "-*.bak"
++	backup, err := os.CreateTemp(backupRoot, pattern)
++	if err != nil {
++		return "", err
++	}
++	path := backup.Name()
++	keep := false
++	defer func() {
++		_ = backup.Close()
++		if !keep {
++			_ = os.Remove(path)
++		}
++	}()
++	if _, err := backup.Write(payload); err != nil {
++		return "", err
++	}
++	if err := backup.Chmod(sourceInfo.Mode().Perm()); err != nil {
++		return "", err
++	}
++	if err := backup.Sync(); err != nil {
++		return "", err
++	}
++	if err := backup.Close(); err != nil {
++		return "", err
++	}
++	if err := os.Chtimes(path, sourceInfo.ModTime(), sourceInfo.ModTime()); err != nil {
++		return "", err
++	}
++	keep = true
++	return path, nil
++}
+diff --git a/internal/globalbins/globalbins.go b/internal/globalbins/globalbins.go
+index 4f43b3d5..20280127 100644
+--- a/internal/globalbins/globalbins.go
++++ b/internal/globalbins/globalbins.go
+@@ -342,9 +342,9 @@ func unmanagedConflict(path, name string, managed map[string]bool, canonical, pl
+ 	if managed[name] && ownedTarget(path, canonical, platform) {
+ 		return false
+ 	}
+-	// A ledger entry is necessary but not sufficient. This avoids adopting a
+-	// matching shim that a user created, and detects replacement of a formerly
+-	// managed path.
++	// A ledger entry is necessary but not sufficient. A matching shim is only
++	// managed after the explicit adopt command records ownership, and changed
++	// paths remain conflicts.
+ 	return true
+ }
+ 
+@@ -416,7 +416,7 @@ func PublishedShims(binDir string) (bool, error) {
+ 
+ func readLedger(binDir string) (map[string]bool, error) {
+ 	path := filepath.Join(binDir, managedFile)
+-	state, err := stateread.ReadFile(path) // #nosec G304 -- binDir is selected from trusted manager state
++	state, err := stateread.ReadRegularFile(path) // #nosec G304 -- binDir is selected from trusted manager state
+ 	if err != nil {
+ 		return nil, err
+ 	}
+@@ -464,13 +464,7 @@ func writeLedger(binDir string, entries map[string]bool) error {
+ 		return err
+ 	}
+ 	target := filepath.Join(binDir, managedFile)
+-	if err := os.Rename(temporaryPath, target); err != nil {
+-		if removeErr := os.Remove(target); removeErr != nil && !os.IsNotExist(removeErr) {
+-			return err
+-		}
+-		return os.Rename(temporaryPath, target)
+-	}
+-	return nil
++	return replaceLedgerFile(temporaryPath, target)
+ }
+ 
+ func expectedNames(expected map[string]bool) []string {
+diff --git a/internal/globalbins/globalbins_test.go b/internal/globalbins/globalbins_test.go
+index 882cc4a1..16123791 100644
+--- a/internal/globalbins/globalbins_test.go
++++ b/internal/globalbins/globalbins_test.go
+@@ -1,6 +1,7 @@
+ package globalbins
+ 
+ import (
++	"bytes"
+ 	"encoding/json"
+ 	"errors"
+ 	"os"
+@@ -8,6 +9,7 @@ import (
+ 	"runtime"
+ 	"strings"
+ 	"testing"
++	"time"
+ 
+ 	"github.com/relux-works/curator/internal/runtimestore"
+ 	"github.com/relux-works/curator/internal/skillspec"
+@@ -61,6 +63,250 @@ func TestRefreshPublishesAndRemovesManagedUnixShims(t *testing.T) {
+ 	}
+ }
+ 
++type adoptionFixture struct {
++	managerHome string
++	userHome    string
++	userBin     string
++	canonical   string
++	published   string
++	platform    string
++	environment map[string]string
++}
++
++func newAdoptionFixture(t *testing.T, platform string, published []byte) adoptionFixture {
++	t.Helper()
++	root := t.TempDir()
++	managerHome := filepath.Join(root, "manager")
++	userHome := filepath.Join(root, "user")
++	userBin := filepath.Join(userHome, ".local", "bin")
++	canonicalBin := filepath.Join(managerHome, "global", "bin")
++	if err := os.MkdirAll(canonicalBin, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.MkdirAll(userBin, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	canonical := shimPath(canonicalBin, "tool", platform)
++	if err := os.WriteFile(canonical, []byte("canonical Curator target\n"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	publishedPath := shimPath(userBin, "tool", platform)
++	if published != nil {
++		if err := os.WriteFile(publishedPath, published, 0o751); err != nil {
++			t.Fatal(err)
++		}
++		fixed := time.Date(2021, 4, 5, 6, 7, 8, 0, time.UTC)
++		if err := os.Chtimes(publishedPath, fixed, fixed); err != nil {
++			t.Fatal(err)
++		}
++	}
++	return adoptionFixture{
++		managerHome: managerHome,
++		userHome:    userHome,
++		userBin:     userBin,
++		canonical:   canonical,
++		published:   publishedPath,
++		platform:    platform,
++		environment: map[string]string{"PATH": userBin, UserBinEnv: userBin},
++	}
++}
++
++func canonicalForwardingBytes(fixture adoptionFixture) []byte {
++	if fixture.platform == "windows" {
++		return []byte(runtimestore.WindowsShimContent(fixture.canonical, nil))
++	}
++	return []byte(runtimestore.UnixShimContent(fixture.canonical, nil))
++}
++
++func TestAdoptCanonicalShimBacksUpAndGlobalInstallStagesItAsManaged(t *testing.T) {
++	for _, platform := range []string{"unix", "windows"} {
++		t.Run(platform, func(t *testing.T) {
++			fixture := newAdoptionFixture(t, platform, nil)
++			if err := writeLedger(fixture.userBin, map[string]bool{"other": true}); err != nil {
++				t.Fatal(err)
++			}
++			want := canonicalForwardingBytes(fixture)
++			if err := os.WriteFile(fixture.published, want, 0o751); err != nil {
++				t.Fatal(err)
++			}
++			fixed := time.Date(2021, 4, 5, 6, 7, 8, 0, time.UTC)
++			if err := os.Chtimes(fixture.published, fixed, fixed); err != nil {
++				t.Fatal(err)
++			}
++			before, err := os.Stat(fixture.published)
++			if err != nil {
++				t.Fatal(err)
++			}
++
++			adopted, err := Adopt(fixture.managerHome, "tool", platform, fixture.environment, fixture.userHome, false)
++			if err != nil {
++				t.Fatalf("Adopt() = %v", err)
++			}
++			if adopted.Path != fixture.published || adopted.Backup == "" || adopted.AlreadyManaged || adopted.DryRun {
++				t.Fatalf("Adopt() = %+v, want a new backed-up adoption", adopted)
++			}
++			if filepath.Dir(adopted.Backup) != filepath.Join(fixture.managerHome, "backups", "global-bins") {
++				t.Fatalf("backup path = %s, want Curator backup root", adopted.Backup)
++			}
++			backup, err := os.ReadFile(adopted.Backup)
++			if err != nil || !bytes.Equal(backup, want) {
++				t.Fatalf("backup bytes = %q, %v; want canonical shim %q", backup, err, want)
++			}
++			backupInfo, err := os.Stat(adopted.Backup)
++			if err != nil || backupInfo.Mode().Perm() != before.Mode().Perm() || !backupInfo.ModTime().Equal(before.ModTime()) {
++				t.Fatalf("backup metadata = (%v, %v); want mode %v and mtime %v", backupInfo, err, before.Mode().Perm(), before.ModTime())
++			}
++			managed, err := readLedger(fixture.userBin)
++			if err != nil || !managed["tool"] || !managed["other"] {
++				t.Fatalf("adoption ledger = %v, %v; want tool added without losing other", managed, err)
++			}
++
++			// install.stageGlobalScope calls StageForwarding. It must recognize
++			// the adopted bytes and ledger entry as its own, without an unmanaged
++			// conflict.
++			forwarding, err := StageForwarding(t.TempDir(), fixture.managerHome, map[string]bool{"tool": true}, platform, fixture.environment, fixture.userHome)
++			if err != nil || forwarding.Published != 1 || containsMessage(forwarding.Messages, "not managed by Curator") {
++				t.Fatalf("StageForwarding() = (%+v, %v); want one managed command and no conflict", forwarding, err)
++			}
++
++			second, err := Adopt(fixture.managerHome, "tool", platform, fixture.environment, fixture.userHome, false)
++			if err != nil || !second.AlreadyManaged || second.Backup != "" {
++				t.Fatalf("second Adopt() = (%+v, %v); want idempotent no-op", second, err)
++			}
++			backups, err := os.ReadDir(filepath.Join(fixture.managerHome, "backups", "global-bins"))
++			if err != nil || len(backups) != 1 {
++				t.Fatalf("backup count after idempotent adoption = (%d, %v), want 1", len(backups), err)
++			}
++		})
++	}
++}
++
++func TestAdoptDryRunWritesNothingForUnixAndWindowsShims(t *testing.T) {
++	for _, platform := range []string{"unix", "windows"} {
++		t.Run(platform, func(t *testing.T) {
++			fixture := newAdoptionFixture(t, platform, nil)
++			want := canonicalForwardingBytes(fixture)
++			if err := os.WriteFile(fixture.published, want, 0o751); err != nil {
++				t.Fatal(err)
++			}
++
++			result, err := Adopt(fixture.managerHome, "tool", platform, fixture.environment, fixture.userHome, true)
++			if err != nil || !result.DryRun || result.AlreadyManaged || result.Backup != "" {
++				t.Fatalf("dry-run Adopt() = (%+v, %v)", result, err)
++			}
++			if _, err := os.Lstat(filepath.Join(fixture.userBin, managedFile)); !os.IsNotExist(err) {
++				t.Fatalf("dry-run wrote ownership marker: %v", err)
++			}
++			if _, err := os.Lstat(filepath.Join(fixture.managerHome, "backups")); !os.IsNotExist(err) {
++				t.Fatalf("dry-run wrote backup root: %v", err)
++			}
++			got, err := os.ReadFile(fixture.published)
++			if err != nil || !bytes.Equal(got, want) {
++				t.Fatalf("dry-run changed source entry: %q, %v", got, err)
++			}
++		})
++	}
++}
++
++func TestAdoptRefusalsDoNotWrite(t *testing.T) {
++	cases := []struct {
++		name       string
++		prepare    func(*testing.T, adoptionFixture)
++		wantReason string
++	}{
++		{
++			name: "different bytes",
++			prepare: func(t *testing.T, fixture adoptionFixture) {
++				if err := os.WriteFile(fixture.published, []byte("manual replacement\n"), 0o755); err != nil {
++					t.Fatal(err)
++				}
++			},
++			wantReason: "bytes differ",
++		},
++		{
++			name: "symbolic link",
++			prepare: func(t *testing.T, fixture adoptionFixture) {
++				if err := os.Remove(fixture.published); err != nil {
++					t.Fatal(err)
++				}
++				if err := os.Symlink(fixture.canonical, fixture.published); err != nil {
++					t.Skipf("host cannot create symbolic links: %v", err)
++				}
++			},
++			wantReason: "symbolic link",
++		},
++		{
++			name: "special entry",
++			prepare: func(t *testing.T, fixture adoptionFixture) {
++				if err := os.Remove(fixture.published); err != nil {
++					t.Fatal(err)
++				}
++				if err := os.Mkdir(fixture.published, 0o755); err != nil {
++					t.Fatal(err)
++				}
++			},
++			wantReason: "not a regular file",
++		},
++		{
++			name: "missing entry",
++			prepare: func(t *testing.T, fixture adoptionFixture) {
++				if err := os.Remove(fixture.published); err != nil {
++					t.Fatal(err)
++				}
++			},
++			wantReason: "entry does not exist",
++		},
++		{
++			name: "unknown command",
++			prepare: func(t *testing.T, fixture adoptionFixture) {
++				if err := os.Remove(fixture.canonical); err != nil {
++					t.Fatal(err)
++				}
++			},
++			wantReason: "no Curator global command has a canonical target",
++		},
++	}
++
++	for _, platform := range []string{"unix", "windows"} {
++		for _, tc := range cases {
++			t.Run(platform+"/"+tc.name, func(t *testing.T) {
++				fixture := newAdoptionFixture(t, platform, nil)
++				if err := os.WriteFile(fixture.published, canonicalForwardingBytes(fixture), 0o755); err != nil {
++					t.Fatal(err)
++				}
++				original, err := os.ReadFile(fixture.published)
++				if err != nil {
++					t.Fatal(err)
++				}
++				tc.prepare(t, fixture)
++
++				_, err = Adopt(fixture.managerHome, "tool", platform, fixture.environment, fixture.userHome, false)
++				if err == nil || !strings.Contains(err.Error(), fixture.published) || !strings.Contains(err.Error(), tc.wantReason) {
++					t.Fatalf("Adopt() error = %v; want path %s and reason %q", err, fixture.published, tc.wantReason)
++				}
++				if _, err := os.Lstat(filepath.Join(fixture.userBin, managedFile)); !os.IsNotExist(err) {
++					t.Fatalf("refusal wrote ownership marker: %v", err)
++				}
++				if _, err := os.Lstat(filepath.Join(fixture.managerHome, "backups")); !os.IsNotExist(err) {
++					t.Fatalf("refusal wrote backup root: %v", err)
++				}
++				if tc.name == "different bytes" {
++					got, err := os.ReadFile(fixture.published)
++					if err != nil || string(got) != "manual replacement\n" {
++						t.Fatalf("mismatch entry changed: %q, %v", got, err)
++					}
++				}
++				if tc.name == "unknown command" {
++					got, err := os.ReadFile(fixture.published)
++					if err != nil || !bytes.Equal(got, original) {
++						t.Fatalf("unknown-command entry changed: %q, %v", got, err)
++					}
++				}
++			})
++		}
++	}
++}
++
+ func TestRefreshAndStageRefuseAnUnreadableOwnershipLedger(t *testing.T) {
+ 	root := t.TempDir()
+ 	managerHome := filepath.Join(root, "manager")
+diff --git a/internal/globalbins/replace_unix.go b/internal/globalbins/replace_unix.go
+new file mode 100644
+index 00000000..1b4034bf
+--- /dev/null
++++ b/internal/globalbins/replace_unix.go
+@@ -0,0 +1,9 @@
++//go:build !windows
++
++package globalbins
++
++import "os"
++
++func replaceLedgerFile(from, to string) error {
++	return os.Rename(from, to)
++}
+diff --git a/internal/globalbins/replace_windows.go b/internal/globalbins/replace_windows.go
+new file mode 100644
+index 00000000..7b8d14d0
+--- /dev/null
++++ b/internal/globalbins/replace_windows.go
+@@ -0,0 +1,17 @@
++//go:build windows
++
++package globalbins
++
++import "golang.org/x/sys/windows"
++
++func replaceLedgerFile(from, to string) error {
++	from16, err := windows.UTF16PtrFromString(from)
++	if err != nil {
++		return err
++	}
++	to16, err := windows.UTF16PtrFromString(to)
++	if err != nil {
++		return err
++	}
++	return windows.MoveFileEx(from16, to16, windows.MOVEFILE_REPLACE_EXISTING|windows.MOVEFILE_WRITE_THROUGH)
++}
+diff --git a/internal/install/global_adopt_test.go b/internal/install/global_adopt_test.go
+new file mode 100644
+index 00000000..59bf0d5e
+--- /dev/null
++++ b/internal/install/global_adopt_test.go
+@@ -0,0 +1,77 @@
++package install
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/globalbins"
++	"github.com/relux-works/curator/internal/runtimestore"
++)
++
++func TestGlobalInstallRecognizesAdoptedForwardingShim(t *testing.T) {
++	e := newEnv(t)
++	e.skill("skill-g")
++	if _, err := GlobalInit(e.home); err != nil {
++		t.Fatal(err)
++	}
++	if err := manifestAddGlobal(e, "skill-g"); err != nil {
++		t.Fatal(err)
++	}
++
++	userHome := t.TempDir()
++	userBin := filepath.Join(userHome, ".local", "bin")
++	inheritedPath := os.Getenv("PATH")
++	t.Setenv(globalbins.UserBinEnv, "")
++	t.Setenv("PATH", inheritedPath)
++	initial := Global(e.cfg, userHome, Options{Platform: installPlatform()})
++	if initial.Status != "ok" {
++		t.Fatalf("initial global install without a selected user bin: %+v", initial)
++	}
++
++	if err := os.MkdirAll(userBin, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	command := "skill-g-tool"
++	canonical := filepath.Join(GlobalRoot(e.home), "bin", shimName(command))
++	published := filepath.Join(userBin, shimName(command))
++	content := runtimestore.UnixShimContent(canonical, nil)
++	if installPlatform() == "windows" {
++		content = runtimestore.WindowsShimContent(canonical, nil)
++	}
++	if err := os.WriteFile(published, []byte(content), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	t.Setenv(globalbins.UserBinEnv, userBin)
++	t.Setenv("PATH", userBin+string(os.PathListSeparator)+inheritedPath)
++
++	adopted, err := globalbins.Adopt(e.home, command, installPlatform(), nil, userHome, false)
++	if err != nil || adopted.Path != published || adopted.Backup == "" {
++		t.Fatalf("globalbins.Adopt() = (%+v, %v)", adopted, err)
++	}
++
++	result := Global(e.cfg, userHome, Options{Platform: installPlatform()})
++	if result.Status != "ok" {
++		t.Fatalf("global install after adoption: %+v", result)
++	}
++	for _, message := range result.Messages {
++		if strings.Contains(message, "not managed by Curator") {
++			t.Fatalf("global install rejected adopted shim: %s", message)
++		}
++	}
++	if _, err := os.Stat(published); err != nil {
++		t.Fatalf("global install did not publish the adopted command: %v", err)
++	}
++	ledgerPayload, err := os.ReadFile(filepath.Join(userBin, ".curator-managed.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var ownership struct {
++		Entries []string `json:"entries"`
++	}
++	if err := json.Unmarshal(ledgerPayload, &ownership); err != nil || len(ownership.Entries) != 1 || ownership.Entries[0] != command {
++		t.Fatalf("global install ownership after adoption = (%+v, %v), want %q managed", ownership, err, command)
++	}
++}
