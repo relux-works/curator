@@ -94,6 +94,17 @@ Integration preconditions for accepted revision 2 verified, evidence attached.
 `worktree integrate` was deliberately not executed per the superseding binding — the runner performs the bound landing synchronously from here.
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260928-d31bee, pid=15713, exit=0)
+spawn run RUN-260928-d31bee failed; operator action required; failure: board_publication_pending: runner integrate refused: board_publication_pending: STORY-260928-lpnvkn is landed and its board state is committed as 213a53e5c701ef16b961f3398c7f2f0b82c98094 on the local trunk, but the publication push did not land (board_publish_local_trunk_unproven); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: 213a53e5c701ef16b961f3398c7f2f0b82c98094
+  cause_code: board_publish_local_trunk_unproven
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: 7bc05184b9e7c459f4c9d321d6593cbe7f0ff8dc
+  story_id: STORY-260928-lpnvkn
+  cause: board_publish_local_trunk_unproven: the local trunk holds an unpublished link 213a53e5c701ef16b961f3398c7f2f0b82c98094 that is not this repository's own board-state record (the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key); a stable content digest is never ownership proof — nothing was projected and nothing was pushed
+  link_oid: 213a53e5c701ef16b961f3398c7f2f0b82c98094
+  reason: the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key
+  remedy: land the unproven commits through integrate/reconcile-trunk, not through this command
 
 ## Precondition Resources
 - [3ed9m3-brief.md](file://TASK-260928-3ed9m3/3ed9m3-brief.md) — 3ed9m3-brief.md
@@ -123,7 +134,7 @@ spawn run completed: muse (run=RUN-260928-d31bee, pid=15713, exit=0)
 2026-09-27T23:45:07Z
 
 ## Last Update
-2026-09-28T10:22:45Z
+2026-09-28T10:56:51Z
 
 ## Assigned To
 [implementer] developer (muse)
