@@ -165,6 +165,18 @@ Integration preconditions confirmed for TASK-260910-3i6vod (revision 2, ACCEPTED
 Handed to the runner for synchronous landing of CR-TASK-260910-3i6vod revision 2; ending the turn with the board left at `integrating`.
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260929-eda83e, pid=75605, exit=0)
+spawn run RUN-260929-eda83e failed; operator action required; failure: board_publication_pending: runner integrate refused: board_publication_pending: STORY-260928-rp2r1j is landed and its board state is committed as 934093b00b2257aa7aa88d4270f5c10333718618 on the local trunk, but the publication push did not land (board_publish_foreign_lane_overlap); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: 934093b00b2257aa7aa88d4270f5c10333718618
+  cause_code: board_publish_foreign_lane_overlap
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: 2d59c6458664fd8ea74553a88c7fc43f9c42fa07
+  story_id: STORY-260928-rp2r1j
+  cause: board_publish_foreign_lane_overlap: the unpublished 934093b00b2257aa7aa88d4270f5c10333718618 reaches outside board_paths(STORY-260928-rp2r1j) on 2 path(s) — starting with .task-board/EPIC-260910-2hw1xb_security-audit-remediation-manager-and-spec/STORY-260910-234vmx_supply-chain-and-credential-hardening/TASK-260910-3i6vod_top-level-sandbox-posture-docs/README.md; a Story record carries its own lane only, and a delta spanning lanes needs an Epic Record subject covering them — nothing was projected and nothing was pushed
+  element_id: STORY-260928-rp2r1j
+  link_oid: 934093b00b2257aa7aa88d4270f5c10333718618
+  paths: .task-board/EPIC-260910-2hw1xb_security-audit-remediation-manager-and-spec/STORY-260910-234vmx_supply-chain-and-credential-hardening/TASK-260910-3i6vod_top-level-sandbox-posture-docs/README.md,.task-board/EPIC-260910-2hw1xb_security-audit-remediation-manager-and-spec/STORY-260910-234vmx_supply-chain-and-credential-hardening/TASK-260910-3i6vod_top-level-sandbox-posture-docs/progress.md
+  remedy: re-record the bytes at the owning scope, or land the chain through integrate/reconcile-trunk
 
 ## Precondition Resources
 - [3i6vod-brief.md](file://TASK-260910-3i6vod/3i6vod-brief.md) — 3i6vod-brief.md
@@ -195,7 +207,7 @@ spawn run completed: muse (run=RUN-260929-eda83e, pid=75605, exit=0)
 2026-09-10T14:45:40Z
 
 ## Last Update
-2026-09-29T11:21:14Z
+2026-09-29T12:07:06Z
 
 ## Assigned To
 [implementer] developer (muse)
