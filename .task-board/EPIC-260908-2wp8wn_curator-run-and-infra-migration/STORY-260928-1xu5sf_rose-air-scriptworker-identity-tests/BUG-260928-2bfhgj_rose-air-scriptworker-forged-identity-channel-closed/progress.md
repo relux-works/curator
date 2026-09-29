@@ -60,6 +60,17 @@ Integration readiness recorded, runner landing is next.
 - Attached `BUG-260928-2bfhgj_integration-land.md` outcome resource; worktree left uncommitted for the runner snapshot.
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260928-bf2f54, pid=83509, exit=0)
+spawn run RUN-260928-bf2f54 failed; operator action required; failure: board_publication_pending: runner integrate refused: board_publication_pending: STORY-260928-1xu5sf is landed and its board state is committed as 56392800b8adc9ae2ffa49d5ae01101241fe6fe9 on the local trunk, but the publication push did not land (board_publish_local_trunk_unproven); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: 56392800b8adc9ae2ffa49d5ae01101241fe6fe9
+  cause_code: board_publish_local_trunk_unproven
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: 46175696b666fc525b70445b67bb53993ea761e9
+  story_id: STORY-260928-1xu5sf
+  cause: board_publish_local_trunk_unproven: the local trunk holds an unpublished link 56392800b8adc9ae2ffa49d5ae01101241fe6fe9 that is not this repository's own board-state record (the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key); a stable content digest is never ownership proof — nothing was projected and nothing was pushed
+  link_oid: 56392800b8adc9ae2ffa49d5ae01101241fe6fe9
+  reason: the signer cannot be bound to the repository identity: the configured signing key holds 1 whitespace-separated fields and is not exactly one SSH public key
+  remedy: land the unproven commits through integrate/reconcile-trunk, not through this command
 
 ## Precondition Resources
 - [2bfhgj-brief.md](file://BUG-260928-2bfhgj/2bfhgj-brief.md) — 2bfhgj-brief.md
@@ -81,7 +92,7 @@ spawn run completed: muse (run=RUN-260928-bf2f54, pid=83509, exit=0)
 2026-09-28T07:09:52Z
 
 ## Last Update
-2026-09-28T09:16:35Z
+2026-09-28T09:55:39Z
 
 ## Assigned To
 [implementer] developer (muse)
