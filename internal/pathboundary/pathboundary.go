@@ -69,9 +69,7 @@ func Validate(root string) error {
 // the seam lets production-entry tests cover foreign-owner paths without
 // requiring a second host user or chown privilege.
 func ValidateWithOwner(root string, ownerLookup OwnerLookup) error {
-	return validateWithOwnerAndEntryInfo(root, ownerLookup, func(_ string, entry fs.DirEntry) (os.FileInfo, error) {
-		return entry.Info()
-	})
+	return validateWithOwnerAndEntryInfo(root, ownerLookup, defaultEntryInfo)
 }
 
 // entryInfoLookup is the metadata read performed after a parent directory
@@ -79,13 +77,34 @@ func ValidateWithOwner(root string, ownerLookup OwnerLookup) error {
 // so tests can reproduce a replacement or removal in the readdir/lstat window.
 type entryInfoLookup func(path string, entry fs.DirEntry) (os.FileInfo, error)
 
+func defaultEntryInfo(_ string, entry fs.DirEntry) (os.FileInfo, error) {
+	return entry.Info()
+}
+
 func validateWithOwnerAndEntryInfo(root string, ownerLookup OwnerLookup, entryInfo entryInfoLookup) error {
+	return validateWithinWithOwnerAndEntryInfo(root, root, ownerLookup, entryInfo)
+}
+
+// ValidateWithin proves that target and every component below root satisfy
+// the protected-boundary checks. target may be a regular file or a
+// directory; a directory is checked recursively. The path from root to
+// target is walked one component at a time with lstat semantics so an
+// intermediate link cannot redirect the verification outside root.
+func ValidateWithin(root, target string) error {
+	return ValidateWithinWithOwner(root, target, DefaultOwnerLookup())
+}
+
+// ValidateRouteWithOwner checks root, each path component, and the exact
+// target node without walking children of a target directory. It is used
+// for enclosing roots whose children have their own independent boundary
+// checks.
+func ValidateRouteWithOwner(root, target string, ownerLookup OwnerLookup) error {
 	if ownerLookup == nil {
-		return &Failure{Root: root, Path: root, Check: CheckOwnership, Reason: "owner lookup is unavailable"}
+		return &Failure{Root: root, Path: target, Check: CheckOwnership, Reason: "owner lookup is unavailable"}
 	}
 	operator, err := effectiveOwner()
 	if err != nil {
-		return &Failure{Root: root, Path: root, Check: CheckOwnership, Cause: err}
+		return &Failure{Root: root, Path: target, Check: CheckOwnership, Cause: err}
 	}
 	absolute, rootInfo, err := inspectRoot(root)
 	if err != nil {
@@ -94,14 +113,136 @@ func validateWithOwnerAndEntryInfo(root string, ownerLookup OwnerLookup, entryIn
 	if err := checkNode(absolute, absolute, rootInfo, operator, ownerLookup); err != nil {
 		return err
 	}
+	targetAbsolute, err := filepath.Abs(target)
+	if err != nil {
+		return &Failure{Root: absolute, Path: target, Check: CheckContainment, Cause: err}
+	}
+	targetAbsolute = filepath.Clean(targetAbsolute)
+	relative, err := filepath.Rel(absolute, targetAbsolute)
+	if err != nil || escapes(relative) {
+		return &Failure{Root: absolute, Path: targetAbsolute, Check: CheckContainment, Reason: "component does not resolve below the declared directory", Cause: err}
+	}
+	if relative == "." {
+		return nil
+	}
+	current := absolute
+	parts := strings.Split(relative, string(os.PathSeparator))
+	for index, part := range parts {
+		current = filepath.Join(current, part)
+		info, err := os.Lstat(current)
+		if err != nil {
+			return &Failure{Root: absolute, Path: current, Check: CheckRegular, Cause: err}
+		}
+		link, err := isLink(current, info)
+		if err != nil {
+			return &Failure{Root: absolute, Path: current, Check: CheckLinkSafety, Cause: err}
+		}
+		if link {
+			if escapes, readErr := symlinkEscapes(absolute, current); readErr != nil {
+				return &Failure{Root: absolute, Path: current, Check: CheckLinkSafety, Cause: readErr}
+			} else if escapes {
+				return &Failure{Root: absolute, Path: current, Check: CheckContainment, Reason: "symbolic-link target escapes the declared directory"}
+			}
+			return &Failure{Root: absolute, Path: current, Check: CheckLinkSafety, Reason: "symbolic link below the declared directory"}
+		}
+		if !info.IsDir() && !info.Mode().IsRegular() {
+			return &Failure{Root: absolute, Path: current, Check: CheckRegular, Reason: "component is neither a directory nor a regular file"}
+		}
+		if index < len(parts)-1 && !info.IsDir() {
+			return &Failure{Root: absolute, Path: current, Check: CheckContainment, Reason: "path component is not a directory"}
+		}
+		if err := checkNode(absolute, current, info, operator, ownerLookup); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
-	return filepath.WalkDir(absolute, func(path string, entry fs.DirEntry, walkErr error) error {
+// ValidateWithinWithOwner is ValidateWithin with an injectable owner lookup.
+// Production callers use ValidateWithin; the seam supports production-entry
+// tests for foreign-owner boundary failures.
+func ValidateWithinWithOwner(root, target string, ownerLookup OwnerLookup) error {
+	return validateWithinWithOwnerAndEntryInfo(root, target, ownerLookup, defaultEntryInfo)
+}
+
+// validateWithinWithOwnerAndEntryInfo walks the named route with lstat and
+// fails closed on any missing component: root and target are named by the
+// caller (lock, marker, store entry). Only children discovered by the tree
+// walk below target may vanish (see validateTree).
+func validateWithinWithOwnerAndEntryInfo(root, target string, ownerLookup OwnerLookup, entryInfo entryInfoLookup) error {
+	if ownerLookup == nil {
+		return &Failure{Root: root, Path: target, Check: CheckOwnership, Reason: "owner lookup is unavailable"}
+	}
+	operator, err := effectiveOwner()
+	if err != nil {
+		return &Failure{Root: root, Path: target, Check: CheckOwnership, Cause: err}
+	}
+	absolute, rootInfo, err := inspectRoot(root)
+	if err != nil {
+		return err
+	}
+	if err := checkNode(absolute, absolute, rootInfo, operator, ownerLookup); err != nil {
+		return err
+	}
+	targetAbsolute, err := filepath.Abs(target)
+	if err != nil {
+		return &Failure{Root: absolute, Path: target, Check: CheckContainment, Cause: err}
+	}
+	targetAbsolute = filepath.Clean(targetAbsolute)
+	relative, err := filepath.Rel(absolute, targetAbsolute)
+	if err != nil || escapes(relative) {
+		return &Failure{Root: absolute, Path: targetAbsolute, Check: CheckContainment, Reason: "component does not resolve below the declared directory", Cause: err}
+	}
+	if relative == "." {
+		return validateTree(absolute, absolute, operator, ownerLookup, entryInfo)
+	}
+	current := absolute
+	parts := strings.Split(relative, string(os.PathSeparator))
+	var targetInfo os.FileInfo
+	for index, part := range parts {
+		current = filepath.Join(current, part)
+		info, err := os.Lstat(current)
+		if err != nil {
+			return &Failure{Root: absolute, Path: current, Check: CheckRegular, Cause: err}
+		}
+		link, err := isLink(current, info)
+		if err != nil {
+			return &Failure{Root: absolute, Path: current, Check: CheckLinkSafety, Cause: err}
+		}
+		if link {
+			if escapes, readErr := symlinkEscapes(absolute, current); readErr != nil {
+				return &Failure{Root: absolute, Path: current, Check: CheckLinkSafety, Cause: readErr}
+			} else if escapes {
+				return &Failure{Root: absolute, Path: current, Check: CheckContainment, Reason: "symbolic-link target escapes the declared directory"}
+			}
+			return &Failure{Root: absolute, Path: current, Check: CheckLinkSafety, Reason: "symbolic link below the declared directory"}
+		}
+		if !info.IsDir() && !info.Mode().IsRegular() {
+			return &Failure{Root: absolute, Path: current, Check: CheckRegular, Reason: "component is neither a directory nor a regular file"}
+		}
+		if index < len(parts)-1 && !info.IsDir() {
+			return &Failure{Root: absolute, Path: current, Check: CheckContainment, Reason: "path component is not a directory"}
+		}
+		if err := checkNode(absolute, current, info, operator, ownerLookup); err != nil {
+			return err
+		}
+		targetInfo = info
+	}
+	if targetInfo != nil && targetInfo.IsDir() {
+		return validateTree(absolute, current, operator, ownerLookup, entryInfo)
+	}
+	return nil
+}
+
+func validateTree(root, target string, operator OwnerIdentity, ownerLookup OwnerLookup, entryInfo entryInfoLookup) error {
+	return filepath.WalkDir(target, func(path string, entry fs.DirEntry, walkErr error) error {
 		// vanished applies environments §4 to every per-entry probe (lstat,
 		// link, ownership/DACL, and the directory open for recursion): an
 		// entry that no longer exists when examined was not part of the
-		// directory at examination time. Any other probe error fails closed.
+		// directory at examination time. The walked target itself is named
+		// by the caller and never vanishes. Any other probe error fails closed.
 		vanished := func(err error) (error, bool) {
-			if path == absolute || !IsAbsent(err) {
+			if path == target || !IsAbsent(err) {
 				return nil, false
 			}
 			if entry != nil && entry.IsDir() {
@@ -114,40 +255,40 @@ func validateWithOwnerAndEntryInfo(root string, ownerLookup OwnerLookup, entryIn
 			if result, gone := vanished(walkErr); gone {
 				return result
 			}
-			return &Failure{Root: absolute, Path: path, Check: CheckRegular, Cause: walkErr}
+			return &Failure{Root: root, Path: path, Check: CheckRegular, Cause: walkErr}
 		}
-		if path == absolute {
+		if path == target {
 			return nil
 		}
-		relative, err := filepath.Rel(absolute, path)
+		relative, err := filepath.Rel(root, path)
 		if err != nil || escapes(relative) {
-			return &Failure{Root: absolute, Path: path, Check: CheckContainment, Reason: "component does not resolve below the declared directory", Cause: err}
+			return &Failure{Root: root, Path: path, Check: CheckContainment, Reason: "component does not resolve below the declared directory", Cause: err}
 		}
 		info, err := entryInfo(path, entry)
 		if err != nil {
 			if result, gone := vanished(err); gone {
 				return result
 			}
-			return &Failure{Root: absolute, Path: path, Check: CheckRegular, Cause: err}
+			return &Failure{Root: root, Path: path, Check: CheckRegular, Cause: err}
 		}
 		link, err := isLink(path, info)
 		if err != nil {
 			if result, gone := vanished(err); gone {
 				return result
 			}
-			return &Failure{Root: absolute, Path: path, Check: CheckLinkSafety, Cause: err}
+			return &Failure{Root: root, Path: path, Check: CheckLinkSafety, Cause: err}
 		}
 		if link {
 			// A link is refused whether or not it still exists when its
 			// target is read: lstat already observed it inside the tree.
-			if escapes, readErr := symlinkEscapes(absolute, path); readErr != nil {
-				return &Failure{Root: absolute, Path: path, Check: CheckLinkSafety, Cause: readErr}
+			if escapes, readErr := symlinkEscapes(root, path); readErr != nil {
+				return &Failure{Root: root, Path: path, Check: CheckLinkSafety, Cause: readErr}
 			} else if escapes {
-				return &Failure{Root: absolute, Path: path, Check: CheckContainment, Reason: "symbolic-link target escapes the declared directory"}
+				return &Failure{Root: root, Path: path, Check: CheckContainment, Reason: "symbolic-link target escapes the declared directory"}
 			}
-			return &Failure{Root: absolute, Path: path, Check: CheckLinkSafety, Reason: "symbolic link below the declared directory"}
+			return &Failure{Root: root, Path: path, Check: CheckLinkSafety, Reason: "symbolic link below the declared directory"}
 		}
-		if err := checkNode(absolute, path, info, operator, ownerLookup); err != nil {
+		if err := checkNode(root, path, info, operator, ownerLookup); err != nil {
 			var failure *Failure
 			if errors.As(err, &failure) && failure.Cause != nil {
 				if result, gone := vanished(failure.Cause); gone {
@@ -157,7 +298,7 @@ func validateWithOwnerAndEntryInfo(root string, ownerLookup OwnerLookup, entryIn
 			return err
 		}
 		if !info.IsDir() && !info.Mode().IsRegular() {
-			return &Failure{Root: absolute, Path: path, Check: CheckRegular, Reason: "component is neither a directory nor a regular file"}
+			return &Failure{Root: root, Path: path, Check: CheckRegular, Reason: "component is neither a directory nor a regular file"}
 		}
 		return nil
 	})
@@ -166,6 +307,15 @@ func validateWithOwnerAndEntryInfo(root string, ownerLookup OwnerLookup, entryIn
 // ValidateRoot checks only the exact directory node. It is useful for a
 // protected parent whose children are independent declared source roots.
 func ValidateRoot(root string) error {
+	return ValidateRootWithOwner(root, DefaultOwnerLookup())
+}
+
+// ValidateRootWithOwner checks only the exact directory node and permits an
+// injected owner lookup for boundary tests.
+func ValidateRootWithOwner(root string, ownerLookup OwnerLookup) error {
+	if ownerLookup == nil {
+		return &Failure{Root: root, Path: root, Check: CheckOwnership, Reason: "owner lookup is unavailable"}
+	}
 	absolute, info, err := inspectRoot(root)
 	if err != nil {
 		return err
@@ -174,7 +324,7 @@ func ValidateRoot(root string) error {
 	if err != nil {
 		return &Failure{Root: absolute, Path: absolute, Check: CheckOwnership, Cause: err}
 	}
-	return checkNode(absolute, absolute, info, operator, DefaultOwnerLookup())
+	return checkNode(absolute, absolute, info, operator, ownerLookup)
 }
 
 func inspectRoot(root string) (string, os.FileInfo, error) {
@@ -249,3 +399,59 @@ func symlinkEscapes(root, path string) (bool, error) {
 // IsAbsent reports a missing declared path without conflating other read
 // failures with absence.
 func IsAbsent(err error) bool { return errors.Is(err, fs.ErrNotExist) }
+
+// ValidateLeafWithOwner applies the full protected-boundary checks to the
+// exact target node only. Components between base and target are walked
+// with lstat semantics for containment and link safety, but their ownership
+// and permissions are not checked: base and its ancestors are the
+// operator's directories (environments §4 protects the manager-created
+// roots, lock, markers and store entries, not the Curator home).
+func ValidateLeafWithOwner(base, target string, ownerLookup OwnerLookup) error {
+	if ownerLookup == nil {
+		return &Failure{Root: base, Path: target, Check: CheckOwnership, Reason: "owner lookup is unavailable"}
+	}
+	operator, err := effectiveOwner()
+	if err != nil {
+		return &Failure{Root: base, Path: target, Check: CheckOwnership, Cause: err}
+	}
+	absolute, _, err := inspectRoot(base)
+	if err != nil {
+		return err
+	}
+	targetAbsolute, err := filepath.Abs(target)
+	if err != nil {
+		return &Failure{Root: absolute, Path: target, Check: CheckContainment, Cause: err}
+	}
+	targetAbsolute = filepath.Clean(targetAbsolute)
+	relative, err := filepath.Rel(absolute, targetAbsolute)
+	if err != nil || escapes(relative) || relative == "." {
+		return &Failure{Root: absolute, Path: targetAbsolute, Check: CheckContainment, Reason: "target does not resolve below the declared directory", Cause: err}
+	}
+	current := absolute
+	parts := strings.Split(relative, string(os.PathSeparator))
+	for index, part := range parts {
+		current = filepath.Join(current, part)
+		info, err := os.Lstat(current)
+		if err != nil {
+			return &Failure{Root: absolute, Path: current, Check: CheckRegular, Cause: err}
+		}
+		link, err := isLink(current, info)
+		if err != nil {
+			return &Failure{Root: absolute, Path: current, Check: CheckLinkSafety, Cause: err}
+		}
+		if link {
+			return &Failure{Root: absolute, Path: current, Check: CheckLinkSafety, Reason: "symbolic link on the protected route"}
+		}
+		if index < len(parts)-1 {
+			if !info.IsDir() {
+				return &Failure{Root: absolute, Path: current, Check: CheckContainment, Reason: "path component is not a directory"}
+			}
+			continue
+		}
+		if !info.IsDir() && !info.Mode().IsRegular() {
+			return &Failure{Root: absolute, Path: current, Check: CheckRegular, Reason: "component is neither a directory nor a regular file"}
+		}
+		return checkNode(absolute, current, info, operator, ownerLookup)
+	}
+	return nil
+}

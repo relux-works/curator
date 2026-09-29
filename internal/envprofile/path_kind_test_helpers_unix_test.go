@@ -25,3 +25,7 @@ func makeWorldWritableDirectoryForTest(path string) (func() error, error) {
 	}
 	return func() error { return os.Chmod(path, info.Mode().Perm()) }, nil
 }
+
+func makeWorldWritableSingleDirectoryForTest(path string) (func() error, error) {
+	return makeWorldWritableDirectoryForTest(path)
+}

@@ -11,6 +11,9 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/config"
+	"github.com/relux-works/curator/internal/contextlock"
+	"github.com/relux-works/curator/internal/contextstore"
+	"github.com/relux-works/curator/internal/envprofile"
 )
 
 // These tests drive the production run() entry point for the env rows and
@@ -74,6 +77,55 @@ func TestEnvResolveRepairEmitsFragment(t *testing.T) {
 	code, shellOut, _ := runProfile(t, source, "env", "resolve", "codex_cli", "--format", "shell")
 	if code != exitOK || !strings.HasPrefix(shellOut, "export CODEX_HOME='") {
 		t.Fatalf("shell format = %d %q", code, shellOut)
+	}
+}
+
+// TestEnvResolveRejectsSwappedStoreEntry drives the shipped CLI entry and
+// proves a store entry whose bytes no longer match the lock pin emits no
+// launch fragment.
+func TestEnvResolveRejectsSwappedStoreEntry(t *testing.T) {
+	source, _ := profileHome(t)
+	writeNativeCredentials(t)
+	pkg := t.TempDir()
+	writeContextPackage(t, pkg, "acme", "1.0.0", "trusted\n")
+	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
+		t.Fatalf("profile install = %d\nstderr:\n%s", code, stderr)
+	}
+	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
+		t.Fatalf("env resolve --repair = %d\nstderr:\n%s", code, stderr)
+	}
+	profiles, err := envprofile.List(source.cfg.Home())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var member contextlock.Member
+	for _, profile := range profiles {
+		if profile.Name != "acme" || profile.Lock == nil {
+			continue
+		}
+		member, _ = profile.Lock.Find(contextlock.KindContext, "acme")
+	}
+	if member.StateHash == "" {
+		t.Fatal("installed path context has no state pin")
+	}
+	entry := contextstore.EntryDir(source.cfg.Home(), member.Kind, member.Name, member.StateHash)
+	swapped := filepath.Join(entry, "context", "a.md")
+	if err := os.WriteFile(swapped, []byte("swapped\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, stdout, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair", "--dry-run")
+	if code != exitFail || stdout != "" || !strings.Contains(stderr, "environment_repair_failed") {
+		t.Fatalf("dry-run repair = %d, stdout %q\nstderr:\n%s", code, stdout, stderr)
+	}
+	if contents, err := os.ReadFile(swapped); err != nil || string(contents) != "swapped\n" {
+		t.Fatalf("dry-run repair changed swapped store bytes: %q (%v)", contents, err)
+	}
+	code, stdout, stderr = runProfile(t, source, "env", "resolve", "codex_cli")
+	if code != exitFail || stdout != "" {
+		t.Fatalf("swapped store resolve = %d, stdout %q\nstderr:\n%s", code, stdout, stderr)
+	}
+	if !strings.Contains(stderr, "environment_store_untrusted") || !strings.Contains(stderr, "pin_hash") {
+		t.Fatalf("resolve did not name the untrusted pin hash:\n%s", stderr)
 	}
 }
 

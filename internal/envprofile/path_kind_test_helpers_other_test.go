@@ -13,3 +13,7 @@ func makeFIFOVectorForTest(string) error {
 func makeWorldWritableDirectoryForTest(string) (func() error, error) {
 	return nil, errors.New("host platform does not expose a writable-boundary test helper")
 }
+
+func makeWorldWritableSingleDirectoryForTest(path string) (func() error, error) {
+	return makeWorldWritableDirectoryForTest(path)
+}

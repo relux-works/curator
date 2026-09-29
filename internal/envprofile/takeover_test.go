@@ -8,6 +8,7 @@ import (
 
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 // Production entry points under test: Install, UseWithPolicy,
@@ -274,7 +275,7 @@ func TestRepairTakeoverProvisionsManagedHome(t *testing.T) {
 	pinHomes(t)
 	installIdleProfile(t, home, "acme")
 	managed := ManagedHomeDir(home, "acme", "claude_code")
-	if err := os.MkdirAll(managed, 0o755); err != nil {
+	if err := privatedir.MakeAll(managed); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(managed, "CLAUDE.md"), []byte("mine\n"), 0o644); err != nil {

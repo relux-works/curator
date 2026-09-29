@@ -2,7 +2,10 @@
 
 package privatedir
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+)
 
 // A platform with neither Unix permission bits nor Windows DACLs cannot
 // express the private shape, so every operation fails closed.
@@ -21,4 +24,20 @@ func validatePrivate(string) error {
 
 func protectPrivate(string) error {
 	return fmt.Errorf("private directories are unsupported on this platform")
+}
+
+func createPrivateTempFile(string, string) (*os.File, error) {
+	return nil, fmt.Errorf("private files are unsupported on this platform")
+}
+
+func validatePrivateFile(string) error {
+	return fmt.Errorf("private files are unsupported on this platform")
+}
+
+func protectPrivateFile(string) error {
+	return fmt.Errorf("private files are unsupported on this platform")
+}
+
+func protectPrivateTree(string) error {
+	return fmt.Errorf("private trees are unsupported on this platform")
 }

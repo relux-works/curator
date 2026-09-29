@@ -34,6 +34,8 @@ import (
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/pathboundary"
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/stateread"
 	"github.com/relux-works/curator/internal/transaction"
@@ -81,7 +83,10 @@ type ResolveRequest struct {
 	LaunchDir string
 	Machine   envregistry.MachineConfig
 	Repair    bool
-	Format    string
+	// DryRun reports store rebuilds that a repair would perform without
+	// publishing them. It is meaningful only together with Repair.
+	DryRun bool
+	Format string
 	// Policy carries the machine gates (environments §12.1): the
 	// precedence primitives that drive emission order and the composition
 	// policy. The zero value resolves with the pair default.
@@ -103,10 +108,12 @@ type ResolveRequest struct {
 	transactionOptions []transaction.Option
 	// passthroughLstat and passthroughReadlink inject entry inspection errors
 	// in tests. Production requests leave them nil and use the shared reader.
-	passthroughLstat    func(string) (os.FileInfo, error)
-	passthroughReadlink func(string) (string, error)
-	readStateFile       func(string) (stateread.File, error)
-	readRegularFile     func(string) (stateread.File, error)
+	passthroughLstat     func(string) (os.FileInfo, error)
+	passthroughReadlink  func(string) (string, error)
+	readStateFile        func(string) (stateread.File, error)
+	readRegularFile      func(string) (stateread.File, error)
+	boundaryOwnerLookup  pathboundary.OwnerLookup
+	storeRepairAttempted bool
 }
 
 // ResolveResult is the outcome: exactly one of Document and StaleErr is
@@ -1093,8 +1100,11 @@ func inventoryUnmanaged(homeDir string, want map[string]bool, storeRoot string) 
 // private marker destination before an operation writes store documents,
 // backups, surfaces, or the marker.
 func preflightManagedWriteTargets(root, homeRel string, want map[string]bool) error {
-	if err := os.MkdirAll(root, 0o755); err != nil {
+	if err := privatedir.MakeAll(root); err != nil {
 		return err
+	}
+	if err := pathboundary.ValidateRoot(root); err != nil {
+		return boundaryDiagnostic("environments root", boundaryCheck(err), err)
 	}
 	for path := range want {
 		if _, err := managedPath(root, managedJoin(homeRel, path), false); err != nil {
@@ -2282,8 +2292,15 @@ func loadResolveInputs(home, profile string) (Source, *contextlock.Lock, string,
 }
 
 func loadResolveInputsWith(home, profile string, readRegularFile func(string) (stateread.File, error)) (Source, *contextlock.Lock, string, error) {
+	return loadResolveInputsWithOwner(home, profile, readRegularFile, nil)
+}
+
+func loadResolveInputsWithOwner(home, profile string, readRegularFile func(string) (stateread.File, error), owner pathboundary.OwnerLookup) (Source, *contextlock.Lock, string, error) {
 	if readRegularFile == nil {
 		readRegularFile = stateread.ReadRegularFile
+	}
+	if err := validateLockBoundary(home, profile, owner); err != nil {
+		return Source{}, nil, "", err
 	}
 	source, err := readSource(home, profile)
 	if err != nil {
@@ -2354,6 +2371,42 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
 	if !identifiers.Valid(profile) {
 		return nil, fmt.Errorf("%s: profile %q is not installed", DiagProfileUnknown, profile)
 	}
+	roots, err := validateResolveRoots(req.Home, req.boundaryOwnerLookup)
+	if err != nil {
+		return nil, err
+	}
+	source, lock, hash, err := loadResolveInputsWithOwner(req.Home, profile, req.readRegularFile, req.boundaryOwnerLookup)
+	if err != nil {
+		return nil, err
+	}
+	if !roots.store {
+		return nil, boundaryDiagnostic("profile store root", "boundary", fmt.Errorf("root %s is absent", contextstore.Root(req.Home)))
+	}
+	if err := validateProfilePathSources(profile, source, req.Policy); err != nil {
+		return nil, err
+	}
+	if failure := validateNamedStoreBoundaries(req.Home, lock, req.boundaryOwnerLookup); failure != nil {
+		if req.Repair && req.DryRun {
+			return nil, dryRunStoreEntryFailure(failure)
+		}
+		if req.Repair {
+			if req.storeRepairAttempted {
+				return nil, fmt.Errorf("%s: store entry remained untrusted after repair: %w", DiagRepairFailed, failure)
+			}
+			if err := rebuildUntrustedStoreEntry(&req, hash, failure); err != nil {
+				return nil, err
+			}
+			req.storeRepairAttempted = true
+			return Resolve(req)
+		}
+		return nil, failure
+	}
+	if err := validateMarkerBoundary(req.Home, profile, req.EnvID, req.boundaryOwnerLookup); err != nil {
+		if req.Repair && req.DryRun {
+			return nil, wouldRebuildUntrustedStore(err)
+		}
+		return nil, err
+	}
 	managedRoot := EnvRoot(req.Home)
 	homeRel, err := managedRelative(managedRoot, ManagedHomeDir(req.Home, profile, req.EnvID))
 	if err != nil {
@@ -2362,15 +2415,27 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
 	if err := checkManagedPrivateTarget(managedRoot, managedJoin(homeRel, envmarker.Name)); err != nil {
 		return nil, err
 	}
-	source, lock, hash, err := loadResolveInputsWith(req.Home, profile, req.readRegularFile)
-	if err != nil {
-		return nil, err
-	}
-	if err := validateProfilePathSources(profile, source, req.Policy); err != nil {
-		return nil, err
-	}
 	if err := policy.checkHardenedMCP(lock); err != nil {
 		return nil, err
+	}
+	if failure := validateNamedStorePins(req.Home, lock); failure != nil {
+		if pinnedCommitObjectUnavailable(failure) {
+			return nil, failure
+		}
+		if req.Repair && req.DryRun {
+			return nil, dryRunStoreEntryFailure(failure)
+		}
+		if req.Repair {
+			if req.storeRepairAttempted {
+				return nil, fmt.Errorf("%s: store entry remained untrusted after repair: %w", DiagRepairFailed, failure)
+			}
+			if err := rebuildUntrustedStoreEntry(&req, hash, failure); err != nil {
+				return nil, err
+			}
+			req.storeRepairAttempted = true
+			return Resolve(req)
+		}
+		return nil, failure
 	}
 	verdict := verifyHome(&req, adapter, source, lock, hash)
 	if verdict.markerReadFailed {
@@ -2390,7 +2455,7 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
 		}
 		return &ResolveResult{Document: document, Warnings: verdict.warnings}, nil
 	}
-	if !req.Repair {
+	if !req.Repair || req.DryRun {
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", DiagHomeStale, strings.Join(verdict.reasons, "; "))
 	}
 	return repairUnderLock(&req, adapter, source, lock, hash)

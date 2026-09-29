@@ -118,11 +118,12 @@ func (c cli) cmdEnvResolve(cfg *config.Config, args []string) int {
 	flags := c.newFlagSet("env resolve")
 	profile := flags.String("profile", "", "profile name (default: the current profile)")
 	repair := flags.Bool("repair", false, "provision or repair the managed home under the mutation lock")
+	dryRun := flags.Bool("dry-run", false, "report store rebuilds without modifying state (requires --repair)")
 	takeover := flags.Bool("takeover", false, "take over the unmanaged files the repair would write (only with --repair)")
 	format := flags.String("format", "json", "fragment format: json | env | shell")
 	positional, err := parseInterspersed(flags, args)
 	if err != nil || len(positional) != 1 {
-		_, _ = fmt.Fprintln(c.stderr, "curator: env resolve <env-id> [--profile <name>] [--repair] [--takeover] [--format json|env|shell]")
+		_, _ = fmt.Fprintln(c.stderr, "curator: env resolve <env-id> [--profile <name>] [--repair [--dry-run]] [--takeover] [--format json|env|shell]")
 		_, _ = fmt.Fprintln(c.stderr, envAliasUsage)
 		return exitUsage
 	}
@@ -130,6 +131,14 @@ func (c cli) cmdEnvResolve(cfg *config.Config, args []string) int {
 	// repair there is no write to take over.
 	if *takeover && !*repair {
 		_, _ = fmt.Fprintln(c.stderr, "curator: env resolve --takeover applies only with --repair")
+		return exitUsage
+	}
+	if *dryRun && !*repair {
+		_, _ = fmt.Fprintln(c.stderr, "curator: env resolve --dry-run requires --repair")
+		return exitUsage
+	}
+	if *dryRun && *takeover {
+		_, _ = fmt.Fprintln(c.stderr, "curator: env resolve --takeover is not available with --dry-run")
 		return exitUsage
 	}
 	launchDir, err := os.Getwd()
@@ -146,6 +155,7 @@ func (c cli) cmdEnvResolve(cfg *config.Config, args []string) int {
 		LaunchDir: launchDir,
 		Machine:   machineFromConfig(cfg),
 		Repair:    *repair,
+		DryRun:    *dryRun,
 		Format:    *format,
 		Policy:    policy,
 	})

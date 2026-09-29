@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/stateread"
 )
 
@@ -23,7 +24,7 @@ func managedPath(root, rel string, createParents bool) (string, error) {
 	}
 	root = filepath.Clean(root)
 	if createParents {
-		if err := os.MkdirAll(root, 0o755); err != nil {
+		if err := privatedir.MakeAll(root); err != nil {
 			return "", err
 		}
 	}
@@ -45,7 +46,7 @@ func managedPath(root, rel string, createParents bool) (string, error) {
 			return "", statErr
 		}
 		if state.Kind == stateread.KindAbsent && createParents {
-			if mkdirErr := os.Mkdir(current, 0o755); mkdirErr != nil && !os.IsExist(mkdirErr) {
+			if mkdirErr := privatedir.Make(current); mkdirErr != nil && !os.IsExist(mkdirErr) {
 				return "", mkdirErr
 			}
 			state, statErr = stateread.Lstat(current)
@@ -75,7 +76,7 @@ func managedDirectory(root, rel string) (string, error) {
 		return "", err
 	}
 	root = filepath.Clean(root)
-	if err := os.MkdirAll(root, 0o755); err != nil {
+	if err := privatedir.MakeAll(root); err != nil {
 		return "", err
 	}
 	rootState, err := stateread.Stat(root)
@@ -96,7 +97,7 @@ func managedDirectory(root, rel string) (string, error) {
 			return "", err
 		}
 		if state.Kind == stateread.KindAbsent {
-			if mkdirErr := os.Mkdir(current, 0o755); mkdirErr != nil && !os.IsExist(mkdirErr) {
+			if mkdirErr := privatedir.Make(current); mkdirErr != nil && !os.IsExist(mkdirErr) {
 				return "", mkdirErr
 			}
 			state, err = stateread.Lstat(current)
@@ -187,7 +188,7 @@ func atomicManagedFile(root, rel string, payload []byte, mode fs.FileMode) error
 	if err != nil {
 		return err
 	}
-	file, err := os.CreateTemp(filepath.Dir(full), ".curator-write-*.tmp")
+	file, err := privatedir.CreateTemp(filepath.Dir(full), ".curator-write-*.tmp")
 	if err != nil {
 		return err
 	}

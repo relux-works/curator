@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 )
 
 // On Unix the private shape is the 0o700 permission bits on a real directory.
@@ -28,4 +29,49 @@ func validatePrivate(path string) error {
 
 func protectPrivate(path string) error {
 	return os.Chmod(path, 0o700) // #nosec G302 -- a private directory, not a regular file.
+}
+
+func createPrivateTempFile(dir, pattern string) (*os.File, error) {
+	return os.CreateTemp(dir, pattern)
+}
+
+func validatePrivateFile(path string) error {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 {
+		return fmt.Errorf("%s is not an owner-only regular file", path)
+	}
+	return nil
+}
+
+func protectPrivateFile(path string) error {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a regular file", path)
+	}
+	return os.Chmod(path, info.Mode().Perm()&0o700)
+}
+
+func protectPrivateTree(root string) error {
+	return filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		info, err := os.Lstat(path)
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() && info.IsDir() {
+			return protectPrivate(path)
+		}
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("%s is not a regular file or directory", path)
+		}
+		return protectPrivateFile(path)
+	})
 }

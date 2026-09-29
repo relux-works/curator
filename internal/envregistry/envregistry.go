@@ -71,6 +71,7 @@ const (
 	DiagPassthroughDetached          = "environment_passthrough_detached"
 	DiagPassthroughUnreadable        = "environment_passthrough_unreadable"
 	DiagStoreUntrusted               = "environment_store_untrusted"
+	DiagWouldRebuildUntrustedStore   = "would-rebuild-untrusted-store"
 	DiagCredentialConflict           = "environment_credential_conflict"
 	DiagCredentialUnsupported        = "environment_credential_unsupported"
 	DiagSeedUnreadable               = "environment_seed_unreadable"

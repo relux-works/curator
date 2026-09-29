@@ -361,12 +361,16 @@ func TestStatusS4Posture(t *testing.T) {
 // empty set — and neither the builder nor status fails.
 func TestSurfacingUnreadableManifest(t *testing.T) {
 	fx := writeManagedFixture(t, "acme")
-	entry := contextstore.EntryDir(fx.home, "mcp", "figma-devmode", strings.Repeat("b", 40))
-	if err := os.Remove(filepath.Join(entry, "agent-mcp.json")); err != nil {
-		t.Fatal(err)
-	}
 	lock, _, err := readLock(fx.home, "acme")
 	if err != nil {
+		t.Fatal(err)
+	}
+	member, ok := lock.Find("mcp", "figma-devmode")
+	if !ok {
+		t.Fatal("fixture lock has no figma-devmode MCP member")
+	}
+	entry := contextstore.EntryDir(fx.home, member.Kind, member.Name, member.PinKey())
+	if err := os.Remove(filepath.Join(entry, "agent-mcp.json")); err != nil {
 		t.Fatal(err)
 	}
 	rows, unreadable := surfacingRows(fx.home, newGitManager(fx.home), lock)

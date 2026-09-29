@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 // Production entry points under test: EnsureState, EnsureGit, Exists,
@@ -25,6 +27,14 @@ func TestStateEntryIsContentKeyed(t *testing.T) {
 	}
 	if len(key) != 64 || first != EntryDir(home, "context", "acme", key) {
 		t.Fatalf("entry %q key %q", first, key)
+	}
+	for _, path := range []string{Root(home), first} {
+		if err := privatedir.Validate(path); err != nil {
+			t.Fatalf("store directory %s is not owner-only: %v", path, err)
+		}
+	}
+	if err := privatedir.ValidateFile(filepath.Join(first, "agent-context.json")); err != nil {
+		t.Fatalf("store file is not owner-only: %v", err)
 	}
 	if exists, err := Exists(home, "context", "acme", key); err != nil || !exists {
 		t.Fatal("entry must exist after install")

@@ -120,3 +120,47 @@ func TestPrivateDirectoryIsUsableByItsOwner(t *testing.T) {
 		t.Fatalf("owner cannot remove its private tree: %v", err)
 	}
 }
+
+func TestCreateTempFileIsOwnerOnlyAtCreation(t *testing.T) {
+	file, err := CreateTemp(t.TempDir(), ".lock-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := file.Name()
+	if err := ValidateFile(path); err != nil {
+		_ = file.Close()
+		t.Fatalf("new private file rejected before writing: %v", err)
+	}
+	if _, err := file.WriteString("lock\n"); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateFile(path); err != nil {
+		t.Fatalf("written private file rejected: %v", err)
+	}
+}
+
+func TestProtectTreeSecuresDirectoriesAndFiles(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "staging")
+	if err := os.MkdirAll(filepath.Join(root, "nested"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(root, "nested", "module.md")
+	if err := os.WriteFile(file, []byte("module\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := ProtectTree(root); err != nil {
+		t.Fatalf("ProtectTree: %v", err)
+	}
+	for _, dir := range []string{root, filepath.Join(root, "nested")} {
+		if err := Validate(dir); err != nil {
+			t.Errorf("protected directory %s rejected: %v", dir, err)
+		}
+	}
+	if err := ValidateFile(file); err != nil {
+		t.Fatalf("protected file rejected: %v", err)
+	}
+}

@@ -5,6 +5,7 @@ package envprofile
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -15,11 +16,12 @@ import (
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/pathboundary"
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 // managedFixture installs a hand-built profile: a context root with a
 // root and a system module, one MCP server, and one skill. Store entries
-// are written directly under their pins; the lock is canonical.
+// are installed through the product store helpers; the lock is canonical.
 type managedFixture struct {
 	home     string
 	profile  string
@@ -37,26 +39,35 @@ func writeManagedFixture(t *testing.T, profile string) *managedFixture {
 		native[id] = t.TempDir()
 	}
 	fx := &managedFixture{home: home, profile: profile, native: native, xdg: t.TempDir(), launch: t.TempDir()}
-	ctxPin := strings.Repeat("a", 64)
-	writeStoreEntry(t, home, "context", profile, ctxPin, map[string]string{
-		"agent-context.json": `{"schema_version": 1, "name": "` + profile + `", "version": "1.0.0", "context": {"modules": [{"path": "a.md"}, {"path": "s.md", "class": "system"}]}}`,
-		"context/a.md":       "hello\n",
-		"context/s.md":       "Be terse.\n",
+	sourceDir := filepath.Join(t.TempDir(), profile+"-source")
+	if err := os.Mkdir(sourceDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	writeGitFile(t, sourceDir, "agent-context.json", `{"schema_version": 1, "name": "`+profile+`", "version": "1.0.0", "context": {"modules": [{"path": "a.md"}, {"path": "s.md", "class": "system"}]}}`)
+	writeGitFile(t, sourceDir, "context/a.md", "hello\n")
+	writeGitFile(t, sourceDir, "context/s.md", "Be terse.\n")
+	if err := pathboundary.ProtectTree(sourceDir); err != nil {
+		t.Fatalf("protect path source fixture: %v", err)
+	}
+	_, ctxPin, err := contextstore.EnsureState(home, "context", profile, sourceDir)
+	if err != nil {
+		t.Fatalf("create context snapshot fixture: %v", err)
+	}
+	mcpSource := "github.com/example/mcp-figma"
+	mcpPin := writeGitStoreFixture(t, home, "mcp", "figma-devmode", mcpSource, map[string]string{
+		"agent-mcp.json":      `{"schema_version": 1, "name": "figma-devmode", "version": "1.2.0", "server": {"transport": "stdio", "command": "npx", "args": ["-y", "figma-developer-mcp", "--stdio"], "env_names": ["FIGMA_API_KEY"], "environments": ["claude_code", "codex_cli", "opencode"]}}`,
+		"unused/pin-only.txt": "not surfaced\n",
 	})
-	mcpPin := strings.Repeat("b", 40)
-	writeStoreEntry(t, home, "mcp", "figma-devmode", mcpPin, map[string]string{
-		"agent-mcp.json": `{"schema_version": 1, "name": "figma-devmode", "version": "1.2.0", "server": {"transport": "stdio", "command": "npx", "args": ["-y", "figma-developer-mcp", "--stdio"], "env_names": ["FIGMA_API_KEY"], "environments": ["claude_code", "codex_cli", "opencode"]}}`,
-	})
-	skillPin := strings.Repeat("c", 40)
-	writeStoreEntry(t, home, "skill", "myskill", skillPin, map[string]string{
+	skillSource := "github.com/example/skill-my"
+	skillPin := writeGitStoreFixture(t, home, "skill", "myskill", skillSource, map[string]string{
 		"SKILL.md": "# myskill\n",
 	})
 	lock := &contextlock.Lock{
 		Root: profile,
 		Members: []contextlock.Member{
 			{Kind: "context", Name: profile, Version: "1.0.0", StateHash: ctxPin, Weight: 100},
-			{Kind: "mcp", Name: "figma-devmode", Source: "github.com/example/mcp-figma", Version: "1.2.0", Commit: mcpPin, RequiredBy: []string{profile}},
-			{Kind: "skill", Name: "myskill", Source: "github.com/example/skill-my", Commit: skillPin, RequiredBy: []string{profile}},
+			{Kind: "mcp", Name: "figma-devmode", Source: mcpSource, Version: "1.2.0", Commit: mcpPin, RequiredBy: []string{profile}},
+			{Kind: "skill", Name: "myskill", Source: skillSource, Commit: skillPin, RequiredBy: []string{profile}},
 		},
 	}
 	lock.Sort()
@@ -65,19 +76,12 @@ func writeManagedFixture(t *testing.T, profile string) *managedFixture {
 		t.Fatal(err)
 	}
 	fx.lockHash = hash
-	sourceDir := filepath.Join(t.TempDir(), profile+"-source")
-	if err := os.Mkdir(sourceDir, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := pathboundary.ProtectTree(sourceDir); err != nil {
-		t.Fatalf("protect path source fixture: %v", err)
-	}
 	source, err := json.Marshal(Source{Kind: KindPath, Path: sourceDir})
 	if err != nil {
 		t.Fatal(err)
 	}
 	source = append(source, '\n')
-	if err := os.MkdirAll(ProfileDir(home, profile), 0o755); err != nil {
+	if err := privatedir.MakeAll(ProfileDir(home, profile)); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(sourcePath(home, profile), source, 0o644); err != nil {
@@ -89,18 +93,36 @@ func writeManagedFixture(t *testing.T, profile string) *managedFixture {
 	return fx
 }
 
-func writeStoreEntry(t *testing.T, home, kind, name, pin string, files map[string]string) {
+func writeGitStoreFixture(t *testing.T, home, kind, name, source string, files map[string]string) string {
 	t.Helper()
-	dir := contextstore.EntryDir(home, kind, name, pin)
-	for rel, content := range files {
-		full := filepath.Join(dir, filepath.FromSlash(rel))
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
-			t.Fatal(err)
-		}
+	repo := newGitManager(home).repoDir(source)
+	if err := os.MkdirAll(repo, 0o755); err != nil {
+		t.Fatal(err)
 	}
+	gitRun(t, repo, "init", "--quiet")
+	for path, content := range files {
+		writeGitFile(t, repo, path, content)
+	}
+	gitRun(t, repo, "add", "--all")
+	gitRun(t, repo, "commit", "--quiet", "-m", "fixture")
+	commit := fixtureGitOutput(t, repo, "rev-parse", "HEAD")
+	if _, err := contextstore.EnsureGit(home, kind, name, repo, commit); err != nil {
+		t.Fatalf("create %s/%s Git snapshot fixture: %v", kind, name, err)
+	}
+	return commit
+}
+
+func fixtureGitOutput(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
+		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+	return strings.TrimSpace(string(out))
 }
 
 // seedLiveNativeCredentials writes live native credential targets for
@@ -155,6 +177,99 @@ func readManagedMarker(t *testing.T, fx *managedFixture, envID string) *envmarke
 	return marker
 }
 
+func TestResolveVerifiesGitStoreEntryAgainstPinnedTree(t *testing.T) {
+	fx := writeManagedFixture(t, "acme")
+	seedLiveNativeCredentials(t, fx)
+	provision := fx.request("codex_cli")
+	provision.Repair = true
+	if _, err := Resolve(provision); err != nil {
+		t.Fatalf("provision intact fixture: %v", err)
+	}
+
+	result, err := Resolve(fx.request("codex_cli"))
+	if err != nil || result == nil || len(result.Document) == 0 {
+		t.Fatalf("Resolve with matching Git tree = (%v, %v), want a fragment", result, err)
+	}
+
+	lock, _, err := readLock(fx.home, fx.profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	member, ok := lock.Find(contextlock.KindMCP, "figma-devmode")
+	if !ok {
+		t.Fatal("fixture lock has no Git MCP member")
+	}
+	entry := contextstore.EntryDir(fx.home, member.Kind, member.Name, member.PinKey())
+	if err := os.WriteFile(filepath.Join(entry, "unused", "pin-only.txt"), []byte("swapped sidecar\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	result, err = Resolve(fx.request("codex_cli"))
+	if err == nil || !strings.Contains(err.Error(), envregistry.DiagStoreUntrusted) ||
+		!strings.Contains(err.Error(), "mcp/figma-devmode") || !strings.Contains(err.Error(), "pin_hash") {
+		t.Fatalf("Resolve after swapping Git entry emitted fragment=%t, error=%v; want named pin failure",
+			result != nil && len(result.Document) != 0, err)
+	}
+	if result != nil && len(result.Document) != 0 {
+		t.Fatalf("untrusted Git store emitted a fragment: %s", result.Document)
+	}
+}
+
+func TestResolveRejectsGitPinMissingFromLocalObjectDatabase(t *testing.T) {
+	fx := writeManagedFixture(t, "acme")
+	lock, _, err := readLock(fx.home, fx.profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	member, ok := lock.Find(contextlock.KindMCP, "figma-devmode")
+	if !ok {
+		t.Fatal("fixture lock has no Git MCP member")
+	}
+	oldEntry := contextstore.EntryDir(fx.home, member.Kind, member.Name, member.PinKey())
+	alternate := filepath.Join(t.TempDir(), "alternate-object-database")
+	if err := os.Mkdir(alternate, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	writeGitFile(t, alternate, "agent-mcp.json", `{"schema_version": 1, "name": "figma-devmode", "version": "1.2.0", "server": {"transport": "stdio", "command": "npx", "args": ["-y", "figma-developer-mcp", "--stdio"], "env_names": ["FIGMA_API_KEY"], "environments": ["claude_code", "codex_cli", "opencode"]}}`)
+	writeGitFile(t, alternate, "unused/pin-only.txt", "not surfaced\n")
+	gitRun(t, alternate, "init", "--quiet")
+	gitRun(t, alternate, "add", "--all")
+	gitRun(t, alternate, "commit", "--quiet", "-m", "alternate object database")
+	member.Commit = fixtureGitOutput(t, alternate, "rev-parse", "HEAD")
+	newEntry := contextstore.EntryDir(fx.home, member.Kind, member.Name, member.PinKey())
+	if err := os.Rename(oldEntry, newEntry); err != nil {
+		t.Fatalf("move fixture entry to missing pin: %v", err)
+	}
+	for i := range lock.Members {
+		if lock.Members[i].Kind == member.Kind && lock.Members[i].Name == member.Name {
+			lock.Members[i] = member
+		}
+	}
+	lock.Sort()
+	if _, err := contextlock.Write(lockPath(fx.home, fx.profile), lock); err != nil {
+		t.Fatal(err)
+	}
+
+	before := hashTreeForTest(t, fx.home)
+	req := fx.request("codex_cli")
+	req.Repair = true
+	t.Setenv("GIT_DIR", filepath.Join(alternate, ".git"))
+	result, err := Resolve(req)
+	if err == nil || !strings.Contains(err.Error(), envregistry.DiagStoreUntrusted) ||
+		!strings.Contains(err.Error(), "mcp/figma-devmode") || !strings.Contains(err.Error(), "pinned commit object unavailable") {
+		t.Fatalf("Resolve without local pinned object emitted fragment=%t, error=%v; want fail-closed missing-object diagnostic",
+			result != nil && len(result.Document) != 0, err)
+	}
+	if strings.Contains(err.Error(), DiagRepairFailed) {
+		t.Fatalf("Resolve attempted repair without the pinned object: %v", err)
+	}
+	if result != nil && len(result.Document) != 0 {
+		t.Fatalf("missing pinned object emitted a fragment: %s", result.Document)
+	}
+	if after := hashTreeForTest(t, fx.home); after != before {
+		t.Fatal("resolve changed manager state while the pinned object was unavailable")
+	}
+}
+
 // TestResolveProvisionRepair drives the production Resolve from
 // provisioning through a current bare resolve: the first --repair
 // provisions, records the marker, prints the notice, and emits a fragment
@@ -187,6 +302,16 @@ func TestResolveProvisionRepair(t *testing.T) {
 		t.Fatal("fragment carries the wrong lock hash")
 	}
 	marker := readManagedMarker(t, fx, "codex_cli")
+	managedHome := ManagedHomeDir(fx.home, "acme", "codex_cli")
+	for _, dir := range []string{EnvRoot(fx.home), managedHome} {
+		if err := privatedir.Validate(dir); err != nil {
+			t.Fatalf("managed directory %s is not owner-only: %v", dir, err)
+		}
+	}
+	markerPath := filepath.Join(managedHome, envmarker.Name)
+	if err := privatedir.ValidateFile(markerPath); err != nil {
+		t.Fatalf("published marker is not owner-only: %v", err)
+	}
 	if marker.Mode != envmarker.ModeManagedHome || marker.Profile.Name != "acme" {
 		t.Fatalf("marker mode/profile %+v", marker)
 	}
@@ -208,6 +333,72 @@ func TestResolveProvisionRepair(t *testing.T) {
 	}
 	if bare.Provisioned || string(bare.Document) != string(result.Document) {
 		t.Fatal("a current bare resolve emits identical bytes without provisioning")
+	}
+}
+
+// TestResolveReportsRecordedContextSurfaceHashDrift proves that Resolve
+// compares the marker's root-context and system-prompt hashes with the
+// surfaces produced from the verified lock, even when their link targets
+// still have the expected paths.
+func TestResolveReportsRecordedContextSurfaceHashDrift(t *testing.T) {
+	for _, surface := range []string{envmarker.SurfaceRootContext, envmarker.SurfaceSystemPrompt} {
+		t.Run(surface, func(t *testing.T) {
+			fx := writeManagedFixture(t, "acme")
+			seedLiveNativeCredentials(t, fx)
+			provision := fx.request("codex_cli")
+			provision.Repair = true
+			if _, err := Resolve(provision); err != nil {
+				t.Fatalf("provision managed home: %v", err)
+			}
+			marker := readManagedMarker(t, fx, "codex_cli")
+			recorded, ok := marker.Surfaces[surface]
+			if !ok {
+				t.Fatalf("fixture marker has no %s surface", surface)
+			}
+			recorded.ContentSHA256 = "sha256:" + strings.Repeat("0", 64)
+			marker.Surfaces[surface] = recorded
+			payload, err := marker.Marshal()
+			if err != nil {
+				t.Fatal(err)
+			}
+			markerPath := filepath.Join(ManagedHomeDir(fx.home, fx.profile, "codex_cli"), envmarker.Name)
+			if err := os.WriteFile(markerPath, payload, 0o600); err != nil {
+				t.Fatalf("change recorded surface hash: %v", err)
+			}
+
+			result, err := Resolve(fx.request("codex_cli"))
+			if err == nil || !strings.Contains(err.Error(), DiagHomeStale) || !strings.Contains(err.Error(), "surface "+surface+" record does not match") {
+				t.Fatalf("Resolve emitted fragment=%t, error=%v; want stale surface-hash drift for %s",
+					result != nil && len(result.Document) != 0, err, surface)
+			}
+			if result == nil || len(result.Document) != 0 {
+				t.Fatalf("drifted resolve emitted a fragment: %+v", result)
+			}
+
+			status, err := StatusOf(statusRequest(fx))
+			if err != nil {
+				t.Fatalf("StatusOf: %v", err)
+			}
+			var row *HomeState
+			for i := range status.Homes {
+				if status.Homes[i].Profile == fx.profile && status.Homes[i].Environment == "codex_cli" {
+					row = &status.Homes[i]
+					break
+				}
+			}
+			if row == nil || row.Current {
+				t.Fatalf("status row = %+v, want non-current drift", row)
+			}
+			foundDrift := false
+			for _, state := range row.Surfaces {
+				if state.Key == surface && state.State == DiagSurfaceDrift {
+					foundDrift = true
+				}
+			}
+			if !foundDrift {
+				t.Fatalf("status row does not report %s as %s: %+v", surface, DiagSurfaceDrift, row.Surfaces)
+			}
+		})
 	}
 }
 

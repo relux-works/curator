@@ -15,6 +15,7 @@ import (
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/hookapproval"
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 // Production entry points under test: StatusOf, Remove (orphan retention),
@@ -492,10 +493,10 @@ func TestReservedSkillName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pin := strings.Repeat("d", 40)
-	writeStoreEntry(t, fx.home, "skill", "curator-evil", pin, map[string]string{"SKILL.md": "# evil\n"})
+	source := "github.com/example/evil"
+	pin := writeGitStoreFixture(t, fx.home, "skill", "curator-evil", source, map[string]string{"SKILL.md": "# evil\n"})
 	lock.Members = append(lock.Members, contextlock.Member{
-		Kind: "skill", Name: "curator-evil", Source: "github.com/example/evil",
+		Kind: "skill", Name: "curator-evil", Source: source,
 		Commit: pin, RequiredBy: []string{"acme"},
 	})
 	lock.Sort()
@@ -514,7 +515,7 @@ func TestReservedSkillName(t *testing.T) {
 // to one platform path below the environments root fail provisioning.
 func TestProfilePathCollision(t *testing.T) {
 	fx := writeManagedFixture(t, "acme")
-	if err := os.MkdirAll(filepath.Join(EnvRoot(fx.home), "ACME"), 0o755); err != nil {
+	if err := privatedir.MakeAll(filepath.Join(EnvRoot(fx.home), "ACME")); err != nil {
 		t.Fatal(err)
 	}
 	req := fx.request("codex_cli")
@@ -531,7 +532,7 @@ func TestProfilePathCollision(t *testing.T) {
 func TestOpencodeFormFallback(t *testing.T) {
 	fx := writeManagedFixture(t, "acme")
 	homeDir := ManagedHomeDir(fx.home, "acme", "opencode")
-	if err := os.MkdirAll(homeDir, 0o755); err != nil {
+	if err := privatedir.MakeAll(homeDir); err != nil {
 		t.Fatal(err)
 	}
 	unmanaged := []byte("{\"instructions\": [\"operator\"]}\n")

@@ -3,11 +3,15 @@
 package privatedir
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"syscall"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -228,6 +232,229 @@ func protectPrivate(path string) error {
 		acl,
 		nil,
 	)
+}
+
+func createPrivateTempFile(dir, pattern string) (*os.File, error) {
+	if dir == "" {
+		dir = os.TempDir()
+	}
+	prefix, suffix, found := strings.Cut(pattern, "*")
+	if !found {
+		prefix = pattern
+	}
+	for attempt := 0; attempt < 100; attempt++ {
+		var random [16]byte
+		if _, err := rand.Read(random[:]); err != nil {
+			return nil, err
+		}
+		path := filepath.Join(dir, prefix+hex.EncodeToString(random[:])+suffix)
+		file, err := createPrivateFile(path)
+		if errors.Is(err, os.ErrExist) {
+			continue
+		}
+		return file, err
+	}
+	return nil, &os.PathError{Op: "createtemp", Path: dir, Err: syscall.ERROR_FILE_EXISTS}
+}
+
+func createPrivateFile(path string) (*os.File, error) {
+	user, err := windows.GetCurrentProcessToken().GetTokenUser()
+	if err != nil {
+		return nil, err
+	}
+	acl, err := ownerOnlyACL()
+	if err != nil {
+		return nil, err
+	}
+	descriptor, err := windows.NewSecurityDescriptor()
+	if err != nil {
+		return nil, err
+	}
+	if err := descriptor.SetDACL(acl, true, false); err != nil {
+		return nil, err
+	}
+	if err := descriptor.SetOwner(user.User.Sid, false); err != nil {
+		return nil, err
+	}
+	if err := descriptor.SetControl(windows.SE_DACL_PROTECTED, windows.SE_DACL_PROTECTED); err != nil {
+		return nil, err
+	}
+	attributes := windows.SecurityAttributes{SecurityDescriptor: descriptor}
+	attributes.Length = uint32(unsafe.Sizeof(attributes))
+	path16, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return nil, err
+	}
+	handle, err := windows.CreateFile(
+		path16,
+		windows.GENERIC_READ|windows.GENERIC_WRITE|windows.READ_CONTROL|windows.WRITE_DAC,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
+		&attributes,
+		windows.CREATE_NEW,
+		windows.FILE_ATTRIBUTE_NORMAL,
+		0,
+	)
+	if err != nil {
+		if errors.Is(err, windows.ERROR_FILE_EXISTS) || errors.Is(err, windows.ERROR_ALREADY_EXISTS) {
+			return nil, &os.PathError{Op: "createtemp", Path: path, Err: os.ErrExist}
+		}
+		return nil, &os.PathError{Op: "createtemp", Path: path, Err: err}
+	}
+	file := os.NewFile(uintptr(handle), path)
+	if file == nil {
+		_ = windows.CloseHandle(handle)
+		return nil, fmt.Errorf("create private file %s: invalid file handle", path)
+	}
+	return file, nil
+}
+
+func validatePrivateFile(path string) error {
+	handle, err := openPrivateFile(path, windows.READ_CONTROL)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = windows.CloseHandle(handle) }()
+	var info windows.ByHandleFileInformation
+	if err := windows.GetFileInformationByHandle(handle, &info); err != nil {
+		return fmt.Errorf("read %s attributes: %w", path, err)
+	}
+	if info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 ||
+		info.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY != 0 {
+		return fmt.Errorf("%s is not a regular, non-link file", path)
+	}
+	return validatePrivateHandle(path, handle)
+}
+
+func protectPrivateFile(path string) error {
+	handle, err := openPrivateFile(path, windows.READ_CONTROL|windows.WRITE_DAC|windows.WRITE_OWNER)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = windows.CloseHandle(handle) }()
+	var info windows.ByHandleFileInformation
+	if err := windows.GetFileInformationByHandle(handle, &info); err != nil {
+		return fmt.Errorf("read %s attributes: %w", path, err)
+	}
+	if info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 ||
+		info.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY != 0 {
+		return fmt.Errorf("%s is not a regular, non-link file", path)
+	}
+	user, err := windows.GetCurrentProcessToken().GetTokenUser()
+	if err != nil {
+		return err
+	}
+	acl, err := ownerOnlyACL()
+	if err != nil {
+		return err
+	}
+	api := windows.NewLazySystemDLL("advapi32.dll")
+	setSecurityInfo := api.NewProc("SetSecurityInfo")
+	if err := setSecurityInfo.Find(); err != nil {
+		return err
+	}
+	status, _, _ := setSecurityInfo.Call(
+		uintptr(handle), uintptr(windows.SE_FILE_OBJECT),
+		uintptr(windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION),
+		uintptr(unsafe.Pointer(user.User.Sid)), 0, uintptr(unsafe.Pointer(acl)), 0,
+	)
+	if status != 0 {
+		return fmt.Errorf("set owner-only file DACL on %s: %w", path, syscall.Errno(status))
+	}
+	runtime.KeepAlive(acl)
+	return nil
+}
+
+func protectPrivateTree(root string) error {
+	return filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		info, err := os.Lstat(path)
+		if err != nil {
+			return err
+		}
+		link, err := isReparsePoint(path)
+		if err != nil {
+			return err
+		}
+		if link || info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("%s is a reparse point", path)
+		}
+		if entry.IsDir() && info.IsDir() {
+			return protectPrivate(path)
+		}
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("%s is not a regular file or directory", path)
+		}
+		return protectPrivateFile(path)
+	})
+}
+
+func validatePrivateHandle(path string, handle windows.Handle) error {
+	descriptor, err := windows.GetSecurityInfo(
+		handle,
+		windows.SE_FILE_OBJECT,
+		windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION,
+	)
+	if err != nil {
+		return fmt.Errorf("read %s owner and DACL: %w", path, err)
+	}
+	owner, _, err := descriptor.Owner()
+	if err != nil || owner == nil || !owner.IsValid() {
+		return fmt.Errorf("%s has no valid owner", path)
+	}
+	user, err := windows.GetCurrentProcessToken().GetTokenUser()
+	if err != nil {
+		return fmt.Errorf("resolve effective Windows user: %w", err)
+	}
+	if !owner.Equals(user.User.Sid) {
+		return fmt.Errorf("%s owner does not match the effective user", path)
+	}
+	control, _, err := descriptor.Control()
+	if err != nil || control&windows.SE_DACL_PROTECTED == 0 {
+		return fmt.Errorf("%s DACL is not protected from inheritance", path)
+	}
+	dacl, _, err := descriptor.DACL()
+	if err != nil || dacl == nil {
+		return fmt.Errorf("%s has no protected DACL", path)
+	}
+	return validateOwnerOnlyDACL(dacl, owner, path)
+}
+
+func isReparsePoint(path string) (bool, error) {
+	handle, err := openPrivateFile(path, windows.FILE_READ_ATTRIBUTES)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = windows.CloseHandle(handle) }()
+	var info windows.ByHandleFileInformation
+	if err := windows.GetFileInformationByHandle(handle, &info); err != nil {
+		return false, err
+	}
+	return info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0, nil
+}
+
+func openPrivateFile(path string, access windows.ACCESS_MASK) (windows.Handle, error) {
+	if strings.TrimSpace(path) == "" {
+		return 0, fmt.Errorf("empty path")
+	}
+	path16, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return 0, err
+	}
+	handle, err := windows.CreateFile(
+		path16,
+		uint32(access),
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
+		nil,
+		windows.OPEN_EXISTING,
+		windows.FILE_FLAG_OPEN_REPARSE_POINT|windows.FILE_FLAG_BACKUP_SEMANTICS,
+		0,
+	)
+	if err != nil {
+		return 0, &os.PathError{Op: "open", Path: path, Err: err}
+	}
+	return handle, nil
 }
 
 func openNoFollow(path string) (windows.Handle, error) {

@@ -18,6 +18,7 @@ import (
 
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/pkgversion"
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/stateread"
 )
@@ -447,11 +448,16 @@ func Write(path string, lock *Lock) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := privatedir.MakeAll(filepath.Dir(path)); err != nil {
 		return "", err
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".lock-*")
+	tmp, err := privatedir.CreateTemp(filepath.Dir(path), ".lock-*")
 	if err != nil {
+		return "", err
+	}
+	if err := privatedir.ValidateFile(tmp.Name()); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmp.Name())
 		return "", err
 	}
 	if _, err := tmp.Write(canonical); err != nil {

@@ -30,6 +30,7 @@ import (
 	"github.com/relux-works/curator/internal/hookapproval"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/manifest"
+	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/registry"
 	"github.com/relux-works/curator/internal/stateread"
 )
@@ -298,6 +299,8 @@ type StatusRequest struct {
 	// codexSeedRevisionForTest exercises retained, non-shipped posture rows
 	// without mutating the registry singleton.
 	codexSeedRevisionForTest string
+	boundaryOwnerLookup      pathboundary.OwnerLookup
+	profileStoreErrors       map[string]error
 }
 
 func (req *StatusRequest) resolve() ResolveRequest {
@@ -314,6 +317,7 @@ func (req *StatusRequest) resolve() ResolveRequest {
 		passthroughReadlink:      req.passthroughReadlink,
 		readStateFile:            req.readStateFile,
 		readRegularFile:          req.readRegularFile,
+		boundaryOwnerLookup:      req.boundaryOwnerLookup,
 	}
 }
 
@@ -348,9 +352,15 @@ func StatusOf(req StatusRequest) (*Status, error) {
 	status.RequireSourceSigners = req.Policy.RequireSourceSigners
 	status.UpdateConfirmationRevision = "B-flip"
 	status.UpdateConfirmationBehavior = "a triggered update delta refuses profile_update_confirmation_required unless --confirm-system-delta is given"
-	infos, err := statusProfiles(req.Home)
+	infos, err := statusProfilesWithOwner(req.Home, req.boundaryOwnerLookup)
 	if err != nil {
 		return nil, err
+	}
+	req.profileStoreErrors = make(map[string]error, len(infos))
+	for _, info := range infos {
+		if err := validateProfileStoreState(req.Home, info.Name, req.readRegularFile, req.boundaryOwnerLookup); err != nil {
+			req.profileStoreErrors[info.Name] = err
+		}
 	}
 	installed := map[string]bool{}
 	for _, info := range infos {
@@ -458,7 +468,7 @@ func StatusOf(req StatusRequest) (*Status, error) {
 // statusProfiles enumerates profile source records without requiring their
 // locks to be readable. The status row then reports environment_store_untrusted
 // and unknown currency instead of dropping a profile from status entirely.
-func statusProfiles(home string) ([]Info, error) {
+func statusProfilesWithOwner(home string, owner pathboundary.OwnerLookup) ([]Info, error) {
 	listing, err := stateread.ReadDir(ProfilesDir(home))
 	if err != nil {
 		return nil, err
@@ -479,8 +489,10 @@ func statusProfiles(home string) ([]Info, error) {
 		if err == nil {
 			info.Source = source
 		}
-		if lock, _, lockErr := readLock(home, entry.Name()); lockErr == nil {
-			info.Lock = lock
+		if boundaryErr := validateLockBoundary(home, entry.Name(), owner); boundaryErr == nil {
+			if lock, _, lockErr := readLock(home, entry.Name()); lockErr == nil {
+				info.Lock = lock
+			}
 		}
 		infos = append(infos, info)
 	}
@@ -628,8 +640,21 @@ func homeState(req StatusRequest, profile string, adapter envregistry.Adapter) H
 	if adapter.ID != envregistry.CodexCLI {
 		state.NativeMCPServersDisposition = "none"
 	}
-	source, lock, hash, err := loadResolveInputsWith(req.Home, profile, req.readRegularFile)
+	if req.profileStoreErrors == nil {
+		if err := validateProfileStoreState(req.Home, profile, req.readRegularFile, req.boundaryOwnerLookup); err != nil {
+			state.Findings = append(state.Findings, err.Error())
+			return state
+		}
+	} else if err := req.profileStoreErrors[profile]; err != nil {
+		state.Findings = append(state.Findings, err.Error())
+		return state
+	}
+	source, lock, hash, err := loadResolveInputsWithOwner(req.Home, profile, req.readRegularFile, req.boundaryOwnerLookup)
 	if err != nil {
+		state.Findings = append(state.Findings, err.Error())
+		return state
+	}
+	if err := validateMarkerBoundary(req.Home, profile, adapter.ID, req.boundaryOwnerLookup); err != nil {
 		state.Findings = append(state.Findings, err.Error())
 		return state
 	}
@@ -820,7 +845,7 @@ func profileStates(req StatusRequest, infos []Info) ([]ProfileState, []StateDiag
 	var out []ProfileState
 	var diagnostics []StateDiagnostic
 	for _, info := range infos {
-		_, lock, hash, err := loadResolveInputs(req.Home, info.Name)
+		_, lock, hash, err := loadResolveInputsWithOwner(req.Home, info.Name, req.readRegularFile, req.boundaryOwnerLookup)
 		if err != nil || lock == nil {
 			continue
 		}

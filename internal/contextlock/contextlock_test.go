@@ -3,6 +3,8 @@ package contextlock
 import (
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 // Production entry points under test: Validate, Sort, Canonical, Hash,
@@ -158,6 +160,9 @@ func TestWriteAndRead(t *testing.T) {
 	hash, err := Write(path, lock)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if err := privatedir.ValidateFile(path); err != nil {
+		t.Fatalf("written lock is not owner-only: %v", err)
 	}
 	read, readHash, err := Read(path)
 	if err != nil {

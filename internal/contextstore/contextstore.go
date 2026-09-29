@@ -20,6 +20,8 @@ import (
 	"github.com/relux-works/curator/internal/gitops"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/pathboundary"
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/stateread"
 )
 
@@ -68,17 +70,35 @@ func EnsureGit(home, kind, name, repo, commit string) (string, error) {
 		return "", fmt.Errorf("store entry name %q is not a portable identifier", name)
 	}
 	target := EntryDir(home, kind, name, commit)
-	if info, err := os.Stat(target); err == nil && info.IsDir() {
-		return target, nil
-	}
-	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+	parent := filepath.Dir(target)
+	if err := privatedir.MakeAll(parent); err != nil {
 		return "", err
 	}
-	staging, err := os.MkdirTemp(filepath.Dir(target), "."+commit+".extract-*")
+	if err := pathboundary.ValidateRouteWithOwner(Root(home), parent, pathboundary.DefaultOwnerLookup()); err != nil {
+		return "", err
+	}
+	state, err := stateread.Lstat(target)
+	if err != nil {
+		return "", err
+	}
+	if state.Kind == stateread.KindPresent {
+		if state.Info == nil || !state.Info.IsDir() {
+			return "", fmt.Errorf("store entry %s is not a directory", target)
+		}
+		if err := pathboundary.ValidateWithin(Root(home), target); err != nil {
+			return "", err
+		}
+		return target, nil
+	}
+	staging, err := os.MkdirTemp(parent, "."+commit+".extract-*")
 	if err != nil {
 		return "", err
 	}
 	if err := gitops.Extract(repo, commit, staging); err != nil {
+		_ = os.RemoveAll(staging)
+		return "", err
+	}
+	if err := privatedir.ProtectTree(staging); err != nil {
 		_ = os.RemoveAll(staging)
 		return "", err
 	}
@@ -107,7 +127,10 @@ func EnsureState(home, kind, name, source string) (string, string, error) {
 		return "", "", fmt.Errorf("%s: path %q names a non-directory", DiagSourceInvalid, source)
 	}
 	parent := filepath.Join(Root(home), kind, name)
-	if err := os.MkdirAll(parent, 0o755); err != nil {
+	if err := privatedir.MakeAll(parent); err != nil {
+		return "", "", err
+	}
+	if err := pathboundary.ValidateRouteWithOwner(Root(home), parent, pathboundary.DefaultOwnerLookup()); err != nil {
 		return "", "", err
 	}
 	staging, err := os.MkdirTemp(parent, ".state-*")
@@ -118,6 +141,10 @@ func EnsureState(home, kind, name, source string) (string, string, error) {
 		_ = os.RemoveAll(staging)
 		return "", "", err
 	}
+	if err := privatedir.ProtectTree(staging); err != nil {
+		_ = os.RemoveAll(staging)
+		return "", "", err
+	}
 	hash, err := ContentHash(staging)
 	if err != nil {
 		_ = os.RemoveAll(staging)
@@ -125,7 +152,20 @@ func EnsureState(home, kind, name, source string) (string, string, error) {
 	}
 	key := hashing.Normalize(hash)
 	target := filepath.Join(parent, key)
-	if info, err := os.Stat(target); err == nil && info.IsDir() {
+	state, err := stateread.Lstat(target)
+	if err != nil {
+		_ = os.RemoveAll(staging)
+		return "", "", err
+	}
+	if state.Kind == stateread.KindPresent {
+		if state.Info == nil || !state.Info.IsDir() {
+			_ = os.RemoveAll(staging)
+			return "", "", fmt.Errorf("store entry %s is not a directory", target)
+		}
+		if err := pathboundary.ValidateWithin(Root(home), target); err != nil {
+			_ = os.RemoveAll(staging)
+			return "", "", err
+		}
 		_ = os.RemoveAll(staging)
 		return target, key, nil
 	}

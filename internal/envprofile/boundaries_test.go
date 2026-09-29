@@ -4,6 +4,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/relux-works/curator/internal/contextstore"
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 // Profile path-source behavior follows environments §1 and remains outside
@@ -42,7 +45,12 @@ func TestPathInstallAdmitsOrdinaryDirectory(t *testing.T) {
 func TestLegacyPathInstallIgnoresStoreOverlap(t *testing.T) {
 	home := t.TempDir()
 	pinHomes(t)
-	seed := filepath.Join(home, "contexts", "operand-seed")
+	// The context store root is manager-protected state (environments §4):
+	// create it the way the manager does so only the overlap rule is tested.
+	if err := privatedir.MakeAll(contextstore.Root(home)); err != nil {
+		t.Fatal(err)
+	}
+	seed := filepath.Join(contextstore.Root(home), "operand-seed")
 	writeSeedPackage(t, seed, "seeded")
 	info, _, _, err := Install(home, InstallOptions{Operand: seed})
 	if err != nil {

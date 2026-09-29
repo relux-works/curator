@@ -13,6 +13,7 @@ import (
 	"github.com/relux-works/curator/internal/conformancecoverage"
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/envmarker"
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 type writeNofollowVector struct {
@@ -299,10 +300,7 @@ func runResolveSymlinkParentCase(t *testing.T, tc writeNofollowCase, fixtures ma
 			t.Skipf("symlink fixture unavailable: %v", err)
 		}
 	}
-	if err := os.MkdirAll(filepath.Dir(parent), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(homeDir, 0o755); err != nil {
+	if err := privatedir.MakeAll(homeDir); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(outside, parent); err != nil {

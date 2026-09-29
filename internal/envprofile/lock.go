@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/relux-works/curator/internal/managerlock"
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/transaction"
 )
 
@@ -113,8 +114,13 @@ func (op *operation) publish(files map[string][]byte, removals ...string) error 
 			LivePath: live, PreimageDigest: preimage,
 		}
 		if !item.remove {
-			temp, err := os.CreateTemp("", "curator-profile-record-*")
+			temp, err := privatedir.CreateTemp("", "curator-profile-record-*")
 			if err != nil {
+				return err
+			}
+			if err := privatedir.ValidateFile(temp.Name()); err != nil {
+				_ = temp.Close()
+				_ = os.Remove(temp.Name())
 				return err
 			}
 			temps = append(temps, temp.Name())
@@ -138,6 +144,14 @@ func (op *operation) publish(files map[string][]byte, removals ...string) error 
 	temps = nil
 	if err := op.engine.Commit(op.lock, plan.TransactionID); err != nil {
 		return fmt.Errorf("commit profile records: %w", err)
+	}
+	for _, item := range changes {
+		if item.remove {
+			continue
+		}
+		if err := privatedir.ProtectFile(item.path); err != nil {
+			return fmt.Errorf("protect published profile record %s: %w", item.path, err)
+		}
 	}
 	return nil
 }
