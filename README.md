@@ -93,6 +93,21 @@ curator shell-init --install
 
 Automatic detection selects zsh or bash from `SHELL`, preserves Git Bash on Windows, and otherwise selects PowerShell on Windows. The cached hook does not start Curator during later shell launches. Curator never edits a profile automatically. Set `CURATOR_AUTO_ENV=0` to retain global activation while disabling project-directory scans.
 
+## Installed command security
+
+Commands launched through Curator-installed shims run as the invoking user and
+with that user's operating-system privileges. Portable assurance does not
+change the command's user identity or provide a complete operating-system
+sandbox. For script commands, only the opt-in `script-worker-v1` policy is an
+enforced command path; commands without it remain declared-only. For compiled
+builds, explicitly selected `verified` mode is the provider-backed enforcement
+path and never falls back to portable mode. See [Security](SECURITY.md#installed-command-execution),
+[Protocol Core §4.1.1](https://github.com/relux-works/curator-spec/blob/23435129ebc4c29e5b7f75ec72a0aa0cd3f16065/protocol/core.md#411-portable-script-worker-v1-execution-policy),
+[Protocol Core §4.2.1](https://github.com/relux-works/curator-spec/blob/23435129ebc4c29e5b7f75ec72a0aa0cd3f16065/protocol/core.md#421-portable-manager-worker-v1-execution-policy),
+[Assurance Protocol §1](https://github.com/relux-works/curator-spec/blob/23435129ebc4c29e5b7f75ec72a0aa0cd3f16065/protocol/assurance.md#1-closed-selection),
+[§2](https://github.com/relux-works/curator-spec/blob/23435129ebc4c29e5b7f75ec72a0aa0cd3f16065/protocol/assurance.md#2-platform-neutral-provider-contract),
+and [§5](https://github.com/relux-works/curator-spec/blob/23435129ebc4c29e5b7f75ec72a0aa0cd3f16065/protocol/assurance.md#5-failure-rules).
+
 ## Execution assurance
 
 Compiled builds default to portable execution mode using an authenticated manager/worker session. Verified execution mode (`execution.mode: verified`) is an explicit non-fallback selection: because this release ships no platform provider, a missing, unhealthy, incompatible, or drifted provider fails closed rather than falling back to portable execution. Portable, verified, legacy assurance-blind, cross-provider, and capability-drifted cache entries occupy disjoint cache key identities, and every adopted or published artifact carries the exact build-session receipt used at dispatch. Language source-closure adapters (Rust, SwiftPM, npm, pnpm, Yarn Classic, and Modern Yarn) bind ecosystem toolchains and resolve immutable source snapshots. See [docs/authoring-language-adapters.md](docs/authoring-language-adapters.md) for adapter authoring contracts and [docs/source-closure-adapter-conformance.md](docs/source-closure-adapter-conformance.md) for cross-adapter conformance.
