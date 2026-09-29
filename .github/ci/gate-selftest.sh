@@ -1784,6 +1784,25 @@ if command -v python3 >/dev/null 2>&1; then
 	assert_contains 'naming (d) fails for the full-name reason' 'the employer name must not appear' "$WORK/out.txt"
 	ng_tree
 	assert 'naming (e): a clean tree passes' 0 bash "$NG" "$WORK/ng"
+	ng_sig='Employer name gate'
+	ng_tree; printf -- '- CI: %s\t2026-09-28T10:11:12.3456789Z ./docs/x.md:3:ask %s\n' "$ng_sig" "$ng_short" >"$WORK/ng/progress.md"
+	assert 'naming (f): a historical CI echo with the step signature passes' 0 bash "$NG" "$WORK/ng"
+	ng_tree; printf '{"log":"%s\\t2026-09-28T10:11:12.3456789Z ./docs/x.md:3:ask %s"}\n' "$ng_sig" "$ng_short" >"$WORK/ng/events.ndjson"
+	assert 'naming (g): a JSON-escaped CI echo with the step signature passes' 0 bash "$NG" "$WORK/ng"
+	ng_tree; printf '%s: ask %s about ./docs\n' "$ng_sig" "$ng_short" >"$WORK/ng/docs/notes.md"
+	assert 'naming (h): the step name without timestamp and ./ is still scanned' 1 bash "$NG" "$WORK/ng"
+	ng_tree; printf '  log: \342\200\246-29T01:51:52.8528587Z ./docs/x.patch:9:zq*>K|@dc %s M7\n' "$ng_short" >"$WORK/ng/progress.md"
+	assert 'naming (j): a prefix-truncated CI echo (ellipsis + timestamp tail + ./) passes' 0 bash "$NG" "$WORK/ng"
+	ng_tree; printf 'as said \342\200\246 ask %s about ./docs\n' "$ng_short" >"$WORK/ng/docs/notes.md"
+	assert 'naming (k): prose with an ellipsis but no timestamp tail is still scanned' 1 bash "$NG" "$WORK/ng"
+	ng_tree; printf 'ask %s\nand %s\n' "$ng_short" "$ng_full" >"$WORK/ng/docs/notes.md"
+	assert 'naming (i): a planted mention fails' 1 bash "$NG" "$WORK/ng"
+	if grep -qiF "$ng_short" "$WORK/out.txt" || grep -qiF "$ng_full" "$WORK/out.txt"; then
+		bad 'naming (i): the failure report carries no line content' "planted word echoed in gate output"
+	else
+		ok 'naming (i): the failure report carries no line content'
+	fi
+	assert_contains 'naming (i) reports path:line' './docs/notes.md:1' "$WORK/out.txt"
 else
 	skip 'the naming gate rows need python3' 'python3 not on PATH'
 fi

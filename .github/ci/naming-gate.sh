@@ -16,6 +16,17 @@
 # mentions. Every other line, including any other line inside a block, is
 # scanned.
 #
+# Reports carry `path:line` only, never the line content: CI job logs are
+# excerpted into immutable board records, so a report that echoed the line
+# would plant fresh hits in the next run. A second narrow exemption covers the
+# echoes the old content-printing format already left behind: a line carrying
+# the GitHub Actions log prefix of this step -- the step name, a TAB (literal,
+# or `\t` inside a JSON string), an RFC3339 UTC timestamp and ` ./` -- is a
+# machine echo and is skipped. Excerpts the runner truncated inside the
+# prefix keep only its tail: the `…` truncation marker directly followed by
+# the rest of the timestamp and ` ./` is the same echo. Stated bound: a line forged with that exact
+# signature is exempt too; prose without it never is.
+#
 # Usage:
 #   naming-gate.sh [root]    (default: the current directory)
 
@@ -45,6 +56,8 @@ import re, sys
 pat = re.compile(sys.argv[1].encode(), re.I)
 B85 = re.compile(rb'^[A-Za-z][0-9A-Za-z!#$%&()*+;<=>?@^_`{|}~-]+$')
 LIT = re.compile(rb'^(literal|delta) [0-9]+$')
+ECHO = re.compile(rb'Employer name gate(\t|\\t)[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z \./'
+                  rb'|\xe2\x80\xa6[0-9-]*T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?Z \./')
 out = sys.stdout.buffer
 for f in open(sys.argv[2], 'rb').read().split(b'\n'):
     if not f:
@@ -59,8 +72,8 @@ for f in open(sys.argv[2], 'rb').read().split(b'\n'):
                 inblock = True
             elif inblock and (line == b'' or LIT.match(line) or B85.match(line)):
                 continue
-            if pat.search(line):
-                out.write(f + b':' + str(n).encode() + b':' + line + b'\n')
+            if pat.search(line) and not ECHO.search(line):
+                out.write(f + b':' + str(n).encode() + b'\n')
 PY
 	rm -f "$hits.g"
 }
