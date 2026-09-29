@@ -7,4 +7,4 @@ curator: README/SECURITY state plainly that installed commands run with user pri
 (define task scope)
 
 ## Acceptance Criteria
-Docs merged
+README.md and SECURITY.md each contain a section stating that installed commands run with the user's privileges under portable assurance and that script-worker-v1 enforced commands and verified mode are the enforcement paths, linking the curator-spec sections; docs build/link checks pass
