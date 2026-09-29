@@ -1180,6 +1180,43 @@ else
 	ok 'the CARGO_HOME-only success prints no diagnostics block'
 fi
 
+# Row (b), TASK-260929-2wgjam: rustup in CARGO_HOME/bin with a go elsewhere
+# on PATH -- unchanged behaviour, and go still resolves to the original.
+GOONLYBIN="$WORK/fake-go-only/bin"
+mkdir -p "$GOONLYBIN"
+printf '#!/usr/bin/env bash\necho "go fake: $0"\n' >"$GOONLYBIN/go"
+chmod +x "$GOONLYBIN/go"
+: >"$WORK/github-path-cargo-b.txt"
+assert 'row (b): rustup in CARGO_HOME/bin installs with go on PATH' 0 \
+	env PATH="$GOONLYBIN:$NORUSTPATH" FAKE_RUSTUP_LOG="$WORK/rustup-log-cargo-b.txt" GITHUB_PATH="$WORK/github-path-cargo-b.txt" \
+	    CARGO_HOME="$WORK/fake-cargo-only" RUSTUP_HOME="$WORK/empty-rustup-home" \
+	    CI_RUST_TOOLCHAIN_FILE="$WORK/rust-install-channel.toml" "$BASH_ABS" "$IRS"
+if [ "$(cat "$WORK/github-path-cargo-b.txt")" = "$WORK/fake-cargo-only/bin" ]; then
+	ok 'row (b): the GITHUB_PATH write is exactly CARGO_HOME/bin'
+else
+	bad 'row (b): the GITHUB_PATH write is exactly CARGO_HOME/bin' "got: $(tr '\n' ' ' <"$WORK/github-path-cargo-b.txt" | cut -c1-200)"
+fi
+
+# Row (c): a directory the script would add (CARGO_HOME/bin) holds a
+# different go -> the script refuses, naming the shadowing directory, and
+# records nothing on GITHUB_PATH.
+SHADOWCARGO="$WORK/fake-cargo-shadow"
+mkdir -p "$SHADOWCARGO/bin"
+cp "$FAKEBIN/rustup" "$FAKEBIN/rustc" "$FAKEBIN/cargo" "$SHADOWCARGO/bin/"
+printf '#!/usr/bin/env bash\necho "shadowing go: $0"\n' >"$SHADOWCARGO/bin/go"
+chmod +x "$SHADOWCARGO/bin/go"
+: >"$WORK/github-path-shadow.txt"
+assert 'row (c): a Rust directory holding a different go is refused' 1 \
+	env PATH="$GOONLYBIN:$NORUSTPATH" FAKE_RUSTUP_LOG="$WORK/rustup-log-shadow.txt" GITHUB_PATH="$WORK/github-path-shadow.txt" \
+	    CARGO_HOME="$SHADOWCARGO" RUSTUP_HOME="$WORK/empty-rustup-home" \
+	    CI_RUST_TOOLCHAIN_FILE="$WORK/rust-install-channel.toml" "$BASH_ABS" "$IRS"
+assert_contains 'row (c): the refusal names the shadowing directory' "rust-pin: refusing to add $SHADOWCARGO/bin to PATH: it would shadow go" "$WORK/out.txt"
+if [ -s "$WORK/github-path-shadow.txt" ]; then
+	bad 'row (c): the refusal records nothing on GITHUB_PATH' "got: $(tr '\n' ' ' <"$WORK/github-path-shadow.txt" | cut -c1-200)"
+else
+	ok 'row (c): the refusal records nothing on GITHUB_PATH'
+fi
+
 # Simulate the Homebrew rustup formula: `rustup` is linked into the prefix's
 # bin directory, but its rustc/cargo proxies exist only beside the real
 # executable in the versioned keg. Git Bash on Windows does not guarantee
@@ -1209,14 +1246,13 @@ assert 'the installer finds rustc and cargo from a Homebrew rustup keg' 0 \
 assert_contains 'the Homebrew-prefix install names the filed channel' 'toolchain install 1.92.0 --profile minimal' "$WORK/rustup-log-brew.txt"
 assert_contains 'the rustc invocation resolves to the keg proxy' "rustc fake: $BREWKEG_REALBIN/rustc" "$WORK/out.txt"
 assert_contains 'the cargo invocation resolves to the keg proxy' "cargo fake: $BREWKEG_REALBIN/cargo" "$WORK/out.txt"
-assert_contains 'the Homebrew bin dir is recorded for the rest of the lane' "$WORK/fake-brew/bin" "$WORK/github-path-brew.txt"
 assert_contains 'the CARGO_HOME bin dir (proxies) is still recorded alongside it' "$WORK/fake-cargo-brew/bin" "$WORK/github-path-brew.txt"
 assert_contains 'the Homebrew keg proxy dir is recorded for the rest of the lane' "$BREWKEG_REALBIN" "$WORK/github-path-brew.txt"
-_brew_want="$(printf '%s\n%s\n%s' "$WORK/fake-cargo-brew/bin" "$WORK/fake-brew/bin" "$BREWKEG_REALBIN")"
+_brew_want="$(printf '%s\n%s' "$WORK/fake-cargo-brew/bin" "$BREWKEG_REALBIN")"
 if [ "$(cat "$WORK/github-path-brew.txt")" = "$_brew_want" ]; then
-	ok 'the Homebrew GITHUB_PATH writes are CARGO_HOME, prefix, then keg proxies'
+	ok 'the Homebrew GITHUB_PATH writes are CARGO_HOME then keg proxies, never the prefix bin'
 else
-	bad 'the Homebrew GITHUB_PATH writes are CARGO_HOME, prefix, then keg proxies' \
+	bad 'the Homebrew GITHUB_PATH writes are CARGO_HOME then keg proxies, never the prefix bin' \
 		"got: $(tr '\n' ' ' <"$WORK/github-path-brew.txt" | cut -c1-200)"
 fi
 if grep -q 'runner diagnostics:' "$WORK/out.txt"; then
@@ -1250,6 +1286,61 @@ assert 'the Homebrew keg self-test rejects a missing keg PATH step' 1 \
 	    CI_RUST_TOOLCHAIN_FILE="$WORK/rust-install-channel.toml" "$BASH_ABS" "$_keg_mutant"
 assert_contains 'the Homebrew keg mutant fails at the pinned rustc check' \
 	'rust-pin: rustc is not on PATH after installing Rust 1.92.0' "$WORK/out.txt"
+
+# Row (a), TASK-260929-2wgjam: the shared-prefix shape of the second
+# rose-air runner. rustup is a symlink in a prefix bin that also holds a
+# different `go`; the lane's original `go` must still resolve afterwards and
+# the prefix bin must never reach GITHUB_PATH.
+SHAREDPFX="$WORK/fake-shared"
+SHAREDKEG="$SHAREDPFX/Cellar/rustup/1.28.2/bin"
+ORIGGOBIN="$WORK/fake-setup-go/bin"
+mkdir -p "$SHAREDPFX/bin" "$SHAREDKEG" "$ORIGGOBIN" "$WORK/fake-cargo-shared/bin"
+cp "$FAKEBIN/rustup" "$FAKEBIN/rustc" "$FAKEBIN/cargo" "$SHAREDKEG/"
+ln -s ../Cellar/rustup/1.28.2/bin/rustup "$SHAREDPFX/bin/rustup"
+printf '#!/usr/bin/env bash\necho "go fake: $0"\n' >"$ORIGGOBIN/go"
+printf '#!/usr/bin/env bash\necho "shadowing go: $0"\n' >"$SHAREDPFX/bin/go"
+chmod +x "$ORIGGOBIN/go" "$SHAREDPFX/bin/go"
+SHARED_REALKEG="$(cd -P "$SHAREDKEG" && pwd)"
+# The lane resolves rustup through the shared prefix (as a launchd PATH
+# with the runner's .path would), and the setup-go bin leads PATH.
+cat >"$WORK/rust-shared-probe.sh" <<'EOF'
+#!/usr/bin/env bash
+set -e
+bash "$IRS_UNDER_TEST"
+# Replay the lane's later steps: GITHUB_PATH entries lead PATH.
+while IFS= read -r _d; do PATH="$_d:$PATH"; done <"$GITHUB_PATH"
+echo "later-step go: $(command -v go)"
+EOF
+: >"$WORK/github-path-shared.txt"
+assert 'row (a): a rustup symlinked from a shared prefix with go installs' 0 \
+	env PATH="$ORIGGOBIN:$SHAREDPFX/bin:$NO_RUST_TOOLS_PATH" IRS_UNDER_TEST="$IRS" \
+	    FAKE_RUSTUP_LOG="$WORK/rustup-log-shared.txt" GITHUB_PATH="$WORK/github-path-shared.txt" \
+	    CARGO_HOME="$WORK/fake-cargo-shared" RUSTUP_HOME="$WORK/empty-rustup-home" \
+	    CI_RUST_TOOLCHAIN_FILE="$WORK/rust-install-channel.toml" "$BASH_ABS" "$WORK/rust-shared-probe.sh"
+assert_contains 'row (a): later steps still resolve the original go' "later-step go: $ORIGGOBIN/go" "$WORK/out.txt"
+if grep -qxF "$SHAREDPFX/bin" "$WORK/github-path-shared.txt"; then
+	bad 'row (a): GITHUB_PATH never records the shared prefix bin' "got: $(tr '\n' ' ' <"$WORK/github-path-shared.txt" | cut -c1-200)"
+else
+	ok 'row (a): GITHUB_PATH never records the shared prefix bin'
+fi
+assert_contains 'row (a): the keg proxy dir is recorded instead' "$SHARED_REALKEG" "$WORK/github-path-shared.txt"
+
+# Mutant: restore the old dirname(rustup) prepend. Row (a) must reject it
+# (real exit 1 from the probe: the prepend puts the shadowing go first).
+_old_mutant="$WORK/install-rust-old-prepend.sh"
+awk '{ print } /^echo "rust-pin: using rustup at \$rustup_bin"$/ && !done { print "printf '"'"'%s\\n'"'"' \"$rustup_dir\" >>\"$GITHUB_PATH\"; export PATH=\"$rustup_dir:$PATH\""; done=1 }' "$IRS" >"$_old_mutant"
+if [ "$(grep -c 'export PATH="$rustup_dir:$PATH"' "$_old_mutant")" -eq 1 ] && "$BASH_ABS" -n "$_old_mutant"; then
+	ok 'the old-prepend mutant restores exactly the dirname(rustup) prepend'
+else
+	bad 'the old-prepend mutant restores exactly the dirname(rustup) prepend' 'mutant not built; the kill below would prove nothing'
+fi
+: >"$WORK/github-path-shared-mutant.txt"
+assert 'row (a) kills the old dirname(rustup) prepend mutant' 1 \
+	env PATH="$ORIGGOBIN:$SHAREDPFX/bin:$NO_RUST_TOOLS_PATH" IRS_UNDER_TEST="$_old_mutant" \
+	    FAKE_RUSTUP_LOG="$WORK/rustup-log-shared-mutant.txt" GITHUB_PATH="$WORK/github-path-shared-mutant.txt" \
+	    CARGO_HOME="$WORK/fake-cargo-shared" RUSTUP_HOME="$WORK/empty-rustup-home" \
+	    CI_RUST_TOOLCHAIN_FILE="$WORK/rust-install-channel.toml" "$BASH_ABS" "$WORK/rust-shared-probe.sh"
+assert_contains 'the old-prepend mutant is caught by the resolution invariant' 'the Rust lane changed go resolution' "$WORK/out.txt"
 ;;
 esac
 
@@ -1274,11 +1365,20 @@ assert_contains 'the fallback compiler resolves from its pinned toolchain bin' \
 	"rustc fake: $FALLBACKBIN/rustc" "$WORK/out.txt"
 assert_contains 'the fallback cargo resolves from its pinned toolchain bin' \
 	"cargo fake: $FALLBACKBIN/cargo" "$WORK/out.txt"
-_fallback_want="$(printf '%s\n%s\n%s' "$WORK/fake-cargo-brew/bin" "$FALLBACKBREW/bin" "$FALLBACKBIN")"
-if [ "$(cat "$WORK/github-path-fallback.txt")" = "$_fallback_want" ]; then
-	ok 'the pinned fallback GITHUB_PATH writes CARGO_HOME, prefix, then toolchain bin'
+# Where ln -s makes a real symlink the middle entry is the keg; where Git
+# Bash copies instead, rustup is a plain file in the prefix bin and the
+# middle entry is the lane-private link directory. Never the prefix bin.
+if [ -L "$FALLBACKBREW/bin/rustup" ]; then
+	_fallback_mid="$(cd -P "$FALLBACKKEGBIN" && pwd)"
 else
-	bad 'the pinned fallback GITHUB_PATH writes CARGO_HOME, prefix, then toolchain bin' \
+	_fallback_mid="$(sed -n 2p "$WORK/github-path-fallback.txt")"
+	case "$_fallback_mid" in */rust-lane-bin.*) ;; *) _fallback_mid="<lane-private rust-lane-bin dir>" ;; esac
+fi
+_fallback_want="$(printf '%s\n%s\n%s' "$WORK/fake-cargo-brew/bin" "$_fallback_mid" "$FALLBACKBIN")"
+if [ "$(cat "$WORK/github-path-fallback.txt")" = "$_fallback_want" ]; then
+	ok 'the pinned fallback GITHUB_PATH writes CARGO_HOME, keg, then toolchain bin'
+else
+	bad 'the pinned fallback GITHUB_PATH writes CARGO_HOME, keg, then toolchain bin' \
 		"got: $(tr '\n' ' ' <"$WORK/github-path-fallback.txt" | cut -c1-200)"
 fi
 

@@ -4,7 +4,7 @@
 # Reads the channel from rust-toolchain.toml -- the file rust-pin-guard.sh
 # verifies against internal/rustsource.SupportedRustToolchainVersion in the
 # preceding lane step -- installs exactly that toolchain with rustup, and
-# prepends the rustup shim directory to PATH for the rest of the lane, so
+# prepends the Rust proxy directory to PATH for the rest of the lane, so
 # `rustc -vV` in the rustsource production cases resolves the pinned release
 # instead of whatever the runner happens to ship (rose-air run 35121791685:
 # no rustc on PATH failed the lane after the pnpm pin had gone green).
@@ -18,11 +18,14 @@
 # runner service starts from launchd with a minimal PATH
 # (no /opt/homebrew/bin) and the lane shell reads no profiles, so this
 # script resolves rustup itself, in order: PATH, $CARGO_HOME/bin,
-# $HOMEBREW_PREFIX/bin (if set), /opt/homebrew/bin, /usr/local/bin. The
-# directory that holds rustup is prepended to PATH and GITHUB_PATH before
-# any rustup call; $CARGO_HOME/bin stays on both too because rustup.rs
-# proxies live there. After installation, if rustc/cargo are still absent,
-# the Homebrew keg that holds the rustup executable is added as well.
+# $HOMEBREW_PREFIX/bin (if set), /opt/homebrew/bin, /usr/local/bin, and
+# always invokes it by that absolute path. Only directories holding Rust
+# proxies reach PATH and GITHUB_PATH, never a shared prefix bin such as
+# the Homebrew one (which also holds Homebrew go): $CARGO_HOME/bin, the
+# symlink-resolved Homebrew keg of rustup, or a lane-private directory of
+# links to exactly the Rust proxies. After installation, if rustc/cargo are
+# still absent, the pinned toolchain bin is added. go and node must resolve
+# to the same paths afterwards, or the script fails naming the directory.
 # Resolution never uses RUSTUP_HOME. A runner without rustup in
 # any of those places fails here with that note named (rose-air run
 # 35306933411), not with a generic rustc-not-found later; the failure
@@ -48,6 +51,39 @@ channel="$(awk '/^[[:space:]]*\[toolchain[[:space:]]*\]/{in_toolchain=1; next} /
 
 cargo_home="${CARGO_HOME:-$HOME/.cargo}"
 [ -n "${GITHUB_PATH:-}" ] || fail "GITHUB_PATH is not set; run this script as a CI lane step"
+# Non-Rust tools whose resolution the Rust lane must never change.
+guarded_tools="go node"
+guarded_before_go="$(command -v go 2>/dev/null || true)"
+guarded_before_node="$(command -v node 2>/dev/null || true)"
+guarded_before() {
+	case "$1" in
+		go) printf '%s' "$guarded_before_go" ;;
+		node) printf '%s' "$guarded_before_node" ;;
+	esac
+}
+
+# refuse_shadowing_dir <dir>: fail if <dir> holds a guarded tool other than
+# the one resolved before this script touched PATH.
+refuse_shadowing_dir() {
+	for _tool in $guarded_tools; do
+		_before="$(guarded_before "$_tool")"
+		if [ -x "$1/$_tool" ] && [ ! -d "$1/$_tool" ] && [ "$1/$_tool" != "$_before" ]; then
+			fail "refusing to add $1 to PATH: it would shadow $_tool (${_before:-not on PATH} before the Rust lane, $1/$_tool in the added directory)"
+		fi
+	done
+}
+
+verify_lane_resolution() {
+	for _tool in $guarded_tools; do
+		_before="$(guarded_before "$_tool")"
+		_after="$(command -v "$_tool" 2>/dev/null || true)"
+		if [ "$_after" != "$_before" ]; then
+			fail "the Rust lane changed $_tool resolution: ${_before:-not on PATH} before, ${_after:-not on PATH} after; shadowing directory: $(dirname "${_after:-${_before:-?}}")"
+		fi
+	done
+}
+
+refuse_shadowing_dir "$cargo_home/bin"
 printf '%s\n' "$cargo_home/bin" >>"$GITHUB_PATH"
 export PATH="$cargo_home/bin:$PATH"
 
@@ -137,31 +173,14 @@ if [ -z "$rustup_bin" ]; then
 	fail "rustup is not installed on this runner; install it once per docs/self-hosted-runner-setup.md, then re-run this lane"
 fi
 
-rustup_dir="$(dirname "$rustup_bin")"
-if [ "$rustup_dir" != "$cargo_home/bin" ]; then
-	printf '%s\n' "$rustup_dir" >>"$GITHUB_PATH"
-	export PATH="$rustup_dir:$PATH"
-fi
-echo "rust-pin: using rustup at $rustup_bin"
-
-rustup toolchain install "$channel" --profile minimal
-
-# rustup.rs exposes its proxies in CARGO_HOME/bin, which was added above.
-# Homebrew can link only rustup into its prefix/bin while keeping the rustc
-# and cargo proxies beside the real rustup executable in the versioned keg.
-# Resolve symlinks without relying on GNU-only readlink flags; if that does
-# not locate the proxies, use the installed pinned compiler's directory.
-lane_has_rust_tools() {
-	command -v rustc >/dev/null 2>&1 && command -v cargo >/dev/null 2>&1
-}
-
-prepend_lane_path() {
-	_lane_dir="$1"
-	[ -n "$_lane_dir" ] || return 0
-	printf '%s\n' "$_lane_dir" >>"$GITHUB_PATH"
-	export PATH="$_lane_dir:$PATH"
-}
-
+# Expose only directories that hold Rust proxies, never a shared prefix bin
+# (TASK-260929-2wgjam): on a runner whose rustup is the Homebrew link
+# under the Apple-silicon Homebrew prefix, prepending that prefix bin also
+# put Homebrew `go` ahead of the setup-go toolchain and toolchain-identity.sh
+# failed with a newer Go instead of the go.mod pin. Every lane PATH addition goes through
+# prepend_lane_path, which refuses a directory holding a different go/node
+# than the one resolved before this script ran; the final check re-verifies
+# the resolution. rustup itself is always invoked by its absolute path.
 real_binary_dir() {
 	_real_path="$1"
 	command -v readlink >/dev/null 2>&1 || return 1
@@ -183,18 +202,53 @@ real_binary_dir() {
 	cd -P "$(dirname "$_real_path")" 2>/dev/null && pwd
 }
 
-if ! lane_has_rust_tools; then
-	rustup_proxy_dir="$(real_binary_dir "$rustup_bin" 2>/dev/null || true)"
-	if [ -n "$rustup_proxy_dir" ] && {
-		[ -x "$rustup_proxy_dir/rustc" ] || [ -x "$rustup_proxy_dir/cargo" ];
-	}; then
-		echo "rust-pin: adding rustup proxy directory $rustup_proxy_dir"
-		prepend_lane_path "$rustup_proxy_dir"
-	fi
+prepend_lane_path() {
+	_lane_dir="$1"
+	[ -n "$_lane_dir" ] || return 0
+	refuse_shadowing_dir "$_lane_dir"
+	printf '%s\n' "$_lane_dir" >>"$GITHUB_PATH"
+	export PATH="$_lane_dir:$PATH"
+}
+
+rustup_dir="$(dirname "$rustup_bin")"
+rustup_real_dir="$(real_binary_dir "$rustup_bin" 2>/dev/null || true)"
+# Compare canonical forms: Git Bash spells one directory as /tmp/... and
+# /c/Users/.../Temp/..., which must not read as a symlinked keg.
+rustup_dir_canon="$(cd -P "$rustup_dir" 2>/dev/null && pwd || printf '%s' "$rustup_dir")"
+if [ "$rustup_dir" = "$cargo_home/bin" ]; then
+	: # already on PATH and GITHUB_PATH
+elif [ -n "$rustup_real_dir" ] && [ "$rustup_real_dir" != "$rustup_dir_canon" ]; then
+	# A symlinked rustup (Homebrew formula): its real directory is the keg,
+	# which also holds the rustc/cargo proxies when the formula ships them.
+	rustup_proxy_dir="$rustup_real_dir"
+	echo "rust-pin: adding rustup proxy directory $rustup_proxy_dir"
+	prepend_lane_path "$rustup_proxy_dir"
+else
+	# rustup is a plain file in a directory that may be shared with other
+	# tools: link exactly the Rust proxies into a lane-private directory.
+	lane_rust_bin="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/rust-lane-bin.XXXXXX")" ||
+		fail "cannot create a lane-private Rust bin directory"
+	for _tool in rustup rustc cargo rustfmt cargo-fmt cargo-clippy clippy-driver; do
+		if [ -x "$rustup_dir/$_tool" ]; then
+			ln -s "$rustup_dir/$_tool" "$lane_rust_bin/$_tool"
+		fi
+	done
+	echo "rust-pin: adding lane-private Rust bin directory $lane_rust_bin"
+	prepend_lane_path "$lane_rust_bin"
 fi
+echo "rust-pin: using rustup at $rustup_bin"
+
+"$rustup_bin" toolchain install "$channel" --profile minimal
+
+# rustup.rs exposes its proxies in CARGO_HOME/bin, which was added above;
+# a Homebrew keg exposes them beside the real rustup, added just above. If
+# neither holds them, use the installed pinned compiler's directory.
+lane_has_rust_tools() {
+	command -v rustc >/dev/null 2>&1 && command -v cargo >/dev/null 2>&1
+}
 
 if ! lane_has_rust_tools; then
-	if pinned_rustc="$(rustup which --toolchain "$channel" rustc 2>/dev/null)"; then
+	if pinned_rustc="$("$rustup_bin" which --toolchain "$channel" rustc 2>/dev/null)"; then
 		pinned_rustc_dir="$(dirname "$pinned_rustc")"
 		if [ -n "$pinned_rustc_dir" ]; then
 			echo "rust-pin: adding pinned toolchain directory $pinned_rustc_dir"
@@ -203,8 +257,11 @@ if ! lane_has_rust_tools; then
 	fi
 fi
 
+# Invariant: every non-Rust tool recorded before the PATH changes resolves
+# to the same path after them.
+verify_lane_resolution
 command -v rustc >/dev/null 2>&1 || fail "rustc is not on PATH after installing Rust $channel"
 command -v cargo >/dev/null 2>&1 || fail "cargo is not on PATH after installing Rust $channel"
 rustc -vV
 cargo --version
-rustup show active-toolchain
+"$rustup_bin" show active-toolchain

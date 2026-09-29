@@ -28,15 +28,20 @@ The runner service starts from launchd with a minimal PATH
 shell profiles, so `rustup` is not expected on the service PATH. The lane
 locates it itself: it probes `PATH`, then `~/.cargo/bin` of the runner user
 (or `$CARGO_HOME/bin`), then the Homebrew prefixes (`$HOMEBREW_PREFIX/bin`,
-`/opt/homebrew/bin`, `/usr/local/bin`), and prepends the directory that
-holds `rustup` (plus `~/.cargo/bin` for the toolchain proxies) to `PATH`
-before any `rustup` call. After installing the pinned channel, if either
-`rustc` or `cargo` is still missing, the lane resolves the real path of the
-selected `rustup` binary and prepends its directory when it contains the
-proxies. If that directory does not provide them, it uses
+`/opt/homebrew/bin`, `/usr/local/bin`) and always invokes it by that
+absolute path. It never adds a shared prefix bin such as `/opt/homebrew/bin`
+to `PATH`, because that directory also holds Homebrew `go` and would shadow
+the Go pinned by `go.mod`. Only directories holding the Rust proxies are
+added: `~/.cargo/bin`, the symlink-resolved Homebrew keg of `rustup`, or,
+for a non-symlinked `rustup` outside `~/.cargo/bin`, a lane-private
+directory under `RUNNER_TEMP` linking exactly the Rust proxies. If `rustc`
+or `cargo` is still missing after installing the pinned channel, it uses
 `rustup which --toolchain <pinned-channel> rustc` to locate the pinned
-toolchain's bin directory. Both additions are written to `GITHUB_PATH` for
-later lane steps. The Homebrew prefixes are probed so a launchd-started
+toolchain's bin directory. All additions are written to `GITHUB_PATH` for
+later lane steps. The step records where `go` and `node` resolve before any
+change and fails, naming the shadowing directory, if an added directory
+would change either.
+The Homebrew prefixes are probed so a launchd-started
 service can find `rustup` even when `/opt/homebrew/bin` is absent from its
 initial PATH. The runner's `.path` file may also carry that prefix, but the
 lane does not depend on it.
