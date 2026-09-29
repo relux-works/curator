@@ -1,0 +1,2153 @@
+diff --git a/.github/ci/conformance-case-counts.tsv b/.github/ci/conformance-case-counts.tsv
+index a364de24..aa18abce 100644
+--- a/.github/ci/conformance-case-counts.tsv
++++ b/.github/ci/conformance-case-counts.tsv
+@@ -78,3 +78,7 @@ environments-env-passthrough/surfacing-order-cases	2
+ environments-read-failure/cases	37
+ environments-read-failure/restore	2
+ environments-write-nofollow/cases	11
++environments-store-boundary/resolve_cases	20
++environments-store-boundary/dry_run_cases	4
++environments-store-boundary/repair_cases	10
++environments-store-boundary/status_cases	4
+diff --git a/cmd/curator/env.go b/cmd/curator/env.go
+index a612bf8b..def40db4 100644
+--- a/cmd/curator/env.go
++++ b/cmd/curator/env.go
+@@ -118,11 +118,12 @@ func (c cli) cmdEnvResolve(cfg *config.Config, args []string) int {
+ 	flags := c.newFlagSet("env resolve")
+ 	profile := flags.String("profile", "", "profile name (default: the current profile)")
+ 	repair := flags.Bool("repair", false, "provision or repair the managed home under the mutation lock")
++	dryRun := flags.Bool("dry-run", false, "report store rebuilds without modifying state (requires --repair)")
+ 	takeover := flags.Bool("takeover", false, "take over the unmanaged files the repair would write (only with --repair)")
+ 	format := flags.String("format", "json", "fragment format: json | env | shell")
+ 	positional, err := parseInterspersed(flags, args)
+ 	if err != nil || len(positional) != 1 {
+-		_, _ = fmt.Fprintln(c.stderr, "curator: env resolve <env-id> [--profile <name>] [--repair] [--takeover] [--format json|env|shell]")
++		_, _ = fmt.Fprintln(c.stderr, "curator: env resolve <env-id> [--profile <name>] [--repair [--dry-run]] [--takeover] [--format json|env|shell]")
+ 		_, _ = fmt.Fprintln(c.stderr, envAliasUsage)
+ 		return exitUsage
+ 	}
+@@ -132,6 +133,14 @@ func (c cli) cmdEnvResolve(cfg *config.Config, args []string) int {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator: env resolve --takeover applies only with --repair")
+ 		return exitUsage
+ 	}
++	if *dryRun && !*repair {
++		_, _ = fmt.Fprintln(c.stderr, "curator: env resolve --dry-run requires --repair")
++		return exitUsage
++	}
++	if *dryRun && *takeover {
++		_, _ = fmt.Fprintln(c.stderr, "curator: env resolve --takeover is not available with --dry-run")
++		return exitUsage
++	}
+ 	launchDir, err := os.Getwd()
+ 	if err != nil {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+@@ -146,6 +155,7 @@ func (c cli) cmdEnvResolve(cfg *config.Config, args []string) int {
+ 		LaunchDir: launchDir,
+ 		Machine:   machineFromConfig(cfg),
+ 		Repair:    *repair,
++		DryRun:    *dryRun,
+ 		Format:    *format,
+ 		Policy:    policy,
+ 	})
+diff --git a/cmd/curator/env_test.go b/cmd/curator/env_test.go
+index 9bcd4c7d..f900d8e6 100644
+--- a/cmd/curator/env_test.go
++++ b/cmd/curator/env_test.go
+@@ -11,6 +11,9 @@ import (
+ 	"testing"
+ 
+ 	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/contextstore"
++	"github.com/relux-works/curator/internal/envprofile"
+ )
+ 
+ // These tests drive the production run() entry point for the env rows and
+@@ -77,6 +80,55 @@ func TestEnvResolveRepairEmitsFragment(t *testing.T) {
+ 	}
+ }
+ 
++// TestEnvResolveRejectsSwappedStoreEntry drives the shipped CLI entry and
++// proves a store entry whose bytes no longer match the lock pin emits no
++// launch fragment.
++func TestEnvResolveRejectsSwappedStoreEntry(t *testing.T) {
++	source, _ := profileHome(t)
++	writeNativeCredentials(t)
++	pkg := t.TempDir()
++	writeContextPackage(t, pkg, "acme", "1.0.0", "trusted\n")
++	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
++		t.Fatalf("profile install = %d\nstderr:\n%s", code, stderr)
++	}
++	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
++		t.Fatalf("env resolve --repair = %d\nstderr:\n%s", code, stderr)
++	}
++	profiles, err := envprofile.List(source.cfg.Home())
++	if err != nil {
++		t.Fatal(err)
++	}
++	var member contextlock.Member
++	for _, profile := range profiles {
++		if profile.Name != "acme" || profile.Lock == nil {
++			continue
++		}
++		member, _ = profile.Lock.Find(contextlock.KindContext, "acme")
++	}
++	if member.StateHash == "" {
++		t.Fatal("installed path context has no state pin")
++	}
++	entry := contextstore.EntryDir(source.cfg.Home(), member.Kind, member.Name, member.StateHash)
++	swapped := filepath.Join(entry, "context", "a.md")
++	if err := os.WriteFile(swapped, []byte("swapped\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	code, stdout, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair", "--dry-run")
++	if code != exitFail || stdout != "" || !strings.Contains(stderr, "environment_repair_failed") {
++		t.Fatalf("dry-run repair = %d, stdout %q\nstderr:\n%s", code, stdout, stderr)
++	}
++	if contents, err := os.ReadFile(swapped); err != nil || string(contents) != "swapped\n" {
++		t.Fatalf("dry-run repair changed swapped store bytes: %q (%v)", contents, err)
++	}
++	code, stdout, stderr = runProfile(t, source, "env", "resolve", "codex_cli")
++	if code != exitFail || stdout != "" {
++		t.Fatalf("swapped store resolve = %d, stdout %q\nstderr:\n%s", code, stdout, stderr)
++	}
++	if !strings.Contains(stderr, "environment_store_untrusted") || !strings.Contains(stderr, "pin_hash") {
++		t.Fatalf("resolve did not name the untrusted pin hash:\n%s", stderr)
++	}
++}
++
+ // TestEnvResolveUnknowns covers the operand gates through the CLI.
+ func TestEnvResolveUnknowns(t *testing.T) {
+ 	source, _ := profileHome(t)
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index a9e33963..57da0213 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -34,6 +34,7 @@ import (
+ 	"github.com/relux-works/curator/internal/envmarker"
+ 	"github.com/relux-works/curator/internal/envregistry"
+ 	"github.com/relux-works/curator/internal/identifiers"
++	"github.com/relux-works/curator/internal/pathboundary"
+ 	"github.com/relux-works/curator/internal/protocoljson"
+ 	"github.com/relux-works/curator/internal/stateread"
+ 	"github.com/relux-works/curator/internal/transaction"
+@@ -81,7 +82,10 @@ type ResolveRequest struct {
+ 	LaunchDir string
+ 	Machine   envregistry.MachineConfig
+ 	Repair    bool
+-	Format    string
++	// DryRun reports store rebuilds that a repair would perform without
++	// publishing them. It is meaningful only together with Repair.
++	DryRun bool
++	Format string
+ 	// Policy carries the machine gates (environments §12.1): the
+ 	// precedence primitives that drive emission order and the composition
+ 	// policy. The zero value resolves with the pair default.
+@@ -100,10 +104,12 @@ type ResolveRequest struct {
+ 	transactionOptions []transaction.Option
+ 	// passthroughLstat and passthroughReadlink inject entry inspection errors
+ 	// in tests. Production requests leave them nil and use the shared reader.
+-	passthroughLstat    func(string) (os.FileInfo, error)
+-	passthroughReadlink func(string) (string, error)
+-	readStateFile       func(string) (stateread.File, error)
+-	readRegularFile     func(string) (stateread.File, error)
++	passthroughLstat     func(string) (os.FileInfo, error)
++	passthroughReadlink  func(string) (string, error)
++	readStateFile        func(string) (stateread.File, error)
++	readRegularFile      func(string) (stateread.File, error)
++	boundaryOwnerLookup  pathboundary.OwnerLookup
++	storeRepairAttempted bool
+ }
+ 
+ // ResolveResult is the outcome: exactly one of Document and StaleErr is
+@@ -2247,9 +2253,16 @@ func loadResolveInputs(home, profile string) (Source, *contextlock.Lock, string,
+ }
+ 
+ func loadResolveInputsWith(home, profile string, readRegularFile func(string) (stateread.File, error)) (Source, *contextlock.Lock, string, error) {
++	return loadResolveInputsWithOwner(home, profile, readRegularFile, nil)
++}
++
++func loadResolveInputsWithOwner(home, profile string, readRegularFile func(string) (stateread.File, error), owner pathboundary.OwnerLookup) (Source, *contextlock.Lock, string, error) {
+ 	if readRegularFile == nil {
+ 		readRegularFile = stateread.ReadRegularFile
+ 	}
++	if err := validateLockBoundary(home, profile, owner); err != nil {
++		return Source{}, nil, "", err
++	}
+ 	source, err := readSource(home, profile)
+ 	if err != nil {
+ 		if isStateAbsent(err) {
+@@ -2309,21 +2322,69 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
+ 	if !identifiers.Valid(profile) {
+ 		return nil, fmt.Errorf("%s: profile %q is not installed", DiagProfileUnknown, profile)
+ 	}
+-	managedRoot := EnvRoot(req.Home)
+-	homeRel, err := managedRelative(managedRoot, ManagedHomeDir(req.Home, profile, req.EnvID))
++	roots, err := validateResolveRoots(req.Home, req.boundaryOwnerLookup)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	if err := checkManagedPrivateTarget(managedRoot, managedJoin(homeRel, envmarker.Name)); err != nil {
++	source, lock, hash, err := loadResolveInputsWithOwner(req.Home, profile, req.readRegularFile, req.boundaryOwnerLookup)
++	if err != nil {
++		return nil, err
++	}
++	if !roots.store {
++		return nil, boundaryDiagnostic("profile store root", "boundary", fmt.Errorf("root %s is absent", contextstore.Root(req.Home)))
++	}
++	if err := validateProfilePathSources(profile, source, req.Policy); err != nil {
++		return nil, err
++	}
++	if failure := validateNamedStoreBoundaries(req.Home, lock, req.boundaryOwnerLookup); failure != nil {
++		if req.Repair && req.DryRun {
++			return nil, dryRunStoreEntryFailure(failure)
++		}
++		if req.Repair {
++			if req.storeRepairAttempted {
++				return nil, fmt.Errorf("%s: store entry remained untrusted after repair: %w", DiagRepairFailed, failure)
++			}
++			if err := rebuildUntrustedStoreEntry(&req, hash, failure); err != nil {
++				return nil, err
++			}
++			req.storeRepairAttempted = true
++			return Resolve(req)
++		}
++		return nil, failure
++	}
++	if err := validateMarkerBoundary(req.Home, profile, req.EnvID, req.boundaryOwnerLookup); err != nil {
++		if req.Repair && req.DryRun {
++			return nil, wouldRebuildUntrustedStore(err)
++		}
+ 		return nil, err
+ 	}
+-	source, lock, hash, err := loadResolveInputsWith(req.Home, profile, req.readRegularFile)
++	managedRoot := EnvRoot(req.Home)
++	homeRel, err := managedRelative(managedRoot, ManagedHomeDir(req.Home, profile, req.EnvID))
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	if err := validateProfilePathSources(profile, source, req.Policy); err != nil {
++	if err := checkManagedPrivateTarget(managedRoot, managedJoin(homeRel, envmarker.Name)); err != nil {
+ 		return nil, err
+ 	}
++	if failure := validateNamedStorePins(req.Home, lock); failure != nil {
++		if pinnedCommitObjectUnavailable(failure) {
++			return nil, failure
++		}
++		if req.Repair && req.DryRun {
++			return nil, dryRunStoreEntryFailure(failure)
++		}
++		if req.Repair {
++			if req.storeRepairAttempted {
++				return nil, fmt.Errorf("%s: store entry remained untrusted after repair: %w", DiagRepairFailed, failure)
++			}
++			if err := rebuildUntrustedStoreEntry(&req, hash, failure); err != nil {
++				return nil, err
++			}
++			req.storeRepairAttempted = true
++			return Resolve(req)
++		}
++		return nil, failure
++	}
+ 	verdict := verifyHome(&req, adapter, source, lock, hash)
+ 	if verdict.markerReadFailed {
+ 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envmarker.DiagMarkerUnreadable, strings.Join(verdict.reasons, "; "))
+@@ -2342,7 +2403,7 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
+ 		}
+ 		return &ResolveResult{Document: document, Warnings: verdict.warnings}, nil
+ 	}
+-	if !req.Repair {
++	if !req.Repair || req.DryRun {
+ 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", DiagHomeStale, strings.Join(verdict.reasons, "; "))
+ 	}
+ 	return repairUnderLock(&req, adapter, source, lock, hash)
+diff --git a/internal/envprofile/managed_test.go b/internal/envprofile/managed_test.go
+index d9aa9a4e..c892d113 100644
+--- a/internal/envprofile/managed_test.go
++++ b/internal/envprofile/managed_test.go
+@@ -5,6 +5,7 @@ package envprofile
+ import (
+ 	"encoding/json"
+ 	"os"
++	"os/exec"
+ 	"path/filepath"
+ 	"strings"
+ 	"testing"
+@@ -37,26 +38,35 @@ func writeManagedFixture(t *testing.T, profile string) *managedFixture {
+ 		native[id] = t.TempDir()
+ 	}
+ 	fx := &managedFixture{home: home, profile: profile, native: native, xdg: t.TempDir(), launch: t.TempDir()}
+-	ctxPin := strings.Repeat("a", 64)
+-	writeStoreEntry(t, home, "context", profile, ctxPin, map[string]string{
+-		"agent-context.json": `{"schema_version": 1, "name": "` + profile + `", "version": "1.0.0", "context": {"modules": [{"path": "a.md"}, {"path": "s.md", "class": "system"}]}}`,
+-		"context/a.md":       "hello\n",
+-		"context/s.md":       "Be terse.\n",
+-	})
+-	mcpPin := strings.Repeat("b", 40)
+-	writeStoreEntry(t, home, "mcp", "figma-devmode", mcpPin, map[string]string{
+-		"agent-mcp.json": `{"schema_version": 1, "name": "figma-devmode", "version": "1.2.0", "server": {"transport": "stdio", "command": "npx", "args": ["-y", "figma-developer-mcp", "--stdio"], "env_names": ["FIGMA_API_KEY"], "environments": ["claude_code", "codex_cli", "opencode"]}}`,
++	sourceDir := filepath.Join(t.TempDir(), profile+"-source")
++	if err := os.Mkdir(sourceDir, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	writeGitFile(t, sourceDir, "agent-context.json", `{"schema_version": 1, "name": "`+profile+`", "version": "1.0.0", "context": {"modules": [{"path": "a.md"}, {"path": "s.md", "class": "system"}]}}`)
++	writeGitFile(t, sourceDir, "context/a.md", "hello\n")
++	writeGitFile(t, sourceDir, "context/s.md", "Be terse.\n")
++	if err := pathboundary.ProtectTree(sourceDir); err != nil {
++		t.Fatalf("protect path source fixture: %v", err)
++	}
++	_, ctxPin, err := contextstore.EnsureState(home, "context", profile, sourceDir)
++	if err != nil {
++		t.Fatalf("create context snapshot fixture: %v", err)
++	}
++	mcpSource := "github.com/example/mcp-figma"
++	mcpPin := writeGitStoreFixture(t, home, "mcp", "figma-devmode", mcpSource, map[string]string{
++		"agent-mcp.json":      `{"schema_version": 1, "name": "figma-devmode", "version": "1.2.0", "server": {"transport": "stdio", "command": "npx", "args": ["-y", "figma-developer-mcp", "--stdio"], "env_names": ["FIGMA_API_KEY"], "environments": ["claude_code", "codex_cli", "opencode"]}}`,
++		"unused/pin-only.txt": "not surfaced\n",
+ 	})
+-	skillPin := strings.Repeat("c", 40)
+-	writeStoreEntry(t, home, "skill", "myskill", skillPin, map[string]string{
++	skillSource := "github.com/example/skill-my"
++	skillPin := writeGitStoreFixture(t, home, "skill", "myskill", skillSource, map[string]string{
+ 		"SKILL.md": "# myskill\n",
+ 	})
+ 	lock := &contextlock.Lock{
+ 		Root: profile,
+ 		Members: []contextlock.Member{
+ 			{Kind: "context", Name: profile, Version: "1.0.0", StateHash: ctxPin, Weight: 100},
+-			{Kind: "mcp", Name: "figma-devmode", Source: "github.com/example/mcp-figma", Version: "1.2.0", Commit: mcpPin, RequiredBy: []string{profile}},
+-			{Kind: "skill", Name: "myskill", Source: "github.com/example/skill-my", Commit: skillPin, RequiredBy: []string{profile}},
++			{Kind: "mcp", Name: "figma-devmode", Source: mcpSource, Version: "1.2.0", Commit: mcpPin, RequiredBy: []string{profile}},
++			{Kind: "skill", Name: "myskill", Source: skillSource, Commit: skillPin, RequiredBy: []string{profile}},
+ 		},
+ 	}
+ 	lock.Sort()
+@@ -65,13 +75,6 @@ func writeManagedFixture(t *testing.T, profile string) *managedFixture {
+ 		t.Fatal(err)
+ 	}
+ 	fx.lockHash = hash
+-	sourceDir := filepath.Join(t.TempDir(), profile+"-source")
+-	if err := os.Mkdir(sourceDir, 0o700); err != nil {
+-		t.Fatal(err)
+-	}
+-	if err := pathboundary.ProtectTree(sourceDir); err != nil {
+-		t.Fatalf("protect path source fixture: %v", err)
+-	}
+ 	source, err := json.Marshal(Source{Kind: KindPath, Path: sourceDir})
+ 	if err != nil {
+ 		t.Fatal(err)
+@@ -89,18 +92,36 @@ func writeManagedFixture(t *testing.T, profile string) *managedFixture {
+ 	return fx
+ }
+ 
+-func writeStoreEntry(t *testing.T, home, kind, name, pin string, files map[string]string) {
++func writeGitStoreFixture(t *testing.T, home, kind, name, source string, files map[string]string) string {
+ 	t.Helper()
+-	dir := contextstore.EntryDir(home, kind, name, pin)
+-	for rel, content := range files {
+-		full := filepath.Join(dir, filepath.FromSlash(rel))
+-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+-			t.Fatal(err)
+-		}
+-		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+-			t.Fatal(err)
+-		}
++	repo := newGitManager(home).repoDir(source)
++	if err := os.MkdirAll(repo, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	gitRun(t, repo, "init", "--quiet")
++	for path, content := range files {
++		writeGitFile(t, repo, path, content)
+ 	}
++	gitRun(t, repo, "add", "--all")
++	gitRun(t, repo, "commit", "--quiet", "-m", "fixture")
++	commit := fixtureGitOutput(t, repo, "rev-parse", "HEAD")
++	if _, err := contextstore.EnsureGit(home, kind, name, repo, commit); err != nil {
++		t.Fatalf("create %s/%s Git snapshot fixture: %v", kind, name, err)
++	}
++	return commit
++}
++
++func fixtureGitOutput(t *testing.T, dir string, args ...string) string {
++	t.Helper()
++	cmd := exec.Command("git", args...)
++	cmd.Dir = dir
++	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
++		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
++	out, err := cmd.CombinedOutput()
++	if err != nil {
++		t.Fatalf("git %v: %v\n%s", args, err, out)
++	}
++	return strings.TrimSpace(string(out))
+ }
+ 
+ // seedLiveNativeCredentials writes live native credential targets for
+@@ -155,6 +176,99 @@ func readManagedMarker(t *testing.T, fx *managedFixture, envID string) *envmarke
+ 	return marker
+ }
+ 
++func TestResolveVerifiesGitStoreEntryAgainstPinnedTree(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	seedLiveNativeCredentials(t, fx)
++	provision := fx.request("codex_cli")
++	provision.Repair = true
++	if _, err := Resolve(provision); err != nil {
++		t.Fatalf("provision intact fixture: %v", err)
++	}
++
++	result, err := Resolve(fx.request("codex_cli"))
++	if err != nil || result == nil || len(result.Document) == 0 {
++		t.Fatalf("Resolve with matching Git tree = (%v, %v), want a fragment", result, err)
++	}
++
++	lock, _, err := readLock(fx.home, fx.profile)
++	if err != nil {
++		t.Fatal(err)
++	}
++	member, ok := lock.Find(contextlock.KindMCP, "figma-devmode")
++	if !ok {
++		t.Fatal("fixture lock has no Git MCP member")
++	}
++	entry := contextstore.EntryDir(fx.home, member.Kind, member.Name, member.PinKey())
++	if err := os.WriteFile(filepath.Join(entry, "unused", "pin-only.txt"), []byte("swapped sidecar\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	result, err = Resolve(fx.request("codex_cli"))
++	if err == nil || !strings.Contains(err.Error(), envregistry.DiagStoreUntrusted) ||
++		!strings.Contains(err.Error(), "mcp/figma-devmode") || !strings.Contains(err.Error(), "pin_hash") {
++		t.Fatalf("Resolve after swapping Git entry emitted fragment=%t, error=%v; want named pin failure",
++			result != nil && len(result.Document) != 0, err)
++	}
++	if result != nil && len(result.Document) != 0 {
++		t.Fatalf("untrusted Git store emitted a fragment: %s", result.Document)
++	}
++}
++
++func TestResolveRejectsGitPinMissingFromLocalObjectDatabase(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	lock, _, err := readLock(fx.home, fx.profile)
++	if err != nil {
++		t.Fatal(err)
++	}
++	member, ok := lock.Find(contextlock.KindMCP, "figma-devmode")
++	if !ok {
++		t.Fatal("fixture lock has no Git MCP member")
++	}
++	oldEntry := contextstore.EntryDir(fx.home, member.Kind, member.Name, member.PinKey())
++	alternate := filepath.Join(t.TempDir(), "alternate-object-database")
++	if err := os.Mkdir(alternate, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	writeGitFile(t, alternate, "agent-mcp.json", `{"schema_version": 1, "name": "figma-devmode", "version": "1.2.0", "server": {"transport": "stdio", "command": "npx", "args": ["-y", "figma-developer-mcp", "--stdio"], "env_names": ["FIGMA_API_KEY"], "environments": ["claude_code", "codex_cli", "opencode"]}}`)
++	writeGitFile(t, alternate, "unused/pin-only.txt", "not surfaced\n")
++	gitRun(t, alternate, "init", "--quiet")
++	gitRun(t, alternate, "add", "--all")
++	gitRun(t, alternate, "commit", "--quiet", "-m", "alternate object database")
++	member.Commit = fixtureGitOutput(t, alternate, "rev-parse", "HEAD")
++	newEntry := contextstore.EntryDir(fx.home, member.Kind, member.Name, member.PinKey())
++	if err := os.Rename(oldEntry, newEntry); err != nil {
++		t.Fatalf("move fixture entry to missing pin: %v", err)
++	}
++	for i := range lock.Members {
++		if lock.Members[i].Kind == member.Kind && lock.Members[i].Name == member.Name {
++			lock.Members[i] = member
++		}
++	}
++	lock.Sort()
++	if _, err := contextlock.Write(lockPath(fx.home, fx.profile), lock); err != nil {
++		t.Fatal(err)
++	}
++
++	before := hashTreeForTest(t, fx.home)
++	req := fx.request("codex_cli")
++	req.Repair = true
++	t.Setenv("GIT_DIR", filepath.Join(alternate, ".git"))
++	result, err := Resolve(req)
++	if err == nil || !strings.Contains(err.Error(), envregistry.DiagStoreUntrusted) ||
++		!strings.Contains(err.Error(), "mcp/figma-devmode") || !strings.Contains(err.Error(), "pinned commit object unavailable") {
++		t.Fatalf("Resolve without local pinned object emitted fragment=%t, error=%v; want fail-closed missing-object diagnostic",
++			result != nil && len(result.Document) != 0, err)
++	}
++	if strings.Contains(err.Error(), DiagRepairFailed) {
++		t.Fatalf("Resolve attempted repair without the pinned object: %v", err)
++	}
++	if result != nil && len(result.Document) != 0 {
++		t.Fatalf("missing pinned object emitted a fragment: %s", result.Document)
++	}
++	if after := hashTreeForTest(t, fx.home); after != before {
++		t.Fatal("resolve changed manager state while the pinned object was unavailable")
++	}
++}
++
+ // TestResolveProvisionRepair drives the production Resolve from
+ // provisioning through a current bare resolve: the first --repair
+ // provisions, records the marker, prints the notice, and emits a fragment
+@@ -211,6 +325,72 @@ func TestResolveProvisionRepair(t *testing.T) {
+ 	}
+ }
+ 
++// TestResolveReportsRecordedContextSurfaceHashDrift proves that Resolve
++// compares the marker's root-context and system-prompt hashes with the
++// surfaces produced from the verified lock, even when their link targets
++// still have the expected paths.
++func TestResolveReportsRecordedContextSurfaceHashDrift(t *testing.T) {
++	for _, surface := range []string{envmarker.SurfaceRootContext, envmarker.SurfaceSystemPrompt} {
++		t.Run(surface, func(t *testing.T) {
++			fx := writeManagedFixture(t, "acme")
++			seedLiveNativeCredentials(t, fx)
++			provision := fx.request("codex_cli")
++			provision.Repair = true
++			if _, err := Resolve(provision); err != nil {
++				t.Fatalf("provision managed home: %v", err)
++			}
++			marker := readManagedMarker(t, fx, "codex_cli")
++			recorded, ok := marker.Surfaces[surface]
++			if !ok {
++				t.Fatalf("fixture marker has no %s surface", surface)
++			}
++			recorded.ContentSHA256 = "sha256:" + strings.Repeat("0", 64)
++			marker.Surfaces[surface] = recorded
++			payload, err := marker.Marshal()
++			if err != nil {
++				t.Fatal(err)
++			}
++			markerPath := filepath.Join(ManagedHomeDir(fx.home, fx.profile, "codex_cli"), envmarker.Name)
++			if err := os.WriteFile(markerPath, payload, 0o600); err != nil {
++				t.Fatalf("change recorded surface hash: %v", err)
++			}
++
++			result, err := Resolve(fx.request("codex_cli"))
++			if err == nil || !strings.Contains(err.Error(), DiagHomeStale) || !strings.Contains(err.Error(), "surface "+surface+" record does not match") {
++				t.Fatalf("Resolve emitted fragment=%t, error=%v; want stale surface-hash drift for %s",
++					result != nil && len(result.Document) != 0, err, surface)
++			}
++			if result == nil || len(result.Document) != 0 {
++				t.Fatalf("drifted resolve emitted a fragment: %+v", result)
++			}
++
++			status, err := StatusOf(statusRequest(fx))
++			if err != nil {
++				t.Fatalf("StatusOf: %v", err)
++			}
++			var row *HomeState
++			for i := range status.Homes {
++				if status.Homes[i].Profile == fx.profile && status.Homes[i].Environment == "codex_cli" {
++					row = &status.Homes[i]
++					break
++				}
++			}
++			if row == nil || row.Current {
++				t.Fatalf("status row = %+v, want non-current drift", row)
++			}
++			foundDrift := false
++			for _, state := range row.Surfaces {
++				if state.Key == surface && state.State == DiagSurfaceDrift {
++					foundDrift = true
++				}
++			}
++			if !foundDrift {
++				t.Fatalf("status row does not report %s as %s: %+v", surface, DiagSurfaceDrift, row.Surfaces)
++			}
++		})
++	}
++}
++
+ // TestResolveStaleUnprovisioned narrows the fail-closed gate: without
+ // --repair a stale home reports environment_home_stale with reasons and
+ // emits no fragment. Weakening the gate to emit anyway must fail this
+diff --git a/internal/envprofile/status.go b/internal/envprofile/status.go
+index 0ec2cc3d..2cc9c1ca 100644
+--- a/internal/envprofile/status.go
++++ b/internal/envprofile/status.go
+@@ -29,6 +29,7 @@ import (
+ 	"github.com/relux-works/curator/internal/hookapproval"
+ 	"github.com/relux-works/curator/internal/identifiers"
+ 	"github.com/relux-works/curator/internal/manifest"
++	"github.com/relux-works/curator/internal/pathboundary"
+ 	"github.com/relux-works/curator/internal/registry"
+ 	"github.com/relux-works/curator/internal/stateread"
+ )
+@@ -290,6 +291,8 @@ type StatusRequest struct {
+ 	readStateFile       func(string) (stateread.File, error)
+ 	readRegularFile     func(string) (stateread.File, error)
+ 	readStateDirectory  func(string) (stateread.Directory, error)
++	boundaryOwnerLookup pathboundary.OwnerLookup
++	profileStoreErrors  map[string]error
+ }
+ 
+ func (req *StatusRequest) resolve() ResolveRequest {
+@@ -305,6 +308,7 @@ func (req *StatusRequest) resolve() ResolveRequest {
+ 		passthroughReadlink: req.passthroughReadlink,
+ 		readStateFile:       req.readStateFile,
+ 		readRegularFile:     req.readRegularFile,
++		boundaryOwnerLookup: req.boundaryOwnerLookup,
+ 	}
+ }
+ 
+@@ -326,10 +330,16 @@ func StatusOf(req StatusRequest) (*Status, error) {
+ 	status.RequireSourceSigners = req.Policy.RequireSourceSigners
+ 	status.UpdateConfirmationRevision = "B-flip"
+ 	status.UpdateConfirmationBehavior = "a triggered update delta refuses profile_update_confirmation_required unless --confirm-system-delta is given"
+-	infos, err := statusProfiles(req.Home)
++	infos, err := statusProfilesWithOwner(req.Home, req.boundaryOwnerLookup)
+ 	if err != nil {
+ 		return nil, err
+ 	}
++	req.profileStoreErrors = make(map[string]error, len(infos))
++	for _, info := range infos {
++		if err := validateProfileStoreState(req.Home, info.Name, req.readRegularFile, req.boundaryOwnerLookup); err != nil {
++			req.profileStoreErrors[info.Name] = err
++		}
++	}
+ 	installed := map[string]bool{}
+ 	for _, info := range infos {
+ 		installed[info.Name] = true
+@@ -425,7 +435,7 @@ func StatusOf(req StatusRequest) (*Status, error) {
+ // statusProfiles enumerates profile source records without requiring their
+ // locks to be readable. The status row then reports environment_store_untrusted
+ // and unknown currency instead of dropping a profile from status entirely.
+-func statusProfiles(home string) ([]Info, error) {
++func statusProfilesWithOwner(home string, owner pathboundary.OwnerLookup) ([]Info, error) {
+ 	listing, err := stateread.ReadDir(ProfilesDir(home))
+ 	if err != nil {
+ 		return nil, err
+@@ -446,8 +456,10 @@ func statusProfiles(home string) ([]Info, error) {
+ 		if err == nil {
+ 			info.Source = source
+ 		}
+-		if lock, _, lockErr := readLock(home, entry.Name()); lockErr == nil {
+-			info.Lock = lock
++		if boundaryErr := validateLockBoundary(home, entry.Name(), owner); boundaryErr == nil {
++			if lock, _, lockErr := readLock(home, entry.Name()); lockErr == nil {
++				info.Lock = lock
++			}
+ 		}
+ 		infos = append(infos, info)
+ 	}
+@@ -595,11 +607,24 @@ func homeState(req StatusRequest, profile string, adapter envregistry.Adapter) H
+ 	if adapter.ID != envregistry.CodexCLI {
+ 		state.NativeMCPServersDisposition = "none"
+ 	}
+-	source, lock, hash, err := loadResolveInputsWith(req.Home, profile, req.readRegularFile)
++	if req.profileStoreErrors == nil {
++		if err := validateProfileStoreState(req.Home, profile, req.readRegularFile, req.boundaryOwnerLookup); err != nil {
++			state.Findings = append(state.Findings, err.Error())
++			return state
++		}
++	} else if err := req.profileStoreErrors[profile]; err != nil {
++		state.Findings = append(state.Findings, err.Error())
++		return state
++	}
++	source, lock, hash, err := loadResolveInputsWithOwner(req.Home, profile, req.readRegularFile, req.boundaryOwnerLookup)
+ 	if err != nil {
+ 		state.Findings = append(state.Findings, err.Error())
+ 		return state
+ 	}
++	if err := validateMarkerBoundary(req.Home, profile, adapter.ID, req.boundaryOwnerLookup); err != nil {
++		state.Findings = append(state.Findings, err.Error())
++		return state
++	}
+ 	if err := validateProfilePathSources(profile, source, req.Policy); err != nil {
+ 		state.Findings = append(state.Findings, err.Error())
+ 		return state
+@@ -787,7 +812,7 @@ func profileStates(req StatusRequest, infos []Info) ([]ProfileState, []StateDiag
+ 	var out []ProfileState
+ 	var diagnostics []StateDiagnostic
+ 	for _, info := range infos {
+-		_, lock, hash, err := loadResolveInputs(req.Home, info.Name)
++		_, lock, hash, err := loadResolveInputsWithOwner(req.Home, info.Name, req.readRegularFile, req.boundaryOwnerLookup)
+ 		if err != nil || lock == nil {
+ 			continue
+ 		}
+diff --git a/internal/envprofile/status_test.go b/internal/envprofile/status_test.go
+index 3a506276..e181b61d 100644
+--- a/internal/envprofile/status_test.go
++++ b/internal/envprofile/status_test.go
+@@ -492,10 +492,10 @@ func TestReservedSkillName(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	pin := strings.Repeat("d", 40)
+-	writeStoreEntry(t, fx.home, "skill", "curator-evil", pin, map[string]string{"SKILL.md": "# evil\n"})
++	source := "github.com/example/evil"
++	pin := writeGitStoreFixture(t, fx.home, "skill", "curator-evil", source, map[string]string{"SKILL.md": "# evil\n"})
+ 	lock.Members = append(lock.Members, contextlock.Member{
+-		Kind: "skill", Name: "curator-evil", Source: "github.com/example/evil",
++		Kind: "skill", Name: "curator-evil", Source: source,
+ 		Commit: pin, RequiredBy: []string{"acme"},
+ 	})
+ 	lock.Sort()
+diff --git a/internal/envprofile/store_boundary.go b/internal/envprofile/store_boundary.go
+new file mode 100644
+index 00000000..1ec037df
+--- /dev/null
++++ b/internal/envprofile/store_boundary.go
+@@ -0,0 +1,472 @@
++package envprofile
++
++import (
++	"crypto/rand"
++	"encoding/hex"
++	"errors"
++	"fmt"
++	"io/fs"
++	"os"
++	"path/filepath"
++	"strings"
++
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/contextstore"
++	"github.com/relux-works/curator/internal/envmarker"
++	"github.com/relux-works/curator/internal/envregistry"
++	"github.com/relux-works/curator/internal/gitops"
++	"github.com/relux-works/curator/internal/pathboundary"
++	"github.com/relux-works/curator/internal/stateread"
++)
++
++const diagPinHash = "pin_hash"
++
++type protectedRoots struct {
++	environments bool
++	store        bool
++}
++
++type storeEntryFailure struct {
++	Member contextlock.Member
++	Path   string
++	Check  string
++	Err    error
++}
++
++func (f *storeEntryFailure) Error() string {
++	if f == nil {
++		return ""
++	}
++	return fmt.Sprintf("%s: store entry %s/%s failed %s check: %v", envregistry.DiagStoreUntrusted, f.Member.Kind, f.Member.Name, f.Check, f.Err)
++}
++
++func boundaryOwner(lookup pathboundary.OwnerLookup) pathboundary.OwnerLookup {
++	if lookup != nil {
++		return lookup
++	}
++	return pathboundary.DefaultOwnerLookup()
++}
++
++func validateResolveRoots(home string, owner pathboundary.OwnerLookup) (protectedRoots, error) {
++	var roots protectedRoots
++	var err error
++	roots.environments, err = validateOptionalProtectedRoot(home, EnvRoot(home), "environments root", owner)
++	if err != nil {
++		return roots, err
++	}
++	roots.store, err = validateOptionalProtectedRoot(home, contextstore.Root(home), "profile store root", owner)
++	if err != nil {
++		return roots, err
++	}
++	return roots, nil
++}
++
++func validateOptionalProtectedRoot(home, root, label string, owner pathboundary.OwnerLookup) (bool, error) {
++	state, err := stateread.Lstat(root)
++	if err != nil {
++		return false, boundaryDiagnostic(label, "boundary", err)
++	}
++	if state.Kind == stateread.KindAbsent {
++		return false, nil
++	}
++	if state.Kind != stateread.KindPresent || state.Info == nil {
++		return false, boundaryDiagnostic(label, "boundary", fmt.Errorf("root metadata is unavailable"))
++	}
++	if err := pathboundary.ValidateRouteWithOwner(home, root, boundaryOwner(owner)); err != nil {
++		return false, boundaryDiagnostic(label, boundaryCheck(err), err)
++	}
++	return true, nil
++}
++
++func validateLockBoundary(home, profile string, owner pathboundary.OwnerLookup) error {
++	path := lockPath(home, profile)
++	state, err := stateread.Lstat(path)
++	if err != nil {
++		return boundaryDiagnostic("profile lock", "boundary", err)
++	}
++	if state.Kind == stateread.KindAbsent {
++		return nil
++	}
++	if state.Kind != stateread.KindPresent || state.Info == nil {
++		return boundaryDiagnostic("profile lock", "boundary", fmt.Errorf("lock metadata is unavailable"))
++	}
++	if err := pathboundary.ValidateWithinWithOwner(home, path, boundaryOwner(owner)); err != nil {
++		return boundaryDiagnostic("profile lock", boundaryCheck(err), err)
++	}
++	return nil
++}
++
++func validateMarkerBoundary(home, profile, envID string, owner pathboundary.OwnerLookup) error {
++	root := EnvRoot(home)
++	path := filepath.Join(ManagedHomeDir(home, profile, envID), envmarker.Name)
++	state, err := stateread.Lstat(path)
++	if err != nil {
++		return boundaryDiagnostic("environment marker", "boundary", err)
++	}
++	if state.Kind == stateread.KindAbsent {
++		return nil
++	}
++	if state.Kind != stateread.KindPresent || state.Info == nil {
++		return boundaryDiagnostic("environment marker", "boundary", fmt.Errorf("marker metadata is unavailable"))
++	}
++	if err := pathboundary.ValidateWithinWithOwner(root, path, boundaryOwner(owner)); err != nil {
++		return boundaryDiagnostic("environment marker", boundaryCheck(err), err)
++	}
++	return nil
++}
++
++func boundaryCheck(err error) string {
++	var failure *pathboundary.Failure
++	if errors.As(err, &failure) && failure.Check != "" {
++		return failure.Check
++	}
++	return "boundary"
++}
++
++func boundaryDiagnostic(label, check string, err error) error {
++	return fmt.Errorf("%s: %s failed %s check: %v", envregistry.DiagStoreUntrusted, label, check, err)
++}
++
++func wouldRebuildUntrustedStore(err error) error {
++	return fmt.Errorf("%s: %v", envregistry.DiagWouldRebuildUntrustedStore, err)
++}
++
++func dryRunStoreEntryFailure(failure *storeEntryFailure) error {
++	if failure == nil {
++		return fmt.Errorf("%s: store entry failure is unavailable", DiagRepairFailed)
++	}
++	if pinnedCommitObjectUnavailable(failure) {
++		return failure
++	}
++	if failure.Member.Commit == "" {
++		return fmt.Errorf("%s: %w; this state pin has no revalidatable Git snapshot", DiagRepairFailed, failure)
++	}
++	return wouldRebuildUntrustedStore(failure)
++}
++
++func validateNamedStoreBoundaries(home string, lock *contextlock.Lock, owner pathboundary.OwnerLookup) *storeEntryFailure {
++	root := contextstore.Root(home)
++	for _, member := range lock.Members {
++		entry := contextstore.EntryDir(home, member.Kind, member.Name, member.PinKey())
++		if err := pathboundary.ValidateWithinWithOwner(root, entry, boundaryOwner(owner)); err != nil {
++			return &storeEntryFailure{Member: member, Path: entry, Check: boundaryCheck(err), Err: err}
++		}
++	}
++	return nil
++}
++
++func validateNamedStorePins(home string, lock *contextlock.Lock) *storeEntryFailure {
++	for _, member := range lock.Members {
++		entry := contextstore.EntryDir(home, member.Kind, member.Name, member.PinKey())
++		actual, expected, err := storeEntryPinHashes(home, member, entry)
++		if err != nil {
++			return &storeEntryFailure{Member: member, Path: entry, Check: diagPinHash, Err: err}
++		}
++		if actual != expected {
++			return &storeEntryFailure{Member: member, Path: entry, Check: diagPinHash, Err: fmt.Errorf("recorded pin %q does not match store hash %q", member.Pin(), actual)}
++		}
++	}
++	return nil
++}
++
++func validateProfileStoreState(home, profile string, readRegularFile func(string) (stateread.File, error), owner pathboundary.OwnerLookup) error {
++	roots, err := validateResolveRoots(home, owner)
++	if err != nil {
++		return err
++	}
++	_, lock, _, err := loadResolveInputsWithOwner(home, profile, readRegularFile, owner)
++	if err != nil {
++		return err
++	}
++	if !roots.store {
++		return boundaryDiagnostic("profile store root", "boundary", fmt.Errorf("root %s is absent", contextstore.Root(home)))
++	}
++	if failure := validateNamedStoreBoundaries(home, lock, owner); failure != nil {
++		return failure
++	}
++	if failure := validateNamedStorePins(home, lock); failure != nil {
++		return failure
++	}
++	return nil
++}
++
++func expectedStoreHash(home string, member contextlock.Member) (string, string, error) {
++	if member.Commit != "" {
++		return pinnedCommitTree(home, member)
++	}
++	if member.StateHash != "" {
++		return "sha256:" + member.StateHash, "", nil
++	}
++	return "", "", fmt.Errorf("member %s/%s has no expected state or commit pin", member.Kind, member.Name)
++}
++
++func storeEntryPinHashes(home string, member contextlock.Member, entry string) (actual, expected string, err error) {
++	expected, format, err := expectedStoreHash(home, member)
++	if err != nil {
++		return "", "", err
++	}
++	if member.Commit != "" {
++		actual, err = gitops.TreeObjectIDFromDir(entry, format)
++		if err != nil {
++			return "", "", err
++		}
++		return actual, expected, nil
++	}
++	actual, err = contextstore.ContentHash(entry)
++	if err != nil {
++		return "", "", err
++	}
++	return actual, expected, nil
++}
++
++func pinnedCommitObjectUnavailable(failure *storeEntryFailure) bool {
++	return failure != nil && failure.Check == diagPinHash &&
++		strings.Contains(failure.Err.Error(), "pinned commit object unavailable")
++}
++
++func pinnedCommitTree(home string, member contextlock.Member) (string, string, error) {
++	if member.Commit == "" || member.Source == "" {
++		return "", "", fmt.Errorf("member %s/%s has no recomputable commit pin", member.Kind, member.Name)
++	}
++	repo := newGitManager(home).repoDir(member.Source)
++	treeID, format, err := gitops.PinnedCommitTree(repo, member.Commit)
++	if err != nil {
++		return "", "", fmt.Errorf("pinned commit object unavailable for member %s/%s: %w", member.Kind, member.Name, err)
++	}
++	return treeID, format, nil
++}
++
++func extractPinnedSnapshot(home string, member contextlock.Member) (string, func(), string, error) {
++	if member.Commit == "" || member.Source == "" {
++		return "", nil, "", fmt.Errorf("member %s/%s has no recomputable pin", member.Kind, member.Name)
++	}
++	snapshot, err := os.MkdirTemp("", "curator-store-pin-*")
++	if err != nil {
++		return "", nil, "", err
++	}
++	cleanup := func() { _ = os.RemoveAll(snapshot) }
++	repo := newGitManager(home).repoDir(member.Source)
++	if err := gitops.Extract(repo, member.Commit, snapshot); err != nil {
++		cleanup()
++		return "", nil, "", fmt.Errorf("extract pinned snapshot %s: %w", member.Commit, err)
++	}
++	hash, err := contextstore.ContentHash(snapshot)
++	if err != nil {
++		cleanup()
++		return "", nil, "", fmt.Errorf("hash pinned snapshot %s: %w", member.Commit, err)
++	}
++	return snapshot, cleanup, hash, nil
++}
++
++func rebuildUntrustedStoreEntry(req *ResolveRequest, expectedLockHash string, failure *storeEntryFailure) error {
++	if failure == nil {
++		return fmt.Errorf("%s: store entry failure is unavailable", DiagRepairFailed)
++	}
++	member := failure.Member
++	if member.Commit == "" {
++		return fmt.Errorf("%s: %w; this state pin has no revalidatable Git snapshot", DiagRepairFailed, failure)
++	}
++	op, err := beginOperation(req.Home, req.transactionOptions...)
++	if err != nil {
++		return fmt.Errorf("%s: %v", DiagRepairFailed, err)
++	}
++	defer func() { _ = op.close() }()
++
++	roots, err := validateResolveRoots(req.Home, req.boundaryOwnerLookup)
++	if err != nil {
++		return err
++	}
++	if !roots.store {
++		return boundaryDiagnostic("profile store root", "boundary", fmt.Errorf("root %s is absent", contextstore.Root(req.Home)))
++	}
++	source, currentLock, currentHash, err := loadResolveInputsWithOwner(req.Home, req.Profile, req.readRegularFile, req.boundaryOwnerLookup)
++	if err != nil {
++		return err
++	}
++	if currentHash != expectedLockHash || !sameLockedMember(currentLock, member) {
++		return fmt.Errorf("%s: profile lock changed before the store entry could be rebuilt", DiagRepairFailed)
++	}
++	if err := validateProfilePathSources(req.Profile, source, req.Policy); err != nil {
++		return err
++	}
++	if err := validateMarkerBoundary(req.Home, req.Profile, req.EnvID, req.boundaryOwnerLookup); err != nil {
++		return err
++	}
++	if other := validateNamedStoreBoundariesExcept(req.Home, currentLock, req.boundaryOwnerLookup, member); other != nil {
++		return fmt.Errorf("%s: another store entry is untrusted: %w", DiagRepairFailed, other)
++	}
++	if other := validateNamedStorePinsExcept(req.Home, currentLock, member); other != nil {
++		return fmt.Errorf("%s: another store entry is untrusted: %w", DiagRepairFailed, other)
++	}
++	snapshot, cleanup, expectedHash, err := extractPinnedSnapshot(req.Home, member)
++	if err != nil {
++		return fmt.Errorf("%s: revalidate pinned snapshot: %w", DiagRepairFailed, err)
++	}
++	defer cleanup()
++	if err := publishRebuiltStoreEntry(req.Home, member, snapshot, expectedHash, req.boundaryOwnerLookup); err != nil {
++		return fmt.Errorf("%s: rebuild store entry %s/%s: %w", DiagRepairFailed, member.Kind, member.Name, err)
++	}
++	if failure := validateNamedStoreBoundaries(req.Home, currentLock, req.boundaryOwnerLookup); failure != nil {
++		return fmt.Errorf("%s: rebuilt store entry is still untrusted: %w", DiagRepairFailed, failure)
++	}
++	if failure := validateNamedStorePins(req.Home, currentLock); failure != nil {
++		return fmt.Errorf("%s: rebuilt store entry did not match its pin: %w", DiagRepairFailed, failure)
++	}
++	return nil
++}
++
++func sameLockedMember(lock *contextlock.Lock, member contextlock.Member) bool {
++	if lock == nil {
++		return false
++	}
++	current, ok := lock.Find(member.Kind, member.Name)
++	return ok && current.PinKey() == member.PinKey() && current.Source == member.Source
++}
++
++func validateNamedStoreBoundariesExcept(home string, lock *contextlock.Lock, owner pathboundary.OwnerLookup, skip contextlock.Member) *storeEntryFailure {
++	remaining := &contextlock.Lock{Root: lock.Root}
++	for _, member := range lock.Members {
++		if member.Kind != skip.Kind || member.Name != skip.Name || member.PinKey() != skip.PinKey() {
++			remaining.Members = append(remaining.Members, member)
++		}
++	}
++	return validateNamedStoreBoundaries(home, remaining, owner)
++}
++
++func validateNamedStorePinsExcept(home string, lock *contextlock.Lock, skip contextlock.Member) *storeEntryFailure {
++	remaining := &contextlock.Lock{Root: lock.Root}
++	for _, member := range lock.Members {
++		if member.Kind != skip.Kind || member.Name != skip.Name || member.PinKey() != skip.PinKey() {
++			remaining.Members = append(remaining.Members, member)
++		}
++	}
++	return validateNamedStorePins(home, remaining)
++}
++
++func publishRebuiltStoreEntry(home string, member contextlock.Member, snapshot, expectedHash string, owner pathboundary.OwnerLookup) error {
++	root := contextstore.Root(home)
++	target := contextstore.EntryDir(home, member.Kind, member.Name, member.PinKey())
++	parent := filepath.Dir(target)
++	if err := ensureStoreEntryParent(root, parent, owner); err != nil {
++		return err
++	}
++	stage, err := os.MkdirTemp(parent, ".curator-rebuild-*")
++	if err != nil {
++		return err
++	}
++	defer func() { _ = os.RemoveAll(stage) }()
++	if err := copyPinnedSnapshot(snapshot, stage); err != nil {
++		return err
++	}
++	if err := pathboundary.ProtectTree(stage); err != nil {
++		return err
++	}
++	if err := pathboundary.ValidateWithinWithOwner(root, stage, boundaryOwner(owner)); err != nil {
++		return err
++	}
++	stageHash, err := contextstore.ContentHash(stage)
++	if err != nil {
++		return err
++	}
++	if stageHash != expectedHash {
++		return fmt.Errorf("staged snapshot hash %q differs from revalidated hash %q", stageHash, expectedHash)
++	}
++
++	var nonce [16]byte
++	if _, err := rand.Read(nonce[:]); err != nil {
++		return err
++	}
++	backup := filepath.Join(parent, ".curator-untrusted-"+hex.EncodeToString(nonce[:]))
++	state, err := stateread.Lstat(target)
++	if err != nil {
++		return err
++	}
++	movedOld := state.Kind == stateread.KindPresent
++	if movedOld {
++		if err := renameManagedEntry(target, backup); err != nil {
++			return err
++		}
++	}
++	if err := renameManagedEntry(stage, target); err != nil {
++		if movedOld {
++			_ = renameManagedEntry(backup, target)
++		}
++		return err
++	}
++	if movedOld {
++		if err := os.RemoveAll(backup); err != nil {
++			return err
++		}
++	}
++	return nil
++}
++
++func ensureStoreEntryParent(root, parent string, owner pathboundary.OwnerLookup) error {
++	rootState, err := stateread.Lstat(root)
++	if err != nil {
++		return err
++	}
++	if rootState.Kind != stateread.KindPresent || rootState.Info == nil {
++		return fmt.Errorf("profile store root is unavailable")
++	}
++	relative, err := filepath.Rel(root, parent)
++	if err != nil || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(os.PathSeparator)) || filepath.IsAbs(relative) {
++		return fmt.Errorf("store entry parent %s is outside %s", parent, root)
++	}
++	current := root
++	for _, component := range strings.Split(relative, string(os.PathSeparator)) {
++		current = filepath.Join(current, component)
++		state, err := stateread.Lstat(current)
++		if err != nil {
++			return err
++		}
++		if state.Kind == stateread.KindAbsent {
++			if err := os.Mkdir(current, 0o755); err != nil && !os.IsExist(err) {
++				return err
++			}
++			state, err = stateread.Lstat(current)
++			if err != nil {
++				return err
++			}
++		}
++		if state.Kind != stateread.KindPresent || state.Info == nil || !state.Info.IsDir() {
++			return fmt.Errorf("store entry parent component %s is not a directory", current)
++		}
++		if err := pathboundary.ValidateRootWithOwner(current, boundaryOwner(owner)); err != nil {
++			return err
++		}
++	}
++	return nil
++}
++
++func copyPinnedSnapshot(source, destination string) error {
++	return filepath.WalkDir(source, func(path string, entry fs.DirEntry, walkErr error) error {
++		if walkErr != nil {
++			return walkErr
++		}
++		relative, err := filepath.Rel(source, path)
++		if err != nil {
++			return err
++		}
++		if relative == "." {
++			return nil
++		}
++		relative = filepath.ToSlash(relative)
++		if entry.IsDir() {
++			_, err := managedDirectory(destination, relative)
++			return err
++		}
++		if !entry.Type().IsRegular() {
++			return fmt.Errorf("pinned snapshot component %s is not a regular file", relative)
++		}
++		info, err := entry.Info()
++		if err != nil {
++			return err
++		}
++		payload, err := os.ReadFile(path) // #nosec G304 -- path is from the operation-private pinned snapshot
++		if err != nil {
++			return err
++		}
++		return atomicManagedFile(destination, relative, payload, info.Mode().Perm())
++	})
++}
+diff --git a/internal/envprofile/store_boundary_conformance_test.go b/internal/envprofile/store_boundary_conformance_test.go
+new file mode 100644
+index 00000000..d4b3f09b
+--- /dev/null
++++ b/internal/envprofile/store_boundary_conformance_test.go
+@@ -0,0 +1,538 @@
++package envprofile
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/conformancecoverage"
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/contextstore"
++	"github.com/relux-works/curator/internal/envmarker"
++	"github.com/relux-works/curator/internal/envregistry"
++	"github.com/relux-works/curator/internal/pathboundary"
++)
++
++const storeBoundaryVectorFile = "environments-store-boundary.json"
++
++type storeBoundaryVectors struct {
++	Resolve []storeBoundaryVector `json:"resolve_cases"`
++	DryRun  []storeBoundaryVector `json:"dry_run_cases"`
++	Repair  []storeBoundaryVector `json:"repair_cases"`
++	Status  []storeBoundaryVector `json:"status_cases"`
++}
++
++type storeBoundaryVector struct {
++	Name                 string `json:"name"`
++	Object               string `json:"object"`
++	Home                 string `json:"home"`
++	Surface              string `json:"surface"`
++	EntryKind            string `json:"entry_kind"`
++	Diagnostic           string `json:"diagnostic"`
++	FailingCheck         string `json:"failing_check"`
++	NamesFailingCheck    string `json:"names_failing_check"`
++	Outcome              string `json:"outcome"`
++	Conforming           *bool  `json:"conforming"`
++	Ownership            *bool  `json:"ownership"`
++	FragmentEmitted      bool   `json:"fragment_emitted"`
++	RowCurrent           bool   `json:"row_current"`
++	RebuiltFromSnapshot  bool   `json:"rebuilt_from_snapshot"`
++	ReappliedBeforeTrust bool   `json:"reapplied_before_trust"`
++	Mutated              bool   `json:"mutated"`
++}
++
++func readStoreBoundaryVectors(t *testing.T) storeBoundaryVectors {
++	t.Helper()
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	payload, err := os.ReadFile(filepath.Join(root, "vectors", storeBoundaryVectorFile)) // #nosec G304 -- explicit pinned conformance input
++	if err != nil {
++		t.Fatal(err)
++	}
++	var vectors storeBoundaryVectors
++	if err := json.Unmarshal(payload, &vectors); err != nil {
++		t.Fatal(err)
++	}
++	return vectors
++}
++
++func TestStoreBoundaryResolveVectorsDriveResolve(t *testing.T) {
++	vectors := readStoreBoundaryVectors(t)
++	conformancecoverage.RunOutcomes(t, "environments-store-boundary/resolve_cases", vectors.Resolve,
++		func(tc storeBoundaryVector) string { return tc.Name }, func(caseT *testing.T, tc storeBoundaryVector) conformancecoverage.Observation {
++			return driveStoreBoundaryResolve(caseT, tc)
++		})
++}
++
++func TestStoreBoundaryDryRunVectorsDriveResolveRepairPlan(t *testing.T) {
++	vectors := readStoreBoundaryVectors(t)
++	conformancecoverage.RunOutcomes(t, "environments-store-boundary/dry_run_cases", vectors.DryRun,
++		func(tc storeBoundaryVector) string { return tc.Name }, func(caseT *testing.T, tc storeBoundaryVector) conformancecoverage.Observation {
++			return driveStoreBoundaryDryRun(caseT, tc)
++		})
++}
++
++func TestStoreBoundaryRepairVectorsDriveResolveRepair(t *testing.T) {
++	vectors := readStoreBoundaryVectors(t)
++	conformancecoverage.RunOutcomes(t, "environments-store-boundary/repair_cases", vectors.Repair,
++		func(tc storeBoundaryVector) string { return tc.Name }, func(caseT *testing.T, tc storeBoundaryVector) conformancecoverage.Observation {
++			return driveStoreBoundaryRepair(caseT, tc)
++		})
++}
++
++func TestStoreBoundaryStatusVectorsDriveStatus(t *testing.T) {
++	vectors := readStoreBoundaryVectors(t)
++	conformancecoverage.RunOutcomes(t, "environments-store-boundary/status_cases", vectors.Status,
++		func(tc storeBoundaryVector) string { return tc.Name }, func(caseT *testing.T, tc storeBoundaryVector) conformancecoverage.Observation {
++			return driveStoreBoundaryStatus(caseT, tc)
++		})
++}
++
++func driveStoreBoundaryResolve(t *testing.T, tc storeBoundaryVector) conformancecoverage.Observation {
++	t.Helper()
++	fx := storeBoundaryFixture(t, tc.Home, false)
++	if tc.Home == "stale-old-marker" {
++		changeStoreBoundaryLock(t, fx)
++	}
++	ownerPath := storeBoundaryOwnerPath(fx, tc)
++	owner := pathboundary.OwnerLookup(nil)
++	if ownerPath != "" && storeBoundaryNeedsOwnerFailure(tc) {
++		owner = storeBoundaryOwnerLookup(ownerPath, false)
++	}
++	if reason := mutateStoreBoundaryVector(t, fx, tc); reason != "" {
++		return conformancecoverage.Observation{BoundReason: reason}
++	}
++	req := fx.request(envregistry.CodexCLI)
++	req.boundaryOwnerLookup = owner
++	if tc.Name == "unreadable-marker-non-current" {
++		marker := filepath.Join(ManagedHomeDir(fx.home, fx.profile, envregistry.CodexCLI), envmarker.Name)
++		req.readStateFile = vectorStateFileReader(marker, os.ErrPermission)
++	}
++	result, err := Resolve(req)
++	if tc.Name == "intact-resolve-emits-fragment" {
++		if err != nil || result == nil || len(result.Document) == 0 {
++			t.Fatalf("Resolve = (%v, %v), want a current fragment", result, err)
++		}
++		return conformancecoverage.Observation{}
++	}
++	wantDiagnostic := tc.Diagnostic
++	if wantDiagnostic == "" {
++		wantDiagnostic = envregistry.DiagStoreUntrusted
++	}
++	if err == nil || !strings.Contains(err.Error(), wantDiagnostic) {
++		t.Fatalf("Resolve error = %v, want %s", err, wantDiagnostic)
++	}
++	if result != nil && len(result.Document) != 0 {
++		t.Fatalf("untrusted resolve emitted fragment %s", result.Document)
++	}
++	if tc.FailingCheck != "" && tc.FailingCheck != "home_currency" && !strings.Contains(err.Error(), tc.FailingCheck) {
++		t.Fatalf("Resolve error %q does not name failing check %q", err, tc.FailingCheck)
++	}
++	return conformancecoverage.Observation{}
++}
++
++func driveStoreBoundaryDryRun(t *testing.T, tc storeBoundaryVector) conformancecoverage.Observation {
++	t.Helper()
++	fx := storeBoundaryFixture(t, tc.Home, true)
++	ownerPath := storeBoundaryOwnerPath(fx, tc)
++	owner := pathboundary.OwnerLookup(nil)
++	if ownerPath != "" && storeBoundaryNeedsOwnerFailure(tc) {
++		owner = storeBoundaryOwnerLookup(ownerPath, false)
++	}
++	if reason := mutateStoreBoundaryVector(t, fx, tc); reason != "" {
++		return conformancecoverage.Observation{BoundReason: reason}
++	}
++	_, entry := storeBoundaryRootMemberFor(fx)
++	entryBefore, err := os.Lstat(entry)
++	if err != nil {
++		t.Fatalf("lstat store entry before dry-run: %v", err)
++	}
++	before := hashTreeForTest(t, fx.home)
++	req := fx.request(envregistry.CodexCLI)
++	req.Repair = true
++	req.DryRun = true
++	req.boundaryOwnerLookup = owner
++	result, resolveErr := Resolve(req)
++	after := hashTreeForTest(t, fx.home)
++	if before != after {
++		t.Fatalf("dry-run repair mutated manager state for %s", tc.Name)
++	}
++	entryAfter, statErr := os.Lstat(entry)
++	if statErr != nil || !os.SameFile(entryBefore, entryAfter) {
++		t.Fatalf("dry-run repair replaced store entry for %s: before=%v after=%v err=%v", tc.Name, entryBefore, entryAfter, statErr)
++	}
++	switch tc.Name {
++	case "dry-run-intact-plans-nothing":
++		if resolveErr != nil || result == nil || len(result.Document) == 0 {
++			t.Fatalf("intact Resolve = (%v, %v), want a current fragment", result, resolveErr)
++		}
++	case "dry-run-enclosing-no-rebuild":
++		if resolveErr == nil || (result != nil && len(result.Document) != 0) || !strings.Contains(resolveErr.Error(), envregistry.DiagStoreUntrusted) {
++			t.Fatalf("dry-run repair = (%v, %v), want fail-closed %s", result, resolveErr, envregistry.DiagStoreUntrusted)
++		}
++	case "dry-run-untrusted-reports-would-rebuild", "dry-run-mutates":
++		if resolveErr == nil || (result != nil && len(result.Document) != 0) || !strings.Contains(resolveErr.Error(), envregistry.DiagWouldRebuildUntrustedStore) {
++			t.Fatalf("dry-run repair = (%v, %v), want %s", result, resolveErr, envregistry.DiagWouldRebuildUntrustedStore)
++		}
++	default:
++		t.Fatalf("unknown dry-run vector %q", tc.Name)
++	}
++	return conformancecoverage.Observation{}
++}
++
++func driveStoreBoundaryRepair(t *testing.T, tc storeBoundaryVector) conformancecoverage.Observation {
++	t.Helper()
++	gitRoot := tc.EntryKind == "git"
++	fx := storeBoundaryFixture(t, tc.Home, gitRoot)
++	if tc.Home == "unprovisioned" {
++		seedLiveNativeCredentials(t, fx)
++	}
++	if tc.Home == "stale-old-marker" {
++		changeStoreBoundaryLock(t, fx)
++	}
++	ownerPath := storeBoundaryOwnerPath(fx, tc)
++	owner := pathboundary.OwnerLookup(nil)
++	if tc.Name == "repair-path-entry-cannot-rebuild" {
++		ownerPath = storeBoundaryEntry(t, fx, contextlock.KindContext)
++	}
++	if ownerPath != "" && storeBoundaryNeedsOwnerFailure(tc) {
++		oneShot := strings.Contains(tc.Name, "rebuilds-entry-boundary") || tc.Name == "repair-reapplies-untrusted"
++		owner = storeBoundaryOwnerLookup(ownerPath, oneShot)
++	}
++	if reason := mutateStoreBoundaryVector(t, fx, tc); reason != "" {
++		return conformancecoverage.Observation{BoundReason: reason}
++	}
++	beforeState := hashTreeForTest(t, fx.home)
++	req := fx.request(envregistry.CodexCLI)
++	req.Repair = true
++	req.boundaryOwnerLookup = owner
++	result, err := Resolve(req)
++	switch tc.Name {
++	case "repair-path-entry-cannot-rebuild", "repair-local-entry-cannot-rebuild":
++		if err == nil || (result != nil && len(result.Document) != 0) || !strings.Contains(err.Error(), DiagRepairFailed) {
++			t.Fatalf("repair Resolve = (%v, %v), want no fragment and %s", result, err, DiagRepairFailed)
++		}
++	case "repair-enclosing-refuses-no-rebuild":
++		if err == nil || (result != nil && len(result.Document) != 0) || !strings.Contains(err.Error(), envregistry.DiagStoreUntrusted) {
++			t.Fatalf("enclosing-boundary repair = (%v, %v), want refusal %s", result, err, envregistry.DiagStoreUntrusted)
++		}
++		if after := hashTreeForTest(t, fx.home); after != beforeState {
++			t.Fatal("enclosing-boundary refusal mutated manager state")
++		}
++	case "repair-rebuilds-git-entry-from-snapshot", "repair-rebuilds-entry-boundary-failure", "repair-stale-old-marker-succeeds", "repair-swapped-old-marker-never-adopted", "repair-unprovisioned-intact-provisions", "repair-unprovisioned-swapped-rebuilds", "repair-reapplies-untrusted":
++		if err != nil || result == nil || len(result.Document) == 0 {
++			t.Fatalf("repair Resolve = (%v, %v), want a trusted fragment", result, err)
++		}
++		if tc.RebuiltFromSnapshot {
++			root, _ := storeBoundaryRootMember(t, fx)
++			if root == nil {
++				t.Fatal("repaired profile lost its context member")
++			}
++			lock, _, err := readLock(fx.home, fx.profile)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if failure := validateNamedStorePins(fx.home, lock); failure != nil {
++				t.Fatalf("rebuilt store entry did not match its pin: %v", failure)
++			}
++		}
++	default:
++		t.Fatalf("unknown repair vector %q", tc.Name)
++	}
++	return conformancecoverage.Observation{}
++}
++
++func driveStoreBoundaryStatus(t *testing.T, tc storeBoundaryVector) conformancecoverage.Observation {
++	t.Helper()
++	fx := storeBoundaryFixture(t, tc.Home, false)
++	provisionStoreBoundaryHome(t, fx)
++	ownerPath := storeBoundaryOwnerPath(fx, tc)
++	owner := pathboundary.OwnerLookup(nil)
++	if ownerPath != "" && storeBoundaryNeedsOwnerFailure(tc) {
++		owner = storeBoundaryOwnerLookup(ownerPath, false)
++	}
++	if reason := mutateStoreBoundaryVector(t, fx, tc); reason != "" {
++		return conformancecoverage.Observation{BoundReason: reason}
++	}
++	req := statusRequest(fx)
++	req.boundaryOwnerLookup = owner
++	status, err := StatusOf(req)
++	if err != nil {
++		t.Fatalf("StatusOf: %v", err)
++	}
++	var row *HomeState
++	for i := range status.Homes {
++		if status.Homes[i].Profile == fx.profile && status.Homes[i].Environment == envregistry.CodexCLI {
++			row = &status.Homes[i]
++			break
++		}
++	}
++	if row == nil {
++		t.Fatalf("StatusOf has no %s/%s row", fx.profile, envregistry.CodexCLI)
++	}
++	if tc.Name == "status-intact-current" {
++		if !row.Current || !row.Provisioned {
++			t.Fatalf("intact status row = %+v, want current and provisioned", *row)
++		}
++		return conformancecoverage.Observation{}
++	}
++	if row.Current || !strings.Contains(strings.Join(row.Findings, " "), envregistry.DiagStoreUntrusted) {
++		t.Fatalf("untrusted status row = %+v, want non-current with %s", *row, envregistry.DiagStoreUntrusted)
++	}
++	wantCheck := tc.NamesFailingCheck
++	if wantCheck == "" {
++		wantCheck = tc.FailingCheck
++	}
++	if wantCheck != "" && !strings.Contains(strings.Join(row.Findings, " "), wantCheck) {
++		t.Fatalf("status findings %q do not name check %q", strings.Join(row.Findings, " "), wantCheck)
++	}
++	return conformancecoverage.Observation{}
++}
++
++func storeBoundaryFixture(t *testing.T, homeState string, gitRoot bool) *managedFixture {
++	t.Helper()
++	fx := writeManagedFixture(t, "acme")
++	if gitRoot {
++		convertStoreBoundaryRootToGit(t, fx)
++	}
++	if homeState != "unprovisioned" {
++		provisionStoreBoundaryHome(t, fx)
++	}
++	return fx
++}
++
++func provisionStoreBoundaryHome(t *testing.T, fx *managedFixture) {
++	t.Helper()
++	seedLiveNativeCredentials(t, fx)
++	req := fx.request(envregistry.CodexCLI)
++	req.Repair = true
++	if _, err := Resolve(req); err != nil {
++		t.Fatalf("provision store-boundary fixture: %v", err)
++	}
++}
++
++func convertStoreBoundaryRootToGit(t *testing.T, fx *managedFixture) {
++	t.Helper()
++	lock, _, err := contextlock.Read(lockPath(fx.home, fx.profile))
++	if err != nil {
++		t.Fatal(err)
++	}
++	_, ok := lock.Find(contextlock.KindContext, fx.profile)
++	if !ok {
++		t.Fatal("fixture has no root context member")
++	}
++	source := "github.com/example/context-" + fx.profile
++	commit := writeGitStoreFixture(t, fx.home, contextlock.KindContext, fx.profile, source, map[string]string{
++		"agent-context.json": `{"schema_version": 1, "name": "` + fx.profile + `", "version": "1.0.0", "context": {"modules": [{"path": "a.md"}, {"path": "s.md", "class": "system"}]}}`,
++		"context/a.md":       "hello\n",
++		"context/s.md":       "Be terse.\n",
++	})
++	for i := range lock.Members {
++		if lock.Members[i].Kind == contextlock.KindContext && lock.Members[i].Name == fx.profile {
++			lock.Members[i].Source = source
++			lock.Members[i].Commit = commit
++			lock.Members[i].StateHash = ""
++		}
++	}
++	lock.Sort()
++	hash, err := contextlock.Write(lockPath(fx.home, fx.profile), lock)
++	if err != nil {
++		t.Fatal(err)
++	}
++	fx.lockHash = hash
++	payload, err := json.Marshal(Source{Kind: KindGit, Git: source, Req: Requirement{Revision: commit}})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(sourcePath(fx.home, fx.profile), append(payload, '\n'), 0o644); err != nil {
++		t.Fatal(err)
++	}
++}
++
++func changeStoreBoundaryLock(t *testing.T, fx *managedFixture) {
++	t.Helper()
++	lock, _, err := contextlock.Read(lockPath(fx.home, fx.profile))
++	if err != nil {
++		t.Fatal(err)
++	}
++	for i := range lock.Members {
++		if lock.Members[i].Kind == contextlock.KindContext && lock.Members[i].Name == fx.profile {
++			lock.Members[i].Weight++
++		}
++	}
++	hash, err := contextlock.Write(lockPath(fx.home, fx.profile), lock)
++	if err != nil {
++		t.Fatal(err)
++	}
++	fx.lockHash = hash
++}
++
++func storeBoundaryRootMember(t *testing.T, fx *managedFixture) (*contextlock.Member, string) {
++	t.Helper()
++	lock, _, err := contextlock.Read(lockPath(fx.home, fx.profile))
++	if err != nil {
++		t.Fatal(err)
++	}
++	member, ok := lock.Find(contextlock.KindContext, fx.profile)
++	if !ok {
++		return nil, ""
++	}
++	return &member, contextstore.EntryDir(fx.home, member.Kind, member.Name, member.PinKey())
++}
++
++func storeBoundaryEntry(t *testing.T, fx *managedFixture, kind string) string {
++	t.Helper()
++	lock, _, err := contextlock.Read(lockPath(fx.home, fx.profile))
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, member := range lock.Members {
++		if member.Kind == kind {
++			return contextstore.EntryDir(fx.home, member.Kind, member.Name, member.PinKey())
++		}
++	}
++	t.Fatalf("fixture has no %s member", kind)
++	return ""
++}
++
++func storeBoundaryOwnerPath(fx *managedFixture, tc storeBoundaryVector) string {
++	switch tc.Object {
++	case "store-entry":
++		_, entry := storeBoundaryRootMemberFor(fx)
++		return entry
++	case "lock-file":
++		return lockPath(fx.home, fx.profile)
++	case "marker-file":
++		return filepath.Join(ManagedHomeDir(fx.home, fx.profile, envregistry.CodexCLI), envmarker.Name)
++	case "environments-root":
++		return EnvRoot(fx.home)
++	case "store-root":
++		return contextstore.Root(fx.home)
++	default:
++		return ""
++	}
++}
++
++func storeBoundaryNeedsOwnerFailure(tc storeBoundaryVector) bool {
++	return tc.Ownership != nil && !*tc.Ownership
++}
++
++func storeBoundaryRootMemberFor(fx *managedFixture) (*contextlock.Member, string) {
++	lock, _, err := contextlock.Read(lockPath(fx.home, fx.profile))
++	if err != nil {
++		return nil, ""
++	}
++	member, ok := lock.Find(contextlock.KindContext, fx.profile)
++	if !ok {
++		return nil, ""
++	}
++	return &member, contextstore.EntryDir(fx.home, member.Kind, member.Name, member.PinKey())
++}
++
++func storeBoundaryOwnerLookup(target string, once bool) pathboundary.OwnerLookup {
++	defaultLookup := pathboundary.DefaultOwnerLookup()
++	used := false
++	return func(path string, info os.FileInfo) (pathboundary.OwnerIdentity, error) {
++		if filepath.Clean(path) == filepath.Clean(target) && (!once || !used) {
++			used = true
++			return pathboundary.OwnerIdentity("foreign-owner"), nil
++		}
++		return defaultLookup(path, info)
++	}
++}
++
++func mutateStoreBoundaryVector(t *testing.T, fx *managedFixture, tc storeBoundaryVector) string {
++	t.Helper()
++	member, entry := storeBoundaryRootMemberFor(fx)
++	if member == nil {
++		t.Fatal("could not read root context member")
++	}
++	switch tc.Name {
++	case "swapped-system-prompt-bytes-untrusted", "swapped-updated-store-old-marker-untrusted", "swapped-bytes-emits-fragment":
++		return writeSwappedStoreSurface(t, entry, "context/s.md")
++	case "swapped-root-context-bytes-untrusted", "unprovisioned-swapped-untrusted":
++		return writeSwappedStoreSurface(t, entry, "context/a.md")
++	case "repair-rebuilds-git-entry-from-snapshot", "repair-swapped-old-marker-never-adopted":
++		return writeSwappedStoreSurface(t, entry, "context/s.md")
++	case "repair-unprovisioned-swapped-rebuilds":
++		return writeSwappedStoreSurface(t, entry, "context/a.md")
++	case "symlinked-entry-root-untrusted", "untrusted-without-diagnostic":
++		other := storeBoundaryEntry(t, fx, contextlock.KindMCP)
++		return replaceWithSymlink(t, entry, other)
++	case "wrong-permissions-untrusted":
++		return makeStoreBoundaryPermissionsFailure(t, entry)
++	case "repair-local-entry-cannot-rebuild":
++		return makeStoreBoundaryPermissionsFailure(t, entry)
++	case "containment-escape-untrusted":
++		outside := filepath.Join(t.TempDir(), "outside.md")
++		if err := os.WriteFile(outside, []byte("outside\n"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++		return replaceWithSymlink(t, filepath.Join(entry, "context", "a.md"), outside)
++	case "non-regular-component-untrusted":
++		if err := makeFIFOVectorForTest(filepath.Join(entry, "context", "pipe")); err != nil {
++			return "host cannot create the non-regular-file vector: " + err.Error()
++		}
++	case "marker-symlink-untrusted":
++		marker := filepath.Join(ManagedHomeDir(fx.home, fx.profile, envregistry.CodexCLI), envmarker.Name)
++		return replaceWithSymlink(t, marker, marker+".saved")
++	case "store-root-symlinked-untrusted":
++		root := contextstore.Root(fx.home)
++		saved := root + ".saved"
++		if err := os.Rename(root, saved); err != nil {
++			t.Fatalf("move store root for symlink vector: %v", err)
++		}
++		if err := os.Symlink(saved, root); err != nil {
++			return "host cannot create the store-root symlink: " + err.Error()
++		}
++	case "intact-resolve-emits-fragment", "intact-updated-store-old-marker-stale", "unprovisioned-intact-stale", "unreadable-marker-non-current",
++		"wrong-ownership-untrusted", "lock-file-wrong-owner-untrusted", "environments-root-wrong-owner-untrusted", "untrusted-reported-current",
++		"dry-run-untrusted-reports-would-rebuild", "dry-run-intact-plans-nothing", "dry-run-enclosing-no-rebuild", "dry-run-mutates",
++		"repair-path-entry-cannot-rebuild", "repair-rebuilds-entry-boundary-failure", "repair-enclosing-refuses-no-rebuild",
++		"repair-stale-old-marker-succeeds", "repair-unprovisioned-intact-provisions", "repair-reapplies-untrusted",
++		"status-intact-current", "status-names-failing-check", "status-enclosing-names-boundary", "status-hides-failing-check":
++		// These rows are driven by the injected owner lookup or by their
++		// intact/stale fixture state; no filesystem mutation is required.
++	default:
++		t.Fatalf("no store-boundary mutator for vector %q", tc.Name)
++	}
++	return ""
++}
++
++func makeStoreBoundaryPermissionsFailure(t *testing.T, path string) string {
++	t.Helper()
++	restore, err := makeWorldWritableDirectoryForTest(path)
++	if err != nil {
++		return "host cannot create the private-permission failure: " + err.Error()
++	}
++	t.Cleanup(func() {
++		if err := restore(); err != nil {
++			t.Errorf("restore store entry permissions: %v", err)
++		}
++	})
++	return ""
++}
++
++func writeSwappedStoreSurface(t *testing.T, entry, relative string) string {
++	t.Helper()
++	path := filepath.Join(entry, filepath.FromSlash(relative))
++	if err := os.WriteFile(path, []byte("swapped bytes\n"), 0o600); err != nil {
++		t.Fatalf("swap store bytes at %s: %v", path, err)
++	}
++	return ""
++}
++
++func replaceWithSymlink(t *testing.T, path, target string) string {
++	t.Helper()
++	if err := os.Rename(path, path+".saved"); err != nil {
++		t.Fatalf("move %s for symlink vector: %v", path, err)
++	}
++	if err := os.Symlink(target, path); err != nil {
++		return "host cannot create the symlink needed by the vector: " + err.Error()
++	}
++	return ""
++}
+diff --git a/internal/envprofile/surfacing_test.go b/internal/envprofile/surfacing_test.go
+index e30d6ef6..d9c05f86 100644
+--- a/internal/envprofile/surfacing_test.go
++++ b/internal/envprofile/surfacing_test.go
+@@ -361,14 +361,18 @@ func TestStatusS4Posture(t *testing.T) {
+ // empty set — and neither the builder nor status fails.
+ func TestSurfacingUnreadableManifest(t *testing.T) {
+ 	fx := writeManagedFixture(t, "acme")
+-	entry := contextstore.EntryDir(fx.home, "mcp", "figma-devmode", strings.Repeat("b", 40))
+-	if err := os.Remove(filepath.Join(entry, "agent-mcp.json")); err != nil {
+-		t.Fatal(err)
+-	}
+ 	lock, _, err := readLock(fx.home, "acme")
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
++	member, ok := lock.Find("mcp", "figma-devmode")
++	if !ok {
++		t.Fatal("fixture lock has no figma-devmode MCP member")
++	}
++	entry := contextstore.EntryDir(fx.home, member.Kind, member.Name, member.PinKey())
++	if err := os.Remove(filepath.Join(entry, "agent-mcp.json")); err != nil {
++		t.Fatal(err)
++	}
+ 	rows, unreadable := surfacingRows(fx.home, newGitManager(fx.home), lock)
+ 	if len(rows) != 0 {
+ 		t.Fatalf("rows = %v, want none for an unreadable declaration", rows)
+diff --git a/internal/envregistry/envregistry.go b/internal/envregistry/envregistry.go
+index 7fa434ab..a2225161 100644
+--- a/internal/envregistry/envregistry.go
++++ b/internal/envregistry/envregistry.go
+@@ -64,6 +64,7 @@ const (
+ 	DiagPassthroughDetached          = "environment_passthrough_detached"
+ 	DiagPassthroughUnreadable        = "environment_passthrough_unreadable"
+ 	DiagStoreUntrusted               = "environment_store_untrusted"
++	DiagWouldRebuildUntrustedStore   = "would-rebuild-untrusted-store"
+ 	DiagCredentialConflict           = "environment_credential_conflict"
+ 	DiagCredentialUnsupported        = "environment_credential_unsupported"
+ 	DiagSeedUnreadable               = "environment_seed_unreadable"
+diff --git a/internal/gitops/treehash.go b/internal/gitops/treehash.go
+new file mode 100644
+index 00000000..a8d4fe19
+--- /dev/null
++++ b/internal/gitops/treehash.go
+@@ -0,0 +1,177 @@
++package gitops
++
++import (
++	"bytes"
++	"crypto/sha1" // #nosec G505 -- Git SHA-1 object IDs must retain Git's required object format.
++	"crypto/sha256"
++	"encoding/hex"
++	"fmt"
++	"hash"
++	"path/filepath"
++	"sort"
++	"strconv"
++	"strings"
++
++	"github.com/relux-works/curator/internal/stateread"
++)
++
++// PinnedCommitTree resolves a full commit ID to its tree ID using only the
++// repository's existing object database. It never fetches or consults refs.
++func PinnedCommitTree(repo, commit string) (treeID, objectFormat string, err error) {
++	if err := EnsureRepo(repo); err != nil {
++		return "", "", err
++	}
++	if err := validateLockedCommit(commit); err != nil {
++		return "", "", err
++	}
++	env, cleanup, err := isolatedGitEnv()
++	if err != nil {
++		return "", "", err
++	}
++	defer cleanup()
++	// Do not let caller Git overrides or replacement refs supply objects
++	// outside the source repository's own object database.
++	env = append(env, "GIT_NO_REPLACE_OBJECTS=1")
++	objectFormat, err = runWithEnv(repo, env, "rev-parse", "--show-object-format")
++	if err != nil {
++		return "", "", fmt.Errorf("read pinned repository object format: %w", err)
++	}
++	if (objectFormat == "sha1" && len(commit) != 40) || (objectFormat == "sha256" && len(commit) != 64) {
++		return "", "", fmt.Errorf("commit object ID does not match repository object format %s", objectFormat)
++	}
++	resolved, err := runWithEnv(repo, env, "rev-parse", "--verify", commit+"^{commit}")
++	if err != nil {
++		return "", "", fmt.Errorf("pinned commit object unavailable: could not resolve %s^{commit}: %w", commit, err)
++	}
++	if !strings.EqualFold(resolved, commit) {
++		return "", "", fmt.Errorf("pinned commit object unavailable: repository resolved %s as %s", commit, resolved)
++	}
++	treeID, err = runWithEnv(repo, env, "rev-parse", "--verify", commit+"^{tree}")
++	if err != nil {
++		return "", "", fmt.Errorf("pinned commit tree unavailable: could not resolve %s^{tree}: %w", commit, err)
++	}
++	return treeID, objectFormat, nil
++}
++
++// TreeObjectIDFromDir computes a Git tree object ID from a regular-file tree.
++// The caller establishes the store boundary first; this function still uses
++// lstat and the shared state-read seam so links and failed reads cannot be
++// mistaken for bytes.
++func TreeObjectIDFromDir(root, objectFormat string) (string, error) {
++	newHash, err := gitHasher(objectFormat)
++	if err != nil {
++		return "", err
++	}
++	metadata, err := stateread.Lstat(root)
++	if err != nil {
++		return "", err
++	}
++	if metadata.Kind != stateread.KindPresent || metadata.Info == nil || !metadata.Info.IsDir() {
++		return "", fmt.Errorf("tree root is not a present directory")
++	}
++	return treeObjectID(root, objectFormat, newHash)
++}
++
++type treeObjectEntry struct {
++	name   string
++	mode   string
++	isDir  bool
++	object []byte
++}
++
++func treeObjectID(dir, objectFormat string, newHash func() hash.Hash) (string, error) {
++	listing, err := stateread.ReadDir(dir)
++	if err != nil {
++		return "", err
++	}
++	if listing.Kind != stateread.KindPresent {
++		return "", fmt.Errorf("tree directory is not present")
++	}
++	entries := make([]treeObjectEntry, 0, len(listing.Entries))
++	for _, child := range listing.Entries {
++		name := child.Name()
++		path := filepath.Join(dir, name)
++		metadata, err := stateread.Lstat(path)
++		if err != nil {
++			return "", err
++		}
++		if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
++			return "", fmt.Errorf("tree entry %q is not present", name)
++		}
++		entry := treeObjectEntry{name: name}
++		switch {
++		case metadata.Info.IsDir():
++			entry.mode = "40000"
++			entry.isDir = true
++			childTree, err := treeObjectID(path, objectFormat, newHash)
++			if err != nil {
++				return "", fmt.Errorf("hash directory %q: %w", name, err)
++			}
++			entry.object, err = hex.DecodeString(childTree)
++			if err != nil {
++				return "", fmt.Errorf("decode tree ID for %q: %w", name, err)
++			}
++		case metadata.Info.Mode().IsRegular():
++			if metadata.Info.Size() < 0 || metadata.Info.Size() > maxSnapshotFileBytes {
++				return "", fmt.Errorf("tree file %q exceeds the supported snapshot size", name)
++			}
++			file, err := stateread.ReadRegularFile(path)
++			if err != nil {
++				return "", err
++			}
++			if file.Kind != stateread.KindPresent {
++				return "", fmt.Errorf("tree file %q is not present", name)
++			}
++			entry.mode = "100644"
++			if metadata.Info.Mode().Perm()&0o111 != 0 {
++				entry.mode = "100755"
++			}
++			entry.object = gitObjectID("blob", file.Bytes, newHash)
++		default:
++			return "", fmt.Errorf("tree entry %q is not a regular file or directory", name)
++		}
++		entries = append(entries, entry)
++	}
++
++	sort.Slice(entries, func(i, j int) bool {
++		return bytes.Compare(treeSortKey(entries[i]), treeSortKey(entries[j])) < 0
++	})
++	var body bytes.Buffer
++	for _, entry := range entries {
++		body.WriteString(entry.mode)
++		body.WriteByte(' ')
++		body.WriteString(entry.name)
++		body.WriteByte(0)
++		body.Write(entry.object)
++	}
++	return hex.EncodeToString(gitObjectID("tree", body.Bytes(), newHash)), nil
++}
++
++func treeSortKey(entry treeObjectEntry) []byte {
++	key := make([]byte, 0, len(entry.name)+1)
++	key = append(key, entry.name...)
++	if entry.isDir {
++		key = append(key, '/')
++	} else {
++		key = append(key, 0)
++	}
++	return key
++}
++
++func gitObjectID(kind string, content []byte, newHash func() hash.Hash) []byte {
++	digest := newHash()
++	_, _ = digest.Write([]byte(kind + " " + strconv.Itoa(len(content)) + "\x00"))
++	_, _ = digest.Write(content)
++	return digest.Sum(nil)
++}
++
++func gitHasher(objectFormat string) (func() hash.Hash, error) {
++	switch objectFormat {
++	case "sha1":
++		return func() hash.Hash { return sha1.New() }, nil // #nosec G401 -- required to reproduce legacy Git tree object IDs.
++	case "sha256":
++		return func() hash.Hash { return sha256.New() }, nil
++	default:
++		return nil, fmt.Errorf("unsupported Git object format %q", objectFormat)
++	}
++}
+diff --git a/internal/pathboundary/pathboundary.go b/internal/pathboundary/pathboundary.go
+index 6a79b20a..63507382 100644
+--- a/internal/pathboundary/pathboundary.go
++++ b/internal/pathboundary/pathboundary.go
+@@ -69,12 +69,29 @@ func Validate(root string) error {
+ // the seam lets production-entry tests cover foreign-owner paths without
+ // requiring a second host user or chown privilege.
+ func ValidateWithOwner(root string, ownerLookup OwnerLookup) error {
++	return ValidateWithinWithOwner(root, root, ownerLookup)
++}
++
++// ValidateWithin proves that target and every component below root satisfy
++// the protected-boundary checks. target may be a regular file or a
++// directory; a directory is checked recursively. The path from root to
++// target is walked one component at a time with lstat semantics so an
++// intermediate link cannot redirect the verification outside root.
++func ValidateWithin(root, target string) error {
++	return ValidateWithinWithOwner(root, target, DefaultOwnerLookup())
++}
++
++// ValidateRouteWithOwner checks root, each path component, and the exact
++// target node without walking children of a target directory. It is used
++// for enclosing roots whose children have their own independent boundary
++// checks.
++func ValidateRouteWithOwner(root, target string, ownerLookup OwnerLookup) error {
+ 	if ownerLookup == nil {
+-		return &Failure{Root: root, Path: root, Check: CheckOwnership, Reason: "owner lookup is unavailable"}
++		return &Failure{Root: root, Path: target, Check: CheckOwnership, Reason: "owner lookup is unavailable"}
+ 	}
+ 	operator, err := effectiveOwner()
+ 	if err != nil {
+-		return &Failure{Root: root, Path: root, Check: CheckOwnership, Cause: err}
++		return &Failure{Root: root, Path: target, Check: CheckOwnership, Cause: err}
+ 	}
+ 	absolute, rootInfo, err := inspectRoot(root)
+ 	if err != nil {
+@@ -83,39 +100,152 @@ func ValidateWithOwner(root string, ownerLookup OwnerLookup) error {
+ 	if err := checkNode(absolute, absolute, rootInfo, operator, ownerLookup); err != nil {
+ 		return err
+ 	}
++	targetAbsolute, err := filepath.Abs(target)
++	if err != nil {
++		return &Failure{Root: absolute, Path: target, Check: CheckContainment, Cause: err}
++	}
++	targetAbsolute = filepath.Clean(targetAbsolute)
++	relative, err := filepath.Rel(absolute, targetAbsolute)
++	if err != nil || escapes(relative) {
++		return &Failure{Root: absolute, Path: targetAbsolute, Check: CheckContainment, Reason: "component does not resolve below the declared directory", Cause: err}
++	}
++	if relative == "." {
++		return nil
++	}
++	current := absolute
++	parts := strings.Split(relative, string(os.PathSeparator))
++	for index, part := range parts {
++		current = filepath.Join(current, part)
++		info, err := os.Lstat(current)
++		if err != nil {
++			return &Failure{Root: absolute, Path: current, Check: CheckRegular, Cause: err}
++		}
++		link, err := isLink(current, info)
++		if err != nil {
++			return &Failure{Root: absolute, Path: current, Check: CheckLinkSafety, Cause: err}
++		}
++		if link {
++			if escapes, readErr := symlinkEscapes(absolute, current); readErr != nil {
++				return &Failure{Root: absolute, Path: current, Check: CheckLinkSafety, Cause: readErr}
++			} else if escapes {
++				return &Failure{Root: absolute, Path: current, Check: CheckContainment, Reason: "symbolic-link target escapes the declared directory"}
++			}
++			return &Failure{Root: absolute, Path: current, Check: CheckLinkSafety, Reason: "symbolic link below the declared directory"}
++		}
++		if !info.IsDir() && !info.Mode().IsRegular() {
++			return &Failure{Root: absolute, Path: current, Check: CheckRegular, Reason: "component is neither a directory nor a regular file"}
++		}
++		if index < len(parts)-1 && !info.IsDir() {
++			return &Failure{Root: absolute, Path: current, Check: CheckContainment, Reason: "path component is not a directory"}
++		}
++		if err := checkNode(absolute, current, info, operator, ownerLookup); err != nil {
++			return err
++		}
++	}
++	return nil
++}
+ 
+-	return filepath.WalkDir(absolute, func(path string, entry fs.DirEntry, walkErr error) error {
++// ValidateWithinWithOwner is ValidateWithin with an injectable owner lookup.
++// Production callers use ValidateWithin; the seam supports production-entry
++// tests for foreign-owner boundary failures.
++func ValidateWithinWithOwner(root, target string, ownerLookup OwnerLookup) error {
++	if ownerLookup == nil {
++		return &Failure{Root: root, Path: target, Check: CheckOwnership, Reason: "owner lookup is unavailable"}
++	}
++	operator, err := effectiveOwner()
++	if err != nil {
++		return &Failure{Root: root, Path: target, Check: CheckOwnership, Cause: err}
++	}
++	absolute, rootInfo, err := inspectRoot(root)
++	if err != nil {
++		return err
++	}
++	if err := checkNode(absolute, absolute, rootInfo, operator, ownerLookup); err != nil {
++		return err
++	}
++	targetAbsolute, err := filepath.Abs(target)
++	if err != nil {
++		return &Failure{Root: absolute, Path: target, Check: CheckContainment, Cause: err}
++	}
++	targetAbsolute = filepath.Clean(targetAbsolute)
++	relative, err := filepath.Rel(absolute, targetAbsolute)
++	if err != nil || escapes(relative) {
++		return &Failure{Root: absolute, Path: targetAbsolute, Check: CheckContainment, Reason: "component does not resolve below the declared directory", Cause: err}
++	}
++	if relative == "." {
++		return validateTree(absolute, absolute, operator, ownerLookup)
++	}
++	current := absolute
++	parts := strings.Split(relative, string(os.PathSeparator))
++	var targetInfo os.FileInfo
++	for index, part := range parts {
++		current = filepath.Join(current, part)
++		info, err := os.Lstat(current)
++		if err != nil {
++			return &Failure{Root: absolute, Path: current, Check: CheckRegular, Cause: err}
++		}
++		link, err := isLink(current, info)
++		if err != nil {
++			return &Failure{Root: absolute, Path: current, Check: CheckLinkSafety, Cause: err}
++		}
++		if link {
++			if escapes, readErr := symlinkEscapes(absolute, current); readErr != nil {
++				return &Failure{Root: absolute, Path: current, Check: CheckLinkSafety, Cause: readErr}
++			} else if escapes {
++				return &Failure{Root: absolute, Path: current, Check: CheckContainment, Reason: "symbolic-link target escapes the declared directory"}
++			}
++			return &Failure{Root: absolute, Path: current, Check: CheckLinkSafety, Reason: "symbolic link below the declared directory"}
++		}
++		if !info.IsDir() && !info.Mode().IsRegular() {
++			return &Failure{Root: absolute, Path: current, Check: CheckRegular, Reason: "component is neither a directory nor a regular file"}
++		}
++		if index < len(parts)-1 && !info.IsDir() {
++			return &Failure{Root: absolute, Path: current, Check: CheckContainment, Reason: "path component is not a directory"}
++		}
++		if err := checkNode(absolute, current, info, operator, ownerLookup); err != nil {
++			return err
++		}
++		targetInfo = info
++	}
++	if targetInfo != nil && targetInfo.IsDir() {
++		return validateTree(absolute, current, operator, ownerLookup)
++	}
++	return nil
++}
++
++func validateTree(root, target string, operator OwnerIdentity, ownerLookup OwnerLookup) error {
++	return filepath.WalkDir(target, func(path string, entry fs.DirEntry, walkErr error) error {
+ 		if walkErr != nil {
+-			return &Failure{Root: absolute, Path: path, Check: CheckRegular, Cause: walkErr}
++			return &Failure{Root: root, Path: path, Check: CheckRegular, Cause: walkErr}
+ 		}
+-		if path == absolute {
++		if path == target {
+ 			return nil
+ 		}
+-		relative, err := filepath.Rel(absolute, path)
++		relative, err := filepath.Rel(root, path)
+ 		if err != nil || escapes(relative) {
+-			return &Failure{Root: absolute, Path: path, Check: CheckContainment, Reason: "component does not resolve below the declared directory", Cause: err}
++			return &Failure{Root: root, Path: path, Check: CheckContainment, Reason: "component does not resolve below the declared directory", Cause: err}
+ 		}
+ 		info, err := entry.Info()
+ 		if err != nil {
+-			return &Failure{Root: absolute, Path: path, Check: CheckRegular, Cause: err}
++			return &Failure{Root: root, Path: path, Check: CheckRegular, Cause: err}
+ 		}
+ 		link, err := isLink(path, info)
+ 		if err != nil {
+-			return &Failure{Root: absolute, Path: path, Check: CheckLinkSafety, Cause: err}
++			return &Failure{Root: root, Path: path, Check: CheckLinkSafety, Cause: err}
+ 		}
+ 		if link {
+-			if escapes, readErr := symlinkEscapes(absolute, path); readErr != nil {
+-				return &Failure{Root: absolute, Path: path, Check: CheckLinkSafety, Cause: readErr}
++			if escapes, readErr := symlinkEscapes(root, path); readErr != nil {
++				return &Failure{Root: root, Path: path, Check: CheckLinkSafety, Cause: readErr}
+ 			} else if escapes {
+-				return &Failure{Root: absolute, Path: path, Check: CheckContainment, Reason: "symbolic-link target escapes the declared directory"}
++				return &Failure{Root: root, Path: path, Check: CheckContainment, Reason: "symbolic-link target escapes the declared directory"}
+ 			}
+-			return &Failure{Root: absolute, Path: path, Check: CheckLinkSafety, Reason: "symbolic link below the declared directory"}
++			return &Failure{Root: root, Path: path, Check: CheckLinkSafety, Reason: "symbolic link below the declared directory"}
+ 		}
+-		if err := checkNode(absolute, path, info, operator, ownerLookup); err != nil {
++		if err := checkNode(root, path, info, operator, ownerLookup); err != nil {
+ 			return err
+ 		}
+ 		if !info.IsDir() && !info.Mode().IsRegular() {
+-			return &Failure{Root: absolute, Path: path, Check: CheckRegular, Reason: "component is neither a directory nor a regular file"}
++			return &Failure{Root: root, Path: path, Check: CheckRegular, Reason: "component is neither a directory nor a regular file"}
+ 		}
+ 		return nil
+ 	})
+@@ -124,6 +254,15 @@ func ValidateWithOwner(root string, ownerLookup OwnerLookup) error {
+ // ValidateRoot checks only the exact directory node. It is useful for a
+ // protected parent whose children are independent declared source roots.
+ func ValidateRoot(root string) error {
++	return ValidateRootWithOwner(root, DefaultOwnerLookup())
++}
++
++// ValidateRootWithOwner checks only the exact directory node and permits an
++// injected owner lookup for boundary tests.
++func ValidateRootWithOwner(root string, ownerLookup OwnerLookup) error {
++	if ownerLookup == nil {
++		return &Failure{Root: root, Path: root, Check: CheckOwnership, Reason: "owner lookup is unavailable"}
++	}
+ 	absolute, info, err := inspectRoot(root)
+ 	if err != nil {
+ 		return err
+@@ -132,7 +271,7 @@ func ValidateRoot(root string) error {
+ 	if err != nil {
+ 		return &Failure{Root: absolute, Path: absolute, Check: CheckOwnership, Cause: err}
+ 	}
+-	return checkNode(absolute, absolute, info, operator, DefaultOwnerLookup())
++	return checkNode(absolute, absolute, info, operator, ownerLookup)
+ }
+ 
+ func inspectRoot(root string) (string, os.FileInfo, error) {
