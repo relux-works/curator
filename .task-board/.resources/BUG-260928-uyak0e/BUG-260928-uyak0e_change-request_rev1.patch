@@ -1,0 +1,171 @@
+diff --git a/internal/envprofile/path_capture_test.go b/internal/envprofile/path_capture_test.go
+index c368fd85..9c07db5b 100644
+--- a/internal/envprofile/path_capture_test.go
++++ b/internal/envprofile/path_capture_test.go
+@@ -37,6 +37,8 @@ func TestPathInstallCapturesDirtyUntrackedInsideGit(t *testing.T) {
+ 	root := filepath.Join(t.TempDir(), "root")
+ 	writeSeedPackage(t, root, "acme")
+ 	pathSourceGit(t, root, "init", "-q", "-b", "main")
++	pathSourceGit(t, root, "config", "gc.auto", "0")
++	pathSourceGit(t, root, "config", "maintenance.auto", "false")
+ 	pathSourceGit(t, root, "add", ".")
+ 	pathSourceGit(t, root, "commit", "-qm", "one")
+ 	if err := os.WriteFile(filepath.Join(root, "context", "a.md"), []byte("dirty\n"), 0o644); err != nil {
+diff --git a/internal/pathboundary/pathboundary.go b/internal/pathboundary/pathboundary.go
+index 6a79b20a..bac540cd 100644
+--- a/internal/pathboundary/pathboundary.go
++++ b/internal/pathboundary/pathboundary.go
+@@ -69,6 +69,17 @@ func Validate(root string) error {
+ // the seam lets production-entry tests cover foreign-owner paths without
+ // requiring a second host user or chown privilege.
+ func ValidateWithOwner(root string, ownerLookup OwnerLookup) error {
++	return validateWithOwnerAndEntryInfo(root, ownerLookup, func(_ string, entry fs.DirEntry) (os.FileInfo, error) {
++		return entry.Info()
++	})
++}
++
++// entryInfoLookup is the metadata read performed after a parent directory
++// has been listed. validateWithOwnerAndEntryInfo keeps that boundary explicit
++// so tests can reproduce a replacement or removal in the readdir/lstat window.
++type entryInfoLookup func(path string, entry fs.DirEntry) (os.FileInfo, error)
++
++func validateWithOwnerAndEntryInfo(root string, ownerLookup OwnerLookup, entryInfo entryInfoLookup) error {
+ 	if ownerLookup == nil {
+ 		return &Failure{Root: root, Path: root, Check: CheckOwnership, Reason: "owner lookup is unavailable"}
+ 	}
+@@ -95,8 +106,17 @@ func ValidateWithOwner(root string, ownerLookup OwnerLookup) error {
+ 		if err != nil || escapes(relative) {
+ 			return &Failure{Root: absolute, Path: path, Check: CheckContainment, Reason: "component does not resolve below the declared directory", Cause: err}
+ 		}
+-		info, err := entry.Info()
++		info, err := entryInfo(path, entry)
+ 		if err != nil {
++			if IsAbsent(err) {
++				// The entry disappeared after its parent was read. It cannot
++				// violate the boundary now; if readdir saw a directory, keep
++				// WalkDir from trying to descend into the vanished path.
++				if entry.IsDir() {
++					return filepath.SkipDir
++				}
++				return nil
++			}
+ 			return &Failure{Root: absolute, Path: path, Check: CheckRegular, Cause: err}
+ 		}
+ 		link, err := isLink(path, info)
+diff --git a/internal/pathboundary/pathboundary_test.go b/internal/pathboundary/pathboundary_test.go
+index 71da097a..6a33eb26 100644
+--- a/internal/pathboundary/pathboundary_test.go
++++ b/internal/pathboundary/pathboundary_test.go
+@@ -1,6 +1,8 @@
+ package pathboundary
+ 
+ import (
++	"errors"
++	"io/fs"
+ 	"os"
+ 	"path/filepath"
+ 	"testing"
+@@ -134,3 +136,103 @@ func TestValidateRejectsInjectedForeignOwner(t *testing.T) {
+ 		t.Fatalf("ValidateWithOwner error = %v, want ownership failure", err)
+ 	}
+ }
++
++func TestValidateSkipsEntryRemovedBetweenReadDirAndLstat(t *testing.T) {
++	root := filepath.Join(t.TempDir(), "source")
++	if err := os.Mkdir(root, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	removed := filepath.Join(root, "removed.md")
++	if err := os.WriteFile(removed, []byte("module\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	removedDirectory := filepath.Join(root, "removed-directory")
++	if err := os.Mkdir(removedDirectory, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := ProtectTree(root); err != nil {
++		t.Fatal(err)
++	}
++
++	lookedUp := map[string]bool{}
++	err := validateWithOwnerAndEntryInfo(root, DefaultOwnerLookup(), func(path string, entry fs.DirEntry) (os.FileInfo, error) {
++		if filepath.Clean(path) == filepath.Clean(removed) || filepath.Clean(path) == filepath.Clean(removedDirectory) {
++			lookedUp[filepath.Clean(path)] = true
++			if err := os.Remove(path); err != nil {
++				t.Fatalf("remove entry after readdir: %v", err)
++			}
++		}
++		return entry.Info()
++	})
++	for _, path := range []string{removed, removedDirectory} {
++		if !lookedUp[filepath.Clean(path)] {
++			t.Errorf("entry info lookup hook did not run for removed entry %q", path)
++		}
++	}
++	if err != nil {
++		t.Fatalf("Validate rejected an entry removed before lstat: %v", err)
++	}
++}
++
++func TestValidateRejectsEntryReplacedBySymlinkBetweenReadDirAndLstat(t *testing.T) {
++	root := filepath.Join(t.TempDir(), "source")
++	if err := os.Mkdir(root, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(root, "target.md"), []byte("module\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	replaced := filepath.Join(root, "replaced.md")
++	if err := os.WriteFile(replaced, []byte("original\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := ProtectTree(root); err != nil {
++		t.Fatal(err)
++	}
++
++	lookedUp := false
++	err := validateWithOwnerAndEntryInfo(root, DefaultOwnerLookup(), func(path string, entry fs.DirEntry) (os.FileInfo, error) {
++		if filepath.Clean(path) == filepath.Clean(replaced) {
++			lookedUp = true
++			if err := os.Remove(path); err != nil {
++				t.Fatalf("remove entry after readdir: %v", err)
++			}
++			if err := os.Symlink("target.md", path); err != nil {
++				t.Skipf("host cannot create symbolic links: %v", err)
++			}
++		}
++		return entry.Info()
++	})
++	if !lookedUp {
++		t.Fatal("entry info lookup hook did not run for replaced entry")
++	}
++	var failure *Failure
++	if !errors.As(err, &failure) || failure.Check != CheckLinkSafety {
++		t.Fatalf("Validate error = %v, want link-safety failure for replacement symlink", err)
++	}
++}
++
++func TestValidateFailsClosedForOtherEntryLstatErrors(t *testing.T) {
++	root := filepath.Join(t.TempDir(), "source")
++	if err := os.Mkdir(root, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	other := filepath.Join(root, "unreadable.md")
++	if err := os.WriteFile(other, []byte("module\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := ProtectTree(root); err != nil {
++		t.Fatal(err)
++	}
++	injected := errors.New("injected lstat failure")
++	err := validateWithOwnerAndEntryInfo(root, DefaultOwnerLookup(), func(path string, entry fs.DirEntry) (os.FileInfo, error) {
++		if filepath.Clean(path) == filepath.Clean(other) {
++			return nil, injected
++		}
++		return entry.Info()
++	})
++	var failure *Failure
++	if !errors.As(err, &failure) || failure.Check != CheckRegular || !errors.Is(err, injected) {
++		t.Fatalf("Validate error = %v, want regular-types failure retaining the lstat error", err)
++	}
++}
