@@ -355,6 +355,23 @@ func inspectRoot(root string) (string, os.FileInfo, error) {
 // onboarding import; an existing operator path is never repaired this way.
 func ProtectTree(root string) error { return protectTree(root) }
 
+// OpenReadNoFollow opens the exact path entry for reading without following a
+// final symbolic link or reparse point. Callers still validate containment,
+// ownership, and mutation permissions for the containing tree.
+func OpenReadNoFollow(path string) (*os.File, error) { return openReadNoFollow(path) }
+
+// CheckPrivateFile proves a single manager-owned file is owned by the
+// effective operator and grants no other identity mutation rights. It uses the
+// platform's own model: permission bits on Unix, the owner/DACL on Windows,
+// where Go reports 0666 for every ordinary file.
+func CheckPrivateFile(path string, info os.FileInfo) error {
+	operator, err := effectiveOwner()
+	if err != nil {
+		return err
+	}
+	return checkNode(filepath.Dir(path), path, info, operator, lookupOwner)
+}
+
 func checkNode(root, path string, info os.FileInfo, operator OwnerIdentity, ownerLookup OwnerLookup) error {
 	owner, err := ownerLookup(path, info)
 	if err != nil {

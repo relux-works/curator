@@ -77,7 +77,8 @@ internal/envprofile	vectors/environments-read-failure.json	TestEnvironmentsReadF
 internal/envprofile	vectors/environments-codex-seed.json,vectors/environments-env-passthrough.json,vectors/environments-path-kind-admission.json	TestEnvironmentsCodexSeedVectors and TestEnvironmentsEnvPassthroughVectors consume their published case groups; path-kind MCP, source-boundary, and read-only resolve consumers drive published path-source cases through production entries
 internal/shell	vectors/shell-hook-trust.json	TestShellHookTrustVectors consumes every published trust case
 internal/skillspec	schema-cases/agent-skill-v6,schema-cases/agent-skill-v7,schema-cases/csk-skill-v7,schema-cases/agent-skill-v8,schema-cases/csk-skill-v8,vectors/portable-paths.json,fixtures/go-build-skill	the schema v6 and v7 cases, BOTH schema-8 manifest families, portable-path vectors and the go-build skill fixture
-internal/install	vectors/build-drivers.json,vectors/manager-lifecycle.json	TestAuthoritativeCacheOutcomesDriveInstallation and the dry-run bindings read the vectors directly
+internal/install	vectors/build-drivers.json,vectors/manager-lifecycle.json,vectors/registry-client.json	Install outcomes, bootstrap/rebootstrap posture, and mirror comparison read their pinned vectors directly
+internal/install	vectors/registry-client.json	TestRegistryMirrorComparisonVectorsDriveInstall reads every pinned mirror-comparison case through the install entry
 internal/envfragment	schema-cases/launch-env-fragment-v1	TestFragmentAuthoritativeSchemaCases and TestFragmentEmissionMatchesReference read the fragment family directly
 internal/envmarker	schema-cases/agent-environment-marker-v1	TestParseAuthoritativeEnvMarkerSchemaCases reads the marker family directly
 internal/envmarker	schema-cases/agent-environment-marker-v2	TestParseAuthoritativeEnvMarkerV2SchemaCases reads the marker family directly

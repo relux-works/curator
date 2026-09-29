@@ -51,9 +51,11 @@ const (
 
 // Registry is one pinned trusted registry.
 type Registry struct {
-	Name       string
-	URL        string
-	PublicKeys []string
+	Name                string
+	URL                 string
+	PublicKeys          []string
+	BootstrapCheckpoint string
+	MirrorGroup         string
 }
 
 // Record is a parsed audit record.

@@ -2,21 +2,29 @@ package install
 
 import (
 	"crypto/ed25519"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/relux-works/curator/internal/config"
+	"github.com/relux-works/curator/internal/conformancecoverage"
 	"github.com/relux-works/curator/internal/gitops"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identity"
 	markerpkg "github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/registry"
 	"github.com/relux-works/curator/internal/snapshot"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // registryFixture describes how the fake registry stamps and serves its
@@ -31,6 +39,9 @@ type registryFixture struct {
 	beforeSnapshot func()
 	serveTimeMint  bool
 	futureOffset   time.Duration
+	merkleRoot     string
+	logSize        int
+	version        int
 }
 
 type registryOption func(*registryFixture)
@@ -62,6 +73,14 @@ func snapshotFutureBy(offset time.Duration) registryOption {
 	return func(f *registryFixture) { f.serveTimeMint = true; f.futureOffset = offset }
 }
 
+func snapshotView(root string, logSize, version int) registryOption {
+	return func(f *registryFixture) {
+		f.merkleRoot = root
+		f.logSize = logSize
+		f.version = version
+	}
+}
+
 // crossSecondBoundary blocks until 50 ms past the next whole second, so the
 // snapshot response is written in a later wall-clock second than the one in
 // which the checker sampled its `now`. RFC3339 truncates created_at down to
@@ -78,6 +97,11 @@ func crossSecondBoundary() {
 
 // fakeRegistry serves signed snapshot and records for one artifact status.
 func fakeRegistry(t *testing.T, status, sourceIdentity, commit, contentHash string, options ...registryOption) (*httptest.Server, string) {
+	server, pinned, _ := fakeRegistryWithSigner(t, status, sourceIdentity, commit, contentHash, options...)
+	return server, pinned
+}
+
+func fakeRegistryWithSigner(t *testing.T, status, sourceIdentity, commit, contentHash string, options ...registryOption) (*httptest.Server, string, ed25519.PrivateKey) {
 	t.Helper()
 	public, private, err := ed25519.GenerateKey(nil)
 	if err != nil {
@@ -88,7 +112,10 @@ func fakeRegistry(t *testing.T, status, sourceIdentity, commit, contentHash stri
 	// second than the checker's pre-fetch `now` — that is a legitimate
 	// publication during the fetch, not tampering, and the product bound
 	// covers it (BUG-260920-2d9gfv).
-	fixture := registryFixture{createdAt: time.Now().UTC().Truncate(time.Second)}
+	fixture := registryFixture{
+		createdAt:  time.Now().UTC().Truncate(time.Second),
+		merkleRoot: strings.Repeat("a", 64), logSize: 1, version: 1,
+	}
 	for _, option := range options {
 		option(&fixture)
 	}
@@ -109,8 +136,8 @@ func fakeRegistry(t *testing.T, status, sourceIdentity, commit, contentHash stri
 			stamped = time.Now().UTC().Add(fixture.futureOffset).Truncate(time.Second).Format(time.RFC3339)
 		}
 		return sign(map[string]any{
-			"schema_version": 1, "merkle_root": strings.Repeat("a", 64), "log_size": 1, "head": strings.Repeat("b", 64),
-			"version": 1, "created_at": stamped,
+			"schema_version": 1, "merkle_root": fixture.merkleRoot, "log_size": fixture.logSize, "head": strings.Repeat("b", 64),
+			"version": fixture.version, "created_at": stamped,
 		})
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -135,10 +162,15 @@ func fakeRegistry(t *testing.T, status, sourceIdentity, commit, contentHash stri
 			http.NotFound(w, r)
 		}
 	}))
-	return server, pinned
+	return server, pinned, private
 }
 
 func registryEnv(t *testing.T, status string, options ...registryOption) (*env, *httptest.Server) {
+	e, server, _, _ := registryEnvWithSigner(t, status, options...)
+	return e, server
+}
+
+func registryEnvWithSigner(t *testing.T, status string, options ...registryOption) (*env, *httptest.Server, ed25519.PrivateKey, string) {
 	t.Helper()
 	e := newEnv(t)
 	e.skill("skill-a")
@@ -162,9 +194,9 @@ func registryEnv(t *testing.T, status string, options ...registryOption) (*env, 
 		t.Fatal(err)
 	}
 	id := identity.Canonical("git@git.example.com:skills/skill-a.git")
-	server, pinned := fakeRegistry(t, status, id, ref.Commit, contentHash, options...)
+	server, pinned, private := fakeRegistryWithSigner(t, status, id, ref.Commit, contentHash, options...)
 	e.cfg.AuditRegistries = []config.Registry{{Name: "test-reg", URL: server.URL, PublicKeys: []string{pinned}, Enabled: true}}
-	return e, server
+	return e, server, private, pinned
 }
 
 func TestRegistryRevocationDeniesInstall(t *testing.T) {
@@ -191,6 +223,309 @@ func TestRegistryAttestationLandsInMarker(t *testing.T) {
 	}
 }
 
+func TestRegistryFirstUseReportsAndPersistsTOFUPosture(t *testing.T) {
+	e, server := registryEnv(t, "audited")
+	defer server.Close()
+	result := e.install(Options{})
+	if result.Status != "ok" {
+		t.Fatalf("install: %+v", result)
+	}
+	joined := strings.Join(result.Messages, "\n")
+	if strings.Count(joined, "registry_bootstrap_tofu") != 1 || !strings.Contains(joined, server.URL) || !strings.Contains(joined, "bootstrap_checkpoint") {
+		t.Fatalf("first-use warning = %s, want one URL-naming checkpoint hint", joined)
+	}
+	state := installedRegistryState(t, e.home, server.URL)
+	if state["bootstrap_source"] != "first-use" {
+		t.Fatalf("first-use state = %+v", state)
+	}
+}
+
+func TestRegistryCheckpointPersistsBeforeTamperedNetworkSnapshot(t *testing.T) {
+	root := strings.Repeat("a", 64)
+	e, server, private, pinned := registryEnvWithSigner(t, "audited", snapshotView(strings.Repeat("c", 64), 7, 7))
+	defer server.Close()
+	e.cfg.AuditRegistries[0].BootstrapCheckpoint = writeBootstrapCheckpoint(t, e.home, private, pinned, root, 8, 8, true)
+
+	result := e.install(Options{})
+	if result.Status != "failed" || !strings.Contains(strings.Join(result.Messages, "\n"), "snapshot version moved backward") {
+		t.Fatalf("below-checkpoint network view must be refused: %+v", result)
+	}
+	state := installedRegistryState(t, e.home, server.URL)
+	if state["highest_version"] != float64(8) || state["merkle_root"] != root || state["bootstrap_source"] != "checkpoint" {
+		t.Fatalf("checkpoint high-water was not retained before network refusal: %+v", state)
+	}
+}
+
+func TestRegistryInvalidFirstUseCheckpointFailsClosed(t *testing.T) {
+	e, server, private, pinned := registryEnvWithSigner(t, "audited")
+	defer server.Close()
+	e.cfg.AuditRegistries[0].BootstrapCheckpoint = writeBootstrapCheckpoint(t, e.home, private, pinned, strings.Repeat("a", 64), 8, 8, false)
+
+	result := e.install(Options{})
+	joined := strings.Join(append(append([]string(nil), result.Errors...), result.Messages...), "\n")
+	if result.Status != "failed" || !strings.Contains(joined, "bootstrap checkpoint configuration error") || !strings.Contains(joined, "signature failed verification") {
+		t.Fatalf("invalid first-use checkpoint was not refused with its path: %+v", result)
+	}
+	sum := sha256.Sum256([]byte(server.URL))
+	statePath := filepath.Join(e.home, "state", "registry", "snapshot-"+hex.EncodeToString(sum[:])[:16]+".json")
+	if _, err := os.Stat(statePath); !os.IsNotExist(err) {
+		t.Fatalf("invalid first-use checkpoint persisted registry high-water: %v", err)
+	}
+}
+
+func TestRegistryRebootstrapRegressionKeepsExistingHighWater(t *testing.T) {
+	e, server, private, pinned := registryEnvWithSigner(t, "audited", snapshotView(strings.Repeat("a", 64), 1, 1))
+	defer server.Close()
+	first := e.install(Options{})
+	if first.Status != "ok" {
+		t.Fatalf("initial install: %+v", first)
+	}
+	prior := installedRegistryState(t, e.home, server.URL)
+	e.cfg.AuditRegistries[0].BootstrapCheckpoint = writeBootstrapCheckpoint(t, e.home, private, pinned, strings.Repeat("c", 64), 1, 1, true)
+
+	result := e.install(Options{})
+	joined := strings.Join(result.Messages, "\n")
+	if result.Status != "ok" || !strings.Contains(joined, "registry_checkpoint_regression (error)") {
+		t.Fatalf("regressing rebootstrap should retain trusted state and report an error: %+v", result)
+	}
+	after := installedRegistryState(t, e.home, server.URL)
+	if after["highest_version"] != prior["highest_version"] || after["head"] != prior["head"] || after["merkle_root"] != prior["merkle_root"] || after["bootstrap_source"] != "first-use" {
+		t.Fatalf("regressing checkpoint changed high-water: before=%+v after=%+v", prior, after)
+	}
+}
+
+func writeBootstrapCheckpoint(t *testing.T, directory string, private ed25519.PrivateKey, pinned, root string, logSize, version int, validSignature bool) string {
+	t.Helper()
+	public, err := registry.ParsePublicKey(pinned)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := map[string]any{
+		"schema_version": 1, "merkle_root": root, "log_size": logSize,
+		"head": strings.Repeat("b", 64), "version": version,
+		"created_at": time.Now().UTC().Truncate(time.Second).Format(time.RFC3339),
+	}
+	signature := ed25519.Sign(private, registry.CanonicalBytes(body))
+	if !validSignature {
+		signature = make([]byte, ed25519.SignatureSize)
+	}
+	body["sig"] = map[string]any{
+		"key_id": registry.KeyID(public), "algorithm": "ed25519",
+		"signature": base64.StdEncoding.EncodeToString(signature),
+	}
+	payload, err := json.Marshal(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkpointDir := filepath.Join(directory, "registry-checkpoints")
+	if err := os.Mkdir(checkpointDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := pathboundary.ProtectTree(checkpointDir); err != nil {
+		t.Fatalf("protect registry checkpoint fixture directory: %v", err)
+	}
+	path := filepath.Join(checkpointDir, "registry-checkpoint.json")
+	if err := os.WriteFile(path, payload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := pathboundary.ProtectTree(checkpointDir); err != nil {
+		t.Fatalf("protect registry checkpoint fixture file: %v", err)
+	}
+	return path
+}
+
+func installedRegistryState(t *testing.T, home, registryURL string) map[string]any {
+	t.Helper()
+	path := filepath.Join(home, "state", "registry", "snapshot-"+registryStateDigest(registryURL)+".json")
+	payload, err := os.ReadFile(path) // #nosec G304 -- test-owned manager state path
+	if err != nil {
+		t.Fatal(err)
+	}
+	var state map[string]any
+	if err := json.Unmarshal(payload, &state); err != nil {
+		t.Fatal(err)
+	}
+	return state
+}
+
+type registryClientBootstrapVector struct {
+	Name                 string  `json:"name"`
+	Phase                string  `json:"phase"`
+	PriorState           string  `json:"prior_state"`
+	CheckpointConfigured bool    `json:"checkpoint_configured"`
+	CheckpointVersion    int     `json:"checkpoint_version"`
+	CandidateSameBody    bool    `json:"candidate_same_body"`
+	FirstNetworkVersion  int     `json:"first_network_version"`
+	Accepted             bool    `json:"accepted"`
+	StateChanged         bool    `json:"state_changed"`
+	StoredVersion        int     `json:"stored_version"`
+	Diagnostic           *string `json:"diagnostic"`
+	Posture              *string `json:"posture"`
+	CheckCurrent         bool    `json:"check_current"`
+	SignatureValid       bool    `json:"signature_valid"`
+	RegistryExcluded     bool    `json:"registry_excluded"`
+	ResolutionChanged    bool    `json:"resolution_changed"`
+	Policy               string  `json:"policy"`
+}
+
+// TestRegistryBootstrapVectorsDriveInstall binds every pinned bootstrap and
+// rebootstrap vector to the production install.Project -> resolveRegistries
+// path. The test supplies signed registry responses and checkpoints while the
+// pinned vectors select trust state, versions, and expected posture.
+func TestRegistryBootstrapVectorsDriveInstall(t *testing.T) {
+	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+	if root == "" {
+		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
+	}
+	payload, err := os.ReadFile(filepath.Join(root, "vectors", "registry-client.json")) // #nosec G304 -- explicit pinned conformance input
+	if err != nil {
+		t.Fatal(err)
+	}
+	var document struct {
+		BootstrapCases []registryClientBootstrapVector `json:"bootstrap_cases"`
+	}
+	if err := json.Unmarshal(payload, &document); err != nil {
+		t.Fatal(err)
+	}
+	var cases []registryClientBootstrapVector
+	for _, vector := range document.BootstrapCases {
+		if vector.Phase != "compare" {
+			cases = append(cases, vector)
+		}
+	}
+	if len(cases) != 10 {
+		t.Fatalf("pinned registry-client bootstrap vectors = %d, want 10", len(cases))
+	}
+	conformancecoverage.RunOutcomes(t, "registry-client/bootstrap-cases", cases,
+		func(vector registryClientBootstrapVector) string { return vector.Name },
+		func(caseT *testing.T, vector registryClientBootstrapVector) conformancecoverage.Observation {
+			return runRegistryClientBootstrapVector(caseT, vector)
+		})
+}
+
+func runRegistryClientBootstrapVector(t *testing.T, vector registryClientBootstrapVector) conformancecoverage.Observation {
+	t.Helper()
+	priorRoot := strings.Repeat("a", 64)
+	checkpointRoot := priorRoot
+	networkRoot := priorRoot
+	networkVersion := vector.FirstNetworkVersion
+	if vector.Phase == "rebootstrap" {
+		networkVersion = vector.StoredVersion
+		if vector.CheckpointConfigured && vector.SignatureValid && vector.CheckpointVersion > vector.StoredVersion {
+			networkVersion = vector.CheckpointVersion
+		}
+	}
+	if vector.Phase == "rebootstrap" && vector.CheckpointConfigured && !vector.CandidateSameBody {
+		checkpointRoot = strings.Repeat("c", 64)
+	}
+	if vector.Phase == "bootstrap" && vector.CheckpointConfigured && networkVersion == vector.CheckpointVersion && !vector.CandidateSameBody {
+		networkRoot = strings.Repeat("c", 64)
+	}
+	if vector.Phase == "bootstrap" && vector.CheckpointConfigured && networkVersion > vector.CheckpointVersion {
+		networkRoot = strings.Repeat("c", 64)
+	}
+	if vector.Phase == "rebootstrap" && vector.CheckpointConfigured && vector.SignatureValid && vector.CheckpointVersion > vector.StoredVersion {
+		networkRoot = checkpointRoot
+	}
+
+	e, server, private, pinned := registryEnvWithSigner(t, "audited", snapshotView(networkRoot, networkVersion, networkVersion))
+	defer server.Close()
+	if vector.Policy != "" {
+		e.cfg.Audit.RegistryPolicy = vector.Policy
+	}
+	if vector.PriorState == "present" {
+		seedRegistryHighWater(t, e.home, []string{server.URL}, []string{priorRoot})
+	}
+	var before map[string]any
+	if vector.PriorState == "present" {
+		before = installedRegistryState(t, e.home, server.URL)
+	}
+	if vector.CheckpointConfigured {
+		e.cfg.AuditRegistries[0].BootstrapCheckpoint = writeBootstrapCheckpoint(
+			t, e.home, private, pinned, checkpointRoot,
+			vector.CheckpointVersion, vector.CheckpointVersion, vector.SignatureValid,
+		)
+	}
+
+	result := e.install(Options{})
+	joined := strings.Join(append(append([]string(nil), result.Errors...), result.Messages...), "\n")
+	if vector.Phase == "bootstrap" && (result.Status == "ok") != vector.Accepted {
+		return conformancecoverage.Observation{FailureReason: fmt.Sprintf("bootstrap install status=%s, accepted=%v: %s", result.Status, vector.Accepted, joined)}
+	}
+	if vector.Phase == "bootstrap" && (result.Status == "failed") != vector.RegistryExcluded {
+		return conformancecoverage.Observation{FailureReason: fmt.Sprintf("bootstrap registry exclusion disagrees with vector: status=%s excluded=%v: %s", result.Status, vector.RegistryExcluded, joined)}
+	}
+	if vector.Phase == "rebootstrap" && result.Status != "ok" {
+		return conformancecoverage.Observation{FailureReason: fmt.Sprintf("rebootstrap changed registry resolution: %+v", result)}
+	}
+	if vector.ResolutionChanged {
+		return conformancecoverage.Observation{FailureReason: "pinned bootstrap vectors must not change artifact resolution"}
+	}
+	if vector.Diagnostic != nil && !strings.Contains(joined, *vector.Diagnostic) {
+		return conformancecoverage.Observation{FailureReason: fmt.Sprintf("install output omitted %q: %s", *vector.Diagnostic, joined)}
+	}
+	if vector.Posture != nil && !strings.Contains(joined, *vector.Posture) {
+		return conformancecoverage.Observation{FailureReason: fmt.Sprintf("install output omitted posture %q: %s", *vector.Posture, joined)}
+	}
+	if result.Status == "ok" {
+		marker := readMarkerFor(t, e, "skill-a")
+		if marker.Attestation == nil || marker.Attestation.Status != "audited" {
+			return conformancecoverage.Observation{FailureReason: "bootstrap handling changed the audited resolution"}
+		}
+	}
+
+	statePath := filepath.Join(e.home, "state", "registry")
+	posture := registry.ReadBoundaryPostureWithPolicy(statePath, []registry.Registry{{
+		Name: "test-reg", URL: server.URL, PublicKeys: []string{pinned},
+		BootstrapCheckpoint: e.cfg.AuditRegistries[0].BootstrapCheckpoint,
+	}}, vector.Policy)
+	if len(posture) != 1 {
+		return conformancecoverage.Observation{FailureReason: fmt.Sprintf("status rows = %d, want one", len(posture))}
+	}
+	row := posture[0]
+	if (row.Diagnostic == "") != vector.CheckCurrent {
+		return conformancecoverage.Observation{FailureReason: fmt.Sprintf("status current=%v, want %v: %+v", row.Diagnostic == "", vector.CheckCurrent, row)}
+	}
+	if vector.Diagnostic != nil && row.BootstrapDiagnostic != *vector.Diagnostic {
+		return conformancecoverage.Observation{FailureReason: fmt.Sprintf("status bootstrap diagnostic=%q, want %q: %+v", row.BootstrapDiagnostic, *vector.Diagnostic, row)}
+	}
+	if vector.Posture != nil && row.BootstrapDiagnostic != *vector.Posture {
+		return conformancecoverage.Observation{FailureReason: fmt.Sprintf("status bootstrap posture=%q, want %q: %+v", row.BootstrapDiagnostic, *vector.Posture, row)}
+	}
+
+	var after map[string]any
+	stateFile := filepath.Join(statePath, "snapshot-"+registryStateDigest(server.URL)+".json")
+	metadata, err := stateread.Lstat(stateFile)
+	if err != nil {
+		return conformancecoverage.Observation{FailureReason: fmt.Sprintf("registry state could not be inspected: %v", err)}
+	}
+	if metadata.Kind == stateread.KindPresent {
+		after = installedRegistryState(t, e.home, server.URL)
+	} else if metadata.Kind != stateread.KindAbsent {
+		return conformancecoverage.Observation{FailureReason: "registry state inspection was unreadable"}
+	}
+	stateChanged := false
+	if before == nil {
+		stateChanged = after != nil
+	} else if after != nil {
+		stateChanged = before["highest_version"] != after["highest_version"] || before["head"] != after["head"] ||
+			before["merkle_root"] != after["merkle_root"] || before["log_size"] != after["log_size"] ||
+			before["bootstrap_source"] != after["bootstrap_source"]
+	}
+	if stateChanged != vector.StateChanged {
+		return conformancecoverage.Observation{FailureReason: fmt.Sprintf("state changed=%v, want %v: before=%+v after=%+v", stateChanged, vector.StateChanged, before, after)}
+	}
+	if before != nil && before["highest_version"] != float64(vector.StoredVersion) {
+		return conformancecoverage.Observation{FailureReason: fmt.Sprintf("stored version=%v, want %d", before["highest_version"], vector.StoredVersion)}
+	}
+	return conformancecoverage.Observation{}
+}
+
+func registryStateDigest(registryURL string) string {
+	sum := sha256.Sum256([]byte(registryURL))
+	return hex.EncodeToString(sum[:])[:16]
+}
+
 func TestStrictRegistryPolicyFailsUnknown(t *testing.T) {
 	t.Parallel()
 	e, server := registryEnv(t, "pending") // pending resolves as unknown
@@ -214,6 +549,194 @@ func readMarkerFor(t *testing.T, e *env, name string) *markerpkg.Marker {
 		t.Fatalf("marker missing for %s", name)
 	}
 	return m
+}
+
+type registryClientMirrorVector struct {
+	Name              string  `json:"name"`
+	GroupSize         int     `json:"group_size"`
+	Policy            string  `json:"policy"`
+	RootsEqual        bool    `json:"roots_equal"`
+	SameLogSize       bool    `json:"same_log_size"`
+	Compared          bool    `json:"compared"`
+	CheckCurrent      bool    `json:"check_current"`
+	Diagnostic        *string `json:"diagnostic"`
+	Severity          *string `json:"severity"`
+	Accepted          bool    `json:"accepted"`
+	RegistryExcluded  bool    `json:"registry_excluded"`
+	ResolutionChanged bool    `json:"resolution_changed"`
+}
+
+// TestRegistryMirrorComparisonVectorsDriveInstall binds every published
+// mirror-comparison vector to the real install.Project -> resolveRegistries
+// path. The vectors decide group size, root equality, boundary equality,
+// policy, and expected diagnostic; this test supplies signed registry views.
+func TestRegistryMirrorComparisonVectorsDriveInstall(t *testing.T) {
+	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+	if root == "" {
+		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
+	}
+	payload, err := os.ReadFile(filepath.Join(root, "vectors", "registry-client.json")) // #nosec G304 -- explicit pinned conformance input
+	if err != nil {
+		t.Fatal(err)
+	}
+	var document struct {
+		BootstrapCases []registryClientMirrorVector `json:"bootstrap_cases"`
+	}
+	if err := json.Unmarshal(payload, &document); err != nil {
+		t.Fatal(err)
+	}
+	var cases []registryClientMirrorVector
+	for _, vector := range document.BootstrapCases {
+		if strings.HasPrefix(vector.Name, "divergence-") {
+			cases = append(cases, vector)
+		}
+	}
+	if len(cases) != 5 {
+		t.Fatalf("pinned registry-client mirror vectors = %d, want 5", len(cases))
+	}
+	conformancecoverage.RunOutcomes(t, "registry-client/mirror-comparison-cases", cases,
+		func(vector registryClientMirrorVector) string { return vector.Name },
+		func(caseT *testing.T, vector registryClientMirrorVector) conformancecoverage.Observation {
+			return runRegistryClientMirrorVector(caseT, vector)
+		})
+}
+
+func runRegistryClientMirrorVector(t *testing.T, vector registryClientMirrorVector) conformancecoverage.Observation {
+	t.Helper()
+	rootA := strings.Repeat("a", 64)
+	rootB := rootA
+	if !vector.RootsEqual {
+		rootB = strings.Repeat("c", 64)
+	}
+	firstSize, secondSize := 8, 8
+	firstVersion, secondVersion := 8, 8
+	if !vector.SameLogSize {
+		secondSize, secondVersion = 9, 9
+	}
+	e, firstServer := registryEnv(t, "audited", snapshotView(rootA, firstSize, firstVersion))
+	defer firstServer.Close()
+	ref, err := gitops.Resolve(e.skillsRoot+"/skill-a", "tag", "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	snap, err := snapshot.Get(e.home, "skill-a", e.skillsRoot+"/skill-a", ref.Commit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contentHash, err := hashing.ContentSHA256(snap, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := identity.Canonical("git@git.example.com:skills/skill-a.git")
+	first := e.cfg.AuditRegistries[0]
+	first.MirrorGroup = "prod"
+	registries := []config.Registry{first}
+	urls := []string{first.URL}
+	roots := []string{rootA}
+	if vector.GroupSize == 2 {
+		secondServer, secondKey := fakeRegistry(t, "audited", id, ref.Commit, contentHash,
+			snapshotView(rootB, secondSize, secondVersion))
+		defer secondServer.Close()
+		registries = append(registries, config.Registry{
+			Name: "mirror", URL: secondServer.URL, PublicKeys: []string{secondKey}, Enabled: true, MirrorGroup: "prod",
+		})
+		urls = append(urls, secondServer.URL)
+		roots = append(roots, rootB)
+	}
+	e.cfg.AuditRegistries = registries
+	e.cfg.Audit.RegistryPolicy = vector.Policy
+	seedRegistryHighWater(t, e.home, urls, roots)
+
+	result := e.install(Options{})
+	if !vector.Accepted || vector.RegistryExcluded || vector.ResolutionChanged {
+		return conformancecoverage.Observation{FailureReason: "published comparison vector is outside the report-only accepted-view cases"}
+	}
+	if result.Status != "ok" {
+		return conformancecoverage.Observation{FailureReason: fmt.Sprintf("install was changed by report-only comparison: %+v", result)}
+	}
+	marker := readMarkerFor(t, e, "skill-a")
+	if marker.Attestation == nil || marker.Attestation.Status != "audited" {
+		return conformancecoverage.Observation{FailureReason: "mirror comparison changed the audited registry resolution"}
+	}
+	joined := strings.Join(result.Messages, "\n")
+	if vector.Diagnostic == nil {
+		if strings.Contains(joined, "registry_view_divergence") {
+			return conformancecoverage.Observation{FailureReason: "a non-divergent or incomparable vector emitted registry_view_divergence"}
+		}
+	} else {
+		if !strings.Contains(joined, *vector.Diagnostic) {
+			return conformancecoverage.Observation{FailureReason: fmt.Sprintf("install output omitted %q: %s", *vector.Diagnostic, joined)}
+		}
+		if vector.Severity != nil && !strings.Contains(joined, "("+*vector.Severity+")") {
+			return conformancecoverage.Observation{FailureReason: fmt.Sprintf("diagnostic severity did not match %q: %s", *vector.Severity, joined)}
+		}
+		if !strings.Contains(joined, "mirror group prod") || !strings.Contains(joined, "test-reg") || !strings.Contains(joined, "mirror") {
+			return conformancecoverage.Observation{FailureReason: fmt.Sprintf("diagnostic omitted group or disagreeing registries: %s", joined)}
+		}
+	}
+	postureRegistries := make([]registry.Registry, 0, len(registries))
+	for _, configured := range registries {
+		postureRegistries = append(postureRegistries, registry.Registry{
+			Name: configured.Name, URL: configured.URL, PublicKeys: configured.PublicKeys,
+			MirrorGroup: configured.MirrorGroup,
+		})
+	}
+	posture := registry.ReadBoundaryPostureWithPolicy(filepath.Join(e.home, "state", "registry"), postureRegistries, vector.Policy)
+	wantComparison := "not-compared"
+	if vector.Compared {
+		if vector.RootsEqual {
+			wantComparison = "agree"
+		} else {
+			wantComparison = "diverged"
+		}
+	}
+	for _, row := range posture {
+		if row.LastMirrorComparison != wantComparison || row.MirrorGroup != "prod" {
+			return conformancecoverage.Observation{FailureReason: fmt.Sprintf("persisted mirror posture = %+v, want %s for prod", row, wantComparison)}
+		}
+		rowCurrent := row.Diagnostic == ""
+		if rowCurrent != vector.CheckCurrent {
+			return conformancecoverage.Observation{FailureReason: fmt.Sprintf("status current=%v, want %v: %+v", row.Diagnostic == "", vector.CheckCurrent, row)}
+		}
+		if row.BootstrapSource != "first-use" || row.BootstrapDiagnostic != "registry_bootstrap_tofu" {
+			return conformancecoverage.Observation{FailureReason: fmt.Sprintf("bootstrap posture = %+v, want first-use TOFU", row)}
+		}
+	}
+	return conformancecoverage.Observation{}
+}
+
+func seedRegistryHighWater(t *testing.T, home string, urls, roots []string) {
+	t.Helper()
+	stateDir := filepath.Join(home, "state", "registry")
+	if err := os.MkdirAll(stateDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	states := make([]string, 0, len(urls))
+	for index, registryURL := range urls {
+		sum := sha256.Sum256([]byte(registryURL))
+		name := "snapshot-" + hex.EncodeToString(sum[:])[:16] + ".json"
+		states = append(states, name)
+		state, err := json.Marshal(map[string]any{
+			"highest_version":  8,
+			"head":             strings.Repeat("b", 64),
+			"merkle_root":      roots[index],
+			"log_size":         8,
+			"bootstrap_source": "first-use",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(stateDir, name), state, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	catalog, err := json.Marshal(map[string]any{"schema_version": 1, "states": states})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(stateDir, "known-registries.json"), catalog, 0o600); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // TestRegistrySnapshotSurvivesASecondBoundaryDuringFetch is the regression

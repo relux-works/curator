@@ -110,6 +110,23 @@ func TestValidateRejectsEscapingSymlinkAsContainmentFailure(t *testing.T) {
 	}
 }
 
+func TestOpenReadNoFollowRejectsFinalSymlink(t *testing.T) {
+	directory := t.TempDir()
+	target := filepath.Join(directory, "target.json")
+	link := filepath.Join(directory, "checkpoint.json")
+	if err := os.WriteFile(target, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("host cannot create symbolic links: %v", err)
+	}
+	file, err := OpenReadNoFollow(link)
+	if err == nil {
+		_ = file.Close()
+		t.Fatal("OpenReadNoFollow followed a final symbolic link")
+	}
+}
+
 func TestValidateRejectsMissingDirectory(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "absent")
 	err := Validate(root)
@@ -292,5 +309,35 @@ func TestValidateFailsClosedForOtherOwnerProbeErrors(t *testing.T) {
 	var failure *Failure
 	if !errors.As(err, &failure) || failure.Check != CheckOwnership || !errors.Is(err, injected) {
 		t.Fatalf("Validate error = %v, want ownership failure retaining the probe error", err)
+	}
+}
+
+func TestCheckPrivateFileRefusesForeignMutation(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "checkpoint.json")
+	if err := os.WriteFile(path, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := ProtectTree(root); err != nil {
+		t.Fatalf("protect fixture: %v", err)
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := CheckPrivateFile(path, info); err != nil {
+		t.Fatalf("protected private file refused: %v", err)
+	}
+	restore, err := makeWorldWritableDirectoryForTest(path)
+	if err != nil {
+		t.Fatalf("widen fixture: %v", err)
+	}
+	t.Cleanup(func() { _ = restore() })
+	info, err = os.Lstat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := CheckPrivateFile(path, info); err == nil {
+		t.Fatal("world-writable file was accepted as private")
 	}
 }

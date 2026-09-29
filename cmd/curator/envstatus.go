@@ -231,26 +231,47 @@ func readRegistryPosture(cfg *config.Config) []registry.BoundaryPosture {
 	trusted := cfg.TrustedRegistries()
 	registries := make([]registry.Registry, 0, len(trusted))
 	for _, entry := range trusted {
-		registries = append(registries, registry.Registry{Name: entry.Name, URL: entry.URL, PublicKeys: entry.PublicKeys})
+		registries = append(registries, registry.Registry{
+			Name: entry.Name, URL: entry.URL, PublicKeys: entry.PublicKeys,
+			BootstrapCheckpoint: entry.BootstrapCheckpoint, MirrorGroup: entry.MirrorGroup,
+		})
 	}
 	cacheDir := filepath.Join(cfg.Home(), "cache", "registry")
 	stateDir := registry.ReadOnlyStateDir(filepath.Join(cfg.Home(), "state", "registry"), cacheDir)
-	return registry.ReadBoundaryPosture(stateDir, registries)
+	return registry.ReadBoundaryPostureWithPolicy(stateDir, registries, cfg.Audit.RegistryPolicy)
 }
 
 func formatRegistryPosture(row registry.BoundaryPosture) string {
-	if row.Diagnostic != "" {
-		return fmt.Sprintf("registry %s %s: rollback state unavailable: %s", row.Name, row.URL, row.Diagnostic)
-	}
 	verified := "no"
 	if row.LastBoundaryVerified {
 		verified = "yes"
 	}
+	var posture string
 	if row.HighWaterVersion == nil || row.HighWaterLogSize == nil {
-		return fmt.Sprintf("registry %s %s: no persisted high-water, last page boundary verified: %s", row.Name, row.URL, verified)
+		posture = fmt.Sprintf("registry %s %s: no persisted high-water, last page boundary verified: %s", row.Name, row.URL, verified)
+	} else {
+		posture = fmt.Sprintf("registry %s %s: high-water version %d, log_size %d, last page boundary verified: %s",
+			row.Name, row.URL, *row.HighWaterVersion, *row.HighWaterLogSize, verified)
 	}
-	return fmt.Sprintf("registry %s %s: high-water version %d, log_size %d, last page boundary verified: %s",
-		row.Name, row.URL, *row.HighWaterVersion, *row.HighWaterLogSize, verified)
+	if row.BootstrapSource != "" {
+		posture += ", bootstrap source " + row.BootstrapSource
+	}
+	if row.BootstrapDiagnostic != "" {
+		posture += " (" + row.BootstrapDiagnostic + " " + row.BootstrapSeverity + ")"
+	}
+	if row.MirrorGroup != "" {
+		posture += ", mirror group " + row.MirrorGroup + " last comparison " + row.LastMirrorComparison
+		if row.LastMirrorComparisonLogSize != nil {
+			posture += fmt.Sprintf(" at log_size %d", *row.LastMirrorComparisonLogSize)
+		}
+		if row.MirrorDiagnostic != "" {
+			posture += " (" + row.MirrorDiagnostic + " " + row.MirrorSeverity + ")"
+		}
+	}
+	if row.Diagnostic != "" {
+		posture += ", status error: " + row.Diagnostic
+	}
+	return posture
 }
 
 func providerPostureForConfig(cfg *config.Config, pathOverride *string) ([]envprofile.ProviderState, *envprofile.StateDiagnostic) {

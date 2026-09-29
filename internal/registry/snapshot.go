@@ -30,11 +30,16 @@ var snapshotStateNameRE = regexp.MustCompile(`^snapshot-[0-9a-f]{16}\.json$`)
 const snapshotStateCatalogName = "known-registries.json"
 
 type snapshotState struct {
-	HighestVersion   int    `json:"highest_version"`
-	Head             string `json:"head,omitempty"`
-	MerkleRoot       string `json:"merkle_root,omitempty"`
-	LogSize          int    `json:"log_size,omitempty"`
-	BoundaryVerified bool   `json:"boundary_verified,omitempty"`
+	HighestVersion              int    `json:"highest_version"`
+	Head                        string `json:"head,omitempty"`
+	MerkleRoot                  string `json:"merkle_root,omitempty"`
+	LogSize                     int    `json:"log_size,omitempty"`
+	BoundaryVerified            bool   `json:"boundary_verified,omitempty"`
+	BootstrapSource             string `json:"bootstrap_source,omitempty"`
+	BootstrapCheckpointID       string `json:"bootstrap_checkpoint_id,omitempty"`
+	MirrorGroup                 string `json:"mirror_group,omitempty"`
+	LastMirrorComparison        string `json:"last_mirror_comparison,omitempty"`
+	LastMirrorComparisonLogSize int    `json:"last_mirror_comparison_log_size,omitempty"`
 }
 
 type snapshotStateCatalog struct {
@@ -69,7 +74,7 @@ type SnapshotCheck struct {
 // persisted highest accepted version, or it is stale. An unreachable
 // snapshot warns but does not exclude.
 func CheckSnapshots(registries []Registry, cacheDir string, fetch SnapshotFetchFn, now time.Time, maxAge time.Duration) (map[string]bool, []string) {
-	result := checkSnapshotsWithPolicy(registries, cacheDir, fetch, now, maxAge, DefaultSnapshotClockSkew, true)
+	result := checkSnapshotsWithPolicy(registries, cacheDir, fetch, now, maxAge, DefaultSnapshotClockSkew, true, nil)
 	return result.Tampered, result.Warnings
 }
 
@@ -90,7 +95,21 @@ func CheckSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch Snap
 // CheckSnapshotsWithPolicyDetailed returns the same snapshot verdict as
 // CheckSnapshotsWithPolicy and also reports URLs whose snapshot fetch failed.
 func CheckSnapshotsWithPolicyDetailed(registries []Registry, cacheDir string, fetch SnapshotFetchFn, now time.Time, maxAge, clockSkew time.Duration) SnapshotCheck {
-	return checkSnapshotsWithPolicy(registries, cacheDir, fetch, now, maxAge, clockSkew, true)
+	return checkSnapshotsWithPolicy(registries, cacheDir, fetch, now, maxAge, clockSkew, true, nil)
+}
+
+// CheckSnapshotsWithPolicyAndObserver applies the usual signed snapshot and
+// rollback checks, then reports accepted views to the optional mirror-group
+// observer. Divergence is diagnostic-only and does not alter the tampered set.
+func CheckSnapshotsWithPolicyAndObserver(registries []Registry, stateDir string, fetch SnapshotFetchFn, now time.Time, maxAge, clockSkew time.Duration, observer *MirrorViewObserver) (map[string]bool, []string) {
+	result := CheckSnapshotsWithPolicyDetailedAndObserver(registries, stateDir, fetch, now, maxAge, clockSkew, observer)
+	return result.Tampered, result.Warnings
+}
+
+// CheckSnapshotsWithPolicyDetailedAndObserver also reports URLs whose snapshot
+// fetch failed, preserving the structured diagnostics needed by install.
+func CheckSnapshotsWithPolicyDetailedAndObserver(registries []Registry, stateDir string, fetch SnapshotFetchFn, now time.Time, maxAge, clockSkew time.Duration, observer *MirrorViewObserver) SnapshotCheck {
+	return checkSnapshotsWithPolicy(registries, stateDir, fetch, now, maxAge, clockSkew, true, observer)
 }
 
 // CheckSnapshotsWithPolicyReadOnly verifies candidates against existing
@@ -103,10 +122,23 @@ func CheckSnapshotsWithPolicyReadOnly(registries []Registry, stateDir string, fe
 // CheckSnapshotsWithPolicyReadOnlyDetailed is the read-only form of
 // CheckSnapshotsWithPolicyDetailed.
 func CheckSnapshotsWithPolicyReadOnlyDetailed(registries []Registry, stateDir string, fetch SnapshotFetchFn, now time.Time, maxAge, clockSkew time.Duration) SnapshotCheck {
-	return checkSnapshotsWithPolicy(registries, stateDir, fetch, now, maxAge, clockSkew, false)
+	return checkSnapshotsWithPolicy(registries, stateDir, fetch, now, maxAge, clockSkew, false, nil)
 }
 
-func checkSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch SnapshotFetchFn, now time.Time, maxAge, clockSkew time.Duration, persist bool) SnapshotCheck {
+// CheckSnapshotsWithPolicyReadOnlyAndObserver is the read-only counterpart
+// of CheckSnapshotsWithPolicyAndObserver.
+func CheckSnapshotsWithPolicyReadOnlyAndObserver(registries []Registry, stateDir string, fetch SnapshotFetchFn, now time.Time, maxAge, clockSkew time.Duration, observer *MirrorViewObserver) (map[string]bool, []string) {
+	result := CheckSnapshotsWithPolicyReadOnlyDetailedAndObserver(registries, stateDir, fetch, now, maxAge, clockSkew, observer)
+	return result.Tampered, result.Warnings
+}
+
+// CheckSnapshotsWithPolicyReadOnlyDetailedAndObserver retains structured
+// unreachable-snapshot information while checking without persistent writes.
+func CheckSnapshotsWithPolicyReadOnlyDetailedAndObserver(registries []Registry, stateDir string, fetch SnapshotFetchFn, now time.Time, maxAge, clockSkew time.Duration, observer *MirrorViewObserver) SnapshotCheck {
+	return checkSnapshotsWithPolicy(registries, stateDir, fetch, now, maxAge, clockSkew, false, observer)
+}
+
+func checkSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch SnapshotFetchFn, now time.Time, maxAge, clockSkew time.Duration, persist bool, observer *MirrorViewObserver) SnapshotCheck {
 	// The future-timestamp bound below tolerates the checker's own latency
 	// since it sampled its clock. The start is taken once at function entry
 	// — not per registry — so the bound is the post-fetch wall clock plus
@@ -161,10 +193,39 @@ func checkSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch Snap
 			tampered[reg.URL] = true
 			continue
 		}
-		if !stateExists && knownStates[stateName] {
+		stateMissingAfterPrior := !stateExists && knownStates[stateName]
+		if stateMissingAfterPrior && reg.BootstrapCheckpoint == "" {
 			warnings = append(warnings, fmt.Sprintf("registry %s rollback state is missing after prior use", reg.Name))
 			tampered[reg.URL] = true
 			continue
+		}
+		firstNetworkFixation := !stateExists && !stateMissingAfterPrior && reg.BootstrapCheckpoint == ""
+		checkpointBootstrap := false
+		if reg.BootstrapCheckpoint != "" {
+			checkpointState, applied, regression, checkpointErr := reconcileBootstrapCheckpoint(reg, state, stateExists)
+			if checkpointErr != nil {
+				warnings = append(warnings, fmt.Sprintf("registry %s bootstrap checkpoint configuration error at %s: %v", reg.Name, reg.BootstrapCheckpoint, checkpointErr))
+				tampered[reg.URL] = true
+				continue
+			}
+			if regression {
+				if observer != nil {
+					observer.ReportCheckpointRegression(reg)
+				} else {
+					warnings = append(warnings, checkpointRegressionMessage(reg))
+				}
+			}
+			if applied {
+				state = checkpointState
+				checkpointBootstrap = true
+				if persist {
+					if err := persistSnapshotStateAndCatalog(cacheDir, stateName, state, knownStates); err != nil {
+						warnings = append(warnings, fmt.Sprintf("registry %s bootstrap checkpoint state could not be persisted: %v", reg.Name, err))
+						tampered[reg.URL] = true
+						continue
+					}
+				}
+			}
 		}
 		snapshot, err := fetch(reg.URL)
 		if err != nil {
@@ -215,10 +276,21 @@ func checkSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch Snap
 		if persist {
 			// Snapshot checks do not receive a page boundary. Preserve the
 			// last page-boundary posture while advancing the shared high-water.
-			if err := writeSnapshotState(stateFile, snapshotState{
-				HighestVersion: parsed.Version, Head: parsed.Head, MerkleRoot: parsed.MerkleRoot,
-				LogSize: parsed.LogSize, BoundaryVerified: state.BoundaryVerified,
-			}); err != nil {
+			next := state
+			next.HighestVersion = parsed.Version
+			next.Head = parsed.Head
+			next.MerkleRoot = parsed.MerkleRoot
+			next.LogSize = parsed.LogSize
+			if firstNetworkFixation {
+				next.BootstrapSource = "first-use"
+			} else if checkpointBootstrap {
+				next.BootstrapSource = "checkpoint"
+			} else if next.BootstrapSource == "" {
+				// State written before the bootstrap-source field was introduced
+				// was fixed by first use.
+				next.BootstrapSource = "first-use"
+			}
+			if err := writeSnapshotState(stateFile, next); err != nil {
 				warnings = append(warnings, fmt.Sprintf("registry %s rollback state could not be persisted: %v", reg.Name, err))
 				tampered[reg.URL] = true
 				continue
@@ -228,8 +300,17 @@ func checkSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch Snap
 				if err := writeSnapshotStateCatalog(cacheDir, knownStates); err != nil {
 					warnings = append(warnings, fmt.Sprintf("registry %s rollback state catalog could not be persisted: %v", reg.Name, err))
 					tampered[reg.URL] = true
+					continue
 				}
 			}
+		}
+		if observer != nil {
+			if firstNetworkFixation && persist {
+				observer.ReportBootstrapTOFU(reg)
+			}
+			observer.Observe(reg, parsed)
+		} else if firstNetworkFixation && persist {
+			warnings = append(warnings, bootstrapTOFUMessage(reg))
 		}
 	}
 	return SnapshotCheck{Tampered: tampered, Warnings: warnings, Unreachable: unreachable}
@@ -320,6 +401,16 @@ func readSnapshotState(path string) (snapshotState, bool, error) {
 	if data.HighestVersion < 0 || data.LogSize < 0 || data.LogSize > data.HighestVersion {
 		return snapshotState{}, true, fmt.Errorf("state has invalid version or log size")
 	}
+	if data.BootstrapSource != "" && data.BootstrapSource != "checkpoint" && data.BootstrapSource != "first-use" {
+		return snapshotState{}, true, fmt.Errorf("state has invalid bootstrap source")
+	}
+	if data.BootstrapCheckpointID != "" &&
+		(data.BootstrapSource != "checkpoint" || !hex256RE.MatchString(data.BootstrapCheckpointID)) {
+		return snapshotState{}, true, fmt.Errorf("state has invalid bootstrap checkpoint identity")
+	}
+	if data.LastMirrorComparison != "" && data.LastMirrorComparison != "agree" && data.LastMirrorComparison != "diverged" && data.LastMirrorComparison != "not-compared" {
+		return snapshotState{}, true, fmt.Errorf("state has invalid mirror comparison")
+	}
 	if !hex256RE.MatchString(data.Head) || !hex256RE.MatchString(data.MerkleRoot) {
 		return snapshotState{}, true, fmt.Errorf("state has invalid head or Merkle root")
 	}
@@ -332,6 +423,25 @@ func writeSnapshotState(path string, state snapshotState) error {
 		return err
 	}
 	return writeProtectedStateFile(path, payload)
+}
+
+// persistSnapshotStateAndCatalog publishes a signed checkpoint high-water
+// before any network response may contribute to registry resolution.
+func persistSnapshotStateAndCatalog(stateDir, stateName string, state snapshotState, known map[string]bool) error {
+	if err := os.MkdirAll(stateDir, 0o700); err != nil {
+		return err
+	}
+	_ = os.Chmod(stateDir, 0o700) // #nosec G302 -- protected state directory needs traversal bits
+	if err := writeSnapshotState(filepath.Join(stateDir, stateName), state); err != nil {
+		return err
+	}
+	if !known[stateName] {
+		known[stateName] = true
+		if err := writeSnapshotStateCatalog(stateDir, known); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func loadSnapshotStateCatalog(stateDir string) (map[string]bool, error) {

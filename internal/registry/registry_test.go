@@ -415,6 +415,16 @@ func snapshotBody(version int, createdAt time.Time) map[string]any {
 	}
 }
 
+func withoutTOFUWarnings(warnings []string) []string {
+	filtered := make([]string, 0, len(warnings))
+	for _, warning := range warnings {
+		if !strings.Contains(warning, "registry_bootstrap_tofu") {
+			filtered = append(filtered, warning)
+		}
+	}
+	return filtered
+}
+
 func TestSnapshotVerification(t *testing.T) {
 	s := newSigner(t)
 	now := time.Now()
@@ -424,7 +434,7 @@ func TestSnapshotVerification(t *testing.T) {
 	// valid snapshot passes and persists the version
 	fetch := func(string) (map[string]any, error) { return s.sign(snapshotBody(5, now)), nil }
 	tampered, warnings := CheckSnapshots([]Registry{reg}, cacheDir, fetch, now, 0)
-	if len(tampered) != 0 || len(warnings) != 0 {
+	if len(tampered) != 0 || len(withoutTOFUWarnings(warnings)) != 0 {
 		t.Fatalf("valid snapshot rejected: %v %v", tampered, warnings)
 	}
 
@@ -510,7 +520,7 @@ func TestSnapshotRollbackStateCorruptionFailsClosedAndMigrates(t *testing.T) {
 	reg := Registry{Name: "one", URL: "https://one", PublicKeys: []string{s.pinned}}
 	fetch := func(string) (map[string]any, error) { return s.sign(snapshotBody(5, now)), nil }
 	tampered, warnings := CheckSnapshots([]Registry{reg}, legacyDir, fetch, now, 0)
-	if len(tampered) != 0 || len(warnings) != 0 {
+	if len(tampered) != 0 || len(withoutTOFUWarnings(warnings)) != 0 {
 		t.Fatalf("valid state setup failed: %v %v", tampered, warnings)
 	}
 	stateFiles, err := filepath.Glob(filepath.Join(legacyDir, "snapshot-*.json"))
@@ -648,7 +658,7 @@ func TestReadOnlySnapshotCheckDoesNotCreateOrAdvanceState(t *testing.T) {
 	persistentState := t.TempDir()
 	if tampered, warnings := CheckSnapshotsWithPolicy(
 		[]Registry{reg}, persistentState, fetch, now, DefaultSnapshotMaxAge, DefaultSnapshotClockSkew,
-	); len(tampered) != 0 || len(warnings) != 0 {
+	); len(tampered) != 0 || len(withoutTOFUWarnings(warnings)) != 0 {
 		t.Fatalf("state setup failed: %v %v", tampered, warnings)
 	}
 	stateFiles, err := filepath.Glob(filepath.Join(persistentState, "snapshot-*.json"))
@@ -830,7 +840,7 @@ func TestSnapshotFutureBoundIsExactAtEveryConfiguredSkew(t *testing.T) {
 				}
 				tampered, warnings := CheckSnapshotsWithPolicy(
 					[]Registry{reg}, cacheDir, fetch, now, 0, skew)
-				joined := strings.Join(warnings, "\n")
+				joined := strings.Join(withoutTOFUWarnings(warnings), "\n")
 				if tampered[reg.URL] != tc.refused {
 					t.Fatalf("skew %v offset %v: refused=%v want %v (%v)",
 						skew, tc.offset, tampered[reg.URL], tc.refused, warnings)
@@ -876,7 +886,7 @@ func TestSnapshotZeroClockSkewIsLiteral(t *testing.T) {
 		t.Fatalf("a zero skew must refuse a sub-second future timestamp: %v %v", tampered, warnings)
 	}
 	tampered, warnings = CheckSnapshotsWithPolicy([]Registry{reg}, defaultCache, fetch, now, 0, DefaultSnapshotClockSkew)
-	if tampered[reg.URL] || len(warnings) != 0 {
+	if tampered[reg.URL] || len(withoutTOFUWarnings(warnings)) != 0 {
 		t.Fatalf("the shipped default must absorb sub-second drift: %v %v", tampered, warnings)
 	}
 }
@@ -906,7 +916,7 @@ func TestSnapshotFutureBoundToleratesCheckerLatency(t *testing.T) {
 		}
 		reg := Registry{Name: "one", URL: "https://one", PublicKeys: []string{s.pinned}}
 		tampered, warnings := CheckSnapshotsWithPolicy([]Registry{reg}, t.TempDir(), fetch, now, 0, 0)
-		if tampered[reg.URL] || len(warnings) != 0 {
+		if tampered[reg.URL] || len(withoutTOFUWarnings(warnings)) != 0 {
 			t.Fatalf("a snapshot minted during its own fetch must be accepted: %v %v", tampered, warnings)
 		}
 	})
@@ -931,7 +941,7 @@ func TestSnapshotFutureBoundToleratesCheckerLatency(t *testing.T) {
 			if tampered[slowReg.URL] {
 				t.Fatalf("the slow registry's own mint must be accepted: %v", warnings)
 			}
-			if tampered[fastReg.URL] || len(warnings) != 0 {
+			if tampered[fastReg.URL] || len(withoutTOFUWarnings(warnings)) != 0 {
 				t.Fatalf("a timestamp behind the post-fetch clock must be accepted: %v %v", tampered, warnings)
 			}
 		})

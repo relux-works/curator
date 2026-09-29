@@ -1431,7 +1431,10 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string, 
 	}
 	registries := make([]registry.Registry, 0, len(trusted))
 	for _, entry := range trusted {
-		registries = append(registries, registry.Registry{Name: entry.Name, URL: entry.URL, PublicKeys: entry.PublicKeys})
+		registries = append(registries, registry.Registry{
+			Name: entry.Name, URL: entry.URL, PublicKeys: entry.PublicKeys,
+			BootstrapCheckpoint: entry.BootstrapCheckpoint, MirrorGroup: entry.MirrorGroup,
+		})
 	}
 	cacheDir := filepath.Join(cfg.Home(), "cache", "registry")
 	stateDir := filepath.Join(cfg.Home(), "state", "registry")
@@ -1448,17 +1451,20 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string, 
 		snapshotStateDir = cacheDir
 	}
 	var snapshotCheck registry.SnapshotCheck
+	observer := registry.NewMirrorViewObserverWithState(cfg.Audit.RegistryPolicy, snapshotStateDir, persist, registries)
 	if persist {
-		snapshotCheck = registry.CheckSnapshotsWithPolicyDetailed(
+		snapshotCheck = registry.CheckSnapshotsWithPolicyDetailedAndObserver(
 			registries, snapshotStateDir, registry.HTTPGetSnapshot, time.Now(),
 			time.Duration(cfg.Audit.SnapshotMaxAgeSeconds)*time.Second,
 			time.Duration(cfg.Audit.SnapshotClockSkewSeconds)*time.Second,
+			observer,
 		)
 	} else {
-		snapshotCheck = registry.CheckSnapshotsWithPolicyReadOnlyDetailed(
+		snapshotCheck = registry.CheckSnapshotsWithPolicyReadOnlyDetailedAndObserver(
 			registries, snapshotStateDir, registry.HTTPGetSnapshot, time.Now(),
 			time.Duration(cfg.Audit.SnapshotMaxAgeSeconds)*time.Second,
 			time.Duration(cfg.Audit.SnapshotClockSkewSeconds)*time.Second,
+			observer,
 		)
 	}
 	result := registryResolution{
@@ -1479,23 +1485,23 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string, 
 	}
 	var fetch registry.FetchFn
 	if persist {
-		fetch = registry.NewHTTPFetchWithPolicy(
+		fetch = registry.NewHTTPFetchWithPolicyAndObserver(
 			cacheDir,
 			snapshotStateDir,
 			usable,
 			time.Duration(cfg.Audit.CacheTTLSeconds)*time.Second,
 			time.Duration(cfg.Audit.OfflineGraceSeconds)*time.Second,
 			nil,
-			registry.FetchPolicy{PersistCache: true, PersistState: true},
+			registry.FetchPolicy{PersistCache: true, PersistState: true}, observer,
 		)
 	} else {
-		fetch = registry.NewHTTPFetchWithPolicyReadOnly(
+		fetch = registry.NewHTTPFetchWithPolicyReadOnlyAndObserver(
 			cacheDir,
 			snapshotStateDir,
 			usable,
 			time.Duration(cfg.Audit.CacheTTLSeconds)*time.Second,
 			time.Duration(cfg.Audit.OfflineGraceSeconds)*time.Second,
-			nil,
+			nil, observer,
 		)
 	}
 	strict := cfg.Audit.RegistryPolicy == "strict"
@@ -1544,6 +1550,12 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string, 
 				KeyID:    resolution.Attestation.KeyID,
 			}
 		}
+	}
+	for _, failure := range observer.Finalize() {
+		result.Warnings = append(result.Warnings, alias+": registry: "+failure)
+	}
+	for _, diagnostic := range observer.Diagnostics() {
+		result.Warnings = append(result.Warnings, alias+": registry: "+diagnostic)
 	}
 	if len(problems) > 0 {
 		return result, fmt.Errorf("%s", strings.Join(problems, "; "))

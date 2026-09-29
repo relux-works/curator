@@ -100,9 +100,10 @@ func (s *draftEvidenceStub) serveRecords(w http.ResponseWriter, r *http.Request)
 // evidence installs and lands its attestation in the marker, while a
 // wrong-name, wrong-repository, wrong-commit, or wrong-context record is
 // refused fail-closed under a strict policy with the shared typed refusal,
-// preserving the prior lock and install and revealing no registry endpoint
-// or key material. Narrowing either the repository or commit comparison to
-// a non-empty check admits its corresponding single-field mismatch row.
+// preserving the prior lock and install. The required first-use posture may
+// name the registry URL; refusal errors and key material remain redacted.
+// Narrowing either the repository or commit comparison to a non-empty check
+// admits its corresponding single-field mismatch row.
 func TestDraftEvidenceExactMatch(t *testing.T) {
 	run := func(t *testing.T, mutate func(body map[string]any)) (Result, *draftEvidenceStub, map[string][]byte) {
 		t.Helper()
@@ -182,9 +183,15 @@ func TestDraftEvidenceExactMatch(t *testing.T) {
 				t.Fatalf("%s refusal exposed attestations: %+v", condition.name, result.Attestations)
 			}
 			diagnostics := strings.Join(append(append([]string(nil), result.Errors...), result.Messages...), ";")
-			for _, secret := range []string{stub.server.URL, stub.pinned, "ed25519:", "127.0.0.1"} {
+			for _, secret := range []string{stub.pinned, "ed25519:"} {
 				if strings.Contains(diagnostics, secret) {
 					t.Fatalf("%s refusal leaks %q: %q", condition.name, secret, diagnostics)
+				}
+			}
+			refusal := strings.Join(result.Errors, ";")
+			for _, secret := range []string{stub.server.URL, "127.0.0.1"} {
+				if strings.Contains(refusal, secret) {
+					t.Fatalf("%s refusal error leaks %q: %q", condition.name, secret, refusal)
 				}
 			}
 			for path, before := range priorState {

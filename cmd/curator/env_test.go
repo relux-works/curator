@@ -422,6 +422,13 @@ func TestEnvStatusRegistryBoundaryPostureAndCheck(t *testing.T) {
 			HighWaterVersion     *int   `json:"high_water_version"`
 			HighWaterLogSize     *int   `json:"high_water_log_size"`
 			LastBoundaryVerified bool   `json:"last_boundary_verified"`
+			BootstrapSource      string `json:"bootstrap_source"`
+			BootstrapDiagnostic  string `json:"bootstrap_diagnostic"`
+			BootstrapSeverity    string `json:"bootstrap_severity"`
+			MirrorGroup          string `json:"mirror_group"`
+			MirrorComparison     string `json:"last_mirror_comparison"`
+			MirrorDiagnostic     string `json:"mirror_diagnostic"`
+			MirrorSeverity       string `json:"mirror_severity"`
 			Diagnostic           string `json:"diagnostic"`
 		} `json:"registry_posture"`
 	}
@@ -468,8 +475,34 @@ func TestEnvStatusRegistryBoundaryPostureAndCheck(t *testing.T) {
 		t.Fatalf("status JSON with persisted high-water: %v\n%s", err, stdout)
 	}
 	row = report.RegistryPosture[0]
-	if row.HighWaterVersion == nil || *row.HighWaterVersion != 17 || row.HighWaterLogSize == nil || *row.HighWaterLogSize != 12 || !row.LastBoundaryVerified || row.Diagnostic != "" {
+	if row.HighWaterVersion == nil || *row.HighWaterVersion != 17 || row.HighWaterLogSize == nil || *row.HighWaterLogSize != 12 || !row.LastBoundaryVerified ||
+		row.BootstrapSource != "first-use" || row.BootstrapDiagnostic != "registry_bootstrap_tofu" || row.BootstrapSeverity != "warning" || row.Diagnostic != "" {
 		t.Fatalf("persisted registry posture = %+v", row)
+	}
+
+	statePayload, err = json.Marshal(map[string]any{
+		"highest_version": 17, "head": strings.Repeat("b", 64), "merkle_root": strings.Repeat("a", 64),
+		"log_size": 12, "boundary_verified": true, "bootstrap_source": "first-use", "mirror_group": "prod",
+		"last_mirror_comparison": "diverged", "last_mirror_comparison_log_size": 12,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(statePath, statePayload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	source.cfg.AuditRegistries[0].MirrorGroup = "prod"
+	source.cfg.Audit.RegistryPolicy = "strict"
+	code, stdout, stderr = runProfile(t, source, "env", "status", "--check", "--json")
+	if code != exitFail {
+		t.Fatalf("strict divergent registry status --check = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitFail, stdout, stderr)
+	}
+	if err := json.Unmarshal([]byte(stdout), &report); err != nil {
+		t.Fatalf("status JSON with divergence: %v\n%s", err, stdout)
+	}
+	row = report.RegistryPosture[0]
+	if !report.NonCurrent || row.MirrorGroup != "prod" || row.MirrorComparison != "diverged" || row.MirrorDiagnostic != "registry_view_divergence" || row.MirrorSeverity != "error" || !strings.Contains(row.Diagnostic, "registry_view_divergence") {
+		t.Fatalf("strict divergence posture = %+v non_current=%v", row, report.NonCurrent)
 	}
 	if err := os.WriteFile(statePath, []byte("{broken"), 0o600); err != nil {
 		t.Fatal(err)

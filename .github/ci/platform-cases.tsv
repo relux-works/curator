@@ -193,6 +193,18 @@ internal/adapters	TestSymlinkModeStagesRelativeLinkTargets	linux,darwin,windows	
 # whichever lane happens to be slow enough to notice.
 internal/install	TestRegistrySnapshotSurvivesASecondBoundaryDuringFetch	linux,darwin,windows	-	-	a snapshot minted before the run installs even when the fetch crosses a whole-second boundary
 internal/install	TestRegistryFutureSnapshotDeniesInstallThroughResolveRegistries	linux,darwin,windows	-	-	a genuinely future-dated snapshot denies the install through the production resolveRegistries path
+internal/install	TestRegistryMirrorComparisonVectorsDriveInstall	linux,darwin,windows	-	-	the pinned mirror-comparison vectors drive accepted registry roots through install and preserve status posture
+internal/install	TestRegistryBootstrapVectorsDriveInstall	linux,darwin,windows	-	-	the pinned bootstrap and rebootstrap vectors drive signed checkpoint and TOFU posture through install
+internal/install	TestRegistryFirstUseReportsAndPersistsTOFUPosture	linux,darwin,windows	-	-	first-use fixation warns with the registry URL and persists the TOFU source
+internal/install	TestRegistryCheckpointPersistsBeforeTamperedNetworkSnapshot	linux,darwin,windows	-	-	a valid checkpoint high-water persists before a lower network snapshot is refused
+internal/install	TestRegistryInvalidFirstUseCheckpointFailsClosed	linux,darwin,windows	-	-	an invalid signed checkpoint is refused before a registry high-water is persisted
+internal/install	TestRegistryRebootstrapRegressionKeepsExistingHighWater	linux,darwin,windows	-	-	a lower or conflicting rebootstrap checkpoint reports regression and preserves established state
+internal/registry	TestReconcileBootstrapCheckpointPreservesAndAdvancesHighWater	linux,darwin,windows	-	-	checkpoint equality, regression, and forward advance preserve or move the protected high-water as specified
+internal/registry	TestReconcileBootstrapCheckpointRequiresValidSignatureOnlyOnFirstUse	linux,darwin,windows	-	-	first-use requires a signed checkpoint while invalid rebootstrap leaves existing state unchanged
+internal/registry	TestReconcileBootstrapCheckpointFailsClosedForMalformedRebootstrap	linux,darwin,windows	-	-	present malformed checkpoint bytes fail closed on rebootstrap without changing established high-water
+internal/registry	TestReadBootstrapCheckpointAcceptsCRLFJSON	linux,darwin,windows	-	-	valid signed checkpoint JSON with CRLF whitespace verifies byte-identically across platforms
+internal/registry	TestRegistryPostureReportsBootstrapAndMirrorSeverityWithoutWrites	linux,darwin,windows	-	-	read-only status reports TOFU and mirror outcome severity without changing persisted state
+internal/pathboundary	TestOpenReadNoFollowRejectsFinalSymlink	linux,darwin,windows	windows	host-capability	checkpoint opening refuses a final symlink; Windows may skip only when the runner cannot create symlinks
 internal/registry	TestSnapshotFutureBoundIsExactAtEveryConfiguredSkew	linux,darwin,windows	-	-	the future-timestamp bound is exactly the configured skew at three sampled skews — the literal zero the e2e path uses, an arbitrary middle, and the shipped default; the gate is linear in clockSkew, so those three fix the line, and the row claims the sample rather than the unbounded set a config can express
 internal/registry	TestSnapshotZeroClockSkewIsLiteral	linux,darwin,windows	-	-	a zero clock skew is literal: no tolerance, not a fallback to the default
 

@@ -22,12 +22,12 @@ import (
 )
 
 // SchemaVersion is the original machine config schema. SchemaVersion2 adds
-// the environments §12.1 machine-configuration object; both stay readable
-// (manager §12) and an unknown schema_version is rejected explicitly.
+// the environments §12.1 object and registry bootstrap members; both stay
+// readable (manager §12) and an unknown schema_version is rejected explicitly.
 const SchemaVersion = 1
 
 // SchemaVersion2 is the machine config schema carrying the environments
-// §12.1 knobs under one environments object.
+// §12.1 knobs and registry bootstrap members.
 const SchemaVersion2 = 2
 
 // DefaultWorktreeAliasPattern extracts checkout aliases for git worktrees.
@@ -108,10 +108,12 @@ type Project struct {
 
 // Registry is a trusted audit registry entry (Spec §7.1).
 type Registry struct {
-	Name       string
-	URL        string
-	PublicKeys []string
-	Enabled    bool
+	Name                string
+	URL                 string
+	PublicKeys          []string
+	Enabled             bool
+	BootstrapCheckpoint string
+	MirrorGroup         string
 }
 
 // SourcePolicyRule classifies sources for cloud audit egress (Spec §12.1).
@@ -646,7 +648,7 @@ func parseConfig(data map[string]any, path string, locked map[string]bool, machi
 		}
 	}
 
-	registries, err := parseRegistries(data["audit_registries"])
+	registries, err := parseRegistries(data["audit_registries"], schema, path)
 	if err != nil {
 		return nil, err
 	}
@@ -1082,7 +1084,7 @@ func parseAudit(raw any) (Audit, error) {
 	return audit, nil
 }
 
-func parseRegistries(raw any) ([]Registry, error) {
+func parseRegistries(raw any, schema int, configPath string) ([]Registry, error) {
 	if raw == nil {
 		return nil, nil
 	}
@@ -1099,7 +1101,11 @@ func parseRegistries(raw any) ([]Registry, error) {
 			return nil, verr.New(label, "must be an object")
 		}
 		for key := range entry {
-			if key != "name" && key != "url" && key != "public_keys" && key != "enabled" {
+			known := key == "name" || key == "url" || key == "public_keys" || key == "enabled"
+			if schema == SchemaVersion2 {
+				known = known || key == "bootstrap_checkpoint" || key == "mirror_group"
+			}
+			if !known {
 				return nil, verr.New(label, "has unsupported field %q", key)
 			}
 		}
@@ -1138,7 +1144,33 @@ func parseRegistries(raw any) ([]Registry, error) {
 				return nil, verr.New(label+".enabled", "must be a boolean")
 			}
 		}
-		registries = append(registries, Registry{Name: name, URL: registryURL, PublicKeys: keys, Enabled: enabled})
+		checkpoint := ""
+		if rawCheckpoint, present := entry["bootstrap_checkpoint"]; present {
+			value, ok := rawCheckpoint.(string)
+			if !ok || value == "" || utf8.RuneCountInString(value) > 4096 {
+				return nil, verr.New(label+".bootstrap_checkpoint", "must be a path of 1 through 4096 characters")
+			}
+			if filepath.IsAbs(value) {
+				checkpoint = filepath.Clean(value)
+			} else {
+				checkpoint = filepath.Join(filepath.Dir(configPath), value)
+			}
+			checkpoint, err = filepath.Abs(checkpoint)
+			if err != nil {
+				return nil, verr.New(label+".bootstrap_checkpoint", "cannot resolve path: %v", err)
+			}
+		}
+		mirrorGroup := ""
+		if rawGroup, present := entry["mirror_group"]; present {
+			mirrorGroup, ok = rawGroup.(string)
+			if !ok || !identifiers.Valid(mirrorGroup) {
+				return nil, verr.New(label+".mirror_group", "%s", identifiers.Rule)
+			}
+		}
+		registries = append(registries, Registry{
+			Name: name, URL: registryURL, PublicKeys: keys, Enabled: enabled,
+			BootstrapCheckpoint: checkpoint, MirrorGroup: mirrorGroup,
+		})
 	}
 	return registries, nil
 }

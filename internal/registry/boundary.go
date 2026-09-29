@@ -52,27 +52,46 @@ type pageChain struct {
 	state     snapshotState
 	chain     []byte
 	pages     int
+	firstUse  bool
 }
 
 // openPageChain reads the existing high-water without creating or repairing
 // state. A missing state file listed in the catalog, an unreadable state, or
 // an invalid catalog is unavailable, never first use.
-func openPageChain(name, registryURL string, keys []string, stateDir string, persist bool) (*pageChain, error) {
+func openPageChain(reg Registry, stateDir string, persist bool, observer *MirrorViewObserver) (*pageChain, error) {
 	known, err := loadSnapshotStateCatalogReadOnly(stateDir)
 	if err != nil {
-		return nil, &pageStateError{fmt.Sprintf("registry %s rollback state catalog is unavailable: %v", name, err)}
+		return nil, &pageStateError{fmt.Sprintf("registry %s rollback state catalog is unavailable: %v", reg.Name, err)}
 	}
-	stateName := "snapshot-" + urlDigest(registryURL) + ".json"
+	stateName := "snapshot-" + urlDigest(reg.URL) + ".json"
 	stateFile := filepath.Join(stateDir, stateName)
 	state, exists, err := readSnapshotState(stateFile)
 	if err != nil {
-		return nil, &pageStateError{fmt.Sprintf("registry %s rollback state is unreadable: %v", name, err)}
+		return nil, &pageStateError{fmt.Sprintf("registry %s rollback state is unreadable: %v", reg.Name, err)}
 	}
-	if !exists && known[stateName] {
-		return nil, &pageStateError{fmt.Sprintf("registry %s rollback state is missing after prior use", name)}
+	stateMissingAfterPrior := !exists && known[stateName]
+	if stateMissingAfterPrior && reg.BootstrapCheckpoint == "" {
+		return nil, &pageStateError{fmt.Sprintf("registry %s rollback state is missing after prior use", reg.Name)}
+	}
+	if reg.BootstrapCheckpoint != "" {
+		checkpointState, applied, regression, checkpointErr := reconcileBootstrapCheckpoint(reg, state, exists)
+		if checkpointErr != nil {
+			return nil, &pageStateError{fmt.Sprintf("registry %s bootstrap checkpoint configuration error at %s: %v", reg.Name, reg.BootstrapCheckpoint, checkpointErr)}
+		}
+		if regression && observer != nil {
+			observer.ReportCheckpointRegression(reg)
+		}
+		if applied {
+			state = checkpointState
+			if persist {
+				if err := persistSnapshotStateAndCatalog(stateDir, stateName, state, known); err != nil {
+					return nil, &pageStateError{fmt.Sprintf("registry %s bootstrap checkpoint state could not be persisted: %v", reg.Name, err)}
+				}
+			}
+		}
 	}
 	return &pageChain{
-		name: name, url: registryURL, keys: keys,
+		name: reg.Name, url: reg.URL, keys: reg.PublicKeys,
 		stateDir: stateDir, stateName: stateName, stateFile: stateFile,
 		persist: persist, known: known, state: state,
 	}, nil
@@ -128,6 +147,16 @@ func (c *pageChain) acceptPage(boundary map[string]any, raw []byte) error {
 		c.pages = 1
 		return nil
 	}
+	firstUse := c.state.Head == "" && c.state.BootstrapSource == ""
+	next := c.state
+	next.HighestVersion = parsed.Version
+	next.Head = parsed.Head
+	next.MerkleRoot = parsed.MerkleRoot
+	next.LogSize = parsed.LogSize
+	next.BoundaryVerified = true
+	if next.BootstrapSource == "" {
+		next.BootstrapSource = "first-use"
+	}
 	if c.persist {
 		if err := os.MkdirAll(c.stateDir, 0o700); err != nil {
 			return &pageStateError{fmt.Sprintf("registry %s rollback state directory is unavailable: %v", c.name, err)}
@@ -135,17 +164,9 @@ func (c *pageChain) acceptPage(boundary map[string]any, raw []byte) error {
 		_ = os.Chmod(c.stateDir, 0o700) // #nosec G302 -- protected state directory needs traversal bits
 		// The shared snapshot-state writer atomically publishes the higher
 		// high-water and boundary posture before this page contributes.
-		next := snapshotState{
-			HighestVersion:   parsed.Version,
-			Head:             parsed.Head,
-			MerkleRoot:       parsed.MerkleRoot,
-			LogSize:          parsed.LogSize,
-			BoundaryVerified: true,
-		}
 		if err := writeSnapshotState(c.stateFile, next); err != nil {
 			return &pageStateError{fmt.Sprintf("registry %s rollback state could not be persisted: %v", c.name, err)}
 		}
-		c.state = next
 		if !c.known[c.stateName] {
 			c.known[c.stateName] = true
 			if err := writeSnapshotStateCatalog(c.stateDir, c.known); err != nil {
@@ -153,6 +174,8 @@ func (c *pageChain) acceptPage(boundary map[string]any, raw []byte) error {
 			}
 		}
 	}
+	c.state = next
+	c.firstUse = firstUse
 	c.chain = append([]byte(nil), raw...)
 	c.pages = 1
 	return nil
@@ -171,25 +194,44 @@ func (c *pageChain) cacheBoundaryCurrent(boundary map[string]any, raw []byte) bo
 
 // BoundaryPosture is one trusted registry's read-only §9.3 status row.
 type BoundaryPosture struct {
-	Name                 string `json:"name"`
-	URL                  string `json:"url"`
-	HighWaterVersion     *int   `json:"high_water_version"`
-	HighWaterLogSize     *int   `json:"high_water_log_size"`
-	LastBoundaryVerified bool   `json:"last_boundary_verified"`
-	Diagnostic           string `json:"diagnostic,omitempty"`
+	Name                        string `json:"name"`
+	URL                         string `json:"url"`
+	HighWaterVersion            *int   `json:"high_water_version"`
+	HighWaterLogSize            *int   `json:"high_water_log_size"`
+	LastBoundaryVerified        bool   `json:"last_boundary_verified"`
+	BootstrapSource             string `json:"bootstrap_source,omitempty"`
+	BootstrapDiagnostic         string `json:"bootstrap_diagnostic,omitempty"`
+	BootstrapSeverity           string `json:"bootstrap_severity,omitempty"`
+	MirrorGroup                 string `json:"mirror_group,omitempty"`
+	LastMirrorComparison        string `json:"last_mirror_comparison,omitempty"`
+	LastMirrorComparisonLogSize *int   `json:"last_mirror_comparison_log_size,omitempty"`
+	MirrorDiagnostic            string `json:"mirror_diagnostic,omitempty"`
+	MirrorSeverity              string `json:"mirror_severity,omitempty"`
+	Diagnostic                  string `json:"diagnostic,omitempty"`
 }
 
 // ReadBoundaryPosture reports persisted state in trusted registry order and
 // never creates, repairs, or mutates protected state. An unreadable or
 // missing-after-use state is reported as a diagnostic rather than absence.
 func ReadBoundaryPosture(stateDir string, registries []Registry) []BoundaryPosture {
+	return ReadBoundaryPostureWithPolicy(stateDir, registries, "advisory")
+}
+
+// ReadBoundaryPostureWithPolicy adds the persisted bootstrap and optional
+// mirror-comparison status required by registry protocol §5 and manager
+// profile §10. A strict divergence makes the row non-current; advisory
+// divergence and TOFU remain warnings.
+func ReadBoundaryPostureWithPolicy(stateDir string, registries []Registry, policy string) []BoundaryPosture {
 	known, catalogErr := loadSnapshotStateCatalogReadOnly(stateDir)
 	rows := make([]BoundaryPosture, 0, len(registries))
 	for _, reg := range registries {
 		if len(reg.PublicKeys) == 0 {
 			continue
 		}
-		row := BoundaryPosture{Name: reg.Name, URL: reg.URL}
+		row := BoundaryPosture{Name: reg.Name, URL: reg.URL, MirrorGroup: reg.MirrorGroup}
+		if reg.MirrorGroup != "" {
+			row.LastMirrorComparison = "not-compared"
+		}
 		if catalogErr != nil {
 			row.Diagnostic = fmt.Sprintf("rollback state catalog is unavailable: %v", catalogErr)
 			rows = append(rows, row)
@@ -203,12 +245,60 @@ func ReadBoundaryPosture(stateDir string, registries []Registry) []BoundaryPostu
 		case !exists && known[stateName]:
 			row.Diagnostic = "rollback state is missing after prior use"
 		case !exists:
-			// First use has no persisted high-water yet.
+			// First use has no persisted high-water yet. A configured
+			// checkpoint is still validated so status cannot report a bad
+			// first-use trust configuration as current.
+			if reg.BootstrapCheckpoint != "" {
+				if _, checkpointErr := readBootstrapCheckpoint(reg.BootstrapCheckpoint, reg.PublicKeys); checkpointErr != nil {
+					row.Diagnostic = fmt.Sprintf("bootstrap checkpoint configuration error at %s: %v", reg.BootstrapCheckpoint, checkpointErr)
+				}
+			}
 		default:
 			version, logSize := state.HighestVersion, state.LogSize
 			row.HighWaterVersion = &version
 			row.HighWaterLogSize = &logSize
 			row.LastBoundaryVerified = state.BoundaryVerified
+			row.BootstrapSource = state.BootstrapSource
+			if row.BootstrapSource == "" {
+				// States created before the source field was introduced used
+				// trust-on-first-use.
+				row.BootstrapSource = "first-use"
+			}
+			if row.BootstrapSource == "checkpoint" {
+				row.BootstrapSeverity = "info"
+			} else {
+				row.BootstrapDiagnostic = "registry_bootstrap_tofu"
+				row.BootstrapSeverity = "warning"
+			}
+			if reg.BootstrapCheckpoint != "" {
+				_, _, regression, _ := reconcileBootstrapCheckpoint(reg, state, true)
+				if regression {
+					row.BootstrapDiagnostic = "registry_checkpoint_regression"
+					row.BootstrapSeverity = "error"
+					row.Diagnostic = checkpointRegressionMessage(reg)
+				}
+			}
+			if reg.MirrorGroup != "" {
+				row.LastMirrorComparison = "not-compared"
+				if state.MirrorGroup == reg.MirrorGroup && state.LastMirrorComparison != "" {
+					row.LastMirrorComparison = state.LastMirrorComparison
+					if state.LastMirrorComparison == "agree" || state.LastMirrorComparison == "diverged" {
+						size := state.LastMirrorComparisonLogSize
+						row.LastMirrorComparisonLogSize = &size
+					}
+				}
+				if row.LastMirrorComparison == "diverged" {
+					row.MirrorDiagnostic = "registry_view_divergence"
+					row.MirrorSeverity = "warning"
+					if policy == "strict" {
+						row.MirrorSeverity = "error"
+						if row.Diagnostic != "" {
+							row.Diagnostic += "; "
+						}
+						row.Diagnostic += "registry_view_divergence: mirror group " + reg.MirrorGroup + " last diverged"
+					}
+				}
+			}
 		}
 		rows = append(rows, row)
 	}

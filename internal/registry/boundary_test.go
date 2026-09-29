@@ -54,8 +54,14 @@ func (w *boundaryWorld) seed(t *testing.T, stateDir string, reg Registry, body m
 	tampered, warnings := CheckSnapshotsWithPolicy(
 		[]Registry{reg}, stateDir, fetch, w.now, DefaultSnapshotMaxAge, DefaultSnapshotClockSkew,
 	)
-	if len(tampered) != 0 || len(warnings) != 0 {
-		t.Fatalf("seed snapshot state: tampered=%v warnings=%v", tampered, warnings)
+	var unexpected []string
+	for _, warning := range warnings {
+		if !strings.Contains(warning, "registry_bootstrap_tofu") {
+			unexpected = append(unexpected, warning)
+		}
+	}
+	if len(tampered) != 0 || len(unexpected) != 0 {
+		t.Fatalf("seed snapshot state: tampered=%v warnings=%v", tampered, unexpected)
 	}
 }
 
@@ -618,6 +624,46 @@ func TestReadBoundaryPostureReportsPersistedHighWaterWithoutWrites(t *testing.T)
 	entriesAfter, err := os.ReadDir(stateDir)
 	if err != nil || len(entriesAfter) != len(entriesBefore) {
 		t.Fatalf("read-only posture changed state files: before=%v after=%v error=%v", entriesBefore, entriesAfter, err)
+	}
+}
+
+func TestRegistryPostureReportsBootstrapAndMirrorSeverityWithoutWrites(t *testing.T) {
+	w := newBoundaryWorld(t)
+	stateDir := t.TempDir()
+	reg := w.registries("https://registry.example.test")[0]
+	reg.MirrorGroup = "prod"
+	w.seed(t, stateDir, reg, w.storedBody(8))
+	statePath := boundaryStateFile(stateDir, reg.URL)
+	state, exists, err := readSnapshotState(statePath)
+	if err != nil || !exists {
+		t.Fatalf("state exists=%v error=%v", exists, err)
+	}
+	state.BootstrapSource = "first-use"
+	state.MirrorGroup = "prod"
+	state.LastMirrorComparison = "diverged"
+	state.LastMirrorComparisonLogSize = 8
+	if err := writeSnapshotState(statePath, state); err != nil {
+		t.Fatal(err)
+	}
+	before := readBoundaryState(t, statePath)
+
+	advisory := ReadBoundaryPostureWithPolicy(stateDir, []Registry{reg}, "advisory")
+	if len(advisory) != 1 {
+		t.Fatalf("advisory posture rows = %+v", advisory)
+	}
+	row := advisory[0]
+	if row.Diagnostic != "" || row.BootstrapSource != "first-use" || row.BootstrapDiagnostic != "registry_bootstrap_tofu" || row.BootstrapSeverity != "warning" ||
+		row.MirrorGroup != "prod" || row.LastMirrorComparison != "diverged" || row.LastMirrorComparisonLogSize == nil || *row.LastMirrorComparisonLogSize != 8 ||
+		row.MirrorDiagnostic != "registry_view_divergence" || row.MirrorSeverity != "warning" {
+		t.Fatalf("advisory posture = %+v", row)
+	}
+
+	strict := ReadBoundaryPostureWithPolicy(stateDir, []Registry{reg}, "strict")
+	if len(strict) != 1 || strict[0].MirrorSeverity != "error" || !strings.Contains(strict[0].Diagnostic, "registry_view_divergence") {
+		t.Fatalf("strict posture = %+v, want a non-current divergence row", strict)
+	}
+	if after := readBoundaryState(t, statePath); string(after) != string(before) {
+		t.Fatalf("status changed manager state:\nbefore %s\nafter %s", before, after)
 	}
 }
 

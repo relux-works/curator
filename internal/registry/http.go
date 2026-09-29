@@ -144,23 +144,35 @@ func NewHTTPFetch(cacheDir, stateDir string, registries []Registry, ttl, grace t
 	if grace == 0 {
 		grace = DefaultOfflineGrace
 	}
-	return newHTTPFetch(cacheDir, stateDir, registries, ttl, grace, now, FetchPolicy{PersistCache: true, PersistState: true})
+	return newHTTPFetch(cacheDir, stateDir, registries, ttl, grace, now, FetchPolicy{PersistCache: true, PersistState: true}, nil)
 }
 
 // NewHTTPFetchWithPolicy is the manager-config form. Zero TTL and grace are
 // literal and disable fresh-cache or stale-fallback use respectively.
 func NewHTTPFetchWithPolicy(cacheDir, stateDir string, registries []Registry, ttl, grace time.Duration, now func() time.Time, policy FetchPolicy) FetchFn {
-	return newHTTPFetch(cacheDir, stateDir, registries, ttl, grace, now, policy)
+	return newHTTPFetch(cacheDir, stateDir, registries, ttl, grace, now, policy, nil)
+}
+
+// NewHTTPFetchWithPolicyAndObserver reports accepted page boundaries to the
+// same operation-scoped mirror observer used for accepted snapshots.
+func NewHTTPFetchWithPolicyAndObserver(cacheDir, stateDir string, registries []Registry, ttl, grace time.Duration, now func() time.Time, policy FetchPolicy, observer *MirrorViewObserver) FetchFn {
+	return newHTTPFetch(cacheDir, stateDir, registries, ttl, grace, now, policy, observer)
 }
 
 // NewHTTPFetchWithPolicyReadOnly verifies network and cached boundaries
 // against existing state, but never creates or updates either persistent
 // cache or rollback state.
 func NewHTTPFetchWithPolicyReadOnly(cacheDir, stateDir string, registries []Registry, ttl, grace time.Duration, now func() time.Time) FetchFn {
-	return newHTTPFetch(cacheDir, stateDir, registries, ttl, grace, now, FetchPolicy{})
+	return newHTTPFetch(cacheDir, stateDir, registries, ttl, grace, now, FetchPolicy{}, nil)
 }
 
-func newHTTPFetch(cacheDir, stateDir string, registries []Registry, ttl, grace time.Duration, now func() time.Time, policy FetchPolicy) FetchFn {
+// NewHTTPFetchWithPolicyReadOnlyAndObserver is the read-only counterpart of
+// NewHTTPFetchWithPolicyAndObserver.
+func NewHTTPFetchWithPolicyReadOnlyAndObserver(cacheDir, stateDir string, registries []Registry, ttl, grace time.Duration, now func() time.Time, observer *MirrorViewObserver) FetchFn {
+	return newHTTPFetch(cacheDir, stateDir, registries, ttl, grace, now, FetchPolicy{}, observer)
+}
+
+func newHTTPFetch(cacheDir, stateDir string, registries []Registry, ttl, grace time.Duration, now func() time.Time, policy FetchPolicy, observer *MirrorViewObserver) FetchFn {
 	if now == nil {
 		now = time.Now
 	}
@@ -176,7 +188,7 @@ func newHTTPFetch(cacheDir, stateDir string, registries []Registry, ttl, grace t
 		if !trusted || len(reg.PublicKeys) == 0 {
 			return nil, fmt.Errorf("registry %s is not trusted: no pinned keys to verify its page boundary", baseURL)
 		}
-		chain, err := openPageChain(reg.Name, baseURL, reg.PublicKeys, stateDir, policy.PersistState)
+		chain, err := openPageChain(reg, stateDir, policy.PersistState, observer)
 		if err != nil {
 			return nil, err
 		}
@@ -191,9 +203,14 @@ func newHTTPFetch(cacheDir, stateDir string, registries []Registry, ttl, grace t
 
 		if fetchedAt, records, boundary, rawBoundary, ok := readRecordCache(cacheFile); ok && now().Sub(fetchedAt) >= 0 && now().Sub(fetchedAt) < ttl &&
 			chain.cacheBoundaryCurrent(boundary, rawBoundary) {
+			if observer != nil {
+				if parsed, err := parseSnapshot(boundary); err == nil {
+					observer.Observe(reg, parsed)
+				}
+			}
 			return records, nil
 		}
-		records, err := httpGetAllRecords(chain, endpoint)
+		records, err := httpGetAllRecords(chain, endpoint, reg, observer)
 		if err != nil {
 			var boundaryErr *PageBoundaryError
 			var stateErr *pageStateError
@@ -216,7 +233,7 @@ func newHTTPFetch(cacheDir, stateDir string, registries []Registry, ttl, grace t
 	}
 }
 
-func httpGetAllRecords(chain *pageChain, endpoint string) ([]map[string]any, error) {
+func httpGetAllRecords(chain *pageChain, endpoint string, reg Registry, observer *MirrorViewObserver) ([]map[string]any, error) {
 	records := make([]map[string]any, 0)
 	seenCursors := map[string]bool{}
 	cursor := ""
@@ -232,7 +249,7 @@ func httpGetAllRecords(chain *pageChain, endpoint string) ([]map[string]any, err
 			query.Set("cursor", cursor)
 		}
 		pageURL.RawQuery = query.Encode()
-		page, next, err := httpGetRecordsPage(chain, pageURL.String())
+		page, next, err := httpGetRecordsPage(chain, pageURL.String(), reg, observer)
 		if err != nil {
 			return nil, err
 		}
@@ -251,7 +268,7 @@ func httpGetAllRecords(chain *pageChain, endpoint string) ([]map[string]any, err
 	}
 }
 
-func httpGetRecordsPage(chain *pageChain, endpoint string) ([]map[string]any, string, error) {
+func httpGetRecordsPage(chain *pageChain, endpoint string, reg Registry, observer *MirrorViewObserver) ([]map[string]any, string, error) {
 	request, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, "", err
@@ -289,6 +306,15 @@ func httpGetRecordsPage(chain *pageChain, endpoint string) ([]map[string]any, st
 	}
 	if err := chain.acceptPage(boundary, rawBoundary); err != nil {
 		return nil, "", err
+	}
+	if chain.firstUse && chain.persist && observer != nil {
+		observer.ReportBootstrapTOFU(reg)
+		chain.firstUse = false
+	}
+	if observer != nil {
+		if parsed, err := parseSnapshot(boundary); err == nil {
+			observer.Observe(reg, parsed)
+		}
 	}
 	var data map[string]any
 	if err := decodeJSON(result.body, &data); err != nil {

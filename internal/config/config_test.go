@@ -159,6 +159,41 @@ func TestParseProjectsAndRegistries(t *testing.T) {
 	}
 }
 
+func TestSchema2RegistryBootstrapMembersArePreserved(t *testing.T) {
+	dir := t.TempDir()
+	path := writeConfig(t, dir, "config.json", `{
+		"schema_version": 2, "skills_root": "./skills", "projects": {},
+		"audit_registries": [{
+			"name": "primary", "url": "https://registry.example",
+			"bootstrap_checkpoint": "checkpoints/primary.json", "mirror_group": "prod"
+		}]
+	}`)
+	cfg, err := Load(path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.AuditRegistries) != 1 {
+		t.Fatalf("registries = %+v, want one configured registry", cfg.AuditRegistries)
+	}
+	entry := cfg.TrustedRegistries()[0]
+	wantCheckpoint := filepath.Join(dir, "checkpoints", "primary.json")
+	if entry.BootstrapCheckpoint != wantCheckpoint || entry.MirrorGroup != "prod" {
+		t.Fatalf("trusted registry bootstrap members = %+v, want checkpoint %q and group prod", entry, wantCheckpoint)
+	}
+}
+
+func TestSchema1RejectsRegistryBootstrapMembers(t *testing.T) {
+	for _, member := range []string{"\"bootstrap_checkpoint\":\"checkpoint.json\"", "\"mirror_group\":\"prod\""} {
+		t.Run(member, func(t *testing.T) {
+			text := `{"schema_version":1,"skills_root":"skills","projects":{},"audit_registries":[{"name":"primary","url":"https://registry.example",` + member + `}]}`
+			_, err := Load(writeConfig(t, t.TempDir(), "config.json", text), nil)
+			if err == nil || !strings.Contains(err.Error(), "unsupported field") {
+				t.Fatalf("schema-1 registry member error = %v, want unknown-field refusal", err)
+			}
+		})
+	}
+}
+
 func TestParseRejections(t *testing.T) {
 	cases := []struct {
 		name string
