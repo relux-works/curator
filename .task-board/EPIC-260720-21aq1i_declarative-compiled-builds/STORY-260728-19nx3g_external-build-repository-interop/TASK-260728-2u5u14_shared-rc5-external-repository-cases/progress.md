@@ -1,5 +1,5 @@
 ## Status
-backlog
+closed
 
 ## Review
 required
@@ -24,6 +24,7 @@ estimated(fibonacci(8))
 - [ ] Review the case matrix against every architecture-v6 threat and lifecycle boundary
 
 ## Notes
+Closed by operator decision 2026-09-30 (Ivan): cross-manager black-box parity between curator and csk is dropped from the goal. The shared spec suite plus the spec Implementations job (both managers pinned, lockstep landings) already provide the conformance guarantee. Reopen as a new task if strict parity is needed later. Audit: TASK-260930-2mtgv7.
 
 ## Precondition Resources
 (none)
@@ -35,4 +36,4 @@ estimated(fibonacci(8))
 2026-07-27T20:22:37Z
 
 ## Last Update
-2026-07-28T09:19:26Z
+2026-09-30T17:46:03Z
