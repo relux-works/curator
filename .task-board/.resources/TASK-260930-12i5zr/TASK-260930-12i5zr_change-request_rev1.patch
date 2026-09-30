@@ -1,0 +1,1357 @@
+diff --git a/.github/ci/conformance-case-counts.tsv b/.github/ci/conformance-case-counts.tsv
+index c8fca47e..753b31af 100644
+--- a/.github/ci/conformance-case-counts.tsv
++++ b/.github/ci/conformance-case-counts.tsv
+@@ -1,87 +1,190 @@
+-# Published case counts for curator-spec corpora consumed by internal/crossconformance.
+-# Verified against v1.0.0-rc.13 tag commit 23435129ebc4c29e5b7f75ec72a0aa0cd3f16065; the protocol-label-only advance preserves case membership.
+-family	expected_cases
+-registry-client/bootstrap-cases	10
+-registry-client/mirror-comparison-cases	5
+-manager-config-v2/vectors	56
+-manager-config-v2/schema-cases	107
+-system-config-v2/schema-cases	42
+-skillfile-sources-v1/semantic-cases/0	21
+-skillfile-sources-v1/semantic-cases/1	28
+-skillfile-sources-v1/semantic-cases/2	14
+-skillfile-sources-v1/semantic-cases/3	19
+-skillfile-sources-v1/semantic-cases/4	23
+-skillfile-sources-v1/schema-cases	121
+-skillfile-sources-v1/snapshot-cases	3
+-agent-environment-marker-v1/schema-cases	61
+-agent-environment-marker-v2/schema-cases	26
+-launch-env-fragment-v1/schema-cases	50
+-portable-paths/vectors	18
+-agent-skill-v7/schema-cases	37
+-csk-skill-v7/schema-cases	37
+-agent-skill-v8/schema-cases	66
+-csk-skill-v8/schema-cases	66
+-module-roots/vectors	10
+-script-host-execution-policy/opt-in-cases	6
+-script-host-execution-policy/executable-identity-cases	8
+-shell-hook-trust/vectors	14
+-environments-path-kind-admission/mcp_kind_cases	5
+-environments-path-kind-admission/path_boundary_cases	14
+-environments-path-kind-admission/dry_run_cases	3
+-build-source/build-source-cases	10
+-build-drivers/positive-cases	8
+-build-drivers/rejection-cases	77
+-build-drivers/argv-cases	5
+-build-drivers/fixed-environment-cases	3
+-build-drivers/toolchain-cases	12
+-go-host-execution-policy/capability-evidence-cases	11
+-go-host-execution-policy/identity-and-protocol-cases	14
+-go-host-execution-policy/package-influence-cases	8
+-source-identities/vectors	10
+-skill-build-v1/schema-cases	13
+-skillfile-dev-v2/schema-cases	16
+-external-repository/raw-objects	12
+-external-repository/lfs-pointers	10
+-external-repository/pack-index	8
+-external-repository/local-config-and-refs	15
+-marker/install-marker-v2/schema-cases	14
+-marker/install-marker-v4/schema-cases	27
+-install/dry-run-cases	3
+-external-repository-lifecycle/status-repair-gc-cases	5
+-closure/ordering-cases	3
+-manager-lifecycle/bootstrap-cases	3
+-manager-lifecycle/build-order-cases	1
+-manager-lifecycle/launcher-cases	2
+-manager-lifecycle/upgrade-cases	3
+-interop/canonical-valid-vectors	3
+-interop/canonical-invalid-vectors	5
+-interop/source-identity-vectors	10
+-interop/identifier-vectors	13
+-interop/locale-selector-vectors	10
+-interop/manager-config-vectors	15
+-context-versions/version-cases	15
+-context-versions/ordering-cases	1
+-context-versions/range-cases	50
+-context-versions/satisfies-cases	63
+-umbrella-provider-resolution/cases	14
+-context-versions/lock-cases	3
+-context-versions/resolution-cases	23
+-context-detectors/cases	12
+-snapshot-acquisition/cases	1
+-environments/header-cases	4
+-environments/materialization-cases	24
+-environments-codex-seed/provisioning-cases	7
+-environments-codex-seed/posture-cases	8
+-environments-env-passthrough/default-resolution-cases	7
+-environments-env-passthrough/allowlist-empty-cases	6
+-environments-env-passthrough/schema-cases	4
+-environments-env-passthrough/surfacing-cases	6
+-environments-env-passthrough/surfacing-order-cases	2
+-environments-read-failure/cases	37
+-environments-read-failure/restore	2
+-environments-write-nofollow/cases	11
+-security-posture/vectors	17
+-environments-store-boundary/resolve_cases	20
+-environments-store-boundary/dry_run_cases	4
+-environments-store-boundary/repair_cases	10
+-environments-store-boundary/status_cases	4
++# Exact published-case counts keyed by the SHA-256 of conformance/v1/manifest.json.
++# rc.13 and the content-hash-v2 candidate share the protocol label; their manifest identities keep the ratchets independent.
++# rc.13 manifest sha256: be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca
++# candidate manifest sha256: 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60
++suite_manifest_sha256	family	expected_cases
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	agent-environment-marker-v1/schema-cases	61
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	agent-environment-marker-v2/schema-cases	26
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	agent-skill-v7/schema-cases	37
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	agent-skill-v8/schema-cases	66
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	audit-record-v1/schema-cases	2
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	build-drivers/argv-cases	5
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	build-drivers/fixed-environment-cases	3
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	build-drivers/positive-cases	8
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	build-drivers/rejection-cases	77
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	build-drivers/toolchain-cases	12
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	build-source/build-source-cases	10
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	closure/ordering-cases	3
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	context-detectors/cases	12
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	context-lock-v1/schema-cases	31
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	context-versions/lock-cases	3
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	context-versions/ordering-cases	1
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	context-versions/range-cases	50
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	context-versions/resolution-cases	23
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	context-versions/satisfies-cases	63
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	context-versions/version-cases	15
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	csk-skill-v7/schema-cases	37
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	csk-skill-v8/schema-cases	66
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/posture-cases	8
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/provisioning-cases	7
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-env-passthrough/allowlist-empty-cases	6
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-env-passthrough/default-resolution-cases	7
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-env-passthrough/schema-cases	4
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-env-passthrough/surfacing-cases	6
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-env-passthrough/surfacing-order-cases	2
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-path-kind-admission/dry_run_cases	3
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-path-kind-admission/mcp_kind_cases	5
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-path-kind-admission/path_boundary_cases	14
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-read-failure/cases	37
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-read-failure/restore	2
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-store-boundary/dry_run_cases	4
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-store-boundary/repair_cases	10
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-store-boundary/resolve_cases	20
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-store-boundary/status_cases	4
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-write-nofollow/cases	11
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments/header-cases	4
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments/materialization-cases	24
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	external-repository-lifecycle/status-repair-gc-cases	5
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	external-repository/lfs-pointers	10
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	external-repository/local-config-and-refs	15
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	external-repository/pack-index	8
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	external-repository/raw-objects	12
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	go-host-execution-policy/capability-evidence-cases	11
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	go-host-execution-policy/identity-and-protocol-cases	14
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	go-host-execution-policy/package-influence-cases	8
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	install/dry-run-cases	3
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	interop/canonical-invalid-vectors	5
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	interop/canonical-valid-vectors	3
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	interop/identifier-vectors	13
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	interop/locale-selector-vectors	10
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	interop/manager-config-vectors	15
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	interop/source-identity-vectors	10
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	launch-env-fragment-v1/schema-cases	50
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	manager-config-v2/schema-cases	107
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	manager-config-v2/vectors	56
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	manager-lifecycle/bootstrap-cases	3
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	manager-lifecycle/build-order-cases	1
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	manager-lifecycle/launcher-cases	2
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	manager-lifecycle/upgrade-cases	3
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	marker/install-marker-v2/schema-cases	14
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	marker/install-marker-v3/schema-cases	27
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	marker/install-marker-v4/schema-cases	27
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	module-roots/vectors	10
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	portable-paths/vectors	18
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	registry-client/bootstrap-cases	10
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	registry-client/mirror-comparison-cases	5
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	registry-log-entry-v1/schema-cases	2
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	script-host-execution-policy/executable-identity-cases	8
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	script-host-execution-policy/opt-in-cases	6
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	security-posture/vectors	17
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	shell-hook-trust/vectors	14
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	skill-build-v1/schema-cases	13
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	skillfile-dev-v2/schema-cases	16
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	skillfile-sources-v1/schema-cases	121
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	skillfile-sources-v1/semantic-cases/0	21
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	skillfile-sources-v1/semantic-cases/1	28
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	skillfile-sources-v1/semantic-cases/2	14
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	skillfile-sources-v1/semantic-cases/3	19
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	skillfile-sources-v1/semantic-cases/4	23
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	skillfile-sources-v1/snapshot-cases	3
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	snapshot-acquisition/cases	1
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	source-identities/vectors	10
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	system-config-v2/schema-cases	42
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	umbrella-provider-resolution/cases	14
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v1/schema-cases	61
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v2/schema-cases	27
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	28
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-skill-v7/schema-cases	37
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-skill-v8/schema-cases	66
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	audit-record-v1/schema-cases	3
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	audit-record-v2/schema-cases	3
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	build-drivers/argv-cases	5
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	build-drivers/fixed-environment-cases	3
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	build-drivers/positive-cases	8
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	build-drivers/rejection-cases	77
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	build-drivers/toolchain-cases	12
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	build-source/build-source-cases	10
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	closure/ordering-cases	3
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	content-hashes-v2/vectors	5
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	context-detectors/cases	12
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	context-lock-v1/schema-cases	32
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	context-lock-v2/schema-cases	4
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	context-versions/lock-cases	3
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	context-versions/ordering-cases	1
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	context-versions/range-cases	50
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	context-versions/resolution-cases	23
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	context-versions/satisfies-cases	63
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	context-versions/version-cases	15
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	csk-skill-v7/schema-cases	37
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	csk-skill-v8/schema-cases	66
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/posture-cases	8
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/provisioning-cases	7
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-env-passthrough/allowlist-empty-cases	6
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-env-passthrough/default-resolution-cases	7
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-env-passthrough/schema-cases	4
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-env-passthrough/surfacing-cases	6
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-env-passthrough/surfacing-order-cases	2
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-path-kind-admission/dry_run_cases	3
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-path-kind-admission/mcp_kind_cases	5
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-path-kind-admission/path_boundary_cases	14
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-read-failure/cases	37
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-read-failure/restore	2
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-store-boundary/dry_run_cases	4
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-store-boundary/repair_cases	10
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-store-boundary/resolve_cases	20
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-store-boundary/status_cases	4
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-write-nofollow/cases	11
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments/header-cases	4
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments/materialization-cases	24
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	external-repository-lifecycle/status-repair-gc-cases	5
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	external-repository/lfs-pointers	10
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	external-repository/local-config-and-refs	15
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	external-repository/pack-index	8
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	external-repository/raw-objects	12
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	go-host-execution-policy/capability-evidence-cases	11
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	go-host-execution-policy/identity-and-protocol-cases	14
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	go-host-execution-policy/package-influence-cases	8
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	install/dry-run-cases	3
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	interop/canonical-invalid-vectors	5
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	interop/canonical-valid-vectors	3
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	interop/identifier-vectors	13
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	interop/locale-selector-vectors	10
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	interop/manager-config-vectors	15
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	interop/source-identity-vectors	10
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	launch-env-fragment-v1/schema-cases	50
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	log-response-v3/schema-cases	2
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	manager-config-v2/schema-cases	107
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	manager-config-v2/vectors	56
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	manager-config-v3/schema-cases	5
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	manager-lifecycle/bootstrap-cases	3
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	manager-lifecycle/build-order-cases	1
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	manager-lifecycle/launcher-cases	2
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	manager-lifecycle/upgrade-cases	3
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v2/schema-cases	14
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v3/schema-cases	28
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v4/schema-cases	28
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	29
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	module-roots/vectors	10
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	portable-paths/vectors	18
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	registry-bundle-v2/schema-cases	2
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	registry-client/bootstrap-cases	10
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	registry-client/mirror-comparison-cases	5
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	registry-log-entry-v1/schema-cases	3
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	registry-log-entry-v2/schema-cases	2
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	script-host-execution-policy/executable-identity-cases	8
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	script-host-execution-policy/opt-in-cases	6
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	security-posture/vectors	17
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	shell-hook-trust/vectors	14
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	skill-build-v1/schema-cases	13
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	skillfile-dev-v2/schema-cases	16
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	skillfile-sources-v1/schema-cases	131
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	skillfile-sources-v1/semantic-cases/0	21
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	skillfile-sources-v1/semantic-cases/1	28
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	skillfile-sources-v1/semantic-cases/2	14
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	skillfile-sources-v1/semantic-cases/3	19
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	skillfile-sources-v1/semantic-cases/4	23
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	skillfile-sources-v1/snapshot-cases	3
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	snapshot-acquisition/cases	1
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	source-identities/vectors	10
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	system-config-v2/schema-cases	42
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	umbrella-provider-resolution/cases	14
+diff --git a/.github/ci/conformance-gaps.tsv b/.github/ci/conformance-gaps.tsv
+index 2873c8ce..b24d9bdf 100644
+--- a/.github/ci/conformance-gaps.tsv
++++ b/.github/ci/conformance-gaps.tsv
+@@ -1,20 +1,123 @@
+-# A row is an owed implementation, not an accepted deviation. Remove it only
+-# after the named published case passes its production-entry consumer.
+-# Case IDs and owners are verified against v1.0.0-rc.13 tag commit 23435129ebc4c29e5b7f75ec72a0aa0cd3f16065.
+-family	case_id	owner	reason
+-environments-codex-seed/provisioning-cases	b-empty-mcp-servers-table-no-warning	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-environments-codex-seed/provisioning-cases	b-strips-servers-keeps-rest	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-environments-codex-seed/provisioning-cases	b-subtable-only-form-stripped	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-environments-codex-seed/provisioning-cases	b-without-servers-no-warning	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-environments-codex-seed/posture-cases	a-home-unstripped-under-b	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-environments-codex-seed/posture-cases	b-home-empty-snapshot-no-rows	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-environments-codex-seed/posture-cases	b-home-lists-not-inherited	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-environments-codex-seed/posture-cases	non-codex-home-without-record-no-rows	TASK-260927-1e5qqm	The manager posture row is revision B in this vector; it remains pending the registry flip owned by this leaf.
+-environments-codex-seed/posture-cases	pre-rule-home-unstripped-under-b	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-marker/install-marker-v4/schema-cases	invalid-external-declared-effective-mismatch.json	BUG-260923-2afgyq	marker.Read admits unequal declared and effective external repository identities
+-marker/install-marker-v4/schema-cases	invalid-marker-local-identity-kind-mismatch.json	BUG-260923-2afgyq	marker.Read admits a local marker identity with the wrong repository identity kind
+-marker/install-marker-v4/schema-cases	invalid-marker-network-identity-kind-mismatch.json	BUG-260923-2afgyq	marker.Read admits a network marker identity with the wrong repository identity kind
+-marker/install-marker-v4/schema-cases	invalid-marker-sha1-effective-revision-width.json	BUG-260923-2afgyq	marker.Read admits a SHA-1 external revision with the wrong effective width
+-marker/install-marker-v4/schema-cases	invalid-marker-sha256-effective-revision-width.json	BUG-260923-2afgyq	marker.Read admits a SHA-256 external revision with the wrong effective width
+-script-host-execution-policy/executable-identity-cases	windows-exec-noncomponent-store-hardlinks	STORY-260925-1v7pvn	The production resolver accepts multiply-linked System32 targets without proving every additional link belongs to the component store.
+-script-host-execution-policy/executable-identity-cases	windows-exec-unowned-file-hardlinks	STORY-260925-1v7pvn	The production resolver accepts a multiply-linked file below captured SystemRoot\System32 without proving the target is platform-owned.
++# An owed implementation is an expected failure, never an accepted deviation.
++# Rows are scoped to the SHA-256 identity of conformance/v1/manifest.json; candidate-only gaps are absent under rc.13.
++# Remove a row only after its named published case passes its production-entry consumer.
++suite_manifest_sha256	family	case_id	owner	reason
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-empty-backend-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-missing-backend-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-missing-backend.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-missing-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-missing-isolation.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-missing-path-on-file-link.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-missing-path-on-keyring-preferred-file.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-missing-provenance.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-missing-source-role.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-missing-strategy.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-path-on-ambient-backend.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-path-on-ambient-strategy.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-path-on-isolated-per-home-keychain.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-unknown-backend.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-unknown-field.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-unknown-isolation.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-unknown-provenance.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-unknown-source-role.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-unknown-strategy.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-wrong-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	valid-ambient.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	valid-file-link.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	valid-in-place.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	valid-keyring-preferred-ambient.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	valid-keyring-preferred-file.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	valid-per-home-keychain-isolated.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	audit-record-v2/schema-cases	invalid-v1-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	audit-record-v2/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	audit-record-v2/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	content-hashes-v2/vectors	colliding_v1_pair	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	content-hashes-v2/vectors	empty_tree	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	content-hashes-v2/vectors	nested_nul	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	content-hashes-v2/vectors	ordinary_tree	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	content-hashes-v2/vectors	registry_version_mismatch	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	context-lock-v2/schema-cases	invalid-missing-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	context-lock-v2/schema-cases	invalid-wrong-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	context-lock-v2/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	context-lock-v2/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/posture-cases	a-home-unstripped-under-b	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/posture-cases	b-home-empty-snapshot-no-rows	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/posture-cases	b-home-lists-not-inherited	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/posture-cases	non-codex-home-without-record-no-rows	TASK-260927-1e5qqm	The manager posture row is revision B in this vector; it remains pending the registry flip owned by this leaf.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/posture-cases	pre-rule-home-unstripped-under-b	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/provisioning-cases	b-empty-mcp-servers-table-no-warning	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/provisioning-cases	b-strips-servers-keeps-rest	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/provisioning-cases	b-subtable-only-form-stripped	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/provisioning-cases	b-without-servers-no-warning	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	log-response-v3/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	log-response-v3/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	manager-config-v3/schema-cases	invalid-v3-state-waiver-commit-length.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	manager-config-v3/schema-cases	invalid-waiver-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	manager-config-v3/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	manager-config-v3/schema-cases	valid-v2-state-hash-waiver.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	manager-config-v3/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v4/schema-cases	invalid-external-declared-effective-mismatch.json	BUG-260923-2afgyq	marker.Read admits unequal declared and effective external repository identities
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v4/schema-cases	invalid-marker-local-identity-kind-mismatch.json	BUG-260923-2afgyq	marker.Read admits a local marker identity with the wrong repository identity kind
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v4/schema-cases	invalid-marker-network-identity-kind-mismatch.json	BUG-260923-2afgyq	marker.Read admits a network marker identity with the wrong repository identity kind
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v4/schema-cases	invalid-marker-sha1-effective-revision-width.json	BUG-260923-2afgyq	marker.Read admits a SHA-1 external revision with the wrong effective width
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v4/schema-cases	invalid-marker-sha256-effective-revision-width.json	BUG-260923-2afgyq	marker.Read admits a SHA-256 external revision with the wrong effective width
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-external-declared-effective-mismatch.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-external-hardened-execution-policy.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-external-missing-execution-policy.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-external-object-width.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-external-only-build-source.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-external-receipt-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-local-hardened-execution-policy.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-local-missing-execution-policy.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-local-receipt-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-marker-local-identity-kind-mismatch.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-marker-network-identity-kind-mismatch.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-marker-sha1-effective-revision-width.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-marker-sha256-effective-revision-width.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-missing-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-missing-local-build-source.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-package-signing.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-wrong-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	valid-empty-builds.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	valid-external-only-substituted.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	valid-external-only-unsubstituted.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	valid-local-only.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	valid-network-sha1-revision.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	valid-network-sha256-revision.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	valid-network-substitution-branch.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	valid-network-substitution-tag.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	valid-sha256-external.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	valid-untagged-external.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	registry-bundle-v2/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	registry-bundle-v2/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	registry-log-entry-v2/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	registry-log-entry-v2/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	script-host-execution-policy/executable-identity-cases	windows-exec-noncomponent-store-hardlinks	STORY-260925-1v7pvn	The production resolver accepts multiply-linked System32 targets without proving every additional link belongs to the component store.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	script-host-execution-policy/executable-identity-cases	windows-exec-unowned-file-hardlinks	STORY-260925-1v7pvn	The production resolver accepts a multiply-linked file below captured SystemRoot\System32 without proving the target is platform-owned.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	skillfile-sources-v1/schema-cases	schema-cases/install-marker-v6/invalid-missing-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	skillfile-sources-v1/schema-cases	schema-cases/install-marker-v6/valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	skillfile-sources-v1/schema-cases	schema-cases/skillfile-lock-v2/invalid-missing-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	skillfile-sources-v1/schema-cases	schema-cases/skillfile-lock-v2/invalid-wrong-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	skillfile-sources-v1/schema-cases	schema-cases/skillfile-lock-v2/valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	skillfile-sources-v1/schema-cases	schema-cases/source-audit-v2/invalid-wrong-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	skillfile-sources-v1/schema-cases	schema-cases/source-audit-v2/valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/posture-cases	a-home-unstripped-under-b	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/posture-cases	b-home-empty-snapshot-no-rows	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/posture-cases	b-home-lists-not-inherited	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/posture-cases	non-codex-home-without-record-no-rows	TASK-260927-1e5qqm	The manager posture row is revision B in this vector; it remains pending the registry flip owned by this leaf.
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/posture-cases	pre-rule-home-unstripped-under-b	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/provisioning-cases	b-empty-mcp-servers-table-no-warning	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/provisioning-cases	b-strips-servers-keeps-rest	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/provisioning-cases	b-subtable-only-form-stripped	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/provisioning-cases	b-without-servers-no-warning	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	marker/install-marker-v4/schema-cases	invalid-external-declared-effective-mismatch.json	BUG-260923-2afgyq	marker.Read admits unequal declared and effective external repository identities
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	marker/install-marker-v4/schema-cases	invalid-marker-local-identity-kind-mismatch.json	BUG-260923-2afgyq	marker.Read admits a local marker identity with the wrong repository identity kind
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	marker/install-marker-v4/schema-cases	invalid-marker-network-identity-kind-mismatch.json	BUG-260923-2afgyq	marker.Read admits a network marker identity with the wrong repository identity kind
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	marker/install-marker-v4/schema-cases	invalid-marker-sha1-effective-revision-width.json	BUG-260923-2afgyq	marker.Read admits a SHA-1 external revision with the wrong effective width
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	marker/install-marker-v4/schema-cases	invalid-marker-sha256-effective-revision-width.json	BUG-260923-2afgyq	marker.Read admits a SHA-256 external revision with the wrong effective width
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	script-host-execution-policy/executable-identity-cases	windows-exec-noncomponent-store-hardlinks	STORY-260925-1v7pvn	The production resolver accepts multiply-linked System32 targets without proving every additional link belongs to the component store.
++be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	script-host-execution-policy/executable-identity-cases	windows-exec-unowned-file-hardlinks	STORY-260925-1v7pvn	The production resolver accepts a multiply-linked file below captured SystemRoot\System32 without proving the target is platform-owned.
+diff --git a/internal/conformancecoverage/content_hash_v2_gaps_test.go b/internal/conformancecoverage/content_hash_v2_gaps_test.go
+new file mode 100644
+index 00000000..8f0bdfdb
+--- /dev/null
++++ b/internal/conformancecoverage/content_hash_v2_gaps_test.go
+@@ -0,0 +1,211 @@
++package conformancecoverage
++
++import (
++	"encoding/json"
++	"fmt"
++	"os"
++	"path/filepath"
++	"sort"
++	"strings"
++	"testing"
++)
++
++type publishedSchemaEntry struct {
++	Instance string `json:"instance"`
++}
++
++type candidateSchemaCase struct {
++	Name string
++}
++
++func isContentHashV2Gap(gap Gap) bool {
++	switch gap.Family {
++	case "agent-environment-marker-v3/schema-cases",
++		"audit-record-v2/schema-cases",
++		"context-lock-v2/schema-cases",
++		"marker/install-marker-v5/schema-cases",
++		"log-response-v3/schema-cases",
++		"manager-config-v3/schema-cases",
++		"registry-bundle-v2/schema-cases",
++		"registry-log-entry-v2/schema-cases",
++		"content-hashes-v2/vectors":
++		return true
++	case "skillfile-sources-v1/schema-cases":
++		return strings.HasPrefix(gap.CaseID, "schema-cases/install-marker-v6/") ||
++			strings.HasPrefix(gap.CaseID, "schema-cases/skillfile-lock-v2/") ||
++			strings.HasPrefix(gap.CaseID, "schema-cases/source-audit-v2/")
++	default:
++		return false
++	}
++}
++
++func TestContentHashV2GapRowsHaveTheAssignedOwner(t *testing.T) {
++	suiteID, err := selectedSuiteIdentity()
++	if err != nil {
++		t.Fatal(err)
++	}
++	_, gaps, err := Load()
++	if err != nil {
++		t.Fatal(err)
++	}
++	ownedRows := 0
++	for _, gap := range gaps {
++		if !isContentHashV2Gap(gap) {
++			continue
++		}
++		if suiteID != ContentHashV2CandidateManifestSHA256 {
++			t.Errorf("content-hash-v2 gap %s/%s leaked into non-candidate suite %s", gap.Family, gap.CaseID, suiteID)
++			continue
++		}
++		ownedRows++
++		if gap.Owner != "TASK-260917-2tx81l" {
++			t.Errorf("content-hash-v2 gap %s/%s owner = %q, want TASK-260917-2tx81l", gap.Family, gap.CaseID, gap.Owner)
++		}
++	}
++	if suiteID == ContentHashV2CandidateManifestSHA256 && ownedRows != 87 {
++		t.Errorf("candidate content-hash-v2 owned gap rows = %d, want 87", ownedRows)
++	}
++}
++
++// TestContentHashV2FamiliesAreKnownGapsWhenPublished accounts for every case
++// in the not-yet-implemented v2 schema families. The families are discovered
++// from index.json and only activated when the selected root publishes them.
++func TestContentHashV2FamiliesAreKnownGapsWhenPublished(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	suiteID, err := selectedSuiteIdentity()
++	if err != nil {
++		t.Fatal(err)
++	}
++	wantCandidate := suiteID == ContentHashV2CandidateManifestSHA256
++	indexPath := filepath.Join(root, "schema-cases", "index.json")
++	indexBytes, err := os.ReadFile(indexPath)
++	if err != nil {
++		t.Fatalf("read published schema-case index: %v", err)
++	}
++	var index []publishedSchemaEntry
++	if err := json.Unmarshal(indexBytes, &index); err != nil {
++		t.Fatalf("parse published schema-case index: %v", err)
++	}
++	indexed := map[string][]string{}
++	for _, entry := range index {
++		family, name, ok := strings.Cut(entry.Instance, "/")
++		if !ok || family == "" || name == "" || strings.Contains(name, "/") {
++			t.Fatalf("schema-case index has unsupported instance path %q", entry.Instance)
++		}
++		indexed[family] = append(indexed[family], name)
++	}
++
++	families := []struct {
++		indexFamily string
++		coverageID  string
++	}{
++		{indexFamily: "agent-environment-marker-v3", coverageID: "agent-environment-marker-v3/schema-cases"},
++		{indexFamily: "audit-record-v2", coverageID: "audit-record-v2/schema-cases"},
++		{indexFamily: "context-lock-v2", coverageID: "context-lock-v2/schema-cases"},
++		{indexFamily: "install-marker-v5", coverageID: "marker/install-marker-v5/schema-cases"},
++		{indexFamily: "log-response-v3", coverageID: "log-response-v3/schema-cases"},
++		{indexFamily: "manager-config-v3", coverageID: "manager-config-v3/schema-cases"},
++		{indexFamily: "registry-bundle-v2", coverageID: "registry-bundle-v2/schema-cases"},
++		{indexFamily: "registry-log-entry-v2", coverageID: "registry-log-entry-v2/schema-cases"},
++	}
++	for _, family := range families {
++		family := family
++		caseNames := indexed[family.indexFamily]
++		dir := filepath.Join(root, "schema-cases", family.indexFamily)
++		_, statErr := os.Stat(dir)
++		if os.IsNotExist(statErr) {
++			if len(caseNames) != 0 {
++				t.Fatalf("schema-case index lists %s cases but its directory is absent", family.indexFamily)
++			}
++			if wantCandidate {
++				t.Fatalf("candidate suite lost schema-cases/%s", family.indexFamily)
++			}
++			continue
++		}
++		if statErr != nil {
++			t.Fatalf("inspect schema-cases/%s: %v", family.indexFamily, statErr)
++		}
++		if len(caseNames) == 0 {
++			t.Fatalf("schema-cases/%s exists without indexed cases", family.indexFamily)
++		}
++		sort.Strings(caseNames)
++		entries, err := os.ReadDir(dir)
++		if err != nil {
++			t.Fatalf("read schema-cases/%s: %v", family.indexFamily, err)
++		}
++		var diskNames []string
++		for _, entry := range entries {
++			if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
++				continue
++			}
++			diskNames = append(diskNames, entry.Name())
++		}
++		sort.Strings(diskNames)
++		if fmt.Sprint(diskNames) != fmt.Sprint(caseNames) {
++			t.Fatalf("schema-cases/%s disk/index cases differ: disk=%v index=%v", family.indexFamily, diskNames, caseNames)
++		}
++		cases := make([]candidateSchemaCase, 0, len(caseNames))
++		for _, name := range caseNames {
++			if _, err := os.ReadFile(filepath.Join(dir, name)); err != nil {
++				t.Fatalf("read schema-cases/%s/%s: %v", family.indexFamily, name, err)
++			}
++			cases = append(cases, candidateSchemaCase{Name: name})
++		}
++		RunOutcomes(t, family.coverageID, cases, func(testCase candidateSchemaCase) string {
++			return testCase.Name
++		}, func(*testing.T, candidateSchemaCase) Observation {
++			return Observation{FailureReason: "content-hash-v2 reader is owned by TASK-260917-2tx81l and is not implemented in this task"}
++		})
++	}
++}
++
++type contentHashVector struct {
++	ID string
++}
++
++// TestContentHashV2VectorsAreKnownGapsWhenPublished counts and classifies the
++// five executable vectors in content-hashes-v2.json. The schema_version and
++// framing members define the vector document; they are metadata, not cases.
++func TestContentHashV2VectorsAreKnownGapsWhenPublished(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	suiteID, err := selectedSuiteIdentity()
++	if err != nil {
++		t.Fatal(err)
++	}
++	path := filepath.Join(root, "vectors", "content-hashes-v2.json")
++	data, err := os.ReadFile(path)
++	if os.IsNotExist(err) {
++		if suiteID == ContentHashV2CandidateManifestSHA256 {
++			t.Fatal("candidate suite lost vectors/content-hashes-v2.json")
++		}
++		return
++	}
++	if err != nil {
++		t.Fatalf("read content-hashes-v2 vector: %v", err)
++	}
++	var document map[string]json.RawMessage
++	if err := json.Unmarshal(data, &document); err != nil {
++		t.Fatalf("parse content-hashes-v2 vector: %v", err)
++	}
++	cases := make([]contentHashVector, 0, len(document)-2)
++	for id := range document {
++		if id == "schema_version" || id == "framing" {
++			continue
++		}
++		cases = append(cases, contentHashVector{ID: id})
++	}
++	if suiteID == ContentHashV2CandidateManifestSHA256 && len(cases) != 5 {
++		t.Fatalf("candidate content-hash-v2 executable vectors = %d, want 5", len(cases))
++	}
++	RunOutcomes(t, "content-hashes-v2/vectors", cases, func(testCase contentHashVector) string {
++		return testCase.ID
++	}, func(*testing.T, contentHashVector) Observation {
++		return Observation{FailureReason: "content-hash-v2 hashing is owned by TASK-260917-2tx81l and is not implemented in this task"}
++	})
++}
+diff --git a/internal/conformancecoverage/coverage.go b/internal/conformancecoverage/coverage.go
+index a6877a55..9837b84a 100644
+--- a/internal/conformancecoverage/coverage.go
++++ b/internal/conformancecoverage/coverage.go
+@@ -5,6 +5,8 @@ package conformancecoverage
+ import (
+ 	"bufio"
+ 	"bytes"
++	"crypto/sha256"
++	"encoding/hex"
+ 	"fmt"
+ 	"os"
+ 	"path/filepath"
+@@ -23,6 +25,14 @@ type Gap struct {
+ 	Reason string
+ }
+ 
++// defaultSuiteManifestSHA256 is the immutable manifest identity used by the
++// checked-in draft corpus when no external conformance root is selected.
++const defaultSuiteManifestSHA256 = "be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca"
++
++// ContentHashV2CandidateManifestSHA256 is the candidate suite accepted by
++// the conformance consumers in this change.
++const ContentHashV2CandidateManifestSHA256 = "950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60"
++
+ // Observation is the result of one published case. A failure may be accepted
+ // only when the ledger names this family and case. Bounds and skips are
+ // explicit classifications, never passes.
+@@ -244,17 +254,27 @@ func runOutcomes[T any](t *testing.T, family string, cases []T, caseID func(T) s
+ 	return check()
+ }
+ 
+-// Load reads the only gap ledger and the committed per-family count pins.
++// Load reads the count pins and gap rows for the selected conformance suite.
++// An explicit root is identified by the SHA-256 of its manifest.json; without
++// one, the checked-in draft corpus uses the immutable rc.13 identity.
+ func Load() (map[string]int, []Gap, error) {
+ 	root, err := repositoryRoot()
+ 	if err != nil {
+ 		return nil, nil, err
+ 	}
+-	counts, err := readCounts(filepath.Join(root, ".github", "ci", "conformance-case-counts.tsv"))
++	suiteID, err := selectedSuiteIdentity()
++	if err != nil {
++		return nil, nil, err
++	}
++	allCounts, err := readCounts(filepath.Join(root, ".github", "ci", "conformance-case-counts.tsv"))
+ 	if err != nil {
+ 		return nil, nil, err
+ 	}
+-	gaps, err := readGaps(filepath.Join(root, ".github", "ci", "conformance-gaps.tsv"))
++	counts, ok := allCounts[suiteID]
++	if !ok {
++		return nil, nil, fmt.Errorf("no published-case count pins for conformance manifest sha256:%s", suiteID)
++	}
++	gaps, err := readGaps(filepath.Join(root, ".github", "ci", "conformance-gaps.tsv"), suiteID)
+ 	if err != nil {
+ 		return nil, nil, err
+ 	}
+@@ -266,6 +286,42 @@ func Load() (map[string]int, []Gap, error) {
+ 	return counts, gaps, nil
+ }
+ 
++func selectedSuiteIdentity() (string, error) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		return defaultSuiteManifestSHA256, nil
++	}
++	manifestPath := filepath.Join(root, "manifest.json")
++	manifest, err := readStateBytes(manifestPath)
++	if err != nil {
++		return "", fmt.Errorf("read conformance manifest identity %s: %w", manifestPath, err)
++	}
++	sum := sha256.Sum256(manifest)
++	return hex.EncodeToString(sum[:]), nil
++}
++
++// RequirePublishedCount checks an independently loaded family count against
++// the exact pin selected by the conformance manifest identity.
++func RequirePublishedCount(t testing.TB, family string, actual int) {
++	t.Helper()
++	counts, _, err := Load()
++	if err != nil {
++		t.Fatalf("load published-case coverage policy: %v", err)
++	}
++	expected, ok := counts[family]
++	if !ok {
++		t.Fatalf("published-case family %q has no committed count pin", family)
++	}
++	if actual != expected {
++		t.Fatalf("published-case family %q has %d cases, want pinned count %d", family, actual, expected)
++	}
++}
++
++// SelectedSuiteManifestSHA256 returns the manifest digest that Load uses for
++// count and gap selection. It is useful to gate cases that exist only in a
++// named candidate suite.
++func SelectedSuiteManifestSHA256() (string, error) { return selectedSuiteIdentity() }
++
+ func repositoryRoot() (string, error) {
+ 	current, err := os.Getwd()
+ 	if err != nil {
+@@ -298,13 +354,13 @@ func repositoryRootFrom(current string) (string, error) {
+ 	}
+ }
+ 
+-func readCounts(path string) (map[string]int, error) {
++func readCounts(path string) (map[string]map[string]int, error) {
+ 	data, err := readStateBytes(path)
+ 	if err != nil {
+ 		return nil, fmt.Errorf("read count pins %s: %w", path, err)
+ 	}
+ 	scanner := bufio.NewScanner(bytes.NewReader(data))
+-	counts := map[string]int{}
++	counts := map[string]map[string]int{}
+ 	header := false
+ 	lineNo := 0
+ 	for scanner.Scan() {
+@@ -315,23 +371,32 @@ func readCounts(path string) (map[string]int, error) {
+ 		}
+ 		fields := strings.Split(line, "\t")
+ 		if !header {
+-			if len(fields) != 2 || fields[0] != "family" || fields[1] != "expected_cases" {
+-				return nil, fmt.Errorf("%s:%d: expected family<TAB>expected_cases header", path, lineNo)
++			if len(fields) != 3 || fields[0] != "suite_manifest_sha256" || fields[1] != "family" || fields[2] != "expected_cases" {
++				return nil, fmt.Errorf("%s:%d: expected suite_manifest_sha256<TAB>family<TAB>expected_cases header", path, lineNo)
+ 			}
+ 			header = true
+ 			continue
+ 		}
+-		if len(fields) != 2 || fields[0] == "" {
++		if len(fields) != 3 || fields[0] == "" || fields[1] == "" {
+ 			return nil, fmt.Errorf("%s:%d: malformed count pin", path, lineNo)
+ 		}
+-		count, err := strconv.Atoi(fields[1])
++		if len(fields[0]) != 64 {
++			return nil, fmt.Errorf("%s:%d: suite manifest identity must be a 64-character sha256", path, lineNo)
++		}
++		if _, err := hex.DecodeString(fields[0]); err != nil {
++			return nil, fmt.Errorf("%s:%d: malformed suite manifest sha256 %q", path, lineNo, fields[0])
++		}
++		count, err := strconv.Atoi(fields[2])
+ 		if err != nil || count <= 0 {
+-			return nil, fmt.Errorf("%s:%d: expected positive case count, got %q", path, lineNo, fields[1])
++			return nil, fmt.Errorf("%s:%d: expected positive case count, got %q", path, lineNo, fields[2])
+ 		}
+-		if _, duplicate := counts[fields[0]]; duplicate {
+-			return nil, fmt.Errorf("%s:%d: duplicate family %q", path, lineNo, fields[0])
++		if counts[fields[0]] == nil {
++			counts[fields[0]] = map[string]int{}
+ 		}
+-		counts[fields[0]] = count
++		if _, duplicate := counts[fields[0]][fields[1]]; duplicate {
++			return nil, fmt.Errorf("%s:%d: duplicate count pin for suite %s family %q", path, lineNo, fields[0], fields[1])
++		}
++		counts[fields[0]][fields[1]] = count
+ 	}
+ 	if err := scanner.Err(); err != nil {
+ 		return nil, fmt.Errorf("read count pins %s: %w", path, err)
+@@ -345,7 +410,7 @@ func readCounts(path string) (map[string]int, error) {
+ 	return counts, nil
+ }
+ 
+-func readGaps(path string) ([]Gap, error) {
++func readGaps(path, suiteID string) ([]Gap, error) {
+ 	data, err := readStateBytes(path)
+ 	if err != nil {
+ 		return nil, fmt.Errorf("read gap ledger %s: %w", path, err)
+@@ -363,9 +428,9 @@ func readGaps(path string) ([]Gap, error) {
+ 		}
+ 		fields := strings.Split(line, "\t")
+ 		if !header {
+-			want := []string{"family", "case_id", "owner", "reason"}
++			want := []string{"suite_manifest_sha256", "family", "case_id", "owner", "reason"}
+ 			if len(fields) != len(want) {
+-				return nil, fmt.Errorf("%s:%d: expected family<TAB>case_id<TAB>owner<TAB>reason header", path, lineNo)
++				return nil, fmt.Errorf("%s:%d: expected suite_manifest_sha256<TAB>family<TAB>case_id<TAB>owner<TAB>reason header", path, lineNo)
+ 			}
+ 			for i := range want {
+ 				if fields[i] != want[i] {
+@@ -375,21 +440,29 @@ func readGaps(path string) ([]Gap, error) {
+ 			header = true
+ 			continue
+ 		}
+-		if len(fields) != 4 {
+-			return nil, fmt.Errorf("%s:%d: gap row must have exactly four tab-separated fields", path, lineNo)
++		if len(fields) != 5 {
++			return nil, fmt.Errorf("%s:%d: gap row must have exactly five tab-separated fields", path, lineNo)
+ 		}
+ 		for _, field := range fields {
+ 			if strings.TrimSpace(field) == "" || strings.ContainsAny(field, "\r\n") {
+ 				return nil, fmt.Errorf("%s:%d: gap row fields must be non-empty and one line", path, lineNo)
+ 			}
+ 		}
+-		gap := Gap{Family: fields[0], CaseID: fields[1], Owner: fields[2], Reason: fields[3]}
+-		key := gap.Family + "\x00" + gap.CaseID
++		if len(fields[0]) != 64 {
++			return nil, fmt.Errorf("%s:%d: suite manifest identity must be a 64-character sha256", path, lineNo)
++		}
++		if _, err := hex.DecodeString(fields[0]); err != nil {
++			return nil, fmt.Errorf("%s:%d: malformed suite manifest sha256 %q", path, lineNo, fields[0])
++		}
++		gap := Gap{Family: fields[1], CaseID: fields[2], Owner: fields[3], Reason: fields[4]}
++		key := fields[0] + "\x00" + gap.Family + "\x00" + gap.CaseID
+ 		if _, duplicate := seen[key]; duplicate {
+ 			return nil, fmt.Errorf("%s:%d: duplicate gap row for %s/%s", path, lineNo, gap.Family, gap.CaseID)
+ 		}
+ 		seen[key] = struct{}{}
+-		gaps = append(gaps, gap)
++		if fields[0] == suiteID {
++			gaps = append(gaps, gap)
++		}
+ 	}
+ 	if err := scanner.Err(); err != nil {
+ 		return nil, fmt.Errorf("read gap ledger %s: %w", path, err)
+diff --git a/internal/contextlock/schema_conformance_test.go b/internal/contextlock/schema_conformance_test.go
+new file mode 100644
+index 00000000..34b086fa
+--- /dev/null
++++ b/internal/contextlock/schema_conformance_test.go
+@@ -0,0 +1,86 @@
++package contextlock
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/conformancecoverage"
++)
++
++type frozenLockSchemaIndexEntry struct {
++	Instance string `json:"instance"`
++	Valid    bool   `json:"valid"`
++}
++
++func TestParseRejectsHashVersionOnFrozenContextLock(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	const family = "context-lock-v1"
++	const caseName = "invalid-hash-version-on-frozen-lock.json"
++
++	indexBytes, err := os.ReadFile(filepath.Join(root, "schema-cases", "index.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var index []frozenLockSchemaIndexEntry
++	if err := json.Unmarshal(indexBytes, &index); err != nil {
++		t.Fatalf("parse schema-case index: %v", err)
++	}
++	var count int
++	var target *frozenLockSchemaIndexEntry
++	prefix := family + "/"
++	for _, entry := range index {
++		if !strings.HasPrefix(entry.Instance, prefix) {
++			continue
++		}
++		count++
++		if strings.TrimPrefix(entry.Instance, prefix) == caseName {
++			copyEntry := entry
++			target = &copyEntry
++		}
++	}
++	conformancecoverage.RequirePublishedCount(t, family+"/schema-cases", count)
++	if target == nil {
++		if _, err := os.Stat(filepath.Join(root, "schema-cases", family, caseName)); err == nil {
++			t.Fatal("frozen context-lock case exists on disk but is absent from the published index")
++		} else if !os.IsNotExist(err) {
++			t.Fatalf("inspect frozen context-lock case: %v", err)
++		}
++		if suiteID, err := conformancecoverage.SelectedSuiteManifestSHA256(); err != nil {
++			t.Fatal(err)
++		} else if suiteID == conformancecoverage.ContentHashV2CandidateManifestSHA256 {
++			t.Fatal("candidate suite is missing the frozen context-lock hash-version case")
++		}
++		return
++	}
++	if target.Valid {
++		t.Fatal("the frozen context-lock hash-version case is published as valid")
++	}
++	payload, err := os.ReadFile(filepath.Join(root, "schema-cases", family, caseName))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if _, err := Parse(payload); err == nil {
++		t.Fatal("Parse accepted the frozen context-lock with hash_version")
++	}
++	var control map[string]json.RawMessage
++	if err := json.Unmarshal(payload, &control); err != nil {
++		t.Fatalf("decode frozen context-lock: %v", err)
++	}
++	if _, present := control["hash_version"]; !present {
++		t.Fatal("frozen context-lock case does not contain hash_version")
++	}
++	delete(control, "hash_version")
++	controlPayload, err := json.Marshal(control)
++	if err != nil {
++		t.Fatalf("encode frozen context-lock control: %v", err)
++	}
++	if _, err := Parse(controlPayload); err != nil {
++		t.Fatalf("context-lock without unknown hash_version is not a valid control: %v", err)
++	}
++}
+diff --git a/internal/crossconformance/draftsources_corpus_test.go b/internal/crossconformance/draftsources_corpus_test.go
+index 96ca5c60..a797d203 100644
+--- a/internal/crossconformance/draftsources_corpus_test.go
++++ b/internal/crossconformance/draftsources_corpus_test.go
+@@ -20,6 +20,13 @@ const skillfileSourcesTestdata = "testdata/skillfile-sources-v1"
+ 
+ func draftCorpusDir(t *testing.T) string {
+ 	t.Helper()
++	if root := os.Getenv("CURATOR_CONFORMANCE_ROOT"); root != "" {
++		dir := filepath.Join(filepath.Dir(root), "skillfile-sources-v1")
++		if _, err := os.Stat(filepath.Join(dir, "index.json")); err != nil {
++			t.Fatalf("selected conformance root has no sibling skillfile-sources corpus: %v", err)
++		}
++		return dir
++	}
+ 	dir := filepath.Join(skillfileSourcesTestdata, "corpus", "conformance", "skillfile-sources-v1")
+ 	if _, err := os.Stat(filepath.Join(dir, "index.json")); err != nil {
+ 		t.Fatalf("vendored draft corpus missing: %v", err)
+diff --git a/internal/crossconformance/draftsources_schema_test.go b/internal/crossconformance/draftsources_schema_test.go
+index 3b5312ab..94c5d719 100644
+--- a/internal/crossconformance/draftsources_schema_test.go
++++ b/internal/crossconformance/draftsources_schema_test.go
+@@ -34,6 +34,12 @@ var draftSchemaDrivers = map[string]func(t *testing.T, dir string, entry draftSc
+ 	"source-audit-v1.schema.json":   driveSourceAuditCase,
+ }
+ 
++var draftSchemaKnownGaps = map[string]string{
++	"install-marker-v6.schema.json": "The install-marker-v6 reader and v2 content-hash behavior are owned by TASK-260917-2tx81l.",
++	"skillfile-lock-v2.schema.json": "The skillfile-lock-v2 reader and v2 content-hash behavior are owned by TASK-260917-2tx81l.",
++	"source-audit-v2.schema.json":   "The source-audit-v2 reader and v2 content-hash behavior are owned by TASK-260917-2tx81l.",
++}
++
+ // draftSchemaBounds records every schema case that cannot be driven at
+ // a production entry, with the exact reason. The harness asserts this
+ // set exactly: a fixed gap must convert its row to a drive, never
+@@ -47,13 +53,18 @@ var draftSchemaBounds = map[string]string{
+ 	"schema-cases/local-snapshot-v1/invalid-unknown-top-level.json": "Curator never reads serialized inventory JSON; inventory is recomputed from the stored tree (internal/snapshot Capture/OpenLocal)",
+ }
+ 
+-// TestDraftSourcesSchemaCases drives all 121 released schema cases.
++// TestDraftSourcesSchemaCases drives the selected corpus and records any
++// published v2-only schema families as explicit owned known gaps.
+ func TestDraftSourcesSchemaCases(t *testing.T) {
+ 	dir := draftCorpusDir(t)
+ 	entries := loadDraftIndex(t)
+ 	seenBounds := map[string]bool{}
+ 	conformancecoverage.RunOutcomes(t, "skillfile-sources-v1/schema-cases", entries,
+ 		func(entry draftSchemaEntry) string { return entry.Instance }, func(t *testing.T, entry draftSchemaEntry) conformancecoverage.Observation {
++			if reason, isKnownGap := draftSchemaKnownGaps[entry.Schema]; isKnownGap {
++				t.Logf("KNOWN GAP: %s: %s", entry.Instance, reason)
++				return conformancecoverage.Observation{FailureReason: reason}
++			}
+ 			driver, ok := draftSchemaDrivers[entry.Schema]
+ 			if !ok {
+ 				t.Fatalf("schema %q has no production-entry driver", entry.Schema)
+@@ -104,6 +115,12 @@ func driveSkillfileLockCase(t *testing.T, dir string, entry draftSchemaEntry) {
+ 	payload := readDraftFile(t, filepath.Join(dir, filepath.FromSlash(entry.Instance)))
+ 	lock, err := sourcelock.Parse(payload)
+ 	base := filepath.Base(entry.Instance)
++	if base == "invalid-hash-version-on-frozen-lock.json" {
++		controlPayload := withoutContentHashVersion(t, payload)
++		if _, err := sourcelock.Parse(controlPayload); err != nil {
++			t.Fatalf("frozen skillfile lock without hash_version is not a valid control: %v", err)
++		}
++	}
+ 	switch base {
+ 	case "valid.json":
+ 		if err != nil {
+@@ -163,6 +180,15 @@ func driveInstallMarkerV5Case(t *testing.T, dir string, entry draftSchemaEntry)
+ 	if (got != nil) != entry.Valid {
+ 		t.Fatalf("valid=%v: marker.Read nil=%v", entry.Valid, got == nil)
+ 	}
++	if filepath.Base(entry.Instance) == "invalid-hash-version-on-frozen-marker.json" {
++		controlDir := t.TempDir()
++		if err := os.WriteFile(filepath.Join(controlDir, marker.Name), withoutContentHashVersion(t, payload), 0o600); err != nil {
++			t.Fatal(err)
++		}
++		if marker.Read(controlDir) == nil {
++			t.Fatal("frozen install marker v5 is not accepted after removing its unknown hash_version")
++		}
++	}
+ }
+ 
+ func driveBuildReceiptV3Case(t *testing.T, dir string, entry draftSchemaEntry) {
+@@ -196,4 +222,26 @@ func driveSourceAuditCase(t *testing.T, dir string, entry draftSchemaEntry) {
+ 	if (err == nil) != entry.Valid {
+ 		t.Fatalf("valid=%v: ParseSourceAudit err=%v", entry.Valid, err)
+ 	}
++	if filepath.Base(entry.Instance) == "invalid-hash-version-on-frozen-audit.json" {
++		if _, err := audit.ParseSourceAudit(withoutContentHashVersion(t, payload)); err != nil {
++			t.Fatalf("frozen source audit without hash_version is not a valid control: %v", err)
++		}
++	}
++}
++
++func withoutContentHashVersion(t *testing.T, payload []byte) []byte {
++	t.Helper()
++	var raw map[string]json.RawMessage
++	if err := json.Unmarshal(payload, &raw); err != nil {
++		t.Fatalf("decode frozen content-hash document: %v", err)
++	}
++	if _, present := raw["hash_version"]; !present {
++		t.Fatal("frozen content-hash case does not contain hash_version")
++	}
++	delete(raw, "hash_version")
++	control, err := json.Marshal(raw)
++	if err != nil {
++		t.Fatalf("encode frozen content-hash control: %v", err)
++	}
++	return control
+ }
+diff --git a/internal/envmarker/marker_env_schema_test.go b/internal/envmarker/marker_env_schema_test.go
+index 5f03fc5b..afe25191 100644
+--- a/internal/envmarker/marker_env_schema_test.go
++++ b/internal/envmarker/marker_env_schema_test.go
+@@ -129,6 +129,23 @@ func TestParseAuthoritativeEnvMarkerV2SchemaCases(t *testing.T) {
+ 			if !tc.Valid && err == nil {
+ 				return conformancecoverage.Observation{FailureReason: "Parse accepted published-invalid case"}
+ 			}
++			if tc.Name == "invalid-hash-version-on-frozen-marker.json" && !tc.Valid {
++				var control map[string]json.RawMessage
++				if err := json.Unmarshal(payload, &control); err != nil {
++					t.Fatalf("decode frozen environment marker: %v", err)
++				}
++				if _, present := control["hash_version"]; !present {
++					t.Fatal("frozen environment marker case does not contain hash_version")
++				}
++				delete(control, "hash_version")
++				controlPayload, err := json.Marshal(control)
++				if err != nil {
++					t.Fatalf("encode frozen environment marker control: %v", err)
++				}
++				if _, err := Parse(controlPayload); err != nil {
++					return conformancecoverage.Observation{FailureReason: fmt.Sprintf("frozen environment marker is not accepted after removing its unknown hash_version: %v", err)}
++				}
++			}
+ 			return conformancecoverage.Observation{}
+ 		})
+ }
+diff --git a/internal/marker/content_hash_v2_marker_cases_test.go b/internal/marker/content_hash_v2_marker_cases_test.go
+new file mode 100644
+index 00000000..9cbd4aba
+--- /dev/null
++++ b/internal/marker/content_hash_v2_marker_cases_test.go
+@@ -0,0 +1,83 @@
++package marker
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/conformancecoverage"
++)
++
++type frozenMarkerSchemaIndexEntry struct {
++	Instance string `json:"instance"`
++	Valid    bool   `json:"valid"`
++}
++
++func TestReadRejectsHashVersionOnFrozenMarkerV3(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	const family = "install-marker-v3"
++	const caseName = "invalid-hash-version-on-frozen-marker.json"
++	coverageFamily := "marker/" + family + "/schema-cases"
++
++	indexBytes, err := os.ReadFile(filepath.Join(root, "schema-cases", "index.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var index []frozenMarkerSchemaIndexEntry
++	if err := json.Unmarshal(indexBytes, &index); err != nil {
++		t.Fatalf("parse schema-case index: %v", err)
++	}
++	var count int
++	var target *frozenMarkerSchemaIndexEntry
++	prefix := family + "/"
++	for _, entry := range index {
++		if !strings.HasPrefix(entry.Instance, prefix) {
++			continue
++		}
++		count++
++		if strings.TrimPrefix(entry.Instance, prefix) == caseName {
++			copyEntry := entry
++			target = &copyEntry
++		}
++	}
++	conformancecoverage.RequirePublishedCount(t, coverageFamily, count)
++	if target == nil {
++		if _, err := os.Stat(filepath.Join(root, "schema-cases", family, caseName)); err == nil {
++			t.Fatal("frozen marker case exists on disk but is absent from the published index")
++		} else if !os.IsNotExist(err) {
++			t.Fatalf("inspect frozen marker case: %v", err)
++		}
++		if suiteID, err := conformancecoverage.SelectedSuiteManifestSHA256(); err != nil {
++			t.Fatal(err)
++		} else if suiteID == conformancecoverage.ContentHashV2CandidateManifestSHA256 {
++			t.Fatal("candidate suite is missing the frozen marker v3 hash-version case")
++		}
++		return
++	}
++	if target.Valid {
++		t.Fatal("the frozen marker v3 hash-version case is published as valid")
++	}
++	payload, err := os.ReadFile(filepath.Join(root, "schema-cases", family, caseName))
++	if err != nil {
++		t.Fatal(err)
++	}
++	dir := t.TempDir()
++	if err := os.WriteFile(filepath.Join(dir, Name), payload, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if got := Read(dir); got != nil {
++		t.Fatalf("Read accepted the frozen marker with hash_version: %+v", got)
++	}
++	controlDir := t.TempDir()
++	if err := os.WriteFile(filepath.Join(controlDir, Name), withoutHashVersion(t, payload), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if got := Read(controlDir); got == nil {
++		t.Fatal("frozen marker v3 is not accepted after removing its unknown hash_version")
++	}
++}
+diff --git a/internal/marker/schema_coverage_test.go b/internal/marker/schema_coverage_test.go
+index 2fbe32bc..b6def430 100644
+--- a/internal/marker/schema_coverage_test.go
++++ b/internal/marker/schema_coverage_test.go
+@@ -1,6 +1,7 @@
+ package marker
+ 
+ import (
++	"encoding/json"
+ 	"fmt"
+ 	"os"
+ 	"path/filepath"
+@@ -61,10 +62,37 @@ func runMarkerSchemaCases(t *testing.T, family string) {
+ 			if gotValid != tc.Valid {
+ 				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("Read valid=%v, suite expects %v", gotValid, tc.Valid)}
+ 			}
++			if tc.Name == "invalid-hash-version-on-frozen-marker.json" && !tc.Valid {
++				controlPayload := withoutHashVersion(t, tc.Bytes)
++				controlDir := t.TempDir()
++				if err := os.WriteFile(filepath.Join(controlDir, Name), controlPayload, 0o600); err != nil {
++					t.Fatal(err)
++				}
++				if Read(controlDir) == nil {
++					return conformancecoverage.Observation{FailureReason: "the frozen marker is not accepted after removing its unknown hash_version"}
++				}
++			}
+ 			return conformancecoverage.Observation{}
+ 		})
+ }
+ 
++func withoutHashVersion(t *testing.T, payload []byte) []byte {
++	t.Helper()
++	var raw map[string]json.RawMessage
++	if err := json.Unmarshal(payload, &raw); err != nil {
++		t.Fatalf("decode frozen marker: %v", err)
++	}
++	if _, present := raw["hash_version"]; !present {
++		t.Fatal("frozen marker case does not contain hash_version")
++	}
++	delete(raw, "hash_version")
++	control, err := json.Marshal(raw)
++	if err != nil {
++		t.Fatalf("encode frozen marker control: %v", err)
++	}
++	return control
++}
++
+ func TestReadAuthoritativeMarkerV2SchemaCases(t *testing.T) {
+ 	runMarkerSchemaCases(t, "install-marker-v2")
+ }
+diff --git a/internal/registry/schema_conformance_test.go b/internal/registry/schema_conformance_test.go
+new file mode 100644
+index 00000000..ddc14fd9
+--- /dev/null
++++ b/internal/registry/schema_conformance_test.go
+@@ -0,0 +1,119 @@
++package registry
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/conformancecoverage"
++)
++
++type frozenRegistrySchemaIndexEntry struct {
++	Instance string `json:"instance"`
++	Valid    bool   `json:"valid"`
++}
++
++func readFrozenRegistrySchemaCase(t *testing.T, root, family, caseName string) ([]byte, bool) {
++	t.Helper()
++	indexBytes, err := os.ReadFile(filepath.Join(root, "schema-cases", "index.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var index []frozenRegistrySchemaIndexEntry
++	if err := json.Unmarshal(indexBytes, &index); err != nil {
++		t.Fatalf("parse schema-case index: %v", err)
++	}
++	var count int
++	var target *frozenRegistrySchemaIndexEntry
++	prefix := family + "/"
++	for _, entry := range index {
++		if !strings.HasPrefix(entry.Instance, prefix) {
++			continue
++		}
++		count++
++		if strings.TrimPrefix(entry.Instance, prefix) == caseName {
++			copyEntry := entry
++			target = &copyEntry
++		}
++	}
++	conformancecoverage.RequirePublishedCount(t, family+"/schema-cases", count)
++	path := filepath.Join(root, "schema-cases", family, caseName)
++	if target == nil {
++		if _, err := os.Stat(path); err == nil {
++			t.Fatalf("frozen case exists on disk but is absent from the published index: %s", path)
++		} else if !os.IsNotExist(err) {
++			t.Fatalf("inspect frozen case %s: %v", path, err)
++		}
++		if suiteID, err := conformancecoverage.SelectedSuiteManifestSHA256(); err != nil {
++			t.Fatal(err)
++		} else if suiteID == conformancecoverage.ContentHashV2CandidateManifestSHA256 {
++			t.Fatalf("candidate suite is missing frozen case %s/%s", family, caseName)
++		}
++		return nil, false
++	}
++	if target.Valid {
++		t.Fatalf("frozen case %s/%s is published as valid", family, caseName)
++	}
++	payload, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return payload, true
++}
++
++func TestParseRecordRejectsHashVersionOnFrozenAuditRecord(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	payload, present := readFrozenRegistrySchemaCase(t, root, "audit-record-v1", "invalid-hash-version-on-frozen-record.json")
++	if !present {
++		return
++	}
++	var record map[string]any
++	if err := decodeJSON(payload, &record); err != nil {
++		t.Fatal(err)
++	}
++	if record["schema_version"] != json.Number("1") || record["hash_version"] != json.Number("2") {
++		t.Fatalf("frozen audit record versions = schema:%v hash:%v", record["schema_version"], record["hash_version"])
++	}
++	mutant := make(map[string]any, len(record)-1)
++	for key, value := range record {
++		if key != "hash_version" {
++			mutant[key] = value
++		}
++	}
++	if _, err := ParseRecord(mutant); err != nil {
++		t.Fatalf("audit record without the unknown hash_version is not a valid control: %v", err)
++	}
++	if _, err := ParseRecord(record); err == nil {
++		t.Fatal("ParseRecord accepted hash_version on a frozen audit-record-v1 document")
++	}
++}
++
++func TestParseRecordRejectsV2RecordInsideFrozenRegistryLogEntry(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	payload, present := readFrozenRegistrySchemaCase(t, root, "registry-log-entry-v1", "invalid-v2-record-in-frozen-entry.json")
++	if !present {
++		return
++	}
++	var entry map[string]any
++	if err := decodeJSON(payload, &entry); err != nil {
++		t.Fatal(err)
++	}
++	record, ok := entry["record"].(map[string]any)
++	if !ok {
++		t.Fatalf("frozen registry log entry has no record object: %T", entry["record"])
++	}
++	if record["schema_version"] != json.Number("2") || record["hash_version"] != json.Number("2") {
++		t.Fatalf("embedded record versions = schema:%v hash:%v", record["schema_version"], record["hash_version"])
++	}
++	if _, err := ParseRecord(record); err == nil {
++		t.Fatal("ParseRecord accepted a v2 record inside a frozen registry-log-entry-v1 case")
++	}
++}
