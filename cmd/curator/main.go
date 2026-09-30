@@ -81,6 +81,7 @@ Commands:
   hybrid <subcommand>      add | remove | list | status
   audit [target] [flags]   run audit, pin trust, or publish a signed record
   gc                       remove unreferenced runtime entries
+  cache prune [flags]      remove unreferenced source snapshots (--keep-last, --older-than, --dry-run, --json)
   shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
   hook <subcommand>        approve | approvals | revoke (project env file trust)
   ui                       terminal view over installed state
@@ -286,6 +287,8 @@ func (c cli) run(args []string) int {
 		return c.cmdAudit(args[1:])
 	case "gc":
 		return c.cmdGC()
+	case "cache":
+		return c.cmdCache(args[1:])
 	case "shell-init":
 		return c.cmdShellInit(args[1:])
 	case "hook":

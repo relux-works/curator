@@ -53,7 +53,7 @@ func TestParseRejectsHashVersionOnFrozenContextLock(t *testing.T) {
 		}
 		if suiteID, err := conformancecoverage.SelectedSuiteManifestSHA256(); err != nil {
 			t.Fatal(err)
-		} else if suiteID == conformancecoverage.ContentHashV2CandidateManifestSHA256 {
+		} else if conformancecoverage.IsContentHashV2Candidate(suiteID) {
 			t.Fatal("candidate suite is missing the frozen context-lock hash-version case")
 		}
 		return

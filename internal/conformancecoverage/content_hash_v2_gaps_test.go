@@ -53,7 +53,7 @@ func TestContentHashV2GapRowsHaveTheAssignedOwner(t *testing.T) {
 		if !isContentHashV2Gap(gap) {
 			continue
 		}
-		if suiteID != ContentHashV2CandidateManifestSHA256 {
+		if !IsContentHashV2Candidate(suiteID) {
 			t.Errorf("content-hash-v2 gap %s/%s leaked into non-candidate suite %s", gap.Family, gap.CaseID, suiteID)
 			continue
 		}
@@ -62,7 +62,7 @@ func TestContentHashV2GapRowsHaveTheAssignedOwner(t *testing.T) {
 			t.Errorf("content-hash-v2 gap %s/%s owner = %q, want TASK-260917-2tx81l", gap.Family, gap.CaseID, gap.Owner)
 		}
 	}
-	if suiteID == ContentHashV2CandidateManifestSHA256 && ownedRows != 87 {
+	if IsContentHashV2Candidate(suiteID) && ownedRows != 87 {
 		t.Errorf("candidate content-hash-v2 owned gap rows = %d, want 87", ownedRows)
 	}
 }
@@ -79,7 +79,7 @@ func TestContentHashV2FamiliesAreKnownGapsWhenPublished(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantCandidate := suiteID == ContentHashV2CandidateManifestSHA256
+	wantCandidate := IsContentHashV2Candidate(suiteID)
 	indexPath := filepath.Join(root, "schema-cases", "index.json")
 	indexBytes, err := os.ReadFile(indexPath)
 	if err != nil {
@@ -181,7 +181,7 @@ func TestContentHashV2VectorsAreKnownGapsWhenPublished(t *testing.T) {
 	path := filepath.Join(root, "vectors", "content-hashes-v2.json")
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		if suiteID == ContentHashV2CandidateManifestSHA256 {
+		if IsContentHashV2Candidate(suiteID) {
 			t.Fatal("candidate suite lost vectors/content-hashes-v2.json")
 		}
 		return
@@ -200,7 +200,7 @@ func TestContentHashV2VectorsAreKnownGapsWhenPublished(t *testing.T) {
 		}
 		cases = append(cases, contentHashVector{ID: id})
 	}
-	if suiteID == ContentHashV2CandidateManifestSHA256 && len(cases) != 5 {
+	if IsContentHashV2Candidate(suiteID) && len(cases) != 5 {
 		t.Fatalf("candidate content-hash-v2 executable vectors = %d, want 5", len(cases))
 	}
 	RunOutcomes(t, "content-hashes-v2/vectors", cases, func(testCase contentHashVector) string {

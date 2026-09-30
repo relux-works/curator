@@ -928,6 +928,50 @@ curator gc
 
 The command acquires the manager home lock and removes unreferenced artifacts older than 24 hours.
 
+`curator gc` does not collect source snapshots. Use `curator cache prune` for those.
+
+### curator cache prune
+
+`curator cache prune` removes commit-keyed source snapshots
+(`~/.curator/cache/<source>/<commit>`) that nothing references, following
+manager profile section 10.1 of the specification.
+
+Synopsis:
+
+```bash
+curator cache prune [--keep-last <n>] [--older-than <duration>] [--dry-run] [--json]
+```
+
+Flags:
+
+- `--keep-last <n>`: keep the `n` most recently used snapshots of every source,
+  whether or not anything references them.
+- `--older-than <duration>`: keep snapshots used within the duration. Accepts a
+  Go duration (`72h`) or whole days (`14d`).
+- `--dry-run`: print the plan and remove nothing.
+- `--json`: print the retention report as JSON.
+
+A snapshot is always kept while an install marker (in a registered project or
+the global or hybrid scope), a `Skillfile.lock.json`, or an installed profile
+lock names its commit. A snapshot used within the last 24 hours is also kept.
+If any of those records cannot be read, nothing is removed and the command
+exits 1, so fix or remove the record the warning names. Without a policy flag,
+every other snapshot is removed.
+
+A snapshot's last-use time is the modification time of its
+`cache/<source>/<commit>` directory. Curator advances it each time it publishes
+or serves the snapshot.
+
+Preview, then prune while keeping the three most recent revisions per source:
+
+```bash
+curator cache prune --keep-last 3 --dry-run
+curator cache prune --keep-last 3
+```
+
+Sizes are allocated bytes, with logical bytes alongside in `--json`. On APFS,
+clones can make both overstate what a removal frees.
+
 ### curator shell-init
 
 `curator shell-init` prints or installs shell integration hooks.
