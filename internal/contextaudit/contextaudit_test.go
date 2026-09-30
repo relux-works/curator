@@ -1,6 +1,8 @@
 package contextaudit
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -128,5 +130,67 @@ func TestDetectorIsUnpinnable(t *testing.T) {
 	files := map[string][]byte{"context/a.md": []byte("key " + exampleKey() + "\n")}
 	if !DetectFiles(files, testPin, nil).Blocking() {
 		t.Fatal("detector must block without waivers")
+	}
+}
+
+func TestOpaqueNULBlocksOutsideSecretScopeAndIgnoresWaivers(t *testing.T) {
+	files := map[string][]byte{"assets/deep/image.bin": []byte("prefix\x00suffix")}
+	report := DetectFiles(files, testPin, []Waiver{{
+		Pin: testPin, File: "assets/deep/image.bin", Span: [2]int{6, 7}, Reason: "must not waive opaque content",
+	}})
+	if !report.Blocking() {
+		t.Fatalf("opaque findings %+v must block", report.Findings)
+	}
+	if len(report.Findings) != 1 {
+		t.Fatalf("opaque findings %+v, want one file finding", report.Findings)
+	}
+	finding := report.Findings[0]
+	if finding.Class != ClassOpaqueFile || finding.Pattern != PatternNULByte || finding.Severity != SeverityBlocking || finding.File != "assets/deep/image.bin" || finding.Waived {
+		t.Fatalf("opaque finding %+v", finding)
+	}
+	if len(report.Waivers) != 1 || report.Waivers[0].Diagnostic != DiagWaiverUnmatched {
+		t.Fatalf("opaque waiver result %+v, want unmatched waiver", report.Waivers)
+	}
+}
+
+func TestDetectScansDeepRegularFiles(t *testing.T) {
+	root := t.TempDir()
+	regular := filepath.Join(root, "assets", "deep", "image.bin")
+	if err := os.MkdirAll(filepath.Dir(regular), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(regular, []byte{1, 0, 2}, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := Detect(root, testPin, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !report.Blocking() || len(report.Findings) != 1 || report.Findings[0].File != "assets/deep/image.bin" {
+		t.Fatalf("findings %+v, want only the deep regular file", report.Findings)
+	}
+}
+
+func TestDetectDoesNotFollowSymlinks(t *testing.T) {
+	root := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "outside.bin")
+	if err := os.WriteFile(outside, []byte{1, 0, 2}, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(root, "docs", "linked.bin")
+	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+
+	report, err := Detect(root, testPin, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Blocking() || len(report.Findings) != 0 {
+		t.Fatalf("findings %+v, want no findings from a symlink target", report.Findings)
 	}
 }

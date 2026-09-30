@@ -18,6 +18,7 @@ import (
 	"github.com/relux-works/curator/internal/capabilities"
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/hashing"
+	"github.com/relux-works/curator/internal/opaquescan"
 	"github.com/relux-works/curator/internal/scriptpolicy"
 	"github.com/relux-works/curator/internal/skillspec"
 )
@@ -44,8 +45,10 @@ var severityRank = map[string]int{
 // backend and model (Spec §12.1).
 const (
 	PromptVersion  = "1"
-	RulesetVersion = "1"
+	RulesetVersion = "2"
 )
+
+const findingOpaqueNUL = "audit.opaque.nul-byte"
 
 // Finding is one audit finding.
 type Finding struct {
@@ -146,7 +149,9 @@ func Decide(findings []Finding, mode, failOn string) string {
 }
 
 // Gate audits every subject and returns warnings and blocking errors per the
-// gate behavior of Spec §12.2. It is a no-op when audit is disabled.
+// gate behavior of Spec §12.2. Opaque NUL files block even when optional audit
+// is disabled, because the v1 content hash cannot distinguish their tree from
+// a colliding twin.
 func Gate(cfg *config.Config, subjects []Subject) (warnings []string, errs []string) {
 	return gate(cfg, subjects, true)
 }
@@ -158,14 +163,46 @@ func GateReadOnly(cfg *config.Config, subjects []Subject) (warnings []string, er
 }
 
 func gate(cfg *config.Config, subjects []Subject, persist bool) (warnings []string, errs []string) {
+	// NUL-bearing files are opaque under the current v1 content framing, so
+	// this refusal is independent of the opt-in audit policy. Scan every
+	// admitted snapshot before the audit-enabled early return.
+	opaquePaths := make([][]string, len(subjects))
+	skipAudit := make([]bool, len(subjects))
+	for index, subject := range subjects {
+		paths, err := opaquescan.NULPaths(subject.Snapshot)
+		if err != nil {
+			skipAudit[index] = true
+			errs = append(errs, fmt.Sprintf("audit blocked: %s: opaque snapshot scan: %v", subject.Name, err))
+			continue
+		}
+		opaquePaths[index] = paths
+		if len(paths) == 0 {
+			continue
+		}
+		skipAudit[index] = true
+		report := opaqueNULReport(paths)
+		switch report.Decision {
+		case DecisionBlock:
+			for _, finding := range report.Findings {
+				errs = append(errs, auditFindingMessage("audit blocked", subject.Name, finding))
+			}
+		case DecisionWarn:
+			for _, finding := range report.Findings {
+				warnings = append(warnings, auditFindingMessage("audit warning", subject.Name, finding))
+			}
+		}
+	}
 	if !cfg.Audit.Enabled {
-		return nil, nil
+		return warnings, errs
 	}
 	if !runStaticCanary() {
-		return nil, []string{"audit blocked: audit canary failed: detectors are not producing expected findings"}
+		return warnings, append(errs, "audit blocked: audit canary failed: detectors are not producing expected findings")
 	}
-	for _, subject := range subjects {
-		report, err := auditSubject(cfg, subject, persist)
+	for index, subject := range subjects {
+		if skipAudit[index] {
+			continue
+		}
+		report, err := auditSubjectWithOpaquePaths(cfg, subject, persist, opaquePaths[index])
 		if err != nil {
 			errs = append(errs, fmt.Sprintf("audit blocked: %s: %v", subject.Name, err))
 			continue
@@ -191,12 +228,12 @@ func gate(cfg *config.Config, subjects []Subject, persist bool) (warnings []stri
 				continue
 			}
 			for _, finding := range report.Findings {
-				errs = append(errs, fmt.Sprintf("audit blocked: %s: %s %s - %s", subject.Name, finding.Severity, finding.ID, finding.Evidence))
+				errs = append(errs, auditFindingMessage("audit blocked", subject.Name, finding))
 			}
 			warnings = append(warnings, scriptWarnings...)
 		default: // warn
 			for _, finding := range report.Findings {
-				warnings = append(warnings, fmt.Sprintf("audit warning: %s: %s %s - %s", subject.Name, finding.Severity, finding.ID, finding.Evidence))
+				warnings = append(warnings, auditFindingMessage("audit warning", subject.Name, finding))
 			}
 			warnings = append(warnings, scriptWarnings...)
 		}
@@ -233,6 +270,14 @@ func scriptAuditWarnings(subject Subject) []string {
 
 // auditSubject runs the pipeline of Spec §12.1 for one subject.
 func auditSubject(cfg *config.Config, subject Subject, persist bool) (Report, error) {
+	opaquePaths, err := opaquescan.NULPaths(subject.Snapshot)
+	if err != nil {
+		return Report{}, fmt.Errorf("opaque snapshot scan: %w", err)
+	}
+	return auditSubjectWithOpaquePaths(cfg, subject, persist, opaquePaths)
+}
+
+func auditSubjectWithOpaquePaths(cfg *config.Config, subject Subject, persist bool, opaquePaths []string) (Report, error) {
 	contentHash, err := hashing.ContentSHA256(subject.Snapshot, nil)
 	if err != nil {
 		return Report{}, err
@@ -240,6 +285,15 @@ func auditSubject(cfg *config.Config, subject Subject, persist bool) (Report, er
 	report := Report{
 		Skill: subject.Name, ContentSHA256: contentHash,
 		ScriptPolicies: scriptpolicy.AuditPoliciesForCommands(subject.Commands),
+	}
+	// The v1 content hash can collide when file bytes contain NUL. Keep this
+	// result outside the verdict cache so a NUL-free twin cannot authorize a
+	// NUL-bearing tree with the same hash.
+	opaqueReport := opaqueNULReport(opaquePaths)
+	if opaqueReport.Decision == DecisionBlock {
+		report.Findings = opaqueReport.Findings
+		report.Decision = opaqueReport.Decision
+		return report, nil
 	}
 
 	// Local revocations block unconditionally (Spec §12.2).
@@ -262,7 +316,7 @@ func auditSubject(cfg *config.Config, subject Subject, persist bool) (Report, er
 		return report, nil
 	}
 
-	findings := detect(subject.Snapshot, subject.Capabilities)
+	findings := detectWithOpaquePaths(subject.Snapshot, subject.Capabilities, opaquePaths)
 	if persist {
 		storeCachedFindings(cfg, contentHash, subject, findings, report.ScriptPolicies)
 	}
@@ -438,7 +492,19 @@ var (
 )
 
 func detect(snapshot string, caps capabilities.Manifest) []Finding {
-	var findings []Finding
+	opaquePaths, err := opaquescan.NULPaths(snapshot)
+	if err != nil {
+		return []Finding{{
+			ID: "audit.opaque.scan-incomplete", Severity: SeverityCritical,
+			Evidence:   fmt.Sprintf("cannot establish whether the snapshot contains NUL bytes: %v", err),
+			Verifiable: true,
+		}}
+	}
+	return detectWithOpaquePaths(snapshot, caps, opaquePaths)
+}
+
+func detectWithOpaquePaths(snapshot string, caps capabilities.Manifest, opaquePaths []string) []Finding {
+	findings := opaqueNULFindings(opaquePaths)
 	declaredHosts := map[string]bool{}
 	for _, host := range caps.Network {
 		declaredHosts[strings.ToLower(host)] = true
@@ -500,6 +566,35 @@ func detect(snapshot string, caps capabilities.Manifest) []Finding {
 		return findings[i].Evidence < findings[j].Evidence
 	})
 	return findings
+}
+
+func opaqueNULFindings(paths []string) []Finding {
+	findings := make([]Finding, 0, len(paths))
+	for _, path := range paths {
+		findings = append(findings, Finding{
+			ID: findingOpaqueNUL, Severity: SeverityCritical, File: path,
+			Evidence:   "regular file contains a NUL byte and is treated as opaque",
+			Verifiable: true,
+		})
+	}
+	return findings
+}
+
+func opaqueNULReport(paths []string) Report {
+	findings := opaqueNULFindings(paths)
+	decision := DecisionAllow
+	if len(findings) != 0 {
+		decision = DecisionBlock
+	}
+	return Report{Findings: findings, Decision: decision}
+}
+
+func auditFindingMessage(prefix, subject string, finding Finding) string {
+	message := fmt.Sprintf("%s: %s: %s %s - %s", prefix, subject, finding.Severity, finding.ID, finding.Evidence)
+	if finding.File != "" {
+		message += fmt.Sprintf(" (file: %s)", finding.File)
+	}
+	return message
 }
 
 func declaredHost(declared map[string]bool, host string) bool {

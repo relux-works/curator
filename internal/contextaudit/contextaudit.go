@@ -1,10 +1,10 @@
-// Package contextaudit implements the two audit classes environments §9.1
-// adds for context and MCP snapshots: the unpinnable, always-blocking
-// context-secret-material detector with its scoped waivers, and the
-// always-warn context-system-module-present surfacing class.
+// Package contextaudit implements audit detectors for context and MCP
+// snapshots: the scoped secret-material detector, the system-module warning,
+// and the interim blocking rule for regular files containing NUL bytes.
 package contextaudit
 
 import (
+	"bytes"
 	"fmt"
 	"io/fs"
 	"os"
@@ -14,12 +14,15 @@ import (
 	"strings"
 
 	"github.com/relux-works/curator/internal/contextpkg"
+	"github.com/relux-works/curator/internal/opaquescan"
 )
 
 // Classes and diagnostics.
 const (
 	ClassSecretMaterial      = "context-secret-material"
 	ClassSystemModulePresent = "context-system-module-present"
+	ClassOpaqueFile          = "opaque-file"
+	PatternNULByte           = "nul-byte"
 	SeverityBlocking         = "blocking"
 	DiagWaiverApplied        = "context_secret_waiver_applied"
 	DiagWaiverUnmatched      = "context_secret_waiver_unmatched"
@@ -104,8 +107,9 @@ type Report struct {
 	SystemModules []SystemModule
 }
 
-// Blocking reports whether an unwaived blocking finding remains. Nothing
-// but a scoped waiver clears one: a content-hash pin never does.
+// Blocking reports whether an unwaived blocking finding remains. Scoped
+// secret waivers may clear only their matching secret finding; opaque-file
+// findings are never waivable.
 func (r Report) Blocking() bool {
 	for _, finding := range r.Findings {
 		if finding.Severity == SeverityBlocking && !finding.Waived {
@@ -113,6 +117,16 @@ func (r Report) Blocking() bool {
 		}
 	}
 	return false
+}
+
+// FirstBlocking returns the first unwaived blocking finding in report order.
+func (r Report) FirstBlocking() (Finding, bool) {
+	for _, finding := range r.Findings {
+		if finding.Severity == SeverityBlocking && !finding.Waived {
+			return finding, true
+		}
+	}
+	return Finding{}, false
 }
 
 // PinKey normalizes a pin spelling onto the bare lowercase key.
@@ -125,8 +139,9 @@ func PinKey(pin string) string {
 }
 
 // Detect walks the snapshot at root and runs the detector over the files in
-// scope. pin is the member's pin; only waivers at that pin apply, and every
-// waiver handed in that clears nothing is reported unmatched.
+// scope. It also checks every regular file for opaque NUL bytes. pin is the
+// member's pin; only waivers at that pin apply, and every waiver handed in
+// that clears nothing is reported unmatched.
 func Detect(root, pin string, waivers []Waiver) (Report, error) {
 	files := map[string][]byte{}
 	for _, name := range ScopeFiles {
@@ -163,12 +178,36 @@ func Detect(root, pin string, waivers []Waiver) (Report, error) {
 			return Report{}, err
 		}
 	}
-	return DetectFiles(files, pin, waivers), nil
+	paths, err := opaquescan.NULPaths(root)
+	if err != nil {
+		return Report{}, err
+	}
+	var opaqueFindings []Finding
+	for _, path := range paths {
+		opaqueFindings = append(opaqueFindings, Finding{
+			Class: ClassOpaqueFile, File: path, Pattern: PatternNULByte,
+			Severity: SeverityBlocking,
+		})
+	}
+	return detectFiles(files, pin, waivers, opaqueFindings), nil
 }
 
-// DetectFiles runs the detector over in-memory files keyed by snapshot-relative
-// portable path. Files outside the scope are ignored.
+// DetectFiles runs the secret detector over its existing scope and applies the
+// opaque NUL rule to every in-memory file keyed by snapshot-relative path.
 func DetectFiles(files map[string][]byte, pin string, waivers []Waiver) Report {
+	var opaqueFindings []Finding
+	for path, content := range files {
+		if offset := bytes.IndexByte(content, 0); offset >= 0 {
+			opaqueFindings = append(opaqueFindings, Finding{
+				Class: ClassOpaqueFile, File: path, Pattern: PatternNULByte,
+				Severity: SeverityBlocking, Span: [2]int{offset, offset + 1},
+			})
+		}
+	}
+	return detectFiles(files, pin, waivers, opaqueFindings)
+}
+
+func detectFiles(files map[string][]byte, pin string, waivers []Waiver, opaqueFindings []Finding) Report {
 	var report Report
 	paths := make([]string, 0, len(files))
 	for path := range files {
@@ -196,6 +235,7 @@ func DetectFiles(files map[string][]byte, pin string, waivers []Waiver) Report {
 			}
 		}
 	}
+	report.Findings = append(report.Findings, opaqueFindings...)
 	sort.SliceStable(report.Findings, func(i, j int) bool {
 		a, b := report.Findings[i], report.Findings[j]
 		if a.File != b.File {
@@ -209,7 +249,7 @@ func DetectFiles(files map[string][]byte, pin string, waivers []Waiver) Report {
 		if PinKey(waiver.Pin) == memberPin {
 			for index := range report.Findings {
 				finding := &report.Findings[index]
-				if finding.File == waiver.File && finding.Span == waiver.Span && !finding.Waived {
+				if finding.Class != ClassOpaqueFile && finding.File == waiver.File && finding.Span == waiver.Span && !finding.Waived {
 					finding.Waived = true
 					finding.WaiverReason = waiver.Reason
 					applied = true

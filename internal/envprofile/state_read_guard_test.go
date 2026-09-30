@@ -85,7 +85,7 @@ func reviewedManagerReadExceptions() map[string]string {
 		"internal/gitops/gitops.go:FetchCommitFromURLIsolated",
 	)
 	allow("Inspects a caller-selected source snapshot for declared content; absence means the snapshot lacks that input and other read failures do not count as absence.",
-		"internal/audit/audit.go:detect",
+		"internal/audit/audit.go:detectWithOpaquePaths",
 		"internal/contextaudit/contextaudit.go:Detect",
 		"internal/closure/resolve.go:openGitFrozen",
 		"internal/closure/resolve.go:serveGitSubtree",

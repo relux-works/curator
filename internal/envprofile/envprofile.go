@@ -1536,7 +1536,8 @@ func auditMember(home string, manager *gitManager, key string, resolved contextr
 		return nil, err
 	}
 	if report.Blocking() {
-		return nil, fmt.Errorf("%s: member %s carries a blocking %s finding", DiagSourceInvalid, key, contextaudit.ClassSecretMaterial)
+		finding, _ := report.FirstBlocking()
+		return nil, fmt.Errorf("%s: member %s carries a blocking finding (%s) in %s", DiagSourceInvalid, key, finding.Class, finding.File)
 	}
 	gateWarnings, err := strictAuditMember(home, manager, resolved, entry, policy)
 	if err != nil {
@@ -1574,7 +1575,8 @@ func auditNewUpdateMember(home string, manager *gitManager, key string, resolved
 		return err
 	}
 	if report.Blocking() {
-		return fmt.Errorf("%s: new member %s carries a blocking finding; the old lock stands", DiagUpdateBlocked, key)
+		finding, _ := report.FirstBlocking()
+		return fmt.Errorf("%s: new member %s carries a blocking finding (%s) in %s; the old lock stands", DiagUpdateBlocked, key, finding.Class, finding.File)
 	}
 	if _, err := strictAuditMember(home, manager, resolved, entry, policy); err != nil {
 		return fmt.Errorf("%s: new member %s %v; the old lock stands", DiagUpdateBlocked, key, err)
@@ -1999,7 +2001,8 @@ func migrateGlobalSkills(home string, policy Policy) ([]contextlock.Member, erro
 		if report, err := contextaudit.Detect(entry, "commit "+resolved.Commit, nil); err != nil {
 			return nil, err
 		} else if report.Blocking() {
-			return nil, fmt.Errorf("%s: migrated global skill %q carries a blocking %s finding", DiagSourceInvalid, decl.Name, contextaudit.ClassSecretMaterial)
+			finding, _ := report.FirstBlocking()
+			return nil, fmt.Errorf("%s: migrated global skill %q carries a blocking finding (%s) in %s", DiagSourceInvalid, decl.Name, finding.Class, finding.File)
 		}
 		migrated := contextresolve.Resolved{
 			Kind: contextlock.KindSkill, Name: decl.Name, Source: identity,
