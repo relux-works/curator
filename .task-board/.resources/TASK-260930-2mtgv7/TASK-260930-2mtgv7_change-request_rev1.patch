@@ -1,0 +1,146 @@
+diff --git a/.research/260930_compiled-build-leaves-reconciliation.md b/.research/260930_compiled-build-leaves-reconciliation.md
+new file mode 100644
+index 00000000..bc785cc9
+--- /dev/null
++++ b/.research/260930_compiled-build-leaves-reconciliation.md
+@@ -0,0 +1,140 @@
++# TASK-260930-2mtgv7 — compiled-build leaves vs curator main (read-only audit)
++
++- Curator base: `origin/main` = `0e3169bb6a20d39e58af361a25554b447df8731c` (worktree HEAD identical).
++- Spec: curator-spec `v1.0.0-rc.13` = `23435129ebc4c29e5b7f75ec72a0aa0cd3f16065` (= `SPEC_PIN`, `.github/workflows/ci.yml:43`).
++  Conformance root: disposable clone checked out at that commit, `CURATOR_CONFORMANCE_ROOT=<clone>/conformance/v1`.
++- Coverage ratios below are the `conformancecoverage` lines the tests themselves print (`driven / known-gap / bound / skipped / total`).
++- No code written. No board status changed except this task's own lifecycle.
++
++## Test runs (focused, bounded, run by me, real exit codes)
++
++| # | Command (all with `-count=1 -v`, `CURATOR_CONFORMANCE_ROOT` = rc.13) | Exit | Result line |
++|---|---|---|---|
++| T1 | `go test -run 'TestReleasedSkillBuildSchemaCases\|TestCanonicalRepositorySourceVectors\|TestReleasedSourceIdentityVectors\|TestRepositorySourceRejectsNonRC5Forms\|TestSkillBuildDescriptorClosedTargetsAndContainment\|TestLocalSelectorCanonicalization\|TestRawObjectAndLFSPinnedConformanceFixtures\|TestLocalConfigAndAdministrationAdversarialBoundaries\|TestPackIndexConformanceAndExactSSHWrapper\|TestTaggedAcquisitionUsesOnlyExactTagAndChecksTerminalCommit\|TestAdmissionFailuresPrecedeAuditCacheAndCompiler\|TestNetworkAndLocalSHA1SHA256RawObjectParity' ./internal/buildrepo` | 0 | `ok internal/buildrepo 16.275s` |
++| T2 | `go test -run 'TestExternal\|TestProtected\|TestSubstitutionCannotAlias\|TestDryRun\|TestPipeline\|TestSigningPolicies\|TestAuditWarnings\|TestReceiptArtifactPath' ./internal/buildrepo` | 0 | `ok internal/buildrepo 6.997s` (27 top-level PASS) |
++| T3 | `go test ./internal/devsub` | 0 | `ok internal/devsub 1.717s` |
++| T4 | `go test -run TestAuthoritativeGarbageCollectionRootsAreRetained ./internal/scopes` | 0 | `ok internal/scopes 2.206s` |
++| T5 | `go test -run TestReadAuthoritativeMarker ./internal/marker` | 0 | `ok internal/marker 1.357s` |
++| T6 | `go test -run TestMarkerV3 ./internal/marker` | 0 | `ok internal/marker 1.282s` (3 PASS) |
++| T7 | `go test -run TestBuildSourceConformanceVectors ./internal/buildsource` | 0 | `ok internal/buildsource 0.903s` |
++| T8 | `go test -run 'TestSchema7\|TestSchema6Rejects' ./internal/skillspec` | 0 | `ok internal/skillspec 1.029s` (5 PASS) |
++| T9 | `go test -run 'TestRevisionSubstitution\|TestDraftBuild\|TestLegacyBuildsKeepReceipt1\|TestReviewExternal\|TestTheCredentialPrecheckRunsBeforeAnyFetch\|TestADryRunReports\|TestAuthoritativeDryRunCases' ./internal/install` | 0 | `ok internal/install 128.657s` (12 PASS) |
++| T10 | `go test -run 'TestToolchainIdentityVectors\|TestToolchainExecutableMismatchCarriesTheOperatorRemedy\|TestDiagnosticRenderingIsUnchangedWithoutARemedy' ./internal/godriver` | 0 | `ok internal/godriver 3.477s` |
++| T11 | `go test -run 'TestInstallPrintsTheRemedyAVersionManagerSelectionEarns\|TestHostGoToolchainIsSelectableOnAnInventoryPlatform' ./cmd/curator` | 0 | `ok cmd/curator 17.301s` |
++| T12 | `go test -run 'Toolchain\|Registry' ./internal/rustsource` | 0 | `ok internal/rustsource 1.602s`. **3 SKIPs** here: no operator-approved Cargo descriptor for x86_64-apple-darwin on this host |
++
++rc.13 coverage lines printed by those runs:
++
++| Family | driven | known-gap | bound | skipped | total | Test |
++|---|---|---|---|---|---|---|
++| external-repository/raw-objects | 12 | 0 | 0 | 0 | 12 | T1 `TestRawObjectAndLFSPinnedConformanceFixtures` |
++| external-repository/lfs-pointers | 10 | 0 | 0 | 0 | 10 | T1 same |
++| external-repository/local-config-and-refs | 13 | 0 | **2** | 0 | 15 | T1 `TestLocalConfigAndAdministrationAdversarialBoundaries` |
++| external-repository/pack-index | 7 | 0 | **1** | 0 | 8 | T1 `TestPackIndexConformanceAndExactSSHWrapper` |
++| skill-build-v1/schema-cases | 13 | 0 | 0 | 0 | 13 | T1 `TestReleasedSkillBuildSchemaCases` |
++| source-identities/vectors | 10 | 0 | 0 | 0 | 10 | T1 `TestReleasedSourceIdentityVectors` |
++| skillfile-dev-v2/schema-cases | 16 | 0 | 0 | 0 | 16 | T3 `TestSkillfileDevV2PublishedCasesUseCoverageRatchet` |
++| external-repository-lifecycle/status-repair-gc-cases | 1 | 0 | **4** | 0 | 5 | T4 (bound reason: "status and repair codes belong to the external-repository manager surface") |
++| marker/install-marker-v2/schema-cases | 14 | 0 | 0 | 0 | 14 | T5 |
++| marker/install-marker-v4/schema-cases | 22 | **5** | 0 | 0 | 27 | T5 (known-gap owner BUG-260923-2afgyq, `.github/ci/conformance-gaps.tsv`) |
++| build-source/build-source-cases | 8 | 0 | 0 | **2** | 10 | T7 (skipped: invalid-unicode / duplicate path, host FS) |
++| install/dry-run-cases | 3 | 0 | 0 | 0 | 3 | T9 `TestAuthoritativeDryRunCasesMutateNothingPersistent` |
++| build-drivers/toolchain-cases | 11 | 0 | 0 | **1** | 12 | T10 `TestToolchainIdentityVectors` (skipped: invalid-unicode-toolchain-path) |
++
++### rc.13 external-repository material with NO Curator consumer (key gap)
++
++`grep -rl` over `internal/` and `cmd/` for each key returns nothing:
++
++| rc.13 artifact | Content | Consumer on main |
++|---|---|---|
++| `conformance/v1/vectors/external-repository-acquisition.json` | `cases` 12, `common_fetch_argv` 55, `clean_environment` 17, `forbidden_fetch_features` 11 | none |
++| `conformance/v1/vectors/external-repository-lifecycle.json` (all but `status_repair_gc_cases`) | `whole_snapshot_order` 12, `cache_cases` 7, `source_covering_cases` 2, `mixed_build_cases` 6, `path_shim_cases` 3, `signing_cases` 4, `transaction_cases` 4 | none |
++| `conformance/v1/schema-cases/install-marker-v3/*` | 27 cases | none. Also missing from `.github/ci/conformance-case-counts.tsv`, so the ratchet has a blind spot here |
++| `conformance/v1/expected/external-repository/{build-receipt-v2,install-marker-v3-mixed,mixed-build-plan}.json` | expected bytes | none. `TestExternalReceiptV2CacheKeyVector` (`internal/buildrepo/pipeline_test.go:539`) pins a locally hard-coded key rather than reading these |
++
++Stated bound: these are unexecuted published cases, not proven failures. Whether main would pass them is **unknown**.
++
++## Verdict table
++
++Legend for access: **C** = Curator repo only; **S** = curator-spec repo; **K** = needs csk; **H** = human/operator-only (for example ssh lev or approving a toolchain root).
++
++### STORY-260728-1ojb1p curator-external-build-repositories
++
++| Leaf | Verdict | Evidence | Access |
++|---|---|---|---|
++| TASK-260728-pwbr32 schema-v7 models + substitutions | **DONE-ON-MAIN** | `internal/skillspec/parse.go:135,172,417` (schema-7 `build_repositories`, schema<7 refusal); `internal/buildrepo/buildrepo.go:72` ParseLockedCommit, `:91` ParseSource, `:190` ParseDescriptor, `:255` NormalizeLocalSelector, `:285` LocalIdentity; `internal/devsub/devsub.go:108`. Tests: T8 `TestSchema7RepositoryModelAndCommandOwnership`, `…CommandAndDeclarationStayClosed`, `…ReferencesAreExactAndExhaustive`, `TestSchema6RejectsSchema7FieldsWithoutChangingGoV1`, `TestSchema7OptionalTagAndSHA256Lock`; T1 `TestRepositorySourceRejectsNonRC5Forms`, `TestSkillBuildDescriptorClosedTargetsAndContainment`, `TestLocalSelectorCanonicalization`; T3 schema-2 substitution tests. rc.13: skill-build-v1 13/13, source-identities 10/10, skillfile-dev-v2 16/16 | C |
++| TASK-260728-1uepyd clean Git + raw-object admission | **PARTIAL** | Implemented: `internal/buildrepo/admission.go:130` ExactSSHCommand, `:186` ValidateGitTool, `:259` AcquireNetwork; `local.go:44` AdmitLocal. Tests (T1): `TestTaggedAcquisitionUsesOnlyExactTagAndChecksTerminalCommit`, `TestNetworkAndLocalSHA1SHA256RawObjectParity`, `TestAdmissionFailuresPrecedeAuditCacheAndCompiler`. rc.13: raw-objects 12/12, lfs-pointers 10/10, local-config-and-refs 13/15 (+2 bound), pack-index 7/8 (+1 bound). **Gap:** `external-repository-acquisition.json` is not consumed (12 cases, 55 fetch argv, 17 clean-env, 11 forbidden-feature rows); 3 bounds are unreviewed | C |
++| TASK-260728-1ax4j0 snapshot audit + cache | **PARTIAL** | `internal/buildrepo/pipeline.go:193` RunPipeline, `:585` SnapshotKey; `protected.go`; `gc.go:19`. T2 (27 PASS) includes `TestExternalPipelineOrderingAcrossOperations`, `…CacheHitRepeatsAdmissionValidationAndAudit`, `…OfflineProtectedSnapshotAndTagFailure`, `…CompilerSeesOnlySelectedBuildRoot`, `TestProtectedArtifactCorruptionQuarantinesAndRebuilds`, `TestProtectedSnapshotCorruptionQuarantinesBeforeAudit`, `TestDryRunDoesNotCreateProtectedRoot`. **Gap:** rc.13 lifecycle `whole_snapshot_order` (12), `cache_cases` (7), `source_covering_cases` (2) are not consumed; these tests use local fixtures only | C |
++| TASK-260728-rjxrgs mixed receipt / marker / lifecycle | **PARTIAL** | Production call sites: `internal/install/install.go:704,749`, `internal/install/global.go:299,339` (planExternalBuilds/stageExternalBuilds); `internal/install/external.go:517` externalMarkerBuild; `internal/marker/marker.go:76` ExternalSchemaVersion=3. T6 `TestMarkerV3StructurallyRepresentsLocalExternalAndMixed`, `…RejectsReceiptInterpretationAliasing`, `…ExternalCurrentnessIsReadOnlyAndFailsClosed`; T9 `TestLegacyBuildsKeepReceipt1`, `TestDraftBuildsPublishReceipt3OnBothArms`. **Gaps:** 27 published install-marker-v3 schema cases are not consumed; marker-v4 has 5 known-gap cases (BUG-260923-2afgyq); lifecycle `mixed_build_cases` 6, `path_shim_cases` 3, `signing_cases` 4 and `transaction_cases` 4 are not consumed; status-repair-gc is 1/5 driven with 4 bound. Note: current receipt/marker lines are receipt v3 and marker v4/v5, so the leaf's "receipt v2 / marker v3" wording is partly historical | C |
++| TASK-260728-20ao7p native blackbox + author guide (re-scoped 2026-09-16) | **NOT-STARTED** | `cmd/curator/native_blackbox_test.go` does not exist; `docs/external-build-repositories.md` does not exist in Curator and README has no link to it (spec has its own copy at rc.13) | C (hosted macOS/Windows lanes) |
++
++### STORY-260728-2fsqtv compiled-build-toolchain-preflight
++
++| Leaf | Verdict | Evidence | Access |
++|---|---|---|---|
++| TASK-260728-1j72zq (csk) | not assessed per brief | csk-owned | K |
++| TASK-260728-2gbtb9 Curator trusted toolchain preflight | **PARTIAL (spec-blocked)** | Exists: trusted Go toolchain identity/fingerprint in cache identity (T10: build-drivers/toolchain-cases 11/12, 1 skipped); remedy diagnostic `internal/godriver/session.go:77,521,669`, `errors.go:22` (T10 remedy tests, T11 `TestInstallPrintsTheRemedyAVersionManagerSelectionEarns`); Rust toolchain registry `internal/rustsource/toolchain_registry.go` (T12 has 3 host SKIPs). **Gap:** rc.13 defines no manifest-declared toolchain-requirement / version-constraint / guidance contract. A grep of `protocol/`, `schemas/` and `conformance/` for preflight / toolchain_missing / version constraint / installation guidance returns only unrelated script-worker preflight rows. So the common two-stage preflight and stable codes cannot be conformance-bound yet. Only one `"toolchain_missing"` literal exists in Curator | S first, then C |
++| TASK-260728-3vtl57 cross-manager preflight verification | **NOT-STARTED** | No shared preflight corpus in rc.13 (see above); no parity harness | S + K (+H for Linux) |
++| TASK-260728-ypbuav official install-guidance catalog | **NOT-STARTED** | No catalog, no versioning, no primary-source URL table in `internal/` or `cmd/`. The only manager guidance is the one-line Go PATH remedy (`session.go:77`). Input exists: TASK-260729-1vpytz research packet (done) | C (+S if catalog is normative) |
++
++### STORY-260720-21bsr2 compiled-build-interop (schema v6 chain)
++
++Fact base: rc.13 publishes no `conformance/v1/vectors/compiled-build-interop.json`, no `tools/run_compiled_build_interop.py`, no `docs/compiled-skill-authoring.md` and no `docs/build-driver-admission.md` (checked with `git ls-tree` at 23435129). The spec workflow `implementations.yml` already pins Curator `80fd617f…` and csk `4a88aa0e…` by full commit (lines 38, 56). Curator pins rc.13 by tag commit with a case-count ratchet (`.github/ci/conformance-case-counts.tsv`).
++
++| Leaf | Verdict | Evidence / reason | Access |
++|---|---|---|---|
++| TASK-260720-2g7avf shared compiled-build interop cases | **NOT-STARTED** | File absent at rc.13. Only adjacent coverage: `install/dry-run-cases` carries a `compiled_build_fixture` (3 cases, T9) | S |
++| TASK-260720-1673lr Curator shared-suite consumer | **NOT-STARTED** | `internal/interop/compiled_build_test.go` absent (only `golden_test.go`, `environments/`). Blocked on 2g7avf | C |
++| TASK-260720-31zeo2 csk shared-suite consumer | **NOT-STARTED** (inferred: no shared case file exists to consume) | csk repo not inspected | K |
++| TASK-260720-3nj1r6 cross-manager runner | **NOT-STARTED** | rc.13 `tools/` has no runner | S + K |
++| TASK-260720-14jjgt schema-v6 authoring guide | **OBSOLETE as scoped** | Scoped to schema v6 go-v1. Current skill schemas are v7/v8 (`agent-skill-v8` 66 cases). Package authoring is covered by spec `docs/external-build-repositories.md` §"Package authoring" (rc.13) and Curator `docs/compiled-commands.md`, `docs/authoring-cli-commands.md`. Any residual belongs in a re-scoped doc leaf | S |
++| TASK-260720-p7sdhg language-driver admission matrix | **NOT-STARTED** | `docs/build-driver-admission.md` absent at rc.13. Its value has shrunk now that the Rust, Swift and Kotlin drivers shipped | S |
++| TASK-260720-3pvihp qualify manager release evidence | **OBSOLETE** | Schema-v6 candidate-qualification gate. The release model moved on: rc.13 `release/1.0.0-rc.13.json` uses claim_v5 with `claims_emitted: []`, and implementations are pinned by full commit in `implementations.yml` | S |
++| TASK-260720-vs6den promote spec implementation pins | **OBSOLETE** | Pins already promoted by later releases (`implementations.yml:38,56`); a compiled-build runner step cannot exist without 3nj1r6 | S |
++| TASK-260720-25d05o qualify protocol release evidence | **OBSOLETE** | Targets the "schema v6 release", which was overtaken by rc.5→rc.13 | S |
++| TASK-260720-38l1sy audit Curator released-suite pin | **OBSOLETE** | The pin is the rc.13 tag commit (`ci.yml:43`), checked out at `ci.yml:103,249`, with the 3-OS matrix (`ci.yml:93,497,554`) and a count ratchet. The v6 compiled-build consumer part is carried by 1673lr | C |
++| TASK-260720-1utsx8 audit csk released-suite pin | **OBSOLETE** (same reasoning) | csk not inspected | K |
++| TASK-260720-22ynoi independent acceptance audit | **OBSOLETE** | Audits the obsolete v6 chain; re-create after any re-scoped interop story | S + K |
++
++### STORY-260728-19nx3g external-build-repository-interop (rc.5 chain)
++
++| Leaf | Verdict | Evidence | Access |
++|---|---|---|---|
++| TASK-260728-2u5u14 shared rc.5 external-repo cases | **PARTIAL** | rc.13 publishes `fixtures/external-repository/{raw-objects,lfs-pointers,pack-index,local-config-and-refs}.json`, `vectors/external-repository-{acquisition,lifecycle}.json`, `schema-cases/install-marker-v3` (27) and `expected/external-repository/*`. Not established: whether these meet every AC bullet (for example adversarial alternate/replace/graft/promisor stores, truthful platform claims). Reported as **unknown**, not assumed | S |
++| TASK-260728-1t4cyb authoring + driver guide | **PARTIAL** | spec `docs/external-build-repositories.md` (154 lines: Package authoring, Development substitutions, Operator requirements, Shared-suite consumption and claims). **Gap:** no future-driver threat-review checklist | S |
++| TASK-260728-1hwq5b cross-manager external runner | **NOT-STARTED** | No runner in rc.13 `tools/` | S + K |
++| TASK-260728-d8ktna qualify rc.5 release + claim-v3 | **OBSOLETE** | Spec doc states claim-v3 bytes "remain historical rc.5 claim bytes"; rc.13 release uses claim_v5 with no claims emitted | S (+K) |
++
++### STORY-260728-1eye8p linux-native-external-build-validation
++
++| Leaf | Verdict | Evidence | Access |
++|---|---|---|---|
++| TASK-260728-1e6811 Linux toolchain preflight | **NOT-STARTED** | Depends on 2gbtb9 + 3vtl57, which depend on a spec contract that does not exist yet | **H** (lev) + K |
++| TASK-260728-1skseh Linux native external-repo qualification | **NOT-STARTED** | No evidence attached. Hosted `ubuntu-latest` lanes run the Curator suite (`ci.yml:93`), but they are not the clean non-root dedicated-host qualification this leaf requires | **H** (lev) + K |
++| TASK-260729-2sxx7k Linux validation of Go snapshot | **OBSOLETE** (currently `blocked`) | Blocker per progress.md (2026-07-29): lev reachable (LevU, x86_64), but there is no operator-approved Go 1.25.x absolute GOROOT + trusted identity. The target snapshot `.temp/TASK-260720-1ljev5/worktree` no longer exists, and hosted Linux CI on main has since been green. Validating current main natively on Linux is 1skseh's job | H |
++
++### STORY-260720-3plyvy
++
++| Leaf | Verdict | Evidence | Access |
++|---|---|---|---|
++| BUG-260730-3eqseq repair v0.13 main CI | **OBSOLETE** | The failing run 30493882177 was on `cfffd7cd` (= `v0.13.0`, tag intact). Main CI workflow run 36641526700 on `0e3169bb` (current main) concluded `success`, and d50a0bf4 and cadaaf2e were also green. Releases v0.14.0-rc.3 and v0.15.0-rc.1/rc.2 have shipped since. Note: this is the workflow conclusion from `gh run list`; I did not re-run it | C |
++
++## Key aspects
++
++1. **The rc.5 external-repository implementation is on main, but its rc.13 conformance coverage is thin.** Four fixture families are fully driven. The acquisition vector, 7 of 8 lifecycle sub-tables and the 27 marker-v3 schema cases have no consumer. marker-v3 is also absent from the count ratchet (blind spot).
++2. **The toolchain-preflight story is blocked on the spec.** rc.13 has no manifest toolchain-requirement or guidance contract. Curator has only Go/Rust identity pinning plus a single remedy string.
++3. **The schema-v6 interop/qualification chain (21bsr2) and the rc.5 claim-v3 qualification (d8ktna) are superseded** by the rc.6+ release model (claim_v5, full-commit implementation pins).
++4. Mandatory-negative-evidence note: the driven families above include rejection rows (raw-object/LFS/local-config negatives). I did not mutation-test any gate in this audit.
++
++## Proposed plan (dependency order, rough size)
++
++1. **Close as OBSOLETE** (orchestrator/human decision): 3eqseq, 2sxx7k, 3pvihp, vs6den, 25d05o, 38l1sy, 1utsx8 (csk), 22ynoi, d8ktna, 14jjgt. — XS (board only).
++2. **C: consume the rc.13 external-repository-acquisition vector** in `internal/buildrepo` through `AcquireNetwork`/`AdmitLocal`, and review the 3 existing bounds → closes 1uepyd. — M.
++3. **C: consume the rc.13 lifecycle vector** (whole_snapshot_order, cache, source_covering) through `RunPipeline` → closes 1ax4j0. — M.
++4. **C: consume the install-marker-v3 schema cases (27)** in `internal/marker` and add them to `conformance-case-counts.tsv`; consume mixed_build/path_shim/signing/transaction and lift the 4 status-repair-gc bounds through the install entry (`install.go:704`); coordinate with BUG-260923-2afgyq for the marker-v4 known gaps → closes rjxrgs. — L.
++5. **C: 20ao7p** native blackbox test + Curator author guide (can link the spec doc). — M. Independent of 2–4.
++6. **S: re-scope 2u5u14/1t4cyb** into an "rc.13 external-repo corpus AC audit + driver threat-review checklist" leaf. — S/M.
++7. **S: toolchain-requirement contract** (manifest version constraints, stable codes, two-stage order, guidance catalog shape) must precede 2gbtb9/ypbuav/3vtl57. This needs a new spec leaf (none exists in these stories). — L. **Human decision:** is manifest-declared toolchain preflight still wanted?
++8. **C: 2gbtb9** after 7. — L. **C: ypbuav** catalog using the 1vpytz packet. — M.
++9. **S + K: interop layer** (2g7avf → 1673lr ∥ 31zeo2 → 3nj1r6 / 1hwq5b), re-scoped from schema v6 to the current schema/drivers. — XL, **needs csk**. p7sdhg can go in parallel. — S. **Human decision:** is cross-manager black-box parity still a goal?
++10. **H: Linux** 1e6811 / 1skseh after 8–9. Needs operator access to lev and an operator-approved toolchain root. — L.
