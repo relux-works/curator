@@ -1,0 +1,119 @@
+diff --git a/internal/envprofile/named_absence_boundary_test.go b/internal/envprofile/named_absence_boundary_test.go
+new file mode 100644
+index 00000000..2bbd2886
+--- /dev/null
++++ b/internal/envprofile/named_absence_boundary_test.go
+@@ -0,0 +1,56 @@
++package envprofile
++
++import (
++	"errors"
++	"io/fs"
++	"os"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/envregistry"
++	"github.com/relux-works/curator/internal/pathboundary"
++)
++
++// A lock-named store entry that is missing after lock creation is refused
++// at the named-route boundary step (validateNamedStoreBoundaries), not only
++// later by pin recomputation: the diagnostic names the regular_types check
++// and never pin_hash. A vanishing-skip on the named route would let the
++// entry through the boundary and surface only as pin_hash.
++func TestResolveRefusesMissingLockNamedStoreEntryAtBoundary(t *testing.T) {
++	fx := storeBoundaryFixture(t, "current", false)
++	entry := storeBoundaryEntry(t, fx, contextlock.KindContext)
++	if err := os.RemoveAll(entry); err != nil {
++		t.Fatal(err)
++	}
++
++	lock, _, err := contextlock.Read(lockPath(fx.home, fx.profile))
++	if err != nil {
++		t.Fatal(err)
++	}
++	failure := validateNamedStoreBoundaries(fx.home, lock, nil)
++	if failure == nil {
++		t.Fatalf("boundary step admitted missing lock-named entry %s", entry)
++	}
++	if failure.Path != entry || failure.Check != pathboundary.CheckRegular || !errors.Is(failure.Err, fs.ErrNotExist) {
++		t.Fatalf("boundary failure = %+v, want %s on %s wrapping ErrNotExist", failure, pathboundary.CheckRegular, entry)
++	}
++
++	before := hashTreeForTest(t, fx.home)
++	result, err := Resolve(fx.request(envregistry.CodexCLI))
++	if err == nil {
++		t.Fatalf("Resolve admitted missing lock-named entry: %+v", result)
++	}
++	message := err.Error()
++	if !strings.Contains(message, envregistry.DiagStoreUntrusted) ||
++		!strings.Contains(message, "failed "+pathboundary.CheckRegular+" check") ||
++		strings.Contains(message, "failed "+diagPinHash+" check") {
++		t.Fatalf("Resolve error = %v, want %s from the boundary %s check, not %s", err, envregistry.DiagStoreUntrusted, pathboundary.CheckRegular, diagPinHash)
++	}
++	if result != nil && len(result.Document) != 0 {
++		t.Fatalf("untrusted Resolve emitted fragment %s", result.Document)
++	}
++	if after := hashTreeForTest(t, fx.home); after != before {
++		t.Fatal("refused Resolve mutated manager state")
++	}
++}
+diff --git a/internal/pathboundary/named_absence_test.go b/internal/pathboundary/named_absence_test.go
+new file mode 100644
+index 00000000..72c40108
+--- /dev/null
++++ b/internal/pathboundary/named_absence_test.go
+@@ -0,0 +1,51 @@
++package pathboundary
++
++import (
++	"errors"
++	"io/fs"
++	"os"
++	"path/filepath"
++	"testing"
++)
++
++// Named targets (lock, marker, store entry) fail closed when missing; only
++// children discovered by the tree walk may vanish.
++func TestNamedRoutesRejectMissingTarget(t *testing.T) {
++	root := t.TempDir()
++	if err := os.Mkdir(filepath.Join(root, "store"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	for _, target := range []string{
++		filepath.Join(root, "missing"),
++		filepath.Join(root, "store", "missing"),
++		filepath.Join(root, "missing", "entry"),
++	} {
++		for name, validate := range map[string]func(string, string, OwnerLookup) error{
++			"within": ValidateWithinWithOwner,
++			"route":  ValidateRouteWithOwner,
++			"leaf":   ValidateLeafWithOwner,
++		} {
++			err := validate(root, target, DefaultOwnerLookup())
++			var failure *Failure
++			if !errors.As(err, &failure) || failure.Check != CheckRegular || !errors.Is(err, fs.ErrNotExist) {
++				t.Errorf("%s(%s) = %v, want *Failure %s wrapping ErrNotExist", name, target, err, CheckRegular)
++			}
++		}
++	}
++}
++
++// The walked target itself is named by the caller: if it is gone when the
++// walk starts, validateTree fails instead of treating it as vanished.
++func TestValidateTreeRejectsMissingWalkTarget(t *testing.T) {
++	root := t.TempDir()
++	operator, err := effectiveOwner()
++	if err != nil {
++		t.Fatal(err)
++	}
++	target := filepath.Join(root, "entry")
++	err = validateTree(root, target, operator, DefaultOwnerLookup(), defaultEntryInfo)
++	var failure *Failure
++	if !errors.As(err, &failure) || failure.Path != target || failure.Check != CheckRegular || !errors.Is(err, fs.ErrNotExist) {
++		t.Fatalf("validateTree(missing target) = %v, want *Failure %s wrapping ErrNotExist", err, CheckRegular)
++	}
++}
