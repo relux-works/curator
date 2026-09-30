@@ -87,6 +87,22 @@ spawn run child final message (run=RUN-260930-f2918f, tools=10 patches=0 failed=
 Landing preconditions confirmed for accepted revision 3 and fresh evidence attached as `TASK-260917-8vfgxf_integration-preconditions.md`. Working tree holds exactly the 10 rev3 paths, uncommitted on the story branch; task and story both `integrating`; no reserved filenames, no CHANGELOG/LOGBOOK edits, no stray files. All gates re-ran green with exit 0. Ready for the runner to land — no handoff or integrate invoked from this run.
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260930-f2918f, pid=74825, exit=0)
+spawn run RUN-260930-f2918f failed; operator action required; failure: run_write_boundary_uncleared: runner integrate refused: run_write_boundary_uncleared: delivery of element STORY-260928-9vt338 is gated on 2 run(s) under warn policy
+  [ok] run RUN-260930-b0cbcf verdict=violated terminal=violated: assessed
+  [BLOCKED] run RUN-260930-76a282 verdict=indeterminate terminal=indeterminate: the terminal assessment is indeterminate
+clear a violating run with: task-board spawn write-boundary-clear <RUN-ID> --reason "..."
+board_publication_pending: STORY-260928-9vt338 is landed and its board state is committed as eed740494fab07d001ea24d45860f96e1cf717f5 on the local trunk, but the publication push did not land (board_publish_foreign_lane_overlap); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: eed740494fab07d001ea24d45860f96e1cf717f5
+  cause_code: board_publish_foreign_lane_overlap
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: 6735fec729aaa670f21812fd7cc558c980db5ebb
+  story_id: STORY-260928-9vt338
+  cause: board_publish_foreign_lane_overlap: the unpublished eed740494fab07d001ea24d45860f96e1cf717f5 reaches outside board_paths(STORY-260928-9vt338) on 2 path(s) — starting with .task-board/EPIC-260910-2hw1xb_security-audit-remediation-manager-and-spec/STORY-260917-hbuawd_content-hash-framing-v2/TASK-260917-8vfgxf_manager-interim-nul-opaque-rule/README.md; a Story record carries its own lane only, and a delta spanning lanes needs an Epic Record subject covering them — nothing was projected and nothing was pushed
+  element_id: STORY-260928-9vt338
+  link_oid: eed740494fab07d001ea24d45860f96e1cf717f5
+  paths: .task-board/EPIC-260910-2hw1xb_security-audit-remediation-manager-and-spec/STORY-260917-hbuawd_content-hash-framing-v2/TASK-260917-8vfgxf_manager-interim-nul-opaque-rule/README.md,.task-board/EPIC-260910-2hw1xb_security-audit-remediation-manager-and-spec/STORY-260917-hbuawd_content-hash-framing-v2/TASK-260917-8vfgxf_manager-interim-nul-opaque-rule/progress.md
+  remedy: re-record the bytes at the owning scope, or land the chain through integrate/reconcile-trunk
 
 ## Precondition Resources
 - [8vfgxf-brief.md](file://TASK-260917-8vfgxf/8vfgxf-brief.md)
@@ -119,7 +135,7 @@ spawn run completed: muse (run=RUN-260930-f2918f, pid=74825, exit=0)
 2026-09-16T21:17:39Z
 
 ## Last Update
-2026-09-30T06:53:45Z
+2026-09-30T07:37:42Z
 
 ## Assigned To
 [implementer] developer (muse)
