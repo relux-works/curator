@@ -1,0 +1,1053 @@
+diff --git a/cmd/curator/nul_opaque_test.go b/cmd/curator/nul_opaque_test.go
+new file mode 100644
+index 00000000..ba4ea0ad
+--- /dev/null
++++ b/cmd/curator/nul_opaque_test.go
+@@ -0,0 +1,71 @@
++package main
++
++import (
++	"context"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/buildrepo"
++	"github.com/relux-works/curator/internal/config"
++)
++
++func TestProductionExternalAuditBlocksOpaqueNULWhenAuditIsDisabled(t *testing.T) {
++	root := t.TempDir()
++	const rel = "assets/deep/opaque.unsupported"
++	path := filepath.Join(root, filepath.FromSlash(rel))
++	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(path, []byte("prefix\x00suffix"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	cfg := &config.Config{Path: filepath.Join(t.TempDir(), "config.json")}
++	if cfg.Audit.Enabled {
++		t.Fatal("test requires the default disabled audit configuration")
++	}
++
++	for _, dryRun := range []bool{false, true} {
++		t.Run(map[bool]string{false: "install", true: "dry-run"}[dryRun], func(t *testing.T) {
++			deps := productionExternalDeps(cfg, dryRun)
++			_, err := deps.AuditWarnings(context.Background(), buildrepo.AuditSubject{
++				Declared:     buildrepo.DeclaredState{Repository: "tools", Identity: "example.test/tools"},
++				Effective:    buildrepo.EffectiveState{Commit: strings.Repeat("1", 40)},
++				SnapshotRoot: root,
++			})
++			if err == nil || !strings.Contains(err.Error(), "audit.opaque.nul-byte") || !strings.Contains(err.Error(), rel) {
++				t.Fatalf("production external audit error = %v, want blocking opaque finding naming %s", err, rel)
++			}
++		})
++	}
++}
++
++func TestCLIAuditBlocksOpaqueNULWhenAuditIsDisabled(t *testing.T) {
++	configPath := auditLabelProject(t, 7, false, nil)
++	cfg, err := config.Load(configPath, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if cfg.Audit.Enabled {
++		t.Fatal("test requires the default disabled audit configuration")
++	}
++	repo := filepath.Join(cfg.SkillsRoot, "label-skill")
++	const rel = "docs/deep/opaque.unknown"
++	path := filepath.Join(repo, filepath.FromSlash(rel))
++	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(path, []byte("prefix\x00suffix"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	runGit(t, repo, "add", ".")
++	runGit(t, repo, "commit", "-qm", "add opaque audit file")
++	runGit(t, repo, "tag", "-f", "v1")
++
++	code, stdout, stderr := capture(t, configPath, "audit", "app")
++	combined := stdout + "\n" + stderr
++	if code == exitOK || !strings.Contains(combined, "audit.opaque.nul-byte") || !strings.Contains(combined, rel) {
++		t.Fatalf("curator audit = %d\nstdout:\n%s\nstderr:\n%s; want blocking opaque finding naming %s", code, stdout, stderr, rel)
++	}
++}
+diff --git a/internal/audit/audit.go b/internal/audit/audit.go
+index 6975d0b2..c75a37f0 100644
+--- a/internal/audit/audit.go
++++ b/internal/audit/audit.go
+@@ -18,6 +18,7 @@ import (
+ 	"github.com/relux-works/curator/internal/capabilities"
+ 	"github.com/relux-works/curator/internal/config"
+ 	"github.com/relux-works/curator/internal/hashing"
++	"github.com/relux-works/curator/internal/opaquescan"
+ 	"github.com/relux-works/curator/internal/scriptpolicy"
+ 	"github.com/relux-works/curator/internal/skillspec"
+ )
+@@ -44,9 +45,11 @@ var severityRank = map[string]int{
+ // backend and model (Spec §12.1).
+ const (
+ 	PromptVersion  = "1"
+-	RulesetVersion = "1"
++	RulesetVersion = "2"
+ )
+ 
++const findingOpaqueNUL = "audit.opaque.nul-byte"
++
+ // Finding is one audit finding.
+ type Finding struct {
+ 	ID         string `json:"id"`
+@@ -146,7 +149,9 @@ func Decide(findings []Finding, mode, failOn string) string {
+ }
+ 
+ // Gate audits every subject and returns warnings and blocking errors per the
+-// gate behavior of Spec §12.2. It is a no-op when audit is disabled.
++// gate behavior of Spec §12.2. Opaque NUL files block even when optional audit
++// is disabled, because the v1 content hash cannot distinguish their tree from
++// a colliding twin.
+ func Gate(cfg *config.Config, subjects []Subject) (warnings []string, errs []string) {
+ 	return gate(cfg, subjects, true)
+ }
+@@ -158,14 +163,46 @@ func GateReadOnly(cfg *config.Config, subjects []Subject) (warnings []string, er
+ }
+ 
+ func gate(cfg *config.Config, subjects []Subject, persist bool) (warnings []string, errs []string) {
++	// NUL-bearing files are opaque under the current v1 content framing, so
++	// this refusal is independent of the opt-in audit policy. Scan every
++	// admitted snapshot before the audit-enabled early return.
++	opaquePaths := make([][]string, len(subjects))
++	skipAudit := make([]bool, len(subjects))
++	for index, subject := range subjects {
++		paths, err := opaquescan.NULPaths(subject.Snapshot)
++		if err != nil {
++			skipAudit[index] = true
++			errs = append(errs, fmt.Sprintf("audit blocked: %s: opaque snapshot scan: %v", subject.Name, err))
++			continue
++		}
++		opaquePaths[index] = paths
++		if len(paths) == 0 {
++			continue
++		}
++		skipAudit[index] = true
++		report := opaqueNULReport(paths)
++		switch report.Decision {
++		case DecisionBlock:
++			for _, finding := range report.Findings {
++				errs = append(errs, auditFindingMessage("audit blocked", subject.Name, finding))
++			}
++		case DecisionWarn:
++			for _, finding := range report.Findings {
++				warnings = append(warnings, auditFindingMessage("audit warning", subject.Name, finding))
++			}
++		}
++	}
+ 	if !cfg.Audit.Enabled {
+-		return nil, nil
++		return warnings, errs
+ 	}
+ 	if !runStaticCanary() {
+-		return nil, []string{"audit blocked: audit canary failed: detectors are not producing expected findings"}
++		return warnings, append(errs, "audit blocked: audit canary failed: detectors are not producing expected findings")
+ 	}
+-	for _, subject := range subjects {
+-		report, err := auditSubject(cfg, subject, persist)
++	for index, subject := range subjects {
++		if skipAudit[index] {
++			continue
++		}
++		report, err := auditSubjectWithOpaquePaths(cfg, subject, persist, opaquePaths[index])
+ 		if err != nil {
+ 			errs = append(errs, fmt.Sprintf("audit blocked: %s: %v", subject.Name, err))
+ 			continue
+@@ -191,12 +228,12 @@ func gate(cfg *config.Config, subjects []Subject, persist bool) (warnings []stri
+ 				continue
+ 			}
+ 			for _, finding := range report.Findings {
+-				errs = append(errs, fmt.Sprintf("audit blocked: %s: %s %s - %s", subject.Name, finding.Severity, finding.ID, finding.Evidence))
++				errs = append(errs, auditFindingMessage("audit blocked", subject.Name, finding))
+ 			}
+ 			warnings = append(warnings, scriptWarnings...)
+ 		default: // warn
+ 			for _, finding := range report.Findings {
+-				warnings = append(warnings, fmt.Sprintf("audit warning: %s: %s %s - %s", subject.Name, finding.Severity, finding.ID, finding.Evidence))
++				warnings = append(warnings, auditFindingMessage("audit warning", subject.Name, finding))
+ 			}
+ 			warnings = append(warnings, scriptWarnings...)
+ 		}
+@@ -233,6 +270,14 @@ func scriptAuditWarnings(subject Subject) []string {
+ 
+ // auditSubject runs the pipeline of Spec §12.1 for one subject.
+ func auditSubject(cfg *config.Config, subject Subject, persist bool) (Report, error) {
++	opaquePaths, err := opaquescan.NULPaths(subject.Snapshot)
++	if err != nil {
++		return Report{}, fmt.Errorf("opaque snapshot scan: %w", err)
++	}
++	return auditSubjectWithOpaquePaths(cfg, subject, persist, opaquePaths)
++}
++
++func auditSubjectWithOpaquePaths(cfg *config.Config, subject Subject, persist bool, opaquePaths []string) (Report, error) {
+ 	contentHash, err := hashing.ContentSHA256(subject.Snapshot, nil)
+ 	if err != nil {
+ 		return Report{}, err
+@@ -241,6 +286,15 @@ func auditSubject(cfg *config.Config, subject Subject, persist bool) (Report, er
+ 		Skill: subject.Name, ContentSHA256: contentHash,
+ 		ScriptPolicies: scriptpolicy.AuditPoliciesForCommands(subject.Commands),
+ 	}
++	// The v1 content hash can collide when file bytes contain NUL. Keep this
++	// result outside the verdict cache so a NUL-free twin cannot authorize a
++	// NUL-bearing tree with the same hash.
++	opaqueReport := opaqueNULReport(opaquePaths)
++	if opaqueReport.Decision == DecisionBlock {
++		report.Findings = opaqueReport.Findings
++		report.Decision = opaqueReport.Decision
++		return report, nil
++	}
+ 
+ 	// Local revocations block unconditionally (Spec §12.2).
+ 	if reason := revocationReason(cfg, contentHash, subject.Source, subject.Git); reason != "" {
+@@ -262,7 +316,7 @@ func auditSubject(cfg *config.Config, subject Subject, persist bool) (Report, er
+ 		return report, nil
+ 	}
+ 
+-	findings := detect(subject.Snapshot, subject.Capabilities)
++	findings := detectWithOpaquePaths(subject.Snapshot, subject.Capabilities, opaquePaths)
+ 	if persist {
+ 		storeCachedFindings(cfg, contentHash, subject, findings, report.ScriptPolicies)
+ 	}
+@@ -438,7 +492,19 @@ var (
+ )
+ 
+ func detect(snapshot string, caps capabilities.Manifest) []Finding {
+-	var findings []Finding
++	opaquePaths, err := opaquescan.NULPaths(snapshot)
++	if err != nil {
++		return []Finding{{
++			ID: "audit.opaque.scan-incomplete", Severity: SeverityCritical,
++			Evidence:   fmt.Sprintf("cannot establish whether the snapshot contains NUL bytes: %v", err),
++			Verifiable: true,
++		}}
++	}
++	return detectWithOpaquePaths(snapshot, caps, opaquePaths)
++}
++
++func detectWithOpaquePaths(snapshot string, caps capabilities.Manifest, opaquePaths []string) []Finding {
++	findings := opaqueNULFindings(opaquePaths)
+ 	declaredHosts := map[string]bool{}
+ 	for _, host := range caps.Network {
+ 		declaredHosts[strings.ToLower(host)] = true
+@@ -502,6 +568,35 @@ func detect(snapshot string, caps capabilities.Manifest) []Finding {
+ 	return findings
+ }
+ 
++func opaqueNULFindings(paths []string) []Finding {
++	findings := make([]Finding, 0, len(paths))
++	for _, path := range paths {
++		findings = append(findings, Finding{
++			ID: findingOpaqueNUL, Severity: SeverityCritical, File: path,
++			Evidence:   "regular file contains a NUL byte and is treated as opaque",
++			Verifiable: true,
++		})
++	}
++	return findings
++}
++
++func opaqueNULReport(paths []string) Report {
++	findings := opaqueNULFindings(paths)
++	decision := DecisionAllow
++	if len(findings) != 0 {
++		decision = DecisionBlock
++	}
++	return Report{Findings: findings, Decision: decision}
++}
++
++func auditFindingMessage(prefix, subject string, finding Finding) string {
++	message := fmt.Sprintf("%s: %s: %s %s - %s", prefix, subject, finding.Severity, finding.ID, finding.Evidence)
++	if finding.File != "" {
++		message += fmt.Sprintf(" (file: %s)", finding.File)
++	}
++	return message
++}
++
+ func declaredHost(declared map[string]bool, host string) bool {
+ 	if declared[host] {
+ 		return true
+diff --git a/internal/audit/audit_test.go b/internal/audit/audit_test.go
+index 5e18d49a..9bbca9e0 100644
+--- a/internal/audit/audit_test.go
++++ b/internal/audit/audit_test.go
+@@ -83,6 +83,84 @@ func TestDetectorsAgainstCapabilities(t *testing.T) {
+ 	}
+ }
+ 
++func TestOpaqueNULBlocksEvenWhenAV1TwinHasCachedAllow(t *testing.T) {
++	nulTree := t.TempDir()
++	cleanTwin := t.TempDir()
++	writeFiles(t, nulTree, map[string][]byte{
++		"assets/a.bin": []byte("x\x00docs/b.md\x00y"),
++	})
++	writeFiles(t, cleanTwin, map[string][]byte{
++		"assets/a.bin": []byte("x"),
++		"docs/b.md":    []byte("y"),
++	})
++	leftHash, err := hashing.ContentSHA256(nulTree, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	rightHash, err := hashing.ContentSHA256(cleanTwin, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if leftHash != rightHash {
++		t.Fatalf("v1 framing did not collide: %s != %s", leftHash, rightHash)
++	}
++
++	cfg := newCfg(t, "advisory", "off")
++	clean := Subject{Name: "clean-twin", Snapshot: cleanTwin, SchemaVersion: 3, Capabilities: capabilities.ImplicitNone()}
++	if warnings, errs := Gate(cfg, []Subject{clean}); len(errs) != 0 || len(warnings) != 0 {
++		t.Fatalf("NUL-free twin: warnings=%v errs=%v", warnings, errs)
++	}
++	if findings, hit := loadCachedFindings(cfg, leftHash); !hit || len(findings) != 0 {
++		t.Fatalf("clean twin cache = (%+v, hit=%v), want cached allow", findings, hit)
++	}
++
++	opaque := Subject{Name: "nul-tree", Snapshot: nulTree, SchemaVersion: 3, Capabilities: capabilities.ImplicitNone()}
++	if _, errs := Gate(cfg, []Subject{opaque}); len(errs) == 0 {
++		t.Fatal("NUL-bearing tree was admitted from its clean twin's cached allow")
++	}
++	report, err := auditSubject(cfg, opaque, false)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if report.Decision != DecisionBlock || report.CacheHit || len(report.Findings) != 1 || report.Findings[0].ID != findingOpaqueNUL || report.Findings[0].File != "assets/a.bin" {
++		t.Fatalf("opaque report %+v, want an uncached blocking finding naming assets/a.bin", report)
++	}
++}
++
++func TestGateBlocksDeepOpaqueNULWhenAuditIsDisabledAndNamesFile(t *testing.T) {
++	snapshot := t.TempDir()
++	writeFiles(t, snapshot, map[string][]byte{
++		"docs/deep/opaque.unsupported": []byte("prefix\x00suffix"),
++	})
++	cfg := &config.Config{Path: filepath.Join(t.TempDir(), "config.json")}
++	if cfg.Audit.Enabled {
++		t.Fatal("test requires the default disabled audit configuration")
++	}
++
++	warnings, errs := Gate(cfg, []Subject{{
++		Name: "opaque-skill", Snapshot: snapshot, SchemaVersion: 3,
++		Capabilities: capabilities.ImplicitNone(),
++	}})
++	if len(warnings) != 0 || len(errs) != 1 ||
++		!strings.Contains(errs[0], findingOpaqueNUL) ||
++		!strings.Contains(errs[0], "docs/deep/opaque.unsupported") {
++		t.Fatalf("Gate with disabled audit = warnings %v, errors %v; want a blocking file-naming opaque finding", warnings, errs)
++	}
++}
++
++func writeFiles(t *testing.T, root string, files map[string][]byte) {
++	t.Helper()
++	for name, content := range files {
++		path := filepath.Join(root, filepath.FromSlash(name))
++		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(path, content, 0o644); err != nil {
++			t.Fatal(err)
++		}
++	}
++}
++
+ func TestGateModes(t *testing.T) {
+ 	subject := subjectWith(t, "curl https://exfil.example.net/x\n", capabilities.ImplicitNone(), 3)
+ 
+diff --git a/internal/contextaudit/contextaudit.go b/internal/contextaudit/contextaudit.go
+index d47a5b0d..93a7be31 100644
+--- a/internal/contextaudit/contextaudit.go
++++ b/internal/contextaudit/contextaudit.go
+@@ -1,10 +1,10 @@
+-// Package contextaudit implements the two audit classes environments §9.1
+-// adds for context and MCP snapshots: the unpinnable, always-blocking
+-// context-secret-material detector with its scoped waivers, and the
+-// always-warn context-system-module-present surfacing class.
++// Package contextaudit implements audit detectors for context and MCP
++// snapshots: the scoped secret-material detector, the system-module warning,
++// and the interim blocking rule for regular files containing NUL bytes.
+ package contextaudit
+ 
+ import (
++	"bytes"
+ 	"fmt"
+ 	"io/fs"
+ 	"os"
+@@ -14,12 +14,15 @@ import (
+ 	"strings"
+ 
+ 	"github.com/relux-works/curator/internal/contextpkg"
++	"github.com/relux-works/curator/internal/opaquescan"
+ )
+ 
+ // Classes and diagnostics.
+ const (
+ 	ClassSecretMaterial      = "context-secret-material"
+ 	ClassSystemModulePresent = "context-system-module-present"
++	ClassOpaqueFile          = "opaque-file"
++	PatternNULByte           = "nul-byte"
+ 	SeverityBlocking         = "blocking"
+ 	DiagWaiverApplied        = "context_secret_waiver_applied"
+ 	DiagWaiverUnmatched      = "context_secret_waiver_unmatched"
+@@ -104,8 +107,9 @@ type Report struct {
+ 	SystemModules []SystemModule
+ }
+ 
+-// Blocking reports whether an unwaived blocking finding remains. Nothing
+-// but a scoped waiver clears one: a content-hash pin never does.
++// Blocking reports whether an unwaived blocking finding remains. Scoped
++// secret waivers may clear only their matching secret finding; opaque-file
++// findings are never waivable.
+ func (r Report) Blocking() bool {
+ 	for _, finding := range r.Findings {
+ 		if finding.Severity == SeverityBlocking && !finding.Waived {
+@@ -115,6 +119,16 @@ func (r Report) Blocking() bool {
+ 	return false
+ }
+ 
++// FirstBlocking returns the first unwaived blocking finding in report order.
++func (r Report) FirstBlocking() (Finding, bool) {
++	for _, finding := range r.Findings {
++		if finding.Severity == SeverityBlocking && !finding.Waived {
++			return finding, true
++		}
++	}
++	return Finding{}, false
++}
++
+ // PinKey normalizes a pin spelling onto the bare lowercase key.
+ func PinKey(pin string) string {
+ 	pin = strings.TrimSpace(pin)
+@@ -125,8 +139,9 @@ func PinKey(pin string) string {
+ }
+ 
+ // Detect walks the snapshot at root and runs the detector over the files in
+-// scope. pin is the member's pin; only waivers at that pin apply, and every
+-// waiver handed in that clears nothing is reported unmatched.
++// scope. It also checks every regular file for opaque NUL bytes. pin is the
++// member's pin; only waivers at that pin apply, and every waiver handed in
++// that clears nothing is reported unmatched.
+ func Detect(root, pin string, waivers []Waiver) (Report, error) {
+ 	files := map[string][]byte{}
+ 	for _, name := range ScopeFiles {
+@@ -163,12 +178,36 @@ func Detect(root, pin string, waivers []Waiver) (Report, error) {
+ 			return Report{}, err
+ 		}
+ 	}
+-	return DetectFiles(files, pin, waivers), nil
++	paths, err := opaquescan.NULPaths(root)
++	if err != nil {
++		return Report{}, err
++	}
++	var opaqueFindings []Finding
++	for _, path := range paths {
++		opaqueFindings = append(opaqueFindings, Finding{
++			Class: ClassOpaqueFile, File: path, Pattern: PatternNULByte,
++			Severity: SeverityBlocking,
++		})
++	}
++	return detectFiles(files, pin, waivers, opaqueFindings), nil
+ }
+ 
+-// DetectFiles runs the detector over in-memory files keyed by snapshot-relative
+-// portable path. Files outside the scope are ignored.
++// DetectFiles runs the secret detector over its existing scope and applies the
++// opaque NUL rule to every in-memory file keyed by snapshot-relative path.
+ func DetectFiles(files map[string][]byte, pin string, waivers []Waiver) Report {
++	var opaqueFindings []Finding
++	for path, content := range files {
++		if offset := bytes.IndexByte(content, 0); offset >= 0 {
++			opaqueFindings = append(opaqueFindings, Finding{
++				Class: ClassOpaqueFile, File: path, Pattern: PatternNULByte,
++				Severity: SeverityBlocking, Span: [2]int{offset, offset + 1},
++			})
++		}
++	}
++	return detectFiles(files, pin, waivers, opaqueFindings)
++}
++
++func detectFiles(files map[string][]byte, pin string, waivers []Waiver, opaqueFindings []Finding) Report {
+ 	var report Report
+ 	paths := make([]string, 0, len(files))
+ 	for path := range files {
+@@ -196,6 +235,7 @@ func DetectFiles(files map[string][]byte, pin string, waivers []Waiver) Report {
+ 			}
+ 		}
+ 	}
++	report.Findings = append(report.Findings, opaqueFindings...)
+ 	sort.SliceStable(report.Findings, func(i, j int) bool {
+ 		a, b := report.Findings[i], report.Findings[j]
+ 		if a.File != b.File {
+@@ -209,7 +249,7 @@ func DetectFiles(files map[string][]byte, pin string, waivers []Waiver) Report {
+ 		if PinKey(waiver.Pin) == memberPin {
+ 			for index := range report.Findings {
+ 				finding := &report.Findings[index]
+-				if finding.File == waiver.File && finding.Span == waiver.Span && !finding.Waived {
++				if finding.Class != ClassOpaqueFile && finding.File == waiver.File && finding.Span == waiver.Span && !finding.Waived {
+ 					finding.Waived = true
+ 					finding.WaiverReason = waiver.Reason
+ 					applied = true
+diff --git a/internal/contextaudit/contextaudit_test.go b/internal/contextaudit/contextaudit_test.go
+index ad38ee35..e1e19261 100644
+--- a/internal/contextaudit/contextaudit_test.go
++++ b/internal/contextaudit/contextaudit_test.go
+@@ -1,6 +1,8 @@
+ package contextaudit
+ 
+ import (
++	"os"
++	"path/filepath"
+ 	"strings"
+ 	"testing"
+ )
+@@ -130,3 +132,65 @@ func TestDetectorIsUnpinnable(t *testing.T) {
+ 		t.Fatal("detector must block without waivers")
+ 	}
+ }
++
++func TestOpaqueNULBlocksOutsideSecretScopeAndIgnoresWaivers(t *testing.T) {
++	files := map[string][]byte{"assets/deep/image.bin": []byte("prefix\x00suffix")}
++	report := DetectFiles(files, testPin, []Waiver{{
++		Pin: testPin, File: "assets/deep/image.bin", Span: [2]int{6, 7}, Reason: "must not waive opaque content",
++	}})
++	if !report.Blocking() {
++		t.Fatalf("opaque findings %+v must block", report.Findings)
++	}
++	if len(report.Findings) != 1 {
++		t.Fatalf("opaque findings %+v, want one file finding", report.Findings)
++	}
++	finding := report.Findings[0]
++	if finding.Class != ClassOpaqueFile || finding.Pattern != PatternNULByte || finding.Severity != SeverityBlocking || finding.File != "assets/deep/image.bin" || finding.Waived {
++		t.Fatalf("opaque finding %+v", finding)
++	}
++	if len(report.Waivers) != 1 || report.Waivers[0].Diagnostic != DiagWaiverUnmatched {
++		t.Fatalf("opaque waiver result %+v, want unmatched waiver", report.Waivers)
++	}
++}
++
++func TestDetectScansDeepRegularFiles(t *testing.T) {
++	root := t.TempDir()
++	regular := filepath.Join(root, "assets", "deep", "image.bin")
++	if err := os.MkdirAll(filepath.Dir(regular), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(regular, []byte{1, 0, 2}, 0o644); err != nil {
++		t.Fatal(err)
++	}
++
++	report, err := Detect(root, testPin, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !report.Blocking() || len(report.Findings) != 1 || report.Findings[0].File != "assets/deep/image.bin" {
++		t.Fatalf("findings %+v, want only the deep regular file", report.Findings)
++	}
++}
++
++func TestDetectDoesNotFollowSymlinks(t *testing.T) {
++	root := t.TempDir()
++	outside := filepath.Join(t.TempDir(), "outside.bin")
++	if err := os.WriteFile(outside, []byte{1, 0, 2}, 0o644); err != nil {
++		t.Fatal(err)
++	}
++	link := filepath.Join(root, "docs", "linked.bin")
++	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Symlink(outside, link); err != nil {
++		t.Skipf("symlinks unavailable: %v", err)
++	}
++
++	report, err := Detect(root, testPin, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if report.Blocking() || len(report.Findings) != 0 {
++		t.Fatalf("findings %+v, want no findings from a symlink target", report.Findings)
++	}
++}
+diff --git a/internal/envprofile/envprofile.go b/internal/envprofile/envprofile.go
+index 7c9ae27a..daa7a32a 100644
+--- a/internal/envprofile/envprofile.go
++++ b/internal/envprofile/envprofile.go
+@@ -1536,7 +1536,8 @@ func auditMember(home string, manager *gitManager, key string, resolved contextr
+ 		return nil, err
+ 	}
+ 	if report.Blocking() {
+-		return nil, fmt.Errorf("%s: member %s carries a blocking %s finding", DiagSourceInvalid, key, contextaudit.ClassSecretMaterial)
++		finding, _ := report.FirstBlocking()
++		return nil, fmt.Errorf("%s: member %s carries a blocking finding (%s) in %s", DiagSourceInvalid, key, finding.Class, finding.File)
+ 	}
+ 	gateWarnings, err := strictAuditMember(home, manager, resolved, entry, policy)
+ 	if err != nil {
+@@ -1574,7 +1575,8 @@ func auditNewUpdateMember(home string, manager *gitManager, key string, resolved
+ 		return err
+ 	}
+ 	if report.Blocking() {
+-		return fmt.Errorf("%s: new member %s carries a blocking finding; the old lock stands", DiagUpdateBlocked, key)
++		finding, _ := report.FirstBlocking()
++		return fmt.Errorf("%s: new member %s carries a blocking finding (%s) in %s; the old lock stands", DiagUpdateBlocked, key, finding.Class, finding.File)
+ 	}
+ 	if _, err := strictAuditMember(home, manager, resolved, entry, policy); err != nil {
+ 		return fmt.Errorf("%s: new member %s %v; the old lock stands", DiagUpdateBlocked, key, err)
+@@ -1999,7 +2001,8 @@ func migrateGlobalSkills(home string, policy Policy) ([]contextlock.Member, erro
+ 		if report, err := contextaudit.Detect(entry, "commit "+resolved.Commit, nil); err != nil {
+ 			return nil, err
+ 		} else if report.Blocking() {
+-			return nil, fmt.Errorf("%s: migrated global skill %q carries a blocking %s finding", DiagSourceInvalid, decl.Name, contextaudit.ClassSecretMaterial)
++			finding, _ := report.FirstBlocking()
++			return nil, fmt.Errorf("%s: migrated global skill %q carries a blocking finding (%s) in %s", DiagSourceInvalid, decl.Name, finding.Class, finding.File)
+ 		}
+ 		migrated := contextresolve.Resolved{
+ 			Kind: contextlock.KindSkill, Name: decl.Name, Source: identity,
+diff --git a/internal/envprofile/nul_opaque_test.go b/internal/envprofile/nul_opaque_test.go
+new file mode 100644
+index 00000000..f3adf988
+--- /dev/null
++++ b/internal/envprofile/nul_opaque_test.go
+@@ -0,0 +1,172 @@
++package envprofile
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/contextaudit"
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/hashing"
++	"github.com/relux-works/curator/internal/pathboundary"
++)
++
++// TestInstallBlocksBothV1CollidingSkillTrees drives Install through
++// contextresolve.Resolve -> auditAndStore -> auditMember. Both trees have the
++// same v1 hash, but each has a regular NUL-bearing file in a different path.
++func TestInstallBlocksBothV1CollidingSkillTrees(t *testing.T) {
++	pinHomes(t)
++	ids := newGitIdentities(t)
++	collision := []struct {
++		name    string
++		files   map[string]string
++		finding string
++	}{
++		{
++			name: "single-record",
++			files: map[string]string{
++				"assets/a.bin": "x\x00docs/b.md\x00y\x00z",
++			},
++			finding: "assets/a.bin",
++		},
++		{
++			name: "split-records",
++			files: map[string]string{
++				"assets/a.bin": "x",
++				"docs/b.md":    "y\x00z",
++			},
++			finding: "docs/b.md",
++		},
++	}
++	left, right := t.TempDir(), t.TempDir()
++	writeV1Files(t, left, collision[0].files)
++	writeV1Files(t, right, collision[1].files)
++	leftHash, err := hashing.ContentSHA256(left, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	rightHash, err := hashing.ContentSHA256(right, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if leftHash != rightHash {
++		t.Fatalf("v1 framing did not collide: %s != %s", leftHash, rightHash)
++	}
++
++	for _, tc := range collision {
++		t.Run(tc.name, func(t *testing.T) {
++			home := t.TempDir()
++			skillRepo := gitRepo(t, tc.files, "v1.0.0")
++			skillOperand := ids.serve(skillRepo, "https://example.com/"+tc.name+"-skill")
++			rootRepo := gitRepo(t, skillDependencyRootFiles(tc.name, skillOperand), "v1.0.0")
++			rootOperand := ids.serve(rootRepo, "https://example.com/"+tc.name+"-root")
++
++			_, _, _, err := Install(home, InstallOptions{Operand: rootOperand})
++			if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) ||
++				!strings.Contains(err.Error(), contextaudit.ClassOpaqueFile) || !strings.Contains(err.Error(), tc.finding) {
++				t.Fatalf("Install error = %v, want a blocking opaque finding naming %s", err, tc.finding)
++			}
++			if _, err := readSource(home, tc.name); err == nil {
++				t.Fatal("blocked install published a profile source")
++			}
++		})
++	}
++
++	t.Run("nul-free-skill-still-installs", func(t *testing.T) {
++		home := t.TempDir()
++		skillRepo := gitRepo(t, map[string]string{
++			"assets/a.bin": "x",
++			"docs/b.md":    "y",
++		}, "v1.0.0")
++		skillOperand := ids.serve(skillRepo, "https://example.com/nul-free-skill")
++		rootRepo := gitRepo(t, skillDependencyRootFiles("clean-root", skillOperand), "v1.0.0")
++		rootOperand := ids.serve(rootRepo, "https://example.com/nul-free-root")
++		info, _, _, err := Install(home, InstallOptions{Operand: rootOperand})
++		if err != nil {
++			t.Fatal(err)
++		}
++		if member, ok := lockMember(info.Lock, "sk"); !ok || member.Kind != contextlock.KindSkill {
++			t.Fatalf("installed lock lacks skill member: %+v", info.Lock.Members)
++		}
++	})
++}
++
++func TestInstallBlocksDeepNULFileInContextPathSnapshot(t *testing.T) {
++	home := t.TempDir()
++	pinHomes(t)
++	source := t.TempDir()
++	writeGitFile(t, source, "agent-context.json", `{"schema_version": 1, "name": "nul-context", "version": "1.0.0",`+
++		`"context": {"modules": [{"path": "a.md"}]}}`+"\n")
++	writeGitFile(t, source, "context/a.md", "clean\n")
++	deep := filepath.Join(source, "assets", "deep", "image.unsupported")
++	if err := os.MkdirAll(filepath.Dir(deep), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(deep, []byte{1, 0, 2}, 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := pathboundary.ProtectTree(source); err != nil {
++		t.Fatal(err)
++	}
++
++	_, _, _, err := Install(home, InstallOptions{Operand: source})
++	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) ||
++		!strings.Contains(err.Error(), contextaudit.ClassOpaqueFile) || !strings.Contains(err.Error(), "assets/deep/image.unsupported") {
++		t.Fatalf("Install error = %v, want a blocking opaque finding naming the deep file", err)
++	}
++	if _, err := readSource(home, "nul-context"); err == nil {
++		t.Fatal("blocked context install published a profile source")
++	}
++}
++
++func TestUpdateBlocksDeepNULFileInNewContextMember(t *testing.T) {
++	home, _, oldHash := installBlockingOverlayRoot(t)
++	overlay := filepath.Join(t.TempDir(), "overlay")
++	writeManifestPackage(t, overlay,
++		`{"schema_version": 1, "name": "personal", "version": "0.3.0",`+
++			`"context": {"modules": [{"path": "a.md"}]}}`+"\n",
++		map[string]string{
++			"a.md":                     "clean\n",
++			"docs/deep/opaque.unknown": "first\x00last",
++		})
++	policy := Policy{
++		OverlaysAllowed:      true,
++		OverlayDefaultWeight: 1000,
++		Overlays:             map[string][]OverlaySpec{"acme": {{Source: overlay}}},
++	}
++	_, _, err := UpdateWithPolicy(home, "acme", policy)
++	if err == nil || !strings.Contains(err.Error(), DiagUpdateBlocked) ||
++		!strings.Contains(err.Error(), contextaudit.ClassOpaqueFile) || !strings.Contains(err.Error(), "docs/deep/opaque.unknown") {
++		t.Fatalf("UpdateWithPolicy error = %v, want a blocking opaque finding naming the deep file", err)
++	}
++	_, afterHash, err := readLock(home, "acme")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if afterHash != oldHash {
++		t.Fatal("blocked update moved the lock")
++	}
++}
++
++func skillDependencyRootFiles(name, skillOperand string) map[string]string {
++	return map[string]string{
++		"agent-context.json": `{"schema_version": 1, "name": "` + name + `", "version": "1.0.0",` +
++			`"context": {"modules": [{"path": "a.md"}]},` +
++			`"requires": {"skills": {"sk": {"git": "` + skillOperand + `", "range": "*"}}}}` + "\n",
++		"context/a.md": "clean\n",
++	}
++}
++
++func writeV1Files(t *testing.T, root string, files map[string]string) {
++	t.Helper()
++	for name, content := range files {
++		full := filepath.Join(root, filepath.FromSlash(name))
++		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
++			t.Fatal(err)
++		}
++	}
++}
+diff --git a/internal/envprofile/state_read_guard_test.go b/internal/envprofile/state_read_guard_test.go
+index 098fba20..6fa3815f 100644
+--- a/internal/envprofile/state_read_guard_test.go
++++ b/internal/envprofile/state_read_guard_test.go
+@@ -85,7 +85,7 @@ func reviewedManagerReadExceptions() map[string]string {
+ 		"internal/gitops/gitops.go:FetchCommitFromURLIsolated",
+ 	)
+ 	allow("Inspects a caller-selected source snapshot for declared content; absence means the snapshot lacks that input and other read failures do not count as absence.",
+-		"internal/audit/audit.go:detect",
++		"internal/audit/audit.go:detectWithOpaquePaths",
+ 		"internal/contextaudit/contextaudit.go:Detect",
+ 		"internal/closure/resolve.go:openGitFrozen",
+ 		"internal/closure/resolve.go:serveGitSubtree",
+diff --git a/internal/install/nul_opaque_test.go b/internal/install/nul_opaque_test.go
+new file mode 100644
+index 00000000..c9778956
+--- /dev/null
++++ b/internal/install/nul_opaque_test.go
+@@ -0,0 +1,142 @@
++package install
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/hashing"
++)
++
++func TestOpaqueNULIsBlockedAtProjectAndGlobalInstallWithAuditDisabled(t *testing.T) {
++	type lane struct {
++		name    string
++		install func(*testing.T, *env) Result
++		target  func(*env) string
++	}
++	lanes := []lane{
++		{
++			name: "project",
++			install: func(_ *testing.T, e *env) Result {
++				e.declare("skill-a")
++				return e.install(Options{})
++			},
++			target: func(e *env) string { return filepath.Join(e.project, ".agents", "skills", "skill-a") },
++		},
++		{
++			name: "global",
++			install: func(t *testing.T, e *env) Result {
++				t.Helper()
++				if _, err := GlobalInit(e.home); err != nil {
++					t.Fatal(err)
++				}
++				if err := manifestAddGlobal(e, "skill-a"); err != nil {
++					t.Fatal(err)
++				}
++				return Global(e.cfg, t.TempDir(), Options{Platform: installPlatform()})
++			},
++			target: func(e *env) string { return filepath.Join(GlobalRoot(e.home), "skills", "skill-a") },
++		},
++	}
++	cases := []struct {
++		name        string
++		files       map[string]string
++		wantFinding string
++	}{
++		{
++			name: "single-file-collision",
++			files: map[string]string{
++				"assets/a.bin": "x\x00docs/b.md\x00y\x00z",
++			},
++			wantFinding: "assets/a.bin",
++		},
++		{
++			name: "split-file-collision",
++			files: map[string]string{
++				"assets/a.bin": "x",
++				"docs/b.md":    "y\x00z",
++			},
++			wantFinding: "docs/b.md",
++		},
++		{
++			name: "deep-docs-opaque-file",
++			files: map[string]string{
++				"docs/deep/opaque.unsupported": "prefix\x00suffix",
++			},
++			wantFinding: "docs/deep/opaque.unsupported",
++		},
++		{name: "nul-free-control"},
++	}
++
++	first, second := t.TempDir(), t.TempDir()
++	writeNULTree(t, first, cases[0].files)
++	writeNULTree(t, second, cases[1].files)
++	firstHash, err := hashing.ContentSHA256(first, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	secondHash, err := hashing.ContentSHA256(second, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if firstHash != secondHash {
++		t.Fatalf("v1 framing did not collide: %s != %s", firstHash, secondHash)
++	}
++
++	for _, installLane := range lanes {
++		for _, tc := range cases {
++			t.Run(installLane.name+"/"+tc.name, func(t *testing.T) {
++				e := newEnv(t)
++				e.skill("skill-a")
++				if len(tc.files) != 0 {
++					addSkillFilesAndRetag(t, e, "skill-a", tc.files)
++				}
++				if e.cfg.Audit.Enabled {
++					t.Fatal("test requires the default disabled audit configuration")
++				}
++
++				result := installLane.install(t, e)
++				joined := strings.Join(append(result.Errors, result.Messages...), "\n")
++				if tc.wantFinding == "" {
++					if result.Status != "ok" {
++						t.Fatalf("NUL-free install status %q: %s", result.Status, joined)
++					}
++					return
++				}
++				if result.Status != "failed" ||
++					!strings.Contains(joined, "critical audit.opaque.nul-byte") ||
++					!strings.Contains(joined, tc.wantFinding) {
++					t.Fatalf("install result %+v, want blocking opaque finding naming %s", result, tc.wantFinding)
++				}
++				if _, err := os.Lstat(installLane.target(e)); err == nil {
++					t.Fatalf("blocked install materialized %s", installLane.target(e))
++				}
++			})
++		}
++	}
++}
++
++func addSkillFilesAndRetag(t *testing.T, e *env, skill string, files map[string]string) {
++	t.Helper()
++	repo := filepath.Join(e.skillsRoot, skill)
++	for name, content := range files {
++		e.write(repo, name, content)
++	}
++	e.git(repo, "add", ".")
++	e.git(repo, "commit", "-qm", "add opaque snapshot files")
++	e.git(repo, "tag", "-f", "v1")
++}
++
++func writeNULTree(t *testing.T, root string, files map[string]string) {
++	t.Helper()
++	for name, content := range files {
++		path := filepath.Join(root, filepath.FromSlash(name))
++		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
++			t.Fatal(err)
++		}
++	}
++}
+diff --git a/internal/opaquescan/nulopaque.go b/internal/opaquescan/nulopaque.go
+new file mode 100644
+index 00000000..c8d0d69a
+--- /dev/null
++++ b/internal/opaquescan/nulopaque.go
+@@ -0,0 +1,97 @@
++// Package opaquescan finds snapshot files whose NUL bytes make the v1 tree
++// framing ambiguous. It walks directories without following symlinks and
++// reads manager-owned file bytes through stateread.
++package opaquescan
++
++import (
++	"bytes"
++	"fmt"
++	"io/fs"
++	"path/filepath"
++	"sort"
++
++	"github.com/relux-works/curator/internal/stateread"
++)
++
++// NULPaths returns the POSIX-style paths of regular files below root that
++// contain at least one NUL byte. Symlinks and other non-regular entries are
++// ignored. A missing root is an empty snapshot; failed or partial reads are
++// errors, never absence.
++func NULPaths(root string) ([]string, error) {
++	metadata, err := stateread.Lstat(root)
++	if err != nil {
++		return nil, err
++	}
++	if metadata.Kind == stateread.KindAbsent {
++		return nil, nil
++	}
++	if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
++		return nil, stateread.UnusableError(root, fmt.Errorf("unknown snapshot metadata state %q", metadata.Kind))
++	}
++	if metadata.Info.Mode()&fs.ModeSymlink != 0 {
++		return nil, nil
++	}
++	if !metadata.Info.IsDir() {
++		return nil, stateread.UnusableError(root, fmt.Errorf("snapshot root is not a directory"))
++	}
++
++	var paths []string
++	if err := walk(root, root, &paths); err != nil {
++		return nil, err
++	}
++	sort.Strings(paths)
++	return paths, nil
++}
++
++func walk(root, dir string, paths *[]string) error {
++	listing, err := stateread.ReadDir(dir)
++	if err != nil {
++		return err
++	}
++	if listing.Kind == stateread.KindAbsent {
++		return stateread.UnusableError(dir, fmt.Errorf("snapshot directory disappeared during scan"))
++	}
++	if listing.Kind != stateread.KindPresent {
++		return stateread.UnusableError(dir, fmt.Errorf("unknown snapshot directory state %q", listing.Kind))
++	}
++
++	for _, entry := range listing.Entries {
++		path := filepath.Join(dir, entry.Name())
++		metadata, err := stateread.Lstat(path)
++		if err != nil {
++			return err
++		}
++		if metadata.Kind == stateread.KindAbsent {
++			return stateread.UnusableError(path, fmt.Errorf("snapshot entry disappeared during scan"))
++		}
++		if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
++			return stateread.UnusableError(path, fmt.Errorf("unknown snapshot entry state %q", metadata.Kind))
++		}
++		if metadata.Info.IsDir() {
++			if err := walk(root, path, paths); err != nil {
++				return err
++			}
++			continue
++		}
++		if !metadata.Info.Mode().IsRegular() {
++			continue
++		}
++
++		file, err := stateread.ReadRegularFile(path)
++		if err != nil {
++			return err
++		}
++		if file.Kind != stateread.KindPresent {
++			return stateread.UnusableError(path, fmt.Errorf("snapshot file is no longer present"))
++		}
++		if bytes.IndexByte(file.Bytes, 0) < 0 {
++			continue
++		}
++		rel, err := filepath.Rel(root, path)
++		if err != nil {
++			return stateread.UnusableError(path, err)
++		}
++		*paths = append(*paths, filepath.ToSlash(rel))
++	}
++	return nil
++}
