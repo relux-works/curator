@@ -228,6 +228,9 @@ jobs:
   # registered for the organisation's board repository only until an
   # administrator registers it for this repository, and an unmatched
   # self-hosted label would leave the job queued forever.
+  # Pinned to the rose-air runner by its `rose-air` label: the generic
+  # self-hosted/macOS/ARM64 labels alone let any organisation Apple-silicon
+  # runner take the job (gate-selftest.sh pins the label).
   test-self-hosted:
     name: Test (rose-air)
     # Runs on main pushes only: every landing gets self-hosted evidence, while
@@ -235,7 +238,7 @@ jobs:
     # single self-hosted slot is shared with other repositories and would
     # serialise every candidate behind unrelated 90-minute runs.
     if: ${{ vars.ROSE_AIR_RUNNER == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-    runs-on: [self-hosted, macOS, ARM64]
+    runs-on: [self-hosted, macOS, ARM64, rose-air]
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4

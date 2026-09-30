@@ -792,6 +792,45 @@ check_timeout_drift_rejected 'the self-test rejects candidate timeout drift' can
 check_timeout_drift_rejected 'the self-test rejects Windows candidate budget drift' \
 	candidate-conformance "$WINDOWS_MATRIX_TIMEOUT" "$WINDOWS_MATRIX_DRIFT"
 
+# The Test (rose-air) lane is pinned to the rose-air runner by label: without
+# it any organisation self-hosted Apple Silicon runner can take the job.
+self_hosted_runs_on() {
+	awk '
+		/^  [a-z][a-z0-9-]*:[ \t\r]*$/ {
+			job = $1
+			sub(/:[ \t\r]*$/, "", job)
+		}
+		job == "test-self-hosted" && /^    runs-on:/ {
+			line = $0
+			sub(/^    runs-on:[ \t]*/, "", line)
+			sub(/[ \t\r]*$/, "", line)
+			count++; value = line
+		}
+		END { if (count == 1) print value }
+	' "$1"
+}
+
+runs_on_pins_rose_air() {
+	printf '%s\n' "$(self_hosted_runs_on "$1")" |
+		awk '/^\[/ && /\]$/ { gsub(/[][ \t]/, ""); n = split($0, l, ","); for (i = 1; i <= n; i++) if (l[i] == "rose-air") found = 1 } END { exit !found }'
+}
+
+if runs_on_pins_rose_air "$WORKFLOW"; then
+	ok 'test-self-hosted runs-on is pinned to the rose-air label'
+else
+	bad 'test-self-hosted runs-on is pinned to the rose-air label' \
+		"observed runs-on: $(self_hosted_runs_on "$WORKFLOW")"
+fi
+sed 's/^    runs-on: \[self-hosted, macOS, ARM64, rose-air\]/    runs-on: [self-hosted, macOS, ARM64]/' \
+	"$WORKFLOW" >"$WORK/runs-on-unpinned.yml"
+if cmp -s "$WORKFLOW" "$WORK/runs-on-unpinned.yml"; then
+	bad 'the self-test rejects an unpinned self-hosted runs-on' 'could not produce the unpinned mutant'
+elif runs_on_pins_rose_air "$WORK/runs-on-unpinned.yml"; then
+	bad 'the self-test rejects an unpinned self-hosted runs-on' 'the unpinned runs-on remained admitted'
+else
+	ok 'the self-test rejects an unpinned self-hosted runs-on'
+fi
+
 GATE_DEFAULT_TIMEOUT="$(awk -F ':-' '/^GO_TEST_TIMEOUT=/{value=$2; sub(/}.*/, "", value); print value; exit}' "$HERE/test-gate.sh")"
 if [ "$GATE_DEFAULT_TIMEOUT" = '60m' ]; then
 	ok 'test-gate.sh defaults to the 60m per-package budget'

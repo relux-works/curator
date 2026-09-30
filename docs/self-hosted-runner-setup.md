@@ -3,7 +3,9 @@
 The `test-self-hosted` lane (`Test (rose-air)` in
 [ci.yml](../.github/workflows/ci.yml)) runs the default gate on the
 organisation's self-hosted macOS ARM64 runner (labels `self-hosted, macOS,
-ARM64`). It runs on `main` pushes only, and only while the repository
+ARM64, rose-air`). The runner must carry the custom `rose-air` label: the
+lane is pinned to it, so another self-hosted Apple-silicon runner without
+that label never takes the job. It runs on `main` pushes only, and only while the repository
 variable `ROSE_AIR_RUNNER` is `true`.
 
 ## One-time prerequisites on the runner
