@@ -1,5 +1,5 @@
 ## Status
-blocked
+closed
 
 ## Review
 required
@@ -41,6 +41,7 @@ Update: combination validated green nearly everywhere in /tmp (build/vet/gofmt/l
 BLOCKER PACKET. Constraint: refresh-candidate is the only sanctioned path to replay checkpoint 73fc8a4 onto trunk, and it refuses deterministically (7 attempts, 3 trunk OIDs) with causeless INTERNAL_ERROR before retaining any replay, so --replay-resolutions cannot proceed and no handoff is possible (would hit stale-anchor). Evidence: error quotes + elimination log in TASK-260918-11f9l1_results.md §1/§7; worktree pristine at 73fc8a4. Failed attempts: plain x5, --json, dummy --replay-resolutions (reaches a later stage, proving early-stage failure). Ruled out: lease, dirty tree, authority observation, signing, CR corruption, stale locks, network. Prime suspect: empty second checkpoint 2ecpjv rev1 (landed after task creation). Alternatives: (a) orchestrator/tool fix for refresh-candidate [recommended: preserves all acceptances]; (b) converge [REJECTED: demotes accepted union to stale]; (c) hand-rebase [FORBIDDEN by brief]. Ready on unblock: 3 resolution files + fixup patch attached; full gate evidence in /tmp (suites green). Needed: a working replay (tool fix or operator-run refresh-candidate), then this task completes in one short run.
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260918-5542c3, pid=85033, exit=0)
+Superseded 2026-09-30: the rc.12 pin promotion this replay targeted is obsolete; curator main pins curator-spec v1.0.0-rc.13 (SPEC_PIN 23435129) and carries the wave-1 manager union. Nothing to replay.
 
 ## Precondition Resources
 - [TASK-260918-11f9l1_brief.md](file://TASK-260918-11f9l1/TASK-260918-11f9l1_brief.md) — Producer brief: refresh-candidate replay of checkpoint 73fc8a4 onto the moved trunk with explicit resolutions, test-order fix-ups, story-final handoff
@@ -58,7 +59,7 @@ spawn run completed: muse (run=RUN-260918-5542c3, pid=85033, exit=0)
 2026-09-18T11:34:57Z
 
 ## Last Update
-2026-09-18T14:20:15Z
+2026-09-29T22:47:28Z
 
 ## Assigned To
 [implementer] developer (muse)

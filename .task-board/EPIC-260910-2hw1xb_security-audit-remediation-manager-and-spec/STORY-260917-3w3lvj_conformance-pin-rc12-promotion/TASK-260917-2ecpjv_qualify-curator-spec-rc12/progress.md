@@ -1,5 +1,5 @@
 ## Status
-integrating
+done
 
 ## Review
 light
@@ -68,6 +68,7 @@ spawn queued: [analyst] researcher (muse) (run=RUN-260918-5d65f5, max_parallel=2
 spawn run started: [analyst] researcher (muse) (run=RUN-260918-5d65f5)
 agent completed: [analyst] researcher (muse) (exit=0)
 spawn run completed: muse (run=RUN-260918-5d65f5, pid=81098, exit=0)
+Superseded 2026-09-30: read-only qualification of curator-spec rc.12; curator main now pins v1.0.0-rc.13 (qualified when SPEC_PIN moved). No repository delta.
 
 ## Precondition Resources
 - [TASK-260917-2ecpjv_brief.md](file://TASK-260917-2ecpjv/TASK-260917-2ecpjv_brief.md) — Read-only qualification brief for curator-spec v1.0.0-rc.12 at dced9b8
@@ -91,7 +92,7 @@ spawn run completed: muse (run=RUN-260918-5d65f5, pid=81098, exit=0)
 2026-09-17T17:45:31Z
 
 ## Last Update
-2026-09-18T11:53:13Z
+2026-09-30T17:23:15Z
 
 ## Assigned To
 [analyst] researcher (muse)
