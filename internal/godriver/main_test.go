@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/buildsource"
+	"github.com/relux-works/curator/internal/testgitenv"
 )
 
 // identityProbeMode is a test-only second hidden mode. It exists so a test can
@@ -32,7 +33,9 @@ func TestMain(m *testing.M) {
 	if len(os.Args) == 2 && os.Args[1] == identityProbeMode {
 		os.Exit(runIdentityProbe(os.Stdout))
 	}
+	restoreGitEnv := testgitenv.Isolate()
 	code := m.Run()
+	restoreGitEnv()
 	// The stub launcher is built once per package run into a scratch
 	// directory no test owns; the package run owns it and removes it here.
 	if stubOnce.directory != "" {

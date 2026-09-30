@@ -1,6 +1,7 @@
 package scriptworker
 
 import (
+	"github.com/relux-works/curator/internal/testgitenv"
 	"go/build"
 	"os"
 	"os/exec"
@@ -25,7 +26,9 @@ func TestMain(m *testing.M) {
 	if len(os.Args) == 3 && os.Args[1] == ScriptLandlockProbeMode {
 		os.Exit(RunLandlockProbe(os.Args[2]))
 	}
+	restoreGitEnv := testgitenv.Isolate()
 	code := m.Run()
+	restoreGitEnv()
 	if stubOnce.directory != "" {
 		_ = os.RemoveAll(stubOnce.directory)
 	}

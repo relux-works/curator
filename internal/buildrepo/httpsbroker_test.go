@@ -16,6 +16,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/relux-works/curator/internal/testgitenv"
 )
 
 const (
@@ -78,7 +80,10 @@ func TestMain(m *testing.M) {
 	if isTestFakeSSH(os.Args[0]) {
 		os.Exit(testFakeSSHMain(os.Args))
 	}
-	os.Exit(m.Run())
+	restoreGitEnv := testgitenv.Isolate()
+	code := m.Run()
+	restoreGitEnv()
+	os.Exit(code)
 }
 
 func runHTTPSBrokerWithTestTransport(t *testing.T, statePath, secret string, args []string, mutate func(map[string]string)) (int, string) {

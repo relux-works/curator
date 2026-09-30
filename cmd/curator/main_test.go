@@ -1107,6 +1107,9 @@ func buildHTTPSGitHome(t *testing.T) string {
 	}
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	// TestMain pins GIT_CONFIG_GLOBAL to an empty file; this home's
+	// .gitconfig is the global config these tests mean git to read.
+	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(home, ".gitconfig"))
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	return home
 }

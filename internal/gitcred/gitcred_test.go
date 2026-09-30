@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/relux-works/curator/internal/testgitenv"
 )
 
 // The credential machinery is exercised against a stand-in Git that
@@ -52,7 +54,10 @@ func TestMain(m *testing.M) {
 	if dir := os.Getenv(fakeGitDirEnv); dir != "" {
 		os.Exit(fakeGitMain(dir))
 	}
-	os.Exit(m.Run())
+	restoreGitEnv := testgitenv.Isolate()
+	code := m.Run()
+	restoreGitEnv()
+	os.Exit(code)
 }
 
 func TestNamespacedEntryIsSeparateFromTheOperatorsOwn(t *testing.T) {

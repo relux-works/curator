@@ -29,6 +29,7 @@ import (
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/scopes"
+	"github.com/relux-works/curator/internal/testgitenv"
 	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
@@ -45,8 +46,12 @@ func TestMain(m *testing.M) {
 	if len(os.Args) == 2 && os.Args[1] == godriver.WorkerMode {
 		os.Exit(godriver.RunWorker(os.Stdin, os.Stdout))
 	}
+	// Before any branch that runs tests: a CLI helper child runs git too.
+	restoreGitEnv := testgitenv.Isolate()
 	if os.Getenv(cliHelperProcess) == "1" {
-		os.Exit(m.Run())
+		code := m.Run()
+		restoreGitEnv()
+		os.Exit(code)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -56,6 +61,7 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	code := m.Run()
+	restoreGitEnv()
 	if lock != nil {
 		if closeErr := lock.Close(); closeErr != nil {
 			_, _ = fmt.Fprintln(os.Stderr, "release package host GOROOT test lock:", closeErr)

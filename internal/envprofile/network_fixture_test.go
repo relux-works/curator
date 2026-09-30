@@ -1,6 +1,7 @@
 package envprofile
 
 import (
+	"github.com/relux-works/curator/internal/testgitenv"
 	"os"
 	"path/filepath"
 	"strings"
@@ -44,7 +45,10 @@ func TestMain(m *testing.M) {
 		_ = os.Setenv("CURATOR_CONFIG", filepath.Join(dir, "config.json"))
 		_ = os.Setenv("CURATOR_SYSTEM_CONFIG", "")
 	}
-	os.Exit(m.Run())
+	restoreGitEnv := testgitenv.Isolate()
+	code := m.Run()
+	restoreGitEnv()
+	os.Exit(code)
 }
 
 // gitIdentities serves local git repositories under fake canonical network

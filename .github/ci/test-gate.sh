@@ -62,7 +62,17 @@ ROOT="$CURATOR_CONFORMANCE_ROOT"
 MODULE="$(awk '/^module[ \t]/{print $2; exit}' go.mod 2>/dev/null)"
 [ -n "$MODULE" ] || { echo 'test-gate: cannot determine the module path' >&2; exit 2; }
 
+# Every go test stage runs git under an empty, gate-owned global config and
+# no system config: a runner whose ~/.gitconfig signs commits or rewrites
+# URLs must not reach fixture repositories. Test binaries isolate again in
+# TestMain (internal/testgitenv) for local runs.
+GIT_CONFIG_GLOBAL="$EVIDENCE/isolated.gitconfig"
+: >"$GIT_CONFIG_GLOBAL" || exit 2
+GIT_CONFIG_NOSYSTEM=1
+export GIT_CONFIG_GLOBAL GIT_CONFIG_NOSYSTEM
+
 echo "test-gate: flags=${GO_TEST_FLAGS:-<none>} timeout=$GO_TEST_TIMEOUT"
+echo "test-gate: GIT_CONFIG_GLOBAL=$GIT_CONFIG_GLOBAL GIT_CONFIG_NOSYSTEM=$GIT_CONFIG_NOSYSTEM"
 echo "test-gate: conformance root=$ROOT"
 echo ''
 

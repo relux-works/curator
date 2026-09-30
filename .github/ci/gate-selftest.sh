@@ -894,6 +894,8 @@ test)
 	done
 	[ -n "$timeout" ] || { echo 'synthetic go: missing -timeout' >&2; exit 2; }
 	printf '%s\n' "$timeout" >"${SYNTHETIC_CAPTURE:?}"
+	printf 'GIT_CONFIG_GLOBAL=%s\nGIT_CONFIG_NOSYSTEM=%s\n' "${GIT_CONFIG_GLOBAL-<unset>}" \
+		"${GIT_CONFIG_NOSYSTEM-<unset>}" >"${SYNTHETIC_CAPTURE:?}.gitenv"
 	cd "${SYNTHETIC_FIXTURE:?}" || exit 2
 	exec "${REAL_GO:?}" test -json -count=1 -timeout "$timeout" .
 	;;
@@ -904,8 +906,16 @@ esac
 GO
 	chmod +x "$SYNTHETIC_GO"
 
+	# The ambient git config is hostile and reached the way a runner's copied
+	# ~/.gitconfig is: through the default global lookup, with neither variable
+	# set. Only the gate's own export can put them into go test's environment.
+	HOSTILE_XDG="$WORK/hostile-xdg"
+	HOSTILE_GITCONFIG="$HOSTILE_XDG/git/config"
+	mkdir -p "$HOSTILE_XDG/git"
+	printf '[commit]\n\tgpgsign = true\n[tag]\n\tgpgsign = true\n' >"$HOSTILE_GITCONFIG"
 	HANG_STARTED="$SECONDS"
-	env \
+	env -u GIT_CONFIG_GLOBAL -u GIT_CONFIG_NOSYSTEM \
+		XDG_CONFIG_HOME="$HOSTILE_XDG" \
 		GO="$SYNTHETIC_GO" REAL_GO="$REAL_GO" \
 		SYNTHETIC_MODULE="$SYNTHETIC_MODULE" SYNTHETIC_PACKAGE="$SYNTHETIC_PACKAGE" \
 		SYNTHETIC_FIXTURE="$SYNTHETIC_FIXTURE" \
@@ -925,6 +935,26 @@ GO
 		ok 'test-gate forwards the configured 2s package deadline to go test'
 	else
 		bad 'test-gate forwards the configured 2s package deadline to go test' 'captured timeout missing or changed'
+	fi
+	GITENV_CAPTURE="$SYNTHETIC_CAPTURE.gitenv"
+	captured_global="$(sed -n 's/^GIT_CONFIG_GLOBAL=//p' "$GITENV_CAPTURE" 2>/dev/null)"
+	if [ "$(sed -n 's/^GIT_CONFIG_NOSYSTEM=//p' "$GITENV_CAPTURE" 2>/dev/null)" = '1' ]; then
+		ok 'test-gate exports GIT_CONFIG_NOSYSTEM=1 to go test'
+	else
+		bad 'test-gate exports GIT_CONFIG_NOSYSTEM=1 to go test' \
+			"observed: $(cat "$GITENV_CAPTURE" 2>/dev/null || echo 'no capture')"
+	fi
+	if [ -n "$captured_global" ] && [ "$captured_global" != "$HOSTILE_GITCONFIG" ] && \
+		[ -f "$captured_global" ] && [ ! -s "$captured_global" ]; then
+		ok 'test-gate exports an empty gate-owned GIT_CONFIG_GLOBAL over a hostile ambient config'
+	else
+		bad 'test-gate exports an empty gate-owned GIT_CONFIG_GLOBAL over a hostile ambient config' \
+			"observed: ${captured_global:-missing}"
+	fi
+	if grep -qF "test-gate: GIT_CONFIG_GLOBAL=$captured_global GIT_CONFIG_NOSYSTEM=1" "$WORK/gate-timeout.out"; then
+		ok 'test-gate logs the isolated git config it exports'
+	else
+		bad 'test-gate logs the isolated git config it exports' 'log line missing'
 	fi
 	if [ -f "$SYNTHETIC_EVIDENCE/go-test.json" ] && \
 		grep -qF 'panic: test timed out after 2s' "$SYNTHETIC_EVIDENCE/go-test.json"; then

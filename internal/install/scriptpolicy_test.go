@@ -19,6 +19,7 @@ import (
 	"github.com/relux-works/curator/internal/scriptpolicy"
 	"github.com/relux-works/curator/internal/scriptworker"
 	"github.com/relux-works/curator/internal/skillspec"
+	"github.com/relux-works/curator/internal/testgitenv"
 )
 
 // errInjectedProbeFailure fails one native-control probe through the
@@ -81,7 +82,9 @@ func (e *env) schema8ScriptSkill(name string, enforced bool, interpreter ...stri
 // run, so the ~20 MB production-binary fixtures do not leak into the
 // system temp dir on every package run.
 func TestMain(m *testing.M) {
+	restoreGitEnv := testgitenv.Isolate()
 	code := m.Run()
+	restoreGitEnv()
 	if enforcedOnce.directory != "" {
 		_ = os.RemoveAll(enforcedOnce.directory)
 	}
