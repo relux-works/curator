@@ -129,6 +129,23 @@ func TestParseAuthoritativeEnvMarkerV2SchemaCases(t *testing.T) {
 			if !tc.Valid && err == nil {
 				return conformancecoverage.Observation{FailureReason: "Parse accepted published-invalid case"}
 			}
+			if tc.Name == "invalid-hash-version-on-frozen-marker.json" && !tc.Valid {
+				var control map[string]json.RawMessage
+				if err := json.Unmarshal(payload, &control); err != nil {
+					t.Fatalf("decode frozen environment marker: %v", err)
+				}
+				if _, present := control["hash_version"]; !present {
+					t.Fatal("frozen environment marker case does not contain hash_version")
+				}
+				delete(control, "hash_version")
+				controlPayload, err := json.Marshal(control)
+				if err != nil {
+					t.Fatalf("encode frozen environment marker control: %v", err)
+				}
+				if _, err := Parse(controlPayload); err != nil {
+					return conformancecoverage.Observation{FailureReason: fmt.Sprintf("frozen environment marker is not accepted after removing its unknown hash_version: %v", err)}
+				}
+			}
 			return conformancecoverage.Observation{}
 		})
 }

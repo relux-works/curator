@@ -1,6 +1,7 @@
 package marker
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -61,8 +62,35 @@ func runMarkerSchemaCases(t *testing.T, family string) {
 			if gotValid != tc.Valid {
 				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("Read valid=%v, suite expects %v", gotValid, tc.Valid)}
 			}
+			if tc.Name == "invalid-hash-version-on-frozen-marker.json" && !tc.Valid {
+				controlPayload := withoutHashVersion(t, tc.Bytes)
+				controlDir := t.TempDir()
+				if err := os.WriteFile(filepath.Join(controlDir, Name), controlPayload, 0o600); err != nil {
+					t.Fatal(err)
+				}
+				if Read(controlDir) == nil {
+					return conformancecoverage.Observation{FailureReason: "the frozen marker is not accepted after removing its unknown hash_version"}
+				}
+			}
 			return conformancecoverage.Observation{}
 		})
+}
+
+func withoutHashVersion(t *testing.T, payload []byte) []byte {
+	t.Helper()
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &raw); err != nil {
+		t.Fatalf("decode frozen marker: %v", err)
+	}
+	if _, present := raw["hash_version"]; !present {
+		t.Fatal("frozen marker case does not contain hash_version")
+	}
+	delete(raw, "hash_version")
+	control, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatalf("encode frozen marker control: %v", err)
+	}
+	return control
 }
 
 func TestReadAuthoritativeMarkerV2SchemaCases(t *testing.T) {

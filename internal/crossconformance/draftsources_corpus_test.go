@@ -20,6 +20,13 @@ const skillfileSourcesTestdata = "testdata/skillfile-sources-v1"
 
 func draftCorpusDir(t *testing.T) string {
 	t.Helper()
+	if root := os.Getenv("CURATOR_CONFORMANCE_ROOT"); root != "" {
+		dir := filepath.Join(filepath.Dir(root), "skillfile-sources-v1")
+		if _, err := os.Stat(filepath.Join(dir, "index.json")); err != nil {
+			t.Fatalf("selected conformance root has no sibling skillfile-sources corpus: %v", err)
+		}
+		return dir
+	}
 	dir := filepath.Join(skillfileSourcesTestdata, "corpus", "conformance", "skillfile-sources-v1")
 	if _, err := os.Stat(filepath.Join(dir, "index.json")); err != nil {
 		t.Fatalf("vendored draft corpus missing: %v", err)

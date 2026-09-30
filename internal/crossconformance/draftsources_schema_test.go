@@ -34,6 +34,12 @@ var draftSchemaDrivers = map[string]func(t *testing.T, dir string, entry draftSc
 	"source-audit-v1.schema.json":   driveSourceAuditCase,
 }
 
+var draftSchemaKnownGaps = map[string]string{
+	"install-marker-v6.schema.json": "The install-marker-v6 reader and v2 content-hash behavior are owned by TASK-260917-2tx81l.",
+	"skillfile-lock-v2.schema.json": "The skillfile-lock-v2 reader and v2 content-hash behavior are owned by TASK-260917-2tx81l.",
+	"source-audit-v2.schema.json":   "The source-audit-v2 reader and v2 content-hash behavior are owned by TASK-260917-2tx81l.",
+}
+
 // draftSchemaBounds records every schema case that cannot be driven at
 // a production entry, with the exact reason. The harness asserts this
 // set exactly: a fixed gap must convert its row to a drive, never
@@ -47,13 +53,18 @@ var draftSchemaBounds = map[string]string{
 	"schema-cases/local-snapshot-v1/invalid-unknown-top-level.json": "Curator never reads serialized inventory JSON; inventory is recomputed from the stored tree (internal/snapshot Capture/OpenLocal)",
 }
 
-// TestDraftSourcesSchemaCases drives all 121 released schema cases.
+// TestDraftSourcesSchemaCases drives the selected corpus and records any
+// published v2-only schema families as explicit owned known gaps.
 func TestDraftSourcesSchemaCases(t *testing.T) {
 	dir := draftCorpusDir(t)
 	entries := loadDraftIndex(t)
 	seenBounds := map[string]bool{}
 	conformancecoverage.RunOutcomes(t, "skillfile-sources-v1/schema-cases", entries,
 		func(entry draftSchemaEntry) string { return entry.Instance }, func(t *testing.T, entry draftSchemaEntry) conformancecoverage.Observation {
+			if reason, isKnownGap := draftSchemaKnownGaps[entry.Schema]; isKnownGap {
+				t.Logf("KNOWN GAP: %s: %s", entry.Instance, reason)
+				return conformancecoverage.Observation{FailureReason: reason}
+			}
 			driver, ok := draftSchemaDrivers[entry.Schema]
 			if !ok {
 				t.Fatalf("schema %q has no production-entry driver", entry.Schema)
@@ -104,6 +115,12 @@ func driveSkillfileLockCase(t *testing.T, dir string, entry draftSchemaEntry) {
 	payload := readDraftFile(t, filepath.Join(dir, filepath.FromSlash(entry.Instance)))
 	lock, err := sourcelock.Parse(payload)
 	base := filepath.Base(entry.Instance)
+	if base == "invalid-hash-version-on-frozen-lock.json" {
+		controlPayload := withoutContentHashVersion(t, payload)
+		if _, err := sourcelock.Parse(controlPayload); err != nil {
+			t.Fatalf("frozen skillfile lock without hash_version is not a valid control: %v", err)
+		}
+	}
 	switch base {
 	case "valid.json":
 		if err != nil {
@@ -163,6 +180,15 @@ func driveInstallMarkerV5Case(t *testing.T, dir string, entry draftSchemaEntry) 
 	if (got != nil) != entry.Valid {
 		t.Fatalf("valid=%v: marker.Read nil=%v", entry.Valid, got == nil)
 	}
+	if filepath.Base(entry.Instance) == "invalid-hash-version-on-frozen-marker.json" {
+		controlDir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(controlDir, marker.Name), withoutContentHashVersion(t, payload), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if marker.Read(controlDir) == nil {
+			t.Fatal("frozen install marker v5 is not accepted after removing its unknown hash_version")
+		}
+	}
 }
 
 func driveBuildReceiptV3Case(t *testing.T, dir string, entry draftSchemaEntry) {
@@ -196,4 +222,26 @@ func driveSourceAuditCase(t *testing.T, dir string, entry draftSchemaEntry) {
 	if (err == nil) != entry.Valid {
 		t.Fatalf("valid=%v: ParseSourceAudit err=%v", entry.Valid, err)
 	}
+	if filepath.Base(entry.Instance) == "invalid-hash-version-on-frozen-audit.json" {
+		if _, err := audit.ParseSourceAudit(withoutContentHashVersion(t, payload)); err != nil {
+			t.Fatalf("frozen source audit without hash_version is not a valid control: %v", err)
+		}
+	}
+}
+
+func withoutContentHashVersion(t *testing.T, payload []byte) []byte {
+	t.Helper()
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &raw); err != nil {
+		t.Fatalf("decode frozen content-hash document: %v", err)
+	}
+	if _, present := raw["hash_version"]; !present {
+		t.Fatal("frozen content-hash case does not contain hash_version")
+	}
+	delete(raw, "hash_version")
+	control, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatalf("encode frozen content-hash control: %v", err)
+	}
+	return control
 }

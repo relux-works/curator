@@ -5,6 +5,8 @@ package conformancecoverage
 import (
 	"bufio"
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -22,6 +24,14 @@ type Gap struct {
 	Owner  string
 	Reason string
 }
+
+// defaultSuiteManifestSHA256 is the immutable manifest identity used by the
+// checked-in draft corpus when no external conformance root is selected.
+const defaultSuiteManifestSHA256 = "be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca"
+
+// ContentHashV2CandidateManifestSHA256 is the candidate suite accepted by
+// the conformance consumers in this change.
+const ContentHashV2CandidateManifestSHA256 = "950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60"
 
 // Observation is the result of one published case. A failure may be accepted
 // only when the ledger names this family and case. Bounds and skips are
@@ -244,17 +254,27 @@ func runOutcomes[T any](t *testing.T, family string, cases []T, caseID func(T) s
 	return check()
 }
 
-// Load reads the only gap ledger and the committed per-family count pins.
+// Load reads the count pins and gap rows for the selected conformance suite.
+// An explicit root is identified by the SHA-256 of its manifest.json; without
+// one, the checked-in draft corpus uses the immutable rc.13 identity.
 func Load() (map[string]int, []Gap, error) {
 	root, err := repositoryRoot()
 	if err != nil {
 		return nil, nil, err
 	}
-	counts, err := readCounts(filepath.Join(root, ".github", "ci", "conformance-case-counts.tsv"))
+	suiteID, err := selectedSuiteIdentity()
 	if err != nil {
 		return nil, nil, err
 	}
-	gaps, err := readGaps(filepath.Join(root, ".github", "ci", "conformance-gaps.tsv"))
+	allCounts, err := readCounts(filepath.Join(root, ".github", "ci", "conformance-case-counts.tsv"))
+	if err != nil {
+		return nil, nil, err
+	}
+	counts, ok := allCounts[suiteID]
+	if !ok {
+		return nil, nil, fmt.Errorf("no published-case count pins for conformance manifest sha256:%s", suiteID)
+	}
+	gaps, err := readGaps(filepath.Join(root, ".github", "ci", "conformance-gaps.tsv"), suiteID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -265,6 +285,42 @@ func Load() (map[string]int, []Gap, error) {
 	}
 	return counts, gaps, nil
 }
+
+func selectedSuiteIdentity() (string, error) {
+	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+	if root == "" {
+		return defaultSuiteManifestSHA256, nil
+	}
+	manifestPath := filepath.Join(root, "manifest.json")
+	manifest, err := readStateBytes(manifestPath)
+	if err != nil {
+		return "", fmt.Errorf("read conformance manifest identity %s: %w", manifestPath, err)
+	}
+	sum := sha256.Sum256(manifest)
+	return hex.EncodeToString(sum[:]), nil
+}
+
+// RequirePublishedCount checks an independently loaded family count against
+// the exact pin selected by the conformance manifest identity.
+func RequirePublishedCount(t testing.TB, family string, actual int) {
+	t.Helper()
+	counts, _, err := Load()
+	if err != nil {
+		t.Fatalf("load published-case coverage policy: %v", err)
+	}
+	expected, ok := counts[family]
+	if !ok {
+		t.Fatalf("published-case family %q has no committed count pin", family)
+	}
+	if actual != expected {
+		t.Fatalf("published-case family %q has %d cases, want pinned count %d", family, actual, expected)
+	}
+}
+
+// SelectedSuiteManifestSHA256 returns the manifest digest that Load uses for
+// count and gap selection. It is useful to gate cases that exist only in a
+// named candidate suite.
+func SelectedSuiteManifestSHA256() (string, error) { return selectedSuiteIdentity() }
 
 func repositoryRoot() (string, error) {
 	current, err := os.Getwd()
@@ -298,13 +354,13 @@ func repositoryRootFrom(current string) (string, error) {
 	}
 }
 
-func readCounts(path string) (map[string]int, error) {
+func readCounts(path string) (map[string]map[string]int, error) {
 	data, err := readStateBytes(path)
 	if err != nil {
 		return nil, fmt.Errorf("read count pins %s: %w", path, err)
 	}
 	scanner := bufio.NewScanner(bytes.NewReader(data))
-	counts := map[string]int{}
+	counts := map[string]map[string]int{}
 	header := false
 	lineNo := 0
 	for scanner.Scan() {
@@ -315,23 +371,32 @@ func readCounts(path string) (map[string]int, error) {
 		}
 		fields := strings.Split(line, "\t")
 		if !header {
-			if len(fields) != 2 || fields[0] != "family" || fields[1] != "expected_cases" {
-				return nil, fmt.Errorf("%s:%d: expected family<TAB>expected_cases header", path, lineNo)
+			if len(fields) != 3 || fields[0] != "suite_manifest_sha256" || fields[1] != "family" || fields[2] != "expected_cases" {
+				return nil, fmt.Errorf("%s:%d: expected suite_manifest_sha256<TAB>family<TAB>expected_cases header", path, lineNo)
 			}
 			header = true
 			continue
 		}
-		if len(fields) != 2 || fields[0] == "" {
+		if len(fields) != 3 || fields[0] == "" || fields[1] == "" {
 			return nil, fmt.Errorf("%s:%d: malformed count pin", path, lineNo)
 		}
-		count, err := strconv.Atoi(fields[1])
+		if len(fields[0]) != 64 {
+			return nil, fmt.Errorf("%s:%d: suite manifest identity must be a 64-character sha256", path, lineNo)
+		}
+		if _, err := hex.DecodeString(fields[0]); err != nil {
+			return nil, fmt.Errorf("%s:%d: malformed suite manifest sha256 %q", path, lineNo, fields[0])
+		}
+		count, err := strconv.Atoi(fields[2])
 		if err != nil || count <= 0 {
-			return nil, fmt.Errorf("%s:%d: expected positive case count, got %q", path, lineNo, fields[1])
+			return nil, fmt.Errorf("%s:%d: expected positive case count, got %q", path, lineNo, fields[2])
 		}
-		if _, duplicate := counts[fields[0]]; duplicate {
-			return nil, fmt.Errorf("%s:%d: duplicate family %q", path, lineNo, fields[0])
+		if counts[fields[0]] == nil {
+			counts[fields[0]] = map[string]int{}
 		}
-		counts[fields[0]] = count
+		if _, duplicate := counts[fields[0]][fields[1]]; duplicate {
+			return nil, fmt.Errorf("%s:%d: duplicate count pin for suite %s family %q", path, lineNo, fields[0], fields[1])
+		}
+		counts[fields[0]][fields[1]] = count
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("read count pins %s: %w", path, err)
@@ -345,7 +410,7 @@ func readCounts(path string) (map[string]int, error) {
 	return counts, nil
 }
 
-func readGaps(path string) ([]Gap, error) {
+func readGaps(path, suiteID string) ([]Gap, error) {
 	data, err := readStateBytes(path)
 	if err != nil {
 		return nil, fmt.Errorf("read gap ledger %s: %w", path, err)
@@ -363,9 +428,9 @@ func readGaps(path string) ([]Gap, error) {
 		}
 		fields := strings.Split(line, "\t")
 		if !header {
-			want := []string{"family", "case_id", "owner", "reason"}
+			want := []string{"suite_manifest_sha256", "family", "case_id", "owner", "reason"}
 			if len(fields) != len(want) {
-				return nil, fmt.Errorf("%s:%d: expected family<TAB>case_id<TAB>owner<TAB>reason header", path, lineNo)
+				return nil, fmt.Errorf("%s:%d: expected suite_manifest_sha256<TAB>family<TAB>case_id<TAB>owner<TAB>reason header", path, lineNo)
 			}
 			for i := range want {
 				if fields[i] != want[i] {
@@ -375,21 +440,29 @@ func readGaps(path string) ([]Gap, error) {
 			header = true
 			continue
 		}
-		if len(fields) != 4 {
-			return nil, fmt.Errorf("%s:%d: gap row must have exactly four tab-separated fields", path, lineNo)
+		if len(fields) != 5 {
+			return nil, fmt.Errorf("%s:%d: gap row must have exactly five tab-separated fields", path, lineNo)
 		}
 		for _, field := range fields {
 			if strings.TrimSpace(field) == "" || strings.ContainsAny(field, "\r\n") {
 				return nil, fmt.Errorf("%s:%d: gap row fields must be non-empty and one line", path, lineNo)
 			}
 		}
-		gap := Gap{Family: fields[0], CaseID: fields[1], Owner: fields[2], Reason: fields[3]}
-		key := gap.Family + "\x00" + gap.CaseID
+		if len(fields[0]) != 64 {
+			return nil, fmt.Errorf("%s:%d: suite manifest identity must be a 64-character sha256", path, lineNo)
+		}
+		if _, err := hex.DecodeString(fields[0]); err != nil {
+			return nil, fmt.Errorf("%s:%d: malformed suite manifest sha256 %q", path, lineNo, fields[0])
+		}
+		gap := Gap{Family: fields[1], CaseID: fields[2], Owner: fields[3], Reason: fields[4]}
+		key := fields[0] + "\x00" + gap.Family + "\x00" + gap.CaseID
 		if _, duplicate := seen[key]; duplicate {
 			return nil, fmt.Errorf("%s:%d: duplicate gap row for %s/%s", path, lineNo, gap.Family, gap.CaseID)
 		}
 		seen[key] = struct{}{}
-		gaps = append(gaps, gap)
+		if fields[0] == suiteID {
+			gaps = append(gaps, gap)
+		}
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("read gap ledger %s: %w", path, err)
