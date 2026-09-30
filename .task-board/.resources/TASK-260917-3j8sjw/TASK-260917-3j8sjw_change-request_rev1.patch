@@ -1,0 +1,462 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 00f498d..e6f06d5 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -27,7 +27,7 @@ jobs:
+         uses: actions/checkout@v4
+         with:
+           repository: relux-works/curator-spec
+-          ref: 47c3c8cbd5da5e3fd6d99b0327d382c6a36494fe
++          ref: b1a2efb6fa28d014968a2a8fd7641823b5f3cf28
+           path: protocol-spec
+       - uses: actions/setup-python@v5
+         with:
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 98b855a..7c68051 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -4,6 +4,10 @@
+ 
+ ### Added
+ 
++- Support framing-v2 audit records, version-scoped content queries, and mixed
++  version bundle imports/exports while preserving signed v1 history. See
++  [deployment guidance](docs/content-hash-versions.md).
++
+ - Added snapshot-bound signed pagination, exact artifact identity, conjunctive
+   filters, and explicit ambiguity rejection.
+ - Added serialized durable append, auditor-scoped idempotency, startup recovery
+diff --git a/docs/content-hash-versions.md b/docs/content-hash-versions.md
+new file mode 100644
+index 0000000..61df86a
+--- /dev/null
++++ b/docs/content-hash-versions.md
+@@ -0,0 +1,32 @@
++# Content-hash framing versions
++
++Existing deployments retain their original signed v1 records and log bytes.
++No history rewrite or database migration is required: absent `hash_version`
++means framing version 1. The store reads the version from authoritative record
++JSON, and latest-record projection includes it in the artifact key.
++
++Version-2 records appear when Curator publishes `schema_version: 2` with
++`hash_version: 2`. Both versions use `sha256:<64 lowercase hex digits>`;
++the registry cannot infer framing from digest bytes or recompute a tree it
++does not possess. It refuses inconsistent schema/framing declarations with
++HTTP 400 `invalid_record` and the diagnostic `hash_version_mismatch`.
++Frozen v1 records must not include a `hash_version` field, even with value 1.
++
++Content queries default to version 1. Send `hash_version=2` together with
++`content_sha256` to query version 2. Version filtering applies even when
++source identity and commit are also supplied. Source-only queries discover
++both versions; clients must check equal framing versions before matching a
++record to an artifact. Supplying a version without a content hash is invalid.
++
++Logs preserve the versioned records using `registry-log-entry-v2` and
++`log-response-v3` shapes. Exports containing v2 records use bundle schema 2;
++v1-only exports retain schema 1. Imports validate record declarations and
++reject v2 records inside a frozen schema-1 bundle. Existing signature,
++chain, Merkle, and upstream high-water checks remain in force. Upgrade
++consumers to understand the new shapes before publishing v2 records.
++
++The normative spec at `b1a2efb6fa28d014968a2a8fd7641823b5f3cf28` keeps
++`registry-snapshot-v1` unchanged. Snapshots commit the versioned log through
++the head and Merkle root; they do not add a top-level `hash_version`, since
++a single log may contain both framing versions. Existing signed checkpoints
++and pagination boundaries therefore retain their wire shape.
+diff --git a/src/csk_registry/app.py b/src/csk_registry/app.py
+index ab55947..6aa6f3e 100644
+--- a/src/csk_registry/app.py
++++ b/src/csk_registry/app.py
+@@ -236,7 +236,7 @@ def create_app(
+             "name": registry_name,
+             "version": __version__,
+             "public_keys": list(accepted_signing_keys),
+-            "record_schema_versions": [1],
++            "record_schema_versions": [1, 2],
+             "policy": "append-only signed records with deny-wins revocation",
+             "limits": {"max_page_size": MAX_PAGE_SIZE, "max_body_bytes": MAX_BODY_BYTES},
+         }
+@@ -248,12 +248,13 @@ def create_app(
+         source_identity: str = Query(default=""),
+         commit: str = Query(default=""),
+         content_sha256: str = Query(default=""),
++        hash_version: str = Query(default=""),
+         limit: int = Query(default=100, ge=1, le=MAX_PAGE_SIZE),
+         cursor: str = Query(default=""),
+     ) -> dict[str, Any]:
+         _validate_query_parameters(
+             request,
+-            {"source_identity", "commit", "content_sha256", "limit", "cursor"},
++            {"source_identity", "commit", "content_sha256", "hash_version", "limit", "cursor"},
+         )
+         if bool(source_identity) != bool(commit):
+             raise APIError(400, "invalid_query", "source_identity and commit must appear together")
+@@ -268,12 +269,17 @@ def create_app(
+             raise APIError(400, "invalid_query", "commit must be a full lowercase object id")
+         if content_sha256 and re.fullmatch(r"sha256:[0-9a-f]{64}", content_sha256) is None:
+             raise APIError(400, "invalid_query", "content_sha256 is malformed")
++        if hash_version and (hash_version not in {"1", "2"} or not content_sha256):
++            raise APIError(400, "invalid_query", "hash_version requires content_sha256 and must be 1 or 2")
++        selected_hash_version = int(hash_version or "1") if content_sha256 else None
+         query = {
+             "source_identity": source_identity,
+             "commit": commit,
+             "content_sha256": content_sha256,
+             "limit": limit,
+         }
++        if selected_hash_version == 2:
++            query["hash_version"] = selected_hash_version
+         if cursor:
+             offset, boundary, boundary_snapshot = _cursor_state(
+                 store,
+@@ -287,6 +293,7 @@ def create_app(
+                     source_identity=source_identity,
+                     commit=commit,
+                     content_sha256=content_sha256,
++                    hash_version=selected_hash_version,
+                     limit=limit,
+                     offset=offset,
+                     boundary=boundary,
+@@ -303,6 +310,7 @@ def create_app(
+                 source_identity=source_identity,
+                 commit=commit,
+                 content_sha256=content_sha256,
++                hash_version=selected_hash_version,
+                 limit=limit,
+                 offset=offset,
+                 max_seq=boundary.log_size,
+@@ -479,7 +487,7 @@ def create_app(
+ def _countersign(record: dict[str, Any], signing_key: SigningKey, *, endorser: str) -> dict[str, Any]:
+     endorsement = {"endorser": endorser, "sig": record.get("sig")}
+     body = {key: value for key, value in record.items() if key != "sig"}
+-    body["schema_version"] = 1
++    body["schema_version"] = record.get("schema_version", 1)
+     existing = body.get("endorsements")
+     body["endorsements"] = ([*existing, endorsement] if isinstance(existing, list) else [endorsement])
+     return signing_key.sign_record(body)
+diff --git a/src/csk_registry/bundle.py b/src/csk_registry/bundle.py
+index 2f16bd6..f87c2d3 100644
+--- a/src/csk_registry/bundle.py
++++ b/src/csk_registry/bundle.py
+@@ -91,7 +91,7 @@ def export_bundle(store: Store, signing_key: SigningKey) -> dict[str, Any]:
+     records = [entry.record for entry in entries]
+     snapshot = build_snapshot(store, signing_key)
+     return {
+-        "schema_version": 1,
++        "schema_version": 2 if any(record.get("hash_version") == 2 for record in records) else 1,
+         "records": records,
+         "snapshot": snapshot,
+         "public_key": signing_key.public_pinned,
+@@ -129,8 +129,10 @@ def import_bundle(
+     """
+     if not isinstance(bundle, dict) or set(bundle) - {"schema_version", "records", "snapshot", "public_key"}:
+         raise ValueError("bundle contains unsupported fields")
+-    if bundle.get("schema_version") != 1:
+-        raise ValueError("bundle schema_version must be 1")
++    if type(bundle.get("schema_version")) is not int or bundle["schema_version"] not in (1, 2):
++        raise ValueError("bundle schema_version must be 1 or 2")
++    if bundle["schema_version"] == 2 and "public_key" not in bundle:
++        raise ValueError("bundle schema 2 requires public_key")
+     snapshot = validate_snapshot(bundle.get("snapshot"))
+     if not verify_signed(upstream_public_key, snapshot):
+         raise ValueError("bundle snapshot does not verify against the upstream key")
+@@ -146,6 +148,8 @@ def import_bundle(
+     previous = "0" * 64
+     for record in records:
+         checked = validate_record(record)
++        if bundle["schema_version"] == 1 and checked.get("hash_version") == 2:
++            raise ValueError("hash_version_mismatch: bundle schema 1 cannot contain v2 records")
+         if not verify_signed(upstream_public_key, checked):
+             raise ValueError(f"bundle record for {record.get('name')!r} does not verify against the upstream key")
+         entry_hash = hashlib.sha256(previous.encode("ascii") + canonical_bytes(checked)).hexdigest()
+diff --git a/src/csk_registry/protocol.py b/src/csk_registry/protocol.py
+index 0f6cc4a..48f2a0b 100644
+--- a/src/csk_registry/protocol.py
++++ b/src/csk_registry/protocol.py
+@@ -160,11 +160,22 @@ def _canonicalize_validated(value: Any) -> None:
+         ) from exc
+ 
+ 
++def validate_hash_version(record: dict[str, Any]) -> None:
++    schema = record.get("schema_version", 1)
++    if type(schema) is not int or schema not in (1, 2):
++        raise ProtocolError("audit record schema_version must be 1 or 2")
++    if (schema == 1 and "hash_version" in record) or (
++        schema == 2 and (type(record.get("hash_version")) is not int or record["hash_version"] != 2)
++    ):
++        raise ProtocolError("hash_version_mismatch: framing version disagrees with audit record schema")
++
++
+ def validate_record(record: Any) -> dict[str, Any]:
+     if not isinstance(record, dict):
+         raise ProtocolError("audit record must be an object")
+     allowed = {
+         "schema_version",
++        "hash_version",
+         "name",
+         "source_identity",
+         "commit",
+@@ -176,8 +187,7 @@ def validate_record(record: Any) -> dict[str, Any]:
+     }
+     if set(record) - allowed:
+         raise ProtocolError("audit record contains unknown fields")
+-    if record.get("schema_version", 1) != 1:
+-        raise ProtocolError("audit record schema_version must be 1")
++    validate_hash_version(record)
+     name = record.get("name")
+     if not isinstance(name, str) or len(name) > 128 or _IDENTIFIER.fullmatch(name) is None or not _portable_component(name):
+         raise ProtocolError("audit record name must be a portable identifier")
+diff --git a/src/csk_registry/store.py b/src/csk_registry/store.py
+index c27a77e..d86b438 100644
+--- a/src/csk_registry/store.py
++++ b/src/csk_registry/store.py
+@@ -14,6 +14,7 @@ from datetime import UTC, datetime
+ from pathlib import Path
+ from typing import Any, Iterator, Literal, NoReturn
+ 
++from .protocol import validate_hash_version
+ from .checkpoint import REFUSAL_DIAGNOSTICS, CheckpointView, compare_checkpoint
+ from .permissions import protect_private_file
+ from .signing import canonical_bytes
+@@ -890,6 +891,7 @@ class Store:
+         for key in ("name", "source_identity", "commit", "content_sha256", "status"):
+             if not isinstance(record.get(key), str) or not record[key]:
+                 raise ValueError(f"record requires a non-empty string {key!r}")
++        validate_hash_version(record)
+         record_bytes = canonical_bytes(record)
+         row = self._conn.execute(
+             "SELECT seq, entry_hash FROM log ORDER BY seq DESC LIMIT 1"
+@@ -1179,11 +1181,13 @@ class Store:
+         source_identity: str = "",
+         commit: str = "",
+         content_sha256: str = "",
++        hash_version: int | None = None,
+     ) -> list[dict[str, Any]]:
+         records, _ = self.records_page(
+             source_identity=source_identity,
+             commit=commit,
+             content_sha256=content_sha256,
++            hash_version=hash_version,
+             limit=10_000,
+             offset=0,
+         )
+@@ -1195,11 +1199,14 @@ class Store:
+         source_identity: str = "",
+         commit: str = "",
+         content_sha256: str = "",
++        hash_version: int | None = None,
+         limit: int,
+         offset: int,
+         max_seq: int | None = None,
+         boundary: SnapshotBoundary | None = None,
+     ) -> tuple[list[dict[str, Any]], bool]:
++        if hash_version is not None and (type(hash_version) is not int or hash_version not in (1, 2) or not content_sha256):
++            raise ValueError("hash_version requires content_sha256 and must be 1 or 2")
+         if bool(source_identity) != bool(commit):
+             raise ValueError("source_identity and commit must appear together")
+         if not ((source_identity and commit) or content_sha256):
+@@ -1214,16 +1221,19 @@ class Store:
+             if content_sha256:
+                 clauses.append("content_sha256 = ?")
+                 params.append(content_sha256)
++                clauses.append("COALESCE(json_extract(record_json, '$.hash_version'), 1) = ?")
++                params.append(hash_version if hash_version is not None else 1)
+             query = (
+                 "SELECT record_json FROM ("
+                 "SELECT record_json, name, source_identity, commit_hash, content_sha256, seq, "
++                "COALESCE(json_extract(record_json, '$.hash_version'), 1) AS hash_version, "
+                 "ROW_NUMBER() OVER ("
+-                "PARTITION BY name, source_identity, commit_hash, content_sha256 "
++                "PARTITION BY name, source_identity, commit_hash, COALESCE(json_extract(record_json, '$.hash_version'), 1), content_sha256 "
+                 "ORDER BY seq DESC"
+                 ") AS rank FROM log WHERE "
+                 + " AND ".join(clauses)
+                 + ") WHERE rank = 1 "
+-                "ORDER BY name, source_identity, commit_hash, content_sha256 "
++                "ORDER BY name, source_identity, commit_hash, hash_version, content_sha256 "
+                 "LIMIT ? OFFSET ?"
+             )
+             rows = self._conn.execute(query, [*params, limit + 1, offset]).fetchall()
+diff --git a/tests/test_hash_version.py b/tests/test_hash_version.py
+new file mode 100644
+index 0000000..3d8891b
+--- /dev/null
++++ b/tests/test_hash_version.py
+@@ -0,0 +1,126 @@
++from copy import deepcopy
++
++import pytest
++
++from csk_registry import signing
++from csk_registry.bundle import export_bundle, import_bundle
++from csk_registry.store import Store
++from test_registry import _body, _client
++
++
++def body(version):
++    result = _body()
++    result['schema_version'] = version
++    if version == 2:
++        result['hash_version'] = 2
++    return result
++
++
++def publish(client, key, token, record):
++    return client.post('/v1/records', json=key.sign_record(record),
++                       headers={'Authorization': f'Bearer {token}'})
++
++
++@pytest.mark.parametrize('version', [1, 2])
++def test_http_matching_is_version_scoped(tmp_path, version):
++    client, _, token = _client(tmp_path)
++    auditor = client.app.state.auditor_key
++    record = body(version)
++    assert publish(client, auditor, token, record).status_code == 201
++    for identity in [False, True]:
++        query = {'content_sha256': record['content_sha256']}
++        if identity:
++            query.update(source_identity=record['source_identity'], commit=record['commit'])
++        for requested in [1, 2]:
++            response = client.get('/v1/records', params={**query, 'hash_version': requested})
++            assert response.status_code == 200
++            assert len(response.json()['records']) == int(requested == version)
++        assert len(client.get('/v1/records', params=query).json()['records']) == int(version == 1)
++
++
++def test_projection_and_pagination_keep_both_versions(tmp_path):
++    client, _, token = _client(tmp_path)
++    auditor = client.app.state.auditor_key
++    for version in [1, 2]:
++        assert publish(client, auditor, token, body(version)).status_code == 201
++    query = {k: body(1)[k] for k in ['source_identity', 'commit']}
++    query['limit'] = 1
++    first = client.get('/v1/records', params=query).json()
++    assert first['records'][0]['schema_version'] == 1
++    second = client.get('/v1/records', params={**query, 'cursor': first['next_cursor']}).json()
++    assert second['records'][0]['hash_version'] == 2
++    assert second['next_cursor'] is None
++
++
++@pytest.mark.parametrize('schema,framing', [(1, 1), (1, 2), (2, None), (2, 1), (2, True), (2, '2'), (2, 3)])
++def test_publication_refuses_version_disagreement(tmp_path, schema, framing):
++    client, _, token = _client(tmp_path)
++    record = body(schema)
++    record.pop('hash_version', None)
++    if framing is not None:
++        record['hash_version'] = framing
++    response = publish(client, client.app.state.auditor_key, token, record)
++    assert response.status_code == 400
++    assert response.json()['error']['code'] == 'invalid_record'
++    assert 'hash_version_mismatch' in response.json()['error']['message']
++    assert client.get('/v1/snapshot').json()['log_size'] == 0
++    store = Store(tmp_path / 'direct.db')
++    with pytest.raises(ValueError, match='hash_version_mismatch'):
++        store.append(signing.generate_key().sign_record(record), created_at='2026-09-30T00:00:00Z')
++
++
++@pytest.mark.parametrize('query', [{'hash_version': '2'}, {'hash_version': '3', 'content_sha256': 'sha256:' + 'a'*64}, {'hash_version': 'true', 'content_sha256': 'sha256:' + 'a'*64}])
++def test_invalid_version_query(tmp_path, query):
++    client, _, _ = _client(tmp_path)
++    query.update(source_identity=body(1)['source_identity'], commit=body(1)['commit'])
++    assert client.get('/v1/records', params=query).status_code == 400
++
++
++def test_mixed_bundle_roundtrip_and_refusals(tmp_path):
++    key, local = signing.generate_key(), signing.generate_key()
++    upstream = Store(tmp_path / 'upstream.db')
++    for version in [1, 2]:
++        upstream.append(key.sign_record(body(version)), created_at='2026-09-30T00:00:00Z')
++    bundle = export_bundle(upstream, key)
++    assert bundle['schema_version'] == 2
++    assert bundle['snapshot']['schema_version'] == 1
++    downstream = Store(tmp_path / 'downstream.db')
++    assert import_bundle(downstream, local, bundle, upstream_public_key=key.public_pinned) == 2
++    assert import_bundle(downstream, local, bundle, upstream_public_key=key.public_pinned) == 0
++    reopened = Store(tmp_path / 'downstream.db')
++    for version in [1, 2]:
++        records = reopened.records_for(content_sha256=body(1)['content_sha256'], hash_version=version)
++        assert len(records) == 1
++        assert records[0].get('hash_version', 1) == version
++        assert signing.verify_signed(local.public_pinned, records[0])
++    for mutation in ['envelope', 'record', 'missing_key']:
++        bad = deepcopy(bundle)
++        if mutation == 'envelope':
++            bad['schema_version'] = 1
++        elif mutation == 'record':
++            bad['records'][1]['hash_version'] = 1
++            bad['records'][1] = key.sign_record(bad['records'][1])
++        else:
++            del bad['public_key']
++        fresh = Store(tmp_path / f'{mutation}.db')
++        with pytest.raises(ValueError):
++            import_bundle(fresh, local, bad, upstream_public_key=key.public_pinned)
++        assert fresh.log_entries() == []
++
++
++def test_version_is_bound_to_cursor_and_snapshot(tmp_path):
++    client, _, token = _client(tmp_path)
++    auditor = client.app.state.auditor_key
++    for name in ['a', 'b']:
++        record = {**body(2), 'name': name}
++        assert publish(client, auditor, token, record).status_code == 201
++    query = {'content_sha256': body(2)['content_sha256'], 'hash_version': 2, 'limit': 1}
++    first = client.get('/v1/records', params=query).json()
++    assert first['next_cursor']
++    record = {**body(2), 'name': 'c'}
++    assert publish(client, auditor, token, record).status_code == 201
++    second = client.get('/v1/records', params={**query, 'cursor': first['next_cursor']}).json()
++    assert second['records'][0]['name'] == 'b'
++    assert second['next_cursor'] is None
++    assert second['boundary'] == first['boundary']
++    assert client.get('/v1/records', params={**query, 'hash_version': 1, 'cursor': first['next_cursor']}).status_code == 404
+diff --git a/tests/test_protocol_conformance.py b/tests/test_protocol_conformance.py
+index 5a93b5c..a83fc62 100644
+--- a/tests/test_protocol_conformance.py
++++ b/tests/test_protocol_conformance.py
+@@ -1102,3 +1102,45 @@ def test_shared_service_cache_control_vectors(case: dict[str, Any], tmp_path: Pa
+         response = client.get("/v1/records")
+     cache_control = response.headers.get("Cache-Control", "")
+     assert case["cache_control"] in cache_control
++
++
++@pytest.mark.parametrize('schema_name', [
++    'audit-record-v1.schema.json', 'audit-record-v2.schema.json',
++    'registry-log-entry-v2.schema.json', 'registry-bundle-v2.schema.json',
++    'log-response-v3.schema.json',
++])
++def test_hash_version_schema_vectors(schema_name: str) -> None:
++    validator = _envelope_validator(schema_name)
++    cases = [case for case in _json('schema-cases/index.json') if case['schema'] == schema_name]
++    assert cases
++    for case in cases:
++        instance = _json('schema-cases/' + case['instance'])
++        assert validator.is_valid(instance) == case['valid']
++        if schema_name.startswith('audit-record'):
++            if case['valid']:
++                validate_record(instance)
++            else:
++                with pytest.raises(ProtocolError):
++                    validate_record(instance)
++
++
++def test_v2_service_outputs_match_pinned_shapes(tmp_path: Path) -> None:
++    from csk_registry.bundle import export_bundle, import_bundle
++    from test_hash_version import body, publish
++    from test_registry import _client
++
++    client, key, token = _client(tmp_path)
++    for version in [1, 2]:
++        assert publish(client, client.app.state.auditor_key, token, body(version)).status_code == 201
++    log = client.get('/v1/log').json()
++    _assert_valid_envelope('log-response-v3.schema.json', log)
++    _assert_invalid_envelope('log-response-v2.schema.json', log)
++    for entry in log['entries']:
++        _assert_valid_envelope('registry-log-entry-v2.schema.json', entry)
++    store = Store(tmp_path / 'r.db')
++    bundle = export_bundle(store, key)
++    _assert_valid_envelope('registry-bundle-v2.schema.json', bundle)
++    _assert_invalid_envelope('registry-bundle-v1.schema.json', bundle)
++    downstream = Store(tmp_path / 'import.db')
++    assert import_bundle(downstream, signing.generate_key(), bundle, upstream_public_key=key.public_pinned) == 2
++    _assert_valid_envelope('registry-snapshot-v1.schema.json', client.get('/v1/snapshot').json())
