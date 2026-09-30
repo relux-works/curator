@@ -1,0 +1,952 @@
+diff --git a/.github/ci/gate-selftest.sh b/.github/ci/gate-selftest.sh
+index a257d03c..ea405473 100644
+--- a/.github/ci/gate-selftest.sh
++++ b/.github/ci/gate-selftest.sh
+@@ -894,6 +894,8 @@ test)
+ 	done
+ 	[ -n "$timeout" ] || { echo 'synthetic go: missing -timeout' >&2; exit 2; }
+ 	printf '%s\n' "$timeout" >"${SYNTHETIC_CAPTURE:?}"
++	printf 'GIT_CONFIG_GLOBAL=%s\nGIT_CONFIG_NOSYSTEM=%s\n' "${GIT_CONFIG_GLOBAL-<unset>}" \
++		"${GIT_CONFIG_NOSYSTEM-<unset>}" >"${SYNTHETIC_CAPTURE:?}.gitenv"
+ 	cd "${SYNTHETIC_FIXTURE:?}" || exit 2
+ 	exec "${REAL_GO:?}" test -json -count=1 -timeout "$timeout" .
+ 	;;
+@@ -904,8 +906,16 @@ esac
+ GO
+ 	chmod +x "$SYNTHETIC_GO"
+ 
++	# The ambient git config is hostile and reached the way a runner's copied
++	# ~/.gitconfig is: through the default global lookup, with neither variable
++	# set. Only the gate's own export can put them into go test's environment.
++	HOSTILE_XDG="$WORK/hostile-xdg"
++	HOSTILE_GITCONFIG="$HOSTILE_XDG/git/config"
++	mkdir -p "$HOSTILE_XDG/git"
++	printf '[commit]\n\tgpgsign = true\n[tag]\n\tgpgsign = true\n' >"$HOSTILE_GITCONFIG"
+ 	HANG_STARTED="$SECONDS"
+-	env \
++	env -u GIT_CONFIG_GLOBAL -u GIT_CONFIG_NOSYSTEM \
++		XDG_CONFIG_HOME="$HOSTILE_XDG" \
+ 		GO="$SYNTHETIC_GO" REAL_GO="$REAL_GO" \
+ 		SYNTHETIC_MODULE="$SYNTHETIC_MODULE" SYNTHETIC_PACKAGE="$SYNTHETIC_PACKAGE" \
+ 		SYNTHETIC_FIXTURE="$SYNTHETIC_FIXTURE" \
+@@ -926,6 +936,26 @@ GO
+ 	else
+ 		bad 'test-gate forwards the configured 2s package deadline to go test' 'captured timeout missing or changed'
+ 	fi
++	GITENV_CAPTURE="$SYNTHETIC_CAPTURE.gitenv"
++	captured_global="$(sed -n 's/^GIT_CONFIG_GLOBAL=//p' "$GITENV_CAPTURE" 2>/dev/null)"
++	if [ "$(sed -n 's/^GIT_CONFIG_NOSYSTEM=//p' "$GITENV_CAPTURE" 2>/dev/null)" = '1' ]; then
++		ok 'test-gate exports GIT_CONFIG_NOSYSTEM=1 to go test'
++	else
++		bad 'test-gate exports GIT_CONFIG_NOSYSTEM=1 to go test' \
++			"observed: $(cat "$GITENV_CAPTURE" 2>/dev/null || echo 'no capture')"
++	fi
++	if [ -n "$captured_global" ] && [ "$captured_global" != "$HOSTILE_GITCONFIG" ] && \
++		[ -f "$captured_global" ] && [ ! -s "$captured_global" ]; then
++		ok 'test-gate exports an empty gate-owned GIT_CONFIG_GLOBAL over a hostile ambient config'
++	else
++		bad 'test-gate exports an empty gate-owned GIT_CONFIG_GLOBAL over a hostile ambient config' \
++			"observed: ${captured_global:-missing}"
++	fi
++	if grep -qF "test-gate: GIT_CONFIG_GLOBAL=$captured_global GIT_CONFIG_NOSYSTEM=1" "$WORK/gate-timeout.out"; then
++		ok 'test-gate logs the isolated git config it exports'
++	else
++		bad 'test-gate logs the isolated git config it exports' 'log line missing'
++	fi
+ 	if [ -f "$SYNTHETIC_EVIDENCE/go-test.json" ] && \
+ 		grep -qF 'panic: test timed out after 2s' "$SYNTHETIC_EVIDENCE/go-test.json"; then
+ 		ok 'the synthetic Go test fails because its package deadline expires'
+diff --git a/.github/ci/test-gate.sh b/.github/ci/test-gate.sh
+index e262215c..66962383 100755
+--- a/.github/ci/test-gate.sh
++++ b/.github/ci/test-gate.sh
+@@ -62,7 +62,17 @@ ROOT="$CURATOR_CONFORMANCE_ROOT"
+ MODULE="$(awk '/^module[ \t]/{print $2; exit}' go.mod 2>/dev/null)"
+ [ -n "$MODULE" ] || { echo 'test-gate: cannot determine the module path' >&2; exit 2; }
+ 
++# Every go test stage runs git under an empty, gate-owned global config and
++# no system config: a runner whose ~/.gitconfig signs commits or rewrites
++# URLs must not reach fixture repositories. Test binaries isolate again in
++# TestMain (internal/testgitenv) for local runs.
++GIT_CONFIG_GLOBAL="$EVIDENCE/isolated.gitconfig"
++: >"$GIT_CONFIG_GLOBAL" || exit 2
++GIT_CONFIG_NOSYSTEM=1
++export GIT_CONFIG_GLOBAL GIT_CONFIG_NOSYSTEM
++
+ echo "test-gate: flags=${GO_TEST_FLAGS:-<none>} timeout=$GO_TEST_TIMEOUT"
++echo "test-gate: GIT_CONFIG_GLOBAL=$GIT_CONFIG_GLOBAL GIT_CONFIG_NOSYSTEM=$GIT_CONFIG_NOSYSTEM"
+ echo "test-gate: conformance root=$ROOT"
+ echo ''
+ 
+diff --git a/cmd/curator/gitenv_hostile_test.go b/cmd/curator/gitenv_hostile_test.go
+new file mode 100644
+index 00000000..850acc36
+--- /dev/null
++++ b/cmd/curator/gitenv_hostile_test.go
+@@ -0,0 +1,103 @@
++package main
++
++import (
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++// hostileGitConfig is the shape of an operator config that broke the
++// signer rows on a runner that copies the host ~/.gitconfig into HOME:
++// every commit and tag is signed with an SSH key.
++func hostileGitConfig(signingKey string) string {
++	return "[user]\n\tname = Hostile Operator\n\temail = hostile@example.invalid\n\tsigningkey = " + signingKey + "\n" +
++		"[gpg]\n\tformat = ssh\n[commit]\n\tgpgsign = true\n[tag]\n\tgpgsign = true\n"
++}
++
++// hostileGitEnv returns this process's environment with every git config
++// entry point (GIT_CONFIG_GLOBAL, HOME/.gitconfig, XDG_CONFIG_HOME/git)
++// aimed at a signing-enabled config and system config re-enabled.
++func hostileGitEnv(t *testing.T) []string {
++	t.Helper()
++	private, _ := generateSSHKey(t)
++	root := t.TempDir()
++	// Forward slashes: git's config parser treats a backslash in a
++	// Windows path as an escape and refuses the line.
++	body := hostileGitConfig(filepath.ToSlash(private))
++	home := filepath.Join(root, "home")
++	xdg := filepath.Join(root, "xdg")
++	for _, path := range []string{filepath.Join(root, "global.gitconfig"), filepath.Join(home, ".gitconfig"), filepath.Join(xdg, "git", "config")} {
++		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
++			t.Fatal(err)
++		}
++	}
++	env := []string{}
++	for _, entry := range os.Environ() {
++		switch strings.SplitN(entry, "=", 2)[0] {
++		case "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM", "HOME", "XDG_CONFIG_HOME":
++			continue
++		}
++		env = append(env, entry)
++	}
++	return append(env, "GIT_CONFIG_GLOBAL="+filepath.Join(root, "global.gitconfig"),
++		"HOME="+home, "XDG_CONFIG_HOME="+xdg)
++}
++
++// TestSignerRowsSurviveHostileGlobalGitConfig re-runs the two signer rows
++// that failed on a signing-enabled runner in a child test process whose
++// whole environment carries that hostile config. The child's TestMain
++// (testgitenv.Isolate) is the only thing standing between the config and
++// the fixture commits, so removing it turns this row red.
++func TestSignerRowsSurviveHostileGlobalGitConfig(t *testing.T) {
++	requireGit(t)
++	if os.Getenv("CURATOR_CONFORMANCE_ROOT") == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set; the signer rows would skip")
++	}
++	env := hostileGitEnv(t)
++
++	// Precondition: the config is really hostile. A plain commit under
++	// it, without the isolation, comes out signed.
++	probe := t.TempDir()
++	for _, args := range [][]string{{"init", "-q"}, {"commit", "-q", "--allow-empty", "-m", "probe"}} {
++		command := exec.Command("git", args...)
++		command.Dir = probe
++		command.Env = env
++		if output, err := command.CombinedOutput(); err != nil {
++			t.Fatalf("hostile probe git %v: %v\n%s", args, err, output)
++		}
++	}
++	command := exec.Command("git", "cat-file", "commit", "HEAD")
++	command.Dir = probe
++	command.Env = env
++	raw, err := command.Output()
++	if err != nil || !strings.Contains(string(raw), "\ngpgsig ") {
++		t.Fatalf("hostile config did not sign the probe commit (err=%v):\n%s", err, raw)
++	}
++
++	executable, err := os.Executable()
++	if err != nil {
++		t.Fatal(err)
++	}
++	child := exec.Command(executable, "-test.v", "-test.count=1",
++		"-test.run", "^(TestSourceSignerVectorsAtProfileInstall|TestRevisionDoesNotBorrowTagSignature)$")
++	// The helper-process branch skips the package GOROOT lock this
++	// process already holds; it still runs TestMain's git isolation.
++	child.Env = append(env, cliHelperProcess+"=1")
++	output, err := child.CombinedOutput()
++	if err != nil {
++		t.Fatalf("signer rows under a hostile global git config: %v\n%s", err, output)
++	}
++	for _, want := range []string{
++		"--- PASS: TestSourceSignerVectorsAtProfileInstall/unsigned-refused",
++		"--- PASS: TestRevisionDoesNotBorrowTagSignature",
++	} {
++		if !strings.Contains(string(output), want) {
++			t.Fatalf("child run is missing %q (skipped or not run):\n%s", want, output)
++		}
++	}
++}
+diff --git a/cmd/curator/main_test.go b/cmd/curator/main_test.go
+index 640e2560..db5d3e7d 100644
+--- a/cmd/curator/main_test.go
++++ b/cmd/curator/main_test.go
+@@ -1107,6 +1107,9 @@ func buildHTTPSGitHome(t *testing.T) string {
+ 	}
+ 	t.Setenv("HOME", home)
+ 	t.Setenv("USERPROFILE", home)
++	// TestMain pins GIT_CONFIG_GLOBAL to an empty file; this home's
++	// .gitconfig is the global config these tests mean git to read.
++	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(home, ".gitconfig"))
+ 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+ 	return home
+ }
+diff --git a/cmd/curator/status_test.go b/cmd/curator/status_test.go
+index 1f7df686..d801752c 100644
+--- a/cmd/curator/status_test.go
++++ b/cmd/curator/status_test.go
+@@ -29,6 +29,7 @@ import (
+ 	"github.com/relux-works/curator/internal/manifest"
+ 	"github.com/relux-works/curator/internal/marker"
+ 	"github.com/relux-works/curator/internal/scopes"
++	"github.com/relux-works/curator/internal/testgitenv"
+ 	"github.com/relux-works/curator/internal/testtoolchain"
+ )
+ 
+@@ -45,8 +46,12 @@ func TestMain(m *testing.M) {
+ 	if len(os.Args) == 2 && os.Args[1] == godriver.WorkerMode {
+ 		os.Exit(godriver.RunWorker(os.Stdin, os.Stdout))
+ 	}
++	// Before any branch that runs tests: a CLI helper child runs git too.
++	restoreGitEnv := testgitenv.Isolate()
+ 	if os.Getenv(cliHelperProcess) == "1" {
+-		os.Exit(m.Run())
++		code := m.Run()
++		restoreGitEnv()
++		os.Exit(code)
+ 	}
+ 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+ 	defer cancel()
+@@ -56,6 +61,7 @@ func TestMain(m *testing.M) {
+ 		os.Exit(1)
+ 	}
+ 	code := m.Run()
++	restoreGitEnv()
+ 	if lock != nil {
+ 		if closeErr := lock.Close(); closeErr != nil {
+ 			_, _ = fmt.Fprintln(os.Stderr, "release package host GOROOT test lock:", closeErr)
+diff --git a/internal/audit/gitenv_main_test.go b/internal/audit/gitenv_main_test.go
+new file mode 100644
+index 00000000..528e7e87
+--- /dev/null
++++ b/internal/audit/gitenv_main_test.go
+@@ -0,0 +1,17 @@
++package audit
++
++import (
++	"os"
++	"testing"
++
++	"github.com/relux-works/curator/internal/testgitenv"
++)
++
++// TestMain keeps every git this package's tests run off the operator's
++// global and system git config; see internal/testgitenv.
++func TestMain(m *testing.M) {
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
++}
+diff --git a/internal/buildrepo/httpsbroker_test.go b/internal/buildrepo/httpsbroker_test.go
+index 33b02883..1531777b 100644
+--- a/internal/buildrepo/httpsbroker_test.go
++++ b/internal/buildrepo/httpsbroker_test.go
+@@ -16,6 +16,8 @@ import (
+ 	"strings"
+ 	"testing"
+ 	"time"
++
++	"github.com/relux-works/curator/internal/testgitenv"
+ )
+ 
+ const (
+@@ -78,7 +80,10 @@ func TestMain(m *testing.M) {
+ 	if isTestFakeSSH(os.Args[0]) {
+ 		os.Exit(testFakeSSHMain(os.Args))
+ 	}
+-	os.Exit(m.Run())
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
+ }
+ 
+ func runHTTPSBrokerWithTestTransport(t *testing.T, statePath, secret string, args []string, mutate func(map[string]string)) (int, string) {
+diff --git a/internal/closure/gitenv_main_test.go b/internal/closure/gitenv_main_test.go
+new file mode 100644
+index 00000000..19b51053
+--- /dev/null
++++ b/internal/closure/gitenv_main_test.go
+@@ -0,0 +1,17 @@
++package closure
++
++import (
++	"os"
++	"testing"
++
++	"github.com/relux-works/curator/internal/testgitenv"
++)
++
++// TestMain keeps every git this package's tests run off the operator's
++// global and system git config; see internal/testgitenv.
++func TestMain(m *testing.M) {
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
++}
+diff --git a/internal/config/gitenv_main_test.go b/internal/config/gitenv_main_test.go
+new file mode 100644
+index 00000000..ac5cbe3b
+--- /dev/null
++++ b/internal/config/gitenv_main_test.go
+@@ -0,0 +1,17 @@
++package config
++
++import (
++	"os"
++	"testing"
++
++	"github.com/relux-works/curator/internal/testgitenv"
++)
++
++// TestMain keeps every git this package's tests run off the operator's
++// global and system git config; see internal/testgitenv.
++func TestMain(m *testing.M) {
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
++}
+diff --git a/internal/contextpkg/gitenv_main_test.go b/internal/contextpkg/gitenv_main_test.go
+new file mode 100644
+index 00000000..488be641
+--- /dev/null
++++ b/internal/contextpkg/gitenv_main_test.go
+@@ -0,0 +1,17 @@
++package contextpkg
++
++import (
++	"os"
++	"testing"
++
++	"github.com/relux-works/curator/internal/testgitenv"
++)
++
++// TestMain keeps every git this package's tests run off the operator's
++// global and system git config; see internal/testgitenv.
++func TestMain(m *testing.M) {
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
++}
+diff --git a/internal/crossconformance/gitenv_main_test.go b/internal/crossconformance/gitenv_main_test.go
+new file mode 100644
+index 00000000..afa3f2c4
+--- /dev/null
++++ b/internal/crossconformance/gitenv_main_test.go
+@@ -0,0 +1,17 @@
++package crossconformance
++
++import (
++	"os"
++	"testing"
++
++	"github.com/relux-works/curator/internal/testgitenv"
++)
++
++// TestMain keeps every git this package's tests run off the operator's
++// global and system git config; see internal/testgitenv.
++func TestMain(m *testing.M) {
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
++}
+diff --git a/internal/devsub/gitenv_main_test.go b/internal/devsub/gitenv_main_test.go
+new file mode 100644
+index 00000000..3625327f
+--- /dev/null
++++ b/internal/devsub/gitenv_main_test.go
+@@ -0,0 +1,17 @@
++package devsub
++
++import (
++	"os"
++	"testing"
++
++	"github.com/relux-works/curator/internal/testgitenv"
++)
++
++// TestMain keeps every git this package's tests run off the operator's
++// global and system git config; see internal/testgitenv.
++func TestMain(m *testing.M) {
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
++}
+diff --git a/internal/envmarker/gitenv_main_test.go b/internal/envmarker/gitenv_main_test.go
+new file mode 100644
+index 00000000..65687926
+--- /dev/null
++++ b/internal/envmarker/gitenv_main_test.go
+@@ -0,0 +1,17 @@
++package envmarker
++
++import (
++	"os"
++	"testing"
++
++	"github.com/relux-works/curator/internal/testgitenv"
++)
++
++// TestMain keeps every git this package's tests run off the operator's
++// global and system git config; see internal/testgitenv.
++func TestMain(m *testing.M) {
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
++}
+diff --git a/internal/envprofile/network_fixture_test.go b/internal/envprofile/network_fixture_test.go
+index da086091..18a22612 100644
+--- a/internal/envprofile/network_fixture_test.go
++++ b/internal/envprofile/network_fixture_test.go
+@@ -1,6 +1,7 @@
+ package envprofile
+ 
+ import (
++	"github.com/relux-works/curator/internal/testgitenv"
+ 	"os"
+ 	"path/filepath"
+ 	"strings"
+@@ -44,7 +45,10 @@ func TestMain(m *testing.M) {
+ 		_ = os.Setenv("CURATOR_CONFIG", filepath.Join(dir, "config.json"))
+ 		_ = os.Setenv("CURATOR_SYSTEM_CONFIG", "")
+ 	}
+-	os.Exit(m.Run())
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
+ }
+ 
+ // gitIdentities serves local git repositories under fake canonical network
+diff --git a/internal/gitcred/gitcred_test.go b/internal/gitcred/gitcred_test.go
+index a541b6f9..c12caacc 100644
+--- a/internal/gitcred/gitcred_test.go
++++ b/internal/gitcred/gitcred_test.go
+@@ -13,6 +13,8 @@ import (
+ 	"strings"
+ 	"testing"
+ 	"time"
++
++	"github.com/relux-works/curator/internal/testgitenv"
+ )
+ 
+ // The credential machinery is exercised against a stand-in Git that
+@@ -52,7 +54,10 @@ func TestMain(m *testing.M) {
+ 	if dir := os.Getenv(fakeGitDirEnv); dir != "" {
+ 		os.Exit(fakeGitMain(dir))
+ 	}
+-	os.Exit(m.Run())
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
+ }
+ 
+ func TestNamespacedEntryIsSeparateFromTheOperatorsOwn(t *testing.T) {
+diff --git a/internal/gitignore/gitenv_main_test.go b/internal/gitignore/gitenv_main_test.go
+new file mode 100644
+index 00000000..3db6006f
+--- /dev/null
++++ b/internal/gitignore/gitenv_main_test.go
+@@ -0,0 +1,17 @@
++package gitignore
++
++import (
++	"os"
++	"testing"
++
++	"github.com/relux-works/curator/internal/testgitenv"
++)
++
++// TestMain keeps every git this package's tests run off the operator's
++// global and system git config; see internal/testgitenv.
++func TestMain(m *testing.M) {
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
++}
+diff --git a/internal/gitops/gitenv_main_test.go b/internal/gitops/gitenv_main_test.go
+new file mode 100644
+index 00000000..95fe5666
+--- /dev/null
++++ b/internal/gitops/gitenv_main_test.go
+@@ -0,0 +1,17 @@
++package gitops
++
++import (
++	"os"
++	"testing"
++
++	"github.com/relux-works/curator/internal/testgitenv"
++)
++
++// TestMain keeps every git this package's tests run off the operator's
++// global and system git config; see internal/testgitenv.
++func TestMain(m *testing.M) {
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
++}
+diff --git a/internal/godriver/main_test.go b/internal/godriver/main_test.go
+index d3ac187a..dcb3733e 100644
+--- a/internal/godriver/main_test.go
++++ b/internal/godriver/main_test.go
+@@ -14,6 +14,7 @@ import (
+ 	"testing"
+ 
+ 	"github.com/relux-works/curator/internal/buildsource"
++	"github.com/relux-works/curator/internal/testgitenv"
+ )
+ 
+ // identityProbeMode is a test-only second hidden mode. It exists so a test can
+@@ -32,7 +33,9 @@ func TestMain(m *testing.M) {
+ 	if len(os.Args) == 2 && os.Args[1] == identityProbeMode {
+ 		os.Exit(runIdentityProbe(os.Stdout))
+ 	}
++	restoreGitEnv := testgitenv.Isolate()
+ 	code := m.Run()
++	restoreGitEnv()
+ 	// The stub launcher is built once per package run into a scratch
+ 	// directory no test owns; the package run owns it and removes it here.
+ 	if stubOnce.directory != "" {
+diff --git a/internal/identity/gitenv_main_test.go b/internal/identity/gitenv_main_test.go
+new file mode 100644
+index 00000000..8b7e1165
+--- /dev/null
++++ b/internal/identity/gitenv_main_test.go
+@@ -0,0 +1,17 @@
++package identity
++
++import (
++	"os"
++	"testing"
++
++	"github.com/relux-works/curator/internal/testgitenv"
++)
++
++// TestMain keeps every git this package's tests run off the operator's
++// global and system git config; see internal/testgitenv.
++func TestMain(m *testing.M) {
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
++}
+diff --git a/internal/install/atomicity/gitenv_main_test.go b/internal/install/atomicity/gitenv_main_test.go
+new file mode 100644
+index 00000000..e2f2e60f
+--- /dev/null
++++ b/internal/install/atomicity/gitenv_main_test.go
+@@ -0,0 +1,17 @@
++package atomicity
++
++import (
++	"os"
++	"testing"
++
++	"github.com/relux-works/curator/internal/testgitenv"
++)
++
++// TestMain keeps every git this package's tests run off the operator's
++// global and system git config; see internal/testgitenv.
++func TestMain(m *testing.M) {
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
++}
+diff --git a/internal/install/scriptpolicy_test.go b/internal/install/scriptpolicy_test.go
+index 0021aab3..2a1995ac 100644
+--- a/internal/install/scriptpolicy_test.go
++++ b/internal/install/scriptpolicy_test.go
+@@ -19,6 +19,7 @@ import (
+ 	"github.com/relux-works/curator/internal/scriptpolicy"
+ 	"github.com/relux-works/curator/internal/scriptworker"
+ 	"github.com/relux-works/curator/internal/skillspec"
++	"github.com/relux-works/curator/internal/testgitenv"
+ )
+ 
+ // errInjectedProbeFailure fails one native-control probe through the
+@@ -81,7 +82,9 @@ func (e *env) schema8ScriptSkill(name string, enforced bool, interpreter ...stri
+ // run, so the ~20 MB production-binary fixtures do not leak into the
+ // system temp dir on every package run.
+ func TestMain(m *testing.M) {
++	restoreGitEnv := testgitenv.Isolate()
+ 	code := m.Run()
++	restoreGitEnv()
+ 	if enforcedOnce.directory != "" {
+ 		_ = os.RemoveAll(enforcedOnce.directory)
+ 	}
+diff --git a/internal/interop/environments/gitenv_main_test.go b/internal/interop/environments/gitenv_main_test.go
+new file mode 100644
+index 00000000..69dee726
+--- /dev/null
++++ b/internal/interop/environments/gitenv_main_test.go
+@@ -0,0 +1,17 @@
++package environments
++
++import (
++	"os"
++	"testing"
++
++	"github.com/relux-works/curator/internal/testgitenv"
++)
++
++// TestMain keeps every git this package's tests run off the operator's
++// global and system git config; see internal/testgitenv.
++func TestMain(m *testing.M) {
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
++}
+diff --git a/internal/manifest/gitenv_main_test.go b/internal/manifest/gitenv_main_test.go
+new file mode 100644
+index 00000000..66b047ba
+--- /dev/null
++++ b/internal/manifest/gitenv_main_test.go
+@@ -0,0 +1,17 @@
++package manifest
++
++import (
++	"os"
++	"testing"
++
++	"github.com/relux-works/curator/internal/testgitenv"
++)
++
++// TestMain keeps every git this package's tests run off the operator's
++// global and system git config; see internal/testgitenv.
++func TestMain(m *testing.M) {
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
++}
+diff --git a/internal/marker/gitenv_main_test.go b/internal/marker/gitenv_main_test.go
+new file mode 100644
+index 00000000..a8bb47ea
+--- /dev/null
++++ b/internal/marker/gitenv_main_test.go
+@@ -0,0 +1,17 @@
++package marker
++
++import (
++	"os"
++	"testing"
++
++	"github.com/relux-works/curator/internal/testgitenv"
++)
++
++// TestMain keeps every git this package's tests run off the operator's
++// global and system git config; see internal/testgitenv.
++func TestMain(m *testing.M) {
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
++}
+diff --git a/internal/rustsource/main_test.go b/internal/rustsource/main_test.go
+index a5b18ff9..5f8fa9a3 100644
+--- a/internal/rustsource/main_test.go
++++ b/internal/rustsource/main_test.go
+@@ -3,6 +3,8 @@ package rustsource
+ import (
+ 	"os"
+ 	"testing"
++
++	"github.com/relux-works/curator/internal/testgitenv"
+ )
+ 
+ func requireNativeCargoDescriptor(t *testing.T) {
+@@ -16,5 +18,8 @@ func TestMain(m *testing.M) {
+ 	if handled, code := DispatchInternalWorker(os.Args[1:], os.Stdin, os.Stdout); handled {
+ 		os.Exit(code)
+ 	}
+-	os.Exit(m.Run())
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
+ }
+diff --git a/internal/scriptpolicy/gitenv_main_test.go b/internal/scriptpolicy/gitenv_main_test.go
+new file mode 100644
+index 00000000..16a2acf2
+--- /dev/null
++++ b/internal/scriptpolicy/gitenv_main_test.go
+@@ -0,0 +1,17 @@
++package scriptpolicy
++
++import (
++	"os"
++	"testing"
++
++	"github.com/relux-works/curator/internal/testgitenv"
++)
++
++// TestMain keeps every git this package's tests run off the operator's
++// global and system git config; see internal/testgitenv.
++func TestMain(m *testing.M) {
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
++}
+diff --git a/internal/scriptworker/main_test.go b/internal/scriptworker/main_test.go
+index 7265a588..27b677a5 100644
+--- a/internal/scriptworker/main_test.go
++++ b/internal/scriptworker/main_test.go
+@@ -1,6 +1,7 @@
+ package scriptworker
+ 
+ import (
++	"github.com/relux-works/curator/internal/testgitenv"
+ 	"go/build"
+ 	"os"
+ 	"os/exec"
+@@ -25,7 +26,9 @@ func TestMain(m *testing.M) {
+ 	if len(os.Args) == 3 && os.Args[1] == ScriptLandlockProbeMode {
+ 		os.Exit(RunLandlockProbe(os.Args[2]))
+ 	}
++	restoreGitEnv := testgitenv.Isolate()
+ 	code := m.Run()
++	restoreGitEnv()
+ 	if stubOnce.directory != "" {
+ 		_ = os.RemoveAll(stubOnce.directory)
+ 	}
+diff --git a/internal/skillspec/gitenv_main_test.go b/internal/skillspec/gitenv_main_test.go
+new file mode 100644
+index 00000000..b4923e32
+--- /dev/null
++++ b/internal/skillspec/gitenv_main_test.go
+@@ -0,0 +1,17 @@
++package skillspec
++
++import (
++	"os"
++	"testing"
++
++	"github.com/relux-works/curator/internal/testgitenv"
++)
++
++// TestMain keeps every git this package's tests run off the operator's
++// global and system git config; see internal/testgitenv.
++func TestMain(m *testing.M) {
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
++}
+diff --git a/internal/snapshot/gitenv_main_test.go b/internal/snapshot/gitenv_main_test.go
+new file mode 100644
+index 00000000..a5d42b1e
+--- /dev/null
++++ b/internal/snapshot/gitenv_main_test.go
+@@ -0,0 +1,17 @@
++package snapshot
++
++import (
++	"os"
++	"testing"
++
++	"github.com/relux-works/curator/internal/testgitenv"
++)
++
++// TestMain keeps every git this package's tests run off the operator's
++// global and system git config; see internal/testgitenv.
++func TestMain(m *testing.M) {
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
++}
+diff --git a/internal/sourcelock/gitenv_main_test.go b/internal/sourcelock/gitenv_main_test.go
+new file mode 100644
+index 00000000..a9b27a52
+--- /dev/null
++++ b/internal/sourcelock/gitenv_main_test.go
+@@ -0,0 +1,17 @@
++package sourcelock
++
++import (
++	"os"
++	"testing"
++
++	"github.com/relux-works/curator/internal/testgitenv"
++)
++
++// TestMain keeps every git this package's tests run off the operator's
++// global and system git config; see internal/testgitenv.
++func TestMain(m *testing.M) {
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
++}
+diff --git a/internal/swiftpmbuild/gitenv_main_test.go b/internal/swiftpmbuild/gitenv_main_test.go
+new file mode 100644
+index 00000000..9000f718
+--- /dev/null
++++ b/internal/swiftpmbuild/gitenv_main_test.go
+@@ -0,0 +1,17 @@
++package swiftpmbuild
++
++import (
++	"os"
++	"testing"
++
++	"github.com/relux-works/curator/internal/testgitenv"
++)
++
++// TestMain keeps every git this package's tests run off the operator's
++// global and system git config; see internal/testgitenv.
++func TestMain(m *testing.M) {
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
++}
+diff --git a/internal/swiftpminterop/gitenv_main_test.go b/internal/swiftpminterop/gitenv_main_test.go
+new file mode 100644
+index 00000000..481005e9
+--- /dev/null
++++ b/internal/swiftpminterop/gitenv_main_test.go
+@@ -0,0 +1,17 @@
++package swiftpminterop
++
++import (
++	"os"
++	"testing"
++
++	"github.com/relux-works/curator/internal/testgitenv"
++)
++
++// TestMain keeps every git this package's tests run off the operator's
++// global and system git config; see internal/testgitenv.
++func TestMain(m *testing.M) {
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
++}
+diff --git a/internal/swiftpmsource/gitenv_main_test.go b/internal/swiftpmsource/gitenv_main_test.go
+new file mode 100644
+index 00000000..84fdd06e
+--- /dev/null
++++ b/internal/swiftpmsource/gitenv_main_test.go
+@@ -0,0 +1,17 @@
++package swiftpmsource
++
++import (
++	"os"
++	"testing"
++
++	"github.com/relux-works/curator/internal/testgitenv"
++)
++
++// TestMain keeps every git this package's tests run off the operator's
++// global and system git config; see internal/testgitenv.
++func TestMain(m *testing.M) {
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
++}
+diff --git a/internal/testgitenv/testgitenv.go b/internal/testgitenv/testgitenv.go
+new file mode 100644
+index 00000000..c3b66c1b
+--- /dev/null
++++ b/internal/testgitenv/testgitenv.go
+@@ -0,0 +1,40 @@
++// Package testgitenv keeps a test process from inheriting the operator's
++// git configuration. A host whose ~/.gitconfig enables commit or tag
++// signing (or rewrites URLs, or installs hooks) would otherwise leak into
++// every fixture repository a test builds, so a commit a test expects to be
++// unsigned comes out signed.
++//
++// TestMain in every package whose tests run git calls Isolate before
++// m.Run. A test that needs its own global config (an insteadOf rewrite, a
++// credential helper) still sets GIT_CONFIG_GLOBAL with t.Setenv, which
++// overrides the process-wide value for that test. Production code never
++// imports this package.
++package testgitenv
++
++import (
++	"fmt"
++	"os"
++	"path/filepath"
++)
++
++// Isolate points GIT_CONFIG_GLOBAL at an empty file it owns and sets
++// GIT_CONFIG_NOSYSTEM=1 for the rest of the process. It replaces any
++// inherited value: an ambient GIT_CONFIG_GLOBAL is exactly what it must
++// not trust. The returned function removes the scratch file; call it after
++// m.Run. A failure to create the file is fatal: a test run that silently
++// falls back to the ambient config is the defect this guards against.
++func Isolate() func() {
++	dir, err := os.MkdirTemp("", "curator-test-gitconfig-*")
++	if err != nil {
++		fmt.Fprintln(os.Stderr, "testgitenv: create isolated git config dir:", err)
++		os.Exit(2)
++	}
++	path := filepath.Join(dir, "gitconfig")
++	if err := os.WriteFile(path, nil, 0o600); err != nil {
++		fmt.Fprintln(os.Stderr, "testgitenv: create isolated git config:", err)
++		os.Exit(2)
++	}
++	_ = os.Setenv("GIT_CONFIG_GLOBAL", path)
++	_ = os.Setenv("GIT_CONFIG_NOSYSTEM", "1")
++	return func() { _ = os.RemoveAll(dir) }
++}
+diff --git a/internal/yarnmodernsource/gitenv_main_test.go b/internal/yarnmodernsource/gitenv_main_test.go
+new file mode 100644
+index 00000000..9d5ae8cc
+--- /dev/null
++++ b/internal/yarnmodernsource/gitenv_main_test.go
+@@ -0,0 +1,17 @@
++package yarnmodernsource
++
++import (
++	"os"
++	"testing"
++
++	"github.com/relux-works/curator/internal/testgitenv"
++)
++
++// TestMain keeps every git this package's tests run off the operator's
++// global and system git config; see internal/testgitenv.
++func TestMain(m *testing.M) {
++	restoreGitEnv := testgitenv.Isolate()
++	code := m.Run()
++	restoreGitEnv()
++	os.Exit(code)
++}
