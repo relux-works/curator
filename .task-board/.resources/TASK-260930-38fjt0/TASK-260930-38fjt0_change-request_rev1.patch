@@ -1,0 +1,88 @@
+diff --git a/.github/ci/gate-selftest.sh b/.github/ci/gate-selftest.sh
+index f07bc359..a257d03c 100644
+--- a/.github/ci/gate-selftest.sh
++++ b/.github/ci/gate-selftest.sh
+@@ -792,6 +792,45 @@ check_timeout_drift_rejected 'the self-test rejects candidate timeout drift' can
+ check_timeout_drift_rejected 'the self-test rejects Windows candidate budget drift' \
+ 	candidate-conformance "$WINDOWS_MATRIX_TIMEOUT" "$WINDOWS_MATRIX_DRIFT"
+ 
++# The Test (rose-air) lane is pinned to the rose-air runner by label: without
++# it any organisation self-hosted Apple Silicon runner can take the job.
++self_hosted_runs_on() {
++	awk '
++		/^  [a-z][a-z0-9-]*:[ \t\r]*$/ {
++			job = $1
++			sub(/:[ \t\r]*$/, "", job)
++		}
++		job == "test-self-hosted" && /^    runs-on:/ {
++			line = $0
++			sub(/^    runs-on:[ \t]*/, "", line)
++			sub(/[ \t\r]*$/, "", line)
++			count++; value = line
++		}
++		END { if (count == 1) print value }
++	' "$1"
++}
++
++runs_on_pins_rose_air() {
++	printf '%s\n' "$(self_hosted_runs_on "$1")" |
++		awk '/^\[/ && /\]$/ { gsub(/[][ \t]/, ""); n = split($0, l, ","); for (i = 1; i <= n; i++) if (l[i] == "rose-air") found = 1 } END { exit !found }'
++}
++
++if runs_on_pins_rose_air "$WORKFLOW"; then
++	ok 'test-self-hosted runs-on is pinned to the rose-air label'
++else
++	bad 'test-self-hosted runs-on is pinned to the rose-air label' \
++		"observed runs-on: $(self_hosted_runs_on "$WORKFLOW")"
++fi
++sed 's/^    runs-on: \[self-hosted, macOS, ARM64, rose-air\]/    runs-on: [self-hosted, macOS, ARM64]/' \
++	"$WORKFLOW" >"$WORK/runs-on-unpinned.yml"
++if cmp -s "$WORKFLOW" "$WORK/runs-on-unpinned.yml"; then
++	bad 'the self-test rejects an unpinned self-hosted runs-on' 'could not produce the unpinned mutant'
++elif runs_on_pins_rose_air "$WORK/runs-on-unpinned.yml"; then
++	bad 'the self-test rejects an unpinned self-hosted runs-on' 'the unpinned runs-on remained admitted'
++else
++	ok 'the self-test rejects an unpinned self-hosted runs-on'
++fi
++
+ GATE_DEFAULT_TIMEOUT="$(awk -F ':-' '/^GO_TEST_TIMEOUT=/{value=$2; sub(/}.*/, "", value); print value; exit}' "$HERE/test-gate.sh")"
+ if [ "$GATE_DEFAULT_TIMEOUT" = '60m' ]; then
+ 	ok 'test-gate.sh defaults to the 60m per-package budget'
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 1c068439..429f1ae8 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -228,6 +228,9 @@ jobs:
+   # registered for the organisation's board repository only until an
+   # administrator registers it for this repository, and an unmatched
+   # self-hosted label would leave the job queued forever.
++  # Pinned to the rose-air runner by its `rose-air` label: the generic
++  # self-hosted/macOS/ARM64 labels alone let any organisation Apple-silicon
++  # runner take the job (gate-selftest.sh pins the label).
+   test-self-hosted:
+     name: Test (rose-air)
+     # Runs on main pushes only: every landing gets self-hosted evidence, while
+@@ -235,7 +238,7 @@ jobs:
+     # single self-hosted slot is shared with other repositories and would
+     # serialise every candidate behind unrelated 90-minute runs.
+     if: ${{ vars.ROSE_AIR_RUNNER == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+-    runs-on: [self-hosted, macOS, ARM64]
++    runs-on: [self-hosted, macOS, ARM64, rose-air]
+     timeout-minutes: 90
+     steps:
+       - uses: actions/checkout@v4
+diff --git a/docs/self-hosted-runner-setup.md b/docs/self-hosted-runner-setup.md
+index 0f2b5d65..ffff2ac4 100644
+--- a/docs/self-hosted-runner-setup.md
++++ b/docs/self-hosted-runner-setup.md
+@@ -3,7 +3,9 @@
+ The `test-self-hosted` lane (`Test (rose-air)` in
+ [ci.yml](../.github/workflows/ci.yml)) runs the default gate on the
+ organisation's self-hosted macOS ARM64 runner (labels `self-hosted, macOS,
+-ARM64`). It runs on `main` pushes only, and only while the repository
++ARM64, rose-air`). The runner must carry the custom `rose-air` label: the
++lane is pinned to it, so another self-hosted Apple-silicon runner without
++that label never takes the job. It runs on `main` pushes only, and only while the repository
+ variable `ROSE_AIR_RUNNER` is `true`.
+ 
+ ## One-time prerequisites on the runner
