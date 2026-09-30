@@ -3,7 +3,6 @@ package snapcache
 import (
 	"fmt"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -84,13 +83,14 @@ func (inventory *Inventory) walk(dir string, source []string) error {
 		if strings.HasPrefix(name, ".") {
 			continue // staging and other private names are never sources
 		}
-		info, err := os.Lstat(path)
+		metadata, err := stateread.Lstat(path)
 		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
 			return err
 		}
+		if metadata.Kind == stateread.KindAbsent {
+			continue // removed while the directory was being read
+		}
+		info := metadata.Info
 		if info.Mode()&fs.ModeSymlink != 0 || isReparsePoint(info) {
 			inventory.Notes = append(inventory.Notes, fmt.Sprintf("ignored link %s in the snapshot cache", path))
 			continue
@@ -119,14 +119,14 @@ func (inventory *Inventory) walk(dir string, source []string) error {
 }
 
 func readEntry(path, source, commit string, info fs.FileInfo) (Entry, bool, error) {
-	snapshotInfo, err := os.Lstat(filepath.Join(path, "snapshot"))
+	metadata, err := stateread.Lstat(filepath.Join(path, "snapshot"))
 	if err != nil {
-		if os.IsNotExist(err) {
-			return Entry{}, false, nil // no published snapshot, only staging residue
-		}
 		return Entry{}, false, err
 	}
-	if !snapshotInfo.IsDir() || snapshotInfo.Mode()&fs.ModeSymlink != 0 {
+	if metadata.Kind == stateread.KindAbsent {
+		return Entry{}, false, nil // no published snapshot, only staging residue
+	}
+	if snapshotInfo := metadata.Info; !snapshotInfo.IsDir() || snapshotInfo.Mode()&fs.ModeSymlink != 0 {
 		return Entry{}, false, nil
 	}
 	allocated, logical, err := measure(path)
