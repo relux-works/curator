@@ -101,6 +101,15 @@ Reran vs accepted: blob/LOGBOOK/status checks above were rerun here; the carrier
 Two honest notes: my first direct `resource add` hung and wedged my shell queue, so a helper with an independent session performed the attach (exit 0, output `Attached …`); I then verified the board file independently and re-confirmed the worktree is unchanged. No `set_status`, `handoff`, `worktree integrate`, or checklist writes were made — checklist items are left for the landing transaction.
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-261001-644e2d, pid=76471, exit=0)
+spawn run RUN-261001-644e2d failed; operator action required; failure: integration_blocked: runner integrate refused: board_publication_pending: STORY-261001-qabjyj is landed and its board state is committed as 7a91c42aced296da63984d45bdbce5e5e8de0b72 on the local trunk, but the publication push did not land (integration_blocked); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: 7a91c42aced296da63984d45bdbce5e5e8de0b72
+  cause_code: integration_blocked
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: b7a2fe6bee7c9942c98ebb4470de9b50bfdfa32f
+  story_id: STORY-261001-qabjyj
+  cause: integration_blocked: the repository integration lock /Users/administrator/Developer/ReluxWorks/curator/curator/.temp/integration/repository.lock is held by another board operation; board publish serializes against every trunk-moving board run and refuses rather than queuing behind one
+  lock: /Users/administrator/Developer/ReluxWorks/curator/curator/.temp/integration/repository.lock
 
 ## Precondition Resources
 - [rescarrier-brief.md](file://TASK-261001-31dgus/rescarrier-brief.md)
@@ -123,7 +132,7 @@ spawn run completed: muse (run=RUN-261001-644e2d, pid=76471, exit=0)
 2026-10-01T15:25:33Z
 
 ## Last Update
-2026-10-01T19:32:20Z
+2026-10-01T20:56:35Z
 
 ## Assigned To
 [implementer] developer (muse)
