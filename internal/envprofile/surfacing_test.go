@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/contextstore"
+	"github.com/relux-works/curator/internal/envregistry"
 )
 
 func gitLookPath() (string, error) { return exec.LookPath("git") }
@@ -196,17 +197,21 @@ func TestAllowlistWarningOperations(t *testing.T) {
 // environment status non-current.
 func TestEmptyAllowlistWarningLeavesCurrentStatusCurrent(t *testing.T) {
 	fx := writeManagedFixture(t, "acme")
+	fx.native[envregistry.Muse] = t.TempDir()
+	if err := os.WriteFile(filepath.Join(fx.native[envregistry.Muse], "auth.json"), []byte("synthetic-native\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
 	seedLiveNativeCredentials(t, fx)
 	if err := EnsureDefault(fx.home); err != nil {
 		t.Fatal(err)
 	}
 	for _, profile := range []string{"acme", DefaultProfile} {
-		for _, environment := range []string{"claude_code", "codex_cli", "opencode", "pi"} {
-			req := fx.request(environment)
+		for _, adapter := range envregistry.Registry {
+			req := fx.request(adapter.ID)
 			req.Profile = profile
 			req.Repair = true
 			if _, err := Resolve(req); err != nil {
-				t.Fatalf("provision %s/%s: %v", profile, environment, err)
+				t.Fatalf("provision %s/%s: %v", profile, adapter.ID, err)
 			}
 		}
 	}

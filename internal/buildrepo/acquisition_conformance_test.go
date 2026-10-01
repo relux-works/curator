@@ -58,8 +58,11 @@ func TestExternalRepositoryAcquisitionConformance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if manifestID != acquisitionManifestID {
-		t.Fatalf("selected conformance manifest = %s, want pinned rc.13 %s", manifestID, acquisitionManifestID)
+	// The Muse candidate carries byte-identical rc.13 acquisition vectors.
+	// Admit that exact digest alongside the release, retaining refusal of
+	// unknown suites and the digest-keyed case counts below.
+	if manifestID != acquisitionManifestID && manifestID != conformancecoverage.MuseCandidateManifestSHA256 {
+		t.Fatalf("selected conformance manifest = %s, want pinned rc.13 %s or Muse candidate %s", manifestID, acquisitionManifestID, conformancecoverage.MuseCandidateManifestSHA256)
 	}
 
 	t.Run("cases", func(t *testing.T) {

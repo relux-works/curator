@@ -46,6 +46,9 @@ type SurfaceState struct {
 
 // HomeState is one profile × environment row.
 type HomeState struct {
+	// Marker absence is established by the verifier, never inferred from
+	// Provisioned=false (which also covers failed or malformed reads).
+	markerState                 stateread.Kind
 	Profile                     string                     `json:"profile"`
 	Environment                 string                     `json:"environment"`
 	Mode                        string                     `json:"mode"`
@@ -293,6 +296,7 @@ type StatusRequest struct {
 	// production-entry tests of failed lstat/readlink operations.
 	passthroughLstat    func(string) (os.FileInfo, error)
 	passthroughReadlink func(string) (string, error)
+	museTargetStat      func(string) (os.FileInfo, error)
 	readStateFile       func(string) (stateread.File, error)
 	readRegularFile     func(string) (stateread.File, error)
 	readStateDirectory  func(string) (stateread.Directory, error)
@@ -315,6 +319,7 @@ func (req *StatusRequest) resolve() ResolveRequest {
 		codexSeedRevisionForTest: req.codexSeedRevisionForTest,
 		passthroughLstat:         req.passthroughLstat,
 		passthroughReadlink:      req.passthroughReadlink,
+		museTargetStat:           req.museTargetStat,
 		readStateFile:            req.readStateFile,
 		readRegularFile:          req.readRegularFile,
 		boundaryOwnerLookup:      req.boundaryOwnerLookup,
@@ -334,6 +339,7 @@ func StatusOf(req StatusRequest) (*Status, error) {
 		Revision:   shippedCodexSeedRevision,
 		Provenance: "shipped",
 	}}
+	status.Notes = append(status.Notes, "Muse: foreign-personal-context isolation gap; root context, skills discovery, refresh semantics, and state/cache internal layouts are unverified")
 	status.Notes = append(status.Notes, "opencode skills come from the machine-current profile, split-brain by construction (§7.1)")
 	if req.Policy.SecurityPosture == config.SecurityPostureHardened && len(req.Policy.AllowedSources) == 0 {
 		status.NonCurrent = true
@@ -381,6 +387,11 @@ func StatusOf(req StatusRequest) (*Status, error) {
 		currentProfiles[scope.Profile] = true
 	}
 	for _, state := range status.Homes {
+		// Muse is explicitly provisioned. An absent optional home stays
+		// informational; failed marker or backup reads still fail --check.
+		if state.Environment == envregistry.Muse && state.markerState == stateread.KindAbsent && state.BackupsKnown {
+			continue
+		}
 		if !state.Current && currentProfiles[state.Profile] {
 			status.NonCurrent = true
 		}
@@ -681,6 +692,7 @@ func homeState(req StatusRequest, profile string, adapter envregistry.Adapter) H
 		state.BackupsKnown = true
 	}
 	verdict := verifyHome(&resolve, adapter, source, lock, hash)
+	state.markerState = verdict.markerState
 	state.Warnings = append(state.Warnings, verdict.warnings...)
 	if verdict.marker == nil {
 		state.Findings = append(state.Findings, verdict.reasons...)
@@ -1028,6 +1040,8 @@ func scopeHomes(req StatusRequest, installed map[string]bool) ([]ScopeHome, []St
 			native := ""
 			if req.NativeHomeOf != nil {
 				native, _ = req.NativeHomeOf(adapter.ID)
+			} else if adapter.ID == envregistry.Muse {
+				native, _ = museNativeHome()
 			} else if legacy, ok := adapterByID(adapter.ID); ok {
 				native, _ = NativeHome(legacy)
 			}

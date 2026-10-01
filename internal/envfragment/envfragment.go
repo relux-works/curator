@@ -63,6 +63,13 @@ type Fragment struct {
 	MCP          *MCP
 }
 
+func (f *Fragment) version() string {
+	if f.Environment == envregistry.Muse {
+		return "launch-env-fragment-v3"
+	}
+	return Version
+}
+
 // channelObject renders one descriptor in the §7.3 grammar: flag with
 // flag, argument, name exactly when argument is name, and optional with;
 // config-key with key; variable with variable; file with filename. A
@@ -99,7 +106,7 @@ func channelObject(channel envregistry.Channel, semantics bool) map[string]any {
 // Object renders the fragment as a JSON-domain value for CCJ-1 encoding.
 func (f *Fragment) Object() map[string]any {
 	object := map[string]any{
-		"fragment":    Version,
+		"fragment":    f.version(),
 		"environment": f.Environment,
 		"profile":     map[string]any{"name": f.Profile, "lock_sha256": f.LockSHA256},
 		"permissions": map[string]any{"mode": f.Permissions.Mode, "locked": f.Permissions.Locked, "source": f.Permissions.Source},
@@ -155,6 +162,12 @@ func (f *Fragment) JSON() ([]byte, error) {
 // (§10.2, §10.3).
 func (f *Fragment) variables(adapter envregistry.Adapter) [][2]string {
 	var out [][2]string
+	if len(adapter.HomeVariables) > 0 {
+		for _, variable := range adapter.HomeVariables {
+			out = append(out, [2]string{variable[0], f.Env[variable[0]]})
+		}
+		return out
+	}
 	if value, ok := f.Env[adapter.EnvVar]; ok {
 		out = append(out, [2]string{adapter.EnvVar, value})
 	}
@@ -333,6 +346,21 @@ func BoundEnvNames(names []string, passable []string) []string {
 // root. Only the profile-name path segment is profile-derived.
 func CheckBoundary(adapter envregistry.Adapter, envRoot string, fragment *Fragment) error {
 	allowed := map[string]bool{adapter.EnvVar: true}
+	for _, variable := range adapter.HomeVariables {
+		allowed[variable[0]] = true
+	}
+	if adapter.ID == envregistry.Muse {
+		if fragment.SystemPrompt != nil || fragment.MCP != nil {
+			return fmt.Errorf("muse channels are unverified")
+		}
+		config := fragment.Env["XDG_CONFIG_HOME"]
+		parent := filepath.Dir(config)
+		for _, variable := range adapter.HomeVariables {
+			if fragment.Env[variable[0]] != filepath.Join(parent, variable[1]) {
+				return fmt.Errorf("muse variable %s does not name its declared parent", variable[0])
+			}
+		}
+	}
 	collect := func(channels []envregistry.Channel) {
 		for _, channel := range channels {
 			if channel.Kind == envregistry.KindVariable {

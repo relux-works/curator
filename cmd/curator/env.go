@@ -49,6 +49,8 @@ func (c cli) profileNativeHomeResolver() func(string) (string, error) {
 			return filepath.Join(userHome, ".codex"), nil
 		case envregistry.OpenCode:
 			return filepath.Join(userHome, ".config", "opencode"), nil
+		case envregistry.Muse:
+			return filepath.Join(userHome, ".config", "muse"), nil
 		case envregistry.Pi:
 			return filepath.Join(userHome, ".pi"), nil
 		default:

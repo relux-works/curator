@@ -33,6 +33,14 @@ const defaultSuiteManifestSHA256 = "be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc
 // the conformance consumers in this change.
 const ContentHashV2CandidateManifestSHA256 = "950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60"
 
+// MuseCandidateManifestSHA256 identifies spec-muse-environment at d373078a.
+const MuseCandidateManifestSHA256 = "bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783"
+
+// IsContentHashV2Candidate identifies suites that publish the separately owned hash-v2 families.
+func IsContentHashV2Candidate(digest string) bool {
+	return digest == ContentHashV2CandidateManifestSHA256 || digest == MuseCandidateManifestSHA256
+}
+
 // Observation is the result of one published case. A failure may be accepted
 // only when the ledger names this family and case. Bounds and skips are
 // explicit classifications, never passes.

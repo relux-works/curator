@@ -15,8 +15,8 @@ func mustAdapter(t *testing.T, id string) Adapter {
 }
 
 func TestRegistryClosed(t *testing.T) {
-	if len(Registry) != 4 {
-		t.Fatalf("the revision-1 registry holds %d adapters, want 4", len(Registry))
+	if len(Registry) != 5 {
+		t.Fatalf("the revision-1 registry holds %d adapters, want 5", len(Registry))
 	}
 	seen := map[string]bool{}
 	for _, adapter := range Registry {
@@ -24,11 +24,11 @@ func TestRegistryClosed(t *testing.T) {
 			t.Fatalf("duplicate adapter %s", adapter.ID)
 		}
 		seen[adapter.ID] = true
-		if adapter.EnvVar == "" || adapter.RootTarget == "" {
+		if adapter.EnvVar == "" || (adapter.RootTarget == "" && adapter.ID != Muse) {
 			t.Fatalf("adapter %s names no home variable or root target", adapter.ID)
 		}
 	}
-	for _, id := range []string{ClaudeCode, CodexCLI, OpenCode, Pi} {
+	for _, id := range []string{ClaudeCode, CodexCLI, OpenCode, Pi, Muse} {
 		if !seen[id] {
 			t.Fatalf("adapter %s is missing from the registry", id)
 		}
@@ -288,5 +288,17 @@ func TestShadowAcknowledgment(t *testing.T) {
 	}
 	if config.ShadowAcknowledges(Pi, "OTHER.md") {
 		t.Fatal("an acknowledgment covers exactly the recorded path")
+	}
+}
+
+func TestMuseHasNoAdmittedRootContextForm(t *testing.T) {
+	adapter := mustAdapter(t, Muse)
+	if adapter.RootTarget != "" || len(adapter.Forms) != 0 {
+		t.Fatalf("unverified Muse root context admitted: %+v", adapter)
+	}
+	for _, form := range []string{FormMonolithic, FormReferenced} {
+		if _, err := adapter.ResolveForm(form); err == nil || !strings.Contains(err.Error(), DiagFormUnsupported) {
+			t.Fatalf("form %s admitted: %v", form, err)
+		}
 	}
 }

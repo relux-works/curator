@@ -156,7 +156,7 @@ func readFrozenRegistrySchemaCase(t *testing.T, root, family, caseName string) (
 		}
 		if suiteID, err := conformancecoverage.SelectedSuiteManifestSHA256(); err != nil {
 			t.Fatal(err)
-		} else if suiteID == conformancecoverage.ContentHashV2CandidateManifestSHA256 {
+		} else if conformancecoverage.IsContentHashV2Candidate(suiteID) {
 			t.Fatalf("candidate suite is missing frozen case %s/%s", family, caseName)
 		}
 		return nil, false

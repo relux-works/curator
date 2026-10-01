@@ -111,6 +111,7 @@ type ResolveRequest struct {
 	// in tests. Production requests leave them nil and use the shared reader.
 	passthroughLstat     func(string) (os.FileInfo, error)
 	passthroughReadlink  func(string) (string, error)
+	museTargetStat       func(string) (os.FileInfo, error)
 	readStateFile        func(string) (stateread.File, error)
 	readRegularFile      func(string) (stateread.File, error)
 	boundaryOwnerLookup  pathboundary.OwnerLookup
@@ -152,6 +153,12 @@ func detectRelease(probe []string) string {
 func (req *ResolveRequest) nativeHome(id string) (string, error) {
 	if req.NativeHomeOf != nil {
 		return req.NativeHomeOf(id)
+	}
+	if id == envregistry.Muse {
+		if req.OperatorXDG != "" {
+			return filepath.Join(req.OperatorXDG, "muse"), nil
+		}
+		return museNativeHome()
 	}
 	adapter, ok := adapterByID(id)
 	if !ok {
@@ -419,6 +426,9 @@ func referencedBlocked(homeDir string, prior *envmarker.Marker) (bool, error) {
 // file (§8.1); referenced module files link into the immutable store
 // entries so link-target identity verifies them lock-free (§10.1).
 func (p *homePlan) rootContext(req *ResolveRequest, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, packages map[string]contextmaterialize.Package, surfaces map[string]envmarker.Surface) error {
+	if p.adapter.RootTarget == "" {
+		return nil
+	}
 	target := p.adapter.RootTarget
 	if p.form == envregistry.FormReferenced {
 		files, written, err := contextmaterialize.Referenced(lock, hash, precedence, p.adapter.ID, packages)
@@ -837,7 +847,14 @@ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bo
 				bundle.claudeInit = true
 				continue
 			}
-			path := filepath.Join(native, filepath.FromSlash(seed))
+			seedRoot := native
+			if adapter.ID == envregistry.Muse {
+				seedRoot, err = req.museSeedRoot()
+				if err != nil {
+					return nil, err
+				}
+			}
+			path := filepath.Join(seedRoot, filepath.FromSlash(seed))
 			readRegularFile := req.readRegularFile
 			if readRegularFile == nil {
 				readRegularFile = stateread.ReadRegularFile
@@ -1172,6 +1189,13 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
 	}
 	if err := preflightManagedWriteTargets(root, homeRel, want); err != nil {
 		return err
+	}
+	if plan.adapter.ID == envregistry.Muse {
+		for _, directory := range []string{"config/muse", "data/muse", "state", "cache"} {
+			if _, err := managedDirectory(root, managedJoin(homeRel, directory)); err != nil {
+				return err
+			}
+		}
 	}
 	if _, err := managedDirectory(root, homeRel); err != nil {
 		return err
@@ -1509,11 +1533,15 @@ func ensureCredentialLink(root, homeRel, path, target string, recorded bool, mig
 	}
 	info := metadata.Info
 	if info.Mode()&os.ModeSymlink != 0 {
-		got, err := os.Readlink(full)
+		link, err := stateread.Readlink(full)
 		if err != nil {
 			return fmt.Errorf("%s: %s link target cannot be read: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full)
 		}
-		if got == target {
+		got := link.Target
+		if !filepath.IsAbs(got) {
+			got = filepath.Join(filepath.Dir(full), got)
+		}
+		if filepath.Clean(got) == filepath.Clean(target) {
 			return nil
 		}
 		if !recorded {
@@ -1669,6 +1697,7 @@ type verification struct {
 	warnings              []string
 	passthroughReadFailed bool
 	markerReadFailed      bool
+	markerState           stateread.Kind
 	// surfaceState carries the per-surface outcome for status rows: ""
 	// (current), environment_surface_drift, environment_surface_missing,
 	// or environment_surface_unreadable.
@@ -1716,9 +1745,11 @@ func verifyHome(req *ResolveRequest, adapter envregistry.Adapter, source Source,
 		return verdict
 	}
 	if marker == nil {
+		verdict.markerState = stateread.KindAbsent
 		verdict.reasons = append(verdict.reasons, "home unprovisioned")
 		return verdict
 	}
+	verdict.markerState = stateread.KindPresent
 	verdict.marker = marker
 	manager := newGitManager(req.Home)
 	servers, err := mcpsOf(req.Home, manager, lock)
@@ -2034,6 +2065,17 @@ func (v *verification) checkPassthrough(req *ResolveRequest, plan *homePlan, mar
 			continue
 		}
 		full := filepath.Join(plan.homeDir, filepath.FromSlash(path))
+		if plan.adapter.ID == envregistry.Muse {
+			state := req.inspectMuseAuth(full, target)
+			if !state.live && (state.err == nil || !strings.Contains(state.err.Error(), envregistry.DiagPassthroughUnreadable)) {
+				v.reasons = append(v.reasons, envregistry.DiagPassthroughDetached+": "+path)
+			}
+			if state.err != nil {
+				v.reasons = append(v.reasons, state.err.Error())
+				v.passthroughReadFailed = strings.Contains(state.err.Error(), envregistry.DiagPassthroughUnreadable)
+			}
+			continue
+		}
 		var metadata stateread.Metadata
 		if req.passthroughLstat == nil {
 			metadata, err = stateread.Lstat(full)
@@ -2226,6 +2268,12 @@ func buildFragment(req *ResolveRequest, adapter envregistry.Adapter, verdict *ve
 		Placement:   req.Policy.Precedence().Placement,
 		Env:         map[string]string{adapter.EnvVar: plan.parent},
 	}
+	if len(adapter.HomeVariables) > 0 {
+		fragment.Env = map[string]string{}
+		for _, variable := range adapter.HomeVariables {
+			fragment.Env[variable[0]] = filepath.Join(plan.parent, variable[1])
+		}
+	}
 	if req.Machine.PermissionsLocked {
 		fragment.Permissions = envfragment.Permissions{Mode: "native", Locked: true, Source: "global"}
 	} else if mode, configured := req.Machine.Permissions[req.Profile]; configured {
@@ -2296,6 +2344,8 @@ func firstResolveNotice(adapter envregistry.Adapter, plan *homePlan) string {
 		steps = "Log in unless the native credential is shared through; pass --skip-git-repo-check outside a git repository."
 	case envregistry.OpenCode:
 		steps = "Apply the resolved fragment by hand (OPENCODE_CONFIG names the MCP file); skills come from the machine-current profile, split-brain by construction."
+	case envregistry.Muse:
+		steps = "Muse first-run seed coverage and credential refresh semantics are unverified; foreign personal context remains ambient."
 	case envregistry.Pi:
 		steps = "No trust wall; authentication is shared from the native home."
 	}
@@ -2563,6 +2613,14 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 		}
 		return nil, fmt.Errorf("%s: %v", DiagRepairFailed, err)
 	}
+	if adapter.ID == envregistry.Muse {
+		for path, target := range passthroughLinks {
+			state := req.inspectMuseAuth(filepath.Join(plan.homeDir, filepath.FromSlash(path)), target)
+			if state.err != nil {
+				return nil, state.err
+			}
+		}
+	}
 	for path := range passthroughLinks {
 		writePaths[path] = true
 	}
@@ -2752,6 +2810,9 @@ func copyTree(source, root, destination string) error {
 // naming package and path, and under error the first skipped module
 // refuses the assembly with context_system_module_transitive.
 func (p *homePlan) systemPrompt(req *ResolveRequest, lock *contextlock.Lock, precedence contextmaterialize.Precedence, packages map[string]contextmaterialize.Package, surfaces map[string]envmarker.Surface) error {
+	if p.adapter.ID == envregistry.Muse {
+		return nil
+	}
 	document, written, dropped, err := contextmaterialize.SystemPrompt(lock, precedence, p.adapter.ID, packages, req.Policy.Admission())
 	if err != nil {
 		return err
@@ -2821,6 +2882,9 @@ func (p *homePlan) skills(req *ResolveRequest, skills []skillOf, surfaces map[st
 // adapter, managed homes only, with the sorted env_names union carried
 // for the fragment.
 func (p *homePlan) mcp(req *ResolveRequest, servers []contextmaterialize.MCPServer, surfaces map[string]envmarker.Surface) error {
+	if p.adapter.ID == envregistry.Muse {
+		return nil
+	}
 	path, document, written, err := contextmaterialize.MCPFile(p.adapter.ID, servers)
 	if err != nil {
 		return err

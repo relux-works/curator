@@ -128,6 +128,15 @@ func SortedNames(requirements map[string]Requirement) []string {
 
 // LoadManifest reads and validates the manifest at the package root.
 func LoadManifest(root string) (*Manifest, error) {
+	// Muse credentials are always native passthrough, never profile content.
+	auth, err := stateread.Lstat(filepath.Join(root, "config", "muse", "auth.json"))
+	if err != nil {
+		return nil, fmt.Errorf("%s: Muse credential source: %w", DiagManifestInvalid, err)
+	}
+	if auth.Kind != stateread.KindAbsent {
+		return nil, invalid(DiagManifestInvalid, "config/muse/auth.json must not be profile content")
+	}
+
 	manifestPath := filepath.Join(root, ManifestName)
 	file, err := stateread.ReadFile(manifestPath) // #nosec G304 -- package root chosen by the caller
 	if err != nil {

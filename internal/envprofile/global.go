@@ -249,6 +249,16 @@ func preflightManagedProfile(home, profile string, policy Policy, machine envreg
 	}
 	precedence := policy.Precedence()
 	for _, adapter := range envregistry.Registry {
+		// Muse is managed-home-only and is provisioned by an explicit resolve.
+		// Global skill changes reconcile an existing Muse home without requiring
+		// every operator to have logged into the newly admitted tool.
+		participates, err := managedAdapterParticipates(home, profile, adapter)
+		if err != nil {
+			return err
+		}
+		if !participates {
+			continue
+		}
 		req := ResolveRequest{Home: home, Profile: profile, EnvID: adapter.ID, Machine: machine, Repair: true, Policy: policy, NativeHomeOf: nativeHomeOf}
 		verdict := verifyHome(&req, adapter, source, lock, hash)
 		if verdict.markerReadFailed {
@@ -290,7 +300,17 @@ func syncManagedProfile(home, profile string, policy Policy, machine envregistry
 	var results []EntryResult
 	var failures []string
 	for _, adapter := range envregistry.Registry {
-		_, err := Resolve(ResolveRequest{
+		// Muse is managed-home-only and is provisioned by an explicit resolve.
+		// Global skill changes reconcile an existing Muse home without requiring
+		// every operator to have logged into the newly admitted tool.
+		participates, err := managedAdapterParticipates(home, profile, adapter)
+		if err != nil {
+			return nil, err
+		}
+		if !participates {
+			continue
+		}
+		_, err = Resolve(ResolveRequest{
 			Home: home, Profile: profile, EnvID: adapter.ID, Machine: machine,
 			Repair: true, Policy: policy, NativeHomeOf: nativeHomeOf,
 		})

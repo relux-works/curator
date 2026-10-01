@@ -132,3 +132,24 @@ func TestReadsDistinguishAbsentFromBlockedParent(t *testing.T) {
 		})
 	}
 }
+
+func TestReadableRegularFileMetadataOnly(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "auth.json")
+	if err := os.WriteFile(path, []byte("synthetic"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := CheckReadableRegularFile(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := CheckReadableRegularFile(filepath.Dir(path)); err == nil {
+		t.Fatal("directory accepted as readable regular credential")
+	}
+	absent, err := StatWith(path+".missing", nil)
+	if err != nil || absent.Kind != KindAbsent {
+		t.Fatalf("absence: %v %v", absent, err)
+	}
+	unreadable, err := StatWith(path, func(string) (os.FileInfo, error) { return nil, os.ErrPermission })
+	if err == nil || unreadable.Kind != KindUnreadable {
+		t.Fatalf("failed observation is absence: %v %v", unreadable, err)
+	}
+}

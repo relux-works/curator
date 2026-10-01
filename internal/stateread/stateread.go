@@ -236,3 +236,36 @@ func missingPathWith(path string, cause error, isNotExist func(error) bool) bool
 		parent = next
 	}
 }
+
+// StatWith is Stat with an injectable metadata reader. Nil uses os.Stat.
+func StatWith(path string, readPath func(string) (os.FileInfo, error)) (Metadata, error) {
+	if readPath == nil {
+		readPath = os.Stat
+	}
+	info, err := readPath(path)
+	if err == nil {
+		return Metadata{Kind: KindPresent, Info: info}, nil
+	}
+	if missingPath(path, err) {
+		return Metadata{Kind: KindAbsent}, nil
+	}
+	return Metadata{Kind: KindUnreadable}, &Error{Kind: KindUnreadable, Path: path, Cause: err}
+}
+
+// CheckReadableRegularFile establishes readability without consuming any bytes.
+// The open-file metadata also detects a non-regular target raced into place.
+func CheckReadableRegularFile(path string) error {
+	file, err := os.Open(path) // #nosec G304 -- caller-selected state path; no bytes consumed
+	if err != nil {
+		return UnusableError(path, err)
+	}
+	defer func() { _ = file.Close() }()
+	info, err := file.Stat()
+	if err != nil {
+		return UnusableError(path, err)
+	}
+	if !info.Mode().IsRegular() {
+		return UnusableError(path, fmt.Errorf("target is not regular"))
+	}
+	return nil
+}

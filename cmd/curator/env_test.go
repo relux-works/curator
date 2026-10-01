@@ -291,6 +291,7 @@ func TestEnvResolveLockedIsolationRequiresMigration(t *testing.T) {
 func TestEnvStatusMatrix(t *testing.T) {
 	source, _ := profileHome(t)
 	writeNativeCredentials(t)
+	prepareNativeMuse(t)
 	// The §12 provider rows join the matrix: run and session are always
 	// reported, and a missing row is non-current — so the post-repair
 	// --check plants stub providers, which warn outside the trust
@@ -318,19 +319,21 @@ func TestEnvStatusMatrix(t *testing.T) {
 	if !strings.Contains(stdout, "acme codex_cli: non-current, unprovisioned") {
 		t.Fatalf("status rows:\n%s", stdout)
 	}
-	for _, profile := range []string{"acme", "default"} {
-		for _, env := range []string{"claude_code", "codex_cli", "opencode", "pi"} {
-			if code, _, stderr := runProfile(t, source, "env", "resolve", env, "--profile", profile, "--repair"); code != exitOK {
-				t.Fatalf("repair %s %s stderr:\n%s", profile, env, stderr)
-			}
-		}
+	if !strings.Contains(stdout, "acme muse: non-current, unprovisioned") {
+		t.Fatalf("Muse status rows:\n%s", stdout)
 	}
+	provisionRegisteredEnvironments(t, source, "acme", "default")
 	code, stdout, _ = runProfile(t, source, "env", "status", "--check")
 	if code != exitOK {
 		t.Fatalf("status --check after repair = %d\n%s", code, stdout)
 	}
 	if !strings.Contains(stdout, "acme codex_cli: current, provisioned") {
 		t.Fatalf("status rows:\n%s", stdout)
+	}
+	for _, profile := range []string{"acme", "default"} {
+		if !strings.Contains(stdout, profile+" muse: current, provisioned") {
+			t.Fatalf("Muse status rows:\n%s", stdout)
+		}
 	}
 	if !strings.Contains(stdout, "tool codex_cli: recorded") {
 		t.Fatalf("tool rows:\n%s", stdout)
@@ -384,18 +387,13 @@ func TestEnvStatusMatrix(t *testing.T) {
 func TestEnvStatusRegistryBoundaryPostureAndCheck(t *testing.T) {
 	source, home := profileHome(t)
 	writeNativeCredentials(t)
+	prepareNativeMuse(t)
 	pkg := t.TempDir()
 	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
 	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
 		t.Fatalf("profile install stderr:\n%s", stderr)
 	}
-	for _, profile := range []string{"acme", "default"} {
-		for _, environment := range []string{"claude_code", "codex_cli", "opencode", "pi"} {
-			if code, _, stderr := runProfile(t, source, "env", "resolve", environment, "--profile", profile, "--repair"); code != exitOK {
-				t.Fatalf("repair %s %s stderr:\n%s", profile, environment, stderr)
-			}
-		}
-	}
+	provisionRegisteredEnvironments(t, source, "acme", "default")
 	const registryURL = "https://registry.example.test"
 	source.cfg.DisableBuiltinRegistries = true
 	source.cfg.AuditRegistries = []config.Registry{{Name: "trusted", URL: registryURL, PublicKeys: []string{"ed25519:test"}, Enabled: true}}

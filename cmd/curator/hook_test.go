@@ -641,18 +641,13 @@ func TestEnvStatusReportsShellHookTrustPosture(t *testing.T) {
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	source, _ := profileHome(t)
 	writeNativeCredentials(t)
+	prepareNativeMuse(t)
 	pkg := t.TempDir()
 	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
 	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
 		t.Fatalf("install stderr:\n%s", stderr)
 	}
-	for _, profile := range []string{"acme", "default"} {
-		for _, env := range []string{"claude_code", "codex_cli", "opencode", "pi"} {
-			if code, _, stderr := runProfile(t, source, "env", "resolve", env, "--profile", profile, "--repair"); code != exitOK {
-				t.Fatalf("repair %s %s stderr:\n%s", profile, env, stderr)
-			}
-		}
-	}
+	provisionRegisteredEnvironments(t, source, "acme", "default")
 	_, _, envPath := hookProject(t, "export CURATOR_PROJECT_ENV=1\n")
 
 	if code, stdout, _ := runProfile(t, source, "env", "status", "--check"); code != exitOK {

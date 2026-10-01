@@ -22,6 +22,7 @@ const (
 	CodexCLI   = "codex_cli"
 	OpenCode   = "opencode"
 	Pi         = "pi"
+	Muse       = "muse"
 )
 
 // Codex seed behavior recorded in codex_seed_record (environments §7.4,
@@ -179,6 +180,8 @@ type Adapter struct {
 	// names the managed parent: the tool reads <parent>/opencode/ as the
 	// home (environments §7.1).
 	EnvVar string
+	// HomeVariables lists ordered home-relative parents for a multi-variable adapter.
+	HomeVariables [][2]string
 	// ParentVar is true where EnvVar names a parent of the home.
 	ParentVar bool
 	// RootTarget is the root-context file name in the home.
@@ -225,6 +228,15 @@ type Adapter struct {
 // Registry is the closed revision-1 adapter set (environments §7.1).
 // #nosec G101 -- no credential material here: the strings name Keychain service schemes and file roles, never secret values.
 var Registry = []Adapter{
+	{
+		ID: Muse, EnvVar: "XDG_CONFIG_HOME",
+		HomeVariables:   [][2]string{{"XDG_CONFIG_HOME", "config"}, {"XDG_DATA_HOME", "data"}, {"XDG_STATE_HOME", "state"}, {"XDG_CACHE_HOME", "cache"}},
+		SkillsDir:       "data/muse/skills",
+		Passthrough:     map[string][]Passthrough{"default": {{Path: "config/muse/auth.json", Strategy: StrategyFileLink, FileLinkTarget: "auth.json"}}},
+		Seeds:           []string{"config/muse/settings.json", "config/muse/trust.json"},
+		VerifiedRelease: "1.4.1-R4503.1", Probe: []string{"muse", "--version"},
+		CredentialScope: "xdg-config; refresh unverified", GlobalContextCap: "unverified",
+	},
 	{
 		ID:          ClaudeCode,
 		EnvVar:      "CLAUDE_CONFIG_DIR",
@@ -442,6 +454,9 @@ func (a Adapter) ResolveIsolation(configured string, atOrAbovePinned bool) (stri
 // resolveIsolation is ResolveIsolation over an explicit platform so the
 // matrix is asserted on every CI runner, not only on macOS.
 func (a Adapter) resolveIsolation(goos, configured string, atOrAbovePinned bool) (string, error) {
+	if a.ID == Muse && configured == IsolationIsolated {
+		return "", fmt.Errorf("%s: Muse fresh-login isolation is unverified", DiagIsolatedUnsupported)
+	}
 	if a.ID == OpenCode && configured == IsolationIsolated {
 		return "", fmt.Errorf("%s: isolated is a no-op for opencode: auth lives outside the swapped config home", DiagIsolatedUnsupported)
 	}

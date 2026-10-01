@@ -49,7 +49,7 @@ var Classes = []PatternClass{
 
 // ScopeFiles are the root-level files inside the detector scope; every file
 // below context/ is inside it too.
-var ScopeFiles = []string{contextpkg.ManifestName, contextpkg.MCPManifestName, contextpkg.InformativeDoc}
+var ScopeFiles = []string{contextpkg.ManifestName, contextpkg.MCPManifestName, contextpkg.InformativeDoc, "config/muse/settings.json", "config/muse/trust.json"}
 
 // InScope reports whether a snapshot-relative portable path is inside the
 // detector scope.
