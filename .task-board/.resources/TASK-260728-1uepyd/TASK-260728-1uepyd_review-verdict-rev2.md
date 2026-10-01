@@ -1,0 +1,34 @@
+# TASK-260728-1uepyd review verdict — CR rev2 — CHANGES REQUESTED (to-dev)
+
+> Supersedes the earlier ACCEPTED text of this resource written by run RUN-260930-23ca05 (that run hit a provider session limit and never called accept_cr). That text listed the same residual ("case rows compare only source+refspec of the shim-observed fetch") as non-blocking. I ran the call-site mutants it did not run; both survive, so I classify the residual as blocking (F1 below). Its other findings (vector ratios, M1/M2/M3 kills, hygiene) match what I measured.
+
+Candidate: base 5432c85f, tree f7416750 (5 paths). Exact-tree proof: temp-index `git add -A internal/ cmd/ .github/` + `write-tree` on the Story worktree = f74167501c16cd6a9dbb1bf8cfcc679859ba3213. Hosted gate run 36772830506 (headSha 14c65dfc, tree f7416750) = success; its Windows evidence (go-test.json and go-test-served.json) shows every table "N driven, 0 known-gap, 0 bound, 0 skipped".
+
+## What is accepted (verified myself)
+- Pin: SPEC_PIN 23435129 = v1.0.0-rc.13; vector extracted with `git archive v1.0.0-rc.13` into /tmp/spec13 (conformance/v1 only), CURATOR_CONFORMANCE_ROOT pointed at it.
+- Baseline on a byte-identical copy (diff -rq internal/ .github/ = identical): `go test ./internal/buildrepo -run 'ExternalRepositoryAcquisition|TestLocalConfigAndAdministrationAdversarialBoundaries|TestPackIndexConformanceAndExactSSHWrapper' -count=1 -v` rc=0 (136 s, host load 18-60). Ratios: acquisition/cases 12/12, common-fetch-argv 55/55, clean-environment 17/17, forbidden-fetch-features 11/11, local-config-and-refs 15/15 (the two old bounds now driven through AdmitLocal), pack-index 8/8 (the old bound driven through AdmitLocal) — 0 known-gap / 0 bound / 0 skipped everywhere. Count rows 12/17/55/11 in conformance-case-counts.tsv match.
+- Production change (ValidateGitTool moved after the pure request-shape checks in admitNetworkRequest) is correct and necessary: mutant M6 (revert the reorder) is killed (rc=1; malformed-ref-rejected-before-git sees a Git start). Cases that expect errors run through RunPipeline with an Audit hook and an exact phase trace ["exact-source-acquisition"].
+- Windows fix changed the fixture (shim built with `.exe`, real Git via realGitTool), not the probe; no Windows skip, no gap row.
+- No CHANGELOG/LOGBOOK, no stray files, new state read goes through stateread, no Windows-reserved names.
+- Mutants against the argv/env builders and the forbidden-feature predicates, real exit codes, run on the copy with the file restored after each (cmp against the original):
+  - M1 extra fetch flag `--verbose` appended in strictFetchArgs: rc=1, argv[51] mismatch.
+  - M2 env leak `GIT_SSL_NO_VERIFY=1` in cleanGitEnvironment: rc=1, clean-environment fails.
+  - M3 forbidden feature accepted — three shapes: drop `--no-tags` (rc=1, argv + forbidden-fetch-features fail); add `--depth=1` (rc=1); add `--prune` (rc=1).
+
+## Why changes are requested (F1, blocking)
+The consumer proves the BUILDERS (`strictFetchArgs`, `cleanGitEnvironment`), not that the production fetch uses them unchanged. Both call-site mutants survive, with real exit codes:
+- M5 (call site, admission.go:356): `env := append(cleanGitEnvironment(paths, request.Tool, request.Source.Transport), "GIT_SSL_NO_VERIFY=1")` → the acquisition tests (`ExternalRepositoryAcquisition|TestAcquire|TestTagged|TestNetwork`) rc=0, and the FULL `go test ./internal/buildrepo` rc=0, 0 FAIL. A leaked clean-environment variable at the real fetch is accepted.
+- M4 (call site, admission.go:410): `fetchArgs := append([]string{"-c","fetch.prune=true"}, strictFetchArgs(...)...)` → same mask rc=0; the full package fails ONLY in `TestResolvedTransportTotalDeadlineBoundsSlowFetch` (transport_test.go:1195, wall-clock 6 s deadline test, host load 28-100 at the time) which counts fetches by any "fetch" word and does not look at flags — it is not a content kill, so a forbidden feature (`prune`) is accepted at the production entry.
+The rc.13 brief item 1 and the review note require the exact argv/env of the production fetch, "through the production entry or the narrowest production seam that builds the fetch argv and environment". The builder functions are called from production, but nothing pins what the call site hands to Git. The cases test already has the shim in the path of every acquisition (testdata/acquisitiongitshim/main.go logs args), so the fix is small and local to the test side.
+
+### Requested fix (test + shim only, no production change expected)
+1. acquisition_conformance_test.go:512-519 compares only source and refspec of the one logged fetch. Compare the FULL logged fetch argv against the vector's common_fetch_argv resolved per case (the `<operation-private>` repo/hooks paths vary per run, so resolve them from the logged `--git-dir=` / `core.hooksPath=` values after asserting they sit under one private root; `<selected>` = the case transport; askPass = the shim path). Drop `-c protocol.<t>.allow=always` rewriting from the comparison only (the shim logs BEFORE it rewrites, so the logged argv is already unrewritten — keep it that way).
+2. Make the shim (testdata/acquisitiongitshim/main.go, log struct at line ~35) also log its received environment (name=value for the entries Git is given), and compare it in the cases test to the vector's clean_environment plus the transport additions and the platform allowlist (the same `want` map that testExternalRepositoryCleanEnvironment builds). One unexpected or missing variable must fail a case.
+3. Re-run mutants M4 and M5 (call-site argv flag, call-site env leak) and show both killed with real exit codes; keep M1-M3.
+
+## Minor residuals (not blocking, record or fix in the same pass)
+- R-a: acquisition_conformance_test.go:357-358: `helper-selected-transport` evaluates `strings.Contains(source, "ext::")` on the constant https URL, so that clause is vacuous; the real refusal (ParseSource rejecting `ext::`) is covered elsewhere but not by this row.
+- R-b: acquisition_conformance_test.go:494: `testCase.AuditBeforeCache != true || AuditBeforeCompiler != true` on success cases only asserts vector data, not an observed order (RunPipeline is used for error cases only). Either drive the success cases through RunPipeline with an Audit hook that records order before the cache/compile phases, or state it as a bound.
+- R-c: admission_test.go (reject-link-or-special-administration-file): when symlink creation fails the row degrades to a BoundReason; on the hosted Windows lane it was driven (15/15 driven), so no action, but the degrade is silent on a host without symlink privilege.
+
+Host note: the load was 18-100 and a disposable `git checkout` hung in uninterruptible I/O, so the mutant runs used a plain tar copy of the worktree (proved byte-identical for internal/ and .github/) instead of a clone. Worktree itself untouched.
