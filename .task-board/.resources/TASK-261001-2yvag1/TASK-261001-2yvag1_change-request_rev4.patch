@@ -1,0 +1,2045 @@
+diff --git a/.github/ci/conformance-case-counts.tsv b/.github/ci/conformance-case-counts.tsv
+index 753b31af..ea811b60 100644
+--- a/.github/ci/conformance-case-counts.tsv
++++ b/.github/ci/conformance-case-counts.tsv
+@@ -188,3 +188,104 @@ be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	umbrella-provid
+ 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	source-identities/vectors	10
+ 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	system-config-v2/schema-cases	42
+ 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	umbrella-provider-resolution/cases	14
++
++# Muse candidate d373078a; rc.13 rows are unchanged.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v1/schema-cases	61
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v2/schema-cases	27
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	29
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-skill-v7/schema-cases	37
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-skill-v8/schema-cases	66
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	audit-record-v1/schema-cases	3
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	audit-record-v2/schema-cases	3
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	build-drivers/argv-cases	5
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	build-drivers/fixed-environment-cases	3
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	build-drivers/positive-cases	8
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	build-drivers/rejection-cases	77
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	build-drivers/toolchain-cases	12
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	build-source/build-source-cases	10
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	closure/ordering-cases	3
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	content-hashes-v2/vectors	5
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	context-detectors/cases	12
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	context-lock-v1/schema-cases	32
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	context-lock-v2/schema-cases	4
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	context-versions/lock-cases	3
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	context-versions/ordering-cases	1
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	context-versions/range-cases	50
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	context-versions/resolution-cases	23
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	context-versions/satisfies-cases	63
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	context-versions/version-cases	15
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	csk-skill-v7/schema-cases	37
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	csk-skill-v8/schema-cases	66
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-codex-seed/posture-cases	8
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-codex-seed/provisioning-cases	7
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-env-passthrough/allowlist-empty-cases	6
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-env-passthrough/default-resolution-cases	7
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-env-passthrough/schema-cases	4
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-env-passthrough/surfacing-cases	6
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-env-passthrough/surfacing-order-cases	2
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-path-kind-admission/dry_run_cases	3
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-path-kind-admission/mcp_kind_cases	5
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-path-kind-admission/path_boundary_cases	14
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-read-failure/cases	37
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-read-failure/restore	2
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-store-boundary/dry_run_cases	4
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-store-boundary/repair_cases	10
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-store-boundary/resolve_cases	20
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-store-boundary/status_cases	4
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-write-nofollow/cases	11
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments/header-cases	4
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments/materialization-cases	24
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	external-repository-lifecycle/status-repair-gc-cases	5
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	external-repository/lfs-pointers	10
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	external-repository/local-config-and-refs	15
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	external-repository/pack-index	8
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	external-repository/raw-objects	12
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	go-host-execution-policy/capability-evidence-cases	11
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	go-host-execution-policy/identity-and-protocol-cases	14
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	go-host-execution-policy/package-influence-cases	8
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	install/dry-run-cases	3
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	interop/canonical-invalid-vectors	5
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	interop/canonical-valid-vectors	3
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	interop/identifier-vectors	13
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	interop/locale-selector-vectors	10
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	interop/manager-config-vectors	15
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	interop/source-identity-vectors	10
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	launch-env-fragment-v1/schema-cases	50
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	log-response-v3/schema-cases	2
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	manager-config-v2/schema-cases	107
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	manager-config-v2/vectors	56
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	manager-config-v3/schema-cases	5
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	manager-lifecycle/bootstrap-cases	3
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	manager-lifecycle/build-order-cases	1
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	manager-lifecycle/launcher-cases	2
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	manager-lifecycle/upgrade-cases	3
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v2/schema-cases	14
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v3/schema-cases	28
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v4/schema-cases	28
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	29
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	module-roots/vectors	10
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	portable-paths/vectors	18
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	registry-bundle-v2/schema-cases	2
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	registry-client/bootstrap-cases	10
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	registry-client/mirror-comparison-cases	5
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	registry-log-entry-v1/schema-cases	3
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	registry-log-entry-v2/schema-cases	2
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	script-host-execution-policy/executable-identity-cases	8
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	script-host-execution-policy/opt-in-cases	6
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	security-posture/vectors	17
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	shell-hook-trust/vectors	14
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	skill-build-v1/schema-cases	13
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	skillfile-dev-v2/schema-cases	16
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	skillfile-sources-v1/schema-cases	131
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	skillfile-sources-v1/semantic-cases/0	21
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	skillfile-sources-v1/semantic-cases/1	28
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	skillfile-sources-v1/semantic-cases/2	14
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	skillfile-sources-v1/semantic-cases/3	19
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	skillfile-sources-v1/semantic-cases/4	23
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	skillfile-sources-v1/snapshot-cases	3
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	snapshot-acquisition/cases	1
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	source-identities/vectors	10
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	system-config-v2/schema-cases	42
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	umbrella-provider-resolution/cases	14
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-muse/cases	16
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	launch-env-fragment-v3/schema-cases	36
+diff --git a/.github/ci/conformance-gaps.tsv b/.github/ci/conformance-gaps.tsv
+index b24d9bdf..8a149aea 100644
+--- a/.github/ci/conformance-gaps.tsv
++++ b/.github/ci/conformance-gaps.tsv
+@@ -121,3 +121,108 @@ be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	marker/install-
+ be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	marker/install-marker-v4/schema-cases	invalid-marker-sha256-effective-revision-width.json	BUG-260923-2afgyq	marker.Read admits a SHA-256 external revision with the wrong effective width
+ be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	script-host-execution-policy/executable-identity-cases	windows-exec-noncomponent-store-hardlinks	STORY-260925-1v7pvn	The production resolver accepts multiply-linked System32 targets without proving every additional link belongs to the component store.
+ be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	script-host-execution-policy/executable-identity-cases	windows-exec-unowned-file-hardlinks	STORY-260925-1v7pvn	The production resolver accepts a multiply-linked file below captured SystemRoot\System32 without proving the target is platform-owned.
++
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	invalid-empty-backend-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	invalid-missing-backend-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	invalid-missing-backend.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	invalid-missing-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	invalid-missing-isolation.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	invalid-missing-path-on-file-link.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	invalid-missing-path-on-keyring-preferred-file.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	invalid-missing-provenance.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	invalid-missing-source-role.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	invalid-missing-strategy.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	invalid-path-on-ambient-backend.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	invalid-path-on-ambient-strategy.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	invalid-path-on-isolated-per-home-keychain.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	invalid-unknown-backend.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	invalid-unknown-field.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	invalid-unknown-isolation.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	invalid-unknown-provenance.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	invalid-unknown-source-role.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	invalid-unknown-strategy.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	invalid-wrong-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	valid-ambient.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	valid-file-link.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	valid-in-place.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	valid-keyring-preferred-ambient.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	valid-keyring-preferred-file.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	valid-per-home-keychain-isolated.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	audit-record-v2/schema-cases	invalid-v1-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	audit-record-v2/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	audit-record-v2/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	content-hashes-v2/vectors	colliding_v1_pair	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	content-hashes-v2/vectors	empty_tree	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	content-hashes-v2/vectors	nested_nul	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	content-hashes-v2/vectors	ordinary_tree	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	content-hashes-v2/vectors	registry_version_mismatch	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	context-lock-v2/schema-cases	invalid-missing-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	context-lock-v2/schema-cases	invalid-wrong-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	context-lock-v2/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	context-lock-v2/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-codex-seed/posture-cases	a-home-unstripped-under-b	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-codex-seed/posture-cases	b-home-empty-snapshot-no-rows	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-codex-seed/posture-cases	b-home-lists-not-inherited	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-codex-seed/posture-cases	non-codex-home-without-record-no-rows	TASK-260927-1e5qqm	The manager posture row is revision B in this vector; it remains pending the registry flip owned by this leaf.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-codex-seed/posture-cases	pre-rule-home-unstripped-under-b	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-codex-seed/provisioning-cases	b-empty-mcp-servers-table-no-warning	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-codex-seed/provisioning-cases	b-strips-servers-keeps-rest	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-codex-seed/provisioning-cases	b-subtable-only-form-stripped	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-codex-seed/provisioning-cases	b-without-servers-no-warning	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	log-response-v3/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	log-response-v3/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	manager-config-v3/schema-cases	invalid-v3-state-waiver-commit-length.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	manager-config-v3/schema-cases	invalid-waiver-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	manager-config-v3/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	manager-config-v3/schema-cases	valid-v2-state-hash-waiver.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	manager-config-v3/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v4/schema-cases	invalid-external-declared-effective-mismatch.json	BUG-260923-2afgyq	marker.Read admits unequal declared and effective external repository identities
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v4/schema-cases	invalid-marker-local-identity-kind-mismatch.json	BUG-260923-2afgyq	marker.Read admits a local marker identity with the wrong repository identity kind
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v4/schema-cases	invalid-marker-network-identity-kind-mismatch.json	BUG-260923-2afgyq	marker.Read admits a network marker identity with the wrong repository identity kind
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v4/schema-cases	invalid-marker-sha1-effective-revision-width.json	BUG-260923-2afgyq	marker.Read admits a SHA-1 external revision with the wrong effective width
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v4/schema-cases	invalid-marker-sha256-effective-revision-width.json	BUG-260923-2afgyq	marker.Read admits a SHA-256 external revision with the wrong effective width
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	invalid-external-declared-effective-mismatch.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	invalid-external-hardened-execution-policy.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	invalid-external-missing-execution-policy.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	invalid-external-object-width.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	invalid-external-only-build-source.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	invalid-external-receipt-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	invalid-local-hardened-execution-policy.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	invalid-local-missing-execution-policy.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	invalid-local-receipt-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	invalid-marker-local-identity-kind-mismatch.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	invalid-marker-network-identity-kind-mismatch.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	invalid-marker-sha1-effective-revision-width.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	invalid-marker-sha256-effective-revision-width.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	invalid-missing-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	invalid-missing-local-build-source.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	invalid-package-signing.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	invalid-wrong-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	valid-empty-builds.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	valid-external-only-substituted.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	valid-external-only-unsubstituted.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	valid-local-only.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	valid-network-sha1-revision.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	valid-network-sha256-revision.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	valid-network-substitution-branch.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	valid-network-substitution-tag.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	valid-sha256-external.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	valid-untagged-external.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	marker/install-marker-v5/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	registry-bundle-v2/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	registry-bundle-v2/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	registry-log-entry-v2/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	registry-log-entry-v2/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	script-host-execution-policy/executable-identity-cases	windows-exec-noncomponent-store-hardlinks	STORY-260925-1v7pvn	The production resolver accepts multiply-linked System32 targets without proving every additional link belongs to the component store.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	script-host-execution-policy/executable-identity-cases	windows-exec-unowned-file-hardlinks	STORY-260925-1v7pvn	The production resolver accepts a multiply-linked file below captured SystemRoot\System32 without proving the target is platform-owned.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	skillfile-sources-v1/schema-cases	schema-cases/install-marker-v6/invalid-missing-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	skillfile-sources-v1/schema-cases	schema-cases/install-marker-v6/valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	skillfile-sources-v1/schema-cases	schema-cases/skillfile-lock-v2/invalid-missing-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	skillfile-sources-v1/schema-cases	schema-cases/skillfile-lock-v2/invalid-wrong-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	skillfile-sources-v1/schema-cases	schema-cases/skillfile-lock-v2/valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	skillfile-sources-v1/schema-cases	schema-cases/source-audit-v2/invalid-wrong-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	skillfile-sources-v1/schema-cases	schema-cases/source-audit-v2/valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	valid-muse-shared.json	TASK-260917-2tx81l	v3 marker emission requires the separately owned content-hash-v2 implementation; Muse emits the current v2 marker without claiming v3 support.
+diff --git a/cmd/curator/env.go b/cmd/curator/env.go
+index c2446d22..e9cc65bf 100644
+--- a/cmd/curator/env.go
++++ b/cmd/curator/env.go
+@@ -49,6 +49,8 @@ func (c cli) profileNativeHomeResolver() func(string) (string, error) {
+ 			return filepath.Join(userHome, ".codex"), nil
+ 		case envregistry.OpenCode:
+ 			return filepath.Join(userHome, ".config", "opencode"), nil
++		case envregistry.Muse:
++			return filepath.Join(userHome, ".config", "muse"), nil
+ 		case envregistry.Pi:
+ 			return filepath.Join(userHome, ".pi"), nil
+ 		default:
+diff --git a/cmd/curator/env_test.go b/cmd/curator/env_test.go
+index 31dc022d..a089b01e 100644
+--- a/cmd/curator/env_test.go
++++ b/cmd/curator/env_test.go
+@@ -291,6 +291,7 @@ func TestEnvResolveLockedIsolationRequiresMigration(t *testing.T) {
+ func TestEnvStatusMatrix(t *testing.T) {
+ 	source, _ := profileHome(t)
+ 	writeNativeCredentials(t)
++	prepareNativeMuse(t)
+ 	// The §12 provider rows join the matrix: run and session are always
+ 	// reported, and a missing row is non-current — so the post-repair
+ 	// --check plants stub providers, which warn outside the trust
+@@ -318,13 +319,10 @@ func TestEnvStatusMatrix(t *testing.T) {
+ 	if !strings.Contains(stdout, "acme codex_cli: non-current, unprovisioned") {
+ 		t.Fatalf("status rows:\n%s", stdout)
+ 	}
+-	for _, profile := range []string{"acme", "default"} {
+-		for _, env := range []string{"claude_code", "codex_cli", "opencode", "pi"} {
+-			if code, _, stderr := runProfile(t, source, "env", "resolve", env, "--profile", profile, "--repair"); code != exitOK {
+-				t.Fatalf("repair %s %s stderr:\n%s", profile, env, stderr)
+-			}
+-		}
++	if !strings.Contains(stdout, "acme muse: non-current, unprovisioned") {
++		t.Fatalf("Muse status rows:\n%s", stdout)
+ 	}
++	provisionRegisteredEnvironments(t, source, "acme", "default")
+ 	code, stdout, _ = runProfile(t, source, "env", "status", "--check")
+ 	if code != exitOK {
+ 		t.Fatalf("status --check after repair = %d\n%s", code, stdout)
+@@ -332,6 +330,11 @@ func TestEnvStatusMatrix(t *testing.T) {
+ 	if !strings.Contains(stdout, "acme codex_cli: current, provisioned") {
+ 		t.Fatalf("status rows:\n%s", stdout)
+ 	}
++	for _, profile := range []string{"acme", "default"} {
++		if !strings.Contains(stdout, profile+" muse: current, provisioned") {
++			t.Fatalf("Muse status rows:\n%s", stdout)
++		}
++	}
+ 	if !strings.Contains(stdout, "tool codex_cli: recorded") {
+ 		t.Fatalf("tool rows:\n%s", stdout)
+ 	}
+@@ -384,18 +387,13 @@ func TestEnvStatusMatrix(t *testing.T) {
+ func TestEnvStatusRegistryBoundaryPostureAndCheck(t *testing.T) {
+ 	source, home := profileHome(t)
+ 	writeNativeCredentials(t)
++	prepareNativeMuse(t)
+ 	pkg := t.TempDir()
+ 	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
+ 	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
+ 		t.Fatalf("profile install stderr:\n%s", stderr)
+ 	}
+-	for _, profile := range []string{"acme", "default"} {
+-		for _, environment := range []string{"claude_code", "codex_cli", "opencode", "pi"} {
+-			if code, _, stderr := runProfile(t, source, "env", "resolve", environment, "--profile", profile, "--repair"); code != exitOK {
+-				t.Fatalf("repair %s %s stderr:\n%s", profile, environment, stderr)
+-			}
+-		}
+-	}
++	provisionRegisteredEnvironments(t, source, "acme", "default")
+ 	const registryURL = "https://registry.example.test"
+ 	source.cfg.DisableBuiltinRegistries = true
+ 	source.cfg.AuditRegistries = []config.Registry{{Name: "trusted", URL: registryURL, PublicKeys: []string{"ed25519:test"}, Enabled: true}}
+diff --git a/cmd/curator/hook_posture_test.go b/cmd/curator/hook_posture_test.go
+index 4b234fa6..1905a423 100644
+--- a/cmd/curator/hook_posture_test.go
++++ b/cmd/curator/hook_posture_test.go
+@@ -345,18 +345,13 @@ func provisionedEnvMatrix(t *testing.T) (stubConfigSource, string) {
+ 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+ 	source, home := profileHome(t)
+ 	writeNativeCredentials(t)
++	prepareNativeMuse(t)
+ 	pkg := t.TempDir()
+ 	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
+ 	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
+ 		t.Fatalf("install stderr:\n%s", stderr)
+ 	}
+-	for _, profile := range []string{"acme", "default"} {
+-		for _, env := range []string{"claude_code", "codex_cli", "opencode", "pi"} {
+-			if code, _, stderr := runProfile(t, source, "env", "resolve", env, "--profile", profile, "--repair"); code != exitOK {
+-				t.Fatalf("repair %s %s stderr:\n%s", profile, env, stderr)
+-			}
+-		}
+-	}
++	provisionRegisteredEnvironments(t, source, "acme", "default")
+ 	if code, stdout, _ := runProfile(t, source, "env", "status", "--check"); code != exitOK {
+ 		t.Fatalf("env status --check without approvals = %d\n%s", code, stdout)
+ 	}
+diff --git a/cmd/curator/hook_test.go b/cmd/curator/hook_test.go
+index 9be387b6..6dd892c8 100644
+--- a/cmd/curator/hook_test.go
++++ b/cmd/curator/hook_test.go
+@@ -641,18 +641,13 @@ func TestEnvStatusReportsShellHookTrustPosture(t *testing.T) {
+ 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+ 	source, _ := profileHome(t)
+ 	writeNativeCredentials(t)
++	prepareNativeMuse(t)
+ 	pkg := t.TempDir()
+ 	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
+ 	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
+ 		t.Fatalf("install stderr:\n%s", stderr)
+ 	}
+-	for _, profile := range []string{"acme", "default"} {
+-		for _, env := range []string{"claude_code", "codex_cli", "opencode", "pi"} {
+-			if code, _, stderr := runProfile(t, source, "env", "resolve", env, "--profile", profile, "--repair"); code != exitOK {
+-				t.Fatalf("repair %s %s stderr:\n%s", profile, env, stderr)
+-			}
+-		}
+-	}
++	provisionRegisteredEnvironments(t, source, "acme", "default")
+ 	_, _, envPath := hookProject(t, "export CURATOR_PROJECT_ENV=1\n")
+ 
+ 	if code, stdout, _ := runProfile(t, source, "env", "status", "--check"); code != exitOK {
+diff --git a/cmd/curator/muse_test.go b/cmd/curator/muse_test.go
+new file mode 100644
+index 00000000..b88b1dd1
+--- /dev/null
++++ b/cmd/curator/muse_test.go
+@@ -0,0 +1,300 @@
++package main
++
++import (
++	"encoding/json"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"reflect"
++	"runtime"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/conformancecoverage"
++	"github.com/relux-works/curator/internal/envfragment"
++	"github.com/relux-works/curator/internal/envprofile"
++	"github.com/relux-works/curator/internal/envregistry"
++	"github.com/santhosh-tekuri/jsonschema/v6"
++)
++
++// Compile an inert, portable binary: no real Muse or credential store is used.
++func fakeMuse(t *testing.T) string {
++	t.Helper()
++	dir := t.TempDir()
++	src := filepath.Join(dir, "fake.go")
++	program := `package main
++import("encoding/json";"os")
++func main(){if len(os.Args)==2 && os.Args[1]=="--version" {os.Stdout.WriteString("1.4.1-R4503.1\n");return}; env:=map[string]string{};for _,key:=range []string{"HOME","XDG_CONFIG_HOME","XDG_DATA_HOME","XDG_STATE_HOME","XDG_CACHE_HOME"}{env[key]=os.Getenv(key)};json.NewEncoder(os.Stdout).Encode(map[string]any{"env":env,"argv":os.Args[1:]})}`
++	if err := os.WriteFile(src, []byte(program), 0600); err != nil {
++		t.Fatal(err)
++	}
++	name := "muse"
++	if runtime.GOOS == "windows" {
++		name += ".exe"
++	}
++	binary := filepath.Join(dir, name)
++	cmd := exec.Command("go", "build", "-o", binary, src)
++	if output, err := cmd.CombinedOutput(); err != nil {
++		t.Fatalf("build fake Muse: %v %s", err, output)
++	}
++	return binary
++}
++
++// prepareNativeMuse uses only an isolated credential fixture and inert binary.
++func prepareNativeMuse(t *testing.T) {
++	t.Helper()
++	binary := fakeMuse(t)
++	t.Setenv("PATH", filepath.Dir(binary)+string(os.PathListSeparator)+os.Getenv("PATH"))
++	native := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "muse", "auth.json")
++	if err := os.MkdirAll(filepath.Dir(native), 0700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(native, []byte("synthetic-native\n"), 0600); err != nil {
++		t.Fatal(err)
++	}
++}
++
++// Keep status-control fixtures current across the registered adapter set so
++// each --check result measures the posture under test.
++func provisionRegisteredEnvironments(t *testing.T, source stubConfigSource, profiles ...string) {
++	t.Helper()
++	for _, profile := range profiles {
++		for _, adapter := range envregistry.Registry {
++			if code, _, stderr := runProfile(t, source, "env", "resolve", adapter.ID, "--profile", profile, "--repair"); code != exitOK {
++				t.Fatalf("repair %s %s stderr:\n%s", profile, adapter.ID, stderr)
++			}
++		}
++	}
++}
++
++func TestMuseCLIFragmentAndFakeLaunch(t *testing.T) {
++	source, _ := profileHome(t)
++	operatorHome := t.TempDir()
++	binary := fakeMuse(t)
++	t.Setenv("HOME", operatorHome)
++	t.Setenv("PATH", filepath.Dir(binary)+string(os.PathListSeparator)+os.Getenv("PATH"))
++	native := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "muse", "auth.json")
++	if err := os.MkdirAll(filepath.Dir(native), 0700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(native, []byte("synthetic-native\n"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	pkg := t.TempDir()
++	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
++	for _, seed := range []string{"settings.json", "trust.json"} {
++		path := filepath.Join(pkg, "config", "muse", seed)
++		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(path, []byte("{\"fixture\":true}\n"), 0600); err != nil {
++			t.Fatal(err)
++		}
++	}
++	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
++		t.Fatalf("install: %d %s", code, stderr)
++	}
++	code, stdout, stderr := runProfile(t, source, "env", "resolve", "muse", "--repair", "--format", "json")
++	if code != exitOK {
++		t.Fatalf("resolve: %d %s", code, stderr)
++	}
++	var fragment struct {
++		Fragment string            `json:"fragment"`
++		Env      map[string]string `json:"env"`
++	}
++	if err := json.Unmarshal([]byte(stdout), &fragment); err != nil {
++		t.Fatal(err)
++	}
++	if fragment.Fragment != "launch-env-fragment-v3" || len(fragment.Env) != 4 {
++		t.Fatalf("fragment %s", stdout)
++	}
++	home := envprofile.ManagedHomeDir(source.cfg.Home(), "acme", "muse")
++	for key, dir := range map[string]string{"XDG_CONFIG_HOME": "config", "XDG_DATA_HOME": "data", "XDG_STATE_HOME": "state", "XDG_CACHE_HOME": "cache"} {
++		if fragment.Env[key] != filepath.Join(home, dir) {
++			t.Fatalf("%s=%s", key, fragment.Env[key])
++		}
++	}
++	for _, seed := range []string{"settings.json", "trust.json"} {
++		payload, err := os.ReadFile(filepath.Join(home, "config", "muse", seed))
++		if err != nil || string(payload) != "{\"fixture\":true}\n" {
++			t.Fatalf("seed %s: %s %v", seed, payload, err)
++		}
++	}
++	command := exec.Command(binary, "exec", "--", "synthetic prompt")
++	command.Env = os.Environ()
++	// Apply exactly the production resolver's fragment, preserving operator HOME.
++	for key, value := range fragment.Env {
++		var filtered []string
++		for _, entry := range command.Env {
++			if !strings.HasPrefix(entry, key+"=") {
++				filtered = append(filtered, entry)
++			}
++		}
++		command.Env = append(filtered, key+"="+value)
++	}
++	output, err := command.Output()
++	if err != nil {
++		t.Fatal(err)
++	}
++	var observed struct {
++		Env  map[string]string `json:"env"`
++		Argv []string          `json:"argv"`
++	}
++	if err := json.Unmarshal(output, &observed); err != nil {
++		t.Fatal(err)
++	}
++	if observed.Env["HOME"] != operatorHome {
++		t.Fatalf("HOME replaced: %s", output)
++	}
++	for key, value := range fragment.Env {
++		if observed.Env[key] != value {
++			t.Fatalf("child %s=%s", key, observed.Env[key])
++		}
++	}
++	if !reflect.DeepEqual(observed.Argv, []string{"exec", "--", "synthetic prompt"}) {
++		t.Fatalf("argv %v", observed.Argv)
++	}
++	// Tool-owned seeds are not refreshed by repair.
++	seed := filepath.Join(home, "config", "muse", "settings.json")
++	if err := os.WriteFile(seed, []byte("tool-owned\n"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	if code, _, stderr := runProfile(t, source, "env", "resolve", "muse", "--repair"); code != exitOK {
++		t.Fatal(stderr)
++	}
++	if payload, err := os.ReadFile(seed); err != nil || string(payload) != "tool-owned\n" {
++		t.Fatalf("seed refreshed: %s %v", payload, err)
++	}
++	// A fork is refused through the real CLI for both resolve paths.
++	link := filepath.Join(home, "config", "muse", "auth.json")
++	if err := os.Remove(link); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(link, []byte("synthetic-fork\n"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	for _, args := range [][]string{{"env", "resolve", "muse"}, {"env", "resolve", "muse", "--repair"}} {
++		code, stdout, stderr := runProfile(t, source, args...)
++		if code != exitFail || stdout != "" || !strings.Contains(stderr, "environment_") {
++			t.Fatalf("fork accepted: %d %s %s", code, stdout, stderr)
++		}
++	}
++}
++
++func TestMuseProfileSeedSecretAndCredentialRefusals(t *testing.T) {
++	for _, tc := range []struct{ name, file, body string }{{"secret", "settings.json", "Bearer abcdefghijklmnopqrstuvwxyz123456"}, {"auth", "auth.json", "synthetic-credential"}} {
++		t.Run(tc.name, func(t *testing.T) {
++			source, _ := profileHome(t)
++			pkg := t.TempDir()
++			writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
++			path := filepath.Join(pkg, "config", "muse", tc.file)
++			if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(path, []byte(tc.body), 0600); err != nil {
++				t.Fatal(err)
++			}
++			code, _, stderr := runProfile(t, source, "profile", "install", pkg)
++			if code == exitOK {
++				t.Fatalf("unsafe profile accepted: %s", stderr)
++			}
++		})
++	}
++}
++
++func TestMuseFragmentV3PublishedCases(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	digest, err := conformancecoverage.SelectedSuiteManifestSHA256()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if digest != conformancecoverage.MuseCandidateManifestSHA256 {
++		t.Log("selected suite has no fragment-v3 family; rc.13 unchanged")
++		return
++	}
++	compiler := jsonschema.NewCompiler()
++	compiler.UseRegexpEngine(compileECMARegexp)
++	schemaDir := filepath.Join(root, "..", "..", "schemas", "v1")
++	for _, name := range []string{"common", "agent-environment-marker-v1", "agent-context-v1", "agent-mcp-v1", "context-lock-v1", "launch-env-fragment-v3"} {
++		raw, err := os.ReadFile(filepath.Join(schemaDir, name+".schema.json"))
++		if err != nil {
++			t.Fatal(err)
++		}
++		var document map[string]any
++		if err := json.Unmarshal(raw, &document); err != nil {
++			t.Fatal(err)
++		}
++		if err := compiler.AddResource(document["$id"].(string), document); err != nil {
++			t.Fatal(err)
++		}
++	}
++	schema, err := compiler.Compile("https://relux-works.github.io/curator-spec/schemas/v1/launch-env-fragment-v3.schema.json")
++	if err != nil {
++		t.Fatal(err)
++	}
++	raw, err := os.ReadFile(filepath.Join(root, "schema-cases", "index.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var index []struct {
++		Instance string `json:"instance"`
++		Valid    bool   `json:"valid"`
++	}
++	if err := json.Unmarshal(raw, &index); err != nil {
++		t.Fatal(err)
++	}
++	var cases []struct {
++		Instance string `json:"instance"`
++		Valid    bool   `json:"valid"`
++	}
++	for _, entry := range index {
++		if strings.HasPrefix(entry.Instance, "launch-env-fragment-v3/") {
++			cases = append(cases, entry)
++		}
++	}
++	conformancecoverage.Run(t, "launch-env-fragment-v3/schema-cases", cases, func(tc struct {
++		Instance string `json:"instance"`
++		Valid    bool   `json:"valid"`
++	}) string {
++		return strings.TrimPrefix(tc.Instance, "launch-env-fragment-v3/")
++	}, func(t *testing.T, tc struct {
++		Instance string `json:"instance"`
++		Valid    bool   `json:"valid"`
++	}) {
++		raw, err := os.ReadFile(filepath.Join(root, "schema-cases", tc.Instance))
++		if err != nil {
++			t.Fatal(err)
++		}
++		var object any
++		if err := json.Unmarshal(raw, &object); err != nil {
++			t.Fatal(err)
++		}
++		err = schema.Validate(object)
++		if err == nil {
++			var value struct {
++				Environment string            `json:"environment"`
++				Env         map[string]string `json:"env"`
++			}
++			if decodeErr := json.Unmarshal(raw, &value); decodeErr != nil {
++				t.Fatal(decodeErr)
++			}
++			if value.Environment == envregistry.Muse {
++				adapter, lookupErr := envregistry.ByID(value.Environment)
++				if lookupErr != nil {
++					t.Fatal(lookupErr)
++				}
++				nativeRoot := filepath.Join(t.TempDir(), "environments")
++				for name, path := range value.Env {
++					value.Env[name] = filepath.FromSlash(strings.Replace(path, "/manager/environments", nativeRoot, 1))
++				}
++				err = envfragment.CheckBoundary(adapter, nativeRoot, &envfragment.Fragment{Environment: value.Environment, Env: value.Env})
++			}
++		}
++		if (err == nil) != tc.Valid {
++			t.Fatalf("valid=%v: %v", tc.Valid, err)
++		}
++	})
++}
+diff --git a/internal/conformancecoverage/content_hash_v2_gaps_test.go b/internal/conformancecoverage/content_hash_v2_gaps_test.go
+index 8f0bdfdb..513e30fe 100644
+--- a/internal/conformancecoverage/content_hash_v2_gaps_test.go
++++ b/internal/conformancecoverage/content_hash_v2_gaps_test.go
+@@ -53,7 +53,7 @@ func TestContentHashV2GapRowsHaveTheAssignedOwner(t *testing.T) {
+ 		if !isContentHashV2Gap(gap) {
+ 			continue
+ 		}
+-		if suiteID != ContentHashV2CandidateManifestSHA256 {
++		if !IsContentHashV2Candidate(suiteID) {
+ 			t.Errorf("content-hash-v2 gap %s/%s leaked into non-candidate suite %s", gap.Family, gap.CaseID, suiteID)
+ 			continue
+ 		}
+@@ -62,8 +62,12 @@ func TestContentHashV2GapRowsHaveTheAssignedOwner(t *testing.T) {
+ 			t.Errorf("content-hash-v2 gap %s/%s owner = %q, want TASK-260917-2tx81l", gap.Family, gap.CaseID, gap.Owner)
+ 		}
+ 	}
+-	if suiteID == ContentHashV2CandidateManifestSHA256 && ownedRows != 87 {
+-		t.Errorf("candidate content-hash-v2 owned gap rows = %d, want 87", ownedRows)
++	wantRows := 87
++	if suiteID == MuseCandidateManifestSHA256 {
++		wantRows = 88
++	}
++	if IsContentHashV2Candidate(suiteID) && ownedRows != wantRows {
++		t.Errorf("candidate content-hash-v2 owned gap rows = %d, want %d", ownedRows, wantRows)
+ 	}
+ }
+ 
+@@ -79,7 +83,7 @@ func TestContentHashV2FamiliesAreKnownGapsWhenPublished(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	wantCandidate := suiteID == ContentHashV2CandidateManifestSHA256
++	wantCandidate := IsContentHashV2Candidate(suiteID)
+ 	indexPath := filepath.Join(root, "schema-cases", "index.json")
+ 	indexBytes, err := os.ReadFile(indexPath)
+ 	if err != nil {
+@@ -181,7 +185,7 @@ func TestContentHashV2VectorsAreKnownGapsWhenPublished(t *testing.T) {
+ 	path := filepath.Join(root, "vectors", "content-hashes-v2.json")
+ 	data, err := os.ReadFile(path)
+ 	if os.IsNotExist(err) {
+-		if suiteID == ContentHashV2CandidateManifestSHA256 {
++		if IsContentHashV2Candidate(suiteID) {
+ 			t.Fatal("candidate suite lost vectors/content-hashes-v2.json")
+ 		}
+ 		return
+@@ -200,7 +204,7 @@ func TestContentHashV2VectorsAreKnownGapsWhenPublished(t *testing.T) {
+ 		}
+ 		cases = append(cases, contentHashVector{ID: id})
+ 	}
+-	if suiteID == ContentHashV2CandidateManifestSHA256 && len(cases) != 5 {
++	if IsContentHashV2Candidate(suiteID) && len(cases) != 5 {
+ 		t.Fatalf("candidate content-hash-v2 executable vectors = %d, want 5", len(cases))
+ 	}
+ 	RunOutcomes(t, "content-hashes-v2/vectors", cases, func(testCase contentHashVector) string {
+diff --git a/internal/conformancecoverage/coverage.go b/internal/conformancecoverage/coverage.go
+index 9837b84a..59a2ac19 100644
+--- a/internal/conformancecoverage/coverage.go
++++ b/internal/conformancecoverage/coverage.go
+@@ -33,6 +33,14 @@ const defaultSuiteManifestSHA256 = "be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc
+ // the conformance consumers in this change.
+ const ContentHashV2CandidateManifestSHA256 = "950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60"
+ 
++// MuseCandidateManifestSHA256 identifies spec-muse-environment at d373078a.
++const MuseCandidateManifestSHA256 = "bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783"
++
++// IsContentHashV2Candidate identifies suites that publish the separately owned hash-v2 families.
++func IsContentHashV2Candidate(digest string) bool {
++	return digest == ContentHashV2CandidateManifestSHA256 || digest == MuseCandidateManifestSHA256
++}
++
+ // Observation is the result of one published case. A failure may be accepted
+ // only when the ledger names this family and case. Bounds and skips are
+ // explicit classifications, never passes.
+diff --git a/internal/contextaudit/contextaudit.go b/internal/contextaudit/contextaudit.go
+index 93a7be31..bba4fde0 100644
+--- a/internal/contextaudit/contextaudit.go
++++ b/internal/contextaudit/contextaudit.go
+@@ -47,7 +47,7 @@ var Classes = []PatternClass{
+ 
+ // ScopeFiles are the root-level files inside the detector scope; every file
+ // below context/ is inside it too.
+-var ScopeFiles = []string{contextpkg.ManifestName, contextpkg.MCPManifestName, contextpkg.InformativeDoc}
++var ScopeFiles = []string{contextpkg.ManifestName, contextpkg.MCPManifestName, contextpkg.InformativeDoc, "config/muse/settings.json", "config/muse/trust.json"}
+ 
+ // InScope reports whether a snapshot-relative portable path is inside the
+ // detector scope.
+diff --git a/internal/contextlock/schema_conformance_test.go b/internal/contextlock/schema_conformance_test.go
+index 34b086fa..89c14817 100644
+--- a/internal/contextlock/schema_conformance_test.go
++++ b/internal/contextlock/schema_conformance_test.go
+@@ -53,7 +53,7 @@ func TestParseRejectsHashVersionOnFrozenContextLock(t *testing.T) {
+ 		}
+ 		if suiteID, err := conformancecoverage.SelectedSuiteManifestSHA256(); err != nil {
+ 			t.Fatal(err)
+-		} else if suiteID == conformancecoverage.ContentHashV2CandidateManifestSHA256 {
++		} else if conformancecoverage.IsContentHashV2Candidate(suiteID) {
+ 			t.Fatal("candidate suite is missing the frozen context-lock hash-version case")
+ 		}
+ 		return
+diff --git a/internal/contextpkg/contextpkg.go b/internal/contextpkg/contextpkg.go
+index 66148228..5e173aff 100644
+--- a/internal/contextpkg/contextpkg.go
++++ b/internal/contextpkg/contextpkg.go
+@@ -128,6 +128,15 @@ func SortedNames(requirements map[string]Requirement) []string {
+ 
+ // LoadManifest reads and validates the manifest at the package root.
+ func LoadManifest(root string) (*Manifest, error) {
++	// Muse credentials are always native passthrough, never profile content.
++	auth, err := stateread.Lstat(filepath.Join(root, "config", "muse", "auth.json"))
++	if err != nil {
++		return nil, fmt.Errorf("%s: Muse credential source: %w", DiagManifestInvalid, err)
++	}
++	if auth.Kind != stateread.KindAbsent {
++		return nil, invalid(DiagManifestInvalid, "config/muse/auth.json must not be profile content")
++	}
++
+ 	manifestPath := filepath.Join(root, ManifestName)
+ 	file, err := stateread.ReadFile(manifestPath) // #nosec G304 -- package root chosen by the caller
+ 	if err != nil {
+diff --git a/internal/envfragment/envfragment.go b/internal/envfragment/envfragment.go
+index f06ab59a..b3e458f4 100644
+--- a/internal/envfragment/envfragment.go
++++ b/internal/envfragment/envfragment.go
+@@ -63,6 +63,13 @@ type Fragment struct {
+ 	MCP          *MCP
+ }
+ 
++func (f *Fragment) version() string {
++	if f.Environment == envregistry.Muse {
++		return "launch-env-fragment-v3"
++	}
++	return Version
++}
++
+ // channelObject renders one descriptor in the §7.3 grammar: flag with
+ // flag, argument, name exactly when argument is name, and optional with;
+ // config-key with key; variable with variable; file with filename. A
+@@ -99,7 +106,7 @@ func channelObject(channel envregistry.Channel, semantics bool) map[string]any {
+ // Object renders the fragment as a JSON-domain value for CCJ-1 encoding.
+ func (f *Fragment) Object() map[string]any {
+ 	object := map[string]any{
+-		"fragment":    Version,
++		"fragment":    f.version(),
+ 		"environment": f.Environment,
+ 		"profile":     map[string]any{"name": f.Profile, "lock_sha256": f.LockSHA256},
+ 		"permissions": map[string]any{"mode": f.Permissions.Mode, "locked": f.Permissions.Locked, "source": f.Permissions.Source},
+@@ -155,6 +162,12 @@ func (f *Fragment) JSON() ([]byte, error) {
+ // (§10.2, §10.3).
+ func (f *Fragment) variables(adapter envregistry.Adapter) [][2]string {
+ 	var out [][2]string
++	if len(adapter.HomeVariables) > 0 {
++		for _, variable := range adapter.HomeVariables {
++			out = append(out, [2]string{variable[0], f.Env[variable[0]]})
++		}
++		return out
++	}
+ 	if value, ok := f.Env[adapter.EnvVar]; ok {
+ 		out = append(out, [2]string{adapter.EnvVar, value})
+ 	}
+@@ -333,6 +346,21 @@ func BoundEnvNames(names []string, passable []string) []string {
+ // root. Only the profile-name path segment is profile-derived.
+ func CheckBoundary(adapter envregistry.Adapter, envRoot string, fragment *Fragment) error {
+ 	allowed := map[string]bool{adapter.EnvVar: true}
++	for _, variable := range adapter.HomeVariables {
++		allowed[variable[0]] = true
++	}
++	if adapter.ID == envregistry.Muse {
++		if fragment.SystemPrompt != nil || fragment.MCP != nil {
++			return fmt.Errorf("muse channels are unverified")
++		}
++		config := fragment.Env["XDG_CONFIG_HOME"]
++		parent := filepath.Dir(config)
++		for _, variable := range adapter.HomeVariables {
++			if fragment.Env[variable[0]] != filepath.Join(parent, variable[1]) {
++				return fmt.Errorf("muse variable %s does not name its declared parent", variable[0])
++			}
++		}
++	}
+ 	collect := func(channels []envregistry.Channel) {
+ 		for _, channel := range channels {
+ 			if channel.Kind == envregistry.KindVariable {
+diff --git a/internal/envfragment/muse_test.go b/internal/envfragment/muse_test.go
+new file mode 100644
+index 00000000..f4bfbab8
+--- /dev/null
++++ b/internal/envfragment/muse_test.go
+@@ -0,0 +1,47 @@
++package envfragment
++
++import (
++	"github.com/relux-works/curator/internal/envregistry"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++func TestMuseFragmentBoundary(t *testing.T) {
++	adapter, err := envregistry.ByID(envregistry.Muse)
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, state := range []string{"valid", "missing-data", "wrong-parent", "HOME", "channel"} {
++		t.Run(state, func(t *testing.T) {
++			root := filepath.Join(t.TempDir(), "environments")
++			parent := filepath.Join(root, "acme", "muse")
++			fragment := &Fragment{Environment: envregistry.Muse, Env: map[string]string{}}
++			for _, variable := range adapter.HomeVariables {
++				fragment.Env[variable[0]] = filepath.Join(parent, variable[1])
++			}
++			switch state {
++			case "missing-data":
++				delete(fragment.Env, "XDG_DATA_HOME")
++			case "wrong-parent":
++				fragment.Env["XDG_DATA_HOME"] = filepath.Join(parent, "config")
++			case "HOME":
++				fragment.Env["HOME"] = parent
++			case "channel":
++				fragment.SystemPrompt = &SystemPrompt{Path: filepath.Join(parent, "unverified.md")}
++			}
++			err := CheckBoundary(adapter, root, fragment)
++			if (err == nil) != (state == "valid") {
++				t.Fatalf("boundary=%v", err)
++			}
++			if state == "valid" {
++				lines := strings.Split(strings.TrimSpace(string(fragment.EnvFormat(adapter))), "\n")
++				for i, variable := range adapter.HomeVariables {
++					if lines[i] != variable[0]+"="+filepath.Join(parent, variable[1]) {
++						t.Fatalf("variable order: %v", lines)
++					}
++				}
++			}
++		})
++	}
++}
+diff --git a/internal/envprofile/global.go b/internal/envprofile/global.go
+index ca42daf1..29ebeac1 100644
+--- a/internal/envprofile/global.go
++++ b/internal/envprofile/global.go
+@@ -249,6 +249,16 @@ func preflightManagedProfile(home, profile string, policy Policy, machine envreg
+ 	}
+ 	precedence := policy.Precedence()
+ 	for _, adapter := range envregistry.Registry {
++		// Muse is managed-home-only and is provisioned by an explicit resolve.
++		// Global skill changes reconcile an existing Muse home without requiring
++		// every operator to have logged into the newly admitted tool.
++		participates, err := managedAdapterParticipates(home, profile, adapter)
++		if err != nil {
++			return err
++		}
++		if !participates {
++			continue
++		}
+ 		req := ResolveRequest{Home: home, Profile: profile, EnvID: adapter.ID, Machine: machine, Repair: true, Policy: policy, NativeHomeOf: nativeHomeOf}
+ 		verdict := verifyHome(&req, adapter, source, lock, hash)
+ 		if verdict.markerReadFailed {
+@@ -290,7 +300,17 @@ func syncManagedProfile(home, profile string, policy Policy, machine envregistry
+ 	var results []EntryResult
+ 	var failures []string
+ 	for _, adapter := range envregistry.Registry {
+-		_, err := Resolve(ResolveRequest{
++		// Muse is managed-home-only and is provisioned by an explicit resolve.
++		// Global skill changes reconcile an existing Muse home without requiring
++		// every operator to have logged into the newly admitted tool.
++		participates, err := managedAdapterParticipates(home, profile, adapter)
++		if err != nil {
++			return nil, err
++		}
++		if !participates {
++			continue
++		}
++		_, err = Resolve(ResolveRequest{
+ 			Home: home, Profile: profile, EnvID: adapter.ID, Machine: machine,
+ 			Repair: true, Policy: policy, NativeHomeOf: nativeHomeOf,
+ 		})
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index d12ab96e..942a8f42 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -110,6 +110,7 @@ type ResolveRequest struct {
+ 	// in tests. Production requests leave them nil and use the shared reader.
+ 	passthroughLstat     func(string) (os.FileInfo, error)
+ 	passthroughReadlink  func(string) (string, error)
++	museTargetStat       func(string) (os.FileInfo, error)
+ 	readStateFile        func(string) (stateread.File, error)
+ 	readRegularFile      func(string) (stateread.File, error)
+ 	boundaryOwnerLookup  pathboundary.OwnerLookup
+@@ -152,6 +153,12 @@ func (req *ResolveRequest) nativeHome(id string) (string, error) {
+ 	if req.NativeHomeOf != nil {
+ 		return req.NativeHomeOf(id)
+ 	}
++	if id == envregistry.Muse {
++		if req.OperatorXDG != "" {
++			return filepath.Join(req.OperatorXDG, "muse"), nil
++		}
++		return museNativeHome()
++	}
+ 	adapter, ok := adapterByID(id)
+ 	if !ok {
+ 		return "", fmt.Errorf("%s: unregistered environment %q", envregistry.DiagUnknown, id)
+@@ -411,6 +418,9 @@ func referencedBlocked(homeDir string, prior *envmarker.Marker) (bool, error) {
+ // file (§8.1); referenced module files link into the immutable store
+ // entries so link-target identity verifies them lock-free (§10.1).
+ func (p *homePlan) rootContext(req *ResolveRequest, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, packages map[string]contextmaterialize.Package, surfaces map[string]envmarker.Surface) error {
++	if p.adapter.RootTarget == "" {
++		return nil
++	}
+ 	target := p.adapter.RootTarget
+ 	if p.form == envregistry.FormReferenced {
+ 		files, written, err := contextmaterialize.Referenced(lock, hash, precedence, p.adapter.ID, packages)
+@@ -829,7 +839,14 @@ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bo
+ 				bundle.claudeInit = true
+ 				continue
+ 			}
+-			path := filepath.Join(native, filepath.FromSlash(seed))
++			seedRoot := native
++			if adapter.ID == envregistry.Muse {
++				seedRoot, err = req.museSeedRoot()
++				if err != nil {
++					return nil, err
++				}
++			}
++			path := filepath.Join(seedRoot, filepath.FromSlash(seed))
+ 			readRegularFile := req.readRegularFile
+ 			if readRegularFile == nil {
+ 				readRegularFile = stateread.ReadRegularFile
+@@ -1165,6 +1182,13 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
+ 	if err := preflightManagedWriteTargets(root, homeRel, want); err != nil {
+ 		return err
+ 	}
++	if plan.adapter.ID == envregistry.Muse {
++		for _, directory := range []string{"config/muse", "data/muse", "state", "cache"} {
++			if _, err := managedDirectory(root, managedJoin(homeRel, directory)); err != nil {
++				return err
++			}
++		}
++	}
+ 	if _, err := managedDirectory(root, homeRel); err != nil {
+ 		return err
+ 	}
+@@ -1495,11 +1519,15 @@ func ensureCredentialLink(root, homeRel, path, target string, recorded bool, mig
+ 	}
+ 	info := metadata.Info
+ 	if info.Mode()&os.ModeSymlink != 0 {
+-		got, err := os.Readlink(full)
++		link, err := stateread.Readlink(full)
+ 		if err != nil {
+ 			return fmt.Errorf("%s: %s link target cannot be read: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full)
+ 		}
+-		if got == target {
++		got := link.Target
++		if !filepath.IsAbs(got) {
++			got = filepath.Join(filepath.Dir(full), got)
++		}
++		if filepath.Clean(got) == filepath.Clean(target) {
+ 			return nil
+ 		}
+ 		if !recorded {
+@@ -2017,6 +2045,17 @@ func (v *verification) checkPassthrough(req *ResolveRequest, plan *homePlan, mar
+ 			continue
+ 		}
+ 		full := filepath.Join(plan.homeDir, filepath.FromSlash(path))
++		if plan.adapter.ID == envregistry.Muse {
++			state := req.inspectMuseAuth(full, target)
++			if !state.live && (state.err == nil || !strings.Contains(state.err.Error(), envregistry.DiagPassthroughUnreadable)) {
++				v.reasons = append(v.reasons, envregistry.DiagPassthroughDetached+": "+path)
++			}
++			if state.err != nil {
++				v.reasons = append(v.reasons, state.err.Error())
++				v.passthroughReadFailed = strings.Contains(state.err.Error(), envregistry.DiagPassthroughUnreadable)
++			}
++			continue
++		}
+ 		var metadata stateread.Metadata
+ 		if req.passthroughLstat == nil {
+ 			metadata, err = stateread.Lstat(full)
+@@ -2209,6 +2248,12 @@ func buildFragment(req *ResolveRequest, adapter envregistry.Adapter, verdict *ve
+ 		Placement:   req.Policy.Precedence().Placement,
+ 		Env:         map[string]string{adapter.EnvVar: plan.parent},
+ 	}
++	if len(adapter.HomeVariables) > 0 {
++		fragment.Env = map[string]string{}
++		for _, variable := range adapter.HomeVariables {
++			fragment.Env[variable[0]] = filepath.Join(plan.parent, variable[1])
++		}
++	}
+ 	if req.Machine.PermissionsLocked {
+ 		fragment.Permissions = envfragment.Permissions{Mode: "native", Locked: true, Source: "global"}
+ 	} else if mode, configured := req.Machine.Permissions[req.Profile]; configured {
+@@ -2279,6 +2324,8 @@ func firstResolveNotice(adapter envregistry.Adapter, plan *homePlan) string {
+ 		steps = "Log in unless the native credential is shared through; pass --skip-git-repo-check outside a git repository."
+ 	case envregistry.OpenCode:
+ 		steps = "Apply the resolved fragment by hand (OPENCODE_CONFIG names the MCP file); skills come from the machine-current profile, split-brain by construction."
++	case envregistry.Muse:
++		steps = "Muse first-run seed coverage and credential refresh semantics are unverified; foreign personal context remains ambient."
+ 	case envregistry.Pi:
+ 		steps = "No trust wall; authentication is shared from the native home."
+ 	}
+@@ -2543,6 +2590,14 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
+ 		}
+ 		return nil, fmt.Errorf("%s: %v", DiagRepairFailed, err)
+ 	}
++	if adapter.ID == envregistry.Muse {
++		for path, target := range passthroughLinks {
++			state := req.inspectMuseAuth(filepath.Join(plan.homeDir, filepath.FromSlash(path)), target)
++			if state.err != nil {
++				return nil, state.err
++			}
++		}
++	}
+ 	for path := range passthroughLinks {
+ 		writePaths[path] = true
+ 	}
+@@ -2732,6 +2787,9 @@ func copyTree(source, root, destination string) error {
+ // naming package and path, and under error the first skipped module
+ // refuses the assembly with context_system_module_transitive.
+ func (p *homePlan) systemPrompt(req *ResolveRequest, lock *contextlock.Lock, precedence contextmaterialize.Precedence, packages map[string]contextmaterialize.Package, surfaces map[string]envmarker.Surface) error {
++	if p.adapter.ID == envregistry.Muse {
++		return nil
++	}
+ 	document, written, dropped, err := contextmaterialize.SystemPrompt(lock, precedence, p.adapter.ID, packages, req.Policy.Admission())
+ 	if err != nil {
+ 		return err
+@@ -2801,6 +2859,9 @@ func (p *homePlan) skills(req *ResolveRequest, skills []skillOf, surfaces map[st
+ // adapter, managed homes only, with the sorted env_names union carried
+ // for the fragment.
+ func (p *homePlan) mcp(req *ResolveRequest, servers []contextmaterialize.MCPServer, surfaces map[string]envmarker.Surface) error {
++	if p.adapter.ID == envregistry.Muse {
++		return nil
++	}
+ 	path, document, written, err := contextmaterialize.MCPFile(p.adapter.ID, servers)
+ 	if err != nil {
+ 		return err
+diff --git a/internal/envprofile/muse.go b/internal/envprofile/muse.go
+new file mode 100644
+index 00000000..9402f997
+--- /dev/null
++++ b/internal/envprofile/muse.go
+@@ -0,0 +1,136 @@
++package envprofile
++
++import (
++	"fmt"
++	"os"
++	"path/filepath"
++
++	"github.com/relux-works/curator/internal/envmarker"
++	"github.com/relux-works/curator/internal/envregistry"
++	"github.com/relux-works/curator/internal/stateread"
++)
++
++func museNativeHome() (string, error) {
++	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
++		return filepath.Join(xdg, "muse"), nil
++	}
++	home, err := os.UserHomeDir()
++	if err != nil {
++		return "", err
++	}
++	return filepath.Join(home, ".config", "muse"), nil
++}
++
++// Seeds come only from the locked root snapshot, never from native credentials
++// or overlays. Store validation and the profile audit precede this read.
++func (req *ResolveRequest) museSeedRoot() (string, error) {
++	_, lock, _, err := loadResolveInputs(req.Home, req.Profile)
++	if err != nil {
++		return "", err
++	}
++	for _, member := range lock.Members {
++		if member.Kind == "context" && member.Name == lock.Root && !member.Overlay {
++			return packageRoot(newGitManager(req.Home).entryPath(req.Home, resolvedOf(member)), member.Directory), nil
++		}
++	}
++	return "", fmt.Errorf("%s: root snapshot is missing", envregistry.DiagSeedUnreadable)
++}
++
++type museAuthState struct {
++	live bool
++	err  error
++}
++
++// inspectMuseAuth never reads credential bytes. A fork is a conflict and a
++// failed observation is unreadable, while a missing entry can be re-linked only
++// after establishing a readable regular native target. Repair preflights this
++// before any managed-home writes; verification calls it on every resolve.
++func (req *ResolveRequest) inspectMuseAuth(full, target string) museAuthState {
++	unreadable := func(err error) museAuthState {
++		return museAuthState{err: fmt.Errorf("%s: %s: %v", envregistry.DiagPassthroughUnreadable, full, err)}
++	}
++	conflict := func(reason string) museAuthState {
++		return museAuthState{err: fmt.Errorf("%s: %s: %s", envregistry.DiagCredentialConflict, full, reason)}
++	}
++	var entry stateread.Metadata
++	var err error
++	if req.passthroughLstat == nil {
++		entry, err = stateread.Lstat(full)
++	} else {
++		entry, err = stateread.LstatWith(full, req.passthroughLstat)
++	}
++	if err != nil {
++		return unreadable(err)
++	}
++	live := false
++	if entry.Kind == stateread.KindPresent {
++		if entry.Info == nil {
++			return unreadable(fmt.Errorf("missing metadata"))
++		}
++		switch {
++		case entry.Info.Mode()&os.ModeSymlink != 0:
++			var link stateread.Link
++			if req.passthroughReadlink == nil {
++				link, err = stateread.Readlink(full)
++			} else {
++				link, err = stateread.ReadlinkWith(full, req.passthroughReadlink)
++			}
++			if err != nil {
++				return unreadable(err)
++			}
++			if link.Kind != stateread.KindPresent {
++				return unreadable(fmt.Errorf("link changed during inspection"))
++			}
++			got := link.Target
++			if !filepath.IsAbs(got) {
++				got = filepath.Join(filepath.Dir(full), got)
++			}
++			if filepath.Clean(got) != filepath.Clean(target) {
++				return conflict("unexpected credential link target")
++			}
++			live = true
++		case entry.Info.IsDir():
++			directory, err := stateread.ReadDir(full)
++			if err != nil {
++				return unreadable(err)
++			}
++			if len(directory.Entries) != 0 {
++				return conflict("non-empty credential directory")
++			}
++		default:
++			return conflict("credential link replaced by a file; preserve both stores")
++		}
++	} else if entry.Kind != stateread.KindAbsent {
++		return unreadable(fmt.Errorf("unknown entry state %q", entry.Kind))
++	}
++	metadata, err := stateread.StatWith(target, req.museTargetStat)
++	if err != nil {
++		return unreadable(err)
++	}
++	if metadata.Kind == stateread.KindAbsent {
++		return conflict("native credential target is absent")
++	}
++	if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
++		return unreadable(fmt.Errorf("native target metadata unavailable"))
++	}
++	if !metadata.Info.Mode().IsRegular() {
++		return conflict("native credential target is not a regular file")
++	}
++	if err := stateread.CheckReadableRegularFile(target); err != nil {
++		return unreadable(err)
++	}
++	return museAuthState{live: live}
++}
++
++// managedAdapterParticipates keeps Muse's explicit provisioning boundary in
++// global reconciliation. An unreadable marker is never treated as absent.
++func managedAdapterParticipates(home, profile string, adapter envregistry.Adapter) (bool, error) {
++	if adapter.ID != envregistry.Muse {
++		return true, nil
++	}
++	metadata, err := stateread.Lstat(filepath.Join(ManagedHomeDir(home, profile, adapter.ID), envmarker.Name))
++	if err != nil {
++		return false, err
++	}
++	return metadata.Kind == stateread.KindPresent, nil
++}
+diff --git a/internal/envprofile/muse_test.go b/internal/envprofile/muse_test.go
+new file mode 100644
+index 00000000..26b2cce2
+--- /dev/null
++++ b/internal/envprofile/muse_test.go
+@@ -0,0 +1,413 @@
++package envprofile
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/conformancecoverage"
++	"github.com/relux-works/curator/internal/envregistry"
++)
++
++const museSuiteDigest = "bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783"
++
++type museVector struct {
++	Name     string `json:"name"`
++	State    string `json:"state"`
++	Repair   bool   `json:"repair"`
++	Expected struct {
++		Action       string `json:"action"`
++		Diagnostic   string `json:"diagnostic"`
++		Emit         bool   `json:"emit_fragment"`
++		Status       string `json:"status"`
++		BytesChanged bool   `json:"credential_bytes_changed"`
++	} `json:"expected"`
++}
++
++func museFixture(t *testing.T) (*managedFixture, string, string) {
++	t.Helper()
++	requireLinkCapability(t)
++	fx := writeManagedFixture(t, "acme")
++	fx.native[envregistry.Muse] = t.TempDir()
++	native := filepath.Join(fx.native[envregistry.Muse], "auth.json")
++	if err := os.WriteFile(native, []byte("synthetic-native\n"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	req := fx.request(envregistry.Muse)
++	req.Repair = true
++	if _, err := Resolve(req); err != nil {
++		t.Fatal(err)
++	}
++	return fx, filepath.Join(ManagedHomeDir(fx.home, fx.profile, envregistry.Muse), "config", "muse", "auth.json"), native
++}
++
++// All 16 source-derived states drive Resolve; StatusOf shares verifyHome.
++func TestMusePublishedLinkStates(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	digest, err := conformancecoverage.SelectedSuiteManifestSHA256()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if digest != museSuiteDigest {
++		t.Log("selected suite has no Muse family; rc.13 remains unchanged")
++		return
++	}
++	payload, err := os.ReadFile(filepath.Join(root, "vectors", "environments-muse.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var vectors struct {
++		Cases []museVector `json:"cases"`
++	}
++	if err := json.Unmarshal(payload, &vectors); err != nil {
++		t.Fatal(err)
++	}
++	conformancecoverage.Run(t, "environments-muse/cases", vectors.Cases, func(tc museVector) string { return tc.Name }, driveMuseLinkState)
++}
++
++func driveMuseLinkState(t *testing.T, tc museVector) {
++	t.Helper()
++	fx, link, native := museFixture(t)
++	req := fx.request(envregistry.Muse)
++	req.Repair = tc.Repair
++	switch tc.State {
++	case "live":
++	case "write-through-refresh":
++		if err := os.WriteFile(link, []byte("synthetic-refreshed\n"), 0600); err != nil {
++			t.Fatal(err)
++		}
++	case "missing-link":
++		if err := os.Remove(link); err != nil {
++			t.Fatal(err)
++		}
++	case "temp-rename-fork":
++		fork := filepath.Join(filepath.Dir(link), "fork.tmp")
++		if err := os.WriteFile(fork, []byte("synthetic-fork\n"), 0600); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Rename(fork, link); err != nil {
++			t.Fatal(err)
++		}
++	case "retargeted-link":
++		other := filepath.Join(t.TempDir(), "other.json")
++		if err := os.WriteFile(other, []byte("synthetic-other\n"), 0600); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Remove(link); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Symlink(other, link); err != nil {
++			t.Fatal(err)
++		}
++	case "dangling-target":
++		if err := os.Remove(native); err != nil {
++			t.Fatal(err)
++		}
++	case "metadata-unreadable":
++		req.passthroughLstat = func(string) (os.FileInfo, error) { return nil, os.ErrPermission }
++	case "target-unreadable":
++		req.museTargetStat = func(string) (os.FileInfo, error) { return nil, os.ErrPermission }
++	default:
++		t.Fatalf("undriven state %q", tc.State)
++	}
++	beforeNative, nativeErr := os.ReadFile(native)
++	beforeLink, linkErr := os.ReadFile(link)
++	beforeText, _ := os.Readlink(link)
++	statusReq := statusRequest(fx)
++	statusReq.passthroughLstat = req.passthroughLstat
++	statusReq.passthroughReadlink = req.passthroughReadlink
++	statusReq.museTargetStat = req.museTargetStat
++	status, err := StatusOf(statusReq)
++	if err != nil {
++		t.Fatal(err)
++	}
++	row := findHome(status, fx.profile, envregistry.Muse)
++	if row == nil {
++		t.Fatal("Muse status row missing")
++	}
++	reasons := strings.Join(row.Findings, "; ")
++	if tc.Expected.Status == "current" {
++		if !row.Current {
++			t.Fatalf("status non-current: %s", reasons)
++		}
++	} else if row.Current || !strings.Contains(reasons, tc.Expected.Status) {
++		t.Fatalf("status %q, want %s", reasons, tc.Expected.Status)
++	}
++	if tc.Expected.Status == envregistry.DiagPassthroughUnreadable && strings.Contains(reasons, envregistry.DiagPassthroughDetached) {
++		t.Fatalf("unreadable classified detached: %s", reasons)
++	}
++	result, err := Resolve(req)
++	if tc.Expected.Diagnostic == "" {
++		if err != nil {
++			t.Fatal(err)
++		}
++	} else if err == nil || !strings.HasPrefix(err.Error(), tc.Expected.Diagnostic+":") {
++		t.Fatalf("error %v, want %s", err, tc.Expected.Diagnostic)
++	}
++	emitted := result != nil && len(result.Document) > 0
++	if emitted != tc.Expected.Emit {
++		t.Fatalf("fragment emitted=%v, want %v", emitted, tc.Expected.Emit)
++	}
++	afterNative, afterNativeErr := os.ReadFile(native)
++	afterLink, afterLinkErr := os.ReadFile(link)
++	if string(beforeNative) != string(afterNative) || (nativeErr == nil) != (afterNativeErr == nil) {
++		t.Fatal("native bytes changed")
++	}
++	if tc.Expected.Action == "relink" {
++		if target, err := os.Readlink(link); err != nil || target != native {
++			t.Fatalf("not relinked: %s %v", target, err)
++		}
++	} else {
++		afterText, _ := os.Readlink(link)
++		if beforeText != afterText || string(beforeLink) != string(afterLink) || (linkErr == nil) != (afterLinkErr == nil) {
++			t.Fatal("managed credential changed")
++		}
++	}
++	if tc.Expected.BytesChanged {
++		t.Fatal("vector unexpectedly permits credential changes")
++	}
++}
++
++func TestMuseForkRefusedRegression(t *testing.T) {
++	for _, repair := range []bool{false, true} {
++		tc := museVector{State: "temp-rename-fork", Repair: repair}
++		tc.Expected.Status = envregistry.DiagPassthroughDetached
++		tc.Expected.Diagnostic = DiagHomeStale
++		if repair {
++			tc.Expected.Diagnostic = envregistry.DiagCredentialConflict
++		}
++		driveMuseLinkState(t, tc)
++	}
++}
++
++func TestMuseDirectoriesAndIsolation(t *testing.T) {
++	fx, _, _ := museFixture(t)
++	home := ManagedHomeDir(fx.home, fx.profile, envregistry.Muse)
++	for _, dir := range []string{"config/muse", "data/muse", "state", "cache"} {
++		info, err := os.Stat(filepath.Join(home, filepath.FromSlash(dir)))
++		if err != nil || !info.IsDir() {
++			t.Fatalf("missing directory %s: %v", dir, err)
++		}
++	}
++	marker := readManagedMarker(t, fx, envregistry.Muse)
++	for _, surface := range []string{"root-context", "system-prompt", "mcp"} {
++		if _, ok := marker.Surfaces[surface]; ok {
++			t.Fatalf("unverified surface %s emitted", surface)
++		}
++	}
++	req := fx.request(envregistry.Muse)
++	req.Machine.Isolation = map[string]map[string]string{fx.profile: {envregistry.Muse: "isolated"}}
++	if _, err := Resolve(req); err == nil || !strings.Contains(err.Error(), envregistry.DiagIsolatedUnsupported) {
++		t.Fatalf("isolated: %v", err)
++	}
++}
++
++func TestMuseAuthRepairAdditionalStates(t *testing.T) {
++	for _, state := range []string{"empty-directory", "nonempty-directory", "relative-link", "target-directory", "readlink-error", "missing-link-missing-target", "config-parent-link"} {
++		t.Run(state, func(t *testing.T) {
++			fx, link, native := museFixture(t)
++			req := fx.request(envregistry.Muse)
++			req.Repair = true
++			switch state {
++			case "empty-directory", "nonempty-directory":
++				if err := os.Remove(link); err != nil {
++					t.Fatal(err)
++				}
++				if err := os.Mkdir(link, 0700); err != nil {
++					t.Fatal(err)
++				}
++				if state == "nonempty-directory" {
++					if err := os.WriteFile(filepath.Join(link, "keep"), []byte("preserve"), 0600); err != nil {
++						t.Fatal(err)
++					}
++				}
++			case "relative-link":
++				if err := os.Remove(link); err != nil {
++					t.Fatal(err)
++				}
++				relative, err := filepath.Rel(filepath.Dir(link), native)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if err := os.Symlink(relative, link); err != nil {
++					t.Fatal(err)
++				}
++			case "target-directory":
++				if err := os.Remove(native); err != nil {
++					t.Fatal(err)
++				}
++				if err := os.Mkdir(native, 0700); err != nil {
++					t.Fatal(err)
++				}
++			case "readlink-error":
++				req.passthroughReadlink = func(string) (string, error) { return "", os.ErrPermission }
++			case "missing-link-missing-target":
++				if err := os.Remove(link); err != nil {
++					t.Fatal(err)
++				}
++				if err := os.Remove(native); err != nil {
++					t.Fatal(err)
++				}
++			case "config-parent-link":
++				config := filepath.Dir(filepath.Dir(link))
++				if err := os.RemoveAll(config); err != nil {
++					t.Fatal(err)
++				}
++				outside := t.TempDir()
++				if err := os.Mkdir(filepath.Join(outside, "muse"), 0700); err != nil {
++					t.Fatal(err)
++				}
++				if err := os.Symlink(outside, config); err != nil {
++					t.Fatal(err)
++				}
++			}
++			result, err := Resolve(req)
++			wantSuccess := state == "empty-directory" || state == "relative-link"
++			if (err == nil) != wantSuccess {
++				t.Fatalf("repair: %v", err)
++			}
++			if !wantSuccess && result != nil && len(result.Document) > 0 {
++				t.Fatal("refusal emitted fragment")
++			}
++			if wantSuccess {
++				if _, err := os.Readlink(link); err != nil {
++					t.Fatal(err)
++				}
++			}
++		})
++	}
++}
++
++func TestMuseGlobalReconciliationUsesExplicitProvisioning(t *testing.T) {
++	adapter, err := envregistry.ByID(envregistry.Muse)
++	if err != nil {
++		t.Fatal(err)
++	}
++	home := t.TempDir()
++	participates, err := managedAdapterParticipates(home, "acme", adapter)
++	if err != nil || participates {
++		t.Fatalf("unprovisioned Muse participated: %v %v", participates, err)
++	}
++	fx, _, _ := museFixture(t)
++	participates, err = managedAdapterParticipates(fx.home, fx.profile, adapter)
++	if err != nil || !participates {
++		t.Fatalf("provisioned Muse missing: %v %v", participates, err)
++	}
++}
++
++func TestMusePublishedRegistryLayout(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	digest, err := conformancecoverage.SelectedSuiteManifestSHA256()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if digest != museSuiteDigest {
++		t.Log("selected suite has no Muse registry/layout; rc.13 unchanged")
++		return
++	}
++	payload, err := os.ReadFile(filepath.Join(root, "vectors", "environments-muse.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var vector struct {
++		Registry struct {
++			Environment    string            `json:"environment"`
++			Variables      map[string]string `json:"home_variables"`
++			ReplaceHOME    bool              `json:"replace_HOME"`
++			RootTarget     *string           `json:"root_context_target"`
++			RootVerified   bool              `json:"root_context_verified"`
++			Skills         string            `json:"skills_target"`
++			SkillsVerified bool              `json:"skills_discovery_verified"`
++			Version        string            `json:"tool_version"`
++			Refresh        string            `json:"refresh_semantics"`
++			Gap            string            `json:"isolation_gap"`
++		} `json:"registry"`
++		Fixtures struct {
++			Layout string `json:"layout"`
++		} `json:"fixtures"`
++	}
++	if err := json.Unmarshal(payload, &vector); err != nil {
++		t.Fatal(err)
++	}
++	adapter, err := envregistry.ByID(vector.Registry.Environment)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if vector.Registry.ReplaceHOME || vector.Registry.RootTarget != nil || vector.Registry.RootVerified || vector.Registry.SkillsVerified || adapter.RootTarget != "" || adapter.SkillsDir != vector.Registry.Skills || adapter.VerifiedRelease != vector.Registry.Version || vector.Registry.Refresh != "unverified" || vector.Registry.Gap != "foreign-personal-context" {
++		t.Fatalf("registry evidence bounds do not match: %+v", vector.Registry)
++	}
++	fx, _, native := museFixture(t)
++	req := fx.request(envregistry.Muse)
++	result, err := Resolve(req)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var fragment struct {
++		Env map[string]string `json:"env"`
++	}
++	if err := json.Unmarshal(result.Document, &fragment); err != nil {
++		t.Fatal(err)
++	}
++	parent := ManagedHomeDir(fx.home, fx.profile, envregistry.Muse)
++	if len(fragment.Env) != len(vector.Registry.Variables) {
++		t.Fatal("XDG variable set changed")
++	}
++	for name, expected := range vector.Registry.Variables {
++		if fragment.Env[name] != filepath.Join(parent, filepath.Base(expected)) {
++			t.Fatalf("XDG variable %s not at source-defined parent", name)
++		}
++	}
++	raw, err := os.ReadFile(filepath.Join(root, vector.Fixtures.Layout))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var layout struct {
++		Directories  []string `json:"tool_directories"`
++		ManagedAuth  string   `json:"managed_auth"`
++		LinkKind     string   `json:"link_kind"`
++		Seeds        []string `json:"seeds"`
++		HOMEReplaced bool     `json:"HOME_replaced"`
++	}
++	if err := json.Unmarshal(raw, &layout); err != nil {
++		t.Fatal(err)
++	}
++	if layout.HOMEReplaced || layout.LinkKind != envregistry.StrategyFileLink || len(layout.Seeds) != len(adapter.Seeds) {
++		t.Fatalf("layout contract %+v", layout)
++	}
++	for i, seed := range layout.Seeds {
++		if adapter.Seeds[i] != seed {
++			t.Fatalf("seed contract %s", seed)
++		}
++	}
++	for _, directory := range layout.Directories {
++		info, err := os.Stat(filepath.Join(parent, filepath.FromSlash(directory)))
++		if err != nil || !info.IsDir() {
++			t.Fatalf("layout directory %s: %v", directory, err)
++		}
++	}
++	target, err := os.Readlink(filepath.Join(parent, filepath.FromSlash(layout.ManagedAuth)))
++	if err != nil || target != native {
++		t.Fatalf("layout auth link %s: %v", target, err)
++	}
++	marker := readManagedMarker(t, fx, envregistry.Muse)
++	surface := marker.Surfaces["skills"]
++	if len(surface.Paths) != 1 || surface.Paths[0] != vector.Registry.Skills+"/myskill" {
++		t.Fatalf("skills surface: %+v", surface)
++	}
++	status, err := StatusOf(statusRequest(fx))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !strings.Contains(strings.Join(status.Notes, ";"), vector.Registry.Gap) {
++		t.Fatal("standing isolation gap missing")
++	}
++	t.Log("registry/layout production checks exercised; exec/serve permission mappings remain the separately owned launcher integration gap")
++}
+diff --git a/internal/envprofile/status.go b/internal/envprofile/status.go
+index f57a256a..2bb91fdc 100644
+--- a/internal/envprofile/status.go
++++ b/internal/envprofile/status.go
+@@ -293,6 +293,7 @@ type StatusRequest struct {
+ 	// production-entry tests of failed lstat/readlink operations.
+ 	passthroughLstat    func(string) (os.FileInfo, error)
+ 	passthroughReadlink func(string) (string, error)
++	museTargetStat      func(string) (os.FileInfo, error)
+ 	readStateFile       func(string) (stateread.File, error)
+ 	readRegularFile     func(string) (stateread.File, error)
+ 	readStateDirectory  func(string) (stateread.Directory, error)
+@@ -315,6 +316,7 @@ func (req *StatusRequest) resolve() ResolveRequest {
+ 		codexSeedRevisionForTest: req.codexSeedRevisionForTest,
+ 		passthroughLstat:         req.passthroughLstat,
+ 		passthroughReadlink:      req.passthroughReadlink,
++		museTargetStat:           req.museTargetStat,
+ 		readStateFile:            req.readStateFile,
+ 		readRegularFile:          req.readRegularFile,
+ 		boundaryOwnerLookup:      req.boundaryOwnerLookup,
+@@ -334,6 +336,7 @@ func StatusOf(req StatusRequest) (*Status, error) {
+ 		Revision:   shippedCodexSeedRevision,
+ 		Provenance: "shipped",
+ 	}}
++	status.Notes = append(status.Notes, "Muse: foreign-personal-context isolation gap; root context, skills discovery, refresh semantics, and state/cache internal layouts are unverified")
+ 	status.Notes = append(status.Notes, "opencode skills come from the machine-current profile, split-brain by construction (§7.1)")
+ 	if req.Policy.SecurityPosture == config.SecurityPostureHardened && len(req.Policy.AllowedSources) == 0 {
+ 		status.NonCurrent = true
+@@ -1021,6 +1024,8 @@ func scopeHomes(req StatusRequest, installed map[string]bool) ([]ScopeHome, []St
+ 			native := ""
+ 			if req.NativeHomeOf != nil {
+ 				native, _ = req.NativeHomeOf(adapter.ID)
++			} else if adapter.ID == envregistry.Muse {
++				native, _ = museNativeHome()
+ 			} else if legacy, ok := adapterByID(adapter.ID); ok {
+ 				native, _ = NativeHome(legacy)
+ 			}
+diff --git a/internal/envprofile/surfacing_test.go b/internal/envprofile/surfacing_test.go
+index d9c05f86..70e7dbf1 100644
+--- a/internal/envprofile/surfacing_test.go
++++ b/internal/envprofile/surfacing_test.go
+@@ -9,6 +9,7 @@ import (
+ 	"testing"
+ 
+ 	"github.com/relux-works/curator/internal/contextstore"
++	"github.com/relux-works/curator/internal/envregistry"
+ )
+ 
+ func gitLookPath() (string, error) { return exec.LookPath("git") }
+@@ -196,17 +197,21 @@ func TestAllowlistWarningOperations(t *testing.T) {
+ // environment status non-current.
+ func TestEmptyAllowlistWarningLeavesCurrentStatusCurrent(t *testing.T) {
+ 	fx := writeManagedFixture(t, "acme")
++	fx.native[envregistry.Muse] = t.TempDir()
++	if err := os.WriteFile(filepath.Join(fx.native[envregistry.Muse], "auth.json"), []byte("synthetic-native\n"), 0600); err != nil {
++		t.Fatal(err)
++	}
+ 	seedLiveNativeCredentials(t, fx)
+ 	if err := EnsureDefault(fx.home); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	for _, profile := range []string{"acme", DefaultProfile} {
+-		for _, environment := range []string{"claude_code", "codex_cli", "opencode", "pi"} {
+-			req := fx.request(environment)
++		for _, adapter := range envregistry.Registry {
++			req := fx.request(adapter.ID)
+ 			req.Profile = profile
+ 			req.Repair = true
+ 			if _, err := Resolve(req); err != nil {
+-				t.Fatalf("provision %s/%s: %v", profile, environment, err)
++				t.Fatalf("provision %s/%s: %v", profile, adapter.ID, err)
+ 			}
+ 		}
+ 	}
+diff --git a/internal/envregistry/envregistry.go b/internal/envregistry/envregistry.go
+index 9abd9f94..89097c82 100644
+--- a/internal/envregistry/envregistry.go
++++ b/internal/envregistry/envregistry.go
+@@ -22,6 +22,7 @@ const (
+ 	CodexCLI   = "codex_cli"
+ 	OpenCode   = "opencode"
+ 	Pi         = "pi"
++	Muse       = "muse"
+ )
+ 
+ // Codex seed behavior recorded in codex_seed_record (environments §7.4,
+@@ -179,6 +180,8 @@ type Adapter struct {
+ 	// names the managed parent: the tool reads <parent>/opencode/ as the
+ 	// home (environments §7.1).
+ 	EnvVar string
++	// HomeVariables lists ordered home-relative parents for a multi-variable adapter.
++	HomeVariables [][2]string
+ 	// ParentVar is true where EnvVar names a parent of the home.
+ 	ParentVar bool
+ 	// RootTarget is the root-context file name in the home.
+@@ -225,6 +228,15 @@ type Adapter struct {
+ // Registry is the closed revision-1 adapter set (environments §7.1).
+ // #nosec G101 -- no credential material here: the strings name Keychain service schemes and file roles, never secret values.
+ var Registry = []Adapter{
++	{
++		ID: Muse, EnvVar: "XDG_CONFIG_HOME",
++		HomeVariables:   [][2]string{{"XDG_CONFIG_HOME", "config"}, {"XDG_DATA_HOME", "data"}, {"XDG_STATE_HOME", "state"}, {"XDG_CACHE_HOME", "cache"}},
++		SkillsDir:       "data/muse/skills",
++		Passthrough:     map[string][]Passthrough{"default": {{Path: "config/muse/auth.json", Strategy: StrategyFileLink, FileLinkTarget: "auth.json"}}},
++		Seeds:           []string{"config/muse/settings.json", "config/muse/trust.json"},
++		VerifiedRelease: "1.4.1-R4503.1", Probe: []string{"muse", "--version"},
++		CredentialScope: "xdg-config; refresh unverified", GlobalContextCap: "unverified",
++	},
+ 	{
+ 		ID:          ClaudeCode,
+ 		EnvVar:      "CLAUDE_CONFIG_DIR",
+@@ -442,6 +454,9 @@ func (a Adapter) ResolveIsolation(configured string, atOrAbovePinned bool) (stri
+ // resolveIsolation is ResolveIsolation over an explicit platform so the
+ // matrix is asserted on every CI runner, not only on macOS.
+ func (a Adapter) resolveIsolation(goos, configured string, atOrAbovePinned bool) (string, error) {
++	if a.ID == Muse && configured == IsolationIsolated {
++		return "", fmt.Errorf("%s: Muse fresh-login isolation is unverified", DiagIsolatedUnsupported)
++	}
+ 	if a.ID == OpenCode && configured == IsolationIsolated {
+ 		return "", fmt.Errorf("%s: isolated is a no-op for opencode: auth lives outside the swapped config home", DiagIsolatedUnsupported)
+ 	}
+diff --git a/internal/envregistry/envregistry_test.go b/internal/envregistry/envregistry_test.go
+index b1ed4489..e02d2053 100644
+--- a/internal/envregistry/envregistry_test.go
++++ b/internal/envregistry/envregistry_test.go
+@@ -15,8 +15,8 @@ func mustAdapter(t *testing.T, id string) Adapter {
+ }
+ 
+ func TestRegistryClosed(t *testing.T) {
+-	if len(Registry) != 4 {
+-		t.Fatalf("the revision-1 registry holds %d adapters, want 4", len(Registry))
++	if len(Registry) != 5 {
++		t.Fatalf("the revision-1 registry holds %d adapters, want 5", len(Registry))
+ 	}
+ 	seen := map[string]bool{}
+ 	for _, adapter := range Registry {
+@@ -24,11 +24,11 @@ func TestRegistryClosed(t *testing.T) {
+ 			t.Fatalf("duplicate adapter %s", adapter.ID)
+ 		}
+ 		seen[adapter.ID] = true
+-		if adapter.EnvVar == "" || adapter.RootTarget == "" {
++		if adapter.EnvVar == "" || (adapter.RootTarget == "" && adapter.ID != Muse) {
+ 			t.Fatalf("adapter %s names no home variable or root target", adapter.ID)
+ 		}
+ 	}
+-	for _, id := range []string{ClaudeCode, CodexCLI, OpenCode, Pi} {
++	for _, id := range []string{ClaudeCode, CodexCLI, OpenCode, Pi, Muse} {
+ 		if !seen[id] {
+ 			t.Fatalf("adapter %s is missing from the registry", id)
+ 		}
+@@ -290,3 +290,15 @@ func TestShadowAcknowledgment(t *testing.T) {
+ 		t.Fatal("an acknowledgment covers exactly the recorded path")
+ 	}
+ }
++
++func TestMuseHasNoAdmittedRootContextForm(t *testing.T) {
++	adapter := mustAdapter(t, Muse)
++	if adapter.RootTarget != "" || len(adapter.Forms) != 0 {
++		t.Fatalf("unverified Muse root context admitted: %+v", adapter)
++	}
++	for _, form := range []string{FormMonolithic, FormReferenced} {
++		if _, err := adapter.ResolveForm(form); err == nil || !strings.Contains(err.Error(), DiagFormUnsupported) {
++			t.Fatalf("form %s admitted: %v", form, err)
++		}
++	}
++}
+diff --git a/internal/marker/content_hash_v2_marker_cases_test.go b/internal/marker/content_hash_v2_marker_cases_test.go
+index 9cbd4aba..817ec94a 100644
+--- a/internal/marker/content_hash_v2_marker_cases_test.go
++++ b/internal/marker/content_hash_v2_marker_cases_test.go
+@@ -54,7 +54,7 @@ func TestReadRejectsHashVersionOnFrozenMarkerV3(t *testing.T) {
+ 		}
+ 		if suiteID, err := conformancecoverage.SelectedSuiteManifestSHA256(); err != nil {
+ 			t.Fatal(err)
+-		} else if suiteID == conformancecoverage.ContentHashV2CandidateManifestSHA256 {
++		} else if conformancecoverage.IsContentHashV2Candidate(suiteID) {
+ 			t.Fatal("candidate suite is missing the frozen marker v3 hash-version case")
+ 		}
+ 		return
+diff --git a/internal/registry/schema_conformance_test.go b/internal/registry/schema_conformance_test.go
+index ddc14fd9..7582bc47 100644
+--- a/internal/registry/schema_conformance_test.go
++++ b/internal/registry/schema_conformance_test.go
+@@ -48,7 +48,7 @@ func readFrozenRegistrySchemaCase(t *testing.T, root, family, caseName string) (
+ 		}
+ 		if suiteID, err := conformancecoverage.SelectedSuiteManifestSHA256(); err != nil {
+ 			t.Fatal(err)
+-		} else if suiteID == conformancecoverage.ContentHashV2CandidateManifestSHA256 {
++		} else if conformancecoverage.IsContentHashV2Candidate(suiteID) {
+ 			t.Fatalf("candidate suite is missing frozen case %s/%s", family, caseName)
+ 		}
+ 		return nil, false
+diff --git a/internal/stateread/stateread.go b/internal/stateread/stateread.go
+index 2a922198..21405d84 100644
+--- a/internal/stateread/stateread.go
++++ b/internal/stateread/stateread.go
+@@ -236,3 +236,36 @@ func missingPathWith(path string, cause error, isNotExist func(error) bool) bool
+ 		parent = next
+ 	}
+ }
++
++// StatWith is Stat with an injectable metadata reader. Nil uses os.Stat.
++func StatWith(path string, readPath func(string) (os.FileInfo, error)) (Metadata, error) {
++	if readPath == nil {
++		readPath = os.Stat
++	}
++	info, err := readPath(path)
++	if err == nil {
++		return Metadata{Kind: KindPresent, Info: info}, nil
++	}
++	if missingPath(path, err) {
++		return Metadata{Kind: KindAbsent}, nil
++	}
++	return Metadata{Kind: KindUnreadable}, &Error{Kind: KindUnreadable, Path: path, Cause: err}
++}
++
++// CheckReadableRegularFile establishes readability without consuming any bytes.
++// The open-file metadata also detects a non-regular target raced into place.
++func CheckReadableRegularFile(path string) error {
++	file, err := os.Open(path) // #nosec G304 -- caller-selected state path; no bytes consumed
++	if err != nil {
++		return UnusableError(path, err)
++	}
++	defer func() { _ = file.Close() }()
++	info, err := file.Stat()
++	if err != nil {
++		return UnusableError(path, err)
++	}
++	if !info.Mode().IsRegular() {
++		return UnusableError(path, fmt.Errorf("target is not regular"))
++	}
++	return nil
++}
+diff --git a/internal/stateread/stateread_test.go b/internal/stateread/stateread_test.go
+index 673283c8..ba4d97ec 100644
+--- a/internal/stateread/stateread_test.go
++++ b/internal/stateread/stateread_test.go
+@@ -132,3 +132,24 @@ func TestReadsDistinguishAbsentFromBlockedParent(t *testing.T) {
+ 		})
+ 	}
+ }
++
++func TestReadableRegularFileMetadataOnly(t *testing.T) {
++	path := filepath.Join(t.TempDir(), "auth.json")
++	if err := os.WriteFile(path, []byte("synthetic"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	if err := CheckReadableRegularFile(path); err != nil {
++		t.Fatal(err)
++	}
++	if err := CheckReadableRegularFile(filepath.Dir(path)); err == nil {
++		t.Fatal("directory accepted as readable regular credential")
++	}
++	absent, err := StatWith(path+".missing", nil)
++	if err != nil || absent.Kind != KindAbsent {
++		t.Fatalf("absence: %v %v", absent, err)
++	}
++	unreadable, err := StatWith(path, func(string) (os.FileInfo, error) { return nil, os.ErrPermission })
++	if err == nil || unreadable.Kind != KindUnreadable {
++		t.Fatalf("failed observation is absence: %v %v", unreadable, err)
++	}
++}
+diff --git a/internal/testcli/cli.go b/internal/testcli/cli.go
+index 6b965ccf..d5cd744f 100644
+--- a/internal/testcli/cli.go
++++ b/internal/testcli/cli.go
+@@ -19,6 +19,7 @@ import (
+ 	"runtime"
+ 	"strings"
+ 	"sync"
++	"syscall"
+ 	"testing"
+ 	"time"
+ 
+@@ -214,6 +215,12 @@ func RunWithHTTPSBrokerSecret(t *testing.T, env []string, transportEnv, secret,
+ 	cancelServe()
+ 	serveErr := <-serveDone
+ 	closeErr := transport.Close()
++	// The exited child may have refused the prompt or answered a username
++	// without reading the secret. Only that closed-pipe delivery result is
++	// benign here; callers still assert the child's exact exit and output.
++	if brokerPipeClosed(serveErr) {
++		serveErr = nil
++	}
+ 	if serveErr != nil || closeErr != nil {
+ 		t.Fatalf("HTTPS broker secret transport: %v", errors.Join(serveErr, closeErr))
+ 	}
+@@ -227,6 +234,29 @@ func RunWithHTTPSBrokerSecret(t *testing.T, env []string, transportEnv, secret,
+ 	return code, stdout.String(), cmd.Env
+ }
+ 
++// Do not hide another transport error joined with the closed-pipe result.
++func brokerPipeClosed(err error) bool {
++	if err == nil {
++		return false
++	}
++	if joined, ok := err.(interface{ Unwrap() []error }); ok {
++		causes := joined.Unwrap()
++		if len(causes) == 0 {
++			return false
++		}
++		for _, cause := range causes {
++			if !brokerPipeClosed(cause) {
++				return false
++			}
++		}
++		return true
++	}
++	if cause := errors.Unwrap(err); cause != nil {
++		return brokerPipeClosed(cause)
++	}
++	return err == syscall.EPIPE
++}
++
+ func withEnvironmentValue(environment []string, name, value string) []string {
+ 	prefix := name + "="
+ 	result := make([]string, 0, len(environment)+1)
+diff --git a/internal/testcli/cli_test.go b/internal/testcli/cli_test.go
+new file mode 100644
+index 00000000..b0c96f34
+--- /dev/null
++++ b/internal/testcli/cli_test.go
+@@ -0,0 +1,75 @@
++package testcli
++
++import (
++	"errors"
++	"os"
++	"strconv"
++	"strings"
++	"syscall"
++	"testing"
++
++	"github.com/relux-works/curator/internal/buildrepo"
++)
++
++const brokerUnusedChildExit = "CURATOR_TEST_BROKER_UNUSED_CHILD_EXIT"
++
++func TestMain(m *testing.M) {
++	if value, ok := os.LookupEnv(brokerUnusedChildExit); ok {
++		code, err := strconv.Atoi(value)
++		if err != nil {
++			os.Exit(2)
++		}
++		if code == 0 {
++			_, _ = os.Stdout.WriteString("transport-unused\n")
++		}
++		os.Exit(code)
++	}
++	os.Exit(m.Run())
++}
++
++func TestBrokerPipeClosedPreservesOtherErrors(t *testing.T) {
++	pipeErr := &os.PathError{Op: "write", Path: "synthetic-pipe", Err: syscall.EPIPE}
++	for _, tc := range []struct {
++		name string
++		err  error
++		want bool
++	}{
++		{"nil", nil, false},
++		{"closed-pipe", pipeErr, true},
++		{"joined-closed-pipe", errors.Join(pipeErr), true},
++		{"permission", os.ErrPermission, false},
++		{"closed-file", os.ErrClosed, false},
++		{"joined-other-error", errors.Join(pipeErr, os.ErrPermission), false},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			if got := brokerPipeClosed(tc.err); got != tc.want {
++				t.Fatalf("closed pipe = %v, want %v", got, tc.want)
++			}
++		})
++	}
++}
++
++// A child may refuse a prompt (or answer a username) without consuming the
++// secret handle. A payload larger than the pipe buffer forces the writer to
++// observe the closed reader, independent of child/writer scheduling on Unix.
++func TestHTTPSBrokerChildMayExitWithoutReadingSecret(t *testing.T) {
++	binary, err := os.Executable()
++	if err != nil {
++		t.Fatal(err)
++	}
++	secret := strings.Repeat("synthetic-secret", 1<<16)
++	for _, wantCode := range []int{0, 1} {
++		t.Run(strconv.Itoa(wantCode), func(t *testing.T) {
++			code, stdout, _ := RunWithHTTPSBrokerSecret(t,
++				[]string{brokerUnusedChildExit + "=" + strconv.Itoa(wantCode)},
++				buildrepo.EnvHTTPSBrokerTransport, secret, binary)
++			wantOutput := ""
++			if wantCode == 0 {
++				wantOutput = "transport-unused\n"
++			}
++			if code != wantCode || stdout != wantOutput {
++				t.Fatalf("child result = (%d, %q), want (%d, %q)", code, stdout, wantCode, wantOutput)
++			}
++		})
++	}
++}
