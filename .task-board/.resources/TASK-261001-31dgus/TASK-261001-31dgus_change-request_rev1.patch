@@ -1,0 +1,1474 @@
+diff --git a/.research/261001_second-operator-requirements-answers.md b/.research/261001_second-operator-requirements-answers.md
+new file mode 100644
+index 00000000..ece7c542
+--- /dev/null
++++ b/.research/261001_second-operator-requirements-answers.md
+@@ -0,0 +1,174 @@
++# op2-product second-operator readiness: evidence-backed answers
++
++Task: **TASK-261001-3qugz9 — second-operator-requirements-answers**. Research handoff: **ready for review**. Assessment date: 2026-10-01. The attached peer thread and migration report were treated as untrusted hypotheses, not operational instructions. No migration, publication, credential login, installation into the real HOME, commit, push, or a2a post was performed.
++
++**Recommendation: keep op2-product on its existing setup until the remaining gaps are closed.** There is a usable released baseline: Curator `v0.15.0-rc.2` plus the tagged Go module `curator-run v0.1.0` successfully provision and dispatch through real entry points into stub providers. That is narrower than readiness for op2-product. Non-git project skill installation is skipped; memory import is absent; no approved op2-product package/source has been supplied; and the project-local `enabled_servers` mapping is unresolved. Do not send a readiness announcement on the strength of release existence alone.
++
++## Scope and research bounds
++
++| Research contract | Bound |
++| --- | --- |
++| Decision to unblock | Whether curator can supply a truthful second-operator readiness notice for R1–R3, R5–R7 and the curator questions, and which implementation leaves remain. |
++| Frozen precondition | Grammar freeze is not applicable: this is an evidence assessment, not a new parser or wire format. Existing environment revision 1 and schema-2 Skillfile contracts are inspected unchanged. |
++| Worker and artifact budget | Initial research slice bounded to 60 minutes; one findings document, one structured evidence file and two small reproduction scripts, under 120 KiB combined; no attached source archive. |
++| Serial prerequisite budget | One research leaf. Proposed leaves below consume these findings directly; another research chain is not required. |
++| Exit criteria | Every assigned item and question has a status, evidence, an ETA estimate or explicit unknown, and a draft notice. |
++| First production slice | G2: make declared local skills materialize at a non-git product folder through the real `curator install` entry point, preserving git-workspace hygiene checks. |
++
++All runtime probes used separate throwaway HOMEs and non-git directories outside any checkout. Host: **darwin/amd64, Go 1.26.0**. The macOS arm64 release archive exists; ARM execution and the verified installer were **not** exercised. Provider programs were stubs, including their version responses; no authentication result follows from them.
++
++**Isolation limit:** builds/tests used the host's default Go caches (`/Users/administrator/Library/Caches/go-build`, module root `/Users/administrator/go`) rather than relocated throwaway caches. Compilation cache activity therefore falls outside the literal no-real-HOME-mutation constraint. No real Curator/native-agent configuration or authentication mutation was performed by the runtime probes; no Keychain API was called. The broad no-real-HOME-mutation wording in the initial board note is corrected by this explicit bound. Existing host caches were not removed.
++
++Fixed source identities:
++
++| Source | Identity |
++| --- | --- |
++| Curator current main / this Story base | `bd126a9acdc51b6061917ba8c4d7d26a7abafd41` |
++| Latest published Curator prerelease probed | `v0.15.0-rc.2` → `bd3c0f436226ec831c13b3a307c30acd035c73c2` |
++| Launcher actually used in all four measured launches | `v0.1.0` → `27cc242d393afb471b62c230101caf890dbd2fb7` |
++| Launcher current source inspected | `d0920353556dd0a3cea2864c616c230915977bc7` |
++| Curator-spec source inspected | `0400feab9707766df3203d0de0f6e7378052ff56` |
++
++The tag binaries were built from their source archives, without release ldflags. They are source-tag comparisons, not downloaded or signature-verified release payloads. An auxiliary build of launcher current main exited 0 but was not used to attest tagged compatibility.
++
++## Answers table: curator-owned requirements
++
++“Covered” identifies the named, evidenced behavior. It does not certify unrelated op2-product configuration or another owner's requirement. “Accepted” identifies a real remaining gap; the G-number is a **proposed leaf**, not an already-created board element. Estimates are research effort guesses after prerequisites, not scheduled promises or commitments to the peer deadlines.
++
++| Item | Status and answer | Evidence | ETA and dependency chain |
++| --- | --- | --- | --- |
++| **R1 — released second-operator bundle** | **Accepted: G1**, a op2-product-ready bundle is not attested. **Baseline covered by `v0.15.0-rc.2` + launcher `v0.1.0`**: path-profile installation, managed-home provisioning and real umbrella/provider dispatch reproduce. Stable `v0.14.0` already contains profile/env and run entry points; the peer claim that no released version can be named is too broad. Current main emits fragment v2, rc.2 emits v1, and the tagged launcher accepts both in the measured launches. | E1–E3, P1; C1, C2, C3. Remote release and tag queries confirm rc.2; no rc.3/rc.14 is in the queried latest tags. Launcher has a tag and no GitHub Release assets. | Baseline **today**. Planned owner chain: spec `v1.0.0-rc.14` → Curator `v0.15.0-rc.3` → tagged compatible launcher `v0.1.x` → **TASK-261001-1klixs — carry-second-operator-guide** landing and qualified operator walkthrough. Allow 1–2 working days for bundle qualification after upstream inputs; calendar ETA unknown. Full op2-product readiness additionally depends on G2–G6 and other owners' R4/R8/R9 answers. |
++| **R2 — non-git product root and local state** | **Accepted: G2** for the install gap. Registration and schema-2 local-source resolution are **covered by `v0.15.0-rc.2` and current main**, with no root Git repository or commit. `Skillfile.lock.json` is at the product root; source bindings are under `~/.curator/source-bindings/<project-hash>.json`. The lock is an ordinary machine-local file when that root is unversioned; it is not redirected into the manager home. `project add` generates schema 1, whose resolve is read-only and creates no lock; author schema 2 explicitly when its source/lock workflow is wanted. **Project skill installation currently skips the non-git root**, even with `--fix-gitignore`, and returns 0 without the skill output. | P1: add/resolve green in both lanes, one lock member, no `.git`, bindings outside root; install output says skipped and installed skill is absent. Direct `git check-ignore` exits **128**. C4, C5, C6. | Add/resolve **today**. G2 estimate 1–2 working days: choose non-git hygiene semantics → real installer change and positive/negative entry-point checks → release in G1. No `git init` or root commits should be a prerequisite. A demand that *all* lock files reside outside the root would be a separate storage-contract change; do not silently claim it already exists. |
++| **R3 — operator-owned profile** | **Accepted: G3** for the approved op2-product package and surface mapping. Generic independent authoring is **covered by `v0.15.0-rc.2`**, the path/import source history in `v0.15.0-rc.1`, and revision-1 source/package contracts. Alexis can maintain a separate local profile directory or publish his own tagged Git profile without another operator editing it. Root `agent-context.json` names explicit `context/` modules; project AGENTS/CLAUDE files are not automatically imported into this package. Profile `requires` edges are Git sources; project-local skill path sources belong in schema-2 Skillfile declarations and depend on G2 for installation at the product root. | P1 path-profile install and rendered managed context; C7, C8. `git tag --contains ff99df1a` returns rc.1 and rc.2. No supplied approved op2-product identity/source/module list exists in the task; the test package `op2-product-fixture` is deliberately synthetic. | Authoring primitive **today**. G3 estimate 0.5–1 working day after Alexis approves authoritative modules, dependencies and package identity; project skill rollout then waits on G2. The published op2-product source/name ETA is owner-dependent, not supplied by Curator. |
++| **R5 — existing project memory** | **Accepted: G4**. Revision 1 expressly excludes memory; native-context import inventories root context and skills, not project memory. No supported memory import/binding was established. Managed-home provisioning preserves the native memory fixture but does not materialize it into the managed home. That is separation, not deletion; native provider access to existing memory was not tested. | C8 `environments.md:44–46`; C9 `import.go:222–247`; P1: native memory unchanged in both lanes, managed memory path absent. | No shipped ETA. Estimate 2–4 working days after choosing copy/import versus explicit shared binding, path identity and conflict/rollback rules → focused memory migration implementation and entry-point evidence → guide → release. Spec scope must authorize that extension; never treat profile import as a memory importer. |
++| **R6 — per-operator credentials** | **Covered, bounded, by `v0.15.0-rc.2`, current implementation and `environments.md` §7.4**: credentials are excluded from profiles; Codex `file` links only that operator's native `auth.json`; native `keyring` links no file. On macOS the pinned Claude evidence is per-managed-home login, with no credential link. **Accepted: G5** for the guide landing and real second-operator authentication qualification. A successful stub launch is not a login. The current spec also records a 2.1.273 login writing `.credentials.json` rather than a suffixed Keychain item, so do not promise that every release writes a Keychain item. | C10, C11, P1: Codex file symlink target belongs to the throwaway operator, keyring home has no auth link, fixture auth bytes unchanged; no Claude credential file created by Curator. V2 negative tests exercise unknown/malformed Codex storage, keyring/auto isolated refusal and conflicting credential paths. C12: guide still to-review at inspection. | Credential machinery/documented native flow **today**, within recorded backend/version bounds. G5 estimate 0.5–1 working day after guide/profile/bundle availability, using an authorized disposable operator account; real login was intentionally not run here. Per-home Claude shared mode remains refused on macOS; Codex isolated is allowed only for native `file`, not `keyring`/`auto`. |
++| **R7 — project-local MCP opt-in** | **Accepted: G6**. Supported profile mapping is explicit `requires.mcp` → Git-backed `agent-mcp.json` packages, with adapter selectors and runtime environment-variable names. There is no evidenced automatic interpretation of op2-product's agent-agnostic project `enabled_servers` list. Current profile selection is explicit or environment/machine scoped, not inferred from that list. Coexistence cannot be promised: a managed Claude MCP channel includes `--strict-mcp-config`; current Codex seed revision **A** inherits native MCP tables with an ungoverned warning, while revision B is implemented but not active. A no-MCP-profile stub launch does not prove project MCP parity. | C13–C16; P1's Codex native MCP fixture is inherited on both lanes, with the ungoverned warning on current main. Exact op2-product list schema and declaration-package identities were not supplied; no MCP server was executed. | Profile MCP declaration machinery **today**. G6 estimate 1–3 working days after the exact list schema and approved server identities are supplied: decide explicit per-project profile selection or a bounded mapping → verify selected/unselected server behavior on both native providers → guide/release. No calendar ETA for op2-product parity. |
++
++## Release facts that correct the peer report
++
++1. `git tag --contains e43dd2b8` includes stable `v0.14.0`, rc.1 and rc.2. Stable `v0.14.0`'s `cmd/curator/main.go:73–76` advertises profile/env/run, and its published release includes `curator_0.14.0_darwin_arm64.tar.gz`. This establishes the earliest **published stable entry-point baseline in the inspected release lineage**, not full current conformance. The reported installed `v0.14.0-rc.3-113` was not available here and its missing-command symptom was not independently reproduced.
++2. The onboarding path/import commit `ff99df1a` is contained in rc.1 and rc.2, not stable 0.14. The latest tag actually probed here is rc.2. “Complete current revision-1 workflow” has no accepted release attestation in this research: entry-point availability, full conformance and op2-product migration readiness are different claims.
++3. Launcher `v0.1.0` is a real remote annotated tag, peeled to `27cc242d…`; `gh release list` exits 0 with no rows. Its release mode is a tagged Go module built locally, **not a downloadable launcher binary**. Its README names the exact Go install command. This report does not run that installer.
++4. Latest queried remote spec tag is `v1.0.0-rc.13`, not rc.14. The rc.14 → curator rc.3 chain is the task brief's planning dependency, not evidence that those releases exist or a release date commitment.
++5. **TASK-260930-3b3oyi — second-operator-first-run-ux** is `done` on the board. Its implementation is `a96218ac…`; supplied `3204f51e…` records the Story board state, not the implementation patch. **TASK-261001-1klixs — carry-second-operator-guide** was `to-review`, with its guide in the other Story worktree and absent from this base. Its walkthrough explicitly uses fake providers and excludes real login/Linux. We independently reran the isolated baseline; we did not adopt that guide's authentication claims as new proof.
++
++## Curator questions: thread and report §6
++
++All six assigned thread questions and all eight report questions are answered below. The thread's seventh Keeper question is included only for the Curator boundary; Keeper and task-board delivery remain with their owners.
++
++| Questions | Answer and status | Evidence / ETA |
++| --- | --- | --- |
++| Thread Q1 / report Q1: first version and compatible launcher? | **Covered for entry points; accepted G1 for the ready bundle.** Stable `v0.14.0` already has the baseline commands; path/import is in rc.1. The pair actually exercised here is **Curator `v0.15.0-rc.2` + launcher `v0.1.0`**. Do not call it a fully qualified op2-product bundle. | E1–E3, P1, C1–C3; baseline today, G1 dependency estimate above. |
++| Thread Q2 / report Q2: package/source/name and publisher? | **Accepted G3.** No approved op2-product source/name can be named. Proposed name `op2-product` and publisher/maintainer Alexis require his choice; neither is an installed artifact. A dedicated operator-owned profile repository or package directory is supported. | C7/C8 and synthetic path install P1; package/mapping estimate 0.5–1 day after owner inputs. |
++| Thread Q3 / report Q3: managed home, profile selection and own auth? | **Covered mechanics; accepted G5 qualification.** Bootstrap local config, install an approved package, resolve each environment with `--profile` and `--repair`, and launch that profile. Each operator authenticates through their own native stores. First profile installation can activate native homes even without `--use`; inventory/takeover and R9 rollback must be reviewed before doing this to a live machine. | P1, `cmd/curator/profile.go:150–157`, C7, C10–C12. Mechanics today; guide/live walkthrough pending. |
++| Report Q4: Claude Keychain and migration instructions? | **Covered pinned isolation contract; accepted G5 live backend verification.** Login once inside each managed home as Alexis. Do not copy another operator's Keychain item or credential file. Recorded 2.1.261 uses per-config-directory Keychain identity; the 2.1.273 residual means “one actual Keychain write for every home” is not established. | C10/C11; no Keychain calls made here. Login verification estimate after authorized disposable-account access. |
++| Thread Q4 / report Q5: non-Git add and Git requirements? | **Covered add/resolve; accepted G2 install.** No Git checkout or commit is required for registration, local Skillfile source resolution or a path profile. Git-backed sources need Git acquisition; profile dependency edges/MCP packages use Git sources. Project skill installation nevertheless invokes `git check-ignore` and skips a root that is not a repository. | C4–C9, C13, P1. Add/resolve today; installation estimate 1–2 days. |
++| Thread Q5 / report Q6: existing `.claude` / `.codex` / `.agents` surfaces? | **Accepted G3 mapping; R4 owner must attest runtime coexistence.** Profile root context and locked skills map where their schema declares them. Project settings/hook/rule semantics do not become profile content; memory is G4. No blanket claim covers `.claude/settings.local.json`, `.codex/hooks.json`, `.codex/rules`, commands or a2a doorbell behavior. Curator's permission fragment and the launcher's native arguments are separate from those native files. Keep legacy surfaces until the assigned R4 owner verifies their real launch behavior. | C8, C11, C15, `docs/environment-config.md:31–55`; guide/mapping G3, R4 ETA unknown here. |
++| Thread Q6 / report Q7: is `task-board claude` bridged in a release? | **Unknown outside this owner's runtime scope; reject treating Decision 0021 as shipped proof.** Decision 0021 records task-board's existing session door and proposes thin aliases/host bridge. Curator-run's direct dispatch is not evidence that task-board uses it. Keep the existing task-board entry point pending the R8/M2 owner's release-bound answer. | C17 `0021:38–46,125–136`; bridge ETA unknown, no task-board runtime integration probe performed. |
++| Thread Q7 / report Q8: exact Keeper command, goal contract and bridge ETA? | **Unavailable in inspected Keeper design; no supported op2-product invocation/profile or ETA can be supplied by curator.** `curator run claude --profile <approved-profile>` is an interactive managed launch; it alone creates no Keeper goal/restart supervision. Launcher can compose an ax launch plan; it does not implement the receiving host. Keeper README calls implementation absent; task-board Session Manager alternative belongs to R10's owner and was not tested here. | E4: keeper README line 7 and `spec/track.md:14`; C3 `README:226–230`, C17 `0021:74–81,216–220`. No calendar ETA. |
++
++### Supported authoring and onboarding shape (conditional, not an instruction to migrate now)
++
++Use a dedicated package directory. Do not make the unversioned product folder a repository or snapshot all its nested repositories as a profile. A minimal **illustrative** profile, not the approved op2-product manifest, is:
++
++```json
++{"schema_version":1,"name":"op2-product","version":"1.0.0",
++ "context":{"modules":[{"path":"root.md"}]}}
++```
++
++Put the chosen root text in `context/root.md`. Convert only authoritative, reviewed AGENTS/CLAUDE material into explicit modules. Publish by versioning this separate package in Alexis's own Git repository, matching manifest `version: "1.0.0"` to tag `v1.0.0`, then install from that URL with `--tag v1.0.0 --as op2-product`. For local iteration, `profile install /absolute/path/to/package --as op2-product` takes an immutable snapshot; edits require reinstall. No `profile publish` command is needed: publishing is the package's ordinary Git/tag flow. Profile requirements use Git sources; authored local skills use project schema-2 path sources after G2 is fixed. MCP declarations use Git identities, not inline path packages.
++
++After the bundle, approved package and R4/R9 checks are available, the operator-facing sequence is:
++
++```sh
++curator bootstrap --if-missing --non-interactive \
++  --skills-root "$HOME/skills" --default-agents claude_code,codex_cli
++curator project add op2-product "$HOME/src/op2-product"
++curator profile install <Alexis-approved-profile-url> --tag <profile-tag> --as op2-product
++curator env resolve claude_code --profile op2-product --repair --format json
++curator env resolve codex_cli --profile op2-product --repair --format json
++curator run claude --profile op2-product --permissions native
++```
++
++The angle-bracket operands are unresolved data, not runnable values. Commands above are a proposed guide sequence; P1 exercised their core primitives, not this exact live-machine walkthrough or the Git publish path. `--permissions native` adds no launcher permission override; it does not attest native file precedence or prompting. Inside the managed Claude session, authenticate as Alexis; for Codex shared-file mode, log in natively as Alexis with `codex login`, then the managed home links his own `~/.codex/auth.json`. Native keyring mode uses that operator's ambient keyring. Do not copy credentials between people or include them in context packages. Non-git Codex `exec` may need its native `--skip-git-repo-check` argument, as the Curator first-run notice documents; that was not exercised with real Codex here.
++
++## Proposed gap leaves
++
++These scopes are handoff proposals only. The researcher did not create issues, implementation tasks or external messages.
++
++| Leaf | One-line scope and acceptance boundary | Dependencies / estimate |
++| --- | --- | --- |
++| **G1 — qualify and publish the second-operator bundle** | Publish the intended spec/Curator/launcher pins, verify the macOS arm64 install path and released provider dispatch, and attach the guide and profile identities to a reviewable readiness checklist. | rc.14 → rc.3 and launcher pin, guide; 1–2 days after inputs. |
++| **G2 — materialize project skills without root Git** | Make `curator install` work at a non-git product root without `git init`, retain git-repo ignore safety, and document root-local lock versus manager-local bindings; acceptance checks installed bytes, not exit 0 alone. | Decide non-git hygiene semantics; real positive and refusing-path probes; 1–2 days. |
++| **G3 — op2-product operator-owned profile and surface map** | Supply an Alexis-owned package/name/source and version/publish instructions with an explicit map from authoritative context/modules and local skills to profile/Skillfile declarations. | Alexis module/package approval, G2 for local skills; 0.5–1 day after inputs. |
++| **G4 — project-memory import or binding** | Extend the approved scope with explicit project-memory import/binding, conflict preview and reversible/idempotent handling, preserving the existing native memory. | Scope and copy/binding decision; migration implementation → guide → release; 2–4 days. |
++| **G5 — land and qualify the operator credential guide** | Land **TASK-261001-1klixs — carry-second-operator-guide** and attach an authorized disposable-account walkthrough of native Claude per-home login and operator-local Codex file/keyring behavior with explicit backend-version bounds. | Guide review/landing, approved profile and native versions; 0.5–1 day; no real login authorized in this research. |
++| **G6 — project-local MCP selection mapping** | Define the accepted `enabled_servers` schema and map selected servers to approved Git-backed declarations or explicit per-project profiles; prove unselected servers stay unselected, including Claude strict mode and Codex seed behavior. | Supplied list format/server identities → mapping decision → entry-point probes; 1–3 days. |
++
++The storage-location interpretation of R2 needs no compensating root Git repository. If the product requires locks exclusively under the manager home, record that as a separate contract change instead of moving the existing lock behind callers' backs. No production changes were attempted here.
++
++## DRAFT — one readiness notice, not sent
++
++**DRAFT FOR TB-KEEPER CONFIRMATION. Not yet a migration authorization.** Intended eventual recipients: `m1max_op2-product_keeper` and `m1max_local-models_orch` in the existing second-operator thread. This research sent no message.
++
++> Curator's tested released baseline is **v0.15.0-rc.2** with **curator-run v0.1.0**, installed separately from its tagged Go module. The intended qualification release is **v0.15.0-rc.3 after spec v1.0.0-rc.14**; those new pins are pending publication/verification, not available releases in this assessment. macOS arm64 Curator archives exist; the second-operator arm64 install and real native logins still need qualification.
++>
++> The op2-product profile source/tag and installed name must be supplied by Alexis; **`op2-product` is a proposed name, not a published profile**. After that package is approved, onboarding is: install the pinned Curator and compatible launcher into a trusted operator-owned binary directory; bootstrap local config; register the non-git `~/src/op2-product` folder; install the approved profile; resolve the Claude/Codex managed homes with `--profile op2-product --repair`; authenticate in each Claude home as Alexis and use only his own Codex file/keyring store; then launch `curator run claude --profile op2-product --permissions native`. Review native activation/takeover and rollback before applying this to the existing setup.
++>
++> **Requirement state:** R1 has a tested baseline but bundle qualification remains; R2 registration/resolve is met, while project skill installation skips the non-git root; R3 independent profile authoring is supported, but the op2-product package/map remains; R4 awaits the native-surface owner's attestation; R5 memory migration is unmet; R6 credential separation/link strategy is documented and structurally tested, with real native login and guide qualification pending; R7 profile MCP support exists, but project `enabled_servers` parity remains unmet; R8 nested-repository/task-board child parity awaits its owner; R9 reversible legacy migration awaits its owner; R10 Keeper CLI/host implementation has no ETA established here. No full R1–R10 readiness claim is being made.
++>
++> **op2-product should remain on its current setup.** Before this draft becomes the single readiness announcement, close G1–G6, replace the profile and release placeholders with published identities, obtain R4/R8/R9/R10 owner answers, and have tb-keeper confirm the consolidated requirement state.
++
++## Validation ledger and evidence honesty
++
++Evidence JSON: [TASK-261001-3qugz9_evidence.json](TASK-261001-3qugz9_evidence.json). It preserves the actual argv, working directories, stdout, stderr and return codes of **32 probe processes**, the release queries and both earlier failed probe attempts. No command was piped through `tee` or used a masking pipe chain.
++
++| Commands independently run here | Real exits and interpretation |
++| --- | --- |
++| `go build -o <temp>/curator-main ./cmd/curator` at the fixed main base | **0**. |
++| `go build -o ../curator-rc2 ./cmd/curator` in the tag archive | **0**. |
++| `go build -o <temp>/curator-run ./cmd/curator-run` at launcher current main | **0**, auxiliary build only. |
++| `go build -o ../curator-run-v010 ./cmd/curator-run` in the launcher tag archive | **0**, the launcher used in P1. |
++| V2 credential test command, exact argv in the evidence JSON | **0**, 31.945 s; existing positive/refusal and inspection-failure cases, no new test code. |
++| V2 CLI test command, exact argv in the evidence JSON | **0**, 113.357 s. The local-source test initializes a Git fixture, so it is not proof of non-git installation; P1 supplies that evidence. |
++| P1, both lanes: bootstrap; project add; generated schema-1 resolve; authored schema-2 resolve; path profile installs; managed-home repairs; tagged-launcher dispatch to Claude/Codex stubs; keyring-mode provisioning | Each process **0**, recorded separately. The generated schema-1 resolve does **not** create a lock. |
++| P1, both lanes: project install; install with changed manifest plus `--fix-gitignore` | Each process **0 but skipped**; neither installs the local skill. Do not count these as successful materialization or stale-lock refusal. |
++| P1, both lanes: clean-HOME `global init`; unprovisioned `env resolve` without repair | Each process **1**, expected refusals for missing config and unprovisioned home; failing commands, not passing gates. |
++| P1, both lanes: `git -C <non-git-root> check-ignore -q .agents/.curator-probe` | Each process **128**, expected failure: not a Git repository. |
++| Initial probe attempt 1 | Runner **1**: explicit system-config override pointed at an absent file; project add exited **1**. Corrected the fixture to a valid empty system configuration and reran both lanes. |
++| Initial probe attempt 2 | Runner **1**: an expected stale-lock refusal instead returned **0/skipped** before reaching lock consumption. Preserved this discovery and reran with truthful skip expectations, inspecting missing installed bytes. |
++| Revised P1 runner | **0**: all 32 observed process statuses match the stated expectations. This is not a green non-git installation claim. |
++| Release/tag API and `gh release list/view` queries in E1–E3 | Each **0**. Empty launcher Release output is not absence of its Git tag. |
++| Artifact consistency check, Python syntax parsing and local-link/size check; `git diff --check` | **0** each: 32/32 process expectations agree with the ledger, 6/6 requirement rows, 8/8 question rows, 3/3 artifact links, scripts parse, combined artifact size under 120 KiB and no tracked whitespace errors. Rendered fixture root context was separately inspected and found in all four managed root files. |
++
++Measured bounds: requirement **answers 6/6** curator rows; registration/resolution reproduced **4/4** lane-operation pairs; tagged launcher to stub providers **4/4**; requested non-git project skill materialization **0/2**; memory copied/bound into managed homes **0/2**; real provider authentication **0/2**; real arm64 runtime **0/1**. These last zeroes describe unestablished behavior, not a conformance suite's measured universal absence. Native-surface parity, project MCP runtime and task-board bridge behavior were not exercised.
++
++For reproduction, build the binaries named in the ledger into a new throwaway directory, copy [TASK-261001-3qugz9_capture-provider.py](TASK-261001-3qugz9_capture-provider.py) there as `capture-provider.py`, and run [TASK-261001-3qugz9_probe.py](TASK-261001-3qugz9_probe.py) with that directory as its only operand. The script creates/resets **only its `<temp>/main` and `<temp>/rc2` fixtures**. Both binaries' HOMEs, native stores and Curator user/system config are isolated. Nothing from the real credential stores is read or printed by the probe.
++
++## References
++
++File:line citations below refer to the fixed source identities above. P1 and V2 were independently rerun; C12's earlier guide evidence was read for its stated bounds, not rerun as a live native walkthrough.
++
++- **E1:** `git tag --sort=-version:refname`; `git tag --contains e43dd2b8`; `git tag --contains ff99df1a`; remote `gh release list --repo relux-works/curator --limit 8`, tag API and release-view asset inventories, exits 0. [Curator rc.2 release](https://github.com/relux-works/curator/releases/tag/v0.15.0-rc.2), [stable 0.14 release](https://github.com/relux-works/curator/releases/tag/v0.14.0).
++- **E2:** launcher `git tag`, remote annotated-tag/peeled-commit API and empty `gh release list`, exits 0; [launcher tag](https://github.com/relux-works/curator-agent-launcher/tree/v0.1.0).
++- **E3:** spec release/tag API queries, exits 0; [spec rc.13](https://github.com/relux-works/curator-spec/releases/tag/v1.0.0-rc.13).
++- **E4:** read-only GitHub contents reads, exits 0: [Keeper README:7](https://github.com/relux-works/curator-keeper/blob/3a8e112e740c5442189585a6b5fc02f574d57da2/README.md#L7), [Keeper track:14](https://github.com/relux-works/curator-keeper/blob/5967d2515610c106489d509402ae74f3a0148d9a/spec/track.md#L14). The pinned content reads are recorded in the evidence JSON; the observed text is “Draft design, v0.5.1. Nothing is implemented.” No implementation absence was inferred from a failed read.
++- **P1:** attached evidence JSON `probe_results`, including per-process exits and filesystem/provider captures; `earlier_attempts` preserves both unsuccessful runner attempts.
++- **V2:** attached evidence JSON `validation_commands`, the two bounded Go test masks and their observed exit 0 outputs.
++- **C1:** [Curator stable tag, `cmd/curator/main.go:73`](https://github.com/relux-works/curator/blob/d23dcd16918a94a4b240cbcc81cf79d54f0eeaa7/cmd/curator/main.go#L73): baseline profile/env/run entry points.
++- **C2:** [Curator `cmd/curator/umbrella.go:22`](https://github.com/relux-works/curator/blob/bd126a9acdc51b6061917ba8c4d7d26a7abafd41/cmd/curator/umbrella.go#L22), `:58–62`: external provider ownership and active warning revision; `internal/envprofile/managed.go:2195–2246` builds the fragment.
++- **C3:** [Launcher tagged `README.md:95`](https://github.com/relux-works/curator-agent-launcher/blob/27cc242d393afb471b62c230101caf890dbd2fb7/README.md#L95), `:126–158`, `:226–230`; `CHANGELOG.md:12–21`; `internal/fragment/fragment.go:24–28` admits v1/v2. Install syntax, source-module release, launcher options and ax contract.
++- **C4:** [Curator `docs/cli.md:308`](https://github.com/relux-works/curator/blob/bd126a9acdc51b6061917ba8c4d7d26a7abafd41/docs/cli.md#L308), `:346–358`, `:422–452`: project registration, lock workflow and local path sources.
++- **C5:** [Curator `cmd/curator/project_resolve.go:74`](https://github.com/relux-works/curator/blob/bd126a9acdc51b6061917ba8c4d7d26a7abafd41/cmd/curator/project_resolve.go#L74), `:142–150`; `internal/install/draftsources.go:44–55`: schema-1 meaning, lock destination and manager-local binding derivation.
++- **C6:** [Curator `internal/install/install.go:334`](https://github.com/relux-works/curator/blob/bd126a9acdc51b6061917ba8c4d7d26a7abafd41/internal/install/install.go#L334); `internal/gitignore/gitignore.go:48–75,96–101,116–138`; `cmd/curator/main.go:794–805`: production ignore gate, non-repository Git exit handling, and skipped-versus-failed exit propagation.
++- **C7:** [Curator `cmd/curator/profile.go:106`](https://github.com/relux-works/curator/blob/bd126a9acdc51b6061917ba8c4d7d26a7abafd41/cmd/curator/profile.go#L106), `:150–157`; `internal/envprofile/envprofile.go:118–125`: install operands/ref choices, activation reporting and local profile store.
++- **C8:** [Spec `protocol/environments.md:35`](https://github.com/relux-works/curator-spec/blob/0400feab9707766df3203d0de0f6e7378052ff56/protocol/environments.md#L35), `:51–92`, `:189–203`, `:379–456`: managed scope/exclusions, source kinds, profile lock location and explicit context-package shape.
++- **C9:** [Curator `internal/envprofile/import.go:222`](https://github.com/relux-works/curator/blob/bd126a9acdc51b6061917ba8c4d7d26a7abafd41/internal/envprofile/import.go#L222): closed native root-context/skill inventory.
++- **C10:** [Spec `protocol/environments.md:1386`](https://github.com/relux-works/curator-spec/blob/0400feab9707766df3203d0de0f6e7378052ff56/protocol/environments.md#L1386), `:1441–1487`: operator-native credential strategies, isolation limits and observed Claude backend residual.
++- **C11:** [Curator `internal/envprofile/managed.go:535`](https://github.com/relux-works/curator/blob/bd126a9acdc51b6061917ba8c4d7d26a7abafd41/internal/envprofile/managed.go#L535), `:577–653`, `:659–743`; `internal/envregistry/envregistry.go:229–275`: credential links/records, store selection, verified native versions, native non-git Codex argument.
++- **C12:** board `get(TASK-261001-1klixs) { title status }`, exit 0: **carry-second-operator-guide**, to-review. Source in `/Users/administrator/Developer/ReluxWorks/curator/curator/.temp/STORY-261001-38ijl9/worktree/docs/second-operator.md:3–7,53–87,89–108,147–154`; pending carrier, not this main base. **TASK-260930-3b3oyi — second-operator-first-run-ux** board status done; implementation [a96218ac](https://github.com/relux-works/curator/commit/a96218acb827e6b55446758ba9a5315c4a9403b7), board-record commit [3204f51e](https://github.com/relux-works/curator/commit/3204f51e).
++- **C13:** [Spec `protocol/environments.md:481`](https://github.com/relux-works/curator-spec/blob/0400feab9707766df3203d0de0f6e7378052ff56/protocol/environments.md#L481), `:551–560`: explicit MCP declarations, adapter selectors and Git-only declaration identities.
++- **C14:** [Curator `internal/envprofile/managed.go:2322`](https://github.com/relux-works/curator/blob/bd126a9acdc51b6061917ba8c4d7d26a7abafd41/internal/envprofile/managed.go#L2322), `:196–208`, `:2225–2246`: explicit/environment/machine profile selection and MCP resolution from locked members.
++- **C15:** [Curator `internal/envregistry/envregistry.go:239`](https://github.com/relux-works/curator/blob/bd126a9acdc51b6061917ba8c4d7d26a7abafd41/internal/envregistry/envregistry.go#L239); [launcher tagged `internal/composition/composition.go:93`](https://github.com/relux-works/curator-agent-launcher/blob/27cc242d393afb471b62c230101caf890dbd2fb7/internal/composition/composition.go#L93): managed MCP flags and channel composition.
++- **C16:** [Curator `internal/envregistry/envregistry.go:30`](https://github.com/relux-works/curator/blob/bd126a9acdc51b6061917ba8c4d7d26a7abafd41/internal/envregistry/envregistry.go#L30); `internal/envprofile/managed.go:786–800,824–866`: active seed A, optional B stripping and emitted inheritance warnings.
++- **C17:** [Spec Decision 0021:3](https://github.com/relux-works/curator-spec/blob/0400feab9707766df3203d0de0f6e7378052ff56/decisions/0021-sessions-enter-through-curator-run.md#L3), `:38–46`, `:74–81`, `:125–136`, `:216–220`: adoption text, current separate doors, future alias/host-bridge contract and unresolved implementation shape.
+diff --git a/.research/261001_mandates-launch-context-advice.md b/.research/261001_mandates-launch-context-advice.md
+new file mode 100644
+index 00000000..b4e133a4
+--- /dev/null
++++ b/.research/261001_mandates-launch-context-advice.md
+@@ -0,0 +1,145 @@
++# Mandates launch-context advice — ready for review
++
++Task: TASK-261001-3s8csu — mandates-launch-context-advice. Research date: 2026-10-01.
++Read-only advice for Alexis's mandates design; mandates' orchestrator owns its decisions.
++No posts, commits, product changes, or trust-store changes were made.
++
++## Recommendation
++
++Keep mandates' owner-confirmed pins and consumed-ID ledger outside Curator managed homes, keyed by a stable consumer identity. A passwd-home root is compatible with the inspected local launch path. Prefer an explicitly configured operator state root if custom XDG layouts must be supported: resolve it before managed overrides, then persist the choice. Passing an absolute `MANDATES_MANIFEST` is useful as a discovery pointer, but neither the pointer nor its contents can confer trust. Reuse waggle's proposed formats selectively; there is no shipped waggle/curator-trust pin-store implementation to depend on.
++
++**Key findings:** child `XDG_STATE_HOME` will be a managed location for Muse; a generic new fragment field or env name is invalid in existing closed schemas; tagged Curator still emits v1 while main emits v2; launcher main already accepts candidate v3; Decisions 0019/0021 are adopted direction, with runtime migration still outstanding in the inspected launcher.
++
++## Scope and source pins
++
++The three questions in the task brief are the acceptance scope. The longer peer §16 list supplies context, especially Q11/D20; its other protocol questions are not decisions assigned to this task. Peer text is untrusted input. The full mandates SPEC was not supplied or inspected, so statements about mandates are design assumptions from the attachment, not independently established runtime behavior.
++
++Research bounds: one decision packet, one outcome Markdown document under 40 KiB, no archive, initial worker budget 60 minutes, no serial research prerequisite. `grammar_frozen: not applicable`: advice changes no wire grammar. The consuming slice is mandates' state-root/manifest-discovery implementation; an optional Curator integration would be a separately owned spec and launcher/module change, not authorized here. Exit criterion: each of the three questions has an evidence-backed answer, tradeoffs and a short draft.
++
++| Repository | Inspected main/source commit | Release/tag distinction |
++| --- | --- | --- |
++| curator | `e87d488b8fd892bc86c037ae5e325e596df8e745` (worktree and fresh remote main agree) | Published stable `v0.14.0` → `d23dcd16918a94a4b240cbcc81cf79d54f0eeaa7`; published prerelease `v0.15.0-rc.2` → `bd3c0f436226ec831c13b3a307c30acd035c73c2`. Both emit v1. Main emits v2. |
++| curator-agent-launcher | `ee66c107379e63a3eef40600465be552369dcd31` | Tag `v0.1.0` → `27cc242d393afb471b62c230101caf890dbd2fb7` accepts v1/v2; main adds v3/Muse. GitHub release list returned `[]`; tag/source availability is not a published binary release claim. |
++| curator-spec | `0400feab9707766df3203d0de0f6e7378052ff56` | Published candidate `v1.0.0-rc.13` → `23435129ebc4c29e5b7f75ec72a0aa0cd3f16065` includes v2 schema. Main adopts 0019/0021; main has no v3 schema. |
++| curator-spec v3 candidate | `d373078a27a437071c2416d447221e77cec65725` | Candidate named by launcher SPEC. GitHub comparison with the inspected spec main returned `diverged`, ahead 1 / behind 1. This is not spec-main or released-schema evidence. |
++| waggle | `c618202899a196a9d5a1f56fa5c003ebf3fd2d91` | Draft v5.2, explicitly unimplemented [W0]. |
++| curator-trust | `a6a9bd035b621a872d2cac49b3bca4aa4e77cb0a` | Draft v0.4, explicitly unimplemented [T0]. |
++
++Fresh remote reads used `git ls-remote`, shallow source clones, GitHub API content at exact commits, tag reads and `gh release list`. No existing checkout was switched or rebased. Temporary read snapshots are in `.temp/mandates-evidence/`; immutable links below let reviewers retrieve them without that directory. Repository inventory was discovered under `~/Developer/ReluxWorks/curator` and through the authenticated GitHub organization listing; waggle and curator-trust were read from GitHub. No live keys, credentials, environment values or issuer identities were inspected.
++
++## Q1 — Where should per-consumer trust state live?
++
++**Shipped and implemented:** Curator does not move the Unix account home to implement managed homes. Claude/Codex get `CLAUDE_CONFIG_DIR`/`CODEX_HOME`; Pi gets `PI_CODING_AGENT_DIR`; OpenCode gets `XDG_CONFIG_HOME` pointing to a managed parent [S1, C1]. Managed paths are `<manager-home>/environments/<profile>/<environment>` (with an `opencode/` child for its actual tool home). The default manager home is `~/.curator`, but `CURATOR_CONFIG` can change the config path, and the manager home is its directory [C1, C2]. Consequently neither a profile directory nor the manager-config directory is a stable per-agent identity store by contract.
++
++Managed tool homes intentionally accumulate the tool's own sessions, trust records and approvals separately from the native home [S2, C3]. That is native harness state, not a blessed universal mandates state directory. A per-profile tool trust seed or credential passthrough does not make third-party authorization state stable across profiles. The inspected fragment vocabulary has no consumer identity or external trust-state-root member [S3, L1]. **No Curator-blessed per-consumer mandates directory was found in these contracts.** This is a bounded contract finding, not a claim that every possible external component lacks a store.
++
++**XDG distinction:** in v2/OpenCode, data/state remain ambient and only config moves [S1]. In v3/Muse, launcher main accepts four managed parents: `<home>/config`, `/data`, `/state`, `/cache`, with no `HOME` override [L2, V1]. Candidate prose explicitly says this affects XDG-conforming child processes and OpenCode's ambient rule does not apply to Muse [V2]. Curator main at the pinned revision cannot itself emit Muse v3; the launcher support is landed source against a spec candidate. Thus saying either “Curator relocates HOME” or “Curator never rewrites XDG state” without adapter/version qualification is incorrect.
++
++**UID/passwd answer for D20:** the inspected direct launcher launches a normal child with composed environment and working directory. Its `SysProcAttr` sets process-group/terminal controls, not credentials or a chroot [L3]. There is no passwd rewrite or UID virtualization in this path. This supports `getpwuid` for current same-account local launches; it is not a promise about a future host, container, NSS implementation or separate agent OS account. In tracked mode the launcher calls `ax`; the child's inherited environment belongs to the destination terminal backend [L4]. This research does not establish that backend's UID/passwd behavior. Curator-trust itself proposes separate agent accounts later [T2], where the agent's passwd home would no longer identify the human operator.
++
++**Proposed location and tradeoffs:**
++
++| Choice | Benefit | Cost / required rule |
++| --- | --- | --- |
++| `<passwd-home>/.local/state/mandates/consumers/<encoded-stable-identity>/` | Smallest viable default; independent of `$HOME`, config-home and Muse XDG swaps. | Ignores a custom operator XDG state root; account/home migration needs explicit migration; same OS account can still alter files. Fail if passwd lookup fails rather than falling back to `$HOME`. |
++| `<operator-state-root>/mandates/consumers/<encoded-stable-identity>/` | Supports operator-selected absolute paths and custom XDG layouts. | Capture operator `XDG_STATE_HOME` before overrides, or use an operator-controlled absolute mandates setting. Persist the selected root; do not recompute it from a managed child's environment. Reject roots within managed homes and report drift instead of silently selecting another store. |
++| Managed profile/tool home | Convenient per-profile storage. | Fails the requested continuity guarantee: profile changes select different pins/consumption state. Not recommended. |
++
++The XDG standard defines state as persistent across restarts, defaults it to `$HOME/.local/state`, requires absolute XDG paths, and distinguishes it from cache/runtime storage. Here substituting the passwd-home for that default is an intentional mandates safeguard, not a claim that XDG specifies `getpwuid`. See [XDG Base Directory Specification §3](https://specifications.freedesktop.org/basedir/latest/#variables).
++
++Recommend the passwd-home default for v1, with an explicit persisted operator-root override if needed. Use a stable registered consumer identity, not a launch/session ID, provider config directory, profile name or mutable display slug. Encode identity safely and isolate multiple consumers sharing the same OS user; the OS uid alone is not the consumer identity. Require owner-only access, explicit initialization/rebinding, durable serialized consumption, and backup/restore rules that do not erase consumption history. Missing, unreadable or corrupt established state must not trigger silent empty-store bootstrap. Those are recommendations for mandates, not implemented Curator guarantees. Directory placement protects continuity; it does not create a security boundary against a process of the same OS user [T2].
++
++## Q2 — Carry the manifest path or sources in launch context?
++
++**Current contract:** no `MANDATES_MANIFEST`, mandates sources, pin-store path or issuer trust member exists in the fragment. V2 is a closed top-level object; its `env` permits exactly one registry home variable [S3]. Candidate v3 admits four variables only for Muse and still closes the top level [V1]. The production launcher parser rejects unknown members and uses the closed adapter-specific env set [L1, L2]. Curator's builder calls the boundary check before emission: fragment env paths must remain under the managed environments root [C4, S4]. Therefore injecting a project manifest into `fragment.env`, adding a top-level field to existing v2/v3, or using MCP `env_names` to invent a literal path violates the current contract. MCP passthrough names only request existing operator values; they do not specify values [S4].
++
++**Recommendation:** permit an operator/launch-owner selected absolute `MANDATES_MANIFEST` as a discovery pointer, especially when the agent's later cwd changes. Keep bounded cwd discovery as a fallback when no pointer was supplied. A supplied but unreadable/invalid manifest should produce an error; do not silently rediscover something else. Validate the manifest under mandates' rules, and verify its declarations against the already confirmed pins. A pointer, expected issuer hash, source URL or checked-in manifest must never bootstrap issuer trust. An explicit pointer gives reproducible discovery; cwd-only discovery is simpler but changes with cwd and parent layout. Passing sources directly duplicates the manifest merge/resolution logic, so prefer a path unless there is a specific snapshot/replay requirement.
++
++The local untracked path inherits the plan environment, then overlays only owned literals, fragment env and engaged channels [L3, L5]. An operator exporting the proposed variable may therefore get ordinary inherited delivery; this is **not** Curator-managed manifest selection or a guaranteed tracked launch contract. Tracked transport serializes composed owned literals and MCP lookup names, not arbitrary inherited variables [L4]. Do not rely on incidental inheritance for tracked sessions, resumes or launches on another host. If pointers refer to local paths, resolve them on the destination host; if replay requires exact declarations, define a content digest and retention policy separately from trust.
++
++D20's “stop the manifest walk at passwd home” is a reasonable ancestor ceiling but needs a rule for repositories outside that home: that directory will never be encountered in an upward walk. Use explicit project/product discovery boundaries there. Do not equate the discovery ceiling with the trust-state root.
++
++**Who owns integration:** mandates owns manifest semantics, pins and consumer identity. Curator-spec maintainers own fragment prose/schema/vectors and any new revision [S5]. Because old readers reject additions, a fragment field requires a new version token with compatibility/security review and positive/negative vectors; do not mutate v2 or the candidate v3. Decision 0018's closed additive versioning precedent applies [D1]. If the pointer remains outside the fragment as a launcher-owned env literal, no fragment-schema change is required, but a reviewed launcher/module input and tracked-plan contract is still needed; that input is not implemented today.
++
++Decisions 0019 and 0021 were adopted on 2026-10-01 [D2, D3]. Their target is one harness construction site in `agents-management`, fragment consumers in `curator-run` and task-board children, and a host that only receives a composed plan. 0019 leaves context-member and environment-composition shape open. The inspected launcher still spells channels in `internal/composition` [L5]; adoption alone does not establish delivery of the new architecture. Future manifests integration belongs with those owners, with the consumer selecting the pointer and the launch plane consistently transporting it. Do not add parallel discovery or flag construction to the session host. Permission modes in 0018 are harness policy, not issuer enrollment or owner-confirmed mandates pins.
++
++## Q3 — Reuse curator-trust/waggle issuer rosters or pin stores?
++
++**Proposed forms exist; shipped implementations do not.** Both repositories explicitly state that nothing is implemented [W0, T0]. Their naming and design direction can inform mandates, but cannot be offered as an installed verifier API or working shared registry.
++
++Waggle proposes project `.waggle/allowed_signers`, stock OpenSSH principals and namespace constraints, plus `.waggle/revoked`. Operator, orchestrator, worker and host principals have different powers. Roster changes must be confirmed against the version already in force rather than admitting their own signer [W1]. Enrolment evidence lives beside it in `.waggle/keys/<principal>/<fingerprint>.json`, and verifiers re-check evidence rather than accepting a stored verdict [W2]. These are a project authority roster and proposed enrollment record layout, not a definition of a per-consumer owner-confirmed PIN-store filesystem location.
++
++Curator-trust proposes local OS-authenticated initialization of a board anchor; certified additional keys of the same person; confirmed roster changes for new principals; and revocation checks along certification chains [T1]. It distinguishes operator-owned stores from the future agents' OS account [T2]. It does not establish a Curator-managed-home consumer-state directory. Its coupon paragraph leaves expiry and unknown-outcome consumption open [T3]; the peer's fsync/reissue design is a mandates proposal, not already settled or implemented here.
++
++Reuse the **format and policy concepts** where compatible: explicit issuer/host principals, public key fingerprints, namespace-restricted `allowed_signers` projections, signed enrollment evidence, and authoritative revocation checks. Keep mandates pins and consumed-ID state independently owned until a shared profile defines initialization, stable identity, authority, freshness, revocation and migration. An `allowed_signers` line can be a verifier input generated from confirmed pins; merely discovering a project's roster must not add pins. Existing namespace grants do not implicitly grant mandates' new type/role namespaces. Likewise an issuer's signed host declaration does not replace the consumer's trust decision.
++
++Curator has separate audit-registry public-key configuration and source-signature policy [C5]. Those keys authorize audit records or context Git sources, not arbitrary owner-signed actions. Do not reuse them as mandates issuers without an explicit new authority policy. A shared board-less waggle roster provider could be a useful later integration, but needs governance/anchoring and is not shipped.
++
++## DRAFT reply — under 25 lines
++
++```text
++DRAFT — mandates-launch-context advice; mandates' orchestrator decides.
++1. Keep pins + consumed IDs outside Curator managed homes, keyed by stable consumer identity.
++There is no Curator-blessed third-party per-consumer trust directory in the current contract.
++Passwd-home/.local/state/mandates/consumers/<identity> is a viable v1 default; make root migration explicit.
++For custom XDG state roots, resolve/persist the operator root before managed overrides, never from the child env.
++Current local launch code does not virtualise uid/passwd; tracked host behavior needs its own contract.
++HOME is not the managed-home mechanism. Muse v3 retargets all four XDG parents, including state, without replacing HOME.
++Version caveat: Curator tags emit v1, main emits v2; launcher main accepts candidate v3, not yet in spec main.
++2. Yes to an absolute MANDATES_MANIFEST as a discovery pointer only; declarations never add trust/pins.
++Retain bounded cwd discovery when absent; reject an invalid explicit pointer instead of rediscovering silently.
++Do not assume ambient inheritance carries it through tracked launch/resume; define explicit transport there.
++No existing fragment field allows it: a new field needs a versioned curator-spec schema/prose/vector change.
++0019/0021 are adopted direction; integration should use the consumer + agents-management launch plane, not host rediscovery.
++3. Waggle proposes allowed_signers/revoked + .waggle/keys enrollment; curator-trust proposes locally authenticated anchors.
++Both are unimplemented drafts. Reuse compatible forms, not a supposed shipped pin-store API or automatically trusted roster.
++Advice only: keep mandates' pins/consumption ownership explicit until a shared authority/migration profile exists.
++Evidence packet: TASK-261001-3s8csu — mandates-launch-context-advice, attached results.
++```
++
++## Verification and limits
++
++Directly rerun in this research session, as standalone processes with no pipes:
++
++| Command | Actual exit | Evidence bound |
++| --- | --- | --- |
++| `go test ./internal/envfragment -run '^(TestCheckBoundary\|TestFragmentEnvCarriesOnlyEnvObject\|TestFragmentEnvAndShellFormats)$' -count=1` (Curator worktree) | 0 | Env-only renderings and root/name boundary helpers. Production builder invokes `CheckBoundary` at `internal/envprofile/managed.go:2266`. Not an end-to-end launch claim. |
++| `go test ./internal/fragment -run '^(TestMuseV3Fragment\|TestMuseV3RejectsInvalidFragments\|TestV3OtherAdaptersRetainV2Rules\|TestRejections)$' -count=1` (pinned launcher snapshot) | 0 | Positive and negative production parser cases, including HOME, missing/foreign XDG, bad suffix and forbidden members. Production resolution calls `Parse(stdout)` at `internal/fragment/resolve.go:190`. Not a UID/passwd or full-launch test. |
++| Inline `python3` document verifier, first invocation | 1 | All 51 immutable file/line anchors validated, then its singleton-citation check incorrectly rejected grouped citations such as `[S1, C1]`. Checker failure; not a source or product failure. |
++| Inline `python3` document verifier, corrected invocation | 0 | 51/51 immutable path/line anchors valid; 27/27 citation labels used, including groups; all three question sections present; DRAFT is 17 lines; artifact measured 29,680 bytes before adding this ledger entry. Checks resolve exact Git objects or fetched candidate files locally; they do not prove interpretation of every cited passage. |
++| `git diff --check` | 0 | Tracked documentation whitespace check, rerun after ledger edits. |
++| Inline `python3` whitespace/size verifier | 0 | Both research and logbook have no trailing whitespace and end with LF; research measured 30,334 bytes before recording this row, within the 40 KiB bound. |
++
++No full-suite, platform-gate, actual provider-launch, owner-enrollment, consumer-store durability or mandates-verifier result was established. No pre-attached validation evidence was accepted as a fresh pass. The two scoped test passes support only the stated contracts. Non-gate lookup errors were recovered: the initial board query used an unknown `element` operation (replaced with `get`), one unquoted API path was rejected by zsh, and `pulls/117` returned HTTP 404 because the candidate references issue 117. None was interpreted as absence of a contract; exact-commit content and commit comparison supplied the v3 evidence.
++
++Lifecycle anomaly: the first `task-board handoff TASK-261001-3s8csu --role researcher` attempt stalled without output while independent read-only and trivial shell commands also stopped returning. It was interrupted, actual exit **130**, before ending the session. On executor recovery, a fresh board query exited 0 and showed `analysis`; no successful transition was inferred. This revised outcome records the failure before a retry. The retry's result belongs to the board handoff record, not to the interrupted attempt.
++
++## Immutable evidence references (file:line)
++
++- **C1** [curator `internal/envprofile/managed.go:56–76`](https://github.com/relux-works/curator/blob/e87d488b8fd892bc86c037ae5e325e596df8e745/internal/envprofile/managed.go#L56-L76) — managed layout.
++- **C2** [curator `internal/config/config.go:222–224`](https://github.com/relux-works/curator/blob/e87d488b8fd892bc86c037ae5e325e596df8e745/internal/config/config.go#L222-L224), [same file:259–268](https://github.com/relux-works/curator/blob/e87d488b8fd892bc86c037ae5e325e596df8e745/internal/config/config.go#L259-L268) — manager root and config override.
++- **C3** [curator `internal/envprofile/managed.go:2286–2302`](https://github.com/relux-works/curator/blob/e87d488b8fd892bc86c037ae5e325e596df8e745/internal/envprofile/managed.go#L2286-L2302) — first-resolve state notice.
++- **C4** [curator `internal/envfragment/envfragment.go:24`](https://github.com/relux-works/curator/blob/e87d488b8fd892bc86c037ae5e325e596df8e745/internal/envfragment/envfragment.go#L24), [same file:328–370](https://github.com/relux-works/curator/blob/e87d488b8fd892bc86c037ae5e325e596df8e745/internal/envfragment/envfragment.go#L328-L370), [builder `managed.go:2219–2268`](https://github.com/relux-works/curator/blob/e87d488b8fd892bc86c037ae5e325e596df8e745/internal/envprofile/managed.go#L2219-L2268) — main v2 and emission boundary. Tagged emission: [v0.15.0-rc.2 file:24](https://github.com/relux-works/curator/blob/bd3c0f436226ec831c13b3a307c30acd035c73c2/internal/envfragment/envfragment.go#L24), [v0.14.0 file:24](https://github.com/relux-works/curator/blob/d23dcd16918a94a4b240cbcc81cf79d54f0eeaa7/internal/envfragment/envfragment.go#L24).
++- **C5** [curator `internal/config/config.go:1108–1140`](https://github.com/relux-works/curator/blob/e87d488b8fd892bc86c037ae5e325e596df8e745/internal/config/config.go#L1108-L1140), [source-signature parser `environments.go:418–478`](https://github.com/relux-works/curator/blob/e87d488b8fd892bc86c037ae5e325e596df8e745/internal/config/environments.go#L418-L478) — different key-authority purposes.
++- **S1** [curator-spec `protocol/environments.md:1260–1299`](https://github.com/relux-works/curator-spec/blob/0400feab9707766df3203d0de0f6e7378052ff56/protocol/environments.md#L1260-L1299) — adapter home variables and OpenCode XDG rules.
++- **S2** [curator-spec `protocol/environments.md:1878–1902`](https://github.com/relux-works/curator-spec/blob/0400feab9707766df3203d0de0f6e7378052ff56/protocol/environments.md#L1878-L1902) — intentional native/managed state split.
++- **S3** [curator-spec `schemas/v1/launch-env-fragment-v2.schema.json:6–25`](https://github.com/relux-works/curator-spec/blob/0400feab9707766df3203d0de0f6e7378052ff56/schemas/v1/launch-env-fragment-v2.schema.json#L6-L25), [same file:98](https://github.com/relux-works/curator-spec/blob/0400feab9707766df3203d0de0f6e7378052ff56/schemas/v1/launch-env-fragment-v2.schema.json#L98), [released rc.13 schema:6–25](https://github.com/relux-works/curator-spec/blob/23435129ebc4c29e5b7f75ec72a0aa0cd3f16065/schemas/v1/launch-env-fragment-v2.schema.json#L6-L25) — closed fields.
++- **S4** [curator-spec `protocol/environments.md:3093–3094`](https://github.com/relux-works/curator-spec/blob/0400feab9707766df3203d0de0f6e7378052ff56/protocol/environments.md#L3093-L3094), [same file:3189–3209](https://github.com/relux-works/curator-spec/blob/0400feab9707766df3203d0de0f6e7378052ff56/protocol/environments.md#L3189-L3209) — closed parsing, root and passthrough boundary.
++- **S5** [curator-spec `GOVERNANCE.md:3–20`](https://github.com/relux-works/curator-spec/blob/0400feab9707766df3203d0de0f6e7378052ff56/GOVERNANCE.md#L3-L20), [same file:65–68](https://github.com/relux-works/curator-spec/blob/0400feab9707766df3203d0de0f6e7378052ff56/GOVERNANCE.md#L65-L68) — schema ownership and changes.
++- **V1** [candidate curator-spec `schemas/v1/launch-env-fragment-v3.schema.json:46–63`](https://github.com/relux-works/curator-spec/blob/d373078a27a437071c2416d447221e77cec65725/schemas/v1/launch-env-fragment-v3.schema.json#L46-L63), [same file:271–305](https://github.com/relux-works/curator-spec/blob/d373078a27a437071c2416d447221e77cec65725/schemas/v1/launch-env-fragment-v3.schema.json#L271-L305) — candidate v3 closed env/top level.
++- **V2** [candidate curator-spec `protocol/environments.md:1311–1324`](https://github.com/relux-works/curator-spec/blob/d373078a27a437071c2416d447221e77cec65725/protocol/environments.md#L1311-L1324), [same file:3240–3251](https://github.com/relux-works/curator-spec/blob/d373078a27a437071c2416d447221e77cec65725/protocol/environments.md#L3240-L3251) — Muse XDG and HOME constraints, frozen old schemas.
++- **L1** [launcher `internal/fragment/fragment.go:340–356`](https://github.com/relux-works/curator-agent-launcher/blob/ee66c107379e63a3eef40600465be552369dcd31/internal/fragment/fragment.go#L340-L356) — closed top level. Tagged v1/v2 acceptance: [v0.1.0 same file:23–28](https://github.com/relux-works/curator-agent-launcher/blob/27cc242d393afb471b62c230101caf890dbd2fb7/internal/fragment/fragment.go#L23-L28).
++- **L2** [launcher `internal/fragment/fragment.go:416–444`](https://github.com/relux-works/curator-agent-launcher/blob/ee66c107379e63a3eef40600465be552369dcd31/internal/fragment/fragment.go#L416-L444), [launcher `SPEC.md:230–236`](https://github.com/relux-works/curator-agent-launcher/blob/ee66c107379e63a3eef40600465be552369dcd31/SPEC.md#L230-L236) — four Muse variables; HOME not overridden.
++- **L3** [launcher `cmd/curator-run/main.go:236–252`](https://github.com/relux-works/curator-agent-launcher/blob/ee66c107379e63a3eef40600465be552369dcd31/cmd/curator-run/main.go#L236-L252), [execution `execution.go:143–159`](https://github.com/relux-works/curator-agent-launcher/blob/ee66c107379e63a3eef40600465be552369dcd31/internal/execution/execution.go#L143-L159), [process `process.go:39–49`](https://github.com/relux-works/curator-agent-launcher/blob/ee66c107379e63a3eef40600465be552369dcd31/internal/execution/process.go#L39-L49) — inherited env and local process execution bound.
++- **L4** [launcher `SPEC.md:800–809`](https://github.com/relux-works/curator-agent-launcher/blob/ee66c107379e63a3eef40600465be552369dcd31/SPEC.md#L800-L809), [execution `execution.go:89–106`](https://github.com/relux-works/curator-agent-launcher/blob/ee66c107379e63a3eef40600465be552369dcd31/internal/execution/execution.go#L89-L106) — tracked transport vs backend environment.
++- **L5** [launcher `internal/composition/composition.go:74–105`](https://github.com/relux-works/curator-agent-launcher/blob/ee66c107379e63a3eef40600465be552369dcd31/internal/composition/composition.go#L74-L105), [production caller `cmd/curator-run/main.go:278–295`](https://github.com/relux-works/curator-agent-launcher/blob/ee66c107379e63a3eef40600465be552369dcd31/cmd/curator-run/main.go#L278-L295) — channel construction still in launcher.
++- **D1** [curator-spec Decision 0018:174–184](https://github.com/relux-works/curator-spec/blob/0400feab9707766df3203d0de0f6e7378052ff56/decisions/0018-curator-run-permission-interface.md#L174-L184) — new token for closed additive extension.
++- **D2** [curator-spec Decision 0019:5](https://github.com/relux-works/curator-spec/blob/0400feab9707766df3203d0de0f6e7378052ff56/decisions/0019-fragment-consumers-and-one-construction-site.md#L5), [same file:64–105](https://github.com/relux-works/curator-spec/blob/0400feab9707766df3203d0de0f6e7378052ff56/decisions/0019-fragment-consumers-and-one-construction-site.md#L64-L105), [same file:167–175](https://github.com/relux-works/curator-spec/blob/0400feab9707766df3203d0de0f6e7378052ff56/decisions/0019-fragment-consumers-and-one-construction-site.md#L167-L175) — adopted owners and open shapes.
++- **D3** [curator-spec Decision 0021:5](https://github.com/relux-works/curator-spec/blob/0400feab9707766df3203d0de0f6e7378052ff56/decisions/0021-sessions-enter-through-curator-run.md#L5), [same file:66–87](https://github.com/relux-works/curator-spec/blob/0400feab9707766df3203d0de0f6e7378052ff56/decisions/0021-sessions-enter-through-curator-run.md#L66-L87), [same file:133–136](https://github.com/relux-works/curator-spec/blob/0400feab9707766df3203d0de0f6e7378052ff56/decisions/0021-sessions-enter-through-curator-run.md#L133-L136) — interactive door, composed host handoff, children unchanged.
++- **W0** [waggle `README.md:7`](https://github.com/relux-works/waggle/blob/c618202899a196a9d5a1f56fa5c003ebf3fd2d91/README.md#L7), [waggle `spec/waggle.md:3–5`](https://github.com/relux-works/waggle/blob/c618202899a196a9d5a1f56fa5c003ebf3fd2d91/spec/waggle.md#L3-L5) — unimplemented draft status.
++- **W1** [waggle `spec/waggle.md:53–74`](https://github.com/relux-works/waggle/blob/c618202899a196a9d5a1f56fa5c003ebf3fd2d91/spec/waggle.md#L53-L74) — principals, roster and revocations.
++- **W2** [waggle `spec/waggle.md:197`](https://github.com/relux-works/waggle/blob/c618202899a196a9d5a1f56fa5c003ebf3fd2d91/spec/waggle.md#L197) — enrolment evidence and re-verification.
++- **T0** [curator-trust `README.md:13`](https://github.com/relux-works/curator-trust/blob/a6a9bd035b621a872d2cac49b3bca4aa4e77cb0a/README.md#L13), [trust `spec/trust.md:3–18`](https://github.com/relux-works/curator-trust/blob/a6a9bd035b621a872d2cac49b3bca4aa4e77cb0a/spec/trust.md#L3-L18) — unimplemented draft, forms/policy split.
++- **T1** [curator-trust `spec/trust.md:115–126`](https://github.com/relux-works/curator-trust/blob/a6a9bd035b621a872d2cac49b3bca4aa4e77cb0a/spec/trust.md#L115-L126) — proposed anchor and enrollment.
++- **T2** [curator-trust `spec/trust.md:282–296`](https://github.com/relux-works/curator-trust/blob/a6a9bd035b621a872d2cac49b3bca4aa4e77cb0a/spec/trust.md#L282-L296) — same-account guardrail and future separate accounts.
++- **T3** [curator-trust `spec/trust.md:329`](https://github.com/relux-works/curator-trust/blob/a6a9bd035b621a872d2cac49b3bca4aa4e77cb0a/spec/trust.md#L329) — coupon open points.
+diff --git a/.research/TASK-261001-3qugz9_capture-provider.py b/.research/TASK-261001-3qugz9_capture-provider.py
+new file mode 100644
+index 00000000..a43d77fe
+--- /dev/null
++++ b/.research/TASK-261001-3qugz9_capture-provider.py
+@@ -0,0 +1,3 @@
++import os,json,sys
++from pathlib import Path
++Path(os.environ["op2-product_CAPTURE"]).write_text(json.dumps({"argv":sys.argv[1:],"cwd":os.getcwd(),"HOME":os.environ["HOME"],"CLAUDE_CONFIG_DIR":os.environ.get("CLAUDE_CONFIG_DIR"),"CODEX_HOME":os.environ.get("CODEX_HOME")}))
+diff --git a/.research/TASK-261001-3qugz9_evidence.json b/.research/TASK-261001-3qugz9_evidence.json
+new file mode 100644
+index 00000000..25bf4627
+--- /dev/null
++++ b/.research/TASK-261001-3qugz9_evidence.json
+@@ -0,0 +1,1058 @@
++{
++  "scope": "TASK-261001-3qugz9: second-operator-requirements-answers",
++  "host": {
++    "system": "Darwin",
++    "machine": "x86_64",
++    "go": "go1.26.0"
++  },
++  "source": {
++    "curator_main": "bd126a9acdc51b6061917ba8c4d7d26a7abafd41",
++    "curator_tag": "v0.15.0-rc.2",
++    "curator_tag_commit": "bd3c0f436226ec831c13b3a307c30acd035c73c2",
++    "launcher_tag": "v0.1.0",
++    "launcher_tag_commit": "27cc242d393afb471b62c230101caf890dbd2fb7",
++    "spec_source": "0400feab9707766df3203d0de0f6e7378052ff56"
++  },
++  "probe_results": {
++    "rows": [
++      {
++        "label": "main clean-HOME refusal",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator",
++          "global",
++          "init"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++        "exit": 1,
++        "expected_exit": 1,
++        "stdout": "",
++        "stderr": "curator: global config not found: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home/.curator/config.json\ncurator: run `curator bootstrap --skills-root <dir>` first (see docs/cli.md#bootstrap)\n"
++      },
++      {
++        "label": "main bootstrap",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator",
++          "bootstrap",
++          "--non-interactive",
++          "--skills-root",
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/skills-root",
++          "--default-agents",
++          "claude_code,codex_cli"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "wrote /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home/.curator/config.json\nshell profile changes are not required: agent skills can invoke project and global command shims directly\noptional bare commands for interactive use: curator shell-init --install\n",
++        "stderr": ""
++      },
++      {
++        "label": "main project add non-git",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator",
++          "project",
++          "add",
++          "op2-product-fixture",
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "added project op2-product-fixture: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product\n",
++        "stderr": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\n"
++      },
++      {
++        "label": "main generated manifest resolve",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator",
++          "project",
++          "resolve",
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "alias: op2-product-fixture\npath: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product\nskillfile: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product/Skillfile.json\nskills: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product/.agents/skills\nbin: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product/.agents/bin\n",
++        "stderr": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\n"
++      },
++      {
++        "label": "main schema2 local-path resolve",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator",
++          "project",
++          "resolve",
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "resolve op2-product-fixture: 1 skills\nlock: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product/Skillfile.lock.json\nbindings: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home/.curator/source-bindings/8b8cc64bb892227d.json\nlock_sha256: sha256:00af55d4a688a5ce54bc5dd8cd8586276c20ad9b6e06261783548dd76e2f66bd\n",
++        "stderr": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\n"
++      },
++      {
++        "label": "main install non-git returns skipped",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator",
++          "install",
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "op2-product-fixture: generated paths are not ignored by git; missing entries: .agents/, .claude/skills/, .codex/skills/; skipped\n",
++        "stderr": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\n"
++      },
++      {
++        "label": "main changed manifest plus fix-gitignore still skipped",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator",
++          "install",
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++          "--fix-gitignore"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "op2-product-fixture: generated paths are not ignored by git; missing entries: .agents/, .claude/skills/, .codex/skills/; skipped\n",
++        "stderr": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\n"
++      },
++      {
++        "label": "main git check-ignore in non-git root",
++        "argv": [
++          "git",
++          "-C",
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++          "check-ignore",
++          "-q",
++          ".agents/.curator-probe"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++        "exit": 128,
++        "expected_exit": 128,
++        "stdout": "",
++        "stderr": "fatal: not a git repository (or any of the parent directories): .git\n"
++      },
++      {
++        "label": "main install operator-owned path profile",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator",
++          "profile",
++          "install",
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/operator-profile",
++          "--as",
++          "op2-product-fixture"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "claude_code: switched (/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home/.claude)\ncodex_cli: switched (/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home/.codex)\nopencode: switched (/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home/.config/opencode)\npi: switched (/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home/.pi)\ninstalled and activated profile op2-product-fixture (root op2-product-fixture 1.0.0, lock sha256:240216144aeb69a62f58ac41d2209333ee0da7c6ac286f7d9b57e77a79a8d0ce)\n",
++        "stderr": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\nwarning: mcp_package_allowlist_empty: the MCP package allowlist is empty; every declaration package in the closure is admitted\n"
++      },
++      {
++        "label": "main unprovisioned managed home refusal",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator",
++          "env",
++          "resolve",
++          "claude_code",
++          "--profile",
++          "op2-product-fixture",
++          "--format",
++          "json"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++        "exit": 1,
++        "expected_exit": 1,
++        "stdout": "",
++        "stderr": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\ncurator: environment_home_stale: home unprovisioned; rerun with --repair\n"
++      },
++      {
++        "label": "main provision claude_code",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator",
++          "env",
++          "resolve",
++          "claude_code",
++          "--profile",
++          "op2-product-fixture",
++          "--repair",
++          "--format",
++          "json"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "{\"env\":{\"CLAUDE_CONFIG_DIR\":\"/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home/.curator/environments/op2-product-fixture/claude_code\"},\"environment\":\"claude_code\",\"fragment\":\"launch-env-fragment-v2\",\"permissions\":{\"locked\":false,\"mode\":\"native\",\"source\":\"default\"},\"precedence\":{\"placement\":\"winner-last\",\"winner\":\"higher-weight\"},\"profile\":{\"lock_sha256\":\"240216144aeb69a62f58ac41d2209333ee0da7c6ac286f7d9b57e77a79a8d0ce\",\"name\":\"op2-product-fixture\"}}\n",
++        "stderr": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\nManaged home provisioned at /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home/.curator/environments/op2-product-fixture/claude_code.\nThe tool treats this home as its own state root: sessions, trust records, and approvals accrue here, not in the native home.\nFirst-run steps the seeds do not cover: Log in inside this home on first use; accept the project trust dialog on the first interactive launch; approve MCP servers when prompted.\n"
++      },
++      {
++        "label": "main provision codex_cli",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator",
++          "env",
++          "resolve",
++          "codex_cli",
++          "--profile",
++          "op2-product-fixture",
++          "--repair",
++          "--format",
++          "json"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "{\"env\":{\"CODEX_HOME\":\"/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home/.curator/environments/op2-product-fixture/codex_cli\"},\"environment\":\"codex_cli\",\"fragment\":\"launch-env-fragment-v2\",\"permissions\":{\"locked\":false,\"mode\":\"native\",\"source\":\"default\"},\"precedence\":{\"placement\":\"winner-last\",\"winner\":\"higher-weight\"},\"profile\":{\"lock_sha256\":\"240216144aeb69a62f58ac41d2209333ee0da7c6ac286f7d9b57e77a79a8d0ce\",\"name\":\"op2-product-fixture\"}}\n",
++        "stderr": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\nwarning: mcp_native_servers_ungoverned: native Codex MCP servers fixture were inherited into this managed home outside the profile lock and MCP allowlist; the next seed revision stops inheriting them. Declare each server in the profile's MCP set, or accept the loss.\nManaged home provisioned at /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home/.curator/environments/op2-product-fixture/codex_cli.\nThe tool treats this home as its own state root: sessions, trust records, and approvals accrue here, not in the native home.\nFirst-run steps the seeds do not cover: Log in unless the native credential is shared through; pass --skip-git-repo-check outside a git repository.\n"
++      },
++      {
++        "label": "main real umbrella+tagged launcher to stub claude",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator",
++          "run",
++          "claude",
++          "--profile",
++          "op2-product-fixture",
++          "--permissions",
++          "native",
++          "--",
++          "--op2-product-fixture"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "",
++        "stderr": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\nwarning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\ncurator-run: provider: path=/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator-run\ncurator-run: defaults: model=claude-opus-5-5 (lineup) effort=high (lineup)\ncurator-run: permissions=native source=flag mapped=none\n"
++      },
++      {
++        "label": "main real umbrella+tagged launcher to stub codex",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator",
++          "run",
++          "codex",
++          "--profile",
++          "op2-product-fixture",
++          "--permissions",
++          "native",
++          "--",
++          "--op2-product-fixture"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "",
++        "stderr": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\nwarning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\ncurator-run: provider: path=/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator-run\ncurator-run: defaults: model=gpt-6-astra (lineup) effort=max (lineup)\ncurator-run: permissions=native source=flag mapped=none\n"
++      },
++      {
++        "label": "main install keyring fixture profile",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator",
++          "profile",
++          "install",
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/keyring-profile",
++          "--as",
++          "op2-product-keyring"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "installed profile op2-product-keyring (root op2-product-keyring 1.0.0, lock sha256:e934c088ba66d6167f2d36d6618f9b4713a165644bca60faa3a0a5bd4fd877ec); activate with 'curator profile use op2-product-keyring'\n",
++        "stderr": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\nwarning: mcp_package_allowlist_empty: the MCP package allowlist is empty; every declaration package in the closure is admitted\n"
++      },
++      {
++        "label": "main provision keyring mode",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator",
++          "env",
++          "resolve",
++          "codex_cli",
++          "--profile",
++          "op2-product-keyring",
++          "--repair",
++          "--format",
++          "json"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "{\"env\":{\"CODEX_HOME\":\"/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home/.curator/environments/op2-product-keyring/codex_cli\"},\"environment\":\"codex_cli\",\"fragment\":\"launch-env-fragment-v2\",\"permissions\":{\"locked\":false,\"mode\":\"native\",\"source\":\"default\"},\"precedence\":{\"placement\":\"winner-last\",\"winner\":\"higher-weight\"},\"profile\":{\"lock_sha256\":\"e934c088ba66d6167f2d36d6618f9b4713a165644bca60faa3a0a5bd4fd877ec\",\"name\":\"op2-product-keyring\"}}\n",
++        "stderr": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\nManaged home provisioned at /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home/.curator/environments/op2-product-keyring/codex_cli.\nThe tool treats this home as its own state root: sessions, trust records, and approvals accrue here, not in the native home.\nFirst-run steps the seeds do not cover: Log in unless the native credential is shared through; pass --skip-git-repo-check outside a git repository.\n"
++      },
++      {
++        "label": "rc2 clean-HOME refusal",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/bin/curator",
++          "global",
++          "init"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product",
++        "exit": 1,
++        "expected_exit": 1,
++        "stdout": "",
++        "stderr": "curator: global config not found: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/home/.curator/config.json\n"
++      },
++      {
++        "label": "rc2 bootstrap",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/bin/curator",
++          "bootstrap",
++          "--non-interactive",
++          "--skills-root",
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/skills-root",
++          "--default-agents",
++          "claude_code,codex_cli"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "wrote /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/home/.curator/config.json\nshell profile changes are not required: agent skills can invoke project and global command shims directly\noptional bare commands for interactive use: curator shell-init --install\n",
++        "stderr": ""
++      },
++      {
++        "label": "rc2 project add non-git",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/bin/curator",
++          "project",
++          "add",
++          "op2-product-fixture",
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "added project op2-product-fixture: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product\n",
++        "stderr": ""
++      },
++      {
++        "label": "rc2 generated manifest resolve",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/bin/curator",
++          "project",
++          "resolve",
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "alias: op2-product-fixture\npath: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product\nskillfile: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product/Skillfile.json\nskills: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product/.agents/skills\nbin: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product/.agents/bin\n",
++        "stderr": ""
++      },
++      {
++        "label": "rc2 schema2 local-path resolve",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/bin/curator",
++          "project",
++          "resolve",
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "resolve op2-product-fixture: 1 skills\nlock: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product/Skillfile.lock.json\nbindings: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/home/.curator/source-bindings/747c1523c2d59379.json\nlock_sha256: sha256:00af55d4a688a5ce54bc5dd8cd8586276c20ad9b6e06261783548dd76e2f66bd\n",
++        "stderr": ""
++      },
++      {
++        "label": "rc2 install non-git returns skipped",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/bin/curator",
++          "install",
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "op2-product-fixture: generated paths are not ignored by git; missing entries: .agents/, .claude/skills/, .codex/skills/; skipped\n",
++        "stderr": ""
++      },
++      {
++        "label": "rc2 changed manifest plus fix-gitignore still skipped",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/bin/curator",
++          "install",
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product",
++          "--fix-gitignore"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "op2-product-fixture: generated paths are not ignored by git; missing entries: .agents/, .claude/skills/, .codex/skills/; skipped\n",
++        "stderr": ""
++      },
++      {
++        "label": "rc2 git check-ignore in non-git root",
++        "argv": [
++          "git",
++          "-C",
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product",
++          "check-ignore",
++          "-q",
++          ".agents/.curator-probe"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product",
++        "exit": 128,
++        "expected_exit": 128,
++        "stdout": "",
++        "stderr": "fatal: not a git repository (or any of the parent directories): .git\n"
++      },
++      {
++        "label": "rc2 install operator-owned path profile",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/bin/curator",
++          "profile",
++          "install",
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/operator-profile",
++          "--as",
++          "op2-product-fixture"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "claude_code: switched (/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/home/.claude)\ncodex_cli: switched (/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/home/.codex)\nopencode: switched (/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/home/.config/opencode)\npi: switched (/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/home/.pi)\ninstalled and activated profile op2-product-fixture (root op2-product-fixture 1.0.0, lock sha256:240216144aeb69a62f58ac41d2209333ee0da7c6ac286f7d9b57e77a79a8d0ce)\n",
++        "stderr": "warning: mcp_package_allowlist_empty: the MCP package allowlist is empty; every declaration package in the closure is admitted\n"
++      },
++      {
++        "label": "rc2 unprovisioned managed home refusal",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/bin/curator",
++          "env",
++          "resolve",
++          "claude_code",
++          "--profile",
++          "op2-product-fixture",
++          "--format",
++          "json"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product",
++        "exit": 1,
++        "expected_exit": 1,
++        "stdout": "",
++        "stderr": "curator: environment_home_stale: home unprovisioned\n"
++      },
++      {
++        "label": "rc2 provision claude_code",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/bin/curator",
++          "env",
++          "resolve",
++          "claude_code",
++          "--profile",
++          "op2-product-fixture",
++          "--repair",
++          "--format",
++          "json"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "{\"env\":{\"CLAUDE_CONFIG_DIR\":\"/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/home/.curator/environments/op2-product-fixture/claude_code\"},\"environment\":\"claude_code\",\"fragment\":\"launch-env-fragment-v1\",\"precedence\":{\"placement\":\"winner-last\",\"winner\":\"higher-weight\"},\"profile\":{\"lock_sha256\":\"240216144aeb69a62f58ac41d2209333ee0da7c6ac286f7d9b57e77a79a8d0ce\",\"name\":\"op2-product-fixture\"}}\n",
++        "stderr": "Managed home provisioned at /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/home/.curator/environments/op2-product-fixture/claude_code.\nThe tool treats this home as its own state root: sessions, trust records, and approvals accrue here, not in the native home.\nFirst-run steps the seeds do not cover: Log in inside this home on first use; accept the project trust dialog on the first interactive launch; approve MCP servers when prompted.\n"
++      },
++      {
++        "label": "rc2 provision codex_cli",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/bin/curator",
++          "env",
++          "resolve",
++          "codex_cli",
++          "--profile",
++          "op2-product-fixture",
++          "--repair",
++          "--format",
++          "json"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "{\"env\":{\"CODEX_HOME\":\"/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/home/.curator/environments/op2-product-fixture/codex_cli\"},\"environment\":\"codex_cli\",\"fragment\":\"launch-env-fragment-v1\",\"precedence\":{\"placement\":\"winner-last\",\"winner\":\"higher-weight\"},\"profile\":{\"lock_sha256\":\"240216144aeb69a62f58ac41d2209333ee0da7c6ac286f7d9b57e77a79a8d0ce\",\"name\":\"op2-product-fixture\"}}\n",
++        "stderr": "Managed home provisioned at /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/home/.curator/environments/op2-product-fixture/codex_cli.\nThe tool treats this home as its own state root: sessions, trust records, and approvals accrue here, not in the native home.\nFirst-run steps the seeds do not cover: Log in unless the native credential is shared through; pass --skip-git-repo-check outside a git repository.\n"
++      },
++      {
++        "label": "rc2 real umbrella+tagged launcher to stub claude",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/bin/curator",
++          "run",
++          "claude",
++          "--profile",
++          "op2-product-fixture",
++          "--permissions",
++          "native",
++          "--",
++          "--op2-product-fixture"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "",
++        "stderr": "curator-run: provider: path=/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/bin/curator-run\ncurator-run: defaults: model=claude-opus-5-5 (lineup) effort=high (lineup)\ncurator-run: permissions=native source=flag mapped=none\n"
++      },
++      {
++        "label": "rc2 real umbrella+tagged launcher to stub codex",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/bin/curator",
++          "run",
++          "codex",
++          "--profile",
++          "op2-product-fixture",
++          "--permissions",
++          "native",
++          "--",
++          "--op2-product-fixture"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "",
++        "stderr": "curator-run: provider: path=/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/bin/curator-run\ncurator-run: defaults: model=gpt-6-astra (lineup) effort=max (lineup)\ncurator-run: permissions=native source=flag mapped=none\n"
++      },
++      {
++        "label": "rc2 install keyring fixture profile",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/bin/curator",
++          "profile",
++          "install",
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/keyring-profile",
++          "--as",
++          "op2-product-keyring"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "installed profile op2-product-keyring (root op2-product-keyring 1.0.0, lock sha256:e934c088ba66d6167f2d36d6618f9b4713a165644bca60faa3a0a5bd4fd877ec); activate with 'curator profile use op2-product-keyring'\n",
++        "stderr": "warning: mcp_package_allowlist_empty: the MCP package allowlist is empty; every declaration package in the closure is admitted\n"
++      },
++      {
++        "label": "rc2 provision keyring mode",
++        "argv": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/bin/curator",
++          "env",
++          "resolve",
++          "codex_cli",
++          "--profile",
++          "op2-product-keyring",
++          "--repair",
++          "--format",
++          "json"
++        ],
++        "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product",
++        "exit": 0,
++        "expected_exit": 0,
++        "stdout": "{\"env\":{\"CODEX_HOME\":\"/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/home/.curator/environments/op2-product-keyring/codex_cli\"},\"environment\":\"codex_cli\",\"fragment\":\"launch-env-fragment-v1\",\"precedence\":{\"placement\":\"winner-last\",\"winner\":\"higher-weight\"},\"profile\":{\"lock_sha256\":\"e934c088ba66d6167f2d36d6618f9b4713a165644bca60faa3a0a5bd4fd877ec\",\"name\":\"op2-product-keyring\"}}\n",
++        "stderr": "Managed home provisioned at /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/home/.curator/environments/op2-product-keyring/codex_cli.\nThe tool treats this home as its own state root: sessions, trust records, and approvals accrue here, not in the native home.\nFirst-run steps the seeds do not cover: Log in unless the native credential is shared through; pass --skip-git-repo-check outside a git repository.\n"
++      }
++    ],
++    "facts": {
++      "main": {
++        "generated_schema": 1,
++        "generated_resolve_writes_lock": false,
++        "project_is_git": false,
++        "lock_path": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product/Skillfile.lock.json",
++        "bindings_paths": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home/.curator/source-bindings/8b8cc64bb892227d.json"
++        ],
++        "lock_member_count": 1,
++        "local_skill_installed": false,
++        "skipped_install_preserved_lock": true,
++        "claude_code_fragment_schema": "launch-env-fragment-v2",
++        "codex_cli_fragment_schema": "launch-env-fragment-v2",
++        "native_memory_unchanged": true,
++        "managed_memory_exists": false,
++        "codex_auth_is_link": true,
++        "codex_auth_target": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home/.codex/auth.json",
++        "native_auth_unchanged": true,
++        "claude_credential_file_exists": false,
++        "codex_native_mcp_inherited": true,
++        "claude_provider_capture": {
++          "argv": [
++            "--model",
++            "claude-opus-5-5",
++            "--effort",
++            "high",
++            "--op2-product-fixture"
++          ],
++          "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++          "HOME": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home",
++          "CLAUDE_CONFIG_DIR": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home/.curator/environments/op2-product-fixture/claude_code",
++          "CODEX_HOME": null
++        },
++        "codex_provider_capture": {
++          "argv": [
++            "-m",
++            "gpt-6-astra",
++            "-c",
++            "model_reasoning_effort=\"max\"",
++            "--op2-product-fixture"
++          ],
++          "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++          "HOME": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home",
++          "CLAUDE_CONFIG_DIR": null,
++          "CODEX_HOME": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home/.curator/environments/op2-product-fixture/codex_cli"
++        },
++        "keyring_links_auth": false
++      },
++      "rc2": {
++        "generated_schema": 1,
++        "generated_resolve_writes_lock": false,
++        "project_is_git": false,
++        "lock_path": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product/Skillfile.lock.json",
++        "bindings_paths": [
++          "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/home/.curator/source-bindings/747c1523c2d59379.json"
++        ],
++        "lock_member_count": 1,
++        "local_skill_installed": false,
++        "skipped_install_preserved_lock": true,
++        "claude_code_fragment_schema": "launch-env-fragment-v1",
++        "codex_cli_fragment_schema": "launch-env-fragment-v1",
++        "native_memory_unchanged": true,
++        "managed_memory_exists": false,
++        "codex_auth_is_link": true,
++        "codex_auth_target": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/home/.codex/auth.json",
++        "native_auth_unchanged": true,
++        "claude_credential_file_exists": false,
++        "codex_native_mcp_inherited": true,
++        "claude_provider_capture": {
++          "argv": [
++            "--model",
++            "claude-opus-5-5",
++            "--effort",
++            "high",
++            "--op2-product-fixture"
++          ],
++          "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product",
++          "HOME": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/home",
++          "CLAUDE_CONFIG_DIR": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/home/.curator/environments/op2-product-fixture/claude_code",
++          "CODEX_HOME": null
++        },
++        "codex_provider_capture": {
++          "argv": [
++            "-m",
++            "gpt-6-astra",
++            "-c",
++            "model_reasoning_effort=\"max\"",
++            "--op2-product-fixture"
++          ],
++          "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/product",
++          "HOME": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/home",
++          "CLAUDE_CONFIG_DIR": null,
++          "CODEX_HOME": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/home/.curator/environments/op2-product-fixture/codex_cli"
++        },
++        "keyring_links_auth": false
++      }
++    }
++  },
++  "earlier_attempts": [
++    {
++      "rows": [
++        {
++          "label": "main clean-HOME refusal",
++          "argv": [
++            "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator",
++            "global",
++            "init"
++          ],
++          "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++          "exit": 1,
++          "expected_exit": 1,
++          "stdout": "",
++          "stderr": "curator: global config not found: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home/.curator/config.json\ncurator: run `curator bootstrap --skills-root <dir>` first (see docs/cli.md#bootstrap)\n"
++        },
++        {
++          "label": "main bootstrap",
++          "argv": [
++            "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator",
++            "bootstrap",
++            "--non-interactive",
++            "--skills-root",
++            "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/skills-root",
++            "--default-agents",
++            "claude_code,codex_cli"
++          ],
++          "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++          "exit": 0,
++          "expected_exit": 0,
++          "stdout": "wrote /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home/.curator/config.json\nshell profile changes are not required: agent skills can invoke project and global command shims directly\noptional bare commands for interactive use: curator shell-init --install\n",
++          "stderr": ""
++        },
++        {
++          "label": "main project add non-git",
++          "argv": [
++            "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator",
++            "project",
++            "add",
++            "op2-product-fixture",
++            "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product"
++          ],
++          "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++          "exit": 1,
++          "expected_exit": 0,
++          "stdout": "",
++          "stderr": "curator: global config not found: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/absent-system.json\ncurator: run `curator bootstrap --skills-root <dir>` first (see docs/cli.md#bootstrap)\n"
++        }
++      ],
++      "facts": {}
++    },
++    {
++      "rows": [
++        {
++          "label": "main clean-HOME refusal",
++          "argv": [
++            "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator",
++            "global",
++            "init"
++          ],
++          "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++          "exit": 1,
++          "expected_exit": 1,
++          "stdout": "",
++          "stderr": "curator: global config not found: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home/.curator/config.json\ncurator: run `curator bootstrap --skills-root <dir>` first (see docs/cli.md#bootstrap)\n"
++        },
++        {
++          "label": "main bootstrap",
++          "argv": [
++            "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator",
++            "bootstrap",
++            "--non-interactive",
++            "--skills-root",
++            "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/skills-root",
++            "--default-agents",
++            "claude_code,codex_cli"
++          ],
++          "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++          "exit": 0,
++          "expected_exit": 0,
++          "stdout": "wrote /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home/.curator/config.json\nshell profile changes are not required: agent skills can invoke project and global command shims directly\noptional bare commands for interactive use: curator shell-init --install\n",
++          "stderr": ""
++        },
++        {
++          "label": "main project add non-git",
++          "argv": [
++            "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator",
++            "project",
++            "add",
++            "op2-product-fixture",
++            "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product"
++          ],
++          "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++          "exit": 0,
++          "expected_exit": 0,
++          "stdout": "added project op2-product-fixture: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product\n",
++          "stderr": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\n"
++        },
++        {
++          "label": "main generated manifest resolve",
++          "argv": [
++            "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator",
++            "project",
++            "resolve",
++            "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product"
++          ],
++          "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++          "exit": 0,
++          "expected_exit": 0,
++          "stdout": "alias: op2-product-fixture\npath: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product\nskillfile: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product/Skillfile.json\nskills: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product/.agents/skills\nbin: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product/.agents/bin\n",
++          "stderr": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\n"
++        },
++        {
++          "label": "main schema2 local-path resolve",
++          "argv": [
++            "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator",
++            "project",
++            "resolve",
++            "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product"
++          ],
++          "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++          "exit": 0,
++          "expected_exit": 0,
++          "stdout": "resolve op2-product-fixture: 1 skills\nlock: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product/Skillfile.lock.json\nbindings: /private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home/.curator/source-bindings/8b8cc64bb892227d.json\nlock_sha256: sha256:00af55d4a688a5ce54bc5dd8cd8586276c20ad9b6e06261783548dd76e2f66bd\n",
++          "stderr": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\n"
++        },
++        {
++          "label": "main install frozen local skill",
++          "argv": [
++            "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator",
++            "install",
++            "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product"
++          ],
++          "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++          "exit": 0,
++          "expected_exit": 0,
++          "stdout": "op2-product-fixture: generated paths are not ignored by git; missing entries: .agents/, .claude/skills/, .codex/skills/; skipped\n",
++          "stderr": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\n"
++        },
++        {
++          "label": "main changed manifest refuses stale lock",
++          "argv": [
++            "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/bin/curator",
++            "install",
++            "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product"
++          ],
++          "cwd": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product",
++          "exit": 0,
++          "expected_exit": 1,
++          "stdout": "op2-product-fixture: generated paths are not ignored by git; missing entries: .agents/, .claude/skills/, .codex/skills/; skipped\n",
++          "stderr": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\n"
++        }
++      ],
++      "facts": {
++        "main": {
++          "generated_schema": 1,
++          "generated_resolve_writes_lock": false,
++          "project_is_git": false,
++          "lock_path": "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/product/Skillfile.lock.json",
++          "bindings_paths": [
++            "/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home/.curator/source-bindings"
++          ],
++          "lock_member_count": 1
++        }
++      }
++    }
++  ],
++  "release_queries": [
++    {
++      "argv": [
++        "gh",
++        "release",
++        "list",
++        "--repo",
++        "relux-works/curator",
++        "--limit",
++        "8"
++      ],
++      "exit": 0,
++      "stdout": "v0.15.0-rc.2\tPre-release\tv0.15.0-rc.2\t2026-09-26T19:20:10Z\nv0.15.0-rc.1\tPre-release\tv0.15.0-rc.1\t2026-09-08T14:27:29Z\nv0.14.0\tLatest\tv0.14.0\t2026-09-06T11:26:52Z\nCurator v0.14.0-rc.1\tPre-release\tv0.14.0-rc.1\t2026-08-06T00:22:40Z\nv0.13.0\t\tv0.13.0\t2026-07-29T21:53:42Z\nv0.12.5\t\tv0.12.5\t2026-07-14T01:36:18Z\nv0.12.4\t\tv0.12.4\t2026-07-13T21:54:06Z\nv0.1.1\t\tv0.1.1\t2026-07-12T23:42:07Z\n",
++      "stderr": ""
++    },
++    {
++      "argv": [
++        "gh",
++        "release",
++        "list",
++        "--repo",
++        "relux-works/curator-agent-launcher",
++        "--limit",
++        "8"
++      ],
++      "exit": 0,
++      "stdout": "",
++      "stderr": ""
++    },
++    {
++      "argv": [
++        "gh",
++        "release",
++        "list",
++        "--repo",
++        "relux-works/curator-spec",
++        "--limit",
++        "8"
++      ],
++      "exit": 0,
++      "stdout": "v1.0.0-rc.13\tPre-release\tv1.0.0-rc.13\t2026-09-26T11:25:11Z\nv1.0.0-rc.11 \u2014 the agent-environments capability, specified\tLatest\tv1.0.0-rc.11\t2026-09-07T19:24:08Z\nv1.0.0-rc.9\tPre-release\tv1.0.0-rc.9\t2026-08-24T18:54:36Z\nv1.0.0-rc.8\tPre-release\tv1.0.0-rc.8\t2026-08-19T00:40:10Z\nv1.0.0-rc.5\tPre-release\tv1.0.0-rc.5\t2026-07-29T22:07:06Z\nv1.0.0-rc.3\tPre-release\tv1.0.0-rc.3\t2026-07-14T01:33:55Z\nv1.0.0-rc.2\tPre-release\tv1.0.0-rc.2\t2026-07-13T21:52:18Z\nv1.0.0-rc.1\tPre-release\tv1.0.0-rc.1\t2026-07-13T12:12:41Z\n",
++      "stderr": ""
++    },
++    {
++      "argv": [
++        "gh",
++        "api",
++        "repos/relux-works/curator/tags",
++        "--jq",
++        ".[0:10] | map({name,sha:.commit.sha})"
++      ],
++      "exit": 0,
++      "stdout": "[{\"name\":\"v0.15.0-rc.2\",\"sha\":\"bd3c0f436226ec831c13b3a307c30acd035c73c2\"},{\"name\":\"v0.15.0-rc.1\",\"sha\":\"d1bb0a4e92304526c782f77607aa30abc2f3ae07\"},{\"name\":\"v0.14.0\",\"sha\":\"d23dcd16918a94a4b240cbcc81cf79d54f0eeaa7\"},{\"name\":\"v0.14.0-rc.3\",\"sha\":\"124654a051f60995e826b75ab43a3c4f3359f5ff\"},{\"name\":\"v0.14.0-rc.2\",\"sha\":\"74a24fdbded64381de512dc916022ca9bae2edb3\"},{\"name\":\"v0.14.0-rc.1\",\"sha\":\"af471504aafd0ea5ea16f712469883ddde8b827e\"},{\"name\":\"v0.13.0\",\"sha\":\"cfffd7cd7be33aba9ca44d26993ce5ab19b5fa4d\"},{\"name\":\"v0.12.5\",\"sha\":\"17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8\"},{\"name\":\"v0.12.4\",\"sha\":\"20fd90c5fbc113331e5cd365ce48c507c912dafd\"},{\"name\":\"v0.1.1\",\"sha\":\"fee0ffb9b301d4ea13309cfb2b08330d7174b442\"}]\n",
++      "stderr": ""
++    },
++    {
++      "argv": [
++        "gh",
++        "api",
++        "repos/relux-works/curator-spec/tags",
++        "--jq",
++        ".[0:5] | map({name,sha:.commit.sha})"
++      ],
++      "exit": 0,
++      "stdout": "[{\"name\":\"v1.0.0-rc.13\",\"sha\":\"23435129ebc4c29e5b7f75ec72a0aa0cd3f16065\"},{\"name\":\"v1.0.0-rc.12\",\"sha\":\"dced9b8317e0e8af79edf2d0539b32bd22b6c85b\"},{\"name\":\"v1.0.0-rc.11\",\"sha\":\"87a0d0060bad64ab883d007dcdf35df7485368bf\"},{\"name\":\"v1.0.0-rc.10\",\"sha\":\"b8b03d597ac83d158a0eadd9d0b25d2e883de1a3\"},{\"name\":\"v1.0.0-rc.9\",\"sha\":\"0ed5c691e9208eea52f21db2fc05e226ce3516fd\"}]\n",
++      "stderr": ""
++    },
++    {
++      "argv": [
++        "gh",
++        "release",
++        "view",
++        "v0.15.0-rc.2",
++        "--repo",
++        "relux-works/curator",
++        "--json",
++        "tagName,publishedAt,isPrerelease,assets",
++        "--jq",
++        "{tag:.tagName,date:.publishedAt,prerelease:.isPrerelease,assets:[.assets[].name]}"
++      ],
++      "exit": 0,
++      "stdout": "{\"assets\":[\"checksums.txt\",\"checksums.txt.pem\",\"checksums.txt.sig\",\"curator_0.15.0-rc.2_darwin_amd64.tar.gz\",\"curator_0.15.0-rc.2_darwin_amd64.tar.gz.sbom.json\",\"curator_0.15.0-rc.2_darwin_arm64.tar.gz\",\"curator_0.15.0-rc.2_darwin_arm64.tar.gz.sbom.json\",\"curator_0.15.0-rc.2_linux_amd64.deb\",\"curator_0.15.0-rc.2_linux_amd64.rpm\",\"curator_0.15.0-rc.2_linux_amd64.tar.gz\",\"curator_0.15.0-rc.2_linux_amd64.tar.gz.sbom.json\",\"curator_0.15.0-rc.2_linux_arm64.deb\",\"curator_0.15.0-rc.2_linux_arm64.rpm\",\"curator_0.15.0-rc.2_linux_arm64.tar.gz\",\"curator_0.15.0-rc.2_linux_arm64.tar.gz.sbom.json\",\"curator_0.15.0-rc.2_windows_amd64.zip\",\"curator_0.15.0-rc.2_windows_amd64.zip.sbom.json\",\"curator_0.15.0-rc.2_windows_arm64.zip\",\"curator_0.15.0-rc.2_windows_arm64.zip.sbom.json\"],\"date\":\"2026-09-26T19:20:10Z\",\"prerelease\":true,\"tag\":\"v0.15.0-rc.2\"}\n",
++      "stderr": ""
++    },
++    {
++      "argv": [
++        "gh",
++        "api",
++        "repos/relux-works/curator-agent-launcher/git/tags/88f2da504591a431003a5d1c45ee2cadd4e9f52c",
++        "--jq",
++        "{tag:.tag,object:.object}"
++      ],
++      "exit": 0,
++      "stdout": "{\"object\":{\"sha\":\"27cc242d393afb471b62c230101caf890dbd2fb7\",\"type\":\"commit\",\"url\":\"https://api.github.com/repos/relux-works/curator-agent-launcher/git/commits/27cc242d393afb471b62c230101caf890dbd2fb7\"},\"tag\":\"v0.1.0\"}\n",
++      "stderr": ""
++    }
++  ],
++  "validation_commands": [
++    {
++      "argv": [
++        "go",
++        "build",
++        "-o",
++        "/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/curator-main",
++        "./cmd/curator"
++      ],
++      "cwd": "/Users/administrator/Developer/ReluxWorks/curator/curator/.temp/STORY-261001-luaymu/worktree",
++      "exit": 0
++    },
++    {
++      "argv": [
++        "go",
++        "build",
++        "-o",
++        "../curator-rc2",
++        "./cmd/curator"
++      ],
++      "cwd": "/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/tag-src",
++      "exit": 0
++    },
++    {
++      "argv": [
++        "go",
++        "build",
++        "-o",
++        "/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/curator-run",
++        "./cmd/curator-run"
++      ],
++      "cwd": "/Users/administrator/Developer/ReluxWorks/curator/curator-agent-launcher",
++      "exit": 0,
++      "scope": "auxiliary current launcher build; not used in measured compatibility launches"
++    },
++    {
++      "argv": [
++        "go",
++        "build",
++        "-o",
++        "../curator-run-v010",
++        "./cmd/curator-run"
++      ],
++      "cwd": "/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/launcher-tag-src",
++      "exit": 0
++    },
++    {
++      "argv": [
++        "go",
++        "test",
++        "./internal/envprofile",
++        "-run",
++        "^(TestCodexIsolatedAdmission|TestCodexUnknownStoreSharedRefuses|TestCodexMalformedStoreSharedRefuses|TestCredentialLinkRegularFileRefuses|TestStaleCredentialLinkRefusals|TestCredentialLinkTargetInspectionFailure)$",
++        "-count=1"
++      ],
++      "cwd": "/Users/administrator/Developer/ReluxWorks/curator/curator/.temp/STORY-261001-luaymu/worktree",
++      "exit": 0,
++      "stdout": "ok github.com/relux-works/curator/internal/envprofile 31.945s"
++    },
++    {
++      "argv": [
++        "go",
++        "test",
++        "./cmd/curator",
++        "-run",
++        "^(TestGlobalInitCleanHomeRefusesWithBootstrapHint|TestGlobalInitMalformedConfigHasNoBootstrapHint|TestEnvResolveStaleHintsRepair|TestProjectResolveLocalCreatesLockThroughCLI)$",
++        "-count=1"
++      ],
++      "cwd": "/Users/administrator/Developer/ReluxWorks/curator/curator/.temp/STORY-261001-luaymu/worktree",
++      "exit": 0,
++      "stdout": "ok github.com/relux-works/curator/cmd/curator 113.357s"
++    }
++  ],
++  "keeper_evidence": [
++    {
++      "path": "README.md",
++      "commit": "3a8e112e740c5442189585a6b5fc02f574d57da2",
++      "content_api_exit": 0,
++      "commit_api_exit": 0,
++      "lines": {
++        "7": "**Draft design, v0.5.1.** Nothing is implemented. The specification is a draft (milestone KP0). The beekeeping names were approved on 2026-09-25 (spec, Names): apiary, yard, keeper, hive, queen, comb, bee, wild bees, nuc. v0.3 adds the memory resolution ladder, the designer's dream rehearsals and the command-only install of `keeper`, and records role profiles as decided. v0.5 applies the command-line shape adopted on 2026-09-27: beekeeping words only in `keeper`'s nouns and the apiary's directories, the full `keeper` command map over `curator session`, `curator run` and `task-board trust`, and the default harness as an operator binding."
++      }
++    },
++    {
++      "path": "spec/track.md",
++      "commit": "5967d2515610c106489d509402ae74f3a0148d9a",
++      "content_api_exit": 0,
++      "commit_api_exit": 0,
++      "lines": {
++        "3": "Status: **DRAFT v0.5.1**, 2026-09-30. Specification: [`keeper.md`](keeper.md). Roadmap: `wiki/roadmap/ecosystem-roadmap.md`, line KP. Names: the keeper of an apiary (specification, Names).",
++        "14": "| KP1 | one node on existing harnesses, terminal-only (no channel and no tick): the root instantiated from the template package with no upstream; the keeper package's `apiary` profile as the one install, with the Curator providers `curator-run` and `curator-session` installed by `keeper init`; the `keeper` command (`keeper` itself, `init`, `up`, `down`, `session list` with its alias `ls`, `chat` with its picker, `watch`, `park`, `stop`, `estop`, `status`, `harness`, `hive` with `add --template`, `hint`, `route`, `ask`, `wake`, `host`) over `curator session` and `curator run`, and over today's `task-board session` commands until the node host lands; the login agent running `keeper up`; supervision through the extracted session host with capability tokens; routing with a generative fallback and routing hints; creating a process from a template; the main loop's own process on its own board | on one machine, a request typed in the terminal reaches the right one of three processes; a request for a missing process creates it from a template after the person confirms; after a reboot, `keeper up` brings back the main loop and every queen with their goals |"
++      }
++    }
++  ],
++  "rendered_context_inspection": {
++    "exit": 0,
++    "checks": [
++      {
++        "lane": "main",
++        "environment": "claude_code",
++        "path": "/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home/.curator/environments/op2-product-fixture/claude_code/CLAUDE.md",
++        "exists": true,
++        "fixture_context_present": true
++      },
++      {
++        "lane": "main",
++        "environment": "codex_cli",
++        "path": "/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/main/home/.curator/environments/op2-product-fixture/codex_cli/AGENTS.md",
++        "exists": true,
++        "fixture_context_present": true
++      },
++      {
++        "lane": "rc2",
++        "environment": "claude_code",
++        "path": "/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/home/.curator/environments/op2-product-fixture/claude_code/CLAUDE.md",
++        "exists": true,
++        "fixture_context_present": true
++      },
++      {
++        "lane": "rc2",
++        "environment": "codex_cli",
++        "path": "/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/op2-product-evidence-ksu7jh3r/rc2/home/.curator/environments/op2-product-fixture/codex_cli/AGENTS.md",
++        "exists": true,
++        "fixture_context_present": true
++      }
++    ]
++  },
++  "artifact_validation": {
++    "exit": 0,
++    "probe_process_expectations": "32/32",
++    "process_exits": {
++      "zero": 26,
++      "one": 4,
++      "128": 2
++    },
++    "skipped_install_processes": 4,
++    "requirement_rows": "6/6",
++    "question_rows": "8/8",
++    "relative_artifact_links": "3/3",
++    "scripts_parse": true,
++    "under_120_KiB": true,
++    "git_diff_check_exit": 0
++  },
++  "isolation_limit": {
++    "go_env_exit": 0,
++    "GOCACHE": "/Users/administrator/Library/Caches/go-build",
++    "GOPATH": "/Users/administrator/go",
++    "build_and_test_caches_relocated": false,
++    "note": "Compiler cache activity was outside literal HOME isolation. Runtime probes isolated Curator and native-agent config/auth; no real Keychain API call or native configuration/authentication write was performed by probes."
++  },
++  "resource_update_recovery": {
++    "initial_exit": 1,
++    "reason": "Incorrect three-operand resource update syntax; command rejected before writing. Corrected to resource update ELEMENT SOURCE --name NAME."
++  }
++}
+diff --git a/.research/TASK-261001-3qugz9_probe.py b/.research/TASK-261001-3qugz9_probe.py
+new file mode 100644
+index 00000000..3e98ef57
+--- /dev/null
++++ b/.research/TASK-261001-3qugz9_probe.py
+@@ -0,0 +1,64 @@
++import os,json,subprocess,shutil,hashlib,sys
++from pathlib import Path
++P=Path(__import__("sys").argv[1]).resolve()
++rows=[]
++def run(args,env,cwd,expected=0,label=None):
++ r=subprocess.run([str(a) for a in args],env=env,cwd=cwd,capture_output=True,text=True,timeout=90)
++ row=dict(label=label or str(args[1:]),argv=[str(a) for a in args],cwd=str(cwd),exit=r.returncode,expected_exit=expected,stdout=r.stdout,stderr=r.stderr)
++ rows.append(row);save();print(row['label'],': exit',r.returncode,'expected',expected,flush=True)
++ if r.returncode!=expected:
++  print(r.stdout,r.stderr);raise RuntimeError('unexpected exit')
++ return r
++facts={}
++def save():
++ (P/'probe-results.json').write_text(json.dumps(dict(rows=rows,facts=facts),indent=2))
++for lane in ['main','rc2']:
++ base=P/lane;shutil.rmtree(base,ignore_errors=True);base.mkdir(exist_ok=True);(base/'system.json').write_text('{"schema_version":2,"locked":[]}');home=base/'home';home.mkdir(exist_ok=True);project=base/'product';project.mkdir(exist_ok=True);skills=base/'skills-root';skills.mkdir(exist_ok=True);bindir=base/'bin';bindir.mkdir(exist_ok=True)
++ shutil.copy2(P/('curator-main' if lane=='main' else 'curator-rc2'),bindir/'curator')
++ shutil.copy2(P/'curator-run-v010',bindir/'curator-run')
++ for agent,version in [('claude','2.1.261'),('codex','0.153.2')]:
++  stub=bindir/agent
++  stub.write_text('#!/bin/sh\nif [ "$1" = "--version" ]; then echo "'+version+'"; exit 0; fi\nexec /usr/bin/python3 '+str(P/'capture-provider.py')+' "$@"\n');stub.chmod(0o755)
++ env={k:v for k,v in os.environ.items() if not (k.startswith(('CURATOR','TASK_BOARD','CODEX','CLAUDE','ANTHROPIC','OPENAI','AX_','A2A','XDG_','PI_')) or k in ['HOME','GOBIN','GOPATH'])}
++ env.update(HOME=str(home),XDG_CONFIG_HOME=str(home/'.config'),CURATOR_CONFIG=str(home/'.curator/config.json'),CURATOR_SYSTEM_CONFIG=str(base/'system.json'),PATH=str(bindir)+':/usr/bin:/bin:/usr/sbin:/sbin',op2-product_CAPTURE=str(base/'provider.json'),CI='true')
++ curator=bindir/'curator'
++ run([curator,'global','init'],env,project,1,label=lane+' clean-HOME refusal')
++ run([curator,'bootstrap','--non-interactive','--skills-root',skills,'--default-agents','claude_code,codex_cli'],env,project,label=lane+' bootstrap')
++ run([curator,'project','add','op2-product-fixture',project],env,project,label=lane+' project add non-git')
++ generated=json.loads((project/'Skillfile.json').read_text()); facts[lane]={'generated_schema':generated['schema_version']}
++ run([curator,'project','resolve',project],env,project,label=lane+' generated manifest resolve')
++ facts[lane]['generated_resolve_writes_lock']=(project/'Skillfile.lock.json').exists()
++ pkg=project/'packages/review';pkg.mkdir(parents=True,exist_ok=True)
++ (pkg/'SKILL.md').write_text('---\nname: review\ndescription: Review a local fixture.\n---\nReview the supplied fixture.\n')
++ (project/'Skillfile.json').write_text(json.dumps({'schema_version':2,'agents':['claude_code','codex_cli'],'sources':{'local':{'path':'./packages'}},'skills':[{'name':'review','from':'local','directory':'review'}]}))
++ run([curator,'project','resolve',project],env,project,label=lane+' schema2 local-path resolve')
++ run([curator,'install',project],env,project,label=lane+' install non-git returns skipped')
++ lock=json.loads((project/'Skillfile.lock.json').read_text()); bindings=list((home/'.curator/source-bindings').glob('*.json'))
++ facts[lane].update(project_is_git=(project/'.git').exists(),lock_path=str(project/'Skillfile.lock.json'),bindings_paths=[str(x) for x in bindings],lock_member_count=len(lock['members']))
++ facts[lane]['local_skill_installed']=(project/'.agents/skills/review/SKILL.md').exists();before=(project/'Skillfile.lock.json').read_bytes(); (project/'Skillfile.json').write_text(json.dumps({'schema_version':2,'agents':['claude_code','codex_cli'],'sources':{'local':{'path':'./packages'}},'skills':[]}))
++ run([curator,'install',project,'--fix-gitignore'],env,project,label=lane+' changed manifest plus fix-gitignore still skipped')
++ run(['git','-C',project,'check-ignore','-q','.agents/.curator-probe'],env,project,128,label=lane+' git check-ignore in non-git root')
++ facts[lane]['skipped_install_preserved_lock']=(project/'Skillfile.lock.json').read_bytes()==before
++ profile=base/'operator-profile';(profile/'context').mkdir(parents=True,exist_ok=True)
++ (profile/'agent-context.json').write_text(json.dumps({'schema_version':1,'name':'op2-product-fixture','version':'1.0.0','context':{'modules':[{'path':'root.md'}]}}))
++ (profile/'context/root.md').write_text('Operator-authored fixture context.\n')
++ native=home/'.codex';native.mkdir(exist_ok=True);(native/'auth.json').write_text('{"fixture":true}\n');(native/'auth.json').chmod(0o600)
++ (native/'config.toml').write_text('cli_auth_credentials_store = "file"\n[mcp_servers.fixture]\ncommand = "fixture-server"\n')
++ memory=home/'.claude/projects/fixture/memory/MEMORY.md';memory.parent.mkdir(parents=True,exist_ok=True);memory.write_text('Existing memory fixture.\n')
++ auth_before=hashlib.sha256((native/'auth.json').read_bytes()).hexdigest()
++ run([curator,'profile','install',profile,'--as','op2-product-fixture'],env,project,label=lane+' install operator-owned path profile')
++ run([curator,'env','resolve','claude_code','--profile','op2-product-fixture','--format','json'],env,project,1,label=lane+' unprovisioned managed home refusal')
++ for agent in ['claude_code','codex_cli']:
++  result=run([curator,'env','resolve',agent,'--profile','op2-product-fixture','--repair','--format','json'],env,project,label=lane+' provision '+agent)
++  fragment=json.loads(result.stdout);facts[lane][agent+'_fragment_schema']=fragment['fragment']
++ managed=home/'.curator/environments/op2-product-fixture'
++ facts[lane].update(native_memory_unchanged=memory.read_text()=='Existing memory fixture.\n',managed_memory_exists=(managed/'claude_code/projects/fixture/memory/MEMORY.md').exists(),codex_auth_is_link=(managed/'codex_cli/auth.json').is_symlink(),codex_auth_target=os.readlink(managed/'codex_cli/auth.json'),native_auth_unchanged=hashlib.sha256((native/'auth.json').read_bytes()).hexdigest()==auth_before,claude_credential_file_exists=(managed/'claude_code/.credentials.json').exists(),codex_native_mcp_inherited='fixture' in (managed/'codex_cli/config.toml').read_text())
++ for agent in ['claude','codex']:
++  run([curator,'run',agent,'--profile','op2-product-fixture','--permissions','native','--','--op2-product-fixture'],env,project,label=lane+' real umbrella+tagged launcher to stub '+agent)
++  facts[lane][agent+'_provider_capture']=json.loads((base/'provider.json').read_text())
++ (native/'config.toml').write_text('cli_auth_credentials_store = "keyring"\n')
++ other=base/'keyring-profile';shutil.copytree(profile,other);manifest=json.loads((other/'agent-context.json').read_text());manifest['name']='op2-product-keyring';(other/'agent-context.json').write_text(json.dumps(manifest))
++ run([curator,'profile','install',other,'--as','op2-product-keyring'],env,project,label=lane+' install keyring fixture profile')
++ run([curator,'env','resolve','codex_cli','--profile','op2-product-keyring','--repair','--format','json'],env,project,label=lane+' provision keyring mode')
++ facts[lane]['keyring_links_auth']=(home/'.curator/environments/op2-product-keyring/codex_cli/auth.json').is_symlink()
++ save()
