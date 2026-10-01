@@ -1,0 +1,877 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 5bda9d9..9b48d29 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -2,6 +2,12 @@
+ 
+ ## Unreleased
+ 
++### Added
++
++- Register the Muse launcher/provider mapping and read v3 launch fragments
++  with four XDG parents, preserving the inherited `HOME`. The pinned Muse
++  plugin still refuses interactive launch plans and has no permission mapping.
++
+ ### Security
+ 
+ - Validate `defaults.json` and `ax.json` before use: reject symlinks, files
+diff --git a/README.md b/README.md
+index 6cd4e05..3a724b5 100644
+--- a/README.md
++++ b/README.md
+@@ -7,7 +7,15 @@ admitted interactive plan, and optional ax tracking. The contract is
+ ## Production pipeline
+ 
+ The executable supports `claude_code` (alias `claude`), `codex_cli`
+-(alias `codex`), and native `pi`:
++(alias `codex`), and native `pi`.
++
++Muse has a registered `muse` system/provider mapping and accepts
++`launch-env-fragment-v3` with four XDG parents under one managed home,
++preserving inherited `HOME`. With agents-management v0.5.22, `curator-run muse`
++still refuses: the module has no Muse permission mapping and declares no
++interactive launch mode. Exec/serve mode is not substituted.
++
++The launch pipeline follows these steps:
+ 
+ 1. Read machine-first `ax.json` before argument validation. Missing configuration
+    or `enabled:false` selects direct execution. Malformed or unreadable
+diff --git a/SPEC.md b/SPEC.md
+index 5130a64..10fb280 100644
+--- a/SPEC.md
++++ b/SPEC.md
+@@ -215,7 +215,7 @@ curator env resolve <env-id> [--profile <name>] --repair --format json
+ with the canonical `<env-id>` of §3: the launcher normalizes the `claude`
+ and `codex` aliases before invoking the subprocess, so the alias never
+ reaches Curator's lookup. The required `fragment` member names the fragment
+-revision. The launcher parses the closed v1 or v2 object per environments.md
++revision. The launcher parses the closed v1, v2, or v3 object per environments.md
+ §10.2 as revised by Decisions 0012 and 0018 and F-S2
+ (curator-spec `ec8dc656`), rejecting unknown fields, unknown kinds,
+ unknown semantics values, and contradictory permission data.
+@@ -227,6 +227,14 @@ usable for legacy `native` launches but cannot establish permission or lock
+ transport, so a launch that would resolve `yolo` fails closed as specified
+ in §4.3 and §4.6.
+ 
++Revision v3 (curator-spec candidate `d373078a`, environments §10.2)
++retains v2 permissions and admits Muse with exactly `XDG_CONFIG_HOME`,
++`XDG_DATA_HOME`, `XDG_STATE_HOME`, and `XDG_CACHE_HOME`. Their values share
++one absolute managed parent, ending in `/config`, `/data`, `/state`, and
++`/cache`, respectively. `HOME` is never a fragment variable or managed
++override. Muse has no system-prompt or MCP member; v1/v2 do not admit Muse.
++Other adapters retain their single variable and existing channel rules.
++
+ `--repair` is **always** passed (environments.md §9.2 step 5, §10.1;
+ `profiles/manager.md` §12.5): the launcher is the one caller that repairs.
+ Without it, `env resolve` is read-only — a lock-free verification of
+@@ -352,6 +360,7 @@ mapping between the three:
+ | `claude_code` | `claude-code` | `claude` |
+ | `codex_cli` | `codex` | `codex` |
+ | `pi` | `pi-native` | `pi` |
++| `muse` | `muse` | `muse` |
+ | `opencode` | none in this revision — `env_unsupported` | none — `env_unsupported` |
+ 
+ The Pi system cell corrects accepted A0 errata E1/E2
+@@ -373,6 +382,13 @@ inference, and a row is launchable only when both non-Curator columns
+ are filled — the launcher does not exec untracked what it could not hand
+ off tracked.
+ 
++The Muse row follows the binding 2026-10-01 task decision. Mapping does
++not attest launch-mode support. The pinned agents-management v0.5.22
++plugin declares exec/dry-run only and lacks a release-pinned permission
++mapping: the launcher preserves those refusals. Its declaration-owned
++model rows are the module's system-only launch authority, without a
++resolved vendor; defaults consumes those rows as BuildLaunch does.
++
+ ### 4.3 Resolve model and effort defaults
+ 
+ The launcher owns default resolution (Decision 0013 D6.2); the spawn plane
+diff --git a/cmd/curator-run/main.go b/cmd/curator-run/main.go
+index 3727ff5..da6e5e9 100644
+--- a/cmd/curator-run/main.go
++++ b/cmd/curator-run/main.go
+@@ -339,7 +339,7 @@ func resolvePermission(ctx context.Context, inv cli.Invocation, frag *fragment.F
+ 	decision, err := execution.ResolvePermission(execution.PermissionRequest{
+ 		Flag: inv.PermissionMode, FlagPresent: inv.PermissionSet, Profile: frag.Permissions,
+ 		Global: global, Headless: headless, Tracked: inv.Tracked,
+-		Transport: frag.Revision == fragment.IdentityV2,
++		Transport: frag.Revision == fragment.IdentityV2 || frag.Revision == fragment.IdentityV3,
+ 	})
+ 	if err != nil {
+ 		return execution.PermissionDecision{}, "", nil, err
+diff --git a/cmd/curator-run/muse_test.go b/cmd/curator-run/muse_test.go
+new file mode 100644
+index 0000000..21972ad
+--- /dev/null
++++ b/cmd/curator-run/muse_test.go
+@@ -0,0 +1,189 @@
++package main
++
++import (
++	"context"
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"reflect"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator-agent-launcher/internal/composition"
++	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++	"github.com/relux-works/curator-agent-launcher/internal/mapping"
++	"github.com/relux-works/curator-agent-launcher/internal/plan"
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++	"github.com/relux-works/skill-agents-management/pkg/providerlimits"
++	"github.com/relux-works/skill-agents-management/pkg/vendorplugin"
++)
++
++func museFixture(t *testing.T) (*pipelineFixture, *fragment.Fragment) {
++	t.Helper()
++	f := entryFixture(t, "pi", false)
++	data, err := os.ReadFile("../../internal/fragment/testdata/v3/muse.json")
++	if err != nil {
++		t.Fatal(err)
++	}
++	data = []byte(strings.ReplaceAll(string(data), "/manager/environments/default/muse", f.home))
++	// Do not pre-validate with the reader under test: run must encounter the
++	// canned bytes through the real resolver, including a rejected-v3 mutant.
++	var wire struct{ Env map[string]string }
++	if err := json.Unmarshal(data, &wire); err != nil {
++		t.Fatal(err)
++	}
++	frag := &fragment.Fragment{Revision: fragment.IdentityV3, Environment: fragment.EnvMuse, Env: wire.Env}
++	fragmentPath := filepath.Join(f.dir, "muse-fragment.json")
++	writeFixture(t, fragmentPath, data, 0600)
++	curator := filepath.Join(f.dir, "curator")
++	helper, err := os.ReadFile(pipelineHelper)
++	if err != nil {
++		t.Fatal(err)
++	}
++	writeFixture(t, curator, helper, 0700)
++	f.binary = filepath.Join(f.dir, "muse")
++	writeFixture(t, f.binary, helper, 0700)
++	t.Setenv("CURATOR_TEST_FRAGMENT", fragmentPath)
++	t.Setenv("CURATOR_TEST_RESOLVE_ARGV", filepath.Join(f.dir, "resolve-argv"))
++	f.deps.resolver = fragment.NewWithRunner(curator, fragment.ExecRunner{})
++	f.deps.environ = func() []string {
++		return []string{"PATH=" + f.dir, "HOME=" + f.dir, "CURATOR_TEST_RELEASE=1.4.1", "XDG_CONFIG_HOME=/foreign/config"}
++	}
++	f.deps.isTerminal = func() bool { return false }
++	f.args = []string{"muse", "--permissions=native"}
++	return f, frag
++}
++
++// Production call sites: run -> fragment.Resolver.Resolve -> resolvePermission.
++// Today's release has no Muse permission mapping, even for native mode.
++func TestMuseV3ThroughRunPermissionBound(t *testing.T) {
++	f, frag := museFixture(t)
++	code, out, stderr := f.run()
++	argv, err := os.ReadFile(filepath.Join(f.dir, "resolve-argv"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if string(argv) != "env\nresolve\nmuse\n--repair\n--format\njson" {
++		t.Fatalf("resolve argv=%q", argv)
++	}
++	_, mappingErr := agentic.Default.PermissionMapping("muse", "1.4.1", agentic.PermissionModeNative)
++	if mappingErr != nil {
++		const refusal = "curator-run: permission_mode_unsupported: agentic: system maps no permission-mode bypass flag: muse has no release-pinned permission mapping\n"
++		if code != 1 || !strings.HasSuffix(string(stderr), refusal) || len(out) != 0 || f.builds != 0 || f.verdicts != 0 {
++			t.Fatalf("permission bound changed: exit=%d stderr=%s", code, stderr)
++		}
++		if !strings.Contains(string(stderr), "model=muse-spark-1.3-contributor (lineup) effort=max (lineup)") {
++			t.Fatalf("Muse declaration rows not resolved: %s", stderr)
++		}
++		f.assertNoChild(t)
++		return
++	}
++	if f.builds != 1 || f.request.Runtime != "muse" || f.request.Home != frag.Home() || f.request.PermissionMode != agentic.PermissionModeNative || !reflect.DeepEqual(f.request.Env, f.deps.environ()) {
++		t.Fatalf("wrong Muse request: %+v stderr=%s", f.request, stderr)
++	}
++	system, ok := agentic.Default.Lookup("muse")
++	if !ok {
++		t.Fatal("Muse plugin not registered")
++	}
++	if !system.Capabilities().SupportsMode(agentic.LaunchModeInteractive) {
++		const refusal = "plan_refused: spawn plane refused the launch: agentic: system does not support launch mode: muse does not declare interactive"
++		if code != 1 || !strings.Contains(string(stderr), refusal+"\n") || len(out) != 0 || f.verdicts != 0 {
++			t.Fatalf("exact interactive bound changed: exit=%d verdicts=%d stdout=%s stderr=%s", code, f.verdicts, out, stderr)
++		}
++		f.assertNoChild(t)
++		return
++	}
++	if code != 0 || f.verdicts != 1 {
++		t.Fatalf("interactive-capable pin refused: exit=%d stderr=%s", code, stderr)
++	}
++	var child childCapture
++	if err := json.Unmarshal(out, &child); err != nil {
++		t.Fatal(err)
++	}
++	if !reflect.DeepEqual(child.Argv, f.plan.Argv) {
++		t.Fatalf("argv=%q plan=%q", child.Argv, f.plan.Argv)
++	}
++	assertMuseEnv(t, child.Env, f.dir, frag)
++}
++
++// Production call site: plan.Build with the real tagged BuildLaunch API.
++// Separate from run's earlier permission bound. This row flips to admission
++// when a pinned plugin declares interactive; no mode substitution is allowed.
++func TestMuseV3PlanBuildInteractiveBound(t *testing.T) {
++	f, frag := museFixture(t)
++	deps := plan.DefaultDeps(nil)
++	deps.Registry = f.deps.registry
++	reads := 0
++	deps.Availability = func(providerlimits.VerdictQuery) (vendorplugin.Availability, error) {
++		reads++
++		return vendorplugin.Availability{State: vendorplugin.AvailabilityHealthy}, nil
++	}
++	req := plan.Request{Runtime: "muse", Model: "muse-spark-1.3-contributor", Effort: "max", PermissionMode: agentic.PermissionModeNative, Home: frag.Home(), WorkDir: f.dir, Env: f.deps.environ()}
++	built, err := plan.Build(context.Background(), deps, req)
++	system, _ := agentic.Default.Lookup("muse")
++	if !system.Capabilities().SupportsMode(agentic.LaunchModeInteractive) {
++		const refusal = "plan_refused: spawn plane refused the launch: agentic: system does not support launch mode: muse does not declare interactive"
++		if err == nil || err.Error() != refusal || reads != 0 {
++			t.Fatalf("interactive refusal=%v reads=%d", err, reads)
++		}
++		f.assertNoChild(t)
++		return
++	}
++	if err != nil || reads != 1 || built.Plan.Binary != f.binary {
++		t.Fatalf("interactive-capable pin: plan=%+v err=%v reads=%d", built.Plan, err, reads)
++	}
++	if !reflect.DeepEqual(plan.SpawnRequest(req).Env, f.deps.environ()) {
++		t.Fatal("plan request changed HOME/env")
++	}
++}
++
++func assertMuseEnv(t *testing.T, env []string, nativeHome string, frag *fragment.Fragment) {
++	t.Helper()
++	values := map[string]string{}
++	for _, entry := range env {
++		k, v, _ := strings.Cut(entry, "=")
++		values[k] = v
++	}
++	if values["HOME"] != nativeHome {
++		t.Fatalf("HOME replaced: %q", values["HOME"])
++	}
++	for k, v := range frag.Env {
++		if values[k] != v {
++			t.Fatalf("%s=%q want %q", k, values[k], v)
++		}
++	}
++}
++
++// Composition is independently reachable for admitted plans of other systems.
++// Test the v3 overlay here without claiming today's Muse plugin admits a plan.
++func TestMuseV3CompositionPreservesHOME(t *testing.T) {
++	f, frag := museFixture(t)
++	p := agentic.Plan{Binary: f.binary, WorkDir: f.dir, Argv: []string{"opaque"}, Env: f.deps.environ()}
++	v, err := composition.Compose(p, nil, *frag, composition.PromptApplication{}, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	assertMuseEnv(t, v.Env, f.dir, frag)
++	if _, ok := v.EnvLiterals["HOME"]; ok {
++		t.Fatal("HOME serialized as an override")
++	}
++	if !reflect.DeepEqual(v.EnvLiterals, frag.Env) || !reflect.DeepEqual(v.Argv, p.Argv) {
++		t.Fatalf("v3 composition=%+v", v)
++	}
++	target, err := mapping.Resolve(frag.Environment)
++	if err != nil || target.System != "muse" || target.Provider != "muse" {
++		t.Fatalf("Muse mapping=%+v err=%v", target, err)
++	}
++}
++
++func TestMuseV3PermissionTransportThroughRun(t *testing.T) {
++	f, _ := museFixture(t)
++	f.args = []string{"muse", "--yolo"}
++	code, _, stderr := f.run()
++	// v3 carries the policy to the real module. Its current interactive Muse
++	// permission capability is unsupported; do not build exec --yolo here.
++	if code != 1 || !strings.Contains(string(stderr), "permission_mode_unsupported:") || strings.Contains(string(stderr), "permission_policy_unsupported:") || f.builds != 0 {
++		t.Fatalf("v3 permission transport: exit=%d builds=%d stderr=%s", code, f.builds, stderr)
++	}
++	f.assertNoChild(t)
++}
+diff --git a/cmd/curator-run/testdata/provider/main.go b/cmd/curator-run/testdata/provider/main.go
+index 7f3fb36..031ad20 100644
+--- a/cmd/curator-run/testdata/provider/main.go
++++ b/cmd/curator-run/testdata/provider/main.go
+@@ -13,6 +13,17 @@ import (
+ )
+ 
+ func main() {
++	// Fake Curator serves a canned fragment and records the resolve arguments.
++	if len(os.Args) > 1 && os.Args[1] == "env" {
++		_ = os.WriteFile(os.Getenv("CURATOR_TEST_RESOLVE_ARGV"), []byte(strings.Join(os.Args[1:], "\n")), 0600)
++		data, err := os.ReadFile(os.Getenv("CURATOR_TEST_FRAGMENT"))
++		if err != nil {
++			fmt.Fprintln(os.Stderr, err)
++			os.Exit(1)
++		}
++		os.Stdout.Write(data)
++		return
++	}
+ 	if len(os.Args) > 1 && os.Args[1] == "--version" {
+ 		fmt.Fprintln(os.Stdout, os.Getenv("CURATOR_TEST_RELEASE"))
+ 		return
+diff --git a/internal/defaults/lineup.go b/internal/defaults/lineup.go
+index cd6b09c..2a7ff22 100644
+--- a/internal/defaults/lineup.go
++++ b/internal/defaults/lineup.go
+@@ -27,6 +27,7 @@
+ package defaults
+ 
+ import (
++	"errors"
+ 	"fmt"
+ 	"io"
+ 	"os"
+@@ -38,6 +39,7 @@ import (
+ 	claudeSystem "github.com/relux-works/skill-agents-management/pkg/agentic/systems/claude"
+ 	codexSystem "github.com/relux-works/skill-agents-management/pkg/agentic/systems/codex"
+ 	geminiSystem "github.com/relux-works/skill-agents-management/pkg/agentic/systems/gemini"
++	museSystem "github.com/relux-works/skill-agents-management/pkg/agentic/systems/muse"
+ 	pinativeSystem "github.com/relux-works/skill-agents-management/pkg/agentic/systems/pinative"
+ 	"github.com/relux-works/skill-agents-management/pkg/vendorplugin"
+ 	"github.com/relux-works/skill-agents-management/pkg/vendorplugin/vendors/anthropic"
+@@ -69,7 +71,7 @@ type Resolved struct {
+ 
+ // NewRegistry builds the production compatibility registry from the real
+ // tagged module: the claude-code, codex, pi-native, gemini-cli, and
+-// antigravity system plugins, the frozen runtime declarations, and the
++// antigravity and Muse system plugins, the frozen runtime declarations, and the
+ // anthropic, openai, and google vendor plugins.
+ //
+ // The legacy pi system plugin is deliberately not registered: it drives
+@@ -99,6 +101,9 @@ func NewRegistry() (*vendorplugin.Registry, error) {
+ 	if err := systems.Register(agySystem.New()); err != nil {
+ 		return nil, fmt.Errorf("register antigravity system: %w", err)
+ 	}
++	if err := systems.Register(museSystem.New()); err != nil {
++		return nil, fmt.Errorf("register muse system: %w", err)
++	}
+ 	registry := vendorplugin.NewRegistry(systems)
+ 	if err := vendorplugin.SeedFrozenRuntimes(registry); err != nil {
+ 		return nil, fmt.Errorf("seed frozen runtimes: %w", err)
+@@ -216,7 +221,8 @@ type candidate struct {
+ // for a mapped system, in the registry's own sorted declaration order.
+ // Rows for other systems are not candidates: a launch on an undeclared
+ // harness is a run nobody has evidence works. A declared runtime that
+-// fails to materialize fails the whole system: a binding the registry
++// fails to materialize fails the whole system, except for BuildLaunch's
++// explicit declaration-owned model authority. A binding the registry
+ // names but cannot resolve is a failure, never a hint to look elsewhere.
+ func systemCandidates(system string, reg *vendorplugin.Registry) ([]candidate, error) {
+ 	var cands []candidate
+@@ -227,10 +233,18 @@ func systemCandidates(system string, reg *vendorplugin.Registry) ([]candidate, e
+ 		}
+ 		declared = true
+ 		runtime, err := reg.ResolveRuntime(decl.ID)
+-		if err != nil {
++		var models []vendorplugin.Model
++		if errors.Is(err, vendorplugin.ErrRuntimeVendorUnresolved) && !decl.VendorResolved() && len(decl.Models) > 0 {
++			// Match BuildLaunch's documented system-only admission authority:
++			// the unresolved declaration owns its model rows. ResolveRuntime
++			// has already proven the system exists. No vendor is inferred.
++			models = decl.Models
++		} else if err != nil {
+ 			return nil, err
++		} else {
++			models = runtime.Vendor.Models()
+ 		}
+-		for _, model := range runtime.Vendor.Models() {
++		for _, model := range models {
+ 			if model.DrivenBy(agentic.SystemID(system)) {
+ 				cands = append(cands, candidate{runtime: decl.ID, model: model})
+ 			}
+diff --git a/internal/defaults/muse_test.go b/internal/defaults/muse_test.go
+new file mode 100644
+index 0000000..0707a56
+--- /dev/null
++++ b/internal/defaults/muse_test.go
+@@ -0,0 +1,69 @@
++package defaults_test
++
++import (
++	"errors"
++	"testing"
++
++	"github.com/relux-works/curator-agent-launcher/internal/defaults"
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++	museSystem "github.com/relux-works/skill-agents-management/pkg/agentic/systems/muse"
++	"github.com/relux-works/skill-agents-management/pkg/vendorplugin"
++)
++
++func TestMuseDefaultsUseDeclarationOwnedModels(t *testing.T) {
++	reg := mustRegistry(t)
++	files, err := defaults.Load(paths(t))
++	if err != nil {
++		t.Fatal(err)
++	}
++	got, err := files.Complete("muse", defaults.Pair{}, reg)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if got.Runtime != "muse" {
++		t.Fatalf("runtime=%q", got.Runtime)
++	}
++	lineupOrigin(t, got.Model, "muse-spark-1.3-contributor")
++	lineupOrigin(t, got.Effort, "max")
++	// This is launch-only authority, not evidence of a resolved vendor.
++	if _, err := reg.ResolveRuntime("muse"); !errors.Is(err, vendorplugin.ErrRuntimeVendorUnresolved) {
++		t.Fatalf("vendor bound changed: %v", err)
++	}
++	got, err = files.Complete("muse", defaults.Pair{Model: defaults.Member{Value: "muse-spark-1.2-contributor", Present: true}}, reg)
++	if err != nil || got.Runtime != "muse" || got.Model.Value != "muse-spark-1.2-contributor" || got.Effort.Present {
++		t.Fatalf("effort-none declaration row: %+v %v", got, err)
++	}
++}
++
++func TestMuseDefaultsDoNotInventMissingAuthority(t *testing.T) {
++	full := mustRegistry(t)
++	declaration, ok := full.RuntimeDeclarationOf("muse")
++	if !ok {
++		t.Fatal("missing module Muse declaration")
++	}
++	for _, missing := range []string{"system", "models"} {
++		t.Run(missing, func(t *testing.T) {
++			systems := agentic.NewRegistry()
++			decl := declaration
++			if missing == "models" {
++				if err := systems.Register(museSystem.New()); err != nil {
++					t.Fatal(err)
++				}
++				decl.Models = nil
++			}
++			reg := vendorplugin.NewRegistry(systems)
++			if err := reg.DeclareRuntime(decl); err != nil {
++				t.Fatal(err)
++			}
++			files, err := defaults.Load(paths(t))
++			if err != nil {
++				t.Fatal(err)
++			}
++			got, err := files.Complete("muse", defaults.Pair{}, reg)
++			code(t, err, defaults.CodeUnresolvable)
++			if got != (defaults.Resolved{}) {
++				t.Fatalf("missing %s authority leaked %+v", missing, got)
++			}
++		})
++	}
++}
+diff --git a/internal/fragment/fragment.go b/internal/fragment/fragment.go
+index 0337671..a130a9a 100644
+--- a/internal/fragment/fragment.go
++++ b/internal/fragment/fragment.go
+@@ -1,9 +1,9 @@
+ // Package fragment implements SPEC.md §4.1, the context-plane step of the
+ // launcher: it runs `curator env resolve <env-id> [--profile <name>]
+ // --repair --format json` as a subprocess, parses the closed
+-// launch-env-fragment-v1 and launch-env-fragment-v2 objects (curator-spec environments.md §10.2 as
++// launch-env-fragment-v1, v2, and v3 objects (curator-spec environments.md §10.2 as
+ // revised by Decision 0012 D8, conformance schema
+-// launch-env-fragment-v1.schema.json plus the draft v2 permissions member,
++// launch-env-fragment-v1/v2/v3 schemas, retaining the v2 permissions member,
+ // and computes the CCJ-1 digest
+ // (registry.md §1) from the parsed object.
+ //
+@@ -27,6 +27,9 @@ const Identity = "launch-env-fragment-v1"
+ // and force-native-lock transport.
+ const IdentityV2 = "launch-env-fragment-v2"
+ 
++// IdentityV3 adds Muse and its four XDG parents, retaining v2 permissions.
++const IdentityV3 = "launch-env-fragment-v3"
++
+ // Environment identifiers of the closed adapter registry (environments.md
+ // §7.1). The launcher's own support for a launch into one of them is a §4.2
+ // fact, not this package's.
+@@ -35,6 +38,7 @@ const (
+ 	EnvCodexCLI   = "codex_cli"
+ 	EnvOpenCode   = "opencode"
+ 	EnvPi         = "pi"
++	EnvMuse       = "muse"
+ )
+ 
+ // ChannelKind is the closed descriptor kind vocabulary (environments.md §7.3).
+@@ -120,17 +124,17 @@ type MCP struct {
+ 	Channels []Channel
+ }
+ 
+-// Fragment is a parsed, validated launch-env-fragment-v1 or v2.
++// Fragment is a parsed, validated launch-env-fragment-v1, v2, or v3.
+ type Fragment struct {
+ 	// Revision is the exact fragment token and the only permission-transport
+-	// signal. Only v2 can carry Permissions.
++	// signal. Only v2/v3 can carry Permissions.
+ 	Revision    string
+ 	Environment string
+ 	Profile     Profile
+ 	Precedence  Precedence
+ 	Permissions *Permissions
+ 	// Env maps the adapter's registry-declared variable name to the managed
+-	// home path. Revision 1 declares exactly one variable per adapter.
++	// home path. Muse declares four XDG variables in v3; other adapters declare one.
+ 	Env map[string]string
+ 	// SystemPrompt is nil when the section is absent.
+ 	SystemPrompt *SystemPrompt
+@@ -145,15 +149,20 @@ type Fragment struct {
+ 	Digest    string
+ }
+ 
+-// HomeVariable returns the adapter's home variable name for env
++// HomeVariable returns the adapter's primary home variable name for env
+ // (environments.md §7.1), or "" for an environment outside the registry.
++// Muse uses XDG_CONFIG_HOME here; Home derives the parent of its /config path.
+ func HomeVariable(env string) string {
+ 	return homeVariable[env]
+ }
+ 
+ // Home returns the managed home this launch runs in: the value of the
+-// adapter's home variable (SPEC §4.1, passed as LaunchRequest.Home in §4.4).
++// adapter's home variable, or the common XDG parent for Muse (SPEC §4.1,
++// passed as LaunchRequest.Home in §4.4).
+ func (f *Fragment) Home() string {
++	if f.Environment == EnvMuse {
++		return strings.TrimSuffix(f.Env["XDG_CONFIG_HOME"], "/config")
++	}
+ 	return f.Env[homeVariable[f.Environment]]
+ }
+ 
+@@ -162,6 +171,7 @@ var homeVariable = map[string]string{
+ 	EnvCodexCLI:   "CODEX_HOME",
+ 	EnvOpenCode:   "XDG_CONFIG_HOME",
+ 	EnvPi:         "PI_CODING_AGENT_DIR",
++	EnvMuse:       "XDG_CONFIG_HOME",
+ }
+ 
+ // The closed adapter channel registry (environments.md §7.3 and §7.8). A
+@@ -219,7 +229,7 @@ func invalid(path, format string, a ...any) error {
+ 	return &InvalidError{Path: path, Msg: fmt.Sprintf(format, a...)}
+ }
+ 
+-// Parse validates data as one closed launch-env-fragment-v1 or v2 object and
++// Parse validates data as one closed launch-env-fragment-v1, v2, or v3 object and
+ // returns it with its CCJ-1 bytes and digest. Everything the reader rules
+ // of registry.md §1 reject (invalid UTF-8, duplicate keys, lone surrogates,
+ // non-integers, trailing content) is an error, as is every departure from
+@@ -322,13 +332,13 @@ func checkFlagToken(path, s string) error {
+ }
+ 
+ func fromValue(root Value) (*Fragment, error) {
+-	revision, err := enumMember("", root, "fragment", Identity, IdentityV2)
++	revision, err := enumMember("", root, "fragment", Identity, IdentityV2, IdentityV3)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+ 	required := []string{"fragment", "environment", "profile", "precedence", "env"}
+ 	optional := []string{"system_prompt", "mcp", "path_prepend"}
+-	if revision == IdentityV2 {
++	if revision != Identity {
+ 		required = append(required, "permissions")
+ 	} else {
+ 		// A v1 reader rejects the v2 member, even when its value looks valid.
+@@ -338,13 +348,16 @@ func fromValue(root Value) (*Fragment, error) {
+ 	}
+ 	f := &Fragment{Revision: revision}
+ 
+-	env, err := enumMember("", root, "environment", EnvClaudeCode, EnvCodexCLI, EnvOpenCode, EnvPi)
++	env, err := enumMember("", root, "environment", EnvClaudeCode, EnvCodexCLI, EnvOpenCode, EnvPi, EnvMuse)
+ 	if err != nil {
+ 		return nil, err
+ 	}
++	if env == EnvMuse && revision != IdentityV3 {
++		return nil, invalid("/environment", "muse requires launch-env-fragment-v3")
++	}
+ 	f.Environment = env
+ 
+-	if revision == IdentityV2 {
++	if revision != Identity {
+ 		value, _ := root.Get("permissions")
+ 		if err := closedObject("/permissions", value, []string{"mode", "locked", "source"}, nil); err != nil {
+ 			return nil, err
+@@ -400,29 +413,42 @@ func fromValue(root Value) (*Fragment, error) {
+ 		return nil, err
+ 	}
+ 
+-	// env: exactly the adapter's one home variable, an absolute path.
++	// env: closed adapter variable set; Muse paths share one managed parent.
+ 	envObj, _ := root.Get("env")
+-	if envObj.Kind != KindObject {
+-		return nil, invalid("/env", "expected an object, got %s", envObj.Kind)
+-	}
+-	if len(envObj.Obj) != 1 {
+-		return nil, invalid("/env", "expected exactly one variable, got %d", len(envObj.Obj))
++	variables := []string{homeVariable[env]}
++	if env == EnvMuse {
++		variables = []string{"XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"}
+ 	}
+-	want := homeVariable[env]
+-	m := envObj.Obj[0]
+-	if m.Key != want {
+-		return nil, invalid("/env/"+m.Key, "not the %s home variable %s", env, want)
++	if err := closedObject("/env", envObj, variables, nil); err != nil {
++		return nil, err
+ 	}
+-	if m.Value.Kind != KindString {
+-		return nil, invalid("/env/"+m.Key, "expected a string, got %s", m.Value.Kind)
++	f.Env = make(map[string]string, len(variables))
++	for _, name := range variables {
++		value, err := stringMember("/env", envObj, name)
++		if err != nil {
++			return nil, err
++		}
++		if err := checkAbsolutePath("/env/"+name, value); err != nil {
++			return nil, err
++		}
++		f.Env[name] = value
+ 	}
+-	if err := checkAbsolutePath("/env/"+m.Key, m.Value.Str); err != nil {
+-		return nil, err
++	if env == EnvMuse {
++		for i, suffix := range []string{"config", "data", "state", "cache"} {
++			if f.Env[variables[i]] != f.Home()+"/"+suffix {
++				return nil, invalid("/env/"+variables[i], "must share the Muse home parent and end in /%s", suffix)
++			}
++		}
++		if err := checkAbsolutePath("/env", f.Home()); err != nil {
++			return nil, err
++		}
+ 	}
+-	f.Env = map[string]string{m.Key: m.Value.Str}
+ 
+ 	// system_prompt
+ 	if sp, ok := root.Get("system_prompt"); ok {
++		if env == EnvMuse {
++			return nil, invalid("/system_prompt", "muse has no system-prompt channel")
++		}
+ 		if err := closedObject("/system_prompt", sp, []string{"path", "channels"}, nil); err != nil {
+ 			return nil, err
+ 		}
+diff --git a/internal/fragment/resolve.go b/internal/fragment/resolve.go
+index 3756e2f..84c49e2 100644
+--- a/internal/fragment/resolve.go
++++ b/internal/fragment/resolve.go
+@@ -189,7 +189,7 @@ func (r *Resolver) Resolve(ctx context.Context, req Request) (*Fragment, error)
+ 	}
+ 	f, err := Parse(stdout)
+ 	if err != nil {
+-		return nil, &ResolveError{Code: CodeFragmentInvalid, ExitCode: 0, Detail: "curator env resolve exited 0 but its output is not a valid launch-env-fragment-v1 or v2: " + err.Error(), Err: err}
++		return nil, &ResolveError{Code: CodeFragmentInvalid, ExitCode: 0, Detail: "curator env resolve exited 0 but its output is not a valid launch-env-fragment-v1, v2, or v3: " + err.Error(), Err: err}
+ 	}
+ 	if f.Environment != req.EnvID {
+ 		return nil, &ResolveError{Code: CodeFragmentInvalid, ExitCode: 0, Detail: fmt.Sprintf("fragment names environment %q, resolve was asked for %q", f.Environment, req.EnvID)}
+diff --git a/internal/fragment/testdata/v3/muse.json b/internal/fragment/testdata/v3/muse.json
+new file mode 100644
+index 0000000..3740f1a
+--- /dev/null
++++ b/internal/fragment/testdata/v3/muse.json
+@@ -0,0 +1,23 @@
++{
++  "fragment": "launch-env-fragment-v3",
++  "environment": "muse",
++  "profile": {
++    "name": "default",
++    "lock_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
++  },
++  "precedence": {
++    "winner": "higher-weight",
++    "placement": "winner-last"
++  },
++  "permissions": {
++    "mode": "native",
++    "locked": false,
++    "source": "default"
++  },
++  "env": {
++    "XDG_CONFIG_HOME": "/manager/environments/default/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/default/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/default/muse/state",
++    "XDG_CACHE_HOME": "/manager/environments/default/muse/cache"
++  }
++}
+diff --git a/internal/fragment/v3_test.go b/internal/fragment/v3_test.go
+new file mode 100644
+index 0000000..9a8365e
+--- /dev/null
++++ b/internal/fragment/v3_test.go
+@@ -0,0 +1,85 @@
++package fragment
++
++import (
++	"strings"
++	"testing"
++)
++
++// Contract: curator-spec d373078a, environments §10.2 and v3 schema.
++func TestMuseV3Fragment(t *testing.T) {
++	raw := readFile(t, "testdata/v3/muse.json")
++	f, err := Parse(raw)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if f.Revision != IdentityV3 || f.Environment != EnvMuse || f.Home() != "/manager/environments/default/muse" || len(f.Env) != 4 || f.Permissions == nil {
++		t.Fatalf("wrong v3 fragment: %+v", f)
++	}
++	if _, ok := f.Env["HOME"]; ok {
++		t.Fatal("HOME must never be set")
++	}
++	g, err := Parse(f.Canonical)
++	if err != nil || g.Digest != f.Digest {
++		t.Fatalf("v3 canonical round trip: %v", err)
++	}
++}
++
++func TestMuseV3RejectsInvalidFragments(t *testing.T) {
++	raw := readFile(t, "testdata/v3/muse.json")
++	for name, edit := range map[string]func(map[string]any){
++		"v1 muse":     func(m map[string]any) { m["fragment"] = Identity; delete(m, "permissions") },
++		"v2 muse":     func(m map[string]any) { m["fragment"] = IdentityV2 },
++		"HOME":        func(m map[string]any) { m["env"].(map[string]any)["HOME"] = "/native" },
++		"missing XDG": func(m map[string]any) { delete(m["env"].(map[string]any), "XDG_STATE_HOME") },
++		"foreign XDG": func(m map[string]any) { m["env"].(map[string]any)["XDG_DATA_HOME"] = "/foreign/data" },
++		"wrong suffix": func(m map[string]any) {
++			m["env"].(map[string]any)["XDG_CONFIG_HOME"] = "/manager/environments/default/muse/wrong"
++		},
++		"relative": func(m map[string]any) { m["env"].(map[string]any)["XDG_CACHE_HOME"] = "relative/cache" },
++		"dotdot":   func(m map[string]any) { m["env"].(map[string]any)["XDG_CACHE_HOME"] = "/manager/../cache" },
++		"root parent": func(m map[string]any) {
++			for _, kind := range []string{"config", "data", "state", "cache"} {
++				m["env"].(map[string]any)["XDG_"+strings.ToUpper(kind)+"_HOME"] = "/" + kind
++			}
++		},
++		"system prompt": func(m map[string]any) { m["system_prompt"] = map[string]any{"path": "/prompt", "channels": []any{}} },
++		"mcp": func(m map[string]any) {
++			m["mcp"] = map[string]any{"path": "/mcp", "env_names": []any{}, "channels": []any{}}
++		},
++		"missing permissions":   func(m map[string]any) { delete(m, "permissions") },
++		"malformed permissions": func(m map[string]any) { m["permissions"].(map[string]any)["locked"] = true },
++		"global yolo": func(m map[string]any) {
++			m["permissions"] = map[string]any{"mode": "yolo", "locked": true, "source": "global"}
++		},
++	} {
++		t.Run(name, func(t *testing.T) {
++			if _, err := Parse(mutate(t, raw, edit)); err == nil {
++				t.Fatal("invalid fragment admitted")
++			}
++		})
++	}
++}
++
++func TestV3OtherAdaptersRetainV2Rules(t *testing.T) {
++	for _, env := range []string{EnvClaudeCode, EnvCodexCLI, EnvOpenCode, EnvPi} {
++		base := mutate(t, readFile(t, "testdata/schema-cases/valid-minimal.json"), func(m map[string]any) {
++			m["environment"] = env
++			m["env"] = map[string]any{HomeVariable(env): "/manager/environments/default/" + env}
++			m["fragment"] = IdentityV2
++			m["permissions"] = map[string]any{"mode": "native", "locked": false, "source": "default"}
++		})
++		t.Run(env, func(t *testing.T) {
++			v2, err := Parse(base)
++			if err != nil {
++				t.Fatal(err)
++			}
++			v3, err := Parse([]byte(strings.ReplaceAll(string(base), IdentityV2, IdentityV3)))
++			if err != nil {
++				t.Fatal(err)
++			}
++			if v2.Home() != v3.Home() || len(v2.Env) != 1 || len(v3.Env) != 1 || *v2.Permissions != *v3.Permissions {
++				t.Fatal("legacy adapter rules changed")
++			}
++		})
++	}
++}
+diff --git a/internal/mapping/mapping.go b/internal/mapping/mapping.go
+index 3c916f7..1d12748 100644
+--- a/internal/mapping/mapping.go
++++ b/internal/mapping/mapping.go
+@@ -25,6 +25,8 @@ func Resolve(environment string) (Target, error) {
+ 		return Target{System: "claude-code", Provider: "claude"}, nil
+ 	case fragment.EnvCodexCLI:
+ 		return Target{System: "codex", Provider: "codex"}, nil
++	case fragment.EnvMuse:
++		return Target{System: "muse", Provider: "muse"}, nil
+ 	case fragment.EnvPi:
+ 		return Target{System: "pi-native", Provider: "pi"}, nil
+ 	default:
+diff --git a/internal/mapping/mapping_test.go b/internal/mapping/mapping_test.go
+index 1862a80..545c444 100644
+--- a/internal/mapping/mapping_test.go
++++ b/internal/mapping/mapping_test.go
+@@ -13,6 +13,7 @@ func TestResolveClosedMapping(t *testing.T) {
+ 		{"claude_code", Target{"claude-code", "claude"}},
+ 		{"codex_cli", Target{"codex", "codex"}},
+ 		{"pi", Target{"pi-native", "pi"}},
++		{"muse", Target{"muse", "muse"}},
+ 		{"opencode", Target{}}, {"future_env", Target{}}, {"", Target{}}, {"PI", Target{}}, {"pi-native", Target{}},
+ 	} {
+ 		t.Run(tc.env, func(t *testing.T) {
+diff --git a/internal/plan/plan.go b/internal/plan/plan.go
+index 8cf647a..c7f7bdb 100644
+--- a/internal/plan/plan.go
++++ b/internal/plan/plan.go
+@@ -53,6 +53,7 @@ import (
+ 	// whose broker was never established.
+ 	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/claude"
+ 	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/codex"
++	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/muse"
+ 	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/pinative"
+ 	_ "github.com/relux-works/skill-agents-management/pkg/vendorplugin/vendors/anthropic"
+ 	_ "github.com/relux-works/skill-agents-management/pkg/vendorplugin/vendors/google"
+diff --git a/internal/plan/plan_test.go b/internal/plan/plan_test.go
+index 20bd176..a6aee48 100644
+--- a/internal/plan/plan_test.go
++++ b/internal/plan/plan_test.go
+@@ -412,19 +412,9 @@ func TestModelNotDrivenBySystem(t *testing.T) {
+ 	}
+ }
+ 
+-// TestUnresolvedVendorScope drives the sole VendorUnresolved frozen runtime
+-// through the production entry point. Frozen runtime "muse" records
+-// VendorUnresolved (vendorplugin/runtime.go frozenRuntimes) on agentic
+-// system "muse", which has no plugin registered in this binary (plan.go
+-// imports only claude/codex/pinative systems). Registry.ResolveRuntime
+-// checks system registration before vendor resolution (registry.go), so the
+-// real tagged BuildLaunch refuses with ErrRuntimeSystemUnregistered —
+-// through the same plan.Build propagation gate that owns
+-// ErrRuntimeVendorUnresolved. ErrRuntimeVendorUnresolved itself is
+-// unreachable here: the system check fires first, and had the system been
+-// present the system-only binding (spawn.go resolveLaunchBinding) would
+-// absorb the unresolved vendor instead of returning it. Production call
+-// site: plan.Build with the real tagged vendorplugin.BuildLaunch.
++// TestUnresolvedVendorScope drives the real Muse system-only declaration
++// through plan.Build. Its unknown model must be refused by model admission,
++// without treating the unresolved vendor as permission to launch arbitrary ids.
+ func TestUnresolvedVendorScope(t *testing.T) {
+ 	req, store, _ := fixture(t, "codex")
+ 	req.Runtime, req.Model, req.Effort = "muse", "anything", "medium"
+@@ -435,7 +425,7 @@ func TestUnresolvedVendorScope(t *testing.T) {
+ 	d.Availability = a.read
+ 	got, err := plan.Build(context.Background(), d, req)
+ 	var refused *plan.RefusedError
+-	if !errors.As(err, &refused) || !errors.Is(err, vendorplugin.ErrRuntimeSystemUnregistered) {
++	if !errors.As(err, &refused) || !errors.Is(err, vendorplugin.ErrUnknownModel) {
+ 		t.Fatalf("unresolved-vendor scope admitted or evidence lost: plan=%+v err=%v", got, err)
+ 	}
+ 	if !reflect.DeepEqual(got, agentic.PlanWithEnvironment{}) || c.count != 1 || a.count != 0 {
+@@ -443,16 +433,9 @@ func TestUnresolvedVendorScope(t *testing.T) {
+ 	}
+ }
+ 
+-// TestInteractiveDeclaredForMappedSystems pins the unreachable bound for
+-// agentic.ErrUnsupportedLaunchMode in the fixed Interactive/mapped-system
+-// scope. plan.Build spells agentic.LaunchModeInteractive by name
+-// (plan.go) and never takes another mode; every §4.2 mapped system in this
+-// binary — claude-code, codex, pi-native, registered by plan.go's blank
+-// imports — declares Interactive (claude.go, codex.go, pinative.go
+-// Capabilities). A refusal for an undeclared mode therefore cannot arise
+-// for a mapped runtime; any such refusal from an unmapped runtime would
+-// travel the same tested `if err != nil` propagation gate proven by
+-// TestModelNotDrivenBySystem and TestTaggedAdmissionRefusals.
++// TestInteractiveDeclaredForMappedSystems pins the established interactive
++// systems. Muse's separately tested bound lives in the entry-point v3 tests:
++// the mapping alone does not imply a plugin declares interactive mode.
+ func TestInteractiveDeclaredForMappedSystems(t *testing.T) {
+ 	for _, id := range []agentic.SystemID{"claude-code", "codex", "pi-native"} {
+ 		sys, ok := agentic.Default.Lookup(id)
