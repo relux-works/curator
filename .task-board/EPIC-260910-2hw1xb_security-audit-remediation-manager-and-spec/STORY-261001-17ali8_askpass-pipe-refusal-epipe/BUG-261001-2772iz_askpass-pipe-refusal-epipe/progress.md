@@ -85,6 +85,15 @@ Attached `BUG-261001-2772iz_integration-precheck.md` as a task-scoped outcome (r
 Per the integration binding I issued no status, handoff, checkpoint, or integrate commands; board left at `integrating` for the landing transaction.
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-261001-5f5800, pid=99722, exit=0)
+spawn run RUN-261001-5f5800 failed; operator action required; failure: integration_blocked: runner integrate refused: board_publication_pending: STORY-261001-17ali8 is landed and its board state is committed as f0119a8b56437ef1e5c8ad264afa0445f2c14e45 on the local trunk, but the publication push did not land (integration_blocked); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: f0119a8b56437ef1e5c8ad264afa0445f2c14e45
+  cause_code: integration_blocked
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: 0ef54f547deec35b1ebaae6fd9b7297d49d3f380
+  story_id: STORY-261001-17ali8
+  cause: integration_blocked: the repository integration lock /Users/administrator/Developer/ReluxWorks/curator/curator/.temp/integration/repository.lock is held by another board operation; board publish serializes against every trunk-moving board run and refuses rather than queuing behind one
+  lock: /Users/administrator/Developer/ReluxWorks/curator/curator/.temp/integration/repository.lock
 
 ## Precondition Resources
 - [epipe-brief.md](file://BUG-261001-2772iz/epipe-brief.md)
@@ -111,7 +120,7 @@ spawn run completed: muse (run=RUN-261001-5f5800, pid=99722, exit=0)
 2026-10-01T07:53:28Z
 
 ## Last Update
-2026-10-01T14:06:21Z
+2026-10-01T15:24:38Z
 
 ## Assigned To
 [implementer] developer (muse)
