@@ -86,32 +86,53 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func runHTTPSBrokerWithTestTransport(t *testing.T, statePath, secret string, args []string, mutate func(map[string]string)) (int, string) {
+func runHTTPSBrokerWithTestTransport(t *testing.T, wrapper, statePath, secret string, args []string, mutate func(map[string]string)) (int, string) {
 	t.Helper()
-	command := exec.Command(os.Args[0])
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	// Give the broker sole ownership of its inherited descriptor, just as in
+	// production. Wrapping an already-owned nonblocking fd in this process
+	// cannot register it with Linux's poller a second time and can return EAGAIN.
+	command := exec.CommandContext(ctx, wrapper, args...)
 	transport, err := NewHTTPSBrokerSecretTransport(command, secret)
 	if err != nil {
 		t.Fatal(err)
 	}
 	environment := map[string]string{
 		EnvHTTPSBrokerState:     statePath,
-		EnvHTTPSBrokerTransport: testHTTPSBrokerTransportValue(transport),
+		EnvHTTPSBrokerTransport: transport.EnvironmentValue(),
 	}
 	if mutate != nil {
 		mutate(environment)
 	}
+	for name, value := range environment {
+		command.Env = append(command.Env, name+"="+value)
+	}
+	var output, stderr bytes.Buffer
+	command.Stdout, command.Stderr = &output, &stderr
+	if err := command.Start(); err != nil {
+		_ = transport.Close()
+		t.Fatal(err)
+	}
+	transport.ChildStarted()
 	serveCtx, cancelServe := context.WithCancel(context.Background())
 	serveDone := make(chan error, 1)
 	go func() { serveDone <- transport.Serve(serveCtx) }()
-	var output bytes.Buffer
-	code := RunHTTPSCredentialBroker(args, func(name string) string { return environment[name] }, &output)
+	waitErr := command.Wait()
 	cancelServe()
 	serveErr := <-serveDone
 	closeErr := transport.Close()
 	if serveErr != nil || closeErr != nil {
 		t.Fatalf("test HTTPS broker transport: %v", errors.Join(serveErr, closeErr))
 	}
-	return code, output.String()
+	var exitErr *exec.ExitError
+	if waitErr != nil && !errors.As(waitErr, &exitErr) {
+		t.Fatal(waitErr)
+	}
+	if ctx.Err() != nil || stderr.Len() != 0 {
+		t.Fatal("broker timed out or emitted diagnostics; output redacted")
+	}
+	return command.ProcessState.ExitCode(), output.String()
 }
 
 func TestHTTPSCredentialBrokerAnswersOnlyPinnedGitPrompts(t *testing.T) {
@@ -143,9 +164,9 @@ func TestHTTPSCredentialBrokerAnswersOnlyPinnedGitPrompts(t *testing.T) {
 		{name: "unreadable state shape", args: []string{"Username for 'https://git.example.test': "}, mutate: func(environment map[string]string) { environment[EnvHTTPSBrokerState] = root }, code: 1},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			code, output := runHTTPSBrokerWithTestTransport(t, statePath, "broker-secret", testCase.args, testCase.mutate)
+			code, output := runHTTPSBrokerWithTestTransport(t, wrapper, statePath, "broker-secret", testCase.args, testCase.mutate)
 			if code != testCase.code || output != testCase.want {
-				t.Fatalf("code=%d output=%q, want code=%d output=%q", code, output, testCase.code, testCase.want)
+				t.Fatalf("code=%d, want code=%d; output redacted", code, testCase.code)
 			}
 		})
 	}
@@ -157,15 +178,16 @@ func TestHTTPSCredentialBrokerRejectsEmptyPasswordPipe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, statePath, err := materializeHTTPSCredentialBroker(t.TempDir(), executable,
+	wrapper, statePath, err := materializeHTTPSCredentialBroker(t.TempDir(), executable,
 		NewHTTPSCredentials("git.example.test", "oauth2", "must-not-be-used"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	code, output := runHTTPSBrokerWithTestTransport(t, statePath, "", []string{"Password for 'https://oauth2@git.example.test': "}, nil)
+	code, output := runHTTPSBrokerWithTestTransport(t, wrapper, statePath, "", []string{"Password for 'https://oauth2@git.example.test': "}, nil)
 	if code != 1 || output != "" {
-		t.Fatalf("empty secret pipe returned code=%d output=%q, want fail-closed exit 1 and empty output", code, output)
+		t.Fatalf("empty secret pipe returned code=%d; output redacted, want fail-closed exit 1 and empty output", code)
 	}
+	assertBrokerExecutableReleased(t, wrapper)
 }
 
 func TestHTTPSBrokerStateContainsHostAndUsernameOnly(t *testing.T) {

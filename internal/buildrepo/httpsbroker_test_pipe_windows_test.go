@@ -34,7 +34,3 @@ func runHTTPSBrokerFetchChild() int {
 	}
 	return 0
 }
-
-func testHTTPSBrokerTransportValue(transport HTTPSBrokerSecretTransport) string {
-	return transport.EnvironmentValue()
-}

@@ -4,6 +4,8 @@ All notable implementation changes are recorded here.
 
 ## Unreleased
 
+- Unix HTTPS askpass requests the secret only after accepting the password prompt, preventing broken-pipe transport errors on refusal paths.
+
 ### Added
 
 - R5 script-worker-v1 runtime conformance qualification. All 33 named

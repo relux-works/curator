@@ -17,6 +17,10 @@ import (
 // the fetch child.
 const EnvHTTPSBrokerTransport = "CURATOR_BUILD_HTTPS_ASKPASS_HANDLE"
 
+// Only the validated password prompt requests secret material. Username and
+// refusal paths close their inherited endpoint without sending this byte.
+const httpsBrokerSecretRequest = "P"
+
 type unixHTTPSBrokerSecretTransport struct {
 	reader      *os.File
 	writer      *os.File
@@ -28,16 +32,35 @@ type unixHTTPSBrokerSecretTransport struct {
 	writerErr   error
 }
 
-// NewHTTPSBrokerSecretTransport creates a fetch-scoped pipe for the askpass
-// secret and configures command to inherit its read end.
+// NewHTTPSBrokerSecretTransport creates a fetch-scoped socket pair for the
+// askpass secret and configures command to inherit the requesting endpoint.
 func NewHTTPSBrokerSecretTransport(command *exec.Cmd, secret string) (HTTPSBrokerSecretTransport, error) {
 	if command == nil {
 		return nil, errors.New("HTTPS broker command is nil")
 	}
-	reader, writer, err := os.Pipe()
+	// Prevent either endpoint leaking into an unrelated concurrent exec before
+	// close-on-exec is set. ExtraFiles explicitly inherits only the child end.
+	syscall.ForkLock.RLock()
+	fds, err := syscall.Socketpair(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
+	if err == nil {
+		syscall.CloseOnExec(fds[0])
+		syscall.CloseOnExec(fds[1])
+	}
+	syscall.ForkLock.RUnlock()
 	if err != nil {
 		return nil, err
 	}
+	// Nonblocking descriptors let os.File use the runtime poller, so Close
+	// interrupts a pending request read or secret write on cancellation.
+	for _, fd := range fds {
+		if err := syscall.SetNonblock(fd, true); err != nil {
+			_ = syscall.Close(fds[0])
+			_ = syscall.Close(fds[1])
+			return nil, err
+		}
+	}
+	reader := os.NewFile(uintptr(fds[0]), "https-askpass-child")
+	writer := os.NewFile(uintptr(fds[1]), "https-askpass-server")
 	fd := 3 + len(command.ExtraFiles)
 	command.ExtraFiles = append(command.ExtraFiles, reader)
 	return &unixHTTPSBrokerSecretTransport{
@@ -62,7 +85,20 @@ func (transport *unixHTTPSBrokerSecretTransport) Serve(ctx context.Context) erro
 	}
 	writeDone := make(chan error, 1)
 	go func() {
-		_, err := io.WriteString(transport.writer, transport.secret)
+		var request [1]byte
+		_, err := io.ReadFull(transport.writer, request[:])
+		switch err {
+		case io.EOF:
+			// No request means no secret was needed. The caller still owns
+			// the child's exit status; this cannot turn refusal into success.
+			err = nil
+		case nil:
+			if string(request[:]) != httpsBrokerSecretRequest {
+				err = errors.New("invalid HTTPS broker secret request")
+			} else {
+				_, err = io.WriteString(transport.writer, transport.secret)
+			}
+		}
 		writeDone <- errors.Join(err, transport.closeWriterOnce())
 	}()
 	select {
@@ -71,7 +107,7 @@ func (transport *unixHTTPSBrokerSecretTransport) Serve(ctx context.Context) erro
 	case <-ctx.Done():
 		closeErr := transport.closeWriterOnce()
 		writeErr := <-writeDone
-		if ctx.Err() != nil {
+		if errors.Is(writeErr, os.ErrClosed) && closeErr == nil {
 			return nil
 		}
 		return errors.Join(closeErr, writeErr)
@@ -115,6 +151,10 @@ func readHTTPSBrokerSecret(getenv func(string) string) ([]byte, bool) {
 	}
 	pipe := os.NewFile(handle, "https-askpass-secret")
 	if pipe == nil {
+		return nil, false
+	}
+	if _, err := io.WriteString(pipe, httpsBrokerSecretRequest); err != nil {
+		_ = pipe.Close()
 		return nil, false
 	}
 	secret, readErr := io.ReadAll(pipe)
