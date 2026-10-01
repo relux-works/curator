@@ -319,3 +319,23 @@ func TestPruneUncertainLeftoversAndDryRunWarnings(t *testing.T) {
 		}
 	}
 }
+
+func TestPruneCertaintyIndependentOfEntryReasons(t *testing.T) {
+	for _, reachableOnly := range []bool{false, true} {
+		home := t.TempDir()
+		refs := References{Commits: map[string]bool{commitOf("a"): true}, Uncertain: []string{"bad source lock"}}
+		if reachableOnly {
+			writeEntry(t, home, "s", commitOf("a"), testNow.Add(-72*time.Hour), map[string]string{"f": "x"})
+		}
+		report, err := Prune(Request{Home: home, Lock: heldLock{}, References: refs, Now: testNow})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if report.Certain() {
+			t.Fatalf("uncertainty lost with reachableOnly=%t: %+v", reachableOnly, report)
+		}
+		if reachableOnly && report.Entries[0].Reason != ReasonReachable {
+			t.Fatal("reachable reason precedence changed")
+		}
+	}
+}

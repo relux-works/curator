@@ -64,23 +64,19 @@ type ReportTotals struct {
 
 // Report is the section 10.1 retention report.
 type Report struct {
-	DryRun      bool          `json:"dry_run"`
-	Policy      ReportPolicy  `json:"policy"`
-	SizeMeasure string        `json:"size_measure"`
-	Entries     []ReportEntry `json:"entries"`
-	Totals      ReportTotals  `json:"totals"`
-	Warnings    []string      `json:"warnings"`
+	referenceSetCertain bool
+	DryRun              bool          `json:"dry_run"`
+	Policy              ReportPolicy  `json:"policy"`
+	SizeMeasure         string        `json:"size_measure"`
+	Entries             []ReportEntry `json:"entries"`
+	Totals              ReportTotals  `json:"totals"`
+	Warnings            []string      `json:"warnings"`
 }
 
 // Certain reports whether the plan was computed over a provably complete
 // reference set.
 func (report Report) Certain() bool {
-	for _, entry := range report.Entries {
-		if entry.Reason == ReasonReferenceUncertain {
-			return false
-		}
-	}
-	return true
+	return report.referenceSetCertain
 }
 
 // Prune computes the section 10.1 plan and, unless DryRun, removes every
@@ -93,10 +89,11 @@ func (report Report) Certain() bool {
 // error names every failure.
 func Prune(request Request) (Report, error) {
 	report := Report{
-		DryRun:      request.DryRun,
-		SizeMeasure: "allocated",
-		Entries:     []ReportEntry{},
-		Warnings:    []string{},
+		referenceSetCertain: len(request.References.Uncertain) == 0,
+		DryRun:              request.DryRun,
+		SizeMeasure:         "allocated",
+		Entries:             []ReportEntry{},
+		Warnings:            []string{},
 		Policy: ReportPolicy{
 			KeepLast:     request.Policy.KeepLast,
 			GraceSeconds: int64(request.Policy.Grace / time.Second),
@@ -124,7 +121,7 @@ func Prune(request Request) (Report, error) {
 	for index := range inventory.Entries {
 		inventory.Entries[index].Reachable = request.References.Commits[inventory.Entries[index].Commit]
 	}
-	certain := len(request.References.Uncertain) == 0
+	certain := report.Certain()
 	decisions := Plan(inventory.Entries, certain, request.Policy, request.Now)
 
 	var failures []error
